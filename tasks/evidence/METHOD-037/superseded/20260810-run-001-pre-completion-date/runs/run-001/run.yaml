@@ -1,0 +1,38 @@
+schema_version: 1
+task_id: METHOD-037
+run_id: run-001
+attempt_id: attempt-001
+status: initialized
+initialized_at: '2026-08-10T15:05:34Z'
+claim_eligible: false
+protocol_path: tasks/evidence/METHOD-037/experiment/protocol.yaml
+protocol_digest: 1f45c07d1611b3873def38145455ca2b5a27a7d526f339d3fcf8c2f17b78f0ab
+task_path: tasks/done/METHOD-037-signed-curvature-mesh-segmentation.md
+task_sha256: a56e74a4951f9f9bd2662b5792780b1f49d14c0d5a0e59d812c5231200dd6eec
+source:
+  revision: be22bb4560f0a46227400d84971c847348b08940
+  clean: false
+config:
+  path: benchmarks/geometry/manifests/curvature_segmentation_reference_smoke.yaml
+  sha256: e8007f0d3475188adff883db346ae8a8074d2f328358bd5e7fcc74f2f2fe7fe0
+environment:
+  path: CMakePresets.json
+  sha256: d852b3973bf46f499f592379e17990c5b1f8c14b8aa565bd07e92a64347a0bba
+datasets:
+- id: curvature-regimes-folded-strip-v1
+  path: benchmarks/geometry/Bench_CurvatureSegmentationReferenceSmoke.cpp
+  sha256: 248d4e46614061155a9d5533894c7ddf61769de271eaea7fd724f3c72f681897
+  split: scratch
+implementation_digest: feecac4e360f2ae7e9076be326f3c5ef69f33d345be76cdf8dd634391ef16506
+command:
+- /bin/bash
+- -o
+- pipefail
+- -c
+- env GIT_COMMIT=be22bb4560f0a46227400d84971c847348b08940 python3 tools/benchmark/run_and_seal.py --executable
+  build/ci/bin/IntrinsicBenchmarkSmoke --output build/ci/custody/METHOD-037-run001-raw --manifests-root
+  benchmarks --run-id method-037-run-001 --attempt-id attempt-001 && cp build/ci/custody/METHOD-037-run001-raw/geometry.curvature_segmentation.reference.smoke.json
+  tasks/evidence/METHOD-037/experiment/inputs/benchmark_result.json
+cell_journal: tasks/evidence/METHOD-037/experiment/runs/run-001/cells.jsonl
+bundle: tasks/evidence/METHOD-037/experiment/runs/run-001/bundle.yaml
+audit: tasks/evidence/METHOD-037/experiment/runs/run-001/audit.json

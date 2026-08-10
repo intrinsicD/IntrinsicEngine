@@ -1,0 +1,23 @@
+{
+  "command": [
+    "/bin/bash",
+    "-o",
+    "pipefail",
+    "-c",
+    "mapfile -t task_files < <(git diff --name-only HEAD^); python3 tools/docs/check_docs_sync.py --root . --files \"${task_files[@]}\" --strict"
+  ],
+  "command_display": "/bin/bash -o pipefail -c 'mapfile -t task_files < <(git diff --name-only HEAD^); python3 tools/docs/check_docs_sync.py --root . --files \"${task_files[@]}\" --strict'",
+  "cwd": ".",
+  "duration_ms": 36,
+  "exit_code": 0,
+  "finished_at": "2026-08-10T15:20:55Z",
+  "label": "docs-sync-final",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-10T15:20:54Z",
+  "stderr_path": "tasks/evidence/METHOD-037/commands/docs-sync-final.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/METHOD-037/commands/docs-sync-final.stdout.log",
+  "stdout_sha256": "8dc90f5ec7404fcfcc544f28493be52c10cd02ffd0d8c582d85657169379b055",
+  "task_id": "METHOD-037"
+}

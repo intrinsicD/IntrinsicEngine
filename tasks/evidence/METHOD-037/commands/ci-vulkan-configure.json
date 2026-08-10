@@ -1,0 +1,21 @@
+{
+  "command": [
+    "cmake",
+    "--preset",
+    "ci-vulkan"
+  ],
+  "command_display": "cmake --preset ci-vulkan",
+  "cwd": ".",
+  "duration_ms": 2383,
+  "exit_code": 0,
+  "finished_at": "2026-08-10T14:28:58Z",
+  "label": "ci-vulkan-configure",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-10T14:28:55Z",
+  "stderr_path": "tasks/evidence/METHOD-037/commands/ci-vulkan-configure.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/METHOD-037/commands/ci-vulkan-configure.stdout.log",
+  "stdout_sha256": "49add1058609ae3894add9998b3d8a9d815284011f2b01c2cf59fe6ba3899a58",
+  "task_id": "METHOD-037"
+}

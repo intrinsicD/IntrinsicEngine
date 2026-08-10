@@ -1,0 +1,23 @@
+{
+  "command": [
+    "python3",
+    "tools/agents/validate_method_manifests.py",
+    "--root",
+    "methods",
+    "--strict"
+  ],
+  "command_display": "python3 tools/agents/validate_method_manifests.py --root methods --strict",
+  "cwd": ".",
+  "duration_ms": 49,
+  "exit_code": 0,
+  "finished_at": "2026-08-10T15:07:19Z",
+  "label": "method-manifests",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-10T15:07:19Z",
+  "stderr_path": "tasks/evidence/METHOD-037/commands/method-manifests.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/METHOD-037/commands/method-manifests.stdout.log",
+  "stdout_sha256": "48af76c515ac7dba1f6649cf0bf05c033a67654928498c4845604b7921183fd9",
+  "task_id": "METHOD-037"
+}

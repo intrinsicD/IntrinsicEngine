@@ -1120,3 +1120,33 @@
 - **Tags**: geometry, runtime, graphics, normal field, texture atlas, Vulkan,
   GPU, bounded result
 - **From staging**: O139
+
+## C38: Signed-curvature segmentation is operational on the CPU editor path
+- **Statement**: On implementation commit
+  `be22bb4560f0a46227400d84971c847348b08940`, the deterministic signed-principal-
+  curvature segmentation reference passes its analytic geometry, runtime
+  publication, config-source, and Sandbox-control contracts; a real editor run
+  on the checked-in sculpt mesh visibly combines deterministic per-face region
+  colors with boundary-only edge colors while the operation preserves topology.
+- **Status**: supported — exact CPU reference/test/editor surface only; no
+  promoted-Vulkan, performance, remeshing-stability, atlas-quality,
+  optimized-backend, or GPU claim
+- **Provenance**: ai-executed
+- **Crystallized via**: artifact-commitment
+- **Falsification criteria**: Repeating the named focused CPU tests changes the
+  deterministic labels/boundaries, violates same-cardinality topology-preserving
+  publication or source parity, or an equivalent Sandbox run cannot display
+  face-region and boundary-edge outputs together after successful segmentation.
+- **Proof**: [tests/unit/geometry/Test.CurvatureSegmentation.cpp,
+  tests/contract/runtime/Test.CurvatureSegmentationOperations.cpp,
+  tests/integration/runtime/Test.SandboxCurvatureSegmentationPanel.cpp,
+  tasks/evidence/METHOD-037/commands/focused-tests.json,
+  tasks/evidence/METHOD-037/commands/cpu-tests.json,
+  tasks/evidence/METHOD-037/previews/sandbox-sculpt-curvature-segmentation.png,
+  tasks/evidence/METHOD-037/experiment/runs/run-002/bundle.yaml,
+  tasks/evidence/METHOD-037/experiment/runs/run-002/audit.json,
+  tasks/done/METHOD-037-signed-curvature-mesh-segmentation.md]
+- **Dependencies**: []
+- **Tags**: geometry, runtime, config, UI, CPU reference, visualization,
+  bounded result
+- **From staging**: O140

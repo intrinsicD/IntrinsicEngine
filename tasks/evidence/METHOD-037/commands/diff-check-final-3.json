@@ -1,0 +1,22 @@
+{
+  "command": [
+    "git",
+    "diff",
+    "--check",
+    "HEAD^"
+  ],
+  "command_display": "git diff --check 'HEAD^'",
+  "cwd": ".",
+  "duration_ms": 24,
+  "exit_code": 0,
+  "finished_at": "2026-08-10T15:24:33Z",
+  "label": "diff-check-final-3",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-10T15:24:33Z",
+  "stderr_path": "tasks/evidence/METHOD-037/commands/diff-check-final-3.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/METHOD-037/commands/diff-check-final-3.stdout.log",
+  "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "task_id": "METHOD-037"
+}

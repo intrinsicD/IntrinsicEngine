@@ -1,0 +1,27 @@
+{
+  "command": [
+    "env",
+    "PYTHONDONTWRITEBYTECODE=1",
+    "python3",
+    "tools/agents/workflow_evidence.py",
+    "validate",
+    "--root",
+    ".",
+    "--require-complete",
+    "METHOD-037"
+  ],
+  "command_display": "env PYTHONDONTWRITEBYTECODE=1 python3 tools/agents/workflow_evidence.py validate --root . --require-complete METHOD-037",
+  "cwd": ".",
+  "duration_ms": 7162,
+  "exit_code": 0,
+  "finished_at": "2026-08-10T15:28:57Z",
+  "label": "workflow-evidence-final",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-10T15:28:50Z",
+  "stderr_path": "tasks/evidence/METHOD-037/commands/workflow-evidence-final.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/METHOD-037/commands/workflow-evidence-final.stdout.log",
+  "stdout_sha256": "d24f621392df55a952cfda17c9f07f518b94721cd047faa68690ab877fa51938",
+  "task_id": "METHOD-037"
+}

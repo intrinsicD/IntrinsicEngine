@@ -1,0 +1,23 @@
+{
+  "command": [
+    "python3",
+    "tools/agents/sync_skills.py",
+    "--root",
+    ".",
+    "--check"
+  ],
+  "command_display": "python3 tools/agents/sync_skills.py --root . --check",
+  "cwd": ".",
+  "duration_ms": 22,
+  "exit_code": 0,
+  "finished_at": "2026-08-10T15:17:30Z",
+  "label": "skill-mirrors",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-10T15:17:30Z",
+  "stderr_path": "tasks/evidence/METHOD-037/commands/skill-mirrors.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/METHOD-037/commands/skill-mirrors.stdout.log",
+  "stdout_sha256": "c14ca682f6c91112dbed6bbaeef9198718f728eda8110bc269568305d46c9b58",
+  "task_id": "METHOD-037"
+}

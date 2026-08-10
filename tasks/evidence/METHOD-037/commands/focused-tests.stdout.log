@@ -1,0 +1,51 @@
+Internal ctest changing into directory: /home/alex/Documents/IntrinsicEngine/build/ci
+Test project /home/alex/Documents/IntrinsicEngine/build/ci
+      Start  609: CurvatureSegmentationOperations.PublishesSemanticPropertiesPreservesTopologyAndSupportsHistory
+ 1/19 Test  #609: CurvatureSegmentationOperations.PublishesSemanticPropertiesPreservesTopologyAndSupportsHistory ........   Passed    0.01 sec
+      Start  610: CurvatureSegmentationOperations.RejectsInvalidConfigurationAndUnavailableKernelWithoutMutation
+ 2/19 Test  #610: CurvatureSegmentationOperations.RejectsInvalidConfigurationAndUnavailableKernelWithoutMutation ........   Passed    0.00 sec
+      Start 1236: SandboxConfigSections.CurvatureSegmentationSourcesProduceIdenticalValidatedState
+ 3/19 Test #1236: SandboxConfigSections.CurvatureSegmentationSourcesProduceIdenticalValidatedState ......................   Passed    0.10 sec
+      Start 1237: SandboxConfigSections.CurvatureSegmentationDefaultsAndInvalidRangesFailClosed
+ 4/19 Test #1237: SandboxConfigSections.CurvatureSegmentationDefaultsAndInvalidRangesFailClosed .........................   Passed    0.04 sec
+      Start 1265: SandboxCurvatureSegmentationPanel.RegistersInsideTheExistingCurvatureWindow
+ 5/19 Test #1265: SandboxCurvatureSegmentationPanel.RegistersInsideTheExistingCurvatureWindow ...........................   Passed    0.04 sec
+      Start 1266: SandboxCurvatureSegmentationPanel.UsesOneValidatedConfiguredRunAndSimultaneousFaceEdgeVisualization
+ 6/19 Test #1266: SandboxCurvatureSegmentationPanel.UsesOneValidatedConfiguredRunAndSimultaneousFaceEdgeVisualization ...   Passed    0.00 sec
+      Start 1746: CurvatureSegmentation.FixedCountFitsSignedPrincipalCurvatureGmm
+ 7/19 Test #1746: CurvatureSegmentation.FixedCountFitsSignedPrincipalCurvatureGmm .......................................   Passed    0.00 sec
+      Start 1747: CurvatureSegmentation.AutomaticModeSelectsSeparatedPopulations
+ 8/19 Test #1747: CurvatureSegmentation.AutomaticModeSelectsSeparatedPopulations ........................................   Passed    0.00 sec
+      Start 1748: CurvatureSegmentation.SignedFeaturesSeparatePlaneSphereCylinderAndSaddleRegimes
+ 9/19 Test #1748: CurvatureSegmentation.SignedFeaturesSeparatePlaneSphereCylinderAndSaddleRegimes .......................   Passed    0.00 sec
+      Start 1749: CurvatureSegmentation.AutomaticModeReportsToleranceFallbackWhenNoCandidateQualifies
+10/19 Test #1749: CurvatureSegmentation.AutomaticModeReportsToleranceFallbackWhenNoCandidateQualifies ...................   Passed    0.01 sec
+      Start 1750: CurvatureSegmentation.IncreasingSpatialWeightReducesSmoothEdgeDisagreement
+11/19 Test #1750: CurvatureSegmentation.IncreasingSpatialWeightReducesSmoothEdgeDisagreement ............................   Passed    0.01 sec
+      Start 1751: CurvatureSegmentation.FeatureWeightPreservesFoldBoundary
+12/19 Test #1751: CurvatureSegmentation.FeatureWeightPreservesFoldBoundary ..............................................   Passed    0.01 sec
+      Start 1752: CurvatureSegmentation.ConnectedRegionsAreContiguousAndDeterministic
+13/19 Test #1752: CurvatureSegmentation.ConnectedRegionsAreContiguousAndDeterministic ...................................   Passed    0.01 sec
+      Start 1753: CurvatureSegmentation.DisconnectedEqualCurvaturePatchesShareComponentButNotRegion
+14/19 Test #1753: CurvatureSegmentation.DisconnectedEqualCurvaturePatchesShareComponentButNotRegion .....................   Passed    0.00 sec
+      Start 1754: CurvatureSegmentation.ComputeAndSegmentUsesExistingSignedCurvatureEstimator
+15/19 Test #1754: CurvatureSegmentation.ComputeAndSegmentUsesExistingSignedCurvatureEstimator ...........................   Passed    0.00 sec
+      Start 1755: CurvatureSegmentation.GlobalOrientationReversalPreservesPartition
+16/19 Test #1755: CurvatureSegmentation.GlobalOrientationReversalPreservesPartition .....................................   Passed    0.00 sec
+      Start 1756: CurvatureSegmentation.FailsClosedOnInvalidInputs
+17/19 Test #1756: CurvatureSegmentation.FailsClosedOnInvalidInputs ......................................................   Passed    0.00 sec
+      Start 1757: CurvatureSegmentation.DeletedSlotsAndOpenMeshBoundaryEdgesRemainUnpublished
+18/19 Test #1757: CurvatureSegmentation.DeletedSlotsAndOpenMeshBoundaryEdgesRemainUnpublished ...........................   Passed    0.00 sec
+      Start 1758: CurvatureSegmentation.RejectsPolygonAndDegenerateFaces
+19/19 Test #1758: CurvatureSegmentation.RejectsPolygonAndDegenerateFaces ................................................   Passed    0.00 sec
+
+100% tests passed, 0 tests failed out of 19
+
+Label Time Summary:
+contract       =   0.01 sec*proc (2 tests)
+geometry       =   0.06 sec*proc (13 tests)
+integration    =   0.18 sec*proc (4 tests)
+runtime        =   0.19 sec*proc (6 tests)
+unit           =   0.06 sec*proc (13 tests)
+
+Total Test time (real) =   1.12 sec

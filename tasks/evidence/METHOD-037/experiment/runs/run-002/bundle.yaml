@@ -1,0 +1,82 @@
+schema_version: 1
+task_id: METHOD-037
+run_id: run-002
+attempt_id: attempt-002
+created_at: '2026-08-10T15:14:38Z'
+protocol_digest: e6b722c80240bd5782ebee93c50dd6d60625d79b4c88293007623c1a973ed153
+provenance:
+  source:
+    revision: be22bb4560f0a46227400d84971c847348b08940
+    clean: false
+  task_sha256: d9b0e4196aa0e8858f494c18b50220a8b94f4d113d2e6b52564c657b62e61bb0
+  implementation_digest: feecac4e360f2ae7e9076be326f3c5ef69f33d345be76cdf8dd634391ef16506
+  datasets:
+  - id: curvature-regimes-folded-strip-v1
+    path: benchmarks/geometry/Bench_CurvatureSegmentationReferenceSmoke.cpp
+    sha256: 248d4e46614061155a9d5533894c7ddf61769de271eaea7fd724f3c72f681897
+    split: scratch
+resolved_config:
+  path: benchmarks/geometry/manifests/curvature_segmentation_reference_smoke.yaml
+  sha256: e8007f0d3475188adff883db346ae8a8074d2f328358bd5e7fcc74f2f2fe7fe0
+environment:
+  path: CMakePresets.json
+  sha256: d852b3973bf46f499f592379e17990c5b1f8c14b8aa565bd07e92a64347a0bba
+raw_rows:
+  path: tasks/evidence/METHOD-037/experiment/runs/run-002/benchmark_raw_rows.jsonl
+  sha256: 8103d3b083104f9f53ae2349ceacf07d492fcf643ae79963428924af40d03e3a
+  row_count: 1
+summaries:
+- name: quality_error_l2
+  column: quality_error_l2
+  statistic: mean
+  value: 0.0
+gates:
+- metric: quality_error_l2
+  operator: <=
+  threshold: 0.05
+  observed: 0.0
+  passed: true
+diagnostics:
+- execution-status=passed
+- fold-boundary-recall=1.0
+- selected-components=2; connected-regions=2; boundary-edges=4
+- visual-proof=sculpt.obj; selected=6; active=5; boundary-edges=752
+- vulkan-operational=false; BUG-118 owns observed LeakSanitizer shutdown hang
+links:
+- path: tasks/evidence/METHOD-037/experiment/protocol.yaml
+  sha256: 4559e512dc3e7b4af54c6fc15fc6d1a4a981802d6ea5f27871bb4d0b2d7cd524
+- path: benchmarks/geometry/Bench_CurvatureSegmentationReferenceSmoke.cpp
+  sha256: 248d4e46614061155a9d5533894c7ddf61769de271eaea7fd724f3c72f681897
+- path: benchmarks/geometry/manifests/curvature_segmentation_reference_smoke.yaml
+  sha256: e8007f0d3475188adff883db346ae8a8074d2f328358bd5e7fcc74f2f2fe7fe0
+- path: tasks/evidence/METHOD-037/experiment/inputs/benchmark_result.json
+  sha256: ee22faa77dd987db986f64b6b9b1e4711a833d21cccc89f2cdf1c76909695c7e
+visual: true
+previews:
+- path: tasks/evidence/METHOD-037/previews/sandbox-sculpt-curvature-segmentation.png
+  sha256: 866eac57fe103c139c87f286b29238ac24cdb6f99f2afc6d9f71fe47f2707934
+replay_command:
+- /bin/bash
+- -o
+- pipefail
+- -c
+- env GIT_COMMIT=be22bb4560f0a46227400d84971c847348b08940 python3 tools/benchmark/run_and_seal.py --executable
+  build/ci/bin/IntrinsicBenchmarkSmoke --output build/ci/custody/METHOD-037-replay-run002-raw --manifests-root
+  benchmarks --run-id method-037-replay-002 --attempt-id replay-attempt-002
+view_command:
+- python3
+- -m
+- json.tool
+- tasks/evidence/METHOD-037/experiment/inputs/benchmark_result.json
+smoke_receipts:
+- tasks/evidence/METHOD-037/commands/benchmark-smoke-run-002.json
+claim_authorized: false
+benchmark_result:
+  path: tasks/evidence/METHOD-037/experiment/inputs/benchmark_result.json
+  sha256: ee22faa77dd987db986f64b6b9b1e4711a833d21cccc89f2cdf1c76909695c7e
+  manifests_root: benchmarks
+  benchmark_id: geometry.curvature_segmentation.reference.smoke
+  run_id: method-037-run-002
+  attempt_id: attempt-002
+  status: passed
+  claim_eligible: false

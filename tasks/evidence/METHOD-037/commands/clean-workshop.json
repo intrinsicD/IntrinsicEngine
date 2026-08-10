@@ -1,0 +1,21 @@
+{
+  "command": [
+    "tools/ci/run_clean_workshop_review.sh",
+    ".",
+    "--strict"
+  ],
+  "command_display": "tools/ci/run_clean_workshop_review.sh . --strict",
+  "cwd": ".",
+  "duration_ms": 1865,
+  "exit_code": 0,
+  "finished_at": "2026-08-10T15:15:44Z",
+  "label": "clean-workshop",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-10T15:15:42Z",
+  "stderr_path": "tasks/evidence/METHOD-037/commands/clean-workshop.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/METHOD-037/commands/clean-workshop.stdout.log",
+  "stdout_sha256": "03a4bad459c123344bf6441b656b13992b02be51d460ac3cacb85e58855a0a0d",
+  "task_id": "METHOD-037"
+}

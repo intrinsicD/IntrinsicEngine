@@ -1,0 +1,81 @@
+schema_version: 2
+task_id: METHOD-037
+protocol_id: curvature-segmentation-reference-smoke-v2
+profile: claim-grade
+state: frozen
+question: Does the deterministic CPU-reference curvature-segmentation smoke recover the two signed-curvature
+  regimes and remain within the frozen quality-error bound on its checked-in folded-strip fixture?
+hypothesis: Fixed-count segmentation with two components reports quality_error_l2 at or below 0.05 and
+  a passing execution status on the folded-strip smoke.
+claim_boundary: 'One checked-in synthetic folded-strip correctness smoke on the serial cpu_reference backend.
+  This is local scratch evidence only: it makes no throughput, remeshing-stability, atlas-quality, optimized-CPU,
+  runtime/UI, Vulkan, or GPU claim.'
+evidence_phase: scratch
+claim_eligible: false
+datasets:
+- id: curvature-regimes-folded-strip-v1
+  path: benchmarks/geometry/Bench_CurvatureSegmentationReferenceSmoke.cpp
+  sha256: 248d4e46614061155a9d5533894c7ddf61769de271eaea7fd724f3c72f681897
+  split: scratch
+disjoint_splits: []
+seeds:
+- 17
+input_policy: Use only the checked-in deterministic fixture and manifest parameters. A failed gate remains
+  visible and must not be repaired by retuning this run.
+comparators:
+- id: analytic-two-regime-labeling
+  budget: fixed-two-components
+primary_metrics:
+- name: quality_error_l2
+  direction: minimize
+  unit: misclassified-face-fraction
+  statistical_unit: folded-strip-smoke
+statistical_tests:
+- name: deterministic-descriptive-bound
+  alpha: null
+summaries:
+- name: quality_error_l2
+  column: quality_error_l2
+  statistic: mean
+killing_gates:
+- metric: quality_error_l2
+  operator: <=
+  threshold: 0.05
+screening_confirmation_policy: This run is non-claim-eligible scratch evidence and has no confirmation
+  cohort. METHOD-038 owns any preregistered remeshing or acceleration evidence.
+resources:
+  cpu_threads: 1
+  gpu: false
+command:
+- /bin/bash
+- -o
+- pipefail
+- -c
+- env GIT_COMMIT=be22bb4560f0a46227400d84971c847348b08940 python3 tools/benchmark/run_and_seal.py --executable
+  build/ci/bin/IntrinsicBenchmarkSmoke --output build/ci/custody/METHOD-037-run002-raw --manifests-root
+  benchmarks --run-id method-037-run-002 --attempt-id attempt-002 && cp build/ci/custody/METHOD-037-run002-raw/geometry.curvature_segmentation.reference.smoke.json
+  tasks/evidence/METHOD-037/experiment/inputs/benchmark_result.json
+expected_artifacts:
+- tasks/evidence/METHOD-037/experiment/inputs/benchmark_result.json
+- tasks/evidence/METHOD-037/experiment/runs/run-002/bundle.yaml
+blockers: []
+source:
+  revision: be22bb4560f0a46227400d84971c847348b08940
+  clean: false
+config:
+  path: benchmarks/geometry/manifests/curvature_segmentation_reference_smoke.yaml
+  sha256: e8007f0d3475188adff883db346ae8a8074d2f328358bd5e7fcc74f2f2fe7fe0
+environment:
+  path: CMakePresets.json
+  sha256: d852b3973bf46f499f592379e17990c5b1f8c14b8aa565bd07e92a64347a0bba
+implementation:
+- path: src/geometry/Geometry.HalfedgeMesh.CurvatureSegmentation.cppm
+  sha256: f7f0369f1216ac101d9ceeb9a99b6dd114971fe13bfeb01db49e362dbd8bda56
+- path: src/geometry/Geometry.HalfedgeMesh.CurvatureSegmentation.cpp
+  sha256: cc1156fb4ad1008c46f3e3874baf6ae7816cba2d8e425bde97b8fc9cf41146b7
+- path: benchmarks/geometry/Bench_CurvatureSegmentationReferenceSmoke.cpp
+  sha256: 248d4e46614061155a9d5533894c7ddf61769de271eaea7fd724f3c72f681897
+- path: benchmarks/runners/BenchmarkSmokeRunner.cpp
+  sha256: 1f647bda7ee41993b21b54e9f1cb949f3d94966f713b0419255b05a0e30efe0d
+frozen_at: '2026-08-10T15:13:56Z'
+protocol_digest: e6b722c80240bd5782ebee93c50dd6d60625d79b4c88293007623c1a973ed153

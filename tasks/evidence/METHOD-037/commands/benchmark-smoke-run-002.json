@@ -1,0 +1,23 @@
+{
+  "command": [
+    "/bin/bash",
+    "-o",
+    "pipefail",
+    "-c",
+    "env GIT_COMMIT=be22bb4560f0a46227400d84971c847348b08940 python3 tools/benchmark/run_and_seal.py --executable build/ci/bin/IntrinsicBenchmarkSmoke --output build/ci/custody/METHOD-037-run002-raw --manifests-root benchmarks --run-id method-037-run-002 --attempt-id attempt-002 && cp build/ci/custody/METHOD-037-run002-raw/geometry.curvature_segmentation.reference.smoke.json tasks/evidence/METHOD-037/experiment/inputs/benchmark_result.json"
+  ],
+  "command_display": "/bin/bash -o pipefail -c 'env GIT_COMMIT=be22bb4560f0a46227400d84971c847348b08940 python3 tools/benchmark/run_and_seal.py --executable build/ci/bin/IntrinsicBenchmarkSmoke --output build/ci/custody/METHOD-037-run002-raw --manifests-root benchmarks --run-id method-037-run-002 --attempt-id attempt-002 && cp build/ci/custody/METHOD-037-run002-raw/geometry.curvature_segmentation.reference.smoke.json tasks/evidence/METHOD-037/experiment/inputs/benchmark_result.json'",
+  "cwd": ".",
+  "duration_ms": 14605,
+  "exit_code": 0,
+  "finished_at": "2026-08-10T15:14:18Z",
+  "label": "benchmark-smoke-run-002",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-10T15:14:03Z",
+  "stderr_path": "tasks/evidence/METHOD-037/commands/benchmark-smoke-run-002.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/METHOD-037/commands/benchmark-smoke-run-002.stdout.log",
+  "stdout_sha256": "b7196701f0ff40a9bf9f0eba78cf0d336ddd4d35090968928eafaaabd12b23a0",
+  "task_id": "METHOD-037"
+}

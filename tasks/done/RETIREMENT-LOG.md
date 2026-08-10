@@ -8,6 +8,31 @@ so blocks moved from the old active-README history work verbatim.
 
 ## Retired task narratives
 
+[`METHOD-037`](METHOD-037-signed-curvature-mesh-segmentation.md) — signed
+principal-curvature segmentation is operational through the serial CPU
+geometry kernel, undoable runtime publication, schema-versioned config lane,
+Sandbox controls, and simultaneous face-region/edge-boundary visualization.
+The deterministic reference robustly normalizes face-averaged `(k1,k2)`, reuses
+the existing GMM in fixed or bounded-automatic mode, and minimizes a
+feature-weighted Potts objective before publishing connected region IDs and
+exact boundary flags without changing topology.
+
+Correctness, runtime/config/UI contracts, the full default CPU-supported gate,
+and strict repository validators passed. A real editor run imported the
+3,669-vertex sculpt fixture, selected six components, retained five active
+components, and displayed 752 internal boundary edges over deterministic face
+colors; the claim-grade bundle retains the captured view and a sealed local
+reference smoke. That smoke is deliberately non-claim-eligible and supports no
+performance, atlas-quality, optimized-backend, or GPU conclusion.
+
+The reached maturity is `Operational` for the CPU runtime/config/UI path only.
+Promoted Vulkan was requested during the visual check but remained
+non-operational, and the already tracked `BUG-118` LeakSanitizer shutdown hang
+was observed, so neither is hidden inside the closure claim. `METHOD-038`
+remains the evidence-gated feature-alignment/remeshing-stability follow-up and
+is still blocked on `GEOM-071`; `GEOM-076` continues to own any later seam or
+UV-atlas adoption.
+
 [`BUG-096`](BUG-096-icp-point-to-plane-target-normals.md) — runtime
 point-to-plane ICP consumes the target's normals, and a request it cannot
 satisfy is refused rather than degraded. Both branches called

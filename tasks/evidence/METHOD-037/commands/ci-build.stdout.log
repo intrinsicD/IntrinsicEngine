@@ -1,0 +1,1448 @@
+[0/2] Re-checking globbed directories...
+[1/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/core/Core.Tasks.Stats.cpp for CXX dependencies
+[2/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/core/Core.Dag.Scheduler.Hazards.cpp for CXX dependencies
+[3/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/core/Core.IOBackend.cpp for CXX dependencies
+[4/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/core/Core.Filesystem.PathResolver.cpp for CXX dependencies
+[5/1309] Scanning /home/alex/Documents/IntrinsicEngine/methods/geometry/progressive_poisson/src/ProgressivePoissonReference.cpp for CXX dependencies
+[6/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/core/Core.Tasks.CounterEvent.cpp for CXX dependencies
+[7/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/core/Core.Process.cpp for CXX dependencies
+[8/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/core/Core.FrameGraph.cpp for CXX dependencies
+[9/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/core/Core.Tasks.Dispatch.cpp for CXX dependencies
+[10/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/core/Core.Tasks.Job.cpp for CXX dependencies
+[11/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/core/Core.Tasks.Lifecycle.cpp for CXX dependencies
+[12/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/core/Core.Logging.cpp for CXX dependencies
+[13/1309] Generating CXX dyndep file CMakeFiles/IntrinsicProgressivePoissonReference.dir/CXX.dd
+[14/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/core/Core.Dag.Scheduler.cpp for CXX dependencies
+[15/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/core/Core.Telemetry.cpp for CXX dependencies
+[16/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/core/Core.Filesystem.cpp for CXX dependencies
+[17/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/core/Core.Dag.TaskGraph.cpp for CXX dependencies
+[18/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/core/Core.Dag.Scheduler.Policy.cppm for CXX dependencies
+[19/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/core/Core.IndexedHeap.cppm for CXX dependencies
+[20/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/core/Core.Config.Window.cppm for CXX dependencies
+[21/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/core/Core.BoundedHeap.cppm for CXX dependencies
+[22/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/core/Core.Config.Render.cppm for CXX dependencies
+[23/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/core/Core.Dag.Scheduler.Hazards.cppm for CXX dependencies
+[24/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/core/Core.Dag.Scheduler.Types.cppm for CXX dependencies
+[25/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/core/Core.Config.EngineLoad.cpp for CXX dependencies
+[26/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/core/Core.Config.EngineLoad.cppm for CXX dependencies
+[27/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/core/Core.Dag.Scheduler.Compiler.cppm for CXX dependencies
+[28/1309] Scanning /home/alex/Documents/IntrinsicEngine/build/ci/generated/deps/tinygltf_impl.cpp for CXX dependencies
+[29/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/core/Core.Config.Engine.cppm for CXX dependencies
+[30/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/core/Core.Tasks.Worker.cpp for CXX dependencies
+[31/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/core/Core.Tasks.WaitToken.cpp for CXX dependencies
+[32/1309] Generating CXX dyndep file CMakeFiles/tinygltf.dir/CXX.dd
+[33/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/core/Core.Dag.Scheduler.cppm for CXX dependencies
+[34/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/core/Core.Geometry2D.cppm for CXX dependencies
+[35/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/core/Core.IOBackend.cppm for CXX dependencies
+[36/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/core/Core.Dag.Scheduler.DomainGraph.cppm for CXX dependencies
+[37/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/core/Core.Error.cppm for CXX dependencies
+[38/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/core/Core.FrameGraph.cppm for CXX dependencies
+[39/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/core/Core.HandleLease.cppm for CXX dependencies
+[40/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/core/Core.Dag.TaskGraph.cppm for CXX dependencies
+[41/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/core/Core.RingBuffer.cppm for CXX dependencies
+[42/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/core/Core.CallbackRegistry.cppm for CXX dependencies
+[43/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/core/Core.ResourcePool.cppm for CXX dependencies
+[44/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/core/Core.Process.cppm for CXX dependencies
+[45/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/core/Core.Hash.cppm for CXX dependencies
+[46/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/core/Core.Memory.Common.cppm for CXX dependencies
+[47/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/core/Core.Telemetry.cppm for CXX dependencies
+[48/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/core/Core.FrameClock.cppm for CXX dependencies
+[49/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/core/Core.Filesystem.PathResolver.cppm for CXX dependencies
+[50/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/core/Core.LockFreeQueue.cppm for CXX dependencies
+[51/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/core/Core.StrongHandle.cppm for CXX dependencies
+[52/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/core/Core.Logging.cppm for CXX dependencies
+[53/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/core/Core.Memory.Polymorphic.cppm for CXX dependencies
+[54/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/core/Core.Memory.ScopeStack.cpp for CXX dependencies
+[55/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/core/Core.Filesystem.cppm for CXX dependencies
+[56/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/core/Core.Memory.LinearArena.cppm for CXX dependencies
+[57/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/core/Core.Memory.Polymorphic.cpp for CXX dependencies
+[58/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/core/Core.Tasks.CounterEvent.cppm for CXX dependencies
+[59/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/core/Core.Tasks.cppm for CXX dependencies
+[60/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/core/Core.Memory.ScopeStack.cppm for CXX dependencies
+[61/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/core/Core.Memory.LinearArena.cpp for CXX dependencies
+[62/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/core/Core.Tasks.Internal.cppm for CXX dependencies
+[63/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/geometry/Geometry.AABB.cpp for CXX dependencies
+[64/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/geometry/Geometry.BVH.cpp for CXX dependencies
+[65/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/core/Core.Tasks.LocalTask.cpp for CXX dependencies
+[66/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/geometry/Geometry.Containment.cpp for CXX dependencies
+[67/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/geometry/Geometry.Capsule.cpp for CXX dependencies
+[68/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/core/Core.Tasks.Internal.cpp for CXX dependencies
+[69/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/geometry/Geometry.ConvexHull.cpp for CXX dependencies
+[70/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/core/Core.Tasks.LocalTask.cppm for CXX dependencies
+[71/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/geometry/Geometry.FixedPoint.Anderson.cpp for CXX dependencies
+[72/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/geometry/Geometry.Curve.cpp for CXX dependencies
+[73/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/geometry/Geometry.ContactManifold.cpp for CXX dependencies
+[74/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/geometry/Geometry.Ellipsoid.cpp for CXX dependencies
+[75/1309] Generating CXX dyndep file src/core/CMakeFiles/ExtrinsicCore.dir/CXX.dd
+[76/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/geometry/Geometry.Cylinder.cpp for CXX dependencies
+[77/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/geometry/Geometry.EPA.cpp for CXX dependencies
+[78/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/geometry/Geometry.ConvexHullBuilder.cpp for CXX dependencies
+[79/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/geometry/Geometry.Grid.cpp for CXX dependencies
+[80/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/geometry/Geometry.Frustum.cpp for CXX dependencies
+[81/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/geometry/Geometry.GJK.cpp for CXX dependencies
+[82/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/geometry/Geometry.Graph.ShortestPath.cpp for CXX dependencies
+[83/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/geometry/Geometry.Graph.Utils.cpp for CXX dependencies
+[84/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/geometry/Geometry.GaussianMixture.cpp for CXX dependencies
+[85/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/geometry/Geometry.HalfedgeMesh.Boundary.cpp for CXX dependencies
+[86/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/geometry/Geometry.Graph.Vertex.Normals.cpp for CXX dependencies
+[87/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/geometry/Geometry.Graph.IO.cpp for CXX dependencies
+[88/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/geometry/Geometry.HalfedgeMesh.Boolean.cpp for CXX dependencies
+[89/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/geometry/Geometry.HalfedgeMesh.Curvature.cpp for CXX dependencies
+[90/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/geometry/Geometry.Graph.cpp for CXX dependencies
+[91/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/geometry/Geometry.HalfedgeMesh.Analysis.cpp for CXX dependencies
+[92/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/geometry/Geometry.HalfedgeMesh.AdaptiveRemeshing.cpp for CXX dependencies
+[93/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/geometry/Geometry.HalfedgeMesh.Builder.cpp for CXX dependencies
+[94/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/geometry/Geometry.HalfedgeMesh.DEC.cpp for CXX dependencies
+[95/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/geometry/Geometry.HalfedgeMesh.Geodesic.cpp for CXX dependencies
+[96/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/geometry/Geometry.HalfedgeMesh.CatmullClark.cpp for CXX dependencies
+[97/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/geometry/Geometry.HalfedgeMesh.CurvatureSegmentation.cpp for CXX dependencies
+[98/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/geometry/Geometry.HalfedgeMesh.Remeshing.cpp for CXX dependencies
+[99/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/geometry/Geometry.HalfedgeMesh.Parameterization.cpp for CXX dependencies
+[100/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/geometry/Geometry.HalfedgeMesh.IO.cpp for CXX dependencies
+[101/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/geometry/Geometry.HalfedgeMesh.Repair.cpp for CXX dependencies
+[102/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/geometry/Geometry.HalfedgeMesh.Quality.cpp for CXX dependencies
+[103/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/geometry/Geometry.HalfedgeMesh.SignedHeatMethod.cpp for CXX dependencies
+[104/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/geometry/Geometry.HalfedgeMesh.Subdivision.cpp for CXX dependencies
+[105/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/geometry/Geometry.HalfedgeMesh.Simplification.cpp for CXX dependencies
+[106/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/geometry/Geometry.HalfedgeMesh.Vertices.Normals.cpp for CXX dependencies
+[107/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/geometry/Geometry.HtexPatch.cpp for CXX dependencies
+[108/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/geometry/Geometry.HalfedgeMesh.Smoothing.cpp for CXX dependencies
+[109/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/geometry/Geometry.KDTree.cpp for CXX dependencies
+[110/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/geometry/Geometry.HalfedgeMesh.cpp for CXX dependencies
+[111/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/geometry/Geometry.ImplicitPlaneField.cpp for CXX dependencies
+[112/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/geometry/Geometry.HalfedgeMesh.SubdivisionSqrt3.cpp for CXX dependencies
+[113/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/geometry/Geometry.HalfedgeMesh.Utils.cpp for CXX dependencies
+[114/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/geometry/Geometry.KMeans.cpp for CXX dependencies
+[115/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/geometry/Geometry.Mesh.Conversion.cpp for CXX dependencies
+[116/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/geometry/Geometry.HalfedgeMesh.VectorHeatMethod.cpp for CXX dependencies
+[117/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/geometry/Geometry.MeshSoup.cpp for CXX dependencies
+[118/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/geometry/Geometry.OBB.cpp for CXX dependencies
+[119/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/geometry/Geometry.MeshClosestFace.cpp for CXX dependencies
+[120/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/geometry/Geometry.MarchingCubes.cpp for CXX dependencies
+[121/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/geometry/Geometry.Overlap.cpp for CXX dependencies
+[122/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/geometry/Geometry.Parameterization.Diagnostics.cpp for CXX dependencies
+[123/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/geometry/Geometry.PCA.cpp for CXX dependencies
+[124/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/geometry/Geometry.Linalg.cpp for CXX dependencies
+[125/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/geometry/Geometry.Plane.cpp for CXX dependencies
+[126/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/geometry/Geometry.Parameterization.Bff.cpp for CXX dependencies
+[127/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/geometry/Geometry.Parameterization.Harmonic.cpp for CXX dependencies
+[128/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/geometry/Geometry.Octree.cpp for CXX dependencies
+[129/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/geometry/Geometry.PointCloud.Conversion.cpp for CXX dependencies
+[130/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/geometry/Geometry.Parameterization.Optimize.cpp for CXX dependencies
+[131/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/geometry/Geometry.PointCloud.Consolidation.cpp for CXX dependencies
+[132/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/geometry/Geometry.PointCloud.Kernels.cpp for CXX dependencies
+[133/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/geometry/Geometry.PointCloud.Normals.cpp for CXX dependencies
+[134/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/geometry/Geometry.PointCloud.QualityMetrics.cpp for CXX dependencies
+[135/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/geometry/Geometry.PointCloud.SurfaceSampling.cpp for CXX dependencies
+[136/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/geometry/Geometry.PointCloud.Utils.cpp for CXX dependencies
+[137/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/geometry/Geometry.PointCloud.IO.cpp for CXX dependencies
+[138/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/geometry/Geometry.Quadric.cpp for CXX dependencies
+[139/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/geometry/Geometry.Properties.cpp for CXX dependencies
+[140/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/geometry/Geometry.Robust.cpp for CXX dependencies
+[141/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/geometry/Geometry.Registration.cpp for CXX dependencies
+[142/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/geometry/Geometry.PointCloud.cpp for CXX dependencies
+[143/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/geometry/Geometry.Raycast.cpp for CXX dependencies
+[144/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/geometry/Geometry.PointCloud.Features.cpp for CXX dependencies
+[145/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/geometry/Geometry.Queries.cpp for CXX dependencies
+[146/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/geometry/Geometry.Rotation.cpp for CXX dependencies
+[147/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/geometry/Geometry.RobustPredicates.cpp for CXX dependencies
+[148/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/geometry/Geometry.Sampling.cpp for CXX dependencies
+[149/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/geometry/Geometry.RotationAveraging.cpp for CXX dependencies
+[150/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/geometry/Geometry.Segment.cpp for CXX dependencies
+[151/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/geometry/Geometry.Sphere.Sampling.cpp for CXX dependencies
+[152/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/geometry/Geometry.Sphere.cpp for CXX dependencies
+[153/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/geometry/Geometry.SDF.cpp for CXX dependencies
+[154/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/geometry/Geometry.SupportRadius.cpp for CXX dependencies
+[155/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/geometry/Geometry.Support.cpp for CXX dependencies
+[156/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/geometry/Geometry.SurfaceReconstruction.cpp for CXX dependencies
+[157/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/geometry/Geometry.Statistics.cpp for CXX dependencies
+[158/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/geometry/Geometry.Validation.cpp for CXX dependencies
+[159/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/geometry/Geometry.BVH.cppm for CXX dependencies
+[160/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/geometry/Geometry.UvAtlas.cpp for CXX dependencies
+[161/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/geometry/Geometry.Circulators.cppm for CXX dependencies
+[162/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/geometry/Geometry.Capsule.cppm for CXX dependencies
+[163/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/geometry/Geometry.AABB.cppm for CXX dependencies
+[164/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/geometry/Geometry.Sparse.cpp for CXX dependencies
+[165/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/geometry/Geometry.Triangle.cpp for CXX dependencies
+[166/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/geometry/Geometry.FixedPoint.Anderson.cppm for CXX dependencies
+[167/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/geometry/Geometry.ContactManifold.cppm for CXX dependencies
+[168/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/geometry/Geometry.Containment.cppm for CXX dependencies
+[169/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/geometry/Geometry.Cylinder.cppm for CXX dependencies
+[170/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/geometry/Geometry.ConvexHullBuilder.cppm for CXX dependencies
+[171/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/geometry/Geometry.Ellipsoid.cppm for CXX dependencies
+[172/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/geometry/Geometry.DomainViews.cppm for CXX dependencies
+[173/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/geometry/Geometry.ConvexHull.cppm for CXX dependencies
+[174/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/geometry/Geometry.Curve.cppm for CXX dependencies
+[175/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/geometry/Geometry.GaussianMixture.cppm for CXX dependencies
+[176/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/geometry/Geometry.Graph.ShortestPath.cppm for CXX dependencies
+[177/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/geometry/Geometry.EPA.cppm for CXX dependencies
+[178/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/geometry/Geometry.Frustum.cppm for CXX dependencies
+[179/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/geometry/Geometry.Graph.IO.cppm for CXX dependencies
+[180/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/geometry/Geometry.HalfedgeMesh.Boolean.cppm for CXX dependencies
+[181/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/geometry/Geometry.GJK.cppm for CXX dependencies
+[182/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/geometry/Geometry.HalfedgeMesh.CatmullClark.cppm for CXX dependencies
+[183/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/geometry/Geometry.HalfedgeMesh.Analysis.cppm for CXX dependencies
+[184/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/geometry/Geometry.Graph.Utils.cppm for CXX dependencies
+[185/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/geometry/Geometry.HalfedgeMesh.Builder.cppm for CXX dependencies
+[186/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/geometry/Geometry.Graph.Vertex.Normals.cppm for CXX dependencies
+[187/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/geometry/Geometry.HalfedgeMesh.AdaptiveRemeshing.cppm for CXX dependencies
+[188/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/geometry/Geometry.HalfedgeMesh.Boundary.cppm for CXX dependencies
+[189/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/geometry/Geometry.HalfedgeMesh.Remeshing.cppm for CXX dependencies
+[190/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/geometry/Geometry.HalfedgeMesh.DEC.cppm for CXX dependencies
+[191/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/geometry/Geometry.HalfedgeMesh.Geodesic.cppm for CXX dependencies
+[192/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/geometry/Geometry.Grid.cppm for CXX dependencies
+[193/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/geometry/Geometry.HalfedgeMesh.Quality.cppm for CXX dependencies
+[194/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/geometry/Geometry.HalfedgeMesh.IO.cppm for CXX dependencies
+[195/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/geometry/Geometry.Graph.cppm for CXX dependencies
+[196/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/geometry/Geometry.HalfedgeMesh.Curvature.cppm for CXX dependencies
+[197/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/geometry/Geometry.HalfedgeMesh.CurvatureSegmentation.cppm for CXX dependencies
+[198/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/geometry/Geometry.HalfedgeMesh.SubdivisionSqrt3.cppm for CXX dependencies
+[199/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/geometry/Geometry.HalfedgeMesh.SignedHeatMethod.cppm for CXX dependencies
+[200/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/geometry/Geometry.HalfedgeMesh.Parameterization.cppm for CXX dependencies
+[201/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/geometry/Geometry.HalfedgeMesh.Simplification.cppm for CXX dependencies
+[202/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/geometry/Geometry.HalfedgeMesh.Utils.cppm for CXX dependencies
+[203/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/geometry/Geometry.IO.cppm for CXX dependencies
+[204/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/geometry/Geometry.HalfedgeMesh.Subdivision.cppm for CXX dependencies
+[205/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/geometry/Geometry.HalfedgeMesh.Repair.cppm for CXX dependencies
+[206/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/geometry/Geometry.LinearSolver.cppm for CXX dependencies
+[207/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/geometry/Geometry.HalfedgeMesh.Smoothing.cppm for CXX dependencies
+[208/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/geometry/Geometry.HalfedgeMesh.Vertices.Normals.cppm for CXX dependencies
+[209/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/geometry/Geometry.HalfedgeMesh.VectorHeatMethod.cppm for CXX dependencies
+[210/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/geometry/Geometry.HtexPatch.cppm for CXX dependencies
+[211/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/geometry/Geometry.ImplicitPlaneField.cppm for CXX dependencies
+[212/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/geometry/Geometry.MeshOperator.cppm for CXX dependencies
+[213/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/geometry/Geometry.KMeans.cppm for CXX dependencies
+[214/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/geometry/Geometry.IntersectionClassification.cppm for CXX dependencies
+[215/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/geometry/Geometry.Mesh.Conversion.cppm for CXX dependencies
+[216/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/geometry/Geometry.KDTree.cppm for CXX dependencies
+[217/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/geometry/Geometry.MarchingCubes.cppm for CXX dependencies
+[218/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/geometry/Geometry.MeshSoup.cppm for CXX dependencies
+[219/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/geometry/Geometry.HalfedgeMesh.cppm for CXX dependencies
+[220/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/geometry/Geometry.OBB.cppm for CXX dependencies
+[221/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/geometry/Geometry.MeshClosestFace.cppm for CXX dependencies
+[222/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/geometry/Geometry.PCA.cppm for CXX dependencies
+[223/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/geometry/Geometry.Parameterization.Diagnostics.cppm for CXX dependencies
+[224/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/geometry/Geometry.Linalg.cppm for CXX dependencies
+[225/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/geometry/Geometry.Parameterization.Harmonic.cppm for CXX dependencies
+[226/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/geometry/Geometry.Parameterization.Optimize.cppm for CXX dependencies
+[227/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/geometry/Geometry.PointCloud.Conversion.cppm for CXX dependencies
+[228/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/geometry/Geometry.Plane.cppm for CXX dependencies
+[229/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/geometry/Geometry.PointCloud.IO.cppm for CXX dependencies
+[230/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/geometry/Geometry.Parameterization.Bff.cppm for CXX dependencies
+[231/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/geometry/Geometry.PointCloud.Consolidation.cppm for CXX dependencies
+[232/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/geometry/Geometry.PointCloud.Features.cppm for CXX dependencies
+[233/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/geometry/Geometry.Overlap.cppm for CXX dependencies
+[234/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/geometry/Geometry.PointCloud.SurfaceSampling.cppm for CXX dependencies
+[235/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/geometry/Geometry.Octree.cppm for CXX dependencies
+[236/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/geometry/Geometry.PointCloud.Kernels.cppm for CXX dependencies
+[237/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/geometry/Geometry.PointCloud.Normals.cppm for CXX dependencies
+[238/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/geometry/Geometry.Robust.cppm for CXX dependencies
+[239/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/geometry/Geometry.PointCloud.Utils.cppm for CXX dependencies
+[240/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/geometry/Geometry.Ray.cppm for CXX dependencies
+[241/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/geometry/Geometry.Quadric.cppm for CXX dependencies
+[242/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/geometry/Geometry.Queries.cppm for CXX dependencies
+[243/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/geometry/Geometry.PointCloud.QualityMetrics.cppm for CXX dependencies
+[244/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/geometry/Geometry.Rotation.cppm for CXX dependencies
+[245/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/geometry/Geometry.PointCloud.cppm for CXX dependencies
+[246/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/geometry/Geometry.RobustPredicates.cppm for CXX dependencies
+[247/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/geometry/Geometry.SpatialQueries.cppm for CXX dependencies
+[248/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/geometry/Geometry.Sampling.cppm for CXX dependencies
+[249/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/geometry/Geometry.SDF.cppm for CXX dependencies
+[250/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/geometry/Geometry.Properties.cppm for CXX dependencies
+[251/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/geometry/Geometry.Raycast.cppm for CXX dependencies
+[252/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/geometry/Geometry.RotationAveraging.cppm for CXX dependencies
+[253/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/geometry/Geometry.Segment.cppm for CXX dependencies
+[254/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/geometry/Geometry.Registration.cppm for CXX dependencies
+[255/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/geometry/Geometry.SDFContact.cppm for CXX dependencies
+[256/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/geometry/Geometry.HalfedgeMesh.Fwd.cppm for CXX dependencies
+[257/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/geometry/Geometry.PointCloud.Fwd.cppm for CXX dependencies
+[258/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/geometry/Geometry.Graph.Fwd.cppm for CXX dependencies
+[259/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/geometry/Geometry.Sphere.Sampling.cppm for CXX dependencies
+[260/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/geometry/Geometry.Sphere.cppm for CXX dependencies
+[261/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/geometry/Geometry.Statistics.cppm for CXX dependencies
+[262/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/geometry/Geometry.Support.cppm for CXX dependencies
+[263/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/geometry/Geometry.Sparse.cppm for CXX dependencies
+[264/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/geometry/Geometry.SurfaceReconstruction.cppm for CXX dependencies
+[265/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/geometry/Geometry.SupportRadius.cppm for CXX dependencies
+[266/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/geometry/Geometry.Triangle.cppm for CXX dependencies
+[267/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/geometry/Geometry.Validation.cppm for CXX dependencies
+[268/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/assets/Asset.Registry.cpp for CXX dependencies
+[269/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/assets/Asset.OperationStatus.cppm for CXX dependencies
+[270/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/geometry/Geometry.UvAtlas.cppm for CXX dependencies
+[271/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/assets/Asset.ImportRouter.cpp for CXX dependencies
+[272/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/assets/Asset.ModelTexturePayload.cpp for CXX dependencies
+[273/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/assets/Asset.EventBus.cpp for CXX dependencies
+[274/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/assets/Asset.PayloadStore.cpp for CXX dependencies
+[275/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/assets/Asset.LoadPipeline.cpp for CXX dependencies
+[276/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/assets/Asset.EventBus.cppm for CXX dependencies
+[277/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/assets/Asset.ModelTexturePayload.cppm for CXX dependencies
+[278/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/assets/Asset.Registry.cppm for CXX dependencies
+[279/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/assets/Asset.TypePool.cppm for CXX dependencies
+[280/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/assets/Asset.PathIndex.cpp for CXX dependencies
+[281/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/assets/Asset.ImportRouter.cppm for CXX dependencies
+[282/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/assets/Asset.Service.cpp for CXX dependencies
+[283/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/assets/Asset.LoadPipeline.cppm for CXX dependencies
+[284/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/assets/Asset.PayloadStore.cppm for CXX dependencies
+[285/1309] Generating CXX dyndep file src/geometry/CMakeFiles/IntrinsicGeometry.dir/CXX.dd
+[286/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/assets/Asset.GeometryPayload.cppm for CXX dependencies
+[287/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/assets/Asset.PathIndex.cppm for CXX dependencies
+[288/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/ecs/Components/ECS.Component.StableId.cpp for CXX dependencies
+[289/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/assets/Asset.Service.cppm for CXX dependencies
+[290/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/ecs/Components/ECS.Component.RigidBody.cpp for CXX dependencies
+[291/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/ecs/ECS.Scene.Bootstrap.cpp for CXX dependencies
+[292/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/ecs/Hierarchy/ECS.Hierarchy.Mutation.cpp for CXX dependencies
+[293/1309] Generating CXX dyndep file src/assets/CMakeFiles/ExtrinsicAssets.dir/CXX.dd
+[294/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/ecs/ECS.Scene.Bootstrap.cppm for CXX dependencies
+[295/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/ecs/Systems/ECS.System.RenderSync.cpp for CXX dependencies
+[296/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/ecs/Components/ECS.Component.Transform.Local.cpp for CXX dependencies
+[297/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/ecs/ECS.Scene.Registry.cpp for CXX dependencies
+[298/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/ecs/Hierarchy/ECS.Hierarchy.Structure.cpp for CXX dependencies
+[299/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/ecs/Components/ECS.Component.GeometrySources.cpp for CXX dependencies
+[300/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/ecs/Components/ECS.Component.AssetInstance.cppm for CXX dependencies
+[301/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/ecs/Components/ECS.Component.Collider.cpp for CXX dependencies
+[302/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/ecs/Components/ECS.Component.GeometrySourcesPopulate.cpp for CXX dependencies
+[303/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/ecs/ECS.Scene.Registry.cppm for CXX dependencies
+[304/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/ecs/ECS.Scene.Handle.cppm for CXX dependencies
+[305/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/ecs/Components/ECS.Component.Hierarchy.cppm for CXX dependencies
+[306/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/ecs/Components/ECS.Component.MetaData.cppm for CXX dependencies
+[307/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/ecs/Components/ECS.Component.Light.cppm for CXX dependencies
+[308/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/ecs/Systems/ECS.System.TransformHierarchy.cpp for CXX dependencies
+[309/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/ecs/Components/ECS.Component.ProceduralGeometryRef.cppm for CXX dependencies
+[310/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/ecs/Components/ECS.Component.StableId.cppm for CXX dependencies
+[311/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/ecs/Systems/ECS.System.BoundsPropagation.cpp for CXX dependencies
+[312/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/ecs/Components/ECS.Component.Selection.cppm for CXX dependencies
+[313/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/ecs/Components/ECS.Component.GeometrySourcesPopulate.cppm for CXX dependencies
+[314/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/ecs/Components/ECS.Component.RigidBody.cppm for CXX dependencies
+[315/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/ecs/Components/ECS.Component.DirtyTags.cppm for CXX dependencies
+[316/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/ecs/Components/ECS.Component.GeometrySources.cppm for CXX dependencies
+[317/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/ecs/Components/ECS.Component.Collider.cppm for CXX dependencies
+[318/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/ecs/Hierarchy/ECS.Hierarchy.Structure.cppm for CXX dependencies
+[319/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/ecs/Components/ECS.Component.Transform.Local.cppm for CXX dependencies
+[320/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/graphics/rhi/RHI.CommandContext.cpp for CXX dependencies
+[321/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/ecs/Hierarchy/ECS.Hierarchy.Mutation.cppm for CXX dependencies
+[322/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/ecs/Components/ECS.Component.Transform.World.cppm for CXX dependencies
+[323/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/graphics/rhi/RHI.BufferView.cppm for CXX dependencies
+[324/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/graphics/rhi/RHI.BufferTransfer.cpp for CXX dependencies
+[325/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/ecs/Systems/ECS.System.TransformHierarchy.cppm for CXX dependencies
+[326/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/graphics/rhi/RHI.BufferTransfer.cppm for CXX dependencies
+[327/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/graphics/rhi/RHI.Descriptors.cppm for CXX dependencies
+[328/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/graphics/rhi/RHI.TextureManager.cpp for CXX dependencies
+[329/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/graphics/rhi/RHI.TextureUpload.cpp for CXX dependencies
+[330/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/graphics/rhi/RHI.Profiler.cpp for CXX dependencies
+[331/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/physics/Physics.World.cppm for CXX dependencies
+[332/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/ecs/Systems/ECS.System.BoundsPropagation.cppm for CXX dependencies
+[333/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/graphics/rhi/RHI.SamplerManager.cpp for CXX dependencies
+[334/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/graphics/rhi/RHI.BufferManager.cpp for CXX dependencies
+[335/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/graphics/rhi/RHI.QueueAffinity.cppm for CXX dependencies
+[336/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/physics/Physics.World.cpp for CXX dependencies
+[337/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/ecs/Systems/ECS.System.RenderSync.cppm for CXX dependencies
+[338/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/graphics/rhi/RHI.Transfer.cppm for CXX dependencies
+[339/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/graphics/rhi/RHI.Bindless.cppm for CXX dependencies
+[340/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/graphics/rhi/RHI.TextureUpload.cppm for CXX dependencies
+[341/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/graphics/rhi/RHI.TransferQueue.cppm for CXX dependencies
+[342/1309] Scanning /home/alex/Documents/IntrinsicEngine/src/graphics/rhi/RHI.FrameHandle.cppm for CXX dependencies
+[343/1309] Generating CXX dyndep file src/physics/CMakeFiles/ExtrinsicPhysics.dir/CXX.dd
+[344/1309] Generating CXX dyndep file src/ecs/CMakeFiles/ExtrinsicECS.dir/CXX.dd
+[345/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/graphics/rhi/RHI.Profiler.cppm for CXX dependencies
+[346/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/graphics/rhi/RHI.PipelineManager.cpp for CXX dependencies
+[347/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/graphics/rhi/RHI.Device.cppm for CXX dependencies
+[348/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/graphics/rhi/RHI.SamplerManager.cppm for CXX dependencies
+[349/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/graphics/rhi/RHI.CommandContext.cppm for CXX dependencies
+[350/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/graphics/rhi/RHI.Types.cppm for CXX dependencies
+[351/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/graphics/renderer/Graphics.CurrentRendererContractAdapter.cpp for CXX dependencies
+[352/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/graphics/rhi/RHI.BufferManager.cppm for CXX dependencies
+[353/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/graphics/renderer/Graphics.CameraSnapshots.cpp for CXX dependencies
+[354/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/graphics/renderer/Graphics.ComputeParallelPrimitives.cpp for CXX dependencies
+[355/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/graphics/assets/Graphics.GpuAssetCache.cpp for CXX dependencies
+[356/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/graphics/rhi/RHI.PipelineManager.cppm for CXX dependencies
+[357/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/graphics/assets/Graphics.GpuAssetCache.cppm for CXX dependencies
+[358/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/graphics/renderer/Graphics.RenderCommandRouter.cpp for CXX dependencies
+[359/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/graphics/rhi/RHI.TextureManager.cppm for CXX dependencies
+[360/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/graphics/renderer/Graphics.RenderSubsystemRegistry.cpp for CXX dependencies
+[361/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/graphics/renderer/Graphics.RenderingContract.cpp for CXX dependencies
+[362/1312] Generating CXX dyndep file src/graphics/rhi/CMakeFiles/ExtrinsicRHI.dir/CXX.dd
+[363/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/graphics/renderer/Graphics.SharedRenderRecipeExecution.cpp for CXX dependencies
+[364/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/graphics/renderer/Graphics.FrameRecipe.cpp for CXX dependencies
+[365/1312] Generating CXX dyndep file src/graphics/assets/CMakeFiles/ExtrinsicGraphicsAssets.dir/CXX.dd
+[366/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/graphics/renderer/Graphics.RenderRecipeConfig.cpp for CXX dependencies
+[367/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/graphics/renderer/Graphics.RenderPrepPipeline.cpp for CXX dependencies
+[368/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/graphics/renderer/Graphics.TransientDebugUploadHelper.cpp for CXX dependencies
+[369/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/graphics/renderer/Graphics.Renderer.cpp for CXX dependencies
+[370/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/graphics/renderer/Graphics.VisualizationOverlayUploadHelper.cpp for CXX dependencies
+[371/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/graphics/renderer/Graphics.PropertyTextureBake.cpp for CXX dependencies
+[372/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/graphics/renderer/Graphics.ColormapSystem.cpp for CXX dependencies
+[373/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/graphics/renderer/Graphics.GpuWorld.cpp for CXX dependencies
+[374/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/graphics/renderer/Graphics.VisualizationPackets.cpp for CXX dependencies
+[375/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/graphics/renderer/Graphics.GpuTransfer.cpp for CXX dependencies
+[376/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/graphics/renderer/Graphics.VisualizationPropertyBufferResidency.cpp for CXX dependencies
+[377/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/graphics/renderer/Graphics.GeometryResidency.cpp for CXX dependencies
+[378/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/graphics/renderer/Graphics.GpuScene.cpp for CXX dependencies
+[379/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/graphics/renderer/Graphics.MaterialSystem.cpp for CXX dependencies
+[380/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/graphics/renderer/Graphics.VisualizationSyncSystem.cpp for CXX dependencies
+[381/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/graphics/renderer/Graphics.ImGuiUploadHelper.cpp for CXX dependencies
+[382/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/graphics/renderer/Graphics.DebugViewSystem.cpp for CXX dependencies
+[383/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/graphics/renderer/Graphics.ImGuiOverlaySystem.cpp for CXX dependencies
+[384/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/graphics/renderer/Graphics.LightSystem.cpp for CXX dependencies
+[385/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/graphics/renderer/Graphics.SpatialDebugVisualizers.cpp for CXX dependencies
+[386/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/graphics/renderer/Graphics.SelectionSystem.cpp for CXX dependencies
+[387/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/graphics/renderer/Graphics.DeferredSystem.cpp for CXX dependencies
+[388/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/graphics/renderer/Graphics.ForwardSystem.cpp for CXX dependencies
+[389/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/graphics/renderer/Graphics.CullingSystem.cpp for CXX dependencies
+[390/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/graphics/renderer/Components/Graphics.Component.GpuSceneSlot.cpp for CXX dependencies
+[391/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/graphics/renderer/Graphics.HZB.cpp for CXX dependencies
+[392/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/graphics/renderer/Graphics.PostProcessSystem.cpp for CXX dependencies
+[393/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/graphics/renderer/Passes/Pass.Deferred.Lighting.cpp for CXX dependencies
+[394/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/graphics/renderer/Graphics.Reconstruction.cpp for CXX dependencies
+[395/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/graphics/renderer/Graphics.LightClusters.cpp for CXX dependencies
+[396/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/graphics/renderer/Passes/Pass.Deferred.GBuffers.cpp for CXX dependencies
+[397/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/graphics/renderer/Backends/Null/Backends.Null.cpp for CXX dependencies
+[398/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/graphics/renderer/Graphics.ShadowSystem.cpp for CXX dependencies
+[399/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/graphics/renderer/Passes/Pass.Forward.Line.cpp for CXX dependencies
+[400/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/graphics/renderer/Backends/Null/Backends.Null.Profiler.cpp for CXX dependencies
+[401/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/graphics/renderer/Passes/Pass.DepthPrepass.cpp for CXX dependencies
+[402/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/graphics/renderer/Passes/Pass.PostProcess.Bloom.cpp for CXX dependencies
+[403/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/graphics/renderer/Passes/Pass.Forward.Point.cpp for CXX dependencies
+[404/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/graphics/renderer/Passes/Pass.Forward.Surface.cpp for CXX dependencies
+[405/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/graphics/renderer/Graphics.UvView.cpp for CXX dependencies
+[406/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/graphics/renderer/Backends/Null/Backends.Null.Bindless.cpp for CXX dependencies
+[407/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/graphics/renderer/Passes/Pass.PostProcess.Histogram.cpp for CXX dependencies
+[408/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/graphics/renderer/Passes/Pass.Selection.EdgeId.cpp for CXX dependencies
+[409/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/graphics/renderer/Graphics.TransformSyncSystem.cpp for CXX dependencies
+[410/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/graphics/renderer/Passes/Pass.ImGui.cpp for CXX dependencies
+[411/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/graphics/renderer/Passes/Pass.Selection.EntityId.cpp for CXX dependencies
+[412/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/graphics/renderer/Passes/Pass.Selection.FaceId.cpp for CXX dependencies
+[413/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/graphics/renderer/Backends/Null/Backends.Null.Transfer.cpp for CXX dependencies
+[414/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/graphics/renderer/Passes/Pass.Selection.Outline.cpp for CXX dependencies
+[415/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/graphics/renderer/Passes/Pass.TransientDebug.Surface.cpp for CXX dependencies
+[416/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/graphics/renderer/Passes/Pass.Selection.PointId.cpp for CXX dependencies
+[417/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/graphics/renderer/Passes/Pass.Shadows.cpp for CXX dependencies
+[418/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/graphics/renderer/Graphics.Colormap.cppm for CXX dependencies
+[419/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/graphics/renderer/Passes/Pass.VisualizationOverlay.cpp for CXX dependencies
+[420/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/graphics/renderer/Graphics.ComputeParallelPrimitives.cppm for CXX dependencies
+[421/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/graphics/renderer/Graphics.CurrentRendererContractAdapter.cppm for CXX dependencies
+[422/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/graphics/renderer/Graphics.RenderSubsystemRegistry.cppm for CXX dependencies
+[423/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/graphics/renderer/Graphics.RenderRecipeConfig.cppm for CXX dependencies
+[424/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/graphics/renderer/Graphics.RenderingContract.cppm for CXX dependencies
+[425/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/graphics/renderer/Graphics.RenderWorld.cppm for CXX dependencies
+[426/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/graphics/renderer/Graphics.SharedRenderRecipeExecution.cppm for CXX dependencies
+[427/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/graphics/renderer/Graphics.RenderCommandRouter.cppm for CXX dependencies
+[428/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/graphics/renderer/Graphics.FrameRecipe.cppm for CXX dependencies
+[429/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/graphics/renderer/Graphics.Renderer.cppm for CXX dependencies
+[430/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/graphics/renderer/Graphics.CameraSnapshots.cppm for CXX dependencies
+[431/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/graphics/renderer/Graphics.RenderPrepPipeline.cppm for CXX dependencies
+[432/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/graphics/renderer/Graphics.PropertyTextureBake.cppm for CXX dependencies
+[433/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/graphics/renderer/Graphics.GeometryResidency.cppm for CXX dependencies
+[434/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/graphics/renderer/Graphics.Material.cppm for CXX dependencies
+[435/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/graphics/renderer/Graphics.GpuTransfer.cppm for CXX dependencies
+[436/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/graphics/renderer/Graphics.ColormapSystem.cppm for CXX dependencies
+[437/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/graphics/renderer/Graphics.DebugViewSystem.cppm for CXX dependencies
+[438/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/graphics/renderer/Graphics.GpuWorld.cppm for CXX dependencies
+[439/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/graphics/renderer/Graphics.VisualizationSyncSystem.cppm for CXX dependencies
+[440/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/graphics/renderer/Graphics.MaterialSystem.cppm for CXX dependencies
+[441/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/graphics/renderer/Graphics.ImGuiOverlaySystem.cppm for CXX dependencies
+[442/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/graphics/renderer/Graphics.ImGuiUploadHelper.cppm for CXX dependencies
+[443/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/graphics/renderer/Graphics.SelectionSystem.cppm for CXX dependencies
+[444/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/graphics/renderer/Graphics.ForwardSystem.cppm for CXX dependencies
+[445/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/graphics/renderer/Graphics.VisualizationPackets.cppm for CXX dependencies
+[446/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/graphics/renderer/Graphics.VisualizationPropertyBufferResidency.cppm for CXX dependencies
+[447/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/graphics/renderer/Graphics.CullingSystem.cppm for CXX dependencies
+[448/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/graphics/renderer/Graphics.SpatialDebugVisualizers.cppm for CXX dependencies
+[449/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/graphics/renderer/Graphics.DeferredSystem.cppm for CXX dependencies
+[450/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/graphics/renderer/Graphics.GpuScene.cppm for CXX dependencies
+[451/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/graphics/renderer/Graphics.LightClusters.cppm for CXX dependencies
+[452/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/graphics/renderer/Graphics.LightSystem.cppm for CXX dependencies
+[453/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/graphics/renderer/Graphics.PostProcessSystem.cppm for CXX dependencies
+[454/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/graphics/renderer/Graphics.Reconstruction.cppm for CXX dependencies
+[455/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/graphics/renderer/Graphics.HZB.cppm for CXX dependencies
+[456/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/graphics/renderer/Graphics.UvView.cppm for CXX dependencies
+[457/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/graphics/renderer/Passes/Pass.DepthPrepass.cppm for CXX dependencies
+[458/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/graphics/renderer/Passes/Pass.Deferred.GBuffers.cppm for CXX dependencies
+[459/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/graphics/renderer/Graphics.VisualizationOverlayUploadHelper.cppm for CXX dependencies
+[460/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/graphics/renderer/Components/Graphics.Component.GpuSceneSlot.cppm for CXX dependencies
+[461/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/graphics/renderer/Graphics.TransformSyncSystem.cppm for CXX dependencies
+[462/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/graphics/renderer/Passes/Pass.Forward.Line.cppm for CXX dependencies
+[463/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/graphics/renderer/Graphics.TransientDebugUploadHelper.cppm for CXX dependencies
+[464/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/graphics/renderer/Components/Graphics.Component.Material.cppm for CXX dependencies
+[465/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/graphics/renderer/Graphics.ShadowSystem.cppm for CXX dependencies
+[466/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/graphics/renderer/Passes/Pass.Forward.Point.cppm for CXX dependencies
+[467/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/graphics/renderer/Passes/Pass.Forward.Surface.cppm for CXX dependencies
+[468/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/graphics/renderer/Passes/Pass.PostProcess.Bloom.cppm for CXX dependencies
+[469/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/graphics/renderer/Passes/Pass.PostProcess.SMAA.cppm for CXX dependencies
+[470/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/graphics/renderer/Components/Graphics.Component.RenderGeometry.cppm for CXX dependencies
+[471/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/graphics/renderer/Passes/Pass.PostProcess.ToneMap.cppm for CXX dependencies
+[472/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/graphics/renderer/Passes/Pass.Selection.Outline.cppm for CXX dependencies
+[473/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/graphics/renderer/Passes/Pass.Selection.EntityId.cppm for CXX dependencies
+[474/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/graphics/renderer/Passes/Pass.Selection.EdgeId.cppm for CXX dependencies
+[475/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/graphics/renderer/Components/Graphics.Component.VisualizationConfig.cppm for CXX dependencies
+[476/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/graphics/renderer/Backends/Null/Backends.Null.cppm for CXX dependencies
+[477/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/graphics/renderer/Passes/Pass.PostProcess.FXAA.cppm for CXX dependencies
+[478/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/graphics/renderer/Passes/Pass.PostProcess.Histogram.cppm for CXX dependencies
+[479/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/graphics/renderer/Passes/Pass.Selection.PointId.cppm for CXX dependencies
+[480/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/graphics/renderer/Passes/Pass.Shadows.cppm for CXX dependencies
+[481/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/graphics/renderer/Passes/Pass.Selection.FaceId.cppm for CXX dependencies
+[482/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/graphics/renderer/Passes/Pass.TransientDebug.Surface.cppm for CXX dependencies
+[483/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/graphics/renderer/Passes/Pass.VisualizationOverlay.cppm for CXX dependencies
+[484/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/graphics/vulkan/Backends.Vulkan.OperationalStatus.cpp for CXX dependencies
+[485/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/graphics/vulkan/Backends.Vulkan.Mappings.cpp for CXX dependencies
+[486/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/graphics/vulkan/Backends.Vulkan.DiagnosticsLogging.cpp for CXX dependencies
+[487/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/graphics/vulkan/Backends.Vulkan.Staging.cpp for CXX dependencies
+[488/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/graphics/vulkan/Backends.Vulkan.CommandContext.cpp for CXX dependencies
+[489/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/graphics/vulkan/Backends.Vulkan.CommandPools.cppm for CXX dependencies
+[490/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/graphics/vulkan/Backends.Vulkan.cppm for CXX dependencies
+[491/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/graphics/vulkan/Backends.Vulkan.Bindless.cpp for CXX dependencies
+[492/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/graphics/vulkan/Vma.cpp for CXX dependencies
+[493/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/graphics/vulkan/Backends.Vulkan.OperationalStatus.cppm for CXX dependencies
+[494/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/graphics/vulkan/Backends.Vulkan.Memory.cppm for CXX dependencies
+[495/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/graphics/vulkan/Backends.Vulkan.Descriptors.cppm for CXX dependencies
+[496/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/graphics/vulkan/Backends.Vulkan.Profiler.cpp for CXX dependencies
+[497/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/graphics/vulkan/Backends.Vulkan.Diagnostics.cppm for CXX dependencies
+[498/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/graphics/vulkan/Backends.Vulkan.Device.cppm for CXX dependencies
+[499/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/graphics/vulkan/Backends.Vulkan.Surface.cppm for CXX dependencies
+[500/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/graphics/vulkan/Backends.Vulkan.Transfer.cpp for CXX dependencies
+[501/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/graphics/vulkan/Backends.Vulkan.Pipelines.cppm for CXX dependencies
+[502/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/graphics/vulkan/Backends.Vulkan.Queues.cppm for CXX dependencies
+[503/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/graphics/vulkan/Backends.Vulkan.Device.cpp for CXX dependencies
+[504/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/graphics/framegraph/Graphics.RenderGraph.Barriers.cpp for CXX dependencies
+[505/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/graphics/vulkan/Backends.Vulkan.Swapchain.cppm for CXX dependencies
+[506/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/graphics/framegraph/Graphics.RenderGraph.TransientAllocator.cpp for CXX dependencies
+[507/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/graphics/vulkan/Backends.Vulkan.Sync.cppm for CXX dependencies
+[508/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/graphics/framegraph/Graphics.RenderGraph.cpp for CXX dependencies
+[509/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/graphics/framegraph/Graphics.RenderGraph.Compiler.cppm for CXX dependencies
+[510/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/graphics/framegraph/Graphics.RenderGraph.Executor.cppm for CXX dependencies
+[511/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/graphics/framegraph/Graphics.RenderGraph.TransientAllocator.cppm for CXX dependencies
+[512/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/graphics/framegraph/Graphics.RenderGraph.Compiler.cpp for CXX dependencies
+[513/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/graphics/framegraph/Graphics.RenderGraph.Executor.cpp for CXX dependencies
+[514/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/graphics/framegraph/Graphics.RenderGraph.Resources.cppm for CXX dependencies
+[515/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/graphics/framegraph/Graphics.RenderGraph.cppm for CXX dependencies
+[516/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/platform/Platform.Input.cpp for CXX dependencies
+[517/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/graphics/framegraph/Graphics.RenderGraph.Barriers.cppm for CXX dependencies
+[518/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/platform/Platform.Input.cppm for CXX dependencies
+[519/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/graphics/framegraph/Graphics.RenderGraph.Pass.cppm for CXX dependencies
+[520/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/graphics/vulkan/Backends.Vulkan.Transfer.cppm for CXX dependencies
+[521/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/platform/Platform.CreateWindow.cpp for CXX dependencies
+[522/1312] Generating CXX dyndep file src/graphics/framegraph/CMakeFiles/ExtrinsicGraphicsRenderGraph.dir/CXX.dd
+[523/1312] Generating CXX dyndep file src_graphics_vulkan/CMakeFiles/ExtrinsicBackendsVulkan.dir/CXX.dd
+[524/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/runtime/Kernel/Runtime.AsyncWorkModule.cpp for CXX dependencies
+[525/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/platform/backends/null/Platform.Backend.Null.cppm for CXX dependencies
+[526/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/platform/backends/glfw/Platform.Backend.Glfw.cpp for CXX dependencies
+[527/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/platform/Platform.IWindow.cppm for CXX dependencies
+[528/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/platform/backends/glfw/Platform.Backend.Glfw.cppm for CXX dependencies
+[529/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/runtime/AssetWorkflow/Runtime.AssetWorkflowModule.cpp for CXX dependencies
+[530/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/platform/backends/null/Platform.Backend.Null.cpp for CXX dependencies
+[531/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/runtime/AssetWorkflow/Runtime.AssetIngestStateMachine.cpp for CXX dependencies
+[532/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/runtime/AssetWorkflow/Runtime.AssetWorkflowImportExecutor.cpp for CXX dependencies
+[533/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/runtime/AssetWorkflow/Runtime.AssetWorkflowGeometryMaterialization.cpp for CXX dependencies
+[534/1312] Generating CXX dyndep file src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/CXX.dd
+[535/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/runtime/AssetWorkflow/Runtime.AssetWorkflowModelMaterialization.cpp for CXX dependencies
+[536/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/runtime/Kernel/Runtime.CommandBus.cpp for CXX dependencies
+[537/1312] Generating CXX dyndep file src/platform/CMakeFiles/ExtrinsicPlatform.dir/CXX.dd
+[538/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/runtime/Kernel/Runtime.DeviceBootstrap.cpp for CXX dependencies
+[539/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/runtime/AssetWorkflow/Runtime.AssetWorkflowModelTextureDecode.cpp for CXX dependencies
+[540/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/runtime/Modules/Clustering/Runtime.ClusteringGpuBackend.cpp for CXX dependencies
+[541/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/runtime/AssetWorkflow/Runtime.AssetWorkflowRecipePolicies.cpp for CXX dependencies
+[542/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/runtime/AssetWorkflow/Runtime.AssetWorkflowTextureResidency.cpp for CXX dependencies
+[543/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/runtime/Rendering/Runtime.RenderArtifactPublication.cpp for CXX dependencies
+[544/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/runtime/Modules/Clustering/Runtime.ClusteringModule.cpp for CXX dependencies
+[545/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/runtime/GeometryIntegration/Runtime.GeometryPresentation.cpp for CXX dependencies
+[546/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/runtime/Modules/Clustering/Runtime.ClusteringConfig.cpp for CXX dependencies
+[547/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/runtime/Modules/CurvatureSegmentation/Runtime.CurvatureSegmentationConfig.cpp for CXX dependencies
+[548/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/runtime/Modules/ProgressivePoisson/Runtime.ProgressivePoissonConfig.cpp for CXX dependencies
+[549/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/runtime/Modules/Parameterization/Runtime.ParameterizationConfig.cpp for CXX dependencies
+[550/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/runtime/Modules/ProgressivePoisson/Runtime.ProgressivePoissonGpuBackend.cpp for CXX dependencies
+[551/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/runtime/Kernel/Runtime.JobService.cpp for CXX dependencies
+[552/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/runtime/Modules/Clustering/Runtime.ClusteringGpuState.cpp for CXX dependencies
+[553/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/runtime/Editor/Runtime.EditorJobProjection.Public.cpp for CXX dependencies
+[554/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/runtime/Modules/PointCloudConsolidation/Runtime.PointCloudConsolidationConfig.cpp for CXX dependencies
+[555/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/runtime/Editor/Operations/Runtime.SceneEditingOperations.Debug.cpp for CXX dependencies
+[556/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/runtime/Modules/PointCloudConsolidation/Runtime.PointCloudConsolidationModule.cpp for CXX dependencies
+[557/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/runtime/Modules/PointCloudConsolidation/Runtime.PointCloudConsolidationGpu.cpp for CXX dependencies
+[558/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/runtime/Editor/Runtime.EditorCommandHistory.cpp for CXX dependencies
+[559/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/runtime/Editor/Operations/Runtime.SceneEditingOperations.Public.cpp for CXX dependencies
+[560/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/runtime/Editor/Operations/Runtime.VisualizationEditingOperations.Public.cpp for CXX dependencies
+[561/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/runtime/Editor/Runtime.EditorWorkspaceAttachment.cpp for CXX dependencies
+[562/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Public.cpp for CXX dependencies
+[563/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/runtime/Config/internal/Runtime.FeatureConfigCodecs.Detail.cpp for CXX dependencies
+[564/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/runtime/Editor/Operations/Runtime.RenderRecipeEditingOperations.Public.cpp for CXX dependencies
+[565/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/runtime/Editor/Operations/Runtime.VisualizationEditingOperations.Debug.cpp for CXX dependencies
+[566/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/runtime/Editor/Operations/Runtime.SceneEditingOperations.Actions.cpp for CXX dependencies
+[567/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/runtime/Editor/Runtime.EditorWorkspaceSnapshots.Public.cpp for CXX dependencies
+[568/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/runtime/Editor/internal/Runtime.EditorFeatureContextAdapters.cpp for CXX dependencies
+[569/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/runtime/Editor/Operations/Runtime.VisualizationEditingOperations.Actions.cpp for CXX dependencies
+[570/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/runtime/Editor/Operations/Runtime.RenderRecipeEditingOperations.Debug.cpp for CXX dependencies
+[571/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/runtime/Editor/Operations/Runtime.RenderRecipeEditingOperations.cpp for CXX dependencies
+[572/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/runtime/Editor/Runtime.EditorWorkspaceSnapshots.Models.cpp for CXX dependencies
+[573/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/runtime/Editor/Runtime.EditorPropertyWidgets.cpp for CXX dependencies
+[574/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/runtime/Editor/Runtime.EditorUiHost.cpp for CXX dependencies
+[575/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Mesh.cpp for CXX dependencies
+[576/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/runtime/Kernel/Runtime.ServiceRegistry.cpp for CXX dependencies
+[577/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.cpp for CXX dependencies
+[578/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/runtime/Editor/internal/Runtime.EditorWorkspaceSession.cpp for CXX dependencies
+[579/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/runtime/Config/Runtime.EngineConfigBoot.cpp for CXX dependencies
+[580/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/runtime/Editor/Runtime.EditorWindowRegistry.cpp for CXX dependencies
+[581/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/runtime/Editor/Operations/Runtime.ParameterizationOperations.cpp for CXX dependencies
+[582/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/runtime/Kernel/Runtime.InputActions.cpp for CXX dependencies
+[583/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/runtime/Config/Runtime.EngineConfigControl.cpp for CXX dependencies
+[584/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/runtime/Editor/Runtime.EditorUiModule.cpp for CXX dependencies
+[585/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/runtime/Kernel/Runtime.KernelEvents.cpp for CXX dependencies
+[586/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/runtime/Kernel/Runtime.Engine.cpp for CXX dependencies
+[587/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/runtime/Kernel/Runtime.WorldRegistry.cpp for CXX dependencies
+[588/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/runtime/Cameras/Runtime.CameraModule.cpp for CXX dependencies
+[589/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/runtime/GeometryIntegration/Runtime.GeometryAvailability.cpp for CXX dependencies
+[590/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/runtime/Scene/Runtime.SceneInteractionModule.cpp for CXX dependencies
+[591/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/runtime/GeometryIntegration/Runtime.GeometryPlanBuilders.Mesh.cpp for CXX dependencies
+[592/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/runtime/GeometryIntegration/Runtime.GeometryPlanBuilders.Graph.cpp for CXX dependencies
+[593/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/runtime/Modules/PhysicsIntegration/Runtime.PhysicsModule.cpp for CXX dependencies
+[594/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/runtime/Gizmos/Runtime.GizmoInteraction.cpp for CXX dependencies
+[595/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/runtime/GeometryIntegration/Runtime.GeometryPlanBuilders.PointCloud.cpp for CXX dependencies
+[596/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/runtime/Cameras/Runtime.CameraFocusCommand.cpp for CXX dependencies
+[597/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/runtime/GeometryIntegration/Runtime.GeometryPlanBuilders.MeshPrimitiveView.cpp for CXX dependencies
+[598/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/runtime/Scene/Runtime.SceneDocumentModule.cpp for CXX dependencies
+[599/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/runtime/GeometryIntegration/Runtime.GeometryPlanBuilders.Procedural.cpp for CXX dependencies
+[600/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/runtime/Cameras/Runtime.CameraControllers.cpp for CXX dependencies
+[601/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/runtime/Scene/Runtime.SceneSerialization.cpp for CXX dependencies
+[602/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/runtime/ImGui/Runtime.ImGuiAdapter.cpp for CXX dependencies
+[603/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/runtime/Config/Runtime.RenderRecipeActivation.cpp for CXX dependencies
+[604/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/runtime/GeometryIntegration/Runtime.MeshSurfaceTopology.cpp for CXX dependencies
+[605/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/runtime/Rendering/Runtime.RenderWorldPool.cpp for CXX dependencies
+[606/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/runtime/Scene/Runtime.ReferenceScene.cpp for CXX dependencies
+[607/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/runtime/Rendering/Runtime.RenderExtraction.Recipes.cpp for CXX dependencies
+[608/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/runtime/Scene/Runtime.SelectionController.cpp for CXX dependencies
+[609/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/runtime/GeometryIntegration/Runtime.PrimitiveSelectionRefinement.cpp for CXX dependencies
+[610/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/runtime/GeometryIntegration/Runtime.VertexChannelStreams.cpp for CXX dependencies
+[611/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/runtime/Kernel/Runtime.AsyncWorkModule.cppm for CXX dependencies
+[612/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/runtime/Rendering/Runtime.RenderExtraction.cpp for CXX dependencies
+[613/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/runtime/Rendering/Runtime.RenderExtraction.Geometry.cpp for CXX dependencies
+[614/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/runtime/GeometryIntegration/Runtime.VertexAttributeBinding.cpp for CXX dependencies
+[615/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/runtime/Visualization/Runtime.VisualizationRecipes.cpp for CXX dependencies
+[616/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/runtime/AssetWorkflow/Runtime.AssetIngestStateMachine.cppm for CXX dependencies
+[617/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/runtime/Scene/Runtime.StableEntityLookup.cpp for CXX dependencies
+[618/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/runtime/Modules/TextureBake/Runtime.TextureBakeModule.cpp for CXX dependencies
+[619/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/runtime/Kernel/Runtime.DeviceBootstrap.cppm for CXX dependencies
+[620/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/runtime/Kernel/Runtime.CommandBus.cppm for CXX dependencies
+[621/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/runtime/Kernel/Runtime.JobService.cppm for CXX dependencies
+[622/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/runtime/Modules/Clustering/Runtime.ClusteringGpuBackend.cppm for CXX dependencies
+[623/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/runtime/Modules/Clustering/Runtime.ClusteringModule.cppm for CXX dependencies
+[624/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/runtime/AssetWorkflow/Runtime.AssetWorkflowModule.cppm for CXX dependencies
+[625/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/runtime/Modules/ProgressivePoisson/Runtime.ProgressivePoissonConfig.cppm for CXX dependencies
+[626/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/runtime/Modules/ProgressivePoisson/Runtime.ProgressivePoissonGpuBackend.cppm for CXX dependencies
+[627/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/runtime/Modules/Parameterization/Runtime.ParameterizationConfig.cppm for CXX dependencies
+[628/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/runtime/Rendering/Runtime.RenderArtifactPublication.cppm for CXX dependencies
+[629/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/runtime/Modules/CurvatureSegmentation/Runtime.CurvatureSegmentationConfig.cppm for CXX dependencies
+[630/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/runtime/Modules/Clustering/Runtime.ClusteringConfig.cppm for CXX dependencies
+[631/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/runtime/GeometryIntegration/Runtime.GeometryPresentation.cppm for CXX dependencies
+[632/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/runtime/Modules/PointCloudConsolidation/Runtime.PointCloudConsolidationConfig.cppm for CXX dependencies
+[633/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/runtime/Editor/Runtime.EditorCommon.cppm for CXX dependencies
+[634/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/runtime/Modules/PointCloudConsolidation/Runtime.PointCloudConsolidationModule.cppm for CXX dependencies
+[635/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/runtime/Editor/Runtime.EditorJobProjection.cppm for CXX dependencies
+[636/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/runtime/Editor/Runtime.EditorPropertyWidgets.cppm for CXX dependencies
+[637/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/runtime/Editor/Runtime.EditorWorkspaceAttachment.cppm for CXX dependencies
+[638/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/runtime/Editor/Runtime.EditorCommandHistory.cppm for CXX dependencies
+[639/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/runtime/Editor/Runtime.EditorWorkspaceSnapshots.cppm for CXX dependencies
+[640/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/runtime/Editor/Runtime.EditorWindowRegistry.cppm for CXX dependencies
+[641/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/runtime/Editor/Operations/Runtime.RenderRecipeEditingOperations.cppm for CXX dependencies
+[642/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/runtime/Editor/Runtime.EditorUiHost.cppm for CXX dependencies
+[643/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/runtime/Kernel/Runtime.FramePacingDiagnostics.cppm for CXX dependencies
+[644/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/runtime/Editor/Operations/Runtime.VisualizationEditingOperations.cppm for CXX dependencies
+[645/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/runtime/Config/Runtime.EngineConfigControl.cppm for CXX dependencies
+[646/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.cppm for CXX dependencies
+[647/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/runtime/Editor/Runtime.EditorUiModule.cppm for CXX dependencies
+[648/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/runtime/Kernel/Runtime.Engine.cppm for CXX dependencies
+[649/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/runtime/Kernel/Runtime.WorldHandle.cppm for CXX dependencies
+[650/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/runtime/Editor/Operations/Runtime.SceneEditingOperations.cppm for CXX dependencies
+[651/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/runtime/Config/Runtime.EngineConfigBoot.cppm for CXX dependencies
+[652/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/runtime/Kernel/Runtime.ServiceRegistry.cppm for CXX dependencies
+[653/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/runtime/Kernel/Runtime.KernelEvents.cppm for CXX dependencies
+[654/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/runtime/Kernel/Runtime.Module.cppm for CXX dependencies
+[655/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/runtime/Cameras/Runtime.CameraModule.cppm for CXX dependencies
+[656/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/runtime/Kernel/Runtime.WorldRegistry.cppm for CXX dependencies
+[657/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/runtime/Kernel/Runtime.InputActions.cppm for CXX dependencies
+[658/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/runtime/Cameras/Runtime.CameraFocusCommand.cppm for CXX dependencies
+[659/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/runtime/GeometryIntegration/Runtime.MeshPrimitiveView.cppm for CXX dependencies
+[660/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/runtime/GeometryIntegration/Runtime.GeometryAvailability.cppm for CXX dependencies
+[661/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/runtime/Scene/Runtime.SceneDocumentModule.cppm for CXX dependencies
+[662/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/runtime/Gizmos/Runtime.GizmoInteraction.cppm for CXX dependencies
+[663/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/runtime/Scene/Runtime.SceneSerialization.cppm for CXX dependencies
+[664/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/runtime/Cameras/Runtime.CameraControllers.cppm for CXX dependencies
+[665/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/runtime/ImGui/Runtime.ImGuiAdapter.cppm for CXX dependencies
+[666/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/runtime/Scene/Runtime.SceneInteractionModule.cppm for CXX dependencies
+[667/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/runtime/Scene/Runtime.ReferenceScene.cppm for CXX dependencies
+[668/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/runtime/Rendering/Runtime.RenderWorldPool.cppm for CXX dependencies
+[669/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/runtime/GeometryIntegration/Runtime.MeshSurfaceTopology.cppm for CXX dependencies
+[670/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/runtime/GeometryIntegration/Runtime.VertexChannelBindings.cppm for CXX dependencies
+[671/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/runtime/Modules/PhysicsIntegration/Runtime.PhysicsModule.cppm for CXX dependencies
+[672/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/runtime/Scene/Runtime.SelectionController.cppm for CXX dependencies
+[673/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/runtime/Config/Runtime.RenderRecipeActivation.cppm for CXX dependencies
+[674/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/runtime/GeometryIntegration/Runtime.PrimitiveSelectionRefinement.cppm for CXX dependencies
+[675/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/runtime/Rendering/Runtime.RenderExtraction.cppm for CXX dependencies
+[676/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/runtime/GeometryIntegration/Runtime.VertexAttributeBinding.cppm for CXX dependencies
+[677/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/runtime/AssetWorkflow/Runtime.AssetWorkflowModelTextureDecode.cppm for CXX dependencies
+[678/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/runtime/Config/internal/Runtime.FeatureConfigCodecs.Detail.cppm for CXX dependencies
+[679/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/runtime/Scene/Runtime.StableEntityLookup.cppm for CXX dependencies
+[680/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/runtime/Modules/TextureBake/Runtime.TextureBakeModule.cppm for CXX dependencies
+[681/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/runtime/GeometryIntegration/Runtime.VertexChannelStreams.cppm for CXX dependencies
+[682/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/runtime/Editor/internal/Runtime.EditorWorkspaceAttachment.Detail.cppm for CXX dependencies
+[683/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/runtime/AssetWorkflow/Runtime.AssetWorkflowRecipePolicies.cppm for CXX dependencies
+[684/1312] Building CXX object src/graphics/renderer/CMakeFiles/ExtrinsicGraphics.dir/Graphics.PropertyTextureBake.cpp.o
+[685/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/runtime/AssetWorkflow/Runtime.AssetWorkflowGeometryMaterialization.cppm for CXX dependencies
+[686/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/runtime/GeometryIntegration/Runtime.GeometryPlanBuilders.cppm for CXX dependencies
+[687/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/runtime/Visualization/Runtime.VisualizationRecipes.cppm for CXX dependencies
+[688/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/runtime/Editor/internal/Runtime.EditorFeatures.Detail.cppm for CXX dependencies
+[689/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/runtime/AssetWorkflow/Runtime.AssetWorkflowTextureResidency.cppm for CXX dependencies
+[690/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/app/Sandbox/Sandbox.ConfigSections.cpp for CXX dependencies
+[691/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/runtime/AssetWorkflow/Runtime.AssetWorkflowImportExecutor.cppm for CXX dependencies
+[692/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/runtime/AssetWorkflow/Runtime.AssetWorkflowModelMaterialization.cppm for CXX dependencies
+[693/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/app/Sandbox/Editor/Sandbox.EditorController.cpp for CXX dependencies
+[694/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/app/Sandbox/Sandbox.ConfigSections.cppm for CXX dependencies
+[695/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/runtime/Rendering/Runtime.RenderExtraction.Internal.cpp for CXX dependencies
+[696/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/app/Sandbox/Editor/Sandbox.EditorController.cppm for CXX dependencies
+[697/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/app/Sandbox/Editor/Sandbox.MeshProcessingPanels.cpp for CXX dependencies
+[698/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/app/Sandbox/Editor/Sandbox.DomainPanels.cpp for CXX dependencies
+[699/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/app/Sandbox/Editor/Sandbox.MethodPanels.cpp for CXX dependencies
+[700/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/app/Sandbox/Editor/Sandbox.MethodPanels.cppm for CXX dependencies
+[701/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/app/Sandbox/Editor/Sandbox.EditorShell.cpp for CXX dependencies
+[702/1312] Scanning /home/alex/Documents/IntrinsicEngine/src/app/Sandbox/Editor/Sandbox.DomainPanels.cppm for CXX dependencies
+[703/1312] Generating CXX dyndep file src/runtime/CMakeFiles/ExtrinsicRuntime.dir/CXX.dd
+[704/1380] Scanning /home/alex/Documents/IntrinsicEngine/src/app/Sandbox/Sandbox.cpp for CXX dependencies
+[705/1380] Scanning /home/alex/Documents/IntrinsicEngine/src/app/Sandbox/Editor/Sandbox.EditorShell.cppm for CXX dependencies
+[706/1380] Scanning /home/alex/Documents/IntrinsicEngine/src/app/Sandbox/Sandbox.cppm for CXX dependencies
+[707/1380] Scanning /home/alex/Documents/IntrinsicEngine/benchmarks/runners/BenchmarkSmokeRunner.cpp for CXX dependencies
+[708/1380] Scanning /home/alex/Documents/IntrinsicEngine/src/app/Sandbox/Editor/Sandbox.MeshProcessingPanels.cppm for CXX dependencies
+[709/1380] Scanning /home/alex/Documents/IntrinsicEngine/benchmarks/core/Bench_SchedulerHardeningSmoke.cpp for CXX dependencies
+[710/1380] Scanning /home/alex/Documents/IntrinsicEngine/benchmarks/geometry/Bench_BoundaryFirstFlatteningReferenceSmoke.cpp for CXX dependencies
+[711/1380] Scanning /home/alex/Documents/IntrinsicEngine/benchmarks/core/Bench_TaskGraphPlanReuseSmoke.cpp for CXX dependencies
+[712/1380] Scanning /home/alex/Documents/IntrinsicEngine/benchmarks/geometry/Bench_EdgeAwareResamplingReferenceSmoke.cpp for CXX dependencies
+[713/1380] Scanning /home/alex/Documents/IntrinsicEngine/benchmarks/geometry/Bench_LopFamilyComparisonSmoke.cpp for CXX dependencies
+[714/1380] Scanning /home/alex/Documents/IntrinsicEngine/benchmarks/geometry/Bench_CurvatureSegmentationReferenceSmoke.cpp for CXX dependencies
+[715/1380] Scanning /home/alex/Documents/IntrinsicEngine/benchmarks/geometry/Bench_ContinuousLopReferenceSmoke.cpp for CXX dependencies
+[716/1380] Generating CXX dyndep file src/app/Sandbox/CMakeFiles/ExtrinsicSandboxEditor.dir/CXX.dd
+[717/1386] Scanning /home/alex/Documents/IntrinsicEngine/benchmarks/geometry/Bench_ExampleSmoke.cpp for CXX dependencies
+[718/1386] Scanning /home/alex/Documents/IntrinsicEngine/benchmarks/geometry/Bench_ProgressivePoissonReferenceSmoke.cpp for CXX dependencies
+[719/1386] Scanning /home/alex/Documents/IntrinsicEngine/benchmarks/geometry/Bench_PointCloudFilteringSmoke.cpp for CXX dependencies
+[720/1386] Scanning /home/alex/Documents/IntrinsicEngine/benchmarks/geometry/Bench_PointCloudConsolidationReferenceSmoke.cpp for CXX dependencies
+[721/1386] Scanning /home/alex/Documents/IntrinsicEngine/benchmarks/geometry/Bench_QualityMetricsSmoke.cpp for CXX dependencies
+[722/1386] Scanning /home/alex/Documents/IntrinsicEngine/benchmarks/physics/Bench_RigidBodyReferenceSmoke.cpp for CXX dependencies
+[723/1386] Scanning /home/alex/Documents/IntrinsicEngine/benchmarks/geometry/Bench_SimplificationQualitySmoke.cpp for CXX dependencies
+[724/1386] Scanning /home/alex/Documents/IntrinsicEngine/benchmarks/physics/Bench_ParticleSpringReferenceSmoke.cpp for CXX dependencies
+[725/1386] Linking CXX static library lib/libExtrinsicGraphics.a
+[726/1386] Scanning /home/alex/Documents/IntrinsicEngine/benchmarks/geometry/Bench_SurfaceSamplingSmoke.cpp for CXX dependencies
+[727/1386] Scanning /home/alex/Documents/IntrinsicEngine/benchmarks/geometry/Bench_SignedHeatReferenceSmoke.cpp for CXX dependencies
+[728/1386] Scanning /home/alex/Documents/IntrinsicEngine/benchmarks/physics/Bench_SphFluidReferenceSmoke.cpp for CXX dependencies
+[729/1386] Scanning /home/alex/Documents/IntrinsicEngine/benchmarks/physics/Bench_XpbdClothReferenceSmoke.cpp for CXX dependencies
+[730/1386] Scanning /home/alex/Documents/IntrinsicEngine/benchmarks/geometry/Bench_UvAtlasSmoke.cpp for CXX dependencies
+[731/1386] Scanning /home/alex/Documents/IntrinsicEngine/benchmarks/rendering/Bench_FramegraphBarrierEmissionSmoke.cpp for CXX dependencies
+[732/1386] Scanning /home/alex/Documents/IntrinsicEngine/methods/physics/rigid_body_reference/src/RigidBodyReference.cpp for CXX dependencies
+[733/1386] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.HalfedgeMesh.CurvatureSegmentation.cppm.o
+[734/1386] Scanning /home/alex/Documents/IntrinsicEngine/benchmarks/rendering/Bench_FramegraphCompilerIndexingSmoke.cpp for CXX dependencies
+[735/1386] Scanning /home/alex/Documents/IntrinsicEngine/methods/physics/sph_fluid_reference/src/SphFluidReference.cpp for CXX dependencies
+[736/1386] Scanning /home/alex/Documents/IntrinsicEngine/benchmarks/rendering/Bench_FrameRecipeCompileCacheSmoke.cpp for CXX dependencies
+[737/1386] Scanning /home/alex/Documents/IntrinsicEngine/benchmarks/rendering/Bench_FramegraphScratchReuseSmoke.cpp for CXX dependencies
+[738/1386] Scanning /home/alex/Documents/IntrinsicEngine/benchmarks/rendering/Bench_RenderGraphParallelRecordingSmoke.cpp for CXX dependencies
+[739/1386] Scanning /home/alex/Documents/IntrinsicEngine/methods/physics/particle_spring_reference/src/ParticleSpringReference.cpp for CXX dependencies
+[740/1386] Scanning /home/alex/Documents/IntrinsicEngine/benchmarks/rendering/Bench_VertexFetchLayoutSmoke.cpp for CXX dependencies
+[741/1386] Scanning /home/alex/Documents/IntrinsicEngine/methods/physics/xpbd_cloth_reference/src/XpbdClothReference.cpp for CXX dependencies
+[742/1386] Generating CXX dyndep file benchmarks/CMakeFiles/IntrinsicBenchmarkSmoke.dir/CXX.dd
+[743/1386] Compiling GLSL -> SPV: debug_surface.vert
+[744/1386] Compiling GLSL -> SPV: debug_view.comp
+[745/1386] Compiling GLSL -> SPV: culling/instance_cull.comp
+[746/1386] Compiling GLSL -> SPV: debug_view.frag
+[747/1386] Compiling GLSL -> SPV: cluster_grid_build.comp
+[748/1386] Compiling GLSL -> SPV: deferred/gbuffer.frag
+[749/1386] Compiling GLSL -> SPV: deferred/gbuffer.vert
+[750/1386] Compiling GLSL -> SPV: debug_view.vert
+[751/1386] Compiling GLSL -> SPV: debug_surface.frag
+[752/1386] Compiling GLSL -> SPV: deferred_lighting.frag
+[753/1386] Compiling GLSL -> SPV: deferred/default_debug_gbuffer.frag
+[754/1386] Compiling GLSL -> SPV: depth_prepass.vert
+[755/1386] Compiling GLSL -> SPV: deferred/lighting.frag
+[756/1386] Compiling GLSL -> SPV: forward/default_debug_surface.frag
+[757/1386] Compiling GLSL -> SPV: forward/line.frag
+[758/1386] Compiling GLSL -> SPV: forward/default_debug_surface.vert
+[759/1386] Compiling GLSL -> SPV: forward/point.frag
+[760/1386] Compiling GLSL -> SPV: forward/line.vert
+[761/1386] Compiling GLSL -> SPV: hzb_build.comp
+[762/1386] Compiling GLSL -> SPV: forward/point.vert
+[763/1386] Compiling GLSL -> SPV: imgui.frag
+[764/1386] Compiling GLSL -> SPV: instance_cull_multigeo.comp
+[765/1386] Compiling GLSL -> SPV: instance_cull.comp
+[766/1386] Compiling GLSL -> SPV: kmeans_assign.comp
+[767/1386] Compiling GLSL -> SPV: kmeans_reset.comp
+[768/1386] Compiling GLSL -> SPV: kmeans_update.comp
+[769/1386] Compiling GLSL -> SPV: imgui.vert
+[770/1386] Compiling GLSL -> SPV: lop_final_reduce.comp
+[771/1386] Compiling GLSL -> SPV: lop_density.comp
+[772/1386] Compiling GLSL -> SPV: line.vert
+[773/1386] Compiling GLSL -> SPV: light_cluster_assign.comp
+[774/1386] Compiling GLSL -> SPV: lop_grid_count.comp
+[775/1386] Compiling GLSL -> SPV: lop_grid_scatter.comp
+[776/1386] Compiling GLSL -> SPV: lop_initialize.comp
+[777/1386] Compiling GLSL -> SPV: lop_iteration_finalize.comp
+[778/1386] Compiling GLSL -> SPV: line.frag
+[779/1386] Compiling GLSL -> SPV: parallel_compact_by_flags.comp
+[780/1386] Compiling GLSL -> SPV: parallel_scan_add_offsets.comp
+[781/1386] Compiling GLSL -> SPV: lop_iteration_reset.comp
+[782/1386] Compiling GLSL -> SPV: parallel_segmented_float_reduce.comp
+[783/1386] Compiling GLSL -> SPV: lop_project.comp
+[784/1386] Compiling GLSL -> SPV: pick_id.frag
+[785/1386] Compiling GLSL -> SPV: pick_id.vert
+[786/1386] Compiling GLSL -> SPV: parallel_count_to_dispatch_args.comp
+[787/1386] Compiling GLSL -> SPV: pick_line.frag
+[788/1386] Compiling GLSL -> SPV: parallel_prefix_scan.comp
+[789/1386] Compiling GLSL -> SPV: pick_line.vert
+[790/1386] Compiling GLSL -> SPV: pick_mesh.frag
+[791/1386] Compiling GLSL -> SPV: pick_mesh.vert
+[792/1386] Compiling GLSL -> SPV: point.frag
+[793/1386] Compiling GLSL -> SPV: pick_point.frag
+[794/1386] Compiling GLSL -> SPV: point_flatdisc.frag
+[795/1386] Compiling GLSL -> SPV: pick_point.vert
+[796/1386] Compiling GLSL -> SPV: point_retained.frag
+[797/1386] Compiling GLSL -> SPV: point.vert
+[798/1386] Compiling GLSL -> SPV: point_sphere.frag
+[799/1386] Compiling GLSL -> SPV: point_retained.vert
+[800/1386] Compiling GLSL -> SPV: point_flatdisc.vert
+[801/1386] Compiling GLSL -> SPV: point_surfel.frag
+[802/1386] Compiling GLSL -> SPV: point_sphere.vert
+[803/1386] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Modules/CurvatureSegmentation/Runtime.CurvatureSegmentationConfig.cppm.o
+[804/1386] Compiling GLSL -> SPV: post_smaa_edge.frag
+[805/1386] Compiling GLSL -> SPV: post_bloom_downsample.frag
+[806/1386] Compiling GLSL -> SPV: post_fullscreen.vert
+[807/1386] Compiling GLSL -> SPV: post_fxaa.frag
+[808/1386] Compiling GLSL -> SPV: post_smaa_blend.frag
+[809/1386] Compiling GLSL -> SPV: post_histogram.comp
+[810/1386] Compiling GLSL -> SPV: post_tonemap.frag
+[811/1386] Compiling GLSL -> SPV: present.frag
+[812/1386] Compiling GLSL -> SPV: point_surfel.vert
+[813/1386] Compiling GLSL -> SPV: post_bloom_upsample.frag
+[814/1386] Compiling GLSL -> SPV: present.vert
+[815/1386] Compiling GLSL -> SPV: post_smaa_resolve.frag
+[816/1386] Compiling GLSL -> SPV: progressive_poisson_accept_phase.comp
+[817/1386] Compiling GLSL -> SPV: selection/entity_id.frag
+[818/1386] Compiling GLSL -> SPV: selection/edge_id.vert
+[819/1386] Compiling GLSL -> SPV: property_texture_bake.frag
+[820/1386] Compiling GLSL -> SPV: selection/edge_id.frag
+[821/1386] Compiling GLSL -> SPV: selection/entity_id.vert
+[822/1386] Compiling GLSL -> SPV: scene_update.comp
+[823/1386] Compiling GLSL -> SPV: property_texture_bake.vert
+[824/1386] Compiling GLSL -> SPV: property_texture_bake_dilate.frag
+[825/1386] Compiling GLSL -> SPV: progressive_poisson_build_cells.comp
+[826/1386] Building CXX object src/ecs/CMakeFiles/ExtrinsicECS.dir/Components/ECS.Component.GeometrySources.cppm.o
+[827/1386] Compiling GLSL -> SPV: selection/entity_id_outline.frag
+[828/1386] Compiling GLSL -> SPV: selection/point_id.frag
+[829/1386] Compiling GLSL -> SPV: selection/face_id.frag
+[830/1386] Compiling GLSL -> SPV: selection/face_id.vert
+[831/1386] Compiling GLSL -> SPV: selection_outline.frag
+[832/1386] Compiling GLSL -> SPV: transient_debug_line.vert
+[833/1386] Compiling GLSL -> SPV: selection/point_id.vert
+[834/1386] Compiling GLSL -> SPV: shadow_depth.vert
+[835/1386] Compiling GLSL -> SPV: transient_debug_line.frag
+[836/1386] Compiling GLSL -> SPV: tests/hzb_conservatism_smoke.comp
+[837/1386] Compiling GLSL -> SPV: surface.frag
+[838/1386] Compiling GLSL -> SPV: surface_gbuffer.frag
+[839/1386] Compiling GLSL -> SPV: surface.vert
+[840/1386] Compiling GLSL -> SPV: transient_debug_point.frag
+[841/1386] Compiling GLSL -> SPV: triangle.frag
+[842/1386] Compiling GLSL -> SPV: transient_debug_triangle.vert
+[843/1386] Compiling GLSL -> SPV: transient_debug_point.vert
+[844/1386] Compiling GLSL -> SPV: transient_debug_triangle.frag
+[845/1386] Compiling GLSL -> SPV: uv_view/background.frag
+[846/1386] Compiling GLSL -> SPV: uv_view/background.vert
+[847/1386] Compiling GLSL -> SPV: triangle.vert
+[848/1386] Compiling GLSL -> SPV: uv_view/mesh.vert
+[849/1386] Compiling GLSL -> SPV: uv_view/line.frag
+[850/1386] Compiling GLSL -> SPV: uv_view/fill.frag
+[851/1386] Compiling GLSL -> SPV: visualization_isoline.vert
+[852/1386] Compiling GLSL -> SPV: visualization_vector_field.frag
+[853/1386] Scanning /home/alex/Documents/IntrinsicEngine/tests/unit/core/Test_IndexedHeap.cpp for CXX dependencies
+[854/1386] Compiling GLSL -> SPV: visualization_isoline.frag
+[855/1386] Scanning /home/alex/Documents/IntrinsicEngine/tests/unit/core/Test.CoreError.cpp for CXX dependencies
+[856/1386] Compiling GLSL -> SPV: visualization_vector_field.vert
+[857/1386] Scanning /home/alex/Documents/IntrinsicEngine/tests/unit/core/Test.LogRingBuffer.cpp for CXX dependencies
+[858/1386] Scanning /home/alex/Documents/IntrinsicEngine/tests/unit/ecs/Test.ECS.SceneBootstrap.cpp for CXX dependencies
+[859/1386] Scanning /home/alex/Documents/IntrinsicEngine/tests/unit/ecs/Test.ECS.Hierarchy.cpp for CXX dependencies
+[860/1386] Generating CXX dyndep file tests/CMakeFiles/CoreTestObjs.dir/CXX.dd
+[861/1386] Scanning /home/alex/Documents/IntrinsicEngine/tests/unit/ecs/Test.ECS.SceneRegistry.cpp for CXX dependencies
+[862/1386] Scanning /home/alex/Documents/IntrinsicEngine/benchmarks/geometry/Bench_LopFamilyGpuVulkanSmoke.cpp for CXX dependencies
+[863/1386] Scanning /home/alex/Documents/IntrinsicEngine/tests/unit/ecs/Test.ECS.ColliderAuthoring.cpp for CXX dependencies
+[864/1386] Scanning /home/alex/Documents/IntrinsicEngine/tests/unit/ecs/Test.ECS.TransformHierarchy.cpp for CXX dependencies
+[865/1386] Scanning /home/alex/Documents/IntrinsicEngine/tests/unit/ecs/Test.ECS.Events.cpp for CXX dependencies
+[866/1386] Scanning /home/alex/Documents/IntrinsicEngine/tests/unit/ecs/Test.ECS.GeometryDirtyDomains.cpp for CXX dependencies
+[867/1386] Scanning /home/alex/Documents/IntrinsicEngine/benchmarks/geometry/Bench_KMeansGpuVulkanSmoke.cpp for CXX dependencies
+[868/1386] Scanning /home/alex/Documents/IntrinsicEngine/tests/unit/ecs/Test.ECS.BoundsPropagation.cpp for CXX dependencies
+[869/1386] Scanning /home/alex/Documents/IntrinsicEngine/tests/unit/ecs/Test.ECS.RenderSync.cpp for CXX dependencies
+[870/1386] Generating CXX dyndep file benchmarks/CMakeFiles/IntrinsicLopFamilyGpuBenchmarkSmoke.dir/CXX.dd
+[871/1387] Scanning /home/alex/Documents/IntrinsicEngine/tests/unit/ecs/Test.ECS.StableIdentity.cpp for CXX dependencies
+[872/1387] Generating CXX dyndep file benchmarks/CMakeFiles/IntrinsicKMeansGpuBenchmarkSmoke.dir/CXX.dd
+[873/1388] Scanning /home/alex/Documents/IntrinsicEngine/tests/contract/ecs/Test.ECS.LayeringBoundaries.cpp for CXX dependencies
+[874/1388] Scanning /home/alex/Documents/IntrinsicEngine/tests/unit/ecs/Test.ECS.GeometrySourcesPopulate.cpp for CXX dependencies
+[875/1388] Scanning /home/alex/Documents/IntrinsicEngine/tests/contract/runtime/Test.CoreGraphInterfaces.cpp for CXX dependencies
+[876/1388] Generating CXX dyndep file tests/CMakeFiles/EcsContractTestObjs.dir/CXX.dd
+[877/1388] Scanning /home/alex/Documents/IntrinsicEngine/tests/contract/runtime/Test.AssetIngestStateMachine.cpp for CXX dependencies
+[878/1388] Generating CXX dyndep file tests/CMakeFiles/ECSTestObjs.dir/CXX.dd
+[879/1389] Scanning /home/alex/Documents/IntrinsicEngine/tests/contract/runtime/Test.GpuAssetCacheFallbackBootstrap.cpp for CXX dependencies
+[880/1389] Scanning /home/alex/Documents/IntrinsicEngine/tests/contract/runtime/Test.GpuResultReadbackJob.cpp for CXX dependencies
+[881/1389] Scanning /home/alex/Documents/IntrinsicEngine/tests/contract/runtime/Test.AssetImportFormatCoverage.cpp for CXX dependencies
+[882/1389] Scanning /home/alex/Documents/IntrinsicEngine/tests/contract/runtime/Test.EditorPropertyWidgets.cpp for CXX dependencies
+[883/1389] Scanning /home/alex/Documents/IntrinsicEngine/tests/contract/runtime/Test.AssetImportRecipe.cpp for CXX dependencies
+[884/1389] Scanning /home/alex/Documents/IntrinsicEngine/tests/contract/runtime/Test.EditorWindowRegistry.cpp for CXX dependencies
+[885/1389] Scanning /home/alex/Documents/IntrinsicEngine/tests/contract/runtime/Test.EditorUiHost.cpp for CXX dependencies
+[886/1389] Scanning /home/alex/Documents/IntrinsicEngine/tests/contract/runtime/Test.AsyncWorkModule.cpp for CXX dependencies
+[887/1389] Scanning /home/alex/Documents/IntrinsicEngine/tests/contract/runtime/Test.EditorCommandHistory.cpp for CXX dependencies
+[888/1389] Scanning /home/alex/Documents/IntrinsicEngine/tests/contract/runtime/Test.AssetWorkflowModule.cpp for CXX dependencies
+[889/1389] Scanning /home/alex/Documents/IntrinsicEngine/tests/contract/runtime/Test.ImGuiAdapter.cpp for CXX dependencies
+[890/1389] Scanning /home/alex/Documents/IntrinsicEngine/tests/contract/runtime/Test.MeshGeometryExtraction.cpp for CXX dependencies
+[891/1389] Scanning /home/alex/Documents/IntrinsicEngine/tests/contract/runtime/Test.CornerTexcoordUpload.cpp for CXX dependencies
+[892/1389] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Editor/Runtime.EditorCommon.cppm.o
+[893/1389] Scanning /home/alex/Documents/IntrinsicEngine/tests/contract/runtime/Test.MeshPrimitiveViewExtraction.cpp for CXX dependencies
+[894/1389] Scanning /home/alex/Documents/IntrinsicEngine/tests/contract/runtime/Test.ProgressivePoissonGpuBackend.cpp for CXX dependencies
+[895/1389] Scanning /home/alex/Documents/IntrinsicEngine/tests/contract/runtime/Test.RenderExtractionContract.cpp for CXX dependencies
+[896/1389] Scanning /home/alex/Documents/IntrinsicEngine/tests/contract/runtime/Test.RenderArtifactPublication.cpp for CXX dependencies
+[897/1389] Scanning /home/alex/Documents/IntrinsicEngine/tests/contract/runtime/Test.ImGuiAdapterEngineWiring.cpp for CXX dependencies
+[898/1389] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Editor/Runtime.EditorCommon.Public.cpp.o
+[899/1389] Scanning /home/alex/Documents/IntrinsicEngine/tests/contract/runtime/Test.GizmoInteraction.cpp for CXX dependencies
+[900/1389] Scanning /home/alex/Documents/IntrinsicEngine/tests/contract/runtime/Test.GizmoInteractionEngineWiring.cpp for CXX dependencies
+[901/1389] Scanning /home/alex/Documents/IntrinsicEngine/tests/contract/runtime/Test.GraphGeometryExtraction.cpp for CXX dependencies
+[902/1389] Scanning /home/alex/Documents/IntrinsicEngine/tests/contract/runtime/Test.PointCloudGeometryExtraction.cpp for CXX dependencies
+[903/1389] Scanning /home/alex/Documents/IntrinsicEngine/tests/contract/runtime/Test.GeometryAvailability.cpp for CXX dependencies
+[904/1389] Scanning /home/alex/Documents/IntrinsicEngine/tests/contract/runtime/Test.ParameterizationOperations.cpp for CXX dependencies
+[905/1389] Scanning /home/alex/Documents/IntrinsicEngine/tests/contract/runtime/Test.GeometryPresentation.cpp for CXX dependencies
+[906/1389] Scanning /home/alex/Documents/IntrinsicEngine/tests/contract/runtime/Test.CurvatureSegmentationOperations.cpp for CXX dependencies
+[907/1389] Scanning /home/alex/Documents/IntrinsicEngine/tests/contract/runtime/Test.PrimitiveSelectionRefinementWiring.cpp for CXX dependencies
+[908/1389] Scanning /home/alex/Documents/IntrinsicEngine/tests/contract/runtime/Test.PrimitiveSelectionRefinement.cpp for CXX dependencies
+[909/1389] Scanning /home/alex/Documents/IntrinsicEngine/tests/contract/runtime/Test.ProceduralGeometryExtraction.cpp for CXX dependencies
+[910/1389] Scanning /home/alex/Documents/IntrinsicEngine/tests/contract/runtime/Test.RuntimeCameraControllers.cpp for CXX dependencies
+[911/1389] Scanning /home/alex/Documents/IntrinsicEngine/tests/contract/runtime/Test.CameraModule.cpp for CXX dependencies
+[912/1389] Scanning /home/alex/Documents/IntrinsicEngine/tests/contract/runtime/Test.RuntimeEngineConfigBoot.cpp for CXX dependencies
+[913/1389] Scanning /home/alex/Documents/IntrinsicEngine/tests/contract/runtime/Test.RuntimeConfigControl.cpp for CXX dependencies
+[914/1389] Scanning /home/alex/Documents/IntrinsicEngine/tests/contract/runtime/Test.RuntimeInputActions.cpp for CXX dependencies
+[915/1389] Scanning /home/alex/Documents/IntrinsicEngine/tests/contract/runtime/Test.RuntimeEngineLayering.cpp for CXX dependencies
+[916/1389] Scanning /home/alex/Documents/IntrinsicEngine/tests/contract/runtime/Test.RuntimeCameraFocusCommand.cpp for CXX dependencies
+[917/1389] Scanning /home/alex/Documents/IntrinsicEngine/tests/contract/runtime/Test.RuntimeRenderRecipeActivation.cpp for CXX dependencies
+[918/1389] Scanning /home/alex/Documents/IntrinsicEngine/tests/contract/runtime/Test.RuntimeEnginePrivateGlue.cpp for CXX dependencies
+[919/1389] Building CXX object benchmarks/CMakeFiles/IntrinsicBenchmarkSmoke.dir/runners/BenchmarkSmokeRunner.cpp.o
+[920/1389] Scanning /home/alex/Documents/IntrinsicEngine/tests/contract/runtime/Test.ClusteringModule.cpp for CXX dependencies
+[921/1389] Scanning /home/alex/Documents/IntrinsicEngine/tests/contract/runtime/Test.PointCloudConsolidationConfig.cpp for CXX dependencies
+[922/1389] Scanning /home/alex/Documents/IntrinsicEngine/tests/contract/runtime/Test.PointCloudConsolidationModule.cpp for CXX dependencies
+[923/1389] Building CXX object benchmarks/CMakeFiles/IntrinsicBenchmarkSmoke.dir/geometry/Bench_CurvatureSegmentationReferenceSmoke.cpp.o
+[924/1389] Scanning /home/alex/Documents/IntrinsicEngine/tests/contract/runtime/Test.RuntimeCommandBus.cpp for CXX dependencies
+[925/1389] Scanning /home/alex/Documents/IntrinsicEngine/tests/contract/runtime/Test.RuntimeJobService.cpp for CXX dependencies
+[926/1389] Scanning /home/alex/Documents/IntrinsicEngine/tests/contract/runtime/Test.RuntimeModule.cpp for CXX dependencies
+[927/1389] Scanning /home/alex/Documents/IntrinsicEngine/tests/contract/runtime/Test.RuntimeReferenceScene.cpp for CXX dependencies
+[928/1389] Scanning /home/alex/Documents/IntrinsicEngine/tests/contract/runtime/Test.RuntimeKernelEvents.cpp for CXX dependencies
+[929/1389] Scanning /home/alex/Documents/IntrinsicEngine/tests/contract/runtime/Test.RuntimeSceneLifecycle.cpp for CXX dependencies
+[930/1389] Scanning /home/alex/Documents/IntrinsicEngine/tests/contract/runtime/Test.RuntimeWorldRegistry.cpp for CXX dependencies
+[931/1389] Scanning /home/alex/Documents/IntrinsicEngine/tests/contract/runtime/Test.SceneInteractionModule.cpp for CXX dependencies
+[932/1389] Scanning /home/alex/Documents/IntrinsicEngine/tests/contract/runtime/Test.RuntimeVulkanBreadcrumb.cpp for CXX dependencies
+[933/1389] Scanning /home/alex/Documents/IntrinsicEngine/tests/contract/runtime/Test.SceneDocumentModule.cpp for CXX dependencies
+[934/1389] Scanning /home/alex/Documents/IntrinsicEngine/tests/contract/runtime/Test.SandboxEditorModels.cpp for CXX dependencies
+[935/1389] Scanning /home/alex/Documents/IntrinsicEngine/tests/contract/runtime/Test.RuntimeSceneSerialization.cpp for CXX dependencies
+[936/1389] Scanning /home/alex/Documents/IntrinsicEngine/tests/contract/runtime/Test.SandboxEditorVisualization.cpp for CXX dependencies
+[937/1389] Scanning /home/alex/Documents/IntrinsicEngine/tests/contract/runtime/Test.SandboxEditorMeshMethods.cpp for CXX dependencies
+[938/1389] Scanning /home/alex/Documents/IntrinsicEngine/tests/contract/runtime/Test.SandboxEditorClusteringMethods.cpp for CXX dependencies
+[939/1389] Scanning /home/alex/Documents/IntrinsicEngine/tests/contract/runtime/Test.SandboxEditorSessionLifecycle.cpp for CXX dependencies
+[940/1389] Scanning /home/alex/Documents/IntrinsicEngine/tests/contract/runtime/Test.TextureBakeModule.cpp for CXX dependencies
+[941/1389] Scanning /home/alex/Documents/IntrinsicEngine/tests/contract/runtime/Test.SelectionController.cpp for CXX dependencies
+[942/1389] Scanning /home/alex/Documents/IntrinsicEngine/tests/contract/runtime/Test.SandboxEditorSceneCommands.cpp for CXX dependencies
+[943/1389] Scanning /home/alex/Documents/IntrinsicEngine/tests/contract/runtime/Test.SelectionStableLookupComposition.cpp for CXX dependencies
+[944/1389] Scanning /home/alex/Documents/IntrinsicEngine/tests/contract/runtime/Test.SelectionSnapshotExtraction.cpp for CXX dependencies
+[945/1389] Scanning /home/alex/Documents/IntrinsicEngine/tests/contract/runtime/Test.StableEntityLookup.cpp for CXX dependencies
+[946/1389] Scanning /home/alex/Documents/IntrinsicEngine/tests/contract/runtime/Test.VertexAttributeBinding.cpp for CXX dependencies
+[947/1389] Scanning /home/alex/Documents/IntrinsicEngine/tests/contract/runtime/Test.VertexChannelStreams.cpp for CXX dependencies
+[948/1389] Scanning /home/alex/Documents/IntrinsicEngine/tests/contract/runtime/Test.RenderWorldPool.cpp for CXX dependencies
+[949/1389] Scanning /home/alex/Documents/IntrinsicEngine/tests/contract/runtime/Test.VisualizationRecipes.cpp for CXX dependencies
+[950/1389] Scanning /home/alex/Documents/IntrinsicEngine/tests/integration/runtime/Test.SandboxDomainPanels.cpp for CXX dependencies
+[951/1389] Scanning /home/alex/Documents/IntrinsicEngine/tests/contract/runtime/Test.AssetImportFormatCoverageSlow.cpp for CXX dependencies
+[952/1389] Scanning /home/alex/Documents/IntrinsicEngine/tests/contract/runtime/Test.RenderWorldPoolEngineWiring.cpp for CXX dependencies
+[953/1389] Scanning /home/alex/Documents/IntrinsicEngine/tests/integration/runtime/Test.SandboxConfigSections.cpp for CXX dependencies
+[954/1389] Generating CXX dyndep file tests/CMakeFiles/RuntimeContractSlowTestObjs.dir/CXX.dd
+[955/1390] Scanning /home/alex/Documents/IntrinsicEngine/tests/integration/runtime/Test.SandboxEditorPresentation.cpp for CXX dependencies
+[956/1390] Scanning /home/alex/Documents/IntrinsicEngine/tests/integration/runtime/Test.SandboxAppComposition.cpp for CXX dependencies
+[957/1390] Scanning /home/alex/Documents/IntrinsicEngine/tests/unit/physics/Test.RigidBodyReference.cpp for CXX dependencies
+[958/1390] Generating CXX dyndep file tests/CMakeFiles/RuntimeContractTestObjs.dir/CXX.dd
+[959/1420] Scanning /home/alex/Documents/IntrinsicEngine/tests/integration/runtime/Test.SandboxCurvatureSegmentationPanel.cpp for CXX dependencies
+[960/1420] Scanning /home/alex/Documents/IntrinsicEngine/tests/benchmark/slo/Test.ArchitectureSLO.cpp for CXX dependencies
+[961/1420] Scanning /home/alex/Documents/IntrinsicEngine/tests/integration/runtime/Test.SandboxParameterizationPanel.cpp for CXX dependencies
+[962/1420] Scanning /home/alex/Documents/IntrinsicEngine/tests/integration/runtime/Test.SandboxPointCloudConsolidationPanel.cpp for CXX dependencies
+[963/1420] Generating CXX dyndep file tests/CMakeFiles/BenchmarkTestObjs.dir/CXX.dd
+[964/1420] Scanning /home/alex/Documents/IntrinsicEngine/tests/unit/physics/Test.XpbdClothReference.cpp for CXX dependencies
+[965/1420] Scanning /home/alex/Documents/IntrinsicEngine/methods/physics/rigid_body_reference/src/RigidBodyReference.cpp for CXX dependencies
+[966/1420] Generating CXX dyndep file tests/CMakeFiles/SandboxEditorIntegrationTestObjs.dir/CXX.dd
+[967/1424] Scanning /home/alex/Documents/IntrinsicEngine/tests/unit/physics/Test.PhysicsSolverParity.cpp for CXX dependencies
+[968/1424] Scanning /home/alex/Documents/IntrinsicEngine/tests/unit/physics/Test.ParticleSpringReference.cpp for CXX dependencies
+[969/1424] Scanning /home/alex/Documents/IntrinsicEngine/methods/physics/particle_spring_reference/src/ParticleSpringReference.cpp for CXX dependencies
+[970/1424] Scanning /home/alex/Documents/IntrinsicEngine/tests/unit/physics/Test.SphFluidReference.cpp for CXX dependencies
+[971/1424] Scanning /home/alex/Documents/IntrinsicEngine/methods/physics/xpbd_cloth_reference/src/XpbdClothReference.cpp for CXX dependencies
+[972/1424] Scanning /home/alex/Documents/IntrinsicEngine/methods/physics/sph_fluid_reference/src/SphFluidReference.cpp for CXX dependencies
+[973/1424] Scanning /home/alex/Documents/IntrinsicEngine/tests/unit/physics/Test.Physics.World.cpp for CXX dependencies
+[974/1424] Generating CXX dyndep file tests/CMakeFiles/PhysicsMethodTestObjs.dir/CXX.dd
+[975/1424] Generating CXX dyndep file tests/CMakeFiles/PhysicsWorldTestObjs.dir/CXX.dd
+[976/1424] Scanning /home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test_Statistics.cpp for CXX dependencies
+[977/1424] Scanning /home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test_AABBCubify.cpp for CXX dependencies
+[978/1424] Scanning /home/alex/Documents/IntrinsicEngine/tests/integration/runtime/Test.PhysicsModule.cpp for CXX dependencies
+[979/1424] Generating CXX dyndep file tests/CMakeFiles/RuntimePhysicsModuleTestObjs.dir/CXX.dd
+[980/1424] Scanning /home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test_BezierCurve.cpp for CXX dependencies
+[981/1424] Scanning /home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test_RotationAveraging.cpp for CXX dependencies
+[982/1424] Scanning /home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test_Rotation.cpp for CXX dependencies
+[983/1424] Scanning /home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test_Curve.cpp for CXX dependencies
+[984/1424] Scanning /home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test_RobustKernels.cpp for CXX dependencies
+[985/1424] Scanning /home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test_LinalgEigenMap.cpp for CXX dependencies
+[986/1424] Scanning /home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test_MeshQuantities.cpp for CXX dependencies
+[987/1424] Scanning /home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test_RuntimeGraph.cpp for CXX dependencies
+[988/1424] Building CXX object src/ecs/CMakeFiles/ExtrinsicECS.dir/Components/ECS.Component.GeometrySources.cpp.o
+[989/1424] Scanning /home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test_MeshClosestFace.cpp for CXX dependencies
+[990/1424] Scanning /home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.GeometryProperties.cpp for CXX dependencies
+[991/1424] Scanning /home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.GraphQueries.cpp for CXX dependencies
+[992/1424] Scanning /home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test_BVH.cpp for CXX dependencies
+[993/1424] Scanning /home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test_MeshOperations.cpp for CXX dependencies
+[994/1424] Scanning /home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test_Octree.cpp for CXX dependencies
+[995/1424] Scanning /home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test_RuntimeGraphKNN.cpp for CXX dependencies
+[996/1424] Scanning /home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test_KDTree.cpp for CXX dependencies
+[997/1424] Scanning /home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.MeshSoup.cpp for CXX dependencies
+[998/1424] Scanning /home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test_DEC.cpp for CXX dependencies
+[999/1424] Scanning /home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.MeshConversion.cpp for CXX dependencies
+[1000/1424] Scanning /home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.PointCloudConversion.cpp for CXX dependencies
+[1001/1424] Scanning /home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test_MeshBuilder.cpp for CXX dependencies
+[1002/1424] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/GeometryIntegration/Runtime.MeshSurfaceTopology.cppm.o
+[1003/1424] Scanning /home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.GaussianMixture.cpp for CXX dependencies
+[1004/1424] Scanning /home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CurvatureSegmentation.cpp for CXX dependencies
+[1005/1424] Scanning /home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test_GeometryProcessing.cpp for CXX dependencies
+[1006/1424] Scanning /home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test_MeshQuality.cpp for CXX dependencies
+[1007/1424] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/GeometryIntegration/Runtime.PrimitiveSelectionRefinement.cppm.o
+[1008/1424] Scanning /home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test_Parameterization.cpp for CXX dependencies
+[1009/1424] Scanning /home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test_SurfaceReconstruction.cpp for CXX dependencies
+[1010/1424] Scanning /home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.ParameterizationDiagnostics.cpp for CXX dependencies
+[1011/1424] Scanning /home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.ParameterizationDispatch.cpp for CXX dependencies
+[1012/1424] Scanning /home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.ParameterizationOptimize.cpp for CXX dependencies
+[1013/1424] Scanning /home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test_MeshAnalysis.cpp for CXX dependencies
+[1014/1424] Scanning /home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.HarmonicParameterization.cpp for CXX dependencies
+[1015/1424] Scanning /home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.BoundaryFirstFlattening.cpp for CXX dependencies
+[1016/1424] Scanning /home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.UvAtlas.cpp for CXX dependencies
+[1017/1424] Scanning /home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test_PointCloud.cpp for CXX dependencies
+[1018/1424] Scanning /home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test_AdaptiveRemeshing.cpp for CXX dependencies
+[1019/1424] Scanning /home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test_ConvexHull.cpp for CXX dependencies
+[1020/1424] Scanning /home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test_SphereFitting.cpp for CXX dependencies
+[1021/1424] Scanning /home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test_TriangleMetrics.cpp for CXX dependencies
+[1022/1424] Scanning /home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test_GeometryAttributePropagation.cpp for CXX dependencies
+[1023/1424] Building CXX object CMakeFiles/tinygltf.dir/generated/deps/tinygltf_impl.cpp.o
+[1024/1424] Scanning /home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test_Boolean.cpp for CXX dependencies
+[1025/1424] Scanning /home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test_MeshBoundary.cpp for CXX dependencies
+[1026/1424] Scanning /home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.GraphVertexNormals.cpp for CXX dependencies
+[1027/1424] Scanning /home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.HalfedgeMeshVertexNormals.cpp for CXX dependencies
+[1028/1424] Linking CXX static library lib/libtinygltf.a
+[1029/1424] Scanning /home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test_HalfedgeMeshPropertyAccess.cpp for CXX dependencies
+[1030/1424] Scanning /home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test_HalfedgeMeshTopology.cpp for CXX dependencies
+[1031/1424] Scanning /home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.MeshTopologyUtilities.cpp for CXX dependencies
+[1032/1424] Scanning /home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test_Curvature.cpp for CXX dependencies
+[1033/1424] Scanning /home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test_Validation.cpp for CXX dependencies
+[1034/1424] Scanning /home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CurvatureTensor.cpp for CXX dependencies
+[1035/1424] Scanning /home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CornerTexcoords.cpp for CXX dependencies
+[1036/1424] Building CXX object src/geometry/CMakeFiles/IntrinsicGeometry.dir/Geometry.HalfedgeMesh.CurvatureSegmentation.cpp.o
+[1037/1424] Scanning /home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test_Overlap.cpp for CXX dependencies
+[1038/1424] Scanning /home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test_Raycast.cpp for CXX dependencies
+[1039/1424] Scanning /home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test_GeometryQueries.cpp for CXX dependencies
+[1040/1424] Scanning /home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test_Grid.cpp for CXX dependencies
+[1041/1424] Scanning /home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test_PcaPrimitives.cpp for CXX dependencies
+[1042/1424] Scanning /home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test_MarchingCubes.cpp for CXX dependencies
+[1043/1424] Scanning /home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test_ImplicitPlaneField.cpp for CXX dependencies
+[1044/1424] Scanning /home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test_Containment.cpp for CXX dependencies
+[1045/1424] Scanning /home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test_Simplification.cpp for CXX dependencies
+[1046/1424] Scanning /home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test_Support.cpp for CXX dependencies
+[1047/1424] Scanning /home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test_Geodesic.cpp for CXX dependencies
+[1048/1424] Scanning /home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test_VectorHeatMethod.cpp for CXX dependencies
+[1049/1424] Scanning /home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.SupportRadius.cpp for CXX dependencies
+[1050/1424] Scanning /home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test_ShortestPath.cpp for CXX dependencies
+[1051/1424] Scanning /home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test_Subdivision.cpp for CXX dependencies
+[1052/1424] Scanning /home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.QualityMetrics.cpp for CXX dependencies
+[1053/1424] Scanning /home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.Sampling.cpp for CXX dependencies
+[1054/1424] Scanning /home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.PointCloudNormals.cpp for CXX dependencies
+[1055/1424] Scanning /home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test_Smoothing.cpp for CXX dependencies
+[1056/1424] Scanning /home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.SurfaceSampling.cpp for CXX dependencies
+[1057/1424] Scanning /home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.PointCloudConsolidation.cpp for CXX dependencies
+[1058/1424] Scanning /home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.PointCloudFeatures.cpp for CXX dependencies
+[1059/1424] Scanning /home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test_Registration.cpp for CXX dependencies
+[1060/1424] Linking CXX static library lib/libIntrinsicGeometry.a
+[1061/1424] Scanning /home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.PointCloudOutlierRemoval.cpp for CXX dependencies
+[1062/1424] Scanning /home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.PointCloudKernels.cpp for CXX dependencies
+[1063/1424] Scanning /home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test_PointCloudRobustness.cpp for CXX dependencies
+[1064/1424] Scanning /home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.RaycastClassify.cpp for CXX dependencies
+[1065/1424] Scanning /home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.IntersectionClassification.cpp for CXX dependencies
+[1066/1424] Scanning /home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.RobustPredicates.cpp for CXX dependencies
+[1067/1424] Scanning /home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.LinearAlgebra.cpp for CXX dependencies
+[1068/1424] Scanning /home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.SparseNonsymmetric.cpp for CXX dependencies
+[1069/1424] Scanning /home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.Sparse.cpp for CXX dependencies
+[1070/1424] Scanning /home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test_SubmeshView.cpp for CXX dependencies
+[1071/1424] Scanning /home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.SparseFactorization.cpp for CXX dependencies
+[1072/1424] Scanning /home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.SignedHeatMethod.cpp for CXX dependencies
+[1073/1424] Scanning /home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.SubmeshViewDomainBorrows.cpp for CXX dependencies
+[1074/1424] Scanning /home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test_SDF.cpp for CXX dependencies
+[1075/1424] Generating CXX dyndep file tests/CMakeFiles/GeometryTestObjs.dir/CXX.dd
+[1076/1424] Scanning /home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test_RuntimeGeometry.cpp for CXX dependencies
+[1077/1424] Scanning /home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test_HtexPatch.cpp for CXX dependencies
+[1078/1424] Scanning /home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test_ContactManifold.cpp for CXX dependencies
+[1079/1424] Scanning /home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test_GJK.cpp for CXX dependencies
+[1080/1424] Generating CXX dyndep file tests/CMakeFiles/GeometryProcessStateTestObjs.dir/CXX.dd
+[1081/1424] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/GeometryIntegration/Runtime.GeometryAvailability.cppm.o
+[1082/1424] Scanning /home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.GeometryIO.cpp for CXX dependencies
+[1083/1424] Scanning /home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.MeshOperationsSlow.cpp for CXX dependencies
+[1084/1424] Scanning /home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.ProgressivePoissonReference.cpp for CXX dependencies
+[1085/1424] Scanning /home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.ProgressivePoissonReferenceSlow.cpp for CXX dependencies
+[1086/1424] Scanning /home/alex/Documents/IntrinsicEngine/tests/unit/assets/Test.Asset.EventBus.cpp for CXX dependencies
+[1087/1424] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/GeometryIntegration/Runtime.VertexChannelBindings.cppm.o
+[1088/1424] Building CXX object src/ecs/CMakeFiles/ExtrinsicECS.dir/Components/ECS.Component.GeometrySourcesPopulate.cppm.o
+[1089/1424] Linking CXX executable bin/IntrinsicBenchmarkSmoke
+[1090/1424] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/GeometryIntegration/Runtime.PrimitiveSelectionRefinement.cpp.o
+[1091/1424] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/GeometryIntegration/Runtime.MeshSurfaceTopology.cpp.o
+[1092/1424] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/GeometryIntegration/Runtime.GeometryPresentation.cppm.o
+[1093/1424] Building CXX object tests/CMakeFiles/RuntimeContractTestObjs.dir/contract/runtime/Test.PrimitiveSelectionRefinement.cpp.o
+[1094/1424] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/GeometryIntegration/Runtime.GeometryAvailability.cpp.o
+[1095/1424] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/GeometryIntegration/Runtime.GeometryPlanBuilders.cppm.o
+[1096/1424] Building CXX object tests/CMakeFiles/RuntimeContractTestObjs.dir/contract/runtime/Test.CornerTexcoordUpload.cpp.o
+[1097/1424] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/GeometryIntegration/Runtime.GeometryPresentation.cpp.o
+[1098/1424] Building CXX object tests/CMakeFiles/GeometryTestObjs.dir/unit/geometry/Test.CurvatureSegmentation.cpp.o
+[1099/1424] Building CXX object tests/CMakeFiles/RuntimeContractTestObjs.dir/contract/runtime/Test.PrimitiveSelectionRefinementWiring.cpp.o
+[1100/1424] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/AssetWorkflow/Runtime.AssetWorkflowGeometryMaterialization.cpp.o
+[1101/1424] Building CXX object src/ecs/CMakeFiles/ExtrinsicECS.dir/Components/ECS.Component.GeometrySourcesPopulate.cpp.o
+[1102/1424] Linking CXX static library lib/libExtrinsicECS.a
+[1103/1424] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/GeometryIntegration/Runtime.GeometryPlanBuilders.Graph.cpp.o
+[1104/1424] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/GeometryIntegration/Runtime.GeometryPlanBuilders.Procedural.cpp.o
+[1105/1424] Generating CXX dyndep file tests/CMakeFiles/GeometryIoTestObjs.dir/CXX.dd
+[1106/1424] Generating CXX dyndep file tests/CMakeFiles/GeometrySlowTestObjs.dir/CXX.dd
+[1107/1424] Generating CXX dyndep file tests/CMakeFiles/GeometryMethodTestObjs.dir/CXX.dd
+[1108/1424] Generating CXX dyndep file tests/CMakeFiles/GeometryMethodSlowTestObjs.dir/CXX.dd
+[1109/1424] Scanning /home/alex/Documents/IntrinsicEngine/tests/unit/assets/Test.Asset.ImportRouter.cpp for CXX dependencies
+[1110/1424] Scanning /home/alex/Documents/IntrinsicEngine/tests/unit/assets/Test.Asset.ModelTexturePayload.cpp for CXX dependencies
+[1111/1424] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Scene/Runtime.ReferenceScene.cpp.o
+[1112/1424] Scanning /home/alex/Documents/IntrinsicEngine/tests/unit/assets/Test.Asset.OperationStatus.cpp for CXX dependencies
+[1113/1424] Scanning /home/alex/Documents/IntrinsicEngine/tests/unit/assets/Test.Asset.PayloadStore.cpp for CXX dependencies
+[1114/1424] Scanning /home/alex/Documents/IntrinsicEngine/tests/unit/assets/Test.Asset.PathIndex.cpp for CXX dependencies
+[1115/1424] Scanning /home/alex/Documents/IntrinsicEngine/tests/unit/assets/Test.Asset.Registry.cpp for CXX dependencies
+[1116/1424] Generating CXX dyndep file tests/CMakeFiles/AssetUnitTestObjs.dir/CXX.dd
+[1117/1424] Scanning /home/alex/Documents/IntrinsicEngine/tests/unit/core/Test.Core.BoundedHeap.cpp for CXX dependencies
+[1118/1424] Scanning /home/alex/Documents/IntrinsicEngine/tests/unit/core/Test.Core.CallbackRegistry.cpp for CXX dependencies
+[1119/1424] Scanning /home/alex/Documents/IntrinsicEngine/tests/unit/core/Test.Core.Config.cpp for CXX dependencies
+[1120/1424] Scanning /home/alex/Documents/IntrinsicEngine/tests/unit/core/Test.Core.EngineConfigLoad.cpp for CXX dependencies
+[1121/1424] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/GeometryIntegration/Runtime.GeometryPlanBuilders.MeshPrimitiveView.cpp.o
+[1122/1424] Scanning /home/alex/Documents/IntrinsicEngine/tests/unit/core/Test.Core.ErrorLegacy.cpp for CXX dependencies
+[1123/1424] Scanning /home/alex/Documents/IntrinsicEngine/tests/unit/core/Test.Core.DagScheduler.cpp for CXX dependencies
+[1124/1424] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/GeometryIntegration/Runtime.GeometryPlanBuilders.Mesh.cpp.o
+[1125/1424] Scanning /home/alex/Documents/IntrinsicEngine/tests/unit/core/Test.Core.Filesystem.cpp for CXX dependencies
+[1126/1424] Scanning /home/alex/Documents/IntrinsicEngine/tests/unit/core/Test.CoreFrameGraphTypeTokenHelper.cpp for CXX dependencies
+[1127/1424] Scanning /home/alex/Documents/IntrinsicEngine/tests/unit/core/Test.Core.FrameClock.cpp for CXX dependencies
+[1128/1424] Scanning /home/alex/Documents/IntrinsicEngine/tests/unit/core/Test.CoreFrameGraph.cpp for CXX dependencies
+[1129/1424] Scanning /home/alex/Documents/IntrinsicEngine/tests/unit/core/Test.Core.HandleLease.cpp for CXX dependencies
+[1130/1424] Scanning /home/alex/Documents/IntrinsicEngine/tests/unit/core/Test.CoreHash.cpp for CXX dependencies
+[1131/1424] Scanning /home/alex/Documents/IntrinsicEngine/tests/unit/core/Test.Core.GraphCompiler.cpp for CXX dependencies
+[1132/1424] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Visualization/Runtime.VisualizationRecipes.cppm.o
+[1133/1424] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/GeometryIntegration/Runtime.GeometryPlanBuilders.PointCloud.cpp.o
+[1134/1424] Scanning /home/alex/Documents/IntrinsicEngine/tests/unit/core/Test.Core.LockFreeQueue.cpp for CXX dependencies
+[1135/1424] Scanning /home/alex/Documents/IntrinsicEngine/tests/unit/core/Test.CoreMemory.cpp for CXX dependencies
+[1136/1424] Scanning /home/alex/Documents/IntrinsicEngine/tests/unit/core/Test.Core.Logging.cpp for CXX dependencies
+[1137/1424] Scanning /home/alex/Documents/IntrinsicEngine/tests/unit/core/Test.CoreProfiling.cpp for CXX dependencies
+[1138/1424] Scanning /home/alex/Documents/IntrinsicEngine/tests/unit/core/Test.Core.ResourcePool.cpp for CXX dependencies
+[1139/1424] Scanning /home/alex/Documents/IntrinsicEngine/tests/unit/core/Test.CoreStrongHandle.cpp for CXX dependencies
+[1140/1424] Scanning /home/alex/Documents/IntrinsicEngine/tests/unit/core/Test.Core.TaskGraphCompletionLifetime.cpp for CXX dependencies
+[1141/1424] Scanning /home/alex/Documents/IntrinsicEngine/tests/unit/core/Test.Core.TaskGraphLegacy.cpp for CXX dependencies
+[1142/1424] Scanning /home/alex/Documents/IntrinsicEngine/tests/unit/core/Test.CoreTasks.cpp for CXX dependencies
+[1143/1424] Generating CXX dyndep file tests/CMakeFiles/CoreWrapperUnitTestObjs.dir/CXX.dd
+[1144/1424] Scanning /home/alex/Documents/IntrinsicEngine/tests/unit/platform/Test.NullPlatform.cpp for CXX dependencies
+[1145/1424] Building CXX object tests/CMakeFiles/ECSTestObjs.dir/unit/ecs/Test.ECS.GeometrySourcesPopulate.cpp.o
+[1146/1424] Scanning /home/alex/Documents/IntrinsicEngine/tests/contract/platform/Test.PlatformLayering.cpp for CXX dependencies
+[1147/1424] Scanning /home/alex/Documents/IntrinsicEngine/tests/integration/platform/Test.GlfwPlatformSmoke.cpp for CXX dependencies
+[1148/1424] Generating CXX dyndep file tests/CMakeFiles/PlatformTestObjs.dir/CXX.dd
+[1149/1424] Generating CXX dyndep file tests/CMakeFiles/PlatformGlfwSmokeTestObjs.dir/CXX.dd
+[1150/1424] Scanning /home/alex/Documents/IntrinsicEngine/tests/integration/graphics/Test.BufferReadbackGpuSmoke.cpp for CXX dependencies
+[1151/1424] Scanning /home/alex/Documents/IntrinsicEngine/tests/integration/graphics/Test.ComputeParallelPrimitivesGpuSmoke.cpp for CXX dependencies
+[1152/1424] Scanning /home/alex/Documents/IntrinsicEngine/tests/integration/graphics/Test.GpuTransferFacadeGpuSmoke.cpp for CXX dependencies
+[1153/1424] Scanning /home/alex/Documents/IntrinsicEngine/tests/integration/graphics/Test.TextureReadbackGpuSmoke.cpp for CXX dependencies
+[1154/1424] Scanning /home/alex/Documents/IntrinsicEngine/tests/integration/graphics/Test.DefaultRecipeSurfaceGpuSmoke.cpp for CXX dependencies
+[1155/1424] Scanning /home/alex/Documents/IntrinsicEngine/tests/integration/graphics/Test.HzbOcclusionConservatismGpuSmoke.cpp for CXX dependencies
+[1156/1424] Scanning /home/alex/Documents/IntrinsicEngine/tests/integration/graphics/Test.TransientDebugSurfaceGpuSmoke.cpp for CXX dependencies
+[1157/1424] Scanning /home/alex/Documents/IntrinsicEngine/tests/integration/graphics/Test.ImGuiSurfaceGpuSmoke.cpp for CXX dependencies
+[1158/1424] Scanning /home/alex/Documents/IntrinsicEngine/tests/gpu/Test.VulkanBootstrapSmoke.cpp for CXX dependencies
+[1159/1424] Scanning /home/alex/Documents/IntrinsicEngine/tests/integration/runtime/Test.RuntimeSandboxAcceptanceGpuSmoke.cpp for CXX dependencies
+[1160/1424] Scanning /home/alex/Documents/IntrinsicEngine/tests/integration/graphics/Test.UvViewGpuSmoke.cpp for CXX dependencies
+[1161/1424] Scanning /home/alex/Documents/IntrinsicEngine/tests/integration/graphics/Test.VisualizationOverlaySurfaceGpuSmoke.cpp for CXX dependencies
+[1162/1424] Generating CXX dyndep file tests/CMakeFiles/RuntimeSandboxAcceptanceGpuSmokeTestObjs.dir/CXX.dd
+[1163/1424] Scanning /home/alex/Documents/IntrinsicEngine/tests/integration/runtime/Test.ClusteringServiceGpuSmoke.cpp for CXX dependencies
+[1164/1424] Generating CXX dyndep file tests/CMakeFiles/GraphicsVulkanSmokeTestObjs.dir/CXX.dd
+[1165/1424] Generating CXX dyndep file tests/CMakeFiles/RuntimeClusteringServiceGpuSmokeTestObjs.dir/CXX.dd
+[1166/1425] Scanning /home/alex/Documents/IntrinsicEngine/tests/integration/runtime/Test.PointCloudConsolidationGpuParity.cpp for CXX dependencies
+[1167/1425] Scanning /home/alex/Documents/IntrinsicEngine/tests/unit/graphics/Test.RHI.BufferManager.cpp for CXX dependencies
+[1168/1425] Building CXX object tests/CMakeFiles/RuntimeContractTestObjs.dir/contract/runtime/Test.GeometryAvailability.cpp.o
+[1169/1425] Scanning /home/alex/Documents/IntrinsicEngine/tests/integration/runtime/Test.ProgressivePoissonGpuResultReadbackGpuSmoke.cpp for CXX dependencies
+[1170/1425] Generating CXX dyndep file tests/CMakeFiles/RuntimePointCloudConsolidationGpuParityTestObjs.dir/CXX.dd
+[1171/1426] Scanning /home/alex/Documents/IntrinsicEngine/tests/unit/graphics/Test.RHI.SamplerManager.cpp for CXX dependencies
+[1172/1426] Generating CXX dyndep file tests/CMakeFiles/RuntimeProgressivePoissonResultGpuSmokeTestObjs.dir/CXX.dd
+[1173/1426] Scanning /home/alex/Documents/IntrinsicEngine/tests/contract/graphics/Test.BufferTransfer.cpp for CXX dependencies
+[1174/1426] Generating CXX dyndep file tests/CMakeFiles/GraphicsBufferTransferTestObjs.dir/CXX.dd
+[1175/1426] Scanning /home/alex/Documents/IntrinsicEngine/tests/unit/graphics/Test.RHI.TextureManager.cpp for CXX dependencies
+[1176/1426] Scanning /home/alex/Documents/IntrinsicEngine/tests/unit/graphics/Test.RHI.PipelineManager.cpp for CXX dependencies
+[1177/1426] Generating CXX dyndep file tests/CMakeFiles/GraphicsUnitTestObjs.dir/CXX.dd
+[1178/1426] Scanning /home/alex/Documents/IntrinsicEngine/tests/unit/graphics/Test.RHI.Profiler.cpp for CXX dependencies
+[1179/1426] Generating CXX dyndep file tests/CMakeFiles/GraphicsRhiCpuUnitTestObjs.dir/CXX.dd
+[1180/1426] Scanning /home/alex/Documents/IntrinsicEngine/tests/unit/graphics/Test.Graphics.ImGuiOverlaySystem.cpp for CXX dependencies
+[1181/1426] Scanning /home/alex/Documents/IntrinsicEngine/tests/unit/graphics/Test.Graphics.GpuSceneSlot.cpp for CXX dependencies
+[1182/1426] Scanning /home/alex/Documents/IntrinsicEngine/tests/unit/graphics/Test.Graphics.ColormapSystem.cpp for CXX dependencies
+[1183/1426] Scanning /home/alex/Documents/IntrinsicEngine/tests/unit/graphics/Test.Graphics.MaterialSystem.cpp for CXX dependencies
+[1184/1426] Scanning /home/alex/Documents/IntrinsicEngine/tests/unit/graphics/Test.Graphics.DebugViewSystem.cpp for CXX dependencies
+[1185/1426] Scanning /home/alex/Documents/IntrinsicEngine/tests/unit/graphics/Test.Graphics.PostProcessSystem.cpp for CXX dependencies
+[1186/1426] Scanning /home/alex/Documents/IntrinsicEngine/tests/unit/graphics/Test.Graphics.SpatialDebugVisualizers.cpp for CXX dependencies
+[1187/1426] Scanning /home/alex/Documents/IntrinsicEngine/tests/unit/graphics/Test.GpuAssetCache.cpp for CXX dependencies
+[1188/1426] Scanning /home/alex/Documents/IntrinsicEngine/tests/unit/graphics/Test.RenderGraphDebugDump.cpp for CXX dependencies
+[1189/1426] Generating CXX dyndep file tests/CMakeFiles/GraphicsAssetsUnitTestObjs.dir/CXX.dd
+[1190/1426] Scanning /home/alex/Documents/IntrinsicEngine/tests/unit/graphics/Test.Graphics.VisualizationPackets.cpp for CXX dependencies
+[1191/1426] Scanning /home/alex/Documents/IntrinsicEngine/tests/contract/graphics/Test.GpuTransferFacade.cpp for CXX dependencies
+[1192/1426] Generating CXX dyndep file tests/CMakeFiles/GraphicsRendererCpuUnitTestObjs.dir/CXX.dd
+[1193/1426] Scanning /home/alex/Documents/IntrinsicEngine/tests/contract/graphics/Test.PropertyTextureBake.cpp for CXX dependencies
+[1194/1426] Scanning /home/alex/Documents/IntrinsicEngine/tests/contract/graphics/Test.MinimalTriangleAcceptance.cpp for CXX dependencies
+[1195/1426] Scanning /home/alex/Documents/IntrinsicEngine/tests/contract/graphics/Test.RHI.CommandContextBarriers.cpp for CXX dependencies
+[1196/1426] Scanning /home/alex/Documents/IntrinsicEngine/tests/contract/graphics/Test.TextureReadback.cpp for CXX dependencies
+[1197/1426] Scanning /home/alex/Documents/IntrinsicEngine/tests/contract/graphics/Test.RendererRhiBoundary.cpp for CXX dependencies
+[1198/1426] Scanning /home/alex/Documents/IntrinsicEngine/tests/contract/graphics/Test.TextureUploadLayout.cpp for CXX dependencies
+[1199/1426] Scanning /home/alex/Documents/IntrinsicEngine/tests/contract/graphics/Test.TransferQueueReadback.cpp for CXX dependencies
+[1200/1426] Generating CXX dyndep file tests/CMakeFiles/GraphicsContractTestObjs.dir/CXX.dd
+[1201/1426] Scanning /home/alex/Documents/IntrinsicEngine/tests/contract/graphics/Test.VulkanFailClosedContract.cpp for CXX dependencies
+[1202/1426] Scanning /home/alex/Documents/IntrinsicEngine/tests/contract/graphics/Test.VulkanOperationalStatusEvaluator.cpp for CXX dependencies
+[1203/1426] Scanning /home/alex/Documents/IntrinsicEngine/tests/contract/graphics/Test.VulkanOperationalDiagnosticsSnapshot.cpp for CXX dependencies
+[1204/1426] Generating CXX dyndep file tests/CMakeFiles/GraphicsVulkanContractTestObjs.dir/CXX.dd
+[1205/1426] Scanning /home/alex/Documents/IntrinsicEngine/tests/contract/graphics/Test.CullingPassContracts.cpp for CXX dependencies
+[1206/1426] Scanning /home/alex/Documents/IntrinsicEngine/tests/contract/graphics/Test.CurrentRendererContractAdapter.cpp for CXX dependencies
+[1207/1426] Scanning /home/alex/Documents/IntrinsicEngine/tests/contract/graphics/Test.CrossQueueTimeline.cpp for CXX dependencies
+[1208/1426] Scanning /home/alex/Documents/IntrinsicEngine/tests/contract/graphics/Test.DefaultRecipeBackbufferReadback.cpp for CXX dependencies
+[1209/1426] Scanning /home/alex/Documents/IntrinsicEngine/tests/contract/graphics/Test.ComputeParallelPrimitives.cpp for CXX dependencies
+[1210/1426] Scanning /home/alex/Documents/IntrinsicEngine/tests/contract/graphics/Test.DebugViewContract.cpp for CXX dependencies
+[1211/1426] Scanning /home/alex/Documents/IntrinsicEngine/tests/contract/graphics/Test.DebugViewPass.cpp for CXX dependencies
+[1212/1426] Scanning /home/alex/Documents/IntrinsicEngine/tests/contract/graphics/Test.FrameRecipeContract.cpp for CXX dependencies
+[1213/1426] Scanning /home/alex/Documents/IntrinsicEngine/tests/contract/graphics/Test.GeometryResidency.cpp for CXX dependencies
+[1214/1426] Scanning /home/alex/Documents/IntrinsicEngine/tests/contract/graphics/Test.GpuWorldCompactionContract.cpp for CXX dependencies
+[1215/1426] Scanning /home/alex/Documents/IntrinsicEngine/tests/contract/graphics/Test.HZBResourceLifetime.cpp for CXX dependencies
+[1216/1426] Scanning /home/alex/Documents/IntrinsicEngine/tests/contract/graphics/Test.GpuWorldUniformSoAContract.cpp for CXX dependencies
+[1217/1426] Scanning /home/alex/Documents/IntrinsicEngine/tests/contract/graphics/Test.ImGuiPass.cpp for CXX dependencies
+[1218/1426] Scanning /home/alex/Documents/IntrinsicEngine/tests/contract/graphics/Test.GpuWorldLifetimeContract.cpp for CXX dependencies
+[1219/1426] Scanning /home/alex/Documents/IntrinsicEngine/tests/contract/graphics/Test.LightingShadowContracts.cpp for CXX dependencies
+[1220/1426] Scanning /home/alex/Documents/IntrinsicEngine/tests/contract/graphics/Test.ImGuiPresentContract.cpp for CXX dependencies
+[1221/1426] Scanning /home/alex/Documents/IntrinsicEngine/tests/contract/graphics/Test.LinePointPassContracts.cpp for CXX dependencies
+[1222/1426] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Editor/Runtime.EditorJobProjection.cppm.o
+[1223/1426] Scanning /home/alex/Documents/IntrinsicEngine/tests/contract/graphics/Test.LightClusterGrid.cpp for CXX dependencies
+[1224/1426] Scanning /home/alex/Documents/IntrinsicEngine/tests/contract/graphics/Test.MaterialSubstitutionContract.cpp for CXX dependencies
+[1225/1426] Scanning /home/alex/Documents/IntrinsicEngine/tests/contract/graphics/Test.MinimalTriangleReadbackHarness.cpp for CXX dependencies
+[1226/1426] Scanning /home/alex/Documents/IntrinsicEngine/tests/contract/graphics/Test.OwnershipTransferBarriers.cpp for CXX dependencies
+[1227/1426] Scanning /home/alex/Documents/IntrinsicEngine/tests/contract/graphics/Test.PostProcessChainContract.cpp for CXX dependencies
+[1228/1426] Scanning /home/alex/Documents/IntrinsicEngine/tests/contract/graphics/Test.QueueAffinity.cpp for CXX dependencies
+[1229/1426] Scanning /home/alex/Documents/IntrinsicEngine/tests/contract/graphics/Test.PresentPass.cpp for CXX dependencies
+[1230/1426] Scanning /home/alex/Documents/IntrinsicEngine/tests/contract/graphics/Test.RHIResourceSlotRecycling.cpp for CXX dependencies
+[1231/1426] Scanning /home/alex/Documents/IntrinsicEngine/tests/contract/graphics/Test.Profiler.cpp for CXX dependencies
+[1232/1426] Scanning /home/alex/Documents/IntrinsicEngine/tests/contract/graphics/Test.ReconstructionContract.cpp for CXX dependencies
+[1233/1426] Scanning /home/alex/Documents/IntrinsicEngine/tests/contract/graphics/Test.RenderingContract.cpp for CXX dependencies
+[1234/1426] Scanning /home/alex/Documents/IntrinsicEngine/tests/contract/graphics/Test.RenderCommandRouter.cpp for CXX dependencies
+[1235/1426] Scanning /home/alex/Documents/IntrinsicEngine/tests/contract/graphics/Test.RenderRecipeConfig.cpp for CXX dependencies
+[1236/1426] Scanning /home/alex/Documents/IntrinsicEngine/tests/contract/graphics/Test.RendererFrameLifecycle.cpp for CXX dependencies
+[1237/1426] Scanning /home/alex/Documents/IntrinsicEngine/tests/contract/graphics/Test.RenderPrepPipeline.cpp for CXX dependencies
+[1238/1426] Scanning /home/alex/Documents/IntrinsicEngine/tests/contract/graphics/Test.RenderSubsystemRegistry.cpp for CXX dependencies
+[1239/1426] Scanning /home/alex/Documents/IntrinsicEngine/tests/contract/graphics/Test.RenderWorldContract.cpp for CXX dependencies
+[1240/1426] Scanning /home/alex/Documents/IntrinsicEngine/tests/contract/graphics/Test.RenderGraphValidation.cpp for CXX dependencies
+[1241/1426] Scanning /home/alex/Documents/IntrinsicEngine/tests/contract/graphics/Test.RenderGraphParallelRecording.cpp for CXX dependencies
+[1242/1426] Scanning /home/alex/Documents/IntrinsicEngine/tests/contract/graphics/Test.SharedRenderRecipeExecution.cpp for CXX dependencies
+[1243/1426] Scanning /home/alex/Documents/IntrinsicEngine/tests/contract/graphics/Test.SelectionPassContracts.cpp for CXX dependencies
+[1244/1426] Scanning /home/alex/Documents/IntrinsicEngine/tests/contract/graphics/Test.TransformSyncSystem.cpp for CXX dependencies
+[1245/1426] Scanning /home/alex/Documents/IntrinsicEngine/tests/contract/graphics/Test.SurfacePassContracts.cpp for CXX dependencies
+[1246/1426] Scanning /home/alex/Documents/IntrinsicEngine/tests/contract/graphics/Test.SelectionSystemContracts.cpp for CXX dependencies
+[1247/1426] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Editor/Runtime.EditorJobProjection.Public.cpp.o
+[1248/1426] Scanning /home/alex/Documents/IntrinsicEngine/tests/contract/graphics/Test.TransientDebugSurfacePass.cpp for CXX dependencies
+[1249/1426] Scanning /home/alex/Documents/IntrinsicEngine/tests/contract/graphics/Test.UvView.cpp for CXX dependencies
+[1250/1426] Scanning /home/alex/Documents/IntrinsicEngine/tests/contract/graphics/Test.VisualizationOverlayPass.cpp for CXX dependencies
+[1251/1426] Scanning /home/alex/Documents/IntrinsicEngine/tests/contract/graphics/Test.VisualizationPropertyBufferResidency.cpp for CXX dependencies
+[1252/1426] Scanning /home/alex/Documents/IntrinsicEngine/tests/contract/runtime/Test.RuntimeDeviceSelection.cpp for CXX dependencies
+[1253/1426] Generating CXX dyndep file tests/CMakeFiles/GraphicsContractCpuTestObjs.dir/CXX.dd
+[1254/1426] Scanning /home/alex/Documents/IntrinsicEngine/tests/integration/runtime/Test.RuntimeRenderExtraction.cpp for CXX dependencies
+[1255/1426] Scanning /home/alex/Documents/IntrinsicEngine/tests/contract/runtime/Test.RuntimeFrameLoopContract.cpp for CXX dependencies
+[1256/1426] Scanning /home/alex/Documents/IntrinsicEngine/tests/integration/runtime/Test.RenderWorldPoolPipelined.cpp for CXX dependencies
+[1257/1426] Scanning /home/alex/Documents/IntrinsicEngine/tests/integration/runtime/Test.AssetLoadPipeline.cpp for CXX dependencies
+[1258/1426] Scanning /home/alex/Documents/IntrinsicEngine/tests/integration/runtime/Test.RuntimeSandboxAcceptance.cpp for CXX dependencies
+[1259/1426] Scanning /home/alex/Documents/IntrinsicEngine/tests/integration/runtime/Test.AssetService.cpp for CXX dependencies
+[1260/1426] Scanning /home/alex/Documents/IntrinsicEngine/tests/integration/runtime/Test.CoreFrameGraphParallel.cpp for CXX dependencies
+[1261/1426] Generating CXX dyndep file tests/CMakeFiles/RuntimeGraphicsCpuTestObjs.dir/CXX.dd
+[1262/1427] Scanning /home/alex/Documents/IntrinsicEngine/tests/integration/runtime/Test.CoreGraphStress.cpp for CXX dependencies
+[1263/1427] Scanning /home/alex/Documents/IntrinsicEngine/tests/integration/runtime/Test.CoreProcess.cpp for CXX dependencies
+[1264/1427] Generating CXX dyndep file tests/CMakeFiles/RuntimeIntegrationCpuTestObjs.dir/CXX.dd
+[1265/1427] Scanning /home/alex/Documents/IntrinsicEngine/tests/integration/graphics/Test.GpuWorldAndCulling.cpp for CXX dependencies
+[1266/1427] Generating CXX dyndep file tests/CMakeFiles/TestSupportObjs.dir/CXX.dd
+[1267/1427] Scanning /home/alex/Documents/IntrinsicEngine/tests/integration/graphics/Test.RenderGraphLegacy.cpp for CXX dependencies
+[1268/1427] Scanning /home/alex/Documents/IntrinsicEngine/tests/integration/graphics/Test.RendererLegacy.cpp for CXX dependencies
+[1269/1427] Generating CXX dyndep file tests/CMakeFiles/GraphicsIntegrationCpuTestObjs.dir/CXX.dd
+[1270/1427] Scanning /home/alex/Documents/IntrinsicEngine/tests/integration/runtime/Test.GpuResultReadbackGpuSmoke.cpp for CXX dependencies
+[1271/1427] Generating CXX dyndep file tests/CMakeFiles/RuntimeGpuResultReadbackSmokeTestObjs.dir/CXX.dd
+[1272/1427] Building CXX object tests/CMakeFiles/RuntimeContractTestObjs.dir/contract/runtime/Test.GeometryPresentation.cpp.o
+[1273/1427] Linking CXX executable bin/IntrinsicPhysicsMethodTests
+[1274/1427] Linking CXX executable bin/IntrinsicPhysicsWorldTests
+[1275/1427] Linking CXX executable bin/IntrinsicECSTests
+[1276/1427] Linking CXX executable bin/IntrinsicGeometryIoTests
+[1277/1427] Scanning /home/alex/Documents/IntrinsicEngine/tests/regression/platform/Test.GlfwLifecycleLsanProcess.cpp for CXX dependencies
+[1278/1427] Generating CXX dyndep file tests/CMakeFiles/IntrinsicGlfwLifecycleLsanProcess.dir/CXX.dd
+[1279/1427] Linking CXX executable bin/IntrinsicGraphicsIntegrationCpuTests
+[1280/1427] Linking CXX executable bin/IntrinsicGeometryProcessStateTests
+[1281/1427] Linking CXX executable bin/IntrinsicGeometrySlowTests
+[1282/1427] Building CXX object tests/CMakeFiles/GraphicsContractTestObjs.dir/contract/graphics/Test.PropertyTextureBake.cpp.o
+[1283/1427] Linking CXX executable bin/IntrinsicGraphicsRendererCpuUnitTests
+[1284/1427] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Visualization/Runtime.VisualizationRecipes.cpp.o
+[1285/1427] Linking CXX executable bin/IntrinsicGraphicsContractTests
+[1286/1427] Building CXX object tests/CMakeFiles/RuntimeContractTestObjs.dir/contract/runtime/Test.VisualizationRecipes.cpp.o
+/home/alex/Documents/IntrinsicEngine/tests/contract/runtime/Test.VisualizationRecipes.cpp:351:5: warning: ignoring return value of function declared with 'nodiscard' attribute [-Wunused-result]
+  351 |     vertices.Properties.Add<glm::vec2>("v:texcoord", glm::vec2{0.0f});
+      |     ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/home/alex/Documents/IntrinsicEngine/tests/contract/runtime/Test.VisualizationRecipes.cpp:367:5: warning: ignoring return value of function declared with 'nodiscard' attribute [-Wunused-result]
+  367 |     halfedges.Properties.Add<float>("h:filler", 0.0f);
+      |     ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/home/alex/Documents/IntrinsicEngine/tests/contract/runtime/Test.VisualizationRecipes.cpp:368:5: warning: ignoring return value of function declared with 'nodiscard' attribute [-Wunused-result]
+  368 |     halfedges.Properties.Add<glm::vec2>("h:texcoord", glm::vec2{0.0f});
+      |     ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+3 warnings generated.
+[1287/1427] Linking CXX executable bin/IntrinsicGeometryTests
+[1288/1427] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Scene/Runtime.SceneSerialization.cpp.o
+[1289/1427] Building CXX object tests/CMakeFiles/RuntimeContractTestObjs.dir/contract/runtime/Test.RuntimeSceneSerialization.cpp.o
+[1290/1427] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Editor/Operations/Runtime.SceneEditingOperations.cppm.o
+[1291/1427] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Editor/Operations/Runtime.SceneEditingOperations.Debug.cpp.o
+[1292/1427] Building CXX object tests/CMakeFiles/GraphicsContractCpuTestObjs.dir/contract/graphics/Test.RendererFrameLifecycle.cpp.o
+[1293/1427] Linking CXX executable bin/IntrinsicGraphicsContractCpuTests
+[1294/1427] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Scene/Runtime.SceneDocumentModule.cpp.o
+[1295/1427] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Scene/Runtime.SceneInteractionModule.cppm.o
+[1296/1427] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Rendering/Runtime.RenderExtraction.cppm.o
+[1297/1427] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Editor/Operations/Runtime.RenderRecipeEditingOperations.cppm.o
+[1298/1427] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Modules/Clustering/Runtime.ClusteringModule.cppm.o
+[1299/1427] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Editor/Operations/Runtime.RenderRecipeEditingOperations.Debug.cpp.o
+[1300/1427] Building CXX object tests/CMakeFiles/RuntimeContractTestObjs.dir/contract/runtime/Test.RenderWorldPool.cpp.o
+[1301/1427] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Editor/Operations/Runtime.RenderRecipeEditingOperations.cpp.o
+[1302/1427] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Modules/Clustering/Runtime.ClusteringGpuBackend.cpp.o
+[1303/1427] Building CXX object tests/CMakeFiles/RuntimeContractTestObjs.dir/contract/runtime/Test.ImGuiAdapterEngineWiring.cpp.o
+[1304/1427] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Modules/Clustering/Runtime.ClusteringGpuState.cpp.o
+[1305/1427] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Scene/Runtime.SceneInteractionModule.cpp.o
+[1306/1427] Building CXX object tests/CMakeFiles/RuntimeContractTestObjs.dir/contract/runtime/Test.RuntimeModule.cpp.o
+[1307/1427] Building CXX object tests/CMakeFiles/RuntimeContractTestObjs.dir/contract/runtime/Test.SelectionStableLookupComposition.cpp.o
+[1308/1427] Building CXX object tests/CMakeFiles/RuntimeGraphicsCpuTestObjs.dir/integration/runtime/Test.RenderWorldPoolPipelined.cpp.o
+[1309/1427] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Modules/PointCloudConsolidation/Runtime.PointCloudConsolidationModule.cppm.o
+[1310/1427] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Modules/Clustering/Runtime.ClusteringModule.cpp.o
+[1311/1427] Building CXX object tests/CMakeFiles/RuntimeContractTestObjs.dir/contract/runtime/Test.ClusteringModule.cpp.o
+[1312/1427] Building CXX object tests/CMakeFiles/RuntimeClusteringServiceGpuSmokeTestObjs.dir/integration/runtime/Test.ClusteringServiceGpuSmoke.cpp.o
+[1313/1427] Building CXX object tests/CMakeFiles/RuntimeContractTestObjs.dir/contract/runtime/Test.SceneInteractionModule.cpp.o
+[1314/1427] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Modules/Clustering/Runtime.ClusteringConfig.cppm.o
+[1315/1427] Building CXX object benchmarks/CMakeFiles/IntrinsicKMeansGpuBenchmarkSmoke.dir/geometry/Bench_KMeansGpuVulkanSmoke.cpp.o
+[1316/1427] Building CXX object src/app/Sandbox/CMakeFiles/ExtrinsicSandboxEditor.dir/Sandbox.ConfigSections.cppm.o
+[1317/1427] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Modules/PointCloudConsolidation/Runtime.PointCloudConsolidationGpu.cpp.o
+[1318/1427] Building CXX object src/app/Sandbox/CMakeFiles/ExtrinsicSandboxEditor.dir/Sandbox.ConfigSections.cpp.o
+[1319/1427] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Modules/PointCloudConsolidation/Runtime.PointCloudConsolidationModule.cpp.o
+[1320/1427] Building CXX object benchmarks/CMakeFiles/IntrinsicLopFamilyGpuBenchmarkSmoke.dir/geometry/Bench_LopFamilyGpuVulkanSmoke.cpp.o
+[1321/1427] Building CXX object tests/CMakeFiles/RuntimeContractTestObjs.dir/contract/runtime/Test.PointCloudConsolidationModule.cpp.o
+[1322/1427] Building CXX object tests/CMakeFiles/RuntimePointCloudConsolidationGpuParityTestObjs.dir/integration/runtime/Test.PointCloudConsolidationGpuParity.cpp.o
+[1323/1427] Building CXX object tests/CMakeFiles/SandboxEditorIntegrationTestObjs.dir/integration/runtime/Test.SandboxConfigSections.cpp.o
+[1324/1427] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Config/internal/Runtime.FeatureConfigCodecs.Detail.cppm.o
+[1325/1427] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Modules/Parameterization/Runtime.ParameterizationConfig.cpp.o
+[1326/1427] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Modules/PointCloudConsolidation/Runtime.PointCloudConsolidationConfig.cpp.o
+[1327/1427] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Modules/Clustering/Runtime.ClusteringConfig.cpp.o
+[1328/1427] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Modules/ProgressivePoisson/Runtime.ProgressivePoissonConfig.cpp.o
+[1329/1427] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Modules/CurvatureSegmentation/Runtime.CurvatureSegmentationConfig.cpp.o
+[1330/1427] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Modules/TextureBake/Runtime.TextureBakeModule.cppm.o
+[1331/1427] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Config/internal/Runtime.FeatureConfigCodecs.Detail.cpp.o
+[1332/1427] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Rendering/Runtime.RenderExtraction.Internal.cpp.o
+[1333/1427] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Modules/TextureBake/Runtime.TextureBakeModule.cpp.o
+[1334/1427] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Rendering/Runtime.RenderExtraction.Recipes.cpp.o
+[1335/1427] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Rendering/Runtime.RenderExtraction.Geometry.cpp.o
+[1336/1427] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Rendering/Runtime.RenderExtraction.cpp.o
+[1337/1427] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/AssetWorkflow/Runtime.AssetWorkflowRecipePolicies.cppm.o
+[1338/1427] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/AssetWorkflow/Runtime.AssetWorkflowRecipePolicies.cpp.o
+[1339/1427] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/AssetWorkflow/Runtime.AssetWorkflowModelMaterialization.cppm.o
+[1340/1427] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/AssetWorkflow/Runtime.AssetWorkflowModule.cppm.o
+[1341/1427] Building CXX object tests/CMakeFiles/RuntimeContractTestObjs.dir/contract/runtime/Test.GpuAssetCacheFallbackBootstrap.cpp.o
+[1342/1427] Building CXX object tests/CMakeFiles/RuntimeContractTestObjs.dir/contract/runtime/Test.AssetImportRecipe.cpp.o
+[1343/1427] Building CXX object tests/CMakeFiles/RuntimeContractTestObjs.dir/contract/runtime/Test.SelectionSnapshotExtraction.cpp.o
+[1344/1427] Building CXX object tests/CMakeFiles/RuntimeContractTestObjs.dir/contract/runtime/Test.GizmoInteractionEngineWiring.cpp.o
+[1345/1427] Building CXX object tests/CMakeFiles/RuntimeContractTestObjs.dir/contract/runtime/Test.ProceduralGeometryExtraction.cpp.o
+[1346/1427] Building CXX object tests/CMakeFiles/RuntimeContractTestObjs.dir/contract/runtime/Test.RuntimeWorldRegistry.cpp.o
+[1347/1427] Building CXX object tests/CMakeFiles/RuntimeContractTestObjs.dir/contract/runtime/Test.RenderExtractionContract.cpp.o
+[1348/1427] Building CXX object tests/CMakeFiles/RuntimeContractTestObjs.dir/contract/runtime/Test.PointCloudGeometryExtraction.cpp.o
+[1349/1427] Building CXX object tests/CMakeFiles/RuntimeContractTestObjs.dir/contract/runtime/Test.RuntimeSceneLifecycle.cpp.o
+[1350/1427] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Kernel/Runtime.Engine.cpp.o
+[1351/1427] Building CXX object tests/CMakeFiles/RuntimeContractTestObjs.dir/contract/runtime/Test.MeshPrimitiveViewExtraction.cpp.o
+[1352/1427] Building CXX object tests/CMakeFiles/RuntimeContractTestObjs.dir/contract/runtime/Test.GraphGeometryExtraction.cpp.o
+[1353/1427] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Editor/Operations/Runtime.SceneEditingOperations.Actions.cpp.o
+[1354/1427] Building CXX object tests/CMakeFiles/RuntimeContractTestObjs.dir/contract/runtime/Test.MeshGeometryExtraction.cpp.o
+[1355/1427] Building CXX object tests/CMakeFiles/SandboxEditorIntegrationTestObjs.dir/integration/runtime/Test.SandboxAppComposition.cpp.o
+[1356/1427] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/AssetWorkflow/Runtime.AssetWorkflowModelMaterialization.cpp.o
+[1357/1427] Building CXX object tests/CMakeFiles/RuntimeContractTestObjs.dir/contract/runtime/Test.AssetWorkflowModule.cpp.o
+[1358/1427] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/AssetWorkflow/Runtime.AssetWorkflowImportExecutor.cppm.o
+[1359/1427] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Editor/Operations/Runtime.GeometryProcessingOperations.cppm.o
+[1360/1427] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/AssetWorkflow/Runtime.AssetWorkflowModule.cpp.o
+[1361/1427] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Editor/Operations/Runtime.ParameterizationOperations.cpp.o
+[1362/1427] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/AssetWorkflow/Runtime.AssetWorkflowImportExecutor.cpp.o
+[1363/1427] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Editor/Operations/Runtime.GeometryProcessingOperations.cpp.o
+[1364/1427] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Editor/Operations/Runtime.GeometryProcessingOperations.Mesh.cpp.o
+[1365/1427] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Editor/Operations/Runtime.VisualizationEditingOperations.cppm.o
+[1366/1427] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Editor/Operations/Runtime.VisualizationEditingOperations.Debug.cpp.o
+[1367/1427] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Editor/Operations/Runtime.VisualizationEditingOperations.Actions.cpp.o
+[1368/1427] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Editor/Runtime.EditorWorkspaceSnapshots.cppm.o
+[1369/1427] Building CXX object tests/CMakeFiles/RuntimeContractTestObjs.dir/contract/runtime/Test.TextureBakeModule.cpp.o
+[1370/1427] Building CXX object tests/CMakeFiles/RuntimeContractTestObjs.dir/contract/runtime/Test.RuntimeRenderRecipeActivation.cpp.o
+[1371/1427] Building CXX object tests/CMakeFiles/RuntimeContractSlowTestObjs.dir/contract/runtime/Test.AssetImportFormatCoverageSlow.cpp.o
+[1372/1427] Building CXX object tests/CMakeFiles/RuntimeContractTestObjs.dir/contract/runtime/Test.RuntimeConfigControl.cpp.o
+[1373/1427] Building CXX object tests/CMakeFiles/RuntimeContractTestObjs.dir/contract/runtime/Test.RuntimeInputActions.cpp.o
+[1374/1427] Building CXX object tests/CMakeFiles/RuntimeContractTestObjs.dir/contract/runtime/Test.SandboxEditorSessionLifecycle.cpp.o
+[1375/1427] Building CXX object tests/CMakeFiles/RuntimeContractTestObjs.dir/contract/runtime/Test.CurvatureSegmentationOperations.cpp.o
+[1376/1427] Building CXX object tests/CMakeFiles/RuntimeContractTestObjs.dir/contract/runtime/Test.RuntimeReferenceScene.cpp.o
+[1377/1427] Building CXX object tests/CMakeFiles/RuntimeContractTestObjs.dir/contract/runtime/Test.ParameterizationOperations.cpp.o
+/home/alex/Documents/IntrinsicEngine/tests/contract/runtime/Test.ParameterizationOperations.cpp:924:5: warning: ignoring return value of function declared with 'nodiscard' attribute [-Wunused-result]
+  924 |     harness.Halfedges()
+      |     ^~~~~~~~~~~~~~~~~~~
+  925 |         .Properties.GetOrAdd<glm::vec2>("h:texcoord", glm::vec2{0.25f, 0.5f});
+      |         ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+1 warning generated.
+[1378/1427] Building CXX object tests/CMakeFiles/RuntimeContractTestObjs.dir/contract/runtime/Test.SandboxEditorSceneCommands.cpp.o
+[1379/1427] Building CXX object tests/CMakeFiles/RuntimeContractTestObjs.dir/contract/runtime/Test.SandboxEditorModels.cpp.o
+[1380/1427] Building CXX object tests/CMakeFiles/RuntimeContractTestObjs.dir/contract/runtime/Test.AssetImportFormatCoverage.cpp.o
+[1381/1427] Building CXX object tests/CMakeFiles/RuntimeGraphicsCpuTestObjs.dir/integration/runtime/Test.RuntimeRenderExtraction.cpp.o
+[1382/1427] Building CXX object tests/CMakeFiles/RuntimeContractTestObjs.dir/contract/runtime/Test.SandboxEditorVisualization.cpp.o
+[1383/1427] Building CXX object tests/CMakeFiles/RuntimeContractTestObjs.dir/contract/runtime/Test.SandboxEditorClusteringMethods.cpp.o
+[1384/1427] Building CXX object tests/CMakeFiles/RuntimeGraphicsCpuTestObjs.dir/integration/runtime/Test.RuntimeSandboxAcceptance.cpp.o
+[1385/1427] Building CXX object tests/CMakeFiles/RuntimeContractTestObjs.dir/contract/runtime/Test.SandboxEditorMeshMethods.cpp.o
+/home/alex/Documents/IntrinsicEngine/tests/contract/runtime/Test.SandboxEditorMeshMethods.cpp:372:9: warning: ignoring return value of function declared with 'nodiscard' attribute [-Wunused-result]
+  372 |         mesh.AddTriangle(a, b, c);
+      |         ^~~~~~~~~~~~~~~~~~~~~~~~~
+1 warning generated.
+[1386/1427] Building CXX object tests/CMakeFiles/RuntimeSandboxAcceptanceGpuSmokeTestObjs.dir/integration/runtime/Test.RuntimeSandboxAcceptanceGpuSmoke.cpp.o
+[1387/1427] Building CXX object src/app/Sandbox/CMakeFiles/ExtrinsicSandboxEditor.dir/Editor/Sandbox.EditorShell.cppm.o
+[1388/1427] Building CXX object src/app/Sandbox/CMakeFiles/ExtrinsicSandboxEditor.dir/Editor/Sandbox.EditorShell.cpp.o
+[1389/1427] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Editor/internal/Runtime.EditorFeatures.Detail.cppm.o
+[1390/1427] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Editor/internal/Runtime.EditorFeatureContextAdapters.cpp.o
+[1391/1427] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Editor/internal/Runtime.EditorWorkspaceSession.cpp.o
+[1392/1427] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Editor/Runtime.EditorWorkspaceSnapshots.Models.cpp.o
+[1393/1427] Building CXX object src/app/Sandbox/CMakeFiles/ExtrinsicSandboxEditor.dir/Editor/Sandbox.DomainPanels.cppm.o
+[1394/1427] Building CXX object src/app/Sandbox/CMakeFiles/ExtrinsicSandboxEditor.dir/Editor/Sandbox.MeshProcessingPanels.cppm.o
+[1395/1427] Building CXX object src/app/Sandbox/CMakeFiles/ExtrinsicSandboxEditor.dir/Editor/Sandbox.MethodPanels.cppm.o
+[1396/1427] Building CXX object tests/CMakeFiles/SandboxEditorIntegrationTestObjs.dir/integration/runtime/Test.SandboxDomainPanels.cpp.o
+[1397/1427] Building CXX object src/app/Sandbox/CMakeFiles/ExtrinsicSandboxEditor.dir/Editor/Sandbox.EditorController.cpp.o
+[1398/1427] Building CXX object src/app/Sandbox/CMakeFiles/ExtrinsicSandboxEditor.dir/Editor/Sandbox.MeshProcessingPanels.cpp.o
+[1399/1427] Building CXX object src/app/Sandbox/CMakeFiles/ExtrinsicSandboxEditor.dir/Editor/Sandbox.DomainPanels.cpp.o
+[1400/1427] Building CXX object tests/CMakeFiles/SandboxEditorIntegrationTestObjs.dir/integration/runtime/Test.SandboxCurvatureSegmentationPanel.cpp.o
+[1401/1427] Building CXX object tests/CMakeFiles/SandboxEditorIntegrationTestObjs.dir/integration/runtime/Test.SandboxParameterizationPanel.cpp.o
+[1402/1427] Building CXX object src/app/Sandbox/CMakeFiles/ExtrinsicSandboxEditor.dir/Editor/Sandbox.MethodPanels.cpp.o
+[1403/1427] Building CXX object tests/CMakeFiles/SandboxEditorIntegrationTestObjs.dir/integration/runtime/Test.SandboxEditorPresentation.cpp.o
+[1404/1427] Building CXX object tests/CMakeFiles/SandboxEditorIntegrationTestObjs.dir/integration/runtime/Test.SandboxPointCloudConsolidationPanel.cpp.o
+[1405/1427] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Editor/internal/Runtime.EditorWorkspaceAttachment.Detail.cppm.o
+[1406/1427] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Editor/Runtime.EditorWorkspaceAttachment.cpp.o
+[1407/1427] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Editor/Operations/Runtime.VisualizationEditingOperations.Public.cpp.o
+[1408/1427] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Editor/Operations/Runtime.RenderRecipeEditingOperations.Public.cpp.o
+[1409/1427] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Editor/Operations/Runtime.SceneEditingOperations.Public.cpp.o
+[1410/1427] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Editor/Operations/Runtime.GeometryProcessingOperations.Public.cpp.o
+[1411/1427] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Editor/Runtime.EditorWorkspaceSnapshots.Public.cpp.o
+[1412/1427] Linking CXX static library lib/libExtrinsicRuntime.a
+[1413/1427] Linking CXX static library lib/libExtrinsicSandboxEditor.a
+[1414/1427] Linking CXX executable bin/IntrinsicRuntimeIntegrationTests
+[1415/1427] Linking CXX executable bin/IntrinsicRuntimeProgressivePoissonResultGpuSmokeTests
+[1416/1427] Linking CXX executable bin/IntrinsicRuntimeGpuResultReadbackSmokeTests
+[1417/1427] Linking CXX executable bin/IntrinsicRuntimeClusteringServiceGpuSmokeTests
+[1418/1427] Linking CXX executable bin/IntrinsicLopFamilyGpuBenchmarkSmoke
+[1419/1427] Linking CXX executable bin/IntrinsicRuntimeContractSlowTests
+[1420/1427] Linking CXX executable bin/IntrinsicRuntimePointCloudConsolidationGpuParityTests
+[1421/1427] Linking CXX executable bin/IntrinsicRuntimePhysicsModuleTests
+[1422/1427] Linking CXX executable bin/IntrinsicKMeansGpuBenchmarkSmoke
+[1423/1427] Linking CXX executable bin/IntrinsicGraphicsVulkanSmokeTests
+[1424/1427] Linking CXX executable bin/IntrinsicRuntimeGraphicsCpuTests
+[1425/1427] Linking CXX executable bin/IntrinsicRuntimeSandboxAcceptanceGpuSmokeTests
+[1426/1427] Linking CXX executable bin/IntrinsicSandboxEditorIntegrationTests
+[1427/1427] Linking CXX executable bin/IntrinsicRuntimeContractTests

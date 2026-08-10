@@ -1,0 +1,79 @@
+{
+  "attempt_id": "attempt-001",
+  "backend": "cpu_reference",
+  "benchmark_id": "geometry.curvature_segmentation.reference.smoke",
+  "claim_eligible": false,
+  "commit": "be22bb4560f0a46227400d84971c847348b08940",
+  "config_digest": "52d56e326cbf9181084879f5e6cc640995113485fec4d55ee2020202c2de8586",
+  "dataset": "builtin.curvature_regimes.folded_strip.v1",
+  "diagnostics": {
+    "boundary_edge_count": 4,
+    "connected_region_count": 2,
+    "fold_boundary_recall": 1.0,
+    "gmm_iterations": 1,
+    "measured_iterations": 8,
+    "mode": "correctness_smoke",
+    "runner": "IntrinsicBenchmarkSmoke",
+    "selected_component_count": 2,
+    "spatial_iterations": 1,
+    "warmup_iterations": 1
+  },
+  "execution_status": "passed",
+  "manifest": {
+    "path": "benchmarks/geometry/manifests/curvature_segmentation_reference_smoke.yaml",
+    "sha256": "e8007f0d3475188adff883db346ae8a8074d2f328358bd5e7fcc74f2f2fe7fe0"
+  },
+  "method": "geometry.curvature_segmentation",
+  "metrics": {
+    "quality_error_l2": 0.0,
+    "runtime_ms": 0.21093125
+  },
+  "resolved_params": {
+    "component_count": 2,
+    "component_selection": "fixed",
+    "feature_sensitivity": 20.0,
+    "intent": "correctness_smoke",
+    "measured_iterations": 8,
+    "minimum_region_faces": 1,
+    "seed": 17,
+    "signed_features": [
+      "k1",
+      "k2"
+    ],
+    "spatial_weight": 40.0,
+    "warmup_iterations": 1
+  },
+  "run_id": "method-037-run-001",
+  "schema_version": 2,
+  "source": {
+    "revision": "be22bb4560f0a46227400d84971c847348b08940",
+    "state": "unverified_commit"
+  },
+  "status": "passed",
+  "threshold_disposition": [
+    {
+      "limit": 250,
+      "metric": "runtime_ms",
+      "observed": 0.21093125,
+      "operator": "<=",
+      "passed": true,
+      "threshold": "smoke_runtime_ms_max"
+    },
+    {
+      "limit": 0.05,
+      "metric": "quality_error_l2",
+      "observed": 0.0,
+      "operator": "<=",
+      "passed": true,
+      "threshold": "quality_error_l2_max"
+    }
+  ],
+  "thresholds": {
+    "quality_error_l2_max": 0.05,
+    "smoke_runtime_ms_max": 250
+  },
+  "warmup_policy": {
+    "measured_iterations": 8,
+    "warmup_iterations": 1
+  }
+}

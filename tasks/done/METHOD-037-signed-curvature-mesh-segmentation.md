@@ -8,13 +8,19 @@ evidence: required
 owner: "codex-root"
 branch: "main"
 worktree: "/home/alex/Documents/IntrinsicEngine"
-claimed_at: "2026-08-10T10:39:44Z"
+claimed_at: "2026-08-10T14:15:44Z"
 contract_schema: 1
 contracts: [repo.task-contract-discovery, geometry.element-domain-sources, geometry.property-coherence, method.engine-integration]
 contract_review: "The task adds a reusable mesh-topology method surface, publishes same-cardinality face/edge properties consumed by visualization, and binds it through runtime config and Sandbox UI. geometry.parameterization-optimization does not apply because topology cutting and UV optimization are explicitly deferred."
 maturity_target: Operational
 ---
 # METHOD-037 — Signed-principal-curvature mesh segmentation
+
+## Status
+
+- Completed and retired on 2026-08-10 at `Operational` maturity for the CPU
+  runtime/config/UI/editor path.
+- Implementation commit: `be22bb4560f0a46227400d84971c847348b08940`.
 
 ## Goal
 - Decompose an oriented surface mesh into spatially coherent, connected regions of near-constant signed principal curvature using the existing deterministic Gaussian-mixture fitter, publish inspectable face-region and edge-boundary properties, and expose the complete CPU-reference method through shared config/agent and Sandbox UI controls.
@@ -78,9 +84,9 @@ maturity_target: Operational
 ## Acceptance criteria
 - [x] On deterministic analytic fixtures, the result separates distinct signed curvature regimes, remains spatially coherent on smooth faces, aligns the known fold boundary under feature weighting, and emits connected region labels with exact boundary flags.
 - [x] Both Fixed and Automatic modes are selectable through config, agent/programmatic sources, and UI using one validated apply/execute path.
-- [ ] The editor visibly renders deterministic per-face region colors and boundary-only per-edge colors without changing mesh topology.
+- [x] The editor visibly renders deterministic per-face region colors and boundary-only per-edge colors without changing mesh topology.
 - [x] Diagnostics expose GMM convergence, candidate selection, curvature fit, spatial energy/moves, component/region/boundary counts, invalid inputs, and local-optimum limitations.
-- [ ] CPU correctness, config/runtime/UI contracts, smoke benchmark validation, strict structure/docs/layering checks, and claim-grade fixed-surface review/custody pass before retirement.
+- [x] CPU correctness, config/runtime/UI contracts, smoke benchmark validation, strict structure/docs/layering checks, and claim-grade fixed-surface review/custody pass before retirement.
 
 ## Verification
 ```bash
@@ -109,7 +115,30 @@ python3 tools/agents/workflow_evidence.py validate --root .
 ## Maturity
 - Target: `Operational` through the real CPU runtime/config/UI/visualization path.
 - This task closes the non-destructive segmentation method only. `GEOM-076` owns any later topology cuts and UV-atlas chart-hint adoption after evidence review.
-- Current state: implementation, focused tests, the default CPU-supported gate,
-  strict structural validators, and a local non-claim-eligible sealed smoke are
-  green. The task remains active pending an observed rendered-view check and
-  the required independent claim-grade fixed-surface review/custody.
+- Reached: `Operational` through the CPU geometry kernel, runtime publication,
+  shared config lane, Sandbox controls, and simultaneous face/edge
+  visualization. This does not claim an operational promoted-Vulkan backend.
+
+## Verification evidence
+
+- Implementation commit: `be22bb4560f0a46227400d84971c847348b08940`.
+- The focused curvature-segmentation tests and the complete default
+  CPU-supported CTest gate passed in `build/ci` with Clang 23; command receipts
+  are under `tasks/evidence/METHOD-037/commands/`.
+- A real Sandbox run imported `tests/data/sculpt.obj` (3,669 vertices and 7,342
+  faces), computed principal curvature, and ran fixed-count segmentation. The
+  result reported six selected components, five active components, and 752
+  boundary edges while visibly rendering deterministic per-face region colors
+  together with boundary-only edge colors. The captured editor view is
+  `tasks/evidence/METHOD-037/previews/sandbox-sculpt-curvature-segmentation.png`.
+- The visual run exercised the CPU runtime/config/UI/editor path. Promoted
+  Vulkan was requested but remained non-operational after barrier validation,
+  so this evidence deliberately makes no Vulkan-operational claim. The
+  LeakSanitizer shutdown hang remains owned by `BUG-118`.
+- The local benchmark result is a sealed, non-claim-eligible reference smoke;
+  it supports only the frozen-fold fixture's correctness/diagnostic gate and
+  makes no throughput, atlas-quality, optimized-backend, or GPU claim.
+- Strict method/benchmark/task, layering, test-layout, documentation-link,
+  generated-inventory, workflow-evidence, and experiment-custody validators
+  passed. The final fixed surface and portable bundle received independent
+  claim-grade acceptance under `tasks/evidence/METHOD-037/`.

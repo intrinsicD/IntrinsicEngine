@@ -2463,3 +2463,24 @@ observations:
     promoted_to: "logic/claims.md:C37"
     crystallized_via: artifact-commitment
     stale: false
+  - id: O140
+    timestamp: "2026-08-10T17:08+02:00"
+    provenance: ai-executed
+    content: >
+      METHOD-037's deterministic signed-curvature segmentation is operational
+      through its serial CPU geometry kernel, undoable runtime publication,
+      shared config lane, Sandbox controls, and simultaneous face-region and
+      boundary-edge visualization on the checked-in tests and observed sculpt
+      editor run.
+    context: >
+      The focused and full CPU gates passed, a real imported mesh visibly
+      rendered both output domains, and the claim-grade evidence retains a
+      sealed non-claim-eligible correctness smoke. Promoted Vulkan did not
+      become operational, so neither Vulkan behavior nor performance or
+      atlas-quality generalization is part of this observation.
+    potential_type: claim
+    bound_to: [N403]
+    promoted: true
+    promoted_to: "logic/claims.md:C38"
+    crystallized_via: artifact-commitment
+    stale: false

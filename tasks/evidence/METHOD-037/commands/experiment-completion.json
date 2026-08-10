@@ -1,0 +1,29 @@
+{
+  "command": [
+    "python3",
+    "tools/agents/experiment_custody.py",
+    "validate-completion",
+    "--root",
+    ".",
+    "--task-id",
+    "METHOD-037",
+    "--profile",
+    "claim-grade",
+    "--experiment-root",
+    "tasks/evidence/METHOD-037/experiment"
+  ],
+  "command_display": "python3 tools/agents/experiment_custody.py validate-completion --root . --task-id METHOD-037 --profile claim-grade --experiment-root tasks/evidence/METHOD-037/experiment",
+  "cwd": ".",
+  "duration_ms": 182,
+  "exit_code": 0,
+  "finished_at": "2026-08-10T15:18:58Z",
+  "label": "experiment-completion",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-10T15:18:57Z",
+  "stderr_path": "tasks/evidence/METHOD-037/commands/experiment-completion.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/METHOD-037/commands/experiment-completion.stdout.log",
+  "stdout_sha256": "49640f5834b668355c76bd393cd7be41bad47aa63ff541a40034f348edd4d118",
+  "task_id": "METHOD-037"
+}

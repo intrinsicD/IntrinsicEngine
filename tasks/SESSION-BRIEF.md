@@ -8,7 +8,7 @@ the authoritative open/unblocked view.
 
 ## Active tasks
 
-- `METHOD-037` — Signed-principal-curvature mesh segmentation (tasks/active/METHOD-037-signed-curvature-mesh-segmentation.md)
+- none
 
 ## Theme B — Rendering modernization
 
@@ -100,7 +100,7 @@ the authoritative open/unblocked view.
 - blocked by `METHOD-033`: `METHOD-034` — iPSR normal orientation baseline (reference backend) (tasks/backlog/methods/METHOD-034-ipsr-orientation-baseline.md)
 - unblocked: `METHOD-035` — Parametric Gauss (winding-number) orientation baseline (reference backend) (tasks/backlog/methods/METHOD-035-pgr-winding-number-orientation-baseline.md)
 - blocked by `METHOD-032`: `METHOD-036` — Normal-orientation method comparison evidence (publication protocol) (tasks/backlog/methods/METHOD-036-orientation-comparison-evidence.md)
-- blocked by `METHOD-037`: `METHOD-038` — Feature-aligned, remeshing-stable curvature segmentation (tasks/backlog/methods/METHOD-038-feature-aligned-remeshing-stable-curvature-segmentation.md)
+- blocked by `GEOM-071`: `METHOD-038` — Feature-aligned, remeshing-stable curvature segmentation (tasks/backlog/methods/METHOD-038-feature-aligned-remeshing-stable-curvature-segmentation.md)
 - unblocked: `RUNTIME-207` — ICP element-domain source integration (tasks/backlog/runtime/RUNTIME-207-icp-element-domain-source-integration.md)
 - unblocked: `RUNTIME-209` — Point-set outlier analysis and publication split (tasks/backlog/runtime/RUNTIME-209-point-set-outlier-analysis-publication.md)
 - unblocked: `RUNTIME-210` — Signed Heat runtime and config integration (tasks/backlog/runtime/RUNTIME-210-signed-heat-runtime-config-integration.md)

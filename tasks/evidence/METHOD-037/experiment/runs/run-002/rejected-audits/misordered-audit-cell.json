@@ -1,0 +1,35 @@
+{
+  "attempt_id": "attempt-002",
+  "audited_at": "2026-08-10T15:16:18Z",
+  "audited_revision": "be22bb4560f0a46227400d84971c847348b08940",
+  "auditor_label": "codex-method037-auditor-20260810-r2",
+  "bundle_path": "tasks/evidence/METHOD-037/experiment/runs/run-002/bundle.yaml",
+  "bundle_sha256": "90356b3b5685c7568bd958bfb5cd69be1d07bf1327d4016e12e9ff552049caa2",
+  "claim_authorized": false,
+  "disposition": "rejected",
+  "driver_label": "codex-root",
+  "errors": [
+    "positive audit requires every journal cell to be completed (got independent-audit=started)"
+  ],
+  "identity_assurance": "cooperative-label-only",
+  "recomputed_gates": [
+    {
+      "metric": "quality_error_l2",
+      "observed": 0.0,
+      "operator": "<=",
+      "passed": true,
+      "threshold": 0.05
+    }
+  ],
+  "recomputed_summaries": [
+    {
+      "column": "quality_error_l2",
+      "name": "quality_error_l2",
+      "statistic": "mean",
+      "value": 0.0
+    }
+  ],
+  "run_id": "run-002",
+  "schema_version": 1,
+  "task_id": "METHOD-037"
+}

@@ -1,0 +1,20 @@
+{
+  "command": [
+    "python3",
+    "tools/agents/generate_session_brief.py"
+  ],
+  "command_display": "python3 tools/agents/generate_session_brief.py",
+  "cwd": ".",
+  "duration_ms": 117,
+  "exit_code": 0,
+  "finished_at": "2026-08-10T15:04:01Z",
+  "label": "session-brief",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-10T15:04:01Z",
+  "stderr_path": "tasks/evidence/METHOD-037/commands/session-brief.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/METHOD-037/commands/session-brief.stdout.log",
+  "stdout_sha256": "1aaa01346c91dfdacb7fd5f0b242ff1f7a3cb1db4c37cddf26d8a0c3bc704f28",
+  "task_id": "METHOD-037"
+}

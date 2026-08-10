@@ -9447,3 +9447,27 @@ tree:
       is intentionally ready at its high-risk independent-review node, not
       falsely terminal.
     status: resolved
+  - id: N403
+    type: experiment
+    title: "Close METHOD-037 signed-curvature segmentation on its CPU editor path"
+    provenance: ai-executed
+    timestamp: "2026-08-10T17:08+02:00"
+    also_depends_on: []
+    evidence:
+      - "tasks/evidence/METHOD-037/commands/focused-tests.json"
+      - "tasks/evidence/METHOD-037/commands/cpu-tests.json"
+      - "tasks/evidence/METHOD-037/previews/sandbox-sculpt-curvature-segmentation.png"
+      - "tasks/evidence/METHOD-037/experiment/runs/run-002/bundle.yaml"
+      - "tasks/done/METHOD-037-signed-curvature-mesh-segmentation.md"
+    result: >
+      Nineteen focused geometry/runtime/config/UI tests and all 4,196 selected
+      default CPU-supported tests passed, with the tracked GLFW/LeakSanitizer
+      control self-skipped. A real Sandbox run imported the 3,669-vertex sculpt
+      fixture, computed curvature, produced six selected and five active
+      components with 752 boundary edges, and visibly combined deterministic
+      per-face colors with boundary-only edge colors. The sealed folded-strip
+      scratch smoke reported zero label error and full fold-boundary recall.
+      Promoted Vulkan remained non-operational, so the result is bounded to the
+      CPU runtime/config/UI/editor path and makes no performance, atlas-quality,
+      or GPU claim.
+    status: resolved

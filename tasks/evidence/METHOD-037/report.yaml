@@ -1,0 +1,329 @@
+schema_version: 1
+task_id: METHOD-037
+workflow_profile: claim-grade
+status: complete
+generated_by: tools/agents/workflow_evidence.py
+generated_at: '2026-08-10T15:29:16Z'
+claim_eligible: false
+source:
+  base_ref: HEAD^
+  base_revision: a4734772ef98f1343192e5091344704916a21373
+  head_revision: be22bb4560f0a46227400d84971c847348b08940
+  branch: main
+  worktree: /home/alex/Documents/IntrinsicEngine
+  dirty: true
+  surface:
+  - path: ara/logic/claims.md
+    sha256: 502a9bfd7f5f8be620fd30daa077e7d3f050bafd3f9fc7802c6d8242667d9e99
+  - path: ara/staging/observations.yaml
+    sha256: 87527cbb51bd096ea915f64522ffbf53c61e7298c09a7be1032edc252c377cd7
+  - path: ara/trace/exploration_tree.yaml
+    sha256: 29c24e9cb87f0c1f8b913c06be2eaadb7faf9733d421655125204d9afa75ef58
+  - path: benchmarks/CMakeLists.txt
+    sha256: 2208187a78845db0c64080c2bda64890ecb20d72131e6ab2763285ab934b2d99
+  - path: benchmarks/geometry/Bench.CurvatureSegmentationReferenceSmoke.hpp
+    sha256: e67cf2686e061d157ec82bd27b2f93aa90f012d1795755729d02f22b1f0ca6ca
+  - path: benchmarks/geometry/Bench_CurvatureSegmentationReferenceSmoke.cpp
+    sha256: 248d4e46614061155a9d5533894c7ddf61769de271eaea7fd724f3c72f681897
+  - path: benchmarks/geometry/README.md
+    sha256: 47456519de7937243e87745c5a13d080795395b2479e5d15454d406a55851b57
+  - path: benchmarks/geometry/manifests/curvature_segmentation_reference_smoke.yaml
+    sha256: e8007f0d3475188adff883db346ae8a8074d2f328358bd5e7fcc74f2f2fe7fe0
+  - path: benchmarks/runners/BenchmarkSmokeRunner.cpp
+    sha256: 1f647bda7ee41993b21b54e9f1cb949f3d94966f713b0419255b05a0e30efe0d
+  - path: docs/api/generated/module_inventory.md
+    sha256: 596fecb670978db951912982fa6a85090bcc122a5911cb6592414038a2352c42
+  - path: docs/architecture/engine-config.md
+    sha256: 75756c69bca65683181ef74961f9f78884d972fb5c52928a63d64a14feb91b50
+  - path: docs/architecture/geometry.md
+    sha256: 322ce6394428fd49f46580876c6432123c9cd88e92c8fabce5b0137bb3a9acc1
+  - path: docs/architecture/parameterization-mapping-roadmap.md
+    sha256: b59bc09859a87d9af735c1f48ad2980f774bcfd664355e853566a41d05159c4f
+  - path: docs/architecture/runtime-config-control.md
+    sha256: 2802a8babb650028b1564ba6164534aa1e7822b60bd662ed4b49cf218fe2ddf4
+  - path: methods/geometry/README.md
+    sha256: fa00d2c2d5382d04adb072f1c5f12d456fb74819f0a2c54d4267c10293485c78
+  - path: methods/geometry/curvature_segmentation/README.md
+    sha256: e69b71c342ba2a5eab48bb3b053db6dcd37f5e4ae1b6b4cd3fbedc2254929b40
+  - path: methods/geometry/curvature_segmentation/method.yaml
+    sha256: ee313434e902d30bce8d8603f9bde706640381008fda2ca55744653555477d15
+  - path: methods/geometry/curvature_segmentation/paper.md
+    sha256: 183daa28e2a400e692b2ca15a5b4d12b3654be0bd822570dc914b5a7e439eadc
+  - path: src/app/Sandbox/Editor/Sandbox.MeshProcessingPanels.cpp
+    sha256: 3f982160c8be355e461228b9eb7fce9feb1ace1e3a482685569dd810d9c4627e
+  - path: src/app/Sandbox/README.md
+    sha256: 2954089a10de3ffd1a9d33b5a4dd20e7808a8f17aea0e34f4b2cb8ec97e694c3
+  - path: src/app/Sandbox/Sandbox.ConfigSections.cpp
+    sha256: afa878cacd325a9019e72cfa9e6d0b69b87b675986d513aadca5d087361a893f
+  - path: src/app/Sandbox/Sandbox.ConfigSections.cppm
+    sha256: 81de7a23b6ccd2cfbd4c2695239cc42e39bc0e1859cff6f9b45935d99ba1b4e2
+  - path: src/ecs/Components/ECS.Component.GeometrySources.cppm
+    sha256: 4218a30fe42dbea020c891d96b0b459e20e69f276aabdcb6ed569b880ec28c95
+  - path: src/geometry/CMakeLists.txt
+    sha256: 05eba6a62367a96b615083ee338192c2770bc14db16f2beaea7f0f2a49cf1df4
+  - path: src/geometry/Geometry.HalfedgeMesh.CurvatureSegmentation.cpp
+    sha256: cc1156fb4ad1008c46f3e3874baf6ae7816cba2d8e425bde97b8fc9cf41146b7
+  - path: src/geometry/Geometry.HalfedgeMesh.CurvatureSegmentation.cppm
+    sha256: f7f0369f1216ac101d9ceeb9a99b6dd114971fe13bfeb01db49e362dbd8bda56
+  - path: src/runtime/CMakeLists.txt
+    sha256: 55311ca9425d6ae4b5115f8b90bff123e13b89aeb6350d896a5714e396dc8e85
+  - path: src/runtime/Config/internal/Runtime.FeatureConfigCodecs.Detail.cpp
+    sha256: 57fe2e393b5463670fce33769399e88c4104e60820dbc12bd0949183dc4c2ddb
+  - path: src/runtime/Config/internal/Runtime.FeatureConfigCodecs.Detail.cppm
+    sha256: f4fdcb5b27268df25f3724fff297b5013ce977727bf1c16e4f7fb3245176dc5b
+  - path: src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Mesh.cpp
+    sha256: 9c2125ebe04511224c2391994dde8e2438aff95e643b0af2f31877c9a917551a
+  - path: src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Public.cpp
+    sha256: ef2228a82a948511d95e2498dd4d1c60c710a14e3733d6c9ffdbfa92f65e7103
+  - path: src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.cpp
+    sha256: 04074ea0397f9f1e379b9386daac711cc42d85c6d80c802c9a90326d2ba7a34b
+  - path: src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.cppm
+    sha256: dbc0b0ff506adf1ca1bc37c76e112ab628a184699e5ce2a0ed0e14a337739108
+  - path: src/runtime/Editor/Runtime.EditorWorkspaceSnapshots.Models.cpp
+    sha256: e9c9d35a5bad99fed571e5fc9720f04dc28482dde52a1608517929e113b9124b
+  - path: src/runtime/Editor/internal/Runtime.EditorFeatureContextAdapters.cpp
+    sha256: 00885cc092c963c26b49dff9448be05f4b545926115d0a07bc47e89f9e23fa37
+  - path: src/runtime/Editor/internal/Runtime.EditorFeatures.Detail.cppm
+    sha256: 0a5dd7d32695d83972bc2605d378572d6e8bf80882f170b2ebde586818732654
+  - path: src/runtime/Modules/CurvatureSegmentation/Runtime.CurvatureSegmentationConfig.cpp
+    sha256: e470a7c6cd8caf71820b9904fc1765a393c4980fd2372e4fd17c0433c25a5374
+  - path: src/runtime/Modules/CurvatureSegmentation/Runtime.CurvatureSegmentationConfig.cppm
+    sha256: d223d428877b4480faf11af41bc90878b537c327259298f782cb53968ffbd09b
+  - path: src/runtime/README.md
+    sha256: 21ef9693452def2f521f1ae5bcca7a2c2dda5dab9f5aa443f425246dee1aac25
+  - path: tasks/SESSION-BRIEF.md
+    sha256: 59b7c21916882d58bf9c8b95c4c2678ffaef46df2414b37e5b8896143c6f1eef
+  - path: tasks/backlog/bugs/BUG-149-benchmark-sealer-dotted-output-directory.md
+    sha256: c00ac9b3fad839999c7b685a314fc79cf66295f6c8d62be6b9ac90ac9999c588
+  - path: tasks/backlog/bugs/index.md
+    sha256: f9ddfed79126c0986045a8cab6c7410e565679c57b314dc0d2bc15a52ac1e2ce
+  - path: tasks/backlog/geometry/GEOM-076-curvature-region-guided-uv-atlas-cuts.md
+    sha256: fa176fb45bb7f535ef34c59b283630f30133e8d2921ab065225d4ee93f2df9f7
+  - path: tasks/backlog/geometry/README.md
+    sha256: 73bf39c9fe642aeeab3b13bb6a9453a63d0ce35fcc63fdcce7bfbec94eed97bb
+  - path: tasks/backlog/methods/METHOD-038-feature-aligned-remeshing-stable-curvature-segmentation.md
+    sha256: 6af36c9b5d25dca2303b40f8bcb0b5eaabdf4a83c86f25fdb52e4de707064c16
+  - path: tasks/backlog/methods/README.md
+    sha256: e8118ac4981d1887ade604c8517f5dab2391b4df84bf61f8e812e77c6876d8bf
+  - path: tasks/done/METHOD-037-signed-curvature-mesh-segmentation.md
+    sha256: d9b0e4196aa0e8858f494c18b50220a8b94f4d113d2e6b52564c657b62e61bb0
+  - path: tasks/done/RETIREMENT-LOG.md
+    sha256: 8ccf49c0f82ef0f02371889135ca87062ecb464026c745a099eaa4f1dccd7f15
+  - path: tests/CMakeLists.txt
+    sha256: 90b5b548f52f73c4f6c3e44be6cd997bcb9312b170559097287b8d014806737c
+  - path: tests/contract/runtime/Test.CurvatureSegmentationOperations.cpp
+    sha256: 87964bafbb70d25e2608d556813aefbe4d99e98a1d08d408238075953ab7a73a
+  - path: tests/contract/runtime/Test.SandboxEditorModels.cpp
+    sha256: bd736cbe405ada32ecbe677c71d6d60dffdee3c81bcc3a764a62659bbc65c7f0
+  - path: tests/integration/runtime/Test.SandboxConfigSections.cpp
+    sha256: f2e33e3713d77debb783cfce36b43c4618aa467cee191bc0082b67f16c99d52d
+  - path: tests/integration/runtime/Test.SandboxCurvatureSegmentationPanel.cpp
+    sha256: 817ff8d64edb9e5626f4d4e7ead86da1e5ef08147b37efb1f0e3aabeb0f542cb
+  - path: tests/integration/runtime/Test.SandboxEditorPresentation.cpp
+    sha256: 71a83e7e48e211d2c9e5faa1fa2630faf9a5524944c4bc36c8f0cf4e50d2acb2
+  - path: tests/support/EditorFeatureTestContext.hpp
+    sha256: 40c34e567fa38fe685cb522ba7c03d204e87a046286f0050d7807db7b981316c
+  - path: tests/unit/geometry/Test.CurvatureSegmentation.cpp
+    sha256: 9aafde253406789d684f103457906629bdcd78a1a30fd1bc46bcb0dce436d265
+  content_digest: 6a710066b79e8827ff0ab87596764d7ca6a068a23b8dcb1d36542e28c396807a
+touched:
+  paths:
+  - ara/logic/claims.md
+  - ara/staging/observations.yaml
+  - ara/trace/exploration_tree.yaml
+  - benchmarks/CMakeLists.txt
+  - benchmarks/geometry/Bench.CurvatureSegmentationReferenceSmoke.hpp
+  - benchmarks/geometry/Bench_CurvatureSegmentationReferenceSmoke.cpp
+  - benchmarks/geometry/README.md
+  - benchmarks/geometry/manifests/curvature_segmentation_reference_smoke.yaml
+  - benchmarks/runners/BenchmarkSmokeRunner.cpp
+  - docs/api/generated/module_inventory.md
+  - docs/architecture/engine-config.md
+  - docs/architecture/geometry.md
+  - docs/architecture/parameterization-mapping-roadmap.md
+  - docs/architecture/runtime-config-control.md
+  - methods/geometry/README.md
+  - methods/geometry/curvature_segmentation/README.md
+  - methods/geometry/curvature_segmentation/method.yaml
+  - methods/geometry/curvature_segmentation/paper.md
+  - src/app/Sandbox/Editor/Sandbox.MeshProcessingPanels.cpp
+  - src/app/Sandbox/README.md
+  - src/app/Sandbox/Sandbox.ConfigSections.cpp
+  - src/app/Sandbox/Sandbox.ConfigSections.cppm
+  - src/ecs/Components/ECS.Component.GeometrySources.cppm
+  - src/geometry/CMakeLists.txt
+  - src/geometry/Geometry.HalfedgeMesh.CurvatureSegmentation.cpp
+  - src/geometry/Geometry.HalfedgeMesh.CurvatureSegmentation.cppm
+  - src/runtime/CMakeLists.txt
+  - src/runtime/Config/internal/Runtime.FeatureConfigCodecs.Detail.cpp
+  - src/runtime/Config/internal/Runtime.FeatureConfigCodecs.Detail.cppm
+  - src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Mesh.cpp
+  - src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Public.cpp
+  - src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.cpp
+  - src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.cppm
+  - src/runtime/Editor/Runtime.EditorWorkspaceSnapshots.Models.cpp
+  - src/runtime/Editor/internal/Runtime.EditorFeatureContextAdapters.cpp
+  - src/runtime/Editor/internal/Runtime.EditorFeatures.Detail.cppm
+  - src/runtime/Modules/CurvatureSegmentation/Runtime.CurvatureSegmentationConfig.cpp
+  - src/runtime/Modules/CurvatureSegmentation/Runtime.CurvatureSegmentationConfig.cppm
+  - src/runtime/README.md
+  - tasks/SESSION-BRIEF.md
+  - tasks/backlog/bugs/BUG-149-benchmark-sealer-dotted-output-directory.md
+  - tasks/backlog/bugs/index.md
+  - tasks/backlog/geometry/GEOM-076-curvature-region-guided-uv-atlas-cuts.md
+  - tasks/backlog/geometry/README.md
+  - tasks/backlog/methods/METHOD-038-feature-aligned-remeshing-stable-curvature-segmentation.md
+  - tasks/backlog/methods/README.md
+  - tasks/done/METHOD-037-signed-curvature-mesh-segmentation.md
+  - tasks/done/RETIREMENT-LOG.md
+  - tests/CMakeLists.txt
+  - tests/contract/runtime/Test.CurvatureSegmentationOperations.cpp
+  - tests/contract/runtime/Test.SandboxEditorModels.cpp
+  - tests/integration/runtime/Test.SandboxConfigSections.cpp
+  - tests/integration/runtime/Test.SandboxCurvatureSegmentationPanel.cpp
+  - tests/integration/runtime/Test.SandboxEditorPresentation.cpp
+  - tests/support/EditorFeatureTestContext.hpp
+  - tests/unit/geometry/Test.CurvatureSegmentation.cpp
+  layers:
+  - app
+  - ecs
+  - geometry
+  - runtime
+  modules:
+  - Extrinsic.Runtime.CurvatureSegmentationConfig
+  - Extrinsic.Runtime.GeometryProcessingOperations
+  - Extrinsic.Sandbox.ConfigSections
+  - Geometry.HalfedgeMesh.CurvatureSegmentation
+extension_seam: Plain params/result/free-function CPU reference plus the existing runtime operation and
+  config lane; no backend registry or service was added.
+future_change_plan: METHOD-038 owns feature-aligned/remeshing-stable v2 and optimized-CPU evidence after
+  GEOM-071 supplies canonical sharp-feature facts; GEOM-076 remains the only atlas consumer.
+acceptance:
+- criterion: On deterministic analytic fixtures, the result separates distinct signed curvature regimes,
+    remains spatially coherent on smooth faces, aligns the known fold boundary under feature weighting,
+    and emits connected region labels with exact boundary flags.
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: Both Fixed and Automatic modes are selectable through config, agent/programmatic sources,
+    and UI using one validated apply/execute path.
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: The editor visibly renders deterministic per-face region colors and boundary-only per-edge
+    colors without changing mesh topology.
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: Diagnostics expose GMM convergence, candidate selection, curvature fit, spatial energy/moves,
+    component/region/boundary counts, invalid inputs, and local-optimum limitations.
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: CPU correctness, config/runtime/UI contracts, smoke benchmark validation, strict structure/docs/layering
+    checks, and claim-grade fixed-surface review/custody pass before retirement.
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+commands:
+- receipt: tasks/evidence/METHOD-037/commands/ara-claims-final-2.json
+- receipt: tasks/evidence/METHOD-037/commands/ara-claims-final.json
+- receipt: tasks/evidence/METHOD-037/commands/benchmark-manifests.json
+- receipt: tasks/evidence/METHOD-037/commands/benchmark-result.json
+- receipt: tasks/evidence/METHOD-037/commands/benchmark-smoke-run-002.json
+- receipt: tasks/evidence/METHOD-037/commands/benchmark-smoke.json
+- receipt: tasks/evidence/METHOD-037/commands/ci-build.json
+- receipt: tasks/evidence/METHOD-037/commands/ci-configure.json
+- receipt: tasks/evidence/METHOD-037/commands/ci-vulkan-configure.json
+- receipt: tasks/evidence/METHOD-037/commands/clean-workshop.json
+- receipt: tasks/evidence/METHOD-037/commands/cpu-tests.json
+- receipt: tasks/evidence/METHOD-037/commands/diff-check-final-2.json
+- receipt: tasks/evidence/METHOD-037/commands/diff-check-final-3.json
+- receipt: tasks/evidence/METHOD-037/commands/diff-check-final.json
+- receipt: tasks/evidence/METHOD-037/commands/diff-check.json
+- receipt: tasks/evidence/METHOD-037/commands/doc-links.json
+- receipt: tasks/evidence/METHOD-037/commands/docs-sync-final.json
+- receipt: tasks/evidence/METHOD-037/commands/docs-sync.json
+- receipt: tasks/evidence/METHOD-037/commands/experiment-completion.json
+- receipt: tasks/evidence/METHOD-037/commands/experiment-custody.json
+- receipt: tasks/evidence/METHOD-037/commands/focused-tests.json
+- receipt: tasks/evidence/METHOD-037/commands/layering.json
+- receipt: tasks/evidence/METHOD-037/commands/method-manifests.json
+- receipt: tasks/evidence/METHOD-037/commands/module-inventory.json
+- receipt: tasks/evidence/METHOD-037/commands/root-hygiene.json
+- receipt: tasks/evidence/METHOD-037/commands/sandbox-build.json
+- receipt: tasks/evidence/METHOD-037/commands/session-brief.json
+- receipt: tasks/evidence/METHOD-037/commands/skill-mirrors.json
+- receipt: tasks/evidence/METHOD-037/commands/task-policy-final.json
+- receipt: tasks/evidence/METHOD-037/commands/task-state-links-final.json
+- receipt: tasks/evidence/METHOD-037/commands/task-state-links.json
+- receipt: tasks/evidence/METHOD-037/commands/test-layout.json
+- receipt: tasks/evidence/METHOD-037/commands/validate-tasks-final.json
+- receipt: tasks/evidence/METHOD-037/commands/workflow-evidence-final.json
+changed_public_contracts:
+- Deterministic fail-closed Segment/ComputeAndSegment CPU-reference API with slot-aligned face/edge results
+  and explicit diagnostics.
+- Schema-v1 sandbox.curvature_segmentation config round-trips and uses one preview/validate/apply path
+  for file, editor, AgentCli, and programmatic sources.
+- Undoable same-cardinality publication of f:curvature_component, f:curvature_region, f:curvature_region_color,
+  e:curvature_region_boundary, and e:curvature_region_boundary_color.
+diagnostics_and_previews:
+- Focused suite passed 19/19; complete default CPU-supported suite passed 4196/4196 with the tracked GLFW/LeakSanitizer
+  control self-skipped.
+- 'Sandbox sculpt.obj proof: 3669 vertices, 7342 faces, six selected components, five active components,
+  752 boundary edges, simultaneous face-region and boundary-only edge colors.'
+- 'Clean-workshop automated rows passed; manual rows: public lower-layer exposure pass, renderer growth
+  n/a, frame-pass routing n/a, frame-recipe dependencies n/a.'
+benchmark_or_parity_evidence:
+- 'Canonical run-002 is a sealed non-claim-eligible scratch smoke: quality_error_l2=0.0 <= 0.05, fold_boundary_recall=1.0,
+  two connected regions; independent bundle audit accepted. Runtime timing is diagnostic only.'
+docs_sync:
+  task_file: tasks/done/METHOD-037-signed-curvature-mesh-segmentation.md
+  session_brief_present: true
+  canonical_docs_changed: true
+  skill_mirrors_checked: true
+residual_risks:
+- The CPU reference uses deterministic local ICM and greedy cleanup, not a global optimizer; MinimumRegionFaces
+  > 1 lacks a deterministic assertion.
+- The tiny folded-strip smoke does not establish remeshing stability, feature-curve quality, atlas suitability,
+  or useful acceleration; quality_error_l2 is a misclassification fraction, not Euclidean L2.
+- Promoted Vulkan remained non-operational after barrier validation during the editor run; BUG-118 owns
+  the observed LeakSanitizer shutdown hang.
+- The first scratch custody run and failed ARA proof-path receipt are transparently retained as superseded;
+  neither is canonical completion evidence.
+- The sculpt visual proof is a manual hash-bound screenshot rather than an automated golden/readback.
+skipped_checks:
+- check: promoted-vulkan
+  reason: Requested during the real editor run but the device remained non-operational after barrier validation;
+    the maturity and ARA claim are explicitly CPU runtime/config/UI only.
+- check: isolated-asan-ubsan-ctest
+  reason: The task frozen verification requires the default CPU gate; the combined-sanitizer ci-vulkan
+    executable built, but separate sanitizer CTest variants were not run and are not used for the bounded
+    claim.
+artifacts:
+- path: tasks/evidence/METHOD-037/previews/sandbox-sculpt-curvature-segmentation.png
+  sha256: 866eac57fe103c139c87f286b29238ac24cdb6f99f2afc6d9f71fe47f2707934
+  kind: file
+- path: tasks/evidence/METHOD-037/experiment/inputs/benchmark_result.json
+  sha256: ee22faa77dd987db986f64b6b9b1e4711a833d21cccc89f2cdf1c76909695c7e
+  kind: file
+- path: tasks/evidence/METHOD-037/experiment/runs/run-002/bundle.yaml
+  sha256: 90356b3b5685c7568bd958bfb5cd69be1d07bf1327d4016e12e9ff552049caa2
+  kind: file
+- path: tasks/evidence/METHOD-037/experiment/runs/run-002/audit.json
+  sha256: 4d7c996830129f108c61e8c41f79ace5e3215d3dae70e6f18a48ec250a1cb10f
+  kind: file
+self_review:
+  completed: true
+  scope_matches_task: true
+  layering_preserved: true
+  tests_and_docs_accounted_for: true
+  mechanical_and_semantic_changes_separated: true
+handoff: tasks/evidence/METHOD-037/handoff.jsonl
+review: tasks/evidence/METHOD-037/reviews.jsonl
+experiment_root: tasks/evidence/METHOD-037/experiment
