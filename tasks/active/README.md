@@ -11,6 +11,9 @@ Each active task should include:
 
 ## Currently active
 
+- [BUG-152 — Geometry index presents retired GEOM-071 as active backlog work](BUG-152-geometry-index-retired-task-state-link.md)
+  — Micro documentation repair for the pre-existing strict task-state-link
+  failure observed while verifying `BUG-151`.
 - [BUG-151 — Work graph cannot advance a declared multi-slice task](BUG-151-work-graph-multi-slice-cycle.md)
   — High-risk workflow repair for one auditable next-slice cycle with fresh
   bounded attempts and an exact clean baseline; no engine or method change.

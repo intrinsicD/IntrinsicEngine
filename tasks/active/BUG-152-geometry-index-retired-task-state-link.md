@@ -5,12 +5,12 @@ depends_on: []
 workflow_schema: 1
 workflow_profile: micro
 evidence: not_applicable
-evidence_skip_reason: "Single category-index lifecycle-link correction with no engine, workflow-policy, or behavior change; strict task-state and task validators are the complete proof."
+owner: "codex-bug152"
+branch: "bug-152-geometry-index-state-link"
+worktree: "/tmp/intrinsic-bug152-worktree"
+claimed_at: "2026-08-10T23:29:25Z"
+evidence_skip_reason: "Single category-index lifecycle-link correction; strict task-state and task validators are the complete proof."
 template: micro
-owner:
-branch:
-worktree:
-claimed_at:
 contract_schema: 1
 contracts: [repo.task-contract-discovery]
 contract_review: "This is a task-lifecycle index defect governed by the reusable task discovery/state-link contract. Engine layering, method integration, publication, runtime, config, UI, and backend contracts are not involved."
