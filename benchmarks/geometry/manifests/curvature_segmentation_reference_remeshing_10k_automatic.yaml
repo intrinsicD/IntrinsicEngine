@@ -1,0 +1,32 @@
+benchmark_id: geometry.curvature_segmentation.reference.remeshing.10k.automatic
+method: geometry.curvature_segmentation
+dataset: builtin.curvature_transition_grid_pair.v1
+params:
+  intent: fixture_screen
+  backend: cpu_reference_v1
+  descriptor_lane: supplied_curvature
+  component_selection: automatic
+  component_range: [1, 4]
+  expected_selected_components: 2
+  live_faces: 10000
+  reference_surface: unit_square
+  reference_boundary: "x=0.5, y in [0,1]"
+  triangulations: [uniform_aligned, anisotropic_feature_crossing]
+  boundary_metric: upper_bound_normalized_symmetric_surface_hausdorff
+  reference_samples: 4097
+  reference_half_spacing_padding: true
+  tolerance_band_normalized: 0.02
+  aggregation: max_of_variant_medians
+  threshold_scope: fixture_contract_not_convergence
+  warmup_iterations: 1
+  measured_iterations: 3
+  quality_error_l2_unit: misclassified_face_fraction
+  quality_error_linf_unit: upper_bound_normalized_symmetric_surface_hausdorff
+metrics: [runtime_ms, memory_peak_bytes, quality_error_l2, quality_error_linf, population_count]
+thresholds:
+  fixture_runtime_ms_max: 10000
+  memory_peak_bytes_max: 2147483648
+  quality_error_l2_max: 0.02
+  quality_error_linf_max: 0.02
+  population_count_min: 2
+  population_count_max: 2

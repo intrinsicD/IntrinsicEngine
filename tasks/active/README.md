@@ -12,9 +12,10 @@ Each active task should include:
 ## Currently active
 
 - [METHOD-038 — Feature-aligned, remeshing-stable curvature segmentation](METHOD-038-feature-aligned-remeshing-stable-curvature-segmentation.md)
-  — Slice A intake and baseline profiling; the frozen 10k replay retained the
-  Automatic four-component negative result, so next add cold-descriptor and
-  continuous paired-remeshing fixtures before any v2 production change.
+  — Slice A intake and baseline profiling; the bounded 10k fixture cohort now
+  covers cold/reusable curvature and one exact planar continuous-boundary
+  comparison. The production selector remains unchanged while the broader
+  analytic screening corpus and candidate split stay open.
 
 ## History
 

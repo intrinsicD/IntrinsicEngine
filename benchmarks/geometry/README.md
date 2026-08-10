@@ -27,13 +27,24 @@ METHOD-038 also provides the opt-in
 as `IntrinsicCurvatureSegmentationProfile`. Its default `smoke` cohort profiles
 the supplied-curvature METHOD-037 reference on paired uniform/nonuniform 10k
 grids in Fixed and Automatic modes. Setting
+`INTRINSIC_CURVATURE_PROFILE_COHORT=fixtures` runs two additional bounded
+screens in both modes: cold `ComputeAndSegment` versus reusable precomputed
+curvature on two 10k-face triangulations of an analytic unit sphere, and a
+continuous boundary comparison on the planar transition-grid pair. The latter
+compares the predicted edge network to the exact line `x=0.5` using a
+bounding-box-normalized symmetric surface-Hausdorff upper bound. The directed
+reference-to-prediction term samples 4097 points and adds half the sample
+spacing using the distance function's 1-Lipschitz bound; it is a fixture
+contract, not a refinement-convergence result. Setting
 `INTRINSIC_CURVATURE_PROFILE_COHORT=heavy` selects the declared 100k and 1M
 cohorts. The heavy runner is not a default CTest. Its manifest thresholds are
 harness-health bounds, not adoption or acceleration claims; clean-source
 screening/confirmation runs require METHOD-038 experiment custody. The
 `population_count` metric is gated to exactly two for both modes so an
 Automatic over-selection is preserved as a benchmark failure instead of being
-hidden inside free-form diagnostics.
+hidden inside free-form diagnostics. The sphere manifests analogously require
+one component; none of these fixture gates retunes or changes the production
+selector.
 
 The GEOM-056/RUNTIME-196 KMeans Vulkan smoke is the explicit exception: it lives in
 [`Bench_KMeansGpuVulkanSmoke.cpp`](Bench_KMeansGpuVulkanSmoke.cpp), imports the

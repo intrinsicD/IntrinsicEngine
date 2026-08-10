@@ -1198,12 +1198,12 @@
 - **Falsification criteria**: Repeating the exact frozen protocol and source
   selects exactly two components on both paired variants while preserving the
   declared `quality_error_l2 <= 0.02` gate.
-- **Proof**: [tasks/evidence/METHOD-038/experiment/protocol.yaml,
+- **Proof**: [tasks/evidence/METHOD-038/superseded/20260810-fixture-cohort-runner-change/experiment/protocol.yaml,
   benchmarks/geometry/manifests/curvature_segmentation_reference_profile_10k_automatic.yaml,
-  tasks/evidence/METHOD-038/experiment/inputs/automatic_benchmark_result.json,
-  tasks/evidence/METHOD-038/experiment/inputs/fixed_benchmark_result.json,
-  tasks/evidence/METHOD-038/experiment/runs/scratch-002/bundle.yaml,
-  tasks/evidence/METHOD-038/experiment/runs/scratch-002/audit.json]
+  tasks/evidence/METHOD-038/superseded/20260810-fixture-cohort-runner-change/experiment/inputs/automatic_benchmark_result.json,
+  tasks/evidence/METHOD-038/superseded/20260810-fixture-cohort-runner-change/experiment/inputs/fixed_benchmark_result.json,
+  tasks/evidence/METHOD-038/superseded/20260810-fixture-cohort-runner-change/experiment/runs/scratch-002/bundle.yaml,
+  tasks/evidence/METHOD-038/superseded/20260810-fixture-cohort-runner-change/experiment/runs/scratch-002/audit.json]
 - **Dependencies**: [C38]
 - **Tags**: geometry, curvature segmentation, automatic selection, CPU reference,
   negative result, scratch

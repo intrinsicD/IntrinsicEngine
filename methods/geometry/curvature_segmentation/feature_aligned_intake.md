@@ -211,9 +211,16 @@ The legacy smoke's `quality_error_l2` schema slot is explicitly measured in
 protocols use semantically named raw columns and bind any compatibility mapping
 to that legacy slot.
 
-The opt-in `IntrinsicCurvatureSegmentationProfile` runner now declares paired
+The opt-in `IntrinsicCurvatureSegmentationProfile` runner declares paired
 uniform/nonuniform supplied-curvature cohorts at 10k, 100k, and 1M live faces
-for both Fixed and Automatic selection. Its manifest limits are harness-health
-bounds only. It does not yet satisfy the cold `ComputeAndSegment` lane or the
-analytic continuous-curve corpus; those must land before the Slice A protocol
-can freeze candidate A-D quality or acceleration gates.
+for both Fixed and Automatic selection. Its `fixtures` cohort adds a 10k
+analytic unit-sphere diagonal pair in cold `ComputeAndSegment` and reusable
+precomputed-curvature lanes, plus a planar transition-grid pair measured
+against the exact continuous line `x=0.5`. The planar symmetric surface-
+Hausdorff result is an upper bound: the predicted-to-reference direction is
+exact on each straight segment, and the sampled reference-to-predicted
+direction adds half the 4097-sample spacing using the distance function's
+1-Lipschitz property. All limits remain harness-health or bounded fixture
+contracts. One planar pair is not the preregistered analytic corpus, and it
+does not establish refinement convergence, candidate A-D quality, or an
+acceleration gate.

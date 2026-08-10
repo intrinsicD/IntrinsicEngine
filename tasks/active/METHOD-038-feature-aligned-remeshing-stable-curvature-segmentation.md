@@ -42,9 +42,19 @@ maturity_target: ParityProven
   `CCACHE_DISABLE=1 cmake --build --preset ci --target IntrinsicTests --parallel 2`
   completed without either crash; no speculative METHOD-038 source workaround
   was introduced.
-- Next: add the cold descriptor lane and continuous paired-remeshing fixtures,
-  then freeze the candidate-screening split before any candidate A
-  implementation.
+- Checkpoint 2 extends only the opt-in private profiler: a 10k analytic-sphere
+  diagonal pair now exercises cold `ComputeAndSegment` and reusable
+  precomputed-curvature lanes, while the existing planar transition pair now
+  reports an exact-reference continuous-boundary upper bound. Both Fixed and
+  Automatic modes retain their declared population gates; no selector,
+  runtime/config/UI path, public module, or production default changed.
+- The canonical non-claim fixture replay is `scratch-003`. It preserves the
+  Fixed control and the Automatic over-selection as separate outcomes instead
+  of tuning the selector from the fixture. This checkpoint is a bounded
+  fixture contract, not the full analytic corpus, remeshing convergence, or a
+  candidate-v2 selection.
+- Next: extend the disjoint analytic screening corpus and freeze the candidate
+  A-D killing split before any `cpu_reference_v2` implementation.
 
 ## Goal
 - Replace METHOD-037's slow, edge-local boundary inference with an evidence-selected CPU formulation that remains statistically based on the existing Gaussian mixture, aligns region boundaries with persistent surface feature curves, converges across retriangulations of the same embedded surface, and meets a preregistered useful-acceleration gate without weakening correctness, diagnostics, or the Fixed/Automatic UI contract.
@@ -167,6 +177,11 @@ ctest --test-dir build/ci --output-on-failure -R 'CurvatureSegmentation|SharpFea
 ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
 python3 tools/agents/validate_method_manifests.py
 python3 tools/benchmark/validate_benchmark_manifests.py --root benchmarks --strict
+INTRINSIC_CURVATURE_PROFILE_COHORT=fixtures \
+  python3 tools/benchmark/run_and_seal.py \
+    --executable build/ci/bin/IntrinsicCurvatureSegmentationProfile \
+    --output <sealed-result-dir> --manifests-root benchmarks \
+    --run-id method-038-fixtures --attempt-id attempt-001
 python3 tools/benchmark/validate_benchmark_results.py --root <sealed-result-dir> --manifests-root benchmarks --strict
 python3 tools/repo/check_layering.py --root src --strict
 python3 tools/repo/check_test_layout.py --root . --strict

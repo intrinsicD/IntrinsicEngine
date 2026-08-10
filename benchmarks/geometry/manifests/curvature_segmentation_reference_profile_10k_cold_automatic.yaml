@@ -1,0 +1,24 @@
+benchmark_id: geometry.curvature_segmentation.reference.profile.10k.cold.automatic
+method: geometry.curvature_segmentation
+dataset: builtin.unit_sphere_diagonal_pair.v1
+params:
+  intent: fixture_screen
+  backend: cpu_reference_v1
+  descriptor_lane: cold_compute_and_segment
+  component_selection: automatic
+  component_range: [1, 4]
+  expected_selected_components: 1
+  live_faces: 10000
+  triangulations: [diagonal_a, diagonal_b]
+  aggregation: max_of_diagonal_pair_medians
+  threshold_scope: harness_health_not_acceleration
+  warmup_iterations: 1
+  measured_iterations: 3
+  quality_error_l2_unit: dominant_component_misclassified_face_fraction
+metrics: [runtime_ms, memory_peak_bytes, quality_error_l2, population_count]
+thresholds:
+  fixture_runtime_ms_max: 60000
+  memory_peak_bytes_max: 2147483648
+  quality_error_l2_max: 0.02
+  population_count_min: 1
+  population_count_max: 1

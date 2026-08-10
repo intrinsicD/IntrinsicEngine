@@ -55,8 +55,10 @@ add_executable(IntrinsicBenchmarkSmoke
 )
 
 # METHOD-038 opt-in baseline profiler. The executable defaults to the bounded
-# 10k-face screening cohort; INTRINSIC_CURVATURE_PROFILE_COHORT=heavy selects
-# the declared 100k/1M cohorts. It is intentionally not a default CTest.
+# 10k-face supplied-curvature cohort. The `fixtures` cohort adds 10k cold and
+# reusable-curvature sphere pairs plus a continuous planar-boundary screen;
+# `heavy` selects the declared 100k/1M supplied-curvature cohorts. It is
+# intentionally not a default CTest.
 add_executable(IntrinsicCurvatureSegmentationProfile
     runners/CurvatureSegmentationProfileRunner.cpp
 )
