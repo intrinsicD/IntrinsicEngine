@@ -1143,8 +1143,8 @@
   tasks/evidence/METHOD-037/commands/focused-tests.json,
   tasks/evidence/METHOD-037/commands/cpu-tests.json,
   tasks/evidence/METHOD-037/previews/sandbox-sculpt-curvature-segmentation.png,
-  tasks/evidence/METHOD-037/experiment/runs/run-002/bundle.yaml,
-  tasks/evidence/METHOD-037/experiment/runs/run-002/audit.json,
+  tasks/evidence/METHOD-037/superseded/20260810-method038-timing-instrumentation/experiment/runs/run-002/bundle.yaml,
+  tasks/evidence/METHOD-037/superseded/20260810-method038-timing-instrumentation/experiment/runs/run-002/audit.json,
   tasks/done/METHOD-037-signed-curvature-mesh-segmentation.md]
 - **Dependencies**: []
 - **Tags**: geometry, runtime, config, UI, CPU reference, visualization,
@@ -1183,3 +1183,28 @@
 - **Tags**: geometry, halfedge mesh, sharp features, properties, FA-QEM, CPU,
   bounded result
 - **From staging**: O141
+
+## C40: METHOD-037 automatic selection does not guarantee two-regime recovery
+- **Statement**: The hypothesis that METHOD-037's Automatic selector recovers
+  exactly two statistical components on the deterministic paired 10k
+  supplied-curvature grid under its frozen one-through-four candidate range is
+  rejected.
+- **Status**: refuted — the commit-`874d09c3` scratch replay selected four
+  components with `0.01` maximum variant misclassified-face fraction, while the
+  matched Fixed control selected two with `0.005`; no selector, default, config,
+  runtime/UI, or production behavior was changed in response
+- **Provenance**: ai-executed
+- **Crystallized via**: artifact-commitment
+- **Falsification criteria**: Repeating the exact frozen protocol and source
+  selects exactly two components on both paired variants while preserving the
+  declared `quality_error_l2 <= 0.02` gate.
+- **Proof**: [tasks/evidence/METHOD-038/experiment/protocol.yaml,
+  benchmarks/geometry/manifests/curvature_segmentation_reference_profile_10k_automatic.yaml,
+  tasks/evidence/METHOD-038/experiment/inputs/automatic_benchmark_result.json,
+  tasks/evidence/METHOD-038/experiment/inputs/fixed_benchmark_result.json,
+  tasks/evidence/METHOD-038/experiment/runs/scratch-002/bundle.yaml,
+  tasks/evidence/METHOD-038/experiment/runs/scratch-002/audit.json]
+- **Dependencies**: [C38]
+- **Tags**: geometry, curvature segmentation, automatic selection, CPU reference,
+  negative result, scratch
+- **From staging**: O142

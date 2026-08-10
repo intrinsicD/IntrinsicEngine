@@ -29,19 +29,22 @@ maturity_target: ParityProven
   deterministic minimum-region cleanup regression, and the primary-source
   equation/scale/metric intake. It does not alter method output or runtime
   defaults.
-- The first dirty-worktree 10k probe refuted the assumption that the existing
-  Automatic selector necessarily recovers two statistical components on a
-  two-regime grid with seam-averaged descriptors. This remains scratch evidence
-  until reproduced from the committed instrumentation under frozen custody.
+- Frozen scratch run `scratch-002` reproduced the earlier probe from checkpoint
+  `874d09c3`: Automatic selected four components and failed the exact-two gate
+  while its `0.01` label error passed; the matched Fixed control selected two
+  with `0.005` error. Independent audit
+  `codex-method038-scratch-auditor-20260810-r2` recomputed the same gates and
+  rejected claim authorization as intended; bounded negative claim C40 records
+  the result.
 - Build triage: the initial broad incremental build and its ccache-disabled
   retry produced shifting Clang 23 frontend bus errors in unrelated runtime and
   test translation units. Preset reconfiguration followed by
   `CCACHE_DISABLE=1 cmake --build --preset ci --target IntrinsicTests --parallel 2`
   completed without either crash; no speculative METHOD-038 source workaround
   was introduced.
-- Next: commit this instrumentation surface, freeze and run the non-claim-grade
-  10k scratch protocol, then add the cold descriptor lane and continuous
-  paired-remeshing fixtures before any candidate A implementation.
+- Next: add the cold descriptor lane and continuous paired-remeshing fixtures,
+  then freeze the candidate-screening split before any candidate A
+  implementation.
 
 ## Goal
 - Replace METHOD-037's slow, edge-local boundary inference with an evidence-selected CPU formulation that remains statistically based on the existing Gaussian mixture, aligns region boundaries with persistent surface feature curves, converges across retriangulations of the same embedded surface, and meets a preregistered useful-acceleration gate without weakening correctness, diagnostics, or the Fixed/Automatic UI contract.

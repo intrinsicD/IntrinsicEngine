@@ -1,58 +1,40 @@
 {
-  "attempt_id": "attempt-003",
+  "attempt_id": "attempt-002",
   "backend": "cpu_reference",
   "benchmark_id": "geometry.curvature_segmentation.reference.smoke",
   "claim_eligible": false,
-  "commit": "874d09c3ab4afcfa2bb8e8838a33b93296520f8c",
-  "config_digest": "59021fce61200383577e7a53e19086a0be353e6bf4efaffe82b2b28757b89343",
+  "commit": "be22bb4560f0a46227400d84971c847348b08940",
+  "config_digest": "52d56e326cbf9181084879f5e6cc640995113485fec4d55ee2020202c2de8586",
   "dataset": "builtin.curvature_regimes.folded_strip.v1",
   "diagnostics": {
     "boundary_edge_count": 4,
     "connected_region_count": 2,
-    "connectivity_publication_ms": 0.003857,
-    "dual_graph_construction_ms": 0.017714,
-    "face_aggregation_ms": 0.013057,
     "fold_boundary_recall": 1.0,
-    "gmm_fitting_ms": 0.063634,
     "gmm_iterations": 1,
     "measured_iterations": 8,
     "mode": "correctness_smoke",
-    "quality_error_l2_unit": "misclassified_face_fraction",
     "runner": "IntrinsicBenchmarkSmoke",
-    "segmentation_total_ms": 0.12096,
     "selected_component_count": 2,
     "spatial_iterations": 1,
-    "spatial_optimization_ms": 0.001674,
-    "unary_construction_ms": 0.018374,
     "warmup_iterations": 1
   },
   "execution_status": "passed",
   "manifest": {
     "path": "benchmarks/geometry/manifests/curvature_segmentation_reference_smoke.yaml",
-    "sha256": "9187be1422531dd1bee053a9bdc2eb4e94443ef075321bc7b76a28e5d337af10"
+    "sha256": "e8007f0d3475188adff883db346ae8a8074d2f328358bd5e7fcc74f2f2fe7fe0"
   },
   "method": "geometry.curvature_segmentation",
   "metrics": {
     "quality_error_l2": 0.0,
-    "runtime_ms": 0.225120625
+    "runtime_ms": 0.222809875
   },
   "resolved_params": {
     "component_count": 2,
     "component_selection": "fixed",
-    "diagnostic_timings": [
-      "face_aggregation_ms",
-      "gmm_fitting_ms",
-      "unary_construction_ms",
-      "dual_graph_construction_ms",
-      "spatial_optimization_ms",
-      "connectivity_publication_ms",
-      "segmentation_total_ms"
-    ],
     "feature_sensitivity": 20.0,
     "intent": "correctness_smoke",
     "measured_iterations": 8,
     "minimum_region_faces": 1,
-    "quality_error_l2_unit": "misclassified_face_fraction",
     "seed": 17,
     "signed_features": [
       "k1",
@@ -61,10 +43,10 @@
     "spatial_weight": 40.0,
     "warmup_iterations": 1
   },
-  "run_id": "method-037-run-003",
+  "run_id": "method-037-run-002",
   "schema_version": 2,
   "source": {
-    "revision": "874d09c3ab4afcfa2bb8e8838a33b93296520f8c",
+    "revision": "be22bb4560f0a46227400d84971c847348b08940",
     "state": "unverified_commit"
   },
   "status": "passed",
@@ -72,7 +54,7 @@
     {
       "limit": 250,
       "metric": "runtime_ms",
-      "observed": 0.225120625,
+      "observed": 0.222809875,
       "operator": "<=",
       "passed": true,
       "threshold": "smoke_runtime_ms_max"

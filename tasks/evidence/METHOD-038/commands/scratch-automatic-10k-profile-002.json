@@ -1,0 +1,23 @@
+{
+  "command": [
+    "/bin/bash",
+    "-o",
+    "pipefail",
+    "-c",
+    "set -eu; CCACHE_DISABLE=1 cmake --build --preset ci --target IntrinsicCurvatureSegmentationProfile --parallel 2; result_root=build/ci/custody/METHOD-038-scratch-002-raw; producer_status=0; env GIT_COMMIT=874d09c3ab4afcfa2bb8e8838a33b93296520f8c python3 tools/benchmark/run_and_seal.py --executable build/ci/bin/IntrinsicCurvatureSegmentationProfile --output \"$result_root\" --manifests-root benchmarks --run-id method-038-scratch-002 --attempt-id attempt-002 || producer_status=$?; test \"$producer_status\" -eq 1; python3 tools/benchmark/validate_benchmark_results.py --root \"$result_root\" --manifests-root benchmarks; mkdir -p tasks/evidence/METHOD-038/experiment/inputs; cp \"$result_root/geometry.curvature_segmentation.reference.profile.10k.automatic.json\" tasks/evidence/METHOD-038/experiment/inputs/automatic_benchmark_result.json; cp \"$result_root/geometry.curvature_segmentation.reference.profile.10k.fixed.json\" tasks/evidence/METHOD-038/experiment/inputs/fixed_benchmark_result.json; jq -e '.execution_status == \"failed\" and .status == \"failed\"' tasks/evidence/METHOD-038/experiment/inputs/automatic_benchmark_result.json >/dev/null; jq -e '.execution_status == \"passed\" and .status == \"passed\"' tasks/evidence/METHOD-038/experiment/inputs/fixed_benchmark_result.json >/dev/null"
+  ],
+  "command_display": "/bin/bash -o pipefail -c 'set -eu; CCACHE_DISABLE=1 cmake --build --preset ci --target IntrinsicCurvatureSegmentationProfile --parallel 2; result_root=build/ci/custody/METHOD-038-scratch-002-raw; producer_status=0; env GIT_COMMIT=874d09c3ab4afcfa2bb8e8838a33b93296520f8c python3 tools/benchmark/run_and_seal.py --executable build/ci/bin/IntrinsicCurvatureSegmentationProfile --output \"$result_root\" --manifests-root benchmarks --run-id method-038-scratch-002 --attempt-id attempt-002 || producer_status=$?; test \"$producer_status\" -eq 1; python3 tools/benchmark/validate_benchmark_results.py --root \"$result_root\" --manifests-root benchmarks; mkdir -p tasks/evidence/METHOD-038/experiment/inputs; cp \"$result_root/geometry.curvature_segmentation.reference.profile.10k.automatic.json\" tasks/evidence/METHOD-038/experiment/inputs/automatic_benchmark_result.json; cp \"$result_root/geometry.curvature_segmentation.reference.profile.10k.fixed.json\" tasks/evidence/METHOD-038/experiment/inputs/fixed_benchmark_result.json; jq -e '\"'\"'.execution_status == \"failed\" and .status == \"failed\"'\"'\"' tasks/evidence/METHOD-038/experiment/inputs/automatic_benchmark_result.json >/dev/null; jq -e '\"'\"'.execution_status == \"passed\" and .status == \"passed\"'\"'\"' tasks/evidence/METHOD-038/experiment/inputs/fixed_benchmark_result.json >/dev/null'",
+  "cwd": ".",
+  "duration_ms": 7850,
+  "exit_code": 0,
+  "finished_at": "2026-08-10T17:41:33Z",
+  "label": "scratch-automatic-10k-profile-002",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-10T17:41:25Z",
+  "stderr_path": "tasks/evidence/METHOD-038/commands/scratch-automatic-10k-profile-002.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/METHOD-038/commands/scratch-automatic-10k-profile-002.stdout.log",
+  "stdout_sha256": "5e70b6c26c42d7a119e51fcb95ac6445c5e64b7db77c192c48b4ee813b9c27f1",
+  "task_id": "METHOD-038"
+}

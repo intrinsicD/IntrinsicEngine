@@ -1,0 +1,152 @@
+{
+  "attempt_id": "attempt-001",
+  "backend": "cpu_reference",
+  "benchmark_id": "geometry.curvature_segmentation.reference.profile.10k.fixed",
+  "claim_eligible": false,
+  "commit": "874d09c3ab4afcfa2bb8e8838a33b93296520f8c",
+  "config_digest": "8b7b3b4571e52985631c31c64c62e1b6d8dd44378b9e5e3c3213b4de15babdfd",
+  "dataset": "builtin.curvature_regime_grid_pair.v1",
+  "diagnostics": {
+    "aggregation": "max_of_variant_medians",
+    "implementation_version": "cpu_reference_v1",
+    "quality_error_l2_unit": "misclassified_face_fraction",
+    "runner": "IntrinsicCurvatureSegmentationProfile",
+    "variants": [
+      {
+        "candidates": [
+          {
+            "component_count": 2,
+            "fit_ms": 17.476914,
+            "iterations": 1,
+            "selected": true
+          }
+        ],
+        "connectivity_publication_ms": 2.006122,
+        "dual_edge_count": 14850,
+        "dual_graph_construction_ms": 9.41071,
+        "face_aggregation_ms": 5.871255,
+        "face_count": 10000,
+        "gmm_fitting_ms": 28.956174,
+        "misclassified_face_fraction": 0.005,
+        "name": "uniform",
+        "segmentation_total_ms": 58.580192,
+        "selected_component_count": 2,
+        "spatial_iterations": 1,
+        "spatial_optimization_ms": 1.004965,
+        "unary_construction_ms": 11.187211
+      },
+      {
+        "candidates": [
+          {
+            "component_count": 2,
+            "fit_ms": 17.481961,
+            "iterations": 1,
+            "selected": true
+          }
+        ],
+        "connectivity_publication_ms": 1.956819,
+        "dual_edge_count": 14850,
+        "dual_graph_construction_ms": 9.434218,
+        "face_aggregation_ms": 5.761945,
+        "face_count": 10000,
+        "gmm_fitting_ms": 29.081156,
+        "misclassified_face_fraction": 0.005,
+        "name": "anisotropic",
+        "segmentation_total_ms": 58.434572,
+        "selected_component_count": 2,
+        "spatial_iterations": 1,
+        "spatial_optimization_ms": 1.013393,
+        "unary_construction_ms": 11.231857
+      }
+    ]
+  },
+  "execution_status": "passed",
+  "manifest": {
+    "path": "benchmarks/geometry/manifests/curvature_segmentation_reference_profile_10k_fixed.yaml",
+    "sha256": "ff8f5a7dd95b4805e4e369308ed75e51fcb5e241a46830d799c887128fa77af9"
+  },
+  "method": "geometry.curvature_segmentation",
+  "metrics": {
+    "memory_peak_bytes": 12984320,
+    "population_count": 2,
+    "quality_error_l2": 0.005,
+    "runtime_ms": 58.580192
+  },
+  "resolved_params": {
+    "aggregation": "max_of_variant_medians",
+    "backend": "cpu_reference_v1",
+    "component_count": 2,
+    "component_selection": "fixed",
+    "descriptor_lane": "supplied_curvature",
+    "intent": "screening_profile",
+    "live_faces": 10000,
+    "measured_iterations": 3,
+    "quality_error_l2_unit": "misclassified_face_fraction",
+    "threshold_scope": "harness_health_not_acceleration",
+    "triangulations": [
+      "uniform",
+      "anisotropic_nonuniform"
+    ],
+    "warmup_iterations": 1
+  },
+  "run_id": "method-038-scratch-001",
+  "schema_version": 2,
+  "source": {
+    "revision": "874d09c3ab4afcfa2bb8e8838a33b93296520f8c",
+    "state": "unverified_commit"
+  },
+  "status": "passed",
+  "threshold_disposition": [
+    {
+      "limit": 2000,
+      "metric": "runtime_ms",
+      "observed": 58.580192,
+      "operator": "<=",
+      "passed": true,
+      "threshold": "screening_runtime_ms_max"
+    },
+    {
+      "limit": 2147483648,
+      "metric": "memory_peak_bytes",
+      "observed": 12984320,
+      "operator": "<=",
+      "passed": true,
+      "threshold": "memory_peak_bytes_max"
+    },
+    {
+      "limit": 0.02,
+      "metric": "quality_error_l2",
+      "observed": 0.005,
+      "operator": "<=",
+      "passed": true,
+      "threshold": "quality_error_l2_max"
+    },
+    {
+      "limit": 2,
+      "metric": "population_count",
+      "observed": 2,
+      "operator": ">=",
+      "passed": true,
+      "threshold": "population_count_min"
+    },
+    {
+      "limit": 2,
+      "metric": "population_count",
+      "observed": 2,
+      "operator": "<=",
+      "passed": true,
+      "threshold": "population_count_max"
+    }
+  ],
+  "thresholds": {
+    "memory_peak_bytes_max": 2147483648,
+    "population_count_max": 2,
+    "population_count_min": 2,
+    "quality_error_l2_max": 0.02,
+    "screening_runtime_ms_max": 2000
+  },
+  "warmup_policy": {
+    "measured_iterations": 3,
+    "warmup_iterations": 1
+  }
+}

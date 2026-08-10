@@ -1,0 +1,45 @@
+schema_version: 1
+task_id: METHOD-038
+run_id: scratch-001
+attempt_id: attempt-001
+status: initialized
+initialized_at: '2026-08-10T17:26:18Z'
+claim_eligible: false
+protocol_path: tasks/evidence/METHOD-038/experiment/protocol.yaml
+protocol_digest: f9e13d11ee65374da2ff950d151c565f9a6a8ec73a108a819a915fdb118962f1
+task_path: tasks/active/METHOD-038-feature-aligned-remeshing-stable-curvature-segmentation.md
+task_sha256: 72604f40d35cb5bed60dfe465c12d05288bad60200acd5690761c236def75802
+source:
+  revision: 874d09c3ab4afcfa2bb8e8838a33b93296520f8c
+  clean: true
+config:
+  path: benchmarks/geometry/manifests/curvature_segmentation_reference_profile_10k_automatic.yaml
+  sha256: de703be7d8883a96425cf0f2d83842d9428ad0b1a128c21cbc30bc7ccf36fa43
+environment:
+  path: CMakePresets.json
+  sha256: d852b3973bf46f499f592379e17990c5b1f8c14b8aa565bd07e92a64347a0bba
+datasets:
+- id: curvature-regime-grid-pair-10k-v1
+  path: benchmarks/runners/CurvatureSegmentationProfileRunner.cpp
+  sha256: b26f286d1bc6acc4b18f0823f233e9c0031b1f61bfa267cffcf607ff29ce3fc7
+  split: scratch
+implementation_digest: fb1af139d24194501616de4d3c7f3d1867565b861a396fdbe05f417a4394a2cc
+command:
+- /bin/bash
+- -o
+- pipefail
+- -c
+- set -eu; CCACHE_DISABLE=1 cmake --build --preset ci --target IntrinsicCurvatureSegmentationProfile --parallel
+  2; result_root=build/ci/custody/METHOD-038-scratch-001-raw; producer_status=0; env GIT_COMMIT=874d09c3ab4afcfa2bb8e8838a33b93296520f8c
+  python3 tools/benchmark/run_and_seal.py --executable build/ci/bin/IntrinsicCurvatureSegmentationProfile
+  --output "$result_root" --manifests-root benchmarks --run-id method-038-scratch-001 --attempt-id attempt-001
+  || producer_status=$?; test "$producer_status" -eq 1; python3 tools/benchmark/validate_benchmark_results.py
+  --root "$result_root" --manifests-root benchmarks; mkdir -p tasks/evidence/METHOD-038/experiment/inputs;
+  cp "$result_root/geometry.curvature_segmentation.reference.profile.10k.automatic.json" tasks/evidence/METHOD-038/experiment/inputs/automatic_benchmark_result.json;
+  cp "$result_root/geometry.curvature_segmentation.reference.profile.10k.fixed.json" tasks/evidence/METHOD-038/experiment/inputs/fixed_benchmark_result.json;
+  jq -e '.execution_status == "failed" and .status == "failed"' tasks/evidence/METHOD-038/experiment/inputs/automatic_benchmark_result.json
+  >/dev/null; jq -e '.execution_status == "passed" and .status == "passed"' tasks/evidence/METHOD-038/experiment/inputs/fixed_benchmark_result.json
+  >/dev/null
+cell_journal: tasks/evidence/METHOD-038/experiment/runs/scratch-001/cells.jsonl
+bundle: tasks/evidence/METHOD-038/experiment/runs/scratch-001/bundle.yaml
+audit: tasks/evidence/METHOD-038/experiment/runs/scratch-001/audit.json

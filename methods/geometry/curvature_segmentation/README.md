@@ -77,6 +77,15 @@ contract and states that spatial optimization is local.
   `population_count` and gates it to exactly two for the preregistered
   two-regime fixture.
 
+The frozen non-claim-eligible
+[`METHOD-038` scratch replay](../../../tasks/evidence/METHOD-038/experiment/protocol.yaml)
+selected four Automatic components on the paired 10k fixture, failing the
+exact-two gate while passing the `0.02` label-error bound; the matched Fixed
+control selected two. The independent
+[`audit`](../../../tasks/evidence/METHOD-038/experiment/runs/scratch-002/audit.json)
+rejected claim authorization as intended. This is bounded negative evidence
+(ARA C40), not a reason to retune or change the production default.
+
 There is no optimized or GPU backend. The output is deliberately
 non-destructive and makes no atlas-quality claim. `GEOM-076` owns the later,
 evidence-gated decision about converting accepted boundaries into cuts and UV

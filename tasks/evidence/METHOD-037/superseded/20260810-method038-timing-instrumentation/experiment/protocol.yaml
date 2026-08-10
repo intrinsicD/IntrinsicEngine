@@ -1,6 +1,6 @@
 schema_version: 2
 task_id: METHOD-037
-protocol_id: curvature-segmentation-reference-smoke-v3
+protocol_id: curvature-segmentation-reference-smoke-v2
 profile: claim-grade
 state: frozen
 question: Does the deterministic CPU-reference curvature-segmentation smoke recover the two signed-curvature
@@ -15,7 +15,7 @@ claim_eligible: false
 datasets:
 - id: curvature-regimes-folded-strip-v1
   path: benchmarks/geometry/Bench_CurvatureSegmentationReferenceSmoke.cpp
-  sha256: a74f794d01350fdebe23b90a691feae5f5b9a8edd75dd492f1571cf844acdb45
+  sha256: 248d4e46614061155a9d5533894c7ddf61769de271eaea7fd724f3c72f681897
   split: scratch
 disjoint_splits: []
 seeds:
@@ -51,31 +51,31 @@ command:
 - -o
 - pipefail
 - -c
-- env GIT_COMMIT=874d09c3ab4afcfa2bb8e8838a33b93296520f8c python3 tools/benchmark/run_and_seal.py --executable
-  build/ci/bin/IntrinsicBenchmarkSmoke --output build/ci/custody/METHOD-037-run003-raw --manifests-root
-  benchmarks --run-id method-037-run-003 --attempt-id attempt-003 && mkdir -p tasks/evidence/METHOD-037/experiment/inputs
-  && cp build/ci/custody/METHOD-037-run003-raw/geometry.curvature_segmentation.reference.smoke.json tasks/evidence/METHOD-037/experiment/inputs/benchmark_result.json
+- env GIT_COMMIT=be22bb4560f0a46227400d84971c847348b08940 python3 tools/benchmark/run_and_seal.py --executable
+  build/ci/bin/IntrinsicBenchmarkSmoke --output build/ci/custody/METHOD-037-run002-raw --manifests-root
+  benchmarks --run-id method-037-run-002 --attempt-id attempt-002 && cp build/ci/custody/METHOD-037-run002-raw/geometry.curvature_segmentation.reference.smoke.json
+  tasks/evidence/METHOD-037/experiment/inputs/benchmark_result.json
 expected_artifacts:
 - tasks/evidence/METHOD-037/experiment/inputs/benchmark_result.json
-- tasks/evidence/METHOD-037/experiment/runs/run-003/bundle.yaml
+- tasks/evidence/METHOD-037/experiment/runs/run-002/bundle.yaml
 blockers: []
 source:
-  revision: 874d09c3ab4afcfa2bb8e8838a33b93296520f8c
-  clean: true
+  revision: be22bb4560f0a46227400d84971c847348b08940
+  clean: false
 config:
   path: benchmarks/geometry/manifests/curvature_segmentation_reference_smoke.yaml
-  sha256: 9187be1422531dd1bee053a9bdc2eb4e94443ef075321bc7b76a28e5d337af10
+  sha256: e8007f0d3475188adff883db346ae8a8074d2f328358bd5e7fcc74f2f2fe7fe0
 environment:
   path: CMakePresets.json
   sha256: d852b3973bf46f499f592379e17990c5b1f8c14b8aa565bd07e92a64347a0bba
 implementation:
 - path: src/geometry/Geometry.HalfedgeMesh.CurvatureSegmentation.cppm
-  sha256: 01b5a4cac7c1bfda0870a406e2866d3fa98c0b554b42104607818f94f2f35840
+  sha256: f7f0369f1216ac101d9ceeb9a99b6dd114971fe13bfeb01db49e362dbd8bda56
 - path: src/geometry/Geometry.HalfedgeMesh.CurvatureSegmentation.cpp
-  sha256: 84b9df2fec8b320a802f53b3ff4271e1ac804c97e0681a49c9af936f668ac1cc
+  sha256: cc1156fb4ad1008c46f3e3874baf6ae7816cba2d8e425bde97b8fc9cf41146b7
 - path: benchmarks/geometry/Bench_CurvatureSegmentationReferenceSmoke.cpp
-  sha256: a74f794d01350fdebe23b90a691feae5f5b9a8edd75dd492f1571cf844acdb45
+  sha256: 248d4e46614061155a9d5533894c7ddf61769de271eaea7fd724f3c72f681897
 - path: benchmarks/runners/BenchmarkSmokeRunner.cpp
-  sha256: fa2b08f2b9e8af82d37a20e12c154adea6773674f81e03a90ebe2c447c9b2f00
-frozen_at: '2026-08-10T17:29:25Z'
-protocol_digest: cc3603d1419c4eda798a29d1a0d876ade60e42e2750841cc5ea977ebd34c77ad
+  sha256: 1f647bda7ee41993b21b54e9f1cb949f3d94966f713b0419255b05a0e30efe0d
+frozen_at: '2026-08-10T15:13:56Z'
+protocol_digest: e6b722c80240bd5782ebee93c50dd6d60625d79b4c88293007623c1a973ed153

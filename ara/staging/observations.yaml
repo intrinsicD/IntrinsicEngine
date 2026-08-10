@@ -2506,3 +2506,24 @@ observations:
     promoted_to: "logic/claims.md:C39"
     crystallized_via: artifact-commitment
     stale: false
+  - id: O142
+    timestamp: "2026-08-10T19:35+02:00"
+    provenance: ai-executed
+    content: >
+      METHOD-037's existing Automatic selector does not necessarily recover the
+      two planted curvature regimes on a paired 10k supplied-curvature grid:
+      under the frozen one-through-four candidate range it selected four
+      components, while the matched Fixed control selected two.
+    context: >
+      METHOD-038 scratch run 002 binds checkpoint 874d09c3, the deterministic
+      uniform/nonuniform grid pair, seed 17, exact component-count and label-error
+      gates, and an independent rejected audit. Automatic label error was 0.01
+      and the Fixed control error was 0.005. The result is non-claim-eligible and
+      bounded to this fixture; it makes no performance, remeshing-stability,
+      cold-curvature, runtime/UI, GPU, or v2 statement.
+    potential_type: claim
+    bound_to: [N405]
+    promoted: true
+    promoted_to: "logic/claims.md:C40"
+    crystallized_via: artifact-commitment
+    stale: false

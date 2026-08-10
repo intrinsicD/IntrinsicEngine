@@ -1,0 +1,48 @@
+{
+  "attempt_id": "attempt-002",
+  "audited_at": "2026-08-10T17:43:45Z",
+  "audited_revision": "874d09c3ab4afcfa2bb8e8838a33b93296520f8c",
+  "auditor_label": "codex-method038-scratch-auditor-20260810-r2",
+  "bundle_path": "tasks/evidence/METHOD-038/experiment/runs/scratch-002/bundle.yaml",
+  "bundle_sha256": "6473ccfbb37fe543561d5f85cb3ce65677a3fd3168a3a95b1641ad6669a952fc",
+  "claim_authorized": false,
+  "disposition": "rejected",
+  "driver_label": "codex-root",
+  "errors": [
+    "benchmark_result: positive benchmark bundle requires execution_status and status to both be 'passed' (got execution_status='failed', status='failed')"
+  ],
+  "identity_assurance": "cooperative-label-only",
+  "recomputed_gates": [
+    {
+      "metric": "population_count",
+      "observed": 4.0,
+      "operator": "==",
+      "passed": false,
+      "threshold": 2
+    },
+    {
+      "metric": "quality_error_l2",
+      "observed": 0.01,
+      "operator": "<=",
+      "passed": true,
+      "threshold": 0.02
+    }
+  ],
+  "recomputed_summaries": [
+    {
+      "column": "population_count",
+      "name": "population_count",
+      "statistic": "mean",
+      "value": 4.0
+    },
+    {
+      "column": "quality_error_l2",
+      "name": "quality_error_l2",
+      "statistic": "mean",
+      "value": 0.01
+    }
+  ],
+  "run_id": "scratch-002",
+  "schema_version": 1,
+  "task_id": "METHOD-038"
+}

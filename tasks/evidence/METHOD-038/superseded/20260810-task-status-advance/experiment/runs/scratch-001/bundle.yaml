@@ -1,0 +1,97 @@
+schema_version: 1
+task_id: METHOD-038
+run_id: scratch-001
+attempt_id: attempt-001
+created_at: '2026-08-10T17:27:20Z'
+protocol_digest: f9e13d11ee65374da2ff950d151c565f9a6a8ec73a108a819a915fdb118962f1
+provenance:
+  source:
+    revision: 874d09c3ab4afcfa2bb8e8838a33b93296520f8c
+    clean: true
+  task_sha256: 72604f40d35cb5bed60dfe465c12d05288bad60200acd5690761c236def75802
+  implementation_digest: fb1af139d24194501616de4d3c7f3d1867565b861a396fdbe05f417a4394a2cc
+  datasets:
+  - id: curvature-regime-grid-pair-10k-v1
+    path: benchmarks/runners/CurvatureSegmentationProfileRunner.cpp
+    sha256: b26f286d1bc6acc4b18f0823f233e9c0031b1f61bfa267cffcf607ff29ce3fc7
+    split: scratch
+resolved_config:
+  path: benchmarks/geometry/manifests/curvature_segmentation_reference_profile_10k_automatic.yaml
+  sha256: de703be7d8883a96425cf0f2d83842d9428ad0b1a128c21cbc30bc7ccf36fa43
+environment:
+  path: CMakePresets.json
+  sha256: d852b3973bf46f499f592379e17990c5b1f8c14b8aa565bd07e92a64347a0bba
+raw_rows:
+  path: tasks/evidence/METHOD-038/experiment/runs/scratch-001/benchmark_raw_rows.jsonl
+  sha256: 1d2847fb66fab1087d6e013e9a249765d11c7fec66b051e01250415bd4118467
+  row_count: 1
+summaries:
+- name: population_count
+  column: population_count
+  statistic: mean
+  value: 4.0
+- name: quality_error_l2
+  column: quality_error_l2
+  statistic: mean
+  value: 0.01
+gates:
+- metric: population_count
+  operator: ==
+  threshold: 2
+  observed: 4.0
+  passed: false
+- metric: quality_error_l2
+  operator: <=
+  threshold: 0.02
+  observed: 0.01
+  passed: true
+diagnostics:
+- automatic-selected-components=4
+- automatic-misclassified-face-fraction=0.01
+- fixed-control-selected-components=2
+- fixed-control-status=passed
+links:
+- path: tasks/evidence/METHOD-038/experiment/protocol.yaml
+  sha256: 50c4271334de566073108b9d38a6d2436e0d5905a4bd8b0d6914d2d50e53f722
+- path: benchmarks/runners/CurvatureSegmentationProfileRunner.cpp
+  sha256: b26f286d1bc6acc4b18f0823f233e9c0031b1f61bfa267cffcf607ff29ce3fc7
+- path: benchmarks/geometry/manifests/curvature_segmentation_reference_profile_10k_automatic.yaml
+  sha256: de703be7d8883a96425cf0f2d83842d9428ad0b1a128c21cbc30bc7ccf36fa43
+- path: benchmarks/geometry/manifests/curvature_segmentation_reference_profile_10k_fixed.yaml
+  sha256: ff8f5a7dd95b4805e4e369308ed75e51fcb5e241a46830d799c887128fa77af9
+- path: tasks/evidence/METHOD-038/experiment/inputs/fixed_benchmark_result.json
+  sha256: d485e8b670e9aefa120662d6445186f4067535edaec5e0695f85ea5b201e4701
+visual: false
+previews: []
+replay_command:
+- /bin/bash
+- -o
+- pipefail
+- -c
+- set -eu; CCACHE_DISABLE=1 cmake --build --preset ci --target IntrinsicCurvatureSegmentationProfile --parallel
+  2; result_root=build/ci/custody/METHOD-038-scratch-001-raw; producer_status=0; env GIT_COMMIT=874d09c3ab4afcfa2bb8e8838a33b93296520f8c
+  python3 tools/benchmark/run_and_seal.py --executable build/ci/bin/IntrinsicCurvatureSegmentationProfile
+  --output "$result_root" --manifests-root benchmarks --run-id method-038-scratch-001 --attempt-id attempt-001
+  || producer_status=$?; test "$producer_status" -eq 1; python3 tools/benchmark/validate_benchmark_results.py
+  --root "$result_root" --manifests-root benchmarks; mkdir -p tasks/evidence/METHOD-038/experiment/inputs;
+  cp "$result_root/geometry.curvature_segmentation.reference.profile.10k.automatic.json" tasks/evidence/METHOD-038/experiment/inputs/automatic_benchmark_result.json;
+  cp "$result_root/geometry.curvature_segmentation.reference.profile.10k.fixed.json" tasks/evidence/METHOD-038/experiment/inputs/fixed_benchmark_result.json;
+  jq -e '.execution_status == "failed" and .status == "failed"' tasks/evidence/METHOD-038/experiment/inputs/automatic_benchmark_result.json
+  >/dev/null; jq -e '.execution_status == "passed" and .status == "passed"' tasks/evidence/METHOD-038/experiment/inputs/fixed_benchmark_result.json
+  >/dev/null
+view_command:
+- jq
+- .metrics
+- tasks/evidence/METHOD-038/experiment/inputs/automatic_benchmark_result.json
+smoke_receipts:
+- tasks/evidence/METHOD-038/commands/scratch-automatic-10k-profile.json
+claim_authorized: false
+benchmark_result:
+  path: tasks/evidence/METHOD-038/experiment/inputs/automatic_benchmark_result.json
+  sha256: 87a2edb202909378bc974ac40d7f5b5f88142d43dd893390230ecf6eeca01f7b
+  manifests_root: benchmarks
+  benchmark_id: geometry.curvature_segmentation.reference.profile.10k.automatic
+  run_id: method-038-scratch-001
+  attempt_id: attempt-001
+  status: failed
+  claim_eligible: false

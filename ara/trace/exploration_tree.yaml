@@ -9457,7 +9457,7 @@ tree:
       - "tasks/evidence/METHOD-037/commands/focused-tests.json"
       - "tasks/evidence/METHOD-037/commands/cpu-tests.json"
       - "tasks/evidence/METHOD-037/previews/sandbox-sculpt-curvature-segmentation.png"
-      - "tasks/evidence/METHOD-037/experiment/runs/run-002/bundle.yaml"
+      - "tasks/evidence/METHOD-037/superseded/20260810-method038-timing-instrumentation/experiment/runs/run-002/bundle.yaml"
       - "tasks/done/METHOD-037-signed-curvature-mesh-segmentation.md"
     result: >
       Nineteen focused geometry/runtime/config/UI tests and all 4,196 selected
@@ -9493,4 +9493,27 @@ tree:
       tests passed with the tracked GLFW/LeakSanitizer control self-skipped. This establishes a bounded
       CPU contract only: Catmull-Clark adoption, runtime/UI control, GPU behavior,
       and performance remain outside GEOM-071.
+    status: resolved
+  - id: N405
+    type: experiment
+    title: "Test METHOD-037 automatic component recovery on a paired 10k curvature grid"
+    provenance: ai-executed
+    timestamp: "2026-08-10T19:35+02:00"
+    also_depends_on: [N403]
+    evidence:
+      - "tasks/evidence/METHOD-038/experiment/protocol.yaml"
+      - "tasks/evidence/METHOD-038/experiment/inputs/automatic_benchmark_result.json"
+      - "tasks/evidence/METHOD-038/experiment/inputs/fixed_benchmark_result.json"
+      - "tasks/evidence/METHOD-038/experiment/runs/scratch-002/bundle.yaml"
+      - "tasks/evidence/METHOD-038/experiment/runs/scratch-002/audit.json"
+    result: >
+      The frozen non-claim-eligible scratch replay bound to METHOD-038 checkpoint
+      874d09c3 refuted exact two-component recovery by METHOD-037's Automatic
+      selector on one paired 10k supplied-curvature grid: both variants selected
+      four components, so the population-count gate failed, while the maximum
+      label error remained 0.01 and passed its 0.02 bound. The matched Fixed
+      control selected two components with 0.005 error. The independent audit
+      recomputed the same failed/passed gates and rejected claim authorization.
+      This is a bounded negative fixture result, not a remeshing-stability,
+      acceleration, cold-curvature, runtime/UI, Vulkan, GPU, or v2 result.
     status: resolved
