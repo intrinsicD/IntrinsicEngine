@@ -122,12 +122,6 @@ end.
 - [METHOD-036 — Normal-orientation comparison evidence](METHOD-036-orientation-comparison-evidence.md)
   (shared-fixture publication protocol comparing octree parity, MST, iPSR,
   and PGR; implementation changes remain in their owning method tasks).
-- [METHOD-038 — Feature-aligned, remeshing-stable curvature segmentation](METHOD-038-feature-aligned-remeshing-stable-curvature-segmentation.md)
-  (claim-grade follow-up to retired `METHOD-037`; compares a feature-first GMM
-  path against feature-sensitive remeshing and variational alternatives, then
-  adopts an optimized CPU path only if frozen feature-alignment,
-  remeshing-stability, parity, memory, and acceleration gates all pass; also
-  depends on `GEOM-071` for canonical high-dihedral feature facts).
 - [HARDEN-084 — Localized CPU/GPU parity signatures](HARDEN-084-localized-cpu-gpu-parity-signatures.md)
   (post-stability two-consumer evidence task, gated by the Progressive Poisson
   and parameterization GPU paths; no generic parity framework unless both

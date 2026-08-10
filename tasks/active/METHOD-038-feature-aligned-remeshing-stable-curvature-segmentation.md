@@ -5,16 +5,24 @@ depends_on: [METHOD-037, GEOM-071]
 workflow_schema: 1
 workflow_profile: claim-grade
 evidence: required
-owner:
-branch:
-worktree:
-claimed_at:
+owner: "codex-root"
+branch: "main"
+worktree: "/home/alex/Documents/IntrinsicEngine"
+claimed_at: "2026-08-10T16:42:34Z"
 contract_schema: 1
 contracts: [repo.task-contract-discovery, geometry.element-domain-sources, geometry.property-coherence, method.engine-integration]
 contract_review: "This task materially changes a mesh method, its CPU backend and diagnostics, its canonical face/edge publication, and its runtime/config/UI controls. geometry.parameterization-optimization does not apply because UV cuts and parameterization remain deferred to GEOM-076; geometry.support-radius-policy is point-set/LOP-specific, while this task freezes a separate surface-geodesic feature scale."
 maturity_target: ParityProven
 ---
 # METHOD-038 — Feature-aligned, remeshing-stable curvature segmentation
+
+## Status
+
+- Active as of 2026-08-10. Slice A is evidence-only: paper intake,
+  deterministic baseline profiling, remeshing fixtures, candidate killing
+  experiments, and a frozen protocol. The production selector remains
+  METHOD-037 `cpu_reference_v1` until the preregistered gates select a v2
+  formulation.
 
 ## Goal
 - Replace METHOD-037's slow, edge-local boundary inference with an evidence-selected CPU formulation that remains statistically based on the existing Gaussian mixture, aligns region boundaries with persistent surface feature curves, converges across retriangulations of the same embedded surface, and meets a preregistered useful-acceleration gate without weakening correctness, diagnostics, or the Fixed/Automatic UI contract.
@@ -105,7 +113,7 @@ maturity_target: ParityProven
 - [ ] Re-run `GEOM-076` eligibility only after the confirmation bundle is independently audited. A failed quality, stability, or acceleration gate leaves atlas consumption blocked and records the negative result.
 
 ## Tests
-- [ ] Prove every valid interior edge at or above the frozen high-dihedral threshold is a feature barrier on aligned crease fixtures, and cover threshold equality, sign/orientation reversal, boundaries, invalid normals, deleted/dangling slots, and `GEOM-071` property equivalence.
+- [ ] Prove every valid interior edge strictly above the frozen high-dihedral threshold is a feature barrier on aligned crease fixtures; threshold equality is non-feature under the shared `GEOM-071` contract. Cover sign/orientation reversal, boundaries, invalid normals, deleted/dangling slots, and `GEOM-071` property equivalence.
 - [ ] Prove a planar quad remains one region under either diagonal, a smooth cylinder does not acquire ring boundaries from tessellation, and feature-crossing remeshings recover the same continuous fold/transition curves within the frozen surface-distance tolerance.
 - [ ] Compare projected segmentations with label-permutation-invariant area-weighted Rand/variation-of-information metrics and compare boundary curves with symmetric geodesic Hausdorff, precision/recall, length, spur/junction, and integrated `k_g^2` metrics. Never compare raw region IDs across meshes.
 - [ ] Include the flat-versus-isometrically-folded negative control to prove intrinsic-only signals cannot satisfy the crease requirement, and an isometric bending test proving boundary fairness is unchanged when `k_g` is unchanged even though `k_n` changes.
