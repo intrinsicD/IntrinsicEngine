@@ -1,0 +1,105 @@
+session:
+  id: "2026-08-10_001"
+  date: "2026-08-10"
+  started: "2026-08-10T17:08+02:00"
+  last_turn: "2026-08-10T19:50+02:00"
+  turn_count: 1
+  summary: "Retired METHOD-037 and GEOM-071, activated METHOD-038, and sealed its first paired-grid baseline as bounded negative selector evidence."
+
+events_logged:
+  - turn: 1
+    type: experiment
+    id: "N403"
+    routing: direct
+    provenance: ai-executed
+    summary: "Closed METHOD-037 on its exact CPU geometry/runtime/config/UI/editor surface with focused, full-CPU, visual, and sealed scratch evidence."
+  - turn: 1
+    type: observation
+    id: "O140"
+    routing: crystallized
+    provenance: ai-executed
+    summary: "Crystallized METHOD-037's bounded CPU editor-path capability to C38 through artifact commitment."
+  - turn: 1
+    type: experiment
+    id: "N404"
+    routing: direct
+    provenance: ai-executed
+    summary: "Established and adopted reusable halfedge sharp-feature classification while preserving FA-QEM's exact CPU behavior."
+  - turn: 1
+    type: observation
+    id: "O141"
+    routing: crystallized
+    provenance: ai-executed
+    summary: "Crystallized GEOM-071's reusable feature-classification contract to C39 through artifact commitment."
+  - turn: 1
+    type: experiment
+    id: "N405"
+    routing: direct
+    provenance: ai-executed
+    summary: "Replayed METHOD-038's paired 10k supplied-curvature fixture: Automatic selected four components; Fixed selected two."
+  - turn: 1
+    type: observation
+    id: "O142"
+    routing: crystallized
+    provenance: ai-executed
+    summary: "Crystallized the exact-two Automatic hypothesis as refuted C40 through committed independently audited scratch evidence."
+
+ai_actions:
+  - turn: 1
+    action: "Retired METHOD-037 and GEOM-071 with their required task, evidence, review, documentation, and ARA records."
+    provenance: ai-executed
+    files_changed:
+      - "tasks/done/METHOD-037-signed-curvature-mesh-segmentation.md"
+      - "tasks/done/GEOM-071-halfedge-mesh-feature-classification.md"
+      - "tasks/evidence/METHOD-037/"
+      - "tasks/evidence/GEOM-071/"
+      - "ara/"
+  - turn: 1
+    action: "Activated and claimed METHOD-038, initialized its claim-grade review diamond, and committed baseline timing diagnostics, deterministic cleanup coverage, intake, paired profiles, and six manifests."
+    provenance: ai-executed
+    files_changed:
+      - "src/geometry/Geometry.HalfedgeMesh.CurvatureSegmentation.cpp"
+      - "src/geometry/Geometry.HalfedgeMesh.CurvatureSegmentation.cppm"
+      - "benchmarks/geometry/Bench.CurvatureSegmentationProfile.cpp"
+      - "methods/geometry/curvature_segmentation/feature_aligned_intake.md"
+      - "tasks/active/METHOD-038-feature-aligned-remeshing-stable-curvature-segmentation.md"
+  - turn: 1
+    action: "Recovered shifting Clang frontend crashes through preset reconfiguration and a ccache-disabled bounded-parallel rebuild, then passed 21 focused and all 4,211 selected CPU tests plus strict structural validators."
+    provenance: ai-executed
+    files_changed:
+      - "tasks/active/METHOD-038-feature-aligned-remeshing-stable-curvature-segmentation.md"
+  - turn: 1
+    action: "Sealed METHOD-038 scratch-002, obtained independent rejection on only the exact-count gate, replayed METHOD-037 run-003 for current-byte custody, and committed the evidence as 69612e79."
+    provenance: ai-executed
+    files_changed:
+      - "tasks/evidence/METHOD-038/"
+      - "tasks/evidence/METHOD-037/"
+      - "ara/"
+
+claims_touched:
+  - id: C38
+    action: crystallized
+    turn: 1
+  - id: C39
+    action: crystallized
+    turn: 1
+  - id: C40
+    action: crystallized
+    turn: 1
+
+key_context:
+  - turn: 1
+    excerpt: "METHOD-038 checkpoint 874d09c3 adds evidence-only timing and profile instrumentation without changing selector, default, config, runtime, UI, or published segmentation behavior."
+  - turn: 1
+    excerpt: "On the frozen paired 10k fixture, Automatic selected four components with 0.01 maximum label error; Fixed selected two with 0.005 error."
+  - turn: 1
+    excerpt: "Independent audit rejected claim authorization exactly because the Automatic population_count gate required two; quality remained within its 0.02 bound."
+
+open_threads:
+  - "Add the cold descriptor lane so candidate screening measures the full curvature-estimation path rather than supplied descriptors only."
+  - "Add continuous paired-remeshing fixtures and preregister correspondence/stability metrics before evaluating candidate A."
+  - "Keep METHOD-038's production selector and defaults unchanged until the wider frozen fixture set justifies a candidate."
+
+ai_suggestions_pending:
+  - "Treat the four-component result as one bounded negative fixture, not as a selector-retuning mandate."
+  - "Freeze the candidate-screening split only after cold-descriptor and continuous paired-remeshing coverage exists."

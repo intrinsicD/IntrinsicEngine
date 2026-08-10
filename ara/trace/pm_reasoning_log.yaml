@@ -1517,3 +1517,11 @@ entries:
       - "Left O137 staged because PROC-032 proves operation but does not supply its requested matched defect-recall, false-positive, human-time, latency, or model-cost baseline; left O138 staged because no controlled tenfold claim was tested."
       - "Did not create a capability claim: N402 records exact tool/test outcomes, while independent high-risk acceptance and task retirement remain open."
       - "Preserved the co-scientist terminal-state finding and the planned CI-012/CI-013/PROC-031 verifier boundary as separate open threads rather than widening PROC-032."
+  - turn: "2026-08-10_001#1"
+    notes:
+      - "Routed the completed METHOD-037 editor-path closure, GEOM-071 reusable-feature contract, and METHOD-038 paired-grid replay as experiments N403-N405."
+      - "Recorded O140-O142 as already crystallized through artifact commitment to bounded claims C38-C40; no duplicate observation or claim was added during this epilogue."
+      - "Kept C40 refuted and fixture-bounded: Automatic selected four components while Fixed selected two, but the result neither justifies selector retuning nor establishes remeshing stability or performance."
+      - "Preserved METHOD-038 scratch-001 and METHOD-037 run-002 under superseded custody after current task/implementation bytes changed; canonical scratch-002 and run-003 validate against checkpoint 874d09c3."
+      - "Did not promote or stale any other open observation: this turn supplies no closure signal for O93, O118, O122, O123, O130, O137, or O138, and fewer than three later session-days have elapsed since their latest review."
+      - "Left METHOD-038 claimed and active; cold descriptors, continuous paired-remeshing fixtures, and frozen candidate screening remain open before any v2 implementation."

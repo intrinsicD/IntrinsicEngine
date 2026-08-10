@@ -272,3 +272,10 @@ sessions:
     events_count: 16
     claims_touched: []
     open_threads: 4
+  - id: "2026-08-10_001"
+    date: "2026-08-10"
+    summary: "Retired METHOD-037 and GEOM-071, activated METHOD-038, and sealed its first paired-grid baseline as bounded negative selector evidence."
+    turn_count: 1
+    events_count: 6
+    claims_touched: [C38, C39, C40]
+    open_threads: 3
