@@ -2,7 +2,18 @@
 id: BUG-097
 theme: G
 depends_on: []
+workflow_schema: 1
+workflow_profile: standard
+evidence: required
+owner:
+branch:
+worktree:
+claimed_at:
 maturity_target: CPUContracted
+contract_schema: 1
+contracts:
+  - geometry.element-domain-sources
+  - geometry.property-coherence
 ---
 # BUG-097 — Progressive model-scene UV job publishes a zero atlas
 

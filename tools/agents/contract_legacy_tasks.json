@@ -2,6 +2,7 @@
   "consumed": {
     "backlog/architecture/REVIEW-003-architecture-stability-right-sizing-readiness-audit.md": "621777a9662872931260c2920eec9132b6fabdcb33e0e6bf466499ef7660c797",
     "backlog/bugs/BUG-096-icp-point-to-plane-target-normals.md": "000e708d24b13fe5e1e8eedc73f8298cec217114fbbf207748714f5aac8505e0",
+    "backlog/bugs/BUG-097-progressive-model-scene-zero-uv-atlas.md": "70c5fdec849b43b827b3c67d251f84da7a976b8c92d309da27c12a060329c8f1",
     "backlog/bugs/BUG-108-fibonacci-sphere-small-count-endpoints.md": "ef05bc71ea4fae2aac48bc435dc59f9938124abda2413bc8961289c97733d639",
     "backlog/bugs/BUG-109-voxel-downsample-invalid-input-ordering.md": "2748923eba25a38adbaa190945222f8aa2766ebcbcc80d03ff38cf1f7dd04fe4",
     "backlog/bugs/BUG-110-implicit-smoothing-boundary-dirichlet-solve.md": "86f612cb8bd6800196d72add621fa2b020b781dced39dcb9e30fc75ae0b806e6",
@@ -49,7 +50,6 @@
     "backlog/assets/ASSETIO-010-async-model-companion-preflight.md": "db7669d3eedc1608ff56422c9ebfe465f7bf0c399b190ad6359265b2219763d6",
     "backlog/assets/ASSETIO-011-semantic-sandbox-file-import-workflow-matrix.md": "70532d82578fe7bc87475593a674965d03ca40b39ba7c3764b9588b6db4838b7",
     "backlog/bugs/BUG-091-gtest-pretest-discovery-cold-timeout.md": "6ace4339819695da1c6b6e8f2f3aafb56e911dc956124c6187f977c61b00d8d1",
-    "backlog/bugs/BUG-097-progressive-model-scene-zero-uv-atlas.md": "70c5fdec849b43b827b3c67d251f84da7a976b8c92d309da27c12a060329c8f1",
     "backlog/bugs/BUG-118-glfw-x11-input-method-lsan-recurrence.md": "5738fcce3240a4be8263d812253f85167c7b1378e1eb0c300d0a0feffd31e8fa",
     "backlog/bugs/BUG-121-glm-anonymous-union-module-copy-assign.md": "68f1f10ebed33fff64d056aeb326e424973c25fc50e1b85283af991470897fb7",
     "backlog/bugs/BUG-122-runtime-asset-asan-test-lifetimes.md": "747f06d6789274d5522ba18db0a0eac26e936eb7e3a507fce04bf4d283e3664d",
