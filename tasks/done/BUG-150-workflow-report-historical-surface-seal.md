@@ -15,6 +15,10 @@ contract_review: "This defect is in the reusable task/workflow-evidence contract
 ---
 # BUG-150 — Completed workflow reports lose their historical surface seal
 
+## Status
+- Completed on 2026-08-11.
+- Implementation commit: `92fb669a`.
+
 ## Goal
 - Keep a completed task's workflow-evidence report globally valid after later
   tasks legitimately modify shared files, while still verifying that report

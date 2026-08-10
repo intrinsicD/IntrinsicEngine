@@ -8,7 +8,6 @@ the authoritative open/unblocked view.
 
 ## Active tasks
 
-- `BUG-150` — Completed workflow reports lose their historical surface seal (tasks/active/BUG-150-workflow-report-historical-surface-seal.md)
 - `BUG-151` — Work graph cannot advance a declared multi-slice task (tasks/active/BUG-151-work-graph-multi-slice-cycle.md)
 - `METHOD-038` — Feature-aligned, remeshing-stable curvature segmentation (tasks/active/METHOD-038-feature-aligned-remeshing-stable-curvature-segmentation.md)
 
