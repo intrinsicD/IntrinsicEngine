@@ -44,46 +44,52 @@ contract_review: "This defect is in the reusable task/workflow-evidence contract
   review identity, so agents currently cannot repair the gate honestly.
 
 ## Required changes
-- [ ] Define a deterministic historical-source seal for completed workflow
+- [x] Define a deterministic historical-source seal for completed workflow
   reports, using a resolvable exact commit or approved snapshot/diff identity
   that contains every recorded surface byte and artifact.
-- [ ] Validate completed reports against that immutable seal while retaining
+- [x] Validate completed reports against that immutable seal while retaining
   live-worktree validation for active/uncommitted reports.
-- [ ] Fail closed when the seal is missing, ambiguous, does not contain the
+- [x] Fail closed when the seal is missing, ambiguous, does not contain the
   recorded task/report, or disagrees with the report's content digest,
   artifacts, receipts, handoff, or accepted review.
-- [ ] Diagnose existing stale completed reports explicitly; migrate them only
+- [x] Diagnose existing stale completed reports explicitly; migrate them only
   through evidence that proves their original bytes, never by rebasing their
   surface onto current `HEAD`.
 
 ## Tests
-- [ ] Add a hermetic regression that commits a complete report and its shared
+- [x] Add a hermetic regression that commits a complete report and its shared
   ARA/task surface, makes a later unrelated commit changing those shared files,
   and proves global validation still checks the historical report successfully.
-- [ ] Cover tampered historical bytes, missing/unresolvable seals, task moves,
+- [x] Cover tampered historical bytes, missing/unresolvable seals, task moves,
   and an active dirty report that must continue comparing against the live
   worktree.
 
 ## Docs
-- [ ] Update `docs/agent/workflow-evidence.md` and regenerate the workflow skill
+- [x] Update `docs/agent/workflow-evidence.md` and regenerate the workflow skill
   mirror if the completed-report source-seal format or validation rules change.
 
 ## Acceptance criteria
-- [ ] The METHOD-038-session repro no longer invalidates completed GEOM-071 or
+- [x] The METHOD-038-session repro no longer invalidates completed GEOM-071 or
   METHOD-037 reports merely because shared ledgers/indexes advanced.
-- [ ] Historical validation still rejects any altered report, source surface,
+- [x] Historical validation still rejects any altered report, source surface,
   artifact, receipt, handoff, or independent-review binding.
-- [ ] Workflow-evidence regressions and repository-global validation pass
+- [x] Workflow-evidence regressions and repository-global validation pass
   without regenerating a completed report against later unrelated changes.
 
 ## Verification
 ```bash
-python3 -m unittest tests.regression.tooling.Test.WorkflowEvidence
+python3 tests/regression/tooling/Test.WorkflowEvidence.py
 python3 tools/agents/workflow_evidence.py validate --root .
 python3 tools/agents/check_task_policy.py --root . --strict
 python3 tools/agents/validate_tasks.py --root tasks --strict
 python3 tools/docs/check_doc_links.py --root .
 ```
+
+Executed on 2026-08-11: all 32 workflow-evidence regressions passed; repository
+validation completed with 0 errors and 68 pre-existing explicit-skip warnings;
+strict task policy/format/state-link, skill-mirror, docs-sync, docs-link, and
+root-hygiene gates passed. The unchanged `GEOM-071` and `METHOD-037` reports
+seal to `2e36465b` and `23c1080a` respectively; neither report was regenerated.
 
 ## Forbidden changes
 - Treating the current worktree as the historical source of a completed report.

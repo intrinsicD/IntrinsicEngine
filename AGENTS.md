@@ -431,6 +431,9 @@ Every task execution should follow this sequence:
 10. Self-review against PR checklist.
 
 Before retiring an enrolled task, validate its generated completion report.
+After committing a retirement surface whose complete report records
+`source.dirty: true`, create and commit the exact historical `seal.yaml`
+described in `docs/agent/workflow-evidence.md` before final validation.
 `high-risk` and higher profiles additionally require a durable handoff and an
 accepted independent fixed-surface review. `claim-grade` and `protected`
 profiles add the frozen experiment/authorization custody defined in

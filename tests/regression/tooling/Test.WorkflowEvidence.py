@@ -175,6 +175,23 @@ class Fixture:
             "TEST-001",
         )
 
+    def seal(
+        self, revision: str = "HEAD", expected: int | None = 0
+    ) -> subprocess.CompletedProcess[str]:
+        return run(
+            self.repo,
+            "seal-report",
+            "--root",
+            str(self.repo),
+            "--task-id",
+            "TEST-001",
+            "--revision",
+            revision,
+            "--reason",
+            "Freeze the completed fixture at its reviewed commit.",
+            expected=expected,
+        )
+
     def digest(self) -> str:
         return self.report_data()["source"]["content_digest"]
 
@@ -292,6 +309,127 @@ class WorkflowEvidenceTests(unittest.TestCase):
 
         self.assertEqual(result.returncode, 0, result.stdout)
         self.assertNotEqual(current_revision, fixed_revision)
+
+    def test_retired_dirty_report_uses_post_commit_historical_seal(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            fixture = self.fixture(tmp)
+            fixture.receipt()
+            done = fixture.repo / "tasks/done/TEST-001-fixture.md"
+            done.parent.mkdir(parents=True)
+            fixture.task.rename(done)
+            fixture.task = done
+            fixture.generate()
+            git(fixture.repo, "add", ".")
+            git(fixture.repo, "commit", "-qm", "retire dirty report fixture")
+
+            missing_seal = fixture.validate()
+            sealed = fixture.seal(expected=None)
+            self.assertEqual(sealed.returncode, 0, sealed.stdout)
+            seal_data = yaml.safe_load(
+                (fixture.report.parent / "seal.yaml").read_text(encoding="utf-8")
+            )
+            report_digest = fixture.digest()
+            git(fixture.repo, "add", ".")
+            git(fixture.repo, "commit", "-qm", "seal retired report")
+
+            fixture.artifact.write_text("later shared content\n", encoding="utf-8")
+            git(fixture.repo, "add", str(fixture.artifact))
+            git(fixture.repo, "commit", "-qm", "later task updates shared artifact")
+            result = fixture.validate()
+
+        self.assertEqual(missing_seal.returncode, 1, missing_seal.stdout)
+        self.assertIn("historical seal", missing_seal.stdout)
+        self.assertEqual(result.returncode, 0, result.stdout)
+        self.assertRegex(seal_data["sealed_revision"], r"^[0-9a-f]{40}$")
+        self.assertEqual(seal_data["task_id"], "TEST-001")
+        self.assertEqual(
+            seal_data["source_content_digest"], report_digest
+        )
+
+    def test_historical_seal_survives_a_later_task_move(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            fixture = self.fixture(tmp)
+            fixture.receipt()
+            fixture.generate()
+            git(fixture.repo, "add", ".")
+            git(fixture.repo, "commit", "-qm", "commit active dirty report")
+            fixture.seal()
+            git(fixture.repo, "add", ".")
+            git(fixture.repo, "commit", "-qm", "seal active report")
+
+            done = fixture.repo / "tasks/done/TEST-001-fixture.md"
+            done.parent.mkdir(parents=True)
+            fixture.task.rename(done)
+            fixture.task = done
+            git(fixture.repo, "add", ".")
+            git(fixture.repo, "commit", "-qm", "retire task after sealing")
+            result = fixture.validate()
+
+        self.assertEqual(result.returncode, 0, result.stdout)
+
+    def test_historical_seal_rejects_report_and_review_tampering(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            fixture = self.fixture(tmp, profile="high-risk")
+            fixture.receipt()
+            done = fixture.repo / "tasks/done/TEST-001-fixture.md"
+            done.parent.mkdir(parents=True)
+            fixture.task.rename(done)
+            fixture.task = done
+            fixture.generate()
+            fixture.handoff()
+            fixture.review()
+            git(fixture.repo, "add", ".")
+            git(fixture.repo, "commit", "-qm", "commit reviewed dirty report")
+            fixture.seal()
+            git(fixture.repo, "add", ".")
+            git(fixture.repo, "commit", "-qm", "seal reviewed report")
+
+            report_bytes = fixture.report.read_bytes()
+            fixture.report.write_bytes(report_bytes + b"\n")
+            report_result = fixture.validate()
+            fixture.report.write_bytes(report_bytes)
+
+            review_path = fixture.report.parent / "reviews.jsonl"
+            review_path.write_text(
+                review_path.read_text(encoding="utf-8") + "\n", encoding="utf-8"
+            )
+            review_result = fixture.validate()
+
+        self.assertEqual(report_result.returncode, 1, report_result.stdout)
+        self.assertIn("report.yaml differs from historical seal", report_result.stdout)
+        self.assertEqual(review_result.returncode, 1, review_result.stdout)
+        self.assertIn("current record differs", review_result.stdout)
+
+    def test_historical_seal_rejects_unresolvable_or_reportless_revision(
+        self,
+    ) -> None:
+        for revision, expected in (
+            ("0" * 40, "git cat-file"),
+            ("base", "does not contain report.yaml"),
+        ):
+            with self.subTest(revision=revision), tempfile.TemporaryDirectory() as tmp:
+                fixture = self.fixture(tmp)
+                fixture.receipt()
+                done = fixture.repo / "tasks/done/TEST-001-fixture.md"
+                done.parent.mkdir(parents=True)
+                fixture.task.rename(done)
+                fixture.task = done
+                fixture.generate()
+                git(fixture.repo, "add", ".")
+                git(fixture.repo, "commit", "-qm", "commit dirty report")
+                fixture.seal()
+                seal_path = fixture.report.parent / "seal.yaml"
+                seal = yaml.safe_load(seal_path.read_text(encoding="utf-8"))
+                seal["sealed_revision"] = (
+                    fixture.base if revision == "base" else revision
+                )
+                seal_path.write_text(
+                    yaml.safe_dump(seal, sort_keys=False), encoding="utf-8"
+                )
+                result = fixture.validate()
+
+            self.assertEqual(result.returncode, 1, result.stdout)
+            self.assertIn(expected, result.stdout)
 
     def test_clean_fixed_revision_hashes_symlink_as_git_blob(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

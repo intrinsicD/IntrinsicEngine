@@ -269,6 +269,16 @@ When a task completes:
    If review requests a revision, change the source, regenerate the report,
    append a new handoff/review round, and validate again.
 
+   If the final completed report records `source.dirty: true`, commit the
+   retirement surface and evidence first, run `workflow_evidence.py
+   seal-report --task-id <TASK-ID> --revision HEAD --reason <why>`, and commit
+   the generated `tasks/evidence/<TASK-ID>/seal.yaml` before the final
+   validation. Active dirty reports remain live-worktree-bound; the seal is the
+   post-commit identity that lets a retired report validate against its own
+   immutable source/artifact tree after later tasks update shared files. See
+   [`workflow-evidence.md`](workflow-evidence.md#completion-evidence) for the
+   migration and tamper rules.
+
 Category READMEs may keep retired entries only under a history-marked heading
 (retired/history/closed/completed/resolved/verified/done). Open lists cite
 retired tasks as plain code spans, not links. `check_task_state_links.py`

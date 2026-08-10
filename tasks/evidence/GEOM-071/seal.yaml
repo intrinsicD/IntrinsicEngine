@@ -1,0 +1,13 @@
+schema_version: 1
+task_id: GEOM-071
+sealed_revision: 2e36465b1e8581995d90908a02a94dbe5fde9841
+source_content_digest: b97286e5d85ac4293a9fa7d0ebff6104c7c612bb550096a142b2561f72a33d61
+report_sha256: 25353a509c97b7dcf31121505c65ffd366e292f59690b3075ebca7a2fd386c74
+records:
+- path: tasks/evidence/GEOM-071/handoff.jsonl
+  sha256: b58ee0144d9855286ed99569834c9f3a01dad21219d5c9953f8eb18b7cca9b46
+- path: tasks/evidence/GEOM-071/reviews.jsonl
+  sha256: 2f891bc17894574b0abaf82bab7d9465d068ecb9f0470a6f987b71977cf2fd6a
+reason: Migrate the unchanged completed report to the exact GEOM-071 retirement commit that contains its
+  accepted source and evidence.
+generated_by: tools/agents/workflow_evidence.py

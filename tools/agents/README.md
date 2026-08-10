@@ -7,8 +7,9 @@ Agent workflow and task policy tooling.
 - `check_task_policy.py` validates required task directories, rejects legacy root planning files, and delegates strict structured-task checks. Runs strict in `ci-docs.yml`; `check_todo_active_only.sh` is a thin compatibility wrapper for it.
 - `validate_tasks.py` validates task IDs, required sections, completion metadata for `tasks/done/`, and checkbox todos in actionable sections. Invoked by `check_task_policy.py`.
 - `workflow_evidence.py` records exact command receipts, generates completion
-  reports from task/Git/artifact facts, appends high-risk handoff/review
-  records, and validates enrolled retirement evidence.
+  reports from task/Git/artifact facts, seals completed dirty reports against
+  an exact commit containing their unchanged evidence, appends high-risk
+  handoff/review records, and validates enrolled retirement evidence.
 - `experiment_custody.py` freezes claim-grade protocols, initializes
   non-overwriting runs, journals cells, builds/audits portable bundles, and
   enforces protected prospective authorization and one-shot attempts. Its
