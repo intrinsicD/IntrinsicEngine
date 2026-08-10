@@ -42,10 +42,10 @@ map.
 - [GEOM-070 — Rectangular sparse LSQR and LSCM adoption](GEOM-070-sparse-lsqr-lscm-adoption.md)
   (adds an LSQR-style free function to `Geometry.Sparse` and removes LSCM's
   private normal-equation path in the same slice).
-- [GEOM-071 — Reusable sharp-feature classification](../../done/GEOM-071-reusable-sharp-feature-classification.md)
-  (retired at `CPUContracted`: owning-mesh boundary/dihedral feature facts,
+- GEOM-071 — Reusable sharp-feature classification is retired at
+  `CPUContracted`: owning-mesh boundary/dihedral feature facts,
   canonical `e:feature` materialization, and behavior-preserving FA-QEM
-  adoption; concrete second consumer is `GEOM-072`).
+  adoption; concrete second consumer is `GEOM-072`.
 - [GEOM-072 — Catmull-Clark crease masks](GEOM-072-catmull-clark-crease-masks.md)
   (opt-in crease stencils and multi-iteration tag propagation; depends on
   `GEOM-071`).
