@@ -9,6 +9,12 @@ The 2026-08-07 Sandbox UI workflow pass (`sculpt.obj` end-to-end through the
 promoted Vulkan build) opened `BUG-137` through `BUG-142`. `BUG-137` is upstream
 of `BUG-140` and of the parameterization rejection recorded in `BUG-141`.
 
+- [`BUG-150` — Completed workflow reports lose their historical surface seal](BUG-150-workflow-report-historical-surface-seal.md):
+  completed reports are revalidated against the current worktree, so later
+  append-only ARA/task/doc updates invalidate their recorded surface hashes.
+  Bind completed reports to an exact historical tree/snapshot while keeping
+  active dirty reports live and tamper checks fail-closed.
+
 - [`BUG-149` — Benchmark sealer escapes dotted output directories](BUG-149-benchmark-sealer-dotted-output-directory.md):
   `run_and_seal.py` interprets a dotted directory name as a file, seals its
   parent (observed as all of `/tmp`), and can return zero after the sealer
