@@ -3,15 +3,15 @@ task_id: BUG-148
 workflow_profile: standard
 status: complete
 generated_by: tools/agents/workflow_evidence.py
-generated_at: '2026-08-10T09:39:21Z'
+generated_at: '2026-08-10T12:58:05Z'
 claim_eligible: false
 source:
-  base_ref: HEAD
+  base_ref: 6e9d7385f745e07047291c9f77274ba45e81eaf3
   base_revision: 6e9d7385f745e07047291c9f77274ba45e81eaf3
-  head_revision: 6e9d7385f745e07047291c9f77274ba45e81eaf3
-  branch: main
-  worktree: /home/alex/Documents/IntrinsicEngine
-  dirty: true
+  head_revision: 9abb8a6be53430086b8885ef95dd171e2ec41494
+  branch: ''
+  worktree: /tmp/intrinsic-bug148-pin.XqwANX/worktree
+  dirty: false
   surface:
   - path: ara/logic/claims.md
     sha256: 0babf510d5039132ebdeec2caa05d3d8efa077bd7fa92756ca374a87c2488a21
