@@ -11,6 +11,9 @@ Each active task should include:
 
 ## Currently active
 
+- [BUG-150 — Completed workflow reports lose their historical surface seal](BUG-150-workflow-report-historical-surface-seal.md)
+  — Standard workflow-evidence repair that validates retired reports against
+  their exact historical source instead of the current worktree.
 - [BUG-151 — Work graph cannot advance a declared multi-slice task](BUG-151-work-graph-multi-slice-cycle.md)
   — High-risk workflow repair for one auditable next-slice cycle with fresh
   bounded attempts and an exact clean baseline; no engine or method change.

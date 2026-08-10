@@ -5,10 +5,10 @@ depends_on: []
 workflow_schema: 1
 workflow_profile: standard
 evidence: required
-owner:
-branch:
-worktree:
-claimed_at:
+owner: "codex-bug150"
+branch: "bug-150-historical-workflow-seals"
+worktree: "/tmp/intrinsic-bug150-worktree"
+claimed_at: "2026-08-10T23:33:26Z"
 contract_schema: 1
 contracts: [repo.task-contract-discovery]
 contract_review: "This defect is in the reusable task/workflow-evidence contract: completed reports lose global validity after later tasks legitimately update shared ARA, task-index, or documentation files. Engine layering, geometry domains, property publication, method integration, and the agent work-graph lifecycle are unchanged."
