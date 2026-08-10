@@ -2,9 +2,9 @@ session:
   id: "2026-08-10_001"
   date: "2026-08-10"
   started: "2026-08-10T17:08+02:00"
-  last_turn: "2026-08-10T19:50+02:00"
-  turn_count: 1
-  summary: "Retired METHOD-037 and GEOM-071, activated METHOD-038, and sealed its first paired-grid baseline as bounded negative selector evidence."
+  last_turn: "2026-08-10T21:18+02:00"
+  turn_count: 2
+  summary: "Retired METHOD-037 and GEOM-071, activated METHOD-038, and advanced its frozen baseline through an audited cold/reusable/continuous fixture cohort that refutes Automatic count stability."
 
 events_logged:
   - turn: 1
@@ -43,6 +43,18 @@ events_logged:
     routing: crystallized
     provenance: ai-executed
     summary: "Crystallized the exact-two Automatic hypothesis as refuted C40 through committed independently audited scratch evidence."
+  - turn: 2
+    type: experiment
+    id: "N406"
+    routing: direct
+    provenance: ai-executed
+    summary: "Replayed six frozen 10k cold, reusable, and continuous-boundary fixture lanes: Fixed passed all declared gates while Automatic selected four components in every lane."
+  - turn: 2
+    type: observation
+    id: "O143"
+    routing: crystallized
+    provenance: ai-executed
+    summary: "Crystallized the bounded Fixed-control and Automatic-instability result to refuted C41 through committed independently audited scratch evidence."
 
 ai_actions:
   - turn: 1
@@ -75,6 +87,26 @@ ai_actions:
       - "tasks/evidence/METHOD-038/"
       - "tasks/evidence/METHOD-037/"
       - "ara/"
+  - turn: 2
+    action: "Extended only METHOD-038's private opt-in profiler with analytic-sphere cold/reusable lanes, a planar continuous-boundary upper bound, and six schema-v2 manifests; production APIs, selectors, defaults, runtime, config, and UI remained unchanged."
+    provenance: ai-executed
+    files_changed:
+      - "benchmarks/geometry/Bench.CurvatureSegmentationProfile.cpp"
+      - "benchmarks/geometry/manifests/curvature_segmentation_reference_profile_10k_cold_fixed.yaml"
+      - "benchmarks/geometry/manifests/curvature_segmentation_reference_profile_10k_cold_automatic.yaml"
+      - "benchmarks/geometry/manifests/curvature_segmentation_reference_profile_10k_reuse_fixed.yaml"
+      - "benchmarks/geometry/manifests/curvature_segmentation_reference_profile_10k_reuse_automatic.yaml"
+      - "benchmarks/geometry/manifests/curvature_segmentation_reference_remeshing_10k_fixed.yaml"
+      - "benchmarks/geometry/manifests/curvature_segmentation_reference_remeshing_10k_automatic.yaml"
+  - turn: 2
+    action: "Sealed and independently audited scratch-003, passed 21 focused and all 4,211 selected CPU tests plus strict method/benchmark/task/docs/ARA/layering checks, and tracked the unrelated stale historical workflow-report seal failure as BUG-150."
+    provenance: ai-executed
+    files_changed:
+      - "tasks/evidence/METHOD-038/experiment/"
+      - "tasks/evidence/METHOD-038/commands/"
+      - "methods/geometry/curvature_segmentation/README.md"
+      - "tasks/backlog/bugs/BUG-150-workflow-reports-stale-after-shared-surface-changes.md"
+      - "ara/"
 
 claims_touched:
   - id: C38
@@ -86,6 +118,9 @@ claims_touched:
   - id: C40
     action: crystallized
     turn: 1
+  - id: C41
+    action: crystallized
+    turn: 2
 
 key_context:
   - turn: 1
@@ -94,12 +129,18 @@ key_context:
     excerpt: "On the frozen paired 10k fixture, Automatic selected four components with 0.01 maximum label error; Fixed selected two with 0.005 error."
   - turn: 1
     excerpt: "Independent audit rejected claim authorization exactly because the Automatic population_count gate required two; quality remained within its 0.02 bound."
+  - turn: 2
+    excerpt: "Across the frozen cold, reusable, and planar continuous-boundary lanes, Fixed recorded populations 1/1/2 while Automatic recorded 4/4/4."
+  - turn: 2
+    excerpt: "Fixed's maximum label error was 0.005 and normalized planar boundary upper bound was 0.007071061; Automatic's sphere-pair dominant-label error was 0.656."
+  - turn: 2
+    excerpt: "Independent audit accepted exact custody and gate recomputation while retaining claim_authorized=false because scratch-003 is deliberately non-claim-eligible."
 
 open_threads:
-  - "Add the cold descriptor lane so candidate screening measures the full curvature-estimation path rather than supplied descriptors only."
-  - "Add continuous paired-remeshing fixtures and preregister correspondence/stability metrics before evaluating candidate A."
-  - "Keep METHOD-038's production selector and defaults unchanged until the wider frozen fixture set justifies a candidate."
+  - "Extend the disjoint analytic screening corpus and freeze the candidate A-D killing split before implementing cpu_reference_v2."
+  - "Keep METHOD-038's production selector and defaults unchanged until a preregistered candidate clears the wider frozen corpus."
+  - "Treat convergence, curved-surface geodesic quality, performance, runtime/UI, GPU, and v2 as unclaimed until dedicated evidence exists."
 
 ai_suggestions_pending:
   - "Treat the four-component result as one bounded negative fixture, not as a selector-retuning mandate."
-  - "Freeze the candidate-screening split only after cold-descriptor and continuous paired-remeshing coverage exists."
+  - "Evaluate candidate A first only after the disjoint screening/confirmation split and killing gates are frozen."

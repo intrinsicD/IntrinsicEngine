@@ -274,8 +274,8 @@ sessions:
     open_threads: 4
   - id: "2026-08-10_001"
     date: "2026-08-10"
-    summary: "Retired METHOD-037 and GEOM-071, activated METHOD-038, and sealed its first paired-grid baseline as bounded negative selector evidence."
-    turn_count: 1
-    events_count: 6
-    claims_touched: [C38, C39, C40]
+    summary: "Retired METHOD-037 and GEOM-071, activated METHOD-038, and advanced its frozen baseline through an audited cold/reusable/continuous fixture cohort that refutes Automatic count stability."
+    turn_count: 2
+    events_count: 8
+    claims_touched: [C38, C39, C40, C41]
     open_threads: 3
