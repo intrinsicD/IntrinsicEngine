@@ -1,0 +1,125 @@
+schema_version: 1
+task_id: BUG-150
+workflow_profile: standard
+status: complete
+generated_by: tools/agents/workflow_evidence.py
+generated_at: '2026-08-10T23:56:38Z'
+claim_eligible: false
+source:
+  base_ref: 47b46852
+  base_revision: 47b4685228d84891ba763d5a9cf20394cfdca41d
+  head_revision: c23e08a44d540ca3bb38d190870d6d0768f15aa3
+  branch: bug-150-historical-workflow-seals
+  worktree: /tmp/intrinsic-bug150-worktree
+  dirty: true
+  surface:
+  - path: AGENTS.md
+    sha256: 43b526f8ef8aa8608b7a6c472a9375212f10dfdd8c1d3ae1aabf76e6ae7c0046
+  - path: docs/agent/task-format.md
+    sha256: af365afa4a458f8d68d138be6dc11e828ff3d3a69dc4e537665e3bfc894e40b8
+  - path: docs/agent/workflow-evidence.md
+    sha256: 49530fe095356e1e592463fc2a017fcde1efab34bdbf0fecdd0e9c74770c75d9
+  - path: tasks/SESSION-BRIEF.md
+    sha256: 698a0fa8337fa65b0f4e7d8415eba43b742b5152c117551f8fddec58c4288a0b
+  - path: tasks/backlog/bugs/index.md
+    sha256: 7e964faedf9d6d36b6f5fe4be9b9162323e8ed1d33bdb65917d31c998681549e
+  - path: tasks/done/BUG-150-workflow-report-historical-surface-seal.md
+    sha256: aed914e6f88141862e755dea6d9ccce04b7cab296f56db1ccb295dc25e0fb5f1
+  - path: tasks/done/RETIREMENT-LOG.md
+    sha256: 1231e941e8b31d42161031a6dc744425205f3cb7864ab007f7b3cb398dcc575f
+  - path: tasks/evidence/GEOM-071/seal.yaml
+    sha256: f4027a5843606aa8c83e61070b2e8f28001a4d34b71726f25d249517d59cbfcd
+  - path: tasks/evidence/METHOD-037/seal.yaml
+    sha256: 1621ae785ff6f1736113b8eb6b1ace1a738e310ca359620a473fe55e7066719d
+  - path: tests/regression/tooling/Test.WorkflowEvidence.py
+    sha256: f79c559794af07e0d98d289be4b9e4a87c25a03fd19b0387fb60baa7b4d0db6e
+  - path: tools/agents/README.md
+    sha256: d219193025db316b3106ea15ceef8bf986f3a82a595a2a9432860bfcfefe1775
+  - path: tools/agents/skills/intrinsicengine-task-workflow/references/task-format.md
+    sha256: 8ac7486ca3cf5f1f720c8564803d5d64b22d5443b7fa6df67669efb173a8a3c1
+  - path: tools/agents/skills/intrinsicengine-task-workflow/references/workflow-evidence.md
+    sha256: 49530fe095356e1e592463fc2a017fcde1efab34bdbf0fecdd0e9c74770c75d9
+  - path: tools/agents/workflow_evidence.py
+    sha256: 610dab823b0c07dac62fff73404ee7e096ed453500c15d43f544115ae5f7ed13
+  content_digest: dfc85c88198d7ffd73af4a3048e7e21c3c79a5beb0ad88b565022eea266d8fce
+touched:
+  paths:
+  - AGENTS.md
+  - docs/agent/task-format.md
+  - docs/agent/workflow-evidence.md
+  - tasks/SESSION-BRIEF.md
+  - tasks/backlog/bugs/index.md
+  - tasks/done/BUG-150-workflow-report-historical-surface-seal.md
+  - tasks/done/RETIREMENT-LOG.md
+  - tasks/evidence/GEOM-071/seal.yaml
+  - tasks/evidence/METHOD-037/seal.yaml
+  - tests/regression/tooling/Test.WorkflowEvidence.py
+  - tools/agents/README.md
+  - tools/agents/skills/intrinsicengine-task-workflow/references/task-format.md
+  - tools/agents/skills/intrinsicengine-task-workflow/references/workflow-evidence.md
+  - tools/agents/workflow_evidence.py
+  layers: []
+  modules: []
+extension_seam: Plain schema-v1 report plus task-local post-commit seal.yaml.
+future_change_plan: Add seal fields only through an explicit workflow-evidence schema migration.
+acceptance:
+- criterion: The METHOD-038-session repro no longer invalidates completed GEOM-071 or
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: Historical validation still rejects any altered report, source surface,
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: Workflow-evidence regressions and repository-global validation pass
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+commands:
+- receipt: tasks/evidence/BUG-150/commands/agent-work-graph-regressions.json
+- receipt: tasks/evidence/BUG-150/commands/docs-links.json
+- receipt: tasks/evidence/BUG-150/commands/skill-mirrors.json
+- receipt: tasks/evidence/BUG-150/commands/strict-task-policy.json
+- receipt: tasks/evidence/BUG-150/commands/task-claim-regressions.json
+- receipt: tasks/evidence/BUG-150/commands/workflow-regressions.json
+changed_public_contracts:
+- repo.task-contract-discovery
+diagnostics_and_previews:
+- Global validation fell from 38 historical hash errors to zero using unchanged GEOM-071 and METHOD-037
+  reports.
+benchmark_or_parity_evidence: []
+docs_sync:
+  task_file: tasks/done/BUG-150-workflow-report-historical-surface-seal.md
+  session_brief_present: true
+  canonical_docs_changed: true
+  skill_mirrors_checked: true
+residual_risks:
+- Historical validation requires the sealed Git commit to remain reachable.
+skipped_checks:
+- check: build-and-ctest
+  reason: No C++ source, module, CMake input, or compiled test changed; Python workflow regressions and
+    strict structural gates are the strongest relevant proof.
+- check: gpu-vulkan
+  reason: No engine, graphics, RHI, shader, runtime, or backend behavior changed.
+artifacts:
+- path: tools/agents/workflow_evidence.py
+  sha256: 610dab823b0c07dac62fff73404ee7e096ed453500c15d43f544115ae5f7ed13
+  kind: file
+- path: tests/regression/tooling/Test.WorkflowEvidence.py
+  sha256: f79c559794af07e0d98d289be4b9e4a87c25a03fd19b0387fb60baa7b4d0db6e
+  kind: file
+- path: tasks/evidence/GEOM-071/seal.yaml
+  sha256: f4027a5843606aa8c83e61070b2e8f28001a4d34b71726f25d249517d59cbfcd
+  kind: file
+- path: tasks/evidence/METHOD-037/seal.yaml
+  sha256: 1621ae785ff6f1736113b8eb6b1ace1a738e310ca359620a473fe55e7066719d
+  kind: file
+self_review:
+  completed: true
+  scope_matches_task: true
+  layering_preserved: true
+  tests_and_docs_accounted_for: true
+  mechanical_and_semantic_changes_separated: true
