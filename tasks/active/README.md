@@ -12,9 +12,9 @@ Each active task should include:
 ## Currently active
 
 - [METHOD-038 — Feature-aligned, remeshing-stable curvature segmentation](METHOD-038-feature-aligned-remeshing-stable-curvature-segmentation.md)
-  — Slice A paper intake and frozen screening protocol; next verify the
-  deterministic METHOD-037 stage-profile baseline before any v2 production
-  change.
+  — Slice A intake and baseline profiling; next freeze/replay the 10k scratch
+  profile from the committed instrumentation, then add cold-descriptor and
+  continuous paired-remeshing fixtures before any v2 production change.
 
 ## History
 

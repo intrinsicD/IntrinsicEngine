@@ -18,8 +18,18 @@ namespace Intrinsic::Bench::Geometry
     struct CurvatureSegmentationReferenceSmokeMetrics
     {
         double RuntimeMilliseconds{0.0};
-        double QualityErrorL2{0.0};
+        // Kept in the benchmark's historical quality_error_l2 schema slot;
+        // the unit is a label-permutation-invariant face fraction, not an L2
+        // norm.
+        double RegimeMisclassificationFraction{0.0};
         double FoldBoundaryRecall{0.0};
+        double FaceAggregationMilliseconds{0.0};
+        double GmmFittingMilliseconds{0.0};
+        double UnaryConstructionMilliseconds{0.0};
+        double DualGraphConstructionMilliseconds{0.0};
+        double SpatialOptimizationMilliseconds{0.0};
+        double ConnectivityPublicationMilliseconds{0.0};
+        double SegmentationTotalMilliseconds{0.0};
         std::uint32_t SelectedComponentCount{0u};
         std::uint32_t ConnectedRegionCount{0u};
         std::uint32_t BoundaryEdgeCount{0u};

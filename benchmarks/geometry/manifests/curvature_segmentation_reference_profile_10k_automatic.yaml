@@ -1,0 +1,24 @@
+benchmark_id: geometry.curvature_segmentation.reference.profile.10k.automatic
+method: geometry.curvature_segmentation
+dataset: builtin.curvature_regime_grid_pair.v1
+params:
+  intent: screening_profile
+  backend: cpu_reference_v1
+  descriptor_lane: supplied_curvature
+  component_selection: automatic
+  component_range: [1, 4]
+  expected_selected_components: 2
+  live_faces: 10000
+  triangulations: [uniform, anisotropic_nonuniform]
+  aggregation: max_of_variant_medians
+  threshold_scope: harness_health_not_acceleration
+  warmup_iterations: 1
+  measured_iterations: 3
+  quality_error_l2_unit: misclassified_face_fraction
+metrics: [runtime_ms, memory_peak_bytes, quality_error_l2, population_count]
+thresholds:
+  screening_runtime_ms_max: 10000
+  memory_peak_bytes_max: 2147483648
+  quality_error_l2_max: 0.02
+  population_count_min: 2
+  population_count_max: 2

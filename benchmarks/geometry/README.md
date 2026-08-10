@@ -22,6 +22,19 @@ It links `IntrinsicGeometry` so workloads may use the public Geometry C++23
 module surface directly; benchmarks must not import `assets`, `ecs`,
 `runtime`, `graphics`, or `platform`.
 
+METHOD-038 also provides the opt-in
+[`CurvatureSegmentationProfileRunner.cpp`](../runners/CurvatureSegmentationProfileRunner.cpp)
+as `IntrinsicCurvatureSegmentationProfile`. Its default `smoke` cohort profiles
+the supplied-curvature METHOD-037 reference on paired uniform/nonuniform 10k
+grids in Fixed and Automatic modes. Setting
+`INTRINSIC_CURVATURE_PROFILE_COHORT=heavy` selects the declared 100k and 1M
+cohorts. The heavy runner is not a default CTest. Its manifest thresholds are
+harness-health bounds, not adoption or acceleration claims; clean-source
+screening/confirmation runs require METHOD-038 experiment custody. The
+`population_count` metric is gated to exactly two for both modes so an
+Automatic over-selection is preserved as a benchmark failure instead of being
+hidden inside free-form diagnostics.
+
 The GEOM-056/RUNTIME-196 KMeans Vulkan smoke is the explicit exception: it lives in
 [`Bench_KMeansGpuVulkanSmoke.cpp`](Bench_KMeansGpuVulkanSmoke.cpp), imports the
 runtime/Vulkan stack, composes the production `ClusteringService`, and is

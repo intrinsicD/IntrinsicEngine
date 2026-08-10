@@ -14,6 +14,15 @@ params:
   seed: 17
   warmup_iterations: 1
   measured_iterations: 8
+  quality_error_l2_unit: misclassified_face_fraction
+  diagnostic_timings:
+    - face_aggregation_ms
+    - gmm_fitting_ms
+    - unary_construction_ms
+    - dual_graph_construction_ms
+    - spatial_optimization_ms
+    - connectivity_publication_ms
+    - segmentation_total_ms
 metrics:
   - runtime_ms
   - quality_error_l2

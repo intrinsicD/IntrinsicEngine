@@ -1,5 +1,6 @@
 #include <algorithm>
 #include <array>
+#include <cmath>
 #include <cstddef>
 #include <cstdint>
 #include <limits>
@@ -285,6 +286,52 @@ TEST(CurvatureSegmentation,
 }
 
 TEST(CurvatureSegmentation,
+     ReportsStageAndPerCandidateProfileTimingsWithoutChangingTheSolve)
+{
+    CurvatureFixture fixture = MakeSeparatedCurvatureTriangles();
+    Segment::CurvatureSegmentationParams params{};
+    params.SelectionMode = Segment::ComponentSelectionMode::Automatic;
+    params.AutomaticMinComponents = 1u;
+    params.AutomaticMaxComponents = 4u;
+    params.AutomaticFitTolerance = 0.12;
+    params.MinimumRegionFaces = 1u;
+    params.Seed = 17u;
+
+    const auto result = Segment::Segment(
+        fixture.Mesh, fixture.K1, fixture.K2, params);
+    ASSERT_TRUE(result.Succeeded())
+        << Segment::ToString(result.Diagnostics.Status);
+
+    const auto& timings = result.Diagnostics.Timings;
+    const std::array<double, 7u> measured{
+        timings.FaceAggregationAndNormalizationMilliseconds,
+        timings.GmmFittingMilliseconds,
+        timings.UnaryConstructionMilliseconds,
+        timings.DualGraphConstructionMilliseconds,
+        timings.SpatialOptimizationMilliseconds,
+        timings.ConnectivityCleanupAndPublicationMilliseconds,
+        timings.TotalMilliseconds,
+    };
+    for (const double milliseconds : measured)
+    {
+        EXPECT_TRUE(std::isfinite(milliseconds));
+        EXPECT_GE(milliseconds, 0.0);
+        EXPECT_LE(milliseconds, timings.TotalMilliseconds);
+    }
+    EXPECT_GT(timings.TotalMilliseconds, 0.0);
+    EXPECT_EQ(timings.CurvatureEstimationMilliseconds, 0.0);
+
+    ASSERT_EQ(result.Diagnostics.Candidates.size(), 4u);
+    for (const auto& candidate : result.Diagnostics.Candidates)
+    {
+        EXPECT_TRUE(std::isfinite(candidate.FitMilliseconds));
+        EXPECT_GE(candidate.FitMilliseconds, 0.0);
+        EXPECT_LE(candidate.FitMilliseconds,
+                  timings.GmmFittingMilliseconds);
+    }
+}
+
+TEST(CurvatureSegmentation,
      AutomaticModeReportsToleranceFallbackWhenNoCandidateQualifies)
 {
     CurvatureFixture fixture = MakeSeparatedCurvatureTriangles();
@@ -337,6 +384,32 @@ TEST(CurvatureSegmentation,
     EXPECT_GT(regularized.Diagnostics.SpatialLabelMoves, 0u);
     EXPECT_LE(regularized.Diagnostics.FinalEnergy,
               regularized.Diagnostics.InitialEnergy + 1.0e-10);
+}
+
+TEST(CurvatureSegmentation,
+     MinimumRegionCleanupDeterministicallyMergesTheSingleFaceOutlier)
+{
+    CurvatureFixture fixture = MakeSingleOutlierStrip();
+    auto params = FixedParams(2u);
+    params.SpatialWeight = 0.0;
+    params.FeatureSensitivity = 0.0;
+    params.MinimumRegionFaces = 1u;
+
+    const auto unmerged = Segment::Segment(
+        fixture.Mesh, fixture.K1, fixture.K2, params);
+    ASSERT_TRUE(unmerged.Succeeded());
+    ASSERT_EQ(unmerged.Diagnostics.SmallRegionsMerged, 0u);
+    ASSERT_GT(unmerged.Diagnostics.ConnectedRegionCount, 1u);
+
+    params.MinimumRegionFaces = 2u;
+    const auto merged = Segment::Segment(
+        fixture.Mesh, fixture.K1, fixture.K2, params);
+    ASSERT_TRUE(merged.Succeeded());
+    EXPECT_GT(merged.Diagnostics.SmallRegionsMerged, 0u);
+    EXPECT_LT(merged.Diagnostics.ConnectedRegionCount,
+              unmerged.Diagnostics.ConnectedRegionCount);
+    EXPECT_LE(merged.Diagnostics.BoundaryEdgeCount,
+              unmerged.Diagnostics.BoundaryEdgeCount);
 }
 
 TEST(CurvatureSegmentation, FeatureWeightPreservesFoldBoundary)
@@ -408,6 +481,13 @@ TEST(CurvatureSegmentation,
     EXPECT_EQ(result.Diagnostics.SelectedComponentCount, 1u);
     EXPECT_EQ(result.Diagnostics.ConnectedRegionCount, 1u);
     EXPECT_EQ(result.Diagnostics.BoundaryEdgeCount, 0u);
+    EXPECT_TRUE(std::isfinite(
+        result.Diagnostics.Timings.CurvatureEstimationMilliseconds));
+    EXPECT_GE(result.Diagnostics.Timings.CurvatureEstimationMilliseconds,
+              0.0);
+    EXPECT_GE(result.Diagnostics.Timings.TotalMilliseconds,
+              result.Diagnostics.Timings
+                  .CurvatureEstimationMilliseconds);
 }
 
 TEST(CurvatureSegmentation, GlobalOrientationReversalPreservesPartition)

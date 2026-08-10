@@ -1,6 +1,7 @@
 module;
 
 #include <algorithm>
+#include <chrono>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
@@ -29,6 +30,14 @@ namespace Geometry::CurvatureSegmentation
     {
         constexpr double kTiny = 1.0e-12;
         constexpr double kPosteriorFloor = 1.0e-15;
+        using ProfileClock = std::chrono::steady_clock;
+
+        [[nodiscard]] double ElapsedMilliseconds(
+            const ProfileClock::time_point start) noexcept
+        {
+            return std::chrono::duration<double, std::milli>(
+                ProfileClock::now() - start).count();
+        }
 
         struct FaceSample
         {
@@ -334,8 +343,11 @@ namespace Geometry::CurvatureSegmentation
             fitParams.CovarianceFloor = params.CovarianceFloor;
             fitParams.Seed = params.Seed;
             fitParams.Acceleration = Gmm::AccelerationPolicy::None;
+            const ProfileClock::time_point fitStart = ProfileClock::now();
             candidate.Fit = Gmm::FitEM(
                 points, componentCount, fitParams);
+            candidate.Diagnostics.FitMilliseconds =
+                ElapsedMilliseconds(fitStart);
             const Gmm::FitDiagnostics& fit =
                 candidate.Fit.Diagnostics;
             candidate.Diagnostics.FitSucceeded = fit.Succeeded();
@@ -809,6 +821,13 @@ namespace Geometry::CurvatureSegmentation
     {
         CurvatureSegmentationResult result{};
         CurvatureSegmentationDiagnostics& diagnostics = result.Diagnostics;
+        const ProfileClock::time_point totalStart = ProfileClock::now();
+        const auto finish = [&]() -> CurvatureSegmentationResult
+        {
+            diagnostics.Timings.TotalMilliseconds =
+                ElapsedMilliseconds(totalStart);
+            return std::move(result);
+        };
         diagnostics.FaceSlotCount = mesh.FacesSize();
         diagnostics.LiveFaceCount = mesh.FaceCount();
         diagnostics.EdgeSlotCount = mesh.EdgesSize();
@@ -824,22 +843,24 @@ namespace Geometry::CurvatureSegmentation
         if (mesh.IsEmpty() || mesh.FaceCount() == 0u)
         {
             diagnostics.Status = SegmentationStatus::EmptyMesh;
-            return result;
+            return finish();
         }
         if (mesh.IsSubmeshView())
         {
             diagnostics.Status =
                 SegmentationStatus::UnsupportedSubmeshView;
-            return result;
+            return finish();
         }
         if (!IsValidParams(params))
         {
             diagnostics.Status = SegmentationStatus::InvalidParameters;
-            return result;
+            return finish();
         }
 
         std::vector<FaceSample> samples;
         std::vector<std::uint32_t> faceSlotToSample;
+        const ProfileClock::time_point aggregationStart =
+            ProfileClock::now();
         diagnostics.Status = BuildFaceSamples(
             mesh,
             maxPrincipal,
@@ -847,8 +868,10 @@ namespace Geometry::CurvatureSegmentation
             samples,
             faceSlotToSample,
             diagnostics);
+        diagnostics.Timings.FaceAggregationAndNormalizationMilliseconds =
+            ElapsedMilliseconds(aggregationStart);
         if (diagnostics.Status != SegmentationStatus::Success)
-            return result;
+            return finish();
 
         const std::uint32_t faceCount =
             static_cast<std::uint32_t>(samples.size());
@@ -866,7 +889,7 @@ namespace Geometry::CurvatureSegmentation
             lastComponentCount > faceCount)
         {
             diagnostics.Status = SegmentationStatus::InvalidParameters;
-            return result;
+            return finish();
         }
         diagnostics.RequestedComponentCount =
             params.SelectionMode == ComponentSelectionMode::FixedCount
@@ -879,12 +902,13 @@ namespace Geometry::CurvatureSegmentation
         if (!finiteGmmPoints)
         {
             diagnostics.Status = SegmentationStatus::NonFiniteCurvature;
-            return result;
+            return finish();
         }
 
         std::vector<FittedCandidate> candidates;
         candidates.reserve(
             lastComponentCount - firstComponentCount + 1u);
+        const ProfileClock::time_point fittingStart = ProfileClock::now();
         for (std::uint32_t componentCount = firstComponentCount;
              componentCount <= lastComponentCount;
              ++componentCount)
@@ -894,6 +918,8 @@ namespace Geometry::CurvatureSegmentation
                 componentCount,
                 params));
         }
+        diagnostics.Timings.GmmFittingMilliseconds =
+            ElapsedMilliseconds(fittingStart);
         const std::optional<std::size_t> selected = SelectCandidate(
             candidates, params.SelectionMode);
         if (!selected.has_value())
@@ -902,7 +928,7 @@ namespace Geometry::CurvatureSegmentation
                 diagnostics.Candidates.push_back(candidate.Diagnostics);
             diagnostics.Status =
                 SegmentationStatus::GaussianMixtureFitFailed;
-            return result;
+            return finish();
         }
         candidates[*selected].Diagnostics.Selected = true;
         for (const FittedCandidate& candidate : candidates)
@@ -942,18 +968,24 @@ namespace Geometry::CurvatureSegmentation
 
         std::vector<double> dataCosts;
         std::vector<std::uint32_t> labels;
+        const ProfileClock::time_point unaryStart = ProfileClock::now();
         if (!BuildDataCosts(
                 std::span<const glm::vec3>{points.data(), points.size()},
                 chosen.Fit.Mixture,
                 dataCosts,
                 labels))
         {
+            diagnostics.Timings.UnaryConstructionMilliseconds =
+                ElapsedMilliseconds(unaryStart);
             diagnostics.Status =
                 SegmentationStatus::PosteriorEvaluationFailed;
-            return result;
+            return finish();
         }
+        diagnostics.Timings.UnaryConstructionMilliseconds =
+            ElapsedMilliseconds(unaryStart);
 
         std::vector<std::vector<std::uint32_t>> incidentDualEdges;
+        const ProfileClock::time_point dualGraphStart = ProfileClock::now();
         const std::vector<DualEdge> dualEdges = BuildDualEdges(
             mesh,
             samples,
@@ -961,7 +993,10 @@ namespace Geometry::CurvatureSegmentation
             params.FeatureSensitivity,
             incidentDualEdges);
         diagnostics.DualEdgeCount = dualEdges.size();
+        diagnostics.Timings.DualGraphConstructionMilliseconds =
+            ElapsedMilliseconds(dualGraphStart);
 
+        const ProfileClock::time_point spatialStart = ProfileClock::now();
         SpatiallyRegularize(
             labels,
             dataCosts,
@@ -970,6 +1005,11 @@ namespace Geometry::CurvatureSegmentation
             incidentDualEdges,
             params,
             diagnostics);
+        diagnostics.Timings.SpatialOptimizationMilliseconds =
+            ElapsedMilliseconds(spatialStart);
+
+        const ProfileClock::time_point connectivityStart =
+            ProfileClock::now();
         MergeSmallRegions(
             labels,
             dataCosts,
@@ -1021,13 +1061,16 @@ namespace Geometry::CurvatureSegmentation
         }
 
         diagnostics.Status = SegmentationStatus::Success;
-        return result;
+        diagnostics.Timings.ConnectivityCleanupAndPublicationMilliseconds =
+            ElapsedMilliseconds(connectivityStart);
+        return finish();
     }
 
     CurvatureSegmentationResult ComputeAndSegment(
         HalfedgeMesh::Mesh& mesh,
         const CurvatureSegmentationParams& params)
     {
+        const ProfileClock::time_point totalStart = ProfileClock::now();
         if (mesh.IsEmpty() || mesh.FaceCount() == 0u)
         {
             CurvatureSegmentationResult result{};
@@ -1036,26 +1079,41 @@ namespace Geometry::CurvatureSegmentation
             result.Diagnostics.LiveFaceCount = mesh.FaceCount();
             result.Diagnostics.EdgeSlotCount = mesh.EdgesSize();
             result.Diagnostics.LiveEdgeCount = mesh.EdgeCount();
+            result.Diagnostics.Timings.TotalMilliseconds =
+                ElapsedMilliseconds(totalStart);
             return result;
         }
+        const ProfileClock::time_point curvatureStart =
+            ProfileClock::now();
         Curvature::CurvatureField curvature =
             Curvature::ComputeCurvature(mesh);
+        const double curvatureMilliseconds =
+            ElapsedMilliseconds(curvatureStart);
         if (!curvature.MaxPrincipalCurvatureProperty ||
             !curvature.MinPrincipalCurvatureProperty)
         {
             CurvatureSegmentationResult result{};
             result.Diagnostics.Status =
                 SegmentationStatus::CurvatureCountMismatch;
+            result.Diagnostics.Timings.CurvatureEstimationMilliseconds =
+                curvatureMilliseconds;
+            result.Diagnostics.Timings.TotalMilliseconds =
+                ElapsedMilliseconds(totalStart);
             return result;
         }
         const std::vector<double>& maximum =
             curvature.MaxPrincipalCurvatureProperty.Vector();
         const std::vector<double>& minimum =
             curvature.MinPrincipalCurvatureProperty.Vector();
-        return Segment(
+        CurvatureSegmentationResult result = Segment(
             mesh,
             std::span<const double>{maximum.data(), maximum.size()},
             std::span<const double>{minimum.data(), minimum.size()},
             params);
+        result.Diagnostics.Timings.CurvatureEstimationMilliseconds =
+            curvatureMilliseconds;
+        result.Diagnostics.Timings.TotalMilliseconds =
+            ElapsedMilliseconds(totalStart);
+        return result;
     }
 }

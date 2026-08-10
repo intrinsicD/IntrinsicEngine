@@ -123,7 +123,7 @@ namespace Intrinsic::Bench::Geometry
             if (!result.Succeeded())
                 return metrics;
 
-            metrics.QualityErrorL2 =
+            metrics.RegimeMisclassificationFraction =
                 RegimeMisclassificationFraction(
                     result.FaceComponents);
             const std::size_t recoveredFoldEdges = std::count_if(
@@ -147,10 +147,25 @@ namespace Intrinsic::Bench::Geometry
             metrics.GmmIterations = result.Diagnostics.GmmIterations;
             metrics.SpatialIterations =
                 result.Diagnostics.SpatialIterations;
+            const auto& timings = result.Diagnostics.Timings;
+            metrics.FaceAggregationMilliseconds =
+                timings.FaceAggregationAndNormalizationMilliseconds;
+            metrics.GmmFittingMilliseconds =
+                timings.GmmFittingMilliseconds;
+            metrics.UnaryConstructionMilliseconds =
+                timings.UnaryConstructionMilliseconds;
+            metrics.DualGraphConstructionMilliseconds =
+                timings.DualGraphConstructionMilliseconds;
+            metrics.SpatialOptimizationMilliseconds =
+                timings.SpatialOptimizationMilliseconds;
+            metrics.ConnectivityPublicationMilliseconds =
+                timings.ConnectivityCleanupAndPublicationMilliseconds;
+            metrics.SegmentationTotalMilliseconds =
+                timings.TotalMilliseconds;
             metrics.Succeeded =
                 metrics.SelectedComponentCount == 2u &&
                 metrics.ConnectedRegionCount == 2u &&
-                metrics.QualityErrorL2 <= 0.05 &&
+                metrics.RegimeMisclassificationFraction <= 0.05 &&
                 metrics.FoldBoundaryRecall >= 0.99 &&
                 result.Diagnostics.FinalEnergy <=
                     result.Diagnostics.InitialEnergy + 1.0e-10;

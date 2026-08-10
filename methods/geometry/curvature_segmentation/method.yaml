@@ -28,6 +28,12 @@ correctness_tests:
   - "../../../tests/integration/runtime/Test.SandboxCurvatureSegmentationPanel.cpp"
 benchmarks:
   - "../../../benchmarks/geometry/manifests/curvature_segmentation_reference_smoke.yaml"
+  - "../../../benchmarks/geometry/manifests/curvature_segmentation_reference_profile_10k_fixed.yaml"
+  - "../../../benchmarks/geometry/manifests/curvature_segmentation_reference_profile_10k_automatic.yaml"
+  - "../../../benchmarks/geometry/manifests/curvature_segmentation_reference_profile_100k_fixed.yaml"
+  - "../../../benchmarks/geometry/manifests/curvature_segmentation_reference_profile_100k_automatic.yaml"
+  - "../../../benchmarks/geometry/manifests/curvature_segmentation_reference_profile_1m_fixed.yaml"
+  - "../../../benchmarks/geometry/manifests/curvature_segmentation_reference_profile_1m_automatic.yaml"
 known_limitations:
   - "This is a repository formulation informed by curvature-tensor segmentation, Gaussian mixtures, information criteria, and pairwise spatial models; it is not an equation-level reproduction of Lavoue et al. or another single publication."
   - "Signed principal curvatures depend on a consistent surface-orientation convention and on the scale, noise, and boundary behavior of the upstream curvature estimator."
@@ -36,3 +42,4 @@ known_limitations:
   - "The reference accepts triangle meshes only and does not repair degeneracies, non-manifold topology, inconsistent orientation, or non-finite inputs."
   - "Published region boundaries are inspection data, not materialized cuts or validated UV-atlas seams; GEOM-076 owns any later seam/cut/atlas use."
   - "Only a serial CPU reference backend exists, and the smoke result makes no performance or atlas-quality claim."
+  - "The METHOD-038 profile cohorts currently cover supplied/reusable curvature descriptors only; cold ComputeAndSegment profiling and paired continuous-surface feature metrics remain open Slice A work."

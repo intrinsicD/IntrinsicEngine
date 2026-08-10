@@ -84,8 +84,26 @@ export namespace Geometry::CurvatureSegmentation
         double FinalLogLikelihood{0.0};
         double BayesianInformationCriterion{0.0};
         double NormalizedRmsFit{0.0};
+        // Wall-clock duration of this candidate's FitEM call. Iterations
+        // remains the deterministic work counter used to normalize profiles.
+        double FitMilliseconds{0.0};
         bool FitToleranceSatisfied{false};
         bool Selected{false};
+    };
+
+    struct CurvatureSegmentationStageTimings
+    {
+        // Zero for Segment(), which consumes supplied curvatures. The
+        // ComputeAndSegment() convenience path fills this field and includes
+        // it in TotalMilliseconds.
+        double CurvatureEstimationMilliseconds{0.0};
+        double FaceAggregationAndNormalizationMilliseconds{0.0};
+        double GmmFittingMilliseconds{0.0};
+        double UnaryConstructionMilliseconds{0.0};
+        double DualGraphConstructionMilliseconds{0.0};
+        double SpatialOptimizationMilliseconds{0.0};
+        double ConnectivityCleanupAndPublicationMilliseconds{0.0};
+        double TotalMilliseconds{0.0};
     };
 
     struct CurvatureComponentSummary
@@ -133,6 +151,7 @@ export namespace Geometry::CurvatureSegmentation
 
         std::vector<ModelCandidateDiagnostics> Candidates{};
         std::vector<CurvatureComponentSummary> Components{};
+        CurvatureSegmentationStageTimings Timings{};
 
         [[nodiscard]] bool Succeeded() const noexcept
         {

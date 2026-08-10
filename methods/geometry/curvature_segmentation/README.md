@@ -8,6 +8,11 @@ curvature-tensor mesh segmentation, Gaussian-mixture EM, BIC, and spatial
 labeling work, but the exact combined objective is repository-specific. See
 [`paper.md`](paper.md) for the citations and frozen equations.
 
+METHOD-038 is active in an evidence-only Slice A. Its primary-source equation
+intake, scale convention, paired-remeshing metrics, and candidate killing order
+are in [`feature_aligned_intake.md`](feature_aligned_intake.md). No v2 backend
+or production default is selected yet.
+
 ## Implemented path
 
 `Geometry.HalfedgeMesh.CurvatureSegmentation` computes or accepts signed
@@ -51,8 +56,12 @@ rejects stale source geometry before writeback.
 The result reports every automatic candidate, selected/fitted/active component
 counts, GMM convergence and regularization, signed-curvature centers/scales and
 fit residual, ICM energy/iterations/moves, small-region merges, connected-region
-and boundary counts, and explicit validation/failure status. The UI also states
-that spatial optimization is local.
+and boundary counts, explicit validation/failure status, per-candidate GMM fit
+duration, and wall-clock timings for face aggregation, GMM fitting, unary and
+dual-graph construction, spatial optimization, connectivity/publication,
+curvature estimation, and total work. Timings are observational and never
+affect the deterministic solve. The UI still reports the METHOD-037 result
+contract and states that spatial optimization is local.
 
 ## Verification and scope
 
@@ -61,6 +70,12 @@ that spatial optimization is local.
 - Config source parity: `tests/integration/runtime/Test.SandboxConfigSections.cpp`
 - UI/visualization contract: `tests/integration/runtime/Test.SandboxCurvatureSegmentationPanel.cpp`
 - Smoke benchmark: `benchmarks/geometry/manifests/curvature_segmentation_reference_smoke.yaml`
+- Opt-in supplied-curvature baseline profiles:
+  `curvature_segmentation_reference_profile_{10k,100k,1m}_{fixed,automatic}.yaml`.
+  The 10k cohort is the bounded screening default; 100k/1M require the
+  explicit heavy cohort switch and experiment custody. Each profile publishes
+  `population_count` and gates it to exactly two for the preregistered
+  two-regime fixture.
 
 There is no optimized or GPU backend. The output is deliberately
 non-destructive and makes no atlas-quality claim. `GEOM-076` owns the later,

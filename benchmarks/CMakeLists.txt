@@ -54,6 +54,30 @@ add_executable(IntrinsicBenchmarkSmoke
     ${CMAKE_SOURCE_DIR}/methods/physics/sph_fluid_reference/src/SphFluidReference.cpp
 )
 
+# METHOD-038 opt-in baseline profiler. The executable defaults to the bounded
+# 10k-face screening cohort; INTRINSIC_CURVATURE_PROFILE_COHORT=heavy selects
+# the declared 100k/1M cohorts. It is intentionally not a default CTest.
+add_executable(IntrinsicCurvatureSegmentationProfile
+    runners/CurvatureSegmentationProfileRunner.cpp
+)
+set_target_properties(
+    IntrinsicCurvatureSegmentationProfile
+    PROPERTIES CXX_SCAN_FOR_MODULES ON
+)
+target_compile_features(
+    IntrinsicCurvatureSegmentationProfile PRIVATE cxx_std_23
+)
+target_compile_options(
+    IntrinsicCurvatureSegmentationProfile PRIVATE ${INTRINSIC_COMPILE_FLAGS}
+)
+target_link_options(
+    IntrinsicCurvatureSegmentationProfile PRIVATE ${INTRINSIC_LINK_FLAGS}
+)
+target_link_libraries(
+    IntrinsicCurvatureSegmentationProfile
+    PRIVATE ExtrinsicCore IntrinsicGeometry
+)
+
 set_target_properties(IntrinsicBenchmarkSmoke PROPERTIES CXX_SCAN_FOR_MODULES ON)
 
 target_compile_features(IntrinsicBenchmarkSmoke PRIVATE cxx_std_23)

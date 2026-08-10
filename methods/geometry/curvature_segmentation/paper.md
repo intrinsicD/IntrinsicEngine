@@ -1,5 +1,11 @@
 # Spatially Regularized Signed-Curvature Mesh Segmentation
 
+METHOD-038's feature-aligned follow-up intake, selected source equations,
+physical-scale convention, remeshing metrics, and candidate killing order are
+recorded separately in
+[`feature_aligned_intake.md`](feature_aligned_intake.md). That Slice A record
+does not change the frozen METHOD-037 formulation below.
+
 ## Published lineage
 
 The closest direct precedent is Lavoué, Dupont, and Baskurt's curvature-tensor
@@ -121,6 +127,9 @@ recovers a perceptually or atlas-optimal number of regions.
 - Runtime publication preserves topology and unrelated properties. It writes
   semantic component, connected-region, boundary, and visualization properties
   through the existing undoable geometry-processing operation.
+- Diagnostics include observational wall-clock stage timings and per-candidate
+  GMM fit duration alongside deterministic iteration counts. These measurements
+  do not participate in candidate selection, energy, labels, or parity.
 
 ## Complexity
 
