@@ -23,6 +23,7 @@ import Extrinsic.ECS.Scene.Registry;
 import Extrinsic.RHI.Device;
 export import Extrinsic.Runtime.ClusteringConfig;
 import Extrinsic.Runtime.ClusteringModule;
+export import Extrinsic.Runtime.CurvatureSegmentationConfig;
 import Extrinsic.Runtime.EditorCommandHistory;
 import Extrinsic.Runtime.EditorCommon;
 import Extrinsic.Runtime.EditorJobProjection;
@@ -37,6 +38,7 @@ export import Extrinsic.Runtime.ProgressivePoissonConfig;
 import Extrinsic.Runtime.SelectionController;
 import Extrinsic.Runtime.WorldHandle;
 import Geometry.Graph.Vertex.Normals;
+export import Geometry.HalfedgeMesh.CurvatureSegmentation;
 import Geometry.HalfedgeMesh.Vertices.Normals;
 export import Geometry.Parameterization;
 import Geometry.PointCloud.Normals;
@@ -101,6 +103,7 @@ export namespace Extrinsic::Runtime
         KMeans,
         MeshDenoise,
         Curvature,
+        CurvatureSegmentation,
         Remeshing,
         Simplification,
         Smoothing,
@@ -440,6 +443,30 @@ export namespace Extrinsic::Runtime
         [[nodiscard]] bool Succeeded() const noexcept
         {
             return Status == EditorCommandStatus::Applied;
+        }
+    };
+
+    struct EditorCurvatureSegmentationCommand
+    {
+        std::uint32_t StableEntityId{0u};
+        CurvatureSegmentationConfig Config{};
+    };
+
+    struct EditorCurvatureSegmentationResult
+    {
+        EditorCommandStatus Status{EditorCommandStatus::NoChange};
+        CurvatureSegmentationConfig Config{};
+        Geometry::CurvatureSegmentation::CurvatureSegmentationDiagnostics
+            Diagnostics{};
+        std::size_t ChangedValueCount{0u};
+        Core::ErrorCode Error{Core::ErrorCode::Success};
+        std::string Message{};
+
+        [[nodiscard]] bool Succeeded() const noexcept
+        {
+            return Diagnostics.Succeeded() &&
+                   (Status == EditorCommandStatus::Applied ||
+                    Status == EditorCommandStatus::NoChange);
         }
     };
 
@@ -890,6 +917,7 @@ export namespace Extrinsic::Runtime
         bool MeshDenoiseAvailable{false};
         bool MeshCurvatureAvailable{false};
         bool MeshCurvatureDirectionsAvailable{false};
+        bool CurvatureSegmentationAvailable{false};
         bool MeshRemeshAvailable{false};
         bool MeshRemeshUniformAvailable{false};
         bool MeshRemeshAdaptiveAvailable{false};
@@ -1014,6 +1042,7 @@ export namespace Extrinsic::Runtime
         bool MeshDenoiseKernelAvailable{true};
         bool MeshCurvatureKernelAvailable{true};
         bool MeshCurvatureDirectionsAvailable{true};
+        bool CurvatureSegmentationKernelAvailable{true};
         bool MeshRemeshUniformKernelAvailable{true};
         bool MeshRemeshAdaptiveKernelAvailable{true};
         bool MeshRemeshProjectToSurfaceAvailable{true};
@@ -1244,6 +1273,16 @@ export namespace Extrinsic::Runtime
     ApplyEditorMeshCurvatureCommand(const EditorGeometryProcessingContext& context,
                                     const EditorMeshCurvatureCommand& command);
 
+    EditorCurvatureSegmentationResult
+    ApplyEditorCurvatureSegmentationCommand(
+        const EditorGeometryProcessingContext& context,
+        const EditorCurvatureSegmentationCommand& command);
+
+    EditorCurvatureSegmentationResult
+    ApplyEditorConfiguredCurvatureSegmentationCommand(
+        const EditorGeometryProcessingContext& context,
+        std::uint32_t stableEntityId);
+
     EditorMeshRemeshResult
     ApplyEditorMeshRemeshCommand(const EditorGeometryProcessingContext& context,
                                  const EditorMeshRemeshCommand& command);
@@ -1291,6 +1330,16 @@ export namespace Extrinsic::Runtime
 
     [[nodiscard]] std::optional<ClusteringConfig>
     GetEditorClusteringConfig(const EditorGeometryProcessingContext& context) noexcept;
+
+    [[nodiscard]] RuntimeEngineConfigApplyResult
+    ApplyEditorCurvatureSegmentationConfig(
+        const EditorGeometryProcessingContext& context,
+        const CurvatureSegmentationConfig& config,
+        std::string sourceId = "sandbox.curvature_segmentation");
+
+    [[nodiscard]] std::optional<CurvatureSegmentationConfig>
+    GetEditorCurvatureSegmentationConfig(
+        const EditorGeometryProcessingContext& context) noexcept;
 
     [[nodiscard]] RuntimeEngineConfigApplyResult
     ApplyEditorPointCloudConsolidationConfig(
@@ -1355,6 +1404,14 @@ export namespace Extrinsic::Runtime
     EditorMeshCurvatureResult ApplyEditorMeshCurvatureCommand(
         const EditorGeometryProcessingCommands& commands,
         const EditorMeshCurvatureCommand& command);
+    EditorCurvatureSegmentationResult
+    ApplyEditorCurvatureSegmentationCommand(
+        const EditorGeometryProcessingCommands& commands,
+        const EditorCurvatureSegmentationCommand& command);
+    EditorCurvatureSegmentationResult
+    ApplyEditorConfiguredCurvatureSegmentationCommand(
+        const EditorGeometryProcessingCommands& commands,
+        std::uint32_t stableEntityId);
     EditorMeshRemeshResult ApplyEditorMeshRemeshCommand(
         const EditorGeometryProcessingCommands& commands,
         const EditorMeshRemeshCommand& command);
@@ -1392,6 +1449,14 @@ export namespace Extrinsic::Runtime
         std::string sourceId = "sandbox.clustering");
     [[nodiscard]] std::optional<ClusteringConfig>
     GetEditorClusteringConfig(
+        const EditorGeometryProcessingCommands& commands) noexcept;
+    [[nodiscard]] RuntimeEngineConfigApplyResult
+    ApplyEditorCurvatureSegmentationConfig(
+        const EditorGeometryProcessingCommands& commands,
+        const CurvatureSegmentationConfig& config,
+        std::string sourceId = "sandbox.curvature_segmentation");
+    [[nodiscard]] std::optional<CurvatureSegmentationConfig>
+    GetEditorCurvatureSegmentationConfig(
         const EditorGeometryProcessingCommands& commands) noexcept;
     [[nodiscard]] RuntimeEngineConfigApplyResult
     ApplyEditorPointCloudConsolidationConfig(

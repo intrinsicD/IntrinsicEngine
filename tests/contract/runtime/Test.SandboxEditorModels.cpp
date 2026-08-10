@@ -2251,6 +2251,9 @@ TEST(SandboxEditorUi, GeometryProcessingSupportedDomainsMatchPromotedEditorContr
     EXPECT_STREQ(Runtime::DebugNameForEditorGeometryProcessingAlgorithm(
                      Algorithm::Curvature),
                  "Curvature");
+    EXPECT_STREQ(Runtime::DebugNameForEditorGeometryProcessingAlgorithm(
+                     Algorithm::CurvatureSegmentation),
+                 "Curvature Segmentation");
 }
 TEST(SandboxEditorUi, GeometrySourcesReportProcessingCapabilitiesAndStableEntries)
 {
@@ -2284,19 +2287,20 @@ TEST(SandboxEditorUi, GeometrySourcesReportProcessingCapabilitiesAndStableEntrie
 
     const std::vector<Runtime::EditorGeometryProcessingEntry> meshEntries =
         Runtime::ResolveEditorGeometryProcessingEntries(meshCaps);
-    ASSERT_EQ(meshEntries.size(), 15u);
+    ASSERT_EQ(meshEntries.size(), 16u);
     EXPECT_EQ(meshEntries[0].Algorithm, Algorithm::KMeans);
     EXPECT_EQ(meshEntries[1].Algorithm, Algorithm::NormalEstimation);
     EXPECT_EQ(meshEntries[2].Algorithm, Algorithm::MeshDenoise);
     EXPECT_EQ(meshEntries[3].Algorithm, Algorithm::Curvature);
-    EXPECT_EQ(meshEntries[4].Algorithm, Algorithm::ProgressivePoissonSampling);
-    EXPECT_EQ(meshEntries[5].Algorithm, Algorithm::ShortestPath);
-    EXPECT_EQ(meshEntries[6].Algorithm, Algorithm::VectorHeat);
-    EXPECT_EQ(meshEntries[7].Algorithm, Algorithm::Parameterization);
-    EXPECT_EQ(meshEntries[8].Algorithm, Algorithm::ConvexHull);
-    EXPECT_EQ(meshEntries[9].Algorithm, Algorithm::BooleanCSG);
-    EXPECT_EQ(meshEntries[10].Algorithm, Algorithm::Remeshing);
-    EXPECT_EQ(meshEntries[14].Algorithm, Algorithm::Repair);
+    EXPECT_EQ(meshEntries[4].Algorithm, Algorithm::CurvatureSegmentation);
+    EXPECT_EQ(meshEntries[5].Algorithm, Algorithm::ProgressivePoissonSampling);
+    EXPECT_EQ(meshEntries[6].Algorithm, Algorithm::ShortestPath);
+    EXPECT_EQ(meshEntries[7].Algorithm, Algorithm::VectorHeat);
+    EXPECT_EQ(meshEntries[8].Algorithm, Algorithm::Parameterization);
+    EXPECT_EQ(meshEntries[9].Algorithm, Algorithm::ConvexHull);
+    EXPECT_EQ(meshEntries[10].Algorithm, Algorithm::BooleanCSG);
+    EXPECT_EQ(meshEntries[11].Algorithm, Algorithm::Remeshing);
+    EXPECT_EQ(meshEntries[15].Algorithm, Algorithm::Repair);
 
     const std::vector<Domain> meshKMeans =
         Runtime::GetAvailableEditorKMeansDomains(registry, mesh);

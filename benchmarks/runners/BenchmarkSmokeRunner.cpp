@@ -18,6 +18,7 @@
 #include "../geometry/Bench.GeometrySmoke.hpp"
 #include "../geometry/Bench.BoundaryFirstFlatteningReferenceSmoke.hpp"
 #include "../geometry/Bench.ContinuousLopReferenceSmoke.hpp"
+#include "../geometry/Bench.CurvatureSegmentationReferenceSmoke.hpp"
 #include "../geometry/Bench.EdgeAwareResamplingReferenceSmoke.hpp"
 #include "../geometry/Bench.LopFamilyComparisonSmoke.hpp"
 #include "../geometry/Bench.PointCloudConsolidationReferenceSmoke.hpp"
@@ -595,6 +596,55 @@ auto EmitSignedHeatReferenceSmoke(const std::string &commit)
 
   return EmittedBenchmark{kSignedHeatReferenceSmokeBenchmarkId, out.str(),
                           metrics.Succeeded};
+}
+
+auto EmitCurvatureSegmentationReferenceSmoke(const std::string &commit)
+    -> EmittedBenchmark {
+  using namespace Intrinsic::Bench::Geometry;
+
+  const auto metrics = RunCurvatureSegmentationReferenceSmoke();
+
+  std::ostringstream out;
+  out.setf(std::ios::fixed);
+  out.precision(9);
+  out << "{\n"
+      << "  \"benchmark_id\": \""
+      << EscapeJson(kCurvatureSegmentationReferenceSmokeBenchmarkId)
+      << "\",\n"
+      << "  \"method\": \""
+      << EscapeJson(kCurvatureSegmentationReferenceSmokeMethod) << "\",\n"
+      << "  \"backend\": \"cpu_reference\",\n"
+      << "  \"dataset\": \""
+      << EscapeJson(kCurvatureSegmentationReferenceSmokeDataset) << "\",\n"
+      << "  \"commit\": \"" << EscapeJson(commit) << "\",\n"
+      << "  \"metrics\": {\n"
+      << "    \"runtime_ms\": " << metrics.RuntimeMilliseconds << ",\n"
+      << "    \"quality_error_l2\": " << metrics.QualityErrorL2 << "\n"
+      << "  },\n"
+      << "  \"diagnostics\": {\n"
+      << "    \"runner\": \"IntrinsicBenchmarkSmoke\",\n"
+      << "    \"mode\": \"correctness_smoke\",\n"
+      << "    \"warmup_iterations\": 1,\n"
+      << "    \"measured_iterations\": 8,\n"
+      << "    \"selected_component_count\": "
+      << metrics.SelectedComponentCount << ",\n"
+      << "    \"connected_region_count\": "
+      << metrics.ConnectedRegionCount << ",\n"
+      << "    \"boundary_edge_count\": "
+      << metrics.BoundaryEdgeCount << ",\n"
+      << "    \"fold_boundary_recall\": "
+      << metrics.FoldBoundaryRecall << ",\n"
+      << "    \"gmm_iterations\": " << metrics.GmmIterations << ",\n"
+      << "    \"spatial_iterations\": "
+      << metrics.SpatialIterations << "\n"
+      << "  },\n"
+      << "  \"status\": \"" << (metrics.Succeeded ? "passed" : "failed")
+      << "\"\n"
+      << "}\n";
+
+  return EmittedBenchmark{
+      kCurvatureSegmentationReferenceSmokeBenchmarkId,
+      out.str(), metrics.Succeeded};
 }
 
 auto EmitPointCloudConsolidationReferenceSmoke(const std::string &commit)
@@ -1837,6 +1887,7 @@ auto main(int argc, char **argv) -> int {
   emitted.push_back(EmitUvAtlasEdgeGroupingScaling(commit));
   emitted.push_back(EmitProgressivePoissonReferenceSmoke(commit));
   emitted.push_back(EmitSignedHeatReferenceSmoke(commit));
+  emitted.push_back(EmitCurvatureSegmentationReferenceSmoke(commit));
   emitted.push_back(EmitPointCloudConsolidationReferenceSmoke(commit));
   emitted.push_back(EmitLopFamilyComparisonSmoke(commit));
   emitted.push_back(EmitContinuousLopReferenceSmoke(commit));

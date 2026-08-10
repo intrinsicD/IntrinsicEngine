@@ -1,0 +1,22 @@
+# METHOD-037 — signed-curvature segmentation CPU-reference smoke manifest.
+
+benchmark_id: geometry.curvature_segmentation.reference.smoke
+method: geometry.curvature_segmentation
+dataset: builtin.curvature_regimes.folded_strip.v1
+params:
+  intent: correctness_smoke
+  signed_features: [k1, k2]
+  component_selection: fixed
+  component_count: 2
+  spatial_weight: 40.0
+  feature_sensitivity: 20.0
+  minimum_region_faces: 1
+  seed: 17
+  warmup_iterations: 1
+  measured_iterations: 8
+metrics:
+  - runtime_ms
+  - quality_error_l2
+thresholds:
+  smoke_runtime_ms_max: 250
+  quality_error_l2_max: 0.05

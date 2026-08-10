@@ -64,10 +64,11 @@ override. Applying an empty path clears the active override and returns to the
 derived default frame recipe.
 
 `Extrinsic.Runtime.ClusteringConfig`,
+`Extrinsic.Runtime.CurvatureSegmentationConfig`,
 `Extrinsic.Runtime.ProgressivePoissonConfig`,
 `Extrinsic.Runtime.ParameterizationConfig`,
 `Extrinsic.Runtime.PointCloudConsolidationConfig`, and
-`Extrinsic.Runtime.PhysicsModule` own the typed codecs for the current five
+`Extrinsic.Runtime.PhysicsModule` own the typed codecs for the current six
 Sandbox records; `Extrinsic.Sandbox.ConfigSections` composes their
 registrations in the application before config boot. The
 `sandbox.progressive_poisson` payload carries the interactive playground's
@@ -77,6 +78,16 @@ the Sandbox Editor decodes that state and drives METHOD-012 through its runtime
 command surface. Existing mesh, graph, and point-cloud `Vertices` are the input;
 the config contains no surface-generation or domain-conversion controls. The
 block has no renderer side effects and no direct RHI/device traffic.
+
+The `sandbox.curvature_segmentation` payload carries Fixed or Automatic
+component selection plus the complete deterministic GMM, model-selection,
+spatial-regularization, feature-sensitivity, and small-region controls. The
+configured geometry operation reads this same live record and runs the CPU
+reference on a detached selected-mesh snapshot. On successful stale-checked
+commit it publishes component/connected-region labels and region/boundary
+colors to the existing face/edge property sources, marks geometry GPU-dirty,
+and records undo/redo state. Applying the config alone has no geometry or
+renderer side effect.
 
 The `sandbox.parameterization` payload carries one of the implemented CPU strategy
 tokens (`lscm`, `harmonic_cotangent`, `tutte_uniform`, or `bff`) and the typed
@@ -167,6 +178,11 @@ after feature preparation resolves `EngineConfigControl` from
   `EngineConfigControl::ApplyEngineConfigHotSubset` with
   `RuntimeConfigControlSource::Editor`; the geometry operation updates the typed draft
   through `SetProgressivePoissonPlaygroundConfig`.
+- The Curvature panel routes Fixed/Automatic selection and all GMM/spatial
+  controls through those same preview/apply methods after
+  `SetCurvatureSegmentationConfig`; its configured run consumes the committed
+  record, and “Show result” issues both the existing face-surface color and
+  edge-boundary color visualization commands.
 - The parameterization panel delivered by retired `UI-036` routes strategy,
   value, render-mode, background, and heatmap edits through those same
   engine-config preview/apply methods with
@@ -205,6 +221,26 @@ does not require any ImGui frame. If the module is omitted, editor recipe and
 engine-config states are null, their command callbacks remain empty, and both
 availability flags are false. Boot or programmatic profiling config remains
 effective without composing the editor UI.
+
+## Curvature Segmentation Editor Operation
+
+`Extrinsic.Runtime.GeometryProcessingOperations` exposes a direct typed command
+and a configured command backed by `sandbox.curvature_segmentation`. The shared
+availability preflight requires a selected mesh with canonical face and edge
+sources and an unambiguous triangle mapping. Runtime computes signed principal
+curvatures and segmentation on a detached halfedge mesh, then revalidates
+positions, topology, metadata, and prior output state before committing.
+
+Successful publication writes slot-count-matched
+`f:curvature_component`, `f:curvature_region`,
+`f:curvature_region_color`, `e:curvature_region_boundary`, and
+`e:curvature_region_boundary_color`. The operation preserves topology and
+unrelated properties, marks the geometry sources GPU-dirty, and records the
+five-property change in `EditorCommandHistory`; identical reruns report no
+change and add no history entry. The pointer-free result exposes GMM candidate,
+fit, spatial energy/move, connected-region, boundary, cleanup, and failure
+diagnostics. No runtime path converts these boundary flags into cuts or atlas
+charts; that remains the evidence-gated `GEOM-076` follow-up.
 
 ## Parameterization Editor Operation
 

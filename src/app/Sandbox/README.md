@@ -29,6 +29,7 @@ against the published `RuntimeInputActionRegistry`, with no Engine forwarding
 method.
 `Sandbox.ConfigSections` is the pre-boot composition surface for the current
 `sandbox.clustering`, `sandbox.progressive_poisson`,
+`sandbox.curvature_segmentation`,
 `sandbox.parameterization`, `sandbox.point_cloud_consolidation`, and
 `sandbox.physics` records.
 Their runtime feature modules own the typed DTOs/codecs. `main.cpp` constructs the
@@ -132,7 +133,15 @@ owns the ICP registration window plus the mesh denoise, curvature, remesh,
 subdivide, simplify, and mesh/graph/point-cloud vertex-normal windows. It
 registers those nine windows under their existing menu paths, owns their ImGui
 input/result-presentation state, and consumes only runtime snapshots and typed
-operations. `Sandbox.Editor.DomainPanels` registers the existing Appearance,
+operations. The Curvature window includes the METHOD-037 segmentation controls:
+Fixed and Automatic GMM selection share the registered
+`sandbox.curvature_segmentation` draft/apply/reload lane, configured Run uses
+the runtime's selected-mesh preflight and undoable five-property publication,
+and Show result enables both `f:curvature_region_color` on the face surface and
+`e:curvature_region_boundary_color` on the edge overlay. Candidate, fit,
+spatial-energy, connected-region, and boundary diagnostics remain pointer-free;
+the panel labels the ICM result as a local optimum and does not present a cut or
+UV-atlas action. `Sandbox.Editor.DomainPanels` registers the existing Appearance,
 Properties, and Selection windows for Mesh, Graph, and PointCloud plus
 PointCloud Remove Outliers. It owns their menu paths, lazy per-frame model
 cache, texture-bake and property-widget draft state, outlier controls, and

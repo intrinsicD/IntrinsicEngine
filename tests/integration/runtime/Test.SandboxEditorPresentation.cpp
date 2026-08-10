@@ -795,7 +795,7 @@ TEST(SandboxEditorPresentation,
     EXPECT_FALSE(std::filesystem::exists(std::filesystem::path{ENGINE_ROOT_DIR} /
                                          "tests/unit/runtime/Test.RegistrationAlignment.cpp"));
 
-    constexpr std::array<std::string_view, 14> allowedPrivateImporters{{
+    constexpr std::array<std::string_view, 15> allowedPrivateImporters{{
         "Runtime.EditorCommon.Public.cpp",
         "Runtime.EditorJobProjection.Public.cpp",
         "Runtime.EditorWorkspaceSnapshots.Public.cpp",
@@ -808,6 +808,7 @@ TEST(SandboxEditorPresentation,
         "Runtime.ParameterizationConfig.cpp",
         "Runtime.ClusteringConfig.cpp",
         "Runtime.PointCloudConsolidationConfig.cpp",
+        "Runtime.CurvatureSegmentationConfig.cpp",
         "Runtime.EditorWorkspaceAttachment.Detail.cppm",
         "Runtime.EditorWorkspaceAttachment.cpp",
     }};

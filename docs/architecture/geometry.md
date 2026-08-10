@@ -446,6 +446,38 @@ intact. Flat 1-rings, boundary (open) vertices, and zero-area 1-rings fail close
 with the zero-vector sentinel and keep their scalar-derived principal curvatures;
 empty / no-face meshes return `nullopt`.
 
+### Signed-curvature mesh segmentation
+
+`Geometry.HalfedgeMesh.CurvatureSegmentation` is the deterministic CPU
+reference for non-destructive, spatially coherent segmentation of an oriented
+triangle mesh. It averages signed per-vertex `(κ₁, κ₂)` onto faces, robustly
+normalizes both channels, and reuses `Geometry.GaussianMixture::FitEM`; the
+existing 3D GMM carrier receives `(κ₁, κ₂, 0)`, never world-space position.
+Fixed mode fits one caller-selected feasible component count. Automatic mode
+fits an inclusive bounded range, records every candidate, prefers candidates
+meeting the normalized curvature-fit tolerance, and minimizes its documented
+weighted two-dimensional BIC criterion.
+
+Posterior negative log probabilities form face data costs. A contrast-sensitive
+Potts term on the face-dual graph penalizes adjacent label disagreements while
+making them cheaper across normalized signed-curvature jumps and normal folds.
+Alternating-order ICM and greedy small-region merging are deterministic local
+optimizers, not a global-minimum guarantee. Statistical component IDs and
+dual-connected region IDs remain separate; disconnected patches may share a
+component but never a region. The result is slot-aligned and includes face
+component/region labels, edge boundary flags, deterministic colors, candidate
+and solver diagnostics, and explicit failure status.
+
+The runtime operation publishes `f:curvature_component`,
+`f:curvature_region`, `f:curvature_region_color`,
+`e:curvature_region_boundary`, and
+`e:curvature_region_boundary_color` without changing topology or unrelated
+properties. These boundaries are visualization/inspection data only. They are
+not UV seams; the evidence-gated `GEOM-076` follow-up owns any later cut or
+atlas-hint adoption. The complete formulation, lineage, parameter guidance,
+and limitations live in
+[`methods/geometry/curvature_segmentation`](../../methods/geometry/curvature_segmentation/).
+
 ### Discrete Laplacian edge-weight modes
 
 `Geometry.DEC` assembles the stiffness (edge-weight) matrix `⋆1` and the weak

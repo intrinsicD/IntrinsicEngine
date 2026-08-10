@@ -10,6 +10,7 @@ export module Extrinsic.Runtime.Private.FeatureConfigCodecs;
 import Extrinsic.Core.Config.Engine;
 import Extrinsic.Core.Config.EngineLoad;
 import Extrinsic.Runtime.ClusteringConfig;
+import Extrinsic.Runtime.CurvatureSegmentationConfig;
 import Extrinsic.Runtime.ParameterizationConfig;
 import Extrinsic.Runtime.PointCloudConsolidationConfig;
 import Extrinsic.Runtime.ProgressivePoissonConfig;
@@ -20,6 +21,8 @@ import Extrinsic.Runtime.ProgressivePoissonConfig;
 export namespace Extrinsic::Runtime::FeatureConfigDetail
 {
     using Runtime::ClusteringConfig;
+    using Runtime::CurvatureSegmentationConfig;
+    using Runtime::CurvatureSegmentationSelectionMode;
     using Runtime::KMeansPropertyRefs;
     using Runtime::ParameterizationBffBoundaryMode;
     using Runtime::ParameterizationBoundaryPolicy;
@@ -40,6 +43,9 @@ export namespace Extrinsic::Runtime::FeatureConfigDetail
     using Runtime::kClusteringConfigSectionName;
     using Runtime::kClusteringConfigSectionSchemaId;
     using Runtime::kClusteringConfigSectionSchemaVersion;
+    using Runtime::kCurvatureSegmentationConfigSectionName;
+    using Runtime::kCurvatureSegmentationConfigSectionSchemaId;
+    using Runtime::kCurvatureSegmentationConfigSectionSchemaVersion;
     using Runtime::kParameterizationConfigSectionName;
     using Runtime::kParameterizationConfigSectionSchemaId;
     using Runtime::kParameterizationConfigSectionSchemaVersion;
@@ -57,6 +63,8 @@ export namespace Extrinsic::Runtime::FeatureConfigDetail
 
     [[nodiscard]] std::string SerializeClusteringConfigImpl(
         const ClusteringConfig& config);
+    [[nodiscard]] std::string SerializeCurvatureSegmentationConfigImpl(
+        const CurvatureSegmentationConfig& config);
     [[nodiscard]] std::string SerializeProgressivePoissonPlaygroundConfigImpl(
         const ProgressivePoissonPlaygroundConfig& config);
     [[nodiscard]] std::string SerializeParameterizationConfigImpl(
@@ -66,6 +74,11 @@ export namespace Extrinsic::Runtime::FeatureConfigDetail
 
     [[nodiscard]] Core::Config::EngineConfigSectionValidationResult
     ValidateClusteringConfigSectionImpl(
+        std::string_view documentPayloadJson,
+        std::string_view referencePayloadJson,
+        std::string_view diagnosticSubject);
+    [[nodiscard]] Core::Config::EngineConfigSectionValidationResult
+    ValidateCurvatureSegmentationConfigSectionImpl(
         std::string_view documentPayloadJson,
         std::string_view referencePayloadJson,
         std::string_view diagnosticSubject);
@@ -91,6 +104,13 @@ export namespace Extrinsic::Runtime::FeatureConfigDetail
         Core::Config::EngineConfig& config,
         const ClusteringConfig& value);
 
+    [[nodiscard]] std::optional<CurvatureSegmentationConfig>
+    GetCurvatureSegmentationConfigImpl(
+        const Core::Config::EngineConfig& config);
+    void SetCurvatureSegmentationConfigImpl(
+        Core::Config::EngineConfig& config,
+        const CurvatureSegmentationConfig& value);
+
     [[nodiscard]] std::optional<ProgressivePoissonPlaygroundConfig>
     GetProgressivePoissonPlaygroundConfigImpl(
         const Core::Config::EngineConfig& config);
@@ -113,6 +133,9 @@ export namespace Extrinsic::Runtime::FeatureConfigDetail
 
     [[nodiscard]] Core::Config::EngineConfigSectionRegistration
     MakeClusteringConfigSectionRegistrationImpl(
+        Core::Config::EngineConfigSectionChangedCallback onChanged = {});
+    [[nodiscard]] Core::Config::EngineConfigSectionRegistration
+    MakeCurvatureSegmentationConfigSectionRegistrationImpl(
         Core::Config::EngineConfigSectionChangedCallback onChanged = {});
     [[nodiscard]] Core::Config::EngineConfigSectionRegistration
     MakeProgressivePoissonConfigSectionRegistrationImpl(

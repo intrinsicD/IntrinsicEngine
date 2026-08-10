@@ -102,6 +102,8 @@ MakeEditorGeometryProcessingContext(const EditorFeatureBindings &bindings) {
       .MeshCurvatureKernelAvailable = bindings.MeshCurvatureKernelAvailable,
       .MeshCurvatureDirectionsAvailable =
           bindings.MeshCurvatureDirectionsAvailable,
+      .CurvatureSegmentationKernelAvailable =
+          bindings.CurvatureSegmentationKernelAvailable,
       .MeshRemeshUniformKernelAvailable =
           bindings.MeshRemeshUniformKernelAvailable,
       .MeshRemeshAdaptiveKernelAvailable =
@@ -260,6 +262,8 @@ ToEditorFeatureBindingsImpl(const EditorGeometryProcessingContext &context) {
       .MeshCurvatureKernelAvailable = context.MeshCurvatureKernelAvailable,
       .MeshCurvatureDirectionsAvailable =
           context.MeshCurvatureDirectionsAvailable,
+      .CurvatureSegmentationKernelAvailable =
+          context.CurvatureSegmentationKernelAvailable,
       .MeshRemeshUniformKernelAvailable =
           context.MeshRemeshUniformKernelAvailable,
       .MeshRemeshAdaptiveKernelAvailable =
@@ -384,6 +388,8 @@ ToEditorFeatureBindingsImpl(const EditorWorkspaceSnapshotContext &context) {
   bindings.MeshCurvatureKernelAvailable = geometry.MeshCurvatureKernelAvailable;
   bindings.MeshCurvatureDirectionsAvailable =
       geometry.MeshCurvatureDirectionsAvailable;
+  bindings.CurvatureSegmentationKernelAvailable =
+      geometry.CurvatureSegmentationKernelAvailable;
   bindings.MeshRemeshUniformKernelAvailable =
       geometry.MeshRemeshUniformKernelAvailable;
   bindings.MeshRemeshAdaptiveKernelAvailable =

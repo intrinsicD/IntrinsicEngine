@@ -80,7 +80,15 @@ binds the GEOM-016 filtering/outlier-removal workload (voxel downsample plus
 statistical and radius outlier removal on a two-cluster + injected-outlier
 fixture). `kSignedHeatReferenceSmokeBenchmarkId`
 from [`Bench.SignedHeatReferenceSmoke.hpp`](Bench.SignedHeatReferenceSmoke.hpp)
-binds the signed heat reference workload. `kUvAtlasSmokeBenchmarkId` from
+binds the signed heat reference workload.
+`kCurvatureSegmentationReferenceSmokeBenchmarkId` from
+[`Bench.CurvatureSegmentationReferenceSmoke.hpp`](Bench.CurvatureSegmentationReferenceSmoke.hpp)
+binds the signed-curvature segmentation correctness smoke. Its folded-strip
+fixture requires two recovered regimes, zero label-invariant
+misclassification, complete fold-boundary recall, and non-increasing spatial
+energy. Boundary recall and solver counts remain diagnostics; the manifest
+gates runtime and `quality_error_l2` and makes no performance or UV-atlas
+quality claim. `kUvAtlasSmokeBenchmarkId` from
 [`Bench.UvAtlasSmoke.hpp`](Bench.UvAtlasSmoke.hpp) binds the GEOM-057
 fast-staged versus xatlas comparison workload; its result diagnostics record
 the xatlas baseline runtime, fast-staged probe runtime, chart counts, and

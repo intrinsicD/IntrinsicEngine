@@ -16,6 +16,7 @@ module;
 #include <string>
 #include <string_view>
 #include <utility>
+#include <unordered_map>
 #include <variant>
 #include <vector>
 
@@ -95,6 +96,7 @@ import Extrinsic.Runtime.WorldRegistry;
 import Geometry.Graph;
 import Geometry.Graph.Vertex.Normals;
 import Geometry.Curvature;
+import Geometry.HalfedgeMesh.CurvatureSegmentation;
 import Geometry.CatmullClark;
 import Geometry.HalfedgeMesh;
 import Geometry.HalfedgeMesh.AdaptiveRemeshing;
@@ -218,6 +220,7 @@ namespace PointNormals = Geometry::PointCloud::Normals;
         namespace SurfaceSampling = Geometry::PointCloud::SurfaceSampling;
         namespace Smooth = Geometry::Smoothing;
         namespace Curv = Geometry::Curvature;
+        namespace CurvSeg = Geometry::CurvatureSegmentation;
         namespace Remesh = Geometry::Remeshing;
         namespace AdaptiveRemesh = Geometry::AdaptiveRemeshing;
         namespace LoopSubdivide = Geometry::Subdivision;
@@ -273,6 +276,7 @@ struct EditorJobResult { std::string Diagnostic{}; };
             {
             case EditorGeometryProcessingAlgorithm::MeshDenoise:
             case EditorGeometryProcessingAlgorithm::Curvature:
+            case EditorGeometryProcessingAlgorithm::CurvatureSegmentation:
             case EditorGeometryProcessingAlgorithm::Remeshing:
             case EditorGeometryProcessingAlgorithm::Simplification:
             case EditorGeometryProcessingAlgorithm::Smoothing:
@@ -2697,6 +2701,619 @@ struct EditorJobResult { std::string Diagnostic{}; };
             if (result.DirectionsRequested && !result.DirectionsPublished)
                 message += " Principal directions were not published for this run.";
             return message;
+        }
+
+        struct MeshCurvatureSegmentationSourceResult
+        {
+            Geometry::HalfedgeMesh::Mesh Mesh{};
+            std::vector<glm::vec3> SourcePositions{};
+            std::vector<std::uint32_t> SourceFaceForMeshFace{};
+            std::vector<std::uint32_t> SourceEdgeForMeshEdge{};
+            std::size_t FaceSlotCount{0u};
+            std::size_t EdgeSlotCount{0u};
+            EditorCommandStatus Status{EditorCommandStatus::NoChange};
+            Core::ErrorCode Error{Core::ErrorCode::Success};
+            std::string Diagnostic{};
+
+            [[nodiscard]] bool Succeeded() const noexcept
+            {
+                return Status == EditorCommandStatus::Applied;
+            }
+        };
+
+        [[nodiscard]] std::uint64_t UndirectedEdgeKey(
+            const std::uint32_t vertex0,
+            const std::uint32_t vertex1) noexcept
+        {
+            const std::uint32_t lower = std::min(vertex0, vertex1);
+            const std::uint32_t upper = std::max(vertex0, vertex1);
+            return (static_cast<std::uint64_t>(lower) << 32u) |
+                   static_cast<std::uint64_t>(upper);
+        }
+
+        [[nodiscard]] MeshCurvatureSegmentationSourceResult
+        BuildHalfedgeMeshForCurvatureSegmentation(
+            const GS::ConstSourceView& view)
+        {
+            MeshCurvatureSegmentationSourceResult result{};
+            if (view.EdgeSource == nullptr ||
+                view.FaceSource == nullptr)
+            {
+                result.Status =
+                    EditorCommandStatus::UnsupportedGeometryDomain;
+                result.Error = Core::ErrorCode::InvalidArgument;
+                result.Diagnostic =
+                    "Curvature segmentation requires mesh face and edge sources.";
+                return result;
+            }
+
+            MeshDenoiseSourceResult source =
+                BuildHalfedgeMeshForDenoise(view);
+            if (!source.Succeeded())
+            {
+                result.Status = source.Status;
+                result.Error = source.Error;
+                result.Diagnostic = source.Diagnostic.empty()
+                    ? "Curvature segmentation could not build a halfedge mesh from GeometrySources."
+                    : source.Diagnostic;
+                return result;
+            }
+
+            result.FaceSlotCount = view.FaceSource->Properties.Size();
+            result.EdgeSlotCount = view.EdgeSource->Properties.Size();
+            result.SourcePositions = std::move(source.BeforePositions);
+            result.SourceFaceForMeshFace =
+                std::move(source.SourceFaceForMeshFace);
+            result.Mesh = std::move(source.Mesh);
+            if (result.SourceFaceForMeshFace.size() !=
+                result.Mesh.FacesSize())
+            {
+                result.Status =
+                    EditorCommandStatus::GeometryProcessingFailed;
+                result.Error = Core::ErrorCode::InvalidState;
+                result.Diagnostic =
+                    "Curvature segmentation face cross-references do not match the detached mesh.";
+                return result;
+            }
+
+            std::vector<bool> seenFaces(result.FaceSlotCount, false);
+            for (const std::uint32_t sourceFace :
+                 result.SourceFaceForMeshFace)
+            {
+                if (sourceFace >= seenFaces.size() || seenFaces[sourceFace])
+                {
+                    result.Status =
+                        EditorCommandStatus::InvalidProcessingParameters;
+                    result.Error = Core::ErrorCode::InvalidArgument;
+                    result.Diagnostic =
+                        "Curvature segmentation currently requires triangle source faces; polygon triangulation is not published as source-face labels.";
+                    return result;
+                }
+                seenFaces[sourceFace] = true;
+            }
+
+            const auto sourceV0 =
+                view.EdgeSource->Properties.Get<std::uint32_t>(
+                    GS::PropertyNames::kEdgeV0);
+            const auto sourceV1 =
+                view.EdgeSource->Properties.Get<std::uint32_t>(
+                    GS::PropertyNames::kEdgeV1);
+            const auto sourceDeleted =
+                view.EdgeSource->Properties.Get<bool>("e:deleted");
+            if (!sourceV0 || !sourceV1 ||
+                sourceV0.Vector().size() != result.EdgeSlotCount ||
+                sourceV1.Vector().size() != result.EdgeSlotCount ||
+                (sourceDeleted &&
+                 sourceDeleted.Vector().size() != result.EdgeSlotCount))
+            {
+                result.Status =
+                    EditorCommandStatus::InvalidProcessingParameters;
+                result.Error = Core::ErrorCode::InvalidArgument;
+                result.Diagnostic =
+                    "Curvature segmentation requires count-matched canonical edge endpoints.";
+                return result;
+            }
+
+            std::unordered_map<std::uint64_t, std::uint32_t>
+                sourceEdgeByVertices{};
+            sourceEdgeByVertices.reserve(result.EdgeSlotCount);
+            for (std::size_t edge = 0u;
+                 edge < result.EdgeSlotCount;
+                 ++edge)
+            {
+                if (sourceDeleted && sourceDeleted.Vector()[edge])
+                    continue;
+                const std::uint32_t v0 = sourceV0.Vector()[edge];
+                const std::uint32_t v1 = sourceV1.Vector()[edge];
+                if (v0 >= result.SourcePositions.size() ||
+                    v1 >= result.SourcePositions.size() || v0 == v1)
+                {
+                    continue;
+                }
+                const auto [iterator, inserted] =
+                    sourceEdgeByVertices.emplace(
+                        UndirectedEdgeKey(v0, v1),
+                        static_cast<std::uint32_t>(edge));
+                (void)iterator;
+                if (!inserted)
+                {
+                    result.Status =
+                        EditorCommandStatus::InvalidProcessingParameters;
+                    result.Error = Core::ErrorCode::InvalidArgument;
+                    result.Diagnostic =
+                        "Curvature segmentation found ambiguous source edges with identical endpoints.";
+                    return result;
+                }
+            }
+
+            result.SourceEdgeForMeshEdge.assign(
+                result.Mesh.EdgesSize(),
+                CurvSeg::kInvalidLabel);
+            for (const Geometry::EdgeHandle edge :
+                 result.Mesh.LiveEdges())
+            {
+                const Geometry::HalfedgeHandle halfedge =
+                    result.Mesh.Halfedge(edge, 0u);
+                const std::uint32_t v0 = static_cast<std::uint32_t>(
+                    result.Mesh.FromVertex(halfedge).Index);
+                const std::uint32_t v1 = static_cast<std::uint32_t>(
+                    result.Mesh.ToVertex(halfedge).Index);
+                const auto sourceEdge = sourceEdgeByVertices.find(
+                    UndirectedEdgeKey(v0, v1));
+                if (sourceEdge == sourceEdgeByVertices.end())
+                {
+                    result.Status =
+                        EditorCommandStatus::InvalidProcessingParameters;
+                    result.Error = Core::ErrorCode::InvalidArgument;
+                    result.Diagnostic =
+                        "Curvature segmentation could not map a detached edge to the authoritative mesh edge source.";
+                    return result;
+                }
+                result.SourceEdgeForMeshEdge[edge.Index] =
+                    sourceEdge->second;
+            }
+
+            result.Status = EditorCommandStatus::Applied;
+            result.Error = Core::ErrorCode::Success;
+            return result;
+        }
+
+        [[nodiscard]] CurvSeg::CurvatureSegmentationParams
+        MakeCurvatureSegmentationParams(
+            const CurvatureSegmentationConfig& config)
+        {
+            return CurvSeg::CurvatureSegmentationParams{
+                .SelectionMode =
+                    config.SelectionMode ==
+                            CurvatureSegmentationSelectionMode::FixedCount
+                        ? CurvSeg::ComponentSelectionMode::FixedCount
+                        : CurvSeg::ComponentSelectionMode::Automatic,
+                .FixedComponentCount = config.FixedComponentCount,
+                .AutomaticMinComponents =
+                    config.AutomaticMinComponents,
+                .AutomaticMaxComponents =
+                    config.AutomaticMaxComponents,
+                .AutomaticFitTolerance =
+                    config.AutomaticFitTolerance,
+                .AutomaticComplexityWeight =
+                    config.AutomaticComplexityWeight,
+                .MaxEmIterations = config.MaxEmIterations,
+                .EmRelativeTolerance = config.EmRelativeTolerance,
+                .CovarianceFloor = config.CovarianceFloor,
+                .Seed = config.Seed,
+                .SpatialWeight = config.SpatialWeight,
+                .FeatureSensitivity = config.FeatureSensitivity,
+                .MaxSpatialIterations =
+                    config.MaxSpatialIterations,
+                .MinimumRegionFaces = config.MinimumRegionFaces,
+            };
+        }
+
+        struct MeshCurvatureSegmentationPropertyState
+        {
+            bool HadComponent{false};
+            bool HadRegion{false};
+            bool HadRegionColor{false};
+            bool HadBoundary{false};
+            bool HadBoundaryColor{false};
+            std::vector<std::uint32_t> Components{};
+            std::vector<std::uint32_t> Regions{};
+            std::vector<glm::vec4> RegionColors{};
+            std::vector<bool> Boundaries{};
+            std::vector<glm::vec4> BoundaryColors{};
+        };
+
+        using MeshCurvatureSegmentationPropertySnapshot =
+            std::shared_ptr<
+                const MeshCurvatureSegmentationPropertyState>;
+
+        [[nodiscard]] bool SameVec4PropertyValues(
+            const std::vector<glm::vec4>& lhs,
+            const std::vector<glm::vec4>& rhs) noexcept
+        {
+            if (lhs.size() != rhs.size())
+                return false;
+            for (std::size_t i = 0u; i < lhs.size(); ++i)
+            {
+                if (lhs[i].x != rhs[i].x ||
+                    lhs[i].y != rhs[i].y ||
+                    lhs[i].z != rhs[i].z ||
+                    lhs[i].w != rhs[i].w)
+                {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        [[nodiscard]] bool SameMeshCurvatureSegmentationPropertyState(
+            const MeshCurvatureSegmentationPropertyState& lhs,
+            const MeshCurvatureSegmentationPropertyState& rhs) noexcept
+        {
+            return lhs.HadComponent == rhs.HadComponent &&
+                   lhs.HadRegion == rhs.HadRegion &&
+                   lhs.HadRegionColor == rhs.HadRegionColor &&
+                   lhs.HadBoundary == rhs.HadBoundary &&
+                   lhs.HadBoundaryColor == rhs.HadBoundaryColor &&
+                   lhs.Components == rhs.Components &&
+                   lhs.Regions == rhs.Regions &&
+                   SameVec4PropertyValues(
+                       lhs.RegionColors, rhs.RegionColors) &&
+                   lhs.Boundaries == rhs.Boundaries &&
+                   SameVec4PropertyValues(
+                       lhs.BoundaryColors, rhs.BoundaryColors);
+        }
+
+        [[nodiscard]] bool
+        MeshCurvatureSegmentationPropertyStateMatchesCounts(
+            const MeshCurvatureSegmentationPropertyState& state,
+            const std::size_t faceCount,
+            const std::size_t edgeCount) noexcept
+        {
+            return (state.HadComponent
+                        ? state.Components.size() == faceCount
+                        : state.Components.empty()) &&
+                   (state.HadRegion
+                        ? state.Regions.size() == faceCount
+                        : state.Regions.empty()) &&
+                   (state.HadRegionColor
+                        ? state.RegionColors.size() == faceCount
+                        : state.RegionColors.empty()) &&
+                   (state.HadBoundary
+                        ? state.Boundaries.size() == edgeCount
+                        : state.Boundaries.empty()) &&
+                   (state.HadBoundaryColor
+                        ? state.BoundaryColors.size() == edgeCount
+                        : state.BoundaryColors.empty());
+        }
+
+        [[nodiscard]] bool CaptureMeshCurvatureSegmentationPropertyState(
+            Geometry::PropertySet& faceProperties,
+            Geometry::PropertySet& edgeProperties,
+            const std::size_t faceCount,
+            const std::size_t edgeCount,
+            MeshCurvatureSegmentationPropertyState& out,
+            std::string& diagnostic)
+        {
+            return CaptureCurvatureProperty<std::uint32_t>(
+                       faceProperties,
+                       GS::PropertyNames::kCurvatureComponent,
+                       faceCount,
+                       out.HadComponent,
+                       out.Components,
+                       diagnostic) &&
+                   CaptureCurvatureProperty<std::uint32_t>(
+                       faceProperties,
+                       GS::PropertyNames::kCurvatureRegion,
+                       faceCount,
+                       out.HadRegion,
+                       out.Regions,
+                       diagnostic) &&
+                   CaptureCurvatureProperty<glm::vec4>(
+                       faceProperties,
+                       GS::PropertyNames::kCurvatureRegionColor,
+                       faceCount,
+                       out.HadRegionColor,
+                       out.RegionColors,
+                       diagnostic) &&
+                   CaptureCurvatureProperty<bool>(
+                       edgeProperties,
+                       GS::PropertyNames::kCurvatureRegionBoundary,
+                       edgeCount,
+                       out.HadBoundary,
+                       out.Boundaries,
+                       diagnostic) &&
+                   CaptureCurvatureProperty<glm::vec4>(
+                       edgeProperties,
+                       GS::PropertyNames::kCurvatureRegionBoundaryColor,
+                       edgeCount,
+                       out.HadBoundaryColor,
+                       out.BoundaryColors,
+                       diagnostic);
+        }
+
+        [[nodiscard]] bool ApplyMeshCurvatureSegmentationPropertyState(
+            Geometry::PropertySet& faceProperties,
+            Geometry::PropertySet& edgeProperties,
+            const MeshCurvatureSegmentationPropertyState& state)
+        {
+            return ApplyCurvatureProperty<std::uint32_t>(
+                       faceProperties,
+                       GS::PropertyNames::kCurvatureComponent,
+                       state.HadComponent,
+                       state.Components,
+                       CurvSeg::kInvalidLabel) &&
+                   ApplyCurvatureProperty<std::uint32_t>(
+                       faceProperties,
+                       GS::PropertyNames::kCurvatureRegion,
+                       state.HadRegion,
+                       state.Regions,
+                       CurvSeg::kInvalidLabel) &&
+                   ApplyCurvatureProperty<glm::vec4>(
+                       faceProperties,
+                       GS::PropertyNames::kCurvatureRegionColor,
+                       state.HadRegionColor,
+                       state.RegionColors,
+                       glm::vec4{0.0f}) &&
+                   ApplyCurvatureProperty<bool>(
+                       edgeProperties,
+                       GS::PropertyNames::kCurvatureRegionBoundary,
+                       state.HadBoundary,
+                       state.Boundaries,
+                       false) &&
+                   ApplyCurvatureProperty<glm::vec4>(
+                       edgeProperties,
+                       GS::PropertyNames::kCurvatureRegionBoundaryColor,
+                       state.HadBoundaryColor,
+                       state.BoundaryColors,
+                       glm::vec4{0.0f});
+        }
+
+        [[nodiscard]] std::size_t
+        CountChangedCurvatureSegmentationValues(
+            const MeshCurvatureSegmentationPropertyState& before,
+            const MeshCurvatureSegmentationPropertyState& after) noexcept
+        {
+            return CountChangedValues(
+                       before.HadComponent,
+                       before.Components,
+                       after.Components) +
+                   CountChangedValues(
+                       before.HadRegion,
+                       before.Regions,
+                       after.Regions) +
+                   CountChangedValues(
+                       before.HadRegionColor,
+                       before.RegionColors,
+                       after.RegionColors) +
+                   CountChangedValues(
+                       before.HadBoundary,
+                       before.Boundaries,
+                       after.Boundaries) +
+                   CountChangedValues(
+                       before.HadBoundaryColor,
+                       before.BoundaryColors,
+                       after.BoundaryColors);
+        }
+
+        struct MeshCurvatureSegmentationMutationGeneration
+        {
+            std::uint64_t GeometryMetadataSignature{0u};
+            std::optional<std::uint64_t> TopologySignature{};
+            std::size_t FaceSlotCount{0u};
+            std::size_t EdgeSlotCount{0u};
+            MeshPositionState Positions{};
+            MeshCurvatureSegmentationPropertySnapshot Properties{};
+        };
+
+        [[nodiscard]] EditorCommandHistoryStatus
+        ApplyMeshCurvatureSegmentationState(
+            ECS::Scene::Registry* scene,
+            const std::uint32_t stableEntityId,
+            const MeshCurvatureSegmentationPropertyState& state)
+        {
+            if (scene == nullptr)
+                return EditorCommandHistoryStatus::MissingScene;
+            entt::registry& raw = scene->Raw();
+            const std::optional<ECS::EntityHandle> entity =
+                ResolveStableEntity(raw, stableEntityId);
+            if (!entity.has_value())
+                return EditorCommandHistoryStatus::StaleEntity;
+            GS::MutableSourceView view = GS::BuildMutableView(raw, *entity);
+            const GS::SourceAvailability availability =
+                GS::BuildSourceAvailability(view);
+            if (availability.ProvenanceDomain != GS::Domain::Mesh ||
+                view.FaceSource == nullptr || view.EdgeSource == nullptr)
+            {
+                return EditorCommandHistoryStatus::UnsupportedOperation;
+            }
+            if (!ApplyMeshCurvatureSegmentationPropertyState(
+                    view.FaceSource->Properties,
+                    view.EdgeSource->Properties,
+                    state))
+            {
+                return EditorCommandHistoryStatus::CommandFailed;
+            }
+            return EditorCommandHistoryStatus::Applied;
+        }
+
+        void StampMeshCurvatureSegmentationDirty(
+            ECS::Scene::Registry& scene,
+            const std::uint32_t stableEntityId)
+        {
+            entt::registry& raw = scene.Raw();
+            const ECS::EntityHandle entity =
+                SelectionController::ToEntityHandle(stableEntityId);
+            if (entity != ECS::InvalidEntityHandle && raw.valid(entity))
+                Dirty::MarkGpuDirty(raw, entity);
+        }
+
+        [[nodiscard]] EditorCommandStatus
+        CommitMeshCurvatureSegmentationProperties(
+            const EditorGeometryProcessingContext& context,
+            const std::uint32_t stableEntityId,
+            std::vector<glm::vec3> positions,
+            const std::size_t faceSlotCount,
+            const std::size_t edgeSlotCount,
+            MeshCurvatureSegmentationPropertyState before,
+            MeshCurvatureSegmentationPropertyState after)
+        {
+            if (context.CommandHistory == nullptr)
+            {
+                const EditorCommandHistoryStatus applied =
+                    ApplyMeshCurvatureSegmentationState(
+                        context.Scene, stableEntityId, after);
+                if (applied != EditorCommandHistoryStatus::Applied)
+                    return ToEditorCommandStatus(applied);
+                StampMeshCurvatureSegmentationDirty(
+                    *context.Scene, stableEntityId);
+                return EditorCommandStatus::Applied;
+            }
+            if (context.Scene == nullptr)
+                return EditorCommandStatus::MissingScene;
+
+            entt::registry& raw = context.Scene->Raw();
+            const std::optional<ECS::EntityHandle> entity =
+                ResolveStableEntity(raw, stableEntityId);
+            if (!entity.has_value())
+                return EditorCommandStatus::StaleEntity;
+
+            const MeshPositionState positionState =
+                std::make_shared<std::vector<glm::vec3>>(
+                    std::move(positions));
+            const MeshCurvatureSegmentationPropertySnapshot beforeState =
+                std::make_shared<
+                    MeshCurvatureSegmentationPropertyState>(
+                        std::move(before));
+            const MeshCurvatureSegmentationPropertySnapshot afterState =
+                std::make_shared<
+                    MeshCurvatureSegmentationPropertyState>(
+                        std::move(after));
+            const EditorCommandHistoryResult history =
+                Internal::ExecuteUndoableEntityMutation(
+                    *context.CommandHistory,
+                    "Segment mesh by signed curvature",
+                    MeshPropertyMutationIdentity{
+                        .Scene = context.Scene,
+                        .World = context.World,
+                        .StableEntityId = stableEntityId,
+                    },
+                    MeshCurvatureSegmentationMutationGeneration{
+                        .GeometryMetadataSignature =
+                            GeometryMetadataSignatureForEntity(raw, *entity),
+                        .TopologySignature =
+                            StoredMeshTopologySignatureForEntity(
+                                raw, stableEntityId),
+                        .FaceSlotCount = faceSlotCount,
+                        .EdgeSlotCount = edgeSlotCount,
+                        .Positions = positionState,
+                        .Properties = beforeState,
+                    },
+                    beforeState,
+                    afterState,
+                    [](
+                        const MeshPropertyMutationIdentity& identity,
+                        const MeshCurvatureSegmentationMutationGeneration& expected,
+                        const MeshCurvatureSegmentationPropertySnapshot& target)
+                    {
+                        if (identity.Scene == nullptr ||
+                            !identity.World.IsValid() || target == nullptr ||
+                            expected.Positions == nullptr ||
+                            expected.Properties == nullptr ||
+                            !MeshCurvatureSegmentationPropertyStateMatchesCounts(
+                                *target,
+                                expected.FaceSlotCount,
+                                expected.EdgeSlotCount))
+                        {
+                            return EditorCommandHistoryStatus::CommandFailed;
+                        }
+                        entt::registry& raw = identity.Scene->Raw();
+                        const std::optional<ECS::EntityHandle> entity =
+                            ResolveStableEntity(
+                                raw, identity.StableEntityId);
+                        if (!entity.has_value())
+                            return EditorCommandHistoryStatus::StaleEntity;
+                        GS::MutableSourceView view =
+                            GS::BuildMutableView(raw, *entity);
+                        if (view.VertexSource == nullptr ||
+                            view.FaceSource == nullptr ||
+                            view.EdgeSource == nullptr ||
+                            view.FaceSource->Properties.Size() !=
+                                expected.FaceSlotCount ||
+                            view.EdgeSource->Properties.Size() !=
+                                expected.EdgeSlotCount ||
+                            GeometryMetadataSignatureForEntity(raw, *entity) !=
+                                expected.GeometryMetadataSignature ||
+                            MeshTopologyValueSignature(
+                                GS::BuildConstView(raw, *entity)) !=
+                                expected.TopologySignature)
+                        {
+                            return EditorCommandHistoryStatus::StaleEntity;
+                        }
+                        const auto currentPositions =
+                            view.VertexSource->Properties.Get<glm::vec3>(
+                                GS::PropertyNames::kPosition);
+                        if (!currentPositions ||
+                            !SameGeometryPositions(
+                                currentPositions.Vector(),
+                                *expected.Positions))
+                        {
+                            return EditorCommandHistoryStatus::StaleEntity;
+                        }
+                        MeshCurvatureSegmentationPropertyState current{};
+                        std::string diagnostic{};
+                        if (!CaptureMeshCurvatureSegmentationPropertyState(
+                                view.FaceSource->Properties,
+                                view.EdgeSource->Properties,
+                                expected.FaceSlotCount,
+                                expected.EdgeSlotCount,
+                                current,
+                                diagnostic) ||
+                            !SameMeshCurvatureSegmentationPropertyState(
+                                current, *expected.Properties))
+                        {
+                            return EditorCommandHistoryStatus::StaleEntity;
+                        }
+                        return EditorCommandHistoryStatus::Applied;
+                    },
+                    [](
+                        const MeshPropertyMutationIdentity& identity,
+                        const MeshCurvatureSegmentationPropertySnapshot& target)
+                    {
+                        if (target == nullptr)
+                            return EditorCommandHistoryStatus::CommandFailed;
+                        return ApplyMeshCurvatureSegmentationState(
+                            identity.Scene,
+                            identity.StableEntityId,
+                            *target);
+                    },
+                    [](
+                        const MeshPropertyMutationIdentity& identity,
+                        const MeshCurvatureSegmentationMutationGeneration& expected,
+                        const MeshCurvatureSegmentationPropertySnapshot& target)
+                    {
+                        StampMeshCurvatureSegmentationDirty(
+                            *identity.Scene,
+                            identity.StableEntityId);
+                        entt::registry& raw = identity.Scene->Raw();
+                        const std::optional<ECS::EntityHandle> entity =
+                            ResolveStableEntity(
+                                raw, identity.StableEntityId);
+                        return MeshCurvatureSegmentationMutationGeneration{
+                            .GeometryMetadataSignature = entity.has_value()
+                                ? GeometryMetadataSignatureForEntity(
+                                      raw, *entity)
+                                : 0u,
+                            .TopologySignature =
+                                StoredMeshTopologySignatureForEntity(
+                                    raw, identity.StableEntityId),
+                            .FaceSlotCount = expected.FaceSlotCount,
+                            .EdgeSlotCount = expected.EdgeSlotCount,
+                            .Positions = expected.Positions,
+                            .Properties = target,
+                        };
+                    });
+            return ToEditorCommandStatus(history.Status);
         }
 
         [[nodiscard]] bool ValidMeshRemeshMode(
@@ -7877,6 +8494,8 @@ GetEditorGeometryProcessingMenuItems(
         case EditorGeometryProcessingAlgorithm::MeshDenoise:
         case EditorGeometryProcessingAlgorithm::Curvature:
             return Domain::MeshVertices;
+        case EditorGeometryProcessingAlgorithm::CurvatureSegmentation:
+            return kMeshTopologyDomains;
         case EditorGeometryProcessingAlgorithm::Remeshing:
         case EditorGeometryProcessingAlgorithm::Simplification:
         case EditorGeometryProcessingAlgorithm::Smoothing:
@@ -7955,12 +8574,13 @@ GetEditorGeometryProcessingCapabilities(
 ResolveEditorGeometryProcessingEntries(
         const EditorGeometryProcessingCapabilities capabilities)
     {
-        static constexpr std::array<EditorGeometryProcessingAlgorithm, 22>
+        static constexpr std::array<EditorGeometryProcessingAlgorithm, 23>
             kAlgorithmOrder{
                 EditorGeometryProcessingAlgorithm::KMeans,
                 EditorGeometryProcessingAlgorithm::NormalEstimation,
                 EditorGeometryProcessingAlgorithm::MeshDenoise,
                 EditorGeometryProcessingAlgorithm::Curvature,
+                EditorGeometryProcessingAlgorithm::CurvatureSegmentation,
                 EditorGeometryProcessingAlgorithm::Registration,
                 EditorGeometryProcessingAlgorithm::BilateralFilter,
                 EditorGeometryProcessingAlgorithm::OutlierEstimation,
@@ -8055,6 +8675,8 @@ ResolveEditorGeometryProcessingEntries(
             return "Mesh Denoise";
         case EditorGeometryProcessingAlgorithm::Curvature:
             return "Curvature";
+        case EditorGeometryProcessingAlgorithm::CurvatureSegmentation:
+            return "Curvature Segmentation";
         case EditorGeometryProcessingAlgorithm::Remeshing:
             return "Remeshing";
         case EditorGeometryProcessingAlgorithm::Simplification:
@@ -9392,6 +10014,286 @@ ApplyEditorMeshCurvatureCommand(
         result.Message = BuildMeshCurvatureSuccessMessage(result);
         InvalidateSelectedModelCache(context);
         return result;
+    }
+
+    EditorCurvatureSegmentationResult
+    ApplyEditorCurvatureSegmentationCommand(
+        const EditorGeometryProcessingContext& context,
+        const EditorCurvatureSegmentationCommand& command)
+    {
+        EditorCurvatureSegmentationResult result{
+            .Config = command.Config,
+        };
+        if (context.Scene == nullptr)
+        {
+            result.Status = EditorCommandStatus::MissingScene;
+            result.Error = Core::ErrorCode::InvalidState;
+            result.Message =
+                "Scene registry is unavailable for curvature segmentation.";
+            return result;
+        }
+        if (!context.CurvatureSegmentationKernelAvailable)
+        {
+            result.Status =
+                EditorCommandStatus::GeometryProcessingFailed;
+            result.Error = Core::ErrorCode::InvalidState;
+            result.Message =
+                "Geometry curvature segmentation is unavailable in this runtime configuration.";
+            return result;
+        }
+        if (!IsValidCurvatureSegmentationConfig(command.Config))
+        {
+            result.Status =
+                EditorCommandStatus::InvalidProcessingParameters;
+            result.Error = Core::ErrorCode::InvalidArgument;
+            result.Message =
+                "Curvature segmentation config contains invalid ranges or a component-count interval with max < min.";
+            return result;
+        }
+
+        entt::registry& raw = context.Scene->Raw();
+        const std::optional<ECS::EntityHandle> entity =
+            ResolveStableEntity(raw, command.StableEntityId);
+        if (!entity.has_value())
+        {
+            result.Status = EditorCommandStatus::StaleEntity;
+            result.Error = Core::ErrorCode::ResourceNotFound;
+            result.Message =
+                "Curvature segmentation target entity is stale or no longer live.";
+            return result;
+        }
+
+        const GS::ConstSourceView constView =
+            GS::BuildConstView(raw, *entity);
+        MeshCurvatureSegmentationSourceResult source =
+            BuildHalfedgeMeshForCurvatureSegmentation(constView);
+        if (!source.Succeeded())
+        {
+            result.Status = source.Status;
+            result.Error = source.Error;
+            result.Message = std::move(source.Diagnostic);
+            return result;
+        }
+
+        GS::MutableSourceView publishView =
+            GS::BuildMutableView(raw, *entity);
+        if (publishView.FaceSource == nullptr ||
+            publishView.EdgeSource == nullptr)
+        {
+            result.Status =
+                EditorCommandStatus::UnsupportedGeometryDomain;
+            result.Error = Core::ErrorCode::InvalidArgument;
+            result.Message =
+                "Curvature segmentation target has no writable face and edge GeometrySources.";
+            return result;
+        }
+
+        MeshCurvatureSegmentationPropertyState before{};
+        std::string captureDiagnostic{};
+        if (!CaptureMeshCurvatureSegmentationPropertyState(
+                publishView.FaceSource->Properties,
+                publishView.EdgeSource->Properties,
+                source.FaceSlotCount,
+                source.EdgeSlotCount,
+                before,
+                captureDiagnostic))
+        {
+            result.Status =
+                EditorCommandStatus::GeometryProcessingFailed;
+            result.Error = Core::ErrorCode::TypeMismatch;
+            result.Message = std::move(captureDiagnostic);
+            return result;
+        }
+
+        CurvSeg::CurvatureSegmentationResult segmented =
+            CurvSeg::ComputeAndSegment(
+                source.Mesh,
+                MakeCurvatureSegmentationParams(command.Config));
+        result.Diagnostics = segmented.Diagnostics;
+        if (!segmented.Succeeded())
+        {
+            switch (segmented.Diagnostics.Status)
+            {
+            case CurvSeg::SegmentationStatus::EmptyMesh:
+            case CurvSeg::SegmentationStatus::UnsupportedSubmeshView:
+                result.Status =
+                    EditorCommandStatus::UnsupportedGeometryDomain;
+                result.Error = Core::ErrorCode::InvalidArgument;
+                break;
+            case CurvSeg::SegmentationStatus::InvalidParameters:
+            case CurvSeg::SegmentationStatus::CurvatureCountMismatch:
+            case CurvSeg::SegmentationStatus::NonTriangleFace:
+            case CurvSeg::SegmentationStatus::NonFinitePosition:
+            case CurvSeg::SegmentationStatus::DegenerateFace:
+            case CurvSeg::SegmentationStatus::NonFiniteCurvature:
+                result.Status =
+                    EditorCommandStatus::InvalidProcessingParameters;
+                result.Error = Core::ErrorCode::InvalidArgument;
+                break;
+            case CurvSeg::SegmentationStatus::GaussianMixtureFitFailed:
+            case CurvSeg::SegmentationStatus::PosteriorEvaluationFailed:
+                result.Status =
+                    EditorCommandStatus::GeometryProcessingFailed;
+                result.Error = Core::ErrorCode::Unknown;
+                break;
+            case CurvSeg::SegmentationStatus::Success:
+                break;
+            }
+            result.Message =
+                "Curvature segmentation failed: ";
+            result.Message +=
+                CurvSeg::ToString(segmented.Diagnostics.Status);
+            result.Message += ".";
+            return result;
+        }
+        if (segmented.FaceComponents.size() !=
+                source.Mesh.FacesSize() ||
+            segmented.FaceRegions.size() !=
+                source.Mesh.FacesSize() ||
+            segmented.FaceRegionColors.size() !=
+                source.Mesh.FacesSize() ||
+            segmented.EdgeBoundaries.size() !=
+                source.Mesh.EdgesSize() ||
+            segmented.EdgeBoundaryColors.size() !=
+                source.Mesh.EdgesSize())
+        {
+            result.Status =
+                EditorCommandStatus::GeometryProcessingFailed;
+            result.Error = Core::ErrorCode::InvalidState;
+            result.Message =
+                "Curvature segmentation returned outputs that do not match detached mesh cardinality.";
+            return result;
+        }
+
+        MeshCurvatureSegmentationPropertyState after = before;
+        after.HadComponent = true;
+        after.HadRegion = true;
+        after.HadRegionColor = true;
+        after.HadBoundary = true;
+        after.HadBoundaryColor = true;
+        after.Components.assign(
+            source.FaceSlotCount, CurvSeg::kInvalidLabel);
+        after.Regions.assign(
+            source.FaceSlotCount, CurvSeg::kInvalidLabel);
+        after.RegionColors.assign(
+            source.FaceSlotCount, glm::vec4{0.0f});
+        after.Boundaries.assign(source.EdgeSlotCount, false);
+        after.BoundaryColors.assign(
+            source.EdgeSlotCount, glm::vec4{0.0f});
+
+        for (std::size_t meshFace = 0u;
+             meshFace < source.SourceFaceForMeshFace.size();
+             ++meshFace)
+        {
+            const std::uint32_t sourceFace =
+                source.SourceFaceForMeshFace[meshFace];
+            if (sourceFace >= source.FaceSlotCount)
+            {
+                result.Status =
+                    EditorCommandStatus::GeometryProcessingFailed;
+                result.Error = Core::ErrorCode::InvalidState;
+                result.Message =
+                    "Curvature segmentation produced an invalid source-face cross-reference.";
+                return result;
+            }
+            after.Components[sourceFace] =
+                segmented.FaceComponents[meshFace];
+            after.Regions[sourceFace] =
+                segmented.FaceRegions[meshFace];
+            after.RegionColors[sourceFace] =
+                segmented.FaceRegionColors[meshFace];
+        }
+        for (std::size_t meshEdge = 0u;
+             meshEdge < source.SourceEdgeForMeshEdge.size();
+             ++meshEdge)
+        {
+            const std::uint32_t sourceEdge =
+                source.SourceEdgeForMeshEdge[meshEdge];
+            if (sourceEdge == CurvSeg::kInvalidLabel)
+                continue;
+            if (sourceEdge >= source.EdgeSlotCount)
+            {
+                result.Status =
+                    EditorCommandStatus::GeometryProcessingFailed;
+                result.Error = Core::ErrorCode::InvalidState;
+                result.Message =
+                    "Curvature segmentation produced an invalid source-edge cross-reference.";
+                return result;
+            }
+            after.Boundaries[sourceEdge] =
+                segmented.EdgeBoundaries[meshEdge] != 0u;
+            after.BoundaryColors[sourceEdge] =
+                segmented.EdgeBoundaryColors[meshEdge];
+        }
+
+        result.ChangedValueCount =
+            CountChangedCurvatureSegmentationValues(before, after);
+        if (result.ChangedValueCount == 0u)
+        {
+            result.Status = EditorCommandStatus::NoChange;
+            result.Error = Core::ErrorCode::Success;
+            result.Message =
+                "Curvature segmentation properties are already up to date; no undo entry was created.";
+            return result;
+        }
+
+        const EditorCommandStatus commitStatus =
+            CommitMeshCurvatureSegmentationProperties(
+                context,
+                command.StableEntityId,
+                std::move(source.SourcePositions),
+                source.FaceSlotCount,
+                source.EdgeSlotCount,
+                std::move(before),
+                std::move(after));
+        if (commitStatus != EditorCommandStatus::Applied)
+        {
+            result.Status = commitStatus;
+            result.Error = Core::ErrorCode::Unknown;
+            result.Message =
+                "Curvature segmentation publication failed during editor history commit.";
+            return result;
+        }
+
+        result.Status = EditorCommandStatus::Applied;
+        result.Error = Core::ErrorCode::Success;
+        result.Message = "Curvature segmentation published ";
+        result.Message += std::to_string(
+            result.Diagnostics.ConnectedRegionCount);
+        result.Message += " connected regions and ";
+        result.Message += std::to_string(
+            result.Diagnostics.BoundaryEdgeCount);
+        result.Message += " internal boundary edges (GMM components=";
+        result.Message += std::to_string(
+            result.Diagnostics.SelectedComponentCount);
+        result.Message += ").";
+        InvalidateSelectedModelCache(context);
+        return result;
+    }
+
+    EditorCurvatureSegmentationResult
+    ApplyEditorConfiguredCurvatureSegmentationCommand(
+        const EditorGeometryProcessingContext& context,
+        const std::uint32_t stableEntityId)
+    {
+        const std::optional<CurvatureSegmentationConfig> config =
+            GetEditorCurvatureSegmentationConfig(context);
+        if (!config.has_value())
+        {
+            EditorCurvatureSegmentationResult result{};
+            result.Status =
+                EditorCommandStatus::InvalidProcessingParameters;
+            result.Error = Core::ErrorCode::InvalidState;
+            result.Message =
+                "No validated curvature-segmentation config is active.";
+            return result;
+        }
+        return ApplyEditorCurvatureSegmentationCommand(
+            context,
+            EditorCurvatureSegmentationCommand{
+                .StableEntityId = stableEntityId,
+                .Config = *config,
+            });
     }
 
     EditorMeshRemeshResult

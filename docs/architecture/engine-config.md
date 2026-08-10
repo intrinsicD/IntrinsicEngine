@@ -73,6 +73,27 @@ imports the application DTO or field vocabulary.
         }
       },
       {
+        "name": "sandbox.curvature_segmentation",
+        "schema": "intrinsic.runtime.sandbox.curvature_segmentation",
+        "version": 1,
+        "payload": {
+          "selection_mode": "automatic",
+          "fixed_component_count": 6,
+          "automatic_min_components": 1,
+          "automatic_max_components": 12,
+          "automatic_fit_tolerance": 0.35,
+          "automatic_complexity_weight": 1.0,
+          "max_em_iterations": 100,
+          "em_relative_tolerance": 1e-6,
+          "covariance_floor": 1e-5,
+          "seed": 42,
+          "spatial_weight": 0.75,
+          "feature_sensitivity": 4.0,
+          "max_spatial_iterations": 24,
+          "minimum_region_faces": 2
+        }
+      },
+      {
         "name": "sandbox.parameterization",
         "schema": "intrinsic.runtime.sandbox.parameterization",
         "version": 1,
@@ -178,8 +199,9 @@ imports the application DTO or field vocabulary.
 
 The current Sandbox registrations validate the following payload fields. The
 table abbreviates `app.sections[name=sandbox.progressive_poisson].payload` as
-`poisson` and `app.sections[name=sandbox.parameterization].payload` as
-`parameterization`, and
+`poisson`, `app.sections[name=sandbox.curvature_segmentation].payload` as
+`curvature_segmentation`, and
+`app.sections[name=sandbox.parameterization].payload` as `parameterization`, and
 `app.sections[name=sandbox.point_cloud_consolidation].payload` as
 `consolidation`, and `app.sections[name=sandbox.physics].payload` as
 `physics`.
@@ -197,6 +219,16 @@ table abbreviates `app.sections[name=sandbox.progressive_poisson].payload` as
 | `poisson` | `channel` | `Level`, `Rank`, `SplatRadius`, `PrefixVisible` |
 | `poisson` | `backend` | `CpuReference`, `VulkanCompute`; unavailable Vulkan execution reports explicit CPU fallback, while METHOD-014 owns Operational dispatch/parity closure |
 | `poisson` | `debounce_seconds` | Number in `[0.0, 10.0]` |
+| `curvature_segmentation` | `selection_mode` | `fixed_count`, `automatic` |
+| `curvature_segmentation` | `fixed_component_count`, `automatic_min_components`, `automatic_max_components` | Integers in `[1, 1024]`; automatic maximum must be at least the minimum or both bounds retain the registered reference values with a diagnostic |
+| `curvature_segmentation` | `automatic_fit_tolerance` | Finite number in `[1e-12, 1e12]` |
+| `curvature_segmentation` | `automatic_complexity_weight` | Finite number in `[0, 1e12]` |
+| `curvature_segmentation` | `max_em_iterations`, `max_spatial_iterations` | Integers in `[1, 100000]` |
+| `curvature_segmentation` | `em_relative_tolerance` | Finite number in `[0, 1]` |
+| `curvature_segmentation` | `covariance_floor` | Finite number in `[1e-15, 1e6]` |
+| `curvature_segmentation` | `seed` | Unsigned 32-bit integer |
+| `curvature_segmentation` | `spatial_weight`, `feature_sensitivity` | Finite number in `[0, 1e12]` |
+| `curvature_segmentation` | `minimum_region_faces` | Integer in `[1, 4294967295]` |
 | `parameterization` | `strategy` | `lscm`, `harmonic_cotangent`, `tutte_uniform`, `bff` |
 | `parameterization.view` | `render_mode` | `cpu_layout`, `gpu_shaded`; the GPU request falls back to the CPU layout until a matching completed target is ready |
 | `parameterization.view` | `background_mode` | `grid`, `checker`, `texel_density`, `texture` |
@@ -261,6 +293,13 @@ parameter bag. The serializer persists the lowercase tokens above, never a
 not change the parameterization solver backend. There is no optimized/GPU
 solver selector while every implemented strategy is CPU-only.
 
+The Sandbox curvature-segmentation payload round-trips both component-selection
+modes and all model-fit, deterministic EM, spatial, feature-sensitivity, and
+small-region controls. The configured runtime operation consumes the same live
+record used by the Sandbox Curvature panel. The record selects no backend: the
+only implemented path is the CPU reference, and its boundary output remains a
+non-destructive visualization hypothesis rather than an atlas seam.
+
 ### One-time Sandbox migration
 
 Files written before `CORE-009` placed the earlier payloads directly at
@@ -310,6 +349,7 @@ method/playground state. The parameterization payload similarly holds the
 selected CPU strategy, typed values, and UV-view choices. Runtime and the
 Sandbox panel decode those payloads through
 the feature-owned `Extrinsic.Runtime.ClusteringConfig`,
+`Extrinsic.Runtime.CurvatureSegmentationConfig`,
 `Extrinsic.Runtime.ProgressivePoissonConfig`,
 `Extrinsic.Runtime.ParameterizationConfig`,
 `Extrinsic.Runtime.PointCloudConsolidationConfig`, and

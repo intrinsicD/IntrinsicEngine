@@ -1,0 +1,38 @@
+id: geometry.curvature_segmentation
+name: Spatially Regularized Signed-Curvature Mesh Segmentation
+domain: geometry
+status: reference
+paper:
+  title: "A New CAD Mesh Segmentation Method, Based on Curvature Tensor Analysis"
+  authors: "Guillaume Lavoue, Florent Dupont, and Atilla Baskurt"
+  year: 2005
+  doi: "10.1016/j.cad.2004.09.001"
+  url: "https://doi.org/10.1016/j.cad.2004.09.001"
+inputs:
+  - "Oriented halfedge triangle mesh with finite positions and face adjacency"
+  - "Signed per-vertex principal curvatures k1 and k2, computed by the existing geometry curvature estimator or supplied as slot-aligned arrays"
+  - "Fixed component count or bounded automatic model-selection controls, deterministic EM controls, and feature-weighted spatial regularization controls"
+outputs:
+  - "Slot-aligned face Gaussian-component labels and dual-connected region labels"
+  - "Slot-aligned edge region-boundary flags plus deterministic face-region and boundary-edge colors"
+  - "Candidate GMM, curvature-fit, spatial-energy, connectivity, cleanup, and failure diagnostics"
+backends:
+  - cpu_reference
+metrics:
+  - "quality_error_l2"
+  - "fold_boundary_recall"
+  - "runtime_ms"
+correctness_tests:
+  - "../../../tests/unit/geometry/Test.CurvatureSegmentation.cpp"
+  - "../../../tests/contract/runtime/Test.CurvatureSegmentationOperations.cpp"
+  - "../../../tests/integration/runtime/Test.SandboxCurvatureSegmentationPanel.cpp"
+benchmarks:
+  - "../../../benchmarks/geometry/manifests/curvature_segmentation_reference_smoke.yaml"
+known_limitations:
+  - "This is a repository formulation informed by curvature-tensor segmentation, Gaussian mixtures, information criteria, and pairwise spatial models; it is not an equation-level reproduction of Lavoue et al. or another single publication."
+  - "Signed principal curvatures depend on a consistent surface-orientation convention and on the scale, noise, and boundary behavior of the upstream curvature estimator."
+  - "The existing Gaussian-mixture carrier is three-dimensional, so normalized (k1,k2) samples use a constant zero third coordinate with covariance flooring; automatic selection applies a two-dimensional 6k-1 parameter penalty."
+  - "Alternating-order ICM and greedy small-region merging are deterministic local optimizers and do not guarantee the global minimum of the Potts energy."
+  - "The reference accepts triangle meshes only and does not repair degeneracies, non-manifold topology, inconsistent orientation, or non-finite inputs."
+  - "Published region boundaries are inspection data, not materialized cuts or validated UV-atlas seams; GEOM-076 owns any later seam/cut/atlas use."
+  - "Only a serial CPU reference backend exists, and the smoke result makes no performance or atlas-quality claim."

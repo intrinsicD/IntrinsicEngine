@@ -3,6 +3,7 @@
 #include <filesystem>
 #include <fstream>
 #include <memory>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <system_error>
@@ -20,6 +21,7 @@ import Extrinsic.Runtime.Engine;
 import Extrinsic.Runtime.EngineConfigBoot;
 import Extrinsic.Runtime.EngineConfigControl;
 import Extrinsic.Runtime.ClusteringConfig;
+import Extrinsic.Runtime.CurvatureSegmentationConfig;
 import Extrinsic.Runtime.ParameterizationConfig;
 import Extrinsic.Runtime.PhysicsModule;
 import Extrinsic.Runtime.PointCloudConsolidationConfig;
@@ -118,6 +120,7 @@ namespace
 TEST(SandboxConfigSections, BootAndLiveApplyUseTheAppOwnedRegistryThroughNullRun)
 {
     std::uint32_t clusteringChanges = 0u;
+    std::uint32_t curvatureSegmentationChanges = 0u;
     std::uint32_t progressivePoissonChanges = 0u;
     std::uint32_t parameterizationChanges = 0u;
     std::uint32_t pointCloudConsolidationChanges = 0u;
@@ -130,6 +133,11 @@ TEST(SandboxConfigSections, BootAndLiveApplyUseTheAppOwnedRegistryThroughNullRun
                     [&](const auto&, const auto&)
                     {
                         ++clusteringChanges;
+                    },
+                .CurvatureSegmentation =
+                    [&](const auto&, const auto&)
+                    {
+                        ++curvatureSegmentationChanges;
                     },
                 .ProgressivePoisson =
                     [&](const auto&, const auto&)
@@ -172,6 +180,16 @@ TEST(SandboxConfigSections, BootAndLiveApplyUseTheAppOwnedRegistryThroughNullRun
         Runtime::KMeansInitialization::Random;
     clustering.Backend = Runtime::ClusteringBackend::VulkanCompute;
     Runtime::SetClusteringConfig(fileConfig, clustering);
+
+    Runtime::CurvatureSegmentationConfig curvatureSegmentation{};
+    curvatureSegmentation.SelectionMode =
+        Runtime::CurvatureSegmentationSelectionMode::FixedCount;
+    curvatureSegmentation.FixedComponentCount = 4u;
+    curvatureSegmentation.SpatialWeight = 1.25;
+    curvatureSegmentation.FeatureSensitivity = 6.5;
+    Runtime::SetCurvatureSegmentationConfig(
+        fileConfig,
+        curvatureSegmentation);
 
     Runtime::ProgressivePoissonPlaygroundConfig progressivePoisson{};
     progressivePoisson.Dimension = 2u;
@@ -233,6 +251,17 @@ TEST(SandboxConfigSections, BootAndLiveApplyUseTheAppOwnedRegistryThroughNullRun
     EXPECT_EQ(
         bootClustering->Backend,
         Runtime::ClusteringBackend::VulkanCompute);
+    const auto bootCurvatureSegmentation =
+        Runtime::GetCurvatureSegmentationConfig(boot.Config);
+    ASSERT_TRUE(bootCurvatureSegmentation.has_value());
+    EXPECT_EQ(
+        bootCurvatureSegmentation->SelectionMode,
+        Runtime::CurvatureSegmentationSelectionMode::FixedCount);
+    EXPECT_EQ(bootCurvatureSegmentation->FixedComponentCount, 4u);
+    EXPECT_DOUBLE_EQ(bootCurvatureSegmentation->SpatialWeight, 1.25);
+    EXPECT_DOUBLE_EQ(
+        bootCurvatureSegmentation->FeatureSensitivity,
+        6.5);
     const auto bootProgressivePoisson =
         Runtime::GetProgressivePoissonPlaygroundConfig(boot.Config);
     ASSERT_TRUE(bootProgressivePoisson.has_value());
@@ -271,6 +300,7 @@ TEST(SandboxConfigSections, BootAndLiveApplyUseTheAppOwnedRegistryThroughNullRun
     EXPECT_EQ(bootPhysics->MaxStepsPerFrame, 3u);
     EXPECT_FLOAT_EQ(bootPhysics->Gravity.y, -4.0f);
     EXPECT_EQ(clusteringChanges, 0u);
+    EXPECT_EQ(curvatureSegmentationChanges, 0u);
     EXPECT_EQ(progressivePoissonChanges, 0u);
     EXPECT_EQ(parameterizationChanges, 0u);
     EXPECT_EQ(pointCloudConsolidationChanges, 0u);
@@ -296,6 +326,19 @@ TEST(SandboxConfigSections, BootAndLiveApplyUseTheAppOwnedRegistryThroughNullRun
         Runtime::KMeansInitialization::Hierarchical;
     liveClustering->Backend = Runtime::ClusteringBackend::CpuReference;
     Runtime::SetClusteringConfig(candidate, *liveClustering);
+
+    auto liveCurvatureSegmentation =
+        Runtime::GetCurvatureSegmentationConfig(candidate);
+    ASSERT_TRUE(liveCurvatureSegmentation.has_value());
+    liveCurvatureSegmentation->SelectionMode =
+        Runtime::CurvatureSegmentationSelectionMode::Automatic;
+    liveCurvatureSegmentation->AutomaticMinComponents = 2u;
+    liveCurvatureSegmentation->AutomaticMaxComponents = 7u;
+    liveCurvatureSegmentation->AutomaticFitTolerance = 0.21;
+    liveCurvatureSegmentation->Seed = 0x2468ace0u;
+    Runtime::SetCurvatureSegmentationConfig(
+        candidate,
+        *liveCurvatureSegmentation);
 
     auto liveParameterization =
         Runtime::GetParameterizationConfig(candidate);
@@ -333,6 +376,8 @@ TEST(SandboxConfigSections, BootAndLiveApplyUseTheAppOwnedRegistryThroughNullRun
     EXPECT_TRUE(apply.SectionChanged(
         Runtime::kClusteringConfigSectionName));
     EXPECT_TRUE(apply.SectionChanged(
+        Runtime::kCurvatureSegmentationConfigSectionName));
+    EXPECT_TRUE(apply.SectionChanged(
         Runtime::kParameterizationConfigSectionName));
     EXPECT_TRUE(apply.SectionChanged(
         Runtime::kPointCloudConsolidationConfigSectionName));
@@ -341,6 +386,7 @@ TEST(SandboxConfigSections, BootAndLiveApplyUseTheAppOwnedRegistryThroughNullRun
     EXPECT_TRUE(apply.SectionChanged(
         Runtime::kPhysicsModuleConfigSectionName));
     EXPECT_EQ(clusteringChanges, 1u);
+    EXPECT_EQ(curvatureSegmentationChanges, 1u);
     EXPECT_EQ(progressivePoissonChanges, 0u);
     EXPECT_EQ(parameterizationChanges, 1u);
     EXPECT_EQ(pointCloudConsolidationChanges, 1u);
@@ -356,6 +402,23 @@ TEST(SandboxConfigSections, BootAndLiveApplyUseTheAppOwnedRegistryThroughNullRun
     const auto activeClustering =
         Runtime::GetClusteringConfig(engine.GetEngineConfig());
     ASSERT_TRUE(activeClustering.has_value());
+    const auto activeCurvatureSegmentation =
+        Runtime::GetCurvatureSegmentationConfig(
+            engine.GetEngineConfig());
+    ASSERT_TRUE(activeCurvatureSegmentation.has_value());
+    EXPECT_EQ(
+        activeCurvatureSegmentation->SelectionMode,
+        Runtime::CurvatureSegmentationSelectionMode::Automatic);
+    EXPECT_EQ(
+        activeCurvatureSegmentation->AutomaticMinComponents,
+        2u);
+    EXPECT_EQ(
+        activeCurvatureSegmentation->AutomaticMaxComponents,
+        7u);
+    EXPECT_DOUBLE_EQ(
+        activeCurvatureSegmentation->AutomaticFitTolerance,
+        0.21);
+    EXPECT_EQ(activeCurvatureSegmentation->Seed, 0x2468ace0u);
     const auto activePointCloudConsolidation =
         Runtime::GetPointCloudConsolidationConfig(engine.GetEngineConfig());
     ASSERT_TRUE(activePointCloudConsolidation.has_value());
@@ -511,4 +574,131 @@ TEST(SandboxConfigSections,
         else
             EXPECT_EQ(serialized, *referenceSerialized);
     }
+}
+
+TEST(SandboxConfigSections,
+     CurvatureSegmentationSourcesProduceIdenticalValidatedState)
+{
+    constexpr std::array sources{
+        Runtime::RuntimeConfigControlSource::Editor,
+        Runtime::RuntimeConfigControlSource::AgentCli,
+        Runtime::RuntimeConfigControlSource::Programmatic,
+    };
+    Runtime::CurvatureSegmentationConfig requested{};
+    requested.SelectionMode =
+        Runtime::CurvatureSegmentationSelectionMode::Automatic;
+    requested.FixedComponentCount = 5u;
+    requested.AutomaticMinComponents = 2u;
+    requested.AutomaticMaxComponents = 9u;
+    requested.AutomaticFitTolerance = 0.18;
+    requested.AutomaticComplexityWeight = 1.75;
+    requested.MaxEmIterations = 77u;
+    requested.EmRelativeTolerance = 2.5e-6;
+    requested.CovarianceFloor = 4.0e-5;
+    requested.Seed = 0x13579bdfu;
+    requested.SpatialWeight = 1.5;
+    requested.FeatureSensitivity = 8.0;
+    requested.MaxSpatialIterations = 19u;
+    requested.MinimumRegionFaces = 3u;
+    ASSERT_TRUE(Runtime::IsValidCurvatureSegmentationConfig(requested));
+
+    std::optional<std::string> referenceSerialized{};
+    for (const Runtime::RuntimeConfigControlSource source : sources)
+    {
+        ConfigControlHarness harness{};
+        Runtime::EngineConfigControl& control = harness.Control();
+        CoreConfig::EngineConfig candidate =
+            control.GetEngineConfigControlState().ActiveConfig;
+        Runtime::SetCurvatureSegmentationConfig(candidate, requested);
+        const CoreConfig::EngineConfigLoadResult preview =
+            control.PreviewEngineConfigControlDocument(
+                CoreConfig::SerializeEngineConfig(candidate),
+                "curvature-segmentation-source-parity");
+        ASSERT_TRUE(CoreConfig::IsConfigUsable(preview));
+
+        const Runtime::RuntimeEngineConfigApplyResult applied =
+            control.ApplyEngineConfigHotSubset(preview, source);
+        ASSERT_TRUE(applied.Succeeded());
+        EXPECT_EQ(applied.Source, source);
+        EXPECT_TRUE(applied.SectionChanged(
+            Runtime::kCurvatureSegmentationConfigSectionName));
+
+        const auto active = Runtime::GetCurvatureSegmentationConfig(
+            control.GetEngineConfigControlState().ActiveConfig);
+        ASSERT_TRUE(active.has_value());
+        EXPECT_EQ(active->SelectionMode, requested.SelectionMode);
+        EXPECT_EQ(active->FixedComponentCount,
+                  requested.FixedComponentCount);
+        EXPECT_EQ(active->AutomaticMinComponents,
+                  requested.AutomaticMinComponents);
+        EXPECT_EQ(active->AutomaticMaxComponents,
+                  requested.AutomaticMaxComponents);
+        EXPECT_DOUBLE_EQ(active->AutomaticFitTolerance,
+                         requested.AutomaticFitTolerance);
+        EXPECT_DOUBLE_EQ(active->AutomaticComplexityWeight,
+                         requested.AutomaticComplexityWeight);
+        EXPECT_EQ(active->MaxEmIterations, requested.MaxEmIterations);
+        EXPECT_DOUBLE_EQ(active->EmRelativeTolerance,
+                         requested.EmRelativeTolerance);
+        EXPECT_DOUBLE_EQ(active->CovarianceFloor,
+                         requested.CovarianceFloor);
+        EXPECT_EQ(active->Seed, requested.Seed);
+        EXPECT_DOUBLE_EQ(active->SpatialWeight, requested.SpatialWeight);
+        EXPECT_DOUBLE_EQ(active->FeatureSensitivity,
+                         requested.FeatureSensitivity);
+        EXPECT_EQ(active->MaxSpatialIterations,
+                  requested.MaxSpatialIterations);
+        EXPECT_EQ(active->MinimumRegionFaces,
+                  requested.MinimumRegionFaces);
+
+        const std::string serialized = CoreConfig::SerializeEngineConfig(
+            control.GetEngineConfigControlState().ActiveConfig);
+        if (!referenceSerialized.has_value())
+            referenceSerialized = serialized;
+        else
+            EXPECT_EQ(serialized, *referenceSerialized);
+    }
+}
+
+TEST(SandboxConfigSections,
+     CurvatureSegmentationDefaultsAndInvalidRangesFailClosed)
+{
+    ConfigControlHarness harness{};
+    const auto defaults = Runtime::GetCurvatureSegmentationConfig(
+        harness.Control().GetEngineConfigControlState().ActiveConfig);
+    ASSERT_TRUE(defaults.has_value());
+    EXPECT_TRUE(Runtime::IsValidCurvatureSegmentationConfig(*defaults));
+    EXPECT_EQ(defaults->SelectionMode,
+              Runtime::CurvatureSegmentationSelectionMode::Automatic);
+
+    Runtime::CurvatureSegmentationConfig invalid = *defaults;
+    invalid.AutomaticMinComponents = 8u;
+    invalid.AutomaticMaxComponents = 2u;
+    EXPECT_FALSE(Runtime::IsValidCurvatureSegmentationConfig(invalid));
+
+    CoreConfig::EngineConfig candidate =
+        harness.Control().GetEngineConfigControlState().ActiveConfig;
+    Runtime::SetCurvatureSegmentationConfig(candidate, invalid);
+    const CoreConfig::EngineConfigLoadResult preview =
+        harness.Control().PreviewEngineConfigControlDocument(
+            CoreConfig::SerializeEngineConfig(candidate),
+            "curvature-segmentation-invalid-range");
+    ASSERT_TRUE(CoreConfig::IsConfigUsable(preview));
+    EXPECT_EQ(preview.State,
+              CoreConfig::EngineConfigState::FallbackApplied);
+    EXPECT_FALSE(preview.Diagnostics.empty());
+
+    const Runtime::RuntimeEngineConfigApplyResult applied =
+        harness.Control().ApplyEngineConfigHotSubset(
+            preview,
+            Runtime::RuntimeConfigControlSource::Editor);
+    ASSERT_TRUE(applied.Succeeded());
+    const auto active = Runtime::GetCurvatureSegmentationConfig(
+        harness.Control().GetEngineConfigControlState().ActiveConfig);
+    ASSERT_TRUE(active.has_value());
+    EXPECT_TRUE(Runtime::IsValidCurvatureSegmentationConfig(*active));
+    EXPECT_EQ(active->AutomaticMinComponents,
+              defaults->AutomaticMinComponents);
+    EXPECT_EQ(active->AutomaticMaxComponents,
+              defaults->AutomaticMaxComponents);
 }

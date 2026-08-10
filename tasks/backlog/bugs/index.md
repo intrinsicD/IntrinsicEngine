@@ -9,6 +9,12 @@ The 2026-08-07 Sandbox UI workflow pass (`sculpt.obj` end-to-end through the
 promoted Vulkan build) opened `BUG-137` through `BUG-142`. `BUG-137` is upstream
 of `BUG-140` and of the parameterization rejection recorded in `BUG-141`.
 
+- [`BUG-149` — Benchmark sealer escapes dotted output directories](BUG-149-benchmark-sealer-dotted-output-directory.md):
+  `run_and_seal.py` interprets a dotted directory name as a file, seals its
+  parent (observed as all of `/tmp`), and can return zero after the sealer
+  reports failure. Resolve the exact output type/root and propagate both stage
+  statuses without touching sibling JSON.
+
 - [`BUG-134` — ImGui adapter panel draw-list test fails intermittently](BUG-134-imgui-adapter-panel-draw-list-intermittent.md):
   one default CPU run reported the panel draw-list contract as its sole
   failure, followed by ten passing isolated repetitions and a clean 4,103-case

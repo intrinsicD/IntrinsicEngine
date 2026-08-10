@@ -259,6 +259,7 @@ if(TARGET ExtrinsicRuntime)
         Test.GeometryPresentation.cpp
         Test.PointCloudGeometryExtraction.cpp
         Test.ParameterizationOperations.cpp
+        Test.CurvatureSegmentationOperations.cpp
         Test.PrimitiveSelectionRefinement.cpp
         Test.PrimitiveSelectionRefinementWiring.cpp
         Test.ProceduralGeometryExtraction.cpp
@@ -334,6 +335,7 @@ if(TARGET ExtrinsicSandboxEditor)
             Test.SandboxConfigSections.cpp
             Test.SandboxAppComposition.cpp
             Test.SandboxEditorPresentation.cpp
+            Test.SandboxCurvatureSegmentationPanel.cpp
             Test.SandboxParameterizationPanel.cpp
             Test.SandboxPointCloudConsolidationPanel.cpp
     )
@@ -446,6 +448,7 @@ set(_geometry_test_files
     Test_MeshBuilder.cpp
     Test_GeometryProcessing.cpp
     Test.GaussianMixture.cpp
+    Test.CurvatureSegmentation.cpp
     Test_SurfaceReconstruction.cpp
     Test_MeshQuality.cpp
     Test_MeshAnalysis.cpp

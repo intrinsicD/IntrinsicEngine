@@ -3186,6 +3186,18 @@ namespace {
             model.MeshCurvatureDirectionsAvailable =
                 model.MeshCurvatureAvailable &&
                 context.MeshCurvatureDirectionsAvailable;
+            model.CurvatureSegmentationAvailable =
+                context.CurvatureSegmentationKernelAvailable &&
+                model.Capabilities.HasEditableSurfaceMesh &&
+                HasAnyEditorGeometryProcessingDomain(
+                    model.Capabilities.Domains,
+                    EditorGeometryProcessingDomain::MeshVertices) &&
+                HasAnyEditorGeometryProcessingDomain(
+                    model.Capabilities.Domains,
+                    EditorGeometryProcessingDomain::MeshEdges) &&
+                HasAnyEditorGeometryProcessingDomain(
+                    model.Capabilities.Domains,
+                    EditorGeometryProcessingDomain::MeshFaces);
             model.MeshRemeshUniformAvailable =
                 context.MeshRemeshUniformKernelAvailable &&
                 model.Capabilities.HasEditableSurfaceMesh;

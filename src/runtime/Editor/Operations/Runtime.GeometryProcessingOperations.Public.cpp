@@ -364,6 +364,21 @@ EditorMeshCurvatureResult ApplyEditorMeshCurvatureCommand(
   return ApplyEditorMeshCurvatureCommand(ContextOrEmpty(commands), command);
 }
 
+EditorCurvatureSegmentationResult ApplyEditorCurvatureSegmentationCommand(
+    const EditorGeometryProcessingCommands &commands,
+    const EditorCurvatureSegmentationCommand &command) {
+  return ApplyEditorCurvatureSegmentationCommand(ContextOrEmpty(commands),
+                                                 command);
+}
+
+EditorCurvatureSegmentationResult
+ApplyEditorConfiguredCurvatureSegmentationCommand(
+    const EditorGeometryProcessingCommands &commands,
+    const std::uint32_t stableEntityId) {
+  return ApplyEditorConfiguredCurvatureSegmentationCommand(
+      ContextOrEmpty(commands), stableEntityId);
+}
+
 EditorMeshRemeshResult ApplyEditorMeshRemeshCommand(
     const EditorGeometryProcessingCommands &commands,
     const EditorMeshRemeshCommand &command) {
@@ -438,6 +453,20 @@ RuntimeEngineConfigApplyResult ApplyEditorClusteringConfig(
 std::optional<ClusteringConfig> GetEditorClusteringConfig(
     const EditorGeometryProcessingCommands &commands) noexcept {
   return GetEditorClusteringConfig(ContextOrEmpty(commands));
+}
+
+RuntimeEngineConfigApplyResult ApplyEditorCurvatureSegmentationConfig(
+    const EditorGeometryProcessingCommands &commands,
+    const CurvatureSegmentationConfig &config,
+    std::string sourceId) {
+  return ApplyEditorCurvatureSegmentationConfig(
+      ContextOrEmpty(commands), config, std::move(sourceId));
+}
+
+std::optional<CurvatureSegmentationConfig>
+GetEditorCurvatureSegmentationConfig(
+    const EditorGeometryProcessingCommands &commands) noexcept {
+  return GetEditorCurvatureSegmentationConfig(ContextOrEmpty(commands));
 }
 
 RuntimeEngineConfigApplyResult ApplyEditorPointCloudConsolidationConfig(

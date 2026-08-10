@@ -26,8 +26,10 @@ export namespace Extrinsic::ECS::Components::GeometrySources
     //   "v:principal_dir2"     – glm::vec3  optional min-principal tangent direction
     //
     // Domain: Edges (mesh or graph)
-    //   "e:v0"        – uint32_t   index of first  endpoint vertex / node
-    //   "e:v1"        – uint32_t   index of second endpoint vertex / node
+    //   "e:v0"                              – uint32_t index of first endpoint
+    //   "e:v1"                              – uint32_t index of second endpoint
+    //   "e:curvature_region_boundary"       – bool     internal region boundary
+    //   "e:curvature_region_boundary_color" – vec4     boundary visualization
     //
     // Domain: Halfedges (mesh or graph)
     //   Graph sources preserve the graph's real `h:connectivity`
@@ -38,7 +40,10 @@ export namespace Extrinsic::ECS::Components::GeometrySources
     //   "h:face"      – uint32_t   index of the adjacent face (UINT32_MAX = boundary)
     //
     // Domain: Faces (mesh only)
-    //   "f:halfedge"  – uint32_t   index of the face's first halfedge
+    //   "f:halfedge"               – uint32_t first halfedge
+    //   "f:curvature_component"    – uint32_t statistical GMM component
+    //   "f:curvature_region"       – uint32_t connected region label
+    //   "f:curvature_region_color" – vec4     region visualization
     // -----------------------------------------------------------------------
     namespace PropertyNames
     {
@@ -52,6 +57,10 @@ export namespace Extrinsic::ECS::Components::GeometrySources
 
         constexpr std::string_view kEdgeV0            = "e:v0";
         constexpr std::string_view kEdgeV1            = "e:v1";
+        constexpr std::string_view kCurvatureRegionBoundary =
+            "e:curvature_region_boundary";
+        constexpr std::string_view kCurvatureRegionBoundaryColor =
+            "e:curvature_region_boundary_color";
 
         constexpr std::string_view kHalfedgeToVertex  = "h:to_vertex";
         constexpr std::string_view kHalfedgeNext      = "h:next";
@@ -59,6 +68,12 @@ export namespace Extrinsic::ECS::Components::GeometrySources
         constexpr std::string_view kHalfedgeConnectivity = "h:connectivity";
 
         constexpr std::string_view kFaceHalfedge      = "f:halfedge";
+        constexpr std::string_view kCurvatureComponent =
+            "f:curvature_component";
+        constexpr std::string_view kCurvatureRegion =
+            "f:curvature_region";
+        constexpr std::string_view kCurvatureRegionColor =
+            "f:curvature_region_color";
     }
 
     // Owned per-domain PropertySet components. After a `PopulateFrom*` call

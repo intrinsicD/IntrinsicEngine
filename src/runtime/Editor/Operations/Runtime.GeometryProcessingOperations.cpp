@@ -1922,6 +1922,49 @@ namespace Extrinsic::Runtime
             context.EngineConfigControlState->ActiveConfig);
     }
 
+    RuntimeEngineConfigApplyResult ApplyEditorCurvatureSegmentationConfig(
+        const EditorGeometryProcessingContext& context,
+        const CurvatureSegmentationConfig& config,
+        std::string sourceId)
+    {
+        RuntimeEngineConfigApplyResult result{
+            .Status = RuntimeEngineConfigApplyStatus::Rejected,
+            .Source = RuntimeConfigControlSource::Editor,
+        };
+        if (context.EngineConfigControlState == nullptr ||
+            !context.PreviewEngineConfigDocument ||
+            !context.ApplyEngineConfigHotSubset ||
+            !context.EngineConfigCommandsAvailable)
+        {
+            return result;
+        }
+
+        Core::Config::EngineConfig candidate =
+            context.EngineConfigControlState->ActiveConfig;
+        SetCurvatureSegmentationConfig(candidate, config);
+        if (sourceId.empty())
+        {
+            sourceId =
+                std::string{kCurvatureSegmentationConfigSectionName};
+        }
+        result.LoadResult = context.PreviewEngineConfigDocument(
+            Core::Config::SerializeEngineConfig(candidate),
+            sourceId);
+        if (!Core::Config::IsConfigUsable(result.LoadResult))
+            return result;
+        return context.ApplyEngineConfigHotSubset(result.LoadResult);
+    }
+
+    std::optional<CurvatureSegmentationConfig>
+    GetEditorCurvatureSegmentationConfig(
+        const EditorGeometryProcessingContext& context) noexcept
+    {
+        if (context.EngineConfigControlState == nullptr)
+            return std::nullopt;
+        return GetCurvatureSegmentationConfig(
+            context.EngineConfigControlState->ActiveConfig);
+    }
+
     RuntimeEngineConfigApplyResult ApplyEditorPointCloudConsolidationConfig(
         const EditorGeometryProcessingContext& context,
         const PointCloudConsolidationConfig& config,

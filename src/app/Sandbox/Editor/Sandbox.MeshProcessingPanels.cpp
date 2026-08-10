@@ -7,6 +7,7 @@ module;
 #include <memory>
 #include <optional>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -21,8 +22,10 @@ import Extrinsic.Runtime.EditorCommon;
 import Extrinsic.Runtime.EditorWindowRegistry;
 import Extrinsic.Runtime.EditorWorkspaceSnapshots;
 import Extrinsic.Runtime.EditorJobProjection;
+import Extrinsic.Runtime.EngineConfigControl;
 import Extrinsic.Runtime.GeometryProcessingOperations;
 import Extrinsic.Runtime.SelectionController;
+import Extrinsic.Runtime.VisualizationEditingOperations;
 
 namespace Extrinsic::Sandbox::Editor
 {
@@ -43,6 +46,17 @@ namespace Extrinsic::Sandbox::Editor
                 Runtime::EditorMeshCurvatureOutput::Gaussian,
                 Runtime::EditorMeshCurvatureOutput::PrincipalDirections,
             }};
+        constexpr std::array<
+            Runtime::CurvatureSegmentationSelectionMode,
+            2>
+            kCurvatureSegmentationSelectionModes{{
+                Runtime::CurvatureSegmentationSelectionMode::FixedCount,
+                Runtime::CurvatureSegmentationSelectionMode::Automatic,
+            }};
+        constexpr std::string_view kCurvatureRegionColorProperty =
+            "f:curvature_region_color";
+        constexpr std::string_view kCurvatureBoundaryColorProperty =
+            "e:curvature_region_boundary_color";
         constexpr std::array<Runtime::EditorMeshRemeshMode, 2>
             kMeshRemeshModes{{
                 Runtime::EditorMeshRemeshMode::Uniform,
@@ -232,6 +246,53 @@ namespace Extrinsic::Sandbox::Editor
             if (sink)
                 sink(std::move(result));
         }
+
+        void ShowCurvatureSegmentationVisualization(
+            const SandboxEditorContext& context,
+            const std::uint32_t stableEntityId)
+        {
+            using SurfaceDomain = decltype(
+                Runtime::EditorRenderHintModel{}.SurfaceDomainValue);
+            using EdgeDomain = decltype(
+                Runtime::EditorRenderHintModel{}.EdgeDomainValue);
+            (void)Runtime::ApplyEditorRenderHintCommand(
+                context.VisualizationCommands,
+                Runtime::EditorRenderHintCommand{
+                    .StableEntityId = stableEntityId,
+                    .SetSurface = true,
+                    .EnableSurface = true,
+                    .SurfaceDomain = static_cast<SurfaceDomain>(1),
+                    .SetEdges = true,
+                    .EnableEdges = true,
+                    .EdgeDomain = static_cast<EdgeDomain>(1),
+                    .SetUniformEdgeWidth = true,
+                    .UniformEdgeWidth = 2.0f,
+                });
+            (void)Runtime::ApplyEditorVisualizationPropertyCommand(
+                context.VisualizationCommands,
+                Runtime::EditorVisualizationPropertyCommand{
+                    .StableEntityId = stableEntityId,
+                    .Target = Runtime::EditorVisualizationTarget::Surface,
+                    .Domain =
+                        Runtime::EditorVisualizationPropertyDomain::MeshFaces,
+                    .Preset =
+                        Runtime::EditorVisualizationPropertyPreset::ColorBuffer,
+                    .PropertyName =
+                        std::string{kCurvatureRegionColorProperty},
+                });
+            (void)Runtime::ApplyEditorVisualizationPropertyCommand(
+                context.VisualizationCommands,
+                Runtime::EditorVisualizationPropertyCommand{
+                    .StableEntityId = stableEntityId,
+                    .Target = Runtime::EditorVisualizationTarget::Edges,
+                    .Domain =
+                        Runtime::EditorVisualizationPropertyDomain::MeshEdges,
+                    .Preset =
+                        Runtime::EditorVisualizationPropertyPreset::ColorBuffer,
+                    .PropertyName =
+                        std::string{kCurvatureBoundaryColorProperty},
+                });
+        }
     }
 
     struct MeshProcessingPanels::Impl
@@ -252,6 +313,16 @@ namespace Extrinsic::Sandbox::Editor
             std::optional<Runtime::EditorMeshCurvatureResult> LastResult{};
             std::int32_t Output{0};
             bool PublishPrincipalDirections{true};
+            Runtime::CurvatureSegmentationConfig SegmentationConfig{};
+            std::optional<Runtime::EditorCurvatureSegmentationResult>
+                LastSegmentationResult{};
+            std::optional<std::uint32_t>
+                LastSegmentationStableEntityId{};
+            std::optional<Runtime::RuntimeEngineConfigApplyResult>
+                LastSegmentationConfigApply{};
+            bool SegmentationConfigInitialized{false};
+            bool SegmentationConfigDirty{false};
+            bool AutoVisualizeSegmentation{true};
         };
 
         struct RemeshState
@@ -385,6 +456,9 @@ namespace Extrinsic::Sandbox::Editor
         void DrawCurvatureControls(
             const Runtime::EditorDomainWindowModel&,
             const SandboxEditorContext&);
+        void DrawCurvatureSegmentationControls(
+            const Runtime::EditorDomainWindowModel&,
+            const SandboxEditorContext&);
         void DrawRemeshControls(
             const Runtime::EditorDomainWindowModel&,
             const SandboxEditorContext&);
@@ -451,6 +525,11 @@ namespace Extrinsic::Sandbox::Editor
         ResetModelCache();
         Denoise.LastResult.reset();
         Curvature.LastResult.reset();
+        Curvature.LastSegmentationResult.reset();
+        Curvature.LastSegmentationStableEntityId.reset();
+        Curvature.LastSegmentationConfigApply.reset();
+        Curvature.SegmentationConfigInitialized = false;
+        Curvature.SegmentationConfigDirty = false;
         Remesh.LastResult.reset();
         Subdivide.LastResult.reset();
         Simplify.LastResult.reset();
@@ -820,6 +899,7 @@ namespace Extrinsic::Sandbox::Editor
                     }),
                 context.MethodResultSinks.MeshCurvature);
         }
+        DrawCurvatureSegmentationControls(model, context);
         const auto& result = Curvature.LastResult.has_value()
             ? Curvature.LastResult
             : processing.LastMeshCurvatureResult;
@@ -858,6 +938,303 @@ namespace Extrinsic::Sandbox::Editor
             Curvature.LastResult,
             Runtime::EditorGeometryProcessingResultSlot::MeshCurvature,
             context);
+    }
+
+    void MeshProcessingPanels::Impl::DrawCurvatureSegmentationControls(
+        const Runtime::EditorDomainWindowModel& model,
+        const SandboxEditorContext& context)
+    {
+        ImGui::SeparatorText("Curvature segmentation");
+        if (!model.Processing.CurvatureSegmentationAvailable)
+        {
+            ImGui::TextDisabled(
+                "Signed-curvature segmentation requires editable mesh faces and edges.");
+            return;
+        }
+
+        if (!Curvature.SegmentationConfigInitialized)
+        {
+            if (const auto active =
+                    Runtime::GetEditorCurvatureSegmentationConfig(
+                        context.GeometryCommands))
+            {
+                Curvature.SegmentationConfig = *active;
+            }
+            Curvature.SegmentationConfigInitialized = true;
+            Curvature.SegmentationConfigDirty = false;
+        }
+
+        Runtime::CurvatureSegmentationConfig& config =
+            Curvature.SegmentationConfig;
+        bool changed = false;
+        if (ImGui::BeginCombo(
+                "Component selection##CurvatureSegmentation",
+                Runtime::DebugNameForCurvatureSegmentationSelectionMode(
+                    config.SelectionMode)))
+        {
+            for (const auto mode :
+                 kCurvatureSegmentationSelectionModes)
+            {
+                const bool selected = mode == config.SelectionMode;
+                if (ImGui::Selectable(
+                        Runtime::
+                            DebugNameForCurvatureSegmentationSelectionMode(
+                                mode),
+                        selected))
+                {
+                    config.SelectionMode = mode;
+                    changed = true;
+                }
+                if (selected)
+                    ImGui::SetItemDefaultFocus();
+            }
+            ImGui::EndCombo();
+        }
+
+        if (config.SelectionMode ==
+            Runtime::CurvatureSegmentationSelectionMode::FixedCount)
+        {
+            changed |= ImGui::InputScalar(
+                "Components##CurvatureSegmentation",
+                ImGuiDataType_U32,
+                &config.FixedComponentCount);
+        }
+        else
+        {
+            changed |= ImGui::InputScalar(
+                "Minimum components##CurvatureSegmentation",
+                ImGuiDataType_U32,
+                &config.AutomaticMinComponents);
+            changed |= ImGui::InputScalar(
+                "Maximum components##CurvatureSegmentation",
+                ImGuiDataType_U32,
+                &config.AutomaticMaxComponents);
+            changed |= ImGui::InputDouble(
+                "Curvature fit tolerance##CurvatureSegmentation",
+                &config.AutomaticFitTolerance,
+                0.01,
+                0.1,
+                "%.6g");
+            changed |= ImGui::InputDouble(
+                "Complexity weight##CurvatureSegmentation",
+                &config.AutomaticComplexityWeight,
+                0.05,
+                0.5,
+                "%.6g");
+        }
+
+        changed |= ImGui::InputDouble(
+            "Spatial regularization##CurvatureSegmentation",
+            &config.SpatialWeight,
+            0.05,
+            0.5,
+            "%.6g");
+        changed |= ImGui::InputDouble(
+            "Feature sensitivity##CurvatureSegmentation",
+            &config.FeatureSensitivity,
+            0.1,
+            1.0,
+            "%.6g");
+        changed |= ImGui::InputScalar(
+            "Minimum region faces##CurvatureSegmentation",
+            ImGuiDataType_U32,
+            &config.MinimumRegionFaces);
+        (void)ImGui::Checkbox(
+            "Show clusters and boundaries after run##CurvatureSegmentation",
+            &Curvature.AutoVisualizeSegmentation);
+
+        if (ImGui::TreeNode("Advanced GMM and optimizer controls"))
+        {
+            changed |= ImGui::InputScalar(
+                "EM iterations##CurvatureSegmentation",
+                ImGuiDataType_U32,
+                &config.MaxEmIterations);
+            changed |= ImGui::InputDouble(
+                "EM relative tolerance##CurvatureSegmentation",
+                &config.EmRelativeTolerance,
+                1.0e-7,
+                1.0e-6,
+                "%.6g");
+            changed |= ImGui::InputDouble(
+                "Covariance floor##CurvatureSegmentation",
+                &config.CovarianceFloor,
+                1.0e-6,
+                1.0e-5,
+                "%.6g");
+            changed |= ImGui::InputScalar(
+                "Seed##CurvatureSegmentation",
+                ImGuiDataType_U32,
+                &config.Seed);
+            changed |= ImGui::InputScalar(
+                "Spatial iterations##CurvatureSegmentation",
+                ImGuiDataType_U32,
+                &config.MaxSpatialIterations);
+            ImGui::TreePop();
+        }
+
+        config.FixedComponentCount = std::clamp(
+            config.FixedComponentCount, 1u, 1024u);
+        config.AutomaticMinComponents = std::clamp(
+            config.AutomaticMinComponents, 1u, 1024u);
+        config.AutomaticMaxComponents = std::clamp(
+            config.AutomaticMaxComponents,
+            config.AutomaticMinComponents,
+            1024u);
+        config.AutomaticFitTolerance = std::clamp(
+            config.AutomaticFitTolerance, 1.0e-12, 1.0e12);
+        config.AutomaticComplexityWeight = std::clamp(
+            config.AutomaticComplexityWeight, 0.0, 1.0e12);
+        config.MaxEmIterations = std::clamp(
+            config.MaxEmIterations, 1u, 100000u);
+        config.EmRelativeTolerance = std::clamp(
+            config.EmRelativeTolerance, 0.0, 1.0);
+        config.CovarianceFloor = std::clamp(
+            config.CovarianceFloor, 1.0e-15, 1.0e6);
+        config.SpatialWeight = std::clamp(
+            config.SpatialWeight, 0.0, 1.0e12);
+        config.FeatureSensitivity = std::clamp(
+            config.FeatureSensitivity, 0.0, 1.0e12);
+        config.MaxSpatialIterations = std::clamp(
+            config.MaxSpatialIterations, 1u, 100000u);
+        config.MinimumRegionFaces = std::max(
+            config.MinimumRegionFaces, 1u);
+        Curvature.SegmentationConfigDirty |= changed;
+
+        const bool configCommandsAvailable =
+            context.GeometryConfigCommandsAvailable;
+        ImGui::BeginDisabled(
+            !configCommandsAvailable ||
+            !Curvature.SegmentationConfigDirty);
+        if (ImGui::Button("Apply configuration##CurvatureSegmentation"))
+        {
+            Curvature.LastSegmentationConfigApply =
+                Runtime::ApplyEditorCurvatureSegmentationConfig(
+                    context.GeometryCommands,
+                    config,
+                    "sandbox.curvature_segmentation.panel");
+            if (Curvature.LastSegmentationConfigApply->Succeeded())
+                Curvature.SegmentationConfigDirty = false;
+        }
+        ImGui::EndDisabled();
+        ImGui::SameLine();
+        ImGui::BeginDisabled(!configCommandsAvailable);
+        if (ImGui::Button("Reload active##CurvatureSegmentation"))
+        {
+            Curvature.SegmentationConfigInitialized = false;
+            Curvature.SegmentationConfigDirty = false;
+        }
+        ImGui::EndDisabled();
+
+        ImGui::BeginDisabled(!configCommandsAvailable);
+        if (ImGui::Button("Run segmentation##CurvatureSegmentation"))
+        {
+            Curvature.LastSegmentationConfigApply =
+                Runtime::ApplyEditorCurvatureSegmentationConfig(
+                    context.GeometryCommands,
+                    config,
+                    "sandbox.curvature_segmentation.panel.run");
+            if (Curvature.LastSegmentationConfigApply->Succeeded())
+            {
+                Curvature.SegmentationConfigDirty = false;
+                Curvature.LastSegmentationResult =
+                    Runtime::
+                        ApplyEditorConfiguredCurvatureSegmentationCommand(
+                            context.GeometryCommands,
+                            model.SelectedStableId);
+                if (Curvature.LastSegmentationResult->Succeeded())
+                {
+                    Curvature.LastSegmentationStableEntityId =
+                        model.SelectedStableId;
+                    if (Curvature.AutoVisualizeSegmentation)
+                    {
+                        ShowCurvatureSegmentationVisualization(
+                            context, model.SelectedStableId);
+                    }
+                }
+                else
+                    Curvature.LastSegmentationStableEntityId.reset();
+            }
+        }
+        ImGui::EndDisabled();
+        ImGui::SameLine();
+        ImGui::BeginDisabled(
+            !Curvature.LastSegmentationResult.has_value() ||
+            !Curvature.LastSegmentationResult->Succeeded() ||
+            !Curvature.LastSegmentationStableEntityId.has_value());
+        if (ImGui::Button("Show result##CurvatureSegmentation"))
+        {
+            ShowCurvatureSegmentationVisualization(
+                context,
+                *Curvature.LastSegmentationStableEntityId);
+        }
+        ImGui::EndDisabled();
+
+        if (Curvature.LastSegmentationConfigApply.has_value() &&
+            !Curvature.LastSegmentationConfigApply->Succeeded())
+        {
+            ImGui::TextDisabled(
+                "The configuration was rejected; inspect config diagnostics.");
+        }
+        if (!Curvature.LastSegmentationResult.has_value())
+        {
+            ImGui::TextDisabled("Last segmentation run: none");
+            return;
+        }
+
+        const Runtime::EditorCurvatureSegmentationResult& result =
+            *Curvature.LastSegmentationResult;
+        ImGui::Text(
+            "Last segmentation run: %s",
+            Runtime::DebugNameForEditorCommandStatus(result.Status));
+        if (result.Diagnostics.Succeeded())
+        {
+            ImGui::Text(
+                "Components: selected=%u active=%u  connected regions=%u",
+                result.Diagnostics.SelectedComponentCount,
+                result.Diagnostics.ActiveComponentCount,
+                result.Diagnostics.ConnectedRegionCount);
+            ImGui::Text(
+                "Boundaries: %zu  changed property values: %zu",
+                result.Diagnostics.BoundaryEdgeCount,
+                result.ChangedValueCount);
+            ImGui::Text(
+                "GMM: %s after %u iterations  normalized RMS=%.6g",
+                result.Diagnostics.GmmConverged
+                    ? "converged"
+                    : "iteration limit",
+                result.Diagnostics.GmmIterations,
+                result.Diagnostics.NormalizedRmsFit);
+            ImGui::Text(
+                "Spatial: %u iterations, %zu moves, %zu small-region merges",
+                result.Diagnostics.SpatialIterations,
+                result.Diagnostics.SpatialLabelMoves,
+                result.Diagnostics.SmallRegionsMerged);
+            ImGui::Text(
+                "Energy: %.6g -> %.6g",
+                result.Diagnostics.InitialEnergy,
+                result.Diagnostics.FinalEnergy);
+            if (ImGui::TreeNode("Model candidates"))
+            {
+                for (const auto& candidate :
+                     result.Diagnostics.Candidates)
+                {
+                    ImGui::BulletText(
+                        "k=%u%s  fit=%s  rms=%.6g  BIC=%.6g",
+                        candidate.ComponentCount,
+                        candidate.Selected ? " (selected)" : "",
+                        candidate.FitSucceeded ? "ok" : "failed",
+                        candidate.NormalizedRmsFit,
+                        candidate.BayesianInformationCriterion);
+                }
+                ImGui::TreePop();
+            }
+        }
+        if (!result.Message.empty())
+            ImGui::TextWrapped("%s", result.Message.c_str());
+        ImGui::TextDisabled(
+            "Boundaries are non-destructive labels, not UV seams; the spatial solve is a deterministic local optimum.");
+        if (ImGui::SmallButton("Dismiss##CurvatureSegmentation"))
+            Curvature.LastSegmentationResult.reset();
     }
 
     void MeshProcessingPanels::Impl::DrawRemeshControls(

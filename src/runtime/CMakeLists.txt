@@ -20,6 +20,7 @@ target_sources(${target_name}
         Modules/ProgressivePoisson/Runtime.ProgressivePoissonGpuBackend.cppm
         Rendering/Runtime.RenderArtifactPublication.cppm
         Modules/Clustering/Runtime.ClusteringConfig.cppm
+        Modules/CurvatureSegmentation/Runtime.CurvatureSegmentationConfig.cppm
         Modules/ProgressivePoisson/Runtime.ProgressivePoissonConfig.cppm
         Modules/Parameterization/Runtime.ParameterizationConfig.cppm
         Modules/PointCloudConsolidation/Runtime.PointCloudConsolidationConfig.cppm
@@ -110,6 +111,7 @@ target_sources(${target_name}
         Modules/ProgressivePoisson/Runtime.ProgressivePoissonGpuBackend.cpp
         Rendering/Runtime.RenderArtifactPublication.cpp
         Modules/Clustering/Runtime.ClusteringConfig.cpp
+        Modules/CurvatureSegmentation/Runtime.CurvatureSegmentationConfig.cpp
         Modules/ProgressivePoisson/Runtime.ProgressivePoissonConfig.cpp
         Modules/Parameterization/Runtime.ParameterizationConfig.cpp
         Modules/PointCloudConsolidation/Runtime.PointCloudConsolidationConfig.cpp

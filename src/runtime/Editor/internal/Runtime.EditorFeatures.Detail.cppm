@@ -160,6 +160,7 @@ export namespace Extrinsic::Runtime::EditorFeatureDetail
         bool MeshDenoiseKernelAvailable{true};
         bool MeshCurvatureKernelAvailable{true};
         bool MeshCurvatureDirectionsAvailable{true};
+        bool CurvatureSegmentationKernelAvailable{true};
         bool MeshRemeshUniformKernelAvailable{true};
         bool MeshRemeshAdaptiveKernelAvailable{true};
         bool MeshRemeshProjectToSurfaceAvailable{true};

@@ -515,6 +515,21 @@ namespace Extrinsic::Runtime::FeatureConfigDetail
             return std::nullopt;
         }
 
+        [[nodiscard]] std::optional<CurvatureSegmentationSelectionMode>
+        ParseCurvatureSegmentationSelectionMode(
+            const std::string_view value) noexcept
+        {
+            if (value == "fixed_count")
+            {
+                return CurvatureSegmentationSelectionMode::FixedCount;
+            }
+            if (value == "automatic")
+            {
+                return CurvatureSegmentationSelectionMode::Automatic;
+            }
+            return std::nullopt;
+        }
+
         [[nodiscard]] std::optional<PointCloudConsolidationStrategy>
         ParsePointCloudConsolidationStrategy(
             const std::string_view value) noexcept
@@ -673,6 +688,19 @@ namespace Extrinsic::Runtime::FeatureConfigDetail
             case ClusteringBackend::CpuReference: return "CpuReference";
             }
             return "CpuReference";
+        }
+
+        [[nodiscard]] std::string_view ToConfigString(
+            const CurvatureSegmentationSelectionMode value) noexcept
+        {
+            switch (value)
+            {
+            case CurvatureSegmentationSelectionMode::FixedCount:
+                return "fixed_count";
+            case CurvatureSegmentationSelectionMode::Automatic:
+                return "automatic";
+            }
+            return "automatic";
         }
 
         [[nodiscard]] std::string_view ToConfigString(
@@ -864,6 +892,173 @@ namespace Extrinsic::Runtime::FeatureConfigDetail
                     config.Backend))
             {
                 CountParsed(context);
+            }
+            return config;
+        }
+
+        [[nodiscard]] CurvatureSegmentationConfig
+        ParseCurvatureSegmentation(
+            const std::string_view payload,
+            CurvatureSegmentationConfig config,
+            ValidationContext context)
+        {
+            const CurvatureSegmentationConfig reference = config;
+            const std::optional<json> object = ParseObject(context, payload);
+            if (!object.has_value())
+                return config;
+
+            AddUnknownFieldDiagnostics(
+                context,
+                *object,
+                {"selection_mode",
+                 "fixed_component_count",
+                 "automatic_min_components",
+                 "automatic_max_components",
+                 "automatic_fit_tolerance",
+                 "automatic_complexity_weight",
+                 "max_em_iterations",
+                 "em_relative_tolerance",
+                 "covariance_floor",
+                 "seed",
+                 "spatial_weight",
+                 "feature_sensitivity",
+                 "max_spatial_iterations",
+                 "minimum_region_faces"});
+
+            if (ReadEnum(
+                    context,
+                    *object,
+                    "selection_mode",
+                    ParseCurvatureSegmentationSelectionMode,
+                    config.SelectionMode))
+            {
+                CountParsed(context);
+            }
+            if (const auto value = ReadInteger(
+                    context, *object, "fixed_component_count", 1, 1024))
+            {
+                config.FixedComponentCount =
+                    static_cast<std::uint32_t>(*value);
+                CountParsed(context);
+            }
+            if (const auto value = ReadInteger(
+                    context, *object, "automatic_min_components", 1, 1024))
+            {
+                config.AutomaticMinComponents =
+                    static_cast<std::uint32_t>(*value);
+                CountParsed(context);
+            }
+            if (const auto value = ReadInteger(
+                    context, *object, "automatic_max_components", 1, 1024))
+            {
+                config.AutomaticMaxComponents =
+                    static_cast<std::uint32_t>(*value);
+                CountParsed(context);
+            }
+            if (const auto value = ReadNumber(
+                    context,
+                    *object,
+                    "automatic_fit_tolerance",
+                    1.0e-12,
+                    1.0e12))
+            {
+                config.AutomaticFitTolerance = *value;
+                CountParsed(context);
+            }
+            if (const auto value = ReadNumber(
+                    context,
+                    *object,
+                    "automatic_complexity_weight",
+                    0.0,
+                    1.0e12))
+            {
+                config.AutomaticComplexityWeight = *value;
+                CountParsed(context);
+            }
+            if (const auto value = ReadInteger(
+                    context, *object, "max_em_iterations", 1, 100000))
+            {
+                config.MaxEmIterations =
+                    static_cast<std::uint32_t>(*value);
+                CountParsed(context);
+            }
+            if (const auto value = ReadNumber(
+                    context,
+                    *object,
+                    "em_relative_tolerance",
+                    0.0,
+                    1.0))
+            {
+                config.EmRelativeTolerance = *value;
+                CountParsed(context);
+            }
+            if (const auto value = ReadNumber(
+                    context,
+                    *object,
+                    "covariance_floor",
+                    1.0e-15,
+                    1.0e6))
+            {
+                config.CovarianceFloor = *value;
+                CountParsed(context);
+            }
+            if (const auto value = ReadInteger(
+                    context,
+                    *object,
+                    "seed",
+                    0,
+                    std::numeric_limits<std::uint32_t>::max()))
+            {
+                config.Seed = static_cast<std::uint32_t>(*value);
+                CountParsed(context);
+            }
+            if (const auto value = ReadNumber(
+                    context, *object, "spatial_weight", 0.0, 1.0e12))
+            {
+                config.SpatialWeight = *value;
+                CountParsed(context);
+            }
+            if (const auto value = ReadNumber(
+                    context, *object, "feature_sensitivity", 0.0, 1.0e12))
+            {
+                config.FeatureSensitivity = *value;
+                CountParsed(context);
+            }
+            if (const auto value = ReadInteger(
+                    context,
+                    *object,
+                    "max_spatial_iterations",
+                    1,
+                    100000))
+            {
+                config.MaxSpatialIterations =
+                    static_cast<std::uint32_t>(*value);
+                CountParsed(context);
+            }
+            if (const auto value = ReadInteger(
+                    context,
+                    *object,
+                    "minimum_region_faces",
+                    1,
+                    std::numeric_limits<std::uint32_t>::max()))
+            {
+                config.MinimumRegionFaces =
+                    static_cast<std::uint32_t>(*value);
+                CountParsed(context);
+            }
+
+            if (config.AutomaticMaxComponents <
+                config.AutomaticMinComponents)
+            {
+                AddWarning(
+                    context,
+                    Core::Config::EngineConfigDiagnosticCode::InvalidValue,
+                    FieldSubject(context.Path, "automatic_max_components"),
+                    "Automatic maximum components must be greater than or equal to the minimum; reference bounds retained.");
+                config.AutomaticMinComponents =
+                    reference.AutomaticMinComponents;
+                config.AutomaticMaxComponents =
+                    reference.AutomaticMaxComponents;
             }
             return config;
         }
@@ -1658,6 +1853,16 @@ namespace Extrinsic::Runtime::FeatureConfigDetail
                 ValidationContext{});
         }
 
+        [[nodiscard]] CurvatureSegmentationConfig
+        DecodeCurvatureSegmentationCanonical(
+            const std::string_view payload)
+        {
+            return ParseCurvatureSegmentation(
+                payload,
+                CurvatureSegmentationConfig{},
+                ValidationContext{});
+        }
+
         [[nodiscard]] ParameterizationConfig DecodeParameterizationCanonical(
             const std::string_view payload)
         {
@@ -1701,6 +1906,29 @@ namespace Extrinsic::Runtime::FeatureConfigDetail
             {"initialization",
              std::string{ToConfigString(config.Parameters.Initialization)}},
             {"backend", std::string{ToConfigString(config.Backend)}},
+        }).dump();
+    }
+
+    std::string SerializeCurvatureSegmentationConfigImpl(
+        const CurvatureSegmentationConfig& config)
+    {
+        return json::object({
+            {"selection_mode",
+             std::string{ToConfigString(config.SelectionMode)}},
+            {"fixed_component_count", config.FixedComponentCount},
+            {"automatic_min_components", config.AutomaticMinComponents},
+            {"automatic_max_components", config.AutomaticMaxComponents},
+            {"automatic_fit_tolerance", config.AutomaticFitTolerance},
+            {"automatic_complexity_weight",
+             config.AutomaticComplexityWeight},
+            {"max_em_iterations", config.MaxEmIterations},
+            {"em_relative_tolerance", config.EmRelativeTolerance},
+            {"covariance_floor", config.CovarianceFloor},
+            {"seed", config.Seed},
+            {"spatial_weight", config.SpatialWeight},
+            {"feature_sensitivity", config.FeatureSensitivity},
+            {"max_spatial_iterations", config.MaxSpatialIterations},
+            {"minimum_region_faces", config.MinimumRegionFaces},
         }).dump();
     }
 
@@ -1823,6 +2051,33 @@ namespace Extrinsic::Runtime::FeatureConfigDetail
     }
 
     Core::Config::EngineConfigSectionValidationResult
+    ValidateCurvatureSegmentationConfigSectionImpl(
+        const std::string_view documentPayloadJson,
+        const std::string_view referencePayloadJson,
+        const std::string_view diagnosticSubject)
+    {
+        const CurvatureSegmentationConfig reference =
+            ParseCurvatureSegmentation(
+                referencePayloadJson,
+                CurvatureSegmentationConfig{},
+                ValidationContext{});
+        Core::Config::EngineConfigSectionValidationResult result{
+            .State = Core::Config::EngineConfigState::Valid,
+        };
+        const CurvatureSegmentationConfig config =
+            ParseCurvatureSegmentation(
+                documentPayloadJson,
+                reference,
+                ValidationContext{
+                    .Result = &result,
+                    .Path = std::string{diagnosticSubject},
+                });
+        result.CanonicalPayloadJson =
+            SerializeCurvatureSegmentationConfigImpl(config);
+        return result;
+    }
+
+    Core::Config::EngineConfigSectionValidationResult
     ValidateProgressivePoissonConfigSectionImpl(
         const std::string_view documentPayloadJson,
         const std::string_view referencePayloadJson,
@@ -1934,6 +2189,52 @@ namespace Extrinsic::Runtime::FeatureConfigDetail
                 .SchemaId = std::string{kClusteringConfigSectionSchemaId},
                 .SchemaVersion = kClusteringConfigSectionSchemaVersion,
                 .PayloadJson = SerializeClusteringConfigImpl(value),
+            });
+    }
+
+    std::optional<CurvatureSegmentationConfig>
+    GetCurvatureSegmentationConfigImpl(
+        const Core::Config::EngineConfig& config)
+    {
+        const Core::Config::EngineConfigSection* section =
+            Core::Config::FindEngineConfigSection(
+                config.AppSections,
+                kCurvatureSegmentationConfigSectionName);
+        if (section == nullptr ||
+            section->SchemaId !=
+                kCurvatureSegmentationConfigSectionSchemaId ||
+            section->SchemaVersion !=
+                kCurvatureSegmentationConfigSectionSchemaVersion)
+        {
+            return std::nullopt;
+        }
+        const auto validated =
+            ValidateCurvatureSegmentationConfigSectionImpl(
+                section->PayloadJson,
+                SerializeCurvatureSegmentationConfigImpl(
+                    CurvatureSegmentationConfig{}),
+                kCurvatureSegmentationConfigSectionName);
+        if (validated.State != Core::Config::EngineConfigState::Valid)
+            return std::nullopt;
+        return DecodeCurvatureSegmentationCanonical(
+            validated.CanonicalPayloadJson);
+    }
+
+    void SetCurvatureSegmentationConfigImpl(
+        Core::Config::EngineConfig& config,
+        const CurvatureSegmentationConfig& value)
+    {
+        Core::Config::UpsertEngineConfigSection(
+            config.AppSections,
+            Core::Config::EngineConfigSection{
+                .Name = std::string{
+                    kCurvatureSegmentationConfigSectionName},
+                .SchemaId = std::string{
+                    kCurvatureSegmentationConfigSectionSchemaId},
+                .SchemaVersion =
+                    kCurvatureSegmentationConfigSectionSchemaVersion,
+                .PayloadJson =
+                    SerializeCurvatureSegmentationConfigImpl(value),
             });
     }
 
@@ -2083,6 +2384,29 @@ namespace Extrinsic::Runtime::FeatureConfigDetail
                         SerializeClusteringConfigImpl(ClusteringConfig{}),
                 },
             .Validate = ValidateClusteringConfigSectionImpl,
+            .OnChanged = std::move(onChanged),
+        };
+    }
+
+    Core::Config::EngineConfigSectionRegistration
+    MakeCurvatureSegmentationConfigSectionRegistrationImpl(
+        Core::Config::EngineConfigSectionChangedCallback onChanged)
+    {
+        return Core::Config::EngineConfigSectionRegistration{
+            .DefaultSection =
+                Core::Config::EngineConfigSection{
+                    .Name = std::string{
+                        kCurvatureSegmentationConfigSectionName},
+                    .SchemaId = std::string{
+                        kCurvatureSegmentationConfigSectionSchemaId},
+                    .SchemaVersion =
+                        kCurvatureSegmentationConfigSectionSchemaVersion,
+                    .PayloadJson =
+                        SerializeCurvatureSegmentationConfigImpl(
+                            CurvatureSegmentationConfig{}),
+                },
+            .Validate =
+                ValidateCurvatureSegmentationConfigSectionImpl,
             .OnChanged = std::move(onChanged),
         };
     }

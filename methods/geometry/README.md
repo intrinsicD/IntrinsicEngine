@@ -9,6 +9,10 @@ Method packages for geometry processing research (remeshing, parameterization, d
 - [`boundary_first_flattening`](boundary_first_flattening/) —
   `geometry.boundary_first_flattening` CPU reference for Boundary First
   Flattening on an already-cut triangle disk.
+- [`curvature_segmentation`](curvature_segmentation/) —
+  `geometry.curvature_segmentation` CPU reference for non-destructive,
+  spatially regularized signed-`(k1,k2)` segmentation with fixed or automatic
+  Gaussian-mixture selection.
 
 Implemented CPU parameterization strategies enter the sandbox through
 `EngineConfig.sandbox.parameterization` and the existing runtime editor facade.

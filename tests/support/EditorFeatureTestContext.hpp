@@ -119,6 +119,7 @@ namespace Intrinsic::Tests
         bool MeshDenoiseKernelAvailable{true};
         bool MeshCurvatureKernelAvailable{true};
         bool MeshCurvatureDirectionsAvailable{true};
+        bool CurvatureSegmentationKernelAvailable{true};
         bool MeshRemeshUniformKernelAvailable{true};
         bool MeshRemeshAdaptiveKernelAvailable{true};
         bool MeshRemeshProjectToSurfaceAvailable{true};
@@ -203,6 +204,8 @@ namespace Intrinsic::Tests
                 .MeshDenoiseKernelAvailable = MeshDenoiseKernelAvailable,
                 .MeshCurvatureKernelAvailable = MeshCurvatureKernelAvailable,
                 .MeshCurvatureDirectionsAvailable = MeshCurvatureDirectionsAvailable,
+                .CurvatureSegmentationKernelAvailable =
+                    CurvatureSegmentationKernelAvailable,
                 .MeshRemeshUniformKernelAvailable = MeshRemeshUniformKernelAvailable,
                 .MeshRemeshAdaptiveKernelAvailable = MeshRemeshAdaptiveKernelAvailable,
                 .MeshRemeshProjectToSurfaceAvailable = MeshRemeshProjectToSurfaceAvailable,
