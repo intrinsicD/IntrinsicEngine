@@ -468,6 +468,7 @@ set(_geometry_test_files
     Test_MeshBoundary.cpp
     Test_GeometryAttributePropagation.cpp
     Test.GraphVertexNormals.cpp
+    Test.HalfedgeMeshFeatures.cpp
     Test.HalfedgeMeshVertexNormals.cpp
     Test_HalfedgeMeshPropertyAccess.cpp
     Test_HalfedgeMeshTopology.cpp

@@ -1150,3 +1150,36 @@
 - **Tags**: geometry, runtime, config, UI, CPU reference, visualization,
   bounded result
 - **From staging**: O140
+
+## C39: Reusable halfedge sharp-feature classification preserves FA-QEM's CPU contract
+- **Statement**: On the GEOM-071 CPU fixtures,
+  `Geometry.HalfedgeMesh.Features` deterministically produces owning-slot-aligned
+  edge masks and exact endpoint/crease/junction incidence from caller-owned face
+  normals, rejects submesh views, scale-stably normalizes every representable
+  finite nonzero magnitude before comparison, fails closed per affected live
+  edge on unusable normals/topology, materializes the canonical boolean
+  `e:feature` property, and replaces FA-QEM's private batch classifier while
+  preserving its exact tessellated-cube protection diagnostics.
+- **Status**: supported — bounded CPU unit/adoption contract only; no
+  Catmull-Clark, runtime/UI, GPU, or performance claim
+- **Provenance**: ai-executed
+- **Crystallized via**: artifact-commitment
+- **Falsification criteria**: The named classifier fixtures change their exact
+  plane/fold/cube masks or incidence, a submesh view is consumed, scaling finite
+  nonzero normals from denormal through near-maximum magnitude changes an edge
+  decision, invalid adjacent normals/topology become smooth, canonical property
+  publication differs from the mask, the warped-grid regression no longer
+  records 96 collapses and 96 final faces under current-normal legality, or the
+  adopted FA-QEM cube
+  regression changes its 84 collapses, 24 final faces, 266 topology rejections,
+  1,256 quality rejections, or eight pinned sharp vertices.
+- **Proof**: [src/geometry/Geometry.HalfedgeMesh.Features.cppm,
+  src/geometry/Geometry.HalfedgeMesh.Features.cpp,
+  tests/unit/geometry/Test.HalfedgeMeshFeatures.cpp,
+  tests/unit/geometry/Test_Simplification.cpp,
+  tasks/evidence/GEOM-071/commands/focused-feature-simplification-tests.json,
+  tasks/evidence/GEOM-071/commands/cpu-tests.json]
+- **Dependencies**: []
+- **Tags**: geometry, halfedge mesh, sharp features, properties, FA-QEM, CPU,
+  bounded result
+- **From staging**: O141

@@ -1,0 +1,205 @@
+Internal ctest changing into directory: /home/alex/Documents/IntrinsicEngine/build/ci
+Test project /home/alex/Documents/IntrinsicEngine/build/ci
+      Start  157: GraphicsRenderer.NullRendererRecompilesOnFeatureAndSizingChangesAndRebindsImports
+ 1/95 Test  #157: GraphicsRenderer.NullRendererRecompilesOnFeatureAndSizingChangesAndRebindsImports .........   Passed    0.11 sec
+      Start 1018: SandboxEditorUi.MeshSimplifyThatCollapsesNothingReportsNoChange
+ 2/95 Test #1018: SandboxEditorUi.MeshSimplifyThatCollapsesNothingReportsNoChange ...........................   Passed    0.01 sec
+      Start 1033: SandboxEditorUi.MeshSimplifyCommandReducesFaceCountAndSupportsUndoRedo
+ 3/95 Test #1033: SandboxEditorUi.MeshSimplifyCommandReducesFaceCountAndSupportsUndoRedo ....................   Passed    0.01 sec
+      Start 1034: SandboxEditorUi.MeshSimplifyRequestQueuesDerivedJobAndPublishesOnApply
+ 4/95 Test #1034: SandboxEditorUi.MeshSimplifyRequestQueuesDerivedJobAndPublishesOnApply ....................   Passed    0.02 sec
+      Start 1035: SandboxEditorUi.MeshSimplifyAppliesAgainAfterAnEarlierTopologyEdit
+ 5/95 Test #1035: SandboxEditorUi.MeshSimplifyAppliesAgainAfterAnEarlierTopologyEdit ........................   Passed    0.02 sec
+      Start 1036: SandboxEditorUi.MeshSubdivideAndRemeshApplyAfterAnEarlierSimplify
+ 6/95 Test #1036: SandboxEditorUi.MeshSubdivideAndRemeshApplyAfterAnEarlierSimplify .........................   Passed    0.02 sec
+      Start 1037: SandboxEditorUi.MeshSimplifyStaleDiscardReportsTerminalResultInsteadOfStayingPending
+ 7/95 Test #1037: SandboxEditorUi.MeshSimplifyStaleDiscardReportsTerminalResultInsteadOfStayingPending ......   Passed    0.02 sec
+      Start 1039: SandboxEditorUi.MeshSimplifyCommandFailsClosedForInvalidTargetsAndUnavailableKernel
+ 8/95 Test #1039: SandboxEditorUi.MeshSimplifyCommandFailsClosedForInvalidTargetsAndUnavailableKernel .......   Passed    0.00 sec
+      Start 1040: SandboxEditorUi.MeshSimplifyPreservesUvSeamsWhenTexcoordsPresent
+ 9/95 Test #1040: SandboxEditorUi.MeshSimplifyPreservesUvSeamsWhenTexcoordsPresent ..........................   Passed    0.01 sec
+      Start 1041: SandboxEditorUi.MeshSimplifyPreservesCornerUvSeamsAcrossTheTopologyEdit
+10/95 Test #1041: SandboxEditorUi.MeshSimplifyPreservesCornerUvSeamsAcrossTheTopologyEdit ...................   Passed    0.01 sec
+      Start 1249: SandboxEditorPresentation.RuntimeFeatureModulesCompileSeparatelyFromEditorShell
+11/95 Test #1249: SandboxEditorPresentation.RuntimeFeatureModulesCompileSeparatelyFromEditorShell ...........   Passed    0.12 sec
+      Start 1620: Simplification_QEM.ReducesFaceCount
+12/95 Test #1620: Simplification_QEM.ReducesFaceCount .......................................................   Passed    0.01 sec
+      Start 1621: Simplification_QEM.RespectsTargetFaceCount
+13/95 Test #1621: Simplification_QEM.RespectsTargetFaceCount ................................................   Passed    0.01 sec
+      Start 1622: Simplification_QEM.TooFewFacesReturnsNullopt
+14/95 Test #1622: Simplification_QEM.TooFewFacesReturnsNullopt ..............................................   Passed    0.00 sec
+      Start 1623: Simplification_QEM.ErrorThresholdStopsEarly
+15/95 Test #1623: Simplification_QEM.ErrorThresholdStopsEarly ...............................................   Passed    0.01 sec
+      Start 1624: Simplification_QEM.PreservedMeshIsValid
+16/95 Test #1624: Simplification_QEM.PreservedMeshIsValid ...................................................   Passed    0.01 sec
+      Start 1625: Simplification_QEM.GarbageCollectionKeepsFaceHalfedgesValidAfterDenseSimplification
+17/95 Test #1625: Simplification_QEM.GarbageCollectionKeepsFaceHalfedgesValidAfterDenseSimplification .......   Passed    0.23 sec
+      Start 1626: Simplification_QEM.DenseClosedMeshStaysClosed
+18/95 Test #1626: Simplification_QEM.DenseClosedMeshStaysClosed .............................................   Passed    0.22 sec
+      Start 1627: Simplification_QEM.HausdorffErrorConstraintSmallMeshSentinel
+19/95 Test #1627: Simplification_QEM.HausdorffErrorConstraintSmallMeshSentinel ..............................   Passed    0.02 sec
+      Start 1628: Simplification_QEM.RepeatedWorkflowSmallMeshSentinel
+20/95 Test #1628: Simplification_QEM.RepeatedWorkflowSmallMeshSentinel ......................................   Passed    0.01 sec
+      Start 1629: Simplification_QEM.ConfigurableQuadricsSmallMeshSentinel
+21/95 Test #1629: Simplification_QEM.ConfigurableQuadricsSmallMeshSentinel ..................................   Passed    0.01 sec
+      Start 1630: Simplification_QEM.ProbabilisticQuadricsSmallMeshSentinel
+22/95 Test #1630: Simplification_QEM.ProbabilisticQuadricsSmallMeshSentinel .................................   Passed    0.01 sec
+      Start 1631: Simplification_QEM.MissingCovariancePropertiesFallBackToZeroCovariance
+23/95 Test #1631: Simplification_QEM.MissingCovariancePropertiesFallBackToZeroCovariance ....................   Passed    0.22 sec
+      Start 1632: Simplification_QEM.OpenBoundaryPatchKeepsDiskTopology
+24/95 Test #1632: Simplification_QEM.OpenBoundaryPatchKeepsDiskTopology .....................................   Passed    0.00 sec
+      Start 1633: Simplification_QEM.PreserveBoundaryPreventsCollapsesOnOpenPatch
+25/95 Test #1633: Simplification_QEM.PreserveBoundaryPreventsCollapsesOnOpenPatch ...........................   Passed    0.00 sec
+      Start 1748: CurvatureSegmentation.SignedFeaturesSeparatePlaneSphereCylinderAndSaddleRegimes
+26/95 Test #1748: CurvatureSegmentation.SignedFeaturesSeparatePlaneSphereCylinderAndSaddleRegimes ...........   Passed    0.00 sec
+      Start 1751: CurvatureSegmentation.FeatureWeightPreservesFoldBoundary
+27/95 Test #1751: CurvatureSegmentation.FeatureWeightPreservesFoldBoundary ..................................   Passed    0.00 sec
+      Start 2002: MeshBoundary.MarkBoundaryVerticesAsFeature
+28/95 Test #2002: MeshBoundary.MarkBoundaryVerticesAsFeature ................................................   Passed    0.00 sec
+      Start 2003: MeshBoundary.MarkBoundaryEdgesAsFeature
+29/95 Test #2003: MeshBoundary.MarkBoundaryEdgesAsFeature ...................................................   Passed    0.00 sec
+      Start 2013: Attributes_TopologyOperators.SimplificationPreservesTexcoords
+30/95 Test #2013: Attributes_TopologyOperators.SimplificationPreservesTexcoords .............................   Passed    0.01 sec
+      Start 2014: Attributes_TopologyOperators.SimplificationWithConfigurableQuadricsPreservesTexcoords
+31/95 Test #2014: Attributes_TopologyOperators.SimplificationWithConfigurableQuadricsPreservesTexcoords .....   Passed    0.01 sec
+      Start 2023: HalfedgeMeshFeatures.PlanarSquareHonorsBoundaryPolicyAndSlotAlignment
+32/95 Test #2023: HalfedgeMeshFeatures.PlanarSquareHonorsBoundaryPolicyAndSlotAlignment .....................   Passed    0.00 sec
+      Start 2024: HalfedgeMeshFeatures.FoldedCreaseIsMagnitudeInvariantAndKeepsEndpoints
+33/95 Test #2024: HalfedgeMeshFeatures.FoldedCreaseIsMagnitudeInvariantAndKeepsEndpoints ....................   Passed    0.00 sec
+      Start 2025: HalfedgeMeshFeatures.CubeHasTwelveFeatureEdgesAndEightJunctions
+34/95 Test #2025: HalfedgeMeshFeatures.CubeHasTwelveFeatureEdgesAndEightJunctions ...........................   Passed    0.00 sec
+      Start 2026: HalfedgeMeshFeatures.RejectsInvalidThresholdAndNormalSlotCount
+35/95 Test #2026: HalfedgeMeshFeatures.RejectsInvalidThresholdAndNormalSlotCount ............................   Passed    0.00 sec
+      Start 2027: HalfedgeMeshFeatures.InvalidNormalsAndNonFiniteGeometryFailClosed
+36/95 Test #2027: HalfedgeMeshFeatures.InvalidNormalsAndNonFiniteGeometryFailClosed .........................   Passed    0.00 sec
+      Start 2028: HalfedgeMeshFeatures.DeletedSlotsStayClearAndDanglingEdgesFailClosed
+37/95 Test #2028: HalfedgeMeshFeatures.DeletedSlotsStayClearAndDanglingEdgesFailClosed ......................   Passed    0.00 sec
+      Start 2029: HalfedgeMeshFeatures.CanonicalPolygonNormalsClassifyQuadPair
+38/95 Test #2029: HalfedgeMeshFeatures.CanonicalPolygonNormalsClassifyQuadPair ..............................   Passed    0.00 sec
+      Start 2030: HalfedgeMeshFeatures.EvolvingSimplificationPredicateReadsCurrentNormals
+39/95 Test #2030: HalfedgeMeshFeatures.EvolvingSimplificationPredicateReadsCurrentNormals ...................   Passed    0.00 sec
+      Start 2031: HalfedgeMeshFeatures.MaterializesExactCanonicalBoolProperty
+40/95 Test #2031: HalfedgeMeshFeatures.MaterializesExactCanonicalBoolProperty ...............................   Passed    0.00 sec
+      Start 2342: Simplification.ReducesToTargetFaceCount
+41/95 Test #2342: Simplification.ReducesToTargetFaceCount ...................................................   Passed    0.08 sec
+      Start 2343: Simplification.ErrorThresholdStopsEarly
+42/95 Test #2343: Simplification.ErrorThresholdStopsEarly ...................................................   Passed    0.03 sec
+      Start 2344: Simplification.PreservesBoundary
+43/95 Test #2344: Simplification.PreservesBoundary ..........................................................   Passed    0.00 sec
+      Start 2345: Simplification.ClosedMeshRemainsClosedAfterSimplification
+44/95 Test #2345: Simplification.ClosedMeshRemainsClosedAfterSimplification .................................   Passed    0.07 sec
+      Start 2346: Simplification.ReturnsNulloptForEmptyMesh
+45/95 Test #2346: Simplification.ReturnsNulloptForEmptyMesh .................................................   Passed    0.00 sec
+      Start 2347: Simplification.ReturnsNulloptForSingleFaceMesh
+46/95 Test #2347: Simplification.ReturnsNulloptForSingleFaceMesh ............................................   Passed    0.00 sec
+      Start 2348: Simplification.MaxCollapseErrorIsNonNegative
+47/95 Test #2348: Simplification.MaxCollapseErrorIsNonNegative ..............................................   Passed    0.07 sec
+      Start 2349: Simplification.TetrahedronMinimalSimplification
+48/95 Test #2349: Simplification.TetrahedronMinimalSimplification ...........................................   Passed    0.00 sec
+      Start 2350: Simplification.QuadricMinimizerPlacement
+49/95 Test #2350: Simplification.QuadricMinimizerPlacement ..................................................   Passed    0.10 sec
+      Start 2351: Simplification.FeatureAwarePreservesCubeCorners
+50/95 Test #2351: Simplification.FeatureAwarePreservesCubeCorners ...........................................   Passed    0.04 sec
+      Start 2352: Simplification.NonTriangleFeatureNormalsKeepLeadingTriangleCompatibility
+51/95 Test #2352: Simplification.NonTriangleFeatureNormalsKeepLeadingTriangleCompatibility ..................   Passed    0.00 sec
+      Start 2353: Simplification.ClassicalMetricRemainsReachable
+52/95 Test #2353: Simplification.ClassicalMetricRemainsReachable ............................................   Passed    0.07 sec
+      Start 2354: Simplification.FeatureAwareIsDeterministic
+53/95 Test #2354: Simplification.FeatureAwareIsDeterministic ................................................   Passed    0.08 sec
+      Start 2355: Simplification.FeatureAwareCornerErrorNotWorseThanClassical
+54/95 Test #2355: Simplification.FeatureAwareCornerErrorNotWorseThanClassical ...............................   Passed    0.21 sec
+      Start 2356: Simplification.FeatureAwarePreservesUvSeams
+55/95 Test #2356: Simplification.FeatureAwarePreservesUvSeams ...............................................   Passed    0.01 sec
+      Start 2357: Simplification.FeatureAwarePreservesCornerUvSeams
+56/95 Test #2357: Simplification.FeatureAwarePreservesCornerUvSeams .........................................   Passed    0.04 sec
+      Start 2358: Simplification.UniformCornerUvsPinNoSeam
+57/95 Test #2358: Simplification.UniformCornerUvsPinNoSeam ..................................................   Passed    0.04 sec
+      Start 2359: Simplification.DiagnosticsCountersPopulated
+58/95 Test #2359: Simplification.DiagnosticsCountersPopulated ...............................................   Passed    0.04 sec
+      Start 2408: Subdivision.FeatureEdgeMaskPropagatesToSplitEdges
+59/95 Test #2408: Subdivision.FeatureEdgeMaskPropagatesToSplitEdges .........................................   Passed    0.00 sec
+      Start 2445: Smoothing.DenoiseBilateralPreservesFeatureBetterThanUniform
+60/95 Test #2445: Smoothing.DenoiseBilateralPreservesFeatureBetterThanUniform ...............................   Passed    0.05 sec
+      Start 2495: PointCloudConsolidation.EarUpsamplesTowardDihedralFeature
+61/95 Test #2495: PointCloudConsolidation.EarUpsamplesTowardDihedralFeature .................................   Passed    0.01 sec
+      Start 2513: PointCloudFeatures.RowAccessorIsBoundsChecked
+62/95 Test #2513: PointCloudFeatures.RowAccessorIsBoundsChecked .............................................   Passed    0.00 sec
+      Start 2514: PointCloudFeatures.MatchRejectsMismatchedDimensions
+63/95 Test #2514: PointCloudFeatures.MatchRejectsMismatchedDimensions .......................................   Passed    0.00 sec
+      Start 2515: PointCloudFeatures.MatchTieBreakPrefersLowestTargetRow
+64/95 Test #2515: PointCloudFeatures.MatchTieBreakPrefersLowestTargetRow ....................................   Passed    0.00 sec
+      Start 2516: PointCloudFeatures.MatchRatioRejectsSingleTargetAmbiguity
+65/95 Test #2516: PointCloudFeatures.MatchRatioRejectsSingleTargetAmbiguity .................................   Passed    0.00 sec
+      Start 2517: PointCloudFeatures.MatchRatioRejectsDuplicateTargets
+66/95 Test #2517: PointCloudFeatures.MatchRatioRejectsDuplicateTargets ......................................   Passed    0.00 sec
+      Start 2518: PointCloudFeatures.ComputeDescriptorsSkipsDeletedPoints
+67/95 Test #2518: PointCloudFeatures.ComputeDescriptorsSkipsDeletedPoints ...................................   Passed    0.01 sec
+      Start 2519: PointCloudFeatures.KeypointsSkipDeletedPoints
+68/95 Test #2519: PointCloudFeatures.KeypointsSkipDeletedPoints .............................................   Passed    0.01 sec
+      Start 2520: PointCloudFeatures.ComputeDescriptorsRequiresNormals
+69/95 Test #2520: PointCloudFeatures.ComputeDescriptorsRequiresNormals ......................................   Passed    0.00 sec
+      Start 2521: PointCloudFeatures.DetectKeypointsIsDeterministic
+70/95 Test #2521: PointCloudFeatures.DetectKeypointsIsDeterministic .........................................   Passed    0.02 sec
+      Start 2522: PointCloudFeatures.DetectKeypointsRejectsTooFewPoints
+71/95 Test #2522: PointCloudFeatures.DetectKeypointsRejectsTooFewPoints .....................................   Passed    0.00 sec
+      Start 2523: PointCloudFeatures.DescriptorMatchingIsRotationInvariant
+72/95 Test #2523: PointCloudFeatures.DescriptorMatchingIsRotationInvariant ..................................   Passed    0.02 sec
+      Start 2524: PointCloudFeatures.CoarseAlignmentRecoversKnownTransform
+73/95 Test #2524: PointCloudFeatures.CoarseAlignmentRecoversKnownTransform ..................................   Passed    0.14 sec
+      Start 2525: PointCloudFeatures.CoarseAlignmentRejectsOutliers
+74/95 Test #2525: PointCloudFeatures.CoarseAlignmentRejectsOutliers .........................................   Passed    0.09 sec
+      Start 2526: PointCloudFeatures.CoarseAlignmentHonorsLargerSampleSize
+75/95 Test #2526: PointCloudFeatures.CoarseAlignmentHonorsLargerSampleSize ..................................   Passed    0.14 sec
+      Start 2527: PointCloudFeatures.CoarseAlignmentInsufficientCorrespondences
+76/95 Test #2527: PointCloudFeatures.CoarseAlignmentInsufficientCorrespondences .............................   Passed    0.00 sec
+      Start 2528: PointCloudFeatures.HandlesCollinearAndDuplicatePoints
+77/95 Test #2528: PointCloudFeatures.HandlesCollinearAndDuplicatePoints .....................................   Passed    0.00 sec
+      Start 2529: PointCloudFeatures.IcpRegistrationRemainsReachable
+78/95 Test #2529: PointCloudFeatures.IcpRegistrationRemainsReachable ........................................   Passed    0.00 sec
+      Start 2600: IntersectionClassificationEnums.SegmentFeatureValuesArePinned
+79/95 Test #2600: IntersectionClassificationEnums.SegmentFeatureValuesArePinned .............................   Passed    0.00 sec
+      Start 2601: IntersectionClassificationEnums.RayFeatureValuesArePinned
+80/95 Test #2601: IntersectionClassificationEnums.RayFeatureValuesArePinned .................................   Passed    0.00 sec
+      Start 2602: IntersectionClassificationEnums.TriangleFeatureValuesArePinned
+81/95 Test #2602: IntersectionClassificationEnums.TriangleFeatureValuesArePinned ............................   Passed    0.00 sec
+      Start 2605: IntersectionClassificationDefaults.FeatureFieldsAreNone
+82/95 Test #2605: IntersectionClassificationDefaults.FeatureFieldsAreNone ...................................   Passed    0.00 sec
+      Start 2609: IntersectionClassificationHelpers.TriangleFeatureFromBarycentricMapsVerticesAndEdges
+83/95 Test #2609: IntersectionClassificationHelpers.TriangleFeatureFromBarycentricMapsVerticesAndEdges ......   Passed    0.00 sec
+      Start 2610: IntersectionClassificationHelpers.TriangleFeatureFromBarycentricMapsOutOfTriangleToNone
+84/95 Test #2610: IntersectionClassificationHelpers.TriangleFeatureFromBarycentricMapsOutOfTriangleToNone ...   Passed    0.00 sec
+      Start 2626: RayTriangleClassifyRayFeature.OriginOnTriangleReportsOriginFeature
+85/95 Test #2626: RayTriangleClassifyRayFeature.OriginOnTriangleReportsOriginFeature ........................   Passed    0.00 sec
+      Start 2627: RayTriangleClassifyRayFeature.ForwardHitReportsInteriorRayFeature
+86/95 Test #2627: RayTriangleClassifyRayFeature.ForwardHitReportsInteriorRayFeature .........................   Passed    0.00 sec
+      Start 3085: Simplification_QEM.HausdorffErrorConstraintIsRespected
+87/95 Test #3085: Simplification_QEM.HausdorffErrorConstraintIsRespected ....................................   Passed    0.34 sec
+      Start 3086: Simplification_QEM.RepeatedWorkflowStyleSimplificationStaysValid
+88/95 Test #3086: Simplification_QEM.RepeatedWorkflowStyleSimplificationStaysValid ..........................   Passed    0.95 sec
+      Start 3087: Simplification_QEM.ConfigurableQuadricsSupportAllTypesResidencesAndPlacements
+89/95 Test #3087: Simplification_QEM.ConfigurableQuadricsSupportAllTypesResidencesAndPlacements .............   Passed    0.68 sec
+      Start 3088: Simplification_QEM.ProbabilisticQuadricsSupportIsotropicAndCovarianceModes
+90/95 Test #3088: Simplification_QEM.ProbabilisticQuadricsSupportIsotropicAndCovarianceModes ................   Passed    0.46 sec
+      Start 3719: VulkanOperationalStatusEvaluator.MissingFeatureReportsMissingRequiredFeature
+91/95 Test #3719: VulkanOperationalStatusEvaluator.MissingFeatureReportsMissingRequiredFeature ..............   Passed    0.00 sec
+      Start 3805: FrameRecipeContract.DisabledContributionDescriptorIsFeatureGatedNoOp
+92/95 Test #3805: FrameRecipeContract.DisabledContributionDescriptorIsFeatureGatedNoOp ......................   Passed    0.00 sec
+      Start 3815: FrameRecipeContract.OptionalResourcesAreGatedByFeatures
+93/95 Test #3815: FrameRecipeContract.OptionalResourcesAreGatedByFeatures ...................................   Passed    0.00 sec
+      Start 3823: FrameRecipeContract.DepthPrepassFeatureGatesPassAndSurfaceDepthOwnership
+94/95 Test #3823: FrameRecipeContract.DepthPrepassFeatureGatesPassAndSurfaceDepthOwnership ..................   Passed    0.00 sec
+      Start 4017: RendererFrameLifecycle.FrameRecipeOverrideProjectionDisablesMappedFeatureSlots
+95/95 Test #4017: RendererFrameLifecycle.FrameRecipeOverrideProjectionDisablesMappedFeatureSlots ............   Passed    0.00 sec
+
+100% tests passed, 0 tests failed out of 95
+
+Label Time Summary:
+contract       =   0.12 sec*proc (14 tests)
+geometry       =   4.71 sec*proc (79 tests)
+graphics       =   0.12 sec*proc (6 tests)
+integration    =   0.23 sec*proc (2 tests)
+runtime        =   0.23 sec*proc (10 tests)
+slow           =   2.43 sec*proc (4 tests)
+unit           =   4.71 sec*proc (79 tests)
+
+Total Test time (real) =   5.79 sec

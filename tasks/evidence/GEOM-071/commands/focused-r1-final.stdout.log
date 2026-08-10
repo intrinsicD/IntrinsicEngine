@@ -1,0 +1,46 @@
+Internal ctest changing into directory: /home/alex/Documents/IntrinsicEngine/build/ci
+Test project /home/alex/Documents/IntrinsicEngine/build/ci
+      Start 2023: HalfedgeMeshFeatures.PlanarSquareHonorsBoundaryPolicyAndSlotAlignment
+ 1/18 Test #2023: HalfedgeMeshFeatures.PlanarSquareHonorsBoundaryPolicyAndSlotAlignment ...........   Passed    0.00 sec
+      Start 2024: HalfedgeMeshFeatures.FoldedCreaseIsMagnitudeInvariantAndKeepsEndpoints
+ 2/18 Test #2024: HalfedgeMeshFeatures.FoldedCreaseIsMagnitudeInvariantAndKeepsEndpoints ..........   Passed    0.00 sec
+      Start 2025: HalfedgeMeshFeatures.CubeHasTwelveFeatureEdgesAndEightJunctions
+ 3/18 Test #2025: HalfedgeMeshFeatures.CubeHasTwelveFeatureEdgesAndEightJunctions .................   Passed    0.00 sec
+      Start 2026: HalfedgeMeshFeatures.RejectsInvalidThresholdAndNormalSlotCount
+ 4/18 Test #2026: HalfedgeMeshFeatures.RejectsInvalidThresholdAndNormalSlotCount ..................   Passed    0.00 sec
+      Start 2027: HalfedgeMeshFeatures.RejectsSubmeshViewsBeforeReadingAbsoluteHandles
+ 5/18 Test #2027: HalfedgeMeshFeatures.RejectsSubmeshViewsBeforeReadingAbsoluteHandles ............   Passed    0.00 sec
+      Start 2028: HalfedgeMeshFeatures.InvalidNormalsAndNonFiniteGeometryFailClosed
+ 6/18 Test #2028: HalfedgeMeshFeatures.InvalidNormalsAndNonFiniteGeometryFailClosed ...............   Passed    0.00 sec
+      Start 2029: HalfedgeMeshFeatures.InvalidBoundaryFaceNormalOverridesDisabledBoundaryPolicy
+ 7/18 Test #2029: HalfedgeMeshFeatures.InvalidBoundaryFaceNormalOverridesDisabledBoundaryPolicy ...   Passed    0.00 sec
+      Start 2030: HalfedgeMeshFeatures.DeletedSlotsStayClearAndDanglingEdgesFailClosed
+ 8/18 Test #2030: HalfedgeMeshFeatures.DeletedSlotsStayClearAndDanglingEdgesFailClosed ............   Passed    0.00 sec
+      Start 2031: HalfedgeMeshFeatures.CanonicalPolygonNormalsClassifyQuadPair
+ 9/18 Test #2031: HalfedgeMeshFeatures.CanonicalPolygonNormalsClassifyQuadPair ....................   Passed    0.01 sec
+      Start 2032: HalfedgeMeshFeatures.EvolvingSimplificationPredicateReadsCurrentNormals
+10/18 Test #2032: HalfedgeMeshFeatures.EvolvingSimplificationPredicateReadsCurrentNormals .........   Passed    0.01 sec
+      Start 2033: HalfedgeMeshFeatures.MaterializesExactCanonicalBoolProperty
+11/18 Test #2033: HalfedgeMeshFeatures.MaterializesExactCanonicalBoolProperty .....................   Passed    0.01 sec
+      Start 2353: Simplification.FeatureAwarePreservesCubeCorners
+12/18 Test #2353: Simplification.FeatureAwarePreservesCubeCorners .................................   Passed    0.06 sec
+      Start 2354: Simplification.EvolvingFeatureLegalityUsesRecomputedNormals
+13/18 Test #2354: Simplification.EvolvingFeatureLegalityUsesRecomputedNormals .....................   Passed    0.04 sec
+      Start 2355: Simplification.NonTriangleFeatureNormalsKeepLeadingTriangleCompatibility
+14/18 Test #2355: Simplification.NonTriangleFeatureNormalsKeepLeadingTriangleCompatibility ........   Passed    0.00 sec
+      Start 2357: Simplification.FeatureAwareIsDeterministic
+15/18 Test #2357: Simplification.FeatureAwareIsDeterministic ......................................   Passed    0.08 sec
+      Start 2358: Simplification.FeatureAwareCornerErrorNotWorseThanClassical
+16/18 Test #2358: Simplification.FeatureAwareCornerErrorNotWorseThanClassical .....................   Passed    0.22 sec
+      Start 2359: Simplification.FeatureAwarePreservesUvSeams
+17/18 Test #2359: Simplification.FeatureAwarePreservesUvSeams .....................................   Passed    0.01 sec
+      Start 2360: Simplification.FeatureAwarePreservesCornerUvSeams
+18/18 Test #2360: Simplification.FeatureAwarePreservesCornerUvSeams ...............................   Passed    0.04 sec
+
+100% tests passed, 0 tests failed out of 18
+
+Label Time Summary:
+geometry    =   0.50 sec*proc (18 tests)
+unit        =   0.50 sec*proc (18 tests)
+
+Total Test time (real) =   1.23 sec

@@ -1,0 +1,21 @@
+{
+  "command": [
+    "bash",
+    "-lc",
+    "python3 tools/repo/generate_module_inventory.py --root src --out /tmp/geom071-module-inventory-r1-final.md && diff -u docs/api/generated/module_inventory.md /tmp/geom071-module-inventory-r1-final.md"
+  ],
+  "command_display": "bash -lc 'python3 tools/repo/generate_module_inventory.py --root src --out /tmp/geom071-module-inventory-r1-final.md && diff -u docs/api/generated/module_inventory.md /tmp/geom071-module-inventory-r1-final.md'",
+  "cwd": ".",
+  "duration_ms": 54,
+  "exit_code": 0,
+  "finished_at": "2026-08-10T16:31:50Z",
+  "label": "module-inventory-r1-final",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-10T16:31:50Z",
+  "stderr_path": "tasks/evidence/GEOM-071/commands/module-inventory-r1-final.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/GEOM-071/commands/module-inventory-r1-final.stdout.log",
+  "stdout_sha256": "23fb9bf78b598068cb0fb5b2c3b8377f6941ed741996040534ab619d5576a29a",
+  "task_id": "GEOM-071"
+}

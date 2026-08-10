@@ -42,7 +42,7 @@ map.
 - [GEOM-070 — Rectangular sparse LSQR and LSCM adoption](GEOM-070-sparse-lsqr-lscm-adoption.md)
   (adds an LSQR-style free function to `Geometry.Sparse` and removes LSCM's
   private normal-equation path in the same slice).
-- [GEOM-071 — Reusable sharp-feature classification](GEOM-071-reusable-sharp-feature-classification.md)
+- [GEOM-071 — Reusable sharp-feature classification](../../active/GEOM-071-reusable-sharp-feature-classification.md)
   (plain boundary/dihedral feature facts with behavior-preserving FA-QEM
   adoption; concrete second consumer is `GEOM-072`).
 - [GEOM-072 — Catmull-Clark crease masks](GEOM-072-catmull-clark-crease-masks.md)
@@ -139,7 +139,9 @@ the runtime SpatialDebug closest-face consumer in `RUNTIME-135`.
   adopter. The mathematically distinct fixed-boundary smoothing defect remains
   the focused correctness task `BUG-110`, not a general constrained-solver
   expansion.
-- GEOM-071 extracts plain, lossless sharp-feature facts into Simplification;
+- GEOM-071 extracts plain, slot-aligned sharp-feature facts plus canonical
+  `e:feature` materialization into a focused geometry module; Simplification
+  is the behavior-preserving first adopter and keeps evolving-edge checks live.
   GEOM-072 is its named second adopter and owns Catmull-Clark crease stencils
   and tag propagation.
 - GEOM-073 and GEOM-074 close the clarified property-domain contract at the

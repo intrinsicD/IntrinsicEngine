@@ -1,0 +1,6 @@
+[ERROR] tools/agents/contract_legacy_tasks.json: stale contract legacy entry `backlog/geometry/GEOM-071-reusable-sharp-feature-classification.md` must move to `consumed` when its task is removed, renamed, promoted, or enrolled.
+Validated 260 task file(s); findings: 1; mode: strict.
+[check_task_maturity_followups] Root: /home/alex/Documents/IntrinsicEngine
+[check_task_maturity_followups] Open task files scanned: 94
+[check_task_maturity_followups] No maturity follow-up findings.
+ERROR: validate_tasks.py strict mode reported task-format violations

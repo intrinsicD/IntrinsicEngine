@@ -12,6 +12,7 @@
 #include <glm/glm.hpp>
 
 import Geometry;
+import Geometry.HalfedgeMesh.Features;
 
 #include "Test_MeshBuilders.h"
 
@@ -121,6 +122,69 @@ namespace
                 (void)mesh.AddTriangle(a, c, d);
             }
         return mesh;
+    }
+
+    // Closed five-face pyramid with a deliberately non-planar quad base. It
+    // distinguishes Simplification's historical leading-triangle normal from
+    // the canonical polygon/Newell normal without relying on boundary edges.
+    Geometry::HalfedgeMesh::Mesh MakeNonPlanarQuadPyramid()
+    {
+        Geometry::HalfedgeMesh::Mesh mesh;
+        const auto v0 = mesh.AddVertex({-1.0f, -1.0f, 0.0f});
+        const auto v1 = mesh.AddVertex({1.0f, -1.0f, 0.0f});
+        const auto v2 = mesh.AddVertex({1.0f, 1.0f, 1.0f});
+        const auto v3 = mesh.AddVertex({-1.0f, 1.0f, 0.0f});
+        const auto apex = mesh.AddVertex({0.0f, 0.0f, 3.0f});
+        (void)mesh.AddQuad(v0, v3, v2, v1);
+        (void)mesh.AddTriangle(v0, v1, apex);
+        (void)mesh.AddTriangle(v1, v2, apex);
+        (void)mesh.AddTriangle(v2, v3, apex);
+        (void)mesh.AddTriangle(v3, v0, apex);
+        return mesh;
+    }
+
+    std::vector<glm::dvec3> LeadingTriangleFaceNormals(
+        const Geometry::HalfedgeMesh::Mesh& mesh)
+    {
+        std::vector<glm::dvec3> normals(mesh.FacesSize(), glm::dvec3(0.0));
+        for (std::size_t faceIndex = 0u; faceIndex < mesh.FacesSize(); ++faceIndex)
+        {
+            const Geometry::FaceHandle face{
+                static_cast<Geometry::PropertyIndex>(faceIndex)};
+            if (mesh.IsDeleted(face))
+                continue;
+            const Geometry::HalfedgeHandle h0 = mesh.Halfedge(face);
+            const Geometry::HalfedgeHandle h1 = mesh.NextHalfedge(h0);
+            const Geometry::HalfedgeHandle h2 = mesh.NextHalfedge(h1);
+            const glm::dvec3 p0(mesh.Position(mesh.ToVertex(h0)));
+            const glm::dvec3 p1(mesh.Position(mesh.ToVertex(h1)));
+            const glm::dvec3 p2(mesh.Position(mesh.ToVertex(h2)));
+            normals[faceIndex] = glm::cross(p1 - p0, p2 - p0);
+        }
+        return normals;
+    }
+
+    std::vector<glm::dvec3> CanonicalPolygonFaceNormals(
+        const Geometry::HalfedgeMesh::Mesh& mesh)
+    {
+        std::vector<glm::dvec3> normals(mesh.FacesSize(), glm::dvec3(0.0));
+        for (std::size_t faceIndex = 0u; faceIndex < mesh.FacesSize(); ++faceIndex)
+        {
+            const Geometry::FaceHandle face{
+                static_cast<Geometry::PropertyIndex>(faceIndex)};
+            if (!mesh.IsDeleted(face))
+                normals[faceIndex] = Geometry::MeshUtils::FaceAreaVector(mesh, face);
+        }
+        return normals;
+    }
+
+    std::size_t JunctionCount(
+        const Geometry::HalfedgeMesh::Features::Classification& classification)
+    {
+        return static_cast<std::size_t>(std::count(
+            classification.VertexIncidence.begin(),
+            classification.VertexIncidence.end(),
+            Geometry::HalfedgeMesh::Features::VertexIncidenceCategory::Junction));
     }
 
     struct SampledSurfaceDistance
@@ -378,11 +442,76 @@ TEST(Simplification, FeatureAwarePreservesCubeCorners)
     auto result = Geometry::Simplification::Simplify(mesh, params);
     ASSERT_TRUE(result.has_value());
     EXPECT_GT(result->CollapseCount, 0u);
+    EXPECT_EQ(result->CollapseCount, 84u);
+    EXPECT_EQ(result->FinalFaceCount, 24u);
+    EXPECT_EQ(result->CollapsesRejectedTopology, 266u);
+    EXPECT_EQ(result->CollapsesRejectedQuality, 1256u);
     EXPECT_EQ(result->SharpFeatureVerticesPinned, 8u);
 
     mesh.GarbageCollection();
     for (const glm::vec3& corner : kCubeCorners)
         EXPECT_TRUE(HasLiveVertexNear(mesh, corner)) << "corner removed: " << corner.x;
+}
+
+// A warped grid creates feature-line edges whose dihedral changes after nearby
+// collapses. These exact diagnostics require legality to read the recomputed
+// one-ring normals: substituting the initialization mask yields 93 collapses
+// and 102 final faces instead of the values below.
+TEST(Simplification, EvolvingFeatureLegalityUsesRecomputedNormals)
+{
+    auto mesh = MakeGridPlane(12);
+    for (std::size_t vi = 0u; vi < mesh.VerticesSize(); ++vi)
+    {
+        const Geometry::VertexHandle vertex{
+            static_cast<Geometry::PropertyIndex>(vi)};
+        glm::vec3& p = mesh.Position(vertex);
+        p.z = 0.12f * std::sin(5.0f * p.x) * std::cos(4.0f * p.y)
+            + 0.03f * std::sin(17.0f * p.x + 11.0f * p.y);
+    }
+
+    Geometry::Simplification::Params params;
+    params.TargetFaces = 40u;
+    params.FeatureAngleThresholdDegrees = 30.0;
+    params.PreserveBoundary = true;
+    const auto result = Geometry::Simplification::Simplify(mesh, params);
+    ASSERT_TRUE(result.has_value());
+    EXPECT_EQ(result->CollapseCount, 96u);
+    EXPECT_EQ(result->FinalFaceCount, 96u);
+    EXPECT_EQ(result->CollapsesRejectedTopology, 40u);
+    EXPECT_EQ(result->CollapsesRejectedQuality, 1739u);
+    EXPECT_EQ(result->SharpFeatureVerticesPinned, 50u);
+}
+
+// The shared classifier accepts caller-selected polygon normals, but the
+// Simplification adopter must keep its historical leading-triangle policy for
+// non-triangle faces. The two policies intentionally disagree on this fixture.
+TEST(Simplification, NonTriangleFeatureNormalsKeepLeadingTriangleCompatibility)
+{
+    auto mesh = MakeNonPlanarQuadPyramid();
+    ASSERT_EQ(mesh.FaceCount(), 5u);
+
+    Geometry::HalfedgeMesh::Features::Params featureParams{};
+    featureParams.DihedralThresholdDegrees = 90.0;
+    const auto leading = Geometry::HalfedgeMesh::Features::Classify(
+        mesh, LeadingTriangleFaceNormals(mesh), featureParams);
+    const auto canonical = Geometry::HalfedgeMesh::Features::Classify(
+        mesh, CanonicalPolygonFaceNormals(mesh), featureParams);
+    ASSERT_EQ(
+        leading.Status,
+        Geometry::HalfedgeMesh::Features::ClassificationStatus::Success);
+    ASSERT_EQ(
+        canonical.Status,
+        Geometry::HalfedgeMesh::Features::ClassificationStatus::Success);
+    ASSERT_NE(JunctionCount(leading), JunctionCount(canonical));
+
+    Geometry::Simplification::Params params;
+    params.TargetFaces = mesh.FaceCount();
+    params.FeatureAngleThresholdDegrees = featureParams.DihedralThresholdDegrees;
+    const auto result = Geometry::Simplification::Simplify(mesh, params);
+    ASSERT_TRUE(result.has_value());
+    EXPECT_EQ(result->CollapseCount, 0u);
+    EXPECT_EQ(result->SharpFeatureVerticesPinned, JunctionCount(leading));
+    EXPECT_NE(result->SharpFeatureVerticesPinned, JunctionCount(canonical));
 }
 
 // The classical metric remains a stable quadric-only contract: changing every

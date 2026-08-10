@@ -1,0 +1,189 @@
+schema_version: 1
+task_id: GEOM-071
+workflow_profile: high-risk
+status: draft
+generated_by: tools/agents/workflow_evidence.py
+generated_at: '2026-08-10T16:32:25Z'
+claim_eligible: false
+source:
+  base_ref: HEAD
+  base_revision: 23c1080a6a9c9d994ed8a95dbdc6c39c4e029ca1
+  head_revision: 23c1080a6a9c9d994ed8a95dbdc6c39c4e029ca1
+  branch: main
+  worktree: /home/alex/Documents/IntrinsicEngine
+  dirty: true
+  surface:
+  - path: ara/logic/claims.md
+    sha256: 868fb03dfa6c82b7dee6d2ee774edb027341cf6b27349f73e50be514575b4fa5
+  - path: ara/staging/observations.yaml
+    sha256: 7b254228381ea16af86e2f44a1ac6a5fb164da4af3e234ffe5c07954d6fdad2d
+  - path: ara/trace/exploration_tree.yaml
+    sha256: 0fbf0e21dbb3201aa70948b2fe108dd14dc32e05b3383678dd4524b4c502b428
+  - path: docs/api/generated/module_inventory.md
+    sha256: 65ff2b42ee2518db967a6f83bd79cb6cba94b7d6016fb44523e5330b0fe7f14f
+  - path: docs/architecture/geometry.md
+    sha256: 357b25de0a59b0cae7d48912ff5c8968ad98e63ac1f95fa4f9cb17387f01d973
+  - path: src/geometry/CMakeLists.txt
+    sha256: 73377cc54fa0cf6e602a2e9e4f21c3fc950d644fff3a271d357da23e402b5da5
+  - path: src/geometry/Geometry.HalfedgeMesh.Features.cpp
+    sha256: a4bb2c68b92b31a2302c36262e0f8a1c2489034f3b5f699b01d3a13f7e51dd9e
+  - path: src/geometry/Geometry.HalfedgeMesh.Features.cppm
+    sha256: 1cc864ccdd3867df3b7a63d98b880664da1fdf401ca0f782850c0b2001f6d807
+  - path: src/geometry/Geometry.HalfedgeMesh.Simplification.cpp
+    sha256: 565a9d6bcc8f1fc4c92c958873b5fb5f56f3885b5d3c28cbce1d0866d3db0f5d
+  - path: tasks/SESSION-BRIEF.md
+    sha256: c330623c54ee5e73cb9f1a6b00fb024133e6a8afb1f931031b2dcf325f22a680
+  - path: tasks/active/GEOM-071-reusable-sharp-feature-classification.md
+    sha256: 77b1bd5a725fac1fd909ea15a0653be4e5f3fd01cb45ec5424b78b280b600be9
+  - path: tasks/active/README.md
+    sha256: 0376422934ed0c76f77b1f24182e5ebacd8dbfd1ce7dfba25365aa897207c79f
+  - path: tasks/backlog/geometry/README.md
+    sha256: d7441312052dd0d5f013d3331bd84597533bffdc23d53b092fd2c044e2645873
+  - path: tests/CMakeLists.txt
+    sha256: 1c14a01d6f946b086c1280427b56a48af0f5e59aebc46b3f2459ea0364c29dae
+  - path: tests/unit/geometry/Test.HalfedgeMeshFeatures.cpp
+    sha256: 58490b8aad7121f419c562ebd3dd3fe371d4105b9aacffaa0869c5aeab6b6ac8
+  - path: tests/unit/geometry/Test_Simplification.cpp
+    sha256: 7f3e391b18352f49ff02d3491544b175a3031a900344f0002bf1818f8ec34c65
+  - path: tools/agents/contract_legacy_tasks.json
+    sha256: 73366a0209affc658cb0108e96f1405165e7dca7a342f7c89c0c2a4f683f62e2
+  content_digest: dab126d25b10d3331cabf6f1133479009686210fe0b4c7bc6b80b57d5764fd3b
+touched:
+  paths:
+  - ara/logic/claims.md
+  - ara/staging/observations.yaml
+  - ara/trace/exploration_tree.yaml
+  - docs/api/generated/module_inventory.md
+  - docs/architecture/geometry.md
+  - src/geometry/CMakeLists.txt
+  - src/geometry/Geometry.HalfedgeMesh.Features.cpp
+  - src/geometry/Geometry.HalfedgeMesh.Features.cppm
+  - src/geometry/Geometry.HalfedgeMesh.Simplification.cpp
+  - tasks/SESSION-BRIEF.md
+  - tasks/active/GEOM-071-reusable-sharp-feature-classification.md
+  - tasks/active/README.md
+  - tasks/backlog/geometry/README.md
+  - tests/CMakeLists.txt
+  - tests/unit/geometry/Test.HalfedgeMeshFeatures.cpp
+  - tests/unit/geometry/Test_Simplification.cpp
+  - tools/agents/contract_legacy_tasks.json
+  layers:
+  - geometry
+  modules:
+  - Geometry.HalfedgeMesh.Features
+  - Geometry.Simplification
+extension_seam: Plain Params/Classification records and free functions; no detector interface, registry,
+  service, cache, or umbrella re-export.
+future_change_plan: GEOM-072 is the concrete second consumer and owns Catmull-Clark crease stencils/tag
+  propagation; METHOD-038 may consume the same facts only after GEOM-071 retirement.
+acceptance:
+- criterion: Simplification contains no duplicate batch feature-edge/count classifier and remains behavior-identical
+    on its regression corpus.
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: The result preserves enough facts for FA-QEM and Catmull-Clark to apply different one-edge
+    policies.
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: The new surface is plain params/result/free functions with no abstract detector machinery.
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: The default CPU geometry and layering gates pass.
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+commands:
+- receipt: tasks/evidence/GEOM-071/commands/ara-claims.json
+- receipt: tasks/evidence/GEOM-071/commands/ara-r1-final.json
+- receipt: tasks/evidence/GEOM-071/commands/baseline-simplification.json
+- receipt: tasks/evidence/GEOM-071/commands/build-geometry-after-module.json
+- receipt: tasks/evidence/GEOM-071/commands/ci-build-final.json
+- receipt: tasks/evidence/GEOM-071/commands/ci-build-r1-final.json
+- receipt: tasks/evidence/GEOM-071/commands/ci-configure-final.json
+- receipt: tasks/evidence/GEOM-071/commands/ci-configure-r1-final.json
+- receipt: tasks/evidence/GEOM-071/commands/clean-workshop-r1-final.json
+- receipt: tasks/evidence/GEOM-071/commands/clean-workshop.json
+- receipt: tasks/evidence/GEOM-071/commands/configure-after-module.json
+- receipt: tasks/evidence/GEOM-071/commands/cpu-r1-final.json
+- receipt: tasks/evidence/GEOM-071/commands/cpu-tests.json
+- receipt: tasks/evidence/GEOM-071/commands/docs-links-r1-final.json
+- receipt: tasks/evidence/GEOM-071/commands/docs-links-review-surface.json
+- receipt: tasks/evidence/GEOM-071/commands/docs-links.json
+- receipt: tasks/evidence/GEOM-071/commands/focused-feature-simplification-tests.json
+- receipt: tasks/evidence/GEOM-071/commands/focused-r1-final.json
+- receipt: tasks/evidence/GEOM-071/commands/layering-r1-final.json
+- receipt: tasks/evidence/GEOM-071/commands/layering.json
+- receipt: tasks/evidence/GEOM-071/commands/module-inventory-r1-final.json
+- receipt: tasks/evidence/GEOM-071/commands/module-inventory.json
+- receipt: tasks/evidence/GEOM-071/commands/root-hygiene-r1-final.json
+- receipt: tasks/evidence/GEOM-071/commands/root-hygiene.json
+- receipt: tasks/evidence/GEOM-071/commands/task-policy-final.json
+- receipt: tasks/evidence/GEOM-071/commands/task-policy-r1-final.json
+- receipt: tasks/evidence/GEOM-071/commands/task-policy-review-surface.json
+- receipt: tasks/evidence/GEOM-071/commands/task-policy.json
+- receipt: tasks/evidence/GEOM-071/commands/task-validation-r1-final.json
+- receipt: tasks/evidence/GEOM-071/commands/test-layout-r1-final.json
+- receipt: tasks/evidence/GEOM-071/commands/test-layout.json
+changed_public_contracts:
+- Owning meshes only; submesh views fail explicitly before absolute-handle access or materialization.
+- Finite [0,180] strict-greater dihedral threshold, caller-owned exact face-normal slots, scale-stable
+  normalization across representable finite nonzero magnitudes, configurable boundary policy, and per-edge
+  fail-closed invalid-input handling.
+- Owned edge masks plus exact vertex incidence counts/categories and validated caller-named bool property
+  materialization with canonical default e:feature.
+- FA-QEM maps endpoint to unprotected, crease to line, junction to corner while retaining its local boundary-turning
+  and current-normal collapse policy.
+diagnostics_and_previews:
+- Eleven direct classifier/property cases and the narrow 18-case classifier/FA-QEM selector passed.
+- All 4,209 selected CPU tests passed; the BUG-118 GLFW/LeakSanitizer control self-skipped.
+- Strict inventory, layering, test-layout, docs-link, task-policy/task-validation, root-hygiene, ARA,
+  and clean-workshop checks passed.
+benchmark_or_parity_evidence: []
+docs_sync:
+  task_file: tasks/active/GEOM-071-reusable-sharp-feature-classification.md
+  session_brief_present: true
+  canonical_docs_changed: true
+  skill_mirrors_checked: true
+residual_risks:
+- Classification is an owning-mesh topology/normal snapshot; callers must reclassify after relevant edits,
+  and same-sized topology mutation is not revision-stamped.
+- Invalid topology and unusable normals intentionally over-classify affected live edges as features; submesh
+  views are rejected rather than projected.
+skipped_checks:
+- check: sanitizer-gpu
+  reason: No isolated ASan/UBSan or GPU/Vulkan gate was run because GEOM-071 is a geometry-only CPUContracted
+    contract with no backend path.
+artifacts:
+- path: src/geometry/Geometry.HalfedgeMesh.Features.cppm
+  sha256: 1cc864ccdd3867df3b7a63d98b880664da1fdf401ca0f782850c0b2001f6d807
+  kind: file
+- path: src/geometry/Geometry.HalfedgeMesh.Features.cpp
+  sha256: a4bb2c68b92b31a2302c36262e0f8a1c2489034f3b5f699b01d3a13f7e51dd9e
+  kind: file
+- path: tests/unit/geometry/Test.HalfedgeMeshFeatures.cpp
+  sha256: 58490b8aad7121f419c562ebd3dd3fe371d4105b9aacffaa0869c5aeab6b6ac8
+  kind: file
+- path: tests/unit/geometry/Test_Simplification.cpp
+  sha256: 7f3e391b18352f49ff02d3491544b175a3031a900344f0002bf1818f8ec34c65
+  kind: file
+- path: docs/architecture/geometry.md
+  sha256: 357b25de0a59b0cae7d48912ff5c8968ad98e63ac1f95fa4f9cb17387f01d973
+  kind: file
+- path: ara/logic/claims.md
+  sha256: 868fb03dfa6c82b7dee6d2ee774edb027341cf6b27349f73e50be514575b4fa5
+  kind: file
+self_review:
+  completed: true
+  scope_matches_task: true
+  layering_preserved: true
+  tests_and_docs_accounted_for: true
+  mechanical_and_semantic_changes_separated: true
+handoff: tasks/evidence/GEOM-071/handoff.jsonl
+review: tasks/evidence/GEOM-071/reviews.jsonl

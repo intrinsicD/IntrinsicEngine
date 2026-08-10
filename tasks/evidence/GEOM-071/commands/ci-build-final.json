@@ -1,0 +1,25 @@
+{
+  "command": [
+    "cmake",
+    "--build",
+    "--preset",
+    "ci",
+    "--target",
+    "IntrinsicGeometryTests",
+    "IntrinsicTests"
+  ],
+  "command_display": "cmake --build --preset ci --target IntrinsicGeometryTests IntrinsicTests",
+  "cwd": ".",
+  "duration_ms": 18367,
+  "exit_code": 0,
+  "finished_at": "2026-08-10T15:51:39Z",
+  "label": "ci-build-final",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-10T15:51:21Z",
+  "stderr_path": "tasks/evidence/GEOM-071/commands/ci-build-final.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/GEOM-071/commands/ci-build-final.stdout.log",
+  "stdout_sha256": "c16ad1742fa91266fed502ba2a0146f3cab13ac70aff17f1c483dbf70fe2d8cc",
+  "task_id": "GEOM-071"
+}

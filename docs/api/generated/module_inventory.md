@@ -12,7 +12,7 @@ Root scanned: `src`
 | `assets` | 11 |
 | `core` | 40 |
 | `ecs` | 27 |
-| `geometry` | 110 |
+| `geometry` | 111 |
 | `graphics/assets` | 1 |
 | `graphics/framegraph` | 7 |
 | `graphics/renderer` | 71 |
@@ -144,6 +144,7 @@ Root scanned: `src`
 | `Geometry.Curvature` | `src/geometry/Geometry.HalfedgeMesh.Curvature.cppm` | `geometry` |
 | `Geometry.HalfedgeMesh.CurvatureSegmentation` | `src/geometry/Geometry.HalfedgeMesh.CurvatureSegmentation.cppm` | `geometry` |
 | `Geometry.DEC` | `src/geometry/Geometry.HalfedgeMesh.DEC.cppm` | `geometry` |
+| `Geometry.HalfedgeMesh.Features` | `src/geometry/Geometry.HalfedgeMesh.Features.cppm` | `geometry` |
 | `Geometry.HalfedgeMesh.Fwd` | `src/geometry/Geometry.HalfedgeMesh.Fwd.cppm` | `geometry` |
 | `Geometry.Geodesic` | `src/geometry/Geometry.HalfedgeMesh.Geodesic.cppm` | `geometry` |
 | `Geometry.HalfedgeMesh.IO` | `src/geometry/Geometry.HalfedgeMesh.IO.cppm` | `geometry` |
@@ -411,4 +412,4 @@ Root scanned: `src`
 | `Extrinsic.Runtime.StableEntityLookup` | `src/runtime/Scene/Runtime.StableEntityLookup.cppm` | `runtime` |
 | `Extrinsic.Runtime.VisualizationRecipes` | `src/runtime/Visualization/Runtime.VisualizationRecipes.cppm` | `runtime` |
 
-Total modules: **384**
+Total modules: **385**

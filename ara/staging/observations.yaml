@@ -2484,3 +2484,25 @@ observations:
     promoted_to: "logic/claims.md:C38"
     crystallized_via: artifact-commitment
     stale: false
+  - id: O141
+    timestamp: "2026-08-10T17:55+02:00"
+    provenance: ai-executed
+    content: >
+      GEOM-071 establishes deterministic, owning-slot-aligned halfedge
+      sharp-feature facts from caller-owned face normals, rejects submesh views,
+      preserves endpoint/crease/junction incidence, materializes the canonical
+      e:feature property, and replaces FA-QEM's private batch classifier without
+      changing its pinned cube corpus.
+    context: >
+      Direct CPU fixtures cover denormal-through-near-maximum magnitude
+      invariance, invalid-normal and topology fail-closed behavior, explicit
+      submesh rejection, polygon-normal policy, exact property publication, and
+      a multi-collapse current-normal evaluation. Focused and complete selected
+      CPU gates passed; no Catmull-Clark, runtime/UI, GPU, or performance result
+      is claimed.
+    potential_type: claim
+    bound_to: [N404]
+    promoted: true
+    promoted_to: "logic/claims.md:C39"
+    crystallized_via: artifact-commitment
+    stale: false

@@ -257,6 +257,33 @@ preservation from a caller-selected boolean edge property, defaulting to
 adds Kobbelt sqrt(3) subdivision for triangle meshes, including centroid split,
 old-vertex relaxation, original interior-edge flips, and boundary handling.
 
+`Geometry.HalfedgeMesh.Features` is the narrow, explicitly imported CPU seam
+for producing that canonical edge-feature property. It rejects submesh views
+because their connectivity handles address absolute backing-storage slots.
+`Classify` borrows an exact `FacesSize()`-aligned `glm::dvec3` normal view for
+the duration of the call; callers therefore retain their own face-normal
+policy. Finite nonzero normals are normalized with component scaling, including
+subnormal and near-maximum magnitudes, and a live interior edge is sharp only when its
+unsigned normal angle strictly exceeds the finite `[0, 180]` degree threshold.
+A regular one-live-face open boundary follows `BoundaryIsFeature` only after
+its sole face normal validates; an unusable sole-face normal overrides a
+disabled boundary policy and marks the edge as a feature. Dangling adjacency,
+deleted/out-of-range adjacent faces, and zero or non-finite adjacent normals
+likewise fail closed. Deleted edge slots remain clear.
+
+The owned result is a snapshot aligned to the mesh's current edge and vertex
+storage slots. It keeps the edge mask, exact incident-feature-edge counts, and
+distinct `None`, `Endpoint`, `Crease`, and `Junction` vertex categories; callers
+must reclassify after relevant topology or normal changes. The materializer
+validates the snapshot before overwriting a caller-named boolean edge property,
+defaulting to `e:feature`. Simplification is the first adopter: its initial
+FA-QEM protection policy maps one-edge endpoints to unprotected, two-edge
+incidence to a line, and three-or-more to a pinned corner, while its collapse
+legality path calls the shared fail-closed edge predicate against recomputed
+one-ring normals. Its historical leading-triangle normal policy for polygon
+faces and its separate boundary-turning promotion remain local compatibility
+behavior. The broad `Geometry` umbrella does not re-export this focused module.
+
 `Geometry.HalfedgeMesh::Mesh` publishes core topology helpers for polygon
 `Triangulate`, conservative `IsRemovalOk`, intrinsic `IsDelaunay`, conditional
 `DelaunayFlip`, direct `EdgeLength`, and `UpdateEdgeLengths`. `UpdateEdgeLengths`

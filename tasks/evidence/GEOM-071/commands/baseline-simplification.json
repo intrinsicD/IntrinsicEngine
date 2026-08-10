@@ -1,0 +1,26 @@
+{
+  "command": [
+    "ctest",
+    "--test-dir",
+    "build/ci",
+    "--output-on-failure",
+    "-R",
+    "Simplification",
+    "--timeout",
+    "120"
+  ],
+  "command_display": "ctest --test-dir build/ci --output-on-failure -R Simplification --timeout 120",
+  "cwd": ".",
+  "duration_ms": 4183,
+  "exit_code": 0,
+  "finished_at": "2026-08-10T15:34:37Z",
+  "label": "baseline-simplification",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-10T15:34:33Z",
+  "stderr_path": "tasks/evidence/GEOM-071/commands/baseline-simplification.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/GEOM-071/commands/baseline-simplification.stdout.log",
+  "stdout_sha256": "3f55c729b3d1e49d365ed78c35d9970220eb40070bad31ee155ef48e9b41dd77",
+  "task_id": "GEOM-071"
+}

@@ -19,6 +19,7 @@ module Geometry.Simplification;
 import Geometry.Quadric;
 import Geometry.Properties;
 import Geometry.HalfedgeMesh;
+import Geometry.HalfedgeMesh.Features;
 import Geometry.HalfedgeMesh.Utils;
 import Geometry.MeshClosestFace;
 import Geometry.Validation;
@@ -613,57 +614,15 @@ namespace Geometry::Simplification
         // it is a boundary edge or its dihedral angle exceeds the threshold.
         // =====================================================================
 
-        enum class FeatureKind : std::uint8_t
+        // Simplification-owned policy derived from the reusable incidence facts.
+        // In particular, a one-edge endpoint remains unprotected here even
+        // though the shared classifier preserves it as a distinct category.
+        enum class FeatureProtection : std::uint8_t
         {
-            None,    // smooth interior vertex
+            Unprotected,
             Line,    // lies on a crease / boundary segment
             Corner   // sharp corner — never removed
         };
-
-        [[nodiscard]] bool IsFeatureEdge(
-            HalfedgeMesh::Mesh const& mesh,
-            EdgeHandle e,
-            std::vector<glm::dvec3> const& faceNormals,
-            double cosThreshold) noexcept
-        {
-            if (!e.IsValid() || mesh.IsDeleted(e) || mesh.IsBoundary(e))
-            {
-                // Boundary (and any dangling) edge is always a feature.
-                return true;
-            }
-
-            const HalfedgeHandle h0 = mesh.Halfedge(e, 0);
-            const HalfedgeHandle h1 = mesh.Halfedge(e, 1);
-            const FaceHandle f0 = mesh.Face(h0);
-            const FaceHandle f1 = mesh.Face(h1);
-            if (!f0.IsValid() || !f1.IsValid()
-                || f0.Index >= faceNormals.size() || f1.Index >= faceNormals.size())
-            {
-                return true;
-            }
-
-            // Sharp when the two face normals diverge by more than the threshold
-            // angle, i.e. their dot product drops below cos(threshold).
-            const double dp = glm::dot(faceNormals[f0.Index], faceNormals[f1.Index]);
-            return dp < cosThreshold;
-        }
-
-        [[nodiscard]] std::size_t CountIncidentFeatureEdges(
-            HalfedgeMesh::Mesh const& mesh,
-            VertexHandle v,
-            std::vector<glm::dvec3> const& faceNormals,
-            double cosThreshold) noexcept
-        {
-            std::size_t count = 0;
-            for (const HalfedgeHandle h : mesh.HalfedgesAroundVertex(v))
-            {
-                if (IsFeatureEdge(mesh, mesh.Edge(h), faceNormals, cosThreshold))
-                {
-                    ++count;
-                }
-            }
-            return count;
-        }
 
         // Deviation of a boundary vertex from straight, in degrees: 0 when the
         // two incident boundary edges are colinear, growing as the loop bends.
@@ -814,9 +773,17 @@ namespace Geometry::Simplification
         // Feature-Aware QEM (GEOM-014). When disabled, every FA_QEM-only branch
         // below is skipped and behaviour is identical to the pre-GEOM-014 path.
         const bool faQem = params.Metric == Metric::FA_QEM;
-        const double featureCosThreshold = std::cos(
-            std::clamp(params.FeatureAngleThresholdDegrees, 0.0, 180.0)
-                / 180.0 * std::numbers::pi);
+        // Preserve the pre-GEOM-071 treatment of NaN as boundary-only: the old
+        // dot < cos(NaN) comparison was false for every interior edge. The
+        // reusable public classifier itself rejects non-finite thresholds.
+        const double featureAngleThresholdDegrees =
+            std::isnan(params.FeatureAngleThresholdDegrees)
+                ? 180.0
+                : std::clamp(params.FeatureAngleThresholdDegrees, 0.0, 180.0);
+        const HalfedgeMesh::Features::Params featureParams{
+            .BoundaryIsFeature = true,
+            .DihedralThresholdDegrees = featureAngleThresholdDegrees,
+        };
 
 
         const Property<glm::dmat3> vertexSigmaP = params.Quadric.ProbabilisticMode == QuadricProbabilisticMode::Covariance
@@ -856,12 +823,25 @@ namespace Geometry::Simplification
         // less predictable.
         // -----------------------------------------------------------------
 
-        std::vector<FeatureKind> vertexFeature(nV, FeatureKind::None);
+        std::vector<FeatureProtection> vertexFeature(
+            nV, FeatureProtection::Unprotected);
         std::vector<std::uint8_t> seamVertex(nV, 0u);
         std::size_t featurePinnedCount = 0;
         std::size_t seamPinnedCount = 0;
         if (faQem && (params.PreserveSharpFeatures || params.PreserveUvSeams))
         {
+            HalfedgeMesh::Features::Classification featureClassification{};
+            if (params.PreserveSharpFeatures)
+            {
+                featureClassification = HalfedgeMesh::Features::Classify(
+                    mesh, faceNormals, featureParams);
+                if (featureClassification.Status
+                    != HalfedgeMesh::Features::ClassificationStatus::Success)
+                {
+                    return std::nullopt;
+                }
+            }
+
             const std::vector<std::uint8_t> seamCandidate =
                 params.PreserveUvSeams
                     ? ClassifySeamVertices(mesh)
@@ -877,15 +857,16 @@ namespace Geometry::Simplification
 
                 if (params.PreserveSharpFeatures)
                 {
-                    const std::size_t fe =
-                        CountIncidentFeatureEdges(mesh, vh, faceNormals, featureCosThreshold);
-                    if (fe >= 3)
+                    const auto incidence = featureClassification.VertexIncidence[vi];
+                    if (incidence
+                        == HalfedgeMesh::Features::VertexIncidenceCategory::Junction)
                     {
-                        vertexFeature[vi] = FeatureKind::Corner;
+                        vertexFeature[vi] = FeatureProtection::Corner;
                     }
-                    else if (fe == 2)
+                    else if (incidence
+                             == HalfedgeMesh::Features::VertexIncidenceCategory::Crease)
                     {
-                        vertexFeature[vi] = FeatureKind::Line;
+                        vertexFeature[vi] = FeatureProtection::Line;
                     }
 
                     // Boundary turning-angle mechanism: when the boundary is
@@ -901,11 +882,11 @@ namespace Geometry::Simplification
                             params.FeatureAngleThresholdDegrees / weight, 0.0, 180.0);
                         if (BoundaryTurningAngleDegrees(mesh, vh) > boundaryThresholdDeg)
                         {
-                            vertexFeature[vi] = FeatureKind::Corner;
+                            vertexFeature[vi] = FeatureProtection::Corner;
                         }
-                        else if (vertexFeature[vi] == FeatureKind::None)
+                        else if (vertexFeature[vi] == FeatureProtection::Unprotected)
                         {
-                            vertexFeature[vi] = FeatureKind::Line;
+                            vertexFeature[vi] = FeatureProtection::Line;
                         }
                     }
                 }
@@ -916,7 +897,7 @@ namespace Geometry::Simplification
                     ++seamPinnedCount;
                 }
 
-                if (vertexFeature[vi] == FeatureKind::Corner)
+                if (vertexFeature[vi] == FeatureProtection::Corner)
                 {
                     ++featurePinnedCount;
                 }
@@ -1013,17 +994,23 @@ namespace Geometry::Simplification
             {
                 if (params.PreserveSharpFeatures)
                 {
-                    const FeatureKind removedKind = vertexFeature[vRemoved.Index];
-                    if (removedKind == FeatureKind::Corner)
+                    const FeatureProtection removedKind = vertexFeature[vRemoved.Index];
+                    if (removedKind == FeatureProtection::Corner)
                     {
                         return false;
                     }
-                    if (removedKind == FeatureKind::Line)
+                    if (removedKind == FeatureProtection::Line)
                     {
-                        const bool edgeIsFeature = IsFeatureEdge(
-                            mesh, mesh.Edge(hCollapse), faceNormals, featureCosThreshold);
-                        const FeatureKind survivorKind = vertexFeature[vSurvivor.Index];
-                        if (!edgeIsFeature || survivorKind == FeatureKind::None)
+                        const EdgeHandle featureEdge = mesh.Edge(hCollapse);
+                        const bool edgeIsFeature =
+                            HalfedgeMesh::Features::IsFeatureEdgeFailClosed(
+                                mesh,
+                                featureEdge,
+                                faceNormals,
+                                featureParams);
+                        const FeatureProtection survivorKind = vertexFeature[vSurvivor.Index];
+                        if (!edgeIsFeature
+                            || survivorKind == FeatureProtection::Unprotected)
                         {
                             return false;
                         }

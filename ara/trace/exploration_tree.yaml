@@ -9471,3 +9471,26 @@ tree:
       CPU runtime/config/UI/editor path and makes no performance, atlas-quality,
       or GPU claim.
     status: resolved
+  - id: N404
+    type: experiment
+    title: "Establish reusable halfedge sharp-feature facts without changing FA-QEM behavior"
+    provenance: ai-executed
+    timestamp: "2026-08-10T17:55+02:00"
+    also_depends_on: []
+    evidence:
+      - "src/geometry/Geometry.HalfedgeMesh.Features.cppm"
+      - "tests/unit/geometry/Test.HalfedgeMeshFeatures.cpp"
+      - "tests/unit/geometry/Test_Simplification.cpp"
+      - "tasks/evidence/GEOM-071/commands/focused-feature-simplification-tests.json"
+      - "tasks/evidence/GEOM-071/commands/cpu-tests.json"
+    result: >
+      Eleven direct classifier/property tests cover exact plane, fold, cube,
+      polygon, slot, invalid-normal, submesh, finite-magnitude extremes,
+      dangling, deletion, determinism, and evolving-normal behavior. The narrow
+      classifier/FA-QEM selector passed 18 tests, including exact cube diagnostics,
+      the historical non-triangle normal policy, and a multi-collapse test that
+      distinguishes current normals from a stale mask; all 4,209 selected CPU
+      tests passed with the tracked GLFW/LeakSanitizer control self-skipped. This establishes a bounded
+      CPU contract only: Catmull-Clark adoption, runtime/UI control, GPU behavior,
+      and performance remain outside GEOM-071.
+    status: resolved

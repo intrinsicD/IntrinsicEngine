@@ -1,0 +1,26 @@
+{
+  "command": [
+    "ctest",
+    "--test-dir",
+    "build/ci",
+    "--output-on-failure",
+    "-R",
+    "^(HalfedgeMeshFeatures\\.|Simplification\\.(FeatureAware|NonTriangleFeatureNormals|EvolvingFeatureLegality))",
+    "--timeout",
+    "120"
+  ],
+  "command_display": "ctest --test-dir build/ci --output-on-failure -R '^(HalfedgeMeshFeatures\\.|Simplification\\.(FeatureAware|NonTriangleFeatureNormals|EvolvingFeatureLegality))' --timeout 120",
+  "cwd": ".",
+  "duration_ms": 1232,
+  "exit_code": 0,
+  "finished_at": "2026-08-10T16:30:33Z",
+  "label": "focused-r1-final",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-10T16:30:31Z",
+  "stderr_path": "tasks/evidence/GEOM-071/commands/focused-r1-final.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/GEOM-071/commands/focused-r1-final.stdout.log",
+  "stdout_sha256": "561f37cebaf2424048347d35e55d9df3c9949618eea08f638e68ad056eb79638",
+  "task_id": "GEOM-071"
+}

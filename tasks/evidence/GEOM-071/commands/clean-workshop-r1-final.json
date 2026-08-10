@@ -1,0 +1,22 @@
+{
+  "command": [
+    "bash",
+    "tools/ci/run_clean_workshop_review.sh",
+    ".",
+    "--strict"
+  ],
+  "command_display": "bash tools/ci/run_clean_workshop_review.sh . --strict",
+  "cwd": ".",
+  "duration_ms": 1947,
+  "exit_code": 0,
+  "finished_at": "2026-08-10T16:31:52Z",
+  "label": "clean-workshop-r1-final",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-10T16:31:50Z",
+  "stderr_path": "tasks/evidence/GEOM-071/commands/clean-workshop-r1-final.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/GEOM-071/commands/clean-workshop-r1-final.stdout.log",
+  "stdout_sha256": "87f6ebbeb586578c1e184cf87d58547a69faadccaed0760aef1c2523a45b69e9",
+  "task_id": "GEOM-071"
+}

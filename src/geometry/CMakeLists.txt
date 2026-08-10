@@ -36,6 +36,7 @@ target_sources(${target_name}
         Geometry.HalfedgeMesh.Curvature.cppm
         Geometry.HalfedgeMesh.CurvatureSegmentation.cppm
         Geometry.HalfedgeMesh.DEC.cppm
+        Geometry.HalfedgeMesh.Features.cppm
         Geometry.HalfedgeMesh.Geodesic.cppm
         Geometry.HalfedgeMesh.IO.cppm
         Geometry.HalfedgeMesh.Parameterization.cppm
@@ -143,6 +144,7 @@ target_sources(${target_name}
         Geometry.HalfedgeMesh.Curvature.cpp
         Geometry.HalfedgeMesh.CurvatureSegmentation.cpp
         Geometry.HalfedgeMesh.DEC.cpp
+        Geometry.HalfedgeMesh.Features.cpp
         Geometry.HalfedgeMesh.Geodesic.cpp
         Geometry.HalfedgeMesh.IO.cpp
         Geometry.HalfedgeMesh.Parameterization.cpp

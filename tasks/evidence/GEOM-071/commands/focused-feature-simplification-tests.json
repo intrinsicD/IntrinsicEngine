@@ -1,0 +1,26 @@
+{
+  "command": [
+    "ctest",
+    "--test-dir",
+    "build/ci",
+    "--output-on-failure",
+    "-R",
+    "Feature|Simplif",
+    "--timeout",
+    "120"
+  ],
+  "command_display": "ctest --test-dir build/ci --output-on-failure -R 'Feature|Simplif' --timeout 120",
+  "cwd": ".",
+  "duration_ms": 5800,
+  "exit_code": 0,
+  "finished_at": "2026-08-10T15:51:50Z",
+  "label": "focused-feature-simplification-tests",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-10T15:51:44Z",
+  "stderr_path": "tasks/evidence/GEOM-071/commands/focused-feature-simplification-tests.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/GEOM-071/commands/focused-feature-simplification-tests.stdout.log",
+  "stdout_sha256": "d38cd67190a2077b84dd2e9b23c09cfab8cf3dbd503a33426e3ebf38533813ca",
+  "task_id": "GEOM-071"
+}

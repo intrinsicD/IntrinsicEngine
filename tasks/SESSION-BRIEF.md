@@ -8,7 +8,7 @@ the authoritative open/unblocked view.
 
 ## Active tasks
 
-- none
+- `GEOM-071` — Reusable sharp-feature classification (tasks/active/GEOM-071-reusable-sharp-feature-classification.md)
 
 ## Theme B — Rendering modernization
 
@@ -72,7 +72,6 @@ the authoritative open/unblocked view.
 - unblocked: `GEOM-068` — Weighted Dijkstra edge-cost contract (tasks/backlog/geometry/GEOM-068-weighted-dijkstra-edge-cost-contract.md)
 - blocked by `GEOM-068`: `GEOM-069` — A* graph shortest path (tasks/backlog/geometry/GEOM-069-astar-graph-shortest-path.md)
 - unblocked: `GEOM-070` — Rectangular sparse LSQR and LSCM adoption (tasks/backlog/geometry/GEOM-070-sparse-lsqr-lscm-adoption.md)
-- unblocked: `GEOM-071` — Reusable sharp-feature classification (tasks/backlog/geometry/GEOM-071-reusable-sharp-feature-classification.md)
 - blocked by `GEOM-071`: `GEOM-072` — Catmull-Clark crease masks (tasks/backlog/geometry/GEOM-072-catmull-clark-crease-masks.md)
 - unblocked: `GEOM-073` — Point-analysis property/span contracts (tasks/backlog/geometry/GEOM-073-point-analysis-property-span-contracts.md)
 - blocked by `GEOM-068`: `GEOM-074` — Graph property and adjacency contracts (tasks/backlog/geometry/GEOM-074-graph-property-adjacency-contracts.md)

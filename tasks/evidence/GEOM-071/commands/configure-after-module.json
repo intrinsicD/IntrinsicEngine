@@ -1,0 +1,21 @@
+{
+  "command": [
+    "cmake",
+    "--preset",
+    "ci"
+  ],
+  "command_display": "cmake --preset ci",
+  "cwd": ".",
+  "duration_ms": 2299,
+  "exit_code": 0,
+  "finished_at": "2026-08-10T15:39:36Z",
+  "label": "configure-after-module",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-10T15:39:34Z",
+  "stderr_path": "tasks/evidence/GEOM-071/commands/configure-after-module.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/GEOM-071/commands/configure-after-module.stdout.log",
+  "stdout_sha256": "d0973f6351851eb9943d8cb2c4d258f912fb9ed4521992ddae66a61f8b627de7",
+  "task_id": "GEOM-071"
+}

@@ -1,0 +1,85 @@
+Internal ctest changing into directory: /home/alex/Documents/IntrinsicEngine/build/ci
+Test project /home/alex/Documents/IntrinsicEngine/build/ci
+      Start 1620: Simplification_QEM.ReducesFaceCount
+ 1/37 Test #1620: Simplification_QEM.ReducesFaceCount .....................................................   Passed    0.01 sec
+      Start 1621: Simplification_QEM.RespectsTargetFaceCount
+ 2/37 Test #1621: Simplification_QEM.RespectsTargetFaceCount ..............................................   Passed    0.01 sec
+      Start 1622: Simplification_QEM.TooFewFacesReturnsNullopt
+ 3/37 Test #1622: Simplification_QEM.TooFewFacesReturnsNullopt ............................................   Passed    0.00 sec
+      Start 1623: Simplification_QEM.ErrorThresholdStopsEarly
+ 4/37 Test #1623: Simplification_QEM.ErrorThresholdStopsEarly .............................................   Passed    0.00 sec
+      Start 1624: Simplification_QEM.PreservedMeshIsValid
+ 5/37 Test #1624: Simplification_QEM.PreservedMeshIsValid .................................................   Passed    0.01 sec
+      Start 1625: Simplification_QEM.GarbageCollectionKeepsFaceHalfedgesValidAfterDenseSimplification
+ 6/37 Test #1625: Simplification_QEM.GarbageCollectionKeepsFaceHalfedgesValidAfterDenseSimplification .....   Passed    0.22 sec
+      Start 1626: Simplification_QEM.DenseClosedMeshStaysClosed
+ 7/37 Test #1626: Simplification_QEM.DenseClosedMeshStaysClosed ...........................................   Passed    0.22 sec
+      Start 1627: Simplification_QEM.HausdorffErrorConstraintSmallMeshSentinel
+ 8/37 Test #1627: Simplification_QEM.HausdorffErrorConstraintSmallMeshSentinel ............................   Passed    0.02 sec
+      Start 1628: Simplification_QEM.RepeatedWorkflowSmallMeshSentinel
+ 9/37 Test #1628: Simplification_QEM.RepeatedWorkflowSmallMeshSentinel ....................................   Passed    0.01 sec
+      Start 1629: Simplification_QEM.ConfigurableQuadricsSmallMeshSentinel
+10/37 Test #1629: Simplification_QEM.ConfigurableQuadricsSmallMeshSentinel ................................   Passed    0.01 sec
+      Start 1630: Simplification_QEM.ProbabilisticQuadricsSmallMeshSentinel
+11/37 Test #1630: Simplification_QEM.ProbabilisticQuadricsSmallMeshSentinel ...............................   Passed    0.01 sec
+      Start 1631: Simplification_QEM.MissingCovariancePropertiesFallBackToZeroCovariance
+12/37 Test #1631: Simplification_QEM.MissingCovariancePropertiesFallBackToZeroCovariance ..................   Passed    0.21 sec
+      Start 1632: Simplification_QEM.OpenBoundaryPatchKeepsDiskTopology
+13/37 Test #1632: Simplification_QEM.OpenBoundaryPatchKeepsDiskTopology ...................................   Passed    0.00 sec
+      Start 1633: Simplification_QEM.PreserveBoundaryPreventsCollapsesOnOpenPatch
+14/37 Test #1633: Simplification_QEM.PreserveBoundaryPreventsCollapsesOnOpenPatch .........................   Passed    0.00 sec
+      Start 2013: Attributes_TopologyOperators.SimplificationPreservesTexcoords
+15/37 Test #2013: Attributes_TopologyOperators.SimplificationPreservesTexcoords ...........................   Passed    0.01 sec
+      Start 2014: Attributes_TopologyOperators.SimplificationWithConfigurableQuadricsPreservesTexcoords
+16/37 Test #2014: Attributes_TopologyOperators.SimplificationWithConfigurableQuadricsPreservesTexcoords ...   Passed    0.01 sec
+      Start 2333: Simplification.ReducesToTargetFaceCount
+17/37 Test #2333: Simplification.ReducesToTargetFaceCount .................................................   Passed    0.08 sec
+      Start 2334: Simplification.ErrorThresholdStopsEarly
+18/37 Test #2334: Simplification.ErrorThresholdStopsEarly .................................................   Passed    0.03 sec
+      Start 2335: Simplification.PreservesBoundary
+19/37 Test #2335: Simplification.PreservesBoundary ........................................................   Passed    0.00 sec
+      Start 2336: Simplification.ClosedMeshRemainsClosedAfterSimplification
+20/37 Test #2336: Simplification.ClosedMeshRemainsClosedAfterSimplification ...............................   Passed    0.08 sec
+      Start 2337: Simplification.ReturnsNulloptForEmptyMesh
+21/37 Test #2337: Simplification.ReturnsNulloptForEmptyMesh ...............................................   Passed    0.00 sec
+      Start 2338: Simplification.ReturnsNulloptForSingleFaceMesh
+22/37 Test #2338: Simplification.ReturnsNulloptForSingleFaceMesh ..........................................   Passed    0.00 sec
+      Start 2339: Simplification.MaxCollapseErrorIsNonNegative
+23/37 Test #2339: Simplification.MaxCollapseErrorIsNonNegative ............................................   Passed    0.07 sec
+      Start 2340: Simplification.TetrahedronMinimalSimplification
+24/37 Test #2340: Simplification.TetrahedronMinimalSimplification .........................................   Passed    0.00 sec
+      Start 2341: Simplification.QuadricMinimizerPlacement
+25/37 Test #2341: Simplification.QuadricMinimizerPlacement ................................................   Passed    0.10 sec
+      Start 2342: Simplification.FeatureAwarePreservesCubeCorners
+26/37 Test #2342: Simplification.FeatureAwarePreservesCubeCorners .........................................   Passed    0.05 sec
+      Start 2343: Simplification.ClassicalMetricRemainsReachable
+27/37 Test #2343: Simplification.ClassicalMetricRemainsReachable ..........................................   Passed    0.07 sec
+      Start 2344: Simplification.FeatureAwareIsDeterministic
+28/37 Test #2344: Simplification.FeatureAwareIsDeterministic ..............................................   Passed    0.08 sec
+      Start 2345: Simplification.FeatureAwareCornerErrorNotWorseThanClassical
+29/37 Test #2345: Simplification.FeatureAwareCornerErrorNotWorseThanClassical .............................   Passed    0.21 sec
+      Start 2346: Simplification.FeatureAwarePreservesUvSeams
+30/37 Test #2346: Simplification.FeatureAwarePreservesUvSeams .............................................   Passed    0.01 sec
+      Start 2347: Simplification.FeatureAwarePreservesCornerUvSeams
+31/37 Test #2347: Simplification.FeatureAwarePreservesCornerUvSeams .......................................   Passed    0.03 sec
+      Start 2348: Simplification.UniformCornerUvsPinNoSeam
+32/37 Test #2348: Simplification.UniformCornerUvsPinNoSeam ................................................   Passed    0.04 sec
+      Start 2349: Simplification.DiagnosticsCountersPopulated
+33/37 Test #2349: Simplification.DiagnosticsCountersPopulated .............................................   Passed    0.04 sec
+      Start 3075: Simplification_QEM.HausdorffErrorConstraintIsRespected
+34/37 Test #3075: Simplification_QEM.HausdorffErrorConstraintIsRespected ..................................   Passed    0.34 sec
+      Start 3076: Simplification_QEM.RepeatedWorkflowStyleSimplificationStaysValid
+35/37 Test #3076: Simplification_QEM.RepeatedWorkflowStyleSimplificationStaysValid ........................   Passed    0.93 sec
+      Start 3077: Simplification_QEM.ConfigurableQuadricsSupportAllTypesResidencesAndPlacements
+36/37 Test #3077: Simplification_QEM.ConfigurableQuadricsSupportAllTypesResidencesAndPlacements ...........   Passed    0.67 sec
+      Start 3078: Simplification_QEM.ProbabilisticQuadricsSupportIsotropicAndCovarianceModes
+37/37 Test #3078: Simplification_QEM.ProbabilisticQuadricsSupportIsotropicAndCovarianceModes ..............   Passed    0.44 sec
+
+100% tests passed, 0 tests failed out of 37
+
+Label Time Summary:
+geometry    =   4.04 sec*proc (37 tests)
+slow        =   2.38 sec*proc (4 tests)
+unit        =   4.04 sec*proc (37 tests)
+
+Total Test time (real) =   4.18 sec
