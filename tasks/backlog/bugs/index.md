@@ -9,7 +9,7 @@ The 2026-08-07 Sandbox UI workflow pass (`sculpt.obj` end-to-end through the
 promoted Vulkan build) opened `BUG-137` through `BUG-142`. `BUG-137` is upstream
 of `BUG-140` and of the parameterization rejection recorded in `BUG-141`.
 
-- [`BUG-152` — Geometry index presents retired GEOM-071 as active backlog work](BUG-152-geometry-index-retired-task-state-link.md):
+- [`BUG-152` — Geometry index presents retired GEOM-071 as active backlog work](../../active/BUG-152-geometry-index-retired-task-state-link.md):
   strict task-state link validation rejects the category index because its
   active section links directly to the retired task. Move the entry into an
   explicit history lane without changing `GEOM-071` or its dependents.
