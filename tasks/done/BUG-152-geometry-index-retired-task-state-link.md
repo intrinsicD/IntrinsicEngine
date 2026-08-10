@@ -17,6 +17,10 @@ contract_review: "This is a task-lifecycle index defect governed by the reusable
 ---
 # BUG-152 — Geometry index presents retired GEOM-071 as active backlog work
 
+## Status
+- Completed on 2026-08-11 as a micro documentation repair.
+- Implementation commit: `5e15963d`.
+
 ## Goal
 - Make the geometry backlog index classify its retired `GEOM-071` link as
   history so strict task-state link validation agrees with the task's location.
@@ -39,19 +43,19 @@ contract_review: "This is a task-lifecycle index defect governed by the reusable
   workflow repair.
 
 ## Required changes
-- [ ] Move or rewrite the `GEOM-071` category-index entry so its retired state
+- [x] Move or rewrite the `GEOM-071` category-index entry so its retired state
       is explicit and the active `GEOM-072` dependency narrative remains clear.
 
 ## Tests
-- [ ] Run the strict task-state-link checker and task-policy validation.
+- [x] Run the strict task-state-link checker and task-policy validation.
 
 ## Docs
-- [ ] Keep the geometry category index and generated session brief synchronized.
+- [x] Keep the geometry category index and generated session brief synchronized.
 
 ## Acceptance criteria
-- [ ] Strict task-state-link validation passes without changing `GEOM-071` or
+- [x] Strict task-state-link validation passes without changing `GEOM-071` or
       weakening the checker.
-- [ ] `GEOM-072` still resolves its dependency on the retired task.
+- [x] `GEOM-072` still resolves its dependency on the retired task.
 
 ## Verification
 ```bash
@@ -60,6 +64,10 @@ python3 tools/agents/check_task_policy.py --root . --strict
 python3 tools/agents/validate_tasks.py --root tasks --strict
 python3 tools/docs/check_doc_links.py --root .
 ```
+
+Executed on 2026-08-11: all four commands passed. The state-link checker
+reported no findings, the task validators covered 263 task files, and the
+documentation link checker covered 3,275 relative links.
 
 ## Forbidden changes
 - Editing `GEOM-071` source, evidence, completion report, or retirement status.

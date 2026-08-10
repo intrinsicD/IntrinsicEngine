@@ -8,6 +8,13 @@ so blocks moved from the old active-README history work verbatim.
 
 ## Retired task narratives
 
+[`BUG-152`](BUG-152-geometry-index-retired-task-state-link.md) — the geometry
+backlog's active list no longer links directly to retired `GEOM-071`. It keeps
+the prerequisite and `GEOM-072` adoption narrative as explicit non-link
+history, restoring the strict task-state-link gate without changing the
+retired task, its evidence, or geometry behavior. Task policy/format validation
+covered 263 files and the documentation link checker covered 3,275 links.
+
 [`GEOM-071`](GEOM-071-reusable-sharp-feature-classification.md) — reusable
 sharp-feature classification is now a focused geometry-owned CPU contract.
 `Geometry.HalfedgeMesh.Features` accepts an owning mesh plus caller-selected

@@ -9,7 +9,6 @@ the authoritative open/unblocked view.
 ## Active tasks
 
 - `BUG-151` — Work graph cannot advance a declared multi-slice task (tasks/active/BUG-151-work-graph-multi-slice-cycle.md)
-- `BUG-152` — Geometry index presents retired GEOM-071 as active backlog work (tasks/active/BUG-152-geometry-index-retired-task-state-link.md)
 - `METHOD-038` — Feature-aligned, remeshing-stable curvature segmentation (tasks/active/METHOD-038-feature-aligned-remeshing-stable-curvature-segmentation.md)
 
 ## Theme B — Rendering modernization
