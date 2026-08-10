@@ -477,10 +477,15 @@ TEST(SandboxEditorPresentation, DomainPanelsPreserveLifetimeCacheAndResultPublic
         "ApplyEditorPointCloudOutlierRemovalCommand",
         "ApplyEditorUvRegenerationCommand",
         "context.GeometryResults.LastUvRegenerationResult",
-          "LastPointCloudOutlierRemovalResult.reset();",
-          "LastUvRegenerationResult.reset();",
-          "MeshPropertyPlotState.SelectedProperty.clear();",
-          "ImGuiCond_FirstUseEver"})
+        "lastUvRegenerationResult->value().AtlasWidth",
+        "ImGui::InputInt(\"Bake padding\"",
+        ".PaddingTexels = paddingSupported",
+        "std::int32_t TextureBakeWidth{1024};",
+        "LastPointCloudOutlierRemovalResult.reset();",
+        "LastUvRegenerationResult.reset();",
+        "LastUvExtentAdoption.reset();",
+        "MeshPropertyPlotState.SelectedProperty.clear();",
+        "ImGuiCond_FirstUseEver"})
     {
         EXPECT_NE(source.find(required), std::string::npos) << required;
     }
@@ -1222,6 +1227,8 @@ TEST(SandboxEditorPresentation, ControllerReattachPinsPanelAttachmentResetPolicy
                   "LastPointCloudOutlierRemovalResult.reset();"),
               std::string::npos);
     EXPECT_NE(domainPanels.find("LastUvRegenerationResult.reset();"),
+              std::string::npos);
+    EXPECT_NE(domainPanels.find("LastUvExtentAdoption.reset();"),
               std::string::npos);
     EXPECT_NE(domainPanels.find(
                   "MeshPropertyPlotState.SelectedProperty.clear();"),

@@ -1,0 +1,43 @@
+Test project /home/alex/Documents/IntrinsicEngine/build/ci
+      Start  713: RuntimeEngineLayering.TextureBakeModuleOwnsSingleCanonicalGpuBakeComposition
+ 1/16 Test  #713: RuntimeEngineLayering.TextureBakeModuleOwnsSingleCanonicalGpuBakeComposition ....................   Passed    0.01 sec
+      Start 1070: SandboxEditorUi.AttachedEngineContextWiresTextureBakeModule
+ 2/16 Test #1070: SandboxEditorUi.AttachedEngineContextWiresTextureBakeModule .....................................   Passed    0.05 sec
+      Start 1072: SandboxEditorUi.UnavailableTextureBakeModuleHasNoCpuFallback
+ 3/16 Test #1072: SandboxEditorUi.UnavailableTextureBakeModuleHasNoCpuFallback ....................................   Passed    0.01 sec
+      Start 1073: SandboxEditorUi.TextureBakeModuleAvailabilityPrecedesAssetCreation
+ 4/16 Test #1073: SandboxEditorUi.TextureBakeModuleAvailabilityPrecedesAssetCreation ..............................   Passed    0.00 sec
+      Start 1099: RuntimeTextureBakeModule.DefaultRequestUsesAtlasScaleExtent
+ 5/16 Test #1099: RuntimeTextureBakeModule.DefaultRequestUsesAtlasScaleExtent .....................................   Passed    0.01 sec
+      Start 1100: RuntimeTextureBakeModule.RepresentationDefaultsPreserveRawScalarData
+ 6/16 Test #1100: RuntimeTextureBakeModule.RepresentationDefaultsPreserveRawScalarData ............................   Passed    0.01 sec
+      Start 1101: RuntimeTextureBakeModule.NormalAndLabelDefaultsChooseEncodedStorage
+ 7/16 Test #1101: RuntimeTextureBakeModule.NormalAndLabelDefaultsChooseEncodedStorage .............................   Passed    0.00 sec
+      Start 1102: RuntimeTextureBakeModule.RepresentationMatrixRejectsEncodersThatDoNotMatchStorageAndValueType
+ 8/16 Test #1102: RuntimeTextureBakeModule.RepresentationMatrixRejectsEncodersThatDoNotMatchStorageAndValueType ...   Passed    0.01 sec
+      Start 1103: RuntimeTextureBakeModule.ServiceFailsClosedWithoutGpuComposition
+ 9/16 Test #1103: RuntimeTextureBakeModule.ServiceFailsClosedWithoutGpuComposition ................................   Passed    0.00 sec
+      Start 1242: SandboxEditorPresentation.DomainPanelsPreserveLifetimeCacheAndResultPublication
+10/16 Test #1242: SandboxEditorPresentation.DomainPanelsPreserveLifetimeCacheAndResultPublication .................   Passed    0.01 sec
+      Start 3601: PropertyTextureBake.PipelineContractIsUvRasterWithoutDepthOrCulling
+11/16 Test #3601: PropertyTextureBake.PipelineContractIsUvRasterWithoutDepthOrCulling .............................   Passed    0.00 sec
+      Start 3602: PropertyTextureBake.DilationPipelineAndScratchMatchEncodedOutput
+12/16 Test #3602: PropertyTextureBake.DilationPipelineAndScratchMatchEncodedOutput ................................   Passed    0.00 sec
+      Start 3603: PropertyTextureBake.InvalidResourcesFailBeforeRecordingCommands
+13/16 Test #3603: PropertyTextureBake.InvalidResourcesFailBeforeRecordingCommands .................................   Passed    0.00 sec
+      Start 3604: PropertyTextureBake.RecordsIndexedRasterWithExactRepresentationMetadata
+14/16 Test #3604: PropertyTextureBake.RecordsIndexedRasterWithExactRepresentationMetadata .........................   Passed    0.00 sec
+      Start 3605: PropertyTextureBake.RecordsEncodedPaddingThroughGenericDilation
+15/16 Test #3605: PropertyTextureBake.RecordsEncodedPaddingThroughGenericDilation .................................   Passed    0.00 sec
+      Start 4019: RendererFrameLifecycle.ForwardSurfacePipelineSurvivesOperationalRebuild
+16/16 Test #4019: RendererFrameLifecycle.ForwardSurfacePipelineSurvivesOperationalRebuild .........................   Passed    0.09 sec
+
+100% tests passed, 0 tests failed out of 16
+
+Label Time Summary:
+contract       =   0.19 sec*proc (15 tests)
+graphics       =   0.10 sec*proc (6 tests)
+integration    =   0.01 sec*proc (1 test)
+runtime        =   0.10 sec*proc (10 tests)
+
+Total Test time (real) =   0.42 sec

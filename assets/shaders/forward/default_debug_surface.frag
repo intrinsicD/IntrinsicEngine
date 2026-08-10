@@ -21,6 +21,7 @@
 // visible missing-material surface.
 
 #include "../common/gpu_scene.glsl"
+#include "../common/property_texture_normal.glsl"
 
 layout(set = 0, binding = 0) uniform sampler2D globalTextures[];
 
@@ -80,16 +81,10 @@ vec3 ResolveSurfaceNormal(
     }
 
     const vec4 normalSample = texture(globalTextures[nonuniformEXT(mat.NormalID)], uv);
-    if (normalSample.a <= 1.0e-6) {
+    vec3 objectNormal;
+    if (!DecodePropertyTextureNormal(normalSample, objectNormal)) {
         return n;
     }
-
-    vec3 objectNormal = normalSample.rgb * 2.0 - vec3(1.0);
-    const float objectNormalLen = length(objectNormal);
-    if (objectNormalLen <= 1.0e-6) {
-        return n;
-    }
-    objectNormal /= objectNormalLen;
 
     if ((mat.Flags & GpuMaterialFlag_WorldSpaceNormalMap) != 0u) {
         return objectNormal;

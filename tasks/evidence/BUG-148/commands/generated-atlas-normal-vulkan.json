@@ -1,0 +1,27 @@
+{
+  "command": [
+    "ctest",
+    "--test-dir",
+    "build/ci-vulkan",
+    "--output-on-failure",
+    "-V",
+    "-R",
+    "^RuntimeSandboxAcceptanceGpuSmoke\\.ImportedObjectSpaceNormalBakeBindsAndReadsBackExactTargetSlice$",
+    "--timeout",
+    "120"
+  ],
+  "command_display": "ctest --test-dir build/ci-vulkan --output-on-failure -V -R '^RuntimeSandboxAcceptanceGpuSmoke\\.ImportedObjectSpaceNormalBakeBindsAndReadsBackExactTargetSlice$' --timeout 120",
+  "cwd": ".",
+  "duration_ms": 12660,
+  "exit_code": 0,
+  "finished_at": "2026-08-10T09:35:39Z",
+  "label": "generated-atlas-normal-vulkan",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-10T09:35:27Z",
+  "stderr_path": "tasks/evidence/BUG-148/commands/generated-atlas-normal-vulkan.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/BUG-148/commands/generated-atlas-normal-vulkan.stdout.log",
+  "stdout_sha256": "b447fba70a96d1423d8cf4669235ad7dda4c0397f6871183443fc06af1e5f954",
+  "task_id": "BUG-148"
+}

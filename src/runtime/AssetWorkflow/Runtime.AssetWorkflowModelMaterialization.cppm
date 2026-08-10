@@ -45,9 +45,12 @@ export namespace Extrinsic::Runtime
         TextureBakeService* TextureBake{nullptr};
         std::string GeneratedNormalPropertyName{"v:normal"};
         std::string GeneratedAlbedoPropertyName{"v:color"};
-        std::uint32_t GeneratedTextureWidth{64u};
-        std::uint32_t GeneratedTextureHeight{64u};
-        std::uint32_t GeneratedTexturePaddingTexels{4u};
+        // Zero resolves each automatic bake to the materialized UV atlas
+        // extent. A fixed nonzero extent remains available to callers that
+        // deliberately request a resample.
+        std::uint32_t GeneratedTextureWidth{0u};
+        std::uint32_t GeneratedTextureHeight{0u};
+        std::uint32_t GeneratedTexturePaddingTexels{2u};
     };
 
     struct AssetWorkflowModelMaterializationDiagnostics

@@ -2440,3 +2440,26 @@ observations:
     promoted_to: null
     crystallized_via: null
     stale: false
+  - id: O139
+    timestamp: "2026-08-10T11:13+02:00"
+    provenance: ai-executed
+    content: >
+      The production Vulkan object-space-normal import path generates UV-atlas
+      coordinates and preserves a three-vertex varying normal field through a
+      matching 1024x1024 RGBA8 bake within a one-degree angular threshold,
+      fills the configured two-texel gutter, keeps farther uncovered texels
+      transparent black, and binds the exact generated texture without replacing
+      unrelated material slots.
+    context: >
+      BUG-148 reproduced the former fixed-64 output failure, then reran the
+      strengthened RuntimeSandboxAcceptanceGpuSmoke fixture after coupling the
+      automatic bake extent to atlas diagnostics and making alpha the filtered
+      normal-coverage channel. This is one operational Vulkan host and fixture,
+      not a visual-quality, cross-device, tangent-space, mip-quality, or
+      performance result.
+    potential_type: claim
+    bound_to: [N272]
+    promoted: true
+    promoted_to: "logic/claims.md:C37"
+    crystallized_via: artifact-commitment
+    stale: false

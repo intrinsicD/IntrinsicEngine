@@ -1,0 +1,56 @@
+UpdateCTestConfiguration  from :/home/alex/Documents/IntrinsicEngine/build/ci-vulkan/DartConfiguration.tcl
+Parse Config file:/home/alex/Documents/IntrinsicEngine/build/ci-vulkan/DartConfiguration.tcl
+Test project /home/alex/Documents/IntrinsicEngine/build/ci-vulkan
+Constructing a list of tests
+Done constructing a list of tests
+Updating test list for fixtures
+Added 0 tests to meet fixture requirements
+Checking test dependency graph...
+Checking test dependency graph end
+test 3458
+    Start 3458: RuntimeSandboxAcceptanceGpuSmoke.ImportedObjectSpaceNormalBakeBindsAndReadsBackExactTargetSlice
+
+3458: Test command: /home/alex/Documents/IntrinsicEngine/build/ci-vulkan/bin/IntrinsicRuntimeSandboxAcceptanceGpuSmokeTests "--gtest_filter=RuntimeSandboxAcceptanceGpuSmoke.ImportedObjectSpaceNormalBakeBindsAndReadsBackExactTargetSlice" "--gtest_also_run_disabled_tests"
+3458: Working Directory: /home/alex/Documents/IntrinsicEngine/build/ci-vulkan/tests
+3458: Environment variables: 
+3458:  LSAN_OPTIONS=fast_unwind_on_malloc=0:detect_leaks=0
+3458:  ASAN_OPTIONS=symbolize=1:detect_leaks=0:fast_unwind_on_malloc=0
+3458:  ASAN_SYMBOLIZER_PATH=/usr/bin/llvm-symbolizer
+3458: Test timeout computed to be: 30
+3458: Running main() from /home/alex/Documents/IntrinsicEngine/external/vcpkg/buildtrees/gtest/src/v1.17.0-0c449efaff.clean/googletest/src/gtest_main.cc
+3458: Note: Google Test filter = RuntimeSandboxAcceptanceGpuSmoke.ImportedObjectSpaceNormalBakeBindsAndReadsBackExactTargetSlice
+3458: [==========] Running 1 test from 1 test suite.
+3458: [----------] Global test environment set-up.
+3458: [----------] 1 test from RuntimeSandboxAcceptanceGpuSmoke
+3458: [ RUN      ] RuntimeSandboxAcceptanceGpuSmoke.ImportedObjectSpaceNormalBakeBindsAndReadsBackExactTargetSlice
+3458: [32m[INFO] Initialized Scheduler with 31 worker threads.[0m
+3458: [33m[WARN] [Runtime] Promoted Vulkan device selected; backend remains fail-closed until the first clean default-recipe validation promotes it.[0m
+3458: [33m[WARN] [VulkanDevice::Initialize] Vulkan bootstrap created logical-device, queue, VMA, per-frame command/sync, swapchain image/view/handle, bindless heap, transfer queue, and global pipeline-layout state; canonical frame execution waits for the first clean recipe validation publish, so device remains non-operational during cold start.[0m
+3458: [33m[WARN] [Runtime] VulkanRequestedButNotOperational status=RequestedButIncompleteGate reason=BarrierValidationFailed[0m
+3458: [32m[INFO] [Runtime] Queued direct mesh post-process: path='/tmp/intrinsic_runtime129_normal_bake_decoy_6919197413822032.obj'[0m
+3458: [32m[INFO] [Runtime] Asset import succeeded: path='/tmp/intrinsic_runtime129_normal_bake_decoy_6919197413822032.obj' requested_payload=Mesh result_payload=Mesh ingest_diagnostic=None primitive_entities=1 embedded_textures=0 texture_upload_requests=0 materialized_model_scene=false requested_texture_upload=false[0m
+3458: [32m[INFO] [Runtime] Queued direct mesh post-process: path='/tmp/intrinsic_runtime129_normal_bake_target_6919197413966329.obj'[0m
+3458: [32m[INFO] [Runtime] Asset import succeeded: path='/tmp/intrinsic_runtime129_normal_bake_target_6919197413966329.obj' requested_payload=Mesh result_payload=Mesh ingest_diagnostic=None primitive_entities=1 embedded_textures=0 texture_upload_requests=0 materialized_model_scene=false requested_texture_upload=false[0m
+3458: [32m[INFO] [Runtime] Direct mesh enrichment applied: path='/tmp/intrinsic_runtime129_normal_bake_decoy_6919197413822032.obj' vertices=3 (source 3) faces=1 (source polygons 1) uv-domain=vertex uv-provenance=authored atlas-backend='authored' gpu-split-vertices=0[0m
+3458: [32m[INFO] [Runtime] Direct mesh enrichment applied: path='/tmp/intrinsic_runtime129_normal_bake_target_6919197413966329.obj' vertices=3 (source 3) faces=1 (source polygons 1) uv-domain=vertex uv-provenance=generated-atlas atlas-backend='fast-staged' gpu-split-vertices=0[0m
+3458: [       OK ] RuntimeSandboxAcceptanceGpuSmoke.ImportedObjectSpaceNormalBakeBindsAndReadsBackExactTargetSlice (11467 ms)
+3458: [----------] 1 test from RuntimeSandboxAcceptanceGpuSmoke (11467 ms total)
+3458: 
+3458: [----------] Global test environment tear-down
+3458: [==========] 1 test from 1 test suite ran. (11467 ms total)
+3458: [  PASSED  ] 1 test.
+1/1 Test #3458: RuntimeSandboxAcceptanceGpuSmoke.ImportedObjectSpaceNormalBakeBindsAndReadsBackExactTargetSlice ...   Passed   11.53 sec
+
+The following tests passed:
+	RuntimeSandboxAcceptanceGpuSmoke.ImportedObjectSpaceNormalBakeBindsAndReadsBackExactTargetSlice
+
+100% tests passed, 0 tests failed out of 1
+
+Label Time Summary:
+gpu            =  11.53 sec*proc (1 test)
+graphics       =  11.53 sec*proc (1 test)
+integration    =  11.53 sec*proc (1 test)
+runtime        =  11.53 sec*proc (1 test)
+vulkan         =  11.53 sec*proc (1 test)
+
+Total Test time (real) =  12.62 sec

@@ -1,0 +1,24 @@
+{
+  "command": [
+    "cmake",
+    "--build",
+    "--preset",
+    "ci-vulkan",
+    "--target",
+    "IntrinsicTests"
+  ],
+  "command_display": "cmake --build --preset ci-vulkan --target IntrinsicTests",
+  "cwd": ".",
+  "duration_ms": 43253,
+  "exit_code": 0,
+  "finished_at": "2026-08-10T09:35:14Z",
+  "label": "build-ci-vulkan",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-10T09:34:30Z",
+  "stderr_path": "tasks/evidence/BUG-148/commands/build-ci-vulkan.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/BUG-148/commands/build-ci-vulkan.stdout.log",
+  "stdout_sha256": "82c07f4e2787f35c15757f344854381b0203f053259a8a9270755fde4d1ca363",
+  "task_id": "BUG-148"
+}

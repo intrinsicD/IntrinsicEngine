@@ -81,6 +81,7 @@ layout(std430, set = 3, binding = 0) readonly buffer MaterialBuffer {
 
 #include "surface_color_resolve.glsl"
 #include "shadow_sampling.glsl"
+#include "common/property_texture_normal.glsl"
 
 const uint MaterialFlag_ObjectSpaceNormalMap = 1u << 5;
 
@@ -95,18 +96,11 @@ vec3 ResolveSurfaceNormal(MaterialData mat, vec3 vertexWorldNormal, vec2 uv)
     }
 
     vec4 normalSample = texture(globalTextures[nonuniformEXT(mat.NormalID)], uv);
-    if (normalSample.a <= 1.0e-6)
+    vec3 objectNormal;
+    if (!DecodePropertyTextureNormal(normalSample, objectNormal))
     {
         return n;
     }
-
-    vec3 objectNormal = normalSample.rgb * 2.0 - vec3(1.0);
-    float objectNormalLen = length(objectNormal);
-    if (objectNormalLen <= 1.0e-6)
-    {
-        return n;
-    }
-    objectNormal /= objectNormalLen;
 
     mat3 normalMatrix = mat3(fragNormalMatrix0, fragNormalMatrix1, fragNormalMatrix2);
     vec3 worldNormal = normalMatrix * objectNormal;

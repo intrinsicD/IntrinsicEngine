@@ -135,8 +135,8 @@ namespace Extrinsic::Runtime
         float RangeMax{1.0f};
         Graphics::Colormap::Type EncodingColormap{
             Graphics::Colormap::Type::Viridis};
-        std::uint32_t Width{64u};
-        std::uint32_t Height{64u};
+        std::uint32_t Width{1024u};
+        std::uint32_t Height{1024u};
         std::uint32_t PaddingTexels{0u};
         std::string OutputName{};
         Assets::AssetId ExistingGeneratedTexture{};

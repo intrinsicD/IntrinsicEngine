@@ -127,6 +127,8 @@ namespace Extrinsic::Sandbox::Editor
         {
             std::optional<EditorUvRegenerationCommandResult>*
                 LastUvRegenerationResult{nullptr};
+            std::optional<EditorUvRegenerationCommandResult>*
+                LastUvExtentAdoption{nullptr};
             std::int32_t* SourceIndex{nullptr};
             std::int32_t* TargetSemanticIndex{nullptr};
             std::int32_t* EncoderIndex{nullptr};
@@ -136,6 +138,7 @@ namespace Extrinsic::Sandbox::Editor
             std::uint32_t* AdditionalConsumerMask{nullptr};
             std::int32_t* Width{nullptr};
             std::int32_t* Height{nullptr};
+            std::int32_t* Padding{nullptr};
             std::int32_t* UvResolution{nullptr};
             std::int32_t* UvPadding{nullptr};
             float* UvTexelsPerUnit{nullptr};
@@ -728,6 +731,8 @@ namespace Extrinsic::Sandbox::Editor
         {
             std::optional<EditorUvRegenerationCommandResult>
                 fallbackUvRegenerationResult{};
+            std::optional<EditorUvRegenerationCommandResult>
+                fallbackUvExtentAdoption{};
             std::int32_t fallbackSourceIndex{0};
             std::int32_t fallbackSemanticIndex{0};
             std::int32_t fallbackEncoderIndex{0};
@@ -739,6 +744,7 @@ namespace Extrinsic::Sandbox::Editor
                 static_cast<std::int32_t>(model.DefaultWidth)};
             std::int32_t fallbackHeight{
                 static_cast<std::int32_t>(model.DefaultHeight)};
+            std::int32_t fallbackPadding{2};
             std::int32_t fallbackUvResolution{1024};
             std::int32_t fallbackUvPadding{2};
             float fallbackUvTexelsPerUnit{0.0f};
@@ -750,6 +756,11 @@ namespace Extrinsic::Sandbox::Editor
                         state->LastUvRegenerationResult != nullptr
                     ? state->LastUvRegenerationResult
                     : &fallbackUvRegenerationResult;
+            auto* lastUvExtentAdoption =
+                state != nullptr &&
+                        state->LastUvExtentAdoption != nullptr
+                    ? state->LastUvExtentAdoption
+                    : &fallbackUvExtentAdoption;
             std::int32_t& sourceIndex =
                 state != nullptr && state->SourceIndex != nullptr
                     ? *state->SourceIndex
@@ -786,6 +797,10 @@ namespace Extrinsic::Sandbox::Editor
                 state != nullptr && state->Height != nullptr
                     ? *state->Height
                     : fallbackHeight;
+            std::int32_t& bakePadding =
+                state != nullptr && state->Padding != nullptr
+                    ? *state->Padding
+                    : fallbackPadding;
             std::int32_t& uvResolution =
                 state != nullptr && state->UvResolution != nullptr
                     ? *state->UvResolution
@@ -877,6 +892,29 @@ namespace Extrinsic::Sandbox::Editor
                         .Padding = static_cast<std::uint32_t>(uvPadding),
                         .TexelsPerUnit = uvTexelsPerUnit,
                     });
+            }
+            if (lastUvRegenerationResult->has_value())
+            {
+                if (!lastUvRegenerationResult->value().Succeeded())
+                {
+                    lastUvExtentAdoption->reset();
+                }
+                else if (!lastUvExtentAdoption->has_value())
+                {
+                    bakeWidth = std::clamp<std::int32_t>(
+                        static_cast<std::int32_t>(
+                            lastUvRegenerationResult->value().AtlasWidth),
+                        1,
+                        8192);
+                    bakeHeight = std::clamp<std::int32_t>(
+                        static_cast<std::int32_t>(
+                            lastUvRegenerationResult->value().AtlasHeight),
+                        1,
+                        8192);
+                    bakePadding = std::clamp<std::int32_t>(uvPadding, 0, 32);
+                    *lastUvExtentAdoption =
+                        lastUvRegenerationResult->value();
+                }
             }
             if (!canRegenerateUvs)
                 ImGui::EndDisabled();
@@ -1121,10 +1159,29 @@ namespace Extrinsic::Sandbox::Editor
                     kNormalSpaceNames.data(),
                     static_cast<int>(kNormalSpaceNames.size()));
             }
+            const PropertyTextureBakeRepresentation resolvedRepresentation =
+                selectedSource != nullptr
+                    ? ResolveEditorTextureBakeTargetRepresentation(
+                          selectedSource->ResolvedExpectedValueKind(),
+                          kTextureBakeStorageModes[
+                              static_cast<std::size_t>(storageIndex)],
+                          kTextureBakeEncoders[
+                              static_cast<std::size_t>(encoderIndex)],
+                          consumers)
+                    : PropertyTextureBakeRepresentation{};
+            const bool paddingSupported =
+                resolvedRepresentation.Storage ==
+                PropertyTextureBakeStorage::EncodedRgba;
             ImGui::InputInt("Bake width", &bakeWidth);
             ImGui::InputInt("Bake height", &bakeHeight);
+            if (!paddingSupported)
+                ImGui::BeginDisabled();
+            ImGui::InputInt("Bake padding", &bakePadding);
+            if (!paddingSupported)
+                ImGui::EndDisabled();
             bakeWidth = std::clamp<std::int32_t>(bakeWidth, 1, 8192);
             bakeHeight = std::clamp<std::int32_t>(bakeHeight, 1, 8192);
+            bakePadding = std::clamp<std::int32_t>(bakePadding, 0, 32);
 
             const bool canBake =
                 model.CanBake &&
@@ -1150,6 +1207,9 @@ namespace Extrinsic::Sandbox::Editor
                                 static_cast<std::size_t>(encoderIndex)],
                         .Width = static_cast<std::uint32_t>(bakeWidth),
                         .Height = static_cast<std::uint32_t>(bakeHeight),
+                        .PaddingTexels = paddingSupported
+                            ? static_cast<std::uint32_t>(bakePadding)
+                            : 0u,
                         .GeneratedKey = selectedSource->Name,
                         .Storage = kTextureBakeStorageModes[
                             static_cast<std::size_t>(storageIndex)],
@@ -3182,8 +3242,11 @@ namespace Extrinsic::Sandbox::Editor
         std::int32_t TextureBakeColormapIndex{0};
         std::int32_t TextureBakeNormalSpaceIndex{0};
         std::uint32_t TextureBakeAdditionalConsumerMask{0u};
-        std::int32_t TextureBakeWidth{64};
-        std::int32_t TextureBakeHeight{64};
+        std::optional<EditorUvRegenerationCommandResult>
+            LastUvExtentAdoption{};
+        std::int32_t TextureBakeWidth{1024};
+        std::int32_t TextureBakeHeight{1024};
+        std::int32_t TextureBakePadding{2};
         std::int32_t UvAtlasResolution{1024};
         std::int32_t UvAtlasPadding{2};
         float UvAtlasTexelsPerUnit{0.0f};
@@ -3245,6 +3308,7 @@ namespace Extrinsic::Sandbox::Editor
             TextureBakeUiState textureBakeState{
                 .LastUvRegenerationResult =
                     &ActivePreparedFrame->Geometry.Results.LastUvRegenerationResult,
+                .LastUvExtentAdoption = &LastUvExtentAdoption,
                 .SourceIndex = &TextureBakeSourceIndex,
                 .TargetSemanticIndex = &TextureBakeTargetSemanticIndex,
                 .EncoderIndex = &TextureBakeEncoderIndex,
@@ -3255,6 +3319,7 @@ namespace Extrinsic::Sandbox::Editor
                     &TextureBakeAdditionalConsumerMask,
                 .Width = &TextureBakeWidth,
                 .Height = &TextureBakeHeight,
+                .Padding = &TextureBakePadding,
                 .UvResolution = &UvAtlasResolution,
                 .UvPadding = &UvAtlasPadding,
                 .UvTexelsPerUnit = &UvAtlasTexelsPerUnit,

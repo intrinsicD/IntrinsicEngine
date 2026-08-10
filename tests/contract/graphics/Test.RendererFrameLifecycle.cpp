@@ -2597,6 +2597,12 @@ TEST(RendererFrameLifecycle, ForwardSurfacePipelineSurvivesOperationalRebuild)
         ReadShaderSource("deferred/default_debug_gbuffer.frag");
     const std::string promotedGBufferFragment =
         ReadShaderSource("deferred/gbuffer.frag");
+    const std::string retainedSurfaceFragment =
+        ReadShaderSource("surface.frag");
+    const std::string retainedGBufferFragment =
+        ReadShaderSource("surface_gbuffer.frag");
+    const std::string normalDecode =
+        ReadShaderSource("common/property_texture_normal.glsl");
 
     EXPECT_NE(surfaceVertex.find("localVertexIndex = vertexIndex - geo.VertexOffset"), std::string::npos);
     EXPECT_NE(surfaceVertex.find("GpuReadPackedVec2(geo.TexcoordBufferBDA, localVertexIndex)"), std::string::npos);
@@ -2616,6 +2622,18 @@ TEST(RendererFrameLifecycle, ForwardSurfacePipelineSurvivesOperationalRebuild)
     EXPECT_NE(promotedGBufferFragment.find("mat.NormalID"), std::string::npos);
     EXPECT_NE(promotedGBufferFragment.find("GpuMaterialFlag_ObjectSpaceNormalMap"), std::string::npos);
     EXPECT_NE(promotedGBufferFragment.find("ResolveSurfaceNormal"), std::string::npos);
+    EXPECT_NE(normalDecode.find("filteredSample.rgb / filteredSample.a"),
+              std::string::npos);
+    EXPECT_NE(surfaceFragment.find("DecodePropertyTextureNormal"),
+              std::string::npos);
+    EXPECT_NE(defaultGBufferFragment.find("DecodePropertyTextureNormal"),
+              std::string::npos);
+    EXPECT_NE(promotedGBufferFragment.find("DecodePropertyTextureNormal"),
+              std::string::npos);
+    EXPECT_NE(retainedSurfaceFragment.find("DecodePropertyTextureNormal"),
+              std::string::npos);
+    EXPECT_NE(retainedGBufferFragment.find("DecodePropertyTextureNormal"),
+              std::string::npos);
     EXPECT_NE(surfaceFragment.find("GpuMaterialType_DefaultDebugUVs"), std::string::npos);
     EXPECT_NE(surfaceFragment.find("DebugUvChecker(fragUv)"), std::string::npos);
     EXPECT_NE(surfaceFragment.find("normalShade"), std::string::npos);

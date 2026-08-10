@@ -1,0 +1,26 @@
+{
+  "command": [
+    "ctest",
+    "--test-dir",
+    "build/ci",
+    "--output-on-failure",
+    "-R",
+    "PropertyTextureBake|TextureBakeModule|SandboxEditorVisualization|ForwardSurfacePipelineSurvivesOperationalRebuild|SandboxEditorPresentation\\.DomainPanelsPreserveLifetimeCacheAndResultPublication",
+    "--timeout",
+    "120"
+  ],
+  "command_display": "ctest --test-dir build/ci --output-on-failure -R 'PropertyTextureBake|TextureBakeModule|SandboxEditorVisualization|ForwardSurfacePipelineSurvivesOperationalRebuild|SandboxEditorPresentation\\.DomainPanelsPreserveLifetimeCacheAndResultPublication' --timeout 120",
+  "cwd": ".",
+  "duration_ms": 456,
+  "exit_code": 0,
+  "finished_at": "2026-08-10T09:34:25Z",
+  "label": "focused-cpu-tests",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-10T09:34:25Z",
+  "stderr_path": "tasks/evidence/BUG-148/commands/focused-cpu-tests.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/BUG-148/commands/focused-cpu-tests.stdout.log",
+  "stdout_sha256": "662b8e270ca89f85a5f98450aa3d3905ffc05f9403fbe25dd517c940791606a8",
+  "task_id": "BUG-148"
+}

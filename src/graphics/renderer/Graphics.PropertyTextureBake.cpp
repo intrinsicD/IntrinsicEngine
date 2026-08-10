@@ -24,13 +24,11 @@ namespace Extrinsic::Graphics
         [[nodiscard]] BakeClearColor ClearColorFor(
             const PropertyTextureBakeEncoding encoding) noexcept
         {
-            return encoding == PropertyTextureBakeEncoding::Normal
-                ? BakeClearColor{
-                      .R = 0.5f,
-                      .G = 0.5f,
-                      .B = 1.0f,
-                  }
-                : BakeClearColor{};
+            (void)encoding;
+            // Alpha is the bake coverage channel. Keeping uncovered RGB at
+            // zero makes linear filtering premultiplied by coverage; normal
+            // consumers divide RGB by alpha before decoding the vector.
+            return BakeClearColor{};
         }
 
         struct TextureRecordingState

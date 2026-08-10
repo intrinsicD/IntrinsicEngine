@@ -230,6 +230,18 @@ TEST(PropertyTextureBake, RecordsEncodedPaddingThroughGenericDilation)
     EXPECT_EQ(
         commands.PushConstantPayloads[2].size(),
         sizeof(Graphics::PropertyTextureBakeDilationPushConstants));
+    for (std::size_t index = 1u; index < 3u; ++index)
+    {
+        Graphics::PropertyTextureBakeDilationPushConstants push{};
+        std::memcpy(
+            &push,
+            commands.PushConstantPayloads[index].data(),
+            sizeof(push));
+        EXPECT_FLOAT_EQ(push.ClearR, 0.0f);
+        EXPECT_FLOAT_EQ(push.ClearG, 0.0f);
+        EXPECT_FLOAT_EQ(push.ClearB, 0.0f);
+        EXPECT_FLOAT_EQ(push.ClearA, 0.0f);
+    }
     ASSERT_FALSE(commands.TextureBarrierCalls.empty());
     EXPECT_EQ(
         commands.TextureBarrierCalls.back().Texture,

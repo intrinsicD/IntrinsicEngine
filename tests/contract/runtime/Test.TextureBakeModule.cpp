@@ -14,6 +14,13 @@ import Geometry.Properties;
 
 namespace Runtime = Extrinsic::Runtime;
 
+TEST(RuntimeTextureBakeModule, DefaultRequestUsesAtlasScaleExtent)
+{
+    const Runtime::PropertyTextureBakeRequest request{};
+    EXPECT_EQ(request.Width, 1024u);
+    EXPECT_EQ(request.Height, 1024u);
+}
+
 TEST(RuntimeTextureBakeModule, RepresentationDefaultsPreserveRawScalarData)
 {
     const std::vector<Runtime::EditorTextureBakeTarget> targets{

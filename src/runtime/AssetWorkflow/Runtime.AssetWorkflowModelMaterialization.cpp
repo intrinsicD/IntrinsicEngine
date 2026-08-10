@@ -65,6 +65,8 @@ namespace Extrinsic::Runtime
             std::string Name{};
             Geometry::HalfedgeMesh::Mesh Mesh{};
             ECS::Components::Culling::Local::Bounds LocalBounds{};
+            std::uint32_t UvAtlasWidth{0u};
+            std::uint32_t UvAtlasHeight{0u};
             bool HasResolvedTexcoords{false};
             RuntimeMeshResolvedUvProvenance TexcoordProvenance{
                 RuntimeMeshResolvedUvProvenance::None};
@@ -556,6 +558,8 @@ namespace Extrinsic::Runtime
                         : primitive.Name,
                     .Mesh = std::move(materialized->Mesh),
                     .LocalBounds = *localBounds,
+                    .UvAtlasWidth = materialized->Diagnostics.AtlasWidth,
+                    .UvAtlasHeight = materialized->Diagnostics.AtlasHeight,
                     .HasResolvedTexcoords =
                         materialized->Diagnostics.ResolvedTexcoordsValid,
                     .TexcoordProvenance =
@@ -1410,6 +1414,22 @@ namespace Extrinsic::Runtime
                 return;
             }
 
+            AssetWorkflowModelMaterializationOptions bakeOptions = options;
+            if (bakeOptions.GeneratedTextureWidth == 0u)
+            {
+                bakeOptions.GeneratedTextureWidth =
+                    primitive.UvAtlasWidth != 0u
+                        ? primitive.UvAtlasWidth
+                        : 1024u;
+            }
+            if (bakeOptions.GeneratedTextureHeight == 0u)
+            {
+                bakeOptions.GeneratedTextureHeight =
+                    primitive.UvAtlasHeight != 0u
+                        ? primitive.UvAtlasHeight
+                        : 1024u;
+            }
+
             JobToken uvJob{};
             JobToken normalJob{};
 
@@ -1502,7 +1522,7 @@ namespace Extrinsic::Runtime
                         [&scene,
                          entity,
                          textureBake = options.TextureBake,
-                         requestOptions = options](
+                         requestOptions = bakeOptions](
                             KernelEventBus&,
                             const JobResultEnvelope&) mutable -> bool
                     {
@@ -1540,7 +1560,7 @@ namespace Extrinsic::Runtime
                         ScheduleGeneratedPropertyTextureBake(
                             *options.TextureBake,
                             entity,
-                            options,
+                            bakeOptions,
                             NormalBakePropertyName(options),
                             Geometry::PropertyValueKind::Vec3,
                             PropertyTextureBakeEncoding::Normal,
@@ -1598,7 +1618,7 @@ namespace Extrinsic::Runtime
                     [&scene, entity,
                      textureBake = options.TextureBake,
                      requestOptions =
-                         options](KernelEventBus&,
+                         bakeOptions](KernelEventBus&,
                                      const JobResultEnvelope&) mutable -> bool
                 {
                     if (!scene.IsValid(entity))
@@ -1633,13 +1653,13 @@ namespace Extrinsic::Runtime
                      MeshHasVertexTexcoords(primitive.Mesh))
             {
                 PropertyTextureBakeResult result =
-                        ScheduleGeneratedPropertyTextureBake(
-                            *options.TextureBake,
-                            entity,
-                        options,
+                    ScheduleGeneratedPropertyTextureBake(
+                        *options.TextureBake,
+                        entity,
+                        bakeOptions,
                         options.GeneratedAlbedoPropertyName,
-                            Geometry::PropertyValueKind::Unknown,
-                            PropertyTextureBakeEncoding::RgbaColor,
+                        Geometry::PropertyValueKind::Unknown,
+                        PropertyTextureBakeEncoding::RgbaColor,
                         "generated-albedo");
                 RecordProgressiveTextureBakeDiagnostic(
                     scene,

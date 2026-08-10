@@ -1674,6 +1674,13 @@ bounded world-scoped `JobService` continuation parks the caller request until
 the service becomes operational; it never blocks mesh publication or selects a
 CPU texture path.
 
+Automatic normal bakes use the materialized UV atlas width and height, or a
+1024x1024 fallback when an authored/progressive UV path has no atlas extent.
+Their default two-texel dilation matches the default atlas chart margin at the
+same resolution. Sandbox manual bake controls pass width, height, and encoded
+padding through the canonical editor command and adopt a completed UV atlas's
+reported extent; raw-float bakes keep padding at zero.
+
 `TextureBakeModule` allocates each output through the live `AssetService`,
 using deterministic metadata paths with collision probes rather than
 fabricating an `AssetId`. Before recording and completion it revalidates exact
@@ -1683,6 +1690,10 @@ property, UV, topology, world, entity, output, cache-generation, and live
 the bake never begins or presents a second frame. Padded work uses retained,
 extent-keyed dilation scratch under fixed entry/byte limits and serializes one
 submission per frame.
+
+Generated normal textures deliberately have one mip. A component-wise color
+mip chain would change vector direction, and no vector-aware reduction path is
+currently part of the runtime composition.
 
 Until exact readiness, callers retain authored texture, property-buffer, or
 vertex-normal fallback. `AssetWorkflowModule` observes the output catalog and

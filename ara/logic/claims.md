@@ -1092,3 +1092,31 @@
 - **Tags**: geometry, runtime, rendering, property revisions, Vulkan, staging,
   LOP, coherence, bounded result
 - **From staging**: O132
+
+## C37: Atlas-sized Vulkan normal baking preserves a varying object-space field
+- **Statement**: On the BUG-148 three-vertex analytic fixture and this
+  operational Vulkan host, the production direct-mesh import path generates
+  UV-atlas coordinates, creates the matching 1024x1024 RGBA8 normal texture,
+  keeps sampled varying-normal angular error below one degree, fills the configured
+  two-texel gutter, leaves farther uncovered texels transparent black, binds
+  the exact object-space normal asset, and preserves unrelated material slots.
+- **Status**: supported — one analytic fixture and Vulkan-capable host; no
+  perceptual-quality, cross-device, tangent-space, vector-mip, or performance
+  claim
+- **Provenance**: ai-executed
+- **Crystallized via**: artifact-commitment
+- **Falsification criteria**: Running the named imported-normal Vulkan test on
+  an operational device produces a non-atlas-scale texture, verifies at most
+  1,000 covered samples, reaches one degree or more angular error, misses the
+  two-texel alpha-one gutter, gives any far uncovered channel a value above
+  four, binds the wrong normal asset/space, or changes an unrelated material
+  slot.
+- **Proof**: [src/graphics/renderer/Graphics.PropertyTextureBake.cpp,
+  assets/shaders/common/property_texture_normal.glsl,
+  src/runtime/AssetWorkflow/Runtime.AssetWorkflowRecipePolicies.cpp,
+  tests/integration/runtime/Test.RuntimeSandboxAcceptanceGpuSmoke.cpp,
+  tasks/done/BUG-148-normal-atlas-bake-fidelity.md]
+- **Dependencies**: []
+- **Tags**: geometry, runtime, graphics, normal field, texture atlas, Vulkan,
+  GPU, bounded result
+- **From staging**: O139

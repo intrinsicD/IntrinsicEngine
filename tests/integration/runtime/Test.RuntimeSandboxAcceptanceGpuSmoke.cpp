@@ -4945,9 +4945,9 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke, HierarchySelectionKeepsDefaultSandboxVisi
 
 namespace
 {
-constexpr std::uint32_t kRuntime129BakeExtent = 64u;
+constexpr std::uint32_t kRuntime129BakeExtent = 1024u;
 constexpr std::uint32_t kRuntime129PixelBytes = 4u;
-constexpr std::uint32_t kRuntime129BakePadding = 4u;
+constexpr std::uint32_t kRuntime129BakePadding = 2u;
 constexpr std::uint32_t kRuntime129MaxFrames = 72u;
 
 class Runtime129ObjectSpaceNormalBakeApp final : public Intrinsic::Tests::RuntimeTestModule
@@ -5172,9 +5172,11 @@ private:
             textureDesc->Height != kRuntime129BakeExtent ||
             textureDesc->Fmt !=
                 Extrinsic::RHI::Format::RGBA8_UNORM ||
+            textureDesc->MipLevels != 1u ||
             !hasTransferSourceUsage)
         {
-            Fail("Generated normal texture did not expose the production 64x64 RGBA8 "
+            Fail("Generated normal texture did not match the production "
+                 "atlas-sized single-mip RGBA8 "
                  "TransferSrc contract.");
             return;
         }
@@ -5453,24 +5455,6 @@ SnapshotRuntime129LiveBakeMesh(
     return snapshot;
 }
 
-void ExpectRuntime129TargetNormalPixel(
-    const RgbaPixel pixel,
-    const std::string_view label)
-{
-    constexpr int kTolerance = 4;
-    EXPECT_NEAR(static_cast<int>(pixel.R), 255, kTolerance)
-        << label << " pixel=" << PixelText(pixel);
-    EXPECT_NEAR(static_cast<int>(pixel.G), 128, kTolerance)
-        << label << " pixel=" << PixelText(pixel);
-    EXPECT_NEAR(static_cast<int>(pixel.B), 128, kTolerance)
-        << label << " pixel=" << PixelText(pixel);
-    EXPECT_NEAR(static_cast<int>(pixel.A), 255, kTolerance)
-        << label << " pixel=" << PixelText(pixel);
-    EXPECT_GT(pixel.R, 240u)
-        << label
-        << " encoded the decoy -X normal instead of the target +X normal: "
-        << PixelText(pixel);
-}
 } // namespace
 
 TEST(RuntimeSandboxAcceptanceGpuSmoke,
@@ -5514,11 +5498,10 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke,
         "v -0.75 -0.75 0\n"
         "v 0.75 -0.75 0\n"
         "v -0.75 0.75 0\n"
-        "vt 0.25 0.25\n"
-        "vt 0.75 0.25\n"
-        "vt 0.25 0.75\n"
         "vn 1 0 0\n"
-        "f 1/1/1 2/2/1 3/3/1\n",
+        "vn 0 1 0\n"
+        "vn 0 0 1\n"
+        "f 1//1 2//2 3//3\n",
     };
 
     RT::AssetWorkflowModule& assetWorkflow =
@@ -5796,12 +5779,22 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke,
 
     ASSERT_TRUE(targetBakeMesh.Succeeded())
         << targetBakeMesh.Diagnostic;
-    for (const Runtime129LiveBakeMesh::Vertex& vertex :
-         targetBakeMesh.Vertices)
+    ASSERT_EQ(targetBakeMesh.Vertices.size(), 3u);
+    ASSERT_EQ(targetBakeMesh.Triangles.size(), 1u);
+    constexpr std::array<glm::vec3, 3u> expectedVertexNormals{
+        glm::vec3{1.0f, 0.0f, 0.0f},
+        glm::vec3{0.0f, 1.0f, 0.0f},
+        glm::vec3{0.0f, 0.0f, 1.0f},
+    };
+    for (std::size_t index = 0u;
+         index < expectedVertexNormals.size();
+         ++index)
     {
-        EXPECT_NEAR(vertex.Normal.x, 1.0f, 1.0e-5f);
-        EXPECT_NEAR(vertex.Normal.y, 0.0f, 1.0e-5f);
-        EXPECT_NEAR(vertex.Normal.z, 0.0f, 1.0e-5f);
+        const glm::vec3 actual = targetBakeMesh.Vertices[index].Normal;
+        const glm::vec3 expected = expectedVertexNormals[index];
+        EXPECT_NEAR(actual.x, expected.x, 1.0e-5f);
+        EXPECT_NEAR(actual.y, expected.y, 1.0e-5f);
+        EXPECT_NEAR(actual.z, expected.z, 1.0e-5f);
     }
 
     const auto sampleAt =
@@ -5836,7 +5829,6 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke,
         std::uint32_t Y{0u};
         std::uint32_t Distance{0u};
     };
-    std::vector<Runtime129Texel> cpuCovered{};
     std::vector<std::uint8_t> cpuCoverage(
         static_cast<std::size_t>(kRuntime129BakeExtent) *
             kRuntime129BakeExtent,
@@ -5844,6 +5836,10 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke,
     std::optional<Runtime129Texel> coveredTexel{};
     float bestInteriorScore =
         std::numeric_limits<float>::lowest();
+    float maximumAngularErrorDegrees{0.0f};
+    std::uint32_t verifiedNormalSamples{0u};
+    const Runtime129LiveBakeMesh::Triangle triangle =
+        targetBakeMesh.Triangles.front();
     for (std::uint32_t y = 0u;
          y < kRuntime129BakeExtent;
          ++y)
@@ -5859,8 +5855,6 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke,
                     static_cast<std::size_t>(y) *
                         kRuntime129BakeExtent +
                     x] = 1u;
-                cpuCovered.push_back(
-                    Runtime129Texel{.X = x, .Y = y});
                 const float interiorScore =
                     std::min(
                         sample.Barycentric.x,
@@ -5874,11 +5868,54 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke,
                         Runtime129Texel{.X = x, .Y = y};
                     bestInteriorScore = interiorScore;
                 }
+
+                const RgbaPixel pixel = readAt(x, y);
+                if (interiorScore <= 1.0e-3f || pixel.A < 251u)
+                {
+                    continue;
+                }
+                glm::vec3 expectedNormal =
+                    sample.Barycentric.x *
+                        targetBakeMesh.Vertices[triangle.A].Normal +
+                    sample.Barycentric.y *
+                        targetBakeMesh.Vertices[triangle.B].Normal +
+                    sample.Barycentric.z *
+                        targetBakeMesh.Vertices[triangle.C].Normal;
+                const float expectedLength = glm::length(expectedNormal);
+                if (expectedLength <= 1.0e-6f)
+                {
+                    continue;
+                }
+                expectedNormal /= expectedLength;
+
+                glm::vec3 decodedNormal{
+                    static_cast<float>(pixel.R) / 255.0f,
+                    static_cast<float>(pixel.G) / 255.0f,
+                    static_cast<float>(pixel.B) / 255.0f,
+                };
+                decodedNormal = decodedNormal * 2.0f - glm::vec3{1.0f};
+                const float decodedLength = glm::length(decodedNormal);
+                if (decodedLength <= 1.0e-6f)
+                {
+                    continue;
+                }
+                decodedNormal /= decodedLength;
+                const float cosine = std::clamp(
+                    glm::dot(expectedNormal, decodedNormal),
+                    -1.0f,
+                    1.0f);
+                maximumAngularErrorDegrees = std::max(
+                    maximumAngularErrorDegrees,
+                    std::acos(cosine) * 57.29577951308232f);
+                ++verifiedNormalSamples;
             }
         }
     }
     ASSERT_TRUE(coveredTexel.has_value());
-    ASSERT_FALSE(cpuCovered.empty());
+    EXPECT_GT(verifiedNormalSamples, 1000u);
+    EXPECT_LT(maximumAngularErrorDegrees, 1.0f)
+        << "The atlas bake visibly changed the varying object-space normal "
+           "field (maximum angular error in degrees).";
 
     const auto distanceToCpuCoverage =
         [&](const std::uint32_t x,
@@ -5886,21 +5923,43 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke,
         {
             std::uint32_t distance =
                 std::numeric_limits<std::uint32_t>::max();
-            for (const Runtime129Texel covered :
-                 cpuCovered)
+            const std::uint32_t searchRadius =
+                kRuntime129BakePadding + 1u;
+            const std::uint32_t minX =
+                x > searchRadius ? x - searchRadius : 0u;
+            const std::uint32_t minY =
+                y > searchRadius ? y - searchRadius : 0u;
+            const std::uint32_t maxX = std::min(
+                kRuntime129BakeExtent - 1u,
+                x + searchRadius);
+            const std::uint32_t maxY = std::min(
+                kRuntime129BakeExtent - 1u,
+                y + searchRadius);
+            for (std::uint32_t coveredY = minY;
+                 coveredY <= maxY;
+                 ++coveredY)
             {
-                const std::uint32_t dx =
-                    x > covered.X
-                        ? x - covered.X
-                        : covered.X - x;
-                const std::uint32_t dy =
-                    y > covered.Y
-                        ? y - covered.Y
-                        : covered.Y - y;
-                distance =
-                    std::min(distance, std::max(dx, dy));
+                for (std::uint32_t coveredX = minX;
+                     coveredX <= maxX;
+                     ++coveredX)
+                {
+                    if (cpuCoverage[
+                            static_cast<std::size_t>(coveredY) *
+                                kRuntime129BakeExtent +
+                            coveredX] == 0u)
+                    {
+                        continue;
+                    }
+                    const std::uint32_t dx =
+                        x > coveredX ? x - coveredX : coveredX - x;
+                    const std::uint32_t dy =
+                        y > coveredY ? y - coveredY : coveredY - y;
+                    distance = std::min(distance, std::max(dx, dy));
+                }
             }
-            return distance;
+            return distance == std::numeric_limits<std::uint32_t>::max()
+                ? searchRadius + 1u
+                : distance;
         };
 
     std::optional<Runtime129Texel> gutterTexel{};
@@ -5952,7 +6011,7 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke,
         << "No GPU-covered texel existed outside the live CPU raster footprint.";
     ASSERT_TRUE(farTexel.has_value());
     EXPECT_EQ(gutterTexel->Distance, kRuntime129BakePadding)
-        << "The selected dilation witness did not reach the requested four-texel "
+        << "The selected dilation witness did not reach the requested two-texel "
            "gutter.";
 
     const RgbaPixel covered =
@@ -5961,14 +6020,13 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke,
         readAt(gutterTexel->X, gutterTexel->Y);
     const RgbaPixel farUncovered =
         readAt(farTexel->X, farTexel->Y);
-    ExpectRuntime129TargetNormalPixel(
-        covered,
-        "covered target");
-    ExpectRuntime129TargetNormalPixel(
-        gutter,
-        "dilated gutter");
+    EXPECT_GE(covered.A, 251u) << PixelText(covered);
+    EXPECT_GE(gutter.A, 251u) << PixelText(gutter);
+    EXPECT_LE(farUncovered.R, 4u) << PixelText(farUncovered);
+    EXPECT_LE(farUncovered.G, 4u) << PixelText(farUncovered);
+    EXPECT_LE(farUncovered.B, 4u) << PixelText(farUncovered);
     EXPECT_LE(farUncovered.A, 4u)
-        << "Far uncovered texel gained coverage outside the four-texel padding "
+        << "Far uncovered texel gained coverage outside the two-texel padding "
            "gutter: "
         << "coordinate=(" << farTexel->X << "," << farTexel->Y
         << ") distance=" << farTexel->Distance << " pixel=" << PixelText(farUncovered);

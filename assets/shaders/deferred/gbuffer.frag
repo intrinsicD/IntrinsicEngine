@@ -5,6 +5,7 @@
 #extension GL_EXT_nonuniform_qualifier : require
 
 #include "common/gpu_scene.glsl"
+#include "common/property_texture_normal.glsl"
 
 layout(set = 0, binding = 0) uniform CameraBuffer {
     mat4 view;
@@ -63,16 +64,10 @@ vec3 ResolveSurfaceNormal(
     }
 
     const vec4 normalSample = texture(globalTextures[nonuniformEXT(mat.NormalID)], uv);
-    if (normalSample.a <= 1.0e-6) {
+    vec3 objectNormal;
+    if (!DecodePropertyTextureNormal(normalSample, objectNormal)) {
         return n;
     }
-
-    vec3 objectNormal = normalSample.rgb * 2.0 - vec3(1.0);
-    const float objectNormalLength = length(objectNormal);
-    if (objectNormalLength <= 1.0e-6) {
-        return n;
-    }
-    objectNormal /= objectNormalLength;
 
     if ((mat.Flags & GpuMaterialFlag_WorldSpaceNormalMap) != 0u) {
         return objectNormal;

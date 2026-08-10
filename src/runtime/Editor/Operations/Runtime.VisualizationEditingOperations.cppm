@@ -374,8 +374,8 @@ export namespace Extrinsic::Runtime
         GeometryPresentationSlotSemantic DefaultTargetSemantic{
             GeometryPresentationSlotSemantic::Albedo};
         PropertyTextureBakeEncoding DefaultEncoder{PropertyTextureBakeEncoding::Auto};
-        std::uint32_t DefaultWidth{64u};
-        std::uint32_t DefaultHeight{64u};
+        std::uint32_t DefaultWidth{1024u};
+        std::uint32_t DefaultHeight{1024u};
         EditorUvDiagnosticsModel Uv{};
         std::vector<EditorTextureBakeSourceRow> Sources{};
         std::vector<PropertyTextureBakeRecord> BakedTextures{};
@@ -555,8 +555,8 @@ export namespace Extrinsic::Runtime
         PropertyTextureBakeRangePolicy RangePolicy{PropertyTextureBakeRangePolicy::AutoFinite};
         float RangeMin{0.0f};
         float RangeMax{1.0f};
-        std::uint32_t Width{64u};
-        std::uint32_t Height{64u};
+        std::uint32_t Width{1024u};
+        std::uint32_t Height{1024u};
         std::uint32_t PaddingTexels{0u};
         std::string GeneratedKey{};
         std::string OutputName{};

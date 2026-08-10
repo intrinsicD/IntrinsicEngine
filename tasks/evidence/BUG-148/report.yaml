@@ -1,0 +1,185 @@
+schema_version: 1
+task_id: BUG-148
+workflow_profile: standard
+status: complete
+generated_by: tools/agents/workflow_evidence.py
+generated_at: '2026-08-10T09:39:21Z'
+claim_eligible: false
+source:
+  base_ref: HEAD
+  base_revision: 6e9d7385f745e07047291c9f77274ba45e81eaf3
+  head_revision: 6e9d7385f745e07047291c9f77274ba45e81eaf3
+  branch: main
+  worktree: /home/alex/Documents/IntrinsicEngine
+  dirty: true
+  surface:
+  - path: ara/logic/claims.md
+    sha256: 0babf510d5039132ebdeec2caa05d3d8efa077bd7fa92756ca374a87c2488a21
+  - path: ara/staging/observations.yaml
+    sha256: c4fa9f27681a95d888c6fbbb64aca7e63cc139de38e47f74864ab37d5e496a9e
+  - path: assets/shaders/common/property_texture_normal.glsl
+    sha256: 74f898c49e9e04afc6384f4b254ab0765491ec1452b0061ba6f3caafa52c60d2
+  - path: assets/shaders/deferred/default_debug_gbuffer.frag
+    sha256: ccb51d39e60679cbb6e8ff5a5418dd350948feefd44d748c88272098b80471a0
+  - path: assets/shaders/deferred/gbuffer.frag
+    sha256: 54dc93a7e165d39dbf20266b323b0a09819832166c5c6a94445df0f36c9ef620
+  - path: assets/shaders/forward/default_debug_surface.frag
+    sha256: 5d9211947dbfaf36a821afd70166acfd692fdba65521db2390e74ca67f7a9b8e
+  - path: assets/shaders/surface.frag
+    sha256: 6b8f81134e4784578c995d8996cd9c1d527e42b8bdfd68d7eefdfd165ce201eb
+  - path: assets/shaders/surface_gbuffer.frag
+    sha256: d46c89040f41365ec525da3622a5df0de5512197bd98de85e63a2558db1149d2
+  - path: docs/architecture/graphics.md
+    sha256: dd49060bede4f8a587890489932efb29d4c07cbd4b712b56c57c83f046871468
+  - path: docs/architecture/runtime.md
+    sha256: 0a77d3385abbe9c86e79f4e2ad79e4a09d2828a228e95922318c76dc05cb0ce5
+  - path: src/app/Sandbox/Editor/Sandbox.DomainPanels.cpp
+    sha256: 57372faf58454be714d8e8530e5acdc1a100f05671a508bca13d30364a8767dc
+  - path: src/app/Sandbox/Editor/Sandbox.EditorShell.cpp
+    sha256: 47a0b34838b5ff94783cb3447748ee5b92582ce4c8097b0249cc20dc9c260389
+  - path: src/graphics/renderer/Graphics.PropertyTextureBake.cpp
+    sha256: 2885af306f26a02db1d3c69c8c52f7422541ecf72c1f07f8bec5c1fcf3a56a1d
+  - path: src/graphics/renderer/README.md
+    sha256: ea125e64af3f137d06fe11cf17e067e9a9d3c60a351a76dba8abad59cd29d5d1
+  - path: src/runtime/AssetWorkflow/Runtime.AssetWorkflowModelMaterialization.cpp
+    sha256: 29211a52975b5b3e9f9292f5502a399849f0586d1f0ea9b57b63a5b732a1cd93
+  - path: src/runtime/AssetWorkflow/Runtime.AssetWorkflowModelMaterialization.cppm
+    sha256: fcbe344c8ce47533611016ef459b52138f2a2f7a62767422da2dbd3516d327a6
+  - path: src/runtime/AssetWorkflow/Runtime.AssetWorkflowRecipePolicies.cpp
+    sha256: 4141abb34275cc86f4c3268c0b4d9dcbf14eaa7bd5293e205c95227e64b28bb0
+  - path: src/runtime/Editor/Operations/Runtime.VisualizationEditingOperations.cppm
+    sha256: 11b3ba0d5144b638a93c0357411140fd79c918fb8a322dff5fe90dda47eb67ac
+  - path: src/runtime/Modules/TextureBake/Runtime.TextureBakeModule.cppm
+    sha256: e0a1fe7cea4d1d3d2b82888c2ad05e8ce534d7dd779e7603c90d94a066edb78b
+  - path: src/runtime/README.md
+    sha256: 891501d0b6ae9c7c4814d74a8049eaa8433aa6946a6250a58062886a350eea89
+  - path: tasks/done/BUG-148-normal-atlas-bake-fidelity.md
+    sha256: 57c21f8411cf90bab24516a593db2aa904e0d996e072bf606fb3122836ac565f
+  - path: tasks/done/RETIREMENT-LOG.md
+    sha256: b23e9007281f2ce564c40287fcbb67e4b16ebd056e61be90471e893473586a60
+  - path: tests/contract/graphics/Test.PropertyTextureBake.cpp
+    sha256: 160659c60ceb507f2c463d9de939f82810f6accef491b00bccc03a20744959d0
+  - path: tests/contract/graphics/Test.RendererFrameLifecycle.cpp
+    sha256: 445daecc99c7e1b7d8576fc9ef34c8e43f9e0cb655fdbbe5c04c309ecc595621
+  - path: tests/contract/runtime/Test.TextureBakeModule.cpp
+    sha256: 69b1518d21d82793ded43f07cb8038a7d7485d7faae2c0ef46fd868b37debf3a
+  - path: tests/integration/runtime/Test.RuntimeSandboxAcceptanceGpuSmoke.cpp
+    sha256: 4ea24701a81b574c7ebd6af8b9a508e2ac9d83dd6e98ccdfe30a96441af0abe7
+  - path: tests/integration/runtime/Test.SandboxEditorPresentation.cpp
+    sha256: 5e7dd0296feedcc129caea39025ea7f5c9164646a46a0c5c32620e0b1e3c8c6c
+  content_digest: 780010ae630c69c8395fb83fc8514b521c50a49b89a38ec6e51b8c4ade506d6e
+touched:
+  paths:
+  - ara/logic/claims.md
+  - ara/staging/observations.yaml
+  - assets/shaders/common/property_texture_normal.glsl
+  - assets/shaders/deferred/default_debug_gbuffer.frag
+  - assets/shaders/deferred/gbuffer.frag
+  - assets/shaders/forward/default_debug_surface.frag
+  - assets/shaders/surface.frag
+  - assets/shaders/surface_gbuffer.frag
+  - docs/architecture/graphics.md
+  - docs/architecture/runtime.md
+  - src/app/Sandbox/Editor/Sandbox.DomainPanels.cpp
+  - src/app/Sandbox/Editor/Sandbox.EditorShell.cpp
+  - src/graphics/renderer/Graphics.PropertyTextureBake.cpp
+  - src/graphics/renderer/README.md
+  - src/runtime/AssetWorkflow/Runtime.AssetWorkflowModelMaterialization.cpp
+  - src/runtime/AssetWorkflow/Runtime.AssetWorkflowModelMaterialization.cppm
+  - src/runtime/AssetWorkflow/Runtime.AssetWorkflowRecipePolicies.cpp
+  - src/runtime/Editor/Operations/Runtime.VisualizationEditingOperations.cppm
+  - src/runtime/Modules/TextureBake/Runtime.TextureBakeModule.cppm
+  - src/runtime/README.md
+  - tasks/done/BUG-148-normal-atlas-bake-fidelity.md
+  - tasks/done/RETIREMENT-LOG.md
+  - tests/contract/graphics/Test.PropertyTextureBake.cpp
+  - tests/contract/graphics/Test.RendererFrameLifecycle.cpp
+  - tests/contract/runtime/Test.TextureBakeModule.cpp
+  - tests/integration/runtime/Test.RuntimeSandboxAcceptanceGpuSmoke.cpp
+  - tests/integration/runtime/Test.SandboxEditorPresentation.cpp
+  layers:
+  - app
+  - graphics
+  - runtime
+  modules:
+  - Extrinsic.Graphics.PropertyTextureBake
+  - Extrinsic.Runtime.AssetWorkflowModelMaterialization
+  - Extrinsic.Runtime.AssetWorkflowRecipePolicies
+  - Extrinsic.Runtime.TextureBakeModule
+  - Extrinsic.Runtime.VisualizationEditingOperations
+extension_seam: Existing bake request dimensions/padding and the shared property-texture normal decoder
+  remain the extension points; no new service or backend seam was introduced.
+future_change_plan: None owed for BUG-148. Tangent-space maps and vector-aware mip generation remain explicit
+  non-goals rather than hidden follow-ups.
+acceptance:
+- criterion: The automatic import path no longer downsamples a default 1024 atlas to a
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: Linear filtering across covered/uncovered texels does not rotate the
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: Default dilation stays within the generated atlas's chart margin at the
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: Manual bake users can see and set padding, and UV regeneration carries
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: Vulkan evidence executes the real import, bake, generated-asset binding,
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: No new dependency edge or abstraction surface is introduced.
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+commands:
+- receipt: tasks/evidence/BUG-148/commands/ara-claims.json
+- receipt: tasks/evidence/BUG-148/commands/build-ci-vulkan.json
+- receipt: tasks/evidence/BUG-148/commands/build-ci.json
+- receipt: tasks/evidence/BUG-148/commands/cpu-supported-gate.json
+- receipt: tasks/evidence/BUG-148/commands/diff-check.json
+- receipt: tasks/evidence/BUG-148/commands/docs-links.json
+- receipt: tasks/evidence/BUG-148/commands/focused-cpu-tests.json
+- receipt: tasks/evidence/BUG-148/commands/generated-atlas-normal-vulkan.json
+- receipt: tasks/evidence/BUG-148/commands/layering.json
+- receipt: tasks/evidence/BUG-148/commands/task-policy.json
+- receipt: tasks/evidence/BUG-148/commands/test-layout.json
+changed_public_contracts:
+- Automatic normal bakes resolve zero dimensions from UV-atlas diagnostics with a 1024 fallback, use two
+  encoded dilation texels, and treat alpha as filtered coverage over transparent-black uncovered texels.
+diagnostics_and_previews:
+- C37/O139 and the generated-atlas-normal-vulkan receipt bind the bounded operational result; the focused
+  CPU contracts bind defaults, clear color, UI forwarding, and all retained/promoted shader consumers.
+benchmark_or_parity_evidence: []
+docs_sync:
+  task_file: tasks/done/BUG-148-normal-atlas-bake-fidelity.md
+  session_brief_present: true
+  canonical_docs_changed: true
+  skill_mirrors_checked: true
+residual_risks:
+- The sub-degree operational result is bounded to one analytic varying-normal fixture and this Vulkan
+  host; no cross-device or perceptual-quality claim is made.
+skipped_checks: []
+artifacts:
+- path: ara/logic/claims.md
+  sha256: 0babf510d5039132ebdeec2caa05d3d8efa077bd7fa92756ca374a87c2488a21
+  kind: file
+- path: ara/staging/observations.yaml
+  sha256: c4fa9f27681a95d888c6fbbb64aca7e63cc139de38e47f74864ab37d5e496a9e
+  kind: file
+self_review:
+  completed: true
+  scope_matches_task: true
+  layering_preserved: true
+  tests_and_docs_accounted_for: true
+  mechanical_and_semantic_changes_separated: true

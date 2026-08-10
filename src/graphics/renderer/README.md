@@ -1893,7 +1893,11 @@ Concretely:
   `MaterialParams::NormalID` only with an explicit object- or world-space flag
   set by `MaterialSystem::ResolveTextureAssetBindings()`. Object-space RGB is
   transformed through the model normal matrix; world-space RGB is used
-  directly; uncovered texels preserve vertex-normal shading. Tangent-space
+  directly. Generated normal atlases clear uncovered texels to transparent
+  black; alpha is coverage, so retained forward/deferred consumers divide
+  filtered RGB by nonzero alpha before decoding and renormalizing. Alpha-zero
+  samples preserve vertex-normal shading. The generated texture stays
+  single-mip until a vector-aware reduction exists. Tangent-space
   authored normal maps remain reserved for a future material path.
   `MaterialParams::MetallicRoughnessID` is consumed by the promoted GBuffer
   shaders when `MaterialSystem` marks the channel texture-backed. Authored glTF

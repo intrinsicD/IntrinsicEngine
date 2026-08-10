@@ -7600,3 +7600,34 @@ against the unfixed source it reports 60 vertices against 12, 60 edges against
 guards the other side of the policy. The existing idempotence case still passes.
 The default CPU gate passes 4176/4176 with its expected `GlfwLifecycleLsan`
 skip.
+
+## 2026-08-10 — BUG-148 retired
+
+[`BUG-148`](BUG-148-normal-atlas-bake-fidelity.md) — normal texture atlas
+baking changing an initially valid object-space normal field — retired on
+2026-08-10.
+
+Two independent scale/coverage errors were compounding. Automatic normal bakes
+discarded the materialized atlas's 1024-scale diagnostics and rasterized into a
+fixed 64x64 target with a larger normalized dilation footprint. At chart edges,
+the target's encoded +Z clear contributed RGB during linear filtering even
+though its alpha said “uncovered,” rotating accepted samples toward +Z. The fix
+resolves automatic dimensions from the actual atlas (1024 fallback when no
+extent exists), matches the default two-texel dilation to the atlas margin, and
+uses transparent black plus alpha-coverage unpremultiplication before normal
+decode in every retained and promoted surface consumer. Generated normals stay
+single-mip because ordinary color reduction is not vector-safe.
+
+The existing control surfaces remain the control surfaces: explicit request
+dimensions still override automatic resolution, and the Sandbox bake panel now
+passes encoded padding and adopts a completed UV regeneration's reported
+extent. Raw-float bakes keep padding zero. No service, chart-ID buffer, backend,
+dependency edge, or mip framework was added.
+
+The Vulkan regression now imports a triangle without UVs, executes the
+generated-atlas path, bakes three varying vertex normals into a 1024x1024
+single-mip RGBA8 texture, and validates more than 1,000 covered texels below one
+degree of angular error. It also pins the two-texel gutter, transparent farther
+texels, exact generated-asset binding, and preservation of unrelated material
+slots. The default CPU-supported gate passes 4177/4177 with the expected
+`GlfwLifecycleLsan` capability skip.

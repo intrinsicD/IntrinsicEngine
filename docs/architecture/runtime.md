@@ -560,6 +560,16 @@ stable render id, presentation/semantic, and expected geometry-presentation
 recipe generation form a separate target record so reusable content never hides a
 destroyed/recycled entity or scene replacement.
 
+Automatic property bakes resolve their output width and height from the
+materialized UV-atlas diagnostics. If an authored-UV or progressive path has no
+atlas extent to report, it uses the atlas-scale 1024x1024 fallback rather than
+the former 64x64 downsample. Generated normals use two dilation texels at this
+matching resolution, equal to the default atlas chart margin. The Sandbox
+manual bake controls expose width, height, and padding through the same editor
+command; completion of a UV-regeneration job adopts its reported atlas extent
+and requested padding once, while raw-float outputs force padding to zero
+because dilation is an encoded-texture operation.
+
 Queue scheduling does not fabricate or expose an output `AssetId`. During the
 asset tick, the private service allocates a runtime metadata asset through the
 live `AssetService`: reusable identities use a deterministic digest path with
@@ -589,7 +599,10 @@ per frame. Fixed entry/byte caps bound queued identities, in-flight/proven
 outputs, and dilation scratch; at most one bake records per frame so shared
 dilation state is serialized. The output finishes in
 `ShaderReadOnly` and includes transfer-source usage for acceptance readback;
-dilation scratch records its actual post-use layout for safe reuse.
+dilation scratch records its actual post-use layout for safe reuse. Generated
+normal textures intentionally retain one mip: ordinary component-wise color
+downsampling is not a valid normal-vector reduction and no vector-aware mip
+generator is currently composed.
 
 Completion is a transactional runtime merge. Before mutation it rechecks the
 current world/epoch, raw entity lifetime and render id, latest request, exact

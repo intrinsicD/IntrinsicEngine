@@ -493,7 +493,9 @@ namespace Extrinsic::Runtime
         [[nodiscard]] PropertyTextureBakeRequest
         BuildDirectMeshNormalBakeRequest(
             const ECS::EntityHandle entity,
-            const WorldHandle world)
+            const WorldHandle world,
+            const std::uint32_t atlasWidth,
+            const std::uint32_t atlasHeight)
         {
             namespace GS = ECS::Components::GeometrySources;
             return PropertyTextureBakeRequest{
@@ -507,9 +509,9 @@ namespace Extrinsic::Runtime
                 },
                 .Storage = PropertyTextureBakeStorage::EncodedRgba,
                 .Encoding = PropertyTextureBakeEncoding::Normal,
-                .Width = 64u,
-                .Height = 64u,
-                .PaddingTexels = 4u,
+                .Width = atlasWidth != 0u ? atlasWidth : 1024u,
+                .Height = atlasHeight != 0u ? atlasHeight : 1024u,
+                .PaddingTexels = 2u,
                 .OutputName = "generated-normal",
             };
         }
@@ -718,6 +720,8 @@ namespace Extrinsic::Runtime
             std::function<bool()> bindingValid,
             TextureBakeService& textureBake,
             const ECS::EntityHandle entity,
+            const std::uint32_t atlasWidth,
+            const std::uint32_t atlasHeight,
             std::string sourcePath)
         {
             auto readinessChecks = std::make_shared<std::uint32_t>(0u);
@@ -766,6 +770,8 @@ namespace Extrinsic::Runtime
                             &textureBake,
                             entity,
                             world,
+                            atlasWidth,
+                            atlasHeight,
                             sourcePath
                         ](
                             KernelEventBus&,
@@ -781,7 +787,9 @@ namespace Extrinsic::Runtime
                                 textureBake.Bake(
                                     BuildDirectMeshNormalBakeRequest(
                                         entity,
-                                        world));
+                                        world,
+                                        atlasWidth,
+                                        atlasHeight));
                             if (!result.Succeeded())
                             {
                                 Core::Log::Warn(
@@ -1037,7 +1045,9 @@ namespace Extrinsic::Runtime
                                     textureBake->Bake(
                                         BuildDirectMeshNormalBakeRequest(
                                             state->Entity,
-                                            state->World));
+                                            state->World,
+                                            meshDiagnostics.AtlasWidth,
+                                            meshDiagnostics.AtlasHeight));
                                 if (result.Status ==
                                     PropertyTextureBakeStatus::
                                         NonOperationalBackend)
@@ -1049,6 +1059,8 @@ namespace Extrinsic::Runtime
                                         state->BindingValid,
                                         *textureBake,
                                         state->Entity,
+                                        meshDiagnostics.AtlasWidth,
+                                        meshDiagnostics.AtlasHeight,
                                         state->Path);
                                 }
                                 else if (!result.Succeeded())
