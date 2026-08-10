@@ -63,6 +63,17 @@ REPORT_REQUIRED_FIELDS = {
     "self_review",
 }
 REPORT_STATUSES = {"draft", "complete", "blocked"}
+SEAL_FIELDS = {
+    "schema_version",
+    "task_id",
+    "sealed_revision",
+    "source_content_digest",
+    "report_sha256",
+    "records",
+    "reason",
+    "generated_by",
+}
+SEAL_RECORD_FIELDS = {"path", "sha256"}
 ACCEPTANCE_DISPOSITIONS = {
     "satisfied",
     "deferred",
@@ -331,14 +342,17 @@ def changed_paths_between(
     base_revision: str,
     head_revision: str,
     evidence_task_id: str | None = None,
+    *,
+    detect_renames: bool = True,
 ) -> list[str]:
+    diff_args = ["diff", "--name-only", "--diff-filter=ACDMRTUXB"]
+    if not detect_renames:
+        diff_args.append("--no-renames")
     paths = {
         line
         for line in git(
             repo_root,
-            "diff",
-            "--name-only",
-            "--diff-filter=ACDMRTUXB",
+            *diff_args,
             base_revision,
             head_revision,
             "--",
@@ -603,6 +617,288 @@ def evidence_root(repo_root: Path, task_id: str) -> Path:
     if not TASK_ID_RE.fullmatch(task_id):
         raise ValueError(f"invalid task ID: {task_id}")
     return repo_root / "tasks" / "evidence" / task_id
+
+
+def report_seal_path(repo_root: Path, task_id: str) -> Path:
+    return evidence_root(repo_root, task_id) / "seal.yaml"
+
+
+def _revision_is_ancestor(repo_root: Path, revision: str) -> bool:
+    result = subprocess.run(
+        ["git", "-C", str(repo_root), "merge-base", "--is-ancestor", revision, "HEAD"],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        check=False,
+    )
+    return result.returncode == 0
+
+
+def _task_paths_at_revision(
+    repo_root: Path, revision: str, task_id: str
+) -> list[str]:
+    paths = git(
+        repo_root,
+        "ls-tree",
+        "-r",
+        "--name-only",
+        revision,
+        "--",
+        "tasks/active",
+        "tasks/backlog",
+        "tasks/done",
+        "tasks/archive",
+    ).splitlines()
+    pattern = re.compile(rf"^id:\s*{re.escape(task_id)}\s*$", re.MULTILINE)
+    matches: list[str] = []
+    for path in paths:
+        if not path.endswith(".md") or not Path(path).name.startswith(task_id):
+            continue
+        blob = blob_at_revision(repo_root, revision, path)
+        if blob is None:
+            continue
+        try:
+            text = blob.decode("utf-8")
+        except UnicodeDecodeError:
+            continue
+        if pattern.search(text):
+            matches.append(path)
+    return sorted(matches)
+
+
+def _sealed_record_paths(report: dict[str, Any]) -> list[str]:
+    paths: list[str] = []
+    for key in ("handoff", "review"):
+        value = report.get(key)
+        if value is not None:
+            paths.append(repository_relative_path(value))
+    return sorted(paths)
+
+
+def _seal_records(
+    repo_root: Path, revision: str, report: dict[str, Any]
+) -> list[dict[str, str]]:
+    records: list[dict[str, str]] = []
+    for path in _sealed_record_paths(report):
+        historical = blob_at_revision(repo_root, revision, path)
+        current_path = resolve_repo_path(repo_root, path)
+        if historical is None:
+            raise ValueError(f"sealed revision does not contain record: {path}")
+        if not current_path.is_file():
+            raise ValueError(f"current evidence record is missing: {path}")
+        digest = sha256_bytes(historical)
+        if sha256_file(current_path) != digest:
+            raise ValueError(
+                f"current evidence record differs from sealed revision: {path}"
+            )
+        records.append({"path": path, "sha256": digest})
+    return records
+
+
+def _historical_surface_errors(
+    repo_root: Path,
+    task_id: str,
+    report: dict[str, Any],
+    revision: str,
+) -> list[str]:
+    errors: list[str] = []
+    source = report.get("source")
+    if not isinstance(source, dict):
+        return ["report source must be a mapping"]
+    raw_entries = source.get("surface")
+    if not isinstance(raw_entries, list):
+        return ["report source.surface must be a list"]
+    checked: list[dict[str, Any]] = []
+    for index, value in enumerate(raw_entries):
+        if not isinstance(value, dict):
+            errors.append(f"source.surface[{index}] must be a mapping")
+            continue
+        try:
+            path = repository_relative_path(value.get("path"))
+            expected = value.get("sha256")
+            actual = sha256_at_revision(repo_root, revision, path)
+            if actual != expected:
+                errors.append(f"content hash mismatch for {path}")
+            checked.append({"path": path, "sha256": expected})
+        except ValueError as exc:
+            errors.append(str(exc))
+    if surface_digest(checked) != source.get("content_digest"):
+        errors.append("source surface digest mismatch")
+    try:
+        base_revision = require_commit(
+            repo_root, source.get("base_revision"), "source.base_revision"
+        )
+        observed = changed_paths_between(
+            repo_root, base_revision, revision, task_id
+        )
+        recorded = sorted(entry["path"] for entry in checked)
+        if observed != recorded:
+            observed = changed_paths_between(
+                repo_root,
+                base_revision,
+                revision,
+                task_id,
+                detect_renames=False,
+            )
+        if observed != recorded:
+            errors.append(
+                "recorded changed-path surface does not match sealed revision diff"
+            )
+    except ValueError as exc:
+        errors.append(str(exc))
+    artifacts = report.get("artifacts")
+    if not isinstance(artifacts, list):
+        errors.append("report artifacts must be a list")
+    else:
+        for index, value in enumerate(artifacts):
+            if not isinstance(value, dict):
+                errors.append(f"artifacts[{index}] must be a mapping")
+                continue
+            try:
+                if value.get("kind") != "file":
+                    raise ValueError("artifact kind must equal file")
+                actual = sha256_artifact_at_revision(
+                    repo_root, revision, value.get("path")
+                )
+                if actual != value.get("sha256"):
+                    raise ValueError(
+                        f"artifact hash mismatch: {value.get('path')}"
+                    )
+            except ValueError as exc:
+                errors.append(str(exc))
+    return errors
+
+
+def _validate_historical_seal(
+    repo_root: Path,
+    task_id: str,
+    report_path: Path,
+    report: dict[str, Any],
+    seal: dict[str, Any] | None = None,
+) -> tuple[str | None, list[Finding]]:
+    path = report_seal_path(repo_root, task_id)
+    findings: list[Finding] = []
+    if seal is None:
+        if not path.is_file():
+            return None, [
+                Finding(
+                    "error",
+                    relative_path(repo_root, path),
+                    "retired complete dirty report requires a historical seal",
+                )
+            ]
+        try:
+            seal = strict_yaml_load(path)
+        except ValueError as exc:
+            return None, [Finding("error", relative_path(repo_root, path), str(exc))]
+    missing = sorted(SEAL_FIELDS - seal.keys())
+    unknown = sorted(seal.keys() - SEAL_FIELDS)
+    if missing:
+        findings.append(
+            Finding("error", relative_path(repo_root, path), "missing fields: " + ", ".join(missing))
+        )
+    if unknown:
+        findings.append(
+            Finding("error", relative_path(repo_root, path), "unknown fields: " + ", ".join(unknown))
+        )
+    if seal.get("schema_version") != SCHEMA_VERSION:
+        findings.append(Finding("error", "seal.schema_version", "must equal 1"))
+    if seal.get("task_id") != task_id:
+        findings.append(Finding("error", "seal.task_id", "does not match report"))
+    if seal.get("generated_by") != "tools/agents/workflow_evidence.py":
+        findings.append(
+            Finding("error", "seal.generated_by", "is not generator-attributed")
+        )
+    if not isinstance(seal.get("reason"), str) or not seal["reason"].strip():
+        findings.append(Finding("error", "seal.reason", "must be non-empty text"))
+    if seal.get("source_content_digest") != report.get("source", {}).get(
+        "content_digest"
+    ):
+        findings.append(
+            Finding(
+                "error",
+                "seal.source_content_digest",
+                "does not match report source digest",
+            )
+        )
+    report_hash = seal.get("report_sha256")
+    if not isinstance(report_hash, str) or not SHA256_RE.fullmatch(report_hash):
+        findings.append(
+            Finding("error", "seal.report_sha256", "must be lowercase sha256")
+        )
+
+    revision: str | None = None
+    try:
+        revision = require_commit(
+            repo_root, seal.get("sealed_revision"), "seal.sealed_revision"
+        )
+        if not _revision_is_ancestor(repo_root, revision):
+            raise ValueError("seal.sealed_revision must be an ancestor of HEAD")
+        report_relative = relative_path(repo_root, report_path)
+        historical_report = blob_at_revision(repo_root, revision, report_relative)
+        if historical_report is None:
+            raise ValueError("sealed revision does not contain report.yaml")
+        if sha256_bytes(historical_report) != report_hash:
+            raise ValueError("sealed report hash does not match report_sha256")
+        if sha256_file(report_path) != report_hash:
+            raise ValueError("current report.yaml differs from historical seal")
+        task_paths = _task_paths_at_revision(repo_root, revision, task_id)
+        if len(task_paths) != 1:
+            raise ValueError(
+                "sealed revision must contain exactly one open/done/archive task "
+                f"for {task_id}; found {len(task_paths)}"
+            )
+    except ValueError as exc:
+        findings.append(Finding("error", "seal.sealed_revision", str(exc)))
+        revision = None
+
+    records = seal.get("records")
+    observed_paths: set[str] = set()
+    if not isinstance(records, list):
+        findings.append(Finding("error", "seal.records", "must be a list"))
+    else:
+        for index, value in enumerate(records):
+            location = f"seal.records[{index}]"
+            if not isinstance(value, dict):
+                findings.append(Finding("error", location, "must be a mapping"))
+                continue
+            missing_record = sorted(SEAL_RECORD_FIELDS - value.keys())
+            unknown_record = sorted(value.keys() - SEAL_RECORD_FIELDS)
+            if missing_record or unknown_record:
+                findings.append(
+                    Finding(
+                        "error",
+                        location,
+                        "invalid fields",
+                    )
+                )
+                continue
+            try:
+                record_path = repository_relative_path(value.get("path"))
+                if record_path in observed_paths:
+                    raise ValueError("duplicate record path")
+                observed_paths.add(record_path)
+                expected = value.get("sha256")
+                if not isinstance(expected, str) or not SHA256_RE.fullmatch(expected):
+                    raise ValueError("record sha256 must be lowercase sha256")
+                if revision is not None:
+                    historical = blob_at_revision(repo_root, revision, record_path)
+                    if historical is None or sha256_bytes(historical) != expected:
+                        raise ValueError("record differs at sealed revision")
+                current = resolve_repo_path(repo_root, record_path)
+                if not current.is_file() or sha256_file(current) != expected:
+                    raise ValueError("current record differs from historical seal")
+            except ValueError as exc:
+                findings.append(Finding("error", location, str(exc)))
+    expected_paths = set(_sealed_record_paths(report))
+    if observed_paths != expected_paths:
+        findings.append(
+            Finding(
+                "error",
+                "seal.records",
+                "must exactly bind report handoff/review records",
+            )
+        )
+    return (revision if not findings else None), findings
 
 
 def _atomic_write(path: Path, payload: bytes, replace: bool = False) -> None:
@@ -885,6 +1181,68 @@ def generate_report(args: argparse.Namespace) -> int:
     return 0
 
 
+def seal_report(args: argparse.Namespace) -> int:
+    repo_root = repo_root_from(args.root)
+    task_path = find_task(repo_root, args.task_id)
+    _, metadata = load_task_metadata(task_path)
+    if metadata.get("workflow_schema") != SCHEMA_VERSION:
+        raise ValueError(f"{args.task_id} is not enrolled in workflow schema v1")
+    report_path = evidence_root(repo_root, args.task_id) / "report.yaml"
+    if not report_path.is_file():
+        raise ValueError("generate and commit report.yaml before sealing it")
+    report = strict_yaml_load(report_path)
+    if report.get("task_id") != args.task_id:
+        raise ValueError("report task_id does not match seal task")
+    if report.get("status") != "complete":
+        raise ValueError("only a complete report may be historically sealed")
+    if report.get("source", {}).get("dirty") is not True:
+        raise ValueError(
+            "clean reports already bind source.head_revision and need no seal"
+        )
+
+    if args.revision == "HEAD":
+        if git(repo_root, "status", "--porcelain"):
+            raise ValueError(
+                "seal-report with HEAD requires a clean worktree containing "
+                "the committed report and evidence"
+            )
+        revision = git(repo_root, "rev-parse", "HEAD")
+    else:
+        if not re.fullmatch(r"[0-9a-f]{40}", args.revision):
+            raise ValueError("--revision must be HEAD or an exact 40-hex commit")
+        revision = require_commit(repo_root, args.revision, "--revision")
+    if not _revision_is_ancestor(repo_root, revision):
+        raise ValueError("sealed revision must be an ancestor of HEAD")
+
+    records = _seal_records(repo_root, revision, report)
+    seal = {
+        "schema_version": SCHEMA_VERSION,
+        "task_id": args.task_id,
+        "sealed_revision": revision,
+        "source_content_digest": report["source"]["content_digest"],
+        "report_sha256": sha256_file(report_path),
+        "records": records,
+        "reason": args.reason,
+        "generated_by": "tools/agents/workflow_evidence.py",
+    }
+    _, seal_findings = _validate_historical_seal(
+        repo_root, args.task_id, report_path, report, seal
+    )
+    surface_errors = _historical_surface_errors(
+        repo_root, args.task_id, report, revision
+    )
+    errors = [finding.message for finding in seal_findings] + surface_errors
+    if errors:
+        raise ValueError("cannot seal report: " + "; ".join(errors))
+
+    out = report_seal_path(repo_root, args.task_id)
+    _atomic_write(out, yaml_dump(seal).encode("utf-8"))
+    print(
+        f"Wrote {relative_path(repo_root, out)} for exact revision {revision}."
+    )
+    return 0
+
+
 def append_handoff(args: argparse.Namespace) -> int:
     repo_root = repo_root_from(args.root)
     task_path = find_task(repo_root, args.task_id)
@@ -1120,6 +1478,13 @@ def validate_report(
     if type(dirty) is not bool:
         findings.append(Finding("error", "source.dirty", "must be a boolean"))
     clean_head: str | None = None
+    lifecycle = {part.lower() for part in task_path.parts}
+    historical_seal_required = (
+        dirty is True
+        and status == "complete"
+        and bool(lifecycle & {"done", "archive"})
+    )
+    live_dirty = dirty is True and not historical_seal_required
     if dirty is False:
         try:
             clean_head = require_commit(
@@ -1127,6 +1492,11 @@ def validate_report(
             )
         except ValueError as exc:
             findings.append(Finding("error", "source.head_revision", str(exc)))
+    elif historical_seal_required:
+        clean_head, seal_findings = _validate_historical_seal(
+            repo_root, task_id, report_path, report
+        )
+        findings.extend(seal_findings)
     checked_entries: list[dict[str, Any]] = []
     for index, entry_value in enumerate(entries):
         entry = _require_mapping(entry_value, f"source.surface[{index}]", findings)
@@ -1136,7 +1506,7 @@ def validate_report(
                 actual_hash = sha256_at_revision(
                     repo_root, clean_head, entry.get("path")
                 )
-            elif dirty is True:
+            elif live_dirty:
                 actual_hash = sha256_worktree_entry(repo_root, entry.get("path"))
             else:
                 actual_hash = expected_hash
@@ -1166,7 +1536,7 @@ def validate_report(
                 mismatch_detail = (
                     "recorded changed-path surface does not match fixed revision diff"
                 )
-            elif dirty is True:
+            elif live_dirty:
                 observed = changed_paths(repo_root, base_revision, task_id)
                 mismatch_detail = (
                     "recorded changed-path surface does not match current worktree diff"
@@ -1179,6 +1549,18 @@ def validate_report(
                 for entry in checked_entries
                 if isinstance(entry.get("path"), str)
             )
+            if (
+                observed != recorded
+                and historical_seal_required
+                and clean_head is not None
+            ):
+                observed = changed_paths_between(
+                    repo_root,
+                    base_revision,
+                    clean_head,
+                    task_id,
+                    detect_renames=False,
+                )
             if observed != recorded:
                 findings.append(
                     Finding(
@@ -1323,7 +1705,7 @@ def validate_report(
                 actual_hash = sha256_artifact_at_revision(
                     repo_root, clean_head, entry.get("path")
                 )
-            elif dirty is True:
+            elif live_dirty:
                 actual_hash = sha256_worktree_artifact(repo_root, entry.get("path"))
             else:
                 actual_hash = entry.get("sha256")
@@ -1748,6 +2130,20 @@ def build_parser() -> argparse.ArgumentParser:
     generate.add_argument("--self-review-complete", action="store_true")
     generate.add_argument("--skill-mirrors-checked", action="store_true")
     generate.set_defaults(handler=generate_report)
+
+    seal = subparsers.add_parser(
+        "seal-report",
+        help="Bind a completed dirty report to a commit containing its evidence.",
+    )
+    seal.add_argument("--root", type=Path, default=Path("."))
+    seal.add_argument("--task-id", required=True)
+    seal.add_argument(
+        "--revision",
+        default="HEAD",
+        help="HEAD for a clean current seal, or an exact historical 40-hex commit",
+    )
+    seal.add_argument("--reason", required=True)
+    seal.set_defaults(handler=seal_report)
 
     handoff = subparsers.add_parser("append-handoff", help="Append durable handoff.")
     handoff.add_argument("--root", type=Path, default=Path("."))
