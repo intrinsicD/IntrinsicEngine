@@ -838,8 +838,6 @@ class AgentWorkGraphTests(unittest.TestCase):
                 "plan",
                 "--reason",
                 "begin the second reviewed slice",
-                "--accept-pre-review-checkpoint",
-                "--accept-stale-source",
             )
             fixture._assert_success(advanced)
             result, state = fixture.show()
@@ -873,6 +871,53 @@ class AgentWorkGraphTests(unittest.TestCase):
         self.assertFalse(event["accepted_pre_review_checkpoint"])
         self.assertEqual(event["accepted_stale_reasons"], [])
         self.assertEqual(event["prior_nodes"]["finalize"]["status"], "succeeded")
+
+    def test_advance_slice_records_surplus_recovery_flags_as_unused(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            fixture = WorkGraphFixture(Path(tmp))
+            fixture._assert_success(fixture.claim())
+            fixture._assert_success(fixture.start())
+            subprocess.run(["git", "add", "."], cwd=fixture.root, check=True)
+            subprocess.run(
+                ["git", "commit", "-qm", "bind task claim"],
+                cwd=fixture.root,
+                check=True,
+            )
+            fixture.progress_to_join()
+            fixture.complete("finalize")
+
+            advanced = fixture.work(
+                "advance-slice",
+                "--task-id",
+                fixture.task_id,
+                "--owner",
+                fixture.owner,
+                "--from-node",
+                "plan",
+                "--reason",
+                "surplus recovery flags must not falsify the event",
+                "--accept-pre-review-checkpoint",
+                "--accept-stale-source",
+            )
+            fixture._assert_success(advanced)
+
+            common = subprocess.run(
+                ["git", "rev-parse", "--path-format=absolute", "--git-common-dir"],
+                cwd=fixture.root,
+                text=True,
+                stdout=subprocess.PIPE,
+                check=True,
+            ).stdout.strip()
+            event_path = (
+                Path(common) / "intrinsic-agent-work-graphs/v1/PROC-999.events.jsonl"
+            )
+            event = json.loads(
+                event_path.read_text(encoding="utf-8").splitlines()[-1]
+            )
+
+        self.assertEqual(event["prior_disposition"], "reviewed")
+        self.assertFalse(event["accepted_pre_review_checkpoint"])
+        self.assertEqual(event["accepted_stale_reasons"], [])
 
     def test_advance_slice_rejects_unsafe_cycle_states(self) -> None:
         def prepare(root: Path) -> WorkGraphFixture:
