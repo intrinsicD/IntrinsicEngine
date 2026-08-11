@@ -9,6 +9,7 @@ the authoritative open/unblocked view.
 ## Active tasks
 
 - `METHOD-039` — Feature-network-constrained curvature patch decomposition (tasks/active/METHOD-039-feature-network-curvature-patch-decomposition.md)
+- `PROC-033` — Source documentation contract and audit skill (tasks/active/PROC-033-source-documentation-contract-and-audit-skill.md)
 
 ## Theme B — Rendering modernization
 

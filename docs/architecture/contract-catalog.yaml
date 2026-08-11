@@ -18,6 +18,16 @@ contracts:
     proofs:
       - tools/agents/agent_work_graph.py
       - tests/regression/tooling/Test.AgentWorkGraph.py
+  repo.source-documentation:
+    owner: agent-workflow
+    source: docs/agent/source-documentation-policy.md
+    applies_when:
+      - A project-owned C++ module interface or header is created or materially changed.
+      - Source comments or README files are added or materially changed.
+      - A source-documentation audit or cleanup task is opened or reviewed.
+    proofs:
+      - tools/agents/skills/intrinsicengine-source-documentation/scripts/audit_source_documentation.py
+      - tests/regression/tooling/Test.SourceDocumentationAudit.py
   geometry.element-domain-sources:
     owner: ecs-geometry-runtime
     source: docs/architecture/geometry-api-style.md

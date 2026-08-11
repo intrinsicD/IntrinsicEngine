@@ -47,6 +47,7 @@ This page is the canonical entry point for repository documentation.
 - [Clean-workshop review gate](agent/clean-workshop-review.md)
 - [Drift-audit checklist](agent/drift-audit-checklist.md)
 - [Docs sync policy](agent/docs-sync-policy.md)
+- [Source documentation policy](agent/source-documentation-policy.md)
 - [Roles](agent/roles.md)
 
 ## Migration

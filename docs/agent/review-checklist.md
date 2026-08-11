@@ -128,6 +128,13 @@ Use this checklist before commit and PR creation.
 ## Documentation and tasks
 
 - [ ] Docs updated for structural/policy/behavior changes.
+- [ ] Every new or materially changed `.cppm` or header has a short, meaningful
+      file synopsis; declaration comments are limited to mandatory non-obvious
+      contracts, and implementation rationale is placed with implementation.
+- [ ] Changed comments describe current invariants rather than task history,
+      and changed README files are concise current-state navigation without
+      changelogs, retired-slice narratives, or future plans
+      ([source documentation policy](source-documentation-policy.md)).
 - [ ] Links are updated and valid.
 - [ ] Task records synchronized (`active`, `backlog`, `done` as appropriate).
 - [ ] Every declared contract is disposed by executable evidence or a named

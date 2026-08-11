@@ -1,6 +1,6 @@
 # IntrinsicEngine Agent Skills
 
-This folder contains twenty-two [Agent Skills](https://agentskills.io). Six of
+This folder contains twenty-three [Agent Skills](https://agentskills.io). Seven of
 them wrap the IntrinsicEngine `AGENTS.md` contract and the procedure docs
 under `docs/agent/`; thirteen add IntrinsicEngine-specific cross-cutting workflow
 disciplines (diagnosis, Vulkan frame triage, GPU smoke authoring, stale-build
@@ -32,7 +32,7 @@ Packaging the same content as Agent Skills gives three additional benefits:
 
 ## The skills
 
-### Source-doc mirrors (six)
+### Source-doc mirrors (seven)
 
 | Skill | Wraps | Triggers on |
 | --- | --- | --- |
@@ -42,8 +42,9 @@ Packaging the same content as Agent Skills gives three additional benefits:
 | `intrinsicengine-method` | `docs/agent/method-workflow.md` + `docs/agent/method-review-checklist.md` | Paper/method implementation under `methods/` |
 | `intrinsicengine-benchmark` | `docs/agent/benchmark-workflow.md` + `docs/agent/benchmark-review-checklist.md` | Benchmark manifests, runners, performance claims |
 | `intrinsicengine-docs-sync` | `docs/agent/docs-sync-policy.md` | File moves, API surface changes, inventory regeneration |
+| `intrinsicengine-source-documentation` | `docs/agent/source-documentation-policy.md` + deterministic audit script | Creating/reviewing module interfaces, headers, comments, and READMEs; recurring source-documentation audits |
 
-Together these cover all 14 procedure files under `docs/agent/` plus
+Together these cover all 15 procedure files under `docs/agent/` plus
 `AGENTS.md` itself, the session-onboarding prompt under
 `docs/agent/prompt/prompt.md`, and the task template at
 `tasks/templates/task.md`. The curated
@@ -104,7 +105,7 @@ skill (see "Keeping in sync" below).
 
 ### Skill-canonical sections in three mirror skills (PROC-023)
 
-Three of the six source-doc mirror skills carry named sections that **extend
+Three of the seven source-doc mirror skills carry named sections that **extend
 beyond** their `docs/agent/*` source and have no source counterpart. Those
 sections are **skill-canonical** — the skill body is their authoritative home
 (the discipline-skill model) — while every other section of the skill still

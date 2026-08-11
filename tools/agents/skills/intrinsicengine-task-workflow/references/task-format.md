@@ -63,6 +63,13 @@ sections so task status is visible at a glance. Completed task files under
 `tasks/done/` should not contain unchecked actionable todos; unresolved work
 belongs in a follow-up task.
 
+The Docs checklist names the canonical current-state documentation affected by
+the task. Do not require a source-tree README update merely to record that a
+feature or slice landed. Update a README only when its directory role,
+ownership, navigation, configuration, or verification entry points change;
+keep chronology in the task, ADR, migration record, report, or retirement log.
+See [`source-documentation-policy.md`](../../../../../docs/agent/source-documentation-policy.md).
+
 ## Front-matter (open tasks)
 
 Open tasks under `tasks/active/` and `tasks/backlog/` must start with a YAML
@@ -279,11 +286,11 @@ When a task completes:
    [`workflow-evidence.md`](../../../../../docs/agent/workflow-evidence.md#completion-evidence) for the
    migration and tamper rules.
 
-Category READMEs may keep retired entries only under a history-marked heading
-(retired/history/closed/completed/resolved/verified/done). Open lists cite
-retired tasks as plain code spans, not links. `check_task_state_links.py`
-enforces this for task indexes; explicitly mixed dependency-DAG sections keep
-their existing state-link-guard comment.
+Category READMEs describe current task state only. Remove retired entries from
+open lists and use `tasks/done/RETIREMENT-LOG.md`, the retired task file, and the
+archive index for history. `check_task_state_links.py` enforces lifecycle
+accuracy for task indexes; explicitly mixed dependency-DAG sections keep their
+existing state-link-guard comment until their tracked cleanup.
 
 Retired files stay in `tasks/done/` short-term; they are periodically swept
 to `tasks/archive/` (frozen read-only history — see

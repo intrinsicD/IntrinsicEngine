@@ -17,10 +17,19 @@ Documentation updates are required in the same PR when code/structure/policy cha
   - Update `docs/methods/*` or `docs/benchmarking/*` plus validators and manifests.
 - **CI/workflow changes**
   - Update workflow docs/process checklists.
+- **Source documentation changes**
+  - Apply [`source-documentation-policy.md`](../../../../../docs/agent/source-documentation-policy.md) to
+    materially changed module interfaces, headers, comments, and README files.
+  - Update a source-tree README only when its current role, ownership,
+    navigation, configuration, or verification entry points change. Record
+    feature chronology and future work in task/ADR/migration/report records.
 
 ## Quality gates
 
 - Docs should describe current behavior/state, not aspirational plans, unless clearly labeled as roadmap/migration.
+- README files are current-state entry points even when a roadmap or migration
+  exists elsewhere; link to the purpose-built record instead of copying its
+  history or plans into the README.
 - Cross-links must be valid.
 - Generated inventories should be refreshed when impacted by structure changes.
 - Generated agent-workflow artifacts are CI-freshness-checked: `tasks/SESSION-BRIEF.md`

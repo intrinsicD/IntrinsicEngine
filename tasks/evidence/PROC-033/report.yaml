@@ -1,0 +1,180 @@
+schema_version: 1
+task_id: PROC-033
+workflow_profile: high-risk
+status: draft
+generated_by: tools/agents/workflow_evidence.py
+generated_at: '2026-08-11T13:21:08Z'
+claim_eligible: false
+source:
+  base_ref: 503c0204149522d60171e4dbffcb46c9163360ee
+  base_revision: 503c0204149522d60171e4dbffcb46c9163360ee
+  head_revision: 566db5e584dcaae0dfd3ed1d2432380cdb208b68
+  branch: codex/proc-033-source-documentation
+  worktree: /tmp/intrinsic-proc033.esP0pr
+  dirty: false
+  surface:
+  - path: .github/workflows/ci-docs.yml
+    sha256: 61bef324e5af0abb4dbfdcb43c48e1772a3d221e4b0b291a0929de1970e51430
+  - path: AGENTS.md
+    sha256: fd981627c253decbed6a1fc8f444dfaf6c7e06bf88f39dfb672684eb9a219c71
+  - path: README.md
+    sha256: 5179a4f6058efed75d5abff21010eb457a8eddf7cd79662821406843716dea95
+  - path: docs/agent/contract.md
+    sha256: 514b11b0e41c1dd7ead7842d82b1f2731da5eea85b42588eef12fd50f508cb84
+  - path: docs/agent/docs-sync-policy.md
+    sha256: efd027d739abe85fa49a8be60525d0ff066155c1d5786abbd517755270adb6bb
+  - path: docs/agent/how-this-repo-is-built.md
+    sha256: affda120ab2f11e2f8c5171b6b8aee57f0c23c2abb79856e66b541cfc0e8ccec
+  - path: docs/agent/review-checklist.md
+    sha256: 6cd5672592bdabfca11b79377576bab0d274d76c54d1c52d9c9f469c4d032d98
+  - path: docs/agent/source-documentation-policy.md
+    sha256: 62cf04820791f4a45ad6805e124ecc53b38ee7a13689776fb95dde722525d642
+  - path: docs/agent/task-format.md
+    sha256: a968efed39ea884e9aa26fa0fbf7605cf6b582de070a45f6917b32724abb48dc
+  - path: docs/architecture/contract-catalog.yaml
+    sha256: 600a575db57bf7ecf030ea0bb30d987b4848da5dd4365c846f9c7206711ab97b
+  - path: docs/index.md
+    sha256: 309fd27a066f47cb0106c8bf387379ff633aa064d434ecea0f53e024036e4ba6
+  - path: tasks/SESSION-BRIEF.md
+    sha256: dcb408b047ae67ad59088ca58118b5b6e257b08de2790cec85c117855859170a
+  - path: tasks/active/PROC-033-source-documentation-contract-and-audit-skill.md
+    sha256: 96f821c45b0677499566ba49c00c626273bf8d4255feabd30d2e3b319d21bda6
+  - path: tasks/active/README.md
+    sha256: d38c6a82ec003ca1a24f7f0df22fb591ab5fb23065e9e504e5918ed60302df43
+  - path: tests/regression/tooling/Test.CheckTaskStateLinks.py
+    sha256: e4fdc977489e236359f8e8b373720565724d7c85bb2547da1ae13eca48402b1e
+  - path: tests/regression/tooling/Test.SourceDocumentationAudit.py
+    sha256: 710ffb3f450e0070b316d7d792e4a8be2223c113c5cd4deaa7ce5f32d52083f5
+  - path: tools/agents/README.md
+    sha256: 03f1641919c4135376b4f6e781f0b68be7eca69379267749c4cfea3be2baf9ac
+  - path: tools/agents/skills/README.md
+    sha256: bc478312004506d081061b601eb9233a686885310d0ee31f949ae477a5745512
+  - path: tools/agents/skills/intrinsicengine-core/SKILL.md
+    sha256: cb24eafd69a0a82c392e74cca296edebb3186ee575394cd18d6d428bbc074bf5
+  - path: tools/agents/skills/intrinsicengine-core/references/contract.md
+    sha256: 8468c627a2a7a3c7bcde6b6ab50876060b4eb4b59627520ea187e5bf20485f75
+  - path: tools/agents/skills/intrinsicengine-docs-sync/SKILL.md
+    sha256: 7f099de509f51ab00d93ea08bcb256c24532a28d3962323e63a647869363dfff
+  - path: tools/agents/skills/intrinsicengine-docs-sync/references/docs-sync-policy.md
+    sha256: 8cd83c6f4ca6b97bda5f1a6ce194ae3fa5b9707dd87767a70fe481c767dd6fff
+  - path: tools/agents/skills/intrinsicengine-review/references/review-checklist.md
+    sha256: 6fa85f70627e3e1912ff21320a977cc66087c52b0f6e15765892784947bca7c6
+  - path: tools/agents/skills/intrinsicengine-source-documentation/SKILL.md
+    sha256: 5e4b5a3bf2fcbe0aa56aba06c18063fabb6dd2351b70e94f33dbe1aa4ba4f46d
+  - path: tools/agents/skills/intrinsicengine-source-documentation/agents/openai.yaml
+    sha256: 8a37a52bbb1fd5787cd648c5ac3c435a8401f70df8ba18e022821ea78dd58b11
+  - path: tools/agents/skills/intrinsicengine-source-documentation/references/source-documentation-policy.md
+    sha256: 62cf04820791f4a45ad6805e124ecc53b38ee7a13689776fb95dde722525d642
+  - path: tools/agents/skills/intrinsicengine-source-documentation/scripts/audit_source_documentation.py
+    sha256: 8058b902ea7544aebfbff841ea48ab3ca0c5110b44bb2f6a70b25afa8afcd296
+  - path: tools/agents/skills/intrinsicengine-task-workflow/references/task-format.md
+    sha256: db3655423441473df896ae770d31d19d9e0a2570fa2aa001485fc5810b188cf1
+  - path: tools/agents/sync_skills.py
+    sha256: bacc6545778bb8514bd00a28fb77473e13f2052807f83cb3760745cb64ad6eba
+  content_digest: 2afeb2512e512005d92d709e6f374b043507ada2a08dc92f0fe613a79855e9b3
+touched:
+  paths:
+  - .github/workflows/ci-docs.yml
+  - AGENTS.md
+  - README.md
+  - docs/agent/contract.md
+  - docs/agent/docs-sync-policy.md
+  - docs/agent/how-this-repo-is-built.md
+  - docs/agent/review-checklist.md
+  - docs/agent/source-documentation-policy.md
+  - docs/agent/task-format.md
+  - docs/architecture/contract-catalog.yaml
+  - docs/index.md
+  - tasks/SESSION-BRIEF.md
+  - tasks/active/PROC-033-source-documentation-contract-and-audit-skill.md
+  - tasks/active/README.md
+  - tests/regression/tooling/Test.CheckTaskStateLinks.py
+  - tests/regression/tooling/Test.SourceDocumentationAudit.py
+  - tools/agents/README.md
+  - tools/agents/skills/README.md
+  - tools/agents/skills/intrinsicengine-core/SKILL.md
+  - tools/agents/skills/intrinsicengine-core/references/contract.md
+  - tools/agents/skills/intrinsicengine-docs-sync/SKILL.md
+  - tools/agents/skills/intrinsicengine-docs-sync/references/docs-sync-policy.md
+  - tools/agents/skills/intrinsicengine-review/references/review-checklist.md
+  - tools/agents/skills/intrinsicengine-source-documentation/SKILL.md
+  - tools/agents/skills/intrinsicengine-source-documentation/agents/openai.yaml
+  - tools/agents/skills/intrinsicengine-source-documentation/references/source-documentation-policy.md
+  - tools/agents/skills/intrinsicengine-source-documentation/scripts/audit_source_documentation.py
+  - tools/agents/skills/intrinsicengine-task-workflow/references/task-format.md
+  - tools/agents/sync_skills.py
+  layers:
+  - agent-workflow
+  modules: []
+extension_seam: One canonical policy, one generated skill reference, and one standard-library audit script
+future_change_plan: Use subsystem-scoped cleanup tasks; add shared lint infrastructure only after a second
+  independent validator needs it
+acceptance:
+- criterion: Agents have one discoverable rule for file synopses, declaration comments,
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: The reusable skill can audit the whole repository or selected paths and
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: Existing debt is visible as a migration inventory but is not silently
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: The skill does not reward repetitive comments or manually maintained API
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: High-risk workflow evidence and an independent fixed-surface review are
+  task_checked: false
+  disposition: pending
+  evidence: []
+  reason: null
+commands:
+- receipt: tasks/evidence/PROC-033/commands/doc-links.json
+- receipt: tasks/evidence/PROC-033/commands/root-hygiene.json
+- receipt: tasks/evidence/PROC-033/commands/skill-sync.json
+- receipt: tasks/evidence/PROC-033/commands/skill-validation.json
+- receipt: tasks/evidence/PROC-033/commands/source-doc-inventory.json
+- receipt: tasks/evidence/PROC-033/commands/source-doc-regression.json
+- receipt: tasks/evidence/PROC-033/commands/task-policy.json
+- receipt: tasks/evidence/PROC-033/commands/test-layout.json
+changed_public_contracts:
+- repo.source-documentation
+diagnostics_and_previews:
+- 'Report-only baseline: 1,319 files, 436 objective errors, and 3,835 human-review findings'
+benchmark_or_parity_evidence: []
+docs_sync:
+  task_file: tasks/active/PROC-033-source-documentation-contract-and-audit-skill.md
+  session_brief_present: true
+  canonical_docs_changed: true
+  skill_mirrors_checked: true
+residual_risks:
+- Heuristic review findings require human judgment and must never become automatic failures by implication
+skipped_checks:
+- check: C++ configure/build/CTest
+  reason: 'The exact touched-scope planner selected the structural route and reported C++ setup required:
+    no'
+artifacts:
+- path: docs/agent/source-documentation-policy.md
+  sha256: 62cf04820791f4a45ad6805e124ecc53b38ee7a13689776fb95dde722525d642
+  kind: file
+- path: tools/agents/skills/intrinsicengine-source-documentation/scripts/audit_source_documentation.py
+  sha256: 8058b902ea7544aebfbff841ea48ab3ca0c5110b44bb2f6a70b25afa8afcd296
+  kind: file
+- path: tests/regression/tooling/Test.SourceDocumentationAudit.py
+  sha256: 710ffb3f450e0070b316d7d792e4a8be2223c113c5cd4deaa7ce5f32d52083f5
+  kind: file
+self_review:
+  completed: true
+  scope_matches_task: true
+  layering_preserved: true
+  tests_and_docs_accounted_for: true
+  mechanical_and_semantic_changes_separated: true
+handoff: tasks/evidence/PROC-033/handoff.jsonl
+review: tasks/evidence/PROC-033/reviews.jsonl

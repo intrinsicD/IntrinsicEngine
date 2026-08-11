@@ -100,6 +100,7 @@ class CheckTaskStateLinksTests(unittest.TestCase):
                 "tests/regression/tooling/Test.CheckTaskStateLinks.py",
                 "tests/regression/tooling/Test.CheckKernelConvergence.py",
                 "tests/regression/tooling/Test.CheckAraClaims.py",
+                "tests/regression/tooling/Test.SourceDocumentationAudit.py",
             ],
         )
         for script in policy_scripts:

@@ -46,6 +46,13 @@ Required dependency boundaries:
   it owns algorithm/control-flow bodies, allocation-heavy work, topology/container
   traversal, backend calls, diagnostics assembly, file/IO handling, or imports
   other modules only needed by the implementation rather than the public API.
+- Make code self-documenting through names, types, organization, and readable
+  control flow. Every project-owned `.cppm` and header starts with a brief
+  synopsis of what it contains and why the surface exists. Declaration comments
+  are exceptional and explain only mandatory, non-obvious contract information;
+  implementation rationale belongs in the matching `.cpp` or beside an inline
+  implementation that cannot move there. See
+  [`source-documentation-policy.md`](../../../../../docs/agent/source-documentation-policy.md).
 
 ## Shared optional session setup
 
@@ -137,6 +144,9 @@ When structure, policy, or behavior changes:
 - update links for moved files,
 - regenerate inventories/manifests when required,
 - keep docs factual and current-state.
+- keep README files concise and current-state; link to task, ADR, migration,
+  retirement, report, or Git records rather than embedding historical or future
+  narratives.
 
 ## CI expectations
 
