@@ -707,6 +707,7 @@ class AgentWorkGraphTests(unittest.TestCase):
                 json.dumps(legacy_state, indent=2, sort_keys=True) + "\n",
                 encoding="utf-8",
             )
+            legacy_result, legacy_status = fixture.show()
 
             missing_ack = fixture.work(
                 "advance-slice",
@@ -757,6 +758,8 @@ class AgentWorkGraphTests(unittest.TestCase):
 
         self.assertEqual(missing_ack.returncode, 2, missing_ack.stdout)
         self.assertIn("--accept-stale-source", missing_ack.stdout)
+        self.assertEqual(legacy_result.returncode, 1, legacy_result.stdout)
+        self.assertEqual(legacy_status["source"]["slice_index"], 1)
         self.assertEqual(
             missing_checkpoint_ack.returncode, 2, missing_checkpoint_ack.stdout
         )

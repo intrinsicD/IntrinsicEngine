@@ -566,6 +566,7 @@ def _load_state(repo_root: Path, task_id: str) -> dict[str, Any]:
         raise WorkGraphError(f"{path}: unsupported run schema")
     if state["task_id"] != task_id:
         raise WorkGraphError(f"{path}: task identity mismatch")
+    state["source"].setdefault("slice_index", 1)
     events = load_jsonl(_events_path(repo_root, task_id))
     if len(events) != state["event_count"]:
         raise WorkGraphError(
@@ -1373,7 +1374,9 @@ def advance_slice(args: argparse.Namespace) -> int:
             prior_nodes=prior_nodes,
             prior_source=prior_source,
             accepted_stale_reasons=accepted_stale,
-            accepted_pre_review_checkpoint=args.accept_pre_review_checkpoint,
+            accepted_pre_review_checkpoint=(
+                prior_disposition == "rolled-forward-before-review"
+            ),
             reset_nodes=sorted(reset),
             new_source=copy.deepcopy(state["source"]),
         )
