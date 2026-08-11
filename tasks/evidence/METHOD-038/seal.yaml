@@ -1,0 +1,13 @@
+schema_version: 1
+task_id: METHOD-038
+sealed_revision: 106d2020287e70b138ac36cb8e103f4755830f32
+source_content_digest: 310339e96b14265a76a710e91035876970186107a92e664d45a3731c6601eccd
+report_sha256: 148633d78d8968b32df0a7ad0c7434c275d4295d3dd3aa56f68d228e7b56f469
+records:
+- path: tasks/evidence/METHOD-038/handoff.jsonl
+  sha256: 64da17431cb471ae0dd2f500188ce270a3bc08177afb87a3f8857cfeb25a15f3
+- path: tasks/evidence/METHOD-038/reviews.jsonl
+  sha256: bc5c68c0980aab103a44cbc0077cec01e6c69d6fe261dbca542b247e577db3ba
+reason: Bind the unchanged complete dirty report, handoff, fixed-surface review, canonical scratch-011
+  artifacts, and retired task to the exact METHOD-038 retirement commit.
+generated_by: tools/agents/workflow_evidence.py
