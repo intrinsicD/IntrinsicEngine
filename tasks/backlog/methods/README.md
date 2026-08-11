@@ -122,12 +122,6 @@ end.
 - [METHOD-036 — Normal-orientation comparison evidence](METHOD-036-orientation-comparison-evidence.md)
   (shared-fixture publication protocol comparing octree parity, MST, iPSR,
   and PGR; implementation changes remain in their owning method tasks).
-- [METHOD-039 — Feature-network-constrained curvature patch decomposition](METHOD-039-feature-network-curvature-patch-decomposition.md)
-  (practical follow-up to retired METHOD-038's feature/fixture evidence: hard and soft
-  feature lines constrain a deterministic seeded oversegmentation, then an
-  explicit curvature-and-boundary energy removes unsupported seed fronts and
-  retains only feature-supported or curvature-closure boundaries; no UV,
-  topology cutting, novelty, optimized, or GPU scope).
 - [HARDEN-084 — Localized CPU/GPU parity signatures](HARDEN-084-localized-cpu-gpu-parity-signatures.md)
   (post-stability two-consumer evidence task, gated by the Progressive Poisson
   and parameterization GPU paths; no generic parity framework unless both

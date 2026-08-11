@@ -449,6 +449,7 @@ set(_geometry_test_files
     Test_GeometryProcessing.cpp
     Test.GaussianMixture.cpp
     Test.CurvatureSegmentation.cpp
+    Test.CurvaturePatchContract.cpp
     Test_SurfaceReconstruction.cpp
     Test_MeshQuality.cpp
     Test_MeshAnalysis.cpp

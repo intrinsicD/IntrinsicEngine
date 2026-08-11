@@ -7,6 +7,32 @@ are recorded separately in
 does not change the frozen METHOD-037 formulation below. METHOD-039 owns the
 practical feature-network patch follow-up.
 
+## METHOD-039 selected follow-up (not yet implemented)
+
+METHOD-039 Slice A fixes one useful, established-method synthesis before
+implementation: strict shared dihedral barriers; compact, physical-radius
+one-sided signed-curvature responses; deterministic non-maximum suppression
+and hysteresis; farthest-point seeds followed by simultaneous dual-graph
+growth; and area-weighted regional GMM cost plus length, intrinsic-turning, and
+soft-feature boundary terms. The complete equations, units, numeric screening
+parameters, merge/refinement stopping rules, supplied-evidence preflight, and
+generated oracle catalog are in
+[`feature_aligned_intake.md`](feature_aligned_intake.md). This is not presented
+as a new scientific contribution.
+
+The selected practical detector must not be called Pottmann equation (27).
+That equation estimates principal curvatures from the covariance of a
+ball--solid *volume* intersection; METHOD-039 instead consumes the repository's
+existing or supplied signed-curvature field and uses explicitly named compact
+surface-patch averages so open surfaces are supported. The
+Hildebrandt--Polthier--Wardetzky extremality equations remain a bounded
+comparator, not a second production path.
+
+Slice A adds only an executable oracle/preflight contract. Until the later CPU
+reference, integration, and evidence slices pass, every equation in this
+section is planned behavior and the implemented formulation below remains the
+only production method.
+
 ## Published lineage
 
 The closest direct precedent is Lavoué, Dupont, and Baskurt's curvature-tensor
@@ -35,6 +61,17 @@ their classifier or region-growing equations.
 - Julian Besag, “On the Statistical Analysis of Dirty Pictures,” *Journal of
   the Royal Statistical Society B* 48(3), 1986. DOI:
   [10.1111/j.2517-6161.1986.tb01412.x](https://doi.org/10.1111/j.2517-6161.1986.tb01412.x).
+- Helmut Pottmann, Johannes Wallner, Yong-Liang Yang, Yu-Kun Lai, and Shi-Min
+  Hu, “Principal Curvatures from the Integral Invariant Viewpoint,” *Computer
+  Aided Geometric Design* 24(8--9), 2007. DOI:
+  [10.1016/j.cagd.2007.07.004](https://doi.org/10.1016/j.cagd.2007.07.004).
+- Klaus Hildebrandt, Konrad Polthier, and Max Wardetzky, “Smooth Feature Lines
+  on Surface Meshes,” *Symposium on Geometry Processing*, 2005. DOI:
+  [10.2312/SGP/SGP05/085-090](https://doi.org/10.2312/SGP/SGP05/085-090).
+- Yixin Zhuang, Hang Dou, Nathan Carr, and Tao Ju, “Feature-Aligned
+  Segmentation Using Correlation Clustering,” *Computational Visual Media* 3,
+  2017. DOI:
+  [10.1007/s41095-016-0071-3](https://doi.org/10.1007/s41095-016-0071-3).
 
 These sources motivate, respectively, curvature-based surface decomposition,
 piecewise-simple surface objectives, mesh-segmentation design choices,

@@ -5,10 +5,10 @@ depends_on: [METHOD-038]
 workflow_schema: 1
 workflow_profile: claim-grade
 evidence: required
-owner:
-branch:
-worktree:
-claimed_at:
+owner: "codex-root"
+branch: "main"
+worktree: "/home/alex/Documents/IntrinsicEngine"
+claimed_at: "2026-08-11T09:56:56Z"
 contract_schema: 1
 contracts: [repo.task-contract-discovery, geometry.element-domain-sources, geometry.property-coherence, method.engine-integration]
 contract_review: "This task materially changes a mesh method, its public CPU result and diagnostics, canonical face/edge property publication, and the existing runtime/config/UI path. geometry.parameterization-optimization does not apply: the result is a same-topology surface partition and no UV, chart, seam, cut-materialization, or parameterization operation is in scope. geometry.support-radius-policy does not apply because that contract is specific to compact-support point-set methods; this task owns a method-local dimensionless surface feature scale."
@@ -18,6 +18,12 @@ maturity_target: Operational
 
 ## Goal
 - Deliver a deterministic, topology-preserving CPU method that partitions an oriented triangle surface into connected, curvature-coherent patches by detecting hard and soft feature lines, forming a conservative seeded oversegmentation, and merging adjacent regions under an explicit curvature-and-boundary energy so every retained boundary is either feature-supported or a diagnosed curvature-change closure boundary.
+
+## Status
+- Slice A contract/oracle implementation is complete, reviewed, and passes the
+  focused and full CPU gates. Owner: `codex-root` on `main`. The next work-graph
+  transition is Slice B's computed feature-evidence CPU reference. No
+  production v2 selector exists yet.
 
 ## Non-goals
 - No UV generation, atlas/chart construction, seam selection, mesh cutting, vertex duplication, face splitting, or other parameterization work.
@@ -37,7 +43,7 @@ maturity_target: Operational
 - Two networks remain distinct throughout the API and diagnostics:
   - `F`, the detected feature-evidence network: hard crease facts plus optional soft ridge/valley/transition confidence;
   - `Gamma`, the final separating patch-boundary network.
-- Validated hard features are a subset of `Gamma`. A soft feature may remain inside a patch when adjacent curvature models are compatible. Conversely, the part of `Gamma` not supported by `F` may contain a closure boundary where different curvature regimes must be separated even though no classical ridge or valley closes the partition.
+- Validated interior hard-feature transitions are a subset of `Gamma`; a source-boundary hard mark remains feature evidence but cannot separate two incident patches. A soft feature may remain inside a patch when adjacent curvature models are compatible. Conversely, the part of `Gamma` not supported by `F` may contain a closure boundary where different curvature regimes must be separated even though no classical ridge or valley closes the partition.
 - Seed growth is an oversegmentation mechanism, not the scientific definition of a patch. Provisional seed fronts are removed unless the final region energy supports them.
 
 ### Established method lineage
@@ -70,7 +76,7 @@ maturity_target: Operational
 ### 2. Feature evidence before patch completion
 
 - Hard evidence `H_e in {0,1}` comes from `Geometry.HalfedgeMesh.Features` with its existing strict `dihedral > threshold` contract and fail-closed invalid-topology/normal handling. An interior dual transition across `H_e = 1` is non-traversable and non-mergeable.
-- Soft evidence `F_e in [0,1]` is a length-weighted, inspectable confidence assembled from scale-persistent signed-curvature change, surface-type transition, and coherent ridge/valley responses. The primary formulation uses the METHOD-038 physical-scale integral-invariant intake; non-maximum suppression and hysteresis produce connected line fragments. Every contributing scale and response remains available in diagnostics.
+- Soft evidence `F_e in [0,1]` is an inspectable confidence assembled from scale-persistent signed-curvature change, surface-type transition, and coherent ridge/valley responses. The primary formulation uses the METHOD-038 physical-scale intake; non-maximum suppression and hysteresis produce connected line fragments, and the objective length-weights their contribution. Every contributing scale and response remains available in diagnostics. Pottmann equation (27) remains a reviewed ball--solid volume comparator and is not misnamed as the selected open-surface quadrature.
 - Oracle/supplied `H_e` and `F_e` inputs are a required test seam. They let patch completion be verified independently of feature-detection error and avoid diagnosing two coupled algorithms from one failed output.
 - Hard and soft evidence are never collapsed into one boolean. Hard evidence constrains topology of the partition; soft evidence changes boundary energy and may be rejected by the region model.
 
@@ -86,7 +92,7 @@ maturity_target: Operational
 - For a connected provisional region `R`, define the area-weighted regional cost
 
   ```text
-  C(R) = min_k sum_{f in R} A_f * [-log(max(p_k(d_f), epsilon))]
+  C(R) = min_k sum_{f in R} (A_f/D^2) * [-log(max(p_k(d_f), epsilon))]
          + beta_patch.
   ```
 
@@ -94,16 +100,17 @@ maturity_target: Operational
 - For adjacent regions `Ri` and `Rj`, define the cost of retaining their shared boundary
 
   ```text
-  B_ij = lambda_length * L_ij
-       + lambda_turn * G_ij
-       - lambda_feature * S_ij,
+  B_ij(P) = B(Gamma(P)) - B(Gamma(P after Ri union Rj)),
+  B(Gamma) = lambda_length * L(Gamma)
+           + lambda_turn * G(Gamma)
+           - lambda_feature * S(Gamma),
   ```
 
-  where `L_ij` is surface boundary length, `G_ij` is discrete geodesic-turning cost, and `S_ij` is length-weighted soft-feature support. No normal-curvature penalty is permitted.
+  where `L` is bbox-normalized surface boundary length, `G` is the discrete intrinsic geodesic-turning quadrature, and `S` is bbox-normalized length-weighted soft-feature support. Defining `B_ij` as the exact before/after boundary credit includes turning changes at affected endpoints and junctions. No normal-curvature penalty is permitted.
 - Merge when the total energy decreases:
 
   ```text
-  delta_merge = C(Ri union Rj) - C(Ri) - C(Rj) - B_ij < 0,
+  delta_merge = C(Ri union Rj) - C(Ri) - C(Rj) - B_ij(P) < 0,
   ```
 
   unless the adjacency contains a hard barrier. Recompute only neighboring region statistics after each merge. Select the most negative admissible delta with stable region-ID tie-breaking and stop when none remains.
@@ -148,16 +155,16 @@ maturity_target: Operational
 | End-to-end tests | Cover a mesh entity from config/agent/editor request through snapshot execution, stale-result rejection, atomic property publication, undo/redo, property-revision visibility, and simultaneous feature/final-boundary visualization. |
 
 ## Slice plan
-- **Slice A — Freeze the practical contract and oracle fixtures.** Bind the inherited evidence boundary to METHOD-038's retired immutable records, record the exact integral-invariant and ridge/valley equations used, define the supplied feature-evidence seam, freeze generated analytic fixtures/metrics, and add no production selector.
+- **Slice A — Freeze the practical contract and oracle fixtures (complete).** Bind the inherited evidence boundary to METHOD-038's retired immutable records, record the exact integral-invariant and ridge/valley equations used, define the supplied feature-evidence seam, freeze generated analytic fixtures/metrics, and add no production selector.
 - **Slice B — Feature evidence CPU reference.** Implement hard-feature consumption plus one primary multi-scale soft-feature detector, with the Hildebrandt-style extremality detector limited to a fixture comparator. Validate feature confidence and line topology independently of patch construction.
 - **Slice C — Oracle-driven grow/merge patch reference.** Implement deterministic seed selection, simultaneous growth, region statistics, RAG merging, boundary roles, and narrow-band refinement. First pass oracle feature evidence, then replay the same tests with detected evidence. Keep all work private to the existing method module until the result contract passes.
 - **Slice D — Engine adoption and evidence.** Add the accepted mode to the existing config/runtime/UI path, publish the distinct feature and final-boundary properties, seal quality/stability/smoke results, and retain `cpu_reference_v1` as an explicit fallback/comparison lane.
 
 ## Required changes
-- [ ] After the declared dependency is satisfied, bind intake and fixture lineage to METHOD-038's immutable retired evidence paths without changing its protocols, raw results, bundles, audits, or claims.
-- [ ] Expand `methods/geometry/curvature_segmentation/feature_aligned_intake.md` with the exact selected feature-response, non-maximum-suppression, hysteresis, seed-cost, region-cost, merge, boundary-role, and stopping equations; mark the formulation as an established-method synthesis rather than a novelty claim.
-- [ ] Add generated analytic fixtures with oracle hard/soft feature evidence and exact/reference patch boundaries for a plane, cylinder, sphere, strict-threshold folds, smooth signed-curvature transition, ridge, valley, nearby feature pair, junction, open boundary, disconnected surfaces, and a same-curvature false-boundary control.
-- [ ] Add the smallest supplied-feature test seam using spans/plain records; do not introduce an interface or public feature-network framework. Reject slot-count mismatches, non-finite confidences/descriptors, unsupported submesh views, and invalid topology with explicit diagnostics.
+- [x] After the declared dependency is satisfied, bind intake and fixture lineage to METHOD-038's immutable retired evidence paths without changing its protocols, raw results, bundles, audits, or claims.
+- [x] Expand `methods/geometry/curvature_segmentation/feature_aligned_intake.md` with the exact selected feature-response, non-maximum-suppression, hysteresis, seed-cost, region-cost, merge, boundary-role, and stopping equations; mark the formulation as an established-method synthesis rather than a novelty claim.
+- [x] Add generated analytic fixtures with oracle hard/soft feature evidence and exact/reference patch boundaries for a plane, cylinder, sphere, strict-threshold folds, smooth signed-curvature transition, ridge, valley, nearby feature pair, junction, open boundary, disconnected surfaces, and a same-curvature false-boundary control.
+- [x] Add the smallest supplied-feature test seam using spans/plain records; do not introduce an interface or public feature-network framework. Reject slot-count mismatches, non-finite confidences/descriptors, unsupported submesh views, and invalid topology with explicit diagnostics.
 - [ ] Implement the primary physical-scale smooth-feature evidence path and consume `Geometry.HalfedgeMesh.Features` for hard facts. Report per-signal contributions, persistence scales, suppression/hysteresis decisions, endpoints, junctions, and rejected fragments.
 - [ ] Implement deterministic seed selection and simultaneous face growth behind hard barriers, including stable tie-breaking and complete provisional-front diagnostics.
 - [ ] Implement area-weighted regional sufficient statistics, the frozen `C(R)` and `B_ij` terms, deterministic adjacency updates, energy-decreasing merges, and final local-optimum checks without adding a generic clustering or graph-optimization layer.
@@ -183,15 +190,15 @@ maturity_target: Operational
 - [ ] Complexity/health: generated smoke and 100k-face cohorts complete without a dense `O(F^2)` allocation, report nonnegative stage timings and bounded working-set diagnostics, and preserve deterministic payloads. These are health checks, not performance claims.
 
 ## Docs
-- [ ] Update `methods/geometry/curvature_segmentation/{paper.md,feature_aligned_intake.md,README.md,method.yaml}` with the selected known formulation, input/output units, `F` versus `Gamma`, parameters, statuses, diagnostics, complexity, and limitations.
-- [ ] Document the interpretation of Fixed/Automatic GMM selection: components are curvature hypotheses, while final patches are connected energy-selected regions and may merge neighboring over-fitted hypotheses.
-- [ ] Document seed behavior and the stability gate prominently: seeds initialize an oversegmentation and do not define final boundaries.
-- [ ] Document hard/soft/closure boundary roles and the fact that soft feature lines may remain internal while curvature closures may occur away from a classical line.
+- [x] Update `methods/geometry/curvature_segmentation/{paper.md,feature_aligned_intake.md,README.md,method.yaml}` with the selected known formulation, input/output units, `F` versus `Gamma`, parameters, statuses, diagnostics, complexity, and limitations.
+- [x] Document the interpretation of Fixed/Automatic GMM selection: components are curvature hypotheses, while final patches are connected energy-selected regions and may merge neighboring over-fitted hypotheses.
+- [x] Document seed behavior and the stability gate prominently: seeds initialize an oversegmentation and do not define final boundaries.
+- [x] Document hard/soft/closure boundary roles and the fact that soft feature lines may remain internal while curvature closures may occur away from a classical line.
 - [ ] Add benchmark manifests and replay instructions for generated feature, patch-quality, seed-stability, and health cohorts. Any quantitative current-state result entering method docs must first have a matching ARA claim/evidence binding.
 - [ ] Update geometry/runtime/Sandbox current-state docs and generated module inventory only if their implemented surfaces change; keep roadmap language explicitly future-tense until adoption.
 
 ## Acceptance criteria
-- [ ] The selected equations and parameters are fixed before the integrated quality run, with stable citations and explicit failure behavior; no novelty claim is made.
+- [x] The selected equations and parameters are fixed before the integrated quality run, with stable citations and explicit failure behavior; no novelty claim is made.
 - [ ] With oracle feature evidence, every analytic fixture produces the expected connected patch count and boundary topology, demonstrating that remaining closure cuts are solved independently of detector quality.
 - [ ] With computed evidence, mandatory hard folds are never crossed, plane/cylinder controls remain unsplit, and the smooth transition/ridge/valley controls pass their frozen line and patch tolerances.
 - [ ] Extra seeds on homogeneous regions disappear during merging, while curvature-incompatible neighboring regions remain separated; every surviving non-feature boundary has a positive recorded curvature-model justification.

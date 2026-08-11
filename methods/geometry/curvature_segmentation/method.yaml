@@ -25,6 +25,7 @@ metrics:
   - "runtime_ms"
 correctness_tests:
   - "../../../tests/unit/geometry/Test.CurvatureSegmentation.cpp"
+  - "../../../tests/unit/geometry/Test.CurvaturePatchContract.cpp"
   - "../../../tests/contract/runtime/Test.CurvatureSegmentationOperations.cpp"
   - "../../../tests/integration/runtime/Test.SandboxCurvatureSegmentationPanel.cpp"
 benchmarks:
@@ -52,3 +53,4 @@ known_limitations:
   - "Published region boundaries are inspection data, not materialized cuts or validated UV-atlas seams; METHOD-039 owns the accepted feature/patch follow-up before GEOM-076 may evaluate any later seam/cut/atlas use."
   - "Only a serial CPU reference backend exists, and the smoke result makes no performance or atlas-quality claim."
   - "METHOD-038 retired at CPUContracted after adding a 10k analytic-sphere cold/reusable descriptor pair, one 10k planar continuous-boundary pair, and independently audited non-claim paired-fold plus cylinder/smooth-transition fixture/oracle lanes. It selected no candidate A-D or v2; broader feature/patch implementation and stability evidence are owned by METHOD-039."
+  - "METHOD-039 Slice A freezes a practical feature-first patch formulation and generated oracle/preflight contract, but no computed detector, grow/merge solver, v2 backend token, runtime/config/UI adoption, or positive quality claim exists yet."

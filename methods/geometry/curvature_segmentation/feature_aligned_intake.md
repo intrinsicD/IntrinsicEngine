@@ -138,6 +138,323 @@ There is no `k_n` term. Candidate A may restrict `Gamma` to a deterministic
 feature-cell/narrow-band graph for the killing experiment; any source-edge mask
 is a visualization projection, not the continuous comparison object.
 
+## METHOD-039 selected practical contract (Slice A freeze)
+
+This section freezes the formulation that METHOD-039 will implement. It is an
+engineering synthesis of the cited integral-invariant, ridge/valley,
+watershed/region-growing, and region-adjacency merging literature; it is not a
+novelty claim. At this checkpoint it is an executable contract and oracle
+catalog only. The production method remains `cpu_reference_v1`, and no runtime
+selector, config migration, or UI behavior changes in Slice A.
+
+### Immutable inherited evidence boundary
+
+METHOD-039 consumes, but must not rewrite or reinterpret, these completed
+METHOD-038 records:
+
+- [`tasks/done/METHOD-038-feature-aligned-remeshing-stable-curvature-segmentation.md`](../../../tasks/done/METHOD-038-feature-aligned-remeshing-stable-curvature-segmentation.md)
+  is the retired task contract;
+- [`tasks/evidence/METHOD-038/experiment/protocol.yaml`](../../../tasks/evidence/METHOD-038/experiment/protocol.yaml)
+  fixes the final experiment protocol;
+- [`tasks/evidence/METHOD-038/experiment/runs/scratch-011/bundle.yaml`](../../../tasks/evidence/METHOD-038/experiment/runs/scratch-011/bundle.yaml)
+  and [`audit.json`](../../../tasks/evidence/METHOD-038/experiment/runs/scratch-011/audit.json)
+  are the accepted portable non-claim replay and independent audit; and
+- ARA claims C40--C43 in
+  [`ara/logic/claims.md`](../../../ara/logic/claims.md) bound the narrow
+  Automatic-selection refutations and fixture/oracle support.
+
+Those records validate only the named v1 and generated-control facts. They do
+not validate the detector, patch construction, stability, runtime adoption, or
+performance of the METHOD-039 formulation below.
+
+### Reviewed integral and extremality equations
+
+Pottmann et al.'s equation (27) is a reviewed comparator, not the selected
+open-surface estimator. For the covariance of the *volume*
+`N_b = B_r(p) intersect D`, its tangent eigenvalues have the asymptotic form
+
+```text
+M_b,1 = 2*pi*r^5/15 - pi*(3*kappa_1 + kappa_2)*r^6/48 + O(r^7),
+M_b,2 = 2*pi*r^5/15 - pi*(kappa_1 + 3*kappa_2)*r^6/48 + O(r^7),
+
+kappa_b,1 = 6*(M_b,2 - 3*M_b,1)/(pi*r^6) + 8/(5*r),
+kappa_b,2 = 6*(M_b,1 - 3*M_b,2)/(pi*r^6) + 8/(5*r).
+```
+
+This construction presumes a solid domain and ball--solid intersection. A
+centroid quadrature over an open triangle patch is not equation (27), so
+METHOD-039 does not use that name for its practical compact surface-patch
+averages. It consumes the existing or supplied signed principal-curvature
+field and makes the physical averaging radius explicit.
+
+The Hildebrandt--Polthier--Wardetzky comparator retains their directional
+extremality quantity
+
+```text
+e_i(p) = 1/area(star(p))
+         * sum_{T incident p} area(T) * <grad(kappa_i)|_T, t_i(p)>.
+```
+
+A maximum-curvature ridge satisfies `e_max = 0`, a negative directional
+derivative of `e_max` along `t_max`, and
+`abs(kappa_max) > abs(kappa_min)`; the valley conditions reverse the
+directional sign for `e_min`. This remains a fixture comparator because it
+requires a stable principal-direction field and higher derivatives. It is not
+a hidden second production detector.
+
+### Units, neighborhoods, and selected soft-feature response
+
+Let `D > 0` be the source bounding-box diagonal, `A_f` a face area, `c_f` its
+centroid, and `m_e` an edge midpoint. The ordered, signed face curvatures are
+the arithmetic means of their three slot-aligned vertex values. Define
+
+```text
+a_f       = A_f / D^2,
+ell_e     = length(e) / D,
+x_f(r)    = r * (kappa_1,f, kappa_2,f),
+r_0 / D   = 0.02,
+r_s / D   in {0.01, 0.02, 0.04}.
+```
+
+All following energies are dimensionless. For adjacent faces `f,g` across
+edge `q`, the dual step length is
+
+```text
+delta_q = norm(c_f - m_q) + norm(c_g - m_q).
+```
+
+For a candidate interior edge `e=(f_0,f_1)`, remove `e` and all hard-feature
+transitions from the dual graph and run bounded Dijkstra searches from `f_0`
+and `f_1`. A face is assigned to the nearer side (equal distances break toward
+the lower source-face slot) when that distance is less than `r_s`. With the
+compact kernel
+
+```text
+psi(t)       = (1 - t^2)^2  for 0 <= t < 1, and 0 otherwise,
+w_jg(r_s)    = A_g * psi(distance_j(g) / r_s),
+mu_e,j(r_s)  = sum_g w_jg(r_s) * x_g(r_s) / sum_g w_jg(r_s),
+z_e(r_s)     = r_s/2 * ((kappa_1,va,kappa_2,va)
+                        + (kappa_1,vb,kappa_2,vb)),
+s_tau(y)     = 1 - exp(-max(y,0) / tau_response),
+tau_response = 0.10,
+```
+
+the three inspectable responses are
+
+```text
+T_e,s = s_tau(norm(mu_e,0 - mu_e,1)),
+R_e,s = s_tau(max(0, min(z_e,1 - mu_e,0,1,
+                           z_e,1 - mu_e,1,1))),
+V_e,s = s_tau(max(0, min(mu_e,0,2 - z_e,2,
+                           mu_e,1,2 - z_e,2))),
+Q_e,s = max(T_e,s, R_e,s, V_e,s),
+Q_e   = median_s Q_e,s.
+```
+
+`T` detects a signed-curvature or surface-type transition. `R` and `V` test
+whether the edge value is respectively above both one-sided `kappa_1` means or
+below both one-sided `kappa_2` means. Taking the median is the exact
+two-of-three scale-persistence rule. The per-scale values and winning signal
+are diagnostics. Under global orientation reversal, `R` and `V` swap names;
+`max(R,V)` and the final support must remain unchanged.
+
+Soft-feature candidates are live, non-hard interior edges with two live
+incident triangles; source-boundary and hard edges do not receive `Q_e`. For
+non-maximum suppression, let `t_e` be the unoriented candidate-edge tangent.
+In each incident triangle, form the in-face binormal
+`b = normalize(n cross t_e)` and choose, from the other two edges that are also
+soft-feature candidates, the edge whose midpoint has the largest absolute
+projection `abs(dot(m_q-m_e,b))`. A side with no eligible alternative adds no
+competitor. These at-most-two edges are `N_perp(e)`. Retain `e` exactly when
+`(Q_e,-slot(e))` is lexicographically no smaller than the same pair for every
+member of `N_perp(e)`. This makes plateaus deterministic.
+
+Hysteresis uses the frozen thresholds
+
+```text
+tau_low = 0.35, tau_high = 0.65, alpha_max = 60 degrees.
+```
+
+Every NMS survivor at or above `tau_high` is a strong edge. A weak survivor at
+or above `tau_low` is retained only when reachable from a strong edge through
+survivors sharing vertices whose consecutive unoriented tangents turn by at
+most `alpha_max`. Strong branches seed themselves, so junctions are not erased
+by the continuation test. A retained connected fragment shorter than `r_0` is
+rejected unless it touches a source boundary, a hard edge, or a retained
+degree-three-or-higher junction. The final supplied/computed soft confidence is
+
+```text
+F_e = Q_e for retained soft edges, and 0 otherwise.
+```
+
+Hard evidence remains the separate binary `H_e` from the strict shared
+dihedral classifier. A boundary-policy hard mark on a source-boundary edge is
+a feature diagnostic and potential line endpoint, not a two-face partition
+transition. `F_e` is not length weighted by itself; its contribution to an
+objective is length weighted. Diagnostics record `T/R/V`, the three scale
+decisions, NMS winner/loser, hysteresis predecessor, rejected-fragment reason,
+endpoint degree, and junction degree.
+
+### Supplied-evidence preflight
+
+The oracle lane supplies only two borrowed, slot-aligned spans: binary
+`H_e` and finite `F_e in [0,1]`. It deliberately adds no feature-network
+interface or owning adapter. Before any detector or patch work, the common
+preflight rejects empty input, submesh views, non-triangle or degenerate faces,
+invalid adjacency, non-finite positions or curvatures, unordered
+`kappa_1 < kappa_2` inputs, edge/vertex slot-count mismatches, non-binary hard
+values, and non-finite or out-of-range soft confidence. Failure returns an
+explicit status and no partial result.
+
+### Seed and simultaneous-growth equations
+
+For a traversable face-dual transition across `e`, define
+
+```text
+g(f,g) = (delta_e / D)
+         * (1 + alpha_kappa * norm(x_f(r_0) - x_g(r_0))
+              + alpha_feature * F_e),
+alpha_kappa = 1, alpha_feature = 4.
+```
+
+`g(f,g)=infinity` across an interior `H_e=1` transition. Both incident faces of
+each interior hard edge are mandatory distinct seeds. Each hard-barrier-
+connected component with no such seed starts from its lowest live face slot.
+Deterministic farthest-point sampling adds the face with greatest distance to
+the current seed set until that distance is at most
+
+```text
+rho_seed = 2*r_0/D = 0.04.
+```
+
+Distance ties use face slot. One multi-source Dijkstra pass then assigns every
+face to the lexicographically smallest `(accumulated_cost, seed_slot,
+face_slot)`. A hard-adjacent seed pair can never be coalesced during growth.
+The resulting fronts are provisional and have no boundary authority.
+
+### Frozen regional and boundary energy
+
+The existing deterministic, unweighted GMM remains the global hypothesis
+generator; Slice A does not claim sample-weight support in `FitEM`. Let
+`p_fk` be its finite posterior responsibility for base-scale descriptor `x_f`,
+after the existing robust descriptor normalization, and set
+
+```text
+u_fk      = -log(max(p_fk, epsilon_p)), epsilon_p = 1e-12,
+C(R)      = min_k sum_{f in R} a_f * u_fk + beta_patch,
+beta_patch = 0.0025.
+```
+
+Thus fitting is unchanged while the regional decision is area weighted. The
+winning component, runner-up cost margin, area, descriptor mean/covariance,
+and normalized residual are diagnostics; a component ID is not a patch ID.
+
+For a boundary graph `Gamma`, let
+
+```text
+L(Gamma) = sum_{e in Gamma} ell_e,
+S(Gamma) = sum_{e in Gamma} ell_e * F_e.
+```
+
+At a degree-two boundary vertex separating two regions, let `omega_0` and
+`omega_1` be the sums of source-triangle corner angles in the two incident
+surface sectors between the outgoing boundary edges. If their lengths are
+`ell_1,ell_2`, define the embedding-independent discrete geodesic turn and
+quadrature
+
+```text
+phi_v = min(abs(pi - omega_0), abs(pi - omega_1)),
+g_v   = phi_v^2 / max((ell_1 + ell_2)/2, epsilon_length),
+epsilon_length = 1e-12,
+G(Gamma) = sum over degree-two boundary vertices g_v.
+```
+
+Endpoints and junctions are reported but contribute no ambiguous pairwise
+turning term. There is no normal-curvature term. The finite boundary energy is
+
+```text
+B(Gamma) = lambda_length * L(Gamma)
+           + lambda_turn * G(Gamma)
+           - lambda_feature * S(Gamma),
+lambda_length = 0.01,
+lambda_turn = 0.001,
+lambda_feature = 0.02.
+```
+
+For adjacent regions `R_i,R_j`, let `P'` be the partition after their union
+and define the exact boundary credit
+
+```text
+B_ij(P) = B(Gamma(P)) - B(Gamma(P')),
+Delta_merge = C(R_i union R_j) - C(R_i) - C(R_j) - B_ij(P).
+```
+
+This definition includes any turning-cost change at affected endpoints and
+junctions; it is not merely the length of the deleted shared chain. A merge is
+inadmissible if the union would internalize any `H_e=1` edge. Otherwise choose
+the most negative finite `Delta_merge`; exact ties use the ordered pair of
+stable region IDs. Recompute only the union and its neighboring adjacencies.
+Stop when every admissible delta is nonnegative. This is the stated local
+optimum; it is not a global multicut claim.
+
+One-ring boundary refinement uses the same complete energy. In each of at most
+eight stable face-slot sweeps, a boundary face may move to an adjacent region
+only if both regions remain nonempty and connected, no hard edge is
+internalized, and the exact energy delta is negative. Stop early after a sweep
+with no accepted move.
+
+Finally
+
+```text
+Gamma_e = 1[label(f_0) != label(f_1)],
+role_e  = hard_feature            if Gamma_e and H_e = 1,
+          soft_feature_supported  if Gamma_e and H_e = 0 and F_e > 0,
+          curvature_closure       if Gamma_e and H_e = 0 and F_e = 0,
+          none                    otherwise.
+```
+
+Every live face must have one connected final region. Interior boundary arcs
+must close or meet a diagnosed junction; open arcs may terminate only on the
+source boundary. Any non-finite posterior/energy, invalid connectivity update,
+or unsatisfied hard constraint fails closed rather than publishing a partial
+partition.
+
+The reference stores only mesh-slot arrays, three scale-response arrays,
+priority queues, region sufficient statistics, and sparse adjacency records:
+`O(F+E)` storage and no all-pairs face matrix. The deliberately direct bounded
+one-sided searches cost `O(3 E N_r log N_r)` in the worst case, where `N_r` is
+the largest number of faces reached inside a frozen physical radius. This can
+grow superlinearly under refinement; the 100k-face health gate must measure it
+before adoption, and any optimization remains a later parity-bound task.
+
+### Slice A generated oracle catalog
+
+[`Test.CurvaturePatchContract.cpp`](../../../tests/unit/geometry/Test.CurvaturePatchContract.cpp)
+constructs the catalog without external assets. Graph controls use an `8 x 16`
+cell grid on `[-1,1]^2`; the cylinder uses 8 axial by 24 periodic cells; the
+sphere is the repository icosahedron. The catalog freezes these expected
+partitions before either the detector or grow/merge implementation exists:
+
+| Control | Variants | Supplied evidence | Expected patches/boundary |
+| --- | ---: | --- | --- |
+| Plane, open cylinder, unit sphere | 1 each | zero hard/soft | one patch, no interior boundary |
+| Strict fold | `30/45/60` degrees, two diagonal phases each | hard only for strict `angle > 45` | one patch at 30/45; two at 60, with eight hard crease edges |
+| Smooth signed transition | `tanh(x/0.20)` generalized-cylinder graph | soft `1.0` on `x=0` | two connected patches |
+| Ridge / valley | signed Gaussian graph of width `0.20` | soft `0.9` on `x=0` | two connected patches with soft-supported boundary |
+| Nearby feature pair | planar supplied descriptor transitions at `x=-0.25,+0.25` | soft `0.9` on both lines | three connected patches |
+| Junction | planar crossed signed descriptors at `x=0,y=0` | soft `1.0` on both lines | four patches and one diagnosed junction |
+| Open-boundary termination | planar signed transition at `x=0` | soft `0.8` | two patches; line endpoints lie on source boundary |
+| Disconnected surfaces | two disjoint triangles | zero hard/soft | two patches solely by connectivity |
+| Same-curvature false boundary | constant planar descriptor | soft `0.55` on `x=0` | one patch; the unsupported provisional split must disappear |
+
+The Slice A tests validate slot counts, evidence ranges, strict fold equality,
+connected expected patches, and boundary endpoint/junction topology. They do
+not claim that the not-yet-implemented computed detector or patch solver
+already reproduces the oracles. Later quality comparisons retain METHOD-038's
+area-weighted variation-of-information limit `<= 0.01` and projected symmetric
+boundary-distance limit `<= 0.02 D`; raw label IDs and cross-remesh edge-mask
+overlap remain forbidden metrics.
+
 ## Paired-remeshing evidence design
 
 Every analytic surface owns a continuous reference parameterization or exact

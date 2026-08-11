@@ -11,7 +11,10 @@ Each active task should include:
 
 ## Currently active
 
-No tasks are currently active.
+- [`METHOD-039` — Feature-network-constrained curvature patch decomposition](METHOD-039-feature-network-curvature-patch-decomposition.md)
+  — in progress on `main`, owned by `codex-root`; Slice A freezes the practical
+  equations, inherited METHOD-038 evidence boundary, supplied-feature seam, and
+  generated oracle fixtures before any production selector is added.
 
 ## History
 

@@ -15,6 +15,15 @@ killing order, profiling lanes, and validated analytic controls are in
 backend and changed no production default. METHOD-039 owns the practical
 feature-network patch method that may consume these immutable controls.
 
+METHOD-039 Slice A now freezes that follow-up's equations, numeric screening
+parameters, fail-closed supplied-evidence shape, and seventeen generated oracle
+fixtures in [`feature_aligned_intake.md`](feature_aligned_intake.md). The
+executable catalog is
+[`Test.CurvaturePatchContract.cpp`](../../../tests/unit/geometry/Test.CurvaturePatchContract.cpp).
+This is a pre-implementation contract: the computed feature detector,
+grow/merge solver, `cpu_reference_v2` selector, publication properties, config,
+runtime, and UI are not implemented yet.
+
 ## Implemented path
 
 `Geometry.HalfedgeMesh.CurvatureSegmentation` computes or accepts signed
@@ -68,6 +77,8 @@ contract and states that spatial optimization is local.
 ## Verification and scope
 
 - Correctness: `tests/unit/geometry/Test.CurvatureSegmentation.cpp`
+- METHOD-039 frozen oracle/preflight contract:
+  `tests/unit/geometry/Test.CurvaturePatchContract.cpp`
 - Runtime publication/history: `tests/contract/runtime/Test.CurvatureSegmentationOperations.cpp`
 - Config source parity: `tests/integration/runtime/Test.SandboxConfigSections.cpp`
 - UI/visualization contract: `tests/integration/runtime/Test.SandboxCurvatureSegmentationPanel.cpp`
@@ -169,7 +180,9 @@ evidence-only task bytes. All seventeen gates pass and
 Historical scratch-008 and scratch-010 remain immutable under `superseded/`,
 and scratch-009 preserves the missing-`jq` replay failure rather than hiding it.
 
-There is no selected v2, optimized, or GPU backend. The output is deliberately
-non-destructive and makes no atlas-quality claim. METHOD-039 owns the accepted
-feature/patch result needed before `GEOM-076` may evaluate any later UV-atlas
-chart hints.
+There is no implemented v2, optimized, or GPU backend. METHOD-039 has selected
+and frozen a practical v2 formulation for implementation, but Slice A does not
+make it executable or change the current output. The implemented v1 output is
+deliberately non-destructive and makes no atlas-quality claim. METHOD-039 must
+still produce an accepted feature/patch result before `GEOM-076` may evaluate
+any later UV-atlas chart hints.
