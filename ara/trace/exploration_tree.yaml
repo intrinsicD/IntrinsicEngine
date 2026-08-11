@@ -9679,10 +9679,10 @@ tree:
     timestamp: "2026-08-11T05:06+02:00"
     also_depends_on: [N404, N406, N410, N411, N412]
     evidence:
-      - "tasks/evidence/METHOD-038/experiment/protocol.yaml"
-      - "tasks/evidence/METHOD-038/experiment/inputs/fold_controls_benchmark_result.json"
-      - "tasks/evidence/METHOD-038/experiment/runs/scratch-006/bundle.yaml"
-      - "tasks/evidence/METHOD-038/experiment/runs/scratch-006/audit.json"
+      - "tasks/evidence/METHOD-038/superseded/20260811-fold-screening-final-task-bound/experiment/protocol.yaml"
+      - "tasks/evidence/METHOD-038/superseded/20260811-fold-screening-final-task-bound/experiment/inputs/fold_controls_benchmark_result.json"
+      - "tasks/evidence/METHOD-038/superseded/20260811-fold-screening-final-task-bound/experiment/runs/scratch-006/bundle.yaml"
+      - "tasks/evidence/METHOD-038/superseded/20260811-fold-screening-final-task-bound/experiment/runs/scratch-006/audit.json"
       - "tasks/evidence/METHOD-038/commands/checkpoint3-focused-tests.json"
       - "tasks/evidence/METHOD-038/commands/checkpoint3-structural.json"
       - "tasks/evidence/METHOD-038/commands/checkpoint3-cpu-tests.json"
@@ -9718,7 +9718,7 @@ tree:
     evidence:
       - "methods/geometry/curvature_segmentation/feature_aligned_intake.md"
       - "benchmarks/geometry/manifests/curvature_segmentation_screening_surface_controls.yaml"
-      - "tasks/evidence/METHOD-038/experiment/protocol.yaml"
+      - "tasks/evidence/METHOD-038/superseded/20260811-surface-screening-task-status-advance/experiment/protocol.yaml"
       - "commit 91408cf9"
     status: resolved
   - id: N415
@@ -9728,10 +9728,10 @@ tree:
     timestamp: "2026-08-11T07:58+02:00"
     also_depends_on: [N404, N406, N413, N414]
     evidence:
-      - "tasks/evidence/METHOD-038/experiment/protocol.yaml"
-      - "tasks/evidence/METHOD-038/experiment/inputs/surface_controls_benchmark_result.json"
-      - "tasks/evidence/METHOD-038/experiment/runs/scratch-007/bundle.yaml"
-      - "tasks/evidence/METHOD-038/experiment/runs/scratch-007/audit.json"
+      - "tasks/evidence/METHOD-038/superseded/20260811-surface-screening-task-status-advance/experiment/protocol.yaml"
+      - "tasks/evidence/METHOD-038/superseded/20260811-surface-screening-task-status-advance/experiment/inputs/surface_controls_benchmark_result.json"
+      - "tasks/evidence/METHOD-038/superseded/20260811-surface-screening-task-status-advance/experiment/runs/scratch-007/bundle.yaml"
+      - "tasks/evidence/METHOD-038/superseded/20260811-surface-screening-task-status-advance/experiment/runs/scratch-007/audit.json"
       - "tasks/evidence/METHOD-038/commands/checkpoint4-focused-tests.json"
       - "tasks/evidence/METHOD-038/commands/checkpoint4-control-replays.json"
       - "tasks/evidence/METHOD-038/commands/checkpoint4-structural.json"
@@ -9739,7 +9739,7 @@ tree:
       - "tasks/evidence/METHOD-038/commands/checkpoint4-asan.json"
       - "tasks/evidence/METHOD-038/commands/checkpoint4-ubsan.json"
     result: >
-      Final task-bound scratch-007 independently recomputed all seventeen
+      Accepted pre-status scratch-007 independently recomputed all seventeen
       frozen gates as passing. Both cylinder phases classified zero hard
       features, retained identical one-component/one-region/zero-boundary v1
       payloads, and stayed within 0.000000008 normalized radial error and
@@ -9749,8 +9749,9 @@ tree:
       junction, and a 0.000049835 normalized sampled symmetric-distance upper
       bound. Custody remains non-claim-eligible with claim_authorized=false.
       Twenty-six focused tests, both control replays, strict structural checks,
-      all 4,211 selected unsanitized CPU tests, all 2,736 grouped ASan tests,
-      and all 2,736 grouped UBSan tests passed. Candidate A-D, v2, the broader
-      and confirmation corpora, convergence, performance, runtime/UI, and
-      GPU/Vulkan remain untested.
+      4,210 unsanitized CPU tests passed with one policy skip; all 2,736 grouped
+      ASan tests passed; and 2,735 grouped UBSan tests passed with the
+      ASan-specific GLFW leak-control case policy-skipped. Candidate A-D, v2,
+      the broader and confirmation corpora, convergence, performance,
+      runtime/UI, and GPU/Vulkan remain untested.
     status: resolved

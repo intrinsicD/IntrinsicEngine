@@ -14,9 +14,10 @@ Each active task should include:
 - [METHOD-038 — Feature-aligned, remeshing-stable curvature segmentation](METHOD-038-feature-aligned-remeshing-stable-curvature-segmentation.md)
   — Slice A intake and baseline profiling; the bounded fixtures cover cold/
   reusable curvature, one exact planar boundary, and paired 30/45/60-degree
-  fold contract controls with independently audited scratch custody. The
-  production selector remains unchanged while cylinder/smooth-transition
-  screens and candidate execution stay open.
+  fold plus cylinder/smooth-transition contract controls with independently
+  audited non-claim scratch custody. The production selector remains unchanged
+  while candidate A's cheapest killing screen, the remaining analytic corpus,
+  and held-out confirmation stay open.
 
 ## History
 

@@ -48,3 +48,12 @@ fixtures under a new manifest and protocol identity, so the fold protocol is
 retained byte-for-byte here and C42 now cites these historical paths. Live
 custody restarts at `scratch-007`; it does not reinterpret the fold result as a
 surface-control outcome.
+
+`20260811-surface-screening-task-status-advance/` preserves accepted
+checkpoint-4 run `scratch-007`, its sealed cylinder/smooth-transition result,
+portable bundle, and independent audit. That run passed all 17 frozen gates
+before its bounded outcome and actual next scientific boundary were recorded
+in current-state task/docs prose. Because experiment custody binds the active
+task bytes, final live identity `scratch-008` replays the unchanged scientific
+protocol against the corrected task hash; scratch-007 remains immutable and is
+not silently rebound.

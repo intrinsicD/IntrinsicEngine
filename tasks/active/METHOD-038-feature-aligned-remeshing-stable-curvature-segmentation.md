@@ -69,8 +69,6 @@ maturity_target: ParityProven
   is preserved under
   `superseded/20260811-fold-screening-final-task-bound/` before checkpoint 4
   takes over the live custody path.
-- Next: extend the frozen screen with the cylinder and smooth-transition
-  controls before any `cpu_reference_v2` implementation.
 - Checkpoint 4 preregisters that extension as a separate, opt-in
   `surface_controls` lane. It fixes an open `R=1`, `L=2`, `32 x 64` cylinder
   phase pair and a `24 x 48` paired-diagonal graph of
@@ -79,10 +77,22 @@ maturity_target: ParityProven
   A-D, held-out confirmation row, selector, or production integration is in
   this checkpoint.
 - The private checkpoint-4 runner and manifest now implement those frozen
-  rows at scientific source `251f2dab`. Development replay is not claim
-  evidence; the checkpoint disposition is governed only by live frozen run
-  `scratch-007` and its independent audit. Production remains METHOD-037
-  `cpu_reference_v1` throughout.
+  rows at scientific source `251f2dab`. Accepted pre-status run `scratch-007`
+  passed all 17 gates: both cylinder phases had zero hard features and exact
+  v1 payload parity; both smooth phases recovered the exact 24-edge reference
+  mask with zero label/mask error, two endpoints, and no junction. Its
+  independent audit retained `claim_authorized: false`, and bounded claim C43
+  records fixture/oracle integrity only. Because this status correction
+  advances the task hash, that immutable run is preserved under
+  `superseded/20260811-surface-screening-task-status-advance/`.
+- Final checkpoint-4 disposition is reserved to task-bound `scratch-008` and
+  its independent audit. That identity must replay the unchanged scientific
+  protocol without retuning any fixture, metric, or gate. Production remains
+  METHOD-037 `cpu_reference_v1` throughout.
+- Next scientific boundary: preregister candidate A's cheapest killing screen
+  against the validated controls, then complete the remaining screening corpus
+  before opening held-out confirmation. This checkpoint does not begin that
+  candidate implementation.
 
 ## Goal
 - Replace METHOD-037's slow, edge-local boundary inference with an evidence-selected CPU formulation that remains statistically based on the existing Gaussian mixture, aligns region boundaries with persistent surface feature curves, converges across retriangulations of the same embedded surface, and meets a preregistered useful-acceleration gate without weakening correctness, diagnostics, or the Fixed/Automatic UI contract.

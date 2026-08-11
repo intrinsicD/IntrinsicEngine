@@ -116,7 +116,7 @@ control selected two. The independent
 rejected claim authorization as intended. This is bounded negative evidence
 (ARA C40), not a reason to retune or change the production default.
 
-The current non-claim-eligible
+The historical non-claim-eligible
 [`scratch-003` protocol](../../../tasks/evidence/METHOD-038/superseded/20260811-fold-screening-controls/experiment/protocol.yaml)
 extends that screen across the new fixture lanes. Fixed selected the expected
 two planar-transition components and one sphere component in both cold and
@@ -140,12 +140,12 @@ schema rejection and accepted pre-status `scratch-005` replay are preserved
 separately; neither historical run is reinterpreted against the final task
 hash.
 
-The checkpoint-4 non-claim-eligible
-[`scratch-007` surface-control protocol](../../../tasks/evidence/METHOD-038/experiment/protocol.yaml),
-[`sealed result`](../../../tasks/evidence/METHOD-038/experiment/inputs/surface_controls_benchmark_result.json),
-[`bundle`](../../../tasks/evidence/METHOD-038/experiment/runs/scratch-007/bundle.yaml),
+The accepted pre-status checkpoint-4 non-claim-eligible
+[`scratch-007` surface-control protocol](../../../tasks/evidence/METHOD-038/superseded/20260811-surface-screening-task-status-advance/experiment/protocol.yaml),
+[`sealed result`](../../../tasks/evidence/METHOD-038/superseded/20260811-surface-screening-task-status-advance/experiment/inputs/surface_controls_benchmark_result.json),
+[`bundle`](../../../tasks/evidence/METHOD-038/superseded/20260811-surface-screening-task-status-advance/experiment/runs/scratch-007/bundle.yaml),
 and independent
-[`audit`](../../../tasks/evidence/METHOD-038/experiment/runs/scratch-007/audit.json)
+[`audit`](../../../tasks/evidence/METHOD-038/superseded/20260811-surface-screening-task-status-advance/experiment/runs/scratch-007/audit.json)
 passed all seventeen frozen gates. Both cylinder phases recorded zero hard
 features, exact v1 payload parity, at most `0.000000008` normalized radial
 error, and at most `0.000000015` paired-edge delta. Both smooth diagonal phases
