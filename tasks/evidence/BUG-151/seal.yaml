@@ -1,0 +1,12 @@
+schema_version: 1
+task_id: BUG-151
+sealed_revision: 5f7753ca265cdf3578d2dfcf2412612134adc51b
+source_content_digest: 47a3ea4a004161814ff2c2086a6719cea45c332f59b805970292feeb1baecafb
+report_sha256: 62959295ac6613df87bb9dfd05d37a5d334f6a24bb46062157358a780690119f
+records:
+- path: tasks/evidence/BUG-151/handoff.jsonl
+  sha256: ceff54981ed60360b321ea53f52edbcc708ea2b92fd00ac96aac5a0f62203d8c
+- path: tasks/evidence/BUG-151/reviews.jsonl
+  sha256: 0fc7e5537d85e36f7342d472f0b52d56cea6df4e58e883581b7e40bc5112ac9c
+reason: Bind the accepted BUG-151 completion report to its immutable reviewed retirement commit
+generated_by: tools/agents/workflow_evidence.py
