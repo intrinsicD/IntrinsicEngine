@@ -639,3 +639,23 @@
   tests/regression/tooling/Test.AgentWorkGraph.py,
   tasks/evidence/PROC-032/commands/focused-workflow-regressions.json]
 - **From staging**: O135
+
+## A41: Multi-Slice Tasks Advance Through an Explicit Bounded Cycle
+- **Decision**: A claimed multi-slice task retains one stable work-graph run
+  identity, but a completed scientific slice can open a fresh bounded writer
+  and review cycle only through an explicit `advance-slice` transition. The
+  transition verifies the exact live claim, task/profile, recipe, clean source,
+  lifecycle state, and reset subgraph; preserves prior attempts, notes,
+  artifacts, surface digests, and events as history; records a monotonically
+  increasing slice index; and requires explicit acknowledgement of any
+  deliberately superseded review checkpoint. It cannot reset a failed or
+  blocked slice, erase unresolved findings, lower the task profile, or replace
+  a new task when the declared scope actually changes.
+- **Provenance**: user-revised
+- **Crystallized via**: verbal-affirmation
+- **Evidence**: [N407, N408, N409, N410,
+  tools/agents/agent_work_graph.py,
+  tests/regression/tooling/Test.AgentWorkGraph.py,
+  tasks/active/BUG-151-work-graph-multi-slice-cycle.md,
+  docs/agent/workflow-evidence.md]
+- **From staging**: O144

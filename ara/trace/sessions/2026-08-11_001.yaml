@@ -2,9 +2,9 @@ session:
   id: "2026-08-11_001"
   date: "2026-08-11"
   started: "2026-08-11T00:47+02:00"
-  last_turn: "2026-08-11T00:47+02:00"
-  turn_count: 1
-  summary: "Audited METHOD-038's next corpus slice and found its one-run work graph exhausted at the frozen checkpoint, requiring an explicit process-repair or task-boundary decision before further writes."
+  last_turn: "2026-08-11T05:06+02:00"
+  turn_count: 2
+  summary: "Authorized and exercised a bounded work-graph slice cycle, then sealed METHOD-038's paired fold-control lane with accepted non-claim custody and complete CPU verification."
 
 events_logged:
   - turn: 1
@@ -25,25 +25,88 @@ events_logged:
     routing: staged
     provenance: ai-suggested
     summary: "Staged the distinction between bounded repair attempts and auditable multi-slice task cycles."
+  - turn: 2
+    type: decision
+    id: "N409"
+    routing: direct
+    provenance: user
+    summary: "Authorized the separately reviewed advance-slice repair and continued METHOD-038 under its existing task identity."
+  - turn: 2
+    type: experiment
+    id: "N410"
+    routing: direct
+    provenance: ai-executed
+    summary: "Implemented and exercised the exact bounded advance-slice transition, preserving the prior METHOD-038 cycle as history."
+  - turn: 2
+    type: dead_end
+    id: "N411"
+    routing: direct
+    provenance: ai-executed
+    summary: "Preserved scratch-004 after schema-v2 sealing rejected its composite benchmark backend label."
+  - turn: 2
+    type: decision
+    id: "N412"
+    routing: direct
+    provenance: ai-executed
+    summary: "Changed only backend serialization to registered cpu_reference and retained every observed scientific gate."
+  - turn: 2
+    type: experiment
+    id: "N413"
+    routing: direct
+    provenance: ai-executed
+    summary: "Sealed and independently audited the paired 30/45/60-degree fold controls; all eleven gates and 4,211 selected CPU tests passed."
+  - turn: 2
+    type: architecture
+    id: "A41"
+    routing: crystallized
+    provenance: user-revised
+    summary: "Crystallized explicit bounded multi-slice cycle advancement after user authorization and artifact commitment."
+  - turn: 2
+    type: claim
+    id: "C42"
+    routing: crystallized
+    provenance: ai-executed
+    summary: "Crystallized bounded fold fixture/oracle integrity from O145 and final scratch-006 custody."
 
 ai_actions:
   - turn: 1
     action: "Re-read the method, benchmark, task, custody, and right-sizing contracts; audited the live graph/event chain and current METHOD-038 intake/fixture surface; attached the exact continuation blocker to freeze_diff without mutating the frozen repository surface."
     provenance: ai-executed
     files_changed: []
+  - turn: 2
+    action: "Completed the BUG-151 slice-cycle repair and real METHOD-038 transition; added paired fold fixtures, benchmark manifest, frozen split documentation, task/claim synchronization, three preserved custody identities, final independent audit, and focused/structural/full-CPU receipts."
+    provenance: ai-executed
+    files_changed:
+      - "tools/agents/agent_work_graph.py"
+      - "tests/regression/tooling/Test.AgentWorkGraph.py"
+      - "benchmarks/runners/CurvatureSegmentationProfileRunner.cpp"
+      - "benchmarks/geometry/manifests/curvature_segmentation_screening_fold_controls.yaml"
+      - "methods/geometry/curvature_segmentation/feature_aligned_intake.md"
+      - "tasks/evidence/METHOD-038/experiment/"
+      - "ara/logic/claims.md"
 
-claims_touched: []
+claims_touched:
+  - id: C41
+    action: advanced
+    turn: 2
+  - id: C42
+    action: created
+    turn: 2
 
 key_context:
   - turn: 1
     excerpt: "METHOD-038's implement node is succeeded at attempt 4/4; reopen rejects exhausted attempts and start rejects a second run for the same task."
   - turn: 1
     excerpt: "The next scientific boundary remains the disjoint analytic screening corpus and frozen candidate A-D killing split; no production selector or cpu_reference_v2 change was attempted."
+  - turn: 2
+    excerpt: "The user explicitly authorized the bounded work-graph repair; METHOD-038 then advanced without resetting or editing Git-common-dir state by hand."
+  - turn: 2
+    excerpt: "Scratch-004 failed only schema sealing; scratch-006 retained the same scientific gates and independently reproduced exact 0/0/24 fold counts with claim_authorized=false."
 
 open_threads:
-  - "Obtain operator authorization for either a separate high-risk work-graph slice-cycle repair or an explicit new method-task boundary."
-  - "After the workflow boundary is resolved, extend the disjoint analytic corpus and freeze candidate A-D screening/confirmation gates before cpu_reference_v2."
-  - "Keep METHOD-038's production selector, defaults, and scratch-003 custody unchanged meanwhile."
+  - "Extend the frozen METHOD-038 screen with the declared cylinder and smooth-transition paired controls."
+  - "Run the cheapest candidate A-D killing screen only after its full screening rows and held-out confirmation boundary remain frozen."
+  - "Keep METHOD-037 cpu_reference_v1 as the production selector until a candidate-v2 protocol passes; no performance, convergence, runtime/UI, or GPU result exists yet."
 
 ai_suggestions_pending:
-  - "Prefer a separately reviewed slice-cycle repair because METHOD-038 was already declared and claimed as a multi-slice task; do not reset attempt counters or edit Git-common-dir state manually."
+  - "Implement the cylinder and smooth-transition oracle lanes before candidate A; do not broaden checkpoint 3 into production-v2 code."

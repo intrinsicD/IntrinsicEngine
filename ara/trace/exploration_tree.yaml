@@ -9524,15 +9524,15 @@ tree:
     timestamp: "2026-08-10T20:43+02:00"
     also_depends_on: [N403, N405]
     evidence:
-      - "tasks/evidence/METHOD-038/experiment/protocol.yaml"
-      - "tasks/evidence/METHOD-038/experiment/runs/scratch-003/bundle.yaml"
-      - "tasks/evidence/METHOD-038/experiment/runs/scratch-003/audit.json"
-      - "tasks/evidence/METHOD-038/experiment/inputs/remeshing_fixed_benchmark_result.json"
-      - "tasks/evidence/METHOD-038/experiment/inputs/remeshing_automatic_benchmark_result.json"
-      - "tasks/evidence/METHOD-038/experiment/inputs/cold_fixed_benchmark_result.json"
-      - "tasks/evidence/METHOD-038/experiment/inputs/cold_automatic_benchmark_result.json"
-      - "tasks/evidence/METHOD-038/experiment/inputs/reuse_fixed_benchmark_result.json"
-      - "tasks/evidence/METHOD-038/experiment/inputs/reuse_automatic_benchmark_result.json"
+      - "tasks/evidence/METHOD-038/superseded/20260811-fold-screening-controls/experiment/protocol.yaml"
+      - "tasks/evidence/METHOD-038/superseded/20260811-fold-screening-controls/experiment/runs/scratch-003/bundle.yaml"
+      - "tasks/evidence/METHOD-038/superseded/20260811-fold-screening-controls/experiment/runs/scratch-003/audit.json"
+      - "tasks/evidence/METHOD-038/superseded/20260811-fold-screening-controls/experiment/inputs/remeshing_fixed_benchmark_result.json"
+      - "tasks/evidence/METHOD-038/superseded/20260811-fold-screening-controls/experiment/inputs/remeshing_automatic_benchmark_result.json"
+      - "tasks/evidence/METHOD-038/superseded/20260811-fold-screening-controls/experiment/inputs/cold_fixed_benchmark_result.json"
+      - "tasks/evidence/METHOD-038/superseded/20260811-fold-screening-controls/experiment/inputs/cold_automatic_benchmark_result.json"
+      - "tasks/evidence/METHOD-038/superseded/20260811-fold-screening-controls/experiment/inputs/reuse_fixed_benchmark_result.json"
+      - "tasks/evidence/METHOD-038/superseded/20260811-fold-screening-controls/experiment/inputs/reuse_automatic_benchmark_result.json"
     result: >
       The frozen non-claim scratch replay bound to implementation commit
       a944b1a1 validated all six schema-v2 results. Fixed passed the expected
@@ -9583,4 +9583,119 @@ tree:
       cycle to the one-run work graph so METHOD-038 retains its task identity,
       or should the remaining corpus/candidate work move behind an explicit
       new method task boundary?
-    status: open
+    status: resolved
+  - id: N409
+    type: decision
+    title: "Authorize an auditable next-slice cycle for METHOD-038"
+    provenance: user
+    timestamp: "2026-08-11T05:06+02:00"
+    also_depends_on: [N407, N408]
+    choice: >
+      Repair the repository work graph with one bounded, append-only
+      advance-slice transition and then continue METHOD-038 under its existing
+      task identity, claim, profile, and review diamond.
+    alternatives:
+      - "Move the remaining METHOD-038 corpus work behind a new method task."
+      - "Stop at checkpoint 2 and leave the declared later slices stranded."
+      - "Reset attempts or edit Git-common-dir state manually."
+    evidence:
+      - "User direction: yes i authorize it"
+      - "tasks/active/BUG-151-work-graph-multi-slice-cycle.md"
+      - "tools/agents/agent_work_graph.py"
+    status: resolved
+  - id: N410
+    type: experiment
+    title: "Implement and exercise the bounded advance-slice transition"
+    provenance: ai-executed
+    timestamp: "2026-08-11T05:06+02:00"
+    also_depends_on: [N402, N407, N409]
+    evidence:
+      - "tools/agents/agent_work_graph.py"
+      - "tests/regression/tooling/Test.AgentWorkGraph.py"
+      - "tasks/active/BUG-151-work-graph-multi-slice-cycle.md"
+      - "commit 462da6ba8f3b77509506a7fd6dcb63d729b03a25"
+      - "METHOD-038 work-graph run method-038-20260810T164302Z slice 2"
+    result: >
+      The repair added one exact claim/task/profile/recipe/source-bound
+      advance-slice command, preserved the run ID and prior event history, and
+      opened a fresh bounded writer/review cycle only after explicit stale-
+      source acknowledgement. Twenty-nine isolated work-graph regressions and
+      an independent fixed-surface review accepted the repair. The real
+      METHOD-038 graph advanced from its reviewed checkpoint to slice 2 with
+      the prior succeeded writer projection retained as historical state.
+    status: resolved
+  - id: N411
+    type: dead_end
+    title: "Seal fold controls under a composite benchmark backend label"
+    provenance: ai-executed
+    timestamp: "2026-08-11T05:06+02:00"
+    also_depends_on: [N404, N406, N410]
+    hypothesis: >
+      The fold-control result can identify its combined reference/classifier
+      implementation by emitting `cpu_reference_v1+feature_classifier` in the
+      benchmark backend field.
+    failure_mode: >
+      Frozen scratch-004 produced the preregistered numeric control row, but
+      schema-v2 sealing rejected the composite token because benchmark backend
+      is a registered execution class rather than an implementation-version
+      string. The attempt therefore has a failed cell, unsealed raw result, no
+      portable bundle, and no accepted audit.
+    lesson: >
+      Keep the stable backend class as `cpu_reference` and carry the exact
+      composition/version in diagnostics. Preserve the rejected attempt and
+      issue a new frozen source/protocol/run identity without changing any
+      fixture, metric, hypothesis, or killing gate.
+    evidence:
+      - "tasks/evidence/METHOD-038/superseded/20260811-fold-screening-schema-rejection/experiment/protocol.yaml"
+      - "tasks/evidence/METHOD-038/superseded/20260811-fold-screening-schema-rejection/experiment/runs/scratch-004/cells.jsonl"
+      - "tasks/evidence/METHOD-038/superseded/20260811-fold-screening-schema-rejection/experiment/runs/scratch-004/unsealed_benchmark_result.json"
+      - "tasks/evidence/METHOD-038/superseded/20260811-fold-screening-schema-rejection/commands/scratch-fold-controls-004.json"
+    status: resolved
+  - id: N412
+    type: decision
+    title: "Repair only fold-result backend serialization"
+    provenance: ai-executed
+    timestamp: "2026-08-11T05:06+02:00"
+    also_depends_on: [N411]
+    choice: >
+      Replace the composite result backend with registered `cpu_reference`,
+      retain `slice_a_control_v1` and `candidate_selection: none` diagnostics,
+      and replay the byte-equivalent scientific protocol under new custody
+      identities.
+    alternatives:
+      - "Expand the repository-wide backend allowlist for one private fixture."
+      - "Treat the unsealed scratch-004 JSON as accepted evidence."
+      - "Retune the fold angles, threshold, oracle, metrics, or gates after observing scratch-004."
+    evidence:
+      - "N411"
+      - "tools/benchmark/validate_benchmark_results.py"
+      - "benchmarks/runners/CurvatureSegmentationProfileRunner.cpp"
+      - "commit f622cd0e50229a77564173f0a3afea5e66c96a95"
+    status: resolved
+  - id: N413
+    type: experiment
+    title: "Validate the bounded METHOD-038 fold-control lane"
+    provenance: ai-executed
+    timestamp: "2026-08-11T05:06+02:00"
+    also_depends_on: [N404, N406, N410, N411, N412]
+    evidence:
+      - "tasks/evidence/METHOD-038/experiment/protocol.yaml"
+      - "tasks/evidence/METHOD-038/experiment/inputs/fold_controls_benchmark_result.json"
+      - "tasks/evidence/METHOD-038/experiment/runs/scratch-006/bundle.yaml"
+      - "tasks/evidence/METHOD-038/experiment/runs/scratch-006/audit.json"
+      - "tasks/evidence/METHOD-038/commands/checkpoint3-focused-tests.json"
+      - "tasks/evidence/METHOD-038/commands/checkpoint3-structural.json"
+      - "tasks/evidence/METHOD-038/commands/checkpoint3-cpu-tests.json"
+    result: >
+      Final task-bound scratch-006 independently recomputed all eleven frozen
+      gates as passing: both diagonal phases classified 0/0/24 crease edges at
+      30/45/60 degrees, feature-mask error was zero, maximum normalized flat-
+      fold edge-length delta was 0.000000038, and every constant-curvature v1
+      result retained one component, one region, zero boundary edges, and the
+      exact flat-control payload. The audit remains non-claim-eligible with
+      claim_authorized=false. Twenty-six focused tests, strict custody/docs/
+      manifest/ARA/task/layering checks, and all 4,211 selected CPU tests
+      passed; one policy-gated GLFW/LeakSanitizer test self-skipped. Candidate
+      A-D, v2, the broader/confirmation corpus, convergence, performance,
+      runtime/UI, and GPU/Vulkan remain untested.
+    status: resolved

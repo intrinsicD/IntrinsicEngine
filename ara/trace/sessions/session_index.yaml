@@ -281,8 +281,8 @@ sessions:
     open_threads: 3
   - id: "2026-08-11_001"
     date: "2026-08-11"
-    summary: "Audited METHOD-038's next corpus slice and found its one-run work graph exhausted at the frozen checkpoint, requiring an explicit process-repair or task-boundary decision before further writes."
-    turn_count: 1
-    events_count: 3
-    claims_touched: []
+    summary: "Authorized and exercised a bounded work-graph slice cycle, then sealed METHOD-038's paired fold-control lane with accepted non-claim custody and complete CPU verification."
+    turn_count: 2
+    events_count: 10
+    claims_touched: [C41, C42]
     open_threads: 3
