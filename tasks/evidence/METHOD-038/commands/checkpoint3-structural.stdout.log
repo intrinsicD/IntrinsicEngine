@@ -1,0 +1,61 @@
+Experiment custody validation passed for 8 protocol(s) and 8 run(s).
+Benchmark result JSON validation passed for 1 file(s), 1 stable benchmark ID(s), and 1 append-only run/attempt identity tuple(s).
+Method manifest validation passed for 13 file(s).
+Benchmark manifest validation passed for 51 file(s).
+check_ara_claims: OK (42 claims)
+Validated 263 task file(s); findings: 0; mode: strict.
+[check_task_maturity_followups] Root: /home/alex/Documents/IntrinsicEngine
+[check_task_maturity_followups] Open task files scanned: 94
+[check_task_maturity_followups] No maturity follow-up findings.
+Task policy check complete. findings=0 mode=strict.
+[check_doc_links] Root: /home/alex/Documents/IntrinsicEngine
+[check_doc_links] Checked relative links: 3284
+[check_doc_links] Mode: warning
+[check_doc_links] No broken relative links found.
+[check_layering] Scan root: /home/alex/Documents/IntrinsicEngine/src
+[check_layering] Files scanned: 752
+[check_layering] References scanned: 7249 import/include, 84 CMake link
+[check_layering] Allowlist entries: 0
+[check_layering] Allowlisted violations: 0
+[check_layering] No layering violations found.
+test layout check complete. findings=0 mode=strict
+[check_root_hygiene] Root: /home/alex/Documents/IntrinsicEngine
+[check_root_hygiene] Root markdown files:
+  - AGENTS.md: allowed
+  - CLAUDE.md: allowed
+  - README.md: allowed
+[check_root_hygiene] Root allowlist: /home/alex/Documents/IntrinsicEngine/tools/repo/root_allowlist.yaml
+[check_root_hygiene] Allowed repository entries present:
+  - .claude/
+  - .codex/
+  - .github/
+  - .gitignore
+  - .mcp.json
+  - AGENTS.md
+  - CLAUDE.md
+  - CMakeLists.txt
+  - CMakePresets.json
+  - README.md
+  - ara/
+  - assets/
+  - benchmarks/
+  - cmake/
+  - docs/
+  - lsan.supp
+  - methods/
+  - research/
+  - src/
+  - tasks/
+  - tests/
+  - tools/
+  - vcpkg-configuration.json
+  - vcpkg.json
+[check_root_hygiene] Ignored named local entries:
+  - .idea/
+  - .ruff_cache/
+  - build/
+  - cmake-build-debug/
+  - experimental/
+  - external/
+[check_root_hygiene] Root entries match repository-owned policy.
+tasks/SESSION-BRIEF.md is up to date.

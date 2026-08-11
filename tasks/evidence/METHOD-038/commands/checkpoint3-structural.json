@@ -1,0 +1,23 @@
+{
+  "command": [
+    "/bin/bash",
+    "-o",
+    "pipefail",
+    "-c",
+    "python3 tools/agents/experiment_custody.py validate --root . && python3 tools/benchmark/validate_benchmark_results.py --root tasks/evidence/METHOD-038/experiment/inputs --manifests-root benchmarks --strict && python3 tools/agents/validate_method_manifests.py --root . && python3 tools/benchmark/validate_benchmark_manifests.py --root benchmarks && python3 tools/agents/check_ara_claims.py --root . --strict && python3 tools/agents/check_task_policy.py --root . --strict && python3 tools/docs/check_doc_links.py --root . && python3 tools/repo/check_layering.py --root src --strict && python3 tools/repo/check_test_layout.py --root . --strict && python3 tools/repo/check_root_hygiene.py --root . && python3 tools/agents/generate_session_brief.py --check && git diff --check"
+  ],
+  "command_display": "/bin/bash -o pipefail -c 'python3 tools/agents/experiment_custody.py validate --root . && python3 tools/benchmark/validate_benchmark_results.py --root tasks/evidence/METHOD-038/experiment/inputs --manifests-root benchmarks --strict && python3 tools/agents/validate_method_manifests.py --root . && python3 tools/benchmark/validate_benchmark_manifests.py --root benchmarks && python3 tools/agents/check_ara_claims.py --root . --strict && python3 tools/agents/check_task_policy.py --root . --strict && python3 tools/docs/check_doc_links.py --root . && python3 tools/repo/check_layering.py --root src --strict && python3 tools/repo/check_test_layout.py --root . --strict && python3 tools/repo/check_root_hygiene.py --root . && python3 tools/agents/generate_session_brief.py --check && git diff --check'",
+  "cwd": ".",
+  "duration_ms": 3796,
+  "exit_code": 0,
+  "finished_at": "2026-08-11T02:49:41Z",
+  "label": "checkpoint3-structural",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-11T02:49:37Z",
+  "stderr_path": "tasks/evidence/METHOD-038/commands/checkpoint3-structural.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/METHOD-038/commands/checkpoint3-structural.stdout.log",
+  "stdout_sha256": "0bc339b37c668033078c6fac9a28f882832d0704eeb870eb07b2a2df31e67aac",
+  "task_id": "METHOD-038"
+}
