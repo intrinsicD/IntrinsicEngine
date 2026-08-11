@@ -182,7 +182,7 @@ diagonal phase; fold pairs rigidly rotate the positive-`x` half about the
 | Plane | `[-1,1] x [0,1]`, `24 x 48` cells, diagonal phases `0/1`, seed `1701` | `[-1.3,0.9] x [0,1.2]`, `31 x 62`, phases `0/1`, seed `9109` | no interior feature or segmentation boundary |
 | Cylinder | open cylinder `R=1`, `L=2`, `32 x 64`, angular phase `0` versus `1/128` turn, seed `1709` | `R=1.7`, `L=2.6`, `37 x 74`, phase `1/148`, seed `9127` | no tessellation-induced ring boundary |
 | Plane-plane folds | the plane grid rigidly folded by `30/45/60` degrees, `theta_0=45` degrees, seed `1723` | folds `20/45/70` degrees on the held-out plane grid, seed `9133` | `theta > theta_0` is mandatory, equality is not; projected crease is `x=0` |
-| Smooth transition | `q(x)=0.5(1+tanh(x/0.08))` on `[-1,1] x [0,1]`, reference curve `x=0`, seed `1741` | width `0.11` on `[-1.3,0.9] x [0,1.2]`, seed `9151` | recover the continuous transition without treating it as a hard dihedral |
+| Smooth transition | graph surface `p(x,y)=(x,y,q(x))`, `q(x)=0.5(1+tanh(x/0.08))`, on `[-1,1] x [0,1]`, `24 x 48` cells with diagonal phases `0/1`, reference curve `x=0`, seed `1741` | width `0.11` on `[-1.3,0.9] x [0,1.2]`, `31 x 62` cells with diagonal phases `0/1`, seed `9151` | recover the continuous transition without treating it as a hard dihedral |
 | Isometric-bend control | flat sheet versus the `60`-degree fold with identical parametric connectivity, reference boundary along the crease, seed `1753` | flat sheet versus the `70`-degree held-out fold, seed `9173` | intrinsic-only evidence and `k_g` fairness are unchanged; extrinsic crease evidence may change |
 
 Screening may read only the left column. Confirmation parameters stay unused
@@ -201,6 +201,40 @@ component, one connected region, zero boundary edges, and the exact flat-control
 payload in every case. This accepted scratch result (ARA C42) validates the
 fixture lane, not candidate A-D, the broader screen, held-out confirmation, or
 a remeshing/convergence claim.
+
+### Frozen cylinder and smooth-transition controls (checkpoint 4)
+
+Before their runner implementation, the next two screening rows are fixed as
+one separate `surface_controls` lane. The open cylinder uses `32` axial by `64`
+angular cells, periodic angular connectivity, radius `1`, length `2`, and the
+two declared angular phases. Its supplied analytic principal curvatures are
+constant `(1,0)`. The two phase meshes must have zero boundary-disabled
+`GEOM-071` hard-feature edges, bbox-normalized radial and paired-edge-length
+errors at most `1e-6`, and identical one-component/one-region/zero-boundary v1
+payloads. This is a tessellation-ring negative control, not a curvature-
+estimator validation.
+
+The smooth row is the generalized-cylinder graph
+
+```text
+p(x,y) = (x, y, q(x)),
+q(x)   = 0.5 * (1 + tanh(x / b)),
+b      = 0.08,
+k(x)   = q''(x) / (1 + q'(x)^2)^(3/2).
+```
+
+The supplied ordered principal-curvature pair is `(max(k,0), min(k,0))`.
+Thus the continuous sign-change curve is exactly `x=0`, `z=0.5`, with no
+crease discontinuity. Both `24 x 48` diagonal phases must yield zero hard-
+feature edges; the fixed-two-component v1 comparison must retain two connected
+regions, at most `0.02` label-permutation-invariant face error, and a boundary
+network within `0.02 D` symmetric surface-distance upper bound of the exact
+curve, with two endpoints and no junction. The runner records zero warmup and
+one measured execution. These controls validate only fixture construction,
+analytic supplied descriptors, reference-curve measurement, and the unchanged
+v1 comparison lane. They do not execute A-D, select v2, read confirmation
+parameters, or support convergence, performance, runtime/UI, or production
+claims.
 
 Candidate A runs every control directly. Candidate B must run the same controls
 after coarse-to-fine transfer and is killed by any lost mandatory fold or

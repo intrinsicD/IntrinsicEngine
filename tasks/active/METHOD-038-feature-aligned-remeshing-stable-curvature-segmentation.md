@@ -69,6 +69,13 @@ maturity_target: ParityProven
   final task-bound replay after this status update.
 - Next: extend the frozen screen with the cylinder and smooth-transition
   controls before any `cpu_reference_v2` implementation.
+- Checkpoint 4 preregisters that extension as a separate, opt-in
+  `surface_controls` lane. It fixes an open `R=1`, `L=2`, `32 x 64` cylinder
+  phase pair and a `24 x 48` paired-diagonal graph of
+  `q(x)=0.5(1+tanh(x/0.08))`, including analytic curvature, hard-feature,
+  v1 negative/comparison, and continuous `x=0` boundary oracles. No candidate
+  A-D, held-out confirmation row, selector, or production integration is in
+  this checkpoint.
 
 ## Goal
 - Replace METHOD-037's slow, edge-local boundary inference with an evidence-selected CPU formulation that remains statistically based on the existing Gaussian mixture, aligns region boundaries with persistent surface feature curves, converges across retriangulations of the same embedded surface, and meets a preregistered useful-acceleration gate without weakening correctness, diagnostics, or the Fixed/Automatic UI contract.
