@@ -2646,3 +2646,25 @@ observations:
     promoted_to: "logic/claims.md:C44"
     crystallized_via: artifact-commitment
     stale: false
+  - id: O148
+    timestamp: "2026-08-11T14:41+02:00"
+    provenance: ai-executed
+    content: >
+      METHOD-039's deterministic local grow/merge patch candidate fails its
+      preregistered bounded seed-location stability gate even though its
+      accepted merge/refinement deltas agree with complete energy
+      recomputation and its other bounded oracle and stability controls pass.
+    context: >
+      The one-dual-step perturbation of every automatic seed exceeds the
+      area-weighted variation-of-information limit of 0.01 and leaves a
+      fragmented exact local optimum. The executable regression preserves the
+      rejection. No threshold, fixture, v1 behavior, selector,
+      runtime/config/UI/property surface, performance claim, parameterization,
+      GPU/Vulkan path, or novelty statement changed. METHOD-040 records the
+      required separately scoped global multicut follow-up.
+    potential_type: claim
+    bound_to: [N417]
+    promoted: true
+    promoted_to: "logic/claims.md:C45"
+    crystallized_via: artifact-commitment
+    stale: false

@@ -15,14 +15,16 @@ killing order, profiling lanes, and validated analytic controls are in
 backend and changed no production default. METHOD-039 owns the practical
 feature-network patch method that may consume these immutable controls.
 
-METHOD-039 Slices A--B freeze that follow-up's equations, numeric screening
+METHOD-039 Slices A--C freeze that follow-up's equations, numeric screening
 parameters, fail-closed supplied-evidence shape, and generated oracle and
 detector controls in [`feature_aligned_intake.md`](feature_aligned_intake.md).
-The executable catalog is
+The executable catalog and the rejected local-solver stability gate are
 [`Test.CurvaturePatchContract.cpp`](../../../tests/unit/geometry/Test.CurvaturePatchContract.cpp).
 The geometry module now implements the standalone computed feature-evidence
-stage. The grow/merge solver, `cpu_reference_v2` selector, publication
-properties, config, runtime, and UI are not implemented yet.
+stage and an unadopted local grow/merge/refine patch reference. The latter is not
+an accepted `cpu_reference_v2`: one-dual-step seed perturbation exceeds the
+frozen variation-of-information gate. Publication properties, a selector,
+config, runtime, and UI adoption therefore remain absent.
 
 ## Implemented path
 
@@ -65,6 +67,31 @@ no dense face-pair matrix. This stage does not mutate topology, publish
 properties, select a v2 segmentation mode, or imply that every detected soft
 line must become a final patch boundary. ARA claim C44 bounds the current CPU
 contract evidence.
+
+### METHOD-039 local patch reference and negative verdict
+
+The companion module
+`Geometry.HalfedgeMesh.CurvatureSegmentation.Patches` consumes borrowed
+hard/soft feature evidence and reuses the existing deterministic Gaussian
+mixture. It selects deterministic farthest-point seeds behind hard barriers,
+grows provisional regions with stable multi-source Dijkstra, greedily merges a
+sparse region-adjacency graph under the frozen area-weighted regional and
+intrinsic boundary energy, and performs bounded connectivity-preserving
+one-ring refinement. Its slot-aligned result separates provisional fronts,
+final regions, hard/soft/closure boundary roles, accepted energy changes,
+regional statistics, and failure/work/timing diagnostics. It neither mutates
+the mesh nor changes the sealed v1 interface.
+
+The reference exactly matches all seventeen supplied-oracle fixtures and the
+bounded computed smooth-transition/ridge/valley, hard-fold, and homogeneous
+controls. Seed-density, alternate-diagonal, scale, noise, and orientation
+checks also pass. However, moving every automatic seed by one legal dual step
+leaves a different local optimum and exceeds the preregistered area-weighted
+VI limit of `0.01`. The focused regression preserves that refutation, and ARA
+claim C45 bounds it. Per the frozen stop rule, no thresholds were retuned and
+no production selector or control surface was added. `METHOD-040` owns a
+separate task-local multicut attempt; it must distinguish a genuinely global
+objective from a wider-move heuristic before implementation.
 
 ## Runtime and UI
 
@@ -204,9 +231,9 @@ evidence-only task bytes. All seventeen gates pass and
 Historical scratch-008 and scratch-010 remain immutable under `superseded/`,
 and scratch-009 preserves the missing-`jq` replay failure rather than hiding it.
 
-There is no implemented v2, optimized, or GPU backend. METHOD-039 has selected
-and frozen a practical v2 formulation for implementation, but Slice A does not
-make it executable or change the current output. The implemented v1 output is
-deliberately non-destructive and makes no atlas-quality claim. METHOD-039 must
-still produce an accepted feature/patch result before `GEOM-076` may evaluate
-any later UV-atlas chart hints.
+There is no accepted v2, optimized, or GPU backend. METHOD-039's unadopted local
+patch candidate is executable but failed its frozen seed-location adoption
+gate, so current output remains the deliberately non-destructive v1 path and
+makes no atlas-quality claim. METHOD-040 must first produce an accepted global-
+partition CPU result before any separately scoped engine adoption or later
+`GEOM-076` UV-atlas chart-hint evaluation may proceed.

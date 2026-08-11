@@ -9785,3 +9785,30 @@ tree:
       runtime/config/UI, performance, GPU/Vulkan, or novelty conclusion was
       exercised.
     status: resolved
+  - id: N417
+    type: experiment
+    title: "Implement and test METHOD-039's local grow/merge patch reference"
+    provenance: ai-executed
+    timestamp: "2026-08-11T14:41+02:00"
+    also_depends_on: [N404, N415, N416]
+    evidence:
+      - "src/geometry/Geometry.HalfedgeMesh.CurvatureSegmentation.Patches.cppm"
+      - "src/geometry/Geometry.HalfedgeMesh.CurvatureSegmentation.Patches.cpp"
+      - "tests/unit/geometry/Test.CurvaturePatchContract.cpp"
+      - "methods/geometry/curvature_segmentation/feature_aligned_intake.md"
+      - "tasks/active/METHOD-039-feature-network-curvature-patch-decomposition.md"
+      - "tasks/backlog/methods/METHOD-040-global-multicut-curvature-patch-reference.md"
+    result: >
+      The unadopted serial CPU candidate implements deterministic hard-barrier
+      seeds, stable simultaneous growth, sparse local RAG merging under the
+      frozen regional and intrinsic-boundary energy, exact full-energy checks,
+      bounded connected refinement, and separate hard/soft/closure output
+      roles. It matches the supplied-feature oracle catalog and bounded
+      computed-evidence, hard-fold, homogeneous, density, diagonal, scale,
+      noise, and orientation controls. The preregistered one-dual-step seed
+      perturbation exceeds the area-weighted VI limit of 0.01 and terminates at
+      a fragmented exact local optimum. The local formulation is therefore not
+      adopted; no selector, runtime/config/UI/publication path, performance,
+      parameterization, GPU/Vulkan, or novelty claim follows. METHOD-040 owns
+      the separately scoped global multicut attempt.
+    status: resolved

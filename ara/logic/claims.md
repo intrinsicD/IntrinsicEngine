@@ -1341,3 +1341,30 @@
 - **Tags**: geometry, curvature segmentation, feature evidence, CPU reference,
   deterministic controls, bounded result
 - **From staging**: O147
+
+## C45: METHOD-039 local greedy merging satisfies bounded seed-location stability
+- **Statement**: METHOD-039's deterministic hard-barrier growth, greedy local
+  RAG merging, and bounded one-ring refinement were expected to preserve the
+  frozen patch partition when every automatic seed is moved by one legal dual
+  step.
+- **Status**: refuted — bounded serial CPU unit/contract evidence only; the
+  perturbed run exceeds the preregistered area-weighted VI limit of `0.01`
+  despite exact full-energy checks after every accepted move, so no v2
+  selector, runtime/config/UI/property adoption, performance, parameterization,
+  GPU/Vulkan, or novelty claim is made
+- **Provenance**: ai-executed
+- **Crystallized via**: artifact-commitment
+- **Falsification criteria**: The unchanged local formulation, frozen params,
+  fixture, and one-dual-step seed perturbation produce a valid connected
+  partition with area-weighted VI at most `0.01` while preserving its hard
+  constraints and exact accepted-delta/full-energy agreement.
+- **Proof**: [src/geometry/Geometry.HalfedgeMesh.CurvatureSegmentation.Patches.cppm,
+  src/geometry/Geometry.HalfedgeMesh.CurvatureSegmentation.Patches.cpp,
+  tests/unit/geometry/Test.CurvaturePatchContract.cpp,
+  methods/geometry/curvature_segmentation/feature_aligned_intake.md,
+  tasks/active/METHOD-039-feature-network-curvature-patch-decomposition.md,
+  tasks/backlog/methods/METHOD-040-global-multicut-curvature-patch-reference.md]
+- **Dependencies**: [C43, C44]
+- **Tags**: geometry, curvature segmentation, local RAG, seed stability, CPU
+  reference, negative result, bounded result
+- **From staging**: O148

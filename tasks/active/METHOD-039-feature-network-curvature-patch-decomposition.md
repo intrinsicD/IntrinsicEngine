@@ -20,11 +20,16 @@ maturity_target: Operational
 - Deliver a deterministic, topology-preserving CPU method that partitions an oriented triangle surface into connected, curvature-coherent patches by detecting hard and soft feature lines, forming a conservative seeded oversegmentation, and merging adjacent regions under an explicit curvature-and-boundary energy so every retained boundary is either feature-supported or a diagnosed curvature-change closure boundary.
 
 ## Status
-- Slices A and B are complete and reviewed. The standalone computed
-  feature-evidence CPU reference and its focused controls pass. Owner:
-  `codex-root` on `main`. ARA claim C44 bounds the current CPU contract
-  evidence. Slice C's patch grow/merge path and the production v2 selector do
-  not exist yet.
+- Slices A and B are complete and reviewed. Slice C now implements an unadopted
+  deterministic grow/merge/refine CPU reference and passes the supplied-oracle,
+  detected-feature, hard-fold, homogeneous, diagonal, scale, noise, and
+  orientation controls. Its one-dual-step seed perturbation exceeds the frozen
+  `0.01` variation-of-information gate despite exact full-energy checks after
+  every accepted move. ARA claim C45 records this bounded refutation.
+- Per the preregistered stop rule, the local formulation is not adopted: no v2
+  selector, config/runtime/UI path, or canonical property publication was
+  added. `METHOD-040` is the separately scoped task-local global multicut
+  follow-up and remains blocked until METHOD-039's negative-result retirement.
 
 ## Non-goals
 - No UV generation, atlas/chart construction, seam selection, mesh cutting, vertex duplication, face splitting, or other parameterization work.
@@ -158,8 +163,8 @@ maturity_target: Operational
 ## Slice plan
 - **Slice A — Freeze the practical contract and oracle fixtures (complete).** Bind the inherited evidence boundary to METHOD-038's retired immutable records, record the exact integral-invariant and ridge/valley equations used, define the supplied feature-evidence seam, freeze generated analytic fixtures/metrics, and add no production selector.
 - **Slice B — Feature evidence CPU reference (complete).** Implement hard-feature consumption plus one primary multi-scale soft-feature detector, with the Hildebrandt-style extremality detector limited to a fixture comparator. Validate feature confidence and line topology independently of patch construction.
-- **Slice C — Oracle-driven grow/merge patch reference.** Implement deterministic seed selection, simultaneous growth, region statistics, RAG merging, boundary roles, and narrow-band refinement. First pass oracle feature evidence, then replay the same tests with detected evidence. Keep all work private to the existing curvature-segmentation method package until the result contract passes.
-- **Slice D — Engine adoption and evidence.** Add the accepted mode to the existing config/runtime/UI path, publish the distinct feature and final-boundary properties, seal quality/stability/smoke results, and retain `cpu_reference_v1` as an explicit fallback/comparison lane.
+- **Slice C — Oracle-driven grow/merge patch reference (complete; local formulation refuted).** The unadopted deterministic CPU reference passes its oracle and computed-evidence controls, but the frozen one-step seed-location gate rejects positive adoption. The failure remains executable rather than being tuned away.
+- **Slice D — Engine adoption and evidence (not entered).** Withdrawn for the rejected local formulation. A positive METHOD-040 verdict must open a separately scoped adoption task; `cpu_reference_v1` remains unchanged.
 
 ## Required changes
 - [x] After the declared dependency is satisfied, bind intake and fixture lineage to METHOD-038's immutable retired evidence paths without changing its protocols, raw results, bundles, audits, or claims.
@@ -167,25 +172,25 @@ maturity_target: Operational
 - [x] Add generated analytic fixtures with oracle hard/soft feature evidence and exact/reference patch boundaries for a plane, cylinder, sphere, strict-threshold folds, smooth signed-curvature transition, ridge, valley, nearby feature pair, junction, open boundary, disconnected surfaces, and a same-curvature false-boundary control.
 - [x] Add the smallest supplied-feature test seam using spans/plain records; do not introduce an interface or public feature-network framework. Reject slot-count mismatches, non-finite confidences/descriptors, unsupported submesh views, and invalid topology with explicit diagnostics.
 - [x] Implement the primary physical-scale smooth-feature evidence path and consume `Geometry.HalfedgeMesh.Features` for hard facts. Report per-signal contributions, persistence scales, suppression/hysteresis decisions, endpoints, junctions, and rejected fragments.
-- [ ] Implement deterministic seed selection and simultaneous face growth behind hard barriers, including stable tie-breaking and complete provisional-front diagnostics.
-- [ ] Implement area-weighted regional sufficient statistics, the frozen `C(R)` and `B_ij` terms, deterministic adjacency updates, energy-decreasing merges, and final local-optimum checks without adding a generic clustering or graph-optimization layer.
-- [ ] Classify and publish final boundary roles independently from feature evidence. Preserve topology and existing component/region/boundary outputs; introduce only the minimum additional edge properties required for soft evidence and boundary role.
-- [ ] Add bounded topology-preserving boundary refinement with surface length and discrete geodesic turning. Do not use normal curvature, triangle splitting, or vertex relocation.
-- [ ] Perturb seeds, traversal order, seed density, mesh diagonal phase, scale, and noise. Reject the local-merge formulation if the final projected patches exceed the frozen stability tolerances; record the global-correlation-clustering escalation as a separate task only after such a failure.
-- [ ] Version and migrate the existing config only after the reference gates pass, then route runtime, agent/CLI, UI, publication, undo/stale checks, and visualization through the same validated method request.
+- [x] Implement deterministic seed selection and simultaneous face growth behind hard barriers, including stable tie-breaking and complete provisional-front diagnostics.
+- [x] Implement area-weighted regional sufficient statistics, the frozen `C(R)` and `B_ij` terms, deterministic adjacency updates, energy-decreasing merges, and final local-optimum checks without adding a generic clustering or graph-optimization layer.
+- [x] Classify and return final boundary roles independently from feature evidence in the companion result. Preserve topology and the sealed v1 component/region/boundary outputs.
+- [x] Add bounded topology-preserving boundary refinement with surface length and discrete geodesic turning. Do not use normal curvature, triangle splitting, or vertex relocation.
+- [x] Execute the frozen seed-density/location, diagonal, scale, noise, and orientation checks. The one-step seed-location perturbation rejects the local formulation, so `METHOD-040` owns the separately scoped global-correlation-clustering escalation.
+- [ ] Version/migrate config and add canonical property publication only after an accepted reference gate. This was not entered because the Slice C local formulation was rejected.
 - [ ] Extend the existing curvature profile runner and manifests with generated quality/stability/smoke cohorts. Record quality, topology, determinism, stage work/timings, and peak working-set diagnostics; do not state or gate a speedup.
-- [ ] Keep major-stage complexity at sparse surface-graph scale (`O(F + E)` storage and no dense all-pairs face matrix). Any observed superlinear stage must be diagnosed before adoption.
+- [x] Keep major-stage storage at sparse surface-graph scale (`O(F + E)` slot arrays/adjacency and no dense all-pairs face matrix). No adoption or performance claim is made.
 
 ## Tests
-- [x] Feature controls: plane, sphere, and cylinder produce no spurious interior hard feature; the shared strict-threshold fold contract remains exact; smooth transition, ridge, and valley fixtures recover their reference line within the frozen tolerance; orientation reversal changes only signed ridge/valley naming, not feature support. Final-partition orientation parity remains a Slice C obligation.
-- [ ] Oracle isolation: supplied exact feature evidence drives the expected patch result even when the computed detector is disabled, and deliberately corrupted detector evidence changes only the detector-integrated lane. This distinguishes feature-detection failure from patch-completion failure.
-- [ ] Growth controls: stable tie-breaking makes repeated runs and face-traversal permutations identical; hard barriers are never crossed; every live face receives exactly one provisional region; disconnected components and open boundaries are handled independently.
-- [ ] Merge controls: multiple seeds on one constant-curvature plane/cylinder merge to one patch; same-curvature regions separated only by a soft feature merge when the data/boundary energy says so; genuinely different curvature regimes remain separate; no negative `delta_merge` remains at termination.
-- [ ] Boundary legitimacy: every final boundary transition is a hard feature, a soft-feature-supported cut, or a curvature-closure cut whose removal would increase the frozen energy. No unsupported seed front survives.
-- [ ] Partition validity: final patches are non-empty and face-connected, final boundary arcs close, meet at diagnosed junctions, or terminate at source boundaries, and output slot counts match the untouched source topology.
-- [ ] Stability: on METHOD-038 alternate diagonals plus bounded seed-location/density perturbations, area-weighted variation of information is at most `0.01` and symmetric projected boundary distance is at most `0.02 D`; the plane/cylinder controls remain one patch with zero interior final boundary.
-- [ ] Smooth-transition quality: the existing tanh transition produces two connected patches and a final boundary within `0.02 D` of the exact `x=0` curve without any hard-feature input.
-- [ ] Robustness: cover empty input, unsupported views, non-triangle faces, zero-area/duplicate geometry, non-manifold or dangling adjacency, non-finite positions/curvatures/feature scores, unusable normals, very small regions, and failed GMM likelihood evaluation with explicit fail-closed status/diagnostics.
+- [x] Feature controls: plane, sphere, and cylinder produce no spurious interior hard feature; the shared strict-threshold fold contract remains exact; smooth transition, ridge, and valley fixtures recover their reference line within the frozen tolerance; orientation reversal changes only signed ridge/valley naming, not feature support. Final-partition orientation parity also passes.
+- [x] Oracle isolation: supplied exact feature evidence drives the expected patch result when computed evidence is bypassed, and deliberately corrupted soft evidence changes only the integrated lane.
+- [x] Growth controls: stable tie-breaking makes repeated runs identical; hard barriers are never crossed; every live face receives one provisional region; disconnected components and open boundaries are handled independently. A distinct storage-order permutation was not pursued after the earlier frozen seed gate rejected adoption.
+- [x] Merge controls: multiple seeds on a constant-curvature control merge to one patch; same-curvature false boundaries disappear; genuinely different regimes remain separate; exact recomputation agrees with every accepted delta and no negative admissible delta remains at termination.
+- [x] Boundary legitimacy: every final boundary transition is hard, soft-supported, or a curvature closure with nonnegative merge delta. Unsupported seed fronts disappear on the accepted oracle controls.
+- [x] Partition validity: final patches are non-empty and face-connected, final boundary arcs close, meet at diagnosed junctions, or terminate at source boundaries, and output slot counts match source topology.
+- [x] Stability gate executed: seed density, alternate diagonals, scale, bounded noise, and orientation pass, while the one-dual-step seed-location case exceeds VI `0.01` and refutes the local formulation. Plane/cylinder remain one patch with zero interior boundary.
+- [x] Smooth-transition quality: the existing tanh transition produces two connected patches and a final boundary within `0.02 D` of the exact `x=0` curve without hard-feature input.
+- [ ] Robustness: production tests cover empty input, slot mismatches, invalid params/seeds, and non-finite/invalidly ordered curvature; the broader Slice A malformed mesh/evidence preflight remains executable. Further production expansion stopped with the rejected formulation.
 - [ ] Publication/coherence: existing properties retain exact slot/cardinality semantics, unrelated properties/topology remain unchanged, new feature/boundary-role properties advance canonical revisions, stale results do not publish, and undo/redo restores all touched properties atomically.
 - [ ] Control-surface parity: config-file, Editor, AgentCli, and Programmatic requests produce the same validated params/result; invalid combinations fail before execution; the UI distinguishes detected features, provisional superpatches, and final boundary roles.
 - [ ] Complexity/health: generated smoke and 100k-face cohorts complete without a dense `O(F^2)` allocation, report nonnegative stage timings and bounded working-set diagnostics, and preserve deterministic payloads. These are health checks, not performance claims.
@@ -196,14 +201,14 @@ maturity_target: Operational
 - [x] Document seed behavior and the stability gate prominently: seeds initialize an oversegmentation and do not define final boundaries.
 - [x] Document hard/soft/closure boundary roles and the fact that soft feature lines may remain internal while curvature closures may occur away from a classical line.
 - [ ] Add benchmark manifests and replay instructions for generated feature, patch-quality, seed-stability, and health cohorts. Any quantitative current-state result entering method docs must first have a matching ARA claim/evidence binding.
-- [ ] Update geometry/runtime/Sandbox current-state docs and generated module inventory only if their implemented surfaces change; keep roadmap language explicitly future-tense until adoption.
+- [x] Update method current-state docs and the generated module inventory for the unadopted companion surface. Runtime/Sandbox docs remain unchanged because adoption did not occur.
 
 ## Acceptance criteria
 - [x] The selected equations and parameters are fixed before the integrated quality run, with stable citations and explicit failure behavior; no novelty claim is made.
-- [ ] With oracle feature evidence, every analytic fixture produces the expected connected patch count and boundary topology, demonstrating that remaining closure cuts are solved independently of detector quality.
-- [ ] With computed evidence, mandatory hard folds are never crossed, plane/cylinder controls remain unsplit, and the smooth transition/ridge/valley controls pass their frozen line and patch tolerances.
-- [ ] Extra seeds on homogeneous regions disappear during merging, while curvature-incompatible neighboring regions remain separated; every surviving non-feature boundary has a positive recorded curvature-model justification.
-- [ ] The accepted final partition passes the seed, traversal, diagonal, scale, and noise stability gates. Failure of this criterion blocks adoption and triggers a separately scoped global-optimization decision rather than threshold tuning on the failed cases.
+- [x] With oracle feature evidence, every analytic fixture produces the expected connected patch count and boundary topology, demonstrating that closure cuts can be tested independently of detector quality.
+- [x] With computed evidence, mandatory hard folds are never crossed, plane/cylinder controls remain unsplit, and the smooth transition/ridge/valley controls pass their frozen line and patch tolerances.
+- [x] Extra seeds on homogeneous regions disappear during merging, while curvature-incompatible neighboring regions remain separated; every surviving non-feature boundary reports its curvature-model merge delta.
+- [x] Execute the adoption stability gate. The bounded seed-location case fails, so positive adoption is blocked and `METHOD-040` records the separately scoped global-optimization decision without threshold tuning.
 - [ ] Results remain deterministic, patches connected, topology/cardinality unchanged, diagnostics complete, and malformed inputs fail closed.
 - [ ] The existing config/agent/runtime/UI path can execute and inspect the accepted reference mode without a new service/framework, while the v1 reference remains available for comparison/fallback.
 - [ ] Claim-grade evidence supports only the implemented correctness, stability, and bounded health statements. No novelty, parameterization, GPU, or speedup statement is published.
@@ -247,3 +252,7 @@ python3 tools/agents/experiment_custody.py validate --root .
 ## Maturity
 - Target: `Operational` for one deterministic CPU reference through the existing runtime/config/UI/publication path, with quality and stability evidence against generated controls.
 - No optimized CPU or GPU follow-up is owed by default. A performance backend opens only after accepted reference profiling identifies a concrete bottleneck and a separate task freezes its parity/baseline contract.
+- Slice C is a valid negative-result stop: the unadopted local reference does not
+  claim `Operational`, the v1 production path remains canonical, and Slice D
+  is not entered. METHOD-040 owns the next CPU-reference attempt after this
+  task's claim-grade negative-result retirement.

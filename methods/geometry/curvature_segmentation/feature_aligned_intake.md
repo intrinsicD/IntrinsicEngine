@@ -451,6 +451,37 @@ the largest number of faces reached inside a frozen physical radius. This can
 grow superlinearly under refinement; the 100k-face health gate must measure it
 before adoption, and any optimization remains a later parity-bound task.
 
+### Slice C local-reference verdict
+
+The companion module
+`Geometry.HalfedgeMesh.CurvatureSegmentation.Patches` implements the equations
+above as an unadopted serial CPU candidate. It borrows the Slice B feature-evidence
+view, reuses the existing deterministic Gaussian mixture, keeps the sealed v1
+interface byte-stable, and returns slot-aligned provisional/final regions,
+growth facts, region statistics, hard/soft/closure boundary roles, exact merge
+and refinement deltas, local-optimum diagnostics, and observational timings.
+Every accepted merge or one-ring move is checked against a complete energy
+recomputation, and the implementation stores sparse surface-graph records
+rather than a dense face-pair matrix.
+
+The candidate matches all seventeen supplied-feature oracle fixtures. The
+computed-evidence smooth-transition, ridge, valley, strict hard-fold, plane,
+and cylinder controls also pass, as do the frozen seed-density, alternate-
+diagonal, scale, bounded-noise, and orientation checks. These are bounded CPU
+unit/contract results only; they are not runtime, production-quality,
+performance, parameterization, or novelty evidence.
+
+The preregistered one-dual-step perturbation of every automatic seed does not
+pass: it terminates at a different exact local optimum and exceeds the frozen
+area-weighted variation-of-information limit of `0.01`. The executable
+`LocalRagOneStepSeedPerturbationRefutesFrozenStabilityGate` regression retains
+this failure. In accordance with the global-optimization escalation gate, the
+local candidate is not adopted, its weights and fixtures are not retuned, and
+Slice D is not entered. ARA claim C45 records the bounded refutation;
+`METHOD-040` owns a separately reviewed task-local multicut formulation and
+must not call a pairwise surrogate the unchanged regional/turning energy
+without a proof.
+
 ### Slice A generated oracle catalog
 
 [`Test.CurvaturePatchContract.cpp`](../../../tests/unit/geometry/Test.CurvaturePatchContract.cpp)

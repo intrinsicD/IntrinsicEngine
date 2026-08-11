@@ -18,6 +18,7 @@ outputs:
   - "Slot-aligned edge region-boundary flags plus deterministic face-region and boundary-edge colors"
   - "Candidate GMM, curvature-fit, spatial-energy, connectivity, cleanup, and failure diagnostics"
   - "Standalone slot-aligned hard/soft feature evidence with per-scale transition/ridge/valley responses, thinning/hysteresis decisions, vertex incidence, work counters, and explicit failure diagnostics"
+  - "Unadopted METHOD-039 local-candidate output with provisional/final face regions, seed-growth facts, hard/soft/closure edge roles, regional statistics, exact accepted energy deltas, and explicit failure diagnostics"
 backends:
   - cpu_reference
 metrics:
@@ -55,4 +56,4 @@ known_limitations:
   - "Published region boundaries are inspection data, not materialized cuts or validated UV-atlas seams; METHOD-039 owns the accepted feature/patch follow-up before GEOM-076 may evaluate any later seam/cut/atlas use."
   - "Only a serial CPU reference backend exists, and the smoke result makes no performance or atlas-quality claim."
   - "METHOD-038 retired at CPUContracted after adding a 10k analytic-sphere cold/reusable descriptor pair, one 10k planar continuous-boundary pair, and independently audited non-claim paired-fold plus cylinder/smooth-transition fixture/oracle lanes. It selected no candidate A-D or v2; broader feature/patch implementation and stability evidence are owned by METHOD-039."
-  - "METHOD-039 Slice B implements and tests the standalone CPU feature-evidence stage, but no grow/merge solver, v2 backend token, runtime/config/UI adoption, sealed integrated-quality result, or positive quantitative claim exists yet."
+  - "METHOD-039 Slice C implements an unadopted deterministic local grow/merge/refine candidate and passes its bounded oracle and detector controls, but a one-dual-step seed perturbation exceeds the frozen area-weighted VI limit of 0.01. The local candidate is therefore not an accepted v2 backend; no selector, runtime/config/UI adoption, canonical property publication, sealed integrated-quality result, or positive stability claim exists. METHOD-040 owns the separately scoped global multicut attempt."

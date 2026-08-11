@@ -5,7 +5,10 @@
 #include <cstdint>
 #include <initializer_list>
 #include <limits>
+#include <map>
 #include <numbers>
+#include <optional>
+#include <set>
 #include <span>
 #include <string>
 #include <utility>
@@ -18,6 +21,7 @@
 import Geometry.HalfedgeMesh;
 import Geometry.HalfedgeMesh.Builder;
 import Geometry.HalfedgeMesh.CurvatureSegmentation.Features;
+import Geometry.HalfedgeMesh.CurvatureSegmentation.Patches;
 import Geometry.HalfedgeMesh.Features;
 import Geometry.Properties;
 
@@ -961,6 +965,230 @@ namespace
             + static_cast<std::size_t>((mask >> 1u) & 1u)
             + static_cast<std::size_t>((mask >> 2u) & 1u);
     }
+
+    [[nodiscard]] FeatureDetector::CurvaturePatchParams FixedPatchParams(
+        const std::uint32_t componentCount = 1u)
+    {
+        FeatureDetector::CurvaturePatchParams params{};
+        params.Mixture.SelectionMode =
+            FeatureDetector::ComponentSelectionMode::FixedCount;
+        params.Mixture.FixedComponentCount = componentCount;
+        return params;
+    }
+
+    [[nodiscard]] bool EquivalentPartitions(
+        const Mesh& mesh,
+        const std::span<const std::uint32_t> expected,
+        const std::span<const std::uint32_t> actual)
+    {
+        if (expected.size() != mesh.FacesSize()
+            || actual.size() != mesh.FacesSize())
+        {
+            return false;
+        }
+        for (const FaceHandle a : mesh.LiveFaces())
+        {
+            if (actual[a.Index] == FeatureDetector::kInvalidPatchIndex)
+                return false;
+            for (const FaceHandle b : mesh.LiveFaces())
+            {
+                if ((expected[a.Index] == expected[b.Index])
+                    != (actual[a.Index] == actual[b.Index]))
+                {
+                    return false;
+                }
+            }
+        }
+        return true;
+    }
+
+    [[nodiscard]] double FaceArea(
+        const Mesh& mesh,
+        const FaceHandle face)
+    {
+        std::array<glm::dvec3, 3u> positions{};
+        std::size_t count = 0u;
+        for (const VertexHandle vertex : mesh.VerticesAroundFace(face))
+            positions[count++] = glm::dvec3(mesh.Position(vertex));
+        return 0.5 * glm::length(glm::cross(
+            positions[1u] - positions[0u],
+            positions[2u] - positions[0u]));
+    }
+
+    [[nodiscard]] double AreaWeightedVariationOfInformation(
+        const Mesh& mesh,
+        const std::span<const std::uint32_t> a,
+        const std::span<const std::uint32_t> b)
+    {
+        std::map<std::uint32_t, double> massA;
+        std::map<std::uint32_t, double> massB;
+        std::map<std::pair<std::uint32_t, std::uint32_t>, double> joint;
+        double total = 0.0;
+        for (const FaceHandle face : mesh.LiveFaces())
+        {
+            const double area = FaceArea(mesh, face);
+            total += area;
+            massA[a[face.Index]] += area;
+            massB[b[face.Index]] += area;
+            joint[{a[face.Index], b[face.Index]}] += area;
+        }
+        const auto entropy = [total](const auto& masses)
+        {
+            double value = 0.0;
+            for (const auto& [label, mass] : masses)
+            {
+                static_cast<void>(label);
+                const double probability = mass / total;
+                value -= probability * std::log(probability);
+            }
+            return value;
+        };
+        double mutualInformation = 0.0;
+        for (const auto& [labels, mass] : joint)
+        {
+            const double probability = mass / total;
+            mutualInformation += probability * std::log(
+                probability
+                / ((massA[labels.first] / total)
+                   * (massB[labels.second] / total)));
+        }
+        return std::max(
+            entropy(massA) + entropy(massB)
+                - 2.0 * mutualInformation,
+            0.0);
+    }
+
+    [[nodiscard]] double BoundingDiagonal(const Mesh& mesh)
+    {
+        const double infinity = std::numeric_limits<double>::infinity();
+        glm::dvec3 lower{infinity};
+        glm::dvec3 upper{-infinity};
+        for (const VertexHandle vertex : mesh.LiveVertices())
+        {
+            const glm::dvec3 position{mesh.Position(vertex)};
+            lower = glm::min(lower, position);
+            upper = glm::max(upper, position);
+        }
+        return glm::length(upper - lower);
+    }
+
+    [[nodiscard]] std::vector<glm::dvec3> BoundaryMidpoints(
+        const Mesh& mesh,
+        const std::span<const std::uint8_t> boundaryMask)
+    {
+        std::vector<glm::dvec3> points;
+        for (const EdgeHandle edge : mesh.LiveEdges())
+        {
+            if (boundaryMask[edge.Index] == 0u)
+                continue;
+            const HalfedgeHandle halfedge = mesh.Halfedge(edge, 0u);
+            points.push_back(0.5 * (
+                glm::dvec3(mesh.Position(mesh.FromVertex(halfedge)))
+                + glm::dvec3(mesh.Position(mesh.ToVertex(halfedge)))));
+        }
+        return points;
+    }
+
+    [[nodiscard]] double SymmetricBoundaryDistance(
+        const Mesh& meshA,
+        const std::span<const std::uint8_t> boundaryA,
+        const Mesh& meshB,
+        const std::span<const std::uint8_t> boundaryB)
+    {
+        const std::vector<glm::dvec3> a =
+            BoundaryMidpoints(meshA, boundaryA);
+        const std::vector<glm::dvec3> b =
+            BoundaryMidpoints(meshB, boundaryB);
+        if (a.empty() || b.empty())
+        {
+            return a.empty() && b.empty()
+                ? 0.0
+                : std::numeric_limits<double>::infinity();
+        }
+        const auto directed = [](const auto& from, const auto& to)
+        {
+            double maximum = 0.0;
+            for (const glm::dvec3 point : from)
+            {
+                double nearest = std::numeric_limits<double>::infinity();
+                for (const glm::dvec3 candidate : to)
+                {
+                    nearest = std::min(
+                        nearest, glm::length(point - candidate));
+                }
+                maximum = std::max(maximum, nearest);
+            }
+            return maximum;
+        };
+        return std::max(directed(a, b), directed(b, a));
+    }
+
+    [[nodiscard]] FeatureDetector::PatchBoundaryRole ExpectedPatchRole(
+        const BoundaryRole role) noexcept
+    {
+        switch (role)
+        {
+        case BoundaryRole::None:
+            return FeatureDetector::PatchBoundaryRole::None;
+        case BoundaryRole::HardFeature:
+            return FeatureDetector::PatchBoundaryRole::HardFeature;
+        case BoundaryRole::SoftFeatureSupported:
+            return FeatureDetector::PatchBoundaryRole::SoftFeatureSupported;
+        case BoundaryRole::CurvatureClosure:
+            return FeatureDetector::PatchBoundaryRole::CurvatureClosure;
+        }
+        return FeatureDetector::PatchBoundaryRole::None;
+    }
+
+    [[nodiscard]] std::vector<std::uint32_t>
+    FacesAdjacentToExpectedBoundary(const OracleFixture& fixture)
+    {
+        std::set<std::uint32_t> adjacent;
+        for (const EdgeHandle edge : fixture.Surface.LiveEdges())
+        {
+            const FaceHandle a = fixture.Surface.Face(
+                fixture.Surface.Halfedge(edge, 0u));
+            const FaceHandle b = fixture.Surface.Face(
+                fixture.Surface.Halfedge(edge, 1u));
+            if (!a.IsValid() || !b.IsValid()
+                || fixture.ExpectedPatchByFace[a.Index]
+                    == fixture.ExpectedPatchByFace[b.Index])
+            {
+                continue;
+            }
+            adjacent.insert(a.Index);
+            adjacent.insert(b.Index);
+        }
+        return {adjacent.begin(), adjacent.end()};
+    }
+
+    [[nodiscard]] std::vector<std::uint32_t> PerturbSeedsOneDualStep(
+        const Mesh& mesh,
+        const std::span<const std::uint32_t> seeds)
+    {
+        std::set<std::uint32_t> perturbed;
+        for (const std::uint32_t seedSlot : seeds)
+        {
+            const FaceHandle seed{seedSlot};
+            std::optional<std::uint32_t> neighborSlot;
+            for (const EdgeHandle edge : mesh.LiveEdges())
+            {
+                const FaceHandle a = mesh.Face(mesh.Halfedge(edge, 0u));
+                const FaceHandle b = mesh.Face(mesh.Halfedge(edge, 1u));
+                if (!a.IsValid() || !b.IsValid())
+                    continue;
+                if (a == seed)
+                    neighborSlot = b.Index;
+                else if (b == seed)
+                    neighborSlot = a.Index;
+                else
+                    continue;
+                break;
+            }
+            perturbed.insert(neighborSlot.value_or(seedSlot));
+        }
+        return {perturbed.begin(), perturbed.end()};
+    }
 }
 
 TEST(CurvaturePatchContract,
@@ -992,6 +1220,598 @@ TEST(CurvaturePatchContract,
                 EXPECT_GT(fixture.SoftEdgeConfidence[edge.Index], 0.0);
         }
     }
+}
+
+TEST(CurvaturePatchContract,
+     PatchReferenceMatchesSuppliedFeatureOracleCatalog)
+{
+    std::vector<OracleFixture> fixtures = MakeOracleCatalog();
+    for (OracleFixture& fixture : fixtures)
+    {
+        SCOPED_TRACE(fixture.Id);
+        const FeatureDetector::CurvaturePatchResult result =
+            FeatureDetector::SegmentFeatureAlignedPatches(
+                fixture.Surface,
+                fixture.K1,
+                fixture.K2,
+                {fixture.HardEdgeMask, fixture.SoftEdgeConfidence},
+                FixedPatchParams());
+        ASSERT_TRUE(result.Succeeded())
+            << FeatureDetector::ToString(result.Diagnostics.Status);
+        EXPECT_TRUE(EquivalentPartitions(
+            fixture.Surface,
+            fixture.ExpectedPatchByFace,
+            result.FaceRegions));
+        ASSERT_EQ(
+            result.EdgeBoundaryRoles.size(),
+            fixture.ExpectedBoundaryRole.size());
+        for (const EdgeHandle edge : fixture.Surface.LiveEdges())
+        {
+            EXPECT_EQ(
+                result.EdgeBoundaryRoles[edge.Index],
+                ExpectedPatchRole(
+                    fixture.ExpectedBoundaryRole[edge.Index]))
+                << "edge " << edge.Index;
+        }
+        EXPECT_EQ(result.Diagnostics.FinalNegativeMergeCount, 0u);
+        EXPECT_EQ(
+            result.Diagnostics.FinalRegionCount,
+            *std::max_element(
+                fixture.ExpectedPatchByFace.begin(),
+                fixture.ExpectedPatchByFace.end()) + 1u);
+        ASSERT_FALSE(result.AcceptedEnergyHistory.empty());
+        for (std::size_t i = 1u;
+             i < result.AcceptedEnergyHistory.size();
+             ++i)
+        {
+            EXPECT_LT(
+                result.AcceptedEnergyHistory[i],
+                result.AcceptedEnergyHistory[i - 1u]);
+        }
+    }
+}
+
+TEST(CurvaturePatchContract,
+     PatchGrowthIsDeterministicAndSeedFrontsHaveNoAuthority)
+{
+    OracleFixture plane = MakeGraphGrid(
+        "patch_growth_plane",
+        [](double, double) { return 0.0; },
+        [](double, double) { return glm::dvec2{0.0}; },
+        [](double, double) { return 0u; });
+    std::vector<std::uint32_t> suppliedSeeds;
+    for (const FaceHandle face : plane.Surface.LiveFaces())
+    {
+        if ((face.Index % 23u) == 0u)
+            suppliedSeeds.push_back(face.Index);
+    }
+    ASSERT_GT(suppliedSeeds.size(), 2u);
+    const FeatureDetector::PatchSeedOverrides overrides{
+        suppliedSeeds, true};
+    const FeatureDetector::CurvaturePatchResult first =
+        FeatureDetector::SegmentFeatureAlignedPatches(
+            plane.Surface,
+            plane.K1,
+            plane.K2,
+            {plane.HardEdgeMask, plane.SoftEdgeConfidence},
+            FixedPatchParams(),
+            overrides);
+    const FeatureDetector::CurvaturePatchResult second =
+        FeatureDetector::SegmentFeatureAlignedPatches(
+            plane.Surface,
+            plane.K1,
+            plane.K2,
+            {plane.HardEdgeMask, plane.SoftEdgeConfidence},
+            FixedPatchParams(),
+            overrides);
+    ASSERT_TRUE(first.Succeeded())
+        << FeatureDetector::ToString(first.Diagnostics.Status);
+    ASSERT_TRUE(second.Succeeded());
+    EXPECT_EQ(first.SeedFaceSlots, suppliedSeeds);
+    EXPECT_EQ(first.SeedFaceSlots, second.SeedFaceSlots);
+    EXPECT_EQ(
+        first.ProvisionalFaceRegions,
+        second.ProvisionalFaceRegions);
+    EXPECT_EQ(first.FaceGrowthCosts, second.FaceGrowthCosts);
+    EXPECT_EQ(first.EdgeGrowthFlags, second.EdgeGrowthFlags);
+    EXPECT_EQ(first.FaceRegions, second.FaceRegions);
+    EXPECT_EQ(first.EdgeBoundaryRoles, second.EdgeBoundaryRoles);
+    EXPECT_EQ(
+        first.Diagnostics.ProvisionalRegionCount,
+        suppliedSeeds.size());
+    EXPECT_GT(first.Diagnostics.ProvisionalBoundaryEdgeCount, 0u);
+    EXPECT_EQ(first.Diagnostics.FinalRegionCount, 1u);
+    EXPECT_EQ(first.Diagnostics.FinalBoundaryEdgeCount, 0u);
+    EXPECT_EQ(
+        first.AcceptedMerges.size(), suppliedSeeds.size() - 1u);
+    EXPECT_TRUE(std::ranges::all_of(
+        first.FaceRegions,
+        [](const std::uint32_t region) { return region == 0u; }));
+}
+
+TEST(CurvaturePatchContract,
+     PatchHardBarriersRemainDistinctFromGrowthThroughPublication)
+{
+    OracleFixture fold = MakeFold(60.0, false);
+    const FeatureDetector::CurvaturePatchResult result =
+        FeatureDetector::SegmentFeatureAlignedPatches(
+            fold.Surface,
+            fold.K1,
+            fold.K2,
+            {fold.HardEdgeMask, fold.SoftEdgeConfidence},
+            FixedPatchParams());
+    ASSERT_TRUE(result.Succeeded())
+        << FeatureDetector::ToString(result.Diagnostics.Status);
+    EXPECT_EQ(result.Diagnostics.HardBlockedTransitionCount, 8u);
+    EXPECT_EQ(result.Diagnostics.HardBoundaryEdgeCount, 8u);
+    EXPECT_EQ(result.Diagnostics.FinalRegionCount, 2u);
+    for (const EdgeHandle edge : fold.Surface.LiveEdges())
+    {
+        if (fold.HardEdgeMask[edge.Index] == 0u)
+            continue;
+        const FaceHandle a = fold.Surface.Face(
+            fold.Surface.Halfedge(edge, 0u));
+        const FaceHandle b = fold.Surface.Face(
+            fold.Surface.Halfedge(edge, 1u));
+        ASSERT_TRUE(a.IsValid());
+        ASSERT_TRUE(b.IsValid());
+        EXPECT_NE(
+            result.ProvisionalFaceRegions[a.Index],
+            result.ProvisionalFaceRegions[b.Index]);
+        EXPECT_NE(result.FaceRegions[a.Index], result.FaceRegions[b.Index]);
+        EXPECT_EQ(
+            result.EdgeBoundaryRoles[edge.Index],
+            FeatureDetector::PatchBoundaryRole::HardFeature);
+        EXPECT_TRUE(std::isinf(
+            result.EdgeGrowthTransitionCosts[edge.Index]));
+        EXPECT_TRUE(std::isinf(
+            result.EdgeBoundaryMergeDelta[edge.Index]));
+    }
+}
+
+TEST(CurvaturePatchContract,
+     PatchCurvatureClosureSurvivesWithoutFeatureEvidence)
+{
+    const auto transitionCurvature = [](const double x, double)
+    {
+        const double value = std::tanh(x / 0.05);
+        return glm::dvec2{
+            std::max(value, 0.0), std::min(value, 0.0)};
+    };
+    OracleFixture fixture = MakeGraphGrid(
+        "curvature_closure",
+        [](double, double) { return 0.0; },
+        transitionCurvature,
+        [](const double x, double) { return x >= 0.0 ? 1u : 0u; });
+    const FeatureDetector::CurvaturePatchResult result =
+        FeatureDetector::SegmentFeatureAlignedPatches(
+            fixture.Surface,
+            fixture.K1,
+            fixture.K2,
+            {fixture.HardEdgeMask, fixture.SoftEdgeConfidence},
+            FixedPatchParams(2u));
+    ASSERT_TRUE(result.Succeeded())
+        << FeatureDetector::ToString(result.Diagnostics.Status);
+    EXPECT_TRUE(EquivalentPartitions(
+        fixture.Surface,
+        fixture.ExpectedPatchByFace,
+        result.FaceRegions));
+    EXPECT_EQ(result.Diagnostics.FinalRegionCount, 2u);
+    EXPECT_EQ(result.Diagnostics.HardBoundaryEdgeCount, 0u);
+    EXPECT_EQ(result.Diagnostics.SoftBoundaryEdgeCount, 0u);
+    EXPECT_GT(result.Diagnostics.ClosureBoundaryEdgeCount, 0u);
+    ASSERT_EQ(result.FinalAdjacencies.size(), 1u);
+    EXPECT_FALSE(result.FinalAdjacencies.front().HardBlocked);
+    EXPECT_GT(
+        result.FinalAdjacencies.front().RegionalCostIncrease,
+        0.0);
+    EXPECT_GE(result.FinalAdjacencies.front().DeltaMerge, 0.0);
+    for (const EdgeHandle edge : fixture.Surface.LiveEdges())
+    {
+        if (result.EdgeBoundaries[edge.Index] == 0u)
+            continue;
+        EXPECT_EQ(
+            result.EdgeBoundaryRoles[edge.Index],
+            FeatureDetector::PatchBoundaryRole::CurvatureClosure);
+        EXPECT_GE(result.EdgeBoundaryMergeDelta[edge.Index], 0.0);
+    }
+}
+
+TEST(CurvaturePatchContract,
+     PatchCompletionReplaysWithDetectedFeatureEvidence)
+{
+    for (const bool flipped : {false, true})
+    {
+        std::vector<OracleFixture> fixtures =
+            MakeDetectorControlCatalog(flipped);
+        fixtures.resize(3u);
+        for (OracleFixture& fixture : fixtures)
+        {
+            SCOPED_TRACE(fixture.Id);
+            const FeatureDetector::FeatureEvidenceResult detected =
+                FeatureDetector::DetectFeatureEvidence(
+                    fixture.Surface,
+                    fixture.K1,
+                    fixture.K2,
+                    DetectorParamsFor(fixture));
+            ASSERT_TRUE(detected.Succeeded())
+                << FeatureDetector::ToString(
+                    detected.Diagnostics.Status);
+            const std::vector<std::uint32_t> seeds =
+                FacesAdjacentToExpectedBoundary(fixture);
+            const FeatureDetector::CurvaturePatchResult result =
+                FeatureDetector::SegmentFeatureAlignedPatches(
+                    fixture.Surface,
+                    fixture.K1,
+                    fixture.K2,
+                    detected.View(),
+                    FixedPatchParams(),
+                    {seeds, true});
+            ASSERT_TRUE(result.Succeeded())
+                << FeatureDetector::ToString(result.Diagnostics.Status);
+            EXPECT_TRUE(EquivalentPartitions(
+                fixture.Surface,
+                fixture.ExpectedPatchByFace,
+                result.FaceRegions));
+            EXPECT_EQ(result.Diagnostics.HardBoundaryEdgeCount, 0u);
+            EXPECT_GT(result.Diagnostics.SoftBoundaryEdgeCount, 0u);
+            EXPECT_EQ(result.Diagnostics.ClosureBoundaryEdgeCount, 0u);
+            for (const EdgeHandle edge : fixture.Surface.LiveEdges())
+            {
+                EXPECT_EQ(
+                    result.EdgeBoundaryRoles[edge.Index],
+                    ExpectedPatchRole(
+                        fixture.ExpectedBoundaryRole[edge.Index]));
+            }
+        }
+    }
+}
+
+TEST(CurvaturePatchContract,
+     SuppliedOracleIsolatesPatchCompletionFromCorruptedDetectorEvidence)
+{
+    std::vector<OracleFixture> fixtures = MakeOracleCatalog();
+    auto fixtureIt = std::find_if(
+        fixtures.begin(),
+        fixtures.end(),
+        [](const OracleFixture& fixture)
+        { return fixture.Id == "ridge"; });
+    ASSERT_NE(fixtureIt, fixtures.end());
+    OracleFixture& fixture = *fixtureIt;
+    const std::vector<std::uint32_t> seeds =
+        FacesAdjacentToExpectedBoundary(fixture);
+    const FeatureDetector::PatchSeedOverrides overrides{seeds, true};
+    const FeatureDetector::CurvaturePatchResult oracle =
+        FeatureDetector::SegmentFeatureAlignedPatches(
+            fixture.Surface,
+            fixture.K1,
+            fixture.K2,
+            {fixture.HardEdgeMask, fixture.SoftEdgeConfidence},
+            FixedPatchParams(),
+            overrides);
+    ASSERT_TRUE(oracle.Succeeded());
+    EXPECT_TRUE(EquivalentPartitions(
+        fixture.Surface,
+        fixture.ExpectedPatchByFace,
+        oracle.FaceRegions));
+
+    std::vector<double> corruptedSoft(fixture.Surface.EdgesSize(), 0.0);
+    const FeatureDetector::CurvaturePatchResult corrupted =
+        FeatureDetector::SegmentFeatureAlignedPatches(
+            fixture.Surface,
+            fixture.K1,
+            fixture.K2,
+            {fixture.HardEdgeMask, corruptedSoft},
+            FixedPatchParams(),
+            overrides);
+    ASSERT_TRUE(corrupted.Succeeded());
+    EXPECT_EQ(corrupted.Diagnostics.FinalRegionCount, 1u);
+    EXPECT_NE(oracle.FaceRegions, corrupted.FaceRegions);
+    EXPECT_EQ(corrupted.Diagnostics.FinalBoundaryEdgeCount, 0u);
+}
+
+TEST(CurvaturePatchContract,
+     DetectedHardFoldBlocksWhileDetectedHomogeneousControlsStayWhole)
+{
+    std::vector<OracleFixture> controls;
+    controls.push_back(MakeGraphGrid(
+        "detected_plane",
+        [](double, double) { return 0.0; },
+        [](double, double) { return glm::dvec2{0.0}; },
+        [](double, double) { return 0u; }));
+    controls.push_back(MakeCylinder());
+    for (OracleFixture& fixture : controls)
+    {
+        SCOPED_TRACE(fixture.Id);
+        const FeatureDetector::FeatureEvidenceResult detected =
+            FeatureDetector::DetectFeatureEvidence(
+                fixture.Surface, fixture.K1, fixture.K2);
+        ASSERT_TRUE(detected.Succeeded());
+        const FeatureDetector::CurvaturePatchResult result =
+            FeatureDetector::SegmentFeatureAlignedPatches(
+                fixture.Surface,
+                fixture.K1,
+                fixture.K2,
+                detected.View(),
+                FixedPatchParams());
+        ASSERT_TRUE(result.Succeeded())
+            << FeatureDetector::ToString(result.Diagnostics.Status);
+        EXPECT_EQ(result.Diagnostics.FinalRegionCount, 1u);
+        EXPECT_EQ(result.Diagnostics.FinalBoundaryEdgeCount, 0u);
+    }
+
+    OracleFixture fold = MakeFold(60.0, true);
+    const FeatureDetector::FeatureEvidenceResult detected =
+        FeatureDetector::DetectFeatureEvidence(
+            fold.Surface, fold.K1, fold.K2);
+    ASSERT_TRUE(detected.Succeeded());
+    ASSERT_EQ(detected.Diagnostics.HardFeatureEdgeCount, 8u);
+    const FeatureDetector::CurvaturePatchResult result =
+        FeatureDetector::SegmentFeatureAlignedPatches(
+            fold.Surface,
+            fold.K1,
+            fold.K2,
+            detected.View(),
+            FixedPatchParams());
+    ASSERT_TRUE(result.Succeeded())
+        << FeatureDetector::ToString(result.Diagnostics.Status);
+    EXPECT_EQ(result.Diagnostics.FinalRegionCount, 2u);
+    EXPECT_EQ(result.Diagnostics.HardBoundaryEdgeCount, 8u);
+}
+
+TEST(CurvaturePatchContract,
+     PatchReferenceFailsClosedForMalformedProductionInputs)
+{
+    const Mesh empty;
+    EXPECT_EQ(
+        FeatureDetector::SegmentFeatureAlignedPatches(
+            empty, {}, {}, {}).Diagnostics.Status,
+        FeatureDetector::CurvaturePatchStatus::EmptyMesh);
+
+    OracleFixture fixture = MakeGraphGrid(
+        "production_validation_control",
+        [](double, double) { return 0.0; },
+        [](double, double) { return glm::dvec2{0.0}; },
+        [](double, double) { return 0u; });
+    const auto run = [&](
+                         const std::span<const double> k1,
+                         const std::span<const double> k2,
+                         const FeatureDetector::FeatureEvidenceView evidence,
+                         const FeatureDetector::CurvaturePatchParams& params,
+                         const FeatureDetector::PatchSeedOverrides seeds = {})
+    {
+        return FeatureDetector::SegmentFeatureAlignedPatches(
+                   fixture.Surface, k1, k2, evidence, params, seeds)
+            .Diagnostics.Status;
+    };
+    const FeatureDetector::FeatureEvidenceView validEvidence{
+        fixture.HardEdgeMask, fixture.SoftEdgeConfidence};
+    const FeatureDetector::CurvaturePatchParams validParams =
+        FixedPatchParams();
+
+    EXPECT_EQ(
+        run({}, fixture.K2, validEvidence, validParams),
+        FeatureDetector::CurvaturePatchStatus::CurvatureCountMismatch);
+    EXPECT_EQ(
+        run(
+            fixture.K1,
+            fixture.K2,
+            {{}, fixture.SoftEdgeConfidence},
+            validParams),
+        FeatureDetector::CurvaturePatchStatus::HardEvidenceCountMismatch);
+    EXPECT_EQ(
+        run(
+            fixture.K1,
+            fixture.K2,
+            {fixture.HardEdgeMask, {}},
+            validParams),
+        FeatureDetector::CurvaturePatchStatus::SoftEvidenceCountMismatch);
+
+    FeatureDetector::CurvaturePatchParams invalidParams = validParams;
+    invalidParams.PatchComplexityCost = 0.0;
+    EXPECT_EQ(
+        run(fixture.K1, fixture.K2, validEvidence, invalidParams),
+        FeatureDetector::CurvaturePatchStatus::InvalidParameters);
+
+    const std::array<std::uint32_t, 1u> invalidSeed{
+        static_cast<std::uint32_t>(fixture.Surface.FacesSize())};
+    EXPECT_EQ(
+        run(
+            fixture.K1,
+            fixture.K2,
+            validEvidence,
+            validParams,
+            {invalidSeed, true}),
+        FeatureDetector::CurvaturePatchStatus::InvalidSeedOverride);
+
+    fixture.K1.front() = std::numeric_limits<double>::quiet_NaN();
+    EXPECT_EQ(
+        run(fixture.K1, fixture.K2, validEvidence, validParams),
+        FeatureDetector::CurvaturePatchStatus::NonFiniteCurvature);
+    fixture.K1.front() = 0.0;
+    fixture.K2.front() = 1.0;
+    EXPECT_EQ(
+        run(fixture.K1, fixture.K2, validEvidence, validParams),
+        FeatureDetector::CurvaturePatchStatus::InvalidCurvatureOrder);
+}
+
+TEST(CurvaturePatchContract,
+     PatchPartitionPassesFrozenDensityDiagonalScaleNoiseAndOrientationControls)
+{
+    const auto makeClosure = [](const bool flipped)
+    {
+        return MakeGraphGrid(
+            flipped
+                ? "stability_closure_phase_b"
+                : "stability_closure_phase_a",
+            [](double, double) { return 0.0; },
+            [](const double x, double)
+            {
+                const double value = std::tanh(x / 0.05);
+                return glm::dvec2{
+                    std::max(value, 0.0), std::min(value, 0.0)};
+            },
+            [](const double x, double) { return x >= 0.0 ? 1u : 0u; },
+            {},
+            flipped);
+    };
+
+    std::array<OracleFixture, 2u> fixtures{
+        makeClosure(false), makeClosure(true)};
+    std::array<FeatureDetector::CurvaturePatchResult, 2u> baselines;
+    for (std::size_t phase = 0u; phase < fixtures.size(); ++phase)
+    {
+        OracleFixture& fixture = fixtures[phase];
+        for (const double spacing : {1.5, 2.0, 3.0})
+        {
+            FeatureDetector::CurvaturePatchParams params =
+                FixedPatchParams(2u);
+            params.SeedSpacingMultiplier = spacing;
+            const FeatureDetector::CurvaturePatchResult result =
+                FeatureDetector::SegmentFeatureAlignedPatches(
+                    fixture.Surface,
+                    fixture.K1,
+                    fixture.K2,
+                    {fixture.HardEdgeMask, fixture.SoftEdgeConfidence},
+                    params);
+            ASSERT_TRUE(result.Succeeded())
+                << fixture.Id << ' '
+                << FeatureDetector::ToString(result.Diagnostics.Status);
+            EXPECT_LE(
+                AreaWeightedVariationOfInformation(
+                    fixture.Surface,
+                    fixture.ExpectedPatchByFace,
+                    result.FaceRegions),
+                0.01);
+            if (spacing == 2.0)
+                baselines[phase] = result;
+        }
+    }
+
+    const double projectedDistance = SymmetricBoundaryDistance(
+        fixtures[0u].Surface,
+        baselines[0u].EdgeBoundaries,
+        fixtures[1u].Surface,
+        baselines[1u].EdgeBoundaries);
+    EXPECT_LE(
+        projectedDistance
+            / std::max(
+                BoundingDiagonal(fixtures[0u].Surface),
+                BoundingDiagonal(fixtures[1u].Surface)),
+        0.02);
+
+    OracleFixture& base = fixtures[0u];
+    OracleFixture scaled = base;
+    for (const VertexHandle vertex : scaled.Surface.LiveVertices())
+        scaled.Surface.Position(vertex) *= 3.0f;
+    for (double& value : scaled.K1)
+        value /= 3.0;
+    for (double& value : scaled.K2)
+        value /= 3.0;
+    const FeatureDetector::CurvaturePatchResult scaledResult =
+        FeatureDetector::SegmentFeatureAlignedPatches(
+            scaled.Surface,
+            scaled.K1,
+            scaled.K2,
+            {scaled.HardEdgeMask, scaled.SoftEdgeConfidence},
+            FixedPatchParams(2u));
+    ASSERT_TRUE(scaledResult.Succeeded());
+    EXPECT_TRUE(EquivalentPartitions(
+        scaled.Surface,
+        scaled.ExpectedPatchByFace,
+        scaledResult.FaceRegions));
+
+    std::vector<double> noisyK1 = base.K1;
+    std::vector<double> noisyK2 = base.K2;
+    for (std::size_t vertex = 0u; vertex < noisyK1.size(); ++vertex)
+    {
+        const double noise = 1.0e-3 * std::sin(
+            static_cast<double>(vertex) * 1.61803398875);
+        noisyK1[vertex] += noise;
+        noisyK2[vertex] += noise;
+    }
+    const FeatureDetector::CurvaturePatchResult noisy =
+        FeatureDetector::SegmentFeatureAlignedPatches(
+            base.Surface,
+            noisyK1,
+            noisyK2,
+            {base.HardEdgeMask, base.SoftEdgeConfidence},
+            FixedPatchParams(2u));
+    ASSERT_TRUE(noisy.Succeeded());
+    EXPECT_LE(
+        AreaWeightedVariationOfInformation(
+            base.Surface,
+            base.ExpectedPatchByFace,
+            noisy.FaceRegions),
+        0.01);
+
+    std::vector<double> reversedK1(base.K1.size(), 0.0);
+    std::vector<double> reversedK2(base.K2.size(), 0.0);
+    for (std::size_t vertex = 0u; vertex < base.K1.size(); ++vertex)
+    {
+        reversedK1[vertex] = -base.K2[vertex];
+        reversedK2[vertex] = -base.K1[vertex];
+    }
+    const FeatureDetector::CurvaturePatchResult reversed =
+        FeatureDetector::SegmentFeatureAlignedPatches(
+            base.Surface,
+            reversedK1,
+            reversedK2,
+            {base.HardEdgeMask, base.SoftEdgeConfidence},
+            FixedPatchParams(2u));
+    ASSERT_TRUE(reversed.Succeeded());
+    EXPECT_TRUE(EquivalentPartitions(
+        base.Surface,
+        baselines[0u].FaceRegions,
+        reversed.FaceRegions));
+}
+
+TEST(CurvaturePatchContract,
+     LocalRagOneStepSeedPerturbationRefutesFrozenStabilityGate)
+{
+    OracleFixture fixture = MakeGraphGrid(
+        "local_rag_seed_refutation",
+        [](double, double) { return 0.0; },
+        [](const double x, double)
+        {
+            const double value = std::tanh(x / 0.05);
+            return glm::dvec2{
+                std::max(value, 0.0), std::min(value, 0.0)};
+        },
+        [](const double x, double) { return x >= 0.0 ? 1u : 0u; });
+    const FeatureDetector::CurvaturePatchResult baseline =
+        FeatureDetector::SegmentFeatureAlignedPatches(
+            fixture.Surface,
+            fixture.K1,
+            fixture.K2,
+            {fixture.HardEdgeMask, fixture.SoftEdgeConfidence},
+            FixedPatchParams(2u));
+    ASSERT_TRUE(baseline.Succeeded())
+        << FeatureDetector::ToString(baseline.Diagnostics.Status);
+
+    const std::vector<std::uint32_t> perturbedSeeds =
+        PerturbSeedsOneDualStep(
+            fixture.Surface, baseline.SeedFaceSlots);
+    const FeatureDetector::CurvaturePatchResult perturbed =
+        FeatureDetector::SegmentFeatureAlignedPatches(
+            fixture.Surface,
+            fixture.K1,
+            fixture.K2,
+            {fixture.HardEdgeMask, fixture.SoftEdgeConfidence},
+            FixedPatchParams(2u),
+            {perturbedSeeds, true});
+    ASSERT_TRUE(perturbed.Succeeded())
+        << FeatureDetector::ToString(perturbed.Diagnostics.Status);
+
+    const double variation = AreaWeightedVariationOfInformation(
+        fixture.Surface,
+        fixture.ExpectedPatchByFace,
+        perturbed.FaceRegions);
+    EXPECT_GT(variation, 0.01)
+        << "A passing value would invalidate METHOD-039's recorded local "
+           "solver refutation and require reevaluating its follow-up.";
+    EXPECT_GT(perturbed.Diagnostics.FinalRegionCount, 2u);
+    EXPECT_GT(perturbed.Diagnostics.ClosureBoundaryEdgeCount, 0u);
 }
 
 TEST(CurvaturePatchContract, SharedStrictFoldClassifierMatchesOracle)
