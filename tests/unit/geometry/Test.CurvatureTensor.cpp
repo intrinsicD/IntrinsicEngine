@@ -57,7 +57,12 @@ namespace
     // Open cylindrical tube of radius R, length L along +z, closed in the
     // angular direction and open at the two end rings. Alternating quad
     // diagonals exercise the estimator on an ordinary triangle tessellation.
-    Geometry::HalfedgeMesh::Mesh MakeCylinderTube(double R, double L, int nu, int nv)
+    Geometry::HalfedgeMesh::Mesh MakeCylinderTube(
+        double R,
+        double L,
+        int nu,
+        int nv,
+        bool reversed = false)
     {
         auto onCyl = [&](double th, double z)
         {
@@ -86,6 +91,11 @@ namespace
                 else
                     idx.insert(idx.end(), {a, b, c, b, d, c});
             }
+        }
+        if (reversed)
+        {
+            for (std::size_t i = 0; i < idx.size(); i += 3u)
+                std::swap(idx[i + 1u], idx[i + 2u]);
         }
         auto mesh = MU::BuildHalfedgeMeshFromIndexedTriangles(pos, idx);
         EXPECT_TRUE(mesh.has_value());
@@ -236,6 +246,32 @@ TEST(CurvatureTensor, ReversingOrientationFlipsSignedCurvature)
             inwardField.GaussianCurvatureProperty[vertex],
             1.0e-12);
     }
+}
+
+TEST(CurvatureTensor, ReversingOrientationSwapsAnisotropicOrderedPairs)
+{
+    auto outward = MakeCylinderTube(1.0, 4.0, 48, 24);
+    auto inward = MakeCylinderTube(1.0, 4.0, 48, 24, true);
+    auto outwardResult = Curv::ComputeCurvatureTensor(outward);
+    auto inwardResult = Curv::ComputeCurvatureTensor(inward);
+    ASSERT_TRUE(outwardResult.has_value());
+    ASSERT_TRUE(inwardResult.has_value());
+
+    const VertexHandle vertex{static_cast<PropertyIndex>(12 * 48)};
+    EXPECT_NEAR(
+        outwardResult->MaxPrincipalCurvatureProperty[vertex],
+        -inwardResult->MinPrincipalCurvatureProperty[vertex],
+        1.0e-12);
+    EXPECT_NEAR(
+        outwardResult->MinPrincipalCurvatureProperty[vertex],
+        -inwardResult->MaxPrincipalCurvatureProperty[vertex],
+        1.0e-12);
+    EXPECT_GT(std::abs(glm::dot(
+        outwardResult->PrincipalDir1Property[vertex],
+        inwardResult->PrincipalDir2Property[vertex])), 0.999f);
+    EXPECT_GT(std::abs(glm::dot(
+        outwardResult->PrincipalDir2Property[vertex],
+        inwardResult->PrincipalDir1Property[vertex])), 0.999f);
 }
 
 // =============================================================================

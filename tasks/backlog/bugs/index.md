@@ -9,13 +9,6 @@ The 2026-08-07 Sandbox UI workflow pass (`sculpt.obj` end-to-end through the
 promoted Vulkan build) opened `BUG-137` through `BUG-142`. `BUG-137` is upstream
 of `BUG-140` and of the parameterization rejection recorded in `BUG-141`.
 
-- [`BUG-153` — Restore edge-dihedral Taubin curvature estimation](../../active/BUG-153-curvature-taubin-edge-dihedral-estimator.md):
-  the promoted curvature field uses a one-ring normal-fitting approximation,
-  zeroes every boundary direction, and mixes Meyer scalar curvatures with a
-  separate tensor's directions. Restore the known-good signed edge-dihedral
-  Taubin estimator and prove it through analytic regressions and the live
-  Sandbox on small and large OBJ meshes.
-
 - [`BUG-149` — Benchmark sealer escapes dotted output directories](BUG-149-benchmark-sealer-dotted-output-directory.md):
   `run_and_seal.py` interprets a dotted directory name as a file, seals its
   parent (observed as all of `/tmp`), and can return zero after the sealer
@@ -55,6 +48,15 @@ of `BUG-140` and of the parameterization rejection recorded in `BUG-141`.
   tests run; collect cold/warm/contention evidence and set an explicit,
   evidence-backed discovery policy without weakening per-test timeouts.
 ## Verified / Closed
+
+- Closed 2026-08-11: [`BUG-153` — Restore edge-dihedral Taubin curvature
+  estimation](../../done/BUG-153-curvature-taubin-edge-dihedral-estimator.md).
+  The public full curvature field now uses one signed edge-dihedral/two-ring
+  estimator, supported boundary vertices are no longer blanket-zeroed, and
+  analytic regressions cover scale, orientation, cylinder/saddle directions,
+  degeneracy, and scalar/direction coherence. Live Sandbox runs applied the
+  command to 1,485-vertex bunny and 21,582-vertex armadillo OBJ inputs without
+  publishing a non-finite value.
 
 - Closed 2026-08-11: [`BUG-151` — Work graph cannot advance a declared
   multi-slice task](../../done/BUG-151-work-graph-multi-slice-cycle.md).

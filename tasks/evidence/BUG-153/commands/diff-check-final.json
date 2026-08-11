@@ -1,0 +1,22 @@
+{
+  "command": [
+    "git",
+    "diff",
+    "--check",
+    "origin/main"
+  ],
+  "command_display": "git diff --check origin/main",
+  "cwd": ".",
+  "duration_ms": 18,
+  "exit_code": 0,
+  "finished_at": "2026-08-11T16:21:21Z",
+  "label": "diff-check-final",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-11T16:21:21Z",
+  "stderr_path": "tasks/evidence/BUG-153/commands/diff-check-final.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/BUG-153/commands/diff-check-final.stdout.log",
+  "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "task_id": "BUG-153"
+}

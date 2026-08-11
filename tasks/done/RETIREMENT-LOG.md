@@ -8,6 +8,24 @@ so blocks moved from the old active-README history work verbatim.
 
 ## Retired task narratives
 
+[`BUG-153`](BUG-153-curvature-taubin-edge-dihedral-estimator.md) — the promoted
+mesh-curvature field now uses the framework24 signed interior-edge dihedral
+integral over two-ring support, an oriented tangent-plane decomposition, the
+physically complementary principal directions, and three deterministic
+nonnegative-cotan smoothing passes. `ComputeCurvature` derives mean, Gaussian,
+principal, normal, and direction fields from this one estimator; the standalone
+Meyer scalar operators remain separately available. Supported open-boundary
+vertices are estimated, while invalid or degenerate support fails closed.
+
+The repair retires at `Operational`: analytic regressions cover ordinary
+triangulations, sphere/cylinder/saddle behavior, scale and orientation,
+boundary support, non-finite input, determinism, and full-field coherence; the
+full CPU, ASan, and UBSan gates pass. Live Sandbox runs applied curvature to the
+1,485-vertex decimated bunny and the 21,582-vertex armadillo with zero
+non-finite publications. The promoted Vulkan device remained correctly
+fail-closed at its independent barrier-validation gate, so the live result is
+CPU command/publication evidence rather than a Vulkan capability claim.
+
 [`PROC-033`](PROC-033-source-documentation-contract-and-audit-skill.md) — the
 repository-wide source-documentation contract is operational. Project-owned
 module interfaces and headers now require a short what-and-why synopsis;

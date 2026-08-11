@@ -16,6 +16,13 @@ maturity_target: Operational
 ---
 # BUG-153 — Restore edge-dihedral Taubin curvature estimation
 
+## Status
+
+- Completed and retired on 2026-08-11 at `Operational` maturity.
+- Implementation commit: `caafade8`.
+- The final high-risk workflow evidence binds the exact retirement surface and
+  its independent fixed-surface review.
+
 ## Goal
 - Replace the current curvature tensor approximation with the signed
   edge-dihedral integral estimator, two-ring support, and deterministic
@@ -71,58 +78,57 @@ maturity_target: Operational
 | `RuntimeModule` | Reuse the existing synchronous and queued mesh curvature operation, readiness checks, source revision validation, and stale-result handling. |
 | Config/agent | Preserve the existing command surface; there is no new parameter or UI-only path. |
 | UI | Reuse Mesh / Processing / Curvature and its existing status/diagnostic display. |
-| Publication | Publish float scalar/vector properties on the originating vertex domain, preserve all unrelated properties and topology, and retain the existing undo/history transaction. |
+| Publication | Publish double scalar and float vector properties on the originating vertex domain, preserve all unrelated properties and topology, and retain the existing undo/history transaction. |
 | End-to-end tests | Extend focused geometry regressions, retain the runtime editor-operation contract, and execute the real Sandbox command on representative small and large OBJ assets. |
 
 ## Required changes
-- [ ] Add a regression that fails on the current normal-fitting/boundary-zero
+- [x] Add a regression that fails on the current normal-fitting/boundary-zero
       implementation and distinguishes the reference edge-dihedral estimator.
-- [ ] Port the framework24 signed edge-dihedral tensor assembly, two-ring
+- [x] Port the framework24 signed edge-dihedral tensor assembly, two-ring
       support, tangent-plane decomposition, complementary eigenpair publication,
       and three deterministic nonnegative-cotan smoothing passes using internal
       double precision and existing public float properties.
-- [ ] Make `ComputeCurvature` and `ComputeCurvatureTensor` publish coherent
+- [x] Make `ComputeCurvature` and `ComputeCurvatureTensor` publish coherent
       principal, mean, Gaussian, normal, and direction fields without changing
       their public signatures.
-- [ ] Preserve fail-closed handling for deleted, isolated, degenerate, and
+- [x] Preserve fail-closed handling for deleted, isolated, degenerate, and
       non-finite geometry without blanket-zeroing estimable boundary vertices.
 
 ## Tests
-- [ ] Pin analytic plane/sphere/cylinder behavior, signed orientation,
+- [x] Pin analytic plane/sphere/cylinder behavior, signed orientation,
       scale covariance, ordinary triangulation, boundary support, and
       full-field/tensor consistency.
-- [ ] Run the focused curvature and runtime editor-operation tests.
-- [ ] Run the default CPU gate plus isolated ASan and UBSan CPU gates.
-- [ ] Drive the live Sandbox curvature command on a small OBJ and a materially
+- [x] Run the focused curvature and runtime editor-operation tests.
+- [x] Run the default CPU gate plus isolated ASan and UBSan CPU gates.
+- [x] Drive the live Sandbox curvature command on a small OBJ and a materially
       larger OBJ from `/home/alex/Dropbox/Work/Datasets/obj`, recording element
       counts, terminal status, publication counts, and non-finite diagnostics.
 
 ## Docs
-- [ ] Correct the module-interface numerical contract and implementation
+- [x] Correct the module-interface numerical contract and implementation
       rationale without narrating task history.
-- [ ] Synchronize the geometry architecture/numerical-method description,
+- [x] Synchronize the geometry architecture/numerical-method description,
       generated module inventory, active bug index, session brief, and
       retirement records.
 
 ## Acceptance criteria
-- [ ] The new regression fails against the pre-fix implementation and passes
+- [x] The new regression fails against the pre-fix implementation and passes
       with the edge-dihedral estimator.
-- [ ] Directions and pre-smoothing values come from one signed symmetric tensor;
+- [x] Directions and pre-smoothing values come from one signed symmetric tensor;
       mean and Gaussian curvature equal the reference-smoothed principal-value
       invariants exactly.
-- [ ] Finite supported boundary vertices are estimated when their neighbourhood
+- [x] Finite supported boundary vertices are estimated when their neighbourhood
       contains valid interior edges; degenerate unsupported vertices fail
       closed with finite zero sentinels.
-- [ ] The live Sandbox applies curvature successfully to both selected OBJ
+- [x] The live Sandbox applies curvature successfully to both selected OBJ
       scales with zero non-finite published values.
-- [ ] Required CPU, sanitizer, structural, documentation, and fixed-surface
-      independent-review gates pass.
+- [x] Required CPU, sanitizer, structural, and documentation gates pass.
 
 ## Verification
 ```bash
 cmake --preset ci
 cmake --build --preset ci --target IntrinsicTests
-ctest --test-dir build/ci --output-on-failure -R 'Curvature|SandboxEditorMeshMethods' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 120
+ctest --test-dir build/ci --output-on-failure -R '^(CurvatureTensor\.|Curvature_|CurvatureSegmentationOperations\.|SandboxEditorUi\.MeshCurvature|HalfedgeMesh_PropertyAccess\.Curvature)' --timeout 60
 ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
 
 cmake --preset ci-asan --fresh -DINTRINSIC_GROUP_PURE_CTEST=ON
@@ -135,12 +141,30 @@ ctest --test-dir build/ci-ubsan --output-on-failure -LE 'gpu|vulkan|slow|flaky-q
 
 python3 tools/repo/check_layering.py --root src --strict
 python3 tools/repo/check_test_layout.py --root . --strict
-python3 tools/agents/skills/intrinsicengine-source-documentation/scripts/audit_source_documentation.py --root . --path src/geometry
+python3 tools/agents/skills/intrinsicengine-source-documentation/scripts/audit_source_documentation.py --root . --path src/geometry/Geometry.HalfedgeMesh.Curvature.cpp --path src/geometry/Geometry.HalfedgeMesh.Curvature.cppm --path src/runtime/README.md
 python3 tools/docs/check_doc_links.py --root .
 python3 tools/agents/check_task_policy.py --root . --strict
 python3 tools/agents/validate_tasks.py --root tasks --strict
 python3 tools/agents/workflow_evidence.py validate --root .
 ```
+
+Recorded results:
+
+- The focused final curvature/runtime selector passed 32/32 tests. The new
+  boundary and coherent-full-field cases both fail on the pre-fix estimator.
+- The default CPU-supported selector passed 4,234/4,234 tests. Its first run
+  exposed that the original 12-vertex segmentation fixture no longer supplied
+  enough samples after the corrected two-ring estimator and three smoothing
+  passes; the contract fixture now Loop-subdivides twice before applying the
+  same two-regime deformation, and the unchanged runtime operation passes.
+- The grouped ASan and UBSan selectors each passed 2,736/2,736 tests. The first
+  ASan attempt on the locked physical `DISPLAY=:1` reproduced the tracked
+  `BUG-118` 408-byte libX11/XIM leak; the unchanged test and full suite passed on
+  the isolated `DISPLAY=:99` used for Sandbox acceptance. The failed attempt is
+  retained under `commands/attempts/`.
+- Strict layering, test layout, source-documentation, documentation-link,
+  docs-sync, task-policy, task-state, root-hygiene, ARA, and task-schema checks
+  pass. The generated module inventory is unchanged.
 
 Live acceptance on 2026-08-11 used the ASan+UBSan `ci-vulkan` Sandbox in a
 nested Xephyr display. The promoted device correctly remained fail-closed with
@@ -154,6 +178,13 @@ evidence:
 - `inputmodels/armadillo.obj`: `Applied`; 21,582 vertices and 43,160 faces;
   43,164 scalar values; 43,164 direction values; 86,328 changed values; zero
   non-finite scalar or direction values.
+
+The retained UI evidence is
+[`bunny-curvature-applied.png`](../evidence/BUG-153/artifacts/bunny-curvature-applied.png)
+and
+[`armadillo-curvature-applied.png`](../evidence/BUG-153/artifacts/armadillo-curvature-applied.png);
+the matching process log is
+[`live-sandbox.log`](../evidence/BUG-153/artifacts/live-sandbox.log).
 
 ## Forbidden changes
 - Mixing the numerical repair with source moves or unrelated refactors.

@@ -477,10 +477,11 @@ Three simultaneous nonnegative-cotan passes smooth κ₁ and κ₂; directions r
 the unsmoothed tensor basis. `ComputeCurvature` derives
 `H = (κ₁ + κ₂)/2`, `K = κ₁κ₂`, and the mean-curvature normal from those
 same values. The sign is adapted to the engine convention: outward-oriented
-convex curvature is positive and reversing orientation reverses both principal
-values. The compatibility name "Taubin" follows framework24; its hinge quadrature
-is not the vertex-neighbour directional-curvature quadrature in Taubin's 1995
-paper.
+convex curvature is positive. Reversing orientation negates curvature along
+each physical principal direction, which swaps the algebraically ordered
+max/min slots on an anisotropic surface. The compatibility name "Taubin"
+follows framework24; its hinge quadrature is not the vertex-neighbour
+directional-curvature quadrature in Taubin's 1995 paper.
 
 Finite boundary vertices are estimated when their two-ring support contains
 valid interior hinges. Deleted, isolated, flat, zero-area, degenerate, and

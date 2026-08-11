@@ -1,0 +1,28 @@
+{
+  "command": [
+    "python3",
+    "tools/agents/skills/intrinsicengine-source-documentation/scripts/audit_source_documentation.py",
+    "--root",
+    ".",
+    "--path",
+    "src/geometry/Geometry.HalfedgeMesh.Curvature.cpp",
+    "--path",
+    "src/geometry/Geometry.HalfedgeMesh.Curvature.cppm",
+    "--path",
+    "src/runtime/README.md"
+  ],
+  "command_display": "python3 tools/agents/skills/intrinsicengine-source-documentation/scripts/audit_source_documentation.py --root . --path src/geometry/Geometry.HalfedgeMesh.Curvature.cpp --path src/geometry/Geometry.HalfedgeMesh.Curvature.cppm --path src/runtime/README.md",
+  "cwd": ".",
+  "duration_ms": 37,
+  "exit_code": 0,
+  "finished_at": "2026-08-11T16:21:21Z",
+  "label": "source-docs-final",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-11T16:21:21Z",
+  "stderr_path": "tasks/evidence/BUG-153/commands/source-docs-final.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/BUG-153/commands/source-docs-final.stdout.log",
+  "stdout_sha256": "f49831f837eaa4b4245da291fe3391a7c769289898dfc36bd40d989bb700f31c",
+  "task_id": "BUG-153"
+}

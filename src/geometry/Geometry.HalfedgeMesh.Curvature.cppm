@@ -98,7 +98,9 @@ export namespace Geometry::Curvature
     // so each eigenvalue is paired with the complementary tangent eigenvector.
     // Three deterministic nonnegative-cotan passes smooth the principal values;
     // directions remain the unsmoothed tensor basis. Outward convex curvature is
-    // positive, and reversing mesh orientation reverses both principal values.
+    // positive. Reversing orientation negates curvature along each physical
+    // direction, swapping the algebraically ordered max/min slots when they
+    // differ.
     //
     // Supported boundary vertices use interior hinges in this two-ring support.
     // Deleted, isolated, flat, zero-area, degenerate, or non-finite support fails
