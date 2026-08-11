@@ -1,0 +1,249 @@
+schema_version: 1
+task_id: BUG-151
+workflow_profile: high-risk
+status: complete
+generated_by: tools/agents/workflow_evidence.py
+generated_at: '2026-08-11T01:10:16Z'
+claim_eligible: false
+source:
+  base_ref: 2f1096a88e1d54777544b81c604572a6276a0674
+  base_revision: 2f1096a88e1d54777544b81c604572a6276a0674
+  head_revision: 2d13da5cd9d236edb06c7eca72fda0ee5f8015c3
+  branch: bug-151-work-graph-slice-cycles
+  worktree: /tmp/intrinsic-bug151-worktree
+  dirty: true
+  surface:
+  - path: AGENTS.md
+    sha256: 43b526f8ef8aa8608b7a6c472a9375212f10dfdd8c1d3ae1aabf76e6ae7c0046
+  - path: docs/agent/how-this-repo-is-built.md
+    sha256: 9df36229053513f8896527f0ed70ea7d6127d7417e3f0ca480f8f1201465a8a7
+  - path: docs/agent/prompt/prompt.md
+    sha256: 103b4cfc501c9e84f4560a39aa1c5f1a63e68a9ca74443403f40b77053573464
+  - path: docs/agent/task-format.md
+    sha256: af365afa4a458f8d68d138be6dc11e828ff3d3a69dc4e537665e3bfc894e40b8
+  - path: docs/agent/workflow-evidence.md
+    sha256: 49530fe095356e1e592463fc2a017fcde1efab34bdbf0fecdd0e9c74770c75d9
+  - path: tasks/SESSION-BRIEF.md
+    sha256: f37c4a0efd3ce0eb26103497c9c2bee1fa9800f211ec01c4763ec7e9fdcfb1a1
+  - path: tasks/active/README.md
+    sha256: a9121d398821a2b7f53571345db1297dc36b3b5ca35327e96cb3e0dcd95a9d0b
+  - path: tasks/backlog/bugs/index.md
+    sha256: f103405a16de725968eee6f52e8c866e999d06e29f4e999571937c3dc5626e82
+  - path: tasks/backlog/geometry/README.md
+    sha256: 1c6e592e58bdc4d3b78cb7f87caa2a7a85b8f1f1315b0790ccd6c1a40e535a3c
+  - path: tasks/done/BUG-150-workflow-report-historical-surface-seal.md
+    sha256: aed914e6f88141862e755dea6d9ccce04b7cab296f56db1ccb295dc25e0fb5f1
+  - path: tasks/done/BUG-151-work-graph-multi-slice-cycle.md
+    sha256: 69b79afd9b215e9a3a5bdbab68c06f8d009163e7e89065eb8f57e138c190484c
+  - path: tasks/done/BUG-152-geometry-index-retired-task-state-link.md
+    sha256: ab50cdb897137da7126d2fc1c4a0a476184ea2042e3a65269044a2eea23fd3ad
+  - path: tasks/done/RETIREMENT-LOG.md
+    sha256: e0b1903b10adb8e52c8eaacb57e82c662c2bdd34a49a4c08c252104e5c3c60df
+  - path: tasks/evidence/BUG-150/commands/agent-work-graph-regressions.json
+    sha256: 7d104e1675a702671418d3982cba85c1b51ba68a1244817a16e166cb38339f9b
+  - path: tasks/evidence/BUG-150/commands/agent-work-graph-regressions.stderr.log
+    sha256: ce1080605f81ef803f4ef17f85c5201e21a280cb77942f7b79e8e0b409122411
+  - path: tasks/evidence/BUG-150/commands/agent-work-graph-regressions.stdout.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/BUG-150/commands/docs-links.json
+    sha256: cc4c8821b394b207647eecca4664ce27449c28184872fcf324d3161ebae2df05
+  - path: tasks/evidence/BUG-150/commands/docs-links.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/BUG-150/commands/docs-links.stdout.log
+    sha256: b77055404ea87ebfbeba89da3fe8df17f64ab864d836413091487c7520edfac2
+  - path: tasks/evidence/BUG-150/commands/skill-mirrors.json
+    sha256: 446a49680d458bc384e33ba7904db6c347c5ec0ceeba95a94ab29415f64fc260
+  - path: tasks/evidence/BUG-150/commands/skill-mirrors.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/BUG-150/commands/skill-mirrors.stdout.log
+    sha256: c14ca682f6c91112dbed6bbaeef9198718f728eda8110bc269568305d46c9b58
+  - path: tasks/evidence/BUG-150/commands/strict-task-policy.json
+    sha256: bdd57f0c931e702d4c987daf4e82c31dbd5dd9c7f4d1357cc1000325399f0a13
+  - path: tasks/evidence/BUG-150/commands/strict-task-policy.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/BUG-150/commands/strict-task-policy.stdout.log
+    sha256: d0913af13cd0dace763a27554c71cc73c9321efb2fa1d96af9be170a9555e86d
+  - path: tasks/evidence/BUG-150/commands/task-claim-regressions.json
+    sha256: 1c11d3938b5f58f17b18192991e54a59ccc10db64380d7f213eb5b84ea407e09
+  - path: tasks/evidence/BUG-150/commands/task-claim-regressions.stderr.log
+    sha256: 4a93d666c5c930f62d2f7f2707aae90a0dfad84153eb65626706d5715a771978
+  - path: tasks/evidence/BUG-150/commands/task-claim-regressions.stdout.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/BUG-150/commands/workflow-regressions.json
+    sha256: b0c328455361622ab59af276a062567cc9876224e040966f8888081836c7decd
+  - path: tasks/evidence/BUG-150/commands/workflow-regressions.stderr.log
+    sha256: 9161a0ddf05286b34d521d8f6de1b618f9eeaaa55280b8236bdab6cb00404691
+  - path: tasks/evidence/BUG-150/commands/workflow-regressions.stdout.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/BUG-150/report.yaml
+    sha256: 4c3a99f76f629a290a2665c376c6b94f2b14967379084804d97037a731116022
+  - path: tasks/evidence/BUG-150/seal.yaml
+    sha256: bfec611e206c7b9f21c8a0124d65523e4b65be602a2cc92e3d6b5840b3680dc4
+  - path: tasks/evidence/BUG-150/superseded/pre-seal-global-validation/README.md
+    sha256: 1832b4a92be3431983e21da57acf2c6ad8d13081e261695f935a8bd06c5650c8
+  - path: tasks/evidence/BUG-150/superseded/pre-seal-global-validation/global-workflow-evidence.json
+    sha256: 7788d6085b5c1291205f22be08c905fd8caa419a4b123cfebd757343cb542aad
+  - path: tasks/evidence/BUG-150/superseded/pre-seal-global-validation/global-workflow-evidence.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/BUG-150/superseded/pre-seal-global-validation/global-workflow-evidence.stdout.log
+    sha256: 62cba5eed73cac20ace488acb1ccfb170d2618ff90baea529ae7abbcc7d4c7da
+  - path: tasks/evidence/GEOM-071/seal.yaml
+    sha256: f4027a5843606aa8c83e61070b2e8f28001a4d34b71726f25d249517d59cbfcd
+  - path: tasks/evidence/METHOD-037/seal.yaml
+    sha256: 1621ae785ff6f1736113b8eb6b1ace1a738e310ca359620a473fe55e7066719d
+  - path: tests/regression/tooling/Test.AgentWorkGraph.py
+    sha256: 61c55c7aa1c81ec9b5ade7c0dd09a560cc781d4e8691539bc3d48f51f83aee7e
+  - path: tests/regression/tooling/Test.WorkflowEvidence.py
+    sha256: f79c559794af07e0d98d289be4b9e4a87c25a03fd19b0387fb60baa7b4d0db6e
+  - path: tools/agents/README.md
+    sha256: d219193025db316b3106ea15ceef8bf986f3a82a595a2a9432860bfcfefe1775
+  - path: tools/agents/agent_work_graph.py
+    sha256: b50dbf5e4423f7ffbb94f0b8afabfa5841730d671eea3cee5055627da918c720
+  - path: tools/agents/skills/intrinsicengine-core/references/session-onboarding.md
+    sha256: 103b4cfc501c9e84f4560a39aa1c5f1a63e68a9ca74443403f40b77053573464
+  - path: tools/agents/skills/intrinsicengine-task-workflow/references/task-format.md
+    sha256: 8ac7486ca3cf5f1f720c8564803d5d64b22d5443b7fa6df67669efb173a8a3c1
+  - path: tools/agents/skills/intrinsicengine-task-workflow/references/workflow-evidence.md
+    sha256: 49530fe095356e1e592463fc2a017fcde1efab34bdbf0fecdd0e9c74770c75d9
+  - path: tools/agents/workflow_evidence.py
+    sha256: 610dab823b0c07dac62fff73404ee7e096ed453500c15d43f544115ae5f7ed13
+  content_digest: 47a3ea4a004161814ff2c2086a6719cea45c332f59b805970292feeb1baecafb
+touched:
+  paths:
+  - AGENTS.md
+  - docs/agent/how-this-repo-is-built.md
+  - docs/agent/prompt/prompt.md
+  - docs/agent/task-format.md
+  - docs/agent/workflow-evidence.md
+  - tasks/SESSION-BRIEF.md
+  - tasks/active/README.md
+  - tasks/backlog/bugs/index.md
+  - tasks/backlog/geometry/README.md
+  - tasks/done/BUG-150-workflow-report-historical-surface-seal.md
+  - tasks/done/BUG-151-work-graph-multi-slice-cycle.md
+  - tasks/done/BUG-152-geometry-index-retired-task-state-link.md
+  - tasks/done/RETIREMENT-LOG.md
+  - tasks/evidence/BUG-150/commands/agent-work-graph-regressions.json
+  - tasks/evidence/BUG-150/commands/agent-work-graph-regressions.stderr.log
+  - tasks/evidence/BUG-150/commands/agent-work-graph-regressions.stdout.log
+  - tasks/evidence/BUG-150/commands/docs-links.json
+  - tasks/evidence/BUG-150/commands/docs-links.stderr.log
+  - tasks/evidence/BUG-150/commands/docs-links.stdout.log
+  - tasks/evidence/BUG-150/commands/skill-mirrors.json
+  - tasks/evidence/BUG-150/commands/skill-mirrors.stderr.log
+  - tasks/evidence/BUG-150/commands/skill-mirrors.stdout.log
+  - tasks/evidence/BUG-150/commands/strict-task-policy.json
+  - tasks/evidence/BUG-150/commands/strict-task-policy.stderr.log
+  - tasks/evidence/BUG-150/commands/strict-task-policy.stdout.log
+  - tasks/evidence/BUG-150/commands/task-claim-regressions.json
+  - tasks/evidence/BUG-150/commands/task-claim-regressions.stderr.log
+  - tasks/evidence/BUG-150/commands/task-claim-regressions.stdout.log
+  - tasks/evidence/BUG-150/commands/workflow-regressions.json
+  - tasks/evidence/BUG-150/commands/workflow-regressions.stderr.log
+  - tasks/evidence/BUG-150/commands/workflow-regressions.stdout.log
+  - tasks/evidence/BUG-150/report.yaml
+  - tasks/evidence/BUG-150/seal.yaml
+  - tasks/evidence/BUG-150/superseded/pre-seal-global-validation/README.md
+  - tasks/evidence/BUG-150/superseded/pre-seal-global-validation/global-workflow-evidence.json
+  - tasks/evidence/BUG-150/superseded/pre-seal-global-validation/global-workflow-evidence.stderr.log
+  - tasks/evidence/BUG-150/superseded/pre-seal-global-validation/global-workflow-evidence.stdout.log
+  - tasks/evidence/GEOM-071/seal.yaml
+  - tasks/evidence/METHOD-037/seal.yaml
+  - tests/regression/tooling/Test.AgentWorkGraph.py
+  - tests/regression/tooling/Test.WorkflowEvidence.py
+  - tools/agents/README.md
+  - tools/agents/agent_work_graph.py
+  - tools/agents/skills/intrinsicengine-core/references/session-onboarding.md
+  - tools/agents/skills/intrinsicengine-task-workflow/references/task-format.md
+  - tools/agents/skills/intrinsicengine-task-workflow/references/workflow-evidence.md
+  - tools/agents/workflow_evidence.py
+  layers:
+  - docs
+  - tests
+  - tooling
+  modules: []
+extension_seam: One bounded advance-slice command over the existing JSON/JSONL work-graph state and checked-in
+  review-diamond recipe.
+future_change_plan: Generalize repeated topology only if a second checked-in recipe cannot express its
+  cycle through the existing from-node reset rule.
+acceptance:
+- criterion: METHOD-038 can enter a fresh slice cycle from an exact clean post-repair
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: Prior node attempts, notes, source bindings, and reviewed versus
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: A failed/blocked or partially reviewed cycle cannot use
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: The next slice independently enforces the recipe's original per-node
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: Strict workflow/task/docs validators and the isolated regression suite
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+commands:
+- receipt: tasks/evidence/BUG-151/commands/agent-work-graph-regressions.json
+- receipt: tasks/evidence/BUG-151/commands/diff-check.json
+- receipt: tasks/evidence/BUG-151/commands/docs-links.json
+- receipt: tasks/evidence/BUG-151/commands/docs-sync.json
+- receipt: tasks/evidence/BUG-151/commands/method038-real-transition.json
+- receipt: tasks/evidence/BUG-151/commands/root-hygiene.json
+- receipt: tasks/evidence/BUG-151/commands/skill-mirrors.json
+- receipt: tasks/evidence/BUG-151/commands/strict-task-policy.json
+- receipt: tasks/evidence/BUG-151/commands/task-claim-regressions.json
+- receipt: tasks/evidence/BUG-151/commands/task-state-links.json
+- receipt: tasks/evidence/BUG-151/commands/validate-recipe.json
+- receipt: tasks/evidence/BUG-151/commands/validate-tasks.json
+- receipt: tasks/evidence/BUG-151/commands/workflow-evidence-regressions.json
+changed_public_contracts:
+- Adds auditable multi-slice continuation with exact live-claim, task/profile, recipe, clean-HEAD, lifecycle,
+  reset-region, and acknowledgement checks.
+diagnostics_and_previews:
+- Human and JSON graph status expose source.slice_index; each transition appends the prior projection,
+  disposition, accepted stale reasons, and exact new source.
+benchmark_or_parity_evidence: []
+docs_sync:
+  task_file: tasks/done/BUG-151-work-graph-multi-slice-cycle.md
+  session_brief_present: true
+  canonical_docs_changed: true
+  skill_mirrors_checked: true
+residual_risks:
+- Non-default recipe topologies and concurrent external Git/worktree mutation during the transition were
+  not exercised; all checked-in recipe paths and fail-closed state classes are covered.
+skipped_checks:
+- check: build-and-ctest
+  reason: No C++ source, module, CMake input, compiled test, or runtime behavior changed; 29 Python graph
+    regressions and strict repository validators are the strongest relevant gates.
+- check: gpu-vulkan
+  reason: No engine, graphics, RHI, shader, device, or backend source changed.
+- check: asan-ubsan
+  reason: The change is deterministic Python file/state validation with no C++ allocation, ownership,
+    or lifetime surface.
+- check: benchmark
+  reason: No performance claim or hot production path changed.
+artifacts:
+- path: tasks/done/BUG-151-work-graph-multi-slice-cycle.md
+  sha256: 69b79afd9b215e9a3a5bdbab68c06f8d009163e7e89065eb8f57e138c190484c
+  kind: file
+- path: tasks/evidence/BUG-151/commands/method038-real-transition.json
+  sha256: dc03abe5f75307a0b32c1ea21d4e59d41c894a2e2098b26902365a3e3f51f8fb
+  kind: file
+self_review:
+  completed: true
+  scope_matches_task: true
+  layering_preserved: true
+  tests_and_docs_accounted_for: true
+  mechanical_and_semantic_changes_separated: true
+handoff: tasks/evidence/BUG-151/handoff.jsonl
+review: tasks/evidence/BUG-151/reviews.jsonl

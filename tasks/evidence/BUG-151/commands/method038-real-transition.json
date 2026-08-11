@@ -1,0 +1,21 @@
+{
+  "command": [
+    "python3",
+    "-c",
+    "import json; from pathlib import Path; graph=Path(\"/home/alex/Documents/IntrinsicEngine/.git/intrinsic-agent-work-graphs/v1/METHOD-038.json\"); events=graph.with_name(\"METHOD-038.events.jsonl\"); state=json.loads(graph.read_text()); event=json.loads(events.read_text().splitlines()[-1]); assert state[\"run_id\"] == \"method-038-20260810T164302Z\"; assert state[\"source\"][\"slice_index\"] == 2; assert state[\"source\"][\"base_revision\"] == \"0775b3049bf72fb81f502c385ff0db0747c8e9d5\"; assert state[\"source\"][\"surface_at_start\"] == []; assert state[\"nodes\"][\"plan\"][\"status\"] == \"ready\" and state[\"nodes\"][\"plan\"][\"attempts\"] == 0; assert state[\"nodes\"][\"implement\"][\"status\"] == \"pending\" and state[\"nodes\"][\"implement\"][\"attempts\"] == 0; assert event[\"event\"] == \"slice_advanced\" and event[\"sequence\"] == 28; assert event[\"prior_disposition\"] == \"rolled-forward-before-review\"; assert event[\"accepted_pre_review_checkpoint\"] is True; assert event[\"accepted_stale_reasons\"] == [\"review source binding is stale\"]; assert event[\"new_source\"] == state[\"source\"]; print(json.dumps({\"run_id\": state[\"run_id\"], \"slice_index\": state[\"source\"][\"slice_index\"], \"base_revision\": state[\"source\"][\"base_revision\"], \"plan\": state[\"nodes\"][\"plan\"], \"event_sequence\": event[\"sequence\"], \"prior_disposition\": event[\"prior_disposition\"], \"accepted_stale_reasons\": event[\"accepted_stale_reasons\"]}, sort_keys=True))"
+  ],
+  "command_display": "python3 -c 'import json; from pathlib import Path; graph=Path(\"/home/alex/Documents/IntrinsicEngine/.git/intrinsic-agent-work-graphs/v1/METHOD-038.json\"); events=graph.with_name(\"METHOD-038.events.jsonl\"); state=json.loads(graph.read_text()); event=json.loads(events.read_text().splitlines()[-1]); assert state[\"run_id\"] == \"method-038-20260810T164302Z\"; assert state[\"source\"][\"slice_index\"] == 2; assert state[\"source\"][\"base_revision\"] == \"0775b3049bf72fb81f502c385ff0db0747c8e9d5\"; assert state[\"source\"][\"surface_at_start\"] == []; assert state[\"nodes\"][\"plan\"][\"status\"] == \"ready\" and state[\"nodes\"][\"plan\"][\"attempts\"] == 0; assert state[\"nodes\"][\"implement\"][\"status\"] == \"pending\" and state[\"nodes\"][\"implement\"][\"attempts\"] == 0; assert event[\"event\"] == \"slice_advanced\" and event[\"sequence\"] == 28; assert event[\"prior_disposition\"] == \"rolled-forward-before-review\"; assert event[\"accepted_pre_review_checkpoint\"] is True; assert event[\"accepted_stale_reasons\"] == [\"review source binding is stale\"]; assert event[\"new_source\"] == state[\"source\"]; print(json.dumps({\"run_id\": state[\"run_id\"], \"slice_index\": state[\"source\"][\"slice_index\"], \"base_revision\": state[\"source\"][\"base_revision\"], \"plan\": state[\"nodes\"][\"plan\"], \"event_sequence\": event[\"sequence\"], \"prior_disposition\": event[\"prior_disposition\"], \"accepted_stale_reasons\": event[\"accepted_stale_reasons\"]}, sort_keys=True))'",
+  "cwd": ".",
+  "duration_ms": 16,
+  "exit_code": 0,
+  "finished_at": "2026-08-11T00:59:02Z",
+  "label": "method038-real-transition",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-11T00:59:02Z",
+  "stderr_path": "tasks/evidence/BUG-151/commands/method038-real-transition.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/BUG-151/commands/method038-real-transition.stdout.log",
+  "stdout_sha256": "c72c845d4a7b9747deb11ed837c34bbba19d6994d5d7d6ecac95515b27ec32a7",
+  "task_id": "BUG-151"
+}

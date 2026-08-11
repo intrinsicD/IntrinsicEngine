@@ -1,0 +1,20 @@
+{
+  "command": [
+    "python3",
+    "tests/regression/tooling/Test.AgentWorkGraph.py"
+  ],
+  "command_display": "python3 tests/regression/tooling/Test.AgentWorkGraph.py",
+  "cwd": ".",
+  "duration_ms": 32999,
+  "exit_code": 0,
+  "finished_at": "2026-08-11T00:53:15Z",
+  "label": "agent-work-graph-regressions",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-11T00:52:42Z",
+  "stderr_path": "tasks/evidence/BUG-151/commands/agent-work-graph-regressions.stderr.log",
+  "stderr_sha256": "d5e23db64206ccd6957de88e5e73f74b4202ac9870a1a784addac46a2d6c46b7",
+  "stdout_path": "tasks/evidence/BUG-151/commands/agent-work-graph-regressions.stdout.log",
+  "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "task_id": "BUG-151"
+}
