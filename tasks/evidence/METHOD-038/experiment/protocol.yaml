@@ -1,0 +1,224 @@
+schema_version: 2
+task_id: METHOD-038
+protocol_id: curvature-segmentation-fold-controls-scratch-v3
+profile: claim-grade
+state: frozen
+question: Does the deterministic paired-diagonal fold-control harness honor the frozen strict 45-degree
+  feature threshold at 30, 45, and 60 degrees, preserve edge lengths under folding, and leave the constant-curvature
+  cpu_reference_v1 payload unchanged from the flat control?
+hypothesis: Both triangulations classify zero crease edges at 30 and 45 degrees and exactly 24 crease
+  edges at 60 degrees, with zero edge-mask mismatch, at most 1e-6 bbox-normalized edge-length delta, three
+  exercised variants, and for every variant one v1 component, one connected region, zero v1 boundary edges,
+  and byte-equivalent published v1 payloads relative to its flat control.
+claim_boundary: This is non-claim-eligible scratch evidence for one deterministic 24-by-48 analytic fold
+  triplet, two diagonal patterns, one strict 45-degree classifier setting, and the serial cpu_reference_v1
+  constant-curvature negative control. It establishes fixture and oracle integrity only; it makes no candidate
+  A-D selection, v2 formulation, broad-corpus, confirmation, convergence, remeshing-stability, performance,
+  runtime/UI, Vulkan, GPU, or production claim.
+evidence_phase: scratch
+claim_eligible: false
+datasets:
+- id: fold-threshold-triplet-paired-diagonals-v1
+  path: benchmarks/runners/CurvatureSegmentationProfileRunner.cpp
+  sha256: 5aae9b8e7d4eb06075c20c70a81a331d900140cb2e6f55427142238e24cb7f81
+  split: scratch
+disjoint_splits: []
+seeds:
+- 1723
+input_policy: Use only the committed 24-by-48 fold generator, diagonal_a and diagonal_b, dihedrals 30/45/60
+  degrees, strict greater-than 45-degree threshold, boundary_is_feature false, constant supplied K1=1
+  and K2=0, and fixed one-component cpu_reference_v1 parameters. Seed 1723 is retained as the declared
+  screening-corpus custody identity even though this deterministic control consumes no random numbers.
+  Preserve every observed failure; do not retune angles, threshold semantics, triangulations, mesh resolution,
+  curvature values, fixture coordinates, or gates from this run.
+comparators:
+- id: diagonal-a-versus-diagonal-b
+  budget: identical rows, columns, angles, classifier parameters, curvature descriptors, and serial CPU
+    backend
+- id: folded-versus-flat-v1-negative-control
+  budget: identical topology, diagonal pattern, constant curvature descriptors, fixed-one parameters,
+    and serial CPU backend
+primary_metrics:
+- name: feature_mask_error
+  direction: minimize
+  unit: maximum-live-edge-mismatch-fraction
+  statistical_unit: fold-triplet-paired-diagonals
+- name: isometry_error
+  direction: minimize
+  unit: bbox-normalized-flat-fold-edge-length-delta
+  statistical_unit: fold-triplet-paired-diagonals
+- name: variant_population
+  direction: target
+  unit: exercised-dihedral-variants
+  statistical_unit: fold-control-run
+- name: classified_count_error
+  direction: minimize
+  unit: maximum-absolute-edge-count-error
+  statistical_unit: six-angle-diagonal-cells
+- name: expected_count_error
+  direction: minimize
+  unit: maximum-absolute-oracle-edge-count-error
+  statistical_unit: three-dihedral-variants
+- name: v1_component_deviation
+  direction: minimize
+  unit: maximum-absolute-count-deviation-from-one
+  statistical_unit: three-dihedral-variants
+- name: v1_region_deviation
+  direction: minimize
+  unit: maximum-absolute-count-deviation-from-one
+  statistical_unit: three-dihedral-variants
+- name: v1_boundary_count
+  direction: minimize
+  unit: maximum-published-boundary-edge-count
+  statistical_unit: three-dihedral-variants
+- name: v1_flat_mismatch_count
+  direction: minimize
+  unit: mismatching-dihedral-variants
+  statistical_unit: three-dihedral-variants
+- name: variant_failure_count
+  direction: minimize
+  unit: failed-dihedral-variants
+  statistical_unit: three-dihedral-variants
+- name: benchmark_failure_count
+  direction: minimize
+  unit: failed-sealed-benchmark-results
+  statistical_unit: fold-control-run
+statistical_tests:
+- name: deterministic-exact-oracle-controls
+  alpha: null
+- name: deterministic-descriptive-isometry-bound
+  alpha: null
+summaries:
+- name: feature_mask_error
+  column: feature_mask_error
+  statistic: mean
+- name: isometry_error
+  column: isometry_error
+  statistic: mean
+- name: variant_population
+  column: variant_population
+  statistic: mean
+- name: classified_count_error
+  column: classified_count_error
+  statistic: mean
+- name: expected_count_error
+  column: expected_count_error
+  statistic: mean
+- name: v1_component_deviation
+  column: v1_component_deviation
+  statistic: mean
+- name: v1_region_deviation
+  column: v1_region_deviation
+  statistic: mean
+- name: v1_boundary_count
+  column: v1_boundary_count
+  statistic: mean
+- name: v1_flat_mismatch_count
+  column: v1_flat_mismatch_count
+  statistic: mean
+- name: variant_failure_count
+  column: variant_failure_count
+  statistic: mean
+- name: benchmark_failure_count
+  column: benchmark_failure_count
+  statistic: mean
+killing_gates:
+- metric: feature_mask_error
+  operator: <=
+  threshold: 0.0
+- metric: isometry_error
+  operator: <=
+  threshold: 1.0e-06
+- metric: variant_population
+  operator: ==
+  threshold: 3
+- metric: classified_count_error
+  operator: <=
+  threshold: 0
+- metric: expected_count_error
+  operator: <=
+  threshold: 0
+- metric: v1_component_deviation
+  operator: <=
+  threshold: 0
+- metric: v1_region_deviation
+  operator: <=
+  threshold: 0
+- metric: v1_boundary_count
+  operator: <=
+  threshold: 0
+- metric: v1_flat_mismatch_count
+  operator: <=
+  threshold: 0
+- metric: variant_failure_count
+  operator: <=
+  threshold: 0
+- metric: benchmark_failure_count
+  operator: <=
+  threshold: 0
+screening_confirmation_policy: This scratch run may validate only the control fixture and measurement
+  lane. It cannot select or reject candidate A-D and cannot authorize a scientific or production claim.
+  Formal candidate screening and its disjoint held-out confirmation remain separate future frozen protocols
+  using the corpus and seeds declared in feature_aligned_intake.md; no confirmation input may be inspected
+  while adapting a screening candidate.
+resources:
+  cpu_threads: 1
+  gpu: false
+command:
+- /bin/bash
+- -o
+- pipefail
+- -c
+- set -eu; CCACHE_DISABLE=1 cmake --build --preset ci --target IntrinsicCurvatureSegmentationProfile --parallel
+  2; result_root=build/ci/custody/METHOD-038-scratch-006-raw; producer_status=0; env INTRINSIC_CURVATURE_PROFILE_COHORT=screening
+  GIT_COMMIT=f622cd0e50229a77564173f0a3afea5e66c96a95 python3 tools/benchmark/run_and_seal.py --executable
+  build/ci/bin/IntrinsicCurvatureSegmentationProfile --output "$result_root" --manifests-root benchmarks
+  --run-id method-038-scratch-006 --attempt-id attempt-006 || producer_status=$?; test "$producer_status"
+  -eq 0 -o "$producer_status" -eq 1; python3 tools/benchmark/validate_benchmark_results.py --root "$result_root"
+  --manifests-root benchmarks --strict; input_root=tasks/evidence/METHOD-038/experiment/inputs; run_root=tasks/evidence/METHOD-038/experiment/runs/scratch-006;
+  mkdir -p "$input_root"; cp "$result_root/geometry.curvature_segmentation.screening.fold_controls.json"
+  "$input_root/fold_controls_benchmark_result.json"; jq -c --argjson expected '[0,0,24]' '{feature_mask_error:.metrics.quality_error_l2,isometry_error:.metrics.quality_error_linf,variant_population:.metrics.population_count,classified_count_error:([range(0;3)
+  as $i | range(0;2) as $j | ((.diagnostics.variants[$i].classified_feature_edge_counts[$j] - $expected[$i])
+  | if . < 0 then -. else . end)] | max),expected_count_error:([range(0;3) as $i | ((.diagnostics.variants[$i].expected_feature_edge_count
+  - $expected[$i]) | if . < 0 then -. else . end)] | max),v1_component_deviation:([.diagnostics.variants[].v1_selected_component_count
+  | ((. - 1) | if . < 0 then -. else . end)] | max),v1_region_deviation:([.diagnostics.variants[].v1_connected_region_count
+  | ((. - 1) | if . < 0 then -. else . end)] | max),v1_boundary_count:([.diagnostics.variants[].v1_boundary_edge_count]
+  | max),v1_flat_mismatch_count:([.diagnostics.variants[].v1_matches_flat_control | if . then 0 else 1
+  end] | add),variant_failure_count:([.diagnostics.variants[].passed | if . then 0 else 1 end] | add),benchmark_failure_count:(if
+  .execution_status == "passed" and .status == "passed" then 0 else 1 end)}' "$input_root/fold_controls_benchmark_result.json"
+  > "$run_root/raw_rows.jsonl"; jq -e '.benchmark_id == "geometry.curvature_segmentation.screening.fold_controls"
+  and .diagnostics.implementation_version == "slice_a_control_v1" and .diagnostics.candidate_selection
+  == "none"' "$input_root/fold_controls_benchmark_result.json" >/dev/null
+expected_artifacts:
+- tasks/evidence/METHOD-038/experiment/inputs/fold_controls_benchmark_result.json
+- tasks/evidence/METHOD-038/experiment/runs/scratch-006/raw_rows.jsonl
+- tasks/evidence/METHOD-038/experiment/runs/scratch-006/bundle.yaml
+blockers: []
+source:
+  revision: f622cd0e50229a77564173f0a3afea5e66c96a95
+  clean: true
+config:
+  path: benchmarks/geometry/manifests/curvature_segmentation_screening_fold_controls.yaml
+  sha256: e9898e9aa8d4f0a4b373f5a1a31e3e9a10aaa25014ca8bb104f9f7e2a6aecf53
+environment:
+  path: CMakePresets.json
+  sha256: d852b3973bf46f499f592379e17990c5b1f8c14b8aa565bd07e92a64347a0bba
+implementation:
+- path: benchmarks/runners/CurvatureSegmentationProfileRunner.cpp
+  sha256: 5aae9b8e7d4eb06075c20c70a81a331d900140cb2e6f55427142238e24cb7f81
+- path: src/geometry/Geometry.HalfedgeMesh.cppm
+  sha256: 99b267d2089e8e47dce8e24148ea8a78bda7ae2ac906332303e841dd19938e30
+- path: src/geometry/Geometry.HalfedgeMesh.cpp
+  sha256: 3901d502b311c047e5c1efadcbba42fba511accac3f3bc943f571628b10c7c30
+- path: src/geometry/Geometry.HalfedgeMesh.Features.cppm
+  sha256: 1cc864ccdd3867df3b7a63d98b880664da1fdf401ca0f782850c0b2001f6d807
+- path: src/geometry/Geometry.HalfedgeMesh.Features.cpp
+  sha256: a4bb2c68b92b31a2302c36262e0f8a1c2489034f3b5f699b01d3a13f7e51dd9e
+- path: src/geometry/Geometry.HalfedgeMesh.CurvatureSegmentation.cppm
+  sha256: 01b5a4cac7c1bfda0870a406e2866d3fa98c0b554b42104607818f94f2f35840
+- path: src/geometry/Geometry.HalfedgeMesh.CurvatureSegmentation.cpp
+  sha256: 84b9df2fec8b320a802f53b3ff4271e1ac804c97e0681a49c9af936f668ac1cc
+- path: benchmarks/CMakeLists.txt
+  sha256: 552a31dd8853b60631b92d3a7f972a5c2a8334f64447914c651ebcea41ee3e28
+frozen_at: '2026-08-11T02:17:17Z'
+protocol_digest: 5463dd72aa4aeb4c931df804444b1bc2469ea2fa8a25ee3bfd214d21c14b3af0

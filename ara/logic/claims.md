@@ -1269,10 +1269,10 @@
   component/region/boundary/payload control.
 - **Proof**: [benchmarks/runners/CurvatureSegmentationProfileRunner.cpp,
   benchmarks/geometry/manifests/curvature_segmentation_screening_fold_controls.yaml,
-  tasks/evidence/METHOD-038/superseded/20260811-fold-screening-task-status-advance/experiment/protocol.yaml,
-  tasks/evidence/METHOD-038/superseded/20260811-fold-screening-task-status-advance/experiment/inputs/fold_controls_benchmark_result.json,
-  tasks/evidence/METHOD-038/superseded/20260811-fold-screening-task-status-advance/experiment/runs/scratch-005/bundle.yaml,
-  tasks/evidence/METHOD-038/superseded/20260811-fold-screening-task-status-advance/experiment/runs/scratch-005/audit.json]
+  tasks/evidence/METHOD-038/experiment/protocol.yaml,
+  tasks/evidence/METHOD-038/experiment/inputs/fold_controls_benchmark_result.json,
+  tasks/evidence/METHOD-038/experiment/runs/scratch-006/bundle.yaml,
+  tasks/evidence/METHOD-038/experiment/runs/scratch-006/audit.json]
 - **Dependencies**: [C38, C39]
 - **Tags**: geometry, curvature segmentation, sharp features, isometric fold,
   CPU reference, fixture control, scratch, bounded result

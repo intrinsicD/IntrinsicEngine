@@ -1,0 +1,54 @@
+schema_version: 1
+task_id: METHOD-038
+run_id: scratch-006
+attempt_id: attempt-006
+status: initialized
+initialized_at: '2026-08-11T02:17:17Z'
+claim_eligible: false
+protocol_path: tasks/evidence/METHOD-038/experiment/protocol.yaml
+protocol_digest: 5463dd72aa4aeb4c931df804444b1bc2469ea2fa8a25ee3bfd214d21c14b3af0
+task_path: tasks/active/METHOD-038-feature-aligned-remeshing-stable-curvature-segmentation.md
+task_sha256: 2ee756913e29553639891bd223ed54e3a2a2c5b5372d4a04a0477525b11c5af0
+source:
+  revision: f622cd0e50229a77564173f0a3afea5e66c96a95
+  clean: true
+config:
+  path: benchmarks/geometry/manifests/curvature_segmentation_screening_fold_controls.yaml
+  sha256: e9898e9aa8d4f0a4b373f5a1a31e3e9a10aaa25014ca8bb104f9f7e2a6aecf53
+environment:
+  path: CMakePresets.json
+  sha256: d852b3973bf46f499f592379e17990c5b1f8c14b8aa565bd07e92a64347a0bba
+datasets:
+- id: fold-threshold-triplet-paired-diagonals-v1
+  path: benchmarks/runners/CurvatureSegmentationProfileRunner.cpp
+  sha256: 5aae9b8e7d4eb06075c20c70a81a331d900140cb2e6f55427142238e24cb7f81
+  split: scratch
+implementation_digest: a6612fcda2e373e961f9dd1e90c29e317126fdc0980de31a0dcbc75c963ba4ff
+command:
+- /bin/bash
+- -o
+- pipefail
+- -c
+- set -eu; CCACHE_DISABLE=1 cmake --build --preset ci --target IntrinsicCurvatureSegmentationProfile --parallel
+  2; result_root=build/ci/custody/METHOD-038-scratch-006-raw; producer_status=0; env INTRINSIC_CURVATURE_PROFILE_COHORT=screening
+  GIT_COMMIT=f622cd0e50229a77564173f0a3afea5e66c96a95 python3 tools/benchmark/run_and_seal.py --executable
+  build/ci/bin/IntrinsicCurvatureSegmentationProfile --output "$result_root" --manifests-root benchmarks
+  --run-id method-038-scratch-006 --attempt-id attempt-006 || producer_status=$?; test "$producer_status"
+  -eq 0 -o "$producer_status" -eq 1; python3 tools/benchmark/validate_benchmark_results.py --root "$result_root"
+  --manifests-root benchmarks --strict; input_root=tasks/evidence/METHOD-038/experiment/inputs; run_root=tasks/evidence/METHOD-038/experiment/runs/scratch-006;
+  mkdir -p "$input_root"; cp "$result_root/geometry.curvature_segmentation.screening.fold_controls.json"
+  "$input_root/fold_controls_benchmark_result.json"; jq -c --argjson expected '[0,0,24]' '{feature_mask_error:.metrics.quality_error_l2,isometry_error:.metrics.quality_error_linf,variant_population:.metrics.population_count,classified_count_error:([range(0;3)
+  as $i | range(0;2) as $j | ((.diagnostics.variants[$i].classified_feature_edge_counts[$j] - $expected[$i])
+  | if . < 0 then -. else . end)] | max),expected_count_error:([range(0;3) as $i | ((.diagnostics.variants[$i].expected_feature_edge_count
+  - $expected[$i]) | if . < 0 then -. else . end)] | max),v1_component_deviation:([.diagnostics.variants[].v1_selected_component_count
+  | ((. - 1) | if . < 0 then -. else . end)] | max),v1_region_deviation:([.diagnostics.variants[].v1_connected_region_count
+  | ((. - 1) | if . < 0 then -. else . end)] | max),v1_boundary_count:([.diagnostics.variants[].v1_boundary_edge_count]
+  | max),v1_flat_mismatch_count:([.diagnostics.variants[].v1_matches_flat_control | if . then 0 else 1
+  end] | add),variant_failure_count:([.diagnostics.variants[].passed | if . then 0 else 1 end] | add),benchmark_failure_count:(if
+  .execution_status == "passed" and .status == "passed" then 0 else 1 end)}' "$input_root/fold_controls_benchmark_result.json"
+  > "$run_root/raw_rows.jsonl"; jq -e '.benchmark_id == "geometry.curvature_segmentation.screening.fold_controls"
+  and .diagnostics.implementation_version == "slice_a_control_v1" and .diagnostics.candidate_selection
+  == "none"' "$input_root/fold_controls_benchmark_result.json" >/dev/null
+cell_journal: tasks/evidence/METHOD-038/experiment/runs/scratch-006/cells.jsonl
+bundle: tasks/evidence/METHOD-038/experiment/runs/scratch-006/bundle.yaml
+audit: tasks/evidence/METHOD-038/experiment/runs/scratch-006/audit.json

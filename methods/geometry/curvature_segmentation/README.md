@@ -120,16 +120,16 @@ accepted the bundle derivation while leaving `claim_authorized: false` (ARA
 C41). This is a bounded negative fixture result, not a curved-surface geodesic,
 refinement-convergence, performance, or candidate-v2 result.
 
-The accepted non-claim-eligible
-[`scratch-005` fold protocol](../../../tasks/evidence/METHOD-038/superseded/20260811-fold-screening-task-status-advance/experiment/protocol.yaml),
-[`sealed result`](../../../tasks/evidence/METHOD-038/superseded/20260811-fold-screening-task-status-advance/experiment/inputs/fold_controls_benchmark_result.json),
-[`bundle`](../../../tasks/evidence/METHOD-038/superseded/20260811-fold-screening-task-status-advance/experiment/runs/scratch-005/bundle.yaml),
+The live non-claim-eligible
+[`scratch-006` fold protocol](../../../tasks/evidence/METHOD-038/experiment/protocol.yaml),
+[`sealed result`](../../../tasks/evidence/METHOD-038/experiment/inputs/fold_controls_benchmark_result.json),
+[`bundle`](../../../tasks/evidence/METHOD-038/experiment/runs/scratch-006/bundle.yaml),
 and independent
-[`audit`](../../../tasks/evidence/METHOD-038/superseded/20260811-fold-screening-task-status-advance/experiment/runs/scratch-005/audit.json)
+[`audit`](../../../tasks/evidence/METHOD-038/experiment/runs/scratch-006/audit.json)
 remain fixture/oracle integrity evidence only. The earlier `scratch-004`
-schema rejection is preserved separately. Live identity `scratch-006` is
-reserved for the unchanged final task-bound replay after this status update;
-neither historical run is reinterpreted against the later task hash.
+schema rejection and accepted pre-status `scratch-005` replay are preserved
+separately; neither historical run is reinterpreted against the final task
+hash.
 
 There is no selected v2, optimized, or GPU backend. The output is deliberately
 non-destructive and makes no atlas-quality claim. `GEOM-076` owns the later,

@@ -1,0 +1,163 @@
+{
+  "attempt_id": "attempt-006",
+  "audited_at": "2026-08-11T02:34:11Z",
+  "audited_revision": "f622cd0e50229a77564173f0a3afea5e66c96a95",
+  "auditor_label": "codex-method038-fold-auditor-20260811-r2",
+  "bundle_path": "tasks/evidence/METHOD-038/experiment/runs/scratch-006/bundle.yaml",
+  "bundle_sha256": "2afb345785e0fc94ab3bf285780de7ca7b1f5133febd1d6f5f9161fb7da677e8",
+  "claim_authorized": false,
+  "disposition": "accepted",
+  "driver_label": "codex-root",
+  "errors": [],
+  "identity_assurance": "cooperative-label-only",
+  "recomputed_gates": [
+    {
+      "metric": "feature_mask_error",
+      "observed": 0.0,
+      "operator": "<=",
+      "passed": true,
+      "threshold": 0.0
+    },
+    {
+      "metric": "isometry_error",
+      "observed": 3.8e-08,
+      "operator": "<=",
+      "passed": true,
+      "threshold": 1e-06
+    },
+    {
+      "metric": "variant_population",
+      "observed": 3.0,
+      "operator": "==",
+      "passed": true,
+      "threshold": 3
+    },
+    {
+      "metric": "classified_count_error",
+      "observed": 0.0,
+      "operator": "<=",
+      "passed": true,
+      "threshold": 0
+    },
+    {
+      "metric": "expected_count_error",
+      "observed": 0.0,
+      "operator": "<=",
+      "passed": true,
+      "threshold": 0
+    },
+    {
+      "metric": "v1_component_deviation",
+      "observed": 0.0,
+      "operator": "<=",
+      "passed": true,
+      "threshold": 0
+    },
+    {
+      "metric": "v1_region_deviation",
+      "observed": 0.0,
+      "operator": "<=",
+      "passed": true,
+      "threshold": 0
+    },
+    {
+      "metric": "v1_boundary_count",
+      "observed": 0.0,
+      "operator": "<=",
+      "passed": true,
+      "threshold": 0
+    },
+    {
+      "metric": "v1_flat_mismatch_count",
+      "observed": 0.0,
+      "operator": "<=",
+      "passed": true,
+      "threshold": 0
+    },
+    {
+      "metric": "variant_failure_count",
+      "observed": 0.0,
+      "operator": "<=",
+      "passed": true,
+      "threshold": 0
+    },
+    {
+      "metric": "benchmark_failure_count",
+      "observed": 0.0,
+      "operator": "<=",
+      "passed": true,
+      "threshold": 0
+    }
+  ],
+  "recomputed_summaries": [
+    {
+      "column": "feature_mask_error",
+      "name": "feature_mask_error",
+      "statistic": "mean",
+      "value": 0.0
+    },
+    {
+      "column": "isometry_error",
+      "name": "isometry_error",
+      "statistic": "mean",
+      "value": 3.8e-08
+    },
+    {
+      "column": "variant_population",
+      "name": "variant_population",
+      "statistic": "mean",
+      "value": 3.0
+    },
+    {
+      "column": "classified_count_error",
+      "name": "classified_count_error",
+      "statistic": "mean",
+      "value": 0.0
+    },
+    {
+      "column": "expected_count_error",
+      "name": "expected_count_error",
+      "statistic": "mean",
+      "value": 0.0
+    },
+    {
+      "column": "v1_component_deviation",
+      "name": "v1_component_deviation",
+      "statistic": "mean",
+      "value": 0.0
+    },
+    {
+      "column": "v1_region_deviation",
+      "name": "v1_region_deviation",
+      "statistic": "mean",
+      "value": 0.0
+    },
+    {
+      "column": "v1_boundary_count",
+      "name": "v1_boundary_count",
+      "statistic": "mean",
+      "value": 0.0
+    },
+    {
+      "column": "v1_flat_mismatch_count",
+      "name": "v1_flat_mismatch_count",
+      "statistic": "mean",
+      "value": 0.0
+    },
+    {
+      "column": "variant_failure_count",
+      "name": "variant_failure_count",
+      "statistic": "mean",
+      "value": 0.0
+    },
+    {
+      "column": "benchmark_failure_count",
+      "name": "benchmark_failure_count",
+      "statistic": "mean",
+      "value": 0.0
+    }
+  ],
+  "run_id": "scratch-006",
+  "schema_version": 1,
+  "task_id": "METHOD-038"
+}
