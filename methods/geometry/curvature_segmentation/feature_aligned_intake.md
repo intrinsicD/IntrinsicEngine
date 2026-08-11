@@ -168,6 +168,39 @@ Projected comparisons use:
 Distance and length are reported both in world units and divided by `D`.
 Raw region IDs and unprojected edge-mask overlap are forbidden metrics.
 
+### Frozen cheapest-screen split (checkpoint 3)
+
+The first executable A-D killing split is narrower than the eventual corpus
+and is frozen before any candidate implementation. Coordinates use the
+reference bounding-box diagonal `D` for normalized distances. Each pair keeps
+the same parametric vertices and connectivity while changing only the listed
+diagonal phase; fold pairs rigidly rotate the positive-`x` half about the
+`x=0` crease and therefore preserve every intrinsic edge length.
+
+| Control | Screening parameters (readable now) | Confirmation parameters (held out) | Killing fact |
+| --- | --- | --- | --- |
+| Plane | `[-1,1] x [0,1]`, `24 x 48` cells, diagonal phases `0/1`, seed `1701` | `[-1.3,0.9] x [0,1.2]`, `31 x 62`, phases `0/1`, seed `9109` | no interior feature or segmentation boundary |
+| Cylinder | open cylinder `R=1`, `L=2`, `32 x 64`, angular phase `0` versus `1/128` turn, seed `1709` | `R=1.7`, `L=2.6`, `37 x 74`, phase `1/148`, seed `9127` | no tessellation-induced ring boundary |
+| Plane-plane folds | the plane grid rigidly folded by `30/45/60` degrees, `theta_0=45` degrees, seed `1723` | folds `20/45/70` degrees on the held-out plane grid, seed `9133` | `theta > theta_0` is mandatory, equality is not; projected crease is `x=0` |
+| Smooth transition | `q(x)=0.5(1+tanh(x/0.08))` on `[-1,1] x [0,1]`, reference curve `x=0`, seed `1741` | width `0.11` on `[-1.3,0.9] x [0,1.2]`, seed `9151` | recover the continuous transition without treating it as a hard dihedral |
+| Isometric-bend control | flat sheet versus the `60`-degree fold with identical parametric connectivity, reference boundary along the crease, seed `1753` | flat sheet versus the `70`-degree held-out fold, seed `9173` | intrinsic-only evidence and `k_g` fairness are unchanged; extrinsic crease evidence may change |
+
+Screening may read only the left column. Confirmation parameters stay unused
+until one candidate implementation, its numeric thresholds, and its source
+digest are frozen. The later full corpus still owes sphere, cone/frustum,
+saddle, tangent plane-cylinder, cylinder-sphere, ridge/valley, nearby-feature,
+junction, open-boundary, and disconnected-component families; this table does
+not silently declare those rows complete.
+
+Candidate A runs every control directly. Candidate B must run the same controls
+after coarse-to-fine transfer and is killed by any lost mandatory fold or
+coarse-level plane/cylinder artifact. Candidate C remains a quality comparator
+but is killed as a production option if the bounded cost screen cannot support
+the later acceleration gate. Candidate D must pass plane, cylinder, and fold
+controls and is killed as the general default if its quadric proxies cannot
+meet the smooth-transition curve gate. No candidate is selected merely because
+the fixture/oracle lane itself passes.
+
 ## Candidate killing order
 
 1. **Contract controls.** Reject a candidate that crosses a valid mandatory

@@ -86,6 +86,14 @@ contract and states that spatial optimization is local.
   boundary-distance upper bound against the exact `x=0.5` reference line.
   These are bounded Slice A fixtures, not the full analytic corpus or a
   refinement-convergence result.
+- Opt-in fold contract controls:
+  `curvature_segmentation_screening_fold_controls.yaml`. The screening cohort
+  checks paired diagonals of isometric `30/45/60`-degree folds against the
+  shared strict `angle > 45 degrees` feature classifier, verifies the
+  flat/fold edge-length correspondence, and records that the constant supplied-
+  curvature v1 negative control remains one region with no boundary. It does
+  not execute or select candidate A-D; the disjoint cheapest-screen parameters
+  are frozen in `feature_aligned_intake.md`.
 
 The historical non-claim-eligible
 [`METHOD-038` scratch replay](../../../tasks/evidence/METHOD-038/superseded/20260810-fixture-cohort-runner-change/experiment/protocol.yaml)

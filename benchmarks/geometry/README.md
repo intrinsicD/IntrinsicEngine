@@ -36,6 +36,15 @@ bounding-box-normalized symmetric surface-Hausdorff upper bound. The directed
 reference-to-prediction term samples 4097 points and adds half the sample
 spacing using the distance function's 1-Lipschitz bound; it is a fixture
 contract, not a refinement-convergence result. Setting
+`INTRINSIC_CURVATURE_PROFILE_COHORT=screening` runs the separate Slice A
+contract-control lane on paired diagonal triangulations of isometric
+`30/45/60`-degree folds. With the shared `GEOM-071` boundary-disabled
+classifier and a `45`-degree threshold, only the strict-above-threshold fold
+may carry crease edges; the `cpu_reference_v1` constant-curvature negative
+control must remain one component, one region, and zero boundaries on every
+fold exactly as on the flat sheet. The lane also gates the flat/fold edge-
+length delta, but it does not execute or select candidate A-D and supports no
+remeshing-convergence or v2 claim. Setting
 `INTRINSIC_CURVATURE_PROFILE_COHORT=heavy` selects the declared 100k and 1M
 cohorts. The heavy runner is not a default CTest. Its manifest thresholds are
 harness-health bounds, not adoption or acceleration claims; clean-source

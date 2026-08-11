@@ -26,6 +26,7 @@
 #include <glm/glm.hpp>
 
 import Geometry.HalfedgeMesh;
+import Geometry.HalfedgeMesh.Features;
 import Geometry.Curvature;
 import Geometry.HalfedgeMesh.CurvatureSegmentation;
 import Geometry.Properties;
@@ -33,6 +34,7 @@ import Geometry.Properties;
 namespace
 {
     namespace Segment = Geometry::CurvatureSegmentation;
+    namespace Features = Geometry::HalfedgeMesh::Features;
     using ProfileClock = std::chrono::steady_clock;
 
     struct CohortSpec
@@ -123,6 +125,45 @@ namespace
         std::uint64_t PeakWorkingSetBytes{0u};
         bool Succeeded{false};
     };
+
+    struct FoldFixture
+    {
+        Geometry::HalfedgeMesh::Mesh Mesh{};
+        std::vector<double> K1{};
+        std::vector<double> K2{};
+        std::vector<glm::dvec3> FaceNormals{};
+        std::vector<std::uint8_t> ExpectedFeatureMask{};
+        bool Valid{true};
+    };
+
+    struct FoldVariantProfile
+    {
+        double DihedralDegrees{0.0};
+        std::size_t FaceCount{0u};
+        std::size_t EdgeCount{0u};
+        std::size_t ExpectedFeatureEdgeCount{0u};
+        std::array<std::size_t, 2u> ClassifiedFeatureEdgeCounts{};
+        double FeatureMaskErrorFraction{0.0};
+        std::uint32_t V1SelectedComponentCount{0u};
+        std::uint32_t V1ConnectedRegionCount{0u};
+        std::size_t V1BoundaryEdgeCount{0u};
+        bool V1MatchesFlatControl{false};
+        bool Succeeded{false};
+    };
+
+    struct FoldScreeningProfile
+    {
+        std::array<FoldVariantProfile, 3u> Variants{};
+        double RuntimeMilliseconds{0.0};
+        double MaxFeatureMaskErrorFraction{1.0};
+        double MaxIsometricEdgeLengthDeltaNormalized{1.0};
+        std::uint64_t PeakWorkingSetBytes{0u};
+        bool Succeeded{false};
+    };
+
+    [[nodiscard]] Segment::CurvatureSegmentationParams MakeParams(
+        SelectionMode mode,
+        std::uint32_t fixedComponentCount);
 
     struct TimingSamples
     {
@@ -619,6 +660,369 @@ namespace
         return fixture;
     }
 
+    [[nodiscard]] FoldFixture MakeFoldFixture(
+        const std::uint32_t rows,
+        const std::uint32_t columns,
+        const double dihedralDegrees,
+        const bool flippedDiagonals)
+    {
+        FoldFixture fixture{};
+        if (rows == 0u || columns < 2u || (columns & 1u) != 0u)
+        {
+            fixture.Valid = false;
+            return fixture;
+        }
+
+        const std::size_t vertexCount =
+            static_cast<std::size_t>(rows + 1u) * (columns + 1u);
+        const std::size_t faceCount =
+            2u * static_cast<std::size_t>(rows) * columns;
+        fixture.Mesh.Reserve(vertexCount, 2u * faceCount, faceCount);
+        fixture.K1.assign(vertexCount, 1.0);
+        fixture.K2.assign(vertexCount, 0.0);
+
+        const double angle = dihedralDegrees
+            * std::numbers::pi_v<double> / 180.0;
+        const double cosine = std::cos(angle);
+        const double sine = std::sin(angle);
+        const glm::dvec3 leftNormal{0.0, 0.0, 1.0};
+        const glm::dvec3 rightNormal{-sine, 0.0, cosine};
+
+        std::vector<Geometry::VertexHandle> vertices;
+        vertices.reserve(vertexCount);
+        for (std::uint32_t row = 0u; row <= rows; ++row)
+        {
+            const double y = static_cast<double>(row) /
+                static_cast<double>(rows);
+            for (std::uint32_t column = 0u; column <= columns; ++column)
+            {
+                const double u = 2.0 * static_cast<double>(column) /
+                    static_cast<double>(columns) - 1.0;
+                const bool right = u > 0.0;
+                const double x = right ? u * cosine : u;
+                const double z = right ? u * sine : 0.0;
+                vertices.push_back(fixture.Mesh.AddVertex(glm::vec3{
+                    static_cast<float>(x),
+                    static_cast<float>(y),
+                    static_cast<float>(z),
+                }));
+            }
+        }
+
+        const auto vertexAt = [&](const std::uint32_t row,
+                                  const std::uint32_t column)
+        {
+            return vertices[
+                static_cast<std::size_t>(row) * (columns + 1u) + column];
+        };
+        const auto addFace = [&](const Geometry::VertexHandle a,
+                                 const Geometry::VertexHandle b,
+                                 const Geometry::VertexHandle c,
+                                 const bool right)
+        {
+            const auto face = fixture.Mesh.AddTriangle(a, b, c);
+            if (!face.has_value())
+            {
+                fixture.Valid = false;
+                return;
+            }
+            if (fixture.FaceNormals.size() <= face->Index)
+            {
+                fixture.FaceNormals.resize(
+                    static_cast<std::size_t>(face->Index) + 1u,
+                    glm::dvec3{0.0});
+            }
+            fixture.FaceNormals[face->Index] =
+                right ? rightNormal : leftNormal;
+        };
+
+        const std::uint32_t creaseColumn = columns / 2u;
+        for (std::uint32_t row = 0u; row < rows; ++row)
+        {
+            for (std::uint32_t column = 0u; column < columns; ++column)
+            {
+                const Geometry::VertexHandle v00 = vertexAt(row, column);
+                const Geometry::VertexHandle v10 = vertexAt(row, column + 1u);
+                const Geometry::VertexHandle v01 = vertexAt(row + 1u, column);
+                const Geometry::VertexHandle v11 =
+                    vertexAt(row + 1u, column + 1u);
+                const bool right = column >= creaseColumn;
+                const bool alternate =
+                    ((row + column + (flippedDiagonals ? 1u : 0u)) & 1u)
+                    != 0u;
+                if (alternate)
+                {
+                    addFace(v00, v10, v01, right);
+                    addFace(v10, v11, v01, right);
+                }
+                else
+                {
+                    addFace(v00, v10, v11, right);
+                    addFace(v00, v11, v01, right);
+                }
+                if (!fixture.Valid)
+                    return fixture;
+            }
+        }
+
+        fixture.ExpectedFeatureMask.assign(fixture.Mesh.EdgesSize(), 0u);
+        if (dihedralDegrees > 45.0)
+        {
+            for (std::uint32_t row = 0u; row < rows; ++row)
+            {
+                const auto edge = fixture.Mesh.FindEdge(
+                    vertexAt(row, creaseColumn),
+                    vertexAt(row + 1u, creaseColumn));
+                if (!edge.has_value())
+                {
+                    fixture.Valid = false;
+                    return fixture;
+                }
+                fixture.ExpectedFeatureMask[edge->Index] = 1u;
+            }
+        }
+
+        fixture.Valid &= fixture.Mesh.VertexCount() == vertexCount;
+        fixture.Valid &= fixture.Mesh.FaceCount() == faceCount;
+        fixture.Valid &= fixture.FaceNormals.size() == fixture.Mesh.FacesSize();
+        return fixture;
+    }
+
+    [[nodiscard]] double EdgeLength(
+        const Geometry::HalfedgeMesh::Mesh& mesh,
+        const Geometry::EdgeHandle edge) noexcept
+    {
+        const Geometry::HalfedgeHandle halfedge = mesh.Halfedge(edge, 0u);
+        if (!halfedge.IsValid() || !mesh.IsValid(halfedge))
+            return std::numeric_limits<double>::infinity();
+        const Geometry::VertexHandle from = mesh.FromVertex(halfedge);
+        const Geometry::VertexHandle to = mesh.ToVertex(halfedge);
+        if (!from.IsValid() || !to.IsValid()
+            || !mesh.IsValid(from) || !mesh.IsValid(to))
+        {
+            return std::numeric_limits<double>::infinity();
+        }
+        const glm::dvec3 delta =
+            ToDouble(mesh.Position(to)) - ToDouble(mesh.Position(from));
+        return std::sqrt(glm::dot(delta, delta));
+    }
+
+    [[nodiscard]] double MaxEdgeLengthDeltaNormalized(
+        const Geometry::HalfedgeMesh::Mesh& flat,
+        const Geometry::HalfedgeMesh::Mesh& folded) noexcept
+    {
+        if (flat.EdgesSize() != folded.EdgesSize())
+            return 1.0;
+        double maximum = 0.0;
+        for (std::size_t edgeIndex = 0u;
+             edgeIndex < flat.EdgesSize();
+             ++edgeIndex)
+        {
+            const Geometry::EdgeHandle edge{
+                static_cast<Geometry::PropertyIndex>(edgeIndex)};
+            if (flat.IsDeleted(edge) != folded.IsDeleted(edge))
+                return 1.0;
+            if (flat.IsDeleted(edge))
+                continue;
+            const double flatLength = EdgeLength(flat, edge);
+            const double foldedLength = EdgeLength(folded, edge);
+            if (!std::isfinite(flatLength) || !std::isfinite(foldedLength))
+                return 1.0;
+            maximum = std::max(maximum, std::abs(flatLength - foldedLength));
+        }
+        // The unfolded reference rectangle is [-1,1] x [0,1].
+        return maximum / std::sqrt(5.0);
+    }
+
+    [[nodiscard]] double FeatureMaskErrorFraction(
+        const Geometry::HalfedgeMesh::Mesh& mesh,
+        const std::vector<std::uint8_t>& actual,
+        const std::vector<std::uint8_t>& expected) noexcept
+    {
+        if (actual.size() != mesh.EdgesSize()
+            || expected.size() != mesh.EdgesSize())
+        {
+            return 1.0;
+        }
+        std::size_t live = 0u;
+        std::size_t mismatches = 0u;
+        for (std::size_t edgeIndex = 0u;
+             edgeIndex < mesh.EdgesSize();
+             ++edgeIndex)
+        {
+            const Geometry::EdgeHandle edge{
+                static_cast<Geometry::PropertyIndex>(edgeIndex)};
+            if (mesh.IsDeleted(edge))
+                continue;
+            ++live;
+            mismatches += actual[edgeIndex] != expected[edgeIndex] ? 1u : 0u;
+        }
+        return live == 0u
+            ? 1.0
+            : static_cast<double>(mismatches) / static_cast<double>(live);
+    }
+
+    [[nodiscard]] bool SameV1Payload(
+        const Segment::CurvatureSegmentationResult& a,
+        const Segment::CurvatureSegmentationResult& b) noexcept
+    {
+        return a.Succeeded() && b.Succeeded()
+            && a.FaceComponents == b.FaceComponents
+            && a.FaceRegions == b.FaceRegions
+            && a.EdgeBoundaries == b.EdgeBoundaries;
+    }
+
+    [[nodiscard]] FoldVariantProfile RunFoldVariant(
+        const double dihedralDegrees,
+        const std::array<FoldFixture, 2u>& flatFixtures,
+        const std::array<Segment::CurvatureSegmentationResult, 2u>& flatResults,
+        double& maxIsometricDelta)
+    {
+        constexpr std::uint32_t kRows = 24u;
+        constexpr std::uint32_t kColumns = 48u;
+        FoldVariantProfile profile{};
+        profile.DihedralDegrees = dihedralDegrees;
+
+        Features::Params featureParams{};
+        featureParams.BoundaryIsFeature = false;
+        featureParams.DihedralThresholdDegrees = 45.0;
+        const Segment::CurvatureSegmentationParams segmentParams =
+            MakeParams(SelectionMode::Fixed, 1u);
+
+        bool allValid = true;
+        for (std::size_t triangulation = 0u;
+             triangulation < 2u;
+             ++triangulation)
+        {
+            FoldFixture fixture = MakeFoldFixture(
+                kRows,
+                kColumns,
+                dihedralDegrees,
+                triangulation != 0u);
+            allValid &= fixture.Valid;
+            if (!fixture.Valid)
+                continue;
+
+            const Features::Classification classification = Features::Classify(
+                fixture.Mesh, fixture.FaceNormals, featureParams);
+            allValid &= classification.Status
+                == Features::ClassificationStatus::Success;
+            profile.ClassifiedFeatureEdgeCounts[triangulation] =
+                classification.FeatureEdgeCount;
+            profile.FeatureMaskErrorFraction = std::max(
+                profile.FeatureMaskErrorFraction,
+                FeatureMaskErrorFraction(
+                    fixture.Mesh,
+                    classification.EdgeFeatureMask,
+                    fixture.ExpectedFeatureMask));
+
+            Segment::CurvatureSegmentationResult result = Segment::Segment(
+                fixture.Mesh,
+                fixture.K1,
+                fixture.K2,
+                segmentParams);
+            allValid &= result.Succeeded();
+            profile.V1MatchesFlatControl = triangulation == 0u
+                ? SameV1Payload(result, flatResults[triangulation])
+                : profile.V1MatchesFlatControl
+                    && SameV1Payload(result, flatResults[triangulation]);
+            if (triangulation == 0u)
+            {
+                profile.FaceCount = fixture.Mesh.FaceCount();
+                profile.EdgeCount = fixture.Mesh.EdgeCount();
+                profile.ExpectedFeatureEdgeCount = static_cast<std::size_t>(
+                    std::count(
+                        fixture.ExpectedFeatureMask.begin(),
+                        fixture.ExpectedFeatureMask.end(),
+                        std::uint8_t{1u}));
+                profile.V1SelectedComponentCount =
+                    result.Diagnostics.SelectedComponentCount;
+                profile.V1ConnectedRegionCount =
+                    result.Diagnostics.ConnectedRegionCount;
+                profile.V1BoundaryEdgeCount =
+                    result.Diagnostics.BoundaryEdgeCount;
+            }
+            else
+            {
+                allValid &= profile.FaceCount == fixture.Mesh.FaceCount();
+                allValid &= profile.EdgeCount == fixture.Mesh.EdgeCount();
+                allValid &= profile.V1SelectedComponentCount
+                    == result.Diagnostics.SelectedComponentCount;
+                allValid &= profile.V1ConnectedRegionCount
+                    == result.Diagnostics.ConnectedRegionCount;
+                allValid &= profile.V1BoundaryEdgeCount
+                    == result.Diagnostics.BoundaryEdgeCount;
+            }
+            maxIsometricDelta = std::max(
+                maxIsometricDelta,
+                MaxEdgeLengthDeltaNormalized(
+                    flatFixtures[triangulation].Mesh,
+                    fixture.Mesh));
+        }
+
+        const std::size_t expected = profile.ExpectedFeatureEdgeCount;
+        profile.Succeeded = allValid
+            && profile.FeatureMaskErrorFraction == 0.0
+            && profile.ClassifiedFeatureEdgeCounts[0u] == expected
+            && profile.ClassifiedFeatureEdgeCounts[1u] == expected
+            && profile.V1SelectedComponentCount == 1u
+            && profile.V1ConnectedRegionCount == 1u
+            && profile.V1BoundaryEdgeCount == 0u
+            && profile.V1MatchesFlatControl;
+        return profile;
+    }
+
+    [[nodiscard]] FoldScreeningProfile RunFoldScreening()
+    {
+        constexpr std::uint32_t kRows = 24u;
+        constexpr std::uint32_t kColumns = 48u;
+        const ProfileClock::time_point start = ProfileClock::now();
+        FoldScreeningProfile profile{};
+        std::array<FoldFixture, 2u> flatFixtures{
+            MakeFoldFixture(kRows, kColumns, 0.0, false),
+            MakeFoldFixture(kRows, kColumns, 0.0, true),
+        };
+        const Segment::CurvatureSegmentationParams params =
+            MakeParams(SelectionMode::Fixed, 1u);
+        std::array<Segment::CurvatureSegmentationResult, 2u> flatResults{
+            Segment::Segment(
+                flatFixtures[0u].Mesh,
+                flatFixtures[0u].K1,
+                flatFixtures[0u].K2,
+                params),
+            Segment::Segment(
+                flatFixtures[1u].Mesh,
+                flatFixtures[1u].K1,
+                flatFixtures[1u].K2,
+                params),
+        };
+
+        constexpr std::array<double, 3u> kDihedrals{30.0, 45.0, 60.0};
+        profile.MaxIsometricEdgeLengthDeltaNormalized = 0.0;
+        profile.MaxFeatureMaskErrorFraction = 0.0;
+        profile.Succeeded = true;
+        for (std::size_t index = 0u; index < kDihedrals.size(); ++index)
+        {
+            profile.Variants[index] = RunFoldVariant(
+                kDihedrals[index],
+                flatFixtures,
+                flatResults,
+                profile.MaxIsometricEdgeLengthDeltaNormalized);
+            profile.MaxFeatureMaskErrorFraction = std::max(
+                profile.MaxFeatureMaskErrorFraction,
+                profile.Variants[index].FeatureMaskErrorFraction);
+            profile.Succeeded &= profile.Variants[index].Succeeded;
+        }
+        profile.Succeeded &= flatFixtures[0u].Valid && flatFixtures[1u].Valid;
+        profile.Succeeded &= flatResults[0u].Succeeded()
+            && flatResults[1u].Succeeded();
+        profile.Succeeded &= profile.MaxIsometricEdgeLengthDeltaNormalized
+            <= 1.0e-6;
+        profile.RuntimeMilliseconds = ElapsedMilliseconds(start);
+        profile.PeakWorkingSetBytes = PeakWorkingSetBytes();
+        return profile;
+    }
+
     [[nodiscard]] double MisclassifiedFaceFraction(
         const std::vector<std::uint32_t>& labels,
         const std::vector<std::uint32_t>& expected)
@@ -871,6 +1275,11 @@ namespace
             (profile.Mode == SelectionMode::Fixed ? "fixed" : "automatic");
     }
 
+    [[nodiscard]] std::string FoldScreeningBenchmarkId()
+    {
+        return "geometry.curvature_segmentation.screening.fold_controls";
+    }
+
     void EmitCandidates(
         std::ostringstream& out,
         const std::vector<CandidateProfile>& candidates)
@@ -1120,6 +1529,79 @@ namespace
         return out.str();
     }
 
+    [[nodiscard]] std::string EmitFoldScreeningResult(
+        const FoldScreeningProfile& profile,
+        const std::string& commit)
+    {
+        const std::string benchmarkId = FoldScreeningBenchmarkId();
+        std::ostringstream out;
+        out << std::fixed << std::setprecision(9)
+            << "{\n"
+            << "  \"benchmark_id\": \"" << benchmarkId << "\",\n"
+            << "  \"method\": \"geometry.curvature_segmentation\",\n"
+            << "  \"backend\": \"cpu_reference_v1+feature_classifier\",\n"
+            << "  \"dataset\": \"builtin.fold_threshold_triplet.v1\",\n"
+            << "  \"commit\": \"" << commit << "\",\n"
+            << "  \"metrics\": {\n"
+            << "    \"runtime_ms\": " << profile.RuntimeMilliseconds << ",\n"
+            << "    \"memory_peak_bytes\": "
+            << profile.PeakWorkingSetBytes << ",\n"
+            << "    \"quality_error_l2\": "
+            << profile.MaxFeatureMaskErrorFraction << ",\n"
+            << "    \"quality_error_linf\": "
+            << profile.MaxIsometricEdgeLengthDeltaNormalized << ",\n"
+            << "    \"population_count\": " << profile.Variants.size()
+            << "\n"
+            << "  },\n"
+            << "  \"diagnostics\": {\n"
+            << "    \"runner\": \"IntrinsicCurvatureSegmentationProfile\",\n"
+            << "    \"implementation_version\": \"slice_a_control_v1\",\n"
+            << "    \"candidate_selection\": \"none\",\n"
+            << "    \"dihedral_threshold_degrees\": 45.000000000,\n"
+            << "    \"threshold_comparison\": \"strictly_greater\",\n"
+            << "    \"boundary_is_feature\": false,\n"
+            << "    \"triangulations\": "
+            << "[\"diagonal_a\",\"diagonal_b\"],\n"
+            << "    \"curvature_lane\": \"constant_supplied_negative_control\",\n"
+            << "    \"quality_error_l2_unit\": "
+            << "\"maximum_live_edge_feature_mask_mismatch_fraction\",\n"
+            << "    \"quality_error_linf_unit\": "
+            << "\"bbox_normalized_flat_fold_edge_length_delta\",\n"
+            << "    \"variants\": [";
+        for (std::size_t index = 0u; index < profile.Variants.size(); ++index)
+        {
+            if (index != 0u)
+                out << ',';
+            const FoldVariantProfile& variant = profile.Variants[index];
+            out << "{\"dihedral_degrees\":" << variant.DihedralDegrees
+                << ",\"face_count\":" << variant.FaceCount
+                << ",\"edge_count\":" << variant.EdgeCount
+                << ",\"expected_feature_edge_count\":"
+                << variant.ExpectedFeatureEdgeCount
+                << ",\"classified_feature_edge_counts\":["
+                << variant.ClassifiedFeatureEdgeCounts[0u] << ','
+                << variant.ClassifiedFeatureEdgeCounts[1u] << ']'
+                << ",\"feature_mask_error_fraction\":"
+                << variant.FeatureMaskErrorFraction
+                << ",\"v1_selected_component_count\":"
+                << variant.V1SelectedComponentCount
+                << ",\"v1_connected_region_count\":"
+                << variant.V1ConnectedRegionCount
+                << ",\"v1_boundary_edge_count\":"
+                << variant.V1BoundaryEdgeCount
+                << ",\"v1_matches_flat_control\":"
+                << (variant.V1MatchesFlatControl ? "true" : "false")
+                << ",\"passed\":"
+                << (variant.Succeeded ? "true" : "false") << '}';
+        }
+        out << "]\n"
+            << "  },\n"
+            << "  \"status\": \""
+            << (profile.Succeeded ? "passed" : "failed") << "\"\n"
+            << "}\n";
+        return out.str();
+    }
+
     [[nodiscard]] bool WriteRawResult(
         const std::filesystem::path& outputRoot,
         const std::string& benchmarkId,
@@ -1168,6 +1650,17 @@ namespace
             RemeshingBenchmarkId(profile),
             EmitRemeshingResult(profile, commit));
     }
+
+    [[nodiscard]] bool WriteFoldScreeningResult(
+        const std::filesystem::path& outputRoot,
+        const FoldScreeningProfile& profile,
+        const std::string& commit)
+    {
+        return WriteRawResult(
+            outputRoot,
+            FoldScreeningBenchmarkId(),
+            EmitFoldScreeningResult(profile, commit));
+    }
 }
 
 int main(int argc, char** argv)
@@ -1212,16 +1705,28 @@ int main(int argc, char** argv)
         selected.push_back(smoke);
     else if (cohort == "heavy")
         selected.assign(heavy.begin(), heavy.end());
-    else if (cohort != "fixtures")
+    else if (cohort != "fixtures" && cohort != "screening")
     {
         std::cerr << "INTRINSIC_CURVATURE_PROFILE_COHORT must be "
-                     "smoke, fixtures, or heavy\n";
+                     "smoke, fixtures, screening, or heavy\n";
         return 2;
     }
 
     const std::filesystem::path outputRoot{argv[1]};
     const std::string commit = ResolveCommit();
     bool allPassed = true;
+    if (cohort == "screening")
+    {
+        const FoldScreeningProfile profile = RunFoldScreening();
+        if (!WriteFoldScreeningResult(outputRoot, profile, commit))
+        {
+            std::cerr << "failed to write "
+                      << FoldScreeningBenchmarkId() << '\n';
+            return 1;
+        }
+        std::cout << "Wrote " << FoldScreeningBenchmarkId() << '\n';
+        return profile.Succeeded ? 0 : 1;
+    }
     if (cohort == "fixtures")
     {
         for (const SelectionMode mode :

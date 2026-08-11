@@ -1,0 +1,30 @@
+benchmark_id: geometry.curvature_segmentation.screening.fold_controls
+method: geometry.curvature_segmentation
+dataset: builtin.fold_threshold_triplet.v1
+params:
+  intent: slice_a_contract_control
+  implementation: cpu_reference_v1_plus_geometry_feature_classifier
+  candidate_selection: none
+  rows: 24
+  columns: 48
+  dihedral_degrees: [30.0, 45.0, 60.0]
+  dihedral_threshold_degrees: 45.0
+  threshold_comparison: strictly_greater
+  boundary_is_feature: false
+  triangulations: [diagonal_a, diagonal_b]
+  curvature_lane: constant_supplied_negative_control
+  expected_v1_components: 1
+  expected_v1_regions: 1
+  expected_v1_boundaries: 0
+  feature_error_unit: maximum_live_edge_feature_mask_mismatch_fraction
+  isometry_error_unit: bbox_normalized_flat_fold_edge_length_delta
+  split: screening
+  claim_scope: fixture_integrity_only
+metrics: [runtime_ms, memory_peak_bytes, quality_error_l2, quality_error_linf, population_count]
+thresholds:
+  fixture_runtime_ms_max: 2000
+  memory_peak_bytes_max: 2147483648
+  quality_error_l2_max: 0.0
+  quality_error_linf_max: 0.000001
+  population_count_min: 3
+  population_count_max: 3

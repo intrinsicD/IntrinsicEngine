@@ -53,8 +53,14 @@ maturity_target: ParityProven
   of tuning the selector from the fixture. This checkpoint is a bounded
   fixture contract, not the full analytic corpus, remeshing convergence, or a
   candidate-v2 selection.
-- Next: extend the disjoint analytic screening corpus and freeze the candidate
-  A-D killing split before any `cpu_reference_v2` implementation.
+- Checkpoint 3 freezes the disjoint cheapest A-D screen/confirmation parameters
+  and adds an opt-in fold-control lane over paired `30/45/60`-degree isometric
+  meshes. It checks the shared strict `angle > 45 degrees` feature facts,
+  flat/fold edge-length correspondence, and the constant-curvature v1 negative
+  control without executing or selecting a candidate.
+- Next: seal the fold-control replay, then extend the frozen screen with the
+  cylinder and smooth-transition controls before any `cpu_reference_v2`
+  implementation.
 
 ## Goal
 - Replace METHOD-037's slow, edge-local boundary inference with an evidence-selected CPU formulation that remains statistically based on the existing Gaussian mixture, aligns region boundaries with persistent surface feature curves, converges across retriangulations of the same embedded surface, and meets a preregistered useful-acceleration gate without weakening correctness, diagnostics, or the Fixed/Automatic UI contract.
