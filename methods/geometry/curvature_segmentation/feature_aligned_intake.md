@@ -1,18 +1,18 @@
 # METHOD-038 Feature-Aligned Segmentation Intake
 
-Status: **Slice A preregistration draft**. This document fixes the scientific
-vocabulary, candidate equations, units, comparison rules, and rejection
-conditions used to build the screening runner. It does not select or expose a
-production `cpu_reference_v2`. The machine-readable protocol becomes frozen
-only after its deterministic fixtures and runner are committed and sealed with
-`tools/agents/experiment_custody.py freeze-protocol`.
+Status: **completed METHOD-038 evidence intake**. This document records the
+scientific vocabulary, candidate equations, units, comparison rules, rejection
+conditions, and analytic controls used by the screening runner. METHOD-038
+retired without selecting or exposing a production `cpu_reference_v2`.
+METHOD-039 owns the smaller practical feature-network patch formulation; its
+implementation must consume rather than reinterpret the sealed controls here.
 
 ## Contract boundary
 
-METHOD-038 retains METHOD-037's signed-curvature Gaussian mixture as the region
-data model. It may replace the input-triangulation Potts boundary inference,
-but it must not replace the GMM, mutate topology, materialize cuts, use a GPU,
-or change the Fixed/Automatic runtime default during Slice A.
+METHOD-038 retained METHOD-037's signed-curvature Gaussian mixture as the
+comparison data model. It did not replace the input-triangulation Potts
+boundary inference, replace the GMM, mutate topology, materialize cuts, use a
+GPU, or change the Fixed/Automatic runtime default.
 
 Two different uses of curvature must remain separate:
 
@@ -245,6 +245,14 @@ reference boundary edges, two endpoints, no junction, and a normalized sampled
 symmetric-distance upper bound of `0.000049835`. ARA C43 limits this result to
 fixture/oracle integrity; it does not select or evaluate candidate A-D.
 
+Final retirement replay scratch-011 repeated the unchanged scientific rows
+against METHOD-038's completed evidence-only task bytes. Its result, raw row,
+portable bundle, and independent audit pass the same seventeen gates and keep
+`claim_authorized: false`. Scratch-008 and scratch-010 remain immutable
+history; scratch-009 records a replay-tooling failure caused by a missing host `jq` command. The
+replacement protocol changed only post-processing to Python and did not change
+any fixture, raw-result field, metric, threshold, or gate.
+
 Candidate A runs every control directly. Candidate B must run the same controls
 after coarse-to-fine transfer and is killed by any lost mandatory fold or
 coarse-level plane/cylinder artifact. Candidate C remains a quality comparator
@@ -271,9 +279,10 @@ the fixture/oracle lane itself passes.
    stages. C, D, and E remain baselines unless their observed cost is compatible
    with the task's later `0.50x` median acceleration target; paper complexity
    alone cannot pass this gate.
-5. **Selection.** A is the smallest first implementation. B is attempted only
-   if A fails stability or the 100k/1M cost projection. A negative screen keeps
-   METHOD-037 available and leaves GEOM-076 blocked.
+5. **Selection.** METHOD-038 made no selection. METHOD-039 now owns the smaller
+   feature-first formulation and its own frozen acceptance gates. METHOD-037
+   remains available, and GEOM-076 stays blocked until METHOD-039 produces an
+   accepted result.
 
 ## Profiling contract
 

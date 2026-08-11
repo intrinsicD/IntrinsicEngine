@@ -1,0 +1,179 @@
+schema_version: 1
+task_id: METHOD-038
+workflow_profile: claim-grade
+status: complete
+generated_by: tools/agents/workflow_evidence.py
+generated_at: '2026-08-11T09:07:00Z'
+claim_eligible: false
+source:
+  base_ref: HEAD
+  base_revision: 595ab6be076645dc325aa6f05d90cf7419dc6d78
+  head_revision: 595ab6be076645dc325aa6f05d90cf7419dc6d78
+  branch: main
+  worktree: /home/alex/Documents/IntrinsicEngine
+  dirty: true
+  surface:
+  - path: ara/logic/claims.md
+    sha256: bc957168acde96b8ca97228f5cb37c240a91bbddf9a508058dbe2039f45d1d16
+  - path: ara/staging/observations.yaml
+    sha256: c78b0c74945af2635cdc8185028e038ef1f2bb320e385a1a342c7ac7f7d57473
+  - path: ara/trace/exploration_tree.yaml
+    sha256: 3f5bdefc439b83323e41814ed800698c45f68d4743632c2c3966750a7f3569a8
+  - path: docs/architecture/parameterization-mapping-roadmap.md
+    sha256: 2dc5e7eedfdadb8bc58c176a06924d6c084b39799c8696523ff42a40562efb2b
+  - path: methods/geometry/curvature_segmentation/README.md
+    sha256: fe5ecaa6f7e5637c5aa049d9b53b96e480119139dddcc198c53f6226a919f902
+  - path: methods/geometry/curvature_segmentation/feature_aligned_intake.md
+    sha256: e023120d3b62e221d55bd370c8384a34d364cce5fc77b708fd916dcfefecc869
+  - path: methods/geometry/curvature_segmentation/method.yaml
+    sha256: ff486054377406c2060afc0a6feb4397d3598bd6abaacbc2af4afbfb8e77df34
+  - path: methods/geometry/curvature_segmentation/paper.md
+    sha256: ded53b35c98f779602bf7d703595dcda52dd43ac62ab1664a92fbdd64719327e
+  - path: tasks/SESSION-BRIEF.md
+    sha256: 3981947856bc551c9f74bb5921e903ac6b59bf2b6b16d40128f2a22125e4508d
+  - path: tasks/active/METHOD-038-feature-aligned-remeshing-stable-curvature-segmentation.md
+    sha256: null
+  - path: tasks/active/README.md
+    sha256: 21086954992e59188d218ea0846e82b5f40f61219e116e842695ba98b0b82a5b
+  - path: tasks/backlog/geometry/GEOM-076-curvature-region-guided-uv-atlas-cuts.md
+    sha256: ef1e719d8744e9d59b9bb4db401e7e367be900e49d92fffe0d45a1879bc8aae5
+  - path: tasks/backlog/geometry/README.md
+    sha256: 5c260e77c43e090752df4c167089a6e47a8f6ddb07279b6eb02e4e299dd9c4f9
+  - path: tasks/backlog/methods/README.md
+    sha256: 5e1cf9836323cc020f2f73428da48101ee2573f94441b91a85c46e651f94855a
+  - path: tasks/done/METHOD-038-feature-aligned-remeshing-stable-curvature-segmentation.md
+    sha256: 924d5b17eb9319ae52417c23a5d1585f9c98c2e4e84a3d250b14d32435d982bb
+  - path: tasks/done/RETIREMENT-LOG.md
+    sha256: 0096666119af60807b90e3e24510d4eb2b37a7dfbc610c4bb494d8ad680785a4
+  content_digest: 310339e96b14265a76a710e91035876970186107a92e664d45a3731c6601eccd
+touched:
+  paths:
+  - ara/logic/claims.md
+  - ara/staging/observations.yaml
+  - ara/trace/exploration_tree.yaml
+  - docs/architecture/parameterization-mapping-roadmap.md
+  - methods/geometry/curvature_segmentation/README.md
+  - methods/geometry/curvature_segmentation/feature_aligned_intake.md
+  - methods/geometry/curvature_segmentation/method.yaml
+  - methods/geometry/curvature_segmentation/paper.md
+  - tasks/SESSION-BRIEF.md
+  - tasks/active/METHOD-038-feature-aligned-remeshing-stable-curvature-segmentation.md
+  - tasks/active/README.md
+  - tasks/backlog/geometry/GEOM-076-curvature-region-guided-uv-atlas-cuts.md
+  - tasks/backlog/geometry/README.md
+  - tasks/backlog/methods/README.md
+  - tasks/done/METHOD-038-feature-aligned-remeshing-stable-curvature-segmentation.md
+  - tasks/done/RETIREMENT-LOG.md
+  layers:
+  - geometry
+  modules:
+  - Geometry.HalfedgeMesh.CurvatureSegmentation
+extension_seam: Private deterministic profiler controls around unchanged METHOD-037 cpu_reference_v1;
+  no new public backend, service, registry, or runtime path.
+future_change_plan: METHOD-039 owns the Operational feature-network patch method; GEOM-076 remains gated
+  on METHOD-039 and no optimized/GPU follow-up is owed by METHOD-038.
+acceptance:
+- criterion: The current v1 production behavior remains unchanged and explicitly named
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: Deterministic profiling and fixture rows can be replayed with declared
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: Fold, cylinder, and smooth-transition controls pass their frozen analytic
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: Claims are limited to fixture/oracle integrity and the bounded Automatic
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: Claim-grade command receipts, frozen protocol/run/bundle, independent
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: 'Unfinished algorithm work has one explicit owner: `Operational` owned by'
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+commands:
+- receipt: tasks/evidence/METHOD-038/commands/checkpoint2-cpu-tests.json
+- receipt: tasks/evidence/METHOD-038/commands/checkpoint2-focused-tests.json
+- receipt: tasks/evidence/METHOD-038/commands/checkpoint2-structural.json
+- receipt: tasks/evidence/METHOD-038/commands/checkpoint2-workflow-global-bug150.json
+- receipt: tasks/evidence/METHOD-038/commands/checkpoint3-cpu-tests.json
+- receipt: tasks/evidence/METHOD-038/commands/checkpoint3-focused-tests.json
+- receipt: tasks/evidence/METHOD-038/commands/checkpoint3-structural.json
+- receipt: tasks/evidence/METHOD-038/commands/checkpoint4-asan.json
+- receipt: tasks/evidence/METHOD-038/commands/checkpoint4-build.json
+- receipt: tasks/evidence/METHOD-038/commands/checkpoint4-control-replays.json
+- receipt: tasks/evidence/METHOD-038/commands/checkpoint4-cpu-tests.json
+- receipt: tasks/evidence/METHOD-038/commands/checkpoint4-focused-tests.json
+- receipt: tasks/evidence/METHOD-038/commands/checkpoint4-post-epilogue.json
+- receipt: tasks/evidence/METHOD-038/commands/checkpoint4-review-repair.json
+- receipt: tasks/evidence/METHOD-038/commands/checkpoint4-structural.json
+- receipt: tasks/evidence/METHOD-038/commands/checkpoint4-ubsan.json
+- receipt: tasks/evidence/METHOD-038/commands/retirement-ci-build.json
+- receipt: tasks/evidence/METHOD-038/commands/retirement-cpu-tests.json
+- receipt: tasks/evidence/METHOD-038/commands/retirement-focused-tests.json
+- receipt: tasks/evidence/METHOD-038/commands/retirement-structural.json
+- receipt: tasks/evidence/METHOD-038/commands/retirement-surface-controls-010.json
+- receipt: tasks/evidence/METHOD-038/commands/retirement-surface-controls-011.json
+- receipt: tasks/evidence/METHOD-038/commands/scratch-automatic-10k-profile-002.json
+- receipt: tasks/evidence/METHOD-038/commands/scratch-automatic-10k-profile.json
+- receipt: tasks/evidence/METHOD-038/commands/scratch-fixtures-10k-003.json
+- receipt: tasks/evidence/METHOD-038/commands/scratch-fixtures-jsonl-canonicalization-003.json
+- receipt: tasks/evidence/METHOD-038/commands/scratch-fold-controls-005.json
+- receipt: tasks/evidence/METHOD-038/commands/scratch-fold-controls-006.json
+- receipt: tasks/evidence/METHOD-038/commands/scratch-surface-controls-007.json
+- receipt: tasks/evidence/METHOD-038/commands/scratch-surface-controls-008.json
+changed_public_contracts: []
+diagnostics_and_previews:
+- Current ci build passed; focused curvature/feature/Sandbox suite passed 32/32; default CPU-supported
+  suite passed 4210 with one policy-gated GLFW/LSan skip.
+- Checkpoint-4 source receipts passed ASan 2736/2736 and UBSan 2735 with one ASan-specific policy skip;
+  no source code changed during retirement.
+- Canonical scratch-011 passed all 17 frozen surface-control gates and independent audit with claim_authorized=false.
+benchmark_or_parity_evidence:
+- tasks/evidence/METHOD-038/experiment/inputs/surface_controls_benchmark_result.json
+docs_sync:
+  task_file: tasks/done/METHOD-038-feature-aligned-remeshing-stable-curvature-segmentation.md
+  session_brief_present: true
+  canonical_docs_changed: true
+  skill_mirrors_checked: true
+residual_risks:
+- Do not treat fixture/oracle integrity as candidate selection, remeshing convergence, speedup, production
+  adoption, parameterization, or novelty evidence.
+skipped_checks:
+- check: deferred-surfaces
+  reason: No candidate A-D, cpu_reference_v2, optimized/GPU backend, broad or held-out corpus, general
+    remeshing convergence, or parameterization result.
+artifacts:
+- path: tasks/evidence/METHOD-038/experiment/protocol.yaml
+  sha256: 5287fe2525152b2682f0461f4eb056fc3755d275306b354919290c78fb25b974
+  kind: file
+- path: tasks/evidence/METHOD-038/experiment/runs/scratch-011/bundle.yaml
+  sha256: c24ec01f207a098548ea86a0ab97caccf27887b9e6c8436d72b76c63dca583e2
+  kind: file
+- path: tasks/evidence/METHOD-038/experiment/runs/scratch-011/audit.json
+  sha256: 24222619edb6f05439118c3d6d144b099be0d52f760aa04ac64845d29aaf8c55
+  kind: file
+- path: ara/logic/claims.md
+  sha256: bc957168acde96b8ca97228f5cb37c240a91bbddf9a508058dbe2039f45d1d16
+  kind: file
+self_review:
+  completed: true
+  scope_matches_task: true
+  layering_preserved: true
+  tests_and_docs_accounted_for: true
+  mechanical_and_semantic_changes_separated: true
+handoff: tasks/evidence/METHOD-038/handoff.jsonl
+review: tasks/evidence/METHOD-038/reviews.jsonl
+experiment_root: tasks/evidence/METHOD-038/experiment

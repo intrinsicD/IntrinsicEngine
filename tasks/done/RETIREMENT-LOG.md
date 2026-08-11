@@ -8,6 +8,30 @@ so blocks moved from the old active-README history work verbatim.
 
 ## Retired task narratives
 
+[`METHOD-038`](METHOD-038-feature-aligned-remeshing-stable-curvature-segmentation.md)
+— feature-aligned curvature segmentation retires at `CPUContracted` for the
+evidence slice it actually completed. The task added observational stage and
+per-candidate timings plus deterministic supplied-curvature, paired-sphere,
+planar-transition, strict-threshold fold, open-cylinder, and smooth-transition
+profiling controls without changing METHOD-037's operational v1 result or
+runtime/config/UI defaults.
+
+ARA C40-C41 preserve Automatic component-count over-selection as bounded
+negative evidence; C42-C43 bind the exact fold, cylinder, and smooth-transition
+fixture/oracle outcomes. Final non-claim retirement replay scratch-011 passed
+all seventeen surface-control gates and received an accepted independent
+audit. Scratch-008 remains immutable after the task split, scratch-009
+preserves the host's missing-`jq` replay failure, and scratch-010 records the
+pre-completion-metadata task hash; no failure or threshold was hidden or tuned
+away.
+
+The original `ParityProven` ambition was not reached: no candidate A-D,
+`cpu_reference_v2`, optimized/GPU backend, general remeshing convergence,
+speedup, parameterization, or novelty result is claimed. METHOD-039 now owns
+the practical feature-network, seeded-oversegmentation, and curvature-aware
+merge method through the existing operational path. GEOM-076 is re-gated on
+that accepted future result rather than being unblocked by these controls.
+
 [`BUG-151`](BUG-151-work-graph-multi-slice-cycle.md) — declared multi-slice
 tasks can now continue through one auditable `advance-slice` transition rather
 than exhausting the only writer node or inventing a second run. The transition

@@ -1,10 +1,11 @@
 # Spatially Regularized Signed-Curvature Mesh Segmentation
 
-METHOD-038's feature-aligned follow-up intake, selected source equations,
-physical-scale convention, remeshing metrics, and candidate killing order are
-recorded separately in
-[`feature_aligned_intake.md`](feature_aligned_intake.md). That Slice A record
-does not change the frozen METHOD-037 formulation below.
+METHOD-038's completed evidence intake, source equations, physical-scale
+convention, projected metrics, analytic controls, and candidate killing order
+are recorded separately in
+[`feature_aligned_intake.md`](feature_aligned_intake.md). It selected no v2 and
+does not change the frozen METHOD-037 formulation below. METHOD-039 owns the
+practical feature-network patch follow-up.
 
 ## Published lineage
 

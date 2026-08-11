@@ -8,10 +8,12 @@ curvature-tensor mesh segmentation, Gaussian-mixture EM, BIC, and spatial
 labeling work, but the exact combined objective is repository-specific. See
 [`paper.md`](paper.md) for the citations and frozen equations.
 
-METHOD-038 is active in an evidence-only Slice A. Its primary-source equation
-intake, scale convention, paired-remeshing metrics, and candidate killing order
-are in [`feature_aligned_intake.md`](feature_aligned_intake.md). No v2 backend
-or production default is selected yet.
+METHOD-038 retired at `CPUContracted` as an evidence-only intake. Its
+primary-source equations, scale convention, projected metrics, candidate
+killing order, profiling lanes, and validated analytic controls are in
+[`feature_aligned_intake.md`](feature_aligned_intake.md). It selected no v2
+backend and changed no production default. METHOD-039 owns the practical
+feature-network patch method that may consume these immutable controls.
 
 ## Implemented path
 
@@ -155,17 +157,19 @@ sampled symmetric-distance upper bound of `0.000049835` (ARA C43). This remains
 fixture/oracle integrity evidence only; custody retains
 `claim_authorized: false`.
 
-The final task-bound
-[`scratch-008` protocol](../../../tasks/evidence/METHOD-038/experiment/protocol.yaml),
+The final retirement-task-bound
+[`scratch-011` protocol](../../../tasks/evidence/METHOD-038/experiment/protocol.yaml),
 [`sealed result`](../../../tasks/evidence/METHOD-038/experiment/inputs/surface_controls_benchmark_result.json),
-[`bundle`](../../../tasks/evidence/METHOD-038/experiment/runs/scratch-008/bundle.yaml),
+[`bundle`](../../../tasks/evidence/METHOD-038/experiment/runs/scratch-011/bundle.yaml),
 and independent
-[`audit`](../../../tasks/evidence/METHOD-038/experiment/runs/scratch-008/audit.json)
-repeat the same scientific row after the current-status correction and bind the
-final checkpoint-4 task hash. All seventeen gates pass and
-`claim_authorized: false` remains unchanged; scratch-008 does not broaden C43.
+[`audit`](../../../tasks/evidence/METHOD-038/experiment/runs/scratch-011/audit.json)
+repeat the same scientific row after the task split and bind the completed
+evidence-only task bytes. All seventeen gates pass and
+`claim_authorized: false` remains unchanged; scratch-011 does not broaden C43.
+Historical scratch-008 and scratch-010 remain immutable under `superseded/`,
+and scratch-009 preserves the missing-`jq` replay failure rather than hiding it.
 
 There is no selected v2, optimized, or GPU backend. The output is deliberately
-non-destructive and makes no atlas-quality claim. `GEOM-076` owns the later,
-evidence-gated decision about converting accepted boundaries into cuts and UV
-atlas chart hints.
+non-destructive and makes no atlas-quality claim. METHOD-039 owns the accepted
+feature/patch result needed before `GEOM-076` may evaluate any later UV-atlas
+chart hints.

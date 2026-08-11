@@ -1,0 +1,76 @@
+schema_version: 1
+task_id: METHOD-038
+run_id: scratch-011
+attempt_id: attempt-011
+status: initialized
+initialized_at: '2026-08-11T08:49:53Z'
+claim_eligible: false
+protocol_path: tasks/evidence/METHOD-038/experiment/protocol.yaml
+protocol_digest: 025582a1830dee2fd33e485f6fcc3ee7c8f0a2251f2ac207e04b5ed966cf00c5
+task_path: tasks/done/METHOD-038-feature-aligned-remeshing-stable-curvature-segmentation.md
+task_sha256: 924d5b17eb9319ae52417c23a5d1585f9c98c2e4e84a3d250b14d32435d982bb
+source:
+  revision: 251f2dabd3096fe50cb7a9c0f70ece4278ca5816
+  clean: true
+config:
+  path: benchmarks/geometry/manifests/curvature_segmentation_screening_surface_controls.yaml
+  sha256: ab34e13d076ff7173d5ad6f064b77db84a68dde45fb7a497aa364baf12c194dc
+environment:
+  path: CMakePresets.json
+  sha256: d852b3973bf46f499f592379e17990c5b1f8c14b8aa565bd07e92a64347a0bba
+datasets:
+- id: cylinder-smooth-transition-paired-controls-v1
+  path: benchmarks/runners/CurvatureSegmentationProfileRunner.cpp
+  sha256: 0580b8d8a8fc6cf13144695ae48fd12487a0ea6542f185451dfc15bf516c6eb9
+  split: scratch
+implementation_digest: bfaf8aeda5b1821cdad4add5ecd13fafd93d1c127d5ea2f5bd4dd273932a4e5f
+command:
+- /bin/bash
+- -o
+- pipefail
+- -c
+- "set -eu\nCCACHE_DISABLE=1 cmake --build --preset ci --target IntrinsicCurvatureSegmentationProfile\
+  \ --parallel 2\nresult_root=build/ci/custody/METHOD-038-scratch-011-raw\nproducer_status=0\nenv INTRINSIC_CURVATURE_PROFILE_COHORT=surface_controls\
+  \ GIT_COMMIT=251f2dabd3096fe50cb7a9c0f70ece4278ca5816 python3 tools/benchmark/run_and_seal.py --executable\
+  \ build/ci/bin/IntrinsicCurvatureSegmentationProfile --output \"$result_root\" --manifests-root benchmarks\
+  \ --run-id method-038-scratch-011 --attempt-id attempt-011 || producer_status=$?\ntest \"$producer_status\"\
+  \ -eq 0 -o \"$producer_status\" -eq 1\npython3 tools/benchmark/validate_benchmark_results.py --root\
+  \ \"$result_root\" --manifests-root benchmarks --strict\ninput_root=tasks/evidence/METHOD-038/experiment/inputs\n\
+  run_root=tasks/evidence/METHOD-038/experiment/runs/scratch-011\nmkdir -p \"$input_root\"\ncp \"$result_root/geometry.curvature_segmentation.screening.surface_controls.json\"\
+  \ \"$input_root/surface_controls_benchmark_result.json\"\npython3 - \"$input_root/surface_controls_benchmark_result.json\"\
+  \ \"$run_root/raw_rows.jsonl\" <<'PYMETRICS'\nimport json\nimport sys\nfrom pathlib import Path\n\n\
+  data = json.loads(Path(sys.argv[1]).read_text(encoding=\"utf-8\"))\ndiagnostics = data[\"diagnostics\"\
+  ]\nif not (\n    data[\"benchmark_id\"] == \"geometry.curvature_segmentation.screening.surface_controls\"\
+  \n    and diagnostics[\"implementation_version\"] == \"slice_a_surface_control_v1\"\n    and diagnostics[\"\
+  candidate_selection\"] == \"none\"\n    and data[\"warmup_policy\"][\"warmup_iterations\"] == 0\n  \
+  \  and data[\"warmup_policy\"][\"measured_iterations\"] == 1\n):\n    raise SystemExit(\"surface-control\
+  \ result identity mismatch\")\n\ncylinder = diagnostics[\"cylinder\"]\nsmooth = diagnostics[\"smooth_transition\"\
+  ]\ncylinder_variants = cylinder[\"variants\"]\nsmooth_variants = smooth[\"variants\"]\nrow = {\n   \
+  \ \"feature_mask_error\": max(\n        [item[\"feature_mask_error_fraction\"] for item in cylinder_variants]\n\
+  \        + [item[\"feature_mask_error_fraction\"] for item in smooth_variants]\n    ),\n    \"geometric_or_boundary_error\"\
+  : data[\"metrics\"][\"quality_error_linf\"],\n    \"cylinder_radial_error\": cylinder[\"max_radial_error_normalized\"\
+  ],\n    \"cylinder_edge_length_delta\": cylinder[\"max_paired_edge_length_delta_normalized\"],\n   \
+  \ \"smooth_surface_equation_error\": max(\n        item[\"surface_equation_error_normalized\"] for item\
+  \ in smooth_variants\n    ),\n    \"v1_component_deviation\": max(\n        [abs(item[\"v1_selected_component_count\"\
+  ] - 1) for item in cylinder_variants]\n        + [abs(item[\"v1_selected_component_count\"] - 2) for\
+  \ item in smooth_variants]\n    ),\n    \"v1_region_deviation\": max(\n        [abs(item[\"v1_connected_region_count\"\
+  ] - 1) for item in cylinder_variants]\n        + [abs(item[\"v1_connected_region_count\"] - 2) for item\
+  \ in smooth_variants]\n    ),\n    \"v1_boundary_deviation\": max(\n        [item[\"v1_boundary_edge_count\"\
+  ] for item in cylinder_variants]\n        + [abs(item[\"v1_boundary_edge_count\"] - 24) for item in\
+  \ smooth_variants]\n    ),\n    \"cylinder_payload_mismatch\": 0 if cylinder[\"v1_payloads_match\"]\
+  \ else 1,\n    \"smooth_label_error\": max(\n        item[\"v1_face_regime_error_fraction\"] for item\
+  \ in smooth_variants\n    ),\n    \"smooth_boundary_mask_error\": max(\n        item[\"v1_boundary_mask_error_fraction\"\
+  ] for item in smooth_variants\n    ),\n    \"orientation_failure_count\": sum(\n        0 if item[\"\
+  face_normals_point_outward\"] else 1 for item in cylinder_variants\n    ) + sum(0 if item[\"face_normals_point_upward\"\
+  ] else 1 for item in smooth_variants),\n    \"analytic_contract_failure_count\": sum(\n        0 if\
+  \ item[\"analytic_curvature_contract_satisfied\"] else 1\n        for item in smooth_variants\n    ),\n\
+  \    \"endpoint_junction_failure_count\": sum(\n        abs(item[\"continuous_boundary\"][\"endpoint_count\"\
+  ] - 2)\n        + item[\"continuous_boundary\"][\"junction_count\"]\n        for item in smooth_variants\n\
+  \    ),\n    \"variant_population\": data[\"metrics\"][\"population_count\"],\n    \"variant_failure_count\"\
+  : sum(\n        0 if item[\"passed\"] else 1 for item in cylinder_variants + smooth_variants\n    ),\n\
+  \    \"benchmark_failure_count\": (\n        0 if data[\"execution_status\"] == \"passed\" and data[\"\
+  status\"] == \"passed\" else 1\n    ),\n}\nPath(sys.argv[2]).write_text(\n    json.dumps(row, separators=(\"\
+  ,\", \":\")) + \"\\n\", encoding=\"utf-8\"\n)\nPYMETRICS"
+cell_journal: tasks/evidence/METHOD-038/experiment/runs/scratch-011/cells.jsonl
+bundle: tasks/evidence/METHOD-038/experiment/runs/scratch-011/bundle.yaml
+audit: tasks/evidence/METHOD-038/experiment/runs/scratch-011/audit.json

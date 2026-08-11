@@ -1,0 +1,57 @@
+schema_version: 1
+task_id: METHOD-038
+run_id: scratch-009
+attempt_id: attempt-009
+status: initialized
+initialized_at: '2026-08-11T08:39:40Z'
+claim_eligible: false
+protocol_path: tasks/evidence/METHOD-038/experiment/protocol.yaml
+protocol_digest: 01527a1e9f5a4b2697893cdff2eb272c8a57d21991434dc24ba87b79c84f9d16
+task_path: tasks/active/METHOD-038-feature-aligned-remeshing-stable-curvature-segmentation.md
+task_sha256: 88287b1e9ed1a5d38fe8f4a230d8e31d49016cc1abfa7398e4d41ffd26199312
+source:
+  revision: 251f2dabd3096fe50cb7a9c0f70ece4278ca5816
+  clean: true
+config:
+  path: benchmarks/geometry/manifests/curvature_segmentation_screening_surface_controls.yaml
+  sha256: ab34e13d076ff7173d5ad6f064b77db84a68dde45fb7a497aa364baf12c194dc
+environment:
+  path: CMakePresets.json
+  sha256: d852b3973bf46f499f592379e17990c5b1f8c14b8aa565bd07e92a64347a0bba
+datasets:
+- id: cylinder-smooth-transition-paired-controls-v1
+  path: benchmarks/runners/CurvatureSegmentationProfileRunner.cpp
+  sha256: 0580b8d8a8fc6cf13144695ae48fd12487a0ea6542f185451dfc15bf516c6eb9
+  split: scratch
+implementation_digest: bfaf8aeda5b1821cdad4add5ecd13fafd93d1c127d5ea2f5bd4dd273932a4e5f
+command:
+- /bin/bash
+- -o
+- pipefail
+- -c
+- set -eu; CCACHE_DISABLE=1 cmake --build --preset ci --target IntrinsicCurvatureSegmentationProfile --parallel
+  2; result_root=build/ci/custody/METHOD-038-scratch-009-raw; producer_status=0; env INTRINSIC_CURVATURE_PROFILE_COHORT=surface_controls
+  GIT_COMMIT=251f2dabd3096fe50cb7a9c0f70ece4278ca5816 python3 tools/benchmark/run_and_seal.py --executable
+  build/ci/bin/IntrinsicCurvatureSegmentationProfile --output "$result_root" --manifests-root benchmarks
+  --run-id method-038-scratch-009 --attempt-id attempt-009 || producer_status=$?; test "$producer_status"
+  -eq 0 -o "$producer_status" -eq 1; python3 tools/benchmark/validate_benchmark_results.py --root "$result_root"
+  --manifests-root benchmarks --strict; input_root=tasks/evidence/METHOD-038/experiment/inputs; run_root=tasks/evidence/METHOD-038/experiment/runs/scratch-009;
+  mkdir -p "$input_root"; cp "$result_root/geometry.curvature_segmentation.screening.surface_controls.json"
+  "$input_root/surface_controls_benchmark_result.json"; jq -c '{feature_mask_error:([.diagnostics.cylinder.variants[].feature_mask_error_fraction,.diagnostics.smooth_transition.variants[].feature_mask_error_fraction]|max),geometric_or_boundary_error:.metrics.quality_error_linf,cylinder_radial_error:.diagnostics.cylinder.max_radial_error_normalized,cylinder_edge_length_delta:.diagnostics.cylinder.max_paired_edge_length_delta_normalized,smooth_surface_equation_error:([.diagnostics.smooth_transition.variants[].surface_equation_error_normalized]|max),v1_component_deviation:([.diagnostics.cylinder.variants[].v1_selected_component_count|((.-1)|if
+  .<0 then -. else . end)]+[.diagnostics.smooth_transition.variants[].v1_selected_component_count|((.-2)|if
+  .<0 then -. else . end)]|max),v1_region_deviation:([.diagnostics.cylinder.variants[].v1_connected_region_count|((.-1)|if
+  .<0 then -. else . end)]+[.diagnostics.smooth_transition.variants[].v1_connected_region_count|((.-2)|if
+  .<0 then -. else . end)]|max),v1_boundary_deviation:([.diagnostics.cylinder.variants[].v1_boundary_edge_count]+[.diagnostics.smooth_transition.variants[].v1_boundary_edge_count|((.-24)|if
+  .<0 then -. else . end)]|max),cylinder_payload_mismatch:(if .diagnostics.cylinder.v1_payloads_match
+  then 0 else 1 end),smooth_label_error:([.diagnostics.smooth_transition.variants[].v1_face_regime_error_fraction]|max),smooth_boundary_mask_error:([.diagnostics.smooth_transition.variants[].v1_boundary_mask_error_fraction]|max),orientation_failure_count:([.diagnostics.cylinder.variants[].face_normals_point_outward,.diagnostics.smooth_transition.variants[].face_normals_point_upward]|map(if
+  . then 0 else 1 end)|add),analytic_contract_failure_count:([.diagnostics.smooth_transition.variants[].analytic_curvature_contract_satisfied]|map(if
+  . then 0 else 1 end)|add),endpoint_junction_failure_count:([.diagnostics.smooth_transition.variants[].continuous_boundary|((.endpoint_count-2)|if
+  .<0 then -. else . end)+.junction_count]|add),variant_population:.metrics.population_count,variant_failure_count:([.diagnostics.cylinder.variants[].passed,.diagnostics.smooth_transition.variants[].passed]|map(if
+  . then 0 else 1 end)|add),benchmark_failure_count:(if .execution_status=="passed" and .status=="passed"
+  then 0 else 1 end)}' "$input_root/surface_controls_benchmark_result.json" > "$run_root/raw_rows.jsonl";
+  jq -e '.benchmark_id=="geometry.curvature_segmentation.screening.surface_controls" and .diagnostics.implementation_version=="slice_a_surface_control_v1"
+  and .diagnostics.candidate_selection=="none" and .warmup_policy.warmup_iterations==0 and .warmup_policy.measured_iterations==1'
+  "$input_root/surface_controls_benchmark_result.json" >/dev/null
+cell_journal: tasks/evidence/METHOD-038/experiment/runs/scratch-009/cells.jsonl
+bundle: tasks/evidence/METHOD-038/experiment/runs/scratch-009/bundle.yaml
+audit: tasks/evidence/METHOD-038/experiment/runs/scratch-009/audit.json

@@ -1,0 +1,267 @@
+{
+  "attempt_id": "attempt-010",
+  "backend": "cpu_reference",
+  "benchmark_id": "geometry.curvature_segmentation.screening.surface_controls",
+  "claim_eligible": false,
+  "commit": "251f2dabd3096fe50cb7a9c0f70ece4278ca5816",
+  "config_digest": "877395561ffd751efed43979c4d3d23e41cc094cbb7a7d5dad64870c60081b75",
+  "dataset": "builtin.cylinder_smooth_transition_pair.v1",
+  "diagnostics": {
+    "boundary_is_feature": false,
+    "candidate_selection": "none",
+    "cylinder": {
+      "angular_cells": 64,
+      "angular_phase_turns": [
+        0.0,
+        0.0078125
+      ],
+      "axial_cells": 32,
+      "length": 2.0,
+      "max_paired_edge_length_delta_normalized": 1.5e-08,
+      "max_radial_error_normalized": 8e-09,
+      "radius": 1.0,
+      "v1_payloads_match": true,
+      "variants": [
+        {
+          "classified_feature_edge_count": 0,
+          "edge_count": 6208,
+          "face_count": 4096,
+          "face_normals_point_outward": true,
+          "feature_mask_error_fraction": 0.0,
+          "name": "phase_0",
+          "passed": true,
+          "v1_boundary_edge_count": 0,
+          "v1_connected_region_count": 1,
+          "v1_selected_component_count": 1
+        },
+        {
+          "classified_feature_edge_count": 0,
+          "edge_count": 6208,
+          "face_count": 4096,
+          "face_normals_point_outward": true,
+          "feature_mask_error_fraction": 0.0,
+          "name": "phase_1_over_128_turn",
+          "passed": true,
+          "v1_boundary_edge_count": 0,
+          "v1_connected_region_count": 1,
+          "v1_selected_component_count": 1
+        }
+      ]
+    },
+    "dihedral_threshold_degrees": 45.0,
+    "implementation_version": "slice_a_surface_control_v1",
+    "measured_iterations": 1,
+    "quality_error_l2_unit": "maximum_control_fraction",
+    "quality_error_linf_unit": "maximum_bbox_normalized_geometric_or_boundary_error",
+    "runner": "IntrinsicCurvatureSegmentationProfile",
+    "smooth_transition": {
+      "columns": 48,
+      "graph": "z=q(x)",
+      "normalized_boundary_tolerance": 0.02,
+      "reference_curve": "x=0,z=0.5,y in [0,1]",
+      "rows": 24,
+      "variants": [
+        {
+          "analytic_curvature_contract_satisfied": true,
+          "classified_feature_edge_count": 0,
+          "continuous_boundary": {
+            "edge_count": 24,
+            "endpoint_count": 2,
+            "junction_count": 0,
+            "predicted_length_normalized": 0.40824829,
+            "reference_length_normalized": 0.40824829,
+            "reference_sample_count": 4097,
+            "reference_sample_spacing_normalized": 9.967e-05,
+            "symmetric_hausdorff_upper_bound_normalized": 4.9835e-05,
+            "tolerance_band_precision": 1.0,
+            "tolerance_band_recall": 1.0,
+            "valid": true
+          },
+          "edge_count": 3528,
+          "expected_boundary_edge_count": 24,
+          "face_count": 2304,
+          "face_normals_point_upward": true,
+          "feature_mask_error_fraction": 0.0,
+          "name": "diagonal_a",
+          "passed": true,
+          "surface_equation_error_normalized": 1.2e-08,
+          "v1_boundary_edge_count": 24,
+          "v1_boundary_mask_error_fraction": 0.0,
+          "v1_connected_region_count": 2,
+          "v1_face_regime_error_fraction": 0.0,
+          "v1_selected_component_count": 2
+        },
+        {
+          "analytic_curvature_contract_satisfied": true,
+          "classified_feature_edge_count": 0,
+          "continuous_boundary": {
+            "edge_count": 24,
+            "endpoint_count": 2,
+            "junction_count": 0,
+            "predicted_length_normalized": 0.40824829,
+            "reference_length_normalized": 0.40824829,
+            "reference_sample_count": 4097,
+            "reference_sample_spacing_normalized": 9.967e-05,
+            "symmetric_hausdorff_upper_bound_normalized": 4.9835e-05,
+            "tolerance_band_precision": 1.0,
+            "tolerance_band_recall": 1.0,
+            "valid": true
+          },
+          "edge_count": 3528,
+          "expected_boundary_edge_count": 24,
+          "face_count": 2304,
+          "face_normals_point_upward": true,
+          "feature_mask_error_fraction": 0.0,
+          "name": "diagonal_b",
+          "passed": true,
+          "surface_equation_error_normalized": 1.2e-08,
+          "v1_boundary_edge_count": 24,
+          "v1_boundary_mask_error_fraction": 0.0,
+          "v1_connected_region_count": 2,
+          "v1_face_regime_error_fraction": 0.0,
+          "v1_selected_component_count": 2
+        }
+      ],
+      "width": 0.08
+    },
+    "threshold_comparison": "strictly_greater",
+    "warmup_iterations": 0
+  },
+  "execution_status": "passed",
+  "manifest": {
+    "path": "benchmarks/geometry/manifests/curvature_segmentation_screening_surface_controls.yaml",
+    "sha256": "ab34e13d076ff7173d5ad6f064b77db84a68dde45fb7a497aa364baf12c194dc"
+  },
+  "method": "geometry.curvature_segmentation",
+  "metrics": {
+    "memory_peak_bytes": 13107200,
+    "population_count": 4,
+    "quality_error_l2": 0.0,
+    "quality_error_linf": 4.9835e-05,
+    "runtime_ms": 271.454139
+  },
+  "resolved_params": {
+    "boundary_is_feature": false,
+    "candidate_selection": "none",
+    "claim_scope": "fixture_integrity_only",
+    "cylinder": {
+      "angular_cells": 64,
+      "angular_phase_turns": [
+        0.0,
+        0.0078125
+      ],
+      "axial_cells": 32,
+      "expected_v1_boundaries": 0,
+      "expected_v1_components": 1,
+      "expected_v1_regions": 1,
+      "length": 2.0,
+      "radius": 1.0,
+      "seed": 1709,
+      "supplied_principal_curvatures": [
+        1.0,
+        0.0
+      ]
+    },
+    "dihedral_threshold_degrees": 45.0,
+    "implementation": "cpu_reference_v1_plus_geometry_feature_classifier",
+    "intent": "slice_a_contract_control",
+    "measured_iterations": 1,
+    "quality_error_l2_unit": "maximum_control_fraction",
+    "quality_error_linf_unit": "maximum_bbox_normalized_geometric_or_boundary_error",
+    "smooth_transition": {
+      "columns": 48,
+      "domain_x": [
+        -1.0,
+        1.0
+      ],
+      "domain_y": [
+        0.0,
+        1.0
+      ],
+      "expected_v1_components": 2,
+      "expected_v1_regions": 2,
+      "graph": "z = q(x), q(x) = 0.5 * (1 + tanh(x / 0.08))",
+      "normalized_boundary_tolerance": 0.02,
+      "reference_curve": "x = 0, z = 0.5, y in [0,1]",
+      "rows": 24,
+      "seed": 1741,
+      "supplied_principal_curvature": "q''(x) / (1 + q'(x)^2)^(3/2)",
+      "triangulations": [
+        "diagonal_a",
+        "diagonal_b"
+      ]
+    },
+    "split": "screening",
+    "threshold_comparison": "strictly_greater",
+    "warmup_iterations": 0
+  },
+  "run_id": "method-038-scratch-010",
+  "schema_version": 2,
+  "source": {
+    "revision": "251f2dabd3096fe50cb7a9c0f70ece4278ca5816",
+    "state": "unverified_commit"
+  },
+  "status": "passed",
+  "threshold_disposition": [
+    {
+      "limit": 2000,
+      "metric": "runtime_ms",
+      "observed": 271.454139,
+      "operator": "<=",
+      "passed": true,
+      "threshold": "fixture_runtime_ms_max"
+    },
+    {
+      "limit": 2147483648,
+      "metric": "memory_peak_bytes",
+      "observed": 13107200,
+      "operator": "<=",
+      "passed": true,
+      "threshold": "memory_peak_bytes_max"
+    },
+    {
+      "limit": 0.02,
+      "metric": "quality_error_l2",
+      "observed": 0.0,
+      "operator": "<=",
+      "passed": true,
+      "threshold": "quality_error_l2_max"
+    },
+    {
+      "limit": 0.02,
+      "metric": "quality_error_linf",
+      "observed": 4.9835e-05,
+      "operator": "<=",
+      "passed": true,
+      "threshold": "quality_error_linf_max"
+    },
+    {
+      "limit": 4,
+      "metric": "population_count",
+      "observed": 4,
+      "operator": ">=",
+      "passed": true,
+      "threshold": "population_count_min"
+    },
+    {
+      "limit": 4,
+      "metric": "population_count",
+      "observed": 4,
+      "operator": "<=",
+      "passed": true,
+      "threshold": "population_count_max"
+    }
+  ],
+  "thresholds": {
+    "fixture_runtime_ms_max": 2000,
+    "memory_peak_bytes_max": 2147483648,
+    "population_count_max": 4,
+    "population_count_min": 4,
+    "quality_error_l2_max": 0.02,
+    "quality_error_linf_max": 0.02
+  },
+  "warmup_policy": {
+    "measured_iterations": 1,
+    "warmup_iterations": 0
+  }
+}

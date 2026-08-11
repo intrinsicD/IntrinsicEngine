@@ -1,5 +1,5 @@
 {
-  "attempt_id": "attempt-008",
+  "attempt_id": "attempt-011",
   "backend": "cpu_reference",
   "benchmark_id": "geometry.curvature_segmentation.screening.surface_controls",
   "claim_eligible": false,
@@ -134,11 +134,11 @@
   },
   "method": "geometry.curvature_segmentation",
   "metrics": {
-    "memory_peak_bytes": 12959744,
+    "memory_peak_bytes": 13369344,
     "population_count": 4,
     "quality_error_l2": 0.0,
     "quality_error_linf": 4.9835e-05,
-    "runtime_ms": 181.436154
+    "runtime_ms": 271.894929
   },
   "resolved_params": {
     "boundary_is_feature": false,
@@ -195,7 +195,7 @@
     "threshold_comparison": "strictly_greater",
     "warmup_iterations": 0
   },
-  "run_id": "method-038-scratch-008",
+  "run_id": "method-038-scratch-011",
   "schema_version": 2,
   "source": {
     "revision": "251f2dabd3096fe50cb7a9c0f70ece4278ca5816",
@@ -206,7 +206,7 @@
     {
       "limit": 2000,
       "metric": "runtime_ms",
-      "observed": 181.436154,
+      "observed": 271.894929,
       "operator": "<=",
       "passed": true,
       "threshold": "fixture_runtime_ms_max"
@@ -214,7 +214,7 @@
     {
       "limit": 2147483648,
       "metric": "memory_peak_bytes",
-      "observed": 12959744,
+      "observed": 13369344,
       "operator": "<=",
       "passed": true,
       "threshold": "memory_peak_bytes_max"

@@ -123,7 +123,7 @@ end.
   (shared-fixture publication protocol comparing octree parity, MST, iPSR,
   and PGR; implementation changes remain in their owning method tasks).
 - [METHOD-039 — Feature-network-constrained curvature patch decomposition](METHOD-039-feature-network-curvature-patch-decomposition.md)
-  (practical follow-up to METHOD-038's feature/fixture evidence: hard and soft
+  (practical follow-up to retired METHOD-038's feature/fixture evidence: hard and soft
   feature lines constrain a deterministic seeded oversegmentation, then an
   explicit curvature-and-boundary energy removes unsupported seed fronts and
   retains only feature-supported or curvature-closure boundaries; no UV,

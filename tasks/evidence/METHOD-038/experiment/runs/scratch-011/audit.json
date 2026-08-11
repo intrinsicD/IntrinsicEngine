@@ -1,0 +1,241 @@
+{
+  "attempt_id": "attempt-011",
+  "audited_at": "2026-08-11T08:50:28Z",
+  "audited_revision": "251f2dabd3096fe50cb7a9c0f70ece4278ca5816",
+  "auditor_label": "codex-method038-retirement-auditor-20260811-r2",
+  "bundle_path": "tasks/evidence/METHOD-038/experiment/runs/scratch-011/bundle.yaml",
+  "bundle_sha256": "c24ec01f207a098548ea86a0ab97caccf27887b9e6c8436d72b76c63dca583e2",
+  "claim_authorized": false,
+  "disposition": "accepted",
+  "driver_label": "codex-root",
+  "errors": [],
+  "identity_assurance": "cooperative-label-only",
+  "recomputed_gates": [
+    {
+      "metric": "feature_mask_error",
+      "observed": 0.0,
+      "operator": "<=",
+      "passed": true,
+      "threshold": 0.0
+    },
+    {
+      "metric": "geometric_or_boundary_error",
+      "observed": 4.9835e-05,
+      "operator": "<=",
+      "passed": true,
+      "threshold": 0.02
+    },
+    {
+      "metric": "cylinder_radial_error",
+      "observed": 8e-09,
+      "operator": "<=",
+      "passed": true,
+      "threshold": 1e-06
+    },
+    {
+      "metric": "cylinder_edge_length_delta",
+      "observed": 1.5e-08,
+      "operator": "<=",
+      "passed": true,
+      "threshold": 1e-06
+    },
+    {
+      "metric": "smooth_surface_equation_error",
+      "observed": 1.2e-08,
+      "operator": "<=",
+      "passed": true,
+      "threshold": 1e-06
+    },
+    {
+      "metric": "v1_component_deviation",
+      "observed": 0.0,
+      "operator": "<=",
+      "passed": true,
+      "threshold": 0
+    },
+    {
+      "metric": "v1_region_deviation",
+      "observed": 0.0,
+      "operator": "<=",
+      "passed": true,
+      "threshold": 0
+    },
+    {
+      "metric": "v1_boundary_deviation",
+      "observed": 0.0,
+      "operator": "<=",
+      "passed": true,
+      "threshold": 0
+    },
+    {
+      "metric": "cylinder_payload_mismatch",
+      "observed": 0.0,
+      "operator": "<=",
+      "passed": true,
+      "threshold": 0
+    },
+    {
+      "metric": "smooth_label_error",
+      "observed": 0.0,
+      "operator": "<=",
+      "passed": true,
+      "threshold": 0.02
+    },
+    {
+      "metric": "smooth_boundary_mask_error",
+      "observed": 0.0,
+      "operator": "<=",
+      "passed": true,
+      "threshold": 0.0
+    },
+    {
+      "metric": "orientation_failure_count",
+      "observed": 0.0,
+      "operator": "<=",
+      "passed": true,
+      "threshold": 0
+    },
+    {
+      "metric": "analytic_contract_failure_count",
+      "observed": 0.0,
+      "operator": "<=",
+      "passed": true,
+      "threshold": 0
+    },
+    {
+      "metric": "endpoint_junction_failure_count",
+      "observed": 0.0,
+      "operator": "<=",
+      "passed": true,
+      "threshold": 0
+    },
+    {
+      "metric": "variant_population",
+      "observed": 4.0,
+      "operator": "==",
+      "passed": true,
+      "threshold": 4
+    },
+    {
+      "metric": "variant_failure_count",
+      "observed": 0.0,
+      "operator": "<=",
+      "passed": true,
+      "threshold": 0
+    },
+    {
+      "metric": "benchmark_failure_count",
+      "observed": 0.0,
+      "operator": "<=",
+      "passed": true,
+      "threshold": 0
+    }
+  ],
+  "recomputed_summaries": [
+    {
+      "column": "feature_mask_error",
+      "name": "feature_mask_error",
+      "statistic": "mean",
+      "value": 0.0
+    },
+    {
+      "column": "geometric_or_boundary_error",
+      "name": "geometric_or_boundary_error",
+      "statistic": "mean",
+      "value": 4.9835e-05
+    },
+    {
+      "column": "cylinder_radial_error",
+      "name": "cylinder_radial_error",
+      "statistic": "mean",
+      "value": 8e-09
+    },
+    {
+      "column": "cylinder_edge_length_delta",
+      "name": "cylinder_edge_length_delta",
+      "statistic": "mean",
+      "value": 1.5e-08
+    },
+    {
+      "column": "smooth_surface_equation_error",
+      "name": "smooth_surface_equation_error",
+      "statistic": "mean",
+      "value": 1.2e-08
+    },
+    {
+      "column": "v1_component_deviation",
+      "name": "v1_component_deviation",
+      "statistic": "mean",
+      "value": 0.0
+    },
+    {
+      "column": "v1_region_deviation",
+      "name": "v1_region_deviation",
+      "statistic": "mean",
+      "value": 0.0
+    },
+    {
+      "column": "v1_boundary_deviation",
+      "name": "v1_boundary_deviation",
+      "statistic": "mean",
+      "value": 0.0
+    },
+    {
+      "column": "cylinder_payload_mismatch",
+      "name": "cylinder_payload_mismatch",
+      "statistic": "mean",
+      "value": 0.0
+    },
+    {
+      "column": "smooth_label_error",
+      "name": "smooth_label_error",
+      "statistic": "mean",
+      "value": 0.0
+    },
+    {
+      "column": "smooth_boundary_mask_error",
+      "name": "smooth_boundary_mask_error",
+      "statistic": "mean",
+      "value": 0.0
+    },
+    {
+      "column": "orientation_failure_count",
+      "name": "orientation_failure_count",
+      "statistic": "mean",
+      "value": 0.0
+    },
+    {
+      "column": "analytic_contract_failure_count",
+      "name": "analytic_contract_failure_count",
+      "statistic": "mean",
+      "value": 0.0
+    },
+    {
+      "column": "endpoint_junction_failure_count",
+      "name": "endpoint_junction_failure_count",
+      "statistic": "mean",
+      "value": 0.0
+    },
+    {
+      "column": "variant_population",
+      "name": "variant_population",
+      "statistic": "mean",
+      "value": 4.0
+    },
+    {
+      "column": "variant_failure_count",
+      "name": "variant_failure_count",
+      "statistic": "mean",
+      "value": 0.0
+    },
+    {
+      "column": "benchmark_failure_count",
+      "name": "benchmark_failure_count",
+      "statistic": "mean",
+      "value": 0.0
+    }
+  ],
+  "run_id": "scratch-011",
+  "schema_version": 1,
+  "task_id": "METHOD-038"
+}

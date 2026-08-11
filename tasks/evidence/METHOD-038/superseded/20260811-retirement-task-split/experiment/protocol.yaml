@@ -1,0 +1,291 @@
+schema_version: 2
+task_id: METHOD-038
+protocol_id: curvature-segmentation-surface-controls-scratch-v1
+profile: claim-grade
+state: frozen
+question: Does the preregistered paired open-cylinder and smooth generalized-cylinder control lane preserve
+  its analytic geometry, orientation, hard-feature, unchanged-v1, and exact continuous-reference-curve
+  oracles?
+hypothesis: Both cylinder phases have outward orientation, at most 1e-6 bbox-normalized radial and paired-edge-length
+  error, zero hard-feature edges, one v1 component, one connected region, zero v1 boundaries, and identical
+  v1 payloads. Both smooth diagonal phases have upward orientation, satisfy the analytic ordered-curvature
+  contract, have at most 1e-6 normalized surface-equation error, zero hard-feature edges, two v1 components
+  and regions, zero face-regime and boundary-mask error, exactly 24 boundary edges on the x=0 reference
+  curve, at most 0.02 normalized boundary-distance upper bound, two endpoints, and no junction.
+claim_boundary: This is non-claim-eligible scratch evidence for one deterministic R=1, L=2, 32-by-64 open-cylinder
+  phase pair and one deterministic 24-by-48 paired-diagonal graph of q(x)=0.5(1+tanh(x/0.08)), using supplied
+  analytic curvature, the shared boundary-disabled 45-degree classifier, and unchanged serial cpu_reference_v1
+  comparisons. It establishes fixture and oracle integrity only; it makes no candidate A-D selection,
+  v2 formulation, broad-corpus, held-out confirmation, convergence, remeshing-stability, performance,
+  runtime/UI, Vulkan, GPU, or production claim.
+evidence_phase: scratch
+claim_eligible: false
+datasets:
+- id: cylinder-smooth-transition-paired-controls-v1
+  path: benchmarks/runners/CurvatureSegmentationProfileRunner.cpp
+  sha256: 0580b8d8a8fc6cf13144695ae48fd12487a0ea6542f185451dfc15bf516c6eb9
+  split: scratch
+disjoint_splits: []
+seeds:
+- 1709
+- 1741
+input_policy: Use only the committed cylinder and smooth-transition generators, declared phase/diagonal
+  pairs, exact mesh resolutions and analytic equations, strict greater-than 45-degree classifier with
+  boundary_is_feature false, fixed one/two-component cpu_reference_v1 parameters, and the frozen manifest
+  gates. Preserve every observed failure; do not retune the surface width, phases, threshold, resolution,
+  supplied curvature, reference curve, segmentation parameters, or gates from this run. Confirmation parameters
+  remain unread.
+comparators:
+- id: cylinder-phase-0-versus-phase-1-over-128-turn
+  budget: identical radius, length, resolution, periodic topology, supplied curvature, classifier parameters,
+    fixed-one v1 parameters, and serial CPU backend
+- id: smooth-diagonal-a-versus-diagonal-b
+  budget: identical graph surface, parametric samples, analytic curvature, reference curve, classifier
+    parameters, fixed-two v1 parameters, and serial CPU backend
+primary_metrics:
+- name: feature_mask_error
+  direction: minimize
+  unit: maximum-live-edge-hard-feature-mismatch-fraction
+  statistical_unit: four-control-variant-run
+- name: geometric_or_boundary_error
+  direction: minimize
+  unit: maximum-bbox-normalized-geometric-or-boundary-error
+  statistical_unit: four-control-variant-run
+- name: cylinder_radial_error
+  direction: minimize
+  unit: bbox-normalized-radius-error
+  statistical_unit: cylinder-phase-pair
+- name: cylinder_edge_length_delta
+  direction: minimize
+  unit: bbox-normalized-paired-edge-length-delta
+  statistical_unit: cylinder-phase-pair
+- name: smooth_surface_equation_error
+  direction: minimize
+  unit: bbox-normalized-graph-height-error
+  statistical_unit: smooth-diagonal-pair
+- name: v1_component_deviation
+  direction: minimize
+  unit: maximum-absolute-count-deviation-from-declared-fixture-target
+  statistical_unit: four-control-variant-run
+- name: v1_region_deviation
+  direction: minimize
+  unit: maximum-absolute-count-deviation-from-declared-fixture-target
+  statistical_unit: four-control-variant-run
+- name: v1_boundary_deviation
+  direction: minimize
+  unit: maximum-absolute-edge-count-deviation-from-declared-fixture-target
+  statistical_unit: four-control-variant-run
+- name: cylinder_payload_mismatch
+  direction: minimize
+  unit: boolean-failure-count
+  statistical_unit: cylinder-phase-pair
+- name: smooth_label_error
+  direction: minimize
+  unit: maximum-label-permutation-invariant-face-error-fraction
+  statistical_unit: smooth-diagonal-pair
+- name: smooth_boundary_mask_error
+  direction: minimize
+  unit: maximum-live-edge-boundary-mask-mismatch-fraction
+  statistical_unit: smooth-diagonal-pair
+- name: orientation_failure_count
+  direction: minimize
+  unit: failed-orientation-controls
+  statistical_unit: four-control-variant-run
+- name: analytic_contract_failure_count
+  direction: minimize
+  unit: failed-supplied-curvature-controls
+  statistical_unit: smooth-diagonal-pair
+- name: endpoint_junction_failure_count
+  direction: minimize
+  unit: endpoint-count-deviation-plus-junction-count
+  statistical_unit: smooth-diagonal-pair
+- name: variant_population
+  direction: target
+  unit: exercised-control-variants
+  statistical_unit: surface-control-run
+- name: variant_failure_count
+  direction: minimize
+  unit: failed-control-variants
+  statistical_unit: four-control-variant-run
+- name: benchmark_failure_count
+  direction: minimize
+  unit: failed-sealed-benchmark-results
+  statistical_unit: surface-control-run
+statistical_tests:
+- name: deterministic-exact-fixture-oracles
+  alpha: null
+- name: deterministic-descriptive-geometric-bounds
+  alpha: null
+summaries:
+- name: feature_mask_error
+  column: feature_mask_error
+  statistic: mean
+- name: geometric_or_boundary_error
+  column: geometric_or_boundary_error
+  statistic: mean
+- name: cylinder_radial_error
+  column: cylinder_radial_error
+  statistic: mean
+- name: cylinder_edge_length_delta
+  column: cylinder_edge_length_delta
+  statistic: mean
+- name: smooth_surface_equation_error
+  column: smooth_surface_equation_error
+  statistic: mean
+- name: v1_component_deviation
+  column: v1_component_deviation
+  statistic: mean
+- name: v1_region_deviation
+  column: v1_region_deviation
+  statistic: mean
+- name: v1_boundary_deviation
+  column: v1_boundary_deviation
+  statistic: mean
+- name: cylinder_payload_mismatch
+  column: cylinder_payload_mismatch
+  statistic: mean
+- name: smooth_label_error
+  column: smooth_label_error
+  statistic: mean
+- name: smooth_boundary_mask_error
+  column: smooth_boundary_mask_error
+  statistic: mean
+- name: orientation_failure_count
+  column: orientation_failure_count
+  statistic: mean
+- name: analytic_contract_failure_count
+  column: analytic_contract_failure_count
+  statistic: mean
+- name: endpoint_junction_failure_count
+  column: endpoint_junction_failure_count
+  statistic: mean
+- name: variant_population
+  column: variant_population
+  statistic: mean
+- name: variant_failure_count
+  column: variant_failure_count
+  statistic: mean
+- name: benchmark_failure_count
+  column: benchmark_failure_count
+  statistic: mean
+killing_gates:
+- metric: feature_mask_error
+  operator: <=
+  threshold: 0.0
+- metric: geometric_or_boundary_error
+  operator: <=
+  threshold: 0.02
+- metric: cylinder_radial_error
+  operator: <=
+  threshold: 1.0e-06
+- metric: cylinder_edge_length_delta
+  operator: <=
+  threshold: 1.0e-06
+- metric: smooth_surface_equation_error
+  operator: <=
+  threshold: 1.0e-06
+- metric: v1_component_deviation
+  operator: <=
+  threshold: 0
+- metric: v1_region_deviation
+  operator: <=
+  threshold: 0
+- metric: v1_boundary_deviation
+  operator: <=
+  threshold: 0
+- metric: cylinder_payload_mismatch
+  operator: <=
+  threshold: 0
+- metric: smooth_label_error
+  operator: <=
+  threshold: 0.02
+- metric: smooth_boundary_mask_error
+  operator: <=
+  threshold: 0.0
+- metric: orientation_failure_count
+  operator: <=
+  threshold: 0
+- metric: analytic_contract_failure_count
+  operator: <=
+  threshold: 0
+- metric: endpoint_junction_failure_count
+  operator: <=
+  threshold: 0
+- metric: variant_population
+  operator: ==
+  threshold: 4
+- metric: variant_failure_count
+  operator: <=
+  threshold: 0
+- metric: benchmark_failure_count
+  operator: <=
+  threshold: 0
+screening_confirmation_policy: This scratch run may validate only the two control fixture/oracle rows
+  and their measurement lane. It cannot select or reject candidate A-D and cannot authorize a scientific
+  or production claim. Formal candidate screening and its disjoint held-out confirmation remain separate
+  future frozen protocols using the corpus and seeds declared in feature_aligned_intake.md; no confirmation
+  input may be inspected while adapting a screening candidate.
+resources:
+  cpu_threads: 1
+  gpu: false
+command:
+- /bin/bash
+- -o
+- pipefail
+- -c
+- set -eu; CCACHE_DISABLE=1 cmake --build --preset ci --target IntrinsicCurvatureSegmentationProfile --parallel
+  2; result_root=build/ci/custody/METHOD-038-scratch-008-raw; producer_status=0; env INTRINSIC_CURVATURE_PROFILE_COHORT=surface_controls
+  GIT_COMMIT=251f2dabd3096fe50cb7a9c0f70ece4278ca5816 python3 tools/benchmark/run_and_seal.py --executable
+  build/ci/bin/IntrinsicCurvatureSegmentationProfile --output "$result_root" --manifests-root benchmarks
+  --run-id method-038-scratch-008 --attempt-id attempt-008 || producer_status=$?; test "$producer_status"
+  -eq 0 -o "$producer_status" -eq 1; python3 tools/benchmark/validate_benchmark_results.py --root "$result_root"
+  --manifests-root benchmarks --strict; input_root=tasks/evidence/METHOD-038/experiment/inputs; run_root=tasks/evidence/METHOD-038/experiment/runs/scratch-008;
+  mkdir -p "$input_root"; cp "$result_root/geometry.curvature_segmentation.screening.surface_controls.json"
+  "$input_root/surface_controls_benchmark_result.json"; jq -c '{feature_mask_error:([.diagnostics.cylinder.variants[].feature_mask_error_fraction,.diagnostics.smooth_transition.variants[].feature_mask_error_fraction]|max),geometric_or_boundary_error:.metrics.quality_error_linf,cylinder_radial_error:.diagnostics.cylinder.max_radial_error_normalized,cylinder_edge_length_delta:.diagnostics.cylinder.max_paired_edge_length_delta_normalized,smooth_surface_equation_error:([.diagnostics.smooth_transition.variants[].surface_equation_error_normalized]|max),v1_component_deviation:([.diagnostics.cylinder.variants[].v1_selected_component_count|((.-1)|if
+  .<0 then -. else . end)]+[.diagnostics.smooth_transition.variants[].v1_selected_component_count|((.-2)|if
+  .<0 then -. else . end)]|max),v1_region_deviation:([.diagnostics.cylinder.variants[].v1_connected_region_count|((.-1)|if
+  .<0 then -. else . end)]+[.diagnostics.smooth_transition.variants[].v1_connected_region_count|((.-2)|if
+  .<0 then -. else . end)]|max),v1_boundary_deviation:([.diagnostics.cylinder.variants[].v1_boundary_edge_count]+[.diagnostics.smooth_transition.variants[].v1_boundary_edge_count|((.-24)|if
+  .<0 then -. else . end)]|max),cylinder_payload_mismatch:(if .diagnostics.cylinder.v1_payloads_match
+  then 0 else 1 end),smooth_label_error:([.diagnostics.smooth_transition.variants[].v1_face_regime_error_fraction]|max),smooth_boundary_mask_error:([.diagnostics.smooth_transition.variants[].v1_boundary_mask_error_fraction]|max),orientation_failure_count:([.diagnostics.cylinder.variants[].face_normals_point_outward,.diagnostics.smooth_transition.variants[].face_normals_point_upward]|map(if
+  . then 0 else 1 end)|add),analytic_contract_failure_count:([.diagnostics.smooth_transition.variants[].analytic_curvature_contract_satisfied]|map(if
+  . then 0 else 1 end)|add),endpoint_junction_failure_count:([.diagnostics.smooth_transition.variants[].continuous_boundary|((.endpoint_count-2)|if
+  .<0 then -. else . end)+.junction_count]|add),variant_population:.metrics.population_count,variant_failure_count:([.diagnostics.cylinder.variants[].passed,.diagnostics.smooth_transition.variants[].passed]|map(if
+  . then 0 else 1 end)|add),benchmark_failure_count:(if .execution_status=="passed" and .status=="passed"
+  then 0 else 1 end)}' "$input_root/surface_controls_benchmark_result.json" > "$run_root/raw_rows.jsonl";
+  jq -e '.benchmark_id=="geometry.curvature_segmentation.screening.surface_controls" and .diagnostics.implementation_version=="slice_a_surface_control_v1"
+  and .diagnostics.candidate_selection=="none" and .warmup_policy.warmup_iterations==0 and .warmup_policy.measured_iterations==1'
+  "$input_root/surface_controls_benchmark_result.json" >/dev/null
+expected_artifacts:
+- tasks/evidence/METHOD-038/experiment/inputs/surface_controls_benchmark_result.json
+- tasks/evidence/METHOD-038/experiment/runs/scratch-008/raw_rows.jsonl
+- tasks/evidence/METHOD-038/experiment/runs/scratch-008/bundle.yaml
+blockers: []
+source:
+  revision: 251f2dabd3096fe50cb7a9c0f70ece4278ca5816
+  clean: true
+config:
+  path: benchmarks/geometry/manifests/curvature_segmentation_screening_surface_controls.yaml
+  sha256: ab34e13d076ff7173d5ad6f064b77db84a68dde45fb7a497aa364baf12c194dc
+environment:
+  path: CMakePresets.json
+  sha256: d852b3973bf46f499f592379e17990c5b1f8c14b8aa565bd07e92a64347a0bba
+implementation:
+- path: benchmarks/runners/CurvatureSegmentationProfileRunner.cpp
+  sha256: 0580b8d8a8fc6cf13144695ae48fd12487a0ea6542f185451dfc15bf516c6eb9
+- path: src/geometry/Geometry.HalfedgeMesh.cppm
+  sha256: 99b267d2089e8e47dce8e24148ea8a78bda7ae2ac906332303e841dd19938e30
+- path: src/geometry/Geometry.HalfedgeMesh.cpp
+  sha256: 3901d502b311c047e5c1efadcbba42fba511accac3f3bc943f571628b10c7c30
+- path: src/geometry/Geometry.HalfedgeMesh.Features.cppm
+  sha256: 1cc864ccdd3867df3b7a63d98b880664da1fdf401ca0f782850c0b2001f6d807
+- path: src/geometry/Geometry.HalfedgeMesh.Features.cpp
+  sha256: a4bb2c68b92b31a2302c36262e0f8a1c2489034f3b5f699b01d3a13f7e51dd9e
+- path: src/geometry/Geometry.HalfedgeMesh.CurvatureSegmentation.cppm
+  sha256: 01b5a4cac7c1bfda0870a406e2866d3fa98c0b554b42104607818f94f2f35840
+- path: src/geometry/Geometry.HalfedgeMesh.CurvatureSegmentation.cpp
+  sha256: 84b9df2fec8b320a802f53b3ff4271e1ac804c97e0681a49c9af936f668ac1cc
+- path: benchmarks/CMakeLists.txt
+  sha256: 6e08aa34e2a866fac413ebac01ce86330e37e776bdb89d1eabfaeec84314bc53
+frozen_at: '2026-08-11T06:26:35Z'
+protocol_digest: e959de18a7a22a901a6da4f8e0b451952ad5efed2d80a4c6b6e42920f55b44e5

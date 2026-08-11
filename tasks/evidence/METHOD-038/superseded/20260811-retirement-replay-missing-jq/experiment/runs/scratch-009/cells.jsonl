@@ -1,0 +1,2 @@
+{"artifacts":[],"cell_key":"surface-controls","error":null,"previous_entry_sha256":null,"reason":null,"recorded_at":"2026-08-11T08:39:58Z","schema_version":1,"sequence":1,"state":"started"}
+{"artifacts":[],"cell_key":"surface-controls","error":"replay prerequisite missing: jq command not found; no protocol metric or threshold changed","previous_entry_sha256":"57793eab45938c74366b1395df18ca44f8c47ddd01e73703ddec7e22ccedae4b","reason":null,"recorded_at":"2026-08-11T08:40:55Z","schema_version":1,"sequence":2,"state":"failed"}

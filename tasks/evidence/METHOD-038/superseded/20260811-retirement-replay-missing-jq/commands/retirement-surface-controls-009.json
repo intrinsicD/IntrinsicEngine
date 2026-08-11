@@ -1,0 +1,21 @@
+{
+  "command": [
+    "python3",
+    "-c",
+    "import subprocess, sys, yaml; from pathlib import Path; protocol = yaml.safe_load(Path(\"tasks/evidence/METHOD-038/experiment/protocol.yaml\").read_text(encoding=\"utf-8\")); sys.exit(subprocess.run(protocol[\"command\"], check=False).returncode)"
+  ],
+  "command_display": "python3 -c 'import subprocess, sys, yaml; from pathlib import Path; protocol = yaml.safe_load(Path(\"tasks/evidence/METHOD-038/experiment/protocol.yaml\").read_text(encoding=\"utf-8\")); sys.exit(subprocess.run(protocol[\"command\"], check=False).returncode)'",
+  "cwd": ".",
+  "duration_ms": 11705,
+  "exit_code": 127,
+  "finished_at": "2026-08-11T08:40:10Z",
+  "label": "retirement-surface-controls-009",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-11T08:39:59Z",
+  "stderr_path": "tasks/evidence/METHOD-038/commands/retirement-surface-controls-009.stderr.log",
+  "stderr_sha256": "39cf7459076ef8388fe6f50bf7cd20a787d0bd7db2e623a6da4ca22aea6e17f6",
+  "stdout_path": "tasks/evidence/METHOD-038/commands/retirement-surface-controls-009.stdout.log",
+  "stdout_sha256": "35454dc074d0315714ea5b91c8706b3a278cfbd6f1cbd61f13b845a5951f6903",
+  "task_id": "METHOD-038"
+}

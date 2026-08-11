@@ -1,0 +1,76 @@
+Test project /home/alex/Documents/IntrinsicEngine/build/ci
+      Start  609: CurvatureSegmentationOperations.PublishesSemanticPropertiesPreservesTopologyAndSupportsHistory
+ 1/32 Test  #609: CurvatureSegmentationOperations.PublishesSemanticPropertiesPreservesTopologyAndSupportsHistory ........   Passed    0.01 sec
+      Start  610: CurvatureSegmentationOperations.RejectsInvalidConfigurationAndUnavailableKernelWithoutMutation
+ 2/32 Test  #610: CurvatureSegmentationOperations.RejectsInvalidConfigurationAndUnavailableKernelWithoutMutation ........   Passed    0.01 sec
+      Start 1236: SandboxConfigSections.CurvatureSegmentationSourcesProduceIdenticalValidatedState
+ 3/32 Test #1236: SandboxConfigSections.CurvatureSegmentationSourcesProduceIdenticalValidatedState ......................   Passed    0.13 sec
+      Start 1237: SandboxConfigSections.CurvatureSegmentationDefaultsAndInvalidRangesFailClosed
+ 4/32 Test #1237: SandboxConfigSections.CurvatureSegmentationDefaultsAndInvalidRangesFailClosed .........................   Passed    0.05 sec
+      Start 1265: SandboxCurvatureSegmentationPanel.RegistersInsideTheExistingCurvatureWindow
+ 5/32 Test #1265: SandboxCurvatureSegmentationPanel.RegistersInsideTheExistingCurvatureWindow ...........................   Passed    0.06 sec
+      Start 1266: SandboxCurvatureSegmentationPanel.UsesOneValidatedConfiguredRunAndSimultaneousFaceEdgeVisualization
+ 6/32 Test #1266: SandboxCurvatureSegmentationPanel.UsesOneValidatedConfiguredRunAndSimultaneousFaceEdgeVisualization ...   Passed    0.00 sec
+      Start 1746: CurvatureSegmentation.FixedCountFitsSignedPrincipalCurvatureGmm
+ 7/32 Test #1746: CurvatureSegmentation.FixedCountFitsSignedPrincipalCurvatureGmm .......................................   Passed    0.01 sec
+      Start 1747: CurvatureSegmentation.AutomaticModeSelectsSeparatedPopulations
+ 8/32 Test #1747: CurvatureSegmentation.AutomaticModeSelectsSeparatedPopulations ........................................   Passed    0.01 sec
+      Start 1748: CurvatureSegmentation.SignedFeaturesSeparatePlaneSphereCylinderAndSaddleRegimes
+ 9/32 Test #1748: CurvatureSegmentation.SignedFeaturesSeparatePlaneSphereCylinderAndSaddleRegimes .......................   Passed    0.01 sec
+      Start 1749: CurvatureSegmentation.ReportsStageAndPerCandidateProfileTimingsWithoutChangingTheSolve
+10/32 Test #1749: CurvatureSegmentation.ReportsStageAndPerCandidateProfileTimingsWithoutChangingTheSolve ................   Passed    0.01 sec
+      Start 1750: CurvatureSegmentation.AutomaticModeReportsToleranceFallbackWhenNoCandidateQualifies
+11/32 Test #1750: CurvatureSegmentation.AutomaticModeReportsToleranceFallbackWhenNoCandidateQualifies ...................   Passed    0.01 sec
+      Start 1751: CurvatureSegmentation.IncreasingSpatialWeightReducesSmoothEdgeDisagreement
+12/32 Test #1751: CurvatureSegmentation.IncreasingSpatialWeightReducesSmoothEdgeDisagreement ............................   Passed    0.01 sec
+      Start 1752: CurvatureSegmentation.MinimumRegionCleanupDeterministicallyMergesTheSingleFaceOutlier
+13/32 Test #1752: CurvatureSegmentation.MinimumRegionCleanupDeterministicallyMergesTheSingleFaceOutlier .................   Passed    0.01 sec
+      Start 1753: CurvatureSegmentation.FeatureWeightPreservesFoldBoundary
+14/32 Test #1753: CurvatureSegmentation.FeatureWeightPreservesFoldBoundary ..............................................   Passed    0.01 sec
+      Start 1754: CurvatureSegmentation.ConnectedRegionsAreContiguousAndDeterministic
+15/32 Test #1754: CurvatureSegmentation.ConnectedRegionsAreContiguousAndDeterministic ...................................   Passed    0.01 sec
+      Start 1755: CurvatureSegmentation.DisconnectedEqualCurvaturePatchesShareComponentButNotRegion
+16/32 Test #1755: CurvatureSegmentation.DisconnectedEqualCurvaturePatchesShareComponentButNotRegion .....................   Passed    0.01 sec
+      Start 1756: CurvatureSegmentation.ComputeAndSegmentUsesExistingSignedCurvatureEstimator
+17/32 Test #1756: CurvatureSegmentation.ComputeAndSegmentUsesExistingSignedCurvatureEstimator ...........................   Passed    0.01 sec
+      Start 1757: CurvatureSegmentation.GlobalOrientationReversalPreservesPartition
+18/32 Test #1757: CurvatureSegmentation.GlobalOrientationReversalPreservesPartition .....................................   Passed    0.01 sec
+      Start 1758: CurvatureSegmentation.FailsClosedOnInvalidInputs
+19/32 Test #1758: CurvatureSegmentation.FailsClosedOnInvalidInputs ......................................................   Passed    0.01 sec
+      Start 1759: CurvatureSegmentation.DeletedSlotsAndOpenMeshBoundaryEdgesRemainUnpublished
+20/32 Test #1759: CurvatureSegmentation.DeletedSlotsAndOpenMeshBoundaryEdgesRemainUnpublished ...........................   Passed    0.01 sec
+      Start 1760: CurvatureSegmentation.RejectsPolygonAndDegenerateFaces
+21/32 Test #1760: CurvatureSegmentation.RejectsPolygonAndDegenerateFaces ................................................   Passed    0.00 sec
+      Start 2025: HalfedgeMeshFeatures.PlanarSquareHonorsBoundaryPolicyAndSlotAlignment
+22/32 Test #2025: HalfedgeMeshFeatures.PlanarSquareHonorsBoundaryPolicyAndSlotAlignment .................................   Passed    0.01 sec
+      Start 2026: HalfedgeMeshFeatures.FoldedCreaseIsMagnitudeInvariantAndKeepsEndpoints
+23/32 Test #2026: HalfedgeMeshFeatures.FoldedCreaseIsMagnitudeInvariantAndKeepsEndpoints ................................   Passed    0.01 sec
+      Start 2027: HalfedgeMeshFeatures.CubeHasTwelveFeatureEdgesAndEightJunctions
+24/32 Test #2027: HalfedgeMeshFeatures.CubeHasTwelveFeatureEdgesAndEightJunctions .......................................   Passed    0.01 sec
+      Start 2028: HalfedgeMeshFeatures.RejectsInvalidThresholdAndNormalSlotCount
+25/32 Test #2028: HalfedgeMeshFeatures.RejectsInvalidThresholdAndNormalSlotCount ........................................   Passed    0.01 sec
+      Start 2029: HalfedgeMeshFeatures.RejectsSubmeshViewsBeforeReadingAbsoluteHandles
+26/32 Test #2029: HalfedgeMeshFeatures.RejectsSubmeshViewsBeforeReadingAbsoluteHandles ..................................   Passed    0.01 sec
+      Start 2030: HalfedgeMeshFeatures.InvalidNormalsAndNonFiniteGeometryFailClosed
+27/32 Test #2030: HalfedgeMeshFeatures.InvalidNormalsAndNonFiniteGeometryFailClosed .....................................   Passed    0.01 sec
+      Start 2031: HalfedgeMeshFeatures.InvalidBoundaryFaceNormalOverridesDisabledBoundaryPolicy
+28/32 Test #2031: HalfedgeMeshFeatures.InvalidBoundaryFaceNormalOverridesDisabledBoundaryPolicy .........................   Passed    0.01 sec
+      Start 2032: HalfedgeMeshFeatures.DeletedSlotsStayClearAndDanglingEdgesFailClosed
+29/32 Test #2032: HalfedgeMeshFeatures.DeletedSlotsStayClearAndDanglingEdgesFailClosed ..................................   Passed    0.01 sec
+      Start 2033: HalfedgeMeshFeatures.CanonicalPolygonNormalsClassifyQuadPair
+30/32 Test #2033: HalfedgeMeshFeatures.CanonicalPolygonNormalsClassifyQuadPair ..........................................   Passed    0.01 sec
+      Start 2034: HalfedgeMeshFeatures.EvolvingSimplificationPredicateReadsCurrentNormals
+31/32 Test #2034: HalfedgeMeshFeatures.EvolvingSimplificationPredicateReadsCurrentNormals ...............................   Passed    0.00 sec
+      Start 2035: HalfedgeMeshFeatures.MaterializesExactCanonicalBoolProperty
+32/32 Test #2035: HalfedgeMeshFeatures.MaterializesExactCanonicalBoolProperty ...........................................   Passed    0.01 sec
+
+100% tests passed, 0 tests failed out of 32
+
+Label Time Summary:
+contract       =   0.01 sec*proc (2 tests)
+geometry       =   0.15 sec*proc (26 tests)
+integration    =   0.24 sec*proc (4 tests)
+runtime        =   0.25 sec*proc (6 tests)
+unit           =   0.15 sec*proc (26 tests)
+
+Total Test time (real) =   1.59 sec

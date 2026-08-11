@@ -1305,8 +1305,8 @@
   benchmarks/geometry/manifests/curvature_segmentation_screening_surface_controls.yaml,
   tasks/evidence/METHOD-038/experiment/protocol.yaml,
   tasks/evidence/METHOD-038/experiment/inputs/surface_controls_benchmark_result.json,
-  tasks/evidence/METHOD-038/experiment/runs/scratch-008/bundle.yaml,
-  tasks/evidence/METHOD-038/experiment/runs/scratch-008/audit.json]
+  tasks/evidence/METHOD-038/experiment/runs/scratch-011/bundle.yaml,
+  tasks/evidence/METHOD-038/experiment/runs/scratch-011/audit.json]
 - **Dependencies**: [C38, C39, C42]
 - **Tags**: geometry, curvature segmentation, cylinder, smooth transition,
   continuous boundary, CPU reference, fixture control, scratch, bounded result

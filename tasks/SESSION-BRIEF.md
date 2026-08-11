@@ -8,7 +8,7 @@ the authoritative open/unblocked view.
 
 ## Active tasks
 
-- `METHOD-038` — Feature-aligned, remeshing-stable curvature segmentation (tasks/active/METHOD-038-feature-aligned-remeshing-stable-curvature-segmentation.md)
+- none
 
 ## Theme B — Rendering modernization
 
@@ -75,7 +75,7 @@ the authoritative open/unblocked view.
 - unblocked: `GEOM-072` — Catmull-Clark crease masks (tasks/backlog/geometry/GEOM-072-catmull-clark-crease-masks.md)
 - unblocked: `GEOM-073` — Point-analysis property/span contracts (tasks/backlog/geometry/GEOM-073-point-analysis-property-span-contracts.md)
 - blocked by `GEOM-068`: `GEOM-074` — Graph property and adjacency contracts (tasks/backlog/geometry/GEOM-074-graph-property-adjacency-contracts.md)
-- blocked by `METHOD-038`: `GEOM-076` — Evidence-gated curvature-region UV atlas cuts (tasks/backlog/geometry/GEOM-076-curvature-region-guided-uv-atlas-cuts.md)
+- blocked by `METHOD-039`: `GEOM-076` — Evidence-gated curvature-region UV atlas cuts (tasks/backlog/geometry/GEOM-076-curvature-region-guided-uv-atlas-cuts.md)
 - blocked by `METHOD-014`: `HARDEN-084` — Localized CPU/GPU parity signatures (tasks/backlog/methods/HARDEN-084-localized-cpu-gpu-parity-signatures.md)
 - unblocked: `METHOD-003` — Closest Point Method PDE solver reference backend (tasks/backlog/methods/METHOD-003-closest-point-method-pde-reference-backend.md)
 - unblocked: `METHOD-004` — Walk on Stars PDE solver reference backend (tasks/backlog/methods/METHOD-004-walk-on-spheres-reference-backend.md)
@@ -99,7 +99,7 @@ the authoritative open/unblocked view.
 - blocked by `METHOD-033`: `METHOD-034` — iPSR normal orientation baseline (reference backend) (tasks/backlog/methods/METHOD-034-ipsr-orientation-baseline.md)
 - unblocked: `METHOD-035` — Parametric Gauss (winding-number) orientation baseline (reference backend) (tasks/backlog/methods/METHOD-035-pgr-winding-number-orientation-baseline.md)
 - blocked by `METHOD-032`: `METHOD-036` — Normal-orientation method comparison evidence (publication protocol) (tasks/backlog/methods/METHOD-036-orientation-comparison-evidence.md)
-- blocked by `METHOD-038`: `METHOD-039` — Feature-network-constrained curvature patch decomposition (tasks/backlog/methods/METHOD-039-feature-network-curvature-patch-decomposition.md)
+- unblocked: `METHOD-039` — Feature-network-constrained curvature patch decomposition (tasks/backlog/methods/METHOD-039-feature-network-curvature-patch-decomposition.md)
 - unblocked: `RUNTIME-207` — ICP element-domain source integration (tasks/backlog/runtime/RUNTIME-207-icp-element-domain-source-integration.md)
 - unblocked: `RUNTIME-209` — Point-set outlier analysis and publication split (tasks/backlog/runtime/RUNTIME-209-point-set-outlier-analysis-publication.md)
 - unblocked: `RUNTIME-210` — Signed Heat runtime and config integration (tasks/backlog/runtime/RUNTIME-210-signed-heat-runtime-config-integration.md)

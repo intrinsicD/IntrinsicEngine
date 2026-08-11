@@ -9730,8 +9730,9 @@ tree:
     evidence:
       - "tasks/evidence/METHOD-038/experiment/protocol.yaml"
       - "tasks/evidence/METHOD-038/experiment/inputs/surface_controls_benchmark_result.json"
-      - "tasks/evidence/METHOD-038/experiment/runs/scratch-008/bundle.yaml"
-      - "tasks/evidence/METHOD-038/experiment/runs/scratch-008/audit.json"
+      - "tasks/evidence/METHOD-038/experiment/runs/scratch-011/bundle.yaml"
+      - "tasks/evidence/METHOD-038/experiment/runs/scratch-011/audit.json"
+      - "tasks/evidence/METHOD-038/commands/retirement-surface-controls-011.json"
       - "tasks/evidence/METHOD-038/commands/checkpoint4-focused-tests.json"
       - "tasks/evidence/METHOD-038/commands/checkpoint4-control-replays.json"
       - "tasks/evidence/METHOD-038/commands/checkpoint4-structural.json"
@@ -9739,8 +9740,8 @@ tree:
       - "tasks/evidence/METHOD-038/commands/checkpoint4-asan.json"
       - "tasks/evidence/METHOD-038/commands/checkpoint4-ubsan.json"
     result: >
-      Final task-bound scratch-008 replayed the byte-identical scientific row
-      from accepted pre-status scratch-007 and independently recomputed all
+      Final retirement-task-bound scratch-011 replayed the same scientific
+      values from accepted scratch-007/scratch-008/scratch-010 and independently recomputed all
       seventeen frozen gates as passing. Both cylinder phases classified zero hard
       features, retained identical one-component/one-region/zero-boundary v1
       payloads, and stayed within 0.000000008 normalized radial error and
@@ -9752,7 +9753,9 @@ tree:
       Twenty-six focused tests, both control replays, strict structural checks,
       4,210 unsanitized CPU tests passed with one policy skip; all 2,736 grouped
       ASan tests passed; and 2,735 grouped UBSan tests passed with the
-      ASan-specific GLFW leak-control case policy-skipped. Candidate A-D, v2,
+      ASan-specific GLFW leak-control case policy-skipped. Scratch-009's
+      missing-jq post-processing failure is preserved and changed no gate.
+      Candidate A-D, v2,
       the broader and confirmation corpora, convergence, performance,
       runtime/UI, and GPU/Vulkan remain untested.
     status: resolved

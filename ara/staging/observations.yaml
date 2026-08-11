@@ -2602,10 +2602,11 @@ observations:
       controls satisfy the frozen analytic-geometry, shared strict-feature,
       continuous-reference-curve, and unchanged-v1 fixture oracles.
     context: >
-      Final task-bound non-claim scratch run 008 binds exact source 251f2dab,
+      Final retirement-task-bound non-claim scratch run 011 binds exact source 251f2dab,
       manifest, task, result, raw row, receipt, bundle, and independent audit
-      identities; its scientific row is byte-identical to accepted pre-status
-      scratch-007.
+      identities; its scientific values are unchanged from accepted
+      scratch-007, scratch-008, and scratch-010. Scratch-009's missing-jq post-processing
+      failure is preserved and does not change this disposition.
       Both cylinder phases recorded zero hard features, at most 0.000000008
       normalized radial error, at most 0.000000015 paired-edge delta, and exact
       one-component/one-region/zero-boundary payload parity. Both smooth

@@ -1,0 +1,28 @@
+{
+  "command": [
+    "cmake",
+    "--build",
+    "--preset",
+    "ci",
+    "--target",
+    "IntrinsicTests",
+    "IntrinsicBenchmarkSmoke",
+    "IntrinsicCurvatureSegmentationProfile",
+    "--parallel",
+    "2"
+  ],
+  "command_display": "cmake --build --preset ci --target IntrinsicTests IntrinsicBenchmarkSmoke IntrinsicCurvatureSegmentationProfile --parallel 2",
+  "cwd": ".",
+  "duration_ms": 613959,
+  "exit_code": 0,
+  "finished_at": "2026-08-11T09:02:18Z",
+  "label": "retirement-ci-build",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-11T08:52:04Z",
+  "stderr_path": "tasks/evidence/METHOD-038/commands/retirement-ci-build.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/METHOD-038/commands/retirement-ci-build.stdout.log",
+  "stdout_sha256": "ed9c3f329da755108c10e208e2bf7b1297b5c436c85be57977fca420b828a240",
+  "task_id": "METHOD-038"
+}

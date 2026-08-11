@@ -57,3 +57,32 @@ in current-state task/docs prose. Because experiment custody binds the active
 task bytes, final live identity `scratch-008` replays the unchanged scientific
 protocol against the corrected task hash; scratch-007 remains immutable and is
 not silently rebound.
+
+`20260811-retirement-task-split/` preserves accepted checkpoint-4 run
+`scratch-008`, its sealed cylinder/smooth-transition result, portable bundle,
+and independent audit. Retiring METHOD-038 now narrows the task to the evidence
+slice it actually completed and transfers the unimplemented feature-patch
+method to METHOD-039. That intentional task-contract change advances the task
+hash without changing any scientific input, fixture, metric, threshold, or
+gate. Canonical retirement run `scratch-009` therefore replays the same frozen
+surface controls against the final task bytes; scratch-008 remains immutable
+and is not reinterpreted as implementation evidence.
+
+`20260811-retirement-replay-missing-jq/` preserves failed retirement run
+`scratch-009`. Its producer built and sealed the benchmark result, but the
+post-processing cell stopped with exit 127 because this host does not provide
+the protocol's historical `jq` command and privileged package installation is
+unavailable. The cell is terminally failed and makes no positive claim.
+Replacement protocol `retirement-v2` changes only that post-processing step to
+the already required Python runtime; all scientific inputs, raw-result fields,
+metrics, thresholds, and gates remain unchanged for canonical run
+`scratch-010`.
+
+`20260811-retirement-completion-metadata/` preserves accepted run
+`scratch-010`, its Python-postprocessed raw row, portable bundle, and
+independent audit. Strict done-task validation then found that the completed
+task prose listed implementation hashes but lacked the required literal
+`Completion commit:` field. Adding that metadata changes the task hash but no
+scientific surface. Canonical run `scratch-011` therefore repeats the same
+retirement-v3 protocol and gates against the final task bytes; scratch-010 is
+retained unchanged.

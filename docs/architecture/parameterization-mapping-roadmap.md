@@ -228,12 +228,12 @@ Implementation tasks:
 
 - [`GEOM-025`](../../tasks/archive/GEOM-025-uv-atlas-backend-xatlas.md) established the backend-neutral UV atlas contract and initial xatlas default.
 - [`GEOM-057`](../../tasks/archive/GEOM-057-fast-uv-atlas-charting-and-packing.md) promotes the fast staged replacement path to the default while keeping xatlas as the visible compatibility fallback.
-- [`GEOM-076`](../../tasks/backlog/geometry/GEOM-076-curvature-region-guided-uv-atlas-cuts.md) is the evidence-gated follow-up that compares METHOD-037 signed-curvature region boundaries with the current chart proposal and adopts optional chart constraints only if preregistered atlas-quality gates pass.
+- [`GEOM-076`](../../tasks/backlog/geometry/GEOM-076-curvature-region-guided-uv-atlas-cuts.md) is the evidence-gated follow-up that waits for METHOD-039's accepted feature-network patch boundaries, compares them with the current chart proposal, and adopts optional chart constraints only if preregistered atlas-quality gates pass. Retired METHOD-038 supplies controls only, not an accepted boundary producer.
 
 Scope:
 
 - Add geometry-owned chart records, seam cuts, atlas segmentation, and CPU chart packing suitable for later renderer/material consumers without depending on those layers. Current promoted state is the `Geometry.UvAtlas` backend contract with `FastStaged` as the default concrete CPU backend, deterministic connected planar chart proposals, per-chart LSCM/harmonic attempts with projection fallback for unsupported topology, per-chart quality records, deterministic shelf packing, chart records, seam records, and explicit xatlas fallback diagnostics for failing fast backends when compatibility fallback is enabled.
-- METHOD-037 currently publishes non-destructive connected-region and edge-boundary properties for inspection. They are not atlas seams and do not affect the promoted default. `GEOM-076` must compare existing, curvature-guided, baseline, and control partitions on a frozen corpus before any optional hint input or runtime/config/UI adoption; a failed evidence gate leaves the current atlas path unchanged.
+- METHOD-037 currently publishes non-destructive connected-region and edge-boundary properties for inspection. They are not atlas seams and do not affect the promoted default. METHOD-039 owns the feature-network patch result that must first pass its own gates. `GEOM-076` must then compare existing, curvature-guided, baseline, and control partitions on a frozen corpus before any optional hint input or runtime/config/UI adoption; a failed evidence gate leaves the current atlas path unchanged.
 - Clarify how `Geometry.HtexPatch` patch metadata relates to UV charts and atlas tiles.
 
 Primary home: `src/geometry`.
