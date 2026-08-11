@@ -790,6 +790,11 @@ class AgentWorkGraphTests(unittest.TestCase):
         self.assertEqual(event["slice_index"], 2)
         self.assertEqual(event["prior_slice_index"], 1)
         self.assertEqual(event["prior_disposition"], "rolled-forward-before-review")
+        self.assertTrue(event["accepted_pre_review_checkpoint"])
+        self.assertEqual(
+            event["accepted_stale_reasons"],
+            ["review source binding is stale"],
+        )
         self.assertEqual(event["prior_nodes"]["implement"]["attempts"], 1)
         self.assertEqual(event["prior_nodes"]["implement"]["status"], "succeeded")
         self.assertEqual(
@@ -833,6 +838,8 @@ class AgentWorkGraphTests(unittest.TestCase):
                 "plan",
                 "--reason",
                 "begin the second reviewed slice",
+                "--accept-pre-review-checkpoint",
+                "--accept-stale-source",
             )
             fixture._assert_success(advanced)
             result, state = fixture.show()
@@ -863,6 +870,8 @@ class AgentWorkGraphTests(unittest.TestCase):
         self.assertEqual(state["nodes"]["plan"]["status"], "ready")
         self.assertEqual(event["event"], "slice_advanced")
         self.assertEqual(event["prior_disposition"], "reviewed")
+        self.assertFalse(event["accepted_pre_review_checkpoint"])
+        self.assertEqual(event["accepted_stale_reasons"], [])
         self.assertEqual(event["prior_nodes"]["finalize"]["status"], "succeeded")
 
     def test_advance_slice_rejects_unsafe_cycle_states(self) -> None:
@@ -906,6 +915,11 @@ class AgentWorkGraphTests(unittest.TestCase):
             blocked._assert_success(blocked.finish("implement", "blocked"))
             blocked_result = advance(blocked)
 
+            failed = prepare(root / "failed")
+            failed._assert_success(failed.begin("implement"))
+            failed._assert_success(failed.finish("implement", "failed"))
+            failed_result = advance(failed)
+
             partial = prepare(root / "partial")
             partial.complete("implement")
             partial.complete("freeze_diff")
@@ -926,6 +940,8 @@ class AgentWorkGraphTests(unittest.TestCase):
         self.assertIn("nodes are running", running_result.stdout)
         self.assertEqual(blocked_result.returncode, 2, blocked_result.stdout)
         self.assertIn("failed or blocked cycle", blocked_result.stdout)
+        self.assertEqual(failed_result.returncode, 2, failed_result.stdout)
+        self.assertIn("failed or blocked cycle", failed_result.stdout)
         self.assertEqual(partial_result.returncode, 2, partial_result.stdout)
         self.assertIn("started review descendants", partial_result.stdout)
         self.assertEqual(undersized_result.returncode, 2, undersized_result.stdout)
@@ -1023,6 +1039,41 @@ class AgentWorkGraphTests(unittest.TestCase):
             )
             inactive_result = advance(inactive)
 
+            done = prepare(root / "done")
+            done_dir = done.root / "tasks/done"
+            done_dir.mkdir(parents=True)
+            (done.root / "tasks/active/PROC-999-fixture.md").rename(
+                done_dir / "PROC-999-fixture.md"
+            )
+            subprocess.run(["git", "add", "."], cwd=done.root, check=True)
+            subprocess.run(
+                ["git", "commit", "-qm", "move task to done"],
+                cwd=done.root,
+                check=True,
+            )
+            done_result = advance(done)
+
+            profile_drift = prepare(root / "profile-drift")
+            profile_task = (
+                profile_drift.root / "tasks/active/PROC-999-fixture.md"
+            )
+            profile_task.write_text(
+                profile_task.read_text(encoding="utf-8").replace(
+                    "workflow_profile: standard",
+                    "workflow_profile: claim-grade",
+                ),
+                encoding="utf-8",
+            )
+            subprocess.run(
+                ["git", "add", "."], cwd=profile_drift.root, check=True
+            )
+            subprocess.run(
+                ["git", "commit", "-qm", "drift workflow profile"],
+                cwd=profile_drift.root,
+                check=True,
+            )
+            profile_drift_result = advance(profile_drift)
+
         self.assertEqual(wrong_owner_result.returncode, 2, wrong_owner_result.stdout)
         self.assertIn("does not match", wrong_owner_result.stdout)
         self.assertEqual(claim_drift_result.returncode, 2, claim_drift_result.stdout)
@@ -1033,6 +1084,12 @@ class AgentWorkGraphTests(unittest.TestCase):
         self.assertIn("## Slice plan", missing_plan_result.stdout)
         self.assertEqual(inactive_result.returncode, 2, inactive_result.stdout)
         self.assertIn("tasks/active/", inactive_result.stdout)
+        self.assertEqual(done_result.returncode, 2, done_result.stdout)
+        self.assertIn("tasks/active/", done_result.stdout)
+        self.assertEqual(
+            profile_drift_result.returncode, 2, profile_drift_result.stdout
+        )
+        self.assertIn("workflow profile changed", profile_drift_result.stdout)
 
     def test_review_surface_change_blocks_finalize_until_writer_reopens(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
