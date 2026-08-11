@@ -2594,3 +2594,28 @@ observations:
     promoted_to: "logic/claims.md:C42"
     crystallized_via: artifact-commitment
     stale: false
+  - id: O146
+    timestamp: "2026-08-11T11:02+02:00"
+    provenance: ai-executed
+    content: >
+      METHOD-038's deterministic paired open-cylinder and smooth-transition
+      controls satisfy the frozen analytic-geometry, shared strict-feature,
+      continuous-reference-curve, and unchanged-v1 fixture oracles.
+    context: >
+      Accepted non-claim scratch run 007 binds exact source 251f2dab, manifest,
+      task, result, raw row, receipt, bundle, and independent audit identities.
+      Both cylinder phases recorded zero hard features, at most 0.000000008
+      normalized radial error, at most 0.000000015 paired-edge delta, and exact
+      one-component/one-region/zero-boundary payload parity. Both smooth
+      diagonal phases recorded zero hard features, zero face-label and
+      boundary-mask error, exactly two regions and 24 reference boundary edges,
+      two endpoints, no junction, and a 0.000049835 normalized sampled
+      symmetric-distance upper bound. All seventeen frozen gates passed with
+      claim_authorized=false. This observation makes no candidate-v2, broader-
+      corpus, confirmation, convergence, performance, runtime/UI, or GPU claim.
+    potential_type: claim
+    bound_to: [N404, N406, N413]
+    promoted: true
+    promoted_to: "logic/claims.md:C43"
+    crystallized_via: artifact-commitment
+    stale: false

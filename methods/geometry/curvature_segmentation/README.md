@@ -140,6 +140,21 @@ schema rejection and accepted pre-status `scratch-005` replay are preserved
 separately; neither historical run is reinterpreted against the final task
 hash.
 
+The checkpoint-4 non-claim-eligible
+[`scratch-007` surface-control protocol](../../../tasks/evidence/METHOD-038/experiment/protocol.yaml),
+[`sealed result`](../../../tasks/evidence/METHOD-038/experiment/inputs/surface_controls_benchmark_result.json),
+[`bundle`](../../../tasks/evidence/METHOD-038/experiment/runs/scratch-007/bundle.yaml),
+and independent
+[`audit`](../../../tasks/evidence/METHOD-038/experiment/runs/scratch-007/audit.json)
+passed all seventeen frozen gates. Both cylinder phases recorded zero hard
+features, exact v1 payload parity, at most `0.000000008` normalized radial
+error, and at most `0.000000015` paired-edge delta. Both smooth diagonal phases
+recorded zero hard features, zero face-label and boundary-mask error, the exact
+24-edge reference mask with two endpoints and no junction, and a normalized
+sampled symmetric-distance upper bound of `0.000049835` (ARA C43). This remains
+fixture/oracle integrity evidence only; custody retains
+`claim_authorized: false`.
+
 There is no selected v2, optimized, or GPU backend. The output is deliberately
 non-destructive and makes no atlas-quality claim. `GEOM-076` owns the later,
 evidence-gated decision about converting accepted boundaries into cuts and UV

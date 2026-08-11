@@ -1,0 +1,62 @@
+Internal ctest changing into directory: /home/alex/Documents/IntrinsicEngine/build/ci
+Test project /home/alex/Documents/IntrinsicEngine/build/ci
+      Start 1746: CurvatureSegmentation.FixedCountFitsSignedPrincipalCurvatureGmm
+ 1/26 Test #1746: CurvatureSegmentation.FixedCountFitsSignedPrincipalCurvatureGmm ..........................   Passed    0.00 sec
+      Start 1747: CurvatureSegmentation.AutomaticModeSelectsSeparatedPopulations
+ 2/26 Test #1747: CurvatureSegmentation.AutomaticModeSelectsSeparatedPopulations ...........................   Passed    0.00 sec
+      Start 1748: CurvatureSegmentation.SignedFeaturesSeparatePlaneSphereCylinderAndSaddleRegimes
+ 3/26 Test #1748: CurvatureSegmentation.SignedFeaturesSeparatePlaneSphereCylinderAndSaddleRegimes ..........   Passed    0.00 sec
+      Start 1749: CurvatureSegmentation.ReportsStageAndPerCandidateProfileTimingsWithoutChangingTheSolve
+ 4/26 Test #1749: CurvatureSegmentation.ReportsStageAndPerCandidateProfileTimingsWithoutChangingTheSolve ...   Passed    0.00 sec
+      Start 1750: CurvatureSegmentation.AutomaticModeReportsToleranceFallbackWhenNoCandidateQualifies
+ 5/26 Test #1750: CurvatureSegmentation.AutomaticModeReportsToleranceFallbackWhenNoCandidateQualifies ......   Passed    0.00 sec
+      Start 1751: CurvatureSegmentation.IncreasingSpatialWeightReducesSmoothEdgeDisagreement
+ 6/26 Test #1751: CurvatureSegmentation.IncreasingSpatialWeightReducesSmoothEdgeDisagreement ...............   Passed    0.01 sec
+      Start 1752: CurvatureSegmentation.MinimumRegionCleanupDeterministicallyMergesTheSingleFaceOutlier
+ 7/26 Test #1752: CurvatureSegmentation.MinimumRegionCleanupDeterministicallyMergesTheSingleFaceOutlier ....   Passed    0.01 sec
+      Start 1753: CurvatureSegmentation.FeatureWeightPreservesFoldBoundary
+ 8/26 Test #1753: CurvatureSegmentation.FeatureWeightPreservesFoldBoundary .................................   Passed    0.00 sec
+      Start 1754: CurvatureSegmentation.ConnectedRegionsAreContiguousAndDeterministic
+ 9/26 Test #1754: CurvatureSegmentation.ConnectedRegionsAreContiguousAndDeterministic ......................   Passed    0.01 sec
+      Start 1755: CurvatureSegmentation.DisconnectedEqualCurvaturePatchesShareComponentButNotRegion
+10/26 Test #1755: CurvatureSegmentation.DisconnectedEqualCurvaturePatchesShareComponentButNotRegion ........   Passed    0.01 sec
+      Start 1756: CurvatureSegmentation.ComputeAndSegmentUsesExistingSignedCurvatureEstimator
+11/26 Test #1756: CurvatureSegmentation.ComputeAndSegmentUsesExistingSignedCurvatureEstimator ..............   Passed    0.01 sec
+      Start 1757: CurvatureSegmentation.GlobalOrientationReversalPreservesPartition
+12/26 Test #1757: CurvatureSegmentation.GlobalOrientationReversalPreservesPartition ........................   Passed    0.01 sec
+      Start 1758: CurvatureSegmentation.FailsClosedOnInvalidInputs
+13/26 Test #1758: CurvatureSegmentation.FailsClosedOnInvalidInputs .........................................   Passed    0.01 sec
+      Start 1759: CurvatureSegmentation.DeletedSlotsAndOpenMeshBoundaryEdgesRemainUnpublished
+14/26 Test #1759: CurvatureSegmentation.DeletedSlotsAndOpenMeshBoundaryEdgesRemainUnpublished ..............   Passed    0.01 sec
+      Start 1760: CurvatureSegmentation.RejectsPolygonAndDegenerateFaces
+15/26 Test #1760: CurvatureSegmentation.RejectsPolygonAndDegenerateFaces ...................................   Passed    0.01 sec
+      Start 2025: HalfedgeMeshFeatures.PlanarSquareHonorsBoundaryPolicyAndSlotAlignment
+16/26 Test #2025: HalfedgeMeshFeatures.PlanarSquareHonorsBoundaryPolicyAndSlotAlignment ....................   Passed    0.00 sec
+      Start 2026: HalfedgeMeshFeatures.FoldedCreaseIsMagnitudeInvariantAndKeepsEndpoints
+17/26 Test #2026: HalfedgeMeshFeatures.FoldedCreaseIsMagnitudeInvariantAndKeepsEndpoints ...................   Passed    0.00 sec
+      Start 2027: HalfedgeMeshFeatures.CubeHasTwelveFeatureEdgesAndEightJunctions
+18/26 Test #2027: HalfedgeMeshFeatures.CubeHasTwelveFeatureEdgesAndEightJunctions ..........................   Passed    0.00 sec
+      Start 2028: HalfedgeMeshFeatures.RejectsInvalidThresholdAndNormalSlotCount
+19/26 Test #2028: HalfedgeMeshFeatures.RejectsInvalidThresholdAndNormalSlotCount ...........................   Passed    0.00 sec
+      Start 2029: HalfedgeMeshFeatures.RejectsSubmeshViewsBeforeReadingAbsoluteHandles
+20/26 Test #2029: HalfedgeMeshFeatures.RejectsSubmeshViewsBeforeReadingAbsoluteHandles .....................   Passed    0.00 sec
+      Start 2030: HalfedgeMeshFeatures.InvalidNormalsAndNonFiniteGeometryFailClosed
+21/26 Test #2030: HalfedgeMeshFeatures.InvalidNormalsAndNonFiniteGeometryFailClosed ........................   Passed    0.01 sec
+      Start 2031: HalfedgeMeshFeatures.InvalidBoundaryFaceNormalOverridesDisabledBoundaryPolicy
+22/26 Test #2031: HalfedgeMeshFeatures.InvalidBoundaryFaceNormalOverridesDisabledBoundaryPolicy ............   Passed    0.01 sec
+      Start 2032: HalfedgeMeshFeatures.DeletedSlotsStayClearAndDanglingEdgesFailClosed
+23/26 Test #2032: HalfedgeMeshFeatures.DeletedSlotsStayClearAndDanglingEdgesFailClosed .....................   Passed    0.01 sec
+      Start 2033: HalfedgeMeshFeatures.CanonicalPolygonNormalsClassifyQuadPair
+24/26 Test #2033: HalfedgeMeshFeatures.CanonicalPolygonNormalsClassifyQuadPair .............................   Passed    0.01 sec
+      Start 2034: HalfedgeMeshFeatures.EvolvingSimplificationPredicateReadsCurrentNormals
+25/26 Test #2034: HalfedgeMeshFeatures.EvolvingSimplificationPredicateReadsCurrentNormals ..................   Passed    0.01 sec
+      Start 2035: HalfedgeMeshFeatures.MaterializesExactCanonicalBoolProperty
+26/26 Test #2035: HalfedgeMeshFeatures.MaterializesExactCanonicalBoolProperty ..............................   Passed    0.01 sec
+
+100% tests passed, 0 tests failed out of 26
+
+Label Time Summary:
+geometry    =   0.17 sec*proc (26 tests)
+unit        =   0.17 sec*proc (26 tests)
+
+Total Test time (real) =   0.92 sec

@@ -236,6 +236,15 @@ v1 comparison lane. They do not execute A-D, select v2, read confirmation
 parameters, or support convergence, performance, runtime/UI, or production
 claims.
 
+The accepted non-claim scratch-007 replay at exact source `251f2dab` passed all
+seventeen frozen fixture gates. The cylinder pair recorded zero hard features,
+exact v1 payload parity, at most `0.000000008` normalized radial error, and at
+most `0.000000015` paired-edge delta. The smooth pair recorded zero hard
+features, zero label and boundary-mask error, exactly two regions and 24
+reference boundary edges, two endpoints, no junction, and a normalized sampled
+symmetric-distance upper bound of `0.000049835`. ARA C43 limits this result to
+fixture/oracle integrity; it does not select or evaluate candidate A-D.
+
 Candidate A runs every control directly. Candidate B must run the same controls
 after coarse-to-fine transfer and is killed by any lost mandatory fold or
 coarse-level plane/cylinder artifact. Candidate C remains a quality comparator

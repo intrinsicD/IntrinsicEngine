@@ -1277,3 +1277,37 @@
 - **Tags**: geometry, curvature segmentation, sharp features, isometric fold,
   CPU reference, fixture control, scratch, bounded result
 - **From staging**: O145
+
+## C43: Paired surface controls validate the cylinder and smooth-transition oracles
+- **Statement**: On exact implementation commit
+  `251f2dabd3096fe50cb7a9c0f70ece4278ca5816`, METHOD-038's deterministic
+  paired open-cylinder phases classify zero hard-feature edges, preserve the
+  analytic radius within `0.000000008` and paired edge lengths within
+  `0.000000015` of the reference bounding-box diagonal, and produce identical
+  one-component, one-region, zero-boundary v1 payloads. Its paired-diagonal
+  smooth-transition controls classify zero hard-feature edges and reproduce
+  the exact 24-edge `x=0`, `z=0.5` reference mask with zero face-label and
+  boundary-mask error, two endpoints, no junction, and a normalized sampled
+  symmetric-distance upper bound of `0.000049835`.
+- **Status**: supported — non-claim-eligible serial CPU scratch fixture/oracle
+  integrity only; all seventeen frozen gates pass and independent custody
+  keeps `claim_authorized: false`; no candidate A-D, v2, broader corpus,
+  confirmation, refinement convergence, performance, runtime/UI, Vulkan, GPU,
+  or production behavior is covered
+- **Provenance**: ai-executed
+- **Crystallized via**: artifact-commitment
+- **Falsification criteria**: Repeating the exact frozen source and protocol
+  classifies any hard-feature edge, exceeds any frozen analytic-geometry or
+  paired-edge gate, changes the cylinder v1 payload, produces anything other
+  than two smooth regions and the exact 24-edge reference mask, or fails any
+  of the seventeen preregistered gates.
+- **Proof**: [benchmarks/runners/CurvatureSegmentationProfileRunner.cpp,
+  benchmarks/geometry/manifests/curvature_segmentation_screening_surface_controls.yaml,
+  tasks/evidence/METHOD-038/experiment/protocol.yaml,
+  tasks/evidence/METHOD-038/experiment/inputs/surface_controls_benchmark_result.json,
+  tasks/evidence/METHOD-038/experiment/runs/scratch-007/bundle.yaml,
+  tasks/evidence/METHOD-038/experiment/runs/scratch-007/audit.json]
+- **Dependencies**: [C38, C39, C42]
+- **Tags**: geometry, curvature segmentation, cylinder, smooth transition,
+  continuous boundary, CPU reference, fixture control, scratch, bounded result
+- **From staging**: O146

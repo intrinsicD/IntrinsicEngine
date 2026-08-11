@@ -1,0 +1,210 @@
+schema_version: 1
+task_id: METHOD-038
+run_id: scratch-007
+attempt_id: attempt-007
+created_at: '2026-08-11T04:42:48Z'
+protocol_digest: b9a484e4d482d92a23400bff5b4ca7be98f10bb16f54eef0c64e14f39aa73774
+provenance:
+  source:
+    revision: 251f2dabd3096fe50cb7a9c0f70ece4278ca5816
+    clean: true
+  task_sha256: a5ee1b9bb350c4ce51eac9efc909f885a5f19d3ee8bd03cf74d815ab1ccf17a9
+  implementation_digest: bfaf8aeda5b1821cdad4add5ecd13fafd93d1c127d5ea2f5bd4dd273932a4e5f
+  datasets:
+  - id: cylinder-smooth-transition-paired-controls-v1
+    path: benchmarks/runners/CurvatureSegmentationProfileRunner.cpp
+    sha256: 0580b8d8a8fc6cf13144695ae48fd12487a0ea6542f185451dfc15bf516c6eb9
+    split: scratch
+resolved_config:
+  path: benchmarks/geometry/manifests/curvature_segmentation_screening_surface_controls.yaml
+  sha256: ab34e13d076ff7173d5ad6f064b77db84a68dde45fb7a497aa364baf12c194dc
+environment:
+  path: CMakePresets.json
+  sha256: d852b3973bf46f499f592379e17990c5b1f8c14b8aa565bd07e92a64347a0bba
+raw_rows:
+  path: tasks/evidence/METHOD-038/experiment/runs/scratch-007/raw_rows.jsonl
+  sha256: 4e4daf95d83badacb4a67a62576a19c2d11d74758fc7a243a657b260d89ff226
+  row_count: 1
+summaries:
+- name: feature_mask_error
+  column: feature_mask_error
+  statistic: mean
+  value: 0.0
+- name: geometric_or_boundary_error
+  column: geometric_or_boundary_error
+  statistic: mean
+  value: 4.9835e-05
+- name: cylinder_radial_error
+  column: cylinder_radial_error
+  statistic: mean
+  value: 8.0e-09
+- name: cylinder_edge_length_delta
+  column: cylinder_edge_length_delta
+  statistic: mean
+  value: 1.5e-08
+- name: smooth_surface_equation_error
+  column: smooth_surface_equation_error
+  statistic: mean
+  value: 1.2e-08
+- name: v1_component_deviation
+  column: v1_component_deviation
+  statistic: mean
+  value: 0.0
+- name: v1_region_deviation
+  column: v1_region_deviation
+  statistic: mean
+  value: 0.0
+- name: v1_boundary_deviation
+  column: v1_boundary_deviation
+  statistic: mean
+  value: 0.0
+- name: cylinder_payload_mismatch
+  column: cylinder_payload_mismatch
+  statistic: mean
+  value: 0.0
+- name: smooth_label_error
+  column: smooth_label_error
+  statistic: mean
+  value: 0.0
+- name: smooth_boundary_mask_error
+  column: smooth_boundary_mask_error
+  statistic: mean
+  value: 0.0
+- name: orientation_failure_count
+  column: orientation_failure_count
+  statistic: mean
+  value: 0.0
+- name: analytic_contract_failure_count
+  column: analytic_contract_failure_count
+  statistic: mean
+  value: 0.0
+- name: endpoint_junction_failure_count
+  column: endpoint_junction_failure_count
+  statistic: mean
+  value: 0.0
+- name: variant_population
+  column: variant_population
+  statistic: mean
+  value: 4.0
+- name: variant_failure_count
+  column: variant_failure_count
+  statistic: mean
+  value: 0.0
+- name: benchmark_failure_count
+  column: benchmark_failure_count
+  statistic: mean
+  value: 0.0
+gates:
+- metric: feature_mask_error
+  operator: <=
+  threshold: 0.0
+  observed: 0.0
+  passed: true
+- metric: geometric_or_boundary_error
+  operator: <=
+  threshold: 0.02
+  observed: 4.9835e-05
+  passed: true
+- metric: cylinder_radial_error
+  operator: <=
+  threshold: 1.0e-06
+  observed: 8.0e-09
+  passed: true
+- metric: cylinder_edge_length_delta
+  operator: <=
+  threshold: 1.0e-06
+  observed: 1.5e-08
+  passed: true
+- metric: smooth_surface_equation_error
+  operator: <=
+  threshold: 1.0e-06
+  observed: 1.2e-08
+  passed: true
+- metric: v1_component_deviation
+  operator: <=
+  threshold: 0
+  observed: 0.0
+  passed: true
+- metric: v1_region_deviation
+  operator: <=
+  threshold: 0
+  observed: 0.0
+  passed: true
+- metric: v1_boundary_deviation
+  operator: <=
+  threshold: 0
+  observed: 0.0
+  passed: true
+- metric: cylinder_payload_mismatch
+  operator: <=
+  threshold: 0
+  observed: 0.0
+  passed: true
+- metric: smooth_label_error
+  operator: <=
+  threshold: 0.02
+  observed: 0.0
+  passed: true
+- metric: smooth_boundary_mask_error
+  operator: <=
+  threshold: 0.0
+  observed: 0.0
+  passed: true
+- metric: orientation_failure_count
+  operator: <=
+  threshold: 0
+  observed: 0.0
+  passed: true
+- metric: analytic_contract_failure_count
+  operator: <=
+  threshold: 0
+  observed: 0.0
+  passed: true
+- metric: endpoint_junction_failure_count
+  operator: <=
+  threshold: 0
+  observed: 0.0
+  passed: true
+- metric: variant_population
+  operator: ==
+  threshold: 4
+  observed: 4.0
+  passed: true
+- metric: variant_failure_count
+  operator: <=
+  threshold: 0
+  observed: 0.0
+  passed: true
+- metric: benchmark_failure_count
+  operator: <=
+  threshold: 0
+  observed: 0.0
+  passed: true
+diagnostics:
+- schema-v2-result-passed
+- cylinder-zero-hard-features-one-region-payload-parity
+- smooth-zero-hard-features-exact-24-edge-reference-mask
+- candidate-selection-none
+links:
+- path: tasks/evidence/METHOD-038/experiment/protocol.yaml
+  sha256: 279d08318a3663f863e8c479e3a586a9985ce0e0bcdbf491c00e97f4adfd5abb
+- path: benchmarks/runners/CurvatureSegmentationProfileRunner.cpp
+  sha256: 0580b8d8a8fc6cf13144695ae48fd12487a0ea6542f185451dfc15bf516c6eb9
+- path: benchmarks/geometry/manifests/curvature_segmentation_screening_surface_controls.yaml
+  sha256: ab34e13d076ff7173d5ad6f064b77db84a68dde45fb7a497aa364baf12c194dc
+- path: tasks/evidence/METHOD-038/experiment/inputs/surface_controls_benchmark_result.json
+  sha256: 5dac8bda98cc6fc41492347b071274b18e488f4d0a2fbc5e956450f2b9cdb225
+visual: false
+previews: []
+replay_command:
+- python3
+- -c
+- import subprocess, sys, yaml; from pathlib import Path; protocol = yaml.safe_load(Path("tasks/evidence/METHOD-038/experiment/protocol.yaml").read_text(encoding="utf-8"));
+  sys.exit(subprocess.run(protocol["command"], check=False).returncode)
+view_command:
+- jq
+- .
+- tasks/evidence/METHOD-038/experiment/runs/scratch-007/raw_rows.jsonl
+smoke_receipts:
+- tasks/evidence/METHOD-038/commands/scratch-surface-controls-007.json
+claim_authorized: false

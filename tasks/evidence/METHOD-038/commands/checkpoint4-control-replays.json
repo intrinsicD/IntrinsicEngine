@@ -1,0 +1,23 @@
+{
+  "command": [
+    "/bin/bash",
+    "-o",
+    "pipefail",
+    "-c",
+    "set -eu; surface_output=$(mktemp -d /tmp/method038-surface-replay.XXXXXX); fold_output=$(mktemp -d /tmp/method038-fold-replay.XXXXXX); GIT_COMMIT=251f2dabd3096fe50cb7a9c0f70ece4278ca5816 INTRINSIC_CURVATURE_PROFILE_COHORT=surface_controls build/ci/bin/IntrinsicCurvatureSegmentationProfile \"$surface_output\"; GIT_COMMIT=f622cd0e50229a77564173f0a3afea5e66c96a95 INTRINSIC_CURVATURE_PROFILE_COHORT=screening build/ci/bin/IntrinsicCurvatureSegmentationProfile \"$fold_output\"; jq -e '.status == \"passed\" and .metrics.population_count == 4' \"$surface_output/geometry.curvature_segmentation.screening.surface_controls.json\" >/dev/null; jq -e '.status == \"passed\" and .metrics.population_count == 3' \"$fold_output/geometry.curvature_segmentation.screening.fold_controls.json\" >/dev/null"
+  ],
+  "command_display": "/bin/bash -o pipefail -c 'set -eu; surface_output=$(mktemp -d /tmp/method038-surface-replay.XXXXXX); fold_output=$(mktemp -d /tmp/method038-fold-replay.XXXXXX); GIT_COMMIT=251f2dabd3096fe50cb7a9c0f70ece4278ca5816 INTRINSIC_CURVATURE_PROFILE_COHORT=surface_controls build/ci/bin/IntrinsicCurvatureSegmentationProfile \"$surface_output\"; GIT_COMMIT=f622cd0e50229a77564173f0a3afea5e66c96a95 INTRINSIC_CURVATURE_PROFILE_COHORT=screening build/ci/bin/IntrinsicCurvatureSegmentationProfile \"$fold_output\"; jq -e '\"'\"'.status == \"passed\" and .metrics.population_count == 4'\"'\"' \"$surface_output/geometry.curvature_segmentation.screening.surface_controls.json\" >/dev/null; jq -e '\"'\"'.status == \"passed\" and .metrics.population_count == 3'\"'\"' \"$fold_output/geometry.curvature_segmentation.screening.fold_controls.json\" >/dev/null'",
+  "cwd": ".",
+  "duration_ms": 372,
+  "exit_code": 0,
+  "finished_at": "2026-08-11T04:44:32Z",
+  "label": "checkpoint4-control-replays",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-11T04:44:32Z",
+  "stderr_path": "tasks/evidence/METHOD-038/commands/checkpoint4-control-replays.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/METHOD-038/commands/checkpoint4-control-replays.stdout.log",
+  "stdout_sha256": "8b372a019ac65cc492246ee387e6b5378e58510281103fcedd65e7695abaedd7",
+  "task_id": "METHOD-038"
+}
