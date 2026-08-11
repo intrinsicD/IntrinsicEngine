@@ -17,12 +17,14 @@
 
 import Geometry.HalfedgeMesh;
 import Geometry.HalfedgeMesh.Builder;
+import Geometry.HalfedgeMesh.CurvatureSegmentation.Features;
 import Geometry.HalfedgeMesh.Features;
 import Geometry.Properties;
 
 namespace
 {
     namespace Features = Geometry::HalfedgeMesh::Features;
+    namespace FeatureDetector = Geometry::CurvatureSegmentation;
     using Geometry::EdgeHandle;
     using Geometry::FaceHandle;
     using Geometry::HalfedgeHandle;
@@ -247,30 +249,30 @@ namespace
         const CurvatureFn& curvature,
         const PatchFn& patch,
         const std::initializer_list<LineEvidence> lines = {},
-        const bool flippedDiagonals = false)
+        const bool flippedDiagonals = false,
+        const std::uint32_t rows = 8u,
+        const std::uint32_t columns = 16u)
     {
-        constexpr std::uint32_t kRows = 8u;
-        constexpr std::uint32_t kColumns = 16u;
         OracleFixture fixture{};
         fixture.Id = std::move(id);
         const std::size_t vertexCount =
-            static_cast<std::size_t>(kRows + 1u) * (kColumns + 1u);
+            static_cast<std::size_t>(rows + 1u) * (columns + 1u);
         const std::size_t faceCount =
-            2u * static_cast<std::size_t>(kRows) * kColumns;
+            2u * static_cast<std::size_t>(rows) * columns;
         fixture.Surface.Reserve(vertexCount, 2u * faceCount, faceCount);
         fixture.K1.resize(vertexCount);
         fixture.K2.resize(vertexCount);
 
         std::vector<VertexHandle> vertices;
         vertices.reserve(vertexCount);
-        for (std::uint32_t row = 0u; row <= kRows; ++row)
+        for (std::uint32_t row = 0u; row <= rows; ++row)
         {
             const double y = -1.0 + 2.0 * static_cast<double>(row)
-                / static_cast<double>(kRows);
-            for (std::uint32_t column = 0u; column <= kColumns; ++column)
+                / static_cast<double>(rows);
+            for (std::uint32_t column = 0u; column <= columns; ++column)
             {
                 const double x = -1.0 + 2.0 * static_cast<double>(column)
-                    / static_cast<double>(kColumns);
+                    / static_cast<double>(columns);
                 const VertexHandle vertex = fixture.Surface.AddVertex({
                     static_cast<float>(x),
                     static_cast<float>(y),
@@ -287,7 +289,7 @@ namespace
                                   const std::uint32_t column)
         {
             return vertices[
-                static_cast<std::size_t>(row) * (kColumns + 1u) + column];
+                static_cast<std::size_t>(row) * (columns + 1u) + column];
         };
         const auto addFace = [&](const VertexHandle a,
                                  const VertexHandle b,
@@ -310,9 +312,9 @@ namespace
                 patch(centroid.x, centroid.y);
         };
 
-        for (std::uint32_t row = 0u; row < kRows; ++row)
+        for (std::uint32_t row = 0u; row < rows; ++row)
         {
-            for (std::uint32_t column = 0u; column < kColumns; ++column)
+            for (std::uint32_t column = 0u; column < columns; ++column)
             {
                 const VertexHandle v00 = vertexAt(row, column);
                 const VertexHandle v10 = vertexAt(row, column + 1u);
@@ -341,11 +343,11 @@ namespace
             if (line.Axis == LineAxis::X)
             {
                 const auto column = static_cast<std::uint32_t>(std::llround(
-                    0.5 * (line.Coordinate + 1.0) * kColumns));
-                EXPECT_LE(column, kColumns);
-                if (column > kColumns)
+                    0.5 * (line.Coordinate + 1.0) * columns));
+                EXPECT_LE(column, columns);
+                if (column > columns)
                     continue;
-                for (std::uint32_t row = 0u; row < kRows; ++row)
+                for (std::uint32_t row = 0u; row < rows; ++row)
                 {
                     const auto edge = fixture.Surface.FindEdge(
                         vertexAt(row, column), vertexAt(row + 1u, column));
@@ -360,11 +362,11 @@ namespace
             else
             {
                 const auto row = static_cast<std::uint32_t>(std::llround(
-                    0.5 * (line.Coordinate + 1.0) * kRows));
-                EXPECT_LE(row, kRows);
-                if (row > kRows)
+                    0.5 * (line.Coordinate + 1.0) * rows));
+                EXPECT_LE(row, rows);
+                if (row > rows)
                     continue;
-                for (std::uint32_t column = 0u; column < kColumns; ++column)
+                for (std::uint32_t column = 0u; column < columns; ++column)
                 {
                     const auto edge = fixture.Surface.FindEdge(
                         vertexAt(row, column), vertexAt(row, column + 1u));
@@ -789,6 +791,176 @@ namespace
         }
         return true;
     }
+
+    [[nodiscard]] std::vector<OracleFixture> MakeDetectorControlCatalog(
+        const bool flippedDiagonals)
+    {
+        constexpr std::uint32_t rows = 24u;
+        constexpr std::uint32_t columns = 48u;
+        constexpr double smoothWidth = 0.08;
+        constexpr double ridgeWidth = 0.20;
+        const std::string phase = flippedDiagonals ? "_phase_b" : "_phase_a";
+        const auto splitX = [](const double x, double)
+        { return x >= 0.0 ? 1u : 0u; };
+        const auto smoothHeight = [](const double x, double)
+        { return 0.5 * (1.0 + std::tanh(x / smoothWidth)); };
+        const auto smoothCurvature = [](const double x, double)
+        {
+            const double tangent = std::tanh(x / smoothWidth);
+            const double sechSquared = 1.0 - tangent * tangent;
+            const double first = 0.5 * sechSquared / smoothWidth;
+            const double second =
+                -sechSquared * tangent / (smoothWidth * smoothWidth);
+            const double k = second / std::pow(1.0 + first * first, 1.5);
+            return glm::dvec2{std::max(k, 0.0), std::min(k, 0.0)};
+        };
+        const auto ridgeHeight = [](const double x, double)
+        { return std::exp(-(x * x) / (ridgeWidth * ridgeWidth)); };
+        const auto ridgeCurvature = [](const double x, double)
+        {
+            const double q = std::exp(-(x * x) / (ridgeWidth * ridgeWidth));
+            const double first = -2.0 * x * q / (ridgeWidth * ridgeWidth);
+            const double second = q * (
+                4.0 * x * x / std::pow(ridgeWidth, 4.0)
+                - 2.0 / (ridgeWidth * ridgeWidth));
+            const double k = second / std::pow(1.0 + first * first, 1.5);
+            return glm::dvec2{std::max(k, 0.0), std::min(k, 0.0)};
+        };
+
+        std::vector<OracleFixture> fixtures;
+        fixtures.reserve(6u);
+        fixtures.push_back(MakeGraphGrid(
+            "detector_smooth_transition" + phase,
+            smoothHeight,
+            smoothCurvature,
+            splitX,
+            {{LineAxis::X, 0.0, false, 1.0}},
+            flippedDiagonals,
+            rows,
+            columns));
+        fixtures.push_back(MakeGraphGrid(
+            "detector_ridge" + phase,
+            ridgeHeight,
+            ridgeCurvature,
+            splitX,
+            {{LineAxis::X, 0.0, false, 0.9}},
+            flippedDiagonals,
+            rows,
+            columns));
+        fixtures.push_back(MakeGraphGrid(
+            "detector_valley" + phase,
+            [&](const double x, const double y)
+            { return -ridgeHeight(x, y); },
+            [&](const double x, const double y)
+            {
+                const glm::dvec2 k = ridgeCurvature(x, y);
+                return glm::dvec2{-k.y, -k.x};
+            },
+            splitX,
+            {{LineAxis::X, 0.0, false, 0.9}},
+            flippedDiagonals,
+            rows,
+            columns));
+        fixtures.push_back(MakeGraphGrid(
+            "detector_nearby_pair" + phase,
+            [](double, double) { return 0.0; },
+            [](const double x, double)
+            {
+                if (x > -0.25 && x < 0.25)
+                    return glm::dvec2{1.0, 0.0};
+                if (x == -0.25 || x == 0.25)
+                    return glm::dvec2{0.0};
+                return glm::dvec2{0.0, -1.0};
+            },
+            [](const double x, double)
+            {
+                if (x < -0.25)
+                    return 0u;
+                return x < 0.25 ? 1u : 2u;
+            },
+            {{LineAxis::X, -0.25, false, 0.9},
+             {LineAxis::X, 0.25, false, 0.9}},
+            flippedDiagonals,
+            rows,
+            columns));
+        fixtures.push_back(MakeGraphGrid(
+            "detector_junction" + phase,
+            [](double, double) { return 0.0; },
+            [](const double x, const double y)
+            {
+                if (x == 0.0 || y == 0.0)
+                    return glm::dvec2{0.0};
+                if (x >= 0.0 && y >= 0.0)
+                    return glm::dvec2{1.0, 1.0};
+                if (x < 0.0 && y < 0.0)
+                    return glm::dvec2{-1.0, -1.0};
+                return glm::dvec2{1.0, -1.0};
+            },
+            [](const double x, const double y)
+            {
+                return static_cast<std::uint32_t>(x >= 0.0)
+                    + 2u * static_cast<std::uint32_t>(y >= 0.0);
+            },
+            {{LineAxis::X, 0.0, false, 1.0},
+             {LineAxis::Y, 0.0, false, 1.0}},
+            flippedDiagonals,
+            rows,
+            columns));
+        fixtures.push_back(MakeGraphGrid(
+            "detector_open_termination" + phase,
+            [](double, double) { return 0.0; },
+            [](const double x, double)
+            {
+                if (x == 0.0)
+                    return glm::dvec2{0.0};
+                return glm::dvec2{x > 0.0 ? 1.0 : -1.0, 0.0};
+            },
+            splitX,
+            {{LineAxis::X, 0.0, false, 0.8}},
+            flippedDiagonals,
+            rows,
+            columns));
+        return fixtures;
+    }
+
+    [[nodiscard]] FeatureDetector::FeatureEvidenceParams DetectorParamsFor(
+        const OracleFixture& fixture)
+    {
+        FeatureDetector::FeatureEvidenceParams params{};
+        if (fixture.Id.starts_with("detector_ridge")
+            || fixture.Id.starts_with("detector_valley"))
+        {
+            // These tests isolate the smooth R/V path. On the deliberately
+            // steep graph itself, the default 45-degree classifier correctly
+            // owns the center line as hard evidence.
+            params.HardDihedralThresholdDegrees = 180.0;
+        }
+        return params;
+    }
+
+    [[nodiscard]] std::vector<glm::dvec3> FaceNormals(
+        const Mesh& mesh)
+    {
+        std::vector<glm::dvec3> normals(
+            mesh.FacesSize(), glm::dvec3{0.0});
+        for (const FaceHandle face : mesh.LiveFaces())
+        {
+            std::array<glm::dvec3, 3u> points{};
+            std::size_t index = 0u;
+            for (const VertexHandle vertex : mesh.VerticesAroundFace(face))
+                points[index++] = glm::dvec3(mesh.Position(vertex));
+            normals[face.Index] = glm::normalize(glm::cross(
+                points[1u] - points[0u], points[2u] - points[0u]));
+        }
+        return normals;
+    }
+
+    [[nodiscard]] std::size_t ThreeBitCount(const std::uint8_t mask) noexcept
+    {
+        return static_cast<std::size_t>(mask & 1u)
+            + static_cast<std::size_t>((mask >> 1u) & 1u)
+            + static_cast<std::size_t>((mask >> 2u) & 1u);
+    }
 }
 
 TEST(CurvaturePatchContract,
@@ -1016,4 +1188,434 @@ TEST(CurvaturePatchContract, SuppliedEvidenceFailsClosedBeforePatchWork)
             fixture.K2,
             {fixture.HardEdgeMask, fixture.SoftEdgeConfidence}),
         EvidenceStatus::UnsupportedSubmeshView);
+}
+
+TEST(CurvaturePatchContract,
+     FeatureDetectorConsumesSharedHardFactsAndRejectsConstantSoftSignals)
+{
+    std::vector<OracleFixture> fixtures = MakeOracleCatalog();
+    ASSERT_GE(fixtures.size(), 9u);
+    for (std::size_t fixtureIndex = 0u; fixtureIndex < 9u; ++fixtureIndex)
+    {
+        OracleFixture& fixture = fixtures[fixtureIndex];
+        SCOPED_TRACE(fixture.Id);
+        FeatureDetector::FeatureEvidenceParams params{};
+        const FeatureDetector::FeatureEvidenceResult result =
+            FeatureDetector::DetectFeatureEvidence(
+                fixture.Surface, fixture.K1, fixture.K2, params);
+        ASSERT_TRUE(result.Succeeded())
+            << FeatureDetector::ToString(result.Diagnostics.Status);
+
+        Features::Params sharedParams{};
+        sharedParams.BoundaryIsFeature = false;
+        sharedParams.DihedralThresholdDegrees = 45.0;
+        const Features::Classification shared = Features::Classify(
+            fixture.Surface, FaceNormals(fixture.Surface), sharedParams);
+        ASSERT_EQ(shared.Status, Features::ClassificationStatus::Success);
+        EXPECT_EQ(result.HardEdgeMask, shared.EdgeFeatureMask);
+        EXPECT_EQ(
+            result.Diagnostics.HardFeatureEdgeCount,
+            shared.FeatureEdgeCount);
+        EXPECT_TRUE(std::ranges::all_of(
+            result.EdgeRawConfidence,
+            [](const double value) { return value == 0.0; }));
+        EXPECT_TRUE(std::ranges::all_of(
+            result.SoftEdgeConfidence,
+            [](const double value) { return value == 0.0; }));
+        EXPECT_EQ(
+            result.Diagnostics.BoundedSearchCount,
+            6u * result.Diagnostics.InteriorCandidateEdgeCount);
+        EXPECT_EQ(result.View().HardEdgeMask.size(), fixture.Surface.EdgesSize());
+        EXPECT_EQ(
+            result.View().SoftEdgeConfidence.size(),
+            fixture.Surface.EdgesSize());
+
+        if (fixture.Id.starts_with("strict_fold_30"))
+            EXPECT_EQ(result.Diagnostics.HardFeatureEdgeCount, 0u);
+        if (fixture.Id.starts_with("strict_fold_60"))
+            EXPECT_EQ(result.Diagnostics.HardFeatureEdgeCount, 8u);
+    }
+
+    OracleFixture plane = std::move(fixtures.front());
+    FeatureDetector::FeatureEvidenceParams boundaryParams{};
+    boundaryParams.BoundaryIsHardFeature = true;
+    const FeatureDetector::FeatureEvidenceResult boundaryResult =
+        FeatureDetector::DetectFeatureEvidence(
+            plane.Surface, plane.K1, plane.K2, boundaryParams);
+    ASSERT_TRUE(boundaryResult.Succeeded());
+    EXPECT_EQ(
+        boundaryResult.Diagnostics.HardFeatureEdgeCount,
+        boundaryResult.Diagnostics.SourceBoundaryEdgeCount);
+    EXPECT_GT(boundaryResult.Diagnostics.HardFeatureEdgeCount, 0u);
+}
+
+TEST(CurvaturePatchContract,
+     FeatureDetectorImplementsFrozenPerSignalScaleEquations)
+{
+    Mesh mesh{};
+    const VertexHandle v0 = mesh.AddVertex({0.0f, 0.0f, 0.0f});
+    const VertexHandle v1 = mesh.AddVertex({1.0f, 0.0f, 0.0f});
+    const VertexHandle v2 = mesh.AddVertex({1.0f, 1.0f, 0.0f});
+    const VertexHandle v3 = mesh.AddVertex({0.0f, 1.0f, 0.0f});
+    ASSERT_TRUE(mesh.AddTriangle(v0, v1, v2).has_value());
+    ASSERT_TRUE(mesh.AddTriangle(v0, v2, v3).has_value());
+    const auto interior = mesh.FindEdge(v0, v2);
+    ASSERT_TRUE(interior.has_value());
+
+    std::vector<double> transitionK1(mesh.VerticesSize(), 0.0);
+    std::vector<double> transitionK2(mesh.VerticesSize(), 0.0);
+    transitionK1[v1.Index] = 30.0;
+    transitionK2[v3.Index] = -30.0;
+    const FeatureDetector::FeatureEvidenceResult transition =
+        FeatureDetector::DetectFeatureEvidence(
+            mesh, transitionK1, transitionK2);
+    ASSERT_TRUE(transition.Succeeded());
+
+    std::vector<double> ridgeK1(mesh.VerticesSize(), 0.0);
+    std::vector<double> ridgeK2(mesh.VerticesSize(), 0.0);
+    ridgeK1[v0.Index] = 30.0;
+    ridgeK1[v2.Index] = 30.0;
+    const FeatureDetector::FeatureEvidenceResult ridge =
+        FeatureDetector::DetectFeatureEvidence(mesh, ridgeK1, ridgeK2);
+    ASSERT_TRUE(ridge.Succeeded());
+
+    std::vector<double> valleyK1(mesh.VerticesSize(), 0.0);
+    std::vector<double> valleyK2(mesh.VerticesSize(), 0.0);
+    valleyK2[v0.Index] = -30.0;
+    valleyK2[v2.Index] = -30.0;
+    const FeatureDetector::FeatureEvidenceResult valley =
+        FeatureDetector::DetectFeatureEvidence(mesh, valleyK1, valleyK2);
+    ASSERT_TRUE(valley.Succeeded());
+
+    for (std::size_t scale = 0u;
+         scale < FeatureDetector::kFeatureEvidenceScaleCount;
+         ++scale)
+    {
+        const std::size_t index =
+            interior->Index * FeatureDetector::kFeatureEvidenceScaleCount
+            + scale;
+        EXPECT_DOUBLE_EQ(transition.TransitionResponse[index], 1.0);
+        EXPECT_DOUBLE_EQ(transition.RidgeResponse[index], 0.0);
+        EXPECT_DOUBLE_EQ(transition.ValleyResponse[index], 0.0);
+
+        const double expectedExtremality = 1.0 - std::exp(
+            -10.0 * ridge.ScaleRadiiWorld[scale] / 0.10);
+        EXPECT_NEAR(ridge.RidgeResponse[index], expectedExtremality, 1.0e-12);
+        EXPECT_DOUBLE_EQ(ridge.TransitionResponse[index], 0.0);
+        EXPECT_DOUBLE_EQ(ridge.ValleyResponse[index], 0.0);
+        EXPECT_NEAR(valley.ValleyResponse[index], expectedExtremality, 1.0e-12);
+        EXPECT_DOUBLE_EQ(valley.TransitionResponse[index], 0.0);
+        EXPECT_DOUBLE_EQ(valley.RidgeResponse[index], 0.0);
+    }
+
+    EXPECT_DOUBLE_EQ(transition.SoftEdgeConfidence[interior->Index], 1.0);
+    EXPECT_EQ(
+        ridge.EdgeDominantSignal[interior->Index],
+        FeatureDetector::SoftFeatureSignal::Ridge);
+    EXPECT_EQ(
+        valley.EdgeDominantSignal[interior->Index],
+        FeatureDetector::SoftFeatureSignal::Valley);
+    EXPECT_EQ(
+        ridge.EdgeDecision[interior->Index],
+        FeatureDetector::FeatureEdgeDecision::RetainedStrong);
+    EXPECT_EQ(ridge.EdgePersistentScaleMask[interior->Index], 0x7u);
+    EXPECT_EQ(ridge.Diagnostics.EndpointVertexCount, 2u);
+    EXPECT_EQ(ridge.Diagnostics.JunctionVertexCount, 0u);
+}
+
+TEST(CurvaturePatchContract,
+     FeatureDetectorRecoversPersistentLinesEndpointsAndJunctions)
+{
+    for (const bool flipped : {false, true})
+    {
+        std::vector<OracleFixture> fixtures =
+            MakeDetectorControlCatalog(flipped);
+        ASSERT_EQ(fixtures.size(), 6u);
+        for (OracleFixture& fixture : fixtures)
+        {
+            SCOPED_TRACE(fixture.Id);
+            const FeatureDetector::FeatureEvidenceParams params =
+                DetectorParamsFor(fixture);
+            const FeatureDetector::FeatureEvidenceResult result =
+                FeatureDetector::DetectFeatureEvidence(
+                    fixture.Surface, fixture.K1, fixture.K2, params);
+            ASSERT_TRUE(result.Succeeded())
+                << FeatureDetector::ToString(result.Diagnostics.Status);
+            EXPECT_EQ(result.Diagnostics.HardFeatureEdgeCount, 0u);
+            EXPECT_EQ(
+                result.Diagnostics.BoundedSearchCount,
+                6u * result.Diagnostics.InteriorCandidateEdgeCount);
+            EXPECT_GT(result.Diagnostics.SettledFaceVisitCount, 0u);
+            EXPECT_GT(result.Diagnostics.MaximumNeighborhoodFaceCount, 0u);
+
+            std::size_t expectedCount = 0u;
+            std::size_t detectedCount = 0u;
+            for (const EdgeHandle edge : fixture.Surface.LiveEdges())
+            {
+                const bool expected =
+                    fixture.SoftEdgeConfidence[edge.Index] > 0.0;
+                const bool detected =
+                    result.SoftEdgeConfidence[edge.Index] > 0.0;
+                const HalfedgeHandle diagnosticHalfedge =
+                    fixture.Surface.Halfedge(edge, 0u);
+                EXPECT_EQ(detected, expected)
+                    << "edge " << edge.Index << " from "
+                    << fixture.Surface.Position(
+                        fixture.Surface.FromVertex(diagnosticHalfedge)).x
+                    << ',' << fixture.Surface.Position(
+                        fixture.Surface.FromVertex(diagnosticHalfedge)).y
+                    << " to "
+                    << fixture.Surface.Position(
+                        fixture.Surface.ToVertex(diagnosticHalfedge)).x
+                    << ',' << fixture.Surface.Position(
+                        fixture.Surface.ToVertex(diagnosticHalfedge)).y
+                    << " q=" << result.EdgeRawConfidence[edge.Index];
+                expectedCount += expected ? 1u : 0u;
+                detectedCount += detected ? 1u : 0u;
+                if (!detected)
+                    continue;
+                EXPECT_GE(
+                    ThreeBitCount(result.EdgePersistentScaleMask[edge.Index]),
+                    2u);
+                EXPECT_EQ(result.EdgeNonMaximumSurvivor[edge.Index], 1u);
+                EXPECT_TRUE(
+                    result.EdgeDecision[edge.Index]
+                        == FeatureDetector::FeatureEdgeDecision::RetainedStrong
+                    || result.EdgeDecision[edge.Index]
+                        == FeatureDetector::FeatureEdgeDecision::RetainedWeak);
+            }
+            EXPECT_EQ(detectedCount, expectedCount);
+            EXPECT_EQ(
+                result.Diagnostics.RetainedSoftEdgeCount,
+                expectedCount);
+
+            if (fixture.Id.starts_with("detector_nearby_pair"))
+            {
+                EXPECT_EQ(result.Diagnostics.EndpointVertexCount, 4u);
+                EXPECT_EQ(result.Diagnostics.JunctionVertexCount, 0u);
+            }
+            else if (fixture.Id.starts_with("detector_junction"))
+            {
+                EXPECT_EQ(result.Diagnostics.EndpointVertexCount, 4u);
+                EXPECT_EQ(result.Diagnostics.JunctionVertexCount, 1u);
+            }
+            else
+            {
+                EXPECT_EQ(result.Diagnostics.EndpointVertexCount, 2u);
+                EXPECT_EQ(result.Diagnostics.JunctionVertexCount, 0u);
+            }
+        }
+    }
+}
+
+TEST(CurvaturePatchContract,
+     FeatureDetectorSupportIsInvariantUnderGlobalOrientationReversal)
+{
+    std::vector<OracleFixture> fixtures = MakeDetectorControlCatalog(false);
+    ASSERT_GE(fixtures.size(), 3u);
+    for (std::size_t fixtureIndex = 0u; fixtureIndex < 3u; ++fixtureIndex)
+    {
+        OracleFixture& fixture = fixtures[fixtureIndex];
+        SCOPED_TRACE(fixture.Id);
+        const FeatureDetector::FeatureEvidenceParams params =
+            DetectorParamsFor(fixture);
+        const FeatureDetector::FeatureEvidenceResult forward =
+            FeatureDetector::DetectFeatureEvidence(
+                fixture.Surface, fixture.K1, fixture.K2, params);
+        ASSERT_TRUE(forward.Succeeded());
+
+        std::vector<double> reversedK1(fixture.K1.size(), 0.0);
+        std::vector<double> reversedK2(fixture.K2.size(), 0.0);
+        for (std::size_t vertex = 0u; vertex < fixture.K1.size(); ++vertex)
+        {
+            reversedK1[vertex] = -fixture.K2[vertex];
+            reversedK2[vertex] = -fixture.K1[vertex];
+        }
+        const FeatureDetector::FeatureEvidenceResult reversed =
+            FeatureDetector::DetectFeatureEvidence(
+                fixture.Surface, reversedK1, reversedK2, params);
+        ASSERT_TRUE(reversed.Succeeded());
+        EXPECT_EQ(forward.HardEdgeMask, reversed.HardEdgeMask);
+        EXPECT_EQ(
+            forward.EdgePersistentScaleMask,
+            reversed.EdgePersistentScaleMask);
+        EXPECT_EQ(
+            forward.EdgeNonMaximumSurvivor,
+            reversed.EdgeNonMaximumSurvivor);
+        EXPECT_EQ(forward.EdgeDecision, reversed.EdgeDecision);
+        ASSERT_EQ(
+            forward.SoftEdgeConfidence.size(),
+            reversed.SoftEdgeConfidence.size());
+        for (std::size_t edge = 0u;
+             edge < forward.SoftEdgeConfidence.size();
+             ++edge)
+        {
+            EXPECT_NEAR(
+                forward.SoftEdgeConfidence[edge],
+                reversed.SoftEdgeConfidence[edge],
+                1.0e-12);
+            EXPECT_NEAR(
+                forward.EdgeRawConfidence[edge],
+                reversed.EdgeRawConfidence[edge],
+                1.0e-12);
+        }
+        ASSERT_EQ(
+            forward.TransitionResponse.size(),
+            reversed.TransitionResponse.size());
+        for (std::size_t index = 0u;
+             index < forward.TransitionResponse.size();
+             ++index)
+        {
+            EXPECT_NEAR(
+                forward.TransitionResponse[index],
+                reversed.TransitionResponse[index],
+                1.0e-12);
+            EXPECT_NEAR(
+                forward.RidgeResponse[index],
+                reversed.ValleyResponse[index],
+                1.0e-12);
+            EXPECT_NEAR(
+                forward.ValleyResponse[index],
+                reversed.RidgeResponse[index],
+                1.0e-12);
+        }
+    }
+}
+
+TEST(CurvaturePatchContract, FeatureDetectorFailsClosedBeforeBoundedSearches)
+{
+    OracleFixture fixture = MakeGraphGrid(
+        "detector_validation_control",
+        [](double, double) { return 0.0; },
+        [](double, double) { return glm::dvec2{0.0}; },
+        [](double, double) { return 0u; });
+    const auto expectFailure = [](
+        const FeatureDetector::FeatureEvidenceResult& result,
+        const FeatureDetector::FeatureEvidenceStatus status)
+    {
+        EXPECT_EQ(result.Diagnostics.Status, status);
+        EXPECT_FALSE(result.Succeeded());
+        EXPECT_EQ(result.Diagnostics.BoundedSearchCount, 0u);
+    };
+
+    FeatureDetector::FeatureEvidenceParams invalidParams{};
+    invalidParams.BaseRadiusRatio = 0.0;
+    expectFailure(
+        FeatureDetector::DetectFeatureEvidence(
+            fixture.Surface, fixture.K1, fixture.K2, invalidParams),
+        FeatureDetector::FeatureEvidenceStatus::InvalidParameters);
+    invalidParams = {};
+    invalidParams.HardDihedralThresholdDegrees =
+        std::numeric_limits<double>::quiet_NaN();
+    expectFailure(
+        FeatureDetector::DetectFeatureEvidence(
+            fixture.Surface, fixture.K1, fixture.K2, invalidParams),
+        FeatureDetector::FeatureEvidenceStatus::InvalidParameters);
+
+    expectFailure(
+        FeatureDetector::DetectFeatureEvidence(
+            fixture.Surface, {}, fixture.K2),
+        FeatureDetector::FeatureEvidenceStatus::CurvatureCountMismatch);
+    std::vector<double> invalidK1 = fixture.K1;
+    invalidK1.front() = std::numeric_limits<double>::quiet_NaN();
+    expectFailure(
+        FeatureDetector::DetectFeatureEvidence(
+            fixture.Surface, invalidK1, fixture.K2),
+        FeatureDetector::FeatureEvidenceStatus::NonFiniteCurvature);
+    invalidK1.front() = -1.0;
+    expectFailure(
+        FeatureDetector::DetectFeatureEvidence(
+            fixture.Surface, invalidK1, fixture.K2),
+        FeatureDetector::FeatureEvidenceStatus::InvalidCurvatureOrder);
+
+    Mesh nonFiniteGeometry = fixture.Surface;
+    nonFiniteGeometry.Position(VertexHandle{0u}).x =
+        std::numeric_limits<float>::infinity();
+    expectFailure(
+        FeatureDetector::DetectFeatureEvidence(
+            nonFiniteGeometry, fixture.K1, fixture.K2),
+        FeatureDetector::FeatureEvidenceStatus::NonFinitePosition);
+
+    Mesh invalidTopology = fixture.Surface;
+    const EdgeHandle firstEdge = *invalidTopology.LiveEdges().begin();
+    invalidTopology.SetFace(
+        invalidTopology.Halfedge(firstEdge, 0u),
+        FaceHandle{static_cast<Geometry::PropertyIndex>(
+            invalidTopology.FacesSize() + 5u)});
+    expectFailure(
+        FeatureDetector::DetectFeatureEvidence(
+            invalidTopology, fixture.K1, fixture.K2),
+        FeatureDetector::FeatureEvidenceStatus::InvalidTopology);
+
+    Mesh quad{};
+    const std::array<VertexHandle, 4u> quadVertices{
+        quad.AddVertex({0.0f, 0.0f, 0.0f}),
+        quad.AddVertex({1.0f, 0.0f, 0.0f}),
+        quad.AddVertex({1.0f, 1.0f, 0.0f}),
+        quad.AddVertex({0.0f, 1.0f, 0.0f}),
+    };
+    ASSERT_TRUE(quad.AddFace(quadVertices).has_value());
+    const std::vector<double> quadCurvature(quad.VerticesSize(), 0.0);
+    expectFailure(
+        FeatureDetector::DetectFeatureEvidence(
+            quad, quadCurvature, quadCurvature),
+        FeatureDetector::FeatureEvidenceStatus::NonTriangleFace);
+
+    Mesh degenerate{};
+    const VertexHandle d0 = degenerate.AddVertex({0.0f, 0.0f, 0.0f});
+    const VertexHandle d1 = degenerate.AddVertex({1.0f, 0.0f, 0.0f});
+    const VertexHandle d2 = degenerate.AddVertex({2.0f, 0.0f, 0.0f});
+    ASSERT_TRUE(degenerate.AddTriangle(d0, d1, d2).has_value());
+    const std::vector<double> degenerateCurvature(
+        degenerate.VerticesSize(), 0.0);
+    expectFailure(
+        FeatureDetector::DetectFeatureEvidence(
+            degenerate, degenerateCurvature, degenerateCurvature),
+        FeatureDetector::FeatureEvidenceStatus::DegenerateFace);
+
+    const Mesh empty{};
+    expectFailure(
+        FeatureDetector::DetectFeatureEvidence(empty, {}, {}),
+        FeatureDetector::FeatureEvidenceStatus::EmptyMesh);
+    Mesh view = Mesh::CreateView(
+        fixture.Surface,
+        Geometry::ElementRange{0u, fixture.Surface.VerticesSize()},
+        Geometry::ElementRange{0u, fixture.Surface.EdgesSize()},
+        Geometry::ElementRange{0u, fixture.Surface.FacesSize()});
+    expectFailure(
+        FeatureDetector::DetectFeatureEvidence(
+            view, fixture.K1, fixture.K2),
+        FeatureDetector::FeatureEvidenceStatus::UnsupportedSubmeshView);
+}
+
+TEST(CurvaturePatchContract,
+     FeatureDetectorIsDeterministicAndComputePathOwnsItsResult)
+{
+    OracleFixture fixture = MakeDetectorControlCatalog(false).front();
+    const FeatureDetector::FeatureEvidenceResult first =
+        FeatureDetector::DetectFeatureEvidence(
+            fixture.Surface, fixture.K1, fixture.K2);
+    const FeatureDetector::FeatureEvidenceResult second =
+        FeatureDetector::DetectFeatureEvidence(
+            fixture.Surface, fixture.K1, fixture.K2);
+    ASSERT_TRUE(first.Succeeded());
+    ASSERT_TRUE(second.Succeeded());
+    EXPECT_EQ(first.HardEdgeMask, second.HardEdgeMask);
+    EXPECT_EQ(first.SoftEdgeConfidence, second.SoftEdgeConfidence);
+    EXPECT_EQ(first.TransitionResponse, second.TransitionResponse);
+    EXPECT_EQ(first.RidgeResponse, second.RidgeResponse);
+    EXPECT_EQ(first.ValleyResponse, second.ValleyResponse);
+    EXPECT_EQ(first.EdgeDecision, second.EdgeDecision);
+    EXPECT_EQ(first.HysteresisPredecessor, second.HysteresisPredecessor);
+
+    Mesh sphere = Geometry::HalfedgeMesh::MakeMeshIcosahedron();
+    const FeatureDetector::FeatureEvidenceResult computed =
+        FeatureDetector::ComputeFeatureEvidence(sphere);
+    ASSERT_TRUE(computed.Succeeded())
+        << FeatureDetector::ToString(computed.Diagnostics.Status);
+    EXPECT_EQ(computed.HardEdgeMask.size(), sphere.EdgesSize());
+    EXPECT_EQ(computed.SoftEdgeConfidence.size(), sphere.EdgesSize());
+    EXPECT_GE(
+        computed.Diagnostics.Timings.CurvatureEstimationMilliseconds,
+        0.0);
 }

@@ -9759,3 +9759,29 @@ tree:
       the broader and confirmation corpora, convergence, performance,
       runtime/UI, and GPU/Vulkan remain untested.
     status: resolved
+  - id: N416
+    type: experiment
+    title: "Implement and exercise METHOD-039's standalone feature-evidence slice"
+    provenance: ai-executed
+    timestamp: "2026-08-11T13:14+02:00"
+    also_depends_on: [N404, N415]
+    evidence:
+      - "src/geometry/Geometry.HalfedgeMesh.CurvatureSegmentation.Features.cppm"
+      - "src/geometry/Geometry.HalfedgeMesh.CurvatureSegmentation.Features.cpp"
+      - "tests/unit/geometry/Test.CurvaturePatchContract.cpp"
+      - "methods/geometry/curvature_segmentation/feature_aligned_intake.md"
+      - "tasks/active/METHOD-039-feature-network-curvature-patch-decomposition.md"
+    result: >
+      The standalone serial CPU stage reuses the shared strict hard-feature
+      classifier and emits separate slot-aligned hard and soft evidence with
+      inspectable scale, suppression, hysteresis, topology, failure, and
+      bounded-work diagnostics. Focused generated controls accepted constant
+      negatives, transition/ridge/valley responses, nearby lines, a junction,
+      an open termination, determinism, orientation reversal, and fail-closed
+      malformed inputs. Executable preflight rejected the originally frozen
+      magnitude-only transition response before integrated quality execution;
+      the recorded direction response distinguishes curvature type without
+      retaining a second backend. No grow/merge, final-partition, selector,
+      runtime/config/UI, performance, GPU/Vulkan, or novelty conclusion was
+      exercised.
+    status: resolved

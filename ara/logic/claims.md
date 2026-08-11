@@ -1311,3 +1311,33 @@
 - **Tags**: geometry, curvature segmentation, cylinder, smooth transition,
   continuous boundary, CPU reference, fixture control, scratch, bounded result
 - **From staging**: O146
+
+## C44: METHOD-039 feature evidence satisfies its bounded CPU contract controls
+- **Statement**: METHOD-039's standalone serial CPU feature-evidence stage
+  deterministically reuses the shared strict hard-feature classifier, emits
+  separate slot-aligned hard and soft evidence with inspectable scale,
+  suppression, hysteresis, topology, failure, and bounded-work diagnostics,
+  and passes its focused generated controls for constant negatives,
+  transition/ridge/valley responses, nearby lines, a junction, an open
+  termination, determinism, orientation reversal, and malformed inputs.
+- **Status**: supported — bounded serial CPU unit/contract evidence only; no
+  grow/merge, final-partition, v2-selector, runtime/config/UI, publication,
+  integrated-quality, performance, GPU/Vulkan, parameterization, or novelty
+  claim
+- **Provenance**: ai-executed
+- **Crystallized via**: artifact-commitment
+- **Falsification criteria**: The focused `CurvaturePatchContract` tests no
+  longer preserve shared hard-feature decisions, change the accepted generated
+  feature supports or incidence, violate orientation-reversal support
+  invariance, become nondeterministic, accept malformed inputs, or the
+  implementation allocates a dense face-pair structure instead of bounded
+  sparse surface-graph workspaces.
+- **Proof**: [src/geometry/Geometry.HalfedgeMesh.CurvatureSegmentation.Features.cppm,
+  src/geometry/Geometry.HalfedgeMesh.CurvatureSegmentation.Features.cpp,
+  tests/unit/geometry/Test.CurvaturePatchContract.cpp,
+  methods/geometry/curvature_segmentation/feature_aligned_intake.md,
+  tasks/active/METHOD-039-feature-network-curvature-patch-decomposition.md]
+- **Dependencies**: [C39, C43]
+- **Tags**: geometry, curvature segmentation, feature evidence, CPU reference,
+  deterministic controls, bounded result
+- **From staging**: O147

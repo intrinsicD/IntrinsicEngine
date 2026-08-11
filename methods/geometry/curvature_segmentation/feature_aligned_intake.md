@@ -235,6 +235,7 @@ w_jg(r_s)    = A_g * psi(distance_j(g) / r_s),
 mu_e,j(r_s)  = sum_g w_jg(r_s) * x_g(r_s) / sum_g w_jg(r_s),
 z_e(r_s)     = r_s/2 * ((kappa_1,va,kappa_2,va)
                         + (kappa_1,vb,kappa_2,vb)),
+u(y)          = y / norm(y) when norm(y) > 0, and (0,0) otherwise,
 s_tau(y)     = 1 - exp(-max(y,0) / tau_response),
 tau_response = 0.10,
 ```
@@ -242,7 +243,7 @@ tau_response = 0.10,
 the three inspectable responses are
 
 ```text
-T_e,s = s_tau(norm(mu_e,0 - mu_e,1)),
+T_e,s = min(1, norm(u(mu_e,0) - u(mu_e,1))),
 R_e,s = s_tau(max(0, min(z_e,1 - mu_e,0,1,
                            z_e,1 - mu_e,1,1))),
 V_e,s = s_tau(max(0, min(mu_e,0,2 - z_e,2,
@@ -251,12 +252,23 @@ Q_e,s = max(T_e,s, R_e,s, V_e,s),
 Q_e   = median_s Q_e,s.
 ```
 
-`T` detects a signed-curvature or surface-type transition. `R` and `V` test
-whether the edge value is respectively above both one-sided `kappa_1` means or
-below both one-sided `kappa_2` means. Taking the median is the exact
-two-of-three scale-persistence rule. The per-scale values and winning signal
-are diagnostics. Under global orientation reversal, `R` and `V` swap names;
-`max(R,V)` and the final support must remain unchanged.
+`T` detects a change in signed-curvature *type* rather than treating every
+large same-type curvature gradient as a feature line. The zero vector remains
+the explicit flat sentinel. `R` and `V` test whether the edge value is
+respectively above both one-sided `kappa_1` means or below both one-sided
+`kappa_2` means. Taking the median is the exact two-of-three scale-persistence
+rule. The per-scale values and winning signal are diagnostics. The normalized
+direction difference and Euclidean norm are invariant under the orthogonal
+map `(kappa_1,kappa_2) -> (-kappa_2,-kappa_1)` induced by global orientation
+reversal; `R` and `V` swap names while `T`, `max(R,V)`, and final support remain
+unchanged.
+
+Slice B corrected the originally frozen magnitude-only `T` during executable
+contract testing, before any integrated quality run or positive claim. The
+magnitude-only form produced parallel curvature-gradient bands and missed the
+zero-crossing line on the preregistered smooth transition. The direction form
+above is the implemented contract; the rejected form is not retained as a
+second backend or tunable option.
 
 Soft-feature candidates are live, non-hard interior edges with two live
 incident triangles; source-boundary and hard edges do not receive `Q_e`. For
@@ -265,9 +277,21 @@ In each incident triangle, form the in-face binormal
 `b = normalize(n cross t_e)` and choose, from the other two edges that are also
 soft-feature candidates, the edge whose midpoint has the largest absolute
 projection `abs(dot(m_q-m_e,b))`. A side with no eligible alternative adds no
-competitor. These at-most-two edges are `N_perp(e)`. Retain `e` exactly when
+competitor. Add candidates sharing either endpoint whose midpoint offset is
+more binormal than longitudinal with respect to the average incident-face
+normal. These candidates form `N_perp(e)`. Retain `e` exactly when
 `(Q_e,-slot(e))` is lexicographically no smaller than the same pair for every
-member of `N_perp(e)`. This makes plateaus deterministic.
+member of `N_perp(e)`.
+
+Two bounded topology rules keep the thinning stable on triangle diagonals.
+A strong transition junction is a vertex incident to at least three strong
+transition candidates with at least one tangent pair turning by more than
+`60 degrees`. A strong branch incident to that vertex bypasses suppression
+only when it has a continuation within `15 degrees` at its other endpoint.
+After suppression, if all three edges of one triangle remain, reject the edge
+with the lexicographically smallest `(Q_e, aligned-continuation-count,
+-slot(e))`. This removes a one-cell triangular plateau without erasing the
+continuing branches of an actual junction. All choices are slot-stable.
 
 Hysteresis uses the frozen thresholds
 

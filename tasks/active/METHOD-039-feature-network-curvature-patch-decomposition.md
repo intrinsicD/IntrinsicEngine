@@ -20,10 +20,11 @@ maturity_target: Operational
 - Deliver a deterministic, topology-preserving CPU method that partitions an oriented triangle surface into connected, curvature-coherent patches by detecting hard and soft feature lines, forming a conservative seeded oversegmentation, and merging adjacent regions under an explicit curvature-and-boundary energy so every retained boundary is either feature-supported or a diagnosed curvature-change closure boundary.
 
 ## Status
-- Slice A contract/oracle implementation is complete, reviewed, and passes the
-  focused and full CPU gates. Owner: `codex-root` on `main`. The next work-graph
-  transition is Slice B's computed feature-evidence CPU reference. No
-  production v2 selector exists yet.
+- Slices A and B are complete and reviewed. The standalone computed
+  feature-evidence CPU reference and its focused controls pass. Owner:
+  `codex-root` on `main`. ARA claim C44 bounds the current CPU contract
+  evidence. Slice C's patch grow/merge path and the production v2 selector do
+  not exist yet.
 
 ## Non-goals
 - No UV generation, atlas/chart construction, seam selection, mesh cutting, vertex duplication, face splitting, or other parameterization work.
@@ -156,8 +157,8 @@ maturity_target: Operational
 
 ## Slice plan
 - **Slice A — Freeze the practical contract and oracle fixtures (complete).** Bind the inherited evidence boundary to METHOD-038's retired immutable records, record the exact integral-invariant and ridge/valley equations used, define the supplied feature-evidence seam, freeze generated analytic fixtures/metrics, and add no production selector.
-- **Slice B — Feature evidence CPU reference.** Implement hard-feature consumption plus one primary multi-scale soft-feature detector, with the Hildebrandt-style extremality detector limited to a fixture comparator. Validate feature confidence and line topology independently of patch construction.
-- **Slice C — Oracle-driven grow/merge patch reference.** Implement deterministic seed selection, simultaneous growth, region statistics, RAG merging, boundary roles, and narrow-band refinement. First pass oracle feature evidence, then replay the same tests with detected evidence. Keep all work private to the existing method module until the result contract passes.
+- **Slice B — Feature evidence CPU reference (complete).** Implement hard-feature consumption plus one primary multi-scale soft-feature detector, with the Hildebrandt-style extremality detector limited to a fixture comparator. Validate feature confidence and line topology independently of patch construction.
+- **Slice C — Oracle-driven grow/merge patch reference.** Implement deterministic seed selection, simultaneous growth, region statistics, RAG merging, boundary roles, and narrow-band refinement. First pass oracle feature evidence, then replay the same tests with detected evidence. Keep all work private to the existing curvature-segmentation method package until the result contract passes.
 - **Slice D — Engine adoption and evidence.** Add the accepted mode to the existing config/runtime/UI path, publish the distinct feature and final-boundary properties, seal quality/stability/smoke results, and retain `cpu_reference_v1` as an explicit fallback/comparison lane.
 
 ## Required changes
@@ -165,7 +166,7 @@ maturity_target: Operational
 - [x] Expand `methods/geometry/curvature_segmentation/feature_aligned_intake.md` with the exact selected feature-response, non-maximum-suppression, hysteresis, seed-cost, region-cost, merge, boundary-role, and stopping equations; mark the formulation as an established-method synthesis rather than a novelty claim.
 - [x] Add generated analytic fixtures with oracle hard/soft feature evidence and exact/reference patch boundaries for a plane, cylinder, sphere, strict-threshold folds, smooth signed-curvature transition, ridge, valley, nearby feature pair, junction, open boundary, disconnected surfaces, and a same-curvature false-boundary control.
 - [x] Add the smallest supplied-feature test seam using spans/plain records; do not introduce an interface or public feature-network framework. Reject slot-count mismatches, non-finite confidences/descriptors, unsupported submesh views, and invalid topology with explicit diagnostics.
-- [ ] Implement the primary physical-scale smooth-feature evidence path and consume `Geometry.HalfedgeMesh.Features` for hard facts. Report per-signal contributions, persistence scales, suppression/hysteresis decisions, endpoints, junctions, and rejected fragments.
+- [x] Implement the primary physical-scale smooth-feature evidence path and consume `Geometry.HalfedgeMesh.Features` for hard facts. Report per-signal contributions, persistence scales, suppression/hysteresis decisions, endpoints, junctions, and rejected fragments.
 - [ ] Implement deterministic seed selection and simultaneous face growth behind hard barriers, including stable tie-breaking and complete provisional-front diagnostics.
 - [ ] Implement area-weighted regional sufficient statistics, the frozen `C(R)` and `B_ij` terms, deterministic adjacency updates, energy-decreasing merges, and final local-optimum checks without adding a generic clustering or graph-optimization layer.
 - [ ] Classify and publish final boundary roles independently from feature evidence. Preserve topology and existing component/region/boundary outputs; introduce only the minimum additional edge properties required for soft evidence and boundary role.
@@ -176,7 +177,7 @@ maturity_target: Operational
 - [ ] Keep major-stage complexity at sparse surface-graph scale (`O(F + E)` storage and no dense all-pairs face matrix). Any observed superlinear stage must be diagnosed before adoption.
 
 ## Tests
-- [ ] Feature controls: plane, sphere, and cylinder produce no spurious interior hard feature; the shared strict-threshold fold contract remains exact; smooth transition, ridge, and valley fixtures recover their reference line within the frozen tolerance; orientation reversal changes only signed ridge/valley naming, not feature support or final partition.
+- [x] Feature controls: plane, sphere, and cylinder produce no spurious interior hard feature; the shared strict-threshold fold contract remains exact; smooth transition, ridge, and valley fixtures recover their reference line within the frozen tolerance; orientation reversal changes only signed ridge/valley naming, not feature support. Final-partition orientation parity remains a Slice C obligation.
 - [ ] Oracle isolation: supplied exact feature evidence drives the expected patch result even when the computed detector is disabled, and deliberately corrupted detector evidence changes only the detector-integrated lane. This distinguishes feature-detection failure from patch-completion failure.
 - [ ] Growth controls: stable tie-breaking makes repeated runs and face-traversal permutations identical; hard barriers are never crossed; every live face receives exactly one provisional region; disconnected components and open boundaries are handled independently.
 - [ ] Merge controls: multiple seeds on one constant-curvature plane/cylinder merge to one patch; same-curvature regions separated only by a soft feature merge when the data/boundary energy says so; genuinely different curvature regimes remain separate; no negative `delta_merge` remains at termination.

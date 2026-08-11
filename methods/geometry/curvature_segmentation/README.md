@@ -15,14 +15,14 @@ killing order, profiling lanes, and validated analytic controls are in
 backend and changed no production default. METHOD-039 owns the practical
 feature-network patch method that may consume these immutable controls.
 
-METHOD-039 Slice A now freezes that follow-up's equations, numeric screening
-parameters, fail-closed supplied-evidence shape, and seventeen generated oracle
-fixtures in [`feature_aligned_intake.md`](feature_aligned_intake.md). The
-executable catalog is
+METHOD-039 Slices A--B freeze that follow-up's equations, numeric screening
+parameters, fail-closed supplied-evidence shape, and generated oracle and
+detector controls in [`feature_aligned_intake.md`](feature_aligned_intake.md).
+The executable catalog is
 [`Test.CurvaturePatchContract.cpp`](../../../tests/unit/geometry/Test.CurvaturePatchContract.cpp).
-This is a pre-implementation contract: the computed feature detector,
-grow/merge solver, `cpu_reference_v2` selector, publication properties, config,
-runtime, and UI are not implemented yet.
+The geometry module now implements the standalone computed feature-evidence
+stage. The grow/merge solver, `cpu_reference_v2` selector, publication
+properties, config, runtime, and UI are not implemented yet.
 
 ## Implemented path
 
@@ -41,6 +41,30 @@ The method publishes statistical component labels separately from connected
 region labels. This matters when disconnected surface pieces share the same
 curvature regime: they can keep one mixture component while receiving distinct
 region IDs.
+
+### METHOD-039 feature-evidence stage
+
+The narrow companion module
+`Geometry.HalfedgeMesh.CurvatureSegmentation.Features` keeps the retired v1
+interface and its sealed evidence byte-stable. `DetectFeatureEvidence` consumes
+a full owning triangle mesh and slot-aligned ordered signed principal
+curvatures; `ComputeFeatureEvidence` obtains those curvatures through the
+existing estimator. Both return separate hard and soft edge arrays. Hard facts
+reuse the shared strict dihedral classifier. Soft
+evidence uses the three physical radii around `r_0/D=0.02`, compact one-sided
+surface neighborhoods, signed-curvature-type transition plus ridge/valley
+responses, two-of-three persistence, deterministic thinning, hysteresis, and
+short-fragment filtering.
+
+The owning result exposes the raw and retained confidence, every per-scale
+`T/R/V/Q` value, persistence bits, dominant signal, suppression/hysteresis
+decision and predecessor, combined vertex incidence, bounded-search work
+counters, explicit failure status, and observational stage timings. The method
+uses reusable stamped bounded-search workspaces and slot arrays; it constructs
+no dense face-pair matrix. This stage does not mutate topology, publish
+properties, select a v2 segmentation mode, or imply that every detected soft
+line must become a final patch boundary. ARA claim C44 bounds the current CPU
+contract evidence.
 
 ## Runtime and UI
 

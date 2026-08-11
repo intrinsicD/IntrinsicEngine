@@ -7,10 +7,10 @@ are recorded separately in
 does not change the frozen METHOD-037 formulation below. METHOD-039 owns the
 practical feature-network patch follow-up.
 
-## METHOD-039 selected follow-up (not yet implemented)
+## METHOD-039 selected follow-up (feature evidence implemented)
 
-METHOD-039 Slice A fixes one useful, established-method synthesis before
-implementation: strict shared dihedral barriers; compact, physical-radius
+METHOD-039 fixes one useful, established-method synthesis: strict shared
+dihedral barriers; compact, physical-radius
 one-sided signed-curvature responses; deterministic non-maximum suppression
 and hysteresis; farthest-point seeds followed by simultaneous dual-graph
 growth; and area-weighted regional GMM cost plus length, intrinsic-turning, and
@@ -28,10 +28,16 @@ surface-patch averages so open surfaces are supported. The
 Hildebrandt--Polthier--Wardetzky extremality equations remain a bounded
 comparator, not a second production path.
 
-Slice A adds only an executable oracle/preflight contract. Until the later CPU
-reference, integration, and evidence slices pass, every equation in this
-section is planned behavior and the implemented formulation below remains the
-only production method.
+Slice B implements the hard/soft feature-evidence portion in the narrow
+`Geometry.HalfedgeMesh.CurvatureSegmentation.Features` companion module as
+`DetectFeatureEvidence`/`ComputeFeatureEvidence`, including explicit failure,
+per-scale response, suppression, hysteresis, fragment, endpoint, junction, and
+bounded-search diagnostics. Executable controls cover the shared hard facts,
+constant-curvature negatives, transition/ridge/valley equations, paired
+diagonal phases, nearby lines, a junction, open termination, determinism, and
+orientation reversal. Patch growth/merging and engine adoption remain planned;
+the formulation below remains the only production segmentation mode. ARA claim
+C44 records the bounded CPU contract evidence for this stage.
 
 ## Published lineage
 

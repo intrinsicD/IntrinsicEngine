@@ -495,6 +495,19 @@ component but never a region. The result is slot-aligned and includes face
 component/region labels, edge boundary flags, deterministic colors, candidate
 and solver diagnostics, and explicit failure status.
 
+The narrow companion module
+`Geometry.HalfedgeMesh.CurvatureSegmentation.Features` exposes METHOD-039's
+standalone CPU feature-evidence stage. `DetectFeatureEvidence` consumes
+slot-aligned ordered signed principal
+curvatures, while `ComputeFeatureEvidence` invokes the existing curvature
+estimator. Both reuse `Geometry.HalfedgeMesh.Features` for strict hard facts and
+return separate slot-aligned hard/soft edge evidence, three-scale
+transition/ridge/valley responses, thinning and hysteresis decisions, combined
+vertex incidence, bounded-search work counters, timings, and fail-closed
+status. This stage is topology-preserving and owns its result; it is not yet a
+runtime segmentation selector or a published geometry-property path. The
+bounded CPU contract evidence is recorded by ARA claim C44.
+
 The runtime operation publishes `f:curvature_component`,
 `f:curvature_region`, `f:curvature_region_color`,
 `e:curvature_region_boundary`, and

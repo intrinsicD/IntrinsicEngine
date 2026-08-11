@@ -2622,3 +2622,27 @@ observations:
     promoted_to: "logic/claims.md:C43"
     crystallized_via: artifact-commitment
     stale: false
+  - id: O147
+    timestamp: "2026-08-11T13:14+02:00"
+    provenance: ai-executed
+    content: >
+      METHOD-039's standalone serial CPU feature-evidence stage passes its
+      focused shared-hard-fact, constant-negative, transition/ridge/valley,
+      nearby-line, junction, open-termination, determinism, orientation-
+      reversal, and malformed-input controls while reporting separate
+      slot-aligned hard and soft evidence plus inspectable bounded-work
+      diagnostics.
+    context: >
+      Slice B remains private to the existing curvature-segmentation geometry
+      module. Executable preflight replaced the rejected magnitude-only
+      transition response with the recorded curvature-type direction response
+      before any integrated quality run or positive claim. Patch grow/merge,
+      final partitions, a v2 selector, runtime/config/UI adoption, sealed
+      integrated-quality evidence, performance, GPU/Vulkan, parameterization,
+      and novelty remain outside this observation.
+    potential_type: claim
+    bound_to: [N416]
+    promoted: true
+    promoted_to: "logic/claims.md:C44"
+    crystallized_via: artifact-commitment
+    stale: false
