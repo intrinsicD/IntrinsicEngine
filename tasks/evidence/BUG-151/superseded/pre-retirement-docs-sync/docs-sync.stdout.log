@@ -1,0 +1,8 @@
+[check_docs_sync] Root: /tmp/intrinsic-bug151-worktree
+[check_docs_sync] Rules: tools/docs/docs_sync_rules.yaml
+[check_docs_sync] Changed files source: git diff 68ddc589091f6f4890fdf61a75463680edbf99d4...HEAD
+[check_docs_sync] Changed files count: 2
+[check_docs_sync] Triggered rules: 1
+[check_docs_sync] Missing docs sync updates:
+  - trigger 'tools/**' matched [tools/agents/agent_work_graph.py] but none of [tools/**/README.md, docs/agent/**, tasks/**] were changed
+[check_docs_sync] STRICT MODE: failing.

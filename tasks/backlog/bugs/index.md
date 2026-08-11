@@ -49,6 +49,14 @@ of `BUG-140` and of the parameterization rejection recorded in `BUG-141`.
   evidence-backed discovery policy without weakening per-test timeouts.
 ## Verified / Closed
 
+- Closed 2026-08-11: [`BUG-151` — Work graph cannot advance a declared
+  multi-slice task](../../done/BUG-151-work-graph-multi-slice-cycle.md).
+  `advance-slice` now preserves one hash-chained run while rebasing a declared
+  repeated subgraph to an exact clean commit with fresh bounded attempts. The
+  real METHOD-038 run advanced from graph slice 1 to 2 with its prior
+  unreviewed checkpoint and stale source binding recorded explicitly; unsafe
+  lifecycle, claim, recipe, and task-state transitions fail closed.
+
 - Closed 2026-08-11: [`BUG-150` — Completed workflow reports lose their
   historical surface seal](../../done/BUG-150-workflow-report-historical-surface-seal.md).
   Completed dirty reports now carry a post-commit `seal.yaml` that binds the

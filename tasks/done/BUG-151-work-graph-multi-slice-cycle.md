@@ -14,6 +14,17 @@ contracts: [repo.task-contract-discovery, repo.agent-work-graph]
 ---
 # BUG-151 — Work graph cannot advance a declared multi-slice task
 
+## Status
+- Completed on 2026-08-11.
+- Completion commit: this retirement commit.
+- Implementation revisions: `7b8553bb`, `101bccd1`, `97aca9fc`, and
+  `af5f64eb`.
+- The real METHOD-038 run retained run ID
+  `method-038-20260810T164302Z`, advanced from graph slice 1 to 2 at clean
+  main revision `0775b304`, preserved the prior projection as
+  `rolled-forward-before-review`, and reset `plan` through `finalize` to fresh
+  attempt budgets without adding the workflow-repair commits to its new diff.
+
 ## Goal
 - Add an explicit, auditable next-slice transition so a claimed multi-slice
   task can begin a fresh bounded plan/write/review cycle without erasing prior
@@ -62,58 +73,58 @@ contracts: [repo.task-contract-discovery, repo.agent-work-graph]
   existing `--from-node` rule and a separate high-risk task owns that evidence.
 
 ## Required changes
-- [ ] Add a deterministic failing regression reproducing METHOD-038's
+- [x] Add a deterministic failing regression reproducing METHOD-038's
       succeeded-at-budget writer, unstarted review descendants, committed stale
       source binding, and rejected continuation.
-- [ ] Add `advance-slice` with explicit owner, reason, and repeated-subgraph
+- [x] Add `advance-slice` with explicit owner, reason, and repeated-subgraph
       root; require a live exact claim, an active task with `## Slice plan`, a
       clean worktree, and a reset region containing every active writer and
       final surface binder.
-- [ ] Preserve the one-run identity and append-only event chain while recording
+- [x] Preserve the one-run identity and append-only event chain while recording
       prior slice index, node projection, source digests/revision, disposition,
       accepted stale state, and the exact new slice baseline.
-- [ ] Reset per-cycle attempts/status/artifacts only inside the repeated
+- [x] Reset per-cycle attempts/status/artifacts only inside the repeated
       subgraph, retain node notes and ancestors, clear review/final bindings,
       and expose the current slice index in human/JSON status.
-- [ ] Permit either a fully succeeded prior cycle or an explicitly authorized
+- [x] Permit either a fully succeeded prior cycle or an explicitly authorized
       pre-review checkpoint with zero downstream review attempts; reject
       running nodes, failed/blocked nodes, started partial review, recipe/claim
       drift, dirty worktrees, inactive tasks, or insufficient reset regions.
 
 ## Tests
-- [ ] Prove the exact exhausted-writer reproduction advances only with the
+- [x] Prove the exact exhausted-writer reproduction advances only with the
       explicit pre-review and stale-source acknowledgements, preserves prior
       event data, rebases to the clean commit, and starts the next plan at
       attempt zero.
-- [ ] Prove normal fully succeeded cycles advance without recovery flags.
-- [ ] Prove rejection for dirty state, backlog/done task state, missing slice
+- [x] Prove normal fully succeeded cycles advance without recovery flags.
+- [x] Prove rejection for dirty state, backlog/done task state, missing slice
       plan, wrong actor/claim generation, recipe drift, running nodes,
       failed/blocked outcomes, partial review attempts, incomplete reset
       regions, and missing recovery acknowledgements.
-- [ ] Re-run all agent-work-graph, task-claim, workflow-evidence, task-policy,
+- [x] Re-run all agent-work-graph, task-claim, workflow-evidence, task-policy,
       and documentation synchronization regressions affected by the change.
 
 ## Docs
-- [ ] Update `docs/agent/workflow-evidence.md` and
+- [x] Update `docs/agent/workflow-evidence.md` and
       `docs/agent/task-format.md` with slice-cycle semantics, safety checks,
       recovery flags, and the boundary from bounded repair attempts.
-- [ ] Update the work-graph tool inventory/help where current CLI commands are
+- [x] Update the work-graph tool inventory/help where current CLI commands are
       enumerated, then regenerate skill mirrors and `tasks/SESSION-BRIEF.md`.
-- [ ] Record the METHOD-038 reproduction and final disposition factually; do
+- [x] Record the METHOD-038 reproduction and final disposition factually; do
       not describe the repair as method evidence.
 
 ## Acceptance criteria
-- [ ] METHOD-038 can enter a fresh slice cycle from an exact clean post-repair
+- [x] METHOD-038 can enter a fresh slice cycle from an exact clean post-repair
       commit without manual graph-state edits and without including BUG-151 in
       its new slice source surface.
-- [ ] Prior node attempts, notes, source bindings, and reviewed versus
+- [x] Prior node attempts, notes, source bindings, and reviewed versus
       rolled-forward disposition remain reconstructible from the hash-chained
       event history.
-- [ ] A failed/blocked or partially reviewed cycle cannot use
+- [x] A failed/blocked or partially reviewed cycle cannot use
       `advance-slice` to evade its repair budget or findings join.
-- [ ] The next slice independently enforces the recipe's original per-node
+- [x] The next slice independently enforces the recipe's original per-node
       attempt limits and exact writer/final source bindings.
-- [ ] Strict workflow/task/docs validators and the isolated regression suite
+- [x] Strict workflow/task/docs validators and the isolated regression suite
       pass on the final surface.
 
 ## Verification

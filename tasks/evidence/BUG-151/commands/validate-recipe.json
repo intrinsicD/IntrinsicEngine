@@ -1,0 +1,23 @@
+{
+  "command": [
+    "python3",
+    "tools/agents/agent_work_graph.py",
+    "validate-recipe",
+    "--recipe",
+    "tools/agents/work_graphs/review-diamond.v1.json"
+  ],
+  "command_display": "python3 tools/agents/agent_work_graph.py validate-recipe --recipe tools/agents/work_graphs/review-diamond.v1.json",
+  "cwd": ".",
+  "duration_ms": 47,
+  "exit_code": 0,
+  "finished_at": "2026-08-11T00:56:53Z",
+  "label": "validate-recipe",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-11T00:56:53Z",
+  "stderr_path": "tasks/evidence/BUG-151/commands/validate-recipe.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/BUG-151/commands/validate-recipe.stdout.log",
+  "stdout_sha256": "52c6bbc9d0db615d5736b9fbc53c1e5e4201630ff9d3a8414d3251174528ab5b",
+  "task_id": "BUG-151"
+}
