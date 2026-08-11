@@ -8,6 +8,22 @@ so blocks moved from the old active-README history work verbatim.
 
 ## Retired task narratives
 
+[`BUG-151`](BUG-151-work-graph-multi-slice-cycle.md) — declared multi-slice
+tasks can now continue through one auditable `advance-slice` transition rather
+than exhausting the only writer node or inventing a second run. The transition
+keeps the run ID and hash-chained history, records the complete prior node and
+source projection with an honest reviewed or explicitly acknowledged
+pre-review disposition, advances a scalar slice index, and resets only the
+declared repeated subgraph against an exact clean `HEAD` baseline.
+
+The command fails closed on dirty worktrees, changed claim generation or
+workflow profile, recipe drift, inactive or planless tasks, running/failed/
+blocked nodes, partial review attempts, and reset regions that omit a writer or
+final binder. Twenty-nine isolated graph regressions cover both ordinary and
+recovery paths. The real METHOD-038 graph retained its original run, advanced
+from slice 1 to 2 at `0775b304`, and began with `plan` ready at attempt zero;
+the workflow repair itself is absent from that new slice diff.
+
 [`BUG-150`](BUG-150-workflow-report-historical-surface-seal.md) — completed
 dirty workflow reports now gain an auditable post-commit `seal.yaml`. The seal
 names an exact ancestor commit containing the byte-identical report, task,
