@@ -1,9 +1,12 @@
 #include <gtest/gtest.h>
 
+#include <algorithm>
 #include <cmath>
 #include <cstdint>
+#include <limits>
 #include <numbers>
 #include <optional>
+#include <utility>
 #include <vector>
 
 #include <glm/glm.hpp>
@@ -29,12 +32,31 @@ namespace
         return std::move(*mesh);
     }
 
+    Geometry::HalfedgeMesh::Mesh MakeTetrahedron(bool reversed)
+    {
+        const std::vector<glm::vec3> positions{
+            {1.0f, 1.0f, 1.0f},
+            {1.0f, -1.0f, -1.0f},
+            {-1.0f, 1.0f, -1.0f},
+            {-1.0f, -1.0f, 1.0f}};
+        std::vector<std::uint32_t> indices{
+            0u, 1u, 2u,
+            0u, 2u, 3u,
+            0u, 3u, 1u,
+            1u, 3u, 2u};
+        if (reversed)
+        {
+            for (std::size_t i = 0; i < indices.size(); i += 3u)
+                std::swap(indices[i + 1u], indices[i + 2u]);
+        }
+        auto mesh = MU::BuildHalfedgeMeshFromIndexedTriangles(positions, indices);
+        EXPECT_TRUE(mesh.has_value());
+        return std::move(*mesh);
+    }
+
     // Open cylindrical tube of radius R, length L along +z, closed in the
-    // angular direction (welded seam) and open at the two end rings. `nu` is the
-    // angular sample count, `nv` the number of axial segments. Each quad is split
-    // into four triangles around its on-surface centroid so interior vertices get
-    // an isotropic 1-ring (a single-diagonal split injects a scale-invariant
-    // helical anisotropy that rotates the principal directions).
+    // angular direction and open at the two end rings. Alternating quad
+    // diagonals exercise the estimator on an ordinary triangle tessellation.
     Geometry::HalfedgeMesh::Mesh MakeCylinderTube(double R, double L, int nu, int nv)
     {
         auto onCyl = [&](double th, double z)
@@ -50,36 +72,29 @@ namespace
             for (int i = 0; i < nu; ++i)
                 pos.push_back(onCyl(2.0 * kPi * static_cast<double>(i) / nu, z));
         }
-        const std::uint32_t gridCount = static_cast<std::uint32_t>(pos.size());
         std::vector<std::uint32_t> idx;
         for (int j = 0; j < nv; ++j)
         {
-            const double z0 = (static_cast<double>(j) / nv - 0.5) * L;
-            const double z1 = (static_cast<double>(j + 1) / nv - 0.5) * L;
             for (int i = 0; i < nu; ++i)
             {
                 const std::uint32_t a = static_cast<std::uint32_t>(j * nu + i);
                 const std::uint32_t b = static_cast<std::uint32_t>(j * nu + (i + 1) % nu);
                 const std::uint32_t c = static_cast<std::uint32_t>((j + 1) * nu + i);
                 const std::uint32_t d = static_cast<std::uint32_t>((j + 1) * nu + (i + 1) % nu);
-                const double th0 = 2.0 * kPi * static_cast<double>(i) / nu;
-                const double th1 = 2.0 * kPi * static_cast<double>(i + 1) / nu;
-                const std::uint32_t e = static_cast<std::uint32_t>(pos.size());
-                pos.push_back(onCyl(0.5 * (th0 + th1), 0.5 * (z0 + z1)));
-                // Outward-facing fan around the centroid e.
-                idx.insert(idx.end(), {a, b, e, b, d, e, d, c, e, c, a, e});
+                if ((i + j) % 2 == 0)
+                    idx.insert(idx.end(), {a, b, d, a, d, c});
+                else
+                    idx.insert(idx.end(), {a, b, c, b, d, c});
             }
         }
-        (void)gridCount;
         auto mesh = MU::BuildHalfedgeMeshFromIndexedTriangles(pos, idx);
         EXPECT_TRUE(mesh.has_value());
         return std::move(*mesh);
     }
 
-    // Height-field grid z = f(x, y) over [-a, a]^2 with `cells` cells per side (so
-    // `cells` even => the origin is a corner vertex). Each quad is split into four
-    // triangles around its on-surface centroid for an isotropic interior 1-ring.
-    // Open boundary.
+    // Height-field grid z = f(x, y) over [-a, a]^2 with `cells` cells per side.
+    // Alternating diagonals avoid a preferred mesh direction without adding
+    // artificial centroid vertices. Open boundary.
     template <class F>
     Geometry::HalfedgeMesh::Mesh MakeHeightGrid(double a, int cells, F&& f)
     {
@@ -105,12 +120,10 @@ namespace
                 const std::uint32_t v10 = v00 + 1;
                 const std::uint32_t v01 = static_cast<std::uint32_t>((iy + 1) * n + ix);
                 const std::uint32_t v11 = v01 + 1;
-                const double cx = 0.5 * (coord(ix) + coord(ix + 1));
-                const double cy = 0.5 * (coord(iy) + coord(iy + 1));
-                const std::uint32_t e = static_cast<std::uint32_t>(pos.size());
-                pos.push_back(glm::vec3(static_cast<float>(cx), static_cast<float>(cy),
-                                        static_cast<float>(f(cx, cy))));
-                idx.insert(idx.end(), {v00, v10, e, v10, v11, e, v11, v01, e, v01, v00, e});
+                if ((ix + iy) % 2 == 0)
+                    idx.insert(idx.end(), {v00, v10, v11, v00, v11, v01});
+                else
+                    idx.insert(idx.end(), {v00, v10, v01, v10, v11, v01});
             }
         }
         auto mesh = MU::BuildHalfedgeMeshFromIndexedTriangles(pos, idx);
@@ -178,6 +191,53 @@ TEST(CurvatureTensor, Sphere_IsotropicAndTangent)
     EXPECT_GT(interior, 100);
 }
 
+TEST(CurvatureTensor, PrincipalCurvaturesScaleInverselyWithGeometry)
+{
+    auto unit = MakeIcosphere(1.0f, 3);
+    auto scaled = MakeIcosphere(3.0f, 3);
+    auto unitResult = Curv::ComputeCurvatureTensor(unit);
+    auto scaledResult = Curv::ComputeCurvatureTensor(scaled);
+    ASSERT_TRUE(unitResult.has_value());
+    ASSERT_TRUE(scaledResult.has_value());
+    ASSERT_EQ(unit.VerticesSize(), scaled.VerticesSize());
+
+    for (std::size_t i = 0; i < unit.VerticesSize(); ++i)
+    {
+        const VertexHandle vertex{static_cast<PropertyIndex>(i)};
+        EXPECT_NEAR(
+            unitResult->MaxPrincipalCurvatureProperty[vertex],
+            3.0 * scaledResult->MaxPrincipalCurvatureProperty[vertex],
+            2.0e-5);
+        EXPECT_NEAR(
+            unitResult->MinPrincipalCurvatureProperty[vertex],
+            3.0 * scaledResult->MinPrincipalCurvatureProperty[vertex],
+            2.0e-5);
+    }
+}
+
+TEST(CurvatureTensor, ReversingOrientationFlipsSignedCurvature)
+{
+    auto outward = MakeTetrahedron(false);
+    auto inward = MakeTetrahedron(true);
+    const Curv::CurvatureField outwardField = Curv::ComputeCurvature(outward);
+    const Curv::CurvatureField inwardField = Curv::ComputeCurvature(inward);
+
+    for (std::size_t i = 0; i < outward.VerticesSize(); ++i)
+    {
+        const VertexHandle vertex{static_cast<PropertyIndex>(i)};
+        EXPECT_GT(outwardField.MeanCurvatureProperty[vertex], 0.0);
+        EXPECT_LT(inwardField.MeanCurvatureProperty[vertex], 0.0);
+        EXPECT_NEAR(
+            outwardField.MeanCurvatureProperty[vertex],
+            -inwardField.MeanCurvatureProperty[vertex],
+            1.0e-12);
+        EXPECT_NEAR(
+            outwardField.GaussianCurvatureProperty[vertex],
+            inwardField.GaussianCurvatureProperty[vertex],
+            1.0e-12);
+    }
+}
+
 // =============================================================================
 // Cylinder: one principal curvature ≈ 0 (axial), one ≈ 1/R (circumferential).
 // =============================================================================
@@ -223,8 +283,34 @@ TEST(CurvatureTensor, Cylinder_AxisAligned)
     EXPECT_GT(tested, 0);
 }
 
+TEST(CurvatureTensor, OpenCylinderBoundaryUsesSupportedNeighbourhood)
+{
+    auto mesh = MakeCylinderTube(1.0, 4.0, 48, 24);
+    auto result = Curv::ComputeCurvatureTensor(mesh);
+    ASSERT_TRUE(result.has_value());
+
+    int estimated = 0;
+    for (int i = 0; i < 48; i += 6)
+    {
+        const VertexHandle boundary{static_cast<PropertyIndex>(i)};
+        ASSERT_TRUE(mesh.IsBoundary(boundary));
+
+        const glm::vec3 d1 = result->PrincipalDir1Property[boundary];
+        const glm::vec3 d2 = result->PrincipalDir2Property[boundary];
+        EXPECT_FALSE(IsZeroVec(d1));
+        EXPECT_FALSE(IsZeroVec(d2));
+        EXPECT_GT(std::max(
+            std::abs(result->MaxPrincipalCurvatureProperty[boundary]),
+            std::abs(result->MinPrincipalCurvatureProperty[boundary])), 0.25);
+        estimated += !IsZeroVec(d1) && !IsZeroVec(d2);
+    }
+    EXPECT_EQ(estimated, 8);
+}
+
 // =============================================================================
-// Saddle z = x² − y²: opposite-sign principal curvatures along the x / y axes.
+// Saddle z = x² − y²: the engine's positive-outward-convex convention is
+// the negative of the graph-normal shape operator, so κ_max follows y and
+// κ_min follows x at the origin.
 // =============================================================================
 
 TEST(CurvatureTensor, Saddle_OppositeSignsAxisAligned)
@@ -254,10 +340,10 @@ TEST(CurvatureTensor, Saddle_OppositeSignsAxisAligned)
     EXPECT_NEAR(k1, 2.0, 0.4);
     EXPECT_NEAR(k2, -2.0, 0.4);
 
-    // Orthogonal, and aligned with the x (positive κ) / y (negative κ) axes.
+    // Orthogonal, and aligned with the y (positive κ) / x (negative κ) axes.
     EXPECT_NEAR(glm::dot(d1, d2), 0.0f, 1e-4f);
-    EXPECT_GT(std::abs(d1.x), 0.9f) << "max-curvature direction ∥ x axis";
-    EXPECT_GT(std::abs(d2.y), 0.9f) << "min-curvature direction ∥ y axis";
+    EXPECT_GT(std::abs(d1.y), 0.9f) << "max-curvature direction ∥ y axis";
+    EXPECT_GT(std::abs(d2.x), 0.9f) << "min-curvature direction ∥ x axis";
 }
 
 // =============================================================================
@@ -321,39 +407,82 @@ TEST(CurvatureTensor, Deterministic)
 }
 
 // =============================================================================
-// Scalar preservation: ComputeCurvature's H/K are unchanged (still equal to the
-// independent ComputeMeanCurvature / ComputeGaussianCurvature outputs), and it
-// now additionally publishes the principal-direction fields.
+// The standalone Meyer scalar operators remain available independently of the
+// coherent Taubin full field.
 // =============================================================================
 
-TEST(CurvatureTensor, ComputeCurvaturePreservesScalarsAndPublishesDirections)
+TEST(CurvatureTensor, StandaloneScalarOperatorsRemainAvailable)
 {
-    auto mesh = MakeIcosphere(1.0f, 3);
+    auto scalarMesh = MakeIcosphere(1.0f, 3);
+    auto fieldMesh = MakeIcosphere(1.0f, 3);
 
-    auto meanOnly = Curv::ComputeMeanCurvature(mesh);
-    auto gaussOnly = Curv::ComputeGaussianCurvature(mesh);
+    auto meanOnly = Curv::ComputeMeanCurvature(scalarMesh);
+    auto gaussOnly = Curv::ComputeGaussianCurvature(scalarMesh);
     ASSERT_TRUE(meanOnly.has_value());
     ASSERT_TRUE(gaussOnly.has_value());
 
-    const Curv::CurvatureField field = Curv::ComputeCurvature(mesh);
+    const Curv::CurvatureField field = Curv::ComputeCurvature(fieldMesh);
 
     int published = 0;
-    for (std::size_t i = 0; i < mesh.VerticesSize(); ++i)
+    for (std::size_t i = 0; i < scalarMesh.VerticesSize(); ++i)
     {
         VertexHandle vh{static_cast<PropertyIndex>(i)};
-        if (mesh.IsDeleted(vh) || mesh.IsIsolated(vh)) continue;
-        EXPECT_DOUBLE_EQ(field.MeanCurvatureProperty[vh], meanOnly->Property[vh]);
-        EXPECT_DOUBLE_EQ(field.GaussianCurvatureProperty[vh], gaussOnly->Property[vh]);
+        if (scalarMesh.IsDeleted(vh) || scalarMesh.IsIsolated(vh)) continue;
+        EXPECT_NEAR(std::abs(meanOnly->Property[vh]), 1.0, 0.15);
+        EXPECT_NEAR(gaussOnly->Property[vh], 1.0, 0.25);
         if (!IsZeroVec(field.PrincipalDir1Property[vh])) ++published;
     }
     EXPECT_GT(published, 100) << "ComputeCurvature should publish principal directions";
 }
 
+TEST(CurvatureTensor, FullFieldUsesTheTensorPrincipalSystem)
+{
+    auto mesh = MakeCylinderTube(1.0, 4.0, 48, 24);
+    auto tensor = Curv::ComputeCurvatureTensor(mesh);
+    ASSERT_TRUE(tensor.has_value());
+
+    std::vector<double> maxPrincipal(mesh.VerticesSize(), 0.0);
+    std::vector<double> minPrincipal(mesh.VerticesSize(), 0.0);
+    std::vector<glm::vec3> maxDirections(mesh.VerticesSize(), glm::vec3(0.0f));
+    std::vector<glm::vec3> minDirections(mesh.VerticesSize(), glm::vec3(0.0f));
+    for (std::size_t i = 0; i < mesh.VerticesSize(); ++i)
+    {
+        const VertexHandle vertex{static_cast<PropertyIndex>(i)};
+        maxPrincipal[i] = tensor->MaxPrincipalCurvatureProperty[vertex];
+        minPrincipal[i] = tensor->MinPrincipalCurvatureProperty[vertex];
+        maxDirections[i] = tensor->PrincipalDir1Property[vertex];
+        minDirections[i] = tensor->PrincipalDir2Property[vertex];
+    }
+
+    const Curv::CurvatureField field = Curv::ComputeCurvature(mesh);
+    int compared = 0;
+    for (std::size_t i = 0; i < mesh.VerticesSize(); ++i)
+    {
+        const VertexHandle vertex{static_cast<PropertyIndex>(i)};
+        if (mesh.IsDeleted(vertex) || IsZeroVec(maxDirections[i]) || IsZeroVec(minDirections[i]))
+            continue;
+
+        EXPECT_DOUBLE_EQ(field.MaxPrincipalCurvatureProperty[vertex], maxPrincipal[i]);
+        EXPECT_DOUBLE_EQ(field.MinPrincipalCurvatureProperty[vertex], minPrincipal[i]);
+        EXPECT_DOUBLE_EQ(
+            field.MeanCurvatureProperty[vertex],
+            0.5 * (maxPrincipal[i] + minPrincipal[i]));
+        EXPECT_DOUBLE_EQ(
+            field.GaussianCurvatureProperty[vertex],
+            maxPrincipal[i] * minPrincipal[i]);
+        EXPECT_EQ(field.PrincipalDir1Property[vertex], maxDirections[i]);
+        EXPECT_EQ(field.PrincipalDir2Property[vertex], minDirections[i]);
+        ++compared;
+    }
+    EXPECT_GT(compared, 1000);
+}
+
 // =============================================================================
-// Fail-closed: flat region, boundary vertex -> zero-sentinel directions, no NaN.
+// Fail-closed: a flat region, including its boundary, has no supported hinge
+// curvature and publishes finite zero sentinels.
 // =============================================================================
 
-TEST(CurvatureTensor, FlatRegionAndBoundaryFailClosed)
+TEST(CurvatureTensor, FlatRegionIncludingBoundaryFailsClosed)
 {
     const double a = 1.0;
     const int cells = 10;
@@ -367,7 +496,8 @@ TEST(CurvatureTensor, FlatRegionAndBoundaryFailClosed)
     EXPECT_TRUE(IsZeroVec(result->PrincipalDir1Property[interior]));
     EXPECT_TRUE(IsZeroVec(result->PrincipalDir2Property[interior]));
 
-    // Boundary vertex (corner of the grid) -> sentinel.
+    // A boundary vertex on the same flat grid is unsupported because all of
+    // its available interior hinges are flat.
     VertexHandle corner{static_cast<PropertyIndex>(0)};
     ASSERT_TRUE(mesh.IsBoundary(corner));
     EXPECT_TRUE(IsZeroVec(result->PrincipalDir1Property[corner]));

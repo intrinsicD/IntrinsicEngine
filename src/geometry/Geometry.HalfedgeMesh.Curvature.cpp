@@ -1,7 +1,6 @@
 module;
 
 #include <algorithm>
-#include <cassert>
 #include <cmath>
 #include <cstddef>
 #include <optional>
@@ -15,7 +14,6 @@ module Geometry.Curvature;
 import Geometry.Properties;
 import Geometry.HalfedgeMesh;
 import Geometry.HalfedgeMesh.Utils;
-import Geometry.PCA;
 
 namespace Geometry::Curvature
 {
@@ -23,168 +21,293 @@ namespace Geometry::Curvature
     using MeshUtils::ComputeCotanLaplacian;
     using MeshUtils::ComputeVertexAngleDefect;
     using MeshUtils::ComputeVertexAngleSums;
-    using MeshUtils::FaceArea;
+    using MeshUtils::EdgeCotanWeight;
+    using MeshUtils::FaceAreaVector;
     using MeshUtils::VertexNormal;
 
     namespace
     {
-        // Per-vertex output of the Taubin curvature-tensor estimator. Default
-        // state is the fail-closed sentinel (zero directions, not Valid).
         struct TensorVertex
         {
-            glm::dvec3 Dir1{0.0}; // κ₁ (max) direction, unit tangent
-            glm::dvec3 Dir2{0.0}; // κ₂ (min) direction, unit tangent
+            glm::dvec3 Dir1{0.0};
+            glm::dvec3 Dir2{0.0};
             double MaxPrincipal{0.0};
             double MinPrincipal{0.0};
             bool Valid{false};
         };
 
-        // Estimate the per-vertex 3×3 curvature tensor (Taubin 1995) and
-        // eigen-decompose it into principal directions. Interior, non-degenerate
-        // vertices get Valid=true; boundary/flat/zero-area 1-rings stay at the
-        // sentinel. Deterministic and allocation-bounded; never emits NaN/Inf.
+        struct EdgeTensorSample
+        {
+            glm::dvec3 WeightedDirection{0.0};
+            double SignedDihedral{0.0};
+            bool Valid{false};
+        };
+
+        struct SymmetricTensor
+        {
+            double M00{0.0};
+            double M01{0.0};
+            double M02{0.0};
+            double M11{0.0};
+            double M12{0.0};
+            double M22{0.0};
+
+            void AddOuterProduct(const glm::dvec3& vector, double scale) noexcept
+            {
+                M00 += scale * vector.x * vector.x;
+                M01 += scale * vector.x * vector.y;
+                M02 += scale * vector.x * vector.z;
+                M11 += scale * vector.y * vector.y;
+                M12 += scale * vector.y * vector.z;
+                M22 += scale * vector.z * vector.z;
+            }
+
+            void Divide(double value) noexcept
+            {
+                M00 /= value;
+                M01 /= value;
+                M02 /= value;
+                M11 /= value;
+                M12 /= value;
+                M22 /= value;
+            }
+
+            [[nodiscard]] glm::dvec3 Multiply(const glm::dvec3& vector) const noexcept
+            {
+                return {
+                    M00 * vector.x + M01 * vector.y + M02 * vector.z,
+                    M01 * vector.x + M11 * vector.y + M12 * vector.z,
+                    M02 * vector.x + M12 * vector.y + M22 * vector.z};
+            }
+
+            [[nodiscard]] double MaxAbsCoefficient() const noexcept
+            {
+                return std::max({
+                    std::abs(M00), std::abs(M01), std::abs(M02),
+                    std::abs(M11), std::abs(M12), std::abs(M22)});
+            }
+        };
+
+        [[nodiscard]] bool IsFinite(const glm::dvec3& value) noexcept
+        {
+            return std::isfinite(value.x)
+                && std::isfinite(value.y)
+                && std::isfinite(value.z);
+        }
+
+        // The framework24 edge-dihedral estimator accumulates signed interior
+        // hinges over the vertex and its one-ring neighbours. Each contribution
+        // uses half the edge length to match mixed vertex-area normalization.
         [[nodiscard]] std::vector<TensorVertex> ComputeTaubinTensor(HalfedgeMesh::Mesh& mesh)
         {
             constexpr double kTiny = 1e-18;
             const std::size_t nV = mesh.VerticesSize();
+            const std::size_t nE = mesh.EdgesSize();
+            const std::size_t nF = mesh.FacesSize();
             std::vector<TensorVertex> out(nV);
+            const std::vector<double> mixedAreas = ComputeMixedVoronoiAreas(mesh);
+
+            std::vector<glm::dvec3> faceNormals(nF, glm::dvec3(0.0));
+            for (std::size_t fi = 0; fi < nF; ++fi)
+            {
+                const FaceHandle face{static_cast<PropertyIndex>(fi)};
+                if (mesh.IsDeleted(face))
+                    continue;
+
+                const glm::dvec3 areaVector = FaceAreaVector(mesh, face);
+                const double length = glm::length(areaVector);
+                if (IsFinite(areaVector) && std::isfinite(length) && length > kTiny)
+                    faceNormals[fi] = areaVector / length;
+            }
+
+            std::vector<EdgeTensorSample> edgeSamples(nE);
+            for (std::size_t ei = 0; ei < nE; ++ei)
+            {
+                const EdgeHandle edge{static_cast<PropertyIndex>(ei)};
+                if (mesh.IsDeleted(edge) || mesh.IsBoundary(edge))
+                    continue;
+
+                const HalfedgeHandle h0 = mesh.Halfedge(edge, 0u);
+                const HalfedgeHandle h1 = mesh.OppositeHalfedge(h0);
+                const FaceHandle f0 = mesh.Face(h0);
+                const FaceHandle f1 = mesh.Face(h1);
+                if (!f0.IsValid() || !f1.IsValid())
+                    continue;
+
+                const glm::dvec3 n0 = faceNormals[f0.Index];
+                const glm::dvec3 n1 = faceNormals[f1.Index];
+                if (glm::dot(n0, n0) <= kTiny || glm::dot(n1, n1) <= kTiny)
+                    continue;
+
+                // The direction is opposite h0, matching the face-order/sign
+                // convention in atan2. Choosing h1 gives the same signed angle.
+                glm::dvec3 direction = glm::dvec3(mesh.Position(mesh.FromVertex(h0)))
+                                     - glm::dvec3(mesh.Position(mesh.ToVertex(h0)));
+                const double length = glm::length(direction);
+                if (!IsFinite(direction) || !std::isfinite(length) || length <= kTiny)
+                    continue;
+                direction /= length;
+
+                // Negate the differential-geometry sign so an outward-oriented
+                // convex surface follows this module's established positive-
+                // curvature convention.
+                const double signedDihedral = -std::atan2(
+                    glm::dot(glm::cross(n0, n1), direction),
+                    glm::dot(n0, n1));
+                if (!std::isfinite(signedDihedral))
+                    continue;
+
+                edgeSamples[ei] = {
+                    .WeightedDirection = std::sqrt(0.5 * length) * direction,
+                    .SignedDihedral = signedDihedral,
+                    .Valid = true};
+            }
 
             for (std::size_t i = 0; i < nV; ++i)
             {
-                VertexHandle vh{static_cast<PropertyIndex>(i)};
-                if (mesh.IsDeleted(vh) || mesh.IsIsolated(vh)) continue;
-                if (mesh.IsBoundary(vh)) continue; // open 1-ring -> sentinel
-
-                const glm::dvec3 normal = glm::dvec3(VertexNormal(mesh, vh));
-                const double nLen = glm::length(normal);
-                // A NaN/Inf normal (e.g. an interior vertex incident to a face
-                // with a non-finite corner) makes nLen non-finite; `nLen <= kTiny`
-                // would be false, so check finiteness explicitly and fail closed.
-                if (!std::isfinite(nLen) || nLen <= kTiny) continue;
-                const glm::dvec3 n = normal / nLen;
-                const glm::dvec3 xi = glm::dvec3(mesh.Position(vh));
-                if (!std::isfinite(xi.x) || !std::isfinite(xi.y) || !std::isfinite(xi.z)) continue;
-
-                // Accumulate M = Σ_j w_ij κ_ij T_ij T_ijᵀ (upper triangle).
-                double m00 = 0.0, m01 = 0.0, m02 = 0.0, m11 = 0.0, m12 = 0.0, m22 = 0.0;
-                double totalW = 0.0;
-                for (const HalfedgeHandle h : mesh.HalfedgesAroundVertex(vh))
-                {
-                    const VertexHandle vj = mesh.ToVertex(h);
-                    const glm::dvec3 d = glm::dvec3(mesh.Position(vj)) - xi;
-                    const double dd = glm::dot(d, d);
-                    // `!(dd > kTiny)` also rejects a non-finite neighbour (NaN
-                    // fails the comparison), so a single bad corner cannot poison
-                    // a finite neighbour's tensor.
-                    if (!(dd > kTiny)) continue;
-
-                    // Area-derived weight: sum of the areas of the two faces
-                    // incident to this edge (one for a boundary edge — but the
-                    // 1-ring is closed here, so generally two).
-                    double w = 0.0;
-                    const FaceHandle f0 = mesh.Face(h);
-                    if (f0.IsValid()) w += FaceArea(mesh, f0);
-                    const FaceHandle f1 = mesh.Face(mesh.OppositeHalfedge(h));
-                    if (f1.IsValid()) w += FaceArea(mesh, f1);
-                    if (w <= kTiny) continue;
-
-                    const double kappa = 2.0 * glm::dot(n, d) / dd;
-                    glm::dvec3 t = d - glm::dot(d, n) * n; // project onto tangent plane
-                    const double tLen = glm::length(t);
-                    if (tLen <= kTiny) continue; // edge parallel to normal
-                    t /= tLen;
-
-                    const double wk = w * kappa;
-                    m00 += wk * t.x * t.x;
-                    m01 += wk * t.x * t.y;
-                    m02 += wk * t.x * t.z;
-                    m11 += wk * t.y * t.y;
-                    m12 += wk * t.y * t.z;
-                    m22 += wk * t.z * t.z;
-                    totalW += w;
-                }
-
-                if (totalW <= kTiny) continue; // zero-area / empty 1-ring
-                const double inv = 1.0 / totalW;
-                m00 *= inv; m01 *= inv; m02 *= inv; m11 *= inv; m12 *= inv; m22 *= inv;
-
-                // Flat 1-ring: tensor numerically zero -> sentinel.
-                const double frob = std::abs(m00) + std::abs(m01) + std::abs(m02)
-                                  + std::abs(m11) + std::abs(m12) + std::abs(m22);
-                if (frob <= 1e-12) continue;
-
-                const PCA::Eigen3 eig = PCA::SymmetricEigen3(m00, m01, m02, m11, m12, m22);
-
-                // Discard the eigenvector most aligned with the surface normal;
-                // the other two are the tangent principal directions.
-                int normalIdx = 0;
-                double bestAlign = -1.0;
-                for (int k = 0; k < 3; ++k)
-                {
-                    const double align = std::abs(glm::dot(eig.Eigenvectors[k], n));
-                    if (align > bestAlign) { bestAlign = align; normalIdx = k; }
-                }
-                const int a = (normalIdx == 0) ? 1 : 0;
-                const int b = (normalIdx == 2) ? 1 : 2;
-
-                // Recover the *signed* tangent eigenvalues via the Rayleigh
-                // quotient mᵏ = vᵏ·(M vᵏ). The shared PCA::SymmetricEigen3 clamps
-                // its returned eigenvalues to non-negative (a PSD-covariance
-                // assumption), which would erase the negative curvatures of the
-                // curvature tensor; its eigenVECTORS are untouched, so we reuse
-                // those and read the eigenvalues straight off M.
-                auto rayleigh = [&](const glm::dvec3& v) -> double
-                {
-                    const glm::dvec3 mv{
-                        m00 * v.x + m01 * v.y + m02 * v.z,
-                        m01 * v.x + m11 * v.y + m12 * v.z,
-                        m02 * v.x + m12 * v.y + m22 * v.z};
-                    return glm::dot(v, mv);
-                };
-
-                // Taubin curvature recovery from the two tangent eigenvalues.
-                const double la = rayleigh(eig.Eigenvectors[a]);
-                const double lb = rayleigh(eig.Eigenvectors[b]);
-                const double kappaA = 3.0 * la - lb;
-                const double kappaB = 3.0 * lb - la;
-
-                glm::dvec3 v1 = eig.Eigenvectors[a];
-                glm::dvec3 v2 = eig.Eigenvectors[b];
-                double k1 = kappaA;
-                double k2 = kappaB;
-                if (kappaB > kappaA)
-                {
-                    std::swap(v1, v2);
-                    std::swap(k1, k2);
-                }
-
-                // Project onto the tangent plane and orthonormalize so the two
-                // output directions are unit-length, mutually orthogonal, tangent.
-                glm::dvec3 d1 = v1 - glm::dot(v1, n) * n;
-                const double d1Len = glm::length(d1);
-                if (d1Len <= kTiny) continue;
-                d1 /= d1Len;
-
-                glm::dvec3 d2 = v2 - glm::dot(v2, n) * n;
-                d2 -= glm::dot(d2, d1) * d1;
-                const double d2Len = glm::length(d2);
-                if (d2Len <= kTiny) continue;
-                d2 /= d2Len;
-
-                // Final fail-closed guard: never publish a non-finite result.
-                const auto vecFinite = [](const glm::dvec3& v) {
-                    return std::isfinite(v.x) && std::isfinite(v.y) && std::isfinite(v.z);
-                };
-                if (!vecFinite(d1) || !vecFinite(d2) || !std::isfinite(k1) || !std::isfinite(k2))
+                const VertexHandle vertex{static_cast<PropertyIndex>(i)};
+                if (mesh.IsDeleted(vertex) || mesh.IsIsolated(vertex))
                     continue;
 
-                out[i].Dir1 = d1;
-                out[i].Dir2 = d2;
-                out[i].MaxPrincipal = k1;
-                out[i].MinPrincipal = k2;
+                SymmetricTensor tensor;
+                double supportArea = 0.0;
+                bool supportValid = true;
+                const auto accumulateSupportVertex = [&](const VertexHandle support)
+                {
+                    const double area = mixedAreas[support.Index];
+                    if (!std::isfinite(area) || area < 0.0)
+                    {
+                        supportValid = false;
+                        return;
+                    }
+                    supportArea += area;
+                    for (const HalfedgeHandle halfedge : mesh.HalfedgesAroundVertex(support))
+                    {
+                        const EdgeTensorSample& sample = edgeSamples[mesh.Edge(halfedge).Index];
+                        if (sample.Valid)
+                            tensor.AddOuterProduct(sample.WeightedDirection, sample.SignedDihedral);
+                    }
+                };
+
+                accumulateSupportVertex(vertex);
+                for (const HalfedgeHandle halfedge : mesh.HalfedgesAroundVertex(vertex))
+                    accumulateSupportVertex(mesh.ToVertex(halfedge));
+
+                if (!supportValid || !std::isfinite(supportArea) || supportArea <= kTiny)
+                    continue;
+                tensor.Divide(supportArea);
+
+                const double scale = tensor.MaxAbsCoefficient();
+                if (!std::isfinite(scale) || scale <= 0.0)
+                    continue;
+
+                glm::dvec3 normal{0.0};
+                for (const FaceHandle face : mesh.FacesAroundVertex(vertex))
+                    normal += FaceAreaVector(mesh, face);
+                const double normalLength = glm::length(normal);
+                if (!IsFinite(normal) || !std::isfinite(normalLength) || normalLength <= kTiny)
+                    continue;
+                normal /= normalLength;
+
+                const glm::dvec3 seed = std::abs(normal.x) < 0.9
+                    ? glm::dvec3{1.0, 0.0, 0.0}
+                    : glm::dvec3{0.0, 1.0, 0.0};
+                glm::dvec3 tangent0 = glm::cross(normal, seed);
+                tangent0 /= glm::length(tangent0);
+                const glm::dvec3 tangent1 = glm::cross(normal, tangent0);
+
+                // Restrict to the estimated tangent plane before diagonalizing.
+                // A full 3x3 smallest-absolute-eigenvalue selection is ambiguous
+                // on cylinders, where both the normal and one principal value are
+                // zero. The 2x2 restriction keeps the published basis tangent.
+                const double m00 = glm::dot(tangent0, tensor.Multiply(tangent0));
+                const double m01 = glm::dot(tangent0, tensor.Multiply(tangent1));
+                const double m11 = glm::dot(tangent1, tensor.Multiply(tangent1));
+                const double meanEigenvalue = 0.5 * (m00 + m11);
+                const double radius = std::hypot(0.5 * (m00 - m11), m01);
+                const double rawMax = meanEigenvalue + radius;
+                const double rawMin = meanEigenvalue - radius;
+                const double angle = 0.5 * std::atan2(2.0 * m01, m00 - m11);
+                const glm::dvec3 rawMaxDirection = std::cos(angle) * tangent0
+                                                 + std::sin(angle) * tangent1;
+                const glm::dvec3 rawMinDirection = -std::sin(angle) * tangent0
+                                                 + std::cos(angle) * tangent1;
+
+                // A hinge angle measures normal curvature across its edge while
+                // the reference integral stores the contribution along that edge.
+                // The two tangent eigenvalues are therefore paired with the
+                // complementary eigenvectors when published as principal fields.
+                const glm::dvec3 maxDirection = rawMinDirection;
+                const glm::dvec3 minDirection = rawMaxDirection;
+                const double maxPrincipal = rawMax;
+                const double minPrincipal = rawMin;
+                if (!IsFinite(maxDirection) || !IsFinite(minDirection)
+                    || !std::isfinite(maxPrincipal) || !std::isfinite(minPrincipal))
+                {
+                    continue;
+                }
+
+                out[i].Dir1 = maxDirection;
+                out[i].Dir2 = minDirection;
+                out[i].MaxPrincipal = maxPrincipal;
+                out[i].MinPrincipal = minPrincipal;
                 out[i].Valid = true;
             }
 
+            // Match framework24's three cotan post-smoothing passes,
+            // but use separate buffers so traversal order and parallel scheduling
+            // cannot change the result. Directions remain the tensor eigenvectors.
+            std::vector<double> minPrincipal(nV, 0.0);
+            std::vector<double> maxPrincipal(nV, 0.0);
+            for (std::size_t i = 0; i < nV; ++i)
+            {
+                minPrincipal[i] = out[i].MinPrincipal;
+                maxPrincipal[i] = out[i].MaxPrincipal;
+            }
+
+            for (int pass = 0; pass < 3; ++pass)
+            {
+                std::vector<double> nextMin = minPrincipal;
+                std::vector<double> nextMax = maxPrincipal;
+                for (std::size_t i = 0; i < nV; ++i)
+                {
+                    const VertexHandle vertex{static_cast<PropertyIndex>(i)};
+                    if (!out[i].Valid || mesh.IsDeleted(vertex) || mesh.IsIsolated(vertex))
+                        continue;
+
+                    double weightSum = 0.0;
+                    double minSum = 0.0;
+                    double maxSum = 0.0;
+                    for (const HalfedgeHandle halfedge : mesh.HalfedgesAroundVertex(vertex))
+                    {
+                        const VertexHandle neighbour = mesh.ToVertex(halfedge);
+                        if (!out[neighbour.Index].Valid)
+                            continue;
+                        const double weight = std::max(0.0, EdgeCotanWeight(mesh, mesh.Edge(halfedge)));
+                        if (!std::isfinite(weight) || weight <= 0.0)
+                            continue;
+                        weightSum += weight;
+                        minSum += weight * minPrincipal[neighbour.Index];
+                        maxSum += weight * maxPrincipal[neighbour.Index];
+                    }
+                    if (std::isfinite(weightSum) && weightSum > 0.0
+                        && std::isfinite(minSum) && std::isfinite(maxSum))
+                    {
+                        nextMin[i] = minSum / weightSum;
+                        nextMax[i] = maxSum / weightSum;
+                    }
+                }
+                minPrincipal.swap(nextMin);
+                maxPrincipal.swap(nextMax);
+            }
+
+            for (std::size_t i = 0; i < nV; ++i)
+            {
+                if (!out[i].Valid)
+                    continue;
+                out[i].MinPrincipal = minPrincipal[i];
+                out[i].MaxPrincipal = maxPrincipal[i];
+            }
             return out;
         }
 
@@ -211,20 +334,9 @@ namespace Geometry::Curvature
         }
     }
 
-    // =========================================================================
-    // ComputeMeanCurvature
-    // =========================================================================
-    //
     // Mean curvature normal at vertex i:
     //   Hn_i = (1 / 2A_i) * Σ_j (cot α_ij + cot β_ij) * (x_j - x_i)
-    //
-    // Mean curvature magnitude: H_i = ||Hn_i|| / 2
-    // (The factor of 2 comes from the Laplace-Beltrami: ΔS x = -2H n)
-    //
-    // Actually, the discrete Laplace-Beltrami is:
-    //   ΔS f(v_i) = (1/A_i) Σ_j w_ij (f(v_j) - f(v_i))
-    // Applied to position: ΔS x = (1/A_i) Σ_j w_ij (x_j - x_i) = -2H n
-    // So H = ||ΔS x|| / 2, but the sign needs the normal.
+    // The discrete Laplace-Beltrami satisfies ΔS x = -2H n.
 
     std::optional<MeanCurvatureResult> ComputeMeanCurvature(HalfedgeMesh::Mesh& mesh)
     {
@@ -239,7 +351,6 @@ namespace Geometry::Curvature
         auto areas = ComputeMixedVoronoiAreas(mesh);
         auto laplacian = ComputeCotanLaplacian(mesh);
 
-        // Normalize by area and compute magnitude
         for (std::size_t i = 0; i < nV; ++i)
         {
             VertexHandle vh{static_cast<PropertyIndex>(i)};
@@ -247,7 +358,6 @@ namespace Geometry::Curvature
 
             if (areas[i] > 1e-12)
             {
-                // ΔS x = laplacian / area = -2H n
                 glm::dvec3 laplaceB = laplacian[i] / areas[i];
                 const glm::dvec3 normal = glm::dvec3(VertexNormal(mesh, vh));
                 result.Property[vh] = ComputeSignedMeanCurvatureFromLaplaceBeltrami(laplaceB, normal);
@@ -257,10 +367,6 @@ namespace Geometry::Curvature
         return result;
     }
 
-    // =========================================================================
-    // ComputeGaussianCurvature
-    // =========================================================================
-    //
     // Discrete Gaussian curvature via angle defect (Descartes' theorem):
     //   K(v_i) = (2π - Σ_j θ_j) / A_i     for interior vertices
     //   K(v_i) = (π  - Σ_j θ_j) / A_i     for boundary vertices
@@ -279,10 +385,8 @@ namespace Geometry::Curvature
 
         auto areas = ComputeMixedVoronoiAreas(mesh);
 
-        // Accumulate angle sum per vertex.
         const std::vector<double> vertexAngleSums = ComputeVertexAngleSums(mesh);
 
-        // Compute Gaussian curvature
         for (std::size_t i = 0; i < nV; ++i)
         {
             VertexHandle vh{static_cast<PropertyIndex>(i)};
@@ -298,10 +402,6 @@ namespace Geometry::Curvature
         return result;
     }
 
-    // =========================================================================
-    // ComputeCurvature — Full curvature field
-    // =========================================================================
-
     CurvatureField ComputeCurvature(HalfedgeMesh::Mesh& mesh)
     {
         const std::size_t nV = mesh.VerticesSize();
@@ -315,71 +415,38 @@ namespace Geometry::Curvature
         result.PrincipalDir1Property = VertexProperty<glm::vec3>(mesh.VertexProperties().GetOrAdd<glm::vec3>("v:principal_dir1", glm::vec3(0.0f)));
         result.PrincipalDir2Property = VertexProperty<glm::vec3>(mesh.VertexProperties().GetOrAdd<glm::vec3>("v:principal_dir2", glm::vec3(0.0f)));
 
-        // Shared computation: mixed Voronoi areas
-        auto areas = ComputeMixedVoronoiAreas(mesh);
-
-        // 1. Cotan-weighted Laplacian for mean curvature
-        auto laplacian = ComputeCotanLaplacian(mesh);
-
-        // 2. Accumulate angle sums for Gaussian curvature.
-        const std::vector<double> vertexAngleSums = ComputeVertexAngleSums(mesh);
-
-        // 3. Assemble per-vertex curvature
-        for (std::size_t i = 0; i < nV; ++i)
-        {
-            VertexHandle vh{static_cast<PropertyIndex>(i)};
-            if (mesh.IsDeleted(vh) || mesh.IsIsolated(vh)) continue;
-
-            if (areas[i] < 1e-12) continue;
-
-            glm::dvec3 laplaceB = laplacian[i] / areas[i];
-            const glm::dvec3 normal = glm::dvec3(VertexNormal(mesh, vh));
-            double H = ComputeSignedMeanCurvatureFromLaplaceBeltrami(laplaceB, normal);
-
-            // Gaussian curvature
-            const double defect = ComputeVertexAngleDefect(mesh, vh, vertexAngleSums[i]);
-            const double K = defect / areas[i];
-
-            // Principal curvatures
-            double discriminant = std::max(0.0, H * H - K);
-            double sqrtDisc = std::sqrt(discriminant);
-            double kappa1 = H + sqrtDisc; // max principal curvature
-            double kappa2 = H - sqrtDisc; // min principal curvature
-
-            result.MeanCurvatureProperty[vh] = H;
-            result.GaussianCurvatureProperty[vh] = K;
-            result.MaxPrincipalCurvatureProperty[vh] = kappa1;
-            result.MinPrincipalCurvatureProperty[vh] = kappa2;
-
-            // Mean curvature normal (half the Laplace-Beltrami of position)
-            result.MeanCurvatureNormalProperty[vh] = glm::vec3(laplaceB / 2.0);
-        }
-
-        // Principal directions from the Taubin tensor. The existing scalar
-        // fields above are left untouched; only the direction fields are added.
         const std::vector<TensorVertex> tensor = ComputeTaubinTensor(mesh);
         for (std::size_t i = 0; i < nV; ++i)
         {
-            VertexHandle vh{static_cast<PropertyIndex>(i)};
-            if (mesh.IsDeleted(vh)) continue;
-            if (tensor[i].Valid)
-            {
-                result.PrincipalDir1Property[vh] = glm::vec3(tensor[i].Dir1);
-                result.PrincipalDir2Property[vh] = glm::vec3(tensor[i].Dir2);
-            }
-            else
-            {
-                result.PrincipalDir1Property[vh] = glm::vec3(0.0f);
-                result.PrincipalDir2Property[vh] = glm::vec3(0.0f);
-            }
+            const VertexHandle vertex{static_cast<PropertyIndex>(i)};
+            result.MeanCurvatureProperty[vertex] = 0.0;
+            result.GaussianCurvatureProperty[vertex] = 0.0;
+            result.MaxPrincipalCurvatureProperty[vertex] = 0.0;
+            result.MinPrincipalCurvatureProperty[vertex] = 0.0;
+            result.MeanCurvatureNormalProperty[vertex] = glm::vec3(0.0f);
+            result.PrincipalDir1Property[vertex] = glm::vec3(0.0f);
+            result.PrincipalDir2Property[vertex] = glm::vec3(0.0f);
+            if (mesh.IsDeleted(vertex) || !tensor[i].Valid)
+                continue;
+
+            const double maxPrincipal = tensor[i].MaxPrincipal;
+            const double minPrincipal = tensor[i].MinPrincipal;
+            const double mean = 0.5 * (maxPrincipal + minPrincipal);
+            result.MeanCurvatureProperty[vertex] = mean;
+            result.GaussianCurvatureProperty[vertex] = maxPrincipal * minPrincipal;
+            result.MaxPrincipalCurvatureProperty[vertex] = maxPrincipal;
+            result.MinPrincipalCurvatureProperty[vertex] = minPrincipal;
+            result.PrincipalDir1Property[vertex] = glm::vec3(tensor[i].Dir1);
+            result.PrincipalDir2Property[vertex] = glm::vec3(tensor[i].Dir2);
+
+            const glm::dvec3 normal(VertexNormal(mesh, vertex));
+            const double normalLength = glm::length(normal);
+            if (IsFinite(normal) && std::isfinite(normalLength) && normalLength > 1e-18)
+                result.MeanCurvatureNormalProperty[vertex] = glm::vec3(-mean * normal / normalLength);
         }
 
         return result;
     }
-
-    // =========================================================================
-    // ComputeCurvatureTensor — principal directions + tensor-recovered curvatures
-    // =========================================================================
 
     std::optional<CurvatureTensorResult> ComputeCurvatureTensor(HalfedgeMesh::Mesh& mesh)
     {
@@ -394,49 +461,22 @@ namespace Geometry::Curvature
         result.MaxPrincipalCurvatureProperty = VertexProperty<double>(mesh.VertexProperties().GetOrAdd<double>("v:max_principal_curvature", 0.0));
         result.MinPrincipalCurvatureProperty = VertexProperty<double>(mesh.VertexProperties().GetOrAdd<double>("v:min_principal_curvature", 0.0));
 
-        // Scalar baseline (H/K-derived principal curvatures) used as the
-        // fail-closed fallback for degenerate/boundary/flat vertices.
-        const auto areas = ComputeMixedVoronoiAreas(mesh);
-        const auto laplacian = ComputeCotanLaplacian(mesh);
-        const std::vector<double> vertexAngleSums = ComputeVertexAngleSums(mesh);
-
         const std::vector<TensorVertex> tensor = ComputeTaubinTensor(mesh);
 
         for (std::size_t i = 0; i < nV; ++i)
         {
-            VertexHandle vh{static_cast<PropertyIndex>(i)};
-            if (mesh.IsDeleted(vh) || mesh.IsIsolated(vh)) continue;
+            const VertexHandle vertex{static_cast<PropertyIndex>(i)};
+            result.PrincipalDir1Property[vertex] = glm::vec3(0.0f);
+            result.PrincipalDir2Property[vertex] = glm::vec3(0.0f);
+            result.MaxPrincipalCurvatureProperty[vertex] = 0.0;
+            result.MinPrincipalCurvatureProperty[vertex] = 0.0;
+            if (mesh.IsDeleted(vertex) || !tensor[i].Valid)
+                continue;
 
-            // Scalar-derived principal curvatures (same formulation as ComputeCurvature).
-            double scalarKMax = 0.0;
-            double scalarKMin = 0.0;
-            if (areas[i] > 1e-12)
-            {
-                const glm::dvec3 laplaceB = laplacian[i] / areas[i];
-                const glm::dvec3 normal = glm::dvec3(VertexNormal(mesh, vh));
-                const double H = ComputeSignedMeanCurvatureFromLaplaceBeltrami(laplaceB, normal);
-                const double defect = ComputeVertexAngleDefect(mesh, vh, vertexAngleSums[i]);
-                const double K = defect / areas[i];
-                const double sqrtDisc = std::sqrt(std::max(0.0, H * H - K));
-                scalarKMax = H + sqrtDisc;
-                scalarKMin = H - sqrtDisc;
-            }
-
-            if (tensor[i].Valid)
-            {
-                result.PrincipalDir1Property[vh] = glm::vec3(tensor[i].Dir1);
-                result.PrincipalDir2Property[vh] = glm::vec3(tensor[i].Dir2);
-                result.MaxPrincipalCurvatureProperty[vh] = tensor[i].MaxPrincipal;
-                result.MinPrincipalCurvatureProperty[vh] = tensor[i].MinPrincipal;
-            }
-            else
-            {
-                // Fail closed: zero-direction sentinel, keep scalar-derived κ.
-                result.PrincipalDir1Property[vh] = glm::vec3(0.0f);
-                result.PrincipalDir2Property[vh] = glm::vec3(0.0f);
-                result.MaxPrincipalCurvatureProperty[vh] = scalarKMax;
-                result.MinPrincipalCurvatureProperty[vh] = scalarKMin;
-            }
+            result.PrincipalDir1Property[vertex] = glm::vec3(tensor[i].Dir1);
+            result.PrincipalDir2Property[vertex] = glm::vec3(tensor[i].Dir2);
+            result.MaxPrincipalCurvatureProperty[vertex] = tensor[i].MaxPrincipal;
+            result.MinPrincipalCurvatureProperty[vertex] = tensor[i].MinPrincipal;
         }
 
         return result;

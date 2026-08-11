@@ -1,0 +1,514 @@
+[source-documentation] files=213 interfaces=114 cpp=213 readmes=0 errors=113 review=399
+[source-documentation] rules: comment-history=10, declaration-comment=380, file-synopsis-missing=113, source-large=9
+ERROR src/geometry/Geometry.AABB.cppm:1 [file-synopsis-missing] module interfaces and headers require a leading what-and-why synopsis
+ERROR src/geometry/Geometry.BVH.cppm:1 [file-synopsis-missing] module interfaces and headers require a leading what-and-why synopsis
+ERROR src/geometry/Geometry.Capsule.cppm:1 [file-synopsis-missing] module interfaces and headers require a leading what-and-why synopsis
+ERROR src/geometry/Geometry.Circulators.cppm:1 [file-synopsis-missing] module interfaces and headers require a leading what-and-why synopsis
+ERROR src/geometry/Geometry.ContactManifold.cppm:1 [file-synopsis-missing] module interfaces and headers require a leading what-and-why synopsis
+ERROR src/geometry/Geometry.Containment.cppm:1 [file-synopsis-missing] module interfaces and headers require a leading what-and-why synopsis
+ERROR src/geometry/Geometry.ConvexHull.cppm:1 [file-synopsis-missing] module interfaces and headers require a leading what-and-why synopsis
+ERROR src/geometry/Geometry.ConvexHullBuilder.cppm:1 [file-synopsis-missing] module interfaces and headers require a leading what-and-why synopsis
+ERROR src/geometry/Geometry.Curve.cppm:1 [file-synopsis-missing] module interfaces and headers require a leading what-and-why synopsis
+ERROR src/geometry/Geometry.Cylinder.cppm:1 [file-synopsis-missing] module interfaces and headers require a leading what-and-why synopsis
+ERROR src/geometry/Geometry.DomainViews.cppm:1 [file-synopsis-missing] module interfaces and headers require a leading what-and-why synopsis
+ERROR src/geometry/Geometry.EPA.cppm:1 [file-synopsis-missing] module interfaces and headers require a leading what-and-why synopsis
+ERROR src/geometry/Geometry.Ellipsoid.cppm:1 [file-synopsis-missing] module interfaces and headers require a leading what-and-why synopsis
+ERROR src/geometry/Geometry.FixedPoint.Anderson.cppm:1 [file-synopsis-missing] module interfaces and headers require a leading what-and-why synopsis
+ERROR src/geometry/Geometry.Frustum.cppm:1 [file-synopsis-missing] module interfaces and headers require a leading what-and-why synopsis
+ERROR src/geometry/Geometry.GJK.cppm:1 [file-synopsis-missing] module interfaces and headers require a leading what-and-why synopsis
+ERROR src/geometry/Geometry.GaussianMixture.cppm:1 [file-synopsis-missing] module interfaces and headers require a leading what-and-why synopsis
+ERROR src/geometry/Geometry.Graph.Fwd.cppm:1 [file-synopsis-missing] module interfaces and headers require a leading what-and-why synopsis
+ERROR src/geometry/Geometry.Graph.IO.cppm:1 [file-synopsis-missing] module interfaces and headers require a leading what-and-why synopsis
+ERROR src/geometry/Geometry.Graph.ShortestPath.cppm:1 [file-synopsis-missing] module interfaces and headers require a leading what-and-why synopsis
+ERROR src/geometry/Geometry.Graph.Utils.cppm:1 [file-synopsis-missing] module interfaces and headers require a leading what-and-why synopsis
+ERROR src/geometry/Geometry.Graph.Vertex.Normals.cppm:1 [file-synopsis-missing] module interfaces and headers require a leading what-and-why synopsis
+ERROR src/geometry/Geometry.Graph.cppm:1 [file-synopsis-missing] module interfaces and headers require a leading what-and-why synopsis
+ERROR src/geometry/Geometry.Grid.cppm:1 [file-synopsis-missing] module interfaces and headers require a leading what-and-why synopsis
+ERROR src/geometry/Geometry.HalfedgeMesh.AdaptiveRemeshing.cppm:1 [file-synopsis-missing] module interfaces and headers require a leading what-and-why synopsis
+ERROR src/geometry/Geometry.HalfedgeMesh.Analysis.cppm:1 [file-synopsis-missing] module interfaces and headers require a leading what-and-why synopsis
+ERROR src/geometry/Geometry.HalfedgeMesh.Boolean.cppm:1 [file-synopsis-missing] module interfaces and headers require a leading what-and-why synopsis
+ERROR src/geometry/Geometry.HalfedgeMesh.Boundary.cppm:1 [file-synopsis-missing] module interfaces and headers require a leading what-and-why synopsis
+ERROR src/geometry/Geometry.HalfedgeMesh.Builder.cppm:1 [file-synopsis-missing] module interfaces and headers require a leading what-and-why synopsis
+ERROR src/geometry/Geometry.HalfedgeMesh.CatmullClark.cppm:1 [file-synopsis-missing] module interfaces and headers require a leading what-and-why synopsis
+ERROR src/geometry/Geometry.HalfedgeMesh.CurvatureSegmentation.Features.cppm:1 [file-synopsis-missing] module interfaces and headers require a leading what-and-why synopsis
+ERROR src/geometry/Geometry.HalfedgeMesh.CurvatureSegmentation.Patches.cppm:1 [file-synopsis-missing] module interfaces and headers require a leading what-and-why synopsis
+ERROR src/geometry/Geometry.HalfedgeMesh.CurvatureSegmentation.cppm:1 [file-synopsis-missing] module interfaces and headers require a leading what-and-why synopsis
+ERROR src/geometry/Geometry.HalfedgeMesh.DEC.cppm:1 [file-synopsis-missing] module interfaces and headers require a leading what-and-why synopsis
+ERROR src/geometry/Geometry.HalfedgeMesh.Features.cppm:1 [file-synopsis-missing] module interfaces and headers require a leading what-and-why synopsis
+ERROR src/geometry/Geometry.HalfedgeMesh.Fwd.cppm:1 [file-synopsis-missing] module interfaces and headers require a leading what-and-why synopsis
+ERROR src/geometry/Geometry.HalfedgeMesh.Geodesic.cppm:1 [file-synopsis-missing] module interfaces and headers require a leading what-and-why synopsis
+ERROR src/geometry/Geometry.HalfedgeMesh.IO.cppm:1 [file-synopsis-missing] module interfaces and headers require a leading what-and-why synopsis
+ERROR src/geometry/Geometry.HalfedgeMesh.Parameterization.cppm:1 [file-synopsis-missing] module interfaces and headers require a leading what-and-why synopsis
+ERROR src/geometry/Geometry.HalfedgeMesh.Quality.cppm:1 [file-synopsis-missing] module interfaces and headers require a leading what-and-why synopsis
+ERROR src/geometry/Geometry.HalfedgeMesh.Remeshing.cppm:1 [file-synopsis-missing] module interfaces and headers require a leading what-and-why synopsis
+ERROR src/geometry/Geometry.HalfedgeMesh.Repair.cppm:1 [file-synopsis-missing] module interfaces and headers require a leading what-and-why synopsis
+ERROR src/geometry/Geometry.HalfedgeMesh.SignedHeatMethod.cppm:1 [file-synopsis-missing] module interfaces and headers require a leading what-and-why synopsis
+ERROR src/geometry/Geometry.HalfedgeMesh.Simplification.cppm:1 [file-synopsis-missing] module interfaces and headers require a leading what-and-why synopsis
+ERROR src/geometry/Geometry.HalfedgeMesh.Smoothing.cppm:1 [file-synopsis-missing] module interfaces and headers require a leading what-and-why synopsis
+ERROR src/geometry/Geometry.HalfedgeMesh.Subdivision.cppm:1 [file-synopsis-missing] module interfaces and headers require a leading what-and-why synopsis
+ERROR src/geometry/Geometry.HalfedgeMesh.SubdivisionSqrt3.cppm:1 [file-synopsis-missing] module interfaces and headers require a leading what-and-why synopsis
+ERROR src/geometry/Geometry.HalfedgeMesh.Utils.cppm:1 [file-synopsis-missing] module interfaces and headers require a leading what-and-why synopsis
+ERROR src/geometry/Geometry.HalfedgeMesh.VectorHeatMethod.cppm:1 [file-synopsis-missing] module interfaces and headers require a leading what-and-why synopsis
+ERROR src/geometry/Geometry.HalfedgeMesh.Vertices.Normals.cppm:1 [file-synopsis-missing] module interfaces and headers require a leading what-and-why synopsis
+ERROR src/geometry/Geometry.HalfedgeMesh.cppm:1 [file-synopsis-missing] module interfaces and headers require a leading what-and-why synopsis
+ERROR src/geometry/Geometry.Handle.cppm:1 [file-synopsis-missing] module interfaces and headers require a leading what-and-why synopsis
+ERROR src/geometry/Geometry.HtexPatch.cppm:1 [file-synopsis-missing] module interfaces and headers require a leading what-and-why synopsis
+ERROR src/geometry/Geometry.IO.cppm:1 [file-synopsis-missing] module interfaces and headers require a leading what-and-why synopsis
+ERROR src/geometry/Geometry.IOText.hpp:1 [file-synopsis-missing] module interfaces and headers require a leading what-and-why synopsis
+ERROR src/geometry/Geometry.ImplicitPlaneField.cppm:1 [file-synopsis-missing] module interfaces and headers require a leading what-and-why synopsis
+ERROR src/geometry/Geometry.IntersectionClassification.cppm:1 [file-synopsis-missing] module interfaces and headers require a leading what-and-why synopsis
+ERROR src/geometry/Geometry.KDTree.cppm:1 [file-synopsis-missing] module interfaces and headers require a leading what-and-why synopsis
+ERROR src/geometry/Geometry.KMeans.cppm:1 [file-synopsis-missing] module interfaces and headers require a leading what-and-why synopsis
+ERROR src/geometry/Geometry.Linalg.cppm:1 [file-synopsis-missing] module interfaces and headers require a leading what-and-why synopsis
+ERROR src/geometry/Geometry.LinearSolver.cppm:1 [file-synopsis-missing] module interfaces and headers require a leading what-and-why synopsis
+ERROR src/geometry/Geometry.MarchingCubes.cppm:1 [file-synopsis-missing] module interfaces and headers require a leading what-and-why synopsis
+ERROR src/geometry/Geometry.Mesh.Conversion.cppm:1 [file-synopsis-missing] module interfaces and headers require a leading what-and-why synopsis
+ERROR src/geometry/Geometry.MeshClosestFace.cppm:1 [file-synopsis-missing] module interfaces and headers require a leading what-and-why synopsis
+ERROR src/geometry/Geometry.MeshOperator.cppm:1 [file-synopsis-missing] module interfaces and headers require a leading what-and-why synopsis
+ERROR src/geometry/Geometry.MeshSoup.cppm:1 [file-synopsis-missing] module interfaces and headers require a leading what-and-why synopsis
+ERROR src/geometry/Geometry.OBB.cppm:1 [file-synopsis-missing] module interfaces and headers require a leading what-and-why synopsis
+ERROR src/geometry/Geometry.Octree.cppm:1 [file-synopsis-missing] module interfaces and headers require a leading what-and-why synopsis
+ERROR src/geometry/Geometry.Overlap.cppm:1 [file-synopsis-missing] module interfaces and headers require a leading what-and-why synopsis
+ERROR src/geometry/Geometry.PCA.cppm:1 [file-synopsis-missing] module interfaces and headers require a leading what-and-why synopsis
+ERROR src/geometry/Geometry.Parameterization.Bff.cppm:1 [file-synopsis-missing] module interfaces and headers require a leading what-and-why synopsis
+ERROR src/geometry/Geometry.Parameterization.Diagnostics.cppm:1 [file-synopsis-missing] module interfaces and headers require a leading what-and-why synopsis
+ERROR src/geometry/Geometry.Parameterization.Harmonic.cppm:1 [file-synopsis-missing] module interfaces and headers require a leading what-and-why synopsis
+ERROR src/geometry/Geometry.Parameterization.Optimize.cppm:1 [file-synopsis-missing] module interfaces and headers require a leading what-and-why synopsis
+ERROR src/geometry/Geometry.Plane.cppm:1 [file-synopsis-missing] module interfaces and headers require a leading what-and-why synopsis
+ERROR src/geometry/Geometry.PointCloud.Consolidation.cppm:1 [file-synopsis-missing] module interfaces and headers require a leading what-and-why synopsis
+ERROR src/geometry/Geometry.PointCloud.Conversion.cppm:1 [file-synopsis-missing] module interfaces and headers require a leading what-and-why synopsis
+ERROR src/geometry/Geometry.PointCloud.Features.cppm:1 [file-synopsis-missing] module interfaces and headers require a leading what-and-why synopsis
+ERROR src/geometry/Geometry.PointCloud.Fwd.cppm:1 [file-synopsis-missing] module interfaces and headers require a leading what-and-why synopsis
+ERROR src/geometry/Geometry.PointCloud.IO.cppm:1 [file-synopsis-missing] module interfaces and headers require a leading what-and-why synopsis
+ERROR src/geometry/Geometry.PointCloud.Kernels.cppm:1 [file-synopsis-missing] module interfaces and headers require a leading what-and-why synopsis
+ERROR src/geometry/Geometry.PointCloud.Normals.cppm:1 [file-synopsis-missing] module interfaces and headers require a leading what-and-why synopsis
+ERROR src/geometry/Geometry.PointCloud.QualityMetrics.cppm:1 [file-synopsis-missing] module interfaces and headers require a leading what-and-why synopsis
+ERROR src/geometry/Geometry.PointCloud.SurfaceSampling.cppm:1 [file-synopsis-missing] module interfaces and headers require a leading what-and-why synopsis
+ERROR src/geometry/Geometry.PointCloud.Utils.cppm:1 [file-synopsis-missing] module interfaces and headers require a leading what-and-why synopsis
+ERROR src/geometry/Geometry.PointCloud.cppm:1 [file-synopsis-missing] module interfaces and headers require a leading what-and-why synopsis
+ERROR src/geometry/Geometry.Primitives.cppm:1 [file-synopsis-missing] module interfaces and headers require a leading what-and-why synopsis
+ERROR src/geometry/Geometry.Properties.cppm:1 [file-synopsis-missing] module interfaces and headers require a leading what-and-why synopsis
+ERROR src/geometry/Geometry.Quadric.cppm:1 [file-synopsis-missing] module interfaces and headers require a leading what-and-why synopsis
+ERROR src/geometry/Geometry.Queries.cppm:1 [file-synopsis-missing] module interfaces and headers require a leading what-and-why synopsis
+ERROR src/geometry/Geometry.Ray.cppm:1 [file-synopsis-missing] module interfaces and headers require a leading what-and-why synopsis
+ERROR src/geometry/Geometry.Raycast.cppm:1 [file-synopsis-missing] module interfaces and headers require a leading what-and-why synopsis
+ERROR src/geometry/Geometry.Registration.cppm:1 [file-synopsis-missing] module interfaces and headers require a leading what-and-why synopsis
+ERROR src/geometry/Geometry.Robust.cppm:1 [file-synopsis-missing] module interfaces and headers require a leading what-and-why synopsis
+ERROR src/geometry/Geometry.RobustPredicates.cppm:1 [file-synopsis-missing] module interfaces and headers require a leading what-and-why synopsis
+ERROR src/geometry/Geometry.Rotation.cppm:1 [file-synopsis-missing] module interfaces and headers require a leading what-and-why synopsis
+ERROR src/geometry/Geometry.RotationAveraging.cppm:1 [file-synopsis-missing] module interfaces and headers require a leading what-and-why synopsis
+ERROR src/geometry/Geometry.SDF.cppm:1 [file-synopsis-missing] module interfaces and headers require a leading what-and-why synopsis
+ERROR src/geometry/Geometry.SDFContact.cppm:1 [file-synopsis-missing] module interfaces and headers require a leading what-and-why synopsis
+ERROR src/geometry/Geometry.Sampling.cppm:1 [file-synopsis-missing] module interfaces and headers require a leading what-and-why synopsis
+ERROR src/geometry/Geometry.Segment.cppm:1 [file-synopsis-missing] module interfaces and headers require a leading what-and-why synopsis
+ERROR src/geometry/Geometry.Sparse.cppm:1 [file-synopsis-missing] module interfaces and headers require a leading what-and-why synopsis
+ERROR src/geometry/Geometry.SpatialQueries.cppm:1 [file-synopsis-missing] module interfaces and headers require a leading what-and-why synopsis
+ERROR src/geometry/Geometry.Sphere.Sampling.cppm:1 [file-synopsis-missing] module interfaces and headers require a leading what-and-why synopsis
+ERROR src/geometry/Geometry.Sphere.cppm:1 [file-synopsis-missing] module interfaces and headers require a leading what-and-why synopsis
+ERROR src/geometry/Geometry.Statistics.cppm:1 [file-synopsis-missing] module interfaces and headers require a leading what-and-why synopsis
+ERROR src/geometry/Geometry.Support.cppm:1 [file-synopsis-missing] module interfaces and headers require a leading what-and-why synopsis
+ERROR src/geometry/Geometry.SupportRadius.cppm:1 [file-synopsis-missing] module interfaces and headers require a leading what-and-why synopsis
+ERROR src/geometry/Geometry.SurfaceReconstruction.cppm:1 [file-synopsis-missing] module interfaces and headers require a leading what-and-why synopsis
+ERROR src/geometry/Geometry.Triangle.cppm:1 [file-synopsis-missing] module interfaces and headers require a leading what-and-why synopsis
+ERROR src/geometry/Geometry.UvAtlas.cppm:1 [file-synopsis-missing] module interfaces and headers require a leading what-and-why synopsis
+ERROR src/geometry/Geometry.Validation.cppm:1 [file-synopsis-missing] module interfaces and headers require a leading what-and-why synopsis
+ERROR src/geometry/Geometry.cppm:1 [file-synopsis-missing] module interfaces and headers require a leading what-and-why synopsis
+REVIEW src/geometry/Geometry.ContactManifold.cppm:18 [declaration-comment] verify this comment is mandatory to understand the declaration at line 40
+REVIEW src/geometry/Geometry.ContactManifold.cppm:57 [declaration-comment] verify this comment is mandatory to understand the declaration at line 59
+REVIEW src/geometry/Geometry.ContactManifold.cppm:62 [declaration-comment] verify this comment is mandatory to understand the declaration at line 69
+REVIEW src/geometry/Geometry.ContactManifold.cppm:103 [declaration-comment] verify this comment is mandatory to understand the declaration at line 105
+REVIEW src/geometry/Geometry.Containment.cppm:28 [declaration-comment] verify this comment is mandatory to understand the declaration at line 30
+REVIEW src/geometry/Geometry.Containment.cppm:35 [declaration-comment] verify this comment is mandatory to understand the declaration at line 39
+REVIEW src/geometry/Geometry.ConvexHullBuilder.cppm:17 [declaration-comment] verify this comment is mandatory to understand the declaration at line 64
+REVIEW src/geometry/Geometry.ConvexHullBuilder.cppm:105 [declaration-comment] verify this comment is mandatory to understand the declaration at line 116
+REVIEW src/geometry/Geometry.ConvexHullBuilder.cppm:120 [declaration-comment] verify this comment is mandatory to understand the declaration at line 126
+REVIEW src/geometry/Geometry.Curve.cppm:36 [declaration-comment] verify this comment is mandatory to understand the declaration at line 38
+REVIEW src/geometry/Geometry.DomainViews.cppm:19 [declaration-comment] verify this comment is mandatory to understand the declaration at line 52
+REVIEW src/geometry/Geometry.DomainViews.cppm:54 [declaration-comment] verify this comment is mandatory to understand the declaration at line 92
+REVIEW src/geometry/Geometry.DomainViews.cppm:94 [declaration-comment] verify this comment is mandatory to understand the declaration at line 149
+REVIEW src/geometry/Geometry.DomainViews.cppm:174 [declaration-comment] verify this comment is mandatory to understand the declaration at line 184
+REVIEW src/geometry/Geometry.DomainViews.cppm:233 [declaration-comment] verify this comment is mandatory to understand the declaration at line 239
+REVIEW src/geometry/Geometry.DomainViews.cppm:279 [declaration-comment] verify this comment is mandatory to understand the declaration at line 289
+REVIEW src/geometry/Geometry.FixedPoint.Anderson.cppm:31 [declaration-comment] verify this comment is mandatory to understand the declaration at line 34
+REVIEW src/geometry/Geometry.FixedPoint.Anderson.cppm:69 [declaration-comment] verify this comment is mandatory to understand the declaration at line 74
+REVIEW src/geometry/Geometry.GJK.cppm:18 [declaration-comment] verify this comment is mandatory to understand the declaration at line 20
+REVIEW src/geometry/Geometry.GJK.cppm:94 [declaration-comment] verify this comment is mandatory to understand the declaration at line 101
+REVIEW src/geometry/Geometry.GJK.cppm:151 [declaration-comment] verify this comment is mandatory to understand the declaration at line 154
+REVIEW src/geometry/Geometry.GaussianMixture.cppm:32 [declaration-comment] verify this comment is mandatory to understand the declaration at line 35
+REVIEW src/geometry/Geometry.GaussianMixture.cppm:91 [declaration-comment] verify this comment is mandatory to understand the declaration at line 93
+REVIEW src/geometry/Geometry.GaussianMixture.cppm:97 [declaration-comment] verify this comment is mandatory to understand the declaration at line 99
+REVIEW src/geometry/Geometry.GaussianMixture.cppm:103 [declaration-comment] verify this comment is mandatory to understand the declaration at line 105
+REVIEW src/geometry/Geometry.GaussianMixture.cppm:113 [declaration-comment] verify this comment is mandatory to understand the declaration at line 119
+REVIEW src/geometry/Geometry.Graph.ShortestPath.cppm:39 [declaration-comment] verify this comment is mandatory to understand the declaration at line 52
+REVIEW src/geometry/Geometry.Graph.Utils.cpp:1 [source-large] C++ file has 1516 lines; inspect whether its responsibilities remain discoverable
+REVIEW src/geometry/Geometry.Graph.Utils.cppm:199 [declaration-comment] verify this comment is mandatory to understand the declaration at line 203
+REVIEW src/geometry/Geometry.Graph.Utils.cppm:206 [declaration-comment] verify this comment is mandatory to understand the declaration at line 208
+REVIEW src/geometry/Geometry.Graph.Utils.cppm:212 [declaration-comment] verify this comment is mandatory to understand the declaration at line 214
+REVIEW src/geometry/Geometry.Graph.Utils.cppm:217 [declaration-comment] verify this comment is mandatory to understand the declaration at line 219
+REVIEW src/geometry/Geometry.Graph.Utils.cppm:222 [declaration-comment] verify this comment is mandatory to understand the declaration at line 224
+REVIEW src/geometry/Geometry.Graph.Utils.cppm:227 [declaration-comment] verify this comment is mandatory to understand the declaration at line 229
+REVIEW src/geometry/Geometry.Graph.Utils.cppm:232 [declaration-comment] verify this comment is mandatory to understand the declaration at line 234
+REVIEW src/geometry/Geometry.Graph.Utils.cppm:237 [declaration-comment] verify this comment is mandatory to understand the declaration at line 238
+REVIEW src/geometry/Geometry.Graph.cppm:59 [declaration-comment] verify this comment is mandatory to understand the declaration at line 60
+REVIEW src/geometry/Geometry.Graph.cppm:109 [declaration-comment] verify this comment is mandatory to understand the declaration at line 110
+REVIEW src/geometry/Geometry.Grid.cppm:20 [declaration-comment] verify this comment is mandatory to understand the declaration at line 28
+REVIEW src/geometry/Geometry.Grid.cppm:115 [declaration-comment] verify this comment is mandatory to understand the declaration at line 128
+REVIEW src/geometry/Geometry.Grid.cppm:133 [declaration-comment] verify this comment is mandatory to understand the declaration at line 135
+REVIEW src/geometry/Geometry.Grid.cppm:137 [declaration-comment] verify this comment is mandatory to understand the declaration at line 138
+REVIEW src/geometry/Geometry.Grid.cppm:186 [declaration-comment] verify this comment is mandatory to understand the declaration at line 187
+REVIEW src/geometry/Geometry.Grid.cppm:189 [declaration-comment] verify this comment is mandatory to understand the declaration at line 190
+REVIEW src/geometry/Geometry.Grid.cppm:214 [declaration-comment] verify this comment is mandatory to understand the declaration at line 228
+REVIEW src/geometry/Geometry.Grid.cppm:241 [declaration-comment] verify this comment is mandatory to understand the declaration at line 242
+REVIEW src/geometry/Geometry.Grid.cppm:256 [declaration-comment] verify this comment is mandatory to understand the declaration at line 258
+REVIEW src/geometry/Geometry.Grid.cppm:260 [declaration-comment] verify this comment is mandatory to understand the declaration at line 262
+REVIEW src/geometry/Geometry.Grid.cppm:264 [declaration-comment] verify this comment is mandatory to understand the declaration at line 265
+REVIEW src/geometry/Geometry.Grid.cppm:269 [declaration-comment] verify this comment is mandatory to understand the declaration at line 271
+REVIEW src/geometry/Geometry.Grid.cppm:391 [declaration-comment] verify this comment is mandatory to understand the declaration at line 392
+REVIEW src/geometry/Geometry.HalfedgeMesh.AdaptiveRemeshing.cppm:18 [declaration-comment] verify this comment is mandatory to understand the declaration at line 45
+REVIEW src/geometry/Geometry.HalfedgeMesh.AdaptiveRemeshing.cppm:64 [declaration-comment] verify this comment is mandatory to understand the declaration at line 68
+REVIEW src/geometry/Geometry.HalfedgeMesh.AdaptiveRemeshing.cppm:162 [declaration-comment] verify this comment is mandatory to understand the declaration at line 170
+REVIEW src/geometry/Geometry.HalfedgeMesh.Boolean.cppm:39 [declaration-comment] verify this comment is mandatory to understand the declaration at line 45
+REVIEW src/geometry/Geometry.HalfedgeMesh.CatmullClark.cppm:13 [declaration-comment] verify this comment is mandatory to understand the declaration at line 47
+REVIEW src/geometry/Geometry.HalfedgeMesh.CatmullClark.cppm:68 [declaration-comment] verify this comment is mandatory to understand the declaration at line 79
+REVIEW src/geometry/Geometry.HalfedgeMesh.Curvature.cppm:60 [declaration-comment] verify this comment is mandatory to understand the declaration at line 70
+REVIEW src/geometry/Geometry.HalfedgeMesh.Curvature.cppm:73 [declaration-comment] verify this comment is mandatory to understand the declaration at line 83
+REVIEW src/geometry/Geometry.HalfedgeMesh.Curvature.cppm:86 [declaration-comment] verify this comment is mandatory to understand the declaration at line 90
+REVIEW src/geometry/Geometry.HalfedgeMesh.Curvature.cppm:92 [declaration-comment] verify this comment is mandatory to understand the declaration at line 110
+REVIEW src/geometry/Geometry.HalfedgeMesh.CurvatureSegmentation.Features.cppm:179 [declaration-comment] verify this comment is mandatory to understand the declaration at line 182
+REVIEW src/geometry/Geometry.HalfedgeMesh.CurvatureSegmentation.Features.cppm:187 [declaration-comment] verify this comment is mandatory to understand the declaration at line 190
+REVIEW src/geometry/Geometry.HalfedgeMesh.CurvatureSegmentation.Patches.cpp:1 [source-large] C++ file has 2422 lines; inspect whether its responsibilities remain discoverable
+REVIEW src/geometry/Geometry.HalfedgeMesh.CurvatureSegmentation.Patches.cppm:88 [declaration-comment] verify this comment is mandatory to understand the declaration at line 91
+REVIEW src/geometry/Geometry.HalfedgeMesh.CurvatureSegmentation.cppm:87 [comment-history] rewrite chronology as a current invariant or move it to a task, ADR, migration record, or Git
+REVIEW src/geometry/Geometry.HalfedgeMesh.CurvatureSegmentation.cppm:184 [declaration-comment] verify this comment is mandatory to understand the declaration at line 187
+REVIEW src/geometry/Geometry.HalfedgeMesh.CurvatureSegmentation.cppm:193 [declaration-comment] verify this comment is mandatory to understand the declaration at line 197
+REVIEW src/geometry/Geometry.HalfedgeMesh.DEC.cppm:17 [declaration-comment] verify this comment is mandatory to understand the declaration at line 26
+REVIEW src/geometry/Geometry.HalfedgeMesh.DEC.cppm:55 [declaration-comment] verify this comment is mandatory to understand the declaration at line 63
+REVIEW src/geometry/Geometry.HalfedgeMesh.DEC.cppm:82 [declaration-comment] verify this comment is mandatory to understand the declaration at line 83
+REVIEW src/geometry/Geometry.HalfedgeMesh.DEC.cppm:120 [declaration-comment] verify this comment is mandatory to understand the declaration at line 157
+REVIEW src/geometry/Geometry.HalfedgeMesh.DEC.cppm:189 [declaration-comment] verify this comment is mandatory to understand the declaration at line 192
+REVIEW src/geometry/Geometry.HalfedgeMesh.DEC.cppm:194 [declaration-comment] verify this comment is mandatory to understand the declaration at line 198
+REVIEW src/geometry/Geometry.HalfedgeMesh.DEC.cppm:200 [declaration-comment] verify this comment is mandatory to understand the declaration at line 206
+REVIEW src/geometry/Geometry.HalfedgeMesh.DEC.cppm:208 [declaration-comment] verify this comment is mandatory to understand the declaration at line 213
+REVIEW src/geometry/Geometry.HalfedgeMesh.DEC.cppm:216 [declaration-comment] verify this comment is mandatory to understand the declaration at line 219
+REVIEW src/geometry/Geometry.HalfedgeMesh.DEC.cppm:221 [declaration-comment] verify this comment is mandatory to understand the declaration at line 225
+REVIEW src/geometry/Geometry.HalfedgeMesh.DEC.cppm:227 [declaration-comment] verify this comment is mandatory to understand the declaration at line 233
+REVIEW src/geometry/Geometry.HalfedgeMesh.DEC.cppm:236 [declaration-comment] verify this comment is mandatory to understand the declaration at line 237
+REVIEW src/geometry/Geometry.HalfedgeMesh.DEC.cppm:239 [declaration-comment] verify this comment is mandatory to understand the declaration at line 246
+REVIEW src/geometry/Geometry.HalfedgeMesh.DEC.cppm:248 [declaration-comment] verify this comment is mandatory to understand the declaration at line 252
+REVIEW src/geometry/Geometry.HalfedgeMesh.DEC.cppm:255 [declaration-comment] verify this comment is mandatory to understand the declaration at line 256
+REVIEW src/geometry/Geometry.HalfedgeMesh.DEC.cppm:258 [declaration-comment] verify this comment is mandatory to understand the declaration at line 261
+REVIEW src/geometry/Geometry.HalfedgeMesh.DEC.cppm:274 [declaration-comment] verify this comment is mandatory to understand the declaration at line 277
+REVIEW src/geometry/Geometry.HalfedgeMesh.DEC.cppm:283 [declaration-comment] verify this comment is mandatory to understand the declaration at line 286
+REVIEW src/geometry/Geometry.HalfedgeMesh.DEC.cppm:293 [declaration-comment] verify this comment is mandatory to understand the declaration at line 296
+REVIEW src/geometry/Geometry.HalfedgeMesh.DEC.cppm:305 [declaration-comment] verify this comment is mandatory to understand the declaration at line 315
+REVIEW src/geometry/Geometry.HalfedgeMesh.DEC.cppm:332 [declaration-comment] verify this comment is mandatory to understand the declaration at line 334
+REVIEW src/geometry/Geometry.HalfedgeMesh.DEC.cppm:336 [declaration-comment] verify this comment is mandatory to understand the declaration at line 338
+REVIEW src/geometry/Geometry.HalfedgeMesh.DEC.cppm:341 [declaration-comment] verify this comment is mandatory to understand the declaration at line 347
+REVIEW src/geometry/Geometry.HalfedgeMesh.DEC.cppm:367 [declaration-comment] verify this comment is mandatory to understand the declaration at line 369
+REVIEW src/geometry/Geometry.HalfedgeMesh.Features.cppm:29 [declaration-comment] verify this comment is mandatory to understand the declaration at line 32
+REVIEW src/geometry/Geometry.HalfedgeMesh.Features.cppm:67 [declaration-comment] verify this comment is mandatory to understand the declaration at line 75
+REVIEW src/geometry/Geometry.HalfedgeMesh.Features.cppm:80 [declaration-comment] verify this comment is mandatory to understand the declaration at line 83
+REVIEW src/geometry/Geometry.HalfedgeMesh.Features.cppm:89 [declaration-comment] verify this comment is mandatory to understand the declaration at line 92
+REVIEW src/geometry/Geometry.HalfedgeMesh.Fwd.cppm:27 [declaration-comment] verify this comment is mandatory to understand the declaration at line 29
+REVIEW src/geometry/Geometry.HalfedgeMesh.Geodesic.cppm:15 [declaration-comment] verify this comment is mandatory to understand the declaration at line 46
+REVIEW src/geometry/Geometry.HalfedgeMesh.Geodesic.cppm:73 [declaration-comment] verify this comment is mandatory to understand the declaration at line 81
+REVIEW src/geometry/Geometry.HalfedgeMesh.IO.cpp:1 [source-large] C++ file has 2992 lines; inspect whether its responsibilities remain discoverable
+REVIEW src/geometry/Geometry.HalfedgeMesh.IO.cppm:13 [declaration-comment] verify this comment is mandatory to understand the declaration at line 16
+REVIEW src/geometry/Geometry.HalfedgeMesh.IO.cppm:31 [declaration-comment] verify this comment is mandatory to understand the declaration at line 33
+REVIEW src/geometry/Geometry.HalfedgeMesh.Parameterization.cppm:22 [declaration-comment] verify this comment is mandatory to understand the declaration at line 46
+REVIEW src/geometry/Geometry.HalfedgeMesh.Parameterization.cppm:87 [declaration-comment] verify this comment is mandatory to understand the declaration at line 99
+REVIEW src/geometry/Geometry.HalfedgeMesh.Parameterization.cppm:106 [declaration-comment] verify this comment is mandatory to understand the declaration at line 113
+REVIEW src/geometry/Geometry.HalfedgeMesh.Parameterization.cppm:122 [declaration-comment] verify this comment is mandatory to understand the declaration at line 128
+REVIEW src/geometry/Geometry.HalfedgeMesh.Quality.cppm:14 [declaration-comment] verify this comment is mandatory to understand the declaration at line 25
+REVIEW src/geometry/Geometry.HalfedgeMesh.Quality.cppm:97 [declaration-comment] verify this comment is mandatory to understand the declaration at line 102
+REVIEW src/geometry/Geometry.HalfedgeMesh.Remeshing.cppm:14 [declaration-comment] verify this comment is mandatory to understand the declaration at line 36
+REVIEW src/geometry/Geometry.HalfedgeMesh.Remeshing.cppm:68 [declaration-comment] verify this comment is mandatory to understand the declaration at line 77
+REVIEW src/geometry/Geometry.HalfedgeMesh.Repair.cppm:29 [declaration-comment] verify this comment is mandatory to understand the declaration at line 33
+REVIEW src/geometry/Geometry.HalfedgeMesh.Repair.cppm:48 [declaration-comment] verify this comment is mandatory to understand the declaration at line 51
+REVIEW src/geometry/Geometry.HalfedgeMesh.Repair.cppm:53 [declaration-comment] verify this comment is mandatory to understand the declaration at line 67
+REVIEW src/geometry/Geometry.HalfedgeMesh.Repair.cppm:93 [declaration-comment] verify this comment is mandatory to understand the declaration at line 94
+REVIEW src/geometry/Geometry.HalfedgeMesh.Repair.cppm:98 [declaration-comment] verify this comment is mandatory to understand the declaration at line 110
+REVIEW src/geometry/Geometry.HalfedgeMesh.Repair.cppm:125 [declaration-comment] verify this comment is mandatory to understand the declaration at line 126
+REVIEW src/geometry/Geometry.HalfedgeMesh.Repair.cppm:130 [declaration-comment] verify this comment is mandatory to understand the declaration at line 144
+REVIEW src/geometry/Geometry.HalfedgeMesh.Repair.cppm:156 [declaration-comment] verify this comment is mandatory to understand the declaration at line 157
+REVIEW src/geometry/Geometry.HalfedgeMesh.Repair.cppm:160 [declaration-comment] verify this comment is mandatory to understand the declaration at line 164
+REVIEW src/geometry/Geometry.HalfedgeMesh.Repair.cppm:171 [declaration-comment] verify this comment is mandatory to understand the declaration at line 173
+REVIEW src/geometry/Geometry.HalfedgeMesh.Repair.cppm:176 [declaration-comment] verify this comment is mandatory to understand the declaration at line 179
+REVIEW src/geometry/Geometry.HalfedgeMesh.Repair.cppm:188 [declaration-comment] verify this comment is mandatory to understand the declaration at line 192
+REVIEW src/geometry/Geometry.HalfedgeMesh.Repair.cppm:210 [declaration-comment] verify this comment is mandatory to understand the declaration at line 212
+REVIEW src/geometry/Geometry.HalfedgeMesh.SignedHeatMethod.cppm:33 [comment-history] rewrite chronology as a current invariant or move it to a task, ADR, migration record, or Git
+REVIEW src/geometry/Geometry.HalfedgeMesh.Simplification.cpp:1 [source-large] C++ file has 1606 lines; inspect whether its responsibilities remain discoverable
+REVIEW src/geometry/Geometry.HalfedgeMesh.Simplification.cpp:33 [comment-history] rewrite chronology as a current invariant or move it to a task, ADR, migration record, or Git
+REVIEW src/geometry/Geometry.HalfedgeMesh.Simplification.cppm:14 [comment-history] rewrite chronology as a current invariant or move it to a task, ADR, migration record, or Git
+REVIEW src/geometry/Geometry.HalfedgeMesh.Simplification.cppm:14 [declaration-comment] verify this comment is mandatory to understand the declaration at line 37
+REVIEW src/geometry/Geometry.HalfedgeMesh.Simplification.cppm:123 [declaration-comment] verify this comment is mandatory to understand the declaration at line 124
+REVIEW src/geometry/Geometry.HalfedgeMesh.Simplification.cppm:209 [declaration-comment] verify this comment is mandatory to understand the declaration at line 210
+REVIEW src/geometry/Geometry.HalfedgeMesh.Simplification.cppm:244 [declaration-comment] verify this comment is mandatory to understand the declaration at line 253
+REVIEW src/geometry/Geometry.HalfedgeMesh.Smoothing.cppm:27 [declaration-comment] verify this comment is mandatory to understand the declaration at line 28
+REVIEW src/geometry/Geometry.HalfedgeMesh.Smoothing.cppm:41 [declaration-comment] verify this comment is mandatory to understand the declaration at line 42
+REVIEW src/geometry/Geometry.HalfedgeMesh.Smoothing.cppm:51 [declaration-comment] verify this comment is mandatory to understand the declaration at line 64
+REVIEW src/geometry/Geometry.HalfedgeMesh.Smoothing.cppm:67 [declaration-comment] verify this comment is mandatory to understand the declaration at line 83
+REVIEW src/geometry/Geometry.HalfedgeMesh.Smoothing.cppm:86 [declaration-comment] verify this comment is mandatory to understand the declaration at line 104
+REVIEW src/geometry/Geometry.HalfedgeMesh.Smoothing.cppm:121 [declaration-comment] verify this comment is mandatory to understand the declaration at line 122
+REVIEW src/geometry/Geometry.HalfedgeMesh.Smoothing.cppm:125 [declaration-comment] verify this comment is mandatory to understand the declaration at line 147
+REVIEW src/geometry/Geometry.HalfedgeMesh.Smoothing.cppm:199 [comment-history] rewrite chronology as a current invariant or move it to a task, ADR, migration record, or Git
+REVIEW src/geometry/Geometry.HalfedgeMesh.Smoothing.cppm:199 [declaration-comment] verify this comment is mandatory to understand the declaration at line 232
+REVIEW src/geometry/Geometry.HalfedgeMesh.Smoothing.cppm:259 [declaration-comment] verify this comment is mandatory to understand the declaration at line 261
+REVIEW src/geometry/Geometry.HalfedgeMesh.Smoothing.cppm:297 [declaration-comment] verify this comment is mandatory to understand the declaration at line 303
+REVIEW src/geometry/Geometry.HalfedgeMesh.Smoothing.cppm:308 [declaration-comment] verify this comment is mandatory to understand the declaration at line 314
+REVIEW src/geometry/Geometry.HalfedgeMesh.Subdivision.cppm:14 [declaration-comment] verify this comment is mandatory to understand the declaration at line 41
+REVIEW src/geometry/Geometry.HalfedgeMesh.Subdivision.cppm:72 [declaration-comment] verify this comment is mandatory to understand the declaration at line 79
+REVIEW src/geometry/Geometry.HalfedgeMesh.SubdivisionSqrt3.cppm:13 [declaration-comment] verify this comment is mandatory to understand the declaration at line 20
+REVIEW src/geometry/Geometry.HalfedgeMesh.Utils.cpp:1 [source-large] C++ file has 1989 lines; inspect whether its responsibilities remain discoverable
+REVIEW src/geometry/Geometry.HalfedgeMesh.Utils.cppm:42 [declaration-comment] verify this comment is mandatory to understand the declaration at line 45
+REVIEW src/geometry/Geometry.HalfedgeMesh.Utils.cppm:52 [declaration-comment] verify this comment is mandatory to understand the declaration at line 57
+REVIEW src/geometry/Geometry.HalfedgeMesh.Utils.cppm:60 [declaration-comment] verify this comment is mandatory to understand the declaration at line 64
+REVIEW src/geometry/Geometry.HalfedgeMesh.Utils.cppm:69 [declaration-comment] verify this comment is mandatory to understand the declaration at line 73
+REVIEW src/geometry/Geometry.HalfedgeMesh.Utils.cppm:77 [declaration-comment] verify this comment is mandatory to understand the declaration at line 80
+REVIEW src/geometry/Geometry.HalfedgeMesh.Utils.cppm:104 [declaration-comment] verify this comment is mandatory to understand the declaration at line 106
+REVIEW src/geometry/Geometry.HalfedgeMesh.Utils.cppm:108 [declaration-comment] verify this comment is mandatory to understand the declaration at line 110
+REVIEW src/geometry/Geometry.HalfedgeMesh.Utils.cppm:112 [declaration-comment] verify this comment is mandatory to understand the declaration at line 114
+REVIEW src/geometry/Geometry.HalfedgeMesh.Utils.cppm:119 [comment-history] rewrite chronology as a current invariant or move it to a task, ADR, migration record, or Git
+REVIEW src/geometry/Geometry.HalfedgeMesh.Utils.cppm:123 [declaration-comment] verify this comment is mandatory to understand the declaration at line 125
+REVIEW src/geometry/Geometry.HalfedgeMesh.Utils.cppm:127 [declaration-comment] verify this comment is mandatory to understand the declaration at line 128
+REVIEW src/geometry/Geometry.HalfedgeMesh.Utils.cppm:130 [declaration-comment] verify this comment is mandatory to understand the declaration at line 131
+REVIEW src/geometry/Geometry.HalfedgeMesh.Utils.cppm:133 [declaration-comment] verify this comment is mandatory to understand the declaration at line 134
+REVIEW src/geometry/Geometry.HalfedgeMesh.Utils.cppm:136 [declaration-comment] verify this comment is mandatory to understand the declaration at line 137
+REVIEW src/geometry/Geometry.HalfedgeMesh.Utils.cppm:139 [declaration-comment] verify this comment is mandatory to understand the declaration at line 142
+REVIEW src/geometry/Geometry.HalfedgeMesh.Utils.cppm:149 [declaration-comment] verify this comment is mandatory to understand the declaration at line 157
+REVIEW src/geometry/Geometry.HalfedgeMesh.Utils.cppm:160 [declaration-comment] verify this comment is mandatory to understand the declaration at line 162
+REVIEW src/geometry/Geometry.HalfedgeMesh.Utils.cppm:164 [declaration-comment] verify this comment is mandatory to understand the declaration at line 169
+REVIEW src/geometry/Geometry.HalfedgeMesh.Utils.cppm:171 [declaration-comment] verify this comment is mandatory to understand the declaration at line 173
+REVIEW src/geometry/Geometry.HalfedgeMesh.Utils.cppm:175 [declaration-comment] verify this comment is mandatory to understand the declaration at line 181
+REVIEW src/geometry/Geometry.HalfedgeMesh.Utils.cppm:183 [declaration-comment] verify this comment is mandatory to understand the declaration at line 184
+REVIEW src/geometry/Geometry.HalfedgeMesh.Utils.cppm:186 [declaration-comment] verify this comment is mandatory to understand the declaration at line 189
+REVIEW src/geometry/Geometry.HalfedgeMesh.Utils.cppm:191 [declaration-comment] verify this comment is mandatory to understand the declaration at line 193
+REVIEW src/geometry/Geometry.HalfedgeMesh.Utils.cppm:195 [declaration-comment] verify this comment is mandatory to understand the declaration at line 199
+REVIEW src/geometry/Geometry.HalfedgeMesh.Utils.cppm:201 [declaration-comment] verify this comment is mandatory to understand the declaration at line 203
+REVIEW src/geometry/Geometry.HalfedgeMesh.Utils.cppm:205 [declaration-comment] verify this comment is mandatory to understand the declaration at line 209
+REVIEW src/geometry/Geometry.HalfedgeMesh.Utils.cppm:214 [declaration-comment] verify this comment is mandatory to understand the declaration at line 215
+REVIEW src/geometry/Geometry.HalfedgeMesh.Utils.cppm:219 [declaration-comment] verify this comment is mandatory to understand the declaration at line 221
+REVIEW src/geometry/Geometry.HalfedgeMesh.Utils.cppm:226 [declaration-comment] verify this comment is mandatory to understand the declaration at line 229
+REVIEW src/geometry/Geometry.HalfedgeMesh.Utils.cppm:231 [declaration-comment] verify this comment is mandatory to understand the declaration at line 232
+REVIEW src/geometry/Geometry.HalfedgeMesh.Utils.cppm:236 [declaration-comment] verify this comment is mandatory to understand the declaration at line 238
+REVIEW src/geometry/Geometry.HalfedgeMesh.Utils.cppm:240 [declaration-comment] verify this comment is mandatory to understand the declaration at line 241
+REVIEW src/geometry/Geometry.HalfedgeMesh.Utils.cppm:243 [declaration-comment] verify this comment is mandatory to understand the declaration at line 244
+REVIEW src/geometry/Geometry.HalfedgeMesh.Utils.cppm:246 [declaration-comment] verify this comment is mandatory to understand the declaration at line 247
+REVIEW src/geometry/Geometry.HalfedgeMesh.Utils.cppm:249 [declaration-comment] verify this comment is mandatory to understand the declaration at line 251
+REVIEW src/geometry/Geometry.HalfedgeMesh.Utils.cppm:253 [declaration-comment] verify this comment is mandatory to understand the declaration at line 255
+REVIEW src/geometry/Geometry.HalfedgeMesh.Utils.cppm:257 [declaration-comment] verify this comment is mandatory to understand the declaration at line 260
+REVIEW src/geometry/Geometry.HalfedgeMesh.Utils.cppm:262 [declaration-comment] verify this comment is mandatory to understand the declaration at line 268
+REVIEW src/geometry/Geometry.HalfedgeMesh.Utils.cppm:272 [declaration-comment] verify this comment is mandatory to understand the declaration at line 275
+REVIEW src/geometry/Geometry.HalfedgeMesh.Utils.cppm:277 [declaration-comment] verify this comment is mandatory to understand the declaration at line 279
+REVIEW src/geometry/Geometry.HalfedgeMesh.Utils.cppm:283 [declaration-comment] verify this comment is mandatory to understand the declaration at line 286
+REVIEW src/geometry/Geometry.HalfedgeMesh.Utils.cppm:316 [declaration-comment] verify this comment is mandatory to understand the declaration at line 318
+REVIEW src/geometry/Geometry.HalfedgeMesh.Utils.cppm:320 [declaration-comment] verify this comment is mandatory to understand the declaration at line 323
+REVIEW src/geometry/Geometry.HalfedgeMesh.Utils.cppm:332 [declaration-comment] verify this comment is mandatory to understand the declaration at line 333
+REVIEW src/geometry/Geometry.HalfedgeMesh.Utils.cppm:346 [declaration-comment] verify this comment is mandatory to understand the declaration at line 359
+REVIEW src/geometry/Geometry.HalfedgeMesh.Utils.cppm:363 [declaration-comment] verify this comment is mandatory to understand the declaration at line 372
+REVIEW src/geometry/Geometry.HalfedgeMesh.VectorHeatMethod.cppm:17 [declaration-comment] verify this comment is mandatory to understand the declaration at line 54
+REVIEW src/geometry/Geometry.HalfedgeMesh.VectorHeatMethod.cppm:105 [declaration-comment] verify this comment is mandatory to understand the declaration at line 116
+REVIEW src/geometry/Geometry.HalfedgeMesh.VectorHeatMethod.cppm:122 [declaration-comment] verify this comment is mandatory to understand the declaration at line 135
+REVIEW src/geometry/Geometry.HalfedgeMesh.cpp:1 [source-large] C++ file has 1825 lines; inspect whether its responsibilities remain discoverable
+REVIEW src/geometry/Geometry.HalfedgeMesh.cppm:46 [declaration-comment] verify this comment is mandatory to understand the declaration at line 47
+REVIEW src/geometry/Geometry.HalfedgeMesh.cppm:83 [declaration-comment] verify this comment is mandatory to understand the declaration at line 87
+REVIEW src/geometry/Geometry.HalfedgeMesh.cppm:230 [declaration-comment] verify this comment is mandatory to understand the declaration at line 231
+REVIEW src/geometry/Geometry.HalfedgeMesh.cppm:245 [declaration-comment] verify this comment is mandatory to understand the declaration at line 255
+REVIEW src/geometry/Geometry.HalfedgeMesh.cppm:257 [declaration-comment] verify this comment is mandatory to understand the declaration at line 259
+REVIEW src/geometry/Geometry.HalfedgeMesh.cppm:261 [declaration-comment] verify this comment is mandatory to understand the declaration at line 271
+REVIEW src/geometry/Geometry.HalfedgeMesh.cppm:273 [declaration-comment] verify this comment is mandatory to understand the declaration at line 277
+REVIEW src/geometry/Geometry.HalfedgeMesh.cppm:279 [declaration-comment] verify this comment is mandatory to understand the declaration at line 280
+REVIEW src/geometry/Geometry.HalfedgeMesh.cppm:282 [declaration-comment] verify this comment is mandatory to understand the declaration at line 283
+REVIEW src/geometry/Geometry.HalfedgeMesh.cppm:285 [declaration-comment] verify this comment is mandatory to understand the declaration at line 286
+REVIEW src/geometry/Geometry.HalfedgeMesh.cppm:288 [declaration-comment] verify this comment is mandatory to understand the declaration at line 291
+REVIEW src/geometry/Geometry.HalfedgeMesh.cppm:293 [declaration-comment] verify this comment is mandatory to understand the declaration at line 294
+REVIEW src/geometry/Geometry.HalfedgeMesh.cppm:296 [declaration-comment] verify this comment is mandatory to understand the declaration at line 298
+REVIEW src/geometry/Geometry.HalfedgeMesh.cppm:300 [declaration-comment] verify this comment is mandatory to understand the declaration at line 301
+REVIEW src/geometry/Geometry.HalfedgeMesh.cppm:303 [declaration-comment] verify this comment is mandatory to understand the declaration at line 304
+REVIEW src/geometry/Geometry.HalfedgeMesh.cppm:306 [declaration-comment] verify this comment is mandatory to understand the declaration at line 307
+REVIEW src/geometry/Geometry.HalfedgeMesh.cppm:331 [declaration-comment] verify this comment is mandatory to understand the declaration at line 338
+REVIEW src/geometry/Geometry.HalfedgeMesh.cppm:340 [declaration-comment] verify this comment is mandatory to understand the declaration at line 343
+REVIEW src/geometry/Geometry.HalfedgeMesh.cppm:345 [declaration-comment] verify this comment is mandatory to understand the declaration at line 348
+REVIEW src/geometry/Geometry.HalfedgeMesh.cppm:371 [declaration-comment] verify this comment is mandatory to understand the declaration at line 373
+REVIEW src/geometry/Geometry.HalfedgeMesh.cppm:375 [declaration-comment] verify this comment is mandatory to understand the declaration at line 376
+REVIEW src/geometry/Geometry.HalfedgeMesh.cppm:426 [declaration-comment] verify this comment is mandatory to understand the declaration at line 427
+REVIEW src/geometry/Geometry.IntersectionClassification.cppm:41 [declaration-comment] verify this comment is mandatory to understand the declaration at line 73
+REVIEW src/geometry/Geometry.IntersectionClassification.cppm:85 [declaration-comment] verify this comment is mandatory to understand the declaration at line 89
+REVIEW src/geometry/Geometry.IntersectionClassification.cppm:104 [declaration-comment] verify this comment is mandatory to understand the declaration at line 112
+REVIEW src/geometry/Geometry.IntersectionClassification.cppm:130 [declaration-comment] verify this comment is mandatory to understand the declaration at line 146
+REVIEW src/geometry/Geometry.IntersectionClassification.cppm:159 [declaration-comment] verify this comment is mandatory to understand the declaration at line 175
+REVIEW src/geometry/Geometry.IntersectionClassification.cppm:189 [declaration-comment] verify this comment is mandatory to understand the declaration at line 200
+REVIEW src/geometry/Geometry.IntersectionClassification.cppm:212 [declaration-comment] verify this comment is mandatory to understand the declaration at line 230
+REVIEW src/geometry/Geometry.IntersectionClassification.cppm:240 [declaration-comment] verify this comment is mandatory to understand the declaration at line 249
+REVIEW src/geometry/Geometry.KMeans.cppm:62 [declaration-comment] verify this comment is mandatory to understand the declaration at line 82
+REVIEW src/geometry/Geometry.KMeans.cppm:86 [declaration-comment] verify this comment is mandatory to understand the declaration at line 96
+REVIEW src/geometry/Geometry.KMeans.cppm:102 [declaration-comment] verify this comment is mandatory to understand the declaration at line 105
+REVIEW src/geometry/Geometry.KMeans.cppm:111 [declaration-comment] verify this comment is mandatory to understand the declaration at line 124
+REVIEW src/geometry/Geometry.KMeans.cppm:129 [declaration-comment] verify this comment is mandatory to understand the declaration at line 141
+REVIEW src/geometry/Geometry.Linalg.cppm:269 [declaration-comment] verify this comment is mandatory to understand the declaration at line 271
+REVIEW src/geometry/Geometry.Linalg.cppm:354 [declaration-comment] verify this comment is mandatory to understand the declaration at line 358
+REVIEW src/geometry/Geometry.MarchingCubes.cppm:44 [declaration-comment] verify this comment is mandatory to understand the declaration at line 48
+REVIEW src/geometry/Geometry.MarchingCubes.cppm:89 [declaration-comment] verify this comment is mandatory to understand the declaration at line 94
+REVIEW src/geometry/Geometry.Mesh.Conversion.cppm:36 [declaration-comment] verify this comment is mandatory to understand the declaration at line 37
+REVIEW src/geometry/Geometry.Mesh.Conversion.cppm:47 [declaration-comment] verify this comment is mandatory to understand the declaration at line 48
+REVIEW src/geometry/Geometry.MeshClosestFace.cppm:92 [declaration-comment] verify this comment is mandatory to understand the declaration at line 95
+REVIEW src/geometry/Geometry.MeshClosestFace.cppm:102 [declaration-comment] verify this comment is mandatory to understand the declaration at line 103
+REVIEW src/geometry/Geometry.MeshOperator.cppm:9 [declaration-comment] verify this comment is mandatory to understand the declaration at line 25
+REVIEW src/geometry/Geometry.Overlap.cppm:16 [declaration-comment] verify this comment is mandatory to understand the declaration at line 19
+REVIEW src/geometry/Geometry.PCA.cppm:10 [declaration-comment] verify this comment is mandatory to understand the declaration at line 14
+REVIEW src/geometry/Geometry.PCA.cppm:24 [declaration-comment] verify this comment is mandatory to understand the declaration at line 28
+REVIEW src/geometry/Geometry.Parameterization.Harmonic.cppm:17 [declaration-comment] verify this comment is mandatory to understand the declaration at line 38
+REVIEW src/geometry/Geometry.Parameterization.Optimize.cppm:19 [declaration-comment] verify this comment is mandatory to understand the declaration at line 23
+REVIEW src/geometry/Geometry.Parameterization.Optimize.cppm:39 [declaration-comment] verify this comment is mandatory to understand the declaration at line 42
+REVIEW src/geometry/Geometry.Parameterization.Optimize.cppm:65 [declaration-comment] verify this comment is mandatory to understand the declaration at line 70
+REVIEW src/geometry/Geometry.Parameterization.Optimize.cppm:74 [declaration-comment] verify this comment is mandatory to understand the declaration at line 78
+REVIEW src/geometry/Geometry.Parameterization.Optimize.cppm:101 [declaration-comment] verify this comment is mandatory to understand the declaration at line 103
+REVIEW src/geometry/Geometry.Parameterization.Optimize.cppm:123 [declaration-comment] verify this comment is mandatory to understand the declaration at line 124
+REVIEW src/geometry/Geometry.Parameterization.Optimize.cppm:148 [declaration-comment] verify this comment is mandatory to understand the declaration at line 153
+REVIEW src/geometry/Geometry.Parameterization.Optimize.cppm:164 [declaration-comment] verify this comment is mandatory to understand the declaration at line 167
+REVIEW src/geometry/Geometry.Parameterization.Optimize.cppm:182 [declaration-comment] verify this comment is mandatory to understand the declaration at line 189
+REVIEW src/geometry/Geometry.Parameterization.Optimize.cppm:210 [declaration-comment] verify this comment is mandatory to understand the declaration at line 214
+REVIEW src/geometry/Geometry.Parameterization.Optimize.cppm:249 [declaration-comment] verify this comment is mandatory to understand the declaration at line 254
+REVIEW src/geometry/Geometry.PointCloud.Consolidation.cpp:1 [source-large] C++ file has 2216 lines; inspect whether its responsibilities remain discoverable
+REVIEW src/geometry/Geometry.PointCloud.Consolidation.cppm:190 [declaration-comment] verify this comment is mandatory to understand the declaration at line 197
+REVIEW src/geometry/Geometry.PointCloud.Consolidation.cppm:201 [declaration-comment] verify this comment is mandatory to understand the declaration at line 204
+REVIEW src/geometry/Geometry.PointCloud.Consolidation.cppm:209 [declaration-comment] verify this comment is mandatory to understand the declaration at line 211
+REVIEW src/geometry/Geometry.PointCloud.Consolidation.cppm:220 [declaration-comment] verify this comment is mandatory to understand the declaration at line 223
+REVIEW src/geometry/Geometry.PointCloud.Conversion.cppm:34 [declaration-comment] verify this comment is mandatory to understand the declaration at line 35
+REVIEW src/geometry/Geometry.PointCloud.Conversion.cppm:45 [declaration-comment] verify this comment is mandatory to understand the declaration at line 46
+REVIEW src/geometry/Geometry.PointCloud.Features.cppm:40 [declaration-comment] verify this comment is mandatory to understand the declaration at line 42
+REVIEW src/geometry/Geometry.PointCloud.Features.cppm:70 [declaration-comment] verify this comment is mandatory to understand the declaration at line 72
+REVIEW src/geometry/Geometry.PointCloud.Features.cppm:112 [declaration-comment] verify this comment is mandatory to understand the declaration at line 114
+REVIEW src/geometry/Geometry.PointCloud.Features.cppm:138 [declaration-comment] verify this comment is mandatory to understand the declaration at line 140
+REVIEW src/geometry/Geometry.PointCloud.Features.cppm:179 [declaration-comment] verify this comment is mandatory to understand the declaration at line 181
+REVIEW src/geometry/Geometry.PointCloud.Features.cppm:183 [declaration-comment] verify this comment is mandatory to understand the declaration at line 184
+REVIEW src/geometry/Geometry.PointCloud.Features.cppm:187 [declaration-comment] verify this comment is mandatory to understand the declaration at line 189
+REVIEW src/geometry/Geometry.PointCloud.Features.cppm:194 [declaration-comment] verify this comment is mandatory to understand the declaration at line 195
+REVIEW src/geometry/Geometry.PointCloud.Features.cppm:200 [declaration-comment] verify this comment is mandatory to understand the declaration at line 203
+REVIEW src/geometry/Geometry.PointCloud.IO.cpp:1 [source-large] C++ file has 2803 lines; inspect whether its responsibilities remain discoverable
+REVIEW src/geometry/Geometry.PointCloud.Kernels.cppm:76 [declaration-comment] verify this comment is mandatory to understand the declaration at line 81
+REVIEW src/geometry/Geometry.PointCloud.Kernels.cppm:86 [declaration-comment] verify this comment is mandatory to understand the declaration at line 91
+REVIEW src/geometry/Geometry.PointCloud.Kernels.cppm:96 [declaration-comment] verify this comment is mandatory to understand the declaration at line 100
+REVIEW src/geometry/Geometry.PointCloud.Kernels.cppm:107 [declaration-comment] verify this comment is mandatory to understand the declaration at line 111
+REVIEW src/geometry/Geometry.PointCloud.Kernels.cppm:117 [declaration-comment] verify this comment is mandatory to understand the declaration at line 119
+REVIEW src/geometry/Geometry.PointCloud.Kernels.cppm:126 [declaration-comment] verify this comment is mandatory to understand the declaration at line 128
+REVIEW src/geometry/Geometry.PointCloud.Utils.cppm:46 [declaration-comment] verify this comment is mandatory to understand the declaration at line 49
+REVIEW src/geometry/Geometry.PointCloud.Utils.cppm:57 [declaration-comment] verify this comment is mandatory to understand the declaration at line 63
+REVIEW src/geometry/Geometry.PointCloud.Utils.cppm:65 [declaration-comment] verify this comment is mandatory to understand the declaration at line 68
+REVIEW src/geometry/Geometry.PointCloud.Utils.cppm:86 [declaration-comment] verify this comment is mandatory to understand the declaration at line 87
+REVIEW src/geometry/Geometry.PointCloud.Utils.cppm:91 [declaration-comment] verify this comment is mandatory to understand the declaration at line 106
+REVIEW src/geometry/Geometry.PointCloud.Utils.cppm:122 [declaration-comment] verify this comment is mandatory to understand the declaration at line 134
+REVIEW src/geometry/Geometry.PointCloud.Utils.cppm:138 [declaration-comment] verify this comment is mandatory to understand the declaration at line 150
+REVIEW src/geometry/Geometry.PointCloud.Utils.cppm:166 [declaration-comment] verify this comment is mandatory to understand the declaration at line 167
+REVIEW src/geometry/Geometry.PointCloud.Utils.cppm:171 [declaration-comment] verify this comment is mandatory to understand the declaration at line 177
+REVIEW src/geometry/Geometry.PointCloud.Utils.cppm:189 [declaration-comment] verify this comment is mandatory to understand the declaration at line 190
+REVIEW src/geometry/Geometry.PointCloud.Utils.cppm:194 [declaration-comment] verify this comment is mandatory to understand the declaration at line 217
+REVIEW src/geometry/Geometry.PointCloud.Utils.cppm:233 [declaration-comment] verify this comment is mandatory to understand the declaration at line 235
+REVIEW src/geometry/Geometry.PointCloud.Utils.cppm:239 [declaration-comment] verify this comment is mandatory to understand the declaration at line 257
+REVIEW src/geometry/Geometry.PointCloud.Utils.cppm:271 [declaration-comment] verify this comment is mandatory to understand the declaration at line 273
+REVIEW src/geometry/Geometry.PointCloud.Utils.cppm:277 [declaration-comment] verify this comment is mandatory to understand the declaration at line 299
+REVIEW src/geometry/Geometry.PointCloud.Utils.cppm:308 [declaration-comment] verify this comment is mandatory to understand the declaration at line 311
+REVIEW src/geometry/Geometry.PointCloud.Utils.cppm:328 [declaration-comment] verify this comment is mandatory to understand the declaration at line 333
+REVIEW src/geometry/Geometry.PointCloud.Utils.cppm:345 [declaration-comment] verify this comment is mandatory to understand the declaration at line 348
+REVIEW src/geometry/Geometry.PointCloud.Utils.cppm:360 [declaration-comment] verify this comment is mandatory to understand the declaration at line 375
+REVIEW src/geometry/Geometry.PointCloud.Utils.cppm:390 [declaration-comment] verify this comment is mandatory to understand the declaration at line 392
+REVIEW src/geometry/Geometry.PointCloud.Utils.cppm:396 [declaration-comment] verify this comment is mandatory to understand the declaration at line 404
+REVIEW src/geometry/Geometry.PointCloud.cppm:28 [declaration-comment] verify this comment is mandatory to understand the declaration at line 35
+REVIEW src/geometry/Geometry.PointCloud.cppm:81 [declaration-comment] verify this comment is mandatory to understand the declaration at line 82
+REVIEW src/geometry/Geometry.PointCloud.cppm:96 [declaration-comment] verify this comment is mandatory to understand the declaration at line 100
+REVIEW src/geometry/Geometry.PointCloud.cppm:157 [declaration-comment] verify this comment is mandatory to understand the declaration at line 158
+REVIEW src/geometry/Geometry.Properties.cppm:110 [declaration-comment] verify this comment is mandatory to understand the declaration at line 111
+REVIEW src/geometry/Geometry.Properties.cppm:123 [declaration-comment] verify this comment is mandatory to understand the declaration at line 124
+REVIEW src/geometry/Geometry.Properties.cppm:144 [declaration-comment] verify this comment is mandatory to understand the declaration at line 145
+REVIEW src/geometry/Geometry.Properties.cppm:146 [declaration-comment] verify this comment is mandatory to understand the declaration at line 147
+REVIEW src/geometry/Geometry.Properties.cppm:148 [declaration-comment] verify this comment is mandatory to understand the declaration at line 149
+REVIEW src/geometry/Geometry.Properties.cppm:150 [declaration-comment] verify this comment is mandatory to understand the declaration at line 151
+REVIEW src/geometry/Geometry.Properties.cppm:152 [declaration-comment] verify this comment is mandatory to understand the declaration at line 153
+REVIEW src/geometry/Geometry.Properties.cppm:154 [declaration-comment] verify this comment is mandatory to understand the declaration at line 155
+REVIEW src/geometry/Geometry.Properties.cppm:157 [declaration-comment] verify this comment is mandatory to understand the declaration at line 158
+REVIEW src/geometry/Geometry.Properties.cppm:159 [declaration-comment] verify this comment is mandatory to understand the declaration at line 160
+REVIEW src/geometry/Geometry.Properties.cppm:259 [declaration-comment] verify this comment is mandatory to understand the declaration at line 260
+REVIEW src/geometry/Geometry.Properties.cppm:275 [declaration-comment] verify this comment is mandatory to understand the declaration at line 276
+REVIEW src/geometry/Geometry.Properties.cppm:277 [declaration-comment] verify this comment is mandatory to understand the declaration at line 278
+REVIEW src/geometry/Geometry.Properties.cppm:281 [declaration-comment] verify this comment is mandatory to understand the declaration at line 282
+REVIEW src/geometry/Geometry.Properties.cppm:283 [declaration-comment] verify this comment is mandatory to understand the declaration at line 284
+REVIEW src/geometry/Geometry.Properties.cppm:286 [declaration-comment] verify this comment is mandatory to understand the declaration at line 287
+REVIEW src/geometry/Geometry.Properties.cppm:288 [declaration-comment] verify this comment is mandatory to understand the declaration at line 289
+REVIEW src/geometry/Geometry.Properties.cppm:291 [declaration-comment] verify this comment is mandatory to understand the declaration at line 292
+REVIEW src/geometry/Geometry.Properties.cppm:294 [declaration-comment] verify this comment is mandatory to understand the declaration at line 295
+REVIEW src/geometry/Geometry.Properties.cppm:296 [declaration-comment] verify this comment is mandatory to understand the declaration at line 297
+REVIEW src/geometry/Geometry.Properties.cppm:299 [declaration-comment] verify this comment is mandatory to understand the declaration at line 300
+REVIEW src/geometry/Geometry.Properties.cppm:302 [declaration-comment] verify this comment is mandatory to understand the declaration at line 303
+REVIEW src/geometry/Geometry.Properties.cppm:305 [declaration-comment] verify this comment is mandatory to understand the declaration at line 307
+REVIEW src/geometry/Geometry.Properties.cppm:309 [declaration-comment] verify this comment is mandatory to understand the declaration at line 310
+REVIEW src/geometry/Geometry.Properties.cppm:313 [declaration-comment] verify this comment is mandatory to understand the declaration at line 314
+REVIEW src/geometry/Geometry.Properties.cppm:317 [declaration-comment] verify this comment is mandatory to understand the declaration at line 318
+REVIEW src/geometry/Geometry.Properties.cppm:321 [declaration-comment] verify this comment is mandatory to understand the declaration at line 322
+REVIEW src/geometry/Geometry.Properties.cppm:325 [declaration-comment] verify this comment is mandatory to understand the declaration at line 326
+REVIEW src/geometry/Geometry.Properties.cppm:329 [declaration-comment] verify this comment is mandatory to understand the declaration at line 330
+REVIEW src/geometry/Geometry.Properties.cppm:333 [declaration-comment] verify this comment is mandatory to understand the declaration at line 334
+REVIEW src/geometry/Geometry.Properties.cppm:337 [declaration-comment] verify this comment is mandatory to understand the declaration at line 338
+REVIEW src/geometry/Geometry.Properties.cppm:357 [declaration-comment] verify this comment is mandatory to understand the declaration at line 358
+REVIEW src/geometry/Geometry.Properties.cppm:377 [declaration-comment] verify this comment is mandatory to understand the declaration at line 378
+REVIEW src/geometry/Geometry.Properties.cppm:476 [comment-history] rewrite chronology as a current invariant or move it to a task, ADR, migration record, or Git
+REVIEW src/geometry/Geometry.Properties.cppm:494 [declaration-comment] verify this comment is mandatory to understand the declaration at line 495
+REVIEW src/geometry/Geometry.Properties.cppm:770 [declaration-comment] verify this comment is mandatory to understand the declaration at line 771
+REVIEW src/geometry/Geometry.Properties.cppm:815 [comment-history] rewrite chronology as a current invariant or move it to a task, ADR, migration record, or Git
+REVIEW src/geometry/Geometry.Properties.cppm:822 [declaration-comment] verify this comment is mandatory to understand the declaration at line 823
+REVIEW src/geometry/Geometry.Properties.cppm:853 [declaration-comment] verify this comment is mandatory to understand the declaration at line 854
+REVIEW src/geometry/Geometry.Properties.cppm:873 [declaration-comment] verify this comment is mandatory to understand the declaration at line 874
+REVIEW src/geometry/Geometry.Properties.cppm:887 [declaration-comment] verify this comment is mandatory to understand the declaration at line 888
+REVIEW src/geometry/Geometry.Properties.cppm:917 [declaration-comment] verify this comment is mandatory to understand the declaration at line 918
+REVIEW src/geometry/Geometry.Properties.cppm:921 [declaration-comment] verify this comment is mandatory to understand the declaration at line 922
+REVIEW src/geometry/Geometry.Properties.cppm:925 [declaration-comment] verify this comment is mandatory to understand the declaration at line 926
+REVIEW src/geometry/Geometry.Properties.cppm:929 [declaration-comment] verify this comment is mandatory to understand the declaration at line 930
+REVIEW src/geometry/Geometry.Properties.cppm:933 [declaration-comment] verify this comment is mandatory to understand the declaration at line 934
+REVIEW src/geometry/Geometry.Properties.cppm:1035 [comment-history] rewrite chronology as a current invariant or move it to a task, ADR, migration record, or Git
+REVIEW src/geometry/Geometry.Properties.cppm:1038 [declaration-comment] verify this comment is mandatory to understand the declaration at line 1041
+REVIEW src/geometry/Geometry.Properties.cppm:1047 [declaration-comment] verify this comment is mandatory to understand the declaration at line 1048
+REVIEW src/geometry/Geometry.Properties.cppm:1056 [declaration-comment] verify this comment is mandatory to understand the declaration at line 1057
+REVIEW src/geometry/Geometry.Quadric.cppm:11 [declaration-comment] verify this comment is mandatory to understand the declaration at line 15
+REVIEW src/geometry/Geometry.Raycast.cppm:21 [declaration-comment] verify this comment is mandatory to understand the declaration at line 26
+REVIEW src/geometry/Geometry.Raycast.cppm:30 [declaration-comment] verify this comment is mandatory to understand the declaration at line 54
+REVIEW src/geometry/Geometry.Registration.cppm:60 [declaration-comment] verify this comment is mandatory to understand the declaration at line 64
+REVIEW src/geometry/Geometry.Registration.cppm:70 [declaration-comment] verify this comment is mandatory to understand the declaration at line 74
+REVIEW src/geometry/Geometry.Registration.cppm:105 [declaration-comment] verify this comment is mandatory to understand the declaration at line 109
+REVIEW src/geometry/Geometry.Registration.cppm:131 [declaration-comment] verify this comment is mandatory to understand the declaration at line 143
+REVIEW src/geometry/Geometry.RobustPredicates.cppm:48 [declaration-comment] verify this comment is mandatory to understand the declaration at line 52
+REVIEW src/geometry/Geometry.RobustPredicates.cppm:83 [declaration-comment] verify this comment is mandatory to understand the declaration at line 84
+REVIEW src/geometry/Geometry.RobustPredicates.cppm:94 [declaration-comment] verify this comment is mandatory to understand the declaration at line 97
+REVIEW src/geometry/Geometry.RobustPredicates.cppm:147 [declaration-comment] verify this comment is mandatory to understand the declaration at line 175
+REVIEW src/geometry/Geometry.RobustPredicates.cppm:183 [declaration-comment] verify this comment is mandatory to understand the declaration at line 186
+REVIEW src/geometry/Geometry.RobustPredicates.cppm:192 [declaration-comment] verify this comment is mandatory to understand the declaration at line 200
+REVIEW src/geometry/Geometry.RobustPredicates.cppm:204 [declaration-comment] verify this comment is mandatory to understand the declaration at line 213
+REVIEW src/geometry/Geometry.RobustPredicates.cppm:218 [declaration-comment] verify this comment is mandatory to understand the declaration at line 225
+REVIEW src/geometry/Geometry.RobustPredicates.cppm:229 [declaration-comment] verify this comment is mandatory to understand the declaration at line 253
+REVIEW src/geometry/Geometry.RobustPredicates.cppm:258 [declaration-comment] verify this comment is mandatory to understand the declaration at line 282
+REVIEW src/geometry/Geometry.Rotation.cppm:9 [comment-history] rewrite chronology as a current invariant or move it to a task, ADR, migration record, or Git
+REVIEW src/geometry/Geometry.Rotation.cppm:25 [declaration-comment] verify this comment is mandatory to understand the declaration at line 27
+REVIEW src/geometry/Geometry.Rotation.cppm:30 [declaration-comment] verify this comment is mandatory to understand the declaration at line 31
+REVIEW src/geometry/Geometry.Rotation.cppm:33 [declaration-comment] verify this comment is mandatory to understand the declaration at line 34
+REVIEW src/geometry/Geometry.Rotation.cppm:36 [declaration-comment] verify this comment is mandatory to understand the declaration at line 37
+REVIEW src/geometry/Geometry.Rotation.cppm:39 [declaration-comment] verify this comment is mandatory to understand the declaration at line 40
+REVIEW src/geometry/Geometry.Rotation.cppm:42 [declaration-comment] verify this comment is mandatory to understand the declaration at line 43
+REVIEW src/geometry/Geometry.Rotation.cppm:45 [declaration-comment] verify this comment is mandatory to understand the declaration at line 48
+REVIEW src/geometry/Geometry.Rotation.cppm:50 [declaration-comment] verify this comment is mandatory to understand the declaration at line 53
+REVIEW src/geometry/Geometry.RotationAveraging.cppm:56 [declaration-comment] verify this comment is mandatory to understand the declaration at line 59
+REVIEW src/geometry/Geometry.RotationAveraging.cppm:62 [declaration-comment] verify this comment is mandatory to understand the declaration at line 63
+REVIEW src/geometry/Geometry.RotationAveraging.cppm:66 [declaration-comment] verify this comment is mandatory to understand the declaration at line 68
+REVIEW src/geometry/Geometry.RotationAveraging.cppm:71 [declaration-comment] verify this comment is mandatory to understand the declaration at line 72
+REVIEW src/geometry/Geometry.RotationAveraging.cppm:75 [declaration-comment] verify this comment is mandatory to understand the declaration at line 77
+REVIEW src/geometry/Geometry.SDFContact.cppm:98 [declaration-comment] verify this comment is mandatory to understand the declaration at line 102
+REVIEW src/geometry/Geometry.Sparse.cppm:287 [declaration-comment] verify this comment is mandatory to understand the declaration at line 304
+REVIEW src/geometry/Geometry.SpatialQueries.cppm:23 [declaration-comment] verify this comment is mandatory to understand the declaration at line 24
+REVIEW src/geometry/Geometry.SpatialQueries.cppm:31 [declaration-comment] verify this comment is mandatory to understand the declaration at line 32
+REVIEW src/geometry/Geometry.SpatialQueries.cppm:40 [declaration-comment] verify this comment is mandatory to understand the declaration at line 41
+REVIEW src/geometry/Geometry.Sphere.Sampling.cppm:28 [declaration-comment] verify this comment is mandatory to understand the declaration at line 42
+REVIEW src/geometry/Geometry.Statistics.cppm:23 [declaration-comment] verify this comment is mandatory to understand the declaration at line 26
+REVIEW src/geometry/Geometry.Statistics.cppm:29 [declaration-comment] verify this comment is mandatory to understand the declaration at line 32
+REVIEW src/geometry/Geometry.Statistics.cppm:58 [declaration-comment] verify this comment is mandatory to understand the declaration at line 60
+REVIEW src/geometry/Geometry.Statistics.cppm:75 [declaration-comment] verify this comment is mandatory to understand the declaration at line 76
+REVIEW src/geometry/Geometry.Statistics.cppm:78 [declaration-comment] verify this comment is mandatory to understand the declaration at line 81
+REVIEW src/geometry/Geometry.SurfaceReconstruction.cppm:41 [declaration-comment] verify this comment is mandatory to understand the declaration at line 45
+REVIEW src/geometry/Geometry.SurfaceReconstruction.cppm:85 [declaration-comment] verify this comment is mandatory to understand the declaration at line 89
+REVIEW src/geometry/Geometry.UvAtlas.cpp:1 [source-large] C++ file has 1559 lines; inspect whether its responsibilities remain discoverable

@@ -1,0 +1,26 @@
+{
+  "command": [
+    "cmake",
+    "--build",
+    "--preset",
+    "ci",
+    "--target",
+    "IntrinsicTests",
+    "-j",
+    "4"
+  ],
+  "command_display": "cmake --build --preset ci --target IntrinsicTests -j 4",
+  "cwd": ".",
+  "duration_ms": 12603,
+  "exit_code": 0,
+  "finished_at": "2026-08-11T15:36:14Z",
+  "label": "ci-build-intrinsic-tests-r2",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-11T15:36:01Z",
+  "stderr_path": "tasks/evidence/BUG-153/commands/ci-build-intrinsic-tests-r2.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/BUG-153/commands/ci-build-intrinsic-tests-r2.stdout.log",
+  "stdout_sha256": "edcd9e0683e68963e1d205c5ff78dbb24608e55f58bde1fc3e3d10b59422725b",
+  "task_id": "BUG-153"
+}

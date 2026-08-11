@@ -619,16 +619,20 @@ backend readout.
 `EditorMeshCurvatureResult`, and
 `ApplyEditorMeshCurvatureCommand(...)`. Runtime validates the selected
 mesh `GeometrySources`, converts the current CPU data to a scratch halfedge
-mesh, calls the geometry-owned `Geometry::Curvature::ComputeCurvature` backend
-from `GEOM-040`, and publishes count-matched finite vertex properties only
-after the geometry result succeeds.
+mesh, calls the geometry-owned `Geometry::Curvature::ComputeCurvature`
+edge-dihedral tensor estimator, and publishes count-matched finite vertex
+properties only after the geometry result succeeds.
 
 Successful scalar publication writes canonical `v:mean_curvature` and
 `v:gaussian_curvature` `double` properties. When principal directions are
 requested and available, the command also writes `v:principal_dir1` and
 `v:principal_dir2` `glm::vec3` properties; when the directions lane is disabled
 or unavailable, the command succeeds with scalars only and reports a
-deterministic diagnostic. The UI exposes an output selector, a principal
+deterministic diagnostic. Mean and Gaussian values are invariants of the
+reference-smoothed principal values from the same edge-dihedral estimator;
+directions retain that estimator's local tensor basis. The runtime does not
+combine the standalone Meyer scalar operators with a separate tensor. The UI
+exposes an output selector, a principal
 directions toggle that is inert when directions are unavailable, and a single
 `Compute` action. Successful commits are undoable through the shared editor
 mutation transaction, which validates geometry metadata, the exact source

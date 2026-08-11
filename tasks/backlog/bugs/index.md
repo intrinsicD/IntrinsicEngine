@@ -9,6 +9,13 @@ The 2026-08-07 Sandbox UI workflow pass (`sculpt.obj` end-to-end through the
 promoted Vulkan build) opened `BUG-137` through `BUG-142`. `BUG-137` is upstream
 of `BUG-140` and of the parameterization rejection recorded in `BUG-141`.
 
+- [`BUG-153` — Restore edge-dihedral Taubin curvature estimation](../../active/BUG-153-curvature-taubin-edge-dihedral-estimator.md):
+  the promoted curvature field uses a one-ring normal-fitting approximation,
+  zeroes every boundary direction, and mixes Meyer scalar curvatures with a
+  separate tensor's directions. Restore the known-good signed edge-dihedral
+  Taubin estimator and prove it through analytic regressions and the live
+  Sandbox on small and large OBJ meshes.
+
 - [`BUG-149` — Benchmark sealer escapes dotted output directories](BUG-149-benchmark-sealer-dotted-output-directory.md):
   `run_and_seal.py` interprets a dotted directory name as a file, seals its
   parent (observed as all of `/tmp`), and can return zero after the sealer

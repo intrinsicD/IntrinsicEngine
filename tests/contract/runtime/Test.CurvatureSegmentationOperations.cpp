@@ -21,6 +21,7 @@ import Extrinsic.Runtime.SelectionController;
 import Geometry.HalfedgeMesh;
 import Geometry.HalfedgeMesh.Builder;
 import Geometry.Properties;
+import Geometry.Subdivision;
 
 namespace Dirty = Extrinsic::ECS::Components::DirtyTags;
 namespace ECS = Extrinsic::ECS;
@@ -31,8 +32,14 @@ namespace
 {
     [[nodiscard]] Geometry::HalfedgeMesh::Mesh MakeTwoRegimeMesh()
     {
-        Geometry::HalfedgeMesh::Mesh mesh =
+        const Geometry::HalfedgeMesh::Mesh coarse =
             Geometry::HalfedgeMesh::MakeMeshIcosahedron();
+        Geometry::HalfedgeMesh::Mesh mesh;
+        const auto subdivision = Geometry::Subdivision::Subdivide(
+            coarse,
+            mesh,
+            Geometry::Subdivision::SubdivisionParams{.Iterations = 2u});
+        EXPECT_TRUE(subdivision.has_value());
         for (const Geometry::VertexHandle vertex : mesh.LiveVertices())
         {
             glm::vec3& position = mesh.Position(vertex);

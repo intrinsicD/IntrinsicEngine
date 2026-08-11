@@ -1,0 +1,24 @@
+{
+  "command": [
+    "python3",
+    "tools/agents/skills/intrinsicengine-source-documentation/scripts/audit_source_documentation.py",
+    "--root",
+    ".",
+    "--path",
+    "src/geometry"
+  ],
+  "command_display": "python3 tools/agents/skills/intrinsicengine-source-documentation/scripts/audit_source_documentation.py --root . --path src/geometry",
+  "cwd": ".",
+  "duration_ms": 74,
+  "exit_code": 1,
+  "finished_at": "2026-08-11T16:11:46Z",
+  "label": "source-docs",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-11T16:11:45Z",
+  "stderr_path": "tasks/evidence/BUG-153/commands/source-docs.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/BUG-153/commands/source-docs.stdout.log",
+  "stdout_sha256": "f8be761874b69b7bb61cd67f5d3de0723d6342d88c863c71cae9a47dd3e7d714",
+  "task_id": "BUG-153"
+}

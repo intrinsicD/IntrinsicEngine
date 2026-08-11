@@ -1,0 +1,24 @@
+{
+  "command": [
+    "cmake",
+    "--build",
+    "--preset",
+    "ci-asan",
+    "--target",
+    "IntrinsicCpuTests"
+  ],
+  "command_display": "cmake --build --preset ci-asan --target IntrinsicCpuTests",
+  "cwd": ".",
+  "duration_ms": 348479,
+  "exit_code": 0,
+  "finished_at": "2026-08-11T15:47:11Z",
+  "label": "asan-build",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-11T15:41:22Z",
+  "stderr_path": "tasks/evidence/BUG-153/commands/asan-build.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/BUG-153/commands/asan-build.stdout.log",
+  "stdout_sha256": "db43596e4db44db4e133dc8e2d88a81bcad36db2f514e6689f6c75b538e1492f",
+  "task_id": "BUG-153"
+}

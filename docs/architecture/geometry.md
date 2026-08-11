@@ -152,11 +152,11 @@
   parity and benchmark manifests justify a second backend.
 - `Geometry.PCA` exports the closed-form symmetric 3×3 eigensolver
   `Geometry::PCA::SymmetricEigen3` (and its `Geometry::PCA::Eigen3` result). It is
-  the single shared solver behind both `ToPCA` and the curvature-tensor
-  decomposition; consumers that need signed eigenvalues (the curvature tensor is
-  not PSD) read them off the matrix via the Rayleigh quotient, because
-  `SymmetricEigen3` clamps its returned eigenvalues non-negative for the
-  covariance use case. No public Eigen types appear on the `Geometry.PCA` surface.
+  the allocation-free covariance solver behind `ToPCA` and other PCA consumers;
+  its returned eigenvalues are clamped non-negative for that covariance use case.
+  Signed curvature tensors use their own tangent-plane decomposition rather than
+  passing a non-PSD matrix through this covariance-specific surface. No public
+  Eigen types appear on the `Geometry.PCA` surface.
 
 ## API style, diagnostics, and numeric policy
 
@@ -453,25 +453,42 @@ frequency radius. Inputs with non-planar `z` values are rejected as
 ### Curvature tensor and principal directions
 
 `Geometry.Curvature` estimates per-vertex discrete curvature on triangle meshes.
-Scalar magnitudes (`v:mean_curvature` H, `v:gaussian_curvature` K,
-`v:max_principal_curvature` κ₁, `v:min_principal_curvature` κ₂, and
-`v:mean_curvature_normal`) follow the Meyer et al. (2003) operators and are
-unchanged.
+The standalone `ComputeMeanCurvature` and `ComputeGaussianCurvature` functions
+retain the Meyer et al. (2003) cotan-Laplacian and angle-defect operators.
+`ComputeCurvature` and `ComputeCurvatureTensor` instead share one signed
+edge-dihedral principal system so the full result never combines Meyer scalars
+with directions from a different estimator.
 
-`ComputeCurvatureTensor` adds the per-vertex curvature tensor and principal
-directions following Taubin (1995): each 1-ring edge contributes
-`w_ij · κ_ij · T_ij T_ijᵀ` (area-derived weights summing to one, directional
-curvature `κ_ij = 2 nᵢ·(x_j − x_i)/‖x_j − x_i‖²`, tangent direction `T_ij`), and the
-accumulated symmetric tensor is decomposed with the shared
-`Geometry::PCA::SymmetricEigen3`. The eigenvector aligned with the vertex normal
-is discarded; the two tangent eigenvectors are published as the unit fields
-`v:principal_dir1` (κ₁/max direction) and `v:principal_dir2` (κ₂/min direction),
-with κ₁ = 3λ_a − λ_b and κ₂ = 3λ_b − λ_a recovered from the signed tensor
-eigenvalues and aligned to their owning direction. `ComputeCurvature` additionally
-publishes the two direction fields while leaving every scalar output bit-for-bit
-intact. Flat 1-rings, boundary (open) vertices, and zero-area 1-rings fail closed
-with the zero-vector sentinel and keep their scalar-derived principal curvatures;
-empty / no-face meshes return `nullopt`.
+For each finite interior edge `e`, the tensor path precomputes
+`M_e = beta_e (|e|/2) t_e t_eᵀ`, where `beta_e` is the oriented face-normal
+dihedral and `t_e` is the unit edge direction. A vertex sums incident edge
+contributions over itself and its one-ring neighbours (the framework24
+two-ring support), then divides by the mixed area of those support vertices.
+The resulting symmetric tensor is restricted to the oriented vertex tangent
+plane and decomposed as a signed 2×2 system. Because the hinge angle measures
+bend across an edge while `M_e` stores the edge tangent, each eigenvalue is paired
+with the complementary tangent eigenvector when publishing
+`v:principal_dir1` (κ₁/max) and `v:principal_dir2` (κ₂/min). This tangent-plane
+restriction avoids the ambiguous full-3×3 "smallest absolute eigenvalue" choice
+on cylinders, where both the surface normal and one principal curvature may have
+zero eigenvalue.
+
+Three simultaneous nonnegative-cotan passes smooth κ₁ and κ₂; directions retain
+the unsmoothed tensor basis. `ComputeCurvature` derives
+`H = (κ₁ + κ₂)/2`, `K = κ₁κ₂`, and the mean-curvature normal from those
+same values. The sign is adapted to the engine convention: outward-oriented
+convex curvature is positive and reversing orientation reverses both principal
+values. The compatibility name "Taubin" follows framework24; its hinge quadrature
+is not the vertex-neighbour directional-curvature quadrature in Taubin's 1995
+paper.
+
+Finite boundary vertices are estimated when their two-ring support contains
+valid interior hinges. Deleted, isolated, flat, zero-area, degenerate, and
+non-finite support fails closed to finite zero scalars and zero-vector directions;
+empty/no-face tensor requests return `nullopt`. Storage is `O(V + E + F)`.
+Runtime is linear on bounded-valence manifold meshes and
+`O(F + E + Σ_v degree(v)²)` without that assumption because the reference
+two-ring quadrature revisits each support vertex's incident edges.
 
 ### Signed-curvature mesh segmentation
 

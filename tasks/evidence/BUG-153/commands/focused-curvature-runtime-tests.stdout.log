@@ -1,0 +1,69 @@
+Test project /home/alex/Documents/IntrinsicEngine-bug153/build/ci
+      Start 1017: SandboxEditorUi.MeshCurvatureCommandPublishesCanonicalPropertiesAndSupportsUndoRedo
+ 1/29 Test #1017: SandboxEditorUi.MeshCurvatureCommandPublishesCanonicalPropertiesAndSupportsUndoRedo ...   Passed    0.01 sec
+      Start 1021: SandboxEditorUi.MeshCurvatureRecomputeThatChangesNothingReportsNoChange
+ 2/29 Test #1021: SandboxEditorUi.MeshCurvatureRecomputeThatChangesNothingReportsNoChange ...............   Passed    0.01 sec
+      Start 1023: SandboxEditorUi.MeshCurvatureRequestQueuesDerivedJobAndPublishesOnApply
+ 3/29 Test #1023: SandboxEditorUi.MeshCurvatureRequestQueuesDerivedJobAndPublishesOnApply ...............   Passed    0.02 sec
+      Start 1024: SandboxEditorUi.MeshCurvatureDerivedJobDiscardsStalePropertiesBeforeApply
+ 4/29 Test #1024: SandboxEditorUi.MeshCurvatureDerivedJobDiscardsStalePropertiesBeforeApply .............   Passed    0.02 sec
+      Start 1025: SandboxEditorUi.MeshCurvatureCommandFallsBackToScalarOnlyWhenDirectionsUnavailable
+ 5/29 Test #1025: SandboxEditorUi.MeshCurvatureCommandFallsBackToScalarOnlyWhenDirectionsUnavailable ....   Passed    0.01 sec
+      Start 1026: SandboxEditorUi.MeshCurvatureCommandFailsClosedForInvalidTargetsAndConflicts
+ 6/29 Test #1026: SandboxEditorUi.MeshCurvatureCommandFailsClosedForInvalidTargetsAndConflicts ..........   Passed    0.01 sec
+      Start 2077: HalfedgeMesh_PropertyAccess.CurvatureMutableOverloadsPublishVertexProperties
+ 7/29 Test #2077: HalfedgeMesh_PropertyAccess.CurvatureMutableOverloadsPublishVertexProperties ..........   Passed    0.01 sec
+      Start 2167: Curvature_MeanCurvature.EmptyMesh_ReturnsNullopt
+ 8/29 Test #2167: Curvature_MeanCurvature.EmptyMesh_ReturnsNullopt ......................................   Passed    0.01 sec
+      Start 2168: Curvature_MeanCurvature.Tetrahedron_UniformPositiveCurvature
+ 9/29 Test #2168: Curvature_MeanCurvature.Tetrahedron_UniformPositiveCurvature ..........................   Passed    0.01 sec
+      Start 2169: Curvature_MeanCurvature.FlatMesh_NearZeroCurvatureAtInteriorVertices
+10/29 Test #2169: Curvature_MeanCurvature.FlatMesh_NearZeroCurvatureAtInteriorVertices ..................   Passed    0.01 sec
+      Start 2170: Curvature_MeanCurvature.FlippedClosedMesh_NegativeCurvature
+11/29 Test #2170: Curvature_MeanCurvature.FlippedClosedMesh_NegativeCurvature ...........................   Passed    0.01 sec
+      Start 2171: Curvature_GaussianCurvature.EmptyMesh_ReturnsNullopt
+12/29 Test #2171: Curvature_GaussianCurvature.EmptyMesh_ReturnsNullopt ..................................   Passed    0.01 sec
+      Start 2172: Curvature_GaussianCurvature.Tetrahedron_GaussBonnet
+13/29 Test #2172: Curvature_GaussianCurvature.Tetrahedron_GaussBonnet ...................................   Passed    0.01 sec
+      Start 2173: Curvature_GaussianCurvature.FlatMesh_NearZeroCurvatureAtInteriorVertices
+14/29 Test #2173: Curvature_GaussianCurvature.FlatMesh_NearZeroCurvatureAtInteriorVertices ..............   Passed    0.01 sec
+      Start 2174: Curvature_Full.Icosahedron_SymmetricCurvatureValues
+15/29 Test #2174: Curvature_Full.Icosahedron_SymmetricCurvatureValues ...................................   Passed    0.01 sec
+      Start 2175: Curvature_Full.PrincipalRelation_K1GeK2_And_H_Equals_Average
+16/29 Test #2175: Curvature_Full.PrincipalRelation_K1GeK2_And_H_Equals_Average ..........................   Passed    0.01 sec
+      Start 2182: CurvatureTensor.EmptyMesh_ReturnsNullopt
+17/29 Test #2182: CurvatureTensor.EmptyMesh_ReturnsNullopt ..............................................   Passed    0.01 sec
+      Start 2183: CurvatureTensor.NoFaceMesh_ReturnsNullopt
+18/29 Test #2183: CurvatureTensor.NoFaceMesh_ReturnsNullopt .............................................   Passed    0.01 sec
+      Start 2184: CurvatureTensor.Sphere_IsotropicAndTangent
+19/29 Test #2184: CurvatureTensor.Sphere_IsotropicAndTangent ............................................   Passed    0.04 sec
+      Start 2185: CurvatureTensor.PrincipalCurvaturesScaleInverselyWithGeometry
+20/29 Test #2185: CurvatureTensor.PrincipalCurvaturesScaleInverselyWithGeometry .........................   Passed    0.08 sec
+      Start 2186: CurvatureTensor.ReversingOrientationFlipsSignedCurvature
+21/29 Test #2186: CurvatureTensor.ReversingOrientationFlipsSignedCurvature ..............................   Passed    0.01 sec
+      Start 2187: CurvatureTensor.Cylinder_AxisAligned
+22/29 Test #2187: CurvatureTensor.Cylinder_AxisAligned ..................................................   Passed    0.06 sec
+      Start 2188: CurvatureTensor.OpenCylinderBoundaryUsesSupportedNeighbourhood
+23/29 Test #2188: CurvatureTensor.OpenCylinderBoundaryUsesSupportedNeighbourhood ........................   Passed    0.07 sec
+      Start 2189: CurvatureTensor.Saddle_OppositeSignsAxisAligned
+24/29 Test #2189: CurvatureTensor.Saddle_OppositeSignsAxisAligned .......................................   Passed    0.05 sec
+      Start 2190: CurvatureTensor.NonFiniteCornerOnClosedMeshFailsClosed
+25/29 Test #2190: CurvatureTensor.NonFiniteCornerOnClosedMeshFailsClosed ................................   Passed    0.01 sec
+      Start 2191: CurvatureTensor.Deterministic
+26/29 Test #2191: CurvatureTensor.Deterministic .........................................................   Passed    0.06 sec
+      Start 2192: CurvatureTensor.StandaloneScalarOperatorsRemainAvailable
+27/29 Test #2192: CurvatureTensor.StandaloneScalarOperatorsRemainAvailable ..............................   Passed    0.07 sec
+      Start 2193: CurvatureTensor.FullFieldUsesTheTensorPrincipalSystem
+28/29 Test #2193: CurvatureTensor.FullFieldUsesTheTensorPrincipalSystem .................................   Passed    0.11 sec
+      Start 2194: CurvatureTensor.FlatRegionIncludingBoundaryFailsClosed
+29/29 Test #2194: CurvatureTensor.FlatRegionIncludingBoundaryFailsClosed ................................   Passed    0.01 sec
+
+100% tests passed, 0 tests failed out of 29
+
+Label Time Summary:
+contract    =   0.05 sec*proc (6 tests)
+geometry    =   0.64 sec*proc (23 tests)
+runtime     =   0.05 sec*proc (6 tests)
+unit        =   0.64 sec*proc (23 tests)
+
+Total Test time (real) =   1.39 sec

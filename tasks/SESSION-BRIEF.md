@@ -8,6 +8,7 @@ the authoritative open/unblocked view.
 
 ## Active tasks
 
+- `BUG-153` — Restore edge-dihedral Taubin curvature estimation (tasks/active/BUG-153-curvature-taubin-edge-dihedral-estimator.md)
 - `METHOD-039` — Feature-network-constrained curvature patch decomposition (tasks/active/METHOD-039-feature-network-curvature-patch-decomposition.md)
 
 ## Theme B — Rendering modernization

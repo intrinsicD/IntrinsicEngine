@@ -20,30 +20,35 @@ Results must report:
 
 ## Worked example: curvature-tensor estimation (Taubin)
 
-`Geometry::Curvature::ComputeCurvatureTensor` estimates the per-vertex 3×3
-curvature tensor (Taubin, "Estimating the tensor of curvature of a surface from a
-polyhedral approximation", ICCV 1995). For each 1-ring edge `(i,j)` it accumulates
+`Geometry::Curvature::ComputeCurvatureTensor` uses the edge-dihedral estimator
+retained under the framework24 "Taubin" compatibility name. For every finite
+interior edge it precomputes
 
 ```
-M_i = Σ_j w_ij · κ_ij · T_ij T_ijᵀ,   Σ_j w_ij = 1
-κ_ij = 2 nᵢ·(x_j − x_i) / ‖x_j − x_i‖²       (directional curvature)
-T_ij = normalize((I − nᵢnᵢᵀ)(x_j − x_i))     (tangent direction)
-w_ij ∝ area of the faces incident to edge (i,j)
+M_e = beta_e (|e| / 2) t_e t_eᵀ
 ```
 
-`M_i` is decomposed with the shared `Geometry::PCA::SymmetricEigen3`. The
-eigenvector aligned with the vertex normal is discarded; the two tangent
-eigenvalues `λ_a, λ_b` are read off `M_i` via the Rayleigh quotient (the tensor is
-not positive semi-definite, so the solver's non-negative eigenvalue clamp cannot
-be used) and the principal curvatures are recovered as `κ₁ = 3λ_a − λ_b`,
-`κ₂ = 3λ_b − λ_a`, each aligned to the direction it came from.
+Here `beta_e` is the signed dihedral between the edge's two oriented face
+normals and `t_e` is the unit edge tangent. Each vertex sums the contributions
+incident to itself and its one-ring neighbours, normalizes by their mixed area,
+and restricts the signed tensor to the finite oriented vertex tangent plane.
+A closed-form 2×2 decomposition avoids a normal/zero-principal ambiguity; because
+the hinge measures bend across the edge, each eigenvalue is paired with the
+complementary eigenvector. Three simultaneous nonnegative-cotan passes smooth
+the two principal values without making results depend on traversal order.
 
-Fail-closed policy (GEOM-005/GEOM-007), never emitting NaN/Inf and never firing an
-assert:
+The sign is converted to the module's established positive-outward-convex
+convention. Mean and Gaussian curvature in `ComputeCurvature` are then derived
+from the same smoothed principal values, never from a second estimator. The
+standalone Meyer mean/Gaussian functions remain separate explicit operators.
+The compatibility name does not imply that this is the vertex-neighbour
+directional-curvature quadrature in Taubin's ICCV 1995 paper.
 
-- Flat 1-ring (tensor numerically zero), boundary (open) 1-ring, and zero-area
-  1-ring → write the zero-vector sentinel direction and keep the scalar
-  (H/K-derived) principal curvatures.
-- Edges parallel to the normal or with zero length are skipped from the
-  accumulation.
+Fail-closed policy, never emitting NaN/Inf and never firing an assert:
+
+- Boundary edges have no dihedral contribution; a boundary vertex remains
+  estimable when its two-ring support contains valid interior hinges.
+- Deleted, isolated, flat, zero-area, degenerate, or non-finite support writes
+  finite zero principal values and zero-vector directions.
+- Zero-length edges and invalid/non-finite face normals are skipped.
 - Empty meshes and meshes with no faces → `nullopt`.

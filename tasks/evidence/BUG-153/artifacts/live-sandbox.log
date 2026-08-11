@@ -1,0 +1,12 @@
+[32m[INFO] Initialized Scheduler with 31 worker threads.[0m
+[33m[WARN] [Runtime] Promoted Vulkan device selected; backend remains fail-closed until the first clean default-recipe validation promotes it.[0m
+[33m[WARN] [VulkanDevice::Initialize] Vulkan bootstrap created logical-device, queue, VMA, per-frame command/sync, swapchain image/view/handle, bindless heap, transfer queue, and global pipeline-layout state; canonical frame execution waits for the first clean recipe validation publish, so device remains non-operational during cold start.[0m
+[33m[WARN] [Runtime] VulkanRequestedButNotOperational status=RequestedButIncompleteGate reason=BarrierValidationFailed[0m
+[32m[INFO] [Runtime] Queued geometry import: source=ManualImport path='/home/alex/Dropbox/Work/Datasets/obj/bunny_decimated.obj' payload=Mesh candidate_count=1[0m
+[32m[INFO] [Runtime] Queued direct mesh post-process: path='/home/alex/Dropbox/Work/Datasets/obj/bunny_decimated.obj'[0m
+[32m[INFO] [Runtime] Asset import succeeded: path='/home/alex/Dropbox/Work/Datasets/obj/bunny_decimated.obj' requested_payload=Mesh result_payload=Mesh ingest_diagnostic=None primitive_entities=1 embedded_textures=0 texture_upload_requests=0 materialized_model_scene=false requested_texture_upload=false[0m
+[32m[INFO] [Runtime] Direct mesh enrichment applied: path='/home/alex/Dropbox/Work/Datasets/obj/bunny_decimated.obj' vertices=1485 (source 1485) faces=495 (source polygons 495) uv-domain=vertex uv-provenance=generated-atlas atlas-backend='fast-staged' gpu-split-vertices=0[0m
+[32m[INFO] [Runtime] Queued geometry import: source=ManualImport path='/home/alex/Dropbox/Work/Datasets/obj/inputmodels/armadillo.obj' payload=Mesh candidate_count=1[0m
+[32m[INFO] [Runtime] Queued direct mesh post-process: path='/home/alex/Dropbox/Work/Datasets/obj/inputmodels/armadillo.obj'[0m
+[32m[INFO] [Runtime] Asset import succeeded: path='/home/alex/Dropbox/Work/Datasets/obj/inputmodels/armadillo.obj' requested_payload=Mesh result_payload=Mesh ingest_diagnostic=None primitive_entities=1 embedded_textures=0 texture_upload_requests=0 materialized_model_scene=false requested_texture_upload=false[0m
+[32m[INFO] [Runtime] Direct mesh enrichment applied: path='/home/alex/Dropbox/Work/Datasets/obj/inputmodels/armadillo.obj' vertices=21582 (source 21582) faces=43160 (source polygons 43160) uv-domain=corner uv-provenance=generated-atlas atlas-backend='fast-staged' gpu-split-vertices=96941[0m

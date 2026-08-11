@@ -1,3 +1,5 @@
+// Exposes discrete scalar and edge-dihedral tensor curvature operators so mesh
+// analysis and runtime publication share canonical per-vertex fields.
 module;
 
 #include <cstddef>
@@ -13,62 +15,38 @@ import Geometry.HalfedgeMesh;
 
 export namespace Geometry::Curvature
 {
-    // =========================================================================
-    // Discrete curvature computation on triangle meshes
-    // =========================================================================
-    //
-    // All curvature operators follow the Meyer et al. (2003) "Discrete
-    // Differential-Geometry Operators for Triangulated 2-Manifolds" formulation,
-    // which provides second-order accurate estimates on arbitrary triangle meshes.
-    //
-    // These operators build on the DEC infrastructure (cotan Laplacian, mixed
-    // Voronoi areas) but are assembled independently for efficiency — the DEC
-    // module builds the full operator matrices, while curvature computation
-    // only needs per-vertex scalar/vector quantities.
-
-    // Per-vertex curvature data. Indexed by vertex handle.
     struct VertexCurvature
     {
-        double MeanCurvature{0.0};         // H — signed mean curvature
-        double GaussianCurvature{0.0};     // K — Gaussian curvature
-        double MinPrincipalCurvature{0.0}; // κ₂ = H - √(H² - K)
-        double MaxPrincipalCurvature{0.0}; // κ₁ = H + √(H² - K)
+        double MeanCurvature{0.0};
+        double GaussianCurvature{0.0};
+        double MinPrincipalCurvature{0.0};
+        double MaxPrincipalCurvature{0.0};
     };
 
-    // Result of curvature computation for the entire mesh.
     struct CurvatureField
     {
-        VertexProperty<double> MeanCurvatureProperty{};             // H — signed mean curvature
-        VertexProperty<double> GaussianCurvatureProperty{};         // K — Gaussian curvature
-        VertexProperty<double> MinPrincipalCurvatureProperty{};     // κ₂ = H - √(H² - K)
-        VertexProperty<double> MaxPrincipalCurvatureProperty{};     // κ₁ = H + √(H² - K)
+        VertexProperty<double> MeanCurvatureProperty{};
+        VertexProperty<double> GaussianCurvatureProperty{};
+        VertexProperty<double> MinPrincipalCurvatureProperty{};
+        VertexProperty<double> MaxPrincipalCurvatureProperty{};
 
-        // Per-vertex mean curvature normal: Hn = (1/2A_i) Σ_j (cot α_ij + cot β_ij)(x_j - x_i)
-        // This is the Laplace-Beltrami of the position function, divided by 2.
-        // Its magnitude is |H|, its direction is the surface normal (for smooth surfaces).
+        // Equals -H times the oriented unit vertex normal. Its magnitude is |H|.
         VertexProperty<glm::vec3> MeanCurvatureNormalProperty{};
 
-        // Unit tangent principal-curvature directions from the Taubin tensor.
-        // PrincipalDir1 is the direction of the maximum principal curvature (κ₁),
-        // PrincipalDir2 the direction of the minimum (κ₂). Published as
-        // v:principal_dir1 / v:principal_dir2. Degenerate / boundary / flat
-        // vertices receive the zero sentinel (see ComputeCurvatureTensor).
+        // Unit tangent directions for maximum and minimum principal curvature.
+        // Unsupported degenerate/flat vertices receive zero-vector sentinels.
         VertexProperty<glm::vec3> PrincipalDir1Property{};
         VertexProperty<glm::vec3> PrincipalDir2Property{};
     };
 
-    // Result of the per-vertex curvature-tensor (Taubin) estimation: the two
-    // principal directions and the tensor-recovered principal curvatures,
-    // aligned so PrincipalDir1Property is the direction of MaxPrincipalCurvatureProperty.
     struct CurvatureTensorResult
     {
-        VertexProperty<glm::vec3> PrincipalDir1Property{};      // v:principal_dir1 (κ₁ direction)
-        VertexProperty<glm::vec3> PrincipalDir2Property{};      // v:principal_dir2 (κ₂ direction)
-        VertexProperty<double> MaxPrincipalCurvatureProperty{}; // v:max_principal_curvature (κ₁)
-        VertexProperty<double> MinPrincipalCurvatureProperty{}; // v:min_principal_curvature (κ₂)
+        VertexProperty<glm::vec3> PrincipalDir1Property{};
+        VertexProperty<glm::vec3> PrincipalDir2Property{};
+        VertexProperty<double> MaxPrincipalCurvatureProperty{};
+        VertexProperty<double> MinPrincipalCurvatureProperty{};
     };
 
-    // Result of per-vertex scalar curvature computation
     struct MeanCurvatureResult
     {
         VertexProperty<double> Property{};
@@ -79,10 +57,6 @@ export namespace Geometry::Curvature
         VertexProperty<double> Property{};
     };
 
-    // -------------------------------------------------------------------------
-    // Compute mean curvature via Laplace-Beltrami operator
-    // -------------------------------------------------------------------------
-    //
     // H(v_i) = (1 / 2) * || (1/A_i) * Σ_j w_ij (x_j - x_i) ||
     //
     // where w_ij = (cot α_ij + cot β_ij) / 2 are the cotan weights
@@ -96,10 +70,6 @@ export namespace Geometry::Curvature
     [[nodiscard]] std::optional<MeanCurvatureResult> ComputeMeanCurvature(
         HalfedgeMesh::Mesh& mesh);
 
-    // -------------------------------------------------------------------------
-    // Compute Gaussian curvature via angle defect
-    // -------------------------------------------------------------------------
-    //
     // K(v_i) = (2π - Σ_j θ_j) / A_i
     //
     // where θ_j are the angles at vertex i in each incident triangle,
@@ -113,41 +83,30 @@ export namespace Geometry::Curvature
     [[nodiscard]] std::optional<GaussianCurvatureResult> ComputeGaussianCurvature(
         HalfedgeMesh::Mesh& mesh);
 
-    // -------------------------------------------------------------------------
-    // Compute all curvature quantities at once
-    // -------------------------------------------------------------------------
-    //
-    // Computes mean curvature, Gaussian curvature, principal curvatures,
-    // and mean curvature normals in a single pass (shares cotan weight
-    // and area computation).
-    //
-    // Principal curvatures are derived from H and K:
-    //   κ₁ = H + √(max(0, H² - K))   (maximum principal curvature)
-    //   κ₂ = H - √(max(0, H² - K))   (minimum principal curvature)
-    //
-    // Note: H² - K < 0 can occur due to numerical error on coarse meshes.
-    // We clamp to zero in that case.
+    // Computes the coherent edge-dihedral principal system described below.
+    // H = (κ₁ + κ₂) / 2 and K = κ₁κ₂ after scalar smoothing;
+    // the standalone Meyer operators remain available through the two functions
+    // above and are not mixed into this result.
     [[nodiscard]] CurvatureField ComputeCurvature(HalfedgeMesh::Mesh& mesh);
 
-    // -------------------------------------------------------------------------
-    // Compute the per-vertex curvature tensor and principal directions (Taubin)
-    // -------------------------------------------------------------------------
+    // For each interior edge e, forms the signed hinge contribution
+    //   M_e = beta_e (|e|/2) t_e t_e^T,
+    // then sums incident contributions over the vertex plus its one-ring
+    // neighbours and divides by their mixed area. The tensor is restricted to
+    // the oriented vertex tangent plane before a closed-form 2x2 decomposition.
+    // A hinge measures bend across its edge while M_e stores the edge tangent,
+    // so each eigenvalue is paired with the complementary tangent eigenvector.
+    // Three deterministic nonnegative-cotan passes smooth the principal values;
+    // directions remain the unsmoothed tensor basis. Outward convex curvature is
+    // positive, and reversing mesh orientation reverses both principal values.
     //
-    // Estimates the per-vertex 3×3 curvature tensor following Taubin, "Estimating
-    // the tensor of curvature of a surface from a polyhedral approximation"
-    // (ICCV 1995): for each 1-ring edge (i,j) it accumulates
-    //   M_i = Σ_j w_ij κ_ij T_ij T_ijᵀ,   Σ_j w_ij = 1,
-    // with directional curvature κ_ij = 2 nᵢ·(x_j − x_i) / ‖x_j − x_i‖², tangent
-    // direction T_ij = normalize((I − nᵢnᵢᵀ)(x_j − x_i)), and area-derived weights.
-    // M_i is eigen-decomposed with Geometry::PCA::SymmetricEigen3; the eigenvector
-    // aligned with nᵢ is discarded and the two tangent eigenvectors become the
-    // principal directions, with κ₁ = 3λ_a − λ_b and κ₂ = 3λ_b − λ_a recovered per
-    // Taubin and aligned to the direction each came from.
-    //
-    // Fail-closed (GEOM-005/GEOM-007): flat 1-rings, boundary (open) vertices, and
-    // zero-area 1-rings receive the zero sentinel direction and keep their
-    // scalar-derived (H/K) principal curvatures; no NaN/Inf is ever written.
-    // Returns nullopt for empty meshes or meshes with no faces.
+    // Supported boundary vertices use interior hinges in this two-ring support.
+    // Deleted, isolated, flat, zero-area, degenerate, or non-finite support fails
+    // closed to finite zero values and zero-vector directions. Empty/no-face
+    // meshes return nullopt. Storage is O(V + E + F). Runtime is linear for
+    // bounded-valence meshes and O(F + E + Σ_v degree(v)²) without that
+    // assumption because the reference two-ring quadrature revisits support
+    // vertices' incident edges.
     [[nodiscard]] std::optional<CurvatureTensorResult> ComputeCurvatureTensor(
         HalfedgeMesh::Mesh& mesh);
 

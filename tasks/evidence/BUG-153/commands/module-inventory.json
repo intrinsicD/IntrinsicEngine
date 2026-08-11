@@ -1,0 +1,24 @@
+{
+  "command": [
+    "python3",
+    "tools/repo/generate_module_inventory.py",
+    "--root",
+    "src",
+    "--out",
+    "docs/api/generated/module_inventory.md"
+  ],
+  "command_display": "python3 tools/repo/generate_module_inventory.py --root src --out docs/api/generated/module_inventory.md",
+  "cwd": ".",
+  "duration_ms": 27,
+  "exit_code": 0,
+  "finished_at": "2026-08-11T16:12:37Z",
+  "label": "module-inventory",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-11T16:12:37Z",
+  "stderr_path": "tasks/evidence/BUG-153/commands/module-inventory.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/BUG-153/commands/module-inventory.stdout.log",
+  "stdout_sha256": "4a01f7724b1accf6d775babf84f57048b24677641dcee06914db72bb48b3bc4b",
+  "task_id": "BUG-153"
+}
