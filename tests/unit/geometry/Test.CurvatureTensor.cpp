@@ -425,16 +425,18 @@ TEST(CurvatureTensor, NonFiniteCornerOnClosedMeshFailsClosed)
 
 TEST(CurvatureTensor, Deterministic)
 {
-    auto mesh = MakeIcosphere(1.0f, 3);
-    auto first = Curv::ComputeCurvatureTensor(mesh);
-    auto second = Curv::ComputeCurvatureTensor(mesh);
+    auto firstMesh = MakeIcosphere(1.0f, 3);
+    auto secondMesh = MakeIcosphere(1.0f, 3);
+    auto first = Curv::ComputeCurvatureTensor(firstMesh);
+    auto second = Curv::ComputeCurvatureTensor(secondMesh);
     ASSERT_TRUE(first.has_value());
     ASSERT_TRUE(second.has_value());
+    ASSERT_EQ(firstMesh.VerticesSize(), secondMesh.VerticesSize());
 
-    for (std::size_t i = 0; i < mesh.VerticesSize(); ++i)
+    for (std::size_t i = 0; i < firstMesh.VerticesSize(); ++i)
     {
         VertexHandle vh{static_cast<PropertyIndex>(i)};
-        if (mesh.IsDeleted(vh)) continue;
+        if (firstMesh.IsDeleted(vh) || secondMesh.IsDeleted(vh)) continue;
         EXPECT_EQ(first->PrincipalDir1Property[vh], second->PrincipalDir1Property[vh]);
         EXPECT_EQ(first->PrincipalDir2Property[vh], second->PrincipalDir2Property[vh]);
         EXPECT_EQ(first->MaxPrincipalCurvatureProperty[vh], second->MaxPrincipalCurvatureProperty[vh]);

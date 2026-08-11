@@ -1,0 +1,28 @@
+{
+  "command": [
+    "ctest",
+    "--test-dir",
+    "build/ci",
+    "--output-on-failure",
+    "-R",
+    "^CurvatureTensor\\.Deterministic$",
+    "--repeat",
+    "until-fail:20",
+    "--timeout",
+    "60"
+  ],
+  "command_display": "ctest --test-dir build/ci --output-on-failure -R '^CurvatureTensor\\.Deterministic$' --repeat until-fail:20 --timeout 60",
+  "cwd": ".",
+  "duration_ms": 2301,
+  "exit_code": 0,
+  "finished_at": "2026-08-11T16:37:37Z",
+  "label": "determinism-repeat",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-11T16:37:34Z",
+  "stderr_path": "tasks/evidence/BUG-153/commands/determinism-repeat.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/BUG-153/commands/determinism-repeat.stdout.log",
+  "stdout_sha256": "370385c2937a830546cf836a1149b3c4d701b9a031b9af3fcedf9ec9c52e6fe1",
+  "task_id": "BUG-153"
+}

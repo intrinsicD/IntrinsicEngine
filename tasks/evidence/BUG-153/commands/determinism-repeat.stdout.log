@@ -1,0 +1,49 @@
+Test project /home/alex/Documents/IntrinsicEngine-bug153/build/ci
+    Start 2192: CurvatureTensor.Deterministic
+    Test #2192: CurvatureTensor.Deterministic ....   Passed    0.08 sec
+    Start 2192: CurvatureTensor.Deterministic
+    Test #2192: CurvatureTensor.Deterministic ....   Passed    0.08 sec
+    Start 2192: CurvatureTensor.Deterministic
+    Test #2192: CurvatureTensor.Deterministic ....   Passed    0.08 sec
+    Start 2192: CurvatureTensor.Deterministic
+    Test #2192: CurvatureTensor.Deterministic ....   Passed    0.08 sec
+    Start 2192: CurvatureTensor.Deterministic
+    Test #2192: CurvatureTensor.Deterministic ....   Passed    0.08 sec
+    Start 2192: CurvatureTensor.Deterministic
+    Test #2192: CurvatureTensor.Deterministic ....   Passed    0.08 sec
+    Start 2192: CurvatureTensor.Deterministic
+    Test #2192: CurvatureTensor.Deterministic ....   Passed    0.08 sec
+    Start 2192: CurvatureTensor.Deterministic
+    Test #2192: CurvatureTensor.Deterministic ....   Passed    0.08 sec
+    Start 2192: CurvatureTensor.Deterministic
+    Test #2192: CurvatureTensor.Deterministic ....   Passed    0.08 sec
+    Start 2192: CurvatureTensor.Deterministic
+    Test #2192: CurvatureTensor.Deterministic ....   Passed    0.08 sec
+    Start 2192: CurvatureTensor.Deterministic
+    Test #2192: CurvatureTensor.Deterministic ....   Passed    0.08 sec
+    Start 2192: CurvatureTensor.Deterministic
+    Test #2192: CurvatureTensor.Deterministic ....   Passed    0.08 sec
+    Start 2192: CurvatureTensor.Deterministic
+    Test #2192: CurvatureTensor.Deterministic ....   Passed    0.08 sec
+    Start 2192: CurvatureTensor.Deterministic
+    Test #2192: CurvatureTensor.Deterministic ....   Passed    0.08 sec
+    Start 2192: CurvatureTensor.Deterministic
+    Test #2192: CurvatureTensor.Deterministic ....   Passed    0.08 sec
+    Start 2192: CurvatureTensor.Deterministic
+    Test #2192: CurvatureTensor.Deterministic ....   Passed    0.08 sec
+    Start 2192: CurvatureTensor.Deterministic
+    Test #2192: CurvatureTensor.Deterministic ....   Passed    0.08 sec
+    Start 2192: CurvatureTensor.Deterministic
+    Test #2192: CurvatureTensor.Deterministic ....   Passed    0.08 sec
+    Start 2192: CurvatureTensor.Deterministic
+    Test #2192: CurvatureTensor.Deterministic ....   Passed    0.08 sec
+    Start 2192: CurvatureTensor.Deterministic
+1/1 Test #2192: CurvatureTensor.Deterministic ....   Passed    0.08 sec
+
+100% tests passed, 0 tests failed out of 1
+
+Label Time Summary:
+geometry    =   0.08 sec*proc (1 test)
+unit        =   0.08 sec*proc (1 test)
+
+Total Test time (real) =   2.26 sec

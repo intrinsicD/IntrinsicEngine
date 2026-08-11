@@ -1,0 +1,22 @@
+{
+  "command": [
+    "git",
+    "diff",
+    "--check",
+    "HEAD"
+  ],
+  "command_display": "git diff --check HEAD",
+  "cwd": ".",
+  "duration_ms": 5,
+  "exit_code": 0,
+  "finished_at": "2026-08-11T16:38:15Z",
+  "label": "review-repair-diff-check",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-11T16:38:15Z",
+  "stderr_path": "tasks/evidence/BUG-153/commands/review-repair-diff-check.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/BUG-153/commands/review-repair-diff-check.stdout.log",
+  "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "task_id": "BUG-153"
+}

@@ -152,16 +152,22 @@ Recorded results:
 
 - The focused final curvature/runtime selector passed 32/32 tests. The new
   boundary and coherent-full-field cases both fail on the pre-fix estimator.
-- The default CPU-supported selector passed 4,234/4,234 tests. Its first run
-  exposed that the original 12-vertex segmentation fixture no longer supplied
-  enough samples after the corrected two-ring estimator and three smoothing
-  passes; the contract fixture now Loop-subdivides twice before applying the
-  same two-regime deformation, and the unchanged runtime operation passes.
-- The grouped ASan and UBSan selectors each passed 2,736/2,736 tests. The first
-  ASan attempt on the locked physical `DISPLAY=:1` reproduced the tracked
-  `BUG-118` 408-byte libX11/XIM leak; the unchanged test and full suite passed on
-  the isolated `DISPLAY=:99` used for Sandbox acceptance. The failed attempt is
-  retained under `commands/attempts/`.
+  After independent review found that the original determinism assertion used
+  two aliased handles into one property store, the final oracle computes on two
+  identical meshes and passed 20 consecutive repetitions.
+- The default CPU-supported selector was green: 4,233 tests passed and the
+  environment-gated GLFW/LSan case recorded one expected capability skip among
+  4,234 selected tests. Its first run exposed that the original 12-vertex
+  segmentation fixture no longer supplied enough samples after the corrected
+  two-ring estimator and three smoothing passes; the contract fixture now
+  Loop-subdivides twice before applying the same two-regime deformation, and
+  the unchanged runtime operation passes.
+- The grouped ASan selector passed all 2,736 tests on the isolated
+  `DISPLAY=:99` used for Sandbox acceptance. Its first attempt on the locked
+  physical `DISPLAY=:1` reproduced the tracked `BUG-118` 408-byte libX11/XIM
+  leak. The grouped UBSan selector was green with 2,735 passes and the same
+  environment-gated case skipped among 2,736 selected tests. The failed ASan
+  attempt is retained under `commands/attempts/`.
 - Strict layering, test layout, source-documentation, documentation-link,
   docs-sync, task-policy, task-state, root-hygiene, ARA, and task-schema checks
   pass. The generated module inventory is unchanged.

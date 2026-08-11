@@ -1,0 +1,26 @@
+{
+  "command": [
+    "ctest",
+    "--test-dir",
+    "build/ci",
+    "--output-on-failure",
+    "-R",
+    "^(CurvatureTensor\\.|Curvature_|CurvatureSegmentationOperations\\.|SandboxEditorUi\\.MeshCurvature|HalfedgeMesh_PropertyAccess\\.Curvature)",
+    "--timeout",
+    "60"
+  ],
+  "command_display": "ctest --test-dir build/ci --output-on-failure -R '^(CurvatureTensor\\.|Curvature_|CurvatureSegmentationOperations\\.|SandboxEditorUi\\.MeshCurvature|HalfedgeMesh_PropertyAccess\\.Curvature)' --timeout 60",
+  "cwd": ".",
+  "duration_ms": 143,
+  "exit_code": 8,
+  "finished_at": "2026-08-11T16:37:34Z",
+  "label": "review-repair-focused",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-11T16:37:34Z",
+  "stderr_path": "tasks/evidence/BUG-153/commands/review-repair-focused.stderr.log",
+  "stderr_sha256": "1d6f9701a828b6885b766043bcaf6c6a391919bd54f7fd737260290eda85e0e0",
+  "stdout_path": "tasks/evidence/BUG-153/commands/review-repair-focused.stdout.log",
+  "stdout_sha256": "a63c8607941fa8ed017088354a801402d71d53d957a76c2d430d12628e7c9209",
+  "task_id": "BUG-153"
+}

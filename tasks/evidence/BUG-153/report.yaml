@@ -1,0 +1,187 @@
+schema_version: 1
+task_id: BUG-153
+workflow_profile: high-risk
+status: complete
+generated_by: tools/agents/workflow_evidence.py
+generated_at: '2026-08-11T16:24:02Z'
+claim_eligible: false
+source:
+  base_ref: origin/main
+  base_revision: 20e58c6a00c1c85c0d1f8b05a02e026c0da3a078
+  head_revision: 08e288287f8974f958c24be6be8c7731a614ab72
+  branch: codex/bug-153-curvature-taubin
+  worktree: /home/alex/Documents/IntrinsicEngine-bug153
+  dirty: false
+  surface:
+  - path: docs/architecture/geometry.md
+    sha256: e2ab6c6d62d981130cdb51607ccd66f04a76fc75995a1408ab578e93af6e0eb1
+  - path: docs/methods/numerical-robustness-policy.md
+    sha256: d4f466d6018e3b1942bda8335225cd01a6ebc095f260768a4308f2a5bc585ce9
+  - path: src/geometry/Geometry.HalfedgeMesh.Curvature.cpp
+    sha256: 6613ea5edc62c69fa5da04457be5a8e685a9358f6e5bf29955aed0a182f14c92
+  - path: src/geometry/Geometry.HalfedgeMesh.Curvature.cppm
+    sha256: 9fe2853b7d359ab897a53081b703a5ecb11fb3cd3c2dbae9dcd0dc966f997897
+  - path: src/runtime/README.md
+    sha256: 789453ac2e19bb4d62ab6ac28e3548d2f4532b140a9e404296ffcd14577960f9
+  - path: tasks/backlog/bugs/index.md
+    sha256: 55ba5ba167e01a87fac78059eb8d7bab0c341f7e1a6c7a3df3cc4bf3cf4c8234
+  - path: tasks/done/BUG-153-curvature-taubin-edge-dihedral-estimator.md
+    sha256: eb2d26caf944dce7cf238e1a99a8e2b505543061abf6788efc473fe5f4b57488
+  - path: tasks/done/RETIREMENT-LOG.md
+    sha256: 077a640d80655c1bb0f983b4cb216ec3f4afe5df9cc17a8cac7fab017bceb470
+  - path: tests/contract/runtime/Test.CurvatureSegmentationOperations.cpp
+    sha256: 3ab2fb1f9da99ac998a37182c4e60ed331711044bda87eb51e73b01025f2270c
+  - path: tests/unit/geometry/Test.CurvatureTensor.cpp
+    sha256: 069a6fc1536298406fdc6051145853a3081c2c0d3151753d1bf97ef8a8bf4f73
+  content_digest: bfe43a116c98d68769470ecfccff48fc48328a528caca492df37093f6102ddcf
+touched:
+  paths:
+  - docs/architecture/geometry.md
+  - docs/methods/numerical-robustness-policy.md
+  - src/geometry/Geometry.HalfedgeMesh.Curvature.cpp
+  - src/geometry/Geometry.HalfedgeMesh.Curvature.cppm
+  - src/runtime/README.md
+  - tasks/backlog/bugs/index.md
+  - tasks/done/BUG-153-curvature-taubin-edge-dihedral-estimator.md
+  - tasks/done/RETIREMENT-LOG.md
+  - tests/contract/runtime/Test.CurvatureSegmentationOperations.cpp
+  - tests/unit/geometry/Test.CurvatureTensor.cpp
+  layers:
+  - geometry
+  - runtime
+  modules:
+  - Geometry.Curvature
+extension_seam: Unchanged Geometry.Curvature function signatures and canonical same-cardinality vertex-property
+  publication
+future_change_plan: Any selectable estimator, support radius, or smoothing control requires a separately
+  reviewed config-schema task using the canonical preview/validate/apply lane
+acceptance:
+- criterion: The new regression fails against the pre-fix implementation and passes
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: Directions and pre-smoothing values come from one signed symmetric tensor;
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: Finite supported boundary vertices are estimated when their neighbourhood
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: The live Sandbox applies curvature successfully to both selected OBJ
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: Required CPU, sanitizer, structural, and documentation gates pass.
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+commands:
+- receipt: tasks/evidence/BUG-153/commands/ara-claims.json
+- receipt: tasks/evidence/BUG-153/commands/asan-build.json
+- receipt: tasks/evidence/BUG-153/commands/asan-configure.json
+- receipt: tasks/evidence/BUG-153/commands/asan-tests-r2.json
+- receipt: tasks/evidence/BUG-153/commands/ci-build-intrinsic-tests-r2.json
+- receipt: tasks/evidence/BUG-153/commands/ci-build-intrinsic-tests.json
+- receipt: tasks/evidence/BUG-153/commands/ci-configure.json
+- receipt: tasks/evidence/BUG-153/commands/diff-check-final.json
+- receipt: tasks/evidence/BUG-153/commands/diff-check.json
+- receipt: tasks/evidence/BUG-153/commands/doc-links-final.json
+- receipt: tasks/evidence/BUG-153/commands/doc-links-retired.json
+- receipt: tasks/evidence/BUG-153/commands/doc-links.json
+- receipt: tasks/evidence/BUG-153/commands/docs-sync-final.json
+- receipt: tasks/evidence/BUG-153/commands/docs-sync-retired.json
+- receipt: tasks/evidence/BUG-153/commands/docs-sync.json
+- receipt: tasks/evidence/BUG-153/commands/final-ci-build-r2.json
+- receipt: tasks/evidence/BUG-153/commands/final-ci-build.json
+- receipt: tasks/evidence/BUG-153/commands/final-diff-check.json
+- receipt: tasks/evidence/BUG-153/commands/final-focused-tests-r2.json
+- receipt: tasks/evidence/BUG-153/commands/final-focused-tests.json
+- receipt: tasks/evidence/BUG-153/commands/focused-curvature-runtime-tests-r2.json
+- receipt: tasks/evidence/BUG-153/commands/focused-curvature-runtime-tests.json
+- receipt: tasks/evidence/BUG-153/commands/full-cpu-tests-r2.json
+- receipt: tasks/evidence/BUG-153/commands/layering.json
+- receipt: tasks/evidence/BUG-153/commands/module-inventory.json
+- receipt: tasks/evidence/BUG-153/commands/root-hygiene.json
+- receipt: tasks/evidence/BUG-153/commands/source-docs-final.json
+- receipt: tasks/evidence/BUG-153/commands/source-docs-r2.json
+- receipt: tasks/evidence/BUG-153/commands/task-policy-final.json
+- receipt: tasks/evidence/BUG-153/commands/task-policy-retired.json
+- receipt: tasks/evidence/BUG-153/commands/task-policy.json
+- receipt: tasks/evidence/BUG-153/commands/task-state-final.json
+- receipt: tasks/evidence/BUG-153/commands/task-state-links.json
+- receipt: tasks/evidence/BUG-153/commands/task-state-retired.json
+- receipt: tasks/evidence/BUG-153/commands/test-layout.json
+- receipt: tasks/evidence/BUG-153/commands/ubsan-build.json
+- receipt: tasks/evidence/BUG-153/commands/ubsan-configure.json
+- receipt: tasks/evidence/BUG-153/commands/ubsan-tests.json
+- receipt: tasks/evidence/BUG-153/commands/validate-tasks-final.json
+- receipt: tasks/evidence/BUG-153/commands/validate-tasks-retired.json
+- receipt: tasks/evidence/BUG-153/commands/validate-tasks.json
+changed_public_contracts:
+- ComputeCurvature and ComputeCurvatureTensor share one signed edge-dihedral principal system; H and K
+  are invariants of its smoothed principal values
+- ComputeMeanCurvature and ComputeGaussianCurvature remain separate Meyer operators
+- Supported boundary vertices use available interior hinges; invalid or degenerate support publishes finite
+  zero sentinels
+- Outward convex curvature is positive; orientation reversal negates curvature along physical directions
+  and swaps ordered max/min slots when anisotropic
+diagnostics_and_previews:
+- Focused curvature/runtime selector passed 32/32; full CPU passed 4234/4234; grouped ASan and UBSan each
+  passed 2736/2736
+- Live Sandbox applied bunny_decimated.obj and armadillo.obj with zero non-finite scalar or direction
+  publications
+- Promoted Vulkan remained fail-closed at BarrierValidationFailed, so live acceptance is CPU command/publication
+  evidence only
+benchmark_or_parity_evidence: []
+docs_sync:
+  task_file: tasks/done/BUG-153-curvature-taubin-edge-dihedral-estimator.md
+  session_brief_present: true
+  canonical_docs_changed: true
+  skill_mirrors_checked: true
+residual_risks:
+- Principal directions intentionally retain the local unsmoothed tensor basis while scalar principal values
+  receive three deterministic cotan passes
+- The Taubin compatibility name follows framework24; the estimator is not Taubin 1995's vertex-neighbour
+  directional-curvature quadrature
+- Physical DISPLAY=:1 reproduces tracked BUG-118's libX11/XIM leak; the unchanged ASan suite passed on
+  isolated DISPLAY=:99
+skipped_checks:
+- check: benchmark
+  reason: No benchmark evidence is applicable because this numerical-correctness repair makes no performance
+    claim
+artifacts:
+- path: tasks/evidence/BUG-153/artifacts/bunny-curvature-applied.png
+  sha256: cd5fa3f0c9216502d7f2f83f1fabfeab37df2b49cd5e8506c635741901320d4c
+  kind: file
+- path: tasks/evidence/BUG-153/artifacts/armadillo-curvature-applied.png
+  sha256: daa93490b1d96193fedf632665c99d234e3bba543e4c50ee3d68c0847f3de6dd
+  kind: file
+- path: tasks/evidence/BUG-153/artifacts/live-sandbox.log
+  sha256: e625be2ef2cd1786fcf99c09199a7cf10605d089de3b66015a9f31d17a91b750
+  kind: file
+- path: tasks/evidence/BUG-153/commands/final-focused-tests-r2.json
+  sha256: 563ff974044aae4f8520b8f77b62541830e1c6ce8bb5d1c071dceeed3ac73080
+  kind: file
+- path: tasks/evidence/BUG-153/commands/full-cpu-tests-r2.json
+  sha256: f4b512735d71274efcb51a97a99747c1d2140cf10f6fbd94b9b2e28788c9d8c3
+  kind: file
+- path: tasks/evidence/BUG-153/commands/asan-tests-r2.json
+  sha256: 01df44c0831f11ad91e29f63069817a55466ab37f0c5dca5e6042467b33ec7be
+  kind: file
+- path: tasks/evidence/BUG-153/commands/ubsan-tests.json
+  sha256: eea5ebc01e4b573c505283e66c6e8152923f5fbd35b149a44551c032b2c1e325
+  kind: file
+self_review:
+  completed: true
+  scope_matches_task: true
+  layering_preserved: true
+  tests_and_docs_accounted_for: true
+  mechanical_and_semantic_changes_separated: true
+handoff: tasks/evidence/BUG-153/handoff.jsonl
+review: tasks/evidence/BUG-153/reviews.jsonl
