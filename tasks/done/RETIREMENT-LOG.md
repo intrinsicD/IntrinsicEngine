@@ -8,6 +8,26 @@ so blocks moved from the old active-README history work verbatim.
 
 ## Retired task narratives
 
+[`PROC-033`](PROC-033-source-documentation-contract-and-audit-skill.md) — the
+repository-wide source-documentation contract is operational. Project-owned
+module interfaces and headers now require a short what-and-why synopsis;
+declaration comments are reserved for mandatory non-obvious contracts;
+implementation rationale stays with implementation; and README files describe
+current state rather than task history or future plans.
+
+The `intrinsicengine-source-documentation` skill packages those rules with a
+deterministic standard-library audit and nine focused regressions. Objective
+synopsis and README-state violations remain distinct from human-review prompts
+for comment necessity and organization, so the tool does not reward generated
+boilerplate. CI runs the regression contract while the whole-tree debt audit
+remains report-only.
+
+The initial inventory scanned 1,319 files and found 436 objective errors plus
+3,835 review findings. Those findings are migration input, not evidence that
+every flagged comment should be removed. The human reviewer accepted the
+merged implementation and explicitly authorized the retirement bookkeeping;
+no C++ production or runtime behavior changed.
+
 [`METHOD-038`](METHOD-038-feature-aligned-remeshing-stable-curvature-segmentation.md)
 — feature-aligned curvature segmentation retires at `CPUContracted` for the
 evidence slice it actually completed. The task added observational stage and

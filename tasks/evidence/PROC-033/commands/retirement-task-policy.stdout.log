@@ -1,0 +1,11 @@
+Validated 265 task file(s); findings: 0; mode: strict.
+Validated 265 task file(s); findings: 0; mode: strict.
+[check_task_maturity_followups] Root: /tmp/intrinsic-proc033.esP0pr
+[check_task_maturity_followups] Open task files scanned: 93
+[check_task_maturity_followups] No maturity follow-up findings.
+Task policy check complete. findings=0 mode=strict.
+[check_task_state_links] Root: /tmp/intrinsic-proc033.esP0pr
+[check_task_state_links] Indexed task IDs: 901
+[check_task_state_links] Mode: strict
+[check_task_state_links] No task-state link findings.
+tasks/SESSION-BRIEF.md is up to date.
