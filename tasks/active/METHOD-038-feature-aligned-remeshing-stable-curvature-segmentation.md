@@ -65,8 +65,10 @@ maturity_target: ParityProven
   flat/fold edge-length delta `0.000000038`, and identical one-component,
   one-region, zero-boundary v1 payloads for all three folds. Independent audit
   accepted the derivation with `claim_authorized: false`; bounded claim C42
-  records fixture/oracle integrity only. Live `scratch-006` is the unchanged
-  final task-bound replay after this status update.
+  records fixture/oracle integrity only. Final task-bound replay `scratch-006`
+  is preserved under
+  `superseded/20260811-fold-screening-final-task-bound/` before checkpoint 4
+  takes over the live custody path.
 - Next: extend the frozen screen with the cylinder and smooth-transition
   controls before any `cpu_reference_v2` implementation.
 - Checkpoint 4 preregisters that extension as a separate, opt-in
@@ -77,9 +79,10 @@ maturity_target: ParityProven
   A-D, held-out confirmation row, selector, or production integration is in
   this checkpoint.
 - The private checkpoint-4 runner and manifest now implement those frozen
-  rows. Development replay is not claim evidence; task status will bind only a
-  frozen, sealed, independently audited custody run. Production remains
-  METHOD-037 `cpu_reference_v1` throughout.
+  rows at scientific source `251f2dab`. Development replay is not claim
+  evidence; the checkpoint disposition is governed only by live frozen run
+  `scratch-007` and its independent audit. Production remains METHOD-037
+  `cpu_reference_v1` throughout.
 
 ## Goal
 - Replace METHOD-037's slow, edge-local boundary inference with an evidence-selected CPU formulation that remains statistically based on the existing Gaussian mixture, aligns region boundaries with persistent surface feature curves, converges across retriangulations of the same embedded surface, and meets a preregistered useful-acceleration gate without weakening correctness, diagnostics, or the Fixed/Automatic UI contract.

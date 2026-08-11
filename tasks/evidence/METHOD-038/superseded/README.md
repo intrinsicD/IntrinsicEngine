@@ -40,3 +40,11 @@ result was recorded in the task, method docs, and ARA ledger. Because official
 custody binds the active task bytes, the live `scratch-006` identity replays the
 same scientific protocol after this documentation advance; scratch-005 remains
 immutable and is not silently rebound to the later task hash.
+
+`20260811-fold-screening-final-task-bound/` preserves the final accepted
+checkpoint-3 run `scratch-006`, its sealed fold result, portable bundle, and
+independent audit. Checkpoint 4 adds different cylinder and smooth-transition
+fixtures under a new manifest and protocol identity, so the fold protocol is
+retained byte-for-byte here and C42 now cites these historical paths. Live
+custody restarts at `scratch-007`; it does not reinterpret the fold result as a
+surface-control outcome.
