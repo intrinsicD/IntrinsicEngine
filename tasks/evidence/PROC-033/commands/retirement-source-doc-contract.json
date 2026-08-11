@@ -1,0 +1,23 @@
+{
+  "command": [
+    "/bin/bash",
+    "-o",
+    "pipefail",
+    "-c",
+    "python3 tests/regression/tooling/Test.SourceDocumentationAudit.py\npython3 /home/alex/.codex/skills/.system/skill-creator/scripts/quick_validate.py tools/agents/skills/intrinsicengine-source-documentation\npython3 tools/agents/sync_skills.py --check"
+  ],
+  "command_display": "/bin/bash -o pipefail -c 'python3 tests/regression/tooling/Test.SourceDocumentationAudit.py\npython3 /home/alex/.codex/skills/.system/skill-creator/scripts/quick_validate.py tools/agents/skills/intrinsicengine-source-documentation\npython3 tools/agents/sync_skills.py --check'",
+  "cwd": ".",
+  "duration_ms": 325,
+  "exit_code": 0,
+  "finished_at": "2026-08-11T13:50:12Z",
+  "label": "retirement-source-doc-contract",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-11T13:50:12Z",
+  "stderr_path": "tasks/evidence/PROC-033/commands/retirement-source-doc-contract.stderr.log",
+  "stderr_sha256": "0f12e06ec01c9bdbed444f492f2e9d77f9dba8cf1071ac3b03733c0422fb1dcd",
+  "stdout_path": "tasks/evidence/PROC-033/commands/retirement-source-doc-contract.stdout.log",
+  "stdout_sha256": "8122395dba9e9529d746a578959a628cc116d8965b6b4adeb627020268e20208",
+  "task_id": "PROC-033"
+}
