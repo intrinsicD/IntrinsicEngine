@@ -419,7 +419,10 @@ Every task execution should follow this sequence:
    Git-common-dir state binds the exact claim generation and writer-frozen
    review surface, but remains observability and control flow only: it never
    replaces the task, claim, verification receipt, fixed-surface review, or
-   experiment custody, and it cannot lower the task profile.
+   experiment custody, and it cannot lower the task profile. A task with a
+   declared `## Slice plan` uses the audited `advance-slice` transition between
+   clean slice cycles; `reopen` remains the bounded repair loop within one
+   cycle.
 5. Implement the smallest useful patch.
 6. Add or update tests.
 7. Add or update docs.
@@ -428,6 +431,9 @@ Every task execution should follow this sequence:
 10. Self-review against PR checklist.
 
 Before retiring an enrolled task, validate its generated completion report.
+After committing a retirement surface whose complete report records
+`source.dirty: true`, create and commit the exact historical `seal.yaml`
+described in `docs/agent/workflow-evidence.md` before final validation.
 `high-risk` and higher profiles additionally require a durable handoff and an
 accepted independent fixed-surface review. `claim-grade` and `protected`
 profiles add the frozen experiment/authorization custody defined in

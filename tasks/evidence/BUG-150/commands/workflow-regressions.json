@@ -1,0 +1,20 @@
+{
+  "command": [
+    "python3",
+    "tests/regression/tooling/Test.WorkflowEvidence.py"
+  ],
+  "command_display": "python3 tests/regression/tooling/Test.WorkflowEvidence.py",
+  "cwd": ".",
+  "duration_ms": 11507,
+  "exit_code": 0,
+  "finished_at": "2026-08-10T23:54:12Z",
+  "label": "workflow-regressions",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-10T23:54:01Z",
+  "stderr_path": "tasks/evidence/BUG-150/commands/workflow-regressions.stderr.log",
+  "stderr_sha256": "9161a0ddf05286b34d521d8f6de1b618f9eeaaa55280b8236bdab6cb00404691",
+  "stdout_path": "tasks/evidence/BUG-150/commands/workflow-regressions.stdout.log",
+  "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "task_id": "BUG-150"
+}

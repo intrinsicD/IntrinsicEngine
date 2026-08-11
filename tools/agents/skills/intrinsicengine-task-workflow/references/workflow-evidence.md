@@ -152,6 +152,48 @@ python3 tools/agents/agent_work_graph.py reopen \
   --reason "Address blocking review findings"
 ```
 
+`reopen` is the bounded repair transition inside one slice: it retains that
+node's attempt count and rejects an exhausted budget. A task whose checked-in
+`## Slice plan` declares another implementation slice uses `advance-slice`
+instead. The transition preserves the run identity and append-only event chain,
+records the prior node/source projection and its `reviewed` disposition, then
+starts the selected plan subgraph with fresh per-slice attempt counters at the
+exact clean `HEAD` commit:
+
+```bash
+python3 tools/agents/agent_work_graph.py advance-slice \
+  --task-id PROC-999 --owner agent-label --from-node plan \
+  --reason "Begin the next declared slice"
+```
+
+The task must remain under `tasks/active/`, its live claim generation, owner,
+branch, worktree, profile, and checked-in recipe must match exactly, and the
+worktree must be clean. The reset root and its descendants must contain every
+active write node and the final surface binder; nodes outside that region must
+already have succeeded. Notes and ancestors are retained, while status,
+attempts, actors, timestamps, outcomes, artifacts, and surface bindings reset
+only inside the selected region. `show` and `list` expose the resulting slice
+index. Runs created before slice indexing are read as slice 1.
+
+There is one narrow recovery form for a committed source change after the last
+writer succeeded but before any downstream review/freeze node started. The
+operator must inspect and acknowledge both facts explicitly:
+
+```bash
+python3 tools/agents/agent_work_graph.py advance-slice \
+  --task-id PROC-999 --owner agent-label --from-node plan \
+  --reason "Roll the clean checkpoint into the next declared slice" \
+  --accept-pre-review-checkpoint --accept-stale-source
+```
+
+That event is recorded as `rolled-forward-before-review`, including the
+accepted stale bindings. It is not review evidence. Advancement rejects dirty
+state, inactive or plan-less tasks, claim/profile/recipe drift, running nodes,
+failed or blocked outcomes, any started downstream review attempt, and reset
+regions that omit a writer or final binder. A stale reviewed/final binding also
+requires `--accept-stale-source`; the flag acknowledges a committed transition
+to the next baseline and never permits dirty bytes.
+
 Later conversational input is attached to the node where it must be honored,
 without mutating graph topology:
 
@@ -273,9 +315,40 @@ For a report with `source.dirty: false`, validation reads the recorded surface
 and referenced artifact blobs from the exact `source.head_revision` commit and
 compares `source.base_revision..source.head_revision`. This keeps a
 fixed-revision draft auditable after unrelated work lands on the current
-branch, including later edits to a shared artifact path. A report with
-`source.dirty: true` remains bound to the current worktree and is invalidated
-by any subsequent worktree or referenced-artifact change.
+branch, including later edits to a shared artifact path.
+
+An active report with `source.dirty: true` remains bound to the current
+worktree and is invalidated by any subsequent worktree or referenced-artifact
+change. Once that report is complete and the task retires, commit its final
+report, handoff/review records, receipts, and source surface, then create a
+post-commit historical seal:
+
+```bash
+python3 tools/agents/workflow_evidence.py seal-report \
+  --task-id PROC-999 --revision HEAD \
+  --reason "Bind the completed report to its reviewed retirement commit"
+git add tasks/evidence/PROC-999/seal.yaml
+git commit -m "PROC-999 seal completion evidence"
+```
+
+`seal-report` with `HEAD` requires a clean worktree. The generated
+`tasks/evidence/<TASK-ID>/seal.yaml` records the exact commit, unchanged report
+hash and source digest, plus exact handoff/review record hashes. The referenced
+commit must be an ancestor of the current branch and contain exactly one
+canonical task record, the byte-identical report and review records, every
+recorded changed-surface blob, and every artifact at its recorded hash.
+Validation then reuses the fixed-revision source/artifact path instead of
+comparing a retired report with today's worktree. The current report and
+handoff/review files must still match the seal, so editing the visible custody
+record fails closed; later tasks may legitimately change or move shared source,
+artifact, and experiment paths without rewriting history.
+
+An existing unchanged retired report may be migrated only by naming an exact
+40-hex historical commit with `--revision`. The command proves that commit
+contains the current report/task/records and recomputes its source diff and
+artifacts before writing a seal. It rejects a missing, unrelated, ambiguous, or
+hash-mismatched revision. Never regenerate an accepted report against a later
+broader surface merely to make validation green.
 
 ## High-risk handoff and review
 

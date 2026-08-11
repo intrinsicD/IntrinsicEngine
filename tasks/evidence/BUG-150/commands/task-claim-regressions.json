@@ -1,0 +1,20 @@
+{
+  "command": [
+    "python3",
+    "tests/regression/tooling/Test.TaskClaim.py"
+  ],
+  "command_display": "python3 tests/regression/tooling/Test.TaskClaim.py",
+  "cwd": ".",
+  "duration_ms": 2582,
+  "exit_code": 0,
+  "finished_at": "2026-08-10T23:54:44Z",
+  "label": "task-claim-regressions",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-10T23:54:41Z",
+  "stderr_path": "tasks/evidence/BUG-150/commands/task-claim-regressions.stderr.log",
+  "stderr_sha256": "4a93d666c5c930f62d2f7f2707aae90a0dfad84153eb65626706d5715a771978",
+  "stdout_path": "tasks/evidence/BUG-150/commands/task-claim-regressions.stdout.log",
+  "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "task_id": "BUG-150"
+}

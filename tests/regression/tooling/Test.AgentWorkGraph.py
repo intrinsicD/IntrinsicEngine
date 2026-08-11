@@ -46,6 +46,10 @@ contract_review: Fixture has no reusable engine contract.
 ## Context
 - Isolated tooling fixture.
 
+## Slice plan
+- Slice 1 establishes the fixture state.
+- Slice 2 exercises an explicitly bounded continuation.
+
 ## Required changes
 - [ ] Run the graph.
 
@@ -633,6 +637,504 @@ class AgentWorkGraphTests(unittest.TestCase):
             )
         self.assertEqual(rejected.returncode, 2, rejected.stdout)
         self.assertIn("exhausted its attempt budget", rejected.stdout)
+
+    def test_advance_slice_recovers_clean_exhausted_pre_review_checkpoint(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            fixture = WorkGraphFixture(Path(tmp), profile="claim-grade")
+            recipe = json.loads(fixture.recipe.read_text(encoding="utf-8"))
+            for node in recipe["nodes"]:
+                if node["id"] == "implement":
+                    node["max_attempts"] = 1
+            fixture.recipe.write_text(
+                json.dumps(recipe, indent=2) + "\n", encoding="utf-8"
+            )
+            subprocess.run(["git", "add", "."], cwd=fixture.root, check=True)
+            subprocess.run(
+                ["git", "commit", "-qm", "limit writer attempts"],
+                cwd=fixture.root,
+                check=True,
+            )
+            fixture._assert_success(fixture.claim())
+            fixture._assert_success(fixture.start())
+            fixture.complete("context")
+            fixture.complete("plan")
+            fixture._assert_success(
+                fixture.work(
+                    "note",
+                    "--task-id",
+                    fixture.task_id,
+                    "--node",
+                    "plan",
+                    "--actor",
+                    fixture.owner,
+                    "--kind",
+                    "decision",
+                    "--text",
+                    "Carry this decision into the next declared slice.",
+                )
+            )
+            fixture.complete("implement")
+            before_result, before = fixture.show()
+            fixture._assert_success(before_result)
+
+            (fixture.root / "README.md").write_text(
+                "committed post-writer epilogue\n", encoding="utf-8"
+            )
+            subprocess.run(["git", "add", "."], cwd=fixture.root, check=True)
+            subprocess.run(
+                ["git", "commit", "-qm", "post-writer epilogue"],
+                cwd=fixture.root,
+                check=True,
+            )
+            head = subprocess.run(
+                ["git", "rev-parse", "HEAD"],
+                cwd=fixture.root,
+                text=True,
+                stdout=subprocess.PIPE,
+                check=True,
+            ).stdout.strip()
+            common = subprocess.run(
+                ["git", "rev-parse", "--path-format=absolute", "--git-common-dir"],
+                cwd=fixture.root,
+                text=True,
+                stdout=subprocess.PIPE,
+                check=True,
+            ).stdout.strip()
+            state_path = Path(common) / "intrinsic-agent-work-graphs/v1/PROC-999.json"
+            legacy_state = json.loads(state_path.read_text(encoding="utf-8"))
+            legacy_state["source"].pop("slice_index")
+            state_path.write_text(
+                json.dumps(legacy_state, indent=2, sort_keys=True) + "\n",
+                encoding="utf-8",
+            )
+            legacy_result, legacy_status = fixture.show()
+
+            missing_ack = fixture.work(
+                "advance-slice",
+                "--task-id",
+                fixture.task_id,
+                "--owner",
+                fixture.owner,
+                "--from-node",
+                "plan",
+                "--reason",
+                "begin the next declared slice",
+            )
+            missing_checkpoint_ack = fixture.work(
+                "advance-slice",
+                "--task-id",
+                fixture.task_id,
+                "--owner",
+                fixture.owner,
+                "--from-node",
+                "plan",
+                "--reason",
+                "begin the next declared slice",
+                "--accept-stale-source",
+            )
+            advanced = fixture.work(
+                "advance-slice",
+                "--task-id",
+                fixture.task_id,
+                "--owner",
+                fixture.owner,
+                "--from-node",
+                "plan",
+                "--reason",
+                "begin the next declared slice",
+                "--accept-pre-review-checkpoint",
+                "--accept-stale-source",
+            )
+            fixture._assert_success(advanced)
+            result, state = fixture.show()
+            fixture._assert_success(result)
+            restarted = fixture.begin("plan")
+
+            event_path = (
+                Path(common) / "intrinsic-agent-work-graphs/v1/PROC-999.events.jsonl"
+            )
+            event_lines = event_path.read_text(encoding="utf-8").splitlines()
+            events = [json.loads(line) for line in event_lines]
+
+        self.assertEqual(missing_ack.returncode, 2, missing_ack.stdout)
+        self.assertIn("--accept-stale-source", missing_ack.stdout)
+        self.assertEqual(legacy_result.returncode, 1, legacy_result.stdout)
+        self.assertEqual(legacy_status["source"]["slice_index"], 1)
+        self.assertEqual(
+            missing_checkpoint_ack.returncode, 2, missing_checkpoint_ack.stdout
+        )
+        self.assertIn(
+            "--accept-pre-review-checkpoint", missing_checkpoint_ack.stdout
+        )
+        self.assertEqual(state["run_id"], before["run_id"])
+        self.assertEqual(state["source"]["slice_index"], 2)
+        self.assertEqual(state["source"]["base_revision"], head)
+        self.assertEqual(state["source"]["head_revision_at_start"], head)
+        self.assertEqual(state["source"]["surface_at_start"], [])
+        self.assertEqual(
+            state["source"]["content_digest_at_start"],
+            hashlib.sha256(b"[]").hexdigest(),
+        )
+        self.assertIsNone(state["source"]["review_content_digest"])
+        self.assertIsNone(state["source"]["final_content_digest"])
+        self.assertEqual(state["nodes"]["context"]["status"], "succeeded")
+        self.assertEqual(state["nodes"]["plan"]["status"], "ready")
+        self.assertEqual(state["nodes"]["plan"]["attempts"], 0)
+        self.assertEqual(state["nodes"]["plan"]["notes_count"], 1)
+        self.assertEqual(state["nodes"]["implement"]["status"], "pending")
+        self.assertEqual(state["nodes"]["implement"]["attempts"], 0)
+        self.assertEqual(restarted.returncode, 0, restarted.stdout)
+        self.assertIn("attempt 1", restarted.stdout)
+        event = events[-2]
+        self.assertEqual(event["event"], "slice_advanced")
+        self.assertEqual(event["slice_index"], 2)
+        self.assertEqual(event["prior_slice_index"], 1)
+        self.assertEqual(event["prior_disposition"], "rolled-forward-before-review")
+        self.assertTrue(event["accepted_pre_review_checkpoint"])
+        self.assertEqual(
+            event["accepted_stale_reasons"],
+            ["review source binding is stale"],
+        )
+        self.assertEqual(event["prior_nodes"]["implement"]["attempts"], 1)
+        self.assertEqual(event["prior_nodes"]["implement"]["status"], "succeeded")
+        self.assertEqual(
+            event["prior_source"]["review_content_digest"],
+            before["source"]["review_content_digest"],
+        )
+        for index, line in enumerate(event_lines):
+            record = json.loads(line)
+            self.assertEqual(record["sequence"], index + 1)
+            expected = (
+                None
+                if index == 0
+                else hashlib.sha256(event_lines[index - 1].encode("utf-8")).hexdigest()
+            )
+            self.assertEqual(record["previous_entry_sha256"], expected)
+
+    def test_advance_slice_restarts_a_fully_reviewed_cycle(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            fixture = WorkGraphFixture(Path(tmp))
+            fixture._assert_success(fixture.claim())
+            fixture._assert_success(fixture.start())
+            subprocess.run(["git", "add", "."], cwd=fixture.root, check=True)
+            subprocess.run(
+                ["git", "commit", "-qm", "bind task claim"],
+                cwd=fixture.root,
+                check=True,
+            )
+            fixture.progress_to_join()
+            fixture.complete("finalize")
+            before_result, before = fixture.show()
+            fixture._assert_success(before_result)
+            human_before = fixture.work("show", "--task-id", fixture.task_id)
+
+            advanced = fixture.work(
+                "advance-slice",
+                "--task-id",
+                fixture.task_id,
+                "--owner",
+                fixture.owner,
+                "--from-node",
+                "plan",
+                "--reason",
+                "begin the second reviewed slice",
+            )
+            fixture._assert_success(advanced)
+            result, state = fixture.show()
+            fixture._assert_success(result)
+            human_after = fixture.work("show", "--task-id", fixture.task_id)
+
+            common = subprocess.run(
+                ["git", "rev-parse", "--path-format=absolute", "--git-common-dir"],
+                cwd=fixture.root,
+                text=True,
+                stdout=subprocess.PIPE,
+                check=True,
+            ).stdout.strip()
+            event_path = (
+                Path(common) / "intrinsic-agent-work-graphs/v1/PROC-999.events.jsonl"
+            )
+            event = json.loads(
+                event_path.read_text(encoding="utf-8").splitlines()[-1]
+            )
+
+        self.assertEqual(before["derived"]["status"], "succeeded")
+        self.assertIn("slice=1", human_before.stdout)
+        self.assertIn("slice=2", human_after.stdout)
+        self.assertEqual(state["source"]["slice_index"], 2)
+        self.assertEqual(state["nodes"]["context"]["attempts"], 1)
+        self.assertEqual(state["nodes"]["context"]["status"], "succeeded")
+        self.assertEqual(state["nodes"]["plan"]["attempts"], 0)
+        self.assertEqual(state["nodes"]["plan"]["status"], "ready")
+        self.assertEqual(event["event"], "slice_advanced")
+        self.assertEqual(event["prior_disposition"], "reviewed")
+        self.assertFalse(event["accepted_pre_review_checkpoint"])
+        self.assertEqual(event["accepted_stale_reasons"], [])
+        self.assertEqual(event["prior_nodes"]["finalize"]["status"], "succeeded")
+
+    def test_advance_slice_records_surplus_recovery_flags_as_unused(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            fixture = WorkGraphFixture(Path(tmp))
+            fixture._assert_success(fixture.claim())
+            fixture._assert_success(fixture.start())
+            subprocess.run(["git", "add", "."], cwd=fixture.root, check=True)
+            subprocess.run(
+                ["git", "commit", "-qm", "bind task claim"],
+                cwd=fixture.root,
+                check=True,
+            )
+            fixture.progress_to_join()
+            fixture.complete("finalize")
+
+            advanced = fixture.work(
+                "advance-slice",
+                "--task-id",
+                fixture.task_id,
+                "--owner",
+                fixture.owner,
+                "--from-node",
+                "plan",
+                "--reason",
+                "surplus recovery flags must not falsify the event",
+                "--accept-pre-review-checkpoint",
+                "--accept-stale-source",
+            )
+            fixture._assert_success(advanced)
+
+            common = subprocess.run(
+                ["git", "rev-parse", "--path-format=absolute", "--git-common-dir"],
+                cwd=fixture.root,
+                text=True,
+                stdout=subprocess.PIPE,
+                check=True,
+            ).stdout.strip()
+            event_path = (
+                Path(common) / "intrinsic-agent-work-graphs/v1/PROC-999.events.jsonl"
+            )
+            event = json.loads(
+                event_path.read_text(encoding="utf-8").splitlines()[-1]
+            )
+
+        self.assertEqual(event["prior_disposition"], "reviewed")
+        self.assertFalse(event["accepted_pre_review_checkpoint"])
+        self.assertEqual(event["accepted_stale_reasons"], [])
+
+    def test_advance_slice_rejects_unsafe_cycle_states(self) -> None:
+        def prepare(root: Path) -> WorkGraphFixture:
+            root.mkdir()
+            fixture = WorkGraphFixture(root)
+            fixture._assert_success(fixture.claim())
+            fixture._assert_success(fixture.start())
+            subprocess.run(["git", "add", "."], cwd=root, check=True)
+            subprocess.run(
+                ["git", "commit", "-qm", "bind task claim"], cwd=root, check=True
+            )
+            fixture.complete("context")
+            fixture.complete("plan")
+            return fixture
+
+        def advance(fixture: WorkGraphFixture, from_node: str = "plan"):
+            return fixture.work(
+                "advance-slice",
+                "--task-id",
+                fixture.task_id,
+                "--owner",
+                fixture.owner,
+                "--from-node",
+                from_node,
+                "--reason",
+                "unsafe fixture must fail closed",
+                "--accept-pre-review-checkpoint",
+                "--accept-stale-source",
+            )
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+
+            running = prepare(root / "running")
+            running._assert_success(running.begin("implement"))
+            running_result = advance(running)
+
+            blocked = prepare(root / "blocked")
+            blocked._assert_success(blocked.begin("implement"))
+            blocked._assert_success(blocked.finish("implement", "blocked"))
+            blocked_result = advance(blocked)
+
+            failed = prepare(root / "failed")
+            failed._assert_success(failed.begin("implement"))
+            failed._assert_success(failed.finish("implement", "failed"))
+            failed_result = advance(failed)
+
+            partial = prepare(root / "partial")
+            partial.complete("implement")
+            partial.complete("freeze_diff")
+            partial_result = advance(partial)
+
+            undersized = prepare(root / "undersized")
+            undersized.complete("implement")
+            undersized_result = advance(undersized, "freeze_diff")
+
+            dirty = prepare(root / "dirty")
+            dirty.complete("implement")
+            (dirty.root / "README.md").write_text(
+                "uncommitted slice bytes\n", encoding="utf-8"
+            )
+            dirty_result = advance(dirty)
+
+        self.assertEqual(running_result.returncode, 2, running_result.stdout)
+        self.assertIn("nodes are running", running_result.stdout)
+        self.assertEqual(blocked_result.returncode, 2, blocked_result.stdout)
+        self.assertIn("failed or blocked cycle", blocked_result.stdout)
+        self.assertEqual(failed_result.returncode, 2, failed_result.stdout)
+        self.assertIn("failed or blocked cycle", failed_result.stdout)
+        self.assertEqual(partial_result.returncode, 2, partial_result.stdout)
+        self.assertIn("started review descendants", partial_result.stdout)
+        self.assertEqual(undersized_result.returncode, 2, undersized_result.stdout)
+        self.assertIn("every active writer", undersized_result.stdout)
+        self.assertEqual(dirty_result.returncode, 2, dirty_result.stdout)
+        self.assertIn("clean worktree", dirty_result.stdout)
+
+    def test_advance_slice_rejects_task_claim_and_recipe_drift(self) -> None:
+        def prepare(root: Path) -> WorkGraphFixture:
+            root.mkdir()
+            fixture = WorkGraphFixture(root)
+            fixture._assert_success(fixture.claim())
+            fixture._assert_success(fixture.start())
+            subprocess.run(["git", "add", "."], cwd=root, check=True)
+            subprocess.run(
+                ["git", "commit", "-qm", "bind task claim"], cwd=root, check=True
+            )
+            fixture.complete("context")
+            fixture.complete("plan")
+            fixture.complete("implement")
+            return fixture
+
+        def advance(fixture: WorkGraphFixture, owner: str | None = None):
+            return fixture.work(
+                "advance-slice",
+                "--task-id",
+                fixture.task_id,
+                "--owner",
+                owner or fixture.owner,
+                "--from-node",
+                "plan",
+                "--reason",
+                "invalid custody must fail closed",
+                "--accept-pre-review-checkpoint",
+                "--accept-stale-source",
+            )
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+
+            wrong_owner = prepare(root / "wrong-owner")
+            wrong_owner_result = advance(wrong_owner, "impostor")
+
+            claim_drift = prepare(root / "claim-drift")
+            claim_drift._assert_success(claim_drift.release())
+            claim_drift._assert_success(claim_drift.claim())
+            claim_drift_result = advance(claim_drift)
+
+            recipe_drift = prepare(root / "recipe-drift")
+            recipe = json.loads(recipe_drift.recipe.read_text(encoding="utf-8"))
+            recipe["description"] += " drift"
+            recipe_drift.recipe.write_text(
+                json.dumps(recipe, indent=2) + "\n", encoding="utf-8"
+            )
+            subprocess.run(
+                ["git", "add", "."], cwd=recipe_drift.root, check=True
+            )
+            subprocess.run(
+                ["git", "commit", "-qm", "drift recipe"],
+                cwd=recipe_drift.root,
+                check=True,
+            )
+            recipe_drift_result = advance(recipe_drift)
+
+            missing_plan = prepare(root / "missing-plan")
+            task_path = missing_plan.root / "tasks/active/PROC-999-fixture.md"
+            task_path.write_text(
+                task_path.read_text(encoding="utf-8").replace(
+                    "## Slice plan\n"
+                    "- Slice 1 establishes the fixture state.\n"
+                    "- Slice 2 exercises an explicitly bounded continuation.\n\n",
+                    "",
+                ),
+                encoding="utf-8",
+            )
+            subprocess.run(["git", "add", "."], cwd=missing_plan.root, check=True)
+            subprocess.run(
+                ["git", "commit", "-qm", "remove slice plan"],
+                cwd=missing_plan.root,
+                check=True,
+            )
+            missing_plan_result = advance(missing_plan)
+
+            inactive = prepare(root / "inactive")
+            backlog = inactive.root / "tasks/backlog/general"
+            backlog.mkdir(parents=True)
+            (inactive.root / "tasks/active/PROC-999-fixture.md").rename(
+                backlog / "PROC-999-fixture.md"
+            )
+            subprocess.run(["git", "add", "."], cwd=inactive.root, check=True)
+            subprocess.run(
+                ["git", "commit", "-qm", "move task to backlog"],
+                cwd=inactive.root,
+                check=True,
+            )
+            inactive_result = advance(inactive)
+
+            done = prepare(root / "done")
+            done_dir = done.root / "tasks/done"
+            done_dir.mkdir(parents=True)
+            (done.root / "tasks/active/PROC-999-fixture.md").rename(
+                done_dir / "PROC-999-fixture.md"
+            )
+            subprocess.run(["git", "add", "."], cwd=done.root, check=True)
+            subprocess.run(
+                ["git", "commit", "-qm", "move task to done"],
+                cwd=done.root,
+                check=True,
+            )
+            done_result = advance(done)
+
+            profile_drift = prepare(root / "profile-drift")
+            profile_task = (
+                profile_drift.root / "tasks/active/PROC-999-fixture.md"
+            )
+            profile_task.write_text(
+                profile_task.read_text(encoding="utf-8").replace(
+                    "workflow_profile: standard",
+                    "workflow_profile: claim-grade",
+                ),
+                encoding="utf-8",
+            )
+            subprocess.run(
+                ["git", "add", "."], cwd=profile_drift.root, check=True
+            )
+            subprocess.run(
+                ["git", "commit", "-qm", "drift workflow profile"],
+                cwd=profile_drift.root,
+                check=True,
+            )
+            profile_drift_result = advance(profile_drift)
+
+        self.assertEqual(wrong_owner_result.returncode, 2, wrong_owner_result.stdout)
+        self.assertIn("does not match", wrong_owner_result.stdout)
+        self.assertEqual(claim_drift_result.returncode, 2, claim_drift_result.stdout)
+        self.assertIn("claim binding changed", claim_drift_result.stdout)
+        self.assertEqual(recipe_drift_result.returncode, 2, recipe_drift_result.stdout)
+        self.assertIn("recipe changed", recipe_drift_result.stdout)
+        self.assertEqual(missing_plan_result.returncode, 2, missing_plan_result.stdout)
+        self.assertIn("## Slice plan", missing_plan_result.stdout)
+        self.assertEqual(inactive_result.returncode, 2, inactive_result.stdout)
+        self.assertIn("tasks/active/", inactive_result.stdout)
+        self.assertEqual(done_result.returncode, 2, done_result.stdout)
+        self.assertIn("tasks/active/", done_result.stdout)
+        self.assertEqual(
+            profile_drift_result.returncode, 2, profile_drift_result.stdout
+        )
+        self.assertIn("workflow profile changed", profile_drift_result.stdout)
 
     def test_review_surface_change_blocks_finalize_until_writer_reopens(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

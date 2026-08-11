@@ -96,6 +96,13 @@ not a second task list or completion receipt; it cannot grant ownership, lower
 the profile, or replace verification/review/experiment custody. See
 `docs/agent/workflow-evidence.md` §"Live agent work graph".
 
+For a task with a checked-in `## Slice plan`, `advance-slice` is the explicit
+boundary between completed implementation slices. It preserves the run/event
+history but rebases the next plan/write/review cycle to an exact clean commit
+and refreshes that cycle's bounded attempts. Do not substitute it for `reopen`
+after a failed, blocked, running, or partially reviewed cycle; the command
+rejects those states.
+
 # Implement the smallest robust slice
 
 The layering, coding, change-scope, testing, and docs-sync rules are owned by `/AGENTS.md` §2, §5, §7, and §9 — including the mechanical-vs-semantic split, one-task patch scoping, `.cppm` interface/implementation placement, no-new-features-during-reorganization, test category labels, and module-inventory regeneration. Apply them from the contract; this prompt deliberately does not restate them.

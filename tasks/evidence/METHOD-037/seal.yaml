@@ -1,0 +1,13 @@
+schema_version: 1
+task_id: METHOD-037
+sealed_revision: 23c1080a6a9c9d994ed8a95dbdc6c39c4e029ca1
+source_content_digest: 6a710066b79e8827ff0ab87596764d7ca6a068a23b8dcb1d36542e28c396807a
+report_sha256: 902d5c031c37245e897e00894db9d1663fe35fc75f70b35d38bbc478a4af517f
+records:
+- path: tasks/evidence/METHOD-037/handoff.jsonl
+  sha256: 63e8737025595b456816d406f0c8f4d75607c78a666c640731837f681178b546
+- path: tasks/evidence/METHOD-037/reviews.jsonl
+  sha256: 5664c3a3ed089aedd0d6238232cc556643fe923e76c1a2f1d9f43492493ed5da
+reason: Migrate the unchanged completed report to the exact METHOD-037 retirement commit that contains
+  its accepted source and evidence.
+generated_by: tools/agents/workflow_evidence.py

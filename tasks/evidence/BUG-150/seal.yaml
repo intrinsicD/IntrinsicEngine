@@ -1,0 +1,8 @@
+schema_version: 1
+task_id: BUG-150
+sealed_revision: 29bea286bd28a95c08cd5ae98f8d0952032065a4
+source_content_digest: dfc85c88198d7ffd73af4a3048e7e21c3c79a5beb0ad88b565022eea266d8fce
+report_sha256: 4c3a99f76f629a290a2665c376c6b94f2b14967379084804d97037a731116022
+records: []
+reason: Bind the completed BUG-150 report to its exact committed retirement and verification surface.
+generated_by: tools/agents/workflow_evidence.py

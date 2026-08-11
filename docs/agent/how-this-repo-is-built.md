@@ -65,11 +65,12 @@ grandfathered; historical tasks are not rewritten.
 Claimed non-micro work also has a live
 [agent work graph](workflow-evidence.md#live-agent-work-graph). Its checked-in
 recipe exposes one write lane, parallel read-only review lanes, a findings
-join, bounded reopen, and profile-gated independent review. Current state and
-its hash-chained event log live in the Git common directory so sibling
-worktrees can inspect progress without creating a committed multi-writer
-status file. The graph is operational telemetry, not task, verification, or
-review authority.
+join, bounded within-slice reopen, an audited next-slice transition for tasks
+with a declared slice plan, and profile-gated independent review. Current state
+and its hash-chained event log live in the Git common directory so sibling
+worktrees can inspect progress without creating a committed multi-writer status
+file. The graph is operational telemetry, not task, verification, or review
+authority.
 
 ## Convergence Instead of a Flat Queue
 

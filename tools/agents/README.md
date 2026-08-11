@@ -7,8 +7,9 @@ Agent workflow and task policy tooling.
 - `check_task_policy.py` validates required task directories, rejects legacy root planning files, and delegates strict structured-task checks. Runs strict in `ci-docs.yml`; `check_todo_active_only.sh` is a thin compatibility wrapper for it.
 - `validate_tasks.py` validates task IDs, required sections, completion metadata for `tasks/done/`, and checkbox todos in actionable sections. Invoked by `check_task_policy.py`.
 - `workflow_evidence.py` records exact command receipts, generates completion
-  reports from task/Git/artifact facts, appends high-risk handoff/review
-  records, and validates enrolled retirement evidence.
+  reports from task/Git/artifact facts, seals completed dirty reports against
+  an exact commit containing their unchanged evidence, appends high-risk
+  handoff/review records, and validates enrolled retirement evidence.
 - `experiment_custody.py` freezes claim-grade protocols, initializes
   non-overwriting runs, journals cells, builds/audits portable bundles, and
   enforces protected prospective authorization and one-shot attempts. Its
@@ -19,10 +20,11 @@ Agent workflow and task policy tooling.
   generation and no daemon is involved.
 - `agent_work_graph.py` validates checked-in schema-v1 work-graph recipes and
   manages one claimed non-micro task's live node state, bounded reopen,
-  exact-generation claim-handoff resume, node-addressed notes, permission
-  checks, writer-frozen review binding, locked inspection, terminal surface
-  binding, and hash-chained event trace in the Git common directory. It never
-  launches an agent or replaces task/evidence/review authority.
+  audited next-slice advancement from an exact clean commit, exact-generation
+  claim-handoff resume, node-addressed notes, permission checks, writer-frozen
+  review binding, locked inspection, terminal surface binding, and hash-chained
+  event trace in the Git common directory. It never launches an agent or
+  replaces task/evidence/review authority.
 - `check_task_maturity_followups.py` validates that open backend-facing `CPUContracted` maturity closures name an operational owner or explicitly state that no operational follow-up is owed. Invoked by `check_task_policy.py`.
 - `check_task_state_links.py` validates that task links and nearby lifecycle status claims agree with the actual `tasks/backlog/`, `tasks/active/`, and `tasks/done/` location of the referenced task ID. Runs strict in `ci-docs.yml`.
 - `check_codex_config.py` validates `.codex/config.yaml` stays meaningful and policy-light (delegating authority to `AGENTS.md` rather than duplicating it). Runs strict in `ci-docs.yml`.
