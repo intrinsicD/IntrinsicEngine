@@ -1,0 +1,21 @@
+{
+  "command": [
+    "bash",
+    "-lc",
+    "set -euo pipefail\ncmake --preset ci-asan --fresh -DINTRINSIC_GROUP_PURE_CTEST=ON\ncmake --build --preset ci-asan --target IntrinsicCpuTests --parallel 2\nctest --test-dir build/ci-asan --output-on-failure -LE \"gpu|vulkan|slow|flaky-quarantine\" --no-tests=error --timeout 60 --parallel 1"
+  ],
+  "command_display": "bash -lc 'set -euo pipefail\ncmake --preset ci-asan --fresh -DINTRINSIC_GROUP_PURE_CTEST=ON\ncmake --build --preset ci-asan --target IntrinsicCpuTests --parallel 2\nctest --test-dir build/ci-asan --output-on-failure -LE \"gpu|vulkan|slow|flaky-quarantine\" --no-tests=error --timeout 60 --parallel 1'",
+  "cwd": ".",
+  "duration_ms": 1839426,
+  "exit_code": 0,
+  "finished_at": "2026-08-11T05:27:41Z",
+  "label": "checkpoint4-asan",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-11T04:57:02Z",
+  "stderr_path": "tasks/evidence/METHOD-038/commands/checkpoint4-asan.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/METHOD-038/commands/checkpoint4-asan.stdout.log",
+  "stdout_sha256": "a0bbaca6528fdf88d1df1a4e5a599ff809a024000d2d72ed59268f6e4614546a",
+  "task_id": "METHOD-038"
+}

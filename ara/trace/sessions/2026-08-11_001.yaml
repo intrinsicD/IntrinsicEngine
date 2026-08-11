@@ -2,9 +2,9 @@ session:
   id: "2026-08-11_001"
   date: "2026-08-11"
   started: "2026-08-11T00:47+02:00"
-  last_turn: "2026-08-11T05:06+02:00"
-  turn_count: 2
-  summary: "Authorized and exercised a bounded work-graph slice cycle, then sealed METHOD-038's paired fold-control lane with accepted non-claim custody and complete CPU verification."
+  last_turn: "2026-08-11T07:58+02:00"
+  turn_count: 3
+  summary: "Advanced METHOD-038 through independently audited fold, cylinder, and smooth-transition fixture controls with complete unsanitized and sanitizer CPU verification."
 
 events_logged:
   - turn: 1
@@ -67,6 +67,24 @@ events_logged:
     routing: crystallized
     provenance: ai-executed
     summary: "Crystallized bounded fold fixture/oracle integrity from O145 and final scratch-006 custody."
+  - turn: 3
+    type: decision
+    id: "N414"
+    routing: direct
+    provenance: ai-executed
+    summary: "Froze paired cylinder and smooth-transition controls before any candidate A-D execution."
+  - turn: 3
+    type: experiment
+    id: "N415"
+    routing: direct
+    provenance: ai-executed
+    summary: "Sealed and independently audited scratch-007; all seventeen surface-control gates and every CPU verification variant passed."
+  - turn: 3
+    type: claim
+    id: "C43"
+    routing: crystallized
+    provenance: ai-executed
+    summary: "Crystallized bounded cylinder and smooth-transition fixture/oracle integrity from O146 and scratch-007 custody."
 
 ai_actions:
   - turn: 1
@@ -84,6 +102,16 @@ ai_actions:
       - "methods/geometry/curvature_segmentation/feature_aligned_intake.md"
       - "tasks/evidence/METHOD-038/experiment/"
       - "ara/logic/claims.md"
+  - turn: 3
+    action: "Preregistered and implemented paired cylinder/smooth-transition benchmark controls, sealed scratch-007 with an accepted independent audit, recorded C43, and ran focused, replay, structural, unsanitized, ASan, and UBSan verification."
+    provenance: ai-executed
+    files_changed:
+      - "benchmarks/runners/CurvatureSegmentationProfileRunner.cpp"
+      - "benchmarks/geometry/manifests/curvature_segmentation_screening_surface_controls.yaml"
+      - "methods/geometry/curvature_segmentation/feature_aligned_intake.md"
+      - "methods/geometry/curvature_segmentation/README.md"
+      - "tasks/evidence/METHOD-038/experiment/"
+      - "ara/logic/claims.md"
 
 claims_touched:
   - id: C41
@@ -92,6 +120,9 @@ claims_touched:
   - id: C42
     action: created
     turn: 2
+  - id: C43
+    action: created
+    turn: 3
 
 key_context:
   - turn: 1
@@ -102,11 +133,15 @@ key_context:
     excerpt: "The user explicitly authorized the bounded work-graph repair; METHOD-038 then advanced without resetting or editing Git-common-dir state by hand."
   - turn: 2
     excerpt: "Scratch-004 failed only schema sealing; scratch-006 retained the same scientific gates and independently reproduced exact 0/0/24 fold counts with claim_authorized=false."
+  - turn: 3
+    excerpt: "Scratch-007 passed all seventeen preregistered cylinder/smooth-transition fixture gates; the independent audit accepted every recomputation while retaining claim_authorized=false."
+  - turn: 3
+    excerpt: "No candidate A-D, v2, confirmation, performance, convergence, runtime/UI, or GPU behavior was executed or inferred from the control lane."
 
 open_threads:
-  - "Extend the frozen METHOD-038 screen with the declared cylinder and smooth-transition paired controls."
-  - "Run the cheapest candidate A-D killing screen only after its full screening rows and held-out confirmation boundary remain frozen."
+  - "Preregister and implement candidate A's cheapest killing screen against the validated plane/fold/cylinder/smooth controls without reading held-out confirmation parameters."
+  - "Complete the remaining analytic screening families and freeze one surviving candidate before opening the disjoint confirmation corpus."
   - "Keep METHOD-037 cpu_reference_v1 as the production selector until a candidate-v2 protocol passes; no performance, convergence, runtime/UI, or GPU result exists yet."
 
 ai_suggestions_pending:
-  - "Implement the cylinder and smooth-transition oracle lanes before candidate A; do not broaden checkpoint 3 into production-v2 code."
+  - "Evaluate candidate A first as the smallest feature-first extension, but retain the frozen B-D killing order and do not select it without comparative evidence."

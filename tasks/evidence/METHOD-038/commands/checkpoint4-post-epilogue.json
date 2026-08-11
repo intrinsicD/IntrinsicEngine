@@ -1,0 +1,21 @@
+{
+  "command": [
+    "bash",
+    "-lc",
+    "set -euo pipefail\npython3 tools/agents/check_ara_claims.py --root . --strict\npython3 tools/agents/experiment_custody.py validate --root .\npython3 tools/agents/validate_method_manifests.py\npython3 tools/docs/check_doc_links.py --root .\npython3 tools/agents/check_task_policy.py --root . --strict\npython3 tools/agents/generate_session_brief.py --root . --check"
+  ],
+  "command_display": "bash -lc 'set -euo pipefail\npython3 tools/agents/check_ara_claims.py --root . --strict\npython3 tools/agents/experiment_custody.py validate --root .\npython3 tools/agents/validate_method_manifests.py\npython3 tools/docs/check_doc_links.py --root .\npython3 tools/agents/check_task_policy.py --root . --strict\npython3 tools/agents/generate_session_brief.py --root . --check'",
+  "cwd": ".",
+  "duration_ms": 3242,
+  "exit_code": 0,
+  "finished_at": "2026-08-11T06:01:19Z",
+  "label": "checkpoint4-post-epilogue",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-11T06:01:16Z",
+  "stderr_path": "tasks/evidence/METHOD-038/commands/checkpoint4-post-epilogue.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/METHOD-038/commands/checkpoint4-post-epilogue.stdout.log",
+  "stdout_sha256": "ebed79124bbe7f9dbeebcfa6712c64b3e214f239330df9715eaede2c6f6145bb",
+  "task_id": "METHOD-038"
+}

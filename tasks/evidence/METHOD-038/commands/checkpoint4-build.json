@@ -1,0 +1,27 @@
+{
+  "command": [
+    "cmake",
+    "--build",
+    "--preset",
+    "ci",
+    "--target",
+    "IntrinsicTests",
+    "IntrinsicCurvatureSegmentationProfile",
+    "--parallel",
+    "2"
+  ],
+  "command_display": "cmake --build --preset ci --target IntrinsicTests IntrinsicCurvatureSegmentationProfile --parallel 2",
+  "cwd": ".",
+  "duration_ms": 37842,
+  "exit_code": 0,
+  "finished_at": "2026-08-11T04:54:36Z",
+  "label": "checkpoint4-build",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-11T04:53:59Z",
+  "stderr_path": "tasks/evidence/METHOD-038/commands/checkpoint4-build.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/METHOD-038/commands/checkpoint4-build.stdout.log",
+  "stdout_sha256": "2700dc7f77744a4cf7adf0a99901557305beaf734092605ada4ae03ce6b87b39",
+  "task_id": "METHOD-038"
+}

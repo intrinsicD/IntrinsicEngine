@@ -281,8 +281,8 @@ sessions:
     open_threads: 3
   - id: "2026-08-11_001"
     date: "2026-08-11"
-    summary: "Authorized and exercised a bounded work-graph slice cycle, then sealed METHOD-038's paired fold-control lane with accepted non-claim custody and complete CPU verification."
-    turn_count: 2
-    events_count: 10
-    claims_touched: [C41, C42]
+    summary: "Advanced METHOD-038 through independently audited fold, cylinder, and smooth-transition fixture controls with complete unsanitized and sanitizer CPU verification."
+    turn_count: 3
+    events_count: 13
+    claims_touched: [C41, C42, C43]
     open_threads: 3

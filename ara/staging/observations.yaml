@@ -2595,7 +2595,7 @@ observations:
     crystallized_via: artifact-commitment
     stale: false
   - id: O146
-    timestamp: "2026-08-11T11:02+02:00"
+    timestamp: "2026-08-11T07:58+02:00"
     provenance: ai-executed
     content: >
       METHOD-038's deterministic paired open-cylinder and smooth-transition
@@ -2614,7 +2614,7 @@ observations:
       claim_authorized=false. This observation makes no candidate-v2, broader-
       corpus, confirmation, convergence, performance, runtime/UI, or GPU claim.
     potential_type: claim
-    bound_to: [N404, N406, N413]
+    bound_to: [N404, N406, N413, N414, N415]
     promoted: true
     promoted_to: "logic/claims.md:C43"
     crystallized_via: artifact-commitment

@@ -9699,3 +9699,58 @@ tree:
       A-D, v2, the broader/confirmation corpus, convergence, performance,
       runtime/UI, and GPU/Vulkan remain untested.
     status: resolved
+  - id: N414
+    type: decision
+    title: "Freeze paired cylinder and smooth-transition controls before candidate execution"
+    provenance: ai-executed
+    timestamp: "2026-08-11T07:58+02:00"
+    also_depends_on: [N404, N406, N413]
+    choice: >
+      Extend METHOD-038's frozen screening surface with one private
+      `surface_controls` cohort before implementing candidate A-D: pair rigid
+      cylinder phases and smooth-graph diagonal phases, supply analytic
+      curvatures, reuse the shared strict feature classifier and unchanged v1
+      segmentation, and retain zero-warmup/one-measurement non-claim custody.
+    alternatives:
+      - "Implement candidate A before validating the cylinder and smooth-transition fixtures."
+      - "Broaden immediately to the entire declared analytic corpus."
+      - "Read held-out confirmation parameters before freezing a candidate implementation."
+    evidence:
+      - "methods/geometry/curvature_segmentation/feature_aligned_intake.md"
+      - "benchmarks/geometry/manifests/curvature_segmentation_screening_surface_controls.yaml"
+      - "tasks/evidence/METHOD-038/experiment/protocol.yaml"
+      - "commit 91408cf9"
+    status: resolved
+  - id: N415
+    type: experiment
+    title: "Validate the bounded METHOD-038 cylinder and smooth-transition control lane"
+    provenance: ai-executed
+    timestamp: "2026-08-11T07:58+02:00"
+    also_depends_on: [N404, N406, N413, N414]
+    evidence:
+      - "tasks/evidence/METHOD-038/experiment/protocol.yaml"
+      - "tasks/evidence/METHOD-038/experiment/inputs/surface_controls_benchmark_result.json"
+      - "tasks/evidence/METHOD-038/experiment/runs/scratch-007/bundle.yaml"
+      - "tasks/evidence/METHOD-038/experiment/runs/scratch-007/audit.json"
+      - "tasks/evidence/METHOD-038/commands/checkpoint4-focused-tests.json"
+      - "tasks/evidence/METHOD-038/commands/checkpoint4-control-replays.json"
+      - "tasks/evidence/METHOD-038/commands/checkpoint4-structural.json"
+      - "tasks/evidence/METHOD-038/commands/checkpoint4-cpu-tests.json"
+      - "tasks/evidence/METHOD-038/commands/checkpoint4-asan.json"
+      - "tasks/evidence/METHOD-038/commands/checkpoint4-ubsan.json"
+    result: >
+      Final task-bound scratch-007 independently recomputed all seventeen
+      frozen gates as passing. Both cylinder phases classified zero hard
+      features, retained identical one-component/one-region/zero-boundary v1
+      payloads, and stayed within 0.000000008 normalized radial error and
+      0.000000015 paired-edge delta. Both smooth diagonal phases classified
+      zero hard features, returned two regions and the exact 24-edge reference
+      mask with zero face-label and boundary-mask error, two endpoints, no
+      junction, and a 0.000049835 normalized sampled symmetric-distance upper
+      bound. Custody remains non-claim-eligible with claim_authorized=false.
+      Twenty-six focused tests, both control replays, strict structural checks,
+      all 4,211 selected unsanitized CPU tests, all 2,736 grouped ASan tests,
+      and all 2,736 grouped UBSan tests passed. Candidate A-D, v2, the broader
+      and confirmation corpora, convergence, performance, runtime/UI, and
+      GPU/Vulkan remain untested.
+    status: resolved

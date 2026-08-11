@@ -1,0 +1,21 @@
+{
+  "command": [
+    "bash",
+    "-lc",
+    "set -euo pipefail\ncmake --preset ci-ubsan --fresh -DINTRINSIC_GROUP_PURE_CTEST=ON\ncmake --build --preset ci-ubsan --target IntrinsicCpuTests --parallel 2\nctest --test-dir build/ci-ubsan --output-on-failure -LE \"gpu|vulkan|slow|flaky-quarantine\" --no-tests=error --timeout 60 --parallel 1"
+  ],
+  "command_display": "bash -lc 'set -euo pipefail\ncmake --preset ci-ubsan --fresh -DINTRINSIC_GROUP_PURE_CTEST=ON\ncmake --build --preset ci-ubsan --target IntrinsicCpuTests --parallel 2\nctest --test-dir build/ci-ubsan --output-on-failure -LE \"gpu|vulkan|slow|flaky-quarantine\" --no-tests=error --timeout 60 --parallel 1'",
+  "cwd": ".",
+  "duration_ms": 1691019,
+  "exit_code": 0,
+  "finished_at": "2026-08-11T05:57:25Z",
+  "label": "checkpoint4-ubsan",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-11T05:29:14Z",
+  "stderr_path": "tasks/evidence/METHOD-038/commands/checkpoint4-ubsan.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/METHOD-038/commands/checkpoint4-ubsan.stdout.log",
+  "stdout_sha256": "f39b220bc22c4f2bef80dcacd436991a80c934ac939231685e3d94713ddc2595",
+  "task_id": "METHOD-038"
+}
