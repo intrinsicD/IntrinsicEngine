@@ -1,0 +1,21 @@
+{
+  "command": [
+    "python3",
+    "/home/alex/.codex/skills/.system/skill-creator/scripts/quick_validate.py",
+    "tools/agents/skills/intrinsicengine-source-documentation"
+  ],
+  "command_display": "python3 /home/alex/.codex/skills/.system/skill-creator/scripts/quick_validate.py tools/agents/skills/intrinsicengine-source-documentation",
+  "cwd": ".",
+  "duration_ms": 24,
+  "exit_code": 0,
+  "finished_at": "2026-08-11T11:21:34Z",
+  "label": "skill-validation",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-11T11:21:34Z",
+  "stderr_path": "tasks/evidence/PROC-033/commands/skill-validation.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/PROC-033/commands/skill-validation.stdout.log",
+  "stdout_sha256": "db349825903d66adffea3ecf1bd8e1803043e8a71cf1a051235dabc5371f5bb0",
+  "task_id": "PROC-033"
+}

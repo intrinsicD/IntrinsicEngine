@@ -1,0 +1,20 @@
+{
+  "command": [
+    "python3",
+    "tests/regression/tooling/Test.SourceDocumentationAudit.py"
+  ],
+  "command_display": "python3 tests/regression/tooling/Test.SourceDocumentationAudit.py",
+  "cwd": ".",
+  "duration_ms": 287,
+  "exit_code": 0,
+  "finished_at": "2026-08-11T11:21:34Z",
+  "label": "source-doc-regression",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-11T11:21:34Z",
+  "stderr_path": "tasks/evidence/PROC-033/commands/source-doc-regression.stderr.log",
+  "stderr_sha256": "e391da42afa5331e6aa108b931ffe56a74d3958c196a07dbfe91c8705b1f9c51",
+  "stdout_path": "tasks/evidence/PROC-033/commands/source-doc-regression.stdout.log",
+  "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "task_id": "PROC-033"
+}
