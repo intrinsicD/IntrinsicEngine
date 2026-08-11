@@ -1,14 +1,14 @@
 schema_version: 1
 task_id: PROC-033
 workflow_profile: high-risk
-status: draft
+status: complete
 generated_by: tools/agents/workflow_evidence.py
-generated_at: '2026-08-11T13:21:08Z'
+generated_at: '2026-08-11T13:51:08Z'
 claim_eligible: false
 source:
   base_ref: 503c0204149522d60171e4dbffcb46c9163360ee
   base_revision: 503c0204149522d60171e4dbffcb46c9163360ee
-  head_revision: 566db5e584dcaae0dfd3ed1d2432380cdb208b68
+  head_revision: c697764de7141fe1db32e8425e0b768ec6be7ebf
   branch: codex/proc-033-source-documentation
   worktree: /tmp/intrinsic-proc033.esP0pr
   dirty: false
@@ -35,12 +35,12 @@ source:
     sha256: 600a575db57bf7ecf030ea0bb30d987b4848da5dd4365c846f9c7206711ab97b
   - path: docs/index.md
     sha256: 309fd27a066f47cb0106c8bf387379ff633aa064d434ecea0f53e024036e4ba6
-  - path: tasks/SESSION-BRIEF.md
-    sha256: dcb408b047ae67ad59088ca58118b5b6e257b08de2790cec85c117855859170a
-  - path: tasks/active/PROC-033-source-documentation-contract-and-audit-skill.md
-    sha256: 96f821c45b0677499566ba49c00c626273bf8d4255feabd30d2e3b319d21bda6
   - path: tasks/active/README.md
-    sha256: d38c6a82ec003ca1a24f7f0df22fb591ab5fb23065e9e504e5918ed60302df43
+    sha256: 8550ba351eb6281b34077a0d331960459405f03a3e2b5ffc0f079fab7c7e9669
+  - path: tasks/done/PROC-033-source-documentation-contract-and-audit-skill.md
+    sha256: 43995dc6a47cfc85112c1259b37e1dbeffb455a3f0cad618b786658e59c81822
+  - path: tasks/done/RETIREMENT-LOG.md
+    sha256: 5273e6e62d224a8fb0253dbb3ad4775059509c0fe10bd6b85e50a3ba5303cfba
   - path: tests/regression/tooling/Test.CheckTaskStateLinks.py
     sha256: e4fdc977489e236359f8e8b373720565724d7c85bb2547da1ae13eca48402b1e
   - path: tests/regression/tooling/Test.SourceDocumentationAudit.py
@@ -71,7 +71,7 @@ source:
     sha256: db3655423441473df896ae770d31d19d9e0a2570fa2aa001485fc5810b188cf1
   - path: tools/agents/sync_skills.py
     sha256: bacc6545778bb8514bd00a28fb77473e13f2052807f83cb3760745cb64ad6eba
-  content_digest: 2afeb2512e512005d92d709e6f374b043507ada2a08dc92f0fe613a79855e9b3
+  content_digest: bd47c080e74def7a0bf2f62c42b882123e173a81abcfca663c338fb2b815c404
 touched:
   paths:
   - .github/workflows/ci-docs.yml
@@ -85,9 +85,9 @@ touched:
   - docs/agent/task-format.md
   - docs/architecture/contract-catalog.yaml
   - docs/index.md
-  - tasks/SESSION-BRIEF.md
-  - tasks/active/PROC-033-source-documentation-contract-and-audit-skill.md
   - tasks/active/README.md
+  - tasks/done/PROC-033-source-documentation-contract-and-audit-skill.md
+  - tasks/done/RETIREMENT-LOG.md
   - tests/regression/tooling/Test.CheckTaskStateLinks.py
   - tests/regression/tooling/Test.SourceDocumentationAudit.py
   - tools/agents/README.md
@@ -131,12 +131,15 @@ acceptance:
   evidence: []
   reason: null
 - criterion: High-risk workflow evidence and an independent fixed-surface review are
-  task_checked: false
-  disposition: pending
+  task_checked: true
+  disposition: satisfied
   evidence: []
   reason: null
 commands:
 - receipt: tasks/evidence/PROC-033/commands/doc-links.json
+- receipt: tasks/evidence/PROC-033/commands/retirement-doc-integrity.json
+- receipt: tasks/evidence/PROC-033/commands/retirement-source-doc-contract.json
+- receipt: tasks/evidence/PROC-033/commands/retirement-task-policy.json
 - receipt: tasks/evidence/PROC-033/commands/root-hygiene.json
 - receipt: tasks/evidence/PROC-033/commands/skill-sync.json
 - receipt: tasks/evidence/PROC-033/commands/skill-validation.json
@@ -150,7 +153,7 @@ diagnostics_and_previews:
 - 'Report-only baseline: 1,319 files, 436 objective errors, and 3,835 human-review findings'
 benchmark_or_parity_evidence: []
 docs_sync:
-  task_file: tasks/active/PROC-033-source-documentation-contract-and-audit-skill.md
+  task_file: tasks/done/PROC-033-source-documentation-contract-and-audit-skill.md
   session_brief_present: true
   canonical_docs_changed: true
   skill_mirrors_checked: true
