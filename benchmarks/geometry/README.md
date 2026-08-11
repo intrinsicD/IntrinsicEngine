@@ -45,6 +45,19 @@ control must remain one component, one region, and zero boundaries on every
 fold exactly as on the flat sheet. The lane also gates the flat/fold edge-
 length delta, but it does not execute or select candidate A-D and supports no
 remeshing-convergence or v2 claim. Setting
+`INTRINSIC_CURVATURE_PROFILE_COHORT=surface_controls` runs the separately
+preregistered paired open-cylinder and smooth-transition controls. The
+`32 x 64` cylinder phases must preserve outward orientation, unit radius,
+paired edge lengths, zero hard features, and identical one-region v1 payloads.
+The paired `24 x 48` graph surfaces
+`z=0.5(1+tanh(x/0.08))` use ordered analytic principal curvatures, require
+upward orientation and zero hard features, and compare unchanged fixed-two v1
+output against the exact smooth sign-change curve `x=0`, `z=0.5`. Exact edge-
+mask agreement on this aligned control makes the predicted and reference
+continuous curves identical; the reported nonzero Hausdorff upper bound is
+only half the declared 4097-sample spacing. This lane still does not execute
+candidate A-D or support a remeshing, convergence, performance, or v2 claim.
+Setting
 `INTRINSIC_CURVATURE_PROFILE_COHORT=heavy` selects the declared 100k and 1M
 cohorts. The heavy runner is not a default CTest. Its manifest thresholds are
 harness-health bounds, not adoption or acceleration claims; clean-source

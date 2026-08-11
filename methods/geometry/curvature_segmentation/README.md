@@ -97,6 +97,15 @@ contract and states that spatial optimization is local.
   control reported exact `0/0/24` feature counts on both diagonals, zero mask
   error, `0.000000038` maximum normalized edge-length delta, and exact v1 flat-
   control payload parity (ARA C42).
+- Opt-in cylinder/smooth-transition contract controls:
+  `curvature_segmentation_screening_surface_controls.yaml`. The separate
+  `surface_controls` cohort checks two rigidly phase-shifted triangulations of
+  the declared open cylinder and two diagonal triangulations of the smooth
+  graph `z=0.5(1+tanh(x/0.08))`. It validates orientation, analytic geometry
+  and supplied-curvature contracts, zero hard-feature classifications, the
+  one-region cylinder v1 negative control, and the fixed-two v1 comparison to
+  the exact smooth `x=0`, `z=0.5` reference curve. It is fixture/oracle work
+  only and neither executes nor selects candidate A-D.
 
 The historical non-claim-eligible
 [`METHOD-038` scratch replay](../../../tasks/evidence/METHOD-038/superseded/20260810-fixture-cohort-runner-change/experiment/protocol.yaml)

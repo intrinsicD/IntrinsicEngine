@@ -58,6 +58,7 @@ add_executable(IntrinsicBenchmarkSmoke
 # 10k-face supplied-curvature cohort. The `fixtures` cohort adds 10k cold and
 # reusable-curvature sphere pairs plus a continuous planar-boundary screen;
 # `screening` adds paired 30/45/60-degree fold and isometric negative controls;
+# `surface_controls` adds paired open-cylinder and smooth-transition oracles;
 # `heavy` selects the declared 100k/1M supplied-curvature cohorts. It is
 # intentionally not a default CTest.
 add_executable(IntrinsicCurvatureSegmentationProfile

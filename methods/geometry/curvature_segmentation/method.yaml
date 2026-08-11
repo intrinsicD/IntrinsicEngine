@@ -42,6 +42,7 @@ benchmarks:
   - "../../../benchmarks/geometry/manifests/curvature_segmentation_reference_remeshing_10k_fixed.yaml"
   - "../../../benchmarks/geometry/manifests/curvature_segmentation_reference_remeshing_10k_automatic.yaml"
   - "../../../benchmarks/geometry/manifests/curvature_segmentation_screening_fold_controls.yaml"
+  - "../../../benchmarks/geometry/manifests/curvature_segmentation_screening_surface_controls.yaml"
 known_limitations:
   - "This is a repository formulation informed by curvature-tensor segmentation, Gaussian mixtures, information criteria, and pairwise spatial models; it is not an equation-level reproduction of Lavoue et al. or another single publication."
   - "Signed principal curvatures depend on a consistent surface-orientation convention and on the scale, noise, and boundary behavior of the upstream curvature estimator."
@@ -50,4 +51,4 @@ known_limitations:
   - "The reference accepts triangle meshes only and does not repair degeneracies, non-manifold topology, inconsistent orientation, or non-finite inputs."
   - "Published region boundaries are inspection data, not materialized cuts or validated UV-atlas seams; GEOM-076 owns any later seam/cut/atlas use."
   - "Only a serial CPU reference backend exists, and the smoke result makes no performance or atlas-quality claim."
-  - "METHOD-038 currently adds a 10k analytic-sphere cold/reusable descriptor pair, one 10k planar continuous-boundary pair, and an independently audited non-claim 30/45/60-degree paired-fold fixture/oracle lane; the broader analytic corpus, candidate A-D execution, heavy cold-descriptor cohorts, geodesic metrics on curved surfaces, and refinement-convergence evidence remain open Slice A work."
+  - "METHOD-038 currently adds a 10k analytic-sphere cold/reusable descriptor pair, one 10k planar continuous-boundary pair, an independently audited non-claim 30/45/60-degree paired-fold fixture/oracle lane, and preregistered paired cylinder/smooth-transition controls; the broader analytic corpus, candidate A-D execution, heavy cold-descriptor cohorts, general geodesic metrics on curved surfaces, and refinement-convergence evidence remain open Slice A work."

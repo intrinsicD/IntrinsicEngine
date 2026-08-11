@@ -76,6 +76,10 @@ maturity_target: ParityProven
   v1 negative/comparison, and continuous `x=0` boundary oracles. No candidate
   A-D, held-out confirmation row, selector, or production integration is in
   this checkpoint.
+- The private checkpoint-4 runner and manifest now implement those frozen
+  rows. Development replay is not claim evidence; task status will bind only a
+  frozen, sealed, independently audited custody run. Production remains
+  METHOD-037 `cpu_reference_v1` throughout.
 
 ## Goal
 - Replace METHOD-037's slow, edge-local boundary inference with an evidence-selected CPU formulation that remains statistically based on the existing Gaussian mixture, aligns region boundaries with persistent surface feature curves, converges across retriangulations of the same embedded surface, and meets a preregistered useful-acceleration gate without weakening correctness, diagnostics, or the Fixed/Automatic UI contract.
