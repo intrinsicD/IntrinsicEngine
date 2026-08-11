@@ -1,6 +1,6 @@
 ---
 name: intrinsicengine-docs-sync
-description: Documentation synchronization policy for IntrinsicEngine — what docs must update in the same PR when code, structure, or policy changes. Defines per-change-type required updates (architecture/layering → `AGENTS.md` + `docs/architecture/*`; migration → `docs/migration/*` + inventories; task/process → `tasks/*` + `docs/agent/*`; method/benchmark infra → `docs/methods/*` or `docs/benchmarking/*` + validators/manifests; CI/workflow → workflow docs), the factual-current-state quality gate, and the warning-mode/strict-mode docs-sync validator. Use this skill whenever the user is moving files, renaming modules, changing public API or module surfaces (`.cppm` interfaces), updating `AGENTS.md` or `docs/architecture/*`, regenerating module inventories, asking whether a doc update is needed, or asking about the `tools/docs/check_docs_sync.py` validator.
+description: Documentation synchronization policy for IntrinsicEngine — what docs must update in the same PR when code, structure, or policy changes. Defines per-change-type required updates (architecture/layering → `AGENTS.md` + `docs/architecture/*`; migration → `docs/migration/*` + inventories; task/process → `tasks/*` + `docs/agent/*`; method/benchmark infra → `docs/methods/*` or `docs/benchmarking/*` + validators/manifests; CI/workflow → workflow docs), current-state README expectations, and the warning-mode/strict-mode docs-sync validator. Use this skill whenever the user is moving files, renaming modules, changing public API or module surfaces (`.cppm` interfaces), updating `AGENTS.md`, README files, or `docs/architecture/*`, regenerating module inventories, asking whether a doc update is needed, or asking about the `tools/docs/check_docs_sync.py` validator.
 ---
 
 # IntrinsicEngine Documentation Sync Policy
@@ -31,6 +31,7 @@ for the common cases.
 | **Task / process changes** | Update `tasks/*` records and `docs/agent/*` where process rules are affected. |
 | **Method or benchmark infrastructure** | Update `docs/methods/*` or `docs/benchmarking/*`, plus validators and manifests. |
 | **CI / workflow** | Update workflow docs / process checklists. |
+| **Source documentation** | Apply `intrinsicengine-source-documentation`; update README files only for current role, ownership, navigation, configuration, or verification changes. |
 | **Module surface changes** (`.cppm` interfaces, public API) | Regenerate `docs/api/generated/module_inventory.md`. |
 
 ## Module-inventory regeneration
@@ -53,6 +54,9 @@ inventory file is generated — don't hand-edit it.
   clearly labeled as roadmap/migration. The weekly audit row 9 in
   `intrinsicengine-review` catches drift here — present-tense claims about
   unimplemented behavior are a flagged failure mode.
+- **README files are concise current-state entry points.** Link to a task, ADR,
+  migration record, report, retirement record, or Git instead of embedding
+  chronology or future plans.
 - **Cross-links must be valid.** Moving a file without updating its inbound
   links breaks the docs graph.
 - **Generated inventories are refreshed when impacted by structure changes.**

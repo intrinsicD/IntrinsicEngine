@@ -66,6 +66,7 @@ For authoritative agent operating rules, task workflow, and review checklist, us
 - `docs/agent/contract.md`
 - `docs/agent/task-format.md`
 - `docs/agent/review-checklist.md`
+- `docs/agent/source-documentation-policy.md`
 
 ## Documentation Pointer
 

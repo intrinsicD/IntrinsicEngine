@@ -93,7 +93,7 @@ dependency-ready task without inventing a new roadmap.
 
 ## Skills: Progressive Procedure Loading
 
-The repository packages its operating knowledge as twenty-one
+The repository packages its operating knowledge as twenty-three
 [Agent Skills](../../tools/agents/skills/README.md). Only skill metadata is
 normally visible to an agent; the full procedure loads when its trigger matches
 the work. This preserves a single authoritative contract while avoiding the
@@ -103,7 +103,7 @@ The skill inventory has three tiers:
 
 | Tier | Role | Examples |
 | --- | --- | --- |
-| Source-procedure mirrors | Route agents to canonical repository procedures. Generated `references/` files are synchronized from `docs/agent/`. | Core contract, task workflow, review, methods, benchmarks, documentation sync. |
+| Source-procedure mirrors | Route agents to canonical repository procedures. Generated `references/` files are synchronized from `docs/agent/`. | Core contract, task workflow, review, methods, benchmarks, documentation sync, source-documentation audit. |
 | Cross-cutting disciplines | Capture recurring repository-specific practices that span several source documents or were learned from repeated defects. | Diagnosis, Vulkan frame triage, GPU smoke authoring, stale-build triage, right-sizing, research ideation. |
 | Imported productivity skills | Supply bounded general-purpose interaction patterns while remaining subordinate to the repository contract. | Teaching and design grilling. |
 
@@ -122,7 +122,7 @@ monolithic linter:
 
 | Validator family | What it protects | Entry points |
 | --- | --- | --- |
-| Task and agent policy | Task shape, unique IDs, dependency resolution, lifecycle links, maturity follow-ups, generated session state, live work-graph topology/transitions, task evidence/experiment custody, concurrent claims, and skill mirrors. | [`tools/agents/`](../../tools/agents/README.md) |
+| Task and agent policy | Task shape, unique IDs, dependency resolution, lifecycle links, maturity follow-ups, generated session state, live work-graph topology/transitions, task evidence/experiment custody, concurrent claims, skill mirrors, and report-only source-documentation audits. | [`tools/agents/`](../../tools/agents/README.md) |
 | Documentation | Relative-link integrity and changed-file documentation synchronization. | [`tools/docs/`](../../tools/docs/README.md) |
 | Repository structure | Layer imports and CMake edges, root hygiene, test layout, allowlist quality, and module inventory. | [`tools/repo/`](../../tools/repo/README.md) |
 | Methods and benchmarks | Method manifests, benchmark manifests, result schemas, and comparable evidence identities. | [Method workflow](method-workflow.md) and [benchmark workflow](benchmark-workflow.md) |

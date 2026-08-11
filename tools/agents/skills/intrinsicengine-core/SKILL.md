@@ -90,6 +90,11 @@ Cross-layer convenience imports that violate this table are prohibited.
   it owns algorithm/control-flow bodies, allocation-heavy work, topology/container
   traversal, backend calls, diagnostics assembly, file/IO handling, or imports
   other modules only needed by the implementation rather than the public API.
+- Keep source documentation concise: each project-owned `.cppm` and header has
+  a brief what-and-why synopsis, declaration comments exist only for mandatory
+  non-obvious contracts, implementation rationale stays with implementation,
+  and README files describe current state. Route audits and cleanup through
+  `intrinsicengine-source-documentation`.
 - Third-party C/C++ deps go through `vcpkg.json` and the repository-local vcpkg
   toolchain (`external/vcpkg/scripts/buildsystems/vcpkg.cmake`) chainloaded with
   `cmake/IntrinsicClangToolchain.cmake`. Run `tools/setup/bootstrap_vcpkg.sh` on
@@ -164,6 +169,7 @@ Load the specialist skill for the touched scope rather than reading every guide:
 | Implementing or modifying paper/method work under `methods/` | `intrinsicengine-method` |
 | Adding, changing, or running benchmark harnesses/manifests/baselines | `intrinsicengine-benchmark` |
 | Moving files, changing public APIs/module surfaces, refreshing inventories | `intrinsicengine-docs-sync` |
+| Creating or materially changing `.cppm` files, headers, source comments, or README files; auditing comment/README debt | `intrinsicengine-source-documentation` |
 | Adding or changing an asset import/materialization path, or an import that "succeeds" but is not visible/selectable in the sandbox | `intrinsicengine-import-visibility-contract` |
 | Adding or changing a geometry importer/exporter (OBJ/OFF/PLY/STL/PCD/XYZ/TGF), parsing an untrusted header count, or defining IO diagnostics/fixtures | `intrinsicengine-geometry-io-format` |
 | Diagnosing a hard bug, validation-layer error, parity mismatch, or perf regression | `intrinsicengine-diagnose` |

@@ -1,0 +1,4 @@
+interface:
+  display_name: "IntrinsicEngine Source Documentation"
+  short_description: "Audit source comments and README hygiene"
+  default_prompt: "Use $intrinsicengine-source-documentation to audit source documentation compliance and identify focused cleanup work."

@@ -131,6 +131,7 @@ jobs:
           python3 tests/regression/tooling/Test.CheckTaskStateLinks.py
           python3 tests/regression/tooling/Test.CheckKernelConvergence.py
           python3 tests/regression/tooling/Test.CheckAraClaims.py
+          python3 tests/regression/tooling/Test.SourceDocumentationAudit.py
 
       - name: Validate CI timing, benchmark result, and ccache policy
         run: |

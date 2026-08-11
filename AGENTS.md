@@ -168,6 +168,12 @@ Every new dependency edge must be justifiable by layer policy and reflected in d
   them as private target sources. Treat an implementation as non-trivial when it owns algorithm/control-flow bodies,
   allocation-heavy work, topology/container traversal, backend calls, diagnostics assembly, file/IO handling, or imports
   other modules only needed by the implementation rather than the public API.
+- Keep source documentation concise and current-state. Every project-owned `.cppm` and header begins with a short
+  synopsis of what the file contains and why its surface exists. Comment declarations only when a correctness,
+  ownership, lifetime, ordering, units, numerical, or similarly non-obvious contract cannot be expressed clearly in
+  code. Put implementation rationale in the matching `.cpp` near the affected implementation (or beside an inline/
+  template implementation that must remain in the interface). Source comments do not narrate task history. The
+  canonical rules and audit workflow live in `docs/agent/source-documentation-policy.md`.
 - Third-party C/C++ dependencies are declared in `vcpkg.json` and resolved by presets through the repository-local
   vcpkg toolchain at `external/vcpkg/scripts/buildsystems/vcpkg.cmake`, chainloaded with
   `cmake/IntrinsicClangToolchain.cmake` so Clang module scanning remains enforced. Run
@@ -368,6 +374,8 @@ When code, structure, or policy changes:
   `python3 tools/agents/generate_session_brief.py`; after editing `docs/agent/*` or `tasks/templates/task.md`,
   re-run `python3 tools/agents/sync_skills.py --write`. CI (`ci-docs.yml`) enforces freshness of both.
 - Keep docs factual (current state), not aspirational unless clearly labeled.
+- Keep every `README.md` as a concise current-state entry point. Link to ADRs, migration docs, tasks, retirement records,
+  reports, or Git for history and future work instead of copying those narratives into a README.
 
 ## 10. CI expectations
 
@@ -493,6 +501,7 @@ Read this `AGENTS.md` file at the start of every session/task; it is the authori
 | `docs/agent/benchmark-workflow.md`            | Adding, changing, or running benchmark harnesses, manifests, datasets, baselines, or reports.                                                                                                                           |
 | `docs/agent/benchmark-review-checklist.md`    | Reviewing benchmark changes or performance claims before commit or PR.                                                                                                                                                  |
 | `docs/agent/docs-sync-policy.md`              | Moving files, changing public APIs/module surfaces, updating docs, or deciding whether generated inventories/manifests must be refreshed.                                                                               |
+| `docs/agent/source-documentation-policy.md`   | Creating or materially changing C++ module interfaces, headers, source comments, or README files; auditing source-documentation debt and discoverability.                                                              |
 | `docs/agent/ara-evidence-policy.md`           | Stating a research/performance/parity/capability result, closing a method or benchmark task, or promoting a claim into README, docs, a method report, or a task status — the `ara/` claim-ledger record format and anti-patterns. |
 | `docs/agent/roles.md`                         | Clarifying agent responsibilities, handoff expectations, or role-specific workflow questions.                                                                                                                           |
 | `docs/agent/agent-output-review-checklist.md` | Running the weekly human-led audit of recent agent-authored slices for cross-PR scope drift, documented-but-untested claims, and process anti-patterns not visible in a single PR review.                               |
