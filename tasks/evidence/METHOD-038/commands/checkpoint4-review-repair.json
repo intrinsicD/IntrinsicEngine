@@ -1,0 +1,21 @@
+{
+  "command": [
+    "bash",
+    "-lc",
+    "set -euo pipefail\npython3 tools/agents/experiment_custody.py validate --root .\npython3 tools/benchmark/validate_benchmark_manifests.py --root benchmarks --strict\npython3 tools/benchmark/validate_benchmark_results.py --root tasks/evidence/METHOD-038/experiment/inputs --manifests-root benchmarks --strict\npython3 tools/agents/validate_method_manifests.py\npython3 tools/agents/check_ara_claims.py --root . --strict\npython3 tools/agents/check_task_policy.py --root . --strict\npython3 tools/docs/check_doc_links.py --root .\npython3 tools/repo/check_layering.py --root src --strict\npython3 tools/repo/check_test_layout.py --root . --strict\npython3 tools/repo/check_root_hygiene.py --root .\npython3 tools/agents/generate_session_brief.py --root . --check"
+  ],
+  "command_display": "bash -lc 'set -euo pipefail\npython3 tools/agents/experiment_custody.py validate --root .\npython3 tools/benchmark/validate_benchmark_manifests.py --root benchmarks --strict\npython3 tools/benchmark/validate_benchmark_results.py --root tasks/evidence/METHOD-038/experiment/inputs --manifests-root benchmarks --strict\npython3 tools/agents/validate_method_manifests.py\npython3 tools/agents/check_ara_claims.py --root . --strict\npython3 tools/agents/check_task_policy.py --root . --strict\npython3 tools/docs/check_doc_links.py --root .\npython3 tools/repo/check_layering.py --root src --strict\npython3 tools/repo/check_test_layout.py --root . --strict\npython3 tools/repo/check_root_hygiene.py --root .\npython3 tools/agents/generate_session_brief.py --root . --check'",
+  "cwd": ".",
+  "duration_ms": 3562,
+  "exit_code": 0,
+  "finished_at": "2026-08-11T06:37:36Z",
+  "label": "checkpoint4-review-repair",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-11T06:37:32Z",
+  "stderr_path": "tasks/evidence/METHOD-038/commands/checkpoint4-review-repair.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/METHOD-038/commands/checkpoint4-review-repair.stdout.log",
+  "stdout_sha256": "7701a2bbb1990d71d97cf5a9453f0aaf26999fb358a810551fee735e5cfcdb75",
+  "task_id": "METHOD-038"
+}

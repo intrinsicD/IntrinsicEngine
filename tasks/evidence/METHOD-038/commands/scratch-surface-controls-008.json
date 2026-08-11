@@ -1,0 +1,21 @@
+{
+  "command": [
+    "python3",
+    "-c",
+    "import subprocess, sys, yaml; from pathlib import Path; protocol = yaml.safe_load(Path(\"tasks/evidence/METHOD-038/experiment/protocol.yaml\").read_text(encoding=\"utf-8\")); sys.exit(subprocess.run(protocol[\"command\"], check=False).returncode)"
+  ],
+  "command_display": "python3 -c 'import subprocess, sys, yaml; from pathlib import Path; protocol = yaml.safe_load(Path(\"tasks/evidence/METHOD-038/experiment/protocol.yaml\").read_text(encoding=\"utf-8\")); sys.exit(subprocess.run(protocol[\"command\"], check=False).returncode)'",
+  "cwd": ".",
+  "duration_ms": 6111,
+  "exit_code": 0,
+  "finished_at": "2026-08-11T06:29:00Z",
+  "label": "scratch-surface-controls-008",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-11T06:28:54Z",
+  "stderr_path": "tasks/evidence/METHOD-038/commands/scratch-surface-controls-008.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/METHOD-038/commands/scratch-surface-controls-008.stdout.log",
+  "stdout_sha256": "a70a52ddd676ea51eb9113559af5de7e6f467b8dde0f0fe2aaaa9b051d8fbc62",
+  "task_id": "METHOD-038"
+}

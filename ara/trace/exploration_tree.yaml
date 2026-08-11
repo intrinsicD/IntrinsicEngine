@@ -9694,8 +9694,8 @@ tree:
       result retained one component, one region, zero boundary edges, and the
       exact flat-control payload. The audit remains non-claim-eligible with
       claim_authorized=false. Twenty-six focused tests, strict custody/docs/
-      manifest/ARA/task/layering checks, and all 4,211 selected CPU tests
-      passed; one policy-gated GLFW/LeakSanitizer test self-skipped. Candidate
+      manifest/ARA/task/layering checks, and 4,210 selected CPU tests passed;
+      one policy-gated GLFW/LeakSanitizer test self-skipped. Candidate
       A-D, v2, the broader/confirmation corpus, convergence, performance,
       runtime/UI, and GPU/Vulkan remain untested.
     status: resolved
@@ -9728,10 +9728,10 @@ tree:
     timestamp: "2026-08-11T07:58+02:00"
     also_depends_on: [N404, N406, N413, N414]
     evidence:
-      - "tasks/evidence/METHOD-038/superseded/20260811-surface-screening-task-status-advance/experiment/protocol.yaml"
-      - "tasks/evidence/METHOD-038/superseded/20260811-surface-screening-task-status-advance/experiment/inputs/surface_controls_benchmark_result.json"
-      - "tasks/evidence/METHOD-038/superseded/20260811-surface-screening-task-status-advance/experiment/runs/scratch-007/bundle.yaml"
-      - "tasks/evidence/METHOD-038/superseded/20260811-surface-screening-task-status-advance/experiment/runs/scratch-007/audit.json"
+      - "tasks/evidence/METHOD-038/experiment/protocol.yaml"
+      - "tasks/evidence/METHOD-038/experiment/inputs/surface_controls_benchmark_result.json"
+      - "tasks/evidence/METHOD-038/experiment/runs/scratch-008/bundle.yaml"
+      - "tasks/evidence/METHOD-038/experiment/runs/scratch-008/audit.json"
       - "tasks/evidence/METHOD-038/commands/checkpoint4-focused-tests.json"
       - "tasks/evidence/METHOD-038/commands/checkpoint4-control-replays.json"
       - "tasks/evidence/METHOD-038/commands/checkpoint4-structural.json"
@@ -9739,8 +9739,9 @@ tree:
       - "tasks/evidence/METHOD-038/commands/checkpoint4-asan.json"
       - "tasks/evidence/METHOD-038/commands/checkpoint4-ubsan.json"
     result: >
-      Accepted pre-status scratch-007 independently recomputed all seventeen
-      frozen gates as passing. Both cylinder phases classified zero hard
+      Final task-bound scratch-008 replayed the byte-identical scientific row
+      from accepted pre-status scratch-007 and independently recomputed all
+      seventeen frozen gates as passing. Both cylinder phases classified zero hard
       features, retained identical one-component/one-region/zero-boundary v1
       payloads, and stayed within 0.000000008 normalized radial error and
       0.000000015 paired-edge delta. Both smooth diagonal phases classified

@@ -155,6 +155,16 @@ sampled symmetric-distance upper bound of `0.000049835` (ARA C43). This remains
 fixture/oracle integrity evidence only; custody retains
 `claim_authorized: false`.
 
+The final task-bound
+[`scratch-008` protocol](../../../tasks/evidence/METHOD-038/experiment/protocol.yaml),
+[`sealed result`](../../../tasks/evidence/METHOD-038/experiment/inputs/surface_controls_benchmark_result.json),
+[`bundle`](../../../tasks/evidence/METHOD-038/experiment/runs/scratch-008/bundle.yaml),
+and independent
+[`audit`](../../../tasks/evidence/METHOD-038/experiment/runs/scratch-008/audit.json)
+repeat the same scientific row after the current-status correction and bind the
+final checkpoint-4 task hash. All seventeen gates pass and
+`claim_authorized: false` remains unchanged; scratch-008 does not broaden C43.
+
 There is no selected v2, optimized, or GPU backend. The output is deliberately
 non-destructive and makes no atlas-quality claim. `GEOM-076` owns the later,
 evidence-gated decision about converting accepted boundaries into cuts and UV
