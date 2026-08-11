@@ -1232,17 +1232,48 @@
   benchmarks/geometry/manifests/curvature_segmentation_reference_remeshing_10k_fixed.yaml,
   benchmarks/geometry/manifests/curvature_segmentation_reference_profile_10k_cold_fixed.yaml,
   benchmarks/geometry/manifests/curvature_segmentation_reference_profile_10k_reuse_fixed.yaml,
-  tasks/evidence/METHOD-038/experiment/protocol.yaml,
-  tasks/evidence/METHOD-038/experiment/inputs/remeshing_fixed_benchmark_result.json,
-  tasks/evidence/METHOD-038/experiment/inputs/remeshing_automatic_benchmark_result.json,
-  tasks/evidence/METHOD-038/experiment/inputs/cold_fixed_benchmark_result.json,
-  tasks/evidence/METHOD-038/experiment/inputs/cold_automatic_benchmark_result.json,
-  tasks/evidence/METHOD-038/experiment/inputs/reuse_fixed_benchmark_result.json,
-  tasks/evidence/METHOD-038/experiment/inputs/reuse_automatic_benchmark_result.json,
-  tasks/evidence/METHOD-038/experiment/runs/scratch-003/bundle.yaml,
-  tasks/evidence/METHOD-038/experiment/runs/scratch-003/audit.json]
+  tasks/evidence/METHOD-038/superseded/20260811-fold-screening-controls/experiment/protocol.yaml,
+  tasks/evidence/METHOD-038/superseded/20260811-fold-screening-controls/experiment/inputs/remeshing_fixed_benchmark_result.json,
+  tasks/evidence/METHOD-038/superseded/20260811-fold-screening-controls/experiment/inputs/remeshing_automatic_benchmark_result.json,
+  tasks/evidence/METHOD-038/superseded/20260811-fold-screening-controls/experiment/inputs/cold_fixed_benchmark_result.json,
+  tasks/evidence/METHOD-038/superseded/20260811-fold-screening-controls/experiment/inputs/cold_automatic_benchmark_result.json,
+  tasks/evidence/METHOD-038/superseded/20260811-fold-screening-controls/experiment/inputs/reuse_fixed_benchmark_result.json,
+  tasks/evidence/METHOD-038/superseded/20260811-fold-screening-controls/experiment/inputs/reuse_automatic_benchmark_result.json,
+  tasks/evidence/METHOD-038/superseded/20260811-fold-screening-controls/experiment/runs/scratch-003/bundle.yaml,
+  tasks/evidence/METHOD-038/superseded/20260811-fold-screening-controls/experiment/runs/scratch-003/audit.json]
 - **Dependencies**: [C38, C40]
 - **Tags**: geometry, curvature segmentation, cold descriptors, remeshing
   fixture, continuous boundary, automatic selection, CPU reference, negative
   result, scratch
 - **From staging**: O143
+
+## C42: Paired fold controls validate the strict feature and v1 negative-control oracles
+- **Statement**: On exact implementation commit
+  `f622cd0e50229a77564173f0a3afea5e66c96a95`, METHOD-038's deterministic
+  `24 x 48` paired-diagonal fold triplet classifies exactly `0/0/24` crease
+  edges at `30/45/60` degrees under strict `angle > 45 degrees`, preserves the
+  flat mesh's edge lengths within `0.000000038` of the reference bounding-box
+  diagonal, and leaves the constant-curvature v1 component, region, boundary,
+  and published payload equal to the flat controls.
+- **Status**: supported — non-claim-eligible serial CPU scratch fixture/oracle
+  integrity only; both diagonal phases have zero feature-mask mismatch, all
+  eleven frozen gates pass, and independent custody keeps
+  `claim_authorized: false`; no candidate A-D, v2, broader corpus,
+  confirmation, convergence, performance, runtime/UI, Vulkan, GPU, or
+  production behavior is covered
+- **Provenance**: ai-executed
+- **Crystallized via**: artifact-commitment
+- **Falsification criteria**: Repeating the exact frozen source and protocol
+  changes any paired feature count from `0/0/24`, produces nonzero feature-mask
+  error, exceeds the `0.000001` normalized isometry gate, or changes any v1
+  component/region/boundary/payload control.
+- **Proof**: [benchmarks/runners/CurvatureSegmentationProfileRunner.cpp,
+  benchmarks/geometry/manifests/curvature_segmentation_screening_fold_controls.yaml,
+  tasks/evidence/METHOD-038/superseded/20260811-fold-screening-task-status-advance/experiment/protocol.yaml,
+  tasks/evidence/METHOD-038/superseded/20260811-fold-screening-task-status-advance/experiment/inputs/fold_controls_benchmark_result.json,
+  tasks/evidence/METHOD-038/superseded/20260811-fold-screening-task-status-advance/experiment/runs/scratch-005/bundle.yaml,
+  tasks/evidence/METHOD-038/superseded/20260811-fold-screening-task-status-advance/experiment/runs/scratch-005/audit.json]
+- **Dependencies**: [C38, C39]
+- **Tags**: geometry, curvature segmentation, sharp features, isometric fold,
+  CPU reference, fixture control, scratch, bounded result
+- **From staging**: O145

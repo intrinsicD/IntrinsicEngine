@@ -57,10 +57,18 @@ maturity_target: ParityProven
   and adds an opt-in fold-control lane over paired `30/45/60`-degree isometric
   meshes. It checks the shared strict `angle > 45 degrees` feature facts,
   flat/fold edge-length correspondence, and the constant-curvature v1 negative
-  control without executing or selecting a candidate.
-- Next: seal the fold-control replay, then extend the frozen screen with the
-  cylinder and smooth-transition controls before any `cpu_reference_v2`
-  implementation.
+  control without executing or selecting a candidate. Frozen `scratch-004`
+  preserved a schema-only rejection of an unregistered composite backend
+  label; the scientific gates were not changed in response.
+- Accepted `scratch-005` then recorded exact paired-diagonal feature counts
+  `0/0/24` at `30/45/60` degrees, zero feature-mask error, normalized maximum
+  flat/fold edge-length delta `0.000000038`, and identical one-component,
+  one-region, zero-boundary v1 payloads for all three folds. Independent audit
+  accepted the derivation with `claim_authorized: false`; bounded claim C42
+  records fixture/oracle integrity only. Live `scratch-006` is the unchanged
+  final task-bound replay after this status update.
+- Next: extend the frozen screen with the cylinder and smooth-transition
+  controls before any `cpu_reference_v2` implementation.
 
 ## Goal
 - Replace METHOD-037's slow, edge-local boundary inference with an evidence-selected CPU formulation that remains statistically based on the existing Gaussian mixture, aligns region boundaries with persistent surface feature curves, converges across retriangulations of the same embedded surface, and meets a preregistered useful-acceleration gate without weakening correctness, diagnostics, or the Fixed/Automatic UI contract.

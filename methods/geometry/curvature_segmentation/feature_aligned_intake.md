@@ -192,6 +192,16 @@ saddle, tangent plane-cylinder, cylinder-sphere, ridge/valley, nearby-feature,
 junction, open-boundary, and disconnected-component families; this table does
 not silently declare those rows complete.
 
+The bounded fold-control custody replay at source `f622cd0e` exercises only the
+fold and flat/fold oracle rows above. On both diagonal phases, strict
+`theta > 45 degrees` classification reported `0/0/24` crease edges at
+`30/45/60` degrees with zero mask error; the maximum normalized flat/fold edge-
+length delta was `0.000000038`. Constant supplied curvature retained one v1
+component, one connected region, zero boundary edges, and the exact flat-control
+payload in every case. This accepted scratch result (ARA C42) validates the
+fixture lane, not candidate A-D, the broader screen, held-out confirmation, or
+a remeshing/convergence claim.
+
 Candidate A runs every control directly. Candidate B must run the same controls
 after coarse-to-fine transfer and is killed by any lost mandatory fold or
 coarse-level plane/cylinder artifact. Candidate C remains a quality comparator

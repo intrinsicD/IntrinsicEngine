@@ -32,3 +32,11 @@ the runner's composite `cpu_reference_v1+feature_classifier` backend label as
 unsupported before it could create a canonical result. The follow-up changes
 only that serialization field to the registered `cpu_reference` backend and
 requires a new protocol and run identity; scratch-004 is not positive evidence.
+
+`20260811-fold-screening-task-status-advance/` preserves accepted run
+`scratch-005`, its sealed fold-control result, portable bundle, and independent
+audit. That run proved the unchanged post-schema-fix lane before its bounded
+result was recorded in the task, method docs, and ARA ledger. Because official
+custody binds the active task bytes, the live `scratch-006` identity replays the
+same scientific protocol after this documentation advance; scratch-005 remains
+immutable and is not silently rebound to the later task hash.

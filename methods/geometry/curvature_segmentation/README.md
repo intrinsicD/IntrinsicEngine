@@ -93,7 +93,10 @@ contract and states that spatial optimization is local.
   flat/fold edge-length correspondence, and records that the constant supplied-
   curvature v1 negative control remains one region with no boundary. It does
   not execute or select candidate A-D; the disjoint cheapest-screen parameters
-  are frozen in `feature_aligned_intake.md`.
+  are frozen in `feature_aligned_intake.md`. The accepted non-claim custody
+  control reported exact `0/0/24` feature counts on both diagonals, zero mask
+  error, `0.000000038` maximum normalized edge-length delta, and exact v1 flat-
+  control payload parity (ARA C42).
 
 The historical non-claim-eligible
 [`METHOD-038` scratch replay](../../../tasks/evidence/METHOD-038/superseded/20260810-fixture-cohort-runner-change/experiment/protocol.yaml)
@@ -105,17 +108,28 @@ rejected claim authorization as intended. This is bounded negative evidence
 (ARA C40), not a reason to retune or change the production default.
 
 The current non-claim-eligible
-[`scratch-003` protocol](../../../tasks/evidence/METHOD-038/experiment/protocol.yaml)
+[`scratch-003` protocol](../../../tasks/evidence/METHOD-038/superseded/20260811-fold-screening-controls/experiment/protocol.yaml)
 extends that screen across the new fixture lanes. Fixed selected the expected
 two planar-transition components and one sphere component in both cold and
 reusable lanes; its maximum label error was `0.005`, and the planar continuous-
 boundary upper bound was `0.007071061` against the frozen `0.02` tolerance.
 Automatic selected four components in all three lanes and reached `0.656`
 maximum label error on the sphere pair. The independent
-[`audit`](../../../tasks/evidence/METHOD-038/experiment/runs/scratch-003/audit.json)
+[`audit`](../../../tasks/evidence/METHOD-038/superseded/20260811-fold-screening-controls/experiment/runs/scratch-003/audit.json)
 accepted the bundle derivation while leaving `claim_authorized: false` (ARA
 C41). This is a bounded negative fixture result, not a curved-surface geodesic,
 refinement-convergence, performance, or candidate-v2 result.
+
+The accepted non-claim-eligible
+[`scratch-005` fold protocol](../../../tasks/evidence/METHOD-038/superseded/20260811-fold-screening-task-status-advance/experiment/protocol.yaml),
+[`sealed result`](../../../tasks/evidence/METHOD-038/superseded/20260811-fold-screening-task-status-advance/experiment/inputs/fold_controls_benchmark_result.json),
+[`bundle`](../../../tasks/evidence/METHOD-038/superseded/20260811-fold-screening-task-status-advance/experiment/runs/scratch-005/bundle.yaml),
+and independent
+[`audit`](../../../tasks/evidence/METHOD-038/superseded/20260811-fold-screening-task-status-advance/experiment/runs/scratch-005/audit.json)
+remain fixture/oracle integrity evidence only. The earlier `scratch-004`
+schema rejection is preserved separately. Live identity `scratch-006` is
+reserved for the unchanged final task-bound replay after this status update;
+neither historical run is reinterpreted against the later task hash.
 
 There is no selected v2, optimized, or GPU backend. The output is deliberately
 non-destructive and makes no atlas-quality claim. `GEOM-076` owns the later,
