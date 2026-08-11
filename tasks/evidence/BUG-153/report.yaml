@@ -3,12 +3,12 @@ task_id: BUG-153
 workflow_profile: high-risk
 status: complete
 generated_by: tools/agents/workflow_evidence.py
-generated_at: '2026-08-11T16:24:02Z'
+generated_at: '2026-08-11T16:39:28Z'
 claim_eligible: false
 source:
   base_ref: origin/main
   base_revision: 20e58c6a00c1c85c0d1f8b05a02e026c0da3a078
-  head_revision: 08e288287f8974f958c24be6be8c7731a614ab72
+  head_revision: 960ea925ba57d174ff71313f40c70c83435eb7c1
   branch: codex/bug-153-curvature-taubin
   worktree: /home/alex/Documents/IntrinsicEngine-bug153
   dirty: false
@@ -26,14 +26,14 @@ source:
   - path: tasks/backlog/bugs/index.md
     sha256: 55ba5ba167e01a87fac78059eb8d7bab0c341f7e1a6c7a3df3cc4bf3cf4c8234
   - path: tasks/done/BUG-153-curvature-taubin-edge-dihedral-estimator.md
-    sha256: eb2d26caf944dce7cf238e1a99a8e2b505543061abf6788efc473fe5f4b57488
+    sha256: 9564467e3ecba49bc9d5da4f1b729c79b6819abd07f693ab1052e5a29112f244
   - path: tasks/done/RETIREMENT-LOG.md
     sha256: 077a640d80655c1bb0f983b4cb216ec3f4afe5df9cc17a8cac7fab017bceb470
   - path: tests/contract/runtime/Test.CurvatureSegmentationOperations.cpp
     sha256: 3ab2fb1f9da99ac998a37182c4e60ed331711044bda87eb51e73b01025f2270c
   - path: tests/unit/geometry/Test.CurvatureTensor.cpp
-    sha256: 069a6fc1536298406fdc6051145853a3081c2c0d3151753d1bf97ef8a8bf4f73
-  content_digest: bfe43a116c98d68769470ecfccff48fc48328a528caca492df37093f6102ddcf
+    sha256: 14272c09542fa86504d1d4a4adc3e03d4a47707b972c2deab3729066246c849f
+  content_digest: 41c205cf7ac4a34e1bcfe8b5a5717c3a3402e03b4d83e5e4b664bfe46295cf7f
 touched:
   paths:
   - docs/architecture/geometry.md
@@ -89,6 +89,7 @@ commands:
 - receipt: tasks/evidence/BUG-153/commands/ci-build-intrinsic-tests-r2.json
 - receipt: tasks/evidence/BUG-153/commands/ci-build-intrinsic-tests.json
 - receipt: tasks/evidence/BUG-153/commands/ci-configure.json
+- receipt: tasks/evidence/BUG-153/commands/determinism-repeat.json
 - receipt: tasks/evidence/BUG-153/commands/diff-check-final.json
 - receipt: tasks/evidence/BUG-153/commands/diff-check.json
 - receipt: tasks/evidence/BUG-153/commands/doc-links-final.json
@@ -107,6 +108,12 @@ commands:
 - receipt: tasks/evidence/BUG-153/commands/full-cpu-tests-r2.json
 - receipt: tasks/evidence/BUG-153/commands/layering.json
 - receipt: tasks/evidence/BUG-153/commands/module-inventory.json
+- receipt: tasks/evidence/BUG-153/commands/review-repair-build.json
+- receipt: tasks/evidence/BUG-153/commands/review-repair-diff-check.json
+- receipt: tasks/evidence/BUG-153/commands/review-repair-doc-links.json
+- receipt: tasks/evidence/BUG-153/commands/review-repair-focused-r2.json
+- receipt: tasks/evidence/BUG-153/commands/review-repair-task-policy.json
+- receipt: tasks/evidence/BUG-153/commands/review-repair-validate-tasks.json
 - receipt: tasks/evidence/BUG-153/commands/root-hygiene.json
 - receipt: tasks/evidence/BUG-153/commands/source-docs-final.json
 - receipt: tasks/evidence/BUG-153/commands/source-docs-r2.json
@@ -132,8 +139,10 @@ changed_public_contracts:
 - Outward convex curvature is positive; orientation reversal negates curvature along physical directions
   and swaps ordered max/min slots when anisotropic
 diagnostics_and_previews:
-- Focused curvature/runtime selector passed 32/32; full CPU passed 4234/4234; grouped ASan and UBSan each
-  passed 2736/2736
+- Focused curvature/runtime selector passed 32/32; the repaired non-aliased determinism oracle passed
+  20 consecutive runs
+- Full CPU selector was green with 4233 passes plus one capability skip among 4234 selected; ASan passed
+  2736/2736; UBSan was green with 2735 passes plus one capability skip among 2736 selected
 - Live Sandbox applied bunny_decimated.obj and armadillo.obj with zero non-finite scalar or direction
   publications
 - Promoted Vulkan remained fail-closed at BarrierValidationFailed, so live acceptance is CPU command/publication
@@ -149,6 +158,9 @@ residual_risks:
   receive three deterministic cotan passes
 - The Taubin compatibility name follows framework24; the estimator is not Taubin 1995's vertex-neighbour
   directional-curvature quadrature
+- Absolute degeneracy thresholds are covered at 1x and 3x scale but not at extreme coordinate magnitudes
+- Standalone Meyer and full edge-dihedral calls intentionally reuse canonical property names, so a later
+  call overwrites earlier handles on the same mesh
 - Physical DISPLAY=:1 reproduces tracked BUG-118's libX11/XIM leak; the unchanged ASan suite passed on
   isolated DISPLAY=:99
 skipped_checks:
@@ -165,8 +177,11 @@ artifacts:
 - path: tasks/evidence/BUG-153/artifacts/live-sandbox.log
   sha256: e625be2ef2cd1786fcf99c09199a7cf10605d089de3b66015a9f31d17a91b750
   kind: file
-- path: tasks/evidence/BUG-153/commands/final-focused-tests-r2.json
-  sha256: 563ff974044aae4f8520b8f77b62541830e1c6ce8bb5d1c071dceeed3ac73080
+- path: tasks/evidence/BUG-153/commands/review-repair-focused-r2.json
+  sha256: 7f691d37656d9455ea904be4fabd210aafc08f4f7b0e7555b8216b79acf3c106
+  kind: file
+- path: tasks/evidence/BUG-153/commands/determinism-repeat.json
+  sha256: 4406440621cf6ea8cc84199c5ea16aca0675448428c1cfc610e6b2ff2a2e6319
   kind: file
 - path: tasks/evidence/BUG-153/commands/full-cpu-tests-r2.json
   sha256: f4b512735d71274efcb51a97a99747c1d2140cf10f6fbd94b9b2e28788c9d8c3
