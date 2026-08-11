@@ -17,12 +17,18 @@ contract_review: "PROC-033 establishes repo.source-documentation through one can
 
 ## Status
 
-- Technical implementation is complete. The current report-only inventory finds
-  436 objective errors (408 missing module/header synopses and 28 explicitly
-  non-current README sections) plus review-only comment/organization hotspots;
-  cleanup remains follow-up migration work.
-- Pending: final structural verification, workflow evidence, and an independent
-  fixed-surface review before retirement.
+- Completed and retired on 2026-08-11 at `Operational` maturity. The canonical
+  policy, reusable audit skill, focused regression suite, and CI routing are in
+  place; implementation commit `07c3f64b` reached `main` through merge commit
+  `2f7fe97b`.
+- The human reviewer accepted the merged implementation and explicitly
+  authorized the deterministic retirement bookkeeping on 2026-08-11. The final
+  report, handoff, and review record bind that reviewed closure surface.
+- The report-only inventory found 436 objective errors (408 missing
+  module/header synopses and 28 explicitly non-current README sections) plus
+  review-only comment/organization hotspots. Cleanup remains bounded follow-up
+  work rather than part of this policy task.
+- Completion commit: this retirement commit.
 
 ## Goal
 
@@ -96,7 +102,7 @@ contract_review: "PROC-033 establishes repo.source-documentation through one can
       auto-fixed, suppressed, or promoted into a repository-wide blocking gate.
 - [x] The skill does not reward repetitive comments or manually maintained API
       inventories that make code less self-documenting.
-- [ ] High-risk workflow evidence and an independent fixed-surface review are
+- [x] High-risk workflow evidence and an independent fixed-surface review are
       recorded before retirement.
 
 ## Verification
@@ -119,8 +125,10 @@ C++ setup. Its complete command bundle passed on 2026-08-11, including the new
 9-case audit regression, affected workflow-policy regressions, task/state
 checks, documentation links, skill sync, and session-brief freshness. Strict
 task, docs-sync, link, root-hygiene, and test-layout checks also passed. The
-  report-only whole-tree audit scanned 1,319 files and recorded 436 objective
-  errors plus 3,835 review findings without changing source files.
+report-only whole-tree audit scanned 1,319 files and recorded 436 objective
+errors plus 3,835 review findings without changing source files. The human
+reviewer accepted the merged implementation and explicitly authorized the
+retirement-only task/index/evidence updates on 2026-08-11.
 
 ## Forbidden changes
 
