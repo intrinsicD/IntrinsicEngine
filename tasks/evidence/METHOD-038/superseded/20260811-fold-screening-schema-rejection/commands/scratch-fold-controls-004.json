@@ -1,0 +1,21 @@
+{
+  "command": [
+    "python3",
+    "-c",
+    "import subprocess, sys, yaml; from pathlib import Path; protocol = yaml.safe_load(Path(\"tasks/evidence/METHOD-038/experiment/protocol.yaml\").read_text(encoding=\"utf-8\")); sys.exit(subprocess.run(protocol[\"command\"], check=False).returncode)"
+  ],
+  "command_display": "python3 -c 'import subprocess, sys, yaml; from pathlib import Path; protocol = yaml.safe_load(Path(\"tasks/evidence/METHOD-038/experiment/protocol.yaml\").read_text(encoding=\"utf-8\")); sys.exit(subprocess.run(protocol[\"command\"], check=False).returncode)'",
+  "cwd": ".",
+  "duration_ms": 5547,
+  "exit_code": 1,
+  "finished_at": "2026-08-11T01:56:18Z",
+  "label": "scratch-fold-controls-004",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-11T01:56:13Z",
+  "stderr_path": "tasks/evidence/METHOD-038/commands/scratch-fold-controls-004.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/METHOD-038/commands/scratch-fold-controls-004.stdout.log",
+  "stdout_sha256": "6877672fdcc6c1b648705ddd3c887b95a6c48d98a47e206875d44bcc7fdc3ad8",
+  "task_id": "METHOD-038"
+}

@@ -1539,7 +1539,7 @@ namespace
             << "{\n"
             << "  \"benchmark_id\": \"" << benchmarkId << "\",\n"
             << "  \"method\": \"geometry.curvature_segmentation\",\n"
-            << "  \"backend\": \"cpu_reference_v1+feature_classifier\",\n"
+            << "  \"backend\": \"cpu_reference\",\n"
             << "  \"dataset\": \"builtin.fold_threshold_triplet.v1\",\n"
             << "  \"commit\": \"" << commit << "\",\n"
             << "  \"metrics\": {\n"

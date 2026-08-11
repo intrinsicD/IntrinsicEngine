@@ -1,0 +1,28 @@
+{
+  "benchmark_id": "geometry.curvature_segmentation.screening.fold_controls",
+  "method": "geometry.curvature_segmentation",
+  "backend": "cpu_reference_v1+feature_classifier",
+  "dataset": "builtin.fold_threshold_triplet.v1",
+  "commit": "27b0c3e8825a7b48c01bf869377fcb791e2ef74a",
+  "metrics": {
+    "runtime_ms": 195.288966000,
+    "memory_peak_bytes": 12845056,
+    "quality_error_l2": 0.000000000,
+    "quality_error_linf": 0.000000038,
+    "population_count": 3
+  },
+  "diagnostics": {
+    "runner": "IntrinsicCurvatureSegmentationProfile",
+    "implementation_version": "slice_a_control_v1",
+    "candidate_selection": "none",
+    "dihedral_threshold_degrees": 45.000000000,
+    "threshold_comparison": "strictly_greater",
+    "boundary_is_feature": false,
+    "triangulations": ["diagonal_a","diagonal_b"],
+    "curvature_lane": "constant_supplied_negative_control",
+    "quality_error_l2_unit": "maximum_live_edge_feature_mask_mismatch_fraction",
+    "quality_error_linf_unit": "bbox_normalized_flat_fold_edge_length_delta",
+    "variants": [{"dihedral_degrees":30.000000000,"face_count":2304,"edge_count":3528,"expected_feature_edge_count":0,"classified_feature_edge_counts":[0,0],"feature_mask_error_fraction":0.000000000,"v1_selected_component_count":1,"v1_connected_region_count":1,"v1_boundary_edge_count":0,"v1_matches_flat_control":true,"passed":true},{"dihedral_degrees":45.000000000,"face_count":2304,"edge_count":3528,"expected_feature_edge_count":0,"classified_feature_edge_counts":[0,0],"feature_mask_error_fraction":0.000000000,"v1_selected_component_count":1,"v1_connected_region_count":1,"v1_boundary_edge_count":0,"v1_matches_flat_control":true,"passed":true},{"dihedral_degrees":60.000000000,"face_count":2304,"edge_count":3528,"expected_feature_edge_count":24,"classified_feature_edge_counts":[24,24],"feature_mask_error_fraction":0.000000000,"v1_selected_component_count":1,"v1_connected_region_count":1,"v1_boundary_edge_count":0,"v1_matches_flat_control":true,"passed":true}]
+  },
+  "status": "passed"
+}
