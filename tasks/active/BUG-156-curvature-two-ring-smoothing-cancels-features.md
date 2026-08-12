@@ -128,6 +128,9 @@ maturity_target: Operational
 - [x] Update `docs/architecture/geometry.md` estimator description.
 - [x] Record the defect analysis, measurements, and decision in
       `docs/reports/2026-08-12-curvature-support-smoothing-defect.md`.
+- [x] Register the accuracy result in the ARA ledger (`O154`, `N432`/`N433`,
+      claim `C50`; `C48` marked superseded in part) with test-bound
+      falsification criteria.
 - [x] Synchronize the active task index and session brief.
 
 ## Acceptance criteria

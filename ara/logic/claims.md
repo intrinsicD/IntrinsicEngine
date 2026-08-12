@@ -1437,12 +1437,18 @@
   ill-conditioned faces are instead diagnosed and excluded from estimator and
   smoothing support, so runtime can report finite support/nonzero/range/quality
   diagnostics and reject a field with zero estimable support.
-- **Status**: supported — 25-slot PMP numeric oracle, analytic/scale/degeneracy
-  CPU contracts, runtime diagnostics, sanitizer evidence, and a non-claim local
-  differential that compared 80 meshes and 2,530,726 vertices; the 62 meshes
-  without rejected triangles stayed below `4.55e-7`/`2.23e-7` worst relative
-  L2 and all material outliers localized to rejected support; no universal
-  estimator-quality or performance claim
+- **Status**: superseded in part by C50 (2026-08-12, BUG-156) — the two-ring
+  support and three damped smoothing passes this row pinned were measured to
+  cancel genuine curvature beside sharp creases and are no longer the shipped
+  default; the signed 3x3 eigensystem, boundary interpolation, complementary
+  pairing, scale-independent predicates, fail-closed quality gating, and
+  zero-support rejection remain in force under C50. Historical support: 25-slot
+  PMP numeric oracle, analytic/scale/degeneracy CPU contracts, runtime
+  diagnostics, sanitizer evidence, and a non-claim local differential that
+  compared 80 meshes and 2,530,726 vertices; the 62 meshes without rejected
+  triangles stayed below `4.55e-7`/`2.23e-7` worst relative L2 and all material
+  outliers localized to rejected support; no universal estimator-quality or
+  performance claim
 - **Provenance**: ai-suggested
 - **Crystallized via**: artifact-commitment
 - **Falsification criteria**: The checked-in 25-slot oracle exceeds `2e-6`,
@@ -1491,3 +1497,49 @@
 - **Tags**: geometry, principal curvature, estimator selection, PMP,
   Rusinkiewicz, corrected curvature measures, literature, bounded result
 - **From staging**: O153
+
+## C50: One-ring unsmoothed hinge eigenvalues publish accurate curvature
+- **Statement**: The curvature tensor default is the signed edge-dihedral
+  hinge formulation with support restricted to each vertex's own incident
+  edges and no eigenvalue post-smoothing; published `H = (κ₁ + κ₂)/2` and
+  `K = κ₁κ₂` equal the principal invariants exactly at every vertex, and
+  diagnostics extrema bound every nonzero published value. The superseded
+  PMP-default two-ring support plus three damped smoothing passes bled
+  sharp-crease bending into flanking vertices and cancelled genuine curvature
+  across convex/concave transitions: on `tests/data/sculpt.obj` (closed
+  genus-2, clean support, every vertex interior) it measured 62% median
+  relative mean-curvature error against the independent Meyer cotan operator
+  with 65 near-zero and 917 sign-flipped vertices, while the corrected
+  default measures 0.07% median error with zero of either, retains at least
+  30% of Meyer magnitude on crease flanks where the superseded pipeline lost
+  up to 79%, and matches an independent NumPy oracle of the formulation to
+  3e-16 on the frozen fixture. Both corrected parameters remain expressible
+  in PMP's API (`two_ring_neighborhood = false`, zero smoothing steps).
+- **Status**: supported — CPU evidence class: committed geometry regressions
+  (independent-replica oracle at `1e-12` tolerance, sculpt zero-band/sign-flip
+  and sub-1% median-relative-error assertions, crease-flank retention,
+  open-mesh invariant/diagnostics bounds) on the committed asset; the
+  session-local variant/noise sweep is recorded in the report and is not a
+  universal accuracy or estimator-selection claim (C49 remains the
+  selection-scope claim)
+- **Provenance**: ai-suggested
+- **Crystallized via**: artifact-commitment
+- **Falsification criteria**: `CurvatureTensor.SculptAssetHasNoZeroCurvatureBands`
+  observes a supported-vertex deficit, any zero-band or sign-flipped vertex,
+  or median relative deviation from the Meyer cross-check at or above 1% on
+  `tests/data/sculpt.obj`; `CurvatureTensor.CreaseFlanksKeepGenuineCurvature`
+  observes a sign flip or below-30% magnitude retention on a probed flank
+  vertex; `CurvatureTensor.MatchesEdgeDihedralReferenceOracle` deviates beyond
+  `1e-12`; or `CurvatureTensor.OpenMeshFullFieldKeepsPrincipalInvariants`
+  finds published H/K diverging from the principal invariants or a nonzero
+  value outside the diagnostics extrema.
+- **Proof**: [src/geometry/Geometry.HalfedgeMesh.Curvature.cpp,
+  src/geometry/Geometry.HalfedgeMesh.Curvature.cppm,
+  tests/unit/geometry/Test.CurvatureTensor.cpp,
+  tests/data/sculpt.obj,
+  docs/reports/2026-08-12-curvature-support-smoothing-defect.md,
+  tasks/active/BUG-156-curvature-two-ring-smoothing-cancels-features.md]
+- **Dependencies**: [C46, C47, C48]
+- **Tags**: geometry, principal curvature, hinge tensor, support radius,
+  smoothing, accuracy, BUG-156
+- **From staging**: O154

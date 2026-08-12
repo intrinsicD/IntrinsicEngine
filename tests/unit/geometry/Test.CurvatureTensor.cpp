@@ -833,20 +833,36 @@ TEST(CurvatureTensor, SculptAssetHasNoZeroCurvatureBands)
 
     std::size_t zeroBand = 0;
     std::size_t signFlips = 0;
+    std::vector<double> relativeDeviation;
+    relativeDeviation.reserve(tensorMean.size());
     for (std::size_t i = 0; i < tensorMean.size(); ++i)
     {
         const bool meyerCurved = std::abs(meyerMean[i]) > 0.5 * meyerScale;
-        if (meyerCurved && std::abs(tensorMean[i]) < 0.05 * tensorScale)
+        if (!meyerCurved)
+            continue;
+        if (std::abs(tensorMean[i]) < 0.05 * tensorScale)
             ++zeroBand;
-        if (meyerCurved && std::abs(tensorMean[i]) > 0.1 * tensorScale
+        if (std::abs(tensorMean[i]) > 0.1 * tensorScale
             && tensorMean[i] * meyerMean[i] < 0.0)
         {
             ++signFlips;
         }
+        relativeDeviation.push_back(
+            std::abs(tensorMean[i] - meyerMean[i]) / std::abs(meyerMean[i]));
     }
-    // Superseded pipeline: 65 zero-band vertices and 917 sign flips.
+    // Superseded pipeline: 65 zero-band vertices, 917 sign flips, and 62%
+    // median relative deviation. The corrected pipeline measures 0.07%.
     EXPECT_EQ(zeroBand, 0u);
     EXPECT_EQ(signFlips, 0u);
+    ASSERT_FALSE(relativeDeviation.empty());
+    const std::size_t middle = relativeDeviation.size() / 2u;
+    std::nth_element(
+        relativeDeviation.begin(),
+        relativeDeviation.begin() + middle,
+        relativeDeviation.end());
+    EXPECT_LT(relativeDeviation[middle], 0.01)
+        << "median relative mean-curvature deviation from the Meyer "
+           "cross-check must stay below 1%";
 }
 
 // =============================================================================

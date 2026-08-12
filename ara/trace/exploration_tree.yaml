@@ -10109,3 +10109,51 @@ tree:
       branch tips were already ancestors, and two historical stashes were
       proven redundant against committed history before cleanup.
     status: resolved
+  - id: N432
+    type: experiment
+    title: "Diagnose sculpt.obj zero-curvature bands against an independent operator"
+    provenance: ai-executed
+    timestamp: "2026-08-12T09:40+00:00"
+    also_depends_on: [N426, N427]
+    evidence:
+      - "docs/reports/2026-08-12-curvature-support-smoothing-defect.md"
+      - "tests/data/sculpt.obj"
+      - "tests/unit/geometry/Test.CurvatureTensor.cpp"
+    detail: >
+      Reported zero/too-small curvature regions on tests/data/sculpt.obj were
+      first tested against structural hypotheses: the asset is a closed
+      genus-2 manifold (V=3669, E=11013, F=7342, zero boundary, minimum
+      triangle quality 0.46), the engine builds exactly that mesh with zero
+      rejected triangles, and the engine field equals an independent NumPy
+      replica to 1.4e-14, ruling out import, construction, circulators, and
+      quality gating. Against the independent Meyer cotan operator the
+      shipped two-ring plus three-damped-smoothing configuration had 62%
+      median relative mean-curvature error, 65 near-zero vertices, and 917
+      sign flips; two-ring raw showed +11 kmax spikes one ring from creases
+      whose true H is -2; one-ring unsmoothed measured 0.1% median error with
+      zero cancelled or flipped vertices and remained dominant under 0.5%-2%
+      normal-noise perturbation. Tensor-space smoothing did not rescue the
+      previous default.
+    status: resolved
+  - id: N433
+    type: decision
+    title: "Adopt one-ring unsmoothed hinge eigenvalues as the curvature default"
+    provenance: ai-executed
+    timestamp: "2026-08-12T09:40+00:00"
+    also_depends_on: [N432]
+    choice: >
+      Restrict hinge-tensor support to each vertex's own incident edges and
+      publish unsmoothed eigenvalues; keep the signed 3x3 eigensystem,
+      complementary pairing, boundary interpolation, dimensionless quality
+      gate, and diagnostics. Both parameters remain expressible in PMP's API
+      (two_ring_neighborhood=false, zero smoothing steps). Stabilization
+      becomes an explicit caller-side Geometry.Smoothing decision.
+    alternatives:
+      - "Keep PMP defaults for literal parity despite the measured 62% median error."
+      - "Smooth the tensor components instead of eigenvalues (measured: does not rescue the default)."
+      - "Switch estimator family (Rusinkiewicz/corrected measures) without the controlled benchmark N427 requires."
+    evidence:
+      - "docs/reports/2026-08-12-curvature-support-smoothing-defect.md"
+      - "N432"
+      - "C50"
+    status: resolved

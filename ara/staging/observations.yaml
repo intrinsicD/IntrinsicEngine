@@ -2769,3 +2769,26 @@ observations:
     promoted_to: "logic/claims.md:C49"
     crystallized_via: artifact-commitment
     stale: false
+  - id: O154
+    timestamp: "2026-08-12T09:40+00:00"
+    provenance: ai-suggested
+    content: >
+      The PMP-default two-ring hinge support and three damped
+      eigenvalue-smoothing passes destroy genuine curvature beside sharp
+      creases: on tests/data/sculpt.obj the published mean curvature had 62%
+      median relative error against the independent Meyer cotan operator with
+      65 near-zero and 917 sign-flipped vertices, while one-ring unsmoothed
+      eigenvalues measure 0.07% median error with none. Parity with PMP hid
+      the defect because both sides ran identical parameters.
+    context: >
+      BUG-156 diagnosis after a Sandbox report of zero/too-small curvature
+      regions. Import, halfedge construction, circulators, connectivity, and
+      quality gating were ruled out; an independent NumPy replica reproduced
+      the engine field to 1.4e-14 and localized the defect to the support and
+      smoothing parameters.
+    potential_type: claim
+    bound_to: [N432, N433]
+    promoted: true
+    promoted_to: "logic/claims.md:C50"
+    crystallized_via: artifact-commitment
+    stale: false
