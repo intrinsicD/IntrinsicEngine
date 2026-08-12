@@ -10157,3 +10157,45 @@ tree:
       - "N432"
       - "C50"
     status: resolved
+  - id: N434
+    type: experiment
+    title: "Compare Intrinsic curvature semantics directly with Framework24"
+    provenance: ai-executed
+    timestamp: "2026-08-12T12:30+02:00"
+    also_depends_on: [N432, N433]
+    evidence:
+      - "ara/evidence/tables/curvature_framework24_parity_2026-08-12.md"
+      - "tests/unit/geometry/Test.CurvatureTensor.cpp"
+      - "tests/data/sculpt.obj"
+    result: >
+      The prior comparison target was wrong: Framework24 differs from the
+      one-ring Intrinsic/PMP path in signed hinge orientation, legacy mixed
+      areas, two-ring support, direct boundary evaluation, eigenvalue/direction
+      pairing, and three in-place full-neighbor smoothing passes. A direct port
+      compared against the actual sequential Framework24 implementation on
+      identical coordinates matched all 3,669 sculpt vertices with maximum
+      absolute errors of 6.22e-15 for kmin and 2.78e-15 for kmax. Acute,
+      obtuse, and open fixtures separately matched to roundoff.
+    status: resolved
+  - id: N435
+    type: decision
+    title: "Adopt deterministic sequential Framework24 curvature semantics"
+    provenance: ai-executed
+    timestamp: "2026-08-12T12:30+02:00"
+    also_depends_on: [N434]
+    choice: >
+      Port Framework24 CurvatureTaubin directly and preserve all defined
+      numerical choices, using only Intrinsic mesh/property adapters and
+      fail-closed invalid-support diagnostics. Execute its in-place smoother
+      sequentially in stable vertex order because the default
+      ParallelUnsequential policy has unsynchronized reads and writes. Keep
+      Framework24 MeshIo AABB normalization outside the curvature operation.
+    alternatives:
+      - "Retain the Meyer-aligned one-ring field despite the requested Framework24 interoperability."
+      - "Approximate Framework24 through PMP parameters despite distinct area, boundary, sign, and smoothing semantics."
+      - "Copy Framework24's nondeterministic parallel shared-array updates."
+    evidence:
+      - "ara/evidence/tables/curvature_framework24_parity_2026-08-12.md"
+      - "C51"
+      - "N434"
+    status: resolved

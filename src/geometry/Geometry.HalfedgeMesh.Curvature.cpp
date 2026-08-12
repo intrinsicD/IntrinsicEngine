@@ -1,13 +1,8 @@
-// Implements discrete scalar operators and the signed edge-dihedral curvature
-// tensor published through canonical vertex fields. The tensor uses one-ring
-// hinge support and publishes unsmoothed eigenvalues: the previous PMP-default
-// two-ring support bled sharp-crease bending into flanking vertices, and the
-// three damped eigenvalue-smoothing passes then cancelled genuine curvature
-// into near-zero bands (BUG-156, tests/data/sculpt.obj).
+// Implements discrete scalar operators and the deterministic Framework24
+// edge-dihedral tensor published through canonical vertex fields.
 module;
 
 #include <algorithm>
-#include <array>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
@@ -15,6 +10,7 @@ module;
 #include <optional>
 #include <vector>
 
+#include <Eigen/Eigenvalues>
 #include <glm/glm.hpp>
 #include <glm/geometric.hpp>
 
@@ -56,60 +52,10 @@ namespace Geometry::Curvature
         struct TensorComputation
         {
             std::vector<TensorVertex> Vertices{};
-            // Unlike Vertices::Valid, this mask remains set for ordinary zero
-            // sentinels (for example, boundary vertices with no interior
-            // interpolation support). It is cleared only where unreliable face
-            // geometry invalidates the local estimate, so boundary
-            // interpolation cannot inherit values from unreliable neighbours.
-            std::vector<std::uint8_t> ReliableField{};
             std::size_t DegenerateFaceCount{0u};
             std::size_t IllConditionedFaceCount{0u};
             std::size_t UnsupportedFaceCount{0u};
             double MinimumTriangleQuality{0.0};
-        };
-
-        struct SymmetricTensor
-        {
-            double M00{0.0};
-            double M01{0.0};
-            double M02{0.0};
-            double M11{0.0};
-            double M12{0.0};
-            double M22{0.0};
-
-            void AddOuterProduct(const glm::dvec3& vector, double scale) noexcept
-            {
-                M00 += scale * vector.x * vector.x;
-                M01 += scale * vector.x * vector.y;
-                M02 += scale * vector.x * vector.z;
-                M11 += scale * vector.y * vector.y;
-                M12 += scale * vector.y * vector.z;
-                M22 += scale * vector.z * vector.z;
-            }
-
-            void Divide(double value) noexcept
-            {
-                M00 /= value;
-                M01 /= value;
-                M02 /= value;
-                M11 /= value;
-                M12 /= value;
-                M22 /= value;
-            }
-
-            [[nodiscard]] double MaxAbsCoefficient() const noexcept
-            {
-                return std::max({
-                    std::abs(M00), std::abs(M01), std::abs(M02),
-                    std::abs(M11), std::abs(M12), std::abs(M22)});
-            }
-        };
-
-        struct SymmetricEigenSystem
-        {
-            std::array<double, 3> Values{};
-            std::array<glm::dvec3, 3> Vectors{};
-            bool Valid{false};
         };
 
         [[nodiscard]] bool IsFinite(const glm::dvec3& value) noexcept
@@ -117,180 +63,6 @@ namespace Geometry::Curvature
             return std::isfinite(value.x)
                 && std::isfinite(value.y)
                 && std::isfinite(value.z);
-        }
-
-        // Allocation-free Jacobi decomposition of the local 3x3 tensor. The
-        // stopping criterion is relative to the tensor magnitude so uniformly
-        // scaling a mesh cannot change which rotations are performed. Values
-        // are returned in decreasing algebraic order.
-        [[nodiscard]] SymmetricEigenSystem DecomposeSymmetric(
-            const SymmetricTensor& tensor) noexcept
-        {
-            const double matrixScale = tensor.MaxAbsCoefficient();
-            if (!std::isfinite(matrixScale))
-                return {};
-            if (matrixScale == 0.0)
-            {
-                return SymmetricEigenSystem{
-                    .Values = {0.0, 0.0, 0.0},
-                    .Vectors = {
-                        glm::dvec3{1.0, 0.0, 0.0},
-                        glm::dvec3{0.0, 1.0, 0.0},
-                        glm::dvec3{0.0, 0.0, 1.0}},
-                    .Valid = true,
-                };
-            }
-            const double convergenceTolerance =
-                64.0 * std::numeric_limits<double>::epsilon() * matrixScale;
-            double a[3][3]{
-                {tensor.M00, tensor.M01, tensor.M02},
-                {tensor.M01, tensor.M11, tensor.M12},
-                {tensor.M02, tensor.M12, tensor.M22},
-            };
-            double vectors[3][3]{
-                {1.0, 0.0, 0.0},
-                {0.0, 1.0, 0.0},
-                {0.0, 0.0, 1.0},
-            };
-
-            bool converged = false;
-            for (int iteration = 0; iteration < 100; ++iteration)
-            {
-                int row = 0;
-                int column = 1;
-                if (std::abs(a[0][1]) < std::abs(a[0][2]))
-                {
-                    if (std::abs(a[0][2]) < std::abs(a[1][2]))
-                    {
-                        row = 1;
-                        column = 2;
-                    }
-                    else
-                    {
-                        row = 0;
-                        column = 2;
-                    }
-                }
-                else if (std::abs(a[0][1]) < std::abs(a[1][2]))
-                {
-                    row = 1;
-                    column = 2;
-                }
-
-                if (std::abs(a[row][column]) <= convergenceTolerance)
-                {
-                    converged = true;
-                    break;
-                }
-
-                const double theta = 0.5
-                    * (a[column][column] - a[row][row])
-                    / a[row][column];
-                double tangent = 1.0
-                    / (std::abs(theta) + std::sqrt(1.0 + theta * theta));
-                if (theta < 0.0)
-                    tangent = -tangent;
-                const double cosine = 1.0 / std::sqrt(1.0 + tangent * tangent);
-                const double sine = tangent * cosine;
-
-                double rotation[3][3]{
-                    {1.0, 0.0, 0.0},
-                    {0.0, 1.0, 0.0},
-                    {0.0, 0.0, 1.0},
-                };
-                rotation[row][row] = cosine;
-                rotation[column][column] = cosine;
-                rotation[row][column] = sine;
-                rotation[column][row] = -sine;
-
-                double intermediate[3][3]{};
-                double rotated[3][3]{};
-                double rotatedVectors[3][3]{};
-                for (int i = 0; i < 3; ++i)
-                {
-                    for (int j = 0; j < 3; ++j)
-                    {
-                        for (int k = 0; k < 3; ++k)
-                        {
-                            intermediate[i][j] += a[i][k] * rotation[k][j];
-                            rotatedVectors[i][j] +=
-                                vectors[i][k] * rotation[k][j];
-                        }
-                    }
-                }
-                for (int i = 0; i < 3; ++i)
-                {
-                    for (int j = 0; j < 3; ++j)
-                    {
-                        for (int k = 0; k < 3; ++k)
-                            rotated[i][j] += rotation[k][i] * intermediate[k][j];
-                        a[i][j] = rotated[i][j];
-                        vectors[i][j] = rotatedVectors[i][j];
-                    }
-                }
-            }
-
-            SymmetricEigenSystem result{};
-            if (!converged)
-                return result;
-
-            const std::array<double, 3> diagonal{a[0][0], a[1][1], a[2][2]};
-            std::array<int, 3> sorted{};
-            if (diagonal[0] > diagonal[1])
-            {
-                if (diagonal[1] > diagonal[2])
-                    sorted = {0, 1, 2};
-                else if (diagonal[0] > diagonal[2])
-                    sorted = {0, 2, 1};
-                else
-                    sorted = {2, 0, 1};
-            }
-            else if (diagonal[0] > diagonal[2])
-            {
-                sorted = {1, 0, 2};
-            }
-            else if (diagonal[1] > diagonal[2])
-            {
-                sorted = {1, 2, 0};
-            }
-            else
-            {
-                sorted = {2, 1, 0};
-            }
-
-            result.Values = {
-                diagonal[sorted[0]],
-                diagonal[sorted[1]],
-                diagonal[sorted[2]],
-            };
-            result.Vectors[0] = {
-                vectors[0][sorted[0]],
-                vectors[1][sorted[0]],
-                vectors[2][sorted[0]],
-            };
-            result.Vectors[1] = {
-                vectors[0][sorted[1]],
-                vectors[1][sorted[1]],
-                vectors[2][sorted[1]],
-            };
-            result.Vectors[2] = glm::cross(
-                result.Vectors[0], result.Vectors[1]);
-            const double thirdLength = glm::length(result.Vectors[2]);
-            if (!std::isfinite(thirdLength)
-                || thirdLength
-                    <= 64.0 * std::numeric_limits<double>::epsilon())
-                return SymmetricEigenSystem{};
-            result.Vectors[2] /= thirdLength;
-            for (std::size_t i = 0u; i < 3u; ++i)
-            {
-                if (!std::isfinite(result.Values[i])
-                    || !IsFinite(result.Vectors[i]))
-                {
-                    return SymmetricEigenSystem{};
-                }
-            }
-            result.Valid = true;
-            return result;
         }
 
         [[nodiscard]] glm::dvec3 GeometricVertexNormal(
@@ -307,12 +79,165 @@ namespace Geometry::Curvature
             return normal / length;
         }
 
-        // Accumulates signed interior hinge samples over each non-boundary
-        // center's own incident edges (the PMP formulation restricted to
-        // one-ring support), then interpolates boundary scalar values from
-        // interior neighbours. Two-ring support is deliberately not used: it
-        // integrates sharp-crease bending into flanking vertices whose local
-        // surface is smooth, overwhelming their own signal.
+        constexpr double kFramework24CotanBound = 19.1;
+        constexpr std::size_t kFramework24SmoothingSteps = 3u;
+
+        [[nodiscard]] double Framework24ClampCotan(
+            const double value) noexcept
+        {
+            return std::clamp(
+                value, -kFramework24CotanBound, kFramework24CotanBound);
+        }
+
+        [[nodiscard]] double Framework24TriangleArea(
+            double a, double b, double c) noexcept
+        {
+            if (a < b)
+                std::swap(a, b);
+            if (a < c)
+                std::swap(a, c);
+            if (b < c)
+                std::swap(b, c);
+            const double radicand =
+                (a + (b + c)) * (c - (a - b))
+                * (c + (a - b)) * (a + (b - c));
+            if (!std::isfinite(radicand))
+                return 0.0;
+            return 0.25 * std::sqrt(std::abs(radicand));
+        }
+
+        [[nodiscard]] double Framework24TriangleArea(
+            const glm::dvec3& p,
+            const glm::dvec3& q,
+            const glm::dvec3& r) noexcept
+        {
+            return Framework24TriangleArea(
+                glm::length(q - p),
+                glm::length(r - q),
+                glm::length(r - p));
+        }
+
+        // Framework24 divides corner dot products by triangle area rather than
+        // twice area. Preserve that legacy normalization because it is part of
+        // the reference field, including the distinct obtuse coefficients.
+        [[nodiscard]] std::vector<double> ComputeFramework24VertexAreas(
+            const HalfedgeMesh::Mesh& mesh)
+        {
+            std::vector<double> areas(mesh.VerticesSize(), 0.0);
+            for (std::size_t i = 0u; i < mesh.VerticesSize(); ++i)
+            {
+                const VertexHandle vertex{static_cast<PropertyIndex>(i)};
+                if (mesh.IsDeleted(vertex) || mesh.IsIsolated(vertex))
+                    continue;
+
+                double areaSum = 0.0;
+                for (const HalfedgeHandle halfedge :
+                     mesh.HalfedgesAroundVertex(vertex))
+                {
+                    if (mesh.IsBoundary(halfedge))
+                        continue;
+                    const HalfedgeHandle next = mesh.NextHalfedge(halfedge);
+                    const glm::dvec3 p(mesh.Position(
+                        mesh.FromVertex(halfedge)));
+                    const glm::dvec3 q(mesh.Position(
+                        mesh.ToVertex(halfedge)));
+                    const glm::dvec3 r(mesh.Position(mesh.ToVertex(next)));
+                    if (!IsFinite(p) || !IsFinite(q) || !IsFinite(r))
+                        continue;
+
+                    const glm::dvec3 pq = q - p;
+                    const glm::dvec3 qr = r - q;
+                    const glm::dvec3 pr = r - p;
+                    const double triangleArea =
+                        Framework24TriangleArea(p, q, r);
+                    if (!std::isfinite(triangleArea)
+                        || triangleArea
+                            <= std::numeric_limits<double>::epsilon())
+                    {
+                        continue;
+                    }
+
+                    const double dotP = glm::dot(pq, pr);
+                    const double dotQ = glm::dot(-qr, pq);
+                    const double dotR = glm::dot(qr, pr);
+                    if (dotP < 0.0)
+                    {
+                        areaSum += 0.25 * triangleArea;
+                    }
+                    else if (dotQ < 0.0 || dotR < 0.0)
+                    {
+                        areaSum += 0.125 * triangleArea;
+                    }
+                    else
+                    {
+                        const double cotQ = Framework24ClampCotan(
+                            dotQ / triangleArea);
+                        const double cotR = Framework24ClampCotan(
+                            dotR / triangleArea);
+                        areaSum += 0.125
+                            * (glm::dot(pr, pr) * cotQ
+                               + glm::dot(pq, pq) * cotR);
+                    }
+                }
+                areas[i] = areaSum;
+            }
+            return areas;
+        }
+
+        [[nodiscard]] double Framework24TriangleCotan(
+            const glm::dvec3& p0,
+            const glm::dvec3& p1,
+            const glm::dvec3& p2) noexcept
+        {
+            const glm::dvec3 d0 = p0 - p2;
+            const glm::dvec3 d1 = p1 - p2;
+            const double dot = glm::dot(d0, d1);
+            const double triangleArea = Framework24TriangleArea(p0, p1, p2);
+            double denominator = triangleArea;
+            if (!(denominator > std::numeric_limits<double>::epsilon()))
+                denominator = glm::length(glm::cross(d0, d1));
+            if (!std::isfinite(dot) || !std::isfinite(denominator)
+                || denominator <= std::numeric_limits<double>::min())
+            {
+                return 0.0;
+            }
+            return Framework24ClampCotan(dot / denominator);
+        }
+
+        [[nodiscard]] std::vector<double> ComputeFramework24EdgeCotans(
+            const HalfedgeMesh::Mesh& mesh)
+        {
+            std::vector<double> cotans(mesh.EdgesSize(), 0.0);
+            for (std::size_t i = 0u; i < mesh.EdgesSize(); ++i)
+            {
+                const EdgeHandle edge{static_cast<PropertyIndex>(i)};
+                if (mesh.IsDeleted(edge))
+                    continue;
+                const HalfedgeHandle h0 = mesh.Halfedge(edge, 0u);
+                const HalfedgeHandle h1 = mesh.OppositeHalfedge(h0);
+                const glm::dvec3 p0(mesh.Position(mesh.ToVertex(h0)));
+                const glm::dvec3 p1(mesh.Position(mesh.ToVertex(h1)));
+                double weight = 0.0;
+                if (!mesh.IsBoundary(h0))
+                {
+                    const glm::dvec3 p2(mesh.Position(
+                        mesh.ToVertex(mesh.NextHalfedge(h0))));
+                    weight += Framework24TriangleCotan(p0, p1, p2);
+                }
+                if (!mesh.IsBoundary(h1))
+                {
+                    const glm::dvec3 p2(mesh.Position(
+                        mesh.ToVertex(mesh.NextHalfedge(h1))));
+                    weight += Framework24TriangleCotan(p0, p1, p2);
+                }
+                cotans[i] = 0.5 * weight;
+            }
+            return cotans;
+        }
+
+        // Direct deterministic port of Framework24 CurvatureTaubin. The
+        // reference's default parallel smoother has a read/write race, so the
+        // same in-place updates run in stable vertex-index order here.
         [[nodiscard]] TensorComputation ComputeEdgeDihedralTensor(
             HalfedgeMesh::Mesh& mesh)
         {
@@ -323,10 +248,9 @@ namespace Geometry::Curvature
             const std::size_t faceCount = mesh.FacesSize();
             TensorComputation computation{};
             computation.Vertices.resize(vertexCount);
-            computation.ReliableField.assign(vertexCount, 1u);
             std::vector<TensorVertex>& out = computation.Vertices;
             const std::vector<double> mixedAreas =
-                ComputeMixedVoronoiAreas(mesh);
+                ComputeFramework24VertexAreas(mesh);
 
             std::vector<glm::dvec3> faceNormals(
                 faceCount, glm::dvec3(0.0));
@@ -424,9 +348,6 @@ namespace Geometry::Curvature
                     continue;
                 }
 
-                // Algebraically equivalent to PMP's to(h0)-to(h1) direction:
-                // both the direction and atan2 sign are reversed here to keep
-                // the module's outward-convex-positive convention explicit.
                 glm::dvec3 direction =
                     glm::dvec3(mesh.Position(mesh.FromVertex(halfedge0)))
                     - glm::dvec3(mesh.Position(mesh.ToVertex(halfedge0)));
@@ -437,7 +358,7 @@ namespace Geometry::Curvature
                     continue;
                 }
                 direction /= length;
-                const double signedDihedral = -std::atan2(
+                const double signedDihedral = std::atan2(
                     glm::dot(glm::cross(normal0, normal1), direction),
                     glm::dot(normal0, normal1));
                 if (!std::isfinite(signedDihedral))
@@ -453,242 +374,151 @@ namespace Geometry::Curvature
             for (std::size_t i = 0u; i < vertexCount; ++i)
             {
                 const VertexHandle vertex{static_cast<PropertyIndex>(i)};
-                if (mesh.IsDeleted(vertex) || mesh.IsIsolated(vertex)
-                    || mesh.IsBoundary(vertex))
-                {
-                    if (mesh.IsDeleted(vertex) || mesh.IsIsolated(vertex))
-                        computation.ReliableField[i] = 0u;
-                    continue;
-                }
-
-                const double supportArea = mixedAreas[i];
-                if (reliableSupport[i] == 0u || !std::isfinite(supportArea)
-                    || supportArea <= std::numeric_limits<double>::min())
-                {
-                    computation.ReliableField[i] = 0u;
-                    continue;
-                }
-                SymmetricTensor tensor{};
-                for (const HalfedgeHandle halfedge :
-                     mesh.HalfedgesAroundVertex(vertex))
-                {
-                    const EdgeTensorSample& sample =
-                        edgeSamples[mesh.Edge(halfedge).Index];
-                    if (sample.Valid)
-                    {
-                        tensor.AddOuterProduct(
-                            sample.WeightedDirection,
-                            sample.SignedDihedral);
-                    }
-                }
-                tensor.Divide(supportArea);
-
-                const SymmetricEigenSystem eigen =
-                    DecomposeSymmetric(tensor);
-                if (!eigen.Valid)
+                if (mesh.IsDeleted(vertex) || mesh.IsIsolated(vertex))
                     continue;
 
-                const double absolute0 = std::abs(eigen.Values[0]);
-                const double absolute1 = std::abs(eigen.Values[1]);
-                const double absolute2 = std::abs(eigen.Values[2]);
-                int normalIndex = 2;
-                if (absolute0 < absolute1)
-                    normalIndex = absolute0 < absolute2 ? 0 : 2;
-                else
-                    normalIndex = absolute1 < absolute2 ? 1 : 2;
-
-                std::array<int, 2> scalarTangentIndices{};
-                std::size_t scalarTangentCount = 0u;
-                for (int index = 0; index < 3; ++index)
-                {
-                    if (index != normalIndex)
-                        scalarTangentIndices[scalarTangentCount++] = index;
-                }
-                const int scalarMaxIndex = scalarTangentIndices[0];
-                const int scalarMinIndex = scalarTangentIndices[1];
-                out[i].MaxPrincipal = eigen.Values[scalarMaxIndex];
-                out[i].MinPrincipal = eigen.Values[scalarMinIndex];
-                out[i].Valid =
-                    std::isfinite(out[i].MaxPrincipal)
-                    && std::isfinite(out[i].MinPrincipal);
-                if (!out[i].Valid || tensor.MaxAbsCoefficient() == 0.0)
-                    continue;
-
-                // PMP publishes scalars only. Direction publication resolves
-                // cylinder zero-eigenvalue ambiguity against the geometric
-                // normal, then retains the hinge tensor's complementary pairing.
-                const glm::dvec3 geometricNormal =
-                    GeometricVertexNormal(mesh, vertex);
-                if (glm::dot(geometricNormal, geometricNormal)
-                    <= kDirectionTiny)
-                    continue;
-                int geometricNormalIndex = 0;
-                double bestAlignment = -1.0;
-                for (int index = 0; index < 3; ++index)
-                {
-                    const double alignment = std::abs(
-                        glm::dot(eigen.Vectors[index], geometricNormal));
-                    if (alignment > bestAlignment)
-                    {
-                        bestAlignment = alignment;
-                        geometricNormalIndex = index;
-                    }
-                }
-                std::array<int, 2> directionTangentIndices{};
-                std::size_t directionTangentCount = 0u;
-                for (int index = 0; index < 3; ++index)
-                {
-                    if (index != geometricNormalIndex)
-                    {
-                        directionTangentIndices[directionTangentCount++] =
-                            index;
-                    }
-                }
-                const int tensorMaxIndex = directionTangentIndices[0];
-                const int tensorMinIndex = directionTangentIndices[1];
-                glm::dvec3 maxDirection =
-                    eigen.Vectors[tensorMinIndex]
-                    - glm::dot(eigen.Vectors[tensorMinIndex], geometricNormal)
-                        * geometricNormal;
-                const double maxDirectionLength = glm::length(maxDirection);
-                if (!IsFinite(maxDirection)
-                    || !std::isfinite(maxDirectionLength)
-                    || maxDirectionLength <= kDirectionTiny)
-                {
-                    continue;
-                }
-                maxDirection /= maxDirectionLength;
-                glm::dvec3 minDirection =
-                    eigen.Vectors[tensorMaxIndex]
-                    - glm::dot(eigen.Vectors[tensorMaxIndex], geometricNormal)
-                        * geometricNormal;
-                minDirection -= glm::dot(minDirection, maxDirection)
-                    * maxDirection;
-                const double minDirectionLength = glm::length(minDirection);
-                if (!IsFinite(minDirection)
-                    || !std::isfinite(minDirectionLength)
-                    || minDirectionLength <= kDirectionTiny)
-                {
-                    continue;
-                }
-                minDirection /= minDirectionLength;
-                out[i].Dir1 = maxDirection;
-                out[i].Dir2 = minDirection;
-                out[i].DirectionValid = true;
-            }
-
-            // PMP boundary values are a uniform average over non-boundary
-            // one-ring neighbours. Direction line fields use the same support,
-            // with signs aligned before averaging and a tangent re-orthogonalization.
-            for (std::size_t i = 0u; i < vertexCount; ++i)
-            {
-                const VertexHandle vertex{static_cast<PropertyIndex>(i)};
-                if (mesh.IsDeleted(vertex) || !mesh.IsBoundary(vertex))
-                    continue;
-                if (reliableSupport[i] == 0u)
-                {
-                    computation.ReliableField[i] = 0u;
-                    continue;
-                }
-                double minSum = 0.0;
-                double maxSum = 0.0;
-                std::size_t scalarCount = 0u;
-                glm::dvec3 direction1Sum{0.0};
-                glm::dvec3 direction2Sum{0.0};
-                glm::dvec3 direction1Reference{0.0};
-                glm::dvec3 direction2Reference{0.0};
-                std::size_t directionCount = 0u;
+                std::vector<VertexHandle> neighborhood{};
+                neighborhood.reserve(16u);
+                neighborhood.push_back(vertex);
                 for (const HalfedgeHandle halfedge :
                      mesh.HalfedgesAroundVertex(vertex))
                 {
                     const VertexHandle neighbor = mesh.ToVertex(halfedge);
-                    if (!neighbor.IsValid() || mesh.IsDeleted(neighbor)
-                        || mesh.IsBoundary(neighbor))
-                    {
-                        continue;
-                    }
-                    if (computation.ReliableField[neighbor.Index] == 0u)
-                    {
-                        computation.ReliableField[i] = 0u;
-                        continue;
-                    }
-                    if (!out[neighbor.Index].Valid)
-                        continue;
-                    minSum += out[neighbor.Index].MinPrincipal;
-                    maxSum += out[neighbor.Index].MaxPrincipal;
-                    ++scalarCount;
-                    if (!out[neighbor.Index].DirectionValid)
-                        continue;
-                    glm::dvec3 direction1 = out[neighbor.Index].Dir1;
-                    glm::dvec3 direction2 = out[neighbor.Index].Dir2;
-                    if (directionCount == 0u)
-                    {
-                        direction1Reference = direction1;
-                        direction2Reference = direction2;
-                    }
-                    if (glm::dot(direction1, direction1Reference) < 0.0)
-                        direction1 = -direction1;
-                    if (glm::dot(direction2, direction2Reference) < 0.0)
-                        direction2 = -direction2;
-                    direction1Sum += direction1;
-                    direction2Sum += direction2;
-                    ++directionCount;
+                    if (neighbor.IsValid() && !mesh.IsDeleted(neighbor))
+                        neighborhood.push_back(neighbor);
                 }
-                if (computation.ReliableField[i] == 0u)
+
+                double supportArea = 0.0;
+                Eigen::Matrix3d tensor = Eigen::Matrix3d::Zero();
+                bool reliable = true;
+                for (const VertexHandle supportVertex : neighborhood)
                 {
-                    out[i] = TensorVertex{};
-                    continue;
+                    if (reliableSupport[supportVertex.Index] == 0u)
+                    {
+                        reliable = false;
+                        break;
+                    }
+                    supportArea += mixedAreas[supportVertex.Index];
+                    for (const HalfedgeHandle halfedge :
+                         mesh.HalfedgesAroundVertex(supportVertex))
+                    {
+                        const EdgeTensorSample& sample =
+                            edgeSamples[mesh.Edge(halfedge).Index];
+                        if (sample.Valid)
+                        {
+                            for (int row = 0; row < 3; ++row)
+                            {
+                                for (int column = 0; column < 3; ++column)
+                                {
+                                    tensor(row, column) +=
+                                        sample.SignedDihedral
+                                        * sample.WeightedDirection[row]
+                                        * sample.WeightedDirection[column];
+                                }
+                            }
+                        }
+                    }
                 }
-                if (scalarCount == 0u)
+                if (!reliable || !std::isfinite(supportArea)
+                    || supportArea <= std::numeric_limits<double>::min())
                     continue;
-                out[i].MinPrincipal = minSum
-                    / static_cast<double>(scalarCount);
-                out[i].MaxPrincipal = maxSum
-                    / static_cast<double>(scalarCount);
-                out[i].Valid = true;
-                if (directionCount == 0u)
+                tensor /= supportArea;
+                Eigen::SelfAdjointEigenSolver<Eigen::Matrix3d> solver(
+                    tensor);
+                if (solver.info() != Eigen::Success)
                     continue;
 
-                const glm::dvec3 geometricNormal =
-                    GeometricVertexNormal(mesh, vertex);
-                if (glm::dot(geometricNormal, geometricNormal)
-                    <= kDirectionTiny)
-                    continue;
-                glm::dvec3 direction1 = direction1Sum
-                    - glm::dot(direction1Sum, geometricNormal)
-                        * geometricNormal;
-                const double direction1Length = glm::length(direction1);
-                if (!IsFinite(direction1)
-                    || !std::isfinite(direction1Length)
-                    || direction1Length <= kDirectionTiny)
+                const Eigen::Vector3d eigenvalues = solver.eigenvalues();
+                const double absolute0 = std::abs(eigenvalues[0]);
+                const double absolute1 = std::abs(eigenvalues[1]);
+                const double absolute2 = std::abs(eigenvalues[2]);
+                int minimumIndex = 0;
+                int maximumIndex = 1;
+                if (absolute0 < absolute1)
                 {
-                    continue;
+                    if (absolute0 < absolute2)
+                    {
+                        minimumIndex = 1;
+                        maximumIndex = 2;
+                    }
                 }
-                direction1 /= direction1Length;
-                glm::dvec3 direction2 = direction2Sum
-                    - glm::dot(direction2Sum, geometricNormal)
-                        * geometricNormal;
-                direction2 -= glm::dot(direction2, direction1) * direction1;
-                double direction2Length = glm::length(direction2);
-                if (!IsFinite(direction2)
-                    || !std::isfinite(direction2Length)
-                    || direction2Length <= kDirectionTiny)
+                else
                 {
-                    direction2 = glm::cross(geometricNormal, direction1);
-                    direction2Length = glm::length(direction2);
+                    if (absolute1 < absolute2)
+                    {
+                        minimumIndex = 0;
+                        maximumIndex = 2;
+                    }
                 }
-                if (!IsFinite(direction2)
-                    || !std::isfinite(direction2Length)
-                    || direction2Length <= kDirectionTiny)
-                {
+                out[i].MinPrincipal = eigenvalues[minimumIndex];
+                out[i].MaxPrincipal = eigenvalues[maximumIndex];
+                out[i].Valid =
+                    std::isfinite(out[i].MaxPrincipal)
+                    && std::isfinite(out[i].MinPrincipal);
+                if (!out[i].Valid)
                     continue;
+                const Eigen::Vector3d maximumDirection =
+                    solver.eigenvectors().col(maximumIndex);
+                const Eigen::Vector3d minimumDirection =
+                    solver.eigenvectors().col(minimumIndex);
+                out[i].Dir1 = {
+                    maximumDirection[0],
+                    maximumDirection[1],
+                    maximumDirection[2]};
+                out[i].Dir2 = {
+                    minimumDirection[0],
+                    minimumDirection[1],
+                    minimumDirection[2]};
+                out[i].DirectionValid = IsFinite(out[i].Dir1)
+                    && IsFinite(out[i].Dir2);
+            }
+
+            const std::vector<double> edgeCotans =
+                ComputeFramework24EdgeCotans(mesh);
+            for (std::size_t step = 0u;
+                 step < kFramework24SmoothingSteps; ++step)
+            {
+                for (std::size_t i = 0u; i < vertexCount; ++i)
+                {
+                    const VertexHandle vertex{static_cast<PropertyIndex>(i)};
+                    if (mesh.IsDeleted(vertex) || !out[i].Valid)
+                        continue;
+                    double minimum = 0.0;
+                    double maximum = 0.0;
+                    double weightSum = 0.0;
+                    for (const HalfedgeHandle halfedge :
+                         mesh.HalfedgesAroundVertex(vertex))
+                    {
+                        const VertexHandle neighbor = mesh.ToVertex(halfedge);
+                        if (!neighbor.IsValid() || mesh.IsDeleted(neighbor)
+                            || !out[neighbor.Index].Valid)
+                        {
+                            continue;
+                        }
+                        const double weight = std::max(
+                            0.0, edgeCotans[mesh.Edge(halfedge).Index]);
+                        weightSum += weight;
+                        minimum += weight
+                            * out[neighbor.Index].MinPrincipal;
+                        maximum += weight
+                            * out[neighbor.Index].MaxPrincipal;
+                    }
+                    if (weightSum > 0.0)
+                    {
+                        minimum /= weightSum;
+                        maximum /= weightSum;
+                        if (std::isfinite(minimum)
+                            && std::isfinite(maximum))
+                        {
+                            out[i].MinPrincipal = minimum;
+                            out[i].MaxPrincipal = maximum;
+                        }
+                        else
+                        {
+                            out[i] = TensorVertex{};
+                        }
+                    }
                 }
-                direction2 /= direction2Length;
-                if (glm::dot(direction2, direction2Reference) < 0.0)
-                    direction2 = -direction2;
-                out[i].Dir1 = direction1;
-                out[i].Dir2 = direction2;
-                out[i].DirectionValid = true;
             }
             if (computation.DegenerateFaceCount > 0u
                 || computation.UnsupportedFaceCount > 0u)
@@ -698,11 +528,7 @@ namespace Geometry::Curvature
             return computation;
         }
 
-        // Publishes the raw per-vertex eigenvalues. No post-smoothing is
-        // applied: damped eigenvalue smoothing averaged across crease
-        // transitions and cancelled genuine curvature into near-zero bands.
-        // Callers wanting stabilized fields can smooth the published
-        // properties explicitly through Geometry.Smoothing.
+        // Publishes the three-pass deterministic Framework24 principal field.
         [[nodiscard]] CurvatureDiagnostics PublishTensorFields(
             HalfedgeMesh::Mesh& mesh,
             const TensorComputation& computation,

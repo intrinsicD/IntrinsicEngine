@@ -459,61 +459,59 @@ retain the Meyer et al. (2003) cotan-Laplacian and angle-defect operators.
 edge-dihedral principal system so the full result never combines Meyer scalars
 with directions from a different estimator.
 
-For each finite interior edge `e`, the tensor path precomputes
-`M_e = beta_e (|e|/2) t_e t_eᵀ`, where `beta_e` is the oriented face-normal
-dihedral and `t_e` is the unit edge direction. A non-boundary vertex sums the
-contributions of its own incident edges (one-ring hinge support) and divides
-by its mixed area. The resulting signed symmetric tensor is decomposed by a
-local 3×3 Jacobi kernel. Its smallest-absolute eigenvalue is treated
-as the tensor-normal mode and the remaining ordered eigenvalues become the
-principal scalars. Because the hinge angle measures bend across an edge while
-`M_e` stores the edge tangent, each scalar direction is paired with the
-complementary tangent eigenvector when publishing `v:principal_dir1` (κ₁/max)
-and `v:principal_dir2` (κ₂/min). Direction publication separately chooses the
-eigenvector most aligned with the geometric normal, which resolves cylindrical
-zero-mode ambiguity without changing the scalar selection.
+The principal path is a deterministic numerical port of Framework24
+`CurvatureTaubin(mesh, 3, true, Policy::Sequential)`. For each finite interior
+edge `e`, it precomputes `M_e = beta_e (|e|/2) t_e t_eᵀ`, where `beta_e` is
+the Framework24-oriented face-normal dihedral and `t_e` is the unit edge
+direction. Each vertex forms a neighborhood containing itself and its adjacent
+vertices, then sums every incident hinge and Framework24 legacy Voronoi area
+over that neighborhood. This is the reference's two-ring hinge support.
 
-Boundary centers are excluded from tensor assembly. Their scalar values are
-uniformly interpolated from supported non-boundary one-ring neighbours, and
-their direction line fields are sign-aligned and re-orthogonalized.
+The resulting symmetric 3×3 tensor is decomposed locally. The eigenvalue with
+smallest absolute magnitude is discarded as the tensor-normal mode; the two
+remaining algebraically ordered eigenvalues and their direct tensor
+eigenvectors publish `v:min_principal_curvature`,
+`v:max_principal_curvature`, `v:principal_dir1` (maximum), and
+`v:principal_dir2` (minimum). This direct pairing is intentionally the
+Framework24 convention, not the complementary physical-direction pairing used
+by the former Intrinsic implementation. Boundary vertices take the same direct
+tensor path instead of receiving interpolated interior values. Flat supported
+vertices retain zero scalar values and the finite basis selected by the
+eigendecomposition.
+
+Framework24's exact legacy numerical choices are part of the compatibility
+contract. Its acute mixed-area branch divides corner dot products by triangle
+area (rather than twice area) before applying the `0.125` coefficient; its
+obtuse branch contributes `0.25A` at an obtuse center and `0.125A` at the other
+corners; cotangents clamp to `[-19.1, 19.1]`. After tensor decomposition, three
+passes replace each principal scalar with its nonnegative-cotan neighbor
+average. The replacements are in-place in stable vertex-index order. That
+matches `Policy::Sequential`; Framework24's default `ParallelUnsequential`
+mode performs unsynchronized reads and writes to the same arrays and therefore
+is not a deterministic oracle. Directions are not smoothed. Parity uses
+Framework24's fresh/default all-false `v_feature` property; the Intrinsic
+operation has no feature-mask input and does not create or mutate an unrelated
+private property to emulate pre-marked Framework24 meshes.
+
 `ComputeCurvature` derives `H = (κ₁ + κ₂)/2`, `K = κ₁κ₂`, and the
-mean-curvature normal from the same published values, so the invariants hold
-exactly at every vertex. The sign is adapted to the engine convention:
-outward-oriented convex curvature is positive. Reversing orientation negates
-curvature along each physical principal direction, which swaps the
-algebraically ordered max/min slots on an anisotropic surface. This
-edge-dihedral hinge tensor is the Cohen-Steiner--Morvan normal-cycle
-formulation PMP also implements; it is not the vertex-neighbour
-directional-curvature quadrature in Taubin's 1995 paper.
+mean-curvature normal from the final principal values, so its published scalar
+invariants remain coherent. The standalone Meyer mean/Gaussian operators are
+independent estimators and are not substituted into this field. Curvature
+values use inverse caller-coordinate units. Framework24 `MeshIo` separately
+centers loaded coordinates and divides them by the maximum AABB extent; the
+curvature operation does not silently reproduce that loader transformation, so
+parity comparisons must provide identical coordinates or convert units by the
+same extent.
 
-The published eigenvalues are deliberately not post-smoothed, and support is
-deliberately one-ring rather than PMP's default two-ring (BUG-156). On the
-`tests/data/sculpt.obj` acceptance asset, two-ring support integrated
-sharp-crease bending into flanking smooth vertices (raw `κ_max ≈ +11` where
-the independent Meyer operator reports `H = -2`), and the three damped
-eigenvalue-smoothing passes then averaged the algebraically ranked channels
-across convex/concave transitions, cancelling genuine curvature into
-near-zero bands: 65 vertices lost their curvature entirely, 917 vertices
-flipped sign, and the median relative mean-curvature error against the Meyer
-cross-check was 62%. The one-ring unsmoothed configuration reduces that
-median error to 0.07% with no zero bands or sign flips, and both changed
-parameters remain expressible in PMP's own API
-(`two_ring_neighborhood = false`, zero post-smoothing steps). Callers that
-want stabilized fields smooth the published properties explicitly through
-`Geometry.Smoothing`.
-
-Finite boundary vertices are supported only when interpolation reaches a valid
-interior neighbour. Triangle conditioning uses the dimensionless
-`2A/l_max^2` ratio. Its `3.5e-4` floor is the conservatively rounded square root
-of machine epsilon for public float positions. Non-triangular, non-finite,
-degenerate, or quality-at/below that floor faces invalidate their incident
-vertices. Invalid centers retain finite zero scalar/direction sentinels and
-cannot seed boundary interpolation, so unreliable values do not propagate into
-the supported field. A valid flat vertex is supported but
-remains zero on an all-flat neighbourhood. Results report supported/nonzero
-vertex counts, face-quality counts and threshold, minimum quality, and the
-finite principal range; empty/no-face tensor requests return `nullopt`.
-Storage and runtime are `O(V + E + F)`.
+Triangle conditioning uses the dimensionless `2A/l_max^2` ratio. Its `3.5e-4`
+floor is the conservatively rounded square root of machine epsilon for public
+float positions. Non-triangular, non-finite, degenerate, or quality-at/below
+that floor faces invalidate affected two-ring support. Invalid vertices retain
+finite zero scalar/direction sentinels and are excluded from smoothing. Results
+report supported/nonzero vertex counts, face-quality counts and threshold,
+minimum quality, and the finite principal range; empty/no-face tensor requests
+return `nullopt`. Storage is `O(V + E + F)`; work is linear on bounded-valence
+meshes and includes the two-ring traversal plus three edge-neighbor passes.
 
 The reusable `Geometry::Smoothing::CotanSmoothVertexProperty` operation
 remains available for callers that stabilize published fields. It supports

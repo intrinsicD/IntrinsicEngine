@@ -7,3 +7,6 @@
   — local non-claim comparison isolating OBJ topology loss, smoothing-stencil
   divergence, uniform-scale defects, and malformed-support behavior across a
   deterministic OBJ corpus sample.
+- [Framework24 curvature parity](tables/curvature_framework24_parity_2026-08-12.md)
+  — direct sequential-Framework24 scalar comparison on acute, obtuse, open,
+  and full sculpt fixtures, with the coordinate-unit boundary made explicit.

@@ -1405,8 +1405,9 @@
   `glm::vec2/vec3/vec4` vertex properties, can pin boundaries or exclude an
   explicit active-vertex mask from both rows and neighborhoods, is invariant to
   uniform mesh scale, and fails before mutation on invalid parameters, mask
-  shape, or non-finite input. Curvature uses three `lambda=0.5` passes,
-  matching PMP's explicit stencil without a linear solve.
+  shape, or non-finite input. The operation remains available independently;
+  current Framework24-compatible curvature uses the reference's distinct
+  in-place full-neighbor replacement and does not call this reusable smoother.
 - **Status**: supported — bounded deterministic CPU unit/oracle evidence; no
   arbitrary-domain diffusion, public double-vector property, or performance
   claim
@@ -1416,8 +1417,8 @@
   different componentwise update, uses in-place iteration, loses the retained
   self-weight, includes an inactive row or neighbor, changes under a uniform
   coordinate scale, mutates on invalid/non-finite input, changes unrelated
-  topology or properties, or the curvature oracle requires a solver or a
-  different smoothing stencil.
+  topology or properties, or is silently substituted for Framework24's
+  distinct in-place curvature smoother.
 - **Proof**: [src/geometry/Geometry.HalfedgeMesh.Smoothing.cppm,
   src/geometry/Geometry.HalfedgeMesh.Smoothing.cpp,
   src/geometry/Geometry.HalfedgeMesh.Curvature.cpp,
@@ -1428,7 +1429,7 @@
 - **Tags**: geometry, cotan smoothing, PMP, scalar properties, vector properties
 - **From staging**: O150
 
-## C48: Principal curvature matches the selected PMP formulation
+## C48: Principal curvature matched the selected PMP formulation
 - **Statement**: Intrinsic's principal-curvature path uses PMP's signed full
   symmetric 3x3 local eigensystem, non-boundary two-ring estimator support,
   boundary scalar interpolation, complementary direction pairing, and three
@@ -1437,12 +1438,12 @@
   ill-conditioned faces are instead diagnosed and excluded from estimator and
   smoothing support, so runtime can report finite support/nonzero/range/quality
   diagnostics and reject a field with zero estimable support.
-- **Status**: superseded in part by C50 (2026-08-12, BUG-156) — the two-ring
-  support and three damped smoothing passes this row pinned were measured to
-  cancel genuine curvature beside sharp creases and are no longer the shipped
-  default; the signed 3x3 eigensystem, boundary interpolation, complementary
-  pairing, scale-independent predicates, fail-closed quality gating, and
-  zero-support rejection remain in force under C50. Historical support: 25-slot
+- **Status**: superseded by C51 (2026-08-12, reopened BUG-156) — the shipped
+  path now targets Framework24 rather than PMP. Framework24 uses a different
+  sign/area convention, direct boundary tensors, direct eigenvector pairing,
+  and in-place full-neighbor smoothing. Scale-independent quality gating and
+  finite zero-support handling remain deliberate Intrinsic extensions.
+  Historical support: 25-slot
   PMP numeric oracle, analytic/scale/degeneracy CPU contracts, runtime
   diagnostics, sanitizer evidence, and a non-claim local differential that
   compared 80 meshes and 2,530,726 vertices; the 62 meshes without rejected
@@ -1451,13 +1452,12 @@
   performance claim
 - **Provenance**: ai-suggested
 - **Crystallized via**: artifact-commitment
-- **Falsification criteria**: The checked-in 25-slot oracle exceeds `2e-6`,
-  supported/nonzero counts differ from 25, boundary values are evaluated
-  directly instead of interpolated, the estimator reverts to a tangent 2x2
-  projection, a uniform position scale changes normalized curvature beyond the
-  declared tolerance, rejected geometry enters an active smoothing row,
-  non-finite outputs publish, or zero-support runtime work reports an
-  informative success.
+- **Falsification criteria**: Under the historical PMP protocol, its 25-slot
+  oracle exceeds `2e-6`, supported/nonzero counts differ from 25, a uniform
+  position scale changes normalized curvature beyond the declared tolerance,
+  rejected geometry enters an active smoothing row, non-finite outputs publish,
+  or zero-support runtime work reports an informative success. The current
+  Framework24 path is assessed by C51 instead.
 - **Proof**: [src/geometry/Geometry.HalfedgeMesh.Curvature.cppm,
   src/geometry/Geometry.HalfedgeMesh.Curvature.cpp,
   src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Mesh.cpp,
@@ -1476,10 +1476,10 @@
 - **Statement**: No one reviewed curvature estimator is the best quality and
   performance choice across clean regular meshes, irregular tessellations,
   noisy/coarse surfaces, physical-scale features, and point samples. The
-  repaired PMP-compatible edge-dihedral tensor is retained as the clean-mesh
-  interoperability baseline; Rusinkiewicz finite differences and interpolated
-  corrected curvature measures are candidates for a controlled in-engine
-  comparison rather than automatic replacements.
+  deterministic Framework24-compatible edge-dihedral tensor is retained as the
+  requested interoperability baseline; PMP, Rusinkiewicz finite differences,
+  and interpolated corrected curvature measures are candidates for a controlled
+  in-engine comparison rather than automatic replacements.
 - **Status**: supported — primary-literature synthesis plus a local 96-model
   PMP differential and explicitly non-claim timing probe; no matched
   cross-estimator accuracy/performance benchmark or backend-adoption claim
@@ -1498,7 +1498,7 @@
   Rusinkiewicz, corrected curvature measures, literature, bounded result
 - **From staging**: O153
 
-## C50: One-ring unsmoothed hinge eigenvalues publish accurate curvature
+## C50: One-ring unsmoothed hinge eigenvalues published the Meyer-aligned field
 - **Statement**: The curvature tensor default is the signed edge-dihedral
   hinge formulation with support restricted to each vertex's own incident
   edges and no eigenvalue post-smoothing; published `H = (κ₁ + κ₂)/2` and
@@ -1515,24 +1515,19 @@
   up to 79%, and matches an independent NumPy oracle of the formulation to
   3e-16 on the frozen fixture. Both corrected parameters remain expressible
   in PMP's API (`two_ring_neighborhood = false`, zero smoothing steps).
-- **Status**: supported — CPU evidence class: committed geometry regressions
-  (independent-replica oracle at `1e-12` tolerance, sculpt zero-band/sign-flip
-  and sub-1% median-relative-error assertions, crease-flank retention,
-  open-mesh invariant/diagnostics bounds) on the committed asset; the
-  session-local variant/noise sweep is recorded in the report and is not a
-  universal accuracy or estimator-selection claim (C49 remains the
-  selection-scope claim)
+- **Status**: superseded by C51 (2026-08-12, reopened BUG-156) — the evidence
+  remains a bounded comparison against Meyer mean curvature, but the reporter
+  selected Framework24 interoperability over that estimator choice. Its
+  one-ring oracle, crease-retention, and sculpt/Meyer assertions were removed
+  from the shipped regression surface rather than weakened.
 - **Provenance**: ai-suggested
 - **Crystallized via**: artifact-commitment
-- **Falsification criteria**: `CurvatureTensor.SculptAssetHasNoZeroCurvatureBands`
-  observes a supported-vertex deficit, any zero-band or sign-flipped vertex,
-  or median relative deviation from the Meyer cross-check at or above 1% on
-  `tests/data/sculpt.obj`; `CurvatureTensor.CreaseFlanksKeepGenuineCurvature`
-  observes a sign flip or below-30% magnitude retention on a probed flank
-  vertex; `CurvatureTensor.MatchesEdgeDihedralReferenceOracle` deviates beyond
-  `1e-12`; or `CurvatureTensor.OpenMeshFullFieldKeepsPrincipalInvariants`
-  finds published H/K diverging from the principal invariants or a nonzero
-  value outside the diagnostics extrema.
+- **Falsification criteria**: Re-running the historical one-ring/no-smoothing
+  protocol produces a sculpt median Meyer-relative deviation at or above 1%,
+  any zero-band/sign-flipped vertex under its recorded thresholds, below-30%
+  crease-flank retention, or a deviation above `1e-12` from its independent
+  NumPy formulation. Those historical predicates are no longer current
+  product acceptance; current Framework24 parity is assessed by C51.
 - **Proof**: [src/geometry/Geometry.HalfedgeMesh.Curvature.cpp,
   src/geometry/Geometry.HalfedgeMesh.Curvature.cppm,
   tests/unit/geometry/Test.CurvatureTensor.cpp,
@@ -1543,3 +1538,43 @@
 - **Tags**: geometry, principal curvature, hinge tensor, support radius,
   smoothing, accuracy, BUG-156
 - **From staging**: O154
+
+## C51: Principal curvature matches deterministic Framework24
+- **Statement**: Intrinsic's principal-curvature path directly reproduces
+  Framework24 `CurvatureTaubin(mesh, 3, true, Policy::Sequential)` on identical
+  finite, well-conditioned triangle coordinates. The contract includes its
+  legacy acute/obtuse vertex areas, `[-19.1, 19.1]` cotan clamp, signed hinge
+  tensor, two-ring support, smallest-absolute normal-mode selection, algebraic
+  value/direct-eigenvector pairing, direct open-boundary evaluation, and three
+  stable-index in-place full-neighbor smoothing passes. `H` and `K` are derived
+  from the final principal values. Intrinsic retains scale-independent quality
+  diagnostics and finite zero sentinels outside that valid parity domain.
+- **Status**: supported — CPU parity evidence on three bounded fixtures and the
+  full 3,669-vertex sculpt asset; maximum absolute scalar errors were
+  `6.22e-15` (`kmin`) and `2.78e-15` (`kmax`) on sculpt. The claim excludes
+  Framework24's separate loader normalization, its nondeterministic default
+  parallel execution, its private pre-populated `v_feature` smoothing-mask
+  mode, malformed/ill-conditioned parity, directions across repeated
+  eigenspaces, universal geometric accuracy, and performance.
+- **Provenance**: ai-executed
+- **Crystallized via**: artifact-commitment
+- **Falsification criteria**: Any acute, obtuse, or open checked-in reference
+  fixture differs from its actual sequential Framework24 scalar field by more
+  than `2e-12`; the sculpt field's `1e-5`-quantized hash differs from
+  `0x1ed455aa30053cf6`; repeated Intrinsic runs differ; principal H/K invariants
+  diverge; identical coordinate scaling fails inverse-length behavior; or
+  unsupported geometry publishes non-finite values.
+- **Proof**: [src/geometry/Geometry.HalfedgeMesh.Curvature.cppm,
+  src/geometry/Geometry.HalfedgeMesh.Curvature.cpp,
+  tests/unit/geometry/Test.CurvatureTensor.cpp,
+  tests/data/framework24-acute-tetrahedron.obj,
+  tests/data/framework24-obtuse-tetrahedron.obj,
+  tests/data/framework24-open-patch.obj,
+  tests/data/sculpt.obj,
+  tools/diagnostics/curvature/Framework24CurvatureParityProbe.cpp,
+  ara/evidence/tables/curvature_framework24_parity_2026-08-12.md,
+  tasks/active/BUG-156-curvature-two-ring-smoothing-cancels-features.md]
+- **Dependencies**: [C46, C47, C50]
+- **Tags**: geometry, principal curvature, Framework24, CPU, parity,
+  deterministic, BUG-156
+- **From staging**: O155

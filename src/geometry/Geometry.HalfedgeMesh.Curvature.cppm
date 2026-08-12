@@ -31,9 +31,8 @@ export namespace Geometry::Curvature
 
     struct CurvatureDiagnostics
     {
-        // Vertices whose interior tensor support, or boundary interpolation
-        // from such support, was numerically valid. A supported flat vertex
-        // can still carry exactly zero curvature.
+        // Vertices whose Framework24 two-ring tensor support was numerically
+        // valid. A supported flat vertex can still carry zero curvature.
         std::size_t SupportedVertexCount{0};
         std::size_t NonZeroPrincipalVertexCount{0};
         double MinimumPrincipalValue{0.0};
@@ -56,9 +55,9 @@ export namespace Geometry::Curvature
         // Equals -H times the oriented unit vertex normal. Its magnitude is |H|.
         VertexProperty<glm::vec3> MeanCurvatureNormalProperty{};
 
-        // Unit tangent directions for maximum and minimum principal curvature.
-        // Supported flat vertices and unsupported degenerate vertices receive
-        // zero-vector sentinels.
+        // Framework24 tensor eigenvectors paired directly with maximum and
+        // minimum principal curvature. Supported flat vertices retain a
+        // finite eigensolver basis; unsupported vertices receive zeros.
         VertexProperty<glm::vec3> PrincipalDir1Property{};
         VertexProperty<glm::vec3> PrincipalDir2Property{};
         CurvatureDiagnostics Diagnostics{};
@@ -115,35 +114,35 @@ export namespace Geometry::Curvature
     // above and are not mixed into this result.
     [[nodiscard]] CurvatureField ComputeCurvature(HalfedgeMesh::Mesh& mesh);
 
-    // For each interior edge e, forms the signed hinge contribution
-    //   M_e = beta_e (|e|/2) t_e t_e^T,
-    // sums the contributions of each non-boundary vertex's own incident edges,
-    // and divides by the vertex's mixed area. A signed symmetric 3x3 Jacobi
-    // decomposition identifies the tensor-normal eigenvalue by minimum
-    // absolute magnitude (the PMP hinge formulation with one-ring support).
-    // A hinge measures bend across its edge while M_e stores the edge tangent,
-    // so each eigenvalue is paired with the complementary tangent eigenvector.
-    // Boundary scalars are interpolated uniformly from non-boundary
-    // neighbours. Published eigenvalues are deliberately not post-smoothed,
-    // and support is deliberately one-ring: the PMP-default two-ring support
-    // integrates sharp-crease bending into flanking smooth vertices, and
-    // damped eigenvalue smoothing then cancels genuine curvature into
-    // near-zero bands across convex/concave transitions (BUG-156). Callers
-    // wanting stabilized fields smooth the published properties explicitly
-    // via Geometry.Smoothing. Directions are the tensor basis and use the
-    // geometric normal to resolve zero-eigenvalue ambiguity. Outward convex
-    // curvature is positive. Reversing orientation negates curvature along
-    // each physical direction, swapping the algebraically ordered max/min
-    // slots when they differ.
+    // Deterministic port of Framework24 CurvatureTaubin(mesh, 3, true,
+    // Policy::Sequential). For every interior edge e it forms
+    //   M_e = beta_e (|e|/2) t_e t_e^T.
+    // Each vertex sums the incident hinges and legacy Voronoi areas of itself
+    // plus its adjacent vertices (Framework24's two-ring support). A symmetric
+    // 3x3 decomposition removes the smallest-absolute eigenvalue as the normal
+    // mode and pairs each remaining algebraically ordered value directly with
+    // its tensor eigenvector. Open-boundary vertices use the same tensor path.
     //
-    // Supported boundary vertices inherit scalars and line directions from
-    // valid interior neighbours. Triangle conditioning is measured by the
-    // scale-independent ratio 2A/l_max^2. Degenerate, non-triangular,
-    // non-finite, or sub-threshold faces invalidate their incident vertices,
-    // which retain finite zero sentinels and cannot seed boundary
-    // interpolation. Supported flat vertices retain zero scalars and
-    // directions. Empty/no-face meshes return nullopt. Storage is
-    // O(V + E + F) and runtime is O(V + E + F).
+    // Principal scalar values then receive three nonnegative-cotan full-
+    // neighbour replacement passes. Updates are intentionally in-place and
+    // execute in stable vertex-index order, matching Framework24's sequential
+    // policy while avoiding its default ParallelUnsequential data race.
+    // Directions are not smoothed. Parity assumes Framework24's default
+    // all-false v_feature property; this API has no private feature-mask input.
+    // The legacy area formula, cotan clamp, sign, eigenvalue ordering, and
+    // direct direction pairing are preserved exactly; consequently its values
+    // are not interchangeable with the standalone Meyer operators above.
+    // Curvature units are inverse caller-coordinate units. This function does
+    // not reproduce Framework24 MeshIo's separate centering/AABB-normalization
+    // side effect.
+    //
+    // Triangle conditioning uses the scale-independent ratio 2A/l_max^2.
+    // Degenerate, non-triangular, non-finite, or sub-threshold faces invalidate
+    // affected support, which retains finite zero sentinels and cannot enter
+    // smoothing. Supported flat vertices keep zero scalars and a finite tensor
+    // basis. Empty/no-face meshes return nullopt. Storage is O(V + E + F);
+    // work is linear for bounded-valence meshes and includes the explicit
+    // two-ring traversal plus three edge-neighbour passes.
     [[nodiscard]] std::optional<CurvatureTensorResult> ComputeCurvatureTensor(
         HalfedgeMesh::Mesh& mesh);
 

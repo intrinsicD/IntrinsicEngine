@@ -1,9 +1,53 @@
 # Curvature corpus differential
 
-This directory contains a local-development diagnostic for comparing
-`Geometry.Curvature` with an explicitly supplied PMP checkout on OBJ corpora.
-It is not registered in CTest, does not download PMP or datasets, and does not
-produce claim-eligible benchmark results.
+This directory contains local-development diagnostics for comparing
+`Geometry.Curvature` with actual Framework24 and explicitly supplied PMP
+checkouts on OBJ corpora. The shipped implementation targets Framework24
+`CurvatureTaubin(mesh, 3, true, Policy::Sequential)` directly; PMP is a useful
+different estimator, not the parity oracle. These harnesses are not registered
+in CTest, do not download reference code or datasets, and do not produce
+claim-eligible benchmark results.
+
+## Framework24 parity probe
+
+`Framework24CurvatureParityProbe.cpp` invokes the actual reference with
+`CurvatureTaubin(mesh, 3, true, Policy::Sequential)` and prints positions,
+principal scalars, and both directions in vertex order. Compile it against an
+existing Framework24 build; for the repository's usual checkout layout:
+
+```bash
+FRAMEWORK24_REFERENCE_ROOT=/path/to/framework24
+FRAMEWORK24_REFERENCE_BUILD="$FRAMEWORK24_REFERENCE_ROOT/cmake-build-debug"
+/usr/bin/clang++ -O2 -DNDEBUG -std=c++17 \
+  -I"$FRAMEWORK24_REFERENCE_ROOT/lib_bcg_framework/include" \
+  -I"$FRAMEWORK24_REFERENCE_ROOT/lib_bcg_framework/src/cuda/include" \
+  -isystem "$FRAMEWORK24_REFERENCE_ROOT/lib_bcg_framework/ext/eigen" \
+  -isystem "$FRAMEWORK24_REFERENCE_ROOT/lib_bcg_framework/ext/EigenRand" \
+  -isystem "$FRAMEWORK24_REFERENCE_ROOT/lib_bcg_framework/ext/happly" \
+  -isystem "$FRAMEWORK24_REFERENCE_ROOT/lib_bcg_framework/ext/nanoflann/include" \
+  -isystem "$FRAMEWORK24_REFERENCE_ROOT/lib_bcg_framework/ext/spectra/include" \
+  tools/diagnostics/curvature/Framework24CurvatureParityProbe.cpp \
+  "$FRAMEWORK24_REFERENCE_BUILD/lib_bcg_framework/liblib_bcg_framework.a" \
+  -ltbb -lpthread -o /tmp/Framework24CurvatureParityProbe
+/tmp/Framework24CurvatureParityProbe tests/data/sculpt.obj \
+  > /tmp/framework24-sculpt.txt
+```
+
+Framework24 `MeshIo` centers coordinates and divides them by maximum AABB
+extent before this call. The committed parity fixtures and `sculpt.obj` all
+have maximum extent one, so translation is the only loader change and does not
+affect curvature. For another mesh, normalize the input supplied to both probes
+or explicitly convert the inverse-length units before comparing.
+
+The default Framework24 policy is deliberately not used as an oracle: its
+parallel-unsequenced in-place smoothing reads and writes the same arrays. The
+sequential policy preserves the reference loop and stable vertex order.
+When comparing directions, map Framework24 `min_direction` to IntrinsicEngine
+`v:principal_dir2` and `max_direction` to `v:principal_dir1`; those are the
+existing public minimum/maximum direction names in the engine. Compare them as
+unoriented lines because an eigenvector and its negation are equivalent.
+
+## PMP comparison probe
 
 Enable and build the Intrinsic probe in a Release preset tree:
 
@@ -39,11 +83,15 @@ Keep the compiler, optimization mode, PMP revision, and compile command with
 any timing interpretation; scalar differential results depend on the PMP
 revision, while low-repetition timings are only diagnostic.
 
-Since BUG-156, the engine estimator uses one-ring hinge support with no
-post-smoothing, and the PMP probe defaults now match
-(`smoothing_steps = 0`, `two_ring = 0`). Pass `... <repetitions> 3 1` to the
-PMP probe to reproduce the superseded PMP-default comparison recorded in the
-2026-08-12 estimator study.
+The PMP probe defaults to its one-ring hinge support with no post-smoothing
+(`smoothing_steps = 0`, `two_ring = 0`). Pass `... <repetitions> 3 1` to select
+PMP's own two-ring/three-pass path. Neither setting reproduces Framework24:
+Framework24 has distinct mixed-area, cotan, sign/direction-pairing, boundary,
+and in-place smoothing semantics. The corrected probe argument order is
+`(smoothing_steps, use_tensor=true, use_two_ring)`.
+
+For the current parity result and its actual Framework24 invocation, see
+[`ara/evidence/tables/curvature_framework24_parity_2026-08-12.md`](../../../ara/evidence/tables/curvature_framework24_parity_2026-08-12.md).
 
 Run a deterministic, size-stratified sample:
 
