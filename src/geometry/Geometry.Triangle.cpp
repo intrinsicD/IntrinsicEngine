@@ -129,8 +129,10 @@ namespace Geometry
         const double a = static_cast<double>(edges.x);
         const double b = static_cast<double>(edges.y);
         const double c = static_cast<double>(edges.z);
-        const double angleA = static_cast<double>(SafeAcos(static_cast<float>((b * b + c * c - a * a) / (2.0 * b * c))));
-        const double angleB = static_cast<double>(SafeAcos(static_cast<float>((a * a + c * c - b * b) / (2.0 * a * c))));
+        const double angleA = static_cast<double>(
+            SafeAcos(static_cast<float>((b * b + c * c - a * a) / (2.0 * b * c))));
+        const double angleB = static_cast<double>(
+            SafeAcos(static_cast<float>((a * a + c * c - b * b) / (2.0 * a * c))));
         const double angleC = std::max(0.0, static_cast<double>(std::numbers::pi_v<float>) - angleA - angleB);
         return glm::vec3{
             static_cast<float>(angleA),
@@ -227,5 +229,29 @@ namespace Geometry
     double Distance(const Triangle& triangle, const glm::vec3& point)
     {
         return std::sqrt(SquaredDistance(triangle, point));
+    }
+
+    double AreaFromMetric(double a, double b, double c)
+    {
+        //Numerically stable herons formula for area of triangle with side lengths a, b and c.
+        if (a < b) std::swap(a, b);
+        if (a < c) std::swap(a, c);
+        if (b < c) std::swap(b, c);
+        assert(a >= b);
+        assert(b >= c);
+
+        double p = std::sqrt(std::abs((a + (b + c)) * (c - (a - b)) * (c + (a - b)) * (a + (b - c)))) / 4;
+        assert(!std::isnan(p));
+        return p;
+    }
+
+    double AreaFromMetric(const glm::vec3& edgeLengths)
+    {
+        return AreaFromMetric(edgeLengths.x, edgeLengths.y, edgeLengths.z);
+    }
+
+    [[nodiscard]] double AreaFromMetric(const Triangle& triangle)
+    {
+        return AreaFromMetric(triangle.EdgeLengths());
     }
 }
