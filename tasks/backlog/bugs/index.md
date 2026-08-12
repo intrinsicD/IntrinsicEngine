@@ -17,6 +17,15 @@ of `BUG-140` and of the parameterization rejection recorded in `BUG-141`.
   afterward. Preserve raw query/availability/slot evidence and distinguish
   legal timestamp quantization from a query-lifecycle defect without retries,
   quarantine, or clamping.
+- [`BUG-157` — Clang 20 fails IntrinsicTests on glm anonymous-union
+  redeclaration](BUG-157-clang20-glm-module-union-build-break.md): on a
+  Clang-20-only host, `Test.CameraModule.cpp` deterministically fails with
+  `glm/detail/type_vec3.hpp: class member cannot be redeclared` when textual
+  glm inclusion meets the imported RHI module chain, so the full
+  `IntrinsicTests` build breaks on the documented minimum toolchain while
+  geometry-only targets build and pass. Hosted CI installs clang-20 and is
+  expected to hit this once its earlier shallow-checkout validator failure is
+  fixed.
 
 - [`BUG-154` — Restore PMP curvature parity without normal-seam topology loss](../../active/BUG-154-curvature-pmp-parity-corner-normal-topology.md):
   OBJ authored normals currently participate in the topology remap key, so a

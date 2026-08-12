@@ -110,41 +110,40 @@ export namespace Geometry::Curvature
         HalfedgeMesh::Mesh& mesh);
 
     // Computes the coherent edge-dihedral principal system described below.
-    // H = (κ₁ + κ₂) / 2 and K = κ₁κ₂ after scalar smoothing;
-    // the standalone Meyer operators remain available through the two functions
+    // H = (κ₁ + κ₂) / 2 and K = κ₁κ₂ hold exactly at every vertex; the
+    // standalone Meyer operators remain available through the two functions
     // above and are not mixed into this result.
     [[nodiscard]] CurvatureField ComputeCurvature(HalfedgeMesh::Mesh& mesh);
 
     // For each interior edge e, forms the signed hinge contribution
     //   M_e = beta_e (|e|/2) t_e t_e^T,
-    // then sums incident contributions over the vertex plus its one-ring
-    // neighbours and divides by their mixed area. A signed symmetric 3x3
-    // Jacobi decomposition identifies the tensor-normal eigenvalue by minimum
-    // absolute magnitude, matching the PMP reference scalar formulation.
+    // sums the contributions of each non-boundary vertex's own incident edges,
+    // and divides by the vertex's mixed area. A signed symmetric 3x3 Jacobi
+    // decomposition identifies the tensor-normal eigenvalue by minimum
+    // absolute magnitude (the PMP hinge formulation with one-ring support).
     // A hinge measures bend across its edge while M_e stores the edge tangent,
     // so each eigenvalue is paired with the complementary tangent eigenvector.
-    // Boundary scalars are first interpolated uniformly from non-boundary
-    // neighbours. Three simultaneous nonnegative-cotan passes then apply
-    // `new = 0.5*old + 0.5*weighted-neighbour-average` through the reusable
-    // property smoother. Directions remain the unsmoothed tensor basis and use
-    // the geometric normal to resolve zero-eigenvalue ambiguity. Outward convex
-    // curvature is positive. Reversing orientation negates curvature along each
-    // physical direction, swapping the algebraically ordered max/min slots when
-    // they differ.
+    // Boundary scalars are interpolated uniformly from non-boundary
+    // neighbours. Published eigenvalues are deliberately not post-smoothed,
+    // and support is deliberately one-ring: the PMP-default two-ring support
+    // integrates sharp-crease bending into flanking smooth vertices, and
+    // damped eigenvalue smoothing then cancels genuine curvature into
+    // near-zero bands across convex/concave transitions (BUG-156). Callers
+    // wanting stabilized fields smooth the published properties explicitly
+    // via Geometry.Smoothing. Directions are the tensor basis and use the
+    // geometric normal to resolve zero-eigenvalue ambiguity. Outward convex
+    // curvature is positive. Reversing orientation negates curvature along
+    // each physical direction, swapping the algebraically ordered max/min
+    // slots when they differ.
     //
-    // Interior centers exclude boundary support samples; supported boundary
-    // vertices inherit scalars and line directions from valid interior
-    // neighbours. Triangle conditioning is measured by the scale-independent
-    // ratio 2A/l_max^2. Degenerate, non-triangular, non-finite, or sub-threshold
-    // faces invalidate their incident support and the one-ring tensor centers
-    // that consume it. Those vertices retain finite zero sentinels and are
-    // excluded as smoothing sources, preventing unreliable spikes from
-    // diffusing into the valid field. Supported flat vertices retain zero
-    // scalars and directions. Empty/no-face meshes return nullopt. Storage is
-    // O(V + E + F). Runtime is linear for
-    // bounded-valence meshes and O(F + E + Σ_v degree(v)²) without that
-    // assumption because the reference two-ring quadrature revisits support
-    // vertices' incident edges.
+    // Supported boundary vertices inherit scalars and line directions from
+    // valid interior neighbours. Triangle conditioning is measured by the
+    // scale-independent ratio 2A/l_max^2. Degenerate, non-triangular,
+    // non-finite, or sub-threshold faces invalidate their incident vertices,
+    // which retain finite zero sentinels and cannot seed boundary
+    // interpolation. Supported flat vertices retain zero scalars and
+    // directions. Empty/no-face meshes return nullopt. Storage is
+    // O(V + E + F) and runtime is O(V + E + F).
     [[nodiscard]] std::optional<CurvatureTensorResult> ComputeCurvatureTensor(
         HalfedgeMesh::Mesh& mesh);
 

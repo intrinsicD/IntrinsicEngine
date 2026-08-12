@@ -39,6 +39,12 @@ Keep the compiler, optimization mode, PMP revision, and compile command with
 any timing interpretation; scalar differential results depend on the PMP
 revision, while low-repetition timings are only diagnostic.
 
+Since BUG-156, the engine estimator uses one-ring hinge support with no
+post-smoothing, and the PMP probe defaults now match
+(`smoothing_steps = 0`, `two_ring = 0`). Pass `... <repetitions> 3 1` to the
+PMP probe to reproduce the superseded PMP-default comparison recorded in the
+2026-08-12 estimator study.
+
 Run a deterministic, size-stratified sample:
 
 ```bash

@@ -1,5 +1,9 @@
-// Implements discrete scalar operators and the PMP-compatible signed
-// edge-dihedral curvature tensor published through canonical vertex fields.
+// Implements discrete scalar operators and the signed edge-dihedral curvature
+// tensor published through canonical vertex fields. The tensor uses one-ring
+// hinge support and publishes unsmoothed eigenvalues: the previous PMP-default
+// two-ring support bled sharp-crease bending into flanking vertices, and the
+// three damped eigenvalue-smoothing passes then cancelled genuine curvature
+// into near-zero bands (BUG-156, tests/data/sculpt.obj).
 module;
 
 #include <algorithm>
@@ -19,7 +23,6 @@ module Geometry.Curvature;
 import Geometry.Properties;
 import Geometry.HalfedgeMesh;
 import Geometry.HalfedgeMesh.Utils;
-import Geometry.Smoothing;
 
 namespace Geometry::Curvature
 {
@@ -53,11 +56,12 @@ namespace Geometry::Curvature
         struct TensorComputation
         {
             std::vector<TensorVertex> Vertices{};
-            // Unlike Vertices::Valid, this mask remains active for ordinary
-            // PMP-compatible zero sentinels (for example, boundary vertices
-            // with no interior interpolation support). It is cleared only
-            // where unreliable face geometry would diffuse through smoothing.
-            std::vector<std::uint8_t> SmoothingActive{};
+            // Unlike Vertices::Valid, this mask remains set for ordinary zero
+            // sentinels (for example, boundary vertices with no interior
+            // interpolation support). It is cleared only where unreliable face
+            // geometry invalidates the local estimate, so boundary
+            // interpolation cannot inherit values from unreliable neighbours.
+            std::vector<std::uint8_t> ReliableField{};
             std::size_t DegenerateFaceCount{0u};
             std::size_t IllConditionedFaceCount{0u};
             std::size_t UnsupportedFaceCount{0u};
@@ -303,10 +307,13 @@ namespace Geometry::Curvature
             return normal / length;
         }
 
-        // PMP's edge-dihedral estimator accumulates signed interior hinges over
-        // each non-boundary center and its one-ring neighbours. Boundary support
-        // samples are excluded, then boundary scalar values are interpolated.
-        [[nodiscard]] TensorComputation ComputePmpEdgeDihedralTensor(
+        // Accumulates signed interior hinge samples over each non-boundary
+        // center's own incident edges (the PMP formulation restricted to
+        // one-ring support), then interpolates boundary scalar values from
+        // interior neighbours. Two-ring support is deliberately not used: it
+        // integrates sharp-crease bending into flanking vertices whose local
+        // surface is smooth, overwhelming their own signal.
+        [[nodiscard]] TensorComputation ComputeEdgeDihedralTensor(
             HalfedgeMesh::Mesh& mesh)
         {
             constexpr double kDirectionTiny =
@@ -316,7 +323,7 @@ namespace Geometry::Curvature
             const std::size_t faceCount = mesh.FacesSize();
             TensorComputation computation{};
             computation.Vertices.resize(vertexCount);
-            computation.SmoothingActive.assign(vertexCount, 1u);
+            computation.ReliableField.assign(vertexCount, 1u);
             std::vector<TensorVertex>& out = computation.Vertices;
             const std::vector<double> mixedAreas =
                 ComputeMixedVoronoiAreas(mesh);
@@ -450,57 +457,29 @@ namespace Geometry::Curvature
                     || mesh.IsBoundary(vertex))
                 {
                     if (mesh.IsDeleted(vertex) || mesh.IsIsolated(vertex))
-                        computation.SmoothingActive[i] = 0u;
+                        computation.ReliableField[i] = 0u;
                     continue;
                 }
 
-                SymmetricTensor tensor{};
-                double supportArea = 0.0;
-                bool supportValid = true;
-                const auto accumulate = [&](const VertexHandle support)
+                const double supportArea = mixedAreas[i];
+                if (reliableSupport[i] == 0u || !std::isfinite(supportArea)
+                    || supportArea <= std::numeric_limits<double>::min())
                 {
-                    if (!support.IsValid() || mesh.IsDeleted(support)
-                        || mesh.IsBoundary(support))
-                    {
-                        return;
-                    }
-                    if (reliableSupport[support.Index] == 0u)
-                    {
-                        supportValid = false;
-                        return;
-                    }
-                    const double area = mixedAreas[support.Index];
-                    if (!std::isfinite(area)
-                        || area <= std::numeric_limits<double>::min())
-                    {
-                        supportValid = false;
-                        return;
-                    }
-                    supportArea += area;
-                    for (const HalfedgeHandle halfedge :
-                         mesh.HalfedgesAroundVertex(support))
-                    {
-                        const EdgeTensorSample& sample =
-                            edgeSamples[mesh.Edge(halfedge).Index];
-                        if (sample.Valid)
-                        {
-                            tensor.AddOuterProduct(
-                                sample.WeightedDirection,
-                                sample.SignedDihedral);
-                        }
-                    }
-                };
-                accumulate(vertex);
+                    computation.ReliableField[i] = 0u;
+                    continue;
+                }
+                SymmetricTensor tensor{};
                 for (const HalfedgeHandle halfedge :
                      mesh.HalfedgesAroundVertex(vertex))
                 {
-                    accumulate(mesh.ToVertex(halfedge));
-                }
-                if (!supportValid || !std::isfinite(supportArea)
-                    || supportArea <= std::numeric_limits<double>::min())
-                {
-                    computation.SmoothingActive[i] = 0u;
-                    continue;
+                    const EdgeTensorSample& sample =
+                        edgeSamples[mesh.Edge(halfedge).Index];
+                    if (sample.Valid)
+                    {
+                        tensor.AddOuterProduct(
+                            sample.WeightedDirection,
+                            sample.SignedDihedral);
+                    }
                 }
                 tensor.Divide(supportArea);
 
@@ -608,7 +587,7 @@ namespace Geometry::Curvature
                     continue;
                 if (reliableSupport[i] == 0u)
                 {
-                    computation.SmoothingActive[i] = 0u;
+                    computation.ReliableField[i] = 0u;
                     continue;
                 }
                 double minSum = 0.0;
@@ -628,9 +607,9 @@ namespace Geometry::Curvature
                     {
                         continue;
                     }
-                    if (computation.SmoothingActive[neighbor.Index] == 0u)
+                    if (computation.ReliableField[neighbor.Index] == 0u)
                     {
-                        computation.SmoothingActive[i] = 0u;
+                        computation.ReliableField[i] = 0u;
                         continue;
                     }
                     if (!out[neighbor.Index].Valid)
@@ -655,7 +634,7 @@ namespace Geometry::Curvature
                     direction2Sum += direction2;
                     ++directionCount;
                 }
-                if (computation.SmoothingActive[i] == 0u)
+                if (computation.ReliableField[i] == 0u)
                 {
                     out[i] = TensorVertex{};
                     continue;
@@ -719,7 +698,12 @@ namespace Geometry::Curvature
             return computation;
         }
 
-        [[nodiscard]] CurvatureDiagnostics PublishAndSmoothTensorFields(
+        // Publishes the raw per-vertex eigenvalues. No post-smoothing is
+        // applied: damped eigenvalue smoothing averaged across crease
+        // transitions and cancelled genuine curvature into near-zero bands.
+        // Callers wanting stabilized fields can smooth the published
+        // properties explicitly through Geometry.Smoothing.
+        [[nodiscard]] CurvatureDiagnostics PublishTensorFields(
             HalfedgeMesh::Mesh& mesh,
             const TensorComputation& computation,
             VertexProperty<glm::vec3> direction1Property,
@@ -745,28 +729,6 @@ namespace Geometry::Curvature
                     direction1Property[vertex] = glm::vec3(tensor[i].Dir1);
                     direction2Property[vertex] = glm::vec3(tensor[i].Dir2);
                 }
-            }
-
-            const VertexProperty<double>& readMin = minPrincipalProperty;
-            const VertexProperty<double>& readMax = maxPrincipalProperty;
-            const std::vector<double> rawMin = readMin.Vector();
-            const std::vector<double> rawMax = readMax.Vector();
-            const Smoothing::VertexPropertySmoothingParams smoothing{
-                .Iterations = 3u,
-                .Lambda = 0.5,
-                .PreserveBoundary = false,
-                .ActiveVertexMask = computation.SmoothingActive,
-            };
-            const Smoothing::VertexPropertySmoothingResult minResult =
-                Smoothing::CotanSmoothVertexProperty(
-                    mesh, minPrincipalProperty, smoothing);
-            const Smoothing::VertexPropertySmoothingResult maxResult =
-                Smoothing::CotanSmoothVertexProperty(
-                    mesh, maxPrincipalProperty, smoothing);
-            if (!minResult.Succeeded() || !maxResult.Succeeded())
-            {
-                minPrincipalProperty.Vector() = rawMin;
-                maxPrincipalProperty.Vector() = rawMax;
             }
 
             CurvatureDiagnostics diagnostics{};
@@ -920,8 +882,8 @@ namespace Geometry::Curvature
         result.PrincipalDir1Property = VertexProperty<glm::vec3>(mesh.VertexProperties().GetOrAdd<glm::vec3>("v:principal_dir1", glm::vec3(0.0f)));
         result.PrincipalDir2Property = VertexProperty<glm::vec3>(mesh.VertexProperties().GetOrAdd<glm::vec3>("v:principal_dir2", glm::vec3(0.0f)));
 
-        const TensorComputation tensor = ComputePmpEdgeDihedralTensor(mesh);
-        result.Diagnostics = PublishAndSmoothTensorFields(
+        const TensorComputation tensor = ComputeEdgeDihedralTensor(mesh);
+        result.Diagnostics = PublishTensorFields(
             mesh,
             tensor,
             result.PrincipalDir1Property,
@@ -970,8 +932,8 @@ namespace Geometry::Curvature
         result.MaxPrincipalCurvatureProperty = VertexProperty<double>(mesh.VertexProperties().GetOrAdd<double>("v:max_principal_curvature", 0.0));
         result.MinPrincipalCurvatureProperty = VertexProperty<double>(mesh.VertexProperties().GetOrAdd<double>("v:min_principal_curvature", 0.0));
 
-        const TensorComputation tensor = ComputePmpEdgeDihedralTensor(mesh);
-        result.Diagnostics = PublishAndSmoothTensorFields(
+        const TensorComputation tensor = ComputeEdgeDihedralTensor(mesh);
+        result.Diagnostics = PublishTensorFields(
             mesh,
             tensor,
             result.PrincipalDir1Property,
