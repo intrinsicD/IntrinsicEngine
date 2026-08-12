@@ -659,3 +659,22 @@
   tasks/active/BUG-151-work-graph-multi-slice-cycle.md,
   docs/agent/workflow-evidence.md]
 - **From staging**: O144
+
+## A42: Authored Normal Discontinuities Stay on the Corner Domain
+- **Decision**: Geometric OBJ topology is derived without authored normal
+  identity. Discontinuous or non-lockstep normals remain canonical halfedge
+  corner properties through import, runtime materialization, and persistence;
+  runtime builds one shared complete shading-tuple split only for GPU upload.
+  Corner normals take precedence over default vertex normals, while explicit
+  vertex-channel bindings remain authoritative. Adjacency consumers never weld
+  or reinterpret topology privately to compensate for a shading seam.
+- **Provenance**: user-revised
+- **Crystallized via**: verbal-affirmation
+- **Evidence**: [N419, N423, N424, N425,
+  src/geometry/Geometry.HalfedgeMesh.IO.cpp,
+  src/runtime/GeometryIntegration/Runtime.MeshSurfaceTopology.cppm,
+  src/runtime/GeometryIntegration/Runtime.MeshSurfaceTopology.cpp,
+  src/runtime/GeometryIntegration/Runtime.GeometryPlanBuilders.Mesh.cpp,
+  tests/contract/runtime/Test.MeshGeometryExtraction.cpp,
+  docs/architecture/property-coherence.md]
+- **From staging**: O152

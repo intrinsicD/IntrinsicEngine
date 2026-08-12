@@ -28,6 +28,7 @@ namespace Extrinsic::Runtime {
 namespace {
 constexpr const char *kPositionProperty = "v:point";
 constexpr const char *kNormalProperty = "v:normal";
+constexpr const char *kCornerNormalProperty = "h:normal";
 constexpr const char *kTexcoordProperty = "v:texcoord";
 constexpr const char *kCornerTexcoordProperty =
     Geometry::MeshUtils::kHalfedgeTexcoordPropertyName;
@@ -244,6 +245,15 @@ ResolveVertexNormals(const Geometry::MeshIO::MeshIOResult &meshPayload,
 
 [[nodiscard]] bool AllFinite(const std::vector<glm::vec2> &values) noexcept {
   for (const glm::vec2 value : values) {
+    if (!IsFinite(value)) {
+      return false;
+    }
+  }
+  return true;
+}
+
+[[nodiscard]] bool AllFinite(const std::vector<glm::vec3> &values) noexcept {
+  for (const glm::vec3 value : values) {
     if (!IsFinite(value)) {
       return false;
     }
@@ -523,6 +533,47 @@ GatherAtlasCornerTexcoords(const Geometry::UvAtlas::UvAtlasResult &atlas,
   return corners;
 }
 
+// OBJ `vn` indices use the same flattened polygon-corner convention as UVs.
+// Preserve them through the source fan triangulation without changing the
+// source vertex table.
+[[nodiscard]] std::optional<std::vector<glm::vec3>>
+GatherAuthoredCornerNormals(
+    const Geometry::MeshIO::MeshIOResult &meshPayload,
+    const std::vector<std::vector<std::uint32_t>> &polygons,
+    const Geometry::MeshSoup::IndexedMesh &sourceMesh) {
+  const auto authored =
+      meshPayload.Halfedges.Get<glm::vec3>(kCornerNormalProperty);
+  if (!authored) {
+    return std::nullopt;
+  }
+  const std::vector<glm::vec3> &values = authored.Vector();
+
+  std::size_t expectedCorners = 0u;
+  for (const std::vector<std::uint32_t> &polygon : polygons) {
+    expectedCorners += polygon.size();
+  }
+  if (values.empty() || values.size() != expectedCorners ||
+      !AllFinite(values)) {
+    return std::nullopt;
+  }
+
+  std::vector<glm::vec3> corners;
+  corners.reserve(sourceMesh.FaceCount() * 3u);
+  std::size_t base = 0u;
+  for (const std::vector<std::uint32_t> &polygon : polygons) {
+    for (std::size_t i = 1u; i + 1u < polygon.size(); ++i) {
+      corners.push_back(values[base]);
+      corners.push_back(values[base + i]);
+      corners.push_back(values[base + i + 1u]);
+    }
+    base += polygon.size();
+  }
+  if (corners.size() != sourceMesh.FaceCount() * 3u) {
+    return std::nullopt;
+  }
+  return corners;
+}
+
 // Publishes the atlas's per-corner UVs onto `mesh` through the shared corner
 // mapping, then leaves exactly one UV authority behind: a stale authored
 // `v:texcoord` copied from the payload would otherwise disagree with — and win
@@ -551,6 +602,16 @@ void PublishVertexTexcoords(Geometry::HalfedgeMesh::Mesh &mesh,
   auto property = mesh.VertexProperties().GetOrAdd<glm::vec2>(
       std::string{kTexcoordProperty}, glm::vec2{0.0f});
   property.Vector() = uvPerVertex;
+}
+
+void PublishVertexNormals(Geometry::HalfedgeMesh::Mesh &mesh,
+                          const std::vector<glm::vec3> &normalPerVertex) {
+  if (mesh.VerticesSize() != normalPerVertex.size()) {
+    return;
+  }
+  auto property = mesh.VertexProperties().GetOrAdd<glm::vec3>(
+      std::string{kNormalProperty}, glm::vec3{0.0f, 0.0f, 1.0f});
+  property.Vector() = normalPerVertex;
 }
 
 [[nodiscard]] std::size_t
@@ -623,8 +684,8 @@ BuildDisconnectedRenderableMesh(
 struct ResolvedHalfedgeMesh {
   Geometry::HalfedgeMesh::Mesh Mesh{};
   // True when the input could not form a halfedge mesh and was rebuilt as a
-  // per-corner soup. Such a mesh no longer shares vertex indices with its
-  // input, so corner-indexed data cannot be mapped onto it.
+  // per-corner soup. Such a mesh no longer shares source vertex indices;
+  // corner data must be published as vertex data in face-corner order.
   bool UsedDisconnectedFallback{false};
 };
 
@@ -691,6 +752,15 @@ BuildRuntimeHalfedgeMeshMaterialization(
   auto source = BuildTriangulatedSourceMesh(positions.Vector(), faces.Vector());
   if (!source.has_value()) {
     return Core::Err<RuntimeMeshMaterializationResult>(source.error());
+  }
+
+  const bool hasAuthoredCornerNormals =
+      meshPayload.Halfedges.Exists(kCornerNormalProperty);
+  const std::optional<std::vector<glm::vec3>> authoredCornerNormals =
+      GatherAuthoredCornerNormals(meshPayload, faces.Vector(), source->Mesh);
+  if (hasAuthoredCornerNormals && !authoredCornerNormals.has_value()) {
+    return Core::Err<RuntimeMeshMaterializationResult>(
+        Core::ErrorCode::AssetInvalidData);
   }
 
   std::vector<glm::vec3> normals =
@@ -766,6 +836,21 @@ BuildRuntimeHalfedgeMeshMaterialization(
   Geometry::HalfedgeMesh::Mesh &mesh = resolved->Mesh;
   diagnostics.ResolvedVertexCount = mesh.VerticesSize();
   diagnostics.ResolvedFaceCount = mesh.FacesSize();
+
+  if (authoredCornerNormals.has_value()) {
+    if (resolved->UsedDisconnectedFallback) {
+      if (mesh.VerticesSize() != authoredCornerNormals->size()) {
+        return Core::Err<RuntimeMeshMaterializationResult>(
+            Core::ErrorCode::AssetInvalidData);
+      }
+      PublishVertexNormals(mesh, *authoredCornerNormals);
+    } else if (!PublishMeshCornerNormals(
+                   mesh, source->Mesh.Faces(), source->Mesh.VertexCount(),
+                   *authoredCornerNormals)) {
+      return Core::Err<RuntimeMeshMaterializationResult>(
+          Core::ErrorCode::AssetInvalidData);
+    }
+  }
 
   if (!atlasUsable) {
     // The atlas-failure path keeps the same topology guarantee; it simply has
@@ -846,6 +931,15 @@ BuildRuntimeHalfedgeMeshGeometryOnly(
     return Core::Err<Geometry::HalfedgeMesh::Mesh>(source.error());
   }
 
+  const bool hasAuthoredCornerNormals =
+      meshPayload.Halfedges.Exists(kCornerNormalProperty);
+  const std::optional<std::vector<glm::vec3>> authoredCornerNormals =
+      GatherAuthoredCornerNormals(meshPayload, faces.Vector(), source->Mesh);
+  if (hasAuthoredCornerNormals && !authoredCornerNormals.has_value()) {
+    return Core::Err<Geometry::HalfedgeMesh::Mesh>(
+        Core::ErrorCode::AssetInvalidData);
+  }
+
   const std::vector<std::uint32_t> identityVertexXrefs =
       MakeIdentityXrefs(source->Mesh.VertexCount());
 
@@ -859,6 +953,20 @@ BuildRuntimeHalfedgeMeshGeometryOnly(
       options.AllowDisconnectedRenderableFallback);
   if (!resolved.has_value()) {
     return Core::Err<Geometry::HalfedgeMesh::Mesh>(resolved.error());
+  }
+  if (authoredCornerNormals.has_value()) {
+    if (resolved->UsedDisconnectedFallback) {
+      if (resolved->Mesh.VerticesSize() != authoredCornerNormals->size()) {
+        return Core::Err<Geometry::HalfedgeMesh::Mesh>(
+            Core::ErrorCode::AssetInvalidData);
+      }
+      PublishVertexNormals(resolved->Mesh, *authoredCornerNormals);
+    } else if (!PublishMeshCornerNormals(
+                   resolved->Mesh, source->Mesh.Faces(),
+                   source->Mesh.VertexCount(), *authoredCornerNormals)) {
+      return Core::Err<Geometry::HalfedgeMesh::Mesh>(
+          Core::ErrorCode::AssetInvalidData);
+    }
   }
   return std::move(resolved->Mesh);
 }

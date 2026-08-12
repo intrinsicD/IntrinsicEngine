@@ -2,9 +2,9 @@ session:
   id: "2026-08-11_001"
   date: "2026-08-11"
   started: "2026-08-11T00:47+02:00"
-  last_turn: "2026-08-11T07:58+02:00"
-  turn_count: 3
-  summary: "Advanced METHOD-038 through independently audited fold, cylinder, and smooth-transition fixture controls with complete unsanitized and sanitizer CPU verification."
+  last_turn: "2026-08-11T23:13+02:00"
+  turn_count: 5
+  summary: "Advanced curvature-segmentation controls, diagnosed the failed raw-curvature workflow, and implemented the PMP-parity/corner-normal repair through full CPU, sanitizer, and Vulkan verification."
 
 events_logged:
   - turn: 1
@@ -85,6 +85,102 @@ events_logged:
     routing: crystallized
     provenance: ai-executed
     summary: "Crystallized bounded cylinder and smooth-transition fixture/oracle integrity from O146 and scratch-007 custody."
+  - turn: 4
+    type: question
+    id: "N418"
+    routing: direct
+    provenance: user
+    summary: "Asked whether the failed post-BUG-153 curvature workflow originates in the algorithm, a solver, integration, or another seam, using PMP as reference."
+  - turn: 4
+    type: experiment
+    id: "N419"
+    routing: direct
+    provenance: ai-executed
+    summary: "Isolated the bunny all-zero field to OBJ normal-index vertex splitting: 259 connected positions became 1485 all-boundary vertices."
+  - turn: 4
+    type: experiment
+    id: "N420"
+    routing: direct
+    provenance: ai-executed
+    summary: "Matched PMP's damped explicit smoother and measured Intrinsic's full-neighbor substitution as the dominant connected-mesh scalar discrepancy."
+  - turn: 4
+    type: experiment
+    id: "N421"
+    routing: direct
+    provenance: ai-executed
+    summary: "Measured residual 2x2/3x3 eigensystem and boundary-policy differences on armadillo, sphere, hemisphere, and a connected bunny."
+  - turn: 4
+    type: dead_end
+    id: "N422"
+    routing: direct
+    provenance: ai-executed
+    summary: "Rejected a linear-solver cause because neither Intrinsic nor PMP invokes a solver in the curvature path."
+  - turn: 4
+    type: observation
+    id: "O149"
+    routing: staged
+    provenance: ai-suggested
+    summary: "Staged the claim that authored OBJ normal seams can destroy owning geometric adjacency and zero adjacency-based curvature."
+  - turn: 4
+    type: observation
+    id: "O150"
+    routing: staged
+    provenance: ai-suggested
+    summary: "Staged the explicit smoothing-stencil mismatch against PMP."
+  - turn: 4
+    type: observation
+    id: "O151"
+    routing: staged
+    provenance: ai-suggested
+    summary: "Staged the remaining eigensystem and boundary-estimator differences."
+  - turn: 4
+    type: observation
+    id: "O152"
+    routing: staged
+    provenance: ai-suggested
+    summary: "Staged the proposed corner-normal topology repair and rejected a curvature-only weld as the durable architecture."
+  - turn: 5
+    type: decision
+    id: "N423"
+    routing: direct
+    provenance: user
+    summary: "Authorized the complete PMP/topology repair and required reusable smoothing for canonical floating-point scalar and vector properties."
+  - turn: 5
+    type: experiment
+    id: "N424"
+    routing: direct
+    provenance: ai-executed
+    summary: "Implemented the exact local PMP estimator, reusable damped cotan smoother, corner-normal import/persistence, and GPU-only shading split; the oracle and real bunny acceptance passed."
+  - turn: 5
+    type: experiment
+    id: "N425"
+    routing: direct
+    provenance: ai-executed
+    summary: "Completed zero-failure CPU, ASan, UBSan, strict structural, and 54/54 promoted Vulkan verification; independent high-risk review remains pending."
+  - turn: 5
+    type: claim
+    id: "C46"
+    routing: crystallized
+    provenance: ai-suggested
+    summary: "Crystallized the authored-normal topology diagnosis after the corner-domain repair and end-to-end tests committed to it."
+  - turn: 5
+    type: claim
+    id: "C47"
+    routing: crystallized
+    provenance: ai-suggested
+    summary: "Crystallized the explicit damped PMP smoother and its reusable canonical scalar/vector property contract."
+  - turn: 5
+    type: claim
+    id: "C48"
+    routing: crystallized
+    provenance: ai-suggested
+    summary: "Crystallized exact selected-formulation PMP curvature parity from the numeric oracle and runtime diagnostics."
+  - turn: 5
+    type: architecture
+    id: "A42"
+    routing: crystallized
+    provenance: user-revised
+    summary: "Crystallized corner-domain authored normals plus runtime-owned GPU shading-tuple expansion after the user authorized the repair."
 
 ai_actions:
   - turn: 1
@@ -112,6 +208,31 @@ ai_actions:
       - "methods/geometry/curvature_segmentation/README.md"
       - "tasks/evidence/METHOD-038/experiment/"
       - "ara/logic/claims.md"
+  - turn: 4
+    action: "Freshly rebuilt the current curvature tests, ran 23 focused tests, compiled temporary Intrinsic/PMP comparison probes, isolated OBJ topology loss, measured smoothing and estimator differentials, removed the probes, and appended the required non-claim ARA diagnostic record."
+    provenance: ai-executed
+    files_changed:
+      - "ara/evidence/README.md"
+      - "ara/evidence/tables/curvature_pmp_diagnostic_2026-08-11.md"
+      - "ara/trace/exploration_tree.yaml"
+      - "ara/staging/observations.yaml"
+      - "ara/trace/sessions/2026-08-11_001.yaml"
+      - "ara/trace/sessions/session_index.yaml"
+      - "ara/trace/pm_reasoning_log.yaml"
+  - turn: 5
+    action: "Implemented BUG-154 across geometry, OBJ I/O, runtime materialization/persistence, render packing, diagnostics, tests, architecture docs, task records, and ARA; ran focused, full CPU, ASan, UBSan, strict structural, and promoted Vulkan verification."
+    provenance: ai-executed
+    files_changed:
+      - "src/geometry/Geometry.HalfedgeMesh.Curvature.cpp"
+      - "src/geometry/Geometry.HalfedgeMesh.Smoothing.cppm"
+      - "src/geometry/Geometry.HalfedgeMesh.IO.cpp"
+      - "src/runtime/GeometryIntegration/Runtime.MeshSurfaceTopology.cpp"
+      - "src/runtime/Rendering/Runtime.RenderExtraction.Geometry.cpp"
+      - "tests/unit/geometry/Test.CurvatureTensor.cpp"
+      - "tests/unit/geometry/Test_Smoothing.cpp"
+      - "tests/contract/runtime/Test.MeshGeometryExtraction.cpp"
+      - "docs/architecture/property-coherence.md"
+      - "tasks/active/BUG-154-curvature-pmp-parity-corner-normal-topology.md"
 
 claims_touched:
   - id: C41
@@ -123,6 +244,15 @@ claims_touched:
   - id: C43
     action: created
     turn: 3
+  - id: C46
+    action: created
+    turn: 5
+  - id: C47
+    action: created
+    turn: 5
+  - id: C48
+    action: created
+    turn: 5
 
 key_context:
   - turn: 1
@@ -137,11 +267,24 @@ key_context:
     excerpt: "Scratch-007 passed all seventeen preregistered cylinder/smooth-transition fixture gates; the independent audit accepted every recomputation while retaining claim_authorized=false."
   - turn: 3
     excerpt: "No candidate A-D, v2, confirmation, performance, convergence, runtime/UI, or GPU behavior was executed or inferred from the control lane."
+  - turn: 4
+    excerpt: "The accepted BUG-153 bunny log recorded 1485 source vertices for 495 faces; the current loader's normal-index key turns its 259-position connected surface into triangle soup."
+  - turn: 4
+    excerpt: "PMP's smoother is one-half self plus one-half weighted neighbors; Intrinsic replaces each value with weighted neighbors, and neither path uses a solver."
+  - turn: 4
+    excerpt: "Current curvature tests pass 23/23 but do not exercise an authored face-normal seam, a PMP numeric oracle, or live nonzero/support diagnostics."
+  - turn: 5
+    excerpt: "The user directed implementation of the complete repair and required smoothing to be reusable for all supported floating-point scalar/vector properties."
+  - turn: 5
+    excerpt: "The original 259-position bunny now materializes as 259 vertices and 495 faces with finite corner normals; the 25-slot PMP oracle passes at 2e-6."
+  - turn: 5
+    excerpt: "CPU, ASan, UBSan, and all 54 promoted Vulkan tests pass; only independent high-risk fixed-surface review remains before BUG-154 retirement."
 
 open_threads:
   - "Preregister and implement candidate A's cheapest killing screen against the validated plane/fold/cylinder/smooth controls without reading held-out confirmation parameters."
   - "Complete the remaining analytic screening families and freeze one surviving candidate before opening the disjoint confirmation corpus."
   - "Keep METHOD-037 cpu_reference_v1 as the production selector until a candidate-v2 protocol passes; no performance, convergence, runtime/UI, or GPU result exists yet."
+  - "Obtain a label-distinct fixed-surface review for BUG-154 before final evidence binding and retirement."
 
 ai_suggestions_pending:
   - "Evaluate candidate A first as the smallest feature-first extension, but retain the frozen B-D killing order and do not select it without comparative evidence."

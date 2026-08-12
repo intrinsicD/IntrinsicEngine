@@ -1,0 +1,26 @@
+{
+  "command": [
+    "ctest",
+    "--test-dir",
+    "build/ci",
+    "--output-on-failure",
+    "-R",
+    "^(RuntimeAssetImportFormatCoverage\\.DirectObjImportPreservesAuthoredCornerNormals|MeshGeometryExtraction\\.(DisagreeingCornerNormalsSplitOnlyGpuShadingVertices|ExplicitNormalBindingOverridesCornerNormalsAndTheirRevision)|CornerTexcoordUpload\\.CompleteSplitCarriesAuthoredCornerNormals|RuntimeSceneSerialization\\.SaveLoadRoundTripPreservesCornerDomainNormals|SandboxEditorUi\\.MeshCurvatureRejectsBoundaryOnlyZeroSupport|CurvatureTensor\\.MatchesPmpTensorAndSmoothingOracle|Smoothing\\.CotanPropertySmoothing(RetainsDampedSelfWeight|SupportsCanonicalScalarAndVectorKinds|PinsBoundaryAndFailsClosed)|GeometryIO_MeshIO\\.(LoadsOBJNormalSeamOnCornersWithoutDuplicatingPositions|ObjCornerNormalsSurviveWriteAndReload))$",
+    "--timeout",
+    "60"
+  ],
+  "command_display": "ctest --test-dir build/ci --output-on-failure -R '^(RuntimeAssetImportFormatCoverage\\.DirectObjImportPreservesAuthoredCornerNormals|MeshGeometryExtraction\\.(DisagreeingCornerNormalsSplitOnlyGpuShadingVertices|ExplicitNormalBindingOverridesCornerNormalsAndTheirRevision)|CornerTexcoordUpload\\.CompleteSplitCarriesAuthoredCornerNormals|RuntimeSceneSerialization\\.SaveLoadRoundTripPreservesCornerDomainNormals|SandboxEditorUi\\.MeshCurvatureRejectsBoundaryOnlyZeroSupport|CurvatureTensor\\.MatchesPmpTensorAndSmoothingOracle|Smoothing\\.CotanPropertySmoothing(RetainsDampedSelfWeight|SupportsCanonicalScalarAndVectorKinds|PinsBoundaryAndFailsClosed)|GeometryIO_MeshIO\\.(LoadsOBJNormalSeamOnCornersWithoutDuplicatingPositions|ObjCornerNormalsSurviveWriteAndReload))$' --timeout 60",
+  "cwd": ".",
+  "duration_ms": 346,
+  "exit_code": 0,
+  "finished_at": "2026-08-11T21:17:34Z",
+  "label": "focused-regressions",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-11T21:17:34Z",
+  "stderr_path": "tasks/evidence/BUG-154/commands/focused-regressions.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/BUG-154/commands/focused-regressions.stdout.log",
+  "stdout_sha256": "7574ee3025b8145c5bf4e2c60d38d2c3556a5b942986b6366d707a9e458154f6",
+  "task_id": "BUG-154"
+}

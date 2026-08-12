@@ -56,10 +56,10 @@ lane. Its private sidecar remembers only the revisions and counts used by that
 lane:
 
 - mesh, graph, and point-cloud positions;
-- resolved texcoord, normal, and color channel properties, where "resolved
-  texcoord" follows the canonical corner-over-vertex order defined in
-  [geometry API style](geometry-api-style.md#texture-coordinates-are-corner-domain-capable):
-  `h:texcoord` when present, otherwise `v:texcoord`;
+- resolved texcoord, normal, and color channel properties. Resolved texcoords
+  follow `h:texcoord` then `v:texcoord`; resolved normals follow `h:normal`
+  then `v:normal`, as defined in [geometry API
+  style](geometry-api-style.md#normals-are-corner-domain-capable);
 - exact topology properties consumed by the corresponding plan builder;
 - vertex-channel binding generation; and
 - mesh edge/vertex primitive-view inputs.
@@ -70,10 +70,14 @@ position update, resolved attribute changes request their channel, and count or
 topology changes request full replacement. The sidecar acknowledges revisions
 only after successful reconciliation, so a failed upload is retried.
 
-A mesh whose UVs are corner-owned is uploaded by emitting one GPU vertex per
-distinct `(vertex, UV)` pair, carrying positions, normals, and packed colors
-across the split. The ECS mesh is never split to satisfy the vertex buffer; the
-duplication belongs to the upload, not to the authoritative geometry.
+A mesh whose UVs or normals are corner-owned is uploaded by emitting one GPU
+vertex per distinct `(vertex, resolved UV, resolved normal)` tuple, carrying
+positions and packed colors across the split. Render extraction tracks the
+winning corner property revision, and property-texture bake uses the same split
+so residency fingerprints agree. An explicit vertex-normal channel binding
+overrides the default corner-over-vertex resolution in both consumers. The ECS
+mesh is never split to satisfy the vertex buffer; the duplication belongs to
+upload, not authoritative geometry.
 
 ### Topology-replacing operations and UVs
 

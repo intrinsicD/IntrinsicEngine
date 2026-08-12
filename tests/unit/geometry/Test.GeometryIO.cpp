@@ -890,7 +890,8 @@ TEST(GeometryIO_MeshIO, LoadsOBJFaceNormalIndicesWithoutLockstepNormals)
     ASSERT_TRUE(result.has_value());
     ExpectTriangleMeshProperties(*result);
 
-    auto normals = result->Vertices.Get<glm::vec3>("v:normal");
+    EXPECT_FALSE(result->Vertices.Exists("v:normal"));
+    auto normals = result->Halfedges.Get<glm::vec3>("h:normal");
     ASSERT_TRUE(normals.IsValid());
     ASSERT_EQ(normals.Vector().size(), 3u);
     EXPECT_EQ(normals[0], glm::vec3(0.0f, 0.0f, 1.0f));
@@ -921,9 +922,74 @@ TEST(GeometryIO_MeshIO, LoadsOBJFaceAttributeNegativeIndices)
     EXPECT_EQ(texcoords[1], glm::vec2(1.0f, 0.0f));
     EXPECT_EQ(texcoords[2], glm::vec2(0.0f, 1.0f));
 
-    auto normals = result->Vertices.Get<glm::vec3>("v:normal");
+    auto normals = result->Halfedges.Get<glm::vec3>("h:normal");
     ASSERT_TRUE(normals.IsValid());
     EXPECT_EQ(normals[0], glm::vec3(0.0f, 0.0f, 1.0f));
+}
+
+TEST(GeometryIO_MeshIO, LoadsOBJNormalSeamOnCornersWithoutDuplicatingPositions)
+{
+    TempFile file(".obj",
+                  "v 0 0 0\n"
+                  "v 1 0 0\n"
+                  "v 1 1 0\n"
+                  "v 0 1 0\n"
+                  "vn 0 0 1\n"
+                  "vn 0 1 0\n"
+                  "f 1//1 2//1 3//1\n"
+                  "f 1//2 3//2 4//2\n");
+
+    const auto result = Geometry::MeshIO::LoadOBJ(file.Path);
+    ASSERT_TRUE(result.has_value());
+    EXPECT_EQ(result->Vertices.Size(), 4u);
+    EXPECT_EQ(result->Faces.Size(), 2u);
+    EXPECT_FALSE(result->Vertices.Exists("v:normal"));
+
+    const auto faces = result->Faces.Get<std::vector<std::uint32_t>>("f:vertices");
+    ASSERT_TRUE(faces.IsValid());
+    EXPECT_EQ(faces[0], (std::vector<std::uint32_t>{0u, 1u, 2u}));
+    EXPECT_EQ(faces[1], (std::vector<std::uint32_t>{0u, 2u, 3u}));
+
+    const auto normals = result->Halfedges.Get<glm::vec3>("h:normal");
+    ASSERT_TRUE(normals.IsValid());
+    ASSERT_EQ(normals.Vector().size(), 6u);
+    for (std::size_t i = 0; i < 3u; ++i)
+    {
+        EXPECT_EQ(normals[i], glm::vec3(0.0f, 0.0f, 1.0f));
+        EXPECT_EQ(normals[i + 3u], glm::vec3(0.0f, 1.0f, 0.0f));
+    }
+}
+
+TEST(GeometryIO_MeshIO, ObjCornerNormalsSurviveWriteAndReload)
+{
+    TempFile source(".obj",
+                    "v 0 0 0\n"
+                    "v 1 0 0\n"
+                    "v 1 1 0\n"
+                    "v 0 1 0\n"
+                    "vn 0 0 1\n"
+                    "vn 0 1 0\n"
+                    "f 1//1 2//1 3//1\n"
+                    "f 1//2 3//2 4//2\n");
+    const auto loaded = Geometry::MeshIO::LoadOBJ(source.Path);
+    ASSERT_TRUE(loaded.has_value());
+    const auto original = loaded->Halfedges.Get<glm::vec3>("h:normal");
+    ASSERT_TRUE(original.IsValid());
+
+    TempFile destination(".obj", "");
+    ASSERT_EQ(Geometry::MeshIO::WriteOBJ(destination.Path, *loaded),
+              Geometry::MeshIO::MeshIOWriteStatus::Success);
+
+    const auto reloaded = Geometry::MeshIO::LoadOBJ(destination.Path);
+    ASSERT_TRUE(reloaded.has_value());
+    EXPECT_EQ(reloaded->Vertices.Size(), 4u);
+    const auto roundTripped = reloaded->Halfedges.Get<glm::vec3>("h:normal");
+    ASSERT_TRUE(roundTripped.IsValid());
+    ASSERT_EQ(roundTripped.Vector().size(), original.Vector().size());
+    for (std::size_t i = 0; i < original.Vector().size(); ++i)
+    {
+        EXPECT_EQ(roundTripped[i], original[i]);
+    }
 }
 
 TEST(GeometryIO_MeshIO, LoadOBJRejectsOutOfRangeFaceTexcoordIndex)

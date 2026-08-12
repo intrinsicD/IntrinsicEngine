@@ -243,8 +243,11 @@ TEST(DEC_HodgeStar0, EquilateralTriangleEqualAreas)
     auto mesh = MakeSingleTriangle();
     auto h0 = Geometry::DEC::BuildHodgeStar0(mesh);
 
-    EXPECT_NEAR(h0.Diagonal[0], h0.Diagonal[1], 1e-10);
-    EXPECT_NEAR(h0.Diagonal[1], h0.Diagonal[2], 1e-10);
+    // The public positions store sqrt(3)/2 in float, so the realized triangle
+    // is equilateral only to float precision. Double-precision area assembly
+    // intentionally preserves that input asymmetry instead of rounding it away.
+    EXPECT_NEAR(h0.Diagonal[0], h0.Diagonal[1], 1e-8);
+    EXPECT_NEAR(h0.Diagonal[1], h0.Diagonal[2], 1e-8);
 }
 
 TEST(DEC_HodgeStar0, RegularTetrahedronEqualAreas)

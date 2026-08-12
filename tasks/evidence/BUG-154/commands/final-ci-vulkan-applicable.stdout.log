@@ -1,0 +1,17 @@
+Internal ctest changing into directory: /home/alex/Documents/IntrinsicEngine/build/ci-vulkan
+Test project /home/alex/Documents/IntrinsicEngine/build/ci-vulkan
+    Start 3533: RuntimeSandboxAcceptanceGpuSmoke.ImportedObjectSpaceNormalBakeBindsAndReadsBackExactTargetSlice
+1/2 Test #3533: RuntimeSandboxAcceptanceGpuSmoke.ImportedObjectSpaceNormalBakeBindsAndReadsBackExactTargetSlice ...   Passed    4.98 sec
+    Start 3535: RuntimeSandboxAcceptanceGpuSmoke.SeamSplitCornerUvMeshDeIndexesAtUploadAndRendersVisibleSurface
+2/2 Test #3535: RuntimeSandboxAcceptanceGpuSmoke.SeamSplitCornerUvMeshDeIndexesAtUploadAndRendersVisibleSurface ...   Passed    3.48 sec
+
+100% tests passed, 0 tests failed out of 2
+
+Label Time Summary:
+gpu            =   8.46 sec*proc (2 tests)
+graphics       =   8.46 sec*proc (2 tests)
+integration    =   8.46 sec*proc (2 tests)
+runtime        =   8.46 sec*proc (2 tests)
+vulkan         =   8.46 sec*proc (2 tests)
+
+Total Test time (real) =   8.60 sec

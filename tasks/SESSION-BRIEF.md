@@ -8,6 +8,7 @@ the authoritative open/unblocked view.
 
 ## Active tasks
 
+- `BUG-154` — Restore PMP curvature parity without normal-seam topology loss (tasks/active/BUG-154-curvature-pmp-parity-corner-normal-topology.md)
 - `METHOD-039` — Feature-network-constrained curvature patch decomposition (tasks/active/METHOD-039-feature-network-curvature-patch-decomposition.md)
 
 ## Theme B — Rendering modernization
@@ -45,6 +46,7 @@ the authoritative open/unblocked view.
 - unblocked: `BUG-097` — Progressive model-scene UV job publishes a zero atlas (tasks/backlog/bugs/BUG-097-progressive-model-scene-zero-uv-atlas.md)
 - unblocked: `BUG-118` — GLFW X11 input-method LeakSanitizer recurrence (tasks/backlog/bugs/BUG-118-glfw-x11-input-method-lsan-recurrence.md)
 - unblocked: `BUG-149` — Benchmark sealer escapes dotted output directories (tasks/backlog/bugs/BUG-149-benchmark-sealer-dotted-output-directory.md)
+- unblocked: `BUG-155` — Native Vulkan timestamp smoke intermittently publishes zero duration (tasks/backlog/bugs/BUG-155-vulkan-native-timestamp-zero-duration-flake.md)
 
 ## Theme H — Agentic workflow hardening
 

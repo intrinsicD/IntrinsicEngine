@@ -451,6 +451,7 @@ namespace {
                    // BUG-137 — same reserved property, on the domain that can
                    // carry a seam.
                    name == "h:texcoord" ||
+                   name == "h:normal" ||
                    name == "p:position" ||
                    name == "p:normal";
         }
@@ -473,6 +474,7 @@ namespace {
                    // BUG-137 — same reserved property, on the domain that can
                    // carry a seam.
                    name == "h:texcoord" ||
+                   name == "h:normal" ||
                    name == "p:position";
         }
 

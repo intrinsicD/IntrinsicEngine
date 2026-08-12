@@ -1701,6 +1701,15 @@ TEST(SandboxEditorUi, MeshCurvatureCommandPublishesCanonicalPropertiesAndSupport
 
     ASSERT_TRUE(result.Succeeded()) << result.Message;
     EXPECT_EQ(result.VertexSlotCount, 4u);
+    EXPECT_EQ(result.SupportedVertexCount, 4u);
+    EXPECT_EQ(result.NonZeroPrincipalVertexCount, 4u);
+    EXPECT_TRUE(std::isfinite(result.MinimumPrincipalValue));
+    EXPECT_TRUE(std::isfinite(result.MaximumPrincipalValue));
+    EXPECT_LE(result.MinimumPrincipalValue, result.MaximumPrincipalValue);
+    EXPECT_EQ(result.DegenerateFaceCount, 0u);
+    EXPECT_EQ(result.IllConditionedFaceCount, 0u);
+    EXPECT_EQ(result.UnsupportedFaceCount, 0u);
+    EXPECT_GT(result.MinimumTriangleQuality, result.TriangleQualityThreshold);
     EXPECT_EQ(result.ScalarPropertyCount, 2u);
     EXPECT_EQ(result.ScalarWrittenCount, 8u);
     EXPECT_EQ(result.DirectionPropertyCount, 2u);
@@ -1799,6 +1808,44 @@ TEST(SandboxEditorUi, MeshCurvatureCommandPublishesCanonicalPropertiesAndSupport
     ASSERT_TRUE(model.Processing.LastMeshCurvatureResult.has_value());
     EXPECT_TRUE(model.Processing.LastMeshCurvatureResult->Succeeded());
     EXPECT_EQ(model.Processing.LastMeshCurvatureResult->ScalarWrittenCount, 8u);
+}
+
+TEST(SandboxEditorUi, MeshCurvatureRejectsBoundaryOnlyZeroSupport)
+{
+    ECS::Scene::Registry registry;
+    Runtime::SelectionController selection;
+    Runtime::EditorCommandHistory history;
+    Intrinsic::Tests::EditorFeatureTestContext context =
+        MakeContext(registry, selection);
+    context.CommandHistory = &history;
+
+    const ECS::EntityHandle mesh = MakeSelectable(registry, "UnsupportedCurvature");
+    AddDenoiseAllBoundaryMeshSource(registry, mesh);
+    auto& properties = registry.Raw().get<GS::Vertices>(mesh).Properties;
+
+    const Runtime::EditorMeshCurvatureResult result =
+        Runtime::ApplyEditorMeshCurvatureCommand(
+            context,
+            Runtime::EditorMeshCurvatureCommand{
+                .StableEntityId =
+                    Runtime::SelectionController::ToStableEntityId(mesh),
+                .Output = Runtime::EditorMeshCurvatureOutput::All,
+                .PublishPrincipalDirections = true,
+            });
+
+    EXPECT_EQ(result.Status,
+              Runtime::EditorCommandStatus::GeometryProcessingFailed);
+    EXPECT_EQ(result.Error, Core::ErrorCode::InvalidArgument);
+    EXPECT_EQ(result.SupportedVertexCount, 0u);
+    EXPECT_EQ(result.NonZeroPrincipalVertexCount, 0u);
+    EXPECT_NE(result.Message.find("no reliable curvature support"),
+              std::string::npos);
+    EXPECT_FALSE(properties.Exists(PN::kMeanCurvature));
+    EXPECT_FALSE(properties.Exists(PN::kGaussianCurvature));
+    EXPECT_FALSE(properties.Exists(PN::kPrincipalDir1));
+    EXPECT_FALSE(properties.Exists(PN::kPrincipalDir2));
+    EXPECT_FALSE(history.CanUndo());
+    EXPECT_FALSE(registry.Raw().all_of<Dirty::DirtyVertexAttributes>(mesh));
 }
 // BUG-145 slice B: curvature derived `Applied` from `ScalarWrittenCount`,
 // which is `mean.size() + gaussian.size()` — a pure written count that is
@@ -2144,6 +2191,8 @@ TEST(SandboxEditorUi, MeshCurvatureRequestQueuesDerivedJobAndPublishesOnApply)
     ASSERT_TRUE(completedResult.has_value());
     EXPECT_TRUE(completedResult->Succeeded()) << completedResult->Message;
     EXPECT_EQ(completedResult->VertexSlotCount, 4u);
+    EXPECT_EQ(completedResult->SupportedVertexCount, 4u);
+    EXPECT_EQ(completedResult->NonZeroPrincipalVertexCount, 4u);
     EXPECT_EQ(completedResult->ScalarPropertyCount, 2u);
     EXPECT_EQ(completedResult->ScalarWrittenCount, 8u);
     EXPECT_EQ(completedResult->DirectionPropertyCount, 2u);

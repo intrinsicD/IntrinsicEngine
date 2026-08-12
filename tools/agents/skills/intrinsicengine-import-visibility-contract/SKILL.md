@@ -1,6 +1,6 @@
 ---
 name: intrinsicengine-import-visibility-contract
-description: The checklist a new or changed asset import/materialization path in IntrinsicEngine must satisfy so that a "successful" import is actually visible AND selectable in the sandbox — render-critical component parity with the reference triangle (GeometrySources residency, RenderSurface, SelectableTag, VisualizationConfig, StableId), count-matched v:normal (authored preserved, area-weighted fallback, never overwritten), resolved v:texcoord (authored or generated atlas UVs before first extraction), runtime-authored culling bounds plus one-shot camera focus for off-origin geometry, derived post-processing that never blocks the first upload or clobbers recomputed attributes, deferred generated-normal/texture bindings, and receipt/route/queue/completion logging so failures are never silent. Use this skill whenever adding or changing a mesh/point-cloud/graph import, drag-and-drop or file-backed materialization, progressive raw-model handoff, or post-import derived work; whenever an import "succeeds" but nothing renders or is pickable; or when normals/UVs are dropped, geometry is off-origin/culled/out-of-view, or a dropped file fails silently.
+description: The checklist a new or changed asset import/materialization path in IntrinsicEngine must satisfy so that a "successful" import is actually visible AND selectable in the sandbox — render-critical component parity with the reference triangle (GeometrySources residency, RenderSurface, SelectableTag, VisualizationConfig, StableId), resolved corner-over-vertex normals (authored preserved, area-weighted fallback, never overwritten), resolved texcoords (authored or generated atlas UVs before first extraction), runtime-authored culling bounds plus one-shot camera focus for off-origin geometry, derived post-processing that never blocks the first upload or clobbers recomputed attributes, deferred generated-normal/texture bindings, and receipt/route/queue/completion logging so failures are never silent. Use this skill whenever adding or changing a mesh/point-cloud/graph import, drag-and-drop or file-backed materialization, progressive raw-model handoff, or post-import derived work; whenever an import "succeeds" but nothing renders or is pickable; or when normals/UVs are dropped, geometry is off-origin/culled/out-of-view, or a dropped file fails silently.
 ---
 
 # IntrinsicEngine Import Visibility Contract
@@ -41,16 +41,21 @@ The materialized entity must carry the same render-critical components the seed
 Evidence: `BUG-022` (non-manifold OBJ produced no renderable entity), `BUG-023`
 (file-backed OBJ materialized as a hidden/culled entity without parity).
 
-### 2. Count-matched `v:normal` — authored preserved, area-weighted fallback, never overwritten
+### 2. Resolved normals — authored preserved, area-weighted fallback, never overwritten
 
-Explicit decoded `v:normal` values are copied through; when source normals are
-absent, deterministic area-weighted fallback normals are computed **before the
-first ECS/render extraction upload**. Later stages must not overwrite them.
+Explicit decoded normals are copied through on their semantic domain:
+count-matched `h:normal` wins for authored corner normals/seams, otherwise
+count-matched `v:normal` applies. Normal identity never splits owning mesh
+topology; any required `(vertex, UV, normal)` duplication belongs to GPU upload.
+When source normals are absent, deterministic area-weighted vertex fallback
+normals are computed **before the first ECS/render extraction upload**. Later
+stages must not overwrite either authored authority.
 
 Evidence: `BUG-041` (authored normals lost during materialization), `BUG-050`
 (direct-mesh first upload lacked computed normals), `BUG-048` (post-process
 overwrote recomputed normals), `BUG-047` (a normal texture overrode
-vertex-normal shading).
+vertex-normal shading), `BUG-154` (OBJ normal identity fractured topology and
+made curvature unsupported).
 
 ### 3. Resolved `v:texcoord` policy — authored UVs preserved, else generated atlas UVs before first extraction
 

@@ -1,3 +1,4 @@
+// Implements canonical runtime mesh face/corner traversal and shading seams.
 module;
 
 #include <cmath>
@@ -6,11 +7,13 @@ module;
 #include <limits>
 #include <span>
 #include <string>
+#include <string_view>
 #include <unordered_map>
 #include <utility>
 #include <vector>
 
 #include <glm/glm.hpp>
+#include <glm/geometric.hpp>
 
 module Extrinsic.Runtime.MeshSurfaceTopology;
 
@@ -33,6 +36,37 @@ namespace Extrinsic::Runtime
             Skip,
             Invalid,
         };
+
+        [[nodiscard]] bool IsFinite(const glm::vec2 value) noexcept
+        {
+            return std::isfinite(value.x) && std::isfinite(value.y);
+        }
+
+        [[nodiscard]] bool IsFinite(const glm::vec3 value) noexcept
+        {
+            return std::isfinite(value.x) && std::isfinite(value.y) &&
+                std::isfinite(value.z);
+        }
+
+        [[nodiscard]] glm::vec3 ResolveNormal(
+            const glm::vec3 candidate,
+            const glm::vec3 fallback) noexcept
+        {
+            constexpr float kDegenerateLengthEpsilon = 1.0e-6f;
+            if (IsFinite(candidate))
+            {
+                const float length = glm::length(candidate);
+                if (std::isfinite(length) && length > kDegenerateLengthEpsilon)
+                    return candidate / length;
+            }
+            if (IsFinite(fallback))
+            {
+                const float length = glm::length(fallback);
+                if (std::isfinite(length) && length > kDegenerateLengthEpsilon)
+                    return fallback / length;
+            }
+            return glm::vec3{0.0f, 0.0f, 1.0f};
+        }
 
         [[nodiscard]] FaceRingOutcome ProduceFaceRing(
             const std::vector<std::uint32_t>& faceHalfedge,
@@ -220,6 +254,81 @@ namespace Extrinsic::Runtime
                 return fail(MeshSurfaceTopologyStatus::DegenerateAllFaces);
             return MeshSurfaceTopologyStatus::Success;
         }
+
+        template <typename T>
+        [[nodiscard]] bool PublishMeshCornerProperty(
+            Geometry::HalfedgeMesh::Mesh& mesh,
+            const std::span<const Geometry::MeshSoup::PolygonFace> sourceFaces,
+            const std::size_t sourceVertexCount,
+            const std::span<const T> cornerValues,
+            const std::string_view propertyName,
+            const T defaultValue)
+        {
+            if (mesh.FacesSize() != sourceFaces.size() ||
+                mesh.VerticesSize() != sourceVertexCount ||
+                cornerValues.size() != sourceFaces.size() * 3u)
+            {
+                return false;
+            }
+
+            std::vector<T> values(mesh.HalfedgesSize(), defaultValue);
+            std::vector<std::uint8_t> written(mesh.HalfedgesSize(), 0u);
+            std::vector<T> valueForVertex(mesh.VerticesSize(), defaultValue);
+            std::vector<std::uint8_t> vertexHasValue(mesh.VerticesSize(), 0u);
+
+            for (std::size_t faceIndex = 0u; faceIndex < mesh.FacesSize(); ++faceIndex)
+            {
+                const Geometry::FaceHandle face{
+                    static_cast<Geometry::PropertyIndex>(faceIndex)};
+                if (mesh.IsDeleted(face))
+                    continue;
+
+                const std::vector<std::uint32_t>& indices =
+                    sourceFaces[faceIndex].Indices;
+                for (const Geometry::HalfedgeHandle halfedge :
+                     mesh.HalfedgesAroundFace(face))
+                {
+                    const Geometry::VertexHandle vertex = mesh.ToVertex(halfedge);
+                    std::size_t slot = indices.size();
+                    for (std::size_t k = 0u; k < indices.size() && k < 3u; ++k)
+                    {
+                        if (indices[k] == vertex.Index)
+                        {
+                            slot = k;
+                            break;
+                        }
+                    }
+                    if (slot >= 3u)
+                        return false;
+
+                    const T value = cornerValues[faceIndex * 3u + slot];
+                    values[halfedge.Index] = value;
+                    written[halfedge.Index] = 1u;
+                    valueForVertex[vertex.Index] = value;
+                    vertexHasValue[vertex.Index] = 1u;
+                }
+            }
+
+            for (std::size_t index = 0u; index < values.size(); ++index)
+            {
+                if (written[index] != 0u)
+                    continue;
+                const Geometry::HalfedgeHandle halfedge{
+                    static_cast<Geometry::PropertyIndex>(index)};
+                if (mesh.IsDeleted(halfedge))
+                    continue;
+                const Geometry::VertexHandle vertex = mesh.ToVertex(halfedge);
+                if (mesh.IsValid(vertex) && vertexHasValue[vertex.Index] != 0u)
+                    values[index] = valueForVertex[vertex.Index];
+            }
+
+            auto property = mesh.HalfedgeProperties().GetOrAdd<T>(
+                std::string{propertyName}, defaultValue);
+            if (property.Vector().size() != values.size())
+                return false;
+            property.Vector() = std::move(values);
+            return true;
+        }
     }
 
     const char* DebugNameForMeshSurfaceTopologyStatus(
@@ -283,9 +392,41 @@ namespace Extrinsic::Runtime
         outSplit.SourceVertexForSlot.clear();
         outSplit.TexcoordForSlot.clear();
 
+        MeshCornerAttributeSplit attributes{};
+        if (!BuildMeshCornerAttributeSplit(
+                cornerTexcoords,
+                {},
+                cornerHalfedges,
+                fallbackVertexTexcoords,
+                {},
+                vertexCount,
+                surfaceIndices,
+                attributes))
+        {
+            return false;
+        }
+        outSplit.SourceVertexForSlot = std::move(attributes.SourceVertexForSlot);
+        outSplit.TexcoordForSlot = std::move(attributes.TexcoordForSlot);
+        return true;
+    }
+
+    bool BuildMeshCornerAttributeSplit(
+        const std::span<const glm::vec2> cornerTexcoords,
+        const std::span<const glm::vec3> cornerNormals,
+        const std::span<const std::uint32_t> cornerHalfedges,
+        const std::span<const glm::vec2> fallbackVertexTexcoords,
+        const std::span<const glm::vec3> fallbackVertexNormals,
+        const std::size_t vertexCount,
+        std::vector<std::uint32_t>& surfaceIndices,
+        MeshCornerAttributeSplit& outSplit)
+    {
+        outSplit.SourceVertexForSlot.clear();
+        outSplit.TexcoordForSlot.clear();
+        outSplit.NormalForSlot.clear();
+
         if (cornerHalfedges.size() != surfaceIndices.size() ||
             surfaceIndices.empty() ||
-            cornerTexcoords.empty())
+            (cornerTexcoords.empty() && cornerNormals.empty()))
         {
             return false;
         }
@@ -298,17 +439,20 @@ namespace Extrinsic::Runtime
             }
         }
 
-        // Per source vertex, the distinct UVs seen so far and the slot each one
-        // was assigned. Seam vertices carry a handful of entries, so a short
-        // linear scan beats hashing the pair.
-        std::unordered_map<std::uint32_t, std::vector<std::pair<glm::vec2, std::uint32_t>>>
-            emitted;
+        struct EmittedAttributes
+        {
+            glm::vec2 Texcoord{0.0f};
+            glm::vec3 Normal{0.0f, 0.0f, 1.0f};
+            std::uint32_t Slot{kInvalidIndex};
+        };
+        std::unordered_map<std::uint32_t, std::vector<EmittedAttributes>> emitted;
         emitted.reserve(vertexCount);
 
         std::vector<std::uint32_t> remappedIndices;
         remappedIndices.reserve(surfaceIndices.size());
         outSplit.SourceVertexForSlot.reserve(vertexCount);
         outSplit.TexcoordForSlot.reserve(vertexCount);
+        outSplit.NormalForSlot.reserve(vertexCount);
 
         for (std::size_t corner = 0u; corner < surfaceIndices.size(); ++corner)
         {
@@ -324,18 +468,31 @@ namespace Extrinsic::Runtime
             {
                 uv = fallbackVertexTexcoords[sourceVertex];
             }
-            if (!std::isfinite(uv.x) || !std::isfinite(uv.y))
+            if (!IsFinite(uv))
             {
                 uv = glm::vec2{0.0f, 0.0f};
             }
 
-            std::vector<std::pair<glm::vec2, std::uint32_t>>& seen = emitted[sourceVertex];
+            const glm::vec3 fallbackNormal =
+                sourceVertex < fallbackVertexNormals.size()
+                    ? fallbackVertexNormals[sourceVertex]
+                    : glm::vec3{0.0f, 0.0f, 1.0f};
+            const glm::vec3 normal = ResolveNormal(
+                halfedge < cornerNormals.size()
+                    ? cornerNormals[halfedge]
+                    : fallbackNormal,
+                fallbackNormal);
+
+            std::vector<EmittedAttributes>& seen = emitted[sourceVertex];
             std::uint32_t slot = kInvalidIndex;
-            for (const auto& [existingUv, existingSlot] : seen)
+            for (const EmittedAttributes& existing : seen)
             {
-                if (existingUv.x == uv.x && existingUv.y == uv.y)
+                if (existing.Texcoord.x == uv.x && existing.Texcoord.y == uv.y &&
+                    existing.Normal.x == normal.x &&
+                    existing.Normal.y == normal.y &&
+                    existing.Normal.z == normal.z)
                 {
-                    slot = existingSlot;
+                    slot = existing.Slot;
                     break;
                 }
             }
@@ -345,7 +502,8 @@ namespace Extrinsic::Runtime
                 slot = static_cast<std::uint32_t>(outSplit.SourceVertexForSlot.size());
                 outSplit.SourceVertexForSlot.push_back(sourceVertex);
                 outSplit.TexcoordForSlot.push_back(uv);
-                seen.emplace_back(uv, slot);
+                outSplit.NormalForSlot.push_back(normal);
+                seen.push_back(EmittedAttributes{uv, normal, slot});
             }
 
             remappedIndices.push_back(slot);
@@ -361,71 +519,28 @@ namespace Extrinsic::Runtime
         const std::size_t sourceVertexCount,
         const std::span<const glm::vec2> cornerUvs)
     {
-        if (mesh.FacesSize() != sourceFaces.size() ||
-            mesh.VerticesSize() != sourceVertexCount ||
-            cornerUvs.size() != sourceFaces.size() * 3u)
-        {
-            return false;
-        }
-
-        std::vector<glm::vec2> values(mesh.HalfedgesSize(), glm::vec2{0.0f});
-        std::vector<std::uint8_t> written(mesh.HalfedgesSize(), 0u);
-        std::vector<glm::vec2> uvForVertex(mesh.VerticesSize(), glm::vec2{0.0f});
-        std::vector<std::uint8_t> vertexHasUv(mesh.VerticesSize(), 0u);
-
-        for (std::size_t faceIndex = 0u; faceIndex < mesh.FacesSize(); ++faceIndex)
-        {
-            const Geometry::FaceHandle face{
-                static_cast<Geometry::PropertyIndex>(faceIndex)};
-            if (mesh.IsDeleted(face))
-                continue;
-
-            const std::vector<std::uint32_t>& indices =
-                sourceFaces[faceIndex].Indices;
-            for (const Geometry::HalfedgeHandle halfedge :
-                 mesh.HalfedgesAroundFace(face))
-            {
-                const Geometry::VertexHandle vertex = mesh.ToVertex(halfedge);
-                std::size_t slot = indices.size();
-                for (std::size_t k = 0u; k < indices.size() && k < 3u; ++k)
-                {
-                    if (indices[k] == vertex.Index)
-                    {
-                        slot = k;
-                        break;
-                    }
-                }
-                if (slot >= 3u)
-                    return false;
-
-                const glm::vec2 uv = cornerUvs[faceIndex * 3u + slot];
-                values[halfedge.Index] = uv;
-                written[halfedge.Index] = 1u;
-                uvForVertex[vertex.Index] = uv;
-                vertexHasUv[vertex.Index] = 1u;
-            }
-        }
-
-        for (std::size_t index = 0u; index < values.size(); ++index)
-        {
-            if (written[index] != 0u)
-                continue;
-            const Geometry::HalfedgeHandle halfedge{
-                static_cast<Geometry::PropertyIndex>(index)};
-            if (mesh.IsDeleted(halfedge))
-                continue;
-            const Geometry::VertexHandle vertex = mesh.ToVertex(halfedge);
-            if (mesh.IsValid(vertex) && vertexHasUv[vertex.Index] != 0u)
-                values[index] = uvForVertex[vertex.Index];
-        }
-
-        auto property = mesh.HalfedgeProperties().GetOrAdd<glm::vec2>(
-            std::string{Geometry::MeshUtils::kHalfedgeTexcoordPropertyName},
+        return PublishMeshCornerProperty(
+            mesh,
+            sourceFaces,
+            sourceVertexCount,
+            cornerUvs,
+            Geometry::MeshUtils::kHalfedgeTexcoordPropertyName,
             glm::vec2{0.0f});
-        if (property.Vector().size() != values.size())
-            return false;
-        property.Vector() = std::move(values);
-        return true;
+    }
+
+    bool PublishMeshCornerNormals(
+        Geometry::HalfedgeMesh::Mesh& mesh,
+        const std::span<const Geometry::MeshSoup::PolygonFace> sourceFaces,
+        const std::size_t sourceVertexCount,
+        const std::span<const glm::vec3> cornerNormals)
+    {
+        return PublishMeshCornerProperty(
+            mesh,
+            sourceFaces,
+            sourceVertexCount,
+            cornerNormals,
+            "h:normal",
+            glm::vec3{0.0f, 0.0f, 1.0f});
     }
 
     bool FinalizeMeshCornerTexcoords(

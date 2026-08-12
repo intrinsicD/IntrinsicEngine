@@ -305,33 +305,44 @@ namespace Geometry::MeshUtils
 
     double Cotan(glm::vec3 u, glm::vec3 v)
     {
-        auto crossVec = glm::cross(u, v);
-        double sinVal = static_cast<double>(glm::length(crossVec));
-        double cosVal = static_cast<double>(glm::dot(u, v));
-
-        if (sinVal < 1e-10)
+        const glm::dvec3 u64(u);
+        const glm::dvec3 v64(v);
+        const double crossLength = glm::length(glm::cross(u64, v64));
+        const double dot = glm::dot(u64, v64);
+        if (!std::isfinite(crossLength) || !std::isfinite(dot)
+            || crossLength <= std::numeric_limits<double>::min())
+        {
             return 0.0;
+        }
 
-        return cosVal / sinVal;
+        return dot / crossLength;
     }
 
     double TriangleArea(glm::vec3 a, glm::vec3 b, glm::vec3 c)
     {
-        return 0.5 * static_cast<double>(glm::length(glm::cross(b - a, c - a)));
+        const glm::dvec3 ab = glm::dvec3(b) - glm::dvec3(a);
+        const glm::dvec3 ac = glm::dvec3(c) - glm::dvec3(a);
+        const double twiceArea = glm::length(glm::cross(ab, ac));
+        return std::isfinite(twiceArea) ? 0.5 * twiceArea : 0.0;
     }
 
     double AngleAtVertex(glm::vec3 a, glm::vec3 b, glm::vec3 c)
     {
         const glm::dvec3 ab = glm::dvec3(b) - glm::dvec3(a);
         const glm::dvec3 ac = glm::dvec3(c) - glm::dvec3(a);
-        const double lenAB = glm::length(ab);
-        const double lenAC = glm::length(ac);
-
-        if (lenAB < 1e-10f || lenAC < 1e-10f)
+        const double lenSqAB = glm::dot(ab, ab);
+        const double lenSqAC = glm::dot(ac, ac);
+        if (!std::isfinite(lenSqAB) || !std::isfinite(lenSqAC)
+            || lenSqAB <= std::numeric_limits<double>::min()
+            || lenSqAC <= std::numeric_limits<double>::min())
+        {
             return 0.0;
+        }
 
         const double sinAngle = glm::length(glm::cross(ab, ac));
         const double cosAngle = glm::dot(ab, ac);
+        if (!std::isfinite(sinAngle) || !std::isfinite(cosAngle))
+            return 0.0;
         return std::atan2(sinAngle, cosAngle);
     }
 
@@ -376,17 +387,35 @@ namespace Geometry::MeshUtils
         if (!mesh.IsBoundary(h0))
         {
             const VertexHandle vOpp = mesh.ToVertex(mesh.NextHalfedge(h0));
-            const glm::vec3 u = mesh.Position(v0) - mesh.Position(vOpp);
-            const glm::vec3 v = mesh.Position(v1) - mesh.Position(vOpp);
-            cotSum += Cotan(u, v);
+            const glm::dvec3 u =
+                glm::dvec3(mesh.Position(v0))
+                - glm::dvec3(mesh.Position(vOpp));
+            const glm::dvec3 v =
+                glm::dvec3(mesh.Position(v1))
+                - glm::dvec3(mesh.Position(vOpp));
+            const double crossLength = glm::length(glm::cross(u, v));
+            if (std::isfinite(crossLength)
+                && crossLength > std::numeric_limits<double>::min())
+            {
+                cotSum += glm::dot(u, v) / crossLength;
+            }
         }
 
         if (!mesh.IsBoundary(h1))
         {
             const VertexHandle vOpp = mesh.ToVertex(mesh.NextHalfedge(h1));
-            const glm::vec3 u = mesh.Position(v1) - mesh.Position(vOpp);
-            const glm::vec3 v = mesh.Position(v0) - mesh.Position(vOpp);
-            cotSum += Cotan(u, v);
+            const glm::dvec3 u =
+                glm::dvec3(mesh.Position(v1))
+                - glm::dvec3(mesh.Position(vOpp));
+            const glm::dvec3 v =
+                glm::dvec3(mesh.Position(v0))
+                - glm::dvec3(mesh.Position(vOpp));
+            const double crossLength = glm::length(glm::cross(u, v));
+            if (std::isfinite(crossLength)
+                && crossLength > std::numeric_limits<double>::min())
+            {
+                cotSum += glm::dot(u, v) / crossLength;
+            }
         }
 
         return cotSum / 2.0;
@@ -577,7 +606,8 @@ namespace Geometry::MeshUtils
             const double aSq = glm::dot(toApex, toApex);
             const double bSq = glm::dot(fromApex, fromApex);
             const double area = 0.5 * glm::length(glm::cross(pFrom - pApex, pTo - pApex));
-            if (area <= 1e-12)
+            if (!std::isfinite(area)
+                || area <= std::numeric_limits<double>::min())
             {
                 continue; // degenerate / zero-area triangle fails closed to 0
             }
@@ -1199,20 +1229,26 @@ namespace Geometry::MeshUtils
             VertexHandle vb = mesh.ToVertex(h1);
             VertexHandle vc = mesh.ToVertex(h2);
 
-            glm::vec3 pa = mesh.Position(va);
-            glm::vec3 pb = mesh.Position(vb);
-            glm::vec3 pc = mesh.Position(vc);
+            const glm::dvec3 pa(mesh.Position(va));
+            const glm::dvec3 pb(mesh.Position(vb));
+            const glm::dvec3 pc(mesh.Position(vc));
+            if (!IsFinite(pa) || !IsFinite(pb) || !IsFinite(pc))
+                continue;
 
-            glm::vec3 eAB = pb - pa;
-            glm::vec3 eAC = pc - pa;
-            glm::vec3 eBC = pc - pb;
+            const glm::dvec3 eAB = pb - pa;
+            const glm::dvec3 eAC = pc - pa;
+            const glm::dvec3 eBC = pc - pb;
+            const double twiceArea = glm::length(glm::cross(eAB, eAC));
+            if (!std::isfinite(twiceArea)
+                || twiceArea <= std::numeric_limits<double>::min())
+            {
+                continue;
+            }
+            const double area = 0.5 * twiceArea;
 
-            double area = TriangleArea(pa, pb, pc);
-            if (area < 1e-12) continue;
-
-            double dotA = static_cast<double>(glm::dot(eAB, eAC));
-            double dotB = static_cast<double>(glm::dot(-eAB, eBC));
-            double dotC = static_cast<double>(glm::dot(-eAC, -eBC));
+            const double dotA = glm::dot(eAB, eAC);
+            const double dotB = glm::dot(-eAB, eBC);
+            const double dotC = glm::dot(-eAC, -eBC);
 
             if (dotA < 0.0)
             {
@@ -1234,13 +1270,13 @@ namespace Geometry::MeshUtils
             }
             else
             {
-                double cotA = Cotan(eAB, eAC);
-                double cotB = Cotan(-eAB, eBC);
-                double cotC = Cotan(-eAC, -eBC);
+                const double cotA = dotA / twiceArea;
+                const double cotB = dotB / twiceArea;
+                const double cotC = dotC / twiceArea;
 
-                double lenSqAB = static_cast<double>(glm::dot(eAB, eAB));
-                double lenSqAC = static_cast<double>(glm::dot(eAC, eAC));
-                double lenSqBC = static_cast<double>(glm::dot(eBC, eBC));
+                const double lenSqAB = glm::dot(eAB, eAB);
+                const double lenSqAC = glm::dot(eAC, eAC);
+                const double lenSqBC = glm::dot(eBC, eBC);
 
                 areas[va.Index] += (lenSqAB * cotC + lenSqAC * cotB) / 8.0;
                 areas[vb.Index] += (lenSqAB * cotC + lenSqBC * cotA) / 8.0;

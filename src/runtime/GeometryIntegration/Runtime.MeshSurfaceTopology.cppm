@@ -1,3 +1,5 @@
+// Canonical runtime mesh face/corner traversal and GPU-only corner-attribute
+// splitting.
 module;
 
 #include <cstddef>
@@ -46,12 +48,12 @@ export namespace Extrinsic::Runtime
         std::vector<std::uint32_t>& outSurfaceIndices,
         std::vector<std::uint32_t>& outTriangleToFace);
 
-    // BUG-137 Slice B — same walk, plus the halfedge that produced each emitted
-    // triangle corner. `outCornerHalfedges` is parallel to `outSurfaceIndices`:
+    // Same walk, plus the halfedge that produced each emitted triangle corner.
+    // `outCornerHalfedges` is parallel to `outSurfaceIndices`:
     // entry `i` is the halfedge whose target vertex is `outSurfaceIndices[i]`.
-    // Corner-domain attributes (notably `h:texcoord`) are indexed by that
-    // halfedge, so this is what lets GPU upload split a vertex per distinct UV
-    // without the mesh itself carrying duplicated topology.
+    // Corner-domain attributes (`h:texcoord` and `h:normal`) are indexed by that
+    // halfedge, which lets GPU upload split distinct shading tuples without the
+    // mesh itself carrying duplicated topology.
     // All three outputs are cleared on entry and on failure.
     [[nodiscard]] MeshSurfaceTopologyStatus BuildMeshSurfaceTriangleCornerTopology(
         const ECS::Components::GeometrySources::ConstSourceView& view,
@@ -59,9 +61,8 @@ export namespace Extrinsic::Runtime
         std::vector<std::uint32_t>& outTriangleToFace,
         std::vector<std::uint32_t>& outCornerHalfedges);
 
-    // BUG-137 — the de-indexed vertex table an indexed GPU buffer needs to
-    // carry corner-domain UVs: one slot per distinct `(mesh vertex, UV)` pair.
-    //
+    // The compatibility UV-only split used by callers without corner normals:
+    // one slot per distinct `(mesh vertex, UV)` pair.
     // This lives here, next to the corner walk, because more than one consumer
     // must produce the *same* split. Renderer upload and property-texture bake
     // cross-check each other through GPU residency (vertex count, index count,
@@ -91,6 +92,31 @@ export namespace Extrinsic::Runtime
         std::vector<std::uint32_t>& surfaceIndices,
         MeshCornerTexcoordSplit& outSplit);
 
+    // GPU vertex table for the complete corner shading tuple. Each emitted
+    // slot represents one distinct `(mesh vertex, resolved UV, resolved normal)`
+    // value, so authored corner discontinuities never alter owning topology.
+    struct MeshCornerAttributeSplit
+    {
+        std::vector<std::uint32_t> SourceVertexForSlot{};
+        std::vector<glm::vec2> TexcoordForSlot{};
+        std::vector<glm::vec3> NormalForSlot{};
+    };
+
+    // Rewrites `surfaceIndices` into split-slot space. Either corner-property
+    // span may be empty; at least one must be present. Missing/out-of-range UVs
+    // use the vertex fallback then (0,0). Missing, non-finite, or degenerate
+    // normals use the normalized vertex fallback then +Z. Returns false without
+    // changing `surfaceIndices` when topology inputs do not line up.
+    [[nodiscard]] bool BuildMeshCornerAttributeSplit(
+        std::span<const glm::vec2> cornerTexcoords,
+        std::span<const glm::vec3> cornerNormals,
+        std::span<const std::uint32_t> cornerHalfedges,
+        std::span<const glm::vec2> fallbackVertexTexcoords,
+        std::span<const glm::vec3> fallbackVertexNormals,
+        std::size_t vertexCount,
+        std::vector<std::uint32_t>& surfaceIndices,
+        MeshCornerAttributeSplit& outSplit);
+
     // Writes `h:texcoord` for every halfedge of `mesh`, whose faces and
     // vertices must be index-identical to `sourceFaces` / `sourceVertexCount`
     // — the relationship `Geometry::Mesh::Conversion::ToHalfedgeMesh` produces
@@ -113,6 +139,15 @@ export namespace Extrinsic::Runtime
         std::span<const Geometry::MeshSoup::PolygonFace> sourceFaces,
         std::size_t sourceVertexCount,
         std::span<const glm::vec2> cornerUvs);
+
+    // Normal-domain counterpart to `PublishMeshCornerTexcoords`. The input is
+    // three normals per source triangle; values are copied without changing
+    // owning mesh cardinality and published as canonical `h:normal`.
+    [[nodiscard]] bool PublishMeshCornerNormals(
+        Geometry::HalfedgeMesh::Mesh& mesh,
+        std::span<const Geometry::MeshSoup::PolygonFace> sourceFaces,
+        std::size_t sourceVertexCount,
+        std::span<const glm::vec3> cornerNormals);
 
     // BUG-137 / BUG-147 — per-corner UVs mapped back onto a *source* mesh's
     // faces, so a chart split can be carried as a UV fact instead of being

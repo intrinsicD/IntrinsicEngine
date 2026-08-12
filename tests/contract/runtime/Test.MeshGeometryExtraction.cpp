@@ -38,6 +38,7 @@ import Extrinsic.Runtime.SceneDocumentModule;
 import Extrinsic.Runtime.GeometryPresentation;
 import Extrinsic.Runtime.RenderExtraction;
 import Extrinsic.Runtime.StableEntityLookup;
+import Extrinsic.Runtime.VertexChannelBindings;
 import Geometry.Properties;
 
 #include "MockRHI.hpp"
@@ -118,6 +119,13 @@ namespace
     {
         auto uv = h.Properties.GetOrAdd<glm::vec2>("h:texcoord", glm::vec2(0.0f));
         uv.Vector() = uvs;
+    }
+
+    void SetCornerNormals(gs::Halfedges& h, const std::vector<glm::vec3>& normals)
+    {
+        auto property =
+            h.Properties.GetOrAdd<glm::vec3>("h:normal", glm::vec3{0.0f, 0.0f, 1.0f});
+        property.Vector() = normals;
     }
 
     // BUG-137 Slice B — two triangles sharing edge (v0, v2). v0 and v2 each
@@ -1658,6 +1666,120 @@ TEST(MeshGeometryExtraction, DisagreeingCornerTexcoordsSplitOnlyTheSeamVertexAtU
     // The ECS mesh is untouched — the whole point of BUG-137.
     EXPECT_EQ(scene.Raw().get<gs::Vertices>(entity).Properties.Size(), 4u);
     EXPECT_EQ(halfedges.Properties.Size(), 6u);
+
+    extraction.Shutdown(engine.GetRenderer());
+    engine.Shutdown();
+}
+
+TEST(MeshGeometryExtraction, DisagreeingCornerNormalsSplitOnlyGpuShadingVertices)
+{
+    Extrinsic::Runtime::Engine engine(HeadlessConfig());
+    InitializeAssetWorkflowEngine(engine);
+
+    auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
+    const EntityHandle entity = MakeQuadMeshRenderable(scene);
+    auto& halfedges = scene.Raw().get<gs::Halfedges>(entity);
+    std::vector<glm::vec3> normals(6u, glm::vec3{0.0f, 0.0f, 1.0f});
+    normals[3u] = glm::vec3{0.0f, 1.0f, 0.0f};
+    normals[4u] = glm::vec3{0.0f, 1.0f, 0.0f};
+    normals[5u] = glm::vec3{0.0f, 1.0f, 0.0f};
+    SetCornerNormals(halfedges, normals);
+
+    Extrinsic::Runtime::RenderExtractionCache extraction;
+    const auto stats = extraction.ExtractAndSubmit(
+        scene,
+        engine.GetRenderer(),
+        &RequiredEngineService<Extrinsic::Graphics::GpuAssetCache>(engine));
+    EXPECT_EQ(stats.MeshGeometryUploads, 1u);
+
+    const auto stableId = Extrinsic::Runtime::StableEntityLookup::ToRenderId(entity);
+    const auto view = extraction.FindRenderableSidecarForTest(stableId);
+    ASSERT_TRUE(view.has_value());
+    Extrinsic::Graphics::GpuGeometryResidencyView residency{};
+    ASSERT_TRUE(engine.GetRenderer().GetGpuWorld().TryGetGeometryResidencyView(
+        view->MeshGeometry, residency));
+
+    // v0 and v2 each carry one normal per incident face: two GPU duplicates,
+    // while the owning ECS topology remains the original four vertices.
+    EXPECT_EQ(residency.VertexCount, 6u);
+    EXPECT_EQ(residency.SurfaceIndexCount, 6u);
+    EXPECT_EQ(scene.Raw().get<gs::Vertices>(entity).Properties.Size(), 4u);
+    EXPECT_EQ(halfedges.Properties.Size(), 6u);
+
+    extraction.Shutdown(engine.GetRenderer());
+    engine.Shutdown();
+}
+
+TEST(MeshGeometryExtraction, ExplicitNormalBindingOverridesCornerNormalsAndTheirRevision)
+{
+    Extrinsic::Runtime::Engine engine(HeadlessConfig());
+    InitializeAssetWorkflowEngine(engine);
+
+    auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
+    auto& raw = scene.Raw();
+    const EntityHandle entity = MakeQuadMeshRenderable(scene);
+    auto& halfedges = raw.get<gs::Halfedges>(entity);
+    std::vector<glm::vec3> cornerNormals(
+        6u, glm::vec3{0.0f, 0.0f, 1.0f});
+    cornerNormals[3u] = glm::vec3{0.0f, 1.0f, 0.0f};
+    cornerNormals[4u] = glm::vec3{0.0f, 1.0f, 0.0f};
+    cornerNormals[5u] = glm::vec3{0.0f, 1.0f, 0.0f};
+    SetCornerNormals(halfedges, cornerNormals);
+
+    auto overrideNormals = raw.get<gs::Vertices>(entity)
+                               .Properties.GetOrAdd<glm::vec3>(
+                                   "v:override_normal",
+                                   glm::vec3{1.0f, 0.0f, 0.0f});
+    overrideNormals.Vector().assign(4u, glm::vec3{1.0f, 0.0f, 0.0f});
+    raw.emplace<Extrinsic::Runtime::VertexChannelBindingSet>(
+        entity,
+        Extrinsic::Runtime::VertexChannelBindingSet{
+            .Normal = Extrinsic::Runtime::VertexChannelSourceBinding{
+                .Enabled = true,
+                .Property = Extrinsic::Runtime::GeometryPropertyRef{
+                    .Domain =
+                        Extrinsic::Runtime::GeometryElementDomain::MeshVertex,
+                    .Name = "v:override_normal",
+                    .ValueKind = Geometry::PropertyValueKind::Vec3,
+                },
+            },
+            .BindingGeneration = 2u,
+        });
+
+    Extrinsic::Runtime::RenderExtractionCache extraction;
+    auto stats = extraction.ExtractAndSubmit(
+        scene,
+        engine.GetRenderer(),
+        &RequiredEngineService<Extrinsic::Graphics::GpuAssetCache>(engine));
+    EXPECT_EQ(stats.MeshGeometryUploads, 1u);
+
+    const auto stableId =
+        Extrinsic::Runtime::StableEntityLookup::ToRenderId(entity);
+    const auto view = extraction.FindRenderableSidecarForTest(stableId);
+    ASSERT_TRUE(view.has_value());
+    Extrinsic::Graphics::GpuGeometryResidencyView residency{};
+    ASSERT_TRUE(engine.GetRenderer().GetGpuWorld().TryGetGeometryResidencyView(
+        view->MeshGeometry, residency));
+    EXPECT_EQ(residency.VertexCount, 4u);
+    EXPECT_EQ(
+        residency.NormalFingerprint,
+        Extrinsic::Tests::GeometryFloat32Fingerprint({
+            1.0f, 0.0f, 0.0f,
+            1.0f, 0.0f, 0.0f,
+            1.0f, 0.0f, 0.0f,
+            1.0f, 0.0f, 0.0f,
+        }));
+
+    auto storedCornerNormals =
+        halfedges.Properties.Get<glm::vec3>("h:normal");
+    ASSERT_TRUE(storedCornerNormals.IsValid());
+    storedCornerNormals[0u] = glm::vec3{0.0f, -1.0f, 0.0f};
+    stats = extraction.ExtractAndSubmit(
+        scene,
+        engine.GetRenderer(),
+        &RequiredEngineService<Extrinsic::Graphics::GpuAssetCache>(engine));
+    EXPECT_EQ(stats.MeshGeometryReuploads, 0u);
+    EXPECT_EQ(stats.MeshGeometryReuseHits, 1u);
 
     extraction.Shutdown(engine.GetRenderer());
     engine.Shutdown();

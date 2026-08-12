@@ -1,8 +1,11 @@
+// Exposes topology-preserving position filters and fail-closed cotan diffusion
+// for canonical scalar/vector vertex properties on a halfedge mesh.
 module;
 
 #include <cstddef>
 #include <cstdint>
 #include <optional>
+#include <span>
 #include <string_view>
 #include <vector>
 
@@ -47,6 +50,78 @@ export namespace Geometry::Smoothing
         // Final vertex count (unchanged — topology is preserved)
         std::size_t VertexCount{0};
     };
+
+    // -------------------------------------------------------------------------
+    // Canonical vertex-property smoothing
+    // -------------------------------------------------------------------------
+    //
+    // Applies simultaneous, row-normalized, nonnegative-cotan updates:
+    //   p_i <- (1-lambda) p_i + lambda sum_j(w_ij p_j) / sum_j(w_ij).
+    //
+    // The operation is independent of traversal order and does not move mesh
+    // positions or alter topology. Invalid parameters, count mismatches, and
+    // non-finite live input fail before the property is mutated. Public
+    // overloads cover every canonical floating-point property kind: float,
+    // double, and the persisted float-vector types vec2/vec3/vec4.
+    enum class VertexPropertySmoothingStatus : std::uint8_t
+    {
+        Success,
+        EmptyMesh,
+        InvalidProperty,
+        InvalidParameters,
+        NonFiniteInput,
+        NonFiniteGeometry,
+        InvalidActiveMask,
+    };
+
+    struct VertexPropertySmoothingParams
+    {
+        std::size_t Iterations{1};
+        double Lambda{0.5};
+        bool PreserveBoundary{false};
+        // Optional one-byte-per-vertex mask. Inactive vertices retain their
+        // values and are excluded from active rows' neighbour support.
+        std::span<const std::uint8_t> ActiveVertexMask{};
+    };
+
+    struct VertexPropertySmoothingResult
+    {
+        VertexPropertySmoothingStatus Status{
+            VertexPropertySmoothingStatus::InvalidProperty};
+        std::size_t IterationsPerformed{0};
+        std::size_t VertexSlotCount{0};
+        std::size_t SmoothedVertexCount{0};
+        std::size_t PinnedBoundaryVertexCount{0};
+        std::size_t SkippedDeletedVertexCount{0};
+        std::size_t SkippedIsolatedVertexCount{0};
+        std::size_t InactiveVertexCount{0};
+
+        [[nodiscard]] bool Succeeded() const noexcept
+        {
+            return Status == VertexPropertySmoothingStatus::Success;
+        }
+    };
+
+    [[nodiscard]] VertexPropertySmoothingResult CotanSmoothVertexProperty(
+        const HalfedgeMesh::Mesh& mesh,
+        VertexProperty<float> property,
+        const VertexPropertySmoothingParams& params = {});
+    [[nodiscard]] VertexPropertySmoothingResult CotanSmoothVertexProperty(
+        const HalfedgeMesh::Mesh& mesh,
+        VertexProperty<double> property,
+        const VertexPropertySmoothingParams& params = {});
+    [[nodiscard]] VertexPropertySmoothingResult CotanSmoothVertexProperty(
+        const HalfedgeMesh::Mesh& mesh,
+        VertexProperty<glm::vec2> property,
+        const VertexPropertySmoothingParams& params = {});
+    [[nodiscard]] VertexPropertySmoothingResult CotanSmoothVertexProperty(
+        const HalfedgeMesh::Mesh& mesh,
+        VertexProperty<glm::vec3> property,
+        const VertexPropertySmoothingParams& params = {});
+    [[nodiscard]] VertexPropertySmoothingResult CotanSmoothVertexProperty(
+        const HalfedgeMesh::Mesh& mesh,
+        VertexProperty<glm::vec4> property,
+        const VertexPropertySmoothingParams& params = {});
 
     // -------------------------------------------------------------------------
     // Uniform Laplacian smoothing

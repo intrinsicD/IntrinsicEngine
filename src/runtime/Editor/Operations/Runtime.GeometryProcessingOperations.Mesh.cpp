@@ -2260,9 +2260,41 @@ struct EditorJobResult { std::string Diagnostic{}; };
             message += std::to_string(result.ScalarWrittenCount);
             message += " scalar and ";
             message += std::to_string(result.DirectionWrittenCount);
-            message += " direction values recomputed, 0 changed). Nothing was "
+            message += " direction values recomputed, support=";
+            message += std::to_string(result.SupportedVertexCount);
+            message += ", nonzero=";
+            message += std::to_string(result.NonZeroPrincipalVertexCount);
+            message += ", degenerate-faces=";
+            message += std::to_string(result.DegenerateFaceCount);
+            message += ", ill-conditioned-faces=";
+            message += std::to_string(result.IllConditionedFaceCount);
+            message += ", 0 changed). Nothing was "
                        "published and no undo entry was created.";
             return message;
+        }
+
+        void CopyMeshCurvatureDiagnostics(
+            const Curv::CurvatureField& curvature,
+            EditorMeshCurvatureResult& result) noexcept
+        {
+            result.SupportedVertexCount =
+                curvature.Diagnostics.SupportedVertexCount;
+            result.NonZeroPrincipalVertexCount =
+                curvature.Diagnostics.NonZeroPrincipalVertexCount;
+            result.MinimumPrincipalValue =
+                curvature.Diagnostics.MinimumPrincipalValue;
+            result.MaximumPrincipalValue =
+                curvature.Diagnostics.MaximumPrincipalValue;
+            result.DegenerateFaceCount =
+                curvature.Diagnostics.DegenerateFaceCount;
+            result.IllConditionedFaceCount =
+                curvature.Diagnostics.IllConditionedFaceCount;
+            result.UnsupportedFaceCount =
+                curvature.Diagnostics.UnsupportedFaceCount;
+            result.MinimumTriangleQuality =
+                curvature.Diagnostics.MinimumTriangleQuality;
+            result.TriangleQualityThreshold =
+                curvature.Diagnostics.TriangleQualityThreshold;
         }
 
         struct MeshCurvatureMutationGeneration
@@ -2695,6 +2727,19 @@ struct EditorJobResult { std::string Diagnostic{}; };
             message += std::to_string(result.ScalarWrittenCount);
             message += ", changed=";
             message += std::to_string(result.ChangedValueCount);
+            message += ", support=";
+            message += std::to_string(result.SupportedVertexCount);
+            message += ", nonzero=";
+            message += std::to_string(result.NonZeroPrincipalVertexCount);
+            message += ", degenerate-faces=";
+            message += std::to_string(result.DegenerateFaceCount);
+            message += ", ill-conditioned-faces=";
+            message += std::to_string(result.IllConditionedFaceCount);
+            message += ", principal-range=[";
+            message += std::to_string(result.MinimumPrincipalValue);
+            message += ", ";
+            message += std::to_string(result.MaximumPrincipalValue);
+            message += "]";
             message += ", directions=";
             message += result.DirectionsPublished ? "published" : "not published";
             message += ").";
@@ -6547,6 +6592,26 @@ struct EditorJobResult { std::string Diagnostic{}; };
                     });
             }
 
+            CopyMeshCurvatureDiagnostics(curvature, result);
+            if (result.SupportedVertexCount == 0u)
+            {
+                result.Status =
+                    EditorCommandStatus::GeometryProcessingFailed;
+                result.Error = Core::ErrorCode::InvalidArgument;
+                result.Message =
+                    "Geometry.Curvature found no reliable curvature support "
+                    "(degenerate faces=" +
+                    std::to_string(result.DegenerateFaceCount) +
+                    ", ill-conditioned faces=" +
+                    std::to_string(result.IllConditionedFaceCount) +
+                    ", unsupported faces=" +
+                    std::to_string(result.UnsupportedFaceCount) + ").";
+                return JobResultEnvelope::Make<EditorJobResult>(
+                    EditorJobResult{
+                        .Diagnostic = result.Message,
+                    });
+            }
+
             const std::vector<double>& mean =
                 curvature.MeanCurvatureProperty.Vector();
             const std::vector<double>& gaussian =
@@ -9905,6 +9970,22 @@ ApplyEditorMeshCurvatureCommand(
             result.Error = Core::ErrorCode::InvalidArgument;
             result.Message = "Geometry.Curvature produced missing or count-mismatched "
                              "scalar properties.";
+            return result;
+        }
+
+        CopyMeshCurvatureDiagnostics(curvature, result);
+        if (result.SupportedVertexCount == 0u)
+        {
+            result.Status = EditorCommandStatus::GeometryProcessingFailed;
+            result.Error = Core::ErrorCode::InvalidArgument;
+            result.Message =
+                "Geometry.Curvature found no reliable curvature support "
+                "(degenerate faces=" +
+                std::to_string(result.DegenerateFaceCount) +
+                ", ill-conditioned faces=" +
+                std::to_string(result.IllConditionedFaceCount) +
+                ", unsupported faces=" +
+                std::to_string(result.UnsupportedFaceCount) + ").";
             return result;
         }
 

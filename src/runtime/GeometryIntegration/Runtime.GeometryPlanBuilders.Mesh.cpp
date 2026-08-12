@@ -270,15 +270,12 @@ namespace Extrinsic::Runtime
         };
         resolveColors();
 
-        // BUG-137 Slice B — de-index corner-domain UVs.
-        //
-        // The GPU path is an indexed mesh with one UV per vertex, while a UV
-        // atlas needs two or more UVs at a seam vertex. When the entity carries
-        // corner UVs (`h:texcoord`, the canonical
-        // `MeshUtils::kHalfedgeTexcoordPropertyName`), the duplication happens
-        // here — once, into the GPU vertex buffer — instead of being baked into
-        // the authoritative mesh topology. Meshes without corner UVs keep the
-        // original per-vertex path byte for byte.
+        // De-index corner-domain shading attributes for indexed GPU upload.
+        // The GPU path has one UV and normal per vertex, while authored seams
+        // may carry several values at one mesh vertex. Duplication happens only
+        // here, keyed by `(source vertex, UV, normal)`, and never mutates the
+        // authoritative mesh. An explicit normal-channel binding remains an
+        // explicit override and suppresses canonical `h:normal` resolution.
         std::vector<glm::vec3> splitPositions;
         std::size_t gpuVertexCount = vertexCount;
         std::span<const glm::vec3> positionSpan{positions.data(), positions.size()};
@@ -289,19 +286,39 @@ namespace Extrinsic::Runtime
                 : Geometry::ConstProperty<glm::vec2>{};
         const bool cornerUvsUsable =
             static_cast<bool>(cornerUvProperty) &&
+            view.HalfedgeSource != nullptr &&
+            cornerUvProperty.Vector().size() ==
+                view.HalfedgeSource->Properties.Size();
+        const auto cornerNormalProperty =
+            view.HalfedgeSource != nullptr && normalOverride == nullptr
+                ? view.HalfedgeSource->Properties.Get<glm::vec3>("h:normal")
+                : Geometry::ConstProperty<glm::vec3>{};
+        const bool cornerNormalsUsable =
+            static_cast<bool>(cornerNormalProperty) &&
+            view.HalfedgeSource != nullptr &&
+            cornerNormalProperty.Vector().size() ==
+                view.HalfedgeSource->Properties.Size();
+        const bool cornerAttributesUsable =
+            (cornerUvsUsable || cornerNormalsUsable) &&
             !cornerHalfedges.empty() &&
             cornerHalfedges.size() == outBuffer.SurfaceIndices.size();
 
-        if (cornerUvsUsable)
+        if (cornerAttributesUsable)
         {
             // The split table itself lives in Runtime.MeshSurfaceTopology so
             // that property-texture bake produces an identical one; the two
             // cross-check through GPU residency.
-            MeshCornerTexcoordSplit split{};
-            if (!BuildMeshCornerTexcoordSplit(
-                    cornerUvProperty.Vector(),
+            MeshCornerAttributeSplit split{};
+            if (!BuildMeshCornerAttributeSplit(
+                    cornerUvsUsable
+                        ? std::span<const glm::vec2>{cornerUvProperty.Vector()}
+                        : std::span<const glm::vec2>{},
+                    cornerNormalsUsable
+                        ? std::span<const glm::vec3>{cornerNormalProperty.Vector()}
+                        : std::span<const glm::vec3>{},
                     cornerHalfedges,
                     texcoords,
+                    normals,
                     vertexCount,
                     outBuffer.SurfaceIndices,
                     split))
@@ -310,22 +327,19 @@ namespace Extrinsic::Runtime
             }
 
             const bool hasColors = !outBuffer.PackedColors.empty();
-            std::vector<glm::vec3> newNormals;
             std::vector<std::uint32_t> newColors;
             splitPositions.reserve(split.SourceVertexForSlot.size());
-            newNormals.reserve(split.SourceVertexForSlot.size());
             if (hasColors)
                 newColors.reserve(split.SourceVertexForSlot.size());
 
             for (const std::uint32_t sourceVertex : split.SourceVertexForSlot)
             {
                 splitPositions.push_back(positions[sourceVertex]);
-                newNormals.push_back(normals[sourceVertex]);
                 if (hasColors)
                     newColors.push_back(outBuffer.PackedColors[sourceVertex]);
             }
 
-            normals = std::move(newNormals);
+            normals = std::move(split.NormalForSlot);
             texcoords = std::move(split.TexcoordForSlot);
             if (hasColors)
                 outBuffer.PackedColors = std::move(newColors);

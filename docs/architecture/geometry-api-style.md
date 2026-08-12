@@ -221,6 +221,32 @@ Two consequences for consumers:
   resolution order and the result read by nothing. Undoable operations capture
   both domains so the retirement is reversible.
 
+## Normals are corner-domain capable
+
+Authored surface normals follow the same ownership rule as UV seams. OBJ
+`f v/vt/vn` assigns a normal to each face corner, so a position referenced with
+different normal values stores those values as count-matched `h:normal`; normal
+identity must never enter an owning-topology remap key. The loader retains the
+compact `v:normal` representation only for the unambiguous lockstep convention
+where there is one `vn` per `v` and every corner refers to the normal with the
+same index as its position.
+
+Absent an explicit runtime channel override, normal consumers resolve **corner
+over vertex**:
+
+1. a correctly sized `h:normal` wins, with invalid or degenerate samples using
+   the consumer's documented fallback;
+2. otherwise a correctly sized `v:normal` applies under the same sample policy;
+3. otherwise the consumer uses its documented derived/fallback normal policy.
+
+Runtime materialization maps flattened payload corners onto live mesh
+halfedges, and scene persistence retains that property on the halfedge domain.
+Rendering and property-texture baking use the same canonical face/corner walk
+and emit one GPU vertex per distinct `(mesh vertex, resolved UV, resolved
+normal)` tuple. This split is render data only: the authoritative mesh keeps its
+position indices, connectivity, manifold status, and every unrelated property.
+See `BUG-154`.
+
 ## Naming and count terminology
 
 - Prefer `PascalCase` for public functions and methods, matching the dominant

@@ -4,6 +4,7 @@
 
 #include <gtest/gtest.h>
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
@@ -112,6 +113,238 @@ TEST(Smoothing, CotanLaplacianConverges)
     auto result = Geometry::Smoothing::CotanLaplacian(mesh, params);
     ASSERT_TRUE(result.has_value());
     EXPECT_EQ(result->IterationsPerformed, 3u);
+}
+
+TEST(Smoothing, CotanPropertySmoothingRetainsDampedSelfWeight)
+{
+    auto mesh = MakeTetrahedron();
+    auto values = Geometry::VertexProperty<double>(
+        mesh.VertexProperties().GetOrAdd<double>("v:test_scalar", 0.0));
+    auto sentinel = Geometry::VertexProperty<std::uint32_t>(
+        mesh.VertexProperties().GetOrAdd<std::uint32_t>("v:sentinel", 0u));
+    values[Geometry::VertexHandle{0u}] = 8.0;
+    for (std::uint32_t i = 0u; i < mesh.VerticesSize(); ++i)
+        sentinel[Geometry::VertexHandle{i}] = 100u + i;
+
+    const std::vector<std::uint32_t> sentinelBefore = sentinel.Vector();
+    const std::size_t vertexSlotsBefore = mesh.VerticesSize();
+    const std::size_t edgeSlotsBefore = mesh.EdgesSize();
+    const std::size_t faceSlotsBefore = mesh.FacesSize();
+    const std::size_t halfedgeSlotsBefore = mesh.HalfedgesSize();
+
+    const Geometry::Smoothing::VertexPropertySmoothingResult result =
+        Geometry::Smoothing::CotanSmoothVertexProperty(
+            mesh,
+            values,
+            Geometry::Smoothing::VertexPropertySmoothingParams{
+                .Iterations = 1u,
+                .Lambda = 0.5,
+                .PreserveBoundary = false,
+            });
+
+    ASSERT_TRUE(result.Succeeded());
+    EXPECT_EQ(result.IterationsPerformed, 1u);
+    EXPECT_EQ(result.SmoothedVertexCount, 4u);
+    EXPECT_DOUBLE_EQ(values[Geometry::VertexHandle{0u}], 4.0);
+    for (std::uint32_t i = 1u; i < 4u; ++i)
+    {
+        EXPECT_NEAR(values[Geometry::VertexHandle{i}], 4.0 / 3.0, 1.0e-12);
+    }
+    EXPECT_EQ(sentinel.Vector(), sentinelBefore);
+    EXPECT_EQ(mesh.VerticesSize(), vertexSlotsBefore);
+    EXPECT_EQ(mesh.EdgesSize(), edgeSlotsBefore);
+    EXPECT_EQ(mesh.FacesSize(), faceSlotsBefore);
+    EXPECT_EQ(mesh.HalfedgesSize(), halfedgeSlotsBefore);
+}
+
+TEST(Smoothing, CotanPropertySmoothingSupportsCanonicalScalarAndVectorKinds)
+{
+    auto mesh = MakeTetrahedron();
+    const Geometry::Smoothing::VertexPropertySmoothingParams params{
+        .Iterations = 1u,
+        .Lambda = 0.5,
+        .PreserveBoundary = false,
+    };
+    const Geometry::VertexHandle vertex{0u};
+
+    auto floatValues = Geometry::VertexProperty<float>(
+        mesh.VertexProperties().GetOrAdd<float>("v:test_float", 0.0f));
+    auto doubleValues = Geometry::VertexProperty<double>(
+        mesh.VertexProperties().GetOrAdd<double>("v:test_double", 0.0));
+    auto vec2Values = Geometry::VertexProperty<glm::vec2>(
+        mesh.VertexProperties().GetOrAdd<glm::vec2>("v:test_vec2", glm::vec2(0.0f)));
+    auto vec3Values = Geometry::VertexProperty<glm::vec3>(
+        mesh.VertexProperties().GetOrAdd<glm::vec3>("v:test_vec3", glm::vec3(0.0f)));
+    auto vec4Values = Geometry::VertexProperty<glm::vec4>(
+        mesh.VertexProperties().GetOrAdd<glm::vec4>("v:test_vec4", glm::vec4(0.0f)));
+    floatValues[vertex] = 8.0f;
+    doubleValues[vertex] = 8.0;
+    vec2Values[vertex] = glm::vec2(8.0f, -4.0f);
+    vec3Values[vertex] = glm::vec3(8.0f, -4.0f, 2.0f);
+    vec4Values[vertex] = glm::vec4(8.0f, -4.0f, 2.0f, 1.0f);
+
+    EXPECT_TRUE(Geometry::Smoothing::CotanSmoothVertexProperty(
+                    mesh, floatValues, params).Succeeded());
+    EXPECT_TRUE(Geometry::Smoothing::CotanSmoothVertexProperty(
+                    mesh, doubleValues, params).Succeeded());
+    EXPECT_TRUE(Geometry::Smoothing::CotanSmoothVertexProperty(
+                    mesh, vec2Values, params).Succeeded());
+    EXPECT_TRUE(Geometry::Smoothing::CotanSmoothVertexProperty(
+                    mesh, vec3Values, params).Succeeded());
+    EXPECT_TRUE(Geometry::Smoothing::CotanSmoothVertexProperty(
+                    mesh, vec4Values, params).Succeeded());
+
+    EXPECT_FLOAT_EQ(floatValues[vertex], 4.0f);
+    EXPECT_DOUBLE_EQ(doubleValues[vertex], 4.0);
+    EXPECT_EQ(vec2Values[vertex], glm::vec2(4.0f, -2.0f));
+    EXPECT_EQ(vec3Values[vertex], glm::vec3(4.0f, -2.0f, 1.0f));
+    EXPECT_EQ(vec4Values[vertex], glm::vec4(4.0f, -2.0f, 1.0f, 0.5f));
+}
+
+TEST(Smoothing, CotanPropertySmoothingPinsBoundaryAndFailsClosed)
+{
+    auto mesh = MakeSubdividedTriangle();
+    auto values = Geometry::VertexProperty<double>(
+        mesh.VertexProperties().GetOrAdd<double>("v:test_scalar", 0.0));
+    for (std::size_t i = 0u; i < mesh.VerticesSize(); ++i)
+        values[Geometry::VertexHandle{static_cast<Geometry::PropertyIndex>(i)}] =
+            static_cast<double>(i + 1u);
+    const std::vector<double> beforeBoundary = values.Vector();
+
+    const auto pinned = Geometry::Smoothing::CotanSmoothVertexProperty(
+        mesh,
+        values,
+        Geometry::Smoothing::VertexPropertySmoothingParams{
+            .Iterations = 2u,
+            .Lambda = 0.5,
+            .PreserveBoundary = true,
+        });
+    ASSERT_TRUE(pinned.Succeeded());
+    EXPECT_GT(pinned.PinnedBoundaryVertexCount, 0u);
+    for (std::size_t i = 0u; i < mesh.VerticesSize(); ++i)
+    {
+        const Geometry::VertexHandle vertex{
+            static_cast<Geometry::PropertyIndex>(i)};
+        if (mesh.IsBoundary(vertex))
+            EXPECT_DOUBLE_EQ(values[vertex], beforeBoundary[i]);
+    }
+
+    const std::vector<double> beforeInvalidParams = values.Vector();
+    const auto invalidParams = Geometry::Smoothing::CotanSmoothVertexProperty(
+        mesh,
+        values,
+        Geometry::Smoothing::VertexPropertySmoothingParams{
+            .Iterations = 1u,
+            .Lambda = 1.5,
+            .PreserveBoundary = false,
+        });
+    EXPECT_EQ(
+        invalidParams.Status,
+        Geometry::Smoothing::VertexPropertySmoothingStatus::InvalidParameters);
+    EXPECT_EQ(values.Vector(), beforeInvalidParams);
+
+    values[Geometry::VertexHandle{0u}] =
+        std::numeric_limits<double>::infinity();
+    const std::vector<double> beforeFailure = values.Vector();
+    const auto failed = Geometry::Smoothing::CotanSmoothVertexProperty(
+        mesh, values, {});
+    EXPECT_EQ(
+        failed.Status,
+        Geometry::Smoothing::VertexPropertySmoothingStatus::NonFiniteInput);
+    ASSERT_EQ(values.Vector().size(), beforeFailure.size());
+    EXPECT_TRUE(std::isinf(values[Geometry::VertexHandle{0u}]));
+    for (std::size_t i = 1u; i < beforeFailure.size(); ++i)
+        EXPECT_DOUBLE_EQ(values.Vector()[i], beforeFailure[i]);
+}
+
+TEST(Smoothing, CotanPropertySmoothingExcludesInactiveRowsAndNeighbours)
+{
+    auto mesh = MakeTetrahedron();
+    auto values = Geometry::VertexProperty<double>(
+        mesh.VertexProperties().GetOrAdd<double>("v:test_masked", 0.0));
+    values[Geometry::VertexHandle{0u}] = 8.0;
+    values[Geometry::VertexHandle{1u}] = 1000.0;
+    const std::array<std::uint8_t, 4> active{1u, 0u, 1u, 1u};
+
+    const auto result = Geometry::Smoothing::CotanSmoothVertexProperty(
+        mesh,
+        values,
+        Geometry::Smoothing::VertexPropertySmoothingParams{
+            .Iterations = 1u,
+            .Lambda = 0.5,
+            .PreserveBoundary = false,
+            .ActiveVertexMask = active,
+        });
+
+    ASSERT_TRUE(result.Succeeded());
+    EXPECT_EQ(result.InactiveVertexCount, 1u);
+    EXPECT_DOUBLE_EQ(values[Geometry::VertexHandle{0u}], 4.0);
+    EXPECT_DOUBLE_EQ(values[Geometry::VertexHandle{1u}], 1000.0);
+    EXPECT_DOUBLE_EQ(values[Geometry::VertexHandle{2u}], 2.0);
+    EXPECT_DOUBLE_EQ(values[Geometry::VertexHandle{3u}], 2.0);
+
+    const std::vector<double> beforeInvalidMask = values.Vector();
+    const std::array<std::uint8_t, 3> invalidMask{1u, 1u, 1u};
+    const auto invalid = Geometry::Smoothing::CotanSmoothVertexProperty(
+        mesh,
+        values,
+        Geometry::Smoothing::VertexPropertySmoothingParams{
+            .Iterations = 1u,
+            .Lambda = 0.5,
+            .PreserveBoundary = false,
+            .ActiveVertexMask = invalidMask,
+        });
+    EXPECT_EQ(
+        invalid.Status,
+        Geometry::Smoothing::VertexPropertySmoothingStatus::InvalidActiveMask);
+    EXPECT_EQ(values.Vector(), beforeInvalidMask);
+}
+
+TEST(Smoothing, CotanPropertySmoothingIsInvariantToUniformMeshScale)
+{
+    auto unit = MakeTetrahedron();
+    auto tiny = MakeTetrahedron();
+    for (std::size_t i = 0u; i < tiny.VerticesSize(); ++i)
+    {
+        const Geometry::VertexHandle vertex{
+            static_cast<Geometry::PropertyIndex>(i)};
+        tiny.Position(vertex) *= 1.0e-6f;
+    }
+    auto unitValues = Geometry::VertexProperty<glm::vec3>(
+        unit.VertexProperties().GetOrAdd<glm::vec3>(
+            "v:test_scale", glm::vec3(0.0f)));
+    auto tinyValues = Geometry::VertexProperty<glm::vec3>(
+        tiny.VertexProperties().GetOrAdd<glm::vec3>(
+            "v:test_scale", glm::vec3(0.0f)));
+    for (std::size_t i = 0u; i < unit.VerticesSize(); ++i)
+    {
+        const Geometry::VertexHandle vertex{
+            static_cast<Geometry::PropertyIndex>(i)};
+        const glm::vec3 value(
+            static_cast<float>(i + 1u),
+            -static_cast<float>(2u * i + 1u),
+            static_cast<float>(i * i));
+        unitValues[vertex] = value;
+        tinyValues[vertex] = value;
+    }
+    const Geometry::Smoothing::VertexPropertySmoothingParams params{
+        .Iterations = 3u,
+        .Lambda = 0.5,
+        .PreserveBoundary = false,
+    };
+
+    ASSERT_TRUE(Geometry::Smoothing::CotanSmoothVertexProperty(
+        unit, unitValues, params).Succeeded());
+    ASSERT_TRUE(Geometry::Smoothing::CotanSmoothVertexProperty(
+        tiny, tinyValues, params).Succeeded());
+    for (std::size_t i = 0u; i < unit.VerticesSize(); ++i)
+    {
+        const Geometry::VertexHandle vertex{
+            static_cast<Geometry::PropertyIndex>(i)};
+        EXPECT_NEAR(unitValues[vertex].x, tinyValues[vertex].x, 1.0e-6f);
+        EXPECT_NEAR(unitValues[vertex].y, tinyValues[vertex].y, 1.0e-6f);
+        EXPECT_NEAR(unitValues[vertex].z, tinyValues[vertex].z, 1.0e-6f);
+    }
 }
 
 // --- Taubin Smoothing ---

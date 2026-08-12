@@ -1,0 +1,36 @@
+Internal ctest changing into directory: /home/alex/Documents/IntrinsicEngine/build/ci
+Test project /home/alex/Documents/IntrinsicEngine/build/ci
+      Start  349: RuntimeAssetImportFormatCoverage.DirectObjImportPreservesAuthoredCornerNormals
+ 1/12 Test  #349: RuntimeAssetImportFormatCoverage.DirectObjImportPreservesAuthoredCornerNormals .......   Passed    0.04 sec
+      Start  474: MeshGeometryExtraction.DisagreeingCornerNormalsSplitOnlyGpuShadingVertices
+ 2/12 Test  #474: MeshGeometryExtraction.DisagreeingCornerNormalsSplitOnlyGpuShadingVertices ...........   Passed    0.05 sec
+      Start  475: MeshGeometryExtraction.ExplicitNormalBindingOverridesCornerNormalsAndTheirRevision
+ 3/12 Test  #475: MeshGeometryExtraction.ExplicitNormalBindingOverridesCornerNormalsAndTheirRevision ...   Passed    0.05 sec
+      Start  478: CornerTexcoordUpload.CompleteSplitCarriesAuthoredCornerNormals
+ 4/12 Test  #478: CornerTexcoordUpload.CompleteSplitCarriesAuthoredCornerNormals .......................   Passed    0.00 sec
+      Start  912: RuntimeSceneSerialization.SaveLoadRoundTripPreservesCornerDomainNormals
+ 5/12 Test  #912: RuntimeSceneSerialization.SaveLoadRoundTripPreservesCornerDomainNormals ..............   Passed    0.01 sec
+      Start 1023: SandboxEditorUi.MeshCurvatureRejectsBoundaryOnlyZeroSupport
+ 6/12 Test #1023: SandboxEditorUi.MeshCurvatureRejectsBoundaryOnlyZeroSupport ..........................   Passed    0.00 sec
+      Start 2194: CurvatureTensor.MatchesPmpTensorAndSmoothingOracle
+ 7/12 Test #2194: CurvatureTensor.MatchesPmpTensorAndSmoothingOracle ...................................   Passed    0.01 sec
+      Start 2461: Smoothing.CotanPropertySmoothingRetainsDampedSelfWeight
+ 8/12 Test #2461: Smoothing.CotanPropertySmoothingRetainsDampedSelfWeight ..............................   Passed    0.01 sec
+      Start 2462: Smoothing.CotanPropertySmoothingSupportsCanonicalScalarAndVectorKinds
+ 9/12 Test #2462: Smoothing.CotanPropertySmoothingSupportsCanonicalScalarAndVectorKinds ................   Passed    0.01 sec
+      Start 2463: Smoothing.CotanPropertySmoothingPinsBoundaryAndFailsClosed
+10/12 Test #2463: Smoothing.CotanPropertySmoothingPinsBoundaryAndFailsClosed ...........................   Passed    0.01 sec
+      Start 2823: GeometryIO_MeshIO.LoadsOBJNormalSeamOnCornersWithoutDuplicatingPositions
+11/12 Test #2823: GeometryIO_MeshIO.LoadsOBJNormalSeamOnCornersWithoutDuplicatingPositions .............   Passed    0.00 sec
+      Start 2824: GeometryIO_MeshIO.ObjCornerNormalsSurviveWriteAndReload
+12/12 Test #2824: GeometryIO_MeshIO.ObjCornerNormalsSurviveWriteAndReload ..............................   Passed    0.00 sec
+
+100% tests passed, 0 tests failed out of 12
+
+Label Time Summary:
+contract    =   0.16 sec*proc (6 tests)
+geometry    =   0.03 sec*proc (6 tests)
+runtime     =   0.16 sec*proc (6 tests)
+unit        =   0.03 sec*proc (6 tests)
+
+Total Test time (real) =   0.34 sec

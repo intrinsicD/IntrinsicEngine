@@ -1,0 +1,152 @@
+Internal ctest changing into directory: /home/alex/Documents/IntrinsicEngine/build/ci-vulkan
+Test project /home/alex/Documents/IntrinsicEngine/build/ci-vulkan
+      Start    3: IntrinsicKMeansGpuBenchmarkSmoke.Run
+ 1/54 Test    #3: IntrinsicKMeansGpuBenchmarkSmoke.Run ........................................................................   Passed    4.19 sec
+      Start    4: IntrinsicKMeansGpuBenchmarkSmoke.Validate
+ 2/54 Test    #4: IntrinsicKMeansGpuBenchmarkSmoke.Validate ...................................................................   Passed    0.08 sec
+      Start    5: IntrinsicLopFamilyGpuBenchmarkSmoke.Run
+ 3/54 Test    #5: IntrinsicLopFamilyGpuBenchmarkSmoke.Run .....................................................................   Passed   11.25 sec
+      Start    6: IntrinsicLopFamilyGpuBenchmarkSmoke.UnavailableEnvironmentFailsClosed
+ 4/54 Test    #6: IntrinsicLopFamilyGpuBenchmarkSmoke.UnavailableEnvironmentFailsClosed .......................................   Passed    3.12 sec
+      Start    7: IntrinsicLopFamilyGpuBenchmarkSmoke.Validate
+ 5/54 Test    #7: IntrinsicLopFamilyGpuBenchmarkSmoke.Validate ................................................................   Passed    0.08 sec
+      Start 3494: BufferReadbackGpuSmoke.TransferQueueDownloadsDeviceLocalBufferWithoutWaitIdle
+ 6/54 Test #3494: BufferReadbackGpuSmoke.TransferQueueDownloadsDeviceLocalBufferWithoutWaitIdle ...............................   Passed    1.72 sec
+      Start 3495: ComputeParallelPrimitivesGpuSmoke.VulkanScanAndCompactionMatchCpuReference
+ 7/54 Test #3495: ComputeParallelPrimitivesGpuSmoke.VulkanScanAndCompactionMatchCpuReference ..................................   Passed    2.81 sec
+      Start 3496: GpuTransferFacadeGpuSmoke.UploadThenReadbackRoundTripsThroughFacadeWithoutWaitIdle
+ 8/54 Test #3496: GpuTransferFacadeGpuSmoke.UploadThenReadbackRoundTripsThroughFacadeWithoutWaitIdle ..........................   Passed    2.11 sec
+      Start 3497: TextureReadbackGpuSmoke.TransferQueueDownloadsTextureSubresourceWithoutWaitIdle
+ 9/54 Test #3497: TextureReadbackGpuSmoke.TransferQueueDownloadsTextureSubresourceWithoutWaitIdle .............................   Passed    1.70 sec
+      Start 3498: DefaultRecipeSurfaceGpuSmoke.RecipeSelectorReachesOperationalVulkanCommandStream
+10/54 Test #3498: DefaultRecipeSurfaceGpuSmoke.RecipeSelectorReachesOperationalVulkanCommandStream ............................   Passed    2.52 sec
+      Start 3499: DefaultRecipeSurfaceGpuSmoke.NativeGpuTimestampsResolveNamedPassesAfterSlotReuse
+11/54 Test #3499: DefaultRecipeSurfaceGpuSmoke.NativeGpuTimestampsResolveNamedPassesAfterSlotReuse ............................***Failed    2.92 sec
+Running main() from /home/alex/Documents/IntrinsicEngine/external/vcpkg/buildtrees/gtest/src/v1.17.0-0c449efaff.clean/googletest/src/gtest_main.cc
+Note: Google Test filter = DefaultRecipeSurfaceGpuSmoke.NativeGpuTimestampsResolveNamedPassesAfterSlotReuse
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from DefaultRecipeSurfaceGpuSmoke
+[ RUN      ] DefaultRecipeSurfaceGpuSmoke.NativeGpuTimestampsResolveNamedPassesAfterSlotReuse
+[32m[INFO] Initialized Scheduler with 15 worker threads.[0m
+[33m[WARN] [Runtime] Promoted Vulkan device selected; backend remains fail-closed until the first clean default-recipe validation promotes it.[0m
+[33m[WARN] [VulkanDevice::Initialize] Vulkan bootstrap created logical-device, queue, VMA, per-frame command/sync, swapchain image/view/handle, bindless heap, transfer queue, and global pipeline-layout state; canonical frame execution waits for the first clean recipe validation publish, so device remains non-operational during cold start.[0m
+[33m[WARN] [Runtime] VulkanRequestedButNotOperational status=RequestedButIncompleteGate reason=BarrierValidationFailed[0m
+/home/alex/Documents/IntrinsicEngine/tests/integration/graphics/Test.DefaultRecipeSurfaceGpuSmoke.cpp:886: Failure
+Expected: (*surfacePass->DurationNs) > (0u), actual: 0 vs 0
+
+[  FAILED  ] DefaultRecipeSurfaceGpuSmoke.NativeGpuTimestampsResolveNamedPassesAfterSlotReuse (2879 ms)
+[----------] 1 test from DefaultRecipeSurfaceGpuSmoke (2879 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (2879 ms total)
+[  PASSED  ] 0 tests.
+[  FAILED  ] 1 test, listed below:
+[  FAILED  ] DefaultRecipeSurfaceGpuSmoke.NativeGpuTimestampsResolveNamedPassesAfterSlotReuse
+
+ 1 FAILED TEST
+
+      Start 3500: DefaultRecipeSurfaceGpuSmoke.ReferenceTriangleDebugViewReadbackMatchesMinimalHarnessSamples
+12/54 Test #3500: DefaultRecipeSurfaceGpuSmoke.ReferenceTriangleDebugViewReadbackMatchesMinimalHarnessSamples .................   Passed    2.62 sec
+      Start 3501: DefaultRecipeSurfaceGpuSmoke.ParallelRecordingMatchesSerialReadbackWithValidation
+13/54 Test #3501: DefaultRecipeSurfaceGpuSmoke.ParallelRecordingMatchesSerialReadbackWithValidation ...........................   Passed    3.94 sec
+      Start 3502: DefaultRecipeSurfaceGpuSmoke.ParallelRecordingMatchesSerialAsyncComputeReadbackWithValidation
+14/54 Test #3502: DefaultRecipeSurfaceGpuSmoke.ParallelRecordingMatchesSerialAsyncComputeReadbackWithValidation ...............   Passed    4.00 sec
+      Start 3503: DefaultRecipeSurfaceGpuSmoke.TransientAliasingMatchesFallbackReadbackAndReducesMemory
+15/54 Test #3503: DefaultRecipeSurfaceGpuSmoke.TransientAliasingMatchesFallbackReadbackAndReducesMemory .......................   Passed    3.37 sec
+      Start 3504: DefaultRecipeSurfaceGpuSmoke.VulkanRenderContractPublishesDeclaredArtifactMetadata
+16/54 Test #3504: DefaultRecipeSurfaceGpuSmoke.VulkanRenderContractPublishesDeclaredArtifactMetadata ..........................   Passed    2.63 sec
+      Start 3505: DefaultRecipeSurfaceGpuSmoke.VulkanResourceSlotsRecycleAfterRetirementWindow
+17/54 Test #3505: DefaultRecipeSurfaceGpuSmoke.VulkanResourceSlotsRecycleAfterRetirementWindow ................................   Passed    3.01 sec
+      Start 3506: DefaultRecipeSurfaceGpuSmoke.AsyncComputeHistogramQueueReadbackMatchesMinimalHarnessSamples
+18/54 Test #3506: DefaultRecipeSurfaceGpuSmoke.AsyncComputeHistogramQueueReadbackMatchesMinimalHarnessSamples .................   Passed    2.66 sec
+      Start 3507: HzbOcclusionConservatismGpuSmoke.TwoPhasePredicateMatchesCpuContractOnOperationalVulkan
+19/54 Test #3507: HzbOcclusionConservatismGpuSmoke.TwoPhasePredicateMatchesCpuContractOnOperationalVulkan .....................   Passed    2.53 sec
+      Start 3508: ImGuiSurfaceGpuSmoke.UserTextureImageRecordsOnOperationalVulkanCommandStream
+20/54 Test #3508: ImGuiSurfaceGpuSmoke.UserTextureImageRecordsOnOperationalVulkanCommandStream ................................   Passed    2.54 sec
+      Start 3509: ImGuiSurfaceGpuSmoke.LargeSelectedEntityPayloadRetainsAtlasOnOperationalVulkan
+21/54 Test #3509: ImGuiSurfaceGpuSmoke.LargeSelectedEntityPayloadRetainsAtlasOnOperationalVulkan ..............................   Passed    2.76 sec
+      Start 3510: ImGuiSurfaceGpuSmoke.DrawListPixelsReachBackbufferOnOperationalVulkan
+22/54 Test #3510: ImGuiSurfaceGpuSmoke.DrawListPixelsReachBackbufferOnOperationalVulkan .......................................   Passed    2.54 sec
+      Start 3511: TransientDebugSurfaceGpuSmoke.MixedLanesRecordOnOperationalVulkanCommandStream
+23/54 Test #3511: TransientDebugSurfaceGpuSmoke.MixedLanesRecordOnOperationalVulkanCommandStream ..............................   Passed    2.65 sec
+      Start 3512: TransientDebugSurfaceGpuSmoke.MixedLanesReadBackExpectedSampleColors
+24/54 Test #3512: TransientDebugSurfaceGpuSmoke.MixedLanesReadBackExpectedSampleColors ........................................   Passed    2.65 sec
+      Start 3513: UvViewGpuSmoke.RetainedBackgroundModesReadBackOnOperationalVulkan
+25/54 Test #3513: UvViewGpuSmoke.RetainedBackgroundModesReadBackOnOperationalVulkan ...........................................   Passed    3.56 sec
+      Start 3514: VisualizationOverlaySurfaceGpuSmoke.PropertyBuffersPublishBdasBeforeOperationalVulkanCommandStream
+26/54 Test #3514: VisualizationOverlaySurfaceGpuSmoke.PropertyBuffersPublishBdasBeforeOperationalVulkanCommandStream ..........   Passed    2.64 sec
+      Start 3515: VisualizationOverlaySurfaceGpuSmoke.MixedLanesReadBackExpectedSampleColors
+27/54 Test #3515: VisualizationOverlaySurfaceGpuSmoke.MixedLanesReadBackExpectedSampleColors ..................................   Passed    2.65 sec
+      Start 3516: VulkanBootstrapSmoke.InitializeCreatesPerFrameResourcesOrFailsCleanly
+28/54 Test #3516: VulkanBootstrapSmoke.InitializeCreatesPerFrameResourcesOrFailsCleanly .......................................   Passed    1.81 sec
+      Start 3517: RuntimeSandboxAcceptanceGpuSmoke.AcceptanceSceneReachesOperationalDefaultRecipePresent
+29/54 Test #3517: RuntimeSandboxAcceptanceGpuSmoke.AcceptanceSceneReachesOperationalDefaultRecipePresent ......................   Passed    2.64 sec
+      Start 3518: RuntimeSandboxAcceptanceGpuSmoke.GeometryPresentationReachesOperationalFrame
+30/54 Test #3518: RuntimeSandboxAcceptanceGpuSmoke.GeometryPresentationReachesOperationalFrame ................................   Passed    2.66 sec
+      Start 3519: RuntimeSandboxAcceptanceGpuSmoke.ExtrinsicSandboxDefaultConfigProducesVisibleFrameWithValidation
+31/54 Test #3519: RuntimeSandboxAcceptanceGpuSmoke.ExtrinsicSandboxDefaultConfigProducesVisibleFrameWithValidation ............   Passed    3.33 sec
+      Start 3520: RuntimeSandboxAcceptanceGpuSmoke.ParameterizationUvViewWindowUsesOperationalGpuTargetThroughRuntimePath
+32/54 Test #3520: RuntimeSandboxAcceptanceGpuSmoke.ParameterizationUvViewWindowUsesOperationalGpuTargetThroughRuntimePath .....   Passed    3.34 sec
+      Start 3521: RuntimeSandboxAcceptanceGpuSmoke.ExtrinsicSandboxDefaultConfigPresentsReferenceTriangleAtFrameCenter
+33/54 Test #3521: RuntimeSandboxAcceptanceGpuSmoke.ExtrinsicSandboxDefaultConfigPresentsReferenceTriangleAtFrameCenter ........   Passed    3.31 sec
+      Start 3522: RuntimeSandboxAcceptanceGpuSmoke.ReferenceTriangleVertexColorStreamShadesDeferredSurface
+34/54 Test #3522: RuntimeSandboxAcceptanceGpuSmoke.ReferenceTriangleVertexColorStreamShadesDeferredSurface ....................   Passed    3.32 sec
+      Start 3523: RuntimeSandboxAcceptanceGpuSmoke.VertexColorDirtyChannelPartiallyUploadsAndShadesDeferredSurface
+35/54 Test #3523: RuntimeSandboxAcceptanceGpuSmoke.VertexColorDirtyChannelPartiallyUploadsAndShadesDeferredSurface ............   Passed    3.33 sec
+      Start 3524: RuntimeSandboxAcceptanceGpuSmoke.ReferenceTriangleMeshConfiguredLineWidthAndPointDrawLanesPresent
+36/54 Test #3524: RuntimeSandboxAcceptanceGpuSmoke.ReferenceTriangleMeshConfiguredLineWidthAndPointDrawLanesPresent ...........   Passed    3.35 sec
+      Start 3525: RuntimeSandboxAcceptanceGpuSmoke.ReferenceTriangleScalarFieldColormapResolvesOnLineAndPointLanes
+37/54 Test #3525: RuntimeSandboxAcceptanceGpuSmoke.ReferenceTriangleScalarFieldColormapResolvesOnLineAndPointLanes ............   Passed    3.41 sec
+      Start 3526: RuntimeSandboxAcceptanceGpuSmoke.ReferenceTriangleScalarFieldSurfaceAndIsolinesResolveOnGpu
+38/54 Test #3526: RuntimeSandboxAcceptanceGpuSmoke.ReferenceTriangleScalarFieldSurfaceAndIsolinesResolveOnGpu .................   Passed    3.35 sec
+      Start 3527: RuntimeSandboxAcceptanceGpuSmoke.InspectorTransformEditShiftsReferenceTrianglePixels
+39/54 Test #3527: RuntimeSandboxAcceptanceGpuSmoke.InspectorTransformEditShiftsReferenceTrianglePixels ........................   Passed    3.76 sec
+      Start 3528: RuntimeSandboxAcceptanceGpuSmoke.ImportedOffOriginObjTriangleAutoFramesAtCenter
+40/54 Test #3528: RuntimeSandboxAcceptanceGpuSmoke.ImportedOffOriginObjTriangleAutoFramesAtCenter .............................   Passed    3.33 sec
+      Start 3529: RuntimeSandboxAcceptanceGpuSmoke.ImportedObjWithoutAuthoredUvsSamplesGeneratedAlbedoTexture
+41/54 Test #3529: RuntimeSandboxAcceptanceGpuSmoke.ImportedObjWithoutAuthoredUvsSamplesGeneratedAlbedoTexture .................   Passed    3.48 sec
+      Start 3530: RuntimeSandboxAcceptanceGpuSmoke.ClickPickReadbackSelectsReferenceTriangleAndBackgroundClears
+42/54 Test #3530: RuntimeSandboxAcceptanceGpuSmoke.ClickPickReadbackSelectsReferenceTriangleAndBackgroundClears ...............   Passed    3.50 sec
+      Start 3531: RuntimeSandboxAcceptanceGpuSmoke.ImportedModelSceneIsVisibleAndClickPickable
+43/54 Test #3531: RuntimeSandboxAcceptanceGpuSmoke.ImportedModelSceneIsVisibleAndClickPickable ................................   Passed    3.82 sec
+      Start 3532: RuntimeSandboxAcceptanceGpuSmoke.HierarchySelectionKeepsDefaultSandboxVisibleWithOutline
+44/54 Test #3532: RuntimeSandboxAcceptanceGpuSmoke.HierarchySelectionKeepsDefaultSandboxVisibleWithOutline ....................   Passed    3.34 sec
+      Start 3533: RuntimeSandboxAcceptanceGpuSmoke.ImportedObjectSpaceNormalBakeBindsAndReadsBackExactTargetSlice
+45/54 Test #3533: RuntimeSandboxAcceptanceGpuSmoke.ImportedObjectSpaceNormalBakeBindsAndReadsBackExactTargetSlice .............   Passed    4.99 sec
+      Start 3534: RuntimeSandboxAcceptanceGpuSmoke.PropertyTextureModuleBakesRebindsRebakesAndRemovesOnVulkan
+46/54 Test #3534: RuntimeSandboxAcceptanceGpuSmoke.PropertyTextureModuleBakesRebindsRebakesAndRemovesOnVulkan .................   Passed    5.61 sec
+      Start 3535: RuntimeSandboxAcceptanceGpuSmoke.SeamSplitCornerUvMeshDeIndexesAtUploadAndRendersVisibleSurface
+47/54 Test #3535: RuntimeSandboxAcceptanceGpuSmoke.SeamSplitCornerUvMeshDeIndexesAtUploadAndRendersVisibleSurface .............   Passed    3.48 sec
+      Start 3536: ClusteringServiceGpuSmoke.VulkanExecutionMatchesCpuReferenceAndCommitsCanonicalProperties
+48/54 Test #3536: ClusteringServiceGpuSmoke.VulkanExecutionMatchesCpuReferenceAndCommitsCanonicalProperties ...................   Passed    2.81 sec
+      Start 3537: PointCloudConsolidationGpuParity.VulkanLopAndIsotropicWlopMatchFrozenCpuReferencesAndRepeat
+49/54 Test #3537: PointCloudConsolidationGpuParity.VulkanLopAndIsotropicWlopMatchFrozenCpuReferencesAndRepeat .................   Passed    6.69 sec
+      Start 3538: PointCloudConsolidationGpuParity.VulkanAutoProcessesChildMeshPositionsAndPublishesDisplacement
+50/54 Test #3538: PointCloudConsolidationGpuParity.VulkanAutoProcessesChildMeshPositionsAndPublishesDisplacement ..............   Passed   21.38 sec
+      Start 3539: ProgressivePoissonGpuResultReadbackGpuSmoke.VulkanBatchTransportsReferenceShapedResultWithoutBlockingRead
+51/54 Test #3539: ProgressivePoissonGpuResultReadbackGpuSmoke.VulkanBatchTransportsReferenceShapedResultWithoutBlockingRead ...   Passed    1.68 sec
+      Start 3540: GpuResultReadbackGpuSmoke.SharedBatchParksJobAndReleasesDerivedUpload
+52/54 Test #3540: GpuResultReadbackGpuSmoke.SharedBatchParksJobAndReleasesDerivedUpload .......................................   Passed    1.69 sec
+      Start 4318: ExtrinsicSandbox.FramePacingDiagnosticCapture
+53/54 Test #4318: ExtrinsicSandbox.FramePacingDiagnosticCapture ...............................................................   Passed    3.44 sec
+      Start 4319: ExtrinsicSandbox.VulkanShutdownLsanContract
+54/54 Test #4319: ExtrinsicSandbox.VulkanShutdownLsanContract .................................................................   Passed   93.45 sec
+
+98% tests passed, 1 tests failed out of 54
+
+Label Time Summary:
+benchmark      =  18.72 sec*proc (5 tests)
+geometry       =  51.28 sec*proc (9 tests)
+gpu            = 279.55 sec*proc (54 tests)
+graphics       = 228.27 sec*proc (45 tests)
+integration    = 105.05 sec*proc (25 tests)
+regression     =  93.45 sec*proc (1 test)
+runtime        = 217.21 sec*proc (31 tests)
+slow           =   1.69 sec*proc (1 test)
+vulkan         = 279.55 sec*proc (54 tests)
+
+Total Test time (real) = 279.70 sec
+
+The following tests FAILED:
+	3499 - DefaultRecipeSurfaceGpuSmoke.NativeGpuTimestampsResolveNamedPassesAfterSlotReuse (Failed)

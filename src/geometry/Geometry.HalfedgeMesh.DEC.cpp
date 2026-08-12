@@ -6,6 +6,7 @@ module;
 #include <cmath>
 #include <cstddef>
 #include <map>
+#include <limits>
 #include <numeric>
 #include <span>
 #include <vector>
@@ -51,7 +52,8 @@ namespace Geometry::DEC
             const double aSq = glm::dot(pApex - pTo, pApex - pTo);
             const double bSq = glm::dot(pApex - pFrom, pApex - pFrom);
             const double area = 0.5 * glm::length(glm::cross(pFrom - pApex, pTo - pApex));
-            if (area <= 1e-12)
+            if (!std::isfinite(area)
+                || area <= std::numeric_limits<double>::min())
                 return 0.0;
             return std::clamp((aSq + bSq - cSq) / (4.0 * area), -bound, bound);
         }

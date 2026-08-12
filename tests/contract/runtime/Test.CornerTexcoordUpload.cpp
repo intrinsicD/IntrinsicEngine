@@ -1,8 +1,8 @@
-// BUG-137 Slice B — the corner->halfedge map that lets GPU upload resolve
-// corner-domain UVs. `Extrinsic.Runtime.GeometryPlanBuilders` is a PRIVATE
-// module, so the split behavior it drives is asserted through the public
-// extraction path in Test.MeshGeometryExtraction.cpp; this file covers the
-// public topology seam that feeds it.
+// The corner-to-halfedge map lets GPU upload resolve corner-domain shading
+// attributes. `Extrinsic.Runtime.GeometryPlanBuilders` is a private module, so
+// the split behavior it drives is asserted through the public extraction path
+// in Test.MeshGeometryExtraction.cpp; this file covers the public topology
+// seam that feeds it.
 #include <cstddef>
 #include <cstdint>
 #include <string>
@@ -127,4 +127,54 @@ TEST(CornerTexcoordUpload, CornerMapIsClearedOnTopologyFailure)
     EXPECT_NE(status, Extrinsic::Runtime::MeshSurfaceTopologyStatus::Success);
     EXPECT_TRUE(indices.empty());
     EXPECT_TRUE(cornerHalfedges.empty());
+}
+
+TEST(CornerTexcoordUpload, CompleteSplitCarriesAuthoredCornerNormals)
+{
+    QuadSources sources{};
+    MakeSharedEdgeQuad(sources);
+
+    const auto view = gs::BuildConstView(sources.Registry, sources.Entity);
+    std::vector<std::uint32_t> indices;
+    std::vector<std::uint32_t> triangleToFace;
+    std::vector<std::uint32_t> cornerHalfedges;
+    ASSERT_EQ(
+        Extrinsic::Runtime::BuildMeshSurfaceTriangleCornerTopology(
+            view, indices, triangleToFace, cornerHalfedges),
+        Extrinsic::Runtime::MeshSurfaceTopologyStatus::Success);
+
+    std::vector<glm::vec3> cornerNormals(
+        6u, glm::vec3{0.0f, 0.0f, 1.0f});
+    cornerNormals[3u] = glm::vec3{0.0f, 2.0f, 0.0f};
+    cornerNormals[4u] = glm::vec3{0.0f, 2.0f, 0.0f};
+    cornerNormals[5u] = glm::vec3{0.0f, 2.0f, 0.0f};
+    const std::vector<glm::vec2> fallbackUvs(4u, glm::vec2{0.25f, 0.5f});
+    const std::vector<glm::vec3> fallbackNormals(
+        4u, glm::vec3{0.0f, 0.0f, 1.0f});
+
+    const std::vector<std::uint32_t> sourceIndices = indices;
+    Extrinsic::Runtime::MeshCornerAttributeSplit split{};
+    ASSERT_TRUE(Extrinsic::Runtime::BuildMeshCornerAttributeSplit(
+        {},
+        cornerNormals,
+        cornerHalfedges,
+        fallbackUvs,
+        fallbackNormals,
+        4u,
+        indices,
+        split));
+
+    ASSERT_EQ(split.SourceVertexForSlot.size(), 6u);
+    ASSERT_EQ(split.NormalForSlot.size(), 6u);
+    ASSERT_EQ(indices.size(), cornerHalfedges.size());
+    for (std::size_t corner = 0u; corner < indices.size(); ++corner)
+    {
+        ASSERT_LT(indices[corner], split.NormalForSlot.size());
+        EXPECT_EQ(split.SourceVertexForSlot[indices[corner]],
+                  sourceIndices[corner]);
+        const glm::vec3 expected = cornerHalfedges[corner] < 3u
+            ? glm::vec3{0.0f, 0.0f, 1.0f}
+            : glm::vec3{0.0f, 1.0f, 0.0f};
+        EXPECT_EQ(split.NormalForSlot[indices[corner]], expected);
+    }
 }

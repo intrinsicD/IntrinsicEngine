@@ -1554,6 +1554,11 @@ namespace Extrinsic::Runtime
             {
                 return false;
             }
+            if (!AddVec3Property(out, "normals", halfedges.Properties,
+                                 "h:normal", false))
+            {
+                return false;
+            }
             geometry["halfedges"] = std::move(out);
             return true;
         }
@@ -1909,6 +1914,16 @@ namespace Extrinsic::Runtime
                     return false;
                 }
                 WriteVec2Property(halfedges.Properties, "h:texcoord", std::move(texcoords));
+            }
+            if (value.contains("normals"))
+            {
+                std::vector<glm::vec3> normals;
+                if (!TryReadVec3Array(value["normals"], normals) ||
+                    normals.size() != halfedgeCount)
+                {
+                    return false;
+                }
+                WriteVec3Property(halfedges.Properties, "h:normal", std::move(normals));
             }
             raw.emplace_or_replace<GS::Halfedges>(entity, std::move(halfedges));
             return true;

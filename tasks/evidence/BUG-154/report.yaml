@@ -1,0 +1,301 @@
+schema_version: 1
+task_id: BUG-154
+workflow_profile: high-risk
+status: draft
+generated_by: tools/agents/workflow_evidence.py
+generated_at: '2026-08-12T01:03:10Z'
+claim_eligible: false
+source:
+  base_ref: origin/main
+  base_revision: 4a043a7db0bae0d546259a0455dd92d3f0e944a5
+  head_revision: 4a043a7db0bae0d546259a0455dd92d3f0e944a5
+  branch: main
+  worktree: /home/alex/Documents/IntrinsicEngine
+  dirty: true
+  surface:
+  - path: CMakeLists.txt
+    sha256: 59e6b808f4b2be4030e8601e45e3e441c21cb3cac5ebffadd3f65a96f33a555d
+  - path: ara/evidence/README.md
+    sha256: f67b59043455b56bfa1d80ba693f44574a0cd635214c049572edd824ea575972
+  - path: ara/evidence/tables/curvature_pmp_diagnostic_2026-08-11.md
+    sha256: 7a69390adbf9997d77050fa8e7c072afe88db3ffcae6ccfbd185109a315a4ab6
+  - path: ara/logic/claims.md
+    sha256: 78c9b72cc84584902eea10f47f5a8d78caa08e7dd9b5c85e90045e0e3a27973d
+  - path: ara/logic/solution/architecture.md
+    sha256: 44ef780c66beaba5dcbca7f9809c8ec69c4e3d0d0915a2a3d5e3a422a01827b4
+  - path: ara/staging/observations.yaml
+    sha256: 6fc85211bd10f19e1fea887b6ec0f154d3ae8af7c332a53a0b69f4c4b3a746b8
+  - path: ara/trace/exploration_tree.yaml
+    sha256: 78d3911e18917537c9791c264a83cd6ed81ac40946459e3d58d10e10fa3973fa
+  - path: ara/trace/pm_reasoning_log.yaml
+    sha256: 9072f4cf862dc43603c1c76c66705e550a4754d3bbf88acb233e4cd2e6f2610c
+  - path: ara/trace/sessions/2026-08-11_001.yaml
+    sha256: e82e13e011a24225fafc50431448bf81e4d9613f9a79434bf15edfb3b5685343
+  - path: ara/trace/sessions/2026-08-12_001.yaml
+    sha256: 9a26d9768ccf418c9514290d4afa454ce948466860b576af844af7251ee68118
+  - path: ara/trace/sessions/session_index.yaml
+    sha256: 46d746b742f7b8048115de3bc09a08eb0e12f363153faf7525e011fe84617f74
+  - path: docs/architecture/geometry-api-style.md
+    sha256: 39b958f67ee926f9566fc541ae5f31bdb7fe4dface5879d633ef5aeb10c7c623
+  - path: docs/architecture/geometry.md
+    sha256: 4870b1998f7cab39fc379ec1cba3ca2f13ecc3f20d15e994165b5fb461d23e98
+  - path: docs/architecture/property-coherence.md
+    sha256: 00c5a484db212dd3e3de34353b5b25c2dc8df5a34e14fb4a00b197e21a86da79
+  - path: docs/methods/numerical-robustness-policy.md
+    sha256: 7911d22ad80624c582e0b788702a0e9380b0897cec008c151a7b0ef79e8c988c
+  - path: docs/reports/2026-08-12-curvature-estimator-study.md
+    sha256: 975bce56f89b27d46e8521aa1c146d9bbfa18483b3b82c00af2dc6cb614e7b88
+  - path: src/geometry/Geometry.HalfedgeMesh.Curvature.cpp
+    sha256: 8805f089f38ea6f33f4d2949397bc739ee55928794e2039cadce19257d01b233
+  - path: src/geometry/Geometry.HalfedgeMesh.Curvature.cppm
+    sha256: 425a1d2ef03ea62678b7a41d3d36468c2011051d2351603d1abaa564ff41772b
+  - path: src/geometry/Geometry.HalfedgeMesh.DEC.cpp
+    sha256: 0a9dd2ebfad8fbdcd6b0acbe5d1f320e367ada71cb4d43762152f8809a18ff03
+  - path: src/geometry/Geometry.HalfedgeMesh.IO.cpp
+    sha256: 026de5dfb4a2c42cabc91237872e4ac798eaf65775a76626624caaab23b8b7a9
+  - path: src/geometry/Geometry.HalfedgeMesh.Smoothing.cpp
+    sha256: d0a325c2da70c29c6541a04046b1d18ae46a0dc71b54fe2ff8bc3010ee94507a
+  - path: src/geometry/Geometry.HalfedgeMesh.Smoothing.cppm
+    sha256: 91cdc02b1268184207bd0d6e11ca3cdccf65bfb5d85e5163b535645d0a9cc49f
+  - path: src/geometry/Geometry.HalfedgeMesh.Utils.cpp
+    sha256: ab3f80dd31a19cc594b8981a7251d4a83345e24324072810cf557843cf8d3680
+  - path: src/runtime/AssetWorkflow/Runtime.AssetWorkflowGeometryMaterialization.cpp
+    sha256: deec21fe4bfe7be09345da64fb38200e82f8b6ce8e3a411d0631b00b1729583d
+  - path: src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Mesh.cpp
+    sha256: 8bdf4d1f43727886245f2bdd7014009e2422a12ef366cc9e73275a0be0cee530
+  - path: src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.cppm
+    sha256: cc4a8c23605e68cd84b6c6be1536e99ab7b5ac79ec89f83f80ac0fcb2e1f5b40
+  - path: src/runtime/Editor/Operations/Runtime.VisualizationEditingOperations.Actions.cpp
+    sha256: da8fcd1e17528791e5788d3ace45f8049e123d3d95ac8d77f10e1016fb1e989d
+  - path: src/runtime/Editor/Runtime.EditorWorkspaceSnapshots.Models.cpp
+    sha256: 583a5ed2ef38c986ebbcbbfb5ea74592685d273c3d8c00fc513bcf2eb2fa362c
+  - path: src/runtime/GeometryIntegration/Runtime.GeometryPlanBuilders.Mesh.cpp
+    sha256: 63de858552ec19e7319adc3b1a7425f0222d54322a2a1f5266a2775727057375
+  - path: src/runtime/GeometryIntegration/Runtime.MeshSurfaceTopology.cpp
+    sha256: d039acf47f371d2405104be58264b0eca16cac50019876451b083a194032be9e
+  - path: src/runtime/GeometryIntegration/Runtime.MeshSurfaceTopology.cppm
+    sha256: 9aabe43048225ee2a142f20dbbe02e4b216761fdb307d36d1c6c86921a4c5573
+  - path: src/runtime/Modules/TextureBake/Runtime.TextureBakeModule.cpp
+    sha256: a8ec9f63aac0ba7732104675848afaea0f9507dd0abc55a9c75ee5406cbd4246
+  - path: src/runtime/README.md
+    sha256: 20224d6b735bc1133bafdb9cef53b3e5c67382425a9d34345140a3d3cb1de7e9
+  - path: src/runtime/Rendering/Runtime.RenderExtraction.Geometry.cpp
+    sha256: 37b0ff2b2b2c3fd4b97475c2abab876ce95993b7b06ffb33f99f5429942c965f
+  - path: src/runtime/Scene/Runtime.SceneSerialization.cpp
+    sha256: 3367bca928d6338ac943652cee13a3e9d9517a506fe0aca3d21abd50218fd518
+  - path: tasks/SESSION-BRIEF.md
+    sha256: 5fd03c85b23b2435af0e31efb0a0938dbb1417fd350c54476f408cb6b8c660c5
+  - path: tasks/active/BUG-154-curvature-pmp-parity-corner-normal-topology.md
+    sha256: ef49082f0d2d6dcd990e9c185d56eff41acccc93e34fd7ee52ba2d58e39338c8
+  - path: tasks/active/README.md
+    sha256: ffad40cf575974504764f3b346e3e88411ab57da5a0994de4458714c5f0b4a73
+  - path: tasks/backlog/bugs/BUG-155-vulkan-native-timestamp-zero-duration-flake.md
+    sha256: d640a82a91ec3ae21f0ddc8161b4f64f011405c1261fbc664692d9faab385c3f
+  - path: tasks/backlog/bugs/index.md
+    sha256: 8f57f5941f290b9b6cb214f07020a2638f9f6808d1eda604650cd82a73c14b0a
+  - path: tests/contract/runtime/Test.AssetImportFormatCoverage.cpp
+    sha256: 6fa202d936c7db24daf52f01d7e8fe414d0597b5ee4cf09ba7bf041cf801196f
+  - path: tests/contract/runtime/Test.CornerTexcoordUpload.cpp
+    sha256: 7544c2a97285fa3b2e40ef8430a0ce78101ed6f37a95123a4e1afa69486ff492
+  - path: tests/contract/runtime/Test.MeshGeometryExtraction.cpp
+    sha256: 6c9edf6f2babe383fffbee48ae985f02501a010b92fa3af8867c51c2a20d2a5a
+  - path: tests/contract/runtime/Test.RuntimeSceneSerialization.cpp
+    sha256: 1e5899654aacdd502856dcbe0d5bb00fa8b1b02082bfda596c28975a70305e9c
+  - path: tests/contract/runtime/Test.SandboxEditorMeshMethods.cpp
+    sha256: 9175ea8d0f0eaeedbb7a111d3b408dd3e02f308ae7242cfb224e3c3a35c37739
+  - path: tests/unit/geometry/Test.CurvatureTensor.cpp
+    sha256: b29431d6c0600a01a5612c5b0af719bdd2847d9266f99c3e1187b36b81b585c4
+  - path: tests/unit/geometry/Test.GeometryIO.cpp
+    sha256: 53737f05c4cf5bb3a02728b1b10f27157e75920e351d332ced6a2a5259f55c3e
+  - path: tests/unit/geometry/Test_Curvature.cpp
+    sha256: 3ec564f8aca52ff1a158d0f80713b6c6bbe6205e008866f033eb1c2e124242da
+  - path: tests/unit/geometry/Test_DEC.cpp
+    sha256: e83712540bbd06e62f656487c0497bc55d360096baf4da6b4cd2a2021c0b6c53
+  - path: tests/unit/geometry/Test_Smoothing.cpp
+    sha256: c559a385c2f1d12138e6f7183f686410fc6a8bc7fff0932dea4d9bc9cea28b61
+  - path: tools/agents/skills/intrinsicengine-import-visibility-contract/SKILL.md
+    sha256: 1ae9205b225b5644c53c20b71cb4be1fbfde2223e55cd8cf34f9dee2bb3f62a5
+  - path: tools/diagnostics/CMakeLists.txt
+    sha256: a65b876f86e539c3822a7238450275739b0a3e3e5af94ec9a012d694a0e2ad4a
+  - path: tools/diagnostics/curvature/IntrinsicCurvatureCorpusProbe.cpp
+    sha256: 19bde74704f5869c98367c29f50ae81420142f6805f63d7d331fc11b4e3f19cf
+  - path: tools/diagnostics/curvature/PmpCurvatureCorpusProbe.cpp
+    sha256: f2ad77a7b0382f8d854c308d84fad8cec23b87b0e869313434405e3bd5b42f58
+  - path: tools/diagnostics/curvature/README.md
+    sha256: a4429bcfe5da94af0fc438cadfd951387f7cf7d7b55b9db28f2eea41f2af3db5
+  - path: tools/diagnostics/curvature/compare_curvature_corpus.py
+    sha256: 4e3096bfd67a19e49c504eebeffaff080e75e7e637612467f6d37b498fd1b67c
+  content_digest: 9e0e83832b51a9a034e4f875e9da50073b298ebbda3e57b501064f37e96a8a8f
+touched:
+  paths:
+  - CMakeLists.txt
+  - ara/evidence/README.md
+  - ara/evidence/tables/curvature_pmp_diagnostic_2026-08-11.md
+  - ara/logic/claims.md
+  - ara/logic/solution/architecture.md
+  - ara/staging/observations.yaml
+  - ara/trace/exploration_tree.yaml
+  - ara/trace/pm_reasoning_log.yaml
+  - ara/trace/sessions/2026-08-11_001.yaml
+  - ara/trace/sessions/2026-08-12_001.yaml
+  - ara/trace/sessions/session_index.yaml
+  - docs/architecture/geometry-api-style.md
+  - docs/architecture/geometry.md
+  - docs/architecture/property-coherence.md
+  - docs/methods/numerical-robustness-policy.md
+  - docs/reports/2026-08-12-curvature-estimator-study.md
+  - src/geometry/Geometry.HalfedgeMesh.Curvature.cpp
+  - src/geometry/Geometry.HalfedgeMesh.Curvature.cppm
+  - src/geometry/Geometry.HalfedgeMesh.DEC.cpp
+  - src/geometry/Geometry.HalfedgeMesh.IO.cpp
+  - src/geometry/Geometry.HalfedgeMesh.Smoothing.cpp
+  - src/geometry/Geometry.HalfedgeMesh.Smoothing.cppm
+  - src/geometry/Geometry.HalfedgeMesh.Utils.cpp
+  - src/runtime/AssetWorkflow/Runtime.AssetWorkflowGeometryMaterialization.cpp
+  - src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Mesh.cpp
+  - src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.cppm
+  - src/runtime/Editor/Operations/Runtime.VisualizationEditingOperations.Actions.cpp
+  - src/runtime/Editor/Runtime.EditorWorkspaceSnapshots.Models.cpp
+  - src/runtime/GeometryIntegration/Runtime.GeometryPlanBuilders.Mesh.cpp
+  - src/runtime/GeometryIntegration/Runtime.MeshSurfaceTopology.cpp
+  - src/runtime/GeometryIntegration/Runtime.MeshSurfaceTopology.cppm
+  - src/runtime/Modules/TextureBake/Runtime.TextureBakeModule.cpp
+  - src/runtime/README.md
+  - src/runtime/Rendering/Runtime.RenderExtraction.Geometry.cpp
+  - src/runtime/Scene/Runtime.SceneSerialization.cpp
+  - tasks/SESSION-BRIEF.md
+  - tasks/active/BUG-154-curvature-pmp-parity-corner-normal-topology.md
+  - tasks/active/README.md
+  - tasks/backlog/bugs/BUG-155-vulkan-native-timestamp-zero-duration-flake.md
+  - tasks/backlog/bugs/index.md
+  - tests/contract/runtime/Test.AssetImportFormatCoverage.cpp
+  - tests/contract/runtime/Test.CornerTexcoordUpload.cpp
+  - tests/contract/runtime/Test.MeshGeometryExtraction.cpp
+  - tests/contract/runtime/Test.RuntimeSceneSerialization.cpp
+  - tests/contract/runtime/Test.SandboxEditorMeshMethods.cpp
+  - tests/unit/geometry/Test.CurvatureTensor.cpp
+  - tests/unit/geometry/Test.GeometryIO.cpp
+  - tests/unit/geometry/Test_Curvature.cpp
+  - tests/unit/geometry/Test_DEC.cpp
+  - tests/unit/geometry/Test_Smoothing.cpp
+  - tools/agents/skills/intrinsicengine-import-visibility-contract/SKILL.md
+  - tools/diagnostics/CMakeLists.txt
+  - tools/diagnostics/curvature/IntrinsicCurvatureCorpusProbe.cpp
+  - tools/diagnostics/curvature/PmpCurvatureCorpusProbe.cpp
+  - tools/diagnostics/curvature/README.md
+  - tools/diagnostics/curvature/compare_curvature_corpus.py
+  layers:
+  - geometry
+  - runtime
+  modules:
+  - Extrinsic.Runtime.MeshSurfaceTopology
+  - Geometry.Curvature
+  - Geometry.MeshIO
+  - Geometry.Smoothing
+extension_seam: Existing halfedge property stores and runtime GeometryUploadPlan; no new backend or service
+  seam
+future_change_plan: Add canonical value overloads only when the public geometry property catalog admits
+  them; any estimator variant or tuning axis requires a separately reviewed config-lane task and controlled
+  accuracy benchmark
+acceptance:
+- criterion: The 259-position authored-face-normal bunny imports as one connected
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: Curvature scalar output matches the PMP reference within the declared
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: The reusable smoother behaves identically for supported scalar and
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: Corner normals survive OBJ load/write/materialization and control render
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: Zero-support curvature cannot be mistaken for a successful informative
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: Degenerate/ill-conditioned support cannot diffuse through smoothing;
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: Required CPU, sanitizer, structural, documentation, and promoted-Vulkan
+  task_checked: false
+  disposition: pending
+  evidence: []
+  reason: null
+- criterion: Independent fixed-surface review accepts the final high-risk revision.
+  task_checked: false
+  disposition: pending
+  evidence: []
+  reason: null
+commands:
+- receipt: tasks/evidence/BUG-154/commands/clean-workshop.json
+- receipt: tasks/evidence/BUG-154/commands/final-ci-asan.json
+- receipt: tasks/evidence/BUG-154/commands/final-ci-cpu.json
+- receipt: tasks/evidence/BUG-154/commands/final-ci-ubsan.json
+- receipt: tasks/evidence/BUG-154/commands/final-ci-vulkan-applicable.json
+- receipt: tasks/evidence/BUG-154/commands/final-ci-vulkan-rerun.json
+- receipt: tasks/evidence/BUG-154/commands/final-ci-vulkan.json
+- receipt: tasks/evidence/BUG-154/commands/final-clean-workshop.json
+- receipt: tasks/evidence/BUG-154/commands/focused-regressions.json
+changed_public_contracts:
+- CotanSmoothVertexProperty supports float, double, and glm::vec2/vec3/vec4 vertex properties with simultaneous
+  damped nonnegative-cotan updates, optional active support, and fail-before-mutation validation
+- Principal curvature follows the selected PMP signed 3x3, interior-support, boundary-interpolation, and
+  three-pass smoothing formulation with explicit finite support diagnostics
+- OBJ authored normal discontinuities publish as h:normal and affect only runtime GPU shading-tuple expansion,
+  never authoritative owning topology
+diagnostics_and_previews:
+- 96-model deterministic corpus sample compared 80 payload-bearing models and 2,530,726 vertices; clean-support
+  median relative L2 was approximately 4e-8 and all material outliers localized to rejected degenerate
+  or ill-conditioned support
+- Final CPU passed 4252/4252; isolated ASan and UBSan each passed 2744/2744; task-specific promoted-Vulkan
+  normal-path cases passed 2/2
+- The complete promoted-Vulkan cohort passed once, then two repeats failed only the unrelated native-timestamp
+  zero-duration assertion; BUG-155 preserves the failure and owns diagnosis
+benchmark_or_parity_evidence:
+- Pinned local PMP revision and matched Clang 23 probes establish numerical parity; four-model timings
+  are explicitly machine-local non-claim evidence
+docs_sync:
+  task_file: tasks/active/BUG-154-curvature-pmp-parity-corner-normal-topology.md
+  session_brief_present: true
+  canonical_docs_changed: true
+  skill_mirrors_checked: true
+residual_risks:
+- Independent fixed-surface review is pending, so this report is deliberately draft and BUG-154 remains
+  active
+- BUG-155 blocks a stable complete promoted-Vulkan cohort even though all BUG-154-specific Vulkan visibility/readback
+  cases pass
+- The reusable operation is vertex-domain cotan diffusion only; arbitrary domains, non-manifold guarantees,
+  and public glm::dvec properties remain out of scope
+skipped_checks:
+- check: claim-grade-performance
+  reason: The matched local timing probe is non-claim evidence; no performance win is asserted
+artifacts:
+- path: docs/reports/2026-08-12-curvature-estimator-study.md
+  sha256: 975bce56f89b27d46e8521aa1c146d9bbfa18483b3b82c00af2dc6cb614e7b88
+  kind: file
+- path: ara/evidence/tables/curvature_pmp_diagnostic_2026-08-11.md
+  sha256: 7a69390adbf9997d77050fa8e7c072afe88db3ffcae6ccfbd185109a315a4ab6
+  kind: file
+- path: tools/diagnostics/curvature/README.md
+  sha256: a4429bcfe5da94af0fc438cadfd951387f7cf7d7b55b9db28f2eea41f2af3db5
+  kind: file
+self_review:
+  completed: true
+  scope_matches_task: true
+  layering_preserved: true
+  tests_and_docs_accounted_for: true
+  mechanical_and_semantic_changes_separated: true
+handoff: tasks/evidence/BUG-154/handoff.jsonl
+review: tasks/evidence/BUG-154/reviews.jsonl

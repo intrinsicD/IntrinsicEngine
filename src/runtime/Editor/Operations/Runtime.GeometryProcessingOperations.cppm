@@ -1,3 +1,5 @@
+// Exposes validated runtime geometry-processing commands, queued requests, and
+// publication diagnostics shared by editor, config, and programmatic callers.
 module;
 
 #include <cstddef>
@@ -426,6 +428,18 @@ export namespace Extrinsic::Runtime
         bool DirectionsAvailable{true};
         bool DirectionsPublished{false};
         std::size_t VertexSlotCount{0u};
+        // Estimator support is distinct from finite publication count: a
+        // supported flat vertex may be zero, while zero supported vertices
+        // means the operation produced no informative field.
+        std::size_t SupportedVertexCount{0u};
+        std::size_t NonZeroPrincipalVertexCount{0u};
+        double MinimumPrincipalValue{0.0};
+        double MaximumPrincipalValue{0.0};
+        std::size_t DegenerateFaceCount{0u};
+        std::size_t IllConditionedFaceCount{0u};
+        std::size_t UnsupportedFaceCount{0u};
+        double MinimumTriangleQuality{0.0};
+        double TriangleQualityThreshold{0.0};
         std::size_t ScalarPropertyCount{0u};
         std::size_t ScalarWrittenCount{0u};
         // BUG-145: `ScalarWrittenCount` is `mean.size() + gaussian.size()`, a

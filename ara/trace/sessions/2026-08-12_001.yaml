@@ -1,0 +1,90 @@
+session:
+  id: "2026-08-12_001"
+  date: "2026-08-12"
+  started: "2026-08-12T02:56+02:00"
+  last_turn: "2026-08-12T02:56+02:00"
+  turn_count: 1
+  summary: "Validated PMP curvature across the local OBJ corpus, retained it as the clean-mesh baseline after primary-literature review, completed CPU/sanitizer evidence, and isolated an unrelated repeat-only Vulkan timestamp flake as BUG-155."
+
+events_logged:
+  - turn: 1
+    type: experiment
+    id: "N426"
+    routing: direct
+    provenance: ai-executed
+    summary: "Compared 80 payload-bearing meshes and 2,530,726 vertices; clean support retained near-roundoff PMP parity and material outliers localized to rejected geometry."
+  - turn: 1
+    type: decision
+    id: "N427"
+    routing: direct
+    provenance: ai-executed
+    summary: "Retained PMP parity as the clean-mesh baseline and deferred any estimator backend axis to a controlled Rusinkiewicz/corrected-measure comparison."
+  - turn: 1
+    type: experiment
+    id: "N428"
+    routing: direct
+    provenance: ai-executed
+    summary: "Passed 4252 CPU, 2744 ASan, 2744 UBSan, strict repository, and two task-specific Vulkan cases; repeated full Vulkan exposed only a native-timestamp zero-duration flake."
+  - turn: 1
+    type: dead_end
+    id: "N429"
+    routing: direct
+    provenance: ai-executed
+    summary: "Rejected one initial 54/54 Vulkan cohort as repeatability proof after two identical 53/54 reruns failed the same timestamp assertion."
+  - turn: 1
+    type: decision
+    id: "N430"
+    routing: direct
+    provenance: ai-executed
+    summary: "Opened BUG-155 and left BUG-154's complete Vulkan gate unresolved instead of retrying, quarantining, or widening the curvature implementation."
+  - turn: 1
+    type: observation
+    id: "O153"
+    routing: crystallized
+    provenance: ai-suggested
+    summary: "Staged and crystallized the literature-backed conclusion that estimator choice depends on mesh regime."
+  - turn: 1
+    type: claim
+    id: "C49"
+    routing: crystallized
+    provenance: ai-suggested
+    summary: "Crystallized the bounded estimator-selection conclusion through commitment of the corpus/literature report."
+
+ai_actions:
+  - turn: 1
+    action: "Implemented scale-independent quality gating and reusable masked smoothing, ran the 96-model PMP differential and scale/direction/timing probes, completed primary-literature synthesis, refreshed CPU/ASan/UBSan/Vulkan/structural evidence, and preserved the repeated timestamp failure as BUG-155."
+    provenance: ai-executed
+    files_changed:
+      - "src/geometry/Geometry.HalfedgeMesh.Curvature.cpp"
+      - "src/geometry/Geometry.HalfedgeMesh.Smoothing.cpp"
+      - "src/geometry/Geometry.HalfedgeMesh.DEC.cpp"
+      - "src/geometry/Geometry.HalfedgeMesh.Utils.cpp"
+      - "tools/diagnostics/curvature/"
+      - "docs/reports/2026-08-12-curvature-estimator-study.md"
+      - "tasks/active/BUG-154-curvature-pmp-parity-corner-normal-topology.md"
+      - "tasks/backlog/bugs/BUG-155-vulkan-native-timestamp-zero-duration-flake.md"
+
+claims_touched:
+  - id: C48
+    action: advanced
+    turn: 1
+  - id: C49
+    action: created
+    turn: 1
+
+key_context:
+  - turn: 1
+    excerpt: "Across 62 comparable meshes without rejected triangles, worst PMP-relative L2 errors were 4.55e-7 for kmin and 2.23e-7 for kmax."
+  - turn: 1
+    excerpt: "The literature does not support a universally best estimator; PMP remains the clean baseline pending one matched accuracy, robustness, directions, time, and memory study."
+  - turn: 1
+    excerpt: "A first 54/54 Vulkan pass was not repeatable: two full reruns failed only the native-timestamp zero-duration assertion, while isolated x3 and all BUG-154-specific GPU cases passed."
+
+open_threads:
+  - "Diagnose BUG-155 with raw query ticks, availability, slot/submission, valid-bit, and timestamp-period evidence; do not retry or clamp it away."
+  - "Obtain a label-distinct fixed-surface review for BUG-154 after the complete promoted-Vulkan dependency is restored."
+  - "Run a controlled common-corpus comparison of PMP, Rusinkiewicz, and corrected measures before introducing a curvature backend axis."
+  - "Keep METHOD-037 cpu_reference_v1 as the production curvature-segmentation selector until its separate candidate-v2 protocol passes."
+
+ai_suggestions_pending:
+  - "Evaluate Rusinkiewicz first as the smallest interactive irregular-mesh alternative, but include corrected measures in the same frozen accuracy/robustness benchmark before adoption."

@@ -15,12 +15,35 @@ import Geometry.HalfedgeMesh;
 
 export namespace Geometry::Curvature
 {
+    // Dimensionless twice-area / longest-edge-squared floor for float-position
+    // triangles. This is sqrt(float epsilon), rounded conservatively: below it,
+    // inverse-area cotan/tensor terms amplify position roundoff beyond the same
+    // sqrt-epsilon budget, so principal values/directions are not published.
+    inline constexpr double kMinimumReliableTriangleQuality = 3.5e-4;
+
     struct VertexCurvature
     {
         double MeanCurvature{0.0};
         double GaussianCurvature{0.0};
         double MinPrincipalCurvature{0.0};
         double MaxPrincipalCurvature{0.0};
+    };
+
+    struct CurvatureDiagnostics
+    {
+        // Vertices whose interior tensor support, or boundary interpolation
+        // from such support, was numerically valid. A supported flat vertex
+        // can still carry exactly zero curvature.
+        std::size_t SupportedVertexCount{0};
+        std::size_t NonZeroPrincipalVertexCount{0};
+        double MinimumPrincipalValue{0.0};
+        double MaximumPrincipalValue{0.0};
+        std::size_t DegenerateFaceCount{0};
+        std::size_t IllConditionedFaceCount{0};
+        std::size_t UnsupportedFaceCount{0};
+        double MinimumTriangleQuality{0.0};
+        double TriangleQualityThreshold{
+            kMinimumReliableTriangleQuality};
     };
 
     struct CurvatureField
@@ -34,9 +57,11 @@ export namespace Geometry::Curvature
         VertexProperty<glm::vec3> MeanCurvatureNormalProperty{};
 
         // Unit tangent directions for maximum and minimum principal curvature.
-        // Unsupported degenerate/flat vertices receive zero-vector sentinels.
+        // Supported flat vertices and unsupported degenerate vertices receive
+        // zero-vector sentinels.
         VertexProperty<glm::vec3> PrincipalDir1Property{};
         VertexProperty<glm::vec3> PrincipalDir2Property{};
+        CurvatureDiagnostics Diagnostics{};
     };
 
     struct CurvatureTensorResult
@@ -45,6 +70,7 @@ export namespace Geometry::Curvature
         VertexProperty<glm::vec3> PrincipalDir2Property{};
         VertexProperty<double> MaxPrincipalCurvatureProperty{};
         VertexProperty<double> MinPrincipalCurvatureProperty{};
+        CurvatureDiagnostics Diagnostics{};
     };
 
     struct MeanCurvatureResult
@@ -92,20 +118,30 @@ export namespace Geometry::Curvature
     // For each interior edge e, forms the signed hinge contribution
     //   M_e = beta_e (|e|/2) t_e t_e^T,
     // then sums incident contributions over the vertex plus its one-ring
-    // neighbours and divides by their mixed area. The tensor is restricted to
-    // the oriented vertex tangent plane before a closed-form 2x2 decomposition.
+    // neighbours and divides by their mixed area. A signed symmetric 3x3
+    // Jacobi decomposition identifies the tensor-normal eigenvalue by minimum
+    // absolute magnitude, matching the PMP reference scalar formulation.
     // A hinge measures bend across its edge while M_e stores the edge tangent,
     // so each eigenvalue is paired with the complementary tangent eigenvector.
-    // Three deterministic nonnegative-cotan passes smooth the principal values;
-    // directions remain the unsmoothed tensor basis. Outward convex curvature is
-    // positive. Reversing orientation negates curvature along each physical
-    // direction, swapping the algebraically ordered max/min slots when they
-    // differ.
+    // Boundary scalars are first interpolated uniformly from non-boundary
+    // neighbours. Three simultaneous nonnegative-cotan passes then apply
+    // `new = 0.5*old + 0.5*weighted-neighbour-average` through the reusable
+    // property smoother. Directions remain the unsmoothed tensor basis and use
+    // the geometric normal to resolve zero-eigenvalue ambiguity. Outward convex
+    // curvature is positive. Reversing orientation negates curvature along each
+    // physical direction, swapping the algebraically ordered max/min slots when
+    // they differ.
     //
-    // Supported boundary vertices use interior hinges in this two-ring support.
-    // Deleted, isolated, flat, zero-area, degenerate, or non-finite support fails
-    // closed to finite zero values and zero-vector directions. Empty/no-face
-    // meshes return nullopt. Storage is O(V + E + F). Runtime is linear for
+    // Interior centers exclude boundary support samples; supported boundary
+    // vertices inherit scalars and line directions from valid interior
+    // neighbours. Triangle conditioning is measured by the scale-independent
+    // ratio 2A/l_max^2. Degenerate, non-triangular, non-finite, or sub-threshold
+    // faces invalidate their incident support and the one-ring tensor centers
+    // that consume it. Those vertices retain finite zero sentinels and are
+    // excluded as smoothing sources, preventing unreliable spikes from
+    // diffusing into the valid field. Supported flat vertices retain zero
+    // scalars and directions. Empty/no-face meshes return nullopt. Storage is
+    // O(V + E + F). Runtime is linear for
     // bounded-valence meshes and O(F + E + Σ_v degree(v)²) without that
     // assumption because the reference two-ring quadrature revisits support
     // vertices' incident edges.

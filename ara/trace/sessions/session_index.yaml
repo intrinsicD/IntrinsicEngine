@@ -281,8 +281,15 @@ sessions:
     open_threads: 3
   - id: "2026-08-11_001"
     date: "2026-08-11"
-    summary: "Advanced METHOD-038 through independently audited fold, cylinder, and smooth-transition fixture controls with complete unsanitized and sanitizer CPU verification."
-    turn_count: 3
-    events_count: 13
-    claims_touched: [C41, C42, C43]
-    open_threads: 3
+    summary: "Advanced curvature-segmentation controls, diagnosed the failed raw-curvature workflow, and implemented the PMP-parity/corner-normal repair through full CPU, sanitizer, and Vulkan verification."
+    turn_count: 5
+    events_count: 29
+    claims_touched: [C41, C42, C43, C46, C47, C48]
+    open_threads: 4
+  - id: "2026-08-12_001"
+    date: "2026-08-12"
+    summary: "Validated PMP curvature across the local OBJ corpus, retained it as the clean-mesh baseline after primary-literature review, completed CPU/sanitizer evidence, and isolated an unrelated repeat-only Vulkan timestamp flake as BUG-155."
+    turn_count: 1
+    events_count: 7
+    claims_touched: [C48, C49]
+    open_threads: 4

@@ -116,6 +116,55 @@ TEST(Curvature_GaussianCurvature, Tetrahedron_GaussBonnet)
     }
 }
 
+TEST(Curvature_ScalarOperators, RemainScaleInvariantAtExtremeScales)
+{
+    auto unit = MakeIcosahedron();
+    auto tiny = MakeIcosahedron();
+    auto huge = MakeIcosahedron();
+    for (std::size_t i = 0u; i < unit.VerticesSize(); ++i)
+    {
+        const Geometry::VertexHandle vertex{
+            static_cast<Geometry::PropertyIndex>(i)};
+        tiny.Position(vertex) *= 1.0e-6f;
+        huge.Position(vertex) *= 1.0e6f;
+    }
+
+    auto unitMean = Geometry::Curvature::ComputeMeanCurvature(unit);
+    auto tinyMean = Geometry::Curvature::ComputeMeanCurvature(tiny);
+    auto hugeMean = Geometry::Curvature::ComputeMeanCurvature(huge);
+    auto unitGaussian = Geometry::Curvature::ComputeGaussianCurvature(unit);
+    auto tinyGaussian = Geometry::Curvature::ComputeGaussianCurvature(tiny);
+    auto hugeGaussian = Geometry::Curvature::ComputeGaussianCurvature(huge);
+    ASSERT_TRUE(unitMean.has_value());
+    ASSERT_TRUE(tinyMean.has_value());
+    ASSERT_TRUE(hugeMean.has_value());
+    ASSERT_TRUE(unitGaussian.has_value());
+    ASSERT_TRUE(tinyGaussian.has_value());
+    ASSERT_TRUE(hugeGaussian.has_value());
+
+    for (std::size_t i = 0u; i < unit.VerticesSize(); ++i)
+    {
+        const Geometry::VertexHandle vertex{
+            static_cast<Geometry::PropertyIndex>(i)};
+        EXPECT_NEAR(
+            unitMean->Property[vertex],
+            1.0e-6 * tinyMean->Property[vertex],
+            3.0e-5);
+        EXPECT_NEAR(
+            unitMean->Property[vertex],
+            1.0e6 * hugeMean->Property[vertex],
+            3.0e-5);
+        EXPECT_NEAR(
+            unitGaussian->Property[vertex],
+            1.0e-12 * tinyGaussian->Property[vertex],
+            5.0e-5);
+        EXPECT_NEAR(
+            unitGaussian->Property[vertex],
+            1.0e12 * hugeGaussian->Property[vertex],
+            5.0e-5);
+    }
+}
+
 // =============================================================================
 // ComputeCurvature — icosahedron symmetry
 // =============================================================================

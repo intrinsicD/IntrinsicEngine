@@ -9812,3 +9812,279 @@ tree:
       parameterization, GPU/Vulkan, or novelty claim follows. METHOD-040 owns
       the separately scoped global multicut attempt.
     status: resolved
+  - id: N418
+    type: question
+    title: "Locate the post-BUG-153 curvature failure against PMP"
+    provenance: user
+    timestamp: "2026-08-11T20:47+02:00"
+    description: >
+      The previous curvature repair still fails in the live workflow. Determine
+      whether the defect is in the estimator, smoothing, a solver, import/runtime
+      integration, or another seam by comparing current IntrinsicEngine behavior
+      with the local PMP reference implementation.
+    status: resolved
+  - id: N419
+    type: experiment
+    title: "Isolate authored OBJ normals from geometric curvature topology"
+    provenance: ai-executed
+    timestamp: "2026-08-11T20:47+02:00"
+    also_depends_on: [N418]
+    evidence:
+      - "ara/evidence/tables/curvature_pmp_diagnostic_2026-08-11.md"
+      - "src/geometry/Geometry.HalfedgeMesh.IO.cpp"
+      - "src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Mesh.cpp"
+      - "tasks/evidence/BUG-153/artifacts/live-sandbox.log"
+      - "/home/alex/Dropbox/Work/Datasets/obj/bunny_decimated.obj"
+    result: >
+      The 259-position, 495-face bunny uses a distinct authored normal index per
+      face. PMP retained 259 vertices, 27 boundary vertices, and 259 nonzero
+      curvature slots. Intrinsic's position/normal/texcoord OBJ key expanded it
+      to 1485 vertices, made every vertex boundary, and returned identically zero
+      principal curvatures. Removing only the normal records and rebinding faces
+      to position indices restored 259 vertices, 27 boundary vertices, and 259
+      nonzero slots. This controlled differential isolates adjacency loss at OBJ
+      materialization as the dominant live bunny failure.
+    status: resolved
+  - id: N420
+    type: experiment
+    title: "Compare Intrinsic and PMP curvature smoothing operators"
+    provenance: ai-executed
+    timestamp: "2026-08-11T20:47+02:00"
+    also_depends_on: [N418, N419]
+    evidence:
+      - "ara/evidence/tables/curvature_pmp_diagnostic_2026-08-11.md"
+      - "src/geometry/Geometry.HalfedgeMesh.Curvature.cpp"
+      - "/home/alex/Documents/Engine24/ext/pmp-library/src/pmp/algorithms/curvature.cpp"
+    result: >
+      A manual three-pass update retaining one half of each old value matched
+      PMP to approximately 2.5e-8 relative L2. Intrinsic instead replaces each
+      value with the full cotangent-weighted neighbor average. On the connected
+      armadillo this operator substitution accounted for 21.65 percent relative
+      L2 in kmin and 12.34 percent in kmax; applying Intrinsic's operator to PMP
+      raw values reduced the remaining Intrinsic/PMP discrepancy to 5.10 and
+      2.57 percent. Both implementations use explicit updates, not a solve.
+    status: resolved
+  - id: N421
+    type: experiment
+    title: "Measure estimator and boundary differences after topology isolation"
+    provenance: ai-executed
+    timestamp: "2026-08-11T20:47+02:00"
+    also_depends_on: [N418, N419, N420]
+    evidence:
+      - "ara/evidence/tables/curvature_pmp_diagnostic_2026-08-11.md"
+      - "src/geometry/Geometry.HalfedgeMesh.Curvature.cpp"
+      - "/home/alex/Documents/Engine24/ext/pmp-library/src/pmp/algorithms/curvature.cpp"
+    result: >
+      Connected-armadillo final values differed from PMP by 22.998 percent
+      relative L2 for kmin and 12.730 percent for kmax, with 1720 and 278 sign
+      disagreements. Smooth sphere controls hid the mismatch at 0.189 and
+      0.176 percent. On the open hemisphere, boundary kmin differed by 18.20
+      percent because Intrinsic directly projects a 3x3 tensor into a 2x2
+      tangent basis and computes boundary slots, while PMP diagonalizes the 3x3
+      tensor and interpolates boundary values from the interior. The freshly
+      rebuilt current focused curvature suite still passed 23 of 23 tests.
+    status: resolved
+  - id: N422
+    type: dead_end
+    title: "Reject a curvature linear-solver failure"
+    provenance: ai-executed
+    timestamp: "2026-08-11T20:47+02:00"
+    also_depends_on: [N418, N420]
+    hypothesis: >
+      A numerical linear solver or factorization defect causes the previous
+      curvature fix to fail.
+    failure_mode: >
+      Source tracing and the matched smoothing probe found no linear-system
+      assembly, factorization, or iterative solver in either curvature path.
+      PMP and Intrinsic both perform explicit local tensor accumulation and
+      explicit smoothing; their smoothing stencils differ algebraically.
+    lesson: >
+      Diagnose curvature failures first through imported adjacency, support
+      counts, scalar ranges, and the exact explicit smoothing operator. Solver
+      tolerances and conditioning are not control variables in this path.
+    evidence:
+      - "N419"
+      - "N420"
+      - "ara/evidence/tables/curvature_pmp_diagnostic_2026-08-11.md"
+    status: resolved
+  - id: N423
+    type: decision
+    title: "Implement the complete PMP curvature and corner-normal repair"
+    provenance: user
+    timestamp: "2026-08-11T23:13+02:00"
+    also_depends_on: [N419, N420, N421, N422]
+    choice: >
+      Implement the diagnosed topology, estimator, boundary, and smoothing
+      corrections, and expose the smoothing operation as a reusable contract
+      for canonical floating-point scalar and vector vertex properties.
+    alternatives:
+      - "Patch only curvature output while leaving OBJ normal seams in owning topology."
+      - "Retain the Intrinsic estimator variant instead of matching PMP."
+      - "Add a solver or selectable backend to a local explicit algorithm."
+    evidence:
+      - "User direction: implement these fixes; smoothing should be reusable for all other floating point or vector properties"
+      - "tasks/active/BUG-154-curvature-pmp-parity-corner-normal-topology.md"
+    status: resolved
+  - id: N424
+    type: experiment
+    title: "Implement and exercise BUG-154's exact curvature and import repair"
+    provenance: ai-executed
+    timestamp: "2026-08-11T23:13+02:00"
+    also_depends_on: [N419, N420, N421, N423]
+    evidence:
+      - "src/geometry/Geometry.HalfedgeMesh.Curvature.cpp"
+      - "src/geometry/Geometry.HalfedgeMesh.Smoothing.cpp"
+      - "src/geometry/Geometry.HalfedgeMesh.IO.cpp"
+      - "src/runtime/GeometryIntegration/Runtime.MeshSurfaceTopology.cpp"
+      - "tests/unit/geometry/Test.CurvatureTensor.cpp"
+      - "tests/unit/geometry/Test_Smoothing.cpp"
+      - "tests/unit/geometry/Test.GeometryIO.cpp"
+      - "tests/contract/runtime/Test.MeshGeometryExtraction.cpp"
+      - "ara/evidence/tables/curvature_pmp_diagnostic_2026-08-11.md"
+    result: >
+      The repair removes authored normal identity from OBJ owning topology,
+      retains discontinuous/non-lockstep normals as h:normal, carries them
+      through persistence and runtime materialization, and performs only GPU
+      shading-tuple expansion. Curvature now uses PMP's signed symmetric 3x3
+      eigensystem, interior support, boundary interpolation, and three damped
+      nonnegative-cotan passes through a reusable float/double/vec2/vec3/vec4
+      vertex-property smoother. The 25-slot PMP oracle passes at 2e-6, the
+      original bunny materializes 259 vertices and 495 faces, and zero-support
+      runtime operations fail closed with explicit diagnostics.
+    status: resolved
+  - id: N425
+    type: experiment
+    title: "Verify BUG-154 across CPU, sanitizers, structure, and Vulkan"
+    provenance: ai-executed
+    timestamp: "2026-08-11T23:13+02:00"
+    also_depends_on: [N424]
+    evidence:
+      - "tasks/active/BUG-154-curvature-pmp-parity-corner-normal-topology.md"
+      - "ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60"
+      - "ctest --test-dir build/ci-asan --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --no-tests=error --timeout 60 --parallel 1"
+      - "ctest --test-dir build/ci-ubsan --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --no-tests=error --timeout 60 --parallel 1"
+      - "ctest --test-dir build/ci-vulkan --output-on-failure -L gpu -L vulkan --timeout 120"
+    result: >
+      The default CPU cohort had zero failures among 4247 selected tests; ASan
+      and UBSan each had zero failures among 2744 selected tests, with only the
+      policy-gated GLFW/LeakSanitizer capability skip. The promoted Vulkan
+      ASan+UBSan cohort passed 54/54, including exact normal-bake readback,
+      seam-split rendering, validation, and shutdown LeakSanitizer coverage.
+      Strict layering, test-layout, task, documentation, ARA, source-doc, and
+      clean-workshop checks passed. Independent high-risk fixed-surface review
+      remains the only retirement gate.
+    status: resolved
+  - id: N426
+    type: experiment
+    title: "Validate PMP curvature parity across the local OBJ corpus"
+    provenance: ai-executed
+    timestamp: "2026-08-12T02:56+02:00"
+    also_depends_on: [N424]
+    evidence:
+      - "docs/reports/2026-08-12-curvature-estimator-study.md"
+      - "tools/diagnostics/curvature/compare_curvature_corpus.py"
+      - "tools/diagnostics/curvature/README.md"
+      - "ara/evidence/tables/curvature_pmp_diagnostic_2026-08-11.md"
+    result: >
+      A deterministic size-stratified sample selected 96 of 1989 local OBJ
+      files and directly compared 80 payload-bearing meshes containing
+      2,530,726 vertices. Median full-field relative L2 errors were 4.15e-8 for
+      kmin and 3.31e-8 for kmax; among 62 meshes without rejected triangles,
+      worst errors were 4.55e-7 and 2.23e-7. Every material full-field outlier
+      localized to exactly degenerate or dimensionlessly ill-conditioned
+      support and its smoothing vicinity; 2,520,863 vertices beyond four rings
+      retained worst errors of 3.48e-6 and 3.25e-6. Scale controls retained
+      near-roundoff parity from 1e-6 through 1e3 and remained below 2.58e-6 at
+      1e6. One PMP result was non-finite while Intrinsic remained finite.
+    status: resolved
+  - id: N427
+    type: decision
+    title: "Retain PMP parity as the clean-mesh baseline"
+    provenance: ai-executed
+    timestamp: "2026-08-12T02:56+02:00"
+    also_depends_on: [N426]
+    choice: >
+      Keep the repaired PMP-compatible edge-dihedral estimator as the default
+      clean connected-mesh baseline. Do not replace it from reputation alone;
+      evaluate Rusinkiewicz finite differences and interpolated corrected
+      curvature measures under one controlled accuracy, direction, robustness,
+      time, and memory protocol before adding a backend axis.
+    alternatives:
+      - "Declare PMP universally best from local parity and timing alone."
+      - "Replace the default immediately without an in-engine matched benchmark."
+      - "Add multiple selectable estimators before a present second caller or validated control surface exists."
+    evidence:
+      - "docs/reports/2026-08-12-curvature-estimator-study.md"
+      - "N426"
+      - "C49"
+    status: resolved
+  - id: N428
+    type: experiment
+    title: "Refresh BUG-154 final-source execution and repository gates"
+    provenance: ai-executed
+    timestamp: "2026-08-12T02:56+02:00"
+    also_depends_on: [N424, N426]
+    evidence:
+      - "tasks/evidence/BUG-154/commands/final-ci-cpu.json"
+      - "tasks/evidence/BUG-154/commands/final-ci-asan.json"
+      - "tasks/evidence/BUG-154/commands/final-ci-ubsan.json"
+      - "tasks/evidence/BUG-154/commands/final-ci-vulkan-applicable.json"
+      - "tasks/evidence/BUG-154/commands/final-clean-workshop.json"
+      - "tasks/evidence/BUG-154/report.yaml"
+    result: >
+      Final current-source CPU passed 4252/4252 selected tests; isolated ASan
+      and UBSan each passed 2744/2744; task-specific promoted-Vulkan normal
+      visibility/readback passed 2/2; and strict layering, test layout, task,
+      documentation, ARA, source-documentation, workflow-evidence, generated
+      inventory, skill-sync, root-hygiene, and clean-workshop checks passed.
+      The complete promoted-Vulkan cohort passed once, then two identical
+      evidence reruns passed 53/54 and failed only a native timestamp row whose
+      present duration resolved to zero. That exact case passed three immediate
+      isolated repetitions; all other Vulkan cases, including validation and
+      shutdown LeakSanitizer coverage, remained green.
+    status: resolved
+  - id: N429
+    type: dead_end
+    title: "Reject one green Vulkan cohort as repeatability proof"
+    provenance: ai-executed
+    timestamp: "2026-08-12T02:56+02:00"
+    also_depends_on: [N425, N428]
+    hypothesis: >
+      The initial 54/54 promoted-Vulkan pass is sufficient evidence that the
+      complete final-source cohort is stable and BUG-154's only remaining gate
+      is independent review.
+    failure_mode: >
+      Two identical full-cohort reruns each failed the same
+      NativeGpuTimestampsResolveNamedPassesAfterSlotReuse strict-positive
+      duration assertion with a present zero value, despite immediate isolated
+      x3 passes and no source or binary change.
+    lesson: >
+      Preserve repeated-gate failures even when task-specific cases pass and a
+      retry turns green. Separate the unrelated harness/backend defect into a
+      bounded bug and leave the complete gate unresolved rather than weakening
+      or rewriting the evidence.
+    evidence:
+      - "tasks/evidence/BUG-154/commands/final-ci-vulkan.json"
+      - "tasks/evidence/BUG-154/commands/final-ci-vulkan-rerun.json"
+      - "tasks/backlog/bugs/BUG-155-vulkan-native-timestamp-zero-duration-flake.md"
+    status: resolved
+  - id: N430
+    type: decision
+    title: "Track the native timestamp flake separately as BUG-155"
+    provenance: ai-executed
+    timestamp: "2026-08-12T02:56+02:00"
+    also_depends_on: [N428, N429]
+    choice: >
+      Open BUG-155 with the failed full-cohort receipts, raw-query diagnostic
+      requirements, and no-retry/no-clamp constraints; make BUG-154 depend on
+      that complete-gate repair while retaining its green curvature-specific
+      CPU, sanitizer, corpus, structural, and Vulkan evidence.
+    alternatives:
+      - "Retry the complete gate until only a green receipt remains."
+      - "Quarantine or weaken the strict-positive timestamp assertion inside BUG-154."
+      - "Expand the curvature task into unrelated Vulkan profiler implementation work."
+    evidence:
+      - "tasks/backlog/bugs/BUG-155-vulkan-native-timestamp-zero-duration-flake.md"
+      - "tasks/active/BUG-154-curvature-pmp-parity-corner-normal-topology.md"
+      - "N429"
+    status: resolved

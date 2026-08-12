@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <cstdint>
 #include <limits>
@@ -225,6 +226,53 @@ TEST(CurvatureTensor, PrincipalCurvaturesScaleInverselyWithGeometry)
     }
 }
 
+TEST(CurvatureTensor, PrincipalCurvaturesRemainScaleInvariantAtExtremeScales)
+{
+    auto unit = MakeIcosphere(1.0f, 2);
+    auto tiny = MakeIcosphere(1.0f, 2);
+    auto huge = MakeIcosphere(1.0f, 2);
+    for (std::size_t i = 0u; i < unit.VerticesSize(); ++i)
+    {
+        const VertexHandle vertex{static_cast<PropertyIndex>(i)};
+        tiny.Position(vertex) *= 1.0e-6f;
+        huge.Position(vertex) *= 1.0e6f;
+    }
+    auto unitResult = Curv::ComputeCurvatureTensor(unit);
+    auto tinyResult = Curv::ComputeCurvatureTensor(tiny);
+    auto hugeResult = Curv::ComputeCurvatureTensor(huge);
+    ASSERT_TRUE(unitResult.has_value());
+    ASSERT_TRUE(tinyResult.has_value());
+    ASSERT_TRUE(hugeResult.has_value());
+    ASSERT_EQ(unit.VerticesSize(), tiny.VerticesSize());
+    ASSERT_EQ(unit.VerticesSize(), huge.VerticesSize());
+    EXPECT_EQ(
+        unitResult->Diagnostics.SupportedVertexCount,
+        tinyResult->Diagnostics.SupportedVertexCount);
+    EXPECT_EQ(
+        unitResult->Diagnostics.SupportedVertexCount,
+        hugeResult->Diagnostics.SupportedVertexCount);
+    EXPECT_EQ(tinyResult->Diagnostics.IllConditionedFaceCount, 0u);
+    EXPECT_EQ(hugeResult->Diagnostics.IllConditionedFaceCount, 0u);
+
+    for (std::size_t i = 0; i < unit.VerticesSize(); ++i)
+    {
+        const VertexHandle vertex{static_cast<PropertyIndex>(i)};
+        for (const auto values : {
+                 std::array{
+                     unitResult->MaxPrincipalCurvatureProperty[vertex],
+                     tinyResult->MaxPrincipalCurvatureProperty[vertex],
+                     hugeResult->MaxPrincipalCurvatureProperty[vertex]},
+                 std::array{
+                     unitResult->MinPrincipalCurvatureProperty[vertex],
+                     tinyResult->MinPrincipalCurvatureProperty[vertex],
+                     hugeResult->MinPrincipalCurvatureProperty[vertex]}})
+        {
+            EXPECT_NEAR(values[0], 1.0e-6 * values[1], 3.0e-5);
+            EXPECT_NEAR(values[0], 1.0e6 * values[2], 3.0e-5);
+        }
+    }
+}
+
 TEST(CurvatureTensor, ReversingOrientationFlipsSignedCurvature)
 {
     auto outward = MakeTetrahedron(false);
@@ -272,6 +320,60 @@ TEST(CurvatureTensor, ReversingOrientationSwapsAnisotropicOrderedPairs)
     EXPECT_GT(std::abs(glm::dot(
         outwardResult->PrincipalDir2Property[vertex],
         inwardResult->PrincipalDir1Property[vertex])), 0.999f);
+}
+
+TEST(CurvatureTensor, MatchesPmpTensorAndSmoothingOracle)
+{
+    auto mesh = MakeHeightGrid(
+        1.0,
+        4,
+        [](double x, double y)
+        {
+            return 0.15 * x * x - 0.08 * y * y + 0.05 * x * y + 0.03 * x;
+        });
+    auto result = Curv::ComputeCurvatureTensor(mesh);
+    ASSERT_TRUE(result.has_value());
+    EXPECT_EQ(result->Diagnostics.SupportedVertexCount, 25u);
+    EXPECT_EQ(result->Diagnostics.NonZeroPrincipalVertexCount, 25u);
+
+    // Generated from pmp-library's CurvatureAnalyzer::analyze_tensor with a
+    // two-ring neighbourhood and three post-smoothing steps on this exact mesh.
+    constexpr std::array<double, 25> expectedMinimum{
+        -0.29810872673988342, -0.29829162359237671, -0.29788762331008911,
+        -0.29596370458602905, -0.29512399435043335, -0.29851984977722168,
+        -0.29860851168632507, -0.29793629050254822, -0.29596918821334839,
+        -0.29515546560287476, -0.29901987314224243, -0.29885548353195190,
+        -0.29762744903564453, -0.29554596543312073, -0.29478919506072998,
+        -0.29874613881111145, -0.29869282245635986, -0.29760706424713135,
+        -0.29525029659271240, -0.29430866241455078, -0.29840597510337830,
+        -0.29840514063835144, -0.29746380448341370, -0.29501923918724060,
+        -0.29400658607482910};
+    constexpr std::array<double, 25> expectedMaximum{
+        0.16148681938648224, 0.16188250482082367, 0.16216836869716644,
+        0.16133323311805725, 0.16078929603099823, 0.16203495860099792,
+        0.16238139569759369, 0.16251479089260101, 0.16180033981800079,
+        0.16130009293556213, 0.16276261210441589, 0.16297620534896851,
+        0.16286219656467438, 0.16235083341598511, 0.16196011006832123,
+        0.16189183294773102, 0.16223013401031494, 0.16237723827362061,
+        0.16169497370719910, 0.16119705140590668, 0.16129149496555328,
+        0.16168102622032166, 0.16199369728565216, 0.16120360791683197,
+        0.16066427528858185};
+
+    ASSERT_EQ(mesh.VerticesSize(), expectedMinimum.size());
+    for (std::size_t i = 0; i < mesh.VerticesSize(); ++i)
+    {
+        const VertexHandle vertex{static_cast<PropertyIndex>(i)};
+        EXPECT_NEAR(
+            result->MinPrincipalCurvatureProperty[vertex],
+            expectedMinimum[i],
+            2.0e-6)
+            << "vertex " << i;
+        EXPECT_NEAR(
+            result->MaxPrincipalCurvatureProperty[vertex],
+            expectedMaximum[i],
+            2.0e-6)
+            << "vertex " << i;
+    }
 }
 
 // =============================================================================
@@ -419,6 +521,63 @@ TEST(CurvatureTensor, NonFiniteCornerOnClosedMeshFailsClosed)
     }
 }
 
+TEST(CurvatureTensor, IllConditionedFacesAreDiagnosedAndFailClosedLocally)
+{
+    constexpr int cells = 12;
+    auto mesh = MakeHeightGrid(
+        1.0,
+        cells,
+        [](double x, double y) { return 0.2 * (x * x + y * y); });
+    const int rowWidth = cells + 1;
+    const VertexHandle center{
+        static_cast<PropertyIndex>((cells / 2) * rowWidth + cells / 2)};
+    const VertexHandle right{center.Index + 1u};
+    mesh.Position(center) = mesh.Position(right) + glm::vec3(1.0e-6f, 0.0f, 0.0f);
+
+    auto result = Curv::ComputeCurvatureTensor(mesh);
+    ASSERT_TRUE(result.has_value());
+    EXPECT_EQ(result->Diagnostics.DegenerateFaceCount, 0u);
+    EXPECT_GT(result->Diagnostics.IllConditionedFaceCount, 0u);
+    EXPECT_LT(
+        result->Diagnostics.MinimumTriangleQuality,
+        Curv::kMinimumReliableTriangleQuality);
+    EXPECT_LT(result->Diagnostics.SupportedVertexCount, mesh.VertexCount());
+    EXPECT_GT(result->Diagnostics.SupportedVertexCount, 0u);
+
+    for (const VertexHandle invalid : {center, right})
+    {
+        EXPECT_DOUBLE_EQ(
+            result->MinPrincipalCurvatureProperty[invalid], 0.0);
+        EXPECT_DOUBLE_EQ(
+            result->MaxPrincipalCurvatureProperty[invalid], 0.0);
+        EXPECT_TRUE(IsZeroVec(result->PrincipalDir1Property[invalid]));
+        EXPECT_TRUE(IsZeroVec(result->PrincipalDir2Property[invalid]));
+    }
+    const VertexHandle far{
+        static_cast<PropertyIndex>(2 * rowWidth + 2)};
+    EXPECT_GT(
+        std::abs(result->MinPrincipalCurvatureProperty[far])
+            + std::abs(result->MaxPrincipalCurvatureProperty[far]),
+        0.0);
+
+    for (std::size_t i = 0; i < mesh.VerticesSize(); ++i)
+    {
+        const VertexHandle vertex{static_cast<PropertyIndex>(i)};
+        EXPECT_TRUE(std::isfinite(
+            result->MaxPrincipalCurvatureProperty[vertex]));
+        EXPECT_TRUE(std::isfinite(
+            result->MinPrincipalCurvatureProperty[vertex]));
+        const glm::vec3 direction1 = result->PrincipalDir1Property[vertex];
+        const glm::vec3 direction2 = result->PrincipalDir2Property[vertex];
+        EXPECT_TRUE(std::isfinite(direction1.x));
+        EXPECT_TRUE(std::isfinite(direction1.y));
+        EXPECT_TRUE(std::isfinite(direction1.z));
+        EXPECT_TRUE(std::isfinite(direction2.x));
+        EXPECT_TRUE(std::isfinite(direction2.y));
+        EXPECT_TRUE(std::isfinite(direction2.z));
+    }
+}
+
 // =============================================================================
 // Determinism: identical output across repeated runs.
 // =============================================================================
@@ -516,11 +675,11 @@ TEST(CurvatureTensor, FullFieldUsesTheTensorPrincipalSystem)
 }
 
 // =============================================================================
-// Fail-closed: a flat region, including its boundary, has no supported hinge
-// curvature and publishes finite zero sentinels.
+// A supported flat region, including interpolated boundaries, has zero hinge
+// curvature and publishes finite zero direction sentinels.
 // =============================================================================
 
-TEST(CurvatureTensor, FlatRegionIncludingBoundaryFailsClosed)
+TEST(CurvatureTensor, FlatRegionPublishesFiniteZeroDirections)
 {
     const double a = 1.0;
     const int cells = 10;
@@ -534,8 +693,8 @@ TEST(CurvatureTensor, FlatRegionIncludingBoundaryFailsClosed)
     EXPECT_TRUE(IsZeroVec(result->PrincipalDir1Property[interior]));
     EXPECT_TRUE(IsZeroVec(result->PrincipalDir2Property[interior]));
 
-    // A boundary vertex on the same flat grid is unsupported because all of
-    // its available interior hinges are flat.
+    // A boundary vertex on the same flat grid inherits supported zero scalars,
+    // but a flat tensor has no unique principal direction.
     VertexHandle corner{static_cast<PropertyIndex>(0)};
     ASSERT_TRUE(mesh.IsBoundary(corner));
     EXPECT_TRUE(IsZeroVec(result->PrincipalDir1Property[corner]));

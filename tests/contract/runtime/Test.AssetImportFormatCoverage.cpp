@@ -801,6 +801,44 @@ namespace
         return false;
     }
 
+    [[nodiscard]] bool MeshHasFiniteCornerNormalSeam(
+        ECS::Scene::Registry& registry,
+        const ECS::EntityHandle entity)
+    {
+        const GS::ConstSourceView view =
+            GS::BuildConstView(registry.Raw(), entity);
+        if (!view.Valid() || view.HalfedgeSource == nullptr)
+        {
+            return false;
+        }
+        const auto normals =
+            view.HalfedgeSource->Properties.Get<glm::vec3>("h:normal");
+        const auto toVertex =
+            view.HalfedgeSource->Properties.Get<std::uint32_t>(
+                GS::PropertyNames::kHalfedgeToVertex);
+        if (!normals.IsValid() || !toVertex.IsValid() ||
+            normals.Vector().size() != toVertex.Vector().size())
+        {
+            return false;
+        }
+
+        std::unordered_map<std::uint32_t, glm::vec3> firstSeen{};
+        bool hasSeam = false;
+        for (std::size_t i = 0u; i < normals.Vector().size(); ++i)
+        {
+            const glm::vec3 normal = normals.Vector()[i];
+            if (!std::isfinite(normal.x) || !std::isfinite(normal.y) ||
+                !std::isfinite(normal.z))
+            {
+                return false;
+            }
+            const auto [it, inserted] =
+                firstSeen.try_emplace(toVertex.Vector()[i], normal);
+            hasSeam = hasSeam || (!inserted && it->second != normal);
+        }
+        return hasSeam;
+    }
+
     template <class T>
     void AppendScalar(std::vector<std::byte>& out, const T value)
     {
@@ -1708,6 +1746,75 @@ TEST(RuntimeAssetImportFormatCoverage, DirectObjImportPreservesAuthoredCornerUvs
             << "authored uv (" << authored.x << "," << authored.y
             << ") was not preserved; the atlas likely re-parameterized the mesh.";
     }
+
+    engine.Shutdown();
+}
+
+TEST(RuntimeAssetImportFormatCoverage, DirectObjImportPreservesAuthoredCornerNormals)
+{
+    TempAssetFile meshFile(
+        "bug154_authored_corner_normals.obj",
+        "v 0 0 0\n"
+        "v 1 0 0\n"
+        "v 1 1 0\n"
+        "v 0 1 0\n"
+        "vt 0 0\n"
+        "vt 1 0\n"
+        "vt 1 1\n"
+        "vt 0 1\n"
+        "vn 0 0 1\n"
+        "vn 0 1 0\n"
+        "f 1/1/1 2/2/1 3/3/1\n"
+        "f 1/1/2 3/3/2 4/4/2\n");
+
+    std::optional<ECS::EntityHandle> meshEntity{};
+    ComposedNormalBakeProbe bakeProbe{};
+    Intrinsic::Tests::RuntimeTestKernel engine(
+        HeadlessConfig(),
+        std::make_unique<WaitForConditionApplication>(
+            [&meshEntity, &bakeProbe](Runtime::Engine& runningEngine)
+            {
+                return meshEntity.has_value() &&
+                    DirectMeshPostProcessReady(
+                        runningEngine, *meshEntity, bakeProbe);
+            },
+            4096u));
+    InitializeAssetImportEngine(engine);
+    InstallSandboxDefaultRuntimePolicies(engine);
+    InstallComposedNormalBakeProbe(engine, bakeProbe);
+
+    auto imported =
+        RequiredEngineService<Extrinsic::Runtime::AssetWorkflowModule>(engine)
+            .ImportAssetFromPath(Runtime::RuntimeAssetImportRequest{
+                .Path = meshFile.Path.string(),
+                .PayloadKind = Assets::AssetPayloadKind::Mesh,
+            });
+    ASSERT_TRUE(imported.has_value()) << static_cast<int>(imported.error());
+
+    meshEntity = FindFirstEntityWithDomain(
+        *engine.Worlds().Get(engine.ActiveWorld()), GS::Domain::Mesh);
+    ASSERT_TRUE(meshEntity.has_value());
+
+    engine.Run();
+    ASSERT_TRUE(DirectMeshPostProcessReady(engine, *meshEntity, bakeProbe));
+
+    ECS::Scene::Registry& scene = *engine.Worlds().Get(engine.ActiveWorld());
+    const MeshTopologyCounts counts = ReadMeshTopologyCounts(scene, *meshEntity);
+    EXPECT_EQ(counts.Vertices, 4u)
+        << "authored normal identity must not split owning topology";
+    EXPECT_EQ(counts.Faces, 2u);
+    EXPECT_TRUE(MeshHasFiniteCornerNormalSeam(scene, *meshEntity));
+
+    const GS::ConstSourceView view =
+        GS::BuildConstView(scene.Raw(), *meshEntity);
+    ASSERT_NE(view.HalfedgeSource, nullptr);
+    const auto normals =
+        view.HalfedgeSource->Properties.Get<glm::vec3>("h:normal");
+    ASSERT_TRUE(normals.IsValid());
+    EXPECT_NE(std::ranges::find(normals.Vector(), glm::vec3{0.0f, 0.0f, 1.0f}),
+              normals.Vector().end());
+    EXPECT_NE(std::ranges::find(normals.Vector(), glm::vec3{0.0f, 1.0f, 0.0f}),
+              normals.Vector().end());
 
     engine.Shutdown();
 }

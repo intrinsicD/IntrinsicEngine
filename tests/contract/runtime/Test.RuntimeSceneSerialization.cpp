@@ -984,3 +984,46 @@ TEST(RuntimeSceneSerialization, SaveLoadRoundTripPreservesCornerDomainTexcoords)
         EXPECT_FLOAT_EQ(reloaded.Vector()[i].y, cornerUvs[i].y) << "corner " << i;
     }
 }
+
+// Authored normal seams stay on halfedges across persistence; reload must not
+// replace them with derived vertex normals or split owning topology.
+TEST(RuntimeSceneSerialization, SaveLoadRoundTripPreservesCornerDomainNormals)
+{
+    ECS::Scene::Registry source;
+    const ECS::EntityHandle mesh = AddMeshEntity(source);
+    auto& halfedges = source.Raw().get<GS::Halfedges>(mesh);
+    const std::vector<glm::vec3> cornerNormals{
+        {0.0f, 0.0f, 1.0f}, {0.0f, 0.0f, 1.0f}, {0.0f, 0.0f, 1.0f},
+        {0.0f, 1.0f, 0.0f}, {0.0f, 1.0f, 0.0f}, {0.0f, 1.0f, 0.0f},
+    };
+    halfedges.Properties.GetOrAdd<glm::vec3>("h:normal", glm::vec3{0.0f})
+        .Vector() = cornerNormals;
+
+    MemoryIOBackend backend;
+    const auto saved = Runtime::SaveSceneDocument(source, "scene.json", backend);
+    ASSERT_TRUE(saved.has_value()) << static_cast<int>(saved.error());
+
+    const nlohmann::json parsed =
+        nlohmann::json::parse(backend.Text("scene.json"));
+    ASSERT_TRUE(
+        parsed["entities"][0]["geometrySources"]["halfedges"]["normals"].is_array());
+    EXPECT_EQ(
+        parsed["entities"][0]["geometrySources"]["halfedges"]["normals"].size(),
+        cornerNormals.size());
+
+    ECS::Scene::Registry loaded;
+    const auto loadedResult =
+        Runtime::LoadSceneDocument(loaded, "scene.json", backend);
+    ASSERT_TRUE(loadedResult.has_value())
+        << static_cast<int>(loadedResult.error());
+
+    const ECS::EntityHandle loadedMesh = FindEntityByName(loaded, "Mesh Entity");
+    ASSERT_NE(loadedMesh, ECS::InvalidEntityHandle);
+    const auto reloaded = loaded.Raw()
+                              .get<GS::Halfedges>(loadedMesh)
+                              .Properties.Get<glm::vec3>("h:normal");
+    ASSERT_TRUE(reloaded.IsValid());
+    ASSERT_EQ(reloaded.Vector().size(), cornerNormals.size());
+    for (std::size_t i = 0; i < cornerNormals.size(); ++i)
+        EXPECT_EQ(reloaded.Vector()[i], cornerNormals[i]) << "corner " << i;
+}

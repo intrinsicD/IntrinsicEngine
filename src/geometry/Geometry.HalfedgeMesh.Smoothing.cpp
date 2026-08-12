@@ -1,3 +1,5 @@
+// Implements deterministic mesh-position filters and reusable cotan diffusion
+// while keeping validation and all temporary state outside public interfaces.
 module;
 
 #include <algorithm>
@@ -8,6 +10,7 @@ module;
 #include <optional>
 #include <span>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 #include <glm/glm.hpp>
@@ -25,6 +28,7 @@ namespace Geometry::Smoothing
     using MeshUtils::MeanEdgeLength;
     using MeshUtils::ComputeCotanLaplacian;
     using MeshUtils::ComputeOneRingCentroid;
+    using MeshUtils::EdgeCotanWeight;
     using MeshUtils::FaceArea;
     using MeshUtils::FaceAreaVector;
     using MeshUtils::FaceCentroid;
@@ -304,6 +308,266 @@ namespace Geometry::Smoothing
             }
         }
     } // namespace
+
+    namespace
+    {
+        template <typename T>
+        struct PropertyAccumulator;
+
+        template <>
+        struct PropertyAccumulator<float>
+        {
+            using Type = double;
+        };
+
+        template <>
+        struct PropertyAccumulator<double>
+        {
+            using Type = double;
+        };
+
+        template <>
+        struct PropertyAccumulator<glm::vec2>
+        {
+            using Type = glm::dvec2;
+        };
+
+        template <>
+        struct PropertyAccumulator<glm::vec3>
+        {
+            using Type = glm::dvec3;
+        };
+
+        template <>
+        struct PropertyAccumulator<glm::vec4>
+        {
+            using Type = glm::dvec4;
+        };
+
+        [[nodiscard]] bool IsFinitePropertyValue(const float value) noexcept
+        {
+            return std::isfinite(value);
+        }
+
+        [[nodiscard]] bool IsFinitePropertyValue(const double value) noexcept
+        {
+            return std::isfinite(value);
+        }
+
+        [[nodiscard]] bool IsFinitePropertyValue(const glm::vec2 value) noexcept
+        {
+            return std::isfinite(value.x) && std::isfinite(value.y);
+        }
+
+        [[nodiscard]] bool IsFinitePropertyValue(const glm::vec3 value) noexcept
+        {
+            return std::isfinite(value.x) && std::isfinite(value.y)
+                && std::isfinite(value.z);
+        }
+
+        [[nodiscard]] bool IsFinitePropertyValue(const glm::vec4 value) noexcept
+        {
+            return std::isfinite(value.x) && std::isfinite(value.y)
+                && std::isfinite(value.z) && std::isfinite(value.w);
+        }
+
+        struct CotanPropertyNeighbor
+        {
+            std::size_t VertexIndex{0};
+            double Weight{0.0};
+        };
+
+        template <typename T>
+        [[nodiscard]] VertexPropertySmoothingResult CotanSmoothVertexPropertyImpl(
+            const HalfedgeMesh::Mesh& mesh,
+            VertexProperty<T> property,
+            const VertexPropertySmoothingParams& params)
+        {
+            VertexPropertySmoothingResult result{
+                .VertexSlotCount = mesh.VerticesSize(),
+            };
+            if (mesh.IsEmpty())
+            {
+                result.Status = VertexPropertySmoothingStatus::EmptyMesh;
+                return result;
+            }
+            if (!property.IsValid() || property.Size() != mesh.VerticesSize())
+            {
+                result.Status = VertexPropertySmoothingStatus::InvalidProperty;
+                return result;
+            }
+            if (params.Iterations == 0u || !std::isfinite(params.Lambda)
+                || params.Lambda <= 0.0 || params.Lambda > 1.0)
+            {
+                result.Status = VertexPropertySmoothingStatus::InvalidParameters;
+                return result;
+            }
+            if (!params.ActiveVertexMask.empty()
+                && params.ActiveVertexMask.size() != mesh.VerticesSize())
+            {
+                result.Status =
+                    VertexPropertySmoothingStatus::InvalidActiveMask;
+                return result;
+            }
+
+            const VertexProperty<T>& readProperty = property;
+            const std::vector<T>& input = readProperty.Vector();
+            for (std::size_t i = 0u; i < mesh.VerticesSize(); ++i)
+            {
+                const VertexHandle vertex{static_cast<PropertyIndex>(i)};
+                if (mesh.IsDeleted(vertex))
+                {
+                    ++result.SkippedDeletedVertexCount;
+                    continue;
+                }
+                const glm::vec3 position = mesh.Position(vertex);
+                if (!std::isfinite(position.x) || !std::isfinite(position.y)
+                    || !std::isfinite(position.z))
+                {
+                    result.Status = VertexPropertySmoothingStatus::NonFiniteGeometry;
+                    return result;
+                }
+                if (!IsFinitePropertyValue(input[i]))
+                {
+                    result.Status = VertexPropertySmoothingStatus::NonFiniteInput;
+                    return result;
+                }
+            }
+
+            std::vector<std::vector<CotanPropertyNeighbor>> rows(
+                mesh.VerticesSize());
+            std::vector<std::uint8_t> smoothable(mesh.VerticesSize(), 0u);
+            for (std::size_t i = 0u; i < mesh.VerticesSize(); ++i)
+            {
+                const VertexHandle vertex{static_cast<PropertyIndex>(i)};
+                if (mesh.IsDeleted(vertex))
+                    continue;
+                if (!params.ActiveVertexMask.empty()
+                    && params.ActiveVertexMask[i] == 0u)
+                {
+                    ++result.InactiveVertexCount;
+                    continue;
+                }
+                if (mesh.IsIsolated(vertex))
+                {
+                    ++result.SkippedIsolatedVertexCount;
+                    continue;
+                }
+                if (params.PreserveBoundary && mesh.IsBoundary(vertex))
+                {
+                    ++result.PinnedBoundaryVertexCount;
+                    continue;
+                }
+
+                double weightSum = 0.0;
+                for (const HalfedgeHandle halfedge :
+                     mesh.HalfedgesAroundVertex(vertex))
+                {
+                    const VertexHandle neighbor = mesh.ToVertex(halfedge);
+                    if (!neighbor.IsValid() || mesh.IsDeleted(neighbor))
+                        continue;
+                    if (!params.ActiveVertexMask.empty()
+                        && params.ActiveVertexMask[neighbor.Index] == 0u)
+                    {
+                        continue;
+                    }
+                    const double weight = std::max(
+                        0.0,
+                        EdgeCotanWeight(mesh, mesh.Edge(halfedge)));
+                    if (!std::isfinite(weight) || weight <= 0.0)
+                        continue;
+                    rows[i].push_back(CotanPropertyNeighbor{
+                        .VertexIndex = neighbor.Index,
+                        .Weight = weight,
+                    });
+                    weightSum += weight;
+                }
+                if (!std::isfinite(weightSum) || weightSum <= 0.0)
+                    continue;
+                for (CotanPropertyNeighbor& neighbor : rows[i])
+                    neighbor.Weight /= weightSum;
+                smoothable[i] = 1u;
+                ++result.SmoothedVertexCount;
+            }
+
+            using Accumulator = typename PropertyAccumulator<T>::Type;
+            std::vector<T> current = input;
+            std::vector<T> next = current;
+            for (std::size_t iteration = 0u;
+                 iteration < params.Iterations;
+                 ++iteration)
+            {
+                next = current;
+                for (std::size_t i = 0u; i < current.size(); ++i)
+                {
+                    if (smoothable[i] == 0u)
+                        continue;
+                    Accumulator average{0.0};
+                    for (const CotanPropertyNeighbor& neighbor : rows[i])
+                    {
+                        average += neighbor.Weight
+                            * Accumulator(current[neighbor.VertexIndex]);
+                    }
+                    const Accumulator updated =
+                        (1.0 - params.Lambda) * Accumulator(current[i])
+                        + params.Lambda * average;
+                    next[i] = T(updated);
+                    if (!IsFinitePropertyValue(next[i]))
+                    {
+                        result.Status =
+                            VertexPropertySmoothingStatus::NonFiniteInput;
+                        return result;
+                    }
+                }
+                current.swap(next);
+            }
+
+            property.Vector() = std::move(current);
+            result.Status = VertexPropertySmoothingStatus::Success;
+            result.IterationsPerformed = params.Iterations;
+            return result;
+        }
+    } // namespace
+
+    VertexPropertySmoothingResult CotanSmoothVertexProperty(
+        const HalfedgeMesh::Mesh& mesh,
+        VertexProperty<float> property,
+        const VertexPropertySmoothingParams& params)
+    {
+        return CotanSmoothVertexPropertyImpl(mesh, std::move(property), params);
+    }
+
+    VertexPropertySmoothingResult CotanSmoothVertexProperty(
+        const HalfedgeMesh::Mesh& mesh,
+        VertexProperty<double> property,
+        const VertexPropertySmoothingParams& params)
+    {
+        return CotanSmoothVertexPropertyImpl(mesh, std::move(property), params);
+    }
+
+    VertexPropertySmoothingResult CotanSmoothVertexProperty(
+        const HalfedgeMesh::Mesh& mesh,
+        VertexProperty<glm::vec2> property,
+        const VertexPropertySmoothingParams& params)
+    {
+        return CotanSmoothVertexPropertyImpl(mesh, std::move(property), params);
+    }
+
+    VertexPropertySmoothingResult CotanSmoothVertexProperty(
+        const HalfedgeMesh::Mesh& mesh,
+        VertexProperty<glm::vec3> property,
+        const VertexPropertySmoothingParams& params)
+    {
+        return CotanSmoothVertexPropertyImpl(mesh, std::move(property), params);
+    }
+
+    VertexPropertySmoothingResult CotanSmoothVertexProperty(
+        const HalfedgeMesh::Mesh& mesh,
+        VertexProperty<glm::vec4> property,
+        const VertexPropertySmoothingParams& params)
+    {
+        return CotanSmoothVertexPropertyImpl(mesh, std::move(property), params);
+    }
 
     // -------------------------------------------------------------------------
     // Helper: single pass of uniform Laplacian smoothing

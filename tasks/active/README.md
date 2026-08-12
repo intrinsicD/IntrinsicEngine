@@ -11,6 +11,10 @@ Each active task should include:
 
 ## Currently active
 
+- [`BUG-154` — Restore PMP curvature parity without normal-seam topology loss](BUG-154-curvature-pmp-parity-corner-normal-topology.md)
+  — in progress on `main`; fixes the reference smoothing/estimator semantics,
+  preserves OBJ normals on the corner domain, and prevents false all-zero
+  curvature success.
 - [`METHOD-039` — Feature-network-constrained curvature patch decomposition](METHOD-039-feature-network-curvature-patch-decomposition.md)
   — in progress on `main`, owned by `codex-root`; Slice A freezes the practical
   equations, inherited METHOD-038 evidence boundary, supplied-feature seam, and

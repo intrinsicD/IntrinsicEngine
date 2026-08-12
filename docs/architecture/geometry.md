@@ -462,34 +462,59 @@ with directions from a different estimator.
 For each finite interior edge `e`, the tensor path precomputes
 `M_e = beta_e (|e|/2) t_e t_eᵀ`, where `beta_e` is the oriented face-normal
 dihedral and `t_e` is the unit edge direction. A vertex sums incident edge
-contributions over itself and its one-ring neighbours (the framework24
-two-ring support), then divides by the mixed area of those support vertices.
-The resulting symmetric tensor is restricted to the oriented vertex tangent
-plane and decomposed as a signed 2×2 system. Because the hinge angle measures
-bend across an edge while `M_e` stores the edge tangent, each eigenvalue is paired
-with the complementary tangent eigenvector when publishing
-`v:principal_dir1` (κ₁/max) and `v:principal_dir2` (κ₂/min). This tangent-plane
-restriction avoids the ambiguous full-3×3 "smallest absolute eigenvalue" choice
-on cylinders, where both the surface normal and one principal curvature may have
-zero eigenvalue.
+contributions over itself and its one-ring neighbours (the PMP two-ring
+support), then divides by the mixed area of those support vertices.
+The resulting signed symmetric tensor is decomposed by a local 3×3 Jacobi
+kernel, matching the PMP reference. Its smallest-absolute eigenvalue is treated
+as the tensor-normal mode and the remaining ordered eigenvalues become the
+principal scalars. Because the hinge angle measures bend across an edge while
+`M_e` stores the edge tangent, each scalar direction is paired with the
+complementary tangent eigenvector when publishing `v:principal_dir1` (κ₁/max)
+and `v:principal_dir2` (κ₂/min). Direction publication separately chooses the
+eigenvector most aligned with the geometric normal, which resolves cylindrical
+zero-mode ambiguity without changing PMP's scalar selection.
 
-Three simultaneous nonnegative-cotan passes smooth κ₁ and κ₂; directions retain
-the unsmoothed tensor basis. `ComputeCurvature` derives
+Boundary centers are excluded from tensor assembly. Their raw scalar values are
+uniformly interpolated from supported non-boundary one-ring neighbours, and
+their direction line fields are sign-aligned and re-orthogonalized. Three
+simultaneous nonnegative-cotan passes then smooth κ₁ and κ₂ with
+`new = 0.5 * old + 0.5 * weighted-neighbour-average`; directions retain the
+unsmoothed tensor basis. `ComputeCurvature` derives
 `H = (κ₁ + κ₂)/2`, `K = κ₁κ₂`, and the mean-curvature normal from those
 same values. The sign is adapted to the engine convention: outward-oriented
 convex curvature is positive. Reversing orientation negates curvature along
 each physical principal direction, which swaps the algebraically ordered
-max/min slots on an anisotropic surface. The compatibility name "Taubin"
-follows framework24; its hinge quadrature is not the vertex-neighbour
-directional-curvature quadrature in Taubin's 1995 paper.
+max/min slots on an anisotropic surface. PMP associates this edge-dihedral
+tensor branch with the Cohen-Steiner--Morvan normal-cycle formulation; it is
+not the vertex-neighbour directional-curvature quadrature in Taubin's 1995
+paper.
 
-Finite boundary vertices are estimated when their two-ring support contains
-valid interior hinges. Deleted, isolated, flat, zero-area, degenerate, and
-non-finite support fails closed to finite zero scalars and zero-vector directions;
-empty/no-face tensor requests return `nullopt`. Storage is `O(V + E + F)`.
+Finite boundary vertices are supported only when interpolation reaches a valid
+interior neighbour. Triangle conditioning uses the dimensionless
+`2A/l_max^2` ratio. Its `3.5e-4` floor is the conservatively rounded square root
+of machine epsilon for public float positions. Non-triangular, non-finite,
+degenerate, or quality-at/below that floor faces invalidate incident support
+and each one-ring tensor center that
+consumes it. Invalid centers retain finite zero scalar/direction sentinels and
+are excluded from smoothing rows and neighbour support, so unreliable values
+cannot diffuse into the supported field. A valid flat vertex is supported but
+remains zero on an all-flat neighbourhood. Results report supported/nonzero
+vertex counts, face-quality counts and threshold, minimum quality, and the
+finite principal range; empty/no-face tensor requests return `nullopt`.
+Storage is `O(V + E + F)`.
 Runtime is linear on bounded-valence manifold meshes and
 `O(F + E + Σ_v degree(v)²)` without that assumption because the reference
 two-ring quadrature revisits each support vertex's incident edges.
+
+The scalar post-filter is the reusable
+`Geometry::Smoothing::CotanSmoothVertexProperty` operation. It supports
+vertex-domain `float`, `double`, and canonical `glm::vec2/vec3/vec4`
+properties, uses simultaneous Jacobi buffers, offers explicit iteration,
+damping, boundary-pin, and optional active-vertex-mask parameters. An inactive
+vertex keeps its value and contributes to no active neighbour row. The operator
+fails before mutation on invalid parameters, property/mask count mismatches, or
+non-finite live input. It changes neither mesh positions nor topology and leaves
+unrelated properties untouched.
 
 ### Signed-curvature mesh segmentation
 

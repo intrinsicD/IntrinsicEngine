@@ -53,6 +53,8 @@ import Extrinsic.Runtime.RenderExtraction;
 import Extrinsic.Runtime.SceneDocumentModule;
 import Extrinsic.Runtime.SelectionController;
 import Extrinsic.Runtime.ServiceRegistry;
+import Extrinsic.Runtime.VertexAttributeBinding;
+import Extrinsic.Runtime.VertexChannelBindings;
 import Extrinsic.Runtime.WorldRegistry;
 import Geometry.Properties;
 
@@ -865,6 +867,19 @@ namespace Extrinsic::Runtime
             const bool useCornerTexcoords = cornerTexcoords.IsValid() &&
                 cornerTexcoords.Vector().size() ==
                     view.HalfedgeSource->Properties.Size();
+            const auto cornerNormals =
+                halfedgeProperties.Get<glm::vec3>("h:normal");
+            const auto* channelBindings =
+                Context.Scene->Raw().try_get<VertexChannelBindingSet>(entity);
+            const VertexChannelSourceBinding* normalOverride =
+                channelBindings != nullptr &&
+                        IsVertexChannelBindingEnabled(channelBindings->Normal)
+                    ? &channelBindings->Normal
+                    : nullptr;
+            const bool useCornerNormals = normalOverride == nullptr &&
+                cornerNormals.IsValid() &&
+                cornerNormals.Vector().size() ==
+                    view.HalfedgeSource->Properties.Size();
 
             const auto texcoords = vertexProperties.Get<glm::vec2>(
                 request.Texcoords.Name);
@@ -1133,27 +1148,60 @@ namespace Extrinsic::Runtime
                     "texture bake supports mesh vertex, edge, and face properties");
             }
 
-            // BUG-137 — de-index corner UVs into the bake's own vertex table.
+            // Reproduce the renderer's complete corner shading split in the
+            // bake's own vertex table.
             // This runs *after* the domain expansions above, which read
             // `SurfaceIndices` as mesh-vertex ids to resolve edge endpoints and
             // face rows. It uses the same shared split as renderer upload, so
             // the bake's vertex count, index count, and index fingerprint match
             // the GPU residency it is cross-checked against.
-            if (useCornerTexcoords)
+            if (useCornerTexcoords || useCornerNormals)
             {
-                MeshCornerTexcoordSplit split{};
-                if (!BuildMeshCornerTexcoordSplit(
-                        resolvedTexcoords,
+                std::vector<glm::vec3> resolvedNormals(
+                    view.VertexSource->Properties.Size());
+                const bool validNormalOverride =
+                    normalOverride != nullptr &&
+                    normalOverride->Property.Domain ==
+                        GeometryElementDomain::MeshVertex &&
+                    normalOverride->Property.ValueKind ==
+                        Geometry::PropertyValueKind::Vec3;
+                const VertexAttributeBinding normalBinding{
+                    .Channel = VertexChannel::Normal,
+                    .SourceType = AttributeSourceType::Vec3,
+                    .SourceProperty = validNormalOverride
+                        ? std::string_view{normalOverride->Property.Name}
+                        : normalOverride == nullptr
+                            ? std::string_view{GS::PropertyNames::kNormal}
+                            : std::string_view{},
+                    .AllowFallback = true,
+                    .Normalize = true,
+                    .Fallback = glm::vec4{0.0f, 0.0f, 1.0f, 0.0f},
+                };
+                static_cast<void>(ResolveVec3Channel(
+                    view.VertexSource->Properties,
+                    normalBinding,
+                    static_cast<std::uint32_t>(resolvedNormals.size()),
+                    resolvedNormals));
+
+                MeshCornerAttributeSplit split{};
+                if (!BuildMeshCornerAttributeSplit(
+                        useCornerTexcoords
+                            ? std::span<const glm::vec2>{cornerTexcoords.Vector()}
+                            : std::span<const glm::vec2>{},
+                        useCornerNormals
+                            ? std::span<const glm::vec3>{cornerNormals.Vector()}
+                            : std::span<const glm::vec3>{},
                         cornerHalfedges,
                         texcoords.IsValid() ? std::span<const glm::vec2>{texcoords.Vector()}
                                             : std::span<const glm::vec2>{},
+                        resolvedNormals,
                         view.VertexSource->Properties.Size(),
                         prepared.SurfaceIndices,
                         split))
                 {
                     return PrepareFailure(
                         PropertyTextureBakeStatus::BakeFailed,
-                        "texture bake could not de-index corner texture coordinates");
+                        "texture bake could not de-index corner shading attributes");
                 }
 
                 if (prepared.Domain == Graphics::PropertyTextureBakeDomain::Vertex)

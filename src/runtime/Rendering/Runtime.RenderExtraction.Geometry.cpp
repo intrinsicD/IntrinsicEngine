@@ -130,13 +130,16 @@ namespace Extrinsic::Runtime
                 // BUG-137 — track whichever domain owns the UVs. A corner-UV
                 // mesh has no `v:texcoord`, so watching only the vertex channel
                 // left every seam-mesh UV edit invisible to the reupload plan.
-                const std::optional<std::uint64_t> cornerRevision =
-                    view.HalfedgeSource != nullptr
-                        ? view.HalfedgeSource->Properties.FindPropertyRevision(
-                              "h:texcoord")
-                        : std::nullopt;
-                snapshot.Texcoord = cornerRevision.has_value()
-                    ? *cornerRevision
+                const auto cornerTexcoord = view.HalfedgeSource != nullptr
+                    ? view.HalfedgeSource->Properties.Get<glm::vec2>(
+                          "h:texcoord")
+                    : Geometry::ConstProperty<glm::vec2>{};
+                snapshot.Texcoord =
+                    cornerTexcoord.IsValid() &&
+                        view.HalfedgeSource != nullptr &&
+                        cornerTexcoord.Vector().size() ==
+                            view.HalfedgeSource->Properties.Size()
+                    ? cornerTexcoord.Revision()
                     : PropertyRevisionOf(properties, "v:texcoord");
             }
 
@@ -160,11 +163,25 @@ namespace Extrinsic::Runtime
                 (bindings == nullptr ||
                  !IsVertexChannelBindingEnabled(bindings->Normal)))
             {
-                const auto normal =
-                    Geometry::ConstPropertySet{properties}.Get<glm::vec3>(
-                        kNormal);
-                if (normal.IsValid())
-                    snapshot.Normal = normal.Revision();
+                const auto cornerNormal = view.HalfedgeSource != nullptr
+                    ? view.HalfedgeSource->Properties.Get<glm::vec3>(
+                          "h:normal")
+                    : Geometry::ConstProperty<glm::vec3>{};
+                if (cornerNormal.IsValid() &&
+                    view.HalfedgeSource != nullptr &&
+                    cornerNormal.Vector().size() ==
+                        view.HalfedgeSource->Properties.Size())
+                {
+                    snapshot.Normal = cornerNormal.Revision();
+                }
+                else
+                {
+                    const auto normal =
+                        Geometry::ConstPropertySet{properties}.Get<glm::vec3>(
+                            kNormal);
+                    if (normal.IsValid())
+                        snapshot.Normal = normal.Revision();
+                }
             }
             if (snapshot.Color == 0u &&
                 meshDefaults &&

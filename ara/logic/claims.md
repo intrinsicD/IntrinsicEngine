@@ -1368,3 +1368,126 @@
 - **Tags**: geometry, curvature segmentation, local RAG, seed stability, CPU
   reference, negative result, bounded result
 - **From staging**: O148
+
+## C46: OBJ authored normal seams no longer destroy geometric adjacency
+- **Statement**: OBJ authored normal identity is shading-domain data rather
+  than owning vertex identity. Intrinsic keeps position-index topology
+  connected across normal discontinuities, publishes discontinuous or
+  non-lockstep authored normals as `h:normal`, retains exact lockstep normals
+  as `v:normal`, and round-trips corner indices without changing authoritative
+  mesh cardinality.
+- **Status**: supported — CPU import/runtime/persistence contracts plus
+  promoted Vulkan shading-path evidence; no general mesh-repair or performance
+  claim
+- **Provenance**: ai-suggested
+- **Crystallized via**: artifact-commitment
+- **Falsification criteria**: An OBJ whose faces share position indices but use
+  distinct normal indices gains owning vertices or loses shared edges; the
+  259-position bunny no longer materializes as 259 connected vertices; authored
+  corner normals are lost during write, runtime materialization, persistence,
+  or GPU packing; or an explicit normal binding fails to override defaults.
+- **Proof**: [src/geometry/Geometry.HalfedgeMesh.IO.cpp,
+  src/runtime/AssetWorkflow/Runtime.AssetWorkflowGeometryMaterialization.cpp,
+  src/runtime/Scene/Runtime.SceneSerialization.cpp,
+  src/runtime/GeometryIntegration/Runtime.MeshSurfaceTopology.cpp,
+  tests/unit/geometry/Test.GeometryIO.cpp,
+  tests/contract/runtime/Test.AssetImportFormatCoverage.cpp,
+  tests/contract/runtime/Test.MeshGeometryExtraction.cpp,
+  ara/evidence/tables/curvature_pmp_diagnostic_2026-08-11.md]
+- **Dependencies**: [C33, C36]
+- **Tags**: geometry, OBJ, corner normals, topology, runtime, Vulkan
+- **From staging**: O149
+
+## C47: Reusable cotan smoothing matches PMP's damped explicit operator
+- **Statement**: `Geometry.Smoothing::CotanSmoothVertexProperty` performs
+  simultaneous nonnegative-cotan updates of `new = (1-lambda) old + lambda
+  neighbor_average`, supports `float`, `double`, and canonical float
+  `glm::vec2/vec3/vec4` vertex properties, can pin boundaries or exclude an
+  explicit active-vertex mask from both rows and neighborhoods, is invariant to
+  uniform mesh scale, and fails before mutation on invalid parameters, mask
+  shape, or non-finite input. Curvature uses three `lambda=0.5` passes,
+  matching PMP's explicit stencil without a linear solve.
+- **Status**: supported — bounded deterministic CPU unit/oracle evidence; no
+  arbitrary-domain diffusion, public double-vector property, or performance
+  claim
+- **Provenance**: ai-suggested
+- **Crystallized via**: artifact-commitment
+- **Falsification criteria**: Any supported scalar/vector overload produces a
+  different componentwise update, uses in-place iteration, loses the retained
+  self-weight, includes an inactive row or neighbor, changes under a uniform
+  coordinate scale, mutates on invalid/non-finite input, changes unrelated
+  topology or properties, or the curvature oracle requires a solver or a
+  different smoothing stencil.
+- **Proof**: [src/geometry/Geometry.HalfedgeMesh.Smoothing.cppm,
+  src/geometry/Geometry.HalfedgeMesh.Smoothing.cpp,
+  src/geometry/Geometry.HalfedgeMesh.Curvature.cpp,
+  tests/unit/geometry/Test_Smoothing.cpp,
+  tests/unit/geometry/Test.CurvatureTensor.cpp,
+  ara/evidence/tables/curvature_pmp_diagnostic_2026-08-11.md]
+- **Dependencies**: []
+- **Tags**: geometry, cotan smoothing, PMP, scalar properties, vector properties
+- **From staging**: O150
+
+## C48: Principal curvature matches the selected PMP formulation
+- **Statement**: Intrinsic's principal-curvature path uses PMP's signed full
+  symmetric 3x3 local eigensystem, non-boundary two-ring estimator support,
+  boundary scalar interpolation, complementary direction pairing, and three
+  damped cotan smoothing passes. Scale-independent geometric predicates retain
+  that parity across uniform coordinate scales. Degenerate or severely
+  ill-conditioned faces are instead diagnosed and excluded from estimator and
+  smoothing support, so runtime can report finite support/nonzero/range/quality
+  diagnostics and reject a field with zero estimable support.
+- **Status**: supported — 25-slot PMP numeric oracle, analytic/scale/degeneracy
+  CPU contracts, runtime diagnostics, sanitizer evidence, and a non-claim local
+  differential that compared 80 meshes and 2,530,726 vertices; the 62 meshes
+  without rejected triangles stayed below `4.55e-7`/`2.23e-7` worst relative
+  L2 and all material outliers localized to rejected support; no universal
+  estimator-quality or performance claim
+- **Provenance**: ai-suggested
+- **Crystallized via**: artifact-commitment
+- **Falsification criteria**: The checked-in 25-slot oracle exceeds `2e-6`,
+  supported/nonzero counts differ from 25, boundary values are evaluated
+  directly instead of interpolated, the estimator reverts to a tangent 2x2
+  projection, a uniform position scale changes normalized curvature beyond the
+  declared tolerance, rejected geometry enters an active smoothing row,
+  non-finite outputs publish, or zero-support runtime work reports an
+  informative success.
+- **Proof**: [src/geometry/Geometry.HalfedgeMesh.Curvature.cppm,
+  src/geometry/Geometry.HalfedgeMesh.Curvature.cpp,
+  src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Mesh.cpp,
+  tests/unit/geometry/Test.CurvatureTensor.cpp,
+  tests/unit/geometry/Test_Curvature.cpp,
+  tests/contract/runtime/Test.SandboxEditorMeshMethods.cpp,
+  tools/diagnostics/curvature/compare_curvature_corpus.py,
+  docs/reports/2026-08-12-curvature-estimator-study.md,
+  ara/evidence/tables/curvature_pmp_diagnostic_2026-08-11.md]
+- **Dependencies**: [C46, C47]
+- **Tags**: geometry, principal curvature, PMP, boundary interpolation,
+  diagnostics, parity
+- **From staging**: O151
+
+## C49: Curvature estimator choice is mesh-regime dependent
+- **Statement**: No one reviewed curvature estimator is the best quality and
+  performance choice across clean regular meshes, irregular tessellations,
+  noisy/coarse surfaces, physical-scale features, and point samples. The
+  repaired PMP-compatible edge-dihedral tensor is retained as the clean-mesh
+  interoperability baseline; Rusinkiewicz finite differences and interpolated
+  corrected curvature measures are candidates for a controlled in-engine
+  comparison rather than automatic replacements.
+- **Status**: supported — primary-literature synthesis plus a local 96-model
+  PMP differential and explicitly non-claim timing probe; no matched
+  cross-estimator accuracy/performance benchmark or backend-adoption claim
+- **Provenance**: ai-suggested
+- **Crystallized via**: artifact-commitment
+- **Falsification criteria**: A controlled common implementation and corpus
+  shows one estimator consistently dominates the reviewed alternatives in
+  scalar error, direction angular error away from umbilics, robustness to
+  tessellation/noise/boundaries/features/scale, runtime, and memory without an
+  incompatible input or support-radius contract.
+- **Proof**: [docs/reports/2026-08-12-curvature-estimator-study.md,
+  tools/diagnostics/curvature/README.md,
+  ara/evidence/tables/curvature_pmp_diagnostic_2026-08-11.md]
+- **Dependencies**: [C48]
+- **Tags**: geometry, principal curvature, estimator selection, PMP,
+  Rusinkiewicz, corrected curvature measures, literature, bounded result
+- **From staging**: O153

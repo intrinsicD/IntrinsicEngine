@@ -9,6 +9,22 @@ The 2026-08-07 Sandbox UI workflow pass (`sculpt.obj` end-to-end through the
 promoted Vulkan build) opened `BUG-137` through `BUG-142`. `BUG-137` is upstream
 of `BUG-140` and of the parameterization rejection recorded in `BUG-141`.
 
+- [`BUG-155` — Native Vulkan timestamp smoke intermittently publishes zero
+  duration](BUG-155-vulkan-native-timestamp-zero-duration-flake.md): a repeated
+  54-case promoted-Vulkan gate produced one present `NativeGpu` `SurfacePass`
+  duration of zero while every other case passed; the same full gate had
+  passed immediately before it and three isolated repetitions passed
+  afterward. Preserve raw query/availability/slot evidence and distinguish
+  legal timestamp quantization from a query-lifecycle defect without retries,
+  quarantine, or clamping.
+
+- [`BUG-154` — Restore PMP curvature parity without normal-seam topology loss](../../active/BUG-154-curvature-pmp-parity-corner-normal-topology.md):
+  OBJ authored normals currently participate in the topology remap key, so a
+  face-normal bunny becomes 1,485 disconnected corners instead of its 259
+  position vertices. The repaired curvature estimator also needs PMP's signed
+  3x3 eigensystem, boundary interpolation, and damped reusable property
+  smoothing rather than full neighbour replacement.
+
 - [`BUG-149` — Benchmark sealer escapes dotted output directories](BUG-149-benchmark-sealer-dotted-output-directory.md):
   `run_and_seal.py` interprets a dotted directory name as a file, seals its
   parent (observed as all of `/tmp`), and can return zero after the sealer

@@ -2093,7 +2093,7 @@ observations:
     promoted: false
     promoted_to: null
     crystallized_via: null
-    stale: false
+    stale: true
   - id: O123
     timestamp: "2026-08-04T23:45+02:00"
     provenance: ai-suggested
@@ -2118,7 +2118,7 @@ observations:
     promoted: false
     promoted_to: null
     crystallized_via: null
-    stale: false
+    stale: true
   - id: O124
     timestamp: "2026-08-05T04:46+02:00"
     provenance: ai-executed
@@ -2269,7 +2269,7 @@ observations:
     promoted: false
     promoted_to: null
     crystallized_via: null
-    stale: false
+    stale: true
   - id: O131
     timestamp: "2026-08-05T17:23+02:00"
     provenance: ai-executed
@@ -2439,7 +2439,7 @@ observations:
     promoted: false
     promoted_to: null
     crystallized_via: null
-    stale: false
+    stale: true
   - id: O139
     timestamp: "2026-08-10T11:13+02:00"
     provenance: ai-executed
@@ -2666,5 +2666,106 @@ observations:
     bound_to: [N417]
     promoted: true
     promoted_to: "logic/claims.md:C45"
+    crystallized_via: artifact-commitment
+    stale: false
+  - id: O149
+    timestamp: "2026-08-11T20:47+02:00"
+    provenance: ai-suggested
+    content: >
+      Authored OBJ normal indices currently participate in Intrinsic's owning
+      vertex identity. A model with one distinct normal per face can therefore
+      become disconnected triangle soup even when its position indices define a
+      connected surface, leaving adjacency-based principal curvature with no
+      interior hinge support and an all-zero field.
+    context: >
+      The controlled bunny differential retained 259 connected vertices and
+      nonzero curvature in PMP, expanded to 1485 all-boundary vertices and zero
+      curvature in Intrinsic, then recovered connectivity and nonzero values
+      when only the normal-index split was removed.
+    potential_type: claim
+    bound_to: [N419]
+    promoted: true
+    promoted_to: "logic/claims.md:C46"
+    crystallized_via: artifact-commitment
+    stale: false
+  - id: O150
+    timestamp: "2026-08-11T20:47+02:00"
+    provenance: ai-suggested
+    content: >
+      Intrinsic's curvature smoother is not the PMP/Taubin reference operator:
+      it publishes the full cotangent-weighted neighbor average, whereas PMP
+      retains one half of the old value and adds one half of that average. The
+      discrepancy is an explicit-stencil port error, not a linear-solver issue.
+    context: >
+      A manual replay matched PMP to about 2.5e-8 relative L2. On armadillo the
+      full-neighbor substitution differed from the damped operator by 21.65
+      percent for kmin and 12.34 percent for kmax.
+    potential_type: claim
+    bound_to: [N420, N422]
+    promoted: true
+    promoted_to: "logic/claims.md:C47"
+    crystallized_via: artifact-commitment
+    stale: false
+  - id: O151
+    timestamp: "2026-08-11T20:47+02:00"
+    provenance: ai-suggested
+    content: >
+      Even after correcting topology and smoothing, Intrinsic is not an exact
+      PMP estimator port: its 2x2 tangent projection and direct boundary
+      evaluation differ from PMP's 3x3 smallest-absolute-eigenvalue selection
+      and interior-to-boundary interpolation. These differences are secondary
+      on closed armadillo but material on open boundaries and irregular meshes.
+    context: >
+      Residual armadillo differences after the smoothing differential were 5.10
+      and 2.57 percent; hemisphere boundary kmin differed by 18.20 percent, and
+      the low-resolution connected bunny remained 46.94 and 22.48 percent from
+      PMP for kmin and kmax.
+    potential_type: claim
+    bound_to: [N421]
+    promoted: true
+    promoted_to: "logic/claims.md:C48"
+    crystallized_via: artifact-commitment
+    stale: false
+  - id: O152
+    timestamp: "2026-08-11T20:47+02:00"
+    provenance: ai-suggested
+    content: >
+      The durable repair should preserve position-index geometric topology
+      across OBJ normal seams and retain authored corner normals on an
+      appropriate corner/halfedge domain, leaving any render-vertex expansion
+      to GPU materialization. A curvature-only weld would need explicit
+      original-to-welded publication mappings and would leave other adjacency
+      consumers exposed to the same import defect.
+    context: >
+      The failure originates before the curvature operation: runtime preserves
+      the already split source vertex slots and publishes same-cardinality
+      curvature properties. No production repair was authorized or made in
+      this diagnostic turn.
+    potential_type: architecture
+    bound_to: [N419, N420, N421]
+    promoted: true
+    promoted_to: "logic/solution/architecture.md:A42"
+    crystallized_via: verbal-affirmation
+    stale: false
+  - id: O153
+    timestamp: "2026-08-12T02:56+02:00"
+    provenance: ai-suggested
+    content: >
+      No curvature estimator is universally best across clean, irregular,
+      noisy, coarse, and point-sampled geometry. The repaired PMP-compatible
+      edge-dihedral tensor is a strong clean-mesh interoperability baseline;
+      Rusinkiewicz is the next low-cost irregular-mesh candidate, while
+      corrected curvature measures or integral invariants are better candidates
+      when robustness and a physical support scale dominate.
+    context: >
+      Primary-source comparison was combined with the 96-model local PMP
+      differential and a matched but non-claim timing probe. The durable report
+      commits to retaining PMP as default until an in-engine controlled
+      accuracy/direction/robustness/time/memory benchmark supports a backend
+      change.
+    potential_type: claim
+    bound_to: [N426, N427]
+    promoted: true
+    promoted_to: "logic/claims.md:C49"
     crystallized_via: artifact-commitment
     stale: false

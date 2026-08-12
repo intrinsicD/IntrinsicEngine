@@ -1,0 +1,26 @@
+{
+  "command": [
+    "ctest",
+    "--test-dir",
+    "build/ci-vulkan",
+    "--output-on-failure",
+    "-R",
+    "^(RuntimeSandboxAcceptanceGpuSmoke\\.(ImportedObjectSpaceNormalBakeBindsAndReadsBackExactTargetSlice|SeamSplitCornerUvMeshDeIndexesAtUploadAndRendersVisibleSurface))$",
+    "--timeout",
+    "120"
+  ],
+  "command_display": "ctest --test-dir build/ci-vulkan --output-on-failure -R '^(RuntimeSandboxAcceptanceGpuSmoke\\.(ImportedObjectSpaceNormalBakeBindsAndReadsBackExactTargetSlice|SeamSplitCornerUvMeshDeIndexesAtUploadAndRendersVisibleSurface))$' --timeout 120",
+  "cwd": ".",
+  "duration_ms": 8602,
+  "exit_code": 0,
+  "finished_at": "2026-08-12T00:52:44Z",
+  "label": "final-ci-vulkan-applicable",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-12T00:52:35Z",
+  "stderr_path": "tasks/evidence/BUG-154/commands/final-ci-vulkan-applicable.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/BUG-154/commands/final-ci-vulkan-applicable.stdout.log",
+  "stdout_sha256": "6561974ba85cd04f858212eb2ba57fb23f393118fa4f769b589f677daa69cf06",
+  "task_id": "BUG-154"
+}

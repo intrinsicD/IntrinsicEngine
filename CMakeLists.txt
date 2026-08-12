@@ -353,6 +353,10 @@ option(INTRINSIC_ENABLE_CUDA "Enable CUDA compute backend for GPU-accelerated ge
 option(INTRINSIC_BUILD_SANDBOX "Build Sandbox application target" ON)
 option(INTRINSIC_BUILD_TESTS "Build test targets" ON)
 option(INTRINSIC_BUILD_BENCHMARKS "Build benchmark scaffold targets" ON)
+option(INTRINSIC_BUILD_DIAGNOSTIC_TOOLS
+    "Build opt-in local diagnostic executables"
+    OFF
+)
 option(INTRINSIC_GROUP_PURE_CTEST
     "Run the audited pure-test cohort as whole-producer CTest processes"
     OFF
@@ -471,6 +475,10 @@ endif()
 
 if(INTRINSIC_BUILD_BENCHMARKS)
     add_subdirectory(benchmarks)
+endif()
+
+if(INTRINSIC_BUILD_DIAGNOSTIC_TOOLS)
+    add_subdirectory(tools/diagnostics)
 endif()
 
 if(INTRINSIC_BUILD_TESTS AND BUILD_TESTING)
