@@ -1585,3 +1585,9 @@ entries:
       - "Preserved N425 as the exact earlier 54/54 journey fact and added N428/N429 rather than silently overwriting it after two repeat failures."
       - "Marked O122, O123, O130, and O138 stale after more than three session-days without topic events or open-thread references; left O93, O118, and O137 current because runtime method integration, active reference-method work, and the live work graph were revisited."
       - "Kept BUG-154 active: the complete Vulkan cohort and label-distinct high-risk review remain unresolved even though curvature-specific CPU, sanitizer, corpus, structural, and Vulkan evidence is green."
+  - turn: "2026-08-12_001#2"
+    notes:
+      - "Routed the exact committed-source build, 4,252-case CPU pass, strict validator pass, and remote publication as experiment N431; routine status/fetch/branch-cleanup commands remained session actions rather than exploration nodes."
+      - "Added no observation or claim: this turn confirms the already crystallized C46-C49 surface and does not broaden its CPU, Vulkan, corpus, estimator-quality, or performance scope."
+      - "Did not crystallize O93, O118, or O137 and did not change existing stale flags; the Git integration and repeated verification provide no closure signal for those unrelated architecture, lifecycle, or workflow proposals."
+      - "Kept BUG-154 active and its high-risk report draft: BUG-155 and a label-distinct independent fixed-surface review remain explicit retirement blockers."

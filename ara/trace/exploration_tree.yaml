@@ -10088,3 +10088,24 @@ tree:
       - "tasks/active/BUG-154-curvature-pmp-parity-corner-normal-topology.md"
       - "N429"
     status: resolved
+  - id: N431
+    type: experiment
+    title: "Verify and publish the committed BUG-154 checkpoint"
+    provenance: ai-executed
+    timestamp: "2026-08-12T08:30+02:00"
+    also_depends_on: [N428, N430]
+    evidence:
+      - "0f133014027e413ab100fd057c51dbaf2f10460e"
+      - "03975b1a4ad0eb84866e9476d2fa999d8e61761c"
+      - "ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60"
+      - "tasks/evidence/BUG-154/report.yaml"
+    result: >
+      The exact committed source configured with Clang 23, built the complete
+      IntrinsicTests target, and passed all 4,252 selected CPU tests with only
+      the policy-gated GLFW/LeakSanitizer capability skip. Strict task,
+      workflow-evidence, documentation, layering, test-layout, root-hygiene,
+      ARA, and source-documentation checks passed. The source and draft
+      evidence commits were pushed to origin/main; all three remaining local
+      branch tips were already ancestors, and two historical stashes were
+      proven redundant against committed history before cleanup.
+    status: resolved

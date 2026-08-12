@@ -2,9 +2,9 @@ session:
   id: "2026-08-12_001"
   date: "2026-08-12"
   started: "2026-08-12T02:56+02:00"
-  last_turn: "2026-08-12T02:56+02:00"
-  turn_count: 1
-  summary: "Validated PMP curvature across the local OBJ corpus, retained it as the clean-mesh baseline after primary-literature review, completed CPU/sanitizer evidence, and isolated an unrelated repeat-only Vulkan timestamp flake as BUG-155."
+  last_turn: "2026-08-12T08:30+02:00"
+  turn_count: 2
+  summary: "Validated PMP curvature across the local OBJ corpus, retained it as the clean-mesh baseline, isolated BUG-155, and published the exact clean BUG-154 checkpoint after complete CPU verification."
 
 events_logged:
   - turn: 1
@@ -49,6 +49,12 @@ events_logged:
     routing: crystallized
     provenance: ai-suggested
     summary: "Crystallized the bounded estimator-selection conclusion through commitment of the corpus/literature report."
+  - turn: 2
+    type: experiment
+    id: "N431"
+    routing: direct
+    provenance: ai-executed
+    summary: "Verified the committed BUG-154 surface with Clang 23 and 4,252 passing CPU tests, then pushed it and removed only proven-redundant branch/stash state."
 
 ai_actions:
   - turn: 1
@@ -63,6 +69,14 @@ ai_actions:
       - "docs/reports/2026-08-12-curvature-estimator-study.md"
       - "tasks/active/BUG-154-curvature-pmp-parity-corner-normal-topology.md"
       - "tasks/backlog/bugs/BUG-155-vulkan-native-timestamp-zero-duration-flake.md"
+  - turn: 2
+    action: "Committed and pushed the complete BUG-154/BUG-155 worktree, refreshed the draft evidence binding after EOF normalization, reran the canonical Clang 23 build and 4,252-case CPU selector, and removed merged or redundant Git state only after reachability checks."
+    provenance: ai-executed
+    files_changed:
+      - "tasks/backlog/bugs/BUG-155-vulkan-native-timestamp-zero-duration-flake.md"
+      - "tasks/evidence/BUG-154/report.yaml"
+      - "tasks/evidence/BUG-154/handoff.jsonl"
+      - "tasks/evidence/BUG-154/reviews.jsonl"
 
 claims_touched:
   - id: C48
@@ -79,6 +93,8 @@ key_context:
     excerpt: "The literature does not support a universally best estimator; PMP remains the clean baseline pending one matched accuracy, robustness, directions, time, and memory study."
   - turn: 1
     excerpt: "A first 54/54 Vulkan pass was not repeatable: two full reruns failed only the native-timestamp zero-duration assertion, while isolated x3 and all BUG-154-specific GPU cases passed."
+  - turn: 2
+    excerpt: "origin/main now contains the clean BUG-154 source and draft-evidence commits; the exact committed surface passed 4,252/4,252 selected CPU tests."
 
 open_threads:
   - "Diagnose BUG-155 with raw query ticks, availability, slot/submission, valid-bit, and timestamp-period evidence; do not retry or clamp it away."

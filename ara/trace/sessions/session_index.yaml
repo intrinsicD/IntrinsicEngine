@@ -288,8 +288,8 @@ sessions:
     open_threads: 4
   - id: "2026-08-12_001"
     date: "2026-08-12"
-    summary: "Validated PMP curvature across the local OBJ corpus, retained it as the clean-mesh baseline after primary-literature review, completed CPU/sanitizer evidence, and isolated an unrelated repeat-only Vulkan timestamp flake as BUG-155."
-    turn_count: 1
-    events_count: 7
+    summary: "Validated PMP curvature across the local OBJ corpus, retained it as the clean-mesh baseline, isolated BUG-155, and published the exact clean BUG-154 checkpoint after complete CPU verification."
+    turn_count: 2
+    events_count: 8
     claims_touched: [C48, C49]
     open_threads: 4
