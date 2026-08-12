@@ -3,15 +3,15 @@ task_id: BUG-154
 workflow_profile: high-risk
 status: draft
 generated_by: tools/agents/workflow_evidence.py
-generated_at: '2026-08-12T01:03:10Z'
+generated_at: '2026-08-12T06:26:39Z'
 claim_eligible: false
 source:
   base_ref: origin/main
   base_revision: 4a043a7db0bae0d546259a0455dd92d3f0e944a5
-  head_revision: 4a043a7db0bae0d546259a0455dd92d3f0e944a5
+  head_revision: 0f133014027e413ab100fd057c51dbaf2f10460e
   branch: main
   worktree: /home/alex/Documents/IntrinsicEngine
-  dirty: true
+  dirty: false
   surface:
   - path: CMakeLists.txt
     sha256: 59e6b808f4b2be4030e8601e45e3e441c21cb3cac5ebffadd3f65a96f33a555d
@@ -90,7 +90,7 @@ source:
   - path: tasks/active/README.md
     sha256: ffad40cf575974504764f3b346e3e88411ab57da5a0994de4458714c5f0b4a73
   - path: tasks/backlog/bugs/BUG-155-vulkan-native-timestamp-zero-duration-flake.md
-    sha256: d640a82a91ec3ae21f0ddc8161b4f64f011405c1261fbc664692d9faab385c3f
+    sha256: aca1ac953bb5364f08a450898791915d04b5c9f2195c1346dad34a6e4d635496
   - path: tasks/backlog/bugs/index.md
     sha256: 8f57f5941f290b9b6cb214f07020a2638f9f6808d1eda604650cd82a73c14b0a
   - path: tests/contract/runtime/Test.AssetImportFormatCoverage.cpp
@@ -125,7 +125,7 @@ source:
     sha256: a4429bcfe5da94af0fc438cadfd951387f7cf7d7b55b9db28f2eea41f2af3db5
   - path: tools/diagnostics/curvature/compare_curvature_corpus.py
     sha256: 4e3096bfd67a19e49c504eebeffaff080e75e7e637612467f6d37b498fd1b67c
-  content_digest: 9e0e83832b51a9a034e4f875e9da50073b298ebbda3e57b501064f37e96a8a8f
+  content_digest: 293bc0501e3ad886cd1a8308de7c45c1af238c0704878274e1a362111ccbdebb
 touched:
   paths:
   - CMakeLists.txt
