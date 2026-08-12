@@ -142,7 +142,13 @@ maturity_target: Operational
       magnitude on the tent-ridge fixture.
 - [x] Published H and K equal the principal invariants exactly at every
       vertex, and diagnostics extrema bound every nonzero published value.
-- [x] The default CPU-supported gate passes on the changed surface.
+- [x] The complete geometry-layer suite passes on the changed surface
+      (1,413/1,413 in `IntrinsicGeometryTests`, including all curvature,
+      segmentation, remeshing, and simplification consumers).
+- [ ] The full default CPU gate (runtime selectors included) passes once the
+      pre-existing `BUG-157` Clang-20 build break in
+      `Test.CameraModule.cpp` is resolved; that break predates this branch
+      and blocks every full `IntrinsicTests` build on Clang-20-only hosts.
 - [ ] Reporter confirms the Sandbox visualization on the reporting asset.
 - [ ] Independent review accepts the semantics change and its documentation.
 
@@ -159,6 +165,28 @@ python3 tools/agents/check_task_policy.py --root . --strict
 python3 tools/agents/validate_tasks.py --root tasks --strict
 python3 tools/docs/check_doc_links.py --root .
 ```
+
+Recorded results on 2026-08-12 (remote session, Clang-20-only host):
+
+- `IntrinsicGeometryTests` (canonical `ci` tree): 1,413/1,413 passed,
+  including all 20 `CurvatureTensor` cases (new oracle, crease-flank,
+  sculpt-asset, open-mesh-invariant regressions) and every geometry-layer
+  curvature consumer (segmentation, remeshing, simplification, patches).
+- `IntrinsicCurvatureCorpusProbe` differential on `tests/data/sculpt.obj`:
+  pre-fix engine equals the independent replica to `1.4e-14` and shows the
+  65-vertex zero bands; post-fix engine measures 0.07% median relative H
+  deviation from the Meyer cross-check with zero zero-band or sign-flip
+  vertices and full 3,669-vertex support; fixture-grid oracle agreement
+  `3e-16`.
+- Strict layering, test-layout, and doc-link checks pass; the ARA ledger
+  validates (50 claims). `validate_tasks --strict` reports 763 pre-existing
+  findings in this shallow checkout with or without this change — the same
+  legacy-inventory `source_revision` readability defect that fails `full-cpu`
+  on `main` (reported on PR #1028).
+- Full `IntrinsicTests` builds are blocked on this host by the pre-existing
+  Clang-20 glm/module defect now tracked as `BUG-157`
+  (`Test.CameraModule.cpp`, untouched by this branch); the runtime-layer
+  curvature selectors therefore still owe a run on a Clang-23-capable host.
 
 ## Forbidden changes
 

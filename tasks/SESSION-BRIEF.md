@@ -48,6 +48,7 @@ the authoritative open/unblocked view.
 - unblocked: `BUG-118` — GLFW X11 input-method LeakSanitizer recurrence (tasks/backlog/bugs/BUG-118-glfw-x11-input-method-lsan-recurrence.md)
 - unblocked: `BUG-149` — Benchmark sealer escapes dotted output directories (tasks/backlog/bugs/BUG-149-benchmark-sealer-dotted-output-directory.md)
 - unblocked: `BUG-155` — Native Vulkan timestamp smoke intermittently publishes zero duration (tasks/backlog/bugs/BUG-155-vulkan-native-timestamp-zero-duration-flake.md)
+- unblocked: `BUG-157` — Clang 20 fails IntrinsicTests on glm anonymous-union redeclaration (tasks/backlog/bugs/BUG-157-clang20-glm-module-union-build-break.md)
 
 ## Theme H — Agentic workflow hardening
 
