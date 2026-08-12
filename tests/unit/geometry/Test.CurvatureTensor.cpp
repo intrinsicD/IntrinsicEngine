@@ -4,6 +4,7 @@
 #include <array>
 #include <cmath>
 #include <cstdint>
+#include <filesystem>
 #include <limits>
 #include <numbers>
 #include <optional>
@@ -322,7 +323,7 @@ TEST(CurvatureTensor, ReversingOrientationSwapsAnisotropicOrderedPairs)
         inwardResult->PrincipalDir1Property[vertex])), 0.999f);
 }
 
-TEST(CurvatureTensor, MatchesPmpTensorAndSmoothingOracle)
+TEST(CurvatureTensor, MatchesEdgeDihedralReferenceOracle)
 {
     auto mesh = MakeHeightGrid(
         1.0,
@@ -336,28 +337,31 @@ TEST(CurvatureTensor, MatchesPmpTensorAndSmoothingOracle)
     EXPECT_EQ(result->Diagnostics.SupportedVertexCount, 25u);
     EXPECT_EQ(result->Diagnostics.NonZeroPrincipalVertexCount, 25u);
 
-    // Generated from pmp-library's CurvatureAnalyzer::analyze_tensor with a
-    // two-ring neighbourhood and three post-smoothing steps on this exact mesh.
+    // Generated from an independent NumPy replica of the one-ring signed
+    // edge-dihedral formulation (no post-smoothing, uniform boundary
+    // interpolation) on this exact float-quantized mesh. Distinguishes the
+    // superseded two-ring/triple-smoothing pipeline, whose values differ in
+    // the second decimal.
     constexpr std::array<double, 25> expectedMinimum{
-        -0.29810872673988342, -0.29829162359237671, -0.29788762331008911,
-        -0.29596370458602905, -0.29512399435043335, -0.29851984977722168,
-        -0.29860851168632507, -0.29793629050254822, -0.29596918821334839,
-        -0.29515546560287476, -0.29901987314224243, -0.29885548353195190,
-        -0.29762744903564453, -0.29554596543312073, -0.29478919506072998,
-        -0.29874613881111145, -0.29869282245635986, -0.29760706424713135,
-        -0.29525029659271240, -0.29430866241455078, -0.29840597510337830,
-        -0.29840514063835144, -0.29746380448341370, -0.29501923918724060,
-        -0.29400658607482910};
+        -0.30763604818085394, -0.30763604818085394, -0.30203228463579473,
+        -0.30107879285620004, -0.30107879285620004, -0.30763604818085394,
+        -0.30763604818085394, -0.29738201287033017, -0.30107879285620004,
+        -0.30107879285620004, -0.30284621585438321, -0.29181010591874701,
+        -0.31685407473095040, -0.28462753927691398, -0.29478966003858620,
+        -0.30909249346354861, -0.30909249346354861, -0.29606906482768247,
+        -0.29866264798264458, -0.29866264798264458, -0.30909249346354861,
+        -0.30909249346354861, -0.30127473542462524, -0.29866264798264458,
+        -0.29866264798264458};
     constexpr std::array<double, 25> expectedMaximum{
-        0.16148681938648224, 0.16188250482082367, 0.16216836869716644,
-        0.16133323311805725, 0.16078929603099823, 0.16203495860099792,
-        0.16238139569759369, 0.16251479089260101, 0.16180033981800079,
-        0.16130009293556213, 0.16276261210441589, 0.16297620534896851,
-        0.16286219656467438, 0.16235083341598511, 0.16196011006832123,
-        0.16189183294773102, 0.16223013401031494, 0.16237723827362061,
-        0.16169497370719910, 0.16119705140590668, 0.16129149496555328,
-        0.16168102622032166, 0.16199369728565216, 0.16120360791683197,
-        0.16066427528858185};
+        0.17454539053529400, 0.17454539053529400, 0.16833233952847096,
+        0.17326714295448911, 0.17326714295448911, 0.17454539053529400,
+        0.17454539053529400, 0.15718448509562977, 0.17326714295448911,
+        0.17326714295448911, 0.16884770609030286, 0.15734881250747568,
+        0.17811381091552106, 0.15619334591518119, 0.16722405894622683,
+        0.17464891522813897, 0.17464891522813897, 0.15695800622893832,
+        0.17221168796901024, 0.17221168796901024, 0.17464891522813897,
+        0.17464891522813897, 0.16793953647536250, 0.17221168796901024,
+        0.17221168796901024};
 
     ASSERT_EQ(mesh.VerticesSize(), expectedMinimum.size());
     for (std::size_t i = 0; i < mesh.VerticesSize(); ++i)
@@ -366,12 +370,12 @@ TEST(CurvatureTensor, MatchesPmpTensorAndSmoothingOracle)
         EXPECT_NEAR(
             result->MinPrincipalCurvatureProperty[vertex],
             expectedMinimum[i],
-            2.0e-6)
+            1.0e-12)
             << "vertex " << i;
         EXPECT_NEAR(
             result->MaxPrincipalCurvatureProperty[vertex],
             expectedMaximum[i],
-            2.0e-6)
+            1.0e-12)
             << "vertex " << i;
     }
 }
@@ -605,7 +609,7 @@ TEST(CurvatureTensor, Deterministic)
 
 // =============================================================================
 // The standalone Meyer scalar operators remain available independently of the
-// coherent Taubin full field.
+// coherent edge-dihedral full field.
 // =============================================================================
 
 TEST(CurvatureTensor, StandaloneScalarOperatorsRemainAvailable)
@@ -712,4 +716,217 @@ TEST(CurvatureTensor, FlatRegionPublishesFiniteZeroDirections)
         EXPECT_TRUE(std::isfinite(result->MaxPrincipalCurvatureProperty[vh]));
         EXPECT_TRUE(std::isfinite(result->MinPrincipalCurvatureProperty[vh]));
     }
+}
+
+// =============================================================================
+// BUG-156 — sharp-crease flanks must keep their genuine curvature. The
+// superseded two-ring support integrated crease bending into flanking smooth
+// vertices, and the three damped eigenvalue-smoothing passes then cancelled
+// their mean curvature toward zero (up to 79% loss on this fixture).
+// =============================================================================
+
+TEST(CurvatureTensor, CreaseFlanksKeepGenuineCurvature)
+{
+    // Tent ridge along x = 0 with parabolic flanks. The independent Meyer
+    // cotan operator supplies the per-vertex cross-check magnitude.
+    constexpr int cells = 20;
+    auto mesh = MakeHeightGrid(
+        1.0,
+        cells,
+        [](double x, double) { return -0.6 * std::abs(x) + 0.55 * x * x; });
+
+    auto meyer = Curv::ComputeMeanCurvature(mesh);
+    ASSERT_TRUE(meyer.has_value());
+    // ComputeCurvature republishes the same property names, so copy first.
+    const std::vector<double> meyerMean = meyer->Property.Vector();
+
+    const Curv::CurvatureField field = Curv::ComputeCurvature(mesh);
+
+    constexpr int n = cells + 1;
+    int probed = 0;
+    for (int iy = 7; iy <= 13; ++iy)
+    {
+        for (const int ix : {12, 13})
+        {
+            const VertexHandle vertex{
+                static_cast<PropertyIndex>(iy * n + ix)};
+            ASSERT_FALSE(mesh.IsBoundary(vertex));
+            const double meanTensor = field.MeanCurvatureProperty[vertex];
+            const double meanMeyer = meyerMean[vertex.Index];
+            ASSERT_GT(std::abs(meanMeyer), 0.2);
+            EXPECT_GT(meanTensor * meanMeyer, 0.0)
+                << "sign flip at (" << ix << ", " << iy << ")";
+            EXPECT_GE(std::abs(meanTensor), 0.3 * std::abs(meanMeyer))
+                << "curvature lost at (" << ix << ", " << iy << ")";
+            ++probed;
+        }
+    }
+    EXPECT_EQ(probed, 14);
+}
+
+// =============================================================================
+// BUG-156 acceptance — the closed genus-2 sculpt asset that exposed the
+// defect: every vertex is interior with clean support, and the independent
+// Meyer field shows |H| >= ~1.9 everywhere, yet the superseded pipeline
+// published 65 near-zero vertices and 917 sign flips.
+// =============================================================================
+
+TEST(CurvatureTensor, SculptAssetHasNoZeroCurvatureBands)
+{
+    const std::filesystem::path fixture =
+        std::filesystem::path(__FILE__)
+            .parent_path()
+            .parent_path()
+            .parent_path()
+        / "data" / "sculpt.obj";
+    ASSERT_TRUE(std::filesystem::exists(fixture)) << fixture.string();
+
+    auto payload = Geometry::MeshIO::LoadOBJ(fixture.string());
+    ASSERT_TRUE(payload.has_value());
+    const auto positions = payload->Vertices.Get<glm::vec3>("v:point");
+    const auto faces =
+        payload->Faces.Get<std::vector<std::uint32_t>>("f:vertices");
+    ASSERT_TRUE(positions.IsValid());
+    ASSERT_TRUE(faces.IsValid());
+    std::vector<std::uint32_t> indices;
+    indices.reserve(faces.Vector().size() * 3u);
+    for (const std::vector<std::uint32_t>& face : faces.Vector())
+    {
+        ASSERT_EQ(face.size(), 3u);
+        indices.insert(indices.end(), face.begin(), face.end());
+    }
+    auto built = MU::BuildHalfedgeMeshFromIndexedTriangles(
+        positions.Vector(), indices);
+    ASSERT_TRUE(built.has_value());
+    Geometry::HalfedgeMesh::Mesh& mesh = *built;
+    ASSERT_EQ(mesh.VertexCount(), 3669u);
+    ASSERT_EQ(mesh.EdgeCount(), 11013u);
+    ASSERT_EQ(mesh.FaceCount(), 7342u);
+    for (std::size_t i = 0; i < mesh.VerticesSize(); ++i)
+    {
+        ASSERT_FALSE(mesh.IsBoundary(
+            VertexHandle{static_cast<PropertyIndex>(i)}));
+    }
+
+    auto meyer = Curv::ComputeMeanCurvature(mesh);
+    ASSERT_TRUE(meyer.has_value());
+    const std::vector<double> meyerMean = meyer->Property.Vector();
+
+    const Curv::CurvatureField field = Curv::ComputeCurvature(mesh);
+    EXPECT_EQ(field.Diagnostics.SupportedVertexCount, 3669u);
+    EXPECT_EQ(field.Diagnostics.NonZeroPrincipalVertexCount, 3669u);
+
+    const auto medianAbs = [](std::vector<double> values)
+    {
+        for (double& value : values)
+            value = std::abs(value);
+        const std::size_t middle = values.size() / 2u;
+        std::nth_element(values.begin(), values.begin() + middle, values.end());
+        return values[middle];
+    };
+    const std::vector<double> tensorMean =
+        field.MeanCurvatureProperty.Vector();
+    const double tensorScale = medianAbs(tensorMean);
+    const double meyerScale = medianAbs(meyerMean);
+    ASSERT_GT(tensorScale, 0.0);
+    ASSERT_GT(meyerScale, 0.0);
+
+    std::size_t zeroBand = 0;
+    std::size_t signFlips = 0;
+    for (std::size_t i = 0; i < tensorMean.size(); ++i)
+    {
+        const bool meyerCurved = std::abs(meyerMean[i]) > 0.5 * meyerScale;
+        if (meyerCurved && std::abs(tensorMean[i]) < 0.05 * tensorScale)
+            ++zeroBand;
+        if (meyerCurved && std::abs(tensorMean[i]) > 0.1 * tensorScale
+            && tensorMean[i] * meyerMean[i] < 0.0)
+        {
+            ++signFlips;
+        }
+    }
+    // Superseded pipeline: 65 zero-band vertices and 917 sign flips.
+    EXPECT_EQ(zeroBand, 0u);
+    EXPECT_EQ(signFlips, 0u);
+}
+
+// =============================================================================
+// Published H and K equal the principal invariants at every vertex, including
+// unsupported vertices holding zero sentinels; diagnostics extrema bound every
+// nonzero published value. The superseded smoothing violated both at boundary
+// vertices with no interior one-ring neighbour (BUG-154 review finding).
+// =============================================================================
+
+TEST(CurvatureTensor, OpenMeshFullFieldKeepsPrincipalInvariants)
+{
+    // Uniform (non-alternating) diagonals leave two grid corners without an
+    // interior one-ring neighbour, so those vertices stay unsupported while
+    // their boundary neighbours carry interpolated values.
+    constexpr int cells = 4;
+    constexpr int n = cells + 1;
+    std::vector<glm::vec3> pos;
+    for (int iy = 0; iy < n; ++iy)
+    {
+        for (int ix = 0; ix < n; ++ix)
+        {
+            const double x = -1.0 + 2.0 * ix / cells;
+            const double y = -1.0 + 2.0 * iy / cells;
+            pos.push_back(glm::vec3(
+                static_cast<float>(x),
+                static_cast<float>(y),
+                static_cast<float>(0.2 * (x * x + y * y))));
+        }
+    }
+    std::vector<std::uint32_t> idx;
+    for (int iy = 0; iy < cells; ++iy)
+    {
+        for (int ix = 0; ix < cells; ++ix)
+        {
+            const std::uint32_t v00 = static_cast<std::uint32_t>(iy * n + ix);
+            const std::uint32_t v10 = v00 + 1;
+            const std::uint32_t v01 = static_cast<std::uint32_t>((iy + 1) * n + ix);
+            const std::uint32_t v11 = v01 + 1;
+            idx.insert(idx.end(), {v00, v10, v11, v00, v11, v01});
+        }
+    }
+    auto built = MU::BuildHalfedgeMeshFromIndexedTriangles(pos, idx);
+    ASSERT_TRUE(built.has_value());
+    Geometry::HalfedgeMesh::Mesh& mesh = *built;
+
+    const Curv::CurvatureField field = Curv::ComputeCurvature(mesh);
+
+    std::size_t nonZero = 0;
+    bool sawUnsupported = false;
+    for (std::size_t i = 0; i < mesh.VerticesSize(); ++i)
+    {
+        const VertexHandle vertex{static_cast<PropertyIndex>(i)};
+        const double maxPrincipal =
+            field.MaxPrincipalCurvatureProperty[vertex];
+        const double minPrincipal =
+            field.MinPrincipalCurvatureProperty[vertex];
+        EXPECT_DOUBLE_EQ(
+            field.MeanCurvatureProperty[vertex],
+            0.5 * (maxPrincipal + minPrincipal));
+        EXPECT_DOUBLE_EQ(
+            field.GaussianCurvatureProperty[vertex],
+            maxPrincipal * minPrincipal);
+        if (maxPrincipal != 0.0 || minPrincipal != 0.0)
+        {
+            ++nonZero;
+            EXPECT_GE(
+                maxPrincipal, field.Diagnostics.MinimumPrincipalValue);
+            EXPECT_LE(
+                maxPrincipal, field.Diagnostics.MaximumPrincipalValue);
+            EXPECT_GE(
+                minPrincipal, field.Diagnostics.MinimumPrincipalValue);
+            EXPECT_LE(
+                minPrincipal, field.Diagnostics.MaximumPrincipalValue);
+        }
+        else
+        {
+            sawUnsupported = true;
+        }
+    }
+    EXPECT_EQ(nonZero, field.Diagnostics.NonZeroPrincipalVertexCount);
+    EXPECT_TRUE(sawUnsupported)
+        << "fixture should contain an unsupported corner vertex";
 }

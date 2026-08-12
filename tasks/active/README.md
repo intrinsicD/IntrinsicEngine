@@ -15,6 +15,12 @@ Each active task should include:
   — in progress on `main`; fixes the reference smoothing/estimator semantics,
   preserves OBJ normals on the corner domain, and prevents false all-zero
   curvature success.
+- [`BUG-156` — Two-ring support and eigenvalue smoothing cancel genuine curvature](BUG-156-curvature-two-ring-smoothing-cancels-features.md)
+  — in progress on `claude/mesh-curvature-analysis-4zvnwi`, owned by `claude`;
+  narrows hinge support to one-ring and publishes unsmoothed eigenvalues so
+  crease-adjacent curvature is no longer cancelled into zero bands on
+  `tests/data/sculpt.obj`; next step is the reporter's Sandbox visual
+  confirmation and independent review.
 - [`METHOD-039` — Feature-network-constrained curvature patch decomposition](METHOD-039-feature-network-curvature-patch-decomposition.md)
   — in progress on `main`, owned by `codex-root`; Slice A freezes the practical
   equations, inherited METHOD-038 evidence boundary, supplied-feature seam, and

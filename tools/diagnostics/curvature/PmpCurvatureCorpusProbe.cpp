@@ -108,14 +108,18 @@ namespace
 
 int main(int argc, char** argv)
 {
-    if (argc < 3 || argc > 5)
+    if (argc < 3 || argc > 6)
     {
         std::cerr << "usage: PmpCurvatureCorpusProbe INPUT.obj OUTPUT.bin "
-                     "[repetitions] [smoothing_steps]\n";
+                     "[repetitions] [smoothing_steps] [two_ring 0|1]\n";
         return 2;
     }
     std::size_t repetitions = 1u;
-    std::size_t smoothingSteps = 3u;
+    // Defaults mirror the corrected Intrinsic configuration (BUG-156):
+    // one-ring hinge support, no post-smoothing. Pass `3 1` to reproduce the
+    // superseded PMP-default comparison.
+    std::size_t smoothingSteps = 0u;
+    bool twoRing = false;
     if (argc >= 4)
     {
         try
@@ -127,11 +131,22 @@ int main(int argc, char** argv)
             return 2;
         }
     }
-    if (argc == 5)
+    if (argc >= 5)
     {
         try
         {
             smoothingSteps = std::stoull(argv[4]);
+        }
+        catch (...)
+        {
+            return 2;
+        }
+    }
+    if (argc == 6)
+    {
+        try
+        {
+            twoRing = std::stoull(argv[5]) != 0u;
         }
         catch (...)
         {
@@ -158,7 +173,7 @@ int main(int argc, char** argv)
 
     pmp::curvature(
         mesh, pmp::Curvature::max,
-        static_cast<int>(smoothingSteps), true, true);
+        static_cast<int>(smoothingSteps), twoRing, true);
     std::vector<double> samples{};
     samples.reserve(repetitions);
     for (std::size_t iteration = 0u; iteration < repetitions; ++iteration)
@@ -166,7 +181,7 @@ int main(int argc, char** argv)
         const auto begin = std::chrono::steady_clock::now();
         pmp::curvature(
             mesh, pmp::Curvature::max,
-            static_cast<int>(smoothingSteps), true, true);
+            static_cast<int>(smoothingSteps), twoRing, true);
         const auto end = std::chrono::steady_clock::now();
         samples.push_back(std::chrono::duration<double, std::milli>(
             end - begin).count());
@@ -174,14 +189,14 @@ int main(int argc, char** argv)
 
     pmp::curvature(
         mesh, pmp::Curvature::min,
-        static_cast<int>(smoothingSteps), true, true);
+        static_cast<int>(smoothingSteps), twoRing, true);
     auto property = mesh.get_vertex_property<pmp::Scalar>("v:curv");
     std::vector<double> minimum(mesh.n_vertices(), 0.0);
     for (const pmp::Vertex vertex : mesh.vertices())
         minimum[vertex.idx()] = property[vertex];
     pmp::curvature(
         mesh, pmp::Curvature::max,
-        static_cast<int>(smoothingSteps), true, true);
+        static_cast<int>(smoothingSteps), twoRing, true);
     std::vector<double> maximum(mesh.n_vertices(), 0.0);
     for (const pmp::Vertex vertex : mesh.vertices())
         maximum[vertex.idx()] = property[vertex];

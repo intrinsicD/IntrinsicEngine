@@ -9,6 +9,7 @@ the authoritative open/unblocked view.
 ## Active tasks
 
 - `BUG-154` — Restore PMP curvature parity without normal-seam topology loss (tasks/active/BUG-154-curvature-pmp-parity-corner-normal-topology.md)
+- `BUG-156` — Two-ring support and eigenvalue smoothing cancel genuine curvature (tasks/active/BUG-156-curvature-two-ring-smoothing-cancels-features.md)
 - `METHOD-039` — Feature-network-constrained curvature patch decomposition (tasks/active/METHOD-039-feature-network-curvature-patch-decomposition.md)
 
 ## Theme B — Rendering modernization
