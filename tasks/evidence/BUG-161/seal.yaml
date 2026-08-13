@@ -1,0 +1,13 @@
+schema_version: 1
+task_id: BUG-161
+sealed_revision: 6ef57b1f854d9c34f41461bda739a0e66fb5a14f
+source_content_digest: fea3683d9608f68c6e6420b162f92e00c21331341f5d11541edcc7fcd4c92e67
+report_sha256: 68534be01c99745ef8c26007d1cfa254725ca244af99e11ee84ccda977ddda1f
+records:
+- path: tasks/evidence/BUG-161/handoff.jsonl
+  sha256: 804a85176425d6e5c2d52de3ff25b0febe2a0e541c143957ab8bd7870be5c273
+- path: tasks/evidence/BUG-161/reviews.jsonl
+  sha256: 1d4f1f27ec2000a21ba274a2dc3b1c8384c24f55df705583aad7ce2e760c9ef6
+reason: Bind accepted revision-2 BUG-161 report, task ownership reconciliation, handoff, receipts, and
+  fixed-surface reviews to retirement commit 6ef57b1f
+generated_by: tools/agents/workflow_evidence.py
