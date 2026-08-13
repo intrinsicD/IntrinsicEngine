@@ -2,9 +2,9 @@ session:
   id: "2026-08-12_001"
   date: "2026-08-12"
   started: "2026-08-12T02:56+02:00"
-  last_turn: "2026-08-12T08:30+02:00"
-  turn_count: 2
-  summary: "Validated PMP curvature across the local OBJ corpus, retained it as the clean-mesh baseline, isolated BUG-155, and published the exact clean BUG-154 checkpoint after complete CPU verification."
+  last_turn: "2026-08-12T23:13+02:00"
+  turn_count: 3
+  summary: "Validated current one-ring curvature live against archived BCG, localized BCG normalization and Sandbox presentation differences, and rejected eig3x3 as the curvature fix while defining a reusable solver direction."
 
 events_logged:
   - turn: 1
@@ -55,6 +55,60 @@ events_logged:
     routing: direct
     provenance: ai-executed
     summary: "Verified the committed BUG-154 surface with Clang 23 and 4,252 passing CPU tests, then pushed it and removed only proven-redundant branch/stash state."
+  - turn: 3
+    type: question
+    id: "N434"
+    routing: direct
+    provenance: user
+    summary: "Opened a paper/code audit for a reusable 3x3 eigensolver and requested a live Xephyr comparison of archived BCG with current Sandbox curvature."
+  - turn: 3
+    type: experiment
+    id: "N435"
+    routing: direct
+    provenance: ai-executed
+    summary: "Audited eig3x3 scope, C++ compatibility, scale homogeneity, accuracy, and local timing against full symmetric 3x3 eigensystem candidates."
+  - turn: 3
+    type: experiment
+    id: "N436"
+    routing: direct
+    provenance: ai-executed
+    summary: "Ran isolated live BCG and Sandbox sessions on sculpt.obj and localized the numeric transform to sign convention plus framework24 mixed-area factors."
+  - turn: 3
+    type: dead_end
+    id: "N437"
+    routing: direct
+    provenance: ai-executed
+    summary: "Rejected eigensolver replacement as the current sculpt curvature fix; field publication, estimator defaults, range, and colormap explain the live mismatch."
+  - turn: 3
+    type: observation
+    id: "O155"
+    routing: staged
+    provenance: ai-suggested
+    summary: "Staged eig3x3 as a scaled values-only candidate rather than a full geometry eigensystem."
+  - turn: 3
+    type: observation
+    id: "O156"
+    routing: staged
+    provenance: ai-suggested
+    summary: "Staged the legacy framework24 mixed-area and sign-convention explanation for the measured scalar transform."
+  - turn: 3
+    type: observation
+    id: "O157"
+    routing: staged
+    provenance: ai-suggested
+    summary: "Staged a single free symmetric-3x3 eigensystem contract in Geometry.Linalg without a backend hierarchy."
+  - turn: 3
+    type: observation
+    id: "O158"
+    routing: staged
+    provenance: ai-suggested
+    summary: "Staged runtime publication of both principal scalar properties for like-for-like inspection."
+  - turn: 3
+    type: observation
+    id: "O159"
+    routing: staged
+    provenance: ai-suggested
+    summary: "Staged zero-centered diverging visualization as the default for signed curvature fields."
 
 ai_actions:
   - turn: 1
@@ -77,6 +131,12 @@ ai_actions:
       - "tasks/evidence/BUG-154/report.yaml"
       - "tasks/evidence/BUG-154/handoff.jsonl"
       - "tasks/evidence/BUG-154/reviews.jsonl"
+  - turn: 3
+    action: "Reviewed the eig3x3 paper and implementation, exercised scale and full-eigenpair candidates, built a temporary archived BCG app, ran BCG and Sandbox under separate software-rendered Xephyr servers, exported and compared matched curvature fields, stopped the live processes, and recorded non-claim evidence without changing production code."
+    provenance: ai-executed
+    files_changed:
+      - "ara/evidence/README.md"
+      - "ara/evidence/tables/eig3x3_live_curvature_diagnostic_2026-08-12.md"
 
 claims_touched:
   - id: C48
@@ -95,12 +155,22 @@ key_context:
     excerpt: "A first 54/54 Vulkan pass was not repeatable: two full reruns failed only the native-timestamp zero-duration assertion, while isolated x3 and all BUG-154-specific GPU cases passed."
   - turn: 2
     excerpt: "origin/main now contains the clean BUG-154 source and draft-evidence commits; the exact committed surface passed 4,252/4,252 selected CPU tests."
+  - turn: 3
+    excerpt: "Under matched one-ring support, Intrinsic mean curvature is approximately -2 times archived BCG mean curvature with 9.67e-7 median absolute error and 0.999034 correlation."
+  - turn: 3
+    excerpt: "BCG defaults to kmin/two-ring/three smoothing passes/Jet/exact extrema; Sandbox exposes mean/one-ring/no smoothing/Viridis/2nd-98th percentiles."
+  - turn: 3
+    excerpt: "eig3x3 computes eigenvalues only and needs a C adapter or port plus explicit pre-scaling; it cannot provide curvature directions or PCA frames."
 
 open_threads:
   - "Diagnose BUG-155 with raw query ticks, availability, slot/submission, valid-bit, and timestamp-period evidence; do not retry or clamp it away."
   - "Obtain a label-distinct fixed-surface review for BUG-154 after the complete promoted-Vulkan dependency is restored."
   - "Run a controlled common-corpus comparison of PMP, Rusinkiewicz, and corrected measures before introducing a curvature backend axis."
   - "Keep METHOD-037 cpu_reference_v1 as the production curvature-segmentation selector until its separate candidate-v2 protocol passes."
+  - "If authorized, publish kmin/kmax through runtime and add signed zero-centered diverging curvature visualization before changing the estimator or eigensolver."
+  - "If authorized, consolidate PCA and curvature on one scaled fixed-size symmetric 3x3 eigensystem contract with focused residual, orthogonality, degeneracy, and scale tests."
+  - "Obtain reporter confirmation of the corrected one-ring unsmoothed curvature view before retiring BUG-156."
 
 ai_suggestions_pending:
   - "Evaluate Rusinkiewicz first as the smallest interactive irregular-mesh alternative, but include corrected measures in the same frozen accuracy/robustness benchmark before adoption."
+  - "Use fixed-size Eigen self-adjoint QR as the simplest reusable reference eigensystem, retaining Habera only for a future benchmark-proven values-only hot path."

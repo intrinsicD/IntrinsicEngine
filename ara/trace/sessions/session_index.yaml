@@ -288,8 +288,8 @@ sessions:
     open_threads: 4
   - id: "2026-08-12_001"
     date: "2026-08-12"
-    summary: "Validated PMP curvature across the local OBJ corpus, retained it as the clean-mesh baseline, isolated BUG-155, and published the exact clean BUG-154 checkpoint after complete CPU verification."
-    turn_count: 2
-    events_count: 8
+    summary: "Validated current one-ring curvature live against archived BCG, localized BCG normalization and Sandbox presentation differences, and rejected eig3x3 as the curvature fix while defining a reusable solver direction."
+    turn_count: 3
+    events_count: 17
     claims_touched: [C48, C49]
-    open_threads: 4
+    open_threads: 7

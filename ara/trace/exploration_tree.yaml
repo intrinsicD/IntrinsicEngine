@@ -10157,3 +10157,94 @@ tree:
       - "N432"
       - "C50"
     status: resolved
+  - id: N434
+    type: question
+    title: "Evaluate a reusable 3x3 eigensolver and the remaining live curvature mismatch"
+    provenance: user
+    timestamp: "2026-08-12T23:13+02:00"
+    description: >
+      Determine whether Habera and Zilian's eig3x3 implementation is an
+      appropriate performant reusable C++ eigensolver for IntrinsicEngine,
+      design a better alternative if it is not, and compare the archived BCG
+      application with the current Sandbox live under Xephyr to explain the
+      still-wrong-looking curvature values.
+    status: resolved
+  - id: N435
+    type: experiment
+    title: "Audit eig3x3 and full symmetric 3x3 eigensolver candidates"
+    provenance: ai-executed
+    timestamp: "2026-08-12T23:13+02:00"
+    also_depends_on: [N434]
+    evidence:
+      - "ara/evidence/tables/eig3x3_live_curvature_diagnostic_2026-08-12.md"
+      - "https://arxiv.org/abs/2511.00292"
+      - "https://github.com/michalhabera/eig3x3/tree/d0f2118705cf30ce7d585302c832829497e143f5"
+      - "src/geometry/Geometry.HalfedgeMesh.Curvature.cpp"
+      - "src/geometry/Geometry.PCA.cpp"
+    result: >
+      The reviewed eig3x3 symmetric routine computes eigenvalues only, is a
+      C11 rather than C++23 surface, and needs explicit max-absolute input
+      scaling to preserve homogeneity at 1e-200 and 1e200. A local non-claim
+      250,000-matrix probe measured 61.14 ns per values-only eig3x3 call,
+      254.94 ns for Intrinsic's full maximal-pivot Jacobi eigensystem, and
+      259.93 ns for Eigen's fixed-size full symmetric QR eigensystem. The
+      current Jacobi and Eigen QR controls remained accurate over the tested
+      1e-200 through 1e200 rotated spectra. PCA's independent closed form,
+      rather than the curvature solver, contains the absolute scale floor and
+      clustered-eigenvector weaknesses that justify consolidation.
+    status: resolved
+  - id: N436
+    type: experiment
+    title: "Compare archived BCG and current Sandbox curvature live under Xephyr"
+    provenance: ai-executed
+    timestamp: "2026-08-12T23:13+02:00"
+    also_depends_on: [N434, N435, N433]
+    evidence:
+      - "ara/evidence/tables/eig3x3_live_curvature_diagnostic_2026-08-12.md"
+      - "tests/data/sculpt.obj"
+      - "experimental/framework24/lib_bcg_framework/src/bcg_mesh_curvature_taubin.cpp"
+      - "experimental/framework24/lib_bcg_framework/src/bcg_mesh_vertex_voronoi_area.cpp"
+      - "src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Mesh.cpp"
+      - "src/runtime/Visualization/Runtime.VisualizationRecipes.cpp"
+    result: >
+      Isolated software-rendered BCG and Sandbox processes loaded the exact
+      3,669-vertex sculpt.obj. BCG defaulted to kmin, two-ring support, three
+      smoothing passes, Jet, and exact extrema; Sandbox exposed mean
+      curvature, one-ring support, no smoothing, Viridis, and 2nd/98th
+      percentiles. Under matched one-ring support, Intrinsic H approximately
+      equaled -2 times BCG H with 9.67e-7 median absolute error and 0.999034
+      correlation. The sign is Intrinsic's deliberate outward-convex-positive
+      convention; the scale comes from framework24's mixed-area routine,
+      which doubles acute-triangle area contributions and halves obtuse
+      allocations. The model is 99.66 percent acute. BCG itself uses Eigen's
+      self-adjoint eigensolver, so the eigensolver does not explain the live
+      field or display discrepancy. All application and Xephyr processes were
+      stopped after capture.
+    status: resolved
+  - id: N437
+    type: dead_end
+    title: "Reject eigensolver replacement as the current sculpt curvature fix"
+    provenance: ai-executed
+    timestamp: "2026-08-12T23:13+02:00"
+    also_depends_on: [N435, N436]
+    hypothesis: >
+      Replacing Intrinsic's private 3x3 Jacobi eigensolver with eig3x3 or
+      another symmetric solver will correct the current sculpt curvature
+      values and make the Sandbox agree visually with archived BCG.
+    failure_mode: >
+      Intrinsic's solver passed extreme-scale controls, BCG uses an independent
+      Eigen solver, and the matched scalar fields correlate above 0.996 after
+      accounting for an explicitly localized sign convention and legacy BCG
+      mixed-area normalization. The remaining visible difference is dominated
+      by different published fields, estimator parameters, colormaps, and
+      automatic ranges.
+    lesson: >
+      Repair scalar publication and signed-curvature visualization before a
+      solver consolidation. Consolidate the eigensolver to remove PCA's real
+      numerical weakness and duplicate implementations, not as a curvature
+      value correction.
+    evidence:
+      - "N435"
+      - "N436"
+      - "ara/evidence/tables/eig3x3_live_curvature_diagnostic_2026-08-12.md"
+    status: resolved

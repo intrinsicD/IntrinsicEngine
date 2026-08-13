@@ -7,3 +7,7 @@
   — local non-claim comparison isolating OBJ topology loss, smoothing-stencil
   divergence, uniform-scale defects, and malformed-support behavior across a
   deterministic OBJ corpus sample.
+- [3x3 eigensolver and live curvature diagnostic](tables/eig3x3_live_curvature_diagnostic_2026-08-12.md)
+  — local non-claim paper/code audit plus an isolated Xephyr comparison that
+  separates solver behavior, legacy area normalization, estimator parameters,
+  published scalar choice, and visualization range.

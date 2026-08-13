@@ -2792,3 +2792,101 @@ observations:
     promoted_to: "logic/claims.md:C50"
     crystallized_via: artifact-commitment
     stale: false
+  - id: O155
+    timestamp: "2026-08-12T23:13+02:00"
+    provenance: ai-suggested
+    content: >
+      Habera and Zilian's eig3x3 is a useful candidate only for a present
+      values-only 3x3 hot path after explicit max-absolute pre-scaling and a
+      maintained C++ integration; it is not a full reusable geometry
+      eigensystem or a drop-in replacement for curvature directions, PCA
+      frames, or oriented bounding-box axes.
+    context: >
+      Paper, C11 source, compilation, homogeneity, accuracy, and local timing
+      audit against Intrinsic Jacobi, Eigen fixed symmetric QR/direct, and the
+      Geometric Tools iterative solver. The timing probe is local non-claim
+      evidence rather than a benchmark result.
+    potential_type: claim
+    bound_to: [N435]
+    promoted: false
+    promoted_to: null
+    crystallized_via: null
+    stale: false
+  - id: O156
+    timestamp: "2026-08-12T23:13+02:00"
+    provenance: ai-suggested
+    content: >
+      In archived framework24, the mixed Voronoi area routine doubles the
+      acute-triangle Meyer contribution and halves the obtuse allocation;
+      combined with its opposite signed-dihedral convention, this explains
+      the near-exact sign, principal-slot swap, factor-of-two principal/mean,
+      and factor-of-four Gaussian relationship to current Intrinsic values on
+      sculpt.obj.
+    context: >
+      Live Xephyr comparison and exported 3,669-slot scalar fields localized
+      the transform to the pre-eigendecomposition area normalization. The
+      model contains 7,317 acute and 25 obtuse triangles.
+    potential_type: claim
+    bound_to: [N436]
+    promoted: false
+    promoted_to: null
+    crystallized_via: null
+    stale: false
+  - id: O157
+    timestamp: "2026-08-12T23:13+02:00"
+    provenance: ai-suggested
+    content: >
+      IntrinsicEngine should expose one allocation-free symmetric 3x3
+      eigensystem free function and result struct from the existing
+      Geometry.Linalg module, using max-absolute pre-scaling and fixed-size
+      Eigen self-adjoint QR as the reference implementation or the consolidated
+      current Jacobi kernel when dependency isolation is required; no backend,
+      factory, or interface hierarchy is warranted.
+    context: >
+      Geometry currently has three distinct paths: robust private curvature
+      Jacobi, a fragile PCA closed form, and allocation-heavy dynamic Eigen.
+      The proposed contract keeps signed eigenvalues generic and leaves
+      positive-semidefinite clamping to PCA callers.
+    potential_type: architecture
+    bound_to: [N435, N437]
+    promoted: false
+    promoted_to: null
+    crystallized_via: null
+    stale: false
+  - id: O158
+    timestamp: "2026-08-12T23:13+02:00"
+    provenance: ai-suggested
+    content: >
+      Runtime curvature publication should retain the already-computed minimum
+      and maximum principal scalar properties in addition to mean, Gaussian,
+      and directions so the Sandbox can perform a like-for-like comparison
+      with BCG and expose every principal-curvature result the method contract
+      computes.
+    context: >
+      The live BCG view defaults to kmin, while current Sandbox runtime output
+      selection and publication expose no principal scalar channel.
+    potential_type: architecture
+    bound_to: [N436, N437]
+    promoted: false
+    promoted_to: null
+    crystallized_via: null
+    stale: false
+  - id: O159
+    timestamp: "2026-08-12T23:13+02:00"
+    provenance: ai-suggested
+    content: >
+      Signed curvature fields should default to a diverging colormap with a
+      zero-centered symmetric robust range; the generic sequential Viridis
+      2nd/98th-percentile range can compress nearly the entire signed field
+      into one small color interval and make numerically sound values look
+      wrong.
+    context: >
+      Intrinsic sculpt mean curvature used robust range -3.19572 to 35.5550,
+      placing zero at 8.25 percent and the median at 13.39 percent of the
+      sequential range during the live Sandbox comparison.
+    potential_type: heuristic
+    bound_to: [N436, N437]
+    promoted: false
+    promoted_to: null
+    crystallized_via: null
+    stale: false
