@@ -66,6 +66,23 @@ their implementation. For example, `.claude/setup.sh` is only a Claude
 Build and maintain IntrinsicEngine as a modular, high-performance, scientifically rigorous engine for graphics, geometry
 processing, and method-driven research integration.
 
+The immediate product objective is to make IntrinsicEngine a demonstrably
+better Framework24 replacement: preserve the modular C++23/Vulkan and
+reliability foundations while reaching comparable-or-better end-to-end
+rendering, UI, loading, geometry-method, and interaction workflows. The
+authoritative scorecard and golden workflows live in
+`docs/product/framework24-convergence.md`.
+
+Until `REVIEW-004` retires with an accepted convergence verdict, Framework24
+product convergence is the P0 work-selection gate. Do not start new research
+expansion or speculative rendering/process work during that interval. Continue
+only Theme J tasks, explicit unsatisfied `REVIEW-004` dependencies,
+reproducible regressions, and correctness/reliability work that a golden
+workflow requires. A pre-existing method task is eligible only when the
+Framework24 feature inventory makes it an explicit product dependency; this
+does not reopen unrelated research. Preserve paused research evidence and
+resume the research track after the gate retires.
+
 All agent work must preserve:
 
 - Buildability.
@@ -73,6 +90,9 @@ All agent work must preserve:
 - Layer ownership.
 - Documentation synchronization.
 - Reviewability of mechanical vs semantic changes.
+- Truthful requested/actual/fallback reporting for every selectable algorithm
+  backend; a backend token exists only for a real implementation with parity
+  and benchmark evidence appropriate to its claim.
 
 ## 2. Non-negotiable architecture invariants
 

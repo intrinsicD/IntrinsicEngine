@@ -1,7 +1,7 @@
 ---
 id: METHOD-039
 theme: I
-depends_on: [METHOD-038]
+depends_on: [METHOD-038, REVIEW-004]
 workflow_schema: 1
 workflow_profile: claim-grade
 evidence: required
@@ -20,6 +20,9 @@ maturity_target: Operational
 - Deliver a deterministic, topology-preserving CPU method that partitions an oriented triangle surface into connected, curvature-coherent patches by detecting hard and soft feature lines, forming a conservative seeded oversegmentation, and merging adjacent regions under an explicit curvature-and-boundary energy so every retained boundary is either feature-supported or a diagnosed curvature-change closure boundary.
 
 ## Status
+- Paused on 2026-08-13 by the user-directed Framework24 product-convergence
+  gate. Preserve the completed negative-result surface; resume only after
+  `REVIEW-004` retires with an accepted verdict.
 - Slices A and B are complete and reviewed. Slice C now implements an unadopted
   deterministic grow/merge/refine CPU reference and passes the supplied-oracle,
   detected-feature, hard-fold, homogeneous, diagonal, scale, noise, and

@@ -1,0 +1,20 @@
+{
+  "command": [
+    "python3",
+    "tests/regression/tooling/Test.WorkflowRouting.py"
+  ],
+  "command_display": "python3 tests/regression/tooling/Test.WorkflowRouting.py",
+  "cwd": ".",
+  "duration_ms": 490,
+  "exit_code": 0,
+  "finished_at": "2026-08-13T11:27:16Z",
+  "label": "workflow-routing",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-13T11:27:16Z",
+  "stderr_path": "tasks/evidence/BUG-161/commands/workflow-routing.stderr.log",
+  "stderr_sha256": "33d2de99ff14d7c488fd80ee3d09f1bab6f91fb326828666234ca0326567b3f8",
+  "stdout_path": "tasks/evidence/BUG-161/commands/workflow-routing.stdout.log",
+  "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "task_id": "BUG-161"
+}

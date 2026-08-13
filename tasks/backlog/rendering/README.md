@@ -24,6 +24,11 @@ without requiring them to read every file.
 
 ## Current open rendering leaves
 
+- [`GRAPHICS-135`](GRAPHICS-135-renderprep-per-frame-taskgraph-overhead.md) is
+  the Theme J steady-state frame-cost owner: run the controlled matched A/B,
+  preserve the nine-step result order, and remove per-frame graph construction
+  or duplicate material sync only when the evidence identifies it.
+
 - The 2026-07-03 review R13 follow-up `GRAPHICS-119` retired parallel
   render-pass command recording via the task scheduler on 2026-07-07.
 - The rejected 2026-08-06 `REVIEW-003` baseline opened six Theme F

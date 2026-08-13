@@ -1,0 +1,20 @@
+{
+  "command": [
+    "python3",
+    "tests/regression/tooling/Test.CiTiming.py"
+  ],
+  "command_display": "python3 tests/regression/tooling/Test.CiTiming.py",
+  "cwd": ".",
+  "duration_ms": 1303,
+  "exit_code": 0,
+  "finished_at": "2026-08-13T11:27:18Z",
+  "label": "ci-timing",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-13T11:27:16Z",
+  "stderr_path": "tasks/evidence/BUG-161/commands/ci-timing.stderr.log",
+  "stderr_sha256": "6e27e32f0d5f212ccef8e8975294c84fba03861df1554cc0846f2d4d8bf4097a",
+  "stdout_path": "tasks/evidence/BUG-161/commands/ci-timing.stdout.log",
+  "stdout_sha256": "2e24badc79f30bfe496b96d35e30989c1eda8ed3f89f5b52d562e58766455606",
+  "task_id": "BUG-161"
+}

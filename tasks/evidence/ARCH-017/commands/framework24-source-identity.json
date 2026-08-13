@@ -1,0 +1,21 @@
+{
+  "command": [
+    "bash",
+    "-lc",
+    "test \"$(git -C experimental/framework24 rev-parse HEAD)\" = 6dd50a8289c64b5054bc9601beb5647f459d7969 && test -z \"$(git -C experimental/framework24 status --short)\""
+  ],
+  "command_display": "bash -lc 'test \"$(git -C experimental/framework24 rev-parse HEAD)\" = 6dd50a8289c64b5054bc9601beb5647f459d7969 && test -z \"$(git -C experimental/framework24 status --short)\"'",
+  "cwd": ".",
+  "duration_ms": 39,
+  "exit_code": 0,
+  "finished_at": "2026-08-13T11:00:40Z",
+  "label": "framework24-source-identity",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-13T11:00:40Z",
+  "stderr_path": "tasks/evidence/ARCH-017/commands/framework24-source-identity.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/ARCH-017/commands/framework24-source-identity.stdout.log",
+  "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "task_id": "ARCH-017"
+}

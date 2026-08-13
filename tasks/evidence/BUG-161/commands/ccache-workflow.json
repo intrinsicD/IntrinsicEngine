@@ -1,0 +1,20 @@
+{
+  "command": [
+    "python3",
+    "tests/regression/tooling/Test.CcacheWorkflow.py"
+  ],
+  "command_display": "python3 tests/regression/tooling/Test.CcacheWorkflow.py",
+  "cwd": ".",
+  "duration_ms": 76,
+  "exit_code": 0,
+  "finished_at": "2026-08-13T11:27:18Z",
+  "label": "ccache-workflow",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-13T11:27:18Z",
+  "stderr_path": "tasks/evidence/BUG-161/commands/ccache-workflow.stderr.log",
+  "stderr_sha256": "a52b7be5707658b8832f911b75b8ef37d507efdde300e44e3522ba22ebc5810c",
+  "stdout_path": "tasks/evidence/BUG-161/commands/ccache-workflow.stdout.log",
+  "stdout_sha256": "09a0612434ba25a1a9b6a88e0679a4ff2904aea7dfa801c308f9e904234aaa25",
+  "task_id": "BUG-161"
+}

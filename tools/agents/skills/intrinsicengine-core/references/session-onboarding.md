@@ -1,6 +1,6 @@
 Operate on this IntrinsicEngine checkout using the repository's agentic workflow. The repo contract beats your prior habits; when in doubt, follow `AGENTS.md`.
 
-This prompt is the default generic onboarding for any agent session. It tells you how to find work, how to scope it, and how to verify and ship it. It deliberately contains no theme-, task-, or schedule-specific policy — those live in `tasks/backlog/README.md` and the individual task files, which are authoritative for what to pick and in what order.
+This prompt is the default generic onboarding for any agent session. It tells you how to find work, how to scope it, and how to verify and ship it. Durable theme rationale and task-specific schedules live in `tasks/backlog/README.md` and the individual task files; the temporary top-level product-selection gate is mirrored here from `AGENTS.md` so bare clients cannot miss it.
 
 # Authority and reading order
 
@@ -41,10 +41,19 @@ Also skim `tasks/active/` task files for any in-progress slice tagged to your br
 
 Apply this priority strictly:
 
-1. **Continue active work first.** If the session brief lists an in-progress or blocked task that matches your branch or owner, continue that task. If it is blocked, address the recorded blocker or escalate via a nonblocking clarification in the task file; do not open new work to dodge a blocker.
-2. **Otherwise pick from the backlog.** Use `tasks/SESSION-BRIEF.md` for what is open and unblocked (dependency edges live in task front-matter), and `tasks/backlog/README.md` for theme priorities and rationale. Respect every gate they record; treat anything not listed as independent.
-3. **Within a theme, prefer the earliest unblocked task.** "Unblocked" means every `depends_on` entry resolves to `tasks/done/` (the brief computes this) or is explicitly recorded as out-of-scope in the candidate task file.
-4. **Reproducible regressions trump feature work.** If `tasks/backlog/README.md` records a bugs theme (or equivalent), a reproducible regression there outranks new feature work in any other theme unless the task or backlog README explicitly says otherwise.
+1. **Honor an open product gate first.** While `REVIEW-004` is open, select
+   only Theme J work, an explicit unsatisfied `REVIEW-004` dependency,
+   reproducible regressions, or correctness/reliability work explicitly
+   required by a golden workflow in
+   `docs/product/framework24-convergence.md`. A pre-existing method task is
+   eligible only when the registered-feature inventory makes it an explicit
+   product dependency. Preserve and release unrelated active research work
+   rather than continuing or replacing it; Theme I and speculative
+   rendering/process expansion resume only after the gate retires.
+2. **Continue eligible active work.** If the session brief lists an in-progress or blocked task that matches your branch or owner and is eligible under rule 1, continue that task. If it is blocked, address the recorded blocker or escalate via a nonblocking clarification in the task file; do not open new work to dodge a blocker.
+3. **Otherwise pick from the backlog.** Use `tasks/SESSION-BRIEF.md` for what is open and unblocked (dependency edges live in task front-matter), and `tasks/backlog/README.md` for theme priorities and rationale. Respect every gate they record; treat anything not listed as independent.
+4. **Within a theme, prefer the earliest unblocked task.** "Unblocked" means every `depends_on` entry resolves to `tasks/done/` (the brief computes this) or is explicitly recorded as out-of-scope in the candidate task file.
+5. **Reproducible regressions trump feature work.** If `tasks/backlog/README.md` records a bugs theme (or equivalent), a reproducible regression there outranks new feature work in any other theme unless the task or backlog README explicitly says otherwise.
 
 Read the chosen task file completely before touching code. Treat it as the source of all task-specific goals, non-goals, required changes, tests, docs, acceptance criteria, verification commands, forbidden changes, and slice plan. If the task file disagrees with this prompt on task-specific policy, the task file wins; if it disagrees with `/AGENTS.md` on repository contract, `/AGENTS.md` wins.
 

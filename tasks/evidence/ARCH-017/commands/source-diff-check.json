@@ -1,0 +1,22 @@
+{
+  "command": [
+    "git",
+    "diff",
+    "--check",
+    "origin/main...HEAD"
+  ],
+  "command_display": "git diff --check origin/main...HEAD",
+  "cwd": ".",
+  "duration_ms": 13,
+  "exit_code": 0,
+  "finished_at": "2026-08-13T11:00:40Z",
+  "label": "source-diff-check",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-13T11:00:40Z",
+  "stderr_path": "tasks/evidence/ARCH-017/commands/source-diff-check.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/ARCH-017/commands/source-diff-check.stdout.log",
+  "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "task_id": "ARCH-017"
+}

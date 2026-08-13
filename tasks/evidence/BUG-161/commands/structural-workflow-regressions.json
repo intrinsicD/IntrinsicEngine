@@ -1,0 +1,24 @@
+{
+  "command": [
+    "python3",
+    "-m",
+    "unittest",
+    "tests/regression/tooling/Test.WorkflowRouting.py",
+    "tests/regression/tooling/Test.CiTiming.py",
+    "tests/regression/tooling/Test.CcacheWorkflow.py"
+  ],
+  "command_display": "python3 -m unittest tests/regression/tooling/Test.WorkflowRouting.py tests/regression/tooling/Test.CiTiming.py tests/regression/tooling/Test.CcacheWorkflow.py",
+  "cwd": ".",
+  "duration_ms": 36,
+  "exit_code": 1,
+  "finished_at": "2026-08-13T11:26:14Z",
+  "label": "structural-workflow-regressions",
+  "required": false,
+  "schema_version": 1,
+  "started_at": "2026-08-13T11:26:14Z",
+  "stderr_path": "tasks/evidence/BUG-161/commands/structural-workflow-regressions.stderr.log",
+  "stderr_sha256": "52d5c4a0d7f59053cf0da713edcf520988316bab3767f9a35b5c5c75c2f1f913",
+  "stdout_path": "tasks/evidence/BUG-161/commands/structural-workflow-regressions.stdout.log",
+  "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "task_id": "BUG-161"
+}

@@ -1,0 +1,23 @@
+{
+  "command": [
+    "python3",
+    "tools/repo/check_root_hygiene.py",
+    "--root",
+    ".",
+    "--strict"
+  ],
+  "command_display": "python3 tools/repo/check_root_hygiene.py --root . --strict",
+  "cwd": ".",
+  "duration_ms": 25,
+  "exit_code": 1,
+  "finished_at": "2026-08-13T11:26:14Z",
+  "label": "root-hygiene",
+  "required": false,
+  "schema_version": 1,
+  "started_at": "2026-08-13T11:26:14Z",
+  "stderr_path": "tasks/evidence/BUG-161/commands/root-hygiene.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/BUG-161/commands/root-hygiene.stdout.log",
+  "stdout_sha256": "5b22b70d4f26fc4f5a9be9f253f07b5da927ed29775ce55594031d8c6747b976",
+  "task_id": "BUG-161"
+}

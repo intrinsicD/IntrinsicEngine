@@ -10,6 +10,16 @@ map.
 
 ## Tasks
 
+- **Theme J product gate:**
+  [`UI-046`](UI-046-sandbox-geometry-export.md) export,
+  [`UI-047`](UI-047-file-chooser-for-import-and-scene-paths.md) file choice,
+  [`UI-048`](UI-048-first-run-workspace-and-layout-persistence.md) first-run
+  workspace/persistence,
+  [`UI-049`](UI-049-editor-panel-sizing-and-readability.md) readability,
+  [`UI-050`](UI-050-vector-field-property-visualization.md) vector fields, and
+  [`UI-051`](UI-051-domain-agnostic-appearance-properties-selection-windows.md)
+  domain-agnostic appearance selection are the bounded UI dependencies of
+  `REVIEW-004`.
 - [UI-045 — Point-set normal property-domain panel](UI-045-point-normal-property-domain-panel.md)
   (generic estimator on every compatible property; topology-aware variants
   only where their real adjacency resolves after `RUNTIME-213`).
@@ -48,6 +58,9 @@ The runtime SpatialDebug closest-face picking consumer for `GEOM-039` is
 retired under the runtime backlog as `RUNTIME-135`.
 
 ## Convergence
+
+- While `REVIEW-004` is open, `UI-046..051` take priority over the method-panel
+  expansion tasks below.
 
 - UI-039 is retired at `Operational`. Stable Mesh, Graph, and PointCloud
   Processing entries open one shared LOP/WLOP/CLOP/EAR panel/state, which

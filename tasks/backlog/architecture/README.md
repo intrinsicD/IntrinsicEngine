@@ -10,6 +10,11 @@ map.
 
 ## Tasks
 
+- [`REVIEW-004`](REVIEW-004-framework24-product-convergence-audit.md) is the
+  claim-grade one-shot Theme J gate. It audits the six golden product workflows
+  on one exact clean revision after every static remediation owner retires;
+  findings become separate tasks and force a fresh complete rerun.
+
 Opened from the 2026-07-08 kernel/module architecture decision record
 ([`docs/adr/0024-kernel-module-architecture.md`](../../../docs/adr/0024-kernel-module-architecture.md));
 seams-first migration order. All additive seams (`ARCH-007`..`ARCH-011`), the
@@ -18,6 +23,11 @@ are retired to `tasks/done/`; `ARCH-014` now records the closed umbrella.
 
 ### Retired seam tasks
 
+- [`ARCH-017`](../../done/ARCH-017-framework24-product-convergence-gate.md) —
+  retired the policy-only Framework24 replacement reset: the main mission,
+  six golden workflows, registered-feature inventory, evidence thresholds,
+  bounded remediation owners, and temporary research pause are authoritative;
+  `REVIEW-004` owns the later product verdict.
 - [`REVIEW-003`](../../done/REVIEW-003-architecture-stability-right-sizing-readiness-audit.md) —
   retired 2026-08-06 after a fresh audit of clean `main` commit `51e7fadd`.
   All 47 dependencies, architecture and clean-workshop rows, nine drift rows,

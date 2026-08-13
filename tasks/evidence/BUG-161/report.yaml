@@ -1,0 +1,365 @@
+schema_version: 1
+task_id: BUG-161
+workflow_profile: high-risk
+status: complete
+generated_by: tools/agents/workflow_evidence.py
+generated_at: '2026-08-13T11:58:23Z'
+claim_eligible: false
+source:
+  base_ref: origin/main
+  base_revision: f541ae84fd4a6bc9c2cb78eb702b613e5893fd8f
+  head_revision: c283de25021c96c91824c1a4124cc85c91988d3c
+  branch: agent/framework24-product-convergence-goal
+  worktree: /home/alex/Documents/IntrinsicEngine
+  dirty: true
+  surface:
+  - path: .github/workflows/ci-linux-clang.yml
+    sha256: 872288f454beab1569669e7edeb33c2836fcf2b3e8638ffe9ab04043574d619a
+  - path: AGENTS.md
+    sha256: 1d47fc6ba3138b285e168236ef988676e0b226a8edd73bbdd27928697b568eab
+  - path: ara/logic/solution/architecture.md
+    sha256: b41dc719c6d5dc0e12a0d49aa220a2734c3c844c96d6021728fcf1e721077f7d
+  - path: docs/agent/contract.md
+    sha256: bf248abea3b139aafa892aa7f9790e75657b9028646aebfe56b8269911e4f474
+  - path: docs/agent/prompt/prompt.md
+    sha256: 5aee2109990ec2a0000c13061d62e530902b02a79faa9bb51243b3b361c31d37
+  - path: docs/index.md
+    sha256: 25c14e8eb2c122c2ab160aaefdc66b163c1b2395e844c30edb05d315dd74c93b
+  - path: docs/product/framework24-convergence.md
+    sha256: 9107f1fb7da63a6bc7f9d8a180cdd2f83a8c94c97efe0d4efc3dac433d97fa85
+  - path: docs/product/framework24-feature-inventory.md
+    sha256: 7bde6dac4b1ebc0ba2a2564307030c8dfdd66270fe4f1e1a1d6f43118c4795d9
+  - path: docs/product/index.md
+    sha256: 2c118ff0ceb0e818a3ba3ba9bf887550f8f68fe2330c69a9fa2dd747b86808d0
+  - path: tasks/SESSION-BRIEF.md
+    sha256: ae00993fd442de7b7cac754990674e29f9c0fa87ac69be06fb24dbf3f347b10a
+  - path: tasks/active/METHOD-039-feature-network-curvature-patch-decomposition.md
+    sha256: d3afb87b88fe6a47122bd9965d2912e0c7d1c7e9d9bc30d8f0645b3c3b18e40e
+  - path: tasks/active/README.md
+    sha256: bdf9ef8867ba0967471140eb5dc2b99e2ea8a60e103e811830eb66852287f7af
+  - path: tasks/backlog/README.md
+    sha256: 8a0df17402369edb4980c7c3f67c7faa830cf81f176d3fd52f6ab6dff0226e29
+  - path: tasks/backlog/architecture/README.md
+    sha256: 83770434d5f33357ed8fba88ae6d088dad177b7fc6140af3b196a4514b03025b
+  - path: tasks/backlog/architecture/REVIEW-004-framework24-product-convergence-audit.md
+    sha256: da4c506d4060e2a3b6285ec5709aa13e797a94ac1d4f0a2829bd2bec36d72d55
+  - path: tasks/backlog/assets/ASSETIO-012-single-source-format-capability-table.md
+    sha256: aff0a1159ff9d8951a8bd063fb2fd0864b5069b06f0b93149f80d45dc6e5131c
+  - path: tasks/backlog/assets/README.md
+    sha256: d6924ab84e46063ff650f862c363007fa2835edb73ededa67ad97699533f92a1
+  - path: tasks/backlog/benchmarks/BENCH-001-framework24-golden-workflow-comparison-harness.md
+    sha256: 8620f22b070b27d53dc5d2701882ba7cbb8db94cf1ec0da7783e96058131db90
+  - path: tasks/backlog/benchmarks/README.md
+    sha256: 2a21bb35f5662c64e09ecc2bbf08dd4ff5cf8d8a796cc08af053d995bc240b70
+  - path: tasks/backlog/bugs/BUG-121-glm-anonymous-union-module-copy-assign.md
+    sha256: null
+  - path: tasks/backlog/bugs/BUG-157-clang20-glm-module-union-build-break.md
+    sha256: 1d996a16aad598e84c120d0ffc2bbf52a2bd948f68ac4deb85fe20d290fb34cf
+  - path: tasks/backlog/bugs/BUG-158-direct-mesh-enrichment-blocks-usable-geometry.md
+    sha256: 74879cb15bff473d419b605b81e445c1ea88cf7b99a6dc0820048699e02dca8b
+  - path: tasks/backlog/bugs/BUG-159-fast-staged-atlas-per-chart-global-remaps.md
+    sha256: d9d11968ebfa31e204607c0bf482ad6043c5934a14a0d17802cae99c50bde2db
+  - path: tasks/backlog/bugs/BUG-160-fast-staged-atlas-chart-fragmentation.md
+    sha256: 31a64f7949f269218adee08ea22bc7e9282dd52b8e1559fde3dacb1eda2a8c58
+  - path: tasks/backlog/bugs/README.md
+    sha256: c054b119571a38990ddc4aabbabe547073f5f67ef7976c76c0544c87122766a1
+  - path: tasks/backlog/bugs/index.md
+    sha256: a67989d1e7f84bc9bace8dc719e78304e22db9f23465d85cbbe842483fb9043d
+  - path: tasks/backlog/rendering/GRAPHICS-135-renderprep-per-frame-taskgraph-overhead.md
+    sha256: 768a8a271c9fbeb37d28c7a4a022556ab141f4d42af77e966755de0554a64557
+  - path: tasks/backlog/rendering/README.md
+    sha256: af557935dc1a808d74cd674503d9fce196406032ebac18d2b707ccd2a9f60da5
+  - path: tasks/backlog/runtime/README.md
+    sha256: 6e25bcf562ade2e84b967c8e10dfe289f76f5f944d88a84e81f4806e95d606fb
+  - path: tasks/backlog/runtime/RUNTIME-218-default-scene-lighting-and-light-authoring.md
+    sha256: 2726945a488dd2050964f18addaf55ceb4c7900d4982a0ce3ff6270f3faed900
+  - path: tasks/backlog/ui/README.md
+    sha256: 75fcd0ff00148650342aa34d324ef4cec212d4b141bfa619d37163454ec913ce
+  - path: tasks/backlog/ui/UI-046-sandbox-geometry-export.md
+    sha256: e36d65775d5768a8fbf75fd8baec78f688fdffd127444cde6eb6cfcf26494983
+  - path: tasks/backlog/ui/UI-047-file-chooser-for-import-and-scene-paths.md
+    sha256: 103180b9ba699aee7e73f8f2316f893db4e1846b32f1e04d2ca55ff232367327
+  - path: tasks/backlog/ui/UI-048-first-run-workspace-and-layout-persistence.md
+    sha256: 135587e9315b6b2678c8b84f2c57ebd8b8b81bb5f9bf2228decce75f7944f133
+  - path: tasks/backlog/ui/UI-049-editor-panel-sizing-and-readability.md
+    sha256: 99abf719e538d2899faf87fc6f3904efb9c8de1e2122738f90ec43f526290bbc
+  - path: tasks/backlog/ui/UI-050-vector-field-property-visualization.md
+    sha256: b1f563de2e235999559a7e5d09ced0b4d1e17830bf2a2ac0539e595eddad3f08
+  - path: tasks/backlog/ui/UI-051-domain-agnostic-appearance-properties-selection-windows.md
+    sha256: c564c62bafa69d1419b94b049e1d0c817a7572f9a8ceb29fd3eaba710068f4f1
+  - path: tasks/done/ARCH-017-framework24-product-convergence-gate.md
+    sha256: 7085a0763001ec67bb1cddcbc3278040ff5f2ef7ad0a3946340609b8460062e0
+  - path: tasks/done/BUG-121-glm-anonymous-union-module-copy-assign.md
+    sha256: cb4fce4c196b4a15746351c3cc9e53248362be30030ad7f3623878b71251e4e5
+  - path: tasks/done/BUG-161-clean-checkout-framework24-policy-validation.md
+    sha256: 5109a0202cd725f5946084f79a5301a8e5679be8d30ca3b76dfd91feedeaa62c
+  - path: tasks/done/RETIREMENT-LOG.md
+    sha256: c81fe600f529c7247bf428228e4267b5dac5ff9ecd811a2686ed1c489b2f95eb
+  - path: tasks/evidence/ARCH-017/commands/ara-claims.json
+    sha256: b92e5e488b4aa616b7eb997f44b796eeb5deb33b2f18b651e08ed06990fbac88
+  - path: tasks/evidence/ARCH-017/commands/ara-claims.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/ARCH-017/commands/ara-claims.stdout.log
+    sha256: f5d1ba21e51c911cdc11f30a65c8351df03ec7f68aeef18f5a5d5fb3b7589771
+  - path: tasks/evidence/ARCH-017/commands/build-intrinsic-tests.json
+    sha256: 7beb899c2302a91bdd03be04fea8380a7d551e4dcc7c51de5b293bc2439dea0c
+  - path: tasks/evidence/ARCH-017/commands/build-intrinsic-tests.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/ARCH-017/commands/build-intrinsic-tests.stdout.log
+    sha256: 1ce5d47b1d36adca2d35ea5a8ea58d21775055dbf38131ebd885b6b2cba96e54
+  - path: tasks/evidence/ARCH-017/commands/doc-links.json
+    sha256: a3fa2808128db1c35079f3b811a881275520e90a11aed2fee54a8c584b80099d
+  - path: tasks/evidence/ARCH-017/commands/doc-links.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/ARCH-017/commands/doc-links.stdout.log
+    sha256: 8ae480804673ef37ed6e94faf9023038856fafa62f3471e277c617b9ef65b1c4
+  - path: tasks/evidence/ARCH-017/commands/framework24-source-identity.json
+    sha256: adcbd890f58986790f30f01911824c0bed9fc4c940124514c00faac9916411e7
+  - path: tasks/evidence/ARCH-017/commands/framework24-source-identity.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/ARCH-017/commands/framework24-source-identity.stdout.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/ARCH-017/commands/full-cpu.json
+    sha256: 589840593069a2abaa95e67c388ba68f763284494e6960bfa0ced9f56c6e3bbb
+  - path: tasks/evidence/ARCH-017/commands/full-cpu.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/ARCH-017/commands/full-cpu.stdout.log
+    sha256: 182987e18f172e89d82a99cd8d2ce103dfee2404730f88214895e6ce0da759cb
+  - path: tasks/evidence/ARCH-017/commands/session-brief.json
+    sha256: 798d7e8e4f7f8240b95f304c2713eca6312dc50924e7b760eaae5ac3b8082d04
+  - path: tasks/evidence/ARCH-017/commands/session-brief.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/ARCH-017/commands/session-brief.stdout.log
+    sha256: 2c6f9e11b29f8cf3a7584ea7fc64def6de5cc12e09b4dfbb0401f86e6854ad44
+  - path: tasks/evidence/ARCH-017/commands/skill-sync.json
+    sha256: 3f7daff825eeeb7b1cdb851cc328ffe6dfd3d866d11762d6e1a776fbd08979a0
+  - path: tasks/evidence/ARCH-017/commands/skill-sync.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/ARCH-017/commands/skill-sync.stdout.log
+    sha256: fa1cc5f61bd88d9100ddeeacc5c3c557fce3279752905eac66c23470395e7556
+  - path: tasks/evidence/ARCH-017/commands/source-diff-check.json
+    sha256: 64d6a51e05423afc0fb8963e227fcd700c7c8910224d9bff0e1b33701ca93844
+  - path: tasks/evidence/ARCH-017/commands/source-diff-check.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/ARCH-017/commands/source-diff-check.stdout.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/ARCH-017/commands/strict-task-policy.json
+    sha256: ae9d56e5afefe4823293b096cd4f35333c5764ff6056a5eebedfb6e968dc7904
+  - path: tasks/evidence/ARCH-017/commands/strict-task-policy.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/ARCH-017/commands/strict-task-policy.stdout.log
+    sha256: 4ddeab71078658df6b421d7f9b3ced5d428b47c38cda9095ca46214cd39ae7a0
+  - path: tasks/evidence/ARCH-017/commands/strict-task-validation.json
+    sha256: a7ee915f62d5931c565d751b7d65adf1cf287269ab109e817a6c91755702de6f
+  - path: tasks/evidence/ARCH-017/commands/strict-task-validation.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/ARCH-017/commands/strict-task-validation.stdout.log
+    sha256: 260f714c5b608d9458cad377c8ed970eaca06e8d245a0d7b6666d84735231dca
+  - path: tasks/evidence/ARCH-017/commands/task-state-links.json
+    sha256: d058ee695ee274a1b98d209f3dedf44d056fedfaf3de898aa221e6bfa29fcd1b
+  - path: tasks/evidence/ARCH-017/commands/task-state-links.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/ARCH-017/commands/task-state-links.stdout.log
+    sha256: 12781decead7040004b4a9afc8fc86d4520c244132d152b6cddf1325b43ebe20
+  - path: tasks/evidence/ARCH-017/commands/task-validator-regressions.json
+    sha256: 0d47ec836528e2f6020286956a678fbd8626cd7860b94c828082ea9d5a05a90a
+  - path: tasks/evidence/ARCH-017/commands/task-validator-regressions.stderr.log
+    sha256: bc78090ea06e3f2544d82c49d458796f28df97e75bec32e5af4d7a5cd38aba75
+  - path: tasks/evidence/ARCH-017/commands/task-validator-regressions.stdout.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/ARCH-017/handoff.jsonl
+    sha256: 4601a8beb9843eb8addebadb595320a418de2666b08320f34fee25593404e539
+  - path: tasks/evidence/ARCH-017/report.yaml
+    sha256: 0c0723ed3d9d0224ab87b0120e8b442cb6ed5eaf2bde3e407d2536111c40f2e1
+  - path: tasks/evidence/ARCH-017/reviews.jsonl
+    sha256: d8d127302355b630b429aa49899396a821d6b05339627ddec20f364bf95e1f6b
+  - path: tasks/evidence/ARCH-017/seal.yaml
+    sha256: 00a0c18e836a0e4ccf563a88054c282b8a621a822dcebe1fb733f170b1c81b6a
+  - path: tests/regression/tooling/Test.WorkflowConcurrency.py
+    sha256: 5934b441133dd1931d23393888e4753479a45c244aa1be7aa06988c1109b96e6
+  - path: tools/agents/contract_legacy_tasks.json
+    sha256: 9e4c42b39ea720bc573fb162607c7d2f250fada6f83bfb37a8881aaa19e895d3
+  - path: tools/agents/generate_session_brief.py
+    sha256: 8db43957e899800d1d2cd1f283b3a5f4909b51c2c02ba66fb7b912fef80583f9
+  - path: tools/agents/skills/intrinsicengine-core/references/contract.md
+    sha256: 299f60b3e1a6c70fbf36dbdbd06f0b20186f3f82c8f2e729174736223bcb1325
+  - path: tools/agents/skills/intrinsicengine-core/references/session-onboarding.md
+    sha256: 5aee2109990ec2a0000c13061d62e530902b02a79faa9bb51243b3b361c31d37
+  content_digest: fea3683d9608f68c6e6420b162f92e00c21331341f5d11541edcc7fcd4c92e67
+touched:
+  paths:
+  - .github/workflows/ci-linux-clang.yml
+  - AGENTS.md
+  - ara/logic/solution/architecture.md
+  - docs/agent/contract.md
+  - docs/agent/prompt/prompt.md
+  - docs/index.md
+  - docs/product/framework24-convergence.md
+  - docs/product/framework24-feature-inventory.md
+  - docs/product/index.md
+  - tasks/SESSION-BRIEF.md
+  - tasks/active/METHOD-039-feature-network-curvature-patch-decomposition.md
+  - tasks/active/README.md
+  - tasks/backlog/README.md
+  - tasks/backlog/architecture/README.md
+  - tasks/backlog/architecture/REVIEW-004-framework24-product-convergence-audit.md
+  - tasks/backlog/assets/ASSETIO-012-single-source-format-capability-table.md
+  - tasks/backlog/assets/README.md
+  - tasks/backlog/benchmarks/BENCH-001-framework24-golden-workflow-comparison-harness.md
+  - tasks/backlog/benchmarks/README.md
+  - tasks/backlog/bugs/BUG-121-glm-anonymous-union-module-copy-assign.md
+  - tasks/backlog/bugs/BUG-157-clang20-glm-module-union-build-break.md
+  - tasks/backlog/bugs/BUG-158-direct-mesh-enrichment-blocks-usable-geometry.md
+  - tasks/backlog/bugs/BUG-159-fast-staged-atlas-per-chart-global-remaps.md
+  - tasks/backlog/bugs/BUG-160-fast-staged-atlas-chart-fragmentation.md
+  - tasks/backlog/bugs/README.md
+  - tasks/backlog/bugs/index.md
+  - tasks/backlog/rendering/GRAPHICS-135-renderprep-per-frame-taskgraph-overhead.md
+  - tasks/backlog/rendering/README.md
+  - tasks/backlog/runtime/README.md
+  - tasks/backlog/runtime/RUNTIME-218-default-scene-lighting-and-light-authoring.md
+  - tasks/backlog/ui/README.md
+  - tasks/backlog/ui/UI-046-sandbox-geometry-export.md
+  - tasks/backlog/ui/UI-047-file-chooser-for-import-and-scene-paths.md
+  - tasks/backlog/ui/UI-048-first-run-workspace-and-layout-persistence.md
+  - tasks/backlog/ui/UI-049-editor-panel-sizing-and-readability.md
+  - tasks/backlog/ui/UI-050-vector-field-property-visualization.md
+  - tasks/backlog/ui/UI-051-domain-agnostic-appearance-properties-selection-windows.md
+  - tasks/done/ARCH-017-framework24-product-convergence-gate.md
+  - tasks/done/BUG-121-glm-anonymous-union-module-copy-assign.md
+  - tasks/done/BUG-161-clean-checkout-framework24-policy-validation.md
+  - tasks/done/RETIREMENT-LOG.md
+  - tasks/evidence/ARCH-017/commands/ara-claims.json
+  - tasks/evidence/ARCH-017/commands/ara-claims.stderr.log
+  - tasks/evidence/ARCH-017/commands/ara-claims.stdout.log
+  - tasks/evidence/ARCH-017/commands/build-intrinsic-tests.json
+  - tasks/evidence/ARCH-017/commands/build-intrinsic-tests.stderr.log
+  - tasks/evidence/ARCH-017/commands/build-intrinsic-tests.stdout.log
+  - tasks/evidence/ARCH-017/commands/doc-links.json
+  - tasks/evidence/ARCH-017/commands/doc-links.stderr.log
+  - tasks/evidence/ARCH-017/commands/doc-links.stdout.log
+  - tasks/evidence/ARCH-017/commands/framework24-source-identity.json
+  - tasks/evidence/ARCH-017/commands/framework24-source-identity.stderr.log
+  - tasks/evidence/ARCH-017/commands/framework24-source-identity.stdout.log
+  - tasks/evidence/ARCH-017/commands/full-cpu.json
+  - tasks/evidence/ARCH-017/commands/full-cpu.stderr.log
+  - tasks/evidence/ARCH-017/commands/full-cpu.stdout.log
+  - tasks/evidence/ARCH-017/commands/session-brief.json
+  - tasks/evidence/ARCH-017/commands/session-brief.stderr.log
+  - tasks/evidence/ARCH-017/commands/session-brief.stdout.log
+  - tasks/evidence/ARCH-017/commands/skill-sync.json
+  - tasks/evidence/ARCH-017/commands/skill-sync.stderr.log
+  - tasks/evidence/ARCH-017/commands/skill-sync.stdout.log
+  - tasks/evidence/ARCH-017/commands/source-diff-check.json
+  - tasks/evidence/ARCH-017/commands/source-diff-check.stderr.log
+  - tasks/evidence/ARCH-017/commands/source-diff-check.stdout.log
+  - tasks/evidence/ARCH-017/commands/strict-task-policy.json
+  - tasks/evidence/ARCH-017/commands/strict-task-policy.stderr.log
+  - tasks/evidence/ARCH-017/commands/strict-task-policy.stdout.log
+  - tasks/evidence/ARCH-017/commands/strict-task-validation.json
+  - tasks/evidence/ARCH-017/commands/strict-task-validation.stderr.log
+  - tasks/evidence/ARCH-017/commands/strict-task-validation.stdout.log
+  - tasks/evidence/ARCH-017/commands/task-state-links.json
+  - tasks/evidence/ARCH-017/commands/task-state-links.stderr.log
+  - tasks/evidence/ARCH-017/commands/task-state-links.stdout.log
+  - tasks/evidence/ARCH-017/commands/task-validator-regressions.json
+  - tasks/evidence/ARCH-017/commands/task-validator-regressions.stderr.log
+  - tasks/evidence/ARCH-017/commands/task-validator-regressions.stdout.log
+  - tasks/evidence/ARCH-017/handoff.jsonl
+  - tasks/evidence/ARCH-017/report.yaml
+  - tasks/evidence/ARCH-017/reviews.jsonl
+  - tasks/evidence/ARCH-017/seal.yaml
+  - tests/regression/tooling/Test.WorkflowConcurrency.py
+  - tools/agents/contract_legacy_tasks.json
+  - tools/agents/generate_session_brief.py
+  - tools/agents/skills/intrinsicengine-core/references/contract.md
+  - tools/agents/skills/intrinsicengine-core/references/session-onboarding.md
+  layers:
+  - ci
+  - docs
+  - tasks
+  modules:
+  - hosted-validation
+  - task-discovery
+extension_seam: Existing GitHub Actions checkout configuration plus a focused YAML regression; no new
+  framework or runtime abstraction
+future_change_plan: BUG-157 is the sole owner of the separately reproduced downstream Clang/GLM test-module
+  compile blocker; REVIEW-004 retains the product-convergence verdict
+acceptance:
+- criterion: '`check_doc_links.py --strict` passes without the ignored Framework24'
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: The full-CPU workflow has the history required to resolve
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: PR 1030's documentation-link and strict task-policy stages rerun
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+commands:
+- receipt: tasks/evidence/BUG-161/commands/ccache-workflow.json
+- receipt: tasks/evidence/BUG-161/commands/ci-timing.json
+- receipt: tasks/evidence/BUG-161/commands/diff-check.json
+- receipt: tasks/evidence/BUG-161/commands/docs-sync.json
+- receipt: tasks/evidence/BUG-161/commands/final-diff-check.json
+- receipt: tasks/evidence/BUG-161/commands/final-doc-links.json
+- receipt: tasks/evidence/BUG-161/commands/final-session-brief.json
+- receipt: tasks/evidence/BUG-161/commands/final-task-policy.json
+- receipt: tasks/evidence/BUG-161/commands/final-task-state-links.json
+- receipt: tasks/evidence/BUG-161/commands/final-task-validation.json
+- receipt: tasks/evidence/BUG-161/commands/final-workflow-regression.json
+- receipt: tasks/evidence/BUG-161/commands/hosted-original-blockers.json
+- receipt: tasks/evidence/BUG-161/commands/layering.json
+- receipt: tasks/evidence/BUG-161/commands/r2-diff-check.json
+- receipt: tasks/evidence/BUG-161/commands/r2-doc-links.json
+- receipt: tasks/evidence/BUG-161/commands/r2-docs-sync.json
+- receipt: tasks/evidence/BUG-161/commands/r2-layering.json
+- receipt: tasks/evidence/BUG-161/commands/r2-root-hygiene.json
+- receipt: tasks/evidence/BUG-161/commands/r2-session-brief.json
+- receipt: tasks/evidence/BUG-161/commands/r2-task-policy.json
+- receipt: tasks/evidence/BUG-161/commands/r2-task-state-links.json
+- receipt: tasks/evidence/BUG-161/commands/r2-task-validation.json
+- receipt: tasks/evidence/BUG-161/commands/r2-workflow-regression.json
+- receipt: tasks/evidence/BUG-161/commands/root-hygiene.json
+- receipt: tasks/evidence/BUG-161/commands/strict-doc-links.json
+- receipt: tasks/evidence/BUG-161/commands/strict-root-hygiene.json
+- receipt: tasks/evidence/BUG-161/commands/strict-task-policy.json
+- receipt: tasks/evidence/BUG-161/commands/structural-workflow-regressions.json
+- receipt: tasks/evidence/BUG-161/commands/task-state-links.json
+- receipt: tasks/evidence/BUG-161/commands/workflow-names.json
+- receipt: tasks/evidence/BUG-161/commands/workflow-regression.json
+- receipt: tasks/evidence/BUG-161/commands/workflow-routing.json
+changed_public_contracts: []
+diagnostics_and_previews:
+- Hosted docs job 94431271144 passed strict links and task policy; full-CPU job 94431455381 passed checkout
+  and strict task policy before the unrelated BUG-157 compile failure
+- Independent review revision 1 found duplicate BUG-121/BUG-157/BUG-162 ownership; revision 2 retires
+  BUG-121 as a duplicate, removes BUG-162, and leaves exactly one open owner in the generated session
+  brief
+benchmark_or_parity_evidence: []
+docs_sync:
+  task_file: tasks/done/BUG-161-clean-checkout-framework24-policy-validation.md
+  session_brief_present: true
+  canonical_docs_changed: true
+  skill_mirrors_checked: true
+residual_risks:
+- PR 1030 remains unmergeable until separately scoped BUG-157 and the independently observed hosted Vulkan
+  environment failure are resolved; BUG-161 makes no green-merge claim
+skipped_checks:
+- check: full-cpu-and-sanitizers
+  reason: Execution did not start because clean Clang 20 runners reached the pre-existing BUG-157 compile
+    failure; BUG-161 changes no C++ source
+artifacts: []
+self_review:
+  completed: true
+  scope_matches_task: true
+  layering_preserved: true
+  tests_and_docs_accounted_for: true
+  mechanical_and_semantic_changes_separated: true
+handoff: tasks/evidence/BUG-161/handoff.jsonl
+review: tasks/evidence/BUG-161/reviews.jsonl

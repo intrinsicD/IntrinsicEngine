@@ -22,9 +22,9 @@ Each active task should include:
   `tests/data/sculpt.obj`; next step is the reporter's Sandbox visual
   confirmation and independent review.
 - [`METHOD-039` — Feature-network-constrained curvature patch decomposition](METHOD-039-feature-network-curvature-patch-decomposition.md)
-  — in progress on `main`, owned by `codex-root`; Slice A freezes the practical
-  equations, inherited METHOD-038 evidence boundary, supplied-feature seam, and
-  generated oracle fixtures before any production selector is added.
+  — paused behind `REVIEW-004` by the 2026-08-13 product-convergence decision;
+  its completed negative-result surface and work-graph history are preserved
+  for research resumption after the gate retires.
 
 ## Records
 

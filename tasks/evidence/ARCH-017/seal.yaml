@@ -1,0 +1,12 @@
+schema_version: 1
+task_id: ARCH-017
+sealed_revision: c5182aad7f0d3427225183da1b0f8a9ed12f1f1e
+source_content_digest: 62d582bd477e9e42763b17a5612190dbd77c33126e44507aa4e2274eca046644
+report_sha256: 0c0723ed3d9d0224ab87b0120e8b442cb6ed5eaf2bde3e407d2536111c40f2e1
+records:
+- path: tasks/evidence/ARCH-017/handoff.jsonl
+  sha256: 4601a8beb9843eb8addebadb595320a418de2666b08320f34fee25593404e539
+- path: tasks/evidence/ARCH-017/reviews.jsonl
+  sha256: d8d127302355b630b429aa49899396a821d6b05339627ddec20f364bf95e1f6b
+reason: Bind the completed ARCH-017 report to its independently reviewed retirement and evidence commits
+generated_by: tools/agents/workflow_evidence.py

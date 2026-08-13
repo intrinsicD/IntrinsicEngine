@@ -1,0 +1,7 @@
+.............ERROR: ccache --print-stats failed: statistics unavailable
+.ERROR: invalid ccache stats value for 'cache_miss': 'not-a-number'
+..
+----------------------------------------------------------------------
+Ran 16 tests in 0.026s
+
+OK

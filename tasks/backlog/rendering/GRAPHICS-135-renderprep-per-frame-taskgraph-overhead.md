@@ -1,6 +1,6 @@
 ---
 id: GRAPHICS-135
-theme: B
+theme: J
 depends_on: []
 workflow_schema: 1
 workflow_profile: standard

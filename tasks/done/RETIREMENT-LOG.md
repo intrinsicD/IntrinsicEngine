@@ -8,6 +8,45 @@ so blocks moved from the old active-README history work verbatim.
 
 ## Retired task narratives
 
+[`BUG-121`](BUG-121-glm-anonymous-union-module-copy-assign.md) — retired as an
+exact duplicate of `BUG-157`, not as a fixed compiler defect. Both records
+identified the same Clang 20 anonymous-union redeclaration in GLM while
+compiling `tests/contract/runtime/Test.CameraModule.cpp:41` through the RHI
+module chain. `BUG-157` now exclusively owns diagnosis, implementation, and
+full CPU/ASan/UBSan recovery. No source, test, build, method, renderer, UI, or
+benchmark behavior changed in this reconciliation.
+
+[`BUG-161`](BUG-161-clean-checkout-framework24-policy-validation.md) — the
+Framework24 convergence policy now validates identically in local and clean
+hosted checkouts. Its comparison-source locator remains revision-bound but is
+plain code text because the ignored `experimental/framework24` tree is not
+part of the repository, and the full-CPU job fetches complete Git history
+before strict task-policy validation resolves the pinned legacy revision.
+
+A focused workflow regression pins that ordering and checkout depth. PR 1030's
+hosted documentation gate passed end-to-end, while full CPU passed the formerly
+blocking checkout/task-policy stages. The later build exposed a separate,
+pre-existing Clang 20/GLM named-module failure already visible on PR 1028;
+`BUG-157` is its sole owner. This repair changes no production, method, renderer, UI, or
+benchmark implementation and weakens no gate.
+
+[`ARCH-017`](ARCH-017-framework24-product-convergence-gate.md) — IntrinsicEngine
+now measures its immediate product objective as a demonstrably better
+Framework24 replacement rather than as architectural or subsystem progress in
+isolation. Six golden workflows cover launch, import readiness, curvature,
+edit/save/export, rendering/property inspection, and truthful method-backend
+selection. A source-backed inventory maps every system registered by the
+Framework24 default viewer at comparison revision `6dd50a82` to current
+IntrinsicEngine evidence or one bounded owner.
+
+The reset is policy-only: it changes no engine, method, importer, renderer,
+shader, UI, or benchmark implementation and makes no present parity or
+performance claim. Theme J is P0, unrelated research expansion is paused, and
+an optimized/parallel CPU or Vulkan backend may be advertised only when the
+implementation, parity, end-to-end value, and requested/actual/fallback
+diagnostics are real. `REVIEW-004` remains the one-shot final product verdict;
+every scorecard row is still open until its exact evidence gate passes.
+
 [`BUG-153`](BUG-153-curvature-taubin-edge-dihedral-estimator.md) — the promoted
 mesh-curvature field now uses the framework24 signed interior-edge dihedral
 integral over two-ring support, an oriented tangent-plane decomposition, the

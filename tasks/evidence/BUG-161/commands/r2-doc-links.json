@@ -1,0 +1,23 @@
+{
+  "command": [
+    "python3",
+    "tools/docs/check_doc_links.py",
+    "--root",
+    ".",
+    "--strict"
+  ],
+  "command_display": "python3 tools/docs/check_doc_links.py --root . --strict",
+  "cwd": ".",
+  "duration_ms": 828,
+  "exit_code": 0,
+  "finished_at": "2026-08-13T11:57:34Z",
+  "label": "r2-doc-links",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-13T11:57:33Z",
+  "stderr_path": "tasks/evidence/BUG-161/commands/r2-doc-links.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/BUG-161/commands/r2-doc-links.stdout.log",
+  "stdout_sha256": "995ab4c26dcdd3a3d9b21c498ad4ce6626c005983aa850d956ccdfbbc2589dac",
+  "task_id": "BUG-161"
+}

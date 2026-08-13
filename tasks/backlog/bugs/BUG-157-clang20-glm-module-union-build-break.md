@@ -15,6 +15,14 @@ contract_review: "This backlog diagnosis does not yet change a reusable engine c
 ---
 # BUG-157 — Clang 20 fails IntrinsicTests on glm anonymous-union redeclaration
 
+## Status
+
+- Sole authoritative owner for the Clang 20/GLM failure at
+  `tests/contract/runtime/Test.CameraModule.cpp:41`.
+- Historical duplicate `BUG-121` was closed without a fix on 2026-08-13; the
+  proposed `BUG-162` duplicate was discarded before commit.
+- No compiler or test-source repair is part of `BUG-161`.
+
 ## Goal
 
 - Restore a green full `IntrinsicTests` build on the repository's documented
@@ -49,14 +57,14 @@ contract_review: "This backlog diagnosis does not yet change a reusable engine c
   break is specific to TUs that combine textual glm inclusion with the RHI
   module chain.
 - GitHub-hosted CI installs `clang-20`/`clang-tools-20`
-  (`.github/workflows/ci-linux-clang.yml`), but `full-cpu` currently dies
-  before its configure step in strict task validation (shallow-checkout
-  baseline defect, reported on PR #1028), so recent CI provides no evidence
-  either way. Once that earlier step is fixed, `full-cpu` is expected to hit
-  this compile error next on the hosted runners. Local development machines
-  on Clang 23 do not reproduce it, which matches the known Clang C++20
-  modules defect class around anonymous-union members that was fixed after
-  Clang 20.
+  (`.github/workflows/ci-linux-clang.yml`). After `BUG-161` fixed the earlier
+  shallow-checkout validator failure, PR 1030 reproduced this exact compile
+  diagnostic in full CPU job `94431455381`, ASan job `94431455564`, and UBSan
+  job `94431455475`. PR 1028's ASan job `94069394793` had already failed at the
+  same source line and import chain before the Framework24 policy branch, so
+  the policy change did not introduce it. Local development machines on
+  Clang 23 do not reproduce it, which matches the known Clang C++20 modules
+  defect class around anonymous-union members that was fixed after Clang 20.
 - `AGENTS.md` documents Clang 20 as the minimum supported major version, so
   either the minimum claim or the build is currently wrong.
 
@@ -104,6 +112,8 @@ ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarant
 - Marking the affected tests as skipped or quarantined to hide the build
   break.
 - Mixing this toolchain repair into the BUG-156 geometry correction.
+- Opening a parallel task for the same `Test.CameraModule.cpp:41` diagnostic;
+  append new evidence and hypotheses here instead.
 
 ## Maturity
 

@@ -249,6 +249,16 @@ def _source_multiworker_budgets() -> set[tuple[str, str, int]]:
 
 
 class WorkflowConcurrencyTests(unittest.TestCase):
+    def test_full_cpu_fetches_history_before_strict_task_policy(self) -> None:
+        payload, _ = _load_workflow("ci-linux-clang.yml")
+        steps = payload["jobs"]["ci-linux-clang"]["steps"]
+        named_steps = {step["name"]: step for step in steps}
+
+        checkout = named_steps["Checkout"]
+        task_policy = named_steps["Enforce task policy"]
+        self.assertEqual(checkout["with"]["fetch-depth"], 0)
+        self.assertLess(steps.index(checkout), steps.index(task_policy))
+
     def test_cpu_engine_config_roots_use_one_worker(self) -> None:
         self.assertEqual(len(CPU_ENGINE_CONFIG_ROOTS), 32)
         self.assertEqual(

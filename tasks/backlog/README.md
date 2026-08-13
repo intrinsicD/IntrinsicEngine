@@ -12,6 +12,8 @@ READMEs.
 
 - [`architecture/`](architecture/) — architecture and layering decisions.
 - [`assets/`](assets/) — promoted CPU asset authority and import/export ingest.
+- [`benchmarks/`](benchmarks/) — benchmark manifests, runners, baselines, and
+  matched product evidence.
 - [`bugs/`](bugs/) — reproducible correctness bugs and harness defects.
 - [`ecs/`](ecs/) — promoted ECS scene/components/systems hardening.
 - [`geometry/`](geometry/) — geometry algorithms, IO, and method readiness.
@@ -36,6 +38,30 @@ stay globally aligned.
 The agent contract in [`/AGENTS.md`](../../AGENTS.md) is the authoritative
 source for the engine mission and layering invariants. Themes below describe
 how the *current* backlog maps onto that contract.
+
+### Theme J — Framework24 product convergence (P0, active gate)
+
+Make IntrinsicEngine a demonstrably better Framework24 replacement without
+regressing its modular C++23/Vulkan architecture, layer ownership, or
+correctness/reliability evidence. The authoritative workflows, scorecard,
+measurement rules, and stop condition are in
+[`docs/product/framework24-convergence.md`](../../docs/product/framework24-convergence.md).
+
+Retired `ARCH-017` established the mission/picker/scorecard reset. `REVIEW-004` is the
+one-shot final gate and depends on the current bounded product owners:
+`ASSETIO-012`, `BENCH-001`, `BUG-154`, `BUG-156`, `BUG-158..160`,
+`GRAPHICS-135`, `METHOD-015`, `RUNTIME-218`, and `UI-046..051`. `METHOD-015`
+is an existing Framework24 registered-feature gap, not a reopening of the
+unrelated research queue. The import critical path is deliberately split:
+`BUG-158` makes base geometry usable during optional enrichment, `BUG-159`
+removes per-chart global remap cost, and `BUG-160` repairs or replaces the
+fragmenting chart policy after the remap fix.
+
+While `REVIEW-004` is open, Theme J, reproducible Theme G regressions, and
+correctness/reliability repairs required by a golden workflow are the only new
+work-selection lanes. Theme I research expansion and speculative Theme B/H
+work are paused. Preserve their existing task and evidence state; they resume
+after `REVIEW-004` retires with every scorecard row accepted.
 
 ### Theme A — Shortest path to sandbox visible geometry (P0, complete)
 
@@ -81,8 +107,8 @@ is retired; see
 (`RUNTIME-126`) is retired with the transfer facade/readback ring wired into the
 runtime derived-job graph.
 
-The 2026-08-07 Sandbox UI workflow pass added
-[`rendering/GRAPHICS-135-renderprep-per-frame-taskgraph-overhead.md`](rendering/GRAPHICS-135-renderprep-per-frame-taskgraph-overhead.md):
+The 2026-08-07 Sandbox UI workflow pass added `GRAPHICS-135`, now a Theme J
+product-gate dependency:
 a frame-pacing capture with only the reference triangle in the scene shows
 `render_prepare_micros` flat at ~69 ms per frame (~92% of frame time), and
 `RenderPrepPipeline::Run()` rebuilds a nine-pass `Core::Dag::TaskGraph` every
@@ -494,7 +520,7 @@ floor and config/command artifact.
 canonical architecture index, and task authoring prompts record backend/config
 control-surface intent.
 
-### Theme I — Research method implementation (P1)
+### Theme I — Research method implementation (P1, paused by REVIEW-004)
 
 Implement the paper/method reference-backend track per the method workflow
 ([`/AGENTS.md`](../../AGENTS.md) §6): CPU reference backend first, correctness
@@ -502,6 +528,14 @@ tests, benchmark harness, then optional optimized/GPU parity. The theme also
 covers the geometry method-readiness seams that unblock those methods. Members
 carry their own `depends_on` edges; the picker takes the earliest unblocked
 member.
+
+Work selection from this theme is temporarily paused while the Theme J product
+gate is open. Existing results and task state remain authoritative; do not
+delete, rewrite, or expand them. `METHOD-039` explicitly records the pause and
+`METHOD-040` remains transitively blocked. The sole current exception is
+`METHOD-015`, which the registered-feature inventory and `REVIEW-004` name as
+an explicit Framework24 product dependency. Resume the rest of this section
+only after `REVIEW-004` retires with an accepted product verdict.
 
 Rationale: `AGENTS.md` §1 names "geometry processing, and method-driven research
 integration" as co-equal mission, but every open `METHOD-*` / research `GEOM-*`
