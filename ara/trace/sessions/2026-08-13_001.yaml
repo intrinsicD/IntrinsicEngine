@@ -1,0 +1,115 @@
+session:
+  id: "2026-08-13_001"
+  date: "2026-08-13"
+  started: "2026-08-13T08:58+02:00"
+  last_turn: "2026-08-13T08:58+02:00"
+  turn_count: 1
+  summary: "Validated and pushed the exact eigensolver/live-curvature diagnostic to main, then crystallized its bounded solver, normalization, publication, and visualization conclusions."
+
+events_logged:
+  - turn: 1
+    type: experiment
+    id: "N438"
+    routing: direct
+    provenance: ai-executed
+    summary: "Validated the seven-file diagnostic surface, committed ef0a544d directly on main, pushed it, and verified local and remote refs match exactly."
+  - turn: 1
+    type: observation
+    id: "O155"
+    routing: crystallized
+    provenance: ai-suggested
+    summary: "Crystallized eig3x3's values-only, C11, scale-sensitive scope through publication of the durable diagnostic."
+  - turn: 1
+    type: claim
+    id: "C51"
+    routing: crystallized
+    provenance: ai-suggested
+    summary: "Recorded eig3x3 as a bounded values-only candidate rather than a reusable geometry eigensystem."
+  - turn: 1
+    type: observation
+    id: "O156"
+    routing: crystallized
+    provenance: ai-suggested
+    summary: "Crystallized the legacy BCG area/sign explanation through publication of the matched live differential."
+  - turn: 1
+    type: claim
+    id: "C52"
+    routing: crystallized
+    provenance: ai-suggested
+    summary: "Recorded the bounded source-and-field evidence for framework24's principal/mean/Gaussian transform."
+  - turn: 1
+    type: observation
+    id: "O157"
+    routing: crystallized
+    provenance: ai-suggested
+    summary: "Crystallized the single scaled symmetric-3x3 free-function contract through artifact commitment."
+  - turn: 1
+    type: architecture
+    id: "A43"
+    routing: crystallized
+    provenance: ai-suggested
+    summary: "Recorded one fixed-size full-eigenpair Geometry.Linalg contract without a backend hierarchy."
+  - turn: 1
+    type: observation
+    id: "O158"
+    routing: crystallized
+    provenance: ai-suggested
+    summary: "Crystallized principal-scalar runtime publication through artifact commitment."
+  - turn: 1
+    type: architecture
+    id: "A44"
+    routing: crystallized
+    provenance: ai-suggested
+    summary: "Recorded canonical kmin/kmax publication alongside mean, Gaussian, and directions."
+  - turn: 1
+    type: observation
+    id: "O159"
+    routing: crystallized
+    provenance: ai-suggested
+    summary: "Crystallized zero-centered diverging signed-curvature visualization through artifact commitment."
+  - turn: 1
+    type: heuristic
+    id: "H17"
+    routing: crystallized
+    provenance: ai-suggested
+    summary: "Recorded a symmetric robust range around zero for signed curvature fields."
+
+ai_actions:
+  - turn: 1
+    action: "Reviewed the exact dirty scope, fetched origin/main, ran the relevant strict documentation and repository checks, committed the research evidence as ef0a544d on main, pushed without force, and verified origin/main resolves to the same full commit."
+    provenance: ai-executed
+    files_changed:
+      - "ara/evidence/README.md"
+      - "ara/evidence/tables/eig3x3_live_curvature_diagnostic_2026-08-12.md"
+      - "ara/staging/observations.yaml"
+      - "ara/trace/exploration_tree.yaml"
+      - "ara/trace/pm_reasoning_log.yaml"
+      - "ara/trace/sessions/2026-08-12_001.yaml"
+      - "ara/trace/sessions/session_index.yaml"
+
+claims_touched:
+  - id: C51
+    action: created
+    turn: 1
+  - id: C52
+    action: created
+    turn: 1
+
+key_context:
+  - turn: 1
+    excerpt: "The user directed that the completed diagnostic be committed, merged to main, and pushed to the remote."
+  - turn: 1
+    excerpt: "Local HEAD and origin/main both resolved to ef0a544dac505fe31d4ceb74cfcff1aabb9499b3 after the push."
+
+open_threads:
+  - "Diagnose BUG-155 with raw query ticks, availability, slot/submission, valid-bit, and timestamp-period evidence; do not retry or clamp it away."
+  - "Obtain a label-distinct fixed-surface review for BUG-154 after the complete promoted-Vulkan dependency is restored."
+  - "Run a controlled common-corpus comparison of PMP, Rusinkiewicz, and corrected measures before introducing a curvature backend axis."
+  - "Keep METHOD-037 cpu_reference_v1 as the production curvature-segmentation selector until its separate candidate-v2 protocol passes."
+  - "Implement A44 and H17 together if authorized so principal scalars and signed visualization share the canonical runtime/config/UI path."
+  - "Implement A43 with residual, orthogonality, degeneracy, finite-input, and extreme-scale tests if authorized."
+  - "Obtain reporter confirmation of the corrected one-ring unsmoothed curvature view before retiring BUG-156."
+
+ai_suggestions_pending:
+  - "Prioritize principal-scalar publication and signed visualization before solver consolidation; neither production change was authorized in this publication-only turn."
+  - "Evaluate Rusinkiewicz and corrected measures under one frozen common-corpus protocol before any estimator backend adoption."

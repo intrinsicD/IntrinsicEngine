@@ -678,3 +678,39 @@
   tests/contract/runtime/Test.MeshGeometryExtraction.cpp,
   docs/architecture/property-coherence.md]
 - **From staging**: O152
+
+## A43: Symmetric 3x3 Eigenpairs Use One Scaled Free-Function Contract
+- **Decision**: Geometry exposes one allocation-free symmetric 3x3
+  eigensystem result struct and free function from the existing
+  `Geometry.Linalg` module. The contract max-absolute-scales finite inputs,
+  returns signed explicitly ordered eigenvalues and a right-handed
+  orthonormal column basis, handles the zero matrix deterministically, and
+  fails closed on non-finite input or solver failure. Fixed-size Eigen
+  self-adjoint QR is the reference implementation; a consolidated unrolled
+  Jacobi implementation remains acceptable where Eigen dependency isolation
+  is required. Positive-semidefinite clamping stays in PCA callers. No
+  backend, factory, wrapper hierarchy, or values-only eig3x3 dependency is
+  introduced without a present benchmarked caller.
+- **Provenance**: ai-suggested
+- **Crystallized via**: artifact-commitment
+- **Evidence**: [N435, N437,
+  ara/evidence/tables/eig3x3_live_curvature_diagnostic_2026-08-12.md,
+  src/geometry/Geometry.HalfedgeMesh.Curvature.cpp,
+  src/geometry/Geometry.PCA.cpp]
+- **From staging**: O157
+
+## A44: Runtime Publishes Both Principal Curvature Scalars
+- **Decision**: Runtime curvature publication retains the geometry kernel's
+  minimum and maximum principal scalar properties alongside mean, Gaussian,
+  and principal directions. Output selection, canonical property state,
+  undo/redo capture, config/agent control, and Sandbox discovery use the same
+  publication path so live comparisons can select like-for-like scalar fields
+  without recomputation or compatibility aliases.
+- **Provenance**: ai-suggested
+- **Crystallized via**: artifact-commitment
+- **Evidence**: [N436, N437,
+  ara/evidence/tables/eig3x3_live_curvature_diagnostic_2026-08-12.md,
+  src/geometry/Geometry.HalfedgeMesh.Curvature.cpp,
+  src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.cppm,
+  src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Mesh.cpp]
+- **From staging**: O158

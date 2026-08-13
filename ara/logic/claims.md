@@ -1543,3 +1543,54 @@
 - **Tags**: geometry, principal curvature, hinge tensor, support radius,
   smoothing, accuracy, BUG-156
 - **From staging**: O154
+
+## C51: eig3x3 is a values-only kernel, not a reusable geometry eigensystem
+- **Statement**: Habera and Zilian's reviewed eig3x3 symmetric entry point
+  computes eigenvalues but not eigenvectors, exposes a C11 interface that is
+  not directly valid C++23, and requires explicit max-absolute input scaling
+  to retain homogeneity on the exercised extreme-scale controls. It can be
+  considered for a present values-only hot path, but cannot replace the full
+  orthonormal eigensystems required by curvature directions, PCA frames, or
+  oriented bounding boxes.
+- **Status**: supported — source/paper inspection, direct C++23 compilation,
+  and local scale controls; the recorded timing probe is explicitly
+  non-claim evidence and does not establish an engine performance advantage
+- **Provenance**: ai-suggested
+- **Crystallized via**: artifact-commitment
+- **Falsification criteria**: The pinned eig3x3 revision provides a directly
+  C++23-compatible symmetric API returning a complete orthonormal eigensystem,
+  or its raw unscaled routine preserves finite, correctly separated
+  eigenvalues for the recorded `1e-200` and `1e200` controls.
+- **Proof**: [ara/evidence/tables/eig3x3_live_curvature_diagnostic_2026-08-12.md]
+- **Dependencies**: []
+- **Tags**: geometry, linear algebra, eig3x3, symmetric eigensystem,
+  numerical scaling, bounded result
+- **From staging**: O155
+
+## C52: Legacy BCG area normalization explains the live curvature transform
+- **Statement**: Archived framework24's mixed Voronoi area routine doubles
+  the acute-triangle Meyer contribution and halves the obtuse allocation.
+  Together with its opposite signed-dihedral convention, this predicts the
+  measured principal-slot swap, factor-of-two principal/mean scaling, and
+  factor-of-four Gaussian scaling between matched one-ring BCG and current
+  Intrinsic fields on `tests/data/sculpt.obj`; the measured mean-curvature
+  transform has `9.67e-7` median absolute error and `0.999034` correlation.
+- **Status**: supported — source-level formula audit and a 3,669-slot isolated
+  Xephyr differential on the exact same closed mesh; no general BCG/PMP
+  implementation-equivalence claim
+- **Provenance**: ai-suggested
+- **Crystallized via**: artifact-commitment
+- **Falsification criteria**: Correcting only framework24's acute cotangent
+  denominator, obtuse allocations, and documented sign convention fails to
+  remove the predicted matched-support transform, or an independently
+  exported same-vertex field does not reproduce the recorded correlations.
+- **Proof**: [ara/evidence/tables/eig3x3_live_curvature_diagnostic_2026-08-12.md,
+  experimental/framework24/lib_bcg_framework/src/bcg_mesh_vertex_voronoi_area.cpp,
+  experimental/framework24/lib_bcg_framework/src/bcg_mesh_curvature_taubin.cpp,
+  src/geometry/Geometry.HalfedgeMesh.Utils.cpp,
+  src/geometry/Geometry.HalfedgeMesh.Curvature.cpp,
+  tests/data/sculpt.obj]
+- **Dependencies**: [C50]
+- **Tags**: geometry, principal curvature, BCG, mixed Voronoi area, sign
+  convention, live differential, bounded result
+- **From staging**: O156

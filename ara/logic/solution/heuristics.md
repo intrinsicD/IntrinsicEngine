@@ -252,3 +252,21 @@
   tasks/backlog/process/CI-020-verification-cutover-and-legacy-retirement.md,
   N334, N335]
 - **From staging**: O99
+
+## H17: Center Signed Curvature Visualization on Zero
+- **Rationale**: Use a diverging colormap and a symmetric robust range
+  `[-q, q]`, where `q` is derived from robust absolute curvature magnitude,
+  for signed principal and mean-curvature fields. This preserves zero as the
+  semantic neutral point and gives positive and negative bending comparable
+  visual bandwidth; a sequential asymmetric percentile range can compress
+  most of a skewed signed field into a narrow color interval even when the
+  stored values are numerically sound. Keep explicit/manual ranges available
+  for exact comparisons and treat unsigned Gaussian or magnitude views by
+  their own scalar semantics.
+- **Provenance**: ai-suggested
+- **Crystallized via**: artifact-commitment
+- **Sensitivity**: medium
+- **Code ref**: [src/runtime/Visualization/Runtime.VisualizationRecipes.cpp,
+  ara/evidence/tables/eig3x3_live_curvature_diagnostic_2026-08-12.md,
+  N436, N437]
+- **From staging**: O159

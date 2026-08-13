@@ -10248,3 +10248,24 @@ tree:
       - "N436"
       - "ara/evidence/tables/eig3x3_live_curvature_diagnostic_2026-08-12.md"
     status: resolved
+  - id: N438
+    type: experiment
+    title: "Validate and publish the eigensolver and live-curvature diagnostic"
+    provenance: ai-executed
+    timestamp: "2026-08-13T08:58+02:00"
+    also_depends_on: [N435, N436, N437]
+    evidence:
+      - "commit ef0a544dac505fe31d4ceb74cfcff1aabb9499b3"
+      - "ara/evidence/tables/eig3x3_live_curvature_diagnostic_2026-08-12.md"
+      - "python3 tools/agents/check_ara_claims.py --root . --strict"
+      - "python3 tools/docs/check_doc_links.py --root ."
+      - "python3 tools/agents/check_task_policy.py --root . --strict"
+      - "python3 tools/repo/check_root_hygiene.py --root ."
+    result: >
+      The seven-file research and trace surface passed diff hygiene, the
+      strict 50-claim ARA audit, 3,327 relative-link checks, strict policy for
+      271 task files, and repository-root hygiene. Local main and origin/main
+      were initially identical; commit ef0a544d was created directly on main,
+      pushed without force, fetched back, and verified byte-identical at the
+      local and remote refs. No production source or test file changed.
+    status: resolved

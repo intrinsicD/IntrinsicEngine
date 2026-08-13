@@ -2808,9 +2808,9 @@ observations:
       evidence rather than a benchmark result.
     potential_type: claim
     bound_to: [N435]
-    promoted: false
-    promoted_to: null
-    crystallized_via: null
+    promoted: true
+    promoted_to: "logic/claims.md:C51"
+    crystallized_via: artifact-commitment
     stale: false
   - id: O156
     timestamp: "2026-08-12T23:13+02:00"
@@ -2828,9 +2828,9 @@ observations:
       model contains 7,317 acute and 25 obtuse triangles.
     potential_type: claim
     bound_to: [N436]
-    promoted: false
-    promoted_to: null
-    crystallized_via: null
+    promoted: true
+    promoted_to: "logic/claims.md:C52"
+    crystallized_via: artifact-commitment
     stale: false
   - id: O157
     timestamp: "2026-08-12T23:13+02:00"
@@ -2849,9 +2849,9 @@ observations:
       positive-semidefinite clamping to PCA callers.
     potential_type: architecture
     bound_to: [N435, N437]
-    promoted: false
-    promoted_to: null
-    crystallized_via: null
+    promoted: true
+    promoted_to: "logic/solution/architecture.md:A43"
+    crystallized_via: artifact-commitment
     stale: false
   - id: O158
     timestamp: "2026-08-12T23:13+02:00"
@@ -2867,9 +2867,9 @@ observations:
       selection and publication expose no principal scalar channel.
     potential_type: architecture
     bound_to: [N436, N437]
-    promoted: false
-    promoted_to: null
-    crystallized_via: null
+    promoted: true
+    promoted_to: "logic/solution/architecture.md:A44"
+    crystallized_via: artifact-commitment
     stale: false
   - id: O159
     timestamp: "2026-08-12T23:13+02:00"
@@ -2886,7 +2886,7 @@ observations:
       sequential range during the live Sandbox comparison.
     potential_type: heuristic
     bound_to: [N436, N437]
-    promoted: false
-    promoted_to: null
-    crystallized_via: null
+    promoted: true
+    promoted_to: "logic/solution/heuristics.md:H17"
+    crystallized_via: artifact-commitment
     stale: false
