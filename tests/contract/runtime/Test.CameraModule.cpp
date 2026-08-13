@@ -4,6 +4,7 @@
 #include <optional>
 #include <utility>
 
+#include <glm/glm.hpp>
 #include <gtest/gtest.h>
 #include "RuntimeTestModule.hpp"
 
@@ -33,31 +34,13 @@ namespace Runtime = Extrinsic::Runtime;
 namespace
 {
     [[nodiscard]] Graphics::CameraViewInput SeedAt(
-        const float x,
-        const float y,
-        const float z)
+        const glm::vec3 position)
     {
         Graphics::CameraViewInput seed =
             Runtime::DefaultCameraControllerSeed();
-        seed.Position.x = x;
-        seed.Position.y = y;
-        seed.Position.z = z;
+        seed.Position = position;
         seed.Valid = true;
         return seed;
-    }
-
-    [[nodiscard]] Graphics::CameraViewInput SeedAt(const float value)
-    {
-        return SeedAt(value, value, value);
-    }
-
-    void ExpectSamePosition(
-        const Graphics::CameraViewInput& actual,
-        const Graphics::CameraViewInput& expected)
-    {
-        EXPECT_EQ(actual.Position.x, expected.Position.x);
-        EXPECT_EQ(actual.Position.y, expected.Position.y);
-        EXPECT_EQ(actual.Position.z, expected.Position.z);
     }
 
     class RecordingController final
@@ -256,7 +239,7 @@ namespace
             ASSERT_NE(Registry, nullptr);
             SeedResult = Registry->SetWorldSeed(
                 engine.ActiveWorld(),
-                SeedAt(1.0f, 2.0f, 6.0f));
+                SeedAt(glm::vec3{1.0f, 2.0f, 6.0f}));
         }
 
 
@@ -297,9 +280,9 @@ TEST(CameraControllerRegistryWorldBinding,
     const Runtime::WorldHandle worldA{3u, 7u};
     const Runtime::WorldHandle worldB{4u, 2u};
     const Graphics::CameraViewInput original =
-        SeedAt(1.0f, 2.0f, 3.0f);
+        SeedAt(glm::vec3{1.0f, 2.0f, 3.0f});
     const Graphics::CameraViewInput replacement =
-        SeedAt(9.0f, 8.0f, 7.0f);
+        SeedAt(glm::vec3{9.0f, 8.0f, 7.0f});
 
     const Core::Result invalidUnbound =
         registry.SetWorldSeed({}, original);
@@ -324,7 +307,7 @@ TEST(CameraControllerRegistryWorldBinding,
 
     const auto retained = registry.WorldSeedFor(worldA);
     ASSERT_TRUE(retained.has_value());
-    ExpectSamePosition(*retained, original);
+    EXPECT_EQ(retained->Position, original.Position);
 
     registry.ResetForWorld({});
     const Core::Result invalidBinding =
@@ -342,7 +325,7 @@ TEST(CameraControllerRegistryWorldBinding,
     const Runtime::WorldHandle world{2u, 9u};
     registry.ResetForWorld(world);
     ASSERT_TRUE(registry.SetWorldSeed(
-        world, SeedAt(2.0f, 3.0f, 4.0f))
+        world, SeedAt(glm::vec3{2.0f, 3.0f, 4.0f}))
                     .has_value());
     registry.Register(
         Runtime::CameraControllerSlot::Main,
@@ -376,7 +359,7 @@ TEST(CameraControllerRegistryWorldBinding,
     const Runtime::WorldHandle worldB{6u, 1u};
     registry.ResetForWorld(worldA);
     ASSERT_TRUE(registry.SetWorldSeed(
-        worldA, SeedAt(1.0f))
+        worldA, SeedAt(glm::vec3{1.0f}))
                     .has_value());
     registry.Register(
         Runtime::CameraControllerSlot::Main,
@@ -514,7 +497,7 @@ TEST(CameraModuleLifecycle,
         std::make_unique<RecordingController>());
     ASSERT_TRUE(registry->SetWorldSeed(
         harness.InitialWorld,
-        SeedAt(4.0f, 5.0f, 6.0f))
+        SeedAt(glm::vec3{4.0f, 5.0f, 6.0f}))
                     .has_value());
 
     harness.Shutdown(module);
@@ -569,7 +552,7 @@ TEST(CameraModuleWorldLifecycle,
               nullptr);
 
     ASSERT_TRUE(registry->SetWorldSeed(
-        next, SeedAt(7.0f))
+        next, SeedAt(glm::vec3{7.0f}))
                     .has_value());
     harness.Events.Publish(Runtime::WorldWillBeDestroyed{
         .World = next,
@@ -596,7 +579,7 @@ TEST(CameraModuleViewportHook,
         Runtime::CameraControllerSlot::Main,
         std::make_unique<RecordingController>());
     ASSERT_TRUE(registry->SetWorldSeed(
-        harness.InitialWorld, SeedAt(3.0f))
+        harness.InitialWorld, SeedAt(glm::vec3{3.0f}))
                     .has_value());
 
     const Runtime::WorldHandle delayedCurrent{9u, 2u};
@@ -632,7 +615,7 @@ TEST(CameraModuleViewportHook,
                              Runtime::CameraControllerRegistry>();
     ASSERT_NE(registry, nullptr);
     const Graphics::CameraViewInput seed =
-        SeedAt(2.0f, 4.0f, 8.0f);
+        SeedAt(glm::vec3{2.0f, 4.0f, 8.0f});
     ASSERT_TRUE(registry->SetWorldSeed(
         harness.InitialWorld, seed)
                     .has_value());
@@ -659,7 +642,7 @@ TEST(CameraModuleViewportHook,
         capture,
         enabledInput);
     EXPECT_TRUE(IsFiniteCamera(enabledInput.Camera));
-    ExpectSamePosition(enabledInput.Camera, seed);
+    EXPECT_EQ(enabledInput.Camera.Position, seed.Position);
     EXPECT_TRUE(
         enabledInput.Camera.ExplicitCameraTransition);
 
@@ -687,7 +670,7 @@ TEST(CameraModuleViewportHook,
                              Runtime::CameraControllerRegistry>();
     ASSERT_NE(registry, nullptr);
     auto controller = std::make_unique<RecordingController>(
-        SeedAt(3.0f, 2.0f, 1.0f));
+        SeedAt(glm::vec3{3.0f, 2.0f, 1.0f}));
     RecordingController* recorder = controller.get();
     registry->Register(
         Runtime::CameraControllerSlot::Main,
