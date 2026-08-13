@@ -22,24 +22,15 @@ the authoritative open/unblocked view.
 - unblocked: `GRAPHICS-124` — Slughorn world-space vector annotation proof (tasks/backlog/rendering/GRAPHICS-124-slughorn-world-space-vector-annotation-proof.md)
 - blocked by `GEOM-066`: `GRAPHICS-125` — Memory-priced cluster hierarchy evidence (tasks/backlog/rendering/GRAPHICS-125-memory-priced-cluster-hierarchy-evidence.md)
 - unblocked: `GRAPHICS-126` — Bandwidth-priced frame-recipe trace model (tasks/backlog/rendering/GRAPHICS-126-bandwidth-priced-frame-recipe-trace-model.md)
-- unblocked: `GRAPHICS-135` — RenderPrepFrame dominates frame time with a per-frame task-graph rebuild (tasks/backlog/rendering/GRAPHICS-135-renderprep-per-frame-taskgraph-overhead.md)
 
 ## Theme F — Architecture/runtime/UI foundation seeds
 
 - unblocked: `ASSETIO-010` — Async model companion preflight (tasks/backlog/assets/ASSETIO-010-async-model-companion-preflight.md)
 - blocked by `ASSETIO-010`: `ASSETIO-011` — Semantic Sandbox File / Import workflow matrix (tasks/backlog/assets/ASSETIO-011-semantic-sandbox-file-import-workflow-matrix.md)
-- unblocked: `ASSETIO-012` — Two hand-maintained format capability tables have already drifted (tasks/backlog/assets/ASSETIO-012-single-source-format-capability-table.md)
 - unblocked: `BUG-134` — ImGui adapter panel draw-list test fails intermittently (tasks/backlog/bugs/BUG-134-imgui-adapter-panel-draw-list-intermittent.md)
 - blocked by `GRAPHICS-105`: `LEGACY-043` — Retire stale multi-descriptor-set shader sources (tasks/backlog/rendering/LEGACY-043-retire-stale-multiset-shaders.md)
 - unblocked: `PLATFORM-004` — Alternative-platform backend onboarding policy (planning seed) (tasks/backlog/platform/PLATFORM-004-alternative-platform-backend-onboarding.md)
-- unblocked: `RUNTIME-218` — Nothing in the scene is ever lit: add default lighting and light authoring (tasks/backlog/runtime/RUNTIME-218-default-scene-lighting-and-light-authoring.md)
 - unblocked: `UI-037` — Linear domain-action readiness and disabled-reason tooltips (tasks/backlog/ui/UI-037-linear-domain-action-readiness-tooltips.md)
-- unblocked: `UI-046` — Sandbox cannot export geometry at all (tasks/backlog/ui/UI-046-sandbox-geometry-export.md)
-- unblocked: `UI-047` — File paths must be hand-typed into a raw text field (tasks/backlog/ui/UI-047-file-chooser-for-import-and-scene-paths.md)
-- unblocked: `UI-048` — Editor opens empty, hides file operations under View, and never remembers layout (tasks/backlog/ui/UI-048-first-run-workspace-and-layout-persistence.md)
-- unblocked: `UI-049` — Editor panels are sized so that labels clip and results are hidden (tasks/backlog/ui/UI-049-editor-panel-sizing-and-readability.md)
-- unblocked: `UI-050` — Vector-field properties cannot be visualized (tasks/backlog/ui/UI-050-vector-field-property-visualization.md)
-- unblocked: `UI-051` — A mesh does not pass as a graph or a point cloud in the domain windows (tasks/backlog/ui/UI-051-domain-agnostic-appearance-properties-selection-windows.md)
 
 ## Theme G — Active bugs
 
@@ -65,7 +56,7 @@ the authoritative open/unblocked view.
 - blocked by `CI-019`: `CI-020` — Cut over verification and retire legacy policy (tasks/backlog/process/CI-020-verification-cutover-and-legacy-retirement.md)
 - blocked by `CI-013`: `PROC-031` — Bind agent workflow to unified verification receipts (tasks/backlog/process/PROC-031-agent-verification-receipts.md)
 
-## Theme I — Research method implementation
+## Theme I — Research method implementation (paused except explicit P0 dependencies)
 
 - unblocked: `GEOM-013` — Feature-preserving dual contouring (tasks/backlog/geometry/GEOM-013-feature-preserving-dual-contouring.md)
 - unblocked: `GEOM-024` — Sparse symmetric generalized eigensolver seam (tasks/backlog/geometry/GEOM-024-sparse-symmetric-generalized-eigensolver-seam.md)
@@ -116,6 +107,23 @@ the authoritative open/unblocked view.
 - blocked by `RUNTIME-211`: `UI-043` — K-Means property-domain panel (tasks/backlog/ui/UI-043-kmeans-property-domain-panel.md)
 - blocked by `RUNTIME-212`: `UI-044` — Progressive Poisson property-domain panel (tasks/backlog/ui/UI-044-progressive-poisson-property-domain-panel.md)
 - blocked by `RUNTIME-213`: `UI-045` — Point-set normal property-domain panel (tasks/backlog/ui/UI-045-point-normal-property-domain-panel.md)
+
+## Theme J — Framework24 product convergence
+
+- unblocked: `ASSETIO-012` — Two hand-maintained format capability tables have already drifted (tasks/backlog/assets/ASSETIO-012-single-source-format-capability-table.md)
+- unblocked: `BENCH-001` — Framework24 golden-workflow comparison harness (tasks/backlog/benchmarks/BENCH-001-framework24-golden-workflow-comparison-harness.md)
+- unblocked: `BUG-158` — Optional direct-mesh enrichment blocks already usable geometry (tasks/backlog/bugs/BUG-158-direct-mesh-enrichment-blocks-usable-geometry.md)
+- unblocked: `BUG-159` — FastStaged atlas allocates global remaps for every chart (tasks/backlog/bugs/BUG-159-fast-staged-atlas-per-chart-global-remaps.md)
+- blocked by `BUG-159`: `BUG-160` — FastStaged fixed seed planes fragment smooth meshes into tiny charts (tasks/backlog/bugs/BUG-160-fast-staged-atlas-chart-fragmentation.md)
+- unblocked: `GRAPHICS-135` — RenderPrepFrame dominates frame time with a per-frame task-graph rebuild (tasks/backlog/rendering/GRAPHICS-135-renderprep-per-frame-taskgraph-overhead.md)
+- blocked by `ASSETIO-012`: `REVIEW-004` — Framework24 product-convergence audit (tasks/backlog/architecture/REVIEW-004-framework24-product-convergence-audit.md)
+- unblocked: `RUNTIME-218` — Nothing in the scene is ever lit: add default lighting and light authoring (tasks/backlog/runtime/RUNTIME-218-default-scene-lighting-and-light-authoring.md)
+- unblocked: `UI-046` — Sandbox cannot export geometry at all (tasks/backlog/ui/UI-046-sandbox-geometry-export.md)
+- unblocked: `UI-047` — File paths must be hand-typed into a raw text field (tasks/backlog/ui/UI-047-file-chooser-for-import-and-scene-paths.md)
+- unblocked: `UI-048` — Editor opens empty, hides file operations under View, and never remembers layout (tasks/backlog/ui/UI-048-first-run-workspace-and-layout-persistence.md)
+- unblocked: `UI-049` — Editor panels are sized so that labels clip and results are hidden (tasks/backlog/ui/UI-049-editor-panel-sizing-and-readability.md)
+- unblocked: `UI-050` — Vector-field properties cannot be visualized (tasks/backlog/ui/UI-050-vector-field-property-visualization.md)
+- unblocked: `UI-051` — A mesh does not pass as a graph or a point cloud in the domain windows (tasks/backlog/ui/UI-051-domain-agnostic-appearance-properties-selection-windows.md)
 
 ## Unthemed
 

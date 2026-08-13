@@ -7,6 +7,12 @@ another backlog directory.
 
 ## Runtime backlog tasks
 
+### Framework24 product convergence
+
+- [`RUNTIME-218`](RUNTIME-218-default-scene-lighting-and-light-authoring.md)
+  owns the Theme J lighting baseline: a usable default light, undoable and
+  persistent light authoring, and promoted-Vulkan non-uniform-luminance proof.
+
 ### Method property-domain integration (audited 2026-08-02, clarified 2026-08-03)
 
 The contract audit in

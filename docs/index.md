@@ -2,6 +2,12 @@
 
 This page is the canonical entry point for repository documentation.
 
+## Product
+
+- [Product documentation](product/)
+- [Framework24 convergence contract and scorecard](product/framework24-convergence.md)
+- [Framework24 registered-feature inventory](product/framework24-feature-inventory.md)
+
 ## Architecture
 
 - [Architecture documents](architecture/) — subsystem design notes, runtime boundaries, rendering plans, and migration-era architecture records.

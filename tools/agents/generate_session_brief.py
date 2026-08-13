@@ -36,7 +36,8 @@ THEME_NAMES = {
     "F": "Architecture/runtime/UI foundation seeds",
     "G": "Active bugs",
     "H": "Agentic workflow hardening",
-    "I": "Research method implementation",
+    "I": "Research method implementation (paused except explicit P0 dependencies)",
+    "J": "Framework24 product convergence",
     "none": "Unthemed",
 }
 

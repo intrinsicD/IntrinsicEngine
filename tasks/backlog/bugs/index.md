@@ -5,6 +5,19 @@ Each entry includes the observed repro, the likely affected symbols, and a fix p
 
 ## Active Issues
 
+- [`BUG-158` — Optional direct-mesh enrichment blocks already usable
+  geometry](BUG-158-direct-mesh-enrichment-blocks-usable-geometry.md): the
+  geometry-only mesh is published immediately, but the editor returns before
+  resolving all processing actions while UV/normal enrichment is active.
+- [`BUG-159` — FastStaged atlas allocates global remaps for every
+  chart](BUG-159-fast-staged-atlas-per-chart-global-remaps.md): two
+  source-vertex-sized mappings inside chart work make pathological charting
+  scale as `O(C × V)` instead of chart-local data.
+- [`BUG-160` — FastStaged fixed seed planes fragment smooth meshes into tiny
+  charts](BUG-160-fast-staged-atlas-chart-fragmentation.md): the seed-normal and
+  seed-plane admission rule produced about 90k charts on a 100k-face
+  diagnostic and must be repaired or lose default selection after matched A/B.
+
 The 2026-08-07 Sandbox UI workflow pass (`sculpt.obj` end-to-end through the
 promoted Vulkan build) opened `BUG-137` through `BUG-142`. `BUG-137` is upstream
 of `BUG-140` and of the parameterization rejection recorded in `BUG-141`.

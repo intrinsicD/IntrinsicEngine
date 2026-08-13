@@ -1,6 +1,6 @@
 ---
 id: UI-048
-theme: F
+theme: J
 depends_on: []
 workflow_schema: 1
 workflow_profile: standard
