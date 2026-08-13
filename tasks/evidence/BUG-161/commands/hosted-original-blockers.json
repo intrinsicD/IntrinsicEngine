@@ -1,0 +1,21 @@
+{
+  "command": [
+    "python3",
+    "-c",
+    "import json,subprocess; jobs=[]\nfor job_id in (\"94431271144\", \"94431455381\"):\n d=json.loads(subprocess.check_output([\"gh\",\"api\",f\"repos/intrinsicD/IntrinsicEngine/actions/jobs/{job_id}\"], text=True)); jobs.append(d)\nsteps={s[\"name\"]:s.get(\"conclusion\") for d in jobs for s in d[\"steps\"]}\nrequired=(\"Validate markdown links (strict mode)\",\"Validate task policy (strict mode)\",\"Checkout\",\"Enforce task policy\")\nassert all(steps.get(name)==\"success\" for name in required), {name:steps.get(name) for name in required}\nprint({name:steps[name] for name in required})"
+  ],
+  "command_display": "python3 -c 'import json,subprocess; jobs=[]\nfor job_id in (\"94431271144\", \"94431455381\"):\n d=json.loads(subprocess.check_output([\"gh\",\"api\",f\"repos/intrinsicD/IntrinsicEngine/actions/jobs/{job_id}\"], text=True)); jobs.append(d)\nsteps={s[\"name\"]:s.get(\"conclusion\") for d in jobs for s in d[\"steps\"]}\nrequired=(\"Validate markdown links (strict mode)\",\"Validate task policy (strict mode)\",\"Checkout\",\"Enforce task policy\")\nassert all(steps.get(name)==\"success\" for name in required), {name:steps.get(name) for name in required}\nprint({name:steps[name] for name in required})'",
+  "cwd": ".",
+  "duration_ms": 745,
+  "exit_code": 0,
+  "finished_at": "2026-08-13T11:42:05Z",
+  "label": "hosted-original-blockers",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-13T11:42:04Z",
+  "stderr_path": "tasks/evidence/BUG-161/commands/hosted-original-blockers.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/BUG-161/commands/hosted-original-blockers.stdout.log",
+  "stdout_sha256": "d1956f6fb0f19e4c19cee0c65a57413cb86b254a92dbd3f5e763eb3a8940dbc9",
+  "task_id": "BUG-161"
+}

@@ -10,7 +10,6 @@ the authoritative open/unblocked view.
 
 - `BUG-154` — Restore PMP curvature parity without normal-seam topology loss (tasks/active/BUG-154-curvature-pmp-parity-corner-normal-topology.md)
 - `BUG-156` — Two-ring support and eigenvalue smoothing cancel genuine curvature (tasks/active/BUG-156-curvature-two-ring-smoothing-cancels-features.md)
-- `BUG-161` — Clean checkouts cannot validate the Framework24 convergence policy (tasks/active/BUG-161-clean-checkout-framework24-policy-validation.md)
 - `METHOD-039` — Feature-network-constrained curvature patch decomposition (tasks/active/METHOD-039-feature-network-curvature-patch-decomposition.md)
 
 ## Theme B — Rendering modernization
@@ -128,7 +127,6 @@ the authoritative open/unblocked view.
 
 ## Unthemed
 
-- unblocked: `BUG-121` — GLM anonymous-union copy-assignment fails to compile through a C++23 module boundary (tasks/backlog/bugs/BUG-121-glm-anonymous-union-module-copy-assign.md)
 - unblocked: `BUG-122` — Runtime asset ASan tests retain expired callback and snapshot state (tasks/backlog/bugs/BUG-122-runtime-asset-asan-test-lifetimes.md)
 - unblocked: `GRAPHICS-109` — Offscreen frame capture to PNG (headless figure renders) (tasks/backlog/rendering/GRAPHICS-109-offscreen-frame-capture-png.md)
 

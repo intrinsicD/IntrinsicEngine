@@ -10,10 +10,18 @@ branch: "agent/framework24-product-convergence-goal"
 worktree: "/home/alex/Documents/IntrinsicEngine"
 claimed_at: "2026-08-13T11:19:39Z"
 contract_schema: 1
-contracts: []
-contract_review: "Reviewed the contract catalog. This repair changes neither a reusable task/workflow contract nor an engine, geometry, method, config, runtime, or UI contract; it only makes the existing strict documentation and task-policy checks reproducible from the clean GitHub checkout that executes them."
+contracts: [repo.task-contract-discovery]
+contract_review: "The clean-checkout repair itself changes no reusable engine contract. Its review repair reconciles duplicate task ownership under the task-discovery contract: BUG-157 is the sole open Clang/GLM owner, BUG-121 is retired as a duplicate, and the uncommitted BUG-162 draft is removed."
 ---
 # BUG-161 — Clean checkouts cannot validate the Framework24 convergence policy
+
+## Status
+
+- Completed and retired on 2026-08-13. Hosted documentation validation passed
+  end-to-end, and full CPU passed checkout plus strict task policy before a
+  separate pre-existing Clang/GLM module compile defect stopped the build;
+  `BUG-157` remains the sole owner of that downstream blocker.
+- Implementation commit: `c283de25`.
 
 ## Goal
 
@@ -26,6 +34,8 @@ contract_review: "Reviewed the contract catalog. This repair changes neither a r
   change.
 - No weakening, skipping, or quarantining of a required gate.
 - No broad CI refactor or unrelated workflow cleanup.
+- No repair of the downstream pre-existing Clang/GLM test-module failure;
+  `BUG-157` owns that separately reproduced defect.
 
 ## Context
 
@@ -60,7 +70,7 @@ contract_review: "Reviewed the contract catalog. This repair changes neither a r
 
 - [x] Keep the feature inventory's source/revision statement factual in both
   local comparison and clean hosted checkouts.
-- [ ] Regenerate the session brief after retiring this bug.
+- [x] Regenerate the session brief after retiring this bug.
 
 ## Acceptance criteria
 
@@ -68,7 +78,9 @@ contract_review: "Reviewed the contract catalog. This repair changes neither a r
   tree.
 - [x] The full-CPU workflow has the history required to resolve
   `contract_legacy_tasks.json`'s pinned source revision.
-- [ ] PR 1030's required checks rerun successfully before merge.
+- [x] PR 1030's documentation-link and strict task-policy stages rerun
+  successfully; the later unrelated compile blocker is tracked only by
+  `BUG-157`.
 
 ## Verification
 

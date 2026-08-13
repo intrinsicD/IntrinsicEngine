@@ -21,10 +21,6 @@ Each active task should include:
   crease-adjacent curvature is no longer cancelled into zero bands on
   `tests/data/sculpt.obj`; next step is the reporter's Sandbox visual
   confirmation and independent review.
-- [`BUG-161` — Clean checkouts cannot validate the Framework24 convergence policy](BUG-161-clean-checkout-framework24-policy-validation.md)
-  — in progress on `agent/framework24-product-convergence-goal`, owned by
-  `codex-root`; the local regression and strict validators pass, and PR 1030's
-  hosted gates are the next verification step.
 - [`METHOD-039` — Feature-network-constrained curvature patch decomposition](METHOD-039-feature-network-curvature-patch-decomposition.md)
   — paused behind `REVIEW-004` by the 2026-08-13 product-convergence decision;
   its completed negative-result surface and work-graph history are preserved

@@ -1,0 +1,28 @@
+{
+  "command": [
+    "python3",
+    "tools/docs/check_docs_sync.py",
+    "--root",
+    ".",
+    "--diff-mode",
+    "--base-ref",
+    "origin/main",
+    "--head-ref",
+    "HEAD",
+    "--strict"
+  ],
+  "command_display": "python3 tools/docs/check_docs_sync.py --root . --diff-mode --base-ref origin/main --head-ref HEAD --strict",
+  "cwd": ".",
+  "duration_ms": 33,
+  "exit_code": 0,
+  "finished_at": "2026-08-13T11:57:38Z",
+  "label": "r2-docs-sync",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-13T11:57:38Z",
+  "stderr_path": "tasks/evidence/BUG-161/commands/r2-docs-sync.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/BUG-161/commands/r2-docs-sync.stdout.log",
+  "stdout_sha256": "2135e1211c400ed9c8a6721c7123d38b21c7c56865a4ece9c2a253980329f8b7",
+  "task_id": "BUG-161"
+}

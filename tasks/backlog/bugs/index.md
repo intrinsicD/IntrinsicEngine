@@ -36,9 +36,9 @@ of `BUG-140` and of the parameterization rejection recorded in `BUG-141`.
   `glm/detail/type_vec3.hpp: class member cannot be redeclared` when textual
   glm inclusion meets the imported RHI module chain, so the full
   `IntrinsicTests` build breaks on the documented minimum toolchain while
-  geometry-only targets build and pass. Hosted CI installs clang-20 and is
-  expected to hit this once its earlier shallow-checkout validator failure is
-  fixed.
+  geometry-only targets build and pass. PR 1030 reproduced it in full CPU,
+  ASan, and UBSan after the earlier shallow-checkout validator failure was
+  fixed; `BUG-157` is the sole implementation owner.
 
 - [`BUG-154` — Restore PMP curvature parity without normal-seam topology loss](../../active/BUG-154-curvature-pmp-parity-corner-normal-topology.md):
   OBJ authored normals currently participate in the topology remap key, so a
@@ -66,11 +66,6 @@ of `BUG-140` and of the parameterization rejection recorded in `BUG-141`.
   stack-use-after-scope and three heap-use-after-free failures on
   `origin/main`; repair the test lifetimes without weakening their semantics or
   changing production contracts absent an independent repro.
-- [`BUG-121` — GLM anonymous-union copy-assignment fails to compile through a C++23 module boundary](BUG-121-glm-anonymous-union-module-copy-assign.md):
-  `clang++-20` rejects `glm/detail/type_vec3.hpp`'s `union { T x, r, s; }` when the implicit copy
-  assignment for `glm::vec<3,float>` is first required in a TU that reaches the type through
-  `Extrinsic.RHI.Types`. Breaks the build of `Test.CameraModule.cpp`, so `full-cpu`, `ci-asan`,
-  and `ci-ubsan` never reach their test phase. Cold cache, so not a stale-BMI artifact.
 - [`BUG-118` — GLFW X11 input-method LeakSanitizer recurrence](BUG-118-glfw-x11-input-method-lsan-recurrence.md):
   the standalone lifetime contract again retains the unsuppressed 408-byte
   libX11 input-method allocation despite proving process-static
@@ -86,6 +81,12 @@ of `BUG-140` and of the parameterization rejection recorded in `BUG-141`.
   tests run; collect cold/warm/contention evidence and set an explicit,
   evidence-backed discovery policy without weakening per-test timeouts.
 ## Verified / Closed
+
+- Closed 2026-08-13: [`BUG-121` — GLM anonymous-union copy-assignment fails
+  through a C++23 module boundary](../../done/BUG-121-glm-anonymous-union-module-copy-assign.md).
+  This record was an exact duplicate of open `BUG-157` and was retired without
+  claiming a fix; `BUG-157` alone owns the compiler diagnosis, implementation,
+  and CPU/sanitizer recovery.
 
 - Closed 2026-08-11: [`BUG-153` — Restore edge-dihedral Taubin curvature
   estimation](../../done/BUG-153-curvature-taubin-edge-dihedral-estimator.md).

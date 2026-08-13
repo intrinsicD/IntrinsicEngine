@@ -1,0 +1,38 @@
+EEE
+======================================================================
+ERROR: Test (unittest.loader._FailedTest.Test)
+----------------------------------------------------------------------
+ImportError: Failed to import test module: Test
+Traceback (most recent call last):
+  File "/home/alex/miniconda3/lib/python3.11/unittest/loader.py", line 162, in loadTestsFromName
+    module = __import__(module_name)
+             ^^^^^^^^^^^^^^^^^^^^^^^
+ModuleNotFoundError: No module named 'tests.regression.tooling.Test'
+
+
+======================================================================
+ERROR: Test (unittest.loader._FailedTest.Test)
+----------------------------------------------------------------------
+ImportError: Failed to import test module: Test
+Traceback (most recent call last):
+  File "/home/alex/miniconda3/lib/python3.11/unittest/loader.py", line 162, in loadTestsFromName
+    module = __import__(module_name)
+             ^^^^^^^^^^^^^^^^^^^^^^^
+ModuleNotFoundError: No module named 'tests.regression.tooling.Test'
+
+
+======================================================================
+ERROR: Test (unittest.loader._FailedTest.Test)
+----------------------------------------------------------------------
+ImportError: Failed to import test module: Test
+Traceback (most recent call last):
+  File "/home/alex/miniconda3/lib/python3.11/unittest/loader.py", line 162, in loadTestsFromName
+    module = __import__(module_name)
+             ^^^^^^^^^^^^^^^^^^^^^^^
+ModuleNotFoundError: No module named 'tests.regression.tooling.Test'
+
+
+----------------------------------------------------------------------
+Ran 3 tests in 0.000s
+
+FAILED (errors=3)
