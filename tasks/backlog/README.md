@@ -41,10 +41,15 @@ how the *current* backlog maps onto that contract.
 
 ### Theme J — Framework24 product convergence (P0, active gate)
 
-Make IntrinsicEngine a demonstrably better Framework24 replacement without
-regressing its modular C++23/Vulkan architecture, layer ownership, or
-correctness/reliability evidence. The authoritative workflows, scorecard,
-measurement rules, and stop condition are in
+Reach full user-facing Framework24 feature and workflow parity while making
+IntrinsicEngine the demonstrably better replacement in modularity,
+extensibility, reliability, usability, and performance. Framework24 is the
+behavioral baseline, not an architecture or implementation blueprint;
+IntrinsicEngine may redesign its architecture and algorithms through the
+normal reviewed process. The current C++23/Vulkan, layer-ownership, and
+correctness/reliability contracts remain quality floors until explicitly
+revised, while “better” never excuses a missing feature. The authoritative
+inventory, workflows, scorecard, measurement rules, and stop condition are in
 [`docs/product/framework24-convergence.md`](../../docs/product/framework24-convergence.md).
 
 Retired `ARCH-017` established the mission/picker/scorecard reset. `REVIEW-004` is the

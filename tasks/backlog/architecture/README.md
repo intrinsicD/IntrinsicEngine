@@ -12,8 +12,9 @@ map.
 
 - [`REVIEW-004`](REVIEW-004-framework24-product-convergence-audit.md) is the
   claim-grade one-shot Theme J gate. It audits the six golden product workflows
-  on one exact clean revision after every static remediation owner retires;
-  findings become separate tasks and force a fresh complete rerun.
+  and every registered-feature row on one exact clean revision after every
+  static remediation owner retires; findings become separate tasks and force a
+  fresh complete rerun.
 
 Opened from the 2026-07-08 kernel/module architecture decision record
 ([`docs/adr/0024-kernel-module-architecture.md`](../../../docs/adr/0024-kernel-module-architecture.md));
@@ -23,6 +24,11 @@ are retired to `tasks/done/`; `ARCH-014` now records the closed umbrella.
 
 ### Retired seam tasks
 
+- [`ARCH-018`](../../done/ARCH-018-framework24-feature-parity-goal-clarification.md) —
+  clarified the policy-only Framework24 target: feature parity is the
+  behavioral coverage floor, “better” is an additional quality gate, and
+  IntrinsicEngine architecture and implementations remain independently
+  improvable rather than copies of Framework24 internals.
 - [`ARCH-017`](../../done/ARCH-017-framework24-product-convergence-gate.md) —
   retired the policy-only Framework24 replacement reset: the main mission,
   six golden workflows, registered-feature inventory, evidence thresholds,

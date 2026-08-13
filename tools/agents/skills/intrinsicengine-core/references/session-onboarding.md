@@ -49,7 +49,11 @@ Apply this priority strictly:
    eligible only when the registered-feature inventory makes it an explicit
    product dependency. Preserve and release unrelated active research work
    rather than continuing or replacing it; Theme I and speculative
-   rendering/process expansion resume only after the gate retires.
+   rendering/process expansion resume only after the gate retires. Treat
+   Framework24 as the required feature/observable-workflow baseline, not as an
+   implementation blueprint: architecture and algorithms may differ or improve,
+   but neither a different design nor the six golden workflows may hide an
+   unclosed registered-feature row.
 2. **Continue eligible active work.** If the session brief lists an in-progress or blocked task that matches your branch or owner and is eligible under rule 1, continue that task. If it is blocked, address the recorded blocker or escalate via a nonblocking clarification in the task file; do not open new work to dodge a blocker.
 3. **Otherwise pick from the backlog.** Use `tasks/SESSION-BRIEF.md` for what is open and unblocked (dependency edges live in task front-matter), and `tasks/backlog/README.md` for theme priorities and rationale. Respect every gate they record; treat anything not listed as independent.
 4. **Within a theme, prefer the earliest unblocked task.** "Unblocked" means every `depends_on` entry resolves to `tasks/done/` (the brief computes this) or is explicitly recorded as out-of-scope in the candidate task file.

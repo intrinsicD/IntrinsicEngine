@@ -1,0 +1,13 @@
+AGENTS.md
+ara/logic/solution/architecture.md
+docs/agent/contract.md
+docs/agent/prompt/prompt.md
+docs/product/framework24-convergence.md
+docs/product/framework24-feature-inventory.md
+tasks/backlog/README.md
+tasks/backlog/architecture/README.md
+tasks/backlog/architecture/REVIEW-004-framework24-product-convergence-audit.md
+tasks/done/ARCH-018-framework24-feature-parity-goal-clarification.md
+tasks/done/RETIREMENT-LOG.md
+tools/agents/skills/intrinsicengine-core/references/contract.md
+tools/agents/skills/intrinsicengine-core/references/session-onboarding.md

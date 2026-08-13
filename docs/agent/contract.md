@@ -12,16 +12,23 @@ Deliver a modular, high-performance, scientifically rigorous engine for graphics
 - documentation synchronization,
 - and reviewability.
 
-The immediate P0 product objective is a demonstrably better Framework24
-replacement without giving up the C++23 module, Vulkan/RHI, layering, and
-reliability foundations. “Better” is decided by the evidence rules and golden
-workflows in [`../product/framework24-convergence.md`](../product/framework24-convergence.md),
-not by subsystem counts or architecture alone. Until `REVIEW-004` retires with
-an accepted verdict, agents select Theme J tasks, explicit unsatisfied
-`REVIEW-004` dependencies, reproducible regressions, and required
-correctness/reliability repairs. A pre-existing method is eligible only when
-the registered-feature inventory makes it a product dependency; new unrelated
-research expansion and speculative rendering/process work remain paused.
+The immediate P0 product objective is full user-facing feature and workflow
+parity with Framework24, delivered as a demonstrably better result in
+modularity, extensibility, reliability, usability, and performance.
+Framework24 supplies the observable feature baseline, not an architecture,
+API, algorithm, source-layout, or OpenGL template. IntrinsicEngine may redesign
+those means through the normal reviewed architecture workflow. Its current
+C++23/Vulkan, layering, and reliability contracts are quality floors rather
+than a frozen component diagram and remain authoritative until explicitly
+revised. “Better” cannot excuse a missing feature or user outcome. The exact
+rules live in
+[`../product/framework24-convergence.md`](../product/framework24-convergence.md).
+Until `REVIEW-004` retires with an accepted verdict, agents select Theme J
+tasks, explicit unsatisfied `REVIEW-004` dependencies, reproducible
+regressions, and required correctness/reliability repairs. A pre-existing
+method is eligible only when the registered-feature inventory makes it a
+product dependency; new unrelated research expansion and speculative
+rendering/process work remain paused.
 
 Selectable algorithm backends are evidence-backed capabilities, not planned
 labels. A method always retains its CPU reference as canonical truth; an

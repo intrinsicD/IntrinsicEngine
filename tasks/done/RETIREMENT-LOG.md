@@ -8,6 +8,19 @@ so blocks moved from the old active-README history work verbatim.
 
 ## Retired task narratives
 
+[`ARCH-018`](ARCH-018-framework24-feature-parity-goal-clarification.md) — the
+Framework24 product objective now makes full user-facing feature and workflow
+parity the behavioral coverage floor. “Better” is an additional quality gate,
+not permission to omit a registered feature, and the six golden workflows no
+longer provide a waiver for an inventory row.
+
+The policy does not prescribe a port: IntrinsicEngine may use different and
+better architecture, APIs, algorithms, interaction design, CPU/GPU
+decomposition, source layout, and Vulkan implementation. Current repository
+invariants remain the reviewed quality floor until explicitly revised. This
+clarification changes no engine, method, benchmark, renderer, UI, shader, or
+test implementation and makes no present parity or performance claim.
+
 [`BUG-121`](BUG-121-glm-anonymous-union-module-copy-assign.md) — retired as an
 exact duplicate of `BUG-157`, not as a fixed compiler defect. Both records
 identified the same Clang 20 anonymous-union redeclaration in GLM while

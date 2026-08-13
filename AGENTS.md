@@ -66,12 +66,19 @@ their implementation. For example, `.claude/setup.sh` is only a Claude
 Build and maintain IntrinsicEngine as a modular, high-performance, scientifically rigorous engine for graphics, geometry
 processing, and method-driven research integration.
 
-The immediate product objective is to make IntrinsicEngine a demonstrably
-better Framework24 replacement: preserve the modular C++23/Vulkan and
-reliability foundations while reaching comparable-or-better end-to-end
-rendering, UI, loading, geometry-method, and interaction workflows. The
-authoritative scorecard and golden workflows live in
-`docs/product/framework24-convergence.md`.
+The immediate product objective is full user-facing feature and workflow
+parity with Framework24, delivered as a demonstrably better replacement in
+modularity, extensibility, reliability, usability, and performance.
+Framework24 is the behavioral baseline, not an
+architecture or implementation template: IntrinsicEngine need not reproduce
+its APIs, algorithms, source organization, or OpenGL design. Its own
+architecture and implementations may be redesigned through the normal reviewed
+architecture workflow whenever that produces the better engine. The current
+C++23/Vulkan, layering, and reliability contracts are quality floors, not a
+frozen component diagram; they remain authoritative until an explicit reviewed
+change replaces them. “Better” never excuses a missing Framework24 feature or
+user outcome. The authoritative feature inventory, scorecard, and golden
+workflows live in `docs/product/framework24-convergence.md`.
 
 Until `REVIEW-004` retires with an accepted convergence verdict, Framework24
 product convergence is the P0 work-selection gate. Do not start new research

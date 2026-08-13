@@ -1,0 +1,23 @@
+{
+  "command": [
+    "git",
+    "diff",
+    "--cached",
+    "--name-only",
+    "--diff-filter=ACMR"
+  ],
+  "command_display": "git diff --cached --name-only --diff-filter=ACMR",
+  "cwd": ".",
+  "duration_ms": 3,
+  "exit_code": 0,
+  "finished_at": "2026-08-13T12:38:47Z",
+  "label": "changed-surface",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-13T12:38:47Z",
+  "stderr_path": "tasks/evidence/ARCH-018/commands/changed-surface.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/ARCH-018/commands/changed-surface.stdout.log",
+  "stdout_sha256": "8086bdae0da2600a30fd7634acfe54fb517079740acb4534e010d2b65c2da6d7",
+  "task_id": "ARCH-018"
+}
