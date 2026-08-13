@@ -1,0 +1,13 @@
+schema_version: 1
+task_id: ARCH-018
+sealed_revision: 4589cc8ca6a7a549e6b90d1814c5ec64258e2f88
+source_content_digest: 29487f50855263f5f1b8c1e1d97b813d8d2a261fd68d7ef46d1ca28cfee63b5f
+report_sha256: 220c216c93112d3900c7f3186a565732daeaeb0ad4894ad6775c9624b1cf85f0
+records:
+- path: tasks/evidence/ARCH-018/handoff.jsonl
+  sha256: 197d720667c6e5adab354612e12162a3159223ff42348dc71f72f4b26f5c2a3f
+- path: tasks/evidence/ARCH-018/reviews.jsonl
+  sha256: b54a1ee6f1139961aa8629d3f7f5f38b421d4301f66e16129a3ac9f96f6eddb5
+reason: Bind the completed independently reviewed feature-parity policy clarification to its retirement
+  commit
+generated_by: tools/agents/workflow_evidence.py
