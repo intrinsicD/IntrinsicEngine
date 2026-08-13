@@ -4,7 +4,8 @@
 
 This inventory starts from the systems registered by Framework24's default
 viewer at comparison revision `6dd50a8289c64b5054bc9601beb5647f459d7969`:
-[`bcg_viewer.cpp`](../../experimental/framework24/lib_bcg_viewer/src/bcg_viewer.cpp).
+`experimental/framework24/lib_bcg_viewer/src/bcg_viewer.cpp` in the local,
+comparison-only Framework24 checkout (not part of this repository).
 That is the reproducible user-facing feature surface. Low-level helper headers
 are not each separate product gates unless a registered system or an accepted
 IntrinsicEngine workflow consumes them. Previously identified library port
