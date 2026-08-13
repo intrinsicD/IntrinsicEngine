@@ -197,8 +197,9 @@ TEST(Curvature_Full, Icosahedron_SymmetricCurvatureValues)
             << "Min principal curvature should be uniform (vertex " << i << ")";
     }
 
-    // On a sphere-like closed mesh, mean curvature should be positive.
-    EXPECT_GT(H0, 0.0);
+    // Framework24's signed hinge convention is negative for this outward
+    // winding; Gaussian curvature remains orientation-independent.
+    EXPECT_LT(H0, 0.0);
     EXPECT_GT(K0, 0.0);
 }
 

@@ -1,6 +1,14 @@
 # Curvature estimator parity and method study — 2026-08-12
 
-## Verdict
+> Historical PMP study: this report characterizes the previously selected PMP
+> formulation and remains useful for estimator comparison and robustness
+> limitations. BUG-156 was subsequently reopened to satisfy the reporter's
+> actual interoperability target: Framework24 `CurvatureTaubin`, whose area,
+> support, boundary, sign/pairing, and smoothing conventions differ from PMP.
+> The current local, non-claim-eligible direct-parity record is
+> [`ara/evidence/tables/curvature_framework24_parity_2026-08-12.md`](../../ara/evidence/tables/curvature_framework24_parity_2026-08-12.md).
+
+## Historical verdict
 
 The repaired Intrinsic principal-curvature implementation reproduces the
 selected PMP tensor formulation on ordinary, well-conditioned triangle meshes.

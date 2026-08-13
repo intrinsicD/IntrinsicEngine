@@ -115,9 +115,9 @@ int main(int argc, char** argv)
         return 2;
     }
     std::size_t repetitions = 1u;
-    // Defaults mirror the corrected Intrinsic configuration (BUG-156):
-    // one-ring hinge support, no post-smoothing. Pass `3 1` to reproduce the
-    // superseded PMP-default comparison.
+    // Defaults reproduce the historical one-ring/no-smoothing PMP experiment.
+    // Current Intrinsic targets Framework24, which is not parameter-equivalent
+    // to either PMP setting. Pass `3 1` for PMP's own default tensor path.
     std::size_t smoothingSteps = 0u;
     bool twoRing = false;
     if (argc >= 4)
@@ -173,7 +173,7 @@ int main(int argc, char** argv)
 
     pmp::curvature(
         mesh, pmp::Curvature::max,
-        static_cast<int>(smoothingSteps), twoRing, true);
+        static_cast<int>(smoothingSteps), true, twoRing);
     std::vector<double> samples{};
     samples.reserve(repetitions);
     for (std::size_t iteration = 0u; iteration < repetitions; ++iteration)
@@ -181,7 +181,7 @@ int main(int argc, char** argv)
         const auto begin = std::chrono::steady_clock::now();
         pmp::curvature(
             mesh, pmp::Curvature::max,
-            static_cast<int>(smoothingSteps), twoRing, true);
+            static_cast<int>(smoothingSteps), true, twoRing);
         const auto end = std::chrono::steady_clock::now();
         samples.push_back(std::chrono::duration<double, std::milli>(
             end - begin).count());
@@ -189,14 +189,14 @@ int main(int argc, char** argv)
 
     pmp::curvature(
         mesh, pmp::Curvature::min,
-        static_cast<int>(smoothingSteps), twoRing, true);
+        static_cast<int>(smoothingSteps), true, twoRing);
     auto property = mesh.get_vertex_property<pmp::Scalar>("v:curv");
     std::vector<double> minimum(mesh.n_vertices(), 0.0);
     for (const pmp::Vertex vertex : mesh.vertices())
         minimum[vertex.idx()] = property[vertex];
     pmp::curvature(
         mesh, pmp::Curvature::max,
-        static_cast<int>(smoothingSteps), twoRing, true);
+        static_cast<int>(smoothingSteps), true, twoRing);
     std::vector<double> maximum(mesh.n_vertices(), 0.0);
     for (const pmp::Vertex vertex : mesh.vertices())
         maximum[vertex.idx()] = property[vertex];

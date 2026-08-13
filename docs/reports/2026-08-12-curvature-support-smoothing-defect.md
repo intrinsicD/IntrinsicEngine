@@ -1,5 +1,14 @@
 # Curvature support/smoothing defect analysis — 2026-08-12
 
+> Superseded product decision (BUG-156 reopen): the measurements below compare
+> the former Intrinsic/PMP configuration with the independent Meyer scalar
+> operator. They remain a record of that accuracy trade-off, but they do not
+> define the shipped interoperability contract. The reporter requires exact
+> Framework24 `CurvatureTaubin` behavior, so the engine now follows its
+> deterministic sequential two-ring/three-pass result. The local,
+> non-claim-eligible direct-parity observation is recorded in
+> [`ara/evidence/tables/curvature_framework24_parity_2026-08-12.md`](../../ara/evidence/tables/curvature_framework24_parity_2026-08-12.md).
+
 ## Verdict
 
 The PMP-parameter defaults restored by BUG-153/BUG-154 — two-ring hinge
@@ -103,9 +112,9 @@ replica oracle on the frozen 5×5 fixture to 3e-16, and on the sculpt asset
 publishes 3,669/3,669 supported, nonzero vertices with zero zero-band and
 zero sign-flip vertices.
 
-## Decision
+## Historical decision (superseded)
 
-- Default = one-ring hinge support, unsmoothed eigenvalues, unchanged quality
+- Former default = one-ring hinge support, unsmoothed eigenvalues, unchanged quality
   gating, boundary interpolation, orientation conventions, and diagnostics.
 - Complexity drops to O(V+E+F); the estimator no longer revisits neighbour
   edge sets.

@@ -11,3 +11,7 @@
   — local non-claim paper/code audit plus an isolated Xephyr comparison that
   separates solver behavior, legacy area normalization, estimator parameters,
   published scalar choice, and visualization range.
+- [Framework24 curvature parity](tables/curvature_framework24_parity_2026-08-12.md)
+  — local non-claim-eligible sequential-Framework24 scalar comparison on
+  acute, obtuse, open, and full sculpt fixtures, with the coordinate-unit
+  boundary made explicit.

@@ -628,14 +628,18 @@ Successful scalar publication writes canonical `v:mean_curvature` and
 requested and available, the command also writes `v:principal_dir1` and
 `v:principal_dir2` `glm::vec3` properties; when the directions lane is disabled
 or unavailable, the command succeeds with scalars only and reports a
-deterministic diagnostic. Mean and Gaussian values are invariants of the
+deterministic diagnostic. The geometry result also owns minimum and maximum
+principal scalar properties, but the current runtime transaction does not yet
+persist them; BUG-156 tracks adding them to this same publication, history, and
+discovery path. Mean and Gaussian values are invariants of the
 reference-smoothed principal values from the same edge-dihedral estimator;
 directions retain that estimator's local tensor basis. Result diagnostics expose
 the supported/nonzero vertex counts, finite principal range, degenerate and
 ill-conditioned face counts, unsupported face count, minimum observed triangle
-quality, and the fixed quality threshold. A mesh with no estimable interior or
-interpolated boundary support fails instead of presenting an all-zero field as
-an informative success. The runtime does not combine the
+quality, and the fixed quality threshold. A mesh with no reliable direct tensor
+support fails instead of presenting an all-zero field as an informative
+success. Boundary vertices use the estimator's direct tensor evaluation rather
+than interpolation from interior values. The runtime does not combine the
 standalone Meyer scalar operators with a separate tensor. The UI exposes an
 output selector, a principal
 directions toggle that is inert when directions are unavailable, and a single

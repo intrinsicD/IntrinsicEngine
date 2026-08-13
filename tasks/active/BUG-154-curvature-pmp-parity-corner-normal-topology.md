@@ -18,6 +18,13 @@ maturity_target: Operational
 
 ## Status
 
+- BUG-156 superseded this task's PMP estimator selection with deterministic
+  Framework24 semantics. The PMP-specific goal and checked estimator evidence
+  below are retained as historical slice records, not as the current shipped
+  curvature contract or remaining acceptance criteria. BUG-154 continues to
+  own the reusable smoother and authored corner-normal path until its existing
+  evidence/review closure; BUG-156 owns the current curvature semantics and
+  runtime publication gap.
 - The estimator, quality gate, reusable smoothing, corner-normal path, corpus
   diagnostic, and literature study are implemented. Final current-source CPU,
   isolated ASan/UBSan, strict structural, and task-specific promoted-Vulkan

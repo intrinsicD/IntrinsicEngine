@@ -18,39 +18,44 @@ Results must report:
 - Applied fallback path.
 - Quality/error metrics used by tests and benchmarks.
 
-## Worked example: PMP-compatible edge-dihedral curvature estimation
+## Worked example: deterministic Framework24 curvature compatibility
 
-`Geometry::Curvature::ComputeCurvatureTensor` uses the edge-dihedral estimator
-implemented by PMP's tensor branch. PMP associates that branch with the
-Cohen-Steiner--Morvan normal-cycle formulation; it is not Taubin's 1995
-vertex-neighbour directional-curvature quadrature. For every finite interior
-edge it precomputes
+`Geometry::Curvature::ComputeCurvatureTensor` is a deterministic numerical port
+of Framework24 `CurvatureTaubin(mesh, 3, true, Policy::Sequential)`. The name is
+the compatibility target; it does not reclassify the edge-dihedral tensor as
+Taubin's 1995 vertex-neighbour directional-curvature quadrature. For every
+finite interior edge it precomputes
 
 ```
 M_e = beta_e (|e| / 2) t_e t_eᵀ
 ```
 
-Here `beta_e` is the signed dihedral between the edge's two oriented face
-normals and `t_e` is the unit edge tangent. Each vertex sums the contributions
-incident to itself and its non-boundary one-ring neighbours and normalizes by
-their mixed area. A local signed symmetric 3×3 Jacobi decomposition then follows
-the PMP reference: the eigenvalue with smallest absolute magnitude is discarded
-as the tensor-normal mode and the remaining ordered pair supplies the principal
-scalars. Because the hinge measures bend across the edge, each scalar direction
-uses the complementary tangent eigenvector. Direction publication additionally
-uses the geometric normal to disambiguate cylindrical zero modes. Boundary
-scalars are interpolated from supported non-boundary neighbours before three
-simultaneous updates of `0.5 * old + 0.5 * nonnegative_cotan_average`.
+Here `beta_e` is Framework24's signed dihedral between the edge's two oriented
+face normals and `t_e` is the unit edge tangent. Each center collects itself and
+its adjacent vertices, then sums every incident hinge and Framework24 legacy
+mixed area over that support. This is the reference's two-ring hinge support;
+open-boundary centers use the same direct tensor evaluation as interior centers.
 
-The sign is converted to the module's established positive-outward-convex
-convention. Mean and Gaussian curvature in `ComputeCurvature` are then derived
-from the same smoothed principal values, never from a second estimator. The
+Eigen's symmetric self-adjoint solver discards the eigenvalue with smallest
+absolute magnitude as the tensor-normal mode. The two remaining algebraically
+ordered values pair directly with their tensor eigenvectors. Framework24's
+sign, legacy acute/obtuse area coefficients, `[-19.1, 19.1]` cotan clamp, and
+direct value/direction pairing remain part of the compatibility contract.
+
+The minimum and maximum principal scalars then receive three nonnegative-cotan
+full-neighbour replacement passes. Updates are intentionally in-place in stable
+vertex-index order: this preserves `Policy::Sequential` while avoiding the
+default `ParallelUnsequential` shared-array race. The replacement has no retained
+self-weight, directions are not smoothed, and parity fixtures use Framework24's
+fresh/default all-false `v_feature` mask. The Intrinsic public operation has no
+private feature-mask input. Mean and Gaussian curvature in `ComputeCurvature`
+are derived from the final principal values, never from a second estimator; the
 standalone Meyer mean/Gaussian functions remain separate explicit operators.
+
 Fail-closed policy, never emitting NaN/Inf and never firing an assert:
 
-- Boundary edges have no dihedral contribution; boundary centers are not
-  estimated directly and become supported only by interpolation from valid
-  non-boundary neighbours.
+- Boundary edges have no dihedral contribution, but supported boundary centers
+  are evaluated directly from their available two-ring tensor support.
 - Triangle quality is the scale-independent ratio `2A/l_max^2`. The `3.5e-4`
   floor is the conservatively rounded square root of machine epsilon for the
   public float-position storage; below it, inverse-area terms amplify position
@@ -63,11 +68,11 @@ Fail-closed policy, never emitting NaN/Inf and never firing an assert:
 - Zero-length edges and invalid/non-finite face normals are skipped.
 - Empty meshes and meshes with no faces → `nullopt`.
 
-The damping operation is the public
-`Geometry::Smoothing::CotanSmoothVertexProperty` contract, not a
-curvature-private loop. It accepts vertex properties of `float`, `double`, and
-canonical persisted `glm::vec2/vec3/vec4`, computes every iteration from a
-separate read buffer, clamps cotan weights nonnegative, and validates parameters,
-property/mask cardinality, geometry, and live values before mutating the
-property. Its optional active-vertex mask excludes unreliable values from both
-their own rows and every neighbour average.
+The public `Geometry::Smoothing::CotanSmoothVertexProperty` operation is a
+separate reusable contract and is not used by this curvature path. It accepts
+vertex properties of `float`, `double`, and canonical persisted
+`glm::vec2/vec3/vec4`, computes every damped iteration from a separate read
+buffer, clamps cotan weights nonnegative, and validates parameters,
+property/mask cardinality, geometry, and live values before mutation. Its
+optional active-vertex mask excludes unreliable values from both their own rows
+and every neighbour average.

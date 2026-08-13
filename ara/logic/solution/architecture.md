@@ -699,11 +699,13 @@
   src/geometry/Geometry.PCA.cpp]
 - **From staging**: O157
 
-## A44: Runtime Publishes Both Principal Curvature Scalars
-- **Decision**: Runtime curvature publication retains the geometry kernel's
-  minimum and maximum principal scalar properties alongside mean, Gaussian,
-  and principal directions. Output selection, canonical property state,
-  undo/redo capture, config/agent control, and Sandbox discovery use the same
+## A44: Principal Curvature Scalars Retain One Publication Path
+- **Decision**: The geometry kernel retains minimum and maximum principal
+  scalar properties alongside mean, Gaussian, and principal directions. The
+  current runtime curvature transaction persists mean/Gaussian and optional
+  directions only; minimum/maximum persistence, canonical property state,
+  undo/redo capture, result counts, and Sandbox discovery remain an explicit
+  BUG-156 closure item. When added, they must use that same validated atomic
   publication path so live comparisons can select like-for-like scalar fields
   without recomputation or compatibility aliases.
 - **Provenance**: ai-suggested

@@ -2890,3 +2890,28 @@ observations:
     promoted_to: "logic/solution/heuristics.md:H17"
     crystallized_via: artifact-commitment
     stale: false
+  - id: O160
+    timestamp: "2026-08-12T12:30+02:00"
+    provenance: ai-executed
+    content: >
+      A direct deterministic port of Framework24 CurvatureTaubin with its
+      default two-ring support and three smoothing steps matches the actual
+      Framework24 sequential scalar field on identical coordinates. Maximum
+      absolute errors on the 3,669-vertex sculpt fixture are 6.22e-15 for kmin
+      and 2.78e-15 for kmax; acute, obtuse, and open fixtures isolate the area
+      branches and direct boundary behavior.
+    context: >
+      Reopened BUG-156 after the reporter clarified that Framework24, not PMP
+      or Meyer accuracy, is the required oracle. The default Framework24
+      ParallelUnsequential smoother has shared-array read/write races, so the
+      parity contract uses the same code under Policy::Sequential. Framework24
+      MeshIo normalization remains a separate input-unit transformation. The
+      recorded differential ran on a dirty task worktree and is therefore a
+      local development observation, not claim-eligible evidence. BENCH-001
+      owns the required claim-grade clean frozen rerun and product comparison.
+    potential_type: claim
+    bound_to: [N439, N440]
+    promoted: true
+    promoted_to: "logic/claims.md:C53"
+    crystallized_via: artifact-commitment
+    stale: false

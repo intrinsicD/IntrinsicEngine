@@ -1810,7 +1810,7 @@ TEST(SandboxEditorUi, MeshCurvatureCommandPublishesCanonicalPropertiesAndSupport
     EXPECT_EQ(model.Processing.LastMeshCurvatureResult->ScalarWrittenCount, 8u);
 }
 
-TEST(SandboxEditorUi, MeshCurvatureRejectsBoundaryOnlyZeroSupport)
+TEST(SandboxEditorUi, MeshCurvaturePublishesBoundaryOnlyFramework24Support)
 {
     ECS::Scene::Registry registry;
     Runtime::SelectionController selection;
@@ -1833,19 +1833,22 @@ TEST(SandboxEditorUi, MeshCurvatureRejectsBoundaryOnlyZeroSupport)
                 .PublishPrincipalDirections = true,
             });
 
-    EXPECT_EQ(result.Status,
-              Runtime::EditorCommandStatus::GeometryProcessingFailed);
-    EXPECT_EQ(result.Error, Core::ErrorCode::InvalidArgument);
-    EXPECT_EQ(result.SupportedVertexCount, 0u);
+    ASSERT_TRUE(result.Succeeded()) << result.Message;
+    EXPECT_EQ(result.VertexSlotCount, 3u);
+    EXPECT_EQ(result.SupportedVertexCount, 3u);
     EXPECT_EQ(result.NonZeroPrincipalVertexCount, 0u);
-    EXPECT_NE(result.Message.find("no reliable curvature support"),
-              std::string::npos);
-    EXPECT_FALSE(properties.Exists(PN::kMeanCurvature));
-    EXPECT_FALSE(properties.Exists(PN::kGaussianCurvature));
-    EXPECT_FALSE(properties.Exists(PN::kPrincipalDir1));
-    EXPECT_FALSE(properties.Exists(PN::kPrincipalDir2));
-    EXPECT_FALSE(history.CanUndo());
-    EXPECT_FALSE(registry.Raw().all_of<Dirty::DirtyVertexAttributes>(mesh));
+    EXPECT_EQ(result.ScalarPropertyCount, 2u);
+    EXPECT_EQ(result.ScalarWrittenCount, 6u);
+    EXPECT_EQ(result.DirectionPropertyCount, 2u);
+    EXPECT_EQ(result.DirectionWrittenCount, 6u);
+    EXPECT_TRUE(result.DirectionsAvailable);
+    EXPECT_TRUE(result.DirectionsPublished);
+    EXPECT_TRUE(properties.Get<double>(PN::kMeanCurvature).IsValid());
+    EXPECT_TRUE(properties.Get<double>(PN::kGaussianCurvature).IsValid());
+    EXPECT_TRUE(properties.Get<glm::vec3>(PN::kPrincipalDir1).IsValid());
+    EXPECT_TRUE(properties.Get<glm::vec3>(PN::kPrincipalDir2).IsValid());
+    EXPECT_TRUE(history.CanUndo());
+    EXPECT_TRUE(registry.Raw().all_of<Dirty::DirtyVertexAttributes>(mesh));
 }
 // BUG-145 slice B: curvature derived `Applied` from `ScalarWrittenCount`,
 // which is `mean.size() + gaussian.size()` — a pure written count that is
