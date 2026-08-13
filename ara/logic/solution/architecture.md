@@ -716,15 +716,22 @@
 - **From staging**: O158
 
 ## A45: Framework24 Replacement Is the Immediate Product Gate
-- **Decision**: IntrinsicEngine keeps its modular C++23/Vulkan, layering,
-  correctness, and evidence foundations, but measures completion as a
-  demonstrably better Framework24 replacement across end-to-end rendering,
-  UI, loading, geometry-method, backend-selection, and interaction workflows.
-  Until the one-shot `REVIEW-004` convergence audit accepts those golden
-  workflows, new research expansion and speculative rendering/process work are
-  paused; product-gate tasks and required correctness/reliability repairs take
-  priority. Research resumes after the gate retires.
+- **Decision**: IntrinsicEngine measures completion by full user-facing
+  Framework24 feature and workflow parity delivered as the better engine in
+  modularity, extensibility, reliability, usability, and performance.
+  Framework24 is a behavioral baseline, not an architecture or implementation
+  template: APIs, algorithms, source layout, CPU/GPU decomposition, interaction
+  design, and graphics technology may differ or improve. Current C++23/Vulkan,
+  layering, correctness, and evidence contracts are quality floors rather than
+  a frozen design and remain authoritative until explicitly revised. Neither a
+  different architecture nor a golden-workflow pass may hide a missing
+  registered feature. Until the one-shot `REVIEW-004` audit accepts every
+  golden workflow and feature-inventory row, new research expansion and
+  speculative rendering/process work are paused; product-gate tasks and
+  required correctness/reliability repairs take priority. Research resumes
+  after the gate retires.
 - **Provenance**: user-revised
 - **Crystallized via**: verbal-affirmation
 - **Evidence**: [tasks/done/ARCH-017-framework24-product-convergence-gate.md,
+  tasks/done/ARCH-018-framework24-feature-parity-goal-clarification.md,
   docs/product/framework24-convergence.md]

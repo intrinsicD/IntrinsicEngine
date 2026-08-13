@@ -35,9 +35,9 @@ contract_review: "Reviewed the full catalog. This one-shot audit evaluates exist
 ## Goal
 
 - Decide, on one clean exact revision with matched sealed evidence, whether
-  IntrinsicEngine has become a comparable-or-better Framework24 replacement
-  across all golden workflows while retaining its modular Vulkan architecture
-  and reliability guarantees.
+  IntrinsicEngine has reached full user-facing Framework24 feature and workflow
+  parity and become the better replacement in architecture quality,
+  reliability, usability, and performance.
 
 ## Non-goals
 
@@ -64,9 +64,10 @@ contract_review: "Reviewed the full catalog. This one-shot audit evaluates exist
       state, host, driver, toolchain, build mode, config, fixtures, and display
       conditions.
 - [ ] Execute W1-W6 exactly as specified and record each as pass or finding.
-- [ ] Audit the full Framework24 feature inventory: each in-scope feature is
-      accepted, deliberately superseded with a tested workflow, or assigned one
-      concrete owner; no “architecture exists” row counts as product parity.
+- [ ] Audit the full Framework24 feature inventory: every registered
+      user-facing feature has an operational tested equivalent or strict
+      superset preserving all user outcomes, or receives one concrete owner;
+      no “architecture exists” row counts as product parity.
 - [ ] Audit every method manifest and integrated config/agent/UI selector for
       CPU-reference truth, real optimized/parallel/Vulkan implementations, and
       requested/actual/fallback honesty.
@@ -96,6 +97,9 @@ contract_review: "Reviewed the full catalog. This one-shot audit evaluates exist
 ## Acceptance criteria
 
 - [ ] W1-W6 are all `Accepted` with no known unowned in-scope gap.
+- [ ] Every registered-feature inventory row is `Accepted`; different internal
+      designs are allowed, but no user-facing feature is waived by a golden
+      workflow or architectural difference.
 - [ ] Matched comparisons meet the declared time and memory gates or carry a
       specifically accepted, evidence-backed product tradeoff.
 - [ ] Correctness, visibility, fallback, validation, sanitizer, and
@@ -130,6 +134,10 @@ python3 tools/agents/check_ara_claims.py --root . --strict
 ## Forbidden changes
 
 - No implementation repair inside the audit.
+- No requirement that IntrinsicEngine copy Framework24 architecture, APIs,
+  algorithms, source layout, interaction details, or OpenGL implementation.
+- No feature omission justified by a different design or by absence from a
+  golden workflow.
 - No reuse of rejected partial evidence as the final verdict.
 - No research restart while any scorecard row remains open or candidate.
 - No weakening, skipping, retrying away, or quarantining a gate to obtain an

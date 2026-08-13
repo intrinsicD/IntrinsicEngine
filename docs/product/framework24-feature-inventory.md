@@ -16,8 +16,9 @@ The inventory describes current source evidence, not final parity. `Kernel`
 means the CPU capability exists but its runtime/config/UI workflow still needs
 the final audit. `Foundation proven` cites accepted ARA evidence for a bounded
 lower-level path. `Open` names a known repair. `Disposition required` means
-`REVIEW-004` must either accept a tested IntrinsicEngine replacement or open a
-scoped implementation owner; it may not silently omit the feature.
+`REVIEW-004` must either accept an operational IntrinsicEngine equivalent or
+strict superset that preserves every user outcome, or open a scoped
+implementation owner; it may not omit the feature.
 
 ## Inventory
 
@@ -50,14 +51,16 @@ scoped implementation owner; it may not silently omit the feature.
 | Correspondence and rigid registration | Feature/correspondence kernels plus point-to-point/point-to-plane ICP editor workflow | Intrinsic workflow exists; compatible-domain and matched behavior work remains in existing runtime/UI backlog | `REVIEW-004` |
 | Coherent Point Drift | `METHOD-015` owns the CPU reference family; no accepted Intrinsic package/runtime/UI path yet | Open Framework24 feature gap | `METHOD-015`, then `REVIEW-004` assigns integration if the reference passes |
 | Implicit system | SDF/implicit-plane, marching-cubes, and surface-reconstruction kernels | Kernel; registered interactive workflow equivalence not accepted | `REVIEW-004` |
-| Orthodontic system | No accepted general IntrinsicEngine equivalent identified | Disposition required: deliberately product-specific exclusion needs explicit user acceptance, otherwise a scoped owner | `REVIEW-004` |
+| Orthodontic system | No accepted general IntrinsicEngine equivalent identified | Open Framework24 feature gap; an operational equivalent or strict superset needs a scoped owner | `REVIEW-004` |
 | Compute-shader test | Promoted Vulkan compute/readback/parity tests and real K-Means/LOP compute paths | Superseded by stronger operational Vulkan evidence; verify no user workflow is lost | W6; ARA C08-C11 and C34-C36, `REVIEW-004` |
 | Statistics and eigendecomposition | `Geometry.Statistics`, `Geometry.Linalg`, PCA, property plots/metadata | Kernel; generic inspectability is part of W5 | `UI-051`, `REVIEW-004` |
 
 ## Audit rule
 
-`REVIEW-004` must walk every row. A row closes only when the exact registered
-Framework24 behavior is either represented by a tested IntrinsicEngine
-workflow or deliberately superseded/excluded with an explicit product decision
-and no loss to the six golden workflows. A source file, module name, or unit
-test alone does not prove product parity.
+`REVIEW-004` must walk every row. A row closes only when the registered
+Framework24 user outcomes are represented by an operational, tested
+IntrinsicEngine equivalent or strict superset. Different architecture,
+interaction design, algorithms, APIs, or rendering technology are allowed;
+loss of a user-facing capability is not. The six golden workflows do not
+waive inventory rows, and a source file, module name, or unit test alone does
+not prove product parity.

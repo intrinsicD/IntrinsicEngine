@@ -1,0 +1,154 @@
+schema_version: 1
+task_id: ARCH-018
+workflow_profile: high-risk
+status: complete
+generated_by: tools/agents/workflow_evidence.py
+generated_at: '2026-08-13T12:39:28Z'
+claim_eligible: false
+source:
+  base_ref: origin/main
+  base_revision: 2934935723462bb2fc289a177bc3bc6890b7e605
+  head_revision: 2934935723462bb2fc289a177bc3bc6890b7e605
+  branch: agent/arch-018-feature-parity-goal
+  worktree: /home/alex/Documents/IntrinsicEngine
+  dirty: true
+  surface:
+  - path: AGENTS.md
+    sha256: 134d6d69bf2d6e188123f8e30d730ff04b4bdb51ff255c2cd2f2f856e6f88b58
+  - path: ara/logic/solution/architecture.md
+    sha256: 339f559785acbdbfcb50e77f3ce80b5b563986d7f54d19a5ebe6e51604e0433a
+  - path: docs/agent/contract.md
+    sha256: d24a751dfe204293637ab272c326ee354cd8693bd34815fa1f180d7a10163159
+  - path: docs/agent/prompt/prompt.md
+    sha256: 3ff4cce0b2f7db595eaaea9fdbd4ad71a93fc84809a509137d49349ab8475646
+  - path: docs/product/framework24-convergence.md
+    sha256: 3c876a31ed60f62d18f30fb78d19bea552cf3073355e57dd8dee5f0c977b9aaa
+  - path: docs/product/framework24-feature-inventory.md
+    sha256: eb58ea9d8f5df5b33d1bef50815ce96e0c878dd6e68ec3e3818ce7287920f7ec
+  - path: tasks/backlog/README.md
+    sha256: 19b516e9701a47c22fc2f8b4d80414fb8bf449539cf2103aa502fc58237742cd
+  - path: tasks/backlog/architecture/README.md
+    sha256: 5420204e4aad910ad22819d50219c19fcf3b14c9f58fb439ed34195846ad2cba
+  - path: tasks/backlog/architecture/REVIEW-004-framework24-product-convergence-audit.md
+    sha256: 721f0bfd2407585ef208d9457777a6e7194aa1695362e7c54d3019aa97fc256c
+  - path: tasks/done/ARCH-018-framework24-feature-parity-goal-clarification.md
+    sha256: 8969945e6fabba81036902fc8b7165d991d75bc099d68a571659dd80fbb8abfc
+  - path: tasks/done/RETIREMENT-LOG.md
+    sha256: ebaa30ffa6b48d8ede18d142751bfcb74056a3fcdf2b7c9e2150de6cd36d68e8
+  - path: tools/agents/skills/intrinsicengine-core/references/contract.md
+    sha256: 1d1b3101c0ecaaa8688806e26a1aa20f465017a80b969074d7033612e0c0ce84
+  - path: tools/agents/skills/intrinsicengine-core/references/session-onboarding.md
+    sha256: 3ff4cce0b2f7db595eaaea9fdbd4ad71a93fc84809a509137d49349ab8475646
+  content_digest: 29487f50855263f5f1b8c1e1d97b813d8d2a261fd68d7ef46d1ca28cfee63b5f
+touched:
+  paths:
+  - AGENTS.md
+  - ara/logic/solution/architecture.md
+  - docs/agent/contract.md
+  - docs/agent/prompt/prompt.md
+  - docs/product/framework24-convergence.md
+  - docs/product/framework24-feature-inventory.md
+  - tasks/backlog/README.md
+  - tasks/backlog/architecture/README.md
+  - tasks/backlog/architecture/REVIEW-004-framework24-product-convergence-audit.md
+  - tasks/done/ARCH-018-framework24-feature-parity-goal-clarification.md
+  - tasks/done/RETIREMENT-LOG.md
+  - tools/agents/skills/intrinsicengine-core/references/contract.md
+  - tools/agents/skills/intrinsicengine-core/references/session-onboarding.md
+  layers:
+  - agent-workflow
+  - architecture
+  - docs
+  - tasks
+  modules:
+  - product-convergence-policy
+  - task-selection
+extension_seam: Plain Markdown mission, inventory, and task-selection policy; no runtime abstraction or
+  production dependency
+future_change_plan: Implement bounded Theme J owners; revise the behavioral baseline or current architecture
+  contracts only through a separate explicit reviewed decision
+acceptance:
+- criterion: A reader cannot interpret the goal as copying Framework24 internals.
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: A reader cannot interpret “better architecture” or six golden workflows
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: Architecture and implementation improvement remain explicitly allowed,
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: No production, method, benchmark, shader, or test implementation file is
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: Independent fixed-surface review accepts the exact high-risk policy
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+commands:
+- receipt: tasks/evidence/ARCH-018/commands/ara-claims.json
+- receipt: tasks/evidence/ARCH-018/commands/changed-surface.json
+- receipt: tasks/evidence/ARCH-018/commands/diff-check.json
+- receipt: tasks/evidence/ARCH-018/commands/doc-links.json
+- receipt: tasks/evidence/ARCH-018/commands/docs-sync.json
+- receipt: tasks/evidence/ARCH-018/commands/layering.json
+- receipt: tasks/evidence/ARCH-018/commands/root-hygiene.json
+- receipt: tasks/evidence/ARCH-018/commands/session-brief.json
+- receipt: tasks/evidence/ARCH-018/commands/skill-sync.json
+- receipt: tasks/evidence/ARCH-018/commands/strict-task-policy.json
+- receipt: tasks/evidence/ARCH-018/commands/strict-task-validation.json
+- receipt: tasks/evidence/ARCH-018/commands/task-state-links.json
+- receipt: tasks/evidence/ARCH-018/commands/task-validator-regressions.json
+changed_public_contracts:
+- Full user-facing Framework24 feature/workflow parity is the behavioral floor; IntrinsicEngine internals
+  may differ and improve, and every inventory row remains mandatory
+diagnostics_and_previews:
+- The exact frozen surface contains 13 policy/task/docs paths and no src, methods, benchmarks, shaders,
+  tests, CMake, or workflow implementation path
+benchmark_or_parity_evidence: []
+docs_sync:
+  task_file: tasks/done/ARCH-018-framework24-feature-parity-goal-clarification.md
+  session_brief_present: true
+  canonical_docs_changed: true
+  skill_mirrors_checked: true
+residual_risks:
+- All Framework24 workflows and inventory rows remain Open; this wording clarification proves neither
+  current parity nor implementation superiority
+skipped_checks:
+- check: cpp-build
+  reason: No executable, module, build-system, test, shader, method, benchmark, or production source changed
+- check: gpu-vulkan
+  reason: No RHI, Vulkan, shader, renderer, command-recording, resource, or device-selection source changed
+- check: asan-ubsan
+  reason: No executable allocation, ownership, lifetime, concurrency, or numeric behavior changed
+- check: benchmark
+  reason: No performance conclusion is made; BENCH-001 retains future matched-evidence ownership
+artifacts:
+- path: tasks/done/ARCH-018-framework24-feature-parity-goal-clarification.md
+  sha256: 8969945e6fabba81036902fc8b7165d991d75bc099d68a571659dd80fbb8abfc
+  kind: file
+- path: docs/product/framework24-convergence.md
+  sha256: 3c876a31ed60f62d18f30fb78d19bea552cf3073355e57dd8dee5f0c977b9aaa
+  kind: file
+- path: docs/product/framework24-feature-inventory.md
+  sha256: eb58ea9d8f5df5b33d1bef50815ce96e0c878dd6e68ec3e3818ce7287920f7ec
+  kind: file
+- path: tasks/backlog/architecture/REVIEW-004-framework24-product-convergence-audit.md
+  sha256: 721f0bfd2407585ef208d9457777a6e7194aa1695362e7c54d3019aa97fc256c
+  kind: file
+self_review:
+  completed: true
+  scope_matches_task: true
+  layering_preserved: true
+  tests_and_docs_accounted_for: true
+  mechanical_and_semantic_changes_separated: true
+handoff: tasks/evidence/ARCH-018/handoff.jsonl
+review: tasks/evidence/ARCH-018/reviews.jsonl

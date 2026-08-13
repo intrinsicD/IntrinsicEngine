@@ -2,14 +2,19 @@
 
 ## Objective
 
-IntrinsicEngine is intended to replace Framework24 as the everyday graphics
-and geometry-processing environment while retaining a cleaner C++23 module
-architecture, Vulkan rather than OpenGL, stronger failure handling, explicit
-CPU/GPU ownership, and reproducible tests and evidence. It is not enough for
-the two engines to be different or for IntrinsicEngine to contain more
-subsystems: the workflows below must be at least as usable and fast on matched
-inputs, and IntrinsicEngine's result must remain more modular, extensible, and
-reliable.
+IntrinsicEngine must reach full user-facing feature and workflow parity with
+Framework24 while becoming the demonstrably better everyday graphics and
+geometry-processing environment in modularity, extensibility, reliability,
+usability, and performance. Framework24 defines the observable capability
+baseline; it does not define IntrinsicEngine's architecture, APIs, algorithms,
+source layout, or graphics implementation. Those means may differ completely
+and should be redesigned when a better C++23/Vulkan solution requires it.
+
+The current module, layering, Vulkan/RHI, and reliability contracts are quality
+floors rather than a frozen architecture. They remain authoritative until a
+separate reviewed architecture decision changes them. Neither architectural
+novelty nor superior performance compensates for a missing Framework24 feature
+or user outcome.
 
 `experimental/framework24/` is a read-only comparison source, never a
 production dependency. `REVIEW-004` owns the one-shot final verdict. Until it
@@ -19,6 +24,25 @@ The source-backed feature census is maintained separately in
 [`framework24-feature-inventory.md`](framework24-feature-inventory.md). A
 golden workflow cannot be accepted while one of its inventory rows remains
 unclassified or lacks a bounded owner.
+
+## Feature-parity boundary
+
+Feature parity is behavioral, not structural. Every registered user-facing
+Framework24 feature in the inventory must have an operational IntrinsicEngine
+equivalent or a strict superset that preserves every user outcome of the
+original. Equivalent results may use different interaction design, data flow,
+algorithms, APIs, CPU/GPU decomposition, or rendering technology.
+
+Parity is a coverage floor, not a porting strategy or a two-stage instruction
+to clone Framework24 before improving it. Each feature should be implemented
+directly with the architecture and algorithm best suited to IntrinsicEngine,
+subject to the observable parity and quality gates.
+
+The six golden workflows are cross-cutting end-to-end gates. They do not
+replace or narrow the row-by-row feature inventory. An inventory row cannot be
+waived merely because it is inconvenient, Framework24-specific, or absent from
+a selected golden workflow; changing that baseline requires a separate,
+explicit user-approved goal revision.
 
 ## Non-regression constraints
 
@@ -106,11 +130,13 @@ implementations to fill a matrix. Each integrated method must:
 ## Final gate
 
 `REVIEW-004` runs only after its static remediation dependencies retire. It
-executes all six workflows on a clean exact revision, validates the complete
-CPU, ASan, UBSan, and promoted-Vulkan gates, audits every method manifest and
-control surface, and checks the matched Framework24 benchmark bundle. Any
-blocking finding gets a separate scoped task added to `REVIEW-004`; partial
-evidence is not reused as the final verdict.
+executes all six workflows on a clean exact revision, requires every
+registered-feature inventory row to have a working equivalent or strict
+superset with no lost user outcome, validates the complete CPU, ASan, UBSan,
+and promoted-Vulkan gates, audits every method manifest and control surface,
+and checks the matched Framework24 benchmark bundle. Any blocking finding gets
+a separate scoped task added to `REVIEW-004`; partial evidence is not reused as
+the final verdict.
 
-Research focus resumes only after every row above is `Accepted` and
-`REVIEW-004` retires.
+Research focus resumes only after every golden-workflow row and every
+registered-feature inventory row is `Accepted` and `REVIEW-004` retires.
