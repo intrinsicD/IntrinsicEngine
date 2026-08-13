@@ -1,0 +1,21 @@
+{
+  "command": [
+    "python3",
+    "tools/agents/sync_skills.py",
+    "--check"
+  ],
+  "command_display": "python3 tools/agents/sync_skills.py --check",
+  "cwd": ".",
+  "duration_ms": 20,
+  "exit_code": 0,
+  "finished_at": "2026-08-13T11:00:32Z",
+  "label": "skill-sync",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-13T11:00:32Z",
+  "stderr_path": "tasks/evidence/ARCH-017/commands/skill-sync.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/ARCH-017/commands/skill-sync.stdout.log",
+  "stdout_sha256": "fa1cc5f61bd88d9100ddeeacc5c3c557fce3279752905eac66c23470395e7556",
+  "task_id": "ARCH-017"
+}

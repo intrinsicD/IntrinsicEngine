@@ -1,0 +1,24 @@
+{
+  "command": [
+    "cmake",
+    "--build",
+    "--preset",
+    "ci",
+    "--target",
+    "IntrinsicTests"
+  ],
+  "command_display": "cmake --build --preset ci --target IntrinsicTests",
+  "cwd": ".",
+  "duration_ms": 2847,
+  "exit_code": 0,
+  "finished_at": "2026-08-13T11:00:46Z",
+  "label": "build-intrinsic-tests",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-08-13T11:00:43Z",
+  "stderr_path": "tasks/evidence/ARCH-017/commands/build-intrinsic-tests.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/ARCH-017/commands/build-intrinsic-tests.stdout.log",
+  "stdout_sha256": "1ce5d47b1d36adca2d35ea5a8ea58d21775055dbf38131ebd885b6b2cba96e54",
+  "task_id": "ARCH-017"
+}
