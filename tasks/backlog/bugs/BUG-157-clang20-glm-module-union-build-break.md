@@ -5,13 +5,13 @@ depends_on: []
 workflow_schema: 1
 workflow_profile: standard
 evidence: required
-owner:
-branch:
-worktree:
-claimed_at:
+owner: "codex-root"
+branch: "agent/framework24-product-convergence-goal"
+worktree: "/home/alex/Documents/IntrinsicEngine"
+claimed_at: "2026-08-13T12:06:10Z"
 contract_schema: 1
 contracts: []
-contract_review: "This backlog diagnosis does not yet change a reusable engine contract. If evidence requires changing the minimum supported Clang version, a glm include/import convention, or a test translation unit's module surface, the implementing slice must declare the applicable repository contract before it is claimed."
+contract_review: "The repair is confined to a test consumer: Test.CameraModule.cpp no longer textually includes glm while also importing module-owned glm types. It changes no reusable module, engine, method, config, runtime, UI, publication, or backend contract."
 ---
 # BUG-157 — Clang 20 fails IntrinsicTests on glm anonymous-union redeclaration
 
@@ -22,6 +22,13 @@ contract_review: "This backlog diagnosis does not yet change a reusable engine c
 - Historical duplicate `BUG-121` was closed without a fix on 2026-08-13; the
   proposed `BUG-162` duplicate was discarded before commit.
 - No compiler or test-source repair is part of `BUG-161`.
+- The candidate repair removes the redundant textual glm declaration set from
+  this one test consumer. Test inputs and exact position assertions now use the
+  exported `CameraViewInput` members without naming `glm::vec3`; no runtime or
+  method implementation changes.
+- Clang 23 locally compiles the focused test object and all 11 `CameraModule*`
+  contracts pass. A clean hosted Clang 20 build remains the authoritative
+  regression check.
 
 ## Goal
 
@@ -72,11 +79,12 @@ contract_review: "This backlog diagnosis does not yet change a reusable engine c
 
 - [ ] Reproduce on a clean Clang-20 host and capture the exact failing TU
       set (whether more than `Test.CameraModule.cpp` triggers it).
-- [ ] Decide the correction: a Clang-20-compatible arrangement of glm
+- [x] Decide the correction: a Clang-20-compatible arrangement of glm
       textual/module visibility for the affected TU(s), a toolchain minimum
       bump with preset/docs updates, or an upstream-pinned workaround with a
-      removal condition.
-- [ ] Keep `check_layering` and module-ownership rules intact in whichever
+      removal condition. Chosen correction: keep glm owned by the imported
+      module surfaces and stop redeclaring it textually in this test TU.
+- [x] Keep `check_layering` and module-ownership rules intact in whichever
       correction is chosen.
 
 ## Tests
@@ -105,6 +113,11 @@ clang-20 --version
 cmake --preset ci
 cmake --build --preset ci --target IntrinsicTests
 ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
+
+# Local focused feedback (Clang 23; not minimum-toolchain evidence)
+cmake --build --preset ci --target RuntimeContractTestObjs
+cmake --build --preset ci --target IntrinsicRuntimeContractTests
+ctest --test-dir build/ci --output-on-failure -R '^CameraModule' --timeout 60
 ```
 
 ## Forbidden changes
