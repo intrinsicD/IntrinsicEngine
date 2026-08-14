@@ -623,17 +623,16 @@ Before promoting a backlog task to active:
 
 ## Recurring audits
 
-Two additive, non-CI-enforced review cadences keep accumulated drift visible.
-Neither gates PR merges; both rotate through the same reviewer pool and file
-follow-up backlog tasks for findings.
+Two additive, non-CI-enforced audit sweeps keep accumulated drift visible
+(merged into [`docs/agent/review.md`](../../docs/agent/review.md) §"Audit
+sweeps" by the 2026-08 pair-workflow redesign). Neither gates PR merges; both
+run on demand — preferably overnight — and file follow-up backlog tasks or
+`tasks/HINTS.md` entries for findings.
 
-- **Weekly agent-output audit** (`REVIEW-001`, done): window-scoped review of
-  ~one week of agent-authored commits against
-  [`docs/agent/agent-output-review-checklist.md`](../../docs/agent/agent-output-review-checklist.md).
-- **Repo-state drift audit** (`REVIEW-002`, done): whole-tree state audit
-  against [`docs/agent/drift-audit-checklist.md`](../../docs/agent/drift-audit-checklist.md),
-  run on demand or every 2–4 weeks; reports land at
-  `docs/reports/<YYYY-MM-DD>-drift-audit.md`.
+- **Output audit** (formerly the weekly `REVIEW-001` sweep): window-scoped
+  review of agent-authored commits.
+- **Drift audit** (formerly the 2–4-week `REVIEW-002` sweep): whole-tree
+  state audit; reports land at `docs/reports/<YYYY-MM-DD>-drift-audit.md`.
 
 ## Related
 
@@ -642,6 +641,6 @@ follow-up backlog tasks for findings.
 - [`tasks/done/RETIREMENT-LOG.md`](../done/RETIREMENT-LOG.md) — retirement narratives and satisfied anchors.
 - [`docs/agent/contract.md`](../../docs/agent/contract.md) — expanded contract.
 - [`docs/agent/task-format.md`](../../docs/agent/task-format.md) — task file structure.
-- [`docs/agent/review-checklist.md`](../../docs/agent/review-checklist.md) — pre-commit/PR review checklist.
+- [`docs/agent/review.md`](../../docs/agent/review.md) — the pre-merge sweep, deep reviews, and audit sweeps.
 - [`tasks/backlog/rendering/README.md`](rendering/README.md) — rendering DAG (Themes A and B detail).
 - [`tasks/backlog/runtime/README.md`](runtime/README.md) — runtime backlog index (Themes A and F detail).

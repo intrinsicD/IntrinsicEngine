@@ -29,7 +29,7 @@ tools/**:
 .github/workflows/**:
   one_of:
     - docs/architecture/ci.md
-    - docs/agent/review-checklist.md
+    - docs/agent/review.md
     - tasks/**
 
 # A change to the claim ledger or its layers must move the policy, a task, or the evidence index

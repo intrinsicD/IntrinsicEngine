@@ -40,8 +40,8 @@ CLAUDE.md                       thin redirect -> AGENTS.md (Claude)
 agentkit.toml                   single source of truth (drives generator + checks)
 .claude/                        SessionStart hook (setup.sh) + wait helper + skills symlink
 .codex/skills                   skills symlink
-docs/agent/                     task-format, review, architecture-review,
-                                agent-output-review, docs-sync, roles, task-maturity, prompt
+docs/agent/                     task-format, review (per-change core + deep
+                                review + output audit), docs-sync, roles, task-maturity, prompt
 tasks/                          backlog / active / done + templates + README
 tools/agent/
   checks/                       config-driven validators (stdlib-only)

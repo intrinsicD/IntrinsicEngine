@@ -160,10 +160,6 @@ jobs:
             --manifests-root benchmarks \
             --strict
 
-      - name: Report audit cadence status (non-blocking)
-        if: always()
-        run: python3 tools/agents/check_audit_cadence.py
-
       - name: Upload nightly reports
         if: always()
         uses: actions/upload-artifact@v4

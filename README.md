@@ -65,7 +65,7 @@ For authoritative agent operating rules, task workflow, and review checklist, us
 - `AGENTS.md`
 - `docs/agent/contract.md`
 - `docs/agent/task-format.md`
-- `docs/agent/review-checklist.md`
+- `docs/agent/review.md`
 - `docs/agent/source-documentation-policy.md`
 
 ## Documentation Pointer
@@ -102,4 +102,4 @@ planning and the `pr-fast` route artifact between full confidence runs.
 
 When changing code/docs/structure, keep touched-scope checks green and update related docs/tasks in the same PR.
 
-A weekly human-led sweep over agent-authored slices is documented in `docs/agent/agent-output-review-checklist.md`; the cadence is additive to per-PR review and is not enforced by CI.
+On-demand audit sweeps over agent-authored output and whole-tree drift are documented in `docs/agent/review.md` §"Audit sweeps"; they run when the operator asks (preferably overnight) and are not enforced by CI.

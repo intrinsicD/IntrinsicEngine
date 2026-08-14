@@ -525,7 +525,7 @@ Concretely:
   layout — see `assets/shaders/forward/default_debug_surface.{vert,frag}`
   (GRAPHICS-031A) and `assets/shaders/deferred/default_debug_gbuffer.frag`
   (GRAPHICS-072 Slice A) as the canonical templates.
-- Reviewers and `docs/agent/review-checklist.md` should treat this as a
+- Reviewers and `docs/agent/review.md` should treat this as a
   hard gate: a passing CPU/null contract test that asserts only
   `Recorded` is *not* sufficient evidence that the pipeline is well-formed
   on a real backend. Either assert the SPV path explicitly in the

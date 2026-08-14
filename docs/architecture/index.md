@@ -39,7 +39,9 @@ Status labels:
 - [Test strategy](test-strategy.md) (`canonical`)
 - [Agent workflow evidence and live work graph](../agent/workflow-evidence.md)
   (`canonical`) — task claims, cumulative evidence profiles, the repository-
-  native review diamond, live Git-common-dir state, and authority boundaries.
+  native review diamond, live Git-common-dir state, and authority boundaries
+  for unattended overnight runs and opt-in custody; interactive sessions ride
+  the micro lane.
 - [Method API contract](method-api-contract.md) (`canonical`)
 - [Contract catalog](contract-catalog.yaml) (`canonical`) — stable routing IDs,
   owners, applicability triggers, and proof paths for reusable repository and

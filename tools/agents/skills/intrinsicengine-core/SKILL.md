@@ -18,21 +18,22 @@ aid, not a replacement.
 Read in this order, only as deep as the touched scope requires:
 
 1. `/AGENTS.md` — authoritative contract. Re-read every session.
-2. `tasks/SESSION-BRIEF.md` — generated current state: active tasks plus
-   per-theme unblocked/blocked backlog. Authoritative for what is open and
-   unblocked; regenerate with
+2. `references/session-onboarding.md` (mirror of
+   `docs/agent/prompt/prompt.md`) — the pair workflow: postures
+   (Pair/Delegate/Advisor), hint tiers, question protocol, risk gates,
+   deferred-hint ledger, unattended overnight mode.
+3. The task note you are continuing (`tasks/active/`), when one exists —
+   read completely before touching code.
+4. `tasks/SESSION-BRIEF.md` (generated open/unblocked view; regenerate with
    `python3 tools/agents/generate_session_brief.py` after opening, retiring,
-   or re-gating any task.
-3. The chosen task file — read completely before touching code.
-4. `tasks/active/README.md` / `tasks/backlog/README.md` — on demand only,
-   for theme priorities, rationale, and the promotion checklist.
+   or re-gating any task) and `tasks/backlog/README.md` — only when picking
+   backlog work.
 5. The specialist procedure for your touched scope (see "Routing" below).
 
-For a claimed non-micro task, start or resume
-`tools/agents/agent_work_graph.py` with the checked-in review-diamond recipe
-before substantive implementation. Its Git-common-dir state exposes the
-current/ready nodes and node-addressed notes; it never replaces the task,
-claim, verification receipt, independent review, or experiment custody.
+Default posture is **Pair** (observant copilot); Delegate and Advisor switch
+verbally. Claim, work-graph, and completion-evidence machinery is scoped to
+unattended overnight runs and opt-in custody profiles — interactive sessions
+owe none of it (see the session-onboarding reference).
 
 Then inspect repo state before choosing work:
 
@@ -161,8 +162,8 @@ Load the specialist skill for the touched scope rather than reading every guide:
 | Touched scope | Skill to consult |
 | --- | --- |
 | Creating, promoting, retiring, or materially updating files under `tasks/` | `intrinsicengine-task-workflow` |
-| Before committing or reporting completion for a non-trivial change | `intrinsicengine-review` |
-| Changing dependency boundaries, module ownership, source layout, runtime wiring | `intrinsicengine-review` (architecture-review checklist) |
+| Before committing or reporting completion for a non-trivial change (the pre-merge sweep) | `intrinsicengine-review` |
+| Changing dependency boundaries, module ownership, source layout, runtime wiring | `intrinsicengine-review` (architecture deep review + clean-workshop scorecard) |
 | Planning or reviewing new abstraction surface (interfaces, service/bridge/registry facades, module frameworks, event/command indirection), a small change fanning out across many files, or suspected over-engineering/glue | `intrinsicengine-right-sizing` |
 | Proposing novel, unconventional, cross-domain, or potentially publishable research directions (the ideation front end that feeds the method track) | `intrinsicengine-research-ideation` |
 | Auditing method, benchmark, backend-parity, capability-maturity, or quantitative claims after evidence exists | `intrinsicengine-results-audit` (then the method/benchmark/review specialists it routes) |
@@ -216,8 +217,8 @@ References bundled with this skill (read on demand):
 
 - `references/contract.md` — expanded rationale for invariants, mission, and protocols.
   Read during onboarding, contract edits, or when you need the *why* behind a rule.
-- `references/roles.md` — agent role definitions (Architect, Implementation, Test,
-  Review, Paper) and the rotating weekly-review ownership.
+- `references/roles.md` — the pair-workflow postures (Pair, Delegate, Advisor)
+  and the unattended overnight / custody responsibilities.
 - `references/session-onboarding.md` — the default generic session prompt: how to
   find work, scope it, verify it, and ship it; commit/PR hygiene; anti-patterns.
 

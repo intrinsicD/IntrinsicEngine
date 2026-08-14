@@ -189,29 +189,24 @@ exceptions are allowed only if:
 - time-bounded,
 - and isolated so they do not create new promoted-layer violations.
 
-## Weekly agent-output review cadence
+## On-demand audit sweeps
 
-The per-PR `docs/agent/review-checklist.md` catches single-slice
-defects. A weekly human-led sweep — driven by
-[`REVIEW-001`](../../../../../tasks/archive/REVIEW-001-human-led-agent-week-review-cadence.md)
-and run from [`docs/agent/agent-output-review-checklist.md`](../../../../../docs/agent/agent-output-review-checklist.md)
-— audits roughly one week of agent-authored commits for patterns the
-per-PR view misses (multi-PR scope drift, decorative comments,
-documented-but-not-tested claims, ceremony-without-shipped-value). The
-cadence is *additive*: it does not gate PR merges, does not impose
-per-commit reviewer load, and either silently passes or files specific
-follow-up tasks. Reviewer ownership rotates; see
-[`docs/agent/roles.md`](../../../../../docs/agent/roles.md).
+The pre-merge sweep in [`docs/agent/review.md`](../../../../../docs/agent/review.md) catches
+single-slice defects. Two deeper sweeps catch what the per-change view
+misses, both defined in the same document and run **on demand — preferably
+overnight — with no fixed cadence** (2026-08-14 decision; the earlier weekly
+`REVIEW-001` and 2–4-week `REVIEW-002` cadences are retired):
 
-A second, *state-scoped* audit complements the window-scoped weekly sweep:
-the repo-state drift audit driven by
-[`REVIEW-002`](../../../../../tasks/archive/REVIEW-002-recurring-drift-and-inconsistency-audit.md)
-and run from [`docs/agent/drift-audit-checklist.md`](../../../../../docs/agent/drift-audit-checklist.md).
-Where the weekly sweep reviews roughly one week of *commits*, the drift audit
-inspects the *whole current tree* for accumulated drift between code, docs,
-tasks, generated inventories, and tracked migration exceptions (inventory
-drift, retired allowlist owners, stale `(planned)` markers, dead seams,
-untracked TODO/shim markers, naming/cross-doc rot). It is also additive — on
-demand or every 2–4 weeks, not CI-enforced — and writes a dated report to
-`docs/reports/<YYYY-MM-DD>-drift-audit.md`. It rotates through the same
-reviewer pool as the weekly sweep.
+- The **output audit** (`review.md` §"Output audit") covers a window of
+  agent-authored commits for multi-PR scope drift, decorative comments,
+  premature abstraction, documented-but-not-tested claims, and
+  ceremony-without-shipped-value.
+- The **drift audit** (`review.md` §"Drift audit") inspects the whole current
+  tree for accumulated drift: inventory drift, retired allowlist owners,
+  stale `(planned)` markers, dead seams, untracked TODO/shim markers,
+  naming/cross-doc rot.
+
+Neither gates PR merges. Findings land as `tasks/HINTS.md` entries or backlog
+tasks; dated reports go to `docs/reports/<YYYY-MM-DD>-<sweep>-audit.md`, and
+`python3 tools/agents/check_audit_cadence.py` reports last-report dates on
+request. The `intrinsicengine-audit` skill is the operator entry point.

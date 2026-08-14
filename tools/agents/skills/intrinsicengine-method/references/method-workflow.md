@@ -76,6 +76,42 @@ control surface explicitly.
 - Benchmark manifests validate.
 - Benchmark outputs include machine-readable diagnostics and status.
 
+## Review checklist
+
+Apply when reviewing method/paper work before commit or PR.
+
+**Paper claim and formulation** — the claim is captured correctly (objective,
+assumptions, expected output); the mathematical formulation, input/output
+contract, and units are explicit; the literature pass covers the original
+paper plus relevant extensions and names which formulation is implemented.
+
+**Engine integration** — the task declares `method.engine-integration` and
+every applicable catalog contract; the least-structured input is explicit and
+runtime/UI accept every ECS source satisfying it; point-set eligibility is
+typed properties/spans on any element domain (never `Vertices`, point-cloud
+provenance, or handle-specific wrappers); graph eligibility adds only named
+adjacency and accepts satisfying meshes; RuntimeModule, config/agent, UI,
+publication/cardinality, and end-to-end test rows are implemented, contractually
+inapplicable, or owned by named follow-ups; UI discovery covers each
+appropriate domain through the same readiness path as non-UI controls;
+same-cardinality results update only named properties on the originating
+domain and never silently discard richer source data.
+
+**Robustness and correctness** — degenerate/boundary cases defined and
+handled; the CPU reference backend exists and is the correctness baseline;
+correctness tests include analytic/simple cases and regressions; tolerances
+and acceptance criteria are documented.
+
+**Benchmarking and parity** — a benchmark manifest exists for the method
+scope; quality metrics are defined (not runtime-only); optimized CPU and GPU
+backends are compared against reference outputs.
+
+**Diagnostics and docs** — results report diagnostics and backend identity;
+failure modes are explicit and actionable; known limitations are documented;
+`methods/**` / `docs/methods/**` updated for touched behavior; the task has
+acceptance criteria and verification commands; the PR links the
+benchmarks/tests used for validation.
+
 ## Required references
 
 - [Methods docs index](../../../../../docs/methods/index.md)
@@ -84,4 +120,3 @@ control surface explicitly.
 - [Numerical robustness policy](../../../../../docs/methods/numerical-robustness-policy.md)
 - [Dataset policy](../../../../../docs/methods/dataset-policy.md)
 - [Method report template](../../../../../docs/methods/report-template.md)
-- [Method implementation review checklist](../../../../../docs/agent/method-review-checklist.md)
