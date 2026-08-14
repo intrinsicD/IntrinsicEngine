@@ -28,6 +28,9 @@ contract_review: <why no catalog contract applies>
 # Add concrete commands for this task.
 ```
 
+<!-- Optional sections when they earn their lines: ## Context, ## Slice plan,
+     ## Log (dated decisions/defaults chosen during interactive work). -->
+
 <!--
 Micro template: for single-slice mechanical work only (small fixes, doc/link
 sweeps, config toggles, test-only additions). `template: micro` in the

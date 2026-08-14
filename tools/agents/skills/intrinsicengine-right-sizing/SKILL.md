@@ -32,8 +32,8 @@ Three checkpoints. Do not wait for the third.
    write the right-sizing note into the task file.
 2. **Diff time.** Before committing, if the diff adds any of the above or a
    file whose methods are ≥80% single-line delegation, audit the diff.
-3. **Review time.** The pre-PR review checklist
-   (`docs/agent/review-checklist.md`) includes a right-sizing item; when it
+3. **Review time.** The review doc
+   (`docs/agent/review.md`, architecture deep review) includes a right-sizing item; when it
    flags, apply this skill and either fix in-slice or file a follow-up task.
 
 ## Detection heuristics

@@ -162,8 +162,8 @@ Load the specialist skill for the touched scope rather than reading every guide:
 | Touched scope | Skill to consult |
 | --- | --- |
 | Creating, promoting, retiring, or materially updating files under `tasks/` | `intrinsicengine-task-workflow` |
-| Before committing or reporting completion for a non-trivial change | `intrinsicengine-review` |
-| Changing dependency boundaries, module ownership, source layout, runtime wiring | `intrinsicengine-review` (architecture-review checklist) |
+| Before committing or reporting completion for a non-trivial change (the pre-merge sweep) | `intrinsicengine-review` |
+| Changing dependency boundaries, module ownership, source layout, runtime wiring | `intrinsicengine-review` (architecture deep review + clean-workshop scorecard) |
 | Planning or reviewing new abstraction surface (interfaces, service/bridge/registry facades, module frameworks, event/command indirection), a small change fanning out across many files, or suspected over-engineering/glue | `intrinsicengine-right-sizing` |
 | Proposing novel, unconventional, cross-domain, or potentially publishable research directions (the ideation front end that feeds the method track) | `intrinsicengine-research-ideation` |
 | Auditing method, benchmark, backend-parity, capability-maturity, or quantitative claims after evidence exists | `intrinsicengine-results-audit` (then the method/benchmark/review specialists it routes) |
@@ -217,8 +217,8 @@ References bundled with this skill (read on demand):
 
 - `references/contract.md` — expanded rationale for invariants, mission, and protocols.
   Read during onboarding, contract edits, or when you need the *why* behind a rule.
-- `references/roles.md` — agent role definitions (Architect, Implementation, Test,
-  Review, Paper) and the rotating weekly-review ownership.
+- `references/roles.md` — the pair-workflow postures (Pair, Delegate, Advisor)
+  and the unattended overnight / custody responsibilities.
 - `references/session-onboarding.md` — the default generic session prompt: how to
   find work, scope it, verify it, and ship it; commit/PR hygiene; anti-patterns.
 

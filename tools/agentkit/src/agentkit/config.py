@@ -34,9 +34,7 @@ SKILL_DIRS = ["core", "task-workflow", "review", "docs-sync", "diagnose", "hando
 # Generic process docs written under docs/agent/.
 AGENT_DOCS = [
     "task-format.md",
-    "review-checklist.md",
-    "architecture-review-checklist.md",
-    "agent-output-review-checklist.md",
+    "review.md",
     "docs-sync-policy.md",
     "roles.md",
     "task-maturity.md",
@@ -68,9 +66,7 @@ RESYNC_DOC_MAP: list[tuple[str, str, str]] = [
     ("docs/agent/task-format.md", "task-workflow", "task-format.md"),
     ("docs/agent/task-maturity.md", "task-workflow", "task-maturity.md"),
     ("tasks/templates/task.md", "task-workflow", "task-template.md"),
-    ("docs/agent/review-checklist.md", "review", "review-checklist.md"),
-    ("docs/agent/architecture-review-checklist.md", "review", "architecture-review-checklist.md"),
-    ("docs/agent/agent-output-review-checklist.md", "review", "agent-output-review-checklist.md"),
+    ("docs/agent/review.md", "review", "review.md"),
     ("docs/agent/docs-sync-policy.md", "docs-sync", "docs-sync-policy.md"),
 ]
 

@@ -256,8 +256,8 @@ self-review, the deterministic validators, and CI.
 | `workflow_evidence.py` receipts / reports / seals; `handoff.jsonl` / `reviews.jsonl`; micro/standard/high-risk profiles | **Retire for interactive work** | Commit + diff + PR + CI are the evidence. Two modes remain: *normal* (nothing owed) and *evidence/custody* (opt-in, claim-bound, §6) |
 | `experiment_custody.py` (claim-grade/protected) | **Keep, opt-in only** for publication-bound claims | The one context where frozen protocols pay for themselves |
 | ARA claim ledger (§8b) | **Keep, trigger narrowed** to statements entering README/docs/reports | The truthfulness floor for public statements; ordinary slices owe nothing |
-| Per-PR review checklist (8 sections) | **Replace with the four-point sweep** (scope, layering, tests, docs) | Matches actual defect yield; the long form moves into `/audit` |
-| Architecture / clean-workshop / agent-output / drift checklists | **Merge into one on-demand `/audit` skill** with named sweeps (`/audit architecture`, `/audit drift`, `/audit output`) | Deep review becomes a deliberate act on request or cadence the human chooses — not ambient duty |
+| Per-PR review checklist (8 sections) | **Replaced by the four-point sweep** (scope, layering, tests, docs) in `review.md` | Matches actual defect yield; deep content preserved in the same doc's risk-gated and audit sections |
+| Architecture / clean-workshop / agent-output / drift checklists | **Merged into `review.md`**; the `intrinsicengine-audit` skill runs the named sweeps (output/drift/workshop/hints) on demand | Deep review becomes a deliberate act on request — not ambient duty |
 | Method/benchmark review checklists | **Fold into their workflow docs**, applied when that work type occurs | Same content, no separate ceremony |
 | Domain skills (vulkan-frame-triage, stale-build-triage, geometry-io-format, import-visibility, sandbox-input-lifecycle, gpu-smoke, diagnose, right-sizing, zoom-out, draw-architecture, handoff…) | **Keep untouched** | They are compressed knowledge, cost nothing until loaded, and are exactly what makes the pair posture sharp |
 | Process skills (core, task-workflow, review, docs-sync mirrors) | **Rewrite/merge** to mirror the new docs via existing `sync_skills.py` | — |
@@ -340,16 +340,23 @@ all interactive work, so no validator code changes are needed; add
 `tasks/HINTS.md`. Run `sync_skills.py --write`. After this change, no
 interactive session owes claims, graph transitions, receipts, or reports.
 
-**PR 2 — collapse the review and task surfaces.** Merge the five review
-instruments into `review.md` + `/audit`; land the 5-section task note template
-(existing tasks are migrated lazily, on next touch — no mass rewrite); demote
-`SESSION-BRIEF.md` freshness from CI gate to convenience; add the pre-commit
-validator hook.
+**PR 2 — collapse the review and task surfaces (landed on this branch).**
+The five review instruments merged into `docs/agent/review.md` (stable row
+numbers preserved; old filenames redirect so history resolves); the
+`intrinsicengine-audit` skill is the on-demand sweep entry point; the micro
+template gained optional Context/Slice-plan/Log guidance (existing tasks
+migrate lazily); `SESSION-BRIEF.md` freshness demoted from CI gate to
+convenience; opt-in pre-commit hook at `tools/repo/githooks/pre-commit`
+(`git config core.hooksPath tools/repo/githooks`).
 
-**PR 3 — retire the machinery.** Remove the mandates and CI blockers for
-task-claim/work-graph/evidence for interactive work per the §10.1 decision;
-rewrite `how-this-repo-is-built.md` and `roles.md`; fold method/benchmark
-checklists into their workflow docs; regenerate skills.
+**PR 3 — retire the machinery (landed on this branch).** The session-brief
+freshness gate and the nightly audit-cadence step were removed from CI (the
+evidence/custody validators and work-graph regressions stay — they protect
+the supported overnight lane); `check_audit_cadence.py` became an on-demand
+last-report reporter; `how-this-repo-is-built.md` now describes the two
+lanes; `roles.md` describes postures instead of the five roles;
+method/benchmark checklists folded into their workflow docs; agentkit and
+docs-sync rules updated; skills regenerated.
 
 Each PR is independently shippable and reversible; the safety floor (§5) is
 untouched throughout.

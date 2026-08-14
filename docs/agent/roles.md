@@ -1,39 +1,49 @@
-# Agent Roles
+# Agent Postures and Responsibilities
 
-These roles describe responsibilities; one change may involve multiple roles.
+The pair workflow (`docs/agent/prompt/prompt.md`) replaced the earlier
+five-role model (Architect / Implementation / Test / Review / Paper agents and
+a rotating weekly-review ownership). Responsibilities now attach to
+**postures** and **lanes**; one session may move through several.
 
-## Architect Agent
+## Pair (default posture)
 
-- Owns layer boundaries and long-lived subsystem structure.
-- Reviews dependency direction and contract compliance.
+- Observes the operator's work at checkpoints; hints in three tiers
+  (stop-the-line / improvement / polish) across architecture, implementation,
+  and harness.
+- Asks one question at a time, with a recommended answer, when destinations
+  diverge.
+- Runs the pre-merge sweep ([review.md](review.md)) before commits.
 
-## Implementation Agent
+## Delegate (bounded hand-off)
 
-- Delivers the smallest useful patch for a task.
-- Preserves buildability/testability and keeps scope tight.
+- Owns the smallest robust slice end-to-end: implement, test, verify, sweep,
+  commit, push, report.
+- Asks questions once, up front; records chosen defaults in the task note.
+- Honors the risk gates (dependency edges, public surfaces, claims,
+  destructive actions) before landing.
 
-## Test Agent
+## Advisor (direction and research)
 
-- Adds/updates tests and validates category labels.
-- Ensures deterministic and actionable verification.
+- Situates from real state; maps 2–3 directions and recommends one.
+- Owns paper intake for method-shaped work: literature pass, formulation
+  choice, critical-parts explanation (`intrinsicengine-method`,
+  `intrinsicengine-research-ideation`).
 
-## Review Agent
+## Unattended overnight lane
 
-- Applies the review checklist before merge.
-- Verifies docs sync, CI impact, and shim tracking.
-- Owns the weekly agent-output audit cadence in
-  [`docs/agent/agent-output-review-checklist.md`](agent-output-review-checklist.md)
-  when picked up that week. The role rotates rather than belonging to a
-  permanent reviewer; the per-PR `docs/agent/review-checklist.md` stays
-  the per-commit gate and is not replaced by the weekly sweep.
-- Also owns the *state-scoped* repo-state drift audit in
-  [`docs/agent/drift-audit-checklist.md`](drift-audit-checklist.md)
-  (`REVIEW-002`), run on demand or every 2–4 weeks against the whole current
-  tree. It rotates through the same reviewer pool as the weekly sweep and is
-  additive to it (state audit vs. commit-window audit); neither gates PR
-  merges.
+- Executes night-ready tasks only, with the full claim / work-graph /
+  completion-evidence custody ([workflow-evidence.md](workflow-evidence.md)).
+- Delivers a morning report: what changed, verification run, uncertainties,
+  hints filed.
 
-## Paper Agent
+## Audits
 
-- Translates paper claims into method contracts.
-- Enforces reference-first workflow and diagnostics reporting.
+- Audit sweeps (output, drift, clean-workshop, hints triage — see
+  [review.md](review.md)) run on demand, preferably overnight, at the
+  operator's request. There is no rotating reviewer role and no fixed
+  cadence; findings land as `tasks/HINTS.md` entries or backlog tasks.
+
+## The operator
+
+- The human is the scheduler and the memory of record: work selection,
+  priorities, risk-gate approvals, and hint dispositions are theirs.

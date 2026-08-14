@@ -153,7 +153,7 @@ Hygiene, enforced by sweeps rather than CI:
 
 # Audits
 
-Deep review is a deliberate act, not an ambient duty. The audit sweeps — per-PR beyond the four-point sweep, architecture (`architecture-review-checklist.md`), agent-output (`agent-output-review-checklist.md`), drift (`drift-audit-checklist.md`), clean-workshop (`clean-workshop-review.md`), hints-ledger triage — run **on demand**, preferably as overnight jobs so they never displace working hours. Findings land as `tasks/HINTS.md` entries or `BUG-`/backlog notes with evidence, never as interruptions.
+Deep review is a deliberate act, not an ambient duty. The audit sweeps — output (window of agent-authored commits), drift (whole-tree state), the clean-workshop scorecard, and hints-ledger triage, all defined in `docs/agent/review.md` — run **on demand**, preferably as overnight jobs so they never displace working hours (the `intrinsicengine-audit` skill is the entry point). Findings land as `tasks/HINTS.md` entries or `BUG-`/backlog notes with evidence, never as interruptions.
 
 # Unattended overnight mode
 

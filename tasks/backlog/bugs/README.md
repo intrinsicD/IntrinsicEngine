@@ -14,7 +14,7 @@ map.
   product gate because they directly block the import golden workflow.
 - Bug fixes that touch multiple layers must respect the same dependency
   anchors as feature work and should still ship as small, scoped patches per
-  [`docs/agent/review-checklist.md`](../../../docs/agent/review-checklist.md).
+  [`docs/agent/review.md`](../../../docs/agent/review.md).
 - Promote a bug to a structured task file (using
   [`tasks/templates/bug-task.md`](../../templates/bug-task.md)) when it
   warrants its own commit boundary or verification.

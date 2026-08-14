@@ -408,7 +408,8 @@ When code, structure, or policy changes:
   `python3 tools/repo/generate_module_inventory.py --root src --out docs/api/generated/module_inventory.md`.
 - After opening, retiring, or re-gating any task, regenerate `tasks/SESSION-BRIEF.md` with
   `python3 tools/agents/generate_session_brief.py`; after editing `docs/agent/*` or `tasks/templates/task.md`,
-  re-run `python3 tools/agents/sync_skills.py --write`. CI (`ci-docs.yml`) enforces freshness of both.
+  re-run `python3 tools/agents/sync_skills.py --write`. CI (`ci-docs.yml`) enforces skill-mirror
+  freshness; the session brief is a convenience view regenerated opportunistically.
 - Keep docs factual (current state), not aspirational unless clearly labeled.
 - Keep every `README.md` as a concise current-state entry point. Link to ADRs, migration docs, tasks, retirement records,
   reports, or Git for history and future work instead of copying those narratives into a README.
@@ -432,7 +433,7 @@ When code, structure, or policy changes:
   `python3 tools/repo/check_layering.py --root src --strict`, and
   `python3 tools/repo/check_test_layout.py --root . --strict`. Repository-root hygiene is enforced by
   `python3 tools/repo/check_root_hygiene.py --root .`; PR review structure lives
-  in `.github/pull_request_template.md` and `docs/agent/review-checklist.md`.
+  in `.github/pull_request_template.md` and `docs/agent/review.md`.
 
 ## 11. Task execution workflow
 
@@ -534,17 +535,11 @@ Read this `AGENTS.md` file at the start of every session/task; it is the authori
 | `docs/architecture/index.md`                  | Designing subsystem architecture, algorithm backend splits, config/command control surfaces, recipe/frame composition, or deciding which canonical architecture doc or ADR governs a change.                           |
 | `docs/agent/task-format.md`                   | Creating, promoting, retiring, or materially updating files under `tasks/`.                                                                                                                                             |
 | `docs/agent/workflow-evidence.md`             | Configuring an unattended overnight run (claims, work graph, completion evidence) or opting into claim-grade/protected custody for publication-bound claims; not used by interactive sessions.                          |
-| `docs/agent/review-checklist.md`              | Before committing or reporting completion for any non-trivial change.                                                                                                                                                   |
-| `docs/agent/architecture-review-checklist.md` | Changing dependency boundaries, module ownership, source layout, runtime wiring, or architecture docs.                                                                                                                  |
-| `docs/agent/method-workflow.md`               | Implementing or modifying paper/method work under `methods/` or method-backed integrations.                                                                                                                             |
-| `docs/agent/method-review-checklist.md`       | Reviewing method/paper changes before commit or PR.                                                                                                                                                                     |
-| `docs/agent/benchmark-workflow.md`            | Adding, changing, or running benchmark harnesses, manifests, datasets, baselines, or reports.                                                                                                                           |
-| `docs/agent/benchmark-review-checklist.md`    | Reviewing benchmark changes or performance claims before commit or PR.                                                                                                                                                  |
+| `docs/agent/review.md`                        | Before committing or reporting completion (the pre-merge sweep); changing dependency boundaries, module ownership, source layout, or runtime wiring (architecture deep review + clean-workshop scorecard); running an on-demand audit sweep. |
+| `docs/agent/method-workflow.md`               | Implementing, modifying, or reviewing paper/method work under `methods/` or method-backed integrations (includes the method review checklist).                                                                                                                             |
+| `docs/agent/benchmark-workflow.md`            | Adding, changing, reviewing, or running benchmark harnesses, manifests, datasets, baselines, or reports (includes the benchmark review checklist).                                                                                                                           |
 | `docs/agent/docs-sync-policy.md`              | Moving files, changing public APIs/module surfaces, updating docs, or deciding whether generated inventories/manifests must be refreshed.                                                                               |
 | `docs/agent/source-documentation-policy.md`   | Creating or materially changing C++ module interfaces, headers, source comments, or README files; auditing source-documentation debt and discoverability.                                                              |
 | `docs/agent/ara-evidence-policy.md`           | Stating a research/performance/parity/capability result, closing a method or benchmark task, or promoting a claim into README, docs, a method report, or a task status — the `ara/` claim-ledger record format and anti-patterns. |
 | `docs/agent/roles.md`                         | Clarifying agent responsibilities, handoff expectations, or role-specific workflow questions.                                                                                                                           |
-| `docs/agent/agent-output-review-checklist.md` | Running the weekly human-led audit of recent agent-authored slices for cross-PR scope drift, documented-but-untested claims, and process anti-patterns not visible in a single PR review.                               |
-| `docs/agent/drift-audit-checklist.md`         | Running the recurring whole-tree repo-state drift audit (inventory drift, retired allowlist owners, stale `(planned)` markers, dead seams, untracked TODO/shim markers, naming/cross-doc rot). State-scoped; additive to the weekly sweep. |
-| `docs/agent/clean-workshop-review.md`         | Reviewing a change that touches a dependency boundary, adds a renderer subsystem/pass, changes RHI/platform/runtime wiring, closes a scaffold/parity task, or edits the layering allowlist — the drift/decomposition scorecard. |
 | `docs/agent/task-maturity.md`                 | Closing a task whose stop-state is ambiguous, especially rendering, Vulkan, asset ingest, hot reload, pass command bodies, runtime composition, or legacy retirement; reviewers checking the `Scaffolded` closure rule. |

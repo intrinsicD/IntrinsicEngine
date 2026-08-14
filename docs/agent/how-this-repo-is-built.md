@@ -9,10 +9,21 @@ retirement narrative as one auditable chain.
 
 This page is a guided tour for readers outside the project. It describes the
 system; it does not add rules. The authoritative operating contract remains
-[`AGENTS.md`](../../AGENTS.md), with the detailed task and review procedures in
-the [task format](task-format.md) and [review checklist](review-checklist.md).
+[`AGENTS.md`](../../AGENTS.md), with the session behavior in the
+[pair workflow](prompt/prompt.md) and the detailed task and review procedures
+in the [task format](task-format.md) and [review doc](review.md).
 
 ## The Development Loop
+
+Since the 2026-08 pair-workflow redesign, work moves through two lanes.
+**Interactive sessions** (the default) are a conversation: the agent pairs
+with the operator in Pair/Delegate/Advisor postures, work rides the micro
+task lane, and the diff, tests, and CI are the evidence — no claims, work
+graph, or generated reports. **Unattended overnight runs** execute
+night-ready tasks without a human present and keep the full evidence chain
+below; it substitutes for the operator who is not there.
+
+The unattended lifecycle:
 
 ```text
 research, defect, or review finding
@@ -50,19 +61,21 @@ The loop has four durable states:
 
 [`tasks/SESSION-BRIEF.md`](../../tasks/SESSION-BRIEF.md) is generated from task
 front-matter. It shows current active work and, for every backlog theme, either
-that a task is unblocked or the first unmet task ID. Agents regenerate it when
-task state or dependencies change; CI rejects a stale copy. That makes the
-picker view a reproducible projection of the task graph, not a hand-maintained
-status report.
+that a task is unblocked or the first unmet task ID. Regenerate it when task
+state or dependencies change; it is a convenience projection of the task
+graph consulted when picking backlog work, not a hand-maintained status
+report.
 
-New or changed tasks also select the cumulative `micro`, `standard`,
-`high-risk`, `claim-grade`, or `protected` workflow profile. The
+New or changed tasks select a workflow profile. Interactive work rides the
+`micro` lane (no report; the PR is the evidence). Unattended overnight tasks
+use `standard` or `high-risk`; `claim-grade` and `protected` remain opt-in
+custody for publication-bound claims. The
 [workflow evidence contract](workflow-evidence.md) uses Git-common-dir claims,
 generated command/report evidence, fixed-surface review, and experiment
 custody in proportion to that profile. Untouched pre-policy task hashes remain
 grandfathered; historical tasks are not rewritten.
 
-Claimed non-micro work also has a live
+Claimed non-micro overnight work also has a live
 [agent work graph](workflow-evidence.md#live-agent-work-graph). Its checked-in
 recipe exposes one write lane, parallel read-only review lanes, a findings
 join, bounded within-slice reopen, an audited next-slice transition for tasks
@@ -93,7 +106,7 @@ dependency-ready task without inventing a new roadmap.
 
 ## Skills: Progressive Procedure Loading
 
-The repository packages its operating knowledge as twenty-three
+The repository packages its operating knowledge as twenty-four
 [Agent Skills](../../tools/agents/skills/README.md). Only skill metadata is
 normally visible to an agent; the full procedure loads when its trigger matches
 the work. This preserves a single authoritative contract while avoiding the
@@ -132,8 +145,9 @@ These checks do not all answer the same question. A link checker proves that a
 reference resolves, not that a rendering backend ran. A CPU contract test
 proves backend-neutral behavior, not Vulkan operation. A benchmark result
 validator proves schema and identity, not a performance win. The task's
-acceptance criteria name the required evidence types, and the review checklist
-prevents a narrow check from supporting a broader claim.
+acceptance criteria name the required evidence types, and the review doc's
+sweep and deep-review sections prevent a narrow check from supporting a
+broader claim.
 
 ## CI: Feedback and Confidence
 

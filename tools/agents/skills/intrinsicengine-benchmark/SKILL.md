@@ -15,7 +15,7 @@ benchmark without a baseline is a measurement, not a claim.
 
 > **Authority (PROC-023).** The lifecycle, manifest/runner/reporting, and
 > review-checklist sections below mirror `references/benchmark-workflow.md` and
-> `references/benchmark-review-checklist.md`; where they restate a source rule,
+> `references/benchmark-workflow.md` §"Review checklist"; where they restate a source rule,
 > the source doc wins. The **Anti-patterns** section has no `docs/agent/*`
 > source and is **skill-canonical** (the discipline-skill model). `AGENTS.md`
 > §8 still wins on anything it covers.
@@ -84,7 +84,7 @@ python3 tools/benchmark/validate_benchmark_results.py
 
 Apply this checklist when reviewing benchmark changes — both the benchmark
 definition and the change that motivates running it. Read
-`references/benchmark-review-checklist.md` for the full version.
+`references/benchmark-workflow.md` §"Review checklist" for the full version.
 
 ### 1. Benchmark definition quality
 
@@ -154,5 +154,5 @@ These come up enough in practice that they're worth calling out explicitly:
 
 - `references/benchmark-workflow.md` — lifecycle, manifest/runner/reporting
   requirements.
-- `references/benchmark-review-checklist.md` — full review checklist; use this
+- `references/benchmark-workflow.md` §"Review checklist" — full review checklist; use this
   for benchmark-PR review.

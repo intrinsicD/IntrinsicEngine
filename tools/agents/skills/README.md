@@ -1,13 +1,13 @@
 # IntrinsicEngine Agent Skills
 
-This folder contains twenty-three [Agent Skills](https://agentskills.io). Seven of
+This folder contains twenty-four [Agent Skills](https://agentskills.io). Seven of
 them wrap the IntrinsicEngine `AGENTS.md` contract and the procedure docs
-under `docs/agent/`; thirteen add IntrinsicEngine-specific cross-cutting workflow
+under `docs/agent/`; fourteen add IntrinsicEngine-specific cross-cutting workflow
 disciplines (diagnosis, Vulkan frame triage, GPU smoke authoring, stale-build
 triage, import-visibility contract, geometry-IO format, sandbox input/lifecycle,
-research ideation, results audit, right-sizing, architecture diagrams,
-zoom-out, handoff) that don't have a single source doc under `docs/agent/`;
-three are imported third-party productivity skills.
+research ideation, results audit, on-demand audit sweeps, right-sizing,
+architecture diagrams, zoom-out, handoff) that don't have a single source doc
+under `docs/agent/`; three are imported third-party productivity skills.
 The skills are designed to load *progressively*: only the metadata (~100 tokens
 per skill) sits in context by default, with full content loaded only when the
 skill's trigger description matches the current task.

@@ -1,0 +1,31 @@
+#!/usr/bin/env bash
+# Opt-in pre-commit hook: runs the cheap deterministic validators for the
+# staged scope so they cost zero session turns (docs/agent/review.md, "The
+# pre-merge sweep"). Enable once per clone with:
+#
+#   git config core.hooksPath tools/repo/githooks
+#
+# Disable with: git config --unset core.hooksPath
+set -uo pipefail
+
+staged="$(git diff --cached --name-only)"
+fail=0
+run() { echo "[pre-commit] $*"; "$@" || fail=1; }
+
+if grep -qE '^src/' <<<"$staged"; then
+  run python3 tools/repo/check_layering.py --root src --strict
+fi
+if grep -qE '^docs/|\.md$' <<<"$staged"; then
+  run python3 tools/docs/check_doc_links.py --root .
+fi
+if grep -qE '^docs/agent/|^tasks/templates/task\.md$' <<<"$staged"; then
+  run python3 tools/agents/sync_skills.py --check
+fi
+if grep -qE '^tasks/' <<<"$staged"; then
+  # Warn-only until the pre-existing archive findings are resolved (BUG-162).
+  echo "[pre-commit] task-policy check (warn-only)"
+  python3 tools/agents/check_task_policy.py --root . --strict \
+    || echo "[pre-commit] WARNING: task policy reported findings (not blocking)"
+fi
+
+exit "$fail"

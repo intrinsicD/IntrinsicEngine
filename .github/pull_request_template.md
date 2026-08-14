@@ -66,11 +66,11 @@
 ## References
 - Contract: `/AGENTS.md`
 - Task format: `/docs/agent/task-format.md`
-- Review checklist: `/docs/agent/review-checklist.md`
+- Review doc (sweep + deep review): `/docs/agent/review.md`
 - Touched-scope verification helper: `/docs/build-troubleshooting.md#fast-touched-scope-verification`
-- Architecture review checklist: `/docs/agent/architecture-review-checklist.md`
+- Architecture deep review: `/docs/agent/review.md` ("Deep review: architecture")
 - Method workflow: `/docs/agent/method-workflow.md`
-- Method review checklist: `/docs/agent/method-review-checklist.md`
+- Method review checklist: `/docs/agent/method-workflow.md` ("Review checklist")
 - Benchmark workflow: `/docs/agent/benchmark-workflow.md`
 
-- Benchmark review checklist: `/docs/agent/benchmark-review-checklist.md`
+- Benchmark review checklist: `/docs/agent/benchmark-workflow.md` ("Review checklist")

@@ -16,7 +16,7 @@ never against each other.
 
 > **Authority (PROC-023).** The required-sequence, backend-policy,
 > verification, and review-checklist sections below mirror
-> `references/method-workflow.md` and `references/method-review-checklist.md`;
+> `references/method-workflow.md` (its §"Review checklist" holds the review rows);
 > where they restate a source rule, the source doc wins. The **knowledge-graph
 > claim→code aid** (under *Paper claim and formulation*) and the **"How method
 > work maps to the maturity taxonomy"** section have no `docs/agent/*` source
@@ -94,7 +94,7 @@ discovery, and publication tests must preserve that substitutability.
 ## Method-implementation review checklist
 
 Apply this checklist when reviewing any method/paper-implementation task. Read
-`references/method-review-checklist.md` for the full version.
+`references/method-workflow.md` §"Review checklist" for the full version.
 
 ### Paper claim and formulation
 
@@ -172,5 +172,5 @@ See `intrinsicengine-task-workflow` for the full taxonomy and closure rules.
 
 - `references/method-workflow.md` — required sequence, backend policy,
   verification expectations.
-- `references/method-review-checklist.md` — full review checklist with all
+- `references/method-workflow.md` §"Review checklist" — full review checklist with all
   rows; use this for any method-PR review.

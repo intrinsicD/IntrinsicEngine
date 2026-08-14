@@ -1,17 +1,16 @@
 #!/usr/bin/env python3
-"""Report whether the recurring human audit cadences have lapsed.
+"""Report the last recorded date of each on-demand audit sweep.
 
-Two additive, non-CI-enforced audits keep agent-output drift visible: the
-weekly agent-output audit and the repo-state drift audit (see
-``docs/agent/agent-output-review-checklist.md`` and
-``docs/agent/drift-audit-checklist.md``). Reports land at
+The output and drift audit sweeps (see ``docs/agent/review.md`` §"Audit
+sweeps") run on demand — preferably overnight — with no enforced cadence
+(2026-08-14 pair-workflow decision). Reports land at
 ``docs/reports/<YYYY-MM-DD>-agent-output-audit.md`` and
 ``docs/reports/<YYYY-MM-DD>-drift-audit.md``.
 
-This checker surfaces lapses; it deliberately never gates PR merges. Default
-mode reports and exits 0; ``--strict`` exits nonzero on a lapse (for local
-use — do not wire ``--strict`` into PR workflows). Thresholds default laxer
-than the cadence targets so a finding means "lapsed", not "one week late".
+This checker reports last-report ages on request; it never gates PR merges
+and is wired into no workflow. Default mode reports and exits 0; ``--strict``
+exits nonzero past the age thresholds for operators who want a reminder at
+their own chosen cadence.
 """
 
 from __future__ import annotations

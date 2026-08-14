@@ -141,7 +141,7 @@ A task that retires to `tasks/done/` at `Scaffolded` maturity must either:
    intended endpoint and that no follow-up gate is owed.
 
 The rule is enforced by review (see
-[`review-checklist.md`](../../../../../docs/agent/review-checklist.md) "Scope and ownership" row), not
+[`review.md`](../../../../../docs/agent/review.md) §"Retirement closure"), not
 by the validator, because the words "scaffold", "stub", "fail-closed", and
 "minimal" are domain language that legitimately appears in many tasks.
 Reviewers should challenge any done task whose body uses those words without
@@ -182,10 +182,8 @@ authoritative vocabulary going forward; do not mass-edit older tasks.
   Operational → ParityProven` sequence for method work).
 - [`task-format.md`](../../../../../docs/agent/task-format.md) — task file structure; optional
   `## Maturity` guidance.
-- [`review-checklist.md`](../../../../../docs/agent/review-checklist.md) — per-PR review including the
-  `Scaffolded` closure rule.
-- [`architecture-review-checklist.md`](../../../../../docs/agent/architecture-review-checklist.md) —
-  architecture-impacting closure language.
+- [`review.md`](../../../../../docs/agent/review.md) — the pre-merge sweep, retirement closure (the
+  `Scaffolded` closure rule), and architecture deep review.
 - [`../migration/nonlegacy-parity-matrix.md`](../../../../../docs/migration/nonlegacy-parity-matrix.md)
   — readiness cells use the taxonomy where it is more precise than the older
   `blocked`/`partial`/`done` triplet.
