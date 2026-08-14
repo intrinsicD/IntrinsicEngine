@@ -1,18 +1,18 @@
 ---
 name: {{SKILL_REVIEW}}
-description: Pre-commit, pre-PR, and periodic-audit review procedures for {{PROJECT_NAME}}. Bundles the per-change review checklist, the architecture review checklist (for boundary/ownership/concurrency changes), and the periodic human-led audit of agent-authored commits. Use before committing, opening a PR, finishing a slice, changing a dependency boundary, or running the output audit.
+description: Pre-commit, pre-PR, and audit review procedures for {{PROJECT_NAME}}. One reference owns review: the per-change core (scope, tests, docs sync, CI, shims), the architecture deep review for boundary/ownership/concurrency changes, and the output audit of agent-authored commits (nine recurring failure modes). Use before committing, opening a PR, finishing a slice, changing a dependency boundary, or running the output audit.
 ---
 
 # Review
 
-Three checklists, used at different moments:
+One reference, `references/review.md`, used at three moments:
 
-- **Per change** (always before commit/PR): `references/review-checklist.md` —
-  scope, tests, docs sync, CI, temporary shims.
-- **Architecture-impacting changes**: `references/architecture-review-checklist.md`
-  — boundaries, ownership, concurrency, error handling, reversibility.
-- **Periodic audit** (e.g. weekly): `references/agent-output-review-checklist.md`
-  — the nine recurring agent failure modes across recent slices.
+- **Per change** (always before commit/PR): §"Per-change core" — scope, tests,
+  docs sync, CI, temporary shims.
+- **Architecture-impacting changes**: §"Architecture deep review" — boundaries,
+  ownership, concurrency, error handling, reversibility.
+- **Audit** (periodic or on demand): §"Output audit" — the nine recurring
+  agent failure modes across recent slices.
 
 ## Quick gate
 
@@ -21,6 +21,4 @@ Three checklists, used at different moments:
 
 ## References
 
-- `references/review-checklist.md`
-- `references/architecture-review-checklist.md`
-- `references/agent-output-review-checklist.md`
+- `references/review.md`
