@@ -4,6 +4,21 @@ This document defines the prospective, versioned evidence and custody workflow
 introduced by `PROC-028`. It extends the existing task, review, benchmark, and
 ARA authorities; it does not replace them.
 
+## Scope
+
+This machinery serves two situations:
+
+- **Unattended overnight runs** — loop or fleet sessions executing night-ready
+  tasks without a human present (`docs/agent/prompt/prompt.md` §"Unattended
+  overnight mode"). Claims, the live work graph, receipts, and completion
+  evidence substitute for the human who is not there.
+- **Opt-in custody** — the `claim-grade` and `protected` profiles for
+  publication-bound research claims.
+
+Interactive pair/delegate/advisor sessions do not use this machinery. They
+ride the micro lane (`docs/agent/task-format.md` §"Micro tasks"), where the PR
+diff, tests, and CI are the evidence.
+
 ## Prospective migration
 
 `workflow_schema: 1` enrolls a task. New tasks copied from
@@ -21,8 +36,8 @@ task keeps its workflow fields when it moves to `tasks/done/`.
 
 | Profile | Trigger | Additional required custody |
 |---|---|---|
-| `micro` | One-slice mechanical work allowed by the micro template | No full report; `evidence: not_applicable` and a concrete `evidence_skip_reason` |
-| `standard` | All other routine non-trivial work | Generated `report.yaml` and at least one successful required command receipt |
+| `micro` | Interactive sessions (pair/delegate/advisor) and one-slice mechanical work | No full report; `evidence: not_applicable` and a concrete `evidence_skip_reason` |
+| `standard` | Routine non-trivial work in unattended overnight runs | Generated `report.yaml` and at least one successful required command receipt |
 | `high-risk` | Architecture/layer policy, public contracts, strict CI/policy, releases, or an explicitly high-risk task | Standard evidence plus append-only handoff and fixed-surface independent terminal review |
 | `claim-grade` | Work intended to support a research, performance, parity, or capability claim | High-risk custody plus frozen protocol, sealed run, cell journal, portable bundle, and independent audit |
 | `protected` | Claim-grade work with held-out/private data or a scientifically single-use attempt | Claim-grade custody plus result-free prospective review, separate launch authorization, and atomic one-shot consumption |

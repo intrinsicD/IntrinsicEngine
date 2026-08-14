@@ -233,7 +233,7 @@ current contract that earns its keep:
 |---|---|
 | New dependency edge, layering-table change, layering-allowlist entry | Agent presents module-level impact (knowledge-graph neighbors + `check_layering`) and gets an explicit human OK before landing; architecture checklist available on request |
 | Public `.cppm` surface change | Inventory regeneration + one-paragraph impact statement in the PR/commit body |
-| A number, performance, parity, or capability statement entering `README.md`, `docs/`, or a method report | **Evidence mode**: benchmark manifest + baseline comparison + an `ara/logic/claims.md` row. Ordinary work owes nothing to the ledger |
+| A research result — method, benchmark, parity, or capability claim — entering `README.md`, `docs/`, or a method report | **Evidence mode**: benchmark manifest + baseline comparison + an `ara/logic/claims.md` row. Implementation and refactoring work owes nothing to the ledger |
 | Method backend beyond the CPU reference | Parity evidence vs. the reference before the backend token is claimable |
 | Destructive or hard-to-reverse action (history rewrite, deleting evidence/fixtures, retiring a public surface) | Ask first, always |
 | Publication-bound experiment (paper submission, external claim) | Opt-in **custody mode**: the existing `experiment_custody.py` freeze/run/bundle/audit chain — used for the handful of runs a year that actually need it |
@@ -246,12 +246,12 @@ self-review, the deterministic validators, and CI.
 | Mechanism (today) | Proposal | Rationale |
 |---|---|---|
 | `AGENTS.md` §1–§10, §12–§13 (mission, layers, coding, testing, benchmarks, docs-sync, CI) | **Keep**, trimmed | This is the engineering contract; it is what makes hints trustworthy |
-| Framework24 P0 work-selection gate (`REVIEW-004`) | **Demote to standing recommendation** | In pair mode the human picks the work; the agent *surfaces* the gate when suggesting work rather than refusing eligible requests. (Open question §10.2) |
+| Framework24 P0 work-selection gate (`REVIEW-004`) | **Demoted to strong standing recommendation** (decision §10.2) | In pair mode the human picks the work; the agent *surfaces* the gate when suggesting work rather than refusing eligible requests |
 | `tasks/` tree (backlog/active/done + retirement log) | **Keep as shared memory, demoted from contract to notebook** | CLI agents lose context between sessions; the tree is the durable memory. Only multi-session work needs a file |
 | Nine-section task template + contract front-matter | **Replace with a 5-section note**: Goal, Context, Plan/slices, Verification, Log. Front-matter: `id`, optional `depends_on` | The current template is a contract for strangers; a note is memory for a colleague |
 | Task maturity vocabulary (`Scaffolded`…`ParityProven`) | **Keep as vocabulary** | Cheap, and it is the repo's strongest defense against documented-but-not-working claims |
 | `SESSION-BRIEF.md` + freshness CI gate | **Keep generator as convenience; drop the freshness gate and the "authoritative" status** | Useful view, wrong as an obligation; regenerate opportunistically or via hook |
-| `task_claim.py` claims, leases, generations | **Retire from the interactive path** | One human = one scheduler; parallel agent sessions are isolated by branches/worktrees anyway. Keep the tool quarantined for genuinely unattended fleet runs if those continue (§10.1) |
+| `task_claim.py` claims, leases, generations | **Retired from the interactive path**; quarantined to unattended overnight runs (decision §10.1) | One human = one scheduler; parallel agent sessions are isolated by branches/worktrees anyway |
 | `agent_work_graph.py` review diamond | **Retire from the interactive path** | The conversation is the work graph when the human is present |
 | `workflow_evidence.py` receipts / reports / seals; `handoff.jsonl` / `reviews.jsonl`; micro/standard/high-risk profiles | **Retire for interactive work** | Commit + diff + PR + CI are the evidence. Two modes remain: *normal* (nothing owed) and *evidence/custody* (opt-in, claim-bound, §6) |
 | `experiment_custody.py` (claim-grade/protected) | **Keep, opt-in only** for publication-bound claims | The one context where frozen protocols pay for themselves |
@@ -304,36 +304,41 @@ aspirational:
   validation, session-brief freshness, work-graph regression suites as merge
   blockers); keep task-structure, doc-links, layering, skill-mirror checks.
 
-## 10. Open decisions (need the human's answer, none block Phase 1)
+## 10. Decisions (accepted 2026-08-14)
 
-1. **Do unattended fleet runs still happen** (overnight loop-mode, remote
-   parallel workers)? If yes: keep `task_claim.py` + `agent_work_graph.py`
-   quarantined behind an explicit "unattended mode" doc instead of retiring
-   them. If no: archive the tooling (code stays in history; mandates go).
-   *Recommendation: quarantine for one release, then archive if unused.*
-2. **Framework24 P0 gate**: standing recommendation the agent voices when
-   suggesting work (proposed), or hard rule it enforces in delegate mode too?
-   *Recommendation: recommendation-only; the human is the scheduler now.*
-3. **ARA ledger scope**: narrow trigger to README/docs/report statements
-   (proposed), or benchmark-result claims only?
-   *Recommendation: keep the README/docs trigger — it is cheap and it is the
-   truthfulness floor.*
-4. **Weekly/drift audits**: keep any fixed cadence (e.g. `/audit` monthly), or
-   purely on demand? *Recommendation: on demand, plus before anything
-   release-shaped.*
-5. **Hint durability**: should improvement-tier hints the human defers be
-   written anywhere (e.g. a `tasks/backlog/workshop/` note) or stay
-   conversational? *Recommendation: agent offers to file a note when a
-   deferred hint is worth keeping; never automatic.*
+The operator resolved the five open questions; Phase 1 (landed on this branch)
+implements them:
+
+1. **Unattended runs stay — overnight-only, night-ready tasks only.** Fleet
+   machinery (claims, work graph, receipts, completion evidence) is
+   quarantined to unattended overnight runs on well-defined tasks with no
+   open questions or loose ends; `prompt.md` §"Unattended overnight mode"
+   defines the night-ready gate.
+2. **Framework24 gate → strong standing recommendation.** All agent-chosen
+   work defaults to convergence; the human may explicitly direct otherwise
+   and the agent proceeds after surfacing the focus once (`AGENTS.md` §1).
+3. **ARA narrowed to research results.** Method/benchmark/parity/capability
+   claims produced by research work owe claim rows; implementation and
+   refactoring work owes nothing to the ledger (`AGENTS.md` §8b).
+4. **Audits on demand, preferably overnight.** No fixed cadence; sweeps run
+   as overnight jobs and land findings as ledger entries or backlog notes,
+   never as interruptions (`prompt.md` §"Audits").
+5. **Deferred hints: one ledger file with hygiene rules.** `tasks/HINTS.md`
+   is the single append-only ledger — consent-only filing, delete-on-resolve,
+   30-day promote-or-drop, ~100-line cap. No parallel note trees.
 
 ## 11. Migration plan (three small PRs)
 
-**PR 1 — flip the default posture.** Add `docs/agent/pair-workflow.md`
-(Appendix A) and rewrite `docs/agent/prompt/prompt.md` to route to it. Rewrite
-`AGENTS.md` §11 to the delegate loop + risk-gate table; mark claims/work-graph/
-evidence machinery *opt-in* (edit the `workflow-evidence.md` preamble; no
-tool-code changes). Run `sync_skills.py --write`. After this PR, no interactive
-session owes claims, graph transitions, receipts, or reports.
+**PR 1 — flip the default posture (landed on this branch).** Rewrite
+`docs/agent/prompt/prompt.md` in place as the pair workflow — it is already
+the synced session-onboarding source, so no new file is needed. Rewrite
+`AGENTS.md` §1/§8b/§11/§12 per the §10 decisions; scope
+`workflow-evidence.md`, `task-format.md`, and the process-skill bodies to the
+unattended/custody lanes; widen the existing validator-recognized **micro
+lane** (`template: micro`, `evidence: not_applicable` + skip reason) to cover
+all interactive work, so no validator code changes are needed; add
+`tasks/HINTS.md`. Run `sync_skills.py --write`. After this change, no
+interactive session owes claims, graph transitions, receipts, or reports.
 
 **PR 2 — collapse the review and task surfaces.** Merge the five review
 instruments into `review.md` + `/audit`; land the 5-section task note template
@@ -351,9 +356,9 @@ untouched throughout.
 
 ## Appendix A — draft core text for `pair-workflow.md`
 
-The following is the proposed replacement session onboarding, in full, to make
-adoption copy-paste. It assumes `AGENTS.md` §1–§10/§12–§13 remain the
-engineering contract.
+**Landed (adapted and extended) as `docs/agent/prompt/prompt.md` in Phase 1**;
+the draft below is retained as the original sketch. It assumes `AGENTS.md`
+§1–§10/§12–§13 remain the engineering contract.
 
 ---
 

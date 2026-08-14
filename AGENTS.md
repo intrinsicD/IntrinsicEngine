@@ -81,14 +81,17 @@ user outcome. The authoritative feature inventory, scorecard, and golden
 workflows live in `docs/product/framework24-convergence.md`.
 
 Until `REVIEW-004` retires with an accepted convergence verdict, Framework24
-product convergence is the P0 work-selection gate. Do not start new research
-expansion or speculative rendering/process work during that interval. Continue
-only Theme J tasks, explicit unsatisfied `REVIEW-004` dependencies,
-reproducible regressions, and correctness/reliability work that a golden
-workflow requires. A pre-existing method task is eligible only when the
-Framework24 feature inventory makes it an explicit product dependency; this
-does not reopen unrelated research. Preserve paused research evidence and
-resume the research track after the gate retires.
+product convergence is the standing P0 focus for work selection. All
+agent-chosen work — suggestions in pair posture, delegated selection, and
+unattended overnight runs — defaults to Theme J tasks, explicit unsatisfied
+`REVIEW-004` dependencies, reproducible regressions, and
+correctness/reliability work that a golden workflow requires; a pre-existing
+method task qualifies only when the Framework24 feature inventory makes it an
+explicit product dependency. This focus is a strong recommendation the agent
+surfaces, not a refusal rule: the human operator may explicitly direct work
+outside it, in which case the agent records that direction in the task note
+and proceeds. Preserve paused research evidence and resume the research track
+after the gate retires.
 
 All agent work must preserve:
 
@@ -374,8 +377,14 @@ in the tree. `ara/staging/observations.yaml` holds `O<NN>` observations awaiting
 `ara/logic/solution/` crystallizes constraints (`K<NN>`), architecture statements (`A<NN>`), and
 heuristics (`H<NN>`).
 
-- A number or capability statement entering `README.md`, `docs/`, a method report, or a task status
-  line needs a claim row first. A commit message is not a claim record.
+- The ledger tracks **research results**: method, benchmark, parity, and capability claims produced
+  by research work (`methods/`, `benchmarks/`, method reports, and research-derived statements
+  entering `README.md`, `docs/`, or a task status line). Such a statement needs a claim row first.
+  A commit message is not a claim record.
+- Ordinary implementation and refactoring work owes no claim rows; its record is the PR, its tests,
+  and its docs. The moment such work produces a claim-shaped statement ("2× faster", "parity with
+  the reference", "operational on Vulkan"), that statement is a research result and follows this
+  section.
 - A gate that rejected a hypothesis gets a `refuted` row with the gate that killed it, not a
   silently dropped branch.
 - A `supported` or `refuted` claim must cite at least one repository path that exists; moving a
@@ -427,62 +436,64 @@ When code, structure, or policy changes:
 
 ## 11. Task execution workflow
 
-Before claiming or materially changing a task, consult
-`docs/architecture/contract-catalog.yaml` and declare every applicable stable
-contract ID in task front-matter. Determine applicability from the owning and
-consuming layers, data domains, publication/cardinality behavior, and config,
-agent, runtime, and UI control surfaces — task wording may not silently narrow
-a canonical contract. A new reusable contract or an intentional contract
-change must update its canonical source, catalog entry, and executable proof in
-the same reviewed change; retirement must dispose every declared contract with
-tests or a named follow-up.
+Sessions follow the pair workflow defined in `docs/agent/prompt/prompt.md`:
+the agent operates in one of three postures — Pair (default observant
+copilot), Delegate (bounded hand-off), Advisor (direction, method selection,
+literature research) — with review effort gated by risk signals (new
+dependency edges, public module surfaces, research claims, destructive
+actions) instead of applied uniformly to every change.
 
-Every task execution should follow this sequence:
+Task files under `tasks/` are shared memory between sessions, not process
+contracts. Single-session work needs no task file. Work that outlives the
+session gets a note in `tasks/active/` seeded from
+`tasks/templates/task-micro.md` — the interactive lane (`template: micro`,
+`workflow_profile: micro`, `evidence: not_applicable`, concrete
+`evidence_skip_reason`). The full `tasks/templates/task.md` and the
+`standard`/`high-risk` profiles are the unattended overnight lane;
+`claim-grade` and `protected` custody remain opt-in for publication-bound
+claims (`docs/agent/workflow-evidence.md`). Do not create long-lived
+root-level planning checklists once work belongs in `tasks/backlog/`,
+`tasks/active/`, or `tasks/done/`.
 
-1. Inspect existing code and docs.
-2. Identify owning subsystem and layer.
-3. Write or update task file.
-    - Base new task files on `tasks/templates/`; do not create long-lived root-level planning checklists once work
-      belongs in `tasks/backlog/`, `tasks/active/`, or `tasks/done/`.
-    - New/changed tasks enroll in workflow schema v1. Use one writer per
-      worktree and acquire the Git-common-dir task claim before substantive
-      edits; parallel coding uses separate branches/worktrees.
-4. For every claimed non-micro task, start or resume the schema-v1
-   repository work graph with `tools/agents/agent_work_graph.py` and the
-   checked-in review-diamond recipe. Keep its current node and later
-   ideas/constraints visible through the CLI while work proceeds. This live
-   Git-common-dir state binds the exact claim generation and writer-frozen
-   review surface, but remains observability and control flow only: it never
-   replaces the task, claim, verification receipt, fixed-surface review, or
-   experiment custody, and it cannot lower the task profile. A task with a
-   declared `## Slice plan` uses the audited `advance-slice` transition between
-   clean slice cycles; `reopen` remains the bounded repair loop within one
-   cycle.
-5. Implement the smallest useful patch.
-6. Add or update tests.
-7. Add or update docs.
-8. Run verification.
-9. Update generated inventories.
-10. Self-review against PR checklist.
+When creating or materially changing a task file, consult
+`docs/architecture/contract-catalog.yaml` and declare applicable stable
+contract IDs in front-matter (or record a justified-empty `contract_review`).
+Task wording may not silently narrow a canonical contract; a new reusable
+contract or an intentional contract change updates its canonical source,
+catalog entry, and executable proof in the same reviewed change.
 
-Before retiring an enrolled task, validate its generated completion report.
-After committing a retirement surface whose complete report records
-`source.dirty: true`, create and commit the exact historical `seal.yaml`
-described in `docs/agent/workflow-evidence.md` before final validation.
-`high-risk` and higher profiles additionally require a durable handoff and an
-accepted independent fixed-surface review. `claim-grade` and `protected`
-profiles add the frozen experiment/authorization custody defined in
-`docs/agent/workflow-evidence.md`. Historical tasks are not backfilled; the
-prospective inventory deterministically enrolls new or changed open work.
+Delegated and unattended work follows this sequence:
 
-The generated `tasks/SESSION-BRIEF.md` is the authoritative open/unblocked
-view of the task tree (derived from task front-matter); consult it before
-picking work. The cross-domain convergence themes and their rationale are
-tracked in `tasks/backlog/README.md`; retirement narratives live in the
-append-only `tasks/done/RETIREMENT-LOG.md`. Older retired tasks are swept
+1. Inspect existing code and docs; identify the owning subsystem and layer.
+2. Read or write the task note; ask clarifying questions once, up front, then
+   record chosen defaults.
+3. Implement the smallest robust slice; add or update tests with it.
+4. Update docs when a surface or structure actually changed (§9).
+5. Run the strongest relevant verification (§7), touched-scope first; update
+   generated inventories when module surfaces changed.
+6. Sweep the diff (scope, layering, tests, docs — §12), commit, push, and
+   report what changed, how it was verified, and what remains uncertain.
+
+Claim (`task_claim.py`), live work-graph (`agent_work_graph.py`), and
+completion-evidence (`workflow_evidence.py`) machinery is scoped to unattended
+overnight runs — where it substitutes for the absent human — and to opt-in
+custody profiles; interactive sessions owe none of it. Unattended runs accept
+only night-ready tasks (complete goal, checkbox acceptance criteria, exact
+verification commands, no open questions or loose ends) and retire their
+enrolled tasks with the completion evidence their profile requires, including
+the `seal.yaml` step for dirty-source reports and independent fixed-surface
+review for `high-risk` and higher (`docs/agent/workflow-evidence.md`).
+Historical tasks are not backfilled; the prospective inventory
+deterministically enrolls new or changed open work.
+
+Retire finished tasks to `tasks/done/` with completion date and commit/PR
+reference, append the narrative to the append-only
+`tasks/done/RETIREMENT-LOG.md`, and regenerate `tasks/SESSION-BRIEF.md` — the
+generated open/unblocked view consulted when picking backlog work. Theme
+rationale lives in `tasks/backlog/README.md`; older retired tasks are swept
 from `tasks/done/` to `tasks/archive/` (frozen read-only history; IDs stay
-authoritative for dependency resolution). Keep roadmap details in those
-files rather than expanding this contract with task-specific plans.
+authoritative for dependency resolution). Keep roadmap details in those files
+rather than expanding this contract with task-specific plans.
 
 ## 12. Review checklist
 
@@ -494,8 +505,10 @@ Before commit/PR, verify:
 - Docs and task records are synchronized.
 - Temporary compatibility shims are tracked with removal follow-up.
 - Mechanical moves and semantic edits are not mixed.
-- Enrolled completion evidence matches the final source surface and profile;
-  high-risk acceptance is independent and revision-bound.
+- For unattended overnight work: enrolled completion evidence matches the
+  final source surface and profile, and high-risk acceptance is independent
+  and revision-bound. Interactive work owes the sweep above, not evidence
+  artifacts.
 
 ## 13. Temporary migration exceptions
 
@@ -517,10 +530,10 @@ Read this `AGENTS.md` file at the start of every session/task; it is the authori
 |-----------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | `docs/agent/how-this-repo-is-built.md`        | You need an outside-reader overview of the task lifecycle, convergence themes, skills, validators, CI gates, and the evidence trail for a retired task.                                                                  |
 | `docs/agent/contract.md`                      | You need expanded rationale or detail for this contract, especially during onboarding or policy edits.                                                                                                                  |
-| `docs/agent/prompt/prompt.md`                 | Starting a generic (non-task-specific) session: work selection, slice picking, verification bundles, commit/PR hygiene, anti-patterns, and multi-task loop-mode policy (default stop condition, checkpoint pushes).      |
+| `docs/agent/prompt/prompt.md`                 | Every session: the pair workflow — postures (Pair/Delegate/Advisor), hint tiers, question protocol, risk gates, work selection, verification bundles, deferred-hint ledger, audits, and unattended overnight mode.        |
 | `docs/architecture/index.md`                  | Designing subsystem architecture, algorithm backend splits, config/command control surfaces, recipe/frame composition, or deciding which canonical architecture doc or ADR governs a change.                           |
 | `docs/agent/task-format.md`                   | Creating, promoting, retiring, or materially updating files under `tasks/`.                                                                                                                                             |
-| `docs/agent/workflow-evidence.md`             | Selecting an enrolled workflow profile; claiming worktrees/tasks; generating completion evidence; or running high-risk, claim-grade, or protected custody.                                                              |
+| `docs/agent/workflow-evidence.md`             | Configuring an unattended overnight run (claims, work graph, completion evidence) or opting into claim-grade/protected custody for publication-bound claims; not used by interactive sessions.                          |
 | `docs/agent/review-checklist.md`              | Before committing or reporting completion for any non-trivial change.                                                                                                                                                   |
 | `docs/agent/architecture-review-checklist.md` | Changing dependency boundaries, module ownership, source layout, runtime wiring, or architecture docs.                                                                                                                  |
 | `docs/agent/method-workflow.md`               | Implementing or modifying paper/method work under `methods/` or method-backed integrations.                                                                                                                             |

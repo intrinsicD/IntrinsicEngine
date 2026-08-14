@@ -1,10 +1,8 @@
 # Task Format
 
-Use this template for all new task files under `tasks/`.
-
-Single-slice mechanical work (small fixes, doc/link sweeps, config toggles,
-test-only additions) may use the reduced **micro template** instead — see
-§"Micro tasks" below.
+Use this template for new task files on the unattended overnight lane.
+Interactive work (pair/delegate/advisor sessions) and single-slice mechanical
+work use the reduced **micro template** instead — see §"Micro tasks" below.
 
 ## Required structure
 
@@ -165,6 +163,9 @@ correctness/parity evidence.
 
 ## Live work graph for claimed tasks
 
+This section applies to the unattended overnight lane only; interactive
+sessions ride the micro lane and never start the graph.
+
 After acquiring a claim for an enrolled non-micro task, start or resume the
 default repository work graph:
 
@@ -212,15 +213,29 @@ and set `template: micro` in the front-matter; `validate_tasks.py` then
 requires only `## Goal`, `## Acceptance criteria` (with checkbox todos), and
 `## Verification`.
 
-Micro tasks are for **single-slice mechanical work only**: small fixes,
-doc/link sweeps, config toggles, test-only additions. They are **not**
-allowed for work that changes dependency boundaries, module ownership,
-public module surfaces (`.cppm`), methods/benchmarks, or anything with an
-ambiguous maturity stop-state — that work uses the full template (or the
-method/bug/review variants). They set `workflow_profile: micro`,
+Micro tasks are the lane for work whose evidence is the PR itself:
+
+- **interactive sessions** (pair/delegate/advisor postures per
+  `docs/agent/prompt/prompt.md`), regardless of slice count — the human, the
+  risk gates, the diff, and CI supply the review; and
+- **one-slice mechanical work** in any mode: small fixes, doc/link sweeps,
+  config toggles, test-only additions.
+
+Unattended overnight work uses the full template (or the method/bug/review
+variants) with the `standard` or higher profile. The risk gates apply on top
+of the lane: dependency-boundary or public `.cppm` surface changes need the
+explicit human OK and inventory refresh, and research claims need
+ARA/benchmark evidence regardless of profile. Record the maturity stop-state
+in the note when it is ambiguous. Micro tasks set `workflow_profile: micro`,
 `evidence: not_applicable`, and a concrete `evidence_skip_reason`; they do not
 inherit high-risk, claim-grade, or protected custody. Retirement rules
 otherwise remain unchanged.
+
+An open enrolled task that finishes interactively may be re-profiled to the
+micro lane in its retiring change (set `template: micro`,
+`workflow_profile: micro`, `evidence: not_applicable`, and the skip reason)
+instead of generating a completion report; validators check the consistency of
+the final front-matter, not the lane history.
 
 ## Optional `## Control surfaces` and `## Backends` fields
 
