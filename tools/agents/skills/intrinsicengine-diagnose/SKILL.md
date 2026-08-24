@@ -1,6 +1,6 @@
 ---
 name: intrinsicengine-diagnose
-description: Disciplined diagnosis loop for hard bugs and performance regressions in IntrinsicEngine. Build a deterministic feedback loop → reproduce → rank 3-5 hypotheses → instrument with tagged probes → fix → regression-test → cleanup. Use whenever the user says "diagnose this", "debug this", reports a crash, validation-layer error, CPU/null gate failure, parity mismatch between reference and optimized/GPU backend, hot-reload regression, or a benchmark regression versus baseline.
+description: Disciplined diagnosis loop for hard bugs and performance regressions in IntrinsicEngine. Build a deterministic feedback loop → reproduce → rank 3-5 hypotheses → instrument with discriminating tagged probes, ledgered → backtest the explanation against all recorded observations → fix → regression-test → cleanup. Use whenever the user says "diagnose this", "debug this", reports a crash, validation-layer error, CPU/null gate failure, parity mismatch between reference and optimized/GPU backend, hot-reload regression, or a benchmark regression versus baseline.
 ---
 
 # IntrinsicEngine Diagnose
@@ -135,10 +135,40 @@ knowledge that re-ranks instantly ("we just changed the GpuScene push-constant
 layout") or know hypotheses they've already ruled out. Cheap checkpoint, big
 time saver. Don't block on it — proceed with your ranking if the user is AFK.
 
+### When predictions keep failing — indict the framing
+
+If two probe rounds in a row contradict the predictions of every surviving
+hypothesis, stop generating variants inside the current framing. The next
+ranked list must contain at least one hypothesis that questions the framing
+itself:
+
+- The feedback loop measures something other than the bug (back to Phase 1).
+- The repro reproduces a *different* bug than the reported one (back to Phase 2).
+- The build is stale (`intrinsicengine-stale-build-triage`).
+- The bug lives in a different layer than assumed — re-derive the layer from
+  the evidence, not from the first stack trace.
+- The "known-good" side of your differential (reference backend, baseline
+  commit, golden output) is itself wrong.
+
+Repeatedly patching rules inside a wrong framing produces epicycles: each
+patch fits the newest observation, and the accumulated theory explains
+nothing.
+
 ## Phase 4 — Instrument
 
 Each probe must map to a specific prediction from Phase 3. **Change one
 variable at a time.**
+
+**Pick the probe that discriminates.** When several hypotheses survive, prefer
+the probe whose possible outcomes split the ranked list — the experiment for
+which competing hypotheses predict *different* results. One discriminating
+probe beats three that can only confirm the favorite.
+
+**A negative probe rules out only what it actually tested.** "Removing the
+barrier didn't fix it" rejects that barrier at that call site, not
+"synchronization"; a hypothesis family survives its tested instances. Record
+the exact combination probed and keep the family ranked until a probe
+addresses it as such.
 
 Tool preference:
 
@@ -161,7 +191,32 @@ runner, then bisect. Measure first, fix second. Re-read
 `intrinsicengine-benchmark` for baseline-comparison policy and warmup rules
 before claiming a "fix".
 
+### Keep an observation ledger
+
+For any diagnosis that outlives one probe round, keep an append-only ledger —
+in the task note when the work spans sessions, otherwise in the session
+scratchpad: one line per probe with the hypothesis tested, the exact command,
+the predicted outcome, and the observed outcome. Observations are ground
+truth — never rewrite or drop an entry because it has become inconvenient to
+the current theory. The ledger is what survives context compaction (hand it
+forward via `intrinsicengine-handoff`), and it is what Phase 5 backtests the
+explanation against.
+
+**A surprise voids the plan.** The moment an observation contradicts your
+current prediction — an unexpected failure mode *or* an unexpected pass —
+stop executing the remaining probe/fix sequence. Append the mismatch to the
+ledger and return to Phase 3 with it as a counterexample. Reality outranks
+the theory; pushing on with a plan whose premise just broke turns one wrong
+belief into several wrong probes.
+
 ## Phase 5 — Fix + regression test
+
+Before designing the fix, **backtest the explanation against the full
+ledger**: the claimed root cause must account for *every* recorded
+observation — the original symptom, each probe outcome, every surprise — not
+only the run that suggested it. An explanation that contradicts a recorded
+observation is an epicycle wearing a root cause's clothes; return to Phase 3
+with that entry as the counterexample.
 
 Write the regression test **before the fix** — but only if there is a
 **correct seam** for it.
@@ -205,7 +260,8 @@ Required before declaring done:
 - [ ] No leftover `printf`, `std::cout`, or `fmt::print` debug calls.
 - [ ] The hypothesis that turned out correct is stated in the commit/PR message
       — so the next debugger learns. Also note which hypotheses were ruled out
-      and how.
+      and by which probe. Distil this from the observation ledger; do not
+      paste the ledger wholesale.
 - [ ] If the fix touched architecture-impacting code, the architecture review
       checklist is run (see `intrinsicengine-review`).
 
@@ -230,6 +286,9 @@ Required before declaring done:
   variance is real. Cite the baseline JSON, warmup config, and N-of-runs.
 - **Patching around a Vulkan validation message instead of reading it.** The
   first validation message is the bug; the rest are cascades.
+- **Epicycle fixes.** Justifying a fix by the latest observation while it
+  contradicts an earlier recorded one. The observation ledger exists to catch
+  these — backtest the explanation against all of it before fixing.
 - **Calling the bug fixed when only the CPU/null gate is green.** That's
   `CPUContracted`, not `Operational` (see `intrinsicengine-task-workflow`
   maturity taxonomy). For backend-impacting fixes, cite a backend-labeled
