@@ -181,5 +181,6 @@ Interactive postures assume the human is present. Unattended runs (overnight loo
 - Starting speculative work outside the Framework24 focus without explicit human direction.
 - Mixing mechanical moves with semantic edits; adding speculative abstractions outside the selected work.
 - Weakening a gate, assertion, or label set to reach green.
+- Continuing a committed plan after an observation contradicted its premise — a surprising result (including an unexpected pass) voids the remainder of the plan until re-diagnosed.
 - Reporting completion without having run the verification in this session.
 - Loading both a `docs/agent/*` file and its mirror `intrinsicengine-*` skill for the same scope.
