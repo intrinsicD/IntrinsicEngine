@@ -32,8 +32,25 @@ maturity_target: CPUContracted
   claim-eligible Framework24 parity statement.
 - The original BUG-156 live review cycle exhausted its fourth bounded writer
   attempt when the strict maturity validator required one final task-wording
-  correction. Its state is retained without manual mutation; BUG-162 owns the
-  exact combined branch-integration surface and independent merge review.
+  correction. Its state is retained without manual mutation; BUG-162 owned the
+  exact combined branch-integration surface and retired on 2026-08-24.
+- 2026-08-24: the runtime minimum/maximum publication gap is implemented. The
+  mesh-curvature transaction now captures, publishes, compares, and restores
+  `v:min_principal_curvature` and `v:max_principal_curvature` alongside
+  mean/Gaussian on both the synchronous command and the queued CPU worker, and
+  the two paths share the staging helpers so they cannot drift. Result counters
+  report the truthful four-property surface (`ScalarPropertyCount` 4,
+  `ScalarWrittenCount` four per vertex slot). Runtime and convergence docs are
+  synchronized. Tests are extended for synchronous and queued publication,
+  undo/redo, the scalar-only fallback, and a new stale-principal-scalar
+  rejection case.
+- That change is **not yet verified**. The closing session ran in a container
+  whose egress policy returns HTTP 403 for every GitHub source archive, so
+  vcpkg cannot fetch the dependency set and no preset configures. Nothing was
+  compiled and no test was executed. The remaining acceptance criteria stay
+  unchecked until the focused selector, the full CPU gate, and the isolated
+  ASan/UBSan gates run on a host that can build; the exact-surface review is
+  open independently of that.
 
 ## Goal
 
@@ -104,7 +121,7 @@ maturity_target: CPUContracted
 | `RuntimeModule` | Reuse the existing synchronous and queued mesh-curvature operation. |
 | Config/agent | Reuse the existing fixed command; no parameter surface is added. |
 | UI | Reuse Mesh / Processing / Curvature and its existing diagnostics result. |
-| Publication | Geometry publishes min/max/mean/Gaussian curvature and principal directions on the originating vertex domain. The existing runtime command currently persists mean/Gaussian plus optional directions; BUG-156 retains ownership of adding min/max persistence, undo/redo state, discovery, and tests before retirement. |
+| Publication | Geometry publishes min/max/mean/Gaussian curvature and principal directions on the originating vertex domain. The runtime command persists all four scalars plus optional directions in one atomic transaction with undo/redo; the remaining gate is execution of the verification suite, not further implementation. |
 | End-to-end tests | Geometry parity fixtures plus the existing runtime and Sandbox curvature-operation contracts. |
 
 ## Right-sizing
@@ -127,7 +144,7 @@ maturity_target: CPUContracted
 - [x] Retain deterministic finite diagnostics and fail closed on unsupported or
       non-finite triangle support without changing well-conditioned parity.
 - [x] Correct the PMP corpus probe's `use_tensor`/`use_two_ring` argument order.
-- [ ] Extend the existing runtime curvature transaction to persist canonical
+- [x] Extend the existing runtime curvature transaction to persist canonical
       minimum and maximum principal scalar properties alongside mean/Gaussian,
       including undo/redo capture and truthful result counts.
 
@@ -143,8 +160,9 @@ maturity_target: CPUContracted
       expectations updated to the selected contract.
 - [x] Run direct Intrinsic/Framework24 parity on `tests/data/sculpt.obj` using
       identical coordinates and record maximum and relative field errors.
-- [ ] Cover synchronous and queued runtime publication, stale-state rejection,
+- [x] Cover synchronous and queued runtime publication, stale-state rejection,
       undo, and redo for both principal scalar properties.
+      (Authored, not yet executed — see the Status note on the blocked build.)
 
 ## Docs
 
@@ -236,6 +254,8 @@ python3 tools/agents/workflow_evidence.py validate --root .
   this geometry-owned CPU operation; `UI-050` owns vector-field visibility and
   `BENCH-001`/`REVIEW-004` own the product-level evidence gate.
 - Current: the geometry kernel and reference-derived regression anchors are
-  CPU-contracted; runtime min/max persistence and the exact-surface high-risk
-  review remain open. `BENCH-001` and `REVIEW-004` own any later
-  claim-eligible `ParityProven` product verdict.
+  CPU-contracted. Runtime min/max persistence is implemented with tests but
+  unexecuted, so the runtime half of the publication contract is not yet
+  `CPUContracted`; that plus the exact-surface high-risk review remain open.
+  `BENCH-001` and `REVIEW-004` own any later claim-eligible `ParityProven`
+  product verdict.

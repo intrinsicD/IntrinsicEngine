@@ -258,8 +258,12 @@ advance the presentation recipe generation on apply, undo, and redo instead of
 restoring a captured generation and admitting an ABA stale-output match. The
 mesh-denoise publisher validates both geometry metadata and the exact live
 `v:position` snapshot before each transition. Mesh-curvature publication also
-validates that source plus the exact mean, Gaussian, and principal-direction
-property snapshots it owns. Remesh, subdivide, and simplify publication
+validates that source plus the exact mean, Gaussian, minimum-principal,
+maximum-principal, and principal-direction property snapshots it owns. The four
+scalar fields publish together in one transaction because
+`Geometry::Curvature` derives mean and Gaussian curvature from the two
+principal values; a partial publication would expose a stale principal field
+beside a freshly derived mean one. Remesh, subdivide, and simplify publication
 validate geometry metadata plus the complete canonical position/connectivity
 state, including before queued output may publish. UV regeneration uses the
 same transaction mechanics with its owner-specific semantic source snapshot:
