@@ -10,7 +10,6 @@ picking backlog work; theme priorities and rationale live in
 
 - `BUG-154` — Restore PMP curvature parity without normal-seam topology loss (tasks/active/BUG-154-curvature-pmp-parity-corner-normal-topology.md)
 - `BUG-156` — Adopt deterministic Framework24 Taubin curvature semantics (tasks/active/BUG-156-curvature-two-ring-smoothing-cancels-features.md)
-- `BUG-162` — Consolidate all local branch history onto main (tasks/active/BUG-162-main-branch-consolidation.md)
 - `METHOD-039` — Feature-network-constrained curvature patch decomposition (tasks/active/METHOD-039-feature-network-curvature-patch-decomposition.md)
 
 ## Theme B — Rendering modernization

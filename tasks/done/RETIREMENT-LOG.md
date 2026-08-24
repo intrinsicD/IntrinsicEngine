@@ -8,6 +8,23 @@ so blocks moved from the old active-README history work verbatim.
 
 ## Retired task narratives
 
+[`BUG-162`](BUG-162-main-branch-consolidation.md) — every pre-integration local
+branch tip is preserved in `main` and pushed. `828414d` (BUG-157 task branch)
+and `a72ef79` (Framework24 curvature semantics) are ancestors of the pushed
+head; local `main`, `origin/main`, and a freshly fetched `FETCH_HEAD` all
+resolve to `aba6521`. No branch was deleted, no history rewritten, and nothing
+force-pushed. Retired at `Operational`.
+
+The task's remaining "independent fixed-surface review" criterion is closed as
+**superseded, not performed**: PR #1032 retired universal independent review for
+interactive work in favor of the risk-gated review in `prompt.md`, and this task
+landed no source change of its own — its criteria are git-verifiable facts, so
+no risk gate fires. The public numerical contract it merged stays under
+`BUG-156`, which remains active and owns that review together with the open
+runtime minimum/maximum publication. This retirement makes no Framework24
+parity, performance, GPU, or accuracy claim and retires neither `BUG-156` nor
+`BUG-157`.
+
 [`ARCH-018`](ARCH-018-framework24-feature-parity-goal-clarification.md) — the
 Framework24 product objective now makes full user-facing feature and workflow
 parity the behavioral coverage floor. “Better” is an additional quality gate,
