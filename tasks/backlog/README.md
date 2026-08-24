@@ -112,6 +112,12 @@ is retired; see
 (`RUNTIME-126`) is retired with the transfer facade/readback ring wired into the
 runtime derived-job graph.
 
+The 2026-08-24 declarative-graphics-state decision (ADR-0028) added
+`GRAPHICS-137` (the trigger-gated shader-object realization spike, ADR-0028's
+killing experiment) and `GRAPHICS-136` (the mechanical rename of the
+RHI-surface `Pipeline*` vocabulary to `GraphicsState*`, blocked on the
+spike's boundary finding).
+
 The 2026-08-07 Sandbox UI workflow pass added `GRAPHICS-135`, now a Theme J
 product-gate dependency:
 a frame-pacing capture with only the reference triangle in the scene shows
