@@ -23,6 +23,14 @@ This workflow governs scientific paper/method implementation in IntrinsicEngine.
 7. **Limitations and diagnostics**
    - Document degenerate-input behavior and numerical limitations.
 
+For steps 1–7 the paper and the CPU reference are the ground truth. Work
+beyond the paper's reported envelope — novel extensions, untested data
+regimes, behavior the paper does not predict — is an evidence campaign
+against a partially-known system: run it under the experiment loop in
+[the ARA evidence policy](../../../../../docs/agent/ara-evidence-policy.md) (prediction recorded before
+each run, observations staged append-only in `ara/`, claims backtested
+against the full campaign record).
+
 ## Required engine-integration matrix
 
 Every new or materially changed method task declares

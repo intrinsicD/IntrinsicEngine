@@ -81,9 +81,53 @@ Aligns with the maturity taxonomy in `docs/agent/task-maturity.md`: a task closi
 `Scaffolded` or `CPUContracted` rarely owns a claim, while `Operational` and `ParityProven`
 usually do, because both assert observed behavior.
 
+## Running an evidence campaign (the experiment loop)
+
+The ledger records outcomes; this loop produces them. It applies whenever an
+experiment probes behavior not fully known in advance — a novel formulation,
+regime behavior on real data, numerics beyond a paper's reported envelope.
+This is the scientist's loop: maintain an explicit, testable model of the
+partially-known system and spend experiments where they discriminate. Paper
+reproduction against reported results needs only the method workflow; the more
+the ground truth is already known, the less of this loop is owed.
+
+1. **Model explicitly.** State the current working model of the system as
+   beliefs with status — established (`K`/`H` rows, `supported` claims),
+   `hypothesis`, unknown. The ARA is that model; keep it diffable rather than
+   implicit in session context.
+2. **Predict, then run.** Before executing an experiment, record what the
+   working model predicts (the `intrinsicengine-research-ideation`
+   killing-experiment fields: null hypothesis, signature if correct, signature
+   under the strongest conventional explanation). A run without a recorded
+   prediction cannot surprise you — it can only be rationalized afterwards.
+3. **Append, never curate.** Every executed experiment lands in the campaign
+   record — predicted vs. observed, including failed, contradictory, and null
+   runs. A sweep may share one `O<NN>`; what may never happen is dropping a
+   run because it contradicted the hypothesis.
+4. **A surprise voids the plan.** An observation that contradicts the working
+   model stops the remaining experiment plan — it was designed to discriminate
+   under a model that just failed. Revise the model, then re-derive which
+   experiment is now most informative.
+5. **Prefer discriminating experiments.** When several explanations survive,
+   run the cheapest experiment whose possible outcomes separate them, not the
+   one most likely to confirm the favorite. A negative result rejects only the
+   configuration actually tested; record that scope with it.
+6. **Backtest before promoting.** `hypothesis → supported` requires the claim
+   to be consistent with *every* observation of the campaign, not only the
+   confirming run. A claim that contradicts a staged `O<NN>` stays
+   `hypothesis` — or becomes `refuted` — until the contradiction is resolved.
+7. **When nothing survives, indict the instrument.** If no explanation fits
+   the record, the next hypothesis list must question the campaign's own
+   representation: the metric, the dataset regime, a measurement or leakage
+   bug, the formulation itself. Route suspected measurement bugs through
+   `intrinsicengine-diagnose` — its observation ledger is this same discipline
+   at bug scale.
+
 ## Anti-patterns
 
 - Promoting a `hypothesis` to `supported` without adding the artifact that justifies it.
+- Promoting `hypothesis` to `supported` on the confirming run alone while a staged observation
+  contradicts it. Backtest the claim against the campaign's full observation record first.
 - Citing a `build/` or otherwise untracked path as proof — a fresh clone cannot resolve it.
 - Rewriting or deleting a `refuted` claim to tidy the ledger. Dispositions are append-only in
   spirit: supersede, do not erase.
