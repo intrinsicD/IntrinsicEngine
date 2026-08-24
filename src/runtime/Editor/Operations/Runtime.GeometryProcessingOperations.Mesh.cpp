@@ -2560,6 +2560,10 @@ struct EditorJobResult { std::string Diagnostic{}; };
         // stale principal field next to a freshly derived mean one. The
         // synchronous command and the queued CPU worker share these three
         // helpers so the two paths cannot drift apart.
+        // The four validity checks must stay ahead of the four size checks:
+        // `Vector()` on an unset property dereferences null storage, so
+        // reordering these conjuncts turns a missing kernel field from a
+        // fail-closed diagnostic into undefined behavior.
         [[nodiscard]] bool MeshCurvatureScalarsUsable(
             const Curv::CurvatureField& curvature,
             const std::size_t expectedCount) noexcept

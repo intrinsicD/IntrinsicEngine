@@ -44,13 +44,33 @@ maturity_target: CPUContracted
   synchronized. Tests are extended for synchronous and queued publication,
   undo/redo, the scalar-only fallback, and a new stale-principal-scalar
   rejection case.
-- That change is **not yet verified**. The closing session ran in a container
-  whose egress policy returns HTTP 403 for every GitHub source archive, so
-  vcpkg cannot fetch the dependency set and no preset configures. Nothing was
-  compiled and no test was executed. The remaining acceptance criteria stay
-  unchecked until the focused selector, the full CPU gate, and the isolated
-  ASan/UBSan gates run on a host that can build; the exact-surface review is
-  open independently of that.
+- That change is **not yet verified by the repository gate**. The session ran
+  in a container whose egress policy returns HTTP 403 for every GitHub source
+  archive, so vcpkg cannot fetch the dependency set and no preset configures.
+  A system-package substitute is not available either: EnTT, xatlas, implot,
+  and imguizmo are absent from the distribution index, and a non-preset tree is
+  not valid verification for module changes under `AGENTS.md`. No engine target
+  was compiled and no ctest case was executed.
+- What was verified instead, and what it is worth: the changed transaction
+  helpers were extracted verbatim into a standalone clang-20 C++23 harness with
+  minimal `PropertySet`/`VertexProperty`/`CurvatureField` stubs, compiled
+  `-Wall -Wextra` clean, and run under ASan+UBSan. It exercises first
+  publication, undo, redo, idempotent recompute, the staleness comparison, the
+  fail-closed paths, and capture rejection of an incompatible stored property.
+  Five mutations that reproduce the pre-change behavior (comparison ignoring
+  the principal scalars, staging only mean/Gaussian, capture not reading the
+  columns back, the usability check dropping them, stale counters) are each
+  detected. This checks the transaction logic and the well-formedness of the
+  changed expressions; it does **not** exercise the real module graph, the ECS
+  registry, the job lane, or the undo history, so it substitutes for nothing in
+  the acceptance criteria below.
+- The harness surfaced one real source hazard, now fixed by a comment: the
+  validity conjuncts in `MeshCurvatureScalarsUsable` are load-bearing, because
+  `Vector()` on an unset property dereferences null storage. Reordering them
+  would convert a fail-closed diagnostic into undefined behavior.
+- The remaining acceptance criteria stay unchecked until the focused selector,
+  the full CPU gate, and the isolated ASan/UBSan gates run on a host that can
+  build; the exact-surface review is open independently of that.
 
 ## Goal
 
