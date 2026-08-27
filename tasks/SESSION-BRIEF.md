@@ -43,6 +43,7 @@ picking backlog work; theme priorities and rationale live in
 - unblocked: `BUG-149` — Benchmark sealer escapes dotted output directories (tasks/backlog/bugs/BUG-149-benchmark-sealer-dotted-output-directory.md)
 - unblocked: `BUG-155` — Native Vulkan timestamp smoke intermittently publishes zero duration (tasks/backlog/bugs/BUG-155-vulkan-native-timestamp-zero-duration-flake.md)
 - unblocked: `BUG-157` — Clang 20 fails IntrinsicTests on glm anonymous-union redeclaration (tasks/backlog/bugs/BUG-157-clang20-glm-module-union-build-break.md)
+- unblocked: `BUG-163` — Strict root hygiene rejects `src_new/`, failing docs-validation on every run (tasks/backlog/bugs/BUG-163-root-hygiene-strict-rejects-src-new.md)
 
 ## Theme H — Agentic workflow hardening
 

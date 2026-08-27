@@ -5,6 +5,12 @@ Each entry includes the observed repro, the likely affected symbols, and a fix p
 
 ## Active Issues
 
+- [`BUG-163` — Strict root hygiene rejects `src_new/`, failing docs-validation
+  on every run](BUG-163-root-hygiene-strict-rejects-src-new.md): the root
+  experiment tree added by `main` commit `aba65211` is not in
+  `tools/repo/root_allowlist.yaml`, so the final `docs-validation` step fails
+  on every run; the owner decides between a documented temporary allowlist
+  exception and relocating the experiment.
 - [`BUG-158` — Optional direct-mesh enrichment blocks already usable
   geometry](BUG-158-direct-mesh-enrichment-blocks-usable-geometry.md): the
   geometry-only mesh is published immediately, but the editor returns before
