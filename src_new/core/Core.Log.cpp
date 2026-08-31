@@ -112,6 +112,22 @@ namespace Extrinsic::Core::Log
     };
 
     static ConsoleSinkShutdown s_ConsoleSinkShutdown;
+    static Level s_MinimumLogLevel = Level::Info;
+
+    void SetMinimumLevel(const Level level)
+    {
+        s_MinimumLogLevel = level;
+    }
+
+    Level GetMinimumLevel() noexcept
+    {
+        return s_MinimumLogLevel;
+    }
+
+    bool IsEnabled(const Level level) noexcept
+    {
+        return level >= s_MinimumLogLevel;
+    }
 
     // -------------------------------------------------------------------------
     // Core write path

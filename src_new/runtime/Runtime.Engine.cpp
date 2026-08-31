@@ -1,69 +1,256 @@
 module;
 
-module Runtime.Engine;
+#include <memory>
 
-import Runtime.Engine;
-import Core.Timer;
+module Runtime.Engine;
 
 namespace Extrinsic::Runtime
 {
-    Engine::Engine(EngineConfig config)
-        : mConfig(std::move(config))
+    struct FrameContext
     {
-    }
+        std::uint64_t FrameIndex{};
+        double RawDeltaSeconds{};
+        double SimulationDeltaSeconds{};
+        double InterpolationAlpha{};
+    };
 
-    Engine::~Engine() = default;
-
-    InitializationDiagnostic Engine::Initialize()
+    struct Snapshot
     {
-        // Initialization logic here
-        // tell everyone to startup in a specific order
-        mInitializationDiagnostic = InitializationDiagnostic{};
-        return mInitializationDiagnostic;
-    }
+        // Placeholder for render snapshot data
+    };
 
-    RunDiagnostic Engine::Run()
+    struct RenderResult
     {
-        Core::Timer globalTime;
-        Core::Timer frameTime;
-        globalTime.Start();
-        mRunDiagnostic = RunDiagnostic{};
-        while (mIsRunning)
+        // Placeholder for render result data
+    };
+
+    [[nodiscard]]
+    static constexpr std::string_view ToString(
+        EngineState state) noexcept
+    {
+        switch (state)
         {
-            if (mIsPaused)
+        case EngineState::Constructed: return "Constructed";
+        case EngineState::Initialized: return "Initialized";
+        case EngineState::Running: return "Running";
+        case EngineState::ShuttingDown: return "ShuttingDown";
+        case EngineState::Stopped: return "Stopped";
+        }
+
+        return "Unknown";
+    }
+
+    struct Engine::Impl
+    {
+        explicit Impl(EngineConfig config) : m_Config(config)
+        {
+        }
+
+        ~Impl() = default;
+
+        void RunFixedSimulation(double simulationDelta = 1.0 / 60.0, double fixedStep = 1.0 / 60.0)
+        {
+            accumulator += simulationDelta;
+
+            while (accumulator >= fixedStep)
             {
-                //query if actually unpaused;
-                mIsPaused = mConfig.pPlatformModule->IsPaused();
-                continue;
+                //Simulate(world, fixedStep);
+                accumulator -= fixedStep;
+            }
+        }
+
+        std::optional<FrameContext> PrepareNextFrame()
+        {
+            return {};
+        }
+
+        void RunSimulation(std::optional<FrameContext> frame)
+        {
+        }
+
+        Snapshot BuildRenderSnapshot(std::optional<FrameContext> frame)
+        {
+            return {};
+        }
+
+        RenderResult RenderFrame(std::optional<FrameContext> frame, const Snapshot& snapshot)
+        {
+            return {};
+        }
+
+        void FinishFrame(std::optional<FrameContext> frame, const RenderResult& renderResult)
+        {
+        }
+
+        [[nodiscard]]
+        static constexpr bool IsValidTransition(
+            EngineState from,
+            EngineState to) noexcept
+        {
+            switch (from)
+            {
+            case EngineState::Constructed:
+                return to == EngineState::Initialized ||
+                    to == EngineState::ShuttingDown;
+
+            case EngineState::Initialized:
+                return to == EngineState::Running ||
+                    to == EngineState::ShuttingDown;
+
+            case EngineState::Running:
+                return to == EngineState::ShuttingDown;
+
+            case EngineState::ShuttingDown:
+                return to == EngineState::Stopped;
+
+            case EngineState::Stopped:
+                return false;
             }
 
-            frameTime.Start();
-
-            ++mRunDiagnostic.frameCounter;
-            mRunDiagnostic.globalTimeSeconds = globalTime.ElapsedSeconds();
-            mRunDiagnostic.frameTimeSeconds = frameTime.ElapsedSeconds();
-            frameTime.Stop();
+            return false;
         }
-        return mRunDiagnostic;
+
+        void RecordInvalidTransition(
+            EngineState from,
+            EngineState requested)
+        {
+            ++m_Diagnostics.InvalidStateTransitionCount;
+
+            m_Diagnostics.LastInvalidTransition = InvalidStateTransition{
+                .From = from,
+                .Requested = requested,
+                .Sequence = m_Diagnostics.InvalidStateTransitionCount
+            };
+
+            Core::Log::Error(
+                "[Engine] invalid state transition: {} -> {}",
+                ToString(from),
+                ToString(requested));
+        }
+
+        [[nodiscard]]
+        bool TransitionTo(EngineState next)
+        {
+            if (m_State == next)
+                return true;
+
+            const EngineState previous = m_State;
+
+            if (!IsValidTransition(previous, next))
+            {
+                RecordInvalidTransition(previous, next);
+                return false;
+            }
+
+            m_State = next;
+
+            ++m_Diagnostics.StateTransitionCount;
+            m_Diagnostics.State = next;
+            m_Diagnostics.LastTransition = StateTransition{
+                .From = previous,
+                .To = next,
+                .Sequence = m_Diagnostics.StateTransitionCount
+            };
+
+            if (m_Observability.LogStateTransitions)
+            {
+                Core::Log::Debug(
+                    "[Engine] state: {} -> {}",
+                    ToString(previous),
+                    ToString(next));
+            }
+
+            return true;
+        }
+
+        EngineState State() const noexcept { return m_State; }
+
+        EngineState m_State{EngineState::Constructed};
+        EngineConfig m_Config;
+        EngineDiagnosticsSnapshot m_Diagnostics{};
+        ObservabilityConfig m_Observability{};
+        double accumulator = 0.0;
+    };
+
+    Engine::Engine(EngineConfig config) : m_Impl(std::make_unique<Impl>(config))
+    {
     }
 
-    ShutdownDiagnostic Engine::Shutdown()
+    Engine::~Engine()
     {
-        // Shutdown logic here
-        // tell everyone to shutdown in a specific order
-        // force stop all pending and queued work
-        mShutdownDiagnostic = ShutdownDiagnostic{};
-        return mShutdownDiagnostic;
     }
 
-    bool Engine::IsRunning() const
+    void Engine::Initialize()
     {
-        // Return running state
-        return mIsRunning;
+        if (m_Impl->State() != EngineState::Constructed)
+        {
+            // Invalid-state diagnostic
+            return;
+        }
+
+        m_Impl->TransitionTo(EngineState::Initialized);
     }
 
-    const EngineConfig& Engine::GetConfig() const
+    void Engine::Run()
     {
-        return mConfig;
+        if (m_Impl->State() != EngineState::Initialized)
+        {
+            // Invalid-state diagnostic
+            return;
+        }
+
+        m_Impl->TransitionTo(EngineState::Running);
+
+        while (m_Impl->State() == EngineState::Running)
+        {
+            auto frame = m_Impl->PrepareNextFrame();
+            if (!frame)
+                break;
+
+            m_Impl->RunSimulation(*frame);
+
+            const auto snapshot = m_Impl->BuildRenderSnapshot(*frame);
+            const auto renderResult = m_Impl->RenderFrame(*frame, snapshot);
+
+            m_Impl->FinishFrame(*frame, renderResult);
+        }
+
+        RequestExit();
+    }
+
+    void Engine::RequestExit() noexcept
+    {
+        m_Impl->TransitionTo(EngineState::ShuttingDown);
+    }
+
+    void Engine::Shutdown()
+    {
+        if (m_Impl->State() == EngineState::Stopped)
+            return;
+
+        if (m_Impl->State() != EngineState::ShuttingDown)
+        {
+            if (!m_Impl->TransitionTo(EngineState::ShuttingDown))
+                return;
+        }
+
+        // Ressourcen in umgekehrter Reihenfolge freigeben.
+
+        m_Impl->TransitionTo(EngineState::Stopped);
+    }
+
+    EngineDiagnosticsSnapshot Engine::GetDiagnostics() const noexcept
+    {
+        return m_Impl->m_Diagnostics;
+    }
+
+    ObservabilityConfig Engine::GetObservabilityConfig() const noexcept
+    {
+        return m_Impl->m_Observability;
+    }
+
+    void Engine::ApplyObservabilityConfig(ObservabilityConfig config)
+    {
+        m_Impl->m_Observability = config;
     }
 }

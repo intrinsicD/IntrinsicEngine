@@ -9,19 +9,15 @@ namespace Extrinsic::Core
     export class Timer
     {
     public:
-        Timer() = default;
-        ~Timer() = default;
+        Timer() noexcept;
 
-        Timer(const Timer&) = delete;
-        Timer& operator=(const Timer&) = delete;
+        void Restart() noexcept;
 
-        void Start();
-        void Stop();
-        double ElapsedSeconds() const;
+        [[nodiscard]] double ElapsedSeconds() const noexcept;
 
     private:
-        std::chrono::high_resolution_clock::time_point m_StartTime;
-        std::chrono::high_resolution_clock::time_point m_EndTime;
-        bool m_Running{false};
+        using Clock = std::chrono::steady_clock;
+
+        Clock::time_point m_StartTime;
     };
 }

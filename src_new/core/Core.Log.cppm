@@ -25,6 +25,10 @@ namespace Extrinsic::Core::Log
         std::string Message;
     };
 
+    export void SetMinimumLevel(Level level) noexcept;
+    [[nodiscard]] Level GetMinimumLevel() noexcept;
+    [[nodiscard]] bool IsEnabled(Level level) noexcept;
+
     // Internal helper to print color codes and append to ring buffer
     void PrintColored(Level level, std::string_view msg);
 
@@ -35,18 +39,24 @@ namespace Extrinsic::Core::Log
     export template <typename... Args>
     void Info(std::format_string<Args...> fmt, Args&&... args)
     {
+        if (!IsEnabled(Level::Info))
+            return;
         PrintColored(Level::Info, std::format(fmt, std::forward<Args>(args)...));
     }
 
     export template <typename... Args>
     void Warn(std::format_string<Args...> fmt, Args&&... args)
     {
+        if (!IsEnabled(Level::Warning))
+            return;
         PrintColored(Level::Warning, std::format(fmt, std::forward<Args>(args)...));
     }
 
     export template <typename... Args>
     void Error(std::format_string<Args...> fmt, Args&&... args)
     {
+        if (!IsEnabled(Level::Error))
+            return;
         PrintColored(Level::Error, std::format(fmt, std::forward<Args>(args)...));
     }
 
@@ -54,9 +64,9 @@ namespace Extrinsic::Core::Log
     export template <typename... Args>
     void Debug([[maybe_unused]] std::format_string<Args...> fmt, [[maybe_unused]] Args&&... args)
     {
-#ifndef NDEBUG
+        if (!IsEnabled(Level::Debug))
+            return;
         PrintColored(Level::Debug, std::format(fmt, std::forward<Args>(args)...));
-#endif
     }
 
     export [[nodiscard]] uint64_t GetSequenceNumber() noexcept;

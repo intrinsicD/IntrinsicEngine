@@ -4,7 +4,7 @@ module;
 #include <cstdint>
 #include <span>
 
-export module Core.TaskGraph;
+export module Core.Dag;
 
 
 namespace Extrinsic::Core
@@ -23,16 +23,16 @@ namespace Extrinsic::Core
         { h.Generation } -> std::convertible_to<uint32_t>;
     };
 
-    class TaskGraph
+    class Dag
     {
     public:
-        TaskGraph() = default;
-        ~TaskGraph() = default;
+        Dag() = default;
+        ~Dag() = default;
 
         NodeHandle AddNode();
 
         EdgeHandle AddDependency(NodeHandle source, std::span<NodeHandle> reads, std::span<NodeHandle> writes);
-
+    
     private:
     };
 }

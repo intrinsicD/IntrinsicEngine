@@ -1,35 +1,25 @@
 module;
 
-module Core.Timer;
-
 #include <chrono>
 
-import Core.Timer;
+module Core.Timer;
 
 namespace Extrinsic::Core
 {
-    void Timer::Start()
+    Timer::Timer() noexcept
+        : m_StartTime{Clock::now()}
     {
-        m_StartTime = std::chrono::high_resolution_clock::now();
-        m_Running = true;
     }
 
-    void Timer::Stop()
+    void Timer::Restart() noexcept
     {
-        m_EndTime = std::chrono::high_resolution_clock::now();
-        m_Running = false;
+        m_StartTime = Clock::now();
     }
 
-    double Timer::ElapsedSeconds() const
+    double Timer::ElapsedSeconds() const noexcept
     {
-        if (m_Running)
-        {
-            auto now = std::chrono::high_resolution_clock::now();
-            return std::chrono::duration<double>(now - m_StartTime).count();
-        }
-        else
-        {
-            return std::chrono::duration<double>(m_EndTime - m_StartTime).count();
-        }
+        return std::chrono::duration<double>(
+            Clock::now() - m_StartTime
+        ).count();
     }
 }

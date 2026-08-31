@@ -10,7 +10,7 @@ namespace Extrinsic::Apps
     {
     public:
         virtual ~IApplication() = default;
-
+    
     protected:
         IApplication(const ParseCLIResult& cliResult);
     };

@@ -1,67 +1,87 @@
 module;
 
-#include <string>
+#include <memory>
 
 export module Runtime.Engine;
 
-import Apps.IApplication;
-import Platform.IBackend;
-import Graphics.IBackend;
-import Compute.IBackend;
-import ECS.World;
+import Core.Log;
 
 namespace Extrinsic::Runtime
 {
+    enum class EngineState
+    {
+        Constructed,
+        Initialized,
+        Running,
+        ShuttingDown,
+        Stopped
+    };
+
+    export struct ObservabilityConfig
+    {
+        Core::Log::Level MinimumLogLevel{Core::Log::Level::Info};
+        bool LogStateTransitions{false};
+    };
+
     export struct EngineConfig
     {
-        Apps::IApplication* pApplication;
-        Platform::IBackend* pPlatformModule;
-        Graphics::IBackend* pGraphicsBackend;
-        Compute::IBackend* pComputeBackend;
-        ECS::World* pWorld;
+        double FixedStepSeconds{1.0 / 60.0};
+        double MaxFrameDeltaSeconds{0.25};
+
+        PlatformBackend Platform{PlatformBackend::Auto};
+        GraphicsBackend Graphics{GraphicsBackend::Null};
+        ObservabilityConfig Observability{};
     };
 
-    export struct InitializationDiagnostic
+    export struct StateTransition
     {
-
+        EngineState From{};
+        EngineState To{};
+        std::uint64_t Sequence{};
     };
 
-    export struct RunDiagnostic
+    export struct InvalidStateTransition
     {
-        size_t frameCounter = 0;
-        double frameTimeSeconds = 0.0;
-        double globalTimeSeconds = 0.0;
+        EngineState From{};
+        EngineState Requested{};
+        std::uint64_t Sequence{};
     };
 
-    export struct ShutdownDiagnostic
+    export struct EngineDiagnosticsSnapshot
     {
+        EngineState State{EngineState::Constructed};
 
+        std::uint64_t FrameIndex{};
+        std::uint64_t StateTransitionCount{};
+
+        double LastFrameSeconds{};
+        double RunElapsedSeconds{};
+        double SimulationAccumulatorSeconds{};
+
+        std::optional<StateTransition> LastTransition;
+        std::uint64_t InvalidStateTransitionCount{};
+        std::optional<InvalidStateTransition> LastInvalidTransition;
     };
 
     export class Engine
     {
     public:
-        Engine(EngineConfig config);
+        explicit Engine(EngineConfig config);
         ~Engine();
 
-        Engine(const Engine&) = delete;
-        Engine& operator=(const Engine&) = delete;
+        void Initialize();
+        void Run();
+        void RequestExit() noexcept;
+        void Shutdown();
+        [[nodiscard]]
+        EngineDiagnosticsSnapshot GetDiagnostics() const;
+        void ApplyObservabilityConfig(ObservabilityConfig config);
 
-        InitializationDiagnostic Initialize();
-        RunDiagnostic Run();
-        ShutdownDiagnostic Shutdown();
-
-        bool IsRunning() const;
-
-        const EngineConfig& GetConfig() const;
+        [[nodiscard]]
+        ObservabilityConfig GetObservabilityConfig() const;
 
     private:
-        InitializationDiagnostic mInitializationDiagnostic;
-        RunDiagnostic mRunDiagnostic;
-        ShutdownDiagnostic mShutdownDiagnostic;
-
-        bool mIsRunning = false;
-        bool mIsPaused = false;
-        EngineConfig mConfig;
+        struct Impl;
+        std::unique_ptr<Impl> m_Impl;
     };
 }
