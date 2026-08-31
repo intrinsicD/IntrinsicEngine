@@ -18,10 +18,8 @@ namespace Extrinsic::Assets
 
     namespace
     {
-        // Call SetState on the registry while NOT holding the pipeline's mutex.
-        // The pipeline mutex only protects m_AssetsInFlight + binding pointers;
-        // Registry has its own lock. Keeping the order strict avoids any cross-
-        // lock ordering concern.
+        // Registry transitions occur without m_Mutex because the registry owns
+        // another lock; this fixed acquisition order prevents cross-lock deadlock.
         Core::Result SetStateChecked(AssetRegistry* registry, AssetId id, AssetState from, AssetState to)
         {
             return registry->SetState(id, from, to);
@@ -368,8 +366,8 @@ namespace Extrinsic::Assets
             eventBus = m_EventBus;
         }
 
-        // Retry-loop the compare-and-swap: the state may change between
-        // our read and our write; tolerate benign races by re-reading.
+        // State can change between observation and compare-and-set; retry only
+        // InvalidState results that represent benign contention.
         for (int attempt = 0; attempt < 8; ++attempt)
         {
             const auto meta = registry->GetMeta(id);
@@ -398,7 +396,6 @@ namespace Extrinsic::Assets
             {
                 return r;
             }
-            // InvalidState = someone moved the state under us - retry.
         }
         return Core::Err(Core::ErrorCode::ResourceBusy);
     }

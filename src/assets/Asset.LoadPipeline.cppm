@@ -1,3 +1,5 @@
+// Coordinates asset state transitions and readiness events across CPU decode
+// and optional externally completed upload stages.
 module;
 
 #include <cstdint>

@@ -100,11 +100,8 @@ namespace Extrinsic::Sandbox::Editor
             }
         }
 
-        // BUG-141: see the same helper in `Sandbox.MeshProcessingPanels.cpp`.
-        // A stored outcome is superseded by the next run of its own operation;
-        // this is the explicit clear for the user who will not run it again.
-        // It drops the panel's copy and the session slot the model is rebuilt
-        // from, so draw it after everything that reads the result.
+        // Dismissal clears both the panel result and the session slot that
+        // rebuilds it. Draw this control after all readers of the panel result.
         template <typename ResultT>
         void DrawDismissLastResultButton(
             const char* const label,
@@ -2000,10 +1997,8 @@ namespace Extrinsic::Sandbox::Editor
             {
                 const Runtime::EditorDomainWindowModel& model =
                     GetDomainWindowModel(context, kind);
-                // BUG-141: the header already renders `model.Diagnostics`,
-                // into which the runtime folds
-                // `model.Processing.Diagnostics`. Rendering the processing
-                // list again here printed every entry twice.
+                // The header already includes processing diagnostics; render
+                // them only once.
                 DrawDomainWindowHeader(model);
                 if (!DomainWindowReady(model) ||
                     !model.Processing.HasSelectedEntity)
@@ -2285,10 +2280,8 @@ namespace Extrinsic::Sandbox::Editor
             {
                 const Runtime::EditorDomainWindowModel& model =
                     GetDomainWindowModel(context, kind);
-                // BUG-141: the header already renders `model.Diagnostics`,
-                // into which the runtime folds
-                // `model.Processing.Diagnostics`. Rendering the processing
-                // list again here printed every entry twice.
+                // The header already includes processing diagnostics; render
+                // them only once.
                 DrawDomainWindowHeader(model);
                 if (!DomainWindowReady(model) ||
                     !model.Processing.HasSelectedEntity)
@@ -3146,8 +3139,8 @@ namespace Extrinsic::Sandbox::Editor
                     summary.MeanAreaDistortion,
                     summary.MeanStretch);
             }
-            // BUG-141: a rejection used to say only that the solver refused
-            // the mesh. The two preconditions it refuses on are counted.
+            // Rejected solves expose both topology preconditions so the user
+            // can identify the unsupported mesh structure.
             if (!result->Succeeded() && result->Rejection.Evaluated)
             {
                 const std::size_t components =

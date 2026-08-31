@@ -1,3 +1,5 @@
+// Defines CPU-only model-scene and texture payloads so decoded asset data can
+// cross into runtime without importing graphics or geometry types.
 module;
 
 #include <array>

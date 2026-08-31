@@ -1,3 +1,5 @@
+// Translates core errors into stable asset-operation outcomes for callers that
+// need coarse diagnostics without subsystem-specific failure details.
 module;
 
 #include <cstdint>

@@ -1,9 +1,10 @@
+// Provides queued asset-lifecycle subscriptions so consumers observe state
+// changes without coupling directly to registry mutation.
 module;
 #include <atomic>
 #include <cstdint>
 #include <functional>
 #include <mutex>
-#include <queue>
 #include <unordered_map>
 #include <vector>
 
@@ -20,7 +21,6 @@ export namespace Extrinsic::Assets
     public:
         using ListenerCallback = std::function<void(AssetId, AssetEvent)>;
         using ListenerToken = uint32_t;
-        // 0 is reserved for "invalid / failed subscribe".
         static constexpr ListenerToken InvalidToken = 0u;
 
         AssetEventBus();
@@ -31,8 +31,10 @@ export namespace Extrinsic::Assets
         void Unsubscribe(AssetId id, ListenerToken token);
         void UnsubscribeAll(ListenerToken token);
         void Publish(AssetId id, AssetEvent ev);
-        void Flush(); // main-thread fanout
-        void Flush(AssetId id); // drain one asset while preserving other pending events
+        // Invokes queued callbacks synchronously; callers flush on the main thread.
+        void Flush();
+        // Drains one asset while preserving unrelated pending events.
+        void Flush(AssetId id);
         [[nodiscard]] std::size_t PendingCount() const;
 
     private:

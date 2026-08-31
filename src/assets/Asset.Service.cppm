@@ -1,3 +1,5 @@
+// Exposes the CPU asset facade that coordinates identity, paths, payloads,
+// load state, and lifecycle events behind one invariant-preserving API.
 module;
 
 #include <string>
@@ -20,8 +22,6 @@ import Extrinsic.Core.Filesystem.PathResolver;
 
 export namespace Extrinsic::Assets
 {
-    // Tag type for loader-callback tokens. Distinct from other StrongHandle
-    // tags (AssetTag, etc.) so tokens cannot be accidentally mixed.
     struct AssetLoaderTag;
 
     struct LoaderToken
@@ -42,20 +42,17 @@ export namespace Extrinsic::Assets
         AssetService(AssetService&&) = delete;
         AssetService& operator=(AssetService&&) = delete;
 
-        // Non-template Load: caller provides decoded payload, type id, and path.
         [[nodiscard]] Core::Expected<AssetId> LoadErased(
             std::string_view path,
             uint32_t typeId,
             std::function<Core::Expected<PayloadTicket>(std::string_view absPath, AssetId id)> loader);
 
-        // Non-template Reload: re-run a previously registered loader.
+        // Reuses the loader captured by the asset's successful Load call.
         Core::Result Reload(AssetId id);
 
-        // Typed read.
         template <class T>
         [[nodiscard]] Core::Expected<std::span<const T>> Read(AssetId id) const;
 
-        // Typed load convenience wrapper.
         template <class T, class Loader>
         [[nodiscard]] Core::Expected<AssetId> Load(std::string_view path, Loader&& loader);
 
@@ -75,27 +72,21 @@ export namespace Extrinsic::Assets
         template <class T>
         [[nodiscard]] static uint32_t TypeIdOf() noexcept;
 
-        // Event bus subscription (public — consumers such as Graphics subscribe
-        // to Ready/Reloaded/Destroyed events; Runtime wires subscriptions).
         [[nodiscard]] AssetEventBus::ListenerToken SubscribeAll(AssetEventBus::ListenerCallback cb);
         void UnsubscribeAll(AssetEventBus::ListenerToken token);
 
-        // Test/debug introspection (thin wrappers over internal state).
+        // Read-only test and diagnostic seams expose facade state without
+        // granting mutable access to its components.
         [[nodiscard]] bool HasLoaderCallback(LoaderToken token) const;
         [[nodiscard]] std::size_t LoaderCallbackCount() const;
         [[nodiscard]] bool PathIndexContains(std::string_view absolutePath) const;
         [[nodiscard]] std::size_t LiveAssetCount() const noexcept;
-        // Force an asset into an arbitrary state — for unit tests only.
+        // Test seam; production state transitions remain owned by the pipeline.
         Core::Result ForceAssetState(AssetId id, AssetState expected, AssetState next);
 
     private:
-        // Internal module accessors. These used to be public ("exposed for
-        // advanced wiring / testing") but that let callers bypass AssetService's
-        // invariants (lock ordering, state transitions, pathIndex/registry
-        // coupling). They are private now; the templated Load/Read/Reload
-        // methods below need them for type dispatch and are AssetService
-        // members, so access is preserved. No non-member external caller
-        // existed before this change.
+        // Inline templates cannot dereference the incomplete Impl; these
+        // private accessors preserve the facade while supplying its components.
         [[nodiscard]] AssetRegistry& Registry() noexcept;
         [[nodiscard]] AssetEventBus& EventBus() noexcept;
         [[nodiscard]] AssetPayloadStore& PayloadStore() noexcept;

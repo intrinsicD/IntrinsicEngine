@@ -1,0 +1,8 @@
+//
+// Created by alex on 31.08.26.
+//
+
+#ifndef INTRINSICENGINE_CORE_ERROR_H
+#define INTRINSICENGINE_CORE_ERROR_H
+
+#endif //INTRINSICENGINE_CORE_ERROR_H

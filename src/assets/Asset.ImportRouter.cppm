@@ -1,3 +1,5 @@
+// Defines the shared format-capability catalog and deterministic route
+// diagnostics used by asset import and export entry points.
 module;
 
 #include <cstdint>

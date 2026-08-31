@@ -1,3 +1,5 @@
+// Declares the app-owned geometry-processing panels that present runtime views
+// and command surfaces without taking ownership of geometry operations.
 module;
 
 #include <memory>

@@ -1,3 +1,5 @@
+// Declares the Sandbox editor controller that attaches app-owned panels to
+// runtime registries and detaches them as one lifecycle unit.
 module;
 
 #include <memory>

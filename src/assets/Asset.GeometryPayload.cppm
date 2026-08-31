@@ -1,6 +1,7 @@
+// Defines type-erased CPU geometry payloads so assets can carry mesh,
+// point-cloud, and graph imports without depending on geometry modules.
 module;
 
-#include <cstdint>
 #include <memory>
 #include <string>
 #include <string_view>
