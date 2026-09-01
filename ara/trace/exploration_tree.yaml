@@ -10311,3 +10311,155 @@ tree:
       - "C53"
       - "N439"
     status: resolved
+  - id: N441
+    type: question
+    title: "Define the smallest reusable DAG substrate for task and render graphs"
+    provenance: user
+    timestamp: "2026-09-01T21:31+02:00"
+    description: >
+      What topology, validity, compilation, traversal, and extension contracts
+      are still missing from src_new/core/Core.Dag.cppm so one property-backed
+      graph can serve both task-graph and render-graph owners, with any
+      specialized behavior supplied through composition or inheritance?
+    evidence:
+      - "src_new/core/Core.Dag.cppm"
+      - "src_new/core/Core.Properties.cppm"
+    status: resolved
+  - id: N442
+    type: decision
+    title: "Use directed edge endpoints instead of halfedges for Core.Dag"
+    provenance: ai-executed
+    timestamp: "2026-09-01T21:53+02:00"
+    also_depends_on: [N441]
+    choice: >
+      Represent each dependency as one directed EdgeEndpoints {Before, After}
+      record and maintain incoming and outgoing EdgeHandle adjacency. Keep the
+      Core.Dag value final and let task and render graphs compose it; do not add
+      twin halfedges or geometry-style rotational and face incidence state.
+    alternatives:
+      - "Represent each dependency with paired halfedges and twin links."
+      - "Expose only endpoint properties and rescan all edges for adjacency."
+      - "Use public inheritance to specialize Core.Dag behavior."
+    evidence:
+      - "src_new/core/Core.Dag.cppm"
+      - "The requested consumers need binary prerequisite direction plus forward and reverse traversal, but no twin or face topology."
+    status: resolved
+  - id: N443
+    type: experiment
+    title: "Compile the exported Core.Dag interface and importer with Clang 20"
+    provenance: ai-executed
+    timestamp: "2026-09-01T21:53+02:00"
+    also_depends_on: [N442]
+    evidence:
+      - "src_new/core/Core.Dag.cppm"
+      - "clang++-20 -std=c++23 -Wall -Wextra -Wpedantic -Werror --precompile"
+      - "focused source-documentation audit"
+      - "git diff --check"
+    result: >
+      Core.TypeToken, Core.Properties, and Core.Dag precompiled successfully
+      with Clang 20.1.2 under warnings-as-errors. A temporary importer used the
+      exported Dag, property facade, AddNode, Compile, and NodeProperties
+      surface under -fsyntax-only. The focused documentation audit reported
+      zero errors and five manually accepted contract-comment review findings;
+      diff whitespace validation passed. No behavior or link test is possible
+      until the requested implementation unit exists.
+    status: resolved
+  - id: N444
+    type: experiment
+    title: "Implement and exercise the property-backed Core.Dag"
+    provenance: ai-executed
+    timestamp: "2026-09-01T23:10+02:00"
+    also_depends_on: [N442, N443]
+    evidence:
+      - "src_new/core/Core.Dag.cpp"
+      - "src_new/core/Core.Dag.cppm"
+      - "clang++-20 -std=c++23 -Wall -Wextra -Wpedantic -Werror"
+      - "direct ASan+UBSan behavior harness with 8,192-node chain and cycle"
+      - "python3 tools/repo/check_layering.py --root src_new --strict"
+      - "focused source-documentation audit and git diff --check"
+    result: >
+      The implementation passed linked behavior checks for empty graphs,
+      rejected invalid and self edges, dense handles, parallel directed edges,
+      endpoint and adjacency views, aligned node and edge properties, topology
+      revisions, deterministic Kahn order, deepest-predecessor layers, copy and
+      clear semantics, and closed cycle paths. Clang 20.1.2 warnings-as-errors
+      plus AddressSanitizer and UndefinedBehaviorSanitizer passed a deep
+      8,192-node chain and cycle. The strict src_new layering scan reported no
+      violations; source documentation reported zero errors and five retained
+      contract-comment review findings; diff whitespace validation passed.
+    status: resolved
+  - id: N445
+    type: question
+    title: "Explain Core.Dag's bidirectional adjacency indices"
+    provenance: user
+    timestamp: "2026-09-01T23:16+02:00"
+    also_depends_on: [N442, N444]
+    description: >
+      Why does the dense DAG retain per-node incoming and outgoing edge-handle
+      lists in addition to the authoritative per-edge endpoint records, and
+      which index is required by compilation versus optional reverse traversal?
+    evidence:
+      - "src_new/core/Core.Dag.cppm"
+      - "src_new/core/Core.Dag.cpp"
+    status: resolved
+  - id: N446
+    type: question
+    title: "Compare Core.Dag with the promoted graph systems"
+    provenance: user
+    timestamp: "2026-09-01T23:30+02:00"
+    also_depends_on: [N441, N444, N445]
+    description: >
+      Which topology, lifecycle, compilation, and diagnostic contracts are
+      still absent from the implemented property-backed Core.Dag when it is
+      compared directly with the promoted Core TaskGraph and FrameGraph plus
+      the Graphics RenderGraph?
+    evidence:
+      - "src_new/core/Core.Dag.cppm"
+      - "src/core/Core.Dag.TaskGraph.cpp"
+      - "src/core/Core.FrameGraph.cppm"
+      - "src/graphics/framegraph/Graphics.RenderGraph.Compiler.cpp"
+    status: resolved
+  - id: N447
+    type: decision
+    title: "Adopt reset epochs and edge-resolved cycle diagnostics"
+    provenance: user
+    timestamp: "2026-09-02T00:05+02:00"
+    also_depends_on: [N446]
+    choice: >
+      Add one nonzero recording epoch to Core.Dag node and edge handles, advance
+      it on a nonempty Clear so recycled dense indices reject stale handles,
+      and report the exact traversed EdgeHandle sequence beside every concrete
+      cycle node sequence. Keep per-slot generations, owner registries, unique
+      edge insertion, and selected-subgraph compilation outside this slice.
+    alternatives:
+      - "Retain index-only node and edge handles."
+      - "Add per-slot generations and individual removal before either has a consumer."
+      - "Keep node-only cycle diagnostics and recover edge provenance later by endpoint lookup."
+    evidence:
+      - "N446"
+      - "src_new/core/Core.Dag.cppm"
+      - "src_new/core/Core.Dag.cpp"
+    status: resolved
+  - id: N448
+    type: experiment
+    title: "Exercise Core.Dag handle epochs and cycle-edge alignment"
+    provenance: ai-executed
+    timestamp: "2026-09-02T00:05+02:00"
+    also_depends_on: [N447]
+    evidence:
+      - "src_new/core/Core.Dag.cppm"
+      - "src_new/core/Core.Dag.cpp"
+      - "Clang 20 warnings-as-errors direct module/importer harness"
+      - "AddressSanitizer plus UndefinedBehaviorSanitizer direct harness"
+      - "python3 tools/repo/check_layering.py --root src_new --strict"
+      - "focused source-documentation audit and git diff --check"
+    result: >
+      Fresh Clang 20.1.2 module and linked behavior runs passed. The harness
+      proved that Clear invalidates old node and edge handles even after dense
+      indices are reused, forged wrong epochs fail graph validation, compiled
+      node handles retain the current epoch, and CycleEdges[i] resolves exactly
+      from Cycle[i] to Cycle[i+1]. A parallel-edge cycle selected the concrete
+      traversed edge, and an iterative 8,192-node cycle produced 8,192 aligned
+      edge handles under ASan and UBSan. Strict src_new layering, source synopsis
+      and comment audit, and diff whitespace checks passed.
+    status: resolved

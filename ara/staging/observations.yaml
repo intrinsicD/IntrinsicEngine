@@ -2915,3 +2915,84 @@ observations:
     promoted_to: "logic/claims.md:C53"
     crystallized_via: artifact-commitment
     stale: false
+  - id: O161
+    timestamp: "2026-09-01T21:31+02:00"
+    provenance: ai-suggested
+    content: >
+      Property-backed node and edge payloads do not by themselves make a DAG
+      reusable. The Core substrate should own only protected edge endpoints,
+      handle validity, deterministic acyclicity validation, adjacency, and an
+      immutable compiled topological plan; task hazards and execution plus
+      render resources, barriers, lifetimes, culling, and queue synchronization
+      should remain in composed domain owners that derive pass-to-pass edges.
+    context: >
+      Read-only review of the experimental Core.Dag interface against
+      Core.Properties, the promoted domain-free task scheduler, and the
+      renderer-owned RenderGraph compiler.
+    potential_type: architecture
+    bound_to: [N441]
+    promoted: false
+    promoted_to: null
+    crystallized_via: null
+    stale: false
+  - id: O162
+    timestamp: "2026-09-01T21:31+02:00"
+    provenance: ai-suggested
+    content: >
+      A Dag must not expose an unrestricted mutable PropertySet because callers
+      can resize or clear rows independently of topology. Core.Properties also
+      restricts values to copyable types, so move-only task callbacks and other
+      noncopyable domain state require an owning sidecar or indirection rather
+      than a claim that arbitrary payloads fit directly in graph properties.
+    context: >
+      Interface audit found private property tables with no safe property
+      facade, index-only handles, and a copyable PropertyValue constraint.
+    potential_type: constraint
+    bound_to: [N441]
+    promoted: false
+    promoted_to: null
+    crystallized_via: null
+    stale: false
+  - id: O163
+    timestamp: "2026-09-01T21:53+02:00"
+    provenance: ai-suggested
+    content: >
+      A binary directed dependency DAG needs one EdgeEndpoints record plus
+      incoming and outgoing edge indices, not paired halfedges. Halfedges become
+      load-bearing only when an algorithm requires a twin relation, cyclic
+      ordering around vertices, face incidence, or local topology edits; none
+      of those relations is shared by task-graph and render-graph scheduling.
+    context: >
+      The user asked whether Core.Dag should replace EdgeEndpoints with
+      halfedges before completing the experimental public interface.
+    potential_type: heuristic
+    bound_to: [N442, N443]
+    promoted: false
+    promoted_to: null
+    crystallized_via: null
+    stale: false
+  - id: O164
+    timestamp: "2026-09-01T23:30+02:00"
+    provenance: ai-suggested
+    content: >
+      Before Core.Dag can replace the duplicated topology kernels in the
+      promoted task and render compilers, its minimal shared contract should
+      add epoch-safe node and edge handles, an optional endpoint-unique edge
+      insertion path, induced-subgraph compilation for render-pass liveness,
+      and cycle edge handles for property-backed provenance. The canonical
+      topological order should remain distinct from task priority and
+      critical-path scheduling, while effective initial indegrees are useful
+      compiled metadata for dependency-ready execution.
+    context: >
+      Comparative read-only audit found duplicate endpoint deduplication,
+      Kahn sorting, layer assignment, and cycle handling in Core TaskGraph,
+      Core DagScheduler, and Graphics RenderGraph. RenderGraph additionally
+      compiles only the reverse-reachable live pass subset, while TaskGraph
+      applies priority and weighted-critical-path scheduling after structural
+      validation.
+    potential_type: architecture
+    bound_to: [N446]
+    promoted: false
+    promoted_to: null
+    crystallized_via: null
+    stale: false

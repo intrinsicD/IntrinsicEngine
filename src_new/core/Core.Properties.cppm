@@ -51,6 +51,19 @@ namespace Extrinsic::Core
     export using PropertyRevision = std::uint64_t;
     export using PropertyTypeId = std::size_t;
 
+    export using PropertyIndex = std::uint32_t;
+
+    /// Sentinel index used to mark an invalid handle.
+    constexpr PropertyIndex kInvalidIndex = std::numeric_limits<PropertyIndex>::max();
+
+    export template <typename Tag>
+    struct Handle
+    {
+        PropertyIndex Index = kInvalidIndex;
+        auto operator<=>(const Handle&) const = default;
+        [[nodiscard]] bool IsValid() const { return Index != kInvalidIndex; }
+    };
+
     export struct PropertyDescriptor
     {
         PropertyId Id{};

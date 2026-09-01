@@ -1,0 +1,129 @@
+session:
+  id: "2026-09-01_001"
+  date: "2026-09-01"
+  started: "2026-09-01T21:31+02:00"
+  last_turn: "2026-09-01T23:30+02:00"
+  turn_count: 5
+  summary: "Defined and exercised Core.Dag, then compared it with the promoted graph systems and identified the minimal remaining shared-topology seams."
+
+events_logged:
+  - turn: 1
+    type: question
+    id: N441
+    routing: direct
+    provenance: user
+    summary: "Opened the smallest reusable DAG contract for task and render graphs."
+  - turn: 1
+    type: observation
+    id: O161
+    routing: staged
+    provenance: ai-suggested
+    summary: "Separated generic topology compilation from task and render semantics."
+  - turn: 1
+    type: observation
+    id: O162
+    routing: staged
+    provenance: ai-suggested
+    summary: "Bound safe graph properties to protected cardinality and copyability limits."
+  - turn: 2
+    type: decision
+    id: N442
+    routing: direct
+    provenance: ai-executed
+    summary: "Selected directed endpoint records and composition instead of halfedges or inheritance."
+  - turn: 2
+    type: experiment
+    id: N443
+    routing: direct
+    provenance: ai-executed
+    summary: "Compiled the exported Core.Dag interface and importer with Clang 20 warnings-as-errors."
+  - turn: 2
+    type: observation
+    id: O163
+    routing: staged
+    provenance: ai-suggested
+    summary: "Bound halfedges to topology relations absent from dependency scheduling."
+  - turn: 3
+    type: experiment
+    id: N444
+    routing: direct
+    provenance: ai-executed
+    summary: "Linked and sanitizer-checked Core.Dag behavior through an 8,192-node chain and cycle."
+  - turn: 4
+    type: question
+    id: N445
+    routing: direct
+    provenance: user
+    summary: "Resolved why Core.Dag retains incoming and outgoing edge indices beside endpoints."
+  - turn: 5
+    type: question
+    id: N446
+    routing: direct
+    provenance: user
+    summary: "Compared Core.Dag with promoted TaskGraph, FrameGraph, and RenderGraph contracts."
+  - turn: 5
+    type: observation
+    id: O164
+    routing: staged
+    provenance: ai-suggested
+    summary: "Isolated the minimal remaining reusable topology and lifecycle seams."
+
+ai_actions:
+  - turn: 1
+    action: "Inspected Core.Dag, Core.Properties, promoted task scheduling, renderer graph compilation, architecture docs, and current consumers; no source code changed."
+    provenance: ai-executed
+    files_changed: []
+  - turn: 1
+    action: "Ran the focused source-documentation audit; it reported one missing leading synopsis in src_new/core/Core.Dag.cppm."
+    provenance: ai-executed
+    files_changed: []
+  - turn: 2
+    action: "Completed the exported Core.Dag declaration surface with endpoints, diagnostics, compiled layers, adjacency, revisions, and safe property access; no implementation unit was added."
+    provenance: ai-executed
+    files_changed: ["src_new/core/Core.Dag.cppm"]
+  - turn: 2
+    action: "Precompiled the dependency modules and Core.Dag with Clang 20 warnings-as-errors, syntax-checked a temporary importer, reran the focused source audit, and checked the diff."
+    provenance: ai-executed
+    files_changed: []
+  - turn: 3
+    action: "Implemented dense DAG mutation, endpoint and adjacency access, revision tracking, deterministic Kahn compilation, deepest-predecessor layers, and iterative cycle-path recovery."
+    provenance: ai-executed
+    files_changed: ["src_new/core/Core.Dag.cpp"]
+  - turn: 3
+    action: "Re-exported Core.Properties so a standalone Core.Dag importer can name the property types exposed by the public API."
+    provenance: ai-executed
+    files_changed: ["src_new/core/Core.Dag.cppm"]
+  - turn: 3
+    action: "Ran linked behavior, Clang 20 warnings-as-errors, ASan, UBSan, deep-graph, strict layering, source-documentation, line-length, and diff-whitespace checks."
+    provenance: ai-executed
+    files_changed: []
+  - turn: 5
+    action: "Audited Core.Dag against promoted TaskGraph, DagScheduler, FrameGraph, Graphics RenderGraph, their tests, and graph architecture contracts; no engine source changed."
+    provenance: ai-executed
+    files_changed: []
+
+claims_touched: []
+
+key_context:
+  - turn: 1
+    excerpt: "The user wants one property-backed DAG usable by render and task graphs, with specialized behavior supplied by composition or inheritance."
+  - turn: 2
+    excerpt: "The user asked whether EdgeEndpoints or halfedges fit the common DAG and requested the missing Core.Dag interface only."
+  - turn: 3
+    excerpt: "The user requested the remaining Core.Dag implementation after accepting the completed interface."
+  - turn: 4
+    excerpt: "The user asked what m_IncomingEdges and m_OutgoingEdges are needed for."
+  - turn: 5
+    excerpt: "The user asked what Core.Dag still lacks as the common foundation beneath the existing RenderGraph, FrameGraph, and TaskGraph."
+
+open_threads:
+  - "Choose and implement the owner/reset-epoch contract that rejects stale and cross-graph node and edge handles."
+  - "When the first promoted consumer migrates, settle unique-edge insertion, live-subgraph compilation, cycle-edge provenance, and canonical-versus-domain scheduling output."
+  - "Add the focused behavior harness to repository CTest when src_new/core gains an active CMake target."
+
+ai_suggestions_pending:
+  - "Keep read/write hazard inference, callbacks, barriers, lifetimes, culling, and queue synchronization in composed domain owners."
+  - "Prefer composition over inheritance so domain builders can protect recording and execution invariants around the final Dag value."
+  - "Retain both adjacency indices: task compilation and dispatch consume forward edges, while render liveness and predecessor-based analysis consume reverse edges."
+  - "Add epoch-safe handles before graph reuse; defer per-slot generations until individual node or edge removal exists."
+  - "Add only the topology seams exercised by the first migration instead of a universal graph-policy framework."
