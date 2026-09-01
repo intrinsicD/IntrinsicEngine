@@ -1,8 +1,14 @@
 module;
 
 #include <memory>
+#include <optional>
+#include <string_view>
 
 module Runtime.Engine;
+
+import Core.CommandBus;
+import Core.EventBus;
+import ECS.World;
 
 namespace Extrinsic::Runtime
 {
@@ -42,22 +48,11 @@ namespace Extrinsic::Runtime
 
     struct Engine::Impl
     {
-        explicit Impl(EngineConfig config) : m_Config(config)
+        explicit Impl(EngineConfig config) : m_Config(std::move(config))
         {
         }
 
         ~Impl() = default;
-
-        void RunFixedSimulation(double simulationDelta = 1.0 / 60.0, double fixedStep = 1.0 / 60.0)
-        {
-            accumulator += simulationDelta;
-
-            while (accumulator >= fixedStep)
-            {
-                //Simulate(world, fixedStep);
-                accumulator -= fixedStep;
-            }
-        }
 
         std::optional<FrameContext> PrepareNextFrame()
         {
@@ -83,19 +78,15 @@ namespace Extrinsic::Runtime
         }
 
         [[nodiscard]]
-        static constexpr bool IsValidTransition(
-            EngineState from,
-            EngineState to) noexcept
+        static constexpr bool IsValidTransition(EngineState from, EngineState to) noexcept
         {
             switch (from)
             {
             case EngineState::Constructed:
-                return to == EngineState::Initialized ||
-                    to == EngineState::ShuttingDown;
+                return to == EngineState::Initialized || to == EngineState::ShuttingDown;
 
             case EngineState::Initialized:
-                return to == EngineState::Running ||
-                    to == EngineState::ShuttingDown;
+                return to == EngineState::Running || to == EngineState::ShuttingDown;
 
             case EngineState::Running:
                 return to == EngineState::ShuttingDown;
@@ -110,9 +101,7 @@ namespace Extrinsic::Runtime
             return false;
         }
 
-        void RecordInvalidTransition(
-            EngineState from,
-            EngineState requested)
+        void RecordInvalidTransition(EngineState from, EngineState requested)
         {
             ++m_Diagnostics.InvalidStateTransitionCount;
 
@@ -128,7 +117,6 @@ namespace Extrinsic::Runtime
                 ToString(requested));
         }
 
-        [[nodiscard]]
         bool TransitionTo(EngineState next)
         {
             if (m_State == next)
@@ -169,7 +157,11 @@ namespace Extrinsic::Runtime
         EngineConfig m_Config;
         EngineDiagnosticsSnapshot m_Diagnostics{};
         ObservabilityConfig m_Observability{};
-        double accumulator = 0.0;
+
+        ECS::World m_World;
+
+        Core::EventBus m_EventBus;
+        Core::CommandBus m_CommandBus;
     };
 
     Engine::Engine(EngineConfig config) : m_Impl(std::make_unique<Impl>(config))
@@ -249,7 +241,7 @@ namespace Extrinsic::Runtime
         return m_Impl->m_Observability;
     }
 
-    void Engine::ApplyObservabilityConfig(ObservabilityConfig config)
+    void Engine::ApplyObservabilityConfig(ObservabilityConfig config) const
     {
         m_Impl->m_Observability = config;
     }

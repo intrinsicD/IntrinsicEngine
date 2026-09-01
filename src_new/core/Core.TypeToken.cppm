@@ -1,10 +1,12 @@
+// Provides stable RTTI-free type metadata for erased containers and buses in
+// the core layer.
 module;
 
-export module Core.TypeToken;
-
-#include <string_view>
 #include <cstdint>
 #include <limits>
+#include <string_view>
+
+export module Core.TypeToken;
 
 namespace Extrinsic::Core
 {
@@ -34,7 +36,7 @@ namespace Extrinsic::Core
 #endif
     }
 
-    template <typename T>
+    export template <typename T>
     [[nodiscard]] std::size_t TypeToken() noexcept
     {
         constexpr auto kMask = std::numeric_limits<std::size_t>::max() >> 1;

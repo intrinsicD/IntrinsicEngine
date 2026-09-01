@@ -114,7 +114,7 @@ namespace Extrinsic::Core::Log
     static ConsoleSinkShutdown s_ConsoleSinkShutdown;
     static Level s_MinimumLogLevel = Level::Info;
 
-    void SetMinimumLevel(const Level level)
+    void SetMinimumLevel(const Level level) noexcept
     {
         s_MinimumLogLevel = level;
     }

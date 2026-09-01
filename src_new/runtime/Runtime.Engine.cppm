@@ -1,6 +1,7 @@
 module;
 
 #include <memory>
+#include <optional>
 
 export module Runtime.Engine;
 
@@ -17,6 +18,19 @@ namespace Extrinsic::Runtime
         Stopped
     };
 
+    export enum class PlatformBackend
+    {
+        Auto,
+        Linux,
+        Null
+    };
+
+    export enum class GraphicsBackend
+    {
+        Null,
+        Vulkan
+    };
+
     export struct ObservabilityConfig
     {
         Core::Log::Level MinimumLogLevel{Core::Log::Level::Info};
@@ -29,7 +43,7 @@ namespace Extrinsic::Runtime
         double MaxFrameDeltaSeconds{0.25};
 
         PlatformBackend Platform{PlatformBackend::Auto};
-        GraphicsBackend Graphics{GraphicsBackend::Null};
+        GraphicsBackend Graphics{GraphicsBackend::Vulkan};
         ObservabilityConfig Observability{};
     };
 
@@ -74,11 +88,11 @@ namespace Extrinsic::Runtime
         void RequestExit() noexcept;
         void Shutdown();
         [[nodiscard]]
-        EngineDiagnosticsSnapshot GetDiagnostics() const;
-        void ApplyObservabilityConfig(ObservabilityConfig config);
+        EngineDiagnosticsSnapshot GetDiagnostics() const noexcept;
+        void ApplyObservabilityConfig(ObservabilityConfig config) const;
 
         [[nodiscard]]
-        ObservabilityConfig GetObservabilityConfig() const;
+        ObservabilityConfig GetObservabilityConfig() const noexcept;
 
     private:
         struct Impl;
