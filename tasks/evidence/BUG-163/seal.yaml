@@ -1,0 +1,9 @@
+schema_version: 1
+task_id: BUG-163
+sealed_revision: 01988874c2ddbbc145c4229eb72819e1533828e0
+source_content_digest: b40e9be23b5963e37a10fd3bbec11e89e3f9d9a0e81dcfab47d19648e91b42ff
+report_sha256: b4aef7e52a0d67c566c21018e5553c7e451c8a9edb63fe402fb255c3471963f2
+records: []
+reason: Report generated on the retirement branch immediately before this commit; the evidence commit
+  contains the receipted commands, retirement log entry, and this report.
+generated_by: tools/agents/workflow_evidence.py
