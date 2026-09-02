@@ -1,3 +1,5 @@
+// Builds the Sandbox registry of runtime configuration sections so app wiring
+// connects every validated section to its change callback in one place.
 module;
 
 export module Extrinsic.Sandbox.ConfigSections;

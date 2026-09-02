@@ -1,3 +1,5 @@
+// Defines Sandbox method-panel models and registration so method controls use
+// the same validated runtime configuration and operation paths as other clients.
 module;
 
 #include <array>

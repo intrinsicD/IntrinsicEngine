@@ -1,3 +1,5 @@
+// Defines generational asset identity and lifecycle metadata so handles remain
+// stable while payload storage and loading stay separately owned.
 module;
 
 #include <cstdint>

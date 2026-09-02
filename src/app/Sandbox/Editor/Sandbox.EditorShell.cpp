@@ -1533,8 +1533,8 @@ namespace Extrinsic::Sandbox::Editor
             if (!canEditVisualization)
                 ImGui::BeginDisabled();
 
-            // UI-032 — preset re-clicks keep the target's tuned range/binning
-            // instead of resetting to defaults.
+            // Reapplying a preset preserves the target's tuned range and
+            // binning.
             const bool scalarAutoRange =
                 visualization.HasConfig ? visualization.ScalarAutoRange : true;
             const float scalarRangeMin =
@@ -1664,10 +1664,8 @@ namespace Extrinsic::Sandbox::Editor
             }
         }
 
-        // UI-032 — scalar-field styling controls: colormap selection, range
-        // clamping, binning, isoline styling, and explicit highlight
-        // isovalues. Every edit reissues the full config command built from
-        // the current model so unrelated fields never reset.
+        // Each edit reapplies the complete model-backed configuration so
+        // fields not represented by that control retain their values.
         void DrawScalarVisualizationControls(
             const EditorVisualizationConfigModel& visualization,
             const SandboxEditorContext& context,

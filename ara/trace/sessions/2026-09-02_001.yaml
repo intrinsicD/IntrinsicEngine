@@ -1,0 +1,48 @@
+session:
+  id: "2026-09-02_001"
+  date: "2026-09-02"
+  started: "2026-09-02T00:05+02:00"
+  last_turn: "2026-09-02T00:05+02:00"
+  turn_count: 1
+  summary: "Added reset-scoped DAG handle epochs and exact cycle-edge provenance, then exercised both through deep sanitizer-backed tests."
+
+events_logged:
+  - turn: 1
+    type: decision
+    id: N447
+    routing: direct
+    provenance: user
+    summary: "Adopted reset epochs and edge-resolved cycle diagnostics for Core.Dag."
+  - turn: 1
+    type: experiment
+    id: N448
+    routing: direct
+    provenance: ai-executed
+    summary: "Verified stale-handle rejection and aligned cycle edges through an 8,192-node sanitizer harness."
+
+ai_actions:
+  - turn: 1
+    action: "Added epoch-bearing tagged DAG handles, Clear-time epoch advancement, epoch-aware validation and emitted handles, plus CycleEdges diagnostics aligned with Cycle nodes."
+    provenance: ai-executed
+    files_changed:
+      - "src_new/core/Core.Dag.cppm"
+      - "src_new/core/Core.Dag.cpp"
+  - turn: 1
+    action: "Ran fresh Clang 20 warnings-as-errors module/link tests, parallel-edge and 8,192-node cycle checks, combined ASan+UBSan, strict src_new layering, focused source documentation, and diff hygiene."
+    provenance: ai-executed
+    files_changed: []
+
+claims_touched: []
+
+key_context:
+  - turn: 1
+    excerpt: "The user explicitly selected handle epochs and CycleEdges as the next Core.Dag slice."
+
+open_threads:
+  - "The implemented epoch is reset-scoped rather than a process-unique graph-owner token; add owner identity only if cross-Dag handle rejection becomes a contract."
+  - "Unique-edge insertion, live-subgraph compilation, and the canonical-versus-domain scheduling seam remain unimplemented parts of O164."
+  - "Add the focused behavior harness to repository CTest when src_new/core gains an active CMake target."
+
+ai_suggestions_pending:
+  - "Do not add per-slot generations until individual node or edge removal exists."
+  - "Keep task scheduling and render lowering in composed domain owners while migrating only shared topology mechanics."

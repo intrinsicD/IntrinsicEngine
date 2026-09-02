@@ -1,3 +1,5 @@
+// Declares the app-owned domain panels that present runtime snapshots and
+// commands without taking ownership of domain state or operations.
 module;
 
 #include <memory>

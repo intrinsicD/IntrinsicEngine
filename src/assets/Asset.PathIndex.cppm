@@ -1,3 +1,5 @@
+// Provides a sharded absolute-path index so repeated loads resolve to one live
+// asset identity without coupling path lookup to payload storage.
 module;
 
 #include <cstddef>

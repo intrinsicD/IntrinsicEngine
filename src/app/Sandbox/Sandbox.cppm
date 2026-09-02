@@ -1,3 +1,5 @@
+// Exposes the app-owned Sandbox session that binds editor lifetime to the
+// runtime engine without moving UI composition into runtime.
 module;
 
 #include <memory>
@@ -9,8 +11,7 @@ import Extrinsic.Runtime.ServiceRegistry;
 import Extrinsic.Runtime.WorldRegistry;
 
 export namespace Extrinsic::Sandbox {
-// Concrete app-owned state. The app root composes runtime modules itself,
-// initializes this state after the kernel is live, and tears it down
+// The session initializes only after the runtime kernel is live and shuts down
 // between Engine::BeginShutdown() and Engine::Shutdown().
 class SandboxSession final {
 public:

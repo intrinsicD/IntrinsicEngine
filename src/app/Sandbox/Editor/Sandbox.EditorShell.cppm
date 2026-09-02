@@ -1,3 +1,5 @@
+// Defines the Sandbox editor frame context and window shell so app-owned ImGui
+// panels consume runtime-prepared views and commands.
 module;
 
 #include <functional>
@@ -31,10 +33,8 @@ export namespace Extrinsic::Sandbox::Editor
         }
     };
 
-    // Sandbox owns only copied view state and feature-named command
-    // capabilities. Live ECS/assets/jobs/renderer bindings stay behind the
-    // runtime command handles and are valid only during the prepared-frame
-    // visitor that supplies this context.
+    // View data is copied, but command handles borrow live runtime services and
+    // remain valid only inside the prepared-frame visitor that supplies them.
     struct SandboxEditorContext final
     {
         SandboxEditorContext() = default;

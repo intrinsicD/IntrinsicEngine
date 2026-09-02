@@ -1,3 +1,5 @@
+// Provides type-checked payload publication and checkpoint restoration keyed by
+// AssetId, keeping CPU payload ownership separate from registry metadata.
 module;
 
 #include <cstddef>

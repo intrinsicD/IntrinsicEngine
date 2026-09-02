@@ -19,7 +19,6 @@ import Extrinsic.Asset.PathIndex;
 
 namespace Extrinsic::Assets
 {
-    // Internal callback registry using the same StrongHandle machinery.
     using InternalLoaderRegistry =
         Core::CallbackRegistry<Core::Expected<PayloadTicket>(std::string_view), AssetLoaderTag>;
     using InternalLoaderToken = InternalLoaderRegistry::Token;
@@ -170,8 +169,8 @@ namespace Extrinsic::Assets
             return *found;
         }
 
-        // Speculatively create the registry entry so the loader receives a
-        // valid AssetId for PayloadStore::Publish().
+        // Publication requires a stable AssetId, so create the registry entry
+        // before invoking the loader and unwind it on failure.
         auto idResult = m_Impl->registry.Create(Core::Hash::HashString(abs), typeId);
         if (!idResult.has_value())
         {
@@ -179,11 +178,9 @@ namespace Extrinsic::Assets
         }
         const AssetId id = *idResult;
 
-        // Run the erased loader (decode + publish) with the real id.
         auto ticket = loader(std::string_view(abs), id);
         if (!ticket.has_value())
         {
-            // Full unwind — no ghost registry entry.
             (void)m_Impl->registry.Destroy(id);
             return std::unexpected(ticket.error());
         }

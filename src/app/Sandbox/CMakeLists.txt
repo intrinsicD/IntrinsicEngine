@@ -47,6 +47,6 @@ if(INTRINSIC_BUILD_SANDBOX AND NOT INTRINSIC_HEADLESS_NO_GLFW)
 
     include(${CMAKE_SOURCE_DIR}/cmake/CompileShaders.cmake)
 
-    # Ensure promoted Sandbox runtime shader artifacts are built next to the executable.
+    # Sandbox resolves promoted runtime shaders beside its executable.
     intrinsic_add_glsl_shaders(ExtrinsicSandbox)
 endif()

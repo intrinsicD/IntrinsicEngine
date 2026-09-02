@@ -1,3 +1,5 @@
+// Provides process-local type tokens for type-erased asset payload checks;
+// token values are runtime identities and are never serialization keys.
 module;
 
 #include <cstdint>

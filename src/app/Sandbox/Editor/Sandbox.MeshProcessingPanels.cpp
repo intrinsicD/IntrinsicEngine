@@ -182,12 +182,8 @@ namespace Extrinsic::Sandbox::Editor
             }
         }
 
-        // BUG-141: a stored outcome is superseded by the next run of its own
-        // operation, but a user who is not going to run it again had no way to
-        // clear the line. Dismissal drops both the panel's own copy and the
-        // session slot the model is rebuilt from, so it does not reappear on
-        // the next frame. Draw it last: it invalidates the result the caller
-        // is rendering.
+        // Dismissal clears both the panel result and the session slot that
+        // rebuilds it. Draw this control after all readers of the panel result.
         template <typename ResultT>
         void DrawDismissLastResultButton(
             const char* const label,
@@ -613,10 +609,8 @@ namespace Extrinsic::Sandbox::Editor
         {
             const Runtime::EditorDomainWindowModel& model =
                 GetDomainWindowModel(context, kind);
-            // BUG-141: `DrawDomainWindowHeader` already renders
-            // `model.Diagnostics`, into which the runtime folds
-            // `model.Processing.Diagnostics`. Rendering the processing list
-            // again here printed every entry twice.
+            // The header already includes processing diagnostics; render them
+            // only once.
             DrawDomainWindowHeader(model);
             if (!DomainWindowReady(model) ||
                 !model.Processing.HasSelectedEntity)
@@ -799,8 +793,8 @@ namespace Extrinsic::Sandbox::Editor
             "Geometry status: %s",
             IndexedName(result->DenoiseStatus, kDenoiseStatusNames));
         ImGui::Text("Stage: %s", MeshDenoiseStageName(result->Stage));
-        // NoChange means the kernel ran and moved nothing, so its diagnostics
-        // are exactly what explains why — keep showing them.
+        // NoChange still means the kernel executed, so its diagnostics remain
+        // relevant.
         const bool kernelRan =
             result->Succeeded() ||
             result->Status == Runtime::EditorCommandStatus::NoChange;
@@ -915,8 +909,8 @@ namespace Extrinsic::Sandbox::Editor
             "Output: %s",
             Runtime::DebugNameForEditorMeshCurvatureOutput(
                 result->Output));
-        // BUG-145: NoChange means the kernel ran and changed nothing, so its
-        // counters are exactly what explains why — keep showing them.
+        // NoChange still means the kernel executed, so its counters remain
+        // relevant.
         if (result->Succeeded() ||
             result->Status == Runtime::EditorCommandStatus::NoChange)
         {
@@ -1397,8 +1391,8 @@ namespace Extrinsic::Sandbox::Editor
             Runtime::DebugNameForEditorMeshRemeshMode(result->Mode),
             Runtime::DebugNameForEditorMeshRemeshSizingLaw(
                 result->SizingLaw));
-        // BUG-145: NoChange means the operation ran and left the mesh
-        // identical, so its counters are exactly what explains why.
+        // NoChange still means the operation executed, so its counters remain
+        // relevant.
         if (result->Succeeded() ||
             result->Status == Runtime::EditorCommandStatus::NoChange)
         {
@@ -1793,8 +1787,8 @@ namespace Extrinsic::Sandbox::Editor
         ImGui::Text(
             "Weighting: %s",
             IndexedName(result->Weighting, kMeshNormalWeightingNames));
-        // BUG-145: NoChange means the kernel ran and changed nothing, so its
-        // counters are exactly what explains why — keep showing them.
+        // NoChange still means the kernel executed, so its counters remain
+        // relevant.
         if (result->Succeeded() ||
             result->Status == Runtime::EditorCommandStatus::NoChange)
         {
@@ -2195,10 +2189,8 @@ namespace Extrinsic::Sandbox::Editor
                 "Last ICP run: %s",
                 Runtime::DebugNameForEditorCommandStatus(
                     result.Status));
-            // BUG-096: show the variant that actually ran, not only the one
-            // that was asked for. Runtime now refuses a point-to-plane request
-            // it cannot satisfy, so these agree — and a disagreement is a bug
-            // the user can see rather than one they cannot.
+            // Accepted requests expose both requested and effective variants;
+            // keeping both visible makes any runtime-contract mismatch obvious.
             ImGui::Text(
                 "Variant: %s (ran %s)",
                 Runtime::DebugNameForEditorICPVariant(result.Variant),
@@ -2249,6 +2241,4 @@ namespace Extrinsic::Sandbox::Editor
         m_Impl->Unregister();
     }
 
-    // The app owns panel registration, ImGui state, and draw controllers.
-    // Runtime retains snapshots, typed operations, undo, jobs, and results.
 }

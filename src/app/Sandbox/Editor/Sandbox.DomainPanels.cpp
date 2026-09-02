@@ -1130,12 +1130,9 @@ void DrawTextureBakeControls(const EditorTextureBakeControlsModel &model,
   DrawDiagnostics(model.Diagnostics);
 }
 
-// UI-031 Slice D: the domain Properties window is a pure property
-// explorer — it lists every property and its value preview and does NOT
-// host render-hint, texture-bake, or property-binding controls (those
-// moved to the Appearance window). Internal/connectivity/generated
-// property rows stay visible; unsupported edit/bind states are marked by
-// the catalog rows rather than hidden.
+// Properties is an exhaustive explorer: internal, connectivity, and generated
+// rows remain visible, with unsupported actions diagnosed rather than hidden.
+// Render, binding, and bake controls belong to Appearance.
 void DrawDomainPropertyWindow(const EditorDomainWindowModel &model) {
   DrawDomainWindowHeader(model);
   if (!DomainWindowReady(model))
@@ -1357,8 +1354,7 @@ void DrawVisualizationPropertyPresets(
   if (!canEditVisualization)
     ImGui::BeginDisabled();
 
-  // UI-032 — preset re-clicks keep the target's tuned range/binning
-  // instead of resetting to defaults.
+  // Reapplying a preset preserves the target's tuned range and binning.
   const bool scalarAutoRange =
       visualization.HasConfig ? visualization.ScalarAutoRange : true;
   const float scalarRangeMin =
@@ -1462,10 +1458,8 @@ void DrawUniformVisualizationColorEdit(
   }
 }
 
-// UI-032 — scalar-field styling controls: colormap selection, range
-// clamping, binning, isoline styling, and explicit highlight
-// isovalues. Every edit reissues the full config command built from
-// the current model so unrelated fields never reset.
+// Each edit reapplies the complete model-backed configuration so fields not
+// represented by that control retain their values.
 void DrawScalarVisualizationControls(
     const EditorVisualizationConfigModel &visualization,
     const SandboxEditorContext &context, const std::uint32_t selectedStableId,
@@ -1589,10 +1583,8 @@ void DrawDomainVisualizationControls(
     const EditorDomainWindowModel &model,
     const SandboxEditorContext &context);
 
-// UI-031 Slices A/B: the domain `Render` section renders as the
-// "Appearance" window and co-locates render hints, bound render-state
-// inspection, visualization controls, property/attribute assignment,
-// and texture baking.
+// Appearance owns render hints and state, visualization controls, property and
+// attribute bindings, and texture baking.
 void DrawDomainRenderWindow(const EditorDomainWindowModel &model,
                             const SandboxEditorContext &context,
                             TextureBakeUiState *textureBakeState) {
@@ -1729,8 +1721,7 @@ void DrawPointCloudOutlierRemovalResultStatus(
               result.Method == EditorPointCloudOutlierMethod::Statistical
                   ? "Statistical"
                   : "Radius");
-  // BUG-145: NoChange means the kernel ran and rejected nothing, so its
-  // counters are exactly what explains why — keep showing them.
+  // NoChange still means the kernel executed, so its counters remain relevant.
   if (result.Succeeded() ||
       result.Status == EditorCommandStatus::NoChange) {
     ImGui::Text("Kept %zu / %zu  rejected %zu  non-finite %zu",
@@ -1832,9 +1823,7 @@ void DrawDomainProcessingWindow(
     const EditorDomainWindowModel &model,
     const SandboxEditorContext &context,
     PointCloudOutlierRemovalUiState *pointCloudOutlierState) {
-  // BUG-141: `DrawDomainWindowHeader` already renders `model.Diagnostics`,
-  // into which the runtime folds `model.Processing.Diagnostics`. Rendering the
-  // processing list again here printed every entry twice.
+  // The header already includes processing diagnostics; render them only once.
   DrawDomainWindowHeader(model);
 
   const EditorGeometryProcessingModel &processing = model.Processing;
@@ -2094,6 +2083,4 @@ void DomainPanels::Register(EditorShell &editorShell) {
 
 void DomainPanels::Unregister() { m_Impl->Unregister(); }
 
-// The app owns stable registrations, ImGui state, and draw controllers.
-// Runtime retains model construction, command/history, jobs, and result sinks.
 } // namespace Extrinsic::Sandbox::Editor
