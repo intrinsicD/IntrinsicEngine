@@ -19,6 +19,25 @@ contract_review: >-
 ---
 # BUG-163 — Strict root hygiene rejects `src_new/`, failing docs-validation on every run
 
+## Status
+
+- Resolved and retired on 2026-09-02. The repository owner implemented
+  disposition **(b)** directly on `main`: commit `17d9d29a`
+  ("removed src_new") deletes the entire `src_new/` experiment tree
+  (3,678 deletions, no other changes), so no undocumented root entry
+  remains and `tools/repo/root_allowlist.yaml` is unchanged.
+- Verified on the first tree containing that commit (the PR #1034 branch
+  after merging `main`): `python3 tools/repo/check_root_hygiene.py
+  --root . --strict` passes and
+  `python3 tests/regression/tooling/Test.RootHygiene.py` passes 12/12.
+- Precision correction recorded at retirement: the `docs-validation` job
+  (`ci-docs.yml`) is triggered by pull requests only, so there is no
+  main-push run to observe. Gate confirmation is each PR's
+  `docs-validation` lane once its merge ref contains `17d9d29a`.
+- The only other in-tree `src_new` references are April-2026 archive and
+  review records about an unrelated earlier reorganization; nothing
+  live pointed at the removed experiment.
+
 ## Goal
 
 - Restore a green `check_root_hygiene.py --strict` gate (the final step of the
@@ -60,32 +79,41 @@ contract_review: >-
 
 ## Required changes
 
-- [ ] Record the owner's disposition here: **(a)** add `src_new/` to
+- [x] Record the owner's disposition here: **(a)** add `src_new/` to
       `tools/repo/root_allowlist.yaml` as a documented temporary experiment
       root (this task is the tracking record; name the removal condition,
       e.g. "experiment merged into `src/` or archived to a branch"), or
       **(b)** move the experiment out of the root (e.g. under `research/` or
       onto a dedicated branch) and leave the allowlist unchanged.
-- [ ] Implement the chosen disposition in a minimal slice.
-- [ ] Confirm the `docs-validation` lane is green on the next `main` push.
+      (Owner chose **(b)** by removing the tree; see Status.)
+- [x] Implement the chosen disposition in a minimal slice. (Implemented by
+      the owner in `main` commit `17d9d29a`, a pure deletion.)
+- [x] Confirm the `docs-validation` lane is green on the next `main` push.
+      (Corrected in Status: the lane is PR-triggered; the strict gate is
+      verified green locally on the post-removal tree, and PR lanes confirm
+      once their merge refs contain `17d9d29a`.)
 
 ## Tests
 
-- [ ] `python3 tools/repo/check_root_hygiene.py --root . --strict` passes
+- [x] `python3 tools/repo/check_root_hygiene.py --root . --strict` passes
       locally on the resulting tree.
-- [ ] `python3 tests/regression/tooling/Test.RootHygiene.py` passes.
+- [x] `python3 tests/regression/tooling/Test.RootHygiene.py` passes.
 
 ## Docs
 
-- [ ] If (a): the allowlist entry carries a short comment naming this task
-      as the removal owner; no other docs owed.
-- [ ] If (b): update any references to the experiment's location.
+- [x] If (a): the allowlist entry carries a short comment naming this task
+      as the removal owner; no other docs owed. (N/A — (b) chosen.)
+- [x] If (b): update any references to the experiment's location. (None
+      existed outside this task, its index entry, and the generated session
+      brief; see Status.)
 
 ## Acceptance criteria
 
-- [ ] The strict root-hygiene gate is green on the `main` head.
-- [ ] No undocumented root entry remains; if an exception exists, it names
-      this task and a removal condition.
+- [x] The strict root-hygiene gate is green on the `main` head. (Verified
+      by running the strict check on a tree containing the `main` head
+      `17d9d29a`; the CI lane itself is PR-triggered, see Status.)
+- [x] No undocumented root entry remains; if an exception exists, it names
+      this task and a removal condition. (No exception was added.)
 
 ## Verification
 
