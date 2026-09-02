@@ -2,9 +2,9 @@ session:
   id: "2026-09-02_001"
   date: "2026-09-02"
   started: "2026-09-02T00:05+02:00"
-  last_turn: "2026-09-02T00:05+02:00"
-  turn_count: 1
-  summary: "Added reset-scoped DAG handle epochs and exact cycle-edge provenance, then exercised both through deep sanitizer-backed tests."
+  last_turn: "2026-09-02T16:43+02:00"
+  turn_count: 2
+  summary: "Added reset-scoped DAG handle epochs and exact cycle-edge provenance, then completed BUG-156 atomic principal-curvature publication with full CPU and sanitizer verification."
 
 events_logged:
   - turn: 1
@@ -19,6 +19,12 @@ events_logged:
     routing: direct
     provenance: ai-executed
     summary: "Verified stale-handle rejection and aligned cycle edges through an 8,192-node sanitizer harness."
+  - turn: 2
+    type: experiment
+    id: N449
+    routing: direct
+    provenance: ai-executed
+    summary: "Completed atomic runtime principal-curvature publication and passed canonical CPU, ASan, UBSan, and structural gates."
 
 ai_actions:
   - turn: 1
@@ -31,17 +37,35 @@ ai_actions:
     action: "Ran fresh Clang 20 warnings-as-errors module/link tests, parallel-edge and 8,192-node cycle checks, combined ASan+UBSan, strict src_new layering, focused source documentation, and diff hygiene."
     provenance: ai-executed
     files_changed: []
+  - turn: 2
+    action: "Selected BUG-156 as the highest-value unblocked Framework24 dependency, then added canonical principal-scalar names and extended runtime capture, validation, apply, history, result counts, tests, and current-state docs."
+    provenance: ai-executed
+    files_changed:
+      - "src/ecs/Components/ECS.Component.GeometrySources.cppm"
+      - "src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Mesh.cpp"
+      - "src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.cppm"
+      - "tests/contract/runtime/Test.SandboxEditorMeshMethods.cpp"
+      - "docs/architecture/runtime.md"
+      - "docs/product/framework24-convergence.md"
+      - "tasks/active/BUG-156-curvature-two-ring-smoothing-cancels-features.md"
+  - turn: 2
+    action: "Ran canonical Clang 23 build, 75 focused tests, 4,257 CPU tests, 2,745 ASan tests, 2,745 UBSan registrations, generated-artifact checks, and strict structural validators."
+    provenance: ai-executed
+    files_changed: []
 
 claims_touched: []
 
 key_context:
   - turn: 1
     excerpt: "The user explicitly selected handle epochs and CycleEdges as the next Core.Dag slice."
+  - turn: 2
+    excerpt: "The user asked the agent to read active tasks and continue with the next best one; BUG-156 was the direct unblocked Framework24 workflow dependency."
 
 open_threads:
   - "The implemented epoch is reset-scoped rather than a process-unique graph-owner token; add owner identity only if cross-Dag handle rejection becomes a contract."
   - "Unique-edge insertion, live-subgraph compilation, and the canonical-versus-domain scheduling seam remain unimplemented parts of O164."
   - "Add the focused behavior harness to repository CTest when src_new/core gains an active CMake target."
+  - "BUG-156 requires an independent fixed-surface high-risk review before retirement; BENCH-001 remains the owner of any claim-grade Framework24 parity result."
 
 ai_suggestions_pending:
   - "Do not add per-slot generations until individual node or edge removal exists."

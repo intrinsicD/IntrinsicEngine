@@ -10463,3 +10463,27 @@ tree:
       edge handles under ASan and UBSan. Strict src_new layering, source synopsis
       and comment audit, and diff whitespace checks passed.
     status: resolved
+  - id: N449
+    type: experiment
+    title: "Complete BUG-156 runtime principal-scalar publication"
+    provenance: ai-executed
+    timestamp: "2026-09-02T16:43+02:00"
+    also_depends_on: [N440]
+    evidence:
+      - "src/ecs/Components/ECS.Component.GeometrySources.cppm"
+      - "src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Mesh.cpp"
+      - "tests/contract/runtime/Test.SandboxEditorMeshMethods.cpp"
+      - "cmake --build --preset ci --target IntrinsicTests"
+      - "75-case focused curvature/runtime selector"
+      - "4,257-case CPU-supported selector"
+      - "2,745-case ASan and UBSan selectors"
+      - "strict layering, task, docs, ARA, workflow, and workshop validators"
+    result: >
+      Runtime publication now captures, validates, applies, undoes, and redoes
+      minimum and maximum principal curvature with mean and Gaussian curvature
+      as one transaction, and a queued edit to either principal-scalar source
+      invalidates stale work. Canonical Clang 23 build and focused, complete
+      CPU, ASan, UBSan, and structural gates passed. BUG-156 remains active
+      only for its independent fixed-surface high-risk review; no parity or
+      performance claim was added.
+    status: resolved

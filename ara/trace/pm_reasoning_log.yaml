@@ -1650,3 +1650,10 @@ entries:
       - "Added no narrower staged observation because N447 directly records the committed architecture choice and N448 binds it to the exact implementation evidence."
       - "Recorded reset-scoped epochs precisely; cross-Dag owner identity and per-slot generations were not implemented or claimed."
       - "Did not stale O161-O164 because this turn directly revisited the Core.Dag architecture topic; no unrelated observation gained a closure signal."
+  - turn: "2026-09-02_001#2"
+    notes:
+      - "Routed the bounded runtime-publication implementation and its canonical CPU, sanitizer, and structural verification as experiment N449; routine active-task ranking and repository reads remained session actions."
+      - "Added no observation or claim: this is ordinary runtime contract work and does not broaden C53; BENCH-001 retains claim-grade Framework24 parity ownership."
+      - "Kept BUG-156 active because independent fixed-surface high-risk review remains unsatisfied; the task was not retired."
+      - "Recorded the fresh ASan pass of the formerly BUG-118-owned GLFW/LSan case as a journey fact only; one pass does not retire or rewrite BUG-118."
+      - "Did not promote or stale O161-O164: this turn is unrelated to Core.Dag and occurs on the same session-day."

@@ -2230,10 +2230,14 @@ struct EditorJobResult { std::string Diagnostic{}; };
         {
             bool HadMean{false};
             bool HadGaussian{false};
+            bool HadMinPrincipal{false};
+            bool HadMaxPrincipal{false};
             bool HadDir1{false};
             bool HadDir2{false};
             std::vector<double> Mean{};
             std::vector<double> Gaussian{};
+            std::vector<double> MinPrincipal{};
+            std::vector<double> MaxPrincipal{};
             std::vector<glm::vec3> Dir1{};
             std::vector<glm::vec3> Dir2{};
         };
@@ -2248,6 +2252,14 @@ struct EditorJobResult { std::string Diagnostic{}; };
             return CountChangedValues(before.HadMean, before.Mean, after.Mean) +
                    CountChangedValues(
                        before.HadGaussian, before.Gaussian, after.Gaussian) +
+                   CountChangedValues(
+                       before.HadMinPrincipal,
+                       before.MinPrincipal,
+                       after.MinPrincipal) +
+                   CountChangedValues(
+                       before.HadMaxPrincipal,
+                       before.MaxPrincipal,
+                       after.MaxPrincipal) +
                    CountChangedValues(before.HadDir1, before.Dir1, after.Dir1) +
                    CountChangedValues(before.HadDir2, before.Dir2, after.Dir2);
         }
@@ -2329,10 +2341,14 @@ struct EditorJobResult { std::string Diagnostic{}; };
         {
             return lhs.HadMean == rhs.HadMean &&
                    lhs.HadGaussian == rhs.HadGaussian &&
+                   lhs.HadMinPrincipal == rhs.HadMinPrincipal &&
+                   lhs.HadMaxPrincipal == rhs.HadMaxPrincipal &&
                    lhs.HadDir1 == rhs.HadDir1 &&
                    lhs.HadDir2 == rhs.HadDir2 &&
                    lhs.Mean == rhs.Mean &&
                    lhs.Gaussian == rhs.Gaussian &&
+                   lhs.MinPrincipal == rhs.MinPrincipal &&
+                   lhs.MaxPrincipal == rhs.MaxPrincipal &&
                    SameVec3PropertyValues(lhs.Dir1, rhs.Dir1) &&
                    SameVec3PropertyValues(lhs.Dir2, rhs.Dir2);
         }
@@ -2347,6 +2363,12 @@ struct EditorJobResult { std::string Diagnostic{}; };
                    (state.HadGaussian
                         ? state.Gaussian.size() == expectedCount
                         : state.Gaussian.empty()) &&
+                   (state.HadMinPrincipal
+                        ? state.MinPrincipal.size() == expectedCount
+                        : state.MinPrincipal.empty()) &&
+                   (state.HadMaxPrincipal
+                        ? state.MaxPrincipal.size() == expectedCount
+                        : state.MaxPrincipal.empty()) &&
                    (state.HadDir1
                         ? state.Dir1.size() == expectedCount
                         : state.Dir1.empty()) &&
@@ -2401,6 +2423,20 @@ struct EditorJobResult { std::string Diagnostic{}; };
                        expectedCount,
                        out.HadGaussian,
                        out.Gaussian,
+                       diagnostic) &&
+                   CaptureCurvatureProperty<double>(
+                       properties,
+                       GS::PropertyNames::kMinPrincipalCurvature,
+                       expectedCount,
+                       out.HadMinPrincipal,
+                       out.MinPrincipal,
+                       diagnostic) &&
+                   CaptureCurvatureProperty<double>(
+                       properties,
+                       GS::PropertyNames::kMaxPrincipalCurvature,
+                       expectedCount,
+                       out.HadMaxPrincipal,
+                       out.MaxPrincipal,
                        diagnostic) &&
                    CaptureCurvatureProperty<glm::vec3>(
                        properties,
@@ -2461,6 +2497,18 @@ struct EditorJobResult { std::string Diagnostic{}; };
                        state.HadGaussian,
                        state.Gaussian,
                        0.0) &&
+                   ApplyCurvatureProperty<double>(
+                       properties,
+                       GS::PropertyNames::kMinPrincipalCurvature,
+                       state.HadMinPrincipal,
+                       state.MinPrincipal,
+                       0.0) &&
+                   ApplyCurvatureProperty<double>(
+                       properties,
+                       GS::PropertyNames::kMaxPrincipalCurvature,
+                       state.HadMaxPrincipal,
+                       state.MaxPrincipal,
+                       0.0) &&
                    ApplyCurvatureProperty<glm::vec3>(
                        properties,
                        GS::PropertyNames::kPrincipalDir1,
@@ -2504,6 +2552,70 @@ struct EditorJobResult { std::string Diagnostic{}; };
         {
             return output == EditorMeshCurvatureOutput::All ||
                    output == EditorMeshCurvatureOutput::PrincipalDirections;
+        }
+
+        // Mean and Gaussian curvature are derived from the principal values,
+        // so all four scalar fields publish as one transaction. Validity checks
+        // must short-circuit before Vector() accesses an invalid property.
+        [[nodiscard]] bool MeshCurvatureScalarsUsable(
+            const Curv::CurvatureField& curvature,
+            const std::size_t expectedCount) noexcept
+        {
+            return curvature.MeanCurvatureProperty &&
+                   curvature.GaussianCurvatureProperty &&
+                   curvature.MinPrincipalCurvatureProperty &&
+                   curvature.MaxPrincipalCurvatureProperty &&
+                   curvature.MeanCurvatureProperty.Vector().size() ==
+                       expectedCount &&
+                   curvature.GaussianCurvatureProperty.Vector().size() ==
+                       expectedCount &&
+                   curvature.MinPrincipalCurvatureProperty.Vector().size() ==
+                       expectedCount &&
+                   curvature.MaxPrincipalCurvatureProperty.Vector().size() ==
+                       expectedCount;
+        }
+
+        [[nodiscard]] std::size_t CountNonFiniteMeshCurvatureScalars(
+            const Curv::CurvatureField& curvature) noexcept
+        {
+            const auto count = [](const std::vector<double>& values) noexcept
+            {
+                return CountNonFiniteScalars(
+                    std::span<const double>{values.data(), values.size()});
+            };
+            return count(curvature.MeanCurvatureProperty.Vector()) +
+                   count(curvature.GaussianCurvatureProperty.Vector()) +
+                   count(curvature.MinPrincipalCurvatureProperty.Vector()) +
+                   count(curvature.MaxPrincipalCurvatureProperty.Vector());
+        }
+
+        void StageMeshCurvatureScalars(
+            const Curv::CurvatureField& curvature,
+            MeshCurvaturePropertyState& after,
+            EditorMeshCurvatureResult& result)
+        {
+            const std::vector<double>& mean =
+                curvature.MeanCurvatureProperty.Vector();
+            const std::vector<double>& gaussian =
+                curvature.GaussianCurvatureProperty.Vector();
+            const std::vector<double>& minPrincipal =
+                curvature.MinPrincipalCurvatureProperty.Vector();
+            const std::vector<double>& maxPrincipal =
+                curvature.MaxPrincipalCurvatureProperty.Vector();
+
+            after.HadMean = true;
+            after.Mean = mean;
+            after.HadGaussian = true;
+            after.Gaussian = gaussian;
+            after.HadMinPrincipal = true;
+            after.MinPrincipal = minPrincipal;
+            after.HadMaxPrincipal = true;
+            after.MaxPrincipal = maxPrincipal;
+
+            result.ScalarPropertyCount = 4u;
+            result.ScalarWrittenCount = mean.size() + gaussian.size() +
+                                        minPrincipal.size() +
+                                        maxPrincipal.size();
         }
 
         [[nodiscard]] EditorCommandHistoryStatus ApplyMeshCurvatureState(
@@ -6574,12 +6686,7 @@ struct EditorJobResult { std::string Diagnostic{}; };
 
             Curv::CurvatureField curvature =
                 Curv::ComputeCurvature(state->Mesh);
-            if (!curvature.MeanCurvatureProperty ||
-                !curvature.GaussianCurvatureProperty ||
-                curvature.MeanCurvatureProperty.Vector().size() !=
-                    result.VertexSlotCount ||
-                curvature.GaussianCurvatureProperty.Vector().size() !=
-                    result.VertexSlotCount)
+            if (!MeshCurvatureScalarsUsable(curvature, result.VertexSlotCount))
             {
                 result.Status =
                     EditorCommandStatus::GeometryProcessingFailed;
@@ -6612,15 +6719,8 @@ struct EditorJobResult { std::string Diagnostic{}; };
                     });
             }
 
-            const std::vector<double>& mean =
-                curvature.MeanCurvatureProperty.Vector();
-            const std::vector<double>& gaussian =
-                curvature.GaussianCurvatureProperty.Vector();
             result.NonFiniteScalarCount =
-                CountNonFiniteScalars(
-                    std::span<const double>{mean.data(), mean.size()}) +
-                CountNonFiniteScalars(
-                    std::span<const double>{gaussian.data(), gaussian.size()});
+                CountNonFiniteMeshCurvatureScalars(curvature);
             if (result.NonFiniteScalarCount != 0u)
             {
                 result.Status =
@@ -6635,12 +6735,10 @@ struct EditorJobResult { std::string Diagnostic{}; };
             }
 
             state->CurvatureAfter = state->CurvatureBefore;
-            state->CurvatureAfter.HadMean = true;
-            state->CurvatureAfter.Mean = mean;
-            state->CurvatureAfter.HadGaussian = true;
-            state->CurvatureAfter.Gaussian = gaussian;
-            result.ScalarPropertyCount = 2u;
-            result.ScalarWrittenCount = mean.size() + gaussian.size();
+            StageMeshCurvatureScalars(
+                curvature,
+                state->CurvatureAfter,
+                result);
 
             if (result.DirectionsRequested &&
                 result.DirectionsAvailable)
@@ -9959,12 +10057,7 @@ ApplyEditorMeshCurvatureCommand(
         }
 
         Curv::CurvatureField curvature = Curv::ComputeCurvature(source.Mesh);
-        if (!curvature.MeanCurvatureProperty ||
-            !curvature.GaussianCurvatureProperty ||
-            curvature.MeanCurvatureProperty.Vector().size() !=
-                result.VertexSlotCount ||
-            curvature.GaussianCurvatureProperty.Vector().size() !=
-                result.VertexSlotCount)
+        if (!MeshCurvatureScalarsUsable(curvature, result.VertexSlotCount))
         {
             result.Status = EditorCommandStatus::GeometryProcessingFailed;
             result.Error = Core::ErrorCode::InvalidArgument;
@@ -9989,15 +10082,8 @@ ApplyEditorMeshCurvatureCommand(
             return result;
         }
 
-        const std::vector<double>& mean =
-            curvature.MeanCurvatureProperty.Vector();
-        const std::vector<double>& gaussian =
-            curvature.GaussianCurvatureProperty.Vector();
         result.NonFiniteScalarCount =
-            CountNonFiniteScalars(
-                std::span<const double>{mean.data(), mean.size()}) +
-            CountNonFiniteScalars(
-                std::span<const double>{gaussian.data(), gaussian.size()});
+            CountNonFiniteMeshCurvatureScalars(curvature);
         if (result.NonFiniteScalarCount != 0u)
         {
             result.Status = EditorCommandStatus::GeometryProcessingFailed;
@@ -10008,12 +10094,7 @@ ApplyEditorMeshCurvatureCommand(
         }
 
         MeshCurvaturePropertyState after = before;
-        after.HadMean = true;
-        after.Mean = mean;
-        after.HadGaussian = true;
-        after.Gaussian = gaussian;
-        result.ScalarPropertyCount = 2u;
-        result.ScalarWrittenCount = mean.size() + gaussian.size();
+        StageMeshCurvatureScalars(curvature, after, result);
 
         if (result.DirectionsRequested &&
             result.DirectionsAvailable)

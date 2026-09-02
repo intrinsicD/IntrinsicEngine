@@ -309,8 +309,8 @@ sessions:
     open_threads: 3
   - id: "2026-09-02_001"
     date: "2026-09-02"
-    summary: "Added reset-scoped DAG handle epochs and exact cycle-edge provenance, then exercised both through deep sanitizer-backed tests."
-    turn_count: 1
-    events_count: 2
+    summary: "Added reset-scoped DAG handle epochs and exact cycle-edge provenance, then completed BUG-156 atomic principal-curvature publication with full CPU and sanitizer verification."
+    turn_count: 2
+    events_count: 3
     claims_touched: []
-    open_threads: 3
+    open_threads: 4

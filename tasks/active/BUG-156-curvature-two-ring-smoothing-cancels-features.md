@@ -23,13 +23,17 @@ maturity_target: CPUContracted
   the previous accuracy claim is no longer the selected product contract.
 - A local, non-claim-eligible differential of the deterministic direct port
   matched sequential Framework24 on all 3,669 sculpt vertices with maximum
-  absolute errors of `6.22e-15` (`kmin`) and `2.78e-15` (`kmax`). The final
-  unsanitized CPU gate passes all 4,256 selected tests and the final UBSan gate
-  passes all 2,744 selected tests. The isolated ASan gate is blocked only by
-  the repeatable pre-existing GLFW/X11 LeakSanitizer failure tracked as
-  BUG-118. This repair's exact-revision independent review remains open;
-  `BENCH-001` separately owns the frozen claim-grade matched run required for a
-  claim-eligible Framework24 parity statement.
+  absolute errors of `6.22e-15` (`kmin`) and `2.78e-15` (`kmax`).
+- The runtime publication slice now persists minimum and maximum principal
+  curvature with mean/Gaussian curvature and optional directions in the same
+  transaction, including stale-state rejection and undo/redo. On 2026-09-02,
+  the final surface passed the 75-case focused selector, all 4,257
+  CPU-supported cases, all 2,745 ASan cases (including the formerly failing
+  BUG-118 GLFW/LSan capability case), and all 2,745 UBSan registrations (with
+  that ASan-only capability case skipped as designed). This repair's
+  exact-revision independent review remains open; `BENCH-001` separately owns
+  the frozen claim-grade matched run required for a claim-eligible Framework24
+  parity statement.
 - The original BUG-156 live review cycle exhausted its fourth bounded writer
   attempt when the strict maturity validator required one final task-wording
   correction. Its state is retained without manual mutation; BUG-162 owns the
@@ -104,7 +108,7 @@ maturity_target: CPUContracted
 | `RuntimeModule` | Reuse the existing synchronous and queued mesh-curvature operation. |
 | Config/agent | Reuse the existing fixed command; no parameter surface is added. |
 | UI | Reuse Mesh / Processing / Curvature and its existing diagnostics result. |
-| Publication | Geometry publishes min/max/mean/Gaussian curvature and principal directions on the originating vertex domain. The existing runtime command currently persists mean/Gaussian plus optional directions; BUG-156 retains ownership of adding min/max persistence, undo/redo state, discovery, and tests before retirement. |
+| Publication | Geometry publishes min/max/mean/Gaussian curvature and principal directions on the originating vertex domain. The runtime command persists all four scalar fields plus optional directions in one transaction with stale-state rejection and undo/redo. |
 | End-to-end tests | Geometry parity fixtures plus the existing runtime and Sandbox curvature-operation contracts. |
 
 ## Right-sizing
@@ -127,7 +131,7 @@ maturity_target: CPUContracted
 - [x] Retain deterministic finite diagnostics and fail closed on unsupported or
       non-finite triangle support without changing well-conditioned parity.
 - [x] Correct the PMP corpus probe's `use_tensor`/`use_two_ring` argument order.
-- [ ] Extend the existing runtime curvature transaction to persist canonical
+- [x] Extend the existing runtime curvature transaction to persist canonical
       minimum and maximum principal scalar properties alongside mean/Gaussian,
       including undo/redo capture and truthful result counts.
 
@@ -143,7 +147,7 @@ maturity_target: CPUContracted
       expectations updated to the selected contract.
 - [x] Run direct Intrinsic/Framework24 parity on `tests/data/sculpt.obj` using
       identical coordinates and record maximum and relative field errors.
-- [ ] Cover synchronous and queued runtime publication, stale-state rejection,
+- [x] Cover synchronous and queued runtime publication, stale-state rejection,
       undo, and redo for both principal scalar properties.
 
 ## Docs
@@ -170,9 +174,9 @@ maturity_target: CPUContracted
       parallel race.
 - [x] Runtime publication remains finite and same-cardinality, with no topology
       or unrelated-property mutation.
-- [ ] Runtime persists min/max principal scalars through the same atomic
+- [x] Runtime persists min/max principal scalars through the same atomic
       transaction, undo/redo, and property-discovery path as mean/Gaussian.
-- [ ] Focused geometry/runtime tests, full CPU gate, isolated ASan/UBSan gates,
+- [x] Focused geometry/runtime tests, full CPU gate, isolated ASan/UBSan gates,
       and strict structural/documentation checks pass on the final surface.
 - [ ] Independent fixed-surface review accepts the high-risk public numerical
       contract and runtime-publication surface.
@@ -185,15 +189,16 @@ maturity_target: CPUContracted
   agreement above `0.999999959`. `BENCH-001` must reproduce any claim intended
   to enter the product-convergence scorecard under its clean frozen
   claim-grade protocol.
-- Focused final curvature/runtime/segmentation selector: 74/74 passed.
-- Final unsanitized CPU selector: 4,256/4,256 passed; the dedicated GLFW LSan
+- Focused final curvature/runtime/segmentation selector: 75/75 passed.
+- Final unsanitized CPU selector: 4,257/4,257 passed; the dedicated GLFW LSan
   capability case skipped outside ASan as designed.
-- Final UBSan CPU selector: 2,744/2,744 passed; the same capability case
-  skipped as designed.
-- ASan CPU selector: every BUG-156-owned and other selected case passed, but
-  `GlfwLifecycleLsan.EngineStaticTeardownAndLeakControl` failed with a
-  repeatable 408-byte `libX11.so.6` allocation. Three focused reruns reproduced
-  it; BUG-118 owns the required diagnosis without weakening the gate.
+- Final ASan CPU selector: 2,745/2,745 passed, including
+  `GlfwLifecycleLsan.EngineStaticTeardownAndLeakControl`.
+- Final UBSan CPU selector: 2,745/2,745 registrations passed; the ASan-only
+  GLFW LSan capability case skipped as designed.
+- Strict layering, test-layout, task-policy, task-schema, documentation-link,
+  ARA, workflow-evidence, and automated clean-workshop checks passed. The
+  regenerated 387-module inventory was unchanged.
 
 ```bash
 cmake --preset ci
@@ -235,7 +240,7 @@ python3 tools/agents/workflow_evidence.py validate --root .
   runtime property-publication contract. No `Operational` follow-up is owed for
   this geometry-owned CPU operation; `UI-050` owns vector-field visibility and
   `BENCH-001`/`REVIEW-004` own the product-level evidence gate.
-- Current: the geometry kernel and reference-derived regression anchors are
-  CPU-contracted; runtime min/max persistence and the exact-surface high-risk
-  review remain open. `BENCH-001` and `REVIEW-004` own any later
-  claim-eligible `ParityProven` product verdict.
+- Current: the geometry kernel, reference-derived regression anchors, and
+  complete runtime property-publication contract are CPU-contracted; only the
+  exact-surface high-risk review remains open. `BENCH-001` and `REVIEW-004` own
+  any later claim-eligible `ParityProven` product verdict.

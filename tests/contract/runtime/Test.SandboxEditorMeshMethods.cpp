@@ -1687,6 +1687,8 @@ TEST(SandboxEditorUi, MeshCurvatureCommandPublishesCanonicalPropertiesAndSupport
     auto& properties = registry.Raw().get<GS::Vertices>(mesh).Properties;
     ASSERT_FALSE(properties.Exists(PN::kMeanCurvature));
     ASSERT_FALSE(properties.Exists(PN::kGaussianCurvature));
+    ASSERT_FALSE(properties.Exists(PN::kMinPrincipalCurvature));
+    ASSERT_FALSE(properties.Exists(PN::kMaxPrincipalCurvature));
     ASSERT_FALSE(properties.Exists(PN::kPrincipalDir1));
     ASSERT_FALSE(properties.Exists(PN::kPrincipalDir2));
 
@@ -1710,8 +1712,8 @@ TEST(SandboxEditorUi, MeshCurvatureCommandPublishesCanonicalPropertiesAndSupport
     EXPECT_EQ(result.IllConditionedFaceCount, 0u);
     EXPECT_EQ(result.UnsupportedFaceCount, 0u);
     EXPECT_GT(result.MinimumTriangleQuality, result.TriangleQualityThreshold);
-    EXPECT_EQ(result.ScalarPropertyCount, 2u);
-    EXPECT_EQ(result.ScalarWrittenCount, 8u);
+    EXPECT_EQ(result.ScalarPropertyCount, 4u);
+    EXPECT_EQ(result.ScalarWrittenCount, 16u);
     EXPECT_EQ(result.DirectionPropertyCount, 2u);
     EXPECT_EQ(result.DirectionWrittenCount, 8u);
     EXPECT_EQ(result.NonFiniteScalarCount, 0u);
@@ -1728,20 +1730,42 @@ TEST(SandboxEditorUi, MeshCurvatureCommandPublishesCanonicalPropertiesAndSupport
 
     const auto mean = properties.Get<double>(PN::kMeanCurvature);
     const auto gaussian = properties.Get<double>(PN::kGaussianCurvature);
+    const auto minPrincipal =
+        properties.Get<double>(PN::kMinPrincipalCurvature);
+    const auto maxPrincipal =
+        properties.Get<double>(PN::kMaxPrincipalCurvature);
     const auto dir1 = properties.Get<glm::vec3>(PN::kPrincipalDir1);
     const auto dir2 = properties.Get<glm::vec3>(PN::kPrincipalDir2);
     ASSERT_TRUE(mean.IsValid());
     ASSERT_TRUE(gaussian.IsValid());
+    ASSERT_TRUE(minPrincipal.IsValid());
+    ASSERT_TRUE(maxPrincipal.IsValid());
     ASSERT_TRUE(dir1.IsValid());
     ASSERT_TRUE(dir2.IsValid());
     ASSERT_EQ(mean.Vector().size(), 4u);
     ASSERT_EQ(gaussian.Vector().size(), 4u);
+    ASSERT_EQ(minPrincipal.Vector().size(), 4u);
+    ASSERT_EQ(maxPrincipal.Vector().size(), 4u);
     ASSERT_EQ(dir1.Vector().size(), 4u);
     ASSERT_EQ(dir2.Vector().size(), 4u);
     for (std::size_t i = 0u; i < 4u; ++i)
     {
         EXPECT_TRUE(std::isfinite(mean.Vector()[i]));
         EXPECT_TRUE(std::isfinite(gaussian.Vector()[i]));
+        EXPECT_TRUE(std::isfinite(minPrincipal.Vector()[i]));
+        EXPECT_TRUE(std::isfinite(maxPrincipal.Vector()[i]));
+        // The kernel orders the pair and derives the other two scalars from
+        // it, so the published fields must satisfy the same identities the
+        // estimator guarantees rather than merely being present.
+        EXPECT_LE(minPrincipal.Vector()[i], maxPrincipal.Vector()[i]);
+        EXPECT_DOUBLE_EQ(
+            mean.Vector()[i],
+            0.5 * (maxPrincipal.Vector()[i] + minPrincipal.Vector()[i]));
+        EXPECT_DOUBLE_EQ(
+            gaussian.Vector()[i],
+            maxPrincipal.Vector()[i] * minPrincipal.Vector()[i]);
+        EXPECT_GE(minPrincipal.Vector()[i], result.MinimumPrincipalValue);
+        EXPECT_LE(maxPrincipal.Vector()[i], result.MaximumPrincipalValue);
         EXPECT_TRUE(std::isfinite(dir1.Vector()[i].x));
         EXPECT_TRUE(std::isfinite(dir1.Vector()[i].y));
         EXPECT_TRUE(std::isfinite(dir1.Vector()[i].z));
@@ -1754,12 +1778,18 @@ TEST(SandboxEditorUi, MeshCurvatureCommandPublishesCanonicalPropertiesAndSupport
               Runtime::EditorCommandHistoryStatus::Undone);
     EXPECT_FALSE(properties.Exists(PN::kMeanCurvature));
     EXPECT_FALSE(properties.Exists(PN::kGaussianCurvature));
+    EXPECT_FALSE(properties.Exists(PN::kMinPrincipalCurvature));
+    EXPECT_FALSE(properties.Exists(PN::kMaxPrincipalCurvature));
     EXPECT_FALSE(properties.Exists(PN::kPrincipalDir1));
     EXPECT_FALSE(properties.Exists(PN::kPrincipalDir2));
     EXPECT_EQ(history.Redo().Status,
               Runtime::EditorCommandHistoryStatus::Redone);
     EXPECT_TRUE(properties.Get<double>(PN::kMeanCurvature).IsValid());
     EXPECT_TRUE(properties.Get<double>(PN::kGaussianCurvature).IsValid());
+    EXPECT_TRUE(
+        properties.Get<double>(PN::kMinPrincipalCurvature).IsValid());
+    EXPECT_TRUE(
+        properties.Get<double>(PN::kMaxPrincipalCurvature).IsValid());
     EXPECT_TRUE(properties.Get<glm::vec3>(PN::kPrincipalDir1).IsValid());
     EXPECT_TRUE(properties.Get<glm::vec3>(PN::kPrincipalDir2).IsValid());
 
@@ -1807,7 +1837,7 @@ TEST(SandboxEditorUi, MeshCurvatureCommandPublishesCanonicalPropertiesAndSupport
     EXPECT_TRUE(model.Processing.MeshCurvatureDirectionsAvailable);
     ASSERT_TRUE(model.Processing.LastMeshCurvatureResult.has_value());
     EXPECT_TRUE(model.Processing.LastMeshCurvatureResult->Succeeded());
-    EXPECT_EQ(model.Processing.LastMeshCurvatureResult->ScalarWrittenCount, 8u);
+    EXPECT_EQ(model.Processing.LastMeshCurvatureResult->ScalarWrittenCount, 16u);
 }
 
 TEST(SandboxEditorUi, MeshCurvaturePublishesBoundaryOnlyFramework24Support)
@@ -1837,14 +1867,18 @@ TEST(SandboxEditorUi, MeshCurvaturePublishesBoundaryOnlyFramework24Support)
     EXPECT_EQ(result.VertexSlotCount, 3u);
     EXPECT_EQ(result.SupportedVertexCount, 3u);
     EXPECT_EQ(result.NonZeroPrincipalVertexCount, 0u);
-    EXPECT_EQ(result.ScalarPropertyCount, 2u);
-    EXPECT_EQ(result.ScalarWrittenCount, 6u);
+    EXPECT_EQ(result.ScalarPropertyCount, 4u);
+    EXPECT_EQ(result.ScalarWrittenCount, 12u);
     EXPECT_EQ(result.DirectionPropertyCount, 2u);
     EXPECT_EQ(result.DirectionWrittenCount, 6u);
     EXPECT_TRUE(result.DirectionsAvailable);
     EXPECT_TRUE(result.DirectionsPublished);
     EXPECT_TRUE(properties.Get<double>(PN::kMeanCurvature).IsValid());
     EXPECT_TRUE(properties.Get<double>(PN::kGaussianCurvature).IsValid());
+    EXPECT_TRUE(
+        properties.Get<double>(PN::kMinPrincipalCurvature).IsValid());
+    EXPECT_TRUE(
+        properties.Get<double>(PN::kMaxPrincipalCurvature).IsValid());
     EXPECT_TRUE(properties.Get<glm::vec3>(PN::kPrincipalDir1).IsValid());
     EXPECT_TRUE(properties.Get<glm::vec3>(PN::kPrincipalDir2).IsValid());
     EXPECT_TRUE(history.CanUndo());
@@ -2153,6 +2187,8 @@ TEST(SandboxEditorUi, MeshCurvatureRequestQueuesDerivedJobAndPublishesOnApply)
     auto& properties = registry.Raw().get<GS::Vertices>(mesh).Properties;
     ASSERT_FALSE(properties.Exists(PN::kMeanCurvature));
     ASSERT_FALSE(properties.Exists(PN::kGaussianCurvature));
+    ASSERT_FALSE(properties.Exists(PN::kMinPrincipalCurvature));
+    ASSERT_FALSE(properties.Exists(PN::kMaxPrincipalCurvature));
     const std::uint32_t stableId =
         Runtime::SelectionController::ToStableEntityId(mesh);
 
@@ -2172,6 +2208,8 @@ TEST(SandboxEditorUi, MeshCurvatureRequestQueuesDerivedJobAndPublishesOnApply)
     EXPECT_NE(result.Message.find("queued"), std::string::npos);
     EXPECT_FALSE(properties.Exists(PN::kMeanCurvature));
     EXPECT_FALSE(properties.Exists(PN::kGaussianCurvature));
+    EXPECT_FALSE(properties.Exists(PN::kMinPrincipalCurvature));
+    EXPECT_FALSE(properties.Exists(PN::kMaxPrincipalCurvature));
     EXPECT_FALSE(registry.Raw().all_of<Dirty::DirtyVertexAttributes>(mesh));
 
     Runtime::EditorJobQueueSnapshot queued =
@@ -2196,8 +2234,8 @@ TEST(SandboxEditorUi, MeshCurvatureRequestQueuesDerivedJobAndPublishesOnApply)
     EXPECT_EQ(completedResult->VertexSlotCount, 4u);
     EXPECT_EQ(completedResult->SupportedVertexCount, 4u);
     EXPECT_EQ(completedResult->NonZeroPrincipalVertexCount, 4u);
-    EXPECT_EQ(completedResult->ScalarPropertyCount, 2u);
-    EXPECT_EQ(completedResult->ScalarWrittenCount, 8u);
+    EXPECT_EQ(completedResult->ScalarPropertyCount, 4u);
+    EXPECT_EQ(completedResult->ScalarWrittenCount, 16u);
     EXPECT_EQ(completedResult->DirectionPropertyCount, 2u);
     EXPECT_EQ(completedResult->DirectionWrittenCount, 8u);
     EXPECT_TRUE(completedResult->DirectionsPublished);
@@ -2205,6 +2243,22 @@ TEST(SandboxEditorUi, MeshCurvatureRequestQueuesDerivedJobAndPublishesOnApply)
     EXPECT_TRUE(properties.Get<double>(PN::kGaussianCurvature).IsValid());
     EXPECT_TRUE(properties.Get<glm::vec3>(PN::kPrincipalDir1).IsValid());
     EXPECT_TRUE(properties.Get<glm::vec3>(PN::kPrincipalDir2).IsValid());
+
+    const auto queuedMin =
+        properties.Get<double>(PN::kMinPrincipalCurvature);
+    const auto queuedMax =
+        properties.Get<double>(PN::kMaxPrincipalCurvature);
+    ASSERT_TRUE(queuedMin.IsValid());
+    ASSERT_TRUE(queuedMax.IsValid());
+    ASSERT_EQ(queuedMin.Vector().size(), 4u);
+    ASSERT_EQ(queuedMax.Vector().size(), 4u);
+    for (std::size_t i = 0u; i < 4u; ++i)
+    {
+        EXPECT_TRUE(std::isfinite(queuedMin.Vector()[i]));
+        EXPECT_TRUE(std::isfinite(queuedMax.Vector()[i]));
+        EXPECT_LE(queuedMin.Vector()[i], queuedMax.Vector()[i]);
+    }
+
     EXPECT_TRUE(registry.Raw().all_of<Dirty::DirtyVertexAttributes>(mesh));
     EXPECT_TRUE(history.IsDirty());
     ASSERT_TRUE(history.CanUndo());
@@ -2212,8 +2266,16 @@ TEST(SandboxEditorUi, MeshCurvatureRequestQueuesDerivedJobAndPublishesOnApply)
               Runtime::EditorCommandHistoryStatus::Undone);
     EXPECT_FALSE(properties.Exists(PN::kMeanCurvature));
     EXPECT_FALSE(properties.Exists(PN::kGaussianCurvature));
+    EXPECT_FALSE(properties.Exists(PN::kMinPrincipalCurvature));
+    EXPECT_FALSE(properties.Exists(PN::kMaxPrincipalCurvature));
     EXPECT_FALSE(properties.Exists(PN::kPrincipalDir1));
     EXPECT_FALSE(properties.Exists(PN::kPrincipalDir2));
+    EXPECT_EQ(history.Redo().Status,
+              Runtime::EditorCommandHistoryStatus::Redone);
+    EXPECT_TRUE(
+        properties.Get<double>(PN::kMinPrincipalCurvature).IsValid());
+    EXPECT_TRUE(
+        properties.Get<double>(PN::kMaxPrincipalCurvature).IsValid());
 }
 TEST(SandboxEditorUi, MeshCurvatureDerivedJobDiscardsStalePropertiesBeforeApply)
 {
@@ -2274,10 +2336,81 @@ TEST(SandboxEditorUi, MeshCurvatureDerivedJobDiscardsStalePropertiesBeforeApply)
     for (const double value : currentMean.Vector())
         EXPECT_DOUBLE_EQ(value, 2.0);
     EXPECT_FALSE(properties.Exists(PN::kGaussianCurvature));
+    EXPECT_FALSE(properties.Exists(PN::kMinPrincipalCurvature));
+    EXPECT_FALSE(properties.Exists(PN::kMaxPrincipalCurvature));
     EXPECT_FALSE(properties.Exists(PN::kPrincipalDir1));
     EXPECT_FALSE(properties.Exists(PN::kPrincipalDir2));
     EXPECT_FALSE(registry.Raw().all_of<Dirty::DirtyVertexAttributes>(mesh));
 }
+
+// Principal-scalar edits participate in staleness checks so queued results
+// cannot overwrite a concurrent property update.
+TEST(SandboxEditorUi, MeshCurvatureDerivedJobDiscardsStalePrincipalScalarsBeforeApply)
+{
+    ECS::Scene::Registry registry;
+    Runtime::SelectionController selection;
+    Intrinsic::Tests::EditorFeatureTestContext context =
+        MakeContext(registry, selection);
+    Extrinsic::Tests::EditorJobHarness jobs{};
+    jobs.Attach(context);
+    std::optional<Runtime::EditorMeshCurvatureResult> completedResult{};
+    context.MethodResultSinks.MeshCurvature =
+        [&completedResult](Runtime::EditorMeshCurvatureResult result)
+        {
+            completedResult = std::move(result);
+        };
+
+    const ECS::EntityHandle mesh =
+        MakeSelectable(registry, "StalePrincipalCurvature");
+    AddDenoiseTetraMeshSource(registry, mesh);
+    auto& properties = registry.Raw().get<GS::Vertices>(mesh).Properties;
+    auto maxPrincipal = properties.GetOrAdd<double>(
+        std::string{PN::kMaxPrincipalCurvature},
+        0.0);
+    ASSERT_TRUE(maxPrincipal.IsValid());
+    ASSERT_EQ(maxPrincipal.Vector().size(), 4u);
+    for (double& value : maxPrincipal.Vector())
+        value = 1.0;
+
+    const Runtime::EditorMeshCurvatureResult result =
+        Runtime::ApplyEditorMeshCurvatureCommand(
+            context,
+            Runtime::EditorMeshCurvatureCommand{
+                .StableEntityId =
+                    Runtime::SelectionController::ToStableEntityId(mesh),
+                .Output = Runtime::EditorMeshCurvatureOutput::All,
+                .PublishPrincipalDirections = true,
+            });
+    ASSERT_EQ(result.Status, Runtime::EditorCommandStatus::Pending);
+
+    auto currentMax =
+        properties.Get<double>(PN::kMaxPrincipalCurvature);
+    ASSERT_TRUE(currentMax.IsValid());
+    for (double& value : currentMax.Vector())
+        value = 2.0;
+
+    ASSERT_TRUE(jobs.DrainUntilTerminal());
+
+    const Runtime::EditorJobQueueSnapshot done = jobs.Snapshot();
+    ASSERT_EQ(done.Entries.size(), 1u);
+    EXPECT_EQ(done.Entries[0].State, Runtime::JobState::StaleDiscarded);
+    ASSERT_TRUE(completedResult.has_value());
+    EXPECT_EQ(completedResult->Status,
+              Runtime::EditorCommandStatus::StaleEntity);
+    EXPECT_FALSE(completedResult->Succeeded());
+
+    currentMax = properties.Get<double>(PN::kMaxPrincipalCurvature);
+    ASSERT_TRUE(currentMax.IsValid());
+    for (const double value : currentMax.Vector())
+        EXPECT_DOUBLE_EQ(value, 2.0);
+    EXPECT_FALSE(properties.Exists(PN::kMeanCurvature));
+    EXPECT_FALSE(properties.Exists(PN::kGaussianCurvature));
+    EXPECT_FALSE(properties.Exists(PN::kMinPrincipalCurvature));
+    EXPECT_FALSE(properties.Exists(PN::kPrincipalDir1));
+    EXPECT_FALSE(properties.Exists(PN::kPrincipalDir2));
+    EXPECT_FALSE(registry.Raw().all_of<Dirty::DirtyVertexAttributes>(mesh));
+}
+
 TEST(SandboxEditorUi, MeshCurvatureCommandFallsBackToScalarOnlyWhenDirectionsUnavailable)
 {
     ECS::Scene::Registry registry;
@@ -2304,14 +2437,20 @@ TEST(SandboxEditorUi, MeshCurvatureCommandFallsBackToScalarOnlyWhenDirectionsUna
     EXPECT_TRUE(result.DirectionsRequested);
     EXPECT_FALSE(result.DirectionsAvailable);
     EXPECT_FALSE(result.DirectionsPublished);
-    EXPECT_EQ(result.ScalarPropertyCount, 2u);
-    EXPECT_EQ(result.ScalarWrittenCount, 8u);
+    EXPECT_EQ(result.ScalarPropertyCount, 4u);
+    EXPECT_EQ(result.ScalarWrittenCount, 16u);
     EXPECT_EQ(result.DirectionWrittenCount, 0u);
     EXPECT_NE(result.Message.find("not published"), std::string::npos);
 
     auto& properties = registry.Raw().get<GS::Vertices>(mesh).Properties;
     EXPECT_TRUE(properties.Get<double>(PN::kMeanCurvature).IsValid());
     EXPECT_TRUE(properties.Get<double>(PN::kGaussianCurvature).IsValid());
+    // Principal *values* are scalars; only the principal *directions* depend
+    // on the unavailable path, so both scalars must still be published here.
+    EXPECT_TRUE(
+        properties.Get<double>(PN::kMinPrincipalCurvature).IsValid());
+    EXPECT_TRUE(
+        properties.Get<double>(PN::kMaxPrincipalCurvature).IsValid());
     EXPECT_FALSE(properties.Exists(PN::kPrincipalDir1));
     EXPECT_FALSE(properties.Exists(PN::kPrincipalDir2));
     EXPECT_TRUE(registry.Raw().all_of<Dirty::DirtyVertexAttributes>(mesh));

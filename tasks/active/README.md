@@ -12,19 +12,18 @@ Each active task should include:
 ## Currently active
 
 - [`BUG-154` — Restore PMP curvature parity without normal-seam topology loss](BUG-154-curvature-pmp-parity-corner-normal-topology.md)
-  — in progress on `main`; fixes the reference smoothing/estimator semantics,
-  preserves OBJ normals on the corner domain, and prevents false all-zero
-  curvature success.
-- [`BUG-156` — Two-ring support and eigenvalue smoothing cancel genuine curvature](BUG-156-curvature-two-ring-smoothing-cancels-features.md)
-  — in progress on `claude/mesh-curvature-analysis-4zvnwi`, owned by `claude`;
-  narrows hinge support to one-ring and publishes unsmoothed eigenvalues so
-  crease-adjacent curvature is no longer cancelled into zero bands on
-  `tests/data/sculpt.obj`; next step is the reporter's Sandbox visual
-  confirmation and independent review.
+  — blocked by `BUG-155` plus its independent fixed-surface review; owns the
+  reusable smoothing and authored corner-normal paths.
+- [`BUG-156` — Adopt deterministic Framework24 Taubin curvature semantics](BUG-156-curvature-two-ring-smoothing-cancels-features.md)
+  — CPU-contracted on `main`; synchronous and queued runtime publication now
+  persists all four curvature scalars atomically with stale-state rejection and
+  undo/redo. Its independent fixed-surface review remains open.
+- [`BUG-162` — Consolidate all local branch history onto main](BUG-162-main-branch-consolidation.md)
+  — in progress on `main`; local ancestry and the integrated source surface are
+  complete, with the final commit, push, and fetched-head verification pending.
 - [`METHOD-039` — Feature-network-constrained curvature patch decomposition](METHOD-039-feature-network-curvature-patch-decomposition.md)
-  — paused behind `REVIEW-004` by the 2026-08-13 product-convergence decision;
-  its completed negative-result surface and work-graph history are preserved
-  for research resumption after the gate retires.
+  — paused behind `REVIEW-004`; preserves its completed negative-result surface
+  and work-graph history for research resumption after the gate retires.
 
 ## Records
 

@@ -23,8 +23,12 @@ maturity_target: Operational
   the duplicate GLFW/LSan report folded into BUG-118, current numerical and
   runtime documentation synchronized, and its local parity differential marked
   non-claim-eligible.
-- The final exact-surface independent review, merge commit, push, and remote
-  ancestry verification remain.
+- BUG-156's follow-on runtime slice now publishes minimum and maximum principal
+  curvature atomically with mean/Gaussian curvature and optional directions;
+  its canonical CPU, sanitizer, and structural gates pass.
+- The final integration commit, risk-gated interactive sweep, push, and remote
+  ancestry verification remain. BUG-156 separately retains the independent
+  fixed-surface review of its public numerical and publication contract.
 
 ## Goal
 
@@ -56,8 +60,8 @@ maturity_target: Operational
 ## Control surfaces
 
 - Config: unchanged.
-- UI: unchanged existing Mesh / Processing / Curvature command; the open
-  minimum/maximum runtime-publication gap remains in BUG-156.
+- UI: unchanged existing Mesh / Processing / Curvature command; all four scalar
+  fields publish through its existing result path.
 - Agent/CLI: Git integration and repository validators only.
 
 ## Backends
@@ -71,10 +75,10 @@ maturity_target: Operational
 | --- | --- |
 | Least-structured input | Preserve BUG-156's oriented finite triangle-surface contract. |
 | Compatible entity sources | Preserve any owning halfedge mesh satisfying the selected adjacency/property contract. |
-| RuntimeModule | Keep the existing curvature operation; it currently persists mean/Gaussian plus optional directions. |
+| RuntimeModule | Keep the existing curvature operation; synchronous and queued paths persist all four scalar fields plus optional directions in one transaction. |
 | Config/agent | Preserve the existing fixed command and validated runtime path. |
 | UI | Preserve Mesh / Processing / Curvature; UI-050 owns vector-field visibility. |
-| Publication | Geometry owns min/max/mean/Gaussian plus directions; BUG-156 retains the open runtime min/max transaction work. |
+| Publication | Geometry owns min/max/mean/Gaussian plus directions; runtime publishes all four scalars atomically with stale-state rejection and undo/redo. |
 | End-to-end tests | Use the merged geometry/runtime selectors and complete CPU-supported gate. |
 
 ## Required changes
@@ -92,10 +96,11 @@ maturity_target: Operational
 
 - [x] Configure with the canonical `ci` preset and build `IntrinsicTests` with
       the selected Clang 23 toolchain.
-- [x] Pass the 74-case curvature/runtime selector and all 4,256 CPU-supported
+- [x] Pass the 75-case curvature/runtime selector and all 4,257 CPU-supported
       tests under the repository exclusion policy.
-- [x] Pass strict task, ARA, layering, test-layout, root-hygiene, custody, and
-      workflow-evidence validation.
+- [x] Pass isolated ASan and UBSan selectors with 2,745 registrations each.
+- [x] Pass strict task, ARA, layering, test-layout, root-hygiene,
+      workflow-evidence, and documentation validation.
 - [ ] Re-run post-commit diff/docs checks and verify remote ancestry after push.
 
 ## Docs
@@ -111,7 +116,8 @@ maturity_target: Operational
 - [x] No unresolved conflict marker, duplicate task ID, or unqualified dirty-run
       parity claim remains in the integrated tree.
 - [x] The final staged surface passes its strongest applicable local gates.
-- [ ] Independent review accepts the exact high-risk integration surface.
+- [ ] Risk-gated interactive review accepts the integration-only surface;
+      BUG-156 retains independent review ownership for its public contract.
 - [ ] Local and fetched `origin/main` resolve to the same pushed commit.
 
 ## Verification

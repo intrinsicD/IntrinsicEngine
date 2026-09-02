@@ -440,11 +440,11 @@ export namespace Extrinsic::Runtime
         std::size_t UnsupportedFaceCount{0u};
         double MinimumTriangleQuality{0.0};
         double TriangleQualityThreshold{0.0};
+        // Counts all four scalar fields written (mean, Gaussian, and minimum
+        // and maximum principal curvature), regardless of value changes.
         std::size_t ScalarPropertyCount{0u};
         std::size_t ScalarWrittenCount{0u};
-        // BUG-145: `ScalarWrittenCount` is `mean.size() + gaussian.size()`, a
-        // pure written count that is non-zero whenever the kernel ran. This is
-        // how many published curvature values differ from the stored ones,
+        // Counts published curvature values that differ from stored values,
         // counted across every property the run publishes.
         std::size_t ChangedValueCount{0u};
         std::size_t DirectionPropertyCount{0u};

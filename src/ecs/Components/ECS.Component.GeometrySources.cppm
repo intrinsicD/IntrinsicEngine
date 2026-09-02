@@ -1,3 +1,5 @@
+// Defines canonical per-domain geometry components and property names so ECS
+// can remain the CPU authority shared by runtime and rendering consumers.
 module;
 
 #include <cstddef>
@@ -22,6 +24,8 @@ export namespace Extrinsic::ECS::Components::GeometrySources
     //   "v:normal"             – glm::vec3  optional surface / point-cloud normal
     //   "v:mean_curvature"     – double     optional mean curvature scalar
     //   "v:gaussian_curvature" – double     optional Gaussian curvature scalar
+    //   "v:min_principal_curvature" – double optional minimum principal curvature
+    //   "v:max_principal_curvature" – double optional maximum principal curvature
     //   "v:principal_dir1"     – glm::vec3  optional max-principal tangent direction
     //   "v:principal_dir2"     – glm::vec3  optional min-principal tangent direction
     //
@@ -52,6 +56,10 @@ export namespace Extrinsic::ECS::Components::GeometrySources
         constexpr std::string_view kVertexConnectivity = "v:connectivity";
         constexpr std::string_view kMeanCurvature     = "v:mean_curvature";
         constexpr std::string_view kGaussianCurvature = "v:gaussian_curvature";
+        constexpr std::string_view kMinPrincipalCurvature =
+            "v:min_principal_curvature";
+        constexpr std::string_view kMaxPrincipalCurvature =
+            "v:max_principal_curvature";
         constexpr std::string_view kPrincipalDir1     = "v:principal_dir1";
         constexpr std::string_view kPrincipalDir2     = "v:principal_dir2";
 
