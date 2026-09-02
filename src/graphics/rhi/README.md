@@ -66,8 +66,11 @@ This directory contains the `RHI` module/files.
 - Status and provenance are value data. `NativeGpu` means an available native
   timestamp pair; `ContractOnly` covers lifecycle-only Null/mock evidence; an
   unavailable duration stays unavailable rather than using zero or a CPU clock
-  as a sentinel. Unsupported queues, exhaustion, invalid lifecycle, not-ready
-  reuse, discarded submissions, and device loss remain distinguishable.
+  as a sentinel. An available pair may resolve to zero when its ordered writes
+  have equal ticks or its native interval converts to less than one whole
+  nanosecond; zero remains native data rather than an unavailable sentinel.
+  Unsupported queues, exhaustion, invalid lifecycle, not-ready reuse,
+  discarded submissions, and device loss remain distinguishable.
 - Query resolution is nonblocking and tied to the backend's existing
   frame-slot completion proof. The RHI contract does not expose native query
   handles, add a profiler-specific wait, sum overlapping queue envelopes, or
@@ -77,9 +80,11 @@ This directory contains the `RHI` module/files.
   upper bound solely to reject ambiguous multiple-wrap intervals. Native
   timestamp ticks remain the only duration source. If that upper bound reaches
   the queue counter's full `2^validBits * timestampPeriod` period, resolution
-  fails with `Overflow` and publishes no duration.
+  fails with `Overflow` and publishes no duration. The resolver preserves an
+  available equal-tick interval as zero; it never fabricates a positive
+  duration.
 
-## Cross-queue timeline submission
+## Cross-queue synchronization submission
 
 - The framegraph compiler owns deterministic timeline value assignment and
   emits CPU-visible signal/wait/edge records. These plain records, not an

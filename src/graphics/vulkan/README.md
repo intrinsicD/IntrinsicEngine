@@ -670,11 +670,20 @@ GRAPHICS-127 adds
 The bounded fixture enables profiling before device boot, requires at least
 `2 * framesInFlight + 1` successful promoted-Vulkan frames, and verifies a
 fresh older-frame `NativeGpu` result for the known recorded `SurfacePass`
-only after its cyclic slot is reused. An operational queue family with zero
+only after its cyclic slot is reused. Vulkan guarantees ordered timestamp
+writes are non-decreasing, not strictly increasing, so an available equal-tick
+pair remains a native zero interval. The backend retains at most eight such
+rows for the latest resolved frame in its status diagnostic, including the raw
+ticks, availability values, valid-bit mask, timestamp period, frame/slot,
+query indices, queue, row name, and profiler lifecycle. The smoke accepts zero
+only when that evidence matches the exact recorded `SurfacePass`; its graphics
+queue envelope must still be positive. An operational queue family with zero
 valid timestamp bits must instead report an explicit per-frame `Unsupported`
 status and no native rows, even if an unused queue made the backend globally
-ready. Native runs also write the selected physical-device/API/driver/UUID and
-queue timestamp metadata into GTest XML. The two GRAPHICS-119 serial/parallel readback fixtures now also
+ready. Native runs also write the selected physical-device/API/driver/UUID,
+queue timestamp metadata, surface duration, zero classification, and raw
+zero-row diagnostic into GTest XML. The two GRAPHICS-119 serial/parallel
+readback fixtures also
 enable profiling: they retain validation and byte parity while asserting
 unique scope identity, exact resolved submitted-frame/slot correlation, and
 truthful accepted Graphics versus AsyncCompute attribution.

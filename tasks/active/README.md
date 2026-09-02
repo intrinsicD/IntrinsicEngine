@@ -14,6 +14,9 @@ Each active task should include:
 - [`BUG-154` — Restore PMP curvature parity without normal-seam topology loss](BUG-154-curvature-pmp-parity-corner-normal-topology.md)
   — blocked by `BUG-155` plus its independent fixed-surface review; owns the
   reusable smoothing and authored corner-normal paths.
+- [`BUG-155` — Native Vulkan timestamp smoke intermittently publishes zero duration](BUG-155-vulkan-native-timestamp-zero-duration-flake.md)
+  — complete and ready for retirement; raw query evidence proved a legal
+  equal-tick interval, and two complete promoted-Vulkan cohorts passed 54/54.
 - [`BUG-156` — Adopt deterministic Framework24 Taubin curvature semantics](BUG-156-curvature-two-ring-smoothing-cancels-features.md)
   — CPU-contracted on `main`; synchronous and queued runtime publication now
   persists all four curvature scalars atomically with stale-state rejection and

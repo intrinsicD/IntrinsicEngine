@@ -539,6 +539,21 @@ FindGpuProfilePass(
     return found != profile.Passes.end() ? &*found : nullptr;
 }
 
+[[nodiscard]] std::string_view RenderCommandPassStatusName(
+    const RenderCommandPassStatus status) noexcept
+{
+    switch (status)
+    {
+    case RenderCommandPassStatus::Recorded:
+        return "Recorded";
+    case RenderCommandPassStatus::SkippedNonOperational:
+        return "SkippedNonOperational";
+    case RenderCommandPassStatus::SkippedUnavailable:
+        return "SkippedUnavailable";
+    }
+    return "Unknown";
+}
+
 [[nodiscard]] std::string BuildGpuProfileSummary(
     const Extrinsic::Graphics::RenderGraphGpuProfileStats& profile)
 {
@@ -562,7 +577,9 @@ FindGpuProfilePass(
         }
         summary += pass.Name + "@" +
             std::string{Extrinsic::RHI::QueueAffinityName(pass.Queue)} +
-            ":" +
+            ":command=" +
+            std::string{RenderCommandPassStatusName(pass.CommandStatus)} +
+            ":source=" +
             std::to_string(static_cast<std::uint32_t>(pass.Source));
         if (pass.DurationNs.has_value())
         {
@@ -721,10 +738,8 @@ TEST(DefaultRecipeSurfaceGpuSmoke, RecipeSelectorReachesOperationalVulkanCommand
     EXPECT_TRUE(run.Stats.Execute.DeviceOperational);
 
     // The default recipe's executor branch for the canonical `"Present"` pass
-    // landed in GRAPHICS-076 Slice A. Slice D's operational-gate proof is that
-    // this branch records on a real Vulkan device rather than soft-skipping
-    // with `SkippedUnavailable`. The pass MUST appear in
-    // `CommandRecords.Passes` for the canonical recipe; assert presence before
+    // must record on an operational Vulkan device rather than soft-skip as
+    // unavailable. Assert its presence before checking command
     // status so a missing pass shows as a clear "recipe shape regression"
     // rather than a status mismatch.
     ASSERT_TRUE(ContainsPass(run.Stats, "Present"))
@@ -883,7 +898,36 @@ TEST(DefaultRecipeSurfaceGpuSmoke,
         surfacePass->Source,
         Extrinsic::RHI::GpuTimestampSource::NativeGpu);
     ASSERT_TRUE(surfacePass->DurationNs.has_value());
-    EXPECT_GT(*surfacePass->DurationNs, 0u);
+    const bool surfacePassQuantizedToZero =
+        *surfacePass->DurationNs == 0u;
+    if (surfacePassQuantizedToZero)
+    {
+        const std::array<std::string, 12u> requiredEvidence{
+            "zeroDurationDiagnostics=[",
+            "frameNumber=" +
+                std::to_string(profile.ResolvedSubmittedFrameNumber),
+            "frameSlot=" +
+                std::to_string(profile.ResolvedFrameSlot),
+            "rowKind=scope",
+            "rowName=\"SurfacePass\"",
+            "queue=graphics",
+            "profilerLifecycle=Ended",
+            "beginQuery=",
+            "endQuery=",
+            "beginAvailability=1; endAvailability=1",
+            "validMask=0x",
+            "deltaTicks=0",
+        };
+        for (const std::string& field : requiredEvidence)
+        {
+            EXPECT_NE(
+                profilerStatus.Diagnostic.find(field),
+                std::string::npos)
+                << "A native zero interval is legal only when the exact "
+                   "available equal-tick pair is retained: missing "
+                << field << "; " << profilerStatus.Diagnostic;
+        }
+    }
     EXPECT_TRUE(std::isfinite(
         static_cast<double>(*surfacePass->DurationNs)));
 
@@ -930,6 +974,13 @@ TEST(DefaultRecipeSurfaceGpuSmoke,
     RecordProperty(
         "SurfacePassGpuTimeNs",
         std::to_string(*surfacePass->DurationNs));
+    RecordProperty(
+        "SurfacePassCommandStatus",
+        std::string{
+            RenderCommandPassStatusName(surfacePass->CommandStatus)});
+    RecordProperty(
+        "SurfacePassQuantizedToZero",
+        surfacePassQuantizedToZero ? "true" : "false");
 
     engine.Shutdown();
 }

@@ -41,6 +41,7 @@ namespace
         2u * RHI::kMaxTimestampScopesPerFrame;
     constexpr std::uint32_t kQueriesPerQueueRange =
         kEnvelopeQueryCount + kScopeQueryCount;
+    constexpr std::size_t kMaxZeroDurationDiagnostics = 8u;
 
     [[nodiscard]] constexpr bool IsValidTimestampWidth(
         const std::uint32_t validBits) noexcept
@@ -492,13 +493,14 @@ struct VulkanProfiler::Impl
             return;
         }
 
+        ReadyStatusDiagnostic = ReadyDiagnostic(
+            DeviceDiagnostic,
+            QueueSupported[0],
+            QueueSupported[1]);
         Status = RHI::ProfilerStatusSnapshot{
             .Status = RHI::ProfilerBackendStatus::Ready,
             .Source = RHI::GpuTimestampSource::NativeGpu,
-            .Diagnostic = ReadyDiagnostic(
-                DeviceDiagnostic,
-                QueueSupported[0],
-                QueueSupported[1]),
+            .Diagnostic = ReadyStatusDiagnostic,
         };
     }
 
@@ -571,11 +573,109 @@ struct VulkanProfiler::Impl
                token.ScopeIndex < Active->Scopes.size();
     }
 
+    void ResetZeroDurationDiagnostics() const
+    {
+        ZeroDurationDiagnostics.clear();
+        ZeroDurationDiagnosticsSuppressed = 0u;
+        Status.Diagnostic = ReadyStatusDiagnostic;
+    }
+
+    void CaptureZeroDurationDiagnostic(
+        const RHI::ProfilerFrameKey frame,
+        const std::string_view rowKind,
+        const std::string_view rowName,
+        const RHI::QueueAffinity queue,
+        const std::string_view profilerLifecycle,
+        const QueryPair pair,
+        const RawTimestampQuery begin,
+        const RawTimestampQuery end,
+        const std::uint32_t validBits,
+        const std::uint64_t intervalUpperBoundNs) const
+    {
+        const std::uint64_t validMask =
+            validBits == 64u
+                ? std::numeric_limits<std::uint64_t>::max()
+                : (std::uint64_t{1} << validBits) - 1u;
+        const auto delta = RHI::ComputeTimestampDeltaTicks(
+            begin.Ticks,
+            end.Ticks,
+            validBits);
+
+        std::ostringstream entry;
+        entry << std::setprecision(
+                     std::numeric_limits<double>::max_digits10)
+              << "{frameNumber=" << frame.FrameNumber
+              << "; frameSlot=" << frame.FrameSlot
+              << "; rowKind=" << rowKind
+              << "; rowName=\"" << rowName << "\""
+              << "; queue=" << RHI::QueueAffinityName(queue)
+              << "; profilerLifecycle=" << profilerLifecycle
+              << "; beginQuery=" << pair.Begin
+              << "; endQuery=" << pair.End
+              << "; beginTicks=" << begin.Ticks
+              << "; endTicks=" << end.Ticks
+              << "; beginAvailability=" << begin.Available
+              << "; endAvailability=" << end.Available
+              << "; validBits=" << validBits
+              << "; validMask=0x" << std::hex << validMask << std::dec
+              << "; deltaTicks=";
+        if (delta)
+        {
+            entry << *delta;
+        }
+        else
+        {
+            entry << "error:"
+                  << RHI::ProfilerErrorName(delta.error());
+        }
+        entry << "; timestampPeriodNs=" << TimestampPeriodNs
+              << "; intervalUpperBoundNs=" << intervalUpperBoundNs
+              << "}";
+
+        // The status snapshot retains only one resolved frame and a fixed
+        // number of zero rows so diagnostics cannot grow with runtime length.
+        if (ZeroDurationDiagnostics.size() <
+            kMaxZeroDurationDiagnostics)
+        {
+            ZeroDurationDiagnostics.push_back(entry.str());
+        }
+        else
+        {
+            ++ZeroDurationDiagnosticsSuppressed;
+        }
+
+        std::ostringstream diagnostic;
+        diagnostic << ReadyStatusDiagnostic
+                   << "; zeroDurationDiagnostics=[";
+        for (std::size_t index = 0u;
+             index < ZeroDurationDiagnostics.size();
+             ++index)
+        {
+            if (index != 0u)
+            {
+                diagnostic << ", ";
+            }
+            diagnostic << ZeroDurationDiagnostics[index];
+        }
+        diagnostic << "]";
+        if (ZeroDurationDiagnosticsSuppressed != 0u)
+        {
+            diagnostic << "; zeroDurationDiagnosticsSuppressed="
+                       << ZeroDurationDiagnosticsSuppressed;
+        }
+        Status.Diagnostic = diagnostic.str();
+    }
+
     [[nodiscard]] std::expected<std::uint64_t, RHI::ProfilerError>
     ReadDuration(
         const QueryPair pair,
         const std::uint32_t validBits,
-        const std::uint64_t intervalUpperBoundNs) const
+        const std::uint64_t intervalUpperBoundNs,
+        const RHI::ProfilerFrameKey frame,
+        const std::string_view rowKind,
+        const std::string_view rowName,
+        const RHI::QueueAffinity queue,
+        const std::string_view profilerLifecycle) const
     {
         if (DeviceLost)
         {
@@ -619,7 +719,7 @@ struct VulkanProfiler::Impl
             return std::unexpected(RHI::ProfilerError::InvalidState);
         }
 
-        return RHI::ResolveTimestampDurationNs(
+        const auto resolved = RHI::ResolveTimestampDurationNs(
             RHI::TimestampQueryValue{
                 .Ticks = queries[0].Ticks,
                 .Available = queries[0].Available != 0u,
@@ -631,6 +731,21 @@ struct VulkanProfiler::Impl
             validBits,
             TimestampPeriodNs,
             intervalUpperBoundNs);
+        if (resolved && *resolved == 0u)
+        {
+            CaptureZeroDurationDiagnostic(
+                frame,
+                rowKind,
+                rowName,
+                queue,
+                profilerLifecycle,
+                pair,
+                queries[0],
+                queries[1],
+                validBits,
+                intervalUpperBoundNs);
+        }
+        return resolved;
     }
 
     [[nodiscard]] std::expected<RHI::GpuTimestampFrame, RHI::ProfilerError>
@@ -643,6 +758,7 @@ struct VulkanProfiler::Impl
         }
 
         const PendingFrame& pending = *PendingFrames[frameSlot];
+        ResetZeroDurationDiagnostics();
         RHI::GpuTimestampFrame result{
             .Frame = pending.Frame,
             .Source = RHI::GpuTimestampSource::Unavailable,
@@ -655,6 +771,8 @@ struct VulkanProfiler::Impl
              ++queueIndex)
         {
             const ActiveQueue& queue = pending.Queues[queueIndex];
+            const RHI::QueueAffinity queueAffinity =
+                QueueFromIndex(queueIndex);
             if (queue.Lifecycle != QueueLifecycle::Closed)
             {
                 continue;
@@ -670,7 +788,12 @@ struct VulkanProfiler::Impl
                         .Supported = true,
                     },
                     QueueValidBits[queueIndex],
-                    intervalUpperBoundNs);
+                    intervalUpperBoundNs,
+                    pending.Frame,
+                    "queue-envelope",
+                    RHI::QueueAffinityName(queueAffinity),
+                    queueAffinity,
+                    "Closed");
                 if (!resolved)
                 {
                     return std::unexpected(resolved.error());
@@ -680,7 +803,7 @@ struct VulkanProfiler::Impl
             }
             result.QueueEnvelopes.push_back(
                 RHI::GpuTimestampQueueEnvelope{
-                    .Queue = QueueFromIndex(queueIndex),
+                    .Queue = queueAffinity,
                     .Source = queue.Supported
                                   ? RHI::GpuTimestampSource::NativeGpu
                                   : RHI::GpuTimestampSource::Unavailable,
@@ -716,7 +839,12 @@ struct VulkanProfiler::Impl
                     ReadDuration(
                         pair,
                         QueueValidBits[*queueIndex],
-                        intervalUpperBoundNs);
+                        intervalUpperBoundNs,
+                        pending.Frame,
+                        "scope",
+                        descriptor.Name,
+                        descriptor.Queue,
+                        "Ended");
                 if (!resolved)
                 {
                     return std::unexpected(resolved.error());
@@ -781,9 +909,12 @@ struct VulkanProfiler::Impl
     VulkanProfilerDeviceLostNotifier NotifyDeviceLost = nullptr;
     double TimestampPeriodNs = 0.0;
     std::string DeviceDiagnostic{};
+    std::string ReadyStatusDiagnostic{};
     std::array<std::uint32_t, kProfiledQueueCount> QueueValidBits{};
     std::array<bool, kProfiledQueueCount> QueueSupported{};
     mutable RHI::ProfilerStatusSnapshot Status{};
+    mutable std::vector<std::string> ZeroDurationDiagnostics{};
+    mutable std::uint32_t ZeroDurationDiagnosticsSuppressed = 0u;
     mutable bool DeviceLost = false;
     std::optional<ActiveFrame> Active{};
     mutable std::vector<std::optional<PendingFrame>> PendingFrames{};

@@ -5,15 +5,31 @@ depends_on: []
 workflow_schema: 1
 workflow_profile: standard
 evidence: required
-owner:
-branch:
-worktree:
-claimed_at:
+owner: "codex-root"
+branch: "main"
+worktree: "/home/alex/Documents/IntrinsicEngine"
+claimed_at: "2026-09-02T18:54:58+02:00"
 contract_schema: 1
-contracts: []
-contract_review: "This backlog diagnosis does not yet change a reusable engine contract. If evidence requires changing native timestamp publication, frame-slot reuse, or the gpu;vulkan test policy, the implementing slice must declare the applicable rendering or repository contract before it is claimed."
+contracts: [repo.task-contract-discovery, repo.source-documentation]
+contract_review: "The correction clarifies the existing native timestamp value contract: an available ordered pair may be zero, while unavailable and incoherent pairs remain fail-closed. It adds bounded Vulkan diagnostics and tightens the gpu;vulkan proof around exact raw-pair evidence without changing RHI types, layer edges, frame-slot ownership, backend selection, or performance claims."
+maturity_target: Operational
 ---
 # BUG-155 — Native Vulkan timestamp smoke intermittently publishes zero duration
+
+## Status
+
+- Complete on `main` and ready for retirement after the repository-contract
+  gates. The defect is diagnosed, the named smoke is corrected, and two
+  complete `gpu;vulkan` cohorts passed without retries.
+- On NVIDIA GeForce RTX 3050, driver 590.48.01, the unchanged smoke reproduced
+  on isolated attempt 4 after three passes. The diagnostic build reproduced on
+  attempt 5 after four passes and captured the exact `SurfacePass` pair:
+  frame 4/slot 1, queries 1036/1037, both availability values 1, 64 valid bits,
+  1 ns advertised period, equal raw ticks, zero delta, and renderer status
+  `Recorded`.
+- The corrected smoke passed 20/20 repetitions. Ten additional XML-recorded
+  attempts passed with nine 1024 ns samples and one legal zero sample whose
+  raw evidence satisfied the exact-frame/slot/pass checks.
 
 ## Goal
 
@@ -55,46 +71,54 @@ contract_review: "This backlog diagnosis does not yet change a reusable engine c
   4. Driver/device scheduling occasionally produces identical raw ticks; if
      so, diagnostics must distinguish a valid zero interval from missing or
      incoherent query data rather than clamping it silently.
+- The 2026-09-02 capture supports hypotheses 1 and 4: the device exposed a
+  coherent, available, correctly indexed equal-tick pair, and neighboring
+  recorded passes plus the graphics envelope advanced in 1024 ns increments.
+  Hypothesis 2 is rejected because the raw delta was exactly zero rather than
+  a positive sub-nanosecond conversion. Hypothesis 3 is rejected by the exact
+  reused frame/slot/query mapping, both availability values, coherent adjacent
+  rows, and unchanged validation counters. Vulkan's normative ordering rule
+  requires later writes to be non-decreasing, not strictly increasing.
 
 ## Required changes
 
-- [ ] Add bounded diagnostic capture of raw start/end ticks, valid-bit mask,
+- [x] Add bounded diagnostic capture of raw start/end ticks, valid-bit mask,
       timestamp period, resolved slot/submission, availability values, and
       command status whenever a native row resolves to zero duration.
-- [ ] Reproduce under repeated isolated and full-cohort runs on the same
+- [x] Reproduce under repeated isolated and full-cohort runs on the same
       Vulkan device, preserving every failure and reporting a distribution
       rather than accepting a passing retry.
-- [ ] Decide from evidence whether zero is a legal quantized interval or a
+- [x] Decide from evidence whether zero is a legal quantized interval or a
       query lifecycle defect; fix the profiler publication contract or the
       reset/record/resolve ordering accordingly.
-- [ ] Keep unsupported, unavailable, stale, and valid-native-zero states
+- [x] Keep unsupported, unavailable, stale, and valid-native-zero states
       semantically distinct and fail closed on incoherent query pairs.
 
 ## Tests
 
-- [ ] Add a deterministic profiler-level regression for identical raw ticks
+- [x] Add a deterministic profiler-level regression for identical raw ticks
       and for stale/partially available query pairs.
-- [ ] Run the named smoke repeatedly across at least two complete query-slot
+- [x] Run the named smoke repeatedly across at least two complete query-slot
       reuse windows per attempt and retain raw-query diagnostics.
-- [ ] Pass the complete `gpu;vulkan` intersection repeatedly without retries,
+- [x] Pass the complete `gpu;vulkan` intersection repeatedly without retries,
       quarantine, exclusions, or weakened validation/LeakSanitizer coverage.
 
 ## Docs
 
-- [ ] Update the native timestamp contract in `tests/README.md` and the owning
+- [x] Update the native timestamp contract in `tests/README.md` and the owning
       RHI/renderer documentation if the legal zero-duration semantics change.
-- [ ] Record the device/driver identity, reproduction distribution, selected
+- [x] Record the device/driver identity, reproduction distribution, selected
       correction, and rejected hypotheses in this task before retirement.
 
 ## Acceptance criteria
 
-- [ ] The intermittent zero-duration result has a deterministic explanation
+- [x] The intermittent zero-duration result has a deterministic explanation
       backed by raw query and slot-reuse evidence.
-- [ ] Valid, unavailable, stale, and incoherent native timestamp results are
+- [x] Valid, unavailable, stale, and incoherent native timestamp results are
       published distinctly without fabricated positive durations.
-- [ ] Repeated named-smoke and complete promoted-Vulkan cohorts pass under the
+- [x] Repeated named-smoke and complete promoted-Vulkan cohorts pass under the
       documented device capabilities and budgets.
-- [ ] No retry, quarantine, timeout weakening, or unrelated production change
+- [x] No retry, quarantine, timeout weakening, or unrelated production change
       is used to reach green.
 
 ## Verification
@@ -111,6 +135,24 @@ python3 tools/repo/check_layering.py --root src --strict
 python3 tools/repo/check_test_layout.py --root . --strict
 python3 tools/agents/check_task_policy.py --root . --strict
 ```
+
+Evidence recorded on 2026-09-02:
+
+- Fresh `ci-vulkan` configure plus `IntrinsicTests` build: pass, 2,235
+  build steps.
+- Unchanged named baseline: three passes then the preserved zero failure on
+  attempt 4 (14.34 seconds).
+- Diagnostic named baseline: four passes then the preserved zero failure on
+  attempt 5 (15.50 seconds); raw evidence is summarized in `## Status`.
+- `RHIProfiler.DurationResolutionPreservesAvailableZeroIntervals`: 1/1 pass.
+  Existing `DurationResolutionRequiresBothAvailableValues` and
+  `FrameIdentityRetainsOtherSlotResultAndRetiresReusedSlot` cover partial
+  availability and stale reused-frame identity.
+- Corrected named smoke: 20/20 passes (134.95 seconds); ten additional
+  XML-recorded attempts passed with a 9 positive / 1 legal-zero distribution.
+- Complete promoted-Vulkan cohorts: 54/54 passed in 385.39 seconds, then 54/54
+  passed in 326.83 seconds. Both included validation-bearing smokes and the
+  Vulkan shutdown/LeakSanitizer contract; neither used a retry or exclusion.
 
 ## Forbidden changes
 

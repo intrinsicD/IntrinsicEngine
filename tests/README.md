@@ -369,16 +369,20 @@ summed cross-queue duration.
 `DefaultRecipeSurfaceGpuSmoke.NativeGpuTimestampsResolveNamedPassesAfterSlotReuse`
 is the GRAPHICS-127 operational proof. It enables profiling in config before
 device initialization, drives at least `2 * framesInFlight + 1` successful
-frames without a profiler-specific wait, and requires a fresh finite nonzero
+frames without a profiler-specific wait, and requires a fresh finite
 `NativeGpu` row for the recorded `SurfacePass` with an older submitted-frame
-number, exact reused slot, and sample age of at least `framesInFlight`.
+number, exact reused slot, and sample age of at least `framesInFlight`. A zero
+row is accepted only when the bounded profiler diagnostic proves both raw
+queries available with zero delta for that exact frame, slot, queue, and pass;
+the graphics queue envelope must remain positive.
 Established GLFW/Vulkan readiness failures skip before the run. Once the
 device is operational, a frame whose actual queues all have zero
 timestamp-valid bits is an explicit per-frame `Unsupported` result with no
 native rows; loss of operation is a failure. Native runs record the
 engine-selected device name/UUID, physical-device and loader API versions,
 engine-requested API, driver name/info/version, timestamp period, and
-graphics/async queue-family valid-bit metadata in GTest XML.
+graphics/async queue-family valid-bit metadata in GTest XML, together with the
+surface duration, renderer command status, and legal-zero classification.
 
 The opt-in `IntrinsicRuntimeSandboxAcceptanceGpuSmokeTests` executable (labels
 `gpu;vulkan;integration;runtime;graphics`, RUNTIME-095 Slice 3) drives

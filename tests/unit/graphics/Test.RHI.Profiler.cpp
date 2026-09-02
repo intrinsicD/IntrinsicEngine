@@ -97,6 +97,35 @@ TEST(RHIProfiler, DurationResolutionRequiresBothAvailableValues)
     EXPECT_EQ(*available, 20u);
 }
 
+TEST(RHIProfiler, DurationResolutionPreservesAvailableZeroIntervals)
+{
+    constexpr RHI::TimestampQueryValue begin{
+        .Ticks = 42u,
+        .Available = true,
+    };
+
+    const auto equalTicks = RHI::ResolveTimestampDurationNs(
+        begin,
+        begin,
+        64u,
+        1.0,
+        100u);
+    ASSERT_TRUE(equalTicks.has_value());
+    EXPECT_EQ(*equalTicks, 0u);
+
+    const auto subNanosecond = RHI::ResolveTimestampDurationNs(
+        begin,
+        RHI::TimestampQueryValue{
+            .Ticks = 43u,
+            .Available = true,
+        },
+        64u,
+        0.5,
+        100u);
+    ASSERT_TRUE(subNanosecond.has_value());
+    EXPECT_EQ(*subNanosecond, 0u);
+}
+
 TEST(RHIProfiler, DurationResolutionValidatesPeriodAndCheckedConversion)
 {
     constexpr RHI::TimestampQueryValue begin{

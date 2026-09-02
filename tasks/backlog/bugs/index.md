@@ -23,13 +23,10 @@ promoted Vulkan build) opened `BUG-137` through `BUG-142`. `BUG-137` is upstream
 of `BUG-140` and of the parameterization rejection recorded in `BUG-141`.
 
 - [`BUG-155` — Native Vulkan timestamp smoke intermittently publishes zero
-  duration](BUG-155-vulkan-native-timestamp-zero-duration-flake.md): a repeated
-  54-case promoted-Vulkan gate produced one present `NativeGpu` `SurfacePass`
-  duration of zero while every other case passed; the same full gate had
-  passed immediately before it and three isolated repetitions passed
-  afterward. Preserve raw query/availability/slot evidence and distinguish
-  legal timestamp quantization from a query-lifecycle defect without retries,
-  quarantine, or clamping.
+  duration](../../active/BUG-155-vulkan-native-timestamp-zero-duration-flake.md):
+  complete and ready for retirement after raw query evidence proved a legal
+  equal-tick interval and two complete promoted-Vulkan cohorts passed 54/54
+  without retries, quarantine, or clamping.
 - [`BUG-157` — Clang 20 fails IntrinsicTests on glm anonymous-union
   redeclaration](BUG-157-clang20-glm-module-union-build-break.md): on a
   Clang-20-only host, `Test.CameraModule.cpp` deterministically fails with

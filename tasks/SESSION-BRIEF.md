@@ -9,6 +9,7 @@ picking backlog work; theme priorities and rationale live in
 ## Active tasks
 
 - `BUG-154` — Restore PMP curvature parity without normal-seam topology loss (tasks/active/BUG-154-curvature-pmp-parity-corner-normal-topology.md)
+- `BUG-155` — Native Vulkan timestamp smoke intermittently publishes zero duration (tasks/active/BUG-155-vulkan-native-timestamp-zero-duration-flake.md)
 - `BUG-156` — Adopt deterministic Framework24 Taubin curvature semantics (tasks/active/BUG-156-curvature-two-ring-smoothing-cancels-features.md)
 - `BUG-162` — Consolidate all local branch history onto main (tasks/active/BUG-162-main-branch-consolidation.md)
 - `METHOD-039` — Feature-network-constrained curvature patch decomposition (tasks/active/METHOD-039-feature-network-curvature-patch-decomposition.md)
@@ -39,7 +40,6 @@ picking backlog work; theme priorities and rationale live in
 - unblocked: `BUG-097` — Progressive model-scene UV job publishes a zero atlas (tasks/backlog/bugs/BUG-097-progressive-model-scene-zero-uv-atlas.md)
 - unblocked: `BUG-118` — GLFW X11 input-method LeakSanitizer recurrence (tasks/backlog/bugs/BUG-118-glfw-x11-input-method-lsan-recurrence.md)
 - unblocked: `BUG-149` — Benchmark sealer escapes dotted output directories (tasks/backlog/bugs/BUG-149-benchmark-sealer-dotted-output-directory.md)
-- unblocked: `BUG-155` — Native Vulkan timestamp smoke intermittently publishes zero duration (tasks/backlog/bugs/BUG-155-vulkan-native-timestamp-zero-duration-flake.md)
 - unblocked: `BUG-157` — Clang 20 fails IntrinsicTests on glm anonymous-union redeclaration (tasks/backlog/bugs/BUG-157-clang20-glm-module-union-build-break.md)
 
 ## Theme H — Agentic workflow hardening
