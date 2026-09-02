@@ -8,6 +8,21 @@ so blocks moved from the old active-README history work verbatim.
 
 ## Retired task narratives
 
+[`BUG-155`](BUG-155-vulkan-native-timestamp-zero-duration-flake.md) — native
+Vulkan timestamps now preserve a coherent, available equal-tick interval as
+zero rather than confusing it with unavailable data or fabricating a positive
+duration. Bounded latest-frame diagnostics retain raw ticks, availability,
+valid-bit mask, period, query indices, frame/slot, queue, scope, and lifecycle;
+the operational smoke accepts zero only when that exact evidence matches its
+recorded `SurfacePass` and the graphics queue envelope remains positive.
+
+The original test reproduced on isolated attempt 4, and the diagnostic build
+captured the same condition on attempt 5. The corrected test passed 20/20
+repetitions; ten XML-recorded attempts included one legal zero; and two full
+promoted-Vulkan cohorts passed 54/54 with validation and the Vulkan
+shutdown/LeakSanitizer contract intact. No retry, quarantine, timeout change,
+or duration clamp was used. Implementation commit: `bc2855f43`.
+
 [`ARCH-018`](ARCH-018-framework24-feature-parity-goal-clarification.md) — the
 Framework24 product objective now makes full user-facing feature and workflow
 parity the behavioral coverage floor. “Better” is an additional quality gate,

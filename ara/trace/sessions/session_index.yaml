@@ -309,8 +309,8 @@ sessions:
     open_threads: 3
   - id: "2026-09-02_001"
     date: "2026-09-02"
-    summary: "Added reset-scoped DAG handle epochs and exact cycle-edge provenance, then completed BUG-156 atomic principal-curvature publication with full CPU and sanitizer verification."
-    turn_count: 2
-    events_count: 3
+    summary: "Added reset-scoped DAG handle epochs and exact cycle-edge provenance, completed BUG-156 atomic principal-curvature publication, and diagnosed and retired BUG-155 with repeated promoted-Vulkan evidence."
+    turn_count: 3
+    events_count: 4
     claims_touched: []
     open_threads: 4

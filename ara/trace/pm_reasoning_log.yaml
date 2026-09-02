@@ -1657,3 +1657,12 @@ entries:
       - "Kept BUG-156 active because independent fixed-surface high-risk review remains unsatisfied; the task was not retired."
       - "Recorded the fresh ASan pass of the formerly BUG-118-owned GLFW/LSan case as a journey fact only; one pass does not retire or rewrite BUG-118."
       - "Did not promote or stale O161-O164: this turn is unrelated to Core.Dag and occurs on the same session-day."
+  - turn: "2026-09-02_001#3"
+    notes:
+      - "Routed the preserved BUG-155 reproductions, discriminating raw-query capture, selected contract correction, repeated promoted-Vulkan verification, and retirement as experiment N450."
+      - "Added no staged observation or claim: this is ordinary profiler/test-contract repair, and the host-local duration distribution is diagnostic evidence rather than a performance or broad capability result."
+      - "Kept native zero narrowly defined as a coherent, available, ordered pair whose raw tick delta or integral-nanosecond conversion is zero; unavailable, stale, incoherent, unsupported, and device-lost states remain distinct and fail closed."
+      - "Rejected stale/partial slot reuse from exact frame, slot, query-index, availability, valid-bit, raw-tick, lifecycle, adjacent-scope, and queue-envelope evidence instead of accepting a passing retry."
+      - "Retired BUG-155 only after 20/20 named repetitions, a retained 9-positive/1-zero direct distribution, two complete 54/54 promoted-Vulkan cohorts, and strict task/layer/docs/source checks; BUG-154's profiler dependency is now resolved."
+      - "Kept BUG-154, BUG-156, and BUG-162 active because their independent fixed-surface reviews remain unsatisfied; task completion was not inferred from implementation or local verification alone."
+      - "Did not promote or stale O161-O164: this turn is unrelated to Core.Dag and occurs on the same session-day."

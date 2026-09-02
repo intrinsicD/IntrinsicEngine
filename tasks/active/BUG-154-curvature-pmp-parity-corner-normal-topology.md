@@ -29,12 +29,11 @@ maturity_target: Operational
   diagnostic, and literature study are implemented. Final current-source CPU,
   isolated ASan/UBSan, strict structural, and task-specific promoted-Vulkan
   visibility/readback gates pass.
-- The full promoted-Vulkan cohort passed once, then two identical reruns failed
-  only an unrelated native-timestamp strict-positive-duration assertion while
-  the other 53 cases passed; immediate isolated x3 reruns passed. `BUG-155`
-  preserves that profiler flake without retrying it away. This task remains
-  active for that full-gate dependency, the required independent high-risk
-  fixed-surface review, and revision-bound final evidence binding.
+- `BUG-155` retired after proving the unrelated native-timestamp zero was a
+  legal equal-tick interval and passing two complete promoted-Vulkan cohorts
+  54/54 without retries. The full-gate dependency is resolved. This task
+  remains active only for its required independent high-risk fixed-surface
+  review and revision-bound final evidence binding.
 
 ## Goal
 
@@ -199,7 +198,7 @@ maturity_target: Operational
       field, and all published diagnostics are deterministic and finite.
 - [x] Degenerate/ill-conditioned support cannot diffuse through smoothing;
       ordinary well-conditioned curvature remains stable under uniform scale.
-- [ ] Required CPU, sanitizer, structural, documentation, and promoted-Vulkan
+- [x] Required CPU, sanitizer, structural, documentation, and promoted-Vulkan
       gates pass on the final current-source surface.
 - [ ] Independent fixed-surface review accepts the final high-risk revision.
 
@@ -261,13 +260,13 @@ Recorded results on 2026-08-11 and 2026-08-12:
   tests. The ASan identity ran its GLFW/LSan case; the UBSan identity recorded
   the expected skip of that LeakSanitizer-only case.
 - The promoted Vulkan ASan+UBSan gate first passed 54/54 tests. Two subsequent
-  evidence-recorded full reruns passed 53/54: exact normal-bake readback,
-  seam-split geometry rendering, validation, and the shutdown LeakSanitizer
-  contract all remained green, while only the unrelated native-timestamp
-  strict-positive-duration assertion intermittently resolved zero. The exact
-  failing case then passed three isolated repetitions; `BUG-155` preserves the
-  failure and owns its raw-query/slot-reuse diagnosis. The two task-specific
-  normal-path Vulkan cases pass 2/2 in the final required receipt.
+  evidence-recorded reruns exposed only the unrelated native-timestamp
+  strict-positive assertion. `BUG-155` captured a coherent equal-tick query
+  pair, corrected that contract without clamping, and then passed the named
+  smoke 20/20 plus two complete cohorts 54/54. Exact normal-bake readback,
+  seam-split rendering, validation, and the shutdown LeakSanitizer contract
+  remained green. The two task-specific normal-path cases pass 2/2 in the
+  final required receipt.
 - Strict layering, test-layout, task-policy/schema, documentation-link, ARA,
   workflow-evidence, source-documentation, generated-inventory, skill-sync,
   and clean-workshop checks pass. Source-documentation review-only findings are
@@ -308,9 +307,9 @@ Recorded results on 2026-08-11 and 2026-08-12:
 - No renderer member, typed frame pass, recipe dependency, or new higher-layer
   public type was introduced; the manual clean-workshop rows are not
   applicable. The strict automated clean-workshop gate passes.
-- Remaining closure is outside the implemented geometry repair: `BUG-155` must
-  restore the complete promoted-Vulkan cohort, then a label-distinct reviewer
-  must audit the exact frozen surface before this high-risk task can retire.
+- Remaining closure is outside the implemented geometry repair: a
+  label-distinct reviewer must audit the exact frozen surface before this
+  high-risk task can bind its final evidence and retire.
 
 ## Forbidden changes
 

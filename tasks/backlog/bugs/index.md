@@ -22,11 +22,6 @@ The 2026-08-07 Sandbox UI workflow pass (`sculpt.obj` end-to-end through the
 promoted Vulkan build) opened `BUG-137` through `BUG-142`. `BUG-137` is upstream
 of `BUG-140` and of the parameterization rejection recorded in `BUG-141`.
 
-- [`BUG-155` — Native Vulkan timestamp smoke intermittently publishes zero
-  duration](../../active/BUG-155-vulkan-native-timestamp-zero-duration-flake.md):
-  complete and ready for retirement after raw query evidence proved a legal
-  equal-tick interval and two complete promoted-Vulkan cohorts passed 54/54
-  without retries, quarantine, or clamping.
 - [`BUG-157` — Clang 20 fails IntrinsicTests on glm anonymous-union
   redeclaration](BUG-157-clang20-glm-module-union-build-break.md): on a
   Clang-20-only host, `Test.CameraModule.cpp` deterministically fails with
@@ -38,11 +33,8 @@ of `BUG-140` and of the parameterization rejection recorded in `BUG-141`.
   fixed; `BUG-157` is the sole implementation owner.
 
 - [`BUG-154` — Restore PMP curvature parity without normal-seam topology loss](../../active/BUG-154-curvature-pmp-parity-corner-normal-topology.md):
-  OBJ authored normals currently participate in the topology remap key, so a
-  face-normal bunny becomes 1,485 disconnected corners instead of its 259
-  position vertices. The repaired curvature estimator also needs PMP's signed
-  3x3 eigensystem, boundary interpolation, and damped reusable property
-  smoothing rather than full neighbour replacement.
+  the geometry repair and all runtime gates are complete; only the independent
+  high-risk fixed-surface review and revision-bound final evidence remain.
 
 - [`BUG-149` — Benchmark sealer escapes dotted output directories](BUG-149-benchmark-sealer-dotted-output-directory.md):
   `run_and_seal.py` interprets a dotted directory name as a file, seals its
@@ -78,6 +70,13 @@ of `BUG-140` and of the parameterization rejection recorded in `BUG-141`.
   tests run; collect cold/warm/contention evidence and set an explicit,
   evidence-backed discovery policy without weakening per-test timeouts.
 ## Verified / Closed
+
+- Closed 2026-09-02: [`BUG-155` — Native Vulkan timestamp smoke intermittently
+  publishes zero duration](../../done/BUG-155-vulkan-native-timestamp-zero-duration-flake.md).
+  Raw query evidence proved a coherent, available equal-tick pair rather than
+  stale slot reuse. The profiler preserves zero as native data, retains bounded
+  diagnostics, and the corrected proof passed 20/20 named repetitions plus two
+  complete promoted-Vulkan cohorts 54/54 without retries or clamping.
 
 - Closed 2026-08-13: [`BUG-121` — GLM anonymous-union copy-assignment fails
   through a C++23 module boundary](../../done/BUG-121-glm-anonymous-union-module-copy-assign.md).

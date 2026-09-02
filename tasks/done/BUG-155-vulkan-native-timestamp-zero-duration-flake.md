@@ -18,9 +18,10 @@ maturity_target: Operational
 
 ## Status
 
-- Complete on `main` and ready for retirement after the repository-contract
-  gates. The defect is diagnosed, the named smoke is corrected, and two
-  complete `gpu;vulkan` cohorts passed without retries.
+- Completed and retired on 2026-09-02 at `Operational`. The defect is
+  diagnosed, the named smoke is corrected, and two complete `gpu;vulkan`
+  cohorts passed without retries.
+- Implementation commit: `bc2855f43`.
 - On NVIDIA GeForce RTX 3050, driver 590.48.01, the unchanged smoke reproduced
   on isolated attempt 4 after three passes. The diagnostic build reproduced on
   attempt 5 after four passes and captured the exact `SurfacePass` pair:

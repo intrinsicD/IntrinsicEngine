@@ -2,9 +2,9 @@ session:
   id: "2026-09-02_001"
   date: "2026-09-02"
   started: "2026-09-02T00:05+02:00"
-  last_turn: "2026-09-02T16:43+02:00"
-  turn_count: 2
-  summary: "Added reset-scoped DAG handle epochs and exact cycle-edge provenance, then completed BUG-156 atomic principal-curvature publication with full CPU and sanitizer verification."
+  last_turn: "2026-09-02T19:37+02:00"
+  turn_count: 3
+  summary: "Added reset-scoped DAG handle epochs and exact cycle-edge provenance, completed BUG-156 atomic principal-curvature publication, and diagnosed and retired BUG-155 with repeated promoted-Vulkan evidence."
 
 events_logged:
   - turn: 1
@@ -25,6 +25,12 @@ events_logged:
     routing: direct
     provenance: ai-executed
     summary: "Completed atomic runtime principal-curvature publication and passed canonical CPU, ASan, UBSan, and structural gates."
+  - turn: 3
+    type: experiment
+    id: N450
+    routing: direct
+    provenance: ai-executed
+    summary: "Diagnosed legal equal-tick Vulkan timestamps, corrected their bounded operational proof, and retired BUG-155 after repeated full cohorts."
 
 ai_actions:
   - turn: 1
@@ -52,6 +58,23 @@ ai_actions:
     action: "Ran canonical Clang 23 build, 75 focused tests, 4,257 CPU tests, 2,745 ASan tests, 2,745 UBSan registrations, generated-artifact checks, and strict structural validators."
     provenance: ai-executed
     files_changed: []
+  - turn: 3
+    action: "Selected BUG-155, added bounded raw timestamp diagnostics, preserved legal native-zero intervals, tightened exact-frame/slot/pass evidence, and synchronized the profiler and test documentation."
+    provenance: ai-executed
+    files_changed:
+      - "src/graphics/vulkan/Backends.Vulkan.Profiler.cpp"
+      - "tests/unit/graphics/Test.RHI.Profiler.cpp"
+      - "tests/integration/graphics/Test.DefaultRecipeSurfaceGpuSmoke.cpp"
+      - "src/graphics/rhi/README.md"
+      - "src/graphics/vulkan/README.md"
+      - "tests/README.md"
+  - turn: 3
+    action: "Preserved two baseline failures, ran deterministic unit coverage, 20 named repetitions, ten XML attempts, two full 54-test promoted-Vulkan cohorts, strict repository gates, and retired BUG-155 at implementation commit bc2855f43."
+    provenance: ai-executed
+    files_changed:
+      - "tasks/done/BUG-155-vulkan-native-timestamp-zero-duration-flake.md"
+      - "tasks/active/BUG-154-curvature-pmp-parity-corner-normal-topology.md"
+      - "tasks/done/RETIREMENT-LOG.md"
 
 claims_touched: []
 
@@ -60,12 +83,14 @@ key_context:
     excerpt: "The user explicitly selected handle epochs and CycleEdges as the next Core.Dag slice."
   - turn: 2
     excerpt: "The user asked the agent to read active tasks and continue with the next best one; BUG-156 was the direct unblocked Framework24 workflow dependency."
+  - turn: 3
+    excerpt: "The user asked the agent to continue with the next task or review and retire tasks that were genuinely done."
 
 open_threads:
   - "The implemented epoch is reset-scoped rather than a process-unique graph-owner token; add owner identity only if cross-Dag handle rejection becomes a contract."
   - "Unique-edge insertion, live-subgraph compilation, and the canonical-versus-domain scheduling seam remain unimplemented parts of O164."
   - "Add the focused behavior harness to repository CTest when src_new/core gains an active CMake target."
-  - "BUG-156 requires an independent fixed-surface high-risk review before retirement; BENCH-001 remains the owner of any claim-grade Framework24 parity result."
+  - "BUG-154, BUG-156, and BUG-162 still require their independent fixed-surface reviews before retirement; BENCH-001 remains the owner of any claim-grade Framework24 parity result."
 
 ai_suggestions_pending:
   - "Do not add per-slot generations until individual node or edge removal exists."

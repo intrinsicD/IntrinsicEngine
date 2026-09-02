@@ -10487,3 +10487,32 @@ tree:
       only for its independent fixed-surface high-risk review; no parity or
       performance claim was added.
     status: resolved
+  - id: N450
+    type: experiment
+    title: "Diagnose and retire BUG-155 native-zero Vulkan timestamps"
+    provenance: ai-executed
+    timestamp: "2026-09-02T19:37+02:00"
+    also_depends_on: [N430]
+    evidence:
+      - "tasks/done/BUG-155-vulkan-native-timestamp-zero-duration-flake.md"
+      - "src/graphics/vulkan/Backends.Vulkan.Profiler.cpp"
+      - "tests/unit/graphics/Test.RHI.Profiler.cpp"
+      - "tests/integration/graphics/Test.DefaultRecipeSurfaceGpuSmoke.cpp"
+      - "bc2855f43"
+      - "20 repeated named-smoke passes and ten XML-recorded direct attempts"
+      - "two complete promoted-Vulkan cohorts: 54/54 and 54/54"
+    result: >
+      The unchanged named smoke reproduced on attempt 4 and the diagnostic
+      build on attempt 5 on an NVIDIA GeForce RTX 3050. The captured
+      SurfacePass pair belonged to the exact frame 4/slot 1 query range, both
+      availability values were one, the 64-bit raw timestamps were equal, and
+      renderer status was Recorded; adjacent scopes and the graphics envelope
+      advanced normally. This rejected stale or partially available slot
+      reuse and identified a legal quantized zero interval. The backend now
+      retains bounded raw-pair diagnostics without clamping, deterministic RHI
+      tests preserve available zero while rejecting unavailable/stale data,
+      the corrected named smoke passed 20/20, ten direct attempts retained a
+      9-positive/1-zero distribution, and two complete gpu;vulkan cohorts
+      passed 54/54 with validation and shutdown LeakSanitizer coverage. BUG-155
+      retired at Operational and its BUG-154 dependency is resolved.
+    status: resolved
