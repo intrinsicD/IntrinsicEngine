@@ -19,8 +19,8 @@ Each active task should include:
   persists all four curvature scalars atomically with stale-state rejection and
   undo/redo. Its independent fixed-surface review remains open.
 - [`BUG-162` — Consolidate all local branch history onto main](BUG-162-main-branch-consolidation.md)
-  — in progress on `main`; local ancestry and the integrated source surface are
-  complete, with the final commit, push, and fetched-head verification pending.
+  — pushed and fetched at `a9706f332`; local ancestry and the integrated source
+  surface are complete, with independent fixed-surface review still pending.
 - [`METHOD-039` — Feature-network-constrained curvature patch decomposition](METHOD-039-feature-network-curvature-patch-decomposition.md)
   — paused behind `REVIEW-004`; preserves its completed negative-result surface
   and work-graph history for research resumption after the gate retires.

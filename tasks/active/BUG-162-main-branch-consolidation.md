@@ -26,9 +26,12 @@ maturity_target: Operational
 - BUG-156's follow-on runtime slice now publishes minimum and maximum principal
   curvature atomically with mean/Gaussian curvature and optional directions;
   its canonical CPU, sanitizer, and structural gates pass.
-- The final integration commit, risk-gated interactive sweep, push, and remote
-  ancestry verification remain. BUG-156 separately retains the independent
-  fixed-surface review of its public numerical and publication contract.
+- Commit `a9706f332` is the final integrated source revision. It was pushed
+  without force and fetched back; local `main`, `origin/main`, and `FETCH_HEAD`
+  resolve identically, and all recorded pre-integration tips remain ancestors.
+- BUG-162 remains active solely for label-distinct independent fixed-surface
+  review. BUG-156 separately retains that review for its public numerical and
+  runtime-publication contract.
 
 ## Goal
 
@@ -90,7 +93,7 @@ maturity_target: Operational
       wording with the merged implementation and actual publication surface.
 - [x] Keep local Framework24 differential numbers explicitly non-claim-eligible
       and delegate formal matched evidence to BENCH-001.
-- [ ] Create the final merge commit and push it to `origin/main` without force.
+- [x] Create the final integration commit and push it to `origin/main` without force.
 
 ## Tests
 
@@ -101,7 +104,7 @@ maturity_target: Operational
 - [x] Pass isolated ASan and UBSan selectors with 2,745 registrations each.
 - [x] Pass strict task, ARA, layering, test-layout, root-hygiene,
       workflow-evidence, and documentation validation.
-- [ ] Re-run post-commit diff/docs checks and verify remote ancestry after push.
+- [x] Re-run post-commit diff/docs checks and verify remote ancestry after push.
 
 ## Docs
 
@@ -116,11 +119,19 @@ maturity_target: Operational
 - [x] No unresolved conflict marker, duplicate task ID, or unqualified dirty-run
       parity claim remains in the integrated tree.
 - [x] The final staged surface passes its strongest applicable local gates.
-- [ ] Risk-gated interactive review accepts the integration-only surface;
-      BUG-156 retains independent review ownership for its public contract.
-- [ ] Local and fetched `origin/main` resolve to the same pushed commit.
+- [ ] Independent fixed-surface review accepts the exact high-risk integration
+      surface; BUG-156 retains separate review ownership for its public contract.
+- [x] Local and fetched `origin/main` resolve to the same pushed commit.
 
 ## Verification
+
+Recorded on 2026-09-02:
+
+- `a9706f33252a4928eb2bb8f5672279b29cf130a2` was pushed to `origin/main`
+  without force and a fresh fetch resolved `HEAD`, `origin/main`, and
+  `FETCH_HEAD` to that exact revision.
+- `828414d`, `a72ef79`, `6783b3d`, and `0dece16` remain ancestors of `HEAD`.
+- The committed strict docs-sync gate and post-commit diff checks passed.
 
 ```bash
 cmake --preset ci
