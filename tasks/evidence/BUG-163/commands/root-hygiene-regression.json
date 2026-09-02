@@ -1,0 +1,20 @@
+{
+  "command": [
+    "python3",
+    "tests/regression/tooling/Test.RootHygiene.py"
+  ],
+  "command_display": "python3 tests/regression/tooling/Test.RootHygiene.py",
+  "cwd": ".",
+  "duration_ms": 821,
+  "exit_code": 0,
+  "finished_at": "2026-09-02T14:44:36Z",
+  "label": "root-hygiene-regression",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-09-02T14:44:36Z",
+  "stderr_path": "tasks/evidence/BUG-163/commands/root-hygiene-regression.stderr.log",
+  "stderr_sha256": "addcd3897312a676aa96b79bf3d61f49fbf901dec8278e5b4b57aba304236df3",
+  "stdout_path": "tasks/evidence/BUG-163/commands/root-hygiene-regression.stdout.log",
+  "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "task_id": "BUG-163"
+}

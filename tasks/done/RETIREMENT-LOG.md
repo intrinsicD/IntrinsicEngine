@@ -7825,3 +7825,22 @@ degree of angular error. It also pins the two-texel gutter, transparent farther
 texels, exact generated-asset binding, and preservation of unrelated material
 slots. The default CPU-supported gate passes 4177/4177 with the expected
 `GlfwLifecycleLsan` capability skip.
+
+## 2026-09-02 — BUG-163 retired
+
+[`BUG-163`](BUG-163-root-hygiene-strict-rejects-src-new.md) — strict root
+hygiene rejecting the undocumented root entry `src_new/`, failing the
+`docs-validation` lane on every pull request — retired on 2026-09-02.
+
+The task existed to record the repository owner's disposition for the
+`src_new/` ground-up experiment rather than prescribe one. The owner chose
+disposition (b) and implemented it directly on `main`: commit `17d9d29a`
+("removed src_new") deletes the entire experiment tree in a pure deletion,
+leaving `tools/repo/root_allowlist.yaml` unchanged and no undocumented root
+entry behind. On the first tree containing that commit, the strict check and
+its regression suite pass (receipted under `tasks/evidence/BUG-163/`). One
+precision correction is recorded in the task: the `docs-validation` job is
+pull-request-triggered, so gate confirmation comes from each PR's lane once
+its merge ref contains `17d9d29a`, not from a `main`-push run. The only other
+in-tree `src_new` references are April-2026 archive and review records about
+an unrelated earlier reorganization.
