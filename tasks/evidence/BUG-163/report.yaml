@@ -1,0 +1,92 @@
+schema_version: 1
+task_id: BUG-163
+workflow_profile: standard
+status: complete
+generated_by: tools/agents/workflow_evidence.py
+generated_at: '2026-09-02T14:49:28Z'
+claim_eligible: false
+source:
+  base_ref: origin/main
+  base_revision: 17d9d29a633afb670b5fa4f9cd760cecdba8024b
+  head_revision: 57581bad4fed47a56d342ec42ff6692c5f2e8413
+  branch: claude/schema-harness-agentic-workflow-d88d6l
+  worktree: /home/user/IntrinsicEngine
+  dirty: true
+  surface:
+  - path: docs/adr/0028-declarative-graphics-state-rhi-boundary.md
+    sha256: 382b32db7d2c6e004b2cf19ce61ceb259096aab9d3b707bfa1d158e069db205e
+  - path: docs/adr/index.md
+    sha256: b4e34b3bf0804110f7a258da926e6bebc3167eb1c9b909deec7a159953adfdb5
+  - path: docs/architecture/graphics.md
+    sha256: 0137e9f787bf89a3b575dc110d4ac4907ff6168ffb9eca3936c7bd855a276ffe
+  - path: tasks/SESSION-BRIEF.md
+    sha256: 479587ab798143407f38fb017fe68c96a6e55fbcc709f032c770da2084ee907e
+  - path: tasks/backlog/README.md
+    sha256: a6bd38a2f5da70f23346df4d24ccf3359f2ed9588694edf033c48d7e058e3a15
+  - path: tasks/backlog/rendering/GRAPHICS-136-rename-pipeline-to-graphics-state-rhi-boundary.md
+    sha256: f27c5398afbd78b49f9b4782de33c80509f856d8ce8a82f04109212bea33d6bf
+  - path: tasks/backlog/rendering/GRAPHICS-137-shader-object-realization-spike.md
+    sha256: d58239aec6eb562835583017d2452cc0abc92d66e74b18f4345d534a5b20e630
+  - path: tasks/backlog/rendering/README.md
+    sha256: 98a5e48c2d7708a2d7ae1f12039357b73dfca779315672437e4d9dab5fdf7139
+  - path: tasks/done/BUG-163-root-hygiene-strict-rejects-src-new.md
+    sha256: 2e3eccd6659b1737b396e54be6259876ccefafc076c38ebe1b43f09e587d5d9f
+  - path: tasks/done/RETIREMENT-LOG.md
+    sha256: c22d32b366456034ce11e17646da9492e24cc28d75e20f5a2f51009b2b49bc5a
+  content_digest: b40e9be23b5963e37a10fd3bbec11e89e3f9d9a0e81dcfab47d19648e91b42ff
+touched:
+  paths:
+  - docs/adr/0028-declarative-graphics-state-rhi-boundary.md
+  - docs/adr/index.md
+  - docs/architecture/graphics.md
+  - tasks/SESSION-BRIEF.md
+  - tasks/backlog/README.md
+  - tasks/backlog/rendering/GRAPHICS-136-rename-pipeline-to-graphics-state-rhi-boundary.md
+  - tasks/backlog/rendering/GRAPHICS-137-shader-object-realization-spike.md
+  - tasks/backlog/rendering/README.md
+  - tasks/done/BUG-163-root-hygiene-strict-rejects-src-new.md
+  - tasks/done/RETIREMENT-LOG.md
+  layers: []
+  modules: []
+extension_seam: A root-allowlist exception is reintroduced only for a deliberately tracked temporary root,
+  added to tools/repo/root_allowlist.yaml with the owning task ID and an explicit removal condition.
+future_change_plan: 'Nothing owed: the experiment tree is deleted on main and the strict gate is green;
+  any future root-level experiment starts with an allowlist entry naming its tracking task before it lands.'
+acceptance:
+- criterion: The strict root-hygiene gate is green on the `main` head. (Verified
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: No undocumented root entry remains; if an exception exists, it names
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+commands:
+- receipt: tasks/evidence/BUG-163/commands/root-hygiene-regression.json
+- receipt: tasks/evidence/BUG-163/commands/root-hygiene-strict.json
+changed_public_contracts: []
+diagnostics_and_previews: []
+benchmark_or_parity_evidence: []
+docs_sync:
+  task_file: tasks/done/BUG-163-root-hygiene-strict-rejects-src-new.md
+  session_brief_present: true
+  canonical_docs_changed: true
+  skill_mirrors_checked: true
+residual_risks: []
+skipped_checks:
+- check: surface-breadth
+  reason: 'The branch surface spans the whole of PR #1034 (the ADR-0028 docs/tasks change plus this retirement),
+    so the recorded surface is a superset containing the BUG-163 changes.'
+- check: cpp-build
+  reason: No C++ source, module, CMake input, or compiled test changed; the resolution is a pure deletion
+    on main plus task bookkeeping, and the receipted strict root-hygiene check and its Python regression
+    suite are the strongest relevant gates.
+artifacts: []
+self_review:
+  completed: true
+  scope_matches_task: true
+  layering_preserved: true
+  tests_and_docs_accounted_for: true
+  mechanical_and_semantic_changes_separated: true
