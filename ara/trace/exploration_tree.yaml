@@ -10600,7 +10600,7 @@ tree:
     timestamp: "2026-09-03T16:18+02:00"
     also_depends_on: [N452, N453]
     evidence:
-      - "tasks/active/BUG-163-sculpt-curvature-feature-patch-rendering.md"
+      - "tasks/done/BUG-163-sculpt-curvature-feature-patch-rendering.md"
       - "tests/unit/geometry/Test.CurvatureTensor.cpp"
       - "tests/contract/runtime/Test.CurvatureSegmentationOperations.cpp"
       - "tests/integration/runtime/Test.RuntimeRenderExtraction.cpp"

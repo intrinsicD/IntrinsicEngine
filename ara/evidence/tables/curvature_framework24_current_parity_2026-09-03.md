@@ -14,8 +14,8 @@ still owns the clean, frozen, independently audited Framework24 comparison.
 - Framework24 invocation:
   `CurvatureTaubin(mesh, 0, false, Policy::Sequential)`.
 - Intrinsic source: BUG-163 implementation worktree based on
-  `ce2379fe5f6702b50dc1c4cf0d916a187e782749`; the final implementation commit
-  is recorded in the retired task.
+  `ce2379fe5f6702b50dc1c4cf0d916a187e782749`; the final implementation is
+  commit `62d5544dbf549d096a6b907b5846d1827e4f34e5`.
 - Intrinsic toolchain: CMake `ci` preset, Clang 23.0.0.
 - Shared input: `tests/data/sculpt.obj`, SHA-256
   `210dc85f20cdec11cb0b50bec255b86126fb6b47f9f938369049570de3f88a25`.

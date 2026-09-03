@@ -129,6 +129,10 @@ python3 tools/docs/check_doc_links.py --root .
   sculpt regression.
 
 ## Maturity
+- Completed: 2026-09-03.
+- Commit: implementation
+  `62d5544dbf549d096a6b907b5846d1827e4f34e5`; retirement metadata follows in
+  this commit.
 - Target: `Operational` for the corrected curvature publication and for
   rendering the explicitly diagnostic METHOD-039 sculpt result through
   promoted Vulkan on a capable host. METHOD-039 does not become an accepted v2
@@ -200,3 +204,8 @@ python3 tools/docs/check_doc_links.py --root .
   closed; no shader, descriptor-set, push-constant, pass-ID, or recipe-edge
   contract changed. Clean-workshop rows: 1 pass, 2 pass, 3 pass, 4 pass,
   5 n/a, 6 n/a, 7 pass, 8 n/a; no follow-up finding was opened.
+- 2026-09-03: Implementation commit
+  `62d5544dbf549d096a6b907b5846d1827e4f34e5` reaches the bounded
+  `Operational` maturity target. This task retires with METHOD-039 still an
+  explicit diagnostic, METHOD-037 still the production default, and
+  BENCH-001/METHOD-040 retaining their clean-parity/global-partition scopes.

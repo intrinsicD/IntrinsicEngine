@@ -1701,7 +1701,7 @@
   tests/unit/geometry/Test.CurvatureTensor.cpp,
   tools/diagnostics/curvature/Framework24CurvatureParityProbe.cpp,
   tests/data/sculpt.obj,
-  tasks/active/BUG-163-sculpt-curvature-feature-patch-rendering.md]
+  tasks/done/BUG-163-sculpt-curvature-feature-patch-rendering.md]
 - **Dependencies**: [C52, C53]
 - **Tags**: geometry, principal curvature, Framework24, CPU, current revision,
   parity candidate, deterministic, BUG-163
@@ -1738,7 +1738,7 @@
   tests/integration/runtime/Test.RuntimeRenderExtraction.cpp,
   tests/integration/runtime/Test.SandboxCurvatureSegmentationPanel.cpp,
   src/runtime/Rendering/Runtime.RenderExtraction.Recipes.cpp,
-  tasks/active/BUG-163-sculpt-curvature-feature-patch-rendering.md]
+  tasks/done/BUG-163-sculpt-curvature-feature-patch-rendering.md]
 - **Dependencies**: [C44, C45, C54, C55, A44]
 - **Tags**: geometry, curvature segmentation, runtime publication, Vulkan,
   Xephyr, corner seams, local operational evidence, BUG-163

@@ -8,6 +8,19 @@ so blocks moved from the old active-README history work verbatim.
 
 ## Retired task narratives
 
+[`BUG-163`](BUG-163-sculpt-curvature-feature-patch-rendering.md) — current
+Framework24 default curvature now agrees on every principal-scalar slot of the
+3,669-vertex sculpt fixture within `8.24e-14`, and the explicit METHOD-039
+diagnostic produces eight connected parts whose 620 final boundaries include
+all 384 hard features. Runtime publishes the part/evidence/boundary properties
+transactionally; Sandbox exposes the shared config and scalar/result views; and
+mesh-surface scalar/color buffers now follow the exact corner-split GPU vertex
+map instead of indexing canonical data with expanded vertex IDs. Focused, full
+CPU, ASan, UBSan, structural, isolated live-app, and promoted-Vulkan readback
+checks pass. It retires at bounded `Operational` maturity without changing the
+METHOD-039 refutation or METHOD-037 production default. Implementation commit:
+`62d5544dbf549d096a6b907b5846d1827e4f34e5`.
+
 [`METHOD-039`](METHOD-039-feature-network-curvature-patch-decomposition.md) —
 the standalone curvature feature-evidence stage and an unadopted deterministic
 grow/merge/refine comparator now preserve the bounded feature, oracle, quality,
