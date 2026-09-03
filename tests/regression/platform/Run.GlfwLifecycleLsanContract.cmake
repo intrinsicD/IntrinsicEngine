@@ -1,12 +1,38 @@
-if(NOT DEFINED PROBE_EXE OR PROBE_EXE STREQUAL "")
-    message(FATAL_ERROR "BUG-082 contract requires PROBE_EXE")
+foreach(_required IN ITEMS PROBE_EXE SUPPRESSIONS_PATH SYMBOLIZER_PATH)
+    if(NOT DEFINED ${_required} OR "${${_required}}" STREQUAL "")
+        message(FATAL_ERROR "BUG-082/118 contract requires ${_required}")
+    endif()
+endforeach()
+
+if(NOT EXISTS "${SUPPRESSIONS_PATH}")
+    message(FATAL_ERROR "BUG-118 suppression file is missing: ${SUPPRESSIONS_PATH}")
+endif()
+
+# The XIM entry is the exact allocation reproduced with libX11 1.7.5 and fixed
+# upstream by xorg/libX11 commit 1d118226. The other entries cannot match this
+# standalone helper. Keep this comparison exact so a broad library suppression
+# cannot silently weaken the synthetic engine-leak control.
+string(CONCAT _expected_suppressions
+    "leak:VulkanCommandContext@Extrinsic.Backends.Vulkan::PushConstants\n"
+    "leak:VmaAllocator_T::BindVulkanBuffer\n"
+    "leak:dbus_connection_send_with_reply_and_block\n"
+    "leak:_XimRegisterIMInstantiateCallback\n"
+)
+file(READ "${SUPPRESSIONS_PATH}" _actual_suppressions)
+string(REPLACE "\r\n" "\n" _actual_suppressions "${_actual_suppressions}")
+if(NOT _actual_suppressions STREQUAL _expected_suppressions)
+    message(FATAL_ERROR
+        "BUG-118 requires the exact reviewed suppression set.\n"
+        "Expected:\n${_expected_suppressions}"
+        "Actual:\n${_actual_suppressions}")
 endif()
 
 find_program(_bug082_env_program NAMES env REQUIRED)
 
 set(_sanitizer_environment
-    "ASAN_OPTIONS=detect_leaks=1:symbolize=0:fast_unwind_on_malloc=0:halt_on_error=1"
-    "LSAN_OPTIONS=detect_leaks=1:fast_unwind_on_malloc=0:exitcode=86"
+    "ASAN_OPTIONS=detect_leaks=1:symbolize=1:fast_unwind_on_malloc=0:halt_on_error=1"
+    "LSAN_OPTIONS=detect_leaks=1:fast_unwind_on_malloc=0:exitcode=86:suppressions=${SUPPRESSIONS_PATH}"
+    "ASAN_SYMBOLIZER_PATH=${SYMBOLIZER_PATH}"
 )
 
 function(_bug082_run mode out_result out_log)
@@ -72,4 +98,4 @@ if(NOT _clean_log MATCHES "BUG082_GLFW_STATIC_TEARDOWN: terminate_calls=1")
 endif()
 
 message(STATUS
-    "BUG-082 passed: process-static GLFW teardown ran once and the unsuppressed synthetic engine leak was detected")
+    "BUG-082/118 passed: process-static GLFW teardown ran once, only the exact upstream XIM retention was suppressed, and the synthetic engine leak was detected")

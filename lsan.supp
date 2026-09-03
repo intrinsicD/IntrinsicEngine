@@ -1,3 +1,4 @@
 leak:VulkanCommandContext@Extrinsic.Backends.Vulkan::PushConstants
 leak:VmaAllocator_T::BindVulkanBuffer
 leak:dbus_connection_send_with_reply_and_block
+leak:_XimRegisterIMInstantiateCallback

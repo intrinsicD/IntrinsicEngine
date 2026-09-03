@@ -20,12 +20,13 @@ string(CONCAT _expected_suppressions
     "leak:VulkanCommandContext@Extrinsic.Backends.Vulkan::PushConstants\n"
     "leak:VmaAllocator_T::BindVulkanBuffer\n"
     "leak:dbus_connection_send_with_reply_and_block\n"
+    "leak:_XimRegisterIMInstantiateCallback\n"
 )
 file(READ "${SUPPRESSIONS_PATH}" _actual_suppressions)
 string(REPLACE "\r\n" "\n" _actual_suppressions "${_actual_suppressions}")
 if(NOT _actual_suppressions STREQUAL _expected_suppressions)
     message(FATAL_ERROR
-        "BUG-083 requires exactly the three diagnosed narrow suppressions.\n"
+        "BUG-083/118 requires exactly the four reviewed narrow suppressions.\n"
         "Expected:\n${_expected_suppressions}"
         "Actual:\n${_actual_suppressions}")
 endif()
@@ -154,4 +155,4 @@ if(_operational_error OR NOT _final_device_operational)
 endif()
 
 message(STATUS
-    "BUG-083 passed: exact five-frame Vulkan shutdown was leak-clean and the engine-leak control remained visible")
+    "BUG-083/118 passed: exact five-frame Vulkan shutdown was leak-clean and the engine-leak control remained visible")

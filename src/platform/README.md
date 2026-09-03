@@ -69,14 +69,12 @@ transform mutations directly.
 
 ## GLFW/X11 sanitizer lifetime contract
 
-The GLFW backend owns one process-static `GLFWLifetime`. A 2026-07-13
-LeakSanitizer report attributed 408 bytes to `_XimOpenIM` after an otherwise
-passing runtime contract. The clean exact repro no longer reports the
-allocation, and a debugger trace proves normal process teardown reaches
-`GLFWLifetime::~GLFWLifetime()` -> `glfwTerminate()` ->
-`XUnregisterIMInstantiateCallback()` -> `XCloseIM()` before exit. That evidence
-does not support an engine shutdown-order change or a suppression for the
-GLFW/Xlib path.
+The GLFW backend owns one process-static `GLFWLifetime`. Normal process
+teardown reaches `GLFWLifetime::~GLFWLifetime()` -> `glfwTerminate()` ->
+`XUnregisterIMInstantiateCallback()` -> `XCloseIM()` before exit. Affected
+libX11 1.7.5 builds can nevertheless retain one 408-byte temporary XIM object
+inside `_XimRegisterIMInstantiateCallback`; xorg/libX11 commit `1d118226`
+corrects that library-owned allocation.
 
 `GlfwLifecycleLsan.EngineStaticTeardownAndLeakControl` preserves the diagnosis
 as a Linux + GLFW regression. Its standalone helper wraps `glfwTerminate` and
@@ -86,10 +84,14 @@ allocates `Bug082SyntheticEngineLeak`; the CMake runner requires that process
 to fail with a LeakSanitizer report for the named 4096-byte allocation before
 accepting the clean GLFW run.
 
-Both subprocesses explicitly use `detect_leaks=1` without a suppression file,
-and the helper deliberately does not link the shared GTest/TestSupport
-sanitizer defaults. The CTest entry reports an environment skip when ASan is
-not active or a usable X11 display is unavailable.
+Both subprocesses explicitly use `detect_leaks=1`, and the helper deliberately
+does not link the shared GTest/TestSupport sanitizer defaults. On hosts with
+the affected libX11, the runner admits only the exact
+`_XimRegisterIMInstantiateCallback` row from the repository suppression file;
+an exact-file guard and explicit symbolizer keep broader X11/GLFW patterns out.
+The named 4096-byte control must still fail under that same file. The CTest
+entry reports an environment skip when ASan is not active or a usable X11
+display is unavailable.
 
 ## Event contract and editor file boundary
 

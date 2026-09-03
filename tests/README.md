@@ -402,13 +402,20 @@ the Slice 1/2 `RuntimeSandboxAcceptance.*` cases in
 
 `ExtrinsicSandbox.VulkanShutdownLsanContract` is the BUG-083 process-level
 regression (`gpu;vulkan;regression;runtime;graphics`). It is intentionally run
-under Xvfb/lavapipe in the same operational `ci-vulkan` batch as the readback
-smoke, enables LeakSanitizer for an exact five-frame Sandbox process, requires
-five renderer-completed samples and an operational final device, then requires
-a clean process exit. Its first subprocess reuses the BUG-082 standalone helper
+under the single ICD selected by the operational `ci-vulkan` batch, enables
+LeakSanitizer for an exact five-frame Sandbox process, requires five
+renderer-completed samples and an operational final device, then requires a
+clean process exit. Its first subprocess reuses the BUG-082 standalone helper
 and must still report the named 4096-byte synthetic engine leak under the same
-three-entry suppression file. GoogleTest binaries embed no default
-suppressions; the three entries are scoped to this runner.
+four-entry suppression file. Three entries are the diagnosed Vulkan/driver
+retentions; the fourth names only the
+`_XimRegisterIMInstantiateCallback` allocation reproduced with libX11 1.7.5,
+fixed upstream and recorded by BUG-118. GoogleTest binaries embed no default
+suppressions; these four entries are scoped to this runner. Hosted CI selects
+lavapipe explicitly; local runs must likewise select the tested operational ICD
+when multiple installed ICDs would otherwise expose non-selected driver-loader
+allocations. Broad loader, Mesa, ICD, unknown-module, pthread, and X11/GLFW
+suppressions remain forbidden.
 
 ```bash
 ctest --test-dir build/ci-vulkan --output-on-failure \

@@ -1251,9 +1251,9 @@ if(TARGET PlatformGlfwSmokeTestObjs)
     )
 endif()
 
-# BUG-082: an intentionally standalone sanitizer process. It must not link
-# TestSupportObjs because their default sanitizer options/suppressions would
-# invalidate the leak-on negative control.
+# BUG-082/118: an intentionally standalone sanitizer process. It must not link
+# TestSupportObjs; the runner admits only the exact reviewed external-retention
+# set and independently proves the leak-on engine allocation remains visible.
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux"
    AND INTRINSIC_PLATFORM_BACKEND_SELECTED STREQUAL "Glfw")
     add_executable(IntrinsicGlfwLifecycleLsanProcess
@@ -1282,6 +1282,8 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux"
     add_test(NAME GlfwLifecycleLsan.EngineStaticTeardownAndLeakControl
         COMMAND ${CMAKE_COMMAND}
             -DPROBE_EXE=$<TARGET_FILE:IntrinsicGlfwLifecycleLsanProcess>
+            -DSUPPRESSIONS_PATH=${CMAKE_SOURCE_DIR}/lsan.supp
+            -DSYMBOLIZER_PATH=${INTRINSIC_LSAN_SYMBOLIZER}
             -P ${CMAKE_CURRENT_SOURCE_DIR}/regression/platform/Run.GlfwLifecycleLsanContract.cmake
     )
     set_tests_properties(
@@ -1368,9 +1370,9 @@ if(TARGET ExtrinsicSandbox
     )
 
     # BUG-083: unlike the general fixture environment above, this subprocess
-    # contract explicitly enables leak detection. The standalone BUG-082 helper
-    # supplies an unsuppressed engine-owned negative control before the exact
-    # five-frame Vulkan shutdown run.
+    # contract explicitly enables leak detection. The standalone BUG-082/118
+    # helper supplies an engine-owned negative control under the same exact
+    # reviewed external-retention set before the five-frame Vulkan shutdown.
     if(CMAKE_SYSTEM_NAME STREQUAL "Linux"
        AND INTRINSIC_SANITIZER_HAS_ADDRESS
        AND TARGET IntrinsicGlfwLifecycleLsanProcess)
