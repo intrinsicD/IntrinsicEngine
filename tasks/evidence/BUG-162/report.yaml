@@ -3,15 +3,15 @@ task_id: BUG-162
 workflow_profile: high-risk
 status: complete
 generated_by: tools/agents/workflow_evidence.py
-generated_at: '2026-09-03T09:28:37Z'
+generated_at: '2026-09-03T09:32:10Z'
 claim_eligible: false
 source:
   base_ref: 64da32db0ddf6758fabf37ab81b7e614e5304e9a
   base_revision: 64da32db0ddf6758fabf37ab81b7e614e5304e9a
-  head_revision: da8934651e4ba0064989f89da0a6cc088697c0bd
-  branch: main
-  worktree: /home/alex/Documents/IntrinsicEngine
-  dirty: true
+  head_revision: f0fbd665dc683c38346d6c7de538955b526c4951
+  branch: codex/evidence-bug162
+  worktree: /tmp/intrinsic-bug162-review.eDFbb7
+  dirty: false
   surface:
   - path: .github/copilot-instructions.md
     sha256: 6eca8f4a866442a1bd1166fa0b9314c2e0b3759b1257b12276cf4ac292e3b259
@@ -185,8 +185,6 @@ source:
     sha256: 63f512c40817ec8e083627cb545625d41505ad933e196bca7e2ae49d8d8e5ea8
   - path: tasks/SESSION-BRIEF.md
     sha256: 768939e39f67c53faa7cbb4d171cb18cdabcd76774c63fb6e5aa24980abb0715
-  - path: tasks/active/BUG-154-curvature-pmp-parity-corner-normal-topology.md
-    sha256: null
   - path: tasks/active/BUG-156-curvature-two-ring-smoothing-cancels-features.md
     sha256: null
   - path: tasks/active/README.md
@@ -529,7 +527,7 @@ source:
     sha256: c85485df548794e8dce225dfae5b482b22642f1ec2035511033540344bc7a3f1
   - path: tools/repo/githooks/pre-commit
     sha256: f57fd300376114c921128c6e519ff6f5fb9cb0695722a00096626b887ccbb7e6
-  content_digest: ca738d38831cb79365db92be7a77af0f42666b5ef4b43b22c60e47a10d9c32da
+  content_digest: 2999fae78cfaa2bfe5d395eef17e983a1508236a547a19da9a9be5cc159fbc37
 touched:
   paths:
   - .github/copilot-instructions.md
@@ -618,7 +616,6 @@ touched:
   - src/runtime/README.md
   - tasks/HINTS.md
   - tasks/SESSION-BRIEF.md
-  - tasks/active/BUG-154-curvature-pmp-parity-corner-normal-topology.md
   - tasks/active/BUG-156-curvature-two-ring-smoothing-cancels-features.md
   - tasks/active/README.md
   - tasks/backlog/README.md
