@@ -530,6 +530,17 @@ namespace Extrinsic::Runtime::FeatureConfigDetail
             return std::nullopt;
         }
 
+        [[nodiscard]] std::optional<CurvatureSegmentationMethod>
+        ParseCurvatureSegmentationMethod(
+            const std::string_view value) noexcept
+        {
+            if (value == "curvature_gmm")
+                return CurvatureSegmentationMethod::CurvatureGmm;
+            if (value == "feature_aligned_patches")
+                return CurvatureSegmentationMethod::FeatureAlignedPatches;
+            return std::nullopt;
+        }
+
         [[nodiscard]] std::optional<PointCloudConsolidationStrategy>
         ParsePointCloudConsolidationStrategy(
             const std::string_view value) noexcept
@@ -701,6 +712,19 @@ namespace Extrinsic::Runtime::FeatureConfigDetail
                 return "automatic";
             }
             return "automatic";
+        }
+
+        [[nodiscard]] std::string_view ToConfigString(
+            const CurvatureSegmentationMethod value) noexcept
+        {
+            switch (value)
+            {
+            case CurvatureSegmentationMethod::CurvatureGmm:
+                return "curvature_gmm";
+            case CurvatureSegmentationMethod::FeatureAlignedPatches:
+                return "feature_aligned_patches";
+            }
+            return "curvature_gmm";
         }
 
         [[nodiscard]] std::string_view ToConfigString(
@@ -910,7 +934,8 @@ namespace Extrinsic::Runtime::FeatureConfigDetail
             AddUnknownFieldDiagnostics(
                 context,
                 *object,
-                {"selection_mode",
+                {"method",
+                 "selection_mode",
                  "fixed_component_count",
                  "automatic_min_components",
                  "automatic_max_components",
@@ -923,7 +948,20 @@ namespace Extrinsic::Runtime::FeatureConfigDetail
                  "spatial_weight",
                  "feature_sensitivity",
                  "max_spatial_iterations",
-                 "minimum_region_faces"});
+                 "minimum_region_faces",
+                 "feature_base_radius_ratio",
+                 "hard_dihedral_threshold_degrees",
+                 "patch_complexity_cost"});
+
+            if (ReadEnum(
+                    context,
+                    *object,
+                    "method",
+                    ParseCurvatureSegmentationMethod,
+                    config.Method))
+            {
+                CountParsed(context);
+            }
 
             if (ReadEnum(
                     context,
@@ -939,6 +977,36 @@ namespace Extrinsic::Runtime::FeatureConfigDetail
             {
                 config.FixedComponentCount =
                     static_cast<std::uint32_t>(*value);
+                CountParsed(context);
+            }
+            if (const auto value = ReadNumber(
+                    context,
+                    *object,
+                    "feature_base_radius_ratio",
+                    1.0e-12,
+                    1.0))
+            {
+                config.FeatureBaseRadiusRatio = *value;
+                CountParsed(context);
+            }
+            if (const auto value = ReadNumber(
+                    context,
+                    *object,
+                    "hard_dihedral_threshold_degrees",
+                    0.0,
+                    180.0))
+            {
+                config.HardDihedralThresholdDegrees = *value;
+                CountParsed(context);
+            }
+            if (const auto value = ReadNumber(
+                    context,
+                    *object,
+                    "patch_complexity_cost",
+                    0.0,
+                    1.0e12))
+            {
+                config.PatchComplexityCost = *value;
                 CountParsed(context);
             }
             if (const auto value = ReadInteger(
@@ -1913,6 +1981,7 @@ namespace Extrinsic::Runtime::FeatureConfigDetail
         const CurvatureSegmentationConfig& config)
     {
         return json::object({
+            {"method", std::string{ToConfigString(config.Method)}},
             {"selection_mode",
              std::string{ToConfigString(config.SelectionMode)}},
             {"fixed_component_count", config.FixedComponentCount},
@@ -1929,6 +1998,10 @@ namespace Extrinsic::Runtime::FeatureConfigDetail
             {"feature_sensitivity", config.FeatureSensitivity},
             {"max_spatial_iterations", config.MaxSpatialIterations},
             {"minimum_region_faces", config.MinimumRegionFaces},
+            {"feature_base_radius_ratio", config.FeatureBaseRadiusRatio},
+            {"hard_dihedral_threshold_degrees",
+             config.HardDihedralThresholdDegrees},
+            {"patch_complexity_cost", config.PatchComplexityCost},
         }).dump();
     }
 

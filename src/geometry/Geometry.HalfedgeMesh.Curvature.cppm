@@ -31,7 +31,7 @@ export namespace Geometry::Curvature
 
     struct CurvatureDiagnostics
     {
-        // Vertices whose Framework24 two-ring tensor support was numerically
+        // Vertices whose Framework24 one-ring tensor support was numerically
         // valid. A supported flat vertex can still carry zero curvature.
         std::size_t SupportedVertexCount{0};
         std::size_t NonZeroPrincipalVertexCount{0};
@@ -114,35 +114,29 @@ export namespace Geometry::Curvature
     // above and are not mixed into this result.
     [[nodiscard]] CurvatureField ComputeCurvature(HalfedgeMesh::Mesh& mesh);
 
-    // Deterministic port of Framework24 CurvatureTaubin(mesh, 3, true,
-    // Policy::Sequential). For every interior edge e it forms
+    // Deterministic port of Framework24 revision 6dd50a82's default
+    // CurvatureTaubin(mesh, 0, false, Policy::Sequential). For every interior
+    // edge e it forms
     //   M_e = beta_e (|e|/2) t_e t_e^T.
-    // Each vertex sums the incident hinges and legacy Voronoi areas of itself
-    // plus its adjacent vertices (Framework24's two-ring support). A symmetric
+    // Each vertex sums its incident hinges over its corrected mixed Voronoi
+    // area (one-ring support). A symmetric
     // 3x3 decomposition removes the smallest-absolute eigenvalue as the normal
     // mode and pairs each remaining algebraically ordered value directly with
     // its tensor eigenvector. Open-boundary vertices use the same tensor path.
     //
-    // Principal scalar values then receive three nonnegative-cotan full-
-    // neighbour replacement passes. Updates are intentionally in-place and
-    // execute in stable vertex-index order, matching Framework24's sequential
-    // policy while avoiding its default ParallelUnsequential data race.
-    // Directions are not smoothed. Parity assumes Framework24's default
-    // all-false v_feature property; this API has no private feature-mask input.
-    // The legacy area formula, cotan clamp, sign, eigenvalue ordering, and
-    // direct direction pairing are preserved exactly; consequently its values
-    // are not interchangeable with the standalone Meyer operators above.
+    // Principal scalar values and directions are published without implicit
+    // smoothing. The corrected area formula, cotan clamp, sign, eigenvalue
+    // ordering, and direct direction pairing are preserved exactly.
     // Curvature units are inverse caller-coordinate units. This function does
     // not reproduce Framework24 MeshIo's separate centering/AABB-normalization
     // side effect.
     //
     // Triangle conditioning uses the scale-independent ratio 2A/l_max^2.
     // Degenerate, non-triangular, non-finite, or sub-threshold faces invalidate
-    // affected support, which retains finite zero sentinels and cannot enter
-    // smoothing. Supported flat vertices keep zero scalars and a finite tensor
-    // basis. Empty/no-face meshes return nullopt. Storage is O(V + E + F);
-    // work is linear for bounded-valence meshes and includes the explicit
-    // two-ring traversal plus three edge-neighbour passes.
+    // affected support, which retains finite zero sentinels. Supported flat
+    // vertices keep zero scalars and a finite tensor basis. Empty/no-face
+    // meshes return nullopt. Storage is O(V + E + F);
+    // work is linear for bounded-valence meshes.
     [[nodiscard]] std::optional<CurvatureTensorResult> ComputeCurvatureTensor(
         HalfedgeMesh::Mesh& mesh);
 

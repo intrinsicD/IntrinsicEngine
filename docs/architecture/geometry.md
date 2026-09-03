@@ -459,13 +459,14 @@ retain the Meyer et al. (2003) cotan-Laplacian and angle-defect operators.
 edge-dihedral principal system so the full result never combines Meyer scalars
 with directions from a different estimator.
 
-The principal path is a deterministic numerical port of Framework24
-`CurvatureTaubin(mesh, 3, true, Policy::Sequential)`. For each finite interior
+The principal path is a deterministic numerical port of Framework24 revision
+`6dd50a82`'s default
+`CurvatureTaubin(mesh, 0, false, Policy::Sequential)`. For each finite interior
 edge `e`, it precomputes `M_e = beta_e (|e|/2) t_e t_eᵀ`, where `beta_e` is
-the Framework24-oriented face-normal dihedral and `t_e` is the unit edge
-direction. Each vertex forms a neighborhood containing itself and its adjacent
-vertices, then sums every incident hinge and Framework24 legacy Voronoi area
-over that neighborhood. This is the reference's two-ring hinge support.
+the current Framework24-oriented signed face-normal dihedral and `t_e` is the
+unit edge direction. Each vertex divides the sum of its incident hinge tensors
+by its own corrected mixed Voronoi area. There is no implicit neighborhood
+expansion or principal-value smoothing.
 
 The resulting symmetric 3×3 tensor is decomposed locally. The eigenvalue with
 smallest absolute magnitude is discarded as the tensor-normal mode; the two
@@ -479,19 +480,13 @@ tensor path instead of receiving interpolated interior values. Flat supported
 vertices retain zero scalar values and the finite basis selected by the
 eigendecomposition.
 
-Framework24's exact legacy numerical choices are part of the compatibility
-contract. Its acute mixed-area branch divides corner dot products by triangle
-area (rather than twice area) before applying the `0.125` coefficient; its
-obtuse branch contributes `0.25A` at an obtuse center and `0.125A` at the other
-corners; cotangents clamp to `[-19.1, 19.1]`. After tensor decomposition, three
-passes replace each principal scalar with its nonnegative-cotan neighbor
-average. The replacements are in-place in stable vertex-index order. That
-matches `Policy::Sequential`; Framework24's default `ParallelUnsequential`
-mode performs unsynchronized reads and writes to the same arrays and therefore
-is not a deterministic oracle. Directions are not smoothed. Parity uses
-Framework24's fresh/default all-false `v_feature` property; the Intrinsic
-operation has no feature-mask input and does not create or mutate an unrelated
-private property to emulate pre-marked Framework24 meshes.
+Framework24's corrected numerical choices are part of the compatibility
+contract. The acute mixed-area branch evaluates its clamped cotangents against
+twice the triangle area before applying the `0.125` coefficient; an obtuse
+corner receives `A/2` and either other corner receives `A/4`; cotangents clamp
+to `[-19.1, 19.1]`. The signed hinge uses the negated oriented `atan2` adopted
+by revision `6dd50a82`. With the default zero post-smoothing steps and one-ring
+flag disabled, neither the principal scalars nor directions are smoothed.
 
 `ComputeCurvature` derives `H = (κ₁ + κ₂)/2`, `K = κ₁κ₂`, and the
 mean-curvature normal from the final principal values, so its published scalar
@@ -506,12 +501,12 @@ same extent.
 Triangle conditioning uses the dimensionless `2A/l_max^2` ratio. Its `3.5e-4`
 floor is the conservatively rounded square root of machine epsilon for public
 float positions. Non-triangular, non-finite, degenerate, or quality-at/below
-that floor faces invalidate affected two-ring support. Invalid vertices retain
-finite zero scalar/direction sentinels and are excluded from smoothing. Results
+that floor faces invalidate affected one-ring support. Invalid vertices retain
+finite zero scalar/direction sentinels. Results
 report supported/nonzero vertex counts, face-quality counts and threshold,
 minimum quality, and the finite principal range; empty/no-face tensor requests
-return `nullopt`. Storage is `O(V + E + F)`; work is linear on bounded-valence
-meshes and includes the two-ring traversal plus three edge-neighbor passes.
+return `nullopt`. Storage is `O(V + E + F)` and work is linear on
+bounded-valence meshes.
 
 The reusable `Geometry::Smoothing::CotanSmoothVertexProperty` operation
 remains available for callers that stabilize published fields. It supports
@@ -554,26 +549,36 @@ estimator. Both reuse `Geometry.HalfedgeMesh.Features` for strict hard facts and
 return separate slot-aligned hard/soft edge evidence, three-scale
 transition/ridge/valley responses, thinning and hysteresis decisions, combined
 vertex incidence, bounded-search work counters, timings, and fail-closed
-status. This stage is topology-preserving and owns its result; it is not yet a
-runtime segmentation selector or a published geometry-property path. The
-bounded CPU contract evidence is recorded by ARA claim C44.
+status. This stage is topology-preserving and owns its result. `BUG-163` adds
+an explicit diagnostic runtime selection that publishes its hard mask and soft
+confidence for inspection; it does not turn the rejected patch formulation
+into an accepted v2 backend. The bounded CPU contract evidence is recorded by
+ARA claim C44.
 
 The companion `Geometry.HalfedgeMesh.CurvatureSegmentation.Patches` module is
 an unadopted diagnostic reference. Its deterministic grow/merge/refine path
 passes the bounded oracle and computed-feature controls, but a one-dual-step
 seed perturbation violates the preregistered partition-stability gate. ARA
-claim C45 preserves that refutation; no v2 selector, canonical property,
-runtime/config/UI path, or UV/atlas behavior was added. METHOD-040 owns the
-separately scoped global-partition attempt.
+claim C45 preserves that refutation. The serialized runtime config can select
+this result explicitly for diagnostic visualization and reports requested and
+actual method identity, but METHOD-037 remains the default and no v2 backend or
+UV/atlas behavior is claimed. METHOD-040 owns the separately scoped global-
+partition attempt.
 
 The runtime operation publishes `f:curvature_component`,
 `f:curvature_region`, `f:curvature_region_color`,
 `e:curvature_region_boundary`, and
 `e:curvature_region_boundary_color` without changing topology or unrelated
-properties. These boundaries are visualization/inspection data only. They are
-not UV seams; the evidence-gated `GEOM-076` follow-up owns any later cut or
-atlas-hint adoption. The complete formulation, lineage, parameter guidance,
-and limitations live in
+properties. The diagnostic METHOD-039 selection additionally publishes
+`e:curvature_hard_feature`, `e:curvature_soft_feature_confidence`,
+`e:curvature_patch_boundary_role`, and
+`e:curvature_feature_patch_color`; the combined color draws only final
+hard/soft/closure boundaries, while retained candidates remain available in
+the separate evidence properties.
+These boundaries are visualization/inspection data only. They are not UV
+seams; the evidence-gated `GEOM-076` follow-up owns any later cut or atlas-hint
+adoption. The complete formulation, lineage, parameter guidance, and
+limitations live in
 [`methods/geometry/curvature_segmentation`](../../methods/geometry/curvature_segmentation/).
 
 ### Discrete Laplacian edge-weight modes

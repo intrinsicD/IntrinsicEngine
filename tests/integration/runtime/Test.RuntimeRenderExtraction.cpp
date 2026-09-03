@@ -1,6 +1,7 @@
 #include <cstdint>
 #include <array>
 #include <cstddef>
+#include <cstring>
 #include <limits>
 #include <memory>
 #include <span>
@@ -267,6 +268,54 @@ namespace
         faces.Properties.GetOrAdd<std::uint32_t>(
             std::string{PN::kFaceHalfedge},
             0u).Vector() = {0u};
+        raw.emplace_or_replace<GS::HasMeshTopology>(entity);
+    }
+
+    void AttachCornerSplitQuadMeshSources(ECS::Scene::Registry& scene,
+                                          entt::entity entity)
+    {
+        namespace GS = ECS::Components::GeometrySources;
+        namespace PN = ECS::Components::GeometrySources::PropertyNames;
+
+        auto& raw = scene.Raw();
+        auto& vertices = raw.emplace_or_replace<GS::Vertices>(entity);
+        vertices.Properties.Resize(4u);
+        vertices.Properties.GetOrAdd<glm::vec3>(
+            std::string{PN::kPosition}, glm::vec3{0.0f}).Vector() = {
+            {0.0f, 0.0f, 0.0f},
+            {1.0f, 0.0f, 0.0f},
+            {1.0f, 1.0f, 0.0f},
+            {0.0f, 1.0f, 0.0f},
+        };
+        vertices.Properties.GetOrAdd<float>("v:split_scalar", 0.0f)
+            .Vector() = {1.0f, 2.0f, 3.0f, 4.0f};
+
+        raw.emplace_or_replace<GS::Edges>(entity).Properties.Resize(5u);
+        auto& halfedges = raw.emplace_or_replace<GS::Halfedges>(entity);
+        halfedges.Properties.Resize(6u);
+        halfedges.Properties.GetOrAdd<std::uint32_t>(
+            std::string{PN::kHalfedgeToVertex}, 0u).Vector() =
+            {1u, 2u, 0u, 2u, 3u, 0u};
+        halfedges.Properties.GetOrAdd<std::uint32_t>(
+            std::string{PN::kHalfedgeNext}, 0u).Vector() =
+            {1u, 2u, 0u, 4u, 5u, 3u};
+        halfedges.Properties.GetOrAdd<std::uint32_t>(
+            std::string{PN::kHalfedgeFace}, 0u).Vector() =
+            {0u, 0u, 0u, 1u, 1u, 1u};
+        halfedges.Properties.GetOrAdd<glm::vec3>(
+            "h:normal", glm::vec3{0.0f, 0.0f, 1.0f}).Vector() = {
+            {0.0f, 0.0f, 1.0f},
+            {0.0f, 0.0f, 1.0f},
+            {0.0f, 0.0f, 1.0f},
+            {0.0f, 1.0f, 0.0f},
+            {0.0f, 1.0f, 0.0f},
+            {0.0f, 1.0f, 0.0f},
+        };
+
+        auto& faces = raw.emplace_or_replace<GS::Faces>(entity);
+        faces.Properties.Resize(2u);
+        faces.Properties.GetOrAdd<std::uint32_t>(
+            std::string{PN::kFaceHalfedge}, 0u).Vector() = {0u, 3u};
         raw.emplace_or_replace<GS::HasMeshTopology>(entity);
     }
 
@@ -738,6 +787,132 @@ TEST(RuntimeRenderExtraction, MeshColorVisualizationPropertyBufferUploadsFromGeo
     EXPECT_EQ(world.Visualization.Diagnostics.AcceptedPacketCount, 1u);
     EXPECT_FALSE(world.Visualization.Diagnostics.HasErrors);
     EXPECT_TRUE(world.Visualization.HasVisualizationPackets);
+}
+
+// OBJ corner UV/normal seams duplicate vertices in the GPU surface stream.
+// Vertex-domain fields remain canonical on the unsplit mesh, so extraction
+// must duplicate their values through the identical source map before the
+// surface shader indexes them by GPU vertex.
+TEST(RuntimeRenderExtraction,
+     MeshSurfaceScalarFollowsCornerAttributeGpuVertexSplit)
+{
+    namespace D = ECS::Components::DirtyTags;
+    namespace GS = ECS::Components::GeometrySources;
+    using ColorSource =
+        Graphics::Components::VisualizationConfig::ColorSource;
+    using Domain = Graphics::Components::VisualizationConfig::Domain;
+
+    RendererFixture fixture;
+    ECS::Scene::Registry scene;
+    const auto entity = scene.Create();
+    auto& registry = scene.Raw();
+    registry.emplace<ECS::Components::Transform::WorldMatrix>(entity).Matrix =
+        glm::mat4{1.0f};
+    registry.emplace<Graphics::Components::RenderSurface>(entity);
+    AttachCornerSplitQuadMeshSources(scene, entity);
+
+    auto& visualization =
+        registry.emplace<Graphics::Components::VisualizationConfig>(entity);
+    visualization.Source = ColorSource::ScalarField;
+    visualization.ScalarFieldName = "v:split_scalar";
+    visualization.ScalarDomain = Domain::Vertex;
+
+    const auto stats = fixture.Extract(scene);
+    Graphics::RenderWorld world = fixture.Renderer->ExtractRenderWorld({});
+    fixture.Renderer->PrepareFrame(world);
+
+    EXPECT_EQ(stats.MeshGeometryUploads, 1u);
+    ASSERT_EQ(world.Visualization.Scalars.size(), 1u);
+    EXPECT_EQ(world.Visualization.Scalars.front().ElementCount, 6u);
+
+    const auto sidecar =
+        fixture.Extraction.FindRenderableSidecarForTest(StableId(entity));
+    ASSERT_TRUE(sidecar.has_value());
+    const RHI::GpuEntityConfig config =
+        fixture.Renderer->GetGpuWorld().GetEntityConfigForTest(
+            sidecar->Instance);
+    EXPECT_EQ(config.ElementCount, 6u);
+    ASSERT_NE(config.ScalarBDA, 0u);
+
+    constexpr std::uint64_t kMockBufferAddressBase = 0x1'0000'0000ull;
+    ASSERT_GE(config.ScalarBDA, kMockBufferAddressBase);
+    const std::uint32_t scalarHandleIndex = static_cast<std::uint32_t>(
+        (config.ScalarBDA - kMockBufferAddressBase) / 0x1000ull);
+    const Tests::MockDevice::BufferWriteRecord* scalarWrite = nullptr;
+    for (auto it = fixture.Device.BufferWrites.rbegin();
+         it != fixture.Device.BufferWrites.rend();
+         ++it)
+    {
+        if (it->Handle.Index == scalarHandleIndex && it->Offset == 0u)
+        {
+            scalarWrite = &*it;
+            break;
+        }
+    }
+    ASSERT_NE(scalarWrite, nullptr);
+    ASSERT_EQ(scalarWrite->Data.size(), 6u * sizeof(float));
+    std::array<float, 6u> uploaded{};
+    std::memcpy(
+        uploaded.data(), scalarWrite->Data.data(), scalarWrite->Data.size());
+    EXPECT_EQ(
+        uploaded,
+        (std::array<float, 6u>{2.0f, 3.0f, 1.0f, 3.0f, 4.0f, 1.0f}));
+
+    // Swap the two face slots without changing either the canonical scalar
+    // property or the six-vertex GPU stream size. Content revision and buffer
+    // shape are therefore unchanged; only the source-vertex layout stamp can
+    // prevent stale residency reuse.
+    auto halfedgeFaces = registry.get<GS::Halfedges>(entity).Properties
+        .Get<std::uint32_t>(GS::PropertyNames::kHalfedgeFace);
+    auto faceHalfedges = registry.get<GS::Faces>(entity).Properties
+        .Get<std::uint32_t>(GS::PropertyNames::kFaceHalfedge);
+    ASSERT_TRUE(halfedgeFaces);
+    ASSERT_TRUE(faceHalfedges);
+    halfedgeFaces.Vector() = {1u, 1u, 1u, 0u, 0u, 0u};
+    faceHalfedges.Vector() = {3u, 0u};
+    D::MarkFaceTopologyDirty(registry, entity);
+
+    const auto reorderedStats = fixture.Extract(scene);
+    Graphics::RenderWorld reorderedWorld =
+        fixture.Renderer->ExtractRenderWorld({});
+    fixture.Renderer->PrepareFrame(reorderedWorld);
+
+    EXPECT_EQ(reorderedStats.MeshGeometryReuploads, 1u);
+    EXPECT_EQ(
+        reorderedWorld.Visualization.PropertyBufferDiagnostics.UploadedBufferCount,
+        1u);
+    EXPECT_EQ(
+        reorderedWorld.Visualization.PropertyBufferDiagnostics.ReusedBufferCount,
+        0u);
+    const RHI::GpuEntityConfig reorderedConfig =
+        fixture.Renderer->GetGpuWorld().GetEntityConfigForTest(
+            sidecar->Instance);
+    EXPECT_EQ(reorderedConfig.ElementCount, 6u);
+    ASSERT_GE(reorderedConfig.ScalarBDA, kMockBufferAddressBase);
+    const std::uint32_t reorderedScalarHandleIndex =
+        static_cast<std::uint32_t>(
+            (reorderedConfig.ScalarBDA - kMockBufferAddressBase) / 0x1000ull);
+    const Tests::MockDevice::BufferWriteRecord* reorderedScalarWrite = nullptr;
+    for (auto it = fixture.Device.BufferWrites.rbegin();
+         it != fixture.Device.BufferWrites.rend();
+         ++it)
+    {
+        if (it->Handle.Index == reorderedScalarHandleIndex && it->Offset == 0u)
+        {
+            reorderedScalarWrite = &*it;
+            break;
+        }
+    }
+    ASSERT_NE(reorderedScalarWrite, nullptr);
+    ASSERT_EQ(reorderedScalarWrite->Data.size(), 6u * sizeof(float));
+    std::array<float, 6u> reorderedUpload{};
+    std::memcpy(
+        reorderedUpload.data(),
+        reorderedScalarWrite->Data.data(),
+        reorderedScalarWrite->Data.size());
+    EXPECT_EQ(
+        reorderedUpload,
+        (std::array<float, 6u>{3.0f, 4.0f, 1.0f, 2.0f, 3.0f, 1.0f}));
 }
 
 TEST(RuntimeRenderExtraction, PointCloudVisualizationPropertyBuffersUploadFromGeometrySources)

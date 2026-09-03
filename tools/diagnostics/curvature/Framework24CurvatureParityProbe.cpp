@@ -25,7 +25,7 @@ int main(int argc, char** argv)
         return 3;
 
     const Bcg::Curvatures curvature = Bcg::CurvatureTaubin(
-        mesh, 3, true, Bcg::Policy::Sequential);
+        mesh, 0, false, Bcg::Policy::Sequential);
     std::cout << std::setprecision(17);
     for (std::size_t vertex = 0u; vertex < mesh.vertices.size(); ++vertex)
     {

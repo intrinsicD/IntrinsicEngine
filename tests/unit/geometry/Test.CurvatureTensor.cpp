@@ -14,6 +14,8 @@
 #include <glm/glm.hpp>
 
 import Geometry;
+import Geometry.HalfedgeMesh.CurvatureSegmentation.Features;
+import Geometry.HalfedgeMesh.CurvatureSegmentation.Patches;
 
 namespace
 {
@@ -21,6 +23,7 @@ namespace
     using Geometry::PropertyIndex;
     using Geometry::VertexHandle;
     namespace Curv = Geometry::Curvature;
+    namespace Patches = Geometry::CurvatureSegmentation;
     namespace MU = Geometry::MeshUtils;
 
     constexpr double kPi = std::numbers::pi;
@@ -254,8 +257,8 @@ TEST(CurvatureTensor, NoFaceMesh_ReturnsNullopt)
 }
 
 // =============================================================================
-// Sphere: Framework24's legacy area convention produces approximately 1/(2R)
-// on acute triangulations while preserving isotropy and tangent directions.
+// Sphere: the corrected Framework24 mixed area produces approximately 1/R on
+// acute triangulations while preserving isotropy and tangent directions.
 // =============================================================================
 
 TEST(CurvatureTensor, Sphere_IsotropicAndTangent)
@@ -277,8 +280,8 @@ TEST(CurvatureTensor, Sphere_IsotropicAndTangent)
 
         const double k1 = result->MaxPrincipalCurvatureProperty[vh];
         const double k2 = result->MinPrincipalCurvatureProperty[vh];
-        EXPECT_NEAR(std::abs(k1), 0.5 / R, 0.08);
-        EXPECT_NEAR(std::abs(k2), 0.5 / R, 0.08);
+        EXPECT_NEAR(std::abs(k1), 1.0 / R, 0.08);
+        EXPECT_NEAR(std::abs(k2), 1.0 / R, 0.08);
         EXPECT_LT(std::abs(std::abs(k1) - std::abs(k2)), 0.08);
 
         // Orthonormal + tangent.
@@ -373,8 +376,8 @@ TEST(CurvatureTensor, ReversingOrientationFlipsSignedCurvature)
     for (std::size_t i = 0; i < outward.VerticesSize(); ++i)
     {
         const VertexHandle vertex{static_cast<PropertyIndex>(i)};
-        EXPECT_LT(outwardField.MeanCurvatureProperty[vertex], 0.0);
-        EXPECT_GT(inwardField.MeanCurvatureProperty[vertex], 0.0);
+        EXPECT_GT(outwardField.MeanCurvatureProperty[vertex], 0.0);
+        EXPECT_LT(inwardField.MeanCurvatureProperty[vertex], 0.0);
         EXPECT_NEAR(
             outwardField.MeanCurvatureProperty[vertex],
             -inwardField.MeanCurvatureProperty[vertex],
@@ -410,10 +413,14 @@ TEST(CurvatureTensor, MatchesFramework24SequentialAcuteClosedReference)
 {
     auto mesh = LoadTriangleFixture("framework24-acute-tetrahedron.obj");
     ASSERT_TRUE(mesh.has_value());
-    constexpr std::array expected{
-        -0.78001275240209988, -0.78001275240209988,
-        -0.78001275240209988, -0.78001275240209988};
-    ExpectFramework24PrincipalReference(*mesh, expected, expected);
+    constexpr std::array expectedMinimum{
+        0.78001275240210033, 0.78001275240210033,
+        0.78001275240210033, 0.78001275240210033};
+    constexpr std::array expectedMaximum{
+        3.1200510096084009, 3.1200510096084009,
+        3.1200510096084009, 3.1200510096084009};
+    ExpectFramework24PrincipalReference(
+        *mesh, expectedMinimum, expectedMaximum);
 }
 
 TEST(CurvatureTensor, MatchesFramework24SequentialObtuseClosedReference)
@@ -421,11 +428,11 @@ TEST(CurvatureTensor, MatchesFramework24SequentialObtuseClosedReference)
     auto mesh = LoadTriangleFixture("framework24-obtuse-tetrahedron.obj");
     ASSERT_TRUE(mesh.has_value());
     constexpr std::array expectedMinimum{
-        2.9822051751846228, 2.9822051751846228,
-        2.9822051751846228, 2.9822051751846232};
+        -6.1810779792105457, -10.012749350060913,
+        -2.3846744578378214, -10.6600725275584};
     constexpr std::array expectedMaximum{
-        4.8848085457685020, 4.8848085457685020,
-        4.8848085457685020, 4.8848085457685020};
+        -3.4382492274809735, -2.4416027945661374,
+        -1.0771084777901436, -2.0751173149857816};
     ExpectFramework24PrincipalReference(
         *mesh, expectedMinimum, expectedMaximum);
 }
@@ -435,17 +442,16 @@ TEST(CurvatureTensor, MatchesFramework24SequentialOpenBoundaryReference)
     auto mesh = LoadTriangleFixture("framework24-open-patch.obj");
     ASSERT_TRUE(mesh.has_value());
     constexpr std::array expectedMinimum{
-        -0.094440446111920762, -0.097230156420572325,
-        -0.097975299536720267, -0.096186264875764663,
-        -0.097455832791234570, -0.097779169992335088,
-        -0.096949960883502273, -0.097516716287938940,
-        -0.097649101765230645};
+        1.4548394143473505e-19, -0.49363388794616025,
+        -0.48175306589211192, 0.0,
+        -0.55741139968573661, 0.0,
+        -0.48175306589211192, -0.49363388794616025,
+        1.4548394143473505e-19};
     constexpr std::array expectedMaximum{
-        0.17177482203183836, 0.17107356955123892,
-        0.17114861190075925, 0.17285476140647338,
-        0.17203716516165615, 0.17182814392120233,
-        0.17291349804443096, 0.17226808351569731,
-        0.17204425049521072};
+        0.48185460157763876, 0.0, 0.0,
+        0.24775096602326011, 0.31158967040402408,
+        0.24775096602326011, 0.0, 0.0,
+        0.48185460157763876};
     ExpectFramework24PrincipalReference(
         *mesh, expectedMinimum, expectedMaximum);
 
@@ -453,9 +459,9 @@ TEST(CurvatureTensor, MatchesFramework24SequentialOpenBoundaryReference)
     ASSERT_TRUE(result.has_value());
     const VertexHandle center{4u};
     const glm::vec3 frameworkMaximumDirection{
-        0.28836815559702916f, -0.95751961172477684f, 0.0f};
+        0.95751961172477684f, 0.28836815559702916f, 0.0f};
     const glm::vec3 frameworkMinimumDirection{
-        -0.95751961172477684f, -0.28836815559702916f, 0.0f};
+        -0.28836815559702916f, 0.95751961172477684f, 0.0f};
     EXPECT_GT(std::abs(glm::dot(
         result->PrincipalDir1Property[center],
         frameworkMaximumDirection)), 0.999999f);
@@ -465,9 +471,9 @@ TEST(CurvatureTensor, MatchesFramework24SequentialOpenBoundaryReference)
 }
 
 // =============================================================================
-// Framework24 publishes tensor eigenvectors without the former complementary
-// pairing. On a cylinder its nonzero edge-tangent mode follows the axis and
-// has the legacy approximately 1/(2R) normalization.
+// Framework24 publishes tensor eigenvectors without complementary pairing. On
+// a cylinder its nonzero edge-tangent mode follows the axis while the scalar
+// has the corrected approximately 1/R normalization.
 // =============================================================================
 
 TEST(CurvatureTensor, Cylinder_AxisAligned)
@@ -501,7 +507,7 @@ TEST(CurvatureTensor, Cylinder_AxisAligned)
             const double bendingValue = firstIsZero ? k2 : k1;
 
             EXPECT_NEAR(std::abs(zeroValue), 0.0, 0.15);
-            EXPECT_NEAR(std::abs(bendingValue), 0.5 / R, 0.12);
+            EXPECT_NEAR(std::abs(bendingValue), 1.0 / R, 0.2);
             EXPECT_LT(std::abs(glm::dot(zeroDirection, axis)), 0.1f);
             EXPECT_GT(std::abs(glm::dot(bendingDirection, axis)), 0.9f);
             ++tested;
@@ -535,8 +541,8 @@ TEST(CurvatureTensor, OpenCylinderBoundaryUsesSupportedNeighbourhood)
 }
 
 // =============================================================================
-// Saddle z = x² − y²: Framework24's signed tensor publishes opposite
-// principal signs and stable axis-aligned directions at the origin.
+// Saddle z = x² − y²: Framework24's corrected signed tensor follows the graph
+// normal convention and publishes stable axis-aligned directions at the origin.
 // =============================================================================
 
 TEST(CurvatureTensor, Saddle_OppositeSignsAxisAligned)
@@ -563,13 +569,13 @@ TEST(CurvatureTensor, Saddle_OppositeSignsAxisAligned)
     EXPECT_GT(k1, 0.0);
     EXPECT_LT(k2, 0.0);
     EXPECT_LT(k1 * k2, 0.0) << "principal curvatures must have opposite signs";
-    EXPECT_NEAR(k1, 1.5, 0.2);
-    EXPECT_NEAR(k2, -1.5, 0.2);
+    EXPECT_NEAR(k1, 2.0, 0.4);
+    EXPECT_NEAR(k2, -2.0, 0.4);
 
-    // Orthogonal, and aligned with the y (positive κ) / x (negative κ) axes.
+    // Orthogonal, and aligned with the x (positive κ) / y (negative κ) axes.
     EXPECT_NEAR(glm::dot(d1, d2), 0.0f, 1e-4f);
-    EXPECT_GT(std::abs(d1.y), 0.9f) << "max-curvature direction ∥ y axis";
-    EXPECT_GT(std::abs(d2.x), 0.9f) << "min-curvature direction ∥ x axis";
+    EXPECT_GT(std::abs(d1.x), 0.9f) << "max-curvature direction ∥ x axis";
+    EXPECT_GT(std::abs(d2.y), 0.9f) << "min-curvature direction ∥ y axis";
 }
 
 // =============================================================================
@@ -807,9 +813,47 @@ TEST(CurvatureTensor, FlatRegionPublishesFiniteFramework24Basis)
     }
 }
 
+TEST(CurvatureTensor, CreaseFlanksKeepGenuineCurvature)
+{
+    // A tent ridge with parabolic flanks. The independent Meyer cotan operator
+    // catches artificial cancellation introduced by wider support or scalar
+    // post-smoothing.
+    constexpr int cells = 20;
+    auto mesh = MakeHeightGrid(
+        1.0,
+        cells,
+        [](double x, double) { return -0.6 * std::abs(x) + 0.55 * x * x; });
+
+    auto meyer = Curv::ComputeMeanCurvature(mesh);
+    ASSERT_TRUE(meyer.has_value());
+    const std::vector<double> meyerMean = meyer->Property.Vector();
+    const Curv::CurvatureField field = Curv::ComputeCurvature(mesh);
+
+    constexpr int rowWidth = cells + 1;
+    int probed = 0;
+    for (int y = 7; y <= 13; ++y)
+    {
+        for (const int x : {12, 13})
+        {
+            const VertexHandle vertex{
+                static_cast<PropertyIndex>(y * rowWidth + x)};
+            ASSERT_FALSE(mesh.IsBoundary(vertex));
+            const double tensorMean = field.MeanCurvatureProperty[vertex];
+            const double referenceMean = meyerMean[vertex.Index];
+            ASSERT_GT(std::abs(referenceMean), 0.2);
+            EXPECT_GT(tensorMean * referenceMean, 0.0)
+                << "sign flip at (" << x << ", " << y << ")";
+            EXPECT_GE(std::abs(tensorMean), 0.3 * std::abs(referenceMean))
+                << "curvature lost at (" << x << ", " << y << ")";
+            ++probed;
+        }
+    }
+    EXPECT_EQ(probed, 14);
+}
+
 // The full sculpt field is checked through a quantized hash plus readable
-// anchors. Both were generated by Framework24 CurvatureTaubin(mesh, 3, true,
-// Policy::Sequential) on the identical unit-extent OBJ coordinates.
+// anchors. Both were generated by Framework24 revision 6dd50a82 using
+// CurvatureTaubin(mesh, 0, false, Policy::Sequential) on the identical OBJ.
 TEST(CurvatureTensor, SculptAssetMatchesFramework24SequentialReference)
 {
     auto built = LoadTriangleFixture("sculpt.obj");
@@ -829,7 +873,7 @@ TEST(CurvatureTensor, SculptAssetMatchesFramework24SequentialReference)
     EXPECT_EQ(field.Diagnostics.NonZeroPrincipalVertexCount, 3669u);
     EXPECT_EQ(
         QuantizedFramework24FieldHash(mesh, field),
-        0x1ed455aa30053cf6ull);
+        0xfc090818c136a6e2ull);
 
     struct Anchor
     {
@@ -838,13 +882,13 @@ TEST(CurvatureTensor, SculptAssetMatchesFramework24SequentialReference)
         double Maximum;
     };
     constexpr std::array anchors{
-        Anchor{0u, -5.7050913223200892, 0.15583997087641360},
-        Anchor{4u, -4.2145716142535612, 1.5139092712469662},
-        Anchor{511u, -4.7544913840560188, -0.52320938264719474},
-        Anchor{1000u, -2.0969818993515790, -0.90511888505055549},
-        Anchor{2048u, -4.0174883152983121, 1.0803869757386524},
-        Anchor{2901u, 1.5340975029113193, 1.6386831788974809},
-        Anchor{3668u, -6.1769018053019265, 0.34803009770241267}};
+        Anchor{0u, -1.1309506518419563, 47.629353972839404},
+        Anchor{4u, -1.2745543828717363, 75.265942565283126},
+        Anchor{511u, 1.9095566040154699, 2.0814124836958148},
+        Anchor{1000u, 1.9913375118628998, 1.9971206015746612},
+        Anchor{2048u, -4.0273646171654249, 0.080819169051565512},
+        Anchor{2901u, -3.3026408414958044, -3.0920399983311264},
+        Anchor{3668u, -4.0106676790063247, 0.025921025178834916}};
     for (const Anchor& anchor : anchors)
     {
         const VertexHandle vertex{
@@ -858,6 +902,161 @@ TEST(CurvatureTensor, SculptAssetMatchesFramework24SequentialReference)
             anchor.Maximum,
             2.0e-12);
     }
+}
+
+TEST(CurvatureTensor, SculptAssetHasNoZeroCurvatureBands)
+{
+    auto built = LoadTriangleFixture("sculpt.obj");
+    ASSERT_TRUE(built.has_value());
+    Geometry::HalfedgeMesh::Mesh& mesh = *built;
+
+    auto meyer = Curv::ComputeMeanCurvature(mesh);
+    ASSERT_TRUE(meyer.has_value());
+    const std::vector<double> meyerMean = meyer->Property.Vector();
+    const Curv::CurvatureField field = Curv::ComputeCurvature(mesh);
+
+    const auto medianAbsolute = [](std::vector<double> values)
+    {
+        for (double& value : values)
+            value = std::abs(value);
+        const std::size_t middle = values.size() / 2u;
+        std::nth_element(values.begin(), values.begin() + middle, values.end());
+        return values[middle];
+    };
+    const std::vector<double> tensorMean =
+        field.MeanCurvatureProperty.Vector();
+    const double tensorScale = medianAbsolute(tensorMean);
+    const double meyerScale = medianAbsolute(meyerMean);
+    ASSERT_GT(tensorScale, 0.0);
+    ASSERT_GT(meyerScale, 0.0);
+
+    std::size_t zeroBand = 0u;
+    std::size_t signFlips = 0u;
+    for (std::size_t i = 0u; i < tensorMean.size(); ++i)
+    {
+        const bool referenceCurved =
+            std::abs(meyerMean[i]) > 0.5 * meyerScale;
+        if (referenceCurved
+            && std::abs(tensorMean[i]) < 0.05 * tensorScale)
+        {
+            ++zeroBand;
+        }
+        if (referenceCurved
+            && std::abs(tensorMean[i]) > 0.1 * tensorScale
+            && tensorMean[i] * meyerMean[i] < 0.0)
+        {
+            ++signFlips;
+        }
+    }
+    EXPECT_EQ(zeroBand, 0u);
+    EXPECT_EQ(signFlips, 0u);
+}
+
+TEST(CurvatureTensor, SculptAssetProducesStableFeatureAlignedParts)
+{
+    auto built = LoadTriangleFixture("sculpt.obj");
+    ASSERT_TRUE(built.has_value());
+    Geometry::HalfedgeMesh::Mesh& mesh = *built;
+    const Curv::CurvatureField curvature = Curv::ComputeCurvature(mesh);
+    const Patches::FeatureEvidenceResult evidence =
+        Patches::DetectFeatureEvidence(
+            mesh,
+            curvature.MaxPrincipalCurvatureProperty.Vector(),
+            curvature.MinPrincipalCurvatureProperty.Vector());
+    ASSERT_TRUE(evidence.Succeeded())
+        << Patches::ToString(evidence.Diagnostics.Status);
+
+    EXPECT_EQ(evidence.Diagnostics.HardFeatureEdgeCount, 384u);
+    EXPECT_EQ(evidence.Diagnostics.RetainedSoftEdgeCount, 808u);
+
+    Patches::CurvaturePatchParams params{};
+    params.Mixture.SelectionMode =
+        Patches::ComponentSelectionMode::FixedCount;
+    params.Mixture.FixedComponentCount = 6u;
+    params.PatchComplexityCost = 0.5;
+    const Patches::CurvaturePatchResult result =
+        Patches::SegmentFeatureAlignedPatches(
+            mesh,
+            curvature.MaxPrincipalCurvatureProperty.Vector(),
+            curvature.MinPrincipalCurvatureProperty.Vector(),
+            evidence.View(),
+            params);
+    ASSERT_TRUE(result.Succeeded())
+        << Patches::ToString(result.Diagnostics.Status);
+    EXPECT_EQ(result.Diagnostics.SelectedComponentCount, 6u);
+    EXPECT_EQ(result.Diagnostics.FinalRegionCount, 8u);
+    EXPECT_EQ(result.Diagnostics.FinalBoundaryEdgeCount, 620u);
+    EXPECT_EQ(result.Diagnostics.HardBoundaryEdgeCount, 384u);
+    EXPECT_EQ(result.Diagnostics.SoftBoundaryEdgeCount, 236u);
+    EXPECT_EQ(result.Diagnostics.ClosureBoundaryEdgeCount, 0u);
+    EXPECT_EQ(result.Diagnostics.FinalNegativeMergeCount, 0u);
+
+    std::vector<std::size_t> regionSizes;
+    for (const Patches::CurvaturePatchRegionDiagnostics& region :
+         result.Regions)
+    {
+        regionSizes.push_back(region.FaceCount);
+    }
+    std::sort(regionSizes.begin(), regionSizes.end());
+    EXPECT_EQ(
+        regionSizes,
+        (std::vector<std::size_t>{
+            160u, 160u, 168u, 628u, 632u, 758u, 1488u, 3348u}));
+
+    for (const Geometry::EdgeHandle edge : mesh.LiveEdges())
+    {
+        if (evidence.HardEdgeMask[edge.Index] != 0u)
+        {
+            EXPECT_EQ(result.EdgeBoundaries[edge.Index], 1u);
+            EXPECT_EQ(
+                result.EdgeBoundaryRoles[edge.Index],
+                Patches::PatchBoundaryRole::HardFeature);
+        }
+        if (result.EdgeBoundaries[edge.Index] == 0u)
+            continue;
+        EXPECT_TRUE(evidence.HardEdgeMask[edge.Index] != 0u
+                    || evidence.SoftEdgeConfidence[edge.Index] > 0.0);
+        EXPECT_NE(
+            result.EdgeBoundaryRoles[edge.Index],
+            Patches::PatchBoundaryRole::CurvatureClosure);
+    }
+
+    std::vector<std::uint32_t> perturbedSeeds;
+    perturbedSeeds.reserve(result.SeedFaceSlots.size());
+    for (const std::uint32_t seedSlot : result.SeedFaceSlots)
+    {
+        const Geometry::FaceHandle seed{seedSlot};
+        std::uint32_t replacement = seedSlot;
+        for (const Geometry::HalfedgeHandle halfedge :
+             mesh.HalfedgesAroundFace(seed))
+        {
+            const Geometry::FaceHandle neighbor =
+                mesh.Face(mesh.OppositeHalfedge(halfedge));
+            if (neighbor.IsValid())
+            {
+                replacement = neighbor.Index;
+                break;
+            }
+        }
+        perturbedSeeds.push_back(replacement);
+    }
+    std::sort(perturbedSeeds.begin(), perturbedSeeds.end());
+    perturbedSeeds.erase(
+        std::unique(perturbedSeeds.begin(), perturbedSeeds.end()),
+        perturbedSeeds.end());
+    const Patches::CurvaturePatchResult perturbed =
+        Patches::SegmentFeatureAlignedPatches(
+            mesh,
+            curvature.MaxPrincipalCurvatureProperty.Vector(),
+            curvature.MinPrincipalCurvatureProperty.Vector(),
+            evidence.View(),
+            params,
+            {perturbedSeeds, true});
+    ASSERT_TRUE(perturbed.Succeeded())
+        << Patches::ToString(perturbed.Diagnostics.Status);
+    EXPECT_EQ(perturbed.Diagnostics.FinalRegionCount, 8u);
+    EXPECT_EQ(result.EdgeBoundaries, perturbed.EdgeBoundaries);
+    EXPECT_EQ(result.EdgeBoundaryRoles, perturbed.EdgeBoundaryRoles);
 }
 
 // =============================================================================
@@ -931,5 +1130,5 @@ TEST(CurvatureTensor, OpenMeshFullFieldKeepsPrincipalInvariants)
     }
     EXPECT_EQ(nonZero, field.Diagnostics.NonZeroPrincipalVertexCount);
     EXPECT_EQ(field.Diagnostics.SupportedVertexCount, mesh.VertexCount());
-    EXPECT_EQ(nonZero, mesh.VertexCount());
+    EXPECT_EQ(nonZero, 23u);
 }

@@ -72,6 +72,7 @@ namespace Extrinsic::Runtime
         Channels = {};
         PackedColors.clear();
         SurfaceIndices.clear();
+        SourceVertexForGpuVertex.clear();
     }
 
     MeshPlanBuildResult BuildMeshGeometryPlan(
@@ -341,6 +342,8 @@ namespace Extrinsic::Runtime
 
             normals = std::move(split.NormalForSlot);
             texcoords = std::move(split.TexcoordForSlot);
+            outBuffer.SourceVertexForGpuVertex =
+                std::move(split.SourceVertexForSlot);
             if (hasColors)
                 outBuffer.PackedColors = std::move(newColors);
             positionSpan = std::span<const glm::vec3>{splitPositions};

@@ -1578,19 +1578,13 @@ namespace Geometry::CurvatureSegmentation
                 }
                 const double energyBefore = currentEnergy;
                 ApplyMerge(partition, pair);
-                currentEnergy =
-                    PartitionEnergy(mesh, faceSlotToSample, transitions,
-                                    incidentTransitions, partition, params);
-                if (!std::isfinite(currentEnergy))
-                    return CurvaturePatchStatus::NonFiniteEnergy;
-                if (!(currentEnergy < energyBefore))
-                    return CurvaturePatchStatus::EnergyInvariantFailed;
                 const double predictedEnergy = energyBefore + best->Delta;
-                const double tolerance =
-                    1.0e-9 * (1.0 + std::max(std::abs(predictedEnergy),
-                                             std::abs(currentEnergy)));
-                if (std::abs(predictedEnergy - currentEnergy) > tolerance)
+                if (!std::isfinite(predictedEnergy)
+                    || !(predictedEnergy < energyBefore))
+                {
                     return CurvaturePatchStatus::EnergyInvariantFailed;
+                }
+                currentEnergy = predictedEnergy;
                 result.AcceptedMerges.push_back(CurvaturePatchMergeDiagnostics{
                     .RegionA = pair.first,
                     .RegionB = pair.second,
@@ -1606,6 +1600,17 @@ namespace Geometry::CurvatureSegmentation
                 if (refreshStatus != CurvaturePatchStatus::Success)
                     return refreshStatus;
             }
+            const double exactEnergy = PartitionEnergy(
+                mesh, faceSlotToSample, transitions, incidentTransitions,
+                partition, params);
+            if (!std::isfinite(exactEnergy))
+                return CurvaturePatchStatus::NonFiniteEnergy;
+            const double tolerance = 1.0e-8
+                * (1.0 + std::max(
+                    std::abs(currentEnergy), std::abs(exactEnergy)));
+            if (std::abs(currentEnergy - exactEnergy) > tolerance)
+                return CurvaturePatchStatus::EnergyInvariantFailed;
+            currentEnergy = exactEnergy;
             return CurvaturePatchStatus::Success;
         }
 
@@ -1839,19 +1844,13 @@ namespace Geometry::CurvatureSegmentation
                     AccumulateFace(targetRegion, samples[face], faceUnary, 1.0);
                     partition.RegionByFace[face] = *bestTarget;
                     const double energyBefore = currentEnergy;
-                    currentEnergy =
-                        PartitionEnergy(mesh, faceSlotToSample, transitions,
-                                        incidentTransitions, partition, params);
-                    if (!std::isfinite(currentEnergy))
-                        return CurvaturePatchStatus::NonFiniteEnergy;
-                    if (!(currentEnergy < energyBefore))
-                        return CurvaturePatchStatus::EnergyInvariantFailed;
                     const double predictedEnergy = energyBefore + bestDelta;
-                    const double tolerance =
-                        1.0e-9 * (1.0 + std::max(std::abs(predictedEnergy),
-                                                 std::abs(currentEnergy)));
-                    if (std::abs(predictedEnergy - currentEnergy) > tolerance)
+                    if (!std::isfinite(predictedEnergy)
+                        || !(predictedEnergy < energyBefore))
+                    {
                         return CurvaturePatchStatus::EnergyInvariantFailed;
+                    }
+                    currentEnergy = predictedEnergy;
                     result.RefinementMoves.push_back(
                         CurvaturePatchRefinementDiagnostics{
                             .FaceSlot = samples[face].Face.Index,
@@ -1875,6 +1874,17 @@ namespace Geometry::CurvatureSegmentation
                     return mergeStatus;
             }
             RebuildRag(partition, transitions);
+            const double exactEnergy = PartitionEnergy(
+                mesh, faceSlotToSample, transitions, incidentTransitions,
+                partition, params);
+            if (!std::isfinite(exactEnergy))
+                return CurvaturePatchStatus::NonFiniteEnergy;
+            const double tolerance = 1.0e-8
+                * (1.0 + std::max(
+                    std::abs(currentEnergy), std::abs(exactEnergy)));
+            if (std::abs(currentEnergy - exactEnergy) > tolerance)
+                return CurvaturePatchStatus::EnergyInvariantFailed;
+            currentEnergy = exactEnergy;
             return CurvaturePatchStatus::Success;
         }
 

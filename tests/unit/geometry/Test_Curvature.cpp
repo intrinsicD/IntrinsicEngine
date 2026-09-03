@@ -197,9 +197,9 @@ TEST(Curvature_Full, Icosahedron_SymmetricCurvatureValues)
             << "Min principal curvature should be uniform (vertex " << i << ")";
     }
 
-    // Framework24's signed hinge convention is negative for this outward
-    // winding; Gaussian curvature remains orientation-independent.
-    EXPECT_LT(H0, 0.0);
+    // Current Framework24's signed hinge convention is positive for this
+    // outward winding; Gaussian curvature remains orientation-independent.
+    EXPECT_GT(H0, 0.0);
     EXPECT_GT(K0, 0.0);
 }
 

@@ -517,6 +517,7 @@ namespace Extrinsic::Runtime
         const auto releaseStaleResidency = [&]() {
             if (!sidecar.MeshGeometry.IsValid())
             {
+                sidecar.MeshSourceVertexForGpuVertex.clear();
                 return;
             }
             (void)ReleaseGeometryResidency(residencyKey);
@@ -524,6 +525,7 @@ namespace Extrinsic::Runtime
                 sidecar.Instance,
                 Graphics::GpuGeometryHandle{});
             sidecar.MeshGeometry = {};
+            sidecar.MeshSourceVertexForGpuVertex.clear();
             ++stats.MeshGeometryReleases;
         };
 
@@ -645,6 +647,15 @@ namespace Extrinsic::Runtime
                             D::DirtyEdgeTopology>(entity);
         }
 
+        if (sidecar.MeshSourceVertexForGpuVertex !=
+            m_MeshPack.SourceVertexForGpuVertex)
+        {
+            ++sidecar.MeshVertexRemapRevision;
+            if (sidecar.MeshVertexRemapRevision == 0u)
+                ++sidecar.MeshVertexRemapRevision;
+        }
+        sidecar.MeshSourceVertexForGpuVertex =
+            m_MeshPack.SourceVertexForGpuVertex;
         sidecar.MeshGeometry = residency.Handle;
         sidecar.MeshSourceRevisions = sourceRevisions;
         sidecar.Geometry = residency.Handle;

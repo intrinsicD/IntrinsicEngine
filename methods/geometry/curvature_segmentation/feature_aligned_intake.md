@@ -484,6 +484,17 @@ bounded refutation; `METHOD-040` owns a separately reviewed task-local multicut
 formulation and must not call a pairwise surrogate the unchanged
 regional/turning energy without a proof.
 
+Post-retirement `BUG-163` does not revise that verdict. It exposes the local
+candidate through an explicitly diagnostic runtime/config/UI token so the
+operator can inspect the exact feature evidence, final boundary roles, and
+part colors on `tests/data/sculpt.obj`. The bounded sculpt profile uses fixed
+GMM count `6` and patch complexity cost `0.5`; its focused regression requires
+3--12 connected parts, mandatory hard-feature boundaries, no unsupported
+seed-front closure, and an identical boundary mask under its recorded one-ring
+seed perturbation. This single-mesh result is neither the original corpus-wide
+adoption gate nor evidence of semantic object-part quality, so METHOD-037
+remains the default and METHOD-040 remains open.
+
 ### Slice A generated oracle catalog
 
 [`Test.CurvaturePatchContract.cpp`](../../../tests/unit/geometry/Test.CurvaturePatchContract.cpp)

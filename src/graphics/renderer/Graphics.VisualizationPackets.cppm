@@ -173,6 +173,11 @@ export namespace Extrinsic::Graphics
         // DirtyStamp == 0 means the producer has no stable dirty stamp yet,
         // so residency must upload this descriptor every submission.
         std::uint64_t DirtyStamp{0u};
+        // Identifies the element-to-buffer layout independently of property
+        // content; zero denotes the producer's canonical layout. Any change
+        // invalidates residency even when DirtyStamp is unchanged (for
+        // example, after mesh corner splitting).
+        std::uint64_t SourceLayoutStamp{0u};
         std::span<const std::byte> Bytes{};
     };
 
@@ -184,6 +189,7 @@ export namespace Extrinsic::Graphics
         std::uint32_t ElementCount{0u};
         std::uint32_t StrideBytes{0u};
         std::uint64_t DirtyStamp{0u};
+        std::uint64_t SourceLayoutStamp{0u};
         std::uint64_t BufferBDA{0u};
     };
 

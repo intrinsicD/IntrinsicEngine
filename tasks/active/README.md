@@ -11,7 +11,10 @@ Each active task should include:
 
 ## Currently active
 
-No tasks are currently active.
+- [`BUG-163`](BUG-163-sculpt-curvature-feature-patch-rendering.md) — repair the
+  authoritative sculpt curvature field, promote feature-aligned patch
+  segmentation, and verify scalar/part/boundary rendering in the isolated
+  Vulkan Sandbox.
 
 ## Records
 

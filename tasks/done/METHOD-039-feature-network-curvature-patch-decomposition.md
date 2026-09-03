@@ -40,6 +40,12 @@ maturity_target: CPUContracted
   quality, refutation, and 100k-face health profiles before retiring the
   negative result. `METHOD-040` is the separately scoped task-local global
   multicut follow-up.
+- Post-retirement note (2026-09-03): by explicit operator direction, `BUG-163`
+  exposes the unchanged candidate through an explicitly diagnostic config/
+  runtime/UI selection for inspecting `tests/data/sculpt.obj`. Its bounded
+  fixed-6, complexity-0.5 sculpt regression does not rewrite this task's
+  original corpus-wide seed-stability refutation, create `cpu_reference_v2`,
+  or replace METHOD-037 as the production default.
 
 ## Non-goals
 - No UV generation, atlas/chart construction, seam selection, mesh cutting, vertex duplication, face splitting, or other parameterization work.

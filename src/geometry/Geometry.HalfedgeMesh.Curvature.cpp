@@ -1,5 +1,5 @@
-// Implements discrete scalar operators and the deterministic Framework24
-// edge-dihedral tensor published through canonical vertex fields.
+// Implements discrete scalar operators and the corrected Framework24
+// one-ring edge-dihedral tensor published through canonical vertex fields.
 module;
 
 #include <algorithm>
@@ -80,8 +80,6 @@ namespace Geometry::Curvature
         }
 
         constexpr double kFramework24CotanBound = 19.1;
-        constexpr std::size_t kFramework24SmoothingSteps = 3u;
-
         [[nodiscard]] double Framework24ClampCotan(
             const double value) noexcept
         {
@@ -117,9 +115,8 @@ namespace Geometry::Curvature
                 glm::length(r - p));
         }
 
-        // Framework24 divides corner dot products by triangle area rather than
-        // twice area. Preserve that legacy normalization because it is part of
-        // the reference field, including the distinct obtuse coefficients.
+        // Framework24 revision 6dd50a82 uses the Meyer mixed-area allocation
+        // and a clamped cotangent evaluated against twice the triangle area.
         [[nodiscard]] std::vector<double> ComputeFramework24VertexAreas(
             const HalfedgeMesh::Mesh& mesh)
         {
@@ -162,18 +159,19 @@ namespace Geometry::Curvature
                     const double dotR = glm::dot(qr, pr);
                     if (dotP < 0.0)
                     {
-                        areaSum += 0.25 * triangleArea;
+                        areaSum += 0.5 * triangleArea;
                     }
                     else if (dotQ < 0.0 || dotR < 0.0)
                     {
-                        areaSum += 0.125 * triangleArea;
+                        areaSum += 0.25 * triangleArea;
                     }
                     else
                     {
+                        const double twiceArea = 2.0 * triangleArea;
                         const double cotQ = Framework24ClampCotan(
-                            dotQ / triangleArea);
+                            dotQ / twiceArea);
                         const double cotR = Framework24ClampCotan(
-                            dotR / triangleArea);
+                            dotR / twiceArea);
                         areaSum += 0.125
                             * (glm::dot(pr, pr) * cotQ
                                + glm::dot(pq, pq) * cotR);
@@ -184,60 +182,8 @@ namespace Geometry::Curvature
             return areas;
         }
 
-        [[nodiscard]] double Framework24TriangleCotan(
-            const glm::dvec3& p0,
-            const glm::dvec3& p1,
-            const glm::dvec3& p2) noexcept
-        {
-            const glm::dvec3 d0 = p0 - p2;
-            const glm::dvec3 d1 = p1 - p2;
-            const double dot = glm::dot(d0, d1);
-            const double triangleArea = Framework24TriangleArea(p0, p1, p2);
-            double denominator = triangleArea;
-            if (!(denominator > std::numeric_limits<double>::epsilon()))
-                denominator = glm::length(glm::cross(d0, d1));
-            if (!std::isfinite(dot) || !std::isfinite(denominator)
-                || denominator <= std::numeric_limits<double>::min())
-            {
-                return 0.0;
-            }
-            return Framework24ClampCotan(dot / denominator);
-        }
-
-        [[nodiscard]] std::vector<double> ComputeFramework24EdgeCotans(
-            const HalfedgeMesh::Mesh& mesh)
-        {
-            std::vector<double> cotans(mesh.EdgesSize(), 0.0);
-            for (std::size_t i = 0u; i < mesh.EdgesSize(); ++i)
-            {
-                const EdgeHandle edge{static_cast<PropertyIndex>(i)};
-                if (mesh.IsDeleted(edge))
-                    continue;
-                const HalfedgeHandle h0 = mesh.Halfedge(edge, 0u);
-                const HalfedgeHandle h1 = mesh.OppositeHalfedge(h0);
-                const glm::dvec3 p0(mesh.Position(mesh.ToVertex(h0)));
-                const glm::dvec3 p1(mesh.Position(mesh.ToVertex(h1)));
-                double weight = 0.0;
-                if (!mesh.IsBoundary(h0))
-                {
-                    const glm::dvec3 p2(mesh.Position(
-                        mesh.ToVertex(mesh.NextHalfedge(h0))));
-                    weight += Framework24TriangleCotan(p0, p1, p2);
-                }
-                if (!mesh.IsBoundary(h1))
-                {
-                    const glm::dvec3 p2(mesh.Position(
-                        mesh.ToVertex(mesh.NextHalfedge(h1))));
-                    weight += Framework24TriangleCotan(p0, p1, p2);
-                }
-                cotans[i] = 0.5 * weight;
-            }
-            return cotans;
-        }
-
-        // Direct deterministic port of Framework24 CurvatureTaubin. The
-        // reference's default parallel smoother has a read/write race, so the
-        // same in-place updates run in stable vertex-index order here.
+        // Direct deterministic port of the corrected Framework24 default:
+        // one-ring support with no implicit principal-value smoothing.
         [[nodiscard]] TensorComputation ComputeEdgeDihedralTensor(
             HalfedgeMesh::Mesh& mesh)
         {
@@ -358,7 +304,7 @@ namespace Geometry::Curvature
                     continue;
                 }
                 direction /= length;
-                const double signedDihedral = std::atan2(
+                const double signedDihedral = -std::atan2(
                     glm::dot(glm::cross(normal0, normal1), direction),
                     glm::dot(normal0, normal1));
                 if (!std::isfinite(signedDihedral))
@@ -377,51 +323,33 @@ namespace Geometry::Curvature
                 if (mesh.IsDeleted(vertex) || mesh.IsIsolated(vertex))
                     continue;
 
-                std::vector<VertexHandle> neighborhood{};
-                neighborhood.reserve(16u);
-                neighborhood.push_back(vertex);
+                const double supportArea = mixedAreas[i];
+                Eigen::Matrix3d tensor = Eigen::Matrix3d::Zero();
+                if (reliableSupport[i] == 0u
+                    || !std::isfinite(supportArea)
+                    || supportArea <= std::numeric_limits<double>::min())
+                {
+                    continue;
+                }
                 for (const HalfedgeHandle halfedge :
                      mesh.HalfedgesAroundVertex(vertex))
                 {
-                    const VertexHandle neighbor = mesh.ToVertex(halfedge);
-                    if (neighbor.IsValid() && !mesh.IsDeleted(neighbor))
-                        neighborhood.push_back(neighbor);
-                }
-
-                double supportArea = 0.0;
-                Eigen::Matrix3d tensor = Eigen::Matrix3d::Zero();
-                bool reliable = true;
-                for (const VertexHandle supportVertex : neighborhood)
-                {
-                    if (reliableSupport[supportVertex.Index] == 0u)
+                    const EdgeTensorSample& sample =
+                        edgeSamples[mesh.Edge(halfedge).Index];
+                    if (sample.Valid)
                     {
-                        reliable = false;
-                        break;
-                    }
-                    supportArea += mixedAreas[supportVertex.Index];
-                    for (const HalfedgeHandle halfedge :
-                         mesh.HalfedgesAroundVertex(supportVertex))
-                    {
-                        const EdgeTensorSample& sample =
-                            edgeSamples[mesh.Edge(halfedge).Index];
-                        if (sample.Valid)
+                        for (int row = 0; row < 3; ++row)
                         {
-                            for (int row = 0; row < 3; ++row)
+                            for (int column = 0; column < 3; ++column)
                             {
-                                for (int column = 0; column < 3; ++column)
-                                {
-                                    tensor(row, column) +=
-                                        sample.SignedDihedral
-                                        * sample.WeightedDirection[row]
-                                        * sample.WeightedDirection[column];
-                                }
+                                tensor(row, column) +=
+                                    sample.SignedDihedral
+                                    * sample.WeightedDirection[row]
+                                    * sample.WeightedDirection[column];
                             }
                         }
                     }
                 }
-                if (!reliable || !std::isfinite(supportArea)
-                    || supportArea <= std::numeric_limits<double>::min())
-                    continue;
                 tensor /= supportArea;
                 Eigen::SelfAdjointEigenSolver<Eigen::Matrix3d> solver(
                     tensor);
@@ -473,53 +401,6 @@ namespace Geometry::Curvature
                     && IsFinite(out[i].Dir2);
             }
 
-            const std::vector<double> edgeCotans =
-                ComputeFramework24EdgeCotans(mesh);
-            for (std::size_t step = 0u;
-                 step < kFramework24SmoothingSteps; ++step)
-            {
-                for (std::size_t i = 0u; i < vertexCount; ++i)
-                {
-                    const VertexHandle vertex{static_cast<PropertyIndex>(i)};
-                    if (mesh.IsDeleted(vertex) || !out[i].Valid)
-                        continue;
-                    double minimum = 0.0;
-                    double maximum = 0.0;
-                    double weightSum = 0.0;
-                    for (const HalfedgeHandle halfedge :
-                         mesh.HalfedgesAroundVertex(vertex))
-                    {
-                        const VertexHandle neighbor = mesh.ToVertex(halfedge);
-                        if (!neighbor.IsValid() || mesh.IsDeleted(neighbor)
-                            || !out[neighbor.Index].Valid)
-                        {
-                            continue;
-                        }
-                        const double weight = std::max(
-                            0.0, edgeCotans[mesh.Edge(halfedge).Index]);
-                        weightSum += weight;
-                        minimum += weight
-                            * out[neighbor.Index].MinPrincipal;
-                        maximum += weight
-                            * out[neighbor.Index].MaxPrincipal;
-                    }
-                    if (weightSum > 0.0)
-                    {
-                        minimum /= weightSum;
-                        maximum /= weightSum;
-                        if (std::isfinite(minimum)
-                            && std::isfinite(maximum))
-                        {
-                            out[i].MinPrincipal = minimum;
-                            out[i].MaxPrincipal = maximum;
-                        }
-                        else
-                        {
-                            out[i] = TensorVertex{};
-                        }
-                    }
-                }
-            }
             if (computation.DegenerateFaceCount > 0u
                 || computation.UnsupportedFaceCount > 0u)
             {
@@ -528,7 +409,7 @@ namespace Geometry::Curvature
             return computation;
         }
 
-        // Publishes the three-pass deterministic Framework24 principal field.
+        // Publishes the corrected deterministic Framework24 principal field.
         [[nodiscard]] CurvatureDiagnostics PublishTensorFields(
             HalfedgeMesh::Mesh& mesh,
             const TensorComputation& computation,

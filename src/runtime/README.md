@@ -72,7 +72,7 @@ The retired Sandbox facade export ledger and current owner map are recorded in
 | `Extrinsic.Runtime.MeshPrimitiveView` | Data-only mesh edge/vertex-view settings and render-mode values retained for editor/session consumers. Upload-plan construction is private to `ExtrinsicRuntime`; no public primitive-view packer or lifecycle owner remains. |
 | `Extrinsic.Runtime.PrimitiveSelectionRefinement` | Runtime-owned pure CPU refinement that validates a graphics `EncodedSelectionId` hint against authoritative mesh, graph, or point-cloud `GeometrySources`, maps it to a face/edge/vertex/point result, and can use a captured pick ray/depth context for the fail-closed CPU fallback. `SceneInteractionModule` directly owns the production correlation records and refined-result cache, captures world/epoch-qualified contexts, drains completed readbacks, and exposes the newest editor-facing refined result; graphics produces only the encoded hint and never owns the cache or live ECS interaction state. |
 | `Extrinsic.Runtime.ReferenceScene` | Plain app-invoked reference-content seam (GRAPHICS-029A/B, simplified by `RUNTIME-180`). Exports only the data records `ReferenceSceneEntity` / `ReferenceScenePopulation` plus `BootstrapReferenceScene(selector, scene)` and `TeardownReferenceScene(scene, population) noexcept`. The triangle implementation is private: bootstrap creates one ordinary visible/selectable mesh-domain `ReferenceTriangle` with durable `StableId`, `RenderSurface`, white `VisualizationConfig`, and an optional camera seed. Sandbox owns the exactly-once initial-world policy and retains `{WorldHandle, population}` so teardown mutates only the original live world; a retired original world is a safe no-op. The content path does not require `CameraModule`. |
-| `Extrinsic.Runtime.RenderExtraction` | Runtime-owned ECS-to-graphics extraction and snapshot handoff. Its exported class holds one opaque implementation object; persistent sidecars, scratch buffers, copied visualization recipe state, and the one graphics residency coordinator have exactly one definition in the non-exported `:Internal` implementation partition (`Runtime.RenderExtraction.Internal.cpp`), outside the primary module interface. Ordinary primary-module implementation units split base extraction/submission (`Runtime.RenderExtraction.cpp`), private typed plan construction and unified residency submission (`Runtime.RenderExtraction.Geometry.cpp`), and visualization recipe encoding (`Runtime.RenderExtraction.Recipes.cpp`) without adding a public subsystem seam. Extraction uses `Extrinsic.Runtime.GeometryAvailability` for `GeometrySources` lane eligibility, builds owning `Graphics::GeometryUploadPlan` values through private plan builders, and drives one `TickGeometryResidency` maintenance hook. The cache reuses its per-frame live-renderable-key scratch set across `ExtractAndSubmit()` calls before retiring missing sidecars, avoiding fresh steady-state set allocation while preserving the same renderer-visible output. `RenderExtractionCache::FindGpuRenderableAvailability(...)` exposes a read-only `GpuRenderableAvailabilityView` keyed by stable entity id, with independent surface, edge, and point lane residency plus canonical named-buffer facts; ECS remains CPU authoring state and stores no GPU handles or renderer sidecars. |
+| `Extrinsic.Runtime.RenderExtraction` | Runtime-owned ECS-to-graphics extraction and snapshot handoff. Its exported class holds one opaque implementation object; persistent sidecars, scratch buffers, copied visualization recipe state, and the one graphics residency coordinator have exactly one definition in the non-exported `:Internal` implementation partition (`Runtime.RenderExtraction.Internal.cpp`), outside the primary module interface. Ordinary primary-module implementation units split base extraction/submission (`Runtime.RenderExtraction.cpp`), private typed plan construction and unified residency submission (`Runtime.RenderExtraction.Geometry.cpp`), and visualization recipe encoding (`Runtime.RenderExtraction.Recipes.cpp`) without adding a public subsystem seam. Extraction uses `Extrinsic.Runtime.GeometryAvailability` for `GeometrySources` lane eligibility, builds owning `Graphics::GeometryUploadPlan` values through private plan builders, and drives one `TickGeometryResidency` maintenance hook. When corner UVs or normals split a mesh surface into additional GPU vertices, the mesh sidecar retains the exact source-vertex map and expands CPU-backed vertex scalar/color visualization buffers into that GPU order; canonical geometry properties stay unsplit. The cache reuses its per-frame live-renderable-key scratch set across `ExtractAndSubmit()` calls before retiring missing sidecars, avoiding fresh steady-state set allocation while preserving the same renderer-visible output. `RenderExtractionCache::FindGpuRenderableAvailability(...)` exposes a read-only `GpuRenderableAvailabilityView` keyed by stable entity id, with independent surface, edge, and point lane residency plus canonical named-buffer facts; ECS remains CPU authoring state and stores no GPU handles or renderer sidecars. |
 | `Extrinsic.Runtime.RenderWorldPool` | Runtime-owned multi-buffer slot-lifecycle pool for pipelined frames (`GRAPHICS-036A`, first implementation child of the retired `GRAPHICS-036` planning slice; the planning slice named it `GRAPHICS-036-Impl-A`). Exports `RenderWorldPoolDiagnostics` (the three `GRAPHICS-036` decision-7 counters: `PipelineStallCount`, `ExtractionSkipCount`, `LastConsumedFrameAge`) and the `RenderWorldPool` value type. Implements the producer/consumer slot state machine the planning slice calls "atomic swap primitives + reclamation queue": the producer (extraction) calls `AcquireBack(frameIndex)` for a free slot, writes the snapshot, and `PublishFront(slot)` (release store of a single `std::atomic` front index plus a monotonic publish-sequence bump); the consumer (renderer) calls `AcquireFront(frameIndex)` (acquire load, per-slot atomic refcount increment) and `ReleaseFront(slot)`. Buffer count defaults to 3 (triple-buffer with reclamation, decision 1), clamps to `[1, 4]`, and collapses to in-place synchronous reuse at 1. Reclamation (decision 4) returns a slot to the free list only once its refcount is zero and it is no longer the published front, drained at the start of each `AcquireBack`. Back-pressure (decision 5): producer-faster overwrites the still-unpublished back slot (`ExtractionSkipCount`); consumer-faster reuses the current front when no new publish-sequence is observed (`PipelineStallCount`), so a synchronous pool that re-publishes the same slot index every frame is never mistaken for a stall. When the producer outruns the consumer so far that every slot is a published front still held in flight (no free slot and no unpublished back), `AcquireBack` fails closed — it returns `kInvalidSlot` (still counting `ExtractionSkipCount`) so the extraction is skipped and the previous front stays current, rather than overwrite storage an in-flight frame still references. The module imports nothing from graphics/ECS/platform — it manages only slot indices and atomics, introducing no new dependency edge. `GRAPHICS-036D` extends the CPU contract to the pipelined integration path: the renderer retains per-slot snapshot storage keyed by the pool slot, and `RenderConfig::SynchronousExtraction = false` consumes `AcquirePreviousFront` to prove render-N-1 without stalls/skips while synchronous mode remains the default. `GRAPHICS-036B` surfaces the pool's three counters read-only on `RuntimeRenderExtractionStats` (`RenderWorldPipelineStallCount`, `RenderWorldExtractionSkipCount`, `RenderWorldFrameAgeFrames`) via the pure `MirrorRenderWorldPoolDiagnostics(pool, stats)` free function in `Extrinsic.Runtime.RenderExtraction`. |
 | `Extrinsic.Runtime.SelectionController` | Runtime/editor selection authority (`RUNTIME-089`), published exactly by `SceneInteractionModule` in production. It coalesces hover/click requests, assigns monotonically increasing sequences, tracks bounded in-flight intent, applies Replace/Add/Toggle semantics, mirrors selected/hovered ECS tags, and maintains copied render-id buffers. Sequence-aware hit/no-hit overloads return false without mutation for unknown or evicted records; standalone no-sequence convenience calls retain their direct-drive behavior. Context-capacity eviction explicitly discards the matching controller record. The controller resolves render ids through the module-owned `StableEntityLookup`, while standalone use can retain the validated decode fallback. `ClearSceneState()` removes tags, pending/in-flight state, and world-bound snapshots without resetting the sequence counter. |
 | `Extrinsic.Runtime.StableEntityLookup` | Runtime-owned scene-local lookup sidecar (`RUNTIME-092`, event-driven wiring from `RUNTIME-145`), owned in production by `SceneInteractionModule`. It maps durable ECS `StableId` values to live entities and separately decodes/validates transient render ids, with deterministic duplicate winners and stale/missing diagnostics. `StableEntityLookupSceneBinding` maintains construct/update/destroy hooks for the one bound registry. The interaction module disconnects and clears it before replacement or rebind, rebuilds it afterward, and exposes stable-id resolution plus read-only diagnostics without publishing the raw mutable binding. |
@@ -630,18 +630,20 @@ requested and available, the command also writes `v:principal_dir1` and
 `v:principal_dir2` `glm::vec3` properties; when the directions lane is disabled
 or unavailable, the command succeeds with scalars only and reports a
 deterministic diagnostic. Mean and Gaussian values are invariants of the
-reference-smoothed principal values from the same edge-dihedral estimator;
-directions retain that estimator's local tensor basis. Result diagnostics expose
-the supported/nonzero vertex counts, finite principal range, degenerate and
-ill-conditioned face counts, unsupported face count, minimum observed triangle
-quality, and the fixed quality threshold. A mesh with no reliable direct tensor
+current Framework24-default principal values from the same edge-dihedral
+estimator; directions retain that estimator's local tensor basis. Result
+diagnostics expose the supported/nonzero vertex counts, finite principal range,
+degenerate and ill-conditioned face counts, unsupported face count, minimum
+observed triangle quality, and the fixed quality threshold. A mesh with no reliable direct tensor
 support fails instead of presenting an all-zero field as an informative
 success. Boundary vertices use the estimator's direct tensor evaluation rather
 than interpolation from interior values. The runtime does not combine the
 standalone Meyer scalar operators with a separate tensor. The UI exposes an
-output selector, a principal
-directions toggle that is inert when directions are unavailable, and a single
-`Compute` action. Successful commits are undoable through the shared editor
+output selector, a principal-directions toggle that is inert when directions
+are unavailable, a scalar-display selector, and a single `Compute` action. A
+successful compute activates the selected canonical scalar property through
+the ordinary visualization command, so publication and renderer input cannot
+silently diverge. Successful commits are undoable through the shared editor
 mutation transaction, which validates geometry metadata, the exact source
 positions, and the four owned curvature-property snapshots before apply, undo,
 or redo. An intervening geometry or curvature-property edit fails closed
@@ -660,24 +662,34 @@ or fallback dispatch path exists.
 ### Sandbox Editor Signed-Curvature Segmentation
 
 `METHOD-037` extends the Curvature window with a non-destructive mesh
-segmentation operation. The direct command accepts a typed
+segmentation operation. `BUG-163` also exposes METHOD-039's rejected local
+patch candidate as an explicit diagnostic choice; it is not the production
+default or an accepted v2 backend. The direct command accepts a typed
 `CurvatureSegmentationConfig`; the configured command reads the registered
-`sandbox.curvature_segmentation` record, so Fixed/Automatic GMM selection and
-all fit/spatial controls use the same validated state for file, editor,
-agent/CLI, and programmatic callers. Runtime builds a detached triangle
-halfedge mesh, computes signed principal curvatures through the existing
-geometry estimator, runs `Geometry.HalfedgeMesh.CurvatureSegmentation`, and
-revalidates positions, topology, metadata, and prior output state before commit.
+`sandbox.curvature_segmentation` record, so method selection, Fixed/Automatic
+GMM selection, and the applicable spatial or patch controls use the same
+validated state for file, editor, agent/CLI, and programmatic callers. Runtime
+builds a detached triangle halfedge mesh, computes signed principal curvatures
+through the existing geometry estimator, runs the selected geometry function,
+and revalidates positions, topology, metadata, and prior output state before
+commit. Requested and actual method identities are explicit; this CPU path has
+no silent fallback.
 
 Successful publication preserves topology and unrelated properties while
 writing `f:curvature_component`, dual-connected `f:curvature_region`,
 `f:curvature_region_color`, `e:curvature_region_boundary`, and
-`e:curvature_region_boundary_color`. The five-property transaction is
-undoable/redoable and stamps `GpuDirty`; an identical rerun reports `NoChange`
-without another history entry. The panel can enable both the face-color surface
-and boundary-only edge color visualization at once, and presents candidate
-GMM, fit, energy/move, region, cleanup, and boundary diagnostics. It does not
-materialize cuts or UV seams; `GEOM-076` owns that evidence-gated follow-up.
+`e:curvature_region_boundary_color`. The same transaction also writes hard
+feature facts, soft-feature confidence, final patch-boundary roles, and a
+final-boundary edge color that is transparent off the partition boundary. The
+property transaction is undoable/redoable and stamps `GpuDirty`; an identical
+rerun reports `NoChange` without another history entry. The panel can enable
+both the face-color surface and feature/boundary edge visualization at once.
+METHOD-039 retains soft
+candidates as inspectable edge properties and displays only final
+hard/soft/closure boundaries in red/gold/blue, alongside region, feature,
+energy, merge, and refinement diagnostics. It does not materialize cuts or UV
+seams; `GEOM-076` owns that
+evidence-gated follow-up.
 
 ### Sandbox Editor Mesh Remesh And Subdivide
 

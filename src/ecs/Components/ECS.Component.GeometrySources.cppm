@@ -34,6 +34,10 @@ export namespace Extrinsic::ECS::Components::GeometrySources
     //   "e:v1"                              – uint32_t index of second endpoint
     //   "e:curvature_region_boundary"       – bool     internal region boundary
     //   "e:curvature_region_boundary_color" – vec4     boundary visualization
+    //   "e:curvature_hard_feature"          – bool     METHOD-039 hard feature
+    //   "e:curvature_soft_feature_confidence" – double retained soft evidence
+    //   "e:curvature_patch_boundary_role"   – uint32_t none/hard/soft/closure
+    //   "e:curvature_feature_patch_color"   – vec4     final boundary-role view
     //
     // Domain: Halfedges (mesh or graph)
     //   Graph sources preserve the graph's real `h:connectivity`
@@ -69,6 +73,14 @@ export namespace Extrinsic::ECS::Components::GeometrySources
             "e:curvature_region_boundary";
         constexpr std::string_view kCurvatureRegionBoundaryColor =
             "e:curvature_region_boundary_color";
+        constexpr std::string_view kCurvatureHardFeature =
+            "e:curvature_hard_feature";
+        constexpr std::string_view kCurvatureSoftFeatureConfidence =
+            "e:curvature_soft_feature_confidence";
+        constexpr std::string_view kCurvaturePatchBoundaryRole =
+            "e:curvature_patch_boundary_role";
+        constexpr std::string_view kCurvatureFeaturePatchColor =
+            "e:curvature_feature_patch_color";
 
         constexpr std::string_view kHalfedgeToVertex  = "h:to_vertex";
         constexpr std::string_view kHalfedgeNext      = "h:next";

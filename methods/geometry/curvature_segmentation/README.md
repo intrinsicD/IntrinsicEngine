@@ -25,7 +25,11 @@ The geometry module now implements the standalone computed feature-evidence
 stage and an unadopted local grow/merge/refine patch reference. The latter is not
 an accepted `cpu_reference_v2`: one-dual-step seed perturbation exceeds the
 frozen variation-of-information gate. Publication properties, a selector,
-config, runtime, and UI adoption therefore remain absent.
+config, runtime, and UI adoption were therefore absent at METHOD-039
+retirement. `BUG-163` later added an explicitly labeled diagnostic selector and
+same-cardinality visualization properties for direct sculpt inspection; it did
+not change the refutation, register a v2 backend, or replace METHOD-037 as the
+production default.
 
 ## Implemented path
 
@@ -90,17 +94,21 @@ checks also pass. However, moving every automatic seed by one legal dual step
 leaves a different local optimum and exceeds the preregistered area-weighted
 VI limit of `0.01`. The focused regression preserves that refutation, and ARA
 claim C45 bounds it. Per the frozen stop rule, no thresholds were retuned and
-no production selector or control surface was added. `METHOD-040` owns a
-separate task-local multicut attempt; it must distinguish a genuinely global
-objective from a wider-move heuristic before implementation.
+no production selector or control surface was added by METHOD-039. The later
+`BUG-163` diagnostic lane can execute this exact candidate and reports its
+requested/actual identity, feature evidence, and boundary roles. `METHOD-040`
+still owns a separate task-local multicut attempt; it must distinguish a
+genuinely global objective from a wider-move heuristic before implementation.
 
 ## Runtime and UI
 
 The schema-versioned `sandbox.curvature_segmentation` config section is the
 single control lane for config files, editor, agent/CLI, and programmatic calls.
-The Sandbox Curvature window exposes Fixed/Automatic selection, model-fit,
-spatial, cleanup, and deterministic EM controls. Running it writes these
-same-cardinality properties without changing topology:
+The Sandbox Curvature window exposes the production-default `curvature_gmm`
+and explicit diagnostic `feature_aligned_patches` method tokens,
+Fixed/Automatic selection, deterministic GMM controls, and the applicable
+spatial or patch values. Running either writes these same-cardinality
+properties without changing topology:
 
 | Domain | Property | Meaning |
 | --- | --- | --- |
@@ -109,10 +117,16 @@ same-cardinality properties without changing topology:
 | Face | `f:curvature_region_color` | deterministic opaque region color |
 | Edge | `e:curvature_region_boundary` | nonzero exactly across different region IDs |
 | Edge | `e:curvature_region_boundary_color` | opaque red on boundaries, transparent elsewhere |
+| Edge | `e:curvature_hard_feature` | METHOD-039 mandatory hard-feature fact |
+| Edge | `e:curvature_soft_feature_confidence` | retained METHOD-039 soft-feature confidence |
+| Edge | `e:curvature_patch_boundary_role` | none, hard, soft-supported, or curvature-closure role |
+| Edge | `e:curvature_feature_patch_color` | final hard/soft/closure boundary visualization; transparent elsewhere |
 
-“Show result” enables both the face-color surface and boundary-only edge
-visualization. The operation is undoable, preserves unrelated properties, and
-rejects stale source geometry before writeback.
+“Show result” enables both the face-color surface and final-boundary edge
+visualization. Retained feature candidates stay inspectable through their
+separate properties and are not drawn as non-boundary lines. The operation is
+undoable, preserves unrelated properties, rejects stale source geometry before
+writeback, and never silently falls back between method tokens.
 
 ## Diagnostics
 
@@ -123,8 +137,9 @@ and boundary counts, explicit validation/failure status, per-candidate GMM fit
 duration, and wall-clock timings for face aggregation, GMM fitting, unary and
 dual-graph construction, spatial optimization, connectivity/publication,
 curvature estimation, and total work. Timings are observational and never
-affect the deterministic solve. The UI still reports the METHOD-037 result
-contract and states that spatial optimization is local.
+affect the deterministic solve. For the diagnostic METHOD-039 token, the UI
+instead reports hard/soft feature counts, final hard/soft/closure boundary
+counts, seeds/provisional/final regions, merge/refinement work, and energy.
 
 ## Verification and scope
 
@@ -250,8 +265,8 @@ Historical scratch-008 and scratch-010 remain immutable under `superseded/`,
 and scratch-009 preserves the missing-`jq` replay failure rather than hiding it.
 
 There is no accepted v2, optimized, or GPU backend. METHOD-039's unadopted local
-patch candidate is executable but failed its frozen seed-location adoption
-gate, so current output remains the deliberately non-destructive v1 path and
-makes no atlas-quality claim. METHOD-040 must first produce an accepted global-
-partition CPU result before any separately scoped engine adoption or later
-`GEOM-076` UV-atlas chart-hint evaluation may proceed.
+patch candidate is executable through an explicit diagnostic token but failed
+its frozen seed-location adoption gate; METHOD-037 therefore remains the
+default and neither output makes an atlas-quality claim. METHOD-040 must first
+produce an accepted global-partition CPU result before any production adoption
+or later `GEOM-076` UV-atlas chart-hint evaluation may proceed.

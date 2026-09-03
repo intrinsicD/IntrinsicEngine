@@ -1176,7 +1176,22 @@ namespace Extrinsic::Runtime
                 if (!projected.has_value())
                     continue;
 
-                AppendVisualizationRecipe(availability, *projected, stats);
+                const bool meshSurfaceSlot =
+                    slot.Lane == GeometryRenderLane::Surface &&
+                    availability.Sources.ProvenanceDomain ==
+                        ECS::Components::GeometrySources::Domain::Mesh &&
+                    sidecar.MeshGeometry.IsValid();
+                AppendVisualizationRecipe(
+                    availability,
+                    *projected,
+                    stats,
+                    meshSurfaceSlot
+                        ? std::span<const std::uint32_t>{
+                              sidecar.MeshSourceVertexForGpuVertex}
+                        : std::span<const std::uint32_t>{},
+                    meshSurfaceSlot
+                        ? sidecar.MeshVertexRemapRevision
+                        : 0u);
                 projectedVisualizationRecipes = true;
             }
         }
@@ -1439,15 +1454,6 @@ namespace Extrinsic::Runtime
                 availability.Sources.ProvenanceDomain == GS::Domain::Graph &&
                 (edgeLane.Ready() || pointLane.Ready());
             availabilityThisFrame = availability;
-            presentationRecipesProjected = ApplyGeometryPresentation(
-                registry,
-                entity,
-                stableId,
-                availability,
-                *sidecar,
-                renderer,
-                gpuAssets,
-                stats);
             if (availability.Sources.ProvenanceDomain == GS::Domain::Mesh)
             {
                 namespace D = ECS::Components::DirtyTags;
@@ -1599,6 +1605,23 @@ namespace Extrinsic::Runtime
             }
         }
 
+        // Project property-backed presentation after geometry reconciliation
+        // so mesh-surface vertex values can follow the exact corner split in
+        // the same submitted frame. Texture resolution still precedes the
+        // visualization/material sync records below.
+        if (availabilityThisFrame.has_value())
+        {
+            presentationRecipesProjected = ApplyGeometryPresentation(
+                registry,
+                entity,
+                stableId,
+                *availabilityThisFrame,
+                *sidecar,
+                renderer,
+                gpuAssets,
+                stats);
+        }
+
         // Shared procedural residency is one reference per renderable, not
         // one reference per extraction. Drop that ownership when procedural
         // binding is no longer authoritative or fails closed.
@@ -1658,6 +1681,7 @@ namespace Extrinsic::Runtime
                 sidecar->GpuSlot.SetGeometryHandle(Graphics::GpuGeometryHandle{});
             }
             sidecar->MeshGeometry = {};
+            sidecar->MeshSourceVertexForGpuVertex.clear();
             ++stats.MeshGeometryReleases;
         }
 
@@ -1893,7 +1917,14 @@ namespace Extrinsic::Runtime
                 AppendVisualizationRecipe(
                     *availabilityThisFrame,
                     explicitRecipe->second,
-                    stats);
+                    stats,
+                    meshBoundThisFrame
+                        ? std::span<const std::uint32_t>{
+                              sidecar->MeshSourceVertexForGpuVertex}
+                        : std::span<const std::uint32_t>{},
+                    meshBoundThisFrame
+                        ? sidecar->MeshVertexRemapRevision
+                        : 0u);
             }
             else if (!presentationRecipesProjected)
             {
@@ -1918,7 +1949,16 @@ namespace Extrinsic::Runtime
                     {
                         ++stats.VisualizationRecipeScalarConfigsObserved;
                         AppendVisualizationRecipe(
-                            *availabilityThisFrame, *scalar, stats);
+                            *availabilityThisFrame,
+                            *scalar,
+                            stats,
+                            i == 0u && meshBoundThisFrame
+                                ? std::span<const std::uint32_t>{
+                                      sidecar->MeshSourceVertexForGpuVertex}
+                                : std::span<const std::uint32_t>{},
+                            i == 0u && meshBoundThisFrame
+                                ? sidecar->MeshVertexRemapRevision
+                                : 0u);
                     }
                     if (const auto color = BuildColorVisualizationRecipe(
                             stableId,
@@ -1927,7 +1967,16 @@ namespace Extrinsic::Runtime
                         color.has_value())
                     {
                         AppendVisualizationRecipe(
-                            *availabilityThisFrame, *color, stats);
+                            *availabilityThisFrame,
+                            *color,
+                            stats,
+                            i == 0u && meshBoundThisFrame
+                                ? std::span<const std::uint32_t>{
+                                      sidecar->MeshSourceVertexForGpuVertex}
+                                : std::span<const std::uint32_t>{},
+                            i == 0u && meshBoundThisFrame
+                                ? sidecar->MeshVertexRemapRevision
+                                : 0u);
                     }
                 }
             }

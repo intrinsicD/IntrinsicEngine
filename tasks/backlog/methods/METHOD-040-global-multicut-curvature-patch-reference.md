@@ -53,6 +53,10 @@ maturity_target: CPUContracted
   fragments. `LocalRagOneStepSeedPerturbationRefutesFrozenStabilityGate` is the
   executable negative oracle. METHOD-039 therefore forbids positive adoption
   or threshold tuning and retires its local solver as a diagnostic comparator.
+  `BUG-163` later exposed that comparator through an explicitly diagnostic
+  config/runtime/UI token for bounded sculpt inspection; this is not the
+  positive production adoption that this task still requires before any
+  METHOD-040 engine integration.
 - Begin with the original Zhuang et al. feature-aligned segmentation paper and
   primary correlation-clustering/multicut sources plus later deterministic
   surface-graph improvements. Record stable citations and distinguish an
@@ -74,7 +78,8 @@ maturity_target: CPUContracted
 ## Backends
 - Backend axis: one serial deterministic CPU reference candidate only. The
   METHOD-037 `cpu_reference_v1` remains the production reference and the
-  METHOD-039 local patch solver remains an unexposed negative comparator.
+  METHOD-039 local patch solver remains an explicitly labeled negative
+  comparator rather than an accepted backend.
 
 ## Engine integration
 
@@ -211,8 +216,8 @@ python3 tools/agents/check_ara_claims.py --root . --strict
 - Crossing hard features, merging disconnected components, retaining a cut
   merely because seed fronts met, or making seed IDs semantic output.
 - Introducing a generic optimizer/service/registry/backend framework, dense
-  all-pairs face storage, a new third-party solver, or a public selector before
-  a positive frozen verdict and separate review.
+  all-pairs face storage, a new third-party solver, or a METHOD-040 production
+  selector before a positive frozen verdict and separate review.
 - Materializing cuts, changing topology, adding parameterization behavior, or
   claiming novelty, GPU parity, or a speedup.
 

@@ -107,6 +107,8 @@ namespace
     [[nodiscard]] Runtime::CurvatureSegmentationConfig MakeFixedConfig()
     {
         Runtime::CurvatureSegmentationConfig config{};
+        config.Method =
+            Runtime::CurvatureSegmentationMethod::CurvatureGmm;
         config.SelectionMode =
             Runtime::CurvatureSegmentationSelectionMode::FixedCount;
         config.FixedComponentCount = 2u;
@@ -127,6 +129,90 @@ namespace
                 .Config = MakeFixedConfig(),
             });
     }
+}
+
+TEST(CurvatureSegmentationOperations,
+     FeatureAlignedMethodPublishesEvidenceBoundaryRolesAndActualIdentity)
+{
+    SegmentationHarness harness{};
+    Runtime::CurvatureSegmentationConfig config{};
+    config.Method =
+        Runtime::CurvatureSegmentationMethod::FeatureAlignedPatches;
+    config.SelectionMode =
+        Runtime::CurvatureSegmentationSelectionMode::FixedCount;
+    config.FixedComponentCount = 2u;
+    config.PatchComplexityCost = 0.5;
+
+    const Runtime::EditorCurvatureSegmentationResult result =
+        Runtime::ApplyEditorCurvatureSegmentationCommand(
+            harness.Context,
+            Runtime::EditorCurvatureSegmentationCommand{
+                .StableEntityId = harness.StableEntityId,
+                .Config = config,
+            });
+    ASSERT_TRUE(result.Succeeded()) << result.Message;
+    EXPECT_EQ(result.RequestedMethod,
+              Runtime::CurvatureSegmentationMethod::FeatureAlignedPatches);
+    EXPECT_EQ(result.ActualMethod, result.RequestedMethod);
+    ASSERT_TRUE(result.FeatureDiagnostics.has_value());
+    ASSERT_TRUE(result.PatchDiagnostics.has_value());
+    EXPECT_EQ(result.Diagnostics.ConnectedRegionCount,
+              result.PatchDiagnostics->FinalRegionCount);
+    EXPECT_EQ(result.Diagnostics.BoundaryEdgeCount,
+              result.PatchDiagnostics->FinalBoundaryEdgeCount);
+
+    GS::Edges& edges = harness.Edges();
+    const auto hard = edges.Properties.Get<bool>(
+        GS::PropertyNames::kCurvatureHardFeature);
+    const auto soft = edges.Properties.Get<double>(
+        GS::PropertyNames::kCurvatureSoftFeatureConfidence);
+    const auto boundary = edges.Properties.Get<bool>(
+        GS::PropertyNames::kCurvatureRegionBoundary);
+    const auto roles = edges.Properties.Get<std::uint32_t>(
+        GS::PropertyNames::kCurvaturePatchBoundaryRole);
+    const auto colors = edges.Properties.Get<glm::vec4>(
+        GS::PropertyNames::kCurvatureFeaturePatchColor);
+    ASSERT_TRUE(hard);
+    ASSERT_TRUE(soft);
+    ASSERT_TRUE(boundary);
+    ASSERT_TRUE(roles);
+    ASSERT_TRUE(colors);
+    ASSERT_EQ(hard.Vector().size(), edges.Properties.Size());
+    ASSERT_EQ(soft.Vector().size(), edges.Properties.Size());
+    ASSERT_EQ(roles.Vector().size(), edges.Properties.Size());
+    ASSERT_EQ(colors.Vector().size(), edges.Properties.Size());
+
+    std::size_t boundaryCount = 0u;
+    for (std::size_t edge = 0u; edge < boundary.Vector().size(); ++edge)
+    {
+        if (boundary[edge])
+        {
+            ++boundaryCount;
+            EXPECT_NE(roles[edge], 0u);
+            EXPECT_GT(colors[edge].a, 0.0f);
+        }
+        else
+        {
+            EXPECT_FLOAT_EQ(colors[edge].a, 0.0f);
+        }
+        if (hard[edge])
+        {
+            EXPECT_TRUE(boundary[edge]);
+            EXPECT_EQ(
+                roles[edge],
+                static_cast<std::uint32_t>(
+                    Geometry::CurvatureSegmentation::
+                        PatchBoundaryRole::HardFeature));
+        }
+        if (roles[edge] == static_cast<std::uint32_t>(
+                Geometry::CurvatureSegmentation::
+                    PatchBoundaryRole::SoftFeatureSupported))
+        {
+            EXPECT_GT(soft[edge], 0.0);
+        }
+    }
+    EXPECT_EQ(boundaryCount,
+              result.PatchDiagnostics->FinalBoundaryEdgeCount);
 }
 
 TEST(CurvatureSegmentationOperations,
@@ -170,6 +256,8 @@ TEST(CurvatureSegmentationOperations,
         GS::PropertyNames::kCurvatureComponent));
     ASSERT_FALSE(edges.Properties.Exists(
         GS::PropertyNames::kCurvatureRegionBoundary));
+    ASSERT_FALSE(edges.Properties.Exists(
+        GS::PropertyNames::kCurvatureHardFeature));
     const Geometry::PropertyRevision faceRevisionBefore =
         faces.Properties.Revision();
     const Geometry::PropertyRevision edgeRevisionBefore =
@@ -196,11 +284,14 @@ TEST(CurvatureSegmentationOperations,
         GS::PropertyNames::kCurvatureRegionBoundary);
     const auto boundaryColors = edges.Properties.Get<glm::vec4>(
         GS::PropertyNames::kCurvatureRegionBoundaryColor);
+    const auto hardFeatures = edges.Properties.Get<bool>(
+        GS::PropertyNames::kCurvatureHardFeature);
     ASSERT_TRUE(components);
     ASSERT_TRUE(regions);
     ASSERT_TRUE(regionColors);
     ASSERT_TRUE(boundaries);
     ASSERT_TRUE(boundaryColors);
+    ASSERT_TRUE(hardFeatures);
     ASSERT_EQ(components.Vector().size(), faces.Properties.Size());
     ASSERT_EQ(regions.Vector().size(), faces.Properties.Size());
     ASSERT_EQ(regionColors.Vector().size(), faces.Properties.Size());
@@ -297,6 +388,8 @@ TEST(CurvatureSegmentationOperations,
         GS::PropertyNames::kCurvatureRegionBoundary));
     EXPECT_FALSE(edges.Properties.Exists(
         GS::PropertyNames::kCurvatureRegionBoundaryColor));
+    EXPECT_FALSE(edges.Properties.Exists(
+        GS::PropertyNames::kCurvatureHardFeature));
     EXPECT_TRUE(harness.Scene.Raw().all_of<Dirty::GpuDirty>(
         harness.Entity));
     EXPECT_EQ(faces.Properties.Get<float>("f:user_value").Vector(),
@@ -320,6 +413,8 @@ TEST(CurvatureSegmentationOperations,
     EXPECT_EQ(edges.Properties.Get<glm::vec4>(
                   GS::PropertyNames::kCurvatureRegionBoundaryColor).Vector(),
               publishedBoundaryColors);
+    EXPECT_TRUE(edges.Properties.Exists(
+        GS::PropertyNames::kCurvatureHardFeature));
 
     auto currentPositions = vertices.Properties.Get<glm::vec3>(
         GS::PropertyNames::kPosition);

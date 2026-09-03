@@ -52,6 +52,7 @@ export namespace Extrinsic::Graphics
             std::uint32_t ElementCount{0u};
             std::uint32_t StrideBytes{0u};
             std::uint64_t DirtyStamp{0u};
+            std::uint64_t SourceLayoutStamp{0u};
             std::uint64_t BufferBDA{0u};
         };
 

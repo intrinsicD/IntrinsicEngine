@@ -1665,14 +1665,18 @@ Concretely:
   `GRAPHICS-084` adds the selected property-buffer residency seam for current
   visualization recipes: `VisualizationPropertyBufferUploadDescriptor`
   carries source key, domain, value type, element count, stride, dirty stamp,
-  and copied bytes; `VisualizationPropertyBufferResidency` validates those
+  source-layout stamp, and copied bytes;
+  `VisualizationPropertyBufferResidency` validates those
   descriptors, rejects unsupported/zero/non-finite/stale inputs, uploads or
   reuses renderer-owned `RHI::BufferManager` storage buffers, and publishes
   BDAs into scalar/color/vector/isoline packets before
   `ValidateVisualizationPackets(...)` runs. A dirty stamp of zero means the
   producer has no stable stamp and the buffer is uploaded every submission;
   positive stamps can reuse equal metadata/stamp buffers and reject older
-  submissions. Runtime extraction scopes descriptor source keys with the
+  submissions. A changed source-layout stamp forces a fresh upload without
+  changing the property key; runtime uses it when canonical mesh-vertex
+  properties are duplicated through a corner-split GPU surface stream.
+  Runtime extraction scopes descriptor source keys with the
   stable renderable id so two entities using the same property name cannot
   collide during BDA publication. Runtime and UI still own property selection
   and CPU data production only; graphics owns all GPU residency.

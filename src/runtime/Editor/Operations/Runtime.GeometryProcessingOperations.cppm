@@ -41,6 +41,7 @@ import Extrinsic.Runtime.SelectionController;
 import Extrinsic.Runtime.WorldHandle;
 import Geometry.Graph.Vertex.Normals;
 export import Geometry.HalfedgeMesh.CurvatureSegmentation;
+export import Geometry.HalfedgeMesh.CurvatureSegmentation.Patches;
 import Geometry.HalfedgeMesh.Vertices.Normals;
 export import Geometry.Parameterization;
 import Geometry.PointCloud.Normals;
@@ -470,17 +471,38 @@ export namespace Extrinsic::Runtime
     {
         EditorCommandStatus Status{EditorCommandStatus::NoChange};
         CurvatureSegmentationConfig Config{};
+        CurvatureSegmentationMethod RequestedMethod{
+            CurvatureSegmentationMethod::CurvatureGmm};
+        CurvatureSegmentationMethod ActualMethod{
+            CurvatureSegmentationMethod::CurvatureGmm};
         Geometry::CurvatureSegmentation::CurvatureSegmentationDiagnostics
             Diagnostics{};
+        std::optional<
+            Geometry::CurvatureSegmentation::FeatureEvidenceDiagnostics>
+            FeatureDiagnostics{};
+        std::optional<
+            Geometry::CurvatureSegmentation::CurvaturePatchDiagnostics>
+            PatchDiagnostics{};
         std::size_t ChangedValueCount{0u};
         Core::ErrorCode Error{Core::ErrorCode::Success};
         std::string Message{};
 
         [[nodiscard]] bool Succeeded() const noexcept
         {
-            return Diagnostics.Succeeded() &&
-                   (Status == EditorCommandStatus::Applied ||
-                    Status == EditorCommandStatus::NoChange);
+            const bool commandSucceeded =
+                Status == EditorCommandStatus::Applied ||
+                Status == EditorCommandStatus::NoChange;
+            if (!commandSucceeded || RequestedMethod != ActualMethod)
+                return false;
+            if (ActualMethod ==
+                CurvatureSegmentationMethod::FeatureAlignedPatches)
+            {
+                return FeatureDiagnostics.has_value() &&
+                       FeatureDiagnostics->Succeeded() &&
+                       PatchDiagnostics.has_value() &&
+                       PatchDiagnostics->Succeeded();
+            }
+            return Diagnostics.Succeeded();
         }
     };
 

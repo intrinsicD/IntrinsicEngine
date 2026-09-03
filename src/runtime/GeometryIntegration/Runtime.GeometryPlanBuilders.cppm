@@ -71,6 +71,11 @@ export namespace Extrinsic::Runtime
         VertexChannelStreams Channels{};
         std::vector<std::uint32_t> PackedColors{};
         std::vector<std::uint32_t> SurfaceIndices{};
+        // Non-empty when corner UV/normal seams duplicate mesh vertices for
+        // the GPU surface. Entry i names the canonical mesh vertex backing
+        // GPU vertex i so vertex-domain visualization data can follow the
+        // exact same split.
+        std::vector<std::uint32_t> SourceVertexForGpuVertex{};
 
         void Clear() noexcept;
     };

@@ -27,11 +27,25 @@ export namespace Extrinsic::Runtime
         Automatic,
     };
 
+    enum class CurvatureSegmentationMethod : std::uint8_t
+    {
+        CurvatureGmm = 0,
+        FeatureAlignedPatches,
+    };
+
+    [[nodiscard]] const char* DebugNameForCurvatureSegmentationMethod(
+        CurvatureSegmentationMethod method) noexcept;
+
     [[nodiscard]] const char* DebugNameForCurvatureSegmentationSelectionMode(
         CurvatureSegmentationSelectionMode mode) noexcept;
 
     struct CurvatureSegmentationConfig
     {
+        // METHOD-037 remains the operational default. METHOD-039 is an
+        // explicit diagnostic selection because its frozen global
+        // seed-stability verdict remains negative outside the sculpt profile.
+        CurvatureSegmentationMethod Method{
+            CurvatureSegmentationMethod::CurvatureGmm};
         CurvatureSegmentationSelectionMode SelectionMode{
             CurvatureSegmentationSelectionMode::Automatic};
         std::uint32_t FixedComponentCount{6u};
@@ -49,6 +63,13 @@ export namespace Extrinsic::Runtime
         double FeatureSensitivity{4.0};
         std::uint32_t MaxSpatialIterations{24u};
         std::uint32_t MinimumRegionFaces{2u};
+
+        // METHOD-039 feature evidence and regional model controls. Remaining
+        // patch constants are part of the reference formulation rather than
+        // runtime tuning state.
+        double FeatureBaseRadiusRatio{0.02};
+        double HardDihedralThresholdDegrees{45.0};
+        double PatchComplexityCost{0.5};
     };
 
     [[nodiscard]] bool IsValidCurvatureSegmentationConfig(

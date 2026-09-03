@@ -97,6 +97,8 @@ import Geometry.Graph;
 import Geometry.Graph.Vertex.Normals;
 import Geometry.Curvature;
 import Geometry.HalfedgeMesh.CurvatureSegmentation;
+import Geometry.HalfedgeMesh.CurvatureSegmentation.Features;
+import Geometry.HalfedgeMesh.CurvatureSegmentation.Patches;
 import Geometry.CatmullClark;
 import Geometry.HalfedgeMesh;
 import Geometry.HalfedgeMesh.AdaptiveRemeshing;
@@ -3066,6 +3068,29 @@ struct EditorJobResult { std::string Diagnostic{}; };
             };
         }
 
+        [[nodiscard]] CurvSeg::FeatureEvidenceParams
+        MakeFeatureEvidenceParams(
+            const CurvatureSegmentationConfig& config)
+        {
+            return CurvSeg::FeatureEvidenceParams{
+                .BoundaryIsHardFeature = false,
+                .HardDihedralThresholdDegrees =
+                    config.HardDihedralThresholdDegrees,
+                .BaseRadiusRatio = config.FeatureBaseRadiusRatio,
+            };
+        }
+
+        [[nodiscard]] CurvSeg::CurvaturePatchParams
+        MakeCurvaturePatchParams(
+            const CurvatureSegmentationConfig& config)
+        {
+            CurvSeg::CurvaturePatchParams params{};
+            params.Mixture = MakeCurvatureSegmentationParams(config);
+            params.BaseRadiusRatio = config.FeatureBaseRadiusRatio;
+            params.PatchComplexityCost = config.PatchComplexityCost;
+            return params;
+        }
+
         struct MeshCurvatureSegmentationPropertyState
         {
             bool HadComponent{false};
@@ -3073,11 +3098,19 @@ struct EditorJobResult { std::string Diagnostic{}; };
             bool HadRegionColor{false};
             bool HadBoundary{false};
             bool HadBoundaryColor{false};
+            bool HadHardFeature{false};
+            bool HadSoftFeatureConfidence{false};
+            bool HadBoundaryRole{false};
+            bool HadFeaturePatchColor{false};
             std::vector<std::uint32_t> Components{};
             std::vector<std::uint32_t> Regions{};
             std::vector<glm::vec4> RegionColors{};
             std::vector<bool> Boundaries{};
             std::vector<glm::vec4> BoundaryColors{};
+            std::vector<bool> HardFeatures{};
+            std::vector<double> SoftFeatureConfidences{};
+            std::vector<std::uint32_t> BoundaryRoles{};
+            std::vector<glm::vec4> FeaturePatchColors{};
         };
 
         using MeshCurvatureSegmentationPropertySnapshot =
@@ -3112,13 +3145,26 @@ struct EditorJobResult { std::string Diagnostic{}; };
                    lhs.HadRegionColor == rhs.HadRegionColor &&
                    lhs.HadBoundary == rhs.HadBoundary &&
                    lhs.HadBoundaryColor == rhs.HadBoundaryColor &&
+                   lhs.HadHardFeature == rhs.HadHardFeature &&
+                   lhs.HadSoftFeatureConfidence ==
+                       rhs.HadSoftFeatureConfidence &&
+                   lhs.HadBoundaryRole == rhs.HadBoundaryRole &&
+                   lhs.HadFeaturePatchColor ==
+                       rhs.HadFeaturePatchColor &&
                    lhs.Components == rhs.Components &&
                    lhs.Regions == rhs.Regions &&
                    SameVec4PropertyValues(
                        lhs.RegionColors, rhs.RegionColors) &&
                    lhs.Boundaries == rhs.Boundaries &&
                    SameVec4PropertyValues(
-                       lhs.BoundaryColors, rhs.BoundaryColors);
+                       lhs.BoundaryColors, rhs.BoundaryColors) &&
+                   lhs.HardFeatures == rhs.HardFeatures &&
+                   lhs.SoftFeatureConfidences ==
+                       rhs.SoftFeatureConfidences &&
+                   lhs.BoundaryRoles == rhs.BoundaryRoles &&
+                   SameVec4PropertyValues(
+                       lhs.FeaturePatchColors,
+                       rhs.FeaturePatchColors);
         }
 
         [[nodiscard]] bool
@@ -3141,7 +3187,19 @@ struct EditorJobResult { std::string Diagnostic{}; };
                         : state.Boundaries.empty()) &&
                    (state.HadBoundaryColor
                         ? state.BoundaryColors.size() == edgeCount
-                        : state.BoundaryColors.empty());
+                        : state.BoundaryColors.empty()) &&
+                   (state.HadHardFeature
+                        ? state.HardFeatures.size() == edgeCount
+                        : state.HardFeatures.empty()) &&
+                   (state.HadSoftFeatureConfidence
+                        ? state.SoftFeatureConfidences.size() == edgeCount
+                        : state.SoftFeatureConfidences.empty()) &&
+                   (state.HadBoundaryRole
+                        ? state.BoundaryRoles.size() == edgeCount
+                        : state.BoundaryRoles.empty()) &&
+                   (state.HadFeaturePatchColor
+                        ? state.FeaturePatchColors.size() == edgeCount
+                        : state.FeaturePatchColors.empty());
         }
 
         [[nodiscard]] bool CaptureMeshCurvatureSegmentationPropertyState(
@@ -3186,6 +3244,34 @@ struct EditorJobResult { std::string Diagnostic{}; };
                        edgeCount,
                        out.HadBoundaryColor,
                        out.BoundaryColors,
+                       diagnostic) &&
+                   CaptureCurvatureProperty<bool>(
+                       edgeProperties,
+                       GS::PropertyNames::kCurvatureHardFeature,
+                       edgeCount,
+                       out.HadHardFeature,
+                       out.HardFeatures,
+                       diagnostic) &&
+                   CaptureCurvatureProperty<double>(
+                       edgeProperties,
+                       GS::PropertyNames::kCurvatureSoftFeatureConfidence,
+                       edgeCount,
+                       out.HadSoftFeatureConfidence,
+                       out.SoftFeatureConfidences,
+                       diagnostic) &&
+                   CaptureCurvatureProperty<std::uint32_t>(
+                       edgeProperties,
+                       GS::PropertyNames::kCurvaturePatchBoundaryRole,
+                       edgeCount,
+                       out.HadBoundaryRole,
+                       out.BoundaryRoles,
+                       diagnostic) &&
+                   CaptureCurvatureProperty<glm::vec4>(
+                       edgeProperties,
+                       GS::PropertyNames::kCurvatureFeaturePatchColor,
+                       edgeCount,
+                       out.HadFeaturePatchColor,
+                       out.FeaturePatchColors,
                        diagnostic);
         }
 
@@ -3223,6 +3309,30 @@ struct EditorJobResult { std::string Diagnostic{}; };
                        GS::PropertyNames::kCurvatureRegionBoundaryColor,
                        state.HadBoundaryColor,
                        state.BoundaryColors,
+                       glm::vec4{0.0f}) &&
+                   ApplyCurvatureProperty<bool>(
+                       edgeProperties,
+                       GS::PropertyNames::kCurvatureHardFeature,
+                       state.HadHardFeature,
+                       state.HardFeatures,
+                       false) &&
+                   ApplyCurvatureProperty<double>(
+                       edgeProperties,
+                       GS::PropertyNames::kCurvatureSoftFeatureConfidence,
+                       state.HadSoftFeatureConfidence,
+                       state.SoftFeatureConfidences,
+                       0.0) &&
+                   ApplyCurvatureProperty<std::uint32_t>(
+                       edgeProperties,
+                       GS::PropertyNames::kCurvaturePatchBoundaryRole,
+                       state.HadBoundaryRole,
+                       state.BoundaryRoles,
+                       0u) &&
+                   ApplyCurvatureProperty<glm::vec4>(
+                       edgeProperties,
+                       GS::PropertyNames::kCurvatureFeaturePatchColor,
+                       state.HadFeaturePatchColor,
+                       state.FeaturePatchColors,
                        glm::vec4{0.0f});
         }
 
@@ -3250,7 +3360,23 @@ struct EditorJobResult { std::string Diagnostic{}; };
                    CountChangedValues(
                        before.HadBoundaryColor,
                        before.BoundaryColors,
-                       after.BoundaryColors);
+                       after.BoundaryColors) +
+                   CountChangedValues(
+                       before.HadHardFeature,
+                       before.HardFeatures,
+                       after.HardFeatures) +
+                   CountChangedValues(
+                       before.HadSoftFeatureConfidence,
+                       before.SoftFeatureConfidences,
+                       after.SoftFeatureConfidences) +
+                   CountChangedValues(
+                       before.HadBoundaryRole,
+                       before.BoundaryRoles,
+                       after.BoundaryRoles) +
+                   CountChangedValues(
+                       before.HadFeaturePatchColor,
+                       before.FeaturePatchColors,
+                       after.FeaturePatchColors);
         }
 
         struct MeshCurvatureSegmentationMutationGeneration
@@ -10185,6 +10311,8 @@ ApplyEditorMeshCurvatureCommand(
     {
         EditorCurvatureSegmentationResult result{
             .Config = command.Config,
+            .RequestedMethod = command.Config.Method,
+            .ActualMethod = command.Config.Method,
         };
         if (context.Scene == nullptr)
         {
@@ -10267,57 +10395,195 @@ ApplyEditorMeshCurvatureCommand(
             return result;
         }
 
-        CurvSeg::CurvatureSegmentationResult segmented =
-            CurvSeg::ComputeAndSegment(
-                source.Mesh,
-                MakeCurvatureSegmentationParams(command.Config));
-        result.Diagnostics = segmented.Diagnostics;
-        if (!segmented.Succeeded())
+        std::vector<std::uint32_t> faceComponents{};
+        std::vector<std::uint32_t> faceRegions{};
+        std::vector<glm::vec4> faceRegionColors{};
+        std::vector<std::uint8_t> edgeBoundaries{};
+        std::vector<glm::vec4> edgeBoundaryColors{};
+        std::vector<std::uint8_t> hardFeatureMask(
+            source.Mesh.EdgesSize(), 0u);
+        std::vector<double> softFeatureConfidence(
+            source.Mesh.EdgesSize(), 0.0);
+        std::vector<std::uint32_t> edgeBoundaryRoles(
+            source.Mesh.EdgesSize(), 0u);
+        std::vector<glm::vec4> featurePatchColors(
+            source.Mesh.EdgesSize(), glm::vec4{0.0f});
+
+        if (command.Config.Method ==
+            CurvatureSegmentationMethod::CurvatureGmm)
         {
-            switch (segmented.Diagnostics.Status)
+            CurvSeg::CurvatureSegmentationResult segmented =
+                CurvSeg::ComputeAndSegment(
+                    source.Mesh,
+                    MakeCurvatureSegmentationParams(command.Config));
+            result.Diagnostics = segmented.Diagnostics;
+            if (!segmented.Succeeded())
             {
-            case CurvSeg::SegmentationStatus::EmptyMesh:
-            case CurvSeg::SegmentationStatus::UnsupportedSubmeshView:
-                result.Status =
-                    EditorCommandStatus::UnsupportedGeometryDomain;
-                result.Error = Core::ErrorCode::InvalidArgument;
-                break;
-            case CurvSeg::SegmentationStatus::InvalidParameters:
-            case CurvSeg::SegmentationStatus::CurvatureCountMismatch:
-            case CurvSeg::SegmentationStatus::NonTriangleFace:
-            case CurvSeg::SegmentationStatus::NonFinitePosition:
-            case CurvSeg::SegmentationStatus::DegenerateFace:
-            case CurvSeg::SegmentationStatus::NonFiniteCurvature:
-                result.Status =
-                    EditorCommandStatus::InvalidProcessingParameters;
-                result.Error = Core::ErrorCode::InvalidArgument;
-                break;
-            case CurvSeg::SegmentationStatus::GaussianMixtureFitFailed:
-            case CurvSeg::SegmentationStatus::PosteriorEvaluationFailed:
+                switch (segmented.Diagnostics.Status)
+                {
+                case CurvSeg::SegmentationStatus::EmptyMesh:
+                case CurvSeg::SegmentationStatus::UnsupportedSubmeshView:
+                    result.Status =
+                        EditorCommandStatus::UnsupportedGeometryDomain;
+                    result.Error = Core::ErrorCode::InvalidArgument;
+                    break;
+                case CurvSeg::SegmentationStatus::InvalidParameters:
+                case CurvSeg::SegmentationStatus::CurvatureCountMismatch:
+                case CurvSeg::SegmentationStatus::NonTriangleFace:
+                case CurvSeg::SegmentationStatus::NonFinitePosition:
+                case CurvSeg::SegmentationStatus::DegenerateFace:
+                case CurvSeg::SegmentationStatus::NonFiniteCurvature:
+                    result.Status =
+                        EditorCommandStatus::InvalidProcessingParameters;
+                    result.Error = Core::ErrorCode::InvalidArgument;
+                    break;
+                case CurvSeg::SegmentationStatus::GaussianMixtureFitFailed:
+                case CurvSeg::SegmentationStatus::PosteriorEvaluationFailed:
+                    result.Status =
+                        EditorCommandStatus::GeometryProcessingFailed;
+                    result.Error = Core::ErrorCode::Unknown;
+                    break;
+                case CurvSeg::SegmentationStatus::Success:
+                    break;
+                }
+                result.Message = "Curvature GMM segmentation failed: ";
+                result.Message +=
+                    CurvSeg::ToString(segmented.Diagnostics.Status);
+                result.Message += ".";
+                return result;
+            }
+            faceComponents = std::move(segmented.FaceComponents);
+            faceRegions = std::move(segmented.FaceRegions);
+            faceRegionColors = std::move(segmented.FaceRegionColors);
+            edgeBoundaries = std::move(segmented.EdgeBoundaries);
+            edgeBoundaryColors =
+                std::move(segmented.EdgeBoundaryColors);
+            for (std::size_t edge = 0u;
+                 edge < edgeBoundaries.size(); ++edge)
+            {
+                if (edgeBoundaries[edge] != 0u)
+                {
+                    edgeBoundaryRoles[edge] = static_cast<std::uint32_t>(
+                        CurvSeg::PatchBoundaryRole::CurvatureClosure);
+                    featurePatchColors[edge] =
+                        edgeBoundaryColors[edge];
+                }
+            }
+        }
+        else
+        {
+            Curv::CurvatureField curvature =
+                Curv::ComputeCurvature(source.Mesh);
+            if (!MeshCurvatureScalarsUsable(
+                    curvature, source.Mesh.VerticesSize()) ||
+                curvature.Diagnostics.SupportedVertexCount == 0u ||
+                CountNonFiniteMeshCurvatureScalars(curvature) != 0u)
+            {
                 result.Status =
                     EditorCommandStatus::GeometryProcessingFailed;
-                result.Error = Core::ErrorCode::Unknown;
-                break;
-            case CurvSeg::SegmentationStatus::Success:
-                break;
+                result.Error = Core::ErrorCode::InvalidArgument;
+                result.Message =
+                    "Feature-aligned segmentation could not compute a finite, supported curvature field.";
+                return result;
             }
-            result.Message =
-                "Curvature segmentation failed: ";
-            result.Message +=
-                CurvSeg::ToString(segmented.Diagnostics.Status);
-            result.Message += ".";
-            return result;
+
+            CurvSeg::FeatureEvidenceResult featureEvidence =
+                CurvSeg::DetectFeatureEvidence(
+                    source.Mesh,
+                    curvature.MaxPrincipalCurvatureProperty.Vector(),
+                    curvature.MinPrincipalCurvatureProperty.Vector(),
+                    MakeFeatureEvidenceParams(command.Config));
+            result.FeatureDiagnostics = featureEvidence.Diagnostics;
+            if (!featureEvidence.Succeeded())
+            {
+                result.Status =
+                    EditorCommandStatus::GeometryProcessingFailed;
+                result.Error = Core::ErrorCode::InvalidArgument;
+                result.Message = "Feature evidence detection failed: ";
+                result.Message +=
+                    CurvSeg::ToString(featureEvidence.Diagnostics.Status);
+                result.Message += ".";
+                return result;
+            }
+
+            CurvSeg::CurvaturePatchResult patches =
+                CurvSeg::SegmentFeatureAlignedPatches(
+                    source.Mesh,
+                    curvature.MaxPrincipalCurvatureProperty.Vector(),
+                    curvature.MinPrincipalCurvatureProperty.Vector(),
+                    featureEvidence.View(),
+                    MakeCurvaturePatchParams(command.Config));
+            result.PatchDiagnostics = patches.Diagnostics;
+            if (!patches.Succeeded())
+            {
+                result.Status =
+                    EditorCommandStatus::GeometryProcessingFailed;
+                result.Error = Core::ErrorCode::InvalidArgument;
+                result.Message =
+                    "Feature-aligned patch segmentation failed: ";
+                result.Message +=
+                    CurvSeg::ToString(patches.Diagnostics.Status);
+                result.Message += ".";
+                return result;
+            }
+
+            result.Diagnostics.Status =
+                CurvSeg::SegmentationStatus::Success;
+            result.Diagnostics.FaceSlotCount =
+                patches.Diagnostics.FaceSlotCount;
+            result.Diagnostics.LiveFaceCount =
+                patches.Diagnostics.LiveFaceCount;
+            result.Diagnostics.EdgeSlotCount =
+                patches.Diagnostics.EdgeSlotCount;
+            result.Diagnostics.LiveEdgeCount =
+                patches.Diagnostics.LiveEdgeCount;
+            result.Diagnostics.SelectedComponentCount =
+                patches.Diagnostics.SelectedComponentCount;
+            result.Diagnostics.ActiveComponentCount =
+                static_cast<std::uint32_t>(
+                    patches.Diagnostics.Components.size());
+            result.Diagnostics.ConnectedRegionCount =
+                static_cast<std::uint32_t>(
+                    patches.Diagnostics.FinalRegionCount);
+            result.Diagnostics.BoundaryEdgeCount =
+                patches.Diagnostics.FinalBoundaryEdgeCount;
+            result.Diagnostics.InitialEnergy =
+                patches.Diagnostics.InitialEnergy;
+            result.Diagnostics.FinalEnergy =
+                patches.Diagnostics.FinalEnergy;
+            result.Diagnostics.Candidates = patches.Diagnostics.Candidates;
+            result.Diagnostics.Components = patches.Diagnostics.Components;
+
+            faceComponents = std::move(patches.FaceComponents);
+            faceRegions = std::move(patches.FaceRegions);
+            faceRegionColors = std::move(patches.FaceRegionColors);
+            edgeBoundaries = std::move(patches.EdgeBoundaries);
+            edgeBoundaryColors =
+                std::move(patches.EdgeBoundaryColors);
+            hardFeatureMask = std::move(featureEvidence.HardEdgeMask);
+            softFeatureConfidence =
+                std::move(featureEvidence.SoftEdgeConfidence);
+            for (std::size_t edge = 0u;
+                 edge < patches.EdgeBoundaryRoles.size(); ++edge)
+            {
+                edgeBoundaryRoles[edge] = static_cast<std::uint32_t>(
+                    patches.EdgeBoundaryRoles[edge]);
+                if (edgeBoundaries[edge] != 0u)
+                {
+                    featurePatchColors[edge] = edgeBoundaryColors[edge];
+                }
+            }
         }
-        if (segmented.FaceComponents.size() !=
-                source.Mesh.FacesSize() ||
-            segmented.FaceRegions.size() !=
-                source.Mesh.FacesSize() ||
-            segmented.FaceRegionColors.size() !=
-                source.Mesh.FacesSize() ||
-            segmented.EdgeBoundaries.size() !=
-                source.Mesh.EdgesSize() ||
-            segmented.EdgeBoundaryColors.size() !=
-                source.Mesh.EdgesSize())
+
+        if (faceComponents.size() != source.Mesh.FacesSize() ||
+            faceRegions.size() != source.Mesh.FacesSize() ||
+            faceRegionColors.size() != source.Mesh.FacesSize() ||
+            edgeBoundaries.size() != source.Mesh.EdgesSize() ||
+            edgeBoundaryColors.size() != source.Mesh.EdgesSize() ||
+            hardFeatureMask.size() != source.Mesh.EdgesSize() ||
+            softFeatureConfidence.size() != source.Mesh.EdgesSize() ||
+            edgeBoundaryRoles.size() != source.Mesh.EdgesSize() ||
+            featurePatchColors.size() != source.Mesh.EdgesSize())
         {
             result.Status =
                 EditorCommandStatus::GeometryProcessingFailed;
@@ -10333,6 +10599,10 @@ ApplyEditorMeshCurvatureCommand(
         after.HadRegionColor = true;
         after.HadBoundary = true;
         after.HadBoundaryColor = true;
+        after.HadHardFeature = true;
+        after.HadSoftFeatureConfidence = true;
+        after.HadBoundaryRole = true;
+        after.HadFeaturePatchColor = true;
         after.Components.assign(
             source.FaceSlotCount, CurvSeg::kInvalidLabel);
         after.Regions.assign(
@@ -10341,6 +10611,12 @@ ApplyEditorMeshCurvatureCommand(
             source.FaceSlotCount, glm::vec4{0.0f});
         after.Boundaries.assign(source.EdgeSlotCount, false);
         after.BoundaryColors.assign(
+            source.EdgeSlotCount, glm::vec4{0.0f});
+        after.HardFeatures.assign(source.EdgeSlotCount, false);
+        after.SoftFeatureConfidences.assign(
+            source.EdgeSlotCount, 0.0);
+        after.BoundaryRoles.assign(source.EdgeSlotCount, 0u);
+        after.FeaturePatchColors.assign(
             source.EdgeSlotCount, glm::vec4{0.0f});
 
         for (std::size_t meshFace = 0u;
@@ -10359,11 +10635,11 @@ ApplyEditorMeshCurvatureCommand(
                 return result;
             }
             after.Components[sourceFace] =
-                segmented.FaceComponents[meshFace];
+                faceComponents[meshFace];
             after.Regions[sourceFace] =
-                segmented.FaceRegions[meshFace];
+                faceRegions[meshFace];
             after.RegionColors[sourceFace] =
-                segmented.FaceRegionColors[meshFace];
+                faceRegionColors[meshFace];
         }
         for (std::size_t meshEdge = 0u;
              meshEdge < source.SourceEdgeForMeshEdge.size();
@@ -10383,9 +10659,17 @@ ApplyEditorMeshCurvatureCommand(
                 return result;
             }
             after.Boundaries[sourceEdge] =
-                segmented.EdgeBoundaries[meshEdge] != 0u;
+                edgeBoundaries[meshEdge] != 0u;
             after.BoundaryColors[sourceEdge] =
-                segmented.EdgeBoundaryColors[meshEdge];
+                edgeBoundaryColors[meshEdge];
+            after.HardFeatures[sourceEdge] =
+                hardFeatureMask[meshEdge] != 0u;
+            after.SoftFeatureConfidences[sourceEdge] =
+                softFeatureConfidence[meshEdge];
+            after.BoundaryRoles[sourceEdge] =
+                edgeBoundaryRoles[meshEdge];
+            after.FeaturePatchColors[sourceEdge] =
+                featurePatchColors[meshEdge];
         }
 
         result.ChangedValueCount =
@@ -10419,7 +10703,9 @@ ApplyEditorMeshCurvatureCommand(
 
         result.Status = EditorCommandStatus::Applied;
         result.Error = Core::ErrorCode::Success;
-        result.Message = "Curvature segmentation published ";
+        result.Message = DebugNameForCurvatureSegmentationMethod(
+            result.ActualMethod);
+        result.Message += " published ";
         result.Message += std::to_string(
             result.Diagnostics.ConnectedRegionCount);
         result.Message += " connected regions and ";
@@ -10428,7 +10714,28 @@ ApplyEditorMeshCurvatureCommand(
         result.Message += " internal boundary edges (GMM components=";
         result.Message += std::to_string(
             result.Diagnostics.SelectedComponentCount);
-        result.Message += ").";
+        result.Message += ")";
+        if (result.PatchDiagnostics.has_value() &&
+            result.FeatureDiagnostics.has_value())
+        {
+            result.Message += "; features=";
+            result.Message += std::to_string(
+                result.FeatureDiagnostics->HardFeatureEdgeCount);
+            result.Message += " hard + ";
+            result.Message += std::to_string(
+                result.FeatureDiagnostics->RetainedSoftEdgeCount);
+            result.Message += " soft, boundary roles=";
+            result.Message += std::to_string(
+                result.PatchDiagnostics->HardBoundaryEdgeCount);
+            result.Message += "/";
+            result.Message += std::to_string(
+                result.PatchDiagnostics->SoftBoundaryEdgeCount);
+            result.Message += "/";
+            result.Message += std::to_string(
+                result.PatchDiagnostics->ClosureBoundaryEdgeCount);
+            result.Message += " hard/soft/closure";
+        }
+        result.Message += ".";
         InvalidateSelectedModelCache(context);
         return result;
     }

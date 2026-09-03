@@ -190,6 +190,8 @@ namespace Extrinsic::Runtime
             std::optional<Graphics::GeometryResidencyKey> ProceduralKey{};
             Graphics::GpuGeometryHandle MeshGeometry{};
             RenderExtractionGeometrySourceRevisions MeshSourceRevisions{};
+            std::vector<std::uint32_t> MeshSourceVertexForGpuVertex{};
+            std::uint64_t MeshVertexRemapRevision{0u};
             Graphics::GpuGeometryHandle GraphGeometry{};
             RenderExtractionGeometrySourceRevisions GraphSourceRevisions{};
             bool GraphPackedLines{false};
@@ -298,7 +300,9 @@ namespace Extrinsic::Runtime
         void AppendVisualizationRecipe(
             const GeometryEntityAvailability& availability,
             const VisualizationRecipe& recipe,
-            RuntimeRenderExtractionStats& stats);
+            RuntimeRenderExtractionStats& stats,
+            std::span<const std::uint32_t> surfaceVertexRemap = {},
+            std::uint64_t surfaceVertexRemapRevision = 0u);
         void ExtractLightsForEntity(
             entt::registry& registry,
             entt::entity entity,

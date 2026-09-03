@@ -585,6 +585,8 @@ TEST(SandboxConfigSections,
         Runtime::RuntimeConfigControlSource::Programmatic,
     };
     Runtime::CurvatureSegmentationConfig requested{};
+    requested.Method =
+        Runtime::CurvatureSegmentationMethod::FeatureAlignedPatches;
     requested.SelectionMode =
         Runtime::CurvatureSegmentationSelectionMode::Automatic;
     requested.FixedComponentCount = 5u;
@@ -600,6 +602,9 @@ TEST(SandboxConfigSections,
     requested.FeatureSensitivity = 8.0;
     requested.MaxSpatialIterations = 19u;
     requested.MinimumRegionFaces = 3u;
+    requested.FeatureBaseRadiusRatio = 0.035;
+    requested.HardDihedralThresholdDegrees = 52.0;
+    requested.PatchComplexityCost = 0.625;
     ASSERT_TRUE(Runtime::IsValidCurvatureSegmentationConfig(requested));
 
     std::optional<std::string> referenceSerialized{};
@@ -626,6 +631,7 @@ TEST(SandboxConfigSections,
         const auto active = Runtime::GetCurvatureSegmentationConfig(
             control.GetEngineConfigControlState().ActiveConfig);
         ASSERT_TRUE(active.has_value());
+        EXPECT_EQ(active->Method, requested.Method);
         EXPECT_EQ(active->SelectionMode, requested.SelectionMode);
         EXPECT_EQ(active->FixedComponentCount,
                   requested.FixedComponentCount);
@@ -650,6 +656,12 @@ TEST(SandboxConfigSections,
                   requested.MaxSpatialIterations);
         EXPECT_EQ(active->MinimumRegionFaces,
                   requested.MinimumRegionFaces);
+        EXPECT_DOUBLE_EQ(active->FeatureBaseRadiusRatio,
+                         requested.FeatureBaseRadiusRatio);
+        EXPECT_DOUBLE_EQ(active->HardDihedralThresholdDegrees,
+                         requested.HardDihedralThresholdDegrees);
+        EXPECT_DOUBLE_EQ(active->PatchComplexityCost,
+                         requested.PatchComplexityCost);
 
         const std::string serialized = CoreConfig::SerializeEngineConfig(
             control.GetEngineConfigControlState().ActiveConfig);
@@ -668,13 +680,26 @@ TEST(SandboxConfigSections,
         harness.Control().GetEngineConfigControlState().ActiveConfig);
     ASSERT_TRUE(defaults.has_value());
     EXPECT_TRUE(Runtime::IsValidCurvatureSegmentationConfig(*defaults));
+    EXPECT_EQ(defaults->Method,
+              Runtime::CurvatureSegmentationMethod::CurvatureGmm);
     EXPECT_EQ(defaults->SelectionMode,
               Runtime::CurvatureSegmentationSelectionMode::Automatic);
+    EXPECT_EQ(defaults->FixedComponentCount, 6u);
+    EXPECT_DOUBLE_EQ(defaults->FeatureBaseRadiusRatio, 0.02);
+    EXPECT_DOUBLE_EQ(defaults->HardDihedralThresholdDegrees, 45.0);
+    EXPECT_DOUBLE_EQ(defaults->PatchComplexityCost, 0.5);
 
     Runtime::CurvatureSegmentationConfig invalid = *defaults;
     invalid.AutomaticMinComponents = 8u;
     invalid.AutomaticMaxComponents = 2u;
     EXPECT_FALSE(Runtime::IsValidCurvatureSegmentationConfig(invalid));
+
+    invalid = *defaults;
+    invalid.PatchComplexityCost = 1.0e13;
+    EXPECT_FALSE(Runtime::IsValidCurvatureSegmentationConfig(invalid));
+
+    invalid.AutomaticMinComponents = 8u;
+    invalid.AutomaticMaxComponents = 2u;
 
     CoreConfig::EngineConfig candidate =
         harness.Control().GetEngineConfigControlState().ActiveConfig;

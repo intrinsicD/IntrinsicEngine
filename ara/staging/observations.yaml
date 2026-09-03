@@ -3015,3 +3015,44 @@ observations:
     promoted_to: "logic/claims.md:C54"
     crystallized_via: artifact-commitment
     stale: false
+  - id: O166
+    timestamp: "2026-09-03T16:18+02:00"
+    provenance: ai-executed
+    content: >
+      Intrinsic's corrected one-ring, unsmoothed curvature path matches
+      Framework24 revision 6dd50a82's sequential default on every one of the
+      3,669 sculpt vertices, with maximum absolute scalar errors of
+      5.440092820663267e-14 for kmin and 8.237854842718662e-14 for kmax.
+    context: >
+      Framework24 revision 6dd50a82 corrected the mixed Voronoi area, hinge
+      sign, and default support/smoothing parameters after the historical C53
+      comparison. The rerun used identical coordinates and a dirty BUG-163
+      worktree, so it is a local candidate rather than claim-eligible evidence;
+      BENCH-001 still owns clean frozen comparison custody.
+    potential_type: claim
+    bound_to: [N453]
+    promoted: true
+    promoted_to: "logic/claims.md:C55"
+    crystallized_via: artifact-commitment
+    stale: false
+  - id: O167
+    timestamp: "2026-09-03T16:18+02:00"
+    provenance: ai-executed
+    content: >
+      The bounded METHOD-039 sculpt profile publishes eight connected parts and
+      620 feature-supported final boundaries, while Runtime expands the 3,669
+      canonical vertex scalar values through the 17,795-entry corner-seam GPU
+      map before Vulkan surface shading.
+    context: >
+      Exact CPU regressions cover region connectivity, boundary roles,
+      transactional publication, UI wiring, and a six-entry seam split. A named
+      promoted-Vulkan scalar readback actually executed, and both Framework24
+      and Sandbox were inspected under an isolated Xephyr display without host
+      input grabs. This is local Operational evidence, not semantic-part,
+      accepted-v2, corpus, performance, or GPU-method evidence.
+    potential_type: claim
+    bound_to: [N454]
+    promoted: true
+    promoted_to: "logic/claims.md:C56"
+    crystallized_via: artifact-commitment
+    stale: false

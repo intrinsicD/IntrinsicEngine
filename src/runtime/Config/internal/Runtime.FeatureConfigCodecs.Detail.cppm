@@ -22,6 +22,7 @@ export namespace Extrinsic::Runtime::FeatureConfigDetail
 {
     using Runtime::ClusteringConfig;
     using Runtime::CurvatureSegmentationConfig;
+    using Runtime::CurvatureSegmentationMethod;
     using Runtime::CurvatureSegmentationSelectionMode;
     using Runtime::KMeansPropertyRefs;
     using Runtime::ParameterizationBffBoundaryMode;

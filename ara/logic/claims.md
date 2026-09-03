@@ -1350,9 +1350,10 @@
   step.
 - **Status**: refuted — bounded serial CPU unit/contract evidence only; the
   perturbed run exceeds the preregistered area-weighted VI limit of `0.01`
-  despite exact full-energy checks after every accepted move, so no v2
-  selector, runtime/config/UI/property adoption, performance, parameterization,
-  GPU/Vulkan, or novelty claim is made
+  despite exact full-energy checks after every accepted move, so it did not
+  justify a v2 or production selector. C56's later explicitly diagnostic
+  sculpt visualization does not overturn this corpus-wide negative result or
+  make a performance, parameterization, GPU-method, or novelty claim
 - **Provenance**: ai-executed
 - **Crystallized via**: artifact-commitment
 - **Falsification criteria**: The unchanged local formulation, frozen params,
@@ -1440,11 +1441,13 @@
   ill-conditioned faces are instead diagnosed and excluded from estimator and
   smoothing support, so runtime can report finite support/nonzero/range/quality
   diagnostics and reject a field with zero estimable support.
-- **Status**: superseded by C53 (2026-08-12, reopened BUG-156) — the shipped
-  path now targets Framework24 rather than PMP. Framework24 uses a different
+- **Status**: superseded by C53 (2026-08-12, reopened BUG-156), then C55
+  (2026-09-03, current Framework24 revision) — the shipped path targets
+  Framework24 rather than PMP. The historical C53 source used a different
   sign/area convention, direct boundary tensors, direct eigenvector pairing,
-  and in-place full-neighbor smoothing. Scale-independent quality gating and
-  finite zero-support handling remain deliberate Intrinsic extensions.
+  and in-place full-neighbor smoothing; C55 records the corrected current
+  reference. Scale-independent quality gating and finite zero-support handling
+  remain deliberate Intrinsic extensions.
   Historical support: 25-slot
   PMP numeric oracle, analytic/scale/degeneracy CPU contracts, runtime
   diagnostics, sanitizer evidence, and a non-claim local differential that
@@ -1459,7 +1462,7 @@
   position scale changes normalized curvature beyond the declared tolerance,
   rejected geometry enters an active smoothing row, non-finite outputs publish,
   or zero-support runtime work reports an informative success. The current
-  Framework24 path is assessed by C53 instead.
+  Framework24 path is assessed by C55 instead.
 - **Proof**: [0f133014027e413ab100fd057c51dbaf2f10460e,
   tasks/done/BUG-154-curvature-pmp-parity-corner-normal-topology.md,
   tools/diagnostics/curvature/compare_curvature_corpus.py,
@@ -1513,11 +1516,12 @@
   up to 79%, and matches an independent NumPy oracle of the formulation to
   3e-16 on the frozen fixture. Both corrected parameters remain expressible
   in PMP's API (`two_ring_neighborhood = false`, zero smoothing steps).
-- **Status**: superseded by C53 (2026-08-12, reopened BUG-156) — the evidence
-  remains a bounded comparison against Meyer mean curvature, but the reporter
-  selected Framework24 interoperability over that estimator choice. Its
-  one-ring oracle, crease-retention, and sculpt/Meyer assertions were removed
-  from the shipped regression surface rather than weakened.
+- **Status**: superseded as a current parity claim by C53 (2026-08-12), then
+  C55 (2026-09-03, current Framework24 revision) — the historical percentages
+  remain only a bounded Meyer comparison. C55 independently records the
+  corrected reference parity; BUG-163 restores qualitative one-ring
+  no-zero-band and crease-retention regressions without promoting the old
+  percentages or estimator-quality conclusion.
 - **Provenance**: ai-suggested
 - **Crystallized via**: artifact-commitment
 - **Falsification criteria**: Re-running the historical one-ring/no-smoothing
@@ -1525,7 +1529,7 @@
   any zero-band/sign-flipped vertex under its recorded thresholds, below-30%
   crease-flank retention, or a deviation above `1e-12` from its independent
   NumPy formulation. Those historical predicates are no longer current
-  product acceptance; current Framework24 parity is assessed by C53.
+  product acceptance; current Framework24 parity is assessed by C55.
 - **Proof**: [a411a613fd1434d56bc426e8bb476a4652ad2401,
   723d65684007fb26df5ced67d83155b0a9ade3ae,
   tests/data/sculpt.obj,
@@ -1568,11 +1572,12 @@
   then-current one-ring Intrinsic field on `tests/data/sculpt.obj`; the measured
   mean-curvature transform had `9.67e-7` median absolute error and `0.999034`
   correlation.
-- **Status**: superseded as current-product evidence by C53 — the historical
+- **Status**: superseded as current-product evidence by C55 — the historical
   source-level formula audit and 3,669-slot isolated Xephyr differential remain
-  supported, but BUG-156 replaced the one-ring Intrinsic field with a direct
-  deterministic Framework24-compatible port; no general BCG/PMP
-  implementation-equivalence claim
+  supported. BUG-156 replaced that one-ring Intrinsic field with the prior
+  deterministic Framework24-compatible port; BUG-163 then follows the
+  corrected current Framework24 revision. No general BCG/PMP implementation-
+  equivalence claim is made
 - **Provenance**: ai-suggested
 - **Crystallized via**: artifact-commitment
 - **Falsification criteria**: Correcting only framework24's acute cotangent
@@ -1580,8 +1585,7 @@
   remove the predicted matched-support transform, or an independently
   exported same-vertex field does not reproduce the recorded correlations.
 - **Proof**: [ara/evidence/tables/eig3x3_live_curvature_diagnostic_2026-08-12.md,
-  experimental/framework24/lib_bcg_framework/src/bcg_mesh_vertex_voronoi_area.cpp,
-  experimental/framework24/lib_bcg_framework/src/bcg_mesh_curvature_taubin.cpp,
+  1f5a813b799f1db7b7725ef5043e8d1e82b10a24,
   src/geometry/Geometry.HalfedgeMesh.Utils.cpp,
   tests/data/sculpt.obj]
 - **Dependencies**: [C50]
@@ -1599,8 +1603,10 @@
   stable-index in-place full-neighbor smoothing passes. `H` and `K` are derived
   from the final principal values. Intrinsic retains scale-independent quality
   diagnostics and finite zero sentinels outside that valid parity domain.
-- **Status**: hypothesis — supported only by local CPU development evidence and
-  not claim-eligible. `BENCH-001` owns the frozen clean-source protocol, run
+- **Status**: superseded by C55 after Framework24 revision `6dd50a82` corrected
+  its mixed area, sign, default support, and smoothing parameters. This remains
+  the bounded historical result for the prior Framework24 source and is not
+  claim-eligible. `BENCH-001` owns the frozen clean-source protocol, run
   custody, portable bundle, exact-revision review, and independent audit
   needed to promote or refute it. The dirty-worktree differential covered
   three bounded fixtures and the full 3,669-vertex sculpt asset; maximum
@@ -1663,3 +1669,77 @@
 - **Tags**: geometry, curvature segmentation, CPU, feature evidence, seed
   stability, negative result, sparse health, bounded result
 - **From staging**: O165
+
+## C55: Current Framework24 default principal-curvature parity candidate
+- **Statement**: On identical finite, well-conditioned triangle coordinates,
+  Intrinsic's principal-curvature path is a deterministic port of Framework24
+  revision `6dd50a8289c64b5054bc9601beb5647f459d7969` using
+  `CurvatureTaubin(mesh, 0, false, Policy::Sequential)`: corrected Meyer mixed
+  areas, the `[-19.1, 19.1]` cotan clamp, corrected signed hinge, one-ring
+  support, direct open-boundary evaluation, smallest-absolute normal-mode
+  selection, direct value/eigenvector pairing, and no implicit scalar or
+  direction smoothing. `H` and `K` derive from the final principal values;
+  Intrinsic retains finite fail-closed diagnostics outside the parity domain.
+- **Status**: hypothesis — local, dirty-source CPU development evidence only,
+  not claim-eligible. The full 3,669-vertex `sculpt.obj` differential measured
+  maximum absolute errors of `5.440092820663267e-14` (`kmin`) and
+  `8.237854842718662e-14` (`kmax`), with exact input positions and scalar hash
+  `0xfc090818c136a6e2`. BENCH-001 still owns the clean frozen rerun, matched
+  product protocol, custody, and independent audit. No loader-equivalence,
+  repeated-eigenspace direction, universal-accuracy, or performance claim is
+  made.
+- **Provenance**: ai-executed
+- **Crystallized via**: artifact-commitment
+- **Falsification criteria**: Any unchanged acute, obtuse, open, analytic, or
+  sculpt reference differs from the actual sequential Framework24 revision by
+  more than `2e-12` in a principal scalar; the sculpt scalar hash differs from
+  `0xfc090818c136a6e2`; repeated Intrinsic runs differ; principal H/K invariants
+  or inverse-length scale behavior diverge; or unsupported geometry publishes
+  non-finite values.
+- **Proof**: [N453,
+  ara/evidence/tables/curvature_framework24_current_parity_2026-09-03.md,
+  tests/unit/geometry/Test.CurvatureTensor.cpp,
+  tools/diagnostics/curvature/Framework24CurvatureParityProbe.cpp,
+  tests/data/sculpt.obj,
+  tasks/active/BUG-163-sculpt-curvature-feature-patch-rendering.md]
+- **Dependencies**: [C52, C53]
+- **Tags**: geometry, principal curvature, Framework24, CPU, current revision,
+  parity candidate, deterministic, BUG-163
+- **From staging**: O166
+
+## C56: Sculpt feature-patch visualization is operational on the local Vulkan path
+- **Statement**: For the exact checked-in `sculpt.obj`, the explicit
+  METHOD-039 diagnostic profile with six fixed mixture components and patch
+  complexity cost `0.5` publishes eight deterministic connected face regions,
+  includes all 384 hard feature edges among 620 final boundaries, assigns every
+  final boundary a hard or soft-supported role, and colors only final boundary
+  edges. Runtime publishes the part and edge properties transactionally, the
+  Sandbox activates the chosen scalar or part/boundary views, and CPU-backed
+  vertex properties are expanded through the mesh's corner-seam GPU split
+  before surface shading.
+- **Status**: supported — bounded local Operational evidence from current
+  Clang-23 CPU regressions, an actually executed promoted-Vulkan scalar-field
+  readback, and isolated Xephyr live inspection of the exact sculpt asset. This
+  is not claim-eligible proof of semantic object parts, corpus-wide seed
+  stability, METHOD-039 v2/default adoption, atlas seams, a GPU method backend,
+  Framework24 product convergence, or performance.
+- **Provenance**: ai-executed
+- **Crystallized via**: artifact-commitment
+- **Falsification criteria**: The sculpt regression changes its eight-part
+  count or boundary mask under the recorded one-dual-step seed perturbation;
+  any hard feature is not a final boundary; an unsupported closure or colored
+  non-boundary appears; runtime requested/actual identities or transactional
+  properties diverge; the six-GPU-vertex corner-split regression does not upload
+  `[2,3,1,3,4,1]`; or the named promoted-Vulkan readback skips, falls back, or
+  fails on the recorded capable host.
+- **Proof**: [N454,
+  tests/unit/geometry/Test.CurvatureTensor.cpp,
+  tests/contract/runtime/Test.CurvatureSegmentationOperations.cpp,
+  tests/integration/runtime/Test.RuntimeRenderExtraction.cpp,
+  tests/integration/runtime/Test.SandboxCurvatureSegmentationPanel.cpp,
+  src/runtime/Rendering/Runtime.RenderExtraction.Recipes.cpp,
+  tasks/active/BUG-163-sculpt-curvature-feature-patch-rendering.md]
+- **Dependencies**: [C44, C45, C54, C55, A44]
+- **Tags**: geometry, curvature segmentation, runtime publication, Vulkan,
+  Xephyr, corner seams, local operational evidence, BUG-163
+- **From staging**: O167

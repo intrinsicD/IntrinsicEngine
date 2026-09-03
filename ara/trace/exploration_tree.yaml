@@ -10572,3 +10572,49 @@ tree:
       below its 19,257,728-entry bound. All rows are sealed clean-source but
       non-claim-eligible, and no speed, scaling, or adoption conclusion follows.
     status: resolved
+  - id: N453
+    type: experiment
+    title: "Recompute current Framework24 curvature parity on sculpt"
+    provenance: ai-executed
+    timestamp: "2026-09-03T16:18+02:00"
+    also_depends_on: [N439]
+    evidence:
+      - "ara/evidence/tables/curvature_framework24_current_parity_2026-09-03.md"
+      - "tests/unit/geometry/Test.CurvatureTensor.cpp"
+      - "tools/diagnostics/curvature/Framework24CurvatureParityProbe.cpp"
+      - "tests/data/sculpt.obj"
+      - "Framework24 6dd50a82 CurvatureTaubin(mesh, 0, false, Policy::Sequential) probe"
+      - "IntrinsicCurvatureCorpusProbe ICURV002 payload and independent parser"
+    result: >
+      Identical input positions produced 3,669 supported and nonzero vertices.
+      Independently recalculated maximum absolute errors were
+      5.440092820663267e-14 for kmin and 8.237854842718662e-14 for kmax;
+      sign-invariant float-publication direction errors stayed below 2.981e-8,
+      and the 1e-5-quantized scalar hash was 0xfc090818c136a6e2. The dirty
+      worktree makes this a candidate observation; no timing was interpreted.
+    status: resolved
+  - id: N454
+    type: experiment
+    title: "Exercise sculpt curvature and METHOD-039 through isolated Vulkan Sandbox"
+    provenance: ai-executed
+    timestamp: "2026-09-03T16:18+02:00"
+    also_depends_on: [N452, N453]
+    evidence:
+      - "tasks/active/BUG-163-sculpt-curvature-feature-patch-rendering.md"
+      - "tests/unit/geometry/Test.CurvatureTensor.cpp"
+      - "tests/contract/runtime/Test.CurvatureSegmentationOperations.cpp"
+      - "tests/integration/runtime/Test.RuntimeRenderExtraction.cpp"
+      - "tests/integration/runtime/Test.SandboxCurvatureSegmentationPanel.cpp"
+      - "RuntimeSandboxAcceptanceGpuSmoke.ReferenceTriangleScalarFieldSurfaceAndIsolinesResolveOnGpu"
+      - "Xephyr :97 with -no-host-grab"
+    result: >
+      The exact sculpt source imported as 3,669 canonical vertices and 7,342
+      faces, with corner attributes producing 17,795 GPU vertices. After
+      source-vertex remapping, the selected minimum-principal field rendered
+      with the same visible structure as the Framework24 reference. The fixed-6,
+      complexity-0.5 METHOD-039 diagnostic produced eight connected regions,
+      384 hard plus 236 soft-supported final boundaries, zero closure
+      boundaries, and identical masks under the recorded seed perturbation.
+      The named promoted-Vulkan readback executed and passed; the live apps ran
+      on isolated display :97 without host input grabs.
+    status: resolved

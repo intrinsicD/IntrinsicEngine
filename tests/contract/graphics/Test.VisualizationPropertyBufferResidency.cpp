@@ -134,6 +134,27 @@ TEST(VisualizationPropertyBufferResidencyContract, UploadsReusesAndRejectsStaleD
     EXPECT_EQ(diagnostics.StaleDirtyStampCount, 1u);
     EXPECT_TRUE(diagnostics.HasErrors);
 
+    Graphics::VisualizationPropertyBufferUploadDescriptor relaid = descriptor;
+    relaid.SourceLayoutStamp = 2u;
+    diagnostics = residency.Update(
+        std::span<const Graphics::VisualizationPropertyBufferUploadDescriptor>{
+            &relaid, 1u});
+
+    EXPECT_EQ(diagnostics.UploadedBufferCount, 1u);
+    EXPECT_EQ(diagnostics.ReusedBufferCount, 0u);
+    EXPECT_EQ(device.CreateBufferCount, 1);
+    EXPECT_EQ(device.BufferWrites.size(), 2u);
+    address = residency.Find("curvature");
+    ASSERT_NE(address, nullptr);
+    EXPECT_EQ(address->SourceKey, "curvature");
+    EXPECT_EQ(address->SourceLayoutStamp, 2u);
+
+    diagnostics = residency.Update(
+        std::span<const Graphics::VisualizationPropertyBufferUploadDescriptor>{
+            &relaid, 1u});
+    EXPECT_EQ(diagnostics.UploadedBufferCount, 0u);
+    EXPECT_EQ(diagnostics.ReusedBufferCount, 1u);
+
     residency.Clear();
     EXPECT_EQ(device.DestroyBufferCount, 1);
 }

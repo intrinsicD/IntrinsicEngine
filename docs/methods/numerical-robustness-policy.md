@@ -21,8 +21,9 @@ Results must report:
 ## Worked example: deterministic Framework24 curvature compatibility
 
 `Geometry::Curvature::ComputeCurvatureTensor` is a deterministic numerical port
-of Framework24 `CurvatureTaubin(mesh, 3, true, Policy::Sequential)`. The name is
-the compatibility target; it does not reclassify the edge-dihedral tensor as
+of Framework24 revision `6dd50a82`'s default
+`CurvatureTaubin(mesh, 0, false, Policy::Sequential)`. The name is the
+compatibility target; it does not reclassify the edge-dihedral tensor as
 Taubin's 1995 vertex-neighbour directional-curvature quadrature. For every
 finite interior edge it precomputes
 
@@ -30,40 +31,34 @@ finite interior edge it precomputes
 M_e = beta_e (|e| / 2) t_e t_eᵀ
 ```
 
-Here `beta_e` is Framework24's signed dihedral between the edge's two oriented
-face normals and `t_e` is the unit edge tangent. Each center collects itself and
-its adjacent vertices, then sums every incident hinge and Framework24 legacy
-mixed area over that support. This is the reference's two-ring hinge support;
-open-boundary centers use the same direct tensor evaluation as interior centers.
+Here `beta_e` is Framework24's corrected signed dihedral between the edge's two
+oriented face normals and `t_e` is the unit edge tangent. Each center sums its
+own incident hinges and divides by its own corrected mixed Voronoi area. This is
+the reference's one-ring support; open-boundary centers use the same direct
+tensor evaluation as interior centers.
 
 Eigen's symmetric self-adjoint solver discards the eigenvalue with smallest
 absolute magnitude as the tensor-normal mode. The two remaining algebraically
 ordered values pair directly with their tensor eigenvectors. Framework24's
-sign, legacy acute/obtuse area coefficients, `[-19.1, 19.1]` cotan clamp, and
-direct value/direction pairing remain part of the compatibility contract.
-
-The minimum and maximum principal scalars then receive three nonnegative-cotan
-full-neighbour replacement passes. Updates are intentionally in-place in stable
-vertex-index order: this preserves `Policy::Sequential` while avoiding the
-default `ParallelUnsequential` shared-array race. The replacement has no retained
-self-weight, directions are not smoothed, and parity fixtures use Framework24's
-fresh/default all-false `v_feature` mask. The Intrinsic public operation has no
-private feature-mask input. Mean and Gaussian curvature in `ComputeCurvature`
-are derived from the final principal values, never from a second estimator; the
+corrected sign, Meyer acute/obtuse area coefficients, `[-19.1, 19.1]` cotan
+clamp, and direct value/direction pairing remain part of the compatibility
+contract. The default zero smoothing-step count publishes principal scalars
+and directions directly. Mean and Gaussian curvature in `ComputeCurvature` are
+derived from those principal values, never from a second estimator; the
 standalone Meyer mean/Gaussian functions remain separate explicit operators.
 
 Fail-closed policy, never emitting NaN/Inf and never firing an assert:
 
 - Boundary edges have no dihedral contribution, but supported boundary centers
-  are evaluated directly from their available two-ring tensor support.
+  are evaluated directly from their available one-ring tensor support.
 - Triangle quality is the scale-independent ratio `2A/l_max^2`. The `3.5e-4`
   floor is the conservatively rounded square root of machine epsilon for the
   public float-position storage; below it, inverse-area terms amplify position
   roundoff beyond the same square-root-epsilon budget. Degenerate, non-finite,
   non-triangular, or quality-at/below that floor support invalidates
-  every tensor center that consumes it. Those centers retain finite zero scalar
-  and direction sentinels and are excluded from smoothing rows and neighbour
-  support, so an unreliable spike cannot diffuse into the supported field.
+  every incident tensor center that consumes it. Those centers retain finite
+  zero scalar and direction sentinels, so unreliable geometry cannot publish a
+  non-finite field.
 - A valid flat neighbourhood is supported and remains exactly zero.
 - Zero-length edges and invalid/non-finite face normals are skipped.
 - Empty meshes and meshes with no faces → `nullopt`.

@@ -1674,3 +1674,12 @@ entries:
       - "Recorded the rejected external push as a session open thread rather than an experiment result; remote equality was not attested and BUG-162 must not retire until an authorized push plus fresh fetch succeeds."
       - "Kept BUG-155's missing completion report as a separate workflow-evidence defect and did not reconstruct unrelated GPU custody inside this review-rebinding slice."
       - "Did not promote or stale O161-O164: this turn is unrelated to Core.Dag and supplies no closure signal for those proposals."
+  - turn: "2026-09-03_001#2"
+    notes:
+      - "Routed the current Framework24 revision differential as experiment N453 and the isolated end-to-end sculpt workflow as experiment N454."
+      - "Superseded C53 rather than rewriting its historical two-ring result; O166/C55 record the corrected 6dd50a82 default as a dirty-source parity candidate and leave clean comparison custody with BENCH-001."
+      - "Crystallized O167/C56 only as bounded local Operational evidence: exact sculpt CPU contracts, transactional runtime/UI wiring, an actually executed promoted-Vulkan readback, and isolated Xephyr inspection."
+      - "Preserved METHOD-039's C45/C54 negative corpus verdict and METHOD-037 production default; eight sculpt parts do not imply semantic decomposition or accepted-v2 status."
+      - "Recorded CPU, live-app, and Vulkan evidence as distinct classes and made no timing, performance, atlas, GPU-method, or product-convergence claim."
+      - "The renderer diagnosis identified canonical-to-corner-split vertex indexing as the visible scalar defect; the repair remaps only CPU-backed mesh-surface vertex properties and leaves edge/point lanes canonical."
+      - "Did not promote or stale O161-O164: this turn is unrelated to Core.Dag and supplies no closure signal for those proposals."

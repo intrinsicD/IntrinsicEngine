@@ -79,15 +79,18 @@ command surface. Existing mesh, graph, and point-cloud `Vertices` are the input;
 the config contains no surface-generation or domain-conversion controls. The
 block has no renderer side effects and no direct RHI/device traffic.
 
-The `sandbox.curvature_segmentation` payload carries Fixed or Automatic
-component selection plus the complete deterministic GMM, model-selection,
-spatial-regularization, feature-sensitivity, and small-region controls. The
-configured geometry operation reads this same live record and runs the CPU
-reference on a detached selected-mesh snapshot. On successful stale-checked
-commit it publishes component/connected-region labels and region/boundary
-colors to the existing face/edge property sources, marks geometry GPU-dirty,
-and records undo/redo state. Applying the config alone has no geometry or
-renderer side effect.
+The `sandbox.curvature_segmentation` payload carries a method token plus Fixed
+or Automatic component selection and the deterministic GMM controls.
+`curvature_gmm` remains the production default and uses the existing spatial,
+feature-sensitivity, and small-region values. Explicit diagnostic
+`feature_aligned_patches` uses the feature-radius, hard-dihedral, and patch-
+complexity values while retaining METHOD-039's negative global stability
+verdict. The configured geometry operation reads this same live record and
+runs the selected CPU function on a detached selected-mesh snapshot. On
+successful stale-checked commit it publishes component/connected-region
+labels, feature evidence, boundary roles, and face/edge colors, marks geometry
+GPU-dirty, and records undo/redo state. Applying the config alone has no
+geometry or renderer side effect.
 
 The `sandbox.parameterization` payload carries one of the implemented CPU strategy
 tokens (`lscm`, `harmonic_cotangent`, `tutte_uniform`, or `bff`) and the typed

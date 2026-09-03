@@ -138,6 +138,9 @@ TEST(SandboxCurvatureSegmentationPanel,
                   "CurvatureSegmentationSelectionMode::Automatic"),
               std::string::npos);
     EXPECT_NE(source.find(
+                  "CurvatureSegmentationMethod::FeatureAlignedPatches"),
+              std::string::npos);
+    EXPECT_NE(source.find(
                   "ApplyEditorCurvatureSegmentationConfig"),
               std::string::npos);
     EXPECT_NE(source.find(
@@ -185,10 +188,35 @@ TEST(SandboxCurvatureSegmentationPanel,
                   "EditorVisualizationPropertyDomain::MeshEdges"),
               std::string_view::npos);
     EXPECT_NE(visualization.find(
-                  "kCurvatureBoundaryColorProperty"),
+                  "kCurvatureFeaturePatchColorProperty"),
               std::string_view::npos);
     EXPECT_NE(source.find("f:curvature_region_color"),
               std::string::npos);
-    EXPECT_NE(source.find("e:curvature_region_boundary_color"),
+    EXPECT_NE(source.find("e:curvature_feature_patch_color"),
+              std::string::npos);
+
+    const std::size_t scalarBegin = source.find(
+        "ShowCurvatureScalarVisualization(");
+    ASSERT_NE(scalarBegin, std::string::npos);
+    EXPECT_NE(source.find(
+                  "EditorVisualizationPropertyDomain::MeshVertices",
+                  scalarBegin),
+              std::string::npos);
+    EXPECT_NE(source.find("v:mean_curvature"), std::string::npos);
+    EXPECT_NE(source.find("v:gaussian_curvature"), std::string::npos);
+    EXPECT_NE(source.find("v:min_principal_curvature"),
+              std::string::npos);
+    EXPECT_NE(source.find("v:max_principal_curvature"),
+              std::string::npos);
+    EXPECT_NE(source.find(
+                  "PendingCurvatureVisualizationStableEntityId"),
+              std::string::npos);
+    EXPECT_NE(source.find(
+                  "EditorCommandStatus::Pending",
+                  scalarBegin),
+              std::string::npos);
+    EXPECT_NE(source.find(
+                  "Scalar visualization:",
+                  scalarBegin),
               std::string::npos);
 }

@@ -46,6 +46,11 @@ namespace Extrinsic::Sandbox::Editor
                 Runtime::EditorMeshCurvatureOutput::Gaussian,
                 Runtime::EditorMeshCurvatureOutput::PrincipalDirections,
             }};
+        constexpr std::array<Runtime::CurvatureSegmentationMethod, 2>
+            kCurvatureSegmentationMethods{{
+                Runtime::CurvatureSegmentationMethod::FeatureAlignedPatches,
+                Runtime::CurvatureSegmentationMethod::CurvatureGmm,
+            }};
         constexpr std::array<
             Runtime::CurvatureSegmentationSelectionMode,
             2>
@@ -55,8 +60,22 @@ namespace Extrinsic::Sandbox::Editor
             }};
         constexpr std::string_view kCurvatureRegionColorProperty =
             "f:curvature_region_color";
-        constexpr std::string_view kCurvatureBoundaryColorProperty =
-            "e:curvature_region_boundary_color";
+        constexpr std::string_view kCurvatureFeaturePatchColorProperty =
+            "e:curvature_feature_patch_color";
+        constexpr std::array<std::string_view, 4>
+            kCurvatureScalarProperties{{
+                "v:mean_curvature",
+                "v:gaussian_curvature",
+                "v:min_principal_curvature",
+                "v:max_principal_curvature",
+            }};
+        constexpr std::array<const char*, 4>
+            kCurvatureScalarLabels{{
+                "Mean curvature",
+                "Gaussian curvature",
+                "Minimum principal curvature",
+                "Maximum principal curvature",
+            }};
         constexpr std::array<Runtime::EditorMeshRemeshMode, 2>
             kMeshRemeshModes{{
                 Runtime::EditorMeshRemeshMode::Uniform,
@@ -286,7 +305,43 @@ namespace Extrinsic::Sandbox::Editor
                     .Preset =
                         Runtime::EditorVisualizationPropertyPreset::ColorBuffer,
                     .PropertyName =
-                        std::string{kCurvatureBoundaryColorProperty},
+                        std::string{kCurvatureFeaturePatchColorProperty},
+                });
+        }
+
+        [[nodiscard]] Runtime::EditorCommandStatus
+        ShowCurvatureScalarVisualization(
+            const SandboxEditorContext& context,
+            const std::uint32_t stableEntityId,
+            const std::string_view propertyName)
+        {
+            using SurfaceDomain = decltype(
+                Runtime::EditorRenderHintModel{}.SurfaceDomainValue);
+            const Runtime::EditorCommandStatus renderHintStatus =
+                Runtime::ApplyEditorRenderHintCommand(
+                context.VisualizationCommands,
+                Runtime::EditorRenderHintCommand{
+                    .StableEntityId = stableEntityId,
+                    .SetSurface = true,
+                    .EnableSurface = true,
+                    .SurfaceDomain = static_cast<SurfaceDomain>(0),
+                });
+            if (renderHintStatus != Runtime::EditorCommandStatus::Applied &&
+                renderHintStatus != Runtime::EditorCommandStatus::NoChange)
+            {
+                return renderHintStatus;
+            }
+            return Runtime::ApplyEditorVisualizationPropertyCommand(
+                context.VisualizationCommands,
+                Runtime::EditorVisualizationPropertyCommand{
+                    .StableEntityId = stableEntityId,
+                    .Target = Runtime::EditorVisualizationTarget::Surface,
+                    .Domain =
+                        Runtime::EditorVisualizationPropertyDomain::MeshVertices,
+                    .Preset =
+                        Runtime::EditorVisualizationPropertyPreset::Scalar,
+                    .PropertyName = std::string{propertyName},
+                    .ScalarAutoRange = true,
                 });
         }
     }
@@ -309,6 +364,13 @@ namespace Extrinsic::Sandbox::Editor
             std::optional<Runtime::EditorMeshCurvatureResult> LastResult{};
             std::int32_t Output{0};
             bool PublishPrincipalDirections{true};
+            std::int32_t ScalarVisualization{0};
+            bool AutoVisualizeCurvature{true};
+            std::optional<std::uint32_t>
+                PendingCurvatureVisualizationStableEntityId{};
+            std::string PendingCurvatureVisualizationProperty{};
+            std::optional<Runtime::EditorCommandStatus>
+                LastCurvatureVisualizationStatus{};
             Runtime::CurvatureSegmentationConfig SegmentationConfig{};
             std::optional<Runtime::EditorCurvatureSegmentationResult>
                 LastSegmentationResult{};
@@ -524,6 +586,9 @@ namespace Extrinsic::Sandbox::Editor
         Curvature.LastSegmentationResult.reset();
         Curvature.LastSegmentationStableEntityId.reset();
         Curvature.LastSegmentationConfigApply.reset();
+        Curvature.PendingCurvatureVisualizationStableEntityId.reset();
+        Curvature.PendingCurvatureVisualizationProperty.clear();
+        Curvature.LastCurvatureVisualizationStatus.reset();
         Curvature.SegmentationConfigInitialized = false;
         Curvature.SegmentationConfigDirty = false;
         Remesh.LastResult.reset();
@@ -838,6 +903,29 @@ namespace Extrinsic::Sandbox::Editor
             model.Processing;
         if (context.GeometryResults.LastMeshCurvatureResult.has_value())
             Curvature.LastResult = *context.GeometryResults.LastMeshCurvatureResult;
+        // The interactive runtime executes curvature on the job lane, so the
+        // Compute command normally returns Pending before its properties exist.
+        // Complete the requested visualization when that terminal result is
+        // projected into a later prepared frame.
+        if (Curvature.PendingCurvatureVisualizationStableEntityId.has_value() &&
+            Curvature.LastResult.has_value() &&
+            Curvature.LastResult->Status !=
+                Runtime::EditorCommandStatus::Pending)
+        {
+            if (Curvature.LastResult->Status ==
+                    Runtime::EditorCommandStatus::Applied ||
+                Curvature.LastResult->Status ==
+                    Runtime::EditorCommandStatus::NoChange)
+            {
+                Curvature.LastCurvatureVisualizationStatus =
+                    ShowCurvatureScalarVisualization(
+                        context,
+                        *Curvature.PendingCurvatureVisualizationStableEntityId,
+                        Curvature.PendingCurvatureVisualizationProperty);
+            }
+            Curvature.PendingCurvatureVisualizationStableEntityId.reset();
+            Curvature.PendingCurvatureVisualizationProperty.clear();
+        }
         ImGui::SeparatorText("Curvature");
         if (!processing.MeshCurvatureAvailable)
         {
@@ -879,10 +967,40 @@ namespace Extrinsic::Sandbox::Editor
         if (!processing.MeshCurvatureDirectionsAvailable)
             ImGui::EndDisabled();
 
+        Curvature.ScalarVisualization = std::clamp(
+            Curvature.ScalarVisualization,
+            0,
+            static_cast<std::int32_t>(
+                kCurvatureScalarProperties.size() - 1u));
+        if (ImGui::BeginCombo(
+                "Display scalar##MeshCurvature",
+                kCurvatureScalarLabels[static_cast<std::size_t>(
+                    Curvature.ScalarVisualization)]))
+        {
+            for (std::size_t i = 0u;
+                 i < kCurvatureScalarProperties.size(); ++i)
+            {
+                const bool selected =
+                    Curvature.ScalarVisualization ==
+                    static_cast<std::int32_t>(i);
+                if (ImGui::Selectable(
+                        kCurvatureScalarLabels[i], selected))
+                {
+                    Curvature.ScalarVisualization =
+                        static_cast<std::int32_t>(i);
+                }
+                if (selected)
+                    ImGui::SetItemDefaultFocus();
+            }
+            ImGui::EndCombo();
+        }
+        (void)ImGui::Checkbox(
+            "Show scalar after compute##MeshCurvature",
+            &Curvature.AutoVisualizeCurvature);
+
         if (ImGui::Button("Compute##MeshCurvature"))
         {
-            PublishCommandResult(
-                Curvature.LastResult,
+            Runtime::EditorMeshCurvatureResult commandResult =
                 Runtime::ApplyEditorMeshCurvatureCommand(
                     context.GeometryCommands,
                     Runtime::EditorMeshCurvatureCommand{
@@ -890,7 +1008,39 @@ namespace Extrinsic::Sandbox::Editor
                         .Output = output,
                         .PublishPrincipalDirections =
                             Curvature.PublishPrincipalDirections,
-                    }),
+                    });
+            if (Curvature.AutoVisualizeCurvature)
+            {
+                const std::string_view property =
+                    kCurvatureScalarProperties[static_cast<std::size_t>(
+                        Curvature.ScalarVisualization)];
+                Curvature.LastCurvatureVisualizationStatus =
+                    ShowCurvatureScalarVisualization(
+                    context,
+                    model.SelectedStableId,
+                    property);
+                const Runtime::EditorCommandStatus visualizationStatus =
+                    *Curvature.LastCurvatureVisualizationStatus;
+                if (commandResult.Status ==
+                        Runtime::EditorCommandStatus::Pending &&
+                    visualizationStatus !=
+                        Runtime::EditorCommandStatus::Applied &&
+                    visualizationStatus !=
+                        Runtime::EditorCommandStatus::NoChange)
+                {
+                    Curvature.PendingCurvatureVisualizationStableEntityId =
+                        model.SelectedStableId;
+                    Curvature.PendingCurvatureVisualizationProperty = property;
+                }
+                else
+                {
+                    Curvature.PendingCurvatureVisualizationStableEntityId.reset();
+                    Curvature.PendingCurvatureVisualizationProperty.clear();
+                }
+            }
+            PublishCommandResult(
+                Curvature.LastResult,
+                std::move(commandResult),
                 context.MethodResultSinks.MeshCurvature);
         }
         DrawCurvatureSegmentationControls(model, context);
@@ -905,6 +1055,13 @@ namespace Extrinsic::Sandbox::Editor
         ImGui::Text(
             "Last curvature run: %s",
             Runtime::DebugNameForEditorCommandStatus(result->Status));
+        if (Curvature.LastCurvatureVisualizationStatus.has_value())
+        {
+            ImGui::Text(
+                "Scalar visualization: %s",
+                Runtime::DebugNameForEditorCommandStatus(
+                    *Curvature.LastCurvatureVisualizationStatus));
+        }
         ImGui::Text(
             "Output: %s",
             Runtime::DebugNameForEditorMeshCurvatureOutput(
@@ -962,6 +1119,27 @@ namespace Extrinsic::Sandbox::Editor
             Curvature.SegmentationConfig;
         bool changed = false;
         if (ImGui::BeginCombo(
+                "Method##CurvatureSegmentation",
+                Runtime::DebugNameForCurvatureSegmentationMethod(
+                    config.Method)))
+        {
+            for (const auto method : kCurvatureSegmentationMethods)
+            {
+                const bool selected = method == config.Method;
+                if (ImGui::Selectable(
+                        Runtime::DebugNameForCurvatureSegmentationMethod(
+                            method),
+                        selected))
+                {
+                    config.Method = method;
+                    changed = true;
+                }
+                if (selected)
+                    ImGui::SetItemDefaultFocus();
+            }
+            ImGui::EndCombo();
+        }
+        if (ImGui::BeginCombo(
                 "Component selection##CurvatureSegmentation",
                 Runtime::DebugNameForCurvatureSegmentationSelectionMode(
                     config.SelectionMode)))
@@ -1017,22 +1195,49 @@ namespace Extrinsic::Sandbox::Editor
                 "%.6g");
         }
 
-        changed |= ImGui::InputDouble(
-            "Spatial regularization##CurvatureSegmentation",
-            &config.SpatialWeight,
-            0.05,
-            0.5,
-            "%.6g");
-        changed |= ImGui::InputDouble(
-            "Feature sensitivity##CurvatureSegmentation",
-            &config.FeatureSensitivity,
-            0.1,
-            1.0,
-            "%.6g");
-        changed |= ImGui::InputScalar(
-            "Minimum region faces##CurvatureSegmentation",
-            ImGuiDataType_U32,
-            &config.MinimumRegionFaces);
+        if (config.Method ==
+            Runtime::CurvatureSegmentationMethod::FeatureAlignedPatches)
+        {
+            changed |= ImGui::InputDouble(
+                "Feature radius / diagonal##CurvatureSegmentation",
+                &config.FeatureBaseRadiusRatio,
+                0.001,
+                0.01,
+                "%.6g");
+            changed |= ImGui::InputDouble(
+                "Hard dihedral degrees##CurvatureSegmentation",
+                &config.HardDihedralThresholdDegrees,
+                1.0,
+                5.0,
+                "%.6g");
+            changed |= ImGui::InputDouble(
+                "Patch complexity cost##CurvatureSegmentation",
+                &config.PatchComplexityCost,
+                0.05,
+                0.25,
+                "%.6g");
+            ImGui::TextDisabled(
+                "Final hard/soft/closure boundaries render in red/gold/blue; retained candidates remain inspectable properties.");
+        }
+        else
+        {
+            changed |= ImGui::InputDouble(
+                "Spatial regularization##CurvatureSegmentation",
+                &config.SpatialWeight,
+                0.05,
+                0.5,
+                "%.6g");
+            changed |= ImGui::InputDouble(
+                "Feature sensitivity##CurvatureSegmentation",
+                &config.FeatureSensitivity,
+                0.1,
+                1.0,
+                "%.6g");
+            changed |= ImGui::InputScalar(
+                "Minimum region faces##CurvatureSegmentation",
+                ImGuiDataType_U32,
+                &config.MinimumRegionFaces);
+        }
         (void)ImGui::Checkbox(
             "Show clusters and boundaries after run##CurvatureSegmentation",
             &Curvature.AutoVisualizeSegmentation);
@@ -1092,6 +1297,12 @@ namespace Extrinsic::Sandbox::Editor
             config.MaxSpatialIterations, 1u, 100000u);
         config.MinimumRegionFaces = std::max(
             config.MinimumRegionFaces, 1u);
+        config.FeatureBaseRadiusRatio = std::clamp(
+            config.FeatureBaseRadiusRatio, 1.0e-12, 1.0);
+        config.HardDihedralThresholdDegrees = std::clamp(
+            config.HardDihedralThresholdDegrees, 0.0, 180.0);
+        config.PatchComplexityCost = std::clamp(
+            config.PatchComplexityCost, 0.0, 1.0e12);
         Curvature.SegmentationConfigDirty |= changed;
 
         const bool configCommandsAvailable =
@@ -1180,7 +1391,43 @@ namespace Extrinsic::Sandbox::Editor
         ImGui::Text(
             "Last segmentation run: %s",
             Runtime::DebugNameForEditorCommandStatus(result.Status));
-        if (result.Diagnostics.Succeeded())
+        ImGui::Text(
+            "Method: requested=%s actual=%s",
+            Runtime::DebugNameForCurvatureSegmentationMethod(
+                result.RequestedMethod),
+            Runtime::DebugNameForCurvatureSegmentationMethod(
+                result.ActualMethod));
+        if (result.PatchDiagnostics.has_value() &&
+            result.FeatureDiagnostics.has_value() &&
+            result.PatchDiagnostics->Succeeded() &&
+            result.FeatureDiagnostics->Succeeded())
+        {
+            const auto& patch = *result.PatchDiagnostics;
+            const auto& feature = *result.FeatureDiagnostics;
+            ImGui::Text(
+                "Parts: %zu  GMM components: %u  seeds: %zu -> provisional: %zu",
+                patch.FinalRegionCount,
+                patch.SelectedComponentCount,
+                patch.SeedCount,
+                patch.ProvisionalRegionCount);
+            ImGui::Text(
+                "Features: hard=%zu soft=%zu  final boundaries=%zu",
+                feature.HardFeatureEdgeCount,
+                feature.RetainedSoftEdgeCount,
+                patch.FinalBoundaryEdgeCount);
+            ImGui::Text(
+                "Boundary roles: hard=%zu soft=%zu closure=%zu",
+                patch.HardBoundaryEdgeCount,
+                patch.SoftBoundaryEdgeCount,
+                patch.ClosureBoundaryEdgeCount);
+            ImGui::Text(
+                "Energy: %.6g -> %.6g  merges=%zu refinement moves=%zu",
+                patch.InitialEnergy,
+                patch.FinalEnergy,
+                patch.AcceptedMergeCount,
+                patch.AcceptedRefinementMoveCount);
+        }
+        else if (result.Diagnostics.Succeeded())
         {
             ImGui::Text(
                 "Components: selected=%u active=%u  connected regions=%u",
@@ -1226,7 +1473,7 @@ namespace Extrinsic::Sandbox::Editor
         if (!result.Message.empty())
             ImGui::TextWrapped("%s", result.Message.c_str());
         ImGui::TextDisabled(
-            "Boundaries are non-destructive labels, not UV seams; the spatial solve is a deterministic local optimum.");
+            "Feature lines and boundaries are non-destructive edge properties, not UV seams.");
         if (ImGui::SmallButton("Dismiss##CurvatureSegmentation"))
             Curvature.LastSegmentationResult.reset();
     }

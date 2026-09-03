@@ -241,9 +241,11 @@ export namespace Geometry::CurvatureSegmentation
     [[nodiscard]] const char* ToString(CurvaturePatchStatus status) noexcept;
     [[nodiscard]] const char* ToString(PatchBoundaryRole role) noexcept;
 
-    // Unadopted METHOD-039 diagnostic candidate: deterministic CPU work from
-    // supplied, slot-aligned feature evidence. It fails the frozen one-step
-    // seed-location stability gate and is not cpu_reference_v2. The mesh is
+    // METHOD-039 diagnostic candidate: deterministic CPU work from supplied,
+    // slot-aligned feature evidence. It fails the original frozen one-step
+    // seed-location stability gate and is not cpu_reference_v2. Runtime may
+    // expose it only by explicit diagnostic selection with requested/actual
+    // reporting; METHOD-037 remains the production default. The mesh is
     // borrowed and never mutated. Feature detection can be tested independently
     // by passing FeatureEvidenceResult::View().
     [[nodiscard]] CurvaturePatchResult

@@ -15,6 +15,19 @@ import Extrinsic.Runtime.Private.FeatureConfigCodecs;
 
 namespace Extrinsic::Runtime
 {
+    const char* DebugNameForCurvatureSegmentationMethod(
+        const CurvatureSegmentationMethod method) noexcept
+    {
+        switch (method)
+        {
+        case CurvatureSegmentationMethod::CurvatureGmm:
+            return "Curvature GMM (METHOD-037)";
+        case CurvatureSegmentationMethod::FeatureAlignedPatches:
+            return "Feature-aligned patches (METHOD-039)";
+        }
+        return "Unknown";
+    }
+
     const char* DebugNameForCurvatureSegmentationSelectionMode(
         const CurvatureSegmentationSelectionMode mode) noexcept
     {
@@ -31,12 +44,16 @@ namespace Extrinsic::Runtime
     bool IsValidCurvatureSegmentationConfig(
         const CurvatureSegmentationConfig& config) noexcept
     {
+        const bool validMethod =
+            config.Method == CurvatureSegmentationMethod::CurvatureGmm ||
+            config.Method ==
+                CurvatureSegmentationMethod::FeatureAlignedPatches;
         const bool validMode =
             config.SelectionMode ==
                 CurvatureSegmentationSelectionMode::FixedCount ||
             config.SelectionMode ==
                 CurvatureSegmentationSelectionMode::Automatic;
-        return validMode &&
+        return validMethod && validMode &&
                config.FixedComponentCount > 0u &&
                config.AutomaticMinComponents > 0u &&
                config.AutomaticMaxComponents >=
@@ -55,7 +72,16 @@ namespace Extrinsic::Runtime
                std::isfinite(config.FeatureSensitivity) &&
                config.FeatureSensitivity >= 0.0 &&
                config.MaxSpatialIterations > 0u &&
-               config.MinimumRegionFaces > 0u;
+               config.MinimumRegionFaces > 0u &&
+               std::isfinite(config.FeatureBaseRadiusRatio) &&
+               config.FeatureBaseRadiusRatio > 0.0 &&
+               config.FeatureBaseRadiusRatio <= 1.0 &&
+               std::isfinite(config.HardDihedralThresholdDegrees) &&
+               config.HardDihedralThresholdDegrees >= 0.0 &&
+               config.HardDihedralThresholdDegrees <= 180.0 &&
+               std::isfinite(config.PatchComplexityCost) &&
+               config.PatchComplexityCost >= 0.0 &&
+               config.PatchComplexityCost <= 1.0e12;
     }
 
     std::string SerializeCurvatureSegmentationConfig(

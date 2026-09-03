@@ -3,7 +3,7 @@
 This directory contains local-development diagnostics for comparing
 `Geometry.Curvature` with actual Framework24 and explicitly supplied PMP
 checkouts on OBJ corpora. The shipped implementation targets Framework24
-`CurvatureTaubin(mesh, 3, true, Policy::Sequential)` directly; PMP is a useful
+`CurvatureTaubin(mesh, 0, false, Policy::Sequential)` directly; PMP is a useful
 different estimator, not the parity oracle. These harnesses are not registered
 in CTest, do not download reference code or datasets, and do not produce
 claim-eligible benchmark results.
@@ -11,7 +11,7 @@ claim-eligible benchmark results.
 ## Framework24 parity probe
 
 `Framework24CurvatureParityProbe.cpp` invokes the actual reference with
-`CurvatureTaubin(mesh, 3, true, Policy::Sequential)` and prints positions,
+`CurvatureTaubin(mesh, 0, false, Policy::Sequential)` and prints positions,
 principal scalars, and both directions in vertex order. Compile it against an
 existing Framework24 build; for the repository's usual checkout layout:
 
@@ -39,9 +39,8 @@ have maximum extent one, so translation is the only loader change and does not
 affect curvature. For another mesh, normalize the input supplied to both probes
 or explicitly convert the inverse-length units before comparing.
 
-The default Framework24 policy is deliberately not used as an oracle: its
-parallel-unsequenced in-place smoothing reads and writes the same arrays. The
-sequential policy preserves the reference loop and stable vertex order.
+The explicit sequential policy makes the diagnostic invocation stable even
+though the current zero-step default performs no scalar smoothing.
 When comparing directions, map Framework24 `min_direction` to IntrinsicEngine
 `v:principal_dir2` and `max_direction` to `v:principal_dir1`; those are the
 existing public minimum/maximum direction names in the engine. Compare them as
@@ -85,14 +84,15 @@ revision, while low-repetition timings are only diagnostic.
 
 The PMP probe defaults to its one-ring hinge support with no post-smoothing
 (`smoothing_steps = 0`, `two_ring = 0`). Pass `... <repetitions> 3 1` to select
-PMP's own two-ring/three-pass path. Neither setting reproduces Framework24:
-Framework24 has distinct mixed-area, cotan, sign/direction-pairing, boundary,
-and in-place smoothing semantics. The corrected probe argument order is
-`(smoothing_steps, use_tensor=true, use_two_ring)`.
+PMP's own two-ring/three-pass path. PMP is not the declared Framework24 oracle:
+its variants retain distinct boundary and value/direction-pairing behavior, and
+the two-ring variant also changes support and smoothing. The corrected probe
+argument order is `(smoothing_steps, use_tensor=true, use_two_ring)`.
 
-For the current local, non-claim-eligible parity observation and its actual
-Framework24 invocation, see
-[`ara/evidence/tables/curvature_framework24_parity_2026-08-12.md`](../../../ara/evidence/tables/curvature_framework24_parity_2026-08-12.md).
+For the historical two-ring comparison, see
+[`curvature_framework24_parity_2026-08-12.md`](../../../ara/evidence/tables/curvature_framework24_parity_2026-08-12.md).
+The current-revision default comparison is recorded in
+[`curvature_framework24_current_parity_2026-09-03.md`](../../../ara/evidence/tables/curvature_framework24_current_parity_2026-09-03.md).
 
 Run a deterministic, size-stratified sample:
 

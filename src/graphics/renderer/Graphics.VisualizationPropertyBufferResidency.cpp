@@ -31,6 +31,7 @@ namespace Extrinsic::Graphics
     {
         return descriptor.DirtyStamp > 0u &&
                entry.DirtyStamp == descriptor.DirtyStamp &&
+               entry.SourceLayoutStamp == descriptor.SourceLayoutStamp &&
                entry.Domain == descriptor.Domain &&
                entry.ValueType == descriptor.ValueType &&
                entry.ElementCount == descriptor.ElementCount &&
@@ -51,6 +52,7 @@ namespace Extrinsic::Graphics
             .ElementCount = entry.ElementCount,
             .StrideBytes = entry.StrideBytes,
             .DirtyStamp = entry.DirtyStamp,
+            .SourceLayoutStamp = entry.SourceLayoutStamp,
             .BufferBDA = entry.BufferBDA,
         };
     }
@@ -134,6 +136,7 @@ namespace Extrinsic::Graphics
             entry.ElementCount = descriptor.ElementCount;
             entry.StrideBytes = descriptor.StrideBytes;
             entry.DirtyStamp = descriptor.DirtyStamp;
+            entry.SourceLayoutStamp = descriptor.SourceLayoutStamp;
             entry.BufferBDA = m_Device->GetBufferDeviceAddress(handle);
 
             if (entry.BufferBDA == 0u)

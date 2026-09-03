@@ -219,6 +219,7 @@ table abbreviates `app.sections[name=sandbox.progressive_poisson].payload` as
 | `poisson` | `channel` | `Level`, `Rank`, `SplatRadius`, `PrefixVisible` |
 | `poisson` | `backend` | `CpuReference`, `VulkanCompute`; unavailable Vulkan execution reports explicit CPU fallback, while METHOD-014 owns Operational dispatch/parity closure |
 | `poisson` | `debounce_seconds` | Number in `[0.0, 10.0]` |
+| `curvature_segmentation` | `method` | `curvature_gmm` (production default), `feature_aligned_patches` (explicit METHOD-039 diagnostic) |
 | `curvature_segmentation` | `selection_mode` | `fixed_count`, `automatic` |
 | `curvature_segmentation` | `fixed_component_count`, `automatic_min_components`, `automatic_max_components` | Integers in `[1, 1024]`; automatic maximum must be at least the minimum or both bounds retain the registered reference values with a diagnostic |
 | `curvature_segmentation` | `automatic_fit_tolerance` | Finite number in `[1e-12, 1e12]` |
@@ -229,6 +230,9 @@ table abbreviates `app.sections[name=sandbox.progressive_poisson].payload` as
 | `curvature_segmentation` | `seed` | Unsigned 32-bit integer |
 | `curvature_segmentation` | `spatial_weight`, `feature_sensitivity` | Finite number in `[0, 1e12]` |
 | `curvature_segmentation` | `minimum_region_faces` | Integer in `[1, 4294967295]` |
+| `curvature_segmentation` | `feature_base_radius_ratio` | Finite number in `[1e-12, 1]`; METHOD-039 physical feature radius divided by the bounding-box diagonal |
+| `curvature_segmentation` | `hard_dihedral_threshold_degrees` | Finite number in `[0, 180]`; strict hard-feature threshold |
+| `curvature_segmentation` | `patch_complexity_cost` | Finite number in `[0, 1e12]`; METHOD-039 regional model cost, with `0.5` used by the bounded sculpt diagnostic profile |
 | `parameterization` | `strategy` | `lscm`, `harmonic_cotangent`, `tutte_uniform`, `bff` |
 | `parameterization.view` | `render_mode` | `cpu_layout`, `gpu_shaded`; the GPU request falls back to the CPU layout until a matching completed target is ready |
 | `parameterization.view` | `background_mode` | `grid`, `checker`, `texel_density`, `texture` |
@@ -293,12 +297,15 @@ parameter bag. The serializer persists the lowercase tokens above, never a
 not change the parameterization solver backend. There is no optimized/GPU
 solver selector while every implemented strategy is CPU-only.
 
-The Sandbox curvature-segmentation payload round-trips both component-selection
-modes and all model-fit, deterministic EM, spatial, feature-sensitivity, and
-small-region controls. The configured runtime operation consumes the same live
-record used by the Sandbox Curvature panel. The record selects no backend: the
-only implemented path is the CPU reference, and its boundary output remains a
-non-destructive visualization hypothesis rather than an atlas seam.
+The Sandbox curvature-segmentation payload round-trips the method token, both
+component-selection modes, model-fit and deterministic EM values, the v1
+spatial/cleanup controls, and the METHOD-039 diagnostic feature/patch values.
+The configured runtime operation consumes the same live record used by the
+Sandbox Curvature panel. The record selects no compute backend: both functions
+are serial CPU paths, requested/actual method identity is explicit, and their
+boundary output remains a non-destructive visualization hypothesis rather than
+an atlas seam. METHOD-037 stays the registered default because METHOD-039's
+original global seed-stability gate remains refuted.
 
 ### One-time Sandbox migration
 
