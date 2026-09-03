@@ -3,15 +3,15 @@ task_id: BUG-156
 workflow_profile: high-risk
 status: complete
 generated_by: tools/agents/workflow_evidence.py
-generated_at: '2026-09-03T09:28:16Z'
+generated_at: '2026-09-03T09:32:11Z'
 claim_eligible: false
 source:
   base_ref: 9b4c0a1220c6f135ad4f4321cef60ffda200513f
   base_revision: 9b4c0a1220c6f135ad4f4321cef60ffda200513f
-  head_revision: da8934651e4ba0064989f89da0a6cc088697c0bd
-  branch: main
-  worktree: /home/alex/Documents/IntrinsicEngine
-  dirty: true
+  head_revision: f0fbd665dc683c38346d6c7de538955b526c4951
+  branch: codex/evidence-bug156
+  worktree: /tmp/intrinsic-bug156-review.S6tFSl
+  dirty: false
   surface:
   - path: .github/copilot-instructions.md
     sha256: 6eca8f4a866442a1bd1166fa0b9314c2e0b3759b1257b12276cf4ac292e3b259
@@ -199,8 +199,6 @@ source:
     sha256: 63f512c40817ec8e083627cb545625d41505ad933e196bca7e2ae49d8d8e5ea8
   - path: tasks/SESSION-BRIEF.md
     sha256: 768939e39f67c53faa7cbb4d171cb18cdabcd76774c63fb6e5aa24980abb0715
-  - path: tasks/active/BUG-154-curvature-pmp-parity-corner-normal-topology.md
-    sha256: null
   - path: tasks/active/METHOD-039-feature-network-curvature-patch-decomposition.md
     sha256: d3afb87b88fe6a47122bd9965d2912e0c7d1c7e9d9bc30d8f0645b3c3b18e40e
   - path: tasks/active/README.md
@@ -836,7 +834,7 @@ source:
   - path: tasks/evidence/BUG-162/handoff.jsonl
     sha256: 3b873359050cfd62045da5647cd28a4d606b31a83a8fdd6cc65ed125ca465138
   - path: tasks/evidence/BUG-162/report.yaml
-    sha256: 5b2fbd270ca520bc8cd2781a4a19269280fdbb3eea3da7be9216e73179f1edd5
+    sha256: 8931ce6c89eb2425f0fc8b812b16845875877b09e7d91d0a03d3aa0bd082fb91
   - path: tasks/evidence/BUG-162/reviews.jsonl
     sha256: ba28a9a700ec071b45c8b2499e2ae52797ce2e3561616bbf023dea59e691b7fd
   - path: tasks/templates/task-micro.md
@@ -963,7 +961,7 @@ source:
     sha256: c85485df548794e8dce225dfae5b482b22642f1ec2035511033540344bc7a3f1
   - path: tools/repo/githooks/pre-commit
     sha256: f57fd300376114c921128c6e519ff6f5fb9cb0695722a00096626b887ccbb7e6
-  content_digest: 520a2599d30efee734f81e1f2a5969c4af753c31594da98b456d4a4b61748c33
+  content_digest: 23761c7b7d94b0a27d351639d7247136236193a2e56aada7f535dc614f3af004
 touched:
   paths:
   - .github/copilot-instructions.md
@@ -1059,7 +1057,6 @@ touched:
   - src/runtime/README.md
   - tasks/HINTS.md
   - tasks/SESSION-BRIEF.md
-  - tasks/active/BUG-154-curvature-pmp-parity-corner-normal-topology.md
   - tasks/active/METHOD-039-feature-network-curvature-patch-decomposition.md
   - tasks/active/README.md
   - tasks/backlog/README.md
