@@ -1,0 +1,16 @@
+Test project /home/alex/Documents/IntrinsicEngine/build/ci-asan
+    Start 1980: GlfwPlatformSmoke.BackendModuleInitializesOrSkipsWhenDisplayUnavailable
+1/2 Test #1980: GlfwPlatformSmoke.BackendModuleInitializesOrSkipsWhenDisplayUnavailable ...   Passed    0.03 sec
+    Start 2753: GlfwLifecycleLsan.EngineStaticTeardownAndLeakControl
+2/2 Test #2753: GlfwLifecycleLsan.EngineStaticTeardownAndLeakControl ......................   Passed    0.11 sec
+
+100% tests passed, 0 tests failed out of 2
+
+Label Time Summary:
+glfw           =   0.14 sec*proc (2 tests)
+integration    =   0.03 sec*proc (1 test)
+platform       =   0.14 sec*proc (2 tests)
+regression     =   0.11 sec*proc (1 test)
+vulkan         =   0.03 sec*proc (1 test)
+
+Total Test time (real) =   0.20 sec

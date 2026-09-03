@@ -1,0 +1,28 @@
+{
+  "command": [
+    "ctest",
+    "--test-dir",
+    "build/ci-asan",
+    "--output-on-failure",
+    "-L",
+    "platform",
+    "-L",
+    "glfw",
+    "--timeout",
+    "60"
+  ],
+  "command_display": "ctest --test-dir build/ci-asan --output-on-failure -L platform -L glfw --timeout 60",
+  "cwd": ".",
+  "duration_ms": 238,
+  "exit_code": 0,
+  "finished_at": "2026-09-03T09:15:48Z",
+  "label": "closure-platform-glfw",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-09-03T09:15:47Z",
+  "stderr_path": "tasks/evidence/BUG-118/commands/closure-platform-glfw.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/BUG-118/commands/closure-platform-glfw.stdout.log",
+  "stdout_sha256": "fab2c8f82801f144fbf1bb7048c7d3b4086b557541cc9e2ec05983cd3b07faa9",
+  "task_id": "BUG-118"
+}

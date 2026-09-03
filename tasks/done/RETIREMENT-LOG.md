@@ -8,6 +8,45 @@ so blocks moved from the old active-README history work verbatim.
 
 ## Retired task narratives
 
+[`BUG-118`](BUG-118-glfw-x11-input-method-lsan-recurrence.md) — the recurring
+408-byte XIM retention is an affected libX11 1.7.5 ownership defect already
+fixed upstream, not an engine teardown regression: the standalone helper still
+proves one `glfwTerminate()` call. The process runners admit only the exact
+`_XimRegisterIMInstantiateCallback` row under a byte-for-byte suppression-file
+guard, while every iteration requires the named 4,096-byte synthetic engine
+leak to remain visible. Ten repeated standalone contracts, the GLFW/platform
+intersection, 4,258 CPU-supported registrations, the exact selected-ICD
+shutdown pair, and the complete 54-test promoted-Vulkan cohort pass. It retires
+at `Operational` after independent review; the failed multi-ICD diagnostic is
+preserved without adding a broad loader or driver suppression. Implementation
+commit: `da893465`.
+
+[`BUG-162`](BUG-162-main-branch-consolidation.md) — all recorded local branch
+history is preserved on `main`, with the BUG-156 implementation, runtime
+publication follow-on, task state, ARA identifiers, and current documentation
+reconciled on one reviewed surface. Integration commit `a9706f332` was pushed
+without force and fetched back exactly; every recorded pre-integration tip is
+an ancestor. The task retires at `Operational` after a label-distinct terminal
+review. BUG-157 and the Framework24 scorecard remain open under their own
+owners.
+
+[`BUG-156`](BUG-156-curvature-two-ring-smoothing-cancels-features.md) — the
+shipped principal-curvature estimator now follows deterministic sequential
+Framework24 Taubin semantics on finite triangle surfaces, and runtime persists
+minimum, maximum, mean, and Gaussian curvature atomically with optional
+directions, stale-state rejection, and undo/redo. It retires at
+`CPUContracted` after independent review of the numerical and publication
+contracts. The local differential remains non-claim-eligible; `BENCH-001` and
+`REVIEW-004` retain claim-grade parity and product-verdict ownership.
+
+[`BUG-154`](BUG-154-curvature-pmp-parity-corner-normal-topology.md) — reusable
+damped cotan smoothing and corner-domain OBJ normals now survive import,
+runtime materialization, round trip, and GPU-only shading-tuple splitting
+without fragmenting authoritative topology. The task retires at `Operational`
+with CPU, sanitizer, structural, and promoted-Vulkan evidence plus accepted
+fixed-surface review. Its PMP estimator record remains preserved as a
+superseded historical slice; BUG-156 is the current shipped curvature contract.
+
 [`BUG-155`](BUG-155-vulkan-native-timestamp-zero-duration-flake.md) — native
 Vulkan timestamps now preserve a coherent, available equal-tick interval as
 zero rather than confusing it with unavailable data or fabricating a positive

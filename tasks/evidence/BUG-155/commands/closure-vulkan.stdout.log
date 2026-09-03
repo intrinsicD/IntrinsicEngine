@@ -1,0 +1,15 @@
+Test project /home/alex/Documents/IntrinsicEngine/build/ci-vulkan
+    Start 3504: DefaultRecipeSurfaceGpuSmoke.NativeGpuTimestampsResolveNamedPassesAfterSlotReuse
+1/2 Test #3504: DefaultRecipeSurfaceGpuSmoke.NativeGpuTimestampsResolveNamedPassesAfterSlotReuse ...   Passed    9.71 sec
+    Start 3601: RHIProfiler.DurationResolutionPreservesAvailableZeroIntervals
+2/2 Test #3601: RHIProfiler.DurationResolutionPreservesAvailableZeroIntervals ......................   Passed    0.01 sec
+
+100% tests passed, 0 tests failed out of 2
+
+Label Time Summary:
+gpu         =   9.71 sec*proc (1 test)
+graphics    =   9.72 sec*proc (2 tests)
+unit        =   0.01 sec*proc (1 test)
+vulkan      =   9.71 sec*proc (1 test)
+
+Total Test time (real) =   9.85 sec

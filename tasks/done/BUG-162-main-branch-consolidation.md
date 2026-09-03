@@ -17,6 +17,9 @@ maturity_target: Operational
 
 ## Status
 
+- Completed and retired on 2026-09-03 at `Operational`. Integration commit:
+  `a9706f332`; it was pushed without force and fetched back with every recorded
+  pre-integration tip preserved as an ancestor.
 - The BUG-157 task-only branch is preserved as an ancestor without leaving its
   invalid, unclaimed active-task promotion in the final tree.
 - The BUG-156 implementation branch is merged with ARA identifiers reconciled,
@@ -29,9 +32,9 @@ maturity_target: Operational
 - Commit `a9706f332` is the final integrated source revision. It was pushed
   without force and fetched back; local `main`, `origin/main`, and `FETCH_HEAD`
   resolve identically, and all recorded pre-integration tips remain ancestors.
-- BUG-162 remains active solely for label-distinct independent fixed-surface
-  review. BUG-156 separately retains that review for its public numerical and
-  runtime-publication contract.
+- A label-distinct independent fixed-surface review accepted the terminal
+  retirement surface. BUG-156's public numerical and runtime-publication
+  contract received its own separate review.
 
 ## Goal
 
@@ -42,8 +45,8 @@ maturity_target: Operational
 ## Non-goals
 
 - No deletion of local or remote branches or linked worktrees.
-- No retirement of BUG-156 or BUG-157 and no representation of their remaining
-  work as complete.
+- No retirement of BUG-157 and no representation of its remaining work as
+  complete. BUG-156 may retire only through its separately accepted review.
 - No claim-eligible Framework24 parity, performance, GPU/Vulkan, or universal
   geometric-accuracy conclusion.
 - No manual mutation or deletion of prior Git-common-dir task/work-graph state.
@@ -119,7 +122,7 @@ maturity_target: Operational
 - [x] No unresolved conflict marker, duplicate task ID, or unqualified dirty-run
       parity claim remains in the integrated tree.
 - [x] The final staged surface passes its strongest applicable local gates.
-- [ ] Independent fixed-surface review accepts the exact high-risk integration
+- [x] Independent fixed-surface review accepts the exact high-risk integration
       surface; BUG-156 retains separate review ownership for its public contract.
 - [x] Local and fetched `origin/main` resolve to the same pushed commit.
 
@@ -155,7 +158,8 @@ git diff --check
 ## Forbidden changes
 
 - Force-pushing, rewriting branch history, or deleting branches/worktrees.
-- Marking BUG-156, BUG-157, or the Framework24 product scorecard complete.
+- Marking BUG-157 or the Framework24 product scorecard complete. BUG-156 has
+  separate accepted review and retirement evidence.
 - Weakening or skipping a failing gate to obtain a green merge.
 - Editing prior live work-graph state outside its checked-in CLI.
 
@@ -164,3 +168,5 @@ git diff --check
 - Target: `Operational` when the exact reviewed `main` revision is pushed and
   fetched back with all pre-integration branch tips in its ancestry.
 - No engine-backend `Operational` follow-up is owed by this integration task.
+- Current: completed at `Operational`; the integrated source revision and its
+  accepted terminal retirement review are preserved by fixed-surface evidence.

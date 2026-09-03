@@ -54,13 +54,15 @@ inventory, workflows, scorecard, measurement rules, and stop condition are in
 
 Retired `ARCH-017` established the mission/picker/scorecard reset. `REVIEW-004` is the
 one-shot final gate and depends on the current bounded product owners:
-`ASSETIO-012`, `BENCH-001`, `BUG-154`, `BUG-156`, `BUG-158..160`,
+`ASSETIO-012`, `BENCH-001`, `BUG-158..160`,
 `GRAPHICS-135`, `METHOD-015`, `RUNTIME-218`, and `UI-046..051`. `METHOD-015`
 is an existing Framework24 registered-feature gap, not a reopening of the
 unrelated research queue. The import critical path is deliberately split:
 `BUG-158` makes base geometry usable during optional enrichment, `BUG-159`
 removes per-chart global remap cost, and `BUG-160` repairs or replaces the
 fragmenting chart policy after the remap fix.
+Retired `BUG-154` and `BUG-156` remain satisfied dependencies of `REVIEW-004`,
+with `BENCH-001` retaining the unfulfilled claim-grade parity gate.
 
 While `REVIEW-004` is open, Theme J, reproducible Theme G regressions, and
 correctness/reliability repairs required by a golden workflow are the only new

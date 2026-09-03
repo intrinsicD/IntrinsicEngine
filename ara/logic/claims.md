@@ -1459,7 +1459,7 @@
   or zero-support runtime work reports an informative success. The current
   Framework24 path is assessed by C53 instead.
 - **Proof**: [0f133014027e413ab100fd057c51dbaf2f10460e,
-  tasks/active/BUG-154-curvature-pmp-parity-corner-normal-topology.md,
+  tasks/done/BUG-154-curvature-pmp-parity-corner-normal-topology.md,
   tools/diagnostics/curvature/compare_curvature_corpus.py,
   docs/reports/2026-08-12-curvature-estimator-study.md,
   ara/evidence/tables/curvature_pmp_diagnostic_2026-08-11.md]
@@ -1528,7 +1528,7 @@
   723d65684007fb26df5ced67d83155b0a9ade3ae,
   tests/data/sculpt.obj,
   docs/reports/2026-08-12-curvature-support-smoothing-defect.md,
-  tasks/active/BUG-156-curvature-two-ring-smoothing-cancels-features.md]
+  tasks/done/BUG-156-curvature-two-ring-smoothing-cancels-features.md]
 - **Dependencies**: [C46, C47, C48]
 - **Tags**: geometry, principal curvature, hinge tensor, support radius,
   smoothing, accuracy, BUG-156

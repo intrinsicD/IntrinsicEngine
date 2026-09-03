@@ -1,0 +1,237 @@
+Test project /home/alex/Documents/IntrinsicEngine/build/ci-vulkan
+      Start    3: IntrinsicKMeansGpuBenchmarkSmoke.Run
+ 1/54 Test    #3: IntrinsicKMeansGpuBenchmarkSmoke.Run ........................................................................   Passed   23.74 sec
+      Start    4: IntrinsicKMeansGpuBenchmarkSmoke.Validate
+ 2/54 Test    #4: IntrinsicKMeansGpuBenchmarkSmoke.Validate ...................................................................   Passed    0.07 sec
+      Start    5: IntrinsicLopFamilyGpuBenchmarkSmoke.Run
+ 3/54 Test    #5: IntrinsicLopFamilyGpuBenchmarkSmoke.Run .....................................................................   Passed   53.86 sec
+      Start    6: IntrinsicLopFamilyGpuBenchmarkSmoke.UnavailableEnvironmentFailsClosed
+ 4/54 Test    #6: IntrinsicLopFamilyGpuBenchmarkSmoke.UnavailableEnvironmentFailsClosed .......................................   Passed    2.58 sec
+      Start    7: IntrinsicLopFamilyGpuBenchmarkSmoke.Validate
+ 5/54 Test    #7: IntrinsicLopFamilyGpuBenchmarkSmoke.Validate ................................................................   Passed    0.07 sec
+      Start 3499: BufferReadbackGpuSmoke.TransferQueueDownloadsDeviceLocalBufferWithoutWaitIdle
+ 6/54 Test #3499: BufferReadbackGpuSmoke.TransferQueueDownloadsDeviceLocalBufferWithoutWaitIdle ...............................   Passed    1.89 sec
+      Start 3500: ComputeParallelPrimitivesGpuSmoke.VulkanScanAndCompactionMatchCpuReference
+ 7/54 Test #3500: ComputeParallelPrimitivesGpuSmoke.VulkanScanAndCompactionMatchCpuReference ..................................   Passed   23.67 sec
+      Start 3501: GpuTransferFacadeGpuSmoke.UploadThenReadbackRoundTripsThroughFacadeWithoutWaitIdle
+ 8/54 Test #3501: GpuTransferFacadeGpuSmoke.UploadThenReadbackRoundTripsThroughFacadeWithoutWaitIdle ..........................   Passed    4.24 sec
+      Start 3502: TextureReadbackGpuSmoke.TransferQueueDownloadsTextureSubresourceWithoutWaitIdle
+ 9/54 Test #3502: TextureReadbackGpuSmoke.TransferQueueDownloadsTextureSubresourceWithoutWaitIdle .............................   Passed    2.87 sec
+      Start 3503: DefaultRecipeSurfaceGpuSmoke.RecipeSelectorReachesOperationalVulkanCommandStream
+10/54 Test #3503: DefaultRecipeSurfaceGpuSmoke.RecipeSelectorReachesOperationalVulkanCommandStream ............................   Passed    5.59 sec
+      Start 3504: DefaultRecipeSurfaceGpuSmoke.NativeGpuTimestampsResolveNamedPassesAfterSlotReuse
+11/54 Test #3504: DefaultRecipeSurfaceGpuSmoke.NativeGpuTimestampsResolveNamedPassesAfterSlotReuse ............................   Passed    9.68 sec
+      Start 3505: DefaultRecipeSurfaceGpuSmoke.ReferenceTriangleDebugViewReadbackMatchesMinimalHarnessSamples
+12/54 Test #3505: DefaultRecipeSurfaceGpuSmoke.ReferenceTriangleDebugViewReadbackMatchesMinimalHarnessSamples .................   Passed    6.64 sec
+      Start 3506: DefaultRecipeSurfaceGpuSmoke.ParallelRecordingMatchesSerialReadbackWithValidation
+13/54 Test #3506: DefaultRecipeSurfaceGpuSmoke.ParallelRecordingMatchesSerialReadbackWithValidation ...........................   Passed   13.97 sec
+      Start 3507: DefaultRecipeSurfaceGpuSmoke.ParallelRecordingMatchesSerialAsyncComputeReadbackWithValidation
+14/54 Test #3507: DefaultRecipeSurfaceGpuSmoke.ParallelRecordingMatchesSerialAsyncComputeReadbackWithValidation ...............   Passed   13.93 sec
+      Start 3508: DefaultRecipeSurfaceGpuSmoke.TransientAliasingMatchesFallbackReadbackAndReducesMemory
+15/54 Test #3508: DefaultRecipeSurfaceGpuSmoke.TransientAliasingMatchesFallbackReadbackAndReducesMemory .......................   Passed    7.91 sec
+      Start 3509: DefaultRecipeSurfaceGpuSmoke.VulkanRenderContractPublishesDeclaredArtifactMetadata
+16/54 Test #3509: DefaultRecipeSurfaceGpuSmoke.VulkanRenderContractPublishesDeclaredArtifactMetadata ..........................   Passed    6.59 sec
+      Start 3510: DefaultRecipeSurfaceGpuSmoke.VulkanResourceSlotsRecycleAfterRetirementWindow
+17/54 Test #3510: DefaultRecipeSurfaceGpuSmoke.VulkanResourceSlotsRecycleAfterRetirementWindow ................................   Passed   10.65 sec
+      Start 3511: DefaultRecipeSurfaceGpuSmoke.AsyncComputeHistogramQueueReadbackMatchesMinimalHarnessSamples
+18/54 Test #3511: DefaultRecipeSurfaceGpuSmoke.AsyncComputeHistogramQueueReadbackMatchesMinimalHarnessSamples .................   Passed    6.59 sec
+      Start 3512: HzbOcclusionConservatismGpuSmoke.TwoPhasePredicateMatchesCpuContractOnOperationalVulkan
+19/54 Test #3512: HzbOcclusionConservatismGpuSmoke.TwoPhasePredicateMatchesCpuContractOnOperationalVulkan .....................   Passed    6.62 sec
+      Start 3513: ImGuiSurfaceGpuSmoke.UserTextureImageRecordsOnOperationalVulkanCommandStream
+20/54 Test #3513: ImGuiSurfaceGpuSmoke.UserTextureImageRecordsOnOperationalVulkanCommandStream ................................   Passed    5.59 sec
+      Start 3514: ImGuiSurfaceGpuSmoke.LargeSelectedEntityPayloadRetainsAtlasOnOperationalVulkan
+21/54 Test #3514: ImGuiSurfaceGpuSmoke.LargeSelectedEntityPayloadRetainsAtlasOnOperationalVulkan ..............................   Passed    7.68 sec
+      Start 3515: ImGuiSurfaceGpuSmoke.DrawListPixelsReachBackbufferOnOperationalVulkan
+22/54 Test #3515: ImGuiSurfaceGpuSmoke.DrawListPixelsReachBackbufferOnOperationalVulkan .......................................   Passed    5.64 sec
+      Start 3516: TransientDebugSurfaceGpuSmoke.MixedLanesRecordOnOperationalVulkanCommandStream
+23/54 Test #3516: TransientDebugSurfaceGpuSmoke.MixedLanesRecordOnOperationalVulkanCommandStream ..............................   Passed    6.60 sec
+      Start 3517: TransientDebugSurfaceGpuSmoke.MixedLanesReadBackExpectedSampleColors
+24/54 Test #3517: TransientDebugSurfaceGpuSmoke.MixedLanesReadBackExpectedSampleColors ........................................   Passed    6.61 sec
+      Start 3518: UvViewGpuSmoke.RetainedBackgroundModesReadBackOnOperationalVulkan
+25/54 Test #3518: UvViewGpuSmoke.RetainedBackgroundModesReadBackOnOperationalVulkan ...........................................   Passed    9.96 sec
+      Start 3519: VisualizationOverlaySurfaceGpuSmoke.PropertyBuffersPublishBdasBeforeOperationalVulkanCommandStream
+26/54 Test #3519: VisualizationOverlaySurfaceGpuSmoke.PropertyBuffersPublishBdasBeforeOperationalVulkanCommandStream ..........   Passed    6.59 sec
+      Start 3520: VisualizationOverlaySurfaceGpuSmoke.MixedLanesReadBackExpectedSampleColors
+27/54 Test #3520: VisualizationOverlaySurfaceGpuSmoke.MixedLanesReadBackExpectedSampleColors ..................................   Passed    6.61 sec
+      Start 3521: VulkanBootstrapSmoke.InitializeCreatesPerFrameResourcesOrFailsCleanly
+28/54 Test #3521: VulkanBootstrapSmoke.InitializeCreatesPerFrameResourcesOrFailsCleanly .......................................   Passed    2.07 sec
+      Start 3522: RuntimeSandboxAcceptanceGpuSmoke.AcceptanceSceneReachesOperationalDefaultRecipePresent
+29/54 Test #3522: RuntimeSandboxAcceptanceGpuSmoke.AcceptanceSceneReachesOperationalDefaultRecipePresent ......................   Passed    5.61 sec
+      Start 3523: RuntimeSandboxAcceptanceGpuSmoke.GeometryPresentationReachesOperationalFrame
+30/54 Test #3523: RuntimeSandboxAcceptanceGpuSmoke.GeometryPresentationReachesOperationalFrame ................................   Passed    5.64 sec
+      Start 3524: RuntimeSandboxAcceptanceGpuSmoke.ExtrinsicSandboxDefaultConfigProducesVisibleFrameWithValidation
+31/54 Test #3524: RuntimeSandboxAcceptanceGpuSmoke.ExtrinsicSandboxDefaultConfigProducesVisibleFrameWithValidation ............   Passed    6.20 sec
+      Start 3525: RuntimeSandboxAcceptanceGpuSmoke.ParameterizationUvViewWindowUsesOperationalGpuTargetThroughRuntimePath
+32/54 Test #3525: RuntimeSandboxAcceptanceGpuSmoke.ParameterizationUvViewWindowUsesOperationalGpuTargetThroughRuntimePath .....   Passed    6.03 sec
+      Start 3526: RuntimeSandboxAcceptanceGpuSmoke.ExtrinsicSandboxDefaultConfigPresentsReferenceTriangleAtFrameCenter
+33/54 Test #3526: RuntimeSandboxAcceptanceGpuSmoke.ExtrinsicSandboxDefaultConfigPresentsReferenceTriangleAtFrameCenter ........   Passed    6.30 sec
+      Start 3527: RuntimeSandboxAcceptanceGpuSmoke.ReferenceTriangleVertexColorStreamShadesDeferredSurface
+34/54 Test #3527: RuntimeSandboxAcceptanceGpuSmoke.ReferenceTriangleVertexColorStreamShadesDeferredSurface ....................   Passed    6.26 sec
+      Start 3528: RuntimeSandboxAcceptanceGpuSmoke.VertexColorDirtyChannelPartiallyUploadsAndShadesDeferredSurface
+35/54 Test #3528: RuntimeSandboxAcceptanceGpuSmoke.VertexColorDirtyChannelPartiallyUploadsAndShadesDeferredSurface ............   Passed    6.23 sec
+      Start 3529: RuntimeSandboxAcceptanceGpuSmoke.ReferenceTriangleMeshConfiguredLineWidthAndPointDrawLanesPresent
+36/54 Test #3529: RuntimeSandboxAcceptanceGpuSmoke.ReferenceTriangleMeshConfiguredLineWidthAndPointDrawLanesPresent ...........   Passed    6.31 sec
+      Start 3530: RuntimeSandboxAcceptanceGpuSmoke.ReferenceTriangleScalarFieldColormapResolvesOnLineAndPointLanes
+37/54 Test #3530: RuntimeSandboxAcceptanceGpuSmoke.ReferenceTriangleScalarFieldColormapResolvesOnLineAndPointLanes ............   Passed    6.50 sec
+      Start 3531: RuntimeSandboxAcceptanceGpuSmoke.ReferenceTriangleScalarFieldSurfaceAndIsolinesResolveOnGpu
+38/54 Test #3531: RuntimeSandboxAcceptanceGpuSmoke.ReferenceTriangleScalarFieldSurfaceAndIsolinesResolveOnGpu .................   Passed    6.23 sec
+      Start 3532: RuntimeSandboxAcceptanceGpuSmoke.InspectorTransformEditShiftsReferenceTrianglePixels
+39/54 Test #3532: RuntimeSandboxAcceptanceGpuSmoke.InspectorTransformEditShiftsReferenceTrianglePixels ........................   Passed   10.52 sec
+      Start 3533: RuntimeSandboxAcceptanceGpuSmoke.ImportedOffOriginObjTriangleAutoFramesAtCenter
+40/54 Test #3533: RuntimeSandboxAcceptanceGpuSmoke.ImportedOffOriginObjTriangleAutoFramesAtCenter .............................   Passed    6.22 sec
+      Start 3534: RuntimeSandboxAcceptanceGpuSmoke.ImportedObjWithoutAuthoredUvsSamplesGeneratedAlbedoTexture
+41/54 Test #3534: RuntimeSandboxAcceptanceGpuSmoke.ImportedObjWithoutAuthoredUvsSamplesGeneratedAlbedoTexture .................   Passed    7.40 sec
+      Start 3535: RuntimeSandboxAcceptanceGpuSmoke.ClickPickReadbackSelectsReferenceTriangleAndBackgroundClears
+42/54 Test #3535: RuntimeSandboxAcceptanceGpuSmoke.ClickPickReadbackSelectsReferenceTriangleAndBackgroundClears ...............   Passed    8.08 sec
+      Start 3536: RuntimeSandboxAcceptanceGpuSmoke.ImportedModelSceneIsVisibleAndClickPickable
+43/54 Test #3536: RuntimeSandboxAcceptanceGpuSmoke.ImportedModelSceneIsVisibleAndClickPickable ................................   Passed   10.55 sec
+      Start 3537: RuntimeSandboxAcceptanceGpuSmoke.HierarchySelectionKeepsDefaultSandboxVisibleWithOutline
+44/54 Test #3537: RuntimeSandboxAcceptanceGpuSmoke.HierarchySelectionKeepsDefaultSandboxVisibleWithOutline ....................   Passed    6.27 sec
+      Start 3538: RuntimeSandboxAcceptanceGpuSmoke.ImportedObjectSpaceNormalBakeBindsAndReadsBackExactTargetSlice
+45/54 Test #3538: RuntimeSandboxAcceptanceGpuSmoke.ImportedObjectSpaceNormalBakeBindsAndReadsBackExactTargetSlice .............   Passed   11.44 sec
+      Start 3539: RuntimeSandboxAcceptanceGpuSmoke.PropertyTextureModuleBakesRebindsRebakesAndRemovesOnVulkan
+46/54 Test #3539: RuntimeSandboxAcceptanceGpuSmoke.PropertyTextureModuleBakesRebindsRebakesAndRemovesOnVulkan .................   Passed   25.93 sec
+      Start 3540: RuntimeSandboxAcceptanceGpuSmoke.SeamSplitCornerUvMeshDeIndexesAtUploadAndRendersVisibleSurface
+47/54 Test #3540: RuntimeSandboxAcceptanceGpuSmoke.SeamSplitCornerUvMeshDeIndexesAtUploadAndRendersVisibleSurface .............   Passed    7.41 sec
+      Start 3541: ClusteringServiceGpuSmoke.VulkanExecutionMatchesCpuReferenceAndCommitsCanonicalProperties
+48/54 Test #3541: ClusteringServiceGpuSmoke.VulkanExecutionMatchesCpuReferenceAndCommitsCanonicalProperties ...................   Passed    9.22 sec
+      Start 3542: PointCloudConsolidationGpuParity.VulkanLopAndIsotropicWlopMatchFrozenCpuReferencesAndRepeat
+49/54 Test #3542: PointCloudConsolidationGpuParity.VulkanLopAndIsotropicWlopMatchFrozenCpuReferencesAndRepeat .................   Passed   29.57 sec
+      Start 3543: PointCloudConsolidationGpuParity.VulkanAutoProcessesChildMeshPositionsAndPublishesDisplacement
+50/54 Test #3543: PointCloudConsolidationGpuParity.VulkanAutoProcessesChildMeshPositionsAndPublishesDisplacement ..............   Passed   24.22 sec
+      Start 3544: ProgressivePoissonGpuResultReadbackGpuSmoke.VulkanBatchTransportsReferenceShapedResultWithoutBlockingRead
+51/54 Test #3544: ProgressivePoissonGpuResultReadbackGpuSmoke.VulkanBatchTransportsReferenceShapedResultWithoutBlockingRead ...   Passed    1.94 sec
+      Start 3545: GpuResultReadbackGpuSmoke.SharedBatchParksJobAndReleasesDerivedUpload
+52/54 Test #3545: GpuResultReadbackGpuSmoke.SharedBatchParksJobAndReleasesDerivedUpload .......................................   Passed    1.95 sec
+      Start 4324: ExtrinsicSandbox.FramePacingDiagnosticCapture
+53/54 Test #4324: ExtrinsicSandbox.FramePacingDiagnosticCapture ...............................................................   Passed    9.93 sec
+      Start 4325: ExtrinsicSandbox.VulkanShutdownLsanContract
+54/54 Test #4325: ExtrinsicSandbox.VulkanShutdownLsanContract .................................................................***Failed    7.26 sec
+CMake Error at /home/alex/Documents/IntrinsicEngine/tests/regression/graphics/Run.VulkanShutdownLsanContract.cmake:101 (message):
+  BUG-083 five-frame Sandbox process exited 86; the narrow leak policy is not
+  clean.
+
+  [32m[INFO] Initialized Scheduler with 31 worker threads.[0m
+
+  [33m[WARN] [Runtime] Promoted Vulkan device selected; backend remains
+  fail-closed until the first clean default-recipe validation promotes
+  it.[0m
+
+  [33m[WARN] [VulkanDevice::Initialize] Vulkan bootstrap created
+  logical-device, queue, VMA, per-frame command/sync, swapchain
+  image/view/handle, bindless heap, transfer queue, and global
+  pipeline-layout state; canonical frame execution waits for the first clean
+  recipe validation publish, so device remains non-operational during cold
+  start.[0m
+
+  [33m[WARN] [Runtime] VulkanRequestedButNotOperational
+  status=RequestedButIncompleteGate reason=BarrierValidationFailed[0m
+
+
+
+  =================================================================
+
+  ==411933==ERROR: LeakSanitizer: detected memory leaks
+
+
+
+  Direct leak of 408 byte(s) in 1 object(s) allocated from:
+
+      #0 0x630500a478c2 in calloc (/home/alex/Documents/IntrinsicEngine/build/ci-vulkan/bin/ExtrinsicSandbox+0x31548c2) (BuildId: 4b6f771efa0c23b25f5b8c7042b8eea19337007d)
+      #1 0x763df10089cf in _XimOpenIM (/lib/x86_64-linux-gnu/libX11.so.6+0x619cf) (BuildId: 37a5d7bbb78e3a99ea8376a7c80ea0c62fe06494)
+      #2 0x763df100e57c in _XimRegisterIMInstantiateCallback (/lib/x86_64-linux-gnu/libX11.so.6+0x6757c) (BuildId: 37a5d7bbb78e3a99ea8376a7c80ea0c62fe06494)
+      #3 0x763df0ffabac in XRegisterIMInstantiateCallback (/lib/x86_64-linux-gnu/libX11.so.6+0x53bac) (BuildId: 37a5d7bbb78e3a99ea8376a7c80ea0c62fe06494)
+      #4 0x6305041ddfdd in _glfwInitX11 /home/alex/Documents/IntrinsicEngine/external/vcpkg/buildtrees/glfw3/src/3.4-2448ff4533.clean/src/x11_init.c:1544:9
+      #5 0x6305041cc608 in glfwInit /home/alex/Documents/IntrinsicEngine/external/vcpkg/buildtrees/glfw3/src/3.4-2448ff4533.clean/src/init.c:405:10
+      #6 0x630502aa7438 in Extrinsic::Platform::Backends::Glfw::(anonymous namespace)::GLFWLifetime::Instanciate() /home/alex/Documents/IntrinsicEngine/src/platform/backends/glfw/Platform.Backend.Glfw.cpp:40:41
+      #7 0x630502aa7a13 in Extrinsic::Platform::Backends::Glfw::Window@Extrinsic.Platform.Backend.Glfw::Window(Extrinsic::Core::Config::WindowConfig@Extrinsic.Core.Config.Window const&) /home/alex/Documents/IntrinsicEngine/src/platform/backends/glfw/Platform.Backend.Glfw.cpp:74:9
+      #8 0x630502aaa118 in std::__detail::_MakeUniq<Extrinsic::Platform::Backends::Glfw::Window@Extrinsic.Platform.Backend.Glfw>::__single_object std::make_unique<Extrinsic::Platform::Backends::Glfw::Window@Extrinsic.Platform.Backend.Glfw, Extrinsic::Core::Config::WindowConfig@Extrinsic.Core.Config.Window const&>(Extrinsic::Core::Config::WindowConfig@Extrinsic.Core.Config.Window const&) /usr/lib/gcc/x86_64-linux-gnu/14/../../../../include/c++/14/bits/unique_ptr.h:1076:34
+      #9 0x630502aa9a6f in Extrinsic::Platform::Backends::Glfw::CreateWindow@Extrinsic.Platform.Backend.Glfw(Extrinsic::Core::Config::WindowConfig@Extrinsic.Core.Config.Window const&) /home/alex/Documents/IntrinsicEngine/src/platform/backends/glfw/Platform.Backend.Glfw.cpp:337:16
+      #10 0x630502a931ae in Extrinsic::Platform::CreateWindow@Extrinsic.Platform.Window(Extrinsic::Core::Config::WindowConfig@Extrinsic.Core.Config.Window const&) /home/alex/Documents/IntrinsicEngine/src/platform/Platform.CreateWindow.cpp:21:16
+      #11 0x63050120c1a1 in Extrinsic::Runtime::Engine@Extrinsic.Runtime.Engine::Initialize() /home/alex/Documents/IntrinsicEngine/src/runtime/Kernel/Runtime.Engine.cpp:507:30
+      #12 0x630500a8c878 in main /home/alex/Documents/IntrinsicEngine/src/app/Sandbox/main.cpp:453:12
+      #13 0x7a3df3229d8f in __libc_start_call_main csu/../sysdeps/nptl/libc_start_call_main.h:58:16
+      #14 0x7a3df3229e3f in __libc_start_main csu/../csu/libc-start.c:392:3
+      #15 0x6305009a3184 in _start (/home/alex/Documents/IntrinsicEngine/build/ci-vulkan/bin/ExtrinsicSandbox+0x30b0184) (BuildId: 4b6f771efa0c23b25f5b8c7042b8eea19337007d)
+
+
+
+  Direct leak of 256 byte(s) in 1 object(s) allocated from:
+
+      #0 0x630500a47af1 in realloc (/home/alex/Documents/IntrinsicEngine/build/ci-vulkan/bin/ExtrinsicSandbox+0x3154af1) (BuildId: 4b6f771efa0c23b25f5b8c7042b8eea19337007d)
+      #1 0x763da6606a08  (<unknown module>)
+      #2 0x763da660707e  (<unknown module>)
+      #3 0x7a3df3299ea7 in __pthread_once_slow nptl/pthread_once.c:116:7
+      #4 0x763da6605497  (<unknown module>)
+      #5 0x763da6642f4a  (<unknown module>)
+      #6 0x630500a44c56 in asan_thread_start(void*) asan_interceptors.cpp.o
+      #7 0x7a3df3294a82 in start_thread nptl/pthread_create.c:442:8
+      #8 0x7a3df332688f  misc/../sysdeps/unix/sysv/linux/x86_64/clone3.S:81
+
+
+
+  Direct leak of 256 byte(s) in 1 object(s) allocated from:
+
+      #0 0x630500a47af1 in realloc (/home/alex/Documents/IntrinsicEngine/build/ci-vulkan/bin/ExtrinsicSandbox+0x3154af1) (BuildId: 4b6f771efa0c23b25f5b8c7042b8eea19337007d)
+      #1 0x763db549e428  (<unknown module>)
+      #2 0x763db549ea9e  (<unknown module>)
+      #3 0x7a3df3299ea7 in __pthread_once_slow nptl/pthread_once.c:116:7
+      #4 0x763db56bb2b6  (<unknown module>)
+      #5 0x763db5461d45  (<unknown module>)
+      #6 0x763db5640ad5  (<unknown module>)
+      #7 0x763db5640a46  (<unknown module>)
+      #8 0x763db5461fb9  (<unknown module>)
+      #9 0x763db54630bf  (<unknown module>)
+      #10 0x763db55034a8  (<unknown module>)
+      #11 0x763db5504050  (<unknown module>)
+      #12 0x7a3df394ea5b  (/lib/x86_64-linux-gnu/libvulkan.so.1+0x21a5b) (BuildId: 26e66a54095520793b4bcde7a38d2da7f48efc88)
+      #13 0x7a3df394f19b  (/lib/x86_64-linux-gnu/libvulkan.so.1+0x2219b) (BuildId: 26e66a54095520793b4bcde7a38d2da7f48efc88)
+      #14 0x763da5517606  (<unknown module>)
+      #15 0x763da51b7c4f  (<unknown module>)
+      #16 0x763df0906136  (<unknown module>)
+      #17 0x7a3df39480de  (/lib/x86_64-linux-gnu/libvulkan.so.1+0x1b0de) (BuildId: 26e66a54095520793b4bcde7a38d2da7f48efc88)
+      #18 0x7a3df395cee5 in vkCreateInstance (/lib/x86_64-linux-gnu/libvulkan.so.1+0x2fee5) (BuildId: 26e66a54095520793b4bcde7a38d2da7f48efc88)
+      #19 0x630503dc78f4 in Extrinsic::Backends::Vulkan::VulkanDevice@Extrinsic.Backends.Vulkan::Initialize(Extrinsic::RHI::DeviceCreateDesc@Extrinsic.RHI.Device const&) /home/alex/Documents/IntrinsicEngine/src/graphics/vulkan/Backends.Vulkan.Device.cpp:1495:23
+      #20 0x63050120cbbf in Extrinsic::Runtime::Engine@Extrinsic.Runtime.Engine::Initialize() /home/alex/Documents/IntrinsicEngine/src/runtime/Kernel/Runtime.Engine.cpp:515:27
+      #21 0x630500a8c878 in main /home/alex/Documents/IntrinsicEngine/src/app/Sandbox/main.cpp:453:12
+      #22 0x7a3df3229d8f in __libc_start_call_main csu/../sysdeps/nptl/libc_start_call_main.h:58:16
+      #23 0x7a3df3229e3f in __libc_start_main csu/../csu/libc-start.c:392:3
+      #24 0x6305009a3184 in _start (/home/alex/Documents/IntrinsicEngine/build/ci-vulkan/bin/ExtrinsicSandbox+0x30b0184) (BuildId: 4b6f771efa0c23b25f5b8c7042b8eea19337007d)
+
+
+
+  -----------------------------------------------------
+
+  Suppressions used:
+
+    count      bytes template
+       18     113760 VulkanCommandContext@Extrinsic.Backends.Vulkan::PushConstants
+        3       1754 dbus_connection_send_with_reply_and_block
+
+  -----------------------------------------------------
+
+
+
+  SUMMARY: AddressSanitizer: 920 byte(s) leaked in 3 allocation(s).
+
+
+
+
+
+98% tests passed, 1 tests failed out of 54
+
+Label Time Summary:
+benchmark      =  80.32 sec*proc (5 tests)
+geometry       = 145.27 sec*proc (9 tests)
+gpu            = 497.73 sec*proc (54 tests)
+graphics       = 352.46 sec*proc (45 tests)
+integration    = 231.96 sec*proc (25 tests)
+regression     =   7.26 sec*proc (1 test)
+runtime        = 319.54 sec*proc (31 tests)
+slow           =   1.95 sec*proc (1 test)
+vulkan         = 497.73 sec*proc (54 tests)
+
+Total Test time (real) = 497.86 sec
+
+The following tests FAILED:
+	4325 - ExtrinsicSandbox.VulkanShutdownLsanContract (Failed) gpu graphics regression runtime vulkan

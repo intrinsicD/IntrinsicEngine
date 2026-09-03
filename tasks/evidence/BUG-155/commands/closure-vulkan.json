@@ -1,0 +1,26 @@
+{
+  "command": [
+    "ctest",
+    "--test-dir",
+    "build/ci-vulkan",
+    "--output-on-failure",
+    "-R",
+    "^(RHIProfiler\\.DurationResolutionPreservesAvailableZeroIntervals|DefaultRecipeSurfaceGpuSmoke\\.NativeGpuTimestampsResolveNamedPassesAfterSlotReuse)$",
+    "--timeout",
+    "120"
+  ],
+  "command_display": "ctest --test-dir build/ci-vulkan --output-on-failure -R '^(RHIProfiler\\.DurationResolutionPreservesAvailableZeroIntervals|DefaultRecipeSurfaceGpuSmoke\\.NativeGpuTimestampsResolveNamedPassesAfterSlotReuse)$' --timeout 120",
+  "cwd": ".",
+  "duration_ms": 9890,
+  "exit_code": 0,
+  "finished_at": "2026-09-03T08:49:46Z",
+  "label": "closure-vulkan",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-09-03T08:49:36Z",
+  "stderr_path": "tasks/evidence/BUG-155/commands/closure-vulkan.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/BUG-155/commands/closure-vulkan.stdout.log",
+  "stdout_sha256": "87471f4ca9b8ae8574d24402a25b989b662e18118dfb4685e515635c62603e71",
+  "task_id": "BUG-155"
+}

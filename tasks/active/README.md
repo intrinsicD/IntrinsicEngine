@@ -11,16 +11,6 @@ Each active task should include:
 
 ## Currently active
 
-- [`BUG-154` — Restore PMP curvature parity without normal-seam topology loss](BUG-154-curvature-pmp-parity-corner-normal-topology.md)
-  — blocked only by its independent fixed-surface review and final
-  revision-bound evidence; `BUG-155` resolved the promoted-Vulkan dependency.
-- [`BUG-156` — Adopt deterministic Framework24 Taubin curvature semantics](BUG-156-curvature-two-ring-smoothing-cancels-features.md)
-  — CPU-contracted on `main`; synchronous and queued runtime publication now
-  persists all four curvature scalars atomically with stale-state rejection and
-  undo/redo. Its independent fixed-surface review remains open.
-- [`BUG-162` — Consolidate all local branch history onto main](BUG-162-main-branch-consolidation.md)
-  — pushed and fetched at `a9706f332`; local ancestry and the integrated source
-  surface are complete, with independent fixed-surface review still pending.
 - [`METHOD-039` — Feature-network-constrained curvature patch decomposition](METHOD-039-feature-network-curvature-patch-decomposition.md)
   — paused behind `REVIEW-004`; preserves its completed negative-result surface
   and work-graph history for research resumption after the gate retires.

@@ -1,0 +1,23 @@
+{
+  "command": [
+    "python3",
+    "tools/docs/check_doc_links.py",
+    "--root",
+    ".",
+    "--strict"
+  ],
+  "command_display": "python3 tools/docs/check_doc_links.py --root . --strict",
+  "cwd": ".",
+  "duration_ms": 788,
+  "exit_code": 0,
+  "finished_at": "2026-09-03T09:25:31Z",
+  "label": "doc-links-final",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-09-03T09:25:31Z",
+  "stderr_path": "tasks/evidence/BUG-118/commands/doc-links-final.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/BUG-118/commands/doc-links-final.stdout.log",
+  "stdout_sha256": "9c2f368518c20028f4a516f6e0b2721899e0f8eb03898b0ab23b10fa3de7b670",
+  "task_id": "BUG-118"
+}

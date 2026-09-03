@@ -18,6 +18,8 @@ maturity_target: CPUContracted
 
 ## Status
 
+- Completed and retired on 2026-09-03 at `CPUContracted`. Estimator commit:
+  `28a5fdea`; runtime-publication commit `a9706f332` owns the shipped repair.
 - Reporter rejected the one-ring unsmoothed correction after direct comparison
   with Framework24. The task is reopened around Framework24 interoperability;
   the previous accuracy claim is no longer the selected product contract.
@@ -31,7 +33,7 @@ maturity_target: CPUContracted
   CPU-supported cases, all 2,745 ASan cases (including the formerly failing
   BUG-118 GLFW/LSan capability case), and all 2,745 UBSan registrations (with
   that ASan-only capability case skipped as designed). This repair's
-  exact-revision independent review remains open; `BENCH-001` separately owns
+  exact-revision independent review is accepted; `BENCH-001` separately owns
   the frozen claim-grade matched run required for a claim-eligible Framework24
   parity statement.
 - The original BUG-156 live review cycle exhausted its fourth bounded writer
@@ -178,7 +180,7 @@ maturity_target: CPUContracted
       transaction, undo/redo, and property-discovery path as mean/Gaussian.
 - [x] Focused geometry/runtime tests, full CPU gate, isolated ASan/UBSan gates,
       and strict structural/documentation checks pass on the final surface.
-- [ ] Independent fixed-surface review accepts the high-risk public numerical
+- [x] Independent fixed-surface review accepts the high-risk public numerical
       contract and runtime-publication surface.
 
 ## Verification
@@ -240,7 +242,8 @@ python3 tools/agents/workflow_evidence.py validate --root .
   runtime property-publication contract. No `Operational` follow-up is owed for
   this geometry-owned CPU operation; `UI-050` owns vector-field visibility and
   `BENCH-001`/`REVIEW-004` own the product-level evidence gate.
-- Current: the geometry kernel, reference-derived regression anchors, and
-  complete runtime property-publication contract are CPU-contracted; only the
-  exact-surface high-risk review remains open. `BENCH-001` and `REVIEW-004` own
-  any later claim-eligible `ParityProven` product verdict.
+- Current: completed at `CPUContracted`; the geometry kernel,
+  reference-derived regression anchors, and complete runtime
+  property-publication contract have accepted exact-surface high-risk review.
+  `BENCH-001` and `REVIEW-004` own any later claim-eligible `ParityProven`
+  product verdict.

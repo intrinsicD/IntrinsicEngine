@@ -1,0 +1,28 @@
+{
+  "command": [
+    "python3",
+    "tools/agents/skills/intrinsicengine-source-documentation/scripts/audit_source_documentation.py",
+    "--root",
+    ".",
+    "--path",
+    "src/platform/README.md",
+    "--path",
+    "src/graphics/vulkan/README.md",
+    "--path",
+    "tests/README.md"
+  ],
+  "command_display": "python3 tools/agents/skills/intrinsicengine-source-documentation/scripts/audit_source_documentation.py --root . --path src/platform/README.md --path src/graphics/vulkan/README.md --path tests/README.md",
+  "cwd": ".",
+  "duration_ms": 30,
+  "exit_code": 0,
+  "finished_at": "2026-09-03T09:18:41Z",
+  "label": "source-doc-audit",
+  "required": false,
+  "schema_version": 1,
+  "started_at": "2026-09-03T09:18:41Z",
+  "stderr_path": "tasks/evidence/BUG-118/commands/source-doc-audit.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/BUG-118/commands/source-doc-audit.stdout.log",
+  "stdout_sha256": "77e37b4e6cd14e01bd5ef93def24df19bd2c86921acd22b1809b0a2048cd759b",
+  "task_id": "BUG-118"
+}

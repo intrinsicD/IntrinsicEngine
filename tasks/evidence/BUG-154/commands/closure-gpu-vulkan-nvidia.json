@@ -1,0 +1,30 @@
+{
+  "command": [
+    "env",
+    "VK_DRIVER_FILES=/usr/share/vulkan/icd.d/nvidia_icd.json",
+    "ctest",
+    "--test-dir",
+    "build/ci-vulkan",
+    "--output-on-failure",
+    "-L",
+    "gpu",
+    "-L",
+    "vulkan",
+    "--timeout",
+    "180"
+  ],
+  "command_display": "env VK_DRIVER_FILES=/usr/share/vulkan/icd.d/nvidia_icd.json ctest --test-dir build/ci-vulkan --output-on-failure -L gpu -L vulkan --timeout 180",
+  "cwd": ".",
+  "duration_ms": 478222,
+  "exit_code": 0,
+  "finished_at": "2026-09-03T09:19:26Z",
+  "label": "closure-gpu-vulkan-nvidia",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-09-03T09:11:28Z",
+  "stderr_path": "tasks/evidence/BUG-154/commands/closure-gpu-vulkan-nvidia.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/BUG-154/commands/closure-gpu-vulkan-nvidia.stdout.log",
+  "stdout_sha256": "a4a4ffa18e02559aa08089f19e55e2b4c903ff832fa45b369e222762747e7cfd",
+  "task_id": "BUG-154"
+}

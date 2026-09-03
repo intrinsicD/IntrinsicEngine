@@ -1,17 +1,17 @@
 schema_version: 1
 task_id: BUG-154
 workflow_profile: high-risk
-status: draft
+status: complete
 generated_by: tools/agents/workflow_evidence.py
-generated_at: '2026-09-03T00:38:57Z'
+generated_at: '2026-09-03T09:27:41Z'
 claim_eligible: false
 source:
   base_ref: 4a043a7db0bae0d546259a0455dd92d3f0e944a5
   base_revision: 4a043a7db0bae0d546259a0455dd92d3f0e944a5
-  head_revision: 55ddf284ee0a44be7c1172f7597c0d08d3ee0443
+  head_revision: da8934651e4ba0064989f89da0a6cc088697c0bd
   branch: main
   worktree: /home/alex/Documents/IntrinsicEngine
-  dirty: false
+  dirty: true
   surface:
   - path: .github/copilot-instructions.md
     sha256: 6eca8f4a866442a1bd1166fa0b9314c2e0b3759b1257b12276cf4ac292e3b259
@@ -38,7 +38,7 @@ source:
   - path: ara/evidence/tables/eig3x3_live_curvature_diagnostic_2026-08-12.md
     sha256: da516c1ca252225ebb36c0184086b36e3f10eeb3a545cc7ddb360e2696303fde
   - path: ara/logic/claims.md
-    sha256: 2112aded20b1933585a4cad66ca58d605e72ce11af2f154ca4225ce7d8b4e8ad
+    sha256: a38331556de6e4f5c8440268ea43d4cd8d7f943307343881e324675ca242ed6d
   - path: ara/logic/solution/architecture.md
     sha256: d97f40c6b869c4a8eea833664da8ae586b786cb740b8805831c3d22a1e4a41a2
   - path: ara/logic/solution/heuristics.md
@@ -46,9 +46,9 @@ source:
   - path: ara/staging/observations.yaml
     sha256: 7b1c03d50950ec283381b0aaf7cd79713dad7653b4c13a47183584673656dfb9
   - path: ara/trace/exploration_tree.yaml
-    sha256: f980dcfc6a653630cb9712cbeac2cd5f27c242a6e18abe4dd78c10e1e744f20a
+    sha256: df9924483e8987773a4827c9660f033d8d9511e4c2d4c7c88e971d64baccd9e0
   - path: ara/trace/pm_reasoning_log.yaml
-    sha256: 055c5ebadddbbd2ae5a918799f6158e8498a9aaf0f35b88254f90cabbcc317f6
+    sha256: be20c8bdaca6e8297059d711ba117063bdf56bf0c40e97cbe8e257739eb6a342
   - path: ara/trace/sessions/2026-08-11_001.yaml
     sha256: e82e13e011a24225fafc50431448bf81e4d9613f9a79434bf15edfb3b5685343
   - path: ara/trace/sessions/2026-08-12_001.yaml
@@ -59,8 +59,10 @@ source:
     sha256: ae75fc92c89cd8a18142fbe36e6c294a7d11f310dd90262aedc44bdc704b06ab
   - path: ara/trace/sessions/2026-09-02_001.yaml
     sha256: d41bd67b2cec732ab8b8f89976e1e886b7a6612bf4fc452d042e673ed4506527
+  - path: ara/trace/sessions/2026-09-03_001.yaml
+    sha256: 61a06a572012dbb58ac2454d6229dbe107eefacb1b6e39e59363e3d1c695834a
   - path: ara/trace/sessions/session_index.yaml
-    sha256: 9e43f8e9aea1d4a9e6ededb18f73e109011735f9f054b6dbc96039e0206d0f99
+    sha256: 81c9eaeb43eaf80b10c7a612979a445b697cede047430dd3e1533ea2037f04ae
   - path: docs/agent/agent-output-review-checklist.md
     sha256: b5485164a4099c54ad6fb064cda25bb15eaa426ab78ba56c6e52955f7fa1da03
   - path: docs/agent/ara-evidence-policy.md
@@ -118,13 +120,17 @@ source:
   - path: docs/product/framework24-convergence.md
     sha256: 174eeaaf9278ee31f756f538edc30260c37fa4cbef7350c377cbf7216444afbc
   - path: docs/product/framework24-feature-inventory.md
-    sha256: eb58ea9d8f5df5b33d1bef50815ce96e0c878dd6e68ec3e3818ce7287920f7ec
+    sha256: 80b40ed87726a69a0bb3a9ebc41c53c93d4cdf14cf228f7a8072364ee7efe5fc
   - path: docs/product/index.md
     sha256: 2c118ff0ceb0e818a3ba3ba9bf887550f8f68fe2330c69a9fa2dd747b86808d0
   - path: docs/reports/2026-08-12-curvature-estimator-study.md
     sha256: 7af720d1e98a65029ea1cf343c9718cc4cbba559ebc267b36f39e6f1545ded81
   - path: docs/reports/2026-08-12-curvature-support-smoothing-defect.md
     sha256: 5aca36610c35e268ec13d6653714faa1f572a49fe837e355eed5bd0c2d1e411f
+  - path: docs/reviews/2026-07-21-runtime-190-clean-workshop-review.md
+    sha256: 21bcda71d9843112788251b7d8b9368bd2de551ce5b363a8c6d06ade91b63d87
+  - path: lsan.supp
+    sha256: 5de097d80421d89bc2d5a14de55ba8fb3e1ebe7294c468e88f8a5b83931ebbed
   - path: src/app/Sandbox/CMakeLists.txt
     sha256: 3e36525fe60ea68dd33c75d8f9f044a757811021cbf252f7d8e8ee1bba0a8e56
   - path: src/app/Sandbox/Editor/Sandbox.DomainPanels.cpp
@@ -200,7 +206,9 @@ source:
   - path: src/graphics/vulkan/Backends.Vulkan.Profiler.cpp
     sha256: b8cc8b16151ee35b45f5e7015e105d8798862859e1d2ef22ebd65204baa1345e
   - path: src/graphics/vulkan/README.md
-    sha256: 7060d6cc2684546e29533691937bd068e00b55ce18d862eb4c0f2d210d178302
+    sha256: a85734d647aa5dae6a505b839ed7acd3d68e68ac8d33292437845c41c68e52a1
+  - path: src/platform/README.md
+    sha256: f334301d31aafcff43fd3b33454de889c89b1b56151ab666591567e58d284f97
   - path: src/runtime/AssetWorkflow/Runtime.AssetWorkflowGeometryMaterialization.cpp
     sha256: deec21fe4bfe7be09345da64fb38200e82f8b6ce8e3a411d0631b00b1729583d
   - path: src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Mesh.cpp
@@ -228,19 +236,13 @@ source:
   - path: tasks/HINTS.md
     sha256: 63f512c40817ec8e083627cb545625d41505ad933e196bca7e2ae49d8d8e5ea8
   - path: tasks/SESSION-BRIEF.md
-    sha256: cf32855f9fc86cd8484a1d01a2f6ac02d42ab2e5b71abd915a5aa528817db7f4
-  - path: tasks/active/BUG-154-curvature-pmp-parity-corner-normal-topology.md
-    sha256: e60c85a5c13c22b0ab32a754df872d7b1e0539c3fd7ee0ae70495f3f74dd8804
-  - path: tasks/active/BUG-156-curvature-two-ring-smoothing-cancels-features.md
-    sha256: 5b9da84115993ea449fe13043a5125fb564428fb472b0f3528096a42e8f02647
-  - path: tasks/active/BUG-162-main-branch-consolidation.md
-    sha256: 3b68cd8b3ea908817e54df59c524b6b68f346afcd3eb9684efa54df6e5a774a7
+    sha256: 768939e39f67c53faa7cbb4d171cb18cdabcd76774c63fb6e5aa24980abb0715
   - path: tasks/active/METHOD-039-feature-network-curvature-patch-decomposition.md
     sha256: d3afb87b88fe6a47122bd9965d2912e0c7d1c7e9d9bc30d8f0645b3c3b18e40e
   - path: tasks/active/README.md
-    sha256: 94242d836a3f5aa5e2ee4df5a0a316a11bab97e79f148f8366dfafa9064de2a3
+    sha256: 396a67e291f5834b873a85329fd71fa664c3d1eda045a02c1a5c04a887529c31
   - path: tasks/backlog/README.md
-    sha256: 6409374fef3bf59d5a8093d6f352db2564b8a31b7f6960834edec1d95f545902
+    sha256: 578e18e32ed8ab66cf577e42003eee35acfc3be3c997ef553029ae103cb3101a
   - path: tasks/backlog/architecture/README.md
     sha256: 5420204e4aad910ad22819d50219c19fcf3b14c9f58fb439ed34195846ad2cba
   - path: tasks/backlog/architecture/REVIEW-004-framework24-product-convergence-audit.md
@@ -253,6 +255,8 @@ source:
     sha256: 8620f22b070b27d53dc5d2701882ba7cbb8db94cf1ec0da7783e96058131db90
   - path: tasks/backlog/benchmarks/README.md
     sha256: 2a21bb35f5662c64e09ecc2bbf08dd4ff5cf8d8a796cc08af053d995bc240b70
+  - path: tasks/backlog/bugs/BUG-118-glfw-x11-input-method-lsan-recurrence.md
+    sha256: null
   - path: tasks/backlog/bugs/BUG-121-glm-anonymous-union-module-copy-assign.md
     sha256: null
   - path: tasks/backlog/bugs/BUG-157-clang20-glm-module-union-build-break.md
@@ -266,7 +270,7 @@ source:
   - path: tasks/backlog/bugs/README.md
     sha256: 3f3ccf887fafa5a2e0bff971e4fa1f201202101b9a4af026430640dc73c153f8
   - path: tasks/backlog/bugs/index.md
-    sha256: 41b9e8d9ccd06c1ec1363a4d15b448cb474629380f1dc5f5b7c47246216314b5
+    sha256: 0ede69a958e3b46b7d2ba9f2fbfbcd2f9e8beb444c3a1b33acb3b765396385b6
   - path: tasks/backlog/rendering/GRAPHICS-135-renderprep-per-frame-taskgraph-overhead.md
     sha256: 768a8a271c9fbeb37d28c7a4a022556ab141f4d42af77e966755de0554a64557
   - path: tasks/backlog/rendering/README.md
@@ -293,14 +297,22 @@ source:
     sha256: 7085a0763001ec67bb1cddcbc3278040ff5f2ef7ad0a3946340609b8460062e0
   - path: tasks/done/ARCH-018-framework24-feature-parity-goal-clarification.md
     sha256: 8969945e6fabba81036902fc8b7165d991d75bc099d68a571659dd80fbb8abfc
+  - path: tasks/done/BUG-118-glfw-x11-input-method-lsan-recurrence.md
+    sha256: b1c14cea03affcd7fedfe8447c1dccd65b4ced317b69d3f66a7b89523d655ca8
   - path: tasks/done/BUG-121-glm-anonymous-union-module-copy-assign.md
     sha256: cb4fce4c196b4a15746351c3cc9e53248362be30030ad7f3623878b71251e4e5
+  - path: tasks/done/BUG-154-curvature-pmp-parity-corner-normal-topology.md
+    sha256: 78f34420697fb0c49827714ae903753c78beed6945929aca73a8d1fe493ffd77
   - path: tasks/done/BUG-155-vulkan-native-timestamp-zero-duration-flake.md
     sha256: e6cadc40a58ccdb3dcf044004f6a889d2d955bd0bfca9b4422de83f96bfbabd5
+  - path: tasks/done/BUG-156-curvature-two-ring-smoothing-cancels-features.md
+    sha256: 888404b41a573fd4996ce66496fa13323557356d8922be0ec05af94987f68ce0
   - path: tasks/done/BUG-161-clean-checkout-framework24-policy-validation.md
     sha256: 5109a0202cd725f5946084f79a5301a8e5679be8d30ca3b76dfd91feedeaa62c
+  - path: tasks/done/BUG-162-main-branch-consolidation.md
+    sha256: f1152c49abffe08c3017c905c903c9dce7fd5921aeb415b7111b1d320ccbda6c
   - path: tasks/done/RETIREMENT-LOG.md
-    sha256: fac8d9b72cd961bc54a93eff8fb0ea70d392aae2ce7a04f2258a171a94cef083
+    sha256: 3c4a1eb503fc6dbd7d45435f41525442a2a833516d16117b6b1cdd4450f84474
   - path: tasks/evidence/ARCH-017/commands/ara-claims.json
     sha256: b92e5e488b4aa616b7eb997f44b796eeb5deb33b2f18b651e08ed06990fbac88
   - path: tasks/evidence/ARCH-017/commands/ara-claims.stderr.log
@@ -467,6 +479,148 @@ source:
     sha256: b54a1ee6f1139961aa8629d3f7f5f38b421d4301f66e16129a3ac9f96f6eddb5
   - path: tasks/evidence/ARCH-018/seal.yaml
     sha256: c90b853aa7a7477a6dae26cf6d4d8442829ec4706d73cae29e7e100e021df4b5
+  - path: tasks/evidence/BUG-118/commands/ara.json
+    sha256: 0bfb93db54a382a5296767352f8267f8667592321470a0fb81f7d61e344305a1
+  - path: tasks/evidence/BUG-118/commands/ara.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/BUG-118/commands/ara.stdout.log
+    sha256: 8cc6193147c8b8920b3dc80a6ad9d6c0b1f01eb1280c0a424f205892f94b53fc
+  - path: tasks/evidence/BUG-118/commands/build-ci-asan-glfw.json
+    sha256: 500bfb5bf631214f0b0a1c35592bd15fef9b384b8fe9bdf0cc944937f3e78864
+  - path: tasks/evidence/BUG-118/commands/build-ci-asan-glfw.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/BUG-118/commands/build-ci-asan-glfw.stdout.log
+    sha256: 41bf19f99e27ab668e5314f395dbed29f6c8d13b27cfd1694cc0ed0d322cb0ad
+  - path: tasks/evidence/BUG-118/commands/build-ci-tests.json
+    sha256: d15894e04348b67936263dd77b3d8af394fa6f0e5d43fdf16b1a89ae0e68c43f
+  - path: tasks/evidence/BUG-118/commands/build-ci-tests.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/BUG-118/commands/build-ci-tests.stdout.log
+    sha256: c4f530f521597ade2b171218010bb2c2e378482d3f48bcf52c25e866af9c56d2
+  - path: tasks/evidence/BUG-118/commands/clean-workshop-final.json
+    sha256: 37dac6414194bc76f91aace081610666840c7128351c099d233f839a6e1a8161
+  - path: tasks/evidence/BUG-118/commands/clean-workshop-final.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/BUG-118/commands/clean-workshop-final.stdout.log
+    sha256: c34dc10062977b606ec45427ce476cee1f089fc4028266f0c3f380e3e5691a66
+  - path: tasks/evidence/BUG-118/commands/clean-workshop.json
+    sha256: 4a064175793343fb49ba179bd89fbe58c58aa21c21c1ca6835eea0432b083322
+  - path: tasks/evidence/BUG-118/commands/clean-workshop.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/BUG-118/commands/clean-workshop.stdout.log
+    sha256: bec8f872fe7287d6057ebb123632c97a55d0baa67bcb6170e00812996194b5c6
+  - path: tasks/evidence/BUG-118/commands/closure-glfw-repeat.json
+    sha256: 2e4f536abbd2a73aaa177f1df0753e6dfde96721e59cd18708de89f45acbd776
+  - path: tasks/evidence/BUG-118/commands/closure-glfw-repeat.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/BUG-118/commands/closure-glfw-repeat.stdout.log
+    sha256: d7f26150741e075f25f94ed4659f7290a99853c2b6d379f49bc17a7e05e181e9
+  - path: tasks/evidence/BUG-118/commands/closure-platform-glfw.json
+    sha256: e2add98b039fecbdb093f74f4192cd55bb957c423fc8498874c3b6e6a672e623
+  - path: tasks/evidence/BUG-118/commands/closure-platform-glfw.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/BUG-118/commands/closure-platform-glfw.stdout.log
+    sha256: fab2c8f82801f144fbf1bb7048c7d3b4086b557541cc9e2ec05983cd3b07faa9
+  - path: tasks/evidence/BUG-118/commands/closure-vulkan-shutdown.json
+    sha256: cf67308369edffb9e52af32802e28bc1f37fc4f547a66237f12f94c09737bfdd
+  - path: tasks/evidence/BUG-118/commands/closure-vulkan-shutdown.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/BUG-118/commands/closure-vulkan-shutdown.stdout.log
+    sha256: 42a73272060bb590607c568acc50a666405110476f32f05b0cef936585f9bdbd
+  - path: tasks/evidence/BUG-118/commands/configure-ci-asan.json
+    sha256: c80d1bfb4e50cf64b8322a154028eee06968d1ba59a06e997f5283126ba61f61
+  - path: tasks/evidence/BUG-118/commands/configure-ci-asan.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/BUG-118/commands/configure-ci-asan.stdout.log
+    sha256: e1c58277c13d3a7bc3ca2f8894a7a12f95c208e7d5a7bb9974e17224204bdf4e
+  - path: tasks/evidence/BUG-118/commands/configure-ci.json
+    sha256: b847585f02e7ca7ae8f1d9bbd93191bea298c6ce7b3a69183306fdf026d9800e
+  - path: tasks/evidence/BUG-118/commands/configure-ci.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/BUG-118/commands/configure-ci.stdout.log
+    sha256: dbf0398f470da7062bb1173997c2bcc4ae26b295dcb77b849f97ce5891950b2e
+  - path: tasks/evidence/BUG-118/commands/cpu-supported.json
+    sha256: 7412fa26074d442ab1465e3b67a9f47052414601b4311187c0fda67641a20f66
+  - path: tasks/evidence/BUG-118/commands/cpu-supported.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/BUG-118/commands/cpu-supported.stdout.log
+    sha256: 9d6abd2668917d019b8b417e4806719d997f079536d08a25941a631bdb2b20ef
+  - path: tasks/evidence/BUG-118/commands/diagnostic-xim-suppression.json
+    sha256: 8b9ce2eba69fc25d166d804bb3f700a44c8b0ea4bbe6bf216975159fb65e361c
+  - path: tasks/evidence/BUG-118/commands/diagnostic-xim-suppression.stderr.log
+    sha256: 6025a9683e0c57b83e00d72acd5621e834c0175d36cdfe137849ff582bb53f1c
+  - path: tasks/evidence/BUG-118/commands/diagnostic-xim-suppression.stdout.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/BUG-118/commands/doc-links-final.json
+    sha256: b4e208857365f2e1e3ec2fa4659f2cebcc27d1d95532d21d1372fe5d1cf79346
+  - path: tasks/evidence/BUG-118/commands/doc-links-final.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/BUG-118/commands/doc-links-final.stdout.log
+    sha256: 9c2f368518c20028f4a516f6e0b2721899e0f8eb03898b0ab23b10fa3de7b670
+  - path: tasks/evidence/BUG-118/commands/doc-links.json
+    sha256: 966c98e96c437ef9ab7a8f2fe1bdfad305aed4e78d22ebf4de55ac734deb6d6f
+  - path: tasks/evidence/BUG-118/commands/doc-links.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/BUG-118/commands/doc-links.stdout.log
+    sha256: 8e8cc2c7616c34f7e5d861d39eafd6c5d571e4d667ec77bf61907c986d45a670
+  - path: tasks/evidence/BUG-118/commands/docs-sync-final-surface.json
+    sha256: 136dfdcc454c2fcfaba2a94e96bfaa8100c41d30ed211bd397334716f4898347
+  - path: tasks/evidence/BUG-118/commands/docs-sync-final-surface.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/BUG-118/commands/docs-sync-final-surface.stdout.log
+    sha256: 836846dabe39b0c4161b3f53e6e6aa497666fc40d7471387e3b933c8d3c7e2a1
+  - path: tasks/evidence/BUG-118/commands/docs-sync.json
+    sha256: a70ba23ac838cff6f35ebbfcfb29522bb5b714e384c987b6bee24b7c926a0530
+  - path: tasks/evidence/BUG-118/commands/docs-sync.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/BUG-118/commands/docs-sync.stdout.log
+    sha256: 6418bed79b6dc73e8b9aa4845436612bf66ef48f12c695ea64e127a0dd0dd7fe
+  - path: tasks/evidence/BUG-118/commands/layering.json
+    sha256: be8f96ba0839646cf4f4dbb92f9bd361ac2c4c3b360754de8b295a45e4c38ad0
+  - path: tasks/evidence/BUG-118/commands/layering.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/BUG-118/commands/layering.stdout.log
+    sha256: 9cd5fda008290dce363b4c8ac32e9cb0a3979a9b069a470a300e2e8bc71fedc8
+  - path: tasks/evidence/BUG-118/commands/root-hygiene.json
+    sha256: 43675b9037f340ed64f3bddeede518b5bed272a54b0ead4058e7cd7e99899444
+  - path: tasks/evidence/BUG-118/commands/root-hygiene.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/BUG-118/commands/root-hygiene.stdout.log
+    sha256: 05485d557043f93bbbcf01fcd9dadf7f169c4de8ae2967207d1c0eb77188d8bf
+  - path: tasks/evidence/BUG-118/commands/source-doc-audit.json
+    sha256: 03384a96166e07b35b44ca15f40e9dc94de3ae42cda0353b871f37e1b444e048
+  - path: tasks/evidence/BUG-118/commands/source-doc-audit.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/BUG-118/commands/source-doc-audit.stdout.log
+    sha256: 77e37b4e6cd14e01bd5ef93def24df19bd2c86921acd22b1809b0a2048cd759b
+  - path: tasks/evidence/BUG-118/commands/task-policy.json
+    sha256: 5f4664efc9779964a14c3aa2a8dd30924b32114ac479f4cf366a6ca2850d186a
+  - path: tasks/evidence/BUG-118/commands/task-policy.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/BUG-118/commands/task-policy.stdout.log
+    sha256: 74569fd39472f682d08a6f0dcba8bd9afabf55d939aef6af3f9bd63daaa5a2cf
+  - path: tasks/evidence/BUG-118/commands/task-state-links.json
+    sha256: 44af7fb8bb33a8f4761e839f7bb249f255d9e72c08b779e445b205a8c9b24514
+  - path: tasks/evidence/BUG-118/commands/task-state-links.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/BUG-118/commands/task-state-links.stdout.log
+    sha256: 27f9b97a14eb012b578a139a0431c27f1a6b3c02cf72aea0ce92dbe29801e7ed
+  - path: tasks/evidence/BUG-118/commands/test-layout.json
+    sha256: 31f5a2650ddc0ab23406131fbdea5c7e575f78bf7bdc2b50caae7eb483f8928f
+  - path: tasks/evidence/BUG-118/commands/test-layout.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/BUG-118/commands/test-layout.stdout.log
+    sha256: 164bf228e1aef2ee28535d5028a51d6afa83b491716f01cb064037a925a98cb2
+  - path: tasks/evidence/BUG-118/report.yaml
+    sha256: 60b64659007d03c8b66eac1829e1c50793bcfc35e7ebd2c1306b88b2f1250476
+  - path: tasks/evidence/BUG-155/commands/closure-vulkan.json
+    sha256: 65122a0a8770cdf951c028e00856de8d71b9f7ce0a01e19879c5ea8f652a2ff6
+  - path: tasks/evidence/BUG-155/commands/closure-vulkan.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/BUG-155/commands/closure-vulkan.stdout.log
+    sha256: 87471f4ca9b8ae8574d24402a25b989b662e18118dfb4685e515635c62603e71
+  - path: tasks/evidence/BUG-155/report.yaml
+    sha256: 6d6bf9a40dcd5bf763b7473dc2fa24d68088f4e8db48946cf3f41b7c5374b7ba
   - path: tasks/evidence/BUG-156/commands/corrected-ci-asan.json
     sha256: 72517afde4ae38b1ac3eb80968179d969ecbaab1f55fb0072d8f1dfa5f2a53f9
   - path: tasks/evidence/BUG-156/commands/corrected-ci-asan.stderr.log
@@ -497,10 +651,12 @@ source:
     sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
   - path: tasks/evidence/BUG-156/commands/corrected-structural.stdout.log
     sha256: c96909d818911f41c835478b7fce4acabf9f51722de6639fdacf42b3d494e9dc
+  - path: tasks/evidence/BUG-156/handoff.jsonl
+    sha256: 50d86846e8e1446206aca7e8734fe78db156cf37bf10588811c96950458cdaab
   - path: tasks/evidence/BUG-156/report.yaml
-    sha256: b41cfa0b04764cfb5ac48186129e75376f877cd33cfb3759d5f7b918d459b5f3
+    sha256: a5229d9f0c3014eed9ff4b22a8cd554725e618d76197ddb6e7aa86d918c52cba
   - path: tasks/evidence/BUG-156/reviews.jsonl
-    sha256: 1a508110a8665c1c0b04e9f43730fc1ad7edd59efdca7d47bbf5cc522e73713e
+    sha256: 86c9519acf8a9ff1e10fafc4902b290788df0877cceee98577c9543835a4e90d
   - path: tasks/evidence/BUG-161/commands/ccache-workflow.json
     sha256: db0f3920b47ef9f90fcadad04f03057719b1af38f1f48d66dde3d82392c0c7a4
   - path: tasks/evidence/BUG-161/commands/ccache-workflow.stderr.log
@@ -731,14 +887,18 @@ source:
     sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
   - path: tasks/evidence/BUG-162/commands/corrected-structural.stdout.log
     sha256: 2cf8dca5c17b21c9841eb7eb1b96cb7809a6a7dd21de85472af71278a952aeac
+  - path: tasks/evidence/BUG-162/handoff.jsonl
+    sha256: 3b873359050cfd62045da5647cd28a4d606b31a83a8fdd6cc65ed125ca465138
   - path: tasks/evidence/BUG-162/report.yaml
-    sha256: e9c0633e56800fa8c7ee1e18b99bf38e520a6fed360e87061c399864f3be384f
+    sha256: 5b2fbd270ca520bc8cd2781a4a19269280fdbb3eea3da7be9216e73179f1edd5
   - path: tasks/evidence/BUG-162/reviews.jsonl
-    sha256: 84d35f5c458252777e4e6b755ae6c3f2d506b0256f6661ad307570fdb1d1b78b
+    sha256: ba28a9a700ec071b45c8b2499e2ae52797ce2e3561616bbf023dea59e691b7fd
   - path: tasks/templates/task-micro.md
     sha256: 88a2639be6e5993c040f0111c362f438876aaaba7995006c39e55ae4645716b0
+  - path: tests/CMakeLists.txt
+    sha256: 57337fa92737a34dac13306e40e6d9e04bdf14620ea2be95c67a2777c8b027b2
   - path: tests/README.md
-    sha256: 7f41f2717e69f8ebd7e9270b7c3d733cbc2901decee6064cd6719be5a49a91db
+    sha256: 829d8bb82c651829a8d0bb32d7178f57a21ba35be7658d0adc8050764de57179
   - path: tests/contract/runtime/Test.AssetImportFormatCoverage.cpp
     sha256: 6fa202d936c7db24daf52f01d7e8fe414d0597b5ee4cf09ba7bf041cf801196f
   - path: tests/contract/runtime/Test.CornerTexcoordUpload.cpp
@@ -757,6 +917,10 @@ source:
     sha256: 55ef2b66c95f1065a345556af44ce03aab769cea6f0c90917f83068bce1cf48d
   - path: tests/integration/graphics/Test.DefaultRecipeSurfaceGpuSmoke.cpp
     sha256: 11fd220ae27d2f98fc50ec13617945bfe9dc261bb5e3e0408d938dfed9151508
+  - path: tests/regression/graphics/Run.VulkanShutdownLsanContract.cmake
+    sha256: 5928d56495e0e4df249968d81c734ac0998ee581e5dcb69c87a4216645a94076
+  - path: tests/regression/platform/Run.GlfwLifecycleLsanContract.cmake
+    sha256: 19e8381ebc25a97265ad9c88f7573266ccf39cee4ec79725d5f04f5272a23b49
   - path: tests/regression/tooling/Test.WorkflowConcurrency.py
     sha256: 5934b441133dd1931d23393888e4753479a45c244aa1be7aa06988c1109b96e6
   - path: tests/unit/geometry/Test.CurvatureTensor.cpp
@@ -800,7 +964,7 @@ source:
   - path: tools/agents/check_audit_cadence.py
     sha256: 79d4c1bbf9681e3ba30327f80f8c3a4e6fba6f8d4e5bdb726e2b462a32802707
   - path: tools/agents/contract_legacy_tasks.json
-    sha256: 9e4c42b39ea720bc573fb162607c7d2f250fada6f83bfb37a8881aaa19e895d3
+    sha256: 27d954474064990fcecbbc0bd221fade87d60fdf91c3a649204be778d9beb632
   - path: tools/agents/generate_session_brief.py
     sha256: f613efcf9f9b01790d33f10f51610836085c79a483cff9905516de5225be0da1
   - path: tools/agents/skills/README.md
@@ -875,7 +1039,7 @@ source:
     sha256: c85485df548794e8dce225dfae5b482b22642f1ec2035511033540344bc7a3f1
   - path: tools/repo/githooks/pre-commit
     sha256: f57fd300376114c921128c6e519ff6f5fb9cb0695722a00096626b887ccbb7e6
-  content_digest: f6a06b6271b7723e5138f5f75dcd4df2bdc062898aa96272e7492aec0e98758d
+  content_digest: 8bd944f7b25b2e4670402a13e68c5393f648a383de76afacef6d4a2bc9fc08e8
 touched:
   paths:
   - .github/copilot-instructions.md
@@ -901,6 +1065,7 @@ touched:
   - ara/trace/sessions/2026-08-13_001.yaml
   - ara/trace/sessions/2026-09-01_001.yaml
   - ara/trace/sessions/2026-09-02_001.yaml
+  - ara/trace/sessions/2026-09-03_001.yaml
   - ara/trace/sessions/session_index.yaml
   - docs/agent/agent-output-review-checklist.md
   - docs/agent/ara-evidence-policy.md
@@ -934,6 +1099,8 @@ touched:
   - docs/product/index.md
   - docs/reports/2026-08-12-curvature-estimator-study.md
   - docs/reports/2026-08-12-curvature-support-smoothing-defect.md
+  - docs/reviews/2026-07-21-runtime-190-clean-workshop-review.md
+  - lsan.supp
   - src/app/Sandbox/CMakeLists.txt
   - src/app/Sandbox/Editor/Sandbox.DomainPanels.cpp
   - src/app/Sandbox/Editor/Sandbox.DomainPanels.cppm
@@ -972,6 +1139,7 @@ touched:
   - src/graphics/rhi/README.md
   - src/graphics/vulkan/Backends.Vulkan.Profiler.cpp
   - src/graphics/vulkan/README.md
+  - src/platform/README.md
   - src/runtime/AssetWorkflow/Runtime.AssetWorkflowGeometryMaterialization.cpp
   - src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Mesh.cpp
   - src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.cppm
@@ -986,9 +1154,6 @@ touched:
   - src/runtime/Scene/Runtime.SceneSerialization.cpp
   - tasks/HINTS.md
   - tasks/SESSION-BRIEF.md
-  - tasks/active/BUG-154-curvature-pmp-parity-corner-normal-topology.md
-  - tasks/active/BUG-156-curvature-two-ring-smoothing-cancels-features.md
-  - tasks/active/BUG-162-main-branch-consolidation.md
   - tasks/active/METHOD-039-feature-network-curvature-patch-decomposition.md
   - tasks/active/README.md
   - tasks/backlog/README.md
@@ -998,6 +1163,7 @@ touched:
   - tasks/backlog/assets/README.md
   - tasks/backlog/benchmarks/BENCH-001-framework24-golden-workflow-comparison-harness.md
   - tasks/backlog/benchmarks/README.md
+  - tasks/backlog/bugs/BUG-118-glfw-x11-input-method-lsan-recurrence.md
   - tasks/backlog/bugs/BUG-121-glm-anonymous-union-module-copy-assign.md
   - tasks/backlog/bugs/BUG-157-clang20-glm-module-union-build-break.md
   - tasks/backlog/bugs/BUG-158-direct-mesh-enrichment-blocks-usable-geometry.md
@@ -1018,9 +1184,13 @@ touched:
   - tasks/backlog/ui/UI-051-domain-agnostic-appearance-properties-selection-windows.md
   - tasks/done/ARCH-017-framework24-product-convergence-gate.md
   - tasks/done/ARCH-018-framework24-feature-parity-goal-clarification.md
+  - tasks/done/BUG-118-glfw-x11-input-method-lsan-recurrence.md
   - tasks/done/BUG-121-glm-anonymous-union-module-copy-assign.md
+  - tasks/done/BUG-154-curvature-pmp-parity-corner-normal-topology.md
   - tasks/done/BUG-155-vulkan-native-timestamp-zero-duration-flake.md
+  - tasks/done/BUG-156-curvature-two-ring-smoothing-cancels-features.md
   - tasks/done/BUG-161-clean-checkout-framework24-policy-validation.md
+  - tasks/done/BUG-162-main-branch-consolidation.md
   - tasks/done/RETIREMENT-LOG.md
   - tasks/evidence/ARCH-017/commands/ara-claims.json
   - tasks/evidence/ARCH-017/commands/ara-claims.stderr.log
@@ -1105,6 +1275,77 @@ touched:
   - tasks/evidence/ARCH-018/report.yaml
   - tasks/evidence/ARCH-018/reviews.jsonl
   - tasks/evidence/ARCH-018/seal.yaml
+  - tasks/evidence/BUG-118/commands/ara.json
+  - tasks/evidence/BUG-118/commands/ara.stderr.log
+  - tasks/evidence/BUG-118/commands/ara.stdout.log
+  - tasks/evidence/BUG-118/commands/build-ci-asan-glfw.json
+  - tasks/evidence/BUG-118/commands/build-ci-asan-glfw.stderr.log
+  - tasks/evidence/BUG-118/commands/build-ci-asan-glfw.stdout.log
+  - tasks/evidence/BUG-118/commands/build-ci-tests.json
+  - tasks/evidence/BUG-118/commands/build-ci-tests.stderr.log
+  - tasks/evidence/BUG-118/commands/build-ci-tests.stdout.log
+  - tasks/evidence/BUG-118/commands/clean-workshop-final.json
+  - tasks/evidence/BUG-118/commands/clean-workshop-final.stderr.log
+  - tasks/evidence/BUG-118/commands/clean-workshop-final.stdout.log
+  - tasks/evidence/BUG-118/commands/clean-workshop.json
+  - tasks/evidence/BUG-118/commands/clean-workshop.stderr.log
+  - tasks/evidence/BUG-118/commands/clean-workshop.stdout.log
+  - tasks/evidence/BUG-118/commands/closure-glfw-repeat.json
+  - tasks/evidence/BUG-118/commands/closure-glfw-repeat.stderr.log
+  - tasks/evidence/BUG-118/commands/closure-glfw-repeat.stdout.log
+  - tasks/evidence/BUG-118/commands/closure-platform-glfw.json
+  - tasks/evidence/BUG-118/commands/closure-platform-glfw.stderr.log
+  - tasks/evidence/BUG-118/commands/closure-platform-glfw.stdout.log
+  - tasks/evidence/BUG-118/commands/closure-vulkan-shutdown.json
+  - tasks/evidence/BUG-118/commands/closure-vulkan-shutdown.stderr.log
+  - tasks/evidence/BUG-118/commands/closure-vulkan-shutdown.stdout.log
+  - tasks/evidence/BUG-118/commands/configure-ci-asan.json
+  - tasks/evidence/BUG-118/commands/configure-ci-asan.stderr.log
+  - tasks/evidence/BUG-118/commands/configure-ci-asan.stdout.log
+  - tasks/evidence/BUG-118/commands/configure-ci.json
+  - tasks/evidence/BUG-118/commands/configure-ci.stderr.log
+  - tasks/evidence/BUG-118/commands/configure-ci.stdout.log
+  - tasks/evidence/BUG-118/commands/cpu-supported.json
+  - tasks/evidence/BUG-118/commands/cpu-supported.stderr.log
+  - tasks/evidence/BUG-118/commands/cpu-supported.stdout.log
+  - tasks/evidence/BUG-118/commands/diagnostic-xim-suppression.json
+  - tasks/evidence/BUG-118/commands/diagnostic-xim-suppression.stderr.log
+  - tasks/evidence/BUG-118/commands/diagnostic-xim-suppression.stdout.log
+  - tasks/evidence/BUG-118/commands/doc-links-final.json
+  - tasks/evidence/BUG-118/commands/doc-links-final.stderr.log
+  - tasks/evidence/BUG-118/commands/doc-links-final.stdout.log
+  - tasks/evidence/BUG-118/commands/doc-links.json
+  - tasks/evidence/BUG-118/commands/doc-links.stderr.log
+  - tasks/evidence/BUG-118/commands/doc-links.stdout.log
+  - tasks/evidence/BUG-118/commands/docs-sync-final-surface.json
+  - tasks/evidence/BUG-118/commands/docs-sync-final-surface.stderr.log
+  - tasks/evidence/BUG-118/commands/docs-sync-final-surface.stdout.log
+  - tasks/evidence/BUG-118/commands/docs-sync.json
+  - tasks/evidence/BUG-118/commands/docs-sync.stderr.log
+  - tasks/evidence/BUG-118/commands/docs-sync.stdout.log
+  - tasks/evidence/BUG-118/commands/layering.json
+  - tasks/evidence/BUG-118/commands/layering.stderr.log
+  - tasks/evidence/BUG-118/commands/layering.stdout.log
+  - tasks/evidence/BUG-118/commands/root-hygiene.json
+  - tasks/evidence/BUG-118/commands/root-hygiene.stderr.log
+  - tasks/evidence/BUG-118/commands/root-hygiene.stdout.log
+  - tasks/evidence/BUG-118/commands/source-doc-audit.json
+  - tasks/evidence/BUG-118/commands/source-doc-audit.stderr.log
+  - tasks/evidence/BUG-118/commands/source-doc-audit.stdout.log
+  - tasks/evidence/BUG-118/commands/task-policy.json
+  - tasks/evidence/BUG-118/commands/task-policy.stderr.log
+  - tasks/evidence/BUG-118/commands/task-policy.stdout.log
+  - tasks/evidence/BUG-118/commands/task-state-links.json
+  - tasks/evidence/BUG-118/commands/task-state-links.stderr.log
+  - tasks/evidence/BUG-118/commands/task-state-links.stdout.log
+  - tasks/evidence/BUG-118/commands/test-layout.json
+  - tasks/evidence/BUG-118/commands/test-layout.stderr.log
+  - tasks/evidence/BUG-118/commands/test-layout.stdout.log
+  - tasks/evidence/BUG-118/report.yaml
+  - tasks/evidence/BUG-155/commands/closure-vulkan.json
+  - tasks/evidence/BUG-155/commands/closure-vulkan.stderr.log
+  - tasks/evidence/BUG-155/commands/closure-vulkan.stdout.log
+  - tasks/evidence/BUG-155/report.yaml
   - tasks/evidence/BUG-156/commands/corrected-ci-asan.json
   - tasks/evidence/BUG-156/commands/corrected-ci-asan.stderr.log
   - tasks/evidence/BUG-156/commands/corrected-ci-asan.stdout.log
@@ -1120,6 +1361,7 @@ touched:
   - tasks/evidence/BUG-156/commands/corrected-structural.json
   - tasks/evidence/BUG-156/commands/corrected-structural.stderr.log
   - tasks/evidence/BUG-156/commands/corrected-structural.stdout.log
+  - tasks/evidence/BUG-156/handoff.jsonl
   - tasks/evidence/BUG-156/report.yaml
   - tasks/evidence/BUG-156/reviews.jsonl
   - tasks/evidence/BUG-161/commands/ccache-workflow.json
@@ -1237,9 +1479,11 @@ touched:
   - tasks/evidence/BUG-162/commands/corrected-structural.json
   - tasks/evidence/BUG-162/commands/corrected-structural.stderr.log
   - tasks/evidence/BUG-162/commands/corrected-structural.stdout.log
+  - tasks/evidence/BUG-162/handoff.jsonl
   - tasks/evidence/BUG-162/report.yaml
   - tasks/evidence/BUG-162/reviews.jsonl
   - tasks/templates/task-micro.md
+  - tests/CMakeLists.txt
   - tests/README.md
   - tests/contract/runtime/Test.AssetImportFormatCoverage.cpp
   - tests/contract/runtime/Test.CornerTexcoordUpload.cpp
@@ -1250,6 +1494,8 @@ touched:
   - tests/data/framework24-obtuse-tetrahedron.obj
   - tests/data/framework24-open-patch.obj
   - tests/integration/graphics/Test.DefaultRecipeSurfaceGpuSmoke.cpp
+  - tests/regression/graphics/Run.VulkanShutdownLsanContract.cmake
+  - tests/regression/platform/Run.GlfwLifecycleLsanContract.cmake
   - tests/regression/tooling/Test.WorkflowConcurrency.py
   - tests/unit/geometry/Test.CurvatureTensor.cpp
   - tests/unit/geometry/Test.GeometryIO.cpp
@@ -1359,12 +1605,14 @@ acceptance:
   evidence: []
   reason: null
 - criterion: Independent fixed-surface review accepts the final high-risk revision.
-  task_checked: false
-  disposition: pending
+  task_checked: true
+  disposition: satisfied
   evidence: []
   reason: null
 commands:
 - receipt: tasks/evidence/BUG-154/commands/clean-workshop.json
+- receipt: tasks/evidence/BUG-154/commands/closure-gpu-vulkan-nvidia.json
+- receipt: tasks/evidence/BUG-154/commands/closure-gpu-vulkan.json
 - receipt: tasks/evidence/BUG-154/commands/final-ci-asan.json
 - receipt: tasks/evidence/BUG-154/commands/final-ci-cpu.json
 - receipt: tasks/evidence/BUG-154/commands/final-ci-ubsan.json
@@ -1384,21 +1632,24 @@ changed_public_contracts:
 diagnostics_and_previews:
 - The retained 96-model diagnostic compared 80 payload-bearing models and 2,530,726 vertices; its machine-local
   timing remains non-claim evidence
-- BUG-154 receipts retain CPU 4252/4252, isolated ASan and UBSan 2744/2744, focused 12/12, task-specific
-  Vulkan 2/2, and strict clean-workshop results on the original frozen surface
-- The first label-distinct independent review accepted the 0f1330140 source surface and identified only
-  report acceptance rebinding plus non-blocking wording/evidence cleanup
+- Retained receipts cover CPU 4252/4252, isolated ASan and UBSan 2744/2744, focused geometry/runtime selectors,
+  task-specific Vulkan readback, strict structural gates, and prior accepted independent review rounds
+- The first 2026-09-03 unqualified multi-ICD retirement cohort passed 53/54 and failed only on BUG-118
+  external shutdown allocations; that receipt is preserved as optional diagnostic evidence
+- After BUG-118 bounded the affected-libX11 XIM row and the local run selected its operational NVIDIA
+  ICD, the complete current promoted-Vulkan cohort passed 54/54 in 478.18 seconds without retries or broad
+  suppressions
 benchmark_or_parity_evidence:
 - Pinned local PMP revision and matched Clang 23 probes establish the bounded numerical comparison; four-model
   timings are explicitly machine-local non-claim evidence
 docs_sync:
-  task_file: tasks/active/BUG-154-curvature-pmp-parity-corner-normal-topology.md
+  task_file: tasks/done/BUG-154-curvature-pmp-parity-corner-normal-topology.md
   session_brief_present: true
   canonical_docs_changed: true
   skill_mirrors_checked: true
 residual_risks:
-- The regenerated surface includes later main history, including BUG-156's estimator supersession, beyond
-  the original 0f1330140 source review
+- The final retirement surface contains later main history, including BUG-156 estimator supersession and
+  the BUG-118 test-contract dependency, beyond the original 0f1330140 implementation review
 - Non-manifold or unbounded-valence meshes beyond existing fail-closed tests remain unverified
 - The reusable operation remains vertex-domain cotan diffusion only; arbitrary domains and public glm::dvec
   properties remain out of scope

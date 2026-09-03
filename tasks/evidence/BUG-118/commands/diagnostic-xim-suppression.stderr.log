@@ -1,0 +1,7 @@
+BUG082_GLFW_STATIC_TEARDOWN: terminate_calls=1
+-----------------------------------------------------
+Suppressions used:
+  count      bytes template
+      1        408 _XimRegisterIMInstantiateCallback
+-----------------------------------------------------
+

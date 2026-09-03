@@ -32,10 +32,6 @@ of `BUG-140` and of the parameterization rejection recorded in `BUG-141`.
   ASan, and UBSan after the earlier shallow-checkout validator failure was
   fixed; `BUG-157` is the sole implementation owner.
 
-- [`BUG-154` — Restore PMP curvature parity without normal-seam topology loss](../../active/BUG-154-curvature-pmp-parity-corner-normal-topology.md):
-  the geometry repair and all runtime gates are complete; only the independent
-  high-risk fixed-surface review and revision-bound final evidence remain.
-
 - [`BUG-149` — Benchmark sealer escapes dotted output directories](BUG-149-benchmark-sealer-dotted-output-directory.md):
   `run_and_seal.py` interprets a dotted directory name as a file, seals its
   parent (observed as all of `/tmp`), and can return zero after the sealer
@@ -55,11 +51,6 @@ of `BUG-140` and of the parameterization rejection recorded in `BUG-141`.
   stack-use-after-scope and three heap-use-after-free failures on
   `origin/main`; repair the test lifetimes without weakening their semantics or
   changing production contracts absent an independent repro.
-- [`BUG-118` — GLFW X11 input-method LeakSanitizer recurrence](BUG-118-glfw-x11-input-method-lsan-recurrence.md):
-  the standalone lifetime contract again retains the unsuppressed 408-byte
-  libX11 input-method allocation despite proving process-static
-  `glfwTerminate()` ran once; compare the live XIM environment and teardown
-  path with the retired `BUG-082` evidence without weakening leak detection.
 - [`BUG-097` — Progressive model-scene UV job publishes a zero atlas](BUG-097-progressive-model-scene-zero-uv-atlas.md):
   the default-off progressive enrichment path labels an all-zero authoritative
   `v:texcoord` property as an atlas and can publish it after newer UV/topology
@@ -70,6 +61,31 @@ of `BUG-140` and of the parameterization rejection recorded in `BUG-141`.
   tests run; collect cold/warm/contention evidence and set an explicit,
   evidence-backed discovery policy without weakening per-test timeouts.
 ## Verified / Closed
+
+- Closed 2026-09-03: [`BUG-118` — GLFW X11 input-method LeakSanitizer
+  recurrence](../../done/BUG-118-glfw-x11-input-method-lsan-recurrence.md).
+  The retained 408-byte object is the affected libX11 1.7.5 temporary-XIM
+  allocation fixed upstream. One exact function suppression is guarded by the
+  unchanged 4,096-byte engine-leak control; CPU and selected-ICD Vulkan gates
+  pass without a broad X11, loader, or driver suppression.
+
+- Closed 2026-09-03: [`BUG-162` — Consolidate all local branch history onto
+  main](../../done/BUG-162-main-branch-consolidation.md). The integrated source
+  commit was pushed without force, fetched back exactly, and preserves every
+  recorded pre-integration tip; an independent fixed-surface review accepted
+  the terminal repository/task/ARA surface.
+
+- Closed 2026-09-03: [`BUG-156` — Adopt deterministic Framework24 Taubin
+  curvature semantics](../../done/BUG-156-curvature-two-ring-smoothing-cancels-features.md).
+  The deterministic CPU estimator and atomic runtime publication of all four
+  curvature scalars retire at `CPUContracted` after separate independent
+  fixed-surface review. `BENCH-001` still owns claim-grade parity evidence.
+
+- Closed 2026-09-03: [`BUG-154` — Restore PMP curvature parity without
+  normal-seam topology loss](../../done/BUG-154-curvature-pmp-parity-corner-normal-topology.md).
+  Reusable property smoothing and corner-normal-preserving OBJ/runtime/render
+  handling retire at `Operational`; BUG-156 remains the shipped estimator
+  contract, and the historical PMP evidence stays explicitly superseded.
 
 - Closed 2026-09-02: [`BUG-155` — Native Vulkan timestamp smoke intermittently
   publishes zero duration](../../done/BUG-155-vulkan-native-timestamp-zero-duration-flake.md).

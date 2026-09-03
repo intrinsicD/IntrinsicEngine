@@ -1,0 +1,24 @@
+{
+  "command": [
+    "env",
+    "ASAN_OPTIONS=detect_leaks=1:symbolize=1:fast_unwind_on_malloc=0:halt_on_error=1",
+    "LSAN_OPTIONS=detect_leaks=1:fast_unwind_on_malloc=0:exitcode=86:suppressions=/home/alex/Documents/IntrinsicEngine/lsan.supp",
+    "ASAN_SYMBOLIZER_PATH=/usr/bin/llvm-symbolizer-22",
+    "build/ci-asan/bin/IntrinsicGlfwLifecycleLsanProcess",
+    "engine-static-lifetime"
+  ],
+  "command_display": "env ASAN_OPTIONS=detect_leaks=1:symbolize=1:fast_unwind_on_malloc=0:halt_on_error=1 LSAN_OPTIONS=detect_leaks=1:fast_unwind_on_malloc=0:exitcode=86:suppressions=/home/alex/Documents/IntrinsicEngine/lsan.supp ASAN_SYMBOLIZER_PATH=/usr/bin/llvm-symbolizer-22 build/ci-asan/bin/IntrinsicGlfwLifecycleLsanProcess engine-static-lifetime",
+  "cwd": ".",
+  "duration_ms": 45,
+  "exit_code": 0,
+  "finished_at": "2026-09-03T09:17:02Z",
+  "label": "diagnostic-xim-suppression",
+  "required": false,
+  "schema_version": 1,
+  "started_at": "2026-09-03T09:17:02Z",
+  "stderr_path": "tasks/evidence/BUG-118/commands/diagnostic-xim-suppression.stderr.log",
+  "stderr_sha256": "6025a9683e0c57b83e00d72acd5621e834c0175d36cdfe137849ff582bb53f1c",
+  "stdout_path": "tasks/evidence/BUG-118/commands/diagnostic-xim-suppression.stdout.log",
+  "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "task_id": "BUG-118"
+}

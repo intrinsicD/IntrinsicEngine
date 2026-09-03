@@ -1,0 +1,28 @@
+{
+  "command": [
+    "ctest",
+    "--test-dir",
+    "build/ci-asan",
+    "--output-on-failure",
+    "-R",
+    "^GlfwLifecycleLsan\\.EngineStaticTeardownAndLeakControl$",
+    "--repeat",
+    "until-fail:10",
+    "--timeout",
+    "60"
+  ],
+  "command_display": "ctest --test-dir build/ci-asan --output-on-failure -R '^GlfwLifecycleLsan\\.EngineStaticTeardownAndLeakControl$' --repeat until-fail:10 --timeout 60",
+  "cwd": ".",
+  "duration_ms": 1146,
+  "exit_code": 0,
+  "finished_at": "2026-09-03T09:15:47Z",
+  "label": "closure-glfw-repeat",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-09-03T09:15:46Z",
+  "stderr_path": "tasks/evidence/BUG-118/commands/closure-glfw-repeat.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/BUG-118/commands/closure-glfw-repeat.stdout.log",
+  "stdout_sha256": "d7f26150741e075f25f94ed4659f7290a99853c2b6d379f49bc17a7e05e181e9",
+  "task_id": "BUG-118"
+}

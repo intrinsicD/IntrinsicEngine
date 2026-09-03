@@ -1,0 +1,29 @@
+{
+  "command": [
+    "env",
+    "VK_DRIVER_FILES=/usr/share/vulkan/icd.d/nvidia_icd.json",
+    "ctest",
+    "--test-dir",
+    "build/ci-vulkan",
+    "--output-on-failure",
+    "-R",
+    "^(GlfwLifecycleLsan\\.EngineStaticTeardownAndLeakControl|ExtrinsicSandbox\\.VulkanShutdownLsanContract)$",
+    "--no-tests=error",
+    "--timeout",
+    "180"
+  ],
+  "command_display": "env VK_DRIVER_FILES=/usr/share/vulkan/icd.d/nvidia_icd.json ctest --test-dir build/ci-vulkan --output-on-failure -R '^(GlfwLifecycleLsan\\.EngineStaticTeardownAndLeakControl|ExtrinsicSandbox\\.VulkanShutdownLsanContract)$' --no-tests=error --timeout 180",
+  "cwd": ".",
+  "duration_ms": 6999,
+  "exit_code": 0,
+  "finished_at": "2026-09-03T09:21:47Z",
+  "label": "closure-vulkan-shutdown",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-09-03T09:21:40Z",
+  "stderr_path": "tasks/evidence/BUG-118/commands/closure-vulkan-shutdown.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/BUG-118/commands/closure-vulkan-shutdown.stdout.log",
+  "stdout_sha256": "42a73272060bb590607c568acc50a666405110476f32f05b0cef936585f9bdbd",
+  "task_id": "BUG-118"
+}

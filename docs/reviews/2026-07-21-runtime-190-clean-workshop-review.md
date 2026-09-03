@@ -29,4 +29,4 @@
 - No findings.
 - The unrelated GLFW/X11 LeakSanitizer recurrence observed by the full CPU
   selector is separately tracked by
-  [`BUG-118`](../../tasks/backlog/bugs/BUG-118-glfw-x11-input-method-lsan-recurrence.md).
+  [`BUG-118`](../../tasks/done/BUG-118-glfw-x11-input-method-lsan-recurrence.md).

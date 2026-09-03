@@ -18,6 +18,9 @@ maturity_target: Operational
 
 ## Status
 
+- Completed and retired on 2026-09-03 at `Operational`. Implementation commit:
+  `0f1330140`; `BUG-155` implementation commit `bc2855f43`
+  restored the promoted-Vulkan evidence needed for closure.
 - BUG-156 superseded this task's PMP estimator selection with deterministic
   Framework24 semantics. The PMP-specific goal and checked estimator evidence
   below are retained as historical slice records, not as the current shipped
@@ -32,8 +35,8 @@ maturity_target: Operational
 - `BUG-155` retired after proving the unrelated native-timestamp zero was a
   legal equal-tick interval and passing two complete promoted-Vulkan cohorts
   54/54 without retries. The full-gate dependency is resolved. This task
-  remains active only for its required independent high-risk fixed-surface
-  review and revision-bound final evidence binding.
+  is now bound to an accepted independent high-risk fixed-surface review and
+  revision-bound final completion evidence.
 
 ## Goal
 
@@ -180,7 +183,7 @@ maturity_target: Operational
 - [x] Record the corpus experiment, source/binary/result identities, solver
       diagnosis, literature comparison, limitations, and recommendation in a
       durable report.
-- [ ] Bind the final high-risk workflow evidence after independent review.
+- [x] Bind the final high-risk workflow evidence after independent review.
 
 ## Acceptance criteria
 
@@ -200,7 +203,7 @@ maturity_target: Operational
       ordinary well-conditioned curvature remains stable under uniform scale.
 - [x] Required CPU, sanitizer, structural, documentation, and promoted-Vulkan
       gates pass on the final current-source surface.
-- [ ] Independent fixed-surface review accepts the final high-risk revision.
+- [x] Independent fixed-surface review accepts the final high-risk revision.
 
 ## Verification
 
@@ -220,7 +223,9 @@ ctest --test-dir build/ci-ubsan --output-on-failure -LE 'gpu|vulkan|slow|flaky-q
 
 cmake --preset ci-vulkan
 cmake --build --preset ci-vulkan --target IntrinsicTests
-ctest --test-dir build/ci-vulkan --output-on-failure -L 'gpu' -L 'vulkan' --timeout 120
+env VK_DRIVER_FILES=/usr/share/vulkan/icd.d/nvidia_icd.json \
+  ctest --test-dir build/ci-vulkan --output-on-failure \
+  -L 'gpu' -L 'vulkan' --timeout 180
 
 python3 tools/repo/generate_module_inventory.py --root src --out docs/api/generated/module_inventory.md
 python3 tools/agents/sync_skills.py --write
@@ -267,6 +272,13 @@ Recorded results on 2026-08-11 and 2026-08-12:
   seam-split rendering, validation, and the shutdown LeakSanitizer contract
   remained green. The two task-specific normal-path cases pass 2/2 in the
   final required receipt.
+- The 2026-09-03 retirement rerun without explicit ICD selection passed 53/54
+  and exposed only BUG-118's affected-libX11 XIM retention plus allocations
+  from installed but non-selected Mesa ICDs in the shutdown subprocess. The
+  failed receipt remains as optional diagnostic evidence. After BUG-118 added
+  its exact upstream-function guard and the local run selected the operational
+  NVIDIA ICD, the complete cohort passed 54/54 without a retry or any broad
+  X11, loader, Mesa, ICD, unknown-module, or pthread suppression.
 - Strict layering, test-layout, task-policy/schema, documentation-link, ARA,
   workflow-evidence, source-documentation, generated-inventory, skill-sync,
   and clean-workshop checks pass. Source-documentation review-only findings are
@@ -307,9 +319,8 @@ Recorded results on 2026-08-11 and 2026-08-12:
 - No renderer member, typed frame pass, recipe dependency, or new higher-layer
   public type was introduced; the manual clean-workshop rows are not
   applicable. The strict automated clean-workshop gate passes.
-- Remaining closure is outside the implemented geometry repair: a
-  label-distinct reviewer must audit the exact frozen surface before this
-  high-risk task can bind its final evidence and retire.
+- A label-distinct reviewer accepted the exact frozen retirement surface; the
+  final report, handoff, and append-only review record retain that binding.
 
 ## Forbidden changes
 
@@ -328,3 +339,5 @@ Recorded results on 2026-08-11 and 2026-08-12:
   command, including corner-normal control of the promoted render plan.
 - CPU-only hosts may establish `CPUContracted`; Operational closure requires
   retained Vulkan-capable visible/readback evidence or an explicit follow-up.
+- Current: completed at `Operational` with retained Vulkan-capable
+  visible/readback evidence and accepted fixed-surface review.

@@ -1,0 +1,23 @@
+{
+  "command": [
+    "python3",
+    "tools/agents/check_ara_claims.py",
+    "--root",
+    ".",
+    "--strict"
+  ],
+  "command_display": "python3 tools/agents/check_ara_claims.py --root . --strict",
+  "cwd": ".",
+  "duration_ms": 24,
+  "exit_code": 0,
+  "finished_at": "2026-09-03T09:24:25Z",
+  "label": "ara",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-09-03T09:24:25Z",
+  "stderr_path": "tasks/evidence/BUG-118/commands/ara.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/BUG-118/commands/ara.stdout.log",
+  "stdout_sha256": "8cc6193147c8b8920b3dc80a6ad9d6c0b1f01eb1280c0a424f205892f94b53fc",
+  "task_id": "BUG-118"
+}

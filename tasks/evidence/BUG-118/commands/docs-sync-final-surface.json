@@ -1,0 +1,32 @@
+{
+  "command": [
+    "python3",
+    "tools/docs/check_docs_sync.py",
+    "--root",
+    ".",
+    "--files",
+    "lsan.supp",
+    "src/graphics/vulkan/README.md",
+    "src/platform/README.md",
+    "tests/CMakeLists.txt",
+    "tests/README.md",
+    "tests/regression/graphics/Run.VulkanShutdownLsanContract.cmake",
+    "tests/regression/platform/Run.GlfwLifecycleLsanContract.cmake",
+    "tasks/done/BUG-118-glfw-x11-input-method-lsan-recurrence.md",
+    "--strict"
+  ],
+  "command_display": "python3 tools/docs/check_docs_sync.py --root . --files lsan.supp src/graphics/vulkan/README.md src/platform/README.md tests/CMakeLists.txt tests/README.md tests/regression/graphics/Run.VulkanShutdownLsanContract.cmake tests/regression/platform/Run.GlfwLifecycleLsanContract.cmake tasks/done/BUG-118-glfw-x11-input-method-lsan-recurrence.md --strict",
+  "cwd": ".",
+  "duration_ms": 25,
+  "exit_code": 0,
+  "finished_at": "2026-09-03T09:24:46Z",
+  "label": "docs-sync-final-surface",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-09-03T09:24:46Z",
+  "stderr_path": "tasks/evidence/BUG-118/commands/docs-sync-final-surface.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/BUG-118/commands/docs-sync-final-surface.stdout.log",
+  "stdout_sha256": "836846dabe39b0c4161b3f53e6e6aa497666fc40d7471387e3b933c8d3c7e2a1",
+  "task_id": "BUG-118"
+}

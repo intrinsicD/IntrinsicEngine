@@ -1,0 +1,25 @@
+{
+  "command": [
+    "cmake",
+    "--build",
+    "--preset",
+    "ci-asan",
+    "--target",
+    "IntrinsicGlfwLifecycleLsanProcess",
+    "IntrinsicPlatformGlfwSmokeTests"
+  ],
+  "command_display": "cmake --build --preset ci-asan --target IntrinsicGlfwLifecycleLsanProcess IntrinsicPlatformGlfwSmokeTests",
+  "cwd": ".",
+  "duration_ms": 247,
+  "exit_code": 0,
+  "finished_at": "2026-09-03T09:21:55Z",
+  "label": "build-ci-asan-glfw",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-09-03T09:21:55Z",
+  "stderr_path": "tasks/evidence/BUG-118/commands/build-ci-asan-glfw.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/BUG-118/commands/build-ci-asan-glfw.stdout.log",
+  "stdout_sha256": "41bf19f99e27ab668e5314f395dbed29f6c8d13b27cfd1694cc0ed0d322cb0ad",
+  "task_id": "BUG-118"
+}

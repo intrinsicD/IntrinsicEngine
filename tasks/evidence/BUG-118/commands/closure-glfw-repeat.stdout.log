@@ -1,0 +1,30 @@
+Test project /home/alex/Documents/IntrinsicEngine/build/ci-asan
+    Start 2753: GlfwLifecycleLsan.EngineStaticTeardownAndLeakControl
+    Test #2753: GlfwLifecycleLsan.EngineStaticTeardownAndLeakControl ...   Passed    0.11 sec
+    Start 2753: GlfwLifecycleLsan.EngineStaticTeardownAndLeakControl
+    Test #2753: GlfwLifecycleLsan.EngineStaticTeardownAndLeakControl ...   Passed    0.10 sec
+    Start 2753: GlfwLifecycleLsan.EngineStaticTeardownAndLeakControl
+    Test #2753: GlfwLifecycleLsan.EngineStaticTeardownAndLeakControl ...   Passed    0.10 sec
+    Start 2753: GlfwLifecycleLsan.EngineStaticTeardownAndLeakControl
+    Test #2753: GlfwLifecycleLsan.EngineStaticTeardownAndLeakControl ...   Passed    0.10 sec
+    Start 2753: GlfwLifecycleLsan.EngineStaticTeardownAndLeakControl
+    Test #2753: GlfwLifecycleLsan.EngineStaticTeardownAndLeakControl ...   Passed    0.10 sec
+    Start 2753: GlfwLifecycleLsan.EngineStaticTeardownAndLeakControl
+    Test #2753: GlfwLifecycleLsan.EngineStaticTeardownAndLeakControl ...   Passed    0.11 sec
+    Start 2753: GlfwLifecycleLsan.EngineStaticTeardownAndLeakControl
+    Test #2753: GlfwLifecycleLsan.EngineStaticTeardownAndLeakControl ...   Passed    0.11 sec
+    Start 2753: GlfwLifecycleLsan.EngineStaticTeardownAndLeakControl
+    Test #2753: GlfwLifecycleLsan.EngineStaticTeardownAndLeakControl ...   Passed    0.11 sec
+    Start 2753: GlfwLifecycleLsan.EngineStaticTeardownAndLeakControl
+    Test #2753: GlfwLifecycleLsan.EngineStaticTeardownAndLeakControl ...   Passed    0.10 sec
+    Start 2753: GlfwLifecycleLsan.EngineStaticTeardownAndLeakControl
+1/1 Test #2753: GlfwLifecycleLsan.EngineStaticTeardownAndLeakControl ...   Passed    0.11 sec
+
+100% tests passed, 0 tests failed out of 1
+
+Label Time Summary:
+glfw          =   0.11 sec*proc (1 test)
+platform      =   0.11 sec*proc (1 test)
+regression    =   0.11 sec*proc (1 test)
+
+Total Test time (real) =   1.11 sec

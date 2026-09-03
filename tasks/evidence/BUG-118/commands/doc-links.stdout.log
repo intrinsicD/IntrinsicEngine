@@ -1,0 +1,7 @@
+[check_doc_links] Root: /home/alex/Documents/IntrinsicEngine
+[check_doc_links] Checked relative links: 3316
+[check_doc_links] Mode: warning
+[check_doc_links] Broken relative links:
+  - docs/reviews/2026-07-21-runtime-190-clean-workshop-review.md -> ../../tasks/backlog/bugs/BUG-118-glfw-x11-input-method-lsan-recurrence.md
+[check_doc_links] Action: update moved paths or convert to canonical links.
+[check_doc_links] WARNING MODE: non-fatal.

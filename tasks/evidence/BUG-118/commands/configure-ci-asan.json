@@ -1,0 +1,22 @@
+{
+  "command": [
+    "cmake",
+    "--preset",
+    "ci-asan",
+    "-DINTRINSIC_GROUP_PURE_CTEST=ON"
+  ],
+  "command_display": "cmake --preset ci-asan -DINTRINSIC_GROUP_PURE_CTEST=ON",
+  "cwd": ".",
+  "duration_ms": 1606,
+  "exit_code": 0,
+  "finished_at": "2026-09-03T09:21:55Z",
+  "label": "configure-ci-asan",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-09-03T09:21:53Z",
+  "stderr_path": "tasks/evidence/BUG-118/commands/configure-ci-asan.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/BUG-118/commands/configure-ci-asan.stdout.log",
+  "stdout_sha256": "e1c58277c13d3a7bc3ca2f8894a7a12f95c208e7d5a7bb9974e17224204bdf4e",
+  "task_id": "BUG-118"
+}

@@ -1,0 +1,215 @@
+schema_version: 1
+task_id: BUG-118
+workflow_profile: high-risk
+status: complete
+generated_by: tools/agents/workflow_evidence.py
+generated_at: '2026-09-03T09:27:24Z'
+claim_eligible: false
+source:
+  base_ref: 322c60b76260c32f9ff71a8c9c193937a1482c4b
+  base_revision: 322c60b76260c32f9ff71a8c9c193937a1482c4b
+  head_revision: da8934651e4ba0064989f89da0a6cc088697c0bd
+  branch: main
+  worktree: /home/alex/Documents/IntrinsicEngine
+  dirty: true
+  surface:
+  - path: ara/logic/claims.md
+    sha256: a38331556de6e4f5c8440268ea43d4cd8d7f943307343881e324675ca242ed6d
+  - path: docs/product/framework24-feature-inventory.md
+    sha256: 80b40ed87726a69a0bb3a9ebc41c53c93d4cdf14cf228f7a8072364ee7efe5fc
+  - path: docs/reviews/2026-07-21-runtime-190-clean-workshop-review.md
+    sha256: 21bcda71d9843112788251b7d8b9368bd2de551ce5b363a8c6d06ade91b63d87
+  - path: lsan.supp
+    sha256: 5de097d80421d89bc2d5a14de55ba8fb3e1ebe7294c468e88f8a5b83931ebbed
+  - path: src/graphics/vulkan/README.md
+    sha256: a85734d647aa5dae6a505b839ed7acd3d68e68ac8d33292437845c41c68e52a1
+  - path: src/platform/README.md
+    sha256: f334301d31aafcff43fd3b33454de889c89b1b56151ab666591567e58d284f97
+  - path: tasks/SESSION-BRIEF.md
+    sha256: 768939e39f67c53faa7cbb4d171cb18cdabcd76774c63fb6e5aa24980abb0715
+  - path: tasks/active/BUG-154-curvature-pmp-parity-corner-normal-topology.md
+    sha256: null
+  - path: tasks/active/BUG-156-curvature-two-ring-smoothing-cancels-features.md
+    sha256: null
+  - path: tasks/active/BUG-162-main-branch-consolidation.md
+    sha256: null
+  - path: tasks/active/README.md
+    sha256: 396a67e291f5834b873a85329fd71fa664c3d1eda045a02c1a5c04a887529c31
+  - path: tasks/backlog/README.md
+    sha256: 578e18e32ed8ab66cf577e42003eee35acfc3be3c997ef553029ae103cb3101a
+  - path: tasks/backlog/bugs/BUG-118-glfw-x11-input-method-lsan-recurrence.md
+    sha256: null
+  - path: tasks/backlog/bugs/index.md
+    sha256: 0ede69a958e3b46b7d2ba9f2fbfbcd2f9e8beb444c3a1b33acb3b765396385b6
+  - path: tasks/done/BUG-118-glfw-x11-input-method-lsan-recurrence.md
+    sha256: b1c14cea03affcd7fedfe8447c1dccd65b4ced317b69d3f66a7b89523d655ca8
+  - path: tasks/done/BUG-154-curvature-pmp-parity-corner-normal-topology.md
+    sha256: 78f34420697fb0c49827714ae903753c78beed6945929aca73a8d1fe493ffd77
+  - path: tasks/done/BUG-156-curvature-two-ring-smoothing-cancels-features.md
+    sha256: 888404b41a573fd4996ce66496fa13323557356d8922be0ec05af94987f68ce0
+  - path: tasks/done/BUG-162-main-branch-consolidation.md
+    sha256: f1152c49abffe08c3017c905c903c9dce7fd5921aeb415b7111b1d320ccbda6c
+  - path: tasks/done/RETIREMENT-LOG.md
+    sha256: 3c4a1eb503fc6dbd7d45435f41525442a2a833516d16117b6b1cdd4450f84474
+  - path: tasks/evidence/BUG-154/commands/closure-gpu-vulkan-nvidia.json
+    sha256: 8244d1c9d3e565290057321e5f0dd226c61673765ab6aa09f6a311d8f3689488
+  - path: tasks/evidence/BUG-154/commands/closure-gpu-vulkan-nvidia.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/BUG-154/commands/closure-gpu-vulkan-nvidia.stdout.log
+    sha256: a4a4ffa18e02559aa08089f19e55e2b4c903ff832fa45b369e222762747e7cfd
+  - path: tasks/evidence/BUG-154/commands/closure-gpu-vulkan.json
+    sha256: d96d35029eaff915db25e3ec9385c3e38e249da05b8aa81881cc159cf39f4c30
+  - path: tasks/evidence/BUG-154/commands/closure-gpu-vulkan.stderr.log
+    sha256: 18e00877dc1071c85cd4f479d451bebeef8309022e46cf8c63b0bed5151984a4
+  - path: tasks/evidence/BUG-154/commands/closure-gpu-vulkan.stdout.log
+    sha256: cf87bd3bd7c4b07b93932217972de3955a61e296ca4d7423cb6fe7bdc91d6a85
+  - path: tasks/evidence/BUG-155/commands/closure-vulkan.json
+    sha256: 65122a0a8770cdf951c028e00856de8d71b9f7ce0a01e19879c5ea8f652a2ff6
+  - path: tasks/evidence/BUG-155/commands/closure-vulkan.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/BUG-155/commands/closure-vulkan.stdout.log
+    sha256: 87471f4ca9b8ae8574d24402a25b989b662e18118dfb4685e515635c62603e71
+  - path: tasks/evidence/BUG-155/report.yaml
+    sha256: 6d6bf9a40dcd5bf763b7473dc2fa24d68088f4e8db48946cf3f41b7c5374b7ba
+  - path: tests/CMakeLists.txt
+    sha256: 57337fa92737a34dac13306e40e6d9e04bdf14620ea2be95c67a2777c8b027b2
+  - path: tests/README.md
+    sha256: 829d8bb82c651829a8d0bb32d7178f57a21ba35be7658d0adc8050764de57179
+  - path: tests/regression/graphics/Run.VulkanShutdownLsanContract.cmake
+    sha256: 5928d56495e0e4df249968d81c734ac0998ee581e5dcb69c87a4216645a94076
+  - path: tests/regression/platform/Run.GlfwLifecycleLsanContract.cmake
+    sha256: 19e8381ebc25a97265ad9c88f7573266ccf39cee4ec79725d5f04f5272a23b49
+  - path: tools/agents/contract_legacy_tasks.json
+    sha256: 27d954474064990fcecbbc0bd221fade87d60fdf91c3a649204be778d9beb632
+  content_digest: d53d2c3750df2eb04be5cd766e43c4e495b4ab83e830c1a89dd8eb77134e0241
+touched:
+  paths:
+  - ara/logic/claims.md
+  - docs/product/framework24-feature-inventory.md
+  - docs/reviews/2026-07-21-runtime-190-clean-workshop-review.md
+  - lsan.supp
+  - src/graphics/vulkan/README.md
+  - src/platform/README.md
+  - tasks/SESSION-BRIEF.md
+  - tasks/active/BUG-154-curvature-pmp-parity-corner-normal-topology.md
+  - tasks/active/BUG-156-curvature-two-ring-smoothing-cancels-features.md
+  - tasks/active/BUG-162-main-branch-consolidation.md
+  - tasks/active/README.md
+  - tasks/backlog/README.md
+  - tasks/backlog/bugs/BUG-118-glfw-x11-input-method-lsan-recurrence.md
+  - tasks/backlog/bugs/index.md
+  - tasks/done/BUG-118-glfw-x11-input-method-lsan-recurrence.md
+  - tasks/done/BUG-154-curvature-pmp-parity-corner-normal-topology.md
+  - tasks/done/BUG-156-curvature-two-ring-smoothing-cancels-features.md
+  - tasks/done/BUG-162-main-branch-consolidation.md
+  - tasks/done/RETIREMENT-LOG.md
+  - tasks/evidence/BUG-154/commands/closure-gpu-vulkan-nvidia.json
+  - tasks/evidence/BUG-154/commands/closure-gpu-vulkan-nvidia.stderr.log
+  - tasks/evidence/BUG-154/commands/closure-gpu-vulkan-nvidia.stdout.log
+  - tasks/evidence/BUG-154/commands/closure-gpu-vulkan.json
+  - tasks/evidence/BUG-154/commands/closure-gpu-vulkan.stderr.log
+  - tasks/evidence/BUG-154/commands/closure-gpu-vulkan.stdout.log
+  - tasks/evidence/BUG-155/commands/closure-vulkan.json
+  - tasks/evidence/BUG-155/commands/closure-vulkan.stderr.log
+  - tasks/evidence/BUG-155/commands/closure-vulkan.stdout.log
+  - tasks/evidence/BUG-155/report.yaml
+  - tests/CMakeLists.txt
+  - tests/README.md
+  - tests/regression/graphics/Run.VulkanShutdownLsanContract.cmake
+  - tests/regression/platform/Run.GlfwLifecycleLsanContract.cmake
+  - tools/agents/contract_legacy_tasks.json
+  layers:
+  - graphics/vulkan
+  - platform
+  modules:
+  - Extrinsic.Platform.Backend.Glfw
+extension_seam: Existing process-static GLFW lifetime and standalone LeakSanitizer process runners; no
+  production backend, service, registry, or ownership seam was added
+future_change_plan: Remove the exact XIM suppression when the minimum supported libX11 contains upstream
+  commit 1d118226; retain the byte-for-byte file guard and synthetic engine-leak control for every suppression-set
+  change
+acceptance:
+- criterion: The standalone clean process exits zero after initializing and
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: The fix or environment contract explains why `BUG-082` passed and this
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+commands:
+- receipt: tasks/evidence/BUG-118/commands/ara.json
+- receipt: tasks/evidence/BUG-118/commands/build-ci-asan-glfw.json
+- receipt: tasks/evidence/BUG-118/commands/build-ci-tests.json
+- receipt: tasks/evidence/BUG-118/commands/clean-workshop-final.json
+- receipt: tasks/evidence/BUG-118/commands/clean-workshop.json
+- receipt: tasks/evidence/BUG-118/commands/closure-glfw-repeat.json
+- receipt: tasks/evidence/BUG-118/commands/closure-platform-glfw.json
+- receipt: tasks/evidence/BUG-118/commands/closure-vulkan-shutdown.json
+- receipt: tasks/evidence/BUG-118/commands/configure-ci-asan.json
+- receipt: tasks/evidence/BUG-118/commands/configure-ci.json
+- receipt: tasks/evidence/BUG-118/commands/cpu-supported.json
+- receipt: tasks/evidence/BUG-118/commands/diagnostic-xim-suppression.json
+- receipt: tasks/evidence/BUG-118/commands/doc-links-final.json
+- receipt: tasks/evidence/BUG-118/commands/doc-links.json
+- receipt: tasks/evidence/BUG-118/commands/docs-sync-final-surface.json
+- receipt: tasks/evidence/BUG-118/commands/docs-sync.json
+- receipt: tasks/evidence/BUG-118/commands/layering.json
+- receipt: tasks/evidence/BUG-118/commands/root-hygiene.json
+- receipt: tasks/evidence/BUG-118/commands/source-doc-audit.json
+- receipt: tasks/evidence/BUG-118/commands/task-policy.json
+- receipt: tasks/evidence/BUG-118/commands/task-state-links.json
+- receipt: tasks/evidence/BUG-118/commands/test-layout.json
+changed_public_contracts:
+- The standalone GLFW and Vulkan shutdown proofs admit only the exact affected-libX11 _XimRegisterIMInstantiateCallback
+  retention while still requiring the named 4096-byte engine allocation to fail under LeakSanitizer
+diagnostics_and_previews:
+- A fresh Clang 23 ASan helper reproduced one 408-byte _XimRegisterIMInstantiateCallback retention after
+  terminate_calls=1; libX11 1.7.5-1ubuntu0.3 predates upstream fix 1d118226, while BUG-082 evidence used
+  fixed libX11 1.8.7
+- Changing XMODIFIERS and GTK/QT input-method variables did not alter the 408-byte finding, rejecting
+  input-method selection as the remedy
+- The direct clean helper used exactly one 408-byte suppression and proved one glfwTerminate call; ten
+  contract iterations each preserved the independent 4096-byte LeakSanitizer exit-86 control
+- Runtime maps bound the initial two 256-byte shutdown rows to installed but non-selected lavapipe and
+  Radeon ICDs; selecting the operational NVIDIA ICD made the exact shutdown proof pass without a loader
+  or driver suppression
+- 'Current gates pass: ASan standalone 10/10, GLFW/platform 2/2, CPU 4258/4258 with one designed unsanitized
+  capability skip, exact Vulkan pair 2/2, and full selected-ICD promoted Vulkan 54/54'
+benchmark_or_parity_evidence:
+- 'Not applicable: this is a sanitizer ownership and verification-contract repair with no performance
+  or parity claim'
+docs_sync:
+  task_file: tasks/done/BUG-118-glfw-x11-input-method-lsan-recurrence.md
+  session_brief_present: true
+  canonical_docs_changed: true
+  skill_mirrors_checked: true
+residual_risks:
+- Function-name suppression matching requires symbolization; both runners require or provide an explicit
+  LLVM symbolizer and compare the complete suppression file byte-for-byte
+- The exact external exception remains necessary only on affected libX11 builds and should be removed
+  once the repository minimum contains the upstream free
+- Multi-ICD local environments can expose loader probing allocations from non-selected drivers; operational
+  verification must select the tested ICD rather than suppress those modules
+skipped_checks:
+- check: module-inventory
+  reason: No module interface or source-tree surface changed
+- check: claim-grade-performance
+  reason: No performance or capability-speed claim is asserted
+artifacts:
+- path: tasks/done/BUG-118-glfw-x11-input-method-lsan-recurrence.md
+  sha256: b1c14cea03affcd7fedfe8447c1dccd65b4ced317b69d3f66a7b89523d655ca8
+  kind: file
+- path: lsan.supp
+  sha256: 5de097d80421d89bc2d5a14de55ba8fb3e1ebe7294c468e88f8a5b83931ebbed
+  kind: file
+self_review:
+  completed: true
+  scope_matches_task: true
+  layering_preserved: true
+  tests_and_docs_accounted_for: true
+  mechanical_and_semantic_changes_separated: true
+handoff: tasks/evidence/BUG-118/handoff.jsonl
+review: tasks/evidence/BUG-118/reviews.jsonl

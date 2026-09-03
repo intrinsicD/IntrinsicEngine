@@ -1,0 +1,23 @@
+{
+  "command": [
+    "python3",
+    "tools/agents/check_task_state_links.py",
+    "--root",
+    ".",
+    "--strict"
+  ],
+  "command_display": "python3 tools/agents/check_task_state_links.py --root . --strict",
+  "cwd": ".",
+  "duration_ms": 342,
+  "exit_code": 0,
+  "finished_at": "2026-09-03T09:24:18Z",
+  "label": "task-state-links",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-09-03T09:24:17Z",
+  "stderr_path": "tasks/evidence/BUG-118/commands/task-state-links.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/BUG-118/commands/task-state-links.stdout.log",
+  "stdout_sha256": "27f9b97a14eb012b578a139a0431c27f1a6b3c02cf72aea0ce92dbe29801e7ed",
+  "task_id": "BUG-118"
+}
