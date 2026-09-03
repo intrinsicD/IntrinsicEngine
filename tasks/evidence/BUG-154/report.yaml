@@ -3,52 +3,184 @@ task_id: BUG-154
 workflow_profile: high-risk
 status: draft
 generated_by: tools/agents/workflow_evidence.py
-generated_at: '2026-08-12T06:26:39Z'
+generated_at: '2026-09-03T00:38:57Z'
 claim_eligible: false
 source:
-  base_ref: origin/main
+  base_ref: 4a043a7db0bae0d546259a0455dd92d3f0e944a5
   base_revision: 4a043a7db0bae0d546259a0455dd92d3f0e944a5
-  head_revision: 0f133014027e413ab100fd057c51dbaf2f10460e
+  head_revision: 55ddf284ee0a44be7c1172f7597c0d08d3ee0443
   branch: main
   worktree: /home/alex/Documents/IntrinsicEngine
   dirty: false
   surface:
+  - path: .github/copilot-instructions.md
+    sha256: 6eca8f4a866442a1bd1166fa0b9314c2e0b3759b1257b12276cf4ac292e3b259
+  - path: .github/pull_request_template.md
+    sha256: fbd768cfcb65a5ea5dc39be24b94f33f3a61043c68a8b35fe99bd07eddf3ee36
+  - path: .github/workflows/ci-docs.yml
+    sha256: a83474c6b13bd2fe78cf0f52de949e41c6e2f50b15f7182d0204f003926eede9
+  - path: .github/workflows/ci-linux-clang.yml
+    sha256: 872288f454beab1569669e7edeb33c2836fcf2b3e8638ffe9ab04043574d619a
+  - path: .github/workflows/nightly-deep.yml
+    sha256: 4e9773ee0c1a8975b5787c4b7d2cdab86ed8258988774ab859156735700ccdd4
+  - path: AGENTS.md
+    sha256: b40cf5fef4745b95a4bea849aa9bcd05517ea4dcd991bd2f4a50e2e650e24a51
   - path: CMakeLists.txt
     sha256: 59e6b808f4b2be4030e8601e45e3e441c21cb3cac5ebffadd3f65a96f33a555d
+  - path: README.md
+    sha256: 19f134d7264cc656d60bd058976071b71d4956b1ad2afcf74547f42fc02a300c
   - path: ara/evidence/README.md
-    sha256: f67b59043455b56bfa1d80ba693f44574a0cd635214c049572edd824ea575972
+    sha256: f6a12e6cef666b9f5bb8b83efe9d900dba5c0b94a71926baf0412ebe44cc41f0
+  - path: ara/evidence/tables/curvature_framework24_parity_2026-08-12.md
+    sha256: 5903fd63f5eec14535ccc2658ec3f6e151d8c258a8c9deb67aa12dcca2643167
   - path: ara/evidence/tables/curvature_pmp_diagnostic_2026-08-11.md
     sha256: 7a69390adbf9997d77050fa8e7c072afe88db3ffcae6ccfbd185109a315a4ab6
+  - path: ara/evidence/tables/eig3x3_live_curvature_diagnostic_2026-08-12.md
+    sha256: da516c1ca252225ebb36c0184086b36e3f10eeb3a545cc7ddb360e2696303fde
   - path: ara/logic/claims.md
-    sha256: 78c9b72cc84584902eea10f47f5a8d78caa08e7dd9b5c85e90045e0e3a27973d
+    sha256: 2112aded20b1933585a4cad66ca58d605e72ce11af2f154ca4225ce7d8b4e8ad
   - path: ara/logic/solution/architecture.md
-    sha256: 44ef780c66beaba5dcbca7f9809c8ec69c4e3d0d0915a2a3d5e3a422a01827b4
+    sha256: d97f40c6b869c4a8eea833664da8ae586b786cb740b8805831c3d22a1e4a41a2
+  - path: ara/logic/solution/heuristics.md
+    sha256: f44e3169d9b481e062b7833b2fd7a9ae47ccd9c386aab623e61618a29459ae6a
   - path: ara/staging/observations.yaml
-    sha256: 6fc85211bd10f19e1fea887b6ec0f154d3ae8af7c332a53a0b69f4c4b3a746b8
+    sha256: 7b1c03d50950ec283381b0aaf7cd79713dad7653b4c13a47183584673656dfb9
   - path: ara/trace/exploration_tree.yaml
-    sha256: 78d3911e18917537c9791c264a83cd6ed81ac40946459e3d58d10e10fa3973fa
+    sha256: f980dcfc6a653630cb9712cbeac2cd5f27c242a6e18abe4dd78c10e1e744f20a
   - path: ara/trace/pm_reasoning_log.yaml
-    sha256: 9072f4cf862dc43603c1c76c66705e550a4754d3bbf88acb233e4cd2e6f2610c
+    sha256: 055c5ebadddbbd2ae5a918799f6158e8498a9aaf0f35b88254f90cabbcc317f6
   - path: ara/trace/sessions/2026-08-11_001.yaml
     sha256: e82e13e011a24225fafc50431448bf81e4d9613f9a79434bf15edfb3b5685343
   - path: ara/trace/sessions/2026-08-12_001.yaml
-    sha256: 9a26d9768ccf418c9514290d4afa454ce948466860b576af844af7251ee68118
+    sha256: ba44a0d0ed93a2f207dfb8ae02d23e28d980d58d656739c1e2d15e7b0f509d2a
+  - path: ara/trace/sessions/2026-08-13_001.yaml
+    sha256: 56daceab05e6137787c05001dba5cde676233657299200b8b8779f6928e9b5dc
+  - path: ara/trace/sessions/2026-09-01_001.yaml
+    sha256: ae75fc92c89cd8a18142fbe36e6c294a7d11f310dd90262aedc44bdc704b06ab
+  - path: ara/trace/sessions/2026-09-02_001.yaml
+    sha256: d41bd67b2cec732ab8b8f89976e1e886b7a6612bf4fc452d042e673ed4506527
   - path: ara/trace/sessions/session_index.yaml
-    sha256: 46d746b742f7b8048115de3bc09a08eb0e12f363153faf7525e011fe84617f74
+    sha256: 9e43f8e9aea1d4a9e6ededb18f73e109011735f9f054b6dbc96039e0206d0f99
+  - path: docs/agent/agent-output-review-checklist.md
+    sha256: b5485164a4099c54ad6fb064cda25bb15eaa426ab78ba56c6e52955f7fa1da03
+  - path: docs/agent/ara-evidence-policy.md
+    sha256: d0a644b8d8b92ad16052593b90832748cf277f1bad057b209b72a663b302ab12
+  - path: docs/agent/architecture-review-checklist.md
+    sha256: cc6fa595bf5db588cfd72ea9d762ec6a64da412b78f700068b0a8804ebb794f3
+  - path: docs/agent/benchmark-review-checklist.md
+    sha256: ec897ec92d44a07e2cfc8337de79bd7f7d9be15de9f213eff954575a864f7d67
+  - path: docs/agent/benchmark-workflow.md
+    sha256: 7b3f002638c1f3785fc20aa319324be10485e43b32107685cd395f858e8b17e1
+  - path: docs/agent/clean-workshop-review.md
+    sha256: c287c4e89925faddfee5656f9735492680adc284c9cbd83b020a624eadc9d77a
+  - path: docs/agent/contract.md
+    sha256: 7e5aeb6df411ac10e60b1cfba153da286f13974a4e0f33f04541ff59174b4436
+  - path: docs/agent/drift-audit-checklist.md
+    sha256: 95048b1059a772252e6ace75f45338a7995a7fdb0db9a268c943664981ceeafc
+  - path: docs/agent/how-this-repo-is-built.md
+    sha256: 489958ac9f38397c86e0c7b7a89c690859433940e15980178c8cc0bb9ea2bbd6
+  - path: docs/agent/method-review-checklist.md
+    sha256: edce48d5b389c1ceeeeb2f5e69a103c66186ec8aa208d4435ec260ba43c62bc9
+  - path: docs/agent/method-workflow.md
+    sha256: 9f554c41b710f893b9aa9d436ab25393d346046be7ca7e9cff9f41562c0a6e88
+  - path: docs/agent/prompt/prompt.md
+    sha256: 9c9688e3a959845c73a8bc1d8e4c849848af56d0e7a22c1255c97bf49c4f86f6
+  - path: docs/agent/proposals/pair-workflow-redesign.md
+    sha256: 20aa02092b9641fb68c769893b2e1e81da55c3cae743fe1f1899c86be4e58b8e
+  - path: docs/agent/review-checklist.md
+    sha256: 57d4030290ab504c02fc914732b86530cac34adbcd0cbd4f667d003a27c13105
+  - path: docs/agent/review.md
+    sha256: 29cc0b63bd671f7e05c1bde8419b0e7de267b0d826dbd4d051a47bffde08e460
+  - path: docs/agent/roles.md
+    sha256: 701ea147c8a31d3222af595eee75ed6b3064e78df3dd43859bf67f9ff38602a4
+  - path: docs/agent/task-format.md
+    sha256: ec577a11717ee62db206fbd57497386f20ea4d4284a8fb2c3edcea3c7ead8143
+  - path: docs/agent/task-maturity.md
+    sha256: d0f518b322e6779128423cd8a57ffc4a3f14907652884f730f2d0bfea56df417
+  - path: docs/agent/workflow-evidence.md
+    sha256: 48fbe7538b61ff6c9e44b8c378bf779853553eb273116d273f394487690089db
   - path: docs/architecture/geometry-api-style.md
     sha256: 39b958f67ee926f9566fc541ae5f31bdb7fe4dface5879d633ef5aeb10c7c623
   - path: docs/architecture/geometry.md
-    sha256: 4870b1998f7cab39fc379ec1cba3ca2f13ecc3f20d15e994165b5fb461d23e98
+    sha256: d268cad9e465e586d21605ca8a2d792a2bc0aecf3ab1cc7ffde7ded8f8038de0
+  - path: docs/architecture/index.md
+    sha256: 7b78c2153655126ea2a459a19715bc2232744a41958a24045dda1511ef4f660e
   - path: docs/architecture/property-coherence.md
     sha256: 00c5a484db212dd3e3de34353b5b25c2dc8df5a34e14fb4a00b197e21a86da79
+  - path: docs/architecture/runtime.md
+    sha256: b8957a1ce65710b3137648924e82c19aa14b0c34e34e58f81ab388c16d742a32
+  - path: docs/benchmarking/index.md
+    sha256: 094ee82ba14480e271b254db0f56efb95bf05fab31f1298ca6f5a328c366980c
+  - path: docs/index.md
+    sha256: 5dcdd0ca5592d01fafac0b5a05eb0b39806cc71ee1f526830c97df205f46184c
   - path: docs/methods/numerical-robustness-policy.md
-    sha256: 7911d22ad80624c582e0b788702a0e9380b0897cec008c151a7b0ef79e8c988c
+    sha256: 2df0ed5f371252251e07d0f12078f985ea433304c858421a3985fdc7b0643319
+  - path: docs/product/framework24-convergence.md
+    sha256: 174eeaaf9278ee31f756f538edc30260c37fa4cbef7350c377cbf7216444afbc
+  - path: docs/product/framework24-feature-inventory.md
+    sha256: eb58ea9d8f5df5b33d1bef50815ce96e0c878dd6e68ec3e3818ce7287920f7ec
+  - path: docs/product/index.md
+    sha256: 2c118ff0ceb0e818a3ba3ba9bf887550f8f68fe2330c69a9fa2dd747b86808d0
   - path: docs/reports/2026-08-12-curvature-estimator-study.md
-    sha256: 975bce56f89b27d46e8521aa1c146d9bbfa18483b3b82c00af2dc6cb614e7b88
+    sha256: 7af720d1e98a65029ea1cf343c9718cc4cbba559ebc267b36f39e6f1545ded81
+  - path: docs/reports/2026-08-12-curvature-support-smoothing-defect.md
+    sha256: 5aca36610c35e268ec13d6653714faa1f572a49fe837e355eed5bd0c2d1e411f
+  - path: src/app/Sandbox/CMakeLists.txt
+    sha256: 3e36525fe60ea68dd33c75d8f9f044a757811021cbf252f7d8e8ee1bba0a8e56
+  - path: src/app/Sandbox/Editor/Sandbox.DomainPanels.cpp
+    sha256: 550cd05e7e76ad4b402b5bac126a556587f25e53f3092038da07e9540af096ab
+  - path: src/app/Sandbox/Editor/Sandbox.DomainPanels.cppm
+    sha256: a925a3ac254f6c5cbefccd728c22fbb5254e63595ef44cc87c6c7fb64253f81d
+  - path: src/app/Sandbox/Editor/Sandbox.EditorController.cppm
+    sha256: 46b9ae1463c2ce15bac802b04e58d35b295b01c04c29e501bd020c46be2a2839
+  - path: src/app/Sandbox/Editor/Sandbox.EditorShell.cpp
+    sha256: 74784c10caafd6a845d3acb49a89c375194f1c3531a98175ef7d4e6d228d9434
+  - path: src/app/Sandbox/Editor/Sandbox.EditorShell.cppm
+    sha256: b3bc3d55b356a59e090dbae728a59dc4e99eb8e0b73e1c453fde2ff71387498e
+  - path: src/app/Sandbox/Editor/Sandbox.MeshProcessingPanels.cpp
+    sha256: f4ecbd9a8bc44114271dd39a6bfc7f40feeba701d0b8c8eb18b8dae90f6e5257
+  - path: src/app/Sandbox/Editor/Sandbox.MeshProcessingPanels.cppm
+    sha256: b4579d1a95c3984cede2e2e75bc50cb6afc342541bcfc2d1becafff49a8bb080
+  - path: src/app/Sandbox/Editor/Sandbox.MethodPanels.cpp
+    sha256: 9a4daf6987d2664c20148d14713a7ba3676b4ebe75e2ac7f6db1e60a059fcae6
+  - path: src/app/Sandbox/Editor/Sandbox.MethodPanels.cppm
+    sha256: 0a3e5f02a1f647590a062a6873531feb988048c277c2bb67c23fe6219a6045e8
+  - path: src/app/Sandbox/Sandbox.ConfigSections.cppm
+    sha256: a3ccca05ba84e2b748f6cb295c2ed93733c30699882a86ce56eba3d9952ab48b
+  - path: src/app/Sandbox/Sandbox.cppm
+    sha256: 84639bc341875701ee73dfb03d98d8d9b778d1a1cb52b1c815d368bcee4f2f21
+  - path: src/assets/Asset.EventBus.cppm
+    sha256: 64d365cef96a264028b87b8175321ad47ca6d30f3a816dc4be6e5e0c4d5d3040
+  - path: src/assets/Asset.GeometryPayload.cppm
+    sha256: fccdae0fdb7fe22e753e1d51e1826233435ec08f9e1b6811ba5c31e7c2d09bd1
+  - path: src/assets/Asset.ImportRouter.cppm
+    sha256: 196cedf2d228736c0011743994b0f110b5c8eff4f52eab905150ff667bc2092b
+  - path: src/assets/Asset.LoadPipeline.cpp
+    sha256: 8e7dce22586ea84708996ffa3c9db7561cbf8d97326d7ed290b10fdf8f6bfbb9
+  - path: src/assets/Asset.LoadPipeline.cppm
+    sha256: 458f746bb2d9c6558c447750872493f74893a00dd96cf292b9402bcb71e20f2f
+  - path: src/assets/Asset.ModelTexturePayload.cppm
+    sha256: d62ea8fab76eddcc2526bc1578340970892fd915fa14817ee2bf32f1baaf7cb4
+  - path: src/assets/Asset.OperationStatus.cppm
+    sha256: 280ad47a3aae75f33bf4db5ac242f09e79087e64de2d40b80ecf4d6a885edc6f
+  - path: src/assets/Asset.PathIndex.cppm
+    sha256: 1b06f8fb7a6d6bfd65538a831de6525567534a81dbfae200bd56297742d5b45a
+  - path: src/assets/Asset.PayloadStore.cppm
+    sha256: f87788723cbaaaaa4d62f3fa4add6f98c104e4f2e3db8c8653b9cb7e2c6f0ea5
+  - path: src/assets/Asset.Registry.cppm
+    sha256: a3bbb4c043a11880d38fd2462b190744c13e5eee8d7e8bded7524c4b4318ae22
+  - path: src/assets/Asset.Service.cpp
+    sha256: af47b969ebc095212698f257e8b6ff576fe8057780185463094a9af4e8890ab1
+  - path: src/assets/Asset.Service.cppm
+    sha256: d2725843a40b5e3206707545252334711c0754f330d4f9abf5f9a9d8767a75f4
+  - path: src/assets/Asset.TypePool.cppm
+    sha256: 8af8a3f6b070bb60151d5c7a4b19d2d1954b821e2891bd9f4f23fcbb41c8f975
+  - path: src/ecs/Components/ECS.Component.GeometrySources.cppm
+    sha256: f618ec32a942c05dd0b3babff663b270eaf3440dd8ccda55216218c86756917b
   - path: src/geometry/Geometry.HalfedgeMesh.Curvature.cpp
-    sha256: 8805f089f38ea6f33f4d2949397bc739ee55928794e2039cadce19257d01b233
+    sha256: c29c1a672f31e6b710c8f230eca17b3be6d0dc0f74f63a220e54eb011a57994f
   - path: src/geometry/Geometry.HalfedgeMesh.Curvature.cppm
-    sha256: 425a1d2ef03ea62678b7a41d3d36468c2011051d2351603d1abaa564ff41772b
+    sha256: 8350cf7c2632fa6dce14b13f46681bc746b3f6ef49c719231822fc550bf9c626
   - path: src/geometry/Geometry.HalfedgeMesh.DEC.cpp
     sha256: 0a9dd2ebfad8fbdcd6b0acbe5d1f320e367ada71cb4d43762152f8809a18ff03
   - path: src/geometry/Geometry.HalfedgeMesh.IO.cpp
@@ -59,12 +191,22 @@ source:
     sha256: 91cdc02b1268184207bd0d6e11ca3cdccf65bfb5d85e5163b535645d0a9cc49f
   - path: src/geometry/Geometry.HalfedgeMesh.Utils.cpp
     sha256: ab3f80dd31a19cc594b8981a7251d4a83345e24324072810cf557843cf8d3680
+  - path: src/geometry/Geometry.Triangle.cpp
+    sha256: 424b8392e198536e7542c4ba8cd64dd9287ae250b0f6a21aa5f59339bc1250b4
+  - path: src/graphics/renderer/README.md
+    sha256: 473bcd2c3271549b10731349e1003d406f882949b70f9fd3a8ce3f1c093c7b56
+  - path: src/graphics/rhi/README.md
+    sha256: c481593e1f6253bab9c6ea748bb55106c4ba7be23f8dcb3dd7c99d5e3b7298f9
+  - path: src/graphics/vulkan/Backends.Vulkan.Profiler.cpp
+    sha256: b8cc8b16151ee35b45f5e7015e105d8798862859e1d2ef22ebd65204baa1345e
+  - path: src/graphics/vulkan/README.md
+    sha256: 7060d6cc2684546e29533691937bd068e00b55ce18d862eb4c0f2d210d178302
   - path: src/runtime/AssetWorkflow/Runtime.AssetWorkflowGeometryMaterialization.cpp
     sha256: deec21fe4bfe7be09345da64fb38200e82f8b6ce8e3a411d0631b00b1729583d
   - path: src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Mesh.cpp
-    sha256: 8bdf4d1f43727886245f2bdd7014009e2422a12ef366cc9e73275a0be0cee530
+    sha256: 7efe46cfc75ebd9be67d41ed0322cc32f987dc0dc44ada674d68dfc16a68fe4c
   - path: src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.cppm
-    sha256: cc4a8c23605e68cd84b6c6be1536e99ab7b5ac79ec89f83f80ac0fcb2e1f5b40
+    sha256: 2fd671b68810e816151b8eb86f1551c4cdec4442d502e39143eb6b8cbf1373b0
   - path: src/runtime/Editor/Operations/Runtime.VisualizationEditingOperations.Actions.cpp
     sha256: da8fcd1e17528791e5788d3ace45f8049e123d3d95ac8d77f10e1016fb1e989d
   - path: src/runtime/Editor/Runtime.EditorWorkspaceSnapshots.Models.cpp
@@ -78,21 +220,525 @@ source:
   - path: src/runtime/Modules/TextureBake/Runtime.TextureBakeModule.cpp
     sha256: a8ec9f63aac0ba7732104675848afaea0f9507dd0abc55a9c75ee5406cbd4246
   - path: src/runtime/README.md
-    sha256: 20224d6b735bc1133bafdb9cef53b3e5c67382425a9d34345140a3d3cb1de7e9
+    sha256: a5f82cae27286983a90515c996c80416768c8bfa59faf350c3aa9de38fdca371
   - path: src/runtime/Rendering/Runtime.RenderExtraction.Geometry.cpp
     sha256: 37b0ff2b2b2c3fd4b97475c2abab876ce95993b7b06ffb33f99f5429942c965f
   - path: src/runtime/Scene/Runtime.SceneSerialization.cpp
     sha256: 3367bca928d6338ac943652cee13a3e9d9517a506fe0aca3d21abd50218fd518
+  - path: tasks/HINTS.md
+    sha256: 63f512c40817ec8e083627cb545625d41505ad933e196bca7e2ae49d8d8e5ea8
   - path: tasks/SESSION-BRIEF.md
-    sha256: 5fd03c85b23b2435af0e31efb0a0938dbb1417fd350c54476f408cb6b8c660c5
+    sha256: cf32855f9fc86cd8484a1d01a2f6ac02d42ab2e5b71abd915a5aa528817db7f4
   - path: tasks/active/BUG-154-curvature-pmp-parity-corner-normal-topology.md
-    sha256: ef49082f0d2d6dcd990e9c185d56eff41acccc93e34fd7ee52ba2d58e39338c8
+    sha256: e60c85a5c13c22b0ab32a754df872d7b1e0539c3fd7ee0ae70495f3f74dd8804
+  - path: tasks/active/BUG-156-curvature-two-ring-smoothing-cancels-features.md
+    sha256: 5b9da84115993ea449fe13043a5125fb564428fb472b0f3528096a42e8f02647
+  - path: tasks/active/BUG-162-main-branch-consolidation.md
+    sha256: 3b68cd8b3ea908817e54df59c524b6b68f346afcd3eb9684efa54df6e5a774a7
+  - path: tasks/active/METHOD-039-feature-network-curvature-patch-decomposition.md
+    sha256: d3afb87b88fe6a47122bd9965d2912e0c7d1c7e9d9bc30d8f0645b3c3b18e40e
   - path: tasks/active/README.md
-    sha256: ffad40cf575974504764f3b346e3e88411ab57da5a0994de4458714c5f0b4a73
-  - path: tasks/backlog/bugs/BUG-155-vulkan-native-timestamp-zero-duration-flake.md
-    sha256: aca1ac953bb5364f08a450898791915d04b5c9f2195c1346dad34a6e4d635496
+    sha256: 94242d836a3f5aa5e2ee4df5a0a316a11bab97e79f148f8366dfafa9064de2a3
+  - path: tasks/backlog/README.md
+    sha256: 6409374fef3bf59d5a8093d6f352db2564b8a31b7f6960834edec1d95f545902
+  - path: tasks/backlog/architecture/README.md
+    sha256: 5420204e4aad910ad22819d50219c19fcf3b14c9f58fb439ed34195846ad2cba
+  - path: tasks/backlog/architecture/REVIEW-004-framework24-product-convergence-audit.md
+    sha256: 721f0bfd2407585ef208d9457777a6e7194aa1695362e7c54d3019aa97fc256c
+  - path: tasks/backlog/assets/ASSETIO-012-single-source-format-capability-table.md
+    sha256: aff0a1159ff9d8951a8bd063fb2fd0864b5069b06f0b93149f80d45dc6e5131c
+  - path: tasks/backlog/assets/README.md
+    sha256: d6924ab84e46063ff650f862c363007fa2835edb73ededa67ad97699533f92a1
+  - path: tasks/backlog/benchmarks/BENCH-001-framework24-golden-workflow-comparison-harness.md
+    sha256: 8620f22b070b27d53dc5d2701882ba7cbb8db94cf1ec0da7783e96058131db90
+  - path: tasks/backlog/benchmarks/README.md
+    sha256: 2a21bb35f5662c64e09ecc2bbf08dd4ff5cf8d8a796cc08af053d995bc240b70
+  - path: tasks/backlog/bugs/BUG-121-glm-anonymous-union-module-copy-assign.md
+    sha256: null
+  - path: tasks/backlog/bugs/BUG-157-clang20-glm-module-union-build-break.md
+    sha256: 1d996a16aad598e84c120d0ffc2bbf52a2bd948f68ac4deb85fe20d290fb34cf
+  - path: tasks/backlog/bugs/BUG-158-direct-mesh-enrichment-blocks-usable-geometry.md
+    sha256: 74879cb15bff473d419b605b81e445c1ea88cf7b99a6dc0820048699e02dca8b
+  - path: tasks/backlog/bugs/BUG-159-fast-staged-atlas-per-chart-global-remaps.md
+    sha256: d9d11968ebfa31e204607c0bf482ad6043c5934a14a0d17802cae99c50bde2db
+  - path: tasks/backlog/bugs/BUG-160-fast-staged-atlas-chart-fragmentation.md
+    sha256: 31a64f7949f269218adee08ea22bc7e9282dd52b8e1559fde3dacb1eda2a8c58
+  - path: tasks/backlog/bugs/README.md
+    sha256: 3f3ccf887fafa5a2e0bff971e4fa1f201202101b9a4af026430640dc73c153f8
   - path: tasks/backlog/bugs/index.md
-    sha256: 8f57f5941f290b9b6cb214f07020a2638f9f6808d1eda604650cd82a73c14b0a
+    sha256: 41b9e8d9ccd06c1ec1363a4d15b448cb474629380f1dc5f5b7c47246216314b5
+  - path: tasks/backlog/rendering/GRAPHICS-135-renderprep-per-frame-taskgraph-overhead.md
+    sha256: 768a8a271c9fbeb37d28c7a4a022556ab141f4d42af77e966755de0554a64557
+  - path: tasks/backlog/rendering/README.md
+    sha256: af557935dc1a808d74cd674503d9fce196406032ebac18d2b707ccd2a9f60da5
+  - path: tasks/backlog/runtime/README.md
+    sha256: 6e25bcf562ade2e84b967c8e10dfe289f76f5f944d88a84e81f4806e95d606fb
+  - path: tasks/backlog/runtime/RUNTIME-218-default-scene-lighting-and-light-authoring.md
+    sha256: 2726945a488dd2050964f18addaf55ceb4c7900d4982a0ce3ff6270f3faed900
+  - path: tasks/backlog/ui/README.md
+    sha256: 75fcd0ff00148650342aa34d324ef4cec212d4b141bfa619d37163454ec913ce
+  - path: tasks/backlog/ui/UI-046-sandbox-geometry-export.md
+    sha256: e36d65775d5768a8fbf75fd8baec78f688fdffd127444cde6eb6cfcf26494983
+  - path: tasks/backlog/ui/UI-047-file-chooser-for-import-and-scene-paths.md
+    sha256: 103180b9ba699aee7e73f8f2316f893db4e1846b32f1e04d2ca55ff232367327
+  - path: tasks/backlog/ui/UI-048-first-run-workspace-and-layout-persistence.md
+    sha256: 135587e9315b6b2678c8b84f2c57ebd8b8b81bb5f9bf2228decce75f7944f133
+  - path: tasks/backlog/ui/UI-049-editor-panel-sizing-and-readability.md
+    sha256: 99abf719e538d2899faf87fc6f3904efb9c8de1e2122738f90ec43f526290bbc
+  - path: tasks/backlog/ui/UI-050-vector-field-property-visualization.md
+    sha256: b1f563de2e235999559a7e5d09ced0b4d1e17830bf2a2ac0539e595eddad3f08
+  - path: tasks/backlog/ui/UI-051-domain-agnostic-appearance-properties-selection-windows.md
+    sha256: c564c62bafa69d1419b94b049e1d0c817a7572f9a8ceb29fd3eaba710068f4f1
+  - path: tasks/done/ARCH-017-framework24-product-convergence-gate.md
+    sha256: 7085a0763001ec67bb1cddcbc3278040ff5f2ef7ad0a3946340609b8460062e0
+  - path: tasks/done/ARCH-018-framework24-feature-parity-goal-clarification.md
+    sha256: 8969945e6fabba81036902fc8b7165d991d75bc099d68a571659dd80fbb8abfc
+  - path: tasks/done/BUG-121-glm-anonymous-union-module-copy-assign.md
+    sha256: cb4fce4c196b4a15746351c3cc9e53248362be30030ad7f3623878b71251e4e5
+  - path: tasks/done/BUG-155-vulkan-native-timestamp-zero-duration-flake.md
+    sha256: e6cadc40a58ccdb3dcf044004f6a889d2d955bd0bfca9b4422de83f96bfbabd5
+  - path: tasks/done/BUG-161-clean-checkout-framework24-policy-validation.md
+    sha256: 5109a0202cd725f5946084f79a5301a8e5679be8d30ca3b76dfd91feedeaa62c
+  - path: tasks/done/RETIREMENT-LOG.md
+    sha256: fac8d9b72cd961bc54a93eff8fb0ea70d392aae2ce7a04f2258a171a94cef083
+  - path: tasks/evidence/ARCH-017/commands/ara-claims.json
+    sha256: b92e5e488b4aa616b7eb997f44b796eeb5deb33b2f18b651e08ed06990fbac88
+  - path: tasks/evidence/ARCH-017/commands/ara-claims.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/ARCH-017/commands/ara-claims.stdout.log
+    sha256: f5d1ba21e51c911cdc11f30a65c8351df03ec7f68aeef18f5a5d5fb3b7589771
+  - path: tasks/evidence/ARCH-017/commands/build-intrinsic-tests.json
+    sha256: 7beb899c2302a91bdd03be04fea8380a7d551e4dcc7c51de5b293bc2439dea0c
+  - path: tasks/evidence/ARCH-017/commands/build-intrinsic-tests.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/ARCH-017/commands/build-intrinsic-tests.stdout.log
+    sha256: 1ce5d47b1d36adca2d35ea5a8ea58d21775055dbf38131ebd885b6b2cba96e54
+  - path: tasks/evidence/ARCH-017/commands/doc-links.json
+    sha256: a3fa2808128db1c35079f3b811a881275520e90a11aed2fee54a8c584b80099d
+  - path: tasks/evidence/ARCH-017/commands/doc-links.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/ARCH-017/commands/doc-links.stdout.log
+    sha256: 8ae480804673ef37ed6e94faf9023038856fafa62f3471e277c617b9ef65b1c4
+  - path: tasks/evidence/ARCH-017/commands/framework24-source-identity.json
+    sha256: adcbd890f58986790f30f01911824c0bed9fc4c940124514c00faac9916411e7
+  - path: tasks/evidence/ARCH-017/commands/framework24-source-identity.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/ARCH-017/commands/framework24-source-identity.stdout.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/ARCH-017/commands/full-cpu.json
+    sha256: 589840593069a2abaa95e67c388ba68f763284494e6960bfa0ced9f56c6e3bbb
+  - path: tasks/evidence/ARCH-017/commands/full-cpu.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/ARCH-017/commands/full-cpu.stdout.log
+    sha256: 182987e18f172e89d82a99cd8d2ce103dfee2404730f88214895e6ce0da759cb
+  - path: tasks/evidence/ARCH-017/commands/session-brief.json
+    sha256: 798d7e8e4f7f8240b95f304c2713eca6312dc50924e7b760eaae5ac3b8082d04
+  - path: tasks/evidence/ARCH-017/commands/session-brief.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/ARCH-017/commands/session-brief.stdout.log
+    sha256: 2c6f9e11b29f8cf3a7584ea7fc64def6de5cc12e09b4dfbb0401f86e6854ad44
+  - path: tasks/evidence/ARCH-017/commands/skill-sync.json
+    sha256: 3f7daff825eeeb7b1cdb851cc328ffe6dfd3d866d11762d6e1a776fbd08979a0
+  - path: tasks/evidence/ARCH-017/commands/skill-sync.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/ARCH-017/commands/skill-sync.stdout.log
+    sha256: fa1cc5f61bd88d9100ddeeacc5c3c557fce3279752905eac66c23470395e7556
+  - path: tasks/evidence/ARCH-017/commands/source-diff-check.json
+    sha256: 64d6a51e05423afc0fb8963e227fcd700c7c8910224d9bff0e1b33701ca93844
+  - path: tasks/evidence/ARCH-017/commands/source-diff-check.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/ARCH-017/commands/source-diff-check.stdout.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/ARCH-017/commands/strict-task-policy.json
+    sha256: ae9d56e5afefe4823293b096cd4f35333c5764ff6056a5eebedfb6e968dc7904
+  - path: tasks/evidence/ARCH-017/commands/strict-task-policy.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/ARCH-017/commands/strict-task-policy.stdout.log
+    sha256: 4ddeab71078658df6b421d7f9b3ced5d428b47c38cda9095ca46214cd39ae7a0
+  - path: tasks/evidence/ARCH-017/commands/strict-task-validation.json
+    sha256: a7ee915f62d5931c565d751b7d65adf1cf287269ab109e817a6c91755702de6f
+  - path: tasks/evidence/ARCH-017/commands/strict-task-validation.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/ARCH-017/commands/strict-task-validation.stdout.log
+    sha256: 260f714c5b608d9458cad377c8ed970eaca06e8d245a0d7b6666d84735231dca
+  - path: tasks/evidence/ARCH-017/commands/task-state-links.json
+    sha256: d058ee695ee274a1b98d209f3dedf44d056fedfaf3de898aa221e6bfa29fcd1b
+  - path: tasks/evidence/ARCH-017/commands/task-state-links.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/ARCH-017/commands/task-state-links.stdout.log
+    sha256: 12781decead7040004b4a9afc8fc86d4520c244132d152b6cddf1325b43ebe20
+  - path: tasks/evidence/ARCH-017/commands/task-validator-regressions.json
+    sha256: 0d47ec836528e2f6020286956a678fbd8626cd7860b94c828082ea9d5a05a90a
+  - path: tasks/evidence/ARCH-017/commands/task-validator-regressions.stderr.log
+    sha256: bc78090ea06e3f2544d82c49d458796f28df97e75bec32e5af4d7a5cd38aba75
+  - path: tasks/evidence/ARCH-017/commands/task-validator-regressions.stdout.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/ARCH-017/handoff.jsonl
+    sha256: 4601a8beb9843eb8addebadb595320a418de2666b08320f34fee25593404e539
+  - path: tasks/evidence/ARCH-017/report.yaml
+    sha256: 0c0723ed3d9d0224ab87b0120e8b442cb6ed5eaf2bde3e407d2536111c40f2e1
+  - path: tasks/evidence/ARCH-017/reviews.jsonl
+    sha256: d8d127302355b630b429aa49899396a821d6b05339627ddec20f364bf95e1f6b
+  - path: tasks/evidence/ARCH-017/seal.yaml
+    sha256: 00a0c18e836a0e4ccf563a88054c282b8a621a822dcebe1fb733f170b1c81b6a
+  - path: tasks/evidence/ARCH-018/commands/ara-claims.json
+    sha256: 492c6ff94dee6107935abbcc0cbb6f559708b74c8c5b6eb541c85fa92564a61a
+  - path: tasks/evidence/ARCH-018/commands/ara-claims.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/ARCH-018/commands/ara-claims.stdout.log
+    sha256: f5d1ba21e51c911cdc11f30a65c8351df03ec7f68aeef18f5a5d5fb3b7589771
+  - path: tasks/evidence/ARCH-018/commands/changed-surface.json
+    sha256: 0cbe13a815f7251e2d3b65945a2465dfe5b69d8e74eb413e69f4368d9d976460
+  - path: tasks/evidence/ARCH-018/commands/changed-surface.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/ARCH-018/commands/changed-surface.stdout.log
+    sha256: 8086bdae0da2600a30fd7634acfe54fb517079740acb4534e010d2b65c2da6d7
+  - path: tasks/evidence/ARCH-018/commands/diff-check.json
+    sha256: 6a87c3d5c575614968dd7ea20c492915f6dcdfc21be4b0d02ccfeb2d4cab5f28
+  - path: tasks/evidence/ARCH-018/commands/diff-check.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/ARCH-018/commands/diff-check.stdout.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/ARCH-018/commands/doc-links.json
+    sha256: ccbbe6801a3ebe9c364545c2f7ac84bb36c53f96bc31d56abe336ea8df4b029d
+  - path: tasks/evidence/ARCH-018/commands/doc-links.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/ARCH-018/commands/doc-links.stdout.log
+    sha256: d9bf7337c210a99036b4dcdfe953a0b0f020f1d798246db92a9b4b6009985424
+  - path: tasks/evidence/ARCH-018/commands/docs-sync.json
+    sha256: fd90ca2669b7ccf943b359431afcc82af566c275395435e410ae7d6e3c25d47b
+  - path: tasks/evidence/ARCH-018/commands/docs-sync.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/ARCH-018/commands/docs-sync.stdout.log
+    sha256: c1f15f06cad276121bbb7ff66524e34e41b7515458df4314b89aae249f994ae1
+  - path: tasks/evidence/ARCH-018/commands/layering.json
+    sha256: ca85a8f91078d9414d64d4bb048de07fa32da859170f59a038bba33bbeceb4ca
+  - path: tasks/evidence/ARCH-018/commands/layering.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/ARCH-018/commands/layering.stdout.log
+    sha256: ed04f1bc96fab0521be2e6e449542eaf07aab3eada27b17956c3c9ffb7507ab8
+  - path: tasks/evidence/ARCH-018/commands/root-hygiene.json
+    sha256: 1d0572801565b86b0aefc9bc29113c6cba31ab5775825c707f713fdf9ed8d347
+  - path: tasks/evidence/ARCH-018/commands/root-hygiene.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/ARCH-018/commands/root-hygiene.stdout.log
+    sha256: 05485d557043f93bbbcf01fcd9dadf7f169c4de8ae2967207d1c0eb77188d8bf
+  - path: tasks/evidence/ARCH-018/commands/session-brief.json
+    sha256: 84ae329e6b10d7e69620e38f9da0fca30b01731e135983c83737719e1faf400e
+  - path: tasks/evidence/ARCH-018/commands/session-brief.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/ARCH-018/commands/session-brief.stdout.log
+    sha256: 2c6f9e11b29f8cf3a7584ea7fc64def6de5cc12e09b4dfbb0401f86e6854ad44
+  - path: tasks/evidence/ARCH-018/commands/skill-sync.json
+    sha256: 05cc1b5c6496ba6c5668d336031034cf5cf6de9abd83a847213b331a0c7b6730
+  - path: tasks/evidence/ARCH-018/commands/skill-sync.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/ARCH-018/commands/skill-sync.stdout.log
+    sha256: fa1cc5f61bd88d9100ddeeacc5c3c557fce3279752905eac66c23470395e7556
+  - path: tasks/evidence/ARCH-018/commands/strict-task-policy.json
+    sha256: 77cf4818e92d6520aec9740b2ab814df2f120527c369ac7fb230850368066612
+  - path: tasks/evidence/ARCH-018/commands/strict-task-policy.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/ARCH-018/commands/strict-task-policy.stdout.log
+    sha256: cc22458fd7066cf043d7605d16c201d1f045ea100cf1f05fadf41b539df05fc1
+  - path: tasks/evidence/ARCH-018/commands/strict-task-validation.json
+    sha256: 1a75859e480121913ab0735c6def53e2e19150eed77ce7c20ef05d8bc59f5b2b
+  - path: tasks/evidence/ARCH-018/commands/strict-task-validation.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/ARCH-018/commands/strict-task-validation.stdout.log
+    sha256: c0fcdf9cc43bca5c00e7b6d35e6301492bf73767ac206edbaee18b0c5e10402d
+  - path: tasks/evidence/ARCH-018/commands/task-state-links.json
+    sha256: dcca55924c627da6932ad7c0edbf01c58fb5dccc0b5811d6911ef7bab7aa60ee
+  - path: tasks/evidence/ARCH-018/commands/task-state-links.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/ARCH-018/commands/task-state-links.stdout.log
+    sha256: d69b5327f31fd030e8ccb52c450be371778b35a72f49742485e172e3669a6c1d
+  - path: tasks/evidence/ARCH-018/commands/task-validator-regressions.json
+    sha256: db311a0ddb6dfe4d3c25ac6ef7fab441fc98607666605833db03a79f54270a90
+  - path: tasks/evidence/ARCH-018/commands/task-validator-regressions.stderr.log
+    sha256: 13c2e046792408d79a1d16fcf04a1d4b101e2d2073d9e97b02b8fb14ae7b347a
+  - path: tasks/evidence/ARCH-018/commands/task-validator-regressions.stdout.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/ARCH-018/handoff.jsonl
+    sha256: 197d720667c6e5adab354612e12162a3159223ff42348dc71f72f4b26f5c2a3f
+  - path: tasks/evidence/ARCH-018/report.yaml
+    sha256: 220c216c93112d3900c7f3186a565732daeaeb0ad4894ad6775c9624b1cf85f0
+  - path: tasks/evidence/ARCH-018/reviews.jsonl
+    sha256: b54a1ee6f1139961aa8629d3f7f5f38b421d4301f66e16129a3ac9f96f6eddb5
+  - path: tasks/evidence/ARCH-018/seal.yaml
+    sha256: c90b853aa7a7477a6dae26cf6d4d8442829ec4706d73cae29e7e100e021df4b5
+  - path: tasks/evidence/BUG-156/commands/corrected-ci-asan.json
+    sha256: 72517afde4ae38b1ac3eb80968179d969ecbaab1f55fb0072d8f1dfa5f2a53f9
+  - path: tasks/evidence/BUG-156/commands/corrected-ci-asan.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/BUG-156/commands/corrected-ci-asan.stdout.log
+    sha256: 96093cf3b5f446b35ca990f56933781afb367af281c39fe59a38a919517f7788
+  - path: tasks/evidence/BUG-156/commands/corrected-ci-cpu.json
+    sha256: 9f9cd3a15d8e7691468964fafe6cb1a5036e909b37dbe976b3989efdba536d9d
+  - path: tasks/evidence/BUG-156/commands/corrected-ci-cpu.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/BUG-156/commands/corrected-ci-cpu.stdout.log
+    sha256: 69ce702c39aff3ab61cdff231fd7217e7931e6d9001ce9aa1aacf5d7c1a2e6ff
+  - path: tasks/evidence/BUG-156/commands/corrected-ci-ubsan.json
+    sha256: dc20e8d82ec0fcea42a42ea60649eebd2d8b05eb30f6beadc983eff8439ce5e3
+  - path: tasks/evidence/BUG-156/commands/corrected-ci-ubsan.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/BUG-156/commands/corrected-ci-ubsan.stdout.log
+    sha256: 5665fda386057bd020df7163f7bb86ee3996e498ef1b52ed47fbbcd032ff7144
+  - path: tasks/evidence/BUG-156/commands/corrected-focused.json
+    sha256: 29222121aa819174cac161a91828f1f180b43c905e2fc692a4c71b0c0ce815bf
+  - path: tasks/evidence/BUG-156/commands/corrected-focused.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/BUG-156/commands/corrected-focused.stdout.log
+    sha256: d8af110adbb426139ce38768d017f28da7ca1b2428c7a1d908a5c6be4c59e97c
+  - path: tasks/evidence/BUG-156/commands/corrected-structural.json
+    sha256: 64dcb05a6fcb591c10a452b75d67db58e02522d13211788963dcea979b314d7d
+  - path: tasks/evidence/BUG-156/commands/corrected-structural.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/BUG-156/commands/corrected-structural.stdout.log
+    sha256: c96909d818911f41c835478b7fce4acabf9f51722de6639fdacf42b3d494e9dc
+  - path: tasks/evidence/BUG-156/report.yaml
+    sha256: b41cfa0b04764cfb5ac48186129e75376f877cd33cfb3759d5f7b918d459b5f3
+  - path: tasks/evidence/BUG-156/reviews.jsonl
+    sha256: 1a508110a8665c1c0b04e9f43730fc1ad7edd59efdca7d47bbf5cc522e73713e
+  - path: tasks/evidence/BUG-161/commands/ccache-workflow.json
+    sha256: db0f3920b47ef9f90fcadad04f03057719b1af38f1f48d66dde3d82392c0c7a4
+  - path: tasks/evidence/BUG-161/commands/ccache-workflow.stderr.log
+    sha256: a52b7be5707658b8832f911b75b8ef37d507efdde300e44e3522ba22ebc5810c
+  - path: tasks/evidence/BUG-161/commands/ccache-workflow.stdout.log
+    sha256: 09a0612434ba25a1a9b6a88e0679a4ff2904aea7dfa801c308f9e904234aaa25
+  - path: tasks/evidence/BUG-161/commands/ci-timing.json
+    sha256: e865b733b9cc2688fa6285ff92875c9d3bdb6274340e4ed2a571a30dce412d2d
+  - path: tasks/evidence/BUG-161/commands/ci-timing.stderr.log
+    sha256: 6e27e32f0d5f212ccef8e8975294c84fba03861df1554cc0846f2d4d8bf4097a
+  - path: tasks/evidence/BUG-161/commands/ci-timing.stdout.log
+    sha256: 2e24badc79f30bfe496b96d35e30989c1eda8ed3f89f5b52d562e58766455606
+  - path: tasks/evidence/BUG-161/commands/diff-check.json
+    sha256: 68e9bb4485f3a6f6e0fcdd4f261e1a3c603f9f1772a4450a2bd5403db278311f
+  - path: tasks/evidence/BUG-161/commands/diff-check.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/BUG-161/commands/diff-check.stdout.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/BUG-161/commands/docs-sync.json
+    sha256: 5616e8065ed542ab63a2a531cdf80b7eedd214ab8444ce097dad0aefde941a58
+  - path: tasks/evidence/BUG-161/commands/docs-sync.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/BUG-161/commands/docs-sync.stdout.log
+    sha256: 2135e1211c400ed9c8a6721c7123d38b21c7c56865a4ece9c2a253980329f8b7
+  - path: tasks/evidence/BUG-161/commands/final-diff-check.json
+    sha256: 50a421a403b57db78b9608f353d16dd7d8a63533f8cf6ecfaf41daca0f849f33
+  - path: tasks/evidence/BUG-161/commands/final-diff-check.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/BUG-161/commands/final-diff-check.stdout.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/BUG-161/commands/final-doc-links.json
+    sha256: 58f20b75b37eca4c7eeb1e5377233f15732bc591f0288e4b97b6762d2886c7b1
+  - path: tasks/evidence/BUG-161/commands/final-doc-links.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/BUG-161/commands/final-doc-links.stdout.log
+    sha256: 8ae480804673ef37ed6e94faf9023038856fafa62f3471e277c617b9ef65b1c4
+  - path: tasks/evidence/BUG-161/commands/final-session-brief.json
+    sha256: e570468fda4d02398a75eb4853074f89b882f0038373d43954767489e0226520
+  - path: tasks/evidence/BUG-161/commands/final-session-brief.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/BUG-161/commands/final-session-brief.stdout.log
+    sha256: 2c6f9e11b29f8cf3a7584ea7fc64def6de5cc12e09b4dfbb0401f86e6854ad44
+  - path: tasks/evidence/BUG-161/commands/final-task-policy.json
+    sha256: 73fbbb15bdb6693c327711c8fe4c48764f5d48b7e5af96dbd3bad993e886e26d
+  - path: tasks/evidence/BUG-161/commands/final-task-policy.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/BUG-161/commands/final-task-policy.stdout.log
+    sha256: 2b95d87d5969fa51d7d9cf0d0ed76fe94a43b4ec818dee9e19657b6be446d2c7
+  - path: tasks/evidence/BUG-161/commands/final-task-state-links.json
+    sha256: 12aa730599a74689541e76b316f8ea2d3b55fdaaa10bdfb05c55f0169f7a3604
+  - path: tasks/evidence/BUG-161/commands/final-task-state-links.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/BUG-161/commands/final-task-state-links.stdout.log
+    sha256: d69b5327f31fd030e8ccb52c450be371778b35a72f49742485e172e3669a6c1d
+  - path: tasks/evidence/BUG-161/commands/final-task-validation.json
+    sha256: 04b9f337b2c54e7641dee66b1039976cb53cb317d90937bb0446f7fdaba6dae6
+  - path: tasks/evidence/BUG-161/commands/final-task-validation.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/BUG-161/commands/final-task-validation.stdout.log
+    sha256: c0fcdf9cc43bca5c00e7b6d35e6301492bf73767ac206edbaee18b0c5e10402d
+  - path: tasks/evidence/BUG-161/commands/final-workflow-regression.json
+    sha256: f81dae4bc4b9da1d6d1d9bd13e78969c204e5ab1867e8a717448b378e60394b2
+  - path: tasks/evidence/BUG-161/commands/final-workflow-regression.stderr.log
+    sha256: f19414494ce81b0aadf078e5fc065a6b08393b6f9d12e795c988a21c3389dcdf
+  - path: tasks/evidence/BUG-161/commands/final-workflow-regression.stdout.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/BUG-161/commands/hosted-original-blockers.json
+    sha256: 5e0722c55f08d70f267fdc64379ac35a5a2aa263531a179c3d00f3f0df34a08c
+  - path: tasks/evidence/BUG-161/commands/hosted-original-blockers.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/BUG-161/commands/hosted-original-blockers.stdout.log
+    sha256: d1956f6fb0f19e4c19cee0c65a57413cb86b254a92dbd3f5e763eb3a8940dbc9
+  - path: tasks/evidence/BUG-161/commands/layering.json
+    sha256: 2aa3caf6c3e29888a4cb26e3e828cb12db2832b9a8b61c08d5e41edd9944f18a
+  - path: tasks/evidence/BUG-161/commands/layering.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/BUG-161/commands/layering.stdout.log
+    sha256: ed04f1bc96fab0521be2e6e449542eaf07aab3eada27b17956c3c9ffb7507ab8
+  - path: tasks/evidence/BUG-161/commands/r2-diff-check.json
+    sha256: 95e16b690e0ba65b4d7bf6e6a1bd3e13708524e06c9a55d11dfc5304e8f848ed
+  - path: tasks/evidence/BUG-161/commands/r2-diff-check.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/BUG-161/commands/r2-diff-check.stdout.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/BUG-161/commands/r2-doc-links.json
+    sha256: b9adf9626fc2ad6051ff1901639fcc61ec653a6f2eb1be5409a83ee13b84211d
+  - path: tasks/evidence/BUG-161/commands/r2-doc-links.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/BUG-161/commands/r2-doc-links.stdout.log
+    sha256: 995ab4c26dcdd3a3d9b21c498ad4ce6626c005983aa850d956ccdfbbc2589dac
+  - path: tasks/evidence/BUG-161/commands/r2-docs-sync.json
+    sha256: 0bd80e56f3a28e1ac1e695b68b9e5090fb786f3f820a1c2d8a2f7d8cd16ec342
+  - path: tasks/evidence/BUG-161/commands/r2-docs-sync.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/BUG-161/commands/r2-docs-sync.stdout.log
+    sha256: 2135e1211c400ed9c8a6721c7123d38b21c7c56865a4ece9c2a253980329f8b7
+  - path: tasks/evidence/BUG-161/commands/r2-layering.json
+    sha256: 43a5cb9918fe65ef83addfbc0aab21c3c109a1f94bf1315e886f73c06b0d39bb
+  - path: tasks/evidence/BUG-161/commands/r2-layering.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/BUG-161/commands/r2-layering.stdout.log
+    sha256: ed04f1bc96fab0521be2e6e449542eaf07aab3eada27b17956c3c9ffb7507ab8
+  - path: tasks/evidence/BUG-161/commands/r2-root-hygiene.json
+    sha256: 50e1db6470d9335cb0619fd2c3e6c76b78851ef3950e01ff5a3fa9e1ef0c45b0
+  - path: tasks/evidence/BUG-161/commands/r2-root-hygiene.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/BUG-161/commands/r2-root-hygiene.stdout.log
+    sha256: 05485d557043f93bbbcf01fcd9dadf7f169c4de8ae2967207d1c0eb77188d8bf
+  - path: tasks/evidence/BUG-161/commands/r2-session-brief.json
+    sha256: 19916a077e1598b6d891792bd2267800e49187539f022d62d4a2f7c070cb3b44
+  - path: tasks/evidence/BUG-161/commands/r2-session-brief.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/BUG-161/commands/r2-session-brief.stdout.log
+    sha256: 2c6f9e11b29f8cf3a7584ea7fc64def6de5cc12e09b4dfbb0401f86e6854ad44
+  - path: tasks/evidence/BUG-161/commands/r2-task-policy.json
+    sha256: 0e451ffa99a830629b7be6369a81cc83fc81f165e1385f977c92cf79f62a5d9f
+  - path: tasks/evidence/BUG-161/commands/r2-task-policy.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/BUG-161/commands/r2-task-policy.stdout.log
+    sha256: dcbaa2c27dc80eff95e5e6cda873afd0aeeb68037690d3a4734edbfa0eb3c8d6
+  - path: tasks/evidence/BUG-161/commands/r2-task-state-links.json
+    sha256: 8395ef61ae07b4a64dfe73a9429669865c9a315b6f4d50fa90a86922f8e807d1
+  - path: tasks/evidence/BUG-161/commands/r2-task-state-links.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/BUG-161/commands/r2-task-state-links.stdout.log
+    sha256: efca39b57e192cb4a2632e6e0e92bf2ee620ec47a9b81ad987de991b95c2b51e
+  - path: tasks/evidence/BUG-161/commands/r2-task-validation.json
+    sha256: d373c39dddbf1aedcc614f0734ac4f525b0a77f9df3d0fe1b5268883cf7a5a05
+  - path: tasks/evidence/BUG-161/commands/r2-task-validation.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/BUG-161/commands/r2-task-validation.stdout.log
+    sha256: 79a36b6cbb823bad2f8867edc33cae14810d2f3513db5eadd8e1590314183630
+  - path: tasks/evidence/BUG-161/commands/r2-workflow-regression.json
+    sha256: acc6fdeecd2715ae3ac35fa12dbb7be674de258ed95f93734e48b425062a0e01
+  - path: tasks/evidence/BUG-161/commands/r2-workflow-regression.stderr.log
+    sha256: 8a42145e94cec7a6bc70384a8c8124517e5a2a81c379785031e40b0f0527db9d
+  - path: tasks/evidence/BUG-161/commands/r2-workflow-regression.stdout.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/BUG-161/commands/root-hygiene.json
+    sha256: 3a37172028bb8d58b19f81f5766c28fe95ee48593e3eb154e770ddc726c445a3
+  - path: tasks/evidence/BUG-161/commands/root-hygiene.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/BUG-161/commands/root-hygiene.stdout.log
+    sha256: 5b22b70d4f26fc4f5a9be9f253f07b5da927ed29775ce55594031d8c6747b976
+  - path: tasks/evidence/BUG-161/commands/strict-doc-links.json
+    sha256: f45f79249704a560bebe9cb57792bbcadc1868c80c6c6b3f03b812977c6e11a2
+  - path: tasks/evidence/BUG-161/commands/strict-doc-links.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/BUG-161/commands/strict-doc-links.stdout.log
+    sha256: 8ae480804673ef37ed6e94faf9023038856fafa62f3471e277c617b9ef65b1c4
+  - path: tasks/evidence/BUG-161/commands/strict-root-hygiene.json
+    sha256: 284a749b8b88d032c5f9e3e59c76fd9bed01bbd5bb8bac2aee2beb0e728937cb
+  - path: tasks/evidence/BUG-161/commands/strict-root-hygiene.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/BUG-161/commands/strict-root-hygiene.stdout.log
+    sha256: 05485d557043f93bbbcf01fcd9dadf7f169c4de8ae2967207d1c0eb77188d8bf
+  - path: tasks/evidence/BUG-161/commands/strict-task-policy.json
+    sha256: 6513aa1d8de01758cd88835feb156f38bf848b82f56a4973ff7d34d33dd2958e
+  - path: tasks/evidence/BUG-161/commands/strict-task-policy.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/BUG-161/commands/strict-task-policy.stdout.log
+    sha256: 529a00dec6fa5813128fd9353f32e922ff902e09277c37e46c0a793b85e2fd8a
+  - path: tasks/evidence/BUG-161/commands/structural-workflow-regressions.json
+    sha256: 3448e6a8702de09d7e42bb91071e4536291b9b789099ab6bc394e33989ea4e4d
+  - path: tasks/evidence/BUG-161/commands/structural-workflow-regressions.stderr.log
+    sha256: 52d5c4a0d7f59053cf0da713edcf520988316bab3767f9a35b5c5c75c2f1f913
+  - path: tasks/evidence/BUG-161/commands/structural-workflow-regressions.stdout.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/BUG-161/commands/task-state-links.json
+    sha256: 80c4685a68b578326ecece4e572aa37cd0c7993050959a8afe12091259a1c01c
+  - path: tasks/evidence/BUG-161/commands/task-state-links.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/BUG-161/commands/task-state-links.stdout.log
+    sha256: efca39b57e192cb4a2632e6e0e92bf2ee620ec47a9b81ad987de991b95c2b51e
+  - path: tasks/evidence/BUG-161/commands/workflow-names.json
+    sha256: c7905197e2af4b0c3dfaf437797db03ebf3284e134fcfc025f82738ef770d196
+  - path: tasks/evidence/BUG-161/commands/workflow-names.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/BUG-161/commands/workflow-names.stdout.log
+    sha256: 9c47be97361b55c2f8807e6fbe4840e549145541c256b47203112ff44deae538
+  - path: tasks/evidence/BUG-161/commands/workflow-regression.json
+    sha256: 52acebea622ab6900dffdabc6b69c1f19d5b2a5cda4873f72b6414653ae1f448
+  - path: tasks/evidence/BUG-161/commands/workflow-regression.stderr.log
+    sha256: 8a42145e94cec7a6bc70384a8c8124517e5a2a81c379785031e40b0f0527db9d
+  - path: tasks/evidence/BUG-161/commands/workflow-regression.stdout.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/BUG-161/commands/workflow-routing.json
+    sha256: 0f8d1b835bafa8f3219283f1b8f212ea6f6a366354ded71c6d5e9886b146cb30
+  - path: tasks/evidence/BUG-161/commands/workflow-routing.stderr.log
+    sha256: 33d2de99ff14d7c488fd80ee3d09f1bab6f91fb326828666234ca0326567b3f8
+  - path: tasks/evidence/BUG-161/commands/workflow-routing.stdout.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/BUG-161/handoff.jsonl
+    sha256: 804a85176425d6e5c2d52de3ff25b0febe2a0e541c143957ab8bd7870be5c273
+  - path: tasks/evidence/BUG-161/report.yaml
+    sha256: 68534be01c99745ef8c26007d1cfa254725ca244af99e11ee84ccda977ddda1f
+  - path: tasks/evidence/BUG-161/reviews.jsonl
+    sha256: 1d4f1f27ec2000a21ba274a2dc3b1c8384c24f55df705583aad7ce2e760c9ef6
+  - path: tasks/evidence/BUG-161/seal.yaml
+    sha256: 12152a45d79769b02b7305db07d748b7107077a1f870be4b9da86c913ccecad7
+  - path: tasks/evidence/BUG-162/commands/corrected-ci-asan.json
+    sha256: 476234b1360cb6a80bab1b638ae2ea23a4269cf7635fc7c6f18a19637f12ca5f
+  - path: tasks/evidence/BUG-162/commands/corrected-ci-asan.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/BUG-162/commands/corrected-ci-asan.stdout.log
+    sha256: 09220bae1332e947ebba2a336d527cc4a08f7f7564e75a392c49d4b168e5badf
+  - path: tasks/evidence/BUG-162/commands/corrected-ci-cpu.json
+    sha256: 841ee682797e2dadefce63389ed8789afd502d6480186e75b064c8fc294cd5f2
+  - path: tasks/evidence/BUG-162/commands/corrected-ci-cpu.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/BUG-162/commands/corrected-ci-cpu.stdout.log
+    sha256: 32a7286862eae13fef05dce0a2136f010d1fc36068fe9e9065ca0f2f88dcd54d
+  - path: tasks/evidence/BUG-162/commands/corrected-ci-ubsan.json
+    sha256: 0488e9e205c6b8547026e51896bdd2cb3e2d6cacb85525921b10191a0ad0f876
+  - path: tasks/evidence/BUG-162/commands/corrected-ci-ubsan.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/BUG-162/commands/corrected-ci-ubsan.stdout.log
+    sha256: f7b7f7972d026b2241f1239c313725d269a2f8a956e16b0fb755362e43314243
+  - path: tasks/evidence/BUG-162/commands/corrected-focused.json
+    sha256: 88c290635cf38772d6d00d74434f4bcce00fdf857beb3f57f1274e733e3da1e7
+  - path: tasks/evidence/BUG-162/commands/corrected-focused.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/BUG-162/commands/corrected-focused.stdout.log
+    sha256: ad564f4b14576a46db04daeb5b65d4f61df4a829452ca463124b9afe5a7258c8
+  - path: tasks/evidence/BUG-162/commands/corrected-structural.json
+    sha256: f64593bec914fd8a4aeb51ac7556eb3f1286711a2c8642b88fae86fc89217535
+  - path: tasks/evidence/BUG-162/commands/corrected-structural.stderr.log
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - path: tasks/evidence/BUG-162/commands/corrected-structural.stdout.log
+    sha256: 2cf8dca5c17b21c9841eb7eb1b96cb7809a6a7dd21de85472af71278a952aeac
+  - path: tasks/evidence/BUG-162/report.yaml
+    sha256: e9c0633e56800fa8c7ee1e18b99bf38e520a6fed360e87061c399864f3be384f
+  - path: tasks/evidence/BUG-162/reviews.jsonl
+    sha256: 84d35f5c458252777e4e6b755ae6c3f2d506b0256f6661ad307570fdb1d1b78b
+  - path: tasks/templates/task-micro.md
+    sha256: 88a2639be6e5993c040f0111c362f438876aaaba7995006c39e55ae4645716b0
+  - path: tests/README.md
+    sha256: 7f41f2717e69f8ebd7e9270b7c3d733cbc2901decee6064cd6719be5a49a91db
   - path: tests/contract/runtime/Test.AssetImportFormatCoverage.cpp
     sha256: 6fa202d936c7db24daf52f01d7e8fe414d0597b5ee4cf09ba7bf041cf801196f
   - path: tests/contract/runtime/Test.CornerTexcoordUpload.cpp
@@ -102,48 +748,218 @@ source:
   - path: tests/contract/runtime/Test.RuntimeSceneSerialization.cpp
     sha256: 1e5899654aacdd502856dcbe0d5bb00fa8b1b02082bfda596c28975a70305e9c
   - path: tests/contract/runtime/Test.SandboxEditorMeshMethods.cpp
-    sha256: 9175ea8d0f0eaeedbb7a111d3b408dd3e02f308ae7242cfb224e3c3a35c37739
+    sha256: 5231c75cfd3bc5693bfda90ac9545821364b30669faffc83dffae641c1187ecb
+  - path: tests/data/framework24-acute-tetrahedron.obj
+    sha256: 3f774ea5e54e84e6c491f33d7d4e48c1d3862753e60791fa1aa5c91282d3aed3
+  - path: tests/data/framework24-obtuse-tetrahedron.obj
+    sha256: 59ba252a94e0d38296ddbe2fc9cbd4b9cce7f7b9ad0b4d8fd01460b1d9bc0af1
+  - path: tests/data/framework24-open-patch.obj
+    sha256: 55ef2b66c95f1065a345556af44ce03aab769cea6f0c90917f83068bce1cf48d
+  - path: tests/integration/graphics/Test.DefaultRecipeSurfaceGpuSmoke.cpp
+    sha256: 11fd220ae27d2f98fc50ec13617945bfe9dc261bb5e3e0408d938dfed9151508
+  - path: tests/regression/tooling/Test.WorkflowConcurrency.py
+    sha256: 5934b441133dd1931d23393888e4753479a45c244aa1be7aa06988c1109b96e6
   - path: tests/unit/geometry/Test.CurvatureTensor.cpp
-    sha256: b29431d6c0600a01a5612c5b0af719bdd2847d9266f99c3e1187b36b81b585c4
+    sha256: afc22a24f2da4f18e43ff70ddbfc1f9df3f507b5ee2002181efe9bae46787e0b
   - path: tests/unit/geometry/Test.GeometryIO.cpp
     sha256: 53737f05c4cf5bb3a02728b1b10f27157e75920e351d332ced6a2a5259f55c3e
   - path: tests/unit/geometry/Test_Curvature.cpp
-    sha256: 3ec564f8aca52ff1a158d0f80713b6c6bbe6205e008866f033eb1c2e124242da
+    sha256: 12ba3fb677b419198b78057eebfc8f2749cfe10d2c395fe48822bf0008d7dd97
   - path: tests/unit/geometry/Test_DEC.cpp
     sha256: e83712540bbd06e62f656487c0497bc55d360096baf4da6b4cd2a2021c0b6c53
   - path: tests/unit/geometry/Test_Smoothing.cpp
     sha256: c559a385c2f1d12138e6f7183f686410fc6a8bc7fff0932dea4d9bc9cea28b61
+  - path: tests/unit/graphics/Test.RHI.Profiler.cpp
+    sha256: 79cee7357b6d667d478ed3eeef39d8e12e6fa0f577002092663fdf7849a46753
+  - path: tools/agentkit/README.md
+    sha256: 0f364689b6d8d23ec26489c3ac383fdb29332f83f215339d39795739d3fdd716
+  - path: tools/agentkit/src/agentkit/config.py
+    sha256: bec7da7e051287a6d9fdaaa87cc84b89150458e5dbc53b46dbc38eed82adb310
+  - path: tools/agentkit/src/agentkit/templates/AGENTS.md.tmpl
+    sha256: 1dc6e5bdb5eb21e8e961f58675ef27bb2f5d6f9e881593150ab34a46abb706d4
+  - path: tools/agentkit/src/agentkit/templates/copilot-instructions.md.tmpl
+    sha256: b947ba7d59887c915b722a4e75910464edcf145c6fbfee941b817e53b39edca1
+  - path: tools/agentkit/src/agentkit/templates/docs/agent/agent-output-review-checklist.md.tmpl
+    sha256: null
+  - path: tools/agentkit/src/agentkit/templates/docs/agent/architecture-review-checklist.md.tmpl
+    sha256: null
+  - path: tools/agentkit/src/agentkit/templates/docs/agent/prompt/prompt.md.tmpl
+    sha256: ef6f88fff59a00670ed4650c8f73b1e01634a30534d921bb6074c2e84a556a60
+  - path: tools/agentkit/src/agentkit/templates/docs/agent/review-checklist.md.tmpl
+    sha256: null
+  - path: tools/agentkit/src/agentkit/templates/docs/agent/review.md.tmpl
+    sha256: f959b331918041094d7ff045699b31bed4bac24be62b34e43956b9a3c7141b3e
+  - path: tools/agentkit/src/agentkit/templates/docs/agent/roles.md.tmpl
+    sha256: a55db6a3c3968fe76192093e636e9f549dfa5a2231810749397e177f0641e4b4
+  - path: tools/agentkit/src/agentkit/templates/github/pull_request_template.md.tmpl
+    sha256: 556c7187b6c0c1ffd5b6eb9fa70fa72cdeeba71a64f44fe8f6acab65e02c0a03
+  - path: tools/agentkit/src/agentkit/templates/tools/agent/resync_skills.sh.tmpl
+    sha256: 6ff29be1e6a4f0248c8a4a22f11c82b131fdbbc709b5117fe16eab6ab6722039
+  - path: tools/agentkit/src/agentkit/templates/tools/agent/skills/review/SKILL.md.tmpl
+    sha256: 4b220b71227aa890081ac3627fe5bce78c0ea8845f58555a62c43868dc3708e9
+  - path: tools/agents/check_audit_cadence.py
+    sha256: 79d4c1bbf9681e3ba30327f80f8c3a4e6fba6f8d4e5bdb726e2b462a32802707
+  - path: tools/agents/contract_legacy_tasks.json
+    sha256: 9e4c42b39ea720bc573fb162607c7d2f250fada6f83bfb37a8881aaa19e895d3
+  - path: tools/agents/generate_session_brief.py
+    sha256: f613efcf9f9b01790d33f10f51610836085c79a483cff9905516de5225be0da1
+  - path: tools/agents/skills/README.md
+    sha256: 4eead859ffd11226c0c20a82113b7c039138b0f4a84079477ff8756c0a66e99d
+  - path: tools/agents/skills/intrinsicengine-audit/SKILL.md
+    sha256: bdf06c16505e17c64d691fa33118252fb29ab220738f83531f3b55f45ec8dec2
+  - path: tools/agents/skills/intrinsicengine-benchmark/SKILL.md
+    sha256: a6baf43c0cfaea0dcd7036c4d6b1d88eb37a788596f0b8f93828a2f4ee23a017
+  - path: tools/agents/skills/intrinsicengine-benchmark/references/benchmark-review-checklist.md
+    sha256: null
+  - path: tools/agents/skills/intrinsicengine-benchmark/references/benchmark-workflow.md
+    sha256: dbc362e52ce42391acf1c6f737994f16492b8123fbe51706983b604d6e7fc3fc
+  - path: tools/agents/skills/intrinsicengine-core/SKILL.md
+    sha256: 672cd59fe8c93ea5fb5999add8080d7a4c131e0f05a1a57533cc62c6ba557abc
+  - path: tools/agents/skills/intrinsicengine-core/references/contract.md
+    sha256: 439ca5a989171e54e928d8da42b8f47f3269ed461ab2772d365357a5b32a2ff0
+  - path: tools/agents/skills/intrinsicengine-core/references/roles.md
+    sha256: e43c62b9f84d553f076bbb2ba68af21cb4c3f96b08aee9489928e8dbf0025947
+  - path: tools/agents/skills/intrinsicengine-core/references/session-onboarding.md
+    sha256: 9c9688e3a959845c73a8bc1d8e4c849848af56d0e7a22c1255c97bf49c4f86f6
+  - path: tools/agents/skills/intrinsicengine-diagnose/SKILL.md
+    sha256: b9cc9d24adcef2646a7fede06f9c49846d5a67cc873a5ab70571afe083864cd6
   - path: tools/agents/skills/intrinsicengine-import-visibility-contract/SKILL.md
     sha256: 1ae9205b225b5644c53c20b71cb4be1fbfde2223e55cd8cf34f9dee2bb3f62a5
+  - path: tools/agents/skills/intrinsicengine-method/SKILL.md
+    sha256: 102d11453edfdc43414b30bff252ef759c00b27e15521de7ce7a7b6df775d72e
+  - path: tools/agents/skills/intrinsicengine-method/references/method-review-checklist.md
+    sha256: null
+  - path: tools/agents/skills/intrinsicengine-method/references/method-workflow.md
+    sha256: a9cc792a49a17c18423e404cd2c98f9cc01fc08769cf7d0cccd9fef98058abbe
+  - path: tools/agents/skills/intrinsicengine-results-audit/references/ara-evidence-policy.md
+    sha256: d0a644b8d8b92ad16052593b90832748cf277f1bad057b209b72a663b302ab12
+  - path: tools/agents/skills/intrinsicengine-review/SKILL.md
+    sha256: bdc59c804ca94341eb9a89f588427abd8ecf6c3b3172a960ae43db52a0d5b1b0
+  - path: tools/agents/skills/intrinsicengine-review/references/agent-output-review-checklist.md
+    sha256: null
+  - path: tools/agents/skills/intrinsicengine-review/references/architecture-review-checklist.md
+    sha256: null
+  - path: tools/agents/skills/intrinsicengine-review/references/clean-workshop-review.md
+    sha256: null
+  - path: tools/agents/skills/intrinsicengine-review/references/drift-audit-checklist.md
+    sha256: null
+  - path: tools/agents/skills/intrinsicengine-review/references/review-checklist.md
+    sha256: null
+  - path: tools/agents/skills/intrinsicengine-review/references/review.md
+    sha256: 328f6bf68bfec42054ba7d74fd73db64ee759001b4185200db747ea59d15dc70
+  - path: tools/agents/skills/intrinsicengine-right-sizing/SKILL.md
+    sha256: 3ce501fc1bf6397fe58626174bd8aa25cae349993f4e3b929a371fe69b98f804
+  - path: tools/agents/skills/intrinsicengine-task-workflow/SKILL.md
+    sha256: a3b9b8a8d854e37ead55bd4b85e3d390c5b6d3a7e4bd80b998ee8e1db245f086
+  - path: tools/agents/skills/intrinsicengine-task-workflow/references/task-format.md
+    sha256: 4da825ccfd0e0f3518947305d6f4514377edeb88dcc4e0587e63a1a8d4e1bf28
+  - path: tools/agents/skills/intrinsicengine-task-workflow/references/task-maturity.md
+    sha256: 1ced27787eb0017bb44a793bd34fdf6b176a0dc8baf04d663979123ebc1ff53c
+  - path: tools/agents/skills/intrinsicengine-task-workflow/references/workflow-evidence.md
+    sha256: 48fbe7538b61ff6c9e44b8c378bf779853553eb273116d273f394487690089db
+  - path: tools/agents/sync_skills.py
+    sha256: 149bb1098d41fbdb86116ac3bff25e35f86c811482f7e92694909025e70abb31
   - path: tools/diagnostics/CMakeLists.txt
     sha256: a65b876f86e539c3822a7238450275739b0a3e3e5af94ec9a012d694a0e2ad4a
+  - path: tools/diagnostics/curvature/Framework24CurvatureParityProbe.cpp
+    sha256: ad81ef4fec81eafa815607cb066966e8608b7dd3fca658923820b28ad12c16ad
   - path: tools/diagnostics/curvature/IntrinsicCurvatureCorpusProbe.cpp
     sha256: 19bde74704f5869c98367c29f50ae81420142f6805f63d7d331fc11b4e3f19cf
   - path: tools/diagnostics/curvature/PmpCurvatureCorpusProbe.cpp
-    sha256: f2ad77a7b0382f8d854c308d84fad8cec23b87b0e869313434405e3bd5b42f58
+    sha256: 8052dbb7956cf6d23f0af9b4c8e92e00f953db6eeedd5836becf21a89f25d0c4
   - path: tools/diagnostics/curvature/README.md
-    sha256: a4429bcfe5da94af0fc438cadfd951387f7cf7d7b55b9db28f2eea41f2af3db5
+    sha256: c6ada8e597d9902d1a5f1e7d550ecd936dc9f9dca70734507f2efdfd334dd2b6
   - path: tools/diagnostics/curvature/compare_curvature_corpus.py
     sha256: 4e3096bfd67a19e49c504eebeffaff080e75e7e637612467f6d37b498fd1b67c
-  content_digest: 293bc0501e3ad886cd1a8308de7c45c1af238c0704878274e1a362111ccbdebb
+  - path: tools/docs/docs_sync_rules.yaml
+    sha256: c85485df548794e8dce225dfae5b482b22642f1ec2035511033540344bc7a3f1
+  - path: tools/repo/githooks/pre-commit
+    sha256: f57fd300376114c921128c6e519ff6f5fb9cb0695722a00096626b887ccbb7e6
+  content_digest: f6a06b6271b7723e5138f5f75dcd4df2bdc062898aa96272e7492aec0e98758d
 touched:
   paths:
+  - .github/copilot-instructions.md
+  - .github/pull_request_template.md
+  - .github/workflows/ci-docs.yml
+  - .github/workflows/ci-linux-clang.yml
+  - .github/workflows/nightly-deep.yml
+  - AGENTS.md
   - CMakeLists.txt
+  - README.md
   - ara/evidence/README.md
+  - ara/evidence/tables/curvature_framework24_parity_2026-08-12.md
   - ara/evidence/tables/curvature_pmp_diagnostic_2026-08-11.md
+  - ara/evidence/tables/eig3x3_live_curvature_diagnostic_2026-08-12.md
   - ara/logic/claims.md
   - ara/logic/solution/architecture.md
+  - ara/logic/solution/heuristics.md
   - ara/staging/observations.yaml
   - ara/trace/exploration_tree.yaml
   - ara/trace/pm_reasoning_log.yaml
   - ara/trace/sessions/2026-08-11_001.yaml
   - ara/trace/sessions/2026-08-12_001.yaml
+  - ara/trace/sessions/2026-08-13_001.yaml
+  - ara/trace/sessions/2026-09-01_001.yaml
+  - ara/trace/sessions/2026-09-02_001.yaml
   - ara/trace/sessions/session_index.yaml
+  - docs/agent/agent-output-review-checklist.md
+  - docs/agent/ara-evidence-policy.md
+  - docs/agent/architecture-review-checklist.md
+  - docs/agent/benchmark-review-checklist.md
+  - docs/agent/benchmark-workflow.md
+  - docs/agent/clean-workshop-review.md
+  - docs/agent/contract.md
+  - docs/agent/drift-audit-checklist.md
+  - docs/agent/how-this-repo-is-built.md
+  - docs/agent/method-review-checklist.md
+  - docs/agent/method-workflow.md
+  - docs/agent/prompt/prompt.md
+  - docs/agent/proposals/pair-workflow-redesign.md
+  - docs/agent/review-checklist.md
+  - docs/agent/review.md
+  - docs/agent/roles.md
+  - docs/agent/task-format.md
+  - docs/agent/task-maturity.md
+  - docs/agent/workflow-evidence.md
   - docs/architecture/geometry-api-style.md
   - docs/architecture/geometry.md
+  - docs/architecture/index.md
   - docs/architecture/property-coherence.md
+  - docs/architecture/runtime.md
+  - docs/benchmarking/index.md
+  - docs/index.md
   - docs/methods/numerical-robustness-policy.md
+  - docs/product/framework24-convergence.md
+  - docs/product/framework24-feature-inventory.md
+  - docs/product/index.md
   - docs/reports/2026-08-12-curvature-estimator-study.md
+  - docs/reports/2026-08-12-curvature-support-smoothing-defect.md
+  - src/app/Sandbox/CMakeLists.txt
+  - src/app/Sandbox/Editor/Sandbox.DomainPanels.cpp
+  - src/app/Sandbox/Editor/Sandbox.DomainPanels.cppm
+  - src/app/Sandbox/Editor/Sandbox.EditorController.cppm
+  - src/app/Sandbox/Editor/Sandbox.EditorShell.cpp
+  - src/app/Sandbox/Editor/Sandbox.EditorShell.cppm
+  - src/app/Sandbox/Editor/Sandbox.MeshProcessingPanels.cpp
+  - src/app/Sandbox/Editor/Sandbox.MeshProcessingPanels.cppm
+  - src/app/Sandbox/Editor/Sandbox.MethodPanels.cpp
+  - src/app/Sandbox/Editor/Sandbox.MethodPanels.cppm
+  - src/app/Sandbox/Sandbox.ConfigSections.cppm
+  - src/app/Sandbox/Sandbox.cppm
+  - src/assets/Asset.EventBus.cppm
+  - src/assets/Asset.GeometryPayload.cppm
+  - src/assets/Asset.ImportRouter.cppm
+  - src/assets/Asset.LoadPipeline.cpp
+  - src/assets/Asset.LoadPipeline.cppm
+  - src/assets/Asset.ModelTexturePayload.cppm
+  - src/assets/Asset.OperationStatus.cppm
+  - src/assets/Asset.PathIndex.cppm
+  - src/assets/Asset.PayloadStore.cppm
+  - src/assets/Asset.Registry.cppm
+  - src/assets/Asset.Service.cpp
+  - src/assets/Asset.Service.cppm
+  - src/assets/Asset.TypePool.cppm
+  - src/ecs/Components/ECS.Component.GeometrySources.cppm
   - src/geometry/Geometry.HalfedgeMesh.Curvature.cpp
   - src/geometry/Geometry.HalfedgeMesh.Curvature.cppm
   - src/geometry/Geometry.HalfedgeMesh.DEC.cpp
@@ -151,6 +967,11 @@ touched:
   - src/geometry/Geometry.HalfedgeMesh.Smoothing.cpp
   - src/geometry/Geometry.HalfedgeMesh.Smoothing.cppm
   - src/geometry/Geometry.HalfedgeMesh.Utils.cpp
+  - src/geometry/Geometry.Triangle.cpp
+  - src/graphics/renderer/README.md
+  - src/graphics/rhi/README.md
+  - src/graphics/vulkan/Backends.Vulkan.Profiler.cpp
+  - src/graphics/vulkan/README.md
   - src/runtime/AssetWorkflow/Runtime.AssetWorkflowGeometryMaterialization.cpp
   - src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Mesh.cpp
   - src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.cppm
@@ -163,27 +984,331 @@ touched:
   - src/runtime/README.md
   - src/runtime/Rendering/Runtime.RenderExtraction.Geometry.cpp
   - src/runtime/Scene/Runtime.SceneSerialization.cpp
+  - tasks/HINTS.md
   - tasks/SESSION-BRIEF.md
   - tasks/active/BUG-154-curvature-pmp-parity-corner-normal-topology.md
+  - tasks/active/BUG-156-curvature-two-ring-smoothing-cancels-features.md
+  - tasks/active/BUG-162-main-branch-consolidation.md
+  - tasks/active/METHOD-039-feature-network-curvature-patch-decomposition.md
   - tasks/active/README.md
-  - tasks/backlog/bugs/BUG-155-vulkan-native-timestamp-zero-duration-flake.md
+  - tasks/backlog/README.md
+  - tasks/backlog/architecture/README.md
+  - tasks/backlog/architecture/REVIEW-004-framework24-product-convergence-audit.md
+  - tasks/backlog/assets/ASSETIO-012-single-source-format-capability-table.md
+  - tasks/backlog/assets/README.md
+  - tasks/backlog/benchmarks/BENCH-001-framework24-golden-workflow-comparison-harness.md
+  - tasks/backlog/benchmarks/README.md
+  - tasks/backlog/bugs/BUG-121-glm-anonymous-union-module-copy-assign.md
+  - tasks/backlog/bugs/BUG-157-clang20-glm-module-union-build-break.md
+  - tasks/backlog/bugs/BUG-158-direct-mesh-enrichment-blocks-usable-geometry.md
+  - tasks/backlog/bugs/BUG-159-fast-staged-atlas-per-chart-global-remaps.md
+  - tasks/backlog/bugs/BUG-160-fast-staged-atlas-chart-fragmentation.md
+  - tasks/backlog/bugs/README.md
   - tasks/backlog/bugs/index.md
+  - tasks/backlog/rendering/GRAPHICS-135-renderprep-per-frame-taskgraph-overhead.md
+  - tasks/backlog/rendering/README.md
+  - tasks/backlog/runtime/README.md
+  - tasks/backlog/runtime/RUNTIME-218-default-scene-lighting-and-light-authoring.md
+  - tasks/backlog/ui/README.md
+  - tasks/backlog/ui/UI-046-sandbox-geometry-export.md
+  - tasks/backlog/ui/UI-047-file-chooser-for-import-and-scene-paths.md
+  - tasks/backlog/ui/UI-048-first-run-workspace-and-layout-persistence.md
+  - tasks/backlog/ui/UI-049-editor-panel-sizing-and-readability.md
+  - tasks/backlog/ui/UI-050-vector-field-property-visualization.md
+  - tasks/backlog/ui/UI-051-domain-agnostic-appearance-properties-selection-windows.md
+  - tasks/done/ARCH-017-framework24-product-convergence-gate.md
+  - tasks/done/ARCH-018-framework24-feature-parity-goal-clarification.md
+  - tasks/done/BUG-121-glm-anonymous-union-module-copy-assign.md
+  - tasks/done/BUG-155-vulkan-native-timestamp-zero-duration-flake.md
+  - tasks/done/BUG-161-clean-checkout-framework24-policy-validation.md
+  - tasks/done/RETIREMENT-LOG.md
+  - tasks/evidence/ARCH-017/commands/ara-claims.json
+  - tasks/evidence/ARCH-017/commands/ara-claims.stderr.log
+  - tasks/evidence/ARCH-017/commands/ara-claims.stdout.log
+  - tasks/evidence/ARCH-017/commands/build-intrinsic-tests.json
+  - tasks/evidence/ARCH-017/commands/build-intrinsic-tests.stderr.log
+  - tasks/evidence/ARCH-017/commands/build-intrinsic-tests.stdout.log
+  - tasks/evidence/ARCH-017/commands/doc-links.json
+  - tasks/evidence/ARCH-017/commands/doc-links.stderr.log
+  - tasks/evidence/ARCH-017/commands/doc-links.stdout.log
+  - tasks/evidence/ARCH-017/commands/framework24-source-identity.json
+  - tasks/evidence/ARCH-017/commands/framework24-source-identity.stderr.log
+  - tasks/evidence/ARCH-017/commands/framework24-source-identity.stdout.log
+  - tasks/evidence/ARCH-017/commands/full-cpu.json
+  - tasks/evidence/ARCH-017/commands/full-cpu.stderr.log
+  - tasks/evidence/ARCH-017/commands/full-cpu.stdout.log
+  - tasks/evidence/ARCH-017/commands/session-brief.json
+  - tasks/evidence/ARCH-017/commands/session-brief.stderr.log
+  - tasks/evidence/ARCH-017/commands/session-brief.stdout.log
+  - tasks/evidence/ARCH-017/commands/skill-sync.json
+  - tasks/evidence/ARCH-017/commands/skill-sync.stderr.log
+  - tasks/evidence/ARCH-017/commands/skill-sync.stdout.log
+  - tasks/evidence/ARCH-017/commands/source-diff-check.json
+  - tasks/evidence/ARCH-017/commands/source-diff-check.stderr.log
+  - tasks/evidence/ARCH-017/commands/source-diff-check.stdout.log
+  - tasks/evidence/ARCH-017/commands/strict-task-policy.json
+  - tasks/evidence/ARCH-017/commands/strict-task-policy.stderr.log
+  - tasks/evidence/ARCH-017/commands/strict-task-policy.stdout.log
+  - tasks/evidence/ARCH-017/commands/strict-task-validation.json
+  - tasks/evidence/ARCH-017/commands/strict-task-validation.stderr.log
+  - tasks/evidence/ARCH-017/commands/strict-task-validation.stdout.log
+  - tasks/evidence/ARCH-017/commands/task-state-links.json
+  - tasks/evidence/ARCH-017/commands/task-state-links.stderr.log
+  - tasks/evidence/ARCH-017/commands/task-state-links.stdout.log
+  - tasks/evidence/ARCH-017/commands/task-validator-regressions.json
+  - tasks/evidence/ARCH-017/commands/task-validator-regressions.stderr.log
+  - tasks/evidence/ARCH-017/commands/task-validator-regressions.stdout.log
+  - tasks/evidence/ARCH-017/handoff.jsonl
+  - tasks/evidence/ARCH-017/report.yaml
+  - tasks/evidence/ARCH-017/reviews.jsonl
+  - tasks/evidence/ARCH-017/seal.yaml
+  - tasks/evidence/ARCH-018/commands/ara-claims.json
+  - tasks/evidence/ARCH-018/commands/ara-claims.stderr.log
+  - tasks/evidence/ARCH-018/commands/ara-claims.stdout.log
+  - tasks/evidence/ARCH-018/commands/changed-surface.json
+  - tasks/evidence/ARCH-018/commands/changed-surface.stderr.log
+  - tasks/evidence/ARCH-018/commands/changed-surface.stdout.log
+  - tasks/evidence/ARCH-018/commands/diff-check.json
+  - tasks/evidence/ARCH-018/commands/diff-check.stderr.log
+  - tasks/evidence/ARCH-018/commands/diff-check.stdout.log
+  - tasks/evidence/ARCH-018/commands/doc-links.json
+  - tasks/evidence/ARCH-018/commands/doc-links.stderr.log
+  - tasks/evidence/ARCH-018/commands/doc-links.stdout.log
+  - tasks/evidence/ARCH-018/commands/docs-sync.json
+  - tasks/evidence/ARCH-018/commands/docs-sync.stderr.log
+  - tasks/evidence/ARCH-018/commands/docs-sync.stdout.log
+  - tasks/evidence/ARCH-018/commands/layering.json
+  - tasks/evidence/ARCH-018/commands/layering.stderr.log
+  - tasks/evidence/ARCH-018/commands/layering.stdout.log
+  - tasks/evidence/ARCH-018/commands/root-hygiene.json
+  - tasks/evidence/ARCH-018/commands/root-hygiene.stderr.log
+  - tasks/evidence/ARCH-018/commands/root-hygiene.stdout.log
+  - tasks/evidence/ARCH-018/commands/session-brief.json
+  - tasks/evidence/ARCH-018/commands/session-brief.stderr.log
+  - tasks/evidence/ARCH-018/commands/session-brief.stdout.log
+  - tasks/evidence/ARCH-018/commands/skill-sync.json
+  - tasks/evidence/ARCH-018/commands/skill-sync.stderr.log
+  - tasks/evidence/ARCH-018/commands/skill-sync.stdout.log
+  - tasks/evidence/ARCH-018/commands/strict-task-policy.json
+  - tasks/evidence/ARCH-018/commands/strict-task-policy.stderr.log
+  - tasks/evidence/ARCH-018/commands/strict-task-policy.stdout.log
+  - tasks/evidence/ARCH-018/commands/strict-task-validation.json
+  - tasks/evidence/ARCH-018/commands/strict-task-validation.stderr.log
+  - tasks/evidence/ARCH-018/commands/strict-task-validation.stdout.log
+  - tasks/evidence/ARCH-018/commands/task-state-links.json
+  - tasks/evidence/ARCH-018/commands/task-state-links.stderr.log
+  - tasks/evidence/ARCH-018/commands/task-state-links.stdout.log
+  - tasks/evidence/ARCH-018/commands/task-validator-regressions.json
+  - tasks/evidence/ARCH-018/commands/task-validator-regressions.stderr.log
+  - tasks/evidence/ARCH-018/commands/task-validator-regressions.stdout.log
+  - tasks/evidence/ARCH-018/handoff.jsonl
+  - tasks/evidence/ARCH-018/report.yaml
+  - tasks/evidence/ARCH-018/reviews.jsonl
+  - tasks/evidence/ARCH-018/seal.yaml
+  - tasks/evidence/BUG-156/commands/corrected-ci-asan.json
+  - tasks/evidence/BUG-156/commands/corrected-ci-asan.stderr.log
+  - tasks/evidence/BUG-156/commands/corrected-ci-asan.stdout.log
+  - tasks/evidence/BUG-156/commands/corrected-ci-cpu.json
+  - tasks/evidence/BUG-156/commands/corrected-ci-cpu.stderr.log
+  - tasks/evidence/BUG-156/commands/corrected-ci-cpu.stdout.log
+  - tasks/evidence/BUG-156/commands/corrected-ci-ubsan.json
+  - tasks/evidence/BUG-156/commands/corrected-ci-ubsan.stderr.log
+  - tasks/evidence/BUG-156/commands/corrected-ci-ubsan.stdout.log
+  - tasks/evidence/BUG-156/commands/corrected-focused.json
+  - tasks/evidence/BUG-156/commands/corrected-focused.stderr.log
+  - tasks/evidence/BUG-156/commands/corrected-focused.stdout.log
+  - tasks/evidence/BUG-156/commands/corrected-structural.json
+  - tasks/evidence/BUG-156/commands/corrected-structural.stderr.log
+  - tasks/evidence/BUG-156/commands/corrected-structural.stdout.log
+  - tasks/evidence/BUG-156/report.yaml
+  - tasks/evidence/BUG-156/reviews.jsonl
+  - tasks/evidence/BUG-161/commands/ccache-workflow.json
+  - tasks/evidence/BUG-161/commands/ccache-workflow.stderr.log
+  - tasks/evidence/BUG-161/commands/ccache-workflow.stdout.log
+  - tasks/evidence/BUG-161/commands/ci-timing.json
+  - tasks/evidence/BUG-161/commands/ci-timing.stderr.log
+  - tasks/evidence/BUG-161/commands/ci-timing.stdout.log
+  - tasks/evidence/BUG-161/commands/diff-check.json
+  - tasks/evidence/BUG-161/commands/diff-check.stderr.log
+  - tasks/evidence/BUG-161/commands/diff-check.stdout.log
+  - tasks/evidence/BUG-161/commands/docs-sync.json
+  - tasks/evidence/BUG-161/commands/docs-sync.stderr.log
+  - tasks/evidence/BUG-161/commands/docs-sync.stdout.log
+  - tasks/evidence/BUG-161/commands/final-diff-check.json
+  - tasks/evidence/BUG-161/commands/final-diff-check.stderr.log
+  - tasks/evidence/BUG-161/commands/final-diff-check.stdout.log
+  - tasks/evidence/BUG-161/commands/final-doc-links.json
+  - tasks/evidence/BUG-161/commands/final-doc-links.stderr.log
+  - tasks/evidence/BUG-161/commands/final-doc-links.stdout.log
+  - tasks/evidence/BUG-161/commands/final-session-brief.json
+  - tasks/evidence/BUG-161/commands/final-session-brief.stderr.log
+  - tasks/evidence/BUG-161/commands/final-session-brief.stdout.log
+  - tasks/evidence/BUG-161/commands/final-task-policy.json
+  - tasks/evidence/BUG-161/commands/final-task-policy.stderr.log
+  - tasks/evidence/BUG-161/commands/final-task-policy.stdout.log
+  - tasks/evidence/BUG-161/commands/final-task-state-links.json
+  - tasks/evidence/BUG-161/commands/final-task-state-links.stderr.log
+  - tasks/evidence/BUG-161/commands/final-task-state-links.stdout.log
+  - tasks/evidence/BUG-161/commands/final-task-validation.json
+  - tasks/evidence/BUG-161/commands/final-task-validation.stderr.log
+  - tasks/evidence/BUG-161/commands/final-task-validation.stdout.log
+  - tasks/evidence/BUG-161/commands/final-workflow-regression.json
+  - tasks/evidence/BUG-161/commands/final-workflow-regression.stderr.log
+  - tasks/evidence/BUG-161/commands/final-workflow-regression.stdout.log
+  - tasks/evidence/BUG-161/commands/hosted-original-blockers.json
+  - tasks/evidence/BUG-161/commands/hosted-original-blockers.stderr.log
+  - tasks/evidence/BUG-161/commands/hosted-original-blockers.stdout.log
+  - tasks/evidence/BUG-161/commands/layering.json
+  - tasks/evidence/BUG-161/commands/layering.stderr.log
+  - tasks/evidence/BUG-161/commands/layering.stdout.log
+  - tasks/evidence/BUG-161/commands/r2-diff-check.json
+  - tasks/evidence/BUG-161/commands/r2-diff-check.stderr.log
+  - tasks/evidence/BUG-161/commands/r2-diff-check.stdout.log
+  - tasks/evidence/BUG-161/commands/r2-doc-links.json
+  - tasks/evidence/BUG-161/commands/r2-doc-links.stderr.log
+  - tasks/evidence/BUG-161/commands/r2-doc-links.stdout.log
+  - tasks/evidence/BUG-161/commands/r2-docs-sync.json
+  - tasks/evidence/BUG-161/commands/r2-docs-sync.stderr.log
+  - tasks/evidence/BUG-161/commands/r2-docs-sync.stdout.log
+  - tasks/evidence/BUG-161/commands/r2-layering.json
+  - tasks/evidence/BUG-161/commands/r2-layering.stderr.log
+  - tasks/evidence/BUG-161/commands/r2-layering.stdout.log
+  - tasks/evidence/BUG-161/commands/r2-root-hygiene.json
+  - tasks/evidence/BUG-161/commands/r2-root-hygiene.stderr.log
+  - tasks/evidence/BUG-161/commands/r2-root-hygiene.stdout.log
+  - tasks/evidence/BUG-161/commands/r2-session-brief.json
+  - tasks/evidence/BUG-161/commands/r2-session-brief.stderr.log
+  - tasks/evidence/BUG-161/commands/r2-session-brief.stdout.log
+  - tasks/evidence/BUG-161/commands/r2-task-policy.json
+  - tasks/evidence/BUG-161/commands/r2-task-policy.stderr.log
+  - tasks/evidence/BUG-161/commands/r2-task-policy.stdout.log
+  - tasks/evidence/BUG-161/commands/r2-task-state-links.json
+  - tasks/evidence/BUG-161/commands/r2-task-state-links.stderr.log
+  - tasks/evidence/BUG-161/commands/r2-task-state-links.stdout.log
+  - tasks/evidence/BUG-161/commands/r2-task-validation.json
+  - tasks/evidence/BUG-161/commands/r2-task-validation.stderr.log
+  - tasks/evidence/BUG-161/commands/r2-task-validation.stdout.log
+  - tasks/evidence/BUG-161/commands/r2-workflow-regression.json
+  - tasks/evidence/BUG-161/commands/r2-workflow-regression.stderr.log
+  - tasks/evidence/BUG-161/commands/r2-workflow-regression.stdout.log
+  - tasks/evidence/BUG-161/commands/root-hygiene.json
+  - tasks/evidence/BUG-161/commands/root-hygiene.stderr.log
+  - tasks/evidence/BUG-161/commands/root-hygiene.stdout.log
+  - tasks/evidence/BUG-161/commands/strict-doc-links.json
+  - tasks/evidence/BUG-161/commands/strict-doc-links.stderr.log
+  - tasks/evidence/BUG-161/commands/strict-doc-links.stdout.log
+  - tasks/evidence/BUG-161/commands/strict-root-hygiene.json
+  - tasks/evidence/BUG-161/commands/strict-root-hygiene.stderr.log
+  - tasks/evidence/BUG-161/commands/strict-root-hygiene.stdout.log
+  - tasks/evidence/BUG-161/commands/strict-task-policy.json
+  - tasks/evidence/BUG-161/commands/strict-task-policy.stderr.log
+  - tasks/evidence/BUG-161/commands/strict-task-policy.stdout.log
+  - tasks/evidence/BUG-161/commands/structural-workflow-regressions.json
+  - tasks/evidence/BUG-161/commands/structural-workflow-regressions.stderr.log
+  - tasks/evidence/BUG-161/commands/structural-workflow-regressions.stdout.log
+  - tasks/evidence/BUG-161/commands/task-state-links.json
+  - tasks/evidence/BUG-161/commands/task-state-links.stderr.log
+  - tasks/evidence/BUG-161/commands/task-state-links.stdout.log
+  - tasks/evidence/BUG-161/commands/workflow-names.json
+  - tasks/evidence/BUG-161/commands/workflow-names.stderr.log
+  - tasks/evidence/BUG-161/commands/workflow-names.stdout.log
+  - tasks/evidence/BUG-161/commands/workflow-regression.json
+  - tasks/evidence/BUG-161/commands/workflow-regression.stderr.log
+  - tasks/evidence/BUG-161/commands/workflow-regression.stdout.log
+  - tasks/evidence/BUG-161/commands/workflow-routing.json
+  - tasks/evidence/BUG-161/commands/workflow-routing.stderr.log
+  - tasks/evidence/BUG-161/commands/workflow-routing.stdout.log
+  - tasks/evidence/BUG-161/handoff.jsonl
+  - tasks/evidence/BUG-161/report.yaml
+  - tasks/evidence/BUG-161/reviews.jsonl
+  - tasks/evidence/BUG-161/seal.yaml
+  - tasks/evidence/BUG-162/commands/corrected-ci-asan.json
+  - tasks/evidence/BUG-162/commands/corrected-ci-asan.stderr.log
+  - tasks/evidence/BUG-162/commands/corrected-ci-asan.stdout.log
+  - tasks/evidence/BUG-162/commands/corrected-ci-cpu.json
+  - tasks/evidence/BUG-162/commands/corrected-ci-cpu.stderr.log
+  - tasks/evidence/BUG-162/commands/corrected-ci-cpu.stdout.log
+  - tasks/evidence/BUG-162/commands/corrected-ci-ubsan.json
+  - tasks/evidence/BUG-162/commands/corrected-ci-ubsan.stderr.log
+  - tasks/evidence/BUG-162/commands/corrected-ci-ubsan.stdout.log
+  - tasks/evidence/BUG-162/commands/corrected-focused.json
+  - tasks/evidence/BUG-162/commands/corrected-focused.stderr.log
+  - tasks/evidence/BUG-162/commands/corrected-focused.stdout.log
+  - tasks/evidence/BUG-162/commands/corrected-structural.json
+  - tasks/evidence/BUG-162/commands/corrected-structural.stderr.log
+  - tasks/evidence/BUG-162/commands/corrected-structural.stdout.log
+  - tasks/evidence/BUG-162/report.yaml
+  - tasks/evidence/BUG-162/reviews.jsonl
+  - tasks/templates/task-micro.md
+  - tests/README.md
   - tests/contract/runtime/Test.AssetImportFormatCoverage.cpp
   - tests/contract/runtime/Test.CornerTexcoordUpload.cpp
   - tests/contract/runtime/Test.MeshGeometryExtraction.cpp
   - tests/contract/runtime/Test.RuntimeSceneSerialization.cpp
   - tests/contract/runtime/Test.SandboxEditorMeshMethods.cpp
+  - tests/data/framework24-acute-tetrahedron.obj
+  - tests/data/framework24-obtuse-tetrahedron.obj
+  - tests/data/framework24-open-patch.obj
+  - tests/integration/graphics/Test.DefaultRecipeSurfaceGpuSmoke.cpp
+  - tests/regression/tooling/Test.WorkflowConcurrency.py
   - tests/unit/geometry/Test.CurvatureTensor.cpp
   - tests/unit/geometry/Test.GeometryIO.cpp
   - tests/unit/geometry/Test_Curvature.cpp
   - tests/unit/geometry/Test_DEC.cpp
   - tests/unit/geometry/Test_Smoothing.cpp
+  - tests/unit/graphics/Test.RHI.Profiler.cpp
+  - tools/agentkit/README.md
+  - tools/agentkit/src/agentkit/config.py
+  - tools/agentkit/src/agentkit/templates/AGENTS.md.tmpl
+  - tools/agentkit/src/agentkit/templates/copilot-instructions.md.tmpl
+  - tools/agentkit/src/agentkit/templates/docs/agent/agent-output-review-checklist.md.tmpl
+  - tools/agentkit/src/agentkit/templates/docs/agent/architecture-review-checklist.md.tmpl
+  - tools/agentkit/src/agentkit/templates/docs/agent/prompt/prompt.md.tmpl
+  - tools/agentkit/src/agentkit/templates/docs/agent/review-checklist.md.tmpl
+  - tools/agentkit/src/agentkit/templates/docs/agent/review.md.tmpl
+  - tools/agentkit/src/agentkit/templates/docs/agent/roles.md.tmpl
+  - tools/agentkit/src/agentkit/templates/github/pull_request_template.md.tmpl
+  - tools/agentkit/src/agentkit/templates/tools/agent/resync_skills.sh.tmpl
+  - tools/agentkit/src/agentkit/templates/tools/agent/skills/review/SKILL.md.tmpl
+  - tools/agents/check_audit_cadence.py
+  - tools/agents/contract_legacy_tasks.json
+  - tools/agents/generate_session_brief.py
+  - tools/agents/skills/README.md
+  - tools/agents/skills/intrinsicengine-audit/SKILL.md
+  - tools/agents/skills/intrinsicengine-benchmark/SKILL.md
+  - tools/agents/skills/intrinsicengine-benchmark/references/benchmark-review-checklist.md
+  - tools/agents/skills/intrinsicengine-benchmark/references/benchmark-workflow.md
+  - tools/agents/skills/intrinsicengine-core/SKILL.md
+  - tools/agents/skills/intrinsicengine-core/references/contract.md
+  - tools/agents/skills/intrinsicengine-core/references/roles.md
+  - tools/agents/skills/intrinsicengine-core/references/session-onboarding.md
+  - tools/agents/skills/intrinsicengine-diagnose/SKILL.md
   - tools/agents/skills/intrinsicengine-import-visibility-contract/SKILL.md
+  - tools/agents/skills/intrinsicengine-method/SKILL.md
+  - tools/agents/skills/intrinsicengine-method/references/method-review-checklist.md
+  - tools/agents/skills/intrinsicengine-method/references/method-workflow.md
+  - tools/agents/skills/intrinsicengine-results-audit/references/ara-evidence-policy.md
+  - tools/agents/skills/intrinsicengine-review/SKILL.md
+  - tools/agents/skills/intrinsicengine-review/references/agent-output-review-checklist.md
+  - tools/agents/skills/intrinsicengine-review/references/architecture-review-checklist.md
+  - tools/agents/skills/intrinsicengine-review/references/clean-workshop-review.md
+  - tools/agents/skills/intrinsicengine-review/references/drift-audit-checklist.md
+  - tools/agents/skills/intrinsicengine-review/references/review-checklist.md
+  - tools/agents/skills/intrinsicengine-review/references/review.md
+  - tools/agents/skills/intrinsicengine-right-sizing/SKILL.md
+  - tools/agents/skills/intrinsicengine-task-workflow/SKILL.md
+  - tools/agents/skills/intrinsicengine-task-workflow/references/task-format.md
+  - tools/agents/skills/intrinsicengine-task-workflow/references/task-maturity.md
+  - tools/agents/skills/intrinsicengine-task-workflow/references/workflow-evidence.md
+  - tools/agents/sync_skills.py
   - tools/diagnostics/CMakeLists.txt
+  - tools/diagnostics/curvature/Framework24CurvatureParityProbe.cpp
   - tools/diagnostics/curvature/IntrinsicCurvatureCorpusProbe.cpp
   - tools/diagnostics/curvature/PmpCurvatureCorpusProbe.cpp
   - tools/diagnostics/curvature/README.md
   - tools/diagnostics/curvature/compare_curvature_corpus.py
+  - tools/docs/docs_sync_rules.yaml
+  - tools/repo/githooks/pre-commit
   layers:
   - geometry
   - runtime
@@ -229,8 +1354,8 @@ acceptance:
   evidence: []
   reason: null
 - criterion: Required CPU, sanitizer, structural, documentation, and promoted-Vulkan
-  task_checked: false
-  disposition: pending
+  task_checked: true
+  disposition: satisfied
   evidence: []
   reason: null
 - criterion: Independent fixed-surface review accepts the final high-risk revision.
@@ -251,45 +1376,44 @@ commands:
 changed_public_contracts:
 - CotanSmoothVertexProperty supports float, double, and glm::vec2/vec3/vec4 vertex properties with simultaneous
   damped nonnegative-cotan updates, optional active support, and fail-before-mutation validation
-- Principal curvature follows the selected PMP signed 3x3, interior-support, boundary-interpolation, and
-  three-pass smoothing formulation with explicit finite support diagnostics
+- Principal curvature on the reviewed BUG-154 slice follows the selected PMP signed 3x3, interior-support,
+  boundary-interpolation, and three-pass smoothing formulation with explicit finite support diagnostics;
+  BUG-156 supersedes the shipped estimator selection
 - OBJ authored normal discontinuities publish as h:normal and affect only runtime GPU shading-tuple expansion,
   never authoritative owning topology
 diagnostics_and_previews:
-- 96-model deterministic corpus sample compared 80 payload-bearing models and 2,530,726 vertices; clean-support
-  median relative L2 was approximately 4e-8 and all material outliers localized to rejected degenerate
-  or ill-conditioned support
-- Final CPU passed 4252/4252; isolated ASan and UBSan each passed 2744/2744; task-specific promoted-Vulkan
-  normal-path cases passed 2/2
-- The complete promoted-Vulkan cohort passed once, then two repeats failed only the unrelated native-timestamp
-  zero-duration assertion; BUG-155 preserves the failure and owns diagnosis
+- The retained 96-model diagnostic compared 80 payload-bearing models and 2,530,726 vertices; its machine-local
+  timing remains non-claim evidence
+- BUG-154 receipts retain CPU 4252/4252, isolated ASan and UBSan 2744/2744, focused 12/12, task-specific
+  Vulkan 2/2, and strict clean-workshop results on the original frozen surface
+- The first label-distinct independent review accepted the 0f1330140 source surface and identified only
+  report acceptance rebinding plus non-blocking wording/evidence cleanup
 benchmark_or_parity_evidence:
-- Pinned local PMP revision and matched Clang 23 probes establish numerical parity; four-model timings
-  are explicitly machine-local non-claim evidence
+- Pinned local PMP revision and matched Clang 23 probes establish the bounded numerical comparison; four-model
+  timings are explicitly machine-local non-claim evidence
 docs_sync:
   task_file: tasks/active/BUG-154-curvature-pmp-parity-corner-normal-topology.md
   session_brief_present: true
   canonical_docs_changed: true
   skill_mirrors_checked: true
 residual_risks:
-- Independent fixed-surface review is pending, so this report is deliberately draft and BUG-154 remains
-  active
-- BUG-155 blocks a stable complete promoted-Vulkan cohort even though all BUG-154-specific Vulkan visibility/readback
-  cases pass
-- The reusable operation is vertex-domain cotan diffusion only; arbitrary domains, non-manifold guarantees,
-  and public glm::dvec properties remain out of scope
+- The regenerated surface includes later main history, including BUG-156's estimator supersession, beyond
+  the original 0f1330140 source review
+- Non-manifold or unbounded-valence meshes beyond existing fail-closed tests remain unverified
+- The reusable operation remains vertex-domain cotan diffusion only; arbitrary domains and public glm::dvec
+  properties remain out of scope
 skipped_checks:
 - check: claim-grade-performance
   reason: The matched local timing probe is non-claim evidence; no performance win is asserted
 artifacts:
 - path: docs/reports/2026-08-12-curvature-estimator-study.md
-  sha256: 975bce56f89b27d46e8521aa1c146d9bbfa18483b3b82c00af2dc6cb614e7b88
+  sha256: 7af720d1e98a65029ea1cf343c9718cc4cbba559ebc267b36f39e6f1545ded81
   kind: file
 - path: ara/evidence/tables/curvature_pmp_diagnostic_2026-08-11.md
   sha256: 7a69390adbf9997d77050fa8e7c072afe88db3ffcae6ccfbd185109a315a4ab6
   kind: file
 - path: tools/diagnostics/curvature/README.md
-  sha256: a4429bcfe5da94af0fc438cadfd951387f7cf7d7b55b9db28f2eea41f2af3db5
+  sha256: c6ada8e597d9902d1a5f1e7d550ecd936dc9f9dca70734507f2efdfd334dd2b6
   kind: file
 self_review:
   completed: true
