@@ -1,0 +1,162 @@
+Internal ctest changing into directory: /home/alex/Documents/IntrinsicEngine/build/ci
+Test project /home/alex/Documents/IntrinsicEngine/build/ci
+      Start  613: CurvatureSegmentationOperations.PublishesSemanticPropertiesPreservesTopologyAndSupportsHistory
+ 1/75 Test  #613: CurvatureSegmentationOperations.PublishesSemanticPropertiesPreservesTopologyAndSupportsHistory .....   Passed    0.04 sec
+      Start  614: CurvatureSegmentationOperations.RejectsInvalidConfigurationAndUnavailableKernelWithoutMutation
+ 2/75 Test  #614: CurvatureSegmentationOperations.RejectsInvalidConfigurationAndUnavailableKernelWithoutMutation .....   Passed    0.01 sec
+      Start 1022: SandboxEditorUi.MeshCurvatureCommandPublishesCanonicalPropertiesAndSupportsUndoRedo
+ 3/75 Test #1022: SandboxEditorUi.MeshCurvatureCommandPublishesCanonicalPropertiesAndSupportsUndoRedo ................   Passed    0.00 sec
+      Start 1023: SandboxEditorUi.MeshCurvaturePublishesBoundaryOnlyFramework24Support
+ 4/75 Test #1023: SandboxEditorUi.MeshCurvaturePublishesBoundaryOnlyFramework24Support ...............................   Passed    0.00 sec
+      Start 1027: SandboxEditorUi.MeshCurvatureRecomputeThatChangesNothingReportsNoChange
+ 5/75 Test #1027: SandboxEditorUi.MeshCurvatureRecomputeThatChangesNothingReportsNoChange ............................   Passed    0.00 sec
+      Start 1029: SandboxEditorUi.MeshCurvatureRequestQueuesDerivedJobAndPublishesOnApply
+ 6/75 Test #1029: SandboxEditorUi.MeshCurvatureRequestQueuesDerivedJobAndPublishesOnApply ............................   Passed    0.02 sec
+      Start 1030: SandboxEditorUi.MeshCurvatureDerivedJobDiscardsStalePropertiesBeforeApply
+ 7/75 Test #1030: SandboxEditorUi.MeshCurvatureDerivedJobDiscardsStalePropertiesBeforeApply ..........................   Passed    0.01 sec
+      Start 1031: SandboxEditorUi.MeshCurvatureDerivedJobDiscardsStalePrincipalScalarsBeforeApply
+ 8/75 Test #1031: SandboxEditorUi.MeshCurvatureDerivedJobDiscardsStalePrincipalScalarsBeforeApply ....................   Passed    0.01 sec
+      Start 1032: SandboxEditorUi.MeshCurvatureCommandFallsBackToScalarOnlyWhenDirectionsUnavailable
+ 9/75 Test #1032: SandboxEditorUi.MeshCurvatureCommandFallsBackToScalarOnlyWhenDirectionsUnavailable .................   Passed    0.00 sec
+      Start 1033: SandboxEditorUi.MeshCurvatureCommandFailsClosedForInvalidTargetsAndConflicts
+10/75 Test #1033: SandboxEditorUi.MeshCurvatureCommandFailsClosedForInvalidTargetsAndConflicts .......................   Passed    0.00 sec
+      Start 1753: CurvatureSegmentation.FixedCountFitsSignedPrincipalCurvatureGmm
+11/75 Test #1753: CurvatureSegmentation.FixedCountFitsSignedPrincipalCurvatureGmm ....................................   Passed    0.00 sec
+      Start 1754: CurvatureSegmentation.AutomaticModeSelectsSeparatedPopulations
+12/75 Test #1754: CurvatureSegmentation.AutomaticModeSelectsSeparatedPopulations .....................................   Passed    0.01 sec
+      Start 1755: CurvatureSegmentation.SignedFeaturesSeparatePlaneSphereCylinderAndSaddleRegimes
+13/75 Test #1755: CurvatureSegmentation.SignedFeaturesSeparatePlaneSphereCylinderAndSaddleRegimes ....................   Passed    0.00 sec
+      Start 1756: CurvatureSegmentation.ReportsStageAndPerCandidateProfileTimingsWithoutChangingTheSolve
+14/75 Test #1756: CurvatureSegmentation.ReportsStageAndPerCandidateProfileTimingsWithoutChangingTheSolve .............   Passed    0.01 sec
+      Start 1757: CurvatureSegmentation.AutomaticModeReportsToleranceFallbackWhenNoCandidateQualifies
+15/75 Test #1757: CurvatureSegmentation.AutomaticModeReportsToleranceFallbackWhenNoCandidateQualifies ................   Passed    0.01 sec
+      Start 1758: CurvatureSegmentation.IncreasingSpatialWeightReducesSmoothEdgeDisagreement
+16/75 Test #1758: CurvatureSegmentation.IncreasingSpatialWeightReducesSmoothEdgeDisagreement .........................   Passed    0.00 sec
+      Start 1759: CurvatureSegmentation.MinimumRegionCleanupDeterministicallyMergesTheSingleFaceOutlier
+17/75 Test #1759: CurvatureSegmentation.MinimumRegionCleanupDeterministicallyMergesTheSingleFaceOutlier ..............   Passed    0.00 sec
+      Start 1760: CurvatureSegmentation.FeatureWeightPreservesFoldBoundary
+18/75 Test #1760: CurvatureSegmentation.FeatureWeightPreservesFoldBoundary ...........................................   Passed    0.00 sec
+      Start 1761: CurvatureSegmentation.ConnectedRegionsAreContiguousAndDeterministic
+19/75 Test #1761: CurvatureSegmentation.ConnectedRegionsAreContiguousAndDeterministic ................................   Passed    0.00 sec
+      Start 1762: CurvatureSegmentation.DisconnectedEqualCurvaturePatchesShareComponentButNotRegion
+20/75 Test #1762: CurvatureSegmentation.DisconnectedEqualCurvaturePatchesShareComponentButNotRegion ..................   Passed    0.00 sec
+      Start 1763: CurvatureSegmentation.ComputeAndSegmentUsesExistingSignedCurvatureEstimator
+21/75 Test #1763: CurvatureSegmentation.ComputeAndSegmentUsesExistingSignedCurvatureEstimator ........................   Passed    0.00 sec
+      Start 1764: CurvatureSegmentation.GlobalOrientationReversalPreservesPartition
+22/75 Test #1764: CurvatureSegmentation.GlobalOrientationReversalPreservesPartition ..................................   Passed    0.00 sec
+      Start 1765: CurvatureSegmentation.FailsClosedOnInvalidInputs
+23/75 Test #1765: CurvatureSegmentation.FailsClosedOnInvalidInputs ...................................................   Passed    0.00 sec
+      Start 1766: CurvatureSegmentation.DeletedSlotsAndOpenMeshBoundaryEdgesRemainUnpublished
+24/75 Test #1766: CurvatureSegmentation.DeletedSlotsAndOpenMeshBoundaryEdgesRemainUnpublished ........................   Passed    0.00 sec
+      Start 1767: CurvatureSegmentation.RejectsPolygonAndDegenerateFaces
+25/75 Test #1767: CurvatureSegmentation.RejectsPolygonAndDegenerateFaces .............................................   Passed    0.00 sec
+      Start 1768: CurvaturePatchContract.GeneratedOracleCatalogHasValidEvidenceAndPartitionTopology
+26/75 Test #1768: CurvaturePatchContract.GeneratedOracleCatalogHasValidEvidenceAndPartitionTopology ..................   Passed    0.04 sec
+      Start 1769: CurvaturePatchContract.PatchReferenceMatchesSuppliedFeatureOracleCatalog
+27/75 Test #1769: CurvaturePatchContract.PatchReferenceMatchesSuppliedFeatureOracleCatalog ...........................   Passed    1.51 sec
+      Start 1770: CurvaturePatchContract.PatchGrowthIsDeterministicAndSeedFrontsHaveNoAuthority
+28/75 Test #1770: CurvaturePatchContract.PatchGrowthIsDeterministicAndSeedFrontsHaveNoAuthority ......................   Passed    0.03 sec
+      Start 1771: CurvaturePatchContract.PatchHardBarriersRemainDistinctFromGrowthThroughPublication
+29/75 Test #1771: CurvaturePatchContract.PatchHardBarriersRemainDistinctFromGrowthThroughPublication .................   Passed    0.09 sec
+      Start 1772: CurvaturePatchContract.PatchCurvatureClosureSurvivesWithoutFeatureEvidence
+30/75 Test #1772: CurvaturePatchContract.PatchCurvatureClosureSurvivesWithoutFeatureEvidence .........................   Passed    0.10 sec
+      Start 1773: CurvaturePatchContract.PatchCompletionReplaysWithDetectedFeatureEvidence
+31/75 Test #1773: CurvaturePatchContract.PatchCompletionReplaysWithDetectedFeatureEvidence ...........................   Passed    3.80 sec
+      Start 1774: CurvaturePatchContract.SuppliedOracleIsolatesPatchCompletionFromCorruptedDetectorEvidence
+32/75 Test #1774: CurvaturePatchContract.SuppliedOracleIsolatesPatchCompletionFromCorruptedDetectorEvidence ..........   Passed    0.06 sec
+      Start 1775: CurvaturePatchContract.DetectedHardFoldBlocksWhileDetectedHomogeneousControlsStayWhole
+33/75 Test #1775: CurvaturePatchContract.DetectedHardFoldBlocksWhileDetectedHomogeneousControlsStayWhole .............   Passed    0.35 sec
+      Start 1776: CurvaturePatchContract.PatchReferenceFailsClosedForMalformedProductionInputs
+34/75 Test #1776: CurvaturePatchContract.PatchReferenceFailsClosedForMalformedProductionInputs .......................   Passed    0.01 sec
+      Start 1777: CurvaturePatchContract.PatchPartitionPassesFrozenDensityDiagonalScaleNoiseAndOrientationControls
+35/75 Test #1777: CurvaturePatchContract.PatchPartitionPassesFrozenDensityDiagonalScaleNoiseAndOrientationControls ...   Passed    0.91 sec
+      Start 1778: CurvaturePatchContract.LocalRagOneStepSeedPerturbationRefutesFrozenStabilityGate
+36/75 Test #1778: CurvaturePatchContract.LocalRagOneStepSeedPerturbationRefutesFrozenStabilityGate ...................   Passed    0.18 sec
+      Start 1779: CurvaturePatchContract.SharedStrictFoldClassifierMatchesOracle
+37/75 Test #1779: CurvaturePatchContract.SharedStrictFoldClassifierMatchesOracle .....................................   Passed    0.01 sec
+      Start 1780: CurvaturePatchContract.SuppliedEvidenceFailsClosedBeforePatchWork
+38/75 Test #1780: CurvaturePatchContract.SuppliedEvidenceFailsClosedBeforePatchWork ..................................   Passed    0.01 sec
+      Start 1781: CurvaturePatchContract.FeatureDetectorConsumesSharedHardFactsAndRejectsConstantSoftSignals
+39/75 Test #1781: CurvaturePatchContract.FeatureDetectorConsumesSharedHardFactsAndRejectsConstantSoftSignals .........   Passed    0.05 sec
+      Start 1782: CurvaturePatchContract.FeatureDetectorImplementsFrozenPerSignalScaleEquations
+40/75 Test #1782: CurvaturePatchContract.FeatureDetectorImplementsFrozenPerSignalScaleEquations ......................   Passed    0.00 sec
+      Start 1783: CurvaturePatchContract.FeatureDetectorRecoversPersistentLinesEndpointsAndJunctions
+41/75 Test #1783: CurvaturePatchContract.FeatureDetectorRecoversPersistentLinesEndpointsAndJunctions .................   Passed    0.51 sec
+      Start 1784: CurvaturePatchContract.FeatureDetectorSupportIsInvariantUnderGlobalOrientationReversal
+42/75 Test #1784: CurvaturePatchContract.FeatureDetectorSupportIsInvariantUnderGlobalOrientationReversal .............   Passed    0.26 sec
+      Start 1785: CurvaturePatchContract.FeatureDetectorFailsClosedBeforeBoundedSearches
+43/75 Test #1785: CurvaturePatchContract.FeatureDetectorFailsClosedBeforeBoundedSearches .............................   Passed    0.01 sec
+      Start 1786: CurvaturePatchContract.FeatureDetectorIsDeterministicAndComputePathOwnsItsResult
+44/75 Test #1786: CurvaturePatchContract.FeatureDetectorIsDeterministicAndComputePathOwnsItsResult ...................   Passed    0.14 sec
+      Start 2174: Curvature_MeanCurvature.EmptyMesh_ReturnsNullopt
+45/75 Test #2174: Curvature_MeanCurvature.EmptyMesh_ReturnsNullopt ...................................................   Passed    0.00 sec
+      Start 2175: Curvature_MeanCurvature.Tetrahedron_UniformPositiveCurvature
+46/75 Test #2175: Curvature_MeanCurvature.Tetrahedron_UniformPositiveCurvature .......................................   Passed    0.00 sec
+      Start 2176: Curvature_MeanCurvature.FlatMesh_NearZeroCurvatureAtInteriorVertices
+47/75 Test #2176: Curvature_MeanCurvature.FlatMesh_NearZeroCurvatureAtInteriorVertices ...............................   Passed    0.00 sec
+      Start 2177: Curvature_MeanCurvature.FlippedClosedMesh_NegativeCurvature
+48/75 Test #2177: Curvature_MeanCurvature.FlippedClosedMesh_NegativeCurvature ........................................   Passed    0.00 sec
+      Start 2178: Curvature_GaussianCurvature.EmptyMesh_ReturnsNullopt
+49/75 Test #2178: Curvature_GaussianCurvature.EmptyMesh_ReturnsNullopt ...............................................   Passed    0.00 sec
+      Start 2179: Curvature_GaussianCurvature.Tetrahedron_GaussBonnet
+50/75 Test #2179: Curvature_GaussianCurvature.Tetrahedron_GaussBonnet ................................................   Passed    0.01 sec
+      Start 2180: Curvature_GaussianCurvature.FlatMesh_NearZeroCurvatureAtInteriorVertices
+51/75 Test #2180: Curvature_GaussianCurvature.FlatMesh_NearZeroCurvatureAtInteriorVertices ...........................   Passed    0.01 sec
+      Start 2181: Curvature_ScalarOperators.RemainScaleInvariantAtExtremeScales
+52/75 Test #2181: Curvature_ScalarOperators.RemainScaleInvariantAtExtremeScales ......................................   Passed    0.01 sec
+      Start 2182: Curvature_Full.Icosahedron_SymmetricCurvatureValues
+53/75 Test #2182: Curvature_Full.Icosahedron_SymmetricCurvatureValues ................................................   Passed    0.00 sec
+      Start 2183: Curvature_Full.PrincipalRelation_K1GeK2_And_H_Equals_Average
+54/75 Test #2183: Curvature_Full.PrincipalRelation_K1GeK2_And_H_Equals_Average .......................................   Passed    0.00 sec
+      Start 2190: CurvatureTensor.EmptyMesh_ReturnsNullopt
+55/75 Test #2190: CurvatureTensor.EmptyMesh_ReturnsNullopt ...........................................................   Passed    0.00 sec
+      Start 2191: CurvatureTensor.NoFaceMesh_ReturnsNullopt
+56/75 Test #2191: CurvatureTensor.NoFaceMesh_ReturnsNullopt ..........................................................   Passed    0.00 sec
+      Start 2192: CurvatureTensor.Sphere_IsotropicAndTangent
+57/75 Test #2192: CurvatureTensor.Sphere_IsotropicAndTangent .........................................................   Passed    0.03 sec
+      Start 2193: CurvatureTensor.PrincipalCurvaturesScaleInverselyWithGeometry
+58/75 Test #2193: CurvatureTensor.PrincipalCurvaturesScaleInverselyWithGeometry ......................................   Passed    0.06 sec
+      Start 2194: CurvatureTensor.PrincipalCurvaturesRemainScaleInvariantAtExtremeScales
+59/75 Test #2194: CurvatureTensor.PrincipalCurvaturesRemainScaleInvariantAtExtremeScales .............................   Passed    0.03 sec
+      Start 2195: CurvatureTensor.ReversingOrientationFlipsSignedCurvature
+60/75 Test #2195: CurvatureTensor.ReversingOrientationFlipsSignedCurvature ...........................................   Passed    0.00 sec
+      Start 2196: CurvatureTensor.ReversingOrientationSwapsAnisotropicScalarPairs
+61/75 Test #2196: CurvatureTensor.ReversingOrientationSwapsAnisotropicScalarPairs ....................................   Passed    0.09 sec
+      Start 2197: CurvatureTensor.MatchesFramework24SequentialAcuteClosedReference
+62/75 Test #2197: CurvatureTensor.MatchesFramework24SequentialAcuteClosedReference ...................................   Passed    0.00 sec
+      Start 2198: CurvatureTensor.MatchesFramework24SequentialObtuseClosedReference
+63/75 Test #2198: CurvatureTensor.MatchesFramework24SequentialObtuseClosedReference ..................................   Passed    0.00 sec
+      Start 2199: CurvatureTensor.MatchesFramework24SequentialOpenBoundaryReference
+64/75 Test #2199: CurvatureTensor.MatchesFramework24SequentialOpenBoundaryReference ..................................   Passed    0.00 sec
+      Start 2200: CurvatureTensor.Cylinder_AxisAligned
+65/75 Test #2200: CurvatureTensor.Cylinder_AxisAligned ...............................................................   Passed    0.04 sec
+      Start 2201: CurvatureTensor.OpenCylinderBoundaryUsesSupportedNeighbourhood
+66/75 Test #2201: CurvatureTensor.OpenCylinderBoundaryUsesSupportedNeighbourhood .....................................   Passed    0.04 sec
+      Start 2202: CurvatureTensor.Saddle_OppositeSignsAxisAligned
+67/75 Test #2202: CurvatureTensor.Saddle_OppositeSignsAxisAligned ....................................................   Passed    0.04 sec
+      Start 2203: CurvatureTensor.NonFiniteCornerOnClosedMeshFailsClosed
+68/75 Test #2203: CurvatureTensor.NonFiniteCornerOnClosedMeshFailsClosed .............................................   Passed    0.00 sec
+      Start 2204: CurvatureTensor.IllConditionedFacesAreDiagnosedAndFailClosedLocally
+69/75 Test #2204: CurvatureTensor.IllConditionedFacesAreDiagnosedAndFailClosedLocally ................................   Passed    0.01 sec
+      Start 2205: CurvatureTensor.Deterministic
+70/75 Test #2205: CurvatureTensor.Deterministic ......................................................................   Passed    0.06 sec
+      Start 2206: CurvatureTensor.StandaloneScalarOperatorsRemainAvailable
+71/75 Test #2206: CurvatureTensor.StandaloneScalarOperatorsRemainAvailable ...........................................   Passed    0.05 sec
+      Start 2207: CurvatureTensor.FullFieldUsesTheTensorPrincipalSystem
+72/75 Test #2207: CurvatureTensor.FullFieldUsesTheTensorPrincipalSystem ..............................................   Passed    0.08 sec
+      Start 2208: CurvatureTensor.FlatRegionPublishesFiniteFramework24Basis
+73/75 Test #2208: CurvatureTensor.FlatRegionPublishesFiniteFramework24Basis ..........................................   Passed    0.01 sec
+      Start 2209: CurvatureTensor.SculptAssetMatchesFramework24SequentialReference
+74/75 Test #2209: CurvatureTensor.SculptAssetMatchesFramework24SequentialReference ...................................   Passed    0.16 sec
+      Start 2210: CurvatureTensor.OpenMeshFullFieldKeepsPrincipalInvariants
+75/75 Test #2210: CurvatureTensor.OpenMeshFullFieldKeepsPrincipalInvariants ..........................................   Passed    0.01 sec
+
+100% tests passed, 0 tests failed out of 75
+
+Label Time Summary:
+contract    =   0.11 sec*proc (10 tests)
+geometry    =   8.92 sec*proc (65 tests)
+runtime     =   0.11 sec*proc (10 tests)
+unit        =   8.92 sec*proc (65 tests)
+
+Total Test time (real) =   9.20 sec

@@ -1,0 +1,23 @@
+{
+  "command": [
+    "/bin/bash",
+    "-o",
+    "pipefail",
+    "-c",
+    "cmake --preset ci-ubsan --fresh -DINTRINSIC_GROUP_PURE_CTEST=ON && cmake --build --preset ci-ubsan --target IntrinsicCpuTests && ctest --test-dir build/ci-ubsan --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --no-tests=error --timeout 60 --parallel 1"
+  ],
+  "command_display": "/bin/bash -o pipefail -c 'cmake --preset ci-ubsan --fresh -DINTRINSIC_GROUP_PURE_CTEST=ON && cmake --build --preset ci-ubsan --target IntrinsicCpuTests && ctest --test-dir build/ci-ubsan --output-on-failure -LE '\"'\"'gpu|vulkan|slow|flaky-quarantine'\"'\"' --no-tests=error --timeout 60 --parallel 1'",
+  "cwd": ".",
+  "duration_ms": 146214,
+  "exit_code": 0,
+  "finished_at": "2026-09-03T00:26:46Z",
+  "label": "corrected-ci-ubsan",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-09-03T00:24:19Z",
+  "stderr_path": "tasks/evidence/BUG-156/commands/corrected-ci-ubsan.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/BUG-156/commands/corrected-ci-ubsan.stdout.log",
+  "stdout_sha256": "5665fda386057bd020df7163f7bb86ee3996e498ef1b52ed47fbbcd032ff7144",
+  "task_id": "BUG-156"
+}

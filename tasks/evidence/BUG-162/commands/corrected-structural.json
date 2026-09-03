@@ -1,0 +1,23 @@
+{
+  "command": [
+    "/bin/bash",
+    "-o",
+    "pipefail",
+    "-c",
+    "python3 tools/repo/check_layering.py --root src --strict && python3 tools/repo/check_test_layout.py --root . --strict && python3 tools/agents/check_task_policy.py --root . --strict && python3 tools/agents/validate_tasks.py --root tasks --strict && python3 tools/agents/check_ara_claims.py --root . --strict && python3 tools/docs/check_doc_links.py --root . && python3 tools/repo/check_root_hygiene.py --root . && git merge-base --is-ancestor 828414db4 HEAD && git merge-base --is-ancestor a72ef7910 HEAD && git merge-base --is-ancestor 6783b3d9e HEAD && git merge-base --is-ancestor 0dece16e6 HEAD && git diff --check"
+  ],
+  "command_display": "/bin/bash -o pipefail -c 'python3 tools/repo/check_layering.py --root src --strict && python3 tools/repo/check_test_layout.py --root . --strict && python3 tools/agents/check_task_policy.py --root . --strict && python3 tools/agents/validate_tasks.py --root tasks --strict && python3 tools/agents/check_ara_claims.py --root . --strict && python3 tools/docs/check_doc_links.py --root . && python3 tools/repo/check_root_hygiene.py --root . && git merge-base --is-ancestor 828414db4 HEAD && git merge-base --is-ancestor a72ef7910 HEAD && git merge-base --is-ancestor 6783b3d9e HEAD && git merge-base --is-ancestor 0dece16e6 HEAD && git diff --check'",
+  "cwd": ".",
+  "duration_ms": 2721,
+  "exit_code": 0,
+  "finished_at": "2026-09-03T00:37:21Z",
+  "label": "corrected-structural",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-09-03T00:37:18Z",
+  "stderr_path": "tasks/evidence/BUG-162/commands/corrected-structural.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/BUG-162/commands/corrected-structural.stdout.log",
+  "stdout_sha256": "2cf8dca5c17b21c9841eb7eb1b96cb7809a6a7dd21de85472af71278a952aeac",
+  "task_id": "BUG-162"
+}

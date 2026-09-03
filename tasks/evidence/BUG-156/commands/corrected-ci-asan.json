@@ -1,0 +1,23 @@
+{
+  "command": [
+    "/bin/bash",
+    "-o",
+    "pipefail",
+    "-c",
+    "cmake --preset ci-asan --fresh -DINTRINSIC_GROUP_PURE_CTEST=ON && cmake --build --preset ci-asan --target IntrinsicCpuTests && ctest --test-dir build/ci-asan --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --no-tests=error --timeout 60 --parallel 1"
+  ],
+  "command_display": "/bin/bash -o pipefail -c 'cmake --preset ci-asan --fresh -DINTRINSIC_GROUP_PURE_CTEST=ON && cmake --build --preset ci-asan --target IntrinsicCpuTests && ctest --test-dir build/ci-asan --output-on-failure -LE '\"'\"'gpu|vulkan|slow|flaky-quarantine'\"'\"' --no-tests=error --timeout 60 --parallel 1'",
+  "cwd": ".",
+  "duration_ms": 332168,
+  "exit_code": 0,
+  "finished_at": "2026-09-03T00:24:04Z",
+  "label": "corrected-ci-asan",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-09-03T00:18:32Z",
+  "stderr_path": "tasks/evidence/BUG-156/commands/corrected-ci-asan.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/BUG-156/commands/corrected-ci-asan.stdout.log",
+  "stdout_sha256": "96093cf3b5f446b35ca990f56933781afb367af281c39fe59a38a919517f7788",
+  "task_id": "BUG-156"
+}

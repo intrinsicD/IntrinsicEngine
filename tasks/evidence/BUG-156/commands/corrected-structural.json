@@ -1,0 +1,23 @@
+{
+  "command": [
+    "/bin/bash",
+    "-o",
+    "pipefail",
+    "-c",
+    "python3 tools/repo/check_layering.py --root src --strict && python3 tools/repo/check_test_layout.py --root . --strict && python3 tools/agents/check_task_policy.py --root . --strict && python3 tools/agents/validate_tasks.py --root tasks --strict && python3 tools/docs/check_doc_links.py --root . && python3 tools/agents/check_ara_claims.py --root . --strict && python3 tools/repo/check_root_hygiene.py --root . && git diff --check"
+  ],
+  "command_display": "/bin/bash -o pipefail -c 'python3 tools/repo/check_layering.py --root src --strict && python3 tools/repo/check_test_layout.py --root . --strict && python3 tools/agents/check_task_policy.py --root . --strict && python3 tools/agents/validate_tasks.py --root tasks --strict && python3 tools/docs/check_doc_links.py --root . && python3 tools/agents/check_ara_claims.py --root . --strict && python3 tools/repo/check_root_hygiene.py --root . && git diff --check'",
+  "cwd": ".",
+  "duration_ms": 3022,
+  "exit_code": 0,
+  "finished_at": "2026-09-03T00:27:06Z",
+  "label": "corrected-structural",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-09-03T00:27:03Z",
+  "stderr_path": "tasks/evidence/BUG-156/commands/corrected-structural.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/BUG-156/commands/corrected-structural.stdout.log",
+  "stdout_sha256": "c96909d818911f41c835478b7fce4acabf9f51722de6639fdacf42b3d494e9dc",
+  "task_id": "BUG-156"
+}
