@@ -3,15 +3,15 @@ task_id: BUG-155
 workflow_profile: standard
 status: complete
 generated_by: tools/agents/workflow_evidence.py
-generated_at: '2026-09-03T09:26:55Z'
+generated_at: '2026-09-03T09:32:11Z'
 claim_eligible: false
 source:
   base_ref: db1d7c15fc2cb45162119e07d7eba3c6a8ecd4a0
   base_revision: db1d7c15fc2cb45162119e07d7eba3c6a8ecd4a0
-  head_revision: da8934651e4ba0064989f89da0a6cc088697c0bd
-  branch: main
-  worktree: /home/alex/Documents/IntrinsicEngine
-  dirty: true
+  head_revision: f0fbd665dc683c38346d6c7de538955b526c4951
+  branch: codex/evidence-bug155
+  worktree: /tmp/intrinsic-bug155-evidence.CA11r1
+  dirty: false
   surface:
   - path: ara/logic/claims.md
     sha256: a38331556de6e4f5c8440268ea43d4cd8d7f943307343881e324675ca242ed6d
@@ -45,12 +45,6 @@ source:
     sha256: a5f82cae27286983a90515c996c80416768c8bfa59faf350c3aa9de38fdca371
   - path: tasks/SESSION-BRIEF.md
     sha256: 768939e39f67c53faa7cbb4d171cb18cdabcd76774c63fb6e5aa24980abb0715
-  - path: tasks/active/BUG-154-curvature-pmp-parity-corner-normal-topology.md
-    sha256: null
-  - path: tasks/active/BUG-156-curvature-two-ring-smoothing-cancels-features.md
-    sha256: null
-  - path: tasks/active/BUG-162-main-branch-consolidation.md
-    sha256: null
   - path: tasks/active/README.md
     sha256: 396a67e291f5834b873a85329fd71fa664c3d1eda045a02c1a5c04a887529c31
   - path: tasks/backlog/README.md
@@ -203,6 +197,8 @@ source:
     sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
   - path: tasks/evidence/BUG-118/commands/test-layout.stdout.log
     sha256: 164bf228e1aef2ee28535d5028a51d6afa83b491716f01cb064037a925a98cb2
+  - path: tasks/evidence/BUG-118/report.yaml
+    sha256: 60b64659007d03c8b66eac1829e1c50793bcfc35e7ebd2c1306b88b2f1250476
   - path: tasks/evidence/BUG-154/commands/closure-gpu-vulkan-nvidia.json
     sha256: 8244d1c9d3e565290057321e5f0dd226c61673765ab6aa09f6a311d8f3689488
   - path: tasks/evidence/BUG-154/commands/closure-gpu-vulkan-nvidia.stderr.log
@@ -218,7 +214,7 @@ source:
   - path: tasks/evidence/BUG-154/handoff.jsonl
     sha256: 98ae36c29107db80895e95aaa1d413c828621a53a85ce2b0e0f1907cf260ab20
   - path: tasks/evidence/BUG-154/report.yaml
-    sha256: 3fb01295d770b2b7fc6cdcf43125254dba358ca445ee032863a9646092938876
+    sha256: 05f63811b948b6571e2c7c0be1971d4c836e05d4211d925ea596ceb02693c0ea
   - path: tasks/evidence/BUG-154/reviews.jsonl
     sha256: 809889463974302eeee3ccc858574892a8d936590d0086e734545ba295df6517
   - path: tasks/evidence/BUG-156/commands/corrected-ci-asan.json
@@ -254,7 +250,7 @@ source:
   - path: tasks/evidence/BUG-156/handoff.jsonl
     sha256: 50d86846e8e1446206aca7e8734fe78db156cf37bf10588811c96950458cdaab
   - path: tasks/evidence/BUG-156/report.yaml
-    sha256: a5229d9f0c3014eed9ff4b22a8cd554725e618d76197ddb6e7aa86d918c52cba
+    sha256: 7ab8f1545822a38680f80687086e08d3a06b7f1a6426f21e8494104098d7d509
   - path: tasks/evidence/BUG-156/reviews.jsonl
     sha256: 86c9519acf8a9ff1e10fafc4902b290788df0877cceee98577c9543835a4e90d
   - path: tasks/evidence/BUG-162/commands/corrected-ci-asan.json
@@ -290,7 +286,7 @@ source:
   - path: tasks/evidence/BUG-162/handoff.jsonl
     sha256: 3b873359050cfd62045da5647cd28a4d606b31a83a8fdd6cc65ed125ca465138
   - path: tasks/evidence/BUG-162/report.yaml
-    sha256: 5b2fbd270ca520bc8cd2781a4a19269280fdbb3eea3da7be9216e73179f1edd5
+    sha256: 8931ce6c89eb2425f0fc8b812b16845875877b09e7d91d0a03d3aa0bd082fb91
   - path: tasks/evidence/BUG-162/reviews.jsonl
     sha256: ba28a9a700ec071b45c8b2499e2ae52797ce2e3561616bbf023dea59e691b7fd
   - path: tests/CMakeLists.txt
@@ -307,7 +303,7 @@ source:
     sha256: 79cee7357b6d667d478ed3eeef39d8e12e6fa0f577002092663fdf7849a46753
   - path: tools/agents/contract_legacy_tasks.json
     sha256: 27d954474064990fcecbbc0bd221fade87d60fdf91c3a649204be778d9beb632
-  content_digest: eee4496d67f3c50cfbbf0d918d22117f7abcb4e5de6d47b4582cabf203370088
+  content_digest: 9050f8e7586382243142458e1e030a1409f1a46b1bb3872d0b3b3faebf99bd92
 touched:
   paths:
   - ara/logic/claims.md
@@ -326,9 +322,6 @@ touched:
   - src/platform/README.md
   - src/runtime/README.md
   - tasks/SESSION-BRIEF.md
-  - tasks/active/BUG-154-curvature-pmp-parity-corner-normal-topology.md
-  - tasks/active/BUG-156-curvature-two-ring-smoothing-cancels-features.md
-  - tasks/active/BUG-162-main-branch-consolidation.md
   - tasks/active/README.md
   - tasks/backlog/README.md
   - tasks/backlog/bugs/BUG-118-glfw-x11-input-method-lsan-recurrence.md
@@ -405,6 +398,7 @@ touched:
   - tasks/evidence/BUG-118/commands/test-layout.json
   - tasks/evidence/BUG-118/commands/test-layout.stderr.log
   - tasks/evidence/BUG-118/commands/test-layout.stdout.log
+  - tasks/evidence/BUG-118/report.yaml
   - tasks/evidence/BUG-154/commands/closure-gpu-vulkan-nvidia.json
   - tasks/evidence/BUG-154/commands/closure-gpu-vulkan-nvidia.stderr.log
   - tasks/evidence/BUG-154/commands/closure-gpu-vulkan-nvidia.stdout.log
