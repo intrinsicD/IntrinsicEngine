@@ -1,0 +1,490 @@
+schema_version: 1
+task_id: BUG-162
+workflow_profile: high-risk
+status: draft
+generated_by: tools/agents/workflow_evidence.py
+generated_at: '2026-09-02T19:12:00Z'
+claim_eligible: false
+source:
+  base_ref: 64da32db0ddf6758fabf37ab81b7e614e5304e9a
+  base_revision: 64da32db0ddf6758fabf37ab81b7e614e5304e9a
+  head_revision: db1d7c15fc2cb45162119e07d7eba3c6a8ecd4a0
+  branch: ''
+  worktree: /tmp/claude-1000/-home-alex-Documents-IntrinsicEngine/4e1908b1-76c3-4f9d-aa0b-1b768010a979/scratchpad/wt162
+  dirty: false
+  surface:
+  - path: .github/copilot-instructions.md
+    sha256: 6eca8f4a866442a1bd1166fa0b9314c2e0b3759b1257b12276cf4ac292e3b259
+  - path: .github/pull_request_template.md
+    sha256: fbd768cfcb65a5ea5dc39be24b94f33f3a61043c68a8b35fe99bd07eddf3ee36
+  - path: .github/workflows/ci-docs.yml
+    sha256: a83474c6b13bd2fe78cf0f52de949e41c6e2f50b15f7182d0204f003926eede9
+  - path: .github/workflows/nightly-deep.yml
+    sha256: 4e9773ee0c1a8975b5787c4b7d2cdab86ed8258988774ab859156735700ccdd4
+  - path: AGENTS.md
+    sha256: b40cf5fef4745b95a4bea849aa9bcd05517ea4dcd991bd2f4a50e2e650e24a51
+  - path: README.md
+    sha256: 19f134d7264cc656d60bd058976071b71d4956b1ad2afcf74547f42fc02a300c
+  - path: ara/evidence/README.md
+    sha256: f6a12e6cef666b9f5bb8b83efe9d900dba5c0b94a71926baf0412ebe44cc41f0
+  - path: ara/evidence/tables/curvature_framework24_parity_2026-08-12.md
+    sha256: 5903fd63f5eec14535ccc2658ec3f6e151d8c258a8c9deb67aa12dcca2643167
+  - path: ara/logic/claims.md
+    sha256: 2112aded20b1933585a4cad66ca58d605e72ce11af2f154ca4225ce7d8b4e8ad
+  - path: ara/logic/solution/architecture.md
+    sha256: 8ece6b20412b37bc7ddfb35682c5883c36423d47d4968c3ac6b222abdb1b5f37
+  - path: ara/staging/observations.yaml
+    sha256: 7b1c03d50950ec283381b0aaf7cd79713dad7653b4c13a47183584673656dfb9
+  - path: ara/trace/exploration_tree.yaml
+    sha256: 9d9f2ff4cdb952ccb44243ae0ae0d950dfe7a5a3beb4a6fa631dedfe772d62fb
+  - path: ara/trace/pm_reasoning_log.yaml
+    sha256: cf59d07d9cf6d2ccf22a6ccc053f2ebb3f73ca3dd0dce449bb1431e73db85d3f
+  - path: ara/trace/sessions/2026-09-01_001.yaml
+    sha256: ae75fc92c89cd8a18142fbe36e6c294a7d11f310dd90262aedc44bdc704b06ab
+  - path: ara/trace/sessions/2026-09-02_001.yaml
+    sha256: 5ed459e7454fd26f27ee3495427342e9177c0bf9b096ee2fcd2c342c4baf3257
+  - path: ara/trace/sessions/session_index.yaml
+    sha256: eb67d88abcc73f5e8117501279a07eeec05da01fa839db434300cfa213314015
+  - path: docs/agent/agent-output-review-checklist.md
+    sha256: b5485164a4099c54ad6fb064cda25bb15eaa426ab78ba56c6e52955f7fa1da03
+  - path: docs/agent/ara-evidence-policy.md
+    sha256: d0a644b8d8b92ad16052593b90832748cf277f1bad057b209b72a663b302ab12
+  - path: docs/agent/architecture-review-checklist.md
+    sha256: cc6fa595bf5db588cfd72ea9d762ec6a64da412b78f700068b0a8804ebb794f3
+  - path: docs/agent/benchmark-review-checklist.md
+    sha256: ec897ec92d44a07e2cfc8337de79bd7f7d9be15de9f213eff954575a864f7d67
+  - path: docs/agent/benchmark-workflow.md
+    sha256: 7b3f002638c1f3785fc20aa319324be10485e43b32107685cd395f858e8b17e1
+  - path: docs/agent/clean-workshop-review.md
+    sha256: c287c4e89925faddfee5656f9735492680adc284c9cbd83b020a624eadc9d77a
+  - path: docs/agent/contract.md
+    sha256: 7e5aeb6df411ac10e60b1cfba153da286f13974a4e0f33f04541ff59174b4436
+  - path: docs/agent/drift-audit-checklist.md
+    sha256: 95048b1059a772252e6ace75f45338a7995a7fdb0db9a268c943664981ceeafc
+  - path: docs/agent/how-this-repo-is-built.md
+    sha256: 489958ac9f38397c86e0c7b7a89c690859433940e15980178c8cc0bb9ea2bbd6
+  - path: docs/agent/method-review-checklist.md
+    sha256: edce48d5b389c1ceeeeb2f5e69a103c66186ec8aa208d4435ec260ba43c62bc9
+  - path: docs/agent/method-workflow.md
+    sha256: 9f554c41b710f893b9aa9d436ab25393d346046be7ca7e9cff9f41562c0a6e88
+  - path: docs/agent/prompt/prompt.md
+    sha256: 9c9688e3a959845c73a8bc1d8e4c849848af56d0e7a22c1255c97bf49c4f86f6
+  - path: docs/agent/proposals/pair-workflow-redesign.md
+    sha256: 20aa02092b9641fb68c769893b2e1e81da55c3cae743fe1f1899c86be4e58b8e
+  - path: docs/agent/review-checklist.md
+    sha256: 57d4030290ab504c02fc914732b86530cac34adbcd0cbd4f667d003a27c13105
+  - path: docs/agent/review.md
+    sha256: 29cc0b63bd671f7e05c1bde8419b0e7de267b0d826dbd4d051a47bffde08e460
+  - path: docs/agent/roles.md
+    sha256: 701ea147c8a31d3222af595eee75ed6b3064e78df3dd43859bf67f9ff38602a4
+  - path: docs/agent/task-format.md
+    sha256: ec577a11717ee62db206fbd57497386f20ea4d4284a8fb2c3edcea3c7ead8143
+  - path: docs/agent/task-maturity.md
+    sha256: d0f518b322e6779128423cd8a57ffc4a3f14907652884f730f2d0bfea56df417
+  - path: docs/agent/workflow-evidence.md
+    sha256: 48fbe7538b61ff6c9e44b8c378bf779853553eb273116d273f394487690089db
+  - path: docs/architecture/geometry.md
+    sha256: d268cad9e465e586d21605ca8a2d792a2bc0aecf3ab1cc7ffde7ded8f8038de0
+  - path: docs/architecture/index.md
+    sha256: 7b78c2153655126ea2a459a19715bc2232744a41958a24045dda1511ef4f660e
+  - path: docs/architecture/runtime.md
+    sha256: b8957a1ce65710b3137648924e82c19aa14b0c34e34e58f81ab388c16d742a32
+  - path: docs/benchmarking/index.md
+    sha256: 094ee82ba14480e271b254db0f56efb95bf05fab31f1298ca6f5a328c366980c
+  - path: docs/index.md
+    sha256: 5dcdd0ca5592d01fafac0b5a05eb0b39806cc71ee1f526830c97df205f46184c
+  - path: docs/methods/numerical-robustness-policy.md
+    sha256: 2df0ed5f371252251e07d0f12078f985ea433304c858421a3985fdc7b0643319
+  - path: docs/product/framework24-convergence.md
+    sha256: 174eeaaf9278ee31f756f538edc30260c37fa4cbef7350c377cbf7216444afbc
+  - path: docs/reports/2026-08-12-curvature-estimator-study.md
+    sha256: 7af720d1e98a65029ea1cf343c9718cc4cbba559ebc267b36f39e6f1545ded81
+  - path: docs/reports/2026-08-12-curvature-support-smoothing-defect.md
+    sha256: 5aca36610c35e268ec13d6653714faa1f572a49fe837e355eed5bd0c2d1e411f
+  - path: src/app/Sandbox/CMakeLists.txt
+    sha256: 3e36525fe60ea68dd33c75d8f9f044a757811021cbf252f7d8e8ee1bba0a8e56
+  - path: src/app/Sandbox/Editor/Sandbox.DomainPanels.cpp
+    sha256: 550cd05e7e76ad4b402b5bac126a556587f25e53f3092038da07e9540af096ab
+  - path: src/app/Sandbox/Editor/Sandbox.DomainPanels.cppm
+    sha256: a925a3ac254f6c5cbefccd728c22fbb5254e63595ef44cc87c6c7fb64253f81d
+  - path: src/app/Sandbox/Editor/Sandbox.EditorController.cppm
+    sha256: 46b9ae1463c2ce15bac802b04e58d35b295b01c04c29e501bd020c46be2a2839
+  - path: src/app/Sandbox/Editor/Sandbox.EditorShell.cpp
+    sha256: 74784c10caafd6a845d3acb49a89c375194f1c3531a98175ef7d4e6d228d9434
+  - path: src/app/Sandbox/Editor/Sandbox.EditorShell.cppm
+    sha256: b3bc3d55b356a59e090dbae728a59dc4e99eb8e0b73e1c453fde2ff71387498e
+  - path: src/app/Sandbox/Editor/Sandbox.MeshProcessingPanels.cpp
+    sha256: f4ecbd9a8bc44114271dd39a6bfc7f40feeba701d0b8c8eb18b8dae90f6e5257
+  - path: src/app/Sandbox/Editor/Sandbox.MeshProcessingPanels.cppm
+    sha256: b4579d1a95c3984cede2e2e75bc50cb6afc342541bcfc2d1becafff49a8bb080
+  - path: src/app/Sandbox/Editor/Sandbox.MethodPanels.cpp
+    sha256: 9a4daf6987d2664c20148d14713a7ba3676b4ebe75e2ac7f6db1e60a059fcae6
+  - path: src/app/Sandbox/Editor/Sandbox.MethodPanels.cppm
+    sha256: 0a3e5f02a1f647590a062a6873531feb988048c277c2bb67c23fe6219a6045e8
+  - path: src/app/Sandbox/Sandbox.ConfigSections.cppm
+    sha256: a3ccca05ba84e2b748f6cb295c2ed93733c30699882a86ce56eba3d9952ab48b
+  - path: src/app/Sandbox/Sandbox.cppm
+    sha256: 84639bc341875701ee73dfb03d98d8d9b778d1a1cb52b1c815d368bcee4f2f21
+  - path: src/assets/Asset.EventBus.cppm
+    sha256: 64d365cef96a264028b87b8175321ad47ca6d30f3a816dc4be6e5e0c4d5d3040
+  - path: src/assets/Asset.GeometryPayload.cppm
+    sha256: fccdae0fdb7fe22e753e1d51e1826233435ec08f9e1b6811ba5c31e7c2d09bd1
+  - path: src/assets/Asset.ImportRouter.cppm
+    sha256: 196cedf2d228736c0011743994b0f110b5c8eff4f52eab905150ff667bc2092b
+  - path: src/assets/Asset.LoadPipeline.cpp
+    sha256: 8e7dce22586ea84708996ffa3c9db7561cbf8d97326d7ed290b10fdf8f6bfbb9
+  - path: src/assets/Asset.LoadPipeline.cppm
+    sha256: 458f746bb2d9c6558c447750872493f74893a00dd96cf292b9402bcb71e20f2f
+  - path: src/assets/Asset.ModelTexturePayload.cppm
+    sha256: d62ea8fab76eddcc2526bc1578340970892fd915fa14817ee2bf32f1baaf7cb4
+  - path: src/assets/Asset.OperationStatus.cppm
+    sha256: 280ad47a3aae75f33bf4db5ac242f09e79087e64de2d40b80ecf4d6a885edc6f
+  - path: src/assets/Asset.PathIndex.cppm
+    sha256: 1b06f8fb7a6d6bfd65538a831de6525567534a81dbfae200bd56297742d5b45a
+  - path: src/assets/Asset.PayloadStore.cppm
+    sha256: f87788723cbaaaaa4d62f3fa4add6f98c104e4f2e3db8c8653b9cb7e2c6f0ea5
+  - path: src/assets/Asset.Registry.cppm
+    sha256: a3bbb4c043a11880d38fd2462b190744c13e5eee8d7e8bded7524c4b4318ae22
+  - path: src/assets/Asset.Service.cpp
+    sha256: af47b969ebc095212698f257e8b6ff576fe8057780185463094a9af4e8890ab1
+  - path: src/assets/Asset.Service.cppm
+    sha256: d2725843a40b5e3206707545252334711c0754f330d4f9abf5f9a9d8767a75f4
+  - path: src/assets/Asset.TypePool.cppm
+    sha256: 8af8a3f6b070bb60151d5c7a4b19d2d1954b821e2891bd9f4f23fcbb41c8f975
+  - path: src/ecs/Components/ECS.Component.GeometrySources.cppm
+    sha256: f618ec32a942c05dd0b3babff663b270eaf3440dd8ccda55216218c86756917b
+  - path: src/geometry/Geometry.HalfedgeMesh.Curvature.cpp
+    sha256: c29c1a672f31e6b710c8f230eca17b3be6d0dc0f74f63a220e54eb011a57994f
+  - path: src/geometry/Geometry.HalfedgeMesh.Curvature.cppm
+    sha256: 8350cf7c2632fa6dce14b13f46681bc746b3f6ef49c719231822fc550bf9c626
+  - path: src/graphics/renderer/README.md
+    sha256: 473bcd2c3271549b10731349e1003d406f882949b70f9fd3a8ce3f1c093c7b56
+  - path: src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Mesh.cpp
+    sha256: 7efe46cfc75ebd9be67d41ed0322cc32f987dc0dc44ada674d68dfc16a68fe4c
+  - path: src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.cppm
+    sha256: 2fd671b68810e816151b8eb86f1551c4cdec4442d502e39143eb6b8cbf1373b0
+  - path: src/runtime/README.md
+    sha256: fafe0f83a2cb6719de4eba9963ea8881ee39fb65e4748ffb77dd0074015487dc
+  - path: tasks/HINTS.md
+    sha256: 63f512c40817ec8e083627cb545625d41505ad933e196bca7e2ae49d8d8e5ea8
+  - path: tasks/SESSION-BRIEF.md
+    sha256: 7e90ce54875b2cdeafa720356bb9ed7ecadf7971e8596bc7de242c4c67edc6e6
+  - path: tasks/active/BUG-154-curvature-pmp-parity-corner-normal-topology.md
+    sha256: ac3913fef534f383af34d376a675eb5f2b67a3b373fceb521f015cc37796a1ed
+  - path: tasks/active/BUG-156-curvature-two-ring-smoothing-cancels-features.md
+    sha256: 5b9da84115993ea449fe13043a5125fb564428fb472b0f3528096a42e8f02647
+  - path: tasks/active/BUG-162-main-branch-consolidation.md
+    sha256: 3b68cd8b3ea908817e54df59c524b6b68f346afcd3eb9684efa54df6e5a774a7
+  - path: tasks/active/README.md
+    sha256: 50ad5e414b0d4c1c939124b5192ce1cd048451d0f6cfd73c9e86dc6ee2db3e08
+  - path: tasks/backlog/README.md
+    sha256: 6409374fef3bf59d5a8093d6f352db2564b8a31b7f6960834edec1d95f545902
+  - path: tasks/backlog/bugs/README.md
+    sha256: 3f3ccf887fafa5a2e0bff971e4fa1f201202101b9a4af026430640dc73c153f8
+  - path: tasks/templates/task-micro.md
+    sha256: 88a2639be6e5993c040f0111c362f438876aaaba7995006c39e55ae4645716b0
+  - path: tests/contract/runtime/Test.SandboxEditorMeshMethods.cpp
+    sha256: 5231c75cfd3bc5693bfda90ac9545821364b30669faffc83dffae641c1187ecb
+  - path: tests/data/framework24-acute-tetrahedron.obj
+    sha256: 3f774ea5e54e84e6c491f33d7d4e48c1d3862753e60791fa1aa5c91282d3aed3
+  - path: tests/data/framework24-obtuse-tetrahedron.obj
+    sha256: 59ba252a94e0d38296ddbe2fc9cbd4b9cce7f7b9ad0b4d8fd01460b1d9bc0af1
+  - path: tests/data/framework24-open-patch.obj
+    sha256: 55ef2b66c95f1065a345556af44ce03aab769cea6f0c90917f83068bce1cf48d
+  - path: tests/unit/geometry/Test.CurvatureTensor.cpp
+    sha256: afc22a24f2da4f18e43ff70ddbfc1f9df3f507b5ee2002181efe9bae46787e0b
+  - path: tests/unit/geometry/Test_Curvature.cpp
+    sha256: 12ba3fb677b419198b78057eebfc8f2749cfe10d2c395fe48822bf0008d7dd97
+  - path: tools/agentkit/README.md
+    sha256: 0f364689b6d8d23ec26489c3ac383fdb29332f83f215339d39795739d3fdd716
+  - path: tools/agentkit/src/agentkit/config.py
+    sha256: bec7da7e051287a6d9fdaaa87cc84b89150458e5dbc53b46dbc38eed82adb310
+  - path: tools/agentkit/src/agentkit/templates/AGENTS.md.tmpl
+    sha256: 1dc6e5bdb5eb21e8e961f58675ef27bb2f5d6f9e881593150ab34a46abb706d4
+  - path: tools/agentkit/src/agentkit/templates/copilot-instructions.md.tmpl
+    sha256: b947ba7d59887c915b722a4e75910464edcf145c6fbfee941b817e53b39edca1
+  - path: tools/agentkit/src/agentkit/templates/docs/agent/agent-output-review-checklist.md.tmpl
+    sha256: null
+  - path: tools/agentkit/src/agentkit/templates/docs/agent/architecture-review-checklist.md.tmpl
+    sha256: null
+  - path: tools/agentkit/src/agentkit/templates/docs/agent/prompt/prompt.md.tmpl
+    sha256: ef6f88fff59a00670ed4650c8f73b1e01634a30534d921bb6074c2e84a556a60
+  - path: tools/agentkit/src/agentkit/templates/docs/agent/review-checklist.md.tmpl
+    sha256: null
+  - path: tools/agentkit/src/agentkit/templates/docs/agent/review.md.tmpl
+    sha256: f959b331918041094d7ff045699b31bed4bac24be62b34e43956b9a3c7141b3e
+  - path: tools/agentkit/src/agentkit/templates/docs/agent/roles.md.tmpl
+    sha256: a55db6a3c3968fe76192093e636e9f549dfa5a2231810749397e177f0641e4b4
+  - path: tools/agentkit/src/agentkit/templates/github/pull_request_template.md.tmpl
+    sha256: 556c7187b6c0c1ffd5b6eb9fa70fa72cdeeba71a64f44fe8f6acab65e02c0a03
+  - path: tools/agentkit/src/agentkit/templates/tools/agent/resync_skills.sh.tmpl
+    sha256: 6ff29be1e6a4f0248c8a4a22f11c82b131fdbbc709b5117fe16eab6ab6722039
+  - path: tools/agentkit/src/agentkit/templates/tools/agent/skills/review/SKILL.md.tmpl
+    sha256: 4b220b71227aa890081ac3627fe5bce78c0ea8845f58555a62c43868dc3708e9
+  - path: tools/agents/check_audit_cadence.py
+    sha256: 79d4c1bbf9681e3ba30327f80f8c3a4e6fba6f8d4e5bdb726e2b462a32802707
+  - path: tools/agents/generate_session_brief.py
+    sha256: f613efcf9f9b01790d33f10f51610836085c79a483cff9905516de5225be0da1
+  - path: tools/agents/skills/README.md
+    sha256: 4eead859ffd11226c0c20a82113b7c039138b0f4a84079477ff8756c0a66e99d
+  - path: tools/agents/skills/intrinsicengine-audit/SKILL.md
+    sha256: bdf06c16505e17c64d691fa33118252fb29ab220738f83531f3b55f45ec8dec2
+  - path: tools/agents/skills/intrinsicengine-benchmark/SKILL.md
+    sha256: a6baf43c0cfaea0dcd7036c4d6b1d88eb37a788596f0b8f93828a2f4ee23a017
+  - path: tools/agents/skills/intrinsicengine-benchmark/references/benchmark-review-checklist.md
+    sha256: null
+  - path: tools/agents/skills/intrinsicengine-benchmark/references/benchmark-workflow.md
+    sha256: dbc362e52ce42391acf1c6f737994f16492b8123fbe51706983b604d6e7fc3fc
+  - path: tools/agents/skills/intrinsicengine-core/SKILL.md
+    sha256: 672cd59fe8c93ea5fb5999add8080d7a4c131e0f05a1a57533cc62c6ba557abc
+  - path: tools/agents/skills/intrinsicengine-core/references/contract.md
+    sha256: 439ca5a989171e54e928d8da42b8f47f3269ed461ab2772d365357a5b32a2ff0
+  - path: tools/agents/skills/intrinsicengine-core/references/roles.md
+    sha256: e43c62b9f84d553f076bbb2ba68af21cb4c3f96b08aee9489928e8dbf0025947
+  - path: tools/agents/skills/intrinsicengine-core/references/session-onboarding.md
+    sha256: 9c9688e3a959845c73a8bc1d8e4c849848af56d0e7a22c1255c97bf49c4f86f6
+  - path: tools/agents/skills/intrinsicengine-diagnose/SKILL.md
+    sha256: b9cc9d24adcef2646a7fede06f9c49846d5a67cc873a5ab70571afe083864cd6
+  - path: tools/agents/skills/intrinsicengine-method/SKILL.md
+    sha256: 102d11453edfdc43414b30bff252ef759c00b27e15521de7ce7a7b6df775d72e
+  - path: tools/agents/skills/intrinsicengine-method/references/method-review-checklist.md
+    sha256: null
+  - path: tools/agents/skills/intrinsicengine-method/references/method-workflow.md
+    sha256: a9cc792a49a17c18423e404cd2c98f9cc01fc08769cf7d0cccd9fef98058abbe
+  - path: tools/agents/skills/intrinsicengine-results-audit/references/ara-evidence-policy.md
+    sha256: d0a644b8d8b92ad16052593b90832748cf277f1bad057b209b72a663b302ab12
+  - path: tools/agents/skills/intrinsicengine-review/SKILL.md
+    sha256: bdc59c804ca94341eb9a89f588427abd8ecf6c3b3172a960ae43db52a0d5b1b0
+  - path: tools/agents/skills/intrinsicengine-review/references/agent-output-review-checklist.md
+    sha256: null
+  - path: tools/agents/skills/intrinsicengine-review/references/architecture-review-checklist.md
+    sha256: null
+  - path: tools/agents/skills/intrinsicengine-review/references/clean-workshop-review.md
+    sha256: null
+  - path: tools/agents/skills/intrinsicengine-review/references/drift-audit-checklist.md
+    sha256: null
+  - path: tools/agents/skills/intrinsicengine-review/references/review-checklist.md
+    sha256: null
+  - path: tools/agents/skills/intrinsicengine-review/references/review.md
+    sha256: 328f6bf68bfec42054ba7d74fd73db64ee759001b4185200db747ea59d15dc70
+  - path: tools/agents/skills/intrinsicengine-right-sizing/SKILL.md
+    sha256: 3ce501fc1bf6397fe58626174bd8aa25cae349993f4e3b929a371fe69b98f804
+  - path: tools/agents/skills/intrinsicengine-task-workflow/SKILL.md
+    sha256: a3b9b8a8d854e37ead55bd4b85e3d390c5b6d3a7e4bd80b998ee8e1db245f086
+  - path: tools/agents/skills/intrinsicengine-task-workflow/references/task-format.md
+    sha256: 4da825ccfd0e0f3518947305d6f4514377edeb88dcc4e0587e63a1a8d4e1bf28
+  - path: tools/agents/skills/intrinsicengine-task-workflow/references/task-maturity.md
+    sha256: 1ced27787eb0017bb44a793bd34fdf6b176a0dc8baf04d663979123ebc1ff53c
+  - path: tools/agents/skills/intrinsicengine-task-workflow/references/workflow-evidence.md
+    sha256: 48fbe7538b61ff6c9e44b8c378bf779853553eb273116d273f394487690089db
+  - path: tools/agents/sync_skills.py
+    sha256: 149bb1098d41fbdb86116ac3bff25e35f86c811482f7e92694909025e70abb31
+  - path: tools/diagnostics/curvature/Framework24CurvatureParityProbe.cpp
+    sha256: ad81ef4fec81eafa815607cb066966e8608b7dd3fca658923820b28ad12c16ad
+  - path: tools/diagnostics/curvature/PmpCurvatureCorpusProbe.cpp
+    sha256: 8052dbb7956cf6d23f0af9b4c8e92e00f953db6eeedd5836becf21a89f25d0c4
+  - path: tools/diagnostics/curvature/README.md
+    sha256: c6ada8e597d9902d1a5f1e7d550ecd936dc9f9dca70734507f2efdfd334dd2b6
+  - path: tools/docs/docs_sync_rules.yaml
+    sha256: c85485df548794e8dce225dfae5b482b22642f1ec2035511033540344bc7a3f1
+  - path: tools/repo/githooks/pre-commit
+    sha256: f57fd300376114c921128c6e519ff6f5fb9cb0695722a00096626b887ccbb7e6
+  content_digest: b17dda54972eb0266b3dc52330997da20f976ad8cc532e3921ab709bfd74b7b6
+touched:
+  paths:
+  - .github/copilot-instructions.md
+  - .github/pull_request_template.md
+  - .github/workflows/ci-docs.yml
+  - .github/workflows/nightly-deep.yml
+  - AGENTS.md
+  - README.md
+  - ara/evidence/README.md
+  - ara/evidence/tables/curvature_framework24_parity_2026-08-12.md
+  - ara/logic/claims.md
+  - ara/logic/solution/architecture.md
+  - ara/staging/observations.yaml
+  - ara/trace/exploration_tree.yaml
+  - ara/trace/pm_reasoning_log.yaml
+  - ara/trace/sessions/2026-09-01_001.yaml
+  - ara/trace/sessions/2026-09-02_001.yaml
+  - ara/trace/sessions/session_index.yaml
+  - docs/agent/agent-output-review-checklist.md
+  - docs/agent/ara-evidence-policy.md
+  - docs/agent/architecture-review-checklist.md
+  - docs/agent/benchmark-review-checklist.md
+  - docs/agent/benchmark-workflow.md
+  - docs/agent/clean-workshop-review.md
+  - docs/agent/contract.md
+  - docs/agent/drift-audit-checklist.md
+  - docs/agent/how-this-repo-is-built.md
+  - docs/agent/method-review-checklist.md
+  - docs/agent/method-workflow.md
+  - docs/agent/prompt/prompt.md
+  - docs/agent/proposals/pair-workflow-redesign.md
+  - docs/agent/review-checklist.md
+  - docs/agent/review.md
+  - docs/agent/roles.md
+  - docs/agent/task-format.md
+  - docs/agent/task-maturity.md
+  - docs/agent/workflow-evidence.md
+  - docs/architecture/geometry.md
+  - docs/architecture/index.md
+  - docs/architecture/runtime.md
+  - docs/benchmarking/index.md
+  - docs/index.md
+  - docs/methods/numerical-robustness-policy.md
+  - docs/product/framework24-convergence.md
+  - docs/reports/2026-08-12-curvature-estimator-study.md
+  - docs/reports/2026-08-12-curvature-support-smoothing-defect.md
+  - src/app/Sandbox/CMakeLists.txt
+  - src/app/Sandbox/Editor/Sandbox.DomainPanels.cpp
+  - src/app/Sandbox/Editor/Sandbox.DomainPanels.cppm
+  - src/app/Sandbox/Editor/Sandbox.EditorController.cppm
+  - src/app/Sandbox/Editor/Sandbox.EditorShell.cpp
+  - src/app/Sandbox/Editor/Sandbox.EditorShell.cppm
+  - src/app/Sandbox/Editor/Sandbox.MeshProcessingPanels.cpp
+  - src/app/Sandbox/Editor/Sandbox.MeshProcessingPanels.cppm
+  - src/app/Sandbox/Editor/Sandbox.MethodPanels.cpp
+  - src/app/Sandbox/Editor/Sandbox.MethodPanels.cppm
+  - src/app/Sandbox/Sandbox.ConfigSections.cppm
+  - src/app/Sandbox/Sandbox.cppm
+  - src/assets/Asset.EventBus.cppm
+  - src/assets/Asset.GeometryPayload.cppm
+  - src/assets/Asset.ImportRouter.cppm
+  - src/assets/Asset.LoadPipeline.cpp
+  - src/assets/Asset.LoadPipeline.cppm
+  - src/assets/Asset.ModelTexturePayload.cppm
+  - src/assets/Asset.OperationStatus.cppm
+  - src/assets/Asset.PathIndex.cppm
+  - src/assets/Asset.PayloadStore.cppm
+  - src/assets/Asset.Registry.cppm
+  - src/assets/Asset.Service.cpp
+  - src/assets/Asset.Service.cppm
+  - src/assets/Asset.TypePool.cppm
+  - src/ecs/Components/ECS.Component.GeometrySources.cppm
+  - src/geometry/Geometry.HalfedgeMesh.Curvature.cpp
+  - src/geometry/Geometry.HalfedgeMesh.Curvature.cppm
+  - src/graphics/renderer/README.md
+  - src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Mesh.cpp
+  - src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.cppm
+  - src/runtime/README.md
+  - tasks/HINTS.md
+  - tasks/SESSION-BRIEF.md
+  - tasks/active/BUG-154-curvature-pmp-parity-corner-normal-topology.md
+  - tasks/active/BUG-156-curvature-two-ring-smoothing-cancels-features.md
+  - tasks/active/BUG-162-main-branch-consolidation.md
+  - tasks/active/README.md
+  - tasks/backlog/README.md
+  - tasks/backlog/bugs/README.md
+  - tasks/templates/task-micro.md
+  - tests/contract/runtime/Test.SandboxEditorMeshMethods.cpp
+  - tests/data/framework24-acute-tetrahedron.obj
+  - tests/data/framework24-obtuse-tetrahedron.obj
+  - tests/data/framework24-open-patch.obj
+  - tests/unit/geometry/Test.CurvatureTensor.cpp
+  - tests/unit/geometry/Test_Curvature.cpp
+  - tools/agentkit/README.md
+  - tools/agentkit/src/agentkit/config.py
+  - tools/agentkit/src/agentkit/templates/AGENTS.md.tmpl
+  - tools/agentkit/src/agentkit/templates/copilot-instructions.md.tmpl
+  - tools/agentkit/src/agentkit/templates/docs/agent/agent-output-review-checklist.md.tmpl
+  - tools/agentkit/src/agentkit/templates/docs/agent/architecture-review-checklist.md.tmpl
+  - tools/agentkit/src/agentkit/templates/docs/agent/prompt/prompt.md.tmpl
+  - tools/agentkit/src/agentkit/templates/docs/agent/review-checklist.md.tmpl
+  - tools/agentkit/src/agentkit/templates/docs/agent/review.md.tmpl
+  - tools/agentkit/src/agentkit/templates/docs/agent/roles.md.tmpl
+  - tools/agentkit/src/agentkit/templates/github/pull_request_template.md.tmpl
+  - tools/agentkit/src/agentkit/templates/tools/agent/resync_skills.sh.tmpl
+  - tools/agentkit/src/agentkit/templates/tools/agent/skills/review/SKILL.md.tmpl
+  - tools/agents/check_audit_cadence.py
+  - tools/agents/generate_session_brief.py
+  - tools/agents/skills/README.md
+  - tools/agents/skills/intrinsicengine-audit/SKILL.md
+  - tools/agents/skills/intrinsicengine-benchmark/SKILL.md
+  - tools/agents/skills/intrinsicengine-benchmark/references/benchmark-review-checklist.md
+  - tools/agents/skills/intrinsicengine-benchmark/references/benchmark-workflow.md
+  - tools/agents/skills/intrinsicengine-core/SKILL.md
+  - tools/agents/skills/intrinsicengine-core/references/contract.md
+  - tools/agents/skills/intrinsicengine-core/references/roles.md
+  - tools/agents/skills/intrinsicengine-core/references/session-onboarding.md
+  - tools/agents/skills/intrinsicengine-diagnose/SKILL.md
+  - tools/agents/skills/intrinsicengine-method/SKILL.md
+  - tools/agents/skills/intrinsicengine-method/references/method-review-checklist.md
+  - tools/agents/skills/intrinsicengine-method/references/method-workflow.md
+  - tools/agents/skills/intrinsicengine-results-audit/references/ara-evidence-policy.md
+  - tools/agents/skills/intrinsicengine-review/SKILL.md
+  - tools/agents/skills/intrinsicengine-review/references/agent-output-review-checklist.md
+  - tools/agents/skills/intrinsicengine-review/references/architecture-review-checklist.md
+  - tools/agents/skills/intrinsicengine-review/references/clean-workshop-review.md
+  - tools/agents/skills/intrinsicengine-review/references/drift-audit-checklist.md
+  - tools/agents/skills/intrinsicengine-review/references/review-checklist.md
+  - tools/agents/skills/intrinsicengine-review/references/review.md
+  - tools/agents/skills/intrinsicengine-right-sizing/SKILL.md
+  - tools/agents/skills/intrinsicengine-task-workflow/SKILL.md
+  - tools/agents/skills/intrinsicengine-task-workflow/references/task-format.md
+  - tools/agents/skills/intrinsicengine-task-workflow/references/task-maturity.md
+  - tools/agents/skills/intrinsicengine-task-workflow/references/workflow-evidence.md
+  - tools/agents/sync_skills.py
+  - tools/diagnostics/curvature/Framework24CurvatureParityProbe.cpp
+  - tools/diagnostics/curvature/PmpCurvatureCorpusProbe.cpp
+  - tools/diagnostics/curvature/README.md
+  - tools/docs/docs_sync_rules.yaml
+  - tools/repo/githooks/pre-commit
+  layers:
+  - app
+  - assets
+  - ecs
+  - geometry
+  - runtime
+  modules:
+  - Extrinsic.ECS.Component.GeometrySources
+  - Extrinsic.Runtime.GeometryProcessingOperations
+  - Geometry.Curvature
+extension_seam: null
+future_change_plan: null
+acceptance:
+- criterion: Every pre-integration local branch tip is an ancestor of local `main`.
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: No unresolved conflict marker, duplicate task ID, or unqualified dirty-run
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: The final staged surface passes its strongest applicable local gates.
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: Independent fixed-surface review accepts the exact high-risk integration
+  task_checked: false
+  disposition: pending
+  evidence: []
+  reason: null
+- criterion: Local and fetched `origin/main` resolve to the same pushed commit.
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+commands: []
+changed_public_contracts: []
+diagnostics_and_previews: []
+benchmark_or_parity_evidence: []
+docs_sync:
+  task_file: tasks/active/BUG-162-main-branch-consolidation.md
+  session_brief_present: true
+  canonical_docs_changed: true
+  skill_mirrors_checked: false
+residual_risks: []
+skipped_checks: []
+artifacts: []
+self_review:
+  completed: false
+  scope_matches_task: false
+  layering_preserved: false
+  tests_and_docs_accounted_for: false
+  mechanical_and_semantic_changes_separated: false
+handoff: tasks/evidence/BUG-162/handoff.jsonl
+review: tasks/evidence/BUG-162/reviews.jsonl

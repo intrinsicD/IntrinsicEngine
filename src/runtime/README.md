@@ -623,15 +623,13 @@ mesh, calls the geometry-owned `Geometry::Curvature::ComputeCurvature`
 edge-dihedral tensor estimator, and publishes count-matched finite vertex
 properties only after the geometry result succeeds.
 
-Successful scalar publication writes canonical `v:mean_curvature` and
-`v:gaussian_curvature` `double` properties. When principal directions are
+Successful scalar publication writes canonical `v:min_principal_curvature`,
+`v:max_principal_curvature`, `v:mean_curvature`, and `v:gaussian_curvature`
+`double` properties in one atomic transaction. When principal directions are
 requested and available, the command also writes `v:principal_dir1` and
 `v:principal_dir2` `glm::vec3` properties; when the directions lane is disabled
 or unavailable, the command succeeds with scalars only and reports a
-deterministic diagnostic. The geometry result also owns minimum and maximum
-principal scalar properties, but the current runtime transaction does not yet
-persist them; BUG-156 tracks adding them to this same publication, history, and
-discovery path. Mean and Gaussian values are invariants of the
+deterministic diagnostic. Mean and Gaussian values are invariants of the
 reference-smoothed principal values from the same edge-dihedral estimator;
 directions retain that estimator's local tensor basis. Result diagnostics expose
 the supported/nonzero vertex counts, finite principal range, degenerate and
