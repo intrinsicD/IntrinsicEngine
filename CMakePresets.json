@@ -164,6 +164,16 @@
         "INTRINSIC_ENABLE_SOURCE_COVERAGE": "OFF",
         "INTRINSIC_RUNTIME_ENABLE_PROMOTED_VULKAN": "ON"
       }
+    },
+    {
+      "name": "sandbox-release",
+      "displayName": "Release sandbox + promoted Vulkan (CUDA off)",
+      "inherits": "ci-vulkan-release",
+      "description": "Optimized developer configuration for interactive Sandbox workloads. Keeps sanitizers and CUDA disabled while retaining promoted Vulkan support.",
+      "cacheVariables": {
+        "INTRINSIC_BUILD_SANDBOX": "ON",
+        "INTRINSIC_BUILD_BENCHMARKS": "OFF"
+      }
     }
   ],
   "buildPresets": [
@@ -206,6 +216,10 @@
     {
       "name": "ci-vulkan-release",
       "configurePreset": "ci-vulkan-release"
+    },
+    {
+      "name": "sandbox-release",
+      "configurePreset": "sandbox-release"
     }
   ]
 }

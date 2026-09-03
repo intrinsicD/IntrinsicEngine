@@ -2,9 +2,9 @@ session:
   id: "2026-09-03_001"
   date: "2026-09-03"
   started: "2026-09-03T02:58+02:00"
-  last_turn: "2026-09-03T02:58+02:00"
-  turn_count: 1
-  summary: "Corrected curvature publication documentation, regenerated high-risk evidence, and obtained three accepted fixed-surface reviews; remote publication remains authorization-blocked."
+  last_turn: "2026-09-03T22:53+02:00"
+  turn_count: 3
+  summary: "Closed the curvature repair and bounded METHOD-039 evidence, then localized feature-patch latency to build mode, repeated topology lookup, merge/seed/refinement work, and multi-scale geodesic search."
 
 events_logged:
   - turn: 1
@@ -13,6 +13,36 @@ events_logged:
     routing: direct
     provenance: ai-executed
     summary: "Corrected stale publication wording, regenerated exact task evidence, and obtained accepted independent reviews for BUG-154, BUG-156, and BUG-162."
+  - turn: 2
+    type: experiment
+    id: N452
+    routing: direct
+    provenance: ai-executed
+    summary: "Sealed METHOD-039's bounded positive controls, negative seed verdict, and 100k sparse-health row without a performance claim."
+  - turn: 2
+    type: experiment
+    id: N453
+    routing: direct
+    provenance: ai-executed
+    summary: "Recomputed dirty-source current-Framework24 curvature parity on the sculpt fixture."
+  - turn: 2
+    type: experiment
+    id: N454
+    routing: direct
+    provenance: ai-executed
+    summary: "Exercised sculpt curvature and explicit METHOD-039 visualization through CPU, runtime, isolated UI, and promoted Vulkan."
+  - turn: 3
+    type: question
+    id: N455
+    routing: direct
+    provenance: user
+    summary: "Locate the expensive curvature-segmentation compute and identify ways to make the working approach much faster."
+  - turn: 3
+    type: experiment
+    id: N456
+    routing: direct
+    provenance: ai-executed
+    summary: "Profiled feature-patch segmentation by wall stage, build mode, and instruction symbol, then ranked exact-preserving optimization candidates."
 
 ai_actions:
   - turn: 1
@@ -32,16 +62,53 @@ ai_actions:
     action: "Ran focused, full CPU, ASan, UBSan, exact-revision structural, receipt-integrity, and workflow-evidence checks; committed the resulting local review surfaces."
     provenance: ai-executed
     files_changed: []
+  - turn: 2
+    action: "Sealed the clean-source METHOD-039 bounded control rows, updated current Framework24 parity evidence, and exercised the sculpt runtime/UI/Vulkan workflow."
+    provenance: ai-executed
+    files_changed:
+      - "ara/evidence/benchmarks"
+      - "ara/evidence/tables/curvature_framework24_current_parity_2026-09-03.md"
+      - "src/runtime"
+      - "src/graphics/renderer"
+  - turn: 3
+    action: "Built and ran existing Debug and Release curvature profile targets, collected Callgrind instruction profiles, traced runtime configuration and hot source paths, and ran strict manifest, raw-result, and ARA checks."
+    provenance: ai-executed
+    files_changed: []
+  - turn: 3
+    action: "Recorded the non-claim profiling evidence and staged the workload-dependent hotspot and exact-preserving optimization interpretations."
+    provenance: ai-executed
+    files_changed:
+      - "ara/evidence/README.md"
+      - "ara/evidence/tables/curvature_segmentation_performance_diagnostic_2026-09-03.md"
+      - "ara/trace/exploration_tree.yaml"
+      - "ara/staging/observations.yaml"
+      - "ara/trace/sessions/2026-09-03_001.yaml"
+      - "ara/trace/sessions/session_index.yaml"
+      - "ara/trace/pm_reasoning_log.yaml"
 
-claims_touched: []
+claims_touched:
+  - id: C54
+    action: created
+    turn: 2
+  - id: C55
+    action: created
+    turn: 2
+  - id: C56
+    action: created
+    turn: 2
 
 key_context:
   - turn: 1
     excerpt: "The user supplied first-round independent verdicts and directed the driver to correct stale wording, regenerate evidence, and request new fixed-surface review rounds."
+  - turn: 3
+    excerpt: "The user reported that curvature segmentation now works well but is too slow and requested a compute-cost analysis plus acceleration opportunities."
 
 open_threads:
-  - "Obtain explicit authorization to push local main to origin/main, then fetch and recheck remote equality before retiring BUG-162."
-  - "BUG-155 remains retired without its required completion report and is the sole workflow-evidence validation error."
-  - "BUG-154, BUG-156, and BUG-162 remain active until their accepted evidence is finalized and their task records are retired through the task workflow."
+  - "Create a schema-v2 Release end-to-end benchmark on a representative user mesh with computed curvature/features, production automatic GMM and seeds, publication, quality parity, and warm repetitions."
+  - "Confirm whether the interactive Sandbox is currently a Debug build; the repository has no ready-made optimized Sandbox preset."
+  - "Benchmark the exact-preserving h:face cache, three-scale search reuse, and local merge/refinement/seed bookkeeping changes independently before combining them."
 
-ai_suggestions_pending: []
+ai_suggestions_pending:
+  - "Start with an optimized Sandbox configuration and cached h:face connectivity, then reuse one largest-radius feature search per edge side."
+  - "Follow with local boundary-turn/RAG invalidation, exact seed maximum-heap selection, and boundary-only exact connectivity state."
+  - "Treat parallel GMM/features, revision-keyed stage caching, coarse-to-fine solving, and local sculpt updates as later parity-controlled work."

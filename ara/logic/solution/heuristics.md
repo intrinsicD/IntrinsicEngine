@@ -270,3 +270,20 @@
   ara/evidence/tables/eig3x3_live_curvature_diagnostic_2026-08-12.md,
   N436, N437]
 - **From staging**: O159
+
+## H18: Eliminate Repeated Exact Work Before Changing a Reference Method
+- **Rationale**: Cache immutable property and topology lookups, reuse a
+  largest-radius shortest-path result for strict smaller-radius subsets, and
+  maintain exact local objective state with generation-stamped lazy heaps and
+  narrowly invalidated connectivity caches. Preserve the original cutoff and
+  tie rules and backcheck incremental energy against exact recomputation before
+  considering parallel, approximate, coarse-to-fine, or backend-changing work.
+- **Provenance**: ai-suggested
+- **Crystallized via**: artifact-commitment
+- **Sensitivity**: high
+- **Code ref**: [src/geometry/Geometry.HalfedgeMesh.cpp,
+  src/geometry/Geometry.HalfedgeMesh.CurvatureSegmentation.Features.cpp,
+  src/geometry/Geometry.HalfedgeMesh.CurvatureSegmentation.Patches.cpp,
+  ara/evidence/tables/curvature_segmentation_performance_diagnostic_2026-09-03.md,
+  N456, N457, N458]
+- **From staging**: O169

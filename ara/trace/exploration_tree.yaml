@@ -10618,3 +10618,92 @@ tree:
       The named promoted-Vulkan readback executed and passed; the live apps ran
       on isolated display :97 without host input grabs.
     status: resolved
+  - id: N455
+    type: question
+    title: "Locate curvature-segmentation cost and exact-preserving acceleration paths"
+    provenance: user
+    timestamp: "2026-09-03T22:53+02:00"
+    description: >
+      Determine where the working curvature feature-patch segmentation spends
+      its compute, identify opportunities to make it materially faster, and
+      report the findings without changing the implementation.
+    status: resolved
+  - id: N456
+    type: experiment
+    title: "Profile curvature feature-patch segmentation by stage and symbol"
+    provenance: ai-executed
+    timestamp: "2026-09-03T22:53+02:00"
+    also_depends_on: [N452, N454, N455]
+    evidence:
+      - "ara/evidence/tables/curvature_segmentation_performance_diagnostic_2026-09-03.md"
+      - "benchmarks/runners/CurvaturePatchProfileRunner.cpp"
+      - "benchmarks/geometry/manifests/curvature_segmentation_feature_patch_health_100k.yaml"
+      - "src/geometry/Geometry.HalfedgeMesh.CurvatureSegmentation.Features.cpp"
+      - "src/geometry/Geometry.HalfedgeMesh.CurvatureSegmentation.Patches.cpp"
+      - "src/geometry/Geometry.HalfedgeMesh.cpp"
+      - "Debug and Release IntrinsicCurvaturePatchProfile executions"
+      - "Release IntrinsicCurvatureSegmentationProfile execution"
+      - "Callgrind Release-health and Debug-smoke instruction profiles"
+      - "python3 tools/benchmark/validate_benchmark_manifests.py --root benchmarks --strict"
+      - "python3 tools/benchmark/validate_benchmark_results.py --root /tmp/intrinsic-curvature-evidence-20260903 --manifests-root benchmarks --strict"
+    result: >
+      The dirty-checkout 100,000-face fixed-count/all-zero-feature health
+      workload took 4.506 seconds in Debug and 0.534-0.717 seconds across
+      observed Release runs. The most recent Release stage population spent
+      53.7 percent in region merging and 20.1 percent in seed selection. On
+      the 2,304-face paired control, boundary refinement and merging consumed
+      49.1 and 30.8 percent of patch time; feature evidence spent 73.5 percent
+      in 20,304 bounded geodesic searches. Callgrind localized 22.34 million
+      property-name lookups, with PropertyRegistry::Find at 22.58 percent of
+      Release-health instructions, to the h:face lookup performed by
+      Mesh::Face and repeated boundary-energy topology walks. The strict
+      manifest gate passed 56 files; the ad-hoc raw result failed schema-v2
+      validation and remains non-claim diagnostic evidence. No production
+      source was changed.
+    status: resolved
+  - id: N457
+    type: decision
+    title: "Implement the exact-preserving curvature acceleration sequence"
+    provenance: user
+    timestamp: "2026-09-04T00:16+02:00"
+    choice: >
+      Capture an unchanged Release baseline first, implement the ranked
+      repeated-work eliminations in order, then repeat the same profiles,
+      compare timing and result payloads, verify, commit, merge, and push.
+    alternatives:
+      - "Change the reference formulation or introduce approximation first."
+      - "Rewrite containers before removing measured repeated computation."
+      - "Optimize without a matched pre-change baseline."
+    evidence: [N456, O169]
+    status: resolved
+  - id: N458
+    type: experiment
+    title: "Implement and compare exact-preserving curvature acceleration"
+    provenance: ai-executed
+    timestamp: "2026-09-04T00:16+02:00"
+    also_depends_on: [N456, N457]
+    evidence:
+      - "ara/evidence/tables/curvature_segmentation_performance_diagnostic_2026-09-03.md"
+      - "src/geometry/Geometry.HalfedgeMesh.cpp"
+      - "src/geometry/Geometry.HalfedgeMesh.CurvatureSegmentation.Features.cpp"
+      - "src/geometry/Geometry.HalfedgeMesh.CurvatureSegmentation.Patches.cpp"
+      - "benchmarks/runners/CurvaturePatchProfileRunner.cpp"
+      - "five matched Release executions per before/after cohort"
+      - "34-case focused curvature CTest selector"
+      - "4,263-case canonical CPU CTest selector"
+      - "grouped geometry ASan and UBSan selectors"
+      - "optimized ExtrinsicSandbox build from sandbox-release"
+      - "strict layering, docs, manifest, task, ARA, and source checks"
+    result: >
+      Median local Release time fell from 595.708 to 335.340 milliseconds on
+      the 100,000-face health fixture, 4.581 to 3.635 milliseconds on feature
+      smoke, 13.886 to 2.776 milliseconds on patch-quality smoke, and 8.823 to
+      2.949 milliseconds on the seed-refutation control. Region merging fell
+      3.85x and boundary refinement 7.63x on the 100,000-face stage medians;
+      feature bounded searches fell exactly from 20,304 to 6,768. Canonically
+      normalized before/after payloads were identical apart from timing, RSS,
+      and intentional search-work counters. Focused, full CPU, grouped ASan,
+      grouped UBSan, optimized Sandbox, and structural verification passed.
+      Dirty source identity and legacy result shape keep this local and
+      non-claim-grade.
+    status: resolved

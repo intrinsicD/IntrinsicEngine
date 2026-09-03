@@ -1,0 +1,74 @@
+session:
+  id: "2026-09-04_001"
+  date: "2026-09-04"
+  started: "2026-09-04T00:16+02:00"
+  last_turn: "2026-09-04T00:16+02:00"
+  turn_count: 1
+  summary: "Implemented the exact-preserving curvature acceleration sequence and matched four five-run local cohorts with identical normalized results and complete verification."
+
+events_logged:
+  - turn: 1
+    type: decision
+    id: N457
+    routing: direct
+    provenance: user
+    summary: "Capture a Release baseline, implement the ranked exact-preserving sequence, repeat matched profiles, verify outputs, and publish the change."
+  - turn: 1
+    type: experiment
+    id: N458
+    routing: direct
+    provenance: ai-executed
+    summary: "Implemented the repeated-work eliminations and matched four five-run before/after cohorts with exact normalized payload parity."
+  - turn: 1
+    type: heuristic
+    id: H18
+    routing: crystallized
+    provenance: ai-suggested
+    summary: "Crystallized exact repeated-work elimination before reference-method reformulation via artifact commitment."
+  - turn: 1
+    type: observation
+    id: O170
+    routing: staged
+    provenance: ai-executed
+    summary: "Staged the improved local timing medians without promoting a dirty-source legacy-payload speed claim."
+
+ai_actions:
+  - turn: 1
+    action: "Captured five pre-change and five post-change Release executions for the 100k health, feature, patch-quality, and seed-refutation controls and compared normalized JSON payloads."
+    provenance: ai-executed
+    files_changed:
+      - "ara/evidence/tables/curvature_segmentation_performance_diagnostic_2026-09-03.md"
+  - turn: 1
+    action: "Cached built-in halfedge face connectivity, reused feature and seed shortest-path work, and added exact local merge/refinement topology, energy, heap, and articulation caches."
+    provenance: ai-executed
+    files_changed:
+      - "src/geometry/Geometry.HalfedgeMesh.cppm"
+      - "src/geometry/Geometry.HalfedgeMesh.cpp"
+      - "src/geometry/Geometry.HalfedgeMesh.CurvatureSegmentation.Features.cpp"
+      - "src/geometry/Geometry.HalfedgeMesh.CurvatureSegmentation.Patches.cpp"
+  - turn: 1
+    action: "Added and built the optimized Sandbox preset, updated exact work-counter contracts, and synchronized geometry architecture and ARA documentation."
+    provenance: ai-executed
+    files_changed:
+      - "CMakePresets.json"
+      - "README.md"
+      - "docs/architecture/geometry.md"
+      - "tests/unit/geometry/Test.CurvaturePatchContract.cpp"
+      - "benchmarks/runners/CurvaturePatchProfileRunner.cpp"
+  - turn: 1
+    action: "Ran focused and canonical CPU tests, grouped geometry ASan and UBSan tests, the optimized Sandbox build, manifest validators, and strict structural checks."
+    provenance: ai-executed
+    files_changed: []
+
+claims_touched: []
+
+key_context:
+  - turn: 1
+    excerpt: "The user directed a pre-change test run, the ranked implementation sequence, a matched post-change timing/output comparison, and final commit, merge, and push."
+
+open_threads:
+  - "Create a clean-source schema-v2 Release benchmark on a representative user mesh with computed curvature/features, production Automatic GMM and automatic seeds, publication, warm repetitions, and quality parity."
+  - "Measure whether amortizing vertex-topology construction and addressing the remaining 100k seed-selection cost improve end-to-end editor latency without changing the reference result."
+
+ai_suggestions_pending:
+  - "Treat parallel GMM/features, revision-keyed stage caching, coarse-to-fine solving, and local sculpt updates as later parity-controlled work."

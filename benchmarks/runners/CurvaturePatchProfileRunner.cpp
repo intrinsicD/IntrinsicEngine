@@ -976,7 +976,7 @@ namespace
             profile.EndpointVertexCount == 2u &&
             profile.JunctionVertexCount == 0u &&
             profile.BoundedSearchCount ==
-                6u * result.Diagnostics.InteriorCandidateEdgeCount &&
+                2u * result.Diagnostics.InteriorCandidateEdgeCount &&
             profile.SettledFaceVisitCount > 0u && profile.Boundary.Valid &&
             profile.Boundary.SymmetricHausdorffUpperBoundNormalized <= 0.02 &&
             FeatureTimingsAreValid(profile.Timings);

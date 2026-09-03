@@ -316,8 +316,15 @@ sessions:
     open_threads: 4
   - id: "2026-09-03_001"
     date: "2026-09-03"
-    summary: "Corrected curvature publication documentation, regenerated high-risk evidence, and obtained three accepted fixed-surface reviews; remote publication remains authorization-blocked."
-    turn_count: 1
-    events_count: 1
-    claims_touched: []
+    summary: "Closed the curvature repair and bounded METHOD-039 evidence, then localized feature-patch latency to build mode, repeated topology lookup, merge/seed/refinement work, and multi-scale geodesic search."
+    turn_count: 3
+    events_count: 6
+    claims_touched: [C54, C55, C56]
     open_threads: 3
+  - id: "2026-09-04_001"
+    date: "2026-09-04"
+    summary: "Implemented the exact-preserving curvature acceleration sequence and matched four five-run local cohorts with identical normalized results and complete verification."
+    turn_count: 1
+    events_count: 4
+    claims_touched: []
+    open_threads: 2

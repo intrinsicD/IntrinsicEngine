@@ -565,6 +565,16 @@ actual method identity, but METHOD-037 remains the default and no v2 backend or
 UV/atlas behavior is claimed. METHOD-040 owns the separately scoped global-
 partition attempt.
 
+The diagnostic CPU implementation reuses the largest-radius bounded search for
+all three feature scales, caches immutable vertex/corner topology and current
+turn contributions, lazily refreshes only affected merge candidates, caches
+exact region articulation sets during refinement, and reuses seed-search
+storage. These are exact-preserving internal evaluation changes: the strict
+radius cutoff, deterministic tie rules, energy, connectivity checks, and
+published result contract remain unchanged. The local before/after timing and
+payload comparison is recorded in the
+[performance diagnostic](../../ara/evidence/tables/curvature_segmentation_performance_diagnostic_2026-09-03.md).
+
 The runtime operation publishes `f:curvature_component`,
 `f:curvature_region`, `f:curvature_region_color`,
 `e:curvature_region_boundary`, and

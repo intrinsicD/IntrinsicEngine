@@ -1,3 +1,5 @@
+// Halfedge-mesh topology, traversal, and property access.
+// This module owns mesh connectivity and the built-in properties used by geometry algorithms.
 module;
 
 #include <cstddef>
@@ -395,6 +397,7 @@ export namespace Geometry::HalfedgeMesh
         VertexProperty<glm::vec3> m_VPoint;
         VertexProperty<VertexConnectivity> m_VConn;
         HalfedgeProperty<HalfedgeConnectivity> m_HConn;
+        HalfedgeProperty<HalfedgeFaceConnectivity> m_HFace;
         FaceProperty<FaceConnectivity> m_FConn;
 
         VertexProperty<bool> m_VDeleted;

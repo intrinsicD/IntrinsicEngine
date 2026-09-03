@@ -1,5 +1,10 @@
 # Evidence Index
 
+- [Curvature-segmentation performance diagnostic](tables/curvature_segmentation_performance_diagnostic_2026-09-03.md)
+  — dirty-checkout Debug/Release wall-stage and Callgrind hotspot localization
+  plus matched five-run before/after controls and normalized-payload comparison;
+  explicitly non-claim evidence used to rank and check exact-preserving
+  optimizations and define the missing production benchmark.
 - [METHOD-039 bounded feature smoke](benchmarks/method039_feature_patch_feature_smoke.json),
   [patch-quality smoke](benchmarks/method039_feature_patch_quality_smoke.json),
   [seed-stability refutation](benchmarks/method039_feature_patch_seed_refutation.json),

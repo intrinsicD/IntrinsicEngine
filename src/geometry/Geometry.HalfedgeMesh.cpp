@@ -34,16 +34,14 @@ namespace Geometry::HalfedgeMesh
 
     FaceHandle Mesh::Face(HalfedgeHandle h) const
     {
-        auto faceConnectivity = m_Halfedges.Get<HalfedgeFaceConnectivity>("h:face");
-        assert(faceConnectivity.IsValid());
-        return faceConnectivity[h.Index].Face;
+        assert(m_HFace.IsValid());
+        return m_HFace[h].Face;
     }
 
     void Mesh::SetFace(HalfedgeHandle h, FaceHandle f)
     {
-        auto faceConnectivity = m_Halfedges.Get<HalfedgeFaceConnectivity>("h:face");
-        assert(faceConnectivity.IsValid());
-        faceConnectivity[h.Index].Face = f;
+        assert(m_HFace.IsValid());
+        m_HFace[h].Face = f;
     }
 
     namespace
@@ -755,7 +753,8 @@ namespace Geometry::HalfedgeMesh
         m_VConn = VertexProperty<VertexConnectivity>(m_Vertices.GetOrAdd<VertexConnectivity>("v:connectivity", {}));
         m_HConn = HalfedgeProperty<HalfedgeConnectivity>(
             m_Halfedges.GetOrAdd<HalfedgeConnectivity>("h:connectivity", {}));
-        (void)m_Halfedges.GetOrAdd<HalfedgeFaceConnectivity>("h:face", {});
+        m_HFace = HalfedgeProperty<HalfedgeFaceConnectivity>(
+            m_Halfedges.GetOrAdd<HalfedgeFaceConnectivity>("h:face", {}));
         m_FConn = FaceProperty<FaceConnectivity>(m_Faces.GetOrAdd<FaceConnectivity>("f:connectivity", {}));
 
         m_VDeleted = VertexProperty<bool>(m_Vertices.GetOrAdd<bool>("v:deleted", false));

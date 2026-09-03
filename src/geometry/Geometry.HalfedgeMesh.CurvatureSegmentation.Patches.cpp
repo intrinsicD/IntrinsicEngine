@@ -43,6 +43,7 @@ namespace Geometry::CurvatureSegmentation
         struct PatchFaceSample
         {
             FaceHandle Face{};
+            std::array<VertexHandle, 3u> Vertices{};
             glm::dvec3 Centroid{0.0};
             glm::dvec2 SignedCurvature{0.0};
             glm::dvec2 Descriptor{0.0};
@@ -96,6 +97,26 @@ namespace Geometry::CurvatureSegmentation
             double RegionalCostIncrease{0.0};
             double BoundaryCredit{0.0};
             double Delta{kInfinity};
+        };
+
+        struct PatchVertexTurnEdge
+        {
+            std::uint32_t FaceA{0u};
+            std::uint32_t FaceB{0u};
+            double NormalizedLength{0.0};
+        };
+
+        struct PatchVertexCorner
+        {
+            std::uint32_t Face{0u};
+            double Angle{0.0};
+        };
+
+        struct PatchVertexTopology
+        {
+            std::vector<PatchVertexTurnEdge> TurnEdges{};
+            std::vector<PatchVertexCorner> Corners{};
+            std::vector<std::uint32_t> IncidentTransitions{};
         };
 
         [[nodiscard]] double
@@ -295,6 +316,7 @@ namespace Geometry::CurvatureSegmentation
                     return CurvaturePatchStatus::NonTriangleFace;
 
                 std::array<glm::dvec3, 3u> positions{};
+                std::array<VertexHandle, 3u> vertices{};
                 glm::dvec2 curvatureSum{0.0};
                 std::size_t vertexCount = 0u;
                 for (const VertexHandle vertex : mesh.VerticesAroundFace(face))
@@ -304,8 +326,8 @@ namespace Geometry::CurvatureSegmentation
                     {
                         return CurvaturePatchStatus::InvalidTopology;
                     }
-                    positions[vertexCount++] =
-                        glm::dvec3(mesh.Position(vertex));
+                    vertices[vertexCount] = vertex;
+                    positions[vertexCount++] = glm::dvec3(mesh.Position(vertex));
                     curvatureSum += glm::dvec2{maxPrincipal[vertex.Index],
                                                minPrincipal[vertex.Index]};
                 }
@@ -327,6 +349,7 @@ namespace Geometry::CurvatureSegmentation
                 faceSlotToSample[face.Index] = sample;
                 samples.push_back(PatchFaceSample{
                     .Face = face,
+                    .Vertices = vertices,
                     .Centroid =
                         (positions[0u] + positions[1u] + positions[2u]) / 3.0,
                     .SignedCurvature = curvature,
@@ -773,39 +796,81 @@ namespace Geometry::CurvatureSegmentation
             return components;
         }
 
+        struct SeedDistanceEntry
+        {
+            double Distance{0.0};
+            std::uint32_t FaceSlot{0u};
+            std::uint32_t Face{0u};
+        };
+
+        struct SeedDistanceWorkspace
+        {
+            std::vector<SeedDistanceEntry> Queue{};
+            std::vector<std::uint32_t> ChangedFaces{};
+            std::vector<std::uint32_t> ChangedGeneration{};
+            std::uint32_t Generation{0u};
+        };
+
         void UpdateDistanceToSeeds(
             const std::vector<PatchFaceSample>& samples,
             const std::vector<PatchDualTransition>& transitions,
             const std::vector<std::vector<std::uint32_t>>& incident,
             const std::span<const std::uint32_t> newSeeds,
-            std::vector<double>& distance)
+            std::vector<double>& distance,
+            SeedDistanceWorkspace& workspace)
         {
-            struct Entry
-            {
-                double Distance{0.0};
-                std::uint32_t FaceSlot{0u};
-                std::uint32_t Face{0u};
-            };
-            const auto later = [](const Entry& a, const Entry& b)
+            const auto later = [](const SeedDistanceEntry& a,
+                                  const SeedDistanceEntry& b)
             {
                 return std::tie(a.Distance, a.FaceSlot, a.Face) >
                        std::tie(b.Distance, b.FaceSlot, b.Face);
             };
-            std::priority_queue<Entry, std::vector<Entry>, decltype(later)>
-                queue(later);
+            workspace.Queue.clear();
+            workspace.ChangedFaces.clear();
+            if (workspace.ChangedGeneration.size() != samples.size())
+            {
+                workspace.ChangedGeneration.assign(samples.size(), 0u);
+                workspace.Generation = 0u;
+            }
+            if (workspace.Generation ==
+                std::numeric_limits<std::uint32_t>::max())
+            {
+                std::fill(workspace.ChangedGeneration.begin(),
+                          workspace.ChangedGeneration.end(), 0u);
+                workspace.Generation = 1u;
+            }
+            else
+            {
+                ++workspace.Generation;
+            }
+            const auto recordChanged = [&](const std::uint32_t face)
+            {
+                if (workspace.ChangedGeneration[face] == workspace.Generation)
+                    return;
+                workspace.ChangedGeneration[face] = workspace.Generation;
+                workspace.ChangedFaces.push_back(face);
+            };
             for (const std::uint32_t face : newSeeds)
             {
-                distance[face] = 0.0;
-                queue.push(Entry{
+                if (distance[face] != 0.0)
+                {
+                    distance[face] = 0.0;
+                    recordChanged(face);
+                }
+                workspace.Queue.push_back(SeedDistanceEntry{
                     .Distance = 0.0,
                     .FaceSlot = samples[face].Face.Index,
                     .Face = face,
                 });
+                std::push_heap(workspace.Queue.begin(), workspace.Queue.end(),
+                               later);
             }
-            while (!queue.empty())
+            while (!workspace.Queue.empty())
             {
-                const Entry current = queue.top();
-                queue.pop();
+                std::pop_heap(workspace.Queue.begin(), workspace.Queue.end(),
+                              later);
+                const SeedDistanceEntry current = workspace.Queue.back();
+                workspace.Queue.pop_back();
                 if (current.Distance != distance[current.Face])
                     continue;
                 for (const std::uint32_t transitionIndex :
@@ -822,11 +887,14 @@ namespace Geometry::CurvatureSegmentation
                     if (!(candidate < distance[neighbor]))
                         continue;
                     distance[neighbor] = candidate;
-                    queue.push(Entry{
+                    recordChanged(neighbor);
+                    workspace.Queue.push_back(SeedDistanceEntry{
                         .Distance = candidate,
                         .FaceSlot = samples[neighbor].Face.Index,
                         .Face = neighbor,
                     });
+                    std::push_heap(workspace.Queue.begin(),
+                                   workspace.Queue.end(), later);
                 }
             }
         }
@@ -880,34 +948,72 @@ namespace Geometry::CurvatureSegmentation
                         initialSeeds.push_back(face);
                 }
                 std::vector<double> distance(samples.size(), kInfinity);
+                SeedDistanceWorkspace distanceWorkspace{};
                 UpdateDistanceToSeeds(samples, transitions, incident,
-                                      initialSeeds, distance);
+                                      initialSeeds, distance,
+                                      distanceWorkspace);
+                struct FarthestEntry
+                {
+                    double Distance{0.0};
+                    std::uint32_t FaceSlot{0u};
+                    std::uint32_t Face{0u};
+                };
+                const auto lowerPriority = [](const FarthestEntry& a,
+                                              const FarthestEntry& b)
+                {
+                    if (a.Distance != b.Distance)
+                        return a.Distance < b.Distance;
+                    if (a.FaceSlot != b.FaceSlot)
+                        return a.FaceSlot > b.FaceSlot;
+                    return a.Face > b.Face;
+                };
+                std::priority_queue<FarthestEntry,
+                                    std::vector<FarthestEntry>,
+                                    decltype(lowerPriority)>
+                    farthestQueue(lowerPriority);
+                for (std::uint32_t face = 0u; face < samples.size(); ++face)
+                {
+                    if (isSeed[face] != 0u)
+                        continue;
+                    if (!std::isfinite(distance[face]))
+                        return CurvaturePatchStatus::GrowthFailed;
+                    farthestQueue.push(FarthestEntry{
+                        .Distance = distance[face],
+                        .FaceSlot = samples[face].Face.Index,
+                        .Face = face,
+                    });
+                }
                 for (;;)
                 {
-                    std::optional<std::uint32_t> farthest{};
-                    double farthestDistance = -1.0;
-                    for (std::uint32_t face = 0u; face < samples.size(); ++face)
+                    while (!farthestQueue.empty())
                     {
-                        if (isSeed[face] != 0u)
-                            continue;
-                        const double candidate = distance[face];
-                        if (!std::isfinite(candidate))
-                            return CurvaturePatchStatus::GrowthFailed;
-                        if (candidate > farthestDistance ||
-                            (candidate == farthestDistance && farthest &&
-                             samples[face].Face.Index <
-                                 samples[*farthest].Face.Index))
-                        {
-                            farthest = face;
-                            farthestDistance = candidate;
-                        }
+                        const FarthestEntry& candidate = farthestQueue.top();
+                        if (isSeed[candidate.Face] == 0u &&
+                            candidate.Distance == distance[candidate.Face])
+                            break;
+                        farthestQueue.pop();
                     }
-                    if (!farthest || !(farthestDistance > spacing))
+                    if (farthestQueue.empty() ||
+                        !(farthestQueue.top().Distance > spacing))
                         break;
-                    isSeed[*farthest] = 1u;
-                    const std::array<std::uint32_t, 1u> newSeed{*farthest};
+                    const std::uint32_t farthest = farthestQueue.top().Face;
+                    farthestQueue.pop();
+                    isSeed[farthest] = 1u;
+                    const std::array<std::uint32_t, 1u> newSeed{farthest};
                     UpdateDistanceToSeeds(samples, transitions, incident,
-                                          newSeed, distance);
+                                          newSeed, distance,
+                                          distanceWorkspace);
+                    for (const std::uint32_t changed :
+                         distanceWorkspace.ChangedFaces)
+                    {
+                        if (isSeed[changed] != 0u)
+                            continue;
+                        farthestQueue.push(FarthestEntry{
+                            .Distance = distance[changed],
+                            .FaceSlot = samples[changed].Face.Index,
+                            .Face = changed,
+                        });
+                    }
                 }
             }
 
@@ -1177,13 +1283,94 @@ namespace Geometry::CurvatureSegmentation
             return std::isfinite(angle) ? angle : kInfinity;
         }
 
-        template <typename RegionForFace>
-        [[nodiscard]] double VertexTurnContribution(
+        [[nodiscard]] CurvaturePatchStatus BuildVertexTopology(
             const HalfedgeMesh::Mesh& mesh,
-            const VertexHandle vertex,
             const std::vector<std::uint32_t>& faceSlotToSample,
             const std::vector<PatchDualTransition>& transitions,
-            const std::vector<std::vector<std::uint32_t>>& incidentTransitions,
+            std::vector<PatchVertexTopology>& topology)
+        {
+            topology.assign(mesh.VerticesSize(), {});
+            std::vector<std::uint32_t> edgeToTransition(
+                mesh.EdgesSize(), kInvalidPatchIndex);
+            for (std::uint32_t transitionIndex = 0u;
+                 transitionIndex < transitions.size(); ++transitionIndex)
+            {
+                const PatchDualTransition& transition =
+                    transitions[transitionIndex];
+                if (transition.Edge.Index >= edgeToTransition.size() ||
+                    transition.VertexA.Index >= topology.size() ||
+                    transition.VertexB.Index >= topology.size())
+                {
+                    return CurvaturePatchStatus::InvalidTopology;
+                }
+                edgeToTransition[transition.Edge.Index] = transitionIndex;
+                topology[transition.VertexA.Index]
+                    .IncidentTransitions.push_back(transitionIndex);
+                topology[transition.VertexB.Index]
+                    .IncidentTransitions.push_back(transitionIndex);
+            }
+
+            for (const VertexHandle vertex : mesh.LiveVertices())
+            {
+                PatchVertexTopology& record = topology[vertex.Index];
+                for (const HalfedgeHandle halfedge :
+                     mesh.HalfedgesAroundVertex(vertex))
+                {
+                    const EdgeHandle edge = mesh.Edge(halfedge);
+                    const FaceHandle face0 = mesh.Face(mesh.Halfedge(edge, 0u));
+                    const FaceHandle face1 = mesh.Face(mesh.Halfedge(edge, 1u));
+                    if (!IsLiveFace(mesh, face0) || !IsLiveFace(mesh, face1))
+                        continue;
+                    if (edge.Index >= edgeToTransition.size())
+                        return CurvaturePatchStatus::InvalidTopology;
+                    const std::uint32_t transitionIndex =
+                        edgeToTransition[edge.Index];
+                    if (transitionIndex == kInvalidPatchIndex ||
+                        face0.Index >= faceSlotToSample.size() ||
+                        face1.Index >= faceSlotToSample.size())
+                    {
+                        return CurvaturePatchStatus::InvalidTopology;
+                    }
+                    const std::uint32_t sample0 =
+                        faceSlotToSample[face0.Index];
+                    const std::uint32_t sample1 =
+                        faceSlotToSample[face1.Index];
+                    if (sample0 == kInvalidPatchIndex ||
+                        sample1 == kInvalidPatchIndex)
+                    {
+                        return CurvaturePatchStatus::InvalidTopology;
+                    }
+                    record.TurnEdges.push_back(PatchVertexTurnEdge{
+                        .FaceA = sample0,
+                        .FaceB = sample1,
+                        .NormalizedLength =
+                            transitions[transitionIndex].NormalizedLength,
+                    });
+                }
+                for (const FaceHandle face : mesh.FacesAroundVertex(vertex))
+                {
+                    if (!IsLiveFace(mesh, face))
+                        continue;
+                    if (face.Index >= faceSlotToSample.size())
+                        return CurvaturePatchStatus::InvalidTopology;
+                    const std::uint32_t sample = faceSlotToSample[face.Index];
+                    if (sample == kInvalidPatchIndex)
+                        return CurvaturePatchStatus::InvalidTopology;
+                    const double angle = CornerAngle(mesh, face, vertex);
+                    if (!std::isfinite(angle))
+                        return CurvaturePatchStatus::NonFiniteEnergy;
+                    record.Corners.push_back(PatchVertexCorner{
+                        .Face = sample,
+                        .Angle = angle,
+                    });
+                }
+            }
+            return CurvaturePatchStatus::Success;
+        }
+
+        template <typename RegionForFace>
+        [[nodiscard]] double VertexTurnContribution(
+            const PatchVertexTopology& topology,
             const RegionForFace& regionForFace)
         {
             std::array<double, 2u> boundaryLengths{};
@@ -1203,40 +1390,16 @@ namespace Geometry::CurvatureSegmentation
                     incidentRegions[incidentRegionCount] = region;
                 ++incidentRegionCount;
             };
-            for (const HalfedgeHandle halfedge :
-                 mesh.HalfedgesAroundVertex(vertex))
+            for (const PatchVertexTurnEdge& edge : topology.TurnEdges)
             {
-                const EdgeHandle edge = mesh.Edge(halfedge);
-                const FaceHandle face0 = mesh.Face(mesh.Halfedge(edge, 0u));
-                const FaceHandle face1 = mesh.Face(mesh.Halfedge(edge, 1u));
-                if (!IsLiveFace(mesh, face0) || !IsLiveFace(mesh, face1))
-                    continue;
-                const std::uint32_t sample0 = faceSlotToSample[face0.Index];
-                const std::uint32_t sample1 = faceSlotToSample[face1.Index];
-                const std::uint32_t region0 = regionForFace(sample0);
-                const std::uint32_t region1 = regionForFace(sample1);
+                const std::uint32_t region0 = regionForFace(edge.FaceA);
+                const std::uint32_t region1 = regionForFace(edge.FaceB);
                 if (region0 == region1)
                     continue;
                 addIncidentRegion(region0);
                 addIncidentRegion(region1);
-                double length = 0.0;
-                bool found = false;
-                for (const std::uint32_t transitionIndex :
-                     incidentTransitions[sample0])
-                {
-                    const PatchDualTransition& transition =
-                        transitions[transitionIndex];
-                    if (transition.Edge == edge)
-                    {
-                        length = transition.NormalizedLength;
-                        found = true;
-                        break;
-                    }
-                }
-                if (!found)
-                    return kInfinity;
                 if (boundaryCount < boundaryLengths.size())
-                    boundaryLengths[boundaryCount] = length;
+                    boundaryLengths[boundaryCount] = edge.NormalizedLength;
                 ++boundaryCount;
             }
             if (boundaryCount != 2u || incidentRegionCount != 2u)
@@ -1245,18 +1408,12 @@ namespace Geometry::CurvatureSegmentation
             const std::uint32_t firstRegion = incidentRegions[0u];
             double firstSector = 0.0;
             double secondSector = 0.0;
-            for (const FaceHandle face : mesh.FacesAroundVertex(vertex))
+            for (const PatchVertexCorner& corner : topology.Corners)
             {
-                if (!IsLiveFace(mesh, face))
-                    continue;
-                const std::uint32_t sample = faceSlotToSample[face.Index];
-                const double angle = CornerAngle(mesh, face, vertex);
-                if (!std::isfinite(angle))
-                    return kInfinity;
-                if (regionForFace(sample) == firstRegion)
-                    firstSector += angle;
+                if (regionForFace(corner.Face) == firstRegion)
+                    firstSector += corner.Angle;
                 else
-                    secondSector += angle;
+                    secondSector += corner.Angle;
             }
             const double phi =
                 std::min(std::abs(std::numbers::pi_v<double> - firstSector),
@@ -1268,11 +1425,11 @@ namespace Geometry::CurvatureSegmentation
 
         [[nodiscard]] double BoundaryEnergy(
             const HalfedgeMesh::Mesh& mesh,
-            const std::vector<std::uint32_t>& faceSlotToSample,
+            const std::vector<PatchVertexTopology>& vertexTopology,
             const std::vector<PatchDualTransition>& transitions,
-            const std::vector<std::vector<std::uint32_t>>& incidentTransitions,
             const std::vector<std::uint32_t>& regionByFace,
-            const CurvaturePatchParams& params)
+            const CurvaturePatchParams& params,
+            std::vector<double>* vertexTurns = nullptr)
         {
             double length = 0.0;
             double support = 0.0;
@@ -1290,13 +1447,16 @@ namespace Geometry::CurvatureSegmentation
             double turning = 0.0;
             const auto regionForFace = [&](const std::uint32_t face)
             { return regionByFace[face]; };
+            if (vertexTurns != nullptr)
+                vertexTurns->assign(vertexTopology.size(), 0.0);
             for (const VertexHandle vertex : mesh.LiveVertices())
             {
                 const double contribution = VertexTurnContribution(
-                    mesh, vertex, faceSlotToSample, transitions,
-                    incidentTransitions, regionForFace);
+                    vertexTopology[vertex.Index], regionForFace);
                 if (!std::isfinite(contribution))
                     return kInfinity;
+                if (vertexTurns != nullptr)
+                    (*vertexTurns)[vertex.Index] = contribution;
                 turning += contribution;
             }
             return params.BoundaryLengthWeight * length +
@@ -1305,10 +1465,9 @@ namespace Geometry::CurvatureSegmentation
         }
 
         [[nodiscard]] double MergeBoundaryCredit(
-            const HalfedgeMesh::Mesh& mesh,
-            const std::vector<std::uint32_t>& faceSlotToSample,
+            const std::vector<PatchVertexTopology>& vertexTopology,
+            const std::span<const double> vertexTurns,
             const std::vector<PatchDualTransition>& transitions,
-            const std::vector<std::vector<std::uint32_t>>& incidentTransitions,
             const std::vector<std::uint32_t>& regionByFace,
             const RegionPair pair,
             const std::vector<std::uint32_t>& sharedTransitions,
@@ -1336,8 +1495,6 @@ namespace Geometry::CurvatureSegmentation
                 addAffectedVertex(transition.VertexA.Index);
                 addAffectedVertex(transition.VertexB.Index);
             }
-            const auto before = [&](const std::uint32_t face)
-            { return regionByFace[face]; };
             const auto after = [&](const std::uint32_t face)
             {
                 const std::uint32_t region = regionByFace[face];
@@ -1346,13 +1503,14 @@ namespace Geometry::CurvatureSegmentation
             double turningCredit = 0.0;
             for (const std::uint32_t vertexSlot : affectedVertices)
             {
-                const VertexHandle vertex{vertexSlot};
-                const double oldTurn = VertexTurnContribution(
-                    mesh, vertex, faceSlotToSample, transitions,
-                    incidentTransitions, before);
+                if (vertexSlot >= vertexTopology.size() ||
+                    vertexSlot >= vertexTurns.size())
+                {
+                    return kInfinity;
+                }
+                const double oldTurn = vertexTurns[vertexSlot];
                 const double newTurn = VertexTurnContribution(
-                    mesh, vertex, faceSlotToSample, transitions,
-                    incidentTransitions, after);
+                    vertexTopology[vertexSlot], after);
                 if (!std::isfinite(oldTurn) || !std::isfinite(newTurn))
                     return kInfinity;
                 turningCredit += oldTurn - newTurn;
@@ -1364,24 +1522,23 @@ namespace Geometry::CurvatureSegmentation
 
         [[nodiscard]] double PartitionEnergy(
             const HalfedgeMesh::Mesh& mesh,
-            const std::vector<std::uint32_t>& faceSlotToSample,
+            const std::vector<PatchVertexTopology>& vertexTopology,
             const std::vector<PatchDualTransition>& transitions,
-            const std::vector<std::vector<std::uint32_t>>& incidentTransitions,
             const PatchPartition& partition,
-            const CurvaturePatchParams& params)
+            const CurvaturePatchParams& params,
+            std::vector<double>* vertexTurns = nullptr)
         {
             const double regional = PartitionRegionalCost(partition, params);
             const double boundary = BoundaryEnergy(
-                mesh, faceSlotToSample, transitions, incidentTransitions,
-                partition.RegionByFace, params);
+                mesh, vertexTopology, transitions, partition.RegionByFace,
+                params, vertexTurns);
             return regional + boundary;
         }
 
         [[nodiscard]] MergeEvaluation EvaluateMerge(
-            const HalfedgeMesh::Mesh& mesh,
-            const std::vector<std::uint32_t>& faceSlotToSample,
+            const std::vector<PatchVertexTopology>& vertexTopology,
+            const std::span<const double> vertexTurns,
             const std::vector<PatchDualTransition>& transitions,
-            const std::vector<std::vector<std::uint32_t>>& incidentTransitions,
             const PatchPartition& partition,
             const RegionPair pair,
             const std::vector<std::uint32_t>& sharedTransitions,
@@ -1410,7 +1567,7 @@ namespace Geometry::CurvatureSegmentation
                                               RegionCost(a, params) -
                                               RegionCost(b, params);
             evaluation.BoundaryCredit = MergeBoundaryCredit(
-                mesh, faceSlotToSample, transitions, incidentTransitions,
+                vertexTopology, vertexTurns, transitions,
                 partition.RegionByFace, pair, sharedTransitions, params);
             evaluation.Delta =
                 evaluation.RegionalCostIncrease - evaluation.BoundaryCredit;
@@ -1484,58 +1641,110 @@ namespace Geometry::CurvatureSegmentation
         [[nodiscard]] CurvaturePatchStatus MergeToLocalOptimum(
             const HalfedgeMesh::Mesh& mesh,
             const std::vector<PatchFaceSample>& samples,
-            const std::vector<std::uint32_t>& faceSlotToSample,
+            const std::vector<PatchVertexTopology>& vertexTopology,
             const std::vector<PatchDualTransition>& transitions,
-            const std::vector<std::vector<std::uint32_t>>& incidentTransitions,
             const CurvaturePatchParams& params,
             PatchPartition& partition,
             double& currentEnergy,
+            std::vector<double>& vertexTurns,
             CurvaturePatchResult& result)
         {
+            struct QueueEntry
+            {
+                double Delta{0.0};
+                RegionPair Pair{};
+                std::uint64_t Generation{0u};
+            };
+            const auto later = [](const QueueEntry& a, const QueueEntry& b)
+            {
+                if (a.Delta != b.Delta)
+                    return a.Delta > b.Delta;
+                if (a.Pair != b.Pair)
+                    return a.Pair > b.Pair;
+                return a.Generation > b.Generation;
+            };
+            std::priority_queue<QueueEntry, std::vector<QueueEntry>,
+                                decltype(later)>
+                queue(later);
             std::map<RegionPair, MergeEvaluation> evaluations;
+            std::map<RegionPair, std::uint64_t> evaluationGenerations;
+            std::uint64_t nextGeneration = 0u;
             const auto refreshEvaluations =
-                [&](const std::vector<std::uint8_t>* affectedVertices,
+                [&](const std::vector<std::uint32_t>* affectedVertices,
                     const std::optional<std::uint32_t> changedRegion)
                 -> CurvaturePatchStatus
             {
                 for (auto it = evaluations.begin(); it != evaluations.end();)
                 {
                     if (!partition.Rag.contains(it->first))
+                    {
+                        evaluationGenerations.erase(it->first);
                         it = evaluations.erase(it);
+                    }
                     else
                         ++it;
                 }
+
+                std::set<RegionPair> refreshPairs;
                 for (const auto& [pair, shared] : partition.Rag)
                 {
-                    bool needsRefresh = !evaluations.contains(pair) ||
+                    (void)shared;
+                    if (!evaluations.contains(pair) ||
                         (changedRegion &&
                          (pair.first == *changedRegion ||
-                          pair.second == *changedRegion));
-                    if (!needsRefresh && affectedVertices != nullptr)
+                          pair.second == *changedRegion)))
                     {
-                        needsRefresh = std::ranges::any_of(
-                            shared,
-                            [&](const std::uint32_t transitionIndex)
-                            {
-                                const PatchDualTransition& transition =
-                                    transitions[transitionIndex];
-                                return (*affectedVertices)
-                                           [transition.VertexA.Index] != 0u ||
-                                       (*affectedVertices)
-                                           [transition.VertexB.Index] != 0u;
-                            });
+                        refreshPairs.insert(pair);
                     }
-                    if (!needsRefresh)
+                }
+                if (affectedVertices != nullptr)
+                {
+                    for (const std::uint32_t vertex : *affectedVertices)
+                    {
+                        if (vertex >= vertexTopology.size())
+                            return CurvaturePatchStatus::InvalidTopology;
+                        for (const std::uint32_t transitionIndex :
+                             vertexTopology[vertex].IncidentTransitions)
+                        {
+                            const PatchDualTransition& transition =
+                                transitions[transitionIndex];
+                            const std::uint32_t a =
+                                partition.RegionByFace[transition.FaceA];
+                            const std::uint32_t b =
+                                partition.RegionByFace[transition.FaceB];
+                            if (a == b)
+                                continue;
+                            const RegionPair dependent = OrderedPair(a, b);
+                            if (partition.Rag.contains(dependent))
+                                refreshPairs.insert(dependent);
+                        }
+                    }
+                }
+
+                for (const RegionPair pair : refreshPairs)
+                {
+                    const auto shared = partition.Rag.find(pair);
+                    if (shared == partition.Rag.end())
                         continue;
                     MergeEvaluation candidate = EvaluateMerge(
-                        mesh, faceSlotToSample, transitions,
-                        incidentTransitions, partition, pair, shared, params);
+                        vertexTopology, vertexTurns, transitions, partition,
+                        pair, shared->second, params);
                     if (!candidate.HardBlocked &&
                         !std::isfinite(candidate.Delta))
                     {
                         return CurvaturePatchStatus::NonFiniteEnergy;
                     }
-                    evaluations[pair] = std::move(candidate);
+                    const std::uint64_t generation = ++nextGeneration;
+                    evaluations[pair] = candidate;
+                    evaluationGenerations[pair] = generation;
+                    if (!candidate.HardBlocked && candidate.Delta < 0.0)
+                    {
+                        queue.push(QueueEntry{
+                            .Delta = candidate.Delta,
+                            .Pair = pair,
+                            .Generation = generation,
+                        });
+                    }
                 }
                 return CurvaturePatchStatus::Success;
             };
@@ -1544,40 +1753,76 @@ namespace Geometry::CurvatureSegmentation
                 refreshEvaluations(nullptr, std::nullopt);
             if (refreshStatus != CurvaturePatchStatus::Success)
                 return refreshStatus;
+
+            std::vector<std::uint32_t> affectedVertexGeneration(
+                vertexTopology.size(), 0u);
+            std::uint32_t affectedGeneration = 0u;
             for (;;)
             {
                 std::optional<MergeEvaluation> best{};
-                for (const auto& evaluation : evaluations)
+                while (!queue.empty())
                 {
-                    const MergeEvaluation& candidate = evaluation.second;
-                    if (candidate.HardBlocked)
-                        continue;
-                    if (!(candidate.Delta < 0.0))
-                        continue;
-                    if (!best || candidate.Delta < best->Delta ||
-                        (candidate.Delta == best->Delta &&
-                         candidate.Pair < best->Pair))
+                    const QueueEntry entry = queue.top();
+                    queue.pop();
+                    const auto generation =
+                        evaluationGenerations.find(entry.Pair);
+                    const auto evaluation = evaluations.find(entry.Pair);
+                    if (generation == evaluationGenerations.end() ||
+                        evaluation == evaluations.end() ||
+                        generation->second != entry.Generation ||
+                        !partition.Rag.contains(entry.Pair) ||
+                        evaluation->second.HardBlocked ||
+                        evaluation->second.Delta != entry.Delta ||
+                        !(evaluation->second.Delta < 0.0))
                     {
-                        best = candidate;
+                        continue;
                     }
+                    best = evaluation->second;
+                    break;
                 }
                 if (!best)
                     break;
 
                 const RegionPair pair = best->Pair;
-                std::vector<std::uint8_t> affectedVertices(
-                    mesh.VerticesSize(), 0u);
+                if (affectedGeneration ==
+                    std::numeric_limits<std::uint32_t>::max())
+                {
+                    std::fill(affectedVertexGeneration.begin(),
+                              affectedVertexGeneration.end(), 0u);
+                    affectedGeneration = 1u;
+                }
+                else
+                {
+                    ++affectedGeneration;
+                }
+                std::vector<std::uint32_t> affectedVertices;
                 for (const std::uint32_t face :
                      partition.Regions[pair.second].Faces)
                 {
-                    for (const VertexHandle vertex :
-                         mesh.VerticesAroundFace(samples[face].Face))
+                    for (const VertexHandle vertex : samples[face].Vertices)
                     {
-                        affectedVertices[vertex.Index] = 1u;
+                        if (affectedVertexGeneration[vertex.Index] ==
+                            affectedGeneration)
+                        {
+                            continue;
+                        }
+                        affectedVertexGeneration[vertex.Index] =
+                            affectedGeneration;
+                        affectedVertices.push_back(vertex.Index);
                     }
                 }
                 const double energyBefore = currentEnergy;
                 ApplyMerge(partition, pair);
+                const auto currentRegion = [&](const std::uint32_t face)
+                { return partition.RegionByFace[face]; };
+                for (const std::uint32_t vertex : affectedVertices)
+                {
+                    const double turn = VertexTurnContribution(
+                        vertexTopology[vertex], currentRegion);
+                    if (!std::isfinite(turn))
+                        return CurvaturePatchStatus::NonFiniteEnergy;
+                    vertexTurns[vertex] = turn;
+                }
                 const double predictedEnergy = energyBefore + best->Delta;
                 if (!std::isfinite(predictedEnergy)
                     || !(predictedEnergy < energyBefore))
@@ -1601,8 +1846,7 @@ namespace Geometry::CurvatureSegmentation
                     return refreshStatus;
             }
             const double exactEnergy = PartitionEnergy(
-                mesh, faceSlotToSample, transitions, incidentTransitions,
-                partition, params);
+                mesh, vertexTopology, transitions, partition, params);
             if (!std::isfinite(exactEnergy))
                 return CurvaturePatchStatus::NonFiniteEnergy;
             const double tolerance = 1.0e-8
@@ -1614,45 +1858,194 @@ namespace Geometry::CurvatureSegmentation
             return CurvaturePatchStatus::Success;
         }
 
-        [[nodiscard]] bool RegionRemainsConnectedWithoutFace(
+        struct RegionConnectivityWorkspace
+        {
+            struct Frame
+            {
+                std::uint32_t Face{0u};
+                std::size_t NextTransition{0u};
+            };
+
+            std::vector<std::uint32_t> VisitGeneration{};
+            std::vector<std::uint32_t> ArticulationGeneration{};
+            std::vector<std::uint32_t> Discovery{};
+            std::vector<std::uint32_t> Low{};
+            std::vector<std::uint32_t> Parent{};
+            std::vector<std::uint32_t> ChildCount{};
+            std::vector<Frame> Stack{};
+            std::uint32_t Generation{0u};
+        };
+
+        struct RegionArticulationCache
+        {
+            std::vector<std::uint8_t> Dirty{};
+            std::vector<std::vector<std::uint32_t>> ArticulationFaces{};
+            RegionConnectivityWorkspace Workspace{};
+        };
+
+        void PrepareConnectivityWorkspace(RegionConnectivityWorkspace& workspace,
+                                          const std::size_t faceCount)
+        {
+            if (workspace.VisitGeneration.size() != faceCount)
+            {
+                workspace.VisitGeneration.assign(faceCount, 0u);
+                workspace.ArticulationGeneration.assign(faceCount, 0u);
+                workspace.Discovery.resize(faceCount);
+                workspace.Low.resize(faceCount);
+                workspace.Parent.resize(faceCount);
+                workspace.ChildCount.resize(faceCount);
+                workspace.Generation = 0u;
+            }
+            if (workspace.Generation ==
+                std::numeric_limits<std::uint32_t>::max())
+            {
+                std::fill(workspace.VisitGeneration.begin(),
+                          workspace.VisitGeneration.end(), 0u);
+                std::fill(workspace.ArticulationGeneration.begin(),
+                          workspace.ArticulationGeneration.end(), 0u);
+                workspace.Generation = 1u;
+            }
+            else
+            {
+                ++workspace.Generation;
+            }
+            workspace.Stack.clear();
+        }
+
+        [[nodiscard]] CurvaturePatchStatus EnsureRegionArticulations(
+            const std::uint32_t region,
+            const PatchPartition& partition,
+            const std::vector<PatchDualTransition>& transitions,
+            const std::vector<std::vector<std::uint32_t>>& incidentTransitions,
+            RegionArticulationCache& cache)
+        {
+            if (cache.Dirty.size() != partition.Regions.size())
+            {
+                cache.Dirty.assign(partition.Regions.size(), 1u);
+                cache.ArticulationFaces.resize(partition.Regions.size());
+            }
+            if (region >= partition.Regions.size() ||
+                !partition.Regions[region].Active)
+            {
+                return CurvaturePatchStatus::ConnectivityInvariantFailed;
+            }
+            if (cache.Dirty[region] == 0u)
+                return CurvaturePatchStatus::Success;
+
+            const PatchRegion& source = partition.Regions[region];
+            if (source.Faces.empty())
+                return CurvaturePatchStatus::ConnectivityInvariantFailed;
+
+            RegionConnectivityWorkspace& workspace = cache.Workspace;
+            PrepareConnectivityWorkspace(workspace,
+                                         partition.RegionByFace.size());
+            std::vector<std::uint32_t>& articulationFaces =
+                cache.ArticulationFaces[region];
+            articulationFaces.clear();
+
+            const std::uint32_t root = *source.Faces.begin();
+            const std::uint32_t generation = workspace.Generation;
+            std::uint32_t discoveryTime = 1u;
+            std::size_t visitedCount = 1u;
+            workspace.VisitGeneration[root] = generation;
+            workspace.Discovery[root] = discoveryTime;
+            workspace.Low[root] = discoveryTime;
+            workspace.Parent[root] = kInvalidPatchIndex;
+            workspace.ChildCount[root] = 0u;
+            workspace.Stack.push_back(
+                RegionConnectivityWorkspace::Frame{.Face = root});
+
+            const auto markArticulation = [&](const std::uint32_t face)
+            {
+                if (workspace.ArticulationGeneration[face] == generation)
+                    return;
+                workspace.ArticulationGeneration[face] = generation;
+                articulationFaces.push_back(face);
+            };
+
+            while (!workspace.Stack.empty())
+            {
+                RegionConnectivityWorkspace::Frame& frame =
+                    workspace.Stack.back();
+                const std::uint32_t face = frame.Face;
+                if (frame.NextTransition < incidentTransitions[face].size())
+                {
+                    const std::uint32_t transitionIndex =
+                        incidentTransitions[face][frame.NextTransition++];
+                    const std::uint32_t neighbor =
+                        OtherFace(transitions[transitionIndex], face);
+                    if (partition.RegionByFace[neighbor] != region)
+                        continue;
+                    if (workspace.VisitGeneration[neighbor] != generation)
+                    {
+                        workspace.VisitGeneration[neighbor] = generation;
+                        workspace.Parent[neighbor] = face;
+                        workspace.ChildCount[neighbor] = 0u;
+                        workspace.Discovery[neighbor] = ++discoveryTime;
+                        workspace.Low[neighbor] = discoveryTime;
+                        ++workspace.ChildCount[face];
+                        ++visitedCount;
+                        workspace.Stack.push_back(
+                            RegionConnectivityWorkspace::Frame{
+                                .Face = neighbor});
+                        continue;
+                    }
+                    if (neighbor != workspace.Parent[face])
+                    {
+                        workspace.Low[face] = std::min(
+                            workspace.Low[face], workspace.Discovery[neighbor]);
+                    }
+                    continue;
+                }
+
+                workspace.Stack.pop_back();
+                const std::uint32_t parent = workspace.Parent[face];
+                if (parent == kInvalidPatchIndex)
+                {
+                    if (workspace.ChildCount[face] > 1u)
+                        markArticulation(face);
+                    continue;
+                }
+                workspace.Low[parent] =
+                    std::min(workspace.Low[parent], workspace.Low[face]);
+                if (workspace.Parent[parent] != kInvalidPatchIndex &&
+                    workspace.Low[face] >= workspace.Discovery[parent])
+                {
+                    markArticulation(parent);
+                }
+            }
+
+            if (visitedCount != source.Faces.size())
+                return CurvaturePatchStatus::ConnectivityInvariantFailed;
+            std::sort(articulationFaces.begin(), articulationFaces.end());
+            cache.Dirty[region] = 0u;
+            return CurvaturePatchStatus::Success;
+        }
+
+        [[nodiscard]] CurvaturePatchStatus RegionRemainsConnectedWithoutFace(
             const std::uint32_t region,
             const std::uint32_t removedFace,
             const PatchPartition& partition,
             const std::vector<PatchDualTransition>& transitions,
-            const std::vector<std::vector<std::uint32_t>>& incidentTransitions)
+            const std::vector<std::vector<std::uint32_t>>& incidentTransitions,
+            RegionArticulationCache& cache,
+            bool& remainsConnected)
         {
             const PatchRegion& source = partition.Regions[region];
             if (source.Faces.size() <= 1u)
-                return false;
-            const auto start = std::find_if(
-                source.Faces.begin(), source.Faces.end(),
-                [&](const std::uint32_t face) { return face != removedFace; });
-            if (start == source.Faces.end())
-                return false;
-
-            std::set<std::uint32_t> visited;
-            std::queue<std::uint32_t> queue;
-            visited.insert(*start);
-            queue.push(*start);
-            while (!queue.empty())
             {
-                const std::uint32_t face = queue.front();
-                queue.pop();
-                for (const std::uint32_t transitionIndex :
-                     incidentTransitions[face])
-                {
-                    const std::uint32_t neighbor =
-                        OtherFace(transitions[transitionIndex], face);
-                    if (neighbor == removedFace ||
-                        partition.RegionByFace[neighbor] != region)
-                    {
-                        continue;
-                    }
-                    if (visited.insert(neighbor).second)
-                        queue.push(neighbor);
-                }
+                remainsConnected = false;
+                return CurvaturePatchStatus::Success;
             }
-            return visited.size() + 1u == source.Faces.size();
+            const CurvaturePatchStatus status = EnsureRegionArticulations(
+                region, partition, transitions, incidentTransitions, cache);
+            if (status != CurvaturePatchStatus::Success)
+                return status;
+            const std::vector<std::uint32_t>& articulationFaces =
+                cache.ArticulationFaces[region];
+            remainsConnected = !std::binary_search(
+                articulationFaces.begin(), articulationFaces.end(), removedFace);
+            return CurvaturePatchStatus::Success;
         }
 
         [[nodiscard]] double
@@ -1674,8 +2067,8 @@ namespace Geometry::CurvatureSegmentation
         }
 
         [[nodiscard]] double MoveBoundaryDelta(
-            const HalfedgeMesh::Mesh& mesh,
-            const std::vector<std::uint32_t>& faceSlotToSample,
+            const std::vector<PatchVertexTopology>& vertexTopology,
+            const std::span<const double> vertexTurns,
             const std::vector<PatchDualTransition>& transitions,
             const std::vector<std::vector<std::uint32_t>>& incidentTransitions,
             const std::vector<std::uint32_t>& regionByFace,
@@ -1713,20 +2106,19 @@ namespace Geometry::CurvatureSegmentation
                 addAffectedVertex(transition.VertexA.Index);
                 addAffectedVertex(transition.VertexB.Index);
             }
-            const auto before = [&](const std::uint32_t sample)
-            { return regionByFace[sample]; };
             const auto after = [&](const std::uint32_t sample)
             { return sample == face ? target : regionByFace[sample]; };
             double turningDelta = 0.0;
             for (const std::uint32_t vertexSlot : affectedVertices)
             {
-                const VertexHandle vertex{vertexSlot};
-                const double oldTurn = VertexTurnContribution(
-                    mesh, vertex, faceSlotToSample, transitions,
-                    incidentTransitions, before);
+                if (vertexSlot >= vertexTopology.size() ||
+                    vertexSlot >= vertexTurns.size())
+                {
+                    return kInfinity;
+                }
+                const double oldTurn = vertexTurns[vertexSlot];
                 const double newTurn = VertexTurnContribution(
-                    mesh, vertex, faceSlotToSample, transitions,
-                    incidentTransitions, after);
+                    vertexTopology[vertexSlot], after);
                 if (!std::isfinite(oldTurn) || !std::isfinite(newTurn))
                     return kInfinity;
                 turningDelta += newTurn - oldTurn;
@@ -1739,7 +2131,7 @@ namespace Geometry::CurvatureSegmentation
         [[nodiscard]] CurvaturePatchStatus RefineBoundaries(
             const HalfedgeMesh::Mesh& mesh,
             const std::vector<PatchFaceSample>& samples,
-            const std::vector<std::uint32_t>& faceSlotToSample,
+            const std::vector<PatchVertexTopology>& vertexTopology,
             const std::vector<PatchDualTransition>& transitions,
             const std::vector<std::vector<std::uint32_t>>& incidentTransitions,
             const std::vector<double>& unary,
@@ -1747,15 +2139,32 @@ namespace Geometry::CurvatureSegmentation
             const CurvaturePatchParams& params,
             PatchPartition& partition,
             double& currentEnergy,
+            std::vector<double>& vertexTurns,
             CurvaturePatchResult& result)
         {
+            RegionArticulationCache articulationCache{};
+            articulationCache.Dirty.assign(partition.Regions.size(), 1u);
+            articulationCache.ArticulationFaces.resize(
+                partition.Regions.size());
             for (std::uint32_t sweep = 0u;
                  sweep < params.MaximumRefinementSweeps; ++sweep)
             {
                 bool moved = false;
                 ++result.Diagnostics.RefinementSweeps;
-                for (std::uint32_t face = 0u; face < samples.size(); ++face)
+                std::set<std::uint32_t> pendingFaces;
+                for (const PatchDualTransition& transition : transitions)
                 {
+                    if (partition.RegionByFace[transition.FaceA] !=
+                        partition.RegionByFace[transition.FaceB])
+                    {
+                        pendingFaces.insert(transition.FaceA);
+                        pendingFaces.insert(transition.FaceB);
+                    }
+                }
+                while (!pendingFaces.empty())
+                {
+                    const std::uint32_t face = *pendingFaces.begin();
+                    pendingFaces.erase(pendingFaces.begin());
                     const std::uint32_t source = partition.RegionByFace[face];
                     if (!partition.Regions[source].Active ||
                         partition.Regions[source].Faces.size() <= 1u)
@@ -1773,13 +2182,18 @@ namespace Geometry::CurvatureSegmentation
                         if (target != source)
                             targets.insert(target);
                     }
-                    if (targets.empty() ||
-                        !RegionRemainsConnectedWithoutFace(
-                            source, face, partition, transitions,
-                            incidentTransitions))
-                    {
+                    if (targets.empty())
                         continue;
-                    }
+                    bool remainsConnected = false;
+                    const CurvaturePatchStatus connectivityStatus =
+                        RegionRemainsConnectedWithoutFace(
+                            source, face, partition, transitions,
+                            incidentTransitions, articulationCache,
+                            remainsConnected);
+                    if (connectivityStatus != CurvaturePatchStatus::Success)
+                        return connectivityStatus;
+                    if (!remainsConnected)
+                        continue;
 
                     std::optional<std::uint32_t> bestTarget{};
                     double bestDelta = 0.0;
@@ -1818,9 +2232,9 @@ namespace Geometry::CurvatureSegmentation
                             RegionCost(partition.Regions[source], params) -
                             RegionCost(partition.Regions[target], params);
                         const double boundaryDelta = MoveBoundaryDelta(
-                            mesh, faceSlotToSample, transitions,
-                            incidentTransitions, partition.RegionByFace, face,
-                            target, params);
+                            vertexTopology, vertexTurns, transitions,
+                            incidentTransitions, partition.RegionByFace,
+                            face, target, params);
                         const double delta = regionalDelta + boundaryDelta;
                         if (!std::isfinite(delta))
                             return CurvaturePatchStatus::NonFiniteEnergy;
@@ -1843,6 +2257,18 @@ namespace Geometry::CurvatureSegmentation
                                    -1.0);
                     AccumulateFace(targetRegion, samples[face], faceUnary, 1.0);
                     partition.RegionByFace[face] = *bestTarget;
+                    articulationCache.Dirty[source] = 1u;
+                    articulationCache.Dirty[*bestTarget] = 1u;
+                    const auto currentRegion = [&](const std::uint32_t sample)
+                    { return partition.RegionByFace[sample]; };
+                    for (const VertexHandle vertex : samples[face].Vertices)
+                    {
+                        const double turn = VertexTurnContribution(
+                            vertexTopology[vertex.Index], currentRegion);
+                        if (!std::isfinite(turn))
+                            return CurvaturePatchStatus::NonFiniteEnergy;
+                        vertexTurns[vertex.Index] = turn;
+                    }
                     const double energyBefore = currentEnergy;
                     const double predictedEnergy = energyBefore + bestDelta;
                     if (!std::isfinite(predictedEnergy)
@@ -1862,21 +2288,29 @@ namespace Geometry::CurvatureSegmentation
                         });
                     result.AcceptedEnergyHistory.push_back(currentEnergy);
                     moved = true;
+                    for (const std::uint32_t transitionIndex :
+                         incidentTransitions[face])
+                    {
+                        const std::uint32_t neighbor =
+                            OtherFace(transitions[transitionIndex], face);
+                        if (neighbor > face)
+                            pendingFaces.insert(neighbor);
+                    }
                 }
                 if (!moved)
                     break;
                 RebuildRag(partition, transitions);
                 const CurvaturePatchStatus mergeStatus = MergeToLocalOptimum(
-                    mesh, samples, faceSlotToSample, transitions,
-                    incidentTransitions, params, partition, currentEnergy,
-                    result);
+                    mesh, samples, vertexTopology, transitions, params,
+                    partition, currentEnergy, vertexTurns, result);
                 if (mergeStatus != CurvaturePatchStatus::Success)
                     return mergeStatus;
+                std::fill(articulationCache.Dirty.begin(),
+                          articulationCache.Dirty.end(), 1u);
             }
             RebuildRag(partition, transitions);
             const double exactEnergy = PartitionEnergy(
-                mesh, faceSlotToSample, transitions, incidentTransitions,
-                partition, params);
+                mesh, vertexTopology, transitions, partition, params);
             if (!std::isfinite(exactEnergy))
                 return CurvaturePatchStatus::NonFiniteEnergy;
             const double tolerance = 1.0e-8
@@ -2078,9 +2512,10 @@ namespace Geometry::CurvatureSegmentation
         [[nodiscard]] CurvaturePatchStatus PublishFinalResult(
             const HalfedgeMesh::Mesh& mesh,
             const std::vector<PatchFaceSample>& samples,
+            const std::vector<PatchVertexTopology>& vertexTopology,
+            const std::span<const double> vertexTurns,
             const std::vector<PatchDualTransition>& transitions,
             const std::vector<std::vector<std::uint32_t>>& incidentTransitions,
-            const std::vector<std::uint32_t>& faceSlotToSample,
             const std::vector<std::uint32_t>& faceComponents,
             const Gmm::Model& mixture,
             const CurvaturePatchParams& params,
@@ -2123,8 +2558,8 @@ namespace Geometry::CurvatureSegmentation
             for (const auto& [pair, shared] : partition.Rag)
             {
                 const MergeEvaluation evaluation = EvaluateMerge(
-                    mesh, faceSlotToSample, transitions, incidentTransitions,
-                    partition, pair, shared, params);
+                    vertexTopology, vertexTurns, transitions, partition, pair,
+                    shared, params);
                 finalEvaluations.emplace(pair, evaluation);
                 const bool hard = evaluation.HardBlocked;
                 if (!hard)
@@ -2329,10 +2764,18 @@ namespace Geometry::CurvatureSegmentation
         const CurvaturePatchStatus sampleStatus = BuildSamplesAndTransitions(
             mesh, maxPrincipal, minPrincipal, evidence, params, samples,
             faceSlotToSample, transitions, incidentTransitions, result);
+        std::vector<PatchVertexTopology> vertexTopology;
+        const CurvaturePatchStatus topologyStatus =
+            sampleStatus == CurvaturePatchStatus::Success
+                ? BuildVertexTopology(mesh, faceSlotToSample, transitions,
+                                      vertexTopology)
+                : sampleStatus;
         diagnostics.Timings.ValidationAndSamplingMilliseconds =
             ElapsedMilliseconds(validationStart);
         if (sampleStatus != CurvaturePatchStatus::Success)
             return finish(sampleStatus);
+        if (topologyStatus != CurvaturePatchStatus::Success)
+            return finish(topologyStatus);
 
         Gmm::Model mixture;
         std::vector<double> unary;
@@ -2393,9 +2836,10 @@ namespace Geometry::CurvatureSegmentation
         PatchPartition partition =
             BuildPartition(samples, transitions, provisionalRegions, unary,
                            mixture.Components.size(), seeds.size());
-        double currentEnergy =
-            PartitionEnergy(mesh, faceSlotToSample, transitions,
-                            incidentTransitions, partition, params);
+        std::vector<double> vertexTurns;
+        double currentEnergy = PartitionEnergy(
+            mesh, vertexTopology, transitions, partition, params,
+            &vertexTurns);
         if (!std::isfinite(currentEnergy))
             return finish(CurvaturePatchStatus::NonFiniteEnergy);
         diagnostics.InitialEnergy = currentEnergy;
@@ -2403,8 +2847,8 @@ namespace Geometry::CurvatureSegmentation
 
         const ProfileClock::time_point mergeStart = ProfileClock::now();
         const CurvaturePatchStatus mergeStatus = MergeToLocalOptimum(
-            mesh, samples, faceSlotToSample, transitions, incidentTransitions,
-            params, partition, currentEnergy, result);
+            mesh, samples, vertexTopology, transitions, params, partition,
+            currentEnergy, vertexTurns, result);
         diagnostics.Timings.RegionMergingMilliseconds =
             ElapsedMilliseconds(mergeStart);
         if (mergeStatus != CurvaturePatchStatus::Success)
@@ -2412,9 +2856,9 @@ namespace Geometry::CurvatureSegmentation
 
         const ProfileClock::time_point refinementStart = ProfileClock::now();
         const CurvaturePatchStatus refinementStatus = RefineBoundaries(
-            mesh, samples, faceSlotToSample, transitions, incidentTransitions,
+            mesh, samples, vertexTopology, transitions, incidentTransitions,
             unary, mixture.Components.size(), params, partition, currentEnergy,
-            result);
+            vertexTurns, result);
         diagnostics.Timings.BoundaryRefinementMilliseconds =
             ElapsedMilliseconds(refinementStart);
         if (refinementStatus != CurvaturePatchStatus::Success)
@@ -2423,8 +2867,9 @@ namespace Geometry::CurvatureSegmentation
         diagnostics.FinalEnergy = currentEnergy;
         const ProfileClock::time_point publicationStart = ProfileClock::now();
         const CurvaturePatchStatus publicationStatus = PublishFinalResult(
-            mesh, samples, transitions, incidentTransitions, faceSlotToSample,
-            faceComponents, mixture, params, partition, result);
+            mesh, samples, vertexTopology, vertexTurns, transitions,
+            incidentTransitions, faceComponents, mixture, params, partition,
+            result);
         diagnostics.Timings.PublicationAndValidationMilliseconds =
             ElapsedMilliseconds(publicationStart);
         return finish(publicationStatus);

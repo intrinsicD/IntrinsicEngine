@@ -3056,3 +3056,69 @@ observations:
     promoted_to: "logic/claims.md:C56"
     crystallized_via: artifact-commitment
     stale: false
+  - id: O168
+    timestamp: "2026-09-03T22:53+02:00"
+    provenance: ai-suggested
+    content: >
+      Curvature feature-patch latency is workload dependent rather than owned
+      by one universal stage: the bounded 100,000-face fixed-count flat case
+      is merge- and automatic-seed-dominated; the paired boundary-quality case
+      is refinement- and merge-dominated; and computed feature evidence is
+      dominated by its per-edge multi-scale bounded geodesic searches.
+      Production automatic GMM counts 1 through 12 and curvature estimation
+      remain unmeasured in the current patch health fixture and may reorder
+      those costs.
+    context: >
+      Dirty-checkout Debug/Release wall-stage runs, bounded quality controls,
+      Callgrind instruction profiles, runtime/config tracing, and an
+      automatic-GMM warning probe performed for the user's performance report.
+    potential_type: claim
+    bound_to: [N456]
+    promoted: false
+    promoted_to: null
+    crystallized_via: null
+    stale: false
+  - id: O169
+    timestamp: "2026-09-03T22:53+02:00"
+    provenance: ai-suggested
+    content: >
+      The first exact-preserving optimization sequence should cache the
+      built-in h:face property handle, reuse one largest-radius bounded
+      Dijkstra per candidate-edge side for all three feature scales, cache
+      corner and local boundary-turn terms while refreshing only dependent RAG
+      pairs, use a lazy maximum heap for farthest-seed selection, and replace
+      per-candidate tree BFS connectivity checks with boundary-only,
+      generation-stamped exact connectivity state.
+    context: >
+      Static source analysis was ranked against the measured wall stages and
+      Callgrind symbols. Container replacement, coarse-to-fine reformulation,
+      GPU work, and approximation were deliberately placed after repeated-work
+      elimination and CPU-reference parity.
+    potential_type: heuristic
+    bound_to: [N456]
+    promoted: true
+    promoted_to: "logic/solution/heuristics.md:H18"
+    crystallized_via: artifact-commitment
+    stale: false
+  - id: O170
+    timestamp: "2026-09-04T00:16+02:00"
+    provenance: ai-executed
+    content: >
+      Matched five-run local Release samples reduced median METHOD-039
+      feature-patch time from 595.708 to 335.340 milliseconds on the 100,000
+      face health fixture, from 4.581 to 3.635 milliseconds on feature smoke,
+      from 13.886 to 2.776 milliseconds on patch-quality smoke, and from 8.823
+      to 2.949 milliseconds on the seed-refutation control. Normalized result
+      payloads were identical after removing timing, process-RSS, and the
+      intentionally changed bounded-search work counters.
+    context: >
+      The comparison used the same dirty checkout, host, Release runner,
+      fixtures, and parameters before and after the exact-preserving patch.
+      Legacy-shaped payloads report commit unknown, so these measurements are
+      local engineering evidence rather than a claim-grade speed result.
+    potential_type: claim
+    bound_to: [N458]
+    promoted: false
+    promoted_to: null
+    crystallized_via: null
+    stale: false

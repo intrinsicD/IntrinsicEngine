@@ -2044,7 +2044,7 @@ TEST(CurvaturePatchContract,
             [](const double value) { return value == 0.0; }));
         EXPECT_EQ(
             result.Diagnostics.BoundedSearchCount,
-            6u * result.Diagnostics.InteriorCandidateEdgeCount);
+            2u * result.Diagnostics.InteriorCandidateEdgeCount);
         EXPECT_EQ(result.View().HardEdgeMask.size(), fixture.Surface.EdgesSize());
         EXPECT_EQ(
             result.View().SoftEdgeConfidence.size(),
@@ -2164,7 +2164,7 @@ TEST(CurvaturePatchContract,
             EXPECT_EQ(result.Diagnostics.HardFeatureEdgeCount, 0u);
             EXPECT_EQ(
                 result.Diagnostics.BoundedSearchCount,
-                6u * result.Diagnostics.InteriorCandidateEdgeCount);
+                2u * result.Diagnostics.InteriorCandidateEdgeCount);
             EXPECT_GT(result.Diagnostics.SettledFaceVisitCount, 0u);
             EXPECT_GT(result.Diagnostics.MaximumNeighborhoodFaceCount, 0u);
 

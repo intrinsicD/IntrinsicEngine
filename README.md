@@ -43,6 +43,13 @@ ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarant
 
 This is the default CPU-supported correctness gate. GPU/Vulkan, slow, and explicitly quarantined tests are opt-in through CTest labels.
 
+For an optimized interactive Sandbox build with promoted Vulkan enabled:
+
+```bash
+cmake --preset sandbox-release
+cmake --build --preset sandbox-release --target ExtrinsicSandbox
+```
+
 For fast local iteration on small, well-scoped changes, plan or run the conservative touched-scope helper before the full gate:
 
 ```bash

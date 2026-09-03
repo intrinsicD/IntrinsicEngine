@@ -664,16 +664,16 @@ namespace Geometry::CurvatureSegmentation
             const std::uint32_t transitionIndex = edgeToTransition[edgeIndex];
             const FeatureDualTransition &transition =
                 transitions[transitionIndex];
+            const double maximumRadius = result.ScaleRadiiWorld.back();
+            BoundedDistances(transition.FaceA, maximumRadius, transitionIndex,
+                             transitions, incident, searchA, diagnostics);
+            BoundedDistances(transition.FaceB, maximumRadius, transitionIndex,
+                             transitions, incident, searchB, diagnostics);
             std::array<double, kFeatureEvidenceScaleCount> combined{};
             for (std::size_t scale = 0u; scale < kFeatureEvidenceScaleCount;
                  ++scale)
             {
                 const double radius = result.ScaleRadiiWorld[scale];
-                BoundedDistances(transition.FaceA, radius, transitionIndex,
-                                 transitions, incident, searchA, diagnostics);
-                BoundedDistances(transition.FaceB, radius, transitionIndex,
-                                 transitions, incident, searchB, diagnostics);
-
                 glm::dvec2 sumA{0.0};
                 glm::dvec2 sumB{0.0};
                 double weightA = 0.0;
@@ -702,9 +702,11 @@ namespace Geometry::CurvatureSegmentation
                     }
                     assignmentGenerationByFace[face] = assignmentGeneration;
                     const bool withinA =
-                        searchA.GenerationByFace[face] == searchA.Generation;
+                        searchA.GenerationByFace[face] == searchA.Generation &&
+                        searchA.Distance[face] < radius;
                     const bool withinB =
-                        searchB.GenerationByFace[face] == searchB.Generation;
+                        searchB.GenerationByFace[face] == searchB.Generation &&
+                        searchB.Distance[face] < radius;
                     if (!withinA && !withinB)
                         return;
 
