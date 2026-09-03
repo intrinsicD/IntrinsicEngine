@@ -3,15 +3,15 @@ task_id: BUG-118
 workflow_profile: high-risk
 status: complete
 generated_by: tools/agents/workflow_evidence.py
-generated_at: '2026-09-03T09:27:24Z'
+generated_at: '2026-09-03T09:32:11Z'
 claim_eligible: false
 source:
   base_ref: 322c60b76260c32f9ff71a8c9c193937a1482c4b
   base_revision: 322c60b76260c32f9ff71a8c9c193937a1482c4b
-  head_revision: da8934651e4ba0064989f89da0a6cc088697c0bd
-  branch: main
-  worktree: /home/alex/Documents/IntrinsicEngine
-  dirty: true
+  head_revision: f0fbd665dc683c38346d6c7de538955b526c4951
+  branch: codex/evidence-bug118
+  worktree: /tmp/intrinsic-bug118-review.gaMGV4
+  dirty: false
   surface:
   - path: ara/logic/claims.md
     sha256: a38331556de6e4f5c8440268ea43d4cd8d7f943307343881e324675ca242ed6d
@@ -27,12 +27,6 @@ source:
     sha256: f334301d31aafcff43fd3b33454de889c89b1b56151ab666591567e58d284f97
   - path: tasks/SESSION-BRIEF.md
     sha256: 768939e39f67c53faa7cbb4d171cb18cdabcd76774c63fb6e5aa24980abb0715
-  - path: tasks/active/BUG-154-curvature-pmp-parity-corner-normal-topology.md
-    sha256: null
-  - path: tasks/active/BUG-156-curvature-two-ring-smoothing-cancels-features.md
-    sha256: null
-  - path: tasks/active/BUG-162-main-branch-consolidation.md
-    sha256: null
   - path: tasks/active/README.md
     sha256: 396a67e291f5834b873a85329fd71fa664c3d1eda045a02c1a5c04a887529c31
   - path: tasks/backlog/README.md
@@ -63,6 +57,8 @@ source:
     sha256: 18e00877dc1071c85cd4f479d451bebeef8309022e46cf8c63b0bed5151984a4
   - path: tasks/evidence/BUG-154/commands/closure-gpu-vulkan.stdout.log
     sha256: cf87bd3bd7c4b07b93932217972de3955a61e296ca4d7423cb6fe7bdc91d6a85
+  - path: tasks/evidence/BUG-154/report.yaml
+    sha256: 05f63811b948b6571e2c7c0be1971d4c836e05d4211d925ea596ceb02693c0ea
   - path: tasks/evidence/BUG-155/commands/closure-vulkan.json
     sha256: 65122a0a8770cdf951c028e00856de8d71b9f7ce0a01e19879c5ea8f652a2ff6
   - path: tasks/evidence/BUG-155/commands/closure-vulkan.stderr.log
@@ -71,6 +67,10 @@ source:
     sha256: 87471f4ca9b8ae8574d24402a25b989b662e18118dfb4685e515635c62603e71
   - path: tasks/evidence/BUG-155/report.yaml
     sha256: 6d6bf9a40dcd5bf763b7473dc2fa24d68088f4e8db48946cf3f41b7c5374b7ba
+  - path: tasks/evidence/BUG-156/report.yaml
+    sha256: 7ab8f1545822a38680f80687086e08d3a06b7f1a6426f21e8494104098d7d509
+  - path: tasks/evidence/BUG-162/report.yaml
+    sha256: 8931ce6c89eb2425f0fc8b812b16845875877b09e7d91d0a03d3aa0bd082fb91
   - path: tests/CMakeLists.txt
     sha256: 57337fa92737a34dac13306e40e6d9e04bdf14620ea2be95c67a2777c8b027b2
   - path: tests/README.md
@@ -81,7 +81,7 @@ source:
     sha256: 19e8381ebc25a97265ad9c88f7573266ccf39cee4ec79725d5f04f5272a23b49
   - path: tools/agents/contract_legacy_tasks.json
     sha256: 27d954474064990fcecbbc0bd221fade87d60fdf91c3a649204be778d9beb632
-  content_digest: d53d2c3750df2eb04be5cd766e43c4e495b4ab83e830c1a89dd8eb77134e0241
+  content_digest: 5ffb35762ba9e9dd68eda56e34cfc8bda20fa70462d119ec645d48c1f0f22531
 touched:
   paths:
   - ara/logic/claims.md
@@ -91,9 +91,6 @@ touched:
   - src/graphics/vulkan/README.md
   - src/platform/README.md
   - tasks/SESSION-BRIEF.md
-  - tasks/active/BUG-154-curvature-pmp-parity-corner-normal-topology.md
-  - tasks/active/BUG-156-curvature-two-ring-smoothing-cancels-features.md
-  - tasks/active/BUG-162-main-branch-consolidation.md
   - tasks/active/README.md
   - tasks/backlog/README.md
   - tasks/backlog/bugs/BUG-118-glfw-x11-input-method-lsan-recurrence.md
@@ -109,10 +106,13 @@ touched:
   - tasks/evidence/BUG-154/commands/closure-gpu-vulkan.json
   - tasks/evidence/BUG-154/commands/closure-gpu-vulkan.stderr.log
   - tasks/evidence/BUG-154/commands/closure-gpu-vulkan.stdout.log
+  - tasks/evidence/BUG-154/report.yaml
   - tasks/evidence/BUG-155/commands/closure-vulkan.json
   - tasks/evidence/BUG-155/commands/closure-vulkan.stderr.log
   - tasks/evidence/BUG-155/commands/closure-vulkan.stdout.log
   - tasks/evidence/BUG-155/report.yaml
+  - tasks/evidence/BUG-156/report.yaml
+  - tasks/evidence/BUG-162/report.yaml
   - tests/CMakeLists.txt
   - tests/README.md
   - tests/regression/graphics/Run.VulkanShutdownLsanContract.cmake
