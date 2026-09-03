@@ -1666,3 +1666,11 @@ entries:
       - "Retired BUG-155 only after 20/20 named repetitions, a retained 9-positive/1-zero direct distribution, two complete 54/54 promoted-Vulkan cohorts, and strict task/layer/docs/source checks; BUG-154's profiler dependency is now resolved."
       - "Kept BUG-154, BUG-156, and BUG-162 active because their independent fixed-surface reviews remain unsatisfied; task completion was not inferred from implementation or local verification alone."
       - "Did not promote or stale O161-O164: this turn is unrelated to Core.Dag and occurs on the same session-day."
+  - turn: "2026-09-03_001#1"
+    notes:
+      - "Routed the documentation correction, task-bound receipt regeneration, and three label-distinct accepted fixed-surface reviews as experiment N451."
+      - "Added no observation or claim: this turn closes engineering evidence and review gaps without broadening the existing curvature semantics, parity, performance, or capability statements."
+      - "Kept CPU, ASan, UBSan, and earlier Vulkan evidence as distinct classes and preserved each report's exact source-revision binding."
+      - "Recorded the rejected external push as a session open thread rather than an experiment result; remote equality was not attested and BUG-162 must not retire until an authorized push plus fresh fetch succeeds."
+      - "Kept BUG-155's missing completion report as a separate workflow-evidence defect and did not reconstruct unrelated GPU custody inside this review-rebinding slice."
+      - "Did not promote or stale O161-O164: this turn is unrelated to Core.Dag and supplies no closure signal for those proposals."

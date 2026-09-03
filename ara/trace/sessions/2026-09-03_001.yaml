@@ -1,0 +1,47 @@
+session:
+  id: "2026-09-03_001"
+  date: "2026-09-03"
+  started: "2026-09-03T02:58+02:00"
+  last_turn: "2026-09-03T02:58+02:00"
+  turn_count: 1
+  summary: "Corrected curvature publication documentation, regenerated high-risk evidence, and obtained three accepted fixed-surface reviews; remote publication remains authorization-blocked."
+
+events_logged:
+  - turn: 1
+    type: experiment
+    id: N451
+    routing: direct
+    provenance: ai-executed
+    summary: "Corrected stale publication wording, regenerated exact task evidence, and obtained accepted independent reviews for BUG-154, BUG-156, and BUG-162."
+
+ai_actions:
+  - turn: 1
+    action: "Corrected current-state runtime and ARA wording for atomic publication of minimum, maximum, mean, and Gaussian curvature plus optional directions."
+    provenance: ai-executed
+    files_changed:
+      - "src/runtime/README.md"
+      - "ara/logic/solution/architecture.md"
+  - turn: 1
+    action: "Generated task-bound receipts, reports, handoffs, and label-distinct independent review records for BUG-154, BUG-156, and BUG-162."
+    provenance: ai-executed
+    files_changed:
+      - "tasks/evidence/BUG-154"
+      - "tasks/evidence/BUG-156"
+      - "tasks/evidence/BUG-162"
+  - turn: 1
+    action: "Ran focused, full CPU, ASan, UBSan, exact-revision structural, receipt-integrity, and workflow-evidence checks; committed the resulting local review surfaces."
+    provenance: ai-executed
+    files_changed: []
+
+claims_touched: []
+
+key_context:
+  - turn: 1
+    excerpt: "The user supplied first-round independent verdicts and directed the driver to correct stale wording, regenerate evidence, and request new fixed-surface review rounds."
+
+open_threads:
+  - "Obtain explicit authorization to push local main to origin/main, then fetch and recheck remote equality before retiring BUG-162."
+  - "BUG-155 remains retired without its required completion report and is the sole workflow-evidence validation error."
+  - "BUG-154, BUG-156, and BUG-162 remain active until their accepted evidence is finalized and their task records are retired through the task workflow."
+
+ai_suggestions_pending: []

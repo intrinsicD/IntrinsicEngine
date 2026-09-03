@@ -10516,3 +10516,29 @@ tree:
       passed 54/54 with validation and shutdown LeakSanitizer coverage. BUG-155
       retired at Operational and its BUG-154 dependency is resolved.
     status: resolved
+  - id: N451
+    type: experiment
+    title: "Rebind curvature evidence and obtain independent acceptance"
+    provenance: ai-executed
+    timestamp: "2026-09-03T02:58+02:00"
+    also_depends_on: [N425, N449, N450]
+    evidence:
+      - "tasks/evidence/BUG-154/report.yaml"
+      - "tasks/evidence/BUG-154/reviews.jsonl"
+      - "tasks/evidence/BUG-156/report.yaml"
+      - "tasks/evidence/BUG-156/reviews.jsonl"
+      - "tasks/evidence/BUG-162/report.yaml"
+      - "tasks/evidence/BUG-162/reviews.jsonl"
+      - "src/runtime/README.md"
+      - "ara/logic/solution/architecture.md"
+    result: >
+      Corrected the stale runtime README and A44 principal-curvature
+      publication wording, regenerated task-bound reports, receipts, and
+      handoffs, and obtained label-distinct independent acceptance for
+      BUG-154 round 6, BUG-156 round 2, and BUG-162 round 2. The recorded
+      verification passed 75/75 focused tests, 4,258/4,258 CPU tests,
+      2,746/2,746 ASan tests, 2,746/2,746 UBSan tests, and the strict
+      structural gates. BUG-162 acceptance is bound to the exact local
+      surface; remote publication and equality remain a post-review
+      integration condition requiring explicit authorization.
+    status: resolved

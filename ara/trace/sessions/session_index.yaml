@@ -314,3 +314,10 @@ sessions:
     events_count: 4
     claims_touched: []
     open_threads: 4
+  - id: "2026-09-03_001"
+    date: "2026-09-03"
+    summary: "Corrected curvature publication documentation, regenerated high-risk evidence, and obtained three accepted fixed-surface reviews; remote publication remains authorization-blocked."
+    turn_count: 1
+    events_count: 1
+    claims_touched: []
+    open_threads: 3
