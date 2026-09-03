@@ -475,6 +475,7 @@ endif()
 
 if(INTRINSIC_BUILD_BENCHMARKS)
     add_subdirectory(benchmarks)
+    add_subdirectory(benchmarks/curvature_patch)
 endif()
 
 if(INTRINSIC_BUILD_DIAGNOSTIC_TOOLS)

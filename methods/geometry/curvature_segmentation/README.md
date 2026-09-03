@@ -12,8 +12,9 @@ METHOD-038 retired at `CPUContracted` as an evidence-only intake. Its
 primary-source equations, scale convention, projected metrics, candidate
 killing order, profiling lanes, and validated analytic controls are in
 [`feature_aligned_intake.md`](feature_aligned_intake.md). It selected no v2
-backend and changed no production default. METHOD-039 owns the practical
-feature-network patch method that may consume these immutable controls.
+backend and changed no production default. METHOD-039 consumed those immutable
+controls but rejected its seed-sensitive local patch formulation; METHOD-040
+owns the next task-local global-partition attempt.
 
 METHOD-039 Slices A--C freeze that follow-up's equations, numeric screening
 parameters, fail-closed supplied-evidence shape, and generated oracle and
@@ -170,6 +171,21 @@ contract and states that spatial optimization is local.
   one-region cylinder v1 negative control, and the fixed-two v1 comparison to
   the exact smooth `x=0`, `z=0.5` reference curve. It is fixture/oracle work
   only and neither executes nor selects candidate A-D.
+- Opt-in METHOD-039 completion profiles:
+  `curvature_segmentation_feature_patch_{feature_smoke,quality_smoke,seed_refutation}.yaml`
+  and `curvature_segmentation_feature_patch_health_100k.yaml`. Replay the
+  three bounded generated controls with
+  `INTRINSIC_CURVATURE_PROFILE_COHORT=feature_patch_smoke
+  build/ci/bin/IntrinsicCurvaturePatchProfile <output-directory>` and
+  run the separate heavy health lane with
+  `INTRINSIC_CURVATURE_PROFILE_COHORT=feature_patch_health
+  build/ci/bin/IntrinsicCurvaturePatchProfile <output-directory>`.
+  A passed `seed_refutation` row means the frozen negative oracle was
+  reproduced, not that seed stability passed. The 100k homogeneous-plane row
+  checks complete assignment, deterministic repeated payloads, sparse result
+  storage, finite stage timings, and bounded working-set health; its generous
+  runtime limit is not a performance baseline or speed claim. All four rows
+  identify the local candidate as unadopted.
 
 The historical non-claim-eligible
 [`METHOD-038` scratch replay](../../../tasks/evidence/METHOD-038/superseded/20260810-fixture-cohort-runner-change/experiment/protocol.yaml)

@@ -477,10 +477,12 @@ area-weighted variation-of-information limit of `0.01`. The executable
 `LocalRagOneStepSeedPerturbationRefutesFrozenStabilityGate` regression retains
 this failure. In accordance with the global-optimization escalation gate, the
 local candidate is not adopted, its weights and fixtures are not retuned, and
-Slice D is not entered. ARA claim C45 records the bounded refutation;
-`METHOD-040` owns a separately reviewed task-local multicut formulation and
-must not call a pairwise surrogate the unchanged regional/turning energy
-without a proof.
+the production-adoption slice is not entered. The completion slice adds only
+opt-in profiles that preserve the positive controls, negative oracle, and
+bounded health diagnostics before retirement. ARA claim C45 records the
+bounded refutation; `METHOD-040` owns a separately reviewed task-local multicut
+formulation and must not call a pairwise surrogate the unchanged
+regional/turning energy without a proof.
 
 ### Slice A generated oracle catalog
 
@@ -651,10 +653,10 @@ the fixture/oracle lane itself passes.
    stages. C, D, and E remain baselines unless their observed cost is compatible
    with the task's later `0.50x` median acceleration target; paper complexity
    alone cannot pass this gate.
-5. **Selection.** METHOD-038 made no selection. METHOD-039 now owns the smaller
-   feature-first formulation and its own frozen acceptance gates. METHOD-037
-   remains available, and GEOM-076 stays blocked until METHOD-039 produces an
-   accepted result.
+5. **Selection.** METHOD-038 made no selection. METHOD-039's smaller
+   feature-first formulation failed its frozen seed-location gate and remains
+   an unadopted comparator. METHOD-037 remains available, and METHOD-040 owns
+   the next CPU-reference attempt before any later atlas-hint evaluation.
 
 ## Profiling contract
 
@@ -691,3 +693,31 @@ direction adds half the 4097-sample spacing using the distance function's
 contracts. One planar pair is not the preregistered analytic corpus, and it
 does not establish refinement convergence, candidate A-D quality, or an
 acceleration gate.
+
+METHOD-039 adds two explicit runner modes without changing the default lane:
+
+```bash
+INTRINSIC_CURVATURE_PROFILE_COHORT=feature_patch_smoke \
+  build/ci/bin/IntrinsicCurvaturePatchProfile <output-directory>
+INTRINSIC_CURVATURE_PROFILE_COHORT=feature_patch_health \
+  build/ci/bin/IntrinsicCurvaturePatchProfile <output-directory>
+```
+
+`feature_patch_smoke` writes three manifest-bound rows. `feature_smoke`
+checks computed soft-feature support and continuous-boundary error on both
+smooth-transition diagonals. `quality_smoke` feeds the same computed evidence
+into the local patch candidate with the declared boundary-adjacent test-seed
+override and checks the exact two-region reference. `seed_refutation` replays
+the unchanged automatic seeds and their one-legal-dual-step perturbation; its
+`passed` status means the preregistered failure (`VI > 0.01`) was reproduced.
+It must never be presented as positive stability evidence.
+
+`feature_patch_health` runs the unadopted local candidate twice on an exact
+100,000-face homogeneous plane with zero supplied evidence. It requires one
+complete region, no boundary, identical deterministic payloads, finite
+nonnegative stage timings, and result storage bounded by a fixed multiple of
+surface slots. The manifest's wall-time and peak-working-set limits are broad
+harness-health guards, not a baseline, acceleration target, or performance
+claim. All four manifests set `candidate_adopted: false`; none reads held-out
+confirmation data or changes production selection, config, runtime, UI, or
+property publication.

@@ -47,6 +47,10 @@ benchmarks:
   - "../../../benchmarks/geometry/manifests/curvature_segmentation_reference_remeshing_10k_automatic.yaml"
   - "../../../benchmarks/geometry/manifests/curvature_segmentation_screening_fold_controls.yaml"
   - "../../../benchmarks/geometry/manifests/curvature_segmentation_screening_surface_controls.yaml"
+  - "../../../benchmarks/geometry/manifests/curvature_segmentation_feature_patch_feature_smoke.yaml"
+  - "../../../benchmarks/geometry/manifests/curvature_segmentation_feature_patch_quality_smoke.yaml"
+  - "../../../benchmarks/geometry/manifests/curvature_segmentation_feature_patch_seed_refutation.yaml"
+  - "../../../benchmarks/geometry/manifests/curvature_segmentation_feature_patch_health_100k.yaml"
 known_limitations:
   - "This is a repository formulation informed by curvature-tensor segmentation, Gaussian mixtures, information criteria, and pairwise spatial models; it is not an equation-level reproduction of Lavoue et al. or another single publication."
   - "Signed principal curvatures depend on a consistent surface-orientation convention and on the scale, noise, and boundary behavior of the upstream curvature estimator."
@@ -56,4 +60,4 @@ known_limitations:
   - "Published region boundaries are inspection data, not materialized cuts or validated UV-atlas seams; METHOD-039 owns the accepted feature/patch follow-up before GEOM-076 may evaluate any later seam/cut/atlas use."
   - "Only a serial CPU reference backend exists, and the smoke result makes no performance or atlas-quality claim."
   - "METHOD-038 retired at CPUContracted after adding a 10k analytic-sphere cold/reusable descriptor pair, one 10k planar continuous-boundary pair, and independently audited non-claim paired-fold plus cylinder/smooth-transition fixture/oracle lanes. It selected no candidate A-D or v2; broader feature/patch implementation and stability evidence are owned by METHOD-039."
-  - "METHOD-039 Slice C implements an unadopted deterministic local grow/merge/refine candidate and passes its bounded oracle and detector controls, but a one-dual-step seed perturbation exceeds the frozen area-weighted VI limit of 0.01. The local candidate is therefore not an accepted v2 backend; no selector, runtime/config/UI adoption, canonical property publication, sealed integrated-quality result, or positive stability claim exists. METHOD-040 owns the separately scoped global multicut attempt."
+  - "METHOD-039 implements an unadopted deterministic local grow/merge/refine candidate and opt-in feature, quality, negative-seed, and 100k-face health profiles. A one-dual-step seed perturbation exceeds the frozen area-weighted VI limit of 0.01, so the local candidate is not an accepted v2 backend; no selector, runtime/config/UI adoption, canonical property publication, positive stability, performance, or parameterization claim exists. METHOD-040 owns the separately scoped global multicut attempt."

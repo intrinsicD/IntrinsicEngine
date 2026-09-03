@@ -1,0 +1,31 @@
+benchmark_id: geometry.curvature_segmentation.feature_patch.health.100k
+method: geometry.curvature_segmentation
+dataset: builtin.method_039.homogeneous_plane_100k.v1
+params:
+  intent: bounded_health
+  implementation: method_039_local_patch_unadopted
+  candidate_adopted: false
+  split: generated_heavy
+  live_faces: 100000
+  component_selection: fixed
+  component_count: 1
+  feature_evidence: all_zero_supplied
+  expected_regions: 1
+  expected_boundaries: 0
+  storage_bound: 64_entries_per_vertex_face_edge_slot
+  baseline: exact_homogeneous_single_patch_and_repeat_1
+  warmup_iterations: 0
+  measured_iterations: 2
+  threshold_scope: harness_health_not_performance_or_adoption
+  quality_error_l2_unit: unassigned_live_face_fraction
+  quality_error_linf_unit: deterministic_payload_mismatch_indicator
+metrics: [runtime_ms, memory_peak_bytes, quality_error_l2, quality_error_linf, population_count, sample_count]
+thresholds:
+  health_runtime_ms_max: 120000
+  memory_peak_bytes_max: 4294967296
+  quality_error_l2_max: 0.0
+  quality_error_linf_max: 0.0
+  population_count_min: 1
+  population_count_max: 1
+  sample_count_min: 100000
+  sample_count_max: 100000

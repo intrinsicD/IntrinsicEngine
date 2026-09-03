@@ -30,7 +30,9 @@ claim-grade protocol says otherwise.
 
 ## Build integration
 
-- Benchmark scaffolding is wired through `benchmarks/CMakeLists.txt`.
+- General benchmark scaffolding is wired through `benchmarks/CMakeLists.txt`;
+  the opt-in curvature-patch profiler target is declared in
+  `benchmarks/curvature_patch/CMakeLists.txt`.
 - Native smoke producers run through
   `tools/benchmark/run_and_seal.py`; raw output is sealed before strict
   validation or artifact publication.

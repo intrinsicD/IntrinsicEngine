@@ -1,0 +1,30 @@
+benchmark_id: geometry.curvature_segmentation.feature_patch.quality_smoke
+method: geometry.curvature_segmentation
+dataset: builtin.method_039.smooth_transition_diagonal_pair.v1
+params:
+  intent: correctness_smoke
+  implementation: method_039_local_patch_unadopted
+  candidate_adopted: false
+  split: generated_screening
+  triangulations: [diagonal_a, diagonal_b]
+  feature_evidence: computed
+  seed_mode: boundary_adjacent_test_override
+  component_selection: fixed
+  component_count: 1
+  expected_regions_per_variant: 2
+  expected_boundary_role: soft_feature_supported
+  baseline: exact_two_patch_smooth_transition_partition
+  aggregation: max_of_diagonal_pair
+  warmup_iterations: 0
+  measured_iterations: 1
+  threshold_scope: bounded_correctness_not_performance_or_adoption
+  quality_error_l2_unit: area_weighted_variation_of_information
+  quality_error_linf_unit: bbox_normalized_boundary_distance_upper_bound
+metrics: [runtime_ms, memory_peak_bytes, quality_error_l2, quality_error_linf, population_count]
+thresholds:
+  smoke_runtime_ms_max: 20000
+  memory_peak_bytes_max: 2147483648
+  quality_error_l2_max: 0.01
+  quality_error_linf_max: 0.02
+  population_count_min: 2
+  population_count_max: 2
