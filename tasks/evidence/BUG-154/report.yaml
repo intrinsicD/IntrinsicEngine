@@ -3,15 +3,15 @@ task_id: BUG-154
 workflow_profile: high-risk
 status: complete
 generated_by: tools/agents/workflow_evidence.py
-generated_at: '2026-09-03T09:27:41Z'
+generated_at: '2026-09-03T09:32:10Z'
 claim_eligible: false
 source:
   base_ref: 4a043a7db0bae0d546259a0455dd92d3f0e944a5
   base_revision: 4a043a7db0bae0d546259a0455dd92d3f0e944a5
-  head_revision: da8934651e4ba0064989f89da0a6cc088697c0bd
-  branch: main
-  worktree: /home/alex/Documents/IntrinsicEngine
-  dirty: true
+  head_revision: f0fbd665dc683c38346d6c7de538955b526c4951
+  branch: codex/evidence-bug154
+  worktree: /tmp/intrinsic-bug154-review.FFai5x
+  dirty: false
   surface:
   - path: .github/copilot-instructions.md
     sha256: 6eca8f4a866442a1bd1166fa0b9314c2e0b3759b1257b12276cf4ac292e3b259
@@ -654,7 +654,7 @@ source:
   - path: tasks/evidence/BUG-156/handoff.jsonl
     sha256: 50d86846e8e1446206aca7e8734fe78db156cf37bf10588811c96950458cdaab
   - path: tasks/evidence/BUG-156/report.yaml
-    sha256: a5229d9f0c3014eed9ff4b22a8cd554725e618d76197ddb6e7aa86d918c52cba
+    sha256: 7ab8f1545822a38680f80687086e08d3a06b7f1a6426f21e8494104098d7d509
   - path: tasks/evidence/BUG-156/reviews.jsonl
     sha256: 86c9519acf8a9ff1e10fafc4902b290788df0877cceee98577c9543835a4e90d
   - path: tasks/evidence/BUG-161/commands/ccache-workflow.json
@@ -890,7 +890,7 @@ source:
   - path: tasks/evidence/BUG-162/handoff.jsonl
     sha256: 3b873359050cfd62045da5647cd28a4d606b31a83a8fdd6cc65ed125ca465138
   - path: tasks/evidence/BUG-162/report.yaml
-    sha256: 5b2fbd270ca520bc8cd2781a4a19269280fdbb3eea3da7be9216e73179f1edd5
+    sha256: 8931ce6c89eb2425f0fc8b812b16845875877b09e7d91d0a03d3aa0bd082fb91
   - path: tasks/evidence/BUG-162/reviews.jsonl
     sha256: ba28a9a700ec071b45c8b2499e2ae52797ce2e3561616bbf023dea59e691b7fd
   - path: tasks/templates/task-micro.md
@@ -1039,7 +1039,7 @@ source:
     sha256: c85485df548794e8dce225dfae5b482b22642f1ec2035511033540344bc7a3f1
   - path: tools/repo/githooks/pre-commit
     sha256: f57fd300376114c921128c6e519ff6f5fb9cb0695722a00096626b887ccbb7e6
-  content_digest: 8bd944f7b25b2e4670402a13e68c5393f648a383de76afacef6d4a2bc9fc08e8
+  content_digest: 8859b1c9327ed0faf2846de729d0d71c5686f9d64b4f147a6a49b7ad2a2c8258
 touched:
   paths:
   - .github/copilot-instructions.md
