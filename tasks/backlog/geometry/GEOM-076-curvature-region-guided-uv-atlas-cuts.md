@@ -1,7 +1,7 @@
 ---
 id: GEOM-076
 theme: I
-depends_on: [METHOD-039, GEOM-057]
+depends_on: [METHOD-040, GEOM-057]
 workflow_schema: 1
 workflow_profile: high-risk
 evidence: required
@@ -11,12 +11,12 @@ worktree:
 claimed_at:
 contract_schema: 1
 contracts: [repo.task-contract-discovery, geometry.element-domain-sources, geometry.property-coherence, method.engine-integration]
-contract_review: "This follow-up consumes METHOD-039's accepted feature/patch-boundary contract, may turn accepted boundaries into explicit UV-atlas chart constraints and corner-domain UV output, and must expose any adoption policy through the shared runtime/config/UI path. METHOD-038 retired with controls only and is not an accepted boundary producer. geometry.parameterization-optimization does not apply unless implementation changes the shared ARAP/SLIM optimization numerics."
+contract_review: "This follow-up consumes only a future accepted METHOD-040 global-partition boundary contract, may turn accepted boundaries into explicit UV-atlas chart constraints and corner-domain UV output, and must expose any adoption policy through the shared runtime/config/UI path. METHOD-038 supplied controls and METHOD-039's local solver was refuted; neither is an accepted boundary producer. geometry.parameterization-optimization does not apply unless implementation changes the shared ARAP/SLIM optimization numerics."
 ---
 # GEOM-076 — Evidence-gated curvature-region UV atlas cuts
 
 ## Goal
-- Determine whether METHOD-039's independently accepted feature-network curvature-patch boundaries improve useful UV-atlas decomposition, and only after preregistered quality gates pass, integrate them as explicit chart/cut hints for parameterization and atlas generation.
+- Determine whether a future independently accepted METHOD-040 global curvature-patch boundary result improves useful UV-atlas decomposition, and only after preregistered quality gates pass, integrate it as explicit chart/cut hints for parameterization and atlas generation.
 
 ## Non-goals
 - No assumption that every curvature boundary is a good seam, no default-policy change before comparative evidence, and no atlas-quality claim from visual inspection alone.
@@ -25,8 +25,8 @@ contract_review: "This follow-up consumes METHOD-039's accepted feature/patch-bo
 - No reimplementation of shared parameterization optimization numerics. If a later solver needs those changes, declare `geometry.parameterization-optimization` in a separately reviewed slice.
 
 ## Context
-- Owner/layer: comparative fixtures, hint interpretation, chart construction, and UV diagnostics live in `src/geometry`; runtime binds the accepted selected-mesh METHOD-039 output contract and owns undoable UV publication; app owns only validated controls and comparison presentation.
-- METHOD-038 retired with bounded fixtures/oracles and no accepted v2 boundary producer. METHOD-039 must first deliver the reviewed feature-evidence and final patch-boundary properties through the existing non-destructive segmentation path. Those boundaries remain a hypothesis until this task evaluates atlas behavior.
+- Owner/layer: comparative fixtures, hint interpretation, chart construction, and UV diagnostics live in `src/geometry`; runtime binds only a future accepted selected-mesh METHOD-040 output contract and owns undoable UV publication; app owns only validated controls and comparison presentation.
+- METHOD-038 retired with bounded fixtures/oracles and no accepted v2 boundary producer. METHOD-039 preserved a useful feature stage but refuted its seed-sensitive local patch solver without publication or adoption. METHOD-040 must first produce an accepted global partition; those boundaries remain a hypothesis until this task evaluates atlas behavior.
 - `Geometry.UvAtlas` already owns source-face cross-references, chart/seam-cut records, FastStaged/XAtlas selection, per-chart parameterization attempts, quality diagnostics, packing, and corner-domain UV publication. Integration should be an optional input to that surface, not a parallel atlas path.
 - Evidence must compare like-for-like atlas runs on the same source mesh and backend, including the current proposal policy, curvature-guided hints, and a deliberately weak control. The task must record negative results rather than silently adopting a visually appealing subset.
 
@@ -53,7 +53,7 @@ contract_review: "This follow-up consumes METHOD-039's accepted feature/patch-bo
 - [ ] Freeze a deterministic evaluation corpus covering plane/cylinder/sphere-like patches, saddles, sharp folds, smooth curvature transitions, thin features, open boundaries, disconnected components, and representative imported meshes; record dataset identities and exact source state.
 - [ ] Preregister quality gates for finite UVs, zero overlaps/flips where required, conformal/stretch/area diagnostics, seam length, chart count, packing utilization, determinism, perturbation stability, and bounded runtime. Separate hard correctness gates from descriptive trade-offs.
 - [ ] Compare the existing FastStaged proposal, curvature-region guidance, XAtlas baseline, and a weak/control partition under identical downstream parameterization and packing settings. Record per-mesh results and aggregate distributions; do not average away fixture regressions.
-- [ ] Audit sensitivity over METHOD-039's accepted method mode, component selection, feature policy/scale, hard-feature threshold, patch-complexity cost, and feature-versus-length boundary balance. Identify a bounded robust operating region or reject adoption.
+- [ ] Audit sensitivity over METHOD-040's accepted method mode, component selection, feature policy/scale, hard-feature threshold, partition-complexity cost, and feature-versus-length boundary balance. Identify a bounded robust operating region or reject adoption.
 - [ ] If and only if the frozen evidence passes, add a plain optional chart-boundary/region-hint input to `Geometry.UvAtlas`; validate exact slot cardinality and connectivity, preserve current behavior when absent, and report requested/accepted/rejected hint edges and fallback reasons.
 - [ ] Interpret accepted region boundaries as chart constraints and produce the existing source-referenced chart/seam records. Parameterize each valid chart through existing strategies and pack through the existing atlas path; fail or fall back explicitly for non-disk, degenerate, tiny, or invalid charts.
 - [ ] Bind the accepted option through the existing runtime UV-regeneration command, config/agent lane, and Sandbox comparison/apply UI. Revalidate segmentation and source topology revisions before commit.

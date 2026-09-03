@@ -9770,7 +9770,7 @@ tree:
       - "src/geometry/Geometry.HalfedgeMesh.CurvatureSegmentation.Features.cpp"
       - "tests/unit/geometry/Test.CurvaturePatchContract.cpp"
       - "methods/geometry/curvature_segmentation/feature_aligned_intake.md"
-      - "tasks/active/METHOD-039-feature-network-curvature-patch-decomposition.md"
+      - "tasks/done/METHOD-039-feature-network-curvature-patch-decomposition.md"
     result: >
       The standalone serial CPU stage reuses the shared strict hard-feature
       classifier and emits separate slot-aligned hard and soft evidence with
@@ -9796,7 +9796,7 @@ tree:
       - "src/geometry/Geometry.HalfedgeMesh.CurvatureSegmentation.Patches.cpp"
       - "tests/unit/geometry/Test.CurvaturePatchContract.cpp"
       - "methods/geometry/curvature_segmentation/feature_aligned_intake.md"
-      - "tasks/active/METHOD-039-feature-network-curvature-patch-decomposition.md"
+      - "tasks/done/METHOD-039-feature-network-curvature-patch-decomposition.md"
       - "tasks/backlog/methods/METHOD-040-global-multicut-curvature-patch-reference.md"
     result: >
       The unadopted serial CPU candidate implements deterministic hard-barrier
@@ -10541,4 +10541,34 @@ tree:
       structural gates. BUG-162 acceptance is bound to the exact local
       surface; remote publication and equality remain a post-review
       integration condition requiring explicit authorization.
+    status: resolved
+  - id: N452
+    type: experiment
+    title: "Seal METHOD-039 bounded completion profiles"
+    provenance: ai-executed
+    timestamp: "2026-09-03T12:35+02:00"
+    also_depends_on: [N417]
+    evidence:
+      - "889126d0bee17376fc811c68d5790763782eb8b3"
+      - "benchmarks/runners/CurvaturePatchProfileRunner.cpp"
+      - "benchmarks/geometry/manifests/curvature_segmentation_feature_patch_feature_smoke.yaml"
+      - "benchmarks/geometry/manifests/curvature_segmentation_feature_patch_quality_smoke.yaml"
+      - "benchmarks/geometry/manifests/curvature_segmentation_feature_patch_seed_refutation.yaml"
+      - "benchmarks/geometry/manifests/curvature_segmentation_feature_patch_health_100k.yaml"
+      - "ara/evidence/benchmarks/method039_feature_patch_feature_smoke.json"
+      - "ara/evidence/benchmarks/method039_feature_patch_quality_smoke.json"
+      - "ara/evidence/benchmarks/method039_feature_patch_seed_refutation.json"
+      - "ara/evidence/benchmarks/method039_feature_patch_health_100k.json"
+      - "IntrinsicCurvaturePatchProfile feature_patch_smoke and feature_patch_health clean-source executions"
+      - "strict benchmark-result validation"
+    result: >
+      The clean smoke run passed all three generated rows: the computed feature
+      line had 24 soft edges, two endpoints, no junction, zero mask error, and
+      0.000049835 normalized boundary error; the boundary-adjacent-seed quality
+      control had two regions, zero VI, and the same boundary error; and the
+      negative oracle reproduced 26 perturbed regions with VI 2.283997466. The
+      separate 100,000-face health run repeated one fully assigned region, no
+      boundary, and identical payloads with 1,554,397 reported result entries
+      below its 19,257,728-entry bound. All rows are sealed clean-source but
+      non-claim-eligible, and no speed, scaling, or adoption conclusion follows.
     status: resolved

@@ -558,6 +558,14 @@ status. This stage is topology-preserving and owns its result; it is not yet a
 runtime segmentation selector or a published geometry-property path. The
 bounded CPU contract evidence is recorded by ARA claim C44.
 
+The companion `Geometry.HalfedgeMesh.CurvatureSegmentation.Patches` module is
+an unadopted diagnostic reference. Its deterministic grow/merge/refine path
+passes the bounded oracle and computed-feature controls, but a one-dual-step
+seed perturbation violates the preregistered partition-stability gate. ARA
+claim C45 preserves that refutation; no v2 selector, canonical property,
+runtime/config/UI path, or UV/atlas behavior was added. METHOD-040 owns the
+separately scoped global-partition attempt.
+
 The runtime operation publishes `f:curvature_component`,
 `f:curvature_region`, `f:curvature_region_color`,
 `e:curvature_region_boundary`, and

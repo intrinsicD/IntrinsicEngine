@@ -1,0 +1,161 @@
+{
+  "attempt_id": "attempt-001",
+  "backend": "cpu_reference",
+  "benchmark_id": "geometry.curvature_segmentation.feature_patch.health.100k",
+  "claim_eligible": false,
+  "commit": "889126d0bee17376fc811c68d5790763782eb8b3",
+  "config_digest": "12c69077e7f371790a271780fd82b649e3d10b315d39acc1fdf4a38ea929d5c3",
+  "dataset": "builtin.method_039.homogeneous_plane_100k.v1",
+  "diagnostics": {
+    "accepted_merge_count": 414,
+    "candidate_adopted": false,
+    "edge_count": 150450,
+    "face_count": 100000,
+    "final_boundary_edge_count": 0,
+    "final_region_count": 1,
+    "implementation_version": "method_039_local_patch_unadopted",
+    "intent": "bounded_health_not_performance",
+    "measured_iterations": 2,
+    "provisional_region_count": 415,
+    "quality_error_l2_unit": "unassigned_live_face_fraction",
+    "quality_error_linf_unit": "deterministic_payload_mismatch_indicator",
+    "result_storage_entry_count": 1554397,
+    "runner": "IntrinsicCurvaturePatchProfile",
+    "seed_count": 415,
+    "sparse_storage_bound_entries": 19257728,
+    "sparse_storage_bound_satisfied": true,
+    "stage_timings": {
+      "boundary_refinement_ms": 6.53589,
+      "mixture_fitting_ms": 236.239616,
+      "posterior_construction_ms": 87.386597,
+      "publication_and_validation_ms": 112.891724,
+      "region_merging_ms": 101383.596321,
+      "seed_selection_ms": 807.536649,
+      "simultaneous_growth_ms": 189.915456,
+      "total_ms": 103532.335374,
+      "validation_and_sampling_ms": 402.064193
+    },
+    "vertex_count": 50451,
+    "warmup_iterations": 0
+  },
+  "execution_status": "passed",
+  "manifest": {
+    "path": "benchmarks/geometry/manifests/curvature_segmentation_feature_patch_health_100k.yaml",
+    "sha256": "9386ee333e64d82bdb424966a1835576a9421417b5a429d8bf733df7308bba2a"
+  },
+  "method": "geometry.curvature_segmentation",
+  "metrics": {
+    "memory_peak_bytes": 66666496,
+    "population_count": 1,
+    "quality_error_l2": 0.0,
+    "quality_error_linf": 0.0,
+    "runtime_ms": 103783.903442,
+    "sample_count": 100000
+  },
+  "resolved_params": {
+    "baseline": "exact_homogeneous_single_patch_and_repeat_1",
+    "candidate_adopted": false,
+    "component_count": 1,
+    "component_selection": "fixed",
+    "expected_boundaries": 0,
+    "expected_regions": 1,
+    "feature_evidence": "all_zero_supplied",
+    "implementation": "method_039_local_patch_unadopted",
+    "intent": "bounded_health",
+    "live_faces": 100000,
+    "measured_iterations": 2,
+    "quality_error_l2_unit": "unassigned_live_face_fraction",
+    "quality_error_linf_unit": "deterministic_payload_mismatch_indicator",
+    "split": "generated_heavy",
+    "storage_bound": "64_entries_per_vertex_face_edge_slot",
+    "threshold_scope": "harness_health_not_performance_or_adoption",
+    "warmup_iterations": 0
+  },
+  "run_id": "method-039-clean-health-20260903",
+  "schema_version": 2,
+  "source": {
+    "revision": "889126d0bee17376fc811c68d5790763782eb8b3",
+    "state": "clean_commit"
+  },
+  "status": "passed",
+  "threshold_disposition": [
+    {
+      "limit": 120000,
+      "metric": "runtime_ms",
+      "observed": 103783.903442,
+      "operator": "<=",
+      "passed": true,
+      "threshold": "health_runtime_ms_max"
+    },
+    {
+      "limit": 4294967296,
+      "metric": "memory_peak_bytes",
+      "observed": 66666496,
+      "operator": "<=",
+      "passed": true,
+      "threshold": "memory_peak_bytes_max"
+    },
+    {
+      "limit": 0.0,
+      "metric": "quality_error_l2",
+      "observed": 0.0,
+      "operator": "<=",
+      "passed": true,
+      "threshold": "quality_error_l2_max"
+    },
+    {
+      "limit": 0.0,
+      "metric": "quality_error_linf",
+      "observed": 0.0,
+      "operator": "<=",
+      "passed": true,
+      "threshold": "quality_error_linf_max"
+    },
+    {
+      "limit": 1,
+      "metric": "population_count",
+      "observed": 1,
+      "operator": ">=",
+      "passed": true,
+      "threshold": "population_count_min"
+    },
+    {
+      "limit": 1,
+      "metric": "population_count",
+      "observed": 1,
+      "operator": "<=",
+      "passed": true,
+      "threshold": "population_count_max"
+    },
+    {
+      "limit": 100000,
+      "metric": "sample_count",
+      "observed": 100000,
+      "operator": ">=",
+      "passed": true,
+      "threshold": "sample_count_min"
+    },
+    {
+      "limit": 100000,
+      "metric": "sample_count",
+      "observed": 100000,
+      "operator": "<=",
+      "passed": true,
+      "threshold": "sample_count_max"
+    }
+  ],
+  "thresholds": {
+    "health_runtime_ms_max": 120000,
+    "memory_peak_bytes_max": 4294967296,
+    "population_count_max": 1,
+    "population_count_min": 1,
+    "quality_error_l2_max": 0.0,
+    "quality_error_linf_max": 0.0,
+    "sample_count_max": 100000,
+    "sample_count_min": 100000
+  },
+  "warmup_policy": {
+    "measured_iterations": 2,
+    "warmup_iterations": 0
+  }
+}

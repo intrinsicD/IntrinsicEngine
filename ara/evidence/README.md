@@ -1,5 +1,12 @@
 # Evidence Index
 
+- [METHOD-039 bounded feature smoke](benchmarks/method039_feature_patch_feature_smoke.json),
+  [patch-quality smoke](benchmarks/method039_feature_patch_quality_smoke.json),
+  [seed-stability refutation](benchmarks/method039_feature_patch_seed_refutation.json),
+  and [100k-face health](benchmarks/method039_feature_patch_health_100k.json)
+  — sealed clean-source, deliberately non-claim-eligible CPU rows preserving
+  the positive controls, negative local-solver verdict, and sparse-storage
+  health check without a performance or adoption claim.
 - [CI-007 PR-fast ccache cohort](tables/ci007_ccache_cohort.md) — five cold,
   five warm, and one repository-interface invalidation sample supporting the
   scoped retain decision.

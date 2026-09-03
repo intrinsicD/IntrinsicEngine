@@ -185,7 +185,9 @@ contract and states that spatial optimization is local.
   checks complete assignment, deterministic repeated payloads, sparse result
   storage, finite stage timings, and bounded working-set health; its generous
   runtime limit is not a performance baseline or speed claim. All four rows
-  identify the local candidate as unadopted.
+  identify the local candidate as unadopted. The sealed clean-source rows are
+  linked from the [ARA evidence index](../../../ara/evidence/README.md) and
+  bound by the deliberately narrow ARA claim C54.
 
 The historical non-claim-eligible
 [`METHOD-038` scratch replay](../../../tasks/evidence/METHOD-038/superseded/20260810-fixture-cohort-runner-change/experiment/protocol.yaml)

@@ -1,0 +1,196 @@
+{
+  "attempt_id": "attempt-001",
+  "backend": "cpu_reference",
+  "benchmark_id": "geometry.curvature_segmentation.feature_patch.feature_smoke",
+  "claim_eligible": false,
+  "commit": "889126d0bee17376fc811c68d5790763782eb8b3",
+  "config_digest": "9229c536bcf7bc83934fd1f6e5c3c759191b6fe6aa79eab5b06c31e899817153",
+  "dataset": "builtin.method_039.smooth_transition_diagonal_pair.v1",
+  "diagnostics": {
+    "aggregation": "max_of_diagonal_pair",
+    "candidate_adopted": false,
+    "implementation_version": "method_039_feature_evidence_unadopted",
+    "quality_error_l2_unit": "maximum_live_edge_feature_mask_mismatch_fraction",
+    "quality_error_linf_unit": "maximum_bbox_normalized_boundary_distance_upper_bound",
+    "runner": "IntrinsicCurvaturePatchProfile",
+    "variants": [
+      {
+        "bounded_search_count": 20304,
+        "continuous_boundary": {
+          "edge_count": 24,
+          "endpoint_count": 2,
+          "junction_count": 0,
+          "predicted_length_normalized": 0.40824829,
+          "reference_length_normalized": 0.40824829,
+          "reference_sample_count": 4097,
+          "reference_sample_spacing_normalized": 9.967e-05,
+          "symmetric_hausdorff_upper_bound_normalized": 4.9835e-05,
+          "tolerance_band_precision": 1.0,
+          "tolerance_band_recall": 1.0,
+          "valid": true
+        },
+        "edge_count": 3528,
+        "endpoint_vertex_count": 2,
+        "expected_soft_edge_count": 24,
+        "face_count": 2304,
+        "feature_mask_error_fraction": 0.0,
+        "hard_feature_edge_count": 0,
+        "junction_vertex_count": 0,
+        "name": "diagonal_a",
+        "passed": true,
+        "retained_soft_edge_count": 24,
+        "settled_face_visit_count": 105508,
+        "stage_timings": {
+          "curvature_estimation_ms": 0.0,
+          "hard_feature_classification_ms": 3.885227,
+          "hysteresis_and_fragment_filtering_ms": 0.932113,
+          "multi_scale_response_ms": 45.895845,
+          "non_maximum_suppression_ms": 5.753364,
+          "total_ms": 64.51572,
+          "validation_and_face_sampling_ms": 7.869526
+        }
+      },
+      {
+        "bounded_search_count": 20304,
+        "continuous_boundary": {
+          "edge_count": 24,
+          "endpoint_count": 2,
+          "junction_count": 0,
+          "predicted_length_normalized": 0.40824829,
+          "reference_length_normalized": 0.40824829,
+          "reference_sample_count": 4097,
+          "reference_sample_spacing_normalized": 9.967e-05,
+          "symmetric_hausdorff_upper_bound_normalized": 4.9835e-05,
+          "tolerance_band_precision": 1.0,
+          "tolerance_band_recall": 1.0,
+          "valid": true
+        },
+        "edge_count": 3528,
+        "endpoint_vertex_count": 2,
+        "expected_soft_edge_count": 24,
+        "face_count": 2304,
+        "feature_mask_error_fraction": 0.0,
+        "hard_feature_edge_count": 0,
+        "junction_vertex_count": 0,
+        "name": "diagonal_b",
+        "passed": true,
+        "retained_soft_edge_count": 24,
+        "settled_face_visit_count": 105544,
+        "stage_timings": {
+          "curvature_estimation_ms": 0.0,
+          "hard_feature_classification_ms": 3.904958,
+          "hysteresis_and_fragment_filtering_ms": 0.860511,
+          "multi_scale_response_ms": 44.07797,
+          "non_maximum_suppression_ms": 5.429456,
+          "total_ms": 62.09557,
+          "validation_and_face_sampling_ms": 7.774294
+        }
+      }
+    ]
+  },
+  "execution_status": "passed",
+  "manifest": {
+    "path": "benchmarks/geometry/manifests/curvature_segmentation_feature_patch_feature_smoke.yaml",
+    "sha256": "c15f837bfabce9136ab3810a98dbbe42cfdb7452783ff775f47dbf5e4f9dc13a"
+  },
+  "method": "geometry.curvature_segmentation",
+  "metrics": {
+    "memory_peak_bytes": 5242880,
+    "population_count": 2,
+    "quality_error_l2": 0.0,
+    "quality_error_linf": 4.9835e-05,
+    "runtime_ms": 64.51572
+  },
+  "resolved_params": {
+    "aggregation": "max_of_diagonal_pair",
+    "base_radius_ratio": 0.02,
+    "baseline": "exact_smooth_transition_feature_line",
+    "candidate_adopted": false,
+    "expected_endpoints_per_variant": 2,
+    "expected_junctions_per_variant": 0,
+    "expected_soft_edges_per_variant": 24,
+    "feature_evidence": "computed",
+    "hard_dihedral_threshold_degrees": 45.0,
+    "implementation": "method_039_feature_evidence_unadopted",
+    "intent": "correctness_smoke",
+    "measured_iterations": 1,
+    "quality_error_l2_unit": "maximum_live_edge_feature_mask_mismatch_fraction",
+    "quality_error_linf_unit": "maximum_bbox_normalized_boundary_distance_upper_bound",
+    "split": "generated_screening",
+    "threshold_scope": "bounded_correctness_not_performance",
+    "triangulations": [
+      "diagonal_a",
+      "diagonal_b"
+    ],
+    "warmup_iterations": 0
+  },
+  "run_id": "method-039-clean-smoke-20260903",
+  "schema_version": 2,
+  "source": {
+    "revision": "889126d0bee17376fc811c68d5790763782eb8b3",
+    "state": "clean_commit"
+  },
+  "status": "passed",
+  "threshold_disposition": [
+    {
+      "limit": 20000,
+      "metric": "runtime_ms",
+      "observed": 64.51572,
+      "operator": "<=",
+      "passed": true,
+      "threshold": "smoke_runtime_ms_max"
+    },
+    {
+      "limit": 2147483648,
+      "metric": "memory_peak_bytes",
+      "observed": 5242880,
+      "operator": "<=",
+      "passed": true,
+      "threshold": "memory_peak_bytes_max"
+    },
+    {
+      "limit": 0.0,
+      "metric": "quality_error_l2",
+      "observed": 0.0,
+      "operator": "<=",
+      "passed": true,
+      "threshold": "quality_error_l2_max"
+    },
+    {
+      "limit": 0.02,
+      "metric": "quality_error_linf",
+      "observed": 4.9835e-05,
+      "operator": "<=",
+      "passed": true,
+      "threshold": "quality_error_linf_max"
+    },
+    {
+      "limit": 2,
+      "metric": "population_count",
+      "observed": 2,
+      "operator": ">=",
+      "passed": true,
+      "threshold": "population_count_min"
+    },
+    {
+      "limit": 2,
+      "metric": "population_count",
+      "observed": 2,
+      "operator": "<=",
+      "passed": true,
+      "threshold": "population_count_max"
+    }
+  ],
+  "thresholds": {
+    "memory_peak_bytes_max": 2147483648,
+    "population_count_max": 2,
+    "population_count_min": 2,
+    "quality_error_l2_max": 0.0,
+    "quality_error_linf_max": 0.02,
+    "smoke_runtime_ms_max": 20000
+  },
+  "warmup_policy": {
+    "measured_iterations": 1,
+    "warmup_iterations": 0
+  }
+}

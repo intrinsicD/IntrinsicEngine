@@ -1,0 +1,196 @@
+{
+  "attempt_id": "attempt-001",
+  "backend": "cpu_reference",
+  "benchmark_id": "geometry.curvature_segmentation.feature_patch.quality_smoke",
+  "claim_eligible": false,
+  "commit": "889126d0bee17376fc811c68d5790763782eb8b3",
+  "config_digest": "c7caf687ed05638c93fb10859113c9e3ce17cf45d9a456c6d70cb0307f161784",
+  "dataset": "builtin.method_039.smooth_transition_diagonal_pair.v1",
+  "diagnostics": {
+    "aggregation": "max_of_diagonal_pair",
+    "candidate_adopted": false,
+    "feature_evidence": "computed",
+    "implementation_version": "method_039_local_patch_unadopted",
+    "quality_error_l2_unit": "area_weighted_variation_of_information",
+    "quality_error_linf_unit": "bbox_normalized_boundary_distance_upper_bound",
+    "runner": "IntrinsicCurvaturePatchProfile",
+    "seed_mode": "boundary_adjacent_test_override",
+    "variants": [
+      {
+        "closure_boundary_edge_count": 0,
+        "continuous_boundary": {
+          "edge_count": 24,
+          "endpoint_count": 2,
+          "junction_count": 0,
+          "predicted_length_normalized": 0.40824829,
+          "reference_length_normalized": 0.40824829,
+          "reference_sample_count": 4097,
+          "reference_sample_spacing_normalized": 9.967e-05,
+          "symmetric_hausdorff_upper_bound_normalized": 4.9835e-05,
+          "tolerance_band_precision": 1.0,
+          "tolerance_band_recall": 1.0,
+          "valid": true
+        },
+        "edge_count": 3528,
+        "face_count": 2304,
+        "final_region_count": 2,
+        "name": "diagonal_a",
+        "passed": true,
+        "seed_count": 48,
+        "soft_boundary_edge_count": 24,
+        "stage_timings": {
+          "boundary_refinement_ms": 36.605523,
+          "mixture_fitting_ms": 5.475507,
+          "posterior_construction_ms": 2.029851,
+          "publication_and_validation_ms": 2.125493,
+          "region_merging_ms": 434.895634,
+          "seed_selection_ms": 0.661496,
+          "simultaneous_growth_ms": 1.764454,
+          "total_ms": 505.072955,
+          "validation_and_sampling_ms": 9.017155
+        },
+        "variation_of_information": 0.0
+      },
+      {
+        "closure_boundary_edge_count": 0,
+        "continuous_boundary": {
+          "edge_count": 24,
+          "endpoint_count": 2,
+          "junction_count": 0,
+          "predicted_length_normalized": 0.40824829,
+          "reference_length_normalized": 0.40824829,
+          "reference_sample_count": 4097,
+          "reference_sample_spacing_normalized": 9.967e-05,
+          "symmetric_hausdorff_upper_bound_normalized": 4.9835e-05,
+          "tolerance_band_precision": 1.0,
+          "tolerance_band_recall": 1.0,
+          "valid": true
+        },
+        "edge_count": 3528,
+        "face_count": 2304,
+        "final_region_count": 2,
+        "name": "diagonal_b",
+        "passed": true,
+        "seed_count": 48,
+        "soft_boundary_edge_count": 24,
+        "stage_timings": {
+          "boundary_refinement_ms": 36.015057,
+          "mixture_fitting_ms": 5.572279,
+          "posterior_construction_ms": 2.02607,
+          "publication_and_validation_ms": 2.073982,
+          "region_merging_ms": 432.876769,
+          "seed_selection_ms": 0.690438,
+          "simultaneous_growth_ms": 1.767994,
+          "total_ms": 502.564036,
+          "validation_and_sampling_ms": 9.080747
+        },
+        "variation_of_information": 0.0
+      }
+    ]
+  },
+  "execution_status": "passed",
+  "manifest": {
+    "path": "benchmarks/geometry/manifests/curvature_segmentation_feature_patch_quality_smoke.yaml",
+    "sha256": "811e113e9da69af5afe0d69839644607dc1fe269397545da948766137158c098"
+  },
+  "method": "geometry.curvature_segmentation",
+  "metrics": {
+    "memory_peak_bytes": 6029312,
+    "population_count": 2,
+    "quality_error_l2": 0.0,
+    "quality_error_linf": 4.9835e-05,
+    "runtime_ms": 505.072955
+  },
+  "resolved_params": {
+    "aggregation": "max_of_diagonal_pair",
+    "baseline": "exact_two_patch_smooth_transition_partition",
+    "candidate_adopted": false,
+    "component_count": 1,
+    "component_selection": "fixed",
+    "expected_boundary_role": "soft_feature_supported",
+    "expected_regions_per_variant": 2,
+    "feature_evidence": "computed",
+    "implementation": "method_039_local_patch_unadopted",
+    "intent": "correctness_smoke",
+    "measured_iterations": 1,
+    "quality_error_l2_unit": "area_weighted_variation_of_information",
+    "quality_error_linf_unit": "bbox_normalized_boundary_distance_upper_bound",
+    "seed_mode": "boundary_adjacent_test_override",
+    "split": "generated_screening",
+    "threshold_scope": "bounded_correctness_not_performance_or_adoption",
+    "triangulations": [
+      "diagonal_a",
+      "diagonal_b"
+    ],
+    "warmup_iterations": 0
+  },
+  "run_id": "method-039-clean-smoke-20260903",
+  "schema_version": 2,
+  "source": {
+    "revision": "889126d0bee17376fc811c68d5790763782eb8b3",
+    "state": "clean_commit"
+  },
+  "status": "passed",
+  "threshold_disposition": [
+    {
+      "limit": 20000,
+      "metric": "runtime_ms",
+      "observed": 505.072955,
+      "operator": "<=",
+      "passed": true,
+      "threshold": "smoke_runtime_ms_max"
+    },
+    {
+      "limit": 2147483648,
+      "metric": "memory_peak_bytes",
+      "observed": 6029312,
+      "operator": "<=",
+      "passed": true,
+      "threshold": "memory_peak_bytes_max"
+    },
+    {
+      "limit": 0.01,
+      "metric": "quality_error_l2",
+      "observed": 0.0,
+      "operator": "<=",
+      "passed": true,
+      "threshold": "quality_error_l2_max"
+    },
+    {
+      "limit": 0.02,
+      "metric": "quality_error_linf",
+      "observed": 4.9835e-05,
+      "operator": "<=",
+      "passed": true,
+      "threshold": "quality_error_linf_max"
+    },
+    {
+      "limit": 2,
+      "metric": "population_count",
+      "observed": 2,
+      "operator": ">=",
+      "passed": true,
+      "threshold": "population_count_min"
+    },
+    {
+      "limit": 2,
+      "metric": "population_count",
+      "observed": 2,
+      "operator": "<=",
+      "passed": true,
+      "threshold": "population_count_max"
+    }
+  ],
+  "thresholds": {
+    "memory_peak_bytes_max": 2147483648,
+    "population_count_max": 2,
+    "population_count_min": 2,
+    "quality_error_l2_max": 0.01,
+    "quality_error_linf_max": 0.02,
+    "smoke_runtime_ms_max": 20000
+  },
+  "warmup_policy": {
+    "measured_iterations": 1,
+    "warmup_iterations": 0
+  }
+}

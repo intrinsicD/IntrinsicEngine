@@ -1336,7 +1336,8 @@
   src/geometry/Geometry.HalfedgeMesh.CurvatureSegmentation.Features.cpp,
   tests/unit/geometry/Test.CurvaturePatchContract.cpp,
   methods/geometry/curvature_segmentation/feature_aligned_intake.md,
-  tasks/active/METHOD-039-feature-network-curvature-patch-decomposition.md]
+  ara/evidence/benchmarks/method039_feature_patch_feature_smoke.json,
+  tasks/done/METHOD-039-feature-network-curvature-patch-decomposition.md]
 - **Dependencies**: [C39, C43]
 - **Tags**: geometry, curvature segmentation, feature evidence, CPU reference,
   deterministic controls, bounded result
@@ -1362,7 +1363,8 @@
   src/geometry/Geometry.HalfedgeMesh.CurvatureSegmentation.Patches.cpp,
   tests/unit/geometry/Test.CurvaturePatchContract.cpp,
   methods/geometry/curvature_segmentation/feature_aligned_intake.md,
-  tasks/active/METHOD-039-feature-network-curvature-patch-decomposition.md,
+  ara/evidence/benchmarks/method039_feature_patch_seed_refutation.json,
+  tasks/done/METHOD-039-feature-network-curvature-patch-decomposition.md,
   tasks/backlog/methods/METHOD-040-global-multicut-curvature-patch-reference.md]
 - **Dependencies**: [C43, C44]
 - **Tags**: geometry, curvature segmentation, local RAG, seed stability, CPU
@@ -1622,3 +1624,42 @@
 - **Tags**: geometry, principal curvature, Framework24, CPU, parity,
   deterministic, BUG-156
 - **From staging**: O160
+
+## C54: METHOD-039 clean profiles preserve its bounded controls and negative verdict
+- **Statement**: On clean implementation commit
+  `889126d0bee17376fc811c68d5790763782eb8b3`, METHOD-039 reproduces the
+  paired-diagonal 24-edge computed feature line with zero mask error, the
+  paired two-region boundary-adjacent-seed quality control with zero
+  area-weighted variation of information, and the frozen one-dual-step seed
+  refutation with `2.283997466` variation of information and 26 perturbed
+  regions. Its generated 100,000-face homogeneous plane repeats one fully
+  assigned region with no boundary and identical payloads while keeping
+  reported result storage below its preregistered sparse health bound.
+- **Status**: supported — four sealed, clean-source, serial CPU harness rows
+  with `claim_eligible: false`; this is bounded replay and health evidence for
+  an unadopted diagnostic candidate, not an accepted v2, positive automatic-
+  seed stability, performance/baseline, asymptotic-complexity,
+  runtime/config/UI, property-publication, GPU/Vulkan, parameterization, or
+  novelty claim
+- **Provenance**: ai-executed
+- **Crystallized via**: artifact-commitment
+- **Falsification criteria**: Replaying any unchanged METHOD-039 completion
+  manifest on revision `889126d0bee17376fc811c68d5790763782eb8b3` fails its
+  recorded gate; the seed-refutation VI falls to at most `0.01`; or the 100k
+  control is not fully assigned to one deterministic region with no boundary
+  and reported storage within its frozen sparse health bound.
+- **Proof**: [N452,
+  benchmarks/runners/CurvaturePatchProfileRunner.cpp,
+  benchmarks/geometry/manifests/curvature_segmentation_feature_patch_feature_smoke.yaml,
+  benchmarks/geometry/manifests/curvature_segmentation_feature_patch_quality_smoke.yaml,
+  benchmarks/geometry/manifests/curvature_segmentation_feature_patch_seed_refutation.yaml,
+  benchmarks/geometry/manifests/curvature_segmentation_feature_patch_health_100k.yaml,
+  ara/evidence/benchmarks/method039_feature_patch_feature_smoke.json,
+  ara/evidence/benchmarks/method039_feature_patch_quality_smoke.json,
+  ara/evidence/benchmarks/method039_feature_patch_seed_refutation.json,
+  ara/evidence/benchmarks/method039_feature_patch_health_100k.json,
+  tasks/done/METHOD-039-feature-network-curvature-patch-decomposition.md]
+- **Dependencies**: [C44, C45]
+- **Tags**: geometry, curvature segmentation, CPU, feature evidence, seed
+  stability, negative result, sparse health, bounded result
+- **From staging**: O165

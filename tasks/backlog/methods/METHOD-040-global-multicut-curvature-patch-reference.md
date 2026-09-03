@@ -1,7 +1,7 @@
 ---
 id: METHOD-040
 theme: I
-depends_on: [METHOD-039]
+depends_on: [METHOD-039, REVIEW-004]
 workflow_schema: 1
 workflow_profile: claim-grade
 evidence: required
@@ -38,6 +38,9 @@ maturity_target: CPUContracted
   claim. A positive CPU-contract verdict must open a separate adoption task.
 
 ## Context
+- METHOD-040 remains paused behind `REVIEW-004`. The explicit user direction
+  that completed METHOD-039 on 2026-09-03 was scoped to that bounded negative-
+  result retirement and does not authorize this next research slice.
 - METHOD-039's standalone feature detector and local patch reference are
   independently executable. The local solver passes the frozen supplied-
   oracle catalog, the mandatory hard-fold and computed smooth-transition/

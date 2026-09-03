@@ -3,16 +3,18 @@ id: METHOD-039
 theme: I
 depends_on: [METHOD-038]
 workflow_schema: 1
-workflow_profile: claim-grade
-evidence: required
+workflow_profile: micro
+evidence: not_applicable
 owner: "codex-root"
 branch: "main"
 worktree: "/home/alex/Documents/IntrinsicEngine"
 claimed_at: "2026-08-11T09:56:56Z"
+evidence_skip_reason: "Interactive user-directed completion; the reviewed diff, repository gates, ARA ledger, and sealed non-claim benchmark rows are the evidence."
+template: micro
 contract_schema: 1
 contracts: [repo.task-contract-discovery, geometry.element-domain-sources, geometry.property-coherence, method.engine-integration]
-contract_review: "This task materially changes a mesh method, its public CPU result and diagnostics, canonical face/edge property publication, and the existing runtime/config/UI path. geometry.parameterization-optimization does not apply: the result is a same-topology surface partition and no UV, chart, seam, cut-materialization, or parameterization operation is in scope. geometry.support-radius-policy does not apply because that contract is specific to compact-support point-set methods; this task owns a method-local dimensionless surface feature scale."
-maturity_target: Operational
+contract_review: "This task materially changes a mesh method and its public CPU result and diagnostics, while its failed stability gate deliberately prevents canonical face/edge property publication and runtime/config/UI adoption. geometry.parameterization-optimization does not apply: the result is a same-topology diagnostic partition and no UV, chart, seam, cut-materialization, or parameterization operation is in scope. geometry.support-radius-policy does not apply because that contract is specific to compact-support point-set methods; this task owns a method-local dimensionless surface feature scale."
+maturity_target: CPUContracted
 ---
 # METHOD-039 — Feature-network-constrained curvature patch decomposition
 
@@ -20,21 +22,24 @@ maturity_target: Operational
 - Deliver a deterministic, topology-preserving CPU method that partitions an oriented triangle surface into connected, curvature-coherent patches by detecting hard and soft feature lines, forming a conservative seeded oversegmentation, and merging adjacent regions under an explicit curvature-and-boundary energy so every retained boundary is either feature-supported or a diagnosed curvature-change closure boundary.
 
 ## Status
-- Resumed on 2026-09-03 by explicit user direction while `REVIEW-004` remains
-  open. This records the operator-approved Theme I exception; it does not
-  weaken or satisfy the product-convergence gate for unrelated work.
+- Completed on 2026-09-03 at `CPUContracted` by explicit user direction while
+  `REVIEW-004` remains open. This records the operator-approved Theme I
+  exception; it does not weaken or satisfy the product-convergence gate for
+  unrelated work.
+- Implementation and clean-source profile commit: `889126d0`.
+- Retirement evidence is indexed by ARA claim C54 and observation O165.
 - Slices A and B are complete and reviewed. Slice C now implements an unadopted
   deterministic grow/merge/refine CPU reference and passes the supplied-oracle,
   detected-feature, hard-fold, homogeneous, diagonal, scale, noise, and
   orientation controls. Its one-dual-step seed perturbation exceeds the frozen
   `0.01` variation-of-information gate despite exact full-energy checks after
   every accepted move. ARA claim C45 records this bounded refutation.
-- Per the preregistered stop rule, the local formulation is not adopted: no v2
+- Per the preregistered stop rule, the local formulation was not adopted: no v2
   selector, config/runtime/UI path, or canonical property publication was
-  added. The current completion slice adds only opt-in generated feature,
+  added. The completion slice added only opt-in generated feature,
   quality, refutation, and 100k-face health profiles before retiring the
   negative result. `METHOD-040` is the separately scoped task-local global
-  multicut follow-up and remains blocked until that retirement.
+  multicut follow-up.
 
 ## Non-goals
 - No UV generation, atlas/chart construction, seam selection, mesh cutting, vertex duplication, face splitting, or other parameterization work.
@@ -146,12 +151,17 @@ maturity_target: Operational
 - Reintroduction trigger: extract a reusable feature-network or graph-optimization module only when a second production method needs the same stable contract, or when the seed-stability gate has first refuted local merging and a separately reviewed global-solver task is opened.
 
 ## Control surfaces
-- Config: version the existing `sandbox.curvature_segmentation` record only after the CPU reference passes method tests. Preserve Fixed/Automatic GMM selection and expose only sensitivity-tested controls: method mode, hard-feature policy/threshold, physical feature scale, patch-complexity cost, and feature-versus-length boundary balance. Seed locations remain debug/test data, not ordinary configuration.
-- UI: extend the existing Curvature Segmentation panel rather than adding a panel or service. Show provisional seeds/superpatches on request, detected hard/soft feature evidence, final regions, boundary roles, and the regional merge-energy diagnostics. The legacy reference remains selectable until the new path passes all acceptance criteria.
-- Agent/CLI: use exactly the same schema-versioned preview/validate/apply path and configured method request as the editor. No UI-only threshold, mode, or rerun path is permitted.
+- Config: not entered. The rejected candidate has no token or tunable state;
+  `sandbox.curvature_segmentation` remains the unchanged v1 control surface.
+- UI: not entered. The existing Curvature Segmentation panel remains v1-only;
+  no private diagnostic execution path was added.
+- Agent/CLI: not entered. A future accepted candidate must use the same schema-
+  versioned preview/validate/apply path as the editor.
 
 ## Backends
-- Backend axis: retain METHOD-037's current CPU reference as `cpu_reference_v1` for regression comparison. Add one deterministic feature-patch CPU reference only after the contract is frozen; do not add an optimized/GPU token or abstraction in this task.
+- Backend axis: METHOD-037's `cpu_reference_v1` remains the sole production
+  reference. METHOD-039 added one deterministic CPU diagnostic comparator but
+  no selectable v2, optimized, or GPU token and no backend abstraction.
 
 ## Engine integration
 
@@ -159,20 +169,20 @@ maturity_target: Operational
 | --- | --- |
 | Least-structured input | A full owning oriented triangle surface with finite positions, live triangle-face adjacency, slot-aligned signed principal curvatures or the existing compute path, and optional slot-aligned hard/soft edge evidence. Surface faces and their embedding are semantic inputs. |
 | Compatible entity sources | Mesh geometry entities only. Point sets and abstract graphs do not satisfy the embedded triangle-surface contract. |
-| RuntimeModule | Extend the existing curvature-segmentation operation and readiness path. Reuse its snapshot, source-revision, stale-result, undo, and atomic-publication behavior; add no module, service, registry, or job type. |
-| Config/agent | Migrate the existing schema-versioned curvature-segmentation config through its shared preview/validate/apply path. Config files, Editor, AgentCli, and Programmatic sources produce the same validated request. |
-| UI | Extend the existing mesh Curvature Segmentation panel with method selection and feature/superpatch/final-boundary diagnostics after the reference contract passes. No graph or point-cloud placement is applicable because faces are semantic inputs. |
-| Publication | Preserve source topology and unrelated properties. Continue face component/region/color and edge boundary/color publication; add the smallest typed soft-feature score and boundary-role properties needed to distinguish `F` from `Gamma`. Publication is same-cardinality and undoable. |
-| End-to-end tests | Cover a mesh entity from config/agent/editor request through snapshot execution, stale-result rejection, atomic property publication, undo/redo, property-revision visibility, and simultaneous feature/final-boundary visualization. |
+| RuntimeModule | Unchanged. The failed candidate never enters the existing curvature-segmentation operation; a future accepted method requires a separately scoped adoption task. |
+| Config/agent | Unchanged v1 schema and validated path; no rejected-candidate token exists. |
+| UI | Unchanged v1 Curvature Segmentation panel; no graph or point-cloud placement is applicable because faces are semantic inputs. |
+| Publication | Diagnostic result only. No new canonical property is published; the existing v1 face/edge properties and topology remain unchanged. |
+| End-to-end tests | Not entered because adoption failed. Existing v1 runtime/publication/coherence coverage remains authoritative. |
 
 ## Slice plan
 - **Slice A — Freeze the practical contract and oracle fixtures (complete).** Bind the inherited evidence boundary to METHOD-038's retired immutable records, record the exact integral-invariant and ridge/valley equations used, define the supplied feature-evidence seam, freeze generated analytic fixtures/metrics, and add no production selector.
 - **Slice B — Feature evidence CPU reference (complete).** Implement hard-feature consumption plus one primary multi-scale soft-feature detector, with the Hildebrandt-style extremality detector limited to a fixture comparator. Validate feature confidence and line topology independently of patch construction.
 - **Slice C — Oracle-driven grow/merge patch reference (complete; local formulation refuted).** The unadopted deterministic CPU reference passes its oracle and computed-evidence controls, but the frozen one-step seed-location gate rejects positive adoption. The failure remains executable rather than being tuned away.
-- **Slice D — Negative-result profiling and retirement (in progress).** Extend
-  the existing opt-in profiler with generated feature/quality/refutation smoke
-  results and a 100k-face sparse-storage health cohort, then retire the bounded
-  negative result without changing production behavior.
+- **Slice D — Negative-result profiling and retirement (complete).** A dedicated
+  opt-in profiler records generated feature/quality/refutation smoke results
+  and a 100k-face sparse-storage health cohort without changing production
+  behavior.
 - **Engine adoption (withdrawn).** The rejected local formulation does not
   enter config/runtime/UI/property adoption. A positive METHOD-040 verdict must
   open a separately scoped adoption task; `cpu_reference_v1` remains unchanged.
@@ -222,7 +232,10 @@ maturity_target: Operational
 - [x] Execute the adoption stability gate. The bounded seed-location case fails, so positive adoption is blocked and `METHOD-040` records the separately scoped global-optimization decision without threshold tuning.
 - [x] Results remain deterministic, patches connected, topology/cardinality unchanged, diagnostics complete, and malformed inputs fail closed across the bounded implemented controls.
 - [x] The rejected candidate was not exposed through config/agent/runtime/UI; no new service/framework was added and the v1 reference remains the unchanged production path.
-- [ ] Claim-grade evidence supports only the implemented correctness, stability, and bounded health statements. No novelty, parameterization, GPU, or speedup statement is published.
+- [x] Clean-source sealed non-claim benchmark rows and ARA claim C54 preserve
+  only the implemented correctness controls, stability refutation, and bounded
+  health result. No novelty, parameterization, GPU, or speedup statement is
+  published.
 
 ## Verification
 ```bash
@@ -261,9 +274,12 @@ python3 tools/agents/experiment_custody.py validate --root .
 - Adding optimized CPU/GPU work or claiming a performance improvement before a separate measured task establishes reference parity and a baseline.
 
 ## Maturity
-- Target: `Operational` for one deterministic CPU reference through the existing runtime/config/UI/publication path, with quality and stability evidence against generated controls.
-- No optimized CPU or GPU follow-up is owed by default. A performance backend opens only after accepted reference profiling identifies a concrete bottleneck and a separate task freezes its parity/baseline contract.
-- Slice C is a valid negative-result stop: the unadopted local reference does not
-  claim `Operational`, the v1 production path remains canonical, and Slice D
-  is not entered. METHOD-040 owns the next CPU-reference attempt after this
-  task's claim-grade negative-result retirement.
+- Reached: `CPUContracted` for the standalone feature stage and preserved local
+  diagnostic comparator. The seed-sensitive local candidate did not reach
+  `Operational`; the v1 production path remains canonical.
+- No optimized CPU or GPU follow-up is owed. A performance backend may open
+  only after an accepted reference method has parity evidence and a separate
+  task freezes its baseline contract.
+- `METHOD-040` owns the next CPU-reference attempt. If it produces a positive
+  global-partition verdict, a separately scoped task must own selector,
+  config/runtime/UI, and canonical-property adoption.

@@ -538,11 +538,13 @@ member.
 
 Work selection from this theme is temporarily paused while the Theme J product
 gate is open. Existing results and task state remain authoritative; do not
-delete, rewrite, or expand them. `METHOD-039` explicitly records the pause and
-`METHOD-040` remains transitively blocked. The sole current exception is
-`METHOD-015`, which the registered-feature inventory and `REVIEW-004` name as
-an explicit Framework24 product dependency. Resume the rest of this section
-only after `REVIEW-004` retires with an accepted product verdict.
+delete, rewrite, or expand them. `METHOD-039` completed its bounded negative
+result on 2026-09-03 under explicit user direction; that exception does not
+unpause `METHOD-040` or the rest of the theme. The standing inventory exception
+is `METHOD-015`, which the registered-feature inventory and `REVIEW-004` name
+as an explicit Framework24 product dependency. Resume other work only after
+`REVIEW-004` retires with an accepted product verdict or the operator gives a
+new explicit direction.
 
 Rationale: `AGENTS.md` §1 names "geometry processing, and method-driven research
 integration" as co-equal mission, but every open `METHOD-*` / research `GEOM-*`

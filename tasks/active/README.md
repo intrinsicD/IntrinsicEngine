@@ -11,9 +11,7 @@ Each active task should include:
 
 ## Currently active
 
-- [`METHOD-039` — Feature-network-constrained curvature patch decomposition](METHOD-039-feature-network-curvature-patch-decomposition.md)
-  — paused behind `REVIEW-004`; preserves its completed negative-result surface
-  and work-graph history for research resumption after the gate retires.
+No tasks are currently active.
 
 ## Records
 

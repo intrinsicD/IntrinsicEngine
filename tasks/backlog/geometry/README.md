@@ -56,10 +56,11 @@ map.
   (lets graph algorithms consume named properties plus adjacency so equivalent
   mesh primal graphs enter without conversion).
 - [GEOM-076 — Evidence-gated curvature-region UV atlas cuts](GEOM-076-curvature-region-guided-uv-atlas-cuts.md)
-  (waits for METHOD-039's accepted feature-network patch disposition,
-  evaluates only its accepted boundaries against current FastStaged/XAtlas
-  atlas behavior, and adopts them as optional chart constraints only if frozen
-  correctness and quality gates pass).
+  (waits for an accepted METHOD-040 global-partition disposition because
+  METHOD-039 refuted its seed-sensitive local solver, evaluates only accepted
+  boundaries against current FastStaged/XAtlas atlas behavior, and adopts them
+  as optional chart constraints only if frozen correctness and quality gates
+  pass).
 
 ### bcg_code_base geometry-processing port gaps (seeded 2026-06-26)
 

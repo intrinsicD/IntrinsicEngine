@@ -8,6 +8,19 @@ so blocks moved from the old active-README history work verbatim.
 
 ## Retired task narratives
 
+[`METHOD-039`](METHOD-039-feature-network-curvature-patch-decomposition.md) —
+the standalone curvature feature-evidence stage and an unadopted deterministic
+grow/merge/refine comparator now preserve the bounded feature, oracle, quality,
+and failure controls. The local solver passes its hard-feature, homogeneous,
+diagonal, scale, noise, and orientation checks but fails the preregistered
+one-dual-step automatic-seed gate with area-weighted VI `2.283997466`; no v2
+selector, property publication, runtime/config/UI path, UV behavior, or
+threshold retuning was added. Four sealed clean-source non-claim rows reproduce
+the positive controls, negative verdict, and deterministic 100k-face sparse-
+storage health check without making a performance claim. It retires at
+`CPUContracted`; METHOD-040 owns the separate global-partition attempt.
+Implementation and profile commit: `889126d0`.
+
 [`BUG-118`](BUG-118-glfw-x11-input-method-lsan-recurrence.md) — the recurring
 408-byte XIM retention is an affected libX11 1.7.5 ownership defect already
 fixed upstream, not an engine teardown regression: the standalone helper still
