@@ -11,6 +11,10 @@ Each active task should include:
 
 ## Currently active
 
+- [`BUG-165` — dropped-file queue tests race worker
+  completion](BUG-165-dropped-geometry-cancellation-test-race.md) — locally
+  complete; deterministic pre-decode barriers pass the two-test 200-repeat
+  gate and the full CPU-supported suite, with hosted `pr-fast` pending.
 - [`BUG-164` — ccache serves stale objects when a macro changes only imported
   module BMIs](BUG-164-ccache-module-bmi-macro-staleness.md) — in progress;
   dependency-local semantic sidecars pass local fixture, core, full-graph, and

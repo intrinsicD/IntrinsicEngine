@@ -11,13 +11,6 @@ Each entry includes the observed repro, the likely affected symbols, and a fix p
   but repository-global validation checks their source inputs against live
   `HEAD` because historical fallback is gated on claim eligibility. Preserve
   immutable source identity without rewriting evidence or promoting a claim.
-- [`BUG-165` — Dropped-file queue tests race worker
-  completion](BUG-165-dropped-geometry-cancellation-test-race.md): hosted
-  `pr-fast` can finish the tiny OBJ import before two tests' first queue
-  snapshots, making `CanCancel` false and, in the cancellation case, allowing
-  main-thread apply. Use the existing pre-decode hook as a deterministic
-  barrier; do not hide the race with retries, quarantine, sleeps, or weakened
-  assertions.
 - [`BUG-158` — Optional direct-mesh enrichment blocks already usable
   geometry](BUG-158-direct-mesh-enrichment-blocks-usable-geometry.md): the
   geometry-only mesh is published immediately, but the editor returns before

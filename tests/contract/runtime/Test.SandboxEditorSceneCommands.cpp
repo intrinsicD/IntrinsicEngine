@@ -4,6 +4,7 @@
 #include <atomic>
 #include <chrono>
 #include <cmath>
+#include <condition_variable>
 #include <cstdint>
 #include <filesystem>
 #include <fstream>
@@ -11,6 +12,7 @@
 #include <iterator>
 #include <limits>
 #include <memory>
+#include <mutex>
 #include <optional>
 #include <span>
 #include <string>
@@ -774,6 +776,54 @@ struct BlockingGeometryDecodeState
         bool CancelAttempted{false};
         bool CancelSucceeded{false};
     };
+
+class QueuedGeometryDecodeBarrier final
+{
+public:
+    ~QueuedGeometryDecodeBarrier() { Release(); }
+
+    [[nodiscard]] std::function<void(const Runtime::RuntimeAssetImportRequest&)>
+    MakeHook() const
+    {
+        const std::shared_ptr<State> state = m_State;
+        return [state](const Runtime::RuntimeAssetImportRequest&)
+        {
+            std::unique_lock lock(state->Mutex);
+            ++state->BlockedWorkers;
+            state->Changed.notify_all();
+            state->Changed.wait(lock, [&state] { return state->Released; });
+        };
+    }
+
+    [[nodiscard]] bool WaitForBlockedWorker() const
+    {
+        std::unique_lock lock(m_State->Mutex);
+        return m_State->Changed.wait_for(
+            lock,
+            std::chrono::seconds(10),
+            [this] { return m_State->BlockedWorkers != 0u; });
+    }
+
+    void Release() const noexcept
+    {
+        {
+            std::lock_guard lock(m_State->Mutex);
+            m_State->Released = true;
+        }
+        m_State->Changed.notify_all();
+    }
+
+private:
+    struct State
+    {
+        std::mutex Mutex{};
+        std::condition_variable Changed{};
+        std::size_t BlockedWorkers{0u};
+        bool Released{false};
+    };
+
+    std::shared_ptr<State> m_State{std::make_shared<State>()};
+};
 
 enum class BlockedGeometryImportAction : std::uint8_t
     {
@@ -2720,14 +2770,21 @@ TEST(SandboxEditorUi, DroppedFileQueuePreservesOrderDiagnosticsAndClearCompleted
     ComposeAsyncWorkAndInitialize(engine);
     InstallSandboxDefaultRuntimePolicies(engine);
 
+    auto& pipeline =
+        RequiredEngineService<Extrinsic::Runtime::AssetWorkflowModule>(engine);
+    QueuedGeometryDecodeBarrier decodeBarrier;
+    pipeline.SetQueuedGeometryImportBeforeDecodeHookForTest(
+        decodeBarrier.MakeHook());
+
     const std::vector<std::string> droppedPaths{
         meshFile.Path.string(),
         missingFile.string(),
     };
-    RequiredEngineService<Extrinsic::Runtime::AssetWorkflowModule>(engine).ImportDroppedFilePaths(droppedPaths);
+    pipeline.ImportDroppedFilePaths(droppedPaths);
+    ASSERT_TRUE(decodeBarrier.WaitForBlockedWorker());
 
     Runtime::RuntimeAssetImportQueueSnapshot queue =
-        RequiredEngineService<Extrinsic::Runtime::AssetWorkflowModule>(engine).GetAssetImportQueueSnapshot();
+        pipeline.GetAssetImportQueueSnapshot();
     ASSERT_EQ(queue.Entries.size(), 2u);
     EXPECT_EQ(queue.ActiveCount, 2u);
     EXPECT_EQ(queue.Entries[0].SourcePath, meshFile.Path.string());
@@ -2739,9 +2796,10 @@ TEST(SandboxEditorUi, DroppedFileQueuePreservesOrderDiagnosticsAndClearCompleted
     ASSERT_FALSE(engine.GetWindow().ShouldClose())
         << "explicit Null window backend must keep Engine::Run() drivable on "
            "headless hosts";
+    decodeBarrier.Release();
     engine.Run();
 
-    queue = RequiredEngineService<Extrinsic::Runtime::AssetWorkflowModule>(engine).GetAssetImportQueueSnapshot();
+    queue = pipeline.GetAssetImportQueueSnapshot();
     ASSERT_EQ(queue.Entries.size(), 2u);
     EXPECT_EQ(queue.ActiveCount, 0u);
     EXPECT_EQ(queue.TerminalCount, 2u);
@@ -2755,10 +2813,11 @@ TEST(SandboxEditorUi, DroppedFileQueuePreservesOrderDiagnosticsAndClearCompleted
     EXPECT_FALSE(queue.Entries[1].DiagnosticText.empty());
     EXPECT_EQ(CountEntitiesWithDomain(*engine.Worlds().Get(engine.ActiveWorld()), GS::Domain::Mesh), 1u);
 
-    EXPECT_EQ(RequiredEngineService<Extrinsic::Runtime::AssetWorkflowModule>(engine).ClearCompletedAssetImports(), 2u);
-    queue = RequiredEngineService<Extrinsic::Runtime::AssetWorkflowModule>(engine).GetAssetImportQueueSnapshot();
+    EXPECT_EQ(pipeline.ClearCompletedAssetImports(), 2u);
+    queue = pipeline.GetAssetImportQueueSnapshot();
     EXPECT_TRUE(queue.Entries.empty());
 
+    pipeline.SetQueuedGeometryImportBeforeDecodeHookForTest({});
     engine.Shutdown();
 }
 TEST(SandboxEditorUi, DroppedGeometryQueueCancellationPreventsMainThreadApply)
@@ -2774,16 +2833,23 @@ TEST(SandboxEditorUi, DroppedGeometryQueueCancellationPreventsMainThreadApply)
                                                std::make_unique<FixedFrameApplication>(16u));
     ComposeAsyncWorkAndInitialize(engine);
 
+    auto& pipeline =
+        RequiredEngineService<Extrinsic::Runtime::AssetWorkflowModule>(engine);
+    QueuedGeometryDecodeBarrier decodeBarrier;
+    pipeline.SetQueuedGeometryImportBeforeDecodeHookForTest(
+        decodeBarrier.MakeHook());
+
     const std::vector<std::string> droppedPaths{meshFile.Path.string()};
-    RequiredEngineService<Extrinsic::Runtime::AssetWorkflowModule>(engine).ImportDroppedFilePaths(droppedPaths);
+    pipeline.ImportDroppedFilePaths(droppedPaths);
+    ASSERT_TRUE(decodeBarrier.WaitForBlockedWorker());
 
     Runtime::RuntimeAssetImportQueueSnapshot queue =
-        RequiredEngineService<Extrinsic::Runtime::AssetWorkflowModule>(engine).GetAssetImportQueueSnapshot();
+        pipeline.GetAssetImportQueueSnapshot();
     ASSERT_EQ(queue.Entries.size(), 1u);
     EXPECT_TRUE(queue.Entries[0].CanCancel);
-    EXPECT_TRUE(RequiredEngineService<Extrinsic::Runtime::AssetWorkflowModule>(engine).CancelAssetImport(queue.Entries[0].Operation).has_value());
+    EXPECT_TRUE(pipeline.CancelAssetImport(queue.Entries[0].Operation).has_value());
 
-    queue = RequiredEngineService<Extrinsic::Runtime::AssetWorkflowModule>(engine).GetAssetImportQueueSnapshot();
+    queue = pipeline.GetAssetImportQueueSnapshot();
     ASSERT_EQ(queue.Entries.size(), 1u);
     EXPECT_EQ(queue.Entries[0].TerminalStatus,
               Runtime::RuntimeAssetImportQueueTerminalStatus::Cancelled);
@@ -2794,10 +2860,12 @@ TEST(SandboxEditorUi, DroppedGeometryQueueCancellationPreventsMainThreadApply)
     ASSERT_FALSE(engine.GetWindow().ShouldClose())
         << "explicit Null window backend must keep Engine::Run() drivable on "
            "headless hosts";
+    decodeBarrier.Release();
     engine.Run();
 
     EXPECT_EQ(CountEntitiesWithDomain(*engine.Worlds().Get(engine.ActiveWorld()), GS::Domain::Mesh), 0u);
 
+    pipeline.SetQueuedGeometryImportBeforeDecodeHookForTest({});
     engine.Shutdown();
 }
 TEST(SandboxEditorUi, DroppedGeometryAssetReimportWaitReportsDeadlineAndCancellationPhase)
