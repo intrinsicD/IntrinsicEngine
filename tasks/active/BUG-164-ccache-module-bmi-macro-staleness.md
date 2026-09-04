@@ -77,16 +77,18 @@ contract_review: "Build-cache key policy for the CI-007 ccache launcher. No engi
   forces changed-macro misses while retaining unchanged warm hits.
 - **Slice B (implemented; hosted evidence pending).** Exercise target-private
   module definitions/options and a GMF-header content edit. Each module compile
-  emits a semantic sidecar from its exact `CXXDependInfo.json` entry, source and
-  project/build-local `.ddi.d` inputs, and direct dependency sidecars. Importers
-  hash only the sidecars named by their `.ddi`/`.modmap` requirements.
+  emits a semantic sidecar from its actual compiler invocation,
+  `CXXDependInfo.json` entry, source and project/build-local `.ddi.d` inputs,
+  and direct dependency sidecars. Importers hash only the sidecars named by
+  their `.ddi`/`.modmap` requirements.
 
 ## Right-sizing
 - Extend the existing `tools/ci/ccache_ci.py` boundary with one launcher
   subcommand instead of adding a target-property registry, header crawler, or
-  second wrapper file. CMake's existing scanner metadata already identifies
-  exact module sources, textual inputs, compile context, and direct imports;
-  the launcher reduces those inputs to one small sidecar per module.
+  second wrapper file. The launcher invocation and CMake's existing scanner
+  metadata identify exact module flags, sources, textual inputs, compile
+  context, and direct imports; the launcher reduces those inputs to one small
+  sidecar per module.
 - Blast radius is the existing C/C++ compiler-launch path plus its hermetic
   tooling tests. Raw PCM bytes are deliberately excluded because a real Clang
   module produced nondeterministic bytes and signatures across clean rebuilds.
@@ -177,6 +179,13 @@ python3 tools/agents/generate_session_brief.py --check
   `IntrinsicPrFastTests` closure through 1,651/1,651 edges. The independent
   no-ccache `ci` `IntrinsicTests` build succeeded, and the CPU-supported CTest
   selector passed 4,263/4,263 with six expected skips.
+- 2026-09-04 — Hosted discriminator: `pr-fast` runs `33865140158` and
+  `33866365146` reproduced the stale macro result under Ubuntu Clang 20.1.2.
+  The module compiler command changed `PROBE_GMF_VALUE=11→29`, but the runner's
+  CMake-generated `CXXDependInfo.json` omitted definitions/options and the
+  module sidecar digest remained unchanged. The same failure then reproduced
+  locally with the runner's exact Clang 20.1.2 and CMake 3.31.6 binaries; CMake
+  4.3.2 includes the fields and explained the earlier local-only pass.
 
 ## Forbidden changes
 - Disabling ccache globally instead of fixing the key.

@@ -16,8 +16,8 @@ if(INTRINSIC_ENABLE_CCACHE AND CCACHE_PROGRAM)
     # Ccache 4.9.1 passes C++23 module interfaces through and cannot use depend
     # mode while direct mode is disabled. Cache implementation/importer units
     # in preprocessor mode. The launcher derives a semantic fingerprint for
-    # each imported module from CMake's scanner metadata, while this base marker
-    # covers global compiler flags that CXXDependInfo.json does not record.
+    # each imported module from scanner metadata and its actual compiler
+    # invocation, while this base marker covers project-wide compiler context.
     get_target_property(_intrinsic_ccache_config_compile_definitions
         IntrinsicConfig INTERFACE_COMPILE_DEFINITIONS)
     if(NOT _intrinsic_ccache_config_compile_definitions)
@@ -27,7 +27,7 @@ if(INTRINSIC_ENABLE_CCACHE AND CCACHE_PROGRAM)
     set(_intrinsic_ccache_active_cxx_flags
         "${CMAKE_CXX_FLAGS_${_intrinsic_ccache_build_type_upper}}")
     string(CONCAT _intrinsic_ccache_global_module_context
-        "key_policy=dependency-local-semantic-v1\n"
+        "key_policy=dependency-local-semantic-v2\n"
         "build_type=${CMAKE_BUILD_TYPE}\n"
         "cxx_flags=${CMAKE_CXX_FLAGS}\n"
         "active_cxx_flags=${_intrinsic_ccache_active_cxx_flags}\n"

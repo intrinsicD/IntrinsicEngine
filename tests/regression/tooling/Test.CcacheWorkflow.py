@@ -166,7 +166,16 @@ class CcacheWorkflowTests(unittest.TestCase):
             build_dir,
             pcm,
             header,
-            ["clang++", f"@{provider_map}"],
+            [
+                "clang++",
+                "-DDIRECT_VALUE=1",
+                "-std=c++23",
+                f"@{provider_map}",
+                "-o",
+                primary_output,
+                "-c",
+                str(source),
+            ],
             ["clang++", f"@{consumer_map}"],
         )
 
@@ -307,7 +316,7 @@ class CcacheWorkflowTests(unittest.TestCase):
         self.assertIn("--base-extra-file=", text)
         self.assertIn("--repo-root=", text)
         self.assertIn("@global-module-context", text)
-        self.assertIn("dependency-local-semantic-v1", text)
+        self.assertIn("dependency-local-semantic-v2", text)
         self.assertIn("CMAKE_CXX_FLAGS", text)
         self.assertNotIn("CMakeCache.txt", text)
         self.assertNotIn("build.ninja", text)
@@ -371,13 +380,52 @@ class CcacheWorkflowTests(unittest.TestCase):
                 changed_fingerprint.read_text(encoding="utf-8"), original
             )
 
+    def test_module_fingerprint_uses_command_when_cmake_context_omits_flags(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            build_dir, _, _, provider_command, _ = self._write_semantic_module_fixture(
+                root
+            )
+            context_path = (
+                build_dir / "CMakeFiles" / "direct.dir" / "CXXDependInfo.json"
+            )
+            context = json.loads(context_path.read_text(encoding="utf-8"))
+            module_context = context["cxx-modules"][
+                "CMakeFiles/direct.dir/Direct.cppm.o"
+            ]
+            for key in (
+                "compile-features",
+                "compile-options",
+                "definitions",
+                "include-directories",
+            ):
+                module_context.pop(key)
+            context_path.write_text(json.dumps(context), encoding="utf-8")
+
+            original = ccache_ci.module_fingerprint_inputs(
+                provider_command, cwd=build_dir, repo_root=root
+            )[0].read_text(encoding="utf-8")
+            changed_command = [
+                "-DDIRECT_VALUE=2" if item == "-DDIRECT_VALUE=1" else item
+                for item in provider_command
+            ]
+            changed = ccache_ci.module_fingerprint_inputs(
+                changed_command, cwd=build_dir, repo_root=root
+            )[0].read_text(encoding="utf-8")
+
+            self.assertNotEqual(changed, original)
+
     def test_module_fingerprint_propagates_direct_dependency_semantics(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             build_dir, direct_pcm, _, provider_command, _ = (
                 self._write_semantic_module_fixture(root)
             )
-            provider_map = Path(provider_command[1][1:])
+            provider_map = Path(
+                next(item[1:] for item in provider_command if item.startswith("@"))
+            )
             provider_ddi = provider_map.with_suffix(".ddi")
             lower_pcm = direct_pcm.with_name("Lower.pcm")
             lower_fingerprint = lower_pcm.with_suffix(".ccache-inputs")

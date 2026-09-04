@@ -244,13 +244,16 @@ Ninja metadata, object directories, Clang BMI files, and the ccache config file
 are not cached. Ccache
 4.9.1 passes named-module interface compiles through. Cacheable implementation
 and importer units therefore use preprocessor mode with direct and depend modes
-disabled. Each module compile emits a stable semantic sidecar from its exact
-`CXXDependInfo.json` entry, its source and project/build-local textual inputs
-listed by the scanner depfile, and its direct dependency sidecars. Importers
-add only their direct module sidecars to `CCACHE_EXTRAFILES`; a small
-CMake-generated marker separately covers global compiler flags that the
-per-module metadata does not record. The launcher fails closed when this CMake
-metadata or a required sidecar is missing or malformed. It does not hash raw
+disabled. Each module compile emits a stable semantic sidecar from its actual
+compiler invocation, its `CXXDependInfo.json` entry, its source and
+project/build-local textual inputs listed by the scanner depfile, and its direct
+dependency sidecars. The actual invocation is authoritative for definitions
+and options because CMake versions before 4.3 omit those fields from
+`CXXDependInfo.json`. Importers add only their direct module sidecars to
+`CCACHE_EXTRAFILES`; a small CMake-generated marker separately covers global
+compiler context for every cacheable translation unit. The launcher fails
+closed when this CMake metadata or a required sidecar is missing or malformed.
+It does not hash raw
 PCM bytes, the whole CMake cache, Ninja graph, or source tree. The workflow
 validates the generated launcher and global marker, zeros statistics before
 compilation, and reports hit/miss, cache-size, error, availability, and health

@@ -881,9 +881,11 @@ the configured compiler/scanner, pinned ccache, preset, sanitizer identity,
 toolchain/dependency-input hash, and commit SHA. Ccache 4.9.1 passes `.cppm`
 compiles through; cacheable C++ consumers run with direct and depend modes off
 and hash stable semantic sidecars for only their direct module imports through
-`CCACHE_EXTRAFILES`. A module sidecar binds that module's CMake compile context,
-source, project/build-local scanner dependencies, and direct dependency
-sidecars; a separate small marker covers global C++ flags. This replaces the
+`CCACHE_EXTRAFILES`. A module sidecar binds that module's actual compiler
+invocation, CMake compile context, source, project/build-local scanner
+dependencies, and direct dependency sidecars; the invocation supplies
+definitions/options omitted by CMake before 4.3. A separate small marker covers
+global C++ context for every cacheable translation unit. This replaces the
 CI-007 cohort's coarse all-interface digest without changing those historical
 measurements. No warm-compile population existed in the CI-003 baseline, and
 the baseline records that absence rather than combining cache states.

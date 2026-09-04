@@ -16,7 +16,7 @@ from pathlib import Path
 
 SCHEMA_VERSION = 1
 MODULE_CONTEXT_NAME = "intrinsic-ccache-module-context.txt"
-MODULE_INPUT_SCHEMA_VERSION = 1
+MODULE_INPUT_SCHEMA_VERSION = 2
 
 SUMMARY_COUNTERS = (
     "direct_cache_hit",
@@ -265,6 +265,7 @@ def _provided_module_digest(
     output_pcm: Path,
     dependency_path: Path,
     required_fingerprints: dict[str, Path],
+    compiler_command: list[str],
     *,
     cwd: Path,
     repo_root: Path,
@@ -287,6 +288,7 @@ def _provided_module_digest(
         record = {
             "schema_version": MODULE_INPUT_SCHEMA_VERSION,
             "logical_name": logical_name,
+            "compiler_command": list(compiler_command),
             "compile_context": _module_compile_context(
                 output_pcm.parent, primary_output, cwd
             ),
@@ -391,6 +393,7 @@ def module_fingerprint_inputs(
             output_pcm,
             dependency_path,
             required_fingerprints,
+            compiler_command,
             cwd=working_directory,
             repo_root=repo_root,
         )
