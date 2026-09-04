@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Validate the CI ccache pilot and export ccache statistics."""
+"""Launch and validate the module-safe CI ccache pilot."""
 
 from __future__ import annotations
 
@@ -8,13 +8,15 @@ import hashlib
 import json
 import os
 import re
+import shlex
 import subprocess
 import sys
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
 SCHEMA_VERSION = 1
-MODULE_DIGEST_NAME = "intrinsic-ccache-module-interfaces.txt"
+MODULE_CONTEXT_NAME = "intrinsic-ccache-module-context.txt"
+MODULE_INPUT_SCHEMA_VERSION = 1
 
 SUMMARY_COUNTERS = (
     "direct_cache_hit",
@@ -57,6 +59,405 @@ class ConfiguredIdentity:
     scan_deps_path: str
     ccache_key: str
     sanitizer: str
+
+
+def _resolve_compile_input(path_text: str, cwd: Path) -> Path:
+    path = Path(path_text)
+    if not path.is_absolute():
+        path = cwd / path
+    return path.resolve()
+
+
+def _read_json_object(path: Path, label: str) -> dict[str, object]:
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise RuntimeError(f"could not parse {label} {path}: {exc}") from exc
+    if not isinstance(payload, dict):
+        raise RuntimeError(f"{label} is not a JSON object: {path}")
+    return payload
+
+
+def _read_module_map_arguments(path: Path) -> list[str]:
+    try:
+        return shlex.split(path.read_text(encoding="utf-8"), posix=True)
+    except (OSError, ValueError) as exc:
+        raise RuntimeError(f"could not parse CMake module map {path}: {exc}") from exc
+
+
+def _read_module_map(path: Path, cwd: Path) -> dict[str, Path]:
+    mappings: dict[str, Path] = {}
+    for argument in _read_module_map_arguments(path):
+        if not argument.startswith("-fmodule-file="):
+            continue
+        mapping = argument.removeprefix("-fmodule-file=")
+        logical_name, separator, pcm_path = mapping.partition("=")
+        if not separator or not logical_name or not pcm_path:
+            raise RuntimeError(f"invalid named-module mapping in {path}: {argument!r}")
+        resolved_pcm = _resolve_compile_input(pcm_path, cwd)
+        if logical_name in mappings and mappings[logical_name] != resolved_pcm:
+            raise RuntimeError(
+                f"conflicting named-module mapping in {path}: {logical_name}"
+            )
+        mappings[logical_name] = resolved_pcm
+    return mappings
+
+
+def _read_module_outputs(path: Path, cwd: Path) -> tuple[Path, ...]:
+    outputs = {
+        _resolve_compile_input(
+            argument.removeprefix("-fmodule-output=").strip('"'), cwd
+        )
+        for argument in _read_module_map_arguments(path)
+        if argument.startswith("-fmodule-output=")
+    }
+    return tuple(sorted(outputs, key=str))
+
+
+def _read_direct_module_requirements(path: Path) -> tuple[str, ...]:
+    payload = _read_json_object(path, "CMake module dependency metadata")
+
+    rules = payload.get("rules") if isinstance(payload, dict) else None
+    if not isinstance(rules, list) or not rules:
+        raise RuntimeError(f"CMake module dependency metadata has no rules: {path}")
+
+    requirements: set[str] = set()
+    for rule in rules:
+        if not isinstance(rule, dict):
+            raise RuntimeError(f"invalid CMake module dependency rule in {path}")
+        entries = rule.get("requires", [])
+        if not isinstance(entries, list):
+            raise RuntimeError(
+                f"invalid CMake module dependency requirements in {path}"
+            )
+        for entry in entries:
+            logical_name = (
+                entry.get("logical-name") if isinstance(entry, dict) else None
+            )
+            if not isinstance(logical_name, str) or not logical_name:
+                raise RuntimeError(
+                    f"invalid CMake direct-module requirement in {path}: {entry!r}"
+                )
+            requirements.add(logical_name)
+    return tuple(sorted(requirements))
+
+
+def _provided_module(path: Path) -> tuple[str, str, str] | None:
+    payload = _read_json_object(path, "CMake module dependency metadata")
+    rules = payload.get("rules")
+    if not isinstance(rules, list):
+        raise RuntimeError(f"CMake module dependency metadata has no rules: {path}")
+
+    providers: list[tuple[str, str, str]] = []
+    for rule in rules:
+        if not isinstance(rule, dict):
+            raise RuntimeError(f"invalid CMake module dependency rule in {path}")
+        primary_output = rule.get("primary-output")
+        entries = rule.get("provides", [])
+        if not isinstance(entries, list):
+            raise RuntimeError(f"invalid CMake module providers in {path}")
+        for entry in entries:
+            logical_name = (
+                entry.get("logical-name") if isinstance(entry, dict) else None
+            )
+            source_path = entry.get("source-path") if isinstance(entry, dict) else None
+            if not all(
+                isinstance(value, str) and value
+                for value in (logical_name, source_path, primary_output)
+            ):
+                raise RuntimeError(
+                    f"invalid CMake module provider in {path}: {entry!r}"
+                )
+            providers.append((logical_name, source_path, primary_output))
+    if not providers:
+        return None
+    if len(providers) != 1:
+        raise RuntimeError(
+            f"expected at most one provided module in {path}, found {len(providers)}"
+        )
+    return providers[0]
+
+
+def _module_compile_context(
+    target_dir: Path,
+    primary_output: str,
+    cwd: Path,
+) -> dict[str, object]:
+    path = target_dir / "CXXDependInfo.json"
+    payload = _read_json_object(path, "CMake C++ dependency context")
+    modules = payload.get("cxx-modules")
+    if not isinstance(modules, dict):
+        raise RuntimeError(f"CMake C++ dependency context has no modules: {path}")
+
+    context = modules.get(primary_output)
+    if context is None:
+        expected_output = _resolve_compile_input(primary_output, cwd)
+        matches = [
+            value
+            for output, value in modules.items()
+            if isinstance(output, str)
+            and _resolve_compile_input(output, cwd) == expected_output
+        ]
+        if len(matches) == 1:
+            context = matches[0]
+    if not isinstance(context, dict):
+        raise RuntimeError(
+            f"CMake C++ dependency context has no entry for {primary_output}: {path}"
+        )
+
+    return {
+        "compiler_frontend_variant": payload.get("compiler-frontend-variant"),
+        "compiler_id": payload.get("compiler-id"),
+        "compiler_simulate_id": payload.get("compiler-simulate-id"),
+        "config": payload.get("config"),
+        "language": payload.get("language"),
+        "module": context,
+    }
+
+
+def _read_depfile_inputs(path: Path, cwd: Path) -> tuple[Path, ...]:
+    try:
+        text = path.read_text(encoding="utf-8")
+    except OSError as exc:
+        raise RuntimeError(
+            f"could not read CMake module scanner depfile {path}: {exc}"
+        ) from exc
+    joined = re.sub(r"\\\r?\n", " ", text)
+    _, separator, dependency_text = joined.partition(":")
+    if not separator:
+        raise RuntimeError(f"invalid CMake module scanner depfile: {path}")
+    try:
+        dependencies = shlex.split(dependency_text, posix=True)
+    except ValueError as exc:
+        raise RuntimeError(
+            f"could not parse CMake module scanner depfile {path}: {exc}"
+        ) from exc
+    return tuple(
+        sorted(
+            {
+                _resolve_compile_input(dependency.replace("$$", "$"), cwd)
+                for dependency in dependencies
+            },
+            key=str,
+        )
+    )
+
+
+def _read_module_fingerprint(path: Path, logical_name: str) -> str:
+    payload = _read_json_object(path, "module-input fingerprint")
+    digest = payload.get("semantic_digest")
+    if (
+        payload.get("schema_version") != MODULE_INPUT_SCHEMA_VERSION
+        or payload.get("logical_name") != logical_name
+        or not isinstance(digest, str)
+        or not re.fullmatch(r"[0-9a-f]{64}", digest)
+    ):
+        raise RuntimeError(
+            f"module-input fingerprint is invalid for {logical_name!r}: {path}"
+        )
+    return digest
+
+
+def _provided_module_digest(
+    logical_name: str,
+    source_text: str,
+    primary_output: str,
+    output_pcm: Path,
+    dependency_path: Path,
+    required_fingerprints: dict[str, Path],
+    *,
+    cwd: Path,
+    repo_root: Path,
+) -> str:
+    source_path = _resolve_compile_input(source_text, cwd)
+    if not source_path.is_file():
+        raise RuntimeError(
+            f"module provider source does not exist for {logical_name!r}: {source_path}"
+        )
+
+    try:
+        dependency_roots = (repo_root.resolve(), cwd)
+        dependency_files = {
+            path
+            for path in _read_depfile_inputs(Path(f"{dependency_path}.d"), cwd)
+            if path.is_file()
+            and any(_is_relative_to(path, root) for root in dependency_roots)
+        }
+        dependency_files.add(source_path)
+        record = {
+            "schema_version": MODULE_INPUT_SCHEMA_VERSION,
+            "logical_name": logical_name,
+            "compile_context": _module_compile_context(
+                output_pcm.parent, primary_output, cwd
+            ),
+            "file_inputs": [
+                {
+                    "path": str(path),
+                    "sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
+                }
+                for path in sorted(dependency_files, key=str)
+            ],
+            "module_inputs": {
+                name: _read_module_fingerprint(path, name)
+                for name, path in sorted(required_fingerprints.items())
+            },
+        }
+        encoded = json.dumps(record, sort_keys=True, separators=(",", ":")).encode(
+            "utf-8"
+        )
+        return hashlib.sha256(encoded).hexdigest()
+    except OSError as exc:
+        raise RuntimeError(
+            f"could not hash semantic inputs for module {logical_name!r}: {exc}"
+        ) from exc
+
+
+def _write_if_changed(path: Path, content: str) -> None:
+    temporary = path.with_name(f".{path.name}.{os.getpid()}.tmp")
+    try:
+        if path.is_file() and path.read_text(encoding="utf-8") == content:
+            return
+        temporary.write_text(content, encoding="utf-8")
+        os.replace(temporary, path)
+    except OSError as exc:
+        raise RuntimeError(
+            f"could not write module-input fingerprint {path}: {exc}"
+        ) from exc
+    finally:
+        try:
+            temporary.unlink(missing_ok=True)
+        except OSError:
+            pass
+
+
+def module_fingerprint_inputs(
+    compiler_command: list[str],
+    *,
+    cwd: Path | None = None,
+    repo_root: Path,
+) -> tuple[Path, ...]:
+    working_directory = (cwd or Path.cwd()).resolve()
+    response_paths = [
+        _resolve_compile_input(argument[1:], working_directory)
+        for argument in compiler_command
+        if argument.startswith("@") and argument[1:].endswith(".modmap")
+    ]
+    if not response_paths:
+        return ()
+
+    fingerprint_inputs: set[Path] = set()
+    for module_map_path in response_paths:
+        mappings = _read_module_map(module_map_path, working_directory)
+        dependency_path = module_map_path.with_suffix(".ddi")
+        requirements = _read_direct_module_requirements(dependency_path)
+        missing = [name for name in requirements if name not in mappings]
+        if missing:
+            raise RuntimeError(
+                f"CMake module map {module_map_path} is missing direct requirements: "
+                + ", ".join(missing)
+            )
+        required_fingerprints: dict[str, Path] = {}
+        for name in requirements:
+            pcm_path = mappings[name]
+            if not pcm_path.is_file():
+                raise RuntimeError(
+                    f"direct module PCM input does not exist: {pcm_path}"
+                )
+            fingerprint_path = pcm_path.with_suffix(".ccache-inputs")
+            _read_module_fingerprint(fingerprint_path, name)
+            required_fingerprints[name] = fingerprint_path
+            fingerprint_inputs.add(fingerprint_path)
+
+        provided_module = _provided_module(dependency_path)
+        module_outputs = _read_module_outputs(module_map_path, working_directory)
+        if provided_module is None:
+            if module_outputs:
+                raise RuntimeError(
+                    f"CMake module map has output but no provider: {module_map_path}"
+                )
+            continue
+        if len(module_outputs) != 1:
+            raise RuntimeError(
+                f"expected one module output in {module_map_path}, "
+                f"found {len(module_outputs)}"
+            )
+
+        logical_name, source_path, primary_output = provided_module
+        output_pcm = module_outputs[0]
+        semantic_digest = _provided_module_digest(
+            logical_name,
+            source_path,
+            primary_output,
+            output_pcm,
+            dependency_path,
+            required_fingerprints,
+            cwd=working_directory,
+            repo_root=repo_root,
+        )
+        own_fingerprint = output_pcm.with_suffix(".ccache-inputs")
+        _write_if_changed(
+            own_fingerprint,
+            json.dumps(
+                {
+                    "schema_version": MODULE_INPUT_SCHEMA_VERSION,
+                    "logical_name": logical_name,
+                    "semantic_digest": semantic_digest,
+                },
+                indent=2,
+                sort_keys=True,
+            )
+            + "\n",
+        )
+        fingerprint_inputs.add(own_fingerprint)
+
+    return tuple(sorted((path.resolve() for path in fingerprint_inputs), key=str))
+
+
+def launch_ccache(args: argparse.Namespace) -> int:
+    compiler_command = list(args.compiler_command)
+    if compiler_command and compiler_command[0] == "--":
+        compiler_command.pop(0)
+    if not compiler_command:
+        print(
+            "ERROR: ccache module launcher received no compiler command",
+            file=sys.stderr,
+        )
+        return 3
+
+    try:
+        base_extra_file = args.base_extra_file.resolve()
+        if not base_extra_file.is_file():
+            raise RuntimeError(
+                f"base module-input fingerprint does not exist: {base_extra_file}"
+            )
+        module_fingerprints = module_fingerprint_inputs(
+            compiler_command,
+            repo_root=args.repo_root,
+        )
+        extra_files = (base_extra_file, *module_fingerprints)
+        encoded_paths = [str(path) for path in dict.fromkeys(extra_files)]
+        if any(os.pathsep in path for path in encoded_paths):
+            raise RuntimeError(
+                f"module-input path contains ccache list separator {os.pathsep!r}"
+            )
+    except RuntimeError as exc:
+        print(f"ERROR: ccache module launcher: {exc}", file=sys.stderr)
+        return 3
+
+    environment = os.environ.copy()
+    environment["CCACHE_NODEPEND"] = "1"
+    environment["CCACHE_NODIRECT"] = "1"
+    environment["CCACHE_EXTRAFILES"] = os.pathsep.join(encoded_paths)
+    try:
+        os.execvpe(
+            str(args.ccache),
+            [str(args.ccache), *compiler_command],
+            environment,
+        )
+        return 0
+    except OSError as exc:
+        print(f"ERROR: could not execute ccache launcher: {exc}", file=sys.stderr)
+        return 127
 
 
 def parse_print_stats(text: str) -> dict[str, int]:
@@ -195,8 +596,7 @@ def configured_identity(build_dir: Path, expected_sanitizer: str) -> ConfiguredI
     sanitizer = cache.get("INTRINSIC_SANITIZER_IDENTITY", "")
     if sanitizer not in {"none", "asan", "ubsan", "asan-ubsan"}:
         raise RuntimeError(
-            "configured CMake cache must name a valid "
-            "INTRINSIC_SANITIZER_IDENTITY"
+            "configured CMake cache must name a valid INTRINSIC_SANITIZER_IDENTITY"
         )
     if sanitizer != expected_sanitizer:
         raise RuntimeError(
@@ -247,51 +647,19 @@ def _is_relative_to(child: Path, parent: Path) -> bool:
     return True
 
 
-def _validate_module_digest(path: Path, repo_root: Path) -> list[str]:
-    errors: list[str] = []
+def _validate_module_context(path: Path) -> list[str]:
     try:
         lines = path.read_text(encoding="utf-8").splitlines()
     except OSError as exc:
-        return [f"could not read ccache module-interface digest {path}: {exc}"]
+        return [f"could not read ccache global module context {path}: {exc}"]
 
-    if not lines or lines[0] != "schema_version=1":
-        errors.append(
-            f"ccache module-interface digest has invalid schema header: {path}"
-        )
-        return errors
-
-    relative_paths: list[str] = []
-    for line_number, line in enumerate(lines[1:], start=2):
-        match = re.fullmatch(r"([0-9a-f]{64})  (.+\.cppm)", line)
-        if not match:
-            errors.append(
-                f"invalid ccache module-interface digest line {line_number}: {line!r}"
-            )
-            continue
-        expected_hash, relative = match.groups()
-        candidate = repo_root / relative
-        if Path(relative).is_absolute() or not _is_relative_to(candidate, repo_root):
-            errors.append(
-                f"ccache module-interface digest path escapes repository: {relative}"
-            )
-            continue
-        try:
-            observed_hash = hashlib.sha256(candidate.read_bytes()).hexdigest()
-        except OSError as exc:
-            errors.append(f"could not hash module interface {candidate}: {exc}")
-            continue
-        if observed_hash != expected_hash:
-            errors.append(
-                f"stale ccache module-interface digest for {relative}: "
-                f"recorded {expected_hash}, observed {observed_hash}"
-            )
-        relative_paths.append(relative)
-
-    if not relative_paths:
-        errors.append("ccache module-interface digest contains no module interfaces")
-    elif relative_paths != sorted(set(relative_paths)):
-        errors.append("ccache module-interface digest paths must be sorted and unique")
-    return errors
+    if (
+        len(lines) != 2
+        or lines[0] != "schema_version=3"
+        or not re.fullmatch(r"[0-9a-f]{64}  @global-module-context", lines[1])
+    ):
+        return [f"ccache global module context has invalid content: {path}"]
+    return []
 
 
 def validate_config(
@@ -314,15 +682,17 @@ def validate_config(
         if not launcher_lines:
             errors.append("generated Ninja graph does not use a ccache launcher")
         for token in (
-            "CCACHE_NODEPEND=1",
-            "CCACHE_NODIRECT=1",
-            "CCACHE_EXTRAFILES=",
+            "ccache_ci.py",
+            "launch",
+            "--ccache=",
+            "--base-extra-file=",
+            "--repo-root=",
         ):
             if not any(token in line for line in launcher_lines):
                 errors.append(f"generated Ninja ccache launcher is missing {token}")
 
-    module_digest = build_dir / MODULE_DIGEST_NAME
-    errors.extend(_validate_module_digest(module_digest, repo_root))
+    module_context = build_dir / MODULE_CONTEXT_NAME
+    errors.extend(_validate_module_context(module_context))
 
     try:
         cache_dir = Path(_run_ccache_config("cache_dir")).expanduser()
@@ -489,6 +859,13 @@ def parse_args() -> argparse.Namespace:
     stats = subparsers.add_parser("write-stats")
     stats.add_argument("--output", type=Path, required=True)
     stats.set_defaults(func=write_stats)
+
+    launch = subparsers.add_parser("launch")
+    launch.add_argument("--ccache", type=Path, required=True)
+    launch.add_argument("--base-extra-file", type=Path, required=True)
+    launch.add_argument("--repo-root", type=Path, required=True)
+    launch.add_argument("compiler_command", nargs=argparse.REMAINDER)
+    launch.set_defaults(func=launch_ccache)
 
     return parser.parse_args()
 

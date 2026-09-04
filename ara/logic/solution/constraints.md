@@ -21,18 +21,19 @@
 - **Evidence**: [src/core/Core.Tasks.Dispatch.cpp], [src/core/Core.Tasks.cppm], [tests/unit/core/Test.CoreTasks.cpp], [src/core/README.md], [tasks/archive/BUG-078-coretasks-counterevent-rearm-uaf.md]
 - **From staging**: O10
 
-## K04: Coarse module-interface cache invalidation
-- **Constraint**: The retained CI ccache path disables direct and depend modes
-  and hashes a deterministic digest of every repository `.cppm` through
-  `CCACHE_EXTRAFILES`. Any module-interface edit therefore invalidates all
-  eligible cached C++ consumers, deliberately trading reuse precision for a
-  fail-closed module-safety boundary; `.cppm` compilation itself remains
-  compiler pass-through.
+## K04: Historical coarse module-interface cache invalidation
+- **Constraint**: The CI-007 evidence cohort disabled direct and depend modes
+  and hashed every repository `.cppm`, so any interface edit deliberately
+  invalidated all eligible C++ consumers. BUG-164 supersedes that coarse key
+  with dependency-local semantic sidecars; retain this row only when
+  interpreting the historical CI-007 measurements. Module-interface
+  compilation remains compiler pass-through in both policies.
 - **Provenance**: ai-executed
 - **Crystallized via**: artifact-commitment
 - **Evidence**: [ara/evidence/tables/ci007_ccache_cohort.md,
   tools/ci/ccache_ci.py, .github/workflows/pr-fast.yml,
-  tasks/archive/CI-007-module-safe-persistent-ccache-pilot.md]
+  tasks/archive/CI-007-module-safe-persistent-ccache-pilot.md,
+  tasks/active/BUG-164-ccache-module-bmi-macro-staleness.md]
 - **From staging**: O14
 
 ## K05: Completion Queue Publication Is a One-Way State Handoff

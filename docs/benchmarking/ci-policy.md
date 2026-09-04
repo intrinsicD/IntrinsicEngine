@@ -880,9 +880,13 @@ compatible-prefix restores as warm samples. Each immutable saved key includes
 the configured compiler/scanner, pinned ccache, preset, sanitizer identity,
 toolchain/dependency-input hash, and commit SHA. Ccache 4.9.1 passes `.cppm`
 compiles through; cacheable C++ consumers run with direct and depend modes off
-and hash a deterministic digest of every repository module interface through
-`CCACHE_EXTRAFILES`. No warm-compile population existed in the CI-003 baseline,
-and the baseline records that absence rather than combining cache states.
+and hash stable semantic sidecars for only their direct module imports through
+`CCACHE_EXTRAFILES`. A module sidecar binds that module's CMake compile context,
+source, project/build-local scanner dependencies, and direct dependency
+sidecars; a separate small marker covers global C++ flags. This replaces the
+CI-007 cohort's coarse all-interface digest without changing those historical
+measurements. No warm-compile population existed in the CI-003 baseline, and
+the baseline records that absence rather than combining cache states.
 As described in the sanitizer topology above, these samples retain their
 historical combined/default and ad hoc variant identities; they are not
 identical-selector measurements of the current isolated presets.
@@ -898,9 +902,11 @@ Before the measured build, `pr-fast` runs a hermetic named-module invalidation
 probe with the compiler and `clang-scan-deps` selected by the configured `ci`
 preset. The probe uses its own ccache config and content store, keeps the module
 implementation and importer byte-for-byte and mtime-stable, and requires an
-empty-cache miss, unchanged-source hits, misses after an interface-only layout
-change, Ninja importer invalidation, and output parity with a clean no-ccache
-build. Its JSON is uploaded as `ci-ccache-module-invalidation-pr-fast`; probe
+empty-cache misses, unchanged-source hits, and importer misses after an
+interface-only layout change, directory and target-private definition changes,
+a target-private option change, and a textual GMF-header edit. It also requires
+Ninja importer invalidation and output parity with clean no-ccache builds. Its
+JSON is uploaded as `ci-ccache-module-invalidation-pr-fast`; probe
 time and probe-cache statistics are not included in the measured gate result.
 
 The aggregate uses the distinct benchmark ID

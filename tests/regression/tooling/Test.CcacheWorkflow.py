@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 
-import hashlib
 import importlib.util
 import json
 import os
@@ -58,6 +57,118 @@ class CcacheWorkflowTests(unittest.TestCase):
 
     def _workflow_text(self) -> str:
         return WORKFLOW.read_text(encoding="utf-8")
+
+    @staticmethod
+    def _write_semantic_module_fixture(
+        root: Path,
+    ) -> tuple[Path, Path, Path, list[str], list[str]]:
+        source_dir = root / "src"
+        build_dir = root / "build"
+        provider_dir = build_dir / "CMakeFiles" / "direct.dir"
+        consumer_dir = build_dir / "CMakeFiles" / "consumer.dir"
+        source_dir.mkdir()
+        provider_dir.mkdir(parents=True)
+        consumer_dir.mkdir(parents=True)
+
+        source = source_dir / "Direct.cppm"
+        header = source_dir / "DirectConfig.hpp"
+        source.write_text(
+            'module;\n#include "DirectConfig.hpp"\nexport module Direct;\n',
+            encoding="utf-8",
+        )
+        header.write_text("#define DIRECT_VALUE 1\n", encoding="utf-8")
+
+        pcm = provider_dir / "Direct.pcm"
+        unrelated_pcm = provider_dir / "Unrelated.pcm"
+        pcm.write_bytes(b"nondeterministic-pcm-v1")
+        unrelated_pcm.write_bytes(b"unrelated")
+        primary_output = "CMakeFiles/direct.dir/Direct.cppm.o"
+        provider_ddi = build_dir / f"{primary_output}.ddi"
+        provider_ddi.write_text(
+            json.dumps(
+                {
+                    "revision": 0,
+                    "rules": [
+                        {
+                            "primary-output": primary_output,
+                            "provides": [
+                                {
+                                    "is-interface": True,
+                                    "logical-name": "Direct",
+                                    "source-path": str(source),
+                                }
+                            ],
+                            "requires": [],
+                        }
+                    ],
+                    "version": 1,
+                }
+            ),
+            encoding="utf-8",
+        )
+        Path(f"{provider_ddi}.d").write_text(
+            f"{provider_ddi}: {source} {header}\n",
+            encoding="utf-8",
+        )
+        provider_map = Path(f"{build_dir / primary_output}.modmap")
+        provider_map.write_text(f'-fmodule-output="{pcm}"\n', encoding="utf-8")
+        (provider_dir / "CXX.dd").write_text(
+            "ninja_dyndep_version = 1.0\n"
+            f"build {primary_output} | {pcm}: dyndep\n"
+            "  restat = 1\n",
+            encoding="utf-8",
+        )
+        (provider_dir / "CXXDependInfo.json").write_text(
+            json.dumps(
+                {
+                    "compiler-frontend-variant": "GNU",
+                    "compiler-id": "Clang",
+                    "compiler-simulate-id": "",
+                    "config": "Debug",
+                    "cxx-modules": {
+                        primary_output: {
+                            "compile-features": ["cxx_std_23"],
+                            "compile-options": ["-DDIRECT_OPTION=1"],
+                            "definitions": ["DIRECT_VALUE=1"],
+                            "include-directories": [str(source_dir)],
+                            "source": str(source),
+                            "type": "CXX_MODULES",
+                        }
+                    },
+                    "language": "CXX",
+                }
+            ),
+            encoding="utf-8",
+        )
+
+        consumer_map = consumer_dir / "Consumer.cpp.o.modmap"
+        consumer_map.write_text(
+            f'-fmodule-file="Direct={pcm}"\n'
+            f'-fmodule-file="Unrelated={unrelated_pcm}"\n',
+            encoding="utf-8",
+        )
+        consumer_map.with_suffix(".ddi").write_text(
+            json.dumps(
+                {
+                    "revision": 0,
+                    "rules": [
+                        {
+                            "primary-output": "CMakeFiles/consumer.dir/Consumer.cpp.o",
+                            "requires": [{"logical-name": "Direct"}],
+                        }
+                    ],
+                    "version": 1,
+                }
+            ),
+            encoding="utf-8",
+        )
+        return (
+            build_dir,
+            pcm,
+            header,
+            ["clang++", f"@{provider_map}"],
+            ["clang++", f"@{consumer_map}"],
+        )
 
     def test_pr_fast_persists_only_external_ccache_store(self) -> None:
         payload = yaml.safe_load(self._workflow_text())
@@ -192,30 +303,192 @@ class CcacheWorkflowTests(unittest.TestCase):
         self.assertIn("option(INTRINSIC_ENABLE_CCACHE", text)
         self.assertIn("if(INTRINSIC_ENABLE_CCACHE)", text)
         self.assertIn("elseif(NOT INTRINSIC_ENABLE_CCACHE)", text)
-        self.assertIn("CCACHE_NODEPEND=1", text)
-        self.assertIn("CCACHE_NODIRECT=1", text)
-        self.assertIn("CCACHE_EXTRAFILES=", text)
-        self.assertIn("CMAKE_CONFIGURE_DEPENDS", text)
+        self.assertIn("ccache_ci.py", text)
+        self.assertIn("--base-extra-file=", text)
+        self.assertIn("--repo-root=", text)
+        self.assertIn("@global-module-context", text)
+        self.assertIn("dependency-local-semantic-v1", text)
+        self.assertIn("CMAKE_CXX_FLAGS", text)
+        self.assertNotIn("CMakeCache.txt", text)
+        self.assertNotIn("build.ninja", text)
+        self.assertNotIn("CACHE_VARIABLES", text)
 
-    def test_module_digest_validation_detects_interface_changes(self) -> None:
+    def test_global_module_context_validation_accepts_exact_schema(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
-            interface = root / "src" / "Probe.cppm"
-            interface.parent.mkdir()
-            interface.write_text("export module Probe;\n", encoding="utf-8")
-            digest = root / ccache_ci.MODULE_DIGEST_NAME
-            digest.write_text(
-                "schema_version=1\n"
-                f"{hashlib.sha256(interface.read_bytes()).hexdigest()}  src/Probe.cppm\n",
+            context = root / ccache_ci.MODULE_CONTEXT_NAME
+            context.write_text(
+                f"schema_version=3\n{'0' * 64}  @global-module-context\n",
                 encoding="utf-8",
             )
 
-            self.assertEqual(ccache_ci._validate_module_digest(digest, root), [])
-            interface.write_text(
-                "export module Probe;\nexport int changed();\n", encoding="utf-8"
+            self.assertEqual(ccache_ci._validate_module_context(context), [])
+
+    def test_global_module_context_validation_rejects_extra_records(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            context = root / ccache_ci.MODULE_CONTEXT_NAME
+            context.write_text(
+                "schema_version=3\n"
+                f"{'0' * 64}  @global-module-context\n"
+                "unexpected=true\n",
+                encoding="utf-8",
             )
-            errors = ccache_ci._validate_module_digest(digest, root)
-            self.assertTrue(any("stale" in error for error in errors), errors)
+
+            errors = ccache_ci._validate_module_context(context)
+            self.assertTrue(any("invalid content" in error for error in errors))
+
+    def test_module_fingerprint_is_semantic_and_dependency_local(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            build_dir, direct_pcm, header, provider_command, consumer_command = (
+                self._write_semantic_module_fixture(root)
+            )
+            fingerprint_inputs = ccache_ci.module_fingerprint_inputs(
+                provider_command, cwd=build_dir, repo_root=root
+            )
+            self.assertEqual(len(fingerprint_inputs), 1)
+            fingerprint = fingerprint_inputs[0]
+            original = fingerprint.read_text(encoding="utf-8")
+            self.assertEqual(
+                ccache_ci.module_fingerprint_inputs(
+                    consumer_command, cwd=build_dir, repo_root=root
+                ),
+                (fingerprint,),
+            )
+
+            direct_pcm.write_bytes(b"nondeterministic-pcm-v2")
+            same_fingerprint = ccache_ci.module_fingerprint_inputs(
+                provider_command, cwd=build_dir, repo_root=root
+            )[0]
+            self.assertEqual(same_fingerprint.read_text(encoding="utf-8"), original)
+
+            header.write_text("#define DIRECT_VALUE 2\n", encoding="utf-8")
+            changed_fingerprint = ccache_ci.module_fingerprint_inputs(
+                provider_command, cwd=build_dir, repo_root=root
+            )[0]
+            self.assertNotEqual(
+                changed_fingerprint.read_text(encoding="utf-8"), original
+            )
+
+    def test_module_fingerprint_propagates_direct_dependency_semantics(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            build_dir, direct_pcm, _, provider_command, _ = (
+                self._write_semantic_module_fixture(root)
+            )
+            provider_map = Path(provider_command[1][1:])
+            provider_ddi = provider_map.with_suffix(".ddi")
+            lower_pcm = direct_pcm.with_name("Lower.pcm")
+            lower_fingerprint = lower_pcm.with_suffix(".ccache-inputs")
+            lower_pcm.write_bytes(b"lower-pcm")
+            provider_map.write_text(
+                provider_map.read_text(encoding="utf-8")
+                + f'-fmodule-file="Lower={lower_pcm}"\n',
+                encoding="utf-8",
+            )
+            metadata = json.loads(provider_ddi.read_text(encoding="utf-8"))
+            metadata["rules"][0]["requires"] = [{"logical-name": "Lower"}]
+            provider_ddi.write_text(json.dumps(metadata), encoding="utf-8")
+
+            lower_fingerprint.write_text(
+                json.dumps(
+                    {
+                        "schema_version": ccache_ci.MODULE_INPUT_SCHEMA_VERSION,
+                        "logical_name": "Lower",
+                        "semantic_digest": "0" * 64,
+                    }
+                ),
+                encoding="utf-8",
+            )
+            direct_fingerprint = ccache_ci.module_fingerprint_inputs(
+                provider_command, cwd=build_dir, repo_root=root
+            )[0]
+            original = direct_fingerprint.read_text(encoding="utf-8")
+
+            lower_fingerprint.write_text(
+                json.dumps(
+                    {
+                        "schema_version": ccache_ci.MODULE_INPUT_SCHEMA_VERSION,
+                        "logical_name": "Lower",
+                        "semantic_digest": "1" * 64,
+                    }
+                ),
+                encoding="utf-8",
+            )
+            changed = ccache_ci.module_fingerprint_inputs(
+                provider_command, cwd=build_dir, repo_root=root
+            )[0]
+            self.assertNotEqual(changed.read_text(encoding="utf-8"), original)
+
+    def test_module_fingerprint_fails_closed_on_missing_metadata(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            module_map = root / "consumer.cpp.o.modmap"
+            module_map.write_text("", encoding="utf-8")
+
+            with self.assertRaisesRegex(RuntimeError, "dependency metadata"):
+                ccache_ci.module_fingerprint_inputs(
+                    ["clang++", f"@{module_map}"],
+                    cwd=root,
+                    repo_root=root,
+                )
+
+    def test_module_map_allows_only_identical_duplicate_mappings(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            module_map = root / "consumer.modmap"
+            module_map.write_text(
+                '-fmodule-file="Direct=Direct.pcm"\n'
+                '-fmodule-file="Direct=Direct.pcm"\n',
+                encoding="utf-8",
+            )
+            self.assertEqual(
+                ccache_ci._read_module_map(module_map, root),
+                {"Direct": (root / "Direct.pcm").resolve()},
+            )
+
+            module_map.write_text(
+                '-fmodule-file="Direct=Direct.pcm"\n-fmodule-file="Direct=Other.pcm"\n',
+                encoding="utf-8",
+            )
+            with self.assertRaisesRegex(RuntimeError, "conflicting"):
+                ccache_ci._read_module_map(module_map, root)
+
+    def test_launch_ccache_hashes_base_and_semantic_module_fingerprint(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            build_dir, _, _, provider_command, command = (
+                self._write_semantic_module_fixture(root)
+            )
+            ccache_ci.module_fingerprint_inputs(
+                provider_command, cwd=build_dir, repo_root=root
+            )
+            base = root / "base.txt"
+            base.write_text("base", encoding="utf-8")
+            args = SimpleNamespace(
+                ccache=Path("/opt/ccache"),
+                base_extra_file=base,
+                repo_root=root,
+                compiler_command=["--", *command],
+            )
+
+            with (
+                mock.patch.object(ccache_ci.os, "execvpe") as execute,
+                mock.patch.object(ccache_ci.Path, "cwd", return_value=build_dir),
+            ):
+                self.assertEqual(ccache_ci.launch_ccache(args), 0)
+
+            command, argv, environment = execute.call_args.args
+            self.assertEqual(command, "/opt/ccache")
+            self.assertEqual(argv, ["/opt/ccache", *args.compiler_command[1:]])
+            self.assertEqual(environment["CCACHE_NODIRECT"], "1")
+            self.assertEqual(environment["CCACHE_NODEPEND"], "1")
+            extra_files = environment["CCACHE_EXTRAFILES"].split(os.pathsep)
+            self.assertEqual(extra_files[0], str(base.resolve()))
+            self.assertEqual(Path(extra_files[1]).suffix, ".ccache-inputs")
+            fingerprint = json.loads(Path(extra_files[1]).read_text(encoding="utf-8"))
+            self.assertEqual(fingerprint["logical_name"], "Direct")
 
     def test_configured_identity_uses_selected_toolchain_and_sanitizer(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -400,9 +673,7 @@ class CcacheWorkflowTests(unittest.TestCase):
                 )
             finally:
                 ccache_ci._run_ccache_config = original
-        self.assertIn(
-            "generated Ninja ccache launcher is missing CCACHE_NODEPEND=1", errors
-        )
+        self.assertIn("generated Ninja ccache launcher is missing ccache_ci.py", errors)
 
 
 if __name__ == "__main__":

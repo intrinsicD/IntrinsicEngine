@@ -10,42 +10,46 @@ endif()
 
 if(INTRINSIC_ENABLE_CCACHE AND CCACHE_PROGRAM)
     message(STATUS "Using CCache: ${CCACHE_PROGRAM}")
-    # CI-007: ccache 4.9.1 passes C++23 module interfaces through and cannot use
-    # depend mode while direct mode is disabled. Cache implementation/importer
-    # units in preprocessor mode, and include one deterministic digest of every
-    # repository module interface in each cache key. Existing interface files are
-    # configure dependencies and CONFIGURE_DEPENDS catches additions/removals, so
-    # the digest is refreshed before an interface-changing incremental build.
-    file(GLOB_RECURSE _intrinsic_ccache_module_interfaces
-        CONFIGURE_DEPENDS
-        LIST_DIRECTORIES false
-        "${CMAKE_SOURCE_DIR}/src/*.cppm"
-        "${CMAKE_SOURCE_DIR}/methods/*.cppm"
-        "${CMAKE_SOURCE_DIR}/benchmarks/*.cppm"
-        "${CMAKE_SOURCE_DIR}/tests/*.cppm")
-    list(SORT _intrinsic_ccache_module_interfaces)
-    set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
-        ${_intrinsic_ccache_module_interfaces})
+    find_program(INTRINSIC_CCACHE_PYTHON_EXECUTABLE
+        NAMES python3 python
+        REQUIRED)
+    # Ccache 4.9.1 passes C++23 module interfaces through and cannot use depend
+    # mode while direct mode is disabled. Cache implementation/importer units
+    # in preprocessor mode. The launcher derives a semantic fingerprint for
+    # each imported module from CMake's scanner metadata, while this base marker
+    # covers global compiler flags that CXXDependInfo.json does not record.
+    get_target_property(_intrinsic_ccache_config_compile_definitions
+        IntrinsicConfig INTERFACE_COMPILE_DEFINITIONS)
+    if(NOT _intrinsic_ccache_config_compile_definitions)
+        set(_intrinsic_ccache_config_compile_definitions "")
+    endif()
+    string(TOUPPER "${CMAKE_BUILD_TYPE}" _intrinsic_ccache_build_type_upper)
+    set(_intrinsic_ccache_active_cxx_flags
+        "${CMAKE_CXX_FLAGS_${_intrinsic_ccache_build_type_upper}}")
+    string(CONCAT _intrinsic_ccache_global_module_context
+        "key_policy=dependency-local-semantic-v1\n"
+        "build_type=${CMAKE_BUILD_TYPE}\n"
+        "cxx_flags=${CMAKE_CXX_FLAGS}\n"
+        "active_cxx_flags=${_intrinsic_ccache_active_cxx_flags}\n"
+        "intrinsic_compile_flags=${INTRINSIC_COMPILE_FLAGS}\n"
+        "intrinsic_config_compile_definitions=${_intrinsic_ccache_config_compile_definitions}\n")
+    string(SHA256 _intrinsic_ccache_global_module_context_hash
+        "${_intrinsic_ccache_global_module_context}")
 
-    set(_intrinsic_ccache_module_digest "schema_version=1\n")
-    foreach(_intrinsic_module_interface IN LISTS _intrinsic_ccache_module_interfaces)
-        file(SHA256 "${_intrinsic_module_interface}" _intrinsic_module_hash)
-        file(RELATIVE_PATH _intrinsic_module_relative
-            "${CMAKE_SOURCE_DIR}" "${_intrinsic_module_interface}")
-        string(APPEND _intrinsic_ccache_module_digest
-            "${_intrinsic_module_hash}  ${_intrinsic_module_relative}\n")
-    endforeach()
-    set(_intrinsic_ccache_module_digest_path
-        "${CMAKE_BINARY_DIR}/intrinsic-ccache-module-interfaces.txt")
-    file(WRITE "${_intrinsic_ccache_module_digest_path}"
-        "${_intrinsic_ccache_module_digest}")
+    set(_intrinsic_ccache_global_module_context_path
+        "${CMAKE_BINARY_DIR}/intrinsic-ccache-module-context.txt")
+    file(WRITE "${_intrinsic_ccache_global_module_context_path}"
+        "schema_version=3\n"
+        "${_intrinsic_ccache_global_module_context_hash}  @global-module-context\n")
 
     set(_intrinsic_ccache_launcher
-        "${CMAKE_COMMAND}" -E env
-        CCACHE_NODEPEND=1
-        CCACHE_NODIRECT=1
-        "CCACHE_EXTRAFILES=${_intrinsic_ccache_module_digest_path}"
-        "${CCACHE_PROGRAM}")
+        "${INTRINSIC_CCACHE_PYTHON_EXECUTABLE}" -B
+        "${CMAKE_SOURCE_DIR}/tools/ci/ccache_ci.py"
+        launch
+        "--ccache=${CCACHE_PROGRAM}"
+        "--base-extra-file=${_intrinsic_ccache_global_module_context_path}"
+        "--repo-root=${CMAKE_SOURCE_DIR}"
+        --)
     set(CMAKE_CXX_COMPILER_LAUNCHER ${_intrinsic_ccache_launcher})
     set(CMAKE_C_COMPILER_LAUNCHER ${_intrinsic_ccache_launcher})
 elseif(NOT INTRINSIC_ENABLE_CCACHE)

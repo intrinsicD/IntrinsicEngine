@@ -5,13 +5,6 @@ Each entry includes the observed repro, the likely affected symbols, and a fix p
 
 ## Active Issues
 
-- [`BUG-164` — ccache serves stale objects when a macro changes only imported
-  module BMIs](BUG-164-ccache-module-bmi-macro-staleness.md): the CI-007
-  preprocessor-mode launcher keys on the TU's preprocessed text plus a digest
-  of `.cppm` sources, so a definition that only alters a header inside other
-  modules' global module fragments (glm under `GLM_FORCE_XYZW_ONLY`) reused a
-  stale `Pass.Selection.Outline.cpp` object; fix the key, not the lane list.
-
 - [`BUG-158` — Optional direct-mesh enrichment blocks already usable
   geometry](BUG-158-direct-mesh-enrichment-blocks-usable-geometry.md): the
   geometry-only mesh is published immediately, but the editor returns before

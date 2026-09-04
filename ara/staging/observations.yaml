@@ -152,7 +152,7 @@ observations:
     promoted: true
     promoted_to: "logic/solution/constraints.md:K04"
     crystallized_via: artifact-commitment
-    stale: false
+    stale: true
   - id: O15
     timestamp: "2026-07-13T01:00"
     provenance: ai-executed

@@ -24,18 +24,26 @@ spec.loader.exec_module(probe)
 
 class CcacheModuleInvalidationProbeTests(unittest.TestCase):
     def test_fixture_uses_safe_ccache_launcher(self) -> None:
-        self.assertIn("CCACHE_NODEPEND=1", probe.CMAKE_LISTS)
-        self.assertIn("CCACHE_NODIRECT=1", probe.CMAKE_LISTS)
+        self.assertIn("PROBE_CCACHE_LAUNCHER", probe.CMAKE_LISTS)
         self.assertIn(
-            "CCACHE_EXTRAFILES=${PROBE_MODULE_FINGERPRINT}", probe.CMAKE_LISTS
+            "--base-extra-file=${PROBE_MODULE_FINGERPRINT}", probe.CMAKE_LISTS
         )
+        self.assertIn("--repo-root=${CMAKE_CURRENT_SOURCE_DIR}", probe.CMAKE_LISTS)
         self.assertNotIn("CCACHE_DEPEND=1", probe.CMAKE_LISTS)
         self.assertIn("PROBE_USE_CCACHE", probe.CMAKE_LISTS)
         self.assertIn("FILE_SET CXX_MODULES", probe.CMAKE_LISTS)
+        self.assertIn("schema_version=3", probe.CMAKE_LISTS)
+        self.assertIn("@global-module-context", probe.CMAKE_LISTS)
+        self.assertNotIn("CMakeCache.txt", probe.CMAKE_LISTS)
+        self.assertNotIn("build.ninja", probe.CMAKE_LISTS)
 
     def test_only_interface_changes_between_fixture_versions(self) -> None:
         self.assertEqual(probe.SOURCE_V1["Probe.cpp"], probe.SOURCE_V2["Probe.cpp"])
         self.assertEqual(probe.SOURCE_V1["main.cpp"], probe.SOURCE_V2["main.cpp"])
+        self.assertEqual(
+            probe.SOURCE_V1["ProbeConfig.hpp"],
+            probe.SOURCE_V2["ProbeConfig.hpp"],
+        )
         self.assertNotEqual(
             probe.SOURCE_V1["Probe.cppm"], probe.SOURCE_V2["Probe.cppm"]
         )
@@ -45,6 +53,25 @@ class CcacheModuleInvalidationProbeTests(unittest.TestCase):
         self.assertIn("int extra = 5", probe.SOURCE_V2["Probe.cppm"])
         self.assertEqual(probe.EXPECTED_V1_OUTPUT, "11")
         self.assertEqual(probe.EXPECTED_V2_OUTPUT, "29")
+        self.assertEqual(probe.EXPECTED_GMF_MACRO_OUTPUT, "47")
+        self.assertEqual(probe.EXPECTED_TARGET_DEFINITION_OUTPUT, "52")
+        self.assertEqual(probe.EXPECTED_TARGET_OPTION_OUTPUT, "58")
+        self.assertEqual(probe.EXPECTED_GMF_HEADER_OUTPUT, "65")
+
+    def test_changed_macro_is_consumed_only_by_the_gmf_header(self) -> None:
+        self.assertIn("PROBE_GMF_VALUE", probe.COMMON_SOURCES["ProbeConfig.hpp"])
+        self.assertIn("PROBE_TARGET_GMF_VALUE", probe.COMMON_SOURCES["ProbeConfig.hpp"])
+        self.assertIn(
+            "PROBE_TARGET_OPTION_VALUE", probe.COMMON_SOURCES["ProbeConfig.hpp"]
+        )
+        for source in ("Probe.cppm", "Probe.cpp", "main.cpp"):
+            self.assertNotIn("PROBE_GMF_VALUE", probe.SOURCE_V2[source])
+            self.assertNotIn("PROBE_TARGET_GMF_VALUE", probe.SOURCE_V2[source])
+            self.assertNotIn("PROBE_TARGET_OPTION_VALUE", probe.SOURCE_V2[source])
+        self.assertIn('#include "ProbeConfig.hpp"', probe.PROBE_INTERFACE_V2)
+        self.assertIn("PROBE_GMF_BASE", probe.PROBE_INTERFACE_V2)
+        self.assertIn("target_compile_definitions(probe PRIVATE", probe.CMAKE_LISTS)
+        self.assertIn("target_compile_options(probe PRIVATE", probe.CMAKE_LISTS)
 
     @staticmethod
     def _scenario(
@@ -73,7 +100,7 @@ class CcacheModuleInvalidationProbeTests(unittest.TestCase):
             dependency_explanations=(),
         )
 
-    def test_cache_evidence_requires_hits_and_interface_change_misses(self) -> None:
+    def test_cache_evidence_requires_hits_and_all_module_input_misses(self) -> None:
         cold = self._scenario(
             "empty-cache-v1",
             {
@@ -104,8 +131,56 @@ class CcacheModuleInvalidationProbeTests(unittest.TestCase):
             hits=0,
             misses=2,
         )
+        macro_changed = self._scenario(
+            "restored-cache-gmf-macro-change-v2",
+            {
+                "Probe.cppm": ("unsupported_source_language",),
+                "Probe.cpp": ("cache_miss",),
+                "main.cpp": ("cache_miss",),
+            },
+            hits=0,
+            misses=2,
+        )
+        target_definition_changed = self._scenario(
+            "restored-cache-target-definition-change-v2",
+            {
+                "Probe.cppm": ("unsupported_source_language",),
+                "Probe.cpp": ("cache_miss",),
+                "main.cpp": ("cache_miss",),
+            },
+            hits=0,
+            misses=2,
+        )
+        target_option_changed = self._scenario(
+            "restored-cache-target-option-change-v2",
+            {
+                "Probe.cppm": ("unsupported_source_language",),
+                "Probe.cpp": ("cache_miss",),
+                "main.cpp": ("cache_miss",),
+            },
+            hits=0,
+            misses=2,
+        )
+        header_changed = self._scenario(
+            "restored-cache-gmf-header-change-v2",
+            {
+                "Probe.cppm": ("unsupported_source_language",),
+                "Probe.cpp": ("cache_miss",),
+                "main.cpp": ("cache_miss",),
+            },
+            hits=0,
+            misses=2,
+        )
 
-        errors, interface_mode = probe._cache_evidence_errors(cold, warm, changed)
+        errors, interface_mode = probe._cache_evidence_errors(
+            cold,
+            warm,
+            changed,
+            macro_changed,
+            target_definition_changed,
+            target_option_changed,
+            header_changed,
+        )
 
         self.assertEqual(errors, [])
         self.assertEqual(interface_mode, "compiler-pass-through")
@@ -120,7 +195,15 @@ class CcacheModuleInvalidationProbeTests(unittest.TestCase):
             hits=0,
             misses=2,
         )
-        errors, _ = probe._cache_evidence_errors(cold, no_hit_warm, changed)
+        errors, _ = probe._cache_evidence_errors(
+            cold,
+            no_hit_warm,
+            changed,
+            macro_changed,
+            target_definition_changed,
+            target_option_changed,
+            header_changed,
+        )
         self.assertTrue(any("zero cache hits" in error for error in errors))
         self.assertTrue(
             any("main.cpp" in error and "cache hit" in error for error in errors)
@@ -140,12 +223,40 @@ class CcacheModuleInvalidationProbeTests(unittest.TestCase):
             cold,
             unsupported_consumer_warm,
             changed,
+            macro_changed,
+            target_definition_changed,
+            target_option_changed,
+            header_changed,
         )
         self.assertTrue(
             any("main.cpp" in error and "cache hit" in error for error in errors)
         )
 
-    def test_probe_runs_cached_and_clean_interface_change(self) -> None:
+        stale_macro = self._scenario(
+            "restored-cache-gmf-macro-change-v2",
+            {
+                "Probe.cppm": ("unsupported_source_language",),
+                "Probe.cpp": ("preprocessed_cache_hit",),
+                "main.cpp": ("preprocessed_cache_hit",),
+            },
+            hits=2,
+            misses=0,
+        )
+        errors, _ = probe._cache_evidence_errors(
+            cold,
+            warm,
+            changed,
+            stale_macro,
+            target_definition_changed,
+            target_option_changed,
+            header_changed,
+        )
+        self.assertTrue(
+            any("gmf-macro" in error and "main.cpp" in error for error in errors),
+            errors,
+        )
+
+    def test_probe_runs_cached_and_clean_module_input_changes(self) -> None:
         for tool in ("cmake", "ninja", "ccache"):
             if shutil.which(tool) is None:
                 self.skipTest(f"{tool} is not available")
@@ -193,13 +304,35 @@ class CcacheModuleInvalidationProbeTests(unittest.TestCase):
             payload = json.loads(output.read_text(encoding="utf-8"))
 
         self.assertEqual(payload["status"], "passed")
+        self.assertEqual(payload["schema_version"], 2)
         self.assertIn("ccache version 4.9.1", payload["ccache_version"])
         self.assertTrue(payload["parity"]["matched"])
         self.assertEqual(payload["parity"]["cached_interface_change_output"], "29")
-        self.assertEqual(payload["parity"]["clean_no_ccache_output"], "29")
+        self.assertEqual(payload["parity"]["clean_interface_change_output"], "29")
+        self.assertTrue(payload["parity"]["interface_matched"])
+        self.assertEqual(payload["parity"]["cached_gmf_macro_change_output"], "47")
+        self.assertEqual(payload["parity"]["clean_gmf_macro_change_output"], "47")
+        self.assertTrue(payload["parity"]["gmf_macro_matched"])
+        self.assertEqual(
+            payload["parity"]["cached_target_definition_change_output"], "52"
+        )
+        self.assertEqual(
+            payload["parity"]["clean_target_definition_change_output"], "52"
+        )
+        self.assertTrue(payload["parity"]["target_definition_matched"])
+        self.assertEqual(payload["parity"]["cached_target_option_change_output"], "58")
+        self.assertEqual(payload["parity"]["clean_target_option_change_output"], "58")
+        self.assertTrue(payload["parity"]["target_option_matched"])
+        self.assertEqual(payload["parity"]["cached_gmf_header_change_output"], "65")
+        self.assertEqual(payload["parity"]["clean_gmf_header_change_output"], "65")
+        self.assertTrue(payload["parity"]["gmf_header_matched"])
         self.assertFalse(payload["cache_mode"]["direct_mode"])
         self.assertFalse(payload["cache_mode"]["depend_mode"])
         self.assertEqual(len(payload["cache_mode"]["extra_files_to_hash"]), 1)
+        self.assertEqual(
+            Path(payload["cache_mode"]["extra_files_to_hash"][0]).name,
+            "probe-global-module-context.txt",
+        )
         self.assertEqual(Path(payload["ccache_config_path"]).parent, root / "work")
         self.assertEqual(Path(payload["toolchain"]["cxx"]), toolchain.cxx.absolute())
         self.assertEqual(
@@ -209,9 +342,27 @@ class CcacheModuleInvalidationProbeTests(unittest.TestCase):
         self.assertTrue(payload["source_invariance"]["interface_changed"])
         self.assertTrue(payload["source_invariance"]["implementation_unchanged"])
         self.assertTrue(payload["source_invariance"]["consumer_unchanged"])
-        self.assertTrue(payload["dependency_invalidation"]["module_dependency_dirty"])
-        self.assertTrue(payload["dependency_invalidation"]["consumer_dependency_dirty"])
-        self.assertTrue(payload["dependency_invalidation"]["consumer_recompiled"])
+        self.assertTrue(
+            payload["source_invariance"]["gmf_macro_change_sources_unchanged"]
+        )
+        self.assertTrue(
+            payload["source_invariance"]["target_definition_change_sources_unchanged"]
+        )
+        self.assertTrue(
+            payload["source_invariance"]["target_option_change_sources_unchanged"]
+        )
+        self.assertTrue(payload["source_invariance"]["gmf_header_changed_only"])
+        for change in (
+            "interface_change",
+            "gmf_macro_change",
+            "target_definition_change",
+            "target_option_change",
+            "gmf_header_change",
+        ):
+            invalidation = payload["dependency_invalidation"][change]
+            self.assertTrue(invalidation["module_dependency_dirty"])
+            self.assertTrue(invalidation["consumer_dependency_dirty"])
+            self.assertTrue(invalidation["consumer_recompiled"])
         for source in ("Probe.cpp", "main.cpp"):
             self.assertEqual(
                 payload["source_invariance"]["v1"][source],
@@ -229,9 +380,24 @@ class CcacheModuleInvalidationProbeTests(unittest.TestCase):
                 "restored-cache-unchanged-v1",
                 "restored-cache-interface-change-v2",
                 "clean-no-ccache-interface-change-v2",
+                "restored-cache-gmf-macro-change-v2",
+                "clean-no-ccache-gmf-macro-change-v2",
+                "restored-cache-target-definition-change-v2",
+                "clean-no-ccache-target-definition-change-v2",
+                "restored-cache-target-option-change-v2",
+                "clean-no-ccache-target-option-change-v2",
+                "restored-cache-gmf-header-change-v2",
+                "clean-no-ccache-gmf-header-change-v2",
             },
         )
-        for name in ("empty-cache-v1", "restored-cache-interface-change-v2"):
+        for name in (
+            "empty-cache-v1",
+            "restored-cache-interface-change-v2",
+            "restored-cache-gmf-macro-change-v2",
+            "restored-cache-target-definition-change-v2",
+            "restored-cache-target-option-change-v2",
+            "restored-cache-gmf-header-change-v2",
+        ):
             summary = scenarios[name]["ccache_summary"]
             self.assertIsNotNone(summary)
             self.assertEqual(summary["error_count"], 0)
@@ -242,21 +408,29 @@ class CcacheModuleInvalidationProbeTests(unittest.TestCase):
             invocation["source"]: set(invocation["results"])
             for invocation in warm["ccache_invocations"]
         }
-        changed_results = {
-            invocation["source"]: set(invocation["results"])
-            for invocation in scenarios["restored-cache-interface-change-v2"][
-                "ccache_invocations"
-            ]
-        }
         for source in ("Probe.cpp", "main.cpp"):
             self.assertTrue(probe.CACHE_HIT_RESULTS.intersection(warm_results[source]))
-            self.assertIn("cache_miss", changed_results[source])
-        self.assertIsNone(
-            scenarios["clean-no-ccache-interface-change-v2"]["ccache_summary"]
-        )
-        self.assertIsNone(
-            scenarios["clean-no-ccache-interface-change-v2"]["ccache_invocations"]
-        )
+            for name in (
+                "restored-cache-interface-change-v2",
+                "restored-cache-gmf-macro-change-v2",
+                "restored-cache-target-definition-change-v2",
+                "restored-cache-target-option-change-v2",
+                "restored-cache-gmf-header-change-v2",
+            ):
+                changed_results = {
+                    invocation["source"]: set(invocation["results"])
+                    for invocation in scenarios[name]["ccache_invocations"]
+                }
+                self.assertIn("cache_miss", changed_results[source])
+        for name in (
+            "clean-no-ccache-interface-change-v2",
+            "clean-no-ccache-gmf-macro-change-v2",
+            "clean-no-ccache-target-definition-change-v2",
+            "clean-no-ccache-target-option-change-v2",
+            "clean-no-ccache-gmf-header-change-v2",
+        ):
+            self.assertIsNone(scenarios[name]["ccache_summary"])
+            self.assertIsNone(scenarios[name]["ccache_invocations"])
 
 
 if __name__ == "__main__":
