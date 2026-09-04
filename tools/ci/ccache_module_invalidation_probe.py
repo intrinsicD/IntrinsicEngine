@@ -403,7 +403,7 @@ def _build_run(
     build_dir: Path,
     *,
     env: dict[str, str],
-) -> tuple[str, tuple[str, ...]]:
+) -> tuple[str, tuple[str, ...], tuple[str, ...]]:
     completed = _run(
         ["ninja", "-C", str(build_dir), "-d", "explain", "-v", "probe_app"],
         env=env,
@@ -412,14 +412,38 @@ def _build_run(
     explanations = tuple(
         line.strip() for line in build_output.splitlines() if "ninja explain:" in line
     )
+    compiler_commands = tuple(
+        line.strip()
+        for line in build_output.splitlines()
+        if "ccache_ci.py" in line
+        and any(source in line for source in EXPECTED_COMPILE_SOURCES)
+    )
     observed = _run([str(build_dir / "probe_app")], env=env).stdout.strip()
-    return observed, explanations
+    return observed, explanations, compiler_commands
 
 
 def _ccache_summary(env: dict[str, str]) -> dict[str, int]:
     completed = _run(["ccache", "--print-stats"], env=env)
     stats = ccache_ci.parse_print_stats(completed.stdout)
     return asdict(ccache_ci.summarize_stats(stats))
+
+
+def _debug_module_key_state(build_dir: Path) -> dict[str, object]:
+    target_dir = build_dir / "CMakeFiles" / "probe.dir"
+    context_path = target_dir / "CXXDependInfo.json"
+    sidecars = sorted(build_dir.rglob("*.ccache-inputs"))
+    state: dict[str, object] = {
+        "context": json.loads(context_path.read_text(encoding="utf-8")),
+        "sidecars": {},
+    }
+    sidecar_state = state["sidecars"]
+    assert isinstance(sidecar_state, dict)
+    for path in sidecars:
+        sidecar_state[str(path.relative_to(build_dir))] = {
+            "content": json.loads(path.read_text(encoding="utf-8")),
+            "mtime_ns": path.stat().st_mtime_ns,
+        }
+    return state
 
 
 def _parse_ccache_stats_log(path: Path) -> tuple[CcacheInvocation, ...]:
@@ -480,9 +504,21 @@ def run_scenario(
         stats_log.unlink(missing_ok=True)
         scenario_env["CCACHE_STATSLOG"] = str(stats_log)
         _zero_ccache(scenario_env)
-    observed, explanations = _build_run(build_dir, env=scenario_env)
+    observed, explanations, compiler_commands = _build_run(build_dir, env=scenario_env)
     summary = _ccache_summary(scenario_env) if use_ccache else None
     invocations = _parse_ccache_stats_log(stats_log) if use_ccache else None
+    if use_ccache:
+        print(
+            "[DBG-BUG164-CLANG20] "
+            + json.dumps(
+                {
+                    "name": name,
+                    "compiler_commands": compiler_commands,
+                    "module_key_state": _debug_module_key_state(build_dir),
+                },
+                sort_keys=True,
+            )
+        )
     if observed != expected_output:
         outcomes = {
             invocation.source: invocation.results for invocation in invocations or ()
