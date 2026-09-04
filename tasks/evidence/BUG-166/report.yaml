@@ -1,0 +1,101 @@
+schema_version: 1
+task_id: BUG-166
+workflow_profile: standard
+status: complete
+generated_by: tools/agents/workflow_evidence.py
+generated_at: '2026-09-04T23:51:54Z'
+claim_eligible: false
+source:
+  base_ref: origin/main
+  base_revision: ba785d34b54d56845723ed5a5a2b86b9f480ad37
+  head_revision: ba785d34b54d56845723ed5a5a2b86b9f480ad37
+  branch: codex/bug-166-historical-input-seals
+  worktree: /tmp/intrinsic-bug166
+  dirty: true
+  surface:
+  - path: docs/agent/workflow-evidence.md
+    sha256: 007a6f01c891d1c42d92e0ba2d092ac171be41bf435a98b6717306c786dfc7a4
+  - path: tasks/SESSION-BRIEF.md
+    sha256: 0c24bea8a3b90f0ba70797f0759cc91923b3304f4b6799cbe09ec50cfe9ac042
+  - path: tasks/active/BUG-166-clean-scratch-experiment-historical-input-seals.md
+    sha256: 34e6779b4f32f6ab977fdf846e49edb9cab6817d4a5492b7c52120d9d6406298
+  - path: tasks/active/README.md
+    sha256: 198e89b1b401767887fc9206e96b6c063d0ff5aef6bc8ca18836a8d56c291382
+  - path: tasks/backlog/bugs/index.md
+    sha256: 0d687f6ee82f3d6f1afde32b9a56481f2aedbc96e0a5236207cb8efa5e2ae0f4
+  - path: tests/regression/tooling/Test.ExperimentCustody.py
+    sha256: c15416e1606316aab01f1194d04b6b95a18af3d7287d049eee430b4714e608a4
+  - path: tools/agents/experiment_custody.py
+    sha256: 42d6e1773cc091caed9da2124b409cc7fa0a47cea8c6d6f9f20ad86d622785b8
+  - path: tools/agents/skills/intrinsicengine-task-workflow/references/workflow-evidence.md
+    sha256: 007a6f01c891d1c42d92e0ba2d092ac171be41bf435a98b6717306c786dfc7a4
+  content_digest: 7f1e42816196d6280aaacc2d358c6c72e3241c7ba4692a5eb5e45c6d4d569b80
+touched:
+  paths:
+  - docs/agent/workflow-evidence.md
+  - tasks/SESSION-BRIEF.md
+  - tasks/active/BUG-166-clean-scratch-experiment-historical-input-seals.md
+  - tasks/active/README.md
+  - tasks/backlog/bugs/index.md
+  - tests/regression/tooling/Test.ExperimentCustody.py
+  - tools/agents/experiment_custody.py
+  - tools/agents/skills/intrinsicengine-task-workflow/references/workflow-evidence.md
+  layers:
+  - tools/agents
+  modules:
+  - experiment_custody.py
+extension_seam: Protocol/run source.clean and source.revision remain the existing data seam for selecting
+  live versus fixed declared-input validation; no new service or interface was introduced.
+future_change_plan: Route any new declared input class through the same sealed-file validator; keep raw
+  rows, results, receipts, previews, bundles, and audits current-tree-bound unless a separately reviewed
+  contract changes that policy.
+acceptance:
+- criterion: Unmodified METHOD-037 and METHOD-038 custody validates after later source
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: Historical lookup is limited to repository-relative regular files in an
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: Experiment-custody regressions and repository-global workflow evidence
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+commands:
+- receipt: tasks/evidence/BUG-166/commands/doc-links-final.json
+- receipt: tasks/evidence/BUG-166/commands/docs-sync-strict-final.json
+- receipt: tasks/evidence/BUG-166/commands/experiment-custody-global-final.json
+- receipt: tasks/evidence/BUG-166/commands/experiment-custody-regressions-final.json
+- receipt: tasks/evidence/BUG-166/commands/generated-surfaces-final.json
+- receipt: tasks/evidence/BUG-166/commands/session-brief-final.json
+- receipt: tasks/evidence/BUG-166/commands/task-policy-final.json
+- receipt: tasks/evidence/BUG-166/commands/task-state-links.json
+- receipt: tasks/evidence/BUG-166/commands/workflow-evidence-global.json
+changed_public_contracts:
+- A clean declared-input source is an exact resolving HEAD-ancestor commit containing repository-relative
+  regular files at the frozen hashes; this identity is independent of claim_eligible and never authorizes
+  a claim.
+diagnostics_and_previews:
+- The prior helper returned a historical revision only for claim_eligible records, so non-claim clean
+  scratch inputs silently fell back to mutable current paths.
+benchmark_or_parity_evidence: []
+docs_sync:
+  task_file: tasks/active/BUG-166-clean-scratch-experiment-historical-input-seals.md
+  session_brief_present: true
+  canonical_docs_changed: true
+  skill_mirrors_checked: true
+residual_risks:
+- Historical lookup could weaken custody if widened beyond declared inputs; regressions cover dirty inputs,
+  non-ancestor and missing commits, symlinks, claim substitution, and current evidence tampering.
+skipped_checks: []
+artifacts: []
+self_review:
+  completed: true
+  scope_matches_task: true
+  layering_preserved: true
+  tests_and_docs_accounted_for: true
+  mechanical_and_semantic_changes_separated: true

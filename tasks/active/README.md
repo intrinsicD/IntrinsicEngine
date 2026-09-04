@@ -11,6 +11,11 @@ Each active task should include:
 
 ## Currently active
 
+- [`BUG-166` — clean scratch experiments lose historical input
+  seals](BUG-166-clean-scratch-experiment-historical-input-seals.md) — in
+  progress; preserve exact clean-revision source-input validation for
+  non-claim scratch custody, beginning with the hermetic experiment-custody
+  regression.
 - [`BUG-164` — ccache serves stale objects when a macro changes only imported
   module BMIs](BUG-164-ccache-module-bmi-macro-staleness.md) — in progress;
   dependency-local semantic sidecars pass local fixture, core, full-graph, and
