@@ -10733,3 +10733,30 @@ tree:
       BUG-164 remains open because bypassing ccache verifies the compiler fix
       but does not repair the cache-key defect.
     status: resolved
+  - id: N460
+    type: experiment
+    title: "Determinize dropped-file queue snapshots"
+    provenance: ai-executed
+    timestamp: "2026-09-04T21:22+02:00"
+    also_depends_on: [N459]
+    evidence:
+      - "777bd8f655c7971b005e0b5e691700ed3ab7e452"
+      - "tests/contract/runtime/Test.SandboxEditorSceneCommands.cpp"
+      - "tasks/active/BUG-165-dropped-geometry-cancellation-test-race.md"
+      - "GitHub Actions run 33872357760 attempt 2"
+      - "two affected tests repeated 200 times under ci-fast"
+      - "184-case SandboxEditorUi selector under ci-fast"
+      - "4,263-case canonical CPU selector under ci"
+      - "strict task, session-brief, documentation-link, and test-layout checks"
+    result: >
+      A condition-variable barrier on the existing queued-geometry pre-decode
+      test hook made both queue snapshots observe the worker at a defined
+      active/cancellable state without sleeps, retries, quarantine, production
+      changes, or weakened assertions. Both affected tests passed 200
+      consecutive repetitions each, all 184 SandboxEditorUi cases passed, and
+      the canonical CPU selector passed 4,263 of 4,263 cases with one expected
+      capability skip. Commit 777bd8f655c7971b005e0b5e691700ed3ab7e452
+      remains local because the export guard requires explicit user approval
+      before pushing it to GitHub; hosted pr-fast and BUG-164 warm-cache
+      evidence therefore remain open.
+    status: resolved

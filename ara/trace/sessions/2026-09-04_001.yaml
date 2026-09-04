@@ -2,9 +2,9 @@ session:
   id: "2026-09-04_001"
   date: "2026-09-04"
   started: "2026-09-04T00:16+02:00"
-  last_turn: "2026-09-04T07:20+02:00"
-  turn_count: 2
-  summary: "Implemented the exact-preserving curvature acceleration sequence with matched timing and payload evidence, then verified and published the Clang 20 GLM-module compatibility fixes from a fresh cache-disabled build."
+  last_turn: "2026-09-04T21:22+02:00"
+  turn_count: 3
+  summary: "Implemented exact-preserving curvature acceleration, published the Clang 20 compatibility fixes, and committed a deterministic BUG-165 queue-test barrier locally pending authorized GitHub publication."
 
 events_logged:
   - turn: 1
@@ -37,6 +37,12 @@ events_logged:
     routing: direct
     provenance: ai-executed
     summary: "Built and tested the complete surface with cache disabled under Clang 20.1.2, then pushed it and verified exact local/remote revision equality."
+  - turn: 3
+    type: experiment
+    id: N460
+    routing: direct
+    provenance: ai-executed
+    summary: "Replaced BUG-165 timing assumptions with a deterministic pre-decode barrier and passed focused repeated plus canonical CPU verification."
 
 ai_actions:
   - turn: 1
@@ -78,6 +84,19 @@ ai_actions:
     action: "Configured a fresh cache-disabled Clang 20.1.2 build, built IntrinsicTests, IntrinsicCpuTests, and ExtrinsicSandbox, ran the canonical CPU selector, repeated strict structural validation, and published all commits to origin/main."
     provenance: ai-executed
     files_changed: []
+  - turn: 3
+    action: "Promoted BUG-165, added a shared-state condition-variable barrier around the existing queued-geometry pre-decode test hook, preserved both affected tests' behavioral assertions, and committed the repair."
+    provenance: ai-executed
+    files_changed:
+      - "tests/contract/runtime/Test.SandboxEditorSceneCommands.cpp"
+      - "tasks/active/BUG-165-dropped-geometry-cancellation-test-race.md"
+      - "tasks/active/README.md"
+      - "tasks/backlog/bugs/index.md"
+      - "tasks/SESSION-BRIEF.md"
+  - turn: 3
+    action: "Ran 400 focused test executions, all 184 SandboxEditorUi cases, all 4,263 canonical CPU-supported cases, and strict touched structural checks; confirmed the second hosted BUG-164 rerun still failed before cache save."
+    provenance: ai-executed
+    files_changed: []
 
 claims_touched: []
 
@@ -86,11 +105,14 @@ key_context:
     excerpt: "The user directed a pre-change test run, the ranked implementation sequence, a matched post-change timing/output comparison, and final commit, merge, and push."
   - turn: 2
     excerpt: "After reviewing the exact GitHub origin, the user explicitly authorized committing and pushing all remaining changes."
+  - turn: 3
+    excerpt: "The user directed completion of the active task; local completion exposed BUG-165 as the deterministic prerequisite for BUG-164's hosted warm-cache cohort."
 
 open_threads:
   - "Create a clean-source schema-v2 Release benchmark on a representative user mesh with computed curvature/features, production Automatic GMM and automatic seeds, publication, warm repetitions, and quality parity."
   - "Measure whether amortizing vertex-topology construction and addressing the remaining 100k seed-selection cost improve end-to-end editor latency without changing the reference result."
   - "Resolve BUG-164 by making ccache's Clang-module cache identity include command-line macro state before re-enabling cache-backed Clang 20 verification."
+  - "Obtain explicit approval to push local BUG-165 commit 777bd8f655c7971b005e0b5e691700ed3ab7e452 to GitHub, then run hosted pr-fast, retire BUG-165, and collect BUG-164 warm-cache evidence."
 
 ai_suggestions_pending:
   - "Treat parallel GMM/features, revision-keyed stage caching, coarse-to-fine solving, and local sculpt updates as later parity-controlled work."
