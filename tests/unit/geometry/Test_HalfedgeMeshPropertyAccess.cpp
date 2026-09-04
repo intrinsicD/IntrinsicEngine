@@ -123,8 +123,8 @@ TEST(HalfedgeMesh_PropertyAccess, FaceProperties_CanAddUserProperty)
     auto readColor = FaceProperty<glm::vec4>(
         mesh.FaceProperties().Get<glm::vec4>("f:color"));
     ASSERT_TRUE(readColor.IsValid());
-    EXPECT_FLOAT_EQ(readColor[f0].r, 1.0f);
-    EXPECT_FLOAT_EQ(readColor[f1].g, 1.0f);
+    EXPECT_FLOAT_EQ(readColor[f0].x, 1.0f);
+    EXPECT_FLOAT_EQ(readColor[f1].y, 1.0f);
 }
 
 TEST(HalfedgeMesh_PropertyAccess, FaceProperties_SpanAccess)

@@ -134,9 +134,9 @@ TEST(GraphicsReconstructionContract, ReferenceTAAClipsHistoryAgainstFiveByFiveYC
     ASSERT_TRUE(result.Applied);
     EXPECT_EQ(result.FailReason, Graphics::ReconstructionFailReason::None);
     const glm::vec4 center = output[12u];
-    EXPECT_NEAR(center.r, 0.25f, 0.0001f);
-    EXPECT_NEAR(center.g, 0.25f, 0.0001f);
-    EXPECT_NEAR(center.b, 0.25f, 0.0001f);
+    EXPECT_NEAR(center.x, 0.25f, 0.0001f);
+    EXPECT_NEAR(center.y, 0.25f, 0.0001f);
+    EXPECT_NEAR(center.z, 0.25f, 0.0001f);
 }
 
 TEST(GraphicsReconstructionContract, ExposureWeightingReducesHistoryContribution)
@@ -176,9 +176,9 @@ TEST(GraphicsReconstructionContract, ExposureWeightingReducesHistoryContribution
         OutputView(highExposureOutput, extent),
         highHints).Applied);
 
-    EXPECT_GT(lowExposureOutput[12u].r, highExposureOutput[12u].r)
+    EXPECT_GT(lowExposureOutput[12u].x, highExposureOutput[12u].x)
         << "Higher exposure should reduce history contribution when luminance differs.";
-    EXPECT_GT(highExposureOutput[12u].r, current[12u].r);
+    EXPECT_GT(highExposureOutput[12u].x, current[12u].x);
 }
 
 TEST(GraphicsReconstructionContract, DisocclusionFallbackReportsFraction)

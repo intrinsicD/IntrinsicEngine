@@ -189,11 +189,11 @@ TEST(CurvatureSegmentationOperations,
         {
             ++boundaryCount;
             EXPECT_NE(roles[edge], 0u);
-            EXPECT_GT(colors[edge].a, 0.0f);
+            EXPECT_GT(colors[edge].w, 0.0f);
         }
         else
         {
-            EXPECT_FLOAT_EQ(colors[edge].a, 0.0f);
+            EXPECT_FLOAT_EQ(colors[edge].w, 0.0f);
         }
         if (hard[edge])
         {
@@ -311,7 +311,7 @@ TEST(CurvatureSegmentationOperations,
     EXPECT_TRUE(std::all_of(
         regionColors.Vector().begin(),
         regionColors.Vector().end(),
-        [](const glm::vec4 color) { return color.a == 1.0f; }));
+        [](const glm::vec4 color) { return color.w == 1.0f; }));
 
     std::size_t semanticBoundaryCount = 0u;
     for (const Geometry::EdgeHandle edge : harness.SourceMesh.LiveEdges())
@@ -329,7 +329,7 @@ TEST(CurvatureSegmentationOperations,
         }
         EXPECT_EQ(boundaries[edge.Index], expected);
         EXPECT_FLOAT_EQ(
-            boundaryColors[edge.Index].a,
+            boundaryColors[edge.Index].w,
             expected ? 1.0f : 0.0f);
         semanticBoundaryCount += expected ? 1u : 0u;
     }

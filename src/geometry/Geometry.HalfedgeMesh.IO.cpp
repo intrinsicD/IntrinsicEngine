@@ -291,8 +291,8 @@ namespace Geometry::MeshIO
 
         [[nodiscard]] bool IsFinite(const glm::vec4& value)
         {
-            return std::isfinite(value.r) && std::isfinite(value.g) &&
-                   std::isfinite(value.b) && std::isfinite(value.a);
+            return std::isfinite(value.x) && std::isfinite(value.y) &&
+                   std::isfinite(value.z) && std::isfinite(value.w);
         }
 
         template <typename T>
@@ -738,10 +738,10 @@ namespace Geometry::MeshIO
                     {
                         return InvalidMeshFormat();
                     }
-                    colors.emplace_back(NormalizePLYColorChannel(color.r),
-                                        NormalizePLYColorChannel(color.g),
-                                        NormalizePLYColorChannel(color.b),
-                                        NormalizePLYColorChannel(color.a));
+                    colors.emplace_back(NormalizePLYColorChannel(color.x),
+                                        NormalizePLYColorChannel(color.y),
+                                        NormalizePLYColorChannel(color.z),
+                                        NormalizePLYColorChannel(color.w));
                 }
                 if (hasTexcoords)
                 {
@@ -1778,9 +1778,9 @@ namespace Geometry::MeshIO
                         {
                             return InvalidMeshFormat();
                         }
-                        color = glm::vec4(NormalizeOFFColorChannel(rawColor.r),
-                                          NormalizeOFFColorChannel(rawColor.g),
-                                          NormalizeOFFColorChannel(rawColor.b),
+                        color = glm::vec4(NormalizeOFFColorChannel(rawColor.x),
+                                          NormalizeOFFColorChannel(rawColor.y),
+                                          NormalizeOFFColorChannel(rawColor.z),
                                           1.0f);
                     }
                     tokenIdx += 3;
@@ -2167,9 +2167,9 @@ namespace Geometry::MeshIO
             {
                 const auto& c = colorsView.Vector()[i];
                 written = std::snprintf(buffer, sizeof(buffer), " %.6f %.6f %.6f",
-                                        static_cast<double>(c.r),
-                                        static_cast<double>(c.g),
-                                        static_cast<double>(c.b));
+                                        static_cast<double>(c.x),
+                                        static_cast<double>(c.y),
+                                        static_cast<double>(c.z));
                 if (written <= 0 || static_cast<std::size_t>(written) >= sizeof(buffer))
                 {
                     return MeshIOWriteStatus::FileWriteError;
@@ -2551,9 +2551,9 @@ namespace Geometry::MeshIO
                 const auto& c = colorsView.Vector()[i];
                 written = std::snprintf(buffer, sizeof(buffer),
                                         " %u %u %u",
-                                        encodeColorChannel(c.r),
-                                        encodeColorChannel(c.g),
-                                        encodeColorChannel(c.b));
+                                        encodeColorChannel(c.x),
+                                        encodeColorChannel(c.y),
+                                        encodeColorChannel(c.z));
                 if (written <= 0)
                 {
                     return MeshIOWriteStatus::FileWriteError;
@@ -2783,9 +2783,9 @@ namespace Geometry::MeshIO
             if (hasColors)
             {
                 const auto& c = colorsView.Vector()[i];
-                if (!writeUInt8(encodeColorChannel(c.r)) ||
-                    !writeUInt8(encodeColorChannel(c.g)) ||
-                    !writeUInt8(encodeColorChannel(c.b)))
+                if (!writeUInt8(encodeColorChannel(c.x)) ||
+                    !writeUInt8(encodeColorChannel(c.y)) ||
+                    !writeUInt8(encodeColorChannel(c.z)))
                 {
                     return MeshIOWriteStatus::FileWriteError;
                 }

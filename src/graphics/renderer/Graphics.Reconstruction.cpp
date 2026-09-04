@@ -120,10 +120,10 @@ namespace Extrinsic::Graphics
                     color[i] = 0.f;
                 }
             }
-            color.r = std::max(0.f, color.r);
-            color.g = std::max(0.f, color.g);
-            color.b = std::max(0.f, color.b);
-            color.a = std::clamp(color.a, 0.f, 1.f);
+            color.x = std::max(0.f, color.x);
+            color.y = std::max(0.f, color.y);
+            color.z = std::max(0.f, color.z);
+            color.w = std::clamp(color.w, 0.f, 1.f);
             return color;
         }
 
@@ -145,7 +145,7 @@ namespace Extrinsic::Graphics
                 {
                     const int sx = std::clamp<int>(static_cast<int>(x) + dx, 0, static_cast<int>(width) - 1);
                     const glm::vec4 sample = current.Pixels[static_cast<std::size_t>(sy) * width + static_cast<std::size_t>(sx)];
-                    const glm::vec3 ycocg = RgbToYCoCg({sample.r, sample.g, sample.b});
+                    const glm::vec3 ycocg = RgbToYCoCg({sample.x, sample.y, sample.z});
                     sum += ycocg;
                     sumSq += ycocg * ycocg;
                     ++count;
@@ -195,7 +195,7 @@ namespace Extrinsic::Graphics
 
         [[nodiscard]] float Luma(const glm::vec3 rgb) noexcept
         {
-            return rgb.r * 0.2126f + rgb.g * 0.7152f + rgb.b * 0.0722f;
+            return rgb.x * 0.2126f + rgb.y * 0.7152f + rgb.z * 0.0722f;
         }
     }
 
@@ -253,16 +253,16 @@ namespace Extrinsic::Graphics
 
                 history = ClampColorFinite(history);
                 const glm::vec3 clippedHistory =
-                    ClampHistoryToNeighborhood(jitteredColor, x, y, {history.r, history.g, history.b});
-                const float currentLum = Luma({current.r, current.g, current.b});
+                    ClampHistoryToNeighborhood(jitteredColor, x, y, {history.x, history.y, history.z});
+                const float currentLum = Luma({current.x, current.y, current.z});
                 const float historyLum = Luma(clippedHistory);
                 const float luminanceDelta = std::abs(currentLum - historyLum) * exposure;
                 const float historyWeight = std::clamp(0.92f - luminanceDelta * 0.35f - sharpness * 0.15f,
                                                        0.05f,
                                                        0.95f);
                 const glm::vec3 resolvedRgb =
-                    glm::mix(glm::vec3{current.r, current.g, current.b}, clippedHistory, historyWeight);
-                const float resolvedAlpha = glm::mix(current.a, history.a, historyWeight);
+                    glm::mix(glm::vec3{current.x, current.y, current.z}, clippedHistory, historyWeight);
+                const float resolvedAlpha = glm::mix(current.w, history.w, historyWeight);
                 output.Pixels[index] = ClampColorFinite(glm::vec4{resolvedRgb, resolvedAlpha});
             }
         }

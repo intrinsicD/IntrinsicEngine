@@ -268,7 +268,7 @@ namespace Extrinsic::Graphics
             MaterialParams p{};
             p.BaseColorFactor = color;
             p.CustomData[2]   = {
-                color.a, 0.f, 0.f, 0.f,
+                color.w, 0.f, 0.f, 0.f,
             };
             return p;
         }

@@ -1479,7 +1479,7 @@ TEST(GeometryIO_PointCloudIO, LoadsPTSFixture)
     EXPECT_EQ(result->Cloud.Position(Geometry::VertexHandle{0}), glm::vec3(0.0f, 0.0f, 0.0f));
     EXPECT_EQ(result->Cloud.Position(Geometry::VertexHandle{1}), glm::vec3(1.0f, 2.0f, 3.0f));
     EXPECT_EQ(result->Cloud.Color(Geometry::VertexHandle{0}), glm::vec4(1.0f, 0.0f, 0.0f, 1.0f));
-    EXPECT_NEAR(result->Cloud.Color(Geometry::VertexHandle{1}).g, 128.0f / 255.0f, 1.0e-6f);
+    EXPECT_NEAR(result->Cloud.Color(Geometry::VertexHandle{1}).y, 128.0f / 255.0f, 1.0e-6f);
 }
 
 TEST(GeometryIO_PointCloudIO, LoadsPWNFixtureWithNormals)
@@ -1524,8 +1524,8 @@ TEST(GeometryIO_PointCloudIO, LoadsTXTFixtureWithColor)
     EXPECT_EQ(result->Cloud.Position(Geometry::VertexHandle{0}), glm::vec3(0.0f, 0.0f, 0.0f));
     EXPECT_EQ(result->Cloud.Position(Geometry::VertexHandle{1}), glm::vec3(2.0f, 3.0f, 4.0f));
     EXPECT_EQ(result->Cloud.Color(Geometry::VertexHandle{0}), glm::vec4(1.0f, 0.0f, 0.0f, 1.0f));
-    EXPECT_NEAR(result->Cloud.Color(Geometry::VertexHandle{1}).g, 1.0f, 1.0e-6f);
-    EXPECT_NEAR(result->Cloud.Color(Geometry::VertexHandle{1}).b, 128.0f / 255.0f, 1.0e-6f);
+    EXPECT_NEAR(result->Cloud.Color(Geometry::VertexHandle{1}).y, 1.0f, 1.0e-6f);
+    EXPECT_NEAR(result->Cloud.Color(Geometry::VertexHandle{1}).z, 128.0f / 255.0f, 1.0e-6f);
 }
 
 TEST(GeometryIO_PointCloudIO, StrictAsciiReadersRejectMalformedInput)
@@ -1844,10 +1844,10 @@ TEST(GeometryIO_PointCloudIO, LoadsASCIIPCDWithPackedFloatRgb)
     EXPECT_EQ(result->Cloud.VerticesSize(), 1u);
     EXPECT_TRUE(result->Cloud.HasColors());
     EXPECT_EQ(result->Cloud.Position(Geometry::VertexHandle{0}), glm::vec3(0.0f, 1.0f, 2.0f));
-    EXPECT_NEAR(result->Cloud.Color(Geometry::VertexHandle{0}).r, 1.0f, 1.0e-6f);
-    EXPECT_NEAR(result->Cloud.Color(Geometry::VertexHandle{0}).g, 128.0f / 255.0f, 1.0e-6f);
-    EXPECT_NEAR(result->Cloud.Color(Geometry::VertexHandle{0}).b, 0.0f, 1.0e-6f);
-    EXPECT_NEAR(result->Cloud.Color(Geometry::VertexHandle{0}).a, 1.0f, 1.0e-6f);
+    EXPECT_NEAR(result->Cloud.Color(Geometry::VertexHandle{0}).x, 1.0f, 1.0e-6f);
+    EXPECT_NEAR(result->Cloud.Color(Geometry::VertexHandle{0}).y, 128.0f / 255.0f, 1.0e-6f);
+    EXPECT_NEAR(result->Cloud.Color(Geometry::VertexHandle{0}).z, 0.0f, 1.0e-6f);
+    EXPECT_NEAR(result->Cloud.Color(Geometry::VertexHandle{0}).w, 1.0f, 1.0e-6f);
 }
 
 TEST(GeometryIO_PointCloudIO, LoadsASCIIPCDWithSignedPackedRgba)
@@ -1869,10 +1869,10 @@ TEST(GeometryIO_PointCloudIO, LoadsASCIIPCDWithSignedPackedRgba)
     ASSERT_TRUE(result.has_value());
     EXPECT_EQ(result->Cloud.VerticesSize(), 1u);
     EXPECT_TRUE(result->Cloud.HasColors());
-    EXPECT_NEAR(result->Cloud.Color(Geometry::VertexHandle{0}).r, 64.0f / 255.0f, 1.0e-6f);
-    EXPECT_NEAR(result->Cloud.Color(Geometry::VertexHandle{0}).g, 32.0f / 255.0f, 1.0e-6f);
-    EXPECT_NEAR(result->Cloud.Color(Geometry::VertexHandle{0}).b, 16.0f / 255.0f, 1.0e-6f);
-    EXPECT_NEAR(result->Cloud.Color(Geometry::VertexHandle{0}).a, 128.0f / 255.0f, 1.0e-6f);
+    EXPECT_NEAR(result->Cloud.Color(Geometry::VertexHandle{0}).x, 64.0f / 255.0f, 1.0e-6f);
+    EXPECT_NEAR(result->Cloud.Color(Geometry::VertexHandle{0}).y, 32.0f / 255.0f, 1.0e-6f);
+    EXPECT_NEAR(result->Cloud.Color(Geometry::VertexHandle{0}).z, 16.0f / 255.0f, 1.0e-6f);
+    EXPECT_NEAR(result->Cloud.Color(Geometry::VertexHandle{0}).w, 128.0f / 255.0f, 1.0e-6f);
 }
 
 TEST(GeometryIO_PointCloudIO, LoadsVertexOnlyASCIIPLY)
@@ -5266,10 +5266,10 @@ TEST(GeometryIO_PointCloudIO, LoadsBinaryPCDPointCloudWithPackedRgba)
     EXPECT_EQ(result->Cloud.VerticesSize(), 1u);
     EXPECT_TRUE(result->Cloud.HasColors());
     EXPECT_EQ(result->Cloud.Position(Geometry::VertexHandle{0}), glm::vec3(1.0f, 2.0f, 3.0f));
-    EXPECT_NEAR(result->Cloud.Color(Geometry::VertexHandle{0}).r, 64.0f / 255.0f, 1.0e-6f);
-    EXPECT_NEAR(result->Cloud.Color(Geometry::VertexHandle{0}).g, 32.0f / 255.0f, 1.0e-6f);
-    EXPECT_NEAR(result->Cloud.Color(Geometry::VertexHandle{0}).b, 16.0f / 255.0f, 1.0e-6f);
-    EXPECT_NEAR(result->Cloud.Color(Geometry::VertexHandle{0}).a, 128.0f / 255.0f, 1.0e-6f);
+    EXPECT_NEAR(result->Cloud.Color(Geometry::VertexHandle{0}).x, 64.0f / 255.0f, 1.0e-6f);
+    EXPECT_NEAR(result->Cloud.Color(Geometry::VertexHandle{0}).y, 32.0f / 255.0f, 1.0e-6f);
+    EXPECT_NEAR(result->Cloud.Color(Geometry::VertexHandle{0}).z, 16.0f / 255.0f, 1.0e-6f);
+    EXPECT_NEAR(result->Cloud.Color(Geometry::VertexHandle{0}).w, 128.0f / 255.0f, 1.0e-6f);
 }
 
 TEST(GeometryIO_PointCloudIO, LoadsBinaryPCDPointCloudSkipsExtraScalars)

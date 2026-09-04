@@ -149,8 +149,8 @@ namespace Geometry::PointCloudIO
 
         [[nodiscard]] bool IsFinite(const glm::vec4& value)
         {
-            return std::isfinite(value.r) && std::isfinite(value.g) &&
-                   std::isfinite(value.b) && std::isfinite(value.a);
+            return std::isfinite(value.x) && std::isfinite(value.y) &&
+                   std::isfinite(value.z) && std::isfinite(value.w);
         }
 
         [[nodiscard]] bool IsFinite(float value)
@@ -1047,7 +1047,7 @@ namespace Geometry::PointCloudIO
                     {
                         return InvalidPointCloudFormat();
                     }
-                    result.Cloud.Color(point) = glm::vec4(NormalizeColorChannel(rawColor.r), NormalizeColorChannel(rawColor.g), NormalizeColorChannel(rawColor.b), 1.0f);
+                    result.Cloud.Color(point) = glm::vec4(NormalizeColorChannel(rawColor.x), NormalizeColorChannel(rawColor.y), NormalizeColorChannel(rawColor.z), 1.0f);
                 }
             }
 
@@ -1846,9 +1846,9 @@ namespace Geometry::PointCloudIO
                         return InvalidPointCloudFormat();
                     }
                     result.Cloud.Color(point) = glm::vec4(
-                        NormalizeColorChannel(rawColor.r),
-                        NormalizeColorChannel(rawColor.g),
-                        NormalizeColorChannel(rawColor.b),
+                        NormalizeColorChannel(rawColor.x),
+                        NormalizeColorChannel(rawColor.y),
+                        NormalizeColorChannel(rawColor.z),
                         1.0f);
                 }
                 else if (hasPackedColors)
@@ -1952,9 +1952,9 @@ namespace Geometry::PointCloudIO
                         return InvalidPointCloudFormat();
                     }
                     result.Cloud.Color(point) = glm::vec4(
-                        NormalizeColorChannel(rawColor.r),
-                        NormalizeColorChannel(rawColor.g),
-                        NormalizeColorChannel(rawColor.b),
+                        NormalizeColorChannel(rawColor.x),
+                        NormalizeColorChannel(rawColor.y),
+                        NormalizeColorChannel(rawColor.z),
                         1.0f);
                 }
                 else if (hasPackedColors)
@@ -2226,9 +2226,9 @@ namespace Geometry::PointCloudIO
                 const auto& c = colors[i];
                 written = std::snprintf(buffer, sizeof(buffer),
                                         " %u %u %u",
-                                        encodeColorChannel(c.r),
-                                        encodeColorChannel(c.g),
-                                        encodeColorChannel(c.b));
+                                        encodeColorChannel(c.x),
+                                        encodeColorChannel(c.y),
+                                        encodeColorChannel(c.z));
                 if (written <= 0)
                 {
                     return PointCloudIOWriteStatus::FileWriteError;
@@ -2376,9 +2376,9 @@ namespace Geometry::PointCloudIO
             if (hasColors)
             {
                 const auto& c = colors[i];
-                if (!writeUInt8(encodeColorChannel(c.r)) ||
-                    !writeUInt8(encodeColorChannel(c.g)) ||
-                    !writeUInt8(encodeColorChannel(c.b)))
+                if (!writeUInt8(encodeColorChannel(c.x)) ||
+                    !writeUInt8(encodeColorChannel(c.y)) ||
+                    !writeUInt8(encodeColorChannel(c.z)))
                 {
                     return PointCloudIOWriteStatus::FileWriteError;
                 }
@@ -2439,9 +2439,9 @@ namespace Geometry::PointCloudIO
             if (hasColors)
             {
                 const auto& c = colors[i];
-                const float r = c.r < 0.0f ? 0.0f : (c.r > 1.0f ? 1.0f : c.r);
-                const float g = c.g < 0.0f ? 0.0f : (c.g > 1.0f ? 1.0f : c.g);
-                const float b = c.b < 0.0f ? 0.0f : (c.b > 1.0f ? 1.0f : c.b);
+                const float r = c.x < 0.0f ? 0.0f : (c.x > 1.0f ? 1.0f : c.x);
+                const float g = c.y < 0.0f ? 0.0f : (c.y > 1.0f ? 1.0f : c.y);
+                const float b = c.z < 0.0f ? 0.0f : (c.z > 1.0f ? 1.0f : c.z);
                 written = std::snprintf(buffer, sizeof(buffer),
                                         "%.6f %.6f %.6f %.6f %.6f %.6f\n",
                                         static_cast<double>(p.x),
@@ -2618,9 +2618,9 @@ namespace Geometry::PointCloudIO
                 const auto& c = colors[i];
                 written = std::snprintf(buffer, sizeof(buffer),
                                         " %.6f %.6f %.6f",
-                                        static_cast<double>(clampUnit(c.r)),
-                                        static_cast<double>(clampUnit(c.g)),
-                                        static_cast<double>(clampUnit(c.b)));
+                                        static_cast<double>(clampUnit(c.x)),
+                                        static_cast<double>(clampUnit(c.y)),
+                                        static_cast<double>(clampUnit(c.z)));
                 if (written <= 0)
                 {
                     return PointCloudIOWriteStatus::FileWriteError;
@@ -2784,9 +2784,9 @@ namespace Geometry::PointCloudIO
             if (hasColors)
             {
                 const auto& c = colors[i];
-                if (!writeFloatLE(clampUnit(c.r)) ||
-                    !writeFloatLE(clampUnit(c.g)) ||
-                    !writeFloatLE(clampUnit(c.b)))
+                if (!writeFloatLE(clampUnit(c.x)) ||
+                    !writeFloatLE(clampUnit(c.y)) ||
+                    !writeFloatLE(clampUnit(c.z)))
                 {
                     return PointCloudIOWriteStatus::FileWriteError;
                 }

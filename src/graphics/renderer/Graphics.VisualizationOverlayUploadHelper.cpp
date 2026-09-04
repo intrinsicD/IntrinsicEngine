@@ -45,10 +45,10 @@ namespace Extrinsic::Graphics
         [[nodiscard]] std::uint32_t PackUnorm4x8(const glm::vec4& color) noexcept
         {
             const glm::vec4 clamped = glm::clamp(color, glm::vec4{0.0f}, glm::vec4{1.0f});
-            const std::uint32_t r = static_cast<std::uint32_t>(clamped.r * 255.0f + 0.5f);
-            const std::uint32_t g = static_cast<std::uint32_t>(clamped.g * 255.0f + 0.5f);
-            const std::uint32_t b = static_cast<std::uint32_t>(clamped.b * 255.0f + 0.5f);
-            const std::uint32_t a = static_cast<std::uint32_t>(clamped.a * 255.0f + 0.5f);
+            const std::uint32_t r = static_cast<std::uint32_t>(clamped.x * 255.0f + 0.5f);
+            const std::uint32_t g = static_cast<std::uint32_t>(clamped.y * 255.0f + 0.5f);
+            const std::uint32_t b = static_cast<std::uint32_t>(clamped.z * 255.0f + 0.5f);
+            const std::uint32_t a = static_cast<std::uint32_t>(clamped.w * 255.0f + 0.5f);
             return r | (g << 8) | (b << 16) | (a << 24);
         }
 

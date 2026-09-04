@@ -336,7 +336,7 @@ namespace Extrinsic::Graphics
         const auto clamp8 = [](float v) -> std::uint8_t {
             return static_cast<std::uint8_t>(std::clamp(v, 0.f, 1.f) * 255.f + 0.5f);
         };
-        return PackRGBA8({clamp8(c.r), clamp8(c.g), clamp8(c.b), clamp8(c.a)});
+        return PackRGBA8({clamp8(c.x), clamp8(c.y), clamp8(c.z), clamp8(c.w)});
     }
 
 } // namespace Extrinsic::Graphics

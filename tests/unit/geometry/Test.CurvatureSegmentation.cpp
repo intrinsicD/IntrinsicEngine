@@ -427,7 +427,7 @@ TEST(CurvatureSegmentation, FeatureWeightPreservesFoldBoundary)
     ASSERT_TRUE(result.Succeeded()) << Segment::ToString(result.Diagnostics.Status);
     ASSERT_LT(fixture.FoldEdge.Index, result.EdgeBoundaries.size());
     EXPECT_EQ(result.EdgeBoundaries[fixture.FoldEdge.Index], 1u);
-    EXPECT_EQ(result.EdgeBoundaryColors[fixture.FoldEdge.Index].a, 1.0f);
+    EXPECT_EQ(result.EdgeBoundaryColors[fixture.FoldEdge.Index].w, 1.0f);
     EXPECT_GE(result.Diagnostics.BoundaryEdgeCount, 1u);
     EXPECT_LE(result.Diagnostics.FinalEnergy, result.Diagnostics.InitialEnergy + 1.0e-10);
 }

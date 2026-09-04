@@ -282,10 +282,10 @@ TEST(MeshPrimitiveViewExtraction, EnableEdgeViewUploadsSeparateEdgeRenderable)
     EXPECT_FLOAT_EQ(config.Line.LineWidth, 1.0f);
     EXPECT_EQ(config.Line.LineWidthBDA, 0u);
     EXPECT_EQ(config.ColorSourceMode, 1u);
-    EXPECT_FLOAT_EQ(config.UniformColor.r, 0.02f);
-    EXPECT_FLOAT_EQ(config.UniformColor.g, 0.02f);
-    EXPECT_FLOAT_EQ(config.UniformColor.b, 0.02f);
-    EXPECT_FLOAT_EQ(config.UniformColor.a, 1.0f);
+    EXPECT_FLOAT_EQ(config.UniformColor.x, 0.02f);
+    EXPECT_FLOAT_EQ(config.UniformColor.y, 0.02f);
+    EXPECT_FLOAT_EQ(config.UniformColor.z, 0.02f);
+    EXPECT_FLOAT_EQ(config.UniformColor.w, 1.0f);
 
     Extrinsic::Graphics::GpuGeometryResidencyView residency{};
     ASSERT_TRUE(gpuWorld.TryGetGeometryResidencyView(
@@ -400,10 +400,10 @@ TEST(MeshPrimitiveViewExtraction, EnableVertexViewUploadsSeparatePointRenderable
     EXPECT_FLOAT_EQ(config.Point.PointSize, 9.0f);
     EXPECT_EQ(config.Point.PointMode, 0u);
     EXPECT_EQ(config.ColorSourceMode, 1u);
-    EXPECT_FLOAT_EQ(config.UniformColor.r, 0.02f);
-    EXPECT_FLOAT_EQ(config.UniformColor.g, 0.02f);
-    EXPECT_FLOAT_EQ(config.UniformColor.b, 0.02f);
-    EXPECT_FLOAT_EQ(config.UniformColor.a, 1.0f);
+    EXPECT_FLOAT_EQ(config.UniformColor.x, 0.02f);
+    EXPECT_FLOAT_EQ(config.UniformColor.y, 0.02f);
+    EXPECT_FLOAT_EQ(config.UniformColor.z, 0.02f);
+    EXPECT_FLOAT_EQ(config.UniformColor.w, 1.0f);
 
     extraction.Shutdown(engine.GetRenderer());
     engine.Shutdown();

@@ -52,14 +52,14 @@ namespace Extrinsic::Graphics
         const SelectionSnapshot& selection) noexcept
     {
         SelectionOutlinePushConstants pc{};
-        pc.OutlineColor[0] = selection.OutlineColor.r;
-        pc.OutlineColor[1] = selection.OutlineColor.g;
-        pc.OutlineColor[2] = selection.OutlineColor.b;
-        pc.OutlineColor[3] = selection.OutlineColor.a;
-        pc.HoverColor[0]   = selection.HoverColor.r;
-        pc.HoverColor[1]   = selection.HoverColor.g;
-        pc.HoverColor[2]   = selection.HoverColor.b;
-        pc.HoverColor[3]   = selection.HoverColor.a;
+        pc.OutlineColor[0] = selection.OutlineColor.x;
+        pc.OutlineColor[1] = selection.OutlineColor.y;
+        pc.OutlineColor[2] = selection.OutlineColor.z;
+        pc.OutlineColor[3] = selection.OutlineColor.w;
+        pc.HoverColor[0]   = selection.HoverColor.x;
+        pc.HoverColor[1]   = selection.HoverColor.y;
+        pc.HoverColor[2]   = selection.HoverColor.z;
+        pc.HoverColor[3]   = selection.HoverColor.w;
         pc.OutlineWidth        = selection.OutlineWidth;
         // The shader's center/neighbour-hover test compares `pc.HoveredId`
         // to texelFetch results that are already 0 for "no entity"; gating
