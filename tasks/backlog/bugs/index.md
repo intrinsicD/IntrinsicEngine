@@ -5,6 +5,12 @@ Each entry includes the observed repro, the likely affected symbols, and a fix p
 
 ## Active Issues
 
+- [`BUG-165` — Dropped-geometry cancellation test races worker
+  completion](BUG-165-dropped-geometry-cancellation-test-race.md): hosted
+  `pr-fast` can finish the tiny OBJ import before the test's first queue
+  snapshot, making `CanCancel` false and allowing main-thread apply. Use the
+  existing pre-decode hook as a deterministic barrier; do not hide the race
+  with retries, quarantine, sleeps, or weakened assertions.
 - [`BUG-158` — Optional direct-mesh enrichment blocks already usable
   geometry](BUG-158-direct-mesh-enrichment-blocks-usable-geometry.md): the
   geometry-only mesh is published immediately, but the editor returns before

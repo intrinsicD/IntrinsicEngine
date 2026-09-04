@@ -186,6 +186,14 @@ python3 tools/agents/generate_session_brief.py --check
   module sidecar digest remained unchanged. The same failure then reproduced
   locally with the runner's exact Clang 20.1.2 and CMake 3.31.6 binaries; CMake
   4.3.2 includes the fields and explained the earlier local-only pass.
+- 2026-09-04 — Corrected hosted seed `33867833363` passed the module-
+  invalidation probe and all 2,039 build edges under CMake 3.31.6/Clang 20.1.2.
+  Its 3,940-case selected-test batch failed only the unrelated scheduling-
+  sensitive
+  `SandboxEditorUi.DroppedGeometryQueueCancellationPreventsMainThreadApply`:
+  the tiny OBJ completed before the first cancellation snapshot. The cache was
+  correctly not saved; `BUG-165` owns deterministic test synchronization, and
+  this run does not count toward the warm population.
 
 ## Forbidden changes
 - Disabling ccache globally instead of fixing the key.
