@@ -390,6 +390,20 @@ set(INTRINSIC_LINK_FLAGS
         # Link-time optimization (LTO) could go here in the future
 )
 
+# glm vector types are consumed both textually (#include in .cpp/.cppm global
+# module fragments) and through imported module BMIs. Clang 20 and 21 fail to
+# merge anonymous-union members of class template specializations that reach a
+# TU through more than one module lineage (upstream fix: llvm/llvm-project
+# PR #155948, first shipped in LLVM 22.1.0), which surfaces as
+# `class member cannot be redeclared` on glm's `union { T x, r, s; }` when a
+# TU first requires vec<N, T>'s defaulted copy assignment. GLM_FORCE_XYZW_ONLY
+# makes glm declare plain `x, y, z, w` members with no anonymous unions, so the
+# defect class cannot trigger on any TU. It is a directory-scope definition
+# (not an IntrinsicConfig usage requirement) because every TU that includes
+# glm must see the same class layout; the define may be dropped once the
+# minimum supported Clang is 22 or newer (BUG-157).
+add_compile_definitions(GLM_FORCE_XYZW_ONLY)
+
 add_library(IntrinsicConfig INTERFACE)
 target_compile_definitions(IntrinsicConfig INTERFACE
         GLM_FORCE_RADIANS

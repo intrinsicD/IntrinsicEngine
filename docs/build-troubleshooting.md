@@ -73,6 +73,61 @@ If no complete Clang 20+ toolchain is installed, install at least Clang 20 and
 its tools package (for example `clang-20`, `clang++-20`, and
 `clang-scan-deps-20`). Newer complete toolchains are preferred automatically.
 
+## Clang 20/21 named-module defects the tree works around
+
+Two Clang defects reproduce deterministically on Clang 20.1.x (the documented
+minimum, and the version GitHub-hosted CI installs from Ubuntu 24.04) and are
+fixed upstream only from LLVM 22.1.0. Both were diagnosed under `BUG-157`;
+the tree carries a source-level arrangement for each so the full
+`IntrinsicTests` build stays green on the minimum toolchain.
+
+### glm anonymous unions: `class member cannot be redeclared`
+
+Symptom: a `.cpp` that includes `<glm/glm.hpp>` textually and imports project
+modules whose global module fragments also include glm fails with
+
+```text
+glm/detail/type_vec3.hpp:77:4: error: class member cannot be redeclared
+    union { T x, r, s; };
+note: while declaring the implicit copy assignment operator for '(anonymous union ...)'
+note: in defaulted copy assignment operator for 'glm::vec<3, float>' first required here
+```
+
+Mechanism: Clang 20/21 fail to merge anonymous-union members of a class
+template specialization (`glm::vec<3, float>`) that reaches one TU through
+more than one module lineage while being instantiated locally
+(llvm/llvm-project PR #155948, "Fix merging of anonymous members of class
+templates", merged 2025-09-19 and first shipped in LLVM 22.1.0). Only glm
+contributes anonymous unions to this tree, so the root `CMakeLists.txt`
+defines `GLM_FORCE_XYZW_ONLY` at directory scope: glm then declares plain
+`x, y, z, w` members and the defect class cannot trigger. Consequences:
+
+- Colour and texture-coordinate components are `.x/.y/.z/.w`; glm's
+  `.r/.g/.b/.a` and `.s/.t/.p/.q` aliases and swizzles do not exist.
+- The define must stay global (not an `IntrinsicConfig` usage requirement)
+  because every TU that includes glm must see one class layout.
+- It may be removed once the minimum supported Clang is 22 or newer.
+
+### Exported operators found through a module the TU does not import
+
+Symptom: comparing two values of a type declared in a module the TU only
+reaches transitively (for example `FramePassId`, exported by
+`Extrinsic.Graphics.RenderGraph:Pass` and used through
+`Extrinsic.Graphics.FrameRecipe`) fails with
+
+```text
+error: invalid operands to binary expression ('const FramePassId' and 'const FramePassId')
+```
+
+Standard C++ ([basic.lookup.argdep]/4.3) lets argument-dependent lookup find
+exported declarations attached to the type's module even when that module is
+not imported; Clang 20's module-level lookup rewrite regressed several such
+cases (llvm/llvm-project #133720 family, fixed in LLVM 22). Arrangement: a TU
+that compares, streams, or hashes a module-owned type imports the module that
+exports those operators (`import Extrinsic.Graphics.RenderGraph;` for
+`FramePassId`). This is also the intended reading of "tests use explicit test
+seams only": import what you use rather than relying on transitive reach.
+
 ## Additional container caveat (non-blocking for libs/tests)
 
 Some containers do not provide X11 RandR headers; CMake enables `INTRINSIC_HEADLESS_NO_GLFW=ON` in that case. This disables GLFW-dependent runtime/sandbox modules but still allows core libraries and headless tests to build.
