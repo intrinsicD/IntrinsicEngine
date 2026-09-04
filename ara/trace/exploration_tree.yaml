@@ -10707,3 +10707,29 @@ tree:
       Dirty source identity and legacy result shape keep this local and
       non-claim-grade.
     status: resolved
+  - id: N459
+    type: experiment
+    title: "Verify the Clang 20 workaround and publish completed work"
+    provenance: ai-executed
+    timestamp: "2026-09-04T07:20+02:00"
+    also_depends_on: [N458]
+    evidence:
+      - "d538639c8ae52e4997e7e2d2553dbdcc13aa95a3"
+      - "c1c25e38758f7863d5e9cd844cb048b447238562"
+      - "ea83f28ac672ec5a6417b510d885cabfa4316f4c"
+      - "tasks/done/BUG-157-clang20-glm-module-union-build-break.md"
+      - "tasks/backlog/bugs/BUG-164-ccache-module-bmi-macro-staleness.md"
+      - "fresh cache-disabled Clang 20.1.2 configure and IntrinsicTests, IntrinsicCpuTests, ExtrinsicSandbox build"
+      - "4,263-case canonical CPU CTest selector on Clang 20.1.2"
+      - "git push origin main followed by fetch and exact HEAD/origin/main comparison"
+    result: >
+      A fresh cache-disabled Clang 20.1.2 tree compiled and linked all three
+      requested targets, and the canonical CPU selector passed 4,263 of 4,263
+      tests with one expected capability skip. The existing Clang 23 tree also
+      passed 4,263 of 4,263 tests. The positional-accessor refactor, GLM-module
+      workaround, BUG-157 retirement, BUG-164 follow-up, and curvature
+      acceleration commit were pushed to origin/main, whose fetched revision
+      exactly matched local HEAD at ea83f28ac672ec5a6417b510d885cabfa4316f4c.
+      BUG-164 remains open because bypassing ccache verifies the compiler fix
+      but does not repair the cache-key defect.
+    status: resolved

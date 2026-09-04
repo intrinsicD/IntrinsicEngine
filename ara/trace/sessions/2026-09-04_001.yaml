@@ -2,9 +2,9 @@ session:
   id: "2026-09-04_001"
   date: "2026-09-04"
   started: "2026-09-04T00:16+02:00"
-  last_turn: "2026-09-04T00:16+02:00"
-  turn_count: 1
-  summary: "Implemented the exact-preserving curvature acceleration sequence and matched four five-run local cohorts with identical normalized results and complete verification."
+  last_turn: "2026-09-04T07:20+02:00"
+  turn_count: 2
+  summary: "Implemented the exact-preserving curvature acceleration sequence with matched timing and payload evidence, then verified and published the Clang 20 GLM-module compatibility fixes from a fresh cache-disabled build."
 
 events_logged:
   - turn: 1
@@ -31,6 +31,12 @@ events_logged:
     routing: staged
     provenance: ai-executed
     summary: "Staged the improved local timing medians without promoting a dirty-source legacy-payload speed claim."
+  - turn: 2
+    type: experiment
+    id: N459
+    routing: direct
+    provenance: ai-executed
+    summary: "Built and tested the complete surface with cache disabled under Clang 20.1.2, then pushed it and verified exact local/remote revision equality."
 
 ai_actions:
   - turn: 1
@@ -59,16 +65,32 @@ ai_actions:
     action: "Ran focused and canonical CPU tests, grouped geometry ASan and UBSan tests, the optimized Sandbox build, manifest validators, and strict structural checks."
     provenance: ai-executed
     files_changed: []
+  - turn: 2
+    action: "Reviewed and separated every remaining working-tree change into positional-accessor, GLM-module workaround, and task-retirement commits."
+    provenance: ai-executed
+    files_changed:
+      - "src/"
+      - "tests/"
+      - "cmake/"
+      - "docs/"
+      - "tasks/"
+  - turn: 2
+    action: "Configured a fresh cache-disabled Clang 20.1.2 build, built IntrinsicTests, IntrinsicCpuTests, and ExtrinsicSandbox, ran the canonical CPU selector, repeated strict structural validation, and published all commits to origin/main."
+    provenance: ai-executed
+    files_changed: []
 
 claims_touched: []
 
 key_context:
   - turn: 1
     excerpt: "The user directed a pre-change test run, the ranked implementation sequence, a matched post-change timing/output comparison, and final commit, merge, and push."
+  - turn: 2
+    excerpt: "After reviewing the exact GitHub origin, the user explicitly authorized committing and pushing all remaining changes."
 
 open_threads:
   - "Create a clean-source schema-v2 Release benchmark on a representative user mesh with computed curvature/features, production Automatic GMM and automatic seeds, publication, warm repetitions, and quality parity."
   - "Measure whether amortizing vertex-topology construction and addressing the remaining 100k seed-selection cost improve end-to-end editor latency without changing the reference result."
+  - "Resolve BUG-164 by making ccache's Clang-module cache identity include command-line macro state before re-enabling cache-backed Clang 20 verification."
 
 ai_suggestions_pending:
   - "Treat parallel GMM/features, revision-keyed stage caching, coarse-to-fine solving, and local sculpt updates as later parity-controlled work."

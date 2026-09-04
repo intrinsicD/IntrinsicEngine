@@ -323,8 +323,8 @@ sessions:
     open_threads: 3
   - id: "2026-09-04_001"
     date: "2026-09-04"
-    summary: "Implemented the exact-preserving curvature acceleration sequence and matched four five-run local cohorts with identical normalized results and complete verification."
-    turn_count: 1
-    events_count: 4
+    summary: "Implemented the exact-preserving curvature acceleration sequence with matched timing and payload evidence, then verified and published the Clang 20 GLM-module compatibility fixes from a fresh cache-disabled build."
+    turn_count: 2
+    events_count: 5
     claims_touched: []
-    open_threads: 2
+    open_threads: 3
