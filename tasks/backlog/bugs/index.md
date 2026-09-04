@@ -5,6 +5,13 @@ Each entry includes the observed repro, the likely affected symbols, and a fix p
 
 ## Active Issues
 
+- [`BUG-164` — ccache serves stale objects when a macro changes only imported
+  module BMIs](BUG-164-ccache-module-bmi-macro-staleness.md): the CI-007
+  preprocessor-mode launcher keys on the TU's preprocessed text plus a digest
+  of `.cppm` sources, so a definition that only alters a header inside other
+  modules' global module fragments (glm under `GLM_FORCE_XYZW_ONLY`) reused a
+  stale `Pass.Selection.Outline.cpp` object; fix the key, not the lane list.
+
 - [`BUG-158` — Optional direct-mesh enrichment blocks already usable
   geometry](BUG-158-direct-mesh-enrichment-blocks-usable-geometry.md): the
   geometry-only mesh is published immediately, but the editor returns before
@@ -21,16 +28,6 @@ Each entry includes the observed repro, the likely affected symbols, and a fix p
 The 2026-08-07 Sandbox UI workflow pass (`sculpt.obj` end-to-end through the
 promoted Vulkan build) opened `BUG-137` through `BUG-142`. `BUG-137` is upstream
 of `BUG-140` and of the parameterization rejection recorded in `BUG-141`.
-
-- [`BUG-157` — Clang 20 fails IntrinsicTests on glm anonymous-union
-  redeclaration](BUG-157-clang20-glm-module-union-build-break.md): on a
-  Clang-20-only host, `Test.CameraModule.cpp` deterministically fails with
-  `glm/detail/type_vec3.hpp: class member cannot be redeclared` when textual
-  glm inclusion meets the imported RHI module chain, so the full
-  `IntrinsicTests` build breaks on the documented minimum toolchain while
-  geometry-only targets build and pass. PR 1030 reproduced it in full CPU,
-  ASan, and UBSan after the earlier shallow-checkout validator failure was
-  fixed; `BUG-157` is the sole implementation owner.
 
 - [`BUG-149` — Benchmark sealer escapes dotted output directories](BUG-149-benchmark-sealer-dotted-output-directory.md):
   `run_and_seal.py` interprets a dotted directory name as a file, seals its
@@ -61,6 +58,17 @@ of `BUG-140` and of the parameterization rejection recorded in `BUG-141`.
   tests run; collect cold/warm/contention evidence and set an explicit,
   evidence-backed discovery policy without weakening per-test timeouts.
 ## Verified / Closed
+
+- Closed 2026-09-03: [`BUG-157` — Clang 20 fails IntrinsicTests on glm
+  anonymous-union redeclaration](../../done/BUG-157-clang20-glm-module-union-build-break.md).
+  Two Clang-20-only module defects, both fixed upstream only in LLVM 22, broke
+  the hosted `ci-linux-clang` gate on every `main` push since 2026-08-05. glm's
+  anonymous unions now compile away under a global `GLM_FORCE_XYZW_ONLY`
+  (137 colour accessors across 14 files renamed mechanically), and the one test
+  that compared `FramePassId` values imports the module that exports its
+  operators. Clang 20
+  stays the documented minimum; fresh Clang 20 and Clang 23 trees build every
+  test target and pass the default CPU gate.
 
 - Closed 2026-09-03: [`BUG-118` — GLFW X11 input-method LeakSanitizer
   recurrence](../../done/BUG-118-glfw-x11-input-method-lsan-recurrence.md).

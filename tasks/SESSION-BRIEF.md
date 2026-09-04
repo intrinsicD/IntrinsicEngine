@@ -35,7 +35,7 @@ picking backlog work; theme priorities and rationale live in
 - unblocked: `BUG-091` — GoogleTest PRE_TEST discovery times out on a cold start (tasks/backlog/bugs/BUG-091-gtest-pretest-discovery-cold-timeout.md)
 - unblocked: `BUG-097` — Progressive model-scene UV job publishes a zero atlas (tasks/backlog/bugs/BUG-097-progressive-model-scene-zero-uv-atlas.md)
 - unblocked: `BUG-149` — Benchmark sealer escapes dotted output directories (tasks/backlog/bugs/BUG-149-benchmark-sealer-dotted-output-directory.md)
-- unblocked: `BUG-157` — Clang 20 fails IntrinsicTests on glm anonymous-union redeclaration (tasks/backlog/bugs/BUG-157-clang20-glm-module-union-build-break.md)
+- unblocked: `BUG-164` — ccache serves stale objects when a macro changes only imported module BMIs (tasks/backlog/bugs/BUG-164-ccache-module-bmi-macro-staleness.md)
 
 ## Theme H — Agentic workflow hardening
 

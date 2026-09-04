@@ -8,6 +8,25 @@ so blocks moved from the old active-README history work verbatim.
 
 ## Retired task narratives
 
+[`BUG-157`](BUG-157-clang20-glm-module-union-build-break.md) — the hosted
+`ci-linux-clang` gate had been red on every `main` push since 2026-08-05
+because Clang 20.1.2, the documented minimum and the Ubuntu 24.04 package, fails
+two test TUs that Clang 23 accepts. `Test.CameraModule.cpp` hit llvm/llvm-project
+PR #155948's defect: anonymous-union members of `glm::vec<3, float>` reaching
+one TU through two module lineages are not merged, so the first defaulted copy
+assignment reports `class member cannot be redeclared`. `Test.RendererFrameLifecycle.cpp`
+hit the Clang 20 module-level-lookup regression family (llvm #133720): ADL did
+not find the exported `FramePassId` operators of a module the TU reached only
+transitively. Both fixes ship first in LLVM 22.1.0. The tree keeps Clang 20 as
+its minimum: `GLM_FORCE_XYZW_ONLY` is now a directory-scope definition so glm
+declares no anonymous unions anywhere, 137 `.r/.g/.b/.a` colour accessors in
+14 files became `.x/.y/.z/.w` by compile-driven substitution, and the frame
+lifecycle test imports `Extrinsic.Graphics.RenderGraph`. Fresh Clang 20.1.2
+and Clang 23 trees build `IntrinsicTests`, `IntrinsicCpuTests`, and
+`ExtrinsicSandbox` and pass the default CPU gate; standalone reproducers for
+both defects fail on clang++-20 and pass on clang++-22/23. Commits: rename
+`d538639c8`; configuration, import, and docs `c1c25e387`.
+
 [`BUG-163`](BUG-163-sculpt-curvature-feature-patch-rendering.md) — current
 Framework24 default curvature now agrees on every principal-scalar slot of the
 3,669-vertex sculpt fixture within `8.24e-14`, and the explicit METHOD-039
