@@ -5,13 +5,19 @@ Each entry includes the observed repro, the likely affected symbols, and a fix p
 
 ## Active Issues
 
-- [`BUG-164` — ccache serves stale objects when a macro changes only imported
-  module BMIs](BUG-164-ccache-module-bmi-macro-staleness.md): the CI-007
-  preprocessor-mode launcher keys on the TU's preprocessed text plus a digest
-  of `.cppm` sources, so a definition that only alters a header inside other
-  modules' global module fragments (glm under `GLM_FORCE_XYZW_ONLY`) reused a
-  stale `Pass.Selection.Outline.cpp` object; fix the key, not the lane list.
-
+- [`BUG-166` — Clean scratch experiments lose historical input
+  seals](BUG-166-clean-scratch-experiment-historical-input-seals.md): frozen
+  clean METHOD-037/038 scratch runs still match their exact recorded commits,
+  but repository-global validation checks their source inputs against live
+  `HEAD` because historical fallback is gated on claim eligibility. Preserve
+  immutable source identity without rewriting evidence or promoting a claim.
+- [`BUG-165` — Dropped-file queue tests race worker
+  completion](BUG-165-dropped-geometry-cancellation-test-race.md): hosted
+  `pr-fast` can finish the tiny OBJ import before two tests' first queue
+  snapshots, making `CanCancel` false and, in the cancellation case, allowing
+  main-thread apply. Use the existing pre-decode hook as a deterministic
+  barrier; do not hide the race with retries, quarantine, sleeps, or weakened
+  assertions.
 - [`BUG-158` — Optional direct-mesh enrichment blocks already usable
   geometry](BUG-158-direct-mesh-enrichment-blocks-usable-geometry.md): the
   geometry-only mesh is published immediately, but the editor returns before

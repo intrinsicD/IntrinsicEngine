@@ -461,6 +461,12 @@ cases live at the top level; negative cases live in sibling `negative_*`
 directories and are scanned per-case so the bulk fixture root can stay
 clean under `--exclude 'negative_*'`.
 
+`regression/tooling/Test.CcacheModuleInvalidationProbe.py` owns the live
+ccache 4.9.1 module-input fixture. It requires unchanged warm-cache hits and
+importer misses after an interface edit, directory/target-private definition
+changes, a target-private option change, or an edit to a header used only by
+an imported module's global fragment.
+
 ## New test naming
 
 New C++ test source files should use the `Test.<Name>.cpp` format.

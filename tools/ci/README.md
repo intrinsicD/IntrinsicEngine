@@ -37,8 +37,8 @@ CI helper scripts and workflow validation tools.
 - `test_cohort_manifest.py`: parses the strict shared fast-to-slow transition
   manifest consumed by timing and source-coverage parity.
 - `validate_gate_timing_baseline.py`: validates the CI-003 historical gate-latency baseline and statistics payloads. Exercised by `tests/regression/tooling/Test.CiTiming.py`; see `benchmarks/ci/README.md`.
-- `ccache_ci.py`: validates the retained CI ccache policy (configured launcher/mode/digest identity) and exports ccache statistics. Part of the CI-007 `pr-fast.yml` policy.
-- `ccache_module_invalidation_probe.py`: exercises ccache reuse across a hermetic C++23 module-interface change to prove exported-interface edits invalidate importers. Part of the retained CI-007 `pr-fast.yml` policy.
+- `ccache_ci.py`: launches and validates the retained CI ccache policy, emits dependency-local semantic module sidecars from actual module compiler invocations plus CMake scanner metadata, and exports ccache statistics. Part of the CI-007 `pr-fast.yml` policy.
+- `ccache_module_invalidation_probe.py`: exercises ccache reuse across hermetic C++23 module-input changes, proving interface, directory/target definition, target-option, and GMF-header edits invalidate importers while unchanged rebuilds still hit. Part of the retained CI-007 `pr-fast.yml` policy.
 - `touched_scope.py`: plans (or runs) conservative build/test/structural
   verification for the exact name-status diff from the unique merge base of
   the supplied base/head refs to the head. It drives `pr-fast` through

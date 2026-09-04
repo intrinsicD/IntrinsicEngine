@@ -244,11 +244,18 @@ Ninja metadata, object directories, Clang BMI files, and the ccache config file
 are not cached. Ccache
 4.9.1 passes named-module interface compiles through. Cacheable implementation
 and importer units therefore use preprocessor mode with direct and depend modes
-disabled, while `CCACHE_EXTRAFILES` adds a CMake-generated digest of every
-repository `.cppm` to each key. CMake regenerates that digest when an existing
-interface changes or the interface inventory changes, deliberately invalidating
-all keyed consumers rather than risking stale BMI/layout reuse. The workflow
-validates the generated launcher and digest, zeros statistics immediately before
+disabled. Each module compile emits a stable semantic sidecar from its actual
+compiler invocation, its `CXXDependInfo.json` entry, its source and
+project/build-local textual inputs listed by the scanner depfile, and its direct
+dependency sidecars. The actual invocation is authoritative for definitions
+and options because CMake versions before 4.3 omit those fields from
+`CXXDependInfo.json`. Importers add only their direct module sidecars to
+`CCACHE_EXTRAFILES`; a small CMake-generated marker separately covers global
+compiler context for every cacheable translation unit. The launcher fails
+closed when this CMake metadata or a required sidecar is missing or malformed.
+It does not hash raw
+PCM bytes, the whole CMake cache, Ninja graph, or source tree. The workflow
+validates the generated launcher and global marker, zeros statistics before
 compilation, and reports hit/miss, cache-size, error, availability, and health
 diagnostics in the CI gate-latency result. Only an exact-key or
 compatibility-prefix content store is restored; each successful commit saves a
@@ -264,8 +271,10 @@ before changing engine source.
 The workflow's pre-build module invalidation probe is deliberately isolated
 from that store and config. It uses the configured compiler/scanner pair and a
 fresh temporary cache to prove real hits for unchanged implementation/importer
-sources, misses after changing only the `.cppm`, importer recompilation, and
-cached-versus-clean output parity. The result is uploaded as
+sources and importer misses after changing the interface, a directory or
+target-private definition, a target-private compile option, or the contents of
+a header used only by the module's global fragment. Every changed case must
+match a clean no-ccache build. The result is uploaded as
 `ci-ccache-module-invalidation-pr-fast`. A failed or missing probe result blocks
 the job and prevents the restored store from being saved.
 

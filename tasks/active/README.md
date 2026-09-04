@@ -11,7 +11,10 @@ Each active task should include:
 
 ## Currently active
 
-No tasks are currently active.
+- [`BUG-164` — ccache serves stale objects when a macro changes only imported
+  module BMIs](BUG-164-ccache-module-bmi-macro-staleness.md) — in progress;
+  dependency-local semantic sidecars pass local fixture, core, full-graph, and
+  exact graphics evidence; hosted warm-budget evidence remains open.
 
 ## Records
 
