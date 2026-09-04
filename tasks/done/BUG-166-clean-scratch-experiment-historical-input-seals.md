@@ -14,6 +14,13 @@ contracts: [repo.task-contract-discovery]
 ---
 # BUG-166 — Clean scratch experiments lose historical input seals
 
+## Status
+- Completed and retired on 2026-09-05. Clean exact source identity now governs
+  frozen declared-input lookup independently of claim eligibility, while dirty
+  inputs and all post-run evidence retain their live/current validation.
+- Implementation commits: `a9aab4b88`, `ecf5af612`.
+- Pull request: [#1037](https://github.com/intrinsicD/IntrinsicEngine/pull/1037).
+
 ## Goal
 - Keep a frozen non-claim scratch experiment with an exact clean source
   revision valid after later commits legitimately change its declared source

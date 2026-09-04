@@ -9,7 +9,6 @@ picking backlog work; theme priorities and rationale live in
 ## Active tasks
 
 - `BUG-164` — ccache serves stale objects when a macro changes only imported module BMIs (tasks/active/BUG-164-ccache-module-bmi-macro-staleness.md)
-- `BUG-166` — Clean scratch experiments lose historical input seals (tasks/active/BUG-166-clean-scratch-experiment-historical-input-seals.md)
 
 ## Theme B — Rendering modernization
 
