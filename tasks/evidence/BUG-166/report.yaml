@@ -3,15 +3,15 @@ task_id: BUG-166
 workflow_profile: standard
 status: complete
 generated_by: tools/agents/workflow_evidence.py
-generated_at: '2026-09-04T23:51:54Z'
+generated_at: '2026-09-04T23:52:52Z'
 claim_eligible: false
 source:
   base_ref: origin/main
   base_revision: ba785d34b54d56845723ed5a5a2b86b9f480ad37
-  head_revision: ba785d34b54d56845723ed5a5a2b86b9f480ad37
+  head_revision: a9aab4b881cab41271f0d5d3e3130fedcb555f2a
   branch: codex/bug-166-historical-input-seals
   worktree: /tmp/intrinsic-bug166
-  dirty: true
+  dirty: false
   surface:
   - path: docs/agent/workflow-evidence.md
     sha256: 007a6f01c891d1c42d92e0ba2d092ac171be41bf435a98b6717306c786dfc7a4
