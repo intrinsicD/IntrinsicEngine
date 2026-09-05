@@ -20,14 +20,11 @@ maturity_target: Operational
 
 ## Status
 
-- In progress: implementation is verified by the full CPU gate and the new
-  Vulkan readback smoke. The broader GPU/Vulkan gate remains pending while
-  its test targets build with two workers.
-- Operator confirmed BUG-158 first. Atlas construction and the operator's
-  replacement work remain unchanged; BUG-097/159/160 are outside this repair.
-- Before the crash, the focused CPU cohort passed 18/18 and the three new
-  enrichment regressions passed repeated execution. These saved logs are
-  recovery context; completion will cite fresh runs from this session.
+- Completed 2026-09-05 at `Operational` maturity; full CPU and GPU/Vulkan
+  gates passed on the recovered source.
+- Commit: `f131d1c4f` (implementation).
+- Operator confirmed BUG-158 first. Atlas algorithm/cost work and
+  `BUG-097/159/160` remain outside this repair.
 
 ## Goal
 
@@ -80,7 +77,7 @@ maturity_target: Operational
   The existing snapshot early return explains the observed discrepancy.
   Full local output: `/tmp/bug-158-red-tests.log`.
 
-## Recovery verification
+## Results
 
 - 2026-09-05: fresh `ci` configure selected Clang 23 with sanitizers off.
   The focused `SandboxEditorUi` enrichment/postprocess/texture-bake cohort
@@ -99,9 +96,16 @@ maturity_target: Operational
   off-origin focus, source/component/selection state, pending enrichment, and
   curvature readiness before any enrichment completion can be drained.
   Log: `/tmp/bug-158-recovery-vulkan-focused.log`.
-- The full `ci-vulkan` `IntrinsicTests` build and GPU/Vulkan gate remain
-  pending. W2 stays open for representative small/large matched evidence;
-  this fix adds bounded regression coverage, not a latency or parity claim.
+- The full `ci-vulkan` `IntrinsicTests` build succeeded. The 10 focused
+  enrichment/postprocess/texture-bake regressions also passed under its
+  ASan+UBSan instrumentation (`--parallel 1`; 5.46 seconds total).
+  Log: `/tmp/bug-158-recovery-sanitized-focused.log`.
+- The full GPU/Vulkan gate passed 55/55 with zero skips in 464.04 seconds,
+  including the pending-enrichment readback and the shutdown LeakSanitizer
+  contract with its engine-leak negative control.
+  Log: `/tmp/bug-158-recovery-vulkan-full.log`.
+- W2 stays open for representative small/large matched evidence; this fix
+  adds bounded regression coverage, not a latency or parity claim.
 
 ## Required changes
 
@@ -123,7 +127,7 @@ maturity_target: Operational
       generation.
 - [x] Add or extend promoted-Vulkan smoke evidence that the geometry-only mesh
       remains rendered while enrichment is pending.
-- [ ] Default CPU and opt-in `gpu;vulkan` gates stay green.
+- [x] Default CPU and opt-in `gpu;vulkan` gates stay green.
 
 ## Docs
 
@@ -142,12 +146,18 @@ maturity_target: Operational
 
 ```bash
 cmake --preset ci
-cmake --build --preset ci --target IntrinsicTests
+cmake --build --preset ci --target IntrinsicTests --parallel 2
+ctest --test-dir build/ci --output-on-failure \
+  -LE 'gpu|vulkan|slow|flaky-quarantine' --no-tests=error --timeout 60
 ctest --test-dir build/ci --output-on-failure \
   -R 'DirectMeshEnrichment|SandboxEditorMeshMethods|AssetImport' --timeout 120
 cmake --preset ci-vulkan
-cmake --build --preset ci-vulkan --target IntrinsicTests
-ctest --test-dir build/ci-vulkan --output-on-failure -L gpu -L vulkan --timeout 120
+cmake --build --preset ci-vulkan --target IntrinsicTests --parallel 2
+ctest --test-dir build/ci-vulkan --output-on-failure \
+  -R 'SandboxEditorUi\.(DirectMeshEnrichment|DirectMeshPostProcess|TextureBakeControlsReportUvSources)' \
+  --no-tests=error --timeout 120 --parallel 1
+ctest --test-dir build/ci-vulkan --output-on-failure -L gpu -L vulkan \
+  --no-tests=error --timeout 120 --parallel 1
 python3 tools/repo/check_layering.py --root src --strict
 ```
 
@@ -156,3 +166,12 @@ python3 tools/repo/check_layering.py --root src --strict
 - No waiting for atlas completion on the main/editor thread.
 - No disabling all geometry actions from one presentation-enrichment bit.
 - No publishing a stale enrichment result after canonical geometry changes.
+
+## Delivery
+
+- Local implementation checkpoint: `f131d1c4f`.
+- Automatic approval review rejected `git push --set-upstream origin
+  codex/bug-158-ready-during-enrichment`: explicit authorization is required
+  to send this private branch to `https://github.com/intrinsicD/IntrinsicEngine.git`.
+  No push occurred or was retried. The completed branch remains local pending
+  operator approval; it also retains the three earlier local planning commits.

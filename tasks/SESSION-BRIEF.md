@@ -8,7 +8,7 @@ picking backlog work; theme priorities and rationale live in
 
 ## Active tasks
 
-- `BUG-158` — Optional direct-mesh enrichment blocks already usable geometry (tasks/active/BUG-158-direct-mesh-enrichment-blocks-usable-geometry.md)
+- none
 
 ## Theme B — Rendering modernization
 

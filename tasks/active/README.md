@@ -11,9 +11,7 @@ Each active task should include:
 
 ## Currently active
 
-- [BUG-158 — Geometry readiness during enrichment](BUG-158-direct-mesh-enrichment-blocks-usable-geometry.md)
-  — in progress on `codex/bug-158-ready-during-enrichment`; CPU regression and
-  pending-enrichment Vulkan readback are the next verification steps.
+- None.
 
 ## Records
 

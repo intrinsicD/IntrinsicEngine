@@ -10,7 +10,7 @@ map.
 ## Convergence
 
 - This category normally corresponds to **Theme G — Active bugs** in the
-  convergence map. `BUG-158..160` are assigned to the temporary Theme J
+  convergence map. `BUG-159` and `BUG-160` are assigned to the temporary Theme J
   product gate because they directly block the import golden workflow.
 - Bug fixes that touch multiple layers must respect the same dependency
   anchors as feature work and should still ship as small, scoped patches per

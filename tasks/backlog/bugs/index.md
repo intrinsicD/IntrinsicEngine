@@ -5,10 +5,6 @@ Each entry includes the observed repro, the likely affected symbols, and a fix p
 
 ## Active Issues
 
-- [`BUG-158` — Optional direct-mesh enrichment blocks already usable
-  geometry](../../active/BUG-158-direct-mesh-enrichment-blocks-usable-geometry.md): the
-  geometry-only mesh is published immediately, but the editor returns before
-  resolving all processing actions while UV/normal enrichment is active.
 - [`BUG-159` — FastStaged atlas allocates global remaps for every
   chart](BUG-159-fast-staged-atlas-per-chart-global-remaps.md): two
   source-vertex-sized mappings inside chart work make pathological charting
@@ -44,6 +40,12 @@ of `BUG-140` and of the parameterization rejection recorded in `BUG-141`.
   tests run; collect cold/warm/contention evidence and set an explicit,
   evidence-backed discovery policy without weakening per-test timeouts.
 ## Verified / Closed
+
+- Closed 2026-09-05: [`BUG-158` — Geometry readiness during optional
+  enrichment](../../done/BUG-158-direct-mesh-enrichment-blocks-usable-geometry.md).
+  Geometry actions use their canonical inputs while enrichment remains visible;
+  stale results cannot overwrite intervening edits. CPU, sanitizer-focused,
+  and GPU/Vulkan gates passed, including a UV-less pending-enrichment readback.
 
 - Closed 2026-09-03: [`BUG-157` — Clang 20 fails IntrinsicTests on glm
   anonymous-union redeclaration](../../done/BUG-157-clang20-glm-module-union-build-break.md).

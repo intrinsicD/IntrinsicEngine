@@ -8,6 +8,20 @@ so blocks moved from the old active-README history work verbatim.
 
 ## Retired task narratives
 
+[`BUG-158`](BUG-158-direct-mesh-enrichment-blocks-usable-geometry.md) — completed
+2026-09-05 at `Operational` maturity in implementation commit `f131d1c4f`.
+The selected-entity processing model resolves canonical geometry actions while
+optional import enrichment is pending, preserving status and generation-safe
+publication. Regressions cover curvature before atlas completion, stale-result
+rejection after property publication, cancellation, and a visible/selectable
+UV-less off-origin import before enrichment publication. Clang 23 built both
+`ci` and `ci-vulkan` `IntrinsicTests` targets; the CPU gate had zero failures
+across 4,265 registered cases with one expected unsanitized GLFW/LSan skip,
+47 import-focused tests passed, 10 focused ASan+UBSan tests passed, and all
+55 GPU/Vulkan cases passed on NVIDIA RTX 3050 / driver 590.48.01, including
+shutdown leak detection. W2 remains open for representative matched evidence
+under `BENCH-001`; atlas repairs remain with `BUG-159` and `BUG-160`.
+
 [`BUG-122`](BUG-122-runtime-asset-asan-test-lifetimes.md) — retired on
 2026-09-05 as superseded by
 [`RUNTIME-200`](RUNTIME-200-staged-asset-import-materialization-recipe.md),
