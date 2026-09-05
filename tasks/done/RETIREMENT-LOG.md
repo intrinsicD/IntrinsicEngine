@@ -8,6 +8,19 @@ so blocks moved from the old active-README history work verbatim.
 
 ## Retired task narratives
 
+[`BUG-159`](BUG-159-fast-staged-atlas-per-chart-global-remaps.md) — completed
+2026-09-05 in implementation commit `1846a5692`, at `Operational` maturity
+for the built-in CPU FastStaged backend. One reusable source lookup and
+chart-local output indices replace retained/copied per-chart global maps.
+The isolated allocation regression fails before the fix and passes after it;
+exact atlas snapshots remain unchanged on the recorded fixtures. The full
+CPU selector had zero failures across 4,267 entries with one expected
+unsanitized GLFW/LSan skip. Sixteen atlas-focused entries passed, and each
+separate ASan/UBSan run passed the allocation regression and 1,394 grouped
+geometry cases. Diagnostic benchmark payloads remain non-claim-eligible;
+BENCH-001 retains product comparison evidence and BUG-160 now owns the
+unblocked chart-fragmentation repair.
+
 [`BUG-158`](BUG-158-direct-mesh-enrichment-blocks-usable-geometry.md) — completed
 2026-09-05 at `Operational` maturity in implementation commit `f131d1c4f`.
 The selected-entity processing model resolves canonical geometry actions while

@@ -111,8 +111,7 @@ picking backlog work; theme priorities and rationale live in
 
 - unblocked: `ASSETIO-012` — Two hand-maintained format capability tables have already drifted (tasks/backlog/assets/ASSETIO-012-single-source-format-capability-table.md)
 - unblocked: `BENCH-001` — Framework24 golden-workflow comparison harness (tasks/backlog/benchmarks/BENCH-001-framework24-golden-workflow-comparison-harness.md)
-- unblocked: `BUG-159` — FastStaged atlas allocates global remaps for every chart (tasks/backlog/bugs/BUG-159-fast-staged-atlas-per-chart-global-remaps.md)
-- blocked by `BUG-159`: `BUG-160` — FastStaged fixed seed planes fragment smooth meshes into tiny charts (tasks/backlog/bugs/BUG-160-fast-staged-atlas-chart-fragmentation.md)
+- unblocked: `BUG-160` — FastStaged fixed seed planes fragment smooth meshes into tiny charts (tasks/backlog/bugs/BUG-160-fast-staged-atlas-chart-fragmentation.md)
 - unblocked: `GRAPHICS-135` — Measure current render-prep scheduling and material-sync overhead (tasks/backlog/rendering/GRAPHICS-135-renderprep-per-frame-taskgraph-overhead.md)
 - blocked by `ASSETIO-012`: `REVIEW-004` — Framework24 product-convergence audit (tasks/backlog/architecture/REVIEW-004-framework24-product-convergence-audit.md)
 - unblocked: `RUNTIME-218` — Nothing in the scene is ever lit: add default lighting and light authoring (tasks/backlog/runtime/RUNTIME-218-default-scene-lighting-and-light-authoring.md)

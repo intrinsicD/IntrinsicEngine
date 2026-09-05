@@ -18,6 +18,15 @@ maturity_target: Operational
 ---
 # BUG-159 — FastStaged atlas allocates global remaps for every chart
 
+## Status
+
+- Completed 2026-09-05.
+- Commit: `1846a5692` (implementation).
+- Reached `Operational` for the built-in FastStaged CPU backend, exercised by
+  the allocation benchmark, atlas regressions, and separate sanitizer suites.
+  This records no GPU capability or Framework24 performance conclusion.
+- BUG-160 is unblocked. BENCH-001 retains matched product evidence.
+
 ## Goal
 
 - Remove the `O(chart_count × source_vertex_count)` initialization and retained
@@ -141,7 +150,7 @@ python3 tools/repo/check_test_layout.py --root . --strict
   also passed (1,394 underlying geometry cases). Both sanitizer selectors
   ran serially with `--parallel 1`.
 - Exact small-fixture and many-chart output snapshots match before/after.
-  [Local diagnostics and reproducible invocation](../../../docs/benchmarking/bug159-atlas-remap-diagnostics.md)
+  [Local diagnostics and reproducible invocation](../../docs/benchmarking/bug159-atlas-remap-diagnostics.md)
   bind the source/harness hashes and preserve `claim_eligible: false`.
 - Strict layering, test-layout, benchmark-manifest, benchmark-result, and ARA
   ledger checks passed. No public module surface or dependency edge changed.

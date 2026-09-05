@@ -5,10 +5,6 @@ Each entry includes the observed repro, the likely affected symbols, and a fix p
 
 ## Active Issues
 
-- [`BUG-159` — FastStaged atlas allocates global remaps for every
-  chart](BUG-159-fast-staged-atlas-per-chart-global-remaps.md): two
-  source-vertex-sized mappings inside chart work make pathological charting
-  scale as `O(C × V)` instead of chart-local data.
 - [`BUG-160` — FastStaged fixed seed planes fragment smooth meshes into tiny
   charts](BUG-160-fast-staged-atlas-chart-fragmentation.md): the seed-normal and
   seed-plane admission rule produced about 90k charts on a 100k-face
@@ -40,6 +36,11 @@ of `BUG-140` and of the parameterization rejection recorded in `BUG-141`.
   tests run; collect cold/warm/contention evidence and set an explicit,
   evidence-backed discovery policy without weakening per-test timeouts.
 ## Verified / Closed
+
+- Closed 2026-09-05: [`BUG-159` — Chart-local FastStaged remaps](../../done/BUG-159-fast-staged-atlas-per-chart-global-remaps.md).
+  Replaced per-chart global maps with reusable scratch and local output
+  indices; allocation regression, exact output snapshots, full CPU, and
+  separate ASan/UBSan geometry checks passed. BUG-160 remains open.
 
 - Closed 2026-09-05: [`BUG-158` — Geometry readiness during optional
   enrichment](../../done/BUG-158-direct-mesh-enrichment-blocks-usable-geometry.md).

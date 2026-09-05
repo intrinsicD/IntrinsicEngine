@@ -81,8 +81,8 @@ python3 tools/benchmark/validate_benchmark_results.py
 The runner writes a sibling `result.json.snapshot`; compare its bytes or
 SHA-256 with the decompressed checked-in snapshot for the recorded configuration.
 For a before/after reproduction, apply only the same benchmark harness to
-`e6350ca56`, then repeat on the implementation revision recorded in the
-[task](../../tasks/backlog/bugs/BUG-159-fast-staged-atlas-per-chart-global-remaps.md).
+`e6350ca56`, then repeat on implementation commit `1846a5692`, recorded in the
+[retired task](../../tasks/done/BUG-159-fast-staged-atlas-per-chart-global-remaps.md).
 
 ## Evidence limits and remaining work
 
