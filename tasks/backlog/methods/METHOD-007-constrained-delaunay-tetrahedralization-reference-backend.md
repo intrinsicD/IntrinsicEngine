@@ -3,6 +3,15 @@ id: METHOD-007
 theme: I
 depends_on: [GEOM-007]
 maturity_target: CPUContracted
+workflow_schema: 1
+workflow_profile: claim-grade
+evidence: required
+owner:
+branch:
+worktree:
+claimed_at:
+contract_schema: 1
+contracts: [geometry.element-domain-sources, method.engine-integration]
 ---
 # METHOD-007 — Constrained Delaunay tetrahedralization reference backend
 
@@ -28,6 +37,21 @@ maturity_target: CPUContracted
   formula-specific indirect `orient3d`/`inSphere` escalation; it must not
   claim those kernels already exist.
 - Closes the P1 "volumetric and cell-complex containers" gap from `docs/reviews/2026-05-12-src-geometry-gap-analysis.md`.
+- Operator decision (2026-09-05): public/persisted positions use `glm::vec3`.
+  Double/exact and implicit-point arithmetic remain internal; conversion must
+  reject invalid materialization, not silently degrade topology or orientation.
+
+## Engine integration
+
+| Field | Disposition |
+| --- | --- |
+| Least-structured input | Finite positions and a closed triangle boundary satisfying the frozen PLC/topology contract; faces are semantic inputs. |
+| Compatible entity sources | Surface meshes satisfying that contract, not point sets or abstract graphs. Binding is deferred to METHOD-007A. |
+| RuntimeModule | Deferred to METHOD-007A; this task exposes the geometry reference API only. |
+| Config/agent | Typed CPU params now; serialized runtime preview/apply and command ownership deferred to METHOD-007A. |
+| UI | Deferred to METHOD-007A; no editor-integration claim from a CPU reference. |
+| Publication | Return a separate float-position TetMesh; do not replace the input boundary. Runtime ownership, persistence, history, and any explicit topology-changing publication are deferred to METHOD-007A. |
+| End-to-end tests | METHOD-007 owns analytic/predicate/materialization CPU tests; METHOD-007A owns planning and task allocation for runtime/config/UI/publication coverage. |
 
 ## Variants and default selection
 
@@ -93,7 +117,7 @@ maturity_target: CPUContracted
       // Property sets: v:point, t:region, f:boundary, ...
     public:
       size_t VertexCount() const; size_t TetCount() const;
-      std::span<const glm::dvec3> VertexPositions() const;
+      std::span<const glm::vec3> VertexPositions() const;
       std::span<const std::array<uint32_t,4>> TetVertices() const;
       // Boundary extraction returns a HalfedgeMesh::Mesh.
       HalfedgeMesh::Mesh ExtractBoundary() const;
@@ -129,7 +153,8 @@ maturity_target: CPUContracted
       across PLC facets, preserving the input boundary exactly in the implicit
       representation.
 - [ ] Step 5: if materializing floating-point Steiner coordinates for
-      `TetMesh`, validate orientation/boundary conformity after rounding and
+      `TetMesh`, convert to public float storage once, then validate
+      orientation/boundary conformity on those published coordinates and
       fail closed when no valid materialization is found; do not hide the
       paper's floating-point representability limitation.
 
@@ -158,6 +183,9 @@ maturity_target: CPUContracted
       volume/quality tolerances before implementing assertions. Zero caps,
       indirect-predicate escalation failure, and invalid floating-point
       materialization fail closed with distinct diagnostics.
+- [ ] Pin the public `glm::vec3` storage type and include a rounding-sensitive
+      fixture: invalid float materialization returns a distinct failure with
+      no partial TetMesh, even if the internal representation is valid.
 
 ## Docs
 - [ ] `methods/geometry/constrained_delaunay_tet/README.md`.
@@ -175,6 +203,8 @@ maturity_target: CPUContracted
       success or expected failure result; broad Thingi10k success remains an
       unclaimed external study.
 - [ ] Diagnostics surface non-manifold / open / self-intersecting inputs without crashing.
+- [ ] Published/persisted positions are float; internal precision is not a
+      public storage exception, and failed conversion cannot publish bad cells.
 - [ ] Smoke manifest/result validate and report geometric/topological quality,
       not runtime alone.
 - [ ] `GEOM-007` is closed before this task starts.

@@ -3,6 +3,16 @@ id: ASSETIO-011
 theme: F
 depends_on: [ASSETIO-010, BUG-098, BUG-099, BUG-100]
 maturity_target: Operational
+workflow_schema: 1
+workflow_profile: standard
+evidence: required
+owner:
+branch:
+worktree:
+claimed_at:
+contract_schema: 1
+contracts: []
+contract_review: Existing import-control integration coverage; no geometry binding, publication, algorithm, or reusable policy changes.
 ---
 # ASSETIO-011 — Semantic Sandbox File / Import workflow matrix
 
@@ -17,8 +27,9 @@ maturity_target: Operational
 
 - No public editor automation API, ImGui Test Engine dependency, coordinate-
   based CI driver, screenshot golden, or production test-only widget.
-- No CI dependency on untracked/local `M16.xyz` or `child.obj`; equivalent
-  generated fixtures may cover their XYZ/OBJ route classes.
+- No CI dependency on untracked/local datasets such as `M16.xyz`; generated
+  fixtures cover those route classes. The tracked `assets/models/child.obj`
+  is part of the required repository matrix, not an excluded local dataset.
 - No duplicate import validation in `app`; the test consumes runtime-owned
   readiness and command results through the real controls.
 - No replacement for focused decoder, runtime contract, or Vulkan visibility
@@ -81,6 +92,9 @@ maturity_target: Operational
       the exact vertex/primitive result.
 - [ ] Generated small OBJ and XYZ rows cover automatic Mesh/PointCloud routing
       without relying on local datasets and prove the command returns Pending.
+- [ ] The tracked `child.obj` has its own bounded automatic-Mesh row through
+      the real controls, with queued completion and selection/focus checks;
+      a generated OBJ does not substitute for that checked-in fixture.
 - [ ] Run the matrix repeatedly without pointer-coordinate constants, sleeps
       as readiness oracles, `/tmp` model fixtures, or ImGui style overrides.
 
@@ -102,7 +116,8 @@ maturity_target: Operational
 - [ ] That queued runtime path is the sole staged `AssetImportRecipe`; the
       matrix cannot pass through a retained compatibility import pipeline.
 - [ ] Generated route-class substitutes cover local XYZ/OBJ without committing
-      or assuming provenance for user datasets.
+      or assuming provenance for user datasets; every tracked fixture,
+      including `child.obj`, remains explicitly covered.
 - [ ] The real-control matrix, focused Vulkan visibility smokes, and default
       CPU-supported gate pass.
 

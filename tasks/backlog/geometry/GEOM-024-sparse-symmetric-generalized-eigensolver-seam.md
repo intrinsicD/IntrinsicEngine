@@ -2,6 +2,16 @@
 id: GEOM-024
 theme: I
 depends_on: [GEOM-020]
+workflow_schema: 1
+workflow_profile: high-risk
+evidence: required
+owner:
+branch:
+worktree:
+claimed_at:
+contract_schema: 1
+contracts: []
+contract_review: Sparse matrix algebra and a private dependency; no method package, ECS property binding/publication, or shared parameterization optimization change. Public API review still applies.
 ---
 # GEOM-024 — Sparse symmetric generalized eigensolver seam
 
@@ -46,9 +56,8 @@ become follow-ups behind the same public seam.
   `SymGEigsShiftSolver` shift-invert mode over `Geometry.Sparse` LDLT.**
   Mature ARPACK-style Lanczos implementation, no binary dependency, pairs
   directly with the existing Eigen3 usage. **Selected as the default.**
-  Requires adding Spectra through `cmake/Dependencies.cmake` +
-  `external/cache/` (coordinate with `INFRA-001` if the vcpkg cutover lands
-  first; Spectra is also a first-class vcpkg port).
+  Requires adding Spectra through `vcpkg.json` with the repository's pinned
+  baseline/override/overlay policy; the vcpkg cutover is already authoritative.
 - [ ] **B — Hand-rolled LOBPCG over `Geometry.Sparse` CSR.** No new
   dependency, but block-iteration robustness (orthogonalization, breakdown
   handling) is non-trivial to get right; only pick if adding Spectra is
@@ -62,9 +71,9 @@ the reviewer disputes the Spectra pick (the policy section already
 anticipates a Spectra-class addition).
 
 ## Required changes
-- [ ] Add Spectra to `cmake/Dependencies.cmake` (FetchContent, header-only,
-      cached under `external/cache/`) or via the vcpkg manifest if `INFRA-001`
-      has landed; pin a release tag.
+- [ ] Add and pin Spectra through `vcpkg.json` and the repository
+      baseline/override/overlay route. Resolve its target through the
+      manifest-only dependency setup; no FetchContent or external-cache lane.
 - [ ] Extend `src/geometry/Geometry.Sparse.cppm` with a
       `SparseSymmetricEigensolver` wrapper: `solve(A, M, k, params)` returning
       the k smallest eigenpairs, with `params` covering shift, max iterations,
@@ -107,7 +116,7 @@ anticipates a Spectra-class addition).
 - [ ] Analytic and dense-oracle tests pass under the default CPU gate; no
       `flaky-quarantine` label is introduced.
 - [ ] Spectra (or the explicitly recorded alternative) is wired through the
-      central dependency mechanism with a pinned tag; no Spectra types leak
+      vcpkg manifest with a pinned version; no Spectra types leak
       through public APIs.
 - [ ] Layering / test-layout / docs-link / task-policy validators remain
       green.
@@ -126,6 +135,7 @@ python3 tools/repo/generate_module_inventory.py --root src --out docs/api/genera
 ```
 
 ## Forbidden changes
+- No FetchContent, direct downloads, or dependency route outside vcpkg.
 - Do not expose Spectra or Eigen types through public geometry APIs.
 - Do not compute or promise full-spectrum decompositions.
 - Do not add ARPACK, SLEPc, or binary eigensolver dependencies.

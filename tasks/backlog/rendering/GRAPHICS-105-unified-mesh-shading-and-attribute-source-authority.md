@@ -11,6 +11,15 @@ depends_on:
   - RUNTIME-197
   - RUNTIME-198
 maturity_target: Operational
+workflow_schema: 1
+workflow_profile: high-risk
+evidence: required
+owner:
+branch:
+worktree:
+claimed_at:
+contract_schema: 1
+contracts: [geometry.element-domain-sources, geometry.property-coherence]
 ---
 # GRAPHICS-105 — Unified mesh shading-model + per-attribute source authority
 
@@ -196,7 +205,8 @@ ctest --test-dir build/ci-vulkan --output-on-failure -L 'gpu' -L 'vulkan' --time
 - Blocking the frame for synchronous GPU texture readback in the editor.
 - Passing `Vk*` types through RHI/renderer/runtime/cache public APIs.
 - Adding live ECS/runtime/AssetService knowledge to graphics-owned modules.
-- Deleting the CPU bake path before the GPU texture path is proven end to end.
+- Restoring the CPU/specialized bake paths already retired by `RUNTIME-191`.
+  This task still owes its own end-to-end normal-source Vulkan evidence.
 - Mixing this consolidation with unrelated renderer/runtime/asset/UI features.
 
 ## Maturity

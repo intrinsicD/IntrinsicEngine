@@ -114,14 +114,12 @@ is retired; see
 (`RUNTIME-126`) is retired with the transfer facade/readback ring wired into the
 runtime derived-job graph.
 
-The 2026-08-07 Sandbox UI workflow pass added `GRAPHICS-135`, now a Theme J
-product-gate dependency:
-a frame-pacing capture with only the reference triangle in the scene shows
-`render_prepare_micros` flat at ~69 ms per frame (~92% of frame time), and
-`RenderPrepPipeline::Run()` rebuilds a nine-pass `Core::Dag::TaskGraph` every
-frame in which every pass is `MainThreadOnly, AllowParallel = false`. The task
-requires the controlled A/B before any change, because the captured numbers come
-from a Debug + ASan/UBSan build and are not a performance claim.
+`GRAPHICS-135` is the Theme J current-render-prep profiling owner. It measures
+callback registration/rebinding, retained-plan execution, scheduler dispatch,
+and material work before proposing changes. Compiled-plan reuse already
+exists, and visualization can dirty materials between the two syncs. Its task
+record retains the historical diagnostic captures; a negative A/B may close
+the investigation without a production rewrite.
 
 The research-control-surface recipe/config seam (see Theme H `PROC-010` for the
 proposed framing) opens new Theme B leaves that close the gap where an activated
@@ -431,7 +429,7 @@ the method panels stay owned by `RUNTIME-209/211/212/213` and
 - [`ui/UI-046-sandbox-geometry-export.md`](ui/UI-046-sandbox-geometry-export.md)
   (the geometry IO writers are unreachable from the app).
 - [`ui/UI-047-file-chooser-for-import-and-scene-paths.md`](ui/UI-047-file-chooser-for-import-and-scene-paths.md)
-  (blocked in practice by `BUG-139`).
+  (file chooser and drop hints; keyboard editing is repaired by retired `BUG-139`).
 - [`ui/UI-048-first-run-workspace-and-layout-persistence.md`](ui/UI-048-first-run-workspace-and-layout-persistence.md).
 - [`ui/UI-049-editor-panel-sizing-and-readability.md`](ui/UI-049-editor-panel-sizing-and-readability.md).
 - [`ui/UI-050-vector-field-property-visualization.md`](ui/UI-050-vector-field-property-visualization.md).
@@ -556,15 +554,12 @@ first-class, P1 scheduling target alongside Theme B (rendering) and Theme C
 *invariants* P1/P3/P5 are owned separately by `PROC-010` (`AGENTS.md` §5).
 
 Open members: `METHOD-003`, `METHOD-004`, `METHOD-005`, `METHOD-006` (blocked by
-`GEOM-024`), `METHOD-007`, `METHOD-014`, and `METHOD-015`; the remaining LOP
-consolidation leaf is `METHOD-020` GPU. `METHOD-019` retired on 2026-08-02 as a
-negative optimized-CPU confirmation with no public selector after all four
-candidates missed its frozen acceleration gate. The CPU-reference methods
-`METHOD-016..018` and engine-integration leaves `RUNTIME-175`/`UI-035` retired
-on 2026-08-01. The
-parameterization family on the retired `GEOM-063` shared surface — `METHOD-021` ARAP (blocked by
-`GEOM-064`), `METHOD-022` SLIM (blocked by `GEOM-064`/`METHOD-021`),
-`METHOD-023` BFF (retired),
+`GEOM-024`), `METHOD-007`, `METHOD-014`, and `METHOD-015`. The LOP family
+`METHOD-016..020` is retired; the remaining property-domain integration is
+tracked separately in the runtime/UI indexes. `METHOD-007A` and `METHOD-033A`
+own deferred integration intake after their CPU references and REVIEW-004.
+The parameterization family uses the retired `GEOM-063`/`GEOM-064` shared
+surfaces: `METHOD-021` ARAP, `METHOD-022` SLIM (blocked by `METHOD-021`),
 `METHOD-024` SCP (blocked by `GEOM-024`), `METHOD-025` Progressive SLIM
 optimized CPU (blocked by `METHOD-022`), `METHOD-026` iterative-strategy GPU (blocked by
 `METHOD-025`; the retired `RUNTIME-176` dependency is satisfied; iterative
@@ -572,11 +567,10 @@ strategies only), and its delivered engine-integration/view leaves
 `RUNTIME-176`, `UI-036`, and `GRAPHICS-122` (all retired 2026-07-15;
 `GRAPHICS-122` delivered the optional GPU-shaded UV target at `Operational`).
 The remaining method-readiness seams are `GEOM-013`,
-`GEOM-024`, `GEOM-059`, `GEOM-060`, `GEOM-061`, and
-`GEOM-064`, plus the 2026-07-16 consolidation leaves `GEOM-068` weighted
+`GEOM-024`, `GEOM-059`, `GEOM-060`, `GEOM-061`, plus `GEOM-068` weighted
 Dijkstra, `GEOM-069` A* (blocked by `GEOM-068`), `GEOM-070` rectangular
-LSQR/LSCM, `GEOM-071` shared sharp-feature classification, and `GEOM-072`
-Catmull-Clark creases (blocked by `GEOM-071`). Retired `GEOM-058` and
+LSQR/LSCM, and `GEOM-072` Catmull-Clark creases (its `GEOM-071` prerequisite
+is satisfied). Retired `GEOM-058` and
 `GEOM-062` delivered the Gaussian-mixture and shared projection-kernel
 prerequisites consumed by the LOP reference family. The post-stability Issue
 445 research incubations are `GEOM-065`, `METHOD-027..031`, and `HARDEN-084`;
@@ -588,7 +582,10 @@ formulation, no upstream paper) opens unblocked as `METHOD-032`; its
 publication track seeds screened-Poisson reconstruction `METHOD-033`, the
 iPSR baseline `METHOD-034` (blocked by `METHOD-033`), the PGR
 winding-number baseline `METHOD-035`, and the shared-protocol comparison
-evidence `METHOD-036` (blocked by `METHOD-032`/`034`/`035`). The premature
+evidence `METHOD-036` (blocked by `METHOD-032`/`034`/`035` and an accepted
+METHOD-032 implementation, not retirement alone). It separates
+orientation-only and joint estimation/reconstruction information contracts.
+The premature
 RUNTIME-189 Sandbox view is retired; a new presentation task requires a
 positive method verdict, frozen public diagnostics, and concrete demand.
 

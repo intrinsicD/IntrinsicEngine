@@ -13,13 +13,13 @@ contract_schema: 1
 contracts: []
 contract_review: "Reviewed the full catalog; this task diagnoses an intermittent existing runtime contract-test failure and changes no reusable subsystem, data-domain, publication, or control-surface contract unless a later reproducible cause proves otherwise."
 ---
-# BUG-134 — ImGui adapter panel draw-list test fails intermittently
+# BUG-134 — ImGui adapter frame timer intermittently undercounts a nested phase
 
 ## Goal
 
-- Make `ImGuiAdapter.EditorPanelDrawProducesNonEmptyDrawList` deterministic or
-  repair the underlying adapter defect once a reproducible failing state is
-  captured.
+- Diagnose and repair the timer-containment failure in
+  `ImGuiAdapter.EditorPanelDrawProducesNonEmptyDrawList`, preserving its
+  non-empty draw-list coverage and all valid timing contracts.
 
 ## Non-goals
 
@@ -41,9 +41,8 @@ contract_review: "Reviewed the full catalog; this task diagnoses an intermittent
   `--repeat until-fail:10` executions, and an immediate complete selector
   rerun passed all 4,103 selected cases with the same expected skip. The
   failure is therefore intermittent and currently lacks a stable repro.
-- Expected behavior: the callback's explicitly positioned and sized panel
-  produces a non-empty ImGui draw list on every initialized Null/headless
-  adapter frame.
+- Expected behavior: the panel produces a non-empty ImGui draw list, and the
+  whole-frame duration consistently contains its measured nested phases.
 - Impact: a recurrence can make the required full CPU gate nondeterministic.
   The fresh `REVIEW-003` audit completed without recurrence, so that readiness
   gate retired cleanly and this bug remains an independent follow-up.
@@ -61,18 +60,16 @@ contract_review: "Reviewed the full catalog; this task diagnoses an intermittent
   is not strictly nested inside the frame timer), not the ImGui frame lifecycle
   or draw-data translation. The three `LastEndFrameMicros >= <phase>` assertions
   at `:298-300` share the shape.
-- The `## Required changes` below still stand as written; the first is now
-  satisfied for evidence purposes, and the second should classify against the
-  timing hypothesis before the lifecycle ones.
+- The captured recurrence establishes the failed timer assertion, not its
+  root cause. Another passing run does not resolve this defect.
 
 ## Required changes
 
-- [ ] Preserve the exact failed assertion and adapter/ImGui diagnostics on the
-      next recurrence, then reduce the failure to the smallest deterministic
-      ordering, state, or environment condition.
-- [ ] Classify whether the defect is test setup, ImGui frame lifecycle, font
-      atlas state, callback execution, or draw-data translation using evidence
-      rather than a retry-based guess.
+- [ ] Retain the captured `12 vs 13` timer failure and reduce it to a
+      deterministic clock, rounding, timer-boundary, or state condition.
+- [ ] Establish whether phase boundaries are actually nested and whether
+      independent reads/conversion explain the one-microsecond inversion.
+      Investigate lifecycle/draw translation only if new evidence points there.
 - [ ] Implement the smallest deterministic correction at the owning surface;
       retain the existing non-empty draw-list assertion.
 

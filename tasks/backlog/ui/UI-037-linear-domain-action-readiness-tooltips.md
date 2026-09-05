@@ -10,6 +10,8 @@ branch:
 worktree:
 claimed_at:
 maturity_target: Operational
+contract_schema: 1
+contracts: [geometry.element-domain-sources, geometry.property-coherence]
 ---
 # UI-037 — Linear domain-action readiness and disabled-reason tooltips
 
@@ -36,7 +38,13 @@ maturity_target: Operational
   owns only ImGui presentation. The dependency remains `app -> runtime`.
 - Today the domain panels mix boolean availability, early returns, inline `TextDisabled`, and buttons that remain enabled until their command fails. That makes the next step in the linear workflow difficult to discover and risks app validation drifting from the command contract.
 - The readiness inventory covers mesh processing actions (denoise, curvature, remesh, subdivide, simplify, and recompute normals), selected-mesh UV regeneration, texture bake, point/graph/mesh normal generation where offered, point-cloud outlier removal, K-Means, Progressive Poisson, ICP, and parameterization.
-- ICP readiness must distinguish two distinct selected point clouds from point-to-plane's additional finite, count-matched target-normal requirement. `BUG-096` first makes those normals authoritative so the UI cannot advertise a variant that silently executes point-to-point.
+- ICP readiness requires two distinct compatible entities/property sources,
+  not point-cloud provenance. Reuse the canonical property/topology preflight
+  shared with `RUNTIME-207` and `UI-040`, including point-to-plane's finite,
+  count-matched target normals. `BUG-096` supplies the authoritative normal
+  semantics; readiness must never advertise point-to-plane while executing
+  point-to-point. This task consumes that preflight, not a duplicate ICP
+  integration or provenance filter.
 - Parameterization readiness includes the selected editable mesh, validated
   strategy/config, and strategy-specific pin or boundary prerequisites.
   Texture-bake readiness includes an operational device, canonical compatible
@@ -109,7 +117,11 @@ maturity_target: Operational
       table-drives every listed action through ready and representative blocked
       states, asserts `Enabled` parity with the authoritative validation result,
       and asserts a stable non-empty unlock reason when disabled.
-- [ ] Cover ICP separately: one selection, duplicate source/target, missing or invalid target normals, and valid point-to-plane normals. The valid case is enabled only after `BUG-096`; no case may report point-to-plane ready while selecting or executing point-to-point semantics.
+- [ ] Cover ICP separately: one selection, duplicate source/target, compatible
+      mesh/graph/point-cloud properties (including non-vertex sample domains),
+      missing/invalid target normals, and valid point-to-plane normals. Assert
+      readiness matches runtime preflight; no point-cloud-only restriction or
+      point-to-point substitution is permitted.
 - [ ] Cover parameterization strategy prerequisites, UV regeneration, texture-bake property/device requirements, and unavailable GPU/backend options without invoking ImGui.
 - [ ] Add an app integration test named
       `SandboxEditorPresentation.DisabledActionReasonTooltipAppearsAfterTwoFrames`.

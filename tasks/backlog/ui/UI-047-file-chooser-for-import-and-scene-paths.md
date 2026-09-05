@@ -25,18 +25,16 @@ contract_review: >-
 ## Non-goals
 - No new asset browser or project/library system.
 - No change to import routing, payload-hint resolution, or the AssetIO queue.
-- No fix for the key-event defect itself — `BUG-139` owns that.
+- No reopening the key-event defect repaired by retired `BUG-139`.
 
 ## Context
 - Symptom: both `File / Import` and `File / Scene` expose only an
   `ImGui::InputText` over a `std::array<char,1024>`
   (`Sandbox.EditorShell.cpp:3173-3174`) and no chooser of any kind.
-- Compounded by `BUG-139`: because ImGui never receives key events, the field is
-  append-only — Backspace, arrows and Ctrl+V all do nothing. In testing, a
-  mistyped path could not be corrected at all; the only way to enter a path
-  successfully was to type it into a freshly opened, empty field in one
-  uninterrupted pass. This is why `UI-047` depends on `BUG-139`.
-- Drag-and-drop *does* work end to end and is currently the only practical route
+- The 2026-08-07 observation was compounded by missing key events. Retired
+  `BUG-139` repaired keyboard editing; it is not a current blocker. The missing
+  chooser remains a separate usability gap.
+- Drag-and-drop *does* work end to end and is a practical alternative route
   (verified: `File drop received` → `Dropped geometry file routed to deferred
   import` → `Queued dropped geometry import` → `Asset import succeeded ...
   primitive_entities=1`), but **nothing in the UI mentions it** — no hint text,
@@ -79,10 +77,9 @@ contract-testable on the default CPU gate, a native dialog is not), the
 repository dependency policy, and avoiding modal blocking on the platform poll
 thread.
 
-- Relationship to `BUG-139`: a browser is driven by clicks, so it is usable
-  before the key-event fix lands. `BUG-139` is therefore **not** a hard blocker
-  for this task; it remains required for the typed-path fallback to be
-  correctable, and for any future save-as filename entry.
+- Relationship to `BUG-139`: its retired keyboard fix supplies the working
+  typed-path fallback and filename entry. Keep that coverage while adding the
+  already-selected click-driven browser; `depends_on: []` remains correct.
 - Owner: `runtime` owns the listing model and the existing import/scene
   commands; `app` owns presentation only. Filesystem enumeration itself belongs
   in `core`/`platform` beneath the runtime model, never in `app`.

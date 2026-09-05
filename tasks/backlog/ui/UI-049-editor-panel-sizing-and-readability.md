@@ -50,9 +50,9 @@ Observed across a full pass over the mesh domain and processing panels:
   two thirds empty grey.
 - **`Mesh / Processing / Simplify` defaults `Target faces` to 0**, which
   correctly disables the Simplify button but gives no usable starting point.
-  With `BUG-139` open (no typing) the only way to set it is to drag a slider
-  blindly; a proportional default (e.g. half the current face count) would make
-  the panel usable immediately.
+  `BUG-139` has repaired keyboard editing, but a proportional default (e.g.
+  half the current face count) still provides a usable starting point without
+  requiring manual entry.
 - **The OS window is titled "Modular Vulkan Engine"**, not the application name.
 - Impact: individually minor, collectively these make the processing panels feel
   broken — the Denoise case in particular reads as "the button does nothing".

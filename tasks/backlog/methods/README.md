@@ -57,6 +57,9 @@ end.
   (Diazzi et al. formulation selected; `GEOM-007` gate satisfied 2026-05-27
   for filtered orientation/diagnostics; this method owns LNC indirect
   `orient3d`/`inSphere`).
+- [METHOD-007A — CDT engine-integration intake](METHOD-007A-cdt-engine-integration-intake.md)
+  (deferred runtime/config/UI/publication ownership; gated on the CPU
+  reference and `REVIEW-004`, not a night-ready implementation task).
 - [METHOD-014 — Progressive Poisson GPU operational parity](METHOD-014-progressive-poisson-gpu-operational-parity.md)
   (Vulkan compute operational/parity follow-up to retired `METHOD-013` through
   the canonical `RUNTIME-194` work and `RUNTIME-195` readback paths; migrates
@@ -67,11 +70,11 @@ end.
   `geometry/GEOM-058` Gaussian-mixture/EM seam).
 - [METHOD-021 — ARAP (local/global) parameterization reference backend](METHOD-021-arap-parameterization-reference-backend.md)
   (adds its concrete ARAP params alternative to the retired `GEOM-063` typed
-  `Geometry.Parameterization` strategy surface; gated on `geometry/GEOM-064`
-  optimization kernels; roadmap Pack 3).
+  `Geometry.Parameterization` strategy surface; its `geometry/GEOM-064`
+  optimization-kernel prerequisite is satisfied; roadmap Pack 3).
 - [METHOD-022 — SLIM locally-injective parameterization reference backend](METHOD-022-slim-injective-parameterization-reference-backend.md)
-  (adds its concrete flip-free SLIM params alternative; gated on `GEOM-064`
-  and `METHOD-021`; roadmap Pack 4).
+  (adds its concrete flip-free SLIM params alternative; `GEOM-064` is
+  satisfied, while `METHOD-021` remains; roadmap Pack 4).
 - [METHOD-024 — Spectral Conformal Parameterization (SCP) reference backend](METHOD-024-spectral-conformal-parameterization-reference-backend.md)
   (adds its concrete pin-free conformal SCP params alternative; gated on the
   `geometry/GEOM-024` generalized eigensolver seam; new SOTA pack).
@@ -111,8 +114,11 @@ end.
   (in-house formulation; prior-art/formulation intake and a frozen held-out
   killing test precede any public CPU-reference surface).
 - [METHOD-033 — Screened Poisson surface reconstruction reference backend](METHOD-033-screened-poisson-reconstruction-reference.md)
-  (uniform-grid CPU reference and watertight reconstruction oracle; supplies
-  the inner reconstruction solver required by `METHOD-034`).
+  (uniform-grid CPU reference; joint intake with `METHOD-034` must freeze
+  iterative inputs separately from standalone reconstruction quality).
+- [METHOD-033A — Screened Poisson engine-integration intake](METHOD-033A-screened-poisson-engine-integration-intake.md)
+  (deferred property-domain binding, controls, and non-destructive publication;
+  gated on the accepted reference and `REVIEW-004`).
 - [METHOD-034 — iPSR normal orientation baseline](METHOD-034-ipsr-orientation-baseline.md)
   (package-local deterministic CPU comparison baseline; gated on the
   screened-Poisson reference in `METHOD-033`).
@@ -120,8 +126,9 @@ end.
   (package-local dense matrix-free CPU comparison baseline with an explicit
   smoke-scale resource guard).
 - [METHOD-036 — Normal-orientation comparison evidence](METHOD-036-orientation-comparison-evidence.md)
-  (shared-fixture publication protocol comparing octree parity, MST, iPSR,
-  and PGR; implementation changes remain in their owning method tasks).
+  (separate orientation-only/joint-method groups with actual input disclosure;
+  skipped if METHOD-032 yields no accepted implementation, not silently
+  converted into a baseline-only study).
 - [HARDEN-084 — Localized CPU/GPU parity signatures](HARDEN-084-localized-cpu-gpu-parity-signatures.md)
   (post-stability two-consumer evidence task, gated by the Progressive Poisson
   and parameterization GPU paths; no generic parity framework unless both
@@ -209,8 +216,9 @@ end.
   owns the in-house octree-parity killing gate and conditional CPU reference;
   `METHOD-033` supplies screened-Poisson reconstruction for the `METHOD-034`
   iPSR baseline; `METHOD-035` supplies the PGR winding-number baseline; and
-  `METHOD-036` owns only the shared-input comparison evidence and publication
-  report. The premature `runtime/RUNTIME-189` diagnostic-view plan is retired;
+  `METHOD-036` owns the group-aware comparison evidence and publication
+  report, conditional on an accepted METHOD-032 implementation. The premature
+  `runtime/RUNTIME-189` diagnostic-view plan is retired;
   any future presentation task follows only a positive method verdict, a
   frozen public payload, and concrete debugging demand.
 - Forbidden: importing runtime, graphics, platform, app, or live ECS ownership

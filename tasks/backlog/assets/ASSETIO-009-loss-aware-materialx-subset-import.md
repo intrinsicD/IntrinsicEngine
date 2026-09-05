@@ -5,6 +5,16 @@ depends_on:
   - REVIEW-003
   - GRAPHICS-105
 maturity_target: CPUContracted
+workflow_schema: 1
+workflow_profile: high-risk
+evidence: required
+owner:
+branch:
+worktree:
+claimed_at:
+contract_schema: 1
+contracts: []
+contract_review: Standalone CPU material-library route and private decoder; no ECS geometry/property publication or method package. Existing layering and public-API review remain mandatory.
 ---
 # ASSETIO-009 — Loss-aware MaterialX subset import
 
@@ -21,7 +31,7 @@ maturity_target: CPUContracted
   Slang codegen, material specialization, hot reload, or editor graph UI.
 - No MaterialX SDK/header or concrete decoder dependency in `src/assets`;
   assets remain CPU-only and depend on `core` only. Runtime privately owns the
-  decoder dependency and registration callback.
+  decoder dependency behind the staged import recipe.
 - No graphics, RHI, Vulkan, ECS, renderer-material handoff, entity creation, or
   visibility integration in this task.
 - No claim of full MaterialX, Standard Surface, or OpenPBR fidelity.
@@ -33,10 +43,14 @@ maturity_target: CPUContracted
 ## Context
 
 - Owner/layer: `assets` owns the `.mtlx` route, primary/external byte transport,
-  standalone material-library payload and diagnostics, callback dispatch, and
-  payload validation. Runtime privately links MaterialX, parses untrusted input,
-  maps it into asset-owned records, and registers that concrete decoder on the
-  existing asset IO bridge. Neither layer performs graphics/ECS handoff here.
+  standalone material-library payload, diagnostics, and payload validation.
+  Runtime privately links MaterialX, parses untrusted input, maps it into
+  asset-owned records, and composes decode/validation/storage through the sole
+  `AssetWorkflowModule` staged recipe. Neither layer performs graphics/ECS
+  handoff here.
+- Operator decision (2026-09-05): retain the MaterialX feature goal, rebased
+  onto RUNTIME-200's plain private decoders and staged recipe. Its deleted
+  `Asset.ModelTextureIOBridge` and callback registries must stay deleted.
 - A material-only `.mtlx` document is not a model scene. It must not be wrapped
   in a fake `AssetModelScenePayload`; the new container reuses
   `AssetModelMaterialPayload` elements while giving their texture indices a
@@ -57,14 +71,14 @@ maturity_target: CPUContracted
 ## Right-sizing
 
 - Element under evaluation: one new route/container and one concrete runtime
-  decoder callback with an explicit mapping table; the file-format boundary
+  decoder function with an explicit mapping table; the file-format boundary
   justifies the parser dependency but not a material-graph framework.
 - Simpler alternative: extend `Asset.ImportRouter`,
-  `Asset.ModelTexturePayload`, and `Asset.ModelTextureIOBridge` with plain
-  records/free validation and one callback lane; reuse
-  `AssetModelMaterialPayload` rather than adding a new bridge or descriptor.
-- Blast radius: vcpkg metadata, focused assets route/payload/bridge extensions,
-  one private runtime decoder/registration implementation, fixtures,
+  `Asset.ModelTexturePayload`, and the existing staged recipe with plain
+  records/free validation and a private decoder call; reuse
+  `AssetModelMaterialPayload` without a bridge or second descriptor.
+- Blast radius: vcpkg metadata, focused assets route/payload extensions,
+  one private runtime decoder and recipe integration, fixtures,
   unit/contract tests, and format docs. No renderer, graphics, ECS, or asset-to-
   scene visibility changes.
 - Reintroduction trigger: Slang generation or arbitrary graph execution needs
@@ -86,18 +100,19 @@ maturity_target: CPUContracted
       factors, bounded counts/strings/source bytes, valid texture-source indices
       and URIs, stable provenance, unique material identity where required, and
       diagnostics consistent with full versus partial fidelity.
-- [ ] Extend the existing `Asset.ModelTextureIOBridge` with one material-library
-      callback/registration/import lane. Assets own IO, relative external reads,
-      missing-callback errors, dispatch, and post-callback validation exactly as
-      they do for model/texture payloads; do not add another bridge/interface.
+- [ ] Extend the current staged import recipe with material-library decode,
+      validation, and standalone asset storage using existing asset-owned IO
+      and bounded relative external reads. Entity authoring, GPU residency,
+      selection, and focus are inapplicable to this payload and must not be
+      fabricated. Preserve identity, generation, cancellation, and terminal
+      completion rules; add no callback registration/dispatch layer.
 - [ ] Pin the smallest required MaterialX 1.39.x feature set through the
       repository vcpkg manifest/override/overlay path and link it privately only
       to the runtime decoder owner; do not enable render, viewer, Python, or
       code-generation features not needed by CPU parsing.
-- [ ] Extend the existing runtime model/texture IO registration path with one
-      private MaterialX decoder callback. MaterialX headers/types stay in the
-      runtime implementation and never cross the callback or asset module
-      boundary.
+- [ ] Add one plain private MaterialX decoder alongside the current runtime
+      model/texture decoders. MaterialX headers/types stay in implementation
+      units and never cross runtime or asset module interfaces.
 - [ ] Define a versioned V1 mapping table for the representable Standard
       Surface/OpenPBR fields: base color, metallic, roughness, opacity when
       exactly compatible, and canonical base-color/normal/metallic-roughness/
@@ -121,7 +136,7 @@ maturity_target: CPUContracted
       OpenPBR, texture-backed material, defaults, unsupported closure,
       procedural graph, unresolved image, cycle, malformed document, huge
       count/string, and non-finite input.
-- [ ] Route `.mtlx` bytes through the asset-owned bridge and validator, proving
+- [ ] Route `.mtlx` bytes through the staged recipe and asset-owned validator, proving
       the standalone payload can be stored/read as its own asset kind. Do not
       invoke model-scene handoff, mint ECS entities/material instances, upload
       textures, or make the imported library visible in the renderer.
@@ -129,9 +144,12 @@ maturity_target: CPUContracted
 ## Tests
 
 - [ ] Asset unit/contract tests cover `.mtlx` route resolution, explicit
-      `MaterialLibrary` kind, missing/duplicate callback registration, primary/
-      external byte transport, callback error propagation, container validation,
+      `MaterialLibrary` kind, primary/external byte transport, container validation,
       and rejection of attempts to route the document as `ModelScene`.
+- [ ] Current `AssetWorkflowModule` contracts cover queued decoder failure,
+      cancellation/stale rejection, validation before storage, terminal
+      completion, and absence of ECS/GPU side effects; retired bridge and
+      handoff surfaces remain absent.
 - [ ] Runtime decoder tests prove exact scalar/color/texture mapping,
       deterministic defaults, source provenance, stable diagnostics, and
       preservation of supported input across parse/serialize/reparse where
@@ -150,7 +168,7 @@ maturity_target: CPUContracted
 - [ ] Document the exact V1 supported-node/input table, defaults, texture/color-
       space rules, diagnostics, resource limits, provenance preservation, and
       examples of rejected lossy mappings.
-- [ ] Document the route/container/callback ownership: assets own transport and
+- [ ] Document the route/container/recipe ownership: assets own transport and
       validated `AssetModelMaterialPayload` collections; runtime owns the
       concrete MaterialX decoder; the result is neither a model scene nor a
       graphics material/executable graph.
@@ -160,15 +178,15 @@ maturity_target: CPUContracted
 ## Acceptance criteria
 
 - [ ] `.mtlx` resolves only to the standalone material-library asset kind, and
-      the asset-owned bridge validates callback output without importing or
-      linking MaterialX in `src/assets`.
+      the staged recipe validates decoder output with the asset-owned
+      validator without importing or linking MaterialX in `src/assets`.
 - [ ] Every declared V1 fixture maps deterministically and exactly into reused
       canonical CPU material records inside the validated material-library
       container; no fake model-scene payload is constructed.
 - [ ] Every unsupported, lossy, malformed, cyclic, unresolved, non-finite, or
       over-budget case returns a structured fail-closed/partial diagnostic with
       source location/provenance; none silently changes semantics.
-- [ ] Runtime privately owns and registers the concrete MaterialX decoder;
+- [ ] Runtime privately owns and directly calls the concrete MaterialX decoder;
       MaterialX types do not cross into asset interfaces, and no graphics/ECS
       handoff, executable graph, shader generator, UI, or renderer
       specialization lands.
@@ -207,6 +225,6 @@ ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarant
 
 ## Maturity
 
-- Target: `CPUContracted`; the standalone route/container, asset-owned bridge
-  contract, runtime decoder, and fail-closed fidelity behavior are the intended
+- Target: `CPUContracted`; the standalone route/container, staged-recipe
+  contract, private decoder, and fail-closed fidelity behavior are the intended
   endpoint. No `Operational` follow-up is owed.

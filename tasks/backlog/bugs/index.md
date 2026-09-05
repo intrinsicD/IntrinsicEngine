@@ -28,16 +28,16 @@ of `BUG-140` and of the parameterization rejection recorded in `BUG-141`.
   reports failure. Resolve the exact output type/root and propagate both stage
   statuses without touching sibling JSON.
 
-- [`BUG-134` — ImGui adapter panel draw-list test fails intermittently](BUG-134-imgui-adapter-panel-draw-list-intermittent.md):
-  one default CPU run reported the panel draw-list contract as its sole
-  failure, followed by ten passing isolated repetitions and a clean 4,103-case
-  full rerun. Preserve the next failed assertion, establish a deterministic
-  cause, and fix the owning test or adapter surface without quarantine,
-  retries, or weakened coverage.
+- [`BUG-134` — ImGui adapter frame timer intermittently undercounts a nested phase](BUG-134-imgui-adapter-panel-draw-list-intermittent.md):
+  the captured recurrence reports a 12-microsecond frame versus a
+  13-microsecond nested callback while draw-list assertions pass. Diagnose
+  timer boundaries/measurement without quarantine, retries, or weakened
+  draw-list coverage.
 - [`BUG-097` — Progressive model-scene UV job publishes a zero atlas](BUG-097-progressive-model-scene-zero-uv-atlas.md):
-  the default-off progressive enrichment path labels an all-zero authoritative
-  `v:texcoord` property as an atlas and can publish it after newer UV/topology
-  edits; replace it with real atlas output plus generation-safe stale discard.
+  the default-off path still fabricates UVs. Interim repair requires a current
+  affected-workflow reproduction and coordination with the operator's shared
+  atlas replacement; otherwise verify supersession when that replacement
+  lands. Preserve corner-domain seams, source topology, and stale rejection.
 - [`BUG-091` — GoogleTest PRE_TEST discovery times out on a cold start](BUG-091-gtest-pretest-discovery-cold-timeout.md):
   CMake's implicit five-second PRE_TEST discovery limit can abort CTest while
   an unrelated cold sanitizer binary enumerates tests, before the selected
