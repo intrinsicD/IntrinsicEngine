@@ -1,0 +1,8 @@
+schema_version: 1
+task_id: BUG-166
+sealed_revision: 6e518f1979df4bc52420a1f1132bd2d847f705f6
+source_content_digest: 59a9f1bfef2bd9788e6259a1774f810d4a6e64c5b0901b28492d0f19c31ac455
+report_sha256: 3674a156a0ac597e21fd04bf661a9bda59d7cf1e20998827af95f2d8f560c891
+records: []
+reason: 'Bind the completed BUG-166 report to retirement commit 6e518f197 and PR #1037'
+generated_by: tools/agents/workflow_evidence.py
