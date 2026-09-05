@@ -855,9 +855,9 @@ namespace Extrinsic::Runtime
                     "texture bake requires complete mesh topology");
             }
 
-            // BUG-137 — UVs follow the canonical corner-over-vertex resolution
-            // order. A seam-carrying mesh has no per-vertex channel at all, so
-            // requiring one here rejected exactly the meshes an atlas produces.
+            // UVs follow canonical corner-over-vertex resolution. A
+            // seam-carrying mesh can omit the per-vertex channel, so texture
+            // bake resolves the corner property first.
             const Geometry::ConstPropertySet vertexProperties{
                 view.VertexSource->Properties};
             const Geometry::ConstPropertySet halfedgeProperties{

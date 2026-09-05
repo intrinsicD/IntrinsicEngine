@@ -522,7 +522,7 @@ export namespace Extrinsic::Runtime
         double MaxReferenceProjectionDistance{0.0};
     };
 
-    // BUG-146 — what a topology-replacing mesh operation did to the mesh's UV
+    // Records what a topology-replacing operation did to the mesh's UV
     // parameterization. These operations rebuild the entity's halfedge mesh, so
     // a UV property the rebuilt mesh does not carry is removed outright rather
     // than left stale. That outcome is reported, never silent.
@@ -672,13 +672,10 @@ export namespace Extrinsic::Runtime
         bool HasResult{false};
         // The variant the command asked for.
         EditorICPVariant Variant{EditorICPVariant::PointToPoint};
-        // BUG-096: the variant the solver actually ran. `Geometry.Registration`
-        // silently degrades `PointToPlane` to `PointToPoint` when target
-        // normals are absent or count-mismatched, and the runtime used to
-        // report the requested variant regardless. Runtime now fails a
-        // point-to-plane request closed rather than degrading it, so on a
-        // successful run these agree; the field exists so a disagreement is
-        // visible rather than invisible.
+        // The variant the solver actually ran. Runtime preflight rejects a
+        // point-to-plane request when it cannot supply valid target normals,
+        // preventing `Geometry.Registration`'s point-to-point fallback from
+        // becoming silent; successful requested/effective variants agree.
         EditorICPVariant EffectiveVariant{EditorICPVariant::PointToPoint};
         std::size_t SourcePointCount{0u};
         std::size_t TargetPointCount{0u};
@@ -718,7 +715,7 @@ export namespace Extrinsic::Runtime
             Geometry::HalfedgeMesh::VertexNormals::AveragingMode::AreaWeighted};
         std::size_t VertexSlotCount{0};
         std::size_t WrittenCount{0};
-        // BUG-145: how many published normals actually differ from the ones
+        // Counts how many published normals differ from the ones
         // already stored. `WrittenCount` is non-zero whenever the kernel ran at
         // all, so it cannot decide `Applied` versus `NoChange`.
         std::size_t ChangedNormalCount{0};
@@ -759,7 +756,7 @@ export namespace Extrinsic::Runtime
         std::size_t VertexSlotCount{0};
         std::size_t EdgeSlotCount{0};
         std::size_t WrittenCount{0};
-        // BUG-145: see EditorMeshVertexNormalsResult::ChangedNormalCount.
+        // Counts published normals that differ from stored values.
         std::size_t ChangedNormalCount{0};
         std::size_t ValidNormalVertexCount{0};
         std::size_t FallbackVertexCount{0};
@@ -811,7 +808,7 @@ export namespace Extrinsic::Runtime
         std::size_t PointSlotCount{0};
         std::size_t FinitePointCount{0};
         std::size_t WrittenCount{0};
-        // BUG-145: see EditorMeshVertexNormalsResult::ChangedNormalCount.
+        // Counts published normals that differ from stored values.
         std::size_t ChangedNormalCount{0};
         std::size_t ValidNormalPointCount{0};
         std::size_t FallbackPointCount{0};
@@ -899,7 +896,7 @@ export namespace Extrinsic::Runtime
     struct EditorUvRegenerationCommandResult;
     struct EditorParameterizationResult;
 
-    // BUG-141: names one stored `Last<Operation>Result` slot so a panel can
+    // Names one stored `Last<Operation>Result` slot so a panel can
     // dismiss the outcome it is showing. Every result is already superseded by
     // the next run of its own operation; this is the explicit clear, and it is
     // one enum rather than one sink per operation because the session's only
@@ -1150,11 +1147,10 @@ export namespace Extrinsic::Runtime
         std::uint32_t AtlasWidth{0u};
         std::uint32_t AtlasHeight{0u};
         std::uint32_t ChartCount{0u};
-        // BUG-147 — how many extra vertices an indexed GPU vertex buffer needs
-        // to carry this atlas's seams, i.e. the duplication that happens once
-        // at upload. It is not, and must never again become, a count of
-        // vertices added to the mesh: the mesh keeps its own topology and the
-        // seam is carried on the corner domain.
+        // Extra vertices an indexed GPU vertex buffer needs to carry this
+        // atlas's seams. Duplication happens once at upload; this is not a
+        // count of vertices added to the mesh, whose topology is preserved
+        // while the seam is carried on the corner domain.
         std::size_t SeamSplitVertexCount{0u};
         std::string Diagnostic{};
 
@@ -1189,7 +1185,7 @@ export namespace Extrinsic::Runtime
         Geometry::Parameterization::ParameterizationStatus ParameterizationStatus{
             Geometry::Parameterization::ParameterizationStatus::InvalidInput};
         Geometry::Parameterization::ParameterizationDiagnostics Diagnostics{};
-        // BUG-141: the structured cause behind a solver rejection. Populated
+        // Structured cause behind a solver rejection. Populated
         // only when the solver ran and refused the mesh; a rejection raised
         // before the solver (stale entity, bad config, unusable source) leaves
         // it unevaluated because no mesh reached the solver.

@@ -1,0 +1,33 @@
+{
+  "command": [
+    "python3",
+    "tools/agents/skills/intrinsicengine-source-documentation/scripts/audit_source_documentation.py",
+    "--root",
+    ".",
+    "--path",
+    "src/geometry/Geometry.HalfedgeMesh.CurvatureSegmentation.Features.cppm",
+    "--path",
+    "src/geometry/Geometry.HalfedgeMesh.CurvatureSegmentation.Patches.cppm",
+    "--path",
+    "src/geometry/Geometry.HalfedgeMesh.CurvatureSegmentation.cppm",
+    "--path",
+    "src/geometry/Geometry.HalfedgeMesh.Features.cppm",
+    "--path",
+    "src/runtime/Modules/CurvatureSegmentation/Runtime.CurvatureSegmentationConfig.cppm",
+    "--summary"
+  ],
+  "command_display": "python3 tools/agents/skills/intrinsicengine-source-documentation/scripts/audit_source_documentation.py --root . --path src/geometry/Geometry.HalfedgeMesh.CurvatureSegmentation.Features.cppm --path src/geometry/Geometry.HalfedgeMesh.CurvatureSegmentation.Patches.cppm --path src/geometry/Geometry.HalfedgeMesh.CurvatureSegmentation.cppm --path src/geometry/Geometry.HalfedgeMesh.Features.cppm --path src/runtime/Modules/CurvatureSegmentation/Runtime.CurvatureSegmentationConfig.cppm --summary",
+  "cwd": ".",
+  "duration_ms": 35,
+  "exit_code": 1,
+  "finished_at": "2026-09-05T04:41:52Z",
+  "label": "baseline-focused-source-doc",
+  "required": false,
+  "schema_version": 1,
+  "started_at": "2026-09-05T04:41:52Z",
+  "stderr_path": "tasks/evidence/HARDEN-089/commands/baseline-focused-source-doc.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/HARDEN-089/commands/baseline-focused-source-doc.stdout.log",
+  "stdout_sha256": "82b90f24df0d0ce5c759b8fb6c9920dcf5e2ab766c3d2ce03f723b2f0ceb9de2",
+  "task_id": "HARDEN-089"
+}

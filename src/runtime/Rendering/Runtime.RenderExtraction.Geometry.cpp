@@ -127,9 +127,9 @@ namespace Extrinsic::Runtime
             snapshot.Position = PropertyRevisionOf(properties, kPosition);
             if (meshDefaults)
             {
-                // BUG-137 — track whichever domain owns the UVs. A corner-UV
-                // mesh has no `v:texcoord`, so watching only the vertex channel
-                // left every seam-mesh UV edit invisible to the reupload plan.
+                // Track whichever domain owns the UVs. A corner-UV mesh can
+                // omit `v:texcoord`, so the reupload plan watches both canonical
+                // channels through the same resolution order.
                 const auto cornerTexcoord = view.HalfedgeSource != nullptr
                     ? view.HalfedgeSource->Properties.Get<glm::vec2>(
                           "h:texcoord")

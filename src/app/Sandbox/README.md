@@ -184,8 +184,8 @@ domain rather than by splitting the mesh, and the per-vertex duplication an
 indexed GPU vertex buffer needs happens at upload. The enrichment diagnostic on
 the imported entity, and the matching `Direct mesh enrichment applied` log line,
 report the resolved counts, which element domain owns the UVs, the atlas
-provenance and backend, and how many vertices the GPU upload duplicates, so that
-duplication is never silent. See `BUG-137`.
+provenance and backend, and how many vertices the GPU upload duplicates. This
+keeps seam duplication observable without changing the source topology.
 
 `File / Import` is a linear path -> payload-hint -> import workflow. The path
 field remains editable whenever the window is bound, while the runtime scene snapshot

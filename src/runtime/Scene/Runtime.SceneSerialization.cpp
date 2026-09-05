@@ -1546,9 +1546,8 @@ namespace Extrinsic::Runtime
             {
                 return false;
             }
-            // BUG-137 — a seam-carrying mesh keeps its UVs on the corner
-            // domain and has no `v:texcoord` at all, so saving only the vertex
-            // channel silently dropped them on round-trip.
+            // A seam-carrying mesh keeps UVs on the corner domain and can omit
+            // `v:texcoord`, so scene round-trips persist this channel too.
             if (!AddVec2Property(out, "texcoords", halfedges.Properties,
                                  "h:texcoord", false))
             {

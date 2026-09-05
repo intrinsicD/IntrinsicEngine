@@ -149,7 +149,7 @@ export namespace Extrinsic::Runtime
         std::size_t sourceVertexCount,
         std::span<const glm::vec3> cornerNormals);
 
-    // BUG-137 / BUG-147 — per-corner UVs mapped back onto a *source* mesh's
+    // Per-corner UVs mapped back onto a source mesh's
     // faces, so a chart split can be carried as a UV fact instead of being
     // baked into the entity mesh's topology.
     struct MeshCornerTexcoords

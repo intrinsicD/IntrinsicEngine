@@ -1,0 +1,6 @@
+[source-documentation] files=5 interfaces=5 cpp=5 readmes=0 errors=0 review=10
+[source-documentation] rules: comment-history=1, declaration-comment=9
+HOTSPOT src/geometry/Geometry.HalfedgeMesh.Features.cppm findings=4 errors=0 review=4
+HOTSPOT src/geometry/Geometry.HalfedgeMesh.CurvatureSegmentation.cppm findings=3 errors=0 review=3
+HOTSPOT src/geometry/Geometry.HalfedgeMesh.CurvatureSegmentation.Features.cppm findings=2 errors=0 review=2
+HOTSPOT src/geometry/Geometry.HalfedgeMesh.CurvatureSegmentation.Patches.cppm findings=1 errors=0 review=1

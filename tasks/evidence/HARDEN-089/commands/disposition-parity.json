@@ -1,0 +1,23 @@
+{
+  "command": [
+    "/bin/bash",
+    "-o",
+    "pipefail",
+    "-c",
+    "set -euo pipefail; rows=$(rg -c \"^\\| [0-9]+ \" tasks/evidence/HARDEN-089/observations/dispositions.md); keeps=$(rg -c \"\\| Keep \\|\" tasks/evidence/HARDEN-089/observations/dispositions.md); rewrites=$(rg -c \"\\| Rewrite \\|\" tasks/evidence/HARDEN-089/observations/dispositions.md); removed=$(git diff --unified=0 origin/main -- src | rg \"^-.*[A-Z]+-[0-9]{3}\" | wc -l); printf \"rows=%s keeps=%s rewrites=%s removed_identifier_lines=%s\\n\" \"$rows\" \"$keeps\" \"$rewrites\" \"$removed\"; test \"$rows\" -eq 98; test \"$keeps\" -eq 12; test \"$rewrites\" -eq 86; test \"$removed\" -eq 86"
+  ],
+  "command_display": "/bin/bash -o pipefail -c 'set -euo pipefail; rows=$(rg -c \"^\\| [0-9]+ \" tasks/evidence/HARDEN-089/observations/dispositions.md); keeps=$(rg -c \"\\| Keep \\|\" tasks/evidence/HARDEN-089/observations/dispositions.md); rewrites=$(rg -c \"\\| Rewrite \\|\" tasks/evidence/HARDEN-089/observations/dispositions.md); removed=$(git diff --unified=0 origin/main -- src | rg \"^-.*[A-Z]+-[0-9]{3}\" | wc -l); printf \"rows=%s keeps=%s rewrites=%s removed_identifier_lines=%s\\n\" \"$rows\" \"$keeps\" \"$rewrites\" \"$removed\"; test \"$rows\" -eq 98; test \"$keeps\" -eq 12; test \"$rewrites\" -eq 86; test \"$removed\" -eq 86'",
+  "cwd": ".",
+  "duration_ms": 24,
+  "exit_code": 0,
+  "finished_at": "2026-09-05T04:55:45Z",
+  "label": "disposition-parity",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-09-05T04:55:45Z",
+  "stderr_path": "tasks/evidence/HARDEN-089/commands/disposition-parity.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/HARDEN-089/commands/disposition-parity.stdout.log",
+  "stdout_sha256": "653fed460b71bf46dc9a42a29e9ebf45b45826b1ab0e842dd1615ee4cd3358bb",
+  "task_id": "HARDEN-089"
+}

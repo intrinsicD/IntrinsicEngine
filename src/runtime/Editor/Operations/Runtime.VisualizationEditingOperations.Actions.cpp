@@ -448,7 +448,7 @@ namespace {
                    name == "v:point" ||
                    name == "v:tex" ||
                    name == "v:texcoord" ||
-                   // BUG-137 — same reserved property, on the domain that can
+                   // Same reserved property, on the domain that can
                    // carry a seam.
                    name == "h:texcoord" ||
                    name == "h:normal" ||
@@ -471,7 +471,7 @@ namespace {
                    name == "v:point" ||
                    name == "v:tex" ||
                    name == "v:texcoord" ||
-                   // BUG-137 — same reserved property, on the domain that can
+                   // Same reserved property, on the domain that can
                    // carry a seam.
                    name == "h:texcoord" ||
                    name == "h:normal" ||
@@ -1926,10 +1926,9 @@ namespace {
             if (view.VertexSource == nullptr)
                 return model;
 
-            // BUG-137 — UVs follow the canonical corner-over-vertex resolution
-            // order. A seam-carrying mesh has no `v:texcoord`, and reporting it
-            // as "no resolved texcoord property" disabled the UV view for
-            // exactly the meshes an atlas produces.
+            // UVs follow canonical corner-over-vertex resolution. A
+            // seam-carrying mesh can omit `v:texcoord`, so the UV view resolves
+            // the corner property before reporting no texcoords.
             const auto cornerTexcoords =
                 view.HalfedgeSource != nullptr
                     ? view.HalfedgeSource->Properties.Get<glm::vec2>("h:texcoord")

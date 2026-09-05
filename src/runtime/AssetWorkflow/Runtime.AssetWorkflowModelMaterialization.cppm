@@ -78,7 +78,7 @@ export namespace Extrinsic::Runtime
         std::uint64_t GeneratedUvAtlasPrimitives{0};
         std::uint64_t InvalidAuthoredUvPrimitives{0};
         std::uint64_t UvAtlasFailures{0};
-        // BUG-137 — vertices an indexed GPU upload duplicates to carry UV
+        // Vertices an indexed GPU upload duplicates to carry UV
         // seams. The materialized mesh itself keeps its source topology.
         std::uint64_t UvAtlasGpuSplitVertices{0};
         std::uint64_t LastUvAtlasChartCount{0};

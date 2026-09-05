@@ -1,0 +1,4 @@
+[source-documentation] files=2 interfaces=0 cpp=1 readmes=1 errors=0 review=160
+[source-documentation] rules: comment-history=6, readme-chronology=151, readme-large=1, readme-manual-inventory=1, source-large=1
+HOTSPOT src/runtime/README.md findings=153 errors=0 review=153
+HOTSPOT src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Mesh.cpp findings=7 errors=0 review=7

@@ -1,3 +1,5 @@
+// Exposes feature-aligned curvature patch growth and diagnostics so runtime
+// and benchmarks evaluate the diagnostic method through one deterministic surface.
 module;
 
 #include <cstddef>

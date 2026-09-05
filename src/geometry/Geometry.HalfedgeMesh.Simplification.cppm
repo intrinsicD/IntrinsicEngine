@@ -160,7 +160,7 @@ export namespace Geometry::Simplification
 
         // FA_QEM only. Treat UV-seam vertices as immovable even when
         // PreserveBoundary is false. Which vertices those are depends on the
-        // domain that owns the mesh's UVs (BUG-137):
+        // domain that owns the mesh's UVs:
         //   "h:texcoord" — a seam is read exactly, as a vertex whose incident
         //     corners disagree on their UV. The mesh stays manifold.
         //   "v:texcoord" — one vertex can hold only one UV, so a seam is not

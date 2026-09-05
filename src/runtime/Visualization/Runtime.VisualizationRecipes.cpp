@@ -1136,12 +1136,9 @@ namespace Extrinsic::Runtime
                         authored.TexcoordDirtyStamp;
                     if (authored.TexcoordBufferBDA == 0u)
                     {
-                        // BUG-137 — the CPU bake reads whichever domain owns
-                        // the UVs, so its dirty stamp has to follow the same
-                        // corner-over-vertex resolution order. Watching only
-                        // `v:texcoord` left a seam-carrying mesh — which has
-                        // no `v:texcoord` at all — pinned to the authored
-                        // stamp, so editing its corner UVs never re-baked.
+                        // CPU bake reads whichever domain owns the UVs, so its
+                        // dirty stamp follows the same corner-over-vertex
+                        // resolution order and observes corner-only edits.
                         const auto revisionIn =
                             [&availability](
                                 const GeometryElementDomain domain,

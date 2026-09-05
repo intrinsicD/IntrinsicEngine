@@ -1,3 +1,5 @@
+// Exposes mesh feature classification so topology-changing methods share one
+// fail-closed edge and vertex-incidence contract.
 module;
 
 #include <cstddef>

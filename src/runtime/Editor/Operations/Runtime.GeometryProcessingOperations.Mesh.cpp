@@ -694,7 +694,7 @@ struct EditorJobResult { std::string Diagnostic{}; };
             return true;
         }
 
-        // BUG-147 — publish regenerated UVs onto a mesh that kept its own
+        // Publish regenerated UVs onto a mesh that kept its own
         // topology, on whichever domain can represent them.
         //
         // A chart split needs two or more UVs at a seam vertex, which a
@@ -878,17 +878,11 @@ struct EditorJobResult { std::string Diagnostic{}; };
             }
         }
 
-        // BUG-138: a topology edit's apply gate has to answer "do the stored
-        // GeometrySources still hold the mesh this job was computed from", and
-        // it has to read the same data on both sides of that question. The gate
-        // used to compare the stored halfedge arrays against the job's
-        // `BeforeMesh`, which is those sources re-derived through a triangle
-        // soup. A soup round-trip reproduces the numbering an import published,
-        // but not the numbering a previous topology edit published, so the
-        // first simplify/subdivide/remesh on an entity applied and every later
-        // one was refused as stale forever. Hashing the stored arrays
-        // themselves is representation-independent and still detects every real
-        // change. Positions are covered separately by the snapshot comparison.
+        // A topology edit's apply gate fingerprints the stored halfedge arrays
+        // at both submit and apply. Re-deriving one side through a triangle
+        // soup can renumber topology after an earlier edit and falsely mark
+        // unchanged sources stale. Direct stored-array fingerprints detect
+        // topology changes; positions are compared separately.
         [[nodiscard]] bool AppendTopologyValueSignature(
             std::uint64_t& signature,
             const Geometry::PropertySet* properties,
@@ -1052,11 +1046,10 @@ struct EditorJobResult { std::string Diagnostic{}; };
             return points;
         }
 
-        // BUG-096: point-to-plane ICP needs the target's normals, and both
-        // runtime branches used to hand the solver an empty span, which
-        // `Geometry.Registration` silently treats as "run point-to-point". The
-        // status distinguishes every rejection cause so the editor can say
-        // which one applies rather than reporting a generic failure.
+        // Point-to-plane ICP requires a validated target-normal span. Invalid
+        // normals fail closed before `Geometry.Registration` can select its
+        // point-to-point fallback; this status lets the editor name the exact
+        // rejection cause.
         enum class RegistrationNormalStatus : std::uint8_t
         {
             Ok,
@@ -1440,7 +1433,7 @@ struct EditorJobResult { std::string Diagnostic{}; };
             return true;
         }
 
-        // BUG-145: how many published values differ from the ones already
+        // Counts how many published values differ from the ones already
         // stored. A property the previous run did not have counts as changed in
         // every slot, because every value is newly authored.
         template <typename T>
@@ -1461,7 +1454,7 @@ struct EditorJobResult { std::string Diagnostic{}; };
             return changed;
         }
 
-        // BUG-145: `WrittenCount` is non-zero whenever the kernel ran at all,
+        // `WrittenCount` is non-zero whenever the kernel ran at all,
         // so it cannot tell a recompute that changed something from one that
         // republished the values already stored. Compare exactly: these paths
         // write the kernel's own output back into the same `v:normal` storage
@@ -3733,13 +3726,11 @@ struct EditorJobResult { std::string Diagnostic{}; };
                    *current == *expected;
         }
 
-        // Vertex-slot state of the stored mesh, compared against the
-        // halfedge mesh a job or history entry captured. Vertex numbering
-        // survives the GeometrySources -> triangle-soup -> halfedge round-trip
-        // that produces those captures, so this half of the old
-        // `SameMeshTopologyState` is representation-faithful. Its edge,
-        // halfedge, and face half was not, and now goes through
-        // `MeshTopologyValueSignature` instead (BUG-138).
+        // Compares stored vertex slots with a job or history mesh. Vertex
+        // numbering survives the GeometrySources -> triangle-soup -> halfedge
+        // round-trip, so this comparison is representation-faithful. Edge,
+        // halfedge, and face state uses `MeshTopologyValueSignature`, which
+        // fingerprints the stored arrays directly.
         [[nodiscard]] bool SameMeshVertexState(
             const GS::ConstSourceView& view,
             const Geometry::HalfedgeMesh::Mesh& mesh) noexcept
@@ -3822,9 +3813,8 @@ struct EditorJobResult { std::string Diagnostic{}; };
             {
                 // Read the stored topology before the apply rewrites it: this
                 // is the "what we expect to still be there" side of the first
-                // undo transition, and it has to come from the sources rather
-                // than from `before`, which is a re-derivation of them
-                // (BUG-138).
+                // undo transition, and it comes from the sources rather than
+                // from `before`, which is a re-derivation of them.
                 const std::optional<std::uint64_t> beforeTopology =
                     context.Scene != nullptr
                         ? StoredMeshTopologySignatureForEntity(
@@ -3939,7 +3929,7 @@ struct EditorJobResult { std::string Diagnostic{}; };
                                 // wrote, so the next undo/redo transition
                                 // compares against the numbering that is
                                 // actually stored rather than a re-derivation
-                                // of it (BUG-138).
+                                // of it.
                                 .TopologySignature =
                                     entity.has_value()
                                         ? MeshTopologyValueSignature(
@@ -4254,7 +4244,7 @@ struct EditorJobResult { std::string Diagnostic{}; };
             target.FlipCount = source.FlipCount;
         }
 
-        // BUG-145: a topology operation commits a whole replacement mesh, so
+        // A topology operation commits a whole replacement mesh, so
         // the honest change signal is whether that mesh differs from the one it
         // replaced. Counts decide neither direction on their own: an edge flip
         // and a tangential relaxation pass each change the mesh while leaving
@@ -4298,7 +4288,7 @@ struct EditorJobResult { std::string Diagnostic{}; };
             return true;
         }
 
-        // BUG-145: UV regeneration also commits a replacement mesh, but its
+        // UV regeneration also commits a replacement mesh, but its
         // point is the texcoord property, so the topology-and-positions
         // comparison alone is not enough: a run that rewrote only `v:texcoord`
         // would read as unchanged and be silently dropped. A texcoord present
@@ -4310,7 +4300,7 @@ struct EditorJobResult { std::string Diagnostic{}; };
             if (!SameMeshTopologyAndPositions(before, after))
                 return false;
 
-            // BUG-147 — UVs now land on whichever domain can represent them, so
+            // UVs land on whichever domain can represent them, so
             // a comparison that reads only the vertex domain would call a
             // corner-UV rewrite "unchanged" and publish nothing.
             const auto sameProperty =
@@ -4392,7 +4382,7 @@ struct EditorJobResult { std::string Diagnostic{}; };
                 work);
         }
 
-        // BUG-146 — a discarded parameterization is a user-visible loss, so it
+        // A discarded parameterization is a user-visible loss, so it
         // is named in the message and not left to the enum alone.
         [[nodiscard]] std::string AppendedTexcoordDiscardSentence(
             const EditorMeshTexcoordOutcome outcome)
@@ -4658,9 +4648,9 @@ struct EditorJobResult { std::string Diagnostic{}; };
             target.DistanceThreshold = source.DistanceThreshold;
         }
 
-        // BUG-145: `RejectedIndices` is the change signal this operation already
-        // computed and then ignored — an empty rejection set means the cloud is
-        // unchanged, however many points were inspected.
+        // `RejectedIndices` is this operation's change signal: an empty
+        // rejection set means the cloud is unchanged, however many points
+        // were inspected.
         [[nodiscard]] std::string BuildPointCloudOutlierRemovalNoChangeMessage(
             const EditorPointCloudOutlierRemovalResult& result)
         {
@@ -6474,7 +6464,7 @@ struct EditorJobResult { std::string Diagnostic{}; };
             return GeometryPresentationSlotSemantic::Displacement;
         }
 
-        // BUG-146 — forward the mesh's corner UVs into a scratch halfedge mesh.
+        // Forward the mesh's corner UVs into a scratch halfedge mesh.
         //
         // A scratch mesh is rebuilt from a triangle soup and starts with no
         // properties at all, and `ApplyMeshTopologyState` publishes its
@@ -6486,7 +6476,7 @@ struct EditorJobResult { std::string Diagnostic{}; };
         // Used by simplify, which preserves rather than resamples (an edge
         // collapse removes corners and the survivors keep their own UVs), and
         // by UV regeneration's before-state, which needs the mesh's existing
-        // corner UVs to tell a genuine no-op from a change (BUG-147).
+        // corner UVs to tell a genuine no-op from a change.
         // Operations that *create* corners (remesh, subdivide) have no source
         // UV for them and must not use this path.
         [[nodiscard]] bool CopyStoredCornerTexcoordsToScratchMesh(
@@ -6559,7 +6549,7 @@ struct EditorJobResult { std::string Diagnostic{}; };
                 cornerUvs);
         }
 
-        // BUG-146 — does this mesh carry UVs a topology edit could destroy?
+        // Determines whether a mesh carries UVs a topology edit could destroy.
         // Follows the canonical corner-over-vertex order, and ignores a
         // property whose size does not match its domain, exactly as every
         // reader does.
@@ -6635,7 +6625,7 @@ struct EditorJobResult { std::string Diagnostic{}; };
             std::vector<bool> DeletedVertices{};
             // Stored-topology fingerprint taken at submit. `std::nullopt` means
             // the topology could not be read, which no later reading may match.
-            // See `MeshTopologyValueSignature` (BUG-138).
+            // See `MeshTopologyValueSignature`.
             std::optional<std::uint64_t> TopologySignature{};
             Geometry::HalfedgeMesh::Mesh BeforeMesh{};
             Geometry::HalfedgeMesh::Mesh Mesh{};
@@ -7433,7 +7423,7 @@ struct EditorJobResult { std::string Diagnostic{}; };
                 return Core::Err(ResultErrorOrUnknown(result.Error));
             }
 
-            // BUG-145: no `NoChange` gate here, unlike remesh and simplify.
+            // There is no `NoChange` gate here, unlike remesh and simplify.
             // Every implemented subdivision operator either refines — which
             // always raises the face count — or fails closed, including when
             // `MaxOutputFaces` blocks the first iteration. A changed-count gate
@@ -7530,14 +7520,10 @@ struct EditorJobResult { std::string Diagnostic{}; };
             return Core::Err(Core::ErrorCode::InvalidArgument);
         }
 
-        // A mesh CPU job that reaches a terminal state without publishing —
-        // cancelled, discarded as stale, or dropped — owes the editor exactly
-        // one terminal result. Without this the panel keeps the "…CPU job
-        // queued" text it was given at submit time and the operation reads as
-        // permanently `Pending`, which is indistinguishable from a job that
-        // genuinely never ran (BUG-138). Every other queued runtime owner
-        // (scene documents, asset import, clustering, point-cloud
-        // consolidation) already reconciles through this hook.
+        // A mesh CPU job that terminates without publishing — cancelled, stale,
+        // or dropped — owes the editor exactly one terminal result. This hook
+        // replaces the submit-time `Pending` state with that result, matching
+        // the reconciliation contract of the other queued runtime owners.
         void FinalizeUnpublishedMeshCpuJob(
             const EditorGeometryProcessingContext& context,
             EditorMeshCpuJobState& job)
@@ -7609,9 +7595,9 @@ struct EditorJobResult { std::string Diagnostic{}; };
             }
         }
 
-        // The retired key carried `SourcePropertyGeneration`; the dedup guard
-        // never compared it, and the staleness it stood for is re-checked by
-        // `ValidateMeshCpuJobApply` immediately before the apply.
+        // Dedup identity omits `SourcePropertyGeneration`; the dedup guard does
+        // not compare it, while `ValidateMeshCpuJobApply` rechecks source
+        // staleness immediately before apply.
         [[nodiscard]] EditorJobIdentity MakeMeshCpuJobIdentity(
             const EditorMeshCpuJobState& state)
         {
@@ -7819,7 +7805,7 @@ struct EditorJobResult { std::string Diagnostic{}; };
             state->GeometryMetadataSignature = geometryMetadataSignature;
             state->SnapshotPositions = ExtractMeshPositions(source.Mesh);
             state->BeforeMesh = source.Mesh;
-            // BUG-138: the apply gate must compare the stored topology
+            // The apply gate compares stored topology
             // against the stored topology, so fingerprint it here rather than
             // re-deriving it from `BeforeMesh` later.
             state->TopologySignature =
@@ -7884,7 +7870,7 @@ struct EditorJobResult { std::string Diagnostic{}; };
             state->GeometryMetadataSignature = geometryMetadataSignature;
             state->SnapshotPositions = ExtractMeshPositions(source.Mesh);
             state->BeforeMesh = source.Mesh;
-            // BUG-138: the apply gate must compare the stored topology
+            // The apply gate compares stored topology
             // against the stored topology, so fingerprint it here rather than
             // re-deriving it from `BeforeMesh` later.
             state->TopologySignature =
@@ -7952,7 +7938,7 @@ struct EditorJobResult { std::string Diagnostic{}; };
             state->GeometryMetadataSignature = geometryMetadataSignature;
             state->SnapshotPositions = ExtractMeshPositions(source.Mesh);
             state->BeforeMesh = source.Mesh;
-            // BUG-138: the apply gate must compare the stored topology
+            // The apply gate compares stored topology
             // against the stored topology, so fingerprint it here rather than
             // re-deriving it from `BeforeMesh` later.
             state->TopologySignature =
@@ -8076,7 +8062,7 @@ struct EditorJobResult { std::string Diagnostic{}; };
             return EditorRegistrationResult{
                 .Status = EditorCommandStatus::NoChange,
                 .Variant = command.Variant,
-                // BUG-096: a result that never reached the solver has run
+                // A result that never reached the solver has run
                 // nothing, so the effective variant stays point-to-point until
                 // a validated normal span makes it point-to-plane.
                 .EffectiveVariant = EditorICPVariant::PointToPoint,
@@ -8210,7 +8196,7 @@ struct EditorJobResult { std::string Diagnostic{}; };
             EditorRegistrationCommand Command{};
             std::vector<glm::vec3> SourceLocalPoints{};
             std::vector<glm::vec3> TargetLocalPoints{};
-            // BUG-096: empty for a point-to-point request. Snapshotted in local
+            // Empty for a point-to-point request. Snapshotted in local
             // space alongside the positions and converted in the worker, so a
             // normal edit between submit and apply is caught by the same
             // staleness comparison the positions get.
@@ -8287,7 +8273,7 @@ struct EditorJobResult { std::string Diagnostic{}; };
                 return JobApplyValidation::StaleGeneration;
             }
 
-            // BUG-096: a point-to-plane job that snapshotted target normals is
+            // A point-to-plane job that snapshotted target normals is
             // stale the moment those normals change, exactly as it is when the
             // positions change.
             if (!job.TargetLocalNormals.empty())
@@ -8530,9 +8516,9 @@ struct EditorJobResult { std::string Diagnostic{}; };
             return Core::Ok();
         }
 
-        // The retired key carried the source *and* target geometry signatures;
-        // neither was part of the dedup comparison, and both are re-checked by
-        // `ValidateRegistrationCpuJobApply` before the apply.
+        // Dedup identity omits source and target geometry signatures; the dedup
+        // guard does not compare them, while `ValidateRegistrationCpuJobApply`
+        // rechecks both immediately before apply.
         [[nodiscard]] EditorJobIdentity MakeRegistrationCpuJobIdentity(
             const EditorRegistrationCpuJobState& state)
         {
@@ -9581,13 +9567,11 @@ DebugNameForEditorICPVariant(
                 });
         }
 
-        // BUG-147 — build the published mesh from the *source* soup, never
-        // from `atlas.OutputMesh`. An unwrapper emits a fresh output vertex per
-        // (chart, source vertex) pair, so publishing its output as the entity
-        // mesh converts a manifold into a triangle soup: a closed icosahedron
-        // used to come back as 60 vertices and 60 edges with one chart per
-        // face. The seam is a UV fact, so it is carried on the corner domain
-        // and the duplication happens once, at GPU upload.
+        // Build the published mesh from the source soup, never
+        // `atlas.OutputMesh`. An unwrapper emits a fresh output vertex per
+        // (chart, source vertex) pair, so publishing that output would convert
+        // a manifold into chart-split triangle soup. The seam is a corner-domain
+        // UV fact, and duplication happens once at GPU upload.
         auto converted =
             Geometry::Mesh::Conversion::ToHalfedgeMesh(state->Soup.Mesh);
         if (!converted.Succeeded())
@@ -9689,9 +9673,9 @@ DebugNameForEditorICPVariant(
         return succeeded ? Core::Ok() : Core::Err(Core::ErrorCode::Unknown);
     }
 
-    // The retired key carried `SourcePropertyGeneration`; the dedup guard never
-    // compared it, and the source/metadata staleness it stood for is re-checked
-    // by `ValidateUvRegenerationCpuJobApply` immediately before the apply.
+    // Dedup identity omits `SourcePropertyGeneration`; the dedup guard does not
+    // compare it, while `ValidateUvRegenerationCpuJobApply` rechecks source and
+    // metadata staleness immediately before apply.
     [[nodiscard]] EditorJobIdentity MakeUvRegenerationCpuJobIdentity(
         const EditorUvRegenerationCpuJobState& state)
     {
@@ -9881,7 +9865,7 @@ DebugNameForEditorICPVariant(
             state->HasSourceFaceProperties,
             state->Soup,
             state->BeforeMesh);
-        // BUG-147 — the before-state needs the mesh's existing corner UVs too,
+        // The before-state needs the mesh's existing corner UVs too,
         // both so a genuine no-op is recognised as one and so undo restores
         // them. Vertex-domain properties came across above; halfedge numbering
         // does not survive the round trip, so these go through the corner walk.
@@ -10864,7 +10848,7 @@ ApplyEditorMeshRemeshCommand(
             return result;
         }
 
-        // BUG-146 — remesh and subdivide replace the topology with one whose
+        // Remesh and subdivide replace the topology with one whose
         // corners have no source UV, so they cannot carry the parameterization
         // and the publish step removes it. Report that instead of leaving the
         // loss silent; resampling UVs onto a re-tessellated surface is a
@@ -11072,7 +11056,7 @@ ApplyEditorMeshSubdivideCommand(
             return result;
         }
 
-        // BUG-146 — remesh and subdivide replace the topology with one whose
+        // Remesh and subdivide replace the topology with one whose
         // corners have no source UV, so they cannot carry the parameterization
         // and the publish step removes it. Report that instead of leaving the
         // loss silent; resampling UVs onto a re-tessellated surface is a
@@ -11172,7 +11156,7 @@ ApplyEditorMeshSubdivideCommand(
         result.OutputVertexCount = output.VertexCount();
         result.OutputFaceCount = output.FaceCount();
 
-        // BUG-145: see the subdivide job publisher — subdivision cannot both
+        // As in the subdivide job publisher, subdivision cannot both
         // run and leave the mesh unchanged, so there is no gate here.
         const EditorCommandStatus commitStatus =
             CommitMeshTopologyReplacement(
@@ -11268,7 +11252,7 @@ ApplyEditorMeshSimplifyCommand(
         // when the selected mesh has them. Copy them in so FA_QEM's
         // PreserveUvSeams can actually see a seam, and -- since the publish step
         // replaces the entity's properties wholesale -- so the mesh keeps the
-        // UVs it came in with (BUG-146).
+        // UVs it came in with.
         const EditorMeshTexcoordOutcome texcoordOutcome =
             CopyMeshSimplifyAuxiliaryProperties(view, source.Mesh);
 
@@ -12238,7 +12222,7 @@ ApplyEditorRegistrationCommand(
         result.SourcePointCount = sourcePoints->size();
         result.TargetPointCount = targetPoints->size();
 
-        // BUG-096: resolve and validate the target normals before anything is
+        // Resolve and validate target normals before anything is
         // dispatched or mutated, so a point-to-plane request with unusable
         // normals fails closed instead of degrading to point-to-point behind a
         // point-to-plane label.

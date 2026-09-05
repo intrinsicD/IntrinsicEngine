@@ -702,7 +702,7 @@ namespace Extrinsic::Runtime
                 return diagnostics;
             }
 
-            // BUG-137 Slice B — corner-domain UVs satisfy this contract too.
+            // Corner-domain UVs satisfy this contract too.
             // `h:texcoord` (MeshUtils::kHalfedgeTexcoordPropertyName) is the
             // canonical seam-carrying representation; when it is present and
             // correctly sized, the per-vertex property is not required and its

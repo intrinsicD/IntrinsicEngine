@@ -77,7 +77,7 @@ The retired Sandbox facade export ledger and current owner map are recorded in
 | `Extrinsic.Runtime.SelectionController` | Runtime/editor selection authority (`RUNTIME-089`), published exactly by `SceneInteractionModule` in production. It coalesces hover/click requests, assigns monotonically increasing sequences, tracks bounded in-flight intent, applies Replace/Add/Toggle semantics, mirrors selected/hovered ECS tags, and maintains copied render-id buffers. Sequence-aware hit/no-hit overloads return false without mutation for unknown or evicted records; standalone no-sequence convenience calls retain their direct-drive behavior. Context-capacity eviction explicitly discards the matching controller record. The controller resolves render ids through the module-owned `StableEntityLookup`, while standalone use can retain the validated decode fallback. `ClearSceneState()` removes tags, pending/in-flight state, and world-bound snapshots without resetting the sequence counter. |
 | `Extrinsic.Runtime.StableEntityLookup` | Runtime-owned scene-local lookup sidecar (`RUNTIME-092`, event-driven wiring from `RUNTIME-145`), owned in production by `SceneInteractionModule`. It maps durable ECS `StableId` values to live entities and separately decodes/validates transient render ids, with deterministic duplicate winners and stale/missing diagnostics. `StableEntityLookupSceneBinding` maintains construct/update/destroy hooks for the one bound registry. The interaction module disconnects and clears it before replacement or rebind, rebuilds it afterward, and exposes stable-id resolution plus read-only diagnostics without publishing the raw mutable binding. |
 | `Extrinsic.Runtime.VisualizationRecipes` | Runtime-owned, data-driven translation from canonical geometry properties to data-only `Extrinsic.Graphics.VisualizationPackets`. Exports a closed `VisualizationRecipe` variant for scalar, color, label, vector-field, isoline, Htex-preview, and fragment-bake metadata; `EncodeVisualizationRecipe(...)` resolves `GeometryPropertyRef` values and returns an owning `VisualizationEncodingBatch` plus deterministic `VisualizationEncodingDiagnostics`. Missing BDAs emit copied property-buffer upload descriptors for common graphics residency. Encoding is side-effect free; `ScheduleVisualizationHtexRecreate(...)` is a separate typed `JobService` operation. `RenderExtractionCache` stores copied per-entity recipes, projects `VisualizationConfig` and ready `GeometryPresentationRecipe` property slots into the same encoder, scopes upload keys by stable entity id, and exposes recipe-prefixed extraction counters. No adapter object, registry, opaque key, borrowed property view, or material-source overloading remains. |
-| `Extrinsic.Runtime.ImGuiAdapter` | Runtime-side Dear ImGui platform/renderer adapter (`RUNTIME-090`, `RUNTIME-159`, `UI-034`). It owns paired ImGui 1.92.8 and ImPlot 1.0 contexts, translates drained platform events — cursor, mouse button, scroll, character, and (since `BUG-139`) key events, the last mapped from the platform's GLFW-numbered key codes to `ImGuiKey` with left/right-aware `ImGuiMod_*` chord state derived from the modifier keys' own press/release, so editing keys and Ctrl shortcuts work in editor text fields; OS key repeat is not forwarded because ImGui synthesises repeat from hold duration — opens a frame through `BeginFrame()`, invokes the configured visible contribution through `BuildEditorFrame()`, and copies `ImDrawData` into `Graphics::ImGuiOverlaySystem` during `EndFrame()`. `EndFrame()` records the data-only `EditorInputCaptureSnapshot` defined by `Runtime.Module` from `WantCaptureKeyboard`, `WantCaptureMouse`, and active-widget state before rendering; `EditorUiModule` copies it into the frame-owned value after end. `SetEditorVisible(false)` clears stored capture immediately and suppresses contribution work while preserving adapter lifecycle. The adapter remains backend-agnostic and exposes diagnostics without exporting ImGui headers; `imgui_core_lib` and `implot::implot` are linked **PRIVATE** to runtime. ImGui dynamic texture requests remain disabled because the promoted renderer consumes the copied legacy CPU font atlas. |
+| `Extrinsic.Runtime.ImGuiAdapter` | Runtime-side Dear ImGui platform/renderer adapter (`RUNTIME-090`, `RUNTIME-159`, `UI-034`). It owns paired ImGui 1.92.8 and ImPlot 1.0 contexts, translates drained platform events — cursor, mouse button, scroll, character, and key events, the last mapped from the platform's GLFW-numbered key codes to `ImGuiKey` with left/right-aware `ImGuiMod_*` chord state derived from the modifier keys' own press/release, so editing keys and Ctrl shortcuts work in editor text fields; OS key repeat is not forwarded because ImGui synthesises repeat from hold duration — opens a frame through `BeginFrame()`, invokes the configured visible contribution through `BuildEditorFrame()`, and copies `ImDrawData` into `Graphics::ImGuiOverlaySystem` during `EndFrame()`. `EndFrame()` records the data-only `EditorInputCaptureSnapshot` defined by `Runtime.Module` from `WantCaptureKeyboard`, `WantCaptureMouse`, and active-widget state before rendering; `EditorUiModule` copies it into the frame-owned value after end. `SetEditorVisible(false)` clears stored capture immediately and suppresses contribution work while preserving adapter lifecycle. The adapter remains backend-agnostic and exposes diagnostics without exporting ImGui headers; `imgui_core_lib` and `implot::implot` are linked **PRIVATE** to runtime. ImGui dynamic texture requests remain disabled because the promoted renderer consumes the copied legacy CPU font atlas. |
 | `Extrinsic.Runtime.EditorWorkspaceSnapshots` | Presentation-free workspace snapshot surface. Public `EditorWorkspaceAttachment` carries only the opaque attachment lifecycle; `PrepareEditorWorkspaceSnapshotFrame(...)` prepares copied `EditorWorkspaceSnapshot` data and snapshot queries, while the four feature operation modules prepare their own callback-scoped command/query handles. `BuildEditorInspectorModel(...)` is also available through those queries so semantic method panels can consume the selected entity's provenance-neutral property catalog without fabricating an exact domain-window requirement. App-private `SandboxPreparedFrame` composes those five records and decides panel/window composition. Each handle carries the attachment epoch, reports unbound after detach, and fails closed before reaching copied service pointers; operation-specific callback diagnostics remain available. Feature mutation contexts receive only an epoch-guarded selected-model-cache invalidation callback, not the workspace cache object. Workspace model assembly and the bounded private attachment/job-result session compile separately; the private binding/context adapters do not implement feature operations or cross the runtime boundary. The module owns no Sandbox names, menus, widgets, or ImGui state. |
 | `Extrinsic.Runtime.EditorJobProjection` | Read-only job identity, dependency, progress, and queue projections over the canonical `JobService`; submission identity remains with the editor workspace session. |
 | `Extrinsic.Runtime.SceneEditingOperations` | Typed selection, import, scene-file, transform, camera, primitive-view, and document operations plus their copied scene snapshots. Validation and mutation stay in runtime owners. |
@@ -439,12 +439,11 @@ the denoising algorithm.
 
 ### Editor command status is decided by a changed count, not a written count
 
-`BUG-140` established the rule for denoise and `BUG-145` is extending it to the
-sibling operations: an editor geometry-processing operation derives its terminal
+An editor geometry-processing operation derives its terminal
 `EditorCommandStatus` from a quantity that actually *changed*, never from a
 written or processed count. A slot-derived written count is non-zero whenever
-the kernel ran at all, so it reports `Applied` for a run that republished the
-values already stored.
+the kernel ran at all, so it would report `Applied` for a run that merely
+republished the values already stored.
 
 Each operation therefore:
 
@@ -661,9 +660,9 @@ or fallback dispatch path exists.
 
 ### Sandbox Editor Signed-Curvature Segmentation
 
-`METHOD-037` extends the Curvature window with a non-destructive mesh
-segmentation operation. `BUG-163` also exposes METHOD-039's rejected local
-patch candidate as an explicit diagnostic choice; it is not the production
+The Curvature window exposes `METHOD-037` as its non-destructive mesh
+segmentation operation and `METHOD-039` as an explicit diagnostic choice.
+METHOD-039 remains a rejected local patch candidate, not the production
 default or an accepted v2 backend. The direct command accepts a typed
 `CurvatureSegmentationConfig`; the configured command reads the registered
 `sandbox.curvature_segmentation` record, so method selection, Fixed/Automatic
@@ -688,8 +687,8 @@ METHOD-039 retains soft
 candidates as inspectable edge properties and displays only final
 hard/soft/closure boundaries in red/gold/blue, alongside region, feature,
 energy, merge, and refinement diagnostics. It does not materialize cuts or UV
-seams; `GEOM-076` owns that
-evidence-gated follow-up.
+seams; that evidence-gated work is explicitly
+[planned in GEOM-076](../../tasks/backlog/geometry/GEOM-076-curvature-region-guided-uv-atlas-cuts.md).
 
 ### Sandbox Editor Mesh Remesh And Subdivide
 
@@ -788,15 +787,14 @@ the previewed pose. The command owns no geometry, renderer, or asset state; it
 only reads point positions, calls the runtime controller, and edits the source
 `Transform`.
 
-#### Point-to-plane prerequisites and the effective variant (`BUG-096`)
+#### Point-to-plane prerequisites and the effective variant
 
-`Geometry.Registration::AlignICP` silently degrades a `PointToPlane` request to
-`PointToPoint` when the target-normal span is empty or count-mismatched. Both
-runtime branches used to pass an empty span while the result kept reporting the
-requested variant, so the editor could display a point-to-plane success for a
-point-to-point run.
+`Geometry.Registration::AlignICP` selects `PointToPoint` for a `PointToPlane`
+request when the target-normal span is empty or count-mismatched. Runtime
+preflight prevents that fallback from making requested/effective reporting
+diverge.
 
-Runtime now resolves the target's `v:normal` before anything is dispatched or
+Runtime resolves the target's `v:normal` before anything is dispatched or
 mutated and **fails a point-to-plane request closed** rather than degrading it.
 The prerequisites are: a `vec3 v:normal` property on the target point cloud,
 exactly one vector per target point, every value finite and non-zero-length, and
@@ -914,7 +912,6 @@ lane they need while preserving mesh, graph, or point-cloud provenance labels.
 
 ### Geometry Presentation Editor Inspector
 
-`BUG-141` fixes the scope of editor geometry-processing diagnostics.
 `EditorGeometryProcessingModel::Diagnostics` carries only diagnostics that are
 true of the whole processing model — no scene, no selection controller, no
 selected entity. An outcome that belongs to one operation stays on that
@@ -922,10 +919,10 @@ operation's `Last<Operation>Result`, which the owning panel renders. The rule
 exists because `BuildEditorDomainWindowModel` folds the shared list into every
 domain window's `Diagnostics`: anything parked there is printed by the
 Denoise, K-Means, and Parameterize (UV) panels too, whether or not it concerns
-them. It also removes a severity error, because `EditorCommandStatus::Pending`
-is not `Succeeded()` and a merely queued job used to be announced under
-`EditorDiagnosticCode::GeometryProcessingFailed`. App panels render the header
-list once, through `DrawDomainWindowHeader`; rendering
+them. `EditorCommandStatus::Pending` is not a terminal failure even though it
+does not satisfy `Succeeded()`, so it stays on the per-operation result and is
+not classified under `EditorDiagnosticCode::GeometryProcessingFailed`. App
+panels render the header list once, through `DrawDomainWindowHeader`; rendering
 `model.Processing.Diagnostics` alongside it prints every entry twice, since the
 header list is a superset.
 

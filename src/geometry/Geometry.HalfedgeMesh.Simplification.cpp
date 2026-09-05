@@ -656,7 +656,7 @@ namespace Geometry::Simplification
             return 180.0 - interior;
         }
 
-        // BUG-137 — which vertices sit on a UV seam, per storage index.
+        // Identifies UV-seam vertices by storage index.
         //
         // A UV seam is two corners at one vertex carrying different UVs. When
         // the corner domain owns the UVs (`h:texcoord`) that is directly
@@ -698,7 +698,7 @@ namespace Geometry::Simplification
                     // A boundary halfedge owns no corner. Producers fill its
                     // slot by repeating a UV already present at its target
                     // vertex, but reading it as a corner would let any producer
-                    // that leaves a default there invent a seam (BUG-146).
+                    // that leaves a default there invent a seam.
                     if (!mesh.Face(h).IsValid())
                     {
                         continue;
@@ -773,9 +773,9 @@ namespace Geometry::Simplification
         // Feature-Aware QEM (GEOM-014). When disabled, every FA_QEM-only branch
         // below is skipped and behaviour is identical to the pre-GEOM-014 path.
         const bool faQem = params.Metric == Metric::FA_QEM;
-        // Preserve the pre-GEOM-071 treatment of NaN as boundary-only: the old
-        // dot < cos(NaN) comparison was false for every interior edge. The
-        // reusable public classifier itself rejects non-finite thresholds.
+        // Treat a NaN threshold as boundary-only: no interior edge satisfies
+        // the comparison. The reusable public classifier rejects non-finite
+        // thresholds instead.
         const double featureAngleThresholdDegrees =
             std::isnan(params.FeatureAngleThresholdDegrees)
                 ? 180.0

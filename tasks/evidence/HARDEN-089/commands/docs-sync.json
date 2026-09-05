@@ -1,0 +1,26 @@
+{
+  "command": [
+    "python3",
+    "tools/docs/check_docs_sync.py",
+    "--root",
+    ".",
+    "--diff-mode",
+    "--base-ref",
+    "origin/main",
+    "--strict"
+  ],
+  "command_display": "python3 tools/docs/check_docs_sync.py --root . --diff-mode --base-ref origin/main --strict",
+  "cwd": ".",
+  "duration_ms": 42,
+  "exit_code": 0,
+  "finished_at": "2026-09-05T05:30:05Z",
+  "label": "docs-sync",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-09-05T05:30:04Z",
+  "stderr_path": "tasks/evidence/HARDEN-089/commands/docs-sync.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/HARDEN-089/commands/docs-sync.stdout.log",
+  "stdout_sha256": "2a0e41b2ab235a282db7c84ef33875e91a2c307a429b110c08576bca37367331",
+  "task_id": "HARDEN-089"
+}

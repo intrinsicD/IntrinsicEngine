@@ -1,3 +1,5 @@
+// Exposes hard and multiscale soft feature evidence so curvature patch
+// segmentation and diagnostics share one deterministic mesh-aligned contract.
 module;
 
 #include <array>
