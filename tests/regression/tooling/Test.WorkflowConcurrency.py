@@ -1110,6 +1110,14 @@ class WorkflowConcurrencyTests(unittest.TestCase):
             "SharedBatchParksJobAndReleasesDerivedUpload",
             operational_regex,
         )
+        self.assertIn(
+            r"IntrinsicLopFamilyGpuBenchmarkSmoke\.(Run|Validate)",
+            operational_regex,
+        )
+        self.assertNotIn(
+            "UnavailableEnvironmentFailsClosed",
+            operational_regex,
+        )
 
         self.assertIn('-E "$VULKAN_OPERATIONAL_TEST_REGEX"', vulkan)
         self.assertGreaterEqual(
@@ -1117,7 +1125,7 @@ class WorkflowConcurrencyTests(unittest.TestCase):
             2,
         )
         self.assertIn(
-            'if [[ "$operational_test_count" -ne 3 ]]',
+            'if [[ "$operational_test_count" -ne 5 ]]',
             vulkan,
         )
         self.assertIn(

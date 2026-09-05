@@ -19,6 +19,10 @@ Each active task should include:
   module BMIs](BUG-164-ccache-module-bmi-macro-staleness.md) — in progress;
   dependency-local semantic sidecars pass local fixture, core, full-graph, and
   exact graphics evidence; hosted warm-budget evidence remains open.
+- [`BUG-167` — LOP benchmark positive runs outside hosted Vulkan
+  display](BUG-167-lop-benchmark-hosted-vulkan-display-routing.md) — in
+  progress; the five-case operational route is pinned locally and hosted
+  `ci-vulkan` execution remains open.
 
 ## Records
 
