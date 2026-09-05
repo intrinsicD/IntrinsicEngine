@@ -173,5 +173,7 @@ python3 tools/repo/check_layering.py --root src --strict
 - Automatic approval review rejected `git push --set-upstream origin
   codex/bug-158-ready-during-enrichment`: explicit authorization is required
   to send this private branch to `https://github.com/intrinsicD/IntrinsicEngine.git`.
-  No push occurred or was retried. The completed branch remains local pending
-  operator approval; it also retains the three earlier local planning commits.
+  No push occurred before that approval.
+- 2026-09-05: the operator explicitly approved pushing the completed branch
+  to `intrinsicD/IntrinsicEngine`, including its three earlier local planning
+  commits. This supersedes the approval blocker above.
