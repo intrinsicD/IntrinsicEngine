@@ -17,6 +17,20 @@ contract_review: "Reviewed the catalog; this test-topology repair preserves the 
 ---
 # BUG-169 — ASan geometry group exceeds its fixed process timeout
 
+## Status
+
+- Completed and retired on 2026-09-05. The fixture-heavy curvature cases now
+  run in a dedicated pure GoogleTest producer without changing logical test
+  selection, labels, assertions, or the fixed 120-second wrapper timeout.
+- Implementation commit: `66ee9cac2`; merge commit: `5c71d11e3`; pull request
+  [#1037](https://github.com/intrinsicD/IntrinsicEngine/pull/1037).
+- Exact hosted `ci-linux-clang` run
+  [`33941134235`](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/33941134235),
+  ASan job `101238665631`, passed all 2,749 selected physical tests. The
+  general geometry wrapper completed in 82.47 seconds and the new curvature
+  wrapper in 43.88 seconds, both below the unchanged 120-second process
+  timeout.
+
 ## Goal
 - Restore the required hosted ASan gate after cumulative geometry-suite growth
   pushed one otherwise healthy grouped process past its fixed 120-second
@@ -28,7 +42,7 @@ contract_review: "Reviewed the catalog; this test-topology repair preserves the 
       ASan, UBSan, and focused geometry selection that previously covered them.
 - [x] Grouped and individually discovered plans retain exact logical-case and
       execution parity, with one canonical 120-second wrapper per pure producer.
-- [ ] Both geometry wrappers complete below 120 seconds under local ASan and
+- [x] Both geometry wrappers complete below 120 seconds under local ASan and
       the exact hosted ASan gate passes without a timeout or coverage exclusion.
 
 ## Verification
@@ -86,3 +100,6 @@ ctest --test-dir build/ci-asan --output-on-failure \
   `0cead2731d00705a42ea9574fa5ad1208a90c452a71609ebde38d7709d7321ec`;
   all cases pass in both plans, and the one unchanged GLFW capability test
   self-skips in both.
+- Exact hosted run `33941134235`, ASan job `101238665631`, passed all 2,749
+  selected physical tests. `IntrinsicGeometryTests.Grouped` completed in
+  82.47 seconds and `IntrinsicGeometryCurvatureTests.Grouped` in 43.88 seconds.

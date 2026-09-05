@@ -17,6 +17,21 @@ contract_review: "The observed defect is nondeterministic test orchestration aro
 ---
 # BUG-165 — Asset-import queue tests race worker completion
 
+## Status
+- Completed and retired on 2026-09-05. All five scheduling-sensitive queue
+  tests now hold the existing pre-decode hook or blocking IO seam until their
+  active/cancellable/progress snapshot has been observed; production behavior
+  is unchanged.
+- Implementation commits: `777bd8f65`, `1ea90eb52`; verification record
+  `8582651ac`. Pull requests
+  [#1036](https://github.com/intrinsicD/IntrinsicEngine/pull/1036) and
+  [#1037](https://github.com/intrinsicD/IntrinsicEngine/pull/1037).
+- The five affected cases passed 1,000/1,000 repeated executions under
+  four-process contention, both containing selectors passed 216/216, the local
+  CPU-supported gate passed 4,205/4,205, and hosted `pr-fast` run
+  [`33932424433`](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/33932424433)
+  passed both attempts on the exact task revision.
+
 ## Goal
 - Make the asset-import queue snapshot, cancellation, and non-blocking-frame
   contracts observe workers at defined barriers instead of assuming small
@@ -81,3 +96,6 @@ ctest --test-dir build/ci-fast --output-on-failure \
 - On 2026-09-05, all five synchronized tests passed 200 consecutive
   repetitions each under four-process contention (1,000 executions total),
   and both containing selectors passed all 216 cases without retry.
+- Hosted `pr-fast` run `33932424433` passed attempt 1 (job `101213592561`)
+  and its exact warm rerun (job `101218584698`) without a retry inside either
+  attempt, closing the hosted scheduling discriminator.
