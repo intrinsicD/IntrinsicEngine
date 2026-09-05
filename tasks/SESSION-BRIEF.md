@@ -9,7 +9,7 @@ picking backlog work; theme priorities and rationale live in
 ## Active tasks
 
 - `BUG-164` — ccache serves stale objects when a macro changes only imported module BMIs (tasks/active/BUG-164-ccache-module-bmi-macro-staleness.md)
-- `BUG-165` — Dropped-file queue tests race worker completion (tasks/active/BUG-165-dropped-geometry-cancellation-test-race.md)
+- `BUG-165` — Asset-import queue tests race worker completion (tasks/active/BUG-165-dropped-geometry-cancellation-test-race.md)
 
 ## Theme B — Rendering modernization
 

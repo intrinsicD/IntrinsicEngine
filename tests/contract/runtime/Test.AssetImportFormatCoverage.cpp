@@ -4,6 +4,7 @@
 #include <atomic>
 #include <chrono>
 #include <cmath>
+#include <condition_variable>
 #include <cstddef>
 #include <cstdint>
 #include <filesystem>
@@ -13,6 +14,7 @@
 #include <iterator>
 #include <limits>
 #include <memory>
+#include <mutex>
 #include <optional>
 #include <span>
 #include <sstream>
@@ -378,6 +380,55 @@ namespace
         std::atomic<bool> ReadStarted{false};
         std::atomic<bool> ReleaseRead{false};
         std::atomic<bool> ReadFinished{false};
+    };
+
+    class QueuedGeometryDecodeBarrier final
+    {
+    public:
+        ~QueuedGeometryDecodeBarrier() { Release(); }
+
+        [[nodiscard]] std::function<void(
+            const Runtime::RuntimeAssetImportRequest&)>
+        MakeHook() const
+        {
+            const std::shared_ptr<State> state = m_State;
+            return [state](const Runtime::RuntimeAssetImportRequest&)
+            {
+                std::unique_lock lock(state->Mutex);
+                state->Blocked = true;
+                state->Changed.notify_all();
+                state->Changed.wait(lock, [&state] { return state->Released; });
+            };
+        }
+
+        [[nodiscard]] bool WaitForBlockedWorker() const
+        {
+            std::unique_lock lock(m_State->Mutex);
+            return m_State->Changed.wait_for(
+                lock,
+                std::chrono::seconds(10),
+                [this] { return m_State->Blocked; });
+        }
+
+        void Release() const noexcept
+        {
+            {
+                std::lock_guard lock(m_State->Mutex);
+                m_State->Released = true;
+            }
+            m_State->Changed.notify_all();
+        }
+
+    private:
+        struct State
+        {
+            std::mutex Mutex{};
+            std::condition_variable Changed{};
+            bool Blocked{false};
+            bool Released{false};
+        };
+
+        std::shared_ptr<State> m_State{std::make_shared<State>()};
     };
 
     class BlockingReadIOBackend final : public Core::IO::IIOBackend
@@ -2347,14 +2398,19 @@ TEST(RuntimeAssetImportFormatCoverage, ExplicitCancelPublishesOneTerminalEvent)
 
     Runtime::AssetWorkflowModule& pipeline =
         RequiredEngineService<Extrinsic::Runtime::AssetWorkflowModule>(engine);
+    QueuedGeometryDecodeBarrier decodeBarrier;
+    pipeline.SetQueuedGeometryImportBeforeDecodeHookForTest(
+        decodeBarrier.MakeHook());
     auto queued = pipeline.QueueGeometryImport(
         Runtime::RuntimeAssetImportRequest{
             .Path = meshFile.Path.string(),
             .PayloadKind = Assets::AssetPayloadKind::Mesh,
         });
     ASSERT_TRUE(queued.has_value()) << static_cast<int>(queued.error());
+    ASSERT_TRUE(decodeBarrier.WaitForBlockedWorker());
 
     ASSERT_TRUE(pipeline.CancelAssetImport(queued->Operation).has_value());
+    decodeBarrier.Release();
     const std::optional<Runtime::RuntimeAssetImportEvent>& cancelledEvent =
         pipeline.GetLastAssetImportEvent();
     ASSERT_TRUE(cancelledEvent.has_value());
@@ -2390,6 +2446,7 @@ TEST(RuntimeAssetImportFormatCoverage, ExplicitCancelPublishesOneTerminalEvent)
         CountEntitiesWithDomain(*engine.Worlds().Get(engine.ActiveWorld()), GS::Domain::Mesh),
         0u);
 
+    pipeline.SetQueuedGeometryImportBeforeDecodeHookForTest({});
     engine.Shutdown();
 }
 
@@ -3415,13 +3472,24 @@ TEST(RuntimeAssetImportFormatCoverage, DroppedModelSceneAndTextureImportThroughS
             256u));
     InitializeAssetImportEngine(engine);
 
+    auto readState = std::make_shared<BlockingReadBackendState>();
+    Runtime::AssetWorkflowModule& pipeline =
+        RequiredEngineService<Extrinsic::Runtime::AssetWorkflowModule>(engine);
+    pipeline.SetModelTextureImportIOBackendFactoryForTest(
+        [readState]()
+        {
+            return std::make_unique<BlockingReadIOBackend>(readState);
+        });
+
     const std::vector<std::string> droppedPaths{
         modelFile.Path.string(),
         textureFile.Path.string(),
     };
-    RequiredEngineService<Extrinsic::Runtime::AssetWorkflowModule>(engine).ImportDroppedFilePaths(droppedPaths);
+    pipeline.ImportDroppedFilePaths(droppedPaths);
+    WaitUntilTrue(readState->ReadStarted);
+    ASSERT_TRUE(readState->ReadStarted.load(std::memory_order_acquire));
 
-    EXPECT_FALSE(RequiredEngineService<Extrinsic::Runtime::AssetWorkflowModule>(engine).GetLastAssetImportEvent().has_value());
+    EXPECT_FALSE(pipeline.GetLastAssetImportEvent().has_value());
     EXPECT_EQ(CountEntitiesWithDomain(*engine.Worlds().Get(engine.ActiveWorld()), GS::Domain::Mesh), 0u);
 
     Runtime::RuntimeAssetImportQueueSnapshot queue =
@@ -3438,6 +3506,8 @@ TEST(RuntimeAssetImportFormatCoverage, DroppedModelSceneAndTextureImportThroughS
     EXPECT_EQ(queue.Entries[1].Stage,
               Runtime::RuntimeAssetImportQueueStage::Decoding);
     EXPECT_TRUE(queue.Entries[1].CanCancel);
+
+    readState->ReleaseRead.store(true, std::memory_order_release);
 
     ASSERT_FALSE(engine.GetWindow().ShouldClose())
         << "explicit Null window backend must keep Engine::Run() drivable on "
@@ -3686,7 +3756,8 @@ TEST(RuntimeAssetImportFormatCoverage, SlowQueuedTextureReadDoesNotBlockRunFrame
             std::chrono::steady_clock::now() - queueBegin);
     ASSERT_TRUE(queued.has_value()) << static_cast<int>(queued.error());
     EXPECT_LT(queueElapsed.count(), 500);
-    EXPECT_FALSE(readState->ReadStarted.load(std::memory_order_acquire));
+    WaitUntilTrue(readState->ReadStarted);
+    ASSERT_TRUE(readState->ReadStarted.load(std::memory_order_acquire));
 
     ASSERT_FALSE(engine.GetWindow().ShouldClose())
         << "explicit Null window backend must keep Engine::Run() drivable on "
