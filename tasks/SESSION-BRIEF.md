@@ -9,6 +9,7 @@ picking backlog work; theme priorities and rationale live in
 ## Active tasks
 
 - `BUG-164` — ccache serves stale objects when a macro changes only imported module BMIs (tasks/active/BUG-164-ccache-module-bmi-macro-staleness.md)
+- `BUG-165` — Asset-import queue tests race worker completion (tasks/active/BUG-165-dropped-geometry-cancellation-test-race.md)
 
 ## Theme B — Rendering modernization
 
@@ -35,7 +36,6 @@ picking backlog work; theme priorities and rationale live in
 - unblocked: `BUG-091` — GoogleTest PRE_TEST discovery times out on a cold start (tasks/backlog/bugs/BUG-091-gtest-pretest-discovery-cold-timeout.md)
 - unblocked: `BUG-097` — Progressive model-scene UV job publishes a zero atlas (tasks/backlog/bugs/BUG-097-progressive-model-scene-zero-uv-atlas.md)
 - unblocked: `BUG-149` — Benchmark sealer escapes dotted output directories (tasks/backlog/bugs/BUG-149-benchmark-sealer-dotted-output-directory.md)
-- unblocked: `BUG-165` — Dropped-file queue tests race worker completion (tasks/backlog/bugs/BUG-165-dropped-geometry-cancellation-test-race.md)
 
 ## Theme H — Agentic workflow hardening
 
