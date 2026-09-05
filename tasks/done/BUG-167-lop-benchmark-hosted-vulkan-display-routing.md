@@ -17,6 +17,20 @@ contract_review: "Reviewed the catalog; this repair changes only which existing 
 ---
 # BUG-167 — Hosted Vulkan omits LOP benchmark runtime prerequisites
 
+## Status
+- Completed and retired on 2026-09-05. The positive LOP Run/Validate pair is
+  part of the existing Xvfb/lavapipe operational batch, the unavailable-host
+  regression remains displayless, and hosted configuration installs and
+  probes `glslc` before wiring shader targets.
+- Implementation commits: `fd3fe937a`, `b65503c84`; pull requests
+  [#1038](https://github.com/intrinsicD/IntrinsicEngine/pull/1038) and
+  [#1037](https://github.com/intrinsicD/IntrinsicEngine/pull/1037).
+- Hosted `ci-vulkan` run
+  [`33934397796`](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/33934397796),
+  job `101219376903`, passed the clean build, displayless capability cohort,
+  and all five operational virtual-display cases, including the LOP benchmark
+  result validator.
+
 ## Goal
 - Keep the positive LOP-family Vulkan benchmark and its validator out of the
   displayless capability batch and execute them in the existing Xvfb/lavapipe
@@ -33,7 +47,7 @@ contract_review: "Reviewed the catalog; this repair changes only which existing 
 - [x] The hosted package set installs and probes `glslc`, so a fresh configure
       wires each `intrinsic_add_glsl_shaders(...)` dependency instead of
       silently omitting every SPIR-V build edge.
-- [ ] Hosted `ci-vulkan` passes with the positive benchmark result validated;
+- [x] Hosted `ci-vulkan` passes with the positive benchmark result validated;
       no GPU/Vulkan assertion, benchmark validator, or fail-closed behavior is
       weakened.
 
@@ -75,3 +89,8 @@ xvfb-run -a --server-args="-screen 0 1280x720x24" \
 - This host does not provide `xvfb-run`, but the same lavapipe-selected pair
   passed 2/2 under its existing `DISPLAY=:1`; the hosted lane owns the final
   clean-checkout Xvfb proof.
+- PR #1037 run `33934397796` installed and probed `glslc`, built the promoted
+  Vulkan target set from a clean checkout, reconciled the five-case operational
+  selector, passed the displayless cohort, and passed all five cases under
+  Xvfb. The aggregate timing result and operational evidence upload also
+  validated.

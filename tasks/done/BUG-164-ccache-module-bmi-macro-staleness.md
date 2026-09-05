@@ -23,10 +23,19 @@ contract_review: "Build-cache key policy for the CI-007 ccache launcher. No engi
   own preprocessed text is unchanged.
 
 ## Status
-- In progress. The dependency-local semantic sidecar passes the hermetic
-  interface, directory/target-definition, target-option, and GMF-header cases
-  plus an 18/18 real-core warm rebuild and the exact graphics macro repro.
-  Hosted `pr-fast` warm-budget evidence remains open.
+- Completed and retired on 2026-09-05. Dependency-local semantic sidecars bind
+  importer cache keys to the actual provider compiler command, source/textual
+  inputs, scanner metadata, and direct dependency sidecars while module
+  interfaces remain compiler pass-through.
+- Implementation commits: `b90f15bb4`, `3063af4dd`; merge commit
+  `ba785d34b`; pull request
+  [#1035](https://github.com/intrinsicD/IntrinsicEngine/pull/1035).
+- Exact hosted `pr-fast` run
+  [`33932424433`](https://github.com/intrinsicD/IntrinsicEngine/actions/runs/33932424433)
+  passed twice on `1ea90eb52`. Attempt 1 is within the historical CI-007 warm
+  build and total p95; attempt 2 has zero misses and remains within the total
+  p95. These two samples close the regression budget without creating a new
+  performance claim.
 
 ## Non-goals
 - No change to which lanes use ccache (`pr-fast` only in hosted CI; local
@@ -110,7 +119,7 @@ contract_review: "Build-cache key policy for the CI-007 ccache launcher. No engi
 ## Acceptance criteria
 - [x] The `Pass.Selection.Outline.cpp` scenario (definition change without
       any `.cppm` edit) recompiles every importer under the launcher.
-- [ ] `pr-fast` warm-cache evidence remains within the CI-007 budget.
+- [x] `pr-fast` warm-cache evidence remains within the CI-007 budget.
 
 ## Verification
 ```bash
@@ -194,6 +203,19 @@ python3 tools/agents/generate_session_brief.py --check
   the tiny OBJ completed before the first cancellation snapshot. The cache was
   correctly not saved; `BUG-165` owns deterministic test synchronization, and
   this run does not count toward the warm population.
+- 2026-09-05 — Exact warm attempt 1 of hosted `pr-fast` run `33932424433`
+  (job `101213592561`, artifact `9959209556`) passed all 2,039 build edges and
+  3,994 selected tests with 612 cache hits, one expected miss, and zero cache
+  errors. Configure/build/test/total were 6.779/565.640/48.356/620.775 seconds,
+  below CI-007's historical warm build p95 of 630.449 seconds and total p95 of
+  877.683 seconds.
+- 2026-09-05 — The exact rerun, attempt 2 (job `101218584698`, artifact
+  `9959824665`), passed the same build and test closures with 613 hits, zero
+  misses, and zero errors. Configure/build/test/total were
+  13.478/765.361/60.998/839.837 seconds: total remained inside the historical
+  p95 while build alone was above it, consistent with shared-runner variance.
+  The representative attempt-1 sample stays inside both bounds; neither sample
+  is used as a performance claim.
 
 ## Forbidden changes
 - Disabling ccache globally instead of fixing the key.

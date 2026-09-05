@@ -8,6 +8,60 @@ so blocks moved from the old active-README history work verbatim.
 
 ## Retired task narratives
 
+[`BUG-169`](BUG-169-asan-geometry-group-timeout.md) — the fixture-heavy
+curvature tensor and segmentation cases now run in their own pure GoogleTest
+producer while retaining exact logical registration and execution parity
+across all 4,262 GoogleTest cases. Exact hosted `ci-linux-clang` run
+`33941134235`, ASan job `101238665631`, passed all 2,749 selected physical
+tests; the general geometry wrapper completed in 82.47 seconds and the new
+curvature wrapper in 43.88 seconds, both below the unchanged 120-second
+timeout. Implementation: `66ee9cac2`; merge: `5c71d11e3`; PR
+[#1037](https://github.com/intrinsicD/IntrinsicEngine/pull/1037).
+
+[`BUG-168`](BUG-168-runtime-compile-hotspot-baseline-paths.md) — the
+compile-hotspot baseline now follows the current `Kernel/` and `Rendering/`
+object paths for `Runtime.Engine.cppm` and `Runtime.RenderExtraction.cppm`.
+Their physical edge IDs are recomputed from the unchanged
+source/kind/sorted-output identity, while the measured 165,000 ms and 167,000
+ms ceilings remain unchanged. A general regression now verifies every
+checked-in edge ID. Hosted `ci-linux-clang` run `33936262942`, job
+`101224743953`, passed all 4,263 CPU-supported tests and the four-edge
+compile-hotspot comparison. Implementation: `3ee6a343d`; PR
+[#1037](https://github.com/intrinsicD/IntrinsicEngine/pull/1037).
+
+[`BUG-167`](BUG-167-lop-benchmark-hosted-vulkan-display-routing.md) — the
+positive LOP Vulkan benchmark and validator now execute inside the existing
+five-case Xvfb/lavapipe operational batch, while the unavailable-environment
+regression remains displayless. Hosted configuration installs and probes
+`glslc`, so clean builds produce every required SPIR-V edge instead of leaving
+the promoted device non-operational. Local workflow regressions pass 20/20,
+and hosted `ci-vulkan` run `33934397796` passed the displayless cohort plus all
+five operational cases. Implementation: `fd3fe937a`, `b65503c84`; PRs
+[#1038](https://github.com/intrinsicD/IntrinsicEngine/pull/1038) and
+[#1037](https://github.com/intrinsicD/IntrinsicEngine/pull/1037).
+
+[`BUG-165`](BUG-165-dropped-geometry-cancellation-test-race.md) — five
+asset-import queue tests now observe active, cancellable, and non-blocking
+states at existing deterministic pre-decode or IO barriers instead of racing
+tiny workers. Production behavior and every terminal/order/progress assertion
+remain unchanged. The cases passed 1,000/1,000 contended repetitions, both
+containing selectors passed 216/216, the CPU-supported gate passed 4,205/4,205,
+and exact hosted `pr-fast` run `33932424433` passed twice. Implementation:
+`777bd8f65`, `1ea90eb52`; PRs
+[#1036](https://github.com/intrinsicD/IntrinsicEngine/pull/1036) and
+[#1037](https://github.com/intrinsicD/IntrinsicEngine/pull/1037).
+
+[`BUG-164`](BUG-164-ccache-module-bmi-macro-staleness.md) — the CI-007 ccache
+launcher now binds an importer to dependency-local semantic sidecars derived
+from each provider's actual compiler invocation, scanner metadata, module
+source/textual inputs, and direct dependency sidecars. Target/private flags,
+GMF-only macros and headers, fail-closed metadata, exact graphics invalidation,
+and unchanged warm hits are covered. Exact hosted `pr-fast` run `33932424433`
+passed twice: attempt 1 stayed within both historical warm build and total p95,
+while the zero-miss rerun stayed inside total p95 and transparently recorded a
+slower build phase. Implementation: `b90f15bb4`, `3063af4dd`; PR
+[#1035](https://github.com/intrinsicD/IntrinsicEngine/pull/1035).
+
 [`BUG-166`](BUG-166-clean-scratch-experiment-historical-input-seals.md) —
 frozen declared inputs now resolve from any clean exact source identity rather
 than only claim-eligible runs. The revision must resolve as an ancestor of the
