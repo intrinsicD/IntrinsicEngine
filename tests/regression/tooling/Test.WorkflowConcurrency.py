@@ -1105,6 +1105,8 @@ class WorkflowConcurrencyTests(unittest.TestCase):
         )
         operational_regex = env.get("VULKAN_OPERATIONAL_TEST_REGEX")
         self.assertIsInstance(operational_regex, str)
+        self.assertIn("\n            glslc \\\n", vulkan)
+        self.assertIn("glslc --version", vulkan)
         self.assertIn(
             r"GpuResultReadbackGpuSmoke\."
             "SharedBatchParksJobAndReleasesDerivedUpload",

@@ -34,6 +34,7 @@ jobs:
             ninja-build \
             clang-20 \
             clang-tools-20 \
+            glslc \
             python3 \
             libx11-dev \
             libxcursor-dev \
@@ -50,6 +51,7 @@ jobs:
             vulkan-tools \
             spirv-tools \
             xvfb
+          glslc --version
 
       - name: Cache vcpkg binary packages
         id: vcpkg-cache
