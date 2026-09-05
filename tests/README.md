@@ -85,9 +85,10 @@ python3 tests/regression/tooling/Test.TestGateRouting.py \
 `INTRINSIC_GROUP_PURE_CTEST` defaults to `OFF`, so a normal local `ci`
 configure retains one discovered CTest entry per GoogleTest case for focused
 `ctest -R` diagnosis. Required full CPU, ASan, and UBSan workflows enable the
-option explicitly. In that plan, these five producers replace their individual
+option explicitly. In that plan, these six producers replace their individual
 entries with one CTest wrapper each:
 
+- `IntrinsicGeometryCurvatureTests`
 - `IntrinsicGeometryTests`
 - `IntrinsicGeometryMethodTests`
 - `IntrinsicGraphicsBufferTransferTests`
@@ -98,6 +99,10 @@ Grouping is replacement-only, not additive. Configuration rejects a grouped
 wrapper whose producer still has individual discovery, and
 `Test.GroupedCTestParity.py` verifies exact producer/case registration and
 execution-status parity between plans.
+
+The curvature tensor and segmentation cases use a dedicated pure producer so
+their fixture-heavy coverage and the remaining geometry cohort each retain the
+same 120-second sanitizer hang-detection budget.
 
 A producer is eligible only when its cases do not depend on mutable
 process-global scheduler, logger, telemetry, registry, filesystem, environment,

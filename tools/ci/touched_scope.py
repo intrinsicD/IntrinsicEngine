@@ -75,7 +75,11 @@ LAYER_SCOPES: tuple[tuple[str, tuple[str, ...], tuple[str, ...]], ...] = (
     (
         "src/geometry/",
         ("geometry",),
-        ("IntrinsicGeometryTests", "IntrinsicGeometryIoTests"),
+        (
+            "IntrinsicGeometryCurvatureTests",
+            "IntrinsicGeometryTests",
+            "IntrinsicGeometryIoTests",
+        ),
     ),
     ("src/assets/", ("assets",), ("IntrinsicAssetUnitTests",)),
     (
@@ -124,6 +128,11 @@ LAYER_SCOPES: tuple[tuple[str, tuple[str, ...], tuple[str, ...]], ...] = (
 )
 
 TEST_SCOPES: tuple[tuple[str, tuple[str, ...], tuple[str, ...]], ...] = (
+    (
+        "tests/unit/geometry/Test.CurvatureTensor.cpp",
+        ("geometry",),
+        ("IntrinsicGeometryCurvatureTests",),
+    ),
     (
         "tests/unit/geometry/Test.GeometryIO.cpp",
         ("geometry",),

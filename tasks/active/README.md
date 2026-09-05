@@ -11,6 +11,10 @@ Each active task should include:
 
 ## Currently active
 
+- [`BUG-169` — ASan geometry group exceeds its fixed process
+  timeout](BUG-169-asan-geometry-group-timeout.md) — locally complete; the two
+  ASan wrappers pass in 55.94 and 27.59 seconds and exact same-binary parity
+  covers all 4,262 GoogleTest cases, with hosted ASan confirmation pending.
 - [`BUG-168` — runtime source move left compile-hotspot physical identities
   stale](BUG-168-runtime-compile-hotspot-baseline-paths.md) — diagnosed; two
   moved module interfaces retain their pre-move object paths and edge IDs in
