@@ -465,6 +465,73 @@ TEST(UvAtlas, FastStagedKeepsFirstSeenBoundaryAndNonmanifoldSeamOrder) {
   }
 }
 
+
+TEST(UvAtlas, FastStagedManyChartsPreserveSparseSourceIndices) {
+  constexpr std::uint32_t chartCount = 1024u;
+  Geometry::MeshSoup::IndexedMesh mesh;
+  for (std::uint32_t corner = 0u; corner < 3u; ++corner) {
+    for (std::uint32_t chart = 0u; chart < chartCount; ++chart) {
+      (void)mesh.AddVertex({static_cast<float>(chart * 2u + (corner == 1u)),
+                            corner == 2u ? 1.0f : 0.0f, 0.0f});
+    }
+  }
+  // Unreferenced storage must not multiply the remap cost of every chart.
+  for (std::uint32_t i = chartCount * 3u; i < 32768u; ++i) {
+    (void)mesh.AddVertex({0.0f, 0.0f, 0.0f});
+  }
+  for (std::uint32_t chart = 0u; chart < chartCount; ++chart) {
+    (void)mesh.AddTriangle(chart + chartCount * 2u, chart,
+                            chart + chartCount);
+  }
+  auto sourceIds = mesh.GetOrAddVertexProperty<std::uint32_t>("v:source_id");
+  for (std::uint32_t i = 0u; i < mesh.VertexCount(); ++i) {
+    sourceIds.Vector()[i] = i;
+  }
+
+  Geometry::UvAtlas::UvAtlasOptions options{};
+  options.PreserveValidAuthoredUvs = false;
+  options.AllowXAtlasFallback = false;
+  options.Resolution = 1024u;
+  const auto first = Geometry::UvAtlas::ResolveUvAtlas(
+      Geometry::UvAtlas::BorrowInput(mesh), options);
+  const auto second = Geometry::UvAtlas::ResolveUvAtlas(
+      Geometry::UvAtlas::BorrowInput(mesh), options);
+
+  ASSERT_TRUE(first.Succeeded());
+  ASSERT_TRUE(second.Succeeded());
+  ASSERT_EQ(first.OutputMesh.VertexCount(), chartCount * 3u);
+  ASSERT_EQ(first.OutputMesh.FaceCount(), chartCount);
+  ASSERT_EQ(first.Charts.size(), chartCount);
+  ASSERT_EQ(first.SourceVertexForOutputVertex.size(), chartCount * 3u);
+  ASSERT_EQ(first.SourceFaceForOutputFace.size(), chartCount);
+  ASSERT_EQ(first.OutputFaceChart.size(), chartCount);
+  EXPECT_EQ(first.Diagnostics.SeamCutCount, 0u);
+  EXPECT_EQ(first.Diagnostics.BoundarySeamCount, chartCount * 3u);
+  EXPECT_FALSE(first.Diagnostics.UsedFallback);
+  const auto outputIds =
+      first.OutputMesh.GetVertexProperty<std::uint32_t>("v:source_id");
+  ASSERT_TRUE(outputIds.IsValid());
+  const auto uvs = first.OutputMesh.GetVertexProperty<glm::vec2>(
+      Geometry::MeshUtils::kVertexTexcoordPropertyName);
+  ASSERT_TRUE(uvs.IsValid());
+  for (std::uint32_t chart = 0u; chart < chartCount; ++chart) {
+    EXPECT_EQ(first.SourceFaceForOutputFace[chart], chart);
+    EXPECT_EQ(first.OutputFaceChart[chart], chart);
+    EXPECT_EQ(first.Charts[chart].OutputVertexStart, chart * 3u);
+    EXPECT_EQ(first.Charts[chart].OutputVertexCount, 3u);
+    const std::uint32_t expectedSources[]{chart + chartCount * 2u, chart,
+                                           chart + chartCount};
+    for (std::uint32_t corner = 0u; corner < 3u; ++corner) {
+      const auto output = chart * 3u + corner;
+      EXPECT_EQ(first.SourceVertexForOutputVertex[output],
+                expectedSources[corner]);
+      EXPECT_EQ(outputIds[output], expectedSources[corner]);
+      ExpectFiniteNormalizedUv(uvs[output]);
+    }
+  }
+  ExpectSameAtlasRecords(first, second);
+}
+
 TEST(UvAtlas, FastStagedFailingBackendFallsBackToXAtlasWhenAllowed) {
   auto mesh = MakeSquareMesh();
   const Geometry::UvAtlas::UvAtlasBackend failingFast{

@@ -307,3 +307,23 @@ if(BUILD_TESTING)
         endif()
     endif()
 endif()
+
+# Isolate the atlas allocation probe from the general benchmark/test binaries.
+add_executable(IntrinsicUvAtlasRemapSmoke runners/UvAtlasRemapSmokeRunner.cpp)
+set_target_properties(IntrinsicUvAtlasRemapSmoke PROPERTIES CXX_SCAN_FOR_MODULES ON)
+target_compile_features(IntrinsicUvAtlasRemapSmoke PRIVATE cxx_std_23)
+target_compile_options(IntrinsicUvAtlasRemapSmoke PRIVATE ${INTRINSIC_COMPILE_FLAGS})
+target_link_options(IntrinsicUvAtlasRemapSmoke PRIVATE ${INTRINSIC_LINK_FLAGS})
+target_link_libraries(IntrinsicUvAtlasRemapSmoke PRIVATE IntrinsicGeometry nlohmann_json::nlohmann_json)
+if(BUILD_TESTING)
+    intrinsic_register_test_executable(
+        TARGET IntrinsicUvAtlasRemapSmoke LABELS benchmark regression geometry)
+    add_test(NAME IntrinsicUvAtlasRemapSmoke.Run
+        COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tools/benchmark/run_and_seal.py
+            --executable $<TARGET_FILE:IntrinsicUvAtlasRemapSmoke>
+            --output ${CMAKE_BINARY_DIR}/benchmark-ctest/IntrinsicUvAtlasRemapSmoke/result.json
+            --manifests-root ${CMAKE_SOURCE_DIR}/benchmarks
+            --run-id ctest-uv-atlas-remap --attempt-id attempt-001)
+    set_tests_properties(IntrinsicUvAtlasRemapSmoke.Run PROPERTIES
+        LABELS "benchmark;regression;geometry" TIMEOUT 60)
+endif()

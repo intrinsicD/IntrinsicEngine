@@ -13,6 +13,10 @@ This section defines how IntrinsicEngine benchmarks are authored, executed, vali
 - [Benchmark manifest schema](benchmark-manifest-schema.md)
 - [Benchmark result JSON schema](result-json-schema.md)
 
+## Regression diagnostics
+
+- [UV atlas remap allocation regression](bug159-atlas-remap-diagnostics.md)
+
 ## Related process docs
 
 - [Agent benchmark workflow](../agent/benchmark-workflow.md)

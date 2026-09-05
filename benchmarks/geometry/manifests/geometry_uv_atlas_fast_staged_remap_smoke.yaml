@@ -1,0 +1,22 @@
+# Local allocation regression for BENCH-001's optional UV enrichment boundary.
+# Allocation traffic is a scoped diagnostic, not process peak memory.
+benchmark_id: geometry.uv_atlas.fast_staged_remap.smoke
+method: geometry.uv_atlas.fast_staged_remap
+dataset: builtin.uv_atlas_sparse_disconnected_triangles_v1
+params:
+  fixture_generator: sparse_disconnected_triangles
+  source_vertex_count: 65536
+  triangle_count: 512
+  resolution: 1024
+  padding: 2
+  warmup_iterations: 1
+  measured_iterations: 3
+  timing_statistic: median
+  unaligned_new_bytes_max: 67108864
+  untimed_exact_output_fixtures: [square, cube, nonmanifold_edge]
+  adoption_claim: false
+metrics:
+  - runtime_ms
+  - quality_error_l2
+thresholds:
+  quality_error_l2_max: 0.0

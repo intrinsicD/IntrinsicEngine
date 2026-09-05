@@ -1,0 +1,100 @@
+{
+  "attempt_id": "attempt-001",
+  "backend": "cpu_optimized",
+  "benchmark_id": "geometry.uv_atlas.fast_staged_remap.smoke",
+  "claim_eligible": false,
+  "commit": "local-dev",
+  "config_digest": "ca8b9aa0413f85d82921907a34f47669a7e9a813e239cc71c0baad2cbfd31a3b",
+  "dataset": "builtin.uv_atlas_sparse_disconnected_triangles_v1",
+  "diagnostics": {
+    "actual_backend": "fast-staged",
+    "adoption_claim": false,
+    "allocation_budget_passed": true,
+    "allocation_scope": "synchronous ResolveUvAtlas only; excludes fixture, aligned/native allocation, snapshot and output IO",
+    "atlas_snapshot": "benchmarks/baselines/geometry_uv_atlas_remap_output.snapshot.gz",
+    "atlas_snapshot_sha256": "179b328feb2fedc9aec6eda1d7d75b1a72bbfd86a971f88e010c839ce412507d",
+    "baseline_revision": "e6350ca56262b644b549b65112ed437dd113f74a",
+    "build": {
+      "compiler": "Clang 23.0.0",
+      "preset": "ci",
+      "sanitizers": "none",
+      "type": "Debug"
+    },
+    "fallback_observed": false,
+    "finite_complete_deterministic": true,
+    "geometry_source_sha256": "e6bdbace50ad399e69ba38db42fbf182188cb4c0f6842b5c8394377a907896df",
+    "input_face_count": 512,
+    "input_vertex_count": 65536,
+    "measured_iterations": 3,
+    "output_face_count": 512,
+    "output_vertex_count": 1536,
+    "product_evidence_owner": "BENCH-001",
+    "requested_backend": "fast-staged",
+    "runner": "IntrinsicUvAtlasRemapSmoke",
+    "runner_source_sha256": "bf9ec4a88e3d391570fdb5e8b177756539086f244823a70384f155511546d67c",
+    "runtime_samples_ms": [
+      49.745099,
+      49.736523,
+      49.750328
+    ],
+    "timed_scope": "resident_input_uv_enrichment_only",
+    "unaligned_new_bytes_budget": 67108864,
+    "unaligned_new_bytes_samples": [
+      6179411,
+      6179411,
+      6179411
+    ],
+    "warmup_iterations": 1
+  },
+  "execution_status": "passed",
+  "manifest": {
+    "path": "benchmarks/geometry/manifests/geometry_uv_atlas_fast_staged_remap_smoke.yaml",
+    "sha256": "7303c1b3d0eb8b9b3908371ed0290356db2e7b1787a40398a46fbdc19bdd1123"
+  },
+  "method": "geometry.uv_atlas.fast_staged_remap",
+  "metrics": {
+    "quality_error_l2": 0.0,
+    "runtime_ms": 49.745099
+  },
+  "resolved_params": {
+    "adoption_claim": false,
+    "fixture_generator": "sparse_disconnected_triangles",
+    "measured_iterations": 3,
+    "padding": 2,
+    "resolution": 1024,
+    "source_vertex_count": 65536,
+    "timing_statistic": "median",
+    "triangle_count": 512,
+    "unaligned_new_bytes_max": 67108864,
+    "untimed_exact_output_fixtures": [
+      "square",
+      "cube",
+      "nonmanifold_edge"
+    ],
+    "warmup_iterations": 1
+  },
+  "run_id": "bug159-final-after",
+  "schema_version": 2,
+  "source": {
+    "revision": "local-dev",
+    "state": "dirty_worktree"
+  },
+  "status": "passed",
+  "threshold_disposition": [
+    {
+      "limit": 0.0,
+      "metric": "quality_error_l2",
+      "observed": 0.0,
+      "operator": "<=",
+      "passed": true,
+      "threshold": "quality_error_l2_max"
+    }
+  ],
+  "thresholds": {
+    "quality_error_l2_max": 0.0
+  },
+  "warmup_policy": {
+    "measured_iterations": 3,
+    "warmup_iterations": 1
+  }
+}

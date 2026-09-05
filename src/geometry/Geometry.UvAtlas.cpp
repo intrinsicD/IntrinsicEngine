@@ -168,7 +168,6 @@ struct FastChartProposal {
 struct FastChartParameterization {
   std::uint32_t ChartId{0};
   std::vector<std::uint32_t> SourceVertices{};
-  std::vector<std::uint32_t> SourceVertexToLocal{};
   std::vector<glm::vec3> Positions{};
   std::vector<std::uint32_t> Indices{};
   std::vector<glm::vec2> LocalUvs{};
@@ -481,27 +480,31 @@ AcceptSolverUvs(FastChartParameterization &parameterization,
 
 [[nodiscard]] FastChartParameterization
 BuildFastChartParameterization(const UvAtlasInput &input,
-                               const FastChartProposal &chart) {
+                               const FastChartProposal &chart,
+                               const std::span<std::uint32_t> sourceVertexToLocal) {
   FastChartParameterization parameterization{};
   parameterization.ChartId = chart.ChartId;
-  parameterization.SourceVertexToLocal.assign(input.Positions.size(),
-                                              kInvalidIndex);
   parameterization.Indices.reserve(chart.SourceFaces.size() * 3u);
 
   for (const std::uint32_t sourceFace : chart.SourceFaces) {
     const MeshSoup::PolygonFace &face = input.Faces[sourceFace];
     for (const std::uint32_t sourceVertex : face.Indices) {
       std::uint32_t localIndex =
-          parameterization.SourceVertexToLocal[sourceVertex];
+          sourceVertexToLocal[sourceVertex];
       if (localIndex == kInvalidIndex) {
         localIndex =
             static_cast<std::uint32_t>(parameterization.SourceVertices.size());
-        parameterization.SourceVertexToLocal[sourceVertex] = localIndex;
+        sourceVertexToLocal[sourceVertex] = localIndex;
         parameterization.SourceVertices.push_back(sourceVertex);
         parameterization.Positions.push_back(input.Positions[sourceVertex]);
       }
       parameterization.Indices.push_back(localIndex);
     }
+  }
+
+  // Reset only vertices touched by this chart before any solver early return.
+  for (const std::uint32_t sourceVertex : parameterization.SourceVertices) {
+    sourceVertexToLocal[sourceVertex] = kInvalidIndex;
   }
 
   const std::optional<HalfedgeMesh::Mesh> halfedge =
@@ -954,9 +957,12 @@ GenerateWithFastStaged(const UvAtlasInput &input,
   const auto chartCount = static_cast<std::uint32_t>(charts.size());
   std::vector<FastChartParameterization> chartParameterizations;
   chartParameterizations.reserve(charts.size());
+  // One O(V) scratch map; retained chart data scales with local vertices/corners.
+  std::vector<std::uint32_t> sourceVertexToLocal(input.Positions.size(),
+                                                kInvalidIndex);
   for (const FastChartProposal &chart : charts) {
     FastChartParameterization parameterization =
-        BuildFastChartParameterization(input, chart);
+        BuildFastChartParameterization(input, chart, sourceVertexToLocal);
     if (!IsFinite(parameterization.LocalExtent) ||
         parameterization.LocalExtent.x <= 0.0f ||
         parameterization.LocalExtent.y <= 0.0f) {
@@ -1012,35 +1018,28 @@ GenerateWithFastStaged(const UvAtlasInput &input,
     glm::vec2 uvMin{std::numeric_limits<float>::max()};
     glm::vec2 uvMax{std::numeric_limits<float>::lowest()};
 
-    std::vector<std::uint32_t> sourceVertexToOutput(input.Positions.size(),
-                                                    kInvalidIndex);
-    for (const std::uint32_t sourceFace : chart.SourceFaces) {
-      const MeshSoup::PolygonFace &face = input.Faces[sourceFace];
+    // SourceVertices and Indices share the source-face first-seen order.
+    for (std::size_t localIndex = 0u;
+         localIndex < parameterization.SourceVertices.size(); ++localIndex) {
+      const std::uint32_t sourceVertex = parameterization.SourceVertices[localIndex];
+      (void)result.OutputMesh.AddVertex(input.Positions[sourceVertex]);
+      result.SourceVertexForOutputVertex.push_back(sourceVertex);
+      const glm::vec2 uv = localIndex < parameterization.LocalUvs.size()
+          ? ApplyPlacement(parameterization, placement,
+                           parameterization.LocalUvs[localIndex])
+          : glm::vec2{0.0f};
+      outputUvs.push_back(glm::clamp(uv, glm::vec2{0.0f}, glm::vec2{1.0f}));
+      uvMin = glm::min(uvMin, outputUvs.back());
+      uvMax = glm::max(uvMax, outputUvs.back());
+    }
+
+    for (std::size_t chartFace = 0u; chartFace < chart.SourceFaces.size();
+         ++chartFace) {
+      const std::uint32_t sourceFace = chart.SourceFaces[chartFace];
       std::array<std::uint32_t, 3u> outputFace{};
       for (std::size_t corner = 0u; corner < 3u; ++corner) {
-        const std::uint32_t sourceVertex = face.Indices[corner];
-        std::uint32_t outputVertex = sourceVertexToOutput[sourceVertex];
-        if (outputVertex == kInvalidIndex) {
-          outputVertex =
-              static_cast<std::uint32_t>(result.OutputMesh.VertexCount());
-          sourceVertexToOutput[sourceVertex] = outputVertex;
-          (void)result.OutputMesh.AddVertex(input.Positions[sourceVertex]);
-          result.SourceVertexForOutputVertex.push_back(sourceVertex);
-
-          const std::uint32_t localIndex =
-              parameterization.SourceVertexToLocal[sourceVertex];
-          const glm::vec2 uv =
-              localIndex != kInvalidIndex &&
-                      localIndex < parameterization.LocalUvs.size()
-                  ? ApplyPlacement(parameterization, placement,
-                                   parameterization.LocalUvs[localIndex])
-                  : glm::vec2{0.0f};
-          outputUvs.push_back(glm::clamp(uv, glm::vec2{0.0f}, glm::vec2{1.0f}));
-          uvMin = glm::min(uvMin, outputUvs.back());
-          uvMax = glm::max(uvMax, outputUvs.back());
-        }
-
-        outputFace[corner] = outputVertex;
+        outputFace[corner] = outputVertexStart +
+            parameterization.Indices[chartFace * 3u + corner];
       }
 
       (void)result.OutputMesh.AddTriangle(outputFace[0u], outputFace[1u],
