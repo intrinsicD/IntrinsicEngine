@@ -11,6 +11,10 @@ Each active task should include:
 
 ## Currently active
 
+- [`BUG-168` — runtime source move left compile-hotspot physical identities
+  stale](BUG-168-runtime-compile-hotspot-baseline-paths.md) — diagnosed; two
+  moved module interfaces retain their pre-move object paths and edge IDs in
+  the hosted full-CPU baseline, while all compilation and tests pass.
 - [`BUG-165` — dropped-file queue tests race worker
   completion](BUG-165-dropped-geometry-cancellation-test-race.md) — locally
   complete; deterministic pre-decode barriers pass the two-test 200-repeat

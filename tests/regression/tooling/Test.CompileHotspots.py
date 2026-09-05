@@ -242,6 +242,23 @@ class CompileHotspotTests(unittest.TestCase):
                 [],
             )
 
+    def test_repository_baseline_edge_ids_match_declared_identity(self) -> None:
+        baseline_path = (
+            REPO_ROOT / "tools" / "analysis" / "compile_hotspot_baseline.json"
+        )
+        baseline = json.loads(baseline_path.read_text(encoding="utf-8"))
+
+        for target in baseline["targets"]:
+            with self.subTest(source=target["source"]):
+                edge_identity = json.dumps(
+                    [target["source"], target["edge_kind"], target["outputs"]],
+                    separators=(",", ":"),
+                )
+                self.assertEqual(
+                    target["edge_id"],
+                    hashlib.sha256(edge_identity.encode()).hexdigest(),
+                )
+
     def test_exact_compile_commands_resolve_all_declared_roots(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             fixture = CompileHotspotFixture(Path(temporary))

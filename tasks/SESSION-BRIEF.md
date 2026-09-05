@@ -11,6 +11,7 @@ picking backlog work; theme priorities and rationale live in
 - `BUG-164` — ccache serves stale objects when a macro changes only imported module BMIs (tasks/active/BUG-164-ccache-module-bmi-macro-staleness.md)
 - `BUG-165` — Asset-import queue tests race worker completion (tasks/active/BUG-165-dropped-geometry-cancellation-test-race.md)
 - `BUG-167` — Hosted Vulkan omits LOP benchmark runtime prerequisites (tasks/active/BUG-167-lop-benchmark-hosted-vulkan-display-routing.md)
+- `BUG-168` — Runtime source move left compile-hotspot physical identities stale (tasks/active/BUG-168-runtime-compile-hotspot-baseline-paths.md)
 
 ## Theme B — Rendering modernization
 
