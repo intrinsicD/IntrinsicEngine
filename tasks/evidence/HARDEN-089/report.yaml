@@ -3,15 +3,15 @@ task_id: HARDEN-089
 workflow_profile: standard
 status: complete
 generated_by: tools/agents/workflow_evidence.py
-generated_at: '2026-09-05T05:36:45Z'
+generated_at: '2026-09-05T05:38:22Z'
 claim_eligible: false
 source:
   base_ref: origin/main
   base_revision: 11479102c15e20fef62869b17368abb5c73e5b25
-  head_revision: cb2f13d52fa334474beb08e349c2d27e3f76b7df
+  head_revision: 47c5714321c28e372f2622238e9e23aee44f8db1
   branch: codex/harden-089-source-doc-cleanup
   worktree: /tmp/intrinsic-audit
-  dirty: true
+  dirty: false
   surface:
   - path: docs/reports/2026-09-05-agent-output-audit.md
     sha256: 5de36dc03520b76e4384d47bc8b62bfa57e610b70ca012134003fe37568a7845
