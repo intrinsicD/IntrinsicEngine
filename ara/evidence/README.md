@@ -27,3 +27,5 @@
   — local non-claim-eligible sequential-Framework24 scalar comparison on
   acute, obtuse, open, and full sculpt fixtures, with the coordinate-unit
   boundary made explicit.
+- [Frog part-segmentation diagnostic](tables/curvature_frog_diagnostic_2026-09-06.md) — exploratory CPU patch-cost and turn-term ablations with sculpt controls; no accepted anatomical-part result.
+- [Feature-boundary objective analysis](diagnostics/curvature_frog_2026-09-06/objective_analysis.json) — conditional merge algebra and a planar edge-turn example; [review and proposed experiment](../../methods/geometry/curvature_segmentation/feature_boundary_review.md).

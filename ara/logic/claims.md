@@ -1743,3 +1743,52 @@
 - **Tags**: geometry, curvature segmentation, runtime publication, Vulkan,
   Xephyr, corner seams, local operational evidence, BUG-163
 - **From staging**: O167
+
+## C57: Frog diagnostic separates patch-count changes from turn-term sensitivity
+- **Statement**: On the external frog OBJ identified by the recorded hash,
+  the direct CPU replay at `9f917c6b2040e363052a4a2901081c463691195b`
+  retains at least 98% of faces in one region when patch cost decreases from
+  0.5 to 0.0025 with the existing turn weight. At Fixed 6 and patch cost 0.05,
+  disabling the turn term changes largest-region size from 18,936 to 3,340
+  of 19,106 faces. The matched Fixed-6 sculpt control returns eight regions.
+- **Status**: supported — bounded exploratory single-run CPU diagnostics,
+  not claim-eligible; no exact two-region UI reproduction, anatomical quality,
+  universal cause, accepted replacement, repeated-run stability, GPU,
+  sanitizer, or performance claim.
+- **Provenance**: ai-executed
+- **Crystallized via**: artifact-commitment
+- **Falsification criteria**: The recorded probe on matching source/input
+  hashes and parameters fails or does not reproduce these region counts and
+  largest-region sizes.
+- **Proof**: [N464,
+  ara/evidence/tables/curvature_frog_diagnostic_2026-09-06.md,
+  ara/evidence/diagnostics/curvature_frog_2026-09-06/results.json]
+- **Dependencies**: [C45, C56]
+- **Tags**: geometry, curvature segmentation, CPU, exploratory diagnosis
+- **From staging**: O172
+
+## C58: Conditional boundary-deletion and edge-turn representation examples
+- **Statement**: For two regions sharing a minimizing GMM component, removing
+  their isolated fully soft-supported closed interface with no hard edge and
+  turning disabled changes METHOD-039 energy by `-beta + 0.01 L`. At runtime
+  `beta=0.5`, deletion is favored for normalized length `L < 50`. On a fixed
+  planar unit square, the recorded n-segment sawtooth has distance to the
+  horizontal line bounded by `1/(n sqrt(2))` while its weighted intrinsic-turn
+  sum is `0.001 n(n-1)(pi/2)^2`.
+- **Status**: supported — conditional algebra and formula-level numerical
+  evaluation only. No C++ replay, universal mesh-convergence refutation,
+  measured frog merge classification, quality improvement, accepted objective,
+  performance, GPU, or sanitizer claim. The turn formula correctly measures a
+  jagged curve; Hausdorff convergence alone does not imply bending convergence.
+- **Provenance**: ai-executed
+- **Crystallized via**: artifact-commitment
+- **Falsification criteria**: Under the stated assumptions the source energy
+  yields a different merge delta, or the specified planar path has different
+  normalized lengths, turns, distance bound, or resulting sum.
+- **Proof**: [N466,
+  methods/geometry/curvature_segmentation/feature_boundary_review.md,
+  ara/evidence/diagnostics/curvature_frog_2026-09-06/objective_analysis.json,
+  src/geometry/Geometry.HalfedgeMesh.CurvatureSegmentation.Patches.cpp]
+- **Dependencies**: []
+- **Tags**: geometry, curvature segmentation, analytical example, representation
+- **From staging**: O174

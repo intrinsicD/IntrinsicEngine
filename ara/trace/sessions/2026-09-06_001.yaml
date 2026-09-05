@@ -1,0 +1,106 @@
+session:
+  id: 2026-09-06_001
+  date: '2026-09-06'
+  started: 2026-09-06T00:10+02:00
+  last_turn: 2026-09-06T01:30+02:00
+  turn_count: 2
+  summary: Diagnosed frog undersegmentation, clarified the geometric-region goal, and reviewed a
+    boundary-first METHOD-040 experiment; preserved CPU and analytical evidence without adopting a replacement.
+events_logged:
+- turn: 1
+  type: question
+  id: N463
+  routing: direct
+  provenance: user
+  summary: Confirm legs/body/head target and report default frog failure.
+- turn: 1
+  type: experiment
+  id: N464
+  routing: direct
+  provenance: ai-executed
+  summary: Patch-cost and turn-term ablations with sculpt control.
+- turn: 1
+  type: observation
+  id: O171
+  routing: staged
+  provenance: user
+  summary: Desired object-part behavior.
+- turn: 1
+  type: claim
+  id: O172
+  routing: crystallized
+  provenance: ai-executed
+  summary: C57 records bounded numerical replay facts used by the diagnostic report.
+- turn: 1
+  type: observation
+  id: O173
+  routing: staged
+  provenance: ai-suggested
+  summary: Part-oriented boundary objective and completion are proposed, not adopted.
+- turn: 2
+  type: decision
+  id: N465
+  routing: direct
+  provenance: user-revised
+  summary: Useful geometric regions, without requiring perfect anatomy; review existing shortlist.
+- turn: 2
+  type: experiment
+  id: N466
+  routing: direct
+  provenance: ai-executed
+  summary: Evaluate conditional merge delta and planar sawtooth turn formula.
+- turn: 2
+  type: claim
+  id: O174
+  routing: crystallized
+  provenance: ai-executed
+  summary: C58 binds only the analytical examples used in the review.
+- turn: 2
+  type: observation
+  id: O175
+  routing: staged
+  provenance: ai-suggested
+  summary: Boundary-first multicut adaptation remains a proposed experiment.
+ai_actions:
+- turn: 1
+  action: Built temporary probes against existing ci Clang-23 libraries, ran fourteen configurations,
+    inspected source, and read primary papers. Preserved exact probe sources and raw results; no engine
+    edit or remote publication. A diagnostic plot was generated in /tmp but image-tool transport failed,
+    so no visual quality assertion rests on it.
+  provenance: ai-executed
+  files_changed:
+  - ara/evidence/tables/curvature_frog_diagnostic_2026-09-06.md
+  - ara/evidence/diagnostics/curvature_frog_2026-09-06/results.json
+- turn: 2
+  action: Re-read primary literature and the source objective, calculated analytical examples, wrote the
+    dated review, and updated METHOD-040 planning. No candidate segmentation run, engine source edit,
+    objective freeze, or adoption.
+  provenance: ai-executed
+  files_changed:
+  - methods/geometry/curvature_segmentation/feature_boundary_review.md
+  - methods/geometry/curvature_segmentation/README.md
+  - tasks/backlog/methods/METHOD-040-global-multicut-curvature-patch-reference.md
+  - tasks/backlog/README.md
+  - ara/evidence/diagnostics/curvature_frog_2026-09-06/objective_analysis.json
+claims_touched:
+- id: C57
+  action: created
+  turn: 1
+- id: C58
+  action: created
+  turn: 2
+key_context:
+- turn: 1
+  excerpt: 'User: yes i did use the default settings... and yes i expected to get those parts somehow'
+- turn: 2
+  excerpt: 'User: i dont really expect perfect semantic or object part segmentation. but still something
+    that would definitely be much more meaningfull'
+open_threads:
+- Reconcile the direct CPU five-region replay with the reported two-region live result before claiming
+  exact reproduction.
+- Freeze the proposed METHOD-040 graph, costs, solver, comparison cohort, and numeric gates before
+  implementation and integrated execution. N465 clarifies that semantic labels are not a prerequisite.
+- Investigate region-pair hard-role reporting separately from actual source feature masks.
+ai_suggestions_pending:
+- O175 proposes a Zhuang-inspired boundary-first comparison; no quality result or exact formulation
+  is adopted. Preserve O173 as the earlier, more anatomical suggestion rather than silently promoting it.

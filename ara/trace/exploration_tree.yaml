@@ -10807,3 +10807,61 @@ tree:
       - "tasks/backlog/bugs/BUG-097-progressive-model-scene-zero-uv-atlas.md"
       - "src/runtime/AssetWorkflow/Runtime.AssetWorkflowModelMaterialization.cpp"
     status: resolved
+  - id: N463
+    type: question
+    title: Explain frog undersegmentation relative to desired object parts
+    provenance: user
+    timestamp: 2026-09-06T00:10+02:00
+    description: Operator endorses sculpt result, reports two frog regions with defaults, and confirms legs/body/head
+      as desired parts. Wants extremal-feature paths, completion between isolated features, and meaningful
+      merging.
+    status: open
+  - id: N464
+    type: experiment
+    title: Separate patch-count penalty from boundary-turn bias on frog
+    provenance: ai-executed
+    timestamp: 2026-09-06T00:10+02:00
+    result: Fourteen public-geometry CPU rows compare frog/sculpt, Automatic/Fixed 6, three patch penalties,
+      and two zero-turn ablations. Frog remains dominated by one region under patch-cost reduction alone;
+      the fixed-six zero-turn ablation changes the spatial distribution. Exact user two-region UI result
+      and anatomical quality remain unverified.
+    evidence:
+    - ara/evidence/tables/curvature_frog_diagnostic_2026-09-06.md
+    - ara/evidence/diagnostics/curvature_frog_2026-09-06/results.json
+    also_depends_on:
+    - N463
+    status: resolved
+  - id: N465
+    type: decision
+    title: Revisit feature-aligned boundaries for useful geometric regions
+    provenance: user-revised
+    timestamp: 2026-09-06T01:30+02:00
+    choice: Review the existing literature and METHOD-039 objective with meaningful connected geometric
+      regions as the target. Perfect semantic or anatomical parts are not required. The dated review and
+      METHOD-040 planning update record this bounded direction; no replacement implementation or quality
+      verdict is claimed.
+    alternatives:
+    - Treat legs/body/head examples as mandatory semantic ground truth.
+    - Retune current defaults without examining their objective.
+    evidence:
+    - N463
+    - N464
+    - methods/geometry/curvature_segmentation/feature_boundary_review.md
+    - tasks/backlog/methods/METHOD-040-global-multicut-curvature-patch-reference.md
+    status: resolved
+  - id: N466
+    type: experiment
+    title: Evaluate two analytical boundary-objective examples
+    provenance: ai-executed
+    timestamp: 2026-09-06T01:30+02:00
+    result: For same-component adjacent regions with an isolated fully supported interface and turning disabled,
+      merge delta is -beta+0.01L; runtime beta=0.5 favors removing L<50. On a fixed planar square, a sawtooth
+      curve approaches a line while raw edge-turn cost grows as 0.001*n*(n-1)*(pi/2)^2. Formula-level calculations
+      only, not a C++ run or a new segmentation-quality result.
+    evidence:
+    - ara/evidence/diagnostics/curvature_frog_2026-09-06/objective_analysis.json
+    - methods/geometry/curvature_segmentation/feature_boundary_review.md
+    also_depends_on:
+    - N464
+    - N465
+    status: resolved

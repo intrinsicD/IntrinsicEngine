@@ -15,6 +15,9 @@ killing order, profiling lanes, and validated analytic controls are in
 backend and changed no production default. METHOD-039 consumed those immutable
 controls but rejected its seed-sensitive local patch formulation; METHOD-040
 owns the next task-local global-partition attempt.
+The [feature-boundary objective review](feature_boundary_review.md) relates the
+frog/sculpt diagnostic to the clarified goal of meaningful geometric patches
+and proposes the next comparison; no replacement is accepted by that review.
 
 METHOD-039 Slices A--C freeze that follow-up's equations, numeric screening
 parameters, fail-closed supplied-evidence shape, and generated oracle and

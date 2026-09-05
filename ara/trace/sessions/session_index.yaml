@@ -335,3 +335,13 @@ sessions:
     events_count: 2
     claims_touched: []
     open_threads: 2
+  - id: 2026-09-06_001
+    date: '2026-09-06'
+    summary: Frog diagnosis and clarified geometric-patch review; proposed boundary-first METHOD-040 experiment,
+      no replacement adopted.
+    turn_count: 2
+    events_count: 9
+    claims_touched:
+    - C57
+    - C58
+    open_threads: 3

@@ -3122,3 +3122,83 @@ observations:
     promoted_to: null
     crystallized_via: null
     stale: false
+  - id: O171
+    timestamp: 2026-09-06T00:10+02:00
+    provenance: user
+    content: Desired segmentation includes legs, body, and head; seams should follow or connect salient
+      extremal-curvature regions, and fragmented patches should merge into meaningful larger parts. Sculpt
+      already matches the operator intent; frog with defaults does not.
+    context: User-confirmed target, not ground-truth labels or authorization to replace METHOD-039.
+    potential_type: constraint
+    bound_to:
+    - N463
+    promoted: false
+    promoted_to: null
+    crystallized_via: null
+    stale: false
+  - id: O172
+    timestamp: 2026-09-06T00:10+02:00
+    provenance: ai-executed
+    content: Bounded frog replay under patch-cost reduction retains at least 98% of faces in one region.
+      With Fixed 6 and patch cost 0.05, disabling the turn term changes largest-region size from 18936 to
+      3340 faces.
+    context: Exact source/input hashes and probe sources are preserved in the diagnostic report. Only raw
+      replay facts are committed to the report; no anatomical or performance interpretation is accepted.
+    potential_type: claim
+    bound_to:
+    - N464
+    promoted: true
+    promoted_to: logic/claims.md:C57
+    crystallized_via: artifact-commitment
+    stale: false
+  - id: O173
+    timestamp: 2026-09-06T00:10+02:00
+    provenance: ai-suggested
+    content: Repairing the boundary objective and explicitly modeling part salience, contour completion,
+      and optionally thickness is a better next experiment than reducing curvature thresholds or assuming
+      METHOD-040 multicut alone will produce anatomical parts.
+    context: Source audit, bounded parameter ablations, and primary-source literature motivate this candidate
+      direction. User has not endorsed the replacement formulation; disabling turn regularization is an
+      ablation, not a selected fix.
+    potential_type: heuristic
+    bound_to:
+    - N463
+    - N464
+    promoted: false
+    promoted_to: null
+    crystallized_via: null
+    stale: false
+  - id: O174
+    timestamp: 2026-09-06T01:30+02:00
+    provenance: ai-executed
+    content: The recorded same-component isolated-loop example favors deleting a fully supported boundary
+      of normalized length below 50 at runtime beta=0.5. The recorded fixed-support sawtooth has decreasing
+      distance to a line but increasing raw turn cost. Both statements are conditional analytical consequences
+      of the current objective.
+    context: The revised review depends on these bounded formula results; neither is a C++ execution, universal
+      frog explanation, or accepted fix.
+    potential_type: claim
+    bound_to:
+    - N466
+    promoted: true
+    promoted_to: logic/claims.md:C58
+    crystallized_via: artifact-commitment
+    stale: false
+  - id: O175
+    timestamp: 2026-09-06T01:30+02:00
+    provenance: ai-suggested
+    content: Test a boundary-first signed-cost multicut with fixed existing feature evidence, joint contour
+      completion, and GMM labels as diagnostics. Begin isotropically on face-dual nodes, then freeze a separate
+      anisotropic variant; assess geometry, fragmentation, and stability rather than region count.
+    context: Proposed METHOD-040 experiment, adapted rather than an exact reproduction of Zhuang. User authorized
+      revisiting the shortlist and clarified the geometric target; the exact objective, solver, and parameters
+      are not frozen or user-endorsed. O171 remains the earlier example target; N465 relaxes perfect anatomical
+      segmentation as a requirement. O173 is not promoted as a semantic/thickness requirement.
+    potential_type: heuristic
+    bound_to:
+    - N465
+    - N466
+    promoted: false
+    promoted_to: null
+    crystallized_via: null
+    stale: false

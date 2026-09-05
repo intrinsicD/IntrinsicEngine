@@ -17,11 +17,13 @@ maturity_target: CPUContracted
 # METHOD-040 — Global multicut curvature-patch CPU reference
 
 ## Goal
-- Replace METHOD-039's seed-sensitive greedy region-merging decision with the
-  smallest task-local global-partition formulation that preserves its hard
-  feature constraints and continuous signed-curvature intent, then accept a
-  CPU reference only if it passes the already frozen oracle, topology, and
-  seed/diagonal/scale/noise stability gates.
+- Compute meaningful connected geometric patches by jointly selecting salient
+  feature segments and their completing boundaries. Replace METHOD-039's
+  seed-sensitive local partitioning with the smallest task-local multicut
+  candidate that preserves hard features and uses surface-curvature evidence;
+  statistical curvature-class coherence is not itself the patch definition.
+  Accept a CPU reference only if it passes the already frozen oracle, topology,
+  and seed/diagonal/scale/noise stability gates plus the declared quality cohort.
 
 ## Non-goals
 - No novelty or publishability claim. This is a practical synthesis of
@@ -38,9 +40,15 @@ maturity_target: CPUContracted
   claim. A positive CPU-contract verdict must open a separate adoption task.
 
 ## Context
-- METHOD-040 remains paused behind `REVIEW-004`. The explicit user direction
-  that completed METHOD-039 on 2026-09-03 was scoped to that bounded negative-
-  result retirement and does not authorize this next research slice.
+- The operator explicitly authorized a bounded literature/objective review on
+  2026-09-06 after the frog/sculpt diagnostic, clarifying that useful geometric
+  regions are required but perfect semantic/anatomical parts are not. The
+  [review](../../../methods/geometry/curvature_segmentation/feature_boundary_review.md)
+  records the proposed boundary-first objective and comparison plan. This is a
+  scoped planning exception to the Theme J focus; implementation remains queued
+  behind `REVIEW-004`, and this review does not claim an objective freeze or a
+  positive candidate result. The earlier 2026-09-03 exception covered only
+  METHOD-039's negative-result retirement.
 - METHOD-039's standalone feature detector and local patch reference are
   independently executable. The local solver passes the frozen supplied-
   oracle catalog, the mandatory hard-fold and computed smooth-transition/
@@ -94,11 +102,14 @@ maturity_target: CPUContracted
 | End-to-end tests | Not applicable before adoption. This task owns geometry CPU correctness, exact-small-graph, stability, and fail-closed controls only. |
 
 ## Slice plan
-- **Slice A — Primary-source intake and objective freeze.** Determine whether
-  the regional/turning objective has an exact multicut representation; freeze
-  graph atoms, signed costs, hard constraints, solver identity, tie-breaking,
-  failure behavior, fixtures, metrics, and killing thresholds before reading a
-  new integrated result.
+- **Slice A — Primary-source intake and objective freeze.** Use the dated
+  feature-boundary review as the proposed direction: a new signed boundary-cost
+  objective, with regional GMM/turning energy reported only as diagnostics.
+  Freeze graph atoms, isotropic then separately specified anisotropic costs,
+  hard constraints, solver identity, tie-breaking, failure behavior, fixtures,
+  quality cohort, metrics, and killing thresholds before integrated execution.
+  State explicitly how face-dual/source-edge boundaries differ from Zhuang's
+  vertex-graph/within-triangle formulation; do not claim equivalence.
 - **Slice B — Exact bounded oracle.** Implement a task-local exhaustive or
   branch-and-bound solver for tiny RAGs and use it to validate objective
   assembly, hard constraints, label-permutation invariance, and every accepted
@@ -119,7 +130,8 @@ maturity_target: CPUContracted
       only.
 - [ ] Freeze initialization-independent graph atoms. Hard-feature transitions
       must be fixed cuts; no atomic node may straddle a hard feature.
-- [ ] Freeze signed join/cut costs, complexity prior, numerical tolerances,
+- [ ] Freeze signed join/cut costs, the presence or absence of a complexity
+      prior, numerical tolerances,
       stable ordering, and infeasibility/non-finite statuses before integrated
       execution. Do not tune against the known perturbed-seed output.
 - [ ] Implement a tiny-graph exact oracle and enumerate all feasible
@@ -159,6 +171,11 @@ maturity_target: CPUContracted
       invalid-cost, and solver-limit inputs fail closed without partial output.
 - [ ] A bounded health cohort confirms sparse storage and reports work/timing
       diagnostics without making a performance claim.
+- [ ] Add the review's equal-curvature/strong-contour, broken-contour completion,
+      unrelated-fragment, and zigzag representation controls. Freeze a quality
+      cohort containing sculpt, the known frog counterexample, and additional
+      held-out meshes; assess feature/closure length, area distribution,
+      fragmentation, and matching-view overlays rather than region count alone.
 
 ## Docs
 - [ ] Record citations, the exact chosen objective, units, solver contract,

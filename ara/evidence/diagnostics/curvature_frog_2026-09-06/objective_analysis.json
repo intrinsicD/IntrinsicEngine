@@ -1,0 +1,62 @@
+{
+  "kind": "analytic_planar_polyline_counterexample",
+  "definition": "The support is a fixed unit square, D=sqrt(2). For even n>=8, p_i=(i/n, 0.5+(i%2)/n), i=0..n. All n-1 interior turns are pi/2. Each edge length/D is 1/n. The curve approaches y=0.5 with normalized Hausdorff distance <=1/(n*sqrt(2)).",
+  "formula": "G=n*(n-1)*(pi/2)^2",
+  "rows": [
+    {
+      "segments": 8,
+      "normalized_distance_bound": 0.08838834764831843,
+      "normalized_length": 1.0,
+      "turn_energy_sum": 138.174461615251,
+      "weighted_turn_cost": 0.13817446161525102
+    },
+    {
+      "segments": 16,
+      "normalized_distance_bound": 0.044194173824159216,
+      "normalized_length": 1.0,
+      "turn_energy_sum": 592.1762640653615,
+      "weighted_turn_cost": 0.5921762640653615
+    },
+    {
+      "segments": 32,
+      "normalized_distance_bound": 0.022097086912079608,
+      "normalized_length": 1.0,
+      "turn_energy_sum": 2447.6618914701608,
+      "weighted_turn_cost": 2.447661891470161
+    },
+    {
+      "segments": 64,
+      "normalized_distance_bound": 0.011048543456039804,
+      "normalized_length": 1.0,
+      "turn_energy_sum": 9948.561236298074,
+      "weighted_turn_cost": 9.948561236298072
+    },
+    {
+      "segments": 128,
+      "normalized_distance_bound": 0.005524271728019902,
+      "normalized_length": 1.0,
+      "turn_energy_sum": 40110.07228602715,
+      "weighted_turn_cost": 40.110072286027155
+    }
+  ],
+  "limits": "Formula-level counterexample for representing a smooth seam by a zigzag source-edge path on a fixed planar support; no C++ solver execution. The formula correctly measures the jagged curve. Hausdorff convergence alone does not imply curvature-energy convergence; this does not refute convergence for sufficiently smooth curve approximations.",
+  "source_commit": "9f917c6b2040e363052a4a2901081c463691195b",
+  "source_paths": [
+    "src/geometry/Geometry.HalfedgeMesh.CurvatureSegmentation.Patches.cpp"
+  ],
+  "same_component_merge_example": {
+    "assumptions": [
+      "Two adjacent regions share a minimizing GMM component.",
+      "The only removed interface is a shared isolated closed contour, with no hard edges and soft confidence one.",
+      "Turning is disabled; no other boundary term changes."
+    ],
+    "normalized_boundary_length": "L = length / D",
+    "merge_delta": "-beta + 0.01*L",
+    "runtime_beta": 0.5,
+    "runtime_removed_if_L_less_than": 50,
+    "reference_beta": 0.0025,
+    "reference_removed_if_L_less_than": 0.25
+  },
+  "reproduction_python": "import math\nfor n in (8,16,32,64,128):\n    G = n*(n-1)*(math.pi/2)**2\n    print(n, 1/(n*math.sqrt(2)), G, 0.001*G)\nfor beta in (0.5,0.0025):\n    print(beta, beta/0.01)\n",
+  "review": "methods/geometry/curvature_segmentation/feature_boundary_review.md"
+}
