@@ -1,8 +1,11 @@
 # Proposal: Pair-programmer workflow redesign
 
-Status: **proposal, not yet policy**. `AGENTS.md` remains authoritative until an
-accepted follow-up change lands. This document proposes the replacement shape,
-the migration path, and the open decisions.
+Status: **landed as policy** (2026-08-14, PR #1032). The operator accepted all
+five open decisions (§10) and all three migration PRs (§11) shipped.
+`AGENTS.md` and [`docs/agent/prompt/prompt.md`](../prompt/prompt.md) are the
+authoritative contract and behavior documents; this file is retained as the
+design rationale and migration record behind them. Where this document and the
+shipped policy disagree, the shipped policy wins.
 
 ## 1. Verdict
 
