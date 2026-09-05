@@ -9,6 +9,7 @@ picking backlog work; theme priorities and rationale live in
 ## Active tasks
 
 - `BUG-164` — ccache serves stale objects when a macro changes only imported module BMIs (tasks/active/BUG-164-ccache-module-bmi-macro-staleness.md)
+- `BUG-167` — LOP benchmark positive runs outside hosted Vulkan display (tasks/active/BUG-167-lop-benchmark-hosted-vulkan-display-routing.md)
 
 ## Theme B — Rendering modernization
 
