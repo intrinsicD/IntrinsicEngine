@@ -323,8 +323,8 @@ sessions:
     open_threads: 3
   - id: "2026-09-04_001"
     date: "2026-09-04"
-    summary: "Implemented the exact-preserving curvature acceleration sequence with matched timing and payload evidence, then verified and published the Clang 20 GLM-module compatibility fixes from a fresh cache-disabled build."
-    turn_count: 2
-    events_count: 5
+    summary: "Implemented exact-preserving curvature acceleration, published the Clang 20 compatibility fixes, and committed a deterministic BUG-165 queue-test barrier locally pending authorized GitHub publication."
+    turn_count: 3
+    events_count: 6
     claims_touched: []
-    open_threads: 3
+    open_threads: 4

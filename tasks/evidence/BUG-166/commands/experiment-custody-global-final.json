@@ -1,0 +1,23 @@
+{
+  "command": [
+    "python3",
+    "tools/agents/experiment_custody.py",
+    "validate",
+    "--root",
+    "."
+  ],
+  "command_display": "python3 tools/agents/experiment_custody.py validate --root .",
+  "cwd": ".",
+  "duration_ms": 2017,
+  "exit_code": 0,
+  "finished_at": "2026-09-04T23:47:56Z",
+  "label": "experiment-custody-global-final",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-09-04T23:47:54Z",
+  "stderr_path": "tasks/evidence/BUG-166/commands/experiment-custody-global-final.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/BUG-166/commands/experiment-custody-global-final.stdout.log",
+  "stdout_sha256": "95f871560fef477e393a2de3effd63ab82ee2d988a6fe3fd778df035bfadd123",
+  "task_id": "BUG-166"
+}

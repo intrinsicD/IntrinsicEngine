@@ -123,6 +123,7 @@ READBACK_TARGET = "IntrinsicRuntimeGpuResultReadbackSmokeTests"
 FRAME_LOOP_SOURCE = "Test.RuntimeFrameLoopContract.cpp"
 GROUPED_PURE_CTEST_TARGETS = frozenset(
     {
+        "IntrinsicGeometryCurvatureTests",
         "IntrinsicGeometryTests",
         "IntrinsicGeometryMethodTests",
         "IntrinsicGraphicsBufferTransferTests",

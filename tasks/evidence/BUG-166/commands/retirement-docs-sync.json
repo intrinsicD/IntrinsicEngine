@@ -1,0 +1,26 @@
+{
+  "command": [
+    "python3",
+    "tools/docs/check_docs_sync.py",
+    "--root",
+    ".",
+    "--diff-mode",
+    "--base-ref",
+    "origin/main",
+    "--strict"
+  ],
+  "command_display": "python3 tools/docs/check_docs_sync.py --root . --diff-mode --base-ref origin/main --strict",
+  "cwd": ".",
+  "duration_ms": 38,
+  "exit_code": 0,
+  "finished_at": "2026-09-04T23:56:45Z",
+  "label": "retirement-docs-sync",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-09-04T23:56:45Z",
+  "stderr_path": "tasks/evidence/BUG-166/commands/retirement-docs-sync.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/BUG-166/commands/retirement-docs-sync.stdout.log",
+  "stdout_sha256": "f310dd670f2ed1dfbe22c900484866106c85bd0eceeaa6d77c9a971aa2f2e3de",
+  "task_id": "BUG-166"
+}

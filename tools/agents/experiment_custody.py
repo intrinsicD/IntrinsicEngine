@@ -22,6 +22,7 @@ from workflow_evidence import (  # noqa: E402
     SCHEMA_VERSION,
     _append_jsonl,
     _atomic_write,
+    artifact_entry_at_revision,
     blob_at_revision,
     find_task,
     git,
@@ -31,7 +32,6 @@ from workflow_evidence import (  # noqa: E402
     repo_root_from,
     resolve_repo_path,
     sha256_bytes,
-    sha256_at_revision,
     sha256_file,
     strict_json_load,
     strict_yaml_load,
@@ -189,6 +189,49 @@ def _claim_source_revision(record: dict[str, Any]) -> str | None:
     return revision
 
 
+def _clean_input_source_revision(
+    repo_root: Path,
+    record: dict[str, Any],
+    location: str,
+    errors: list[str],
+) -> str | None:
+    """Resolve the fixed commit that owns clean declared experiment inputs."""
+    source = record.get("source")
+    if not isinstance(source, dict) or source.get("clean") is not True:
+        return None
+    revision = source.get("revision")
+    if not isinstance(revision, str) or not re.fullmatch(r"[0-9a-f]{40}", revision):
+        errors.append(f"{location}.revision must be an exact 40-hex clean commit")
+        return None
+    probe = subprocess.run(
+        ["git", "-C", str(repo_root), "cat-file", "-e", f"{revision}^{{commit}}"],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        check=False,
+    )
+    if probe.returncode != 0:
+        errors.append(f"{location}.revision does not resolve to a commit")
+        return None
+    ancestor = subprocess.run(
+        [
+            "git",
+            "-C",
+            str(repo_root),
+            "merge-base",
+            "--is-ancestor",
+            revision,
+            "HEAD",
+        ],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        check=False,
+    )
+    if ancestor.returncode != 0:
+        errors.append(f"{location}.revision is not an ancestor of HEAD")
+        return None
+    return revision
+
+
 def _has_valid_historical_rejected_task_seal(
     repo_root: Path,
     run_root: Path,
@@ -265,18 +308,24 @@ def _validate_sealed_file(
     expected = entry.get("sha256")
     if source_revision is not None:
         try:
-            actual = sha256_at_revision(repo_root, source_revision, value)
+            historical = artifact_entry_at_revision(
+                repo_root, source_revision, value
+            )
         except ValueError as exc:
             errors.append(f"{location}: {exc}")
             return
-        if actual is None:
+        if historical is None:
             errors.append(
-                f"{location}: {value} is missing from claim-eligible source revision"
+                f"{location}: {value} is missing from clean source revision"
             )
-        elif actual != expected:
+        elif historical.kind != "file":
             errors.append(
-                f"{location}: {value} hash differs from claim-eligible source revision "
-                f"(expected {expected}, got {actual})"
+                f"{location}: {value} is not a regular file in clean source revision"
+            )
+        elif historical.digest != expected:
+            errors.append(
+                f"{location}: {value} hash differs from clean source revision "
+                f"(expected {expected}, got {historical.digest})"
             )
         return
     try:
@@ -302,7 +351,9 @@ def validate_protocol_data(
     require_frozen: bool,
 ) -> list[str]:
     errors: list[str] = []
-    source_revision = _claim_source_revision(protocol)
+    source_revision = _clean_input_source_revision(
+        repo_root, protocol, "source", errors
+    )
     missing = sorted(PROTOCOL_REQUIRED - protocol.keys())
     if missing:
         errors.append(f"missing protocol fields: {', '.join(missing)}")
@@ -644,7 +695,10 @@ def _validate_run_bindings(
     repo_root: Path, run_root: Path, run: dict[str, Any]
 ) -> list[str]:
     errors: list[str] = []
-    source_revision = _claim_source_revision(run)
+    source_revision = _clean_input_source_revision(
+        repo_root, run, "run.source", errors
+    )
+    claim_source_revision = _claim_source_revision(run)
     missing = sorted(RUN_REQUIRED - run.keys())
     if missing:
         errors.append(f"run missing fields: {', '.join(missing)}")
@@ -690,7 +744,7 @@ def _validate_run_bindings(
         if (
             sha256_file(task_path) != run.get("task_sha256")
             and not _has_valid_historical_rejected_task_seal(
-                repo_root, run_root, run, protocol, source_revision
+                repo_root, run_root, run, protocol, claim_source_revision
             )
         ):
             errors.append("task changed after official run initialization")
@@ -1123,10 +1177,16 @@ def _validate_bundle_path(
 
     if source_revision is not None:
         try:
-            historical = sha256_at_revision(repo_root, source_revision, value)
+            historical = artifact_entry_at_revision(
+                repo_root, source_revision, value
+            )
         except ValueError:
             historical = None
-        if historical == expected:
+        if (
+            historical is not None
+            and historical.kind == "file"
+            and historical.digest == expected
+        ):
             return None
     return current_error
 
@@ -1265,7 +1325,10 @@ def _validate_bundle(
             )
         except (KeyError, TypeError, ValueError) as exc:
             errors.append(f"gates[{index}] cannot be recomputed: {exc}")
-    source_revision = _claim_source_revision(run)
+    source_revision_errors: list[str] = []
+    source_revision = _clean_input_source_revision(
+        repo_root, run, "run.source", source_revision_errors
+    )
     for index, entry in enumerate(bundle.get("links", [])):
         value = entry.get("path") if isinstance(entry, dict) else None
         error = _validate_bundle_path(

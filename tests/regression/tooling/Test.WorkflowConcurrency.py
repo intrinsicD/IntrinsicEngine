@@ -1105,9 +1105,19 @@ class WorkflowConcurrencyTests(unittest.TestCase):
         )
         operational_regex = env.get("VULKAN_OPERATIONAL_TEST_REGEX")
         self.assertIsInstance(operational_regex, str)
+        self.assertIn("\n            glslc \\\n", vulkan)
+        self.assertIn("glslc --version", vulkan)
         self.assertIn(
             r"GpuResultReadbackGpuSmoke\."
             "SharedBatchParksJobAndReleasesDerivedUpload",
+            operational_regex,
+        )
+        self.assertIn(
+            r"IntrinsicLopFamilyGpuBenchmarkSmoke\.(Run|Validate)",
+            operational_regex,
+        )
+        self.assertNotIn(
+            "UnavailableEnvironmentFailsClosed",
             operational_regex,
         )
 
@@ -1117,7 +1127,7 @@ class WorkflowConcurrencyTests(unittest.TestCase):
             2,
         )
         self.assertIn(
-            'if [[ "$operational_test_count" -ne 3 ]]',
+            'if [[ "$operational_test_count" -ne 5 ]]',
             vulkan,
         )
         self.assertIn(

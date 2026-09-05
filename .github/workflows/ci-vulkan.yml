@@ -20,7 +20,7 @@ jobs:
     runs-on: ubuntu-24.04
     env:
       VULKAN_READBACK_TEST: GpuResultReadbackGpuSmoke.SharedBatchParksJobAndReleasesDerivedUpload
-      VULKAN_OPERATIONAL_TEST_REGEX: '^(ExtrinsicSandbox\.(FramePacingDiagnosticCapture|VulkanShutdownLsanContract)|GpuResultReadbackGpuSmoke\.SharedBatchParksJobAndReleasesDerivedUpload)$'
+      VULKAN_OPERATIONAL_TEST_REGEX: '^(ExtrinsicSandbox\.(FramePacingDiagnosticCapture|VulkanShutdownLsanContract)|GpuResultReadbackGpuSmoke\.SharedBatchParksJobAndReleasesDerivedUpload|IntrinsicLopFamilyGpuBenchmarkSmoke\.(Run|Validate))$'
 
     steps:
       - name: Checkout
@@ -34,6 +34,7 @@ jobs:
             ninja-build \
             clang-20 \
             clang-tools-20 \
+            glslc \
             python3 \
             libx11-dev \
             libxcursor-dev \
@@ -50,6 +51,7 @@ jobs:
             vulkan-tools \
             spirv-tools \
             xvfb
+          glslc --version
 
       - name: Cache vcpkg binary packages
         id: vcpkg-cache
@@ -92,7 +94,9 @@ jobs:
       # capability-truthful executables. Repeated `-L` arguments are an
       # intersection. The readback remains `slow`, is built explicitly outside
       # the fast aggregate, and joins the two Sandbox contracts in the
-      # operational lavapipe/Xvfb batch below.
+      # operational lavapipe/Xvfb batch below. The positive LOP-family
+      # benchmark and validator also require that display; its explicit
+      # unavailable-environment regression remains in this displayless batch.
       - name: Run gpu;vulkan opt-in fixtures
         run: |
           python3 tools/ci/check_prerequisites.py test-binaries \
@@ -116,8 +120,8 @@ jobs:
             -R "$VULKAN_OPERATIONAL_TEST_REGEX" \
             -L "gpu" -L "vulkan" \
             | python3 -c 'import json, sys; print(len(json.load(sys.stdin).get("tests", [])))')"
-          if [[ "$operational_test_count" -ne 3 ]]; then
-            echo "Expected two Sandbox contracts and the readback smoke, found $operational_test_count" >&2
+          if [[ "$operational_test_count" -ne 5 ]]; then
+            echo "Expected two Sandbox contracts, the readback smoke, and the LOP benchmark pair; found $operational_test_count" >&2
             exit 1
           fi
           operational_junit="${GITHUB_WORKSPACE}/build/ci-vulkan/ci-timing/result/operational-vulkan.junit.xml"

@@ -477,7 +477,6 @@ set(_geometry_test_files
     Test.CornerTexcoords.cpp
     Test_Validation.cpp
     Test_Curvature.cpp
-    Test.CurvatureTensor.cpp
     Test_Raycast.cpp
     Test_GeometryQueries.cpp
     Test_PcaPrimitives.cpp
@@ -525,6 +524,22 @@ intrinsic_test_object_lib(GeometryTestObjs
     DEPS ExtrinsicCore IntrinsicGeometry
 )
 target_compile_definitions(GeometryTestObjs PRIVATE
+    INTRINSIC_TEST_SUPPORT_DIR="${CMAKE_CURRENT_SOURCE_DIR}/support"
+)
+
+# Curvature tensor and segmentation cases stay in the required pure cohort,
+# but run in their own process so the sanitizer wrapper keeps its bounded
+# 120-second hang-detection budget as the broader geometry suite grows.
+intrinsic_resolve_test_sources(_geometry_curvature_test_sources
+    SEARCH_DIRS unit/geometry
+    FILES Test.CurvatureTensor.cpp
+)
+intrinsic_test_object_lib(GeometryCurvatureTestObjs
+    SOURCES
+        ${_geometry_curvature_test_sources}
+    DEPS ExtrinsicCore IntrinsicGeometry
+)
+target_compile_definitions(GeometryCurvatureTestObjs PRIVATE
     INTRINSIC_TEST_SUPPORT_DIR="${CMAKE_CURRENT_SOURCE_DIR}/support"
 )
 
@@ -1202,6 +1217,21 @@ if(INTRINSIC_GROUP_PURE_CTEST)
     intrinsic_grouped_test(
         IntrinsicGeometryTests.Grouped
         IntrinsicGeometryTests
+        FILTER "*"
+        LABELS unit geometry
+    )
+endif()
+
+intrinsic_test_executable(IntrinsicGeometryCurvatureTests
+    OBJECTS GeometryCurvatureTestObjs
+    LINK_LIBS ExtrinsicCore IntrinsicGeometry
+    LABELS unit geometry
+    ${_intrinsic_pure_ctest_registration}
+)
+if(INTRINSIC_GROUP_PURE_CTEST)
+    intrinsic_grouped_test(
+        IntrinsicGeometryCurvatureTests.Grouped
+        IntrinsicGeometryCurvatureTests
         FILTER "*"
         LABELS unit geometry
     )

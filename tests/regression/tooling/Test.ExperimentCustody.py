@@ -69,6 +69,8 @@ class ExperimentFixture:
         *,
         profile: str = "claim-grade",
         claim_eligible: bool = False,
+        evidence_phase: str = "confirmation",
+        source_clean: bool | None = None,
     ):
         self.repo = root
         git(root, "init", "-q")
@@ -151,7 +153,7 @@ true
             "question": "Does the synthetic score remain bounded?",
             "hypothesis": "Mean score is at most two.",
             "claim_boundary": "Synthetic fixture only.",
-            "evidence_phase": "confirmation",
+            "evidence_phase": evidence_phase,
             "claim_eligible": claim_eligible,
             "datasets": [
                 {
@@ -195,7 +197,7 @@ true
             "blockers": [],
             "source": {
                 "revision": self.source_revision,
-                "clean": claim_eligible,
+                "clean": claim_eligible if source_clean is None else source_clean,
             },
             "config": {"path": "config/run.yaml", "sha256": sha(self.config)},
             "environment": {
@@ -710,7 +712,7 @@ class ExperimentCustodyTests(unittest.TestCase):
             git(fixture.repo, "commit", "-qm", "freeze mismatched implementation")
             result = fixture.init()
         self.assertEqual(result.returncode, 2, result.stdout)
-        self.assertIn("hash differs from claim-eligible source revision", result.stdout)
+        self.assertIn("hash differs from clean source revision", result.stdout)
 
     def test_claim_source_path_cannot_follow_current_worktree_symlink(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -724,6 +726,13 @@ class ExperimentCustodyTests(unittest.TestCase):
                     "sha256": sha(alias),
                 }
             ]
+            fixture.protocol.write_text(
+                yaml.safe_dump(protocol, sort_keys=False), encoding="utf-8"
+            )
+            git(fixture.repo, "add", ".")
+            git(fixture.repo, "commit", "-qm", "add symlinked implementation")
+            fixture.source_revision = git(fixture.repo, "rev-parse", "HEAD")
+            protocol["source"]["revision"] = fixture.source_revision
             seal_protocol(protocol)
             fixture.protocol.write_text(
                 yaml.safe_dump(protocol, sort_keys=False), encoding="utf-8"
@@ -732,7 +741,35 @@ class ExperimentCustodyTests(unittest.TestCase):
             git(fixture.repo, "commit", "-qm", "freeze symlinked implementation")
             result = fixture.init()
         self.assertEqual(result.returncode, 2, result.stdout)
-        self.assertIn("is missing from claim-eligible source revision", result.stdout)
+        self.assertIn("is not a regular file in clean source revision", result.stdout)
+
+    def test_clean_source_revision_must_resolve_to_a_commit(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            fixture = ExperimentFixture(Path(tmp), source_clean=True)
+            protocol = yaml.safe_load(fixture.protocol.read_text(encoding="utf-8"))
+            protocol["source"]["revision"] = "f" * 40
+            fixture.protocol.write_text(
+                yaml.safe_dump(protocol, sort_keys=False), encoding="utf-8"
+            )
+            result = fixture.freeze()
+        self.assertEqual(result.returncode, 2, result.stdout)
+        self.assertIn("source.revision does not resolve to a commit", result.stdout)
+
+    def test_clean_source_revision_must_be_an_ancestor(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            fixture = ExperimentFixture(Path(tmp), source_clean=True)
+            tree = git(fixture.repo, "rev-parse", "HEAD^{tree}")
+            unrelated = git(
+                fixture.repo, "commit-tree", tree, "-m", "unrelated source"
+            )
+            protocol = yaml.safe_load(fixture.protocol.read_text(encoding="utf-8"))
+            protocol["source"]["revision"] = unrelated
+            fixture.protocol.write_text(
+                yaml.safe_dump(protocol, sort_keys=False), encoding="utf-8"
+            )
+            result = fixture.freeze()
+        self.assertEqual(result.returncode, 2, result.stdout)
+        self.assertIn("source.revision is not an ancestor of HEAD", result.stdout)
 
     def test_run_root_cannot_be_overwritten(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -969,11 +1006,16 @@ class ExperimentCustodyTests(unittest.TestCase):
         self.assertEqual(result.returncode, 1, result.stdout)
         self.assertIn("hash mismatch", result.stdout)
 
-    def test_clean_claim_run_keeps_historical_source_seals_after_later_commit(
-        self,
+    def _assert_clean_source_seals_survive_later_commit(
+        self, *, claim_eligible: bool, evidence_phase: str
     ) -> None:
         with tempfile.TemporaryDirectory() as tmp:
-            fixture = ExperimentFixture(Path(tmp), claim_eligible=True)
+            fixture = ExperimentFixture(
+                Path(tmp),
+                claim_eligible=claim_eligible,
+                evidence_phase=evidence_phase,
+                source_clean=True,
+            )
             self.assertEqual(fixture.freeze(commit=True).returncode, 0)
             self.assertEqual(fixture.init().returncode, 0)
             self.assertEqual(fixture.cell("started").returncode, 0)
@@ -988,7 +1030,7 @@ class ExperimentCustodyTests(unittest.TestCase):
             )
             self.assertEqual(fixture.audit().returncode, 0)
             git(fixture.repo, "add", ".")
-            git(fixture.repo, "commit", "-qm", "seal official evidence")
+            git(fixture.repo, "commit", "-qm", "seal evidence")
 
             for path, payload in (
                 (fixture.data_screen, '{"rows":[10,20]}\n'),
@@ -999,7 +1041,7 @@ class ExperimentCustodyTests(unittest.TestCase):
             ):
                 path.write_text(payload, encoding="utf-8")
             git(fixture.repo, "add", ".")
-            git(fixture.repo, "commit", "-qm", "evolve source inputs")
+            git(fixture.repo, "commit", "-qm", "evolve inputs")
 
             validation = invoke(
                 fixture.repo, "validate", "--root", str(fixture.repo)
@@ -1016,6 +1058,22 @@ class ExperimentCustodyTests(unittest.TestCase):
         self.assertEqual(tampered.returncode, 1, tampered.stdout)
         self.assertIn("hash mismatch", tampered.stdout)
 
+    def test_clean_claim_run_keeps_historical_source_seals_after_later_commit(
+        self,
+    ) -> None:
+        self._assert_clean_source_seals_survive_later_commit(
+            claim_eligible=True,
+            evidence_phase="confirmation",
+        )
+
+    def test_clean_nonclaim_scratch_keeps_historical_source_seals_after_later_commit(
+        self,
+    ) -> None:
+        self._assert_clean_source_seals_survive_later_commit(
+            claim_eligible=False,
+            evidence_phase="scratch",
+        )
+
     def test_run_bindings_must_equal_frozen_protocol(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             fixture = ExperimentFixture(Path(tmp))
@@ -1030,6 +1088,28 @@ class ExperimentCustodyTests(unittest.TestCase):
             result = invoke(fixture.repo, "validate", "--root", str(fixture.repo))
         self.assertEqual(result.returncode, 1, result.stdout)
         self.assertIn("run config differs from frozen protocol", result.stdout)
+
+    def test_clean_nonclaim_run_cannot_substitute_claim_eligibility(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            fixture = ExperimentFixture(
+                Path(tmp),
+                claim_eligible=False,
+                evidence_phase="scratch",
+                source_clean=True,
+            )
+            self.assertEqual(fixture.freeze(commit=True).returncode, 0)
+            self.assertEqual(fixture.init().returncode, 0)
+            run_path = fixture.run_root / "run.yaml"
+            run = yaml.safe_load(run_path.read_text(encoding="utf-8"))
+            run["claim_eligible"] = True
+            run_path.write_text(
+                yaml.safe_dump(run, sort_keys=False), encoding="utf-8"
+            )
+            result = invoke(fixture.repo, "validate", "--root", str(fixture.repo))
+        self.assertEqual(result.returncode, 1, result.stdout)
+        self.assertIn(
+            "run claim eligibility differs from frozen protocol", result.stdout
+        )
 
     def test_cell_keys_are_append_only_and_errors_remain_visible(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

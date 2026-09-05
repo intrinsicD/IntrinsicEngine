@@ -1707,3 +1707,10 @@ entries:
       - "Kept BUG-164 open because bypassing ccache discriminates the compiler workaround from the cache-key defect but does not repair cache-backed module reuse."
       - "Preserved O168 and O170 as staged: the fresh compiler verification supplies no representative production-workload or clean schema-v2 speed evidence."
       - "Recorded origin/main equality at ea83f28ac672ec5a6417b510d885cabfa4316f4c after an explicit user-authorized push."
+  - turn: "2026-09-04_001#3"
+    notes:
+      - "Routed the deterministic BUG-165 repair and its repeated focused plus canonical CPU verification as experiment N460."
+      - "Added no staged observation or claim: this is ordinary test-harness reliability work and does not establish a broader runtime, cache-performance, or compiler capability result."
+      - "Kept BUG-164 open because both old hosted reruns failed before cache save; a passing cold seed followed by a warm exact-shape cohort is still required."
+      - "Recorded the rejected GitHub push as an open thread rather than publication evidence; commit 777bd8f655c7971b005e0b5e691700ed3ab7e452 remains local until the user explicitly approves export."
+      - "Did not promote or stale O161-O170: this turn supplies no closure signal for the Core.Dag or curvature observations and occurs on the same session-day."

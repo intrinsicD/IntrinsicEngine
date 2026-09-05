@@ -8,6 +8,17 @@ so blocks moved from the old active-README history work verbatim.
 
 ## Retired task narratives
 
+[`BUG-166`](BUG-166-clean-scratch-experiment-historical-input-seals.md) —
+frozen declared inputs now resolve from any clean exact source identity rather
+than only claim-eligible runs. The revision must resolve as an ancestor of the
+validating `HEAD`, each historical input must be a repository-relative regular
+file at its frozen hash, and this lookup never authorizes a claim. Dirty inputs
+and raw rows, results, receipts, previews, bundles, and audits remain bound to
+the live/current tree. All 40 hermetic custody regressions, unchanged
+METHOD-037/038 records, repository-global workflow evidence, and strict
+task/docs/generated-surface checks pass. Implementation: `a9aab4b88` and
+`ecf5af612`; PR [#1037](https://github.com/intrinsicD/IntrinsicEngine/pull/1037).
+
 [`BUG-157`](BUG-157-clang20-glm-module-union-build-break.md) — the hosted
 `ci-linux-clang` gate had been red on every `main` push since 2026-08-05
 because Clang 20.1.2, the documented minimum and the Ubuntu 24.04 package, fails
