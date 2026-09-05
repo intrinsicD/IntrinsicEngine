@@ -568,7 +568,7 @@ namespace {
                    name == "v:point" ||
                    name == "v:tex" ||
                    name == "v:texcoord" ||
-                   // BUG-137 — same reserved property, on the domain that can
+                   // Same reserved property, on the domain that can
                    // carry a seam.
                    name == "h:texcoord" ||
                    name == "h:normal" ||
@@ -591,7 +591,7 @@ namespace {
                    name == "v:point" ||
                    name == "v:tex" ||
                    name == "v:texcoord" ||
-                   // BUG-137 — same reserved property, on the domain that can
+                   // Same reserved property, on the domain that can
                    // carry a seam.
                    name == "h:texcoord" ||
                    name == "h:normal" ||
@@ -3322,17 +3322,11 @@ namespace {
                     break;
                 }
             }
-            // BUG-141: the per-operation results below are carried on the
-            // model and rendered by the panel that produced them. They used to
-            // be mirrored into `model.Diagnostics` as well, and that mirror was
-            // the defect: `BuildDomainWindowModel` folds this shared list into
-            // every domain window's header, so a simplify failure surfaced in
-            // the K-Means and Parameterize (UV) panels, and a merely `Pending`
-            // result — which is not `Succeeded()` — was announced under
-            // `GeometryProcessingFailed`. The list now carries only diagnostics
-            // that are true of the whole processing model (no scene, no
-            // selection, unsupported domain); anything owned by one operation
-            // stays on that operation's result.
+            // Operation-specific results stay on the model for their owning
+            // panels. `model.Diagnostics` carries only whole-model facts (no
+            // scene, no selection, unsupported domain), because
+            // `BuildDomainWindowModel` folds that shared list into every
+            // domain window header and `Pending` is not a failure.
             if (context.LastKMeansResult != nullptr)
             {
                 model.LastKMeansResult = *context.LastKMeansResult;

@@ -52,7 +52,7 @@ namespace Extrinsic::Runtime
         constexpr std::uint32_t kInvalidIndex =
             std::numeric_limits<std::uint32_t>::max();
 
-        // BUG-137 — the mesh's UVs live on whichever of the two domains owns
+        // Mesh UVs live on whichever of the two domains owns
         // them, and the corner domain wins when both exist. Parameterization
         // computes one UV per vertex, so it publishes to the vertex domain and
         // retires any corner UVs it supersedes: publishing underneath a stale
@@ -763,7 +763,7 @@ namespace Extrinsic::Runtime
                 return EditorCommandHistoryStatus::UnsupportedOperation;
             }
 
-            // BUG-137 — one UV property per domain, restored or retired to
+            // One UV property per domain is restored or retired to
             // match `state` exactly. Applying only the vertex half would leave
             // a superseded `h:texcoord` winning the resolution order, so the
             // computed parameterization would never be the one read.
@@ -1007,10 +1007,9 @@ namespace Extrinsic::Runtime
             };
         }
 
-        // BUG-141: a bare "solver rejected the selected mesh or config" told a
-        // user nothing they could act on. Every implemented strategy needs one
-        // connected component with exactly one boundary loop, and both counts
-        // are computable, so name whichever precondition the mesh missed.
+        // Every implemented strategy needs one connected component with
+        // exactly one boundary loop. The rejection message names whichever
+        // computable precondition the mesh missed.
         [[nodiscard]] std::string DescribeParameterizationRejection(
             const Parameterization::ParameterizationRejection& rejection)
         {
@@ -1248,7 +1247,7 @@ namespace Extrinsic::Runtime
             geometryMetadataSignature,
             sourceGeneration,
             *before,
-            // BUG-137 — a parameterization is one UV per vertex, so it
+            // A parameterization is one UV per vertex, so it
             // publishes on the vertex domain and leaves `CornerPresent` false:
             // any corner UVs it supersedes are retired here rather than left
             // to win the resolution order over the result just computed. Undo
@@ -1516,11 +1515,10 @@ namespace Extrinsic::Runtime
                  view.HalfedgeSource->Properties.Exists(
                      kCornerTexcoordProperty))
         {
-            // BUG-137 — the mesh is parameterized, just on the corner domain,
-            // which this vertex-indexed layout view cannot draw. Reporting
-            // nothing at all read as "no UVs" for exactly the meshes an atlas
-            // produces. Running a parameterization from here republishes on
-            // the vertex domain and retires the corner UVs, so say so.
+            // The mesh is parameterized on the corner domain, which this
+            // vertex-indexed layout view cannot draw. Running parameterization
+            // from here republishes on the vertex domain and retires corner
+            // UVs, so the view states both facts.
             model.Message =
                 "Selected mesh carries corner-domain UVs (h:texcoord), which "
                 "the vertex-indexed UV layout view cannot draw. Running a "
@@ -1560,13 +1558,10 @@ namespace Extrinsic::Runtime
                             : std::numeric_limits<float>::quiet_NaN());
                 }
             }
-            // BUG-141: the last result's message used to be mirrored onto the
-            // view model, and the panel renders both — its header from
-            // `Message` and its "Last run diagnostics" block from the result —
-            // so one command printed one sentence twice in one window. The
-            // header keeps only what is true of the view itself (no selection,
-            // stale entity, unusable v:texcoord, unavailable topology); the
-            // outcome stays on the result that owns it.
+            // The header carries only view-wide facts (no selection, stale
+            // entity, unusable v:texcoord, unavailable topology). The panel
+            // renders the operation outcome from the result that owns it, so
+            // it is not mirrored into `Message`.
         }
         return model;
     }

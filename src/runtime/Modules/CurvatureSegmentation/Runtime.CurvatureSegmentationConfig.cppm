@@ -1,3 +1,5 @@
+// Exposes serializable curvature-segmentation controls so config files, editor
+// UI, agents, and programmatic callers use one validated method selection.
 module;
 
 #include <cstdint>

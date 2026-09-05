@@ -1,0 +1,28 @@
+{
+  "command": [
+    "python3",
+    "tools/agents/skills/intrinsicengine-source-documentation/scripts/audit_source_documentation.py",
+    "--root",
+    ".",
+    "--path",
+    "src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Mesh.cpp",
+    "--path",
+    "src/runtime/README.md",
+    "--summary",
+    "--no-fail"
+  ],
+  "command_display": "python3 tools/agents/skills/intrinsicengine-source-documentation/scripts/audit_source_documentation.py --root . --path src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Mesh.cpp --path src/runtime/README.md --summary --no-fail",
+  "cwd": ".",
+  "duration_ms": 50,
+  "exit_code": 0,
+  "finished_at": "2026-09-05T04:55:04Z",
+  "label": "runtime-source-doc",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-09-05T04:55:04Z",
+  "stderr_path": "tasks/evidence/HARDEN-089/commands/runtime-source-doc.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/HARDEN-089/commands/runtime-source-doc.stdout.log",
+  "stdout_sha256": "2c87ea467647f581136f1ffb7d66a827748411cdf1bb693ac6f732b9e5cdcad3",
+  "task_id": "HARDEN-089"
+}

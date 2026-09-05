@@ -1,0 +1,23 @@
+{
+  "command": [
+    "python3",
+    "tools/agents/check_task_policy.py",
+    "--root",
+    ".",
+    "--strict"
+  ],
+  "command_display": "python3 tools/agents/check_task_policy.py --root . --strict",
+  "cwd": ".",
+  "duration_ms": 758,
+  "exit_code": 0,
+  "finished_at": "2026-09-05T05:42:51Z",
+  "label": "retirement-task-policy",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-09-05T05:42:51Z",
+  "stderr_path": "tasks/evidence/HARDEN-089/commands/retirement-task-policy.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/HARDEN-089/commands/retirement-task-policy.stdout.log",
+  "stdout_sha256": "90c98abb63f427b37ccbd6b48902d52d258821d0222e2f472c9ac63864f64cdc",
+  "task_id": "HARDEN-089"
+}

@@ -8,6 +8,20 @@ so blocks moved from the old active-README history work verbatim.
 
 ## Retired task narratives
 
+[`HARDEN-089`](HARDEN-089-audit-window-source-documentation-cleanup.md) — the
+five module interfaces missing mandatory leading documentation now carry
+concise what-and-why synopses. Every one of the 98 task-ID lines introduced in
+the fixed audit window was manually dispositioned: 12 durable method/evidence
+references remain, 86 chronology-first lines now state the current contract,
+and none were dropped without replacement. The six confirmed runtime history
+blocks and affected README chronology are gone while their load-bearing
+rationale remains. A mechanical guard proves the C++ diff is comment-only;
+Clang 23 `pr-fast` passed 54 selected integration tests, the canonical
+`IntrinsicTests` target built, and all 4,263 CPU-supported tests passed with
+zero failures and one expected GLFW capability skip. Implementation and
+evidence: `47c571432`, `45ea3f06a`; PR
+[#1041](https://github.com/intrinsicD/IntrinsicEngine/pull/1041).
+
 [`BUG-169`](BUG-169-asan-geometry-group-timeout.md) — the fixture-heavy
 curvature tensor and segmentation cases now run in their own pure GoogleTest
 producer while retaining exact logical registration and execution parity

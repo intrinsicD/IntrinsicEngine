@@ -634,9 +634,8 @@ namespace Extrinsic::Runtime
             return "none";
         }
 
-        // BUG-137 — the enrichment diagnostic is the only place a user sees
-        // what import actually produced, so it names the preserved topology and
-        // where the UV seam duplication landed instead of just "successfully".
+        // The enrichment diagnostic exposes what import produced, so it names
+        // the preserved topology and where UV seam duplication is applied.
         [[nodiscard]] std::string DescribeDirectMeshEnrichment(
             const RuntimeMeshMaterializationDiagnostics& diagnostics)
         {
@@ -1014,8 +1013,8 @@ namespace Extrinsic::Runtime
                                 state->Job,
                                 JobState::Published,
                                 DescribeDirectMeshEnrichment(meshDiagnostics));
-                            // BUG-137 — the import preserves source topology,
-                            // so any vertex duplication now happens at GPU
+                            // The import preserves source topology, so any
+                            // vertex duplication happens at GPU
                             // upload. Report it rather than computing it and
                             // dropping it on the floor.
                             Core::Log::Info(

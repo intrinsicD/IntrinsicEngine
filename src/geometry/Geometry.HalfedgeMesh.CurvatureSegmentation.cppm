@@ -1,3 +1,5 @@
+// Exposes signed-curvature GMM segmentation so geometry and runtime share
+// deterministic component selection, region labels, and diagnostics.
 module;
 
 #include <cstddef>

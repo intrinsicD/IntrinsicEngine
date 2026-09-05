@@ -455,8 +455,8 @@ available through the Vulkan 1.2/1.3 feature chain.
   external-retention suppressions are the diagnosed push-constant driver,
   `VmaAllocator_T::BindVulkanBuffer`, and
   `dbus_connection_send_with_reply_and_block` call paths, plus the exact
-  `_XimRegisterIMInstantiateCallback` allocation reproduced with libX11 1.7.5,
-  fixed upstream and documented by BUG-118. Before
+  `_XimRegisterIMInstantiateCallback` allocation reproduced with libX11 1.7.5
+  and bounded by the BUG-118 evidence. Before
   launching the Sandbox, the runner reuses the standalone BUG-082 helper to
   prove that a named 4096-byte engine allocation still fails under that exact
   suppression file. The operational batch selects exactly one tested ICD;

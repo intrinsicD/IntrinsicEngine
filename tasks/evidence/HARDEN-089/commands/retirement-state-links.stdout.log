@@ -1,0 +1,4 @@
+[check_task_state_links] Root: /tmp/intrinsic-audit
+[check_task_state_links] Indexed task IDs: 924
+[check_task_state_links] Mode: strict
+[check_task_state_links] No task-state link findings.

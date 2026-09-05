@@ -1,0 +1,22 @@
+[source-documentation] files=1329 interfaces=449 cpp=1162 readmes=167 errors=408 review=3868
+[source-documentation] rules: comment-history=138, declaration-comment=1033, file-synopsis-long=12, file-synopsis-missing=381, file-synopsis-weak=2, readme-chronology=2602, readme-large=17, readme-manual-inventory=2, readme-non-current-section=27, source-large=62
+HOTSPOT tasks/backlog/rendering/README.md findings=454 errors=2 review=452
+HOTSPOT tasks/backlog/runtime/README.md findings=373 errors=11 review=362
+HOTSPOT tasks/backlog/README.md findings=263 errors=0 review=263
+HOTSPOT tasks/backlog/architecture/README.md findings=197 errors=3 review=194
+HOTSPOT tasks/backlog/geometry/README.md findings=161 errors=1 review=160
+HOTSPOT src/graphics/renderer/README.md findings=157 errors=0 review=157
+HOTSPOT src/runtime/README.md findings=149 errors=0 review=149
+HOTSPOT tasks/backlog/methods/README.md findings=141 errors=1 review=140
+HOTSPOT tasks/backlog/process/README.md findings=122 errors=2 review=120
+HOTSPOT tasks/backlog/ui/README.md findings=121 errors=1 review=120
+HOTSPOT src/graphics/vulkan/README.md findings=52 errors=0 review=52
+HOTSPOT src/geometry/Geometry.Properties.cppm findings=51 errors=1 review=50
+HOTSPOT src/geometry/Geometry.HalfedgeMesh.Utils.cppm findings=47 errors=1 review=46
+HOTSPOT methods/geometry/curvature_segmentation/README.md findings=39 errors=0 review=39
+HOTSPOT src/graphics/renderer/Graphics.Renderer.cppm findings=38 errors=1 review=37
+HOTSPOT tasks/backlog/ecs/README.md findings=36 errors=1 review=35
+HOTSPOT tasks/backlog/workshop/README.md findings=33 errors=1 review=32
+HOTSPOT tasks/backlog/physics/README.md findings=26 errors=1 review=25
+HOTSPOT src/geometry/Geometry.HalfedgeMesh.DEC.cppm findings=25 errors=1 review=24
+HOTSPOT tasks/backlog/assets/README.md findings=25 errors=1 review=24

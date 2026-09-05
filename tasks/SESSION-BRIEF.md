@@ -26,7 +26,6 @@ picking backlog work; theme priorities and rationale live in
 - unblocked: `ASSETIO-010` — Async model companion preflight (tasks/backlog/assets/ASSETIO-010-async-model-companion-preflight.md)
 - blocked by `ASSETIO-010`: `ASSETIO-011` — Semantic Sandbox File / Import workflow matrix (tasks/backlog/assets/ASSETIO-011-semantic-sandbox-file-import-workflow-matrix.md)
 - unblocked: `BUG-134` — ImGui adapter panel draw-list test fails intermittently (tasks/backlog/bugs/BUG-134-imgui-adapter-panel-draw-list-intermittent.md)
-- unblocked: `HARDEN-089` — Reconcile audit-window source comments and README prose (tasks/backlog/architecture/HARDEN-089-audit-window-source-documentation-cleanup.md)
 - blocked by `GRAPHICS-105`: `LEGACY-043` — Retire stale multi-descriptor-set shader sources (tasks/backlog/rendering/LEGACY-043-retire-stale-multiset-shaders.md)
 - unblocked: `PLATFORM-004` — Alternative-platform backend onboarding policy (planning seed) (tasks/backlog/platform/PLATFORM-004-alternative-platform-backend-onboarding.md)
 - unblocked: `UI-037` — Linear domain-action readiness and disabled-reason tooltips (tasks/backlog/ui/UI-037-linear-domain-action-readiness-tooltips.md)

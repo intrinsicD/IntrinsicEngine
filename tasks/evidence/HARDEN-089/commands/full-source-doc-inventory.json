@@ -1,0 +1,24 @@
+{
+  "command": [
+    "python3",
+    "tools/agents/skills/intrinsicengine-source-documentation/scripts/audit_source_documentation.py",
+    "--root",
+    ".",
+    "--summary",
+    "--no-fail"
+  ],
+  "command_display": "python3 tools/agents/skills/intrinsicengine-source-documentation/scripts/audit_source_documentation.py --root . --summary --no-fail",
+  "cwd": ".",
+  "duration_ms": 540,
+  "exit_code": 0,
+  "finished_at": "2026-09-05T04:55:15Z",
+  "label": "full-source-doc-inventory",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-09-05T04:55:14Z",
+  "stderr_path": "tasks/evidence/HARDEN-089/commands/full-source-doc-inventory.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/HARDEN-089/commands/full-source-doc-inventory.stdout.log",
+  "stdout_sha256": "73f5b6140a8cea1284682b111e8e153c049d05e09a1e68854008a3c683756d8b",
+  "task_id": "HARDEN-089"
+}

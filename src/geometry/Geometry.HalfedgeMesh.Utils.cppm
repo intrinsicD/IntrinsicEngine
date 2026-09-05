@@ -20,7 +20,7 @@ export namespace Geometry::MeshUtils
     // geometry modules (subdivision, remeshing, mesh conversion, etc.).
     inline constexpr const char* kVertexTexcoordPropertyName = "v:texcoord";
 
-    // BUG-137 — canonical property name for per-corner texture coordinates.
+    // Canonical property name for per-corner texture coordinates.
     //
     // A UV seam needs two or more distinct UVs at one vertex. Storing UVs only
     // per vertex forces a seam to be expressed as duplicated *topology*, which
@@ -39,7 +39,7 @@ export namespace Geometry::MeshUtils
     inline constexpr const char* kFaceScalarGradientPropertyName = "f:scalar_gradient";
     inline constexpr const char* kVertexPcaPropertyName = "v:pca";
 
-    // BUG-137 — which element domain currently owns this mesh's texture
+    // Identifies which element domain owns this mesh's texture
     // coordinates. Corner UVs win over vertex UVs so a mesh can be migrated
     // incrementally without a flag day.
     enum class TexcoordDomain : std::uint8_t

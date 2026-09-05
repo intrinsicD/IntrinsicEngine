@@ -261,8 +261,8 @@ ResolveVertexNormals(const Geometry::MeshIO::MeshIOResult &meshPayload,
   return true;
 }
 
-// BUG-137 — UVs may be owned by the corner domain now, so validity follows the
-// canonical resolution order instead of assuming `v:texcoord`.
+// UV validity follows the canonical domain resolution order rather than
+// assuming `v:texcoord`.
 [[nodiscard]] bool HasValidTexcoords(const Geometry::HalfedgeMesh::Mesh &mesh) {
   switch (Geometry::MeshUtils::ResolveTexcoordDomain(mesh)) {
   case Geometry::MeshUtils::TexcoordDomain::Halfedge:
@@ -447,8 +447,8 @@ MakeRuntimeDiagnostics(const Geometry::UvAtlas::UvAtlasResult &atlas,
   return diagnostics;
 }
 
-// BUG-137 — the atlas-to-corner mapping and its finalization are shared with
-// the editor's UV regeneration command (BUG-147), so they live next to the
+// Atlas-to-corner mapping and finalization are shared with the editor's UV
+// regeneration command, so they live next to the
 // corner walk in `Runtime.MeshSurfaceTopology` rather than here. `AtlasCornerTexcoords`
 // is that shared record.
 using AtlasCornerTexcoords = MeshCornerTexcoords;
@@ -472,7 +472,7 @@ GatherAtlasCornerTexcoords(const Geometry::UvAtlas::UvAtlasResult &atlas,
   return corners;
 }
 
-// BUG-137 — OBJ stores UVs per corner natively, so a payload that already
+// OBJ stores UVs per corner natively, so a payload that already
 // carries authored corner UVs must be preserved rather than re-atlased. The
 // payload corner index is flattened over the *polygon* face list, while the
 // entity mesh is built from the fan triangulation of those polygons; this
@@ -766,7 +766,7 @@ BuildRuntimeHalfedgeMeshMaterialization(
   std::vector<glm::vec3> normals =
       ResolveVertexNormals(meshPayload, positions.Vector(), faces.Vector());
 
-  // BUG-137 — authored per-corner UVs (OBJ's native encoding) are preserved
+  // Authored per-corner UVs (OBJ's native encoding) are preserved
   // as-is. Re-atlasing them would discard the file's own parameterization, and
   // they cannot be validated as vertex-domain UVs because a seam vertex has
   // more than one.
@@ -806,10 +806,10 @@ BuildRuntimeHalfedgeMeshMaterialization(
                                positions.Vector().size(), faces.Vector().size());
   }
 
-  // BUG-137 — the entity mesh is always built from the source topology. A UV
-  // seam is a UV fact, not a topology fact: publishing the atlas *output* mesh
-  // here is what replaced a closed manifold import with a chart-split soup.
-  // The seam now lives on the corner domain and is de-indexed at GPU upload.
+  // The entity mesh is always built from the source topology. A UV seam is a
+  // UV fact, not a topology fact: publishing the atlas output mesh would
+  // replace a closed manifold import with a chart-split soup. The seam lives
+  // on the corner domain and is de-indexed at GPU upload.
   const std::vector<std::uint32_t> identityVertexXrefs =
       MakeIdentityXrefs(source->Mesh.VertexCount());
   Geometry::MeshSoup::IndexedMesh entityMesh = source->Mesh;

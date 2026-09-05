@@ -1,0 +1,6 @@
+[check_layering] Scan root: /tmp/intrinsic-audit/src
+[check_layering] Files scanned: 756
+[check_layering] References scanned: 7317 import/include, 84 CMake link
+[check_layering] Allowlist entries: 0
+[check_layering] Allowlisted violations: 0
+[check_layering] No layering violations found.

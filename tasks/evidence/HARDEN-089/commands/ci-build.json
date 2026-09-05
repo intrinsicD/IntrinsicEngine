@@ -1,0 +1,24 @@
+{
+  "command": [
+    "cmake",
+    "--build",
+    "--preset",
+    "ci",
+    "--target",
+    "IntrinsicTests"
+  ],
+  "command_display": "cmake --build --preset ci --target IntrinsicTests",
+  "cwd": ".",
+  "duration_ms": 887579,
+  "exit_code": 0,
+  "finished_at": "2026-09-05T05:26:25Z",
+  "label": "ci-build",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-09-05T05:11:38Z",
+  "stderr_path": "tasks/evidence/HARDEN-089/commands/ci-build.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/HARDEN-089/commands/ci-build.stdout.log",
+  "stdout_sha256": "f0b4665f31cd68d170ec7ebe6e9f6bd71aa74e898b566dfd91fd1378fbc18103",
+  "task_id": "HARDEN-089"
+}

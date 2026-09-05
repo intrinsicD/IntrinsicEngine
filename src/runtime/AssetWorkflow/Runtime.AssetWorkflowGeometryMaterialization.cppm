@@ -45,21 +45,18 @@ struct RuntimeMeshMaterializationDiagnostics {
   bool AuthoredTexcoordsValid{false};
   bool AuthoredTexcoordsRejected{false};
   bool ResolvedTexcoordsValid{false};
-  // BUG-137 — true when the resolved UVs live on the halfedge/corner domain
+  // True when resolved UVs live on the halfedge/corner domain
   // (`h:texcoord`) because the atlas produced at least one seam. False means
-  // the mesh carries per-vertex `v:texcoord` exactly as it did before.
+  // the resolved UVs are vertex-owned.
   bool TexcoordsOnCornerDomain{false};
   std::size_t SourceVertexCount{0};
   std::size_t SourceFaceCount{0};
-  // Counts of the *materialized entity mesh*. These now equal the source
-  // counts for a manifold input: a UV seam no longer splits the mesh.
+  // Counts of the materialized entity mesh. For a manifold input they equal
+  // the source counts because a UV seam does not split mesh topology.
   std::size_t ResolvedVertexCount{0};
   std::size_t ResolvedFaceCount{0};
-  // BUG-137 — extra vertices an indexed GPU upload must emit to carry the UV
-  // seams, i.e. the duplication that used to be applied to the ECS mesh and is
-  // now confined to the vertex buffer. Zero when UVs are vertex-owned. This
-  // replaces the old `SeamSplitVertexCount`, which measured the same seams in
-  // the wrong place and was never surfaced anywhere.
+  // Extra vertices an indexed GPU upload must emit to carry UV seams. Zero
+  // when UVs are vertex-owned; the ECS mesh retains its source topology.
   std::size_t GpuSplitVertexCount{0};
   // Source corners the atlas produced no UV for (dropped degenerate faces).
   // They inherit a sibling corner's UV rather than a hole, so a non-zero count

@@ -1,0 +1,244 @@
+schema_version: 1
+task_id: HARDEN-089
+workflow_profile: standard
+status: complete
+generated_by: tools/agents/workflow_evidence.py
+generated_at: '2026-09-05T05:43:45Z'
+claim_eligible: false
+source:
+  base_ref: origin/main
+  base_revision: 11479102c15e20fef62869b17368abb5c73e5b25
+  head_revision: 45ea3f06af9f4fc60bb031b37d9eb1bba04a1072
+  branch: codex/harden-089-source-doc-cleanup
+  worktree: /tmp/intrinsic-audit
+  dirty: true
+  surface:
+  - path: docs/reports/2026-09-05-agent-output-audit.md
+    sha256: b5f17fd9307f55fbd878a6c5b039a9e7e7b81048562d10718aba4919c709c068
+  - path: src/app/Sandbox/README.md
+    sha256: 41cd2c8fda0e55ef80e813486b12716aca3c9901dd0dde88730d60324627c117
+  - path: src/geometry/Geometry.HalfedgeMesh.CurvatureSegmentation.Features.cppm
+    sha256: 5b131a3d31c607398cb2bdfdd71845349dae269ac811d3adc5423ca57f547b0b
+  - path: src/geometry/Geometry.HalfedgeMesh.CurvatureSegmentation.Patches.cppm
+    sha256: a7b56d8916bc7b3d74997f2afd24e4c3acbc3f23806094367afa78db49ce52f1
+  - path: src/geometry/Geometry.HalfedgeMesh.CurvatureSegmentation.cppm
+    sha256: fe75c45903e6646b390e021c616b9918bfc4b35a58864eb5b1bc4074256d8b86
+  - path: src/geometry/Geometry.HalfedgeMesh.Features.cppm
+    sha256: 5980a0109ba8e52b0256a323d158817a6cd0b015f182efd535cc6b419d70ef0d
+  - path: src/geometry/Geometry.HalfedgeMesh.Simplification.cpp
+    sha256: c9118af57e6f7c852976803442d86dbfc6e445c08cf4f37d057e5677d17fdc4c
+  - path: src/geometry/Geometry.HalfedgeMesh.Simplification.cppm
+    sha256: a6a95dd36d95d5356d76dadf06ea3d586df87bc9e9bd9acadeaa6ddd07f5bf4b
+  - path: src/geometry/Geometry.HalfedgeMesh.Utils.cpp
+    sha256: 07ff676f67adc2d843ad669a4881f5781faff975471663757586ffe905d9bdf3
+  - path: src/geometry/Geometry.HalfedgeMesh.Utils.cppm
+    sha256: d14a626a0bef79081a32a2bda078d56a61ec641d34c21958027e0c9b781de2f1
+  - path: src/graphics/vulkan/README.md
+    sha256: 56cb1848c7311ae41b647d56546c8e53165786a3aecbc5b3b99bf467a10518ff
+  - path: src/platform/README.md
+    sha256: 62b184e1ecccee027ee4af5cac3b4251ecbd798b7f5563cf460a9e102ce6f27c
+  - path: src/runtime/AssetWorkflow/Runtime.AssetWorkflowGeometryMaterialization.cpp
+    sha256: 17f2e9e5b3d625f59ae3c35a9e88c02bb4b91e7a0c7bb6e156d5786051de93c9
+  - path: src/runtime/AssetWorkflow/Runtime.AssetWorkflowGeometryMaterialization.cppm
+    sha256: 98f9b3f8791a9a1d657629e87971d40ec77012abf5b6c231b48e1bed27db7252
+  - path: src/runtime/AssetWorkflow/Runtime.AssetWorkflowModelMaterialization.cppm
+    sha256: e3a46af26c283cfacb3a0263b2d5b9d09cb5c8f97cc42c8bfbeabd202e5107ec
+  - path: src/runtime/AssetWorkflow/Runtime.AssetWorkflowRecipePolicies.cpp
+    sha256: ee5ef83f7181ef5bee1d7a73d41482cfab73e02eabf42725704ed3c177234d21
+  - path: src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Mesh.cpp
+    sha256: 3f3a2e2c3571383ed583132f7442992bb38636bd4abf9c04373f6b838d399d24
+  - path: src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.cppm
+    sha256: f9a2d4e4c48cda58c395a4ac0341346fea33abfa64d3656dfd2a5e8f0abfd79e
+  - path: src/runtime/Editor/Operations/Runtime.ParameterizationOperations.cpp
+    sha256: 8eb0f883f69b3a735649494747fedc63e72ad406e6520d40033f39e86869c436
+  - path: src/runtime/Editor/Operations/Runtime.VisualizationEditingOperations.Actions.cpp
+    sha256: 97bc9c232a7f9a4fcc1c686ee1736eb68f7639028756d463cbfcf9117b684144
+  - path: src/runtime/Editor/Runtime.EditorWorkspaceSnapshots.Models.cpp
+    sha256: 1a8b7ab9dc9b6a29cda1e34dfa287e82ad4aeaebe70c8e56346cfca5f5a6f305
+  - path: src/runtime/GeometryIntegration/Runtime.MeshSurfaceTopology.cppm
+    sha256: 44dad4ca09b78e8b4fa2bef2be37f166f9465eda80e7c656d553befd3833458b
+  - path: src/runtime/Modules/CurvatureSegmentation/Runtime.CurvatureSegmentationConfig.cppm
+    sha256: 5648320fea7b984e9f47db665c3ad1d59e4db1303e396057fd5f9eba0e3aa19c
+  - path: src/runtime/Modules/TextureBake/Runtime.TextureBakeModule.cpp
+    sha256: b332de3b1536e7b59d76e1ab90401f78293b0525662964af1880dfdebd705783
+  - path: src/runtime/README.md
+    sha256: 6ccc3901df17e6914f992790c8e000ab3193e2caacbdf22ea3eb945d51c064a6
+  - path: src/runtime/Rendering/Runtime.RenderExtraction.Geometry.cpp
+    sha256: 7079738ee833a974d261f3fdcf852dd72d1f35ac7a3edb6d30d528a37e326c2a
+  - path: src/runtime/Rendering/Runtime.RenderExtraction.cpp
+    sha256: 748bb528e3952793c4a913dd81f29e92cdcae67d58e64b6ef8fe7b3176ec733c
+  - path: src/runtime/Scene/Runtime.SceneSerialization.cpp
+    sha256: 2fffe277841ae9204a9fdb9aa0646e3e07c09d48c93bb7cbbcca3a2666614a0e
+  - path: src/runtime/Visualization/Runtime.VisualizationRecipes.cpp
+    sha256: 55a81a130736e9d77435ae6d634c198c5877eb39948e6c998b24d5818f246d01
+  - path: tasks/SESSION-BRIEF.md
+    sha256: 1bbbfac321f9f6238eee1523aab4e5111da317f31d020a6693f468484aa311c8
+  - path: tasks/backlog/architecture/HARDEN-089-audit-window-source-documentation-cleanup.md
+    sha256: null
+  - path: tasks/backlog/architecture/README.md
+    sha256: b6a1795728552e7e32e3a680fe1c73f17a6a19333a2ff4728e6855fe00ffd487
+  - path: tasks/done/HARDEN-089-audit-window-source-documentation-cleanup.md
+    sha256: 417bc756785445dceea7f38b27b70acaa4830cfd8181bd1b6b25f388743e1f5c
+  - path: tasks/done/RETIREMENT-LOG.md
+    sha256: 24550e921c3c384fbf45892a6172d8a6b53dbe10554ef3b07c4c81abd5f713c0
+  content_digest: 1206488c8dfebf9343835966abf4ffa1b758a6bac8e382148edf5c0670547529
+touched:
+  paths:
+  - docs/reports/2026-09-05-agent-output-audit.md
+  - src/app/Sandbox/README.md
+  - src/geometry/Geometry.HalfedgeMesh.CurvatureSegmentation.Features.cppm
+  - src/geometry/Geometry.HalfedgeMesh.CurvatureSegmentation.Patches.cppm
+  - src/geometry/Geometry.HalfedgeMesh.CurvatureSegmentation.cppm
+  - src/geometry/Geometry.HalfedgeMesh.Features.cppm
+  - src/geometry/Geometry.HalfedgeMesh.Simplification.cpp
+  - src/geometry/Geometry.HalfedgeMesh.Simplification.cppm
+  - src/geometry/Geometry.HalfedgeMesh.Utils.cpp
+  - src/geometry/Geometry.HalfedgeMesh.Utils.cppm
+  - src/graphics/vulkan/README.md
+  - src/platform/README.md
+  - src/runtime/AssetWorkflow/Runtime.AssetWorkflowGeometryMaterialization.cpp
+  - src/runtime/AssetWorkflow/Runtime.AssetWorkflowGeometryMaterialization.cppm
+  - src/runtime/AssetWorkflow/Runtime.AssetWorkflowModelMaterialization.cppm
+  - src/runtime/AssetWorkflow/Runtime.AssetWorkflowRecipePolicies.cpp
+  - src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Mesh.cpp
+  - src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.cppm
+  - src/runtime/Editor/Operations/Runtime.ParameterizationOperations.cpp
+  - src/runtime/Editor/Operations/Runtime.VisualizationEditingOperations.Actions.cpp
+  - src/runtime/Editor/Runtime.EditorWorkspaceSnapshots.Models.cpp
+  - src/runtime/GeometryIntegration/Runtime.MeshSurfaceTopology.cppm
+  - src/runtime/Modules/CurvatureSegmentation/Runtime.CurvatureSegmentationConfig.cppm
+  - src/runtime/Modules/TextureBake/Runtime.TextureBakeModule.cpp
+  - src/runtime/README.md
+  - src/runtime/Rendering/Runtime.RenderExtraction.Geometry.cpp
+  - src/runtime/Rendering/Runtime.RenderExtraction.cpp
+  - src/runtime/Scene/Runtime.SceneSerialization.cpp
+  - src/runtime/Visualization/Runtime.VisualizationRecipes.cpp
+  - tasks/SESSION-BRIEF.md
+  - tasks/backlog/architecture/HARDEN-089-audit-window-source-documentation-cleanup.md
+  - tasks/backlog/architecture/README.md
+  - tasks/done/HARDEN-089-audit-window-source-documentation-cleanup.md
+  - tasks/done/RETIREMENT-LOG.md
+  layers:
+  - app
+  - geometry
+  - graphics
+  - platform
+  - runtime
+  modules:
+  - Extrinsic.Runtime.CurvatureSegmentationConfig
+  - Extrinsic.Runtime.GeometryProcessingOperations
+  - Geometry.HalfedgeMesh.CurvatureSegmentation
+  - Geometry.HalfedgeMesh.Features
+extension_seam: 'None: this is a bounded source-documentation cleanup with no new interface, service,
+  or extension axis.'
+future_change_plan: Any broader cleanup must begin from a separately measured, fixed path or commit window;
+  do not convert report-only prompts into a gate without a new policy task.
+acceptance:
+- criterion: All five audited module interfaces begin with a concise synopsis that
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: Every one of the 98 added task-ID lines has an explicit keep/rewrite/drop
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: The six confirmed runtime comment-history findings are absent while
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: The affected runtime README passages are factual current state; future
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: The final C++ diff is comment-only and all required build/test/structural
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+commands:
+- receipt: tasks/evidence/HARDEN-089/commands/baseline-focused-source-doc.json
+- receipt: tasks/evidence/HARDEN-089/commands/baseline-runtime-source-doc.json
+- receipt: tasks/evidence/HARDEN-089/commands/ci-build.json
+- receipt: tasks/evidence/HARDEN-089/commands/ci-configure.json
+- receipt: tasks/evidence/HARDEN-089/commands/cpp-comment-only-diff.json
+- receipt: tasks/evidence/HARDEN-089/commands/cpu-tests.json
+- receipt: tasks/evidence/HARDEN-089/commands/diff-check.json
+- receipt: tasks/evidence/HARDEN-089/commands/disposition-parity.json
+- receipt: tasks/evidence/HARDEN-089/commands/doc-links.json
+- receipt: tasks/evidence/HARDEN-089/commands/docs-sync.json
+- receipt: tasks/evidence/HARDEN-089/commands/final-diff-check.json
+- receipt: tasks/evidence/HARDEN-089/commands/final-session-brief.json
+- receipt: tasks/evidence/HARDEN-089/commands/final-task-policy.json
+- receipt: tasks/evidence/HARDEN-089/commands/final-validate-tasks.json
+- receipt: tasks/evidence/HARDEN-089/commands/focused-source-doc.json
+- receipt: tasks/evidence/HARDEN-089/commands/full-source-doc-inventory.json
+- receipt: tasks/evidence/HARDEN-089/commands/layering.json
+- receipt: tasks/evidence/HARDEN-089/commands/pr-fast.json
+- receipt: tasks/evidence/HARDEN-089/commands/retirement-diff-check.json
+- receipt: tasks/evidence/HARDEN-089/commands/retirement-doc-links.json
+- receipt: tasks/evidence/HARDEN-089/commands/retirement-docs-sync.json
+- receipt: tasks/evidence/HARDEN-089/commands/retirement-session-brief.json
+- receipt: tasks/evidence/HARDEN-089/commands/retirement-state-links.json
+- receipt: tasks/evidence/HARDEN-089/commands/retirement-task-policy.json
+- receipt: tasks/evidence/HARDEN-089/commands/retirement-validate-tasks.json
+- receipt: tasks/evidence/HARDEN-089/commands/runtime-source-doc.json
+- receipt: tasks/evidence/HARDEN-089/commands/session-brief-check.json
+- receipt: tasks/evidence/HARDEN-089/commands/task-policy.json
+- receipt: tasks/evidence/HARDEN-089/commands/task-state-links.json
+- receipt: tasks/evidence/HARDEN-089/commands/test-layout.json
+- receipt: tasks/evidence/HARDEN-089/commands/validate-tasks.json
+changed_public_contracts:
+- No public API or behavior contract changed; the existing repo.source-documentation contract now holds
+  for all five audited module interfaces and the reconciled fixed-window prose.
+diagnostics_and_previews:
+- 'Focused scan: five interfaces, zero objective errors; runtime target scan: six comment-history findings
+  removed; disposition ledger: 98 rows = 12 keep + 86 rewrite + 0 drop.'
+benchmark_or_parity_evidence: []
+docs_sync:
+  task_file: tasks/done/HARDEN-089-audit-window-source-documentation-cleanup.md
+  session_brief_present: true
+  canonical_docs_changed: true
+  skill_mirrors_checked: true
+residual_risks:
+- The whole-tree report-only scan still reports 408 inherited objective errors and 3,868 review prompts
+  outside the fixed audit window; HARDEN-089 makes no repository-wide cleanliness claim.
+skipped_checks:
+- check: sanitizers
+  reason: Documentation-only changes alter no ownership, allocation, lifetime, concurrency, or executable
+    behavior; canonical compilation and the full CPU suite are the strongest relevant checks.
+- check: gpu-vulkan
+  reason: No Vulkan/backend path or executable token changed.
+- check: benchmark
+  reason: No performance or capability claim is made.
+artifacts:
+- path: tasks/evidence/HARDEN-089/observations/dispositions.md
+  sha256: 01327662a6136411f5b25db702efce10110c4741ff69dcab11cf07997056b30c
+  kind: file
+- path: tasks/evidence/HARDEN-089/commands/focused-source-doc.json
+  sha256: 4fbcf1e5c4861bfdbcebbfa8e13c0d7ac39810927169287e5fa6fe817199d542
+  kind: file
+- path: tasks/evidence/HARDEN-089/commands/runtime-source-doc.json
+  sha256: 9756deea9fe1c5de07a50e9ce6b539904141cd813c5d35ebff8d2a31cbb2b8a1
+  kind: file
+- path: tasks/evidence/HARDEN-089/commands/full-source-doc-inventory.json
+  sha256: b6275fd4aad04739550d5989eb6a30a193729c171a9edab2f56c22f067f1d1e0
+  kind: file
+- path: tasks/evidence/HARDEN-089/commands/cpp-comment-only-diff.json
+  sha256: af8966234b770baa9b32659553ed807f70d62d6b3062568b0059fdc21522bb6a
+  kind: file
+- path: tasks/evidence/HARDEN-089/commands/cpu-tests.json
+  sha256: 2b9443eb0e631aa092a96b016e3dd2ecd3406112eebc22e84c6a86c6b30ba9c0
+  kind: file
+- path: tasks/done/HARDEN-089-audit-window-source-documentation-cleanup.md
+  sha256: 417bc756785445dceea7f38b27b70acaa4830cfd8181bd1b6b25f388743e1f5c
+  kind: file
+self_review:
+  completed: true
+  scope_matches_task: true
+  layering_preserved: true
+  tests_and_docs_accounted_for: true
+  mechanical_and_semantic_changes_separated: true

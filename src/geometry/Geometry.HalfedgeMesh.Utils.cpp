@@ -422,7 +422,7 @@ namespace Geometry::MeshUtils
     }
 
     // ---------------------------------------------------------------------
-    // BUG-137 — texture-coordinate element-domain resolution.
+    // Texture-coordinate element-domain resolution.
     // ---------------------------------------------------------------------
 
     TexcoordDomain ResolveTexcoordDomain(const HalfedgeMesh::Mesh& mesh) noexcept

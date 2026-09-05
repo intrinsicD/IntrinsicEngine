@@ -5,15 +5,24 @@ depends_on: []
 workflow_schema: 1
 workflow_profile: standard
 evidence: required
-owner:
-branch:
-worktree:
-claimed_at:
+owner: "Codex-HARDEN089"
+branch: "codex/harden-089-source-doc-cleanup"
+worktree: "/tmp/intrinsic-audit"
+claimed_at: "2026-09-05T04:41:20Z"
 contract_schema: 1
 contracts:
   - repo.source-documentation
 ---
 # HARDEN-089 — Reconcile audit-window source comments and README prose
+
+## Status
+
+- Completed and retired on 2026-09-05. The five audited module interfaces now
+  have concise synopses, and all 98 fixed-window task-ID lines have explicit
+  dispositions: 12 durable references retained and 86 history-first lines
+  rewritten as current-state documentation, with no executable C++ changes.
+- Implementation and evidence commits: `47c571432`, `45ea3f06a`.
+- Pull request: [#1041](https://github.com/intrinsicD/IntrinsicEngine/pull/1041).
 
 ## Goal
 
@@ -34,7 +43,7 @@ contracts:
 ## Context
 
 - The 2026-09-05
-  [agent-output audit](../../../docs/reports/2026-09-05-agent-output-audit.md)
+  [agent-output audit](../../docs/reports/2026-09-05-agent-output-audit.md)
   found five newly added module interfaces without mandatory leading synopses,
   six historical comment blocks in the largest touched runtime implementation,
   and current-state README sections phrased as task chronology or future work.
@@ -63,61 +72,61 @@ contracts:
 
 ## Required changes
 
-- [ ] Add a concise leading what-and-why synopsis to:
+- [x] Add a concise leading what-and-why synopsis to:
       `Geometry.HalfedgeMesh.CurvatureSegmentation.Features.cppm`,
       `Geometry.HalfedgeMesh.CurvatureSegmentation.Patches.cppm`,
       `Geometry.HalfedgeMesh.CurvatureSegmentation.cppm`,
       `Geometry.HalfedgeMesh.Features.cppm`, and
       `Runtime.CurvatureSegmentationConfig.cppm`.
-- [ ] Review all 98 audit-window source additions that mention a task ID.
+- [x] Review all 98 audit-window source additions that mention a task ID.
       Preserve a reference only after the current invariant when the provenance
       materially helps; remove or rewrite chronology, status, and future-owner
       narration.
-- [ ] Rewrite the six confirmed history-first blocks in
+- [x] Rewrite the six confirmed history-first blocks in
       `src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Mesh.cpp`
       (the topology signature, registration normals, mesh/registration/UV job
       identities, and UV publication seam) as concise present-state rationale.
-- [ ] Rewrite the audit-window additions in `src/runtime/README.md` so the
+- [x] Rewrite the audit-window additions in `src/runtime/README.md` so the
       changed-count rule, curvature segmentation, ICP prerequisites, and
       per-operation diagnostic lifetime describe current behavior. Keep links
       to durable task evidence only where they add provenance after the rule.
-- [ ] Review the final diff as documentation-only and confirm that no
+- [x] Review the final diff as documentation-only and confirm that no
       declaration, signature, expression, statement, include/import, literal
       consumed by code, or build input changed.
 
 ## Tests
 
-- [ ] The focused source-documentation audit reports zero objective errors for
+- [x] The focused source-documentation audit reports zero objective errors for
       the five new module interfaces.
-- [ ] Report-only scans of the touched runtime implementation and README are
+- [x] Report-only scans of the touched runtime implementation and README are
       manually reconciled against the fixed findings; unrelated inherited
       review prompts remain out of scope.
-- [ ] The canonical Clang module build and CPU-supported CTest selector pass
+- [x] The canonical Clang module build and CPU-supported CTest selector pass
       because comments in module interface units still traverse the real build
       graph.
-- [ ] Touched-scope `pr-fast`, strict task/docs/layering/test-layout checks,
+- [x] Touched-scope `pr-fast`, strict task/docs/layering/test-layout checks,
       and `git diff --check` pass.
 
 ## Docs
 
-- [ ] Source comments and `src/runtime/README.md` are the documentation
+- [x] Source comments and `src/runtime/README.md` are the documentation
       surface; do not copy their current-state contracts into architecture
       docs unless an actual architecture contract changes.
-- [ ] Retire this task with standard-profile evidence, append the retirement
+- [x] Retire this task with standard-profile evidence, append the retirement
       narrative, and regenerate `tasks/SESSION-BRIEF.md`.
 
 ## Acceptance criteria
 
-- [ ] All five audited module interfaces begin with a concise synopsis that
+- [x] All five audited module interfaces begin with a concise synopsis that
       states what the file contains and why its surface exists.
-- [ ] Every one of the 98 added task-ID lines has an explicit keep/rewrite/drop
+- [x] Every one of the 98 added task-ID lines has an explicit keep/rewrite/drop
       disposition in the work record, and no retained source comment or README
       sentence substitutes task history for the current contract.
-- [ ] The six confirmed runtime comment-history findings are absent while
+- [x] The six confirmed runtime comment-history findings are absent while
       their load-bearing rationale remains next to the relevant implementation.
-- [ ] The affected runtime README passages are factual current state; future
+- [x] The affected runtime README passages are factual current state; future
       work is linked as such rather than narrated as an in-progress feature.
-- [ ] The final C++ diff is comment-only and all required build/test/structural
+- [x] The final C++ diff is comment-only and all required build/test/structural
       gates pass.
 
 ## Verification
