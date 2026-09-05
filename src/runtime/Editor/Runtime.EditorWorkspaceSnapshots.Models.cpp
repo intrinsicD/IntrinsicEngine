@@ -3161,13 +3161,10 @@ namespace {
                     model.DirectMeshEnrichmentDiagnostic.empty())
                 {
                     model.DirectMeshEnrichmentDiagnostic =
-                        "Direct mesh enrichment is pending; geometry-mutating "
-                        "actions are disabled until it resolves.";
+                        "Direct mesh enrichment is pending; geometry actions "
+                        "remain available when their inputs are ready.";
                 }
             }
-
-            if (model.DirectMeshEnrichmentPending)
-                return model;
 
             model.Entries =
       ResolveEditorGeometryProcessingEntries(model.Capabilities);

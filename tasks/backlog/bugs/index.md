@@ -6,7 +6,7 @@ Each entry includes the observed repro, the likely affected symbols, and a fix p
 ## Active Issues
 
 - [`BUG-158` — Optional direct-mesh enrichment blocks already usable
-  geometry](BUG-158-direct-mesh-enrichment-blocks-usable-geometry.md): the
+  geometry](../../active/BUG-158-direct-mesh-enrichment-blocks-usable-geometry.md): the
   geometry-only mesh is published immediately, but the editor returns before
   resolving all processing actions while UV/normal enrichment is active.
 - [`BUG-159` — FastStaged atlas allocates global remaps for every

@@ -8,7 +8,7 @@ picking backlog work; theme priorities and rationale live in
 
 ## Active tasks
 
-- none
+- `BUG-158` — Optional direct-mesh enrichment blocks already usable geometry (tasks/active/BUG-158-direct-mesh-enrichment-blocks-usable-geometry.md)
 
 ## Theme B — Rendering modernization
 
@@ -109,7 +109,6 @@ picking backlog work; theme priorities and rationale live in
 
 - unblocked: `ASSETIO-012` — Two hand-maintained format capability tables have already drifted (tasks/backlog/assets/ASSETIO-012-single-source-format-capability-table.md)
 - unblocked: `BENCH-001` — Framework24 golden-workflow comparison harness (tasks/backlog/benchmarks/BENCH-001-framework24-golden-workflow-comparison-harness.md)
-- unblocked: `BUG-158` — Optional direct-mesh enrichment blocks already usable geometry (tasks/backlog/bugs/BUG-158-direct-mesh-enrichment-blocks-usable-geometry.md)
 - unblocked: `BUG-159` — FastStaged atlas allocates global remaps for every chart (tasks/backlog/bugs/BUG-159-fast-staged-atlas-per-chart-global-remaps.md)
 - blocked by `BUG-159`: `BUG-160` — FastStaged fixed seed planes fragment smooth meshes into tiny charts (tasks/backlog/bugs/BUG-160-fast-staged-atlas-chart-fragmentation.md)
 - unblocked: `GRAPHICS-135` — Measure current render-prep scheduling and material-sync overhead (tasks/backlog/rendering/GRAPHICS-135-renderprep-per-frame-taskgraph-overhead.md)

@@ -307,9 +307,13 @@ document replacement, destroyed world, recycled entity, or generation mismatch
 therefore terminates without targeting retired storage. A stale discard
 performs no ECS, history, or selection write. The same sidecar projects
 pending/terminal status plus a nonempty reason into the selected-entity
-processing model; while pending, that model exposes no geometry-mutating
-action. `RUNTIME-200` owns migration into the staged import recipe and must
-preserve this validation, lifetime, and readiness contract.
+processing model. Pending enrichment does not gate geometry processing:
+each action retains its canonical property/topology and kernel-readiness
+checks, so a geometry-only mesh can run curvature before UV/texture work
+finishes. An intervening geometry or property edit invalidates the captured
+generation; late enrichment is discarded without replacing the newer result.
+UV-dependent operations still require usable UVs, and enrichment progress and
+terminal diagnostics remain visible independently of action readiness.
 
 `Extrinsic.Runtime.CameraModule` is the optional app-composed global viewport
 owner. During registration it binds `WorldRegistry::ActiveWorld()`, publishes

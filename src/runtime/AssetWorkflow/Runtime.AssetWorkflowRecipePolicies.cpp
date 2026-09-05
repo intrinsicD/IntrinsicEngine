@@ -866,8 +866,8 @@ namespace Extrinsic::Runtime
                 AssetImportMeshEnrichmentState{
                     .Status = JobState::Queued,
                     .Diagnostic =
-                        "Direct mesh enrichment is pending; geometry-mutating "
-                        "actions are disabled until it resolves.",
+                        "Direct mesh enrichment is pending; geometry actions "
+                        "remain available when their inputs are ready.",
                 });
 
             const JobToken handle = jobs->Submit(

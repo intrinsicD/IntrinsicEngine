@@ -4927,20 +4927,14 @@ TEST(SandboxEditorUi, DirectMeshPostProcessDiscardsCompletionAfterBindingChange)
     engine.Shutdown();
 }
 
-TEST(SandboxEditorUi, DirectMeshPostProcessPendingStateGatesMutatingActions)
+TEST(SandboxEditorUi, DirectMeshEnrichmentPendingPreservesGeometryReadiness)
 {
     TmpFile meshFile(
         "runtime_mesh_postprocess_pending_readiness.obj",
         "v 0 0 0\n"
         "v 1 0 0\n"
         "v 0 1 0\n"
-        "vt 0 0\n"
-        "vt 1 0\n"
-        "vt 0 1\n"
-        "vn 0 0 1\n"
-        "vn 0 0 1\n"
-        "vn 0 0 1\n"
-        "f 1/1/1 2/2/2 3/3/3\n");
+        "f 1 2 3\n");
 
     Intrinsic::Tests::RuntimeTestKernel engine(
         HeadlessConfig(),
@@ -4985,15 +4979,22 @@ TEST(SandboxEditorUi, DirectMeshPostProcessPendingStateGatesMutatingActions)
         pendingModel.Processing.DirectMeshEnrichmentStatus));
     EXPECT_FALSE(
         pendingModel.Processing.DirectMeshEnrichmentDiagnostic.empty());
-    EXPECT_TRUE(pendingModel.Processing.Entries.empty());
-    EXPECT_TRUE(pendingModel.Processing.KMeansDomains.empty());
-    EXPECT_FALSE(pendingModel.Processing.MeshDenoiseAvailable);
-    EXPECT_FALSE(pendingModel.Processing.MeshCurvatureAvailable);
-    EXPECT_FALSE(pendingModel.Processing.MeshRemeshAvailable);
-    EXPECT_FALSE(pendingModel.Processing.MeshSubdivideAvailable);
-    EXPECT_FALSE(pendingModel.Processing.MeshSimplifyAvailable);
-    EXPECT_FALSE(pendingModel.Processing.MeshVertexNormalsAvailable);
-    EXPECT_FALSE(pendingModel.Processing.ProgressivePoissonAvailable);
+    EXPECT_FALSE(pendingModel.Processing.Entries.empty());
+    EXPECT_FALSE(pendingModel.Processing.KMeansDomains.empty());
+    EXPECT_TRUE(pendingModel.Processing.MeshDenoiseAvailable);
+    EXPECT_TRUE(pendingModel.Processing.MeshCurvatureAvailable);
+    EXPECT_TRUE(pendingModel.Processing.MeshRemeshAvailable);
+    EXPECT_TRUE(pendingModel.Processing.MeshSubdivideAvailable);
+    EXPECT_TRUE(pendingModel.Processing.MeshSimplifyAvailable);
+    EXPECT_TRUE(pendingModel.Processing.MeshVertexNormalsAvailable);
+    EXPECT_TRUE(pendingModel.Processing.ProgressivePoissonAvailable);
+
+    auto unavailableKernelContext = context;
+    unavailableKernelContext.MeshCurvatureKernelAvailable = false;
+    const auto unavailableKernelModel = Runtime::BuildEditorDomainWindowModel(
+        unavailableKernelContext, Runtime::EditorDomainWindowKind::Mesh);
+    EXPECT_FALSE(unavailableKernelModel.Processing.MeshCurvatureAvailable);
+    EXPECT_TRUE(unavailableKernelModel.Processing.MeshDenoiseAvailable);
 
     Runtime::JobToken enrichmentJob{};
     for (const Runtime::JobSnapshot& job : jobs.SnapshotAll())
@@ -5046,6 +5047,148 @@ TEST(SandboxEditorUi, DirectMeshPostProcessPendingStateGatesMutatingActions)
     EXPECT_TRUE(readyModel.Processing.MeshVertexNormalsAvailable);
     EXPECT_TRUE(readyModel.Processing.ProgressivePoissonAvailable);
 
+    engine.Shutdown();
+}
+
+TEST(SandboxEditorUi, DirectMeshEnrichmentDiscardsCompletionAfterCurvaturePublication)
+{
+    TmpFile meshFile(
+        "runtime_mesh_enrichment_curvature.obj",
+        "v 0 0 0\n"
+        "v 1 0 0\n"
+        "v 0 1 0\n"
+        "v 0 0 1\n"
+        "f 1 3 2\n"
+        "f 1 2 4\n"
+        "f 2 3 4\n"
+        "f 3 1 4\n");
+
+    Intrinsic::Tests::RuntimeTestKernel engine(
+        HeadlessConfig(), MakeDirectMeshPostProcessExitApplication());
+    InitializeDirectMeshPostProcessEngine(engine);
+    auto& jobs = RequiredEngineService<Runtime::JobService>(engine);
+    DirectMeshPostProcessWorkerBarrier workerBarrier{};
+    ASSERT_TRUE(workerBarrier.Submit(jobs, engine.ActiveWorld()).IsValid());
+    ASSERT_TRUE(workerBarrier.WaitUntilStarted());
+
+    const auto imported = RequiredEngineService<Runtime::AssetWorkflowModule>(engine)
+        .ImportAssetFromPath(Runtime::RuntimeAssetImportRequest{
+            .Path = meshFile.Path.string(),
+            .PayloadKind = Assets::AssetPayloadKind::Mesh,
+        });
+    ASSERT_TRUE(imported.has_value()) << static_cast<int>(imported.error());
+    auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
+    const auto meshEntity = FindFirstEntityWithDomain(scene, GS::Domain::Mesh);
+    ASSERT_TRUE(meshEntity.has_value());
+    auto& selection = RequiredEngineService<Runtime::SelectionController>(engine);
+    auto context = MakeContext(scene, selection);
+    auto& history = RequiredEngineService<Runtime::EditorCommandHistory>(engine);
+    context.CommandHistory = &history;
+
+    const auto pending = Runtime::BuildEditorDomainWindowModel(
+        context, Runtime::EditorDomainWindowKind::Mesh);
+    EXPECT_TRUE(pending.Processing.DirectMeshEnrichmentPending);
+    EXPECT_TRUE(pending.Processing.MeshCurvatureAvailable);
+    const auto curvature = Runtime::ApplyEditorMeshCurvatureCommand(
+        context,
+        Runtime::EditorMeshCurvatureCommand{
+            .StableEntityId = Runtime::SelectionController::ToStableEntityId(*meshEntity),
+            .Output = Runtime::EditorMeshCurvatureOutput::All,
+            .PublishPrincipalDirections = true,
+        });
+    ASSERT_TRUE(curvature.Succeeded()) << curvature.Message;
+    EXPECT_EQ(curvature.SupportedVertexCount, 4u);
+    EXPECT_GT(curvature.NonZeroPrincipalVertexCount, 0u);
+    const auto editedCounts = SourceMeshCounts(scene, *meshEntity);
+    const auto editedPositions = MeshVertexPositions(scene, *meshEntity);
+    const auto editedHistory = history.Snapshot();
+    const auto editedView = GS::BuildConstView(scene.Raw(), *meshEntity);
+    ASSERT_NE(editedView.VertexSource, nullptr);
+    const auto mean = editedView.VertexSource->Properties.Get<double>(PN::kMeanCurvature);
+    ASSERT_TRUE(mean.IsValid());
+    const auto expectedMean = mean.Vector();
+    EXPECT_TRUE(scene.Raw().all_of<Dirty::DirtyVertexAttributes>(*meshEntity));
+
+    workerBarrier.Release();
+    engine.Run();
+
+    EXPECT_EQ(jobs.Stats().StaleDiscardedJobs, 1u);
+    ExpectMeshCountsEqual(SourceMeshCounts(scene, *meshEntity), editedCounts);
+    ExpectPositionsExactlyEqual(MeshVertexPositions(scene, *meshEntity), editedPositions);
+    const auto finalView = GS::BuildConstView(scene.Raw(), *meshEntity);
+    ASSERT_NE(finalView.VertexSource, nullptr);
+    const auto finalMean = finalView.VertexSource->Properties.Get<double>(PN::kMeanCurvature);
+    ASSERT_TRUE(finalMean.IsValid());
+    EXPECT_EQ(finalMean.Vector(), expectedMean);
+    EXPECT_FALSE(finalView.VertexSource->Properties.Exists("v:texcoord"));
+    ASSERT_NE(finalView.HalfedgeSource, nullptr);
+    EXPECT_FALSE(finalView.HalfedgeSource->Properties.Exists("h:texcoord"));
+    EXPECT_EQ(history.Snapshot().Revision, editedHistory.Revision);
+    EXPECT_EQ(history.Snapshot().UndoCount, editedHistory.UndoCount);
+    const auto finalModel = Runtime::BuildEditorDomainWindowModel(
+        context, Runtime::EditorDomainWindowKind::Mesh);
+    EXPECT_FALSE(finalModel.Processing.DirectMeshEnrichmentPending);
+    EXPECT_EQ(finalModel.Processing.DirectMeshEnrichmentStatus, Runtime::JobState::StaleDiscarded);
+    EXPECT_FALSE(finalModel.Processing.DirectMeshEnrichmentDiagnostic.empty());
+    EXPECT_TRUE(finalModel.Processing.MeshCurvatureAvailable);
+    EXPECT_EQ(selection.SelectedStableIds().size(), 1u);
+    engine.Shutdown();
+}
+
+TEST(SandboxEditorUi, DirectMeshEnrichmentCancellationPreservesGeometryAndReadiness)
+{
+    TmpFile meshFile(
+        "runtime_mesh_enrichment_cancelled.obj",
+        "v 0 0 0\nv 1 0 0\nv 0 1 0\nf 1 2 3\n");
+    Intrinsic::Tests::RuntimeTestKernel engine(
+        HeadlessConfig(),
+        std::make_unique<WaitForConditionApplication>(
+            [](Runtime::Engine& kernel)
+            {
+                return RequiredEngineService<Runtime::JobService>(kernel)
+                    .Stats().InFlightJobs == 0u;
+            }));
+    InitializeDirectMeshPostProcessEngine(engine);
+    auto& jobs = RequiredEngineService<Runtime::JobService>(engine);
+    DirectMeshPostProcessWorkerBarrier workerBarrier{};
+    ASSERT_TRUE(workerBarrier.Submit(jobs, engine.ActiveWorld()).IsValid());
+    ASSERT_TRUE(workerBarrier.WaitUntilStarted());
+    const auto imported = RequiredEngineService<Runtime::AssetWorkflowModule>(engine)
+        .ImportAssetFromPath(Runtime::RuntimeAssetImportRequest{
+            .Path = meshFile.Path.string(),
+            .PayloadKind = Assets::AssetPayloadKind::Mesh,
+        });
+    ASSERT_TRUE(imported.has_value()) << static_cast<int>(imported.error());
+    auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
+    const auto mesh = FindFirstEntityWithDomain(scene, GS::Domain::Mesh);
+    ASSERT_TRUE(mesh.has_value());
+    auto context = MakeContext(
+        scene, RequiredEngineService<Runtime::SelectionController>(engine));
+    const auto counts = SourceMeshCounts(scene, *mesh);
+    const auto positions = MeshVertexPositions(scene, *mesh);
+    const auto history = RequiredEngineService<Runtime::EditorCommandHistory>(engine).Snapshot();
+    Runtime::JobToken enrichment{};
+    for (const auto& job : jobs.SnapshotAll())
+    {
+        if (job.DebugName.starts_with("Runtime.DirectMeshPostProcess."))
+            enrichment = job.Token;
+    }
+    ASSERT_TRUE(enrichment.IsValid());
+    ASSERT_TRUE(jobs.Cancel(enrichment));
+    workerBarrier.Release();
+    engine.Run();
+
+    const auto model = Runtime::BuildEditorDomainWindowModel(
+        context, Runtime::EditorDomainWindowKind::Mesh);
+    EXPECT_FALSE(model.Processing.DirectMeshEnrichmentPending);
+    EXPECT_EQ(model.Processing.DirectMeshEnrichmentStatus, Runtime::JobState::Cancelled);
+    EXPECT_FALSE(model.Processing.DirectMeshEnrichmentDiagnostic.empty());
+    EXPECT_TRUE(model.Processing.MeshCurvatureAvailable);
+    ExpectMeshCountsEqual(SourceMeshCounts(scene, *mesh), counts);
+    ExpectPositionsExactlyEqual(MeshVertexPositions(scene, *mesh), positions);
+    EXPECT_EQ(RequiredEngineService<Runtime::EditorCommandHistory>(engine)
+        .Snapshot().Revision, history.Revision);
+    EXPECT_TRUE((scene.Raw().all_of<G::RenderSurface, Sel::SelectableTag>(*mesh)));
     engine.Shutdown();
 }
 

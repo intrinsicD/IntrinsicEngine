@@ -4044,6 +4044,122 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke, ImportedOffOriginObjTriangleAutoFramesAtC
     engine.Shutdown();
 }
 
+TEST(RuntimeSandboxAcceptanceGpuSmoke, DirectMeshEnrichmentPendingRendersGeometryOnlyImport)
+{
+    TempObjFile obj{
+        "intrinsic_pending_enrichment_triangle",
+        "v 7.25 -0.75 0\n"
+        "v 8.75 -0.75 0\n"
+        "v 8 0.75 0\n"
+        "f 1 2 3\n",
+    };
+    EntityHandle importedEntity = Extrinsic::ECS::InvalidEntityHandle;
+    std::uint32_t warmupFrames = 0u;
+    auto importAfterCompletionDrain = std::make_unique<ExitWhenReadyApp>(
+        [&](Engine& kernel)
+        {
+            if (!kernel.GetDevice().IsOperational() || ++warmupFrames < kTargetFrames)
+                return false;
+            const auto imported = RequiredEngineService<RT::AssetWorkflowModule>(kernel)
+                .ImportAssetFromPath(RT::RuntimeAssetImportRequest{
+                    .Path = obj.Path.string(),
+                    .PayloadKind = Assets::AssetPayloadKind::Mesh,
+                });
+            if (!imported.has_value())
+            {
+                ADD_FAILURE() << "Geometry-only import failed: " << static_cast<int>(imported.error());
+                return true;
+            }
+            auto& scene = *kernel.Worlds().Get(kernel.ActiveWorld());
+            importedEntity = FindEntityByName(scene, obj.Path.filename().string());
+            if (importedEntity == Extrinsic::ECS::InvalidEntityHandle)
+            {
+                ADD_FAILURE() << "Import did not publish the mesh entity.";
+                return true;
+            }
+            auto& visualization = scene.Raw().get<G::VisualizationConfig>(importedEntity);
+            visualization.Source = G::VisualizationConfig::ColorSource::UniformColor;
+            visualization.Color = glm::vec4{1.0f, 0.0f, 0.0f, 1.0f};
+            return true;
+        },
+        /*settleFrames=*/0u,
+        /*maxFrames=*/32u,
+        /*budget=*/std::chrono::seconds{15},
+        /*attachEditor=*/false);
+    auto& importProbe = *importAfterCompletionDrain;
+    auto bootstrap = BootstrapDefaultSandboxAppEngineWithApp(std::move(importAfterCompletionDrain));
+    if (bootstrap.Skipped)
+        GTEST_SKIP() << bootstrap.SkipReason;
+    auto& engine = *bootstrap.EnginePtr;
+    auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
+    SetEntityPosition(scene, FindEntityByName(scene, "ReferenceTriangle"), glm::vec3{4.0f, 0.0f, 0.0f});
+
+    auto& renderer = engine.GetRenderer();
+    auto& device = engine.GetDevice();
+    const auto format = device.GetBackbufferFormat();
+    const auto bytesPerPixel = Extrinsic::RHI::BytesPerBlock(format);
+    const auto extent = device.GetBackbufferExtent();
+    ASSERT_GE(bytesPerPixel, 4u);
+    ASSERT_GT(extent.Width, 0u);
+    ASSERT_GT(extent.Height, 0u);
+    const std::uint64_t readbackSize = static_cast<std::uint64_t>(bytesPerPixel) * extent.Width * extent.Height;
+    const auto readback = device.CreateBuffer(Extrinsic::RHI::BufferDesc{
+        .SizeBytes = readbackSize,
+        .Usage = Extrinsic::RHI::BufferUsage::TransferDst,
+        .HostVisible = true,
+        .DebugName = "Sandbox.PendingEnrichment.Readback",
+    });
+    ASSERT_TRUE(readback.IsValid());
+    renderer.SetDefaultRecipeBackbufferReadbackBuffer(readback);
+    const auto run = DriveAcceptanceAndCapture(engine);
+    std::vector<std::uint8_t> bytes(static_cast<std::size_t>(readbackSize), 0u);
+    device.ReadBuffer(readback, bytes.data(), readbackSize, 0u);
+    renderer.SetDefaultRecipeBackbufferReadbackBuffer({});
+    device.DestroyBuffer(readback);
+
+    ASSERT_TRUE(run.DeviceOperational) << importProbe.ExitSummary();
+    ASSERT_NE(importedEntity, Extrinsic::ECS::InvalidEntityHandle) << importProbe.ExitSummary();
+    EXPECT_TRUE(run.Stats.Compile.Succeeded) << run.Stats.Diagnostic;
+    EXPECT_TRUE(run.Stats.Execute.Succeeded) << run.Stats.Diagnostic;
+    EXPECT_EQ(FindPassStatus(run.Stats, "SurfacePass"), RenderCommandPassStatus::Recorded);
+    EXPECT_GE(run.Stats.DefaultRecipeBackbufferReadbackCopyCount, 1u);
+    EXPECT_TRUE(Counters::IsStable(run.Before, run.After));
+
+    const auto view = gs::BuildConstView(scene.Raw(), importedEntity);
+    ASSERT_TRUE(view.Valid());
+    ASSERT_NE(view.VertexSource, nullptr);
+    ASSERT_NE(view.HalfedgeSource, nullptr);
+    EXPECT_FALSE(view.VertexSource->Properties.Exists("v:texcoord"));
+    EXPECT_FALSE(view.HalfedgeSource->Properties.Exists("h:texcoord"));
+    EXPECT_EQ(view.VerticesAlive(), 3u);
+    EXPECT_EQ(view.FacesAlive(), 1u);
+    EXPECT_TRUE((scene.Raw().all_of<ECSC::Selection::SelectableTag, G::RenderSurface,
+        ECSC::Culling::Local::Bounds, ECSC::Culling::World::Bounds>(importedEntity)));
+    auto& selection = RequiredEngineService<RT::SelectionController>(engine);
+    ASSERT_EQ(selection.SelectedStableIds().size(), 1u);
+    EXPECT_EQ(selection.SelectedStableIds().front(), RT::SelectionController::ToStableEntityId(importedEntity));
+    const auto context = Intrinsic::Tests::EditorFeatureTestContext{
+        .Scene = &scene,
+        .Selection = &selection,
+        .ImGuiAdapterAvailable = true,
+    };
+    const auto pending = RT::BuildEditorDomainWindowModel(context, RT::EditorDomainWindowKind::Mesh);
+    EXPECT_TRUE(pending.Processing.DirectMeshEnrichmentPending)
+        << "The final frame must precede the next completion drain.";
+    EXPECT_TRUE(pending.Processing.MeshCurvatureAvailable);
+    EXPECT_FALSE(pending.Processing.DirectMeshEnrichmentDiagnostic.empty());
+
+    const auto center = ReadPixel(bytes, format, bytesPerPixel, extent, extent.Width / 2u, extent.Height / 2u);
+    const auto background = ReadPixel(bytes, format, bytesPerPixel, extent,
+        (extent.Width * 15u) / 16u, (extent.Height * 15u) / 16u);
+    EXPECT_GT(RgbDistance(center, background), 48)
+        << "The UV-less imported mesh did not contribute a visible center pixel: "
+        << PixelText(center) << " background=" << PixelText(background);
+    EXPECT_GT(center.R, center.G) << PixelText(center);
+    EXPECT_GT(center.R, center.B) << PixelText(center);
+    engine.Shutdown();
+}
+
 TEST(RuntimeSandboxAcceptanceGpuSmoke, ImportedObjWithoutAuthoredUvsSamplesGeneratedAlbedoTexture)
 {
     auto app = std::make_unique<GeneratedUvTextureSmokeApp>();
