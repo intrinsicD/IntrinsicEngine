@@ -328,3 +328,10 @@ sessions:
     events_count: 6
     claims_touched: []
     open_threads: 4
+  - id: "2026-09-05_001"
+    date: "2026-09-05"
+    summary: "Applied approved backlog contract corrections and made interim BUG-097 repair conditional on current need while preserving the operator's UV-atlas replacement direction."
+    turn_count: 1
+    events_count: 2
+    claims_touched: []
+    open_threads: 2

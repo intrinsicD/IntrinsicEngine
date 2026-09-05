@@ -10760,3 +10760,50 @@ tree:
       before pushing it to GitHub; hosted pr-fast and BUG-164 warm-cache
       evidence therefore remain open.
     status: resolved
+  - id: N461
+    type: decision
+    title: "Accept backlog method-contract and comparison corrections"
+    provenance: user-revised
+    timestamp: "2026-09-05T12:58+02:00"
+    choice: >
+      Apply the recommended backlog corrections. METHOD-007 publishes float
+      positions while retaining precision-sensitive internal arithmetic and
+      validating the converted result. METHOD-033 and METHOD-034 share a
+      primary-source intake before implementation. METHOD-036 distinguishes
+      orientation-only from joint-estimation inputs, keeps ground truth for
+      scoring only, and requires an accepted METHOD-032 implementation before
+      starting the planned comparison. Existing benchmark metrics plus
+      structured diagnostics remain the default. These are future-work
+      contracts, not completed implementations or comparative results.
+    alternatives:
+      - "Leave incompatible publication types and comparison-input assumptions in the backlog."
+      - "Start the planned comparison after a negative METHOD-032 retirement without a new study decision."
+    evidence:
+      - "84f7c132d"
+      - "tasks/backlog/methods/METHOD-007-constrained-delaunay-tetrahedralization-reference-backend.md"
+      - "tasks/backlog/methods/METHOD-033-screened-poisson-reconstruction-reference.md"
+      - "tasks/backlog/methods/METHOD-034-ipsr-orientation-baseline.md"
+      - "tasks/backlog/methods/METHOD-036-orientation-comparison-evidence.md"
+    status: resolved
+  - id: N462
+    type: decision
+    title: "Make BUG-097 conditional on current need while UV-atlas replacement proceeds"
+    provenance: user-revised
+    timestamp: "2026-09-05T12:58+02:00"
+    choice: >
+      Preserve the operator's ongoing improved UV-atlas work. The stated goal
+      is automatic atlas construction at asset creation when UVs are missing;
+      the task note interprets applicable assets as newly created surface
+      meshes and preserves valid authored UVs. Repair the existing BUG-097
+      path only when a currently required workflow reproduces the defect.
+      Keep the bug open until a repair or evidenced supersession closes it.
+      No replacement branch or task was identified, and no interim code fix
+      or research-method adoption was performed in this turn.
+    alternatives:
+      - "Unconditionally repair the interim atlas path before locating the replacement work."
+      - "Retire BUG-097 solely because a replacement is planned."
+    evidence:
+      - "84f7c132d"
+      - "tasks/backlog/bugs/BUG-097-progressive-model-scene-zero-uv-atlas.md"
+      - "src/runtime/AssetWorkflow/Runtime.AssetWorkflowModelMaterialization.cpp"
+    status: resolved

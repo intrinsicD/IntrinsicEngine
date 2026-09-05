@@ -2003,7 +2003,7 @@ observations:
     promoted: false
     promoted_to: null
     crystallized_via: null
-    stale: false
+    stale: true
   - id: O119
     timestamp: "2026-08-04T23:21+02:00"
     provenance: user-revised
@@ -2421,7 +2421,7 @@ observations:
     promoted: false
     promoted_to: null
     crystallized_via: null
-    stale: false
+    stale: true
   - id: O138
     timestamp: "2026-08-07T00:01+02:00"
     provenance: ai-suggested

@@ -1,0 +1,54 @@
+session:
+  id: "2026-09-05_001"
+  date: "2026-09-05"
+  started: "2026-09-05T12:58+02:00"
+  last_turn: "2026-09-05T12:58+02:00"
+  turn_count: 1
+  summary: "Applied approved backlog contract corrections and made interim BUG-097 repair conditional on current need while preserving the operator's UV-atlas replacement direction."
+
+events_logged:
+  - turn: 1
+    type: decision
+    id: N461
+    routing: direct
+    provenance: user-revised
+    summary: "Accept float publication, shared Poisson/iPSR intake, and input-group-aware comparison gates."
+  - turn: 1
+    type: decision
+    id: N462
+    routing: direct
+    provenance: user-revised
+    summary: "Prioritize improved automatic atlas creation; repair BUG-097 only when currently necessary."
+
+ai_actions:
+  - turn: 1
+    action: >
+      Committed fourteen revised backlog notes, two explicitly gated method
+      integration intake notes, and synchronized indexes and metadata as
+      84f7c132d. Task, link, and docs-sync checks passed, as did twenty-three
+      task-validator regression tests. No engine code changed and no new
+      method, performance, sanitizer, or GPU result was established. The
+      remote publication attempt was rejected by the export guard; the
+      backlog and prior BUG-122 retirement commits remain local.
+    provenance: ai-executed
+    files_changed:
+      - "tasks/backlog/methods/METHOD-007A-cdt-engine-integration-intake.md"
+      - "tasks/backlog/methods/METHOD-033A-screened-poisson-engine-integration-intake.md"
+      - "tasks/backlog/methods/METHOD-036-orientation-comparison-evidence.md"
+      - "tasks/backlog/bugs/BUG-097-progressive-model-scene-zero-uv-atlas.md"
+      - "tasks/SESSION-BRIEF.md"
+
+claims_touched: []
+
+key_context:
+  - turn: 1
+    excerpt: >
+      User accepted the recommendations but specified that BUG-097 should be
+      repaired only if currently necessary because improved atlas construction
+      is already being worked on, with automatic creation when UVs are missing.
+
+open_threads:
+  - "Identify the operator's replacement UV-atlas task or branch before authorizing interim BUG-097 work."
+  - "Obtain explicit authorization before pushing the local commits to intrinsicD/IntrinsicEngine on GitHub."
+
+ai_suggestions_pending: []

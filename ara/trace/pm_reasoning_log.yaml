@@ -1714,3 +1714,11 @@ entries:
       - "Kept BUG-164 open because both old hosted reruns failed before cache save; a passing cold seed followed by a warm exact-shape cohort is still required."
       - "Recorded the rejected GitHub push as an open thread rather than publication evidence; commit 777bd8f655c7971b005e0b5e691700ed3ab7e452 remains local until the user explicitly approves export."
       - "Did not promote or stale O161-O170: this turn supplies no closure signal for the Core.Dag or curvature observations and occurs on the same session-day."
+  - turn: "2026-09-05_001#1"
+    notes:
+      - "Recorded accepted method planning corrections and the replacement-first atlas direction as decisions N461 and N462, not implementation or capability claims."
+      - "The atlas owner remains unknown; METHOD-040 and GEOM-076 were inspected but not identified as the operator's replacement or released from their existing gates."
+      - "No staged observation received a clear closure signal from this backlog-only turn. The method integration topic was revisited without endorsing every detail of O93's proposed lifecycle."
+      - "Flagged O118 and O137 stale after more than three session-days without a recorded revisit; retained them for operator triage without promotion or deletion."
+      - "Kept Core.Dag and curvature observations staged; task edits establish no new evidence for those topics."
+      - "Recorded local commits and rejected publication separately; did not treat a blocked push as hosted verification."
