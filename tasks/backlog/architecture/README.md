@@ -15,12 +15,6 @@ map.
   and every registered-feature row on one exact clean revision after every
   static remediation owner retires; findings become separate tasks and force a
   fresh complete rerun.
-- [`HARDEN-089`](HARDEN-089-audit-window-source-documentation-cleanup.md)
-  is the bounded 2026-09-05 output-audit follow-up: add five missing module
-  synopses and reconcile newly added history-first source/README prose without
-  changing executable C++. The operator explicitly selected this long hygiene
-  task next despite the standing Theme J picker default.
-
 Opened from the 2026-07-08 kernel/module architecture decision record
 ([`docs/adr/0024-kernel-module-architecture.md`](../../../docs/adr/0024-kernel-module-architecture.md));
 seams-first migration order. All additive seams (`ARCH-007`..`ARCH-011`), the

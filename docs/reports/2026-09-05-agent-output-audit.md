@@ -46,7 +46,7 @@ organization (`61fec5c06`), the removal of the transient `src_new` tree
 ## Follow-ups
 
 - Rows 2 and 9 are owned by
-  [`HARDEN-089`](../../tasks/backlog/architecture/HARDEN-089-audit-window-source-documentation-cleanup.md).
+  [`HARDEN-089`](../../tasks/active/HARDEN-089-audit-window-source-documentation-cleanup.md).
   That standard-profile cleanup is deliberately bounded to this audit window:
   five missing interface synopses, six identified historical comment blocks,
   current-state runtime README wording, and review of the 98 added source lines

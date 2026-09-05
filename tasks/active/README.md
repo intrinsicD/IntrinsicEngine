@@ -11,7 +11,10 @@ Each active task should include:
 
 ## Currently active
 
-No tasks are active.
+- [`HARDEN-089`](HARDEN-089-audit-window-source-documentation-cleanup.md) —
+  in progress under `Codex-HARDEN089` on
+  `codex/harden-089-source-doc-cleanup`; the next gate is the fixed-window
+  source-documentation baseline before comment-only implementation.
 
 ## Records
 

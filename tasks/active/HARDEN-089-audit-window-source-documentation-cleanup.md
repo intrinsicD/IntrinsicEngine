@@ -5,10 +5,10 @@ depends_on: []
 workflow_schema: 1
 workflow_profile: standard
 evidence: required
-owner:
-branch:
-worktree:
-claimed_at:
+owner: Codex-HARDEN089
+branch: codex/harden-089-source-doc-cleanup
+worktree: /tmp/intrinsic-audit
+claimed_at: "2026-09-05T04:38:08Z"
 contract_schema: 1
 contracts:
   - repo.source-documentation
@@ -34,7 +34,7 @@ contracts:
 ## Context
 
 - The 2026-09-05
-  [agent-output audit](../../../docs/reports/2026-09-05-agent-output-audit.md)
+  [agent-output audit](../../docs/reports/2026-09-05-agent-output-audit.md)
   found five newly added module interfaces without mandatory leading synopses,
   six historical comment blocks in the largest touched runtime implementation,
   and current-state README sections phrased as task chronology or future work.
