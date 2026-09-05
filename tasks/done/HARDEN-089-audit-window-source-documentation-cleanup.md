@@ -15,6 +15,15 @@ contracts:
 ---
 # HARDEN-089 — Reconcile audit-window source comments and README prose
 
+## Status
+
+- Completed and retired on 2026-09-05. The five audited module interfaces now
+  have concise synopses, and all 98 fixed-window task-ID lines have explicit
+  dispositions: 12 durable references retained and 86 history-first lines
+  rewritten as current-state documentation, with no executable C++ changes.
+- Implementation and evidence commits: `47c571432`, `45ea3f06a`.
+- Pull request: [#1041](https://github.com/intrinsicD/IntrinsicEngine/pull/1041).
+
 ## Goal
 
 - Make the source documentation introduced since the 2026-08-06 output audit
@@ -103,7 +112,7 @@ contracts:
 - [x] Source comments and `src/runtime/README.md` are the documentation
       surface; do not copy their current-state contracts into architecture
       docs unless an actual architecture contract changes.
-- [ ] Retire this task with standard-profile evidence, append the retirement
+- [x] Retire this task with standard-profile evidence, append the retirement
       narrative, and regenerate `tasks/SESSION-BRIEF.md`.
 
 ## Acceptance criteria

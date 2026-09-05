@@ -8,7 +8,7 @@ picking backlog work; theme priorities and rationale live in
 
 ## Active tasks
 
-- `HARDEN-089` — Reconcile audit-window source comments and README prose (tasks/active/HARDEN-089-audit-window-source-documentation-cleanup.md)
+- none
 
 ## Theme B — Rendering modernization
 

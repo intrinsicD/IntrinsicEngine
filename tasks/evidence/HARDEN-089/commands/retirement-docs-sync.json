@@ -1,0 +1,26 @@
+{
+  "command": [
+    "python3",
+    "tools/docs/check_docs_sync.py",
+    "--root",
+    ".",
+    "--diff-mode",
+    "--base-ref",
+    "origin/main",
+    "--strict"
+  ],
+  "command_display": "python3 tools/docs/check_docs_sync.py --root . --diff-mode --base-ref origin/main --strict",
+  "cwd": ".",
+  "duration_ms": 35,
+  "exit_code": 0,
+  "finished_at": "2026-09-05T05:43:14Z",
+  "label": "retirement-docs-sync",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-09-05T05:43:14Z",
+  "stderr_path": "tasks/evidence/HARDEN-089/commands/retirement-docs-sync.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/HARDEN-089/commands/retirement-docs-sync.stdout.log",
+  "stdout_sha256": "709aaac2a22073356056da5334f76c9ca511da0b7623b98c28fd07719e55eeb8",
+  "task_id": "HARDEN-089"
+}

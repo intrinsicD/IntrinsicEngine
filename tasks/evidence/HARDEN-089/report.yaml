@@ -3,18 +3,18 @@ task_id: HARDEN-089
 workflow_profile: standard
 status: complete
 generated_by: tools/agents/workflow_evidence.py
-generated_at: '2026-09-05T05:38:22Z'
+generated_at: '2026-09-05T05:43:45Z'
 claim_eligible: false
 source:
   base_ref: origin/main
   base_revision: 11479102c15e20fef62869b17368abb5c73e5b25
-  head_revision: 47c5714321c28e372f2622238e9e23aee44f8db1
+  head_revision: 45ea3f06af9f4fc60bb031b37d9eb1bba04a1072
   branch: codex/harden-089-source-doc-cleanup
   worktree: /tmp/intrinsic-audit
-  dirty: false
+  dirty: true
   surface:
   - path: docs/reports/2026-09-05-agent-output-audit.md
-    sha256: 5de36dc03520b76e4384d47bc8b62bfa57e610b70ca012134003fe37568a7845
+    sha256: b5f17fd9307f55fbd878a6c5b039a9e7e7b81048562d10718aba4919c709c068
   - path: src/app/Sandbox/README.md
     sha256: 41cd2c8fda0e55ef80e813486b12716aca3c9901dd0dde88730d60324627c117
   - path: src/geometry/Geometry.HalfedgeMesh.CurvatureSegmentation.Features.cppm
@@ -72,14 +72,16 @@ source:
   - path: src/runtime/Visualization/Runtime.VisualizationRecipes.cpp
     sha256: 55a81a130736e9d77435ae6d634c198c5877eb39948e6c998b24d5818f246d01
   - path: tasks/SESSION-BRIEF.md
-    sha256: 59b4f418171be7eb8f98b210115c0f8227fad898ca5f2a3d9350ca4b27e0adfe
-  - path: tasks/active/HARDEN-089-audit-window-source-documentation-cleanup.md
-    sha256: a127cd418979f687022a0c6ff0a8add31c9337a48b34cbcdfabb3a85462cf8e0
-  - path: tasks/active/README.md
-    sha256: 03cea940e94dfcfad7534fa5ca7d444df6f3784b105edec2616a16f707a8ec2e
+    sha256: 1bbbfac321f9f6238eee1523aab4e5111da317f31d020a6693f468484aa311c8
+  - path: tasks/backlog/architecture/HARDEN-089-audit-window-source-documentation-cleanup.md
+    sha256: null
   - path: tasks/backlog/architecture/README.md
     sha256: b6a1795728552e7e32e3a680fe1c73f17a6a19333a2ff4728e6855fe00ffd487
-  content_digest: 9a6ca175c30e054e16b321e0375c414976f26e45553c7a4619a32411ef6f2505
+  - path: tasks/done/HARDEN-089-audit-window-source-documentation-cleanup.md
+    sha256: 417bc756785445dceea7f38b27b70acaa4830cfd8181bd1b6b25f388743e1f5c
+  - path: tasks/done/RETIREMENT-LOG.md
+    sha256: 24550e921c3c384fbf45892a6172d8a6b53dbe10554ef3b07c4c81abd5f713c0
+  content_digest: 1206488c8dfebf9343835966abf4ffa1b758a6bac8e382148edf5c0670547529
 touched:
   paths:
   - docs/reports/2026-09-05-agent-output-audit.md
@@ -112,9 +114,10 @@ touched:
   - src/runtime/Scene/Runtime.SceneSerialization.cpp
   - src/runtime/Visualization/Runtime.VisualizationRecipes.cpp
   - tasks/SESSION-BRIEF.md
-  - tasks/active/HARDEN-089-audit-window-source-documentation-cleanup.md
-  - tasks/active/README.md
+  - tasks/backlog/architecture/HARDEN-089-audit-window-source-documentation-cleanup.md
   - tasks/backlog/architecture/README.md
+  - tasks/done/HARDEN-089-audit-window-source-documentation-cleanup.md
+  - tasks/done/RETIREMENT-LOG.md
   layers:
   - app
   - geometry
@@ -175,6 +178,13 @@ commands:
 - receipt: tasks/evidence/HARDEN-089/commands/full-source-doc-inventory.json
 - receipt: tasks/evidence/HARDEN-089/commands/layering.json
 - receipt: tasks/evidence/HARDEN-089/commands/pr-fast.json
+- receipt: tasks/evidence/HARDEN-089/commands/retirement-diff-check.json
+- receipt: tasks/evidence/HARDEN-089/commands/retirement-doc-links.json
+- receipt: tasks/evidence/HARDEN-089/commands/retirement-docs-sync.json
+- receipt: tasks/evidence/HARDEN-089/commands/retirement-session-brief.json
+- receipt: tasks/evidence/HARDEN-089/commands/retirement-state-links.json
+- receipt: tasks/evidence/HARDEN-089/commands/retirement-task-policy.json
+- receipt: tasks/evidence/HARDEN-089/commands/retirement-validate-tasks.json
 - receipt: tasks/evidence/HARDEN-089/commands/runtime-source-doc.json
 - receipt: tasks/evidence/HARDEN-089/commands/session-brief-check.json
 - receipt: tasks/evidence/HARDEN-089/commands/task-policy.json
@@ -189,7 +199,7 @@ diagnostics_and_previews:
   removed; disposition ledger: 98 rows = 12 keep + 86 rewrite + 0 drop.'
 benchmark_or_parity_evidence: []
 docs_sync:
-  task_file: tasks/active/HARDEN-089-audit-window-source-documentation-cleanup.md
+  task_file: tasks/done/HARDEN-089-audit-window-source-documentation-cleanup.md
   session_brief_present: true
   canonical_docs_changed: true
   skill_mirrors_checked: true
@@ -222,6 +232,9 @@ artifacts:
   kind: file
 - path: tasks/evidence/HARDEN-089/commands/cpu-tests.json
   sha256: 2b9443eb0e631aa092a96b016e3dd2ecd3406112eebc22e84c6a86c6b30ba9c0
+  kind: file
+- path: tasks/done/HARDEN-089-audit-window-source-documentation-cleanup.md
+  sha256: 417bc756785445dceea7f38b27b70acaa4830cfd8181bd1b6b25f388743e1f5c
   kind: file
 self_review:
   completed: true
