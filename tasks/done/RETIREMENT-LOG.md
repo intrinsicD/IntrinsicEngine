@@ -8029,3 +8029,15 @@ degree of angular error. It also pins the two-texel gutter, transparent farther
 texels, exact generated-asset binding, and preservation of unrelated material
 slots. The default CPU-supported gate passes 4177/4177 with the expected
 `GlfwLifecycleLsan` capability skip.
+
+## 2026-09-05 — BUG-170 retired
+
+[BUG-170](BUG-170-root-hygiene-historical-id-reconciliation.md) preserves the
+ADR-0028 branch's historical root-hygiene closure under a unique ID during
+PR #1034 consolidation. Its original `BUG-163` collided with main's existing
+sculpt/curvature task, which remains unchanged. The root-hygiene defect was
+already fixed by owner commit `17d9d29a` removing `src_new/` on 2026-09-02.
+Original task, report, seal, and receipts remain intact at merged parent
+`e4edd20fc3ac30bada55c8ec48b6bef65e10615a`; the new note links those artifacts
+without rewriting their sealed identity or occupying the unrelated canonical
+`BUG-163` evidence directory.

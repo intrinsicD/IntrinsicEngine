@@ -30,6 +30,18 @@ without requiring them to read every file.
   work. Compiled-plan reuse already exists; intervening visualization writes
   can require the second material sync. Negative evidence permits no rewrite.
 
+- [`GRAPHICS-137`](GRAPHICS-137-shader-object-realization-spike.md) is the
+  ADR-0028 killing-experiment spike: an opt-in `VK_EXT_shader_object`
+  realization behind the unchanged `RHI::PipelineManager` API. Its own
+  trigger (measured pipeline-compile stalls, or a landing
+  material/permutation slice) must fire and be recorded before work starts.
+
+- [`GRAPHICS-136`](GRAPHICS-136-rename-pipeline-to-graphics-state-rhi-boundary.md)
+  is the ADR-0028 trigger-gated mechanical rename of the RHI-surface
+  `Pipeline*` vocabulary to `GraphicsState*`. It depends on `GRAPHICS-137`
+  and stays blocked until the spike's boundary finding is recorded in the
+  task; do not pick it up before that.
+
 - The 2026-07-03 review R13 follow-up `GRAPHICS-119` retired parallel
   render-pass command recording via the task scheduler on 2026-07-07.
 - The rejected 2026-08-06 `REVIEW-003` baseline opened six Theme F

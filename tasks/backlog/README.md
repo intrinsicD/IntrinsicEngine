@@ -113,6 +113,11 @@ is retired; see
 (`RUNTIME-126`) is retired with the transfer facade/readback ring wired into the
 runtime derived-job graph.
 
+`GRAPHICS-137` owns the trigger-gated shader-object realization spike from
+[ADR-0028](../../docs/adr/0028-declarative-graphics-state-rhi-boundary.md).
+`GRAPHICS-136` owns the mechanical RHI surface rename and remains blocked
+until the spike records its boundary finding and a second realization lands.
+
 `GRAPHICS-135` is the Theme J current-render-prep profiling owner. It measures
 callback registration/rebinding, retained-plan execution, scheduler dispatch,
 and material work before proposing changes. Compiled-plan reuse already
