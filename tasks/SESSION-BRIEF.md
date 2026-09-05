@@ -122,7 +122,6 @@ picking backlog work; theme priorities and rationale live in
 
 ## Unthemed
 
-- unblocked: `BUG-122` — Runtime asset ASan tests retain expired callback and snapshot state (tasks/backlog/bugs/BUG-122-runtime-asset-asan-test-lifetimes.md)
 - unblocked: `GRAPHICS-109` — Offscreen frame capture to PNG (headless figure renders) (tasks/backlog/rendering/GRAPHICS-109-offscreen-frame-capture-png.md)
 
 ## Audits

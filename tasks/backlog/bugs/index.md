@@ -34,13 +34,6 @@ of `BUG-140` and of the parameterization rejection recorded in `BUG-141`.
   full rerun. Preserve the next failed assertion, establish a deterministic
   cause, and fix the owning test or adapter surface without quarantine,
   retries, or weakened coverage.
-- [`BUG-122` — Runtime asset ASan tests retain expired callback and snapshot state](BUG-122-runtime-asset-asan-test-lifetimes.md):
-  one shutdown test lets a queued hook retain loop-local synchronization state,
-  while three progressive model-scene tests retain pointers into temporary
-  `SnapshotAll()` vectors. The required serial ASan gate reports one
-  stack-use-after-scope and three heap-use-after-free failures on
-  `origin/main`; repair the test lifetimes without weakening their semantics or
-  changing production contracts absent an independent repro.
 - [`BUG-097` — Progressive model-scene UV job publishes a zero atlas](BUG-097-progressive-model-scene-zero-uv-atlas.md):
   the default-off progressive enrichment path labels an all-zero authoritative
   `v:texcoord` property as an atlas and can publish it after newer UV/topology

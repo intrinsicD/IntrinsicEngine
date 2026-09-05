@@ -8,6 +8,18 @@ so blocks moved from the old active-README history work verbatim.
 
 ## Retired task narratives
 
+[`BUG-122`](BUG-122-runtime-asset-asan-test-lifetimes.md) — retired on
+2026-09-05 as superseded by
+[`RUNTIME-200`](RUNTIME-200-staged-asset-import-materialization-recipe.md),
+not as a new repair. The surviving shutdown-order regression now waits for
+its worker before releasing loop-local synchronization state. The three
+temporary-snapshot-pointer regressions disappeared with the deliberately
+retired model-scene handoff tests in `0fdeac008`; the accepted RUNTIME-200
+implementation runs through `c974242b`. Its recorded serial ASan gate passed
+2,667/2,667 on 2026-07-31. This closure changes only task bookkeeping and cites
+that historical evidence; it does not claim a fresh sanitizer run or restore
+deleted tests. Unrelated open bugs and backlog decisions remain unchanged.
+
 [`HARDEN-089`](HARDEN-089-audit-window-source-documentation-cleanup.md) — the
 five module interfaces missing mandatory leading documentation now carry
 concise what-and-why synopses. Every one of the 98 task-ID lines introduced in
