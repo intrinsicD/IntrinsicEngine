@@ -42,6 +42,7 @@ import Extrinsic.Runtime.WorldHandle;
 import Geometry.Graph.Vertex.Normals;
 export import Geometry.HalfedgeMesh.CurvatureSegmentation;
 export import Geometry.HalfedgeMesh.CurvatureSegmentation.Patches;
+export import Geometry.HalfedgeMesh.CurvatureSegmentation.Multicut;
 import Geometry.HalfedgeMesh.Vertices.Normals;
 export import Geometry.Parameterization;
 import Geometry.PointCloud.Normals;
@@ -483,6 +484,9 @@ export namespace Extrinsic::Runtime
         std::optional<
             Geometry::CurvatureSegmentation::CurvaturePatchDiagnostics>
             PatchDiagnostics{};
+        std::optional<
+            Geometry::CurvatureSegmentation::BoundaryPartitionDiagnostics>
+            BoundaryDiagnostics{};
         std::size_t ChangedValueCount{0u};
         Core::ErrorCode Error{Core::ErrorCode::Success};
         std::string Message{};
@@ -502,7 +506,16 @@ export namespace Extrinsic::Runtime
                        PatchDiagnostics.has_value() &&
                        PatchDiagnostics->Succeeded();
             }
-            return Diagnostics.Succeeded();
+            if (ActualMethod == CurvatureSegmentationMethod::FeatureBoundaryCurves)
+            {
+                return FeatureDiagnostics.has_value() &&
+                       FeatureDiagnostics->Succeeded() &&
+                       BoundaryDiagnostics.has_value() &&
+                       BoundaryDiagnostics->Status == Geometry::CurvatureSegmentation::
+                           BoundaryPartitionStatus::Success;
+            }
+            return ActualMethod == CurvatureSegmentationMethod::CurvatureGmm &&
+                   Diagnostics.Succeeded();
         }
     };
 

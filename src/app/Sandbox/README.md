@@ -133,14 +133,15 @@ owns the ICP registration window plus the mesh denoise, curvature, remesh,
 subdivide, simplify, and mesh/graph/point-cloud vertex-normal windows. It
 registers those nine windows under their existing menu paths, owns their ImGui
 input/result-presentation state, and consumes only runtime snapshots and typed
-operations. The Curvature window includes the METHOD-037 segmentation controls:
-Fixed and Automatic GMM selection share the registered
-`sandbox.curvature_segmentation` draft/apply/reload lane, configured Run uses
-the runtime's selected-mesh preflight and undoable five-property publication,
-and Show result enables both `f:curvature_region_color` on the face surface and
-`e:curvature_region_boundary_color` on the edge overlay. Candidate, fit,
-spatial-energy, connected-region, and boundary diagnostics remain pointer-free;
-the panel labels the ICM result as a local optimum and does not present a cut or
+operations. The Curvature window includes production METHOD-037 and diagnostic
+METHOD-039/METHOD-040 choices through the registered
+`sandbox.curvature_segmentation` draft/apply/reload lane. Select **Feature
+boundaries (METHOD-040, experimental curves_v1)** and **Run segmentation** to
+inspect the fixed boundary profile. Configured Run uses the shared selected-mesh
+preflight and undoable property publication; Show result enables
+`f:curvature_region_color` on the surface and `e:curvature_feature_patch_color`
+on the edge overlay. METHOD-040 hides unused GMM controls and reports its own
+boundary/cleanup diagnostics. It remains experimental and exposes no cut or
 UV-atlas action. `Sandbox.Editor.DomainPanels` registers the existing Appearance,
 Properties, and Selection windows for Mesh, Graph, and PointCloud plus
 PointCloud Remove Outliers. It owns their menu paths, lazy per-frame model

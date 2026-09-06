@@ -24,6 +24,8 @@ namespace Extrinsic::Runtime
             return "Curvature GMM (METHOD-037)";
         case CurvatureSegmentationMethod::FeatureAlignedPatches:
             return "Feature-aligned patches (METHOD-039)";
+        case CurvatureSegmentationMethod::FeatureBoundaryCurves:
+            return "Feature boundaries (METHOD-040, experimental curves_v1)";
         }
         return "Unknown";
     }
@@ -47,7 +49,8 @@ namespace Extrinsic::Runtime
         const bool validMethod =
             config.Method == CurvatureSegmentationMethod::CurvatureGmm ||
             config.Method ==
-                CurvatureSegmentationMethod::FeatureAlignedPatches;
+                CurvatureSegmentationMethod::FeatureAlignedPatches ||
+            config.Method == CurvatureSegmentationMethod::FeatureBoundaryCurves;
         const bool validMode =
             config.SelectionMode ==
                 CurvatureSegmentationSelectionMode::FixedCount ||

@@ -457,3 +457,100 @@ TEST(CurvatureSegmentationOperations,
         GS::PropertyNames::kCurvatureComponent));
     EXPECT_EQ(harness.History.UndoCount(), 0u);
 }
+
+TEST(CurvatureSegmentationOperations,
+     BoundaryCurvesPublishRegionsWithoutFittedComponentsAndUndoRemoval)
+{
+    SegmentationHarness harness{};
+    Runtime::CurvatureSegmentationConfig config{};
+    config.Method = Runtime::CurvatureSegmentationMethod::FeatureBoundaryCurves;
+    const auto command = Runtime::EditorCurvatureSegmentationCommand{
+        .StableEntityId = harness.StableEntityId, .Config = config};
+    const auto positions = harness.Vertices().Properties.Get<glm::vec3>(
+        GS::PropertyNames::kPosition).Vector();
+    const auto topology = harness.Faces().Properties.Get<std::uint32_t>(
+        GS::PropertyNames::kFaceHalfedge).Vector();
+    (void)harness.Faces().Properties.GetOrAdd<float>("f:user_value", 3.25f);
+    const auto result = Runtime::ApplyEditorCurvatureSegmentationCommand(harness.Context, command);
+    ASSERT_TRUE(result.Succeeded()) << result.Message;
+    EXPECT_EQ(result.ActualMethod, config.Method);
+    EXPECT_EQ(result.RequestedMethod, config.Method);
+    ASSERT_TRUE(result.BoundaryDiagnostics.has_value());
+    EXPECT_FALSE(result.PatchDiagnostics.has_value());
+    EXPECT_FALSE(result.Diagnostics.Succeeded());
+    EXPECT_EQ(result.Message.find("GMM components="), std::string::npos);
+    EXPECT_NE(result.Message.find("curves_v1"), std::string::npos);
+    EXPECT_FALSE(harness.Faces().Properties.Exists(GS::PropertyNames::kCurvatureComponent));
+    const auto regions = harness.Faces().Properties.Get<std::uint32_t>(
+        GS::PropertyNames::kCurvatureRegion).Vector();
+    const auto boundaries = harness.Edges().Properties.Get<bool>(
+        GS::PropertyNames::kCurvatureRegionBoundary).Vector();
+    const auto hard = harness.Edges().Properties.Get<bool>(GS::PropertyNames::kCurvatureHardFeature);
+    const auto colors = harness.Edges().Properties.Get<glm::vec4>(GS::PropertyNames::kCurvatureFeaturePatchColor);
+    ASSERT_EQ(regions.size(), harness.Faces().Properties.Size());
+    ASSERT_EQ(boundaries.size(), harness.Edges().Properties.Size());
+    for (const auto region : regions)
+        EXPECT_LT(region, result.BoundaryDiagnostics->RegionCount);
+    for (const auto edge : harness.SourceMesh.LiveEdges())
+    {
+        const bool expected = !harness.SourceMesh.IsBoundary(edge) &&
+            regions[harness.SourceMesh.Face(harness.SourceMesh.Halfedge(edge, 0)).Index] !=
+            regions[harness.SourceMesh.Face(harness.SourceMesh.Halfedge(edge, 1)).Index];
+        EXPECT_EQ(boundaries[edge.Index], expected);
+        if (hard[edge.Index]) EXPECT_TRUE(expected);
+        EXPECT_FLOAT_EQ(colors[edge.Index].w, expected ? 1.0f : 0.0f);
+    }
+    EXPECT_EQ(harness.History.UndoCount(), 1u);
+    // Adding only stale fitted labels must still create a removal transaction
+    // when every partition output is already identical.
+    const std::vector<std::uint32_t> staleComponents(regions.size(), 7u);
+    harness.Faces().Properties.GetOrAdd<std::uint32_t>(
+        std::string{GS::PropertyNames::kCurvatureComponent}, 0u).Vector() = staleComponents;
+    const auto repeated = Runtime::ApplyEditorCurvatureSegmentationCommand(harness.Context, command);
+    ASSERT_TRUE(repeated.Succeeded()) << repeated.Message;
+    EXPECT_EQ(repeated.Status, Runtime::EditorCommandStatus::Applied);
+    EXPECT_EQ(repeated.ChangedValueCount, staleComponents.size());
+    EXPECT_FALSE(harness.Faces().Properties.Exists(GS::PropertyNames::kCurvatureComponent));
+    EXPECT_EQ(harness.History.UndoCount(), 2u);
+    ASSERT_TRUE(harness.History.Undo().Succeeded());
+    EXPECT_EQ(harness.Faces().Properties.Get<std::uint32_t>(
+        GS::PropertyNames::kCurvatureComponent).Vector(), staleComponents);
+    EXPECT_EQ(harness.Faces().Properties.Get<std::uint32_t>(
+        GS::PropertyNames::kCurvatureRegion).Vector(), regions);
+    ASSERT_TRUE(harness.History.Redo().Succeeded());
+    EXPECT_FALSE(harness.Faces().Properties.Exists(GS::PropertyNames::kCurvatureComponent));
+    EXPECT_EQ(harness.Edges().Properties.Get<bool>(
+        GS::PropertyNames::kCurvatureRegionBoundary).Vector(), boundaries);
+    EXPECT_EQ(harness.Vertices().Properties.Get<glm::vec3>(GS::PropertyNames::kPosition).Vector(), positions);
+    EXPECT_EQ(harness.Faces().Properties.Get<std::uint32_t>(GS::PropertyNames::kFaceHalfedge).Vector(), topology);
+    EXPECT_FLOAT_EQ(harness.Faces().Properties.Get<float>("f:user_value")[0], 3.25f);
+    const auto unchanged = Runtime::ApplyEditorCurvatureSegmentationCommand(harness.Context, command);
+    EXPECT_TRUE(unchanged.Succeeded());
+    EXPECT_EQ(unchanged.Status, Runtime::EditorCommandStatus::NoChange);
+    EXPECT_EQ(harness.History.UndoCount(), 2u);
+}
+
+TEST(CurvatureSegmentationOperations, BoundaryCurvesFailurePreservesExistingPublication)
+{
+    SegmentationHarness harness{};
+    ASSERT_TRUE(Apply(harness).Succeeded());
+    const auto components = harness.Faces().Properties.Get<std::uint32_t>(
+        GS::PropertyNames::kCurvatureComponent).Vector();
+    const auto regions = harness.Faces().Properties.Get<std::uint32_t>(
+        GS::PropertyNames::kCurvatureRegion).Vector();
+    const auto history = harness.History.UndoCount();
+    // A collapsed surface must fail before publication or history changes.
+    auto position = harness.Vertices().Properties.Get<glm::vec3>(GS::PropertyNames::kPosition);
+    std::fill(position.Vector().begin(), position.Vector().end(), glm::vec3{0.0f});
+    Runtime::CurvatureSegmentationConfig config{};
+    config.Method = Runtime::CurvatureSegmentationMethod::FeatureBoundaryCurves;
+    const auto failed = Runtime::ApplyEditorCurvatureSegmentationCommand(harness.Context,
+        {.StableEntityId = harness.StableEntityId, .Config = config});
+    EXPECT_FALSE(failed.Succeeded());
+    EXPECT_EQ(failed.ActualMethod, config.Method);
+    EXPECT_EQ(harness.History.UndoCount(), history);
+    EXPECT_EQ(harness.Faces().Properties.Get<std::uint32_t>(
+        GS::PropertyNames::kCurvatureComponent).Vector(), components);
+    EXPECT_EQ(harness.Faces().Properties.Get<std::uint32_t>(
+        GS::PropertyNames::kCurvatureRegion).Vector(), regions);
+}

@@ -33,6 +33,7 @@ export namespace Extrinsic::Runtime
     {
         CurvatureGmm = 0,
         FeatureAlignedPatches,
+        FeatureBoundaryCurves,
     };
 
     [[nodiscard]] const char* DebugNameForCurvatureSegmentationMethod(
@@ -43,9 +44,8 @@ export namespace Extrinsic::Runtime
 
     struct CurvatureSegmentationConfig
     {
-        // METHOD-037 remains the operational default. METHOD-039 is an
-        // explicit diagnostic selection because its frozen global
-        // seed-stability verdict remains negative outside the sculpt profile.
+        // The feature-patch and boundary-curve methods are explicit diagnostics;
+        // their negative adoption verdicts do not change the operational default.
         CurvatureSegmentationMethod Method{
             CurvatureSegmentationMethod::CurvatureGmm};
         CurvatureSegmentationSelectionMode SelectionMode{

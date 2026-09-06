@@ -58,7 +58,7 @@ int main(int argc, char **argv)
     if (clean)
         params.MinimumRegionArea = std::numbers::pi * radius * radius;
     if (mode == "curves")
-        params.MinimumExclusionCurveLength = radius;
+        params = C::BoundaryCurveCoverageProfileV1();
     if (argc == 5)
     {
         char *end = nullptr;

@@ -99,6 +99,7 @@ import Geometry.Curvature;
 import Geometry.HalfedgeMesh.CurvatureSegmentation;
 import Geometry.HalfedgeMesh.CurvatureSegmentation.Features;
 import Geometry.HalfedgeMesh.CurvatureSegmentation.Patches;
+import Geometry.HalfedgeMesh.CurvatureSegmentation.Multicut;
 import Geometry.CatmullClark;
 import Geometry.HalfedgeMesh;
 import Geometry.HalfedgeMesh.AdaptiveRemeshing;
@@ -3334,10 +3335,10 @@ struct EditorJobResult { std::string Diagnostic{}; };
             const MeshCurvatureSegmentationPropertyState& before,
             const MeshCurvatureSegmentationPropertyState& after) noexcept
         {
-            return CountChangedValues(
-                       before.HadComponent,
-                       before.Components,
-                       after.Components) +
+            return (before.HadComponent && !after.HadComponent
+                        ? before.Components.size()
+                        : CountChangedValues(before.HadComponent,
+                                             before.Components, after.Components)) +
                    CountChangedValues(
                        before.HadRegion,
                        before.Regions,
@@ -10490,71 +10491,130 @@ ApplyEditorMeshCurvatureCommand(
                 return result;
             }
 
-            CurvSeg::CurvaturePatchResult patches =
-                CurvSeg::SegmentFeatureAlignedPatches(
-                    source.Mesh,
+            if (command.Config.Method == CurvatureSegmentationMethod::FeatureBoundaryCurves)
+            {
+                auto partition = CurvSeg::PartitionFeatureBoundaries(
+                    source.Mesh, featureEvidence.View(),
+                    CurvSeg::BoundaryCurveCoverageProfileV1(),
                     curvature.MaxPrincipalCurvatureProperty.Vector(),
-                    curvature.MinPrincipalCurvatureProperty.Vector(),
-                    featureEvidence.View(),
-                    MakeCurvaturePatchParams(command.Config));
-            result.PatchDiagnostics = patches.Diagnostics;
-            if (!patches.Succeeded())
-            {
-                result.Status =
-                    EditorCommandStatus::GeometryProcessingFailed;
-                result.Error = Core::ErrorCode::InvalidArgument;
-                result.Message =
-                    "Feature-aligned patch segmentation failed: ";
-                result.Message +=
-                    CurvSeg::ToString(patches.Diagnostics.Status);
-                result.Message += ".";
-                return result;
-            }
-
-            result.Diagnostics.Status =
-                CurvSeg::SegmentationStatus::Success;
-            result.Diagnostics.FaceSlotCount =
-                patches.Diagnostics.FaceSlotCount;
-            result.Diagnostics.LiveFaceCount =
-                patches.Diagnostics.LiveFaceCount;
-            result.Diagnostics.EdgeSlotCount =
-                patches.Diagnostics.EdgeSlotCount;
-            result.Diagnostics.LiveEdgeCount =
-                patches.Diagnostics.LiveEdgeCount;
-            result.Diagnostics.SelectedComponentCount =
-                patches.Diagnostics.SelectedComponentCount;
-            result.Diagnostics.ActiveComponentCount =
-                static_cast<std::uint32_t>(
-                    patches.Diagnostics.Components.size());
-            result.Diagnostics.ConnectedRegionCount =
-                static_cast<std::uint32_t>(
-                    patches.Diagnostics.FinalRegionCount);
-            result.Diagnostics.BoundaryEdgeCount =
-                patches.Diagnostics.FinalBoundaryEdgeCount;
-            result.Diagnostics.InitialEnergy =
-                patches.Diagnostics.InitialEnergy;
-            result.Diagnostics.FinalEnergy =
-                patches.Diagnostics.FinalEnergy;
-            result.Diagnostics.Candidates = patches.Diagnostics.Candidates;
-            result.Diagnostics.Components = patches.Diagnostics.Components;
-
-            faceComponents = std::move(patches.FaceComponents);
-            faceRegions = std::move(patches.FaceRegions);
-            faceRegionColors = std::move(patches.FaceRegionColors);
-            edgeBoundaries = std::move(patches.EdgeBoundaries);
-            edgeBoundaryColors =
-                std::move(patches.EdgeBoundaryColors);
-            hardFeatureMask = std::move(featureEvidence.HardEdgeMask);
-            softFeatureConfidence =
-                std::move(featureEvidence.SoftEdgeConfidence);
-            for (std::size_t edge = 0u;
-                 edge < patches.EdgeBoundaryRoles.size(); ++edge)
-            {
-                edgeBoundaryRoles[edge] = static_cast<std::uint32_t>(
-                    patches.EdgeBoundaryRoles[edge]);
-                if (edgeBoundaries[edge] != 0u)
+                    curvature.MinPrincipalCurvatureProperty.Vector());
+                result.BoundaryDiagnostics = partition.Diagnostics;
+                if (!partition.Succeeded())
                 {
-                    featurePatchColors[edge] = edgeBoundaryColors[edge];
+                    result.Status = EditorCommandStatus::GeometryProcessingFailed;
+                    result.Error = Core::ErrorCode::InvalidArgument;
+                    result.Message = "Experimental METHOD-040 failed: ";
+                    result.Message += CurvSeg::ToString(partition.Diagnostics.Status);
+                    return result;
+                }
+                const auto& diagnostic = partition.Diagnostics;
+                result.Diagnostics.ConnectedRegionCount =
+                    static_cast<std::uint32_t>(diagnostic.RegionCount);
+                result.Diagnostics.BoundaryEdgeCount = diagnostic.BoundaryCount;
+                faceRegions = std::move(partition.FaceRegions);
+                faceComponents.assign(source.Mesh.FacesSize(), CurvSeg::kInvalidLabel);
+                faceRegionColors.resize(faceRegions.size());
+                for (std::size_t face = 0; face < faceRegions.size(); ++face)
+                {
+                    if (faceRegions[face] == CurvSeg::kInvalidLabel)
+                        continue;
+                    const float phase = 2.39996323f * static_cast<float>(faceRegions[face]);
+                    faceRegionColors[face] = glm::vec4{
+                        0.6f + 0.35f * std::cos(phase),
+                        0.6f + 0.35f * std::cos(phase + 2.0943951f),
+                        0.6f + 0.35f * std::cos(phase + 4.1887902f), 1.0f};
+                }
+                edgeBoundaries = std::move(partition.EdgeBoundaries);
+                edgeBoundaryColors.assign(edgeBoundaries.size(), glm::vec4{0.0f});
+                hardFeatureMask = std::move(featureEvidence.HardEdgeMask);
+                softFeatureConfidence = std::move(featureEvidence.SoftEdgeConfidence);
+                for (std::size_t edge = 0; edge < edgeBoundaries.size(); ++edge)
+                {
+                    if (edgeBoundaries[edge] == 0u)
+                        continue;
+                    const auto role = hardFeatureMask[edge]
+                        ? CurvSeg::PatchBoundaryRole::HardFeature
+                        : softFeatureConfidence[edge] > 0.0
+                            ? CurvSeg::PatchBoundaryRole::SoftFeatureSupported
+                            : CurvSeg::PatchBoundaryRole::CurvatureClosure;
+                    edgeBoundaryRoles[edge] = static_cast<std::uint32_t>(role);
+                    const glm::vec4 color = hardFeatureMask[edge]
+                        ? glm::vec4{1.0f, 0.15f, 0.1f, 1.0f}
+                        : softFeatureConfidence[edge] > 0.0
+                            ? glm::vec4{1.0f, 0.75f, 0.1f, 1.0f}
+                            : glm::vec4{0.15f, 0.45f, 1.0f, 1.0f};
+                    edgeBoundaryColors[edge] = color;
+                    featurePatchColors[edge] = color;
+                }
+            }
+            else
+            {
+                CurvSeg::CurvaturePatchResult patches =
+                    CurvSeg::SegmentFeatureAlignedPatches(
+                        source.Mesh,
+                        curvature.MaxPrincipalCurvatureProperty.Vector(),
+                        curvature.MinPrincipalCurvatureProperty.Vector(),
+                        featureEvidence.View(),
+                        MakeCurvaturePatchParams(command.Config));
+                result.PatchDiagnostics = patches.Diagnostics;
+                if (!patches.Succeeded())
+                {
+                    result.Status =
+                        EditorCommandStatus::GeometryProcessingFailed;
+                    result.Error = Core::ErrorCode::InvalidArgument;
+                    result.Message =
+                        "Feature-aligned patch segmentation failed: ";
+                    result.Message +=
+                        CurvSeg::ToString(patches.Diagnostics.Status);
+                    result.Message += ".";
+                    return result;
+                }
+
+                result.Diagnostics.Status =
+                    CurvSeg::SegmentationStatus::Success;
+                result.Diagnostics.FaceSlotCount =
+                    patches.Diagnostics.FaceSlotCount;
+                result.Diagnostics.LiveFaceCount =
+                    patches.Diagnostics.LiveFaceCount;
+                result.Diagnostics.EdgeSlotCount =
+                    patches.Diagnostics.EdgeSlotCount;
+                result.Diagnostics.LiveEdgeCount =
+                    patches.Diagnostics.LiveEdgeCount;
+                result.Diagnostics.SelectedComponentCount =
+                    patches.Diagnostics.SelectedComponentCount;
+                result.Diagnostics.ActiveComponentCount =
+                    static_cast<std::uint32_t>(
+                        patches.Diagnostics.Components.size());
+                result.Diagnostics.ConnectedRegionCount =
+                    static_cast<std::uint32_t>(
+                        patches.Diagnostics.FinalRegionCount);
+                result.Diagnostics.BoundaryEdgeCount =
+                    patches.Diagnostics.FinalBoundaryEdgeCount;
+                result.Diagnostics.InitialEnergy =
+                    patches.Diagnostics.InitialEnergy;
+                result.Diagnostics.FinalEnergy =
+                    patches.Diagnostics.FinalEnergy;
+                result.Diagnostics.Candidates = patches.Diagnostics.Candidates;
+                result.Diagnostics.Components = patches.Diagnostics.Components;
+
+                faceComponents = std::move(patches.FaceComponents);
+                faceRegions = std::move(patches.FaceRegions);
+                faceRegionColors = std::move(patches.FaceRegionColors);
+                edgeBoundaries = std::move(patches.EdgeBoundaries);
+                edgeBoundaryColors =
+                    std::move(patches.EdgeBoundaryColors);
+                hardFeatureMask = std::move(featureEvidence.HardEdgeMask);
+                softFeatureConfidence =
+                    std::move(featureEvidence.SoftEdgeConfidence);
+                for (std::size_t edge = 0u;
+                     edge < patches.EdgeBoundaryRoles.size(); ++edge)
+                {
+                    edgeBoundaryRoles[edge] = static_cast<std::uint32_t>(
+                        patches.EdgeBoundaryRoles[edge]);
+                    if (edgeBoundaries[edge] != 0u)
+                    {
+                        featurePatchColors[edge] = edgeBoundaryColors[edge];
+                    }
                 }
             }
         }
@@ -10578,7 +10638,8 @@ ApplyEditorMeshCurvatureCommand(
         }
 
         MeshCurvatureSegmentationPropertyState after = before;
-        after.HadComponent = true;
+        after.HadComponent =
+            command.Config.Method != CurvatureSegmentationMethod::FeatureBoundaryCurves;
         after.HadRegion = true;
         after.HadRegionColor = true;
         after.HadBoundary = true;
@@ -10587,8 +10648,11 @@ ApplyEditorMeshCurvatureCommand(
         after.HadSoftFeatureConfidence = true;
         after.HadBoundaryRole = true;
         after.HadFeaturePatchColor = true;
-        after.Components.assign(
-            source.FaceSlotCount, CurvSeg::kInvalidLabel);
+        // A boundary partition has no fitted curvature components. Remove an
+        // earlier method-owned component field in the same undo transaction.
+        after.Components.clear();
+        if (after.HadComponent)
+            after.Components.assign(source.FaceSlotCount, CurvSeg::kInvalidLabel);
         after.Regions.assign(
             source.FaceSlotCount, CurvSeg::kInvalidLabel);
         after.RegionColors.assign(
@@ -10618,8 +10682,8 @@ ApplyEditorMeshCurvatureCommand(
                     "Curvature segmentation produced an invalid source-face cross-reference.";
                 return result;
             }
-            after.Components[sourceFace] =
-                faceComponents[meshFace];
+            if (after.HadComponent)
+                after.Components[sourceFace] = faceComponents[meshFace];
             after.Regions[sourceFace] =
                 faceRegions[meshFace];
             after.RegionColors[sourceFace] =
@@ -10695,10 +10759,17 @@ ApplyEditorMeshCurvatureCommand(
         result.Message += " connected regions and ";
         result.Message += std::to_string(
             result.Diagnostics.BoundaryEdgeCount);
-        result.Message += " internal boundary edges (GMM components=";
-        result.Message += std::to_string(
-            result.Diagnostics.SelectedComponentCount);
-        result.Message += ")";
+        result.Message += " internal boundary edges";
+        if (result.BoundaryDiagnostics.has_value())
+        {
+            result.Message += "; experimental curves_v1, adoption oracle not passed";
+        }
+        else
+        {
+            result.Message += " (GMM components=";
+            result.Message += std::to_string(result.Diagnostics.SelectedComponentCount);
+            result.Message += ")";
+        }
         if (result.PatchDiagnostics.has_value() &&
             result.FeatureDiagnostics.has_value())
         {

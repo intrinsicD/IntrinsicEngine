@@ -607,69 +607,76 @@ TEST(SandboxConfigSections,
     requested.PatchComplexityCost = 0.625;
     ASSERT_TRUE(Runtime::IsValidCurvatureSegmentationConfig(requested));
 
-    std::optional<std::string> referenceSerialized{};
-    for (const Runtime::RuntimeConfigControlSource source : sources)
+    for (const auto method : {Runtime::CurvatureSegmentationMethod::CurvatureGmm,
+                              Runtime::CurvatureSegmentationMethod::FeatureAlignedPatches,
+                              Runtime::CurvatureSegmentationMethod::FeatureBoundaryCurves})
     {
-        ConfigControlHarness harness{};
-        Runtime::EngineConfigControl& control = harness.Control();
-        CoreConfig::EngineConfig candidate =
-            control.GetEngineConfigControlState().ActiveConfig;
-        Runtime::SetCurvatureSegmentationConfig(candidate, requested);
-        const CoreConfig::EngineConfigLoadResult preview =
-            control.PreviewEngineConfigControlDocument(
-                CoreConfig::SerializeEngineConfig(candidate),
-                "curvature-segmentation-source-parity");
-        ASSERT_TRUE(CoreConfig::IsConfigUsable(preview));
+        requested.Method = method;
+        std::optional<std::string> referenceSerialized{};
+        for (const Runtime::RuntimeConfigControlSource source : sources)
+        {
+            ConfigControlHarness harness{};
+            Runtime::EngineConfigControl& control = harness.Control();
+            CoreConfig::EngineConfig candidate =
+                control.GetEngineConfigControlState().ActiveConfig;
+            Runtime::SetCurvatureSegmentationConfig(candidate, requested);
+            const CoreConfig::EngineConfigLoadResult preview =
+                control.PreviewEngineConfigControlDocument(
+                    CoreConfig::SerializeEngineConfig(candidate),
+                    "curvature-segmentation-source-parity");
+            ASSERT_TRUE(CoreConfig::IsConfigUsable(preview));
 
-        const Runtime::RuntimeEngineConfigApplyResult applied =
-            control.ApplyEngineConfigHotSubset(preview, source);
-        ASSERT_TRUE(applied.Succeeded());
-        EXPECT_EQ(applied.Source, source);
-        EXPECT_TRUE(applied.SectionChanged(
-            Runtime::kCurvatureSegmentationConfigSectionName));
+            const Runtime::RuntimeEngineConfigApplyResult applied =
+                control.ApplyEngineConfigHotSubset(preview, source);
+            ASSERT_TRUE(applied.Succeeded());
+            EXPECT_EQ(applied.Source, source);
+            EXPECT_TRUE(applied.SectionChanged(
+                Runtime::kCurvatureSegmentationConfigSectionName));
 
-        const auto active = Runtime::GetCurvatureSegmentationConfig(
-            control.GetEngineConfigControlState().ActiveConfig);
-        ASSERT_TRUE(active.has_value());
-        EXPECT_EQ(active->Method, requested.Method);
-        EXPECT_EQ(active->SelectionMode, requested.SelectionMode);
-        EXPECT_EQ(active->FixedComponentCount,
-                  requested.FixedComponentCount);
-        EXPECT_EQ(active->AutomaticMinComponents,
-                  requested.AutomaticMinComponents);
-        EXPECT_EQ(active->AutomaticMaxComponents,
-                  requested.AutomaticMaxComponents);
-        EXPECT_DOUBLE_EQ(active->AutomaticFitTolerance,
-                         requested.AutomaticFitTolerance);
-        EXPECT_DOUBLE_EQ(active->AutomaticComplexityWeight,
-                         requested.AutomaticComplexityWeight);
-        EXPECT_EQ(active->MaxEmIterations, requested.MaxEmIterations);
-        EXPECT_DOUBLE_EQ(active->EmRelativeTolerance,
-                         requested.EmRelativeTolerance);
-        EXPECT_DOUBLE_EQ(active->CovarianceFloor,
-                         requested.CovarianceFloor);
-        EXPECT_EQ(active->Seed, requested.Seed);
-        EXPECT_DOUBLE_EQ(active->SpatialWeight, requested.SpatialWeight);
-        EXPECT_DOUBLE_EQ(active->FeatureSensitivity,
-                         requested.FeatureSensitivity);
-        EXPECT_EQ(active->MaxSpatialIterations,
-                  requested.MaxSpatialIterations);
-        EXPECT_EQ(active->MinimumRegionFaces,
-                  requested.MinimumRegionFaces);
-        EXPECT_DOUBLE_EQ(active->FeatureBaseRadiusRatio,
-                         requested.FeatureBaseRadiusRatio);
-        EXPECT_DOUBLE_EQ(active->HardDihedralThresholdDegrees,
-                         requested.HardDihedralThresholdDegrees);
-        EXPECT_DOUBLE_EQ(active->PatchComplexityCost,
-                         requested.PatchComplexityCost);
+            const auto active = Runtime::GetCurvatureSegmentationConfig(
+                control.GetEngineConfigControlState().ActiveConfig);
+            ASSERT_TRUE(active.has_value());
+            EXPECT_EQ(active->Method, requested.Method);
+            EXPECT_EQ(active->SelectionMode, requested.SelectionMode);
+            EXPECT_EQ(active->FixedComponentCount,
+                      requested.FixedComponentCount);
+            EXPECT_EQ(active->AutomaticMinComponents,
+                      requested.AutomaticMinComponents);
+            EXPECT_EQ(active->AutomaticMaxComponents,
+                      requested.AutomaticMaxComponents);
+            EXPECT_DOUBLE_EQ(active->AutomaticFitTolerance,
+                             requested.AutomaticFitTolerance);
+            EXPECT_DOUBLE_EQ(active->AutomaticComplexityWeight,
+                             requested.AutomaticComplexityWeight);
+            EXPECT_EQ(active->MaxEmIterations, requested.MaxEmIterations);
+            EXPECT_DOUBLE_EQ(active->EmRelativeTolerance,
+                             requested.EmRelativeTolerance);
+            EXPECT_DOUBLE_EQ(active->CovarianceFloor,
+                             requested.CovarianceFloor);
+            EXPECT_EQ(active->Seed, requested.Seed);
+            EXPECT_DOUBLE_EQ(active->SpatialWeight, requested.SpatialWeight);
+            EXPECT_DOUBLE_EQ(active->FeatureSensitivity,
+                             requested.FeatureSensitivity);
+            EXPECT_EQ(active->MaxSpatialIterations,
+                      requested.MaxSpatialIterations);
+            EXPECT_EQ(active->MinimumRegionFaces,
+                      requested.MinimumRegionFaces);
+            EXPECT_DOUBLE_EQ(active->FeatureBaseRadiusRatio,
+                             requested.FeatureBaseRadiusRatio);
+            EXPECT_DOUBLE_EQ(active->HardDihedralThresholdDegrees,
+                             requested.HardDihedralThresholdDegrees);
+            EXPECT_DOUBLE_EQ(active->PatchComplexityCost,
+                             requested.PatchComplexityCost);
 
-        const std::string serialized = CoreConfig::SerializeEngineConfig(
-            control.GetEngineConfigControlState().ActiveConfig);
-        if (!referenceSerialized.has_value())
-            referenceSerialized = serialized;
-        else
-            EXPECT_EQ(serialized, *referenceSerialized);
+            const std::string serialized = CoreConfig::SerializeEngineConfig(
+                control.GetEngineConfigControlState().ActiveConfig);
+            if (!referenceSerialized.has_value())
+                referenceSerialized = serialized;
+            else
+                EXPECT_EQ(serialized, *referenceSerialized);
+        }
     }
+
 }
 
 TEST(SandboxConfigSections,

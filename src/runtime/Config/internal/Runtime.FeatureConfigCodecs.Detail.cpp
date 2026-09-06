@@ -538,6 +538,8 @@ namespace Extrinsic::Runtime::FeatureConfigDetail
                 return CurvatureSegmentationMethod::CurvatureGmm;
             if (value == "feature_aligned_patches")
                 return CurvatureSegmentationMethod::FeatureAlignedPatches;
+            if (value == "feature_boundary_curves_v1")
+                return CurvatureSegmentationMethod::FeatureBoundaryCurves;
             return std::nullopt;
         }
 
@@ -723,6 +725,8 @@ namespace Extrinsic::Runtime::FeatureConfigDetail
                 return "curvature_gmm";
             case CurvatureSegmentationMethod::FeatureAlignedPatches:
                 return "feature_aligned_patches";
+            case CurvatureSegmentationMethod::FeatureBoundaryCurves:
+                return "feature_boundary_curves_v1";
             }
             return "curvature_gmm";
         }

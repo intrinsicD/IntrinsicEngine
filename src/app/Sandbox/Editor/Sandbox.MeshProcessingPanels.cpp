@@ -46,8 +46,9 @@ namespace Extrinsic::Sandbox::Editor
                 Runtime::EditorMeshCurvatureOutput::Gaussian,
                 Runtime::EditorMeshCurvatureOutput::PrincipalDirections,
             }};
-        constexpr std::array<Runtime::CurvatureSegmentationMethod, 2>
+        constexpr std::array<Runtime::CurvatureSegmentationMethod, 3>
             kCurvatureSegmentationMethods{{
+                Runtime::CurvatureSegmentationMethod::FeatureBoundaryCurves,
                 Runtime::CurvatureSegmentationMethod::FeatureAlignedPatches,
                 Runtime::CurvatureSegmentationMethod::CurvatureGmm,
             }};
@@ -1139,63 +1140,68 @@ namespace Extrinsic::Sandbox::Editor
             }
             ImGui::EndCombo();
         }
-        if (ImGui::BeginCombo(
-                "Component selection##CurvatureSegmentation",
-                Runtime::DebugNameForCurvatureSegmentationSelectionMode(
-                    config.SelectionMode)))
+        const bool boundaryCurves = config.Method ==
+            Runtime::CurvatureSegmentationMethod::FeatureBoundaryCurves;
+        if (!boundaryCurves)
         {
-            for (const auto mode :
-                 kCurvatureSegmentationSelectionModes)
+            if (ImGui::BeginCombo(
+                    "Component selection##CurvatureSegmentation",
+                    Runtime::DebugNameForCurvatureSegmentationSelectionMode(
+                        config.SelectionMode)))
             {
-                const bool selected = mode == config.SelectionMode;
-                if (ImGui::Selectable(
-                        Runtime::
-                            DebugNameForCurvatureSegmentationSelectionMode(
-                                mode),
-                        selected))
+                for (const auto mode :
+                     kCurvatureSegmentationSelectionModes)
                 {
-                    config.SelectionMode = mode;
-                    changed = true;
+                    const bool selected = mode == config.SelectionMode;
+                    if (ImGui::Selectable(
+                            Runtime::
+                                DebugNameForCurvatureSegmentationSelectionMode(
+                                    mode),
+                            selected))
+                    {
+                        config.SelectionMode = mode;
+                        changed = true;
+                    }
+                    if (selected)
+                        ImGui::SetItemDefaultFocus();
                 }
-                if (selected)
-                    ImGui::SetItemDefaultFocus();
+                ImGui::EndCombo();
             }
-            ImGui::EndCombo();
+
+            if (config.SelectionMode ==
+                Runtime::CurvatureSegmentationSelectionMode::FixedCount)
+            {
+                changed |= ImGui::InputScalar(
+                    "Components##CurvatureSegmentation",
+                    ImGuiDataType_U32,
+                    &config.FixedComponentCount);
+            }
+            else
+            {
+                changed |= ImGui::InputScalar(
+                    "Minimum components##CurvatureSegmentation",
+                    ImGuiDataType_U32,
+                    &config.AutomaticMinComponents);
+                changed |= ImGui::InputScalar(
+                    "Maximum components##CurvatureSegmentation",
+                    ImGuiDataType_U32,
+                    &config.AutomaticMaxComponents);
+                changed |= ImGui::InputDouble(
+                    "Curvature fit tolerance##CurvatureSegmentation",
+                    &config.AutomaticFitTolerance,
+                    0.01,
+                    0.1,
+                    "%.6g");
+                changed |= ImGui::InputDouble(
+                    "Complexity weight##CurvatureSegmentation",
+                    &config.AutomaticComplexityWeight,
+                    0.05,
+                    0.5,
+                    "%.6g");
+            }
         }
 
-        if (config.SelectionMode ==
-            Runtime::CurvatureSegmentationSelectionMode::FixedCount)
-        {
-            changed |= ImGui::InputScalar(
-                "Components##CurvatureSegmentation",
-                ImGuiDataType_U32,
-                &config.FixedComponentCount);
-        }
-        else
-        {
-            changed |= ImGui::InputScalar(
-                "Minimum components##CurvatureSegmentation",
-                ImGuiDataType_U32,
-                &config.AutomaticMinComponents);
-            changed |= ImGui::InputScalar(
-                "Maximum components##CurvatureSegmentation",
-                ImGuiDataType_U32,
-                &config.AutomaticMaxComponents);
-            changed |= ImGui::InputDouble(
-                "Curvature fit tolerance##CurvatureSegmentation",
-                &config.AutomaticFitTolerance,
-                0.01,
-                0.1,
-                "%.6g");
-            changed |= ImGui::InputDouble(
-                "Complexity weight##CurvatureSegmentation",
-                &config.AutomaticComplexityWeight,
-                0.05,
-                0.5,
-                "%.6g");
-        }
-
-        if (config.Method ==
+        if (boundaryCurves || config.Method ==
             Runtime::CurvatureSegmentationMethod::FeatureAlignedPatches)
         {
             changed |= ImGui::InputDouble(
@@ -1210,12 +1216,21 @@ namespace Extrinsic::Sandbox::Editor
                 1.0,
                 5.0,
                 "%.6g");
-            changed |= ImGui::InputDouble(
-                "Patch complexity cost##CurvatureSegmentation",
-                &config.PatchComplexityCost,
-                0.05,
-                0.25,
-                "%.6g");
+            if (!boundaryCurves)
+            {
+                changed |= ImGui::InputDouble(
+                    "Patch complexity cost##CurvatureSegmentation",
+                    &config.PatchComplexityCost,
+                    0.05,
+                    0.25,
+                    "%.6g");
+            }
+            else
+            {
+                ImGui::TextWrapped(
+                    "Experimental curves_v1: adoption quality checks have not passed. "
+                    "Uses the fixed comparison profile; GMM settings do not apply.");
+            }
             ImGui::TextDisabled(
                 "Final hard/soft/closure boundaries render in red/gold/blue; retained candidates remain inspectable properties.");
         }
@@ -1242,7 +1257,7 @@ namespace Extrinsic::Sandbox::Editor
             "Show clusters and boundaries after run##CurvatureSegmentation",
             &Curvature.AutoVisualizeSegmentation);
 
-        if (ImGui::TreeNode("Advanced GMM and optimizer controls"))
+        if (!boundaryCurves && ImGui::TreeNode("Advanced GMM and optimizer controls"))
         {
             changed |= ImGui::InputScalar(
                 "EM iterations##CurvatureSegmentation",
@@ -1271,38 +1286,45 @@ namespace Extrinsic::Sandbox::Editor
             ImGui::TreePop();
         }
 
-        config.FixedComponentCount = std::clamp(
-            config.FixedComponentCount, 1u, 1024u);
-        config.AutomaticMinComponents = std::clamp(
-            config.AutomaticMinComponents, 1u, 1024u);
-        config.AutomaticMaxComponents = std::clamp(
-            config.AutomaticMaxComponents,
-            config.AutomaticMinComponents,
-            1024u);
-        config.AutomaticFitTolerance = std::clamp(
-            config.AutomaticFitTolerance, 1.0e-12, 1.0e12);
-        config.AutomaticComplexityWeight = std::clamp(
-            config.AutomaticComplexityWeight, 0.0, 1.0e12);
-        config.MaxEmIterations = std::clamp(
-            config.MaxEmIterations, 1u, 100000u);
-        config.EmRelativeTolerance = std::clamp(
-            config.EmRelativeTolerance, 0.0, 1.0);
-        config.CovarianceFloor = std::clamp(
-            config.CovarianceFloor, 1.0e-15, 1.0e6);
-        config.SpatialWeight = std::clamp(
-            config.SpatialWeight, 0.0, 1.0e12);
-        config.FeatureSensitivity = std::clamp(
-            config.FeatureSensitivity, 0.0, 1.0e12);
-        config.MaxSpatialIterations = std::clamp(
-            config.MaxSpatialIterations, 1u, 100000u);
-        config.MinimumRegionFaces = std::max(
-            config.MinimumRegionFaces, 1u);
+        // Preserve valid inactive settings when inspecting the fixed profile.
+        if (!boundaryCurves)
+        {
+            config.FixedComponentCount = std::clamp(
+                config.FixedComponentCount, 1u, 1024u);
+            config.AutomaticMinComponents = std::clamp(
+                config.AutomaticMinComponents, 1u, 1024u);
+            config.AutomaticMaxComponents = std::clamp(
+                config.AutomaticMaxComponents,
+                config.AutomaticMinComponents,
+                1024u);
+            config.AutomaticFitTolerance = std::clamp(
+                config.AutomaticFitTolerance, 1.0e-12, 1.0e12);
+            config.AutomaticComplexityWeight = std::clamp(
+                config.AutomaticComplexityWeight, 0.0, 1.0e12);
+            config.MaxEmIterations = std::clamp(
+                config.MaxEmIterations, 1u, 100000u);
+            config.EmRelativeTolerance = std::clamp(
+                config.EmRelativeTolerance, 0.0, 1.0);
+            config.CovarianceFloor = std::clamp(
+                config.CovarianceFloor, 1.0e-15, 1.0e6);
+            config.SpatialWeight = std::clamp(
+                config.SpatialWeight, 0.0, 1.0e12);
+            config.FeatureSensitivity = std::clamp(
+                config.FeatureSensitivity, 0.0, 1.0e12);
+            config.MaxSpatialIterations = std::clamp(
+                config.MaxSpatialIterations, 1u, 100000u);
+            config.MinimumRegionFaces = std::max(
+                config.MinimumRegionFaces, 1u);
+        }
         config.FeatureBaseRadiusRatio = std::clamp(
             config.FeatureBaseRadiusRatio, 1.0e-12, 1.0);
         config.HardDihedralThresholdDegrees = std::clamp(
             config.HardDihedralThresholdDegrees, 0.0, 180.0);
-        config.PatchComplexityCost = std::clamp(
-            config.PatchComplexityCost, 0.0, 1.0e12);
+        if (!boundaryCurves)
+        {
+            config.PatchComplexityCost = std::clamp(
+                config.PatchComplexityCost, 0.0, 1.0e12);
+        }
         Curvature.SegmentationConfigDirty |= changed;
 
         const bool configCommandsAvailable =
@@ -1397,7 +1419,19 @@ namespace Extrinsic::Sandbox::Editor
                 result.RequestedMethod),
             Runtime::DebugNameForCurvatureSegmentationMethod(
                 result.ActualMethod));
-        if (result.PatchDiagnostics.has_value() &&
+        if (result.BoundaryDiagnostics.has_value())
+        {
+            const auto& boundary = *result.BoundaryDiagnostics;
+            ImGui::Text("Regions: %zu  boundaries: %zu", boundary.RegionCount, boundary.BoundaryCount);
+            ImGui::Text("Boundary roles: hard=%zu soft=%zu closure=%zu",
+                boundary.HardBoundaryCount, boundary.SoftBoundaryCount, boundary.ClosureBoundaryCount);
+            ImGui::Text("Cleanup: %u merges, %u remaining small regions",
+                boundary.AreaMerges, boundary.UnmergeableSmallRegions);
+            ImGui::Text("Energy: optimized=%.6g, after cleanup=%.6g",
+                boundary.OptimizedEnergy, boundary.FinalEnergy);
+            ImGui::Text("Partition: %.3f ms", boundary.TotalMilliseconds);
+        }
+        else if (result.PatchDiagnostics.has_value() &&
             result.FeatureDiagnostics.has_value() &&
             result.PatchDiagnostics->Succeeded() &&
             result.FeatureDiagnostics->Succeeded())

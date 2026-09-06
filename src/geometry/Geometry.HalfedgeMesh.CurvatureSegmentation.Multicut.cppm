@@ -45,6 +45,9 @@ struct BoundaryPartitionParams
     // Optional postprocessing in area / D^2; it may increase the cut objective.
     double MinimumRegionArea{0.0};
 };
+// Fixed curves_v1 profile; changing its constants requires a new profile identity.
+[[nodiscard]] BoundaryPartitionParams BoundaryCurveCoverageProfileV1() noexcept;
+
 struct BoundaryPartitionDiagnostics
 {
     BoundaryPartitionStatus Status{BoundaryPartitionStatus::EmptyMesh};

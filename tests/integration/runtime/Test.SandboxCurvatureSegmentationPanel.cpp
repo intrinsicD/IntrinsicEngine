@@ -140,6 +140,10 @@ TEST(SandboxCurvatureSegmentationPanel,
     EXPECT_NE(source.find(
                   "CurvatureSegmentationMethod::FeatureAlignedPatches"),
               std::string::npos);
+    EXPECT_NE(source.find("CurvatureSegmentationMethod::FeatureBoundaryCurves"),
+              std::string::npos);
+    EXPECT_NE(source.find("Experimental curves_v1"), std::string::npos);
+    EXPECT_NE(source.find("result.BoundaryDiagnostics"), std::string::npos);
     EXPECT_NE(source.find(
                   "ApplyEditorCurvatureSegmentationConfig"),
               std::string::npos);

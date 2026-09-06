@@ -381,3 +381,11 @@ python3 tools/agents/check_ara_claims.py --root . --strict
 - End-of-turn research record: C59 records the refuted frozen adoption hypothesis;
   C60 records only the bound local cohort observations. No generalized quality
   or performance claim is asserted.
+
+## Subsequent diagnostic access
+- The operator subsequently requested direct engine/UI testing with Claude
+  collaboration. [UI-052](UI-052-method040-diagnostic-inspection.md) owns that
+  separately scoped explicit diagnostic access, analogous to BUG-163. This
+  does not change the overnight negative oracle, production default, formal
+  retirement blocker, or the positive-adoption conditions above. Its versioned
+  method token selects the fixed curves profile, not an accepted v2 backend.

@@ -560,3 +560,18 @@ TEST(CurvatureBoundaryPartition, OnlyQualifyingConnectedHardCurvesSeedAttenuatio
     EXPECT_EQ(all.Diagnostics.AttenuationCurveCount, 2);
     EXPECT_EQ(all.Diagnostics.AttenuationHardEdgeCount, 9);
 }
+
+TEST(CurvatureBoundaryPartition, CurveCoverageV1ProfileRemainsFrozen)
+{
+    const auto profile = Geometry::CurvatureSegmentation::BoundaryCurveCoverageProfileV1();
+    EXPECT_DOUBLE_EQ(profile.FeatureWeight, 4.0);
+    EXPECT_DOUBLE_EQ(profile.FeatureExponent, 3.0);
+    EXPECT_DOUBLE_EQ(profile.BoundaryScale, 0.04);
+    EXPECT_DOUBLE_EQ(profile.RegionCost, std::acos(-1.0) * 0.04 * 0.04);
+    EXPECT_DOUBLE_EQ(profile.MinimumRegionArea, profile.RegionCost);
+    EXPECT_DOUBLE_EQ(profile.HardFeatureExclusionRatio, 0.04);
+    EXPECT_DOUBLE_EQ(profile.MinimumExclusionCurveLength, 0.04);
+    EXPECT_DOUBLE_EQ(profile.ModelWeight, 0.0);
+    EXPECT_EQ(profile.MaximumMoves, 2000000u);
+    EXPECT_EQ(profile.MaximumFlowEdgeVisits, 20000000u);
+}

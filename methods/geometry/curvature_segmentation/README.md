@@ -109,28 +109,40 @@ claim C45 bounds it. Per the frozen stop rule, no thresholds were retuned and
 no production selector or control surface was added by METHOD-039. The later
 `BUG-163` diagnostic lane can execute this exact candidate and reports its
 requested/actual identity, feature evidence, and boundary roles. `METHOD-040`
-still owns a separate task-local multicut attempt; it must distinguish a
-genuinely global objective from a wider-move heuristic before implementation.
+owns the experimental multicut formulation and its negative adoption result;
+its global objective is distinct from the bounded heuristic used to solve it.
 
 ## Runtime and UI
 
 The schema-versioned `sandbox.curvature_segmentation` config section is the
 single control lane for config files, editor, agent/CLI, and programmatic calls.
 The Sandbox Curvature window exposes the production-default `curvature_gmm`
-and explicit diagnostic `feature_aligned_patches` method tokens,
-Fixed/Automatic selection, deterministic GMM controls, and the applicable
-spatial or patch values. Running either writes these same-cardinality
-properties without changing topology:
+and explicit diagnostic `feature_aligned_patches` and
+`feature_boundary_curves_v1` method tokens. The latter runs METHOD-040's fixed
+`curves_v1` comparison profile through the same operation. Feature radius and
+hard-dihedral controls apply to both diagnostic methods. Valid GMM/patch
+settings remain serialized for switching methods but are hidden and unused by
+METHOD-040. The default remains METHOD-037.
+
+To try METHOD-040, import a triangle OBJ, select the mesh, open **Mesh →
+Processing → Curvature**, choose **Feature boundaries (METHOD-040,
+experimental curves_v1)**, and press **Run segmentation**. The default checked
+visualization option shows colored regions and hard/soft/closure boundaries;
+**Show result** reapplies that view. The solve is synchronous, so larger inputs
+can pause the UI while curvature and feature detection run.
+
+The operation publishes these same-cardinality properties without changing
+topology:
 
 | Domain | Property | Meaning |
 | --- | --- | --- |
-| Face | `f:curvature_component` | selected GMM component label |
+| Face | `f:curvature_component` | fitted GMM label for METHOD-037/039; absent for METHOD-040, with removal/restoration included in undo |
 | Face | `f:curvature_region` | contiguous dual-connected region ID |
 | Face | `f:curvature_region_color` | deterministic opaque region color |
 | Edge | `e:curvature_region_boundary` | nonzero exactly across different region IDs |
-| Edge | `e:curvature_region_boundary_color` | opaque red on boundaries, transparent elsewhere |
-| Edge | `e:curvature_hard_feature` | METHOD-039 mandatory hard-feature fact |
-| Edge | `e:curvature_soft_feature_confidence` | retained METHOD-039 soft-feature confidence |
+| Edge | `e:curvature_region_boundary_color` | opaque boundary color, transparent elsewhere |
+| Edge | `e:curvature_hard_feature` | diagnostic detector mandatory hard-feature fact |
+| Edge | `e:curvature_soft_feature_confidence` | retained diagnostic detector soft-feature confidence |
 | Edge | `e:curvature_patch_boundary_role` | none, hard, soft-supported, or curvature-closure role |
 | Edge | `e:curvature_feature_patch_color` | final hard/soft/closure boundary visualization; transparent elsewhere |
 
@@ -152,6 +164,11 @@ curvature estimation, and total work. Timings are observational and never
 affect the deterministic solve. For the diagnostic METHOD-039 token, the UI
 instead reports hard/soft feature counts, final hard/soft/closure boundary
 counts, seeds/provisional/final regions, merge/refinement work, and energy.
+METHOD-040 exposes its own boundary diagnostics, region count, exact hard/soft/
+closure counts, area merges, remaining small regions, and optimized versus
+post-cleanup energy. It does not report a fitted GMM or a positive adoption
+verdict. The versioned profile constants are shared by runtime and the native
+runner through `BoundaryCurveCoverageProfileV1`.
 
 ## Verification and scope
 

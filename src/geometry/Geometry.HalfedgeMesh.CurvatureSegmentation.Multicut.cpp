@@ -1,4 +1,5 @@
 module;
+#include <numbers>
 #include "CurvatureBoundaryGraph.hpp"
 #include <algorithm>
 #include <array>
@@ -15,6 +16,19 @@ import Geometry.Properties;
 
 namespace Geometry::CurvatureSegmentation
 {
+BoundaryPartitionParams BoundaryCurveCoverageProfileV1() noexcept
+{
+    BoundaryPartitionParams params{};
+    params.FeatureWeight = 4.0;
+    params.FeatureExponent = 3.0;
+    params.BoundaryScale = 0.04;
+    params.RegionCost = std::numbers::pi * 0.04 * 0.04;
+    params.HardFeatureExclusionRatio = 0.04;
+    params.MinimumExclusionCurveLength = 0.04;
+    params.MinimumRegionArea = params.RegionCost;
+    return params;
+}
+
 const char *ToString(BoundaryPartitionStatus s) noexcept
 {
     switch (s)
