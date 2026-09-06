@@ -1,0 +1,73 @@
+Internal ctest changing into directory: /home/alex/Documents/IntrinsicEngine/build/ci
+Test project /home/alex/Documents/IntrinsicEngine/build/ci
+      Start 1791: CurvatureBoundaryPartition.InheritedSuppliedOracleCatalog
+ 1/19 Test #1791: CurvatureBoundaryPartition.InheritedSuppliedOracleCatalog .................................   Passed    0.16 sec
+      Start 1792: CurvatureBoundaryPartition.InheritedRegionalOracleCatalog
+ 2/19 Test #1792: CurvatureBoundaryPartition.InheritedRegionalOracleCatalog .................................   Passed    0.18 sec
+      Start 1793: CurvatureBoundaryPartition.FrozenUnmarkedClosureAndComputedEvidenceAudit
+ 3/19 Test #1793: CurvatureBoundaryPartition.FrozenUnmarkedClosureAndComputedEvidenceAudit ..................***Failed    1.33 sec
+Running main() from /home/alex/Documents/IntrinsicEngine/external/vcpkg/buildtrees/gtest/src/v1.17.0-0c449efaff.clean/googletest/src/gtest_main.cc
+Note: Google Test filter = CurvatureBoundaryPartition.FrozenUnmarkedClosureAndComputedEvidenceAudit
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from CurvatureBoundaryPartition
+[ RUN      ] CurvatureBoundaryPartition.FrozenUnmarkedClosureAndComputedEvidenceAudit
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CurvaturePatchContract.cpp:2491: Failure
+Expected: (AreaWeightedVariationOfInformation(closure.Surface, closure.ExpectedPatchByFace, result.FaceRegions)) <= (0.01), actual: 0.69314718055994529 vs 0.01
+unmarked closure
+
+[  FAILED  ] CurvatureBoundaryPartition.FrozenUnmarkedClosureAndComputedEvidenceAudit (1317 ms)
+[----------] 1 test from CurvatureBoundaryPartition (1317 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (1318 ms total)
+[  PASSED  ] 0 tests.
+[  FAILED  ] 1 test, listed below:
+[  FAILED  ] CurvatureBoundaryPartition.FrozenUnmarkedClosureAndComputedEvidenceAudit
+
+ 1 FAILED TEST
+
+      Start 1794: CurvatureBoundaryPartition.StrongContourAndShortCompletionSeparateEqualCurvatureSurface
+ 4/19 Test #1794: CurvatureBoundaryPartition.StrongContourAndShortCompletionSeparateEqualCurvatureSurface ...   Passed    0.02 sec
+      Start 1795: CurvatureBoundaryPartition.HomogeneousSurfaceStaysWholeAndPreservesTopology
+ 5/19 Test #1795: CurvatureBoundaryPartition.HomogeneousSurfaceStaysWholeAndPreservesTopology ...............   Passed    0.01 sec
+      Start 1796: CurvatureBoundaryPartition.UniformScalePreservesPartitionAndObjective
+ 6/19 Test #1796: CurvatureBoundaryPartition.UniformScalePreservesPartitionAndObjective .....................   Passed    0.01 sec
+      Start 1797: CurvatureBoundaryPartition.InvalidEvidenceAndBudgetFailClosed
+ 7/19 Test #1797: CurvatureBoundaryPartition.InvalidEvidenceAndBudgetFailClosed .............................   Passed    0.01 sec
+      Start 1798: CurvatureBoundaryPartition.RegionalFieldScalesAndFailsClosed
+ 8/19 Test #1798: CurvatureBoundaryPartition.RegionalFieldScalesAndFailsClosed ..............................   Passed    0.01 sec
+      Start 1799: CurvatureBoundaryPartition.FlowLimitReturnsNoPartialPartition
+ 9/19 Test #1799: CurvatureBoundaryPartition.FlowLimitReturnsNoPartialPartition .............................   Passed    0.01 sec
+      Start 1800: CurvatureBoundaryGraph.ExactOracleMatchesIndependentAssignments
+10/19 Test #1800: CurvatureBoundaryGraph.ExactOracleMatchesIndependentAssignments ...........................   Passed    0.03 sec
+      Start 1801: CurvatureBoundaryGraph.HardCutCannotBeBypassedThroughPositivePath
+11/19 Test #1801: CurvatureBoundaryGraph.HardCutCannotBeBypassedThroughPositivePath .........................   Passed    0.01 sec
+      Start 1802: CurvatureBoundaryGraph.WiderMovesRecoverAcrossPrematureContraction
+12/19 Test #1802: CurvatureBoundaryGraph.WiderMovesRecoverAcrossPrematureContraction ........................   Passed    0.02 sec
+      Start 1803: CurvatureBoundaryGraph.HeuristicIsFeasibleDeterministicAndBoundedByOracle
+13/19 Test #1803: CurvatureBoundaryGraph.HeuristicIsFeasibleDeterministicAndBoundedByOracle .................   Passed    0.08 sec
+      Start 1804: CurvatureBoundaryGraph.InvalidAndLimitedInputsReturnNoPartition
+14/19 Test #1804: CurvatureBoundaryGraph.InvalidAndLimitedInputsReturnNoPartition ...........................   Passed    0.01 sec
+      Start 1805: CurvatureBoundaryGraph.DisconnectedNodesPublishSeparateConnectedRegions
+15/19 Test #1805: CurvatureBoundaryGraph.DisconnectedNodesPublishSeparateConnectedRegions ...................   Passed    0.01 sec
+      Start 1806: CurvatureBoundaryGraph.RegionalExactOracleMatchesIndependentModelFits
+16/19 Test #1806: CurvatureBoundaryGraph.RegionalExactOracleMatchesIndependentModelFits .....................   Passed    0.04 sec
+      Start 1807: CurvatureBoundaryGraph.RegionCostCountsConnectedPieces
+17/19 Test #1807: CurvatureBoundaryGraph.RegionCostCountsConnectedPieces ....................................   Passed    0.01 sec
+      Start 1808: CurvatureBoundaryGraph.RegionalMergeRefreshesEverySurvivingNeighbor
+18/19 Test #1808: CurvatureBoundaryGraph.RegionalMergeRefreshesEverySurvivingNeighbor .......................   Passed    0.01 sec
+      Start 1809: CurvatureBoundaryGraph.RegionalWeightOverflowFailsAndTinyWeightsRetainVariance
+19/19 Test #1809: CurvatureBoundaryGraph.RegionalWeightOverflowFailsAndTinyWeightsRetainVariance ............   Passed    0.01 sec
+
+95% tests passed, 1 tests failed out of 19
+
+Label Time Summary:
+geometry    =   1.97 sec*proc (19 tests)
+unit        =   1.97 sec*proc (19 tests)
+
+Total Test time (real) =   2.54 sec
+
+The following tests FAILED:
+	1793 - CurvatureBoundaryPartition.FrozenUnmarkedClosureAndComputedEvidenceAudit (Failed)
+Errors while running CTest

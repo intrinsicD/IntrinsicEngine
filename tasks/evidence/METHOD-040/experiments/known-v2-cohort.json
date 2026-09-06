@@ -1,0 +1,271 @@
+{
+  "schema": 1,
+  "candidate": "boundary_multicut_isotropic_v2",
+  "source_revision": "8b16089f4db745809e28615575e0377a1b6d8009",
+  "source_dirty": true,
+  "source_hashes": {
+    "src/geometry/CurvatureBoundaryGraph.cpp": "5edb24f8fc6c8de203e8a05de29116d911587bc7d2d30645c127e170421f338e",
+    "src/geometry/CurvatureBoundaryGraph.hpp": "51576f297f74e106b155f496c8005ee58b1b88833eaa163b387e677e230a6ebc",
+    "src/geometry/Geometry.HalfedgeMesh.CurvatureSegmentation.Multicut.cpp": "2eb573d9fdfd4c8fa5c409bd053eafbe15f28c2e154168e104939024bc9e379f",
+    "src/geometry/Geometry.HalfedgeMesh.CurvatureSegmentation.Multicut.cppm": "d366b90ee10d271bece8b61946e4a25c5b7bc430978f8b20d5657615a8f342ff",
+    "benchmarks/runners/CurvatureBoundaryMeshRunner.cpp": "fef43d542b71dfa5d9ab658516ef147a69e927b0493de1ac266a82ad4c3d84b5"
+  },
+  "runner_sha256": "82f1a709cfc13064056f49e103066e9458618d2548e51c3a19b9aed9715dba92",
+  "claim_eligible": false,
+  "timeout_seconds": 300,
+  "inputs": {
+    "sculpt": {
+      "path": "/home/alex/Dropbox/Work/Datasets/obj/sculpt.obj",
+      "sha256": "210dc85f20cdec11cb0b50bec255b86126fb6b47f9f938369049570de3f88a25"
+    },
+    "frog": {
+      "path": "/home/alex/Dropbox/Work/Datasets/obj/frog.obj",
+      "sha256": "c72c55b72392f55e02b846267424c9069c580e1bede1c9b7ee7ff189fa4656aa"
+    }
+  },
+  "runs": [
+    {
+      "mesh": "sculpt",
+      "mode": "multicut",
+      "command": [
+        "/home/alex/Documents/IntrinsicEngine/build/ci/bin/IntrinsicCurvatureBoundaryMesh",
+        "/home/alex/Dropbox/Work/Datasets/obj/sculpt.obj",
+        "/tmp/method040-cohort-known-v2/sculpt-multicut",
+        "multicut"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.36636468599317595,
+      "result": {
+        "status": "passed",
+        "benchmark_id": "geometry.curvature_segmentation.boundary_mesh.local_cohort",
+        "method": "geometry.curvature_segmentation",
+        "backend": "cpu_reference",
+        "dataset": "local.method_040.mesh_cohort.v1",
+        "commit": "local-dev",
+        "metrics": {
+          "runtime_ms": 343.605457,
+          "memory_peak_bytes": 20291584,
+          "quality_error_l2": 0,
+          "quality_error_linf": 0,
+          "population_count": 17
+        },
+        "diagnostics": {
+          "input": "/home/alex/Dropbox/Work/Datasets/obj/sculpt.obj",
+          "implementation": "boundary_multicut_isotropic_v2",
+          "feature_weight": 1.5,
+          "faces": 7342,
+          "vertices": 3669,
+          "load_ms": 48.221918,
+          "curvature_ms": 61.889932,
+          "feature_ms": 144.028087,
+          "partition_ms": 79.592324,
+          "energy": 1.7530647537323467,
+          "lower_bound": 1.2381621500968052,
+          "exact": false,
+          "attempted_moves": 25309,
+          "accepted_moves": 0,
+          "contractions": 7325,
+          "sweeps": 1,
+          "source_hard": 384,
+          "source_soft": 808,
+          "boundaries": 1136,
+          "hard": 384,
+          "soft": 752,
+          "closure": 0,
+          "feature_length_recall": 0.9535546176942041,
+          "unsupported_length_fraction": 0,
+          "region_sizes": [
+            670,
+            168,
+            88,
+            1224,
+            88,
+            88,
+            88,
+            540,
+            160,
+            88,
+            544,
+            160,
+            88,
+            2844,
+            168,
+            168,
+            168
+          ],
+          "region_area_fractions": [
+            0.08074527861079932,
+            0.01958393140653581,
+            0.01061903015389143,
+            0.18018973950048744,
+            0.010264083415495437,
+            0.01026329427756303,
+            0.010331274011021666,
+            0.07761154398249998,
+            0.02213571535424018,
+            0.011190510957588594,
+            0.07781323006110648,
+            0.022029342113816543,
+            0.01109517263953668,
+            0.3944473007680834,
+            0.020104651297080244,
+            0.020769846670117498,
+            0.020806054780136387
+          ]
+        }
+      }
+    },
+    {
+      "mesh": "sculpt",
+      "mode": "local",
+      "command": [
+        "/home/alex/Documents/IntrinsicEngine/build/ci/bin/IntrinsicCurvatureBoundaryMesh",
+        "/home/alex/Dropbox/Work/Datasets/obj/sculpt.obj",
+        "/tmp/method040-cohort-known-v2/sculpt-local",
+        "local"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 16.95323006399849,
+      "result": {
+        "status": "passed",
+        "benchmark_id": "geometry.curvature_segmentation.boundary_mesh.local_cohort",
+        "method": "geometry.curvature_segmentation",
+        "backend": "cpu_reference",
+        "dataset": "local.method_040.mesh_cohort.v1",
+        "commit": "local-dev",
+        "metrics": {
+          "runtime_ms": 16926.143691,
+          "memory_peak_bytes": 20291584,
+          "quality_error_l2": 0,
+          "quality_error_linf": 0,
+          "population_count": 5
+        },
+        "diagnostics": {
+          "input": "/home/alex/Dropbox/Work/Datasets/obj/sculpt.obj",
+          "implementation": "method_039_local_patch_unadopted",
+          "feature_weight": 1.5,
+          "faces": 7342,
+          "vertices": 3669,
+          "load_ms": 42.299843,
+          "curvature_ms": 62.420662,
+          "feature_ms": 138.309002,
+          "partition_ms": 16670.865084,
+          "energy": 8.947517465622415,
+          "lower_bound": 0,
+          "exact": false,
+          "attempted_moves": 0,
+          "accepted_moves": 0,
+          "contractions": 0,
+          "sweeps": 0,
+          "source_hard": 384,
+          "source_soft": 808,
+          "boundaries": 384,
+          "hard": 384,
+          "soft": 0,
+          "closure": 0,
+          "feature_length_recall": 0.3124892389064154,
+          "unsupported_length_fraction": 0,
+          "region_sizes": [
+            926,
+            1488,
+            788,
+            792,
+            3348
+          ],
+          "region_area_fractions": [
+            0.1109482401712266,
+            0.21104839120456792,
+            0.11093777029432864,
+            0.11093774481445982,
+            0.4561278535154175
+          ]
+        }
+      }
+    },
+    {
+      "mesh": "frog",
+      "mode": "multicut",
+      "command": [
+        "/home/alex/Documents/IntrinsicEngine/build/ci/bin/IntrinsicCurvatureBoundaryMesh",
+        "/home/alex/Dropbox/Work/Datasets/obj/frog.obj",
+        "/tmp/method040-cohort-known-v2/frog-multicut",
+        "multicut"
+      ],
+      "exit_code": 4,
+      "elapsed_seconds": 5.424774351995438,
+      "result": {
+        "status": "error",
+        "stage": "partition",
+        "diagnostic": "work_limit",
+        "input": "/home/alex/Dropbox/Work/Datasets/obj/frog.obj"
+      }
+    },
+    {
+      "mesh": "frog",
+      "mode": "local",
+      "command": [
+        "/home/alex/Documents/IntrinsicEngine/build/ci/bin/IntrinsicCurvatureBoundaryMesh",
+        "/home/alex/Dropbox/Work/Datasets/obj/frog.obj",
+        "/tmp/method040-cohort-known-v2/frog-local",
+        "local"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 72.37164809800743,
+      "result": {
+        "status": "passed",
+        "benchmark_id": "geometry.curvature_segmentation.boundary_mesh.local_cohort",
+        "method": "geometry.curvature_segmentation",
+        "backend": "cpu_reference",
+        "dataset": "local.method_040.mesh_cohort.v1",
+        "commit": "local-dev",
+        "metrics": {
+          "runtime_ms": 72341.018231,
+          "memory_peak_bytes": 27660288,
+          "quality_error_l2": 0,
+          "quality_error_linf": 0,
+          "population_count": 5
+        },
+        "diagnostics": {
+          "input": "/home/alex/Dropbox/Work/Datasets/obj/frog.obj",
+          "implementation": "method_039_local_patch_unadopted",
+          "feature_weight": 1.5,
+          "faces": 19106,
+          "vertices": 9555,
+          "load_ms": 114.439201,
+          "curvature_ms": 160.636502,
+          "feature_ms": 1360.549418,
+          "partition_ms": 70669.54544,
+          "energy": 15.118312581905833,
+          "lower_bound": 0,
+          "exact": false,
+          "attempted_moves": 0,
+          "accepted_moves": 0,
+          "contractions": 0,
+          "sweeps": 0,
+          "source_hard": 4,
+          "source_soft": 3010,
+          "boundaries": 55,
+          "hard": 4,
+          "soft": 15,
+          "closure": 36,
+          "feature_length_recall": 0.0044617963775264525,
+          "unsupported_length_fraction": 0.6906706426941308,
+          "region_sizes": [
+            19019,
+            5,
+            28,
+            42,
+            12
+          ],
+          "region_area_fractions": [
+            0.997304182983238,
+            0.00018079461802017414,
+            0.000556759934879001,
+            0.001719897260305902,
+            0.00023836520355657254
+          ]
+        }
+      }
+    }
+  ]
+}

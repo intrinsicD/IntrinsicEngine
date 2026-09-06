@@ -9797,7 +9797,7 @@ tree:
       - "tests/unit/geometry/Test.CurvaturePatchContract.cpp"
       - "methods/geometry/curvature_segmentation/feature_aligned_intake.md"
       - "tasks/done/METHOD-039-feature-network-curvature-patch-decomposition.md"
-      - "tasks/backlog/methods/METHOD-040-global-multicut-curvature-patch-reference.md"
+      - "tasks/active/METHOD-040-global-multicut-curvature-patch-reference.md"
     result: >
       The unadopted serial CPU candidate implements deterministic hard-barrier
       seeds, stable simultaneous growth, sparse local RAG merging under the
@@ -10847,7 +10847,7 @@ tree:
     - N463
     - N464
     - methods/geometry/curvature_segmentation/feature_boundary_review.md
-    - tasks/backlog/methods/METHOD-040-global-multicut-curvature-patch-reference.md
+    - tasks/active/METHOD-040-global-multicut-curvature-patch-reference.md
     status: resolved
   - id: N466
     type: experiment
@@ -10864,4 +10864,94 @@ tree:
     also_depends_on:
     - N464
     - N465
+    status: resolved
+  - id: N467
+    type: decision
+    title: Authorize bounded overnight geometric-partition implementation
+    provenance: user
+    timestamp: 2026-09-06T05:37+02:00
+    choice: Implement and improve METHOD-040 through morning, compare varied local Dropbox meshes, and collaborate
+      with Claude through MCP while preserving model capacity. This releases only the scoped method task
+      from the product gate.
+    alternatives:
+    - Stop after the literature/objective review.
+    evidence:
+    - N465
+    - tasks/active/METHOD-040-global-multicut-curvature-patch-reference.md
+    status: resolved
+  - id: N468
+    type: dead_end
+    title: Frozen unmarked-curvature oracle rejects METHOD-040 adoption
+    provenance: ai-executed
+    timestamp: 2026-09-06T05:37+02:00
+    hypothesis: The frozen weak regional candidate satisfies the inherited unmarked-curvature closure gate.
+    failure_mode: One region instead of two gives area-weighted VI=log(2), exceeding unchanged 0.01. Boundary-only
+      profiles cannot cut this zero-feature fixture by their chosen objective. Passing the executable negative-control
+      test is not passing the adoption oracle.
+    lesson: Retain the rejection and do not promote the candidate or tune the inherited fixture/threshold.
+      More distributed frog regions do not establish the required contract.
+    evidence:
+    - tasks/evidence/METHOD-040/experiments/regional-v2-frozen-closure-failure.log
+    - tests/unit/geometry/Test.CurvaturePatchContract.cpp
+    also_depends_on:
+    - N467
+    status: resolved
+  - id: N469
+    type: experiment
+    title: Compare four final fixed profiles on twelve local meshes
+    provenance: ai-executed
+    timestamp: 2026-09-06T05:37+02:00
+    result: 48 retained runs:36 successes on 9 admissible inputs,12 explicit failures on 3 invalid/unsupported
+      inputs. Fixed curves profile changes frog from 5 labels with 99.7%largest area to 15 with 26.1%; sculpt
+      keeps 5 regions and the same hard boundaries. Single Debug dirty-source observations are non-claim-eligible;
+      no semantic quality, held-out validation, or speedup verdict. Earlier failed and misidentified candidates
+      remain retained.
+    evidence:
+    - tasks/evidence/METHOD-040/experiments/final-cohort.json
+    - tasks/evidence/METHOD-040/benchmarks/final-cohort/frog-curves.json
+    - methods/geometry/curvature_segmentation/boundary_partition_report.md
+    also_depends_on:
+    - N467
+    status: resolved
+  - id: N470
+    type: decision
+    title: Keep the boundary implementation experimental and retain failed custody
+    provenance: ai-executed
+    timestamp: 2026-09-06T05:37+02:00
+    choice: Keep the CPU API and opt-in cohort/viewer without runtime/config/UI/default adoption. Exact
+      hard constraints, bounded work and separately reported energy-increasing cleanup remain explicit.
+      Preserve all failed required receipts; BUG-171 prevents formal retirement. Abort the live work graph
+      without a completion verdict and release its lease.
+    alternatives:
+    - Treat coverage/region count as general segmentation quality.
+    - Discard failed receipts to obtain a retirement report.
+    evidence:
+    - N468
+    - N469
+    - O177
+    - methods/geometry/curvature_segmentation/boundary_partition_report.md
+    - tasks/backlog/bugs/BUG-171-required-command-receipt-supersession.md
+    status: resolved
+  - id: N471
+    type: experiment
+    title: Verify reviewed partition source through CPU and isolated sanitizer gates
+    provenance: ai-executed
+    timestamp: 2026-09-06T05:37+02:00
+    result: Final CPU 4295 selected records passes with expected non-ASan leak-control skip. ASan 2753 physical
+      entries passes without skips; UBSan 2753 passes with its expected leak-control skip, covering the
+      same 4295 logical records. Registration parity preserves 4293 GoogleTest cases plus 2 manual records.28
+      focused boundary cases and 10 synthetic viewer cases passed. Independent source review fixed stale
+      Ward gains and weighted-variance extremes. Two public-math-only Claude reviews succeeded; private
+      source/data and derived screenshot transfers were rejected by automatic approval.
+    evidence:
+    - tasks/evidence/METHOD-040/commands/cpu-ctest-serial.json
+    - tasks/evidence/METHOD-040/commands/asan-ctest-local-symbols.json
+    - tasks/evidence/METHOD-040/commands/ubsan-ctest-serial.json
+    - tasks/evidence/METHOD-040/experiments/source-review.json
+    - tasks/evidence/METHOD-040/experiments/test-routing-review.json
+    - tasks/evidence/METHOD-040/experiments/claude-public-math-review.json
+    - tasks/evidence/METHOD-040/experiments/claude-public-region-review.json
+    also_depends_on:
+    - N469
+    - N470
     status: resolved

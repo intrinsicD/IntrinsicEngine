@@ -1,0 +1,29 @@
+{
+  "command": [
+    "ctest",
+    "--test-dir",
+    "build/ci-asan",
+    "--output-on-failure",
+    "-LE",
+    "gpu|vulkan|slow|flaky-quarantine",
+    "--no-tests=error",
+    "--timeout",
+    "60",
+    "--parallel",
+    "1"
+  ],
+  "command_display": "ctest --test-dir build/ci-asan --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --no-tests=error --timeout 60 --parallel 1",
+  "cwd": ".",
+  "duration_ms": 603744,
+  "exit_code": 0,
+  "finished_at": "2026-09-06T03:34:22Z",
+  "label": "asan-ctest-local-symbols",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-09-06T03:24:19Z",
+  "stderr_path": "tasks/evidence/METHOD-040/commands/asan-ctest-local-symbols.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/METHOD-040/commands/asan-ctest-local-symbols.stdout.log",
+  "stdout_sha256": "f84c5d03d9f1224aba81d66d22db7d2399eb7cdd0256b54cba86055900634db1",
+  "task_id": "METHOD-040"
+}

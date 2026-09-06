@@ -22,6 +22,7 @@ import Geometry.HalfedgeMesh;
 import Geometry.HalfedgeMesh.Builder;
 import Geometry.HalfedgeMesh.CurvatureSegmentation.Features;
 import Geometry.HalfedgeMesh.CurvatureSegmentation.Patches;
+import Geometry.HalfedgeMesh.CurvatureSegmentation.Multicut;
 import Geometry.HalfedgeMesh.Features;
 import Geometry.Properties;
 
@@ -2438,4 +2439,169 @@ TEST(CurvaturePatchContract,
     EXPECT_GE(
         computed.Diagnostics.Timings.CurvatureEstimationMilliseconds,
         0.0);
+}
+
+TEST(CurvatureBoundaryPartition, InheritedSuppliedOracleCatalog)
+{
+    for (auto &fixture : MakeOracleCatalog())
+    {
+        SCOPED_TRACE(fixture.Id);
+        auto result = FeatureDetector::PartitionFeatureBoundaries(
+            fixture.Surface, {fixture.HardEdgeMask, fixture.SoftEdgeConfidence});
+        ASSERT_TRUE(result.Succeeded())
+            << FeatureDetector::ToString(result.Diagnostics.Status);
+        EXPECT_TRUE(EquivalentPartitions(fixture.Surface, fixture.ExpectedPatchByFace,
+                                         result.FaceRegions));
+    }
+}
+
+TEST(CurvatureBoundaryPartition, InheritedRegionalOracleCatalog)
+{
+    FeatureDetector::BoundaryPartitionParams params;
+    params.ModelWeight = 0.03;
+    params.BoundaryScale = 0.02;
+    params.RegionCost = 0.0012566370614359173;
+    params.HardFeatureExclusionRatio = 0.02;
+    for (auto &fixture : MakeOracleCatalog())
+    {
+        SCOPED_TRACE(fixture.Id);
+        auto result = FeatureDetector::PartitionFeatureBoundaries(
+            fixture.Surface, {fixture.HardEdgeMask, fixture.SoftEdgeConfidence}, params,
+            fixture.K1, fixture.K2);
+        ASSERT_TRUE(result.Succeeded())
+            << FeatureDetector::ToString(result.Diagnostics.Status);
+        EXPECT_TRUE(EquivalentPartitions(fixture.Surface, fixture.ExpectedPatchByFace,
+                                         result.FaceRegions));
+    }
+}
+
+TEST(CurvatureBoundaryPartition, RegionalCandidateRefutesFrozenUnmarkedClosureGate)
+{
+    FeatureDetector::BoundaryPartitionParams params;
+    params.ModelWeight = 0.03;
+    params.BoundaryScale = 0.02;
+    params.RegionCost = 0.0012566370614359173;
+    params.HardFeatureExclusionRatio = 0.02;
+    auto closure = MakeGraphGrid(
+        "frozen_unmarked_closure", [](double, double) { return 0.0; },
+        [](double x, double)
+        {
+            const double k = std::tanh(x / 0.05);
+            return glm::dvec2{std::max(k, 0.0), std::min(k, 0.0)};
+        },
+        [](double x, double) { return x >= 0 ? 1u : 0u; });
+    const auto run =
+        [&](const OracleFixture &fixture, FeatureDetector::FeatureEvidenceView evidence)
+    {
+        return FeatureDetector::PartitionFeatureBoundaries(
+            fixture.Surface, evidence, params, fixture.K1, fixture.K2);
+    };
+    auto result = run(closure, {closure.HardEdgeMask, closure.SoftEdgeConfidence});
+    ASSERT_TRUE(result.Succeeded());
+    // This is retained negative evidence, not a relaxed adoption threshold.
+    EXPECT_GT(AreaWeightedVariationOfInformation(
+                  closure.Surface, closure.ExpectedPatchByFace, result.FaceRegions),
+              0.01);
+}
+
+TEST(CurvatureBoundaryPartition, RegionalComputedEvidenceCatalog)
+{
+    FeatureDetector::BoundaryPartitionParams params;
+    params.ModelWeight = 0.03;
+    params.BoundaryScale = 0.02;
+    params.RegionCost = 0.0012566370614359173;
+    params.HardFeatureExclusionRatio = 0.02;
+    const auto run =
+        [&](const OracleFixture &fixture, FeatureDetector::FeatureEvidenceView evidence)
+    {
+        return FeatureDetector::PartitionFeatureBoundaries(
+            fixture.Surface, evidence, params, fixture.K1, fixture.K2);
+    };
+    for (bool flipped : {false, true})
+        for (const auto &fixture : MakeDetectorControlCatalog(flipped))
+        {
+            SCOPED_TRACE(fixture.Id);
+            auto evidence = FeatureDetector::DetectFeatureEvidence(
+                fixture.Surface, fixture.K1, fixture.K2);
+            ASSERT_TRUE(evidence.Succeeded());
+            auto partition = run(fixture, evidence.View());
+            ASSERT_TRUE(partition.Succeeded());
+            EXPECT_LE(AreaWeightedVariationOfInformation(fixture.Surface,
+                                                         fixture.ExpectedPatchByFace,
+                                                         partition.FaceRegions),
+                      0.01);
+        }
+}
+
+TEST(CurvatureBoundaryPartition, ContrastSuppliedOracleCatalog)
+{
+    FeatureDetector::BoundaryPartitionParams params;
+    params.FeatureWeight = 4;
+    params.FeatureExponent = 3;
+    params.BoundaryScale = 0.02;
+    params.RegionCost = 0.0012566370614359173;
+    params.HardFeatureExclusionRatio = 0.02;
+    for (auto &fixture : MakeOracleCatalog())
+    {
+        SCOPED_TRACE(fixture.Id);
+        const auto result = FeatureDetector::PartitionFeatureBoundaries(
+            fixture.Surface, {fixture.HardEdgeMask, fixture.SoftEdgeConfidence}, params);
+        ASSERT_TRUE(result.Succeeded())
+            << FeatureDetector::ToString(result.Diagnostics.Status);
+        EXPECT_TRUE(EquivalentPartitions(fixture.Surface, fixture.ExpectedPatchByFace,
+                                         result.FaceRegions));
+    }
+}
+
+TEST(CurvatureBoundaryPartition, AreaCleanupSuppliedOracleCatalog)
+{
+    FeatureDetector::BoundaryPartitionParams params;
+    params.FeatureWeight = 4;
+    params.FeatureExponent = 3;
+    params.BoundaryScale = 0.02;
+    params.RegionCost = 0.0012566370614359173;
+    params.HardFeatureExclusionRatio = 0.02;
+    params.MinimumRegionArea = 0.0012566370614359173;
+    for (auto &fixture : MakeOracleCatalog())
+    {
+        SCOPED_TRACE(fixture.Id);
+        const auto result = FeatureDetector::PartitionFeatureBoundaries(
+            fixture.Surface, {fixture.HardEdgeMask, fixture.SoftEdgeConfidence}, params);
+        ASSERT_TRUE(result.Succeeded())
+            << FeatureDetector::ToString(result.Diagnostics.Status);
+        EXPECT_TRUE(EquivalentPartitions(fixture.Surface, fixture.ExpectedPatchByFace,
+                                         result.FaceRegions));
+    }
+}
+
+TEST(CurvatureBoundaryPartition, CleanupProfilesPreserveComputedFeatureContours)
+{
+    for (bool alternate : {false, true})
+        for (const auto &fixture : MakeDetectorControlCatalog(alternate))
+        {
+            SCOPED_TRACE(fixture.Id);
+            // The three partition profiles consume identical detector evidence.
+            const auto evidence = FeatureDetector::DetectFeatureEvidence(
+                fixture.Surface, fixture.K1, fixture.K2);
+            ASSERT_TRUE(evidence.Succeeded());
+            for (double radius : {0.02, 0.04, 0.08})
+            {
+                SCOPED_TRACE("radius=" + std::to_string(radius));
+                FeatureDetector::BoundaryPartitionParams params;
+                params.FeatureWeight = 4;
+                params.FeatureExponent = 3;
+                params.BoundaryScale = radius;
+                params.RegionCost = 3.141592653589793 * radius * radius;
+                params.MinimumRegionArea = params.RegionCost;
+                params.HardFeatureExclusionRatio = radius;
+                const auto result = FeatureDetector::PartitionFeatureBoundaries(
+                    fixture.Surface, evidence.View(), params);
+                ASSERT_TRUE(result.Succeeded())
+                    << FeatureDetector::ToString(result.Diagnostics.Status);
+                EXPECT_LE(AreaWeightedVariationOfInformation(fixture.Surface,
+                                                             fixture.ExpectedPatchByFace,
+                                                             result.FaceRegions),
+                          0.01);
+            }
+        }
 }

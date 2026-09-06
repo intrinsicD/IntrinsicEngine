@@ -2,9 +2,11 @@
 id: BUG-174
 theme: J
 depends_on: []
+template: micro
 workflow_schema: 1
-workflow_profile: high-risk
-evidence: required
+workflow_profile: micro
+evidence: not_applicable
+evidence_skip_reason: "Incidental one-variable test-harness environment repair during METHOD-040 verification. No engine, suppression, assertion, or timeout changes; parent command receipts and BUG-174 discriminating probes retain the complete evidence."
 owner:
 branch:
 worktree:
@@ -76,7 +78,7 @@ python3 tools/agents/check_task_policy.py --root . --strict
 - The harness now clears that variable for its two subprocesses. Twenty required
   harness repetitions pass, including the clean GLFW lifetime check without a
   capability skip; the independent source review found no issue.
-- [Isolated evidence](../../evidence/BUG-174/summary.md) retains the failing
+- [Isolated evidence](../evidence/BUG-174/summary.md) retains the failing
   process states and both discriminating environment probes. No caches were
   cleared; this establishes fresh-process reliability, not cold-cache timing.
 - Independent source review accepted the exact harness change at SHA-256
@@ -84,4 +86,14 @@ python3 tools/agents/check_task_policy.py --root . --strict
 - Verification: `ctest --test-dir build/ci-asan --output-on-failure -R
   '^GlfwLifecycleLsan.EngineStaticTeardownAndLeakControl$' --repeat until-fail:20
   --timeout 60 --parallel 1` passed all twenty runs in 2.81 seconds. The retained
-  log is [harness-repeat.log](../../evidence/BUG-174/harness-repeat.log).
+  log is [harness-repeat.log](../evidence/BUG-174/harness-repeat.log).
+
+## Completion
+- Completed 2026-09-06.
+- Commit: 2d22f6f01 (implementation).
+- The remaining METHOD-040 full-gate rerun is separate from the completed
+  bounded harness repair.
+- The original investigation placeholder used the high-risk profile. Once the
+  cause was isolated, the repair became one test-harness environment variable;
+  it follows the same incidental micro lane as BUG-173/175, with all diagnostic
+  evidence retained. No high-risk execution claim was acquired for this bug.

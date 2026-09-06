@@ -1,0 +1,25 @@
+{
+  "command": [
+    "cmake",
+    "--build",
+    "--preset",
+    "ci-ubsan",
+    "--target",
+    "IntrinsicCpuTests",
+    "-j4"
+  ],
+  "command_display": "cmake --build --preset ci-ubsan --target IntrinsicCpuTests -j4",
+  "cwd": ".",
+  "duration_ms": 1712045,
+  "exit_code": 0,
+  "finished_at": "2026-09-06T02:53:38Z",
+  "label": "ubsan-build-final",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-09-06T02:25:06Z",
+  "stderr_path": "tasks/evidence/METHOD-040/commands/ubsan-build-final.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/METHOD-040/commands/ubsan-build-final.stdout.log",
+  "stdout_sha256": "3cf9efb5ecca9b15fb3c0c60a9837eec5b4a33dc4e9a5849fd850a8e5f9e8494",
+  "task_id": "METHOD-040"
+}

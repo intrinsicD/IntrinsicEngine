@@ -1,0 +1,821 @@
+{
+  "artifact": "/home/alex/Documents/IntrinsicEngine/build/method040-review/index.html",
+  "checks": [
+    {
+      "name": "exact artifact ready",
+      "passed": true,
+      "details": {
+        "status": "ready",
+        "meshes": 9,
+        "runs": 36,
+        "rejected": 12,
+        "selectedMesh": "sculpt",
+        "left": "local",
+        "right": "curves",
+        "camera": {
+          "yaw": 0.55,
+          "pitch": -0.2,
+          "zoom": 1
+        },
+        "glErrors": [
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "name": "exact artifact location",
+      "passed": true,
+      "details": "file:///home/alex/Documents/IntrinsicEngine/build/method040-review/index.html"
+    },
+    {
+      "name": "expected population",
+      "passed": true,
+      "details": null
+    },
+    {
+      "name": "four intended modes",
+      "passed": true,
+      "details": [
+        "clean_coarse",
+        "clean_medium",
+        "curves",
+        "local"
+      ]
+    },
+    {
+      "name": "all 36 mesh-mode renders",
+      "passed": true,
+      "details": {
+        "combinations": 36,
+        "minimumColoredPixels": 16993
+      }
+    },
+    {
+      "name": "native saddle2 in all modes",
+      "passed": true,
+      "details": [
+        {
+          "mode": "local",
+          "faces": 1352
+        },
+        {
+          "mode": "clean_medium",
+          "faces": 1352
+        },
+        {
+          "mode": "clean_coarse",
+          "faces": 1352
+        },
+        {
+          "mode": "curves",
+          "faces": 1352
+        }
+      ]
+    },
+    {
+      "name": "native geometry throughout",
+      "passed": true,
+      "details": null
+    },
+    {
+      "name": "boundary overlay changes both images",
+      "passed": true,
+      "details": null
+    },
+    {
+      "name": "input feature overlay changes both images",
+      "passed": true,
+      "details": null
+    },
+    {
+      "name": "left drag changes shared orbit",
+      "passed": true,
+      "details": {
+        "yaw": 1.04,
+        "pitch": 0.044999999999999984,
+        "zoom": 1
+      }
+    },
+    {
+      "name": "right wheel zoom updates both views",
+      "passed": true,
+      "details": {
+        "yaw": 1.04,
+        "pitch": 0.044999999999999984,
+        "zoom": 1.2214027581601699
+      }
+    },
+    {
+      "name": "reset restores synchronized camera",
+      "passed": true,
+      "details": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      }
+    },
+    {
+      "name": "narrow viewport remains functional",
+      "passed": true,
+      "details": {
+        "stacked": true,
+        "gl": [
+          0,
+          0
+        ],
+        "pixels": [
+          35028,
+          35028
+        ]
+      }
+    },
+    {
+      "name": "exclusions visibly represented",
+      "passed": true,
+      "details": "Excluded and failed records (12)"
+    },
+    {
+      "name": "no uncaught JavaScript exceptions",
+      "passed": true,
+      "details": 0
+    },
+    {
+      "name": "no external page requests",
+      "passed": true,
+      "details": []
+    }
+  ],
+  "coverage": [
+    {
+      "mesh": "sculpt",
+      "left": "local",
+      "right": "clean_medium",
+      "native": true,
+      "independent": true,
+      "faces": 7342,
+      "labels": 7342,
+      "pixels": [
+        40649,
+        40649
+      ],
+      "gl": [
+        0,
+        0
+      ],
+      "status": "ready"
+    },
+    {
+      "mesh": "sculpt",
+      "left": "clean_medium",
+      "right": "clean_coarse",
+      "native": true,
+      "independent": true,
+      "faces": 7342,
+      "labels": 7342,
+      "pixels": [
+        40649,
+        40649
+      ],
+      "gl": [
+        0,
+        0
+      ],
+      "status": "ready"
+    },
+    {
+      "mesh": "sculpt",
+      "left": "clean_coarse",
+      "right": "curves",
+      "native": true,
+      "independent": true,
+      "faces": 7342,
+      "labels": 7342,
+      "pixels": [
+        40649,
+        40649
+      ],
+      "gl": [
+        0,
+        0
+      ],
+      "status": "ready"
+    },
+    {
+      "mesh": "sculpt",
+      "left": "curves",
+      "right": "local",
+      "native": true,
+      "independent": true,
+      "faces": 7342,
+      "labels": 7342,
+      "pixels": [
+        40649,
+        40649
+      ],
+      "gl": [
+        0,
+        0
+      ],
+      "status": "ready"
+    },
+    {
+      "mesh": "frog",
+      "left": "local",
+      "right": "clean_medium",
+      "native": true,
+      "independent": true,
+      "faces": 19106,
+      "labels": 19106,
+      "pixels": [
+        38150,
+        38219
+      ],
+      "gl": [
+        0,
+        0
+      ],
+      "status": "ready"
+    },
+    {
+      "mesh": "frog",
+      "left": "clean_medium",
+      "right": "clean_coarse",
+      "native": true,
+      "independent": true,
+      "faces": 19106,
+      "labels": 19106,
+      "pixels": [
+        38219,
+        38200
+      ],
+      "gl": [
+        0,
+        0
+      ],
+      "status": "ready"
+    },
+    {
+      "mesh": "frog",
+      "left": "clean_coarse",
+      "right": "curves",
+      "native": true,
+      "independent": true,
+      "faces": 19106,
+      "labels": 19106,
+      "pixels": [
+        38200,
+        38224
+      ],
+      "gl": [
+        0,
+        0
+      ],
+      "status": "ready"
+    },
+    {
+      "mesh": "frog",
+      "left": "curves",
+      "right": "local",
+      "native": true,
+      "independent": true,
+      "faces": 19106,
+      "labels": 19106,
+      "pixels": [
+        38224,
+        38150
+      ],
+      "gl": [
+        0,
+        0
+      ],
+      "status": "ready"
+    },
+    {
+      "mesh": "fandisk",
+      "left": "local",
+      "right": "clean_medium",
+      "native": true,
+      "independent": true,
+      "faces": 12946,
+      "labels": 12946,
+      "pixels": [
+        52761,
+        52761
+      ],
+      "gl": [
+        0,
+        0
+      ],
+      "status": "ready"
+    },
+    {
+      "mesh": "fandisk",
+      "left": "clean_medium",
+      "right": "clean_coarse",
+      "native": true,
+      "independent": true,
+      "faces": 12946,
+      "labels": 12946,
+      "pixels": [
+        52761,
+        52761
+      ],
+      "gl": [
+        0,
+        0
+      ],
+      "status": "ready"
+    },
+    {
+      "mesh": "fandisk",
+      "left": "clean_coarse",
+      "right": "curves",
+      "native": true,
+      "independent": true,
+      "faces": 12946,
+      "labels": 12946,
+      "pixels": [
+        52761,
+        52761
+      ],
+      "gl": [
+        0,
+        0
+      ],
+      "status": "ready"
+    },
+    {
+      "mesh": "fandisk",
+      "left": "curves",
+      "right": "local",
+      "native": true,
+      "independent": true,
+      "faces": 12946,
+      "labels": 12946,
+      "pixels": [
+        52761,
+        52761
+      ],
+      "gl": [
+        0,
+        0
+      ],
+      "status": "ready"
+    },
+    {
+      "mesh": "dolphin",
+      "left": "local",
+      "right": "clean_medium",
+      "native": true,
+      "independent": true,
+      "faces": 5120,
+      "labels": 5120,
+      "pixels": [
+        17000,
+        17039
+      ],
+      "gl": [
+        0,
+        0
+      ],
+      "status": "ready"
+    },
+    {
+      "mesh": "dolphin",
+      "left": "clean_medium",
+      "right": "clean_coarse",
+      "native": true,
+      "independent": true,
+      "faces": 5120,
+      "labels": 5120,
+      "pixels": [
+        17039,
+        16993
+      ],
+      "gl": [
+        0,
+        0
+      ],
+      "status": "ready"
+    },
+    {
+      "mesh": "dolphin",
+      "left": "clean_coarse",
+      "right": "curves",
+      "native": true,
+      "independent": true,
+      "faces": 5120,
+      "labels": 5120,
+      "pixels": [
+        16993,
+        17042
+      ],
+      "gl": [
+        0,
+        0
+      ],
+      "status": "ready"
+    },
+    {
+      "mesh": "dolphin",
+      "left": "curves",
+      "right": "local",
+      "native": true,
+      "independent": true,
+      "faces": 5120,
+      "labels": 5120,
+      "pixels": [
+        17042,
+        17000
+      ],
+      "gl": [
+        0,
+        0
+      ],
+      "status": "ready"
+    },
+    {
+      "mesh": "elephant",
+      "left": "local",
+      "right": "clean_medium",
+      "native": true,
+      "independent": true,
+      "faces": 49918,
+      "labels": 49918,
+      "pixels": [
+        26406,
+        26482
+      ],
+      "gl": [
+        0,
+        0
+      ],
+      "status": "ready"
+    },
+    {
+      "mesh": "elephant",
+      "left": "clean_medium",
+      "right": "clean_coarse",
+      "native": true,
+      "independent": true,
+      "faces": 49918,
+      "labels": 49918,
+      "pixels": [
+        26482,
+        26391
+      ],
+      "gl": [
+        0,
+        0
+      ],
+      "status": "ready"
+    },
+    {
+      "mesh": "elephant",
+      "left": "clean_coarse",
+      "right": "curves",
+      "native": true,
+      "independent": true,
+      "faces": 49918,
+      "labels": 49918,
+      "pixels": [
+        26391,
+        26509
+      ],
+      "gl": [
+        0,
+        0
+      ],
+      "status": "ready"
+    },
+    {
+      "mesh": "elephant",
+      "left": "curves",
+      "right": "local",
+      "native": true,
+      "independent": true,
+      "faces": 49918,
+      "labels": 49918,
+      "pixels": [
+        26509,
+        26406
+      ],
+      "gl": [
+        0,
+        0
+      ],
+      "status": "ready"
+    },
+    {
+      "mesh": "bumpy_torus",
+      "left": "local",
+      "right": "clean_medium",
+      "native": true,
+      "independent": true,
+      "faces": 33630,
+      "labels": 33630,
+      "pixels": [
+        43235,
+        43227
+      ],
+      "gl": [
+        0,
+        0
+      ],
+      "status": "ready"
+    },
+    {
+      "mesh": "bumpy_torus",
+      "left": "clean_medium",
+      "right": "clean_coarse",
+      "native": true,
+      "independent": true,
+      "faces": 33630,
+      "labels": 33630,
+      "pixels": [
+        43227,
+        43227
+      ],
+      "gl": [
+        0,
+        0
+      ],
+      "status": "ready"
+    },
+    {
+      "mesh": "bumpy_torus",
+      "left": "clean_coarse",
+      "right": "curves",
+      "native": true,
+      "independent": true,
+      "faces": 33630,
+      "labels": 33630,
+      "pixels": [
+        43227,
+        43241
+      ],
+      "gl": [
+        0,
+        0
+      ],
+      "status": "ready"
+    },
+    {
+      "mesh": "bumpy_torus",
+      "left": "curves",
+      "right": "local",
+      "native": true,
+      "independent": true,
+      "faces": 33630,
+      "labels": 33630,
+      "pixels": [
+        43241,
+        43235
+      ],
+      "gl": [
+        0,
+        0
+      ],
+      "status": "ready"
+    },
+    {
+      "mesh": "genus3",
+      "left": "local",
+      "right": "clean_medium",
+      "native": true,
+      "independent": true,
+      "faces": 13312,
+      "labels": 13312,
+      "pixels": [
+        40030,
+        40103
+      ],
+      "gl": [
+        0,
+        0
+      ],
+      "status": "ready"
+    },
+    {
+      "mesh": "genus3",
+      "left": "clean_medium",
+      "right": "clean_coarse",
+      "native": true,
+      "independent": true,
+      "faces": 13312,
+      "labels": 13312,
+      "pixels": [
+        40103,
+        40031
+      ],
+      "gl": [
+        0,
+        0
+      ],
+      "status": "ready"
+    },
+    {
+      "mesh": "genus3",
+      "left": "clean_coarse",
+      "right": "curves",
+      "native": true,
+      "independent": true,
+      "faces": 13312,
+      "labels": 13312,
+      "pixels": [
+        40031,
+        40105
+      ],
+      "gl": [
+        0,
+        0
+      ],
+      "status": "ready"
+    },
+    {
+      "mesh": "genus3",
+      "left": "curves",
+      "right": "local",
+      "native": true,
+      "independent": true,
+      "faces": 13312,
+      "labels": 13312,
+      "pixels": [
+        40105,
+        40030
+      ],
+      "gl": [
+        0,
+        0
+      ],
+      "status": "ready"
+    },
+    {
+      "mesh": "cube",
+      "left": "local",
+      "right": "clean_medium",
+      "native": true,
+      "independent": true,
+      "faces": 12288,
+      "labels": 12288,
+      "pixels": [
+        88948,
+        88948
+      ],
+      "gl": [
+        0,
+        0
+      ],
+      "status": "ready"
+    },
+    {
+      "mesh": "cube",
+      "left": "clean_medium",
+      "right": "clean_coarse",
+      "native": true,
+      "independent": true,
+      "faces": 12288,
+      "labels": 12288,
+      "pixels": [
+        88948,
+        88948
+      ],
+      "gl": [
+        0,
+        0
+      ],
+      "status": "ready"
+    },
+    {
+      "mesh": "cube",
+      "left": "clean_coarse",
+      "right": "curves",
+      "native": true,
+      "independent": true,
+      "faces": 12288,
+      "labels": 12288,
+      "pixels": [
+        88948,
+        88948
+      ],
+      "gl": [
+        0,
+        0
+      ],
+      "status": "ready"
+    },
+    {
+      "mesh": "cube",
+      "left": "curves",
+      "right": "local",
+      "native": true,
+      "independent": true,
+      "faces": 12288,
+      "labels": 12288,
+      "pixels": [
+        88948,
+        88948
+      ],
+      "gl": [
+        0,
+        0
+      ],
+      "status": "ready"
+    },
+    {
+      "mesh": "saddle2",
+      "left": "local",
+      "right": "clean_medium",
+      "native": true,
+      "independent": true,
+      "faces": 1352,
+      "labels": 1352,
+      "pixels": [
+        20872,
+        20872
+      ],
+      "gl": [
+        0,
+        0
+      ],
+      "status": "ready"
+    },
+    {
+      "mesh": "saddle2",
+      "left": "clean_medium",
+      "right": "clean_coarse",
+      "native": true,
+      "independent": true,
+      "faces": 1352,
+      "labels": 1352,
+      "pixels": [
+        20872,
+        20872
+      ],
+      "gl": [
+        0,
+        0
+      ],
+      "status": "ready"
+    },
+    {
+      "mesh": "saddle2",
+      "left": "clean_coarse",
+      "right": "curves",
+      "native": true,
+      "independent": true,
+      "faces": 1352,
+      "labels": 1352,
+      "pixels": [
+        20872,
+        20872
+      ],
+      "gl": [
+        0,
+        0
+      ],
+      "status": "ready"
+    },
+    {
+      "mesh": "saddle2",
+      "left": "curves",
+      "right": "local",
+      "native": true,
+      "independent": true,
+      "faces": 1352,
+      "labels": 1352,
+      "pixels": [
+        20872,
+        20872
+      ],
+      "gl": [
+        0,
+        0
+      ],
+      "status": "ready"
+    }
+  ],
+  "screenshot": "/tmp/method040-viewer/final-saddle2.png",
+  "browserLog": [],
+  "finalInspection": {
+    "status": "ready",
+    "meshes": 9,
+    "runs": 36,
+    "rejected": 12,
+    "selectedMesh": "saddle2",
+    "left": "local",
+    "right": "curves",
+    "camera": {
+      "yaw": 0.55,
+      "pitch": -0.2,
+      "zoom": 1
+    },
+    "glErrors": [
+      0,
+      0
+    ]
+  },
+  "passed": true,
+  "artifactSha256": "4a28176d080aca4cc57e54036e63bdb57659cdbe3c2fec8ae11c88f0f1b08d26"
+}

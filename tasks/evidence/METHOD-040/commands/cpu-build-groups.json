@@ -1,0 +1,27 @@
+{
+  "command": [
+    "cmake",
+    "--build",
+    "--preset",
+    "ci",
+    "--target",
+    "IntrinsicTests",
+    "IntrinsicBenchmarkSmoke",
+    "IntrinsicCurvatureBoundaryMesh",
+    "-j4"
+  ],
+  "command_display": "cmake --build --preset ci --target IntrinsicTests IntrinsicBenchmarkSmoke IntrinsicCurvatureBoundaryMesh -j4",
+  "cwd": ".",
+  "duration_ms": 87919,
+  "exit_code": 0,
+  "finished_at": "2026-09-06T02:52:45Z",
+  "label": "cpu-build-groups",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-09-06T02:51:17Z",
+  "stderr_path": "tasks/evidence/METHOD-040/commands/cpu-build-groups.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/METHOD-040/commands/cpu-build-groups.stdout.log",
+  "stdout_sha256": "bf16b5568334fc560fdeb2d8410772f6db09831466e75aa55c43d1e966a044d6",
+  "task_id": "METHOD-040"
+}

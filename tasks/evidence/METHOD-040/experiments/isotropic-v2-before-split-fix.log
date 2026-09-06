@@ -1,0 +1,191 @@
+Internal ctest changing into directory: /home/alex/Documents/IntrinsicEngine/build/ci
+Test project /home/alex/Documents/IntrinsicEngine/build/ci
+      Start 1791: CurvatureBoundaryPartition.InheritedSuppliedOracleCatalog
+ 1/11 Test #1791: CurvatureBoundaryPartition.InheritedSuppliedOracleCatalog .................................   Passed    0.13 sec
+      Start 1792: CurvatureBoundaryPartition.StrongContourAndShortCompletionSeparateEqualCurvatureSurface
+ 2/11 Test #1792: CurvatureBoundaryPartition.StrongContourAndShortCompletionSeparateEqualCurvatureSurface ...***Failed    0.01 sec
+Running main() from /home/alex/Documents/IntrinsicEngine/external/vcpkg/buildtrees/gtest/src/v1.17.0-0c449efaff.clean/googletest/src/gtest_main.cc
+Note: Google Test filter = CurvatureBoundaryPartition.StrongContourAndShortCompletionSeparateEqualCurvatureSurface
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from CurvatureBoundaryPartition
+[ RUN      ] CurvatureBoundaryPartition.StrongContourAndShortCompletionSeparateEqualCurvatureSurface
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CurvatureBoundaryPartition.cpp:149: Failure
+Expected equality of these values:
+  r.Diagnostics.RegionCount
+    Which is: 1
+  2
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CurvatureBoundaryPartition.cpp:150: Failure
+Expected equality of these values:
+  r.Diagnostics.ClosureBoundaryCount
+    Which is: 0
+  gap?1:0
+    Which is: 1
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CurvatureBoundaryPartition.cpp:155: Failure
+Expected equality of these values:
+  r.EdgeBoundaries[e.Index]
+    Which is: '\0'
+  a.x==4&&b.x==4
+    Which is: true
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CurvatureBoundaryPartition.cpp:155: Failure
+Expected equality of these values:
+  r.EdgeBoundaries[e.Index]
+    Which is: '\0'
+  a.x==4&&b.x==4
+    Which is: true
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CurvatureBoundaryPartition.cpp:155: Failure
+Expected equality of these values:
+  r.EdgeBoundaries[e.Index]
+    Which is: '\0'
+  a.x==4&&b.x==4
+    Which is: true
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CurvatureBoundaryPartition.cpp:155: Failure
+Expected equality of these values:
+  r.EdgeBoundaries[e.Index]
+    Which is: '\0'
+  a.x==4&&b.x==4
+    Which is: true
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CurvatureBoundaryPartition.cpp:155: Failure
+Expected equality of these values:
+  r.EdgeBoundaries[e.Index]
+    Which is: '\0'
+  a.x==4&&b.x==4
+    Which is: true
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CurvatureBoundaryPartition.cpp:155: Failure
+Expected equality of these values:
+  r.EdgeBoundaries[e.Index]
+    Which is: '\0'
+  a.x==4&&b.x==4
+    Which is: true
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CurvatureBoundaryPartition.cpp:155: Failure
+Expected equality of these values:
+  r.EdgeBoundaries[e.Index]
+    Which is: '\0'
+  a.x==4&&b.x==4
+    Which is: true
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CurvatureBoundaryPartition.cpp:155: Failure
+Expected equality of these values:
+  r.EdgeBoundaries[e.Index]
+    Which is: '\0'
+  a.x==4&&b.x==4
+    Which is: true
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CurvatureBoundaryPartition.cpp:149: Failure
+Expected equality of these values:
+  r.Diagnostics.RegionCount
+    Which is: 1
+  2
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CurvatureBoundaryPartition.cpp:150: Failure
+Expected equality of these values:
+  r.Diagnostics.ClosureBoundaryCount
+    Which is: 0
+  gap?1:0
+    Which is: 1
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CurvatureBoundaryPartition.cpp:155: Failure
+Expected equality of these values:
+  r.EdgeBoundaries[e.Index]
+    Which is: '\0'
+  a.x==4&&b.x==4
+    Which is: true
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CurvatureBoundaryPartition.cpp:155: Failure
+Expected equality of these values:
+  r.EdgeBoundaries[e.Index]
+    Which is: '\0'
+  a.x==4&&b.x==4
+    Which is: true
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CurvatureBoundaryPartition.cpp:155: Failure
+Expected equality of these values:
+  r.EdgeBoundaries[e.Index]
+    Which is: '\0'
+  a.x==4&&b.x==4
+    Which is: true
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CurvatureBoundaryPartition.cpp:155: Failure
+Expected equality of these values:
+  r.EdgeBoundaries[e.Index]
+    Which is: '\0'
+  a.x==4&&b.x==4
+    Which is: true
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CurvatureBoundaryPartition.cpp:155: Failure
+Expected equality of these values:
+  r.EdgeBoundaries[e.Index]
+    Which is: '\0'
+  a.x==4&&b.x==4
+    Which is: true
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CurvatureBoundaryPartition.cpp:155: Failure
+Expected equality of these values:
+  r.EdgeBoundaries[e.Index]
+    Which is: '\0'
+  a.x==4&&b.x==4
+    Which is: true
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CurvatureBoundaryPartition.cpp:155: Failure
+Expected equality of these values:
+  r.EdgeBoundaries[e.Index]
+    Which is: '\0'
+  a.x==4&&b.x==4
+    Which is: true
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CurvatureBoundaryPartition.cpp:155: Failure
+Expected equality of these values:
+  r.EdgeBoundaries[e.Index]
+    Which is: '\0'
+  a.x==4&&b.x==4
+    Which is: true
+
+[  FAILED  ] CurvatureBoundaryPartition.StrongContourAndShortCompletionSeparateEqualCurvatureSurface (5 ms)
+[----------] 1 test from CurvatureBoundaryPartition (5 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (5 ms total)
+[  PASSED  ] 0 tests.
+[  FAILED  ] 1 test, listed below:
+[  FAILED  ] CurvatureBoundaryPartition.StrongContourAndShortCompletionSeparateEqualCurvatureSurface
+
+ 1 FAILED TEST
+
+      Start 1793: CurvatureBoundaryPartition.HomogeneousSurfaceStaysWholeAndPreservesTopology
+ 3/11 Test #1793: CurvatureBoundaryPartition.HomogeneousSurfaceStaysWholeAndPreservesTopology ...............   Passed    0.01 sec
+      Start 1794: CurvatureBoundaryPartition.UniformScalePreservesPartitionAndObjective
+ 4/11 Test #1794: CurvatureBoundaryPartition.UniformScalePreservesPartitionAndObjective .....................   Passed    0.01 sec
+      Start 1795: CurvatureBoundaryPartition.InvalidEvidenceAndBudgetFailClosed
+ 5/11 Test #1795: CurvatureBoundaryPartition.InvalidEvidenceAndBudgetFailClosed .............................   Passed    0.01 sec
+      Start 1796: CurvatureBoundaryGraph.ExactOracleMatchesIndependentAssignments
+ 6/11 Test #1796: CurvatureBoundaryGraph.ExactOracleMatchesIndependentAssignments ...........................   Passed    0.02 sec
+      Start 1797: CurvatureBoundaryGraph.HardCutCannotBeBypassedThroughPositivePath
+ 7/11 Test #1797: CurvatureBoundaryGraph.HardCutCannotBeBypassedThroughPositivePath .........................   Passed    0.01 sec
+      Start 1798: CurvatureBoundaryGraph.WiderMovesRecoverAcrossPrematureContraction
+ 8/11 Test #1798: CurvatureBoundaryGraph.WiderMovesRecoverAcrossPrematureContraction ........................   Passed    0.02 sec
+      Start 1799: CurvatureBoundaryGraph.HeuristicIsFeasibleDeterministicAndBoundedByOracle
+ 9/11 Test #1799: CurvatureBoundaryGraph.HeuristicIsFeasibleDeterministicAndBoundedByOracle .................   Passed    0.03 sec
+      Start 1800: CurvatureBoundaryGraph.InvalidAndLimitedInputsReturnNoPartition
+10/11 Test #1800: CurvatureBoundaryGraph.InvalidAndLimitedInputsReturnNoPartition ...........................   Passed    0.00 sec
+      Start 1801: CurvatureBoundaryGraph.DisconnectedNodesPublishSeparateConnectedRegions
+11/11 Test #1801: CurvatureBoundaryGraph.DisconnectedNodesPublishSeparateConnectedRegions ...................   Passed    0.01 sec
+
+91% tests passed, 1 tests failed out of 11
+
+Label Time Summary:
+geometry    =   0.24 sec*proc (11 tests)
+unit        =   0.24 sec*proc (11 tests)
+
+Total Test time (real) =   1.23 sec
+
+The following tests FAILED:
+	1792 - CurvatureBoundaryPartition.StrongContourAndShortCompletionSeparateEqualCurvatureSurface (Failed)
+Errors while running CTest

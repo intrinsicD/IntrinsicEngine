@@ -1,0 +1,28 @@
+{
+  "command": [
+    "cmake",
+    "--build",
+    "--preset",
+    "ci",
+    "--target",
+    "IntrinsicTests",
+    "IntrinsicBenchmarkSmoke",
+    "IntrinsicCurvatureBoundaryMesh",
+    "-j",
+    "2"
+  ],
+  "command_display": "cmake --build --preset ci --target IntrinsicTests IntrinsicBenchmarkSmoke IntrinsicCurvatureBoundaryMesh -j 2",
+  "cwd": ".",
+  "duration_ms": 90663,
+  "exit_code": 0,
+  "finished_at": "2026-09-06T02:06:40Z",
+  "label": "cpu-build-reviewed",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-09-06T02:05:09Z",
+  "stderr_path": "tasks/evidence/METHOD-040/commands/cpu-build-reviewed.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/METHOD-040/commands/cpu-build-reviewed.stdout.log",
+  "stdout_sha256": "fd9a0735c2bf4f1e41e1bcfeb1ab1734aa1ce9ecf082483566e81b2b48a90619",
+  "task_id": "METHOD-040"
+}

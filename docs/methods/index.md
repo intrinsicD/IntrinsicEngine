@@ -89,3 +89,14 @@ This index is the canonical entry point for method/paper implementation document
   compute-result `gpu;vulkan` parity tests, and benchmark metric extension are
   owned by open follow-up
   [`METHOD-014`](../../tasks/backlog/methods/METHOD-014-progressive-poisson-gpu-operational-parity.md).
+
+## Experimental feature-boundary partitions
+
+METHOD-040's unadopted CPU candidates, exact small-graph oracle, regional fitting
+and explicit small-area agglomeration are documented in the
+[experiment contract](../../methods/geometry/curvature_segmentation/boundary_partition_experiment.md).
+The method package records production and diagnostic paths separately.
+
+The [local mesh comparison](../../methods/geometry/curvature_segmentation/boundary_partition_report.md)
+includes fixed-profile results, rejected inputs, the failed adoption control,
+and reproduction commands.

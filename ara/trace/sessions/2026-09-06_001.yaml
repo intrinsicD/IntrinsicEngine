@@ -2,10 +2,10 @@ session:
   id: 2026-09-06_001
   date: '2026-09-06'
   started: 2026-09-06T00:10+02:00
-  last_turn: 2026-09-06T01:30+02:00
-  turn_count: 2
-  summary: Diagnosed frog undersegmentation, clarified the geometric-region goal, and reviewed a
-    boundary-first METHOD-040 experiment; preserved CPU and analytical evidence without adopting a replacement.
+  last_turn: 2026-09-06T05:37+02:00
+  turn_count: 3
+  summary: Diagnosed frog, implemented reviewed experimental boundary partitions, compared twelve meshes,
+    and passed CPU/ASan/UBSan gates; preserved the negative adoption oracle and unresolved custody.
 events_logged:
 - turn: 1
   type: question
@@ -61,6 +61,48 @@ events_logged:
   routing: staged
   provenance: ai-suggested
   summary: Boundary-first multicut adaptation remains a proposed experiment.
+- turn: 3
+  type: decision
+  id: N467
+  routing: direct
+  provenance: user
+  summary: Authorize bounded overnight geometric-partition implementation
+- turn: 3
+  type: dead_end
+  id: N468
+  routing: direct
+  provenance: ai-executed
+  summary: Frozen unmarked-curvature oracle rejects METHOD-040 adoption
+- turn: 3
+  type: experiment
+  id: N469
+  routing: direct
+  provenance: ai-executed
+  summary: Compare four final fixed profiles on twelve local meshes
+- turn: 3
+  type: decision
+  id: N470
+  routing: direct
+  provenance: ai-executed
+  summary: Keep the boundary implementation experimental and retain failed custody
+- turn: 3
+  type: experiment
+  id: N471
+  routing: direct
+  provenance: ai-executed
+  summary: Verify reviewed partition source through CPU and isolated sanitizer gates
+- turn: 3
+  type: claim
+  id: O176
+  routing: crystallized
+  provenance: ai-executed
+  summary: logic/claims.md:C59
+- turn: 3
+  type: claim
+  id: O177
+  routing: crystallized
+  provenance: ai-executed
+  summary: logic/claims.md:C60
 ai_actions:
 - turn: 1
   action: Built temporary probes against existing ci Clang-23 libraries, ran fourteen configurations,
@@ -79,9 +121,25 @@ ai_actions:
   files_changed:
   - methods/geometry/curvature_segmentation/feature_boundary_review.md
   - methods/geometry/curvature_segmentation/README.md
-  - tasks/backlog/methods/METHOD-040-global-multicut-curvature-patch-reference.md
+  - tasks/active/METHOD-040-global-multicut-curvature-patch-reference.md
   - tasks/backlog/README.md
   - ara/evidence/diagnostics/curvature_frog_2026-09-06/objective_analysis.json
+- turn: 3
+  action: Implemented the method-local kernel/API, exact tests, native runner and validated local viewer;
+    retained candidate failures. Fixed stale merge gains and numeric extremes, test grouping/routing and
+    three incidental test-harness bugs. Completed final CPU/ASan/UBSan checks and local independent reviews.
+    Claude supplied two bounded public math reviews through MCP; automatic approval blocked private payloads.
+    No remote publication.
+  provenance: ai-executed
+  files_changed:
+  - src/geometry/CurvatureBoundaryGraph.cpp
+  - src/geometry/Geometry.HalfedgeMesh.CurvatureSegmentation.Multicut.cppm
+  - benchmarks/runners/CurvatureBoundaryMeshRunner.cpp
+  - methods/geometry/curvature_segmentation/boundary_partition_report.md
+  - tasks/active/METHOD-040-global-multicut-curvature-patch-reference.md
+  - tasks/done/BUG-173-runtime-test-ordering.md
+  - tasks/done/BUG-174-synthetic-lsan-control-timeout.md
+  - tasks/done/BUG-175-uv-atlas-smoke-test-routing.md
 claims_touched:
 - id: C57
   action: created
@@ -89,18 +147,31 @@ claims_touched:
 - id: C58
   action: created
   turn: 2
+- id: C59
+  action: created
+  turn: 3
+- id: C60
+  action: created
+  turn: 3
 key_context:
 - turn: 1
   excerpt: 'User: yes i did use the default settings... and yes i expected to get those parts somehow'
 - turn: 2
   excerpt: 'User: i dont really expect perfect semantic or object part segmentation. but still something
     that would definitely be much more meaningfull'
+- turn: 3
+  excerpt: User authorized clean, robust, performant implementation, varied Dropbox mesh testing and iterative
+    fixes with bounded Claude MCP collaboration through next morning.
 open_threads:
 - Reconcile the direct CPU five-region replay with the reported two-region live result before claiming
   exact reproduction.
-- Freeze the proposed METHOD-040 graph, costs, solver, comparison cohort, and numeric gates before
-  implementation and integrated execution. N465 clarifies that semantic labels are not a prerequisite.
 - Investigate region-pair hard-role reporting separately from actual source feature masks.
+- 'METHOD-040 remains unadopted: frozen closure oracle fails; BUG-171 prevents formal retirement from
+  retained failed required receipts.'
+- Final candidate lacks a human/agent visual-quality acceptance; latest derived screenshot transfer was
+  blocked. Local viewer is available for operator inspection.
+- BUG-172 retains the unproven attribution of an intermittent import completion failure; BUG-176 owns
+  concurrent CTest discovery coordination.
 ai_suggestions_pending:
-- O175 proposes a Zhuang-inspired boundary-first comparison; no quality result or exact formulation
-  is adopted. Preserve O173 as the earlier, more anatomical suggestion rather than silently promoting it.
+- O175 was explored through separately frozen objectives; its exact proposal is not promoted to a generally
+  valid heuristic. O173 remains a suggestion, not a semantic/thickness requirement.

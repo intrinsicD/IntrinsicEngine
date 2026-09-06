@@ -1,0 +1,26 @@
+{
+  "command": [
+    "cmake",
+    "--build",
+    "--preset",
+    "ci",
+    "--target",
+    "IntrinsicGeometryTests",
+    "-j",
+    "4"
+  ],
+  "command_display": "cmake --build --preset ci --target IntrinsicGeometryTests -j 4",
+  "cwd": ".",
+  "duration_ms": 11766,
+  "exit_code": 1,
+  "finished_at": "2026-09-06T00:05:01Z",
+  "label": "build-geometry-01",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-09-06T00:04:50Z",
+  "stderr_path": "tasks/evidence/METHOD-040/commands/build-geometry-01.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/METHOD-040/commands/build-geometry-01.stdout.log",
+  "stdout_sha256": "2a63c60a1064a353023f1c25d77ab9d5e1cd4d288bc2b736064cc65b29bd1ccd",
+  "task_id": "METHOD-040"
+}

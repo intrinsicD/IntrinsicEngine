@@ -1,0 +1,23 @@
+{
+  "schema": 1,
+  "date": "2026-09-06",
+  "reviewer": "local Codex partition_review subagent",
+  "scope": "Final test-producer split, reused immutable detector setup and touched-scope routing; source/evidence review only, no independent rerun.",
+  "outcome": "accepted_for_reviewed_source_scope",
+  "final_source_sha256": {
+    "tests/CMakeLists.txt": "aa06d78a73472ceed0e523d7fecfb81438ef3eae16c474f58324bd5044280819",
+    "tests/README.md": "595228c4fc783cdd510adaaac6bf318be643bdcd67a79ca04a67cc3b8c774777",
+    "tests/unit/geometry/Test.CurvaturePatchContract.cpp": "9212097898c221cb8c7382c76490405456101a192ac41eea7d28a5b8b8b7d145",
+    "tests/regression/tooling/Test.TestGateRouting.py": "ef8e3f1895f50f16bf62a5e41b2f9f50c9d29eacf28b9676d3cd2203fbc274b7",
+    "tests/regression/tooling/Test.TouchedScope.py": "3660ba69dca9068b24d44c07684c945a0169d7a7541616d6d055657966edb0e1",
+    "tools/ci/touched_scope.py": "a94620f66e70129c482ec3ed3dd2b0c9845a45d2e0bd20ac00e8a545c6bb27ed"
+  },
+  "findings": [],
+  "evidence": [
+    "test-grouping-case-set-serial.json",
+    "grouped-registration-serial.json"
+  ],
+  "limitations": [
+    "Not a formal METHOD-040 retirement review."
+  ]
+}

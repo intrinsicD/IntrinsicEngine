@@ -1,0 +1,21 @@
+{
+  "command": [
+    "cmake",
+    "--preset",
+    "ci"
+  ],
+  "command_display": "cmake --preset ci",
+  "cwd": ".",
+  "duration_ms": 4692,
+  "exit_code": 0,
+  "finished_at": "2026-09-06T01:42:34Z",
+  "label": "configure-final",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-09-06T01:42:29Z",
+  "stderr_path": "tasks/evidence/METHOD-040/commands/configure-final.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/METHOD-040/commands/configure-final.stdout.log",
+  "stdout_sha256": "2cc9453fcfa7803837a6869dadcda63045c07d59a34144fee6185a6eab891c4f",
+  "task_id": "METHOD-040"
+}

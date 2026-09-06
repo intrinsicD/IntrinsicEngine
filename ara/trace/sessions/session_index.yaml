@@ -337,11 +337,13 @@ sessions:
     open_threads: 2
   - id: 2026-09-06_001
     date: '2026-09-06'
-    summary: Frog diagnosis and clarified geometric-patch review; proposed boundary-first METHOD-040 experiment,
-      no replacement adopted.
-    turn_count: 2
-    events_count: 9
+    summary: Diagnosed frog, implemented reviewed experimental boundary partitions, compared twelve meshes,
+      and passed CPU/ASan/UBSan gates; preserved the negative adoption oracle and unresolved custody.
+    turn_count: 3
+    events_count: 16
     claims_touched:
     - C57
     - C58
-    open_threads: 3
+    - C59
+    - C60
+    open_threads: 5

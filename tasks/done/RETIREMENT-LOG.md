@@ -8054,3 +8054,28 @@ Original task, report, seal, and receipts remain intact at merged parent
 `e4edd20fc3ac30bada55c8ec48b6bef65e10615a`; the new note links those artifacts
 without rewriting their sealed identity or occupying the unrelated canonical
 `BUG-163` evidence directory.
+
+
+### 2026-09-06 — BUG-173 — Deterministic runtime fixture ordering
+
+Retired after implementation commit `8c3200f1d`. A paused sole worker establishes
+actual cancellation before start, and a complete worker join settles finalizer
+publication. Source mutation now runs in the fixture's Simulation hook before
+completion drain across all eight property domains. Both cases pass 20 ASan
+repetitions each and the full canonical CPU gate; assertions and production
+behavior are unchanged. METHOD-040 retains the original failures and verification.
+
+### 2026-09-06 — BUG-175 — UV-atlas manual test producer classification
+
+Retired after implementation commit `81b855283`. The existing BUG-159 standalone
+smoke is now explicitly classified as a manual CTest producer. Strict routing
+validates the actual required CPU registry, and grouped/discovered registration
+parity remains exact. Unknown producers still fail closed.
+
+### BUG-174 — 2026-09-06
+
+Fixed the inherited debuginfod lookup that stalled synthetic LSan reporting.
+Only the harness subprocess environment changes; local symbols, exact
+suppressions, leak assertions and the ten-second limit remain intact.
+Discriminating probes and twenty complete ASan harness repetitions pass.
+Implementation commit: `2d22f6f01`.

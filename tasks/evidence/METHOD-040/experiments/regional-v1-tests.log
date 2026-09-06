@@ -1,0 +1,77 @@
+Internal ctest changing into directory: /home/alex/Documents/IntrinsicEngine/build/ci
+Test project /home/alex/Documents/IntrinsicEngine/build/ci
+      Start 1791: CurvatureBoundaryPartition.InheritedSuppliedOracleCatalog
+ 1/16 Test #1791: CurvatureBoundaryPartition.InheritedSuppliedOracleCatalog .................................   Passed    0.15 sec
+      Start 1792: CurvatureBoundaryPartition.InheritedRegionalOracleCatalog
+ 2/16 Test #1792: CurvatureBoundaryPartition.InheritedRegionalOracleCatalog .................................***Failed    0.15 sec
+Running main() from /home/alex/Documents/IntrinsicEngine/external/vcpkg/buildtrees/gtest/src/v1.17.0-0c449efaff.clean/googletest/src/gtest_main.cc
+Note: Google Test filter = CurvatureBoundaryPartition.InheritedRegionalOracleCatalog
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from CurvatureBoundaryPartition
+[ RUN      ] CurvatureBoundaryPartition.InheritedRegionalOracleCatalog
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CurvaturePatchContract.cpp:2467: Failure
+Value of: EquivalentPartitions(fixture.Surface,fixture.ExpectedPatchByFace,result.FaceRegions)
+  Actual: false
+Expected: true
+Google Test trace:
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CurvaturePatchContract.cpp:2463: ridge
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CurvaturePatchContract.cpp:2467: Failure
+Value of: EquivalentPartitions(fixture.Surface,fixture.ExpectedPatchByFace,result.FaceRegions)
+  Actual: false
+Expected: true
+Google Test trace:
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CurvaturePatchContract.cpp:2463: valley
+
+[  FAILED  ] CurvatureBoundaryPartition.InheritedRegionalOracleCatalog (139 ms)
+[----------] 1 test from CurvatureBoundaryPartition (139 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (139 ms total)
+[  PASSED  ] 0 tests.
+[  FAILED  ] 1 test, listed below:
+[  FAILED  ] CurvatureBoundaryPartition.InheritedRegionalOracleCatalog
+
+ 1 FAILED TEST
+
+      Start 1793: CurvatureBoundaryPartition.StrongContourAndShortCompletionSeparateEqualCurvatureSurface
+ 3/16 Test #1793: CurvatureBoundaryPartition.StrongContourAndShortCompletionSeparateEqualCurvatureSurface ...   Passed    0.02 sec
+      Start 1794: CurvatureBoundaryPartition.HomogeneousSurfaceStaysWholeAndPreservesTopology
+ 4/16 Test #1794: CurvatureBoundaryPartition.HomogeneousSurfaceStaysWholeAndPreservesTopology ...............   Passed    0.01 sec
+      Start 1795: CurvatureBoundaryPartition.UniformScalePreservesPartitionAndObjective
+ 5/16 Test #1795: CurvatureBoundaryPartition.UniformScalePreservesPartitionAndObjective .....................   Passed    0.01 sec
+      Start 1796: CurvatureBoundaryPartition.InvalidEvidenceAndBudgetFailClosed
+ 6/16 Test #1796: CurvatureBoundaryPartition.InvalidEvidenceAndBudgetFailClosed .............................   Passed    0.01 sec
+      Start 1797: CurvatureBoundaryPartition.RegionalFieldScalesAndFailsClosed
+ 7/16 Test #1797: CurvatureBoundaryPartition.RegionalFieldScalesAndFailsClosed ..............................   Passed    0.01 sec
+      Start 1798: CurvatureBoundaryPartition.FlowLimitReturnsNoPartialPartition
+ 8/16 Test #1798: CurvatureBoundaryPartition.FlowLimitReturnsNoPartialPartition .............................   Passed    0.01 sec
+      Start 1799: CurvatureBoundaryGraph.ExactOracleMatchesIndependentAssignments
+ 9/16 Test #1799: CurvatureBoundaryGraph.ExactOracleMatchesIndependentAssignments ...........................   Passed    0.02 sec
+      Start 1800: CurvatureBoundaryGraph.HardCutCannotBeBypassedThroughPositivePath
+10/16 Test #1800: CurvatureBoundaryGraph.HardCutCannotBeBypassedThroughPositivePath .........................   Passed    0.01 sec
+      Start 1801: CurvatureBoundaryGraph.WiderMovesRecoverAcrossPrematureContraction
+11/16 Test #1801: CurvatureBoundaryGraph.WiderMovesRecoverAcrossPrematureContraction ........................   Passed    0.02 sec
+      Start 1802: CurvatureBoundaryGraph.HeuristicIsFeasibleDeterministicAndBoundedByOracle
+12/16 Test #1802: CurvatureBoundaryGraph.HeuristicIsFeasibleDeterministicAndBoundedByOracle .................   Passed    0.08 sec
+      Start 1803: CurvatureBoundaryGraph.InvalidAndLimitedInputsReturnNoPartition
+13/16 Test #1803: CurvatureBoundaryGraph.InvalidAndLimitedInputsReturnNoPartition ...........................   Passed    0.01 sec
+      Start 1804: CurvatureBoundaryGraph.DisconnectedNodesPublishSeparateConnectedRegions
+14/16 Test #1804: CurvatureBoundaryGraph.DisconnectedNodesPublishSeparateConnectedRegions ...................   Passed    0.01 sec
+      Start 1805: CurvatureBoundaryGraph.RegionalExactOracleMatchesIndependentModelFits
+15/16 Test #1805: CurvatureBoundaryGraph.RegionalExactOracleMatchesIndependentModelFits .....................   Passed    0.03 sec
+      Start 1806: CurvatureBoundaryGraph.RegionCostCountsConnectedPieces
+16/16 Test #1806: CurvatureBoundaryGraph.RegionCostCountsConnectedPieces ....................................   Passed    0.01 sec
+
+94% tests passed, 1 tests failed out of 16
+
+Label Time Summary:
+geometry    =   0.56 sec*proc (16 tests)
+unit        =   0.56 sec*proc (16 tests)
+
+Total Test time (real) =   1.07 sec
+
+The following tests FAILED:
+	1792 - CurvatureBoundaryPartition.InheritedRegionalOracleCatalog (Failed)
+Errors while running CTest

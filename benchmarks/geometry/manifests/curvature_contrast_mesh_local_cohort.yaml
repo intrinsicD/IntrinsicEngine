@@ -1,0 +1,57 @@
+benchmark_id: geometry.curvature_segmentation.contrast_mesh.local_cohort
+method: geometry.curvature_segmentation
+dataset: local.method_040.mesh_cohort.v1
+params:
+  intent: nightly
+  implementation: boundary_feature_contrast_v1
+  candidate_adopted: false
+  feature_weight: 4
+  feature_exponent: 3
+  model_weight: 0
+  boundary_scale: 0.02
+  region_cost: 0.0012566370614359175
+  curvature_radius_ratio: 0.02
+  hard_feature_exclusion_ratio: 0.02
+  maximum_sweeps: 8
+  maximum_moves: 2000000
+  maximum_flow_edge_visits: 20000000
+  maximum_split_trials: 4
+  maximum_non_improving_moves: 64
+  relative_energy_tolerance: 1.0e-12
+  detector: method_039_defaults
+  cohort:
+  - sculpt
+  - frog
+  - fandisk
+  - bunny10k
+  - dolphin
+  - elephant
+  - bumpy_torus
+  - genus3
+  - office_chair
+  - sphere
+  - cube
+  - saddle2
+  inputs: external_local_read_only_obj
+  split: known_sculpt_frog_and_preselected_comparison
+  baseline: method_039_default_local_patch
+  warmup_iterations: 0
+  measured_iterations: 1
+  aggregation: per_mesh
+  quality_error_l2_unit: unassigned_face_fraction
+  quality_error_linf_unit: hard_constraint_violation_count
+  threshold_scope: correctness_and_bounded_health_not_segmentation_quality
+  minimum_exclusion_curve_length: 0
+  minimum_region_area: 0
+metrics:
+- runtime_ms
+- memory_peak_bytes
+- quality_error_l2
+- quality_error_linf
+- population_count
+thresholds:
+  runtime_ms_max: 300000
+  memory_peak_bytes_max: 2147483648
+  quality_error_l2_max: 0
+  quality_error_linf_max: 0
+  population_count_min: 1

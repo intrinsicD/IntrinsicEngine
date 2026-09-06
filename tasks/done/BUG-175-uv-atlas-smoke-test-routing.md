@@ -31,11 +31,19 @@ contract_review: "Corrects the existing CPU test routing inventory for a manuall
   matches that existing declaration; unknown producers still fail closed.
 
 ## Acceptance criteria
-- [ ] Strict routing validates the actual CPU aggregate with the smoke included.
-- [ ] Grouped/discovered case parity and unknown-producer rejection remain intact.
+- [x] Strict routing validates the actual CPU aggregate with the smoke included.
+- [x] Grouped/discovered case parity and unknown-producer rejection remain intact.
 
 ## Verification
 ```bash
 python3 tests/regression/tooling/Test.TestGateRouting.py --build-dir build/ci --aggregate IntrinsicCpuTests
 python3 tests/regression/tooling/Test.GroupedCTestParity.py --self-test
 ```
+
+## Status
+
+- Completed 2026-09-06.
+- Commit: `81b855283` (implementation).
+- Actual CPU routing validates 28 producers and 4,293 GoogleTest cases;
+  grouped/discovered registration parity and parity self-tests pass. The two
+  manual CTest records bring the selected physical total to 4,295.

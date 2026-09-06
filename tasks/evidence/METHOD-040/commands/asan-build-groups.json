@@ -1,0 +1,25 @@
+{
+  "command": [
+    "cmake",
+    "--build",
+    "--preset",
+    "ci-asan",
+    "--target",
+    "IntrinsicCpuTests",
+    "-j4"
+  ],
+  "command_display": "cmake --build --preset ci-asan --target IntrinsicCpuTests -j4",
+  "cwd": ".",
+  "duration_ms": 39225,
+  "exit_code": 0,
+  "finished_at": "2026-09-06T02:54:52Z",
+  "label": "asan-build-groups",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-09-06T02:54:13Z",
+  "stderr_path": "tasks/evidence/METHOD-040/commands/asan-build-groups.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/METHOD-040/commands/asan-build-groups.stdout.log",
+  "stdout_sha256": "23547653f0b70adfd24cc9b4f752bbc7d95ce3598b2822a44bc70658ba533a17",
+  "task_id": "METHOD-040"
+}

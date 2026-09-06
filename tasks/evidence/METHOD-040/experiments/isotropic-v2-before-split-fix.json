@@ -1,0 +1,5 @@
+{
+  "candidate": "boundary_multicut_isotropic_v2",
+  "result": "Inherited 17-fixture catalog passes; additional interrupted-contour fixture fails on both diagonals. Energy favors the intended complete contour but the single greedy split sequence returns one region.",
+  "next_change": "Keep objective and alpha=1.5 fixed; add bounded repulsive-edge terminal mincut split proposals, evaluated on original signed costs."
+}

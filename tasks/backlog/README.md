@@ -542,9 +542,11 @@ gate is open. Existing results and task state remain authoritative; do not
 delete, rewrite, or expand them. `METHOD-039` completed its bounded negative
 result on 2026-09-03 under explicit user direction; that exception does not
 unpause `METHOD-040` or the rest of the theme. On 2026-09-06 the operator
-explicitly requested a bounded METHOD-040 literature/objective review following
-the frog/sculpt diagnostic; its task note records that planning exception while
-implementation remains queued. The standing inventory exception is `METHOD-015`, which the registered-feature inventory and `REVIEW-004` name
+requested the METHOD-040 literature review and then an overnight implementation,
+varied local-mesh comparison, iterative fixes, and bounded Claude collaboration.
+Its active task records that explicit exception and the negative adoption gate;
+other research work remains paused. The standing inventory exception is
+`METHOD-015`, which the registered-feature inventory and `REVIEW-004` name
 as an explicit Framework24 product dependency. Resume other work only after
 `REVIEW-004` retires with an accepted product verdict or the operator gives a
 new explicit direction.

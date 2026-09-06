@@ -1,0 +1,110 @@
+{
+  "duration_api_ms": 48662,
+  "stop_reason": "end_turn",
+  "session_id": "f9ad1036-f63b-4e9c-bf40-7d8f256840c9",
+  "total_cost_usd": 0.173638,
+  "usage": {
+    "input_tokens": 2,
+    "cache_creation_input_tokens": 534,
+    "cache_read_input_tokens": 0,
+    "output_tokens": 3236,
+    "output_tokens_details": {
+      "thinking_tokens": 1661
+    },
+    "server_tool_use": {
+      "web_search_requests": 0,
+      "web_fetch_requests": 0
+    },
+    "service_tier": "standard",
+    "cache_creation": {
+      "ephemeral_1h_input_tokens": 534,
+      "ephemeral_5m_input_tokens": 0
+    },
+    "inference_geo": "not_available",
+    "iterations": [
+      {
+        "input_tokens": 2,
+        "output_tokens": 3236,
+        "cache_read_input_tokens": 0,
+        "cache_creation_input_tokens": 534,
+        "cache_creation": {
+          "ephemeral_5m_input_tokens": 0,
+          "ephemeral_1h_input_tokens": 534
+        },
+        "type": "message"
+      }
+    ],
+    "speed": "standard"
+  },
+  "modelUsage": {
+    "claude-haiku-4-5-20251001": {
+      "inputTokens": 1048,
+      "outputTokens": 18,
+      "cacheReadInputTokens": 0,
+      "cacheCreationInputTokens": 0,
+      "webSearchRequests": 0,
+      "costUSD": 0.0011380000000000001,
+      "contextWindow": 200000,
+      "maxOutputTokens": 32000,
+      "thinkingTokens": 0,
+      "canonicalModel": "claude-haiku-4-5",
+      "provider": "firstParty",
+      "costBasis": "list"
+    },
+    "claude-fable-5-1": {
+      "inputTokens": 2,
+      "outputTokens": 3236,
+      "cacheReadInputTokens": 0,
+      "cacheCreationInputTokens": 534,
+      "webSearchRequests": 0,
+      "costUSD": 0.1725,
+      "contextWindow": 1000000,
+      "maxOutputTokens": 64000,
+      "thinkingTokens": 1661,
+      "canonicalModel": "claude-fable-5-1",
+      "provider": "firstParty",
+      "costBasis": "list"
+    }
+  },
+  "permission_denials": [],
+  "terminal_reason": "completed",
+  "fast_mode_state": "off",
+  "fast_mode_disabled_reason": "sdk_opt_in_required",
+  "subagent_stats": {
+    "spawned": 0,
+    "requested": {
+      "background": 0,
+      "foreground": 0,
+      "unset": 0
+    },
+    "started_in_background": 0,
+    "max_depth": 0,
+    "spawned_by_subagents": 0,
+    "completed": 0,
+    "failed": 0,
+    "killed": {
+      "parent": 0,
+      "user": 0,
+      "system": 0
+    },
+    "refused": {
+      "depth_limit": 0,
+      "concurrency_limit": 0,
+      "budget": 0
+    },
+    "by_type": {}
+  },
+  "is_error": false,
+  "num_turns": 1,
+  "subtype": "success",
+  "api_error_status": null,
+  "result": "**Setting.** Multicut/correlation clustering: choose a partition of V into connected components, minimizing F = \u03a3_{e cut} c_e (c_e < 0 \u201cwants\u201d cutting). Must\u2011cut edges are c_e = \u2212\u221e (constraint). Since all\u2011singletons is feasible, the problem is always feasible (unless a must\u2011cut edge is a self\u2011loop), but finding the optimum is NP\u2011hard, so a descent heuristic is reasonable.\n\n**Pipeline validity.**\n- *Greedy additive contraction (GAEC)*: repeatedly merge the adjacent pair of components with largest positive aggregated cost; never merge across a must\u2011cut edge (aggregated cost \u2212\u221e). Every merge strictly decreases F, so termination is guaranteed.\n- *KL vertex/pair moves*: move or swap boundary vertices, accept if F decreases. Forbid moving v into a component containing a must\u2011cut neighbour. A vertex move can disconnect a component; after the move run a local BFS and split disconnected pieces (no edges between pieces \u21d2 F unchanged, feasibility restored).\n- *Split move via s\u2011t cut*: inside a component C, put capacity max(c_e,0) on internal edges, take an internal negative edge (u,v), compute the min u\u2011v cut (S, C\\S). Any bipartition of C yields a valid partition, so the move is feasible; the objective change is\n \u0394F = w\u207a(\u03b4(S)) \u2212 |w\u207b(\u03b4(S))| \u2264 \u03bb_{uv} \u2212 |c_uv|,\n where \u03bb_{uv} is the flow value (only positive edges have capacity, and (u,v) has capacity 0 and is necessarily cut). Thus a sufficient certificate for improvement is \u03bb_{uv} < |c_uv|; the actual signed evaluation may be even better. Accepting only on strict decrease keeps the search monotone and terminating (F takes finitely many values).\n\n**Limitations.**\n- Min cut minimizes only the positive penalty, ignoring the reward from other negative edges crossing the cut. The best bipartition of C under signed weights is itself NP\u2011hard (max\u2011cut\u2011like), so this is one heuristic among many possible cuts; it can miss profitable contours whose positive cost is high but whose negative reward is higher.\n- On sparse meshes, min cuts are often degenerate: the cheapest u\u2011v cut frequently isolates u or v alone (small positive degree), giving a useless singleton. Mitigate by using terminal *sets* (u plus neighbours attached by strongly positive edges, likewise for v), or by choosing among multiple min cuts (e.g., the one farthest from s, or after adding a tiny \u03b5 per edge to favour short contours).\n- No guarantee of local optimality with respect to all splits; result is a local minimum only for the tried moves.\n\n**Must\u2011cut enforcement.** Maintain the invariant \u201cno must\u2011cut edge is internal to a component\u201d from the start (GAEC never violates it, KL moves are filtered). If an initial solution violates it, those edges are the first mandatory terminal pairs; since their capacity is 0, the min cut always separates them.\n\n**Connected output.** After every accepted split, compute connected components of S and C\\S (BFS restricted to C); replace C by these pieces. Splitting a disconnected part costs nothing and can only increase the count of pieces, so the final partition consists of connected components, as the multicut definition requires.\n\n**Efficient bounded solver.** Run the max\u2011flow on the induced subgraph of C only (typically much smaller than G). Use Boykov\u2013Kolmogorov or push\u2011relabel; on mesh\u2011like (near\u2011planar, bounded degree) graphs BK is near\u2011linear in practice, and for genuinely planar meshes planar min\u2011cut algorithms give O(|C| log|C|). Bound further by restricting to a k\u2011hop ball around (u,v) with the outside contracted into a super\u2011sink/super\u2011source, or by capping flow at |c_uv| (stop as soon as flow \u2265 |c_uv|, since no certificate can then arise\u2014though the true \u0394F could still be negative, so optionally still evaluate).\n\n**How many terminal pairs.** Candidates are the internal negative edges of C. Rank by |c_uv| (or by |c_uv| relative to positive degree of the endpoints) and try a fixed budget k per component (5\u201320 typically suffices), always including all must\u2011cut violations. For small components try all; for large ones, a Gomory\u2013Hu tree (|C|\u22121 flows) yields min cuts for all pairs simultaneously. After an accepted split, re\u2011enqueue the two new parts and iterate until no candidate certifies or evaluates a strict decrease.",
+  "ttft_ms": 26025,
+  "type": "result",
+  "duration_ms": 47649,
+  "uuid": "1979a764-a722-4ed2-a8b8-07d4a9a4a66e",
+  "ttft_stream_ms": 992,
+  "time_to_request_ms": 22,
+  "first_content_frame_ms": 2012,
+  "queued_turn_count": 0
+}

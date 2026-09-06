@@ -124,6 +124,7 @@ FRAME_LOOP_SOURCE = "Test.RuntimeFrameLoopContract.cpp"
 GROUPED_PURE_CTEST_TARGETS = frozenset(
     {
         "IntrinsicGeometryCurvatureTests",
+        "IntrinsicGeometryFeaturePartitionTests",
         "IntrinsicGeometryTests",
         "IntrinsicGeometryMethodTests",
         "IntrinsicGraphicsBufferTransferTests",

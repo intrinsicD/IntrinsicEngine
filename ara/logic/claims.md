@@ -1366,7 +1366,7 @@
   methods/geometry/curvature_segmentation/feature_aligned_intake.md,
   ara/evidence/benchmarks/method039_feature_patch_seed_refutation.json,
   tasks/done/METHOD-039-feature-network-curvature-patch-decomposition.md,
-  tasks/backlog/methods/METHOD-040-global-multicut-curvature-patch-reference.md]
+  tasks/active/METHOD-040-global-multicut-curvature-patch-reference.md]
 - **Dependencies**: [C43, C44]
 - **Tags**: geometry, curvature segmentation, local RAG, seed stability, CPU
   reference, negative result, bounded result
@@ -1792,3 +1792,25 @@
 - **Dependencies**: []
 - **Tags**: geometry, curvature segmentation, analytical example, representation
 - **From staging**: O174
+
+## C59: METHOD-040 weak regional adoption hypothesis
+- **Statement**: The frozen weak regional METHOD-040 candidate satisfies the inherited unmarked-curvature closure oracle at area-weighted VI <= 0.01.
+- **Status**: refuted — the retained CPU run produces one region instead of two, VI=log(2). Boundary-only zero-feature profiles cannot satisfy that fixture by their objective. A passing negative-control CTest preserves this rejection; it does not reverse it.
+- **Provenance**: ai-executed
+- **Crystallized via**: artifact-commitment
+- **Falsification criteria**: The exact frozen candidate and unchanged fixture produce VI <= 0.01; changing the objective or threshold is a new experiment.
+- **Proof**: [N468, tasks/evidence/METHOD-040/experiments/regional-v2-frozen-closure-failure.log, tests/unit/geometry/Test.CurvaturePatchContract.cpp, methods/geometry/curvature_segmentation/boundary_partition_experiment.md]
+- **Dependencies**: []
+- **Tags**: geometry, curvature segmentation, negative adoption, CPU
+- **From staging**: O176
+
+## C60: Bounded METHOD-040 local comparison observations
+- **Statement**: The retained final four-profile/twelve-input cohort contains 36 completed runs on nine meshes and 12 explicit rejected-input runs on three meshes. With fixed `curves`, frog has 15 regions and largest area about 26.1%, versus the METHOD-039 runtime-default diagnostic's five labels and 99.7%. Sculpt retains five regions and the same hard boundary edge set.
+- **Status**: supported — descriptive dirty-source Debug CPU observations only, bound to the recorded input/binary/source/output hashes. All 36 schema-v2 rows remain `claim_eligible: false`. This records the experiment facts; it is not publication-eligible benchmark evidence, held-out quality validation, anatomical recognition, a speedup, or positive method adoption.
+- **Provenance**: ai-executed
+- **Crystallized via**: artifact-commitment
+- **Falsification criteria**: Recomputing these counts/areas/boundaries from the bound outputs disagrees with the record, or an input/source/binary identity check fails. Broader mesh generalization is not asserted.
+- **Proof**: [N469, tasks/evidence/METHOD-040/experiments/final-cohort.json, tasks/evidence/METHOD-040/benchmarks/final-cohort/frog-curves.json, tasks/evidence/METHOD-040/benchmarks/final-cohort/frog-local.json, tasks/evidence/METHOD-040/benchmarks/final-cohort/sculpt-curves.json, methods/geometry/curvature_segmentation/boundary_partition_report.md]
+- **Dependencies**: []
+- **Tags**: geometry, local observation, CPU, non-publication evidence
+- **From staging**: O177

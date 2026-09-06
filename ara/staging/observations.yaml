@@ -3202,3 +3202,32 @@ observations:
     promoted_to: null
     crystallized_via: null
     stale: false
+  - id: O176
+    timestamp: 2026-09-06T05:37+02:00
+    provenance: ai-executed
+    content: The weak regional METHOD-040 candidate satisfies the frozen unmarked-curvature closure oracle.
+    context: Rejected by the unchanged VI gate. N468 records the dead end; repository policy additionally
+      requires refuted claim C59. No positive contract or general quality claim.
+    potential_type: claim
+    bound_to:
+    - N468
+    promoted: true
+    promoted_to: logic/claims.md:C59
+    crystallized_via: artifact-commitment
+    stale: false
+  - id: O177
+    timestamp: 2026-09-06T05:37+02:00
+    provenance: ai-executed
+    content: The recorded final fixed-profile local comparison has 36 successes and 12 retained input failures;
+      frog curves has 15 regions and 26.1%largest area, while sculpt keeps 5 regions and identical hard
+      boundaries.
+    context: Source/input/output-bound dirty Debug observations used by the report. No held-out quality,
+      semantic interpretation, speedup, or production adoption. Individual schema-v2 runs remain claim_eligible:false.
+    potential_type: claim
+    bound_to:
+    - N469
+    - N470
+    promoted: true
+    promoted_to: logic/claims.md:C60
+    crystallized_via: artifact-commitment
+    stale: false

@@ -1,0 +1,90 @@
+Internal ctest changing into directory: /home/alex/Documents/IntrinsicEngine/build/ci-asan
+Test project /home/alex/Documents/IntrinsicEngine/build/ci-asan
+    Start 799: PointCloudConsolidationModule.SourceMutationDropsQueuedWriteback
+    Test #799: PointCloudConsolidationModule.SourceMutationDropsQueuedWriteback ..............   Passed    1.82 sec
+    Start 799: PointCloudConsolidationModule.SourceMutationDropsQueuedWriteback
+    Test #799: PointCloudConsolidationModule.SourceMutationDropsQueuedWriteback ..............   Passed    1.97 sec
+    Start 799: PointCloudConsolidationModule.SourceMutationDropsQueuedWriteback
+    Test #799: PointCloudConsolidationModule.SourceMutationDropsQueuedWriteback ..............   Passed    1.77 sec
+    Start 799: PointCloudConsolidationModule.SourceMutationDropsQueuedWriteback
+    Test #799: PointCloudConsolidationModule.SourceMutationDropsQueuedWriteback ..............   Passed    1.84 sec
+    Start 799: PointCloudConsolidationModule.SourceMutationDropsQueuedWriteback
+    Test #799: PointCloudConsolidationModule.SourceMutationDropsQueuedWriteback ..............   Passed    1.75 sec
+    Start 799: PointCloudConsolidationModule.SourceMutationDropsQueuedWriteback
+    Test #799: PointCloudConsolidationModule.SourceMutationDropsQueuedWriteback ..............   Passed    1.76 sec
+    Start 799: PointCloudConsolidationModule.SourceMutationDropsQueuedWriteback
+    Test #799: PointCloudConsolidationModule.SourceMutationDropsQueuedWriteback ..............   Passed    1.79 sec
+    Start 799: PointCloudConsolidationModule.SourceMutationDropsQueuedWriteback
+    Test #799: PointCloudConsolidationModule.SourceMutationDropsQueuedWriteback ..............   Passed    1.74 sec
+    Start 799: PointCloudConsolidationModule.SourceMutationDropsQueuedWriteback
+    Test #799: PointCloudConsolidationModule.SourceMutationDropsQueuedWriteback ..............   Passed    1.80 sec
+    Start 799: PointCloudConsolidationModule.SourceMutationDropsQueuedWriteback
+    Test #799: PointCloudConsolidationModule.SourceMutationDropsQueuedWriteback ..............   Passed    2.00 sec
+    Start 799: PointCloudConsolidationModule.SourceMutationDropsQueuedWriteback
+    Test #799: PointCloudConsolidationModule.SourceMutationDropsQueuedWriteback ..............   Passed    1.80 sec
+    Start 799: PointCloudConsolidationModule.SourceMutationDropsQueuedWriteback
+    Test #799: PointCloudConsolidationModule.SourceMutationDropsQueuedWriteback ..............   Passed    1.78 sec
+    Start 799: PointCloudConsolidationModule.SourceMutationDropsQueuedWriteback
+    Test #799: PointCloudConsolidationModule.SourceMutationDropsQueuedWriteback ..............   Passed    2.04 sec
+    Start 799: PointCloudConsolidationModule.SourceMutationDropsQueuedWriteback
+    Test #799: PointCloudConsolidationModule.SourceMutationDropsQueuedWriteback ..............   Passed    1.78 sec
+    Start 799: PointCloudConsolidationModule.SourceMutationDropsQueuedWriteback
+    Test #799: PointCloudConsolidationModule.SourceMutationDropsQueuedWriteback ..............   Passed    1.83 sec
+    Start 799: PointCloudConsolidationModule.SourceMutationDropsQueuedWriteback
+    Test #799: PointCloudConsolidationModule.SourceMutationDropsQueuedWriteback ..............   Passed    1.81 sec
+    Start 799: PointCloudConsolidationModule.SourceMutationDropsQueuedWriteback
+    Test #799: PointCloudConsolidationModule.SourceMutationDropsQueuedWriteback ..............   Passed    1.80 sec
+    Start 799: PointCloudConsolidationModule.SourceMutationDropsQueuedWriteback
+    Test #799: PointCloudConsolidationModule.SourceMutationDropsQueuedWriteback ..............   Passed    1.83 sec
+    Start 799: PointCloudConsolidationModule.SourceMutationDropsQueuedWriteback
+    Test #799: PointCloudConsolidationModule.SourceMutationDropsQueuedWriteback ..............   Passed    1.75 sec
+    Start 799: PointCloudConsolidationModule.SourceMutationDropsQueuedWriteback
+1/2 Test #799: PointCloudConsolidationModule.SourceMutationDropsQueuedWriteback ..............   Passed    1.97 sec
+    Start 826: RuntimeJobService.CancelBeforeStartFinalizesOnMainThreadInsteadOfPublishing
+    Test #826: RuntimeJobService.CancelBeforeStartFinalizesOnMainThreadInsteadOfPublishing ...   Passed    0.16 sec
+    Start 826: RuntimeJobService.CancelBeforeStartFinalizesOnMainThreadInsteadOfPublishing
+    Test #826: RuntimeJobService.CancelBeforeStartFinalizesOnMainThreadInsteadOfPublishing ...   Passed    0.13 sec
+    Start 826: RuntimeJobService.CancelBeforeStartFinalizesOnMainThreadInsteadOfPublishing
+    Test #826: RuntimeJobService.CancelBeforeStartFinalizesOnMainThreadInsteadOfPublishing ...   Passed    0.13 sec
+    Start 826: RuntimeJobService.CancelBeforeStartFinalizesOnMainThreadInsteadOfPublishing
+    Test #826: RuntimeJobService.CancelBeforeStartFinalizesOnMainThreadInsteadOfPublishing ...   Passed    0.13 sec
+    Start 826: RuntimeJobService.CancelBeforeStartFinalizesOnMainThreadInsteadOfPublishing
+    Test #826: RuntimeJobService.CancelBeforeStartFinalizesOnMainThreadInsteadOfPublishing ...   Passed    0.13 sec
+    Start 826: RuntimeJobService.CancelBeforeStartFinalizesOnMainThreadInsteadOfPublishing
+    Test #826: RuntimeJobService.CancelBeforeStartFinalizesOnMainThreadInsteadOfPublishing ...   Passed    0.13 sec
+    Start 826: RuntimeJobService.CancelBeforeStartFinalizesOnMainThreadInsteadOfPublishing
+    Test #826: RuntimeJobService.CancelBeforeStartFinalizesOnMainThreadInsteadOfPublishing ...   Passed    0.12 sec
+    Start 826: RuntimeJobService.CancelBeforeStartFinalizesOnMainThreadInsteadOfPublishing
+    Test #826: RuntimeJobService.CancelBeforeStartFinalizesOnMainThreadInsteadOfPublishing ...   Passed    0.13 sec
+    Start 826: RuntimeJobService.CancelBeforeStartFinalizesOnMainThreadInsteadOfPublishing
+    Test #826: RuntimeJobService.CancelBeforeStartFinalizesOnMainThreadInsteadOfPublishing ...   Passed    0.13 sec
+    Start 826: RuntimeJobService.CancelBeforeStartFinalizesOnMainThreadInsteadOfPublishing
+    Test #826: RuntimeJobService.CancelBeforeStartFinalizesOnMainThreadInsteadOfPublishing ...   Passed    0.13 sec
+    Start 826: RuntimeJobService.CancelBeforeStartFinalizesOnMainThreadInsteadOfPublishing
+    Test #826: RuntimeJobService.CancelBeforeStartFinalizesOnMainThreadInsteadOfPublishing ...   Passed    0.13 sec
+    Start 826: RuntimeJobService.CancelBeforeStartFinalizesOnMainThreadInsteadOfPublishing
+    Test #826: RuntimeJobService.CancelBeforeStartFinalizesOnMainThreadInsteadOfPublishing ...   Passed    0.13 sec
+    Start 826: RuntimeJobService.CancelBeforeStartFinalizesOnMainThreadInsteadOfPublishing
+    Test #826: RuntimeJobService.CancelBeforeStartFinalizesOnMainThreadInsteadOfPublishing ...   Passed    0.12 sec
+    Start 826: RuntimeJobService.CancelBeforeStartFinalizesOnMainThreadInsteadOfPublishing
+    Test #826: RuntimeJobService.CancelBeforeStartFinalizesOnMainThreadInsteadOfPublishing ...   Passed    0.12 sec
+    Start 826: RuntimeJobService.CancelBeforeStartFinalizesOnMainThreadInsteadOfPublishing
+    Test #826: RuntimeJobService.CancelBeforeStartFinalizesOnMainThreadInsteadOfPublishing ...   Passed    0.12 sec
+    Start 826: RuntimeJobService.CancelBeforeStartFinalizesOnMainThreadInsteadOfPublishing
+    Test #826: RuntimeJobService.CancelBeforeStartFinalizesOnMainThreadInsteadOfPublishing ...   Passed    0.12 sec
+    Start 826: RuntimeJobService.CancelBeforeStartFinalizesOnMainThreadInsteadOfPublishing
+    Test #826: RuntimeJobService.CancelBeforeStartFinalizesOnMainThreadInsteadOfPublishing ...   Passed    0.13 sec
+    Start 826: RuntimeJobService.CancelBeforeStartFinalizesOnMainThreadInsteadOfPublishing
+    Test #826: RuntimeJobService.CancelBeforeStartFinalizesOnMainThreadInsteadOfPublishing ...   Passed    0.13 sec
+    Start 826: RuntimeJobService.CancelBeforeStartFinalizesOnMainThreadInsteadOfPublishing
+    Test #826: RuntimeJobService.CancelBeforeStartFinalizesOnMainThreadInsteadOfPublishing ...   Passed    0.13 sec
+    Start 826: RuntimeJobService.CancelBeforeStartFinalizesOnMainThreadInsteadOfPublishing
+2/2 Test #826: RuntimeJobService.CancelBeforeStartFinalizesOnMainThreadInsteadOfPublishing ...   Passed    0.13 sec
+
+100% tests passed, 0 tests failed out of 2
+
+Label Time Summary:
+contract    =   2.23 sec*proc (2 tests)
+runtime     =   2.23 sec*proc (2 tests)
+
+Total Test time (real) =  40.82 sec

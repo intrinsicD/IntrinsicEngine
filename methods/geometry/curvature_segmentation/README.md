@@ -34,6 +34,15 @@ same-cardinality visualization properties for direct sculpt inspection; it did
 not change the refutation, register a v2 backend, or replace METHOD-037 as the
 production default.
 
+The experimental `Geometry.HalfedgeMesh.CurvatureSegmentation.Multicut` module
+now exposes signed-boundary partitioning, optional regional fitting, and explicit
+area cleanup through `PartitionFeatureBoundaries`. It is not an accepted
+replacement backend. The [experiment contract](boundary_partition_experiment.md)
+describes its objectives, fixed profiles, failures, and source-bound comparison
+protocol; the local cohort runner and standalone viewer are opt-in tools.
+The [overnight comparison report](boundary_partition_report.md) records the local
+mesh results, rejected inputs, verification, and reproduction commands.
+
 ## Implemented path
 
 `Geometry.HalfedgeMesh.CurvatureSegmentation` computes or accepts signed

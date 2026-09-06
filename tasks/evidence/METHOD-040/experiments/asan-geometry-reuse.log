@@ -1,0 +1,1389 @@
+Internal ctest changing into directory: /home/alex/Documents/IntrinsicEngine/build/ci-asan
+Test project /home/alex/Documents/IntrinsicEngine/build/ci-asan
+    Start 2767: IntrinsicGeometryTests.Grouped
+1/1 Test #2767: IntrinsicGeometryTests.Grouped ...***Timeout 120.05 sec
+Running main() from /home/alex/Documents/IntrinsicEngine/external/vcpkg/buildtrees/gtest/src/v1.17.0-0c449efaff.clean/googletest/src/gtest_main.cc
+[==========] Running 1422 tests from 184 test suites.
+[----------] Global test environment set-up.
+[----------] 8 tests from GeometryStatistics
+[ RUN      ] GeometryStatistics.StreamingMomentsMatchBatch
+[       OK ] GeometryStatistics.StreamingMomentsMatchBatch (0 ms)
+[ RUN      ] GeometryStatistics.MergeEqualsConcatenation
+[       OK ] GeometryStatistics.MergeEqualsConcatenation (0 ms)
+[ RUN      ] GeometryStatistics.MedianOddAndEven
+[       OK ] GeometryStatistics.MedianOddAndEven (0 ms)
+[ RUN      ] GeometryStatistics.QuantileLinearInterpolation
+[       OK ] GeometryStatistics.QuantileLinearInterpolation (0 ms)
+[ RUN      ] GeometryStatistics.GenericMedianAndQuantileSupportNonDoubleVectors
+[       OK ] GeometryStatistics.GenericMedianAndQuantileSupportNonDoubleVectors (0 ms)
+[ RUN      ] GeometryStatistics.RunningMedianTracksMedian
+[       OK ] GeometryStatistics.RunningMedianTracksMedian (0 ms)
+[ RUN      ] GeometryStatistics.SafeTrigClampsOutOfDomain
+[       OK ] GeometryStatistics.SafeTrigClampsOutOfDomain (0 ms)
+[ RUN      ] GeometryStatistics.FailClosedOnDegenerateInput
+[       OK ] GeometryStatistics.FailClosedOnDegenerateInput (0 ms)
+[----------] 8 tests from GeometryStatistics (1 ms total)
+
+[----------] 6 tests from GeometryRobust
+[ RUN      ] GeometryRobust.WeightMatchesAnalyticForms
+[       OK ] GeometryRobust.WeightMatchesAnalyticForms (0 ms)
+[ RUN      ] GeometryRobust.WeightEqualsPsiOverU
+[       OK ] GeometryRobust.WeightEqualsPsiOverU (0 ms)
+[ RUN      ] GeometryRobust.WeightFiniteAtZeroAndNonIncreasing
+[       OK ] GeometryRobust.WeightFiniteAtZeroAndNonIncreasing (0 ms)
+[ RUN      ] GeometryRobust.RedescendingDownweightsLargeResiduals
+[       OK ] GeometryRobust.RedescendingDownweightsLargeResiduals (0 ms)
+[ RUN      ] GeometryRobust.FailClosedOnBadInputs
+[       OK ] GeometryRobust.FailClosedOnBadInputs (0 ms)
+[ RUN      ] GeometryRobust.RhoIsZeroAtZeroAndPositiveElsewhere
+[       OK ] GeometryRobust.RhoIsZeroAtZeroAndPositiveElsewhere (0 ms)
+[----------] 6 tests from GeometryRobust (0 ms total)
+
+[----------] 3 tests from AABBCubify
+[ RUN      ] AABBCubify.MakeCubicExpandsAroundCenterAndContainsOriginal
+[       OK ] AABBCubify.MakeCubicExpandsAroundCenterAndContainsOriginal (0 ms)
+[ RUN      ] AABBCubify.ChildOctantsTileParentWithoutPositiveOverlap
+[       OK ] AABBCubify.ChildOctantsTileParentWithoutPositiveOverlap (0 ms)
+[ RUN      ] AABBCubify.InvalidInputAndOutOfRangeOctantsFailClosed
+[       OK ] AABBCubify.InvalidInputAndOutOfRangeOctantsFailClosed (0 ms)
+[----------] 3 tests from AABBCubify (0 ms total)
+
+[----------] 4 tests from BezierCurve
+[ RUN      ] BezierCurve.ReportsDegreeAndInterpolatesEndpoints
+[       OK ] BezierCurve.ReportsDegreeAndInterpolatesEndpoints (0 ms)
+[ RUN      ] BezierCurve.DegreeOneEqualsLinearLerp
+[       OK ] BezierCurve.DegreeOneEqualsLinearLerp (0 ms)
+[ RUN      ] BezierCurve.BernsteinMatchesDeCasteljauForQuadraticAndCubic
+[       OK ] BezierCurve.BernsteinMatchesDeCasteljauForQuadraticAndCubic (0 ms)
+[ RUN      ] BezierCurve.EmptyAndNonFiniteInputsFailClosed
+[       OK ] BezierCurve.EmptyAndNonFiniteInputsFailClosed (0 ms)
+[----------] 4 tests from BezierCurve (0 ms total)
+
+[----------] 6 tests from GeometryCurve
+[ RUN      ] GeometryCurve.EndpointsInterpolateControlPoints
+[       OK ] GeometryCurve.EndpointsInterpolateControlPoints (0 ms)
+[ RUN      ] GeometryCurve.DegreeOneIsLinearLerp
+[       OK ] GeometryCurve.DegreeOneIsLinearLerp (0 ms)
+[ RUN      ] GeometryCurve.DeCasteljauMatchesBernstein
+[       OK ] GeometryCurve.DeCasteljauMatchesBernstein (0 ms)
+[ RUN      ] GeometryCurve.DerivativeAtEndpoints
+[       OK ] GeometryCurve.DerivativeAtEndpoints (0 ms)
+[ RUN      ] GeometryCurve.SingleControlPointIsConstant
+[       OK ] GeometryCurve.SingleControlPointIsConstant (0 ms)
+[ RUN      ] GeometryCurve.FailClosedOnBadInput
+[       OK ] GeometryCurve.FailClosedOnBadInput (0 ms)
+[----------] 6 tests from GeometryCurve (0 ms total)
+
+[----------] 9 tests from GeometryRotation
+[ RUN      ] GeometryRotation.HatVeeInverse
+[       OK ] GeometryRotation.HatVeeInverse (0 ms)
+[ RUN      ] GeometryRotation.ExpLogRoundTrip
+[       OK ] GeometryRotation.ExpLogRoundTrip (0 ms)
+[ RUN      ] GeometryRotation.LogExpRoundTripFromRandom
+[       OK ] GeometryRotation.LogExpRoundTripFromRandom (0 ms)
+[ RUN      ] GeometryRotation.AngularDistanceMatchesAngle
+[       OK ] GeometryRotation.AngularDistanceMatchesAngle (0 ms)
+[ RUN      ] GeometryRotation.ChordalDistanceRelation
+[       OK ] GeometryRotation.ChordalDistanceRelation (0 ms)
+[ RUN      ] GeometryRotation.RandomRotationDeterministicAndValid
+[       OK ] GeometryRotation.RandomRotationDeterministicAndValid (0 ms)
+[ RUN      ] GeometryRotation.ProjectOnSO3
+[       OK ] GeometryRotation.ProjectOnSO3 (1 ms)
+[ RUN      ] GeometryRotation.OptimalRotationRecoversKnown
+[       OK ] GeometryRotation.OptimalRotationRecoversKnown (0 ms)
+[ RUN      ] GeometryRotation.FailClosed
+[       OK ] GeometryRotation.FailClosed (0 ms)
+[----------] 9 tests from GeometryRotation (2 ms total)
+
+[----------] 6 tests from GeometryRotationAveraging
+[ RUN      ] GeometryRotationAveraging.AllRoutinesReturnRepeatedRotation
+[       OK ] GeometryRotationAveraging.AllRoutinesReturnRepeatedRotation (17 ms)
+[ RUN      ] GeometryRotationAveraging.ChordalAndKarcherAgreeOnCluster
+[       OK ] GeometryRotationAveraging.ChordalAndKarcherAgreeOnCluster (3 ms)
+[ RUN      ] GeometryRotationAveraging.WeightedKarcherMeanMatchesAnalyticSlerp
+[       OK ] GeometryRotationAveraging.WeightedKarcherMeanMatchesAnalyticSlerp (0 ms)
+[ RUN      ] GeometryRotationAveraging.MediansStayCloserToInliersThanMeansWithOutliers
+[       OK ] GeometryRotationAveraging.MediansStayCloserToInliersThanMeansWithOutliers (20 ms)
+[ RUN      ] GeometryRotationAveraging.DeterministicAcrossRepeatedCallsAndPermutation
+[       OK ] GeometryRotationAveraging.DeterministicAcrossRepeatedCallsAndPermutation (20 ms)
+[ RUN      ] GeometryRotationAveraging.FailClosedStatuses
+[       OK ] GeometryRotationAveraging.FailClosedStatuses (6 ms)
+[----------] 6 tests from GeometryRotationAveraging (69 ms total)
+
+[----------] 15 tests from GeometryMeshQuantities
+[ RUN      ] GeometryMeshQuantities.SingleTriangleAreaVectorCentroid
+[       OK ] GeometryMeshQuantities.SingleTriangleAreaVectorCentroid (1 ms)
+[ RUN      ] GeometryMeshQuantities.BarycentricAreasSumToSurfaceArea
+[       OK ] GeometryMeshQuantities.BarycentricAreasSumToSurfaceArea (1 ms)
+[ RUN      ] GeometryMeshQuantities.EquilateralTriangleAreaIsAnalytic
+[       OK ] GeometryMeshQuantities.EquilateralTriangleAreaIsAnalytic (1 ms)
+[ RUN      ] GeometryMeshQuantities.ClosedMeshAreaVectorsSumToZero
+[       OK ] GeometryMeshQuantities.ClosedMeshAreaVectorsSumToZero (1 ms)
+[ RUN      ] GeometryMeshQuantities.PublishCanonicalQuantityProperties
+[       OK ] GeometryMeshQuantities.PublishCanonicalQuantityProperties (0 ms)
+[ RUN      ] GeometryMeshQuantities.FaceCentroidIsCornerAverageNotOneRing
+[       OK ] GeometryMeshQuantities.FaceCentroidIsCornerAverageNotOneRing (0 ms)
+[ RUN      ] GeometryMeshQuantities.FailClosedOnInvalidFace
+[       OK ] GeometryMeshQuantities.FailClosedOnInvalidFace (1 ms)
+[ RUN      ] GeometryMeshQuantities.FaceScalarGradientMatchesLinearField
+[       OK ] GeometryMeshQuantities.FaceScalarGradientMatchesLinearField (2 ms)
+[ RUN      ] GeometryMeshQuantities.FaceScalarGradientFailsClosed
+[       OK ] GeometryMeshQuantities.FaceScalarGradientFailsClosed (1 ms)
+[ RUN      ] GeometryMeshQuantities.ProjectToUnitSphereLeavesOriginAndNormalizesFiniteVertices
+[       OK ] GeometryMeshQuantities.ProjectToUnitSphereLeavesOriginAndNormalizesFiniteVertices (0 ms)
+[ RUN      ] GeometryMeshQuantities.VertexOneRingPcaAlignsWithSphereNormal
+[       OK ] GeometryMeshQuantities.VertexOneRingPcaAlignsWithSphereNormal (1 ms)
+[ RUN      ] GeometryMeshQuantities.VertexOneRingPcaFailsClosedWhenUnderdetermined
+[       OK ] GeometryMeshQuantities.VertexOneRingPcaFailsClosedWhenUnderdetermined (0 ms)
+[ RUN      ] GeometryMeshQuantities.NonPlanarQuadAreaUsesTriangleFan
+[       OK ] GeometryMeshQuantities.NonPlanarQuadAreaUsesTriangleFan (0 ms)
+[ RUN      ] GeometryMeshQuantities.PlanarConcavePolygonUsesShoelaceArea
+[       OK ] GeometryMeshQuantities.PlanarConcavePolygonUsesShoelaceArea (0 ms)
+[ RUN      ] GeometryMeshQuantities.FailClosedOnNonFiniteCorner
+[       OK ] GeometryMeshQuantities.FailClosedOnNonFiniteCorner (0 ms)
+[----------] 15 tests from GeometryMeshQuantities (14 ms total)
+
+[----------] 5 tests from GeometryMeshClosestFace
+[ RUN      ] GeometryMeshClosestFace.MatchesBruteForce
+[       OK ] GeometryMeshClosestFace.MatchesBruteForce (1992 ms)
+[ RUN      ] GeometryMeshClosestFace.PointOnSurfaceHasZeroDistance
+[       OK ] GeometryMeshClosestFace.PointOnSurfaceHasZeroDistance (5 ms)
+[ RUN      ] GeometryMeshClosestFace.FailClosed
+[       OK ] GeometryMeshClosestFace.FailClosed (4 ms)
+[ RUN      ] GeometryMeshClosestFace.KNearestAndRadiusMatchBruteForce
+[       OK ] GeometryMeshClosestFace.KNearestAndRadiusMatchBruteForce (10 ms)
+[ RUN      ] GeometryMeshClosestFace.SubsetBuildRestrictsCandidates
+[       OK ] GeometryMeshClosestFace.SubsetBuildRestrictsCandidates (2 ms)
+[----------] 5 tests from GeometryMeshClosestFace (2014 ms total)
+
+[----------] 5 tests from GeometryLinalgEigenMap
+[ RUN      ] GeometryLinalgEigenMap.MapsVec3ArrayAsNby3
+[       OK ] GeometryLinalgEigenMap.MapsVec3ArrayAsNby3 (0 ms)
+[ RUN      ] GeometryLinalgEigenMap.MutableMapAliasesStorage
+[       OK ] GeometryLinalgEigenMap.MutableMapAliasesStorage (0 ms)
+[ RUN      ] GeometryLinalgEigenMap.EmptySpanYieldsZeroRows
+[       OK ] GeometryLinalgEigenMap.EmptySpanYieldsZeroRows (0 ms)
+[ RUN      ] GeometryLinalgEigenMap.MapAsMatrixAliasesStridedRows
+[       OK ] GeometryLinalgEigenMap.MapAsMatrixAliasesStridedRows (0 ms)
+[ RUN      ] GeometryLinalgEigenMap.MapVectorAsMatrixAliasesFixedSizeVectors
+[       OK ] GeometryLinalgEigenMap.MapVectorAsMatrixAliasesFixedSizeVectors (0 ms)
+[----------] 5 tests from GeometryLinalgEigenMap (0 ms total)
+
+[----------] 17 tests from RuntimeGraph
+[ RUN      ] RuntimeGraph.AddEdge_FindEdge
+[       OK ] RuntimeGraph.AddEdge_FindEdge (0 ms)
+[ RUN      ] RuntimeGraph.DeleteVertex_ThenGarbageCollect
+[       OK ] RuntimeGraph.DeleteVertex_ThenGarbageCollect (0 ms)
+[ RUN      ] RuntimeGraph.GarbageCollectionRemapsSurvivingConnectivity
+[       OK ] RuntimeGraph.GarbageCollectionRemapsSurvivingConnectivity (0 ms)
+[ RUN      ] RuntimeGraph.GarbageCollectionRebuildsSurvivingVertexStar
+[       OK ] RuntimeGraph.GarbageCollectionRebuildsSurvivingVertexStar (0 ms)
+[ RUN      ] RuntimeGraph.ForceDirectedLayoutRejectsDegenerateInputs
+[       OK ] RuntimeGraph.ForceDirectedLayoutRejectsDegenerateInputs (0 ms)
+[ RUN      ] RuntimeGraph.ForceDirectedLayoutProducesFiniteSeparatedEmbedding
+[       OK ] RuntimeGraph.ForceDirectedLayoutProducesFiniteSeparatedEmbedding (0 ms)
+[ RUN      ] RuntimeGraph.SpectralLayoutRejectsDegenerateInputs
+[       OK ] RuntimeGraph.SpectralLayoutRejectsDegenerateInputs (0 ms)
+[ RUN      ] RuntimeGraph.SpectralLayoutProducesFiniteCenteredEmbedding
+[       OK ] RuntimeGraph.SpectralLayoutProducesFiniteCenteredEmbedding (1 ms)
+[ RUN      ] RuntimeGraph.SpectralLayoutNormalizedVariantProducesFiniteEmbedding
+[       OK ] RuntimeGraph.SpectralLayoutNormalizedVariantProducesFiniteEmbedding (0 ms)
+[ RUN      ] RuntimeGraph.HierarchicalLayoutRejectsDegenerateInputs
+[       OK ] RuntimeGraph.HierarchicalLayoutRejectsDegenerateInputs (0 ms)
+[ RUN      ] RuntimeGraph.HierarchicalLayoutProducesLayeredEmbedding
+[       OK ] RuntimeGraph.HierarchicalLayoutProducesLayeredEmbedding (1 ms)
+[ RUN      ] RuntimeGraph.HierarchicalLayoutCrossingMinimizationReducesCrossings
+[       OK ] RuntimeGraph.HierarchicalLayoutCrossingMinimizationReducesCrossings (2 ms)
+[ RUN      ] RuntimeGraph.HierarchicalLayoutAutoRootCentersLongPath
+[       OK ] RuntimeGraph.HierarchicalLayoutAutoRootCentersLongPath (2 ms)
+[ RUN      ] RuntimeGraph.CountEdgeCrossingsRejectsDegenerateInput
+[       OK ] RuntimeGraph.CountEdgeCrossingsRejectsDegenerateInput (0 ms)
+[ RUN      ] RuntimeGraph.CountEdgeCrossingsCountsOnlyNonIncidentByDefault
+[       OK ] RuntimeGraph.CountEdgeCrossingsCountsOnlyNonIncidentByDefault (0 ms)
+[ RUN      ] RuntimeGraph.CountEdgeCrossingsCanIncludeIncidentAndCollinearOverlaps
+[       OK ] RuntimeGraph.CountEdgeCrossingsCanIncludeIncidentAndCollinearOverlaps (0 ms)
+[ RUN      ] RuntimeGraph.TopologicalLayersIndependentPasses
+[       OK ] RuntimeGraph.TopologicalLayersIndependentPasses (0 ms)
+[----------] 17 tests from RuntimeGraph (15 ms total)
+
+[----------] 3 tests from GraphCirculators
+[ RUN      ] GraphCirculators.HalfedgesAroundVertexTraversesIncidentRing
+[       OK ] GraphCirculators.HalfedgesAroundVertexTraversesIncidentRing (0 ms)
+[ RUN      ] GraphCirculators.BoundaryHalfedgesVisitBoundaryLoopOnce
+[       OK ] GraphCirculators.BoundaryHalfedgesVisitBoundaryLoopOnce (0 ms)
+[ RUN      ] GraphCirculators.IsolatedVertexProducesEmptyHalfedgeRing
+[       OK ] GraphCirculators.IsolatedVertexProducesEmptyHalfedgeRing (0 ms)
+[----------] 3 tests from GraphCirculators (1 ms total)
+
+[----------] 7 tests from RuntimeGraphKNN
+[ RUN      ] RuntimeGraphKNN.ReturnsNulloptForDegenerateInputs
+[       OK ] RuntimeGraphKNN.ReturnsNulloptForDegenerateInputs (0 ms)
+[ RUN      ] RuntimeGraphKNN.UnionConnectivityBuildsSymmetricNeighborhoodGraph
+[       OK ] RuntimeGraphKNN.UnionConnectivityBuildsSymmetricNeighborhoodGraph (1 ms)
+[ RUN      ] RuntimeGraphKNN.MutualConnectivityFiltersNonReciprocalNeighbors
+[       OK ] RuntimeGraphKNN.MutualConnectivityFiltersNonReciprocalNeighbors (1 ms)
+[ RUN      ] RuntimeGraphKNN.CoincidentPointsAreRejectedByDistanceEpsilon
+[       OK ] RuntimeGraphKNN.CoincidentPointsAreRejectedByDistanceEpsilon (1 ms)
+[ RUN      ] RuntimeGraphKNN.BuildFromIndicesCreatesExpectedGraph
+[       OK ] RuntimeGraphKNN.BuildFromIndicesCreatesExpectedGraph (0 ms)
+[ RUN      ] RuntimeGraphKNN.BuildFromIndicesRejectsInvalidAndCoincidentPairs
+[       OK ] RuntimeGraphKNN.BuildFromIndicesRejectsInvalidAndCoincidentPairs (0 ms)
+[ RUN      ] RuntimeGraphKNN.OctreeBuilderMatchesBruteForceNeighborSets
+[       OK ] RuntimeGraphKNN.OctreeBuilderMatchesBruteForceNeighborSets (3 ms)
+[----------] 7 tests from RuntimeGraphKNN (9 ms total)
+
+[----------] 5 tests from GraphQueries
+[ RUN      ] GraphQueries.EnsureEdgeLengthsCachesCanonicalProperty
+[       OK ] GraphQueries.EnsureEdgeLengthsCachesCanonicalProperty (0 ms)
+[ RUN      ] GraphQueries.ClosestKAndRadiusQueriesMatchBruteForce
+[       OK ] GraphQueries.ClosestKAndRadiusQueriesMatchBruteForce (1 ms)
+[ RUN      ] GraphQueries.ClosestEdgeWithinOneRingOnlySearchesIncidentEdges
+[       OK ] GraphQueries.ClosestEdgeWithinOneRingOnlySearchesIncidentEdges (0 ms)
+[ RUN      ] GraphQueries.GaussianNoiseIsDeterministicAndIdentityAtZeroScale
+[       OK ] GraphQueries.GaussianNoiseIsDeterministicAndIdentityAtZeroScale (6 ms)
+[ RUN      ] GraphQueries.DegenerateInputsFailClosed
+[       OK ] GraphQueries.DegenerateInputsFailClosed (1 ms)
+[----------] 5 tests from GraphQueries (9 ms total)
+
+[----------] 14 tests from GeometryPropertiesContract
+[ RUN      ] GeometryPropertiesContract.NameAccessorsReturnStableStringView
+[       OK ] GeometryPropertiesContract.NameAccessorsReturnStableStringView (0 ms)
+[ RUN      ] GeometryPropertiesContract.RegistryHandlesFailClosed
+[       OK ] GeometryPropertiesContract.RegistryHandlesFailClosed (0 ms)
+[ RUN      ] GeometryPropertiesContract.DefaultConstPropertySetIsSafeEmptyView
+[       OK ] GeometryPropertiesContract.DefaultConstPropertySetIsSafeEmptyView (0 ms)
+[ RUN      ] GeometryPropertiesContract.ConstLookupReturnsReadOnlyProperty
+[       OK ] GeometryPropertiesContract.ConstLookupReturnsReadOnlyProperty (0 ms)
+[ RUN      ] GeometryPropertiesContract.BoolPropertySupportsScalarProxyAccessOnly
+[       OK ] GeometryPropertiesContract.BoolPropertySupportsScalarProxyAccessOnly (0 ms)
+[ RUN      ] GeometryPropertiesContract.MapPropertyAliasesScalarAndVectorColumns
+[       OK ] GeometryPropertiesContract.MapPropertyAliasesScalarAndVectorColumns (0 ms)
+[ RUN      ] GeometryPropertiesContract.MapPropertyBoolReturnsCopiedNumericColumn
+[       OK ] GeometryPropertiesContract.MapPropertyBoolReturnsCopiedNumericColumn (0 ms)
+[ RUN      ] GeometryPropertiesContract.DescriptorCatalogReportsTypeAndAccessMetadata
+[       OK ] GeometryPropertiesContract.DescriptorCatalogReportsTypeAndAccessMetadata (0 ms)
+[ RUN      ] GeometryPropertiesContract.MutableBorrowsPublishMonotonicContentRevisions
+[       OK ] GeometryPropertiesContract.MutableBorrowsPublishMonotonicContentRevisions (0 ms)
+[ RUN      ] GeometryPropertiesContract.StructuralEditsCopiesAndDescriptorsCarryRevisions
+[       OK ] GeometryPropertiesContract.StructuralEditsCopiesAndDescriptorsCarryRevisions (0 ms)
+[ RUN      ] GeometryPropertiesContract.ShrinkToFitIsCanonicalSpelling
+[       OK ] GeometryPropertiesContract.ShrinkToFitIsCanonicalSpelling (0 ms)
+[ RUN      ] GeometryPropertiesContract.LiveElementRangeSkipsDeletedAndFailsClosed
+[       OK ] GeometryPropertiesContract.LiveElementRangeSkipsDeletedAndFailsClosed (0 ms)
+[ RUN      ] GeometryPropertiesContract.MeshLiveRangesMatchManualDeletedFilter
+[       OK ] GeometryPropertiesContract.MeshLiveRangesMatchManualDeletedFilter (1 ms)
+[ RUN      ] GeometryPropertiesContract.ConstDomainViewsExposeReadOnlyLiveRanges
+[       OK ] GeometryPropertiesContract.ConstDomainViewsExposeReadOnlyLiveRanges (1 ms)
+[----------] 14 tests from GeometryPropertiesContract (4 ms total)
+
+[----------] 6 tests from KDTree
+[ RUN      ] KDTree.RejectsDegenerateBuildInputs
+[       OK ] KDTree.RejectsDegenerateBuildInputs (0 ms)
+[ RUN      ] KDTree.KnnMatchesBruteForceOrderingForPointAabbs
+[       OK ] KDTree.KnnMatchesBruteForceOrderingForPointAabbs (0 ms)
+[ RUN      ] KDTree.RadiusQueryMatchesBruteForceSetForPointAabbs
+[       OK ] KDTree.RadiusQueryMatchesBruteForceSetForPointAabbs (0 ms)
+[ RUN      ] KDTree.RadiusQueryScratchPreservesOrderingAcrossReuse
+[       OK ] KDTree.RadiusQueryScratchPreservesOrderingAcrossReuse (0 ms)
+[ RUN      ] KDTree.SupportsVolumetricElementsThroughAabbInput
+[       OK ] KDTree.SupportsVolumetricElementsThroughAabbInput (0 ms)
+[ RUN      ] KDTree.HandlesCoincidentElementsAndInvalidQueries
+[       OK ] KDTree.HandlesCoincidentElementsAndInvalidQueries (0 ms)
+[----------] 6 tests from KDTree (1 ms total)
+
+[----------] 24 tests from Octree
+[ RUN      ] Octree.BuildFromPointsMatchesExplicitPointAabbs
+[       OK ] Octree.BuildFromPointsMatchesExplicitPointAabbs (1 ms)
+[ RUN      ] Octree.Build_EmptyInput
+[       OK ] Octree.Build_EmptyInput (0 ms)
+[ RUN      ] Octree.Build_SingleElement
+[       OK ] Octree.Build_SingleElement (0 ms)
+[ RUN      ] Octree.Build_SmallSet
+[       OK ] Octree.Build_SmallSet (0 ms)
+[ RUN      ] Octree.Build_LargeSet
+[       OK ] Octree.Build_LargeSet (20 ms)
+[ RUN      ] Octree.Build_DifferentSplitPolicies
+[       OK ] Octree.Build_DifferentSplitPolicies (5 ms)
+[ RUN      ] Octree.QueryAABB_EmptyResult
+[       OK ] Octree.QueryAABB_EmptyResult (1 ms)
+[ RUN      ] Octree.QueryAABB_AllElements
+[       OK ] Octree.QueryAABB_AllElements (0 ms)
+[ RUN      ] Octree.QueryAABB_PartialOverlap
+[       OK ] Octree.QueryAABB_PartialOverlap (1 ms)
+[ RUN      ] Octree.QueryAABB_CorrectResults
+[       OK ] Octree.QueryAABB_CorrectResults (1 ms)
+[ RUN      ] Octree.QuerySphere_Basic
+[       OK ] Octree.QuerySphere_Basic (2 ms)
+[ RUN      ] Octree.QuerySphere_CorrectResults
+[       OK ] Octree.QuerySphere_CorrectResults (2 ms)
+[ RUN      ] Octree.QueryRay_Basic
+[       OK ] Octree.QueryRay_Basic (1 ms)
+[ RUN      ] Octree.QueryRay_Miss
+[       OK ] Octree.QueryRay_Miss (0 ms)
+[ RUN      ] Octree.QueryNearest_Basic
+[       OK ] Octree.QueryNearest_Basic (0 ms)
+[ RUN      ] Octree.QueryNearest_CorrectResult
+[       OK ] Octree.QueryNearest_CorrectResult (1 ms)
+[ RUN      ] Octree.QueryKNN_Basic
+[       OK ] Octree.QueryKNN_Basic (0 ms)
+[ RUN      ] Octree.QueryKNN_KGreaterThanElements
+[       OK ] Octree.QueryKNN_KGreaterThanElements (0 ms)
+[ RUN      ] Octree.QueryKNN_CorrectResults
+[       OK ] Octree.QueryKNN_CorrectResults (2 ms)
+[ RUN      ] Octree.AddNodeProperty
+[       OK ] Octree.AddNodeProperty (0 ms)
+[ RUN      ] Octree.GetNodeProperty
+[       OK ] Octree.GetNodeProperty (0 ms)
+[ RUN      ] Octree.HasNodeProperty
+[       OK ] Octree.HasNodeProperty (0 ms)
+[ RUN      ] Octree.AllElementsAtSamePoint
+[       OK ] Octree.AllElementsAtSamePoint (3 ms)
+[ RUN      ] Octree.LargeExtentDifferences
+[       OK ] Octree.LargeExtentDifferences (0 ms)
+[----------] 24 tests from Octree (49 ms total)
+
+[----------] 4 tests from BVH
+[ RUN      ] BVH.RejectsDegenerateBuildInputs
+[       OK ] BVH.RejectsDegenerateBuildInputs (0 ms)
+[ RUN      ] BVH.QueryAabbAndRayMatchExpectedPrimitiveSet
+[       OK ] BVH.QueryAabbAndRayMatchExpectedPrimitiveSet (0 ms)
+[ RUN      ] BVH.HandlesCoincidentCentroidsWithoutDroppingElements
+[       OK ] BVH.HandlesCoincidentCentroidsWithoutDroppingElements (0 ms)
+[ RUN      ] BVH.QueryRayIncludesBoundaryCoincidentBoxes
+[       OK ] BVH.QueryRayIncludesBoundaryCoincidentBoxes (0 ms)
+[----------] 4 tests from BVH (0 ms total)
+
+[----------] 5 tests from DEC_ExteriorDerivative0
+[ RUN      ] DEC_ExteriorDerivative0.DimensionsMatchMesh
+[       OK ] DEC_ExteriorDerivative0.DimensionsMatchMesh (1 ms)
+[ RUN      ] DEC_ExteriorDerivative0.EachRowHasTwoEntries
+[       OK ] DEC_ExteriorDerivative0.EachRowHasTwoEntries (0 ms)
+[ RUN      ] DEC_ExteriorDerivative0.RowSumIsZero
+[       OK ] DEC_ExteriorDerivative0.RowSumIsZero (0 ms)
+[ RUN      ] DEC_ExteriorDerivative0.GradientOfConstantIsZero
+[       OK ] DEC_ExteriorDerivative0.GradientOfConstantIsZero (1 ms)
+[ RUN      ] DEC_ExteriorDerivative0.GradientOfLinearFunction
+[       OK ] DEC_ExteriorDerivative0.GradientOfLinearFunction (1 ms)
+[----------] 5 tests from DEC_ExteriorDerivative0 (4 ms total)
+
+[----------] 4 tests from DEC_ExteriorDerivative1
+[ RUN      ] DEC_ExteriorDerivative1.DimensionsMatchMesh
+[       OK ] DEC_ExteriorDerivative1.DimensionsMatchMesh (1 ms)
+[ RUN      ] DEC_ExteriorDerivative1.TriangleFacesHaveThreeEntries
+[       OK ] DEC_ExteriorDerivative1.TriangleFacesHaveThreeEntries (1 ms)
+[ RUN      ] DEC_ExteriorDerivative1.EntriesArePlusMinusOne
+[       OK ] DEC_ExteriorDerivative1.EntriesArePlusMinusOne (1 ms)
+[ RUN      ] DEC_ExteriorDerivative1.ExactnessD1D0IsZero
+[       OK ] DEC_ExteriorDerivative1.ExactnessD1D0IsZero (1 ms)
+[----------] 4 tests from DEC_ExteriorDerivative1 (4 ms total)
+
+[----------] 6 tests from DEC_HodgeStar0
+[ RUN      ] DEC_HodgeStar0.DimensionsMatchVertexCount
+[       OK ] DEC_HodgeStar0.DimensionsMatchVertexCount (0 ms)
+[ RUN      ] DEC_HodgeStar0.AllEntriesPositive
+[       OK ] DEC_HodgeStar0.AllEntriesPositive (0 ms)
+[ RUN      ] DEC_HodgeStar0.SumEqualsTotalArea
+[       OK ] DEC_HodgeStar0.SumEqualsTotalArea (1 ms)
+[ RUN      ] DEC_HodgeStar0.SingleTriangleSumEqualsArea
+[       OK ] DEC_HodgeStar0.SingleTriangleSumEqualsArea (0 ms)
+[ RUN      ] DEC_HodgeStar0.EquilateralTriangleEqualAreas
+[       OK ] DEC_HodgeStar0.EquilateralTriangleEqualAreas (0 ms)
+[ RUN      ] DEC_HodgeStar0.RegularTetrahedronEqualAreas
+[       OK ] DEC_HodgeStar0.RegularTetrahedronEqualAreas (0 ms)
+[----------] 6 tests from DEC_HodgeStar0 (5 ms total)
+
+[----------] 4 tests from DEC_HodgeStar1
+[ RUN      ] DEC_HodgeStar1.DimensionsMatchEdgeCount
+[       OK ] DEC_HodgeStar1.DimensionsMatchEdgeCount (0 ms)
+[ RUN      ] DEC_HodgeStar1.InteriorEdgesPositive
+[       OK ] DEC_HodgeStar1.InteriorEdgesPositive (0 ms)
+[ RUN      ] DEC_HodgeStar1.RegularTetrahedronEqualWeights
+[       OK ] DEC_HodgeStar1.RegularTetrahedronEqualWeights (0 ms)
+[ RUN      ] DEC_HodgeStar1.EquilateralTriangleCotanValue
+[       OK ] DEC_HodgeStar1.EquilateralTriangleCotanValue (0 ms)
+[----------] 4 tests from DEC_HodgeStar1 (2 ms total)
+
+[----------] 4 tests from DEC_HodgeStar2
+[ RUN      ] DEC_HodgeStar2.DimensionsMatchFaceCount
+[       OK ] DEC_HodgeStar2.DimensionsMatchFaceCount (0 ms)
+[ RUN      ] DEC_HodgeStar2.AllEntriesPositive
+[       OK ] DEC_HodgeStar2.AllEntriesPositive (1 ms)
+[ RUN      ] DEC_HodgeStar2.InverseAreaCorrect
+[       OK ] DEC_HodgeStar2.InverseAreaCorrect (0 ms)
+[ RUN      ] DEC_HodgeStar2.TwoTriangleSquareAreas
+[       OK ] DEC_HodgeStar2.TwoTriangleSquareAreas (0 ms)
+[----------] 4 tests from DEC_HodgeStar2 (3 ms total)
+
+[----------] 8 tests from DEC_Laplacian
+[ RUN      ] DEC_Laplacian.DimensionsAreVxV
+[       OK ] DEC_Laplacian.DimensionsAreVxV (1 ms)
+[ RUN      ] DEC_Laplacian.RowSumsAreZero
+[       OK ] DEC_Laplacian.RowSumsAreZero (1 ms)
+[ RUN      ] DEC_Laplacian.ConstantFunctionInKernel
+[       OK ] DEC_Laplacian.ConstantFunctionInKernel (1 ms)
+[ RUN      ] DEC_Laplacian.SymmetricMatrix
+[       OK ] DEC_Laplacian.SymmetricMatrix (1 ms)
+[ RUN      ] DEC_Laplacian.NegativeSemidefinite
+[       OK ] DEC_Laplacian.NegativeSemidefinite (1 ms)
+[ RUN      ] DEC_Laplacian.OffDiagonalNonPositive
+[       OK ] DEC_Laplacian.OffDiagonalNonPositive (0 ms)
+[ RUN      ] DEC_Laplacian.DiagonalPositive
+[       OK ] DEC_Laplacian.DiagonalPositive (1 ms)
+[ RUN      ] DEC_Laplacian.RegularTetrahedronSymmetricRows
+[       OK ] DEC_Laplacian.RegularTetrahedronSymmetricRows (1 ms)
+[----------] 8 tests from DEC_Laplacian (9 ms total)
+
+[----------] 2 tests from DEC_BuildOperators
+[ RUN      ] DEC_BuildOperators.AllOperatorsValid
+[       OK ] DEC_BuildOperators.AllOperatorsValid (1 ms)
+[ RUN      ] DEC_BuildOperators.ConsistentDimensions
+[       OK ] DEC_BuildOperators.ConsistentDimensions (1 ms)
+[----------] 2 tests from DEC_BuildOperators (3 ms total)
+
+[----------] 1 test from DEC_SparseMatrix
+[ RUN      ] DEC_SparseMatrix.MultiplyTransposeConsistent
+[       OK ] DEC_SparseMatrix.MultiplyTransposeConsistent (1 ms)
+[----------] 1 test from DEC_SparseMatrix (1 ms total)
+
+[----------] 3 tests from DEC_DiagonalMatrix
+[ RUN      ] DEC_DiagonalMatrix.MultiplyCorrect
+[       OK ] DEC_DiagonalMatrix.MultiplyCorrect (0 ms)
+[ RUN      ] DEC_DiagonalMatrix.MultiplyInverseCorrect
+[       OK ] DEC_DiagonalMatrix.MultiplyInverseCorrect (0 ms)
+[ RUN      ] DEC_DiagonalMatrix.MultiplyInverseHandlesZero
+[       OK ] DEC_DiagonalMatrix.MultiplyInverseHandlesZero (0 ms)
+[----------] 3 tests from DEC_DiagonalMatrix (0 ms total)
+
+[----------] 2 tests from DEC_Integration
+[ RUN      ] DEC_Integration.HodgeStarDuality
+[       OK ] DEC_Integration.HodgeStarDuality (1 ms)
+[ RUN      ] DEC_Integration.LaplacianMatchesD0TH1D0
+[       OK ] DEC_Integration.LaplacianMatchesD0TH1D0 (1 ms)
+[----------] 2 tests from DEC_Integration (2 ms total)
+
+[----------] 2 tests from DEC_EdgeCases
+[ RUN      ] DEC_EdgeCases.SingleTriangleBoundary
+[       OK ] DEC_EdgeCases.SingleTriangleBoundary (1 ms)
+[ RUN      ] DEC_EdgeCases.SubdividedTriangleMixedBoundary
+[       OK ] DEC_EdgeCases.SubdividedTriangleMixedBoundary (1 ms)
+[----------] 2 tests from DEC_EdgeCases (2 ms total)
+
+[----------] 5 tests from DEC_LaplacianCache
+[ RUN      ] DEC_LaplacianCache.BuildFromRegularTetrahedron
+[       OK ] DEC_LaplacianCache.BuildFromRegularTetrahedron (1 ms)
+[ RUN      ] DEC_LaplacianCache.MassInverseIsConsistentWithHodge0
+[       OK ] DEC_LaplacianCache.MassInverseIsConsistentWithHodge0 (0 ms)
+[ RUN      ] DEC_LaplacianCache.MassSqrtInverseIsConsistentWithHodge0
+[       OK ] DEC_LaplacianCache.MassSqrtInverseIsConsistentWithHodge0 (1 ms)
+[ RUN      ] DEC_LaplacianCache.SymNormalizedLaplacianIsSymmetric
+[       OK ] DEC_LaplacianCache.SymNormalizedLaplacianIsSymmetric (1 ms)
+[ RUN      ] DEC_LaplacianCache.SymNormalizedRowSumsAreZero
+[       OK ] DEC_LaplacianCache.SymNormalizedRowSumsAreZero (1 ms)
+[----------] 5 tests from DEC_LaplacianCache (7 ms total)
+
+[----------] 4 tests from DEC_Diagnostics
+[ RUN      ] DEC_Diagnostics.RegularTetrahedronPassesAll
+[       OK ] DEC_Diagnostics.RegularTetrahedronPassesAll (1 ms)
+[ RUN      ] DEC_Diagnostics.SubdividedTrianglePassesAll
+[       OK ] DEC_Diagnostics.SubdividedTrianglePassesAll (1 ms)
+[ RUN      ] DEC_Diagnostics.SingleTrianglePassesAll
+[       OK ] DEC_Diagnostics.SingleTrianglePassesAll (1 ms)
+[ RUN      ] DEC_Diagnostics.EmptyMatrixDoesNotCrash
+[       OK ] DEC_Diagnostics.EmptyMatrixDoesNotCrash (0 ms)
+[----------] 4 tests from DEC_Diagnostics (3 ms total)
+
+[----------] 16 tests from DEC_HeatKernel
+[ RUN      ] DEC_HeatKernel.HodgeStar1AllPositive
+[       OK ] DEC_HeatKernel.HodgeStar1AllPositive (0 ms)
+[ RUN      ] DEC_HeatKernel.RegularTetrahedronEqualWeights
+[       OK ] DEC_HeatKernel.RegularTetrahedronEqualWeights (0 ms)
+[ RUN      ] DEC_HeatKernel.AutoTimeParamMeanEdgeLengthSq
+[       OK ] DEC_HeatKernel.AutoTimeParamMeanEdgeLengthSq (0 ms)
+[ RUN      ] DEC_HeatKernel.ExplicitTimeParam
+[       OK ] DEC_HeatKernel.ExplicitTimeParam (0 ms)
+[ RUN      ] DEC_HeatKernel.LargeTimeLimitUniform
+[       OK ] DEC_HeatKernel.LargeTimeLimitUniform (0 ms)
+[ RUN      ] DEC_HeatKernel.SmallTimeDiscriminatesEdgeLengths
+[       OK ] DEC_HeatKernel.SmallTimeDiscriminatesEdgeLengths (0 ms)
+[ RUN      ] DEC_HeatKernel.LaplacianPassesDiagnostics
+[       OK ] DEC_HeatKernel.LaplacianPassesDiagnostics (1 ms)
+[ RUN      ] DEC_HeatKernel.LaplacianSubdividedTrianglePassesDiagnostics
+[       OK ] DEC_HeatKernel.LaplacianSubdividedTrianglePassesDiagnostics (1 ms)
+[ RUN      ] DEC_HeatKernel.LaplacianConstantInKernel
+[       OK ] DEC_HeatKernel.LaplacianConstantInKernel (1 ms)
+[ RUN      ] DEC_HeatKernel.LaplacianMatchesHodge1Weights
+[       OK ] DEC_HeatKernel.LaplacianMatchesHodge1Weights (1 ms)
+[ RUN      ] DEC_HeatKernel.BuildOperatorsValid
+[       OK ] DEC_HeatKernel.BuildOperatorsValid (1 ms)
+[ RUN      ] DEC_HeatKernel.LaplacianCacheValid
+[       OK ] DEC_HeatKernel.LaplacianCacheValid (0 ms)
+[ RUN      ] DEC_HeatKernel.SymNormalizedLaplacianSymmetric
+[       OK ] DEC_HeatKernel.SymNormalizedLaplacianSymmetric (1 ms)
+[ RUN      ] DEC_HeatKernel.ObtuseTriangleAlwaysPositive
+[       OK ] DEC_HeatKernel.ObtuseTriangleAlwaysPositive (1 ms)
+[ RUN      ] DEC_HeatKernel.CotanModePassthrough
+[       OK ] DEC_HeatKernel.CotanModePassthrough (1 ms)
+[ RUN      ] DEC_HeatKernel.SolveCGShiftedWithHeatKernel
+[       OK ] DEC_HeatKernel.SolveCGShiftedWithHeatKernel (1 ms)
+[----------] 16 tests from DEC_HeatKernel (19 ms total)
+
+[----------] 6 tests from DEC_StiffnessModes
+[ RUN      ] DEC_StiffnessModes.RowSumsZeroAndSymmetricForEveryMode
+[       OK ] DEC_StiffnessModes.RowSumsZeroAndSymmetricForEveryMode (3 ms)
+[ RUN      ] DEC_StiffnessModes.GraphWeightsAreUnitPerEdge
+[       OK ] DEC_StiffnessModes.GraphWeightsAreUnitPerEdge (1 ms)
+[ RUN      ] DEC_StiffnessModes.FujiwaraWeightsMatchInverseLength
+[       OK ] DEC_StiffnessModes.FujiwaraWeightsMatchInverseLength (1 ms)
+[ RUN      ] DEC_StiffnessModes.ModifiedNormalEqualsCotanTimesNormalDot
+[       OK ] DEC_StiffnessModes.ModifiedNormalEqualsCotanTimesNormalDot (3 ms)
+[ RUN      ] DEC_StiffnessModes.FailClosedOnEmptyMesh
+[       OK ] DEC_StiffnessModes.FailClosedOnEmptyMesh (0 ms)
+[ RUN      ] DEC_StiffnessModes.FailClosedOnNonFinitePositions
+[       OK ] DEC_StiffnessModes.FailClosedOnNonFinitePositions (1 ms)
+[----------] 6 tests from DEC_StiffnessModes (11 ms total)
+
+[----------] 2 tests from DEC_ClampedHalfedgeCotan
+[ RUN      ] DEC_ClampedHalfedgeCotan.MatchesEdgeCotanWeight
+[       OK ] DEC_ClampedHalfedgeCotan.MatchesEdgeCotanWeight (1 ms)
+[ RUN      ] DEC_ClampedHalfedgeCotan.ClampEngagesOnSliver
+[       OK ] DEC_ClampedHalfedgeCotan.ClampEngagesOnSliver (0 ms)
+[----------] 2 tests from DEC_ClampedHalfedgeCotan (2 ms total)
+
+[----------] 7 tests from DEC_MassModes
+[ RUN      ] DEC_MassModes.VoronoiVariantReproducesDefault
+[       OK ] DEC_MassModes.VoronoiVariantReproducesDefault (3 ms)
+[ RUN      ] DEC_MassModes.AllLumpedModesPartitionTotalArea
+[       OK ] DEC_MassModes.AllLumpedModesPartitionTotalArea (2 ms)
+[ RUN      ] DEC_MassModes.BarycentricIsOneThirdIncidentArea
+[       OK ] DEC_MassModes.BarycentricIsOneThirdIncidentArea (1 ms)
+[ RUN      ] DEC_MassModes.GalerkinRowSumsEqualLumpedSum
+[       OK ] DEC_MassModes.GalerkinRowSumsEqualLumpedSum (4 ms)
+[ RUN      ] DEC_MassModes.GalerkinConsistentMassIsSymmetricSPD
+[       OK ] DEC_MassModes.GalerkinConsistentMassIsSymmetricSPD (3 ms)
+[ RUN      ] DEC_MassModes.GalerkinOperatorsPopulateConsistentAndLumped
+[       OK ] DEC_MassModes.GalerkinOperatorsPopulateConsistentAndLumped (4 ms)
+[ RUN      ] DEC_MassModes.FailClosedOnEmptyAndNonFinite
+[       OK ] DEC_MassModes.FailClosedOnEmptyAndNonFinite (2 ms)
+[----------] 7 tests from DEC_MassModes (22 ms total)
+
+[----------] 4 tests from Quadric_Probabilistic
+[ RUN      ] Quadric_Probabilistic.PlaneZeroVarianceMatchesDeterministicPlane
+[       OK ] Quadric_Probabilistic.PlaneZeroVarianceMatchesDeterministicPlane (0 ms)
+[ RUN      ] Quadric_Probabilistic.PlaneIsotropicAndGeneralCovarianceVariantsAgree
+[       OK ] Quadric_Probabilistic.PlaneIsotropicAndGeneralCovarianceVariantsAgree (0 ms)
+[ RUN      ] Quadric_Probabilistic.TriangleIsotropicAndGeneralCovarianceVariantsAgree
+[       OK ] Quadric_Probabilistic.TriangleIsotropicAndGeneralCovarianceVariantsAgree (0 ms)
+[ RUN      ] Quadric_Probabilistic.DegenerateTriangleProducesFiniteEnergy
+[       OK ] Quadric_Probabilistic.DegenerateTriangleProducesFiniteEnergy (0 ms)
+[----------] 4 tests from Quadric_Probabilistic (0 ms total)
+
+[----------] 4 tests from MeshTopology_Flip
+[ RUN      ] MeshTopology_Flip.FlipPreservesVertexCount
+[       OK ] MeshTopology_Flip.FlipPreservesVertexCount (1 ms)
+[ RUN      ] MeshTopology_Flip.FlipChangesEndpoints
+[       OK ] MeshTopology_Flip.FlipChangesEndpoints (1 ms)
+[ RUN      ] MeshTopology_Flip.TwoTriangleSquareRejected
+[       OK ] MeshTopology_Flip.TwoTriangleSquareRejected (0 ms)
+[ RUN      ] MeshTopology_Flip.BoundaryEdgeReject
+[       OK ] MeshTopology_Flip.BoundaryEdgeReject (0 ms)
+[----------] 4 tests from MeshTopology_Flip (3 ms total)
+
+[----------] 3 tests from MeshTopology_Split
+[ RUN      ] MeshTopology_Split.InteriorSplitCreatesCorrectCounts
+[       OK ] MeshTopology_Split.InteriorSplitCreatesCorrectCounts (0 ms)
+[ RUN      ] MeshTopology_Split.BoundarySplitCreatesCorrectCounts
+[       OK ] MeshTopology_Split.BoundarySplitCreatesCorrectCounts (1 ms)
+[ RUN      ] MeshTopology_Split.NewVertexAtCorrectPosition
+[       OK ] MeshTopology_Split.NewVertexAtCorrectPosition (1 ms)
+[----------] 3 tests from MeshTopology_Split (2 ms total)
+
+[----------] 4 tests from MeshTopology_Collapse
+[ RUN      ] MeshTopology_Collapse.CollapseReducesCounts
+[       OK ] MeshTopology_Collapse.CollapseReducesCounts (1 ms)
+[ RUN      ] MeshTopology_Collapse.SingleCollapsePreservesNextCycles
+[       OK ] MeshTopology_Collapse.SingleCollapsePreservesNextCycles (1 ms)
+[ RUN      ] MeshTopology_Collapse.SurvivingVertexAtCorrectPosition
+[       OK ] MeshTopology_Collapse.SurvivingVertexAtCorrectPosition (1 ms)
+[ RUN      ] MeshTopology_Collapse.DirectedHalfedgeCollapsePreservesToVertexWhileLegacyEdgeCollapseKeepsHistoricalSurvivor
+[       OK ] MeshTopology_Collapse.DirectedHalfedgeCollapsePreservesToVertexWhileLegacyEdgeCollapseKeepsHistoricalSurvivor (2 ms)
+[----------] 4 tests from MeshTopology_Collapse (7 ms total)
+
+[----------] 14 tests from Simplification_QEM
+[ RUN      ] Simplification_QEM.ReducesFaceCount
+[       OK ] Simplification_QEM.ReducesFaceCount (16 ms)
+[ RUN      ] Simplification_QEM.RespectsTargetFaceCount
+[       OK ] Simplification_QEM.RespectsTargetFaceCount (15 ms)
+[ RUN      ] Simplification_QEM.TooFewFacesReturnsNullopt
+[       OK ] Simplification_QEM.TooFewFacesReturnsNullopt (1 ms)
+[ RUN      ] Simplification_QEM.ErrorThresholdStopsEarly
+[       OK ] Simplification_QEM.ErrorThresholdStopsEarly (8 ms)
+[ RUN      ] Simplification_QEM.PreservedMeshIsValid
+[       OK ] Simplification_QEM.PreservedMeshIsValid (16 ms)
+[ RUN      ] Simplification_QEM.GarbageCollectionKeepsFaceHalfedgesValidAfterDenseSimplification
+[       OK ] Simplification_QEM.GarbageCollectionKeepsFaceHalfedgesValidAfterDenseSimplification (1583 ms)
+[ RUN      ] Simplification_QEM.DenseClosedMeshStaysClosed
+[       OK ] Simplification_QEM.DenseClosedMeshStaysClosed (1588 ms)
+[ RUN      ] Simplification_QEM.HausdorffErrorConstraintSmallMeshSentinel
+[       OK ] Simplification_QEM.HausdorffErrorConstraintSmallMeshSentinel (138 ms)
+[ RUN      ] Simplification_QEM.RepeatedWorkflowSmallMeshSentinel
+[       OK ] Simplification_QEM.RepeatedWorkflowSmallMeshSentinel (20 ms)
+[ RUN      ] Simplification_QEM.ConfigurableQuadricsSmallMeshSentinel
+[       OK ] Simplification_QEM.ConfigurableQuadricsSmallMeshSentinel (21 ms)
+[ RUN      ] Simplification_QEM.ProbabilisticQuadricsSmallMeshSentinel
+[       OK ] Simplification_QEM.ProbabilisticQuadricsSmallMeshSentinel (59 ms)
+[ RUN      ] Simplification_QEM.MissingCovariancePropertiesFallBackToZeroCovariance
+[       OK ] Simplification_QEM.MissingCovariancePropertiesFallBackToZeroCovariance (1401 ms)
+[ RUN      ] Simplification_QEM.OpenBoundaryPatchKeepsDiskTopology
+[       OK ] Simplification_QEM.OpenBoundaryPatchKeepsDiskTopology (3 ms)
+[ RUN      ] Simplification_QEM.PreserveBoundaryPreventsCollapsesOnOpenPatch
+[       OK ] Simplification_QEM.PreserveBoundaryPreventsCollapsesOnOpenPatch (2 ms)
+[----------] 14 tests from Simplification_QEM (4879 ms total)
+
+[----------] 3 tests from MeshRepair_BoundaryDetection
+[ RUN      ] MeshRepair_BoundaryDetection.ClosedMeshHasNoBoundary
+[       OK ] MeshRepair_BoundaryDetection.ClosedMeshHasNoBoundary (1 ms)
+[ RUN      ] MeshRepair_BoundaryDetection.OpenMeshHasBoundary
+[       OK ] MeshRepair_BoundaryDetection.OpenMeshHasBoundary (1 ms)
+[ RUN      ] MeshRepair_BoundaryDetection.TwoTriangleSquareHasBoundary
+[       OK ] MeshRepair_BoundaryDetection.TwoTriangleSquareHasBoundary (1 ms)
+[----------] 3 tests from MeshRepair_BoundaryDetection (3 ms total)
+
+[----------] 3 tests from MeshRepair_HoleFilling
+[ RUN      ] MeshRepair_HoleFilling.FillsTriangularHole
+[       OK ] MeshRepair_HoleFilling.FillsTriangularHole (1 ms)
+[ RUN      ] MeshRepair_HoleFilling.EmptyMeshReturnsNullopt
+[       OK ] MeshRepair_HoleFilling.EmptyMeshReturnsNullopt (0 ms)
+[ RUN      ] MeshRepair_HoleFilling.ClosedMeshReportsZeroHoles
+[       OK ] MeshRepair_HoleFilling.ClosedMeshReportsZeroHoles (1 ms)
+[----------] 3 tests from MeshRepair_HoleFilling (3 ms total)
+
+[----------] 3 tests from MeshRepair_DegenerateFaces
+[ RUN      ] MeshRepair_DegenerateFaces.DetectsZeroAreaTriangle
+[       OK ] MeshRepair_DegenerateFaces.DetectsZeroAreaTriangle (1 ms)
+[ RUN      ] MeshRepair_DegenerateFaces.PreservesValidTriangles
+[       OK ] MeshRepair_DegenerateFaces.PreservesValidTriangles (1 ms)
+[ RUN      ] MeshRepair_DegenerateFaces.EmptyMeshReturnsNullopt
+[       OK ] MeshRepair_DegenerateFaces.EmptyMeshReturnsNullopt (0 ms)
+[----------] 3 tests from MeshRepair_DegenerateFaces (2 ms total)
+
+[----------] 3 tests from MeshRepair_Orientation
+[ RUN      ] MeshRepair_Orientation.ClosedMeshIsConsistent
+[       OK ] MeshRepair_Orientation.ClosedMeshIsConsistent (1 ms)
+[ RUN      ] MeshRepair_Orientation.EmptyMeshReturnsNullopt
+[       OK ] MeshRepair_Orientation.EmptyMeshReturnsNullopt (0 ms)
+[ RUN      ] MeshRepair_Orientation.IcosahedronSingleComponent
+[       OK ] MeshRepair_Orientation.IcosahedronSingleComponent (1 ms)
+[----------] 3 tests from MeshRepair_Orientation (3 ms total)
+
+[----------] 3 tests from MeshRepair_Combined
+[ RUN      ] MeshRepair_Combined.RepairValidMesh
+[       OK ] MeshRepair_Combined.RepairValidMesh (0 ms)
+[ RUN      ] MeshRepair_Combined.RepairWithDegenerates
+[       OK ] MeshRepair_Combined.RepairWithDegenerates (0 ms)
+[ RUN      ] MeshRepair_Combined.EmptyMeshReturnsNullopt
+[       OK ] MeshRepair_Combined.EmptyMeshReturnsNullopt (0 ms)
+[----------] 3 tests from MeshRepair_Combined (2 ms total)
+
+[----------] 3 tests from MeshConversion
+[ RUN      ] MeshConversion.ConvertsValidSoupToHalfedgeMeshWithFailureDiagnostics
+[       OK ] MeshConversion.ConvertsValidSoupToHalfedgeMeshWithFailureDiagnostics (2 ms)
+[ RUN      ] MeshConversion.ConvertsHalfedgeMeshToIndexedSoupAndBack
+[       OK ] MeshConversion.ConvertsHalfedgeMeshToIndexedSoupAndBack (1 ms)
+[ RUN      ] MeshConversion.ConvertedHalfedgeMeshOutlivesSourceViaMoveOwnershipTransfer
+[       OK ] MeshConversion.ConvertedHalfedgeMeshOutlivesSourceViaMoveOwnershipTransfer (1 ms)
+[----------] 3 tests from MeshConversion (5 ms total)
+
+[----------] 12 tests from MeshSoup
+[ RUN      ] MeshSoup.EmptyInputIsValid
+[       OK ] MeshSoup.EmptyInputIsValid (0 ms)
+[ RUN      ] MeshSoup.ValidTriangleSoupAndBorrowedViewAreAccepted
+[       OK ] MeshSoup.ValidTriangleSoupAndBorrowedViewAreAccepted (0 ms)
+[ RUN      ] MeshSoup.PolygonSoupIsAccepted
+[       OK ] MeshSoup.PolygonSoupIsAccepted (0 ms)
+[ RUN      ] MeshSoup.DuplicateVerticesAreWarnings
+[       OK ] MeshSoup.DuplicateVerticesAreWarnings (0 ms)
+[ RUN      ] MeshSoup.DuplicateVerticesTreatSignedZeroAsEqual
+[       OK ] MeshSoup.DuplicateVerticesTreatSignedZeroAsEqual (0 ms)
+[ RUN      ] MeshSoup.InvalidIndicesAreErrors
+[       OK ] MeshSoup.InvalidIndicesAreErrors (0 ms)
+[ RUN      ] MeshSoup.DegenerateFacesAreErrors
+[       OK ] MeshSoup.DegenerateFacesAreErrors (0 ms)
+[ RUN      ] MeshSoup.NonManifoldEdgesAreErrors
+[       OK ] MeshSoup.NonManifoldEdgesAreErrors (0 ms)
+[ RUN      ] MeshSoup.InconsistentWindingIsReportedForSameDirectedSharedEdge
+[       OK ] MeshSoup.InconsistentWindingIsReportedForSameDirectedSharedEdge (0 ms)
+[ RUN      ] MeshSoup.PropertySetsStoreVertexFaceAndCornerDomains
+[       OK ] MeshSoup.PropertySetsStoreVertexFaceAndCornerDomains (0 ms)
+[ RUN      ] MeshSoup.CopyAndMoveRebindBuiltInPropertyHandles
+[       OK ] MeshSoup.CopyAndMoveRebindBuiltInPropertyHandles (0 ms)
+[ RUN      ] MeshSoup.AttributeArityMismatchesUsePropertySetDomainCardinality
+[       OK ] MeshSoup.AttributeArityMismatchesUsePropertySetDomainCardinality (0 ms)
+[----------] 12 tests from MeshSoup (6 ms total)
+
+[----------] 11 tests from PointCloudConversion
+[ RUN      ] PointCloudConversion.EmptyCloudRoundTripsThroughSoup
+[       OK ] PointCloudConversion.EmptyCloudRoundTripsThroughSoup (0 ms)
+[ RUN      ] PointCloudConversion.CloudPositionsRoundTripPreservesOrder
+[       OK ] PointCloudConversion.CloudPositionsRoundTripPreservesOrder (0 ms)
+[ RUN      ] PointCloudConversion.ConvertedCloudOutlivesAndDecouplesFromSource
+[       OK ] PointCloudConversion.ConvertedCloudOutlivesAndDecouplesFromSource (1 ms)
+[ RUN      ] PointCloudConversion.DeletedPointsAreOmittedWithDiagnostic
+[       OK ] PointCloudConversion.DeletedPointsAreOmittedWithDiagnostic (0 ms)
+[ RUN      ] PointCloudConversion.SoupFacesAreDroppedWithDiagnostic
+[       OK ] PointCloudConversion.SoupFacesAreDroppedWithDiagnostic (0 ms)
+[ RUN      ] PointCloudConversion.CloudWithBuiltInAttributesEmitsRemapWarnings
+[       OK ] PointCloudConversion.CloudWithBuiltInAttributesEmitsRemapWarnings (0 ms)
+[ RUN      ] PointCloudConversion.CloudWithUserPropertyEmitsRemapWarning
+[       OK ] PointCloudConversion.CloudWithUserPropertyEmitsRemapWarning (0 ms)
+[ RUN      ] PointCloudConversion.InvalidSoupIndexHaltsToPointCloud
+[       OK ] PointCloudConversion.InvalidSoupIndexHaltsToPointCloud (0 ms)
+[ RUN      ] PointCloudConversion.BorrowedViewWithFacePropertiesEmitsRemapWarning
+[       OK ] PointCloudConversion.BorrowedViewWithFacePropertiesEmitsRemapWarning (0 ms)
+[ RUN      ] PointCloudConversion.SubmeshViewHonorsOffsetAndSize
+[       OK ] PointCloudConversion.SubmeshViewHonorsOffsetAndSize (0 ms)
+[ RUN      ] PointCloudConversion.SubmeshViewSkipsDeletedInRangeAndIgnoresDeletedOutsideRange
+[       OK ] PointCloudConversion.SubmeshViewSkipsDeletedInRangeAndIgnoresDeletedOutsideRange (0 ms)
+[----------] 11 tests from PointCloudConversion (7 ms total)
+
+[----------] 10 tests from MeshBuilder
+[ RUN      ] MeshBuilder.AABBProducesQuadBox
+[       OK ] MeshBuilder.AABBProducesQuadBox (1 ms)
+[ RUN      ] MeshBuilder.DegenerateAABBReturnsNullopt
+[       OK ] MeshBuilder.DegenerateAABBReturnsNullopt (0 ms)
+[ RUN      ] MeshBuilder.OBBProducesQuadBox
+[       OK ] MeshBuilder.OBBProducesQuadBox (1 ms)
+[ RUN      ] MeshBuilder.SphereSubdivisionZeroMatchesIcosahedronCounts
+[       OK ] MeshBuilder.SphereSubdivisionZeroMatchesIcosahedronCounts (1 ms)
+[ RUN      ] MeshBuilder.DegenerateSphereReturnsNullopt
+[       OK ] MeshBuilder.DegenerateSphereReturnsNullopt (0 ms)
+[ RUN      ] MeshBuilder.CylinderProducesClosedMesh
+[       OK ] MeshBuilder.CylinderProducesClosedMesh (2 ms)
+[ RUN      ] MeshBuilder.CapsuleZeroAxisFallsBackToSphere
+[       OK ] MeshBuilder.CapsuleZeroAxisFallsBackToSphere (52 ms)
+[ RUN      ] MeshBuilder.CapsuleProducesClosedMesh
+[       OK ] MeshBuilder.CapsuleProducesClosedMesh (13 ms)
+[ RUN      ] MeshBuilder.EllipsoidProducesFiniteTransformedSphere
+[       OK ] MeshBuilder.EllipsoidProducesFiniteTransformedSphere (66 ms)
+[ RUN      ] MeshBuilder.PlatonicSolidCounts
+[       OK ] MeshBuilder.PlatonicSolidCounts (9 ms)
+[----------] 10 tests from MeshBuilder (150 ms total)
+
+[----------] 5 tests from CG_Solver
+[ RUN      ] CG_Solver.SolvesIdentitySystem
+[       OK ] CG_Solver.SolvesIdentitySystem (0 ms)
+[ RUN      ] CG_Solver.SolvesDiagonalSystem
+[       OK ] CG_Solver.SolvesDiagonalSystem (0 ms)
+[ RUN      ] CG_Solver.SolvesSPDTridiagonal
+[       OK ] CG_Solver.SolvesSPDTridiagonal (0 ms)
+[ RUN      ] CG_Solver.SolvesLaplacianSystem
+[       OK ] CG_Solver.SolvesLaplacianSystem (2 ms)
+[ RUN      ] CG_Solver.ShiftedSolverConverges
+[       OK ] CG_Solver.ShiftedSolverConverges (4 ms)
+[----------] 5 tests from CG_Solver (7 ms total)
+
+[----------] 7 tests from Remeshing_Isotropic
+[ RUN      ] Remeshing_Isotropic.ReducesEdgeLengthVariance
+[       OK ] Remeshing_Isotropic.ReducesEdgeLengthVariance (4 ms)
+[ RUN      ] Remeshing_Isotropic.PerformsSplitsAndCollapses
+[       OK ] Remeshing_Isotropic.PerformsSplitsAndCollapses (4 ms)
+[ RUN      ] Remeshing_Isotropic.ShorterTargetIncreasesVertexCount
+[       OK ] Remeshing_Isotropic.ShorterTargetIncreasesVertexCount (3 ms)
+[ RUN      ] Remeshing_Isotropic.PreservesBoundaryVertices
+[       OK ] Remeshing_Isotropic.PreservesBoundaryVertices (1 ms)
+[ RUN      ] Remeshing_Isotropic.MaintainsValidMesh
+[       OK ] Remeshing_Isotropic.MaintainsValidMesh (3 ms)
+[ RUN      ] Remeshing_Isotropic.TooFewFacesReturnsNullopt
+[       OK ] Remeshing_Isotropic.TooFewFacesReturnsNullopt (1 ms)
+[ RUN      ] Remeshing_Isotropic.EmptyMeshReturnsNullopt
+[       OK ] Remeshing_Isotropic.EmptyMeshReturnsNullopt (0 ms)
+[----------] 7 tests from Remeshing_Isotropic (19 ms total)
+
+[----------] 5 tests from MeshUtils_CotanLaplacian
+[ RUN      ] MeshUtils_CotanLaplacian.EmptyMeshReturnsEmptyVector
+[       OK ] MeshUtils_CotanLaplacian.EmptyMeshReturnsEmptyVector (0 ms)
+[ RUN      ] MeshUtils_CotanLaplacian.SingleTriangleNonZero
+[       OK ] MeshUtils_CotanLaplacian.SingleTriangleNonZero (0 ms)
+[ RUN      ] MeshUtils_CotanLaplacian.EquilateralTriangleSymmetry
+[       OK ] MeshUtils_CotanLaplacian.EquilateralTriangleSymmetry (0 ms)
+[ RUN      ] MeshUtils_CotanLaplacian.ClampedWeightsNonNegative
+[       OK ] MeshUtils_CotanLaplacian.ClampedWeightsNonNegative (1 ms)
+[ RUN      ] MeshUtils_CotanLaplacian.ClosedMeshLaplacianSumsToZero
+[       OK ] MeshUtils_CotanLaplacian.ClosedMeshLaplacianSumsToZero (1 ms)
+[----------] 5 tests from MeshUtils_CotanLaplacian (5 ms total)
+
+[----------] 1 test from MeshUtils_EdgeCotanWeight
+[ RUN      ] MeshUtils_EdgeCotanWeight.EquilateralTriangleBoundaryWeight
+[       OK ] MeshUtils_EdgeCotanWeight.EquilateralTriangleBoundaryWeight (1 ms)
+[----------] 1 test from MeshUtils_EdgeCotanWeight (1 ms total)
+
+[----------] 3 tests from MeshUtils_OneRingCentroid
+[ RUN      ] MeshUtils_OneRingCentroid.IsolatedVertexReturnsSelf
+[       OK ] MeshUtils_OneRingCentroid.IsolatedVertexReturnsSelf (0 ms)
+[ RUN      ] MeshUtils_OneRingCentroid.EquilateralTriangleCentroids
+[       OK ] MeshUtils_OneRingCentroid.EquilateralTriangleCentroids (1 ms)
+[ RUN      ] MeshUtils_OneRingCentroid.RegularTetrahedronSymmetry
+[       OK ] MeshUtils_OneRingCentroid.RegularTetrahedronSymmetry (1 ms)
+[----------] 3 tests from MeshUtils_OneRingCentroid (3 ms total)
+
+[----------] 15 tests from EdgeLoop
+[ RUN      ] EdgeLoop.InvalidEdgeReturnsEmpty
+[       OK ] EdgeLoop.InvalidEdgeReturnsEmpty (1 ms)
+[ RUN      ] EdgeLoop.SingleTriangleProducesPath
+[       OK ] EdgeLoop.SingleTriangleProducesPath (1 ms)
+[ RUN      ] EdgeLoop.QuadStripVerticalEdgeSelectsColumn
+[       OK ] EdgeLoop.QuadStripVerticalEdgeSelectsColumn (1 ms)
+[ RUN      ] EdgeLoop.QuadStripHorizontalEdgeSelectsRow
+[       OK ] EdgeLoop.QuadStripHorizontalEdgeSelectsRow (1 ms)
+[ RUN      ] EdgeLoop.ClosedMeshNoDuplicatesOrOverflow
+[       OK ] EdgeLoop.ClosedMeshNoDuplicatesOrOverflow (14 ms)
+[ RUN      ] EdgeLoop.StrictQuadStopsAtNonQuadVertex
+[       OK ] EdgeLoop.StrictQuadStopsAtNonQuadVertex (2 ms)
+[ RUN      ] EdgeLoop.StrictQuadTraversesQuadStripInterior
+[       OK ] EdgeLoop.StrictQuadTraversesQuadStripInterior (1 ms)
+[ RUN      ] EdgeLoop.OddValenceVertexProducesDeterministicResult
+[       OK ] EdgeLoop.OddValenceVertexProducesDeterministicResult (4 ms)
+[ RUN      ] EdgeLoop.MixedTriQuadFanNoDuplicatesOrOverflow
+[       OK ] EdgeLoop.MixedTriQuadFanNoDuplicatesOrOverflow (6 ms)
+[ RUN      ] EdgeLoop.BoundaryMeshStopsAtBoundary
+[       OK ] EdgeLoop.BoundaryMeshStopsAtBoundary (1 ms)
+[ RUN      ] EdgeLoop.TwoTriangleDiamondBoundary
+[       OK ] EdgeLoop.TwoTriangleDiamondBoundary (2 ms)
+[ RUN      ] EdgeLoop.SubdividedTriangleValence6Interior
+[       OK ] EdgeLoop.SubdividedTriangleValence6Interior (3 ms)
+[ RUN      ] EdgeLoop.OrderingIsConsistentAcrossRuns
+[       OK ] EdgeLoop.OrderingIsConsistentAcrossRuns (4 ms)
+[ RUN      ] EdgeLoop.AlwaysContainsStartEdge
+[       OK ] EdgeLoop.AlwaysContainsStartEdge (2 ms)
+[ RUN      ] EdgeLoop.DegenerateZeroLengthEdgeDoesNotCrash
+[       OK ] EdgeLoop.DegenerateZeroLengthEdgeDoesNotCrash (0 ms)
+[----------] 15 tests from EdgeLoop (50 ms total)
+
+[----------] 12 tests from EdgeRing
+[ RUN      ] EdgeRing.InvalidEdgeReturnsEmpty
+[       OK ] EdgeRing.InvalidEdgeReturnsEmpty (1 ms)
+[ RUN      ] EdgeRing.SingleTriangleBoundaryStops
+[       OK ] EdgeRing.SingleTriangleBoundaryStops (1 ms)
+[ RUN      ] EdgeRing.QuadStripVerticalEdgeSelectsAllVerticalEdges
+[       OK ] EdgeRing.QuadStripVerticalEdgeSelectsAllVerticalEdges (1 ms)
+[ RUN      ] EdgeRing.QuadStripHorizontalEdgeCrossesStripHeight
+[       OK ] EdgeRing.QuadStripHorizontalEdgeCrossesStripHeight (1 ms)
+[ RUN      ] EdgeRing.TriangleStripProducesPath
+[       OK ] EdgeRing.TriangleStripProducesPath (2 ms)
+[ RUN      ] EdgeRing.ClosedMeshNoDuplicatesOrOverflow
+[       OK ] EdgeRing.ClosedMeshNoDuplicatesOrOverflow (10 ms)
+[ RUN      ] EdgeRing.StrictQuadStopsAtTriangleFace
+[       OK ] EdgeRing.StrictQuadStopsAtTriangleFace (2 ms)
+[ RUN      ] EdgeRing.StrictQuadTraversesQuadStrip
+[       OK ] EdgeRing.StrictQuadTraversesQuadStrip (1 ms)
+[ RUN      ] EdgeRing.MixedTriQuadFanNoDuplicatesOrOverflow
+[       OK ] EdgeRing.MixedTriQuadFanNoDuplicatesOrOverflow (3 ms)
+[ RUN      ] EdgeRing.BoundaryMeshStopsAtBoundary
+[       OK ] EdgeRing.BoundaryMeshStopsAtBoundary (1 ms)
+[ RUN      ] EdgeRing.OrderingIsConsistentAcrossRuns
+[       OK ] EdgeRing.OrderingIsConsistentAcrossRuns (2 ms)
+[ RUN      ] EdgeRing.AlwaysContainsStartEdge
+[       OK ] EdgeRing.AlwaysContainsStartEdge (1 ms)
+[----------] 12 tests from EdgeRing (32 ms total)
+
+[----------] 5 tests from AndersonAcceleration
+[ RUN      ] AndersonAcceleration.ContractionUsesFiniteSafeguardedMix
+[       OK ] AndersonAcceleration.ContractionUsesFiniteSafeguardedMix (0 ms)
+[ RUN      ] AndersonAcceleration.DimensionChangesResetPrivateHistory
+[       OK ] AndersonAcceleration.DimensionChangesResetPrivateHistory (0 ms)
+[ RUN      ] AndersonAcceleration.ExtremeFiniteInputsFailClosedWithoutHistoryMutation
+[       OK ] AndersonAcceleration.ExtremeFiniteInputsFailClosedWithoutHistoryMutation (0 ms)
+[ RUN      ] AndersonAcceleration.SafeguardAndSingularMixFallBackToPlainStep
+[       OK ] AndersonAcceleration.SafeguardAndSingularMixFallBackToPlainStep (0 ms)
+[ RUN      ] AndersonAcceleration.ZeroDampingPublishesThePlainMappedValue
+[       OK ] AndersonAcceleration.ZeroDampingPublishesThePlainMappedValue (0 ms)
+[----------] 5 tests from AndersonAcceleration (2 ms total)
+
+[----------] 8 tests from GaussianMixture
+[ RUN      ] GaussianMixture.KMeansPlusPlusInitializationIsSeedDeterministic
+[       OK ] GaussianMixture.KMeansPlusPlusInitializationIsSeedDeterministic (0 ms)
+[ RUN      ] GaussianMixture.IdentityLogPdfAndSeededSampleAreDeterministic
+[       OK ] GaussianMixture.IdentityLogPdfAndSeededSampleAreDeterministic (0 ms)
+[ RUN      ] GaussianMixture.CovarianceSymmetryCheckIsScaleAware
+[       OK ] GaussianMixture.CovarianceSymmetryCheckIsScaleAware (0 ms)
+[ RUN      ] GaussianMixture.RecoversSeparatedComponentsAndMonotonicLikelihood
+[       OK ] GaussianMixture.RecoversSeparatedComponentsAndMonotonicLikelihood (9 ms)
+[ RUN      ] GaussianMixture.RecoversThreeSeparatedComponents
+[       OK ] GaussianMixture.RecoversThreeSeparatedComponents (8 ms)
+[ RUN      ] GaussianMixture.AndersonMatchesPlainEmWithoutMoreIterations
+[       OK ] GaussianMixture.AndersonMatchesPlainEmWithoutMoreIterations (551 ms)
+[ RUN      ] GaussianMixture.CoincidentPointsUseCovarianceFloorDeterministically
+[       OK ] GaussianMixture.CoincidentPointsUseCovarianceFloorDeterministically (1 ms)
+[ RUN      ] GaussianMixture.InvalidInputsFailClosed
+[       OK ] GaussianMixture.InvalidInputsFailClosed (0 ms)
+[----------] 8 tests from GaussianMixture (572 ms total)
+
+[----------] 15 tests from CurvatureSegmentation
+[ RUN      ] CurvatureSegmentation.FixedCountFitsSignedPrincipalCurvatureGmm
+[       OK ] CurvatureSegmentation.FixedCountFitsSignedPrincipalCurvatureGmm (6 ms)
+[ RUN      ] CurvatureSegmentation.AutomaticModeSelectsSeparatedPopulations
+[       OK ] CurvatureSegmentation.AutomaticModeSelectsSeparatedPopulations (13 ms)
+[ RUN      ] CurvatureSegmentation.SignedFeaturesSeparatePlaneSphereCylinderAndSaddleRegimes
+[       OK ] CurvatureSegmentation.SignedFeaturesSeparatePlaneSphereCylinderAndSaddleRegimes (11 ms)
+[ RUN      ] CurvatureSegmentation.ReportsStageAndPerCandidateProfileTimingsWithoutChangingTheSolve
+[       OK ] CurvatureSegmentation.ReportsStageAndPerCandidateProfileTimingsWithoutChangingTheSolve (7 ms)
+[ RUN      ] CurvatureSegmentation.AutomaticModeReportsToleranceFallbackWhenNoCandidateQualifies
+[       OK ] CurvatureSegmentation.AutomaticModeReportsToleranceFallbackWhenNoCandidateQualifies (4 ms)
+[ RUN      ] CurvatureSegmentation.IncreasingSpatialWeightReducesSmoothEdgeDisagreement
+[       OK ] CurvatureSegmentation.IncreasingSpatialWeightReducesSmoothEdgeDisagreement (11 ms)
+[ RUN      ] CurvatureSegmentation.MinimumRegionCleanupDeterministicallyMergesTheSingleFaceOutlier
+[       OK ] CurvatureSegmentation.MinimumRegionCleanupDeterministicallyMergesTheSingleFaceOutlier (12 ms)
+[ RUN      ] CurvatureSegmentation.FeatureWeightPreservesFoldBoundary
+[       OK ] CurvatureSegmentation.FeatureWeightPreservesFoldBoundary (5 ms)
+[ RUN      ] CurvatureSegmentation.ConnectedRegionsAreContiguousAndDeterministic
+[       OK ] CurvatureSegmentation.ConnectedRegionsAreContiguousAndDeterministic (10 ms)
+[ RUN      ] CurvatureSegmentation.DisconnectedEqualCurvaturePatchesShareComponentButNotRegion
+[       OK ] CurvatureSegmentation.DisconnectedEqualCurvaturePatchesShareComponentButNotRegion (6 ms)
+[ RUN      ] CurvatureSegmentation.ComputeAndSegmentUsesExistingSignedCurvatureEstimator
+[       OK ] CurvatureSegmentation.ComputeAndSegmentUsesExistingSignedCurvatureEstimator (10 ms)
+[ RUN      ] CurvatureSegmentation.GlobalOrientationReversalPreservesPartition
+[       OK ] CurvatureSegmentation.GlobalOrientationReversalPreservesPartition (11 ms)
+[ RUN      ] CurvatureSegmentation.FailsClosedOnInvalidInputs
+[       OK ] CurvatureSegmentation.FailsClosedOnInvalidInputs (3 ms)
+[ RUN      ] CurvatureSegmentation.DeletedSlotsAndOpenMeshBoundaryEdgesRemainUnpublished
+[       OK ] CurvatureSegmentation.DeletedSlotsAndOpenMeshBoundaryEdgesRemainUnpublished (2 ms)
+[ RUN      ] CurvatureSegmentation.RejectsPolygonAndDegenerateFaces
+[       OK ] CurvatureSegmentation.RejectsPolygonAndDegenerateFaces (2 ms)
+[----------] 15 tests from CurvatureSegmentation (121 ms total)
+
+[----------] 19 tests from CurvaturePatchContract
+[ RUN      ] CurvaturePatchContract.GeneratedOracleCatalogHasValidEvidenceAndPartitionTopology
+[       OK ] CurvaturePatchContract.GeneratedOracleCatalogHasValidEvidenceAndPartitionTopology (357 ms)
+[ RUN      ] CurvaturePatchContract.PatchReferenceMatchesSuppliedFeatureOracleCatalog
+[       OK ] CurvaturePatchContract.PatchReferenceMatchesSuppliedFeatureOracleCatalog (4060 ms)
+[ RUN      ] CurvaturePatchContract.PatchGrowthIsDeterministicAndSeedFrontsHaveNoAuthority
+[       OK ] CurvaturePatchContract.PatchGrowthIsDeterministicAndSeedFrontsHaveNoAuthority (185 ms)
+[ RUN      ] CurvaturePatchContract.PatchHardBarriersRemainDistinctFromGrowthThroughPublication
+[       OK ] CurvaturePatchContract.PatchHardBarriersRemainDistinctFromGrowthThroughPublication (203 ms)
+[ RUN      ] CurvaturePatchContract.PatchCurvatureClosureSurvivesWithoutFeatureEvidence
+[       OK ] CurvaturePatchContract.PatchCurvatureClosureSurvivesWithoutFeatureEvidence (250 ms)
+[ RUN      ] CurvaturePatchContract.PatchCompletionReplaysWithDetectedFeatureEvidence
+[       OK ] CurvaturePatchContract.PatchCompletionReplaysWithDetectedFeatureEvidence (24683 ms)
+[ RUN      ] CurvaturePatchContract.SuppliedOracleIsolatesPatchCompletionFromCorruptedDetectorEvidence
+[       OK ] CurvaturePatchContract.SuppliedOracleIsolatesPatchCompletionFromCorruptedDetectorEvidence (350 ms)
+[ RUN      ] CurvaturePatchContract.DetectedHardFoldBlocksWhileDetectedHomogeneousControlsStayWhole
+[       OK ] CurvaturePatchContract.DetectedHardFoldBlocksWhileDetectedHomogeneousControlsStayWhole (913 ms)
+[ RUN      ] CurvaturePatchContract.PatchReferenceFailsClosedForMalformedProductionInputs
+[       OK ] CurvaturePatchContract.PatchReferenceFailsClosedForMalformedProductionInputs (80 ms)
+[ RUN      ] CurvaturePatchContract.PatchPartitionPassesFrozenDensityDiagonalScaleNoiseAndOrientationControls
+[       OK ] CurvaturePatchContract.PatchPartitionPassesFrozenDensityDiagonalScaleNoiseAndOrientationControls (2228 ms)
+[ RUN      ] CurvaturePatchContract.LocalRagOneStepSeedPerturbationRefutesFrozenStabilityGate
+[       OK ] CurvaturePatchContract.LocalRagOneStepSeedPerturbationRefutesFrozenStabilityGate (556 ms)
+[ RUN      ] CurvaturePatchContract.SharedStrictFoldClassifierMatchesOracle
+[       OK ] CurvaturePatchContract.SharedStrictFoldClassifierMatchesOracle (73 ms)
+[ RUN      ] CurvaturePatchContract.SuppliedEvidenceFailsClosedBeforePatchWork
+[       OK ] CurvaturePatchContract.SuppliedEvidenceFailsClosedBeforePatchWork (28 ms)
+[ RUN      ] CurvaturePatchContract.FeatureDetectorConsumesSharedHardFactsAndRejectsConstantSoftSignals
+[       OK ] CurvaturePatchContract.FeatureDetectorConsumesSharedHardFactsAndRejectsConstantSoftSignals (508 ms)
+[ RUN      ] CurvaturePatchContract.FeatureDetectorImplementsFrozenPerSignalScaleEquations
+[       OK ] CurvaturePatchContract.FeatureDetectorImplementsFrozenPerSignalScaleEquations (3 ms)
+[ RUN      ] CurvaturePatchContract.FeatureDetectorRecoversPersistentLinesEndpointsAndJunctions
+[       OK ] CurvaturePatchContract.FeatureDetectorRecoversPersistentLinesEndpointsAndJunctions (7199 ms)
+[ RUN      ] CurvaturePatchContract.FeatureDetectorSupportIsInvariantUnderGlobalOrientationReversal
+[       OK ] CurvaturePatchContract.FeatureDetectorSupportIsInvariantUnderGlobalOrientationReversal (3359 ms)
+[ RUN      ] CurvaturePatchContract.FeatureDetectorFailsClosedBeforeBoundedSearches
+[       OK ] CurvaturePatchContract.FeatureDetectorFailsClosedBeforeBoundedSearches (15 ms)
+[ RUN      ] CurvaturePatchContract.FeatureDetectorIsDeterministicAndComputePathOwnsItsResult
+[       OK ] CurvaturePatchContract.FeatureDetectorIsDeterministicAndComputePathOwnsItsResult (1426 ms)
+[----------] 19 tests from CurvaturePatchContract (46488 ms total)
+
+[----------] 16 tests from CurvatureBoundaryPartition
+[ RUN      ] CurvatureBoundaryPartition.StrongContourAndShortCompletionSeparateEqualCurvatureSurface
+[       OK ] CurvatureBoundaryPartition.StrongContourAndShortCompletionSeparateEqualCurvatureSurface (105 ms)
+[ RUN      ] CurvatureBoundaryPartition.HomogeneousSurfaceStaysWholeAndPreservesTopology
+[       OK ] CurvatureBoundaryPartition.HomogeneousSurfaceStaysWholeAndPreservesTopology (22 ms)
+[ RUN      ] CurvatureBoundaryPartition.UniformScalePreservesPartitionAndObjective
+[       OK ] CurvatureBoundaryPartition.UniformScalePreservesPartitionAndObjective (52 ms)
+[ RUN      ] CurvatureBoundaryPartition.InvalidEvidenceAndBudgetFailClosed
+[       OK ] CurvatureBoundaryPartition.InvalidEvidenceAndBudgetFailClosed (13 ms)
+[ RUN      ] CurvatureBoundaryPartition.RegionalFieldScalesAndFailsClosed
+[       OK ] CurvatureBoundaryPartition.RegionalFieldScalesAndFailsClosed (43 ms)
+[ RUN      ] CurvatureBoundaryPartition.FlowLimitReturnsNoPartialPartition
+[       OK ] CurvatureBoundaryPartition.FlowLimitReturnsNoPartialPartition (28 ms)
+[ RUN      ] CurvatureBoundaryPartition.SurfacePreflightFailsClosedWithoutChangingInput
+[       OK ] CurvatureBoundaryPartition.SurfacePreflightFailsClosedWithoutChangingInput (10 ms)
+[ RUN      ] CurvatureBoundaryPartition.ShortHardFactsDoNotSuppressAWholeSoftContour
+[       OK ] CurvatureBoundaryPartition.ShortHardFactsDoNotSuppressAWholeSoftContour (44 ms)
+[ RUN      ] CurvatureBoundaryPartition.OnlyQualifyingConnectedHardCurvesSeedAttenuation
+[       OK ] CurvatureBoundaryPartition.OnlyQualifyingConnectedHardCurvesSeedAttenuation (72 ms)
+[ RUN      ] CurvatureBoundaryPartition.InheritedSuppliedOracleCatalog
+[       OK ] CurvatureBoundaryPartition.InheritedSuppliedOracleCatalog (1444 ms)
+[ RUN      ] CurvatureBoundaryPartition.InheritedRegionalOracleCatalog
+[       OK ] CurvatureBoundaryPartition.InheritedRegionalOracleCatalog (1344 ms)
+[ RUN      ] CurvatureBoundaryPartition.RegionalCandidateRefutesFrozenUnmarkedClosureGate
+[       OK ] CurvatureBoundaryPartition.RegionalCandidateRefutesFrozenUnmarkedClosureGate (46 ms)
+[ RUN      ] CurvatureBoundaryPartition.RegionalComputedEvidenceCatalog
+[       OK ] CurvatureBoundaryPartition.RegionalComputedEvidenceCatalog (13172 ms)
+[ RUN      ] CurvatureBoundaryPartition.ContrastSuppliedOracleCatalog
+[       OK ] CurvatureBoundaryPartition.ContrastSuppliedOracleCatalog (1346 ms)
+[ RUN      ] CurvatureBoundaryPartition.AreaCleanupSuppliedOracleCatalog
+[       OK ] CurvatureBoundaryPartition.AreaCleanupSuppliedOracleCatalog (1421 ms)
+[ RUN      ] CurvatureBoundaryPartition.CleanupProfilesPreserveComputedFeatureContours
+[       OK ] CurvatureBoundaryPartition.CleanupProfilesPreserveComputedFeatureContours (23468 ms)
+[----------] 16 tests from CurvatureBoundaryPartition (42639 ms total)
+
+[----------] 12 tests from CurvatureBoundaryGraph
+[ RUN      ] CurvatureBoundaryGraph.ExactOracleMatchesIndependentAssignments
+[       OK ] CurvatureBoundaryGraph.ExactOracleMatchesIndependentAssignments (186 ms)
+[ RUN      ] CurvatureBoundaryGraph.HardCutCannotBeBypassedThroughPositivePath
+[       OK ] CurvatureBoundaryGraph.HardCutCannotBeBypassedThroughPositivePath (1 ms)
+[ RUN      ] CurvatureBoundaryGraph.WiderMovesRecoverAcrossPrematureContraction
+[       OK ] CurvatureBoundaryGraph.WiderMovesRecoverAcrossPrematureContraction (40 ms)
+[ RUN      ] CurvatureBoundaryGraph.HeuristicIsFeasibleDeterministicAndBoundedByOracle
+[       OK ] CurvatureBoundaryGraph.HeuristicIsFeasibleDeterministicAndBoundedByOracle (3841 ms)
+[ RUN      ] CurvatureBoundaryGraph.InvalidAndLimitedInputsReturnNoPartition
+[       OK ] CurvatureBoundaryGraph.InvalidAndLimitedInputsReturnNoPartition (0 ms)
+[ RUN      ] CurvatureBoundaryGraph.DisconnectedNodesPublishSeparateConnectedRegions
+[       OK ] CurvatureBoundaryGraph.DisconnectedNodesPublishSeparateConnectedRegions (0 ms)
+[ RUN      ] CurvatureBoundaryGraph.RegionalExactOracleMatchesIndependentModelFits
+[       OK ] CurvatureBoundaryGraph.RegionalExactOracleMatchesIndependentModelFits (151 ms)
+[ RUN      ] CurvatureBoundaryGraph.RegionCostCountsConnectedPieces
+[       OK ] CurvatureBoundaryGraph.RegionCostCountsConnectedPieces (1 ms)
+[ RUN      ] CurvatureBoundaryGraph.RegionalMergeRefreshesEverySurvivingNeighbor
+[       OK ] CurvatureBoundaryGraph.RegionalMergeRefreshesEverySurvivingNeighbor (19 ms)
+[ RUN      ] CurvatureBoundaryGraph.RegionalWeightOverflowFailsAndTinyWeightsRetainVariance
+[       OK ] CurvatureBoundaryGraph.RegionalWeightOverflowFailsAndTinyWeightsRetainVariance (0 ms)
+[ RUN      ] CurvatureBoundaryGraph.AreaCleanupReportsItsEnergyIncrease
+[       OK ] CurvatureBoundaryGraph.AreaCleanupReportsItsEnergyIncrease (0 ms)
+[ RUN      ] CurvatureBoundaryGraph.AreaCleanupNeverBypassesHardCutsAndRetainsIsolatedRegions
+[       OK ] CurvatureBoundaryGraph.AreaCleanupNeverBypassesHardCutsAndRetainsIsolatedRegions (1 ms)
+[----------] 12 tests from CurvatureBoundaryGraph (4246 ms total)
+
+[----------] 14 tests from SurfaceReconstruction
+[ RUN      ] SurfaceReconstruction.EmptyPointsReturnsNullopt
+[       OK ] SurfaceReconstruction.EmptyPointsReturnsNullopt (0 ms)
+[ RUN      ] SurfaceReconstruction.TooFewPointsReturnsNullopt
+[       OK ] SurfaceReconstruction.TooFewPointsReturnsNullopt (0 ms)
+[ RUN      ] SurfaceReconstruction.MismatchedNormalsReturnsNullopt
+[       OK ] SurfaceReconstruction.MismatchedNormalsReturnsNullopt (0 ms)
+[ RUN      ] SurfaceReconstruction.NoNormalsAndNoEstimationReturnsNullopt
+[       OK ] SurfaceReconstruction.NoNormalsAndNoEstimationReturnsNullopt (0 ms)
+[ RUN      ] SurfaceReconstruction.ZeroResolutionReturnsNullopt
+[       OK ] SurfaceReconstruction.ZeroResolutionReturnsNullopt (0 ms)
+[ RUN      ] SurfaceReconstruction.InvalidNormalsAreRejected
+[       OK ] SurfaceReconstruction.InvalidNormalsAreRejected (547 ms)
+[ RUN      ] SurfaceReconstruction.AllInvalidNormalsReturnNullopt
+[       OK ] SurfaceReconstruction.AllInvalidNormalsReturnNullopt (0 ms)
+[ RUN      ] SurfaceReconstruction.SphereWithProvidedNormals
+[       OK ] SurfaceReconstruction.SphereWithProvidedNormals (964 ms)
+[ RUN      ] SurfaceReconstruction.SphereWithEstimatedNormals
+[       OK ] SurfaceReconstruction.SphereWithEstimatedNormals (1066 ms)
+[ RUN      ] SurfaceReconstruction.SphereWithWeightedDistance
+[       OK ] SurfaceReconstruction.SphereWithWeightedDistance (2760 ms)
+[ RUN      ] SurfaceReconstruction.OutputMeshHasVerticesAndFaces
+[       OK ] SurfaceReconstruction.OutputMeshHasVerticesAndFaces (432 ms)
+[ RUN      ] SurfaceReconstruction.HigherResolutionMoreDetail
+[       OK ] SurfaceReconstruction.HigherResolutionMoreDetail (2245 ms)
+[ RUN      ] SurfaceReconstruction.SphereReconstructionApproximatesRadius
+[       OK ] SurfaceReconstruction.SphereReconstructionApproximatesRadius (2387 ms)
+[ RUN      ] SurfaceReconstruction.AcceptsBorrowedSpanInput
+[       OK ] SurfaceReconstruction.AcceptsBorrowedSpanInput (28 ms)
+[----------] 14 tests from SurfaceReconstruction (10433 ms total)
+
+[----------] 10 tests from MeshQuality
+[ RUN      ] MeshQuality.EmptyMeshReturnsNullopt
+[       OK ] MeshQuality.EmptyMeshReturnsNullopt (0 ms)
+[ RUN      ] MeshQuality.EquilateralAngles60
+[       OK ] MeshQuality.EquilateralAngles60 (1 ms)
+[ RUN      ] MeshQuality.EquilateralAspectRatio1
+[       OK ] MeshQuality.EquilateralAspectRatio1 (1 ms)
+[ RUN      ] MeshQuality.TetrahedronClosed
+[       OK ] MeshQuality.TetrahedronClosed (1 ms)
+[ RUN      ] MeshQuality.TetrahedronVolume
+[       OK ] MeshQuality.TetrahedronVolume (1 ms)
+[ RUN      ] MeshQuality.SingleTriangleNotClosed
+[       OK ] MeshQuality.SingleTriangleNotClosed (1 ms)
+[ RUN      ] MeshQuality.EulerCharacteristic
+[       OK ] MeshQuality.EulerCharacteristic (2 ms)
+[ RUN      ] MeshQuality.IcosahedronUniformValence5
+[       OK ] MeshQuality.IcosahedronUniformValence5 (1 ms)
+[ RUN      ] MeshQuality.EdgeLengthStats
+[       OK ] MeshQuality.EdgeLengthStats (0 ms)
+[ RUN      ] MeshQuality.BoundaryLoopCount
+[       OK ] MeshQuality.BoundaryLoopCount (1 ms)
+[----------] 10 tests from MeshQuality (12 ms total)
+
+[----------] 5 tests from MeshAnalysis
+[ RUN      ] MeshAnalysis.EmptyMeshReturnsNullopt
+[       OK ] MeshAnalysis.EmptyMeshReturnsNullopt (0 ms)
+[ RUN      ] MeshAnalysis.TetrahedronHasNoProblems
+[       OK ] MeshAnalysis.TetrahedronHasNoProblems (1 ms)
+[ RUN      ] MeshAnalysis.SingleTriangleMarksBoundaryRegion
+[       OK ] MeshAnalysis.SingleTriangleMarksBoundaryRegion (1 ms)
+[ RUN      ] MeshAnalysis.DegenerateTriangleIsDetected
+[       OK ] MeshAnalysis.DegenerateTriangleIsDetected (1 ms)
+[ RUN      ] MeshAnalysis.SingleQuadFlagsNonTriangleFace
+[       OK ] MeshAnalysis.SingleQuadFlagsNonTriangleFace (1 ms)
+[----------] 5 tests from MeshAnalysis (8 ms total)
+
+[----------] 8 tests from LSCM
+[ RUN      ] LSCM.EmptyMeshReturnsNullopt
+[       OK ] LSCM.EmptyMeshReturnsNullopt (0 ms)
+[ RUN      ] LSCM.ClosedMeshReturnsNullopt
+[       OK ] LSCM.ClosedMeshReturnsNullopt (0 ms)
+[ RUN      ] LSCM.DiskTopologyProducesUVs
+[       OK ] LSCM.DiskTopologyProducesUVs (1 ms)
+[ RUN      ] LSCM.PinnedVerticesHaveCorrectUVs
+[       OK ] LSCM.PinnedVerticesHaveCorrectUVs (2 ms)
+[ RUN      ] LSCM.NoFlippedTrianglesOnConvexDisk
+[       OK ] LSCM.NoFlippedTrianglesOnConvexDisk (2 ms)
+[ RUN      ] LSCM.FlatDiskDistortionNearOne
+[       OK ] LSCM.FlatDiskDistortionNearOne (2 ms)
+[ RUN      ] LSCM.UVAreaPositive
+[       OK ] LSCM.UVAreaPositive (2 ms)
+[ RUN      ] LSCM.SingleTriangleDiskTopology
+[       OK ] LSCM.SingleTriangleDiskTopology (1 ms)
+[----------] 8 tests from LSCM (14 ms total)
+
+[----------] 10 tests from ParameterizationDiagnostics
+[ RUN      ] ParameterizationDiagnostics.IdentityTriangleHasZeroNormalizedError
+[       OK ] ParameterizationDiagnostics.IdentityTriangleHasZeroNormalizedError (0 ms)
+[ RUN      ] ParameterizationDiagnostics.IdentitySquareReportsBoundaryMetrics
+[       OK ] ParameterizationDiagnostics.IdentitySquareReportsBoundaryMetrics (0 ms)
+[ RUN      ] ParameterizationDiagnostics.StretchedRectangleHasPredictableDistortion
+[       OK ] ParameterizationDiagnostics.StretchedRectangleHasPredictableDistortion (0 ms)
+[ RUN      ] ParameterizationDiagnostics.FlippedUvReportsElementWithoutFailing
+[       OK ] ParameterizationDiagnostics.FlippedUvReportsElementWithoutFailing (0 ms)
+[ RUN      ] ParameterizationDiagnostics.DegeneratePositionTriangleIsSkipped
+[       OK ] ParameterizationDiagnostics.DegeneratePositionTriangleIsSkipped (0 ms)
+[ RUN      ] ParameterizationDiagnostics.DegenerateUvTriangleIsSkipped
+[       OK ] ParameterizationDiagnostics.DegenerateUvTriangleIsSkipped (1 ms)
+[ RUN      ] ParameterizationDiagnostics.DeletedFaceKeepsStorageAlignedNanSentinel
+[       OK ] ParameterizationDiagnostics.DeletedFaceKeepsStorageAlignedNanSentinel (1 ms)
+[ RUN      ] ParameterizationDiagnostics.NonTriangleFaceIsReported
+[       OK ] ParameterizationDiagnostics.NonTriangleFaceIsReported (1 ms)
+[ RUN      ] ParameterizationDiagnostics.MissingUvsFailBeforeEvaluation
+[       OK ] ParameterizationDiagnostics.MissingUvsFailBeforeEvaluation (0 ms)
+[ RUN      ] ParameterizationDiagnostics.NonFiniteUvsAreReported
+[       OK ] ParameterizationDiagnostics.NonFiniteUvsAreReported (1 ms)
+[----------] 10 tests from ParameterizationDiagnostics (9 ms total)
+
+[----------] 15 tests from HarmonicParameterization
+[ RUN      ] HarmonicParameterization.SquareFanCenterAtHarmonicAverage
+[       OK ] HarmonicParameterization.SquareFanCenterAtHarmonicAverage (3 ms)
+[ RUN      ] HarmonicParameterization.CircleBoundaryIsOnCircleAndDeterministic
+[       OK ] HarmonicParameterization.CircleBoundaryIsOnCircleAndDeterministic (7 ms)
+[ RUN      ] HarmonicParameterization.SquareArcLengthBoundaryProducesValidEmbedding
+[       OK ] HarmonicParameterization.SquareArcLengthBoundaryProducesValidEmbedding (4 ms)
+[ RUN      ] HarmonicParameterization.TutteEmbeddingHasNoFlippedTriangles
+[       OK ] HarmonicParameterization.TutteEmbeddingHasNoFlippedTriangles (4 ms)
+[ RUN      ] HarmonicParameterization.ClosedMeshIsNotDiskTopology
+[       OK ] HarmonicParameterization.ClosedMeshIsNotDiskTopology (1 ms)
+[ RUN      ] HarmonicParameterization.MultipleBoundaryLoopsAreNotDiskTopology
+[       OK ] HarmonicParameterization.MultipleBoundaryLoopsAreNotDiskTopology (1 ms)
+[ RUN      ] HarmonicParameterization.PuncturedGenusOneMeshIsNotDiskTopology
+[       OK ] HarmonicParameterization.PuncturedGenusOneMeshIsNotDiskTopology (2 ms)
+[ RUN      ] HarmonicParameterization.FewerThanThreeVerticesAreReported
+[       OK ] HarmonicParameterization.FewerThanThreeVerticesAreReported (0 ms)
+[ RUN      ] HarmonicParameterization.NonTriangleMeshIsRejected
+[       OK ] HarmonicParameterization.NonTriangleMeshIsRejected (0 ms)
+[ RUN      ] HarmonicParameterization.MismatchedBoundaryArrayIsRejected
+[       OK ] HarmonicParameterization.MismatchedBoundaryArrayIsRejected (1 ms)
+[ RUN      ] HarmonicParameterization.DuplicatePinIsRejected
+[       OK ] HarmonicParameterization.DuplicatePinIsRejected (1 ms)
+[ RUN      ] HarmonicParameterization.DeletedPinIsRejected
+[       OK ] HarmonicParameterization.DeletedPinIsRejected (1 ms)
+[ RUN      ] HarmonicParameterization.NonFinitePinUvIsRejected
+[       OK ] HarmonicParameterization.NonFinitePinUvIsRejected (1 ms)
+[ RUN      ] HarmonicParameterization.CustomBoundaryNotFullyPinnedIsRejected
+[       OK ] HarmonicParameterization.CustomBoundaryNotFullyPinnedIsRejected (1 ms)
+[ RUN      ] HarmonicParameterization.LscmApiRemainsReachable
+[       OK ] HarmonicParameterization.LscmApiRemainsReachable (5 ms)
+[----------] 15 tests from HarmonicParameterization (40 ms total)
+
+[----------] 10 tests from ParameterizationOptimize
+[ RUN      ] ParameterizationOptimize.ReferencePreparationIsStorageAlignedAndFailClosed
+[       OK ] ParameterizationOptimize.ReferencePreparationIsStorageAlignedAndFailClosed (3 ms)
+[ RUN      ] ParameterizationOptimize.ProperRotationFitRecoversRotationAndScale
+[       OK ] ParameterizationOptimize.ProperRotationFitRecoversRotationAndScale (1 ms)
+[ RUN      ] ParameterizationOptimize.SymmetricDirichletMatchesReportingDiagnostics
+[       OK ] ParameterizationOptimize.SymmetricDirichletMatchesReportingDiagnostics (1 ms)
+[ RUN      ] ParameterizationOptimize.ReflectionUsesProperRotationButTripsBarrier
+[       OK ] ParameterizationOptimize.ReflectionUsesProperRotationButTripsBarrier (1 ms)
+[ RUN      ] ParameterizationOptimize.AnalyticDirichletGradientMatchesFiniteDifference
+[       OK ] ParameterizationOptimize.AnalyticDirichletGradientMatchesFiniteDifference (1 ms)
+[ RUN      ] ParameterizationOptimize.ProxySystemsArePsdAndMatchCurrentGradients
+[       OK ] ParameterizationOptimize.ProxySystemsArePsdAndMatchCurrentGradients (4 ms)
+[ RUN      ] ParameterizationOptimize.InjectiveSearchStopsInsideFirstFlipRoot
+[       OK ] ParameterizationOptimize.InjectiveSearchStopsInsideFirstFlipRoot (1 ms)
+[ RUN      ] ParameterizationOptimize.IdenticalInputsProduceBitwiseIdenticalOutputs
+[       OK ] ParameterizationOptimize.IdenticalInputsProduceBitwiseIdenticalOutputs (1 ms)
+[ RUN      ] ParameterizationOptimize.InvalidDynamicInputsReturnExplicitStatuses
+[       OK ] ParameterizationOptimize.InvalidDynamicInputsReturnExplicitStatuses (1 ms)
+[ RUN      ] ParameterizationOptimize.PublicRecordsAreRevalidatedBeforeIndexing
+[       OK ] ParameterizationOptimize.PublicRecordsAreRevalidatedBeforeIndexing (2 ms)
+[----------] 10 tests from ParameterizationOptimize (22 ms total)
+
+[----------] 7 tests from ParameterizationDispatch
+[ RUN      ] ParameterizationDispatch.LscmMatchesDirectSolverAndCarriesDiagnostics
+[       OK ] ParameterizationDispatch.LscmMatchesDirectSolverAndCarriesDiagnostics (3 ms)
+[ RUN      ] ParameterizationDispatch.HarmonicAndTutteMatchDirectSolver
+[       OK ] ParameterizationDispatch.HarmonicAndTutteMatchDirectSolver (4 ms)
+[ RUN      ] ParameterizationDispatch.InvalidInputsFailClosedThroughStatus
+[       OK ] ParameterizationDispatch.InvalidInputsFailClosedThroughStatus (5 ms)
+[ RUN      ] ParameterizationDispatch.RejectionCarriesConnectedComponentAndBoundaryLoopCounts
+[       OK ] ParameterizationDispatch.RejectionCarriesConnectedComponentAndBoundaryLoopCounts (7 ms)
+[ RUN      ] ParameterizationDispatch.UnusableDiagnosticsFailClosedWithoutUvs
+[       OK ] ParameterizationDispatch.UnusableDiagnosticsFailClosedWithoutUvs (1 ms)
+[ RUN      ] ParameterizationDispatch.LscmNonConvergenceIsSolverFailureWithoutUvs
+[       OK ] ParameterizationDispatch.LscmNonConvergenceIsSolverFailureWithoutUvs (3 ms)
+[ RUN      ] ParameterizationDispatch.RepeatedCallsAreDeterministic
+[       OK ] ParameterizationDispatch.RepeatedCallsAreDeterministic (5 ms)
+[----------] 7 tests from ParameterizationDispatch (31 ms total)
+
+[----------] 10 tests from BoundaryFirstFlattening
+[ RUN      ] BoundaryFirstFlattening.AutomaticPlanarDiskIsDeterministicAndConformal
+[       OK ] BoundaryFirstFlattening.AutomaticPlanarDiskIsDeterministicAndConformal (5 ms)
+[ RUN      ] BoundaryFirstFlattening.AutomaticCurvedDiskMeetsAbsoluteQualityBounds
+[       OK ] BoundaryFirstFlattening.AutomaticCurvedDiskMeetsAbsoluteQualityBounds (6 ms)
+[ RUN      ] BoundaryFirstFlattening.AutomaticModeIsInvariantToUniformInputScale
+[       OK ] BoundaryFirstFlattening.AutomaticModeIsInvariantToUniformInputScale (12 ms)
+[ RUN      ] BoundaryFirstFlattening.UniformTargetLengthsAreRealized
+[       OK ] BoundaryFirstFlattening.UniformTargetLengthsAreRealized (5 ms)
+[ RUN      ] BoundaryFirstFlattening.NonIntegrableLengthRequestReportsApproximation
+[       OK ] BoundaryFirstFlattening.NonIntegrableLengthRequestReportsApproximation (3 ms)
+[ RUN      ] BoundaryFirstFlattening.TargetAnglesPreserveSquareCorners
+[       OK ] BoundaryFirstFlattening.TargetAnglesPreserveSquareCorners (3 ms)
+[ RUN      ] BoundaryFirstFlattening.IrregularTriangleUsesPerEdgeClosureWeights
+[       OK ] BoundaryFirstFlattening.IrregularTriangleUsesPerEdgeClosureWeights (4 ms)
+[ RUN      ] BoundaryFirstFlattening.InvalidTopologyAndGeometryFailClosed
+[       OK ] BoundaryFirstFlattening.InvalidTopologyAndGeometryFailClosed (4 ms)
+[ RUN      ] BoundaryFirstFlattening.InvalidBoundaryDataFailsClosed
+[       OK ] BoundaryFirstFlattening.InvalidBoundaryDataFailsClosed (3 ms)
+[ RUN      ] BoundaryFirstFlattening.TypedDispatchMatchesDirectAndFailsClosed
+[       OK ] BoundaryFirstFlattening.TypedDispatchMatchesDirectAndFailsClosed (5 ms)
+[----------] 10 tests from BoundaryFirstFlattening (57 ms total)
+
+[----------] 15 tests from UvAtlas
+[ RUN      ] UvAtlas.FakeBackendCanReplaceDefault
+[       OK ] UvAtlas.FakeBackendCanReplaceDefault (0 ms)
+[ RUN      ] UvAtlas.FastStagedRequestUsesBuiltInBackendWithoutXAtlasFallback
+[       OK ] UvAtlas.FastStagedRequestUsesBuiltInBackendWithoutXAtlasFallback (6 ms)
+[ RUN      ] UvAtlas.FastStagedCubeCutsFaceChartsAndCopiesProperties
+[       OK ] UvAtlas.FastStagedCubeCutsFaceChartsAndCopiesProperties (26 ms)
+[ RUN      ] UvAtlas.FastStagedHighCardinalityGridIsFiniteAndDeterministic
+[       OK ] UvAtlas.FastStagedHighCardinalityGridIsFiniteAndDeterministic (595 ms)
+[ RUN      ] UvAtlas.FastStagedKeepsFirstSeenBoundaryAndNonmanifoldSeamOrder
+[       OK ] UvAtlas.FastStagedKeepsFirstSeenBoundaryAndNonmanifoldSeamOrder (14 ms)
+[ RUN      ] UvAtlas.FastStagedManyChartsPreserveSparseSourceIndices
+[       OK ] UvAtlas.FastStagedManyChartsPreserveSparseSourceIndices (6511 ms)
+[ RUN      ] UvAtlas.FastStagedFailingBackendFallsBackToXAtlasWhenAllowed
+[       OK ] UvAtlas.FastStagedFailingBackendFallsBackToXAtlasWhenAllowed (172 ms)
+[ RUN      ] UvAtlas.FastStagedFailingBackendFailsClosedWhenXAtlasFallbackDisabled
+[       OK ] UvAtlas.FastStagedFailingBackendFailsClosedWhenXAtlasFallbackDisabled (0 ms)
+[ RUN      ] UvAtlas.FastStagedRequestCanUseCallerSuppliedBackend
+[       OK ] UvAtlas.FastStagedRequestCanUseCallerSuppliedBackend (0 ms)
+[ RUN      ] UvAtlas.ValidAuthoredUvsArePreservedWithoutCallingBackend
+[       OK ] UvAtlas.ValidAuthoredUvsArePreservedWithoutCallingBackend (3 ms)
+[ RUN      ] UvAtlas.MissingUvsGenerateFiniteNormalizedFastStagedUvsByDefault
+[       OK ] UvAtlas.MissingUvsGenerateFiniteNormalizedFastStagedUvsByDefault (6 ms)
+[ RUN      ] UvAtlas.ExplicitXAtlasMethodGeneratesFiniteNormalizedUvs
+[       OK ] UvAtlas.ExplicitXAtlasMethodGeneratesFiniteNormalizedUvs (13 ms)
+[ RUN      ] UvAtlas.SeamSplitXrefsPreserveVertexProperties
+[       OK ] UvAtlas.SeamSplitXrefsPreserveVertexProperties (32 ms)
+[ RUN      ] UvAtlas.InvalidInputsReturnExplicitStatuses
+[       OK ] UvAtlas.InvalidInputsReturnExplicitStatuses (0 ms)
+[ RUN      ] UvAtlas.InvalidAuthoredUvsFallBackToDefaultBackend
+[       OK ] UvAtlas.InvalidAuthoredUvsFallBackToDefaultBackend (6 ms)
+[----------] 15 tests from UvAtlas (7392 ms total)
+
+[----------] 13 tests from AdaptiveRemesh
+[ RUN      ] AdaptiveRemesh.EmptyMeshReturnsNullopt
+[       OK ] AdaptiveRemesh.EmptyMeshReturnsNullopt (0 ms)
+[ RUN      ] AdaptiveRemesh.SingleTriangleReturnsNullopt
+[       OK ] AdaptiveRemesh.SingleTriangleReturnsNullopt (0 ms)
+[ RUN      ] AdaptiveRemesh.TwoTrianglesMinimalCase
+[       OK ] AdaptiveRemesh.TwoTrianglesMinimalCase (1 ms)
+[ RUN      ] AdaptiveRemesh.FlatPlaneUniformSizing
+[       OK ] AdaptiveRemesh.FlatPlaneUniformSizing (4 ms)
+[ RUN      ] AdaptiveRemesh.SphereRefinement
+[       OK ] AdaptiveRemesh.SphereRefinement (12 ms)
+[ RUN      ] AdaptiveRemesh.BoundaryPreservation
+[       OK ] AdaptiveRemesh.BoundaryPreservation (1 ms)
+[ RUN      ] AdaptiveRemesh.MultiIterationConvergence
+[       OK ] AdaptiveRemesh.MultiIterationConvergence (28 ms)
+[ RUN      ] AdaptiveRemesh.ZeroAdaptationBehavesLikeIsotropic
+[       OK ] AdaptiveRemesh.ZeroAdaptationBehavesLikeIsotropic (2 ms)
+[ RUN      ] AdaptiveRemesh.EdgeLengthBoundsRespected
+[       OK ] AdaptiveRemesh.EdgeLengthBoundsRespected (22 ms)
+[ RUN      ] AdaptiveRemesh.ResultDiagnostics
+[       OK ] AdaptiveRemesh.ResultDiagnostics (15 ms)
+[ RUN      ] AdaptiveRemesh.ReferenceProjectionPathProducesValidMesh
+[       OK ] AdaptiveRemesh.ReferenceProjectionPathProducesValidMesh (36 ms)
+[ RUN      ] AdaptiveRemesh.ReferenceProjectorProjectsToFrozenSurface
+[       OK ] AdaptiveRemesh.ReferenceProjectorProjectsToFrozenSurface (1 ms)
+[ RUN      ] AdaptiveRemesh.ErrorBoundedSizingPathProducesValidMesh
+[       OK ] AdaptiveRemesh.ErrorBoundedSizingPathProducesValidMesh (6 ms)
+[----------] 13 tests from AdaptiveRemesh (134 ms total)
+
+[----------] 7 tests from ConvexHull_Degenerate
+[ RUN      ] ConvexHull_Degenerate.EmptyInputReturnsNullopt
+[       OK ] ConvexHull_Degenerate.EmptyInputReturnsNullopt (0 ms)
+[ RUN      ] ConvexHull_Degenerate.SinglePointReturnsNullopt
+[       OK ] ConvexHull_Degenerate.SinglePointReturnsNullopt (0 ms)
+[ RUN      ] ConvexHull_Degenerate.TwoPointsReturnsNullopt
+[       OK ] ConvexHull_Degenerate.TwoPointsReturnsNullopt (0 ms)
+[ RUN      ] ConvexHull_Degenerate.ThreePointsReturnsNullopt
+[       OK ] ConvexHull_Degenerate.ThreePointsReturnsNullopt (0 ms)
+[ RUN      ] ConvexHull_Degenerate.CoincidentPointsReturnsNullopt
+[       OK ] ConvexHull_Degenerate.CoincidentPointsReturnsNullopt (0 ms)
+[ RUN      ] ConvexHull_Degenerate.CollinearPointsReturnsNullopt
+[       OK ] ConvexHull_Degenerate.CollinearPointsReturnsNullopt (0 ms)
+[ RUN      ] ConvexHull_Degenerate.CoplanarPointsReturnsNullopt
+[       OK ] ConvexHull_Degenerate.CoplanarPointsReturnsNullopt (0 ms)
+[----------] 7 tests from ConvexHull_Degenerate (0 ms total)
+
+[----------] 2 tests from ConvexHull_Tetrahedron
+[ RUN      ] ConvexHull_Tetrahedron.FourPointsProduceTetrahedron
+[       OK ] ConvexHull_Tetrahedron.FourPointsProduceTetrahedron (0 ms)
+[ RUN      ] ConvexHull_Tetrahedron.PlanesHaveOutwardNormals
+[       OK ] ConvexHull_Tetrahedron.PlanesHaveOutwardNormals (0 ms)
+[----------] 2 tests from ConvexHull_Tetrahedron (1 ms total)
+
+[----------] 1 test from ConvexHull_Cube
+[ RUN      ] ConvexHull_Cube.EightVerticesTwelveFaces
+[       OK ] ConvexHull_Cube.EightVerticesTwelveFaces (2 ms)
+[----------] 1 test from ConvexHull_Cube (2 ms total)
+
+[----------] 1 test from ConvexHull_Octahedron
+[ RUN      ] ConvexHull_Octahedron.SixVerticesEightFaces
+[       OK ] ConvexHull_Octahedron.SixVerticesEightFaces (1 ms)
+[----------] 1 test from ConvexHull_Octahedron (1 ms total)
+
+[----------] 2 tests from ConvexHull_Interior
+[ RUN      ] ConvexHull_Interior.CubeWithInteriorPoints
+[       OK ] ConvexHull_Interior.CubeWithInteriorPoints (2 ms)
+[ RUN      ] ConvexHull_Interior.SphereWithCentroid
+[       OK ] ConvexHull_Interior.SphereWithCentroid (17 ms)
+[----------] 2 tests from ConvexHull_Interior (20 ms total)
+
+[----------] 2 tests from ConvexHull_Sphere
+[ RUN      ] ConvexHull_Sphere.AllSurfacePointsOnHull
+[       OK ] ConvexHull_Sphere.AllSurfacePointsOnHull (4 ms)
+[ RUN      ] ConvexHull_Sphere.LargerSphereConverges
+[       OK ] ConvexHull_Sphere.LargerSphereConverges (104 ms)
+[----------] 2 tests from ConvexHull_Sphere (109 ms total)
+
+[----------] 3 tests from ConvexHull_Random
+[ RUN      ] ConvexHull_Random.UniformCubeDistribution
+[       OK ] ConvexHull_Random.UniformCubeDistribution (10 ms)
+[ RUN      ] ConvexHull_Random.GaussianDistribution
+[       OK ] ConvexHull_Random.GaussianDistribution (9 ms)
+[ RUN      ] ConvexHull_Random.LargePointCloud
+
+
+0% tests passed, 1 tests failed out of 1
+
+Label Time Summary:
+geometry    = 120.05 sec*proc (1 test)
+unit        = 120.05 sec*proc (1 test)
+
+Total Test time (real) = 120.23 sec
+
+The following tests FAILED:
+	2767 - IntrinsicGeometryTests.Grouped (Timeout)
+Errors while running CTest

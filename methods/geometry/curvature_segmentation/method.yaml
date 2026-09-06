@@ -18,6 +18,7 @@ outputs:
   - "Slot-aligned edge region-boundary flags plus deterministic face-region and boundary-edge colors"
   - "Candidate GMM, curvature-fit, spatial-energy, connectivity, cleanup, and failure diagnostics"
   - "Standalone slot-aligned hard/soft feature evidence with per-scale transition/ridge/valley responses, thinning/hysteresis decisions, vertex incidence, work counters, and explicit failure diagnostics"
+  - "Experimental METHOD-040 slot-aligned face/edge partitions from signed boundary costs, optional regional fitting, and separately reported area agglomeration; no accepted replacement backend"
   - "Unadopted METHOD-039 local-candidate output with provisional/final face regions, seed-growth facts, hard/soft/closure edge roles, regional statistics, exact accepted energy deltas, and explicit failure diagnostics"
 backends:
   - cpu_reference
@@ -29,6 +30,7 @@ metrics:
 correctness_tests:
   - "../../../tests/unit/geometry/Test.CurvatureSegmentation.cpp"
   - "../../../tests/unit/geometry/Test.CurvaturePatchContract.cpp"
+  - "../../../tests/unit/geometry/Test.CurvatureBoundaryPartition.cpp"
   - "../../../tests/contract/runtime/Test.CurvatureSegmentationOperations.cpp"
   - "../../../tests/integration/runtime/Test.SandboxCurvatureSegmentationPanel.cpp"
 benchmarks:
@@ -51,6 +53,14 @@ benchmarks:
   - "../../../benchmarks/geometry/manifests/curvature_segmentation_feature_patch_quality_smoke.yaml"
   - "../../../benchmarks/geometry/manifests/curvature_segmentation_feature_patch_seed_refutation.yaml"
   - "../../../benchmarks/geometry/manifests/curvature_segmentation_feature_patch_health_100k.yaml"
+  - "../../../benchmarks/geometry/manifests/curvature_boundary_mesh_local_cohort.yaml"
+  - "../../../benchmarks/geometry/manifests/curvature_clean_coarse_mesh_local_cohort.yaml"
+  - "../../../benchmarks/geometry/manifests/curvature_clean_medium_mesh_local_cohort.yaml"
+  - "../../../benchmarks/geometry/manifests/curvature_clean_mesh_local_cohort.yaml"
+  - "../../../benchmarks/geometry/manifests/curvature_contrast_mesh_local_cohort.yaml"
+  - "../../../benchmarks/geometry/manifests/curvature_curves_mesh_local_cohort.yaml"
+  - "../../../benchmarks/geometry/manifests/curvature_local_mesh_local_cohort.yaml"
+  - "../../../benchmarks/geometry/manifests/curvature_regional_mesh_local_cohort.yaml"
 known_limitations:
   - "This is a repository formulation informed by curvature-tensor segmentation, Gaussian mixtures, information criteria, and pairwise spatial models; it is not an equation-level reproduction of Lavoue et al. or another single publication."
   - "Signed principal curvatures depend on a consistent surface-orientation convention and on the scale, noise, and boundary behavior of the upstream curvature estimator."
@@ -61,3 +71,4 @@ known_limitations:
   - "Only a serial CPU reference backend exists, and the smoke result makes no performance or atlas-quality claim."
   - "METHOD-038 retired at CPUContracted after adding a 10k analytic-sphere cold/reusable descriptor pair, one 10k planar continuous-boundary pair, and independently audited non-claim paired-fold plus cylinder/smooth-transition fixture/oracle lanes. It selected no candidate A-D or v2; broader feature/patch implementation and stability evidence are owned by METHOD-039."
   - "METHOD-039 implements an unadopted deterministic local grow/merge/refine candidate and opt-in feature, quality, negative-seed, and 100k-face health profiles. A one-dual-step seed perturbation exceeds the frozen area-weighted VI limit of 0.01, so the local candidate is not an accepted v2 backend. BUG-163 later added an explicitly diagnostic runtime/config/UI selector and same-cardinality inspection properties for a bounded sculpt profile; that does not establish corpus-wide positive stability, performance, parameterization, semantic-part quality, or production-default adoption. METHOD-040 owns the separately scoped global multicut attempt."
+  - "METHOD-040 experiments have a tiny exact graph oracle and bounded sparse heuristics, but have not passed the inherited unmarked-curvature closure gate. Optional area cleanup may increase the optimized cut energy, reports that increase, and preserves all exact hard cuts. Its remaining undersized-region count is conditional on the current region adjacency graph, not a proof of unavoidable small parts."

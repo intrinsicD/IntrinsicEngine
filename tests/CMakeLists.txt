@@ -449,7 +449,6 @@ set(_geometry_test_files
     Test_GeometryProcessing.cpp
     Test.GaussianMixture.cpp
     Test.CurvatureSegmentation.cpp
-    Test.CurvaturePatchContract.cpp
     Test_SurfaceReconstruction.cpp
     Test_MeshQuality.cpp
     Test_MeshAnalysis.cpp
@@ -527,7 +526,7 @@ target_compile_definitions(GeometryTestObjs PRIVATE
     INTRINSIC_TEST_SUPPORT_DIR="${CMAKE_CURRENT_SOURCE_DIR}/support"
 )
 
-# Curvature tensor and segmentation cases stay in the required pure cohort,
+# Curvature tensor cases stay in the required pure cohort,
 # but run in their own process so the sanitizer wrapper keeps its bounded
 # 120-second hang-detection budget as the broader geometry suite grows.
 intrinsic_resolve_test_sources(_geometry_curvature_test_sources
@@ -540,6 +539,19 @@ intrinsic_test_object_lib(GeometryCurvatureTestObjs
     DEPS ExtrinsicCore IntrinsicGeometry
 )
 target_compile_definitions(GeometryCurvatureTestObjs PRIVATE
+    INTRINSIC_TEST_SUPPORT_DIR="${CMAKE_CURRENT_SOURCE_DIR}/support"
+)
+
+# Feature detection and partition fixtures retain their own bounded pure process.
+intrinsic_resolve_test_sources(_geometry_feature_partition_test_sources
+    SEARCH_DIRS unit/geometry
+    FILES Test.CurvaturePatchContract.cpp Test.CurvatureBoundaryPartition.cpp
+)
+intrinsic_test_object_lib(GeometryFeaturePartitionTestObjs
+    SOURCES ${_geometry_feature_partition_test_sources}
+    DEPS ExtrinsicCore IntrinsicGeometry
+)
+target_compile_definitions(GeometryFeaturePartitionTestObjs PRIVATE
     INTRINSIC_TEST_SUPPORT_DIR="${CMAKE_CURRENT_SOURCE_DIR}/support"
 )
 
@@ -1232,6 +1244,21 @@ if(INTRINSIC_GROUP_PURE_CTEST)
     intrinsic_grouped_test(
         IntrinsicGeometryCurvatureTests.Grouped
         IntrinsicGeometryCurvatureTests
+        FILTER "*"
+        LABELS unit geometry
+    )
+endif()
+
+intrinsic_test_executable(IntrinsicGeometryFeaturePartitionTests
+    OBJECTS GeometryFeaturePartitionTestObjs
+    LINK_LIBS ExtrinsicCore IntrinsicGeometry
+    LABELS unit geometry
+    ${_intrinsic_pure_ctest_registration}
+)
+if(INTRINSIC_GROUP_PURE_CTEST)
+    intrinsic_grouped_test(
+        IntrinsicGeometryFeaturePartitionTests.Grouped
+        IntrinsicGeometryFeaturePartitionTests
         FILTER "*"
         LABELS unit geometry
     )

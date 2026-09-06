@@ -1,0 +1,32 @@
+{
+  "schema": 1,
+  "date": "2026-09-06",
+  "reviewer": "local Codex partition_review subagent",
+  "scope": "Independent read-only algorithm, API, runner and viewer source review; not a formal retirement or general quality verdict.",
+  "outcome": "accepted_for_reviewed_source_scope",
+  "final_source_sha256": {
+    "src/geometry/CurvatureBoundaryGraph.hpp": "67e82b41b7f45f28c051f7063f11fc025e9836ff56256c433523c9c722565590",
+    "src/geometry/CurvatureBoundaryGraph.cpp": "6bc3f47d3628f0e7acbe8b3c6c40f048e037214827bebe4cf9010da0e6e15608",
+    "src/geometry/Geometry.HalfedgeMesh.CurvatureSegmentation.Multicut.cppm": "b71377063d3a0c4f4b3dda6d4c9763fecc6cae835d12950c538de0d55e77cb65",
+    "src/geometry/Geometry.HalfedgeMesh.CurvatureSegmentation.Multicut.cpp": "131ad2c0fef1e22df0772d2241904f96324c37375ec3875a702e94d6a427d132",
+    "benchmarks/runners/CurvatureBoundaryMeshRunner.cpp": "87b56d226e482c5376656ecfbcf14c273c2ed15c9c9f7b19a57630137e98b22d",
+    "tests/unit/geometry/Test.CurvatureBoundaryPartition.cpp": "bfa68e3593ddf60610c91437e0bc091d4c8ca2f6f1abc220772e49cecb60bcb1",
+    "benchmarks/runners/curvature_boundary_cohort.py": "c8a9544a557d9f9b2a3430222ff01423faf40300d856264d2b60102416a31a35",
+    "benchmarks/runners/curvature_boundary_viewer.py": "9c1032baa11ca960bd1cce83ca0fee78d4804db393c72125bb3aa8f9031da0d6",
+    "tests/regression/tooling/Test.CurvatureBoundaryViewer.py": "decc74525d09fa133ec775eb828c1cfbb75e6e8ba68b7717346e17dbf2f4a728"
+  },
+  "resolved_findings": [
+    "Stale Ward merge gains after surviving regional statistics change",
+    "Weighted variance overflow/underflow under disparate positive weights",
+    "Candidate runner identity for medium/coarse profiles",
+    "Hard barrier propagation under undersized area cleanup",
+    "Positive multi-edge hard-curve attenuation coverage",
+    "Unbound native geometry sidecar rejected",
+    "Native float32 restoration before double area validation"
+  ],
+  "limitations": [
+    "Reviewer inspected final source but did not rerun build or tests.",
+    "No global optimum or semantic segmentation quality verdict.",
+    "Formal completion evidence remains blocked by BUG-171."
+  ]
+}

@@ -1,0 +1,364 @@
+{
+  "schema": 1,
+  "candidates": {
+    "multicut": "boundary_multicut_isotropic_v2",
+    "regional": "curvature_region_scale_v2",
+    "contrast": "boundary_feature_contrast_v1",
+    "clean": "boundary_feature_area_cleanup_v1",
+    "clean_medium": "boundary_feature_area_cleanup_v1",
+    "clean_coarse": "boundary_feature_area_cleanup_v1",
+    "local": "method_039_default_local_patch"
+  },
+  "source_revision": "8b16089f4db745809e28615575e0377a1b6d8009",
+  "source_dirty": true,
+  "source_hashes": {
+    "src/geometry/CurvatureBoundaryGraph.cpp": "6bc3f47d3628f0e7acbe8b3c6c40f048e037214827bebe4cf9010da0e6e15608",
+    "src/geometry/CurvatureBoundaryGraph.hpp": "67e82b41b7f45f28c051f7063f11fc025e9836ff56256c433523c9c722565590",
+    "src/geometry/Geometry.HalfedgeMesh.CurvatureSegmentation.Multicut.cpp": "50f787a78e57ef68450f19b919961a70bd8ff38c35dc084891ddf11597d59b76",
+    "src/geometry/Geometry.HalfedgeMesh.CurvatureSegmentation.Multicut.cppm": "d96d96a6442b8de3975a13aa8ed8b6236d47cb6050c5d7edb1a9e48939c0d3cb",
+    "benchmarks/runners/CurvatureBoundaryMeshRunner.cpp": "9755f11f526ed0aeccc4c6ce88b1cd88bc65dc1066e45f048ec566e7588e9f7a"
+  },
+  "runner_sha256": "fc7287dc16e9b1a7e4321017f22ed756bcc797da076d074d144c63f789df4c3a",
+  "claim_eligible": false,
+  "timeout_seconds": 300,
+  "inputs": {
+    "sculpt": {
+      "path": "/home/alex/Dropbox/Work/Datasets/obj/sculpt.obj",
+      "sha256": "210dc85f20cdec11cb0b50bec255b86126fb6b47f9f938369049570de3f88a25"
+    },
+    "frog": {
+      "path": "/home/alex/Dropbox/Work/Datasets/obj/frog.obj",
+      "sha256": "c72c55b72392f55e02b846267424c9069c580e1bede1c9b7ee7ff189fa4656aa"
+    },
+    "fandisk": {
+      "path": "/home/alex/Dropbox/Work/Datasets/obj/fandisk.obj",
+      "sha256": "9bb0e3fa76f175ed8995a43131f900f721f32cea9a32297ca37078d1d519b880"
+    },
+    "bunny10k": {
+      "path": "/home/alex/Dropbox/Work/Datasets/obj/bunny10k.obj",
+      "sha256": "a0430239f795e94b7305b6f2f668ad29e76cc8df533ea8713614dc99fec08e2b"
+    },
+    "dolphin": {
+      "path": "/home/alex/Dropbox/Work/Datasets/obj/dolphin.obj",
+      "sha256": "eb47d91c9da39d84185bd54bf66df8253561a31ec488aa893725c17cc2a425ba"
+    },
+    "elephant": {
+      "path": "/home/alex/Dropbox/Work/Datasets/obj/elephant.obj",
+      "sha256": "bb9727bcaf69492d43b59d488947a793d9917a08d8bd50746e8ff7f02a1f4e46"
+    },
+    "bumpy_torus": {
+      "path": "/home/alex/Dropbox/Work/Datasets/obj/bumpy_torus.obj",
+      "sha256": "878c10c85d34b650eef72a004521e08306571f0eb4ae737d793ef3450434e7e8"
+    },
+    "genus3": {
+      "path": "/home/alex/Dropbox/Work/Datasets/obj/genus3.obj",
+      "sha256": "17069cc5b207dcc509463c8cd69fdb61119be8f1bb6bedf5746c6fc3260da808"
+    },
+    "office_chair": {
+      "path": "/home/alex/Dropbox/Work/Datasets/obj/office_chair.obj",
+      "sha256": "eb036c46431fd48768dc7cb3441bcc7c67c3548cbe8bab4a3f4ac42b35d928c7"
+    },
+    "sphere": {
+      "path": "/home/alex/Dropbox/Work/Datasets/obj/sphere.obj",
+      "sha256": "2decd67f63e2cc25582e56ea2cc48921c5fb609a65839e8385bf48053d6f9c90"
+    },
+    "cube": {
+      "path": "/home/alex/Dropbox/Work/Datasets/obj/cube.obj",
+      "sha256": "198b95fa2b3fc8b07f6f848dcdea76feebc7f2384d275ed27140ffdcc72de4ab"
+    },
+    "saddle2": {
+      "path": "/home/alex/Dropbox/Work/Datasets/obj/saddle2.obj",
+      "sha256": "f76ffdf05f325eae84d561eb6a235ff0902d69c9de8a9b03bc8ceb552a2ffd4a"
+    }
+  },
+  "runs": [
+    {
+      "mesh": "sculpt",
+      "mode": "clean_medium",
+      "command": [
+        "/home/alex/Documents/IntrinsicEngine/build/ci/bin/IntrinsicCurvatureBoundaryMesh",
+        "/home/alex/Dropbox/Work/Datasets/obj/sculpt.obj",
+        "/tmp/method040-cohort-scale-profiles/sculpt-clean_medium",
+        "clean_medium"
+      ],
+      "exit_code": 2,
+      "elapsed_seconds": 0.0015966819919412956
+    },
+    {
+      "mesh": "sculpt",
+      "mode": "clean_coarse",
+      "command": [
+        "/home/alex/Documents/IntrinsicEngine/build/ci/bin/IntrinsicCurvatureBoundaryMesh",
+        "/home/alex/Dropbox/Work/Datasets/obj/sculpt.obj",
+        "/tmp/method040-cohort-scale-profiles/sculpt-clean_coarse",
+        "clean_coarse"
+      ],
+      "exit_code": 2,
+      "elapsed_seconds": 0.003562780999345705
+    },
+    {
+      "mesh": "frog",
+      "mode": "clean_medium",
+      "command": [
+        "/home/alex/Documents/IntrinsicEngine/build/ci/bin/IntrinsicCurvatureBoundaryMesh",
+        "/home/alex/Dropbox/Work/Datasets/obj/frog.obj",
+        "/tmp/method040-cohort-scale-profiles/frog-clean_medium",
+        "clean_medium"
+      ],
+      "exit_code": 2,
+      "elapsed_seconds": 0.0038002310029696673
+    },
+    {
+      "mesh": "frog",
+      "mode": "clean_coarse",
+      "command": [
+        "/home/alex/Documents/IntrinsicEngine/build/ci/bin/IntrinsicCurvatureBoundaryMesh",
+        "/home/alex/Dropbox/Work/Datasets/obj/frog.obj",
+        "/tmp/method040-cohort-scale-profiles/frog-clean_coarse",
+        "clean_coarse"
+      ],
+      "exit_code": 2,
+      "elapsed_seconds": 0.004108762994292192
+    },
+    {
+      "mesh": "fandisk",
+      "mode": "clean_medium",
+      "command": [
+        "/home/alex/Documents/IntrinsicEngine/build/ci/bin/IntrinsicCurvatureBoundaryMesh",
+        "/home/alex/Dropbox/Work/Datasets/obj/fandisk.obj",
+        "/tmp/method040-cohort-scale-profiles/fandisk-clean_medium",
+        "clean_medium"
+      ],
+      "exit_code": 2,
+      "elapsed_seconds": 0.003695755993248895
+    },
+    {
+      "mesh": "fandisk",
+      "mode": "clean_coarse",
+      "command": [
+        "/home/alex/Documents/IntrinsicEngine/build/ci/bin/IntrinsicCurvatureBoundaryMesh",
+        "/home/alex/Dropbox/Work/Datasets/obj/fandisk.obj",
+        "/tmp/method040-cohort-scale-profiles/fandisk-clean_coarse",
+        "clean_coarse"
+      ],
+      "exit_code": 2,
+      "elapsed_seconds": 0.0021445270103868097
+    },
+    {
+      "mesh": "bunny10k",
+      "mode": "clean_medium",
+      "command": [
+        "/home/alex/Documents/IntrinsicEngine/build/ci/bin/IntrinsicCurvatureBoundaryMesh",
+        "/home/alex/Dropbox/Work/Datasets/obj/bunny10k.obj",
+        "/tmp/method040-cohort-scale-profiles/bunny10k-clean_medium",
+        "clean_medium"
+      ],
+      "exit_code": 2,
+      "elapsed_seconds": 0.004064773995196447
+    },
+    {
+      "mesh": "bunny10k",
+      "mode": "clean_coarse",
+      "command": [
+        "/home/alex/Documents/IntrinsicEngine/build/ci/bin/IntrinsicCurvatureBoundaryMesh",
+        "/home/alex/Dropbox/Work/Datasets/obj/bunny10k.obj",
+        "/tmp/method040-cohort-scale-profiles/bunny10k-clean_coarse",
+        "clean_coarse"
+      ],
+      "exit_code": 2,
+      "elapsed_seconds": 0.0015347169974120334
+    },
+    {
+      "mesh": "dolphin",
+      "mode": "clean_medium",
+      "command": [
+        "/home/alex/Documents/IntrinsicEngine/build/ci/bin/IntrinsicCurvatureBoundaryMesh",
+        "/home/alex/Dropbox/Work/Datasets/obj/dolphin.obj",
+        "/tmp/method040-cohort-scale-profiles/dolphin-clean_medium",
+        "clean_medium"
+      ],
+      "exit_code": 2,
+      "elapsed_seconds": 0.0013722589937970042
+    },
+    {
+      "mesh": "dolphin",
+      "mode": "clean_coarse",
+      "command": [
+        "/home/alex/Documents/IntrinsicEngine/build/ci/bin/IntrinsicCurvatureBoundaryMesh",
+        "/home/alex/Dropbox/Work/Datasets/obj/dolphin.obj",
+        "/tmp/method040-cohort-scale-profiles/dolphin-clean_coarse",
+        "clean_coarse"
+      ],
+      "exit_code": 2,
+      "elapsed_seconds": 0.0034919530007755384
+    },
+    {
+      "mesh": "elephant",
+      "mode": "clean_medium",
+      "command": [
+        "/home/alex/Documents/IntrinsicEngine/build/ci/bin/IntrinsicCurvatureBoundaryMesh",
+        "/home/alex/Dropbox/Work/Datasets/obj/elephant.obj",
+        "/tmp/method040-cohort-scale-profiles/elephant-clean_medium",
+        "clean_medium"
+      ],
+      "exit_code": 2,
+      "elapsed_seconds": 0.0028905590006615967
+    },
+    {
+      "mesh": "elephant",
+      "mode": "clean_coarse",
+      "command": [
+        "/home/alex/Documents/IntrinsicEngine/build/ci/bin/IntrinsicCurvatureBoundaryMesh",
+        "/home/alex/Dropbox/Work/Datasets/obj/elephant.obj",
+        "/tmp/method040-cohort-scale-profiles/elephant-clean_coarse",
+        "clean_coarse"
+      ],
+      "exit_code": 2,
+      "elapsed_seconds": 0.003744385001482442
+    },
+    {
+      "mesh": "bumpy_torus",
+      "mode": "clean_medium",
+      "command": [
+        "/home/alex/Documents/IntrinsicEngine/build/ci/bin/IntrinsicCurvatureBoundaryMesh",
+        "/home/alex/Dropbox/Work/Datasets/obj/bumpy_torus.obj",
+        "/tmp/method040-cohort-scale-profiles/bumpy_torus-clean_medium",
+        "clean_medium"
+      ],
+      "exit_code": 2,
+      "elapsed_seconds": 0.005183960005524568
+    },
+    {
+      "mesh": "bumpy_torus",
+      "mode": "clean_coarse",
+      "command": [
+        "/home/alex/Documents/IntrinsicEngine/build/ci/bin/IntrinsicCurvatureBoundaryMesh",
+        "/home/alex/Dropbox/Work/Datasets/obj/bumpy_torus.obj",
+        "/tmp/method040-cohort-scale-profiles/bumpy_torus-clean_coarse",
+        "clean_coarse"
+      ],
+      "exit_code": 2,
+      "elapsed_seconds": 0.003307185004814528
+    },
+    {
+      "mesh": "genus3",
+      "mode": "clean_medium",
+      "command": [
+        "/home/alex/Documents/IntrinsicEngine/build/ci/bin/IntrinsicCurvatureBoundaryMesh",
+        "/home/alex/Dropbox/Work/Datasets/obj/genus3.obj",
+        "/tmp/method040-cohort-scale-profiles/genus3-clean_medium",
+        "clean_medium"
+      ],
+      "exit_code": 2,
+      "elapsed_seconds": 0.0036179680027998984
+    },
+    {
+      "mesh": "genus3",
+      "mode": "clean_coarse",
+      "command": [
+        "/home/alex/Documents/IntrinsicEngine/build/ci/bin/IntrinsicCurvatureBoundaryMesh",
+        "/home/alex/Dropbox/Work/Datasets/obj/genus3.obj",
+        "/tmp/method040-cohort-scale-profiles/genus3-clean_coarse",
+        "clean_coarse"
+      ],
+      "exit_code": 2,
+      "elapsed_seconds": 0.0014489050081465393
+    },
+    {
+      "mesh": "office_chair",
+      "mode": "clean_medium",
+      "command": [
+        "/home/alex/Documents/IntrinsicEngine/build/ci/bin/IntrinsicCurvatureBoundaryMesh",
+        "/home/alex/Dropbox/Work/Datasets/obj/office_chair.obj",
+        "/tmp/method040-cohort-scale-profiles/office_chair-clean_medium",
+        "clean_medium"
+      ],
+      "exit_code": 2,
+      "elapsed_seconds": 0.0016546750121051446
+    },
+    {
+      "mesh": "office_chair",
+      "mode": "clean_coarse",
+      "command": [
+        "/home/alex/Documents/IntrinsicEngine/build/ci/bin/IntrinsicCurvatureBoundaryMesh",
+        "/home/alex/Dropbox/Work/Datasets/obj/office_chair.obj",
+        "/tmp/method040-cohort-scale-profiles/office_chair-clean_coarse",
+        "clean_coarse"
+      ],
+      "exit_code": 2,
+      "elapsed_seconds": 0.003640643000835553
+    },
+    {
+      "mesh": "sphere",
+      "mode": "clean_medium",
+      "command": [
+        "/home/alex/Documents/IntrinsicEngine/build/ci/bin/IntrinsicCurvatureBoundaryMesh",
+        "/home/alex/Dropbox/Work/Datasets/obj/sphere.obj",
+        "/tmp/method040-cohort-scale-profiles/sphere-clean_medium",
+        "clean_medium"
+      ],
+      "exit_code": 2,
+      "elapsed_seconds": 0.0036451590131036937
+    },
+    {
+      "mesh": "sphere",
+      "mode": "clean_coarse",
+      "command": [
+        "/home/alex/Documents/IntrinsicEngine/build/ci/bin/IntrinsicCurvatureBoundaryMesh",
+        "/home/alex/Dropbox/Work/Datasets/obj/sphere.obj",
+        "/tmp/method040-cohort-scale-profiles/sphere-clean_coarse",
+        "clean_coarse"
+      ],
+      "exit_code": 2,
+      "elapsed_seconds": 0.0038211679930100217
+    },
+    {
+      "mesh": "cube",
+      "mode": "clean_medium",
+      "command": [
+        "/home/alex/Documents/IntrinsicEngine/build/ci/bin/IntrinsicCurvatureBoundaryMesh",
+        "/home/alex/Dropbox/Work/Datasets/obj/cube.obj",
+        "/tmp/method040-cohort-scale-profiles/cube-clean_medium",
+        "clean_medium"
+      ],
+      "exit_code": 2,
+      "elapsed_seconds": 0.004023490997496992
+    },
+    {
+      "mesh": "cube",
+      "mode": "clean_coarse",
+      "command": [
+        "/home/alex/Documents/IntrinsicEngine/build/ci/bin/IntrinsicCurvatureBoundaryMesh",
+        "/home/alex/Dropbox/Work/Datasets/obj/cube.obj",
+        "/tmp/method040-cohort-scale-profiles/cube-clean_coarse",
+        "clean_coarse"
+      ],
+      "exit_code": 2,
+      "elapsed_seconds": 0.002643277999595739
+    },
+    {
+      "mesh": "saddle2",
+      "mode": "clean_medium",
+      "command": [
+        "/home/alex/Documents/IntrinsicEngine/build/ci/bin/IntrinsicCurvatureBoundaryMesh",
+        "/home/alex/Dropbox/Work/Datasets/obj/saddle2.obj",
+        "/tmp/method040-cohort-scale-profiles/saddle2-clean_medium",
+        "clean_medium"
+      ],
+      "exit_code": 2,
+      "elapsed_seconds": 0.001473843993153423
+    },
+    {
+      "mesh": "saddle2",
+      "mode": "clean_coarse",
+      "command": [
+        "/home/alex/Documents/IntrinsicEngine/build/ci/bin/IntrinsicCurvatureBoundaryMesh",
+        "/home/alex/Dropbox/Work/Datasets/obj/saddle2.obj",
+        "/tmp/method040-cohort-scale-profiles/saddle2-clean_coarse",
+        "clean_coarse"
+      ],
+      "exit_code": 2,
+      "elapsed_seconds": 0.001463131993659772
+    }
+  ]
+}

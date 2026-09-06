@@ -1,0 +1,12 @@
+{
+  "candidate": "curvature_region_scale_v1",
+  "verdict": "refuted_by_ridge_and_valley_oracles",
+  "model_weight": 1.0,
+  "source_sha256": {
+    "src/geometry/CurvatureBoundaryGraph.cpp": "7af464594c608bc1b09dc7cd864867f7915ed840a765c07c1a6cb7f4043eab6e",
+    "src/geometry/CurvatureBoundaryGraph.hpp": "2013d398fb4358a0921696e12db1df3e85d1bf4d8ef35c7d55f66674e7b90631",
+    "src/geometry/Geometry.HalfedgeMesh.CurvatureSegmentation.Multicut.cpp": "66f54fdaeadb2987e6ec2db9acfb7050abf1d8ca1c3055cf693ba54957194772",
+    "src/geometry/Geometry.HalfedgeMesh.CurvatureSegmentation.Multicut.cppm": "c22b4ac5e730014a41786c3799da032937c0917d5599c0c6a02770e7f41a7b93"
+  },
+  "next_candidate": "curvature_region_scale_v2, same energy and radius with weak model coefficient 0.03, calibrated only on the unchanged analytic catalog before any regional dataset output"
+}

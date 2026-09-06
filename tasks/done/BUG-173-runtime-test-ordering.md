@@ -41,11 +41,11 @@ contract_review: "Existing test seams establish existing job cancellation and st
   domains remain. No production path or timing threshold changes.
 
 ## Acceptance criteria
-- [ ] Focused CPU and ASan repeated tests pass with the required ordering explicit.
-- [ ] Cancellation finalizes exactly once on the main thread without publication.
-- [ ] Mutation precedes the writeback gate for all eight property domains and
+- [x] Focused CPU and ASan repeated tests pass with the required ordering explicit.
+- [x] Cancellation finalizes exactly once on the main thread without publication.
+- [x] Mutation precedes the writeback gate for all eight property domains and
       yields StaleSource without creating the output property.
-- [ ] Full CPU and isolated sanitizer verification retain all previous failures.
+- [x] Full CPU and isolated sanitizer verification retain all previous failures.
 
 ## Verification
 ```bash
@@ -55,3 +55,11 @@ cmake --build --preset ci-asan --target IntrinsicRuntimeContractTests
 ctest --test-dir build/ci-asan --output-on-failure -R 'RuntimeJobService.CancelBeforeStartFinalizesOnMainThreadInsteadOfPublishing|PointCloudConsolidationModule.SourceMutationDropsQueuedWriteback' --repeat until-fail:20 --timeout 60 --parallel 1
 python3 tools/agents/check_task_policy.py --root . --strict
 ```
+
+## Status
+
+- Completed 2026-09-06.
+- Commit: `8c3200f1d` (implementation).
+- Both corrected fixtures passed 20 ASan repetitions each and the final full
+  canonical CPU selector. Original ASan failures and subsequent focused logs
+  remain in METHOD-040 evidence. No production behavior or assertion changed.

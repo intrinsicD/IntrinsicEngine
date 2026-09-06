@@ -1,0 +1,531 @@
+{
+  "schema": 1,
+  "candidates": {
+    "multicut": "boundary_multicut_isotropic_v2",
+    "regional": "curvature_region_scale_v2",
+    "local": "method_039_default_local_patch"
+  },
+  "source_revision": "8b16089f4db745809e28615575e0377a1b6d8009",
+  "source_dirty": true,
+  "source_hashes": {
+    "src/geometry/CurvatureBoundaryGraph.cpp": "81b2592a170697c3c4dbbf61a4a772a2ea92fae582d35029a348bc861063c3f1",
+    "src/geometry/CurvatureBoundaryGraph.hpp": "2013d398fb4358a0921696e12db1df3e85d1bf4d8ef35c7d55f66674e7b90631",
+    "src/geometry/Geometry.HalfedgeMesh.CurvatureSegmentation.Multicut.cpp": "66f54fdaeadb2987e6ec2db9acfb7050abf1d8ca1c3055cf693ba54957194772",
+    "src/geometry/Geometry.HalfedgeMesh.CurvatureSegmentation.Multicut.cppm": "c22b4ac5e730014a41786c3799da032937c0917d5599c0c6a02770e7f41a7b93",
+    "benchmarks/runners/CurvatureBoundaryMeshRunner.cpp": "6cd7e89daca7095749bc4a8c4d5932052094faa1e0002d1ec3d86e074aa0cbd3"
+  },
+  "runner_sha256": "3ed1233ef2ade411e968f0e8dcb42e1dc8116b4d320964ef5b0994b0248f4924",
+  "claim_eligible": false,
+  "timeout_seconds": 300,
+  "inputs": {
+    "sculpt": {
+      "path": "/home/alex/Dropbox/Work/Datasets/obj/sculpt.obj",
+      "sha256": "210dc85f20cdec11cb0b50bec255b86126fb6b47f9f938369049570de3f88a25"
+    },
+    "frog": {
+      "path": "/home/alex/Dropbox/Work/Datasets/obj/frog.obj",
+      "sha256": "c72c55b72392f55e02b846267424c9069c580e1bede1c9b7ee7ff189fa4656aa"
+    },
+    "fandisk": {
+      "path": "/home/alex/Dropbox/Work/Datasets/obj/fandisk.obj",
+      "sha256": "9bb0e3fa76f175ed8995a43131f900f721f32cea9a32297ca37078d1d519b880"
+    },
+    "bunny10k": {
+      "path": "/home/alex/Dropbox/Work/Datasets/obj/bunny10k.obj",
+      "sha256": "a0430239f795e94b7305b6f2f668ad29e76cc8df533ea8713614dc99fec08e2b"
+    },
+    "dolphin": {
+      "path": "/home/alex/Dropbox/Work/Datasets/obj/dolphin.obj",
+      "sha256": "eb47d91c9da39d84185bd54bf66df8253561a31ec488aa893725c17cc2a425ba"
+    },
+    "elephant": {
+      "path": "/home/alex/Dropbox/Work/Datasets/obj/elephant.obj",
+      "sha256": "bb9727bcaf69492d43b59d488947a793d9917a08d8bd50746e8ff7f02a1f4e46"
+    },
+    "bumpy_torus": {
+      "path": "/home/alex/Dropbox/Work/Datasets/obj/bumpy_torus.obj",
+      "sha256": "878c10c85d34b650eef72a004521e08306571f0eb4ae737d793ef3450434e7e8"
+    },
+    "genus3": {
+      "path": "/home/alex/Dropbox/Work/Datasets/obj/genus3.obj",
+      "sha256": "17069cc5b207dcc509463c8cd69fdb61119be8f1bb6bedf5746c6fc3260da808"
+    },
+    "office_chair": {
+      "path": "/home/alex/Dropbox/Work/Datasets/obj/office_chair.obj",
+      "sha256": "eb036c46431fd48768dc7cb3441bcc7c67c3548cbe8bab4a3f4ac42b35d928c7"
+    },
+    "sphere": {
+      "path": "/home/alex/Dropbox/Work/Datasets/obj/sphere.obj",
+      "sha256": "2decd67f63e2cc25582e56ea2cc48921c5fb609a65839e8385bf48053d6f9c90"
+    },
+    "cube": {
+      "path": "/home/alex/Dropbox/Work/Datasets/obj/cube.obj",
+      "sha256": "198b95fa2b3fc8b07f6f848dcdea76feebc7f2384d275ed27140ffdcc72de4ab"
+    },
+    "saddle2": {
+      "path": "/home/alex/Dropbox/Work/Datasets/obj/saddle2.obj",
+      "sha256": "f76ffdf05f325eae84d561eb6a235ff0902d69c9de8a9b03bc8ceb552a2ffd4a"
+    }
+  },
+  "runs": [
+    {
+      "mesh": "sculpt",
+      "mode": "regional",
+      "command": [
+        "/home/alex/Documents/IntrinsicEngine/build/ci/bin/IntrinsicCurvatureBoundaryMesh",
+        "/home/alex/Dropbox/Work/Datasets/obj/sculpt.obj",
+        "/tmp/method040-cohort-regional-v2-fixed/sculpt-regional",
+        "regional"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.8162159060011618,
+      "result": {
+        "status": "passed",
+        "benchmark_id": "geometry.curvature_segmentation.regional_mesh.local_cohort",
+        "method": "geometry.curvature_segmentation",
+        "backend": "cpu_reference",
+        "dataset": "local.method_040.mesh_cohort.v1",
+        "commit": "local-dev",
+        "metrics": {
+          "runtime_ms": 771.609688,
+          "memory_peak_bytes": 20430848,
+          "quality_error_l2": 0,
+          "quality_error_linf": 0,
+          "population_count": 7
+        },
+        "diagnostics": {
+          "input": "/home/alex/Dropbox/Work/Datasets/obj/sculpt.obj",
+          "implementation": "curvature_region_scale_v2",
+          "feature_weight": 1.5,
+          "faces": 7342,
+          "vertices": 3669,
+          "load_ms": 47.928994,
+          "curvature_ms": 68.924592,
+          "feature_ms": 162.784675,
+          "partition_ms": 478.630439,
+          "energy": 0.14556191953422815,
+          "lower_bound": 0.12733184209724613,
+          "exact": false,
+          "attempted_moves": 7335,
+          "accepted_moves": 0,
+          "contractions": 7335,
+          "sweeps": 1,
+          "source_hard": 384,
+          "source_soft": 808,
+          "boundaries": 536,
+          "hard": 384,
+          "soft": 152,
+          "closure": 0,
+          "feature_length_recall": 0.4397931225141366,
+          "unsupported_length_fraction": 0,
+          "region_sizes": [
+            926,
+            1488,
+            628,
+            160,
+            632,
+            160,
+            3348
+          ],
+          "region_area_fractions": [
+            0.1109482401712266,
+            0.21104839120456792,
+            0.08880205494008853,
+            0.02213571535424018,
+            0.08890840270064321,
+            0.022029342113816543,
+            0.4561278535154175
+          ]
+        }
+      }
+    },
+    {
+      "mesh": "frog",
+      "mode": "regional",
+      "command": [
+        "/home/alex/Documents/IntrinsicEngine/build/ci/bin/IntrinsicCurvatureBoundaryMesh",
+        "/home/alex/Dropbox/Work/Datasets/obj/frog.obj",
+        "/tmp/method040-cohort-regional-v2-fixed/frog-regional",
+        "regional"
+      ],
+      "exit_code": 4,
+      "elapsed_seconds": 4.626401847999659,
+      "result": {
+        "status": "error",
+        "stage": "partition",
+        "diagnostic": "work_limit",
+        "input": "/home/alex/Dropbox/Work/Datasets/obj/frog.obj",
+        "diagnostics": {
+          "attempted_moves": 19091,
+          "flow_edge_visits": 20000001,
+          "accepted_moves": 0,
+          "contractions": 19091,
+          "sweeps": 1,
+          "partition_ms": 2714.31
+        }
+      }
+    },
+    {
+      "mesh": "fandisk",
+      "mode": "regional",
+      "command": [
+        "/home/alex/Documents/IntrinsicEngine/build/ci/bin/IntrinsicCurvatureBoundaryMesh",
+        "/home/alex/Dropbox/Work/Datasets/obj/fandisk.obj",
+        "/tmp/method040-cohort-regional-v2-fixed/fandisk-regional",
+        "regional"
+      ],
+      "exit_code": 4,
+      "elapsed_seconds": 1.4665103560109856,
+      "result": {
+        "status": "error",
+        "stage": "partition",
+        "diagnostic": "work_limit",
+        "input": "/home/alex/Dropbox/Work/Datasets/obj/fandisk.obj",
+        "diagnostics": {
+          "attempted_moves": 12924,
+          "flow_edge_visits": 20000001,
+          "accepted_moves": 0,
+          "contractions": 12924,
+          "sweeps": 1,
+          "partition_ms": 730.782
+        }
+      }
+    },
+    {
+      "mesh": "bunny10k",
+      "mode": "regional",
+      "command": [
+        "/home/alex/Documents/IntrinsicEngine/build/ci/bin/IntrinsicCurvatureBoundaryMesh",
+        "/home/alex/Dropbox/Work/Datasets/obj/bunny10k.obj",
+        "/tmp/method040-cohort-regional-v2-fixed/bunny10k-regional",
+        "regional"
+      ],
+      "exit_code": 4,
+      "elapsed_seconds": 0.2648571390018333,
+      "result": {
+        "status": "error",
+        "stage": "features",
+        "diagnostic": "invalid_topology",
+        "input": "/home/alex/Dropbox/Work/Datasets/obj/bunny10k.obj",
+        "diagnostics": {}
+      }
+    },
+    {
+      "mesh": "dolphin",
+      "mode": "regional",
+      "command": [
+        "/home/alex/Documents/IntrinsicEngine/build/ci/bin/IntrinsicCurvatureBoundaryMesh",
+        "/home/alex/Dropbox/Work/Datasets/obj/dolphin.obj",
+        "/tmp/method040-cohort-regional-v2-fixed/dolphin-regional",
+        "regional"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.9735911869938718,
+      "result": {
+        "status": "passed",
+        "benchmark_id": "geometry.curvature_segmentation.regional_mesh.local_cohort",
+        "method": "geometry.curvature_segmentation",
+        "backend": "cpu_reference",
+        "dataset": "local.method_040.mesh_cohort.v1",
+        "commit": "local-dev",
+        "metrics": {
+          "runtime_ms": 955.577197,
+          "memory_peak_bytes": 20430848,
+          "quality_error_l2": 0,
+          "quality_error_linf": 0,
+          "population_count": 9
+        },
+        "diagnostics": {
+          "input": "/home/alex/Dropbox/Work/Datasets/obj/dolphin.obj",
+          "implementation": "curvature_region_scale_v2",
+          "feature_weight": 1.5,
+          "faces": 5120,
+          "vertices": 2562,
+          "load_ms": 43.421576,
+          "curvature_ms": 62.736018,
+          "feature_ms": 283.092325,
+          "partition_ms": 559.247698,
+          "energy": 0.049680395842890517,
+          "lower_bound": -0.009246751302360134,
+          "exact": false,
+          "attempted_moves": 5111,
+          "accepted_moves": 0,
+          "contractions": 5111,
+          "sweeps": 1,
+          "source_hard": 28,
+          "source_soft": 358,
+          "boundaries": 301,
+          "hard": 28,
+          "soft": 129,
+          "closure": 144,
+          "feature_length_recall": 0.44923638627564466,
+          "unsupported_length_fraction": 0.32451965817579154,
+          "region_sizes": [
+            3415,
+            1698,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1
+          ],
+          "region_area_fractions": [
+            0.6732139126036784,
+            0.32424494172162904,
+            0.00020164631835753574,
+            3.6833411859423314e-05,
+            0.000933221618412404,
+            0.0001829147074815472,
+            0.0010036490039825304,
+            9.373475939229766e-05,
+            8.914585520615989e-05
+          ]
+        }
+      }
+    },
+    {
+      "mesh": "elephant",
+      "mode": "regional",
+      "command": [
+        "/home/alex/Documents/IntrinsicEngine/build/ci/bin/IntrinsicCurvatureBoundaryMesh",
+        "/home/alex/Dropbox/Work/Datasets/obj/elephant.obj",
+        "/tmp/method040-cohort-regional-v2-fixed/elephant-regional",
+        "regional"
+      ],
+      "exit_code": 4,
+      "elapsed_seconds": 41.66641327200341,
+      "result": {
+        "status": "error",
+        "stage": "partition",
+        "diagnostic": "work_limit",
+        "input": "/home/alex/Dropbox/Work/Datasets/obj/elephant.obj",
+        "diagnostics": {
+          "attempted_moves": 49872,
+          "flow_edge_visits": 20000001,
+          "accepted_moves": 0,
+          "contractions": 49872,
+          "sweeps": 1,
+          "partition_ms": 23227.8
+        }
+      }
+    },
+    {
+      "mesh": "bumpy_torus",
+      "mode": "regional",
+      "command": [
+        "/home/alex/Documents/IntrinsicEngine/build/ci/bin/IntrinsicCurvatureBoundaryMesh",
+        "/home/alex/Dropbox/Work/Datasets/obj/bumpy_torus.obj",
+        "/tmp/method040-cohort-regional-v2-fixed/bumpy_torus-regional",
+        "regional"
+      ],
+      "exit_code": 4,
+      "elapsed_seconds": 73.31560683700081,
+      "result": {
+        "status": "error",
+        "stage": "partition",
+        "diagnostic": "work_limit",
+        "input": "/home/alex/Dropbox/Work/Datasets/obj/bumpy_torus.obj",
+        "diagnostics": {
+          "attempted_moves": 33574,
+          "flow_edge_visits": 20000001,
+          "accepted_moves": 0,
+          "contractions": 33574,
+          "sweeps": 1,
+          "partition_ms": 68241.2
+        }
+      }
+    },
+    {
+      "mesh": "genus3",
+      "mode": "regional",
+      "command": [
+        "/home/alex/Documents/IntrinsicEngine/build/ci/bin/IntrinsicCurvatureBoundaryMesh",
+        "/home/alex/Dropbox/Work/Datasets/obj/genus3.obj",
+        "/tmp/method040-cohort-regional-v2-fixed/genus3-regional",
+        "regional"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 3.1826216070039663,
+      "result": {
+        "status": "passed",
+        "benchmark_id": "geometry.curvature_segmentation.regional_mesh.local_cohort",
+        "method": "geometry.curvature_segmentation",
+        "backend": "cpu_reference",
+        "dataset": "local.method_040.mesh_cohort.v1",
+        "commit": "local-dev",
+        "metrics": {
+          "runtime_ms": 3145.508922,
+          "memory_peak_bytes": 34185216,
+          "quality_error_l2": 0,
+          "quality_error_linf": 0,
+          "population_count": 5
+        },
+        "diagnostics": {
+          "input": "/home/alex/Dropbox/Work/Datasets/obj/genus3.obj",
+          "implementation": "curvature_region_scale_v2",
+          "feature_weight": 1.5,
+          "faces": 13312,
+          "vertices": 6652,
+          "load_ms": 101.500966,
+          "curvature_ms": 153.460012,
+          "feature_ms": 738.911836,
+          "partition_ms": 2120.636355,
+          "energy": 0.03887426504291535,
+          "lower_bound": -0.007128991937373072,
+          "exact": false,
+          "attempted_moves": 13307,
+          "accepted_moves": 0,
+          "contractions": 13307,
+          "sweeps": 1,
+          "source_hard": 16,
+          "source_soft": 260,
+          "boundaries": 248,
+          "hard": 16,
+          "soft": 88,
+          "closure": 144,
+          "feature_length_recall": 0.40646210449986236,
+          "unsupported_length_fraction": 0.47696236029669437,
+          "region_sizes": [
+            1933,
+            11250,
+            5,
+            121,
+            3
+          ],
+          "region_area_fractions": [
+            0.13793722944853476,
+            0.8548059096824103,
+            0.00019142970205677018,
+            0.0067789620969128635,
+            0.0002864690700842764
+          ]
+        }
+      }
+    },
+    {
+      "mesh": "office_chair",
+      "mode": "regional",
+      "command": [
+        "/home/alex/Documents/IntrinsicEngine/build/ci/bin/IntrinsicCurvatureBoundaryMesh",
+        "/home/alex/Dropbox/Work/Datasets/obj/office_chair.obj",
+        "/tmp/method040-cohort-regional-v2-fixed/office_chair-regional",
+        "regional"
+      ],
+      "exit_code": 4,
+      "elapsed_seconds": 0.01719114600564353,
+      "result": {
+        "status": "error",
+        "stage": "load",
+        "diagnostic": "obj_read_failed",
+        "input": "/home/alex/Dropbox/Work/Datasets/obj/office_chair.obj",
+        "diagnostics": {}
+      }
+    },
+    {
+      "mesh": "sphere",
+      "mode": "regional",
+      "command": [
+        "/home/alex/Documents/IntrinsicEngine/build/ci/bin/IntrinsicCurvatureBoundaryMesh",
+        "/home/alex/Dropbox/Work/Datasets/obj/sphere.obj",
+        "/tmp/method040-cohort-regional-v2-fixed/sphere-regional",
+        "regional"
+      ],
+      "exit_code": 4,
+      "elapsed_seconds": 0.03414692799560726,
+      "result": {
+        "status": "error",
+        "stage": "features",
+        "diagnostic": "degenerate_face",
+        "input": "/home/alex/Dropbox/Work/Datasets/obj/sphere.obj",
+        "diagnostics": {}
+      }
+    },
+    {
+      "mesh": "cube",
+      "mode": "regional",
+      "command": [
+        "/home/alex/Documents/IntrinsicEngine/build/ci/bin/IntrinsicCurvatureBoundaryMesh",
+        "/home/alex/Dropbox/Work/Datasets/obj/cube.obj",
+        "/tmp/method040-cohort-regional-v2-fixed/cube-regional",
+        "regional"
+      ],
+      "exit_code": 4,
+      "elapsed_seconds": 1.8796297579974635,
+      "result": {
+        "status": "error",
+        "stage": "partition",
+        "diagnostic": "work_limit",
+        "input": "/home/alex/Dropbox/Work/Datasets/obj/cube.obj",
+        "diagnostics": {
+          "attempted_moves": 12282,
+          "flow_edge_visits": 20000001,
+          "accepted_moves": 0,
+          "contractions": 12282,
+          "sweeps": 1,
+          "partition_ms": 1351.64
+        }
+      }
+    },
+    {
+      "mesh": "saddle2",
+      "mode": "regional",
+      "command": [
+        "/home/alex/Documents/IntrinsicEngine/build/ci/bin/IntrinsicCurvatureBoundaryMesh",
+        "/home/alex/Dropbox/Work/Datasets/obj/saddle2.obj",
+        "/tmp/method040-cohort-regional-v2-fixed/saddle2-regional",
+        "regional"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.11787880600604694,
+      "result": {
+        "status": "passed",
+        "benchmark_id": "geometry.curvature_segmentation.regional_mesh.local_cohort",
+        "method": "geometry.curvature_segmentation",
+        "backend": "cpu_reference",
+        "dataset": "local.method_040.mesh_cohort.v1",
+        "commit": "local-dev",
+        "metrics": {
+          "runtime_ms": 113.701994,
+          "memory_peak_bytes": 20430848,
+          "quality_error_l2": 0,
+          "quality_error_linf": 0,
+          "population_count": 1
+        },
+        "diagnostics": {
+          "input": "/home/alex/Dropbox/Work/Datasets/obj/saddle2.obj",
+          "implementation": "curvature_region_scale_v2",
+          "feature_weight": 1.5,
+          "faces": 1352,
+          "vertices": 741,
+          "load_ms": 13.518733,
+          "curvature_ms": 19.861733,
+          "feature_ms": 23.899226,
+          "partition_ms": 53.834326,
+          "energy": 0.0012618496074661054,
+          "lower_bound": 0.0012566370614359175,
+          "exact": false,
+          "attempted_moves": 1351,
+          "accepted_moves": 0,
+          "contractions": 1351,
+          "sweeps": 1,
+          "source_hard": 0,
+          "source_soft": 0,
+          "boundaries": 0,
+          "hard": 0,
+          "soft": 0,
+          "closure": 0,
+          "feature_length_recall": 1,
+          "unsupported_length_fraction": 0,
+          "region_sizes": [
+            1352
+          ],
+          "region_area_fractions": [
+            1
+          ]
+        }
+      }
+    }
+  ]
+}
