@@ -473,6 +473,17 @@ namespace
         {
         }
 
+        [[nodiscard]] Extrinsic::Core::Result
+        OnRegister(Runtime::EngineSetup& setup) override
+        {
+            // Commands capture the input before Simulation; completion drain
+            // follows it, even when the main thread helps execute worker jobs.
+            return setup.RegisterFrameHook(
+                Runtime::FramePhase::Simulation,
+                [this](Runtime::RuntimeFrameHookContext& context)
+                { Frame(context.FixedStepAlpha, context.FrameDeltaSeconds); });
+        }
+
         void Resolve() override
         {
             auto& engine = Kernel();
@@ -494,13 +505,6 @@ namespace
                     Completion = result;
                 });
 
-            Extrinsic::Core::Tasks::Scheduler::Dispatch(
-                [this]
-                {
-                    BlockerStarted.store(true, std::memory_order_release);
-                    while (!ReleaseBlocker.load(std::memory_order_acquire))
-                        std::this_thread::sleep_for(1ms);
-                });
             Correlation = Service->Run(MakeDomainRequest(
                 Entity, Domain, InputProperty, "lop:stale_output"));
         }
@@ -509,8 +513,7 @@ namespace
         {
             auto& engine = Kernel();
             ++Ticks;
-            if (!Mutated &&
-                BlockerStarted.load(std::memory_order_acquire))
+            if (!Mutated)
             {
                 const std::vector<Runtime::JobSnapshot> jobs =
                     engine.Jobs().SnapshotAll();
@@ -529,7 +532,6 @@ namespace
                         .Get<glm::vec3>(InputProperty);
                     position[0].z += 10.0f;
                     Mutated = true;
-                    ReleaseBlocker.store(true, std::memory_order_release);
                 }
             }
 
@@ -540,14 +542,12 @@ namespace
             else if (Ticks > 240u)
             {
                 TimedOut = true;
-                ReleaseBlocker.store(true, std::memory_order_release);
                 engine.RequestExit();
             }
         }
 
         void Shutdown() override
         {
-            ReleaseBlocker.store(true, std::memory_order_release);
             if (Service != nullptr)
                 Service->Unsubscribe(CompletionSubscription);
         }
@@ -561,8 +561,6 @@ namespace
         Runtime::KernelEventSubscription CompletionSubscription{};
         Runtime::CommandCorrelationId Correlation{};
         std::optional<Runtime::PointCloudConsolidationResult> Completion{};
-        std::atomic<bool> BlockerStarted{false};
-        std::atomic<bool> ReleaseBlocker{false};
         std::uint32_t Ticks{0u};
         bool MissingService{false};
         bool Mutated{false};

@@ -1120,9 +1120,23 @@ TEST(RuntimeJobService,
 
 TEST(RuntimeJobService, CancelBeforeStartFinalizesOnMainThreadInsteadOfPublishing)
 {
-    SchedulerScope scheduler{2};
+    SchedulerScope scheduler{1};
     Runtime::JobService jobs;
     Runtime::KernelEventBus events;
+
+    CompletionQueueInterlock blocker;
+    struct ReleaseAndDrain
+    {
+        CompletionQueueInterlock& Blocker;
+        ~ReleaseAndDrain()
+        {
+            Blocker.ReleaseWorker();
+            Extrinsic::Core::Tasks::Scheduler::WaitForAll();
+        }
+    } releaseAndDrain{blocker};
+    Extrinsic::Core::Tasks::Scheduler::Dispatch(
+        [&] { blocker.PauseWorker({}); });
+    ASSERT_TRUE(blocker.WaitForWorkerPause());
 
     std::vector<int> publishOrder;
     FinalizerProbe probe;
@@ -1134,10 +1148,10 @@ TEST(RuntimeJobService, CancelBeforeStartFinalizesOnMainThreadInsteadOfPublishin
 
     EXPECT_TRUE(jobs.Cancel(token));
 
-    // The worker observes the cancel and never queues a completion record, so
-    // the finalizer is the only thing that can unblock the consumer.
-    ASSERT_TRUE(WaitUntil([&] { return jobs.GetState(token) ==
-                                       Runtime::JobState::Cancelled; }));
+    blocker.ReleaseWorker();
+    // Join the complete worker transition, including finalizer publication.
+    Extrinsic::Core::Tasks::Scheduler::WaitForAll();
+    ASSERT_EQ(jobs.GetState(token), Runtime::JobState::Cancelled);
 
     EXPECT_EQ(jobs.DrainCompletions(events), 0u);
     EXPECT_EQ(probe.Calls, 1);

@@ -1548,7 +1548,7 @@ set(_intrinsic_multiworker_test_budgets
     "IntrinsicRuntimeContractTests|RuntimeJobService.BoundedApplyLimitsWorkPerDrainWithoutStarving|3"
     "IntrinsicRuntimeContractTests|RuntimeJobService.CancelAfterWorkerFinishFinalizesExactlyOnce|3"
     "IntrinsicRuntimeContractTests|RuntimeJobService.CancelAfterWorkerFinishSuppressesGatePublication|3"
-    "IntrinsicRuntimeContractTests|RuntimeJobService.CancelBeforeStartFinalizesOnMainThreadInsteadOfPublishing|3"
+    "IntrinsicRuntimeContractTests|RuntimeJobService.CancelBeforeStartFinalizesOnMainThreadInsteadOfPublishing|2"
     "IntrinsicRuntimeContractTests|RuntimeJobService.CancelMidFlightIsObservedAndDropsCompletion|3"
     "IntrinsicRuntimeContractTests|RuntimeJobService.DependenciesGateDispatchUntilUpstreamPublishes|3"
     "IntrinsicRuntimeContractTests|RuntimeJobService.DependencyCancelledJobFinalizesInTheSameDrain|3"
