@@ -349,10 +349,10 @@ sessions:
     open_threads: 5
   - id: 2026-09-07_001
     date: '2026-09-07'
-    summary: Completed METHOD-041 CPU curvature-extremum inspection and six-mesh offline viewer; engine
-      integration remains UI-053 and part-quality/adoption remain open.
-    turn_count: 1
-    events_count: 7
+    summary: Completed METHOD-041 inspection and published all eleven pending commits on main after the full
+      CPU gate; UI-053 integration and part-quality/adoption remain open.
+    turn_count: 2
+    events_count: 8
     claims_touched:
     - C61
     - C62

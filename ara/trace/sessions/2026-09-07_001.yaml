@@ -2,10 +2,10 @@ session:
   id: 2026-09-07_001
   date: '2026-09-07'
   started: 2026-09-07T00:36+02:00
-  last_turn: 2026-09-07T00:36+02:00
-  turn_count: 1
-  summary: Completed METHOD-041 CPU curvature-extremum inspection and six-mesh offline viewer; engine
-    integration remains UI-053 and part-quality/adoption remain open.
+  last_turn: 2026-09-07T01:28+02:00
+  turn_count: 2
+  summary: Completed METHOD-041 inspection and published all eleven pending commits on main after the full
+    CPU gate; UI-053 integration and part-quality/adoption remain open.
 events_logged:
 - turn: 1
   type: decision
@@ -49,6 +49,12 @@ events_logged:
   routing: crystallized
   provenance: ai-executed
   summary: logic/claims.md:C62
+- turn: 2
+  type: decision
+  id: N479
+  routing: direct
+  provenance: user
+  summary: Publish the committed work on main for the next workday
 ai_actions:
 - turn: 1
   action: Read primary feature-line/curvature formulations; implemented CPU detector, exact JSON export
@@ -65,6 +71,14 @@ ai_actions:
   - tests/unit/geometry/Test.CurvatureExtrema.cpp
   - methods/geometry/curvature_segmentation/curvature_extrema_report.md
   - tasks/active/UI-053-curvature-extremum-engine-overlay.md
+- turn: 2
+  action: 'Fetched origin, confirmed both local branches are contained in the eleven-commit stack, and
+    fast-forwarded main without conflicts to 6799e1970. Configured ci, built IntrinsicCpuTests and ran
+    the full CPU selector: zero failures across 4308 selected records with the expected non-ASan LSan-control
+    skip. Structural gates passed. Pushed origin/main successfully and verified its exact SHA; generated
+    build artifacts remain local. This is publication/verification bookkeeping, not a new research result.'
+  provenance: ai-executed
+  files_changed: []
 claims_touched:
 - id: C61
   action: created
@@ -75,6 +89,9 @@ claims_touched:
 key_context:
 - turn: 1
   excerpt: 'User: yes, please cowork on this with claude.'
+- turn: 2
+  excerpt: 'User: please commit and merge everything to main. then push to remote. i need it tomorrow
+    at work'
 open_threads:
 - 'UI-053: integrate detached curves through shared engine/config/UI publication.'
 - Inspect candidate curve placement with the operator before choosing boundary completion, selection and

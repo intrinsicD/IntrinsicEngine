@@ -11082,3 +11082,17 @@ tree:
     - methods/geometry/curvature_segmentation/curvature_extrema.md
     - tasks/active/UI-053-curvature-extremum-engine-overlay.md
     status: resolved
+  - id: N479
+    type: decision
+    title: Publish the committed work on main for the next workday
+    provenance: user
+    timestamp: 2026-09-07T01:28+02:00
+    choice: Explicitly authorize committing all pending work, merging it into main and pushing to the configured
+      origin so it is available at work tomorrow. This authorizes repository publication, not scientific
+      adoption of the experimental segmentation.
+    alternatives:
+    - Keep the completed commit stack local.
+    evidence:
+    - 6799e1970
+    - tasks/done/METHOD-041-curvature-extremum-curve-inspection.md
+    status: resolved
