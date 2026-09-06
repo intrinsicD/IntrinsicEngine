@@ -1,0 +1,511 @@
+{
+  "elapsed": 12.026768645999255,
+  "returncode": -15,
+  "terminated_after_observation": true,
+  "samples": [
+    {
+      "seconds": 0.500088365006377,
+      "processes": [
+        {
+          "pid": 1618385,
+          "status": "Name:\tIntrinsicGlfwLi\nState:\tS (sleeping)\nPPid:\t1618384\nTracerPid:\t0\nVmRSS:\t    8720 kB\nThreads:\t1\nvoluntary_ctxt_switches:\t4\nnonvoluntary_ctxt_switches:\t1",
+          "wchan": "pipe_read",
+          "syscall": "0 0x3 0x72b9dad3e000 0x1000 0x22 0x0 0x0 0x7ffe81f73548 0x64ab2f1b34e4\n",
+          "stack": "[Errno 13] Permission denied",
+          "cmdline": "/home/alex/Documents/IntrinsicEngine/build/ci-asan/bin/IntrinsicGlfwLifecycleLsanProcess synthetic-engine-leak "
+        },
+        {
+          "pid": 1618388,
+          "status": "Name:\tllvm-symbolizer\nState:\tS (sleeping)\nPPid:\t1618385\nTracerPid:\t0\nVmRSS:\t   56812 kB\nThreads:\t1\nvoluntary_ctxt_switches:\t12\nnonvoluntary_ctxt_switches:\t6",
+          "wchan": "do_poll.constprop.0",
+          "syscall": "7 0x7ffe7a6400b0 0x2 0x3e8 0x0 0x0 0x9 0x7ffe7a63ffb0 0x7fec64d1b5fd\n",
+          "stack": "[Errno 13] Permission denied",
+          "cmdline": "/usr/bin/llvm-symbolizer-18 --demangle --inlines --default-arch=x86_64 "
+        }
+      ]
+    },
+    {
+      "seconds": 1.0009405169985257,
+      "processes": [
+        {
+          "pid": 1618385,
+          "status": "Name:\tIntrinsicGlfwLi\nState:\tS (sleeping)\nPPid:\t1618384\nTracerPid:\t0\nVmRSS:\t    8720 kB\nThreads:\t1\nvoluntary_ctxt_switches:\t4\nnonvoluntary_ctxt_switches:\t1",
+          "wchan": "pipe_read",
+          "syscall": "0 0x3 0x72b9dad3e000 0x1000 0x22 0x0 0x0 0x7ffe81f73548 0x64ab2f1b34e4\n",
+          "stack": "[Errno 13] Permission denied",
+          "cmdline": "/home/alex/Documents/IntrinsicEngine/build/ci-asan/bin/IntrinsicGlfwLifecycleLsanProcess synthetic-engine-leak "
+        },
+        {
+          "pid": 1618388,
+          "status": "Name:\tllvm-symbolizer\nState:\tS (sleeping)\nPPid:\t1618385\nTracerPid:\t0\nVmRSS:\t   56812 kB\nThreads:\t1\nvoluntary_ctxt_switches:\t12\nnonvoluntary_ctxt_switches:\t6",
+          "wchan": "do_poll.constprop.0",
+          "syscall": "7 0x7ffe7a6400b0 0x2 0x3e8 0x0 0x0 0x9 0x7ffe7a63ffb0 0x7fec64d1b5fd\n",
+          "stack": "[Errno 13] Permission denied",
+          "cmdline": "/usr/bin/llvm-symbolizer-18 --demangle --inlines --default-arch=x86_64 "
+        }
+      ]
+    },
+    {
+      "seconds": 1.5022712610079907,
+      "processes": [
+        {
+          "pid": 1618385,
+          "status": "Name:\tIntrinsicGlfwLi\nState:\tS (sleeping)\nPPid:\t1618384\nTracerPid:\t0\nVmRSS:\t    8720 kB\nThreads:\t1\nvoluntary_ctxt_switches:\t4\nnonvoluntary_ctxt_switches:\t1",
+          "wchan": "pipe_read",
+          "syscall": "0 0x3 0x72b9dad3e000 0x1000 0x22 0x0 0x0 0x7ffe81f73548 0x64ab2f1b34e4\n",
+          "stack": "[Errno 13] Permission denied",
+          "cmdline": "/home/alex/Documents/IntrinsicEngine/build/ci-asan/bin/IntrinsicGlfwLifecycleLsanProcess synthetic-engine-leak "
+        },
+        {
+          "pid": 1618388,
+          "status": "Name:\tllvm-symbolizer\nState:\tS (sleeping)\nPPid:\t1618385\nTracerPid:\t0\nVmRSS:\t   56812 kB\nThreads:\t1\nvoluntary_ctxt_switches:\t13\nnonvoluntary_ctxt_switches:\t6",
+          "wchan": "do_poll.constprop.0",
+          "syscall": "7 0x7ffe7a6400b0 0x2 0x3e8 0x0 0x0 0x9 0x7ffe7a63ffb0 0x7fec64d1b5fd\n",
+          "stack": "[Errno 13] Permission denied",
+          "cmdline": "/usr/bin/llvm-symbolizer-18 --demangle --inlines --default-arch=x86_64 "
+        }
+      ]
+    },
+    {
+      "seconds": 2.0029829350096406,
+      "processes": [
+        {
+          "pid": 1618385,
+          "status": "Name:\tIntrinsicGlfwLi\nState:\tS (sleeping)\nPPid:\t1618384\nTracerPid:\t0\nVmRSS:\t    8720 kB\nThreads:\t1\nvoluntary_ctxt_switches:\t4\nnonvoluntary_ctxt_switches:\t1",
+          "wchan": "pipe_read",
+          "syscall": "0 0x3 0x72b9dad3e000 0x1000 0x22 0x0 0x0 0x7ffe81f73548 0x64ab2f1b34e4\n",
+          "stack": "[Errno 13] Permission denied",
+          "cmdline": "/home/alex/Documents/IntrinsicEngine/build/ci-asan/bin/IntrinsicGlfwLifecycleLsanProcess synthetic-engine-leak "
+        },
+        {
+          "pid": 1618388,
+          "status": "Name:\tllvm-symbolizer\nState:\tS (sleeping)\nPPid:\t1618385\nTracerPid:\t0\nVmRSS:\t   56812 kB\nThreads:\t1\nvoluntary_ctxt_switches:\t13\nnonvoluntary_ctxt_switches:\t6",
+          "wchan": "do_poll.constprop.0",
+          "syscall": "7 0x7ffe7a6400b0 0x2 0x3e8 0x0 0x0 0x9 0x7ffe7a63ffb0 0x7fec64d1b5fd\n",
+          "stack": "[Errno 13] Permission denied",
+          "cmdline": "/usr/bin/llvm-symbolizer-18 --demangle --inlines --default-arch=x86_64 "
+        }
+      ]
+    },
+    {
+      "seconds": 2.5035242370067863,
+      "processes": [
+        {
+          "pid": 1618385,
+          "status": "Name:\tIntrinsicGlfwLi\nState:\tS (sleeping)\nPPid:\t1618384\nTracerPid:\t0\nVmRSS:\t    8720 kB\nThreads:\t1\nvoluntary_ctxt_switches:\t4\nnonvoluntary_ctxt_switches:\t1",
+          "wchan": "pipe_read",
+          "syscall": "0 0x3 0x72b9dad3e000 0x1000 0x22 0x0 0x0 0x7ffe81f73548 0x64ab2f1b34e4\n",
+          "stack": "[Errno 13] Permission denied",
+          "cmdline": "/home/alex/Documents/IntrinsicEngine/build/ci-asan/bin/IntrinsicGlfwLifecycleLsanProcess synthetic-engine-leak "
+        },
+        {
+          "pid": 1618388,
+          "status": "Name:\tllvm-symbolizer\nState:\tS (sleeping)\nPPid:\t1618385\nTracerPid:\t0\nVmRSS:\t   56812 kB\nThreads:\t1\nvoluntary_ctxt_switches:\t14\nnonvoluntary_ctxt_switches:\t6",
+          "wchan": "do_poll.constprop.0",
+          "syscall": "7 0x7ffe7a6400b0 0x2 0x3e8 0x0 0x0 0x9 0x7ffe7a63ffb0 0x7fec64d1b5fd\n",
+          "stack": "[Errno 13] Permission denied",
+          "cmdline": "/usr/bin/llvm-symbolizer-18 --demangle --inlines --default-arch=x86_64 "
+        }
+      ]
+    },
+    {
+      "seconds": 3.0052988870011177,
+      "processes": [
+        {
+          "pid": 1618385,
+          "status": "Name:\tIntrinsicGlfwLi\nState:\tS (sleeping)\nPPid:\t1618384\nTracerPid:\t0\nVmRSS:\t    8720 kB\nThreads:\t1\nvoluntary_ctxt_switches:\t4\nnonvoluntary_ctxt_switches:\t1",
+          "wchan": "pipe_read",
+          "syscall": "0 0x3 0x72b9dad3e000 0x1000 0x22 0x0 0x0 0x7ffe81f73548 0x64ab2f1b34e4\n",
+          "stack": "[Errno 13] Permission denied",
+          "cmdline": "/home/alex/Documents/IntrinsicEngine/build/ci-asan/bin/IntrinsicGlfwLifecycleLsanProcess synthetic-engine-leak "
+        },
+        {
+          "pid": 1618388,
+          "status": "Name:\tllvm-symbolizer\nState:\tS (sleeping)\nPPid:\t1618385\nTracerPid:\t0\nVmRSS:\t   56812 kB\nThreads:\t1\nvoluntary_ctxt_switches:\t14\nnonvoluntary_ctxt_switches:\t6",
+          "wchan": "do_poll.constprop.0",
+          "syscall": "7 0x7ffe7a6400b0 0x2 0x3e8 0x0 0x0 0x9 0x7ffe7a63ffb0 0x7fec64d1b5fd\n",
+          "stack": "[Errno 13] Permission denied",
+          "cmdline": "/usr/bin/llvm-symbolizer-18 --demangle --inlines --default-arch=x86_64 "
+        }
+      ]
+    },
+    {
+      "seconds": 3.5072857920022216,
+      "processes": [
+        {
+          "pid": 1618385,
+          "status": "Name:\tIntrinsicGlfwLi\nState:\tS (sleeping)\nPPid:\t1618384\nTracerPid:\t0\nVmRSS:\t    8720 kB\nThreads:\t1\nvoluntary_ctxt_switches:\t4\nnonvoluntary_ctxt_switches:\t1",
+          "wchan": "pipe_read",
+          "syscall": "0 0x3 0x72b9dad3e000 0x1000 0x22 0x0 0x0 0x7ffe81f73548 0x64ab2f1b34e4\n",
+          "stack": "[Errno 13] Permission denied",
+          "cmdline": "/home/alex/Documents/IntrinsicEngine/build/ci-asan/bin/IntrinsicGlfwLifecycleLsanProcess synthetic-engine-leak "
+        },
+        {
+          "pid": 1618388,
+          "status": "Name:\tllvm-symbolizer\nState:\tS (sleeping)\nPPid:\t1618385\nTracerPid:\t0\nVmRSS:\t   56812 kB\nThreads:\t1\nvoluntary_ctxt_switches:\t15\nnonvoluntary_ctxt_switches:\t6",
+          "wchan": "do_poll.constprop.0",
+          "syscall": "7 0x7ffe7a6400b0 0x2 0x3e8 0x0 0x0 0x9 0x7ffe7a63ffb0 0x7fec64d1b5fd\n",
+          "stack": "[Errno 13] Permission denied",
+          "cmdline": "/usr/bin/llvm-symbolizer-18 --demangle --inlines --default-arch=x86_64 "
+        }
+      ]
+    },
+    {
+      "seconds": 4.008005313007743,
+      "processes": [
+        {
+          "pid": 1618385,
+          "status": "Name:\tIntrinsicGlfwLi\nState:\tS (sleeping)\nPPid:\t1618384\nTracerPid:\t0\nVmRSS:\t    8720 kB\nThreads:\t1\nvoluntary_ctxt_switches:\t4\nnonvoluntary_ctxt_switches:\t1",
+          "wchan": "pipe_read",
+          "syscall": "0 0x3 0x72b9dad3e000 0x1000 0x22 0x0 0x0 0x7ffe81f73548 0x64ab2f1b34e4\n",
+          "stack": "[Errno 13] Permission denied",
+          "cmdline": "/home/alex/Documents/IntrinsicEngine/build/ci-asan/bin/IntrinsicGlfwLifecycleLsanProcess synthetic-engine-leak "
+        },
+        {
+          "pid": 1618388,
+          "status": "Name:\tllvm-symbolizer\nState:\tS (sleeping)\nPPid:\t1618385\nTracerPid:\t0\nVmRSS:\t   56812 kB\nThreads:\t1\nvoluntary_ctxt_switches:\t15\nnonvoluntary_ctxt_switches:\t6",
+          "wchan": "do_poll.constprop.0",
+          "syscall": "7 0x7ffe7a6400b0 0x2 0x3e8 0x0 0x0 0x9 0x7ffe7a63ffb0 0x7fec64d1b5fd\n",
+          "stack": "[Errno 13] Permission denied",
+          "cmdline": "/usr/bin/llvm-symbolizer-18 --demangle --inlines --default-arch=x86_64 "
+        }
+      ]
+    },
+    {
+      "seconds": 4.50865698501002,
+      "processes": [
+        {
+          "pid": 1618385,
+          "status": "Name:\tIntrinsicGlfwLi\nState:\tS (sleeping)\nPPid:\t1618384\nTracerPid:\t0\nVmRSS:\t    8720 kB\nThreads:\t1\nvoluntary_ctxt_switches:\t4\nnonvoluntary_ctxt_switches:\t1",
+          "wchan": "pipe_read",
+          "syscall": "0 0x3 0x72b9dad3e000 0x1000 0x22 0x0 0x0 0x7ffe81f73548 0x64ab2f1b34e4\n",
+          "stack": "[Errno 13] Permission denied",
+          "cmdline": "/home/alex/Documents/IntrinsicEngine/build/ci-asan/bin/IntrinsicGlfwLifecycleLsanProcess synthetic-engine-leak "
+        },
+        {
+          "pid": 1618388,
+          "status": "Name:\tllvm-symbolizer\nState:\tS (sleeping)\nPPid:\t1618385\nTracerPid:\t0\nVmRSS:\t   56812 kB\nThreads:\t1\nvoluntary_ctxt_switches:\t16\nnonvoluntary_ctxt_switches:\t6",
+          "wchan": "do_poll.constprop.0",
+          "syscall": "7 0x7ffe7a6400b0 0x2 0x3e8 0x0 0x0 0x9 0x7ffe7a63ffb0 0x7fec64d1b5fd\n",
+          "stack": "[Errno 13] Permission denied",
+          "cmdline": "/usr/bin/llvm-symbolizer-18 --demangle --inlines --default-arch=x86_64 "
+        }
+      ]
+    },
+    {
+      "seconds": 5.009296105999965,
+      "processes": [
+        {
+          "pid": 1618385,
+          "status": "Name:\tIntrinsicGlfwLi\nState:\tS (sleeping)\nPPid:\t1618384\nTracerPid:\t0\nVmRSS:\t    8720 kB\nThreads:\t1\nvoluntary_ctxt_switches:\t4\nnonvoluntary_ctxt_switches:\t1",
+          "wchan": "pipe_read",
+          "syscall": "0 0x3 0x72b9dad3e000 0x1000 0x22 0x0 0x0 0x7ffe81f73548 0x64ab2f1b34e4\n",
+          "stack": "[Errno 13] Permission denied",
+          "cmdline": "/home/alex/Documents/IntrinsicEngine/build/ci-asan/bin/IntrinsicGlfwLifecycleLsanProcess synthetic-engine-leak "
+        },
+        {
+          "pid": 1618388,
+          "status": "Name:\tllvm-symbolizer\nState:\tS (sleeping)\nPPid:\t1618385\nTracerPid:\t0\nVmRSS:\t   56812 kB\nThreads:\t1\nvoluntary_ctxt_switches:\t16\nnonvoluntary_ctxt_switches:\t6",
+          "wchan": "do_poll.constprop.0",
+          "syscall": "7 0x7ffe7a6400b0 0x2 0x3e8 0x0 0x0 0x9 0x7ffe7a63ffb0 0x7fec64d1b5fd\n",
+          "stack": "[Errno 13] Permission denied",
+          "cmdline": "/usr/bin/llvm-symbolizer-18 --demangle --inlines --default-arch=x86_64 "
+        }
+      ]
+    },
+    {
+      "seconds": 5.510021035006503,
+      "processes": [
+        {
+          "pid": 1618385,
+          "status": "Name:\tIntrinsicGlfwLi\nState:\tS (sleeping)\nPPid:\t1618384\nTracerPid:\t0\nVmRSS:\t    8720 kB\nThreads:\t1\nvoluntary_ctxt_switches:\t4\nnonvoluntary_ctxt_switches:\t1",
+          "wchan": "pipe_read",
+          "syscall": "0 0x3 0x72b9dad3e000 0x1000 0x22 0x0 0x0 0x7ffe81f73548 0x64ab2f1b34e4\n",
+          "stack": "[Errno 13] Permission denied",
+          "cmdline": "/home/alex/Documents/IntrinsicEngine/build/ci-asan/bin/IntrinsicGlfwLifecycleLsanProcess synthetic-engine-leak "
+        },
+        {
+          "pid": 1618388,
+          "status": "Name:\tllvm-symbolizer\nState:\tS (sleeping)\nPPid:\t1618385\nTracerPid:\t0\nVmRSS:\t   56812 kB\nThreads:\t1\nvoluntary_ctxt_switches:\t17\nnonvoluntary_ctxt_switches:\t6",
+          "wchan": "do_poll.constprop.0",
+          "syscall": "7 0x7ffe7a6400b0 0x2 0x3e8 0x0 0x0 0x9 0x7ffe7a63ffb0 0x7fec64d1b5fd\n",
+          "stack": "[Errno 13] Permission denied",
+          "cmdline": "/usr/bin/llvm-symbolizer-18 --demangle --inlines --default-arch=x86_64 "
+        }
+      ]
+    },
+    {
+      "seconds": 6.010887020005612,
+      "processes": [
+        {
+          "pid": 1618385,
+          "status": "Name:\tIntrinsicGlfwLi\nState:\tS (sleeping)\nPPid:\t1618384\nTracerPid:\t0\nVmRSS:\t    8720 kB\nThreads:\t1\nvoluntary_ctxt_switches:\t4\nnonvoluntary_ctxt_switches:\t1",
+          "wchan": "pipe_read",
+          "syscall": "0 0x3 0x72b9dad3e000 0x1000 0x22 0x0 0x0 0x7ffe81f73548 0x64ab2f1b34e4\n",
+          "stack": "[Errno 13] Permission denied",
+          "cmdline": "/home/alex/Documents/IntrinsicEngine/build/ci-asan/bin/IntrinsicGlfwLifecycleLsanProcess synthetic-engine-leak "
+        },
+        {
+          "pid": 1618388,
+          "status": "Name:\tllvm-symbolizer\nState:\tS (sleeping)\nPPid:\t1618385\nTracerPid:\t0\nVmRSS:\t   56812 kB\nThreads:\t1\nvoluntary_ctxt_switches:\t17\nnonvoluntary_ctxt_switches:\t6",
+          "wchan": "do_poll.constprop.0",
+          "syscall": "7 0x7ffe7a6400b0 0x2 0x3e8 0x0 0x0 0x9 0x7ffe7a63ffb0 0x7fec64d1b5fd\n",
+          "stack": "[Errno 13] Permission denied",
+          "cmdline": "/usr/bin/llvm-symbolizer-18 --demangle --inlines --default-arch=x86_64 "
+        }
+      ]
+    },
+    {
+      "seconds": 6.511515000005602,
+      "processes": [
+        {
+          "pid": 1618385,
+          "status": "Name:\tIntrinsicGlfwLi\nState:\tS (sleeping)\nPPid:\t1618384\nTracerPid:\t0\nVmRSS:\t    8720 kB\nThreads:\t1\nvoluntary_ctxt_switches:\t4\nnonvoluntary_ctxt_switches:\t1",
+          "wchan": "pipe_read",
+          "syscall": "0 0x3 0x72b9dad3e000 0x1000 0x22 0x0 0x0 0x7ffe81f73548 0x64ab2f1b34e4\n",
+          "stack": "[Errno 13] Permission denied",
+          "cmdline": "/home/alex/Documents/IntrinsicEngine/build/ci-asan/bin/IntrinsicGlfwLifecycleLsanProcess synthetic-engine-leak "
+        },
+        {
+          "pid": 1618388,
+          "status": "Name:\tllvm-symbolizer\nState:\tS (sleeping)\nPPid:\t1618385\nTracerPid:\t0\nVmRSS:\t   56812 kB\nThreads:\t1\nvoluntary_ctxt_switches:\t18\nnonvoluntary_ctxt_switches:\t6",
+          "wchan": "do_poll.constprop.0",
+          "syscall": "7 0x7ffe7a6400b0 0x2 0x3e8 0x0 0x0 0x9 0x7ffe7a63ffb0 0x7fec64d1b5fd\n",
+          "stack": "[Errno 13] Permission denied",
+          "cmdline": "/usr/bin/llvm-symbolizer-18 --demangle --inlines --default-arch=x86_64 "
+        }
+      ]
+    },
+    {
+      "seconds": 7.0132759120024275,
+      "processes": [
+        {
+          "pid": 1618385,
+          "status": "Name:\tIntrinsicGlfwLi\nState:\tS (sleeping)\nPPid:\t1618384\nTracerPid:\t0\nVmRSS:\t    8720 kB\nThreads:\t1\nvoluntary_ctxt_switches:\t4\nnonvoluntary_ctxt_switches:\t1",
+          "wchan": "pipe_read",
+          "syscall": "0 0x3 0x72b9dad3e000 0x1000 0x22 0x0 0x0 0x7ffe81f73548 0x64ab2f1b34e4\n",
+          "stack": "[Errno 13] Permission denied",
+          "cmdline": "/home/alex/Documents/IntrinsicEngine/build/ci-asan/bin/IntrinsicGlfwLifecycleLsanProcess synthetic-engine-leak "
+        },
+        {
+          "pid": 1618388,
+          "status": "Name:\tllvm-symbolizer\nState:\tS (sleeping)\nPPid:\t1618385\nTracerPid:\t0\nVmRSS:\t   56812 kB\nThreads:\t1\nvoluntary_ctxt_switches:\t18\nnonvoluntary_ctxt_switches:\t6",
+          "wchan": "do_poll.constprop.0",
+          "syscall": "7 0x7ffe7a6400b0 0x2 0x3e8 0x0 0x0 0x9 0x7ffe7a63ffb0 0x7fec64d1b5fd\n",
+          "stack": "[Errno 13] Permission denied",
+          "cmdline": "/usr/bin/llvm-symbolizer-18 --demangle --inlines --default-arch=x86_64 "
+        }
+      ]
+    },
+    {
+      "seconds": 7.513961404998554,
+      "processes": [
+        {
+          "pid": 1618385,
+          "status": "Name:\tIntrinsicGlfwLi\nState:\tS (sleeping)\nPPid:\t1618384\nTracerPid:\t0\nVmRSS:\t    8720 kB\nThreads:\t1\nvoluntary_ctxt_switches:\t4\nnonvoluntary_ctxt_switches:\t1",
+          "wchan": "pipe_read",
+          "syscall": "0 0x3 0x72b9dad3e000 0x1000 0x22 0x0 0x0 0x7ffe81f73548 0x64ab2f1b34e4\n",
+          "stack": "[Errno 13] Permission denied",
+          "cmdline": "/home/alex/Documents/IntrinsicEngine/build/ci-asan/bin/IntrinsicGlfwLifecycleLsanProcess synthetic-engine-leak "
+        },
+        {
+          "pid": 1618388,
+          "status": "Name:\tllvm-symbolizer\nState:\tS (sleeping)\nPPid:\t1618385\nTracerPid:\t0\nVmRSS:\t   56812 kB\nThreads:\t1\nvoluntary_ctxt_switches:\t19\nnonvoluntary_ctxt_switches:\t6",
+          "wchan": "do_poll.constprop.0",
+          "syscall": "7 0x7ffe7a6400b0 0x2 0x3e8 0x0 0x0 0x9 0x7ffe7a63ffb0 0x7fec64d1b5fd\n",
+          "stack": "[Errno 13] Permission denied",
+          "cmdline": "/usr/bin/llvm-symbolizer-18 --demangle --inlines --default-arch=x86_64 "
+        }
+      ]
+    },
+    {
+      "seconds": 8.014856123001664,
+      "processes": [
+        {
+          "pid": 1618385,
+          "status": "Name:\tIntrinsicGlfwLi\nState:\tS (sleeping)\nPPid:\t1618384\nTracerPid:\t0\nVmRSS:\t    8720 kB\nThreads:\t1\nvoluntary_ctxt_switches:\t4\nnonvoluntary_ctxt_switches:\t1",
+          "wchan": "pipe_read",
+          "syscall": "0 0x3 0x72b9dad3e000 0x1000 0x22 0x0 0x0 0x7ffe81f73548 0x64ab2f1b34e4\n",
+          "stack": "[Errno 13] Permission denied",
+          "cmdline": "/home/alex/Documents/IntrinsicEngine/build/ci-asan/bin/IntrinsicGlfwLifecycleLsanProcess synthetic-engine-leak "
+        },
+        {
+          "pid": 1618388,
+          "status": "Name:\tllvm-symbolizer\nState:\tS (sleeping)\nPPid:\t1618385\nTracerPid:\t0\nVmRSS:\t   56812 kB\nThreads:\t1\nvoluntary_ctxt_switches:\t19\nnonvoluntary_ctxt_switches:\t6",
+          "wchan": "do_poll.constprop.0",
+          "syscall": "7 0x7ffe7a6400b0 0x2 0x3e8 0x0 0x0 0x9 0x7ffe7a63ffb0 0x7fec64d1b5fd\n",
+          "stack": "[Errno 13] Permission denied",
+          "cmdline": "/usr/bin/llvm-symbolizer-18 --demangle --inlines --default-arch=x86_64 "
+        }
+      ]
+    },
+    {
+      "seconds": 8.51828280701011,
+      "processes": [
+        {
+          "pid": 1618385,
+          "status": "Name:\tIntrinsicGlfwLi\nState:\tS (sleeping)\nPPid:\t1618384\nTracerPid:\t0\nVmRSS:\t    8720 kB\nThreads:\t1\nvoluntary_ctxt_switches:\t4\nnonvoluntary_ctxt_switches:\t1",
+          "wchan": "pipe_read",
+          "syscall": "0 0x3 0x72b9dad3e000 0x1000 0x22 0x0 0x0 0x7ffe81f73548 0x64ab2f1b34e4\n",
+          "stack": "[Errno 13] Permission denied",
+          "cmdline": "/home/alex/Documents/IntrinsicEngine/build/ci-asan/bin/IntrinsicGlfwLifecycleLsanProcess synthetic-engine-leak "
+        },
+        {
+          "pid": 1618388,
+          "status": "Name:\tllvm-symbolizer\nState:\tS (sleeping)\nPPid:\t1618385\nTracerPid:\t0\nVmRSS:\t   56812 kB\nThreads:\t1\nvoluntary_ctxt_switches:\t20\nnonvoluntary_ctxt_switches:\t6",
+          "wchan": "do_poll.constprop.0",
+          "syscall": "7 0x7ffe7a6400b0 0x2 0x3e8 0x0 0x0 0x9 0x7ffe7a63ffb0 0x7fec64d1b5fd\n",
+          "stack": "[Errno 13] Permission denied",
+          "cmdline": "/usr/bin/llvm-symbolizer-18 --demangle --inlines --default-arch=x86_64 "
+        }
+      ]
+    },
+    {
+      "seconds": 9.01903474800929,
+      "processes": [
+        {
+          "pid": 1618385,
+          "status": "Name:\tIntrinsicGlfwLi\nState:\tS (sleeping)\nPPid:\t1618384\nTracerPid:\t0\nVmRSS:\t    8720 kB\nThreads:\t1\nvoluntary_ctxt_switches:\t4\nnonvoluntary_ctxt_switches:\t1",
+          "wchan": "pipe_read",
+          "syscall": "0 0x3 0x72b9dad3e000 0x1000 0x22 0x0 0x0 0x7ffe81f73548 0x64ab2f1b34e4\n",
+          "stack": "[Errno 13] Permission denied",
+          "cmdline": "/home/alex/Documents/IntrinsicEngine/build/ci-asan/bin/IntrinsicGlfwLifecycleLsanProcess synthetic-engine-leak "
+        },
+        {
+          "pid": 1618388,
+          "status": "Name:\tllvm-symbolizer\nState:\tS (sleeping)\nPPid:\t1618385\nTracerPid:\t0\nVmRSS:\t   56812 kB\nThreads:\t1\nvoluntary_ctxt_switches:\t20\nnonvoluntary_ctxt_switches:\t6",
+          "wchan": "do_poll.constprop.0",
+          "syscall": "7 0x7ffe7a6400b0 0x2 0x3e8 0x0 0x0 0x9 0x7ffe7a63ffb0 0x7fec64d1b5fd\n",
+          "stack": "[Errno 13] Permission denied",
+          "cmdline": "/usr/bin/llvm-symbolizer-18 --demangle --inlines --default-arch=x86_64 "
+        }
+      ]
+    },
+    {
+      "seconds": 9.51975407199643,
+      "processes": [
+        {
+          "pid": 1618385,
+          "status": "Name:\tIntrinsicGlfwLi\nState:\tS (sleeping)\nPPid:\t1618384\nTracerPid:\t0\nVmRSS:\t    8720 kB\nThreads:\t1\nvoluntary_ctxt_switches:\t4\nnonvoluntary_ctxt_switches:\t1",
+          "wchan": "pipe_read",
+          "syscall": "0 0x3 0x72b9dad3e000 0x1000 0x22 0x0 0x0 0x7ffe81f73548 0x64ab2f1b34e4\n",
+          "stack": "[Errno 13] Permission denied",
+          "cmdline": "/home/alex/Documents/IntrinsicEngine/build/ci-asan/bin/IntrinsicGlfwLifecycleLsanProcess synthetic-engine-leak "
+        },
+        {
+          "pid": 1618388,
+          "status": "Name:\tllvm-symbolizer\nState:\tS (sleeping)\nPPid:\t1618385\nTracerPid:\t0\nVmRSS:\t   56812 kB\nThreads:\t1\nvoluntary_ctxt_switches:\t21\nnonvoluntary_ctxt_switches:\t6",
+          "wchan": "do_poll.constprop.0",
+          "syscall": "7 0x7ffe7a6400b0 0x2 0x3e8 0x0 0x0 0x9 0x7ffe7a63ffb0 0x7fec64d1b5fd\n",
+          "stack": "[Errno 13] Permission denied",
+          "cmdline": "/usr/bin/llvm-symbolizer-18 --demangle --inlines --default-arch=x86_64 "
+        }
+      ]
+    },
+    {
+      "seconds": 10.020288896004786,
+      "processes": [
+        {
+          "pid": 1618385,
+          "status": "Name:\tIntrinsicGlfwLi\nState:\tS (sleeping)\nPPid:\t1618384\nTracerPid:\t0\nVmRSS:\t    8720 kB\nThreads:\t1\nvoluntary_ctxt_switches:\t4\nnonvoluntary_ctxt_switches:\t1",
+          "wchan": "pipe_read",
+          "syscall": "0 0x3 0x72b9dad3e000 0x1000 0x22 0x0 0x0 0x7ffe81f73548 0x64ab2f1b34e4\n",
+          "stack": "[Errno 13] Permission denied",
+          "cmdline": "/home/alex/Documents/IntrinsicEngine/build/ci-asan/bin/IntrinsicGlfwLifecycleLsanProcess synthetic-engine-leak "
+        },
+        {
+          "pid": 1618388,
+          "status": "Name:\tllvm-symbolizer\nState:\tS (sleeping)\nPPid:\t1618385\nTracerPid:\t0\nVmRSS:\t   56812 kB\nThreads:\t1\nvoluntary_ctxt_switches:\t21\nnonvoluntary_ctxt_switches:\t6",
+          "wchan": "do_poll.constprop.0",
+          "syscall": "7 0x7ffe7a6400b0 0x2 0x3e8 0x0 0x0 0x9 0x7ffe7a63ffb0 0x7fec64d1b5fd\n",
+          "stack": "[Errno 13] Permission denied",
+          "cmdline": "/usr/bin/llvm-symbolizer-18 --demangle --inlines --default-arch=x86_64 "
+        }
+      ]
+    },
+    {
+      "seconds": 10.520857873998466,
+      "processes": [
+        {
+          "pid": 1618385,
+          "status": "Name:\tIntrinsicGlfwLi\nState:\tS (sleeping)\nPPid:\t1618384\nTracerPid:\t0\nVmRSS:\t    8720 kB\nThreads:\t1\nvoluntary_ctxt_switches:\t4\nnonvoluntary_ctxt_switches:\t1",
+          "wchan": "pipe_read",
+          "syscall": "0 0x3 0x72b9dad3e000 0x1000 0x22 0x0 0x0 0x7ffe81f73548 0x64ab2f1b34e4\n",
+          "stack": "[Errno 13] Permission denied",
+          "cmdline": "/home/alex/Documents/IntrinsicEngine/build/ci-asan/bin/IntrinsicGlfwLifecycleLsanProcess synthetic-engine-leak "
+        },
+        {
+          "pid": 1618388,
+          "status": "Name:\tllvm-symbolizer\nState:\tS (sleeping)\nPPid:\t1618385\nTracerPid:\t0\nVmRSS:\t   56812 kB\nThreads:\t1\nvoluntary_ctxt_switches:\t22\nnonvoluntary_ctxt_switches:\t6",
+          "wchan": "do_poll.constprop.0",
+          "syscall": "7 0x7ffe7a6400b0 0x2 0x3e8 0x0 0x0 0x9 0x7ffe7a63ffb0 0x7fec64d1b5fd\n",
+          "stack": "[Errno 13] Permission denied",
+          "cmdline": "/usr/bin/llvm-symbolizer-18 --demangle --inlines --default-arch=x86_64 "
+        }
+      ]
+    },
+    {
+      "seconds": 11.021443468009238,
+      "processes": [
+        {
+          "pid": 1618385,
+          "status": "Name:\tIntrinsicGlfwLi\nState:\tS (sleeping)\nPPid:\t1618384\nTracerPid:\t0\nVmRSS:\t    8720 kB\nThreads:\t1\nvoluntary_ctxt_switches:\t4\nnonvoluntary_ctxt_switches:\t1",
+          "wchan": "pipe_read",
+          "syscall": "0 0x3 0x72b9dad3e000 0x1000 0x22 0x0 0x0 0x7ffe81f73548 0x64ab2f1b34e4\n",
+          "stack": "[Errno 13] Permission denied",
+          "cmdline": "/home/alex/Documents/IntrinsicEngine/build/ci-asan/bin/IntrinsicGlfwLifecycleLsanProcess synthetic-engine-leak "
+        },
+        {
+          "pid": 1618388,
+          "status": "Name:\tllvm-symbolizer\nState:\tS (sleeping)\nPPid:\t1618385\nTracerPid:\t0\nVmRSS:\t   56812 kB\nThreads:\t1\nvoluntary_ctxt_switches:\t22\nnonvoluntary_ctxt_switches:\t6",
+          "wchan": "do_poll.constprop.0",
+          "syscall": "7 0x7ffe7a6400b0 0x2 0x3e8 0x0 0x0 0x9 0x7ffe7a63ffb0 0x7fec64d1b5fd\n",
+          "stack": "[Errno 13] Permission denied",
+          "cmdline": "/usr/bin/llvm-symbolizer-18 --demangle --inlines --default-arch=x86_64 "
+        }
+      ]
+    },
+    {
+      "seconds": 11.522134754006402,
+      "processes": [
+        {
+          "pid": 1618385,
+          "status": "Name:\tIntrinsicGlfwLi\nState:\tS (sleeping)\nPPid:\t1618384\nTracerPid:\t0\nVmRSS:\t    8720 kB\nThreads:\t1\nvoluntary_ctxt_switches:\t4\nnonvoluntary_ctxt_switches:\t1",
+          "wchan": "pipe_read",
+          "syscall": "0 0x3 0x72b9dad3e000 0x1000 0x22 0x0 0x0 0x7ffe81f73548 0x64ab2f1b34e4\n",
+          "stack": "[Errno 13] Permission denied",
+          "cmdline": "/home/alex/Documents/IntrinsicEngine/build/ci-asan/bin/IntrinsicGlfwLifecycleLsanProcess synthetic-engine-leak "
+        },
+        {
+          "pid": 1618388,
+          "status": "Name:\tllvm-symbolizer\nState:\tS (sleeping)\nPPid:\t1618385\nTracerPid:\t0\nVmRSS:\t   56812 kB\nThreads:\t1\nvoluntary_ctxt_switches:\t23\nnonvoluntary_ctxt_switches:\t6",
+          "wchan": "do_poll.constprop.0",
+          "syscall": "7 0x7ffe7a6400b0 0x2 0x3e8 0x0 0x0 0x9 0x7ffe7a63ffb0 0x7fec64d1b5fd\n",
+          "stack": "[Errno 13] Permission denied",
+          "cmdline": "/usr/bin/llvm-symbolizer-18 --demangle --inlines --default-arch=x86_64 "
+        }
+      ]
+    },
+    {
+      "seconds": 12.02289468300296,
+      "processes": [
+        {
+          "pid": 1618385,
+          "status": "Name:\tIntrinsicGlfwLi\nState:\tS (sleeping)\nPPid:\t1618384\nTracerPid:\t0\nVmRSS:\t    8720 kB\nThreads:\t1\nvoluntary_ctxt_switches:\t4\nnonvoluntary_ctxt_switches:\t1",
+          "wchan": "pipe_read",
+          "syscall": "0 0x3 0x72b9dad3e000 0x1000 0x22 0x0 0x0 0x7ffe81f73548 0x64ab2f1b34e4\n",
+          "stack": "[Errno 13] Permission denied",
+          "cmdline": "/home/alex/Documents/IntrinsicEngine/build/ci-asan/bin/IntrinsicGlfwLifecycleLsanProcess synthetic-engine-leak "
+        },
+        {
+          "pid": 1618388,
+          "status": "Name:\tllvm-symbolizer\nState:\tS (sleeping)\nPPid:\t1618385\nTracerPid:\t0\nVmRSS:\t   56812 kB\nThreads:\t1\nvoluntary_ctxt_switches:\t23\nnonvoluntary_ctxt_switches:\t6",
+          "wchan": "do_poll.constprop.0",
+          "syscall": "7 0x7ffe7a6400b0 0x2 0x3e8 0x0 0x0 0x9 0x7ffe7a63ffb0 0x7fec64d1b5fd\n",
+          "stack": "[Errno 13] Permission denied",
+          "cmdline": "/usr/bin/llvm-symbolizer-18 --demangle --inlines --default-arch=x86_64 "
+        }
+      ]
+    }
+  ]
+}

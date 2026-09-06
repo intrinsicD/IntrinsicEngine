@@ -29,7 +29,10 @@ endif()
 
 find_program(_bug082_env_program NAMES env REQUIRED)
 
+# Use local debug symbols so leak-report generation does not depend on network
+# availability through an inherited debuginfod server configuration.
 set(_sanitizer_environment
+    "DEBUGINFOD_URLS="
     "ASAN_OPTIONS=detect_leaks=1:symbolize=1:fast_unwind_on_malloc=0:halt_on_error=1"
     "LSAN_OPTIONS=detect_leaks=1:fast_unwind_on_malloc=0:exitcode=86:suppressions=${SUPPRESSIONS_PATH}"
     "ASAN_SYMBOLIZER_PATH=${SYMBOLIZER_PATH}"

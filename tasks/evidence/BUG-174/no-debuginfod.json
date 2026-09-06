@@ -1,0 +1,35 @@
+{
+  "command": [
+    "/home/alex/Documents/IntrinsicEngine/build/ci-asan/bin/IntrinsicGlfwLifecycleLsanProcess",
+    "synthetic-engine-leak"
+  ],
+  "environment_overrides": {
+    "ASAN_OPTIONS": "detect_leaks=1:symbolize=1:fast_unwind_on_malloc=0:halt_on_error=1",
+    "LSAN_OPTIONS": "detect_leaks=1:fast_unwind_on_malloc=0:exitcode=86:suppressions=/home/alex/Documents/IntrinsicEngine/lsan.supp",
+    "ASAN_SYMBOLIZER_PATH": "/usr/bin/llvm-symbolizer-18",
+    "DEBUGINFOD_URLS": ""
+  },
+  "runs": [
+    {
+      "iteration": 0,
+      "returncode": 86,
+      "elapsed": 0.09855569399951492,
+      "stdout": "",
+      "stderr": "BUG082_SYNTHETIC_ENGINE_LEAK_ALLOCATED: bytes=4096\n\n=================================================================\n==1621582==ERROR: LeakSanitizer: detected memory leaks\n\nDirect leak of 4096 byte(s) in 1 object(s) allocated from:\n    #0 0x637c01ddd971 in operator new(unsigned long) (/home/alex/Documents/IntrinsicEngine/build/ci-asan/bin/IntrinsicGlfwLifecycleLsanProcess+0x12c971) (BuildId: e442d811ad89d1be6c3a79358bca94ddc09bd5c7)\n    #1 0x637c01ddf381 in (anonymous namespace)::AllocateBug082SyntheticEngineLeak() /home/alex/Documents/IntrinsicEngine/tests/regression/platform/Test.GlfwLifecycleLsanProcess.cpp:33:24\n    #2 0x637c01ddf278 in (anonymous namespace)::RunSyntheticEngineLeak() /home/alex/Documents/IntrinsicEngine/tests/regression/platform/Test.GlfwLifecycleLsanProcess.cpp:95:9\n    #3 0x637c01ddf03f in main /home/alex/Documents/IntrinsicEngine/tests/regression/platform/Test.GlfwLifecycleLsanProcess.cpp:122:16\n    #4 0x7a701a42a1c9 in __libc_start_call_main csu/../sysdeps/nptl/libc_start_call_main.h:58:16\n    #5 0x7a701a42a28a in __libc_start_main csu/../csu/libc-start.c:360:3\n    #6 0x637c01cf4934 in _start (/home/alex/Documents/IntrinsicEngine/build/ci-asan/bin/IntrinsicGlfwLifecycleLsanProcess+0x43934) (BuildId: e442d811ad89d1be6c3a79358bca94ddc09bd5c7)\n\nSUMMARY: AddressSanitizer: 4096 byte(s) leaked in 1 allocation(s).\n"
+    },
+    {
+      "iteration": 1,
+      "returncode": 86,
+      "elapsed": 0.07291944600001443,
+      "stdout": "",
+      "stderr": "BUG082_SYNTHETIC_ENGINE_LEAK_ALLOCATED: bytes=4096\n\n=================================================================\n==1621603==ERROR: LeakSanitizer: detected memory leaks\n\nDirect leak of 4096 byte(s) in 1 object(s) allocated from:\n    #0 0x565635ef2971 in operator new(unsigned long) (/home/alex/Documents/IntrinsicEngine/build/ci-asan/bin/IntrinsicGlfwLifecycleLsanProcess+0x12c971) (BuildId: e442d811ad89d1be6c3a79358bca94ddc09bd5c7)\n    #1 0x565635ef4381 in (anonymous namespace)::AllocateBug082SyntheticEngineLeak() /home/alex/Documents/IntrinsicEngine/tests/regression/platform/Test.GlfwLifecycleLsanProcess.cpp:33:24\n    #2 0x565635ef4278 in (anonymous namespace)::RunSyntheticEngineLeak() /home/alex/Documents/IntrinsicEngine/tests/regression/platform/Test.GlfwLifecycleLsanProcess.cpp:95:9\n    #3 0x565635ef403f in main /home/alex/Documents/IntrinsicEngine/tests/regression/platform/Test.GlfwLifecycleLsanProcess.cpp:122:16\n    #4 0x75768302a1c9 in __libc_start_call_main csu/../sysdeps/nptl/libc_start_call_main.h:58:16\n    #5 0x75768302a28a in __libc_start_main csu/../csu/libc-start.c:360:3\n    #6 0x565635e09934 in _start (/home/alex/Documents/IntrinsicEngine/build/ci-asan/bin/IntrinsicGlfwLifecycleLsanProcess+0x43934) (BuildId: e442d811ad89d1be6c3a79358bca94ddc09bd5c7)\n\nSUMMARY: AddressSanitizer: 4096 byte(s) leaked in 1 allocation(s).\n"
+    },
+    {
+      "iteration": 2,
+      "returncode": 86,
+      "elapsed": 0.07637511599750724,
+      "stdout": "",
+      "stderr": "BUG082_SYNTHETIC_ENGINE_LEAK_ALLOCATED: bytes=4096\n\n=================================================================\n==1621609==ERROR: LeakSanitizer: detected memory leaks\n\nDirect leak of 4096 byte(s) in 1 object(s) allocated from:\n    #0 0x5705935da971 in operator new(unsigned long) (/home/alex/Documents/IntrinsicEngine/build/ci-asan/bin/IntrinsicGlfwLifecycleLsanProcess+0x12c971) (BuildId: e442d811ad89d1be6c3a79358bca94ddc09bd5c7)\n    #1 0x5705935dc381 in (anonymous namespace)::AllocateBug082SyntheticEngineLeak() /home/alex/Documents/IntrinsicEngine/tests/regression/platform/Test.GlfwLifecycleLsanProcess.cpp:33:24\n    #2 0x5705935dc278 in (anonymous namespace)::RunSyntheticEngineLeak() /home/alex/Documents/IntrinsicEngine/tests/regression/platform/Test.GlfwLifecycleLsanProcess.cpp:95:9\n    #3 0x5705935dc03f in main /home/alex/Documents/IntrinsicEngine/tests/regression/platform/Test.GlfwLifecycleLsanProcess.cpp:122:16\n    #4 0x75058ce2a1c9 in __libc_start_call_main csu/../sysdeps/nptl/libc_start_call_main.h:58:16\n    #5 0x75058ce2a28a in __libc_start_main csu/../csu/libc-start.c:360:3\n    #6 0x5705934f1934 in _start (/home/alex/Documents/IntrinsicEngine/build/ci-asan/bin/IntrinsicGlfwLifecycleLsanProcess+0x43934) (BuildId: e442d811ad89d1be6c3a79358bca94ddc09bd5c7)\n\nSUMMARY: AddressSanitizer: 4096 byte(s) leaked in 1 allocation(s).\n"
+    }
+  ]
+}
