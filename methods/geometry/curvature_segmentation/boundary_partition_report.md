@@ -216,7 +216,7 @@ strict clean-workshop checks pass. Manual scorecard:
 ## Subsequent operator inspection
 
 The operator subsequently requested engine/UI access. The separate
-[UI-052 diagnostic integration](../../../tasks/active/UI-052-method040-diagnostic-inspection.md)
+[UI-052 diagnostic integration](../../../tasks/done/UI-052-method040-diagnostic-inspection.md)
 adds `feature_boundary_curves_v1` to the existing Curvature window using the
 same fixed profile as the runner. See the [current runtime instructions](README.md#runtime-and-ui).
 The overnight observations, failed oracle, and no-adoption verdict above remain

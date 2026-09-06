@@ -8079,3 +8079,12 @@ Only the harness subprocess environment changes; local symbols, exact
 suppressions, leak assertions and the ten-second limit remain intact.
 Discriminating probes and twenty complete ASan harness repetitions pass.
 Implementation commit: `2d22f6f01`.
+
+### UI-052 — 2026-09-06
+
+Exposed METHOD-040 through the Curvature window as the versioned experimental
+`feature_boundary_curves_v1` choice. Runtime and the native runner share its
+fixed profile; config parity, absent fitted labels, atomic history and failed
+publication are tested. Ten focused CTest cases pass and the optimized Sandbox
+is rebuilt. This provides diagnostic inspection without method adoption.
+Implementation commit: `c04071f8b`.

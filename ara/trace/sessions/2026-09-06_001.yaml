@@ -2,10 +2,11 @@ session:
   id: 2026-09-06_001
   date: '2026-09-06'
   started: 2026-09-06T00:10+02:00
-  last_turn: 2026-09-06T05:37+02:00
-  turn_count: 3
-  summary: Diagnosed frog, implemented reviewed experimental boundary partitions, compared twelve meshes,
-    and passed CPU/ASan/UBSan gates; preserved the negative adoption oracle and unresolved custody.
+  last_turn: 2026-09-06T21:56+02:00
+  turn_count: 4
+  summary: Diagnosed frog, implemented and tested experimental boundary partitions, and exposed frozen
+    curves_v1 through engine/config/UI for operator inspection; negative adoption and custody findings
+    remain open.
 events_logged:
 - turn: 1
   type: question
@@ -103,6 +104,18 @@ events_logged:
   routing: crystallized
   provenance: ai-executed
   summary: logic/claims.md:C60
+- turn: 4
+  type: decision
+  id: N472
+  routing: direct
+  provenance: ai-executed
+  summary: Expose frozen METHOD-040 curves profile for operator inspection
+- turn: 4
+  type: experiment
+  id: N473
+  routing: direct
+  provenance: ai-executed
+  summary: Verify explicit METHOD-040 config, publication and history integration
 ai_actions:
 - turn: 1
   action: Built temporary probes against existing ci Clang-23 libraries, ran fourteen configurations,
@@ -140,6 +153,19 @@ ai_actions:
   - tasks/done/BUG-173-runtime-test-ordering.md
   - tasks/done/BUG-174-synthetic-lsan-control-timeout.md
   - tasks/done/BUG-175-uv-atlas-smoke-test-routing.md
+- turn: 4
+  action: 'Completed UI-052: explicit versioned method/config selection, method-specific diagnostics,
+    atomic publication without fitted GMM components, removal-only history accounting and guarded inactive
+    UI controls. Added focused tests and rebuilt the ci targets and dev Sandbox. Claude provided one bounded
+    abstract design review via MCP. A usage-limit interruption was followed by the user instruction to
+    continue and successful remaining work. No desktop click-through, new quality verdict or remote publication.'
+  provenance: ai-executed
+  files_changed:
+  - src/runtime/Modules/CurvatureSegmentation/Runtime.CurvatureSegmentationConfig.cppm
+  - src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Mesh.cpp
+  - src/app/Sandbox/Editor/Sandbox.MeshProcessingPanels.cpp
+  - tests/contract/runtime/Test.CurvatureSegmentationOperations.cpp
+  - tasks/done/UI-052-method040-diagnostic-inspection.md
 claims_touched:
 - id: C57
   action: created
@@ -162,14 +188,18 @@ key_context:
 - turn: 3
   excerpt: User authorized clean, robust, performant implementation, varied Dropbox mesh testing and iterative
     fixes with bounded Claude MCP collaboration through next morning.
+- turn: 4
+  excerpt: User requested continued Claude collaboration and asked whether METHOD-040 was wired into engine/UI
+    for direct testing; then explicitly instructed continuation.
 open_threads:
 - Reconcile the direct CPU five-region replay with the reported two-region live result before claiming
   exact reproduction.
 - Investigate region-pair hard-role reporting separately from actual source feature masks.
 - 'METHOD-040 remains unadopted: frozen closure oracle fails; BUG-171 prevents formal retirement from
   retained failed required receipts.'
-- Final candidate lacks a human/agent visual-quality acceptance; latest derived screenshot transfer was
-  blocked. Local viewer is available for operator inspection.
+- Final candidate still lacks operator visual-quality acceptance. Both the local comparison viewer and
+  explicit experimental METHOD-040 Sandbox choice are available for inspection; the running Sandbox must
+  restart to load the rebuilt binary.
 - BUG-172 retains the unproven attribution of an intermittent import completion failure; BUG-176 owns
   concurrent CTest discovery coordination.
 ai_suggestions_pending:

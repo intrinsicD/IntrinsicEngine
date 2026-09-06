@@ -384,7 +384,7 @@ python3 tools/agents/check_ara_claims.py --root . --strict
 
 ## Subsequent diagnostic access
 - The operator subsequently requested direct engine/UI testing with Claude
-  collaboration. [UI-052](UI-052-method040-diagnostic-inspection.md) owns that
+  collaboration. [UI-052](../done/UI-052-method040-diagnostic-inspection.md) owns that
   separately scoped explicit diagnostic access, analogous to BUG-163. This
   does not change the overnight negative oracle, production default, formal
   retirement blocker, or the positive-adoption conditions above. Its versioned

@@ -10955,3 +10955,42 @@ tree:
     - N469
     - N470
     status: resolved
+
+- id: N472
+  type: decision
+  title: Expose frozen METHOD-040 curves profile for operator inspection
+  provenance: ai-executed
+  timestamp: 2026-09-06T21:56+02:00
+  choice: The operator requested METHOD-040 engine/UI access with Claude collaboration. Expose an explicit
+    experimental curves_v1 choice through the shared validated config and execution path while preserving the
+    existing default and the negative adoption verdict. Reuse one frozen profile across the native runner and
+    runtime.
+  alternatives:
+  - Keep inspection limited to the offline comparison viewer.
+  - Treat requested diagnostic access as acceptance of segmentation quality.
+  evidence:
+  - N470
+  - tasks/done/UI-052-method040-diagnostic-inspection.md
+  - tasks/evidence/UI-052/claude-design-review.md
+  status: resolved
+- id: N473
+  type: experiment
+  title: Verify explicit METHOD-040 config, publication and history integration
+  provenance: ai-executed
+  timestamp: 2026-09-06T21:56+02:00
+  result: Ten focused CPU tests passed without skips, covering config identity and round-trip, runtime success/failure,
+    absent fitted-component publication, removal-only undo/redo, UI contracts and the frozen profile. The dev
+    Sandbox rebuilt successfully; the existing operator process was left intact and needs restarting. Native
+    frog label and edge outputs were byte-identical to the saved overnight curves outputs after extracting
+    the shared profile. This is integration and refactoring evidence, not new segmentation-quality, performance,
+    full-suite or sanitizer evidence. Claude supplied an abstract design review through MCP, not a source review.
+  evidence:
+  - tasks/evidence/UI-052/focused-ctest.log
+  - tasks/evidence/UI-052/claude-design-review.md
+  - tasks/done/UI-052-method040-diagnostic-inspection.md
+  - tests/contract/runtime/Test.CurvatureSegmentationOperations.cpp
+  - tests/integration/runtime/Test.SandboxConfigSections.cpp
+  - tests/unit/geometry/Test.CurvatureBoundaryPartition.cpp
+  also_depends_on:
+  - N472
+  status: resolved

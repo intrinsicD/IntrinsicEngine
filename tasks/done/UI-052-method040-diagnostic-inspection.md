@@ -99,3 +99,9 @@ python3 tools/docs/check_doc_links.py --root . --strict
 - Strict layering, task policy, doc links, test layout, method manifests,
   root hygiene, and automated clean-workshop checks pass. The module inventory
   was regenerated. No desktop click-through or new quality verdict is claimed.
+
+## Completion
+- Completed 2026-09-06.
+- Commit: c04071f8b (implementation).
+- Diagnostic access is complete; METHOD-040 still owns its negative adoption
+  result and independent formal-retirement blocker.

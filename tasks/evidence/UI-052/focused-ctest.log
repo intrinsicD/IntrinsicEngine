@@ -1,0 +1,33 @@
+Internal ctest changing into directory: /home/alex/Documents/IntrinsicEngine/build/ci
+Test project /home/alex/Documents/IntrinsicEngine/build/ci
+      Start  614: CurvatureSegmentationOperations.FeatureAlignedMethodPublishesEvidenceBoundaryRolesAndActualIdentity
+ 1/10 Test  #614: CurvatureSegmentationOperations.FeatureAlignedMethodPublishesEvidenceBoundaryRolesAndActualIdentity ...   Passed    0.08 sec
+      Start  615: CurvatureSegmentationOperations.PublishesSemanticPropertiesPreservesTopologyAndSupportsHistory
+ 2/10 Test  #615: CurvatureSegmentationOperations.PublishesSemanticPropertiesPreservesTopologyAndSupportsHistory ........   Passed    0.04 sec
+      Start  616: CurvatureSegmentationOperations.RejectsInvalidConfigurationAndUnavailableKernelWithoutMutation
+ 3/10 Test  #616: CurvatureSegmentationOperations.RejectsInvalidConfigurationAndUnavailableKernelWithoutMutation ........   Passed    0.01 sec
+      Start  617: CurvatureSegmentationOperations.BoundaryCurvesPublishRegionsWithoutFittedComponentsAndUndoRemoval
+ 4/10 Test  #617: CurvatureSegmentationOperations.BoundaryCurvesPublishRegionsWithoutFittedComponentsAndUndoRemoval .....   Passed    0.05 sec
+      Start  618: CurvatureSegmentationOperations.BoundaryCurvesFailurePreservesExistingPublication
+ 5/10 Test  #618: CurvatureSegmentationOperations.BoundaryCurvesFailurePreservesExistingPublication .....................   Passed    0.04 sec
+      Start 1249: SandboxConfigSections.CurvatureSegmentationSourcesProduceIdenticalValidatedState
+ 6/10 Test #1249: SandboxConfigSections.CurvatureSegmentationSourcesProduceIdenticalValidatedState ......................   Passed    0.39 sec
+      Start 1250: SandboxConfigSections.CurvatureSegmentationDefaultsAndInvalidRangesFailClosed
+ 7/10 Test #1250: SandboxConfigSections.CurvatureSegmentationDefaultsAndInvalidRangesFailClosed .........................   Passed    0.06 sec
+      Start 1278: SandboxCurvatureSegmentationPanel.RegistersInsideTheExistingCurvatureWindow
+ 8/10 Test #1278: SandboxCurvatureSegmentationPanel.RegistersInsideTheExistingCurvatureWindow ...........................   Passed    0.06 sec
+      Start 1279: SandboxCurvatureSegmentationPanel.UsesOneValidatedConfiguredRunAndSimultaneousFaceEdgeVisualization
+ 9/10 Test #1279: SandboxCurvatureSegmentationPanel.UsesOneValidatedConfiguredRunAndSimultaneousFaceEdgeVisualization ...   Passed    0.01 sec
+      Start 2824: CurvatureBoundaryPartition.CurveCoverageV1ProfileRemainsFrozen
+10/10 Test #2824: CurvatureBoundaryPartition.CurveCoverageV1ProfileRemainsFrozen ........................................   Passed    0.00 sec
+
+100% tests passed, 0 tests failed out of 10
+
+Label Time Summary:
+contract       =   0.22 sec*proc (5 tests)
+geometry       =   0.00 sec*proc (1 test)
+integration    =   0.52 sec*proc (4 tests)
+runtime        =   0.73 sec*proc (9 tests)
+unit           =   0.00 sec*proc (1 test)
+
+Total Test time (real) =   2.31 sec

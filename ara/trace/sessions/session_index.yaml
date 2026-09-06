@@ -337,10 +337,11 @@ sessions:
     open_threads: 2
   - id: 2026-09-06_001
     date: '2026-09-06'
-    summary: Diagnosed frog, implemented reviewed experimental boundary partitions, compared twelve meshes,
-      and passed CPU/ASan/UBSan gates; preserved the negative adoption oracle and unresolved custody.
-    turn_count: 3
-    events_count: 16
+    summary: Diagnosed frog, implemented and tested experimental boundary partitions, and exposed frozen
+      curves_v1 through engine/config/UI for operator inspection; negative adoption and custody findings
+      remain open.
+    turn_count: 4
+    events_count: 18
     claims_touched:
     - C57
     - C58
