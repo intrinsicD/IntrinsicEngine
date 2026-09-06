@@ -1,0 +1,32 @@
+benchmark_id: geometry.curvature_segmentation.extrema_mesh.local_cohort
+method: geometry.curvature_segmentation
+dataset: local.method_041.mesh_cohort.v1
+params:
+  intent: nightly
+  implementation: normal_variation_extrema_reference_v1
+  candidate_adopted: false
+  detector_params:
+    radius_ratio: 0.02
+    scale_factors: [0.5, 1.0, 2.0]
+    minimum_strength: 0.01
+    minimum_sharpness: 0.0001
+    minimum_anisotropy: 0.1
+    hard_dihedral_degrees: 45.0
+    maximum_neighbors: 2048
+    maximum_work_items: 80000000
+  cohort: [frog, sculpt, trim-star, fandisk, dolphin, bumpy_torus]
+  inputs: external_local_read_only_obj
+  baseline: method_040_curves_v1_visual_comparison_only
+  warmup_iterations: 0
+  measured_iterations: 1
+  aggregation: per_mesh
+  quality_error_l2_unit: maximum_source_interpolation_error_over_diagonal
+  quality_error_linf_unit: invalid_segment_reference_count
+  threshold_scope: extraction_contract_not_crease_quality
+metrics: [runtime_ms, quality_error_l2, quality_error_linf, population_count, sample_count]
+thresholds:
+  runtime_ms_max: 180000
+  quality_error_l2_max: 0.000001
+  quality_error_linf_max: 0
+  population_count_min: 0
+  sample_count_min: 3

@@ -555,6 +555,16 @@ target_compile_definitions(GeometryFeaturePartitionTestObjs PRIVATE
     INTRINSIC_TEST_SUPPORT_DIR="${CMAKE_CURRENT_SOURCE_DIR}/support"
 )
 
+# Multi-scale extremum fixtures need their own bounded sanitizer process.
+intrinsic_resolve_test_sources(_geometry_curvature_extrema_test_sources
+    SEARCH_DIRS unit/geometry
+    FILES Test.CurvatureExtrema.cpp
+)
+intrinsic_test_object_lib(GeometryCurvatureExtremaTestObjs
+    SOURCES ${_geometry_curvature_extrema_test_sources}
+    DEPS ExtrinsicCore IntrinsicGeometry
+)
+
 # These tests exercise production paths that write process-global telemetry or
 # logging state, so they remain individually discovered.
 intrinsic_resolve_test_sources(_geometry_process_state_test_sources
@@ -1259,6 +1269,21 @@ if(INTRINSIC_GROUP_PURE_CTEST)
     intrinsic_grouped_test(
         IntrinsicGeometryFeaturePartitionTests.Grouped
         IntrinsicGeometryFeaturePartitionTests
+        FILTER "*"
+        LABELS unit geometry
+    )
+endif()
+
+intrinsic_test_executable(IntrinsicGeometryCurvatureExtremaTests
+    OBJECTS GeometryCurvatureExtremaTestObjs
+    LINK_LIBS ExtrinsicCore IntrinsicGeometry
+    LABELS unit geometry
+    ${_intrinsic_pure_ctest_registration}
+)
+if(INTRINSIC_GROUP_PURE_CTEST)
+    intrinsic_grouped_test(
+        IntrinsicGeometryCurvatureExtremaTests.Grouped
+        IntrinsicGeometryCurvatureExtremaTests
         FILTER "*"
         LABELS unit geometry
     )

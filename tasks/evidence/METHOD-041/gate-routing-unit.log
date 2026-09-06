@@ -1,0 +1,24 @@
+test_affected_case_addition_is_rejected (__main__.TestGateRoutingSelfTests.test_affected_case_addition_is_rejected) ... ok
+test_affected_case_deletion_is_rejected (__main__.TestGateRoutingSelfTests.test_affected_case_deletion_is_rejected) ... ok
+test_affected_case_rename_is_rejected (__main__.TestGateRoutingSelfTests.test_affected_case_rename_is_rejected) ... ok
+test_affected_contract_accepts_intended_routing (__main__.TestGateRoutingSelfTests.test_affected_contract_accepts_intended_routing) ... ok
+test_aggregate_mismatch_is_rejected (__main__.TestGateRoutingSelfTests.test_aggregate_mismatch_is_rejected) ... ok
+test_ctest_extraction_uses_raw_filter_not_display_name (__main__.TestGateRoutingSelfTests.test_ctest_extraction_uses_raw_filter_not_display_name) ... ok
+test_discovered_gtest_environment_fails_closed (__main__.TestGateRoutingSelfTests.test_discovered_gtest_environment_fails_closed) ... ok
+test_duplicate_expanded_name_is_rejected (__main__.TestGateRoutingSelfTests.test_duplicate_expanded_name_is_rejected) ... ok
+test_duplicate_grouped_registration_is_rejected (__main__.TestGateRoutingSelfTests.test_duplicate_grouped_registration_is_rejected) ... ok
+test_duplicate_source_ownership_is_rejected (__main__.TestGateRoutingSelfTests.test_duplicate_source_ownership_is_rejected) ... ok
+test_grouped_ctest_configuration_is_narrow_and_default_off (__main__.TestGateRoutingSelfTests.test_grouped_ctest_configuration_is_narrow_and_default_off) ... ok
+test_grouped_exclusions_require_individual_owners (__main__.TestGateRoutingSelfTests.test_grouped_exclusions_require_individual_owners) ... ok
+test_gtest_discovery_has_one_canonical_property_writer (__main__.TestGateRoutingSelfTests.test_gtest_discovery_has_one_canonical_property_writer) ... ok
+test_hosted_compound_ctest_label_fails_closed (__main__.TestGateRoutingSelfTests.test_hosted_compound_ctest_label_fails_closed) ... ok
+test_listing_expands_comments_and_preserves_disabled_names (__main__.TestGateRoutingSelfTests.test_listing_expands_comments_and_preserves_disabled_names) ... ok
+test_malformed_ctest_labels_fail_closed (__main__.TestGateRoutingSelfTests.test_malformed_ctest_labels_fail_closed) ... ok
+test_missing_ctest_case_is_rejected (__main__.TestGateRoutingSelfTests.test_missing_ctest_case_is_rejected) ... ok
+test_outside_unlabeled_gpu_placeholder_fails_cpu_routing (__main__.TestGateRoutingSelfTests.test_outside_unlabeled_gpu_placeholder_fails_cpu_routing) ... ok
+test_registered_target_without_sources_must_be_explicitly_manual (__main__.TestGateRoutingSelfTests.test_registered_target_without_sources_must_be_explicitly_manual) ... ok
+
+----------------------------------------------------------------------
+Ran 19 tests in 0.003s
+
+OK

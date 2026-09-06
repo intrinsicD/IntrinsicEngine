@@ -3231,3 +3231,81 @@ observations:
     promoted_to: logic/claims.md:C60
     crystallized_via: artifact-commitment
     stale: false
+
+  - id: O178
+    timestamp: 2026-09-06T23:17+02:00
+    provenance: user
+    content: 'Operator visual feedback: METHOD-040 looks good already; sculpt and other noise-free models
+      are described as nearly flawless, with minor deviations including trim-star. Frog boundaries still
+      differ from the desired dominant-curvature creases. This is subjective feedback, not a quantitative
+      oracle pass or general adoption verdict.'
+    context: METHOD-040 operator inspection and curvature-crease clarification; source and primary-literature
+      review with one bounded abstract Claude critique.
+    potential_type: claim
+    bound_to:
+    - N474
+    promoted: false
+    promoted_to: null
+    crystallized_via: null
+    stale: false
+  - id: O179
+    timestamp: 2026-09-06T23:17+02:00
+    provenance: user
+    content: Part segmentation should at least be informed by curvature-extremum curves. Candidate creases
+      should inform which boundaries are retained, connected or removed and how regions merge, seeking a
+      data-informed useful granularity. Mean curvature is an example signal; L0 geometry optimization is
+      a motivating hypothesis, not a mandated stage.
+    context: METHOD-040 operator inspection and curvature-crease clarification; source and primary-literature
+      review with one bounded abstract Claude critique.
+    potential_type: constraint
+    bound_to:
+    - N474
+    promoted: true
+    promoted_to: logic/solution/constraints.md:K33
+    crystallized_via: artifact-commitment
+    stale: false
+  - id: O180
+    timestamp: 2026-09-06T23:17+02:00
+    provenance: ai-suggested
+    content: First validate explicit multiscale curvature-extremum curves independently from segmentation.
+      Compare mean-curvature scalar ridges with principal-curvature ridge/valley lines, account for direction
+      reliability and sampling, and retain candidate confidence and tangents. Then assess joint boundary
+      selection, continuation and merging with a complexity cost rather than equal-area or fixed-count targets.
+      This proposal is unimplemented and has no new quality evidence.
+    context: METHOD-040 operator inspection and curvature-crease clarification; source and primary-literature
+      review with one bounded abstract Claude critique.
+    potential_type: heuristic
+    bound_to:
+    - N474
+    promoted: false
+    promoted_to: null
+    crystallized_via: null
+    stale: false
+  - id: O181
+    timestamp: 2026-09-07T00:36+02:00
+    provenance: ai-executed
+    content: The frozen METHOD-041 CPU reference satisfies the ten documented analytic curve fixtures and
+      its focused CPU/ASan/UBSan contracts.
+    context: Committed inspection report depends on these bounded executed facts. No part-quality, general
+      robustness, performance win or engine-integration claim. Dirty benchmark measurements remain non-claim-eligible.
+    potential_type: claim
+    bound_to:
+    - N476
+    promoted: true
+    promoted_to: logic/claims.md:C61
+    crystallized_via: artifact-commitment
+    stale: false
+  - id: O182
+    timestamp: 2026-09-07T00:36+02:00
+    provenance: ai-executed
+    content: The retained six-input METHOD-041 local cohort has six successful source-bound exports and
+      a browser record of 41 rendered comparison views with no WebGL errors.
+    context: Committed inspection report depends on these bounded executed facts. No part-quality, general
+      robustness, performance win or engine-integration claim. Dirty benchmark measurements remain non-claim-eligible.
+    potential_type: claim
+    bound_to:
+    - N477
+    promoted: true
+    promoted_to: logic/claims.md:C62
+    crystallized_via: artifact-commitment
+    stale: false

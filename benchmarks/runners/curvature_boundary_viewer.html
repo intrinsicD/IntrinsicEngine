@@ -4,7 +4,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>METHOD-040 · Mesh segmentation comparison</title>
 <style>
-:root{color-scheme:dark;font:14px system-ui,sans-serif;background:#111923;color:#e1e9ef}*{box-sizing:border-box}body{margin:0;padding:24px;max-width:1800px;margin-inline:auto}h1{margin:8px 0;font-size:25px;letter-spacing:-.5px}p{color:#a9bbca;line-height:1.5;margin:8px 0}.tag{color:#f3c77d;font-size:12px;letter-spacing:1.3px;text-transform:uppercase}.toolbar{display:flex;align-items:center;gap:16px;flex-wrap:wrap;margin:20px 0}select,button{border:1px solid #3d5164;background:#1a2937;color:#eaf3fa;border-radius:5px;padding:8px;font:inherit;max-width:100%}button{cursor:pointer}label{display:flex;align-items:center;gap:8px}.compare{display:grid;grid-template-columns:1fr 1fr;gap:18px}.pane{min-width:0;border:1px solid #344656;border-radius:8px;overflow:hidden;background:#17232f}.pane-head{padding:14px 16px}.pane-head label{display:block}.pane-head select{width:100%;margin-top:8px}.facts{display:flex;flex-wrap:wrap;gap:20px;padding:0 16px 14px}.fact{color:#a9bbca;font-size:12px}.fact b{display:block;font-size:21px;font-weight:600;color:#eef4f7;margin-bottom:3px}canvas{display:block;width:100%;height:480px;touch-action:none;background:#202d3a;cursor:grab}canvas:active{cursor:grabbing}.provenance{font:11px ui-monospace,monospace;color:#94a8bb;padding:12px 16px;overflow-wrap:anywhere;line-height:1.6;min-height:105px}.legend{display:flex;gap:22px;flex-wrap:wrap;margin:14px 0;font-size:12px;color:#afbdca}.swatch{display:inline-block;width:22px;height:3px;vertical-align:middle;margin-right:6px}.status{padding:10px 14px;background:#192c33;border:1px solid #30515d;border-radius:5px;margin:14px 0;color:#b8d4dc}.error{background:#3b2529;border-color:#84505a;color:#ffd0d0}details{margin-top:16px}summary{cursor:pointer;color:#c6d7e2}table{border-collapse:collapse;width:100%;font-size:12px;margin-top:12px}th,td{text-align:left;padding:9px;border-bottom:1px solid #30414f;vertical-align:top}td:last-child{overflow-wrap:anywhere}th{color:#93adbe}.note{font-size:12px}.mesh-info{font:12px ui-monospace,monospace;color:#8fa9bc;overflow-wrap:anywhere}@media(max-width:850px){body{padding:14px}.compare{grid-template-columns:1fr}canvas{height:390px}}
+:root{color-scheme:dark;font:14px system-ui,sans-serif;background:#111923;color:#e1e9ef}*{box-sizing:border-box}body{margin:0;padding:24px;max-width:1800px;margin-inline:auto}h1{margin:8px 0;font-size:25px;letter-spacing:-.5px}p{color:#a9bbca;line-height:1.5;margin:8px 0}.tag{color:#f3c77d;font-size:12px;letter-spacing:1.3px;text-transform:uppercase}.toolbar{display:flex;align-items:center;gap:16px;flex-wrap:wrap;margin:20px 0}select,button,input[type=number]{border:1px solid #3d5164;background:#1a2937;color:#eaf3fa;border-radius:5px;padding:8px;font:inherit;max-width:100%}button{cursor:pointer}label{display:flex;align-items:center;gap:8px}.compare{display:grid;grid-template-columns:1fr 1fr;gap:18px}.pane{min-width:0;border:1px solid #344656;border-radius:8px;overflow:hidden;background:#17232f}.pane-head{padding:14px 16px}.pane-head label{display:block}.pane-head select{width:100%;margin-top:8px}.facts{display:flex;flex-wrap:wrap;gap:20px;padding:0 16px 14px}.fact{color:#a9bbca;font-size:12px}.fact b{display:block;font-size:21px;font-weight:600;color:#eef4f7;margin-bottom:3px}canvas{display:block;width:100%;height:480px;touch-action:none;background:#202d3a;cursor:grab}canvas:active{cursor:grabbing}.provenance{font:11px ui-monospace,monospace;color:#94a8bb;padding:12px 16px;overflow-wrap:anywhere;line-height:1.6;min-height:105px}.legend{display:flex;gap:22px;flex-wrap:wrap;margin:14px 0;font-size:12px;color:#afbdca}.swatch{display:inline-block;width:22px;height:3px;vertical-align:middle;margin-right:6px}.status{padding:10px 14px;background:#192c33;border:1px solid #30515d;border-radius:5px;margin:14px 0;color:#b8d4dc}.error{background:#3b2529;border-color:#84505a;color:#ffd0d0}details{margin-top:16px}summary{cursor:pointer;color:#c6d7e2}table{border-collapse:collapse;width:100%;font-size:12px;margin-top:12px}th,td{text-align:left;padding:9px;border-bottom:1px solid #30414f;vertical-align:top}td:last-child{overflow-wrap:anywhere}th{color:#93adbe}.note{font-size:12px}.mesh-info{font:12px ui-monospace,monospace;color:#8fa9bc;overflow-wrap:anywhere}@media(max-width:850px){body{padding:14px}.compare{grid-template-columns:1fr}canvas{height:390px}}
 </style>
 <div class="tag">METHOD-040 / local experimental evidence</div>
 <h1>Where does the surface split?</h1>
@@ -13,6 +13,11 @@
 <label>Mesh <select id="mesh" aria-label="Mesh"></select></label>
 <label><input id="boundary" type="checkbox" checked> Final boundaries</label>
 <label><input id="features" type="checkbox"> Input features</label>
+<span id="curveControls" style="display:none;gap:16px;align-items:center;flex-wrap:wrap">
+<label>Curve confidence <input id="curveConfidence" type="range" min="0" max="1" step="0.05" value="0.15"><output id="confidenceValue">0.15</output></label>
+<label title="Support radius times absolute curvature">Min. strength <input id="curveStrength" type="number" min="0" step="0.01" value="0" style="width:75px"></label>
+<label>Scales agreeing <select id="curvePersistence"><option value="1">1 or more</option><option value="2">2 or more</option><option value="3">All 3</option></select></label>
+<label><input id="sharpCurves" type="checkbox" checked> Sharp edges</label></span>
 <button id="reset">Reset view</button>
 </div>
 <div id="meshInfo" class="mesh-info"></div>
@@ -70,7 +75,7 @@ function prepareGeometry(mesh){
   const n=[u[1]*v[2]-u[2]*v[1],u[2]*v[0]-u[0]*v[2],u[0]*v[1]-u[1]*v[0]],length=Math.hypot(...n)||1;
   for(let j=0;j<3;j++)for(let k=0;k<3;k++){positions[(f+j)*3+k]=normalized[t[f+j]*3+k];normals[(f+j)*3+k]=n[k]/length;}
  }
- return {normalized,positions,normals,count:t.length};
+ return {normalized,positions,normals,count:t.length,center,radius};
 }
 function colorFor(label){
  const h=((label*.61803398875+.08)%1)*6,c=.53,x=c*(1-Math.abs(h%2-1)),m=.31;
@@ -86,18 +91,33 @@ function edgeBuffer(view,run,kind){
  }
  return {position:buffer(view,new Float32Array(positions)),color:buffer(view,new Float32Array(colors)),count:positions.length/3};
 }
+function curveBuffer(view,run){
+ const positions=[],colors=[],curves=new Set();let kept=0;
+ const threshold=Number($('curveConfidence').value),persistence=Number($('curvePersistence').value),strength=Math.max(0,Number($('curveStrength').value)||0);
+ for(const segment of run.curveSegments||[]){
+  const sharp=segment.kind==='sharp_edge',count=segment.scale_mask.toString(2).split('1').length-1;
+  if(sharp?!$('sharpCurves').checked:segment.confidence<threshold||segment.strength<strength||count<persistence)continue;
+  const color=sharp?[.04,.07,.11]:segment.kind.endsWith('ridge')?[.85,.08,.03]:[.06,.22,.8];
+  for(const id of segment.points){const p=selectedMesh.curvePoints[id];for(let k=0;k<3;k++)positions.push((p[k]-geometry.center[k])/geometry.radius);colors.push(...color);}
+  if(!sharp){kept++;curves.add(segment.curve);}
+ }
+ view.curveCount=curves.size;view.curveSegmentCount=kept;
+ return {position:buffer(view,new Float32Array(positions)),color:buffer(view,new Float32Array(colors)),count:positions.length/3};
+}
 function updateView(view){
  const run=selectedMesh.runs[Number($(view.side+'Mode').value)],gl=view.gl;view.run=run;
- for(const b of view.buffers)gl.deleteBuffer(b);view.buffers=[];
+ for(const b of view.buffers)gl.deleteBuffer(b);view.buffers=[];view.curveCount=0;view.curveSegmentCount=0;
  const colors=new Float32Array(geometry.count*3);
- for(let f=0;f<run.labels.length;f++){const c=colorFor(run.labels[f]);for(let j=0;j<3;j++)colors.set(c,(f*3+j)*3);}
+ for(let f=0;f<run.labels.length;f++){const c=run.curveSegments?[.67,.7,.71]:colorFor(run.labels[f]);for(let j=0;j<3;j++)colors.set(c,(f*3+j)*3);}
  view.surface={position:buffer(view,geometry.positions),normal:buffer(view,geometry.normals),color:buffer(view,colors),count:geometry.count};
- view.boundary=edgeBuffer(view,run,'boundary');view.features=edgeBuffer(view,run,'features');
+ view.boundary=run.curveSegments?curveBuffer(view,run):edgeBuffer(view,run,'boundary');view.features=edgeBuffer(view,run,'features');
  const facts=$(view.side+'Facts');facts.replaceChildren();
- for(const [value,label] of [[run.regions.toLocaleString(),'regions'],[(run.largestArea*100).toFixed(1)+'%','largest region area'],[run.smallRegions,'small regions']]){
+ const factsList=run.curveSegments?[[view.curveSegmentCount,'visible smooth segments'],[view.curveCount,'source curves represented'],[(100*run.supportFraction).toFixed(0)+'%','vertices with curvature support']]:[[run.regions.toLocaleString(),'regions'],[(run.largestArea*100).toFixed(1)+'%','largest region area'],[run.smallRegions,'small regions']];
+ for(const [value,label] of factsList){
   const div=document.createElement('div');div.className='fact';const b=document.createElement('b');b.textContent=value;div.append(b,document.createTextNode(label));facts.append(div);
  }
  $(view.side+'Provenance').textContent=`${run.implementation} · ${run.geometrySource}\n${run.cohort}\nsource ${run.sourceRevision.slice(0,12)}${run.sourceDirty?' + dirty':''}; runner ${run.runnerHash.slice(0,12)}\n${Object.entries(run.parameters).map(([k,v])=>k+'='+Number(v).toPrecision(3)).join(' · ')}`;
+ if(run.curveSegments)$(view.side+'Provenance').textContent='Curves stay on the original surface. Red: positive crests; blue: negative crests; black: sharp mesh edges. Confidence and scale agreement are diagnostic scores. Filtering can leave open curve fragments.';
  $(view.side+'Provenance').style.whiteSpace='pre-wrap';
 }
 function bind(view,name,b){const gl=view.gl,loc=view.attributes[name];if(b){gl.bindBuffer(gl.ARRAY_BUFFER,b);gl.enableVertexAttribArray(loc);gl.vertexAttribPointer(loc,3,gl.FLOAT,false,0,0);}else{gl.disableVertexAttribArray(loc);gl.vertexAttrib3f(loc,0,0,1);}}
@@ -122,14 +142,27 @@ function chooseMesh(){
  selectedMesh=DATA.meshes[Number($('mesh').value)];geometry=prepareGeometry(selectedMesh);
  for(const view of views){const select=$(view.side+'Mode'),previous=view.run?.mode;select.replaceChildren();
   selectedMesh.runs.forEach((run,i)=>select.add(new Option(run.key,i)));
-  const preserved=selectedMesh.runs.findIndex(r=>r.mode===previous);select.value=String(preserved>=0?preserved:view.side==='left'?0:selectedMesh.runs.length-1);updateView(view);
+  const preserved=selectedMesh.runs.findIndex(r=>r.mode===previous);select.value=String(preserved>=0?preserved:view.side==='left'?0:(selectedMesh.runs.findIndex(r=>r.mode==='principal_1')>=0?selectedMesh.runs.findIndex(r=>r.mode==='principal_1'):selectedMesh.runs.length-1));updateView(view);
  }
  $('meshInfo').textContent=`${selectedMesh.name} · ${(selectedMesh.positions.length/3).toLocaleString()} vertices · ${(selectedMesh.triangles.length/3).toLocaleString()} triangles · SHA-256 ${selectedMesh.sha256.slice(0,16)}`;
  reset();document.body.dataset.viewerStatus='ready';
 }
 function main(){
  const count=DATA.meshes.reduce((n,m)=>n+m.runs.length,0);
+ if(DATA.curveInspection){
+  document.title='Curvature creases · surface inspection';document.querySelector('h1').textContent='Where are the curvature creases?';
+  document.querySelector('.tag').textContent='Curvature-extremum inspection';
+  document.querySelectorAll('.pane-head label').forEach((label,i)=>label.firstChild.textContent=i?'Right view':'Left view');
+  $('boundary').parentElement.lastChild.textContent=' Show curves / boundaries';
+  $('features').parentElement.lastChild.textContent=' METHOD-040 input features';
+  document.querySelector('h1+p').textContent='Compare curvature signals and support scales on the unchanged surface. Drag either view to orbit; scroll to zoom.';
+  $('curveControls').style.display='flex';document.querySelector('.legend').textContent='Red: positive crests · Blue: negative crests · Black: sharp edges or partition boundaries';
+  const notes=document.querySelectorAll('p.note');notes[0].textContent='Support scale changes which details are visible. Compare principal-curvature and mean-curvature curves using the selectors. Increasing scale agreement hides curves without nearby matching evidence at other scales.';
+  notes[1].textContent='These are candidate feature curves, not a new part segmentation. METHOD-040 comparisons retain their existing boundaries.';
+  for(const id of ['curveConfidence','curveStrength','curvePersistence','sharpCurves'])$(id).addEventListener('input',()=>{$('confidenceValue').textContent=$('curveConfidence').value;for(const v of views)updateView(v);renderAll();});
+ }
  $('status').textContent=`${DATA.meshes.length} meshes · ${count} validated runs · ${DATA.rejected.length} excluded records. Successful execution and source identity checked; scientific quality remains experimental.`;
+ if(DATA.curveInspection)$('status').textContent=`${DATA.meshes.length} meshes · ${count} comparison views · ${DATA.rejected.length} excluded records`;
  $('exclusionSummary').textContent=`Excluded and failed records (${DATA.rejected.length})`;
  for(const record of DATA.rejected){const tr=document.createElement('tr');for(const k of ['mesh','mode','cohort','reason']){const td=document.createElement('td');td.textContent=record[k];tr.append(td);}$('excludedRows').append(tr);}
  if(!count){$('exclusions').open=true;throw Error('No validated runs available. See excluded records below.');}
@@ -139,7 +172,7 @@ function main(){
  for(const id of ['boundary','features'])$(id).addEventListener('change',renderAll);
  window.addEventListener('resize',renderAll);chooseMesh();
  // Read-only inspection hook used by the offline browser smoke check.
- window.viewerInspection=()=>({status:document.body.dataset.viewerStatus,meshes:DATA.meshes.length,runs:count,rejected:DATA.rejected.length,selectedMesh:selectedMesh.name,left:views[0].run.mode,right:views[1].run.mode,camera:{...camera},glErrors:views.map(v=>v.gl.getError())});
+ window.viewerInspection=()=>({status:document.body.dataset.viewerStatus,meshes:DATA.meshes.length,runs:count,rejected:DATA.rejected.length,selectedMesh:selectedMesh.name,left:views[0].run.mode,right:views[1].run.mode,curveSegments:views.map(v=>v.curveSegmentCount||0),camera:{...camera},glErrors:views.map(v=>v.gl.getError())});
 }
 try{main();}catch(error){fail(error);}
 </script>

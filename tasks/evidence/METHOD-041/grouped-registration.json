@@ -1,0 +1,20 @@
+{
+  "aggregate": "IntrinsicCpuTests",
+  "grouped_logical_cases": 1560,
+  "grouped_physical_ctest_records": 2756,
+  "grouped_producers": [
+    "IntrinsicGeometryCurvatureExtremaTests",
+    "IntrinsicGeometryCurvatureTests",
+    "IntrinsicGeometryFeaturePartitionTests",
+    "IntrinsicGeometryMethodTests",
+    "IntrinsicGeometryTests",
+    "IntrinsicGraphicsBufferTransferTests",
+    "IntrinsicPhysicsMethodTests",
+    "IntrinsicPhysicsWorldTests"
+  ],
+  "individual_physical_ctest_records": 4308,
+  "logical_cases": 4306,
+  "logical_digest": "ab873afd6e1a8a34542bc56676c74b80bb33135658b2c937282cd12e7caedca0",
+  "mode": "registration",
+  "physical_process_reduction": 1552
+}

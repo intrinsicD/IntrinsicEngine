@@ -1,0 +1,1016 @@
+{
+  "initial": {
+    "status": "ready",
+    "meshes": 6,
+    "runs": 41,
+    "rejected": 0,
+    "selectedMesh": "frog",
+    "left": "curves",
+    "right": "principal_1",
+    "curveSegments": [
+      0,
+      4055
+    ],
+    "camera": {
+      "yaw": 0.55,
+      "pitch": -0.2,
+      "zoom": 1
+    },
+    "glErrors": [
+      0,
+      0
+    ]
+  },
+  "coverage": [
+    {
+      "status": "ready",
+      "meshes": 6,
+      "runs": 41,
+      "rejected": 0,
+      "selectedMesh": "frog",
+      "left": "curves",
+      "right": "curves",
+      "curveSegments": [
+        0,
+        0
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "status": "ready",
+      "meshes": 6,
+      "runs": 41,
+      "rejected": 0,
+      "selectedMesh": "frog",
+      "left": "curves",
+      "right": "principal_0",
+      "curveSegments": [
+        0,
+        255
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "status": "ready",
+      "meshes": 6,
+      "runs": 41,
+      "rejected": 0,
+      "selectedMesh": "frog",
+      "left": "curves",
+      "right": "principal_1",
+      "curveSegments": [
+        0,
+        4055
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "status": "ready",
+      "meshes": 6,
+      "runs": 41,
+      "rejected": 0,
+      "selectedMesh": "frog",
+      "left": "curves",
+      "right": "principal_2",
+      "curveSegments": [
+        0,
+        2773
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "status": "ready",
+      "meshes": 6,
+      "runs": 41,
+      "rejected": 0,
+      "selectedMesh": "frog",
+      "left": "curves",
+      "right": "mean_0",
+      "curveSegments": [
+        0,
+        7
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "status": "ready",
+      "meshes": 6,
+      "runs": 41,
+      "rejected": 0,
+      "selectedMesh": "frog",
+      "left": "curves",
+      "right": "mean_1",
+      "curveSegments": [
+        0,
+        3151
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "status": "ready",
+      "meshes": 6,
+      "runs": 41,
+      "rejected": 0,
+      "selectedMesh": "frog",
+      "left": "curves",
+      "right": "mean_2",
+      "curveSegments": [
+        0,
+        2725
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "status": "ready",
+      "meshes": 6,
+      "runs": 41,
+      "rejected": 0,
+      "selectedMesh": "sculpt",
+      "left": "curves",
+      "right": "curves",
+      "curveSegments": [
+        0,
+        0
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "status": "ready",
+      "meshes": 6,
+      "runs": 41,
+      "rejected": 0,
+      "selectedMesh": "sculpt",
+      "left": "curves",
+      "right": "principal_0",
+      "curveSegments": [
+        0,
+        0
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "status": "ready",
+      "meshes": 6,
+      "runs": 41,
+      "rejected": 0,
+      "selectedMesh": "sculpt",
+      "left": "curves",
+      "right": "principal_1",
+      "curveSegments": [
+        0,
+        59
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "status": "ready",
+      "meshes": 6,
+      "runs": 41,
+      "rejected": 0,
+      "selectedMesh": "sculpt",
+      "left": "curves",
+      "right": "principal_2",
+      "curveSegments": [
+        0,
+        435
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "status": "ready",
+      "meshes": 6,
+      "runs": 41,
+      "rejected": 0,
+      "selectedMesh": "sculpt",
+      "left": "curves",
+      "right": "mean_0",
+      "curveSegments": [
+        0,
+        0
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "status": "ready",
+      "meshes": 6,
+      "runs": 41,
+      "rejected": 0,
+      "selectedMesh": "sculpt",
+      "left": "curves",
+      "right": "mean_1",
+      "curveSegments": [
+        0,
+        0
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "status": "ready",
+      "meshes": 6,
+      "runs": 41,
+      "rejected": 0,
+      "selectedMesh": "sculpt",
+      "left": "curves",
+      "right": "mean_2",
+      "curveSegments": [
+        0,
+        1216
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "status": "ready",
+      "meshes": 6,
+      "runs": 41,
+      "rejected": 0,
+      "selectedMesh": "trim-star",
+      "left": "principal_0",
+      "right": "principal_0",
+      "curveSegments": [
+        0,
+        0
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "status": "ready",
+      "meshes": 6,
+      "runs": 41,
+      "rejected": 0,
+      "selectedMesh": "trim-star",
+      "left": "principal_0",
+      "right": "principal_1",
+      "curveSegments": [
+        0,
+        241
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "status": "ready",
+      "meshes": 6,
+      "runs": 41,
+      "rejected": 0,
+      "selectedMesh": "trim-star",
+      "left": "principal_0",
+      "right": "principal_2",
+      "curveSegments": [
+        0,
+        253
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "status": "ready",
+      "meshes": 6,
+      "runs": 41,
+      "rejected": 0,
+      "selectedMesh": "trim-star",
+      "left": "principal_0",
+      "right": "mean_0",
+      "curveSegments": [
+        0,
+        0
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "status": "ready",
+      "meshes": 6,
+      "runs": 41,
+      "rejected": 0,
+      "selectedMesh": "trim-star",
+      "left": "principal_0",
+      "right": "mean_1",
+      "curveSegments": [
+        0,
+        0
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "status": "ready",
+      "meshes": 6,
+      "runs": 41,
+      "rejected": 0,
+      "selectedMesh": "trim-star",
+      "left": "principal_0",
+      "right": "mean_2",
+      "curveSegments": [
+        0,
+        1289
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "status": "ready",
+      "meshes": 6,
+      "runs": 41,
+      "rejected": 0,
+      "selectedMesh": "fandisk",
+      "left": "principal_0",
+      "right": "curves",
+      "curveSegments": [
+        0,
+        0
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "status": "ready",
+      "meshes": 6,
+      "runs": 41,
+      "rejected": 0,
+      "selectedMesh": "fandisk",
+      "left": "principal_0",
+      "right": "principal_0",
+      "curveSegments": [
+        0,
+        0
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "status": "ready",
+      "meshes": 6,
+      "runs": 41,
+      "rejected": 0,
+      "selectedMesh": "fandisk",
+      "left": "principal_0",
+      "right": "principal_1",
+      "curveSegments": [
+        0,
+        715
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "status": "ready",
+      "meshes": 6,
+      "runs": 41,
+      "rejected": 0,
+      "selectedMesh": "fandisk",
+      "left": "principal_0",
+      "right": "principal_2",
+      "curveSegments": [
+        0,
+        683
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "status": "ready",
+      "meshes": 6,
+      "runs": 41,
+      "rejected": 0,
+      "selectedMesh": "fandisk",
+      "left": "principal_0",
+      "right": "mean_0",
+      "curveSegments": [
+        0,
+        0
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "status": "ready",
+      "meshes": 6,
+      "runs": 41,
+      "rejected": 0,
+      "selectedMesh": "fandisk",
+      "left": "principal_0",
+      "right": "mean_1",
+      "curveSegments": [
+        0,
+        57
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "status": "ready",
+      "meshes": 6,
+      "runs": 41,
+      "rejected": 0,
+      "selectedMesh": "fandisk",
+      "left": "principal_0",
+      "right": "mean_2",
+      "curveSegments": [
+        0,
+        761
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "status": "ready",
+      "meshes": 6,
+      "runs": 41,
+      "rejected": 0,
+      "selectedMesh": "dolphin",
+      "left": "principal_0",
+      "right": "curves",
+      "curveSegments": [
+        1,
+        0
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "status": "ready",
+      "meshes": 6,
+      "runs": 41,
+      "rejected": 0,
+      "selectedMesh": "dolphin",
+      "left": "principal_0",
+      "right": "principal_0",
+      "curveSegments": [
+        1,
+        1
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "status": "ready",
+      "meshes": 6,
+      "runs": 41,
+      "rejected": 0,
+      "selectedMesh": "dolphin",
+      "left": "principal_0",
+      "right": "principal_1",
+      "curveSegments": [
+        1,
+        433
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "status": "ready",
+      "meshes": 6,
+      "runs": 41,
+      "rejected": 0,
+      "selectedMesh": "dolphin",
+      "left": "principal_0",
+      "right": "principal_2",
+      "curveSegments": [
+        1,
+        565
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "status": "ready",
+      "meshes": 6,
+      "runs": 41,
+      "rejected": 0,
+      "selectedMesh": "dolphin",
+      "left": "principal_0",
+      "right": "mean_0",
+      "curveSegments": [
+        1,
+        0
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "status": "ready",
+      "meshes": 6,
+      "runs": 41,
+      "rejected": 0,
+      "selectedMesh": "dolphin",
+      "left": "principal_0",
+      "right": "mean_1",
+      "curveSegments": [
+        1,
+        149
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "status": "ready",
+      "meshes": 6,
+      "runs": 41,
+      "rejected": 0,
+      "selectedMesh": "dolphin",
+      "left": "principal_0",
+      "right": "mean_2",
+      "curveSegments": [
+        1,
+        609
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "status": "ready",
+      "meshes": 6,
+      "runs": 41,
+      "rejected": 0,
+      "selectedMesh": "bumpy_torus",
+      "left": "principal_0",
+      "right": "curves",
+      "curveSegments": [
+        1901,
+        0
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "status": "ready",
+      "meshes": 6,
+      "runs": 41,
+      "rejected": 0,
+      "selectedMesh": "bumpy_torus",
+      "left": "principal_0",
+      "right": "principal_0",
+      "curveSegments": [
+        1901,
+        1901
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "status": "ready",
+      "meshes": 6,
+      "runs": 41,
+      "rejected": 0,
+      "selectedMesh": "bumpy_torus",
+      "left": "principal_0",
+      "right": "principal_1",
+      "curveSegments": [
+        1901,
+        5068
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "status": "ready",
+      "meshes": 6,
+      "runs": 41,
+      "rejected": 0,
+      "selectedMesh": "bumpy_torus",
+      "left": "principal_0",
+      "right": "principal_2",
+      "curveSegments": [
+        1901,
+        4181
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "status": "ready",
+      "meshes": 6,
+      "runs": 41,
+      "rejected": 0,
+      "selectedMesh": "bumpy_torus",
+      "left": "principal_0",
+      "right": "mean_0",
+      "curveSegments": [
+        1901,
+        125
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "status": "ready",
+      "meshes": 6,
+      "runs": 41,
+      "rejected": 0,
+      "selectedMesh": "bumpy_torus",
+      "left": "principal_0",
+      "right": "mean_1",
+      "curveSegments": [
+        1901,
+        5264
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "status": "ready",
+      "meshes": 6,
+      "runs": 41,
+      "rejected": 0,
+      "selectedMesh": "bumpy_torus",
+      "left": "principal_0",
+      "right": "mean_2",
+      "curveSegments": [
+        1901,
+        4599
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    }
+  ],
+  "before_filter": {
+    "status": "ready",
+    "meshes": 6,
+    "runs": 41,
+    "rejected": 0,
+    "selectedMesh": "frog",
+    "left": "curves",
+    "right": "principal_1",
+    "curveSegments": [
+      0,
+      4055
+    ],
+    "camera": {
+      "yaw": 0.55,
+      "pitch": -0.2,
+      "zoom": 1
+    },
+    "glErrors": [
+      0,
+      0
+    ]
+  },
+  "strength_filter": {
+    "status": "ready",
+    "meshes": 6,
+    "runs": 41,
+    "rejected": 0,
+    "selectedMesh": "frog",
+    "left": "curves",
+    "right": "principal_1",
+    "curveSegments": [
+      0,
+      0
+    ],
+    "camera": {
+      "yaw": 0.55,
+      "pitch": -0.2,
+      "zoom": 1
+    },
+    "glErrors": [
+      0,
+      0
+    ]
+  },
+  "after_filter": {
+    "status": "ready",
+    "meshes": 6,
+    "runs": 41,
+    "rejected": 0,
+    "selectedMesh": "frog",
+    "left": "curves",
+    "right": "principal_1",
+    "curveSegments": [
+      0,
+      0
+    ],
+    "camera": {
+      "yaw": 0.55,
+      "pitch": -0.2,
+      "zoom": 1
+    },
+    "glErrors": [
+      0,
+      0
+    ]
+  },
+  "persistence_filter": {
+    "status": "ready",
+    "meshes": 6,
+    "runs": 41,
+    "rejected": 0,
+    "selectedMesh": "frog",
+    "left": "curves",
+    "right": "principal_1",
+    "curveSegments": [
+      0,
+      2989
+    ],
+    "camera": {
+      "yaw": 0.55,
+      "pitch": -0.2,
+      "zoom": 1
+    },
+    "glErrors": [
+      0,
+      0
+    ]
+  }
+}

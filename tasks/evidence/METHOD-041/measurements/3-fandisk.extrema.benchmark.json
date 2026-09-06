@@ -1,0 +1,153 @@
+{
+  "schema_version": 2,
+  "benchmark_id": "geometry.curvature_segmentation.extrema_mesh.local_cohort",
+  "run_id": "method041-20260906T221514842035Z",
+  "attempt_id": "attempt-001",
+  "method": "geometry.curvature_segmentation",
+  "backend": "cpu_reference",
+  "dataset": "local.method_041.mesh_cohort.v1",
+  "commit": "de4acc5d07034705076b9c26a07896c35eeefa6d",
+  "source": {
+    "revision": "de4acc5d07034705076b9c26a07896c35eeefa6d",
+    "state": "dirty_worktree"
+  },
+  "claim_eligible": false,
+  "manifest": {
+    "path": "benchmarks/geometry/manifests/curvature_extrema_mesh_local_cohort.yaml",
+    "sha256": "aa0759194096adf73710ec5862a2fec177b5f11f44b695dadfe39c8cd5185fe9"
+  },
+  "resolved_params": {
+    "intent": "nightly",
+    "implementation": "normal_variation_extrema_reference_v1",
+    "candidate_adopted": false,
+    "detector_params": {
+      "radius_ratio": 0.02,
+      "scale_factors": [
+        0.5,
+        1.0,
+        2.0
+      ],
+      "minimum_strength": 0.01,
+      "minimum_sharpness": 0.0001,
+      "minimum_anisotropy": 0.1,
+      "hard_dihedral_degrees": 45.0,
+      "maximum_neighbors": 2048,
+      "maximum_work_items": 80000000
+    },
+    "cohort": [
+      "frog",
+      "sculpt",
+      "trim-star",
+      "fandisk",
+      "dolphin",
+      "bumpy_torus"
+    ],
+    "inputs": "external_local_read_only_obj",
+    "baseline": "method_040_curves_v1_visual_comparison_only",
+    "warmup_iterations": 0,
+    "measured_iterations": 1,
+    "aggregation": "per_mesh",
+    "quality_error_l2_unit": "maximum_source_interpolation_error_over_diagonal",
+    "quality_error_linf_unit": "invalid_segment_reference_count",
+    "threshold_scope": "extraction_contract_not_crease_quality"
+  },
+  "config_digest": "3bac67fc7b3f86d80fc7b51b704f450f8850038126945851d26d2f9a466be4e9",
+  "warmup_policy": {
+    "warmup_iterations": 0,
+    "measured_iterations": 1
+  },
+  "metrics": {
+    "runtime_ms": 42.952273,
+    "quality_error_l2": 1.265318844532407e-07,
+    "quality_error_linf": 0,
+    "population_count": 3342,
+    "sample_count": 6475
+  },
+  "diagnostics": {
+    "input_sha256": "9bb0e3fa76f175ed8995a43131f900f721f32cea9a32297ca37078d1d519b880",
+    "runner_sha256": "1a70233aef351f3e8ef0d6a0adb2c5ca1a3faec3c16d851e0e1e15fb8949eb7b",
+    "inspection_sha256": "69d93e58684424e453d8f956fce2219202d949cd7b597fad682e9720ee13fa86",
+    "input": "/home/alex/Dropbox/Work/Datasets/obj/fandisk.obj",
+    "parameters": {
+      "hard_dihedral_degrees": 45.0,
+      "maximum_neighbors": 2048,
+      "maximum_work_items": 80000000,
+      "minimum_anisotropy": 0.1,
+      "minimum_sharpness": 0.0001,
+      "minimum_strength": 0.01,
+      "radius_ratio": 0.02,
+      "scale_factors": [
+        0.5,
+        1.0,
+        2.0
+      ]
+    },
+    "stages": {
+      "boundary_vertices": 0,
+      "bounding_box_diagonal": 7.615588818623092,
+      "fields_ms": 28.943411,
+      "matching_candidate_visits": 344676,
+      "matching_ms": 0.822895,
+      "neighborhood_edge_visits": 804676,
+      "neighborhood_ms": 7.885038,
+      "neighborhood_samples": 134033,
+      "peak_neighborhood": 48,
+      "runtime_ms": 42.952273,
+      "sharp_vertices": 696,
+      "state": "success",
+      "trace_ms": 2.3031680000000003
+    },
+    "quality_scope": "source interpolation and graph references only"
+  },
+  "thresholds": {
+    "runtime_ms_max": 180000,
+    "quality_error_l2_max": 1e-06,
+    "quality_error_linf_max": 0,
+    "population_count_min": 0,
+    "sample_count_min": 3
+  },
+  "threshold_disposition": [
+    {
+      "threshold": "runtime_ms_max",
+      "metric": "runtime_ms",
+      "operator": "<=",
+      "limit": 180000,
+      "observed": 42.952273,
+      "passed": true
+    },
+    {
+      "threshold": "quality_error_l2_max",
+      "metric": "quality_error_l2",
+      "operator": "<=",
+      "limit": 1e-06,
+      "observed": 1.265318844532407e-07,
+      "passed": true
+    },
+    {
+      "threshold": "quality_error_linf_max",
+      "metric": "quality_error_linf",
+      "operator": "<=",
+      "limit": 0,
+      "observed": 0,
+      "passed": true
+    },
+    {
+      "threshold": "population_count_min",
+      "metric": "population_count",
+      "operator": ">=",
+      "limit": 0,
+      "observed": 3342,
+      "passed": true
+    },
+    {
+      "threshold": "sample_count_min",
+      "metric": "sample_count",
+      "operator": ">=",
+      "limit": 3,
+      "observed": 6475,
+      "passed": true
+    }
+  ],
+  "execution_status": "passed",
+  "status": "passed"
+}

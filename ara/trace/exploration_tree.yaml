@@ -10956,41 +10956,129 @@ tree:
     - N470
     status: resolved
 
-- id: N472
-  type: decision
-  title: Expose frozen METHOD-040 curves profile for operator inspection
-  provenance: ai-executed
-  timestamp: 2026-09-06T21:56+02:00
-  choice: The operator requested METHOD-040 engine/UI access with Claude collaboration. Expose an explicit
-    experimental curves_v1 choice through the shared validated config and execution path while preserving the
-    existing default and the negative adoption verdict. Reuse one frozen profile across the native runner and
-    runtime.
-  alternatives:
-  - Keep inspection limited to the offline comparison viewer.
-  - Treat requested diagnostic access as acceptance of segmentation quality.
-  evidence:
-  - N470
-  - tasks/done/UI-052-method040-diagnostic-inspection.md
-  - tasks/evidence/UI-052/claude-design-review.md
-  status: resolved
-- id: N473
-  type: experiment
-  title: Verify explicit METHOD-040 config, publication and history integration
-  provenance: ai-executed
-  timestamp: 2026-09-06T21:56+02:00
-  result: Ten focused CPU tests passed without skips, covering config identity and round-trip, runtime success/failure,
-    absent fitted-component publication, removal-only undo/redo, UI contracts and the frozen profile. The dev
-    Sandbox rebuilt successfully; the existing operator process was left intact and needs restarting. Native
-    frog label and edge outputs were byte-identical to the saved overnight curves outputs after extracting
-    the shared profile. This is integration and refactoring evidence, not new segmentation-quality, performance,
-    full-suite or sanitizer evidence. Claude supplied an abstract design review through MCP, not a source review.
-  evidence:
-  - tasks/evidence/UI-052/focused-ctest.log
-  - tasks/evidence/UI-052/claude-design-review.md
-  - tasks/done/UI-052-method040-diagnostic-inspection.md
-  - tests/contract/runtime/Test.CurvatureSegmentationOperations.cpp
-  - tests/integration/runtime/Test.SandboxConfigSections.cpp
-  - tests/unit/geometry/Test.CurvatureBoundaryPartition.cpp
-  also_depends_on:
-  - N472
-  status: resolved
+  - id: N472
+    type: decision
+    title: Expose frozen METHOD-040 curves profile for operator inspection
+    provenance: ai-executed
+    timestamp: 2026-09-06T21:56+02:00
+    choice: The operator requested METHOD-040 engine/UI access with Claude collaboration. Expose an explicit
+      experimental curves_v1 choice through the shared validated config and execution path while preserving the
+      existing default and the negative adoption verdict. Reuse one frozen profile across the native runner and
+      runtime.
+    alternatives:
+    - Keep inspection limited to the offline comparison viewer.
+    - Treat requested diagnostic access as acceptance of segmentation quality.
+    evidence:
+    - N470
+    - tasks/done/UI-052-method040-diagnostic-inspection.md
+    - tasks/evidence/UI-052/claude-design-review.md
+    status: resolved
+  - id: N473
+    type: experiment
+    title: Verify explicit METHOD-040 config, publication and history integration
+    provenance: ai-executed
+    timestamp: 2026-09-06T21:56+02:00
+    result: Ten focused CPU tests passed without skips, covering config identity and round-trip, runtime success/failure,
+      absent fitted-component publication, removal-only undo/redo, UI contracts and the frozen profile. The dev
+      Sandbox rebuilt successfully; the existing operator process was left intact and needs restarting. Native
+      frog label and edge outputs were byte-identical to the saved overnight curves outputs after extracting
+      the shared profile. This is integration and refactoring evidence, not new segmentation-quality, performance,
+      full-suite or sanitizer evidence. Claude supplied an abstract design review through MCP, not a source review.
+    evidence:
+    - tasks/evidence/UI-052/focused-ctest.log
+    - tasks/evidence/UI-052/claude-design-review.md
+    - tasks/done/UI-052-method040-diagnostic-inspection.md
+    - tests/contract/runtime/Test.CurvatureSegmentationOperations.cpp
+    - tests/integration/runtime/Test.SandboxConfigSections.cpp
+    - tests/unit/geometry/Test.CurvatureBoundaryPartition.cpp
+    also_depends_on:
+    - N472
+    status: resolved
+
+  - id: N474
+    type: question
+    title: Make dominant curvature-extremum curves inform candidate part boundaries
+    provenance: user
+    timestamp: 2026-09-06T23:17+02:00
+    description: Operator reports the experimental UI looks good on sculpt and other clean models, with
+      minor trim-star deviations, but expects frog boundaries to follow dominant curvature creases. Asks
+      which signals should guide curve retention, completion and merging, and explicitly clarifies that
+      curvature-extremum curves should at least inform the result. L0 geometry optimization is an intuition/comparator,
+      not a requested mandatory preprocessing step.
+    also_depends_on:
+    - N472
+    - N473
+    status: open
+  - id: N475
+    type: decision
+    title: Proceed with curvature-extremum inspection and bounded Claude collaboration
+    provenance: user
+    timestamp: 2026-09-07T00:36+02:00
+    choice: Authorize the proposed detector-first experiment with Claude. Curvature-extremum curves should
+      inform the later segmentation; this does not endorse exact numerical choices or promise semantic parts.
+    alternatives:
+    - Change partition selection before inspecting explicit curves.
+    evidence:
+    - N474
+    - O179
+    - tasks/active/METHOD-041-curvature-extremum-curve-inspection.md
+    status: resolved
+  - id: N476
+    type: experiment
+    title: Verify detached extrema against analytic controls and distinct CPU sanitizers
+    provenance: ai-executed
+    timestamp: 2026-09-07T00:36+02:00
+    result: Ten new analytic cases and 39 selected CPU cases pass. ASan and UBSan separately pass 48 existing
+      feature/partition cases plus ten extremum cases. The unchanged winding assertion exposed near-vertex
+      publication differences, fixed by precision-aware endpoint coalescence. Sharp-fold controls exclude
+      parallel smooth artifacts. A new pure producer fixes the retained ASan group timeout without changing
+      assertions or the 120-second budget. Whole-registry comparison preserves 4306 logical GoogleTest cases;
+      it is registration evidence, not a full-suite execution.
+    evidence:
+    - tests/unit/geometry/Test.CurvatureExtrema.cpp
+    - tasks/evidence/METHOD-041/cpu.log
+    - tasks/evidence/METHOD-041/asan.log
+    - tasks/evidence/METHOD-041/ubsan.log
+    - tasks/evidence/METHOD-041/asan-group-timeout.log
+    - tasks/evidence/METHOD-041/grouped-registration.json
+    also_depends_on:
+    - N475
+    status: resolved
+  - id: N477
+    type: experiment
+    title: Inspect six local meshes with exact principal and mean curves at three scales
+    provenance: ai-executed
+    timestamp: 2026-09-07T00:36+02:00
+    result: Six native Release extractions succeed and six schema-v2 measurements validate; all remain dirty-source
+      and claim_eligible:false. The local browser exercises 41 views with strength/confidence/scale filters
+      and no WebGL errors. Frog, sculpt and trim-star screenshots were inspected locally. Sampling support
+      varies strongly by radius. No semantic quality, preferred signal, speedup, partition adoption or Sandbox
+      integration is established.
+    evidence:
+    - tasks/evidence/METHOD-041/cohort-summary.json
+    - tasks/evidence/METHOD-041/browser.json
+    - tasks/evidence/METHOD-041/benchmark-validation.log
+    - methods/geometry/curvature_segmentation/curvature_extrema_report.md
+    also_depends_on:
+    - N475
+    status: resolved
+  - id: N478
+    type: decision
+    title: Freeze a CPU curve-inspection formulation before partition adoption
+    provenance: ai-executed
+    timestamp: 2026-09-07T00:36+02:00
+    choice: Use symmetric normal-variation fits, sign-covariant principal extremality, a mean-Hessian comparator,
+      exact subtriangle crossings and separate sharp edges. Preserve METHOD-040 defaults and track shared
+      engine/config/overlay integration as UI-053. Claude supplied a bounded public-math critique only;
+      local source review rejected its unnecessary fixed-face-reference and post-fit-only symmetry requirements
+      against the primary formulations.
+    alternatives:
+    - Adopt heuristic confidence as a probability or scale agreement as formal persistence.
+    - Treat the standalone overlay as integrated Sandbox segmentation.
+    evidence:
+    - N476
+    - N477
+    - tasks/evidence/METHOD-041/claude-math-review.json
+    - methods/geometry/curvature_segmentation/curvature_extrema.md
+    - tasks/active/UI-053-curvature-extremum-engine-overlay.md
+    status: resolved

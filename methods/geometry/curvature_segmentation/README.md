@@ -299,3 +299,11 @@ its frozen seed-location adoption gate; METHOD-037 therefore remains the
 default and neither output makes an atlas-quality claim. METHOD-040 must first
 produce an accepted global-partition CPU result before any production adoption
 or later `GEOM-076` UV-atlas chart-hint evaluation may proceed.
+
+## Curvature-extremum inspection
+
+The experimental [curvature-extremum detector](curvature_extrema.md) exports
+principal and mean-curvature crest curves at three support scales without moving
+the mesh. Its standalone viewer supports exact curve overlays, confidence/scale
+filters, and comparison with saved METHOD-040 partitions. These curves are not
+yet consumed by METHOD-040 or exposed in the Sandbox; UI-053 owns that integration.

@@ -1814,3 +1814,25 @@
 - **Dependencies**: []
 - **Tags**: geometry, local observation, CPU, non-publication evidence
 - **From staging**: O177
+
+## C61: Bounded METHOD-041 CPU extremum-curve contract
+- **Statement**: The recorded normal-variation CPU reference passes the ten analytic extremum cases covering a Gaussian central crease, principal/mean comparison, plane/sphere/cylinder negatives, winding reversal, retriangulation/refinement, scale/translation, bounded noise, sharp-fold separation, source preservation and explicit failure. The final focused CPU selector passes 39 cases; distinct ASan and UBSan runs each pass 58 cases across the feature/partition and extremum producers.
+- **Status**: supported — CPUContracted on the named fixtures and Clang 23 presets only. No whole-engine execution, Vulkan, arbitrary-mesh guarantee, semantic quality, exact paper reproduction or Sandbox-integration claim.
+- **Provenance**: ai-executed
+- **Crystallized via**: artifact-commitment
+- **Falsification criteria**: Replaying the bound source and unchanged fixtures violates their geometric or failure assertions, or the retained logs/XML disagree with the stated selected/passed case counts.
+- **Proof**: [N476, tests/unit/geometry/Test.CurvatureExtrema.cpp, tasks/evidence/METHOD-041/source-hashes.json, tasks/evidence/METHOD-041/cpu.log, tasks/evidence/METHOD-041/asan.log, tasks/evidence/METHOD-041/ubsan.log, tasks/evidence/METHOD-041/asan-IntrinsicGeometryCurvatureExtremaTests.xml, tasks/evidence/METHOD-041/ubsan-IntrinsicGeometryCurvatureExtremaTests.xml]
+- **Dependencies**: []
+- **Tags**: geometry, curvature extrema, CPU, ASan, UBSan, bounded fixtures
+- **From staging**: O181
+
+## C62: Descriptive METHOD-041 local curve-inspection observations
+- **Statement**: The retained default-parameter Release cohort contains successful source-bound exports for frog, sculpt, trim-star, fandisk, dolphin and bumpy_torus; six schema-v2 measurements pass validation. Its browser evidence records 41 comparison views without WebGL errors and verifies strength/confidence filtering. This describes retained local artifacts, not general curve or part quality.
+- **Status**: supported — exploratory dirty-source observations only. Every measurement remains claim_eligible:false. No publication-eligible performance result, speedup, preferred signal, semantic segmentation, operator visual acceptance or engine adoption.
+- **Provenance**: ai-executed
+- **Crystallized via**: artifact-commitment
+- **Falsification criteria**: Recomputing the retained cohort/measurement/view counts disagrees with the record, their source/output bindings fail, or the browser record contains an error or fails its stated filter checks.
+- **Proof**: [N477, tasks/evidence/METHOD-041/cohort-summary.json, tasks/evidence/METHOD-041/browser.json, tasks/evidence/METHOD-041/benchmark-validation.log, tasks/evidence/METHOD-041/measurements/0-frog.extrema.benchmark.json, methods/geometry/curvature_segmentation/curvature_extrema_report.md]
+- **Dependencies**: []
+- **Tags**: geometry, local observation, CPU, non-publication evidence
+- **From staging**: O182

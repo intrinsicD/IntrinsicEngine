@@ -1762,15 +1762,43 @@ entries:
       conditions do not close. Claude public math collaboration does not imply private source review or
       screenshot inspection.
 
-- turn: 2026-09-06_001#4
-  notes:
-  - Recorded explicit operator diagnostic access as a decision, not acceptance of METHOD-040 quality or a change
-    to the default. N470 remains historical; N472 records the scoped subsequent UI exception.
-  - Ordinary config/publication/refactoring evidence does not require a new research claim under AGENTS section
-    8b. C59 remains refuted and C60 remains bounded to its recorded cohort. No new staging observation is needed.
-  - Ten focused CPU tests and a rebuilt dev executable are this turn's evidence; prior full CPU and sanitizer
-    gates remain distinct. Byte-identical native frog outputs check shared-profile extraction only.
-  - Claude reviewed an abstract design with no repository or dataset payload. It did not review private source
-    or accept visual quality.
-  - No closure signal promotes O171, O173 or O175. Operator visual inspection and the METHOD-040 adoption/custody
-    blockers remain pending.
+  - turn: 2026-09-06_001#4
+    notes:
+    - Recorded explicit operator diagnostic access as a decision, not acceptance of METHOD-040 quality or a change
+      to the default. N470 remains historical; N472 records the scoped subsequent UI exception.
+    - Ordinary config/publication/refactoring evidence does not require a new research claim under AGENTS section
+      8b. C59 remains refuted and C60 remains bounded to its recorded cohort. No new staging observation is needed.
+    - Ten focused CPU tests and a rebuilt dev executable are this turn's evidence; prior full CPU and sanitizer
+      gates remain distinct. Byte-identical native frog outputs check shared-profile extraction only.
+    - Claude reviewed an abstract design with no repository or dataset payload. It did not review private source
+      or accept visual quality.
+    - No closure signal promotes O171, O173 or O175. Operator visual inspection and the METHOD-040 adoption/custody
+      blockers remain pending.
+
+  - turn: 2026-09-06_001#5
+    notes:
+    - N474 records the user research question; O178 retains qualified subjective visual feedback, O179 the
+      curvature-informed boundary expectation, and O180 an untested engineering proposal. No new measured
+      result or claim-ledger row.
+    - No affirmation endorses all proposed details or upgrades the failed adoption oracle. O171/O173/O175
+      remain revisited and unpromoted; their anatomical and optional-thickness examples are not imposed
+      as mandatory ground truth.
+    - Claude supplied a public-math critique only. Its conflation of scalar ridges with high scalar magnitude
+      and suggested prohibition on short closure edges are not adopted. Genuine scalar ridges also require
+      extremality; closure merit depends on evidence and topology, not shortness alone.
+    - Preserved prior events while fixing the preceding epilogue list indentation. Validate YAML parsing
+      explicitly because the claims validator does not cover all trace records.
+  - turn: 2026-09-07_001#1
+    notes:
+    - Promoted O179 to user constraint K33 through the accepted experiment artifact; exact numerical choices
+      remain AI-executed.
+    - O180 remains staged because only detector inspection is implemented, not the proposed joint boundary
+      objective. Historical unimplemented wording records its earlier timestamp.
+    - C61/O181 binds only analytic CPU/sanitizer contracts. C62/O182 binds descriptive dirty-source local
+      artifacts; no speedup or segmentation adoption is inferred.
+    - Claude critique is public-math-only, with its two disputed requirements explicitly adjudicated against
+      primary formulations. No private source or visual acceptance is attributed to Claude.
+    - Kept the initial ASan registration timeout and its producer-split fix; all final assertions and timeouts
+      are unchanged. Whole-registry parity is not whole-suite execution.
+    - No unrelated observation has a new closure signal; active curvature topics are revisited, not abandoned.
+      Prior-day research edits are preserved.

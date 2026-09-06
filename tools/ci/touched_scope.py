@@ -78,6 +78,7 @@ LAYER_SCOPES: tuple[tuple[str, tuple[str, ...], tuple[str, ...]], ...] = (
         (
             "IntrinsicGeometryCurvatureTests",
             "IntrinsicGeometryFeaturePartitionTests",
+            "IntrinsicGeometryCurvatureExtremaTests",
             "IntrinsicGeometryTests",
             "IntrinsicGeometryIoTests",
         ),
@@ -148,6 +149,11 @@ TEST_SCOPES: tuple[tuple[str, tuple[str, ...], tuple[str, ...]], ...] = (
         "tests/unit/geometry/Test.CurvatureBoundaryPartition.cpp",
         ("geometry",),
         ("IntrinsicGeometryFeaturePartitionTests",),
+    ),
+    (
+        "tests/unit/geometry/Test.CurvatureExtrema.cpp",
+        ("geometry",),
+        ("IntrinsicGeometryCurvatureExtremaTests",),
     ),
     ("tests/unit/geometry/", ("geometry",), ("IntrinsicGeometryTests",)),
     (

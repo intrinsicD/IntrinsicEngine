@@ -1,0 +1,88 @@
+Internal ctest changing into directory: /home/alex/Documents/IntrinsicEngine/build/ci
+Test project /home/alex/Documents/IntrinsicEngine/build/ci
+      Start 2808: CurvatureBoundaryPartition.InheritedSuppliedOracleCatalog
+ 1/39 Test #2808: CurvatureBoundaryPartition.InheritedSuppliedOracleCatalog .................................   Passed    0.09 sec
+      Start 2809: CurvatureBoundaryPartition.InheritedRegionalOracleCatalog
+ 2/39 Test #2809: CurvatureBoundaryPartition.InheritedRegionalOracleCatalog .................................   Passed    0.10 sec
+      Start 2810: CurvatureBoundaryPartition.RegionalCandidateRefutesFrozenUnmarkedClosureGate
+ 3/39 Test #2810: CurvatureBoundaryPartition.RegionalCandidateRefutesFrozenUnmarkedClosureGate ..............   Passed    0.01 sec
+      Start 2811: CurvatureBoundaryPartition.RegionalComputedEvidenceCatalog
+ 4/39 Test #2811: CurvatureBoundaryPartition.RegionalComputedEvidenceCatalog ................................   Passed    0.75 sec
+      Start 2812: CurvatureBoundaryPartition.ContrastSuppliedOracleCatalog
+ 5/39 Test #2812: CurvatureBoundaryPartition.ContrastSuppliedOracleCatalog ..................................   Passed    0.12 sec
+      Start 2813: CurvatureBoundaryPartition.AreaCleanupSuppliedOracleCatalog
+ 6/39 Test #2813: CurvatureBoundaryPartition.AreaCleanupSuppliedOracleCatalog ...............................   Passed    0.13 sec
+      Start 2814: CurvatureBoundaryPartition.CleanupProfilesPreserveComputedFeatureContours
+ 7/39 Test #2814: CurvatureBoundaryPartition.CleanupProfilesPreserveComputedFeatureContours .................   Passed    1.18 sec
+      Start 2815: CurvatureBoundaryPartition.StrongContourAndShortCompletionSeparateEqualCurvatureSurface
+ 8/39 Test #2815: CurvatureBoundaryPartition.StrongContourAndShortCompletionSeparateEqualCurvatureSurface ...   Passed    0.01 sec
+      Start 2816: CurvatureBoundaryPartition.HomogeneousSurfaceStaysWholeAndPreservesTopology
+ 9/39 Test #2816: CurvatureBoundaryPartition.HomogeneousSurfaceStaysWholeAndPreservesTopology ...............   Passed    0.00 sec
+      Start 2817: CurvatureBoundaryPartition.UniformScalePreservesPartitionAndObjective
+10/39 Test #2817: CurvatureBoundaryPartition.UniformScalePreservesPartitionAndObjective .....................   Passed    0.00 sec
+      Start 2818: CurvatureBoundaryPartition.InvalidEvidenceAndBudgetFailClosed
+11/39 Test #2818: CurvatureBoundaryPartition.InvalidEvidenceAndBudgetFailClosed .............................   Passed    0.00 sec
+      Start 2819: CurvatureBoundaryPartition.RegionalFieldScalesAndFailsClosed
+12/39 Test #2819: CurvatureBoundaryPartition.RegionalFieldScalesAndFailsClosed ..............................   Passed    0.00 sec
+      Start 2820: CurvatureBoundaryPartition.FlowLimitReturnsNoPartialPartition
+13/39 Test #2820: CurvatureBoundaryPartition.FlowLimitReturnsNoPartialPartition .............................   Passed    0.00 sec
+      Start 2821: CurvatureBoundaryPartition.SurfacePreflightFailsClosedWithoutChangingInput
+14/39 Test #2821: CurvatureBoundaryPartition.SurfacePreflightFailsClosedWithoutChangingInput ................   Passed    0.00 sec
+      Start 2822: CurvatureBoundaryPartition.ShortHardFactsDoNotSuppressAWholeSoftContour
+15/39 Test #2822: CurvatureBoundaryPartition.ShortHardFactsDoNotSuppressAWholeSoftContour ...................   Passed    0.00 sec
+      Start 2823: CurvatureBoundaryPartition.OnlyQualifyingConnectedHardCurvesSeedAttenuation
+16/39 Test #2823: CurvatureBoundaryPartition.OnlyQualifyingConnectedHardCurvesSeedAttenuation ...............   Passed    0.01 sec
+      Start 2824: CurvatureBoundaryPartition.CurveCoverageV1ProfileRemainsFrozen
+17/39 Test #2824: CurvatureBoundaryPartition.CurveCoverageV1ProfileRemainsFrozen ............................   Passed    0.00 sec
+      Start 2825: CurvatureBoundaryGraph.ExactOracleMatchesIndependentAssignments
+18/39 Test #2825: CurvatureBoundaryGraph.ExactOracleMatchesIndependentAssignments ...........................   Passed    0.01 sec
+      Start 2826: CurvatureBoundaryGraph.HardCutCannotBeBypassedThroughPositivePath
+19/39 Test #2826: CurvatureBoundaryGraph.HardCutCannotBeBypassedThroughPositivePath .........................   Passed    0.00 sec
+      Start 2827: CurvatureBoundaryGraph.WiderMovesRecoverAcrossPrematureContraction
+20/39 Test #2827: CurvatureBoundaryGraph.WiderMovesRecoverAcrossPrematureContraction ........................   Passed    0.01 sec
+      Start 2828: CurvatureBoundaryGraph.HeuristicIsFeasibleDeterministicAndBoundedByOracle
+21/39 Test #2828: CurvatureBoundaryGraph.HeuristicIsFeasibleDeterministicAndBoundedByOracle .................   Passed    0.06 sec
+      Start 2829: CurvatureBoundaryGraph.InvalidAndLimitedInputsReturnNoPartition
+22/39 Test #2829: CurvatureBoundaryGraph.InvalidAndLimitedInputsReturnNoPartition ...........................   Passed    0.00 sec
+      Start 2830: CurvatureBoundaryGraph.DisconnectedNodesPublishSeparateConnectedRegions
+23/39 Test #2830: CurvatureBoundaryGraph.DisconnectedNodesPublishSeparateConnectedRegions ...................   Passed    0.00 sec
+      Start 2831: CurvatureBoundaryGraph.RegionalExactOracleMatchesIndependentModelFits
+24/39 Test #2831: CurvatureBoundaryGraph.RegionalExactOracleMatchesIndependentModelFits .....................   Passed    0.02 sec
+      Start 2832: CurvatureBoundaryGraph.RegionCostCountsConnectedPieces
+25/39 Test #2832: CurvatureBoundaryGraph.RegionCostCountsConnectedPieces ....................................   Passed    0.00 sec
+      Start 2833: CurvatureBoundaryGraph.RegionalMergeRefreshesEverySurvivingNeighbor
+26/39 Test #2833: CurvatureBoundaryGraph.RegionalMergeRefreshesEverySurvivingNeighbor .......................   Passed    0.00 sec
+      Start 2834: CurvatureBoundaryGraph.RegionalWeightOverflowFailsAndTinyWeightsRetainVariance
+27/39 Test #2834: CurvatureBoundaryGraph.RegionalWeightOverflowFailsAndTinyWeightsRetainVariance ............   Passed    0.00 sec
+      Start 2835: CurvatureBoundaryGraph.AreaCleanupReportsItsEnergyIncrease
+28/39 Test #2835: CurvatureBoundaryGraph.AreaCleanupReportsItsEnergyIncrease ................................   Passed    0.00 sec
+      Start 2836: CurvatureBoundaryGraph.AreaCleanupNeverBypassesHardCutsAndRetainsIsolatedRegions
+29/39 Test #2836: CurvatureBoundaryGraph.AreaCleanupNeverBypassesHardCutsAndRetainsIsolatedRegions ..........   Passed    0.00 sec
+      Start 2837: CurvatureExtrema.GaussianExtrusionFindsGeometricTransverseExtremum
+30/39 Test #2837: CurvatureExtrema.GaussianExtrusionFindsGeometricTransverseExtremum ........................   Passed    4.43 sec
+      Start 2838: CurvatureExtrema.PlaneHasNoArtificialCurves
+31/39 Test #2838: CurvatureExtrema.PlaneHasNoArtificialCurves ...............................................   Passed    1.87 sec
+      Start 2839: CurvatureExtrema.OrientationReversalExchangesRidgeValley
+32/39 Test #2839: CurvatureExtrema.OrientationReversalExchangesRidgeValley ..................................   Passed    6.93 sec
+      Start 2840: CurvatureExtrema.RetriangulationAndRefinementRetainCenterCurve
+33/39 Test #2840: CurvatureExtrema.RetriangulationAndRefinementRetainCenterCurve ............................   Passed   17.75 sec
+      Start 2841: CurvatureExtrema.ScaleTranslationAndSourcePreservation
+34/39 Test #2841: CurvatureExtrema.ScaleTranslationAndSourcePreservation ....................................   Passed    1.38 sec
+      Start 2842: CurvatureExtrema.InvalidInputsAndWorkLimitHaveNoPartialCurves
+35/39 Test #2842: CurvatureExtrema.InvalidInputsAndWorkLimitHaveNoPartialCurves .............................   Passed    0.01 sec
+      Start 2843: CurvatureExtrema.ConstantCurvatureCylinderHasNoInteriorCreases
+36/39 Test #2843: CurvatureExtrema.ConstantCurvatureCylinderHasNoInteriorCreases ............................   Passed    0.38 sec
+      Start 2844: CurvatureExtrema.SphereRejectsUmbilicPrincipalDirections
+37/39 Test #2844: CurvatureExtrema.SphereRejectsUmbilicPrincipalDirections ..................................   Passed    0.65 sec
+      Start 2845: CurvatureExtrema.NoisyExtrusionRetainsDominantCenter
+38/39 Test #2845: CurvatureExtrema.NoisyExtrusionRetainsDominantCenter ......................................   Passed    3.37 sec
+      Start 2846: CurvatureExtrema.SharpFoldDoesNotCreateParallelSmoothCurves
+39/39 Test #2846: CurvatureExtrema.SharpFoldDoesNotCreateParallelSmoothCurves ...............................   Passed    1.13 sec
+
+100% tests passed, 0 tests failed out of 39
+
+Label Time Summary:
+geometry    =  40.43 sec*proc (39 tests)
+unit        =  40.43 sec*proc (39 tests)
+
+Total Test time (real) =  41.42 sec

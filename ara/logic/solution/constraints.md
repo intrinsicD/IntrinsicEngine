@@ -455,3 +455,10 @@
   tests/regression/tooling/Test.AgentWorkGraph.py,
   tasks/evidence/PROC-032/commands/structural-policy.json]
 - **From staging**: O136
+
+## K33: Curvature-extremum curves inform the part-boundary experiment
+- **Constraint**: The operator-directed segmentation experiment should use curvature-extremum curves as evidence for boundary retention, continuation and merging. Mean curvature is an example signal; L0 geometry optimization and perfect anatomical parts are not mandatory. Inspecting explicit candidates is the current first slice, without freezing a part-count target or adopting the detector as a partitioner.
+- **Provenance**: user
+- **Crystallized via**: artifact-commitment
+- **Evidence**: [N474, N475, methods/geometry/curvature_segmentation/curvature_extrema.md]
+- **From staging**: O179

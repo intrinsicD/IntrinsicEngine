@@ -1,0 +1,7 @@
+test_execution_parity_and_report_failures (__main__.GroupedCTestParitySelfTests.test_execution_parity_and_report_failures) ... ok
+
+----------------------------------------------------------------------
+Ran 1 test in 0.004s
+
+OK
+grouped CTest parity: ok: mode="execution" aggregate="IntrinsicCpuTests" logical_cases=10 logical_digest="cf93b3dabd2eb72c187c0b6adfbb250efe9b1b7f1a2f5dbf21b1a917e29cdce4" grouped_logical_cases=9 individual_physical_ctest_records=11 grouped_physical_ctest_records=10 physical_process_reduction=1 status_counts={"disabled":1,"error":0,"failed":0,"passed":9,"skipped":0} status_digest="b3ac3d5496801d6c0263071bd9879ae4363f49df1396022c4b2105bda345d64c" unchanged_physical_status_counts={"disabled":0,"error":0,"failed":0,"passed":2,"skipped":0} unchanged_physical_status_digest="d43fc36cfc1b5aedebfd4fdf5469b63cdd1c5414889b4b0c5ad9d9f8b21d1155"

@@ -1,0 +1,133 @@
+Internal ctest changing into directory: /home/alex/Documents/IntrinsicEngine/build/ci-asan
+Test project /home/alex/Documents/IntrinsicEngine/build/ci-asan
+    Start 2769: IntrinsicGeometryFeaturePartitionTests.Grouped
+1/1 Test #2769: IntrinsicGeometryFeaturePartitionTests.Grouped ...***Timeout 120.07 sec
+Running main() from /home/alex/Documents/IntrinsicEngine/external/vcpkg/buildtrees/gtest/src/v1.17.0-0c449efaff.clean/googletest/src/gtest_main.cc
+[==========] Running 58 tests from 4 test suites.
+[----------] Global test environment set-up.
+[----------] 19 tests from CurvaturePatchContract
+[ RUN      ] CurvaturePatchContract.GeneratedOracleCatalogHasValidEvidenceAndPartitionTopology
+[       OK ] CurvaturePatchContract.GeneratedOracleCatalogHasValidEvidenceAndPartitionTopology (168 ms)
+[ RUN      ] CurvaturePatchContract.PatchReferenceMatchesSuppliedFeatureOracleCatalog
+[       OK ] CurvaturePatchContract.PatchReferenceMatchesSuppliedFeatureOracleCatalog (2116 ms)
+[ RUN      ] CurvaturePatchContract.PatchGrowthIsDeterministicAndSeedFrontsHaveNoAuthority
+[       OK ] CurvaturePatchContract.PatchGrowthIsDeterministicAndSeedFrontsHaveNoAuthority (97 ms)
+[ RUN      ] CurvaturePatchContract.PatchHardBarriersRemainDistinctFromGrowthThroughPublication
+[       OK ] CurvaturePatchContract.PatchHardBarriersRemainDistinctFromGrowthThroughPublication (111 ms)
+[ RUN      ] CurvaturePatchContract.PatchCurvatureClosureSurvivesWithoutFeatureEvidence
+[       OK ] CurvaturePatchContract.PatchCurvatureClosureSurvivesWithoutFeatureEvidence (138 ms)
+[ RUN      ] CurvaturePatchContract.PatchCompletionReplaysWithDetectedFeatureEvidence
+[       OK ] CurvaturePatchContract.PatchCompletionReplaysWithDetectedFeatureEvidence (12493 ms)
+[ RUN      ] CurvaturePatchContract.SuppliedOracleIsolatesPatchCompletionFromCorruptedDetectorEvidence
+[       OK ] CurvaturePatchContract.SuppliedOracleIsolatesPatchCompletionFromCorruptedDetectorEvidence (185 ms)
+[ RUN      ] CurvaturePatchContract.DetectedHardFoldBlocksWhileDetectedHomogeneousControlsStayWhole
+[       OK ] CurvaturePatchContract.DetectedHardFoldBlocksWhileDetectedHomogeneousControlsStayWhole (495 ms)
+[ RUN      ] CurvaturePatchContract.PatchReferenceFailsClosedForMalformedProductionInputs
+[       OK ] CurvaturePatchContract.PatchReferenceFailsClosedForMalformedProductionInputs (40 ms)
+[ RUN      ] CurvaturePatchContract.PatchPartitionPassesFrozenDensityDiagonalScaleNoiseAndOrientationControls
+[       OK ] CurvaturePatchContract.PatchPartitionPassesFrozenDensityDiagonalScaleNoiseAndOrientationControls (1207 ms)
+[ RUN      ] CurvaturePatchContract.LocalRagOneStepSeedPerturbationRefutesFrozenStabilityGate
+[       OK ] CurvaturePatchContract.LocalRagOneStepSeedPerturbationRefutesFrozenStabilityGate (241 ms)
+[ RUN      ] CurvaturePatchContract.SharedStrictFoldClassifierMatchesOracle
+[       OK ] CurvaturePatchContract.SharedStrictFoldClassifierMatchesOracle (31 ms)
+[ RUN      ] CurvaturePatchContract.SuppliedEvidenceFailsClosedBeforePatchWork
+[       OK ] CurvaturePatchContract.SuppliedEvidenceFailsClosedBeforePatchWork (12 ms)
+[ RUN      ] CurvaturePatchContract.FeatureDetectorConsumesSharedHardFactsAndRejectsConstantSoftSignals
+[       OK ] CurvaturePatchContract.FeatureDetectorConsumesSharedHardFactsAndRejectsConstantSoftSignals (254 ms)
+[ RUN      ] CurvaturePatchContract.FeatureDetectorImplementsFrozenPerSignalScaleEquations
+[       OK ] CurvaturePatchContract.FeatureDetectorImplementsFrozenPerSignalScaleEquations (1 ms)
+[ RUN      ] CurvaturePatchContract.FeatureDetectorRecoversPersistentLinesEndpointsAndJunctions
+[       OK ] CurvaturePatchContract.FeatureDetectorRecoversPersistentLinesEndpointsAndJunctions (4041 ms)
+[ RUN      ] CurvaturePatchContract.FeatureDetectorSupportIsInvariantUnderGlobalOrientationReversal
+[       OK ] CurvaturePatchContract.FeatureDetectorSupportIsInvariantUnderGlobalOrientationReversal (1782 ms)
+[ RUN      ] CurvaturePatchContract.FeatureDetectorFailsClosedBeforeBoundedSearches
+[       OK ] CurvaturePatchContract.FeatureDetectorFailsClosedBeforeBoundedSearches (7 ms)
+[ RUN      ] CurvaturePatchContract.FeatureDetectorIsDeterministicAndComputePathOwnsItsResult
+[       OK ] CurvaturePatchContract.FeatureDetectorIsDeterministicAndComputePathOwnsItsResult (747 ms)
+[----------] 19 tests from CurvaturePatchContract (24175 ms total)
+
+[----------] 17 tests from CurvatureBoundaryPartition
+[ RUN      ] CurvatureBoundaryPartition.StrongContourAndShortCompletionSeparateEqualCurvatureSurface
+[       OK ] CurvatureBoundaryPartition.StrongContourAndShortCompletionSeparateEqualCurvatureSurface (54 ms)
+[ RUN      ] CurvatureBoundaryPartition.HomogeneousSurfaceStaysWholeAndPreservesTopology
+[       OK ] CurvatureBoundaryPartition.HomogeneousSurfaceStaysWholeAndPreservesTopology (11 ms)
+[ RUN      ] CurvatureBoundaryPartition.UniformScalePreservesPartitionAndObjective
+[       OK ] CurvatureBoundaryPartition.UniformScalePreservesPartitionAndObjective (26 ms)
+[ RUN      ] CurvatureBoundaryPartition.InvalidEvidenceAndBudgetFailClosed
+[       OK ] CurvatureBoundaryPartition.InvalidEvidenceAndBudgetFailClosed (8 ms)
+[ RUN      ] CurvatureBoundaryPartition.RegionalFieldScalesAndFailsClosed
+[       OK ] CurvatureBoundaryPartition.RegionalFieldScalesAndFailsClosed (25 ms)
+[ RUN      ] CurvatureBoundaryPartition.FlowLimitReturnsNoPartialPartition
+[       OK ] CurvatureBoundaryPartition.FlowLimitReturnsNoPartialPartition (13 ms)
+[ RUN      ] CurvatureBoundaryPartition.SurfacePreflightFailsClosedWithoutChangingInput
+[       OK ] CurvatureBoundaryPartition.SurfacePreflightFailsClosedWithoutChangingInput (5 ms)
+[ RUN      ] CurvatureBoundaryPartition.ShortHardFactsDoNotSuppressAWholeSoftContour
+[       OK ] CurvatureBoundaryPartition.ShortHardFactsDoNotSuppressAWholeSoftContour (23 ms)
+[ RUN      ] CurvatureBoundaryPartition.OnlyQualifyingConnectedHardCurvesSeedAttenuation
+[       OK ] CurvatureBoundaryPartition.OnlyQualifyingConnectedHardCurvesSeedAttenuation (37 ms)
+[ RUN      ] CurvatureBoundaryPartition.CurveCoverageV1ProfileRemainsFrozen
+[       OK ] CurvatureBoundaryPartition.CurveCoverageV1ProfileRemainsFrozen (0 ms)
+[ RUN      ] CurvatureBoundaryPartition.InheritedSuppliedOracleCatalog
+[       OK ] CurvatureBoundaryPartition.InheritedSuppliedOracleCatalog (641 ms)
+[ RUN      ] CurvatureBoundaryPartition.InheritedRegionalOracleCatalog
+[       OK ] CurvatureBoundaryPartition.InheritedRegionalOracleCatalog (765 ms)
+[ RUN      ] CurvatureBoundaryPartition.RegionalCandidateRefutesFrozenUnmarkedClosureGate
+[       OK ] CurvatureBoundaryPartition.RegionalCandidateRefutesFrozenUnmarkedClosureGate (31 ms)
+[ RUN      ] CurvatureBoundaryPartition.RegionalComputedEvidenceCatalog
+[       OK ] CurvatureBoundaryPartition.RegionalComputedEvidenceCatalog (6727 ms)
+[ RUN      ] CurvatureBoundaryPartition.ContrastSuppliedOracleCatalog
+[       OK ] CurvatureBoundaryPartition.ContrastSuppliedOracleCatalog (694 ms)
+[ RUN      ] CurvatureBoundaryPartition.AreaCleanupSuppliedOracleCatalog
+[       OK ] CurvatureBoundaryPartition.AreaCleanupSuppliedOracleCatalog (710 ms)
+[ RUN      ] CurvatureBoundaryPartition.CleanupProfilesPreserveComputedFeatureContours
+[       OK ] CurvatureBoundaryPartition.CleanupProfilesPreserveComputedFeatureContours (12845 ms)
+[----------] 17 tests from CurvatureBoundaryPartition (22623 ms total)
+
+[----------] 12 tests from CurvatureBoundaryGraph
+[ RUN      ] CurvatureBoundaryGraph.ExactOracleMatchesIndependentAssignments
+[       OK ] CurvatureBoundaryGraph.ExactOracleMatchesIndependentAssignments (81 ms)
+[ RUN      ] CurvatureBoundaryGraph.HardCutCannotBeBypassedThroughPositivePath
+[       OK ] CurvatureBoundaryGraph.HardCutCannotBeBypassedThroughPositivePath (0 ms)
+[ RUN      ] CurvatureBoundaryGraph.WiderMovesRecoverAcrossPrematureContraction
+[       OK ] CurvatureBoundaryGraph.WiderMovesRecoverAcrossPrematureContraction (16 ms)
+[ RUN      ] CurvatureBoundaryGraph.HeuristicIsFeasibleDeterministicAndBoundedByOracle
+[       OK ] CurvatureBoundaryGraph.HeuristicIsFeasibleDeterministicAndBoundedByOracle (1962 ms)
+[ RUN      ] CurvatureBoundaryGraph.InvalidAndLimitedInputsReturnNoPartition
+[       OK ] CurvatureBoundaryGraph.InvalidAndLimitedInputsReturnNoPartition (0 ms)
+[ RUN      ] CurvatureBoundaryGraph.DisconnectedNodesPublishSeparateConnectedRegions
+[       OK ] CurvatureBoundaryGraph.DisconnectedNodesPublishSeparateConnectedRegions (0 ms)
+[ RUN      ] CurvatureBoundaryGraph.RegionalExactOracleMatchesIndependentModelFits
+[       OK ] CurvatureBoundaryGraph.RegionalExactOracleMatchesIndependentModelFits (81 ms)
+[ RUN      ] CurvatureBoundaryGraph.RegionCostCountsConnectedPieces
+[       OK ] CurvatureBoundaryGraph.RegionCostCountsConnectedPieces (0 ms)
+[ RUN      ] CurvatureBoundaryGraph.RegionalMergeRefreshesEverySurvivingNeighbor
+[       OK ] CurvatureBoundaryGraph.RegionalMergeRefreshesEverySurvivingNeighbor (10 ms)
+[ RUN      ] CurvatureBoundaryGraph.RegionalWeightOverflowFailsAndTinyWeightsRetainVariance
+[       OK ] CurvatureBoundaryGraph.RegionalWeightOverflowFailsAndTinyWeightsRetainVariance (0 ms)
+[ RUN      ] CurvatureBoundaryGraph.AreaCleanupReportsItsEnergyIncrease
+[       OK ] CurvatureBoundaryGraph.AreaCleanupReportsItsEnergyIncrease (0 ms)
+[ RUN      ] CurvatureBoundaryGraph.AreaCleanupNeverBypassesHardCutsAndRetainsIsolatedRegions
+[       OK ] CurvatureBoundaryGraph.AreaCleanupNeverBypassesHardCutsAndRetainsIsolatedRegions (0 ms)
+[----------] 12 tests from CurvatureBoundaryGraph (2156 ms total)
+
+[----------] 10 tests from CurvatureExtrema
+[ RUN      ] CurvatureExtrema.GaussianExtrusionFindsGeometricTransverseExtremum
+[       OK ] CurvatureExtrema.GaussianExtrusionFindsGeometricTransverseExtremum (8790 ms)
+[ RUN      ] CurvatureExtrema.PlaneHasNoArtificialCurves
+[       OK ] CurvatureExtrema.PlaneHasNoArtificialCurves (3475 ms)
+[ RUN      ] CurvatureExtrema.OrientationReversalExchangesRidgeValley
+[       OK ] CurvatureExtrema.OrientationReversalExchangesRidgeValley (17406 ms)
+[ RUN      ] CurvatureExtrema.RetriangulationAndRefinementRetainCenterCurve
+
+
+0% tests passed, 1 tests failed out of 1
+
+Label Time Summary:
+geometry    = 120.07 sec*proc (1 test)
+unit        = 120.07 sec*proc (1 test)
+
+Total Test time (real) = 121.39 sec
+
+The following tests FAILED:
+	2769 - IntrinsicGeometryFeaturePartitionTests.Grouped (Timeout)
+Errors while running CTest

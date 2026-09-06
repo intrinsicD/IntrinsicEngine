@@ -85,11 +85,12 @@ python3 tests/regression/tooling/Test.TestGateRouting.py \
 `INTRINSIC_GROUP_PURE_CTEST` defaults to `OFF`, so a normal local `ci`
 configure retains one discovered CTest entry per GoogleTest case for focused
 `ctest -R` diagnosis. Required full CPU, ASan, and UBSan workflows enable the
-option explicitly. In that plan, these seven producers replace their individual
+option explicitly. In that plan, these eight producers replace their individual
 entries with one CTest wrapper each:
 
 - `IntrinsicGeometryCurvatureTests`
 - `IntrinsicGeometryFeaturePartitionTests`
+- `IntrinsicGeometryCurvatureExtremaTests`
 - `IntrinsicGeometryTests`
 - `IntrinsicGeometryMethodTests`
 - `IntrinsicGraphicsBufferTransferTests`
@@ -105,7 +106,10 @@ Curvature tensor and feature/partition fixtures use separate pure producers so
 each fixture-heavy cohort and the remaining geometry tests retain the same
 120-second sanitizer hang-detection budget. The feature producer owns
 `Test.CurvaturePatchContract.cpp` and `Test.CurvatureBoundaryPartition.cpp`;
-all cases remain in the required CPU selector with unchanged assertions.
+the extremum producer owns `Test.CurvatureExtrema.cpp`. Keeping multi-scale
+extremum fixtures separate prevents their added runtime from exceeding the
+feature producer's sanitizer timeout. All cases remain in the required CPU
+selector with unchanged assertions.
 
 A producer is eligible only when its cases do not depend on mutable
 process-global scheduler, logger, telemetry, registry, filesystem, environment,

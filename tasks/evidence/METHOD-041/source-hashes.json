@@ -1,0 +1,12 @@
+{
+  "scope": "Hashes of reviewed implementation and producer registration; not a claim-grade source seal",
+  "files": {
+    "src/geometry/Geometry.HalfedgeMesh.CurvatureExtrema.cppm": "dbdf40f4aaaa08d1949eb91996fd080140c27c2af4c4bbecf84b87d01b330b51",
+    "src/geometry/Geometry.HalfedgeMesh.CurvatureExtrema.cpp": "4629275c9c8425e7439b0d0ffe9041957eb6939ca2bb9c3e1a4d4080ab75e452",
+    "benchmarks/runners/CurvatureExtremaMeshRunner.cpp": "99213ffa9bf70a6db6a6fe5db64792a1f9e9879c5fa33ac9874a2780b229fb5a",
+    "benchmarks/runners/curvature_extrema_viewer.py": "d7d9c09e500450f4ae97d85ffc404be825b8e1dcb93be7ef0910226ac7f57a8f",
+    "benchmarks/runners/curvature_boundary_viewer.html": "dfb6655a0806b0d116ddc6140ef9659757f30f156eb9f6ee7f190ef68f792ec4",
+    "tests/unit/geometry/Test.CurvatureExtrema.cpp": "ec9e1668c974b97f044a7e49881961b0d4901af60b446bbf74693648f9bbbe5e",
+    "tests/CMakeLists.txt": "f70c5ac7a43dbdba1974fd5b29c38c6ee4b4d122aa62f3a902cb65523425051e"
+  }
+}

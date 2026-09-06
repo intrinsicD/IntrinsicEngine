@@ -1,0 +1,55 @@
+[
+  {
+    "case": "unknown",
+    "exit_code": 2,
+    "stderr": "Unknown parameter: wrong\n",
+    "status": null
+  },
+  {
+    "case": "duplicate",
+    "exit_code": 2,
+    "stderr": "Duplicate parameter key\n",
+    "status": null
+  },
+  {
+    "case": "mistyped",
+    "exit_code": 2,
+    "stderr": "",
+    "status": null
+  },
+  {
+    "case": "negative_count",
+    "exit_code": 2,
+    "stderr": "",
+    "status": null
+  },
+  {
+    "case": "overflow",
+    "exit_code": 2,
+    "stderr": "Invalid parameter object\n",
+    "status": null
+  },
+  {
+    "case": "invalid_radius",
+    "exit_code": 4,
+    "stderr": "",
+    "status": "error"
+  },
+  {
+    "case": "invalid_scales",
+    "exit_code": 4,
+    "stderr": "",
+    "status": "error"
+  },
+  {
+    "case": "defaults",
+    "exit_code": 0,
+    "stderr": "",
+    "status": "success"
+  },
+  {
+    "case": "refuse_existing_source_output",
+    "exit_code": 2,
+    "source_preserved": true
+  }
+]

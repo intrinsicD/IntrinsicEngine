@@ -1,0 +1,49 @@
+[source-documentation] files=3 interfaces=1 cpp=2 readmes=1 errors=0 review=47
+[source-documentation] rules: declaration-comment=1, readme-chronology=45, readme-large=1
+REVIEW methods/geometry/curvature_segmentation/README.md:1 [readme-large] README has 309 lines; verify it remains a concise entry point
+REVIEW methods/geometry/curvature_segmentation/README.md:11 [readme-chronology] verify this is a concise link to an authoritative record rather than embedded chronology
+REVIEW methods/geometry/curvature_segmentation/README.md:15 [readme-chronology] verify this is a concise link to an authoritative record rather than embedded chronology
+REVIEW methods/geometry/curvature_segmentation/README.md:16 [readme-chronology] verify this is a concise link to an authoritative record rather than embedded chronology
+REVIEW methods/geometry/curvature_segmentation/README.md:22 [readme-chronology] verify this is a concise link to an authoritative record rather than embedded chronology
+REVIEW methods/geometry/curvature_segmentation/README.md:31 [readme-chronology] verify this is a concise link to an authoritative record rather than embedded chronology
+REVIEW methods/geometry/curvature_segmentation/README.md:32 [readme-chronology] verify this is a concise link to an authoritative record rather than embedded chronology
+REVIEW methods/geometry/curvature_segmentation/README.md:34 [readme-chronology] verify this is a concise link to an authoritative record rather than embedded chronology
+REVIEW methods/geometry/curvature_segmentation/README.md:64 [readme-chronology] verify this is a concise link to an authoritative record rather than embedded chronology
+REVIEW methods/geometry/curvature_segmentation/README.md:67 [readme-chronology] verify this is a concise link to an authoritative record rather than embedded chronology
+REVIEW methods/geometry/curvature_segmentation/README.md:88 [readme-chronology] verify this is a concise link to an authoritative record rather than embedded chronology
+REVIEW methods/geometry/curvature_segmentation/README.md:109 [readme-chronology] verify this is a concise link to an authoritative record rather than embedded chronology
+REVIEW methods/geometry/curvature_segmentation/README.md:110 [readme-chronology] verify this is a concise link to an authoritative record rather than embedded chronology
+REVIEW methods/geometry/curvature_segmentation/README.md:111 [readme-chronology] verify this is a concise link to an authoritative record rather than embedded chronology
+REVIEW methods/geometry/curvature_segmentation/README.md:113 [readme-chronology] verify this is a concise link to an authoritative record rather than embedded chronology
+REVIEW methods/geometry/curvature_segmentation/README.md:121 [readme-chronology] verify this is a concise link to an authoritative record rather than embedded chronology
+REVIEW methods/geometry/curvature_segmentation/README.md:125 [readme-chronology] verify this is a concise link to an authoritative record rather than embedded chronology
+REVIEW methods/geometry/curvature_segmentation/README.md:127 [readme-chronology] verify this is a concise link to an authoritative record rather than embedded chronology
+REVIEW methods/geometry/curvature_segmentation/README.md:128 [readme-chronology] verify this is a concise link to an authoritative record rather than embedded chronology
+REVIEW methods/geometry/curvature_segmentation/README.md:139 [readme-chronology] verify this is a concise link to an authoritative record rather than embedded chronology
+REVIEW methods/geometry/curvature_segmentation/README.md:164 [readme-chronology] verify this is a concise link to an authoritative record rather than embedded chronology
+REVIEW methods/geometry/curvature_segmentation/README.md:167 [readme-chronology] verify this is a concise link to an authoritative record rather than embedded chronology
+REVIEW methods/geometry/curvature_segmentation/README.md:176 [readme-chronology] verify this is a concise link to an authoritative record rather than embedded chronology
+REVIEW methods/geometry/curvature_segmentation/README.md:218 [readme-chronology] verify this is a concise link to an authoritative record rather than embedded chronology
+REVIEW methods/geometry/curvature_segmentation/README.md:237 [readme-chronology] verify this is a concise link to an authoritative record rather than embedded chronology
+REVIEW methods/geometry/curvature_segmentation/README.md:241 [readme-chronology] verify this is a concise link to an authoritative record rather than embedded chronology
+REVIEW methods/geometry/curvature_segmentation/README.md:246 [readme-chronology] verify this is a concise link to an authoritative record rather than embedded chronology
+REVIEW methods/geometry/curvature_segmentation/README.md:253 [readme-chronology] verify this is a concise link to an authoritative record rather than embedded chronology
+REVIEW methods/geometry/curvature_segmentation/README.md:259 [readme-chronology] verify this is a concise link to an authoritative record rather than embedded chronology
+REVIEW methods/geometry/curvature_segmentation/README.md:260 [readme-chronology] verify this is a concise link to an authoritative record rather than embedded chronology
+REVIEW methods/geometry/curvature_segmentation/README.md:261 [readme-chronology] verify this is a concise link to an authoritative record rather than embedded chronology
+REVIEW methods/geometry/curvature_segmentation/README.md:263 [readme-chronology] verify this is a concise link to an authoritative record rather than embedded chronology
+REVIEW methods/geometry/curvature_segmentation/README.md:270 [readme-chronology] verify this is a concise link to an authoritative record rather than embedded chronology
+REVIEW methods/geometry/curvature_segmentation/README.md:271 [readme-chronology] verify this is a concise link to an authoritative record rather than embedded chronology
+REVIEW methods/geometry/curvature_segmentation/README.md:272 [readme-chronology] verify this is a concise link to an authoritative record rather than embedded chronology
+REVIEW methods/geometry/curvature_segmentation/README.md:274 [readme-chronology] verify this is a concise link to an authoritative record rather than embedded chronology
+REVIEW methods/geometry/curvature_segmentation/README.md:285 [readme-chronology] verify this is a concise link to an authoritative record rather than embedded chronology
+REVIEW methods/geometry/curvature_segmentation/README.md:286 [readme-chronology] verify this is a concise link to an authoritative record rather than embedded chronology
+REVIEW methods/geometry/curvature_segmentation/README.md:287 [readme-chronology] verify this is a concise link to an authoritative record rather than embedded chronology
+REVIEW methods/geometry/curvature_segmentation/README.md:289 [readme-chronology] verify this is a concise link to an authoritative record rather than embedded chronology
+REVIEW methods/geometry/curvature_segmentation/README.md:296 [readme-chronology] verify this is a concise link to an authoritative record rather than embedded chronology
+REVIEW methods/geometry/curvature_segmentation/README.md:298 [readme-chronology] verify this is a concise link to an authoritative record rather than embedded chronology
+REVIEW methods/geometry/curvature_segmentation/README.md:299 [readme-chronology] verify this is a concise link to an authoritative record rather than embedded chronology
+REVIEW methods/geometry/curvature_segmentation/README.md:301 [readme-chronology] verify this is a concise link to an authoritative record rather than embedded chronology
+REVIEW methods/geometry/curvature_segmentation/README.md:308 [readme-chronology] verify this is a concise link to an authoritative record rather than embedded chronology
+REVIEW methods/geometry/curvature_segmentation/README.md:309 [readme-chronology] verify this is a concise link to an authoritative record rather than embedded chronology
+REVIEW src/geometry/Geometry.HalfedgeMesh.CurvatureExtrema.cppm:93 [declaration-comment] verify this comment is mandatory to understand the declaration at line 95

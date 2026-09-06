@@ -12,7 +12,7 @@ Root scanned: `src`
 | `assets` | 11 |
 | `core` | 40 |
 | `ecs` | 27 |
-| `geometry` | 114 |
+| `geometry` | 115 |
 | `graphics/assets` | 1 |
 | `graphics/framegraph` | 7 |
 | `graphics/renderer` | 71 |
@@ -142,6 +142,7 @@ Root scanned: `src`
 | `Geometry.HalfedgeMesh.Builder` | `src/geometry/Geometry.HalfedgeMesh.Builder.cppm` | `geometry` |
 | `Geometry.CatmullClark` | `src/geometry/Geometry.HalfedgeMesh.CatmullClark.cppm` | `geometry` |
 | `Geometry.Curvature` | `src/geometry/Geometry.HalfedgeMesh.Curvature.cppm` | `geometry` |
+| `Geometry.HalfedgeMesh.CurvatureExtrema` | `src/geometry/Geometry.HalfedgeMesh.CurvatureExtrema.cppm` | `geometry` |
 | `Geometry.HalfedgeMesh.CurvatureSegmentation.Features` | `src/geometry/Geometry.HalfedgeMesh.CurvatureSegmentation.Features.cppm` | `geometry` |
 | `Geometry.HalfedgeMesh.CurvatureSegmentation.Multicut` | `src/geometry/Geometry.HalfedgeMesh.CurvatureSegmentation.Multicut.cppm` | `geometry` |
 | `Geometry.HalfedgeMesh.CurvatureSegmentation.Patches` | `src/geometry/Geometry.HalfedgeMesh.CurvatureSegmentation.Patches.cppm` | `geometry` |
@@ -415,4 +416,4 @@ Root scanned: `src`
 | `Extrinsic.Runtime.StableEntityLookup` | `src/runtime/Scene/Runtime.StableEntityLookup.cppm` | `runtime` |
 | `Extrinsic.Runtime.VisualizationRecipes` | `src/runtime/Visualization/Runtime.VisualizationRecipes.cppm` | `runtime` |
 
-Total modules: **388**
+Total modules: **389**

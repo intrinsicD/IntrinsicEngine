@@ -1,0 +1,87 @@
+session:
+  id: 2026-09-07_001
+  date: '2026-09-07'
+  started: 2026-09-07T00:36+02:00
+  last_turn: 2026-09-07T00:36+02:00
+  turn_count: 1
+  summary: Completed METHOD-041 CPU curvature-extremum inspection and six-mesh offline viewer; engine
+    integration remains UI-053 and part-quality/adoption remain open.
+events_logged:
+- turn: 1
+  type: decision
+  id: N475
+  routing: direct
+  provenance: user
+  summary: Proceed with curvature-extremum inspection and bounded Claude collaboration
+- turn: 1
+  type: experiment
+  id: N476
+  routing: direct
+  provenance: ai-executed
+  summary: Verify detached extrema against analytic controls and distinct CPU sanitizers
+- turn: 1
+  type: experiment
+  id: N477
+  routing: direct
+  provenance: ai-executed
+  summary: Inspect six local meshes with exact principal and mean curves at three scales
+- turn: 1
+  type: decision
+  id: N478
+  routing: direct
+  provenance: ai-executed
+  summary: Freeze a CPU curve-inspection formulation before partition adoption
+- turn: 1
+  type: constraint
+  id: O179
+  routing: crystallized
+  provenance: user
+  summary: K33 records the operator curvature-informed boundary constraint.
+- turn: 1
+  type: claim
+  id: O181
+  routing: crystallized
+  provenance: ai-executed
+  summary: logic/claims.md:C61
+- turn: 1
+  type: claim
+  id: O182
+  routing: crystallized
+  provenance: ai-executed
+  summary: logic/claims.md:C62
+ai_actions:
+- turn: 1
+  action: Read primary feature-line/curvature formulations; implemented CPU detector, exact JSON export
+    and existing viewer extension; fixed sharp support and crossing precision; ran analytic controls,
+    six local meshes, browser coverage and focused CPU/sanitizer gates. Split the pure producer after
+    a retained timeout, refreshed a stale runtime test binary for whole-registry parity, and passed structural
+    checks. Claude provided a bounded public-math review; no private source/data transfer, remote publication
+    or Sandbox replacement.
+  provenance: ai-executed
+  files_changed:
+  - src/geometry/Geometry.HalfedgeMesh.CurvatureExtrema.cpp
+  - src/geometry/Geometry.HalfedgeMesh.CurvatureExtrema.cppm
+  - benchmarks/runners/curvature_extrema_viewer.py
+  - tests/unit/geometry/Test.CurvatureExtrema.cpp
+  - methods/geometry/curvature_segmentation/curvature_extrema_report.md
+  - tasks/active/UI-053-curvature-extremum-engine-overlay.md
+claims_touched:
+- id: C61
+  action: created
+  turn: 1
+- id: C62
+  action: created
+  turn: 1
+key_context:
+- turn: 1
+  excerpt: 'User: yes, please cowork on this with claude.'
+open_threads:
+- 'UI-053: integrate detached curves through shared engine/config/UI publication.'
+- Inspect candidate curve placement with the operator before choosing boundary completion, selection and
+  merging.
+- METHOD-040 remains experimental; C59 frozen closure rejection and BUG-171 custody blocker remain unchanged.
+- Keep BUG-172 import attribution and BUG-176 concurrent CTest discovery separate from this detector work.
+ai_suggestions_pending:
+- 'O180 is only partly implemented: detector inspection is delivered, while joint boundary selection/continuation/merging
+  and its complexity cost remain unadopted.'
+- O171/O173/O175 remain revisited without imposing exact anatomy, thickness or a generally valid solver.

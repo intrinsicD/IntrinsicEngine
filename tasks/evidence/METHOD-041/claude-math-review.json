@@ -1,0 +1,35 @@
+{
+  "scope": "Public formulation critique only; no repository source or private meshes supplied",
+  "session_id": "4a7a71f8-0533-48dd-91fa-25565da8f213",
+  "model_usage": {
+    "claude-haiku-4-5-20251001": {
+      "inputTokens": 1045,
+      "outputTokens": 16,
+      "cacheReadInputTokens": 0,
+      "cacheCreationInputTokens": 0,
+      "webSearchRequests": 0,
+      "costUSD": 0.001125,
+      "contextWindow": 200000,
+      "maxOutputTokens": 32000,
+      "thinkingTokens": 0,
+      "canonicalModel": "claude-haiku-4-5",
+      "provider": "firstParty",
+      "costBasis": "list"
+    },
+    "claude-fable-5-1": {
+      "inputTokens": 482,
+      "outputTokens": 612,
+      "cacheReadInputTokens": 0,
+      "cacheCreationInputTokens": 0,
+      "webSearchRequests": 0,
+      "costUSD": 0.03542,
+      "contextWindow": 1000000,
+      "maxOutputTokens": 64000,
+      "thinkingTokens": 0,
+      "canonicalModel": "claude-fable-5-1",
+      "provider": "firstParty",
+      "costBasis": "list"
+    }
+  },
+  "result": "**Assessment (≈200 words)**\n\nThe pipeline is sound in outline: S = −dN is symmetric on the tangent plane, e = ∇κ·t is the standard ridge/crest criterion (Ohtake–Belyaev–Seidel), and zero-tracing of e with sign-flip alignment is the right topology. Two pitfalls dominate correctness:\n\n1. **Sign/orientation of the line field.** t is only defined up to sign; e = ∇κ·t is therefore odd under t → −t. Averaging e with sign(t_i·t_j) transport is correct only if you transport relative to a fixed reference per face before averaging and before finding zeros; mixing per-vertex e’s with different local references produces spurious zeros. Also, at umbilics (κ₁≈κ₂) t is undefined and the \"mutually positive alignment\" test must reject triangles, not silently orient them. Same issue for the mean-curvature comparator: Hessian eigendirections of H flip sign too, and the \"transverse\" choice must be consistent.\n\n2. **Fitting bias in S.** Least-squares S from tangent displacement vs. normal difference is first-order; curvature gradients need second-order accuracy, so ∇κ from area-averaged face gradients of fitted κ will be noisy in proportion to h. Using geodesic radii mitigates but doesn’t eliminate this—symmetrize S *after* fitting, not by construction.\n\n**Analytic tests:** (a) an ellipsoid (closed-form principal curvatures, ridges along axes; check crest positions converge O(h) and umbilics are excluded); (b) a torus or a sinusoidal height field z = a·sin(x) (known ∇κ, crest at x = π/2 + kπ, sign of ∇e·t distinguishes ridge from valley; compare H-comparator)."
+}

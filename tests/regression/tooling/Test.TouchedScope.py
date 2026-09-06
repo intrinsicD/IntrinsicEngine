@@ -36,6 +36,7 @@ def write_registry(
     inventory = build_dir / "test-inventories"
     inventory.mkdir(parents=True)
     rows = rows or [
+        ("IntrinsicGeometryCurvatureExtremaTests", "geometry,unit"),
         ("IntrinsicGeometryCurvatureTests", "geometry,unit"),
         ("IntrinsicGeometryFeaturePartitionTests", "geometry,unit"),
         ("IntrinsicGeometryTests", "geometry,unit"),
@@ -157,6 +158,11 @@ class TouchedScopeTests(unittest.TestCase):
                 [record("tests/unit/geometry/" + name)]
             )
             self.assertEqual(feature["anchor_targets"], ["IntrinsicGeometryFeaturePartitionTests"])
+
+        extrema = touched_scope.analyze_change_records(
+            [record("tests/unit/geometry/Test.CurvatureExtrema.cpp")]
+        )
+        self.assertEqual(extrema["anchor_targets"], ["IntrinsicGeometryCurvatureExtremaTests"])
 
         geometry_io = touched_scope.analyze_change_records(
             [record("tests/unit/geometry/Test.GeometryIO.cpp")]
@@ -529,6 +535,7 @@ class TouchedScopeTests(unittest.TestCase):
                 finalized["finalization"]["selected_targets"],
                 [
                     "GeometryContractTests",
+                    "IntrinsicGeometryCurvatureExtremaTests",
                     "IntrinsicGeometryCurvatureTests",
                     "IntrinsicGeometryFeaturePartitionTests",
                     "IntrinsicGeometryIoTests",
@@ -547,6 +554,7 @@ class TouchedScopeTests(unittest.TestCase):
                         "name": "focused-owner",
                         "targets": [
                             "GeometryContractTests",
+                            "IntrinsicGeometryCurvatureExtremaTests",
                             "IntrinsicGeometryCurvatureTests",
                             "IntrinsicGeometryFeaturePartitionTests",
                             "IntrinsicGeometryIoTests",
@@ -554,6 +562,7 @@ class TouchedScopeTests(unittest.TestCase):
                         ],
                         "producer_targets": [
                             "GeometryContractTests",
+                            "IntrinsicGeometryCurvatureExtremaTests",
                             "IntrinsicGeometryCurvatureTests",
                             "IntrinsicGeometryFeaturePartitionTests",
                             "IntrinsicGeometryIoTests",
@@ -575,6 +584,7 @@ class TouchedScopeTests(unittest.TestCase):
                         ],
                         "producer_targets": [
                             "GeometryContractTests",
+                            "IntrinsicGeometryCurvatureExtremaTests",
                             "IntrinsicGeometryCurvatureTests",
                             "IntrinsicGeometryFeaturePartitionTests",
                             "IntrinsicGeometryIoTests",

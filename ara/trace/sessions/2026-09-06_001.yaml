@@ -2,11 +2,10 @@ session:
   id: 2026-09-06_001
   date: '2026-09-06'
   started: 2026-09-06T00:10+02:00
-  last_turn: 2026-09-06T21:56+02:00
-  turn_count: 4
-  summary: Diagnosed frog, implemented and tested experimental boundary partitions, and exposed frozen
-    curves_v1 through engine/config/UI for operator inspection; negative adoption and custody findings
-    remain open.
+  last_turn: 2026-09-06T23:17+02:00
+  turn_count: 5
+  summary: Implemented experimental METHOD-040 and UI access; operator feedback now prioritizes explicit
+    curvature-extremum curves, while negative adoption and custody findings remain open.
 events_logged:
 - turn: 1
   type: question
@@ -116,6 +115,40 @@ events_logged:
   routing: direct
   provenance: ai-executed
   summary: Verify explicit METHOD-040 config, publication and history integration
+- turn: 5
+  type: question
+  id: N474
+  routing: direct
+  provenance: user
+  summary: Make dominant curvature-extremum curves inform candidate part boundaries
+- turn: 5
+  type: observation
+  id: O178
+  routing: staged
+  provenance: user
+  summary: 'Operator visual feedback: METHOD-040 looks good already; sculpt and other noise-free models
+    are described as nearly flawless, with minor deviations including trim-star. Frog boundaries still
+    differ from the desired dominant-curvature creases. This is subjective feedback, not a quantitative
+    oracle pass or general adoption verdict.'
+- turn: 5
+  type: observation
+  id: O179
+  routing: staged
+  provenance: user
+  summary: Part segmentation should at least be informed by curvature-extremum curves. Candidate creases
+    should inform which boundaries are retained, connected or removed and how regions merge, seeking a
+    data-informed useful granularity. Mean curvature is an example signal; L0 geometry optimization is
+    a motivating hypothesis, not a mandated stage.
+- turn: 5
+  type: observation
+  id: O180
+  routing: staged
+  provenance: ai-suggested
+  summary: First validate explicit multiscale curvature-extremum curves independently from segmentation.
+    Compare mean-curvature scalar ridges with principal-curvature ridge/valley lines, account for direction
+    reliability and sampling, and retain candidate confidence and tangents. Then assess joint boundary
+    selection, continuation and merging with a complexity cost rather than equal-area or fixed-count targets.
+    This proposal is unimplemented and has no new quality evidence.
 ai_actions:
 - turn: 1
   action: Built temporary probes against existing ci Clang-23 libraries, ran fourteen configurations,
@@ -166,6 +199,19 @@ ai_actions:
   - src/app/Sandbox/Editor/Sandbox.MeshProcessingPanels.cpp
   - tests/contract/runtime/Test.CurvatureSegmentationOperations.cpp
   - tasks/done/UI-052-method040-diagnostic-inspection.md
+- turn: 5
+  action: Inspected the feature-response equations and boundary cost assembly; searched primary feature-line
+    and L0-denoising literature. Obtained one bounded public-math design critique from Claude through
+    MCP without source/data transfer. Recommended validating explicit extremum curves before changing
+    partition optimization. No engine edits, mesh experiments, test runs or performance claims. Repaired
+    list indentation introduced in the preceding research epilogue and parsed all changed YAML records.
+  provenance: ai-executed
+  files_changed:
+  - ara/trace/exploration_tree.yaml
+  - ara/staging/observations.yaml
+  - ara/trace/pm_reasoning_log.yaml
+  - ara/trace/sessions/2026-09-06_001.yaml
+  - ara/trace/sessions/session_index.yaml
 claims_touched:
 - id: C57
   action: created
@@ -191,15 +237,19 @@ key_context:
 - turn: 4
   excerpt: User requested continued Claude collaboration and asked whether METHOD-040 was wired into engine/UI
     for direct testing; then explicitly instructed continuation.
+- turn: 5
+  excerpt: 'User: ok, this should atleast be informed by the curvature-extremum curves right? Earlier
+    in the same exchange the operator described good clean-model results and a remaining frog crease-alignment
+    gap.'
 open_threads:
 - Reconcile the direct CPU five-region replay with the reported two-region live result before claiming
   exact reproduction.
 - Investigate region-pair hard-role reporting separately from actual source feature masks.
 - 'METHOD-040 remains unadopted: frozen closure oracle fails; BUG-171 prevents formal retirement from
   retained failed required receipts.'
-- Final candidate still lacks operator visual-quality acceptance. Both the local comparison viewer and
-  explicit experimental METHOD-040 Sandbox choice are available for inspection; the running Sandbox must
-  restart to load the rebuilt binary.
+- Operator supplied positive but qualified visual feedback on clean models; frog and trim-star expectations
+  remain unresolved. Validate explicit curvature-extremum candidates before interpreting region counts
+  as quality.
 - BUG-172 retains the unproven attribution of an intermittent import completion failure; BUG-176 owns
   concurrent CTest discovery coordination.
 ai_suggestions_pending:

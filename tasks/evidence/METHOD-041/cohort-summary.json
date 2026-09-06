@@ -1,0 +1,104 @@
+{
+  "scope": "Local exploratory extraction; source_dirty=true, no performance or part-quality claim",
+  "source_revision": "de4acc5d07034705076b9c26a07896c35eeefa6d",
+  "source_dirty": true,
+  "runner_sha256": "1a70233aef351f3e8ef0d6a0adb2c5ca1a3faec3c16d851e0e1e15fb8949eb7b",
+  "meshes": [
+    {
+      "mesh": "frog",
+      "input_sha256": "c72c55b72392f55e02b846267424c9069c580e1bede1c9b7ee7ff189fa4656aa",
+      "inspection_sha256": "5d6e7c39c4b9f3e77d5e3797dad275284d5fe0f5c1a90a59a1840265892ea685",
+      "vertices": 9555,
+      "faces": 19106,
+      "segments": 14035,
+      "curves": 1309,
+      "supported_vertices": [
+        1352,
+        9437,
+        9547
+      ],
+      "runtime_ms": 163.774337,
+      "native_status": "success"
+    },
+    {
+      "mesh": "sculpt",
+      "input_sha256": "210dc85f20cdec11cb0b50bec255b86126fb6b47f9f938369049570de3f88a25",
+      "inspection_sha256": "02574e22c20bf1fa6b77c90f6baaebaa20c849e9737fafb8e3cdf6a728e726a9",
+      "vertices": 3669,
+      "faces": 7342,
+      "segments": 2144,
+      "curves": 346,
+      "supported_vertices": [
+        0,
+        969,
+        3264
+      ],
+      "runtime_ms": 19.918922,
+      "native_status": "success"
+    },
+    {
+      "mesh": "trim-star",
+      "input_sha256": "cb68b78950f03f12264519af931431ad38c2db1b9e5d7cef33b03d2220d4c947",
+      "inspection_sha256": "5fea9fab6e00f80f6bc6b797d7038f02987da2793f8ffc144aff90541961d70b",
+      "vertices": 5192,
+      "faces": 10384,
+      "segments": 2543,
+      "curves": 389,
+      "supported_vertices": [
+        1,
+        3353,
+        4524
+      ],
+      "runtime_ms": 31.410709,
+      "native_status": "success"
+    },
+    {
+      "mesh": "fandisk",
+      "input_sha256": "9bb0e3fa76f175ed8995a43131f900f721f32cea9a32297ca37078d1d519b880",
+      "inspection_sha256": "69d93e58684424e453d8f956fce2219202d949cd7b597fad682e9720ee13fa86",
+      "vertices": 6475,
+      "faces": 12946,
+      "segments": 3342,
+      "curves": 380,
+      "supported_vertices": [
+        20,
+        4480,
+        5774
+      ],
+      "runtime_ms": 42.952273,
+      "native_status": "success"
+    },
+    {
+      "mesh": "dolphin",
+      "input_sha256": "eb47d91c9da39d84185bd54bf66df8253561a31ec488aa893725c17cc2a425ba",
+      "inspection_sha256": "304b65f12d631fff5e1ec30ed095b42c4fe573b67bbf2cc45c214596261334bf",
+      "vertices": 2562,
+      "faces": 5120,
+      "segments": 1861,
+      "curves": 170,
+      "supported_vertices": [
+        19,
+        1789,
+        2513
+      ],
+      "runtime_ms": 22.30154,
+      "native_status": "success"
+    },
+    {
+      "mesh": "bumpy_torus",
+      "input_sha256": "878c10c85d34b650eef72a004521e08306571f0eb4ae737d793ef3450434e7e8",
+      "inspection_sha256": "ebde5928ebd853b9f680c52c2d46ebc54b4c3b919361cebf18f145e2631803ea",
+      "vertices": 16815,
+      "faces": 33630,
+      "segments": 22827,
+      "curves": 1931,
+      "supported_vertices": [
+        7122,
+        16506,
+        16709
+      ],
+      "runtime_ms": 290.524062,
+      "native_status": "success"
+    }
+  ]
+}

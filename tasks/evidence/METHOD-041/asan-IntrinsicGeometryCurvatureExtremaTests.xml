@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites tests="10" failures="0" disabled="0" errors="0" time="100.01" timestamp="2026-09-07T00:20:31.339" name="AllTests">
+  <testsuite name="CurvatureExtrema" tests="10" failures="0" disabled="0" skipped="0" errors="0" time="100.01" timestamp="2026-09-07T00:20:31.339">
+    <testcase name="GaussianExtrusionFindsGeometricTransverseExtremum" file="/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CurvatureExtrema.cpp" line="82" status="run" result="completed" time="9.656" timestamp="2026-09-07T00:20:31.339" classname="CurvatureExtrema" />
+    <testcase name="PlaneHasNoArtificialCurves" file="/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CurvatureExtrema.cpp" line="108" status="run" result="completed" time="4.17" timestamp="2026-09-07T00:20:40.996" classname="CurvatureExtrema" />
+    <testcase name="OrientationReversalExchangesRidgeValley" file="/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CurvatureExtrema.cpp" line="116" status="run" result="completed" time="18.186" timestamp="2026-09-07T00:20:45.166" classname="CurvatureExtrema" />
+    <testcase name="RetriangulationAndRefinementRetainCenterCurve" file="/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CurvatureExtrema.cpp" line="134" status="run" result="completed" time="48.681" timestamp="2026-09-07T00:21:03.353" classname="CurvatureExtrema" />
+    <testcase name="ScaleTranslationAndSourcePreservation" file="/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CurvatureExtrema.cpp" line="145" status="run" result="completed" time="3.807" timestamp="2026-09-07T00:21:52.034" classname="CurvatureExtrema" />
+    <testcase name="InvalidInputsAndWorkLimitHaveNoPartialCurves" file="/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CurvatureExtrema.cpp" line="164" status="run" result="completed" time="0.038" timestamp="2026-09-07T00:21:55.841" classname="CurvatureExtrema" />
+    <testcase name="ConstantCurvatureCylinderHasNoInteriorCreases" file="/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CurvatureExtrema.cpp" line="241" status="run" result="completed" time="1.032" timestamp="2026-09-07T00:21:55.880" classname="CurvatureExtrema" />
+    <testcase name="SphereRejectsUmbilicPrincipalDirections" file="/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CurvatureExtrema.cpp" line="252" status="run" result="completed" time="1.785" timestamp="2026-09-07T00:21:56.912" classname="CurvatureExtrema" />
+    <testcase name="NoisyExtrusionRetainsDominantCenter" file="/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CurvatureExtrema.cpp" line="259" status="run" result="completed" time="9.559" timestamp="2026-09-07T00:21:58.698" classname="CurvatureExtrema" />
+    <testcase name="SharpFoldDoesNotCreateParallelSmoothCurves" file="/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.CurvatureExtrema.cpp" line="275" status="run" result="completed" time="3.092" timestamp="2026-09-07T00:22:08.257" classname="CurvatureExtrema" />
+  </testsuite>
+</testsuites>

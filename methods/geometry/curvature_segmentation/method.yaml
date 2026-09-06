@@ -20,6 +20,7 @@ outputs:
   - "Standalone slot-aligned hard/soft feature evidence with per-scale transition/ridge/valley responses, thinning/hysteresis decisions, vertex incidence, work counters, and explicit failure diagnostics"
   - "Experimental METHOD-040 slot-aligned face/edge partitions from signed boundary costs, optional regional fitting, and separately reported area agglomeration; no accepted replacement backend"
   - "Unadopted METHOD-039 local-candidate output with provisional/final face regions, seed-growth facts, hard/soft/closure edge roles, regional statistics, exact accepted energy deltas, and explicit failure diagnostics"
+  - "Experimental METHOD-041 detached principal/mean curvature-extremum curves with exact source interpolation, scale agreement and fit diagnostics; not consumed by METHOD-040 yet"
 backends:
   - cpu_reference
 metrics:
@@ -28,12 +29,14 @@ metrics:
   - "fold_boundary_recall"
   - "runtime_ms"
 correctness_tests:
+  - "../../../tests/unit/geometry/Test.CurvatureExtrema.cpp"
   - "../../../tests/unit/geometry/Test.CurvatureSegmentation.cpp"
   - "../../../tests/unit/geometry/Test.CurvaturePatchContract.cpp"
   - "../../../tests/unit/geometry/Test.CurvatureBoundaryPartition.cpp"
   - "../../../tests/contract/runtime/Test.CurvatureSegmentationOperations.cpp"
   - "../../../tests/integration/runtime/Test.SandboxCurvatureSegmentationPanel.cpp"
 benchmarks:
+  - "../../../benchmarks/geometry/manifests/curvature_extrema_mesh_local_cohort.yaml"
   - "../../../benchmarks/geometry/manifests/curvature_segmentation_reference_smoke.yaml"
   - "../../../benchmarks/geometry/manifests/curvature_segmentation_reference_profile_10k_fixed.yaml"
   - "../../../benchmarks/geometry/manifests/curvature_segmentation_reference_profile_10k_automatic.yaml"

@@ -9,6 +9,8 @@ picking backlog work; theme priorities and rationale live in
 ## Active tasks
 
 - `METHOD-040` — Global multicut curvature-patch CPU reference (tasks/active/METHOD-040-global-multicut-curvature-patch-reference.md)
+- `METHOD-041` — Inspect explicit curvature-extremum curves (tasks/active/METHOD-041-curvature-extremum-curve-inspection.md)
+- `UI-053` — Curvature-extremum engine overlay (tasks/active/UI-053-curvature-extremum-engine-overlay.md)
 
 ## Theme B — Rendering modernization
 

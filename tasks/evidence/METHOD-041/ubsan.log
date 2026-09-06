@@ -1,0 +1,14 @@
+Internal ctest changing into directory: /home/alex/Documents/IntrinsicEngine/build/ci-ubsan
+Test project /home/alex/Documents/IntrinsicEngine/build/ci-ubsan
+    Start 2769: IntrinsicGeometryFeaturePartitionTests.Grouped
+1/2 Test #2769: IntrinsicGeometryFeaturePartitionTests.Grouped ...   Passed   15.90 sec
+    Start 2770: IntrinsicGeometryCurvatureExtremaTests.Grouped
+2/2 Test #2770: IntrinsicGeometryCurvatureExtremaTests.Grouped ...   Passed   85.26 sec
+
+100% tests passed, 0 tests failed out of 2
+
+Label Time Summary:
+geometry    = 101.17 sec*proc (2 tests)
+unit        = 101.17 sec*proc (2 tests)
+
+Total Test time (real) = 101.80 sec
