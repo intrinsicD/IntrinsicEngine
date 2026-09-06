@@ -11021,7 +11021,7 @@ tree:
     evidence:
     - N474
     - O179
-    - tasks/active/METHOD-041-curvature-extremum-curve-inspection.md
+    - tasks/done/METHOD-041-curvature-extremum-curve-inspection.md
     status: resolved
   - id: N476
     type: experiment

@@ -111,7 +111,7 @@ refinement, small positional noise, scale/translation, an exact sharp fold,
 source preservation, malformed input and bounded work. These fixtures are the
 CPU contract; they are not semantic-part ground truth or a corpus-wide stability
 proof. Local mesh observations and reviewed artifacts belong to the
-[METHOD-041 task](../../../tasks/active/METHOD-041-curvature-extremum-curve-inspection.md).
+[METHOD-041 task](../../../tasks/done/METHOD-041-curvature-extremum-curve-inspection.md).
 
 Missing or weak curves may reflect unsupported sampling, unreliable directions,
 thresholds, genuine flatness or detector limitations. Large-coordinate float

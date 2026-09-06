@@ -63,3 +63,8 @@ python3 tools/docs/check_doc_links.py --root . --strict
 
 ## Result
 CPUContracted detector and standalone inspector. See the [inspection record](../../methods/geometry/curvature_segmentation/curvature_extrema_report.md) and [evidence](../evidence/METHOD-041). UI-053 owns deferred engine integration; partition adoption remains an explicit later experiment.
+
+## Completion
+- Completed 2026-09-07 at CPUContracted maturity for the detector and standalone inspector.
+- Implementation commit: `362b794ac`.
+- UI-053 owns engine/config/Sandbox integration. Curve-driven partition selection and merging remain a later experiment.

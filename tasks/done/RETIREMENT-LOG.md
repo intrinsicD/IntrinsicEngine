@@ -8088,3 +8088,18 @@ fixed profile; config parity, absent fitted labels, atomic history and failed
 publication are tested. Ten focused CTest cases pass and the optimized Sandbox
 is rebuilt. This provides diagnostic inspection without method adoption.
 Implementation commit: `c04071f8b`.
+
+### METHOD-041 — 2026-09-07
+
+Completed the CPU curvature-extremum detector and standalone exact-curve
+inspector, with principal and mean signals at three support scales. The final
+six-mesh local cohort and 41 browser views are inspection evidence only.
+All 39 focused CPU cases and 58 cases per distinct ASan/UBSan run pass;
+the new pure producer retains the existing 120-second sanitizer budget.
+Claude supplied a bounded public-mathematics critique; source and visual
+review stayed local. UI-053 owns engine/config/Sandbox integration, and
+partition adoption remains a later experiment. Implementation: `362b794ac`.
+
+Build-identity correction to the earlier UI-052 entry: the `dev` preset is
+Debug, so its wording "optimized Sandbox" was incorrect. METHOD-041's final
+native inspection used the distinct `ci-release` preset; no speedup is claimed.
