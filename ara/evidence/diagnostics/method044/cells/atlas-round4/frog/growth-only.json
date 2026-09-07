@@ -1,0 +1,59 @@
+{
+  "arm": "growth-only",
+  "patches": 64,
+  "stretch_limit": 1.5,
+  "subdivide": 0,
+  "faces": 19106,
+  "source": "/home/alex/Dropbox/Work/Datasets/obj/frog.obj",
+  "source_sha256": "c72c55b72392f55e02b846267424c9069c580e1bede1c9b7ee7ff189fa4656aa",
+  "implementation_sha256": "d91563c25f0105e402a79f2ef550b1bebe7bba1f8abb31a16ee8d000e136c9f9",
+  "claim_eligible": false,
+  "metrics": {
+    "input_vertices": 9555,
+    "input_faces": 19106,
+    "initial_charts": 70,
+    "chart_count": 14,
+    "merge_attempts": 146,
+    "accepted_merges": 56,
+    "parameterization_attempts": 222,
+    "uv_solves": 218,
+    "factorized_degrees_of_freedom": 521110,
+    "rejections": {
+      "initial_distortion": 6,
+      "merge_distortion": 86,
+      "merge_topology": 4
+    },
+    "max_stretch": 1.4924442741284885,
+    "mean_stretch": 1.077785235353948,
+    "max_anisotropy": 1.2859208446055894,
+    "mean_anisotropy": 1.0157884787747713,
+    "seam_length_over_sqrt_area": 8.946394264208635,
+    "continuous_packing_utilization": 0.4474262442387599,
+    "all_charts_valid": true,
+    "runtime_seconds": 3.9933041320182383,
+    "phases_seconds": {
+      "geometry": 0.3434572529513389,
+      "clustering": 0.1207863709423691,
+      "initial_validation": 0.2682543280534446,
+      "merging": 3.248932433081791,
+      "packing": 0.011873746989294887
+    },
+    "independent_audit": {
+      "chart_count": 14,
+      "invalid_charts": [],
+      "chart_texel_density_ratio": 1.000000000000001,
+      "non_disk_charts": [],
+      "positive_area_overlap_count": 0,
+      "overlap_pairs_sample": [],
+      "global_chart_reflections": 0,
+      "all_charts_valid": true,
+      "max_stretch": 1.4924442741285016,
+      "mean_stretch": 1.077785235353948,
+      "area_weighted_p95_stretch": 1.2133503957749048,
+      "max_anisotropy": 1.2859208446055568,
+      "mean_anisotropy": 1.0157884787747715,
+      "seam_length_over_sqrt_area": 8.946394264208635,
+      "smallest_chart_area_fraction": 0.0018265980874492425
+    }
+  }
+}

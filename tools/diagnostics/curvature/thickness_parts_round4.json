@@ -1,0 +1,14 @@
+{
+  "schema": "intrinsic.thickness-withheld-controls.v1",
+  "round": 4,
+  "maximum_rounds": 4,
+  "field_config": "tools/diagnostics/curvature/shape_diameter_round1.json",
+  "parts_config": "tools/diagnostics/curvature/thickness_parts_round3.json",
+  "junction_x": 0.9,
+  "limb_length": 1.7,
+  "bulge_amplitude": 0.45,
+  "bulge_center": 0.55,
+  "bulge_width": 0.16,
+  "cases": ["taper", "bulge"],
+  "samplings": ["base", "dense", "flip", "reordered", "rigid_scaled"]
+}

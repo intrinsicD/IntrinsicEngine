@@ -1,0 +1,12 @@
+{
+  "schema": "intrinsic.thickness-parts.v1",
+  "implementation": "thickness_persistence_cpu_diagnostic_v1",
+  "round": 2,
+  "maximum_rounds": 4,
+  "minimum_relative_persistence": 0.25,
+  "minimum_peak_core_area_fraction": 0.02,
+  "invalid_field_policy": "reject",
+  "smoothing": "none",
+  "preserve_baseline_boundaries": true,
+  "purpose": "Raw shape-diameter superlevel merge tree with elder-rule drainage; not an anatomical part oracle."
+}

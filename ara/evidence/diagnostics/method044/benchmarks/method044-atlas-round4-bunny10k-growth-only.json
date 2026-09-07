@@ -1,0 +1,143 @@
+{
+  "schema_version": 2,
+  "benchmark_id": "geometry.uv_atlas.patch_merge.diagnostic",
+  "run_id": "method044-atlas-round4-bunny10k-growth-only",
+  "attempt_id": "attempt-001",
+  "method": "geometry.uv_atlas.patch_merge",
+  "backend": "cpu_reference",
+  "dataset": "external.atlas_mesh_cohort_v1",
+  "commit": "local-dev",
+  "source": {
+    "revision": "local-dev",
+    "state": "dirty_worktree"
+  },
+  "claim_eligible": false,
+  "manifest": {
+    "path": "benchmarks/geometry/manifests/geometry_uv_atlas_patch_merge_diagnostic.yaml",
+    "sha256": "ea8a5556ea5b1cd386b8b409da10021e7d9807ad2cb45fb3f95503280e3824b4"
+  },
+  "resolved_params": {
+    "cohort": [
+      "frog",
+      "sculpt",
+      "bunny10k",
+      "fandisk"
+    ],
+    "same_surface_resolution_controls": [
+      "frog_subdivide1",
+      "sculpt_subdivide1"
+    ],
+    "arms": [
+      "feature",
+      "blind",
+      "growth-only",
+      "merge-only",
+      "xatlas"
+    ],
+    "patches": 64,
+    "feature_weight": 2.0,
+    "stretch_limits": [
+      1.25,
+      1.35,
+      1.5
+    ],
+    "anisotropy_limit": 2.0,
+    "native_resolution": 1024,
+    "native_padding": 2,
+    "prototype_packer": "continuous_shelf",
+    "native_preset": "ci",
+    "warmup_iterations": 0,
+    "measured_iterations": 1,
+    "adoption_claim": false,
+    "timing_claim": false,
+    "scope": "offline_diagnostic_not_default_smoke"
+  },
+  "config_digest": "cb8ddc21cee350a3a2db2d0585473ec507813518063205a8433aadbc3a5656a2",
+  "warmup_policy": {
+    "warmup_iterations": 0,
+    "measured_iterations": 1
+  },
+  "metrics": {
+    "runtime_ms": 1942.2008381225169,
+    "quality_error_linf": 0.0
+  },
+  "diagnostics": {
+    "cell": {
+      "arm": "growth-only",
+      "patches": 64,
+      "stretch_limit": 1.5,
+      "subdivide": 0,
+      "faces": 9999,
+      "source": "/home/alex/Dropbox/Work/Datasets/obj/bunny10k.obj",
+      "source_sha256": "a0430239f795e94b7305b6f2f668ad29e76cc8df533ea8713614dc99fec08e2b",
+      "implementation_sha256": "d91563c25f0105e402a79f2ef550b1bebe7bba1f8abb31a16ee8d000e136c9f9",
+      "claim_eligible": false,
+      "metrics": {
+        "input_vertices": 6164,
+        "input_faces": 9999,
+        "initial_charts": 86,
+        "chart_count": 16,
+        "merge_attempts": 197,
+        "accepted_merges": 70,
+        "parameterization_attempts": 305,
+        "uv_solves": 279,
+        "factorized_degrees_of_freedom": 238650,
+        "rejections": {
+          "initial_distortion": 22,
+          "merge_distortion": 101,
+          "merge_topology": 26
+        },
+        "max_stretch": 1.4955286265365424,
+        "mean_stretch": 1.1268329310184886,
+        "max_anisotropy": 1.5033752282984008,
+        "mean_anisotropy": 1.031577522638427,
+        "seam_length_over_sqrt_area": 10.005422919335937,
+        "continuous_packing_utilization": 0.40051794030111115,
+        "all_charts_valid": true,
+        "runtime_seconds": 1.9422008381225169,
+        "phases_seconds": {
+          "geometry": 0.18257307214662433,
+          "clustering": 0.05708217993378639,
+          "initial_validation": 0.21944617293775082,
+          "merging": 1.4748944321181625,
+          "packing": 0.008204980986192822
+        },
+        "independent_audit": {
+          "chart_count": 16,
+          "invalid_charts": [],
+          "chart_texel_density_ratio": 1.0000000000000009,
+          "non_disk_charts": [],
+          "positive_area_overlap_count": 0,
+          "overlap_pairs_sample": [],
+          "global_chart_reflections": 0,
+          "all_charts_valid": true,
+          "max_stretch": 1.4955286265365901,
+          "mean_stretch": 1.1268329310184886,
+          "area_weighted_p95_stretch": 1.3092267677187182,
+          "max_anisotropy": 1.5033752282984079,
+          "mean_anisotropy": 1.031577522638427,
+          "seam_length_over_sqrt_area": 10.005422919335937,
+          "smallest_chart_area_fraction": 0.0016798680601039174
+        }
+      }
+    },
+    "validity_error_definition": "max of invalid-map indicator and prototype stretch excess; native has no imposed stretch bound",
+    "timed_scope": "resident geometry through internal validation and packing; excludes independent audit, IO, and rendering",
+    "implementation_comparability": "Python reference versus ci Debug native adapter; no speedup claim"
+  },
+  "thresholds": {
+    "quality_error_linf_max": 0.0
+  },
+  "threshold_disposition": [
+    {
+      "threshold": "quality_error_linf_max",
+      "metric": "quality_error_linf",
+      "operator": "<=",
+      "limit": 0.0,
+      "observed": 0.0,
+      "passed": true
+    }
+  ],
+  "execution_status": "passed",
+  "status": "passed"
+}

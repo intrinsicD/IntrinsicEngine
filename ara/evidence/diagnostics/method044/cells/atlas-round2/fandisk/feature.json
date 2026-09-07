@@ -1,0 +1,59 @@
+{
+  "arm": "feature",
+  "patches": 64,
+  "stretch_limit": 1.5,
+  "subdivide": 0,
+  "faces": 12946,
+  "source": "/home/alex/Dropbox/Work/Datasets/obj/fandisk.obj",
+  "source_sha256": "9bb0e3fa76f175ed8995a43131f900f721f32cea9a32297ca37078d1d519b880",
+  "implementation_sha256": "cbfc28a60ee2bb43c8b7d1e9d8aa45b9a417835efbc5c8d7dc27ead220cff6bb",
+  "claim_eligible": false,
+  "metrics": {
+    "input_vertices": 6475,
+    "input_faces": 12946,
+    "initial_charts": 70,
+    "chart_count": 5,
+    "merge_attempts": 93,
+    "accepted_merges": 65,
+    "parameterization_attempts": 169,
+    "uv_solves": 168,
+    "factorized_degrees_of_freedom": 230856,
+    "rejections": {
+      "initial_boundary_overlap": 6,
+      "merge_distortion": 25,
+      "merge_boundary_overlap": 2,
+      "merge_topology": 1
+    },
+    "max_stretch": 1.3195541134075155,
+    "mean_stretch": 1.04738579714896,
+    "max_anisotropy": 1.095211034863598,
+    "mean_anisotropy": 1.003179099130174,
+    "seam_length_over_sqrt_area": 6.023020428549194,
+    "continuous_packing_utilization": 0.3304841865186226,
+    "all_charts_valid": true,
+    "runtime_seconds": 1.7992659118026495,
+    "phases_seconds": {
+      "geometry": 0.20516059594228864,
+      "clustering": 0.05522424494847655,
+      "initial_validation": 0.18017036211676896,
+      "merging": 1.3510029099415988,
+      "packing": 0.007707798853516579
+    },
+    "independent_audit": {
+      "chart_count": 5,
+      "invalid_charts": [],
+      "non_disk_charts": [],
+      "positive_area_overlap_count": 0,
+      "overlap_pairs_sample": [],
+      "global_chart_reflections": 0,
+      "all_charts_valid": true,
+      "max_stretch": 1.3195541134075413,
+      "mean_stretch": 1.04738579714896,
+      "area_weighted_p95_stretch": 1.193187748820485,
+      "max_anisotropy": 1.0952110348636208,
+      "mean_anisotropy": 1.003179099130174,
+      "seam_length_over_sqrt_area": 6.023020428549194,
+      "smallest_chart_area_fraction": 0.02641006506293477
+    }
+  }
+}

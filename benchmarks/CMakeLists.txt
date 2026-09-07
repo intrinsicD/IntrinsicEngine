@@ -64,6 +64,7 @@ add_executable(IntrinsicBenchmarkSmoke
 add_executable(IntrinsicCurvatureSegmentationProfile
     runners/CurvatureSegmentationProfileRunner.cpp
 )
+
 set_target_properties(
     IntrinsicCurvatureSegmentationProfile
     PROPERTIES CXX_SCAN_FOR_MODULES ON
@@ -81,6 +82,20 @@ target_link_libraries(
     IntrinsicCurvatureSegmentationProfile
     PRIVATE ExtrinsicCore IntrinsicGeometry
 )
+
+# Opt-in native baseline and pack-only dumps; external meshes are not CTest fixtures.
+add_executable(IntrinsicUvAtlasMeshDiagnostic runners/UvAtlasMeshDiagnosticRunner.cpp)
+set_target_properties(IntrinsicUvAtlasMeshDiagnostic PROPERTIES CXX_SCAN_FOR_MODULES ON)
+target_compile_features(IntrinsicUvAtlasMeshDiagnostic PRIVATE cxx_std_23)
+target_compile_options(IntrinsicUvAtlasMeshDiagnostic PRIVATE ${INTRINSIC_COMPILE_FLAGS})
+target_link_options(IntrinsicUvAtlasMeshDiagnostic PRIVATE ${INTRINSIC_LINK_FLAGS})
+target_link_libraries(IntrinsicUvAtlasMeshDiagnostic PRIVATE ExtrinsicCore IntrinsicGeometry)
+
+add_executable(IntrinsicUvChartPackDiagnostic runners/UvChartPackDiagnosticRunner.cpp)
+target_compile_features(IntrinsicUvChartPackDiagnostic PRIVATE cxx_std_23)
+target_compile_options(IntrinsicUvChartPackDiagnostic PRIVATE ${INTRINSIC_COMPILE_FLAGS})
+target_link_options(IntrinsicUvChartPackDiagnostic PRIVATE ${INTRINSIC_LINK_FLAGS})
+target_link_libraries(IntrinsicUvChartPackDiagnostic PRIVATE xatlas::xatlas nlohmann_json::nlohmann_json)
 
 set_target_properties(IntrinsicBenchmarkSmoke PROPERTIES CXX_SCAN_FOR_MODULES ON)
 

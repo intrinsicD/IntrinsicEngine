@@ -1,0 +1,45 @@
+{
+  "schema": "intrinsic.atlas-patch-merge.diagnostic.v1",
+  "source": "/home/alex/Dropbox/Work/Datasets/obj/frog.obj",
+  "source_sha256": "c72c55b72392f55e02b846267424c9069c580e1bede1c9b7ee7ff189fa4656aa",
+  "implementation": "python_scipy_lscm_patch_merge",
+  "claim_eligible": false,
+  "parameters": {
+    "mesh": "/home/alex/Dropbox/Work/Datasets/obj/frog.obj",
+    "output": "/tmp/atlas-round1/frog_feature.json",
+    "patches": 64,
+    "feature_weight": 2.0,
+    "stretch_limit": 1.5,
+    "anisotropy_limit": 2.0,
+    "no_merge": false
+  },
+  "metrics": {
+    "input_vertices": 9555,
+    "input_faces": 19106,
+    "initial_charts": 70,
+    "chart_count": 12,
+    "merge_attempts": 139,
+    "accepted_merges": 58,
+    "uv_solves": 215,
+    "rejections": {
+      "initial_distortion": 6,
+      "merge_distortion": 67,
+      "merge_topology": 14
+    },
+    "max_stretch": 1.4924442741284885,
+    "mean_stretch": 1.1137357343230003,
+    "max_anisotropy": 1.2922087860582858,
+    "mean_anisotropy": 1.0159241893602744,
+    "seam_length_over_sqrt_area": 9.214261253453577,
+    "continuous_packing_utilization": 0.4671182178155126,
+    "all_charts_valid": true,
+    "runtime_seconds": 6.103117220103741,
+    "phases_seconds": {
+      "geometry": 0.35492218914441764,
+      "clustering": 0.12430495000444353,
+      "initial_validation": 0.36774453590624034,
+      "merging": 5.243736834032461,
+      "packing": 0.012408711016178131
+    }
+  }
+}

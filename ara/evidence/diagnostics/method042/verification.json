@@ -1,0 +1,46 @@
+{
+  "schema": "intrinsic.parts-verification.v1",
+  "claim_eligible": false,
+  "source_state": "dirty_worktree",
+  "base_revision": "0b1d7f4dfc70408f0b1b1cf386937f5dcd916b1b",
+  "preset": "ci",
+  "compiler": "Clang 23",
+  "build": "IntrinsicTests IntrinsicCurvatureExtremaMesh; IntrinsicCurvatureBoundaryMesh built before native cohort",
+  "ctest": {
+    "command": "ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60",
+    "exit_code": 0,
+    "selected": 4308,
+    "passed": 4302,
+    "skipped": 6,
+    "failed": 0,
+    "skipped_cases": [
+      "ImGuiAdapterEngineWiring.RunProducesOneOverlayFramePerEngineFrame",
+      "ImGuiAdapterEngineWiring.EditorHookInvokedOncePerFrameAndProducesDrawLists",
+      "ImGuiAdapterEngineWiring.RunNormalizesNativeCloseBeforeFirstFrame",
+      "ImGuiAdapterEngineWiring.RunNormalizesNativeCloseAfterInteractiveInput",
+      "GizmoInteractionEngineWiring.RunFramePublishesSelectedEntityGizmoPacket",
+      "GlfwLifecycleLsan.EngineStaticTeardownAndLeakControl"
+    ],
+    "local_full_log": "/tmp/method042-ctest.log"
+  },
+  "tooling": {
+    "Test.PartSeamOracle.py": 9,
+    "Test.NeckSweep.py": 9,
+    "Test.CurvatureBoundaryViewer.py": 10,
+    "Test.CurvatureExtremaViewer.py": 14
+  },
+  "retained_failures_and_corrections": [
+    "Independent native energy replay rejected six-digit confidence export. Native runner now exports max_digits10; exact replay then agrees.",
+    "Initial neck filters v1/v2/v3 failed the severe coarse-neck prediction; outputs and configurations retained.",
+    "v4 sampling stability is refuted, not rescued by passing negative-control assertions.",
+    "A proposed rotation-invariance assertion failed. AABB normalization changes under rotation; exact predicted dependence is now the test, not a loosened tolerance.",
+    "Strict benchmark validation rejected raw payloads lacking a v2 envelope. A first shared run-ID seal was also rejected for duplicate per-mesh identities; those envelopes remain local under build/method042-final/invalid-seal-duplicate-ids. Separate per-input run identities now validate; raw data were not changed.",
+    "The new follow-up task used a noncanonical integration-matrix field label. It was corrected to Compatible entity sources.",
+    "Root hygiene reports the pre-existing non-fatal local .agents/ entry; no cleanup or policy relaxation was made."
+  ],
+  "limitations": [
+    "CPU and Python diagnostic evidence only; no new Vulkan, GPU, ASan or UBSan run.",
+    "No production method adoption, semantic quality, performance win or publication eligibility.",
+    "Full local geometry/label exports require the external input meshes to reproduce; retained summary binds their hashes."
+  ]
+}

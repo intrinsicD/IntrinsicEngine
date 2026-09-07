@@ -1,0 +1,115 @@
+{
+  "schema_version": 2,
+  "benchmark_id": "geometry.uv_atlas.patch_merge.diagnostic",
+  "run_id": "method044-atlas-round2-frog-xatlas",
+  "attempt_id": "attempt-001",
+  "method": "geometry.uv_atlas.patch_merge",
+  "backend": "cpu_reference",
+  "dataset": "external.atlas_mesh_cohort_v1",
+  "commit": "local-dev",
+  "source": {
+    "revision": "local-dev",
+    "state": "dirty_worktree"
+  },
+  "claim_eligible": false,
+  "manifest": {
+    "path": "benchmarks/geometry/manifests/geometry_uv_atlas_patch_merge_diagnostic.yaml",
+    "sha256": "ea8a5556ea5b1cd386b8b409da10021e7d9807ad2cb45fb3f95503280e3824b4"
+  },
+  "resolved_params": {
+    "cohort": [
+      "frog",
+      "sculpt",
+      "bunny10k",
+      "fandisk"
+    ],
+    "same_surface_resolution_controls": [
+      "frog_subdivide1",
+      "sculpt_subdivide1"
+    ],
+    "arms": [
+      "feature",
+      "blind",
+      "growth-only",
+      "merge-only",
+      "xatlas"
+    ],
+    "patches": 64,
+    "feature_weight": 2.0,
+    "stretch_limits": [
+      1.25,
+      1.35,
+      1.5
+    ],
+    "anisotropy_limit": 2.0,
+    "native_resolution": 1024,
+    "native_padding": 2,
+    "prototype_packer": "continuous_shelf",
+    "native_preset": "ci",
+    "warmup_iterations": 0,
+    "measured_iterations": 1,
+    "adoption_claim": false,
+    "timing_claim": false,
+    "scope": "offline_diagnostic_not_default_smoke"
+  },
+  "config_digest": "cb8ddc21cee350a3a2db2d0585473ec507813518063205a8433aadbc3a5656a2",
+  "warmup_policy": {
+    "warmup_iterations": 0,
+    "measured_iterations": 1
+  },
+  "metrics": {
+    "runtime_ms": 15454.200832999999,
+    "quality_error_linf": 0.0
+  },
+  "diagnostics": {
+    "cell": {
+      "arm": "xatlas",
+      "patches": 64,
+      "stretch_limit": 1.5,
+      "subdivide": 0,
+      "faces": 19106,
+      "source": "/home/alex/Dropbox/Work/Datasets/obj/frog.obj",
+      "source_sha256": "c72c55b72392f55e02b846267424c9069c580e1bede1c9b7ee7ff189fa4656aa",
+      "implementation_sha256": "cbfc28a60ee2bb43c8b7d1e9d8aa45b9a417835efbc5c8d7dc27ead220cff6bb",
+      "claim_eligible": false,
+      "metrics": {
+        "chart_count": 26,
+        "invalid_charts": [],
+        "non_disk_charts": [
+          1
+        ],
+        "positive_area_overlap_count": 0,
+        "overlap_pairs_sample": [],
+        "global_chart_reflections": 12,
+        "all_charts_valid": true,
+        "max_stretch": 1.8580732017811024,
+        "mean_stretch": 1.0478501909851838,
+        "area_weighted_p95_stretch": 1.1878461802171223,
+        "max_anisotropy": 1.3285081578289666,
+        "mean_anisotropy": 1.0105923336274483,
+        "seam_length_over_sqrt_area": 11.892689963084408,
+        "smallest_chart_area_fraction": 1.9302192660102362e-05,
+        "runtime_seconds": 15.454200833,
+        "implementation": "native_engine_xatlas"
+      }
+    },
+    "validity_error_definition": "max of invalid-map indicator and prototype stretch excess; native has no imposed stretch bound",
+    "timed_scope": "resident geometry through internal validation and packing; excludes independent audit, IO, and rendering",
+    "implementation_comparability": "Python reference versus ci Debug native adapter; no speedup claim"
+  },
+  "thresholds": {
+    "quality_error_linf_max": 0.0
+  },
+  "threshold_disposition": [
+    {
+      "threshold": "quality_error_linf_max",
+      "metric": "quality_error_linf",
+      "operator": "<=",
+      "limit": 0.0,
+      "observed": 0.0,
+      "passed": true
+    }
+  ],
+  "execution_status": "passed",
+  "status": "passed"
+}

@@ -1,0 +1,183 @@
+{
+  "attempt_id": "1",
+  "backend": "cpu_reference",
+  "benchmark_id": "geometry.curvature_segmentation.local_mesh.local_cohort",
+  "claim_eligible": false,
+  "commit": "0b1d7f4dfc70408f0b1b1cf386937f5dcd916b1b",
+  "config_digest": "d6ae2d1aa88fd17c41248939a6619b604a5e8de01ae093a7464c3e6d61d4ba68",
+  "dataset": "local.method_040.mesh_cohort.v1",
+  "diagnostics": {
+    "accepted_moves": 0,
+    "area_merges": 0,
+    "attempted_moves": 0,
+    "attenuation_curves": 0,
+    "attenuation_hard_edges": 0,
+    "boundaries": 55,
+    "boundary_scale": 1,
+    "closure": 36,
+    "contractions": 0,
+    "curvature_ms": 170.071915,
+    "energy": 15.118312581905833,
+    "exact": false,
+    "faces": 19106,
+    "feature_exponent": 1,
+    "feature_length_recall": 0.0044617963775264525,
+    "feature_ms": 1663.3758,
+    "feature_weight": 1.5,
+    "hard": 4,
+    "hard_feature_exclusion_ratio": 0,
+    "implementation": "method_039_local_patch_unadopted",
+    "input": "/home/alex/Dropbox/Work/Datasets/obj/frog.obj",
+    "load_ms": 130.170173,
+    "lower_bound": null,
+    "minimum_exclusion_curve_length": 0,
+    "minimum_region_area": 0,
+    "model_weight": 0,
+    "optimized_energy": 15.118312581905833,
+    "partition_ms": 68779.118711,
+    "region_area_fractions": [
+      0.997304182983238,
+      0.00018079461802017414,
+      0.000556759934879001,
+      0.001719897260305902,
+      0.00023836520355657254
+    ],
+    "region_cost": 0,
+    "region_sizes": [
+      19019,
+      5,
+      28,
+      42,
+      12
+    ],
+    "soft": 15,
+    "source_hard": 4,
+    "source_soft": 3010,
+    "sweeps": 0,
+    "unmergeable_small_regions": 0,
+    "unsupported_length_fraction": 0.6906706426941308,
+    "vertices": 9555
+  },
+  "execution_status": "passed",
+  "manifest": {
+    "path": "benchmarks/geometry/manifests/curvature_local_mesh_local_cohort.yaml",
+    "sha256": "380a879931075a84181ee4845d273e303afa5889191d170e497b4c34cd8e85ef"
+  },
+  "method": "geometry.curvature_segmentation",
+  "metrics": {
+    "memory_peak_bytes": 27136000,
+    "population_count": 5,
+    "quality_error_l2": 0,
+    "quality_error_linf": 0,
+    "runtime_ms": 70788.926291
+  },
+  "resolved_params": {
+    "aggregation": "per_mesh",
+    "base_radius_ratio": 0.02,
+    "boundary_feature_weight": 0.02,
+    "boundary_length_weight": 0.01,
+    "boundary_turn_weight": 0.001,
+    "candidate_adopted": false,
+    "cohort": [
+      "sculpt",
+      "frog",
+      "fandisk",
+      "bunny10k",
+      "dolphin",
+      "elephant",
+      "bumpy_torus",
+      "genus3",
+      "office_chair",
+      "sphere",
+      "cube",
+      "saddle2"
+    ],
+    "curvature_transition_weight": 1,
+    "detector": "method_039_defaults",
+    "implementation": "method_039_local_patch_unadopted",
+    "inputs": "external_local_read_only_obj",
+    "intent": "nightly",
+    "maximum_refinement_sweeps": 8,
+    "measured_iterations": 1,
+    "mixture": {
+      "automatic_complexity_weight": 1,
+      "automatic_fit_tolerance": 0.35,
+      "automatic_max_components": 12,
+      "automatic_min_components": 1,
+      "covariance_floor": 1e-05,
+      "em_relative_tolerance": 1e-06,
+      "fixed_component_count": 6,
+      "max_em_iterations": 100,
+      "seed": 42,
+      "selection": "automatic",
+      "unused_fields": "Potts spatial and cleanup controls are not consumed by METHOD-039"
+    },
+    "patch_complexity_cost": 0.5,
+    "quality_error_l2_unit": "unassigned_face_fraction",
+    "quality_error_linf_unit": "hard_constraint_violation_count",
+    "seed_spacing_multiplier": 2,
+    "soft_feature_transition_weight": 4,
+    "threshold_scope": "correctness_and_bounded_health_not_segmentation_quality",
+    "warmup_iterations": 0
+  },
+  "run_id": "method042-native-frog-20260907",
+  "schema_version": 2,
+  "source": {
+    "revision": "0b1d7f4dfc70408f0b1b1cf386937f5dcd916b1b",
+    "state": "dirty_worktree"
+  },
+  "status": "passed",
+  "threshold_disposition": [
+    {
+      "limit": 300000,
+      "metric": "runtime_ms",
+      "observed": 70788.926291,
+      "operator": "<=",
+      "passed": true,
+      "threshold": "runtime_ms_max"
+    },
+    {
+      "limit": 2147483648,
+      "metric": "memory_peak_bytes",
+      "observed": 27136000,
+      "operator": "<=",
+      "passed": true,
+      "threshold": "memory_peak_bytes_max"
+    },
+    {
+      "limit": 0,
+      "metric": "quality_error_l2",
+      "observed": 0,
+      "operator": "<=",
+      "passed": true,
+      "threshold": "quality_error_l2_max"
+    },
+    {
+      "limit": 0,
+      "metric": "quality_error_linf",
+      "observed": 0,
+      "operator": "<=",
+      "passed": true,
+      "threshold": "quality_error_linf_max"
+    },
+    {
+      "limit": 1,
+      "metric": "population_count",
+      "observed": 5,
+      "operator": ">=",
+      "passed": true,
+      "threshold": "population_count_min"
+    }
+  ],
+  "thresholds": {
+    "memory_peak_bytes_max": 2147483648,
+    "population_count_min": 1,
+    "quality_error_l2_max": 0,
+    "quality_error_linf_max": 0,
+    "runtime_ms_max": 300000
+  },
+  "warmup_policy": {
+    "measured_iterations": 1,
+    "warmup_iterations": 0
+  }
+}

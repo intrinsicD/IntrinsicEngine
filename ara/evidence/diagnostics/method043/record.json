@@ -1,0 +1,1817 @@
+{
+  "schema": "intrinsic.thickness-experiment-record.v1",
+  "backend": "offline_cpu_reference",
+  "claim_eligible": false,
+  "source_revision": "0b1d7f4dfc70408f0b1b1cf386937f5dcd916b1b",
+  "source_state": "dirty_worktree",
+  "source_sha256": {
+    "tools/diagnostics/curvature/shape_diameter_parts.py": "9c4e49d183a086253067006714883685519dca82bc24c3dfbd86e4f3bba17cfd",
+    "tools/diagnostics/curvature/shape_diameter_controls.py": "dde458449eef688b4863200084213464ba915e3473301decdafaef790f8d9380",
+    "tools/diagnostics/curvature/select_thickness_parts.py": "de8a9da9895fd8760b9d94dbd58c00647ac1f0c0585f23664ed91500988c4e83",
+    "tools/diagnostics/curvature/refine_thickness_parts.py": "baf687ddd2ea5a3895d5da7e581080ca9a68118c62ed11055b54023012984ab2",
+    "tools/diagnostics/curvature/thickness_parts_controls.py": "522a8580c46782801ce877f078985dcb56d8d5730b6690b1ac8ba1609edbb33b",
+    "tools/diagnostics/curvature/thickness_withheld_controls.py": "e7af56c3c130a8249014f76647d3ed1faf7bd05c3f55aa39a19c4c419635ea48",
+    "tools/diagnostics/curvature/evaluate_part_seams.py": "26ae09398b7abda6c8a88a70f10c190195725846ef4719c004f44d32acd6dd3f",
+    "tools/diagnostics/curvature/neck_sweep.py": "e162649ed79f80a9baf4d8f765fc77f8654ef4dafd1d20cb836bd2fdffe09030",
+    "tools/diagnostics/curvature/shape_diameter_round1.json": "05078495558b004ae01bb2e4d19e05598a9ff35bf611e13bb54984acf5766702",
+    "tools/diagnostics/curvature/thickness_parts_round2.json": "d9467fbcc844b5d7c8039c85072eca6f7e8f4211bca454288633a6cc3bbb1fc0",
+    "tools/diagnostics/curvature/thickness_parts_round3.json": "8aa7bbd7bef4d3eedd9de80595573037937c463057dcbfdfbe5839ac776ac999",
+    "tools/diagnostics/curvature/thickness_parts_round4.json": "73ef25867068581d3af7e864500bddeebf65efb77fc171e598be490b9477f9da",
+    "tests/regression/tooling/Test.ShapeDiameterParts.py": "77c00505e95cadf264705278e0d7913c3c015d400dda26b674597a1fd5f53a58",
+    "benchmarks/runners/CurvatureBoundaryMeshRunner.cpp": "9c21afdc97f9649808b658d3aebf496dd5ca63f97cc0f1e13c1337b3823f8836"
+  },
+  "rounds": {
+    "schema": "intrinsic.parts-round-ledger.v1",
+    "maximum_rounds": 4,
+    "claim_eligible": false,
+    "rounds": [
+      {
+        "round": 1,
+        "status": "completed",
+        "observation": "All 18 synthetic fields fully supported, no ray misses. Lobe median thickness exceeds waist in all nine neck cases. Native frog has 11 unsupported faces despite zero missed rays; sculpt is fully supported.",
+        "hypothesis": "An inward-cone shape-diameter field supplies independent lobe-versus-neck information without geodesic-ball cut proposals.",
+        "prediction": "Sphere is approximately uniform; lobe-center thickness exceeds the severe waist in symmetric/asymmetric/bent controls. Decorative perturbations are measured, not declared parts.",
+        "null": "Opposite-surface ray lengths are dominated by local orientation/sampling or unrelated intersections and do not distinguish the controlled waist.",
+        "config": "tools/diagnostics/curvature/shape_diameter_round1.json",
+        "stop_rule": "No segmentation quality inference from scalar histograms. Do not inspect frog until analytic and synthetic field checks finish."
+      },
+      {
+        "round": 2,
+        "status": "refuted",
+        "observation": "Sphere/groove/ridge stay one region, but symmetric neck counts are 5/101/5, asymmetric 3/3/3 and bent 4/4/4. Two large lobe regions coexist with tiny residual caps/fragments. Frog rejects incomplete field; sculpt fragments into 89 baseline-intersected regions.",
+        "hypothesis": "Area-filtered persistent thickness maxima distinguish substantive lobes without geodesic-ball cut proposals or fixed part count.",
+        "prediction": "Two regions on symmetric/asymmetric/bent severe necks across declared samplings, one on sphere/groove/ridge. Frog is exploratory, not a threshold-selection set.",
+        "config": "tools/diagnostics/curvature/thickness_parts_round2.json",
+        "rule": "Descending superlevel components, simultaneous plateaus, elder-rule peak death; keep relative persistence >= .25 and above-saddle core area >= .02 of total, plus global root. Cancel other peaks through parent tree, canonicalize connected drainage regions, intersect native baseline labels.",
+        "stop_rule": "Reject incomplete fields; no silent imputation, no parameter changes after the first Round 2 segmentation."
+      },
+      {
+        "round": 3,
+        "status": "completed",
+        "observation": "All nine neck controls yield two regions and all nine convex/decorative controls one. Frog yields seven substantive thickness regions plus four preserved baseline islands (11 total); two-view inspection still shows non-anatomical front/back patches and jagged boundaries. Sculpt regresses from five to 24 baseline-intersected regions. No adoption.",
+        "hypothesis": "Applying the area threshold to exclusive connected regions removes residual pole/root fragments without losing the substantive thickness lobes.",
+        "prediction": "All nine neck controls produce two connected regions, all nine decorative/convex controls remain one. Native comparisons remain exploratory and may still regress sculpt or miss tapering frog limbs.",
+        "config": "tools/diagnostics/curvature/thickness_parts_round3.json",
+        "rule": "Explicit nearest-valid completion limited to .005 total area and .02 sqrt(area) graph distance. Unchanged persistence selector, then merge the smallest sub-.02 connected region into its longest shared boundary neighbor, including root fragments. Intersect baseline only after cleanup.",
+        "stop_rule": "No hidden lowering of valid-ray threshold, no post-intersection removal of baseline boundaries. Any next scientific change consumes Round 4."
+      },
+      {
+        "round": 4,
+        "status": "completed_with_refutation",
+        "observation": "Taper remains one thickness region in all five variants; bulge has three, not the predicted two, with seams t=.46875..625 rather than attachment t=0. Base native METHOD-039/040 counts are taper2/2 and bulge4/3. Reordered/rigid-scaled copies preserve boundary edges but scalar differences reach about .000438 in normalized units. No hard-edge guard was implemented; sculpt remains a documented regression under the diagnostic.",
+        "hypothesis": "Persistent thickness maxima are not sufficient for tapering-limb decomposition: without a competing limb maximum the attachment may remain uncut.",
+        "prediction": "Frozen Round 3 returns one region on a body with a monotone tapered appendage, but two on the same appendage with a substantial mid-length bulge; any new bulge seam lies between the body and bulge, not at the bulge maximum. Counts should survive density, diagonal, ordering and rigid/scale changes. Native METHOD-039/040 base-fixture counts are descriptive, not presupposed.",
+        "config": "tools/diagnostics/curvature/thickness_parts_round4.json",
+        "rule": "No method change. Sphere portion x in [-1,.9], radius sqrt(1-x*x), joined to taper r=sqrt(.19)*(1-t), x=.9+1.7*t. Bulged variant adds .45*sin(pi*t)*exp(-((t-.55)/.16)^2). Base32x24, dense64x48, diagonal flip, reversed vertex+face numbering, and scale3.7 with two rotations/translation. Measure actual field and labels, do not assume radius equals measured thickness.",
+        "stop_rule": "Final round. Preserve failures and raw fields; no hard-edge guard, no smoothing changes, no fifth tuning pass."
+      }
+    ]
+  },
+  "round1_controls": {
+    "schema": "intrinsic.sdf-control-cohort.v1",
+    "claim_eligible": false,
+    "config_sha256": "05078495558b004ae01bb2e4d19e05598a9ff35bf611e13bb54984acf5766702",
+    "source_sha256": "9c4e49d183a086253067006714883685519dca82bc24c3dfbd86e4f3bba17cfd",
+    "invocation": [
+      "tools/diagnostics/curvature/shape_diameter_controls.py",
+      "--config",
+      "tools/diagnostics/curvature/shape_diameter_round1.json",
+      "--output",
+      "build/method043/r1/controls"
+    ],
+    "cases": [
+      {
+        "case": "sphere",
+        "sampling": "base",
+        "path": "build/method043/r1/controls/sphere-base.field.json",
+        "sha256": "a2353a45f47fee1055901e64c1876663b5be15ef5dfd2028988f9ade291c4bde",
+        "supported_faces": 1488,
+        "faces": 1488,
+        "ray_misses": 0,
+        "opposite_normal_rejections": 18336,
+        "area_quantiles": [
+          0.47931355482888593,
+          0.4860760515884608,
+          0.49295086808998523
+        ]
+      },
+      {
+        "case": "sphere",
+        "sampling": "dense",
+        "path": "build/method043/r1/controls/sphere-dense.field.json",
+        "sha256": "6d91148da93563ddf73e262f7ac3c83173a5ca97a5d34d0c402dbdc553cc0588",
+        "supported_faces": 6048,
+        "faces": 6048,
+        "ray_misses": 0,
+        "opposite_normal_rejections": 75168,
+        "area_quantiles": [
+          0.4800625027778703,
+          0.48447933560278744,
+          0.49049960344586585
+        ]
+      },
+      {
+        "case": "sphere",
+        "sampling": "flip",
+        "path": "build/method043/r1/controls/sphere-flip.field.json",
+        "sha256": "ee970fd6cf758a99f269eb20fd3c73ae23af854fcea6c0ceb0f4abc5618f1572",
+        "supported_faces": 1488,
+        "faces": 1488,
+        "ray_misses": 0,
+        "opposite_normal_rejections": 18432,
+        "area_quantiles": [
+          0.4762891508993897,
+          0.48072441005078903,
+          0.490775372264891
+        ]
+      },
+      {
+        "case": "neck",
+        "sampling": "base",
+        "path": "build/method043/r1/controls/neck-base.field.json",
+        "sha256": "3539c8d13db7ac0fe42b89ff484d6f4c2885a7d4b46e9be72b4f547cd746e626",
+        "supported_faces": 1488,
+        "faces": 1488,
+        "ray_misses": 0,
+        "opposite_normal_rejections": 15212,
+        "area_quantiles": [
+          0.21826258166684767,
+          0.3397875942520351,
+          0.36799906962101936
+        ],
+        "region_medians": {
+          "waist": 0.21826258166684734,
+          "left_lobe": 0.35141320915871965,
+          "right_lobe": 0.3514132091587197
+        }
+      },
+      {
+        "case": "neck",
+        "sampling": "dense",
+        "path": "build/method043/r1/controls/neck-dense.field.json",
+        "sha256": "8b8a432c915770e53b298b7a80c10c317a05f7cf793da48f2b0f9c4044f7ab21",
+        "supported_faces": 6048,
+        "faces": 6048,
+        "ray_misses": 0,
+        "opposite_normal_rejections": 62063,
+        "area_quantiles": [
+          0.30341422576106947,
+          0.3401683815178913,
+          0.3593468844244866
+        ],
+        "region_medians": {
+          "waist": 0.17913545050374338,
+          "left_lobe": 0.3505163569780347,
+          "right_lobe": 0.3505163569780347
+        }
+      },
+      {
+        "case": "neck",
+        "sampling": "flip",
+        "path": "build/method043/r1/controls/neck-flip.field.json",
+        "sha256": "48f7af9e96a216bb1a1111047cba6c0539a5f89e0d16adee41d6b37d7eb73fcd",
+        "supported_faces": 1488,
+        "faces": 1488,
+        "ray_misses": 0,
+        "opposite_normal_rejections": 15404,
+        "area_quantiles": [
+          0.1957197945525717,
+          0.34036166481356933,
+          0.3615549896483827
+        ],
+        "region_medians": {
+          "waist": 0.17893484634985074,
+          "left_lobe": 0.3461443174243759,
+          "right_lobe": 0.34614431742437585
+        }
+      },
+      {
+        "case": "asymmetric",
+        "sampling": "base",
+        "path": "build/method043/r1/controls/asymmetric-base.field.json",
+        "sha256": "6e24193e4959d75eb7609851a21626df8b512376073f83df2b20e1f0746d798d",
+        "supported_faces": 1488,
+        "faces": 1488,
+        "ray_misses": 0,
+        "opposite_normal_rejections": 14794,
+        "area_quantiles": [
+          0.2812913076693915,
+          0.3325751485915026,
+          0.3884082410568977
+        ],
+        "region_medians": {
+          "waist": 0.2035110141729906,
+          "left_lobe": 0.3221593164910066,
+          "right_lobe": 0.37795934417790356
+        }
+      },
+      {
+        "case": "asymmetric",
+        "sampling": "dense",
+        "path": "build/method043/r1/controls/asymmetric-dense.field.json",
+        "sha256": "b12a84021cdf6271655f5f20b9273b73cf3840f2939be557d355a05340386e38",
+        "supported_faces": 6048,
+        "faces": 6048,
+        "ray_misses": 0,
+        "opposite_normal_rejections": 61285,
+        "area_quantiles": [
+          0.2691043966182808,
+          0.33061392987496563,
+          0.38565982898224904
+        ],
+        "region_medians": {
+          "waist": 0.17325957098877154,
+          "left_lobe": 0.32058426763853226,
+          "right_lobe": 0.37676852361715074
+        }
+      },
+      {
+        "case": "asymmetric",
+        "sampling": "flip",
+        "path": "build/method043/r1/controls/asymmetric-flip.field.json",
+        "sha256": "e340c3663c6714ec879dac9e100b730c35524836933693cbcae443f7c3dd19d1",
+        "supported_faces": 1488,
+        "faces": 1488,
+        "ray_misses": 0,
+        "opposite_normal_rejections": 15226,
+        "area_quantiles": [
+          0.21536287876320415,
+          0.3371899526758496,
+          0.3845042959466272
+        ],
+        "region_medians": {
+          "waist": 0.1976611373461783,
+          "left_lobe": 0.32242458194806045,
+          "right_lobe": 0.3651435434791556
+        }
+      },
+      {
+        "case": "bent",
+        "sampling": "base",
+        "path": "build/method043/r1/controls/bent-base.field.json",
+        "sha256": "538c150451626c63883207537f4bc2a4bf6fe66d75187fcd1673bb88cfc6d19d",
+        "supported_faces": 1488,
+        "faces": 1488,
+        "ray_misses": 0,
+        "opposite_normal_rejections": 14338,
+        "area_quantiles": [
+          0.20378731406765038,
+          0.3314084195149561,
+          0.38804571856210857
+        ],
+        "region_medians": {
+          "waist": 0.19065734814540092,
+          "left_lobe": 0.32068914073187405,
+          "right_lobe": 0.3725629236534945
+        }
+      },
+      {
+        "case": "bent",
+        "sampling": "dense",
+        "path": "build/method043/r1/controls/bent-dense.field.json",
+        "sha256": "75e02531f4619085d736ee6c6317c75e3aacc151d3755f5cb981cadf75b5aa0e",
+        "supported_faces": 6048,
+        "faces": 6048,
+        "ray_misses": 0,
+        "opposite_normal_rejections": 60123,
+        "area_quantiles": [
+          0.27094348762497017,
+          0.33159449142944586,
+          0.38947555262112993
+        ],
+        "region_medians": {
+          "waist": 0.17242304741069361,
+          "left_lobe": 0.32012830956318283,
+          "right_lobe": 0.37470457334616536
+        }
+      },
+      {
+        "case": "bent",
+        "sampling": "flip",
+        "path": "build/method043/r1/controls/bent-flip.field.json",
+        "sha256": "aef0f9d08b7b3e5e6036254b05fb51c2deebdfd98838f6d364614e3154741d5b",
+        "supported_faces": 1488,
+        "faces": 1488,
+        "ray_misses": 0,
+        "opposite_normal_rejections": 14858,
+        "area_quantiles": [
+          0.197956086546592,
+          0.3311983910186878,
+          0.38630979767610646
+        ],
+        "region_medians": {
+          "waist": 0.19426225810084471,
+          "left_lobe": 0.3188852067747748,
+          "right_lobe": 0.36921416896691683
+        }
+      },
+      {
+        "case": "groove",
+        "sampling": "base",
+        "path": "build/method043/r1/controls/groove-base.field.json",
+        "sha256": "d5257c82663c607af5796175ea0c9a38acf1dba773d4e52767016d52f8426168",
+        "supported_faces": 1488,
+        "faces": 1488,
+        "ray_misses": 0,
+        "opposite_normal_rejections": 17980,
+        "area_quantiles": [
+          0.4744937260661933,
+          0.4839470180024396,
+          0.49302612649574296
+        ]
+      },
+      {
+        "case": "groove",
+        "sampling": "dense",
+        "path": "build/method043/r1/controls/groove-dense.field.json",
+        "sha256": "d0d3de72055639e7f97d92983194ee0c2a5fa8e9dfff4d87588c490fb9b4c9be",
+        "supported_faces": 6048,
+        "faces": 6048,
+        "ray_misses": 0,
+        "opposite_normal_rejections": 72141,
+        "area_quantiles": [
+          0.4746398437516347,
+          0.4843120992429224,
+          0.494038199617996
+        ]
+      },
+      {
+        "case": "groove",
+        "sampling": "flip",
+        "path": "build/method043/r1/controls/groove-flip.field.json",
+        "sha256": "04819f5298118675b4bf124309c30de541c93df4904d8d0e40df8bff01c201bb",
+        "supported_faces": 1488,
+        "faces": 1488,
+        "ray_misses": 0,
+        "opposite_normal_rejections": 17836,
+        "area_quantiles": [
+          0.4717974736887067,
+          0.48126266948050084,
+          0.4919215972378133
+        ]
+      },
+      {
+        "case": "ridge",
+        "sampling": "base",
+        "path": "build/method043/r1/controls/ridge-base.field.json",
+        "sha256": "97119e513438098de42b92a5c6b56dea186bc850fdfff919a45fbd8d2cc44881",
+        "supported_faces": 1488,
+        "faces": 1488,
+        "ray_misses": 0,
+        "opposite_normal_rejections": 17184,
+        "area_quantiles": [
+          0.4588995465503195,
+          0.4759536277449136,
+          0.4932323280449067
+        ]
+      },
+      {
+        "case": "ridge",
+        "sampling": "dense",
+        "path": "build/method043/r1/controls/ridge-dense.field.json",
+        "sha256": "e4fe2efa6da19c9d5b2e549dab36a52498575c51634ac23ebda74b618095fc2f",
+        "supported_faces": 6048,
+        "faces": 6048,
+        "ray_misses": 0,
+        "opposite_normal_rejections": 67776,
+        "area_quantiles": [
+          0.429763366485441,
+          0.4731621536259777,
+          0.5016408196875628
+        ]
+      },
+      {
+        "case": "ridge",
+        "sampling": "flip",
+        "path": "build/method043/r1/controls/ridge-flip.field.json",
+        "sha256": "6a30aea2fe906bf5d1e01de76b57b8c67acbc273c4660956aecc90bb263b60a1",
+        "supported_faces": 1488,
+        "faces": 1488,
+        "ray_misses": 0,
+        "opposite_normal_rejections": 16224,
+        "area_quantiles": [
+          0.4577243760815671,
+          0.47289946308605485,
+          0.49294312357863357
+        ]
+      }
+    ]
+  },
+  "round2_controls": {
+    "config": {
+      "schema": "intrinsic.thickness-parts.v1",
+      "implementation": "thickness_persistence_cpu_diagnostic_v1",
+      "round": 2,
+      "maximum_rounds": 4,
+      "minimum_relative_persistence": 0.25,
+      "minimum_peak_core_area_fraction": 0.02,
+      "invalid_field_policy": "reject",
+      "smoothing": "none",
+      "preserve_baseline_boundaries": true,
+      "purpose": "Raw shape-diameter superlevel merge tree with elder-rule drainage; not an anatomical part oracle."
+    },
+    "config_sha256": "d9467fbcc844b5d7c8039c85072eca6f7e8f4211bca454288633a6cc3bbb1fc0",
+    "records": [
+      {
+        "regions": 1,
+        "area_fractions": [
+          0.9999999999999922
+        ],
+        "retained_peaks": [
+          621
+        ],
+        "case": "sphere",
+        "sampling": "base",
+        "path": "build/method043/r2/controls/sphere-base.parts.json",
+        "sha256": "f486bca986f822f741adc7e782e51d98f0279baba68adc77d57353b8d91949bb"
+      },
+      {
+        "regions": 1,
+        "area_fractions": [
+          0.9999999999999905
+        ],
+        "retained_peaks": [
+          4884
+        ],
+        "case": "sphere",
+        "sampling": "dense",
+        "path": "build/method043/r2/controls/sphere-dense.parts.json",
+        "sha256": "1a2aa724dd240052f627ea8396a695b1c7342c21dd187da918cedd940743f32d"
+      },
+      {
+        "regions": 1,
+        "area_fractions": [
+          0.9999999999999922
+        ],
+        "retained_peaks": [
+          692
+        ],
+        "case": "sphere",
+        "sampling": "flip",
+        "path": "build/method043/r2/controls/sphere-flip.parts.json",
+        "sha256": "4a04614a6673886697c427ab0bebd384bd09157bd2b605387ab43df95cbdc09d"
+      },
+      {
+        "regions": 5,
+        "area_fractions": [
+          0.0015144028760787282,
+          0.5102897514955775,
+          0.48245367448055465,
+          0.004227768271710563,
+          0.0015144028760787271
+        ],
+        "retained_peaks": [
+          2,
+          524,
+          937,
+          1467
+        ],
+        "case": "neck",
+        "sampling": "base",
+        "path": "build/method043/r2/controls/neck-base.parts.json",
+        "sha256": "17b4c67f1279bc3853c21e89e3e83bd550d35bb2357388e4e71d1a3c8bdb3528",
+        "seam_max_abs_x_over_sqrt_area": 0.48482503000162536
+      },
+      {
+        "regions": 101,
+        "area_fractions": [
+          0.0006325344935088304,
+          1.1419820736326668e-05,
+          1.1419820736326668e-05,
+          1.1419820736326675e-05,
+          1.1419820736326661e-05,
+          1.1419820736326678e-05,
+          1.1419820736326658e-05,
+          1.1419820736326671e-05,
+          1.1419820736326663e-05,
+          1.1419820736326675e-05,
+          1.1419820736326678e-05,
+          1.1419820736326658e-05,
+          1.1419820736326675e-05,
+          1.1419820736326675e-05,
+          1.1419820736326658e-05,
+          1.1419820736326656e-05,
+          1.1419820736326675e-05,
+          1.1419820736326691e-05,
+          1.1419820736326658e-05,
+          1.141982073632665e-05,
+          1.1419820736326702e-05,
+          1.1419820736326654e-05,
+          1.1419820736326658e-05,
+          1.1419820736326658e-05,
+          1.1419820736326695e-05,
+          1.1419820736326695e-05,
+          1.1419820736326658e-05,
+          1.1419820736326654e-05,
+          1.1419820736326654e-05,
+          1.1419820736326702e-05,
+          1.141982073632662e-05,
+          1.1419820736326683e-05,
+          1.141982073632665e-05,
+          1.1419820736326739e-05,
+          1.1419820736326656e-05,
+          1.1419820736326654e-05,
+          1.1419820736326654e-05,
+          1.1419820736326658e-05,
+          1.1419820736326661e-05,
+          1.1419820736326658e-05,
+          1.1419820736326736e-05,
+          1.1419820736326573e-05,
+          1.1419820736326736e-05,
+          1.1419820736326656e-05,
+          1.141982073632665e-05,
+          1.1419820736326734e-05,
+          1.1419820736326576e-05,
+          1.1419820736326732e-05,
+          1.1419820736326678e-05,
+          0.5044932733125178,
+          0.4885819279595356,
+          0.004563426950239118,
+          1.1419820736326668e-05,
+          1.1419820736326668e-05,
+          1.1419820736326673e-05,
+          1.1419820736326663e-05,
+          1.1419820736326678e-05,
+          1.1419820736326658e-05,
+          1.1419820736326671e-05,
+          1.1419820736326661e-05,
+          1.1419820736326675e-05,
+          1.1419820736326678e-05,
+          1.1419820736326658e-05,
+          1.1419820736326675e-05,
+          1.1419820736326673e-05,
+          1.1419820736326658e-05,
+          1.1419820736326654e-05,
+          1.1419820736326675e-05,
+          1.1419820736326691e-05,
+          1.1419820736326658e-05,
+          1.1419820736326649e-05,
+          1.1419820736326702e-05,
+          1.1419820736326652e-05,
+          1.1419820736326661e-05,
+          1.1419820736326658e-05,
+          1.1419820736326693e-05,
+          1.1419820736326695e-05,
+          1.1419820736326658e-05,
+          1.1419820736326656e-05,
+          1.141982073632665e-05,
+          1.1419820736326703e-05,
+          1.141982073632662e-05,
+          1.1419820736326685e-05,
+          1.141982073632665e-05,
+          1.1419820736326737e-05,
+          1.1419820736326654e-05,
+          1.1419820736326654e-05,
+          1.1419820736326656e-05,
+          1.1419820736326658e-05,
+          1.1419820736326658e-05,
+          1.141982073632666e-05,
+          1.1419820736326736e-05,
+          1.1419820736326573e-05,
+          1.1419820736326736e-05,
+          1.1419820736326658e-05,
+          1.141982073632665e-05,
+          1.1419820736326732e-05,
+          1.1419820736326576e-05,
+          1.1419820736326732e-05,
+          1.1419820736326676e-05,
+          0.0006325344935088297
+        ],
+        "retained_peaks": [
+          5,
+          241,
+          245,
+          247,
+          281,
+          299,
+          2120,
+          3899,
+          5734,
+          5776,
+          5782,
+          6000
+        ],
+        "case": "neck",
+        "sampling": "dense",
+        "path": "build/method043/r2/controls/neck-dense.parts.json",
+        "sha256": "879803f4dbb11198f80ba69667af8539c4bc3b5d227f681b8f8fce04b3aeb0b6",
+        "seam_max_abs_x_over_sqrt_area": 0.48693917732275477
+      },
+      {
+        "regions": 5,
+        "area_fractions": [
+          0.0025071818191617894,
+          0.0032349893286275004,
+          0.506061983223867,
+          0.4856886638091821,
+          0.0025071818191617903
+        ],
+        "retained_peaks": [
+          0,
+          460,
+          985,
+          1467
+        ],
+        "case": "neck",
+        "sampling": "flip",
+        "path": "build/method043/r2/controls/neck-flip.parts.json",
+        "sha256": "f266ef26d97e93ba9d00e08986207497c737f92df97944f4d0c5bdc6e2b58200",
+        "seam_max_abs_x_over_sqrt_area": 0.47303791793285305
+      },
+      {
+        "regions": 3,
+        "area_fractions": [
+          0.008436714597463233,
+          0.40226031011977365,
+          0.5893029752827655
+        ],
+        "retained_peaks": [
+          507,
+          1464
+        ],
+        "case": "asymmetric",
+        "sampling": "base",
+        "path": "build/method043/r2/controls/asymmetric-base.parts.json",
+        "sha256": "defb9f0d599dd8034e7566487d48f1a9591d59f23d6831c5bd9e318cf03dcc57",
+        "seam_max_abs_x_over_sqrt_area": 0.43428721575373114
+      },
+      {
+        "regions": 3,
+        "area_fractions": [
+          0.008401091193352101,
+          0.41355749085877824,
+          0.5780414179478595
+        ],
+        "retained_peaks": [
+          2069,
+          3923
+        ],
+        "case": "asymmetric",
+        "sampling": "dense",
+        "path": "build/method043/r2/controls/asymmetric-dense.parts.json",
+        "sha256": "14063dfa8669788b3d4da70034f323b7074f578677c40384dbc4422fa3d81ea6",
+        "seam_max_abs_x_over_sqrt_area": 0.4324600204573894
+      },
+      {
+        "regions": 3,
+        "area_fractions": [
+          0.00843671459746323,
+          0.38861757782703743,
+          0.6029457075755017
+        ],
+        "retained_peaks": [
+          505,
+          1464
+        ],
+        "case": "asymmetric",
+        "sampling": "flip",
+        "path": "build/method043/r2/controls/asymmetric-flip.parts.json",
+        "sha256": "829f9beaea331ee58426280972765531e9ec9198bf0f36613d28b4c2d53d4429",
+        "seam_max_abs_x_over_sqrt_area": 0.43428721575373114
+      },
+      {
+        "regions": 4,
+        "area_fractions": [
+          0.00035660763595286355,
+          0.009293572167875214,
+          0.40115086119337606,
+          0.5891989590027964
+        ],
+        "retained_peaks": [
+          1,
+          463,
+          984
+        ],
+        "case": "bent",
+        "sampling": "base",
+        "path": "build/method043/r2/controls/bent-base.parts.json",
+        "sha256": "cf8f7b267450d03b45e27435415ad92f04e38214eb33c42e0f2ce7486512d5bd",
+        "seam_max_abs_x_over_sqrt_area": 0.48965743636524267
+      },
+      {
+        "regions": 4,
+        "area_fractions": [
+          0.000421352584877458,
+          0.009332022289363109,
+          0.4078933859761107,
+          0.5823532391496465
+        ],
+        "retained_peaks": [
+          22,
+          1881,
+          6010
+        ],
+        "case": "bent",
+        "sampling": "dense",
+        "path": "build/method043/r2/controls/bent-dense.parts.json",
+        "sha256": "6be05635ccb7274f302952a301c037dce96447436767256df4e302c723aa2c2e",
+        "seam_max_abs_x_over_sqrt_area": 0.48465803129460217
+      },
+      {
+        "regions": 4,
+        "area_fractions": [
+          0.00025376815454354623,
+          0.010615136986043215,
+          0.3863114700213228,
+          0.6028196248380908
+        ],
+        "retained_peaks": [
+          1,
+          415,
+          1463
+        ],
+        "case": "bent",
+        "sampling": "flip",
+        "path": "build/method043/r2/controls/bent-flip.parts.json",
+        "sha256": "faa49cae5d356ed8aadfd4dd9e689d99fcd172b0b0f99d4bfef5f2671d51be95",
+        "seam_max_abs_x_over_sqrt_area": 0.48965743636524267
+      },
+      {
+        "regions": 1,
+        "area_fractions": [
+          1.0000000000000002
+        ],
+        "retained_peaks": [
+          1439
+        ],
+        "case": "groove",
+        "sampling": "base",
+        "path": "build/method043/r2/controls/groove-base.parts.json",
+        "sha256": "06d1956a69c11ec809d54917c34648e3eb6540826797ec4afe1e345a40b339f2"
+      },
+      {
+        "regions": 1,
+        "area_fractions": [
+          0.9999999999999759
+        ],
+        "retained_peaks": [
+          145
+        ],
+        "case": "groove",
+        "sampling": "dense",
+        "path": "build/method043/r2/controls/groove-dense.parts.json",
+        "sha256": "dbd475d9a2a3102d179c633c150a05bc92859ac8290e243fbf857f8315aa92bb"
+      },
+      {
+        "regions": 1,
+        "area_fractions": [
+          1.0000000000000002
+        ],
+        "retained_peaks": [
+          35
+        ],
+        "case": "groove",
+        "sampling": "flip",
+        "path": "build/method043/r2/controls/groove-flip.parts.json",
+        "sha256": "4daf3f7a9ee4f2b349e05f43f144c29326e92719b761af910b3a5dbc67eb701e"
+      },
+      {
+        "regions": 1,
+        "area_fractions": [
+          1.0000000000000016
+        ],
+        "retained_peaks": [
+          292
+        ],
+        "case": "ridge",
+        "sampling": "base",
+        "path": "build/method043/r2/controls/ridge-base.parts.json",
+        "sha256": "8653061a8f463ea188aa099734dc155b84de17b4abcff2663b942485d9357b9b"
+      },
+      {
+        "regions": 1,
+        "area_fractions": [
+          0.9999999999999826
+        ],
+        "retained_peaks": [
+          3037
+        ],
+        "case": "ridge",
+        "sampling": "dense",
+        "path": "build/method043/r2/controls/ridge-dense.parts.json",
+        "sha256": "e6fceb072e71390c39532d8d53504e0059105f4cd687f49b912740340917fab3"
+      },
+      {
+        "regions": 1,
+        "area_fractions": [
+          1.0000000000000016
+        ],
+        "retained_peaks": [
+          662
+        ],
+        "case": "ridge",
+        "sampling": "flip",
+        "path": "build/method043/r2/controls/ridge-flip.parts.json",
+        "sha256": "8203084311eaca34c57314ab27b2b178fc306b1a7f0c8975ee77280d27ead705"
+      }
+    ]
+  },
+  "round3_controls": {
+    "config": {
+      "schema": "intrinsic.thickness-cleanup.v1",
+      "implementation": "thickness_persistence_cleanup_cpu_diagnostic_v1",
+      "round": 3,
+      "maximum_rounds": 4,
+      "minimum_connected_area_fraction": 0.02,
+      "maximum_filled_area_fraction": 0.005,
+      "maximum_fill_distance_over_sqrt_area": 0.02,
+      "merge_rule": "smallest_area_into_longest_shared_boundary",
+      "selector": {
+        "schema": "intrinsic.thickness-parts.v1",
+        "implementation": "thickness_persistence_cpu_diagnostic_v1",
+        "minimum_relative_persistence": 0.25,
+        "minimum_peak_core_area_fraction": 0.02,
+        "invalid_field_policy": "reject",
+        "smoothing": "none",
+        "preserve_baseline_boundaries": true
+      },
+      "purpose": "Explicit bounded field completion plus connected-area cleanup, followed by exact preservation of native baseline boundaries."
+    },
+    "records": [
+      {
+        "regions": 1,
+        "area_fractions": [
+          1.0
+        ],
+        "clean_regions_before_baseline": 1,
+        "case": "sphere",
+        "sampling": "base",
+        "path": "build/method043/r3/controls/sphere-base.parts.json",
+        "sha256": "6a3436863fbf99aeac4459f1c22077caec47100326cfb8180f09b29e8d5bdb1f"
+      },
+      {
+        "regions": 1,
+        "area_fractions": [
+          1.0
+        ],
+        "clean_regions_before_baseline": 1,
+        "case": "sphere",
+        "sampling": "dense",
+        "path": "build/method043/r3/controls/sphere-dense.parts.json",
+        "sha256": "805faed63012e2f2285efc9f7ce4c99d0270eebb8fb397646358bacd66daab62"
+      },
+      {
+        "regions": 1,
+        "area_fractions": [
+          1.0
+        ],
+        "clean_regions_before_baseline": 1,
+        "case": "sphere",
+        "sampling": "flip",
+        "path": "build/method043/r3/controls/sphere-flip.parts.json",
+        "sha256": "f3fa91db977a0a02ffa77da2a99db74334dd432781194ea1d735ef7a75c675e8"
+      },
+      {
+        "regions": 2,
+        "area_fractions": [
+          0.5118041543716558,
+          0.4881958456283442
+        ],
+        "clean_regions_before_baseline": 2,
+        "case": "neck",
+        "sampling": "base",
+        "path": "build/method043/r3/controls/neck-base.parts.json",
+        "sha256": "21f46736d4ab6ca6f9e84453f7e7ff947c8fb7d8eddcccc7b7ce4a6febc53e3a",
+        "seam_max_abs_x_over_sqrt_area": 0.048452157623547716
+      },
+      {
+        "regions": 2,
+        "area_fractions": [
+          0.5056739592013718,
+          0.4943260407986282
+        ],
+        "clean_regions_before_baseline": 2,
+        "case": "neck",
+        "sampling": "dense",
+        "path": "build/method043/r3/controls/neck-dense.parts.json",
+        "sha256": "95ef21f903a3928e4bdd9fd4e364ede5b15b7bfd9833922651588e39605886a8",
+        "seam_max_abs_x_over_sqrt_area": 0.02415440796403917
+      },
+      {
+        "regions": 2,
+        "area_fractions": [
+          0.5118041543716558,
+          0.4881958456283442
+        ],
+        "clean_regions_before_baseline": 2,
+        "case": "neck",
+        "sampling": "flip",
+        "path": "build/method043/r3/controls/neck-flip.parts.json",
+        "sha256": "470cc89e634595c94391b08a0fd7f7fb2f618008d2a04b00ead1bb5656558b40",
+        "seam_max_abs_x_over_sqrt_area": 0.048452157623547716
+      },
+      {
+        "regions": 2,
+        "area_fractions": [
+          0.4106970247172358,
+          0.5893029752827642
+        ],
+        "clean_regions_before_baseline": 2,
+        "case": "asymmetric",
+        "sampling": "base",
+        "path": "build/method043/r3/controls/asymmetric-base.parts.json",
+        "sha256": "ba64e9258d77f4a1eda720b3c8756a5a3b235675f861879948315c4995720e1c",
+        "seam_max_abs_x_over_sqrt_area": 0.048266883553738295
+      },
+      {
+        "regions": 2,
+        "area_fractions": [
+          0.42195858205213455,
+          0.5780414179478655
+        ],
+        "clean_regions_before_baseline": 2,
+        "case": "asymmetric",
+        "sampling": "dense",
+        "path": "build/method043/r3/controls/asymmetric-dense.parts.json",
+        "sha256": "838c432dfcdb69bc226431dd1198523039945a4aa007cb15833fd1d7cd77446f",
+        "seam_max_abs_x_over_sqrt_area": 3.002596723890461e-17
+      },
+      {
+        "regions": 2,
+        "area_fractions": [
+          0.3970542924244996,
+          0.6029457075755004
+        ],
+        "clean_regions_before_baseline": 2,
+        "case": "asymmetric",
+        "sampling": "flip",
+        "path": "build/method043/r3/controls/asymmetric-flip.parts.json",
+        "sha256": "d0b7367f905d74a14538241db6a711ce46bd186e96fc2cf658e55b160bc4fc08",
+        "seam_max_abs_x_over_sqrt_area": 0.048266883553738295
+      },
+      {
+        "regions": 2,
+        "area_fractions": [
+          0.4108010409972039,
+          0.5891989590027961
+        ],
+        "clean_regions_before_baseline": 2,
+        "case": "bent",
+        "sampling": "base",
+        "path": "build/method043/r3/controls/bent-base.parts.json",
+        "sha256": "d423ee061b138fba67346556e64a2dcf9101de1340ee2d96216c4f853ecab957",
+        "seam_max_abs_x_over_sqrt_area": 0.04822704807188419
+      },
+      {
+        "regions": 2,
+        "area_fractions": [
+          0.41764676085035224,
+          0.5823532391496478
+        ],
+        "clean_regions_before_baseline": 2,
+        "case": "bent",
+        "sampling": "dense",
+        "path": "build/method043/r3/controls/bent-dense.parts.json",
+        "sha256": "c1ab2302be8f8ebf81b1d4d4b796b040c8b02cdcf10045652031472ea56dbec8",
+        "seam_max_abs_x_over_sqrt_area": 0.024041252698750265
+      },
+      {
+        "regions": 2,
+        "area_fractions": [
+          0.39718037516190946,
+          0.6028196248380907
+        ],
+        "clean_regions_before_baseline": 2,
+        "case": "bent",
+        "sampling": "flip",
+        "path": "build/method043/r3/controls/bent-flip.parts.json",
+        "sha256": "494967713090dbb904d87b1d15082b2d4762c21e0e115fbeff68538714237062",
+        "seam_max_abs_x_over_sqrt_area": 0.04822704807188419
+      },
+      {
+        "regions": 1,
+        "area_fractions": [
+          1.0
+        ],
+        "clean_regions_before_baseline": 1,
+        "case": "groove",
+        "sampling": "base",
+        "path": "build/method043/r3/controls/groove-base.parts.json",
+        "sha256": "435e0b222e072f3a884b717d4d818e267e5c76dbe71222bd58c90f0d97a6668e"
+      },
+      {
+        "regions": 1,
+        "area_fractions": [
+          1.0
+        ],
+        "clean_regions_before_baseline": 1,
+        "case": "groove",
+        "sampling": "dense",
+        "path": "build/method043/r3/controls/groove-dense.parts.json",
+        "sha256": "8add2d93168e668fe4efc7d48d248a4bebf5f8a33b0b7e6447bf54fd5bada3da"
+      },
+      {
+        "regions": 1,
+        "area_fractions": [
+          1.0
+        ],
+        "clean_regions_before_baseline": 1,
+        "case": "groove",
+        "sampling": "flip",
+        "path": "build/method043/r3/controls/groove-flip.parts.json",
+        "sha256": "dec17c400b5a399ff2815f054a81ab812d4a667a6861bfae3448d37b374fb782"
+      },
+      {
+        "regions": 1,
+        "area_fractions": [
+          1.0
+        ],
+        "clean_regions_before_baseline": 1,
+        "case": "ridge",
+        "sampling": "base",
+        "path": "build/method043/r3/controls/ridge-base.parts.json",
+        "sha256": "1dd5c4dc731f61ce21e3ae2c12c19e97a2f6acf4b74d6374ac8f7d05debaadd6"
+      },
+      {
+        "regions": 1,
+        "area_fractions": [
+          1.0
+        ],
+        "clean_regions_before_baseline": 1,
+        "case": "ridge",
+        "sampling": "dense",
+        "path": "build/method043/r3/controls/ridge-dense.parts.json",
+        "sha256": "2371bdbe72d6bf7c4be8f44935e4eef29db6905b848b24a356753c6f274e5dc2"
+      },
+      {
+        "regions": 1,
+        "area_fractions": [
+          1.0
+        ],
+        "clean_regions_before_baseline": 1,
+        "case": "ridge",
+        "sampling": "flip",
+        "path": "build/method043/r3/controls/ridge-flip.parts.json",
+        "sha256": "6f2e8b2a9b685440248d3edfd1ea92b768d5240632e909c542065be7b4bc0201"
+      }
+    ]
+  },
+  "round4_controls": {
+    "config": {
+      "schema": "intrinsic.thickness-withheld-controls.v1",
+      "round": 4,
+      "maximum_rounds": 4,
+      "field_config": "tools/diagnostics/curvature/shape_diameter_round1.json",
+      "parts_config": "tools/diagnostics/curvature/thickness_parts_round3.json",
+      "junction_x": 0.9,
+      "limb_length": 1.7,
+      "bulge_amplitude": 0.45,
+      "bulge_center": 0.55,
+      "bulge_width": 0.16,
+      "cases": [
+        "taper",
+        "bulge"
+      ],
+      "samplings": [
+        "base",
+        "dense",
+        "flip",
+        "reordered",
+        "rigid_scaled"
+      ]
+    },
+    "config_sha256": "73ef25867068581d3af7e864500bddeebf65efb77fc171e598be490b9477f9da",
+    "invocation": [
+      "tools/diagnostics/curvature/thickness_withheld_controls.py",
+      "--config",
+      "tools/diagnostics/curvature/thickness_parts_round4.json",
+      "--output",
+      "build/method043/r4/controls"
+    ],
+    "claim_eligible": false,
+    "records": [
+      {
+        "case": "taper",
+        "sampling": "base",
+        "regions": 1,
+        "area_fractions": [
+          1.0
+        ],
+        "supported_faces": 1488,
+        "faces": 1488,
+        "field_completion": {
+          "filled_faces": [],
+          "filled_area_fraction": 0.0,
+          "maximum_fill_distance_over_sqrt_area": 0.0,
+          "source_face_for_fill": []
+        },
+        "seam_t_min": null,
+        "seam_t_max": null,
+        "path": "build/method043/r4/controls/taper-base.json",
+        "sha256": "c11c791237c6f7ca4dc95b65c7fa590c0b47ce4794835d95a0e9cb6f1ef13d31"
+      },
+      {
+        "case": "taper",
+        "sampling": "dense",
+        "regions": 1,
+        "area_fractions": [
+          1.0
+        ],
+        "supported_faces": 6048,
+        "faces": 6048,
+        "field_completion": {
+          "filled_faces": [],
+          "filled_area_fraction": 0.0,
+          "maximum_fill_distance_over_sqrt_area": 0.0,
+          "source_face_for_fill": []
+        },
+        "seam_t_min": null,
+        "seam_t_max": null,
+        "path": "build/method043/r4/controls/taper-dense.json",
+        "sha256": "3c1f112fd43a7fae35d53ccb6073f6935e0a0a5c39fdc543d597964d97aa40a0"
+      },
+      {
+        "case": "taper",
+        "sampling": "flip",
+        "regions": 1,
+        "area_fractions": [
+          1.0
+        ],
+        "supported_faces": 1488,
+        "faces": 1488,
+        "field_completion": {
+          "filled_faces": [],
+          "filled_area_fraction": 0.0,
+          "maximum_fill_distance_over_sqrt_area": 0.0,
+          "source_face_for_fill": []
+        },
+        "seam_t_min": null,
+        "seam_t_max": null,
+        "path": "build/method043/r4/controls/taper-flip.json",
+        "sha256": "c496f2d64a458af6dd0b40cfcfb182d931529ed4c4688aeeb7daa0d3312c8092"
+      },
+      {
+        "case": "taper",
+        "sampling": "reordered",
+        "regions": 1,
+        "area_fractions": [
+          1.0
+        ],
+        "supported_faces": 1488,
+        "faces": 1488,
+        "field_completion": {
+          "filled_faces": [],
+          "filled_area_fraction": 0.0,
+          "maximum_fill_distance_over_sqrt_area": 0.0,
+          "source_face_for_fill": []
+        },
+        "seam_t_min": null,
+        "seam_t_max": null,
+        "maximum_field_difference": 0.00043794621125153865,
+        "boundary_edge_disagreements": 0,
+        "path": "build/method043/r4/controls/taper-reordered.json",
+        "sha256": "d99ede4742128dde0972b277db815206fe3df4aa3f6af2adf18f7dad42ac9922"
+      },
+      {
+        "case": "taper",
+        "sampling": "rigid_scaled",
+        "regions": 1,
+        "area_fractions": [
+          1.0
+        ],
+        "supported_faces": 1488,
+        "faces": 1488,
+        "field_completion": {
+          "filled_faces": [],
+          "filled_area_fraction": 0.0,
+          "maximum_fill_distance_over_sqrt_area": 0.0,
+          "source_face_for_fill": []
+        },
+        "seam_t_min": null,
+        "seam_t_max": null,
+        "maximum_field_difference": 0.00043794621125159416,
+        "boundary_edge_disagreements": 0,
+        "path": "build/method043/r4/controls/taper-rigid_scaled.json",
+        "sha256": "b6b098a6b36af2d4f758261e6615404848def9663a3b75c6d225ec9e1d0ac81d"
+      },
+      {
+        "case": "bulge",
+        "sampling": "base",
+        "regions": 3,
+        "area_fractions": [
+          0.8767109631995066,
+          0.04578716465407895,
+          0.07750187214641434
+        ],
+        "supported_faces": 1488,
+        "faces": 1488,
+        "field_completion": {
+          "filled_faces": [],
+          "filled_area_fraction": 0.0,
+          "maximum_fill_distance_over_sqrt_area": 0.0,
+          "source_face_for_fill": []
+        },
+        "seam_t_min": 0.5,
+        "seam_t_max": 0.625,
+        "path": "build/method043/r4/controls/bulge-base.json",
+        "sha256": "4a5a5603dbd28d3b983613531d77ade725d6593a60920c34beaa0ca295aced33"
+      },
+      {
+        "case": "bulge",
+        "sampling": "dense",
+        "regions": 3,
+        "area_fractions": [
+          0.8587031600024991,
+          0.07117948999607596,
+          0.07011735000142501
+        ],
+        "supported_faces": 6048,
+        "faces": 6048,
+        "field_completion": {
+          "filled_faces": [],
+          "filled_area_fraction": 0.0,
+          "maximum_fill_distance_over_sqrt_area": 0.0,
+          "source_face_for_fill": []
+        },
+        "seam_t_min": 0.46874999999999994,
+        "seam_t_max": 0.625,
+        "path": "build/method043/r4/controls/bulge-dense.json",
+        "sha256": "e183bb3be9df843688a5553f0eaa186397097da0da3e9d59b66cfdd280a887ea"
+      },
+      {
+        "case": "bulge",
+        "sampling": "flip",
+        "regions": 3,
+        "area_fractions": [
+          0.8767109631995068,
+          0.045787164654078956,
+          0.07750187214641434
+        ],
+        "supported_faces": 1488,
+        "faces": 1488,
+        "field_completion": {
+          "filled_faces": [],
+          "filled_area_fraction": 0.0,
+          "maximum_fill_distance_over_sqrt_area": 0.0,
+          "source_face_for_fill": []
+        },
+        "seam_t_min": 0.5,
+        "seam_t_max": 0.625,
+        "path": "build/method043/r4/controls/bulge-flip.json",
+        "sha256": "eaa24803cc698aea823aaa7c11a628f9be3d289e08020b68963a606c8c6ca158"
+      },
+      {
+        "case": "bulge",
+        "sampling": "reordered",
+        "regions": 3,
+        "area_fractions": [
+          0.07750187214641462,
+          0.04578716465407904,
+          0.8767109631995064
+        ],
+        "supported_faces": 1488,
+        "faces": 1488,
+        "field_completion": {
+          "filled_faces": [],
+          "filled_area_fraction": 0.0,
+          "maximum_fill_distance_over_sqrt_area": 0.0,
+          "source_face_for_fill": []
+        },
+        "seam_t_min": 0.5,
+        "seam_t_max": 0.625,
+        "maximum_field_difference": 0.0004078661446157983,
+        "boundary_edge_disagreements": 0,
+        "path": "build/method043/r4/controls/bulge-reordered.json",
+        "sha256": "89543cd90bcffc71dd77398e931b42c57d7f0ce19a829cfbbb42c4354035d01b"
+      },
+      {
+        "case": "bulge",
+        "sampling": "rigid_scaled",
+        "regions": 3,
+        "area_fractions": [
+          0.8767109631995068,
+          0.045787164654078956,
+          0.0775018721464142
+        ],
+        "supported_faces": 1488,
+        "faces": 1488,
+        "field_completion": {
+          "filled_faces": [],
+          "filled_area_fraction": 0.0,
+          "maximum_fill_distance_over_sqrt_area": 0.0,
+          "source_face_for_fill": []
+        },
+        "seam_t_min": 0.5,
+        "seam_t_max": 0.625,
+        "maximum_field_difference": 0.0004078661446159093,
+        "boundary_edge_disagreements": 0,
+        "path": "build/method043/r4/controls/bulge-rigid_scaled.json",
+        "sha256": "679c6921b76984bd6ea4417fb19ad05ec3a627f7a3b6fb98322c66208be3e743"
+      }
+    ]
+  },
+  "native": {
+    "frog": {
+      "field": {
+        "config": {
+          "schema": "intrinsic.shape-diameter-experiment.v1",
+          "implementation": "shape_diameter_cpu_diagnostic_v1",
+          "round": 1,
+          "maximum_rounds": 4,
+          "cone_opening_degrees": 120.0,
+          "ray_count": 30,
+          "ray_layout": "equal_solid_angle_fibonacci",
+          "minimum_valid_rays": 6,
+          "ray_epsilon_over_sqrt_area": 1e-09,
+          "purpose": "Independent thickness measurement; no segmentation or production-backend claim."
+        },
+        "config_sha256": "05078495558b004ae01bb2e4d19e05598a9ff35bf611e13bb54984acf5766702",
+        "source_sha256": "9c4e49d183a086253067006714883685519dca82bc24c3dfbd86e4f3bba17cfd",
+        "input_sha256": "c72c55b72392f55e02b846267424c9069c580e1bede1c9b7ee7ff189fa4656aa",
+        "supported_faces": 19095,
+        "faces": 19106,
+        "ray_misses": 0,
+        "opposite_normal_rejections": 140786,
+        "physical_scale": 143.77651774528795,
+        "invocation": [
+          "tools/diagnostics/curvature/shape_diameter_parts.py",
+          "--config",
+          "tools/diagnostics/curvature/shape_diameter_round1.json",
+          "--cohort",
+          "build/method042-native/cohort.json",
+          "--mesh",
+          "frog",
+          "--output",
+          "build/method043/r1/frog"
+        ],
+        "path": "build/method043/r1/frog/field.json",
+        "sha256": "b9a6eabe0601dfd29bcfab44776ca0f6ca10733a6807e229e20eeefd3c7a6238",
+        "unsupported_faces": [
+          85,
+          104,
+          1744,
+          2180,
+          2310,
+          18159,
+          18235,
+          18310,
+          18396,
+          18591,
+          18592
+        ]
+      },
+      "baseline_regions": 5,
+      "baseline_area_fractions": [
+        0.9973041829832394,
+        0.00018079461802017469,
+        0.0005567599348790028,
+        0.0017198972603059068,
+        0.00023836520355657322
+      ],
+      "round3": {
+        "implementation": "thickness_persistence_cleanup_cpu_diagnostic_v1",
+        "backend": "offline_cpu_reference",
+        "claim_eligible": false,
+        "regions": 11,
+        "area_fractions": [
+          0.06314681405638382,
+          0.19218149249561442,
+          0.3537788439664539,
+          0.04726085250955015,
+          0.00018079461802017474,
+          0.1299587726472838,
+          0.000556759934879003,
+          0.07938082999027847,
+          0.13159657731767377,
+          0.0017198972603059074,
+          0.0002383652035565733
+        ],
+        "raw_regions": 409,
+        "clean_regions_before_baseline": 7,
+        "field_completion": {
+          "filled_faces": [
+            85,
+            104,
+            1744,
+            2180,
+            2310,
+            18159,
+            18235,
+            18310,
+            18396,
+            18591,
+            18592
+          ],
+          "filled_area_fraction": 0.0002674470261408775,
+          "maximum_fill_distance_over_sqrt_area": 0.005063387441614247,
+          "source_face_for_fill": [
+            65,
+            105,
+            1868,
+            2012,
+            2566,
+            18158,
+            18230,
+            18308,
+            18399,
+            18544,
+            18593
+          ]
+        },
+        "schema": "intrinsic.thickness-parts-result.v1",
+        "config": {
+          "schema": "intrinsic.thickness-cleanup.v1",
+          "implementation": "thickness_persistence_cleanup_cpu_diagnostic_v1",
+          "round": 3,
+          "maximum_rounds": 4,
+          "minimum_connected_area_fraction": 0.02,
+          "maximum_filled_area_fraction": 0.005,
+          "maximum_fill_distance_over_sqrt_area": 0.02,
+          "merge_rule": "smallest_area_into_longest_shared_boundary",
+          "selector": {
+            "schema": "intrinsic.thickness-parts.v1",
+            "implementation": "thickness_persistence_cpu_diagnostic_v1",
+            "minimum_relative_persistence": 0.25,
+            "minimum_peak_core_area_fraction": 0.02,
+            "invalid_field_policy": "reject",
+            "smoothing": "none",
+            "preserve_baseline_boundaries": true
+          },
+          "purpose": "Explicit bounded field completion plus connected-area cleanup, followed by exact preservation of native baseline boundaries."
+        },
+        "config_sha256": "8aa7bbd7bef4d3eedd9de80595573037937c463057dcbfdfbe5839ac776ac999",
+        "source_sha256": "baf687ddd2ea5a3895d5da7e581080ca9a68118c62ed11055b54023012984ab2",
+        "field_sha256": "b9a6eabe0601dfd29bcfab44776ca0f6ca10733a6807e229e20eeefd3c7a6238",
+        "field_path": "build/method043/r1/frog/field.json",
+        "input_sha256": "c72c55b72392f55e02b846267424c9069c580e1bede1c9b7ee7ff189fa4656aa",
+        "invocation": [
+          "tools/diagnostics/curvature/refine_thickness_parts.py",
+          "--field",
+          "build/method043/r1/frog/field.json",
+          "--config",
+          "tools/diagnostics/curvature/thickness_parts_round3.json",
+          "--output",
+          "build/method043/r3/frog"
+        ],
+        "path": "build/method043/r3/frog/parts.json",
+        "sha256": "192cc1d7c3b673e9aed49fcd228ef6d92ba3b013417ed6b646ec20cf0489d8bc",
+        "labels_sha256": "5982bea065caf75ae3f0ba0365b9251e4cebcc4389dcc8bea9a051f74afaf0c8",
+        "label_count": 19106,
+        "merge_count": 402
+      },
+      "round2": {
+        "status": "rejected",
+        "reason": "11 unsupported field faces; missing values are rejected by the Round 2 policy",
+        "exit_code": 1,
+        "log": "ara/evidence/diagnostics/method043/round2-frog-rejection.txt"
+      }
+    },
+    "sculpt": {
+      "field": {
+        "config": {
+          "schema": "intrinsic.shape-diameter-experiment.v1",
+          "implementation": "shape_diameter_cpu_diagnostic_v1",
+          "round": 1,
+          "maximum_rounds": 4,
+          "cone_opening_degrees": 120.0,
+          "ray_count": 30,
+          "ray_layout": "equal_solid_angle_fibonacci",
+          "minimum_valid_rays": 6,
+          "ray_epsilon_over_sqrt_area": 1e-09,
+          "purpose": "Independent thickness measurement; no segmentation or production-backend claim."
+        },
+        "config_sha256": "05078495558b004ae01bb2e4d19e05598a9ff35bf611e13bb54984acf5766702",
+        "source_sha256": "9c4e49d183a086253067006714883685519dca82bc24c3dfbd86e4f3bba17cfd",
+        "input_sha256": "210dc85f20cdec11cb0b50bec255b86126fb6b47f9f938369049570de3f88a25",
+        "supported_faces": 7342,
+        "faces": 7342,
+        "ray_misses": 0,
+        "opposite_normal_rejections": 34606,
+        "physical_scale": 1.8875717599064588,
+        "invocation": [
+          "tools/diagnostics/curvature/shape_diameter_parts.py",
+          "--config",
+          "tools/diagnostics/curvature/shape_diameter_round1.json",
+          "--cohort",
+          "build/method042-native/cohort.json",
+          "--mesh",
+          "sculpt",
+          "--output",
+          "build/method043/r1/sculpt"
+        ],
+        "path": "build/method043/r1/sculpt/field.json",
+        "sha256": "7e1927eeb65a306fc4bc7dbc1b085dd46acaa122dd33b7cf2be5e460ec142ad0",
+        "unsupported_faces": []
+      },
+      "baseline_regions": 5,
+      "baseline_area_fractions": [
+        0.11094824017122668,
+        0.21104839120456778,
+        0.11093777029432884,
+        0.11093774481445987,
+        0.4561278535154179
+      ],
+      "round3": {
+        "implementation": "thickness_persistence_cleanup_cpu_diagnostic_v1",
+        "backend": "offline_cpu_reference",
+        "claim_eligible": false,
+        "regions": 24,
+        "area_fractions": [
+          0.08642028374325718,
+          0.024527956427969518,
+          0.08734280044514994,
+          0.12347339516300286,
+          0.00011714513605037838,
+          0.00011505046036406679,
+          0.08790533918098982,
+          0.023032431113339052,
+          0.0381943633724948,
+          0.017958436866742443,
+          0.017279875878534107,
+          0.001460484130798299,
+          0.03581732098406783,
+          0.00011404195516614204,
+          0.00011322162665609785,
+          0.03878978532207874,
+          0.04060724465019697,
+          0.08149383352415582,
+          0.08413705433820672,
+          0.08224443265742482,
+          0.041408831103774905,
+          0.08120357336959545,
+          0.0029344818285386614,
+          0.0033086167214454545
+        ],
+        "raw_regions": 64,
+        "clean_regions_before_baseline": 7,
+        "field_completion": {
+          "filled_faces": [],
+          "filled_area_fraction": 0.0,
+          "maximum_fill_distance_over_sqrt_area": 0.0,
+          "source_face_for_fill": []
+        },
+        "schema": "intrinsic.thickness-parts-result.v1",
+        "config": {
+          "schema": "intrinsic.thickness-cleanup.v1",
+          "implementation": "thickness_persistence_cleanup_cpu_diagnostic_v1",
+          "round": 3,
+          "maximum_rounds": 4,
+          "minimum_connected_area_fraction": 0.02,
+          "maximum_filled_area_fraction": 0.005,
+          "maximum_fill_distance_over_sqrt_area": 0.02,
+          "merge_rule": "smallest_area_into_longest_shared_boundary",
+          "selector": {
+            "schema": "intrinsic.thickness-parts.v1",
+            "implementation": "thickness_persistence_cpu_diagnostic_v1",
+            "minimum_relative_persistence": 0.25,
+            "minimum_peak_core_area_fraction": 0.02,
+            "invalid_field_policy": "reject",
+            "smoothing": "none",
+            "preserve_baseline_boundaries": true
+          },
+          "purpose": "Explicit bounded field completion plus connected-area cleanup, followed by exact preservation of native baseline boundaries."
+        },
+        "config_sha256": "8aa7bbd7bef4d3eedd9de80595573037937c463057dcbfdfbe5839ac776ac999",
+        "source_sha256": "baf687ddd2ea5a3895d5da7e581080ca9a68118c62ed11055b54023012984ab2",
+        "field_sha256": "7e1927eeb65a306fc4bc7dbc1b085dd46acaa122dd33b7cf2be5e460ec142ad0",
+        "field_path": "build/method043/r1/sculpt/field.json",
+        "input_sha256": "210dc85f20cdec11cb0b50bec255b86126fb6b47f9f938369049570de3f88a25",
+        "invocation": [
+          "tools/diagnostics/curvature/refine_thickness_parts.py",
+          "--field",
+          "build/method043/r1/sculpt/field.json",
+          "--config",
+          "tools/diagnostics/curvature/thickness_parts_round3.json",
+          "--output",
+          "build/method043/r3/sculpt"
+        ],
+        "path": "build/method043/r3/sculpt/parts.json",
+        "sha256": "efef6599ddd844501cd91470287ad4c5e07104da38a6530bf16fcbba37c076ec",
+        "labels_sha256": "64875e4afa2e6aed4738b3b44ad6a04154f45aa1a7a914127f2164ea8ab39191",
+        "label_count": 7342,
+        "merge_count": 57
+      },
+      "round2": {
+        "implementation": "thickness_persistence_cpu_diagnostic_v1",
+        "backend": "offline_cpu_reference",
+        "claim_eligible": false,
+        "unconstrained_regions": 64,
+        "regions": 89,
+        "area_fractions": [
+          0.08642028374325715,
+          0.02452795642796951,
+          0.0860563426879437,
+          0.12347339516300282,
+          0.00011714513605037834,
+          0.00011717804063692515,
+          0.00011661518405880313,
+          0.00011707171651052614,
+          0.00011857665210935538,
+          0.00011521915648732564,
+          0.00011505046036406675,
+          0.00011590416925219782,
+          0.00011801413112034886,
+          0.00011800714077555863,
+          0.00011608348592463426,
+          0.00011765642342781989,
+          0.00011613165690273824,
+          0.036154876772508435,
+          0.017155949842518396,
+          0.0023628110207998786,
+          0.016957053807164398,
+          0.03348222600861651,
+          0.00033865612208737006,
+          0.0025030237865680833,
+          0.00017782375365586086,
+          0.0001684939017570662,
+          0.00015810711665429852,
+          0.0004457900783216268,
+          0.00013362766379702777,
+          0.0001608680241449792,
+          0.0002432620301594711,
+          0.00012930369310092774,
+          0.00011784052442788558,
+          0.0001149921149244566,
+          0.00013306403312211094,
+          0.03382855669949677,
+          0.017670779007458903,
+          0.017279875878534103,
+          0.0037020204698972555,
+          0.0014604841307982986,
+          0.0356295807603733,
+          0.0001004669958882487,
+          0.00044240939744899873,
+          0.00018774022369451947,
+          0.0001673686516491779,
+          0.00012090980976351505,
+          0.00012028920763436559,
+          0.000114041955166142,
+          0.00011322162665609781,
+          0.03688823480863745,
+          0.038820140439831,
+          0.08149383352415579,
+          0.00033372495002953955,
+          0.08368691500041668,
+          0.08224443265742479,
+          0.00014629552294506793,
+          0.0001313001771410277,
+          0.00016251183494030865,
+          0.04127560533780402,
+          0.0807557564549944,
+          0.00010672000637475037,
+          0.0001238094407664137,
+          0.00015025327358922385,
+          0.00014587480059962332,
+          0.00014597873666308741,
+          0.00014465940251135248,
+          0.0002956598017408864,
+          0.00016575237370338914,
+          0.00011863759830329957,
+          0.00014630603818407566,
+          0.0001719419201971661,
+          0.0001714450979685447,
+          0.00014259236113179684,
+          0.00014700481911398444,
+          0.00014456052634378725,
+          0.00014856890447126318,
+          0.0028036253709625455,
+          0.0001565901413608556,
+          0.0001471576250793829,
+          0.0033086167214454536,
+          0.00014130937064840604,
+          0.00013322576597086443,
+          0.00013085645757611518,
+          0.00022446759700278556,
+          0.00011495512786491635,
+          0.00022302695928018085,
+          0.00011436494759864384,
+          0.00011071661292230811,
+          0.00011042500772219678
+        ],
+        "boundary_length_over_sqrt_area": 19.63522734900369,
+        "field_policy": "reject",
+        "schema": "intrinsic.thickness-parts-result.v1",
+        "config": {
+          "schema": "intrinsic.thickness-parts.v1",
+          "implementation": "thickness_persistence_cpu_diagnostic_v1",
+          "round": 2,
+          "maximum_rounds": 4,
+          "minimum_relative_persistence": 0.25,
+          "minimum_peak_core_area_fraction": 0.02,
+          "invalid_field_policy": "reject",
+          "smoothing": "none",
+          "preserve_baseline_boundaries": true,
+          "purpose": "Raw shape-diameter superlevel merge tree with elder-rule drainage; not an anatomical part oracle."
+        },
+        "config_sha256": "d9467fbcc844b5d7c8039c85072eca6f7e8f4211bca454288633a6cc3bbb1fc0",
+        "source_sha256": "de8a9da9895fd8760b9d94dbd58c00647ac1f0c0585f23664ed91500988c4e83",
+        "field_sha256": "7e1927eeb65a306fc4bc7dbc1b085dd46acaa122dd33b7cf2be5e460ec142ad0",
+        "field_path": "build/method043/r1/sculpt/field.json",
+        "input_sha256": "210dc85f20cdec11cb0b50bec255b86126fb6b47f9f938369049570de3f88a25",
+        "invocation": [
+          "tools/diagnostics/curvature/select_thickness_parts.py",
+          "--field",
+          "build/method043/r1/sculpt/field.json",
+          "--config",
+          "tools/diagnostics/curvature/thickness_parts_round2.json",
+          "--output",
+          "build/method043/r2/sculpt"
+        ],
+        "path": "build/method043/r2/sculpt/parts.json",
+        "sha256": "2658d589c8aa8505b297e7e21b6622b0468e58ab4982ae828f18c5cbc06d107f",
+        "labels_sha256": "1314e7eba3d2ca16c7b6af7b5f141afcbefbef649f7fad7d553442baa14328d4",
+        "label_count": 7342
+      }
+    }
+  },
+  "round4_native": [
+    {
+      "case": "taper",
+      "mode": "local",
+      "backend": "cpu_reference",
+      "regions": 2,
+      "area_fractions": [
+        0.8315669135283744,
+        0.16843308647162553
+      ],
+      "seam_t_min": -6.530723674265627e-17,
+      "seam_t_max": -6.530723674265627e-17,
+      "labels_sha256": "c5bf5d94f325ff88208817261defb7df0569fdf7e7d11900ea6696b17d5d1920",
+      "raw_result_sha256": "fa514ec841254ffe49119e09b88c9625eb6655d19462010d5f44a3be3a7dce22",
+      "input_sha256": "332ab2268ce7d37b58b821cd5ff30202dadb077f78f48f6d48eec9f4c3cfd3b9",
+      "runner_sha256": "247a9f8eb08dc826ae4c16a4e77e0eac5aaf0011a8dea689055e2aa7f65ade36",
+      "command": [
+        "build/ci/bin/IntrinsicCurvatureBoundaryMesh",
+        "build/method043/r4/controls/taper.obj",
+        "build/method043/r4/taper-local",
+        "local"
+      ]
+    },
+    {
+      "case": "taper",
+      "mode": "curves",
+      "backend": "cpu_reference",
+      "regions": 2,
+      "area_fractions": [
+        0.8315669135283744,
+        0.16843308647162553
+      ],
+      "seam_t_min": -6.530723674265627e-17,
+      "seam_t_max": -6.530723674265627e-17,
+      "labels_sha256": "c5bf5d94f325ff88208817261defb7df0569fdf7e7d11900ea6696b17d5d1920",
+      "raw_result_sha256": "2bccd888d90c035f814964474d4adc0bd4e3cd71c2e2c96d9e5fc8972743a984",
+      "input_sha256": "332ab2268ce7d37b58b821cd5ff30202dadb077f78f48f6d48eec9f4c3cfd3b9",
+      "runner_sha256": "247a9f8eb08dc826ae4c16a4e77e0eac5aaf0011a8dea689055e2aa7f65ade36",
+      "command": [
+        "build/ci/bin/IntrinsicCurvatureBoundaryMesh",
+        "build/method043/r4/controls/taper.obj",
+        "build/method043/r4/taper-curves",
+        "curves"
+      ]
+    },
+    {
+      "case": "bulge",
+      "mode": "local",
+      "backend": "cpu_reference",
+      "regions": 4,
+      "area_fractions": [
+        0.7212585453832397,
+        0.1554524148957391,
+        0.025499382451664183,
+        0.09778965726936008
+      ],
+      "seam_t_min": -6.530723674265627e-17,
+      "seam_t_max": 0.5625,
+      "labels_sha256": "fca26c774ca626cba565acee01fb3a8654f660ec15ce52030769d87ab3440f11",
+      "raw_result_sha256": "87829fed161ed669f3f00b51ff5f59d0e653a7f570c145648b19f0129be510a6",
+      "input_sha256": "6ed869614376a586fa43db5a5e78cc7ad47724569ffcd840ddb307fd79e2c523",
+      "runner_sha256": "247a9f8eb08dc826ae4c16a4e77e0eac5aaf0011a8dea689055e2aa7f65ade36",
+      "command": [
+        "build/ci/bin/IntrinsicCurvatureBoundaryMesh",
+        "build/method043/r4/controls/bulge.obj",
+        "build/method043/r4/bulge-local",
+        "local"
+      ]
+    },
+    {
+      "case": "bulge",
+      "mode": "curves",
+      "backend": "cpu_reference",
+      "regions": 3,
+      "area_fractions": [
+        0.7212585453832397,
+        0.1809517973474032,
+        0.09778965726936008
+      ],
+      "seam_t_min": -6.530723674265627e-17,
+      "seam_t_max": 0.5625,
+      "labels_sha256": "e189f21b1804d5aff33ca15354a0f344e8b450e3b2d5fbae6cebcfbb556c0b5e",
+      "raw_result_sha256": "8941658384b8a3b340217e4e0d28091333a3702149f33ccc432ed8476bb49450",
+      "input_sha256": "6ed869614376a586fa43db5a5e78cc7ad47724569ffcd840ddb307fd79e2c523",
+      "runner_sha256": "247a9f8eb08dc826ae4c16a4e77e0eac5aaf0011a8dea689055e2aa7f65ade36",
+      "command": [
+        "build/ci/bin/IntrinsicCurvatureBoundaryMesh",
+        "build/method043/r4/controls/bulge.obj",
+        "build/method043/r4/bulge-curves",
+        "curves"
+      ]
+    }
+  ],
+  "local_artifacts_are_not_portable_proof": true,
+  "limitations": [
+    "Exploratory fixture observations; no anatomical ground truth or performance claim.",
+    "Full geometry, labels and fields remain in build/method043; regeneration requires the documented commands and native OBJ inputs.",
+    "Round 4 isolates thickness without baseline labels; native hard-cut preservation is not disproved.",
+    "Discrete field values differ under rigid/scale and indexing changes despite unchanged boundary edges on the two tested fixtures."
+  ]
+}

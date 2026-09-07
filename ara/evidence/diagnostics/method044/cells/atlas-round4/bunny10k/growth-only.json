@@ -1,0 +1,59 @@
+{
+  "arm": "growth-only",
+  "patches": 64,
+  "stretch_limit": 1.5,
+  "subdivide": 0,
+  "faces": 9999,
+  "source": "/home/alex/Dropbox/Work/Datasets/obj/bunny10k.obj",
+  "source_sha256": "a0430239f795e94b7305b6f2f668ad29e76cc8df533ea8713614dc99fec08e2b",
+  "implementation_sha256": "d91563c25f0105e402a79f2ef550b1bebe7bba1f8abb31a16ee8d000e136c9f9",
+  "claim_eligible": false,
+  "metrics": {
+    "input_vertices": 6164,
+    "input_faces": 9999,
+    "initial_charts": 86,
+    "chart_count": 16,
+    "merge_attempts": 197,
+    "accepted_merges": 70,
+    "parameterization_attempts": 305,
+    "uv_solves": 279,
+    "factorized_degrees_of_freedom": 238650,
+    "rejections": {
+      "initial_distortion": 22,
+      "merge_distortion": 101,
+      "merge_topology": 26
+    },
+    "max_stretch": 1.4955286265365424,
+    "mean_stretch": 1.1268329310184886,
+    "max_anisotropy": 1.5033752282984008,
+    "mean_anisotropy": 1.031577522638427,
+    "seam_length_over_sqrt_area": 10.005422919335937,
+    "continuous_packing_utilization": 0.40051794030111115,
+    "all_charts_valid": true,
+    "runtime_seconds": 1.9422008381225169,
+    "phases_seconds": {
+      "geometry": 0.18257307214662433,
+      "clustering": 0.05708217993378639,
+      "initial_validation": 0.21944617293775082,
+      "merging": 1.4748944321181625,
+      "packing": 0.008204980986192822
+    },
+    "independent_audit": {
+      "chart_count": 16,
+      "invalid_charts": [],
+      "chart_texel_density_ratio": 1.0000000000000009,
+      "non_disk_charts": [],
+      "positive_area_overlap_count": 0,
+      "overlap_pairs_sample": [],
+      "global_chart_reflections": 0,
+      "all_charts_valid": true,
+      "max_stretch": 1.4955286265365901,
+      "mean_stretch": 1.1268329310184886,
+      "area_weighted_p95_stretch": 1.3092267677187182,
+      "max_anisotropy": 1.5033752282984079,
+      "mean_anisotropy": 1.031577522638427,
+      "seam_length_over_sqrt_area": 10.005422919335937,
+      "smallest_chart_area_fraction": 0.0016798680601039174
+    }
+  }
+}

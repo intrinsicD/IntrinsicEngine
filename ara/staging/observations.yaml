@@ -3309,3 +3309,135 @@ observations:
     promoted_to: logic/claims.md:C62
     crystallized_via: artifact-commitment
     stale: false
+  - id: O183
+    timestamp: 2026-09-07T11:49+02:00
+    provenance: ai-suggested
+    content: 'METHOD-042 prediction: the frozen provisional coordinate seams test whether those specific frog partitions are feasible and favored by METHOD-040. A positive energy delta rules out search alone for that competitor, not for all useful frog partitions. The neck-sweep comparator should separate a severe two-lobe waist while rejecting convex and shallow decorative controls; frog is held back until controls are examined.'
+    context: 'Operator-approved interactive collaboration with Claude. Pilot spec and first comparator config were written before their respective runs; this staging entry transcribes those predictions, not a retrospective pre-registration claim.'
+    potential_type: claim
+    bound_to: []
+    promoted: false
+    promoted_to: null
+    crystallized_via: null
+    stale: false
+  - id: O184
+    timestamp: 2026-09-07T11:49+02:00
+    provenance: ai-executed
+    content: 'Initial neck-sweep face-mean filter did not split the rho=.3, aspect=2 synthetic neck. This contradicts the expected severe-neck response. Claude identified directional cancellation before this result was inspected. Revised hypothesis: averaging similarly transverse edges with nonnegative alignment weights will preserve the meridional concavity; test the same fixture before continuing the cohort.'
+    context: 'Retain the first failed result. Directional filter v2 changes only the curvature averaging; no frog-driven threshold selection. Geodesic-ball candidates remain a restricted, sampling-sensitive proposal family.'
+    potential_type: claim
+    bound_to: []
+    promoted: false
+    promoted_to: null
+    crystallized_via: null
+    stale: false
+  - id: O185
+    timestamp: 2026-09-07T11:49+02:00
+    provenance: ai-executed
+    content: 'Direction-weighted averaging v2 also rejects the severe neck. The explicit equatorial seam itself has positive cost after averaging, despite every raw seam curvature being negative. Next discriminator: unfiltered per-edge curvature with the same energy multiplier and regional gate. Prediction: the exact equator becomes favorable; whether the restricted geodesic proposals find it is separately measured.'
+    context: 'Both averaging attempts retained. v3 is a deliberately sampling-sensitive ablation, not a robustness fix or adopted backend. No frog run has been used for selection.'
+    potential_type: claim
+    bound_to: []
+    promoted: false
+    promoted_to: null
+    crystallized_via: null
+    stale: false
+  - id: O186
+    timestamp: 2026-09-07T11:49+02:00
+    provenance: ai-executed
+    content: 'Unfiltered v3 makes the exact equatorial split favorable, but still accepts no split: five-sample profile smoothing moves the selected minima to the adjacent quantiles. Sphere and shallow groove remain unsplit. Revised proposal: retain a two-quantile band around each prominent smoothed minimum and choose by exact energy inside the band. Predict the severe neck will now split; no claim of density stability follows.'
+    context: 'v4 expands only the proposal band; all earlier failed controls remain recorded. Frog still held out during this revision.'
+    potential_type: claim
+    bound_to: []
+    promoted: false
+    promoted_to: null
+    crystallized_via: null
+    stale: false
+  - id: O187
+    timestamp: 2026-09-07T11:49+02:00
+    provenance: ai-executed
+    content: 'v4 splits the severe coarse neck at its equator, but the sampling cohort refutes stability: dense severe necks remain unsplit, while the moderate neck changes from unsplit coarse to split dense. Convex, outward-belt and shallow-groove controls remain unsplit in the five sampling variants. Freeze this unsuccessful comparator; a frog run is descriptive failure inspection only, not an adoption candidate or new tuning set.'
+    context: 'Forty-five geometry/sampling cells and six gate-ablation cells retained. No stability guarantee, no semantic part-quality verdict. The regional-only ablation oversegments controls; the full regional gate has not demonstrated an advantage over concavity-only on this cohort.'
+    potential_type: claim
+    bound_to: []
+    promoted: true
+    promoted_to: logic/claims.md:C64
+    crystallized_via: artifact-commitment
+    stale: false
+  - id: O188
+    timestamp: 2026-09-07T11:49+02:00
+    provenance: ai-executed
+    content: 'The four frozen provisional frog partitions are hard-feasible and have higher fixed METHOD-040 energy than the preserved local baseline. Full-precision native export replay independently agrees on frog and sculpt. Source-edge approximations and Euclidean curve-union Hausdorff bounds are retained; provisional coordinate masks are not ground truth.'
+    context: 'Bounded dirty-source CPU observations in the METHOD-042 record, with existing schema-v2 native comparisons remaining non-claim-eligible. No universal objective inadequacy or part-quality assertion.'
+    potential_type: claim
+    bound_to: []
+    promoted: true
+    promoted_to: logic/claims.md:C63
+    crystallized_via: artifact-commitment
+    stale: false
+  - id: O189
+    timestamp: 2026-09-07T11:49+02:00
+    provenance: ai-executed
+    content: 'Dense severe-neck discrimination: the explicit equatorial partition improves v4 energy, whereas the best tested minimum-area geodesic-sweep partition without prominence gating increases it. This identifies a limitation of the tested proposal bank, not a global impossibility or a proof of one discretization mechanism. Frozen frog v4 accepts zero splits. A proposed rotation-invariance test failed because the AABB diagonal changes; fixed-partition scale/translation invariance and the predicted rotation-dependent length term are tested separately.'
+    context: 'No further frog tuning. Claude withdrew incorrect missing-normalization, positive-cost-floor and diagonal-flip causal findings after source/evidence corrections. All computation and tests were run by Codex; Claude provided design/source critique.'
+    potential_type: claim
+    bound_to: []
+    promoted: true
+    promoted_to: logic/claims.md:C65
+    crystallized_via: artifact-commitment
+    stale: false
+  - id: O190
+    timestamp: 2026-09-07T12:31+02:00
+    provenance: ai-executed
+    content: 'METHOD-043 Round 1 supplies fully supported synthetic ray fields with thicker lobe medians than waist medians. Round 3 connected-area cleanup passes all 18 declared part-count cells, but frog remains visually patch-like and sculpt regresses to 24 regions. Eleven unsupported frog faces receive explicit bounded completion; the original missing field is retained.'
+    context: 'Four-round operator cap. Predictions were written in the round ledger before each run; this entry summarizes the retained observations, not a new preregistration. Offline CPU only, no anatomical or performance claim.'
+    potential_type: claim
+    bound_to: []
+    promoted: true
+    promoted_to: logic/claims.md:C66
+    crystallized_via: artifact-commitment
+    stale: false
+  - id: O191
+    timestamp: 2026-09-07T12:31+02:00
+    provenance: ai-executed
+    content: 'Round 2 core-area/persistence filtering does not bound final connected drainage area: every neck variant contains residual cap/fragment regions. Frog fails closed on 11 missing values; sculpt oversegments. Round 3 applies the unchanged area threshold to final connected regions and adds an explicit limited field-completion policy.'
+    context: 'Failed formulation retained. Claude identified root ownership versus exclusive-area cancellation and recommended longest-boundary cleanup; Codex implemented and ran the code.'
+    potential_type: claim
+    bound_to: []
+    promoted: true
+    promoted_to: logic/claims.md:C67
+    crystallized_via: artifact-commitment
+    stale: false
+  - id: O192
+    timestamp: 2026-09-07T12:31+02:00
+    provenance: ai-executed
+    content: 'Final Round 4 freezes the selector and tests withheld tapered/bulged appendages. Taper stays unsplit; bulge produces three regions instead of two and misses the attachment. Boundary edges survive the tested index and rigid/scale transforms, but field values are not identical. Native hard-crease baselines are reported separately; thickness-only controls omit baseline intersection deliberately.'
+    context: 'Claude proposed final falsification instead of cosmetic boundary smoothing. The exact bulge prediction was corrected before execution. All four rounds are used; no hard-edge guard, smoothing change or fifth iteration was implemented.'
+    potential_type: claim
+    bound_to: []
+    promoted: true
+    promoted_to: logic/claims.md:C68
+    crystallized_via: artifact-commitment
+    stale: false
+  - id: O193
+    timestamp: "2026-09-07T14:29+02:00"
+    provenance: ai-executed
+    content: 'METHOD-044 classical connected feature patches followed by actual LSCM-gated adjacent merges produce bounded-distortion UV charts on frog, sculpt, bunny10k and fandisk, and on fourfold frog/sculpt subdivisions. Direct triangle intersection audits and pack-only xatlas checks retain numerical validity. These are local dirty-source diagnostics, not production/native-performance evidence.'
+    context: 'Four interactive rounds with actual Claude design, iteration and source/result reviews. Original negatives and incomplete initial native-disk audit are retained. Main examples use a 1.35 stretch cap; the fixed held-out cohort uses 1.5. No deep learning or production default change.'
+    potential_type: claim
+    bound_to: []
+    promoted: true
+    promoted_to: logic/claims.md:C69
+    crystallized_via: artifact-commitment
+    stale: false
+  - id: O194
+    timestamp: "2026-09-07T14:29+02:00"
+    provenance: ai-executed
+    content: 'The 2x2 feature ablation distinguishes initialization from merge ordering: feature-only growth gives 14/5/16/4 charts on frog/sculpt/bunny10k/fandisk versus blind 16/8/23/8; adding the merge-order feature term gives 12/5/18/5. Merge-only gives 13/8/23/8. No term wins every count, seam and distortion metric.'
+    context: 'Same geometric seed positions, 64 target seeds, LSCM solver and maximum stretch 1.5. This supports retaining feature-aware initialization as a candidate, not declaring feature-biased merging universally better or claiming superiority over direct D-Charts-style growth, which was not implemented.'
+    potential_type: claim
+    bound_to: []
+    promoted: true
+    promoted_to: logic/claims.md:C70
+    crystallized_via: artifact-commitment
+    stale: false

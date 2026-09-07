@@ -1,0 +1,13 @@
+Traceback (most recent call last):
+  File "/home/alex/Documents/IntrinsicEngine/tools/diagnostics/curvature/select_thickness_parts.py", line 131, in <module>
+    if __name__=='__main__':main()
+                            ^^^^^^
+  File "/home/alex/Documents/IntrinsicEngine/tools/diagnostics/curvature/select_thickness_parts.py", line 122, in main
+    result=select(graph,field['values_over_sqrt_area'],config,field.get('baseline_labels'))
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/alex/Documents/IntrinsicEngine/tools/diagnostics/curvature/select_thickness_parts.py", line 92, in select
+    owner,peaks=peak_tree(values,graph['areas'],graph['adjacent'])
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/alex/Documents/IntrinsicEngine/tools/diagnostics/curvature/select_thickness_parts.py", line 32, in peak_tree
+    raise ValueError('finite positive thickness on every face required')
+ValueError: finite positive thickness on every face required

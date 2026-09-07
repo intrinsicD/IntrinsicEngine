@@ -1,0 +1,15 @@
+{
+  "schema": "intrinsic.neck-sweep.v1",
+  "implementation": "neck_sweep_cpu_diagnostic_v1",
+  "landmarks": 8,
+  "smoothing_radius_over_D": 0.02,
+  "concavity_weight": 16.0,
+  "region_cost": 0.005,
+  "minimum_child_area_fraction": 0.02,
+  "quantile_step": 0.01,
+  "profile_half_window": 2,
+  "prominence_half_window": 10,
+  "minimum_relative_prominence": 0.15,
+  "maximum_splits": 12,
+  "purpose": "Frozen pre-frog diagnostic settings; no production backend or adopted quality claim."
+}

@@ -229,6 +229,7 @@ int main(int argc, char **argv)
         return failed("output", "write_failed");
     std::ofstream labelFile(std::string(argv[2]) + ".labels"),
         edgeFile(std::string(argv[2]) + ".edges");
+    edgeFile << std::setprecision(std::numeric_limits<double>::max_digits10);
     if (!labelFile || !edgeFile)
         return failed("output", "open_failed");
     for (auto f : mesh.LiveFaces())

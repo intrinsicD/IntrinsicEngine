@@ -1,0 +1,60 @@
+{
+  "arm": "growth-only",
+  "patches": 64,
+  "stretch_limit": 1.5,
+  "subdivide": 0,
+  "faces": 12946,
+  "source": "/home/alex/Dropbox/Work/Datasets/obj/fandisk.obj",
+  "source_sha256": "9bb0e3fa76f175ed8995a43131f900f721f32cea9a32297ca37078d1d519b880",
+  "implementation_sha256": "d91563c25f0105e402a79f2ef550b1bebe7bba1f8abb31a16ee8d000e136c9f9",
+  "claim_eligible": false,
+  "metrics": {
+    "input_vertices": 6475,
+    "input_faces": 12946,
+    "initial_charts": 70,
+    "chart_count": 4,
+    "merge_attempts": 114,
+    "accepted_merges": 66,
+    "parameterization_attempts": 190,
+    "uv_solves": 179,
+    "factorized_degrees_of_freedom": 277558,
+    "rejections": {
+      "initial_boundary_overlap": 6,
+      "merge_boundary_overlap": 1,
+      "merge_distortion": 36,
+      "merge_topology": 11
+    },
+    "max_stretch": 1.2734401879244839,
+    "mean_stretch": 1.0502499569646426,
+    "max_anisotropy": 1.0950380333351217,
+    "mean_anisotropy": 1.004399530832077,
+    "seam_length_over_sqrt_area": 5.5511102472155525,
+    "continuous_packing_utilization": 0.4268389314188987,
+    "all_charts_valid": true,
+    "runtime_seconds": 2.2029579640366137,
+    "phases_seconds": {
+      "geometry": 0.21346011711284518,
+      "clustering": 0.059626718051731586,
+      "initial_validation": 0.18282318185083568,
+      "merging": 1.7388391559943557,
+      "packing": 0.008208791026845574
+    },
+    "independent_audit": {
+      "chart_count": 4,
+      "invalid_charts": [],
+      "chart_texel_density_ratio": 1.0000000000000002,
+      "non_disk_charts": [],
+      "positive_area_overlap_count": 0,
+      "overlap_pairs_sample": [],
+      "global_chart_reflections": 0,
+      "all_charts_valid": true,
+      "max_stretch": 1.2734401879244555,
+      "mean_stretch": 1.0502499569646426,
+      "area_weighted_p95_stretch": 1.1481572387411247,
+      "max_anisotropy": 1.0950380333351355,
+      "mean_anisotropy": 1.0043995308320768,
+      "seam_length_over_sqrt_area": 5.5511102472155525,
+      "smallest_chart_area_fraction": 0.05887428511795949
+    }
+  }
+}

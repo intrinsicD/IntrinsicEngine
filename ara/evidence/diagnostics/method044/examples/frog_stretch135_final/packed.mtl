@@ -1,0 +1,3 @@
+newmtl atlas_checker
+Kd 1 1 1
+map_Kd packed.checker.png

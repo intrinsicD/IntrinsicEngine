@@ -1836,3 +1836,91 @@
 - **Dependencies**: []
 - **Tags**: geometry, local observation, CPU, non-publication evidence
 - **From staging**: O182
+
+## C63: Bounded METHOD-042 provisional seam-energy observations
+- **Statement**: The four frozen provisional frog partitions are hard-feasible but each has higher fixed METHOD-040 energy than the preserved local partition evaluated under that same objective. Independent final-energy replay agrees with the full-precision native frog and sculpt exports within 1e-9. The record includes length inflation and Euclidean curve-union approximation bounds for the three single-plane seams.
+- **Status**: supported — descriptive local dirty-source CPU observations only. The coordinate partitions are hypotheses, not ground truth. This neither proves all useful frog partitions are disfavored nor establishes quality, global optimality, a speedup or production adoption. Native benchmark rows remain claim_eligible:false.
+- **Provenance**: ai-executed
+- **Crystallized via**: artifact-commitment
+- **Falsification criteria**: Replaying the bound native inputs/outputs and frozen specification changes feasibility, the signs of the energy differences, or violates the native replay tolerance; independently computed curve distances fall outside the recorded bounds.
+- **Proof**: [ara/evidence/diagnostics/method042/record.json, tools/diagnostics/curvature/evaluate_part_seams.py, tools/diagnostics/curvature/frog_parts_pilot.json, tests/regression/tooling/Test.PartSeamOracle.py]
+- **Dependencies**: []
+- **Tags**: geometry, CPU, exploratory observation, objective, representation
+- **From staging**: O188
+
+## C64: METHOD-042 frozen neck-sweep sampling-stability hypothesis
+- **Statement**: The frozen v4 neck-sweep diagnostic preserves its split decision across the declared coarse, dense, diagonal-flipped and clustered samplings of the synthetic neck family.
+- **Status**: refuted — severe neck30 changes from two regions on the coarse triangulations to one on the dense and clustered variants; neck50 changes from one coarse to two dense. The frozen frog comparison adds no splits. These are offline CPU diagnostics, not a new engine backend or an accepted part decomposition.
+- **Provenance**: ai-executed
+- **Crystallized via**: artifact-commitment
+- **Falsification criteria**: The unchanged implementation/configuration and synthetic geometry generation reproduce identical split decisions across all five samplings; a revised method is a new experiment, not reversal by changing this gate.
+- **Proof**: [ara/evidence/diagnostics/method042/record.json, tools/diagnostics/curvature/neck_sweep.py, tools/diagnostics/curvature/neck_sweep_controls.py, tools/diagnostics/curvature/neck_sweep_v4.json, tests/regression/tooling/Test.NeckSweep.py]
+- **Dependencies**: []
+- **Tags**: geometry, CPU, negative result, sampling, unadopted diagnostic
+- **From staging**: O187
+
+## C65: Bounded METHOD-042 proposal-bank discriminator
+- **Statement**: On the frozen v4 dense severe synthetic neck, the explicit equatorial partition improves EN by approximately 2.448812, while every tested minimum-area geodesic-quantile partition without prominence gating increases EN (best delta approximately +0.163316). The tested proposal bank therefore misses a favorable representable partition. For fixed labels the EN implementation preserves scale/translation but has the analytically predicted AABB-diagonal rotation dependence.
+- **Status**: supported — the named offline CPU fixture, finite proposal bank and fixed-partition tests only. No universal proposal impossibility, unique causal mechanism, rotation-invariant algorithm, asymmetric-neck validation or semantic-quality claim.
+- **Provenance**: ai-executed
+- **Crystallized via**: artifact-commitment
+- **Falsification criteria**: Recomputing the frozen dense-neck partitions changes either delta sign or finds a lower delta within the recorded proposal bank; fixed-partition scaling/translation changes energy beyond the tested tolerance or rotation disagrees with the predicted length-term difference.
+- **Proof**: [ara/evidence/diagnostics/method042/record.json, tools/diagnostics/curvature/neck_sweep_controls.py, tests/regression/tooling/Test.NeckSweep.py]
+- **Dependencies**: []
+- **Tags**: geometry, CPU, bounded diagnostic, proposal limitation
+- **From staging**: O189
+
+## C66: Bounded thickness-field and cleaned-region observations
+- **Statement**: In METHOD-043's frozen offline CPU cohort, all 18 synthetic fields meet the six-valid-ray support rule, and waist median thickness is below both lobe medians in all nine neck cells. Round 3 produces two connected regions in each neck cell and one in each sphere/groove/ridge cell. Native frog needs explicit completion on 11 of 19106 faces and yields 11 baseline-intersected regions; sculpt yields 24 versus five baseline regions.
+- **Status**: supported — only the recorded synthetic and native diagnostics. The frog/sculpt images do not establish anatomical quality; sculpt regresses and no engine backend or default is adopted. Full fields/labels are local, with source-bound summaries retained in the repository.
+- **Provenance**: ai-executed
+- **Crystallized via**: artifact-commitment
+- **Falsification criteria**: Replaying the frozen fields/configurations changes a stated support/count observation, fails to reproduce the neck median ordering, or violates the recorded baseline boundary preservation.
+- **Proof**: [ara/evidence/diagnostics/method043/record.json, ara/evidence/diagnostics/method043/frog-comparison.png, ara/evidence/diagnostics/method043/sculpt-comparison.png, tools/diagnostics/curvature/shape_diameter_parts.py, tools/diagnostics/curvature/refine_thickness_parts.py, tests/regression/tooling/Test.ShapeDiameterParts.py]
+- **Dependencies**: []
+- **Tags**: geometry, CPU, exploratory observation, thickness, unadopted diagnostic
+- **From staging**: O190
+
+## C67: Persistent-peak core area alone prevents residual fragments
+- **Statement**: METHOD-043 Round 2's relative-persistence and above-saddle core-area filtering, without connected-region cleanup, produces exactly two regions on each declared severe-neck control and one on each negative control.
+- **Status**: refuted — symmetric neck counts are 5/101/5, asymmetric 3/3/3 and bent 4/4/4. Negative controls stay one. Core area is not a lower bound on exclusive connected drainage area. Native frog rejects incomplete input and sculpt reaches 89 regions after baseline intersection.
+- **Provenance**: ai-executed
+- **Crystallized via**: artifact-commitment
+- **Falsification criteria**: The unchanged Round 2 selector and source-bound fields reproduce the predicted two-region neck counts. Applying Round 3 cleanup is a different formulation, not reversal of this disposition.
+- **Proof**: [ara/evidence/diagnostics/method043/record.json, ara/evidence/diagnostics/method043/round2-frog-rejection.txt, tools/diagnostics/curvature/select_thickness_parts.py, tools/diagnostics/curvature/thickness_parts_round2.json]
+- **Dependencies**: []
+- **Tags**: geometry, CPU, negative result, persistence
+- **From staging**: O191
+
+## C68: Withheld taper/bulge thickness-part prediction
+- **Statement**: The frozen Round 3 thickness selector alone returns one region on the withheld taper and two on its bulged variant across the five declared samplings/transforms, with the bulge seam between the body and bulge.
+- **Status**: refuted — taper stays one, but bulge yields three in all five variants, with seams at normalized limb positions 0.46875 to 0.625, not the attachment at zero. Native METHOD-039/040 base results are 2/2 on taper and 4/3 on bulge; their taper seams lie at the intentional attachment crease to rounding precision. Reordering and rigid/scale variants preserve tested thickness boundary edges but not exact scalar values (maximum difference about 0.000438). This isolates the thickness cue without baseline intersection, not a failure of hard-constraint preservation or a universal anatomical claim.
+- **Provenance**: ai-executed
+- **Crystallized via**: artifact-commitment
+- **Falsification criteria**: Replaying the frozen fixture generator, ray field and selector produces the predicted two-region bulge outcome and body-to-bulge separator, rather than the recorded three-region bulge patches.
+- **Proof**: [ara/evidence/diagnostics/method043/record.json, ara/evidence/diagnostics/method043/withheld-comparison.png, ara/evidence/diagnostics/method043/benchmarks/taper-local.json, ara/evidence/diagnostics/method043/benchmarks/taper-curves.json, ara/evidence/diagnostics/method043/benchmarks/bulge-local.json, ara/evidence/diagnostics/method043/benchmarks/bulge-curves.json, tools/diagnostics/curvature/thickness_withheld_controls.py, tools/diagnostics/curvature/thickness_parts_round4.json]
+- **Dependencies**: []
+- **Tags**: geometry, CPU, negative result, withheld fixture, unadopted diagnostic
+- **From staging**: O192
+
+## C69: Bounded classical atlas patch-and-merge diagnostic
+- **Statement**: In the METHOD-044 offline CPU campaign, the frozen 64-seed feature-aware patch/LSCM-merge configuration yields 12/5/18/5 charts on frog/sculpt/bunny10k/fandisk at a maximum area-normalized bidirectional stretch limit of 1.5, with complete source-face coverage, consistent orientation within each chart and no positive-area UV intersections detected at the declared tolerance. Fourfold same-surface subdivisions produce 13 frog and 6 sculpt charts, not identical decompositions. Packed 1.35-limit examples produce 15 frog charts (maximum stretch about 1.347) and 5 sculpt charts (about 1.301).
+- **Status**: supported — bounded local CPU observations only; all ten distinct pack-only settings retain their corresponding limits. No exact-predicate certificate, native speedup, resolution invariance, optimal packing, anatomical meaning, production integration or blanket xatlas superiority is claimed. Dirty-source benchmark cells are explicitly non-claim-eligible for publication.
+- **Provenance**: ai-executed
+- **Crystallized via**: artifact-commitment
+- **Falsification criteria**: Replaying the recorded input hashes/configurations changes the stated counts or independent source-face/UV audit finds a bound breach, missing face, mixed chart orientation or positive-area intersection above the declared tolerance in those prototype cells.
+- **Proof**: [ara/evidence/diagnostics/method044/record.json, ara/evidence/diagnostics/method044/iteration-notes.md, ara/evidence/diagnostics/method044/atlas-round2-controls.json, tools/diagnostics/atlas/patch_merge.py, tools/diagnostics/atlas/compare_atlases.py, tools/diagnostics/atlas/repack.py, tests/regression/tooling/Test.AtlasPatchMerge.py, benchmarks/geometry/manifests/geometry_uv_atlas_patch_merge_diagnostic.yaml]
+- **Dependencies**: []
+- **Tags**: geometry, CPU diagnostic, UV atlas, unadopted, local evidence
+- **From staging**: O193
+
+## C70: Feature initialization versus merge-order ablation
+- **Statement**: At the frozen 1.5 stretch cap, feature-aware initialization without a feature merge-order term yields 14/5/16/4 charts on frog/sculpt/bunny10k/fandisk, compared with fully blind 16/8/23/8. Adding the merge-order feature term instead gives 12/5/18/5, while merge-only gives 13/8/23/8. Feature-aware initialization is useful in this small cohort, but the extra merge term is not uniformly beneficial across chart count, seam length and distortion.
+- **Status**: supported — attribution limited to these deterministic meshes/settings and this greedy solver/merge policy, not all classical atlas algorithms or remeshing distributions.
+- **Provenance**: ai-executed
+- **Crystallized via**: artifact-commitment
+- **Falsification criteria**: Replaying the four recorded feature-growth/merge-weight combinations with identical seeds and gates contradicts the reported counts or shows that another uncontrolled input/solver change explains them.
+- **Proof**: [ara/evidence/diagnostics/method044/record.json, tools/diagnostics/atlas/patch_merge.py, tools/diagnostics/atlas/compare_atlases.py, tasks/active/METHOD-044-feature-aware-atlas-merge-experiment.md]
+- **Dependencies**: [C69]
+- **Tags**: geometry, CPU diagnostic, feature ablation, non-universal
+- **From staging**: O194

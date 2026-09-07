@@ -1,0 +1,29 @@
+{
+  "arm": "xatlas",
+  "patches": 64,
+  "stretch_limit": 1.5,
+  "subdivide": 0,
+  "faces": 12946,
+  "source": "/home/alex/Dropbox/Work/Datasets/obj/fandisk.obj",
+  "source_sha256": "9bb0e3fa76f175ed8995a43131f900f721f32cea9a32297ca37078d1d519b880",
+  "implementation_sha256": "cbfc28a60ee2bb43c8b7d1e9d8aa45b9a417835efbc5c8d7dc27ead220cff6bb",
+  "claim_eligible": false,
+  "metrics": {
+    "chart_count": 15,
+    "invalid_charts": [],
+    "non_disk_charts": [],
+    "positive_area_overlap_count": 0,
+    "overlap_pairs_sample": [],
+    "global_chart_reflections": 12,
+    "all_charts_valid": true,
+    "max_stretch": 1.1822834561965394,
+    "mean_stretch": 1.0146635102323047,
+    "area_weighted_p95_stretch": 1.0768700321390454,
+    "max_anisotropy": 1.2019562191902073,
+    "mean_anisotropy": 1.0097134360253244,
+    "seam_length_over_sqrt_area": 9.168793742642988,
+    "smallest_chart_area_fraction": 0.007708534623467304,
+    "runtime_seconds": 1.633104397,
+    "implementation": "native_engine_xatlas"
+  }
+}

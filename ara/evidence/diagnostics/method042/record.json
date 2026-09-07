@@ -1,0 +1,1818 @@
+{
+  "schema": "intrinsic.parts-experiment-record.v1",
+  "claim_eligible": false,
+  "scope": "Exploratory CPU diagnostics only; no production backend, quality, performance, or publication eligibility.",
+  "oracle": {
+    "schema": "intrinsic.parts-oracle.v1",
+    "input_sha256": "c72c55b72392f55e02b846267424c9069c580e1bede1c9b7ee7ff189fa4656aa",
+    "cohort_sha256": "8c3f79ae6b4fad307e6a2a0e9846ef710c65c637e4780c9269cac744f9cca251",
+    "spec_sha256": "27c2be6141f0e8aebedd1ce28c9770d2a322769d3ecdb426a799e9883ebca9d4",
+    "evaluator_sha256": "26ae09398b7abda6c8a88a70f10c190195725846ef4719c004f44d32acd6dd3f",
+    "source_revision": "0b1d7f4dfc70408f0b1b1cf386937f5dcd916b1b",
+    "claim_eligible": false,
+    "profile": {
+      "feature_weight": 4,
+      "feature_exponent": 3,
+      "boundary_scale": 0.04,
+      "region_cost": 0.00502654824574367,
+      "hard_feature_exclusion_ratio": 0.04,
+      "minimum_exclusion_curve_length": 0.04,
+      "minimum_region_area": 0.00502654824574367
+    },
+    "native_curves": {
+      "feasible": true,
+      "hard_violations": [],
+      "regions": 15,
+      "energy": -0.9802601710256695,
+      "unconstrained_boundary_energy": -1.0556583947118245,
+      "region_energy": 0.07539822368615504,
+      "boundary_length_over_D": 19.26102683278125,
+      "boundary_edges": 1969,
+      "area_fractions": [
+        0.025567030023424402,
+        0.26080028499408997,
+        0.007107232187653472,
+        0.20214754939924856,
+        0.019340983014453434,
+        0.2501381940917509,
+        0.001773820329316031,
+        0.039935002357230034,
+        2.36582840537233e-05,
+        0.016776389751775703,
+        0.10401423713829085,
+        0.009267784519231553,
+        0.04635334814866092,
+        0.007902639579293724,
+        0.008851846181526719
+      ],
+      "regions_below_cleanup_area": 2,
+      "label_count": 19106,
+      "labels_canonical_json_sha256": "76897697c3fdf58cad41439b9c1d47d7b1693a109e6f670252ab43053ae3daca"
+    },
+    "local_labels_under_curves_energy": {
+      "feasible": true,
+      "hard_violations": [],
+      "regions": 5,
+      "energy": 0.02721810117736721,
+      "unconstrained_boundary_energy": 0.0020853599486488675,
+      "region_energy": 0.025132741228718343,
+      "boundary_length_over_D": 0.4572635993458731,
+      "boundary_edges": 55,
+      "area_fractions": [
+        0.9973041829832383,
+        0.0001807946180201748,
+        0.0005567599348790029,
+        0.0017198972603059079,
+        0.00023836520355657344
+      ],
+      "regions_below_cleanup_area": 4,
+      "label_count": 19106,
+      "labels_canonical_json_sha256": "253b60ff46f7b0efa28f9cf6607d2bb05982c52029d0b44a20c7c83e6b23917b"
+    },
+    "candidates": [
+      {
+        "feasible": true,
+        "hard_violations": [],
+        "regions": 6,
+        "energy": 0.0936302223501999,
+        "unconstrained_boundary_energy": 0.06347093287573788,
+        "region_energy": 0.030159289474462014,
+        "boundary_length_over_D": 2.1415965849543985,
+        "boundary_edges": 210,
+        "area_fractions": [
+          0.7987255115238667,
+          0.0001807946180201748,
+          0.19857867145937166,
+          0.0005567599348790029,
+          0.0017198972603059077,
+          0.0002383652035565734
+        ],
+        "regions_below_cleanup_area": 4,
+        "name": "upper_transition",
+        "role": "provisional coordinate competitor",
+        "cleanup": "not applied",
+        "delta_vs_local_labels_under_curves_energy": 0.06641212117283268,
+        "delta_vs_curves_final": 1.0738903933758694,
+        "approximation": {
+          "exact_planar_intersection_length_over_D": 1.2861342699249638,
+          "source_edge_seam_length_over_D": 1.6843329856085254,
+          "length_ratio": 1.3096089770679957,
+          "midpoint_plane_distance_mean_over_D": 0.0012170736931553646,
+          "midpoint_plane_distance_max_over_D": 0.003349283745150388,
+          "distance_scope": "Distance to the defining plane, a lower bound on distance to its surface intersection; not Hausdorff error.",
+          "surface_curve_hausdorff_bounds_over_D": {
+            "lower": 0.00946675672847778,
+            "upper": 0.014507803154395052,
+            "metric": "Euclidean Hausdorff distance between complete piecewise-linear curve unions"
+          },
+          "positive_cost_length_fraction": 0.9591444663786347,
+          "length_weighted_mean_signed_factor": 0.9111258499890875
+        },
+        "label_count": 19106,
+        "labels_canonical_json_sha256": "18c6576adc20a17cdd1a1083097e26db7af04db99703ba704db6bd0c436ac8b1"
+      },
+      {
+        "feasible": true,
+        "hard_violations": [],
+        "regions": 7,
+        "energy": 0.08135015527166171,
+        "unconstrained_boundary_energy": 0.04616431755145603,
+        "region_energy": 0.035185837720205684,
+        "boundary_length_over_D": 2.019558671513927,
+        "boundary_edges": 201,
+        "area_fractions": [
+          0.1440293173247895,
+          0.8493444990712984,
+          0.00018079461802017504,
+          0.0005567599348790036,
+          0.003930366587150438,
+          0.0017198972603059103,
+          0.00023836520355657374
+        ],
+        "regions_below_cleanup_area": 5,
+        "name": "left_appendage",
+        "role": "provisional coordinate competitor",
+        "cleanup": "not applied",
+        "delta_vs_local_labels_under_curves_energy": 0.0541320540942945,
+        "delta_vs_curves_final": 1.0616103262973313,
+        "approximation": {
+          "exact_planar_intersection_length_over_D": 1.2594212142224013,
+          "source_edge_seam_length_over_D": 1.562295072168054,
+          "length_ratio": 1.2404865461414787,
+          "midpoint_plane_distance_mean_over_D": 0.0011981103061408347,
+          "midpoint_plane_distance_max_over_D": 0.0035407765212811817,
+          "distance_scope": "Distance to the defining plane, a lower bound on distance to its surface intersection; not Hausdorff error.",
+          "surface_curve_hausdorff_bounds_over_D": {
+            "lower": 0.008400067345356461,
+            "upper": 0.01357781276245127,
+            "metric": "Euclidean Hausdorff distance between complete piecewise-linear curve unions"
+          },
+          "positive_cost_length_fraction": 0.9193799934665171,
+          "length_weighted_mean_signed_factor": 0.7053558317513794
+        },
+        "label_count": 19106,
+        "labels_canonical_json_sha256": "d804dd416e49a962d856acadd4231ced461f4f0b8e95f46964ee0b563caa24d2"
+      },
+      {
+        "feasible": true,
+        "hard_violations": [],
+        "regions": 6,
+        "energy": 0.08556916443270288,
+        "unconstrained_boundary_energy": 0.05540987495824086,
+        "region_energy": 0.030159289474462014,
+        "boundary_length_over_D": 2.3234071604901665,
+        "boundary_edges": 225,
+        "area_fractions": [
+          0.844641670417784,
+          0.15266251256545432,
+          0.000180794618020175,
+          0.0005567599348790035,
+          0.0017198972603059098,
+          0.00023836520355657368
+        ],
+        "regions_below_cleanup_area": 4,
+        "name": "right_appendage",
+        "role": "provisional coordinate competitor",
+        "cleanup": "not applied",
+        "delta_vs_local_labels_under_curves_energy": 0.058351063255335664,
+        "delta_vs_curves_final": 1.0658293354583723,
+        "approximation": {
+          "exact_planar_intersection_length_over_D": 1.3291123029553,
+          "source_edge_seam_length_over_D": 1.8661435611442934,
+          "length_ratio": 1.4040525823099348,
+          "midpoint_plane_distance_mean_over_D": 0.0009817095715656705,
+          "midpoint_plane_distance_max_over_D": 0.003554090206503991,
+          "distance_scope": "Distance to the defining plane, a lower bound on distance to its surface intersection; not Hausdorff error.",
+          "surface_curve_hausdorff_bounds_over_D": {
+            "lower": 0.010034863652749871,
+            "upper": 0.015746204881812692,
+            "metric": "Euclidean Hausdorff distance between complete piecewise-linear curve unions"
+          },
+          "positive_cost_length_fraction": 0.903582936710089,
+          "length_weighted_mean_signed_factor": 0.714367802669133
+        },
+        "label_count": 19106,
+        "labels_canonical_json_sha256": "795768a70fed6adaf712926abd37e6d45d66b2d40b9a3a7687974f1078ba2c11"
+      },
+      {
+        "feasible": true,
+        "hard_violations": [],
+        "regions": 9,
+        "energy": 0.20611333969983003,
+        "unconstrained_boundary_energy": 0.16087440548813703,
+        "region_energy": 0.04523893421169302,
+        "boundary_length_over_D": 5.570035218266746,
+        "boundary_edges": 526,
+        "area_fractions": [
+          0.14402931732478924,
+          0.498103315046473,
+          0.1526625125654541,
+          0.00018079461802017474,
+          0.1985786714593716,
+          0.0005567599348790026,
+          0.003930366587150431,
+          0.0017198972603059072,
+          0.00023836520355657336
+        ],
+        "regions_below_cleanup_area": 5,
+        "name": "combined_provisional",
+        "role": "provisional coordinate competitor",
+        "cleanup": "not applied",
+        "delta_vs_local_labels_under_curves_energy": 0.17889523852246283,
+        "delta_vs_curves_final": 1.1863735107254996,
+        "label_count": 19106,
+        "labels_canonical_json_sha256": "5a14c7b6458b46a644c3bf2eaadfc74c0df6686b9b28163ebe51fd3a071440e5"
+      }
+    ]
+  },
+  "controls": {
+    "schema": "intrinsic.neck-controls.v1",
+    "claim_eligible": false,
+    "config": {
+      "schema": "intrinsic.neck-sweep.v1",
+      "implementation": "neck_sweep_cpu_diagnostic_v1",
+      "curvature_filter": "edge_unfiltered_v3",
+      "landmarks": 8,
+      "smoothing_radius_over_D": 0.02,
+      "concavity_weight": 16.0,
+      "region_cost": 0.005,
+      "minimum_child_area_fraction": 0.02,
+      "quantile_step": 0.01,
+      "profile_half_window": 2,
+      "prominence_half_window": 10,
+      "proposal_band_half_window": 2,
+      "minimum_relative_prominence": 0.15,
+      "maximum_splits": 12,
+      "purpose": "Test a narrow proposal band around smoothed minima: the v3 smoother displaced the exact severe-neck minimum by one quantile. Frozen before frog."
+    },
+    "config_sha256": "2a04cbffb7afae7a1e6a2f5ebfceaded746787162fc0439f7f48f112be0062ae",
+    "implementation_sha256": "e162649ed79f80a9baf4d8f765fc77f8654ef4dafd1d20cb836bd2fdffe09030",
+    "controller_sha256": "c6c1e33846d1d01520fab08e28df333d818f524995bd1550bb067781d3712ac5",
+    "invocation": [
+      "tools/diagnostics/curvature/neck_sweep_controls.py",
+      "--config",
+      "tools/diagnostics/curvature/neck_sweep_v4.json",
+      "--output",
+      "build/method042-final/controls",
+      "--sampling",
+      "--ablations"
+    ],
+    "records": [
+      {
+        "regions": 1,
+        "area_fractions": [
+          1.000000000000012
+        ],
+        "initial_energy": 0.005,
+        "final_energy": 0.005,
+        "minimum_raw_kappa_times_D": -6.326672989734764e-14,
+        "case": "sphere",
+        "sampling": "base",
+        "path": "build/method042-final/controls/sphere-base.json",
+        "sha256": "357d934a2c8b03d13afeadd5d724d503a68b83695780c11220968ea93d4d3561",
+        "splits": 0,
+        "waist_cut_max_abs_x_over_D": null
+      },
+      {
+        "regions": 1,
+        "area_fractions": [
+          1.000000000000012
+        ],
+        "initial_energy": 0.005,
+        "final_energy": 0.005,
+        "minimum_raw_kappa_times_D": -4.448680325943106e-14,
+        "case": "sphere",
+        "sampling": "flip",
+        "path": "build/method042-final/controls/sphere-flip.json",
+        "sha256": "6f1edb6d8a9fd3a66f9df00dd3b1f96271d79e3ab58e987f69b8144f023cd693",
+        "splits": 0,
+        "waist_cut_max_abs_x_over_D": null
+      },
+      {
+        "regions": 1,
+        "area_fractions": [
+          1.0000000000000253
+        ],
+        "initial_energy": 0.005,
+        "final_energy": 0.005,
+        "minimum_raw_kappa_times_D": -1.9645404015881488e-13,
+        "case": "sphere",
+        "sampling": "dense",
+        "path": "build/method042-final/controls/sphere-dense.json",
+        "sha256": "677377aa8be32b0492ed3d3341088962b9cdb48dbd96925816e3ddb49b15dfb2",
+        "splits": 0,
+        "waist_cut_max_abs_x_over_D": null
+      },
+      {
+        "regions": 1,
+        "area_fractions": [
+          1.000000000000025
+        ],
+        "initial_energy": 0.005,
+        "final_energy": 0.005,
+        "minimum_raw_kappa_times_D": -2.3453433722664406e-13,
+        "case": "sphere",
+        "sampling": "dense_flip",
+        "path": "build/method042-final/controls/sphere-dense_flip.json",
+        "sha256": "d04f6eac3a2b1f51f11e68271cfa002ddc43fad373255db9bb951faf34c37a25",
+        "splits": 0,
+        "waist_cut_max_abs_x_over_D": null
+      },
+      {
+        "regions": 1,
+        "area_fractions": [
+          1.0000000000000084
+        ],
+        "initial_energy": 0.005,
+        "final_energy": 0.005,
+        "minimum_raw_kappa_times_D": -5.138117382083947e-14,
+        "case": "sphere",
+        "sampling": "clustered",
+        "path": "build/method042-final/controls/sphere-clustered.json",
+        "sha256": "7dfec26a7516e0c24a54c89af8c6670eedf532dbd68b112219789699b13a3e69",
+        "splits": 0,
+        "waist_cut_max_abs_x_over_D": null
+      },
+      {
+        "regions": 1,
+        "area_fractions": [
+          0.9999999999999901
+        ],
+        "initial_energy": 0.005,
+        "final_energy": 0.005,
+        "minimum_raw_kappa_times_D": -9.779198283719801e-14,
+        "case": "elongated4",
+        "sampling": "base",
+        "path": "build/method042-final/controls/elongated4-base.json",
+        "sha256": "9419dee8c8e94c3f6e8a8a7244f206bbc10f95bce0871662b57e07f3b5007773",
+        "splits": 0,
+        "waist_cut_max_abs_x_over_D": null
+      },
+      {
+        "regions": 1,
+        "area_fractions": [
+          0.9999999999999901
+        ],
+        "initial_energy": 0.005,
+        "final_energy": 0.005,
+        "minimum_raw_kappa_times_D": -7.168873578225184e-14,
+        "case": "elongated4",
+        "sampling": "flip",
+        "path": "build/method042-final/controls/elongated4-flip.json",
+        "sha256": "da74e3492dd942b808697c07f0338a9a0c8af8ec07f1f3c4c4b440001b2dd9b8",
+        "splits": 0,
+        "waist_cut_max_abs_x_over_D": null
+      },
+      {
+        "regions": 1,
+        "area_fractions": [
+          1.0000000000000104
+        ],
+        "initial_energy": 0.005,
+        "final_energy": 0.005,
+        "minimum_raw_kappa_times_D": -4.0514916132112694e-13,
+        "case": "elongated4",
+        "sampling": "dense",
+        "path": "build/method042-final/controls/elongated4-dense.json",
+        "sha256": "59b6ffc6964c5c22e9912ec906e926259a71380cdd1f480af9f982d737a240b6",
+        "splits": 0,
+        "waist_cut_max_abs_x_over_D": null
+      },
+      {
+        "regions": 1,
+        "area_fractions": [
+          1.0000000000000104
+        ],
+        "initial_energy": 0.005,
+        "final_energy": 0.005,
+        "minimum_raw_kappa_times_D": -3.897044480301267e-13,
+        "case": "elongated4",
+        "sampling": "dense_flip",
+        "path": "build/method042-final/controls/elongated4-dense_flip.json",
+        "sha256": "4fbf4eba434421d0cc87daac9cd88bef1ea885bdc7d134f057ddf10678a7f12e",
+        "splits": 0,
+        "waist_cut_max_abs_x_over_D": null
+      },
+      {
+        "regions": 1,
+        "area_fractions": [
+          1.0000000000000053
+        ],
+        "initial_energy": 0.005,
+        "final_energy": 0.005,
+        "minimum_raw_kappa_times_D": -6.841708069297376e-14,
+        "case": "elongated4",
+        "sampling": "clustered",
+        "path": "build/method042-final/controls/elongated4-clustered.json",
+        "sha256": "ffe6919ebc7ca390aecb2156f707e41e0f451b2d1207c2dde7dd2a3239ca4fff",
+        "splits": 0,
+        "waist_cut_max_abs_x_over_D": null
+      },
+      {
+        "regions": 1,
+        "area_fractions": [
+          1.000000000000001
+        ],
+        "initial_energy": 0.005,
+        "final_energy": 0.005,
+        "minimum_raw_kappa_times_D": -9.207442127037349e-14,
+        "case": "elongated8",
+        "sampling": "base",
+        "path": "build/method042-final/controls/elongated8-base.json",
+        "sha256": "d4cecbf870ba7ad79177efb2ec7aaeb072561ff25dcc5f1d78a8a600847ea1fd",
+        "splits": 0,
+        "waist_cut_max_abs_x_over_D": null
+      },
+      {
+        "regions": 1,
+        "area_fractions": [
+          1.000000000000001
+        ],
+        "initial_energy": 0.005,
+        "final_energy": 0.005,
+        "minimum_raw_kappa_times_D": -7.185095816097306e-14,
+        "case": "elongated8",
+        "sampling": "flip",
+        "path": "build/method042-final/controls/elongated8-flip.json",
+        "sha256": "813e09421c0ced83da20ac40a809ae46c4427d00b961407e3ec16636aabf2e7b",
+        "splits": 0,
+        "waist_cut_max_abs_x_over_D": null
+      },
+      {
+        "regions": 1,
+        "area_fractions": [
+          0.9999999999999919
+        ],
+        "initial_energy": 0.005,
+        "final_energy": 0.005,
+        "minimum_raw_kappa_times_D": -4.855305461040718e-13,
+        "case": "elongated8",
+        "sampling": "dense",
+        "path": "build/method042-final/controls/elongated8-dense.json",
+        "sha256": "678d7eb747e7ad09d12ec33bc8f5b2b4b903ce22136dbf6884ae7a0c77feef17",
+        "splits": 0,
+        "waist_cut_max_abs_x_over_D": null
+      },
+      {
+        "regions": 1,
+        "area_fractions": [
+          0.9999999999999919
+        ],
+        "initial_energy": 0.005,
+        "final_energy": 0.005,
+        "minimum_raw_kappa_times_D": -4.977135782574959e-13,
+        "case": "elongated8",
+        "sampling": "dense_flip",
+        "path": "build/method042-final/controls/elongated8-dense_flip.json",
+        "sha256": "7480cbe8d8548a4c0745cf5ba1395d0cb010ed3b769fb24b048db317a564643a",
+        "splits": 0,
+        "waist_cut_max_abs_x_over_D": null
+      },
+      {
+        "regions": 1,
+        "area_fractions": [
+          1.0000000000000007
+        ],
+        "initial_energy": 0.005,
+        "final_energy": 0.005,
+        "minimum_raw_kappa_times_D": -5.1788473969344054e-14,
+        "case": "elongated8",
+        "sampling": "clustered",
+        "path": "build/method042-final/controls/elongated8-clustered.json",
+        "sha256": "1b2e6cefb41d46df42a933e04d8213578c3b37f104349a924d50ff5e00faa481",
+        "splits": 0,
+        "waist_cut_max_abs_x_over_D": null
+      },
+      {
+        "regions": 1,
+        "area_fractions": [
+          0.9999999999999977
+        ],
+        "initial_energy": 0.005,
+        "final_energy": 0.005,
+        "minimum_raw_kappa_times_D": -5.50013917760234,
+        "case": "ridge",
+        "sampling": "base",
+        "path": "build/method042-final/controls/ridge-base.json",
+        "sha256": "4ccdaee4953ad3aa868751afdb233f8bd212a079dca06fd4e308e32bf457f2c5",
+        "splits": 0,
+        "waist_cut_max_abs_x_over_D": null
+      },
+      {
+        "regions": 1,
+        "area_fractions": [
+          0.9999999999999977
+        ],
+        "initial_energy": 0.005,
+        "final_energy": 0.005,
+        "minimum_raw_kappa_times_D": -5.500139177602341,
+        "case": "ridge",
+        "sampling": "flip",
+        "path": "build/method042-final/controls/ridge-flip.json",
+        "sha256": "bbbaa86550addf1b1a3ba0a7f2cf12f6ff964c0f64a6a93882df9d564ce6c99f",
+        "splits": 0,
+        "waist_cut_max_abs_x_over_D": null
+      },
+      {
+        "regions": 1,
+        "area_fractions": [
+          0.9999999999999954
+        ],
+        "initial_energy": 0.005,
+        "final_energy": 0.005,
+        "minimum_raw_kappa_times_D": -11.558830163132049,
+        "case": "ridge",
+        "sampling": "dense",
+        "path": "build/method042-final/controls/ridge-dense.json",
+        "sha256": "521702888e2a903425c3a4deecba46d29cad63700575bdcf2875fd6ca40695f5",
+        "splits": 0,
+        "waist_cut_max_abs_x_over_D": null
+      },
+      {
+        "regions": 1,
+        "area_fractions": [
+          0.9999999999999953
+        ],
+        "initial_energy": 0.005,
+        "final_energy": 0.005,
+        "minimum_raw_kappa_times_D": -11.558830163132013,
+        "case": "ridge",
+        "sampling": "dense_flip",
+        "path": "build/method042-final/controls/ridge-dense_flip.json",
+        "sha256": "57b2dc4dc5038e49c0269774742f292421ada8b8a3c6b80eb07559f08fa160e0",
+        "splits": 0,
+        "waist_cut_max_abs_x_over_D": null
+      },
+      {
+        "regions": 1,
+        "area_fractions": [
+          1.0000000000000009
+        ],
+        "initial_energy": 0.005,
+        "final_energy": 0.005,
+        "minimum_raw_kappa_times_D": -5.70378451565685,
+        "case": "ridge",
+        "sampling": "clustered",
+        "path": "build/method042-final/controls/ridge-clustered.json",
+        "sha256": "45073e5aa525cc128d44523863291265f27a1b6b068979a149ba610a2bed1ea9",
+        "splits": 0,
+        "waist_cut_max_abs_x_over_D": null
+      },
+      {
+        "regions": 1,
+        "area_fractions": [
+          0.9999999999999925
+        ],
+        "initial_energy": 0.005,
+        "final_energy": 0.005,
+        "minimum_raw_kappa_times_D": -9.942510680860526,
+        "case": "groove",
+        "sampling": "base",
+        "path": "build/method042-final/controls/groove-base.json",
+        "sha256": "0854f1b5d1aca62c80e8d4b5e894db79e65f09b55858f91437e05b63ffbd97ea",
+        "splits": 0,
+        "waist_cut_max_abs_x_over_D": null
+      },
+      {
+        "regions": 1,
+        "area_fractions": [
+          0.9999999999999925
+        ],
+        "initial_energy": 0.005,
+        "final_energy": 0.005,
+        "minimum_raw_kappa_times_D": -9.942510680860526,
+        "case": "groove",
+        "sampling": "flip",
+        "path": "build/method042-final/controls/groove-flip.json",
+        "sha256": "7a0002ca08e73bc6860a54bb898f73e15423cf7c380b0a1ef292a1bca5fbce48",
+        "splits": 0,
+        "waist_cut_max_abs_x_over_D": null
+      },
+      {
+        "regions": 1,
+        "area_fractions": [
+          0.999999999999989
+        ],
+        "initial_energy": 0.005,
+        "final_energy": 0.005,
+        "minimum_raw_kappa_times_D": -15.137472681454373,
+        "case": "groove",
+        "sampling": "dense",
+        "path": "build/method042-final/controls/groove-dense.json",
+        "sha256": "eafbb3d55f3c1a23849910e9aa36ca12617923d936a45ef650f7ca7e125a0f04",
+        "splits": 0,
+        "waist_cut_max_abs_x_over_D": null
+      },
+      {
+        "regions": 1,
+        "area_fractions": [
+          0.999999999999989
+        ],
+        "initial_energy": 0.005,
+        "final_energy": 0.005,
+        "minimum_raw_kappa_times_D": -15.1374726814543,
+        "case": "groove",
+        "sampling": "dense_flip",
+        "path": "build/method042-final/controls/groove-dense_flip.json",
+        "sha256": "792e9f3ea6812a02e2d07c8f3a6f1d77acbf5035c60cbd84e47fa92418c9c830",
+        "splits": 0,
+        "waist_cut_max_abs_x_over_D": null
+      },
+      {
+        "regions": 1,
+        "area_fractions": [
+          0.9999999999999952
+        ],
+        "initial_energy": 0.005,
+        "final_energy": 0.005,
+        "minimum_raw_kappa_times_D": -3.6738014043640845,
+        "case": "groove",
+        "sampling": "clustered",
+        "path": "build/method042-final/controls/groove-clustered.json",
+        "sha256": "7de880a526dc57e8ba9b1522817d8f43db185703678b0e347ff9c4ac5e6d80c8",
+        "splits": 0,
+        "waist_cut_max_abs_x_over_D": null
+      },
+      {
+        "regions": 2,
+        "area_fractions": [
+          0.5000000000000017,
+          0.4999999999999979
+        ],
+        "initial_energy": 0.005,
+        "final_energy": -2.213946941852295,
+        "minimum_raw_kappa_times_D": -20.527993473263177,
+        "case": "neck30",
+        "sampling": "base",
+        "path": "build/method042-final/controls/neck30-base.json",
+        "sha256": "86c227c95a021eeba6d2eacaf5e65fa9df44f3c48554ddef88b50ebd476a0e11",
+        "splits": 1,
+        "waist_cut_max_abs_x_over_D": 2.6019633622849985e-17,
+        "proposal_diagnostic": {
+          "explicit_equatorial_partition_delta_energy": -2.2189469418522947,
+          "best_minimum_area_sweep_without_prominence_gate": {
+            "delta_energy": -2.2189469418522947,
+            "source_face": 0,
+            "fraction": 0.5,
+            "proposal_prominence": 0.4908133135230702,
+            "regions": 2
+          }
+        }
+      },
+      {
+        "regions": 2,
+        "area_fractions": [
+          0.5000000000000017,
+          0.4999999999999979
+        ],
+        "initial_energy": 0.005,
+        "final_energy": -2.2139469418522952,
+        "minimum_raw_kappa_times_D": -20.527993473263177,
+        "case": "neck30",
+        "sampling": "flip",
+        "path": "build/method042-final/controls/neck30-flip.json",
+        "sha256": "589c6a333ca47aa1d7a03c098596d6286386d9ede94a54db99bcef1d54303fe3",
+        "splits": 1,
+        "waist_cut_max_abs_x_over_D": 2.6019633622849985e-17,
+        "proposal_diagnostic": {
+          "explicit_equatorial_partition_delta_energy": -2.218946941852295,
+          "best_minimum_area_sweep_without_prominence_gate": {
+            "delta_energy": -2.218946941852295,
+            "source_face": 0,
+            "fraction": 0.5,
+            "proposal_prominence": 0.4908133135230702,
+            "regions": 2
+          }
+        }
+      },
+      {
+        "regions": 1,
+        "area_fractions": [
+          0.9999999999999934
+        ],
+        "initial_energy": 0.005,
+        "final_energy": 0.005,
+        "minimum_raw_kappa_times_D": -22.285639254515026,
+        "case": "neck30",
+        "sampling": "dense",
+        "path": "build/method042-final/controls/neck30-dense.json",
+        "sha256": "e2abd6d44d55b48f409ff0885c474fb98f080366619db1e203bbcc8bf3910306",
+        "splits": 0,
+        "waist_cut_max_abs_x_over_D": null,
+        "proposal_diagnostic": {
+          "explicit_equatorial_partition_delta_energy": -2.4488121553576176,
+          "best_minimum_area_sweep_without_prominence_gate": {
+            "delta_energy": 0.1633163328368369,
+            "source_face": 6030,
+            "fraction": 0.510044645984797,
+            "proposal_prominence": 0.4093365036209019,
+            "regions": 2
+          }
+        }
+      },
+      {
+        "regions": 1,
+        "area_fractions": [
+          0.9999999999999934
+        ],
+        "initial_energy": 0.005,
+        "final_energy": 0.005,
+        "minimum_raw_kappa_times_D": -22.285639254515022,
+        "case": "neck30",
+        "sampling": "dense_flip",
+        "path": "build/method042-final/controls/neck30-dense_flip.json",
+        "sha256": "1b4291e71bb404b1524c39aa819e9b48915a3cd5c8a9e95fd3b1f3b0a75847c2",
+        "splits": 0,
+        "waist_cut_max_abs_x_over_D": null,
+        "proposal_diagnostic": {
+          "explicit_equatorial_partition_delta_energy": -2.448812155357617,
+          "best_minimum_area_sweep_without_prominence_gate": {
+            "delta_energy": 0.16331633283683847,
+            "source_face": 0,
+            "fraction": 0.510044645984797,
+            "proposal_prominence": 0.40933650362090174,
+            "regions": 2
+          }
+        }
+      },
+      {
+        "regions": 1,
+        "area_fractions": [
+          1.0000000000000058
+        ],
+        "initial_energy": 0.005,
+        "final_energy": 0.005,
+        "minimum_raw_kappa_times_D": -18.31065991437659,
+        "case": "neck30",
+        "sampling": "clustered",
+        "path": "build/method042-final/controls/neck30-clustered.json",
+        "sha256": "4ee61bd31660fd685ec2a80ae76c3f300fd02be1aae6bce9022fb762f011a5cf",
+        "splits": 0,
+        "waist_cut_max_abs_x_over_D": null,
+        "proposal_diagnostic": {
+          "explicit_equatorial_partition_delta_energy": -1.9363498919446862,
+          "best_minimum_area_sweep_without_prominence_gate": {
+            "delta_energy": 0.13325715081818945,
+            "source_face": 1479,
+            "fraction": 0.47021878755597124,
+            "proposal_prominence": 0.3003226556016992,
+            "regions": 2
+          }
+        }
+      },
+      {
+        "regions": 1,
+        "area_fractions": [
+          1.0000000000000024
+        ],
+        "initial_energy": 0.005,
+        "final_energy": 0.005,
+        "minimum_raw_kappa_times_D": -13.63188731012242,
+        "case": "neck50",
+        "sampling": "base",
+        "path": "build/method042-final/controls/neck50-base.json",
+        "sha256": "370615aa037624d1beeda0f3c8f756d9b55a0a321e3988d480fd0da2d38df791",
+        "splits": 0,
+        "waist_cut_max_abs_x_over_D": null,
+        "proposal_diagnostic": {
+          "explicit_equatorial_partition_delta_energy": -2.231803590628826,
+          "best_minimum_area_sweep_without_prominence_gate": {
+            "delta_energy": 0.20569736943483474,
+            "source_face": 1478,
+            "fraction": 0.5,
+            "proposal_prominence": 0.24662405358355505,
+            "regions": 2
+          }
+        }
+      },
+      {
+        "regions": 1,
+        "area_fractions": [
+          1.0000000000000024
+        ],
+        "initial_energy": 0.005,
+        "final_energy": 0.005,
+        "minimum_raw_kappa_times_D": -13.631887310122417,
+        "case": "neck50",
+        "sampling": "flip",
+        "path": "build/method042-final/controls/neck50-flip.json",
+        "sha256": "0d35d076398c9687b013a2930f009cedc2a21b5c4e7311606476101916be5fe4",
+        "splits": 0,
+        "waist_cut_max_abs_x_over_D": null,
+        "proposal_diagnostic": {
+          "explicit_equatorial_partition_delta_energy": -2.231803590628826,
+          "best_minimum_area_sweep_without_prominence_gate": {
+            "delta_energy": 0.20569736943483483,
+            "source_face": 1474,
+            "fraction": 0.5,
+            "proposal_prominence": 0.24662405358355505,
+            "regions": 2
+          }
+        }
+      },
+      {
+        "regions": 2,
+        "area_fractions": [
+          0.4899943230092615,
+          0.5100056769907528
+        ],
+        "initial_energy": 0.005,
+        "final_energy": -0.7110390315986143,
+        "minimum_raw_kappa_times_D": -14.568746740774886,
+        "case": "neck50",
+        "sampling": "dense",
+        "path": "build/method042-final/controls/neck50-dense.json",
+        "sha256": "f31ce7932b828c37a6373402e8ff4b1c5dcfec52ea3d3bb735e09f2e9a1ccd51",
+        "splits": 1,
+        "waist_cut_max_abs_x_over_D": 0.020823856190270922,
+        "proposal_diagnostic": {
+          "explicit_equatorial_partition_delta_energy": -2.4344598099152566,
+          "best_minimum_area_sweep_without_prominence_gate": {
+            "delta_energy": -0.7160390315986143,
+            "source_face": 6029,
+            "fraction": 0.5100056769907418,
+            "proposal_prominence": 0.3027913094923619,
+            "regions": 2
+          }
+        }
+      },
+      {
+        "regions": 2,
+        "area_fractions": [
+          0.4899943230092615,
+          0.5100056769907529
+        ],
+        "initial_energy": 0.005,
+        "final_energy": -0.7110390315986138,
+        "minimum_raw_kappa_times_D": -14.56874674077489,
+        "case": "neck50",
+        "sampling": "dense_flip",
+        "path": "build/method042-final/controls/neck50-dense_flip.json",
+        "sha256": "f51816c7cf36057f84a033b57c077252e125ef5f065c669083a850b11a7d89e2",
+        "splits": 1,
+        "waist_cut_max_abs_x_over_D": 0.020823856190270922,
+        "proposal_diagnostic": {
+          "explicit_equatorial_partition_delta_energy": -2.434459809915257,
+          "best_minimum_area_sweep_without_prominence_gate": {
+            "delta_energy": -0.7160390315986138,
+            "source_face": 6019,
+            "fraction": 0.5100056769907418,
+            "proposal_prominence": 0.30279130949236177,
+            "regions": 2
+          }
+        }
+      },
+      {
+        "regions": 1,
+        "area_fractions": [
+          0.9999999999999976
+        ],
+        "initial_energy": 0.005,
+        "final_energy": 0.005,
+        "minimum_raw_kappa_times_D": -10.042595196378857,
+        "case": "neck50",
+        "sampling": "clustered",
+        "path": "build/method042-final/controls/neck50-clustered.json",
+        "sha256": "33e674fa25e373b617b7e0014ed1f1df09e2b92eca9f916fcb743824accaf3fc",
+        "splits": 0,
+        "waist_cut_max_abs_x_over_D": null,
+        "proposal_diagnostic": {
+          "explicit_equatorial_partition_delta_energy": -1.3283316193855332,
+          "best_minimum_area_sweep_without_prominence_gate": {
+            "delta_energy": 0.1233592430854365,
+            "source_face": 1478,
+            "fraction": 0.5304823428852838,
+            "proposal_prominence": 0.40163229970177333,
+            "regions": 2
+          }
+        }
+      },
+      {
+        "regions": 1,
+        "area_fractions": [
+          0.9999999999999943
+        ],
+        "initial_energy": 0.005,
+        "final_energy": 0.005,
+        "minimum_raw_kappa_times_D": -7.082772098508838,
+        "case": "neck70",
+        "sampling": "base",
+        "path": "build/method042-final/controls/neck70-base.json",
+        "sha256": "d05617821d0e6f515f42558e2850f21a6b946d5395936f55a6609b0a2fbf226b",
+        "splits": 0,
+        "waist_cut_max_abs_x_over_D": null,
+        "proposal_diagnostic": {
+          "explicit_equatorial_partition_delta_energy": -1.1710266551025967,
+          "best_minimum_area_sweep_without_prominence_gate": {
+            "delta_energy": 0.5112931775799469,
+            "source_face": 1478,
+            "fraction": 0.48048125850932494,
+            "proposal_prominence": 0.15004477183841625,
+            "regions": 2
+          }
+        }
+      },
+      {
+        "regions": 1,
+        "area_fractions": [
+          0.9999999999999943
+        ],
+        "initial_energy": 0.005,
+        "final_energy": 0.005,
+        "minimum_raw_kappa_times_D": -7.082772098508837,
+        "case": "neck70",
+        "sampling": "flip",
+        "path": "build/method042-final/controls/neck70-flip.json",
+        "sha256": "e0aef200f74ee7d68889129e5f06614c599cb6120c9de457e06a18171e4bf43b",
+        "splits": 0,
+        "waist_cut_max_abs_x_over_D": null,
+        "proposal_diagnostic": {
+          "explicit_equatorial_partition_delta_energy": -1.1710266551025967,
+          "best_minimum_area_sweep_without_prominence_gate": {
+            "delta_energy": 0.5112931775799473,
+            "source_face": 1474,
+            "fraction": 0.48048125850932494,
+            "proposal_prominence": 0.15004477183841625,
+            "regions": 2
+          }
+        }
+      },
+      {
+        "regions": 1,
+        "area_fractions": [
+          1.0000000000000075
+        ],
+        "initial_energy": 0.005,
+        "final_energy": 0.005,
+        "minimum_raw_kappa_times_D": -7.467015559018161,
+        "case": "neck70",
+        "sampling": "dense",
+        "path": "build/method042-final/controls/neck70-dense.json",
+        "sha256": "55882801f8b8c98ddd7c8e1b6d9e285b95be100e577766f26efbfe86fd7a2ef6",
+        "splits": 0,
+        "waist_cut_max_abs_x_over_D": null,
+        "proposal_diagnostic": {
+          "explicit_equatorial_partition_delta_energy": -1.2870323629465392,
+          "best_minimum_area_sweep_without_prominence_gate": {
+            "delta_energy": 0.6396794195567354,
+            "source_face": 6029,
+            "fraction": 0.480173801727434,
+            "proposal_prominence": 0.1916430618081313,
+            "regions": 2
+          }
+        }
+      },
+      {
+        "regions": 1,
+        "area_fractions": [
+          1.0000000000000075
+        ],
+        "initial_energy": 0.005,
+        "final_energy": 0.005,
+        "minimum_raw_kappa_times_D": -7.4670155590181535,
+        "case": "neck70",
+        "sampling": "dense_flip",
+        "path": "build/method042-final/controls/neck70-dense_flip.json",
+        "sha256": "2e4e678458affad0ab8a9191939e4c407b2b08caa451cc83ac0aa7eab1f1160b",
+        "splits": 0,
+        "waist_cut_max_abs_x_over_D": null,
+        "proposal_diagnostic": {
+          "explicit_equatorial_partition_delta_energy": -1.2870323629465394,
+          "best_minimum_area_sweep_without_prominence_gate": {
+            "delta_energy": 0.639679419556734,
+            "source_face": 6019,
+            "fraction": 0.480173801727434,
+            "proposal_prominence": 0.1916430618081313,
+            "regions": 2
+          }
+        }
+      },
+      {
+        "regions": 1,
+        "area_fractions": [
+          0.9999999999999992
+        ],
+        "initial_energy": 0.005,
+        "final_energy": 0.005,
+        "minimum_raw_kappa_times_D": -4.579927934630279,
+        "case": "neck70",
+        "sampling": "clustered",
+        "path": "build/method042-final/controls/neck70-clustered.json",
+        "sha256": "cf11ab4f9beecc4f6b7121b7e5f2ad1ab1b5ed132438e36ae3ab8e3fe484179d",
+        "splits": 0,
+        "waist_cut_max_abs_x_over_D": null,
+        "proposal_diagnostic": {
+          "explicit_equatorial_partition_delta_energy": -0.18927933417124487,
+          "best_minimum_area_sweep_without_prominence_gate": {
+            "delta_energy": 0.7798448575902546,
+            "source_face": 1478,
+            "fraction": 0.5003808213516553,
+            "proposal_prominence": 0.30474517608694834,
+            "regions": 2
+          }
+        }
+      },
+      {
+        "regions": 1,
+        "area_fractions": [
+          1.0000000000000029
+        ],
+        "initial_energy": 0.005,
+        "final_energy": 0.005,
+        "minimum_raw_kappa_times_D": -1.3029918744772386,
+        "case": "neck90",
+        "sampling": "base",
+        "path": "build/method042-final/controls/neck90-base.json",
+        "sha256": "8ccd19dc90b3ff6d9ae0a616605b8c893455e0686561793c60caa69499f3b8e2",
+        "splits": 0,
+        "waist_cut_max_abs_x_over_D": null,
+        "proposal_diagnostic": {
+          "explicit_equatorial_partition_delta_energy": 0.6937121954174194,
+          "best_minimum_area_sweep_without_prominence_gate": {
+            "delta_energy": 1.167227170960083,
+            "source_face": 722,
+            "fraction": 0.02040462153824754,
+            "proposal_prominence": 0.0,
+            "regions": 2
+          }
+        }
+      },
+      {
+        "regions": 1,
+        "area_fractions": [
+          1.0000000000000029
+        ],
+        "initial_energy": 0.005,
+        "final_energy": 0.005,
+        "minimum_raw_kappa_times_D": -1.302991874477237,
+        "case": "neck90",
+        "sampling": "flip",
+        "path": "build/method042-final/controls/neck90-flip.json",
+        "sha256": "78c5de0d1c3676907f3c596bb29ba0a672bbac11e7e8b1b8c450e24ef976cb16",
+        "splits": 0,
+        "waist_cut_max_abs_x_over_D": null,
+        "proposal_diagnostic": {
+          "explicit_equatorial_partition_delta_energy": 0.6937121954174197,
+          "best_minimum_area_sweep_without_prominence_gate": {
+            "delta_energy": 1.167227170960083,
+            "source_face": 791,
+            "fraction": 0.02040462153824757,
+            "proposal_prominence": 0.0,
+            "regions": 2
+          }
+        }
+      },
+      {
+        "regions": 1,
+        "area_fractions": [
+          0.9999999999999964
+        ],
+        "initial_energy": 0.005,
+        "final_energy": 0.005,
+        "minimum_raw_kappa_times_D": -1.3853118647275944,
+        "case": "neck90",
+        "sampling": "dense",
+        "path": "build/method042-final/controls/neck90-dense.json",
+        "sha256": "ef33f66481d9b09f6d00eae171e6d7171b3e69f8db87435ef96cb853108dc66f",
+        "splits": 0,
+        "waist_cut_max_abs_x_over_D": null,
+        "proposal_diagnostic": {
+          "explicit_equatorial_partition_delta_energy": 0.6640065333422637,
+          "best_minimum_area_sweep_without_prominence_gate": {
+            "delta_energy": 1.2248296341707887,
+            "source_face": 3126,
+            "fraction": 0.020106409839762553,
+            "proposal_prominence": 0.0,
+            "regions": 2
+          }
+        }
+      },
+      {
+        "regions": 1,
+        "area_fractions": [
+          0.9999999999999964
+        ],
+        "initial_energy": 0.005,
+        "final_energy": 0.005,
+        "minimum_raw_kappa_times_D": -1.3853118647275986,
+        "case": "neck90",
+        "sampling": "dense_flip",
+        "path": "build/method042-final/controls/neck90-dense_flip.json",
+        "sha256": "f5133cae726b77b667f9e98cffb8a0bde43f8d3adc0e11e99501544bafa5e17f",
+        "splits": 0,
+        "waist_cut_max_abs_x_over_D": null,
+        "proposal_diagnostic": {
+          "explicit_equatorial_partition_delta_energy": 0.6640065333422634,
+          "best_minimum_area_sweep_without_prominence_gate": {
+            "delta_energy": 1.2248296341707898,
+            "source_face": 3210,
+            "fraction": 0.020106409839762553,
+            "proposal_prominence": 0.0,
+            "regions": 2
+          }
+        }
+      },
+      {
+        "regions": 1,
+        "area_fractions": [
+          1.0000000000000069
+        ],
+        "initial_energy": 0.005,
+        "final_energy": 0.005,
+        "minimum_raw_kappa_times_D": -0.7210850237101871,
+        "case": "neck90",
+        "sampling": "clustered",
+        "path": "build/method042-final/controls/neck90-clustered.json",
+        "sha256": "3836bbca24ef98beab3f0c1a8db0c7f47d3cca1aed6d9db47398f38efbbe7dc3",
+        "splits": 0,
+        "waist_cut_max_abs_x_over_D": null,
+        "proposal_diagnostic": {
+          "explicit_equatorial_partition_delta_energy": 0.9709571809046439,
+          "best_minimum_area_sweep_without_prominence_gate": {
+            "delta_energy": 1.262184305617366,
+            "source_face": 665,
+            "fraction": 0.02036070962031847,
+            "proposal_prominence": 0.0,
+            "regions": 2
+          }
+        }
+      },
+      {
+        "case": "neck-regional_only",
+        "regions": 10,
+        "splits": 9,
+        "path": "build/method042-final/controls/neck-regional_only.json",
+        "sha256": "9ce679fa9bd8e43cf20c99cd2ff0dd72ea0bab73abbc65954e3ba72c5a9449c7"
+      },
+      {
+        "case": "neck-concavity_only",
+        "regions": 2,
+        "splits": 1,
+        "path": "build/method042-final/controls/neck-concavity_only.json",
+        "sha256": "481ffe874d575643a445ec0049ea0b9ff9cb0d0bbd9c2c461c34adb6b432f661"
+      },
+      {
+        "case": "groove-regional_only",
+        "regions": 13,
+        "splits": 9,
+        "path": "build/method042-final/controls/groove-regional_only.json",
+        "sha256": "dde5db02daee294a90a607c3be2c50855b600fb6070f0df6f94749a2f0ffbcd5"
+      },
+      {
+        "case": "groove-concavity_only",
+        "regions": 1,
+        "splits": 0,
+        "path": "build/method042-final/controls/groove-concavity_only.json",
+        "sha256": "7063596a72b24fea915ee398ece6d0d285e07584710202bea1990e324a07debc"
+      },
+      {
+        "case": "ridge-regional_only",
+        "regions": 2,
+        "splits": 1,
+        "path": "build/method042-final/controls/ridge-regional_only.json",
+        "sha256": "3e06d98d77e934e7880f1e0497d89685183b00fbff383957967f22bcff7225f7"
+      },
+      {
+        "case": "ridge-concavity_only",
+        "regions": 1,
+        "splits": 0,
+        "path": "build/method042-final/controls/ridge-concavity_only.json",
+        "sha256": "9afbbbb0121116f2cc27c13be6a28711d635609ef828cf2d684eb3ebf4a243f1"
+      }
+    ]
+  },
+  "frog": {
+    "implementation": "neck_sweep_cpu_diagnostic_v1",
+    "backend": "offline_cpu_reference",
+    "claim_eligible": false,
+    "regional_gate": true,
+    "concavity_gate": true,
+    "initial_energy": 7.070360477739323,
+    "final_energy": 7.070360477739323,
+    "regions": 5,
+    "area_fractions": [
+      0.9973041829832374,
+      0.00018079461802017466,
+      0.0005567599348790024,
+      0.0017198972603059063,
+      0.00023836520355657322
+    ],
+    "accepted_splits": [],
+    "considered_feasible_splits": 0,
+    "minimum_raw_kappa_times_D": -307.26144394109014,
+    "config": {
+      "schema": "intrinsic.neck-sweep.v1",
+      "implementation": "neck_sweep_cpu_diagnostic_v1",
+      "curvature_filter": "edge_unfiltered_v3",
+      "landmarks": 8,
+      "smoothing_radius_over_D": 0.02,
+      "concavity_weight": 16.0,
+      "region_cost": 0.005,
+      "minimum_child_area_fraction": 0.02,
+      "quantile_step": 0.01,
+      "profile_half_window": 2,
+      "prominence_half_window": 10,
+      "proposal_band_half_window": 2,
+      "minimum_relative_prominence": 0.15,
+      "maximum_splits": 12,
+      "purpose": "Test a narrow proposal band around smoothed minima: the v3 smoother displaced the exact severe-neck minimum by one quantile. Frozen before frog."
+    },
+    "config_sha256": "2a04cbffb7afae7a1e6a2f5ebfceaded746787162fc0439f7f48f112be0062ae",
+    "implementation_sha256": "e162649ed79f80a9baf4d8f765fc77f8654ef4dafd1d20cb836bd2fdffe09030",
+    "evaluator_sha256": "26ae09398b7abda6c8a88a70f10c190195725846ef4719c004f44d32acd6dd3f",
+    "input_sha256": "c72c55b72392f55e02b846267424c9069c580e1bede1c9b7ee7ff189fa4656aa",
+    "invocation": [
+      "tools/diagnostics/curvature/neck_sweep.py",
+      "--config",
+      "tools/diagnostics/curvature/neck_sweep_v4.json",
+      "--cohort",
+      "build/method042-native/cohort.json",
+      "--mesh",
+      "frog",
+      "--output",
+      "build/method042-final/frog"
+    ],
+    "label_count": 19106,
+    "labels_canonical_json_sha256": "253b60ff46f7b0efa28f9cf6607d2bb05982c52029d0b44a20c7c83e6b23917b"
+  },
+  "initial_filter_attempts": [
+    {
+      "implementation": "neck_sweep_cpu_diagnostic_v1",
+      "backend": "offline_cpu_reference",
+      "claim_eligible": false,
+      "regional_gate": true,
+      "concavity_gate": true,
+      "initial_energy": 0.005,
+      "final_energy": 0.005,
+      "regions": 1,
+      "area_fractions": [
+        1.0000000000000082
+      ],
+      "accepted_splits": [],
+      "considered_feasible_splits": 10,
+      "minimum_raw_kappa_times_D": -20.527993473263177,
+      "config": {
+        "schema": "intrinsic.neck-sweep.v1",
+        "implementation": "neck_sweep_cpu_diagnostic_v1",
+        "landmarks": 8,
+        "smoothing_radius_over_D": 0.02,
+        "concavity_weight": 16.0,
+        "region_cost": 0.005,
+        "minimum_child_area_fraction": 0.02,
+        "quantile_step": 0.01,
+        "profile_half_window": 2,
+        "prominence_half_window": 10,
+        "minimum_relative_prominence": 0.15,
+        "maximum_splits": 12,
+        "purpose": "Frozen pre-frog diagnostic settings; no production backend or adopted quality claim."
+      },
+      "config_sha256": "9f8c331b6cdae976db83b6036ca49f155b788ab77ebce25417761003164082eb",
+      "implementation_sha256": "e162649ed79f80a9baf4d8f765fc77f8654ef4dafd1d20cb836bd2fdffe09030",
+      "evaluator_sha256": "26ae09398b7abda6c8a88a70f10c190195725846ef4719c004f44d32acd6dd3f",
+      "input_sha256": null,
+      "invocation": [
+        "tools/diagnostics/curvature/neck_sweep.py",
+        "--config",
+        "tools/diagnostics/curvature/neck_sweep_v1.json",
+        "--synthetic",
+        "neck",
+        "--rho",
+        ".3",
+        "--aspect",
+        "2",
+        "--output",
+        "build/method042-final/initial-v1"
+      ],
+      "label_count": 1488,
+      "labels_canonical_json_sha256": "b74974de3e9546d93b34de1c536731ad19ceb1f5a8ce600e257c033380a41621"
+    },
+    {
+      "implementation": "neck_sweep_cpu_diagnostic_v1",
+      "backend": "offline_cpu_reference",
+      "claim_eligible": false,
+      "regional_gate": true,
+      "concavity_gate": true,
+      "initial_energy": 0.005,
+      "final_energy": 0.005,
+      "regions": 1,
+      "area_fractions": [
+        1.0000000000000082
+      ],
+      "accepted_splits": [],
+      "considered_feasible_splits": 10,
+      "minimum_raw_kappa_times_D": -20.527993473263177,
+      "config": {
+        "schema": "intrinsic.neck-sweep.v1",
+        "implementation": "neck_sweep_cpu_diagnostic_v1",
+        "curvature_filter": "transverse_alignment_v2",
+        "landmarks": 8,
+        "smoothing_radius_over_D": 0.02,
+        "concavity_weight": 16.0,
+        "region_cost": 0.005,
+        "minimum_child_area_fraction": 0.02,
+        "quantile_step": 0.01,
+        "profile_half_window": 2,
+        "prominence_half_window": 10,
+        "minimum_relative_prominence": 0.15,
+        "maximum_splits": 12,
+        "purpose": "Direction-preserving correction after the severe synthetic neck failed with face-mean averaging; frozen before frog."
+      },
+      "config_sha256": "ba38c948d5b55b42c3ecac0b69cb6c52dabb1ca8222dd8a5d22d2c53c48b2317",
+      "implementation_sha256": "e162649ed79f80a9baf4d8f765fc77f8654ef4dafd1d20cb836bd2fdffe09030",
+      "evaluator_sha256": "26ae09398b7abda6c8a88a70f10c190195725846ef4719c004f44d32acd6dd3f",
+      "input_sha256": null,
+      "invocation": [
+        "tools/diagnostics/curvature/neck_sweep.py",
+        "--config",
+        "tools/diagnostics/curvature/neck_sweep_v2.json",
+        "--synthetic",
+        "neck",
+        "--rho",
+        ".3",
+        "--aspect",
+        "2",
+        "--output",
+        "build/method042-final/initial-v2"
+      ],
+      "label_count": 1488,
+      "labels_canonical_json_sha256": "b74974de3e9546d93b34de1c536731ad19ceb1f5a8ce600e257c033380a41621"
+    },
+    {
+      "implementation": "neck_sweep_cpu_diagnostic_v1",
+      "backend": "offline_cpu_reference",
+      "claim_eligible": false,
+      "regional_gate": true,
+      "concavity_gate": true,
+      "initial_energy": 0.005,
+      "final_energy": 0.005,
+      "regions": 1,
+      "area_fractions": [
+        1.0000000000000082
+      ],
+      "accepted_splits": [],
+      "considered_feasible_splits": 10,
+      "minimum_raw_kappa_times_D": -20.527993473263177,
+      "config": {
+        "schema": "intrinsic.neck-sweep.v1",
+        "implementation": "neck_sweep_cpu_diagnostic_v1",
+        "curvature_filter": "edge_unfiltered_v3",
+        "landmarks": 8,
+        "smoothing_radius_over_D": 0.02,
+        "concavity_weight": 16.0,
+        "region_cost": 0.005,
+        "minimum_child_area_fraction": 0.02,
+        "quantile_step": 0.01,
+        "profile_half_window": 2,
+        "prominence_half_window": 10,
+        "minimum_relative_prominence": 0.15,
+        "maximum_splits": 12,
+        "purpose": "Unfiltered edge-curvature ablation after both averaging filters rejected the severe neck; radius only scales curvature in this variant. Frozen before frog."
+      },
+      "config_sha256": "36c6bea98099adf9b744e647af24b6844476972504b72d4b9bf5bad91b32ac5a",
+      "implementation_sha256": "e162649ed79f80a9baf4d8f765fc77f8654ef4dafd1d20cb836bd2fdffe09030",
+      "evaluator_sha256": "26ae09398b7abda6c8a88a70f10c190195725846ef4719c004f44d32acd6dd3f",
+      "input_sha256": null,
+      "invocation": [
+        "tools/diagnostics/curvature/neck_sweep.py",
+        "--config",
+        "tools/diagnostics/curvature/neck_sweep_v3.json",
+        "--synthetic",
+        "neck",
+        "--rho",
+        ".3",
+        "--aspect",
+        "2",
+        "--output",
+        "build/method042-final/initial-v3"
+      ],
+      "label_count": 1488,
+      "labels_canonical_json_sha256": "b74974de3e9546d93b34de1c536731ad19ceb1f5a8ce600e257c033380a41621"
+    }
+  ],
+  "native_replays": [
+    {
+      "mesh": "sculpt",
+      "native_energy": 0.3022780930083699,
+      "independent_energy": 0.3022780930083699,
+      "absolute_delta": 0.0,
+      "feasible": true
+    },
+    {
+      "mesh": "frog",
+      "native_energy": -0.9802601710256704,
+      "independent_energy": -0.9802601710256695,
+      "absolute_delta": 8.881784197001252e-16,
+      "feasible": true
+    }
+  ],
+  "native_cohort": {
+    "schema": 1,
+    "candidates": {
+      "multicut": "boundary_multicut_isotropic_v2",
+      "regional": "curvature_region_scale_v2",
+      "contrast": "boundary_feature_contrast_v1",
+      "clean": "boundary_feature_area_cleanup_v1",
+      "clean_medium": "boundary_feature_area_cleanup_v1",
+      "clean_coarse": "boundary_feature_area_cleanup_v1",
+      "curves": "boundary_feature_curve_coverage_v1",
+      "local": "method_039_local_patch_unadopted"
+    },
+    "source_revision": "0b1d7f4dfc70408f0b1b1cf386937f5dcd916b1b",
+    "source_dirty": true,
+    "source_hashes": {
+      "src/geometry/CurvatureBoundaryGraph.cpp": "6bc3f47d3628f0e7acbe8b3c6c40f048e037214827bebe4cf9010da0e6e15608",
+      "src/geometry/CurvatureBoundaryGraph.hpp": "67e82b41b7f45f28c051f7063f11fc025e9836ff56256c433523c9c722565590",
+      "src/geometry/Geometry.HalfedgeMesh.CurvatureSegmentation.Multicut.cpp": "83fe4a58b585f799663f233798c93c17c6fde74b0ba6294d4afbfa99842fa7c8",
+      "src/geometry/Geometry.HalfedgeMesh.CurvatureSegmentation.Multicut.cppm": "f41fd4833cb1a9f446041d3b3f09bf894bd1e4d20dac2fa9994615ebf91a0a71",
+      "benchmarks/runners/CurvatureBoundaryMeshRunner.cpp": "9c21afdc97f9649808b658d3aebf496dd5ca63f97cc0f1e13c1337b3823f8836"
+    },
+    "runner_sha256": "247a9f8eb08dc826ae4c16a4e77e0eac5aaf0011a8dea689055e2aa7f65ade36",
+    "claim_eligible": false,
+    "timeout_seconds": 300,
+    "inputs": {
+      "sculpt": {
+        "path": "/home/alex/Dropbox/Work/Datasets/obj/sculpt.obj",
+        "sha256": "210dc85f20cdec11cb0b50bec255b86126fb6b47f9f938369049570de3f88a25"
+      },
+      "frog": {
+        "path": "/home/alex/Dropbox/Work/Datasets/obj/frog.obj",
+        "sha256": "c72c55b72392f55e02b846267424c9069c580e1bede1c9b7ee7ff189fa4656aa"
+      }
+    },
+    "runs": [
+      {
+        "mesh": "sculpt",
+        "mode": "local",
+        "command": [
+          "/home/alex/Documents/IntrinsicEngine/build/ci/bin/IntrinsicCurvatureBoundaryMesh",
+          "/home/alex/Dropbox/Work/Datasets/obj/sculpt.obj",
+          "build/method042-native/sculpt-local",
+          "local"
+        ],
+        "exit_code": 0,
+        "elapsed_seconds": 17.03677768795751,
+        "result": {
+          "status": "passed",
+          "benchmark_id": "geometry.curvature_segmentation.local_mesh.local_cohort",
+          "method": "geometry.curvature_segmentation",
+          "backend": "cpu_reference",
+          "dataset": "local.method_040.mesh_cohort.v1",
+          "commit": "local-dev",
+          "metrics": {
+            "runtime_ms": 17016.548562,
+            "memory_peak_bytes": 19660800,
+            "quality_error_l2": 0,
+            "quality_error_linf": 0,
+            "population_count": 5
+          },
+          "diagnostics": {
+            "input": "/home/alex/Dropbox/Work/Datasets/obj/sculpt.obj",
+            "implementation": "method_039_local_patch_unadopted",
+            "feature_weight": 1.5,
+            "feature_exponent": 1,
+            "model_weight": 0,
+            "boundary_scale": 1,
+            "region_cost": 0,
+            "hard_feature_exclusion_ratio": 0,
+            "faces": 7342,
+            "vertices": 3669,
+            "load_ms": 54.683766,
+            "curvature_ms": 69.38845,
+            "feature_ms": 182.537899,
+            "partition_ms": 16692.431326,
+            "minimum_exclusion_curve_length": 0,
+            "minimum_region_area": 0,
+            "attenuation_curves": 0,
+            "attenuation_hard_edges": 0,
+            "area_merges": 0,
+            "unmergeable_small_regions": 0,
+            "optimized_energy": 8.947517465622415,
+            "energy": 8.947517465622415,
+            "lower_bound": null,
+            "exact": false,
+            "attempted_moves": 0,
+            "accepted_moves": 0,
+            "contractions": 0,
+            "sweeps": 0,
+            "source_hard": 384,
+            "source_soft": 808,
+            "boundaries": 384,
+            "hard": 384,
+            "soft": 0,
+            "closure": 0,
+            "feature_length_recall": 0.3124892389064154,
+            "unsupported_length_fraction": 0,
+            "region_sizes": [
+              926,
+              1488,
+              788,
+              792,
+              3348
+            ],
+            "region_area_fractions": [
+              0.1109482401712266,
+              0.21104839120456792,
+              0.11093777029432864,
+              0.11093774481445982,
+              0.4561278535154175
+            ]
+          }
+        },
+        "output_sha256": {
+          ".json": "32e4fa5cf3d8bd61dd5baf07a7f27a565361f01ee63b70d1c5e1b6afe28b3861",
+          ".labels": "c2b1ea735efb706b16c29dd40fa2ac69da60624b0a30566cd9928aff4575daaf",
+          ".edges": "14de4542f68cc92524221c1ac014605d44b914d267f37ac1f3c3a19a1142cfd4",
+          ".geometry.json": "941c988ce43502c48b6d0eae0f6d0f6ff0a410c4e2d88e8c3857ab0b9d3cef0f"
+        }
+      },
+      {
+        "mesh": "sculpt",
+        "mode": "curves",
+        "command": [
+          "/home/alex/Documents/IntrinsicEngine/build/ci/bin/IntrinsicCurvatureBoundaryMesh",
+          "/home/alex/Dropbox/Work/Datasets/obj/sculpt.obj",
+          "build/method042-native/sculpt-curves",
+          "curves"
+        ],
+        "exit_code": 0,
+        "elapsed_seconds": 0.4141905929427594,
+        "result": {
+          "status": "passed",
+          "benchmark_id": "geometry.curvature_segmentation.curves_mesh.local_cohort",
+          "method": "geometry.curvature_segmentation",
+          "backend": "cpu_reference",
+          "dataset": "local.method_040.mesh_cohort.v1",
+          "commit": "local-dev",
+          "metrics": {
+            "runtime_ms": 372.439415,
+            "memory_peak_bytes": 19660800,
+            "quality_error_l2": 0,
+            "quality_error_linf": 0,
+            "population_count": 5
+          },
+          "diagnostics": {
+            "input": "/home/alex/Dropbox/Work/Datasets/obj/sculpt.obj",
+            "implementation": "boundary_feature_curve_coverage_v1",
+            "feature_weight": 4,
+            "feature_exponent": 3,
+            "model_weight": 0,
+            "boundary_scale": 0.04,
+            "region_cost": 0.00502654824574367,
+            "hard_feature_exclusion_ratio": 0.04,
+            "faces": 7342,
+            "vertices": 3669,
+            "load_ms": 51.179689,
+            "curvature_ms": 64.91556,
+            "feature_ms": 170.521327,
+            "partition_ms": 69.0524,
+            "minimum_exclusion_curve_length": 0.04,
+            "minimum_region_area": 0.00502654824574367,
+            "attenuation_curves": 6,
+            "attenuation_hard_edges": 384,
+            "area_merges": 0,
+            "unmergeable_small_regions": 0,
+            "optimized_energy": 0.3022780930083699,
+            "energy": 0.3022780930083699,
+            "lower_bound": 0.2821719000253952,
+            "exact": false,
+            "attempted_moves": 7337,
+            "accepted_moves": 0,
+            "contractions": 7337,
+            "sweeps": 1,
+            "source_hard": 384,
+            "source_soft": 808,
+            "boundaries": 384,
+            "hard": 384,
+            "soft": 0,
+            "closure": 0,
+            "feature_length_recall": 0.3124892389064154,
+            "unsupported_length_fraction": 0,
+            "region_sizes": [
+              926,
+              1488,
+              788,
+              792,
+              3348
+            ],
+            "region_area_fractions": [
+              0.1109482401712266,
+              0.21104839120456792,
+              0.11093777029432864,
+              0.11093774481445982,
+              0.4561278535154175
+            ]
+          }
+        },
+        "output_sha256": {
+          ".json": "93810b879ee019a2950b03f8820f158d1db7b95b0dc493bd0e081ac21f7c733a",
+          ".labels": "c2b1ea735efb706b16c29dd40fa2ac69da60624b0a30566cd9928aff4575daaf",
+          ".edges": "14de4542f68cc92524221c1ac014605d44b914d267f37ac1f3c3a19a1142cfd4",
+          ".geometry.json": "941c988ce43502c48b6d0eae0f6d0f6ff0a410c4e2d88e8c3857ab0b9d3cef0f"
+        }
+      },
+      {
+        "mesh": "frog",
+        "mode": "local",
+        "command": [
+          "/home/alex/Documents/IntrinsicEngine/build/ci/bin/IntrinsicCurvatureBoundaryMesh",
+          "/home/alex/Dropbox/Work/Datasets/obj/frog.obj",
+          "build/method042-native/frog-local",
+          "local"
+        ],
+        "exit_code": 0,
+        "elapsed_seconds": 70.80851015890948,
+        "result": {
+          "status": "passed",
+          "benchmark_id": "geometry.curvature_segmentation.local_mesh.local_cohort",
+          "method": "geometry.curvature_segmentation",
+          "backend": "cpu_reference",
+          "dataset": "local.method_040.mesh_cohort.v1",
+          "commit": "local-dev",
+          "metrics": {
+            "runtime_ms": 70788.926291,
+            "memory_peak_bytes": 27136000,
+            "quality_error_l2": 0,
+            "quality_error_linf": 0,
+            "population_count": 5
+          },
+          "diagnostics": {
+            "input": "/home/alex/Dropbox/Work/Datasets/obj/frog.obj",
+            "implementation": "method_039_local_patch_unadopted",
+            "feature_weight": 1.5,
+            "feature_exponent": 1,
+            "model_weight": 0,
+            "boundary_scale": 1,
+            "region_cost": 0,
+            "hard_feature_exclusion_ratio": 0,
+            "faces": 19106,
+            "vertices": 9555,
+            "load_ms": 130.170173,
+            "curvature_ms": 170.071915,
+            "feature_ms": 1663.3758,
+            "partition_ms": 68779.118711,
+            "minimum_exclusion_curve_length": 0,
+            "minimum_region_area": 0,
+            "attenuation_curves": 0,
+            "attenuation_hard_edges": 0,
+            "area_merges": 0,
+            "unmergeable_small_regions": 0,
+            "optimized_energy": 15.118312581905833,
+            "energy": 15.118312581905833,
+            "lower_bound": null,
+            "exact": false,
+            "attempted_moves": 0,
+            "accepted_moves": 0,
+            "contractions": 0,
+            "sweeps": 0,
+            "source_hard": 4,
+            "source_soft": 3010,
+            "boundaries": 55,
+            "hard": 4,
+            "soft": 15,
+            "closure": 36,
+            "feature_length_recall": 0.0044617963775264525,
+            "unsupported_length_fraction": 0.6906706426941308,
+            "region_sizes": [
+              19019,
+              5,
+              28,
+              42,
+              12
+            ],
+            "region_area_fractions": [
+              0.997304182983238,
+              0.00018079461802017414,
+              0.000556759934879001,
+              0.001719897260305902,
+              0.00023836520355657254
+            ]
+          }
+        },
+        "output_sha256": {
+          ".json": "ac74e12cb6c758ac85affe11a81b9bfddc658bdfcc2826f6f8169fd0022bd7d2",
+          ".labels": "23817553e6515f245e5f22e515a03acc1aebdafce28ead039b2a0bff265e8399",
+          ".edges": "a9b0c2bce603c8d9602f38493220cf4b2d59a5e107422577c63e7c66ad4a0209",
+          ".geometry.json": "f272713be39dc528b36a0be29d8e0439fcbce28f3d3d5edc302291155d6b5d2f"
+        }
+      },
+      {
+        "mesh": "frog",
+        "mode": "curves",
+        "command": [
+          "/home/alex/Documents/IntrinsicEngine/build/ci/bin/IntrinsicCurvatureBoundaryMesh",
+          "/home/alex/Dropbox/Work/Datasets/obj/frog.obj",
+          "build/method042-native/frog-curves",
+          "curves"
+        ],
+        "exit_code": 0,
+        "elapsed_seconds": 2.2667212868109345,
+        "result": {
+          "status": "passed",
+          "benchmark_id": "geometry.curvature_segmentation.curves_mesh.local_cohort",
+          "method": "geometry.curvature_segmentation",
+          "backend": "cpu_reference",
+          "dataset": "local.method_040.mesh_cohort.v1",
+          "commit": "local-dev",
+          "metrics": {
+            "runtime_ms": 2218.384619,
+            "memory_peak_bytes": 23883776,
+            "quality_error_l2": 0,
+            "quality_error_linf": 0,
+            "population_count": 15
+          },
+          "diagnostics": {
+            "input": "/home/alex/Dropbox/Work/Datasets/obj/frog.obj",
+            "implementation": "boundary_feature_curve_coverage_v1",
+            "feature_weight": 4,
+            "feature_exponent": 3,
+            "model_weight": 0,
+            "boundary_scale": 0.04,
+            "region_cost": 0.00502654824574367,
+            "hard_feature_exclusion_ratio": 0.04,
+            "faces": 19106,
+            "vertices": 9555,
+            "load_ms": 130.625797,
+            "curvature_ms": 170.465454,
+            "feature_ms": 1662.744,
+            "partition_ms": 210.856182,
+            "minimum_exclusion_curve_length": 0.04,
+            "minimum_region_area": 0.00502654824574367,
+            "attenuation_curves": 0,
+            "attenuation_hard_edges": 0,
+            "area_merges": 17,
+            "unmergeable_small_regions": 2,
+            "optimized_energy": -1.045378733864604,
+            "energy": -0.9802601710256704,
+            "lower_bound": -1.8053258531303662,
+            "exact": false,
+            "attempted_moves": 19091,
+            "accepted_moves": 0,
+            "contractions": 19091,
+            "sweeps": 1,
+            "source_hard": 4,
+            "source_soft": 3010,
+            "boundaries": 1969,
+            "hard": 4,
+            "soft": 1508,
+            "closure": 457,
+            "feature_length_recall": 0.49930527981101364,
+            "unsupported_length_fraction": 0.1782026330551005,
+            "region_sizes": [
+              672,
+              4440,
+              249,
+              3600,
+              485,
+              5026,
+              57,
+              880,
+              2,
+              228,
+              1841,
+              220,
+              851,
+              271,
+              284
+            ],
+            "region_area_fractions": [
+              0.025567030023424347,
+              0.26080028499408814,
+              0.007107232187653445,
+              0.20214754939924787,
+              0.01934098301445336,
+              0.2501381940917508,
+              0.0017738203293160243,
+              0.03993500235722985,
+              2.365828405372321e-05,
+              0.01677638975177564,
+              0.10401423713829051,
+              0.009267784519231522,
+              0.0463533481486608,
+              0.007902639579293698,
+              0.008851846181526684
+            ]
+          }
+        },
+        "output_sha256": {
+          ".json": "44395b96fcd0f23b3386d2c7e2b61efbcbb67bc0a3eb61a8b225587ca2d41114",
+          ".labels": "05dc28f1e37e413e3a0b8535e7e990328606a6018a50d1498c61ff1d367993cb",
+          ".edges": "4ec6c14f0abc499db18ab361460a59db4660bab132e82d66a8418b486c96786b",
+          ".geometry.json": "f272713be39dc528b36a0be29d8e0439fcbce28f3d3d5edc302291155d6b5d2f"
+        }
+      }
+    ],
+    "runner_unchanged": true,
+    "inputs_unchanged": true
+  },
+  "source_file_sha256": {
+    "tools/diagnostics/curvature/evaluate_part_seams.py": "26ae09398b7abda6c8a88a70f10c190195725846ef4719c004f44d32acd6dd3f",
+    "tools/diagnostics/curvature/neck_sweep.py": "e162649ed79f80a9baf4d8f765fc77f8654ef4dafd1d20cb836bd2fdffe09030",
+    "tools/diagnostics/curvature/neck_sweep_controls.py": "c6c1e33846d1d01520fab08e28df333d818f524995bd1550bb067781d3712ac5",
+    "benchmarks/runners/CurvatureBoundaryMeshRunner.cpp": "9c21afdc97f9649808b658d3aebf496dd5ca63f97cc0f1e13c1337b3823f8836",
+    "benchmarks/runners/curvature_boundary_viewer.py": "9c1032baa11ca960bd1cce83ca0fee78d4804db393c72125bb3aa8f9031da0d6",
+    "tests/regression/tooling/Test.PartSeamOracle.py": "6867ab08e92224cd166bd4fb4040dad7095af5588c2f97270e34d42798a5ddb8",
+    "tests/regression/tooling/Test.NeckSweep.py": "6d7b0b5efa3c2ca0543b4ff713721e2e60f9ff846119646c16a87e6cf62dcd4f"
+  },
+  "local_artifact_locations_are_not_portable_proof": true,
+  "reproduction": "See docs/methods/frog_parts_experiment.md; large native meshes and full label/geometry exports remain local."
+}

@@ -1,0 +1,58 @@
+{
+  "arm": "blind",
+  "patches": 64,
+  "stretch_limit": 1.5,
+  "subdivide": 1,
+  "faces": 29368,
+  "source": "/home/alex/Dropbox/Work/Datasets/obj/sculpt.obj",
+  "source_sha256": "210dc85f20cdec11cb0b50bec255b86126fb6b47f9f938369049570de3f88a25",
+  "implementation_sha256": "cbfc28a60ee2bb43c8b7d1e9d8aa45b9a417835efbc5c8d7dc27ead220cff6bb",
+  "claim_eligible": false,
+  "metrics": {
+    "input_vertices": 14682,
+    "input_faces": 29368,
+    "initial_charts": 66,
+    "chart_count": 10,
+    "merge_attempts": 162,
+    "accepted_merges": 56,
+    "parameterization_attempts": 230,
+    "uv_solves": 167,
+    "factorized_degrees_of_freedom": 508954,
+    "rejections": {
+      "initial_distortion": 2,
+      "merge_topology": 63,
+      "merge_distortion": 43
+    },
+    "max_stretch": 1.4690024406718671,
+    "mean_stretch": 1.113142673215932,
+    "max_anisotropy": 1.2444600316320524,
+    "mean_anisotropy": 1.0122018296908195,
+    "seam_length_over_sqrt_area": 8.49268727438952,
+    "continuous_packing_utilization": 0.43414816047098287,
+    "all_charts_valid": true,
+    "runtime_seconds": 5.050704970024526,
+    "phases_seconds": {
+      "geometry": 0.6313422070816159,
+      "clustering": 0.18050877284258604,
+      "initial_validation": 0.2849917879793793,
+      "merging": 3.9338549990206957,
+      "packing": 0.02000720310024917
+    },
+    "independent_audit": {
+      "chart_count": 10,
+      "invalid_charts": [],
+      "non_disk_charts": [],
+      "positive_area_overlap_count": 0,
+      "overlap_pairs_sample": [],
+      "global_chart_reflections": 0,
+      "all_charts_valid": true,
+      "max_stretch": 1.4690024406718545,
+      "mean_stretch": 1.1131426732159317,
+      "area_weighted_p95_stretch": 1.2779495413111224,
+      "max_anisotropy": 1.2444600316320802,
+      "mean_anisotropy": 1.0122018296908197,
+      "seam_length_over_sqrt_area": 8.49268727438952,
+      "smallest_chart_area_fraction": 0.00930487417960605
+    }
+  }
+}

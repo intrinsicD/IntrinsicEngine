@@ -1,0 +1,142 @@
+{
+  "schema_version": 2,
+  "benchmark_id": "geometry.uv_atlas.patch_merge.diagnostic",
+  "run_id": "method044-atlas-round2-sculpt_subdivide1-feature",
+  "attempt_id": "attempt-001",
+  "method": "geometry.uv_atlas.patch_merge",
+  "backend": "cpu_reference",
+  "dataset": "external.atlas_mesh_cohort_v1",
+  "commit": "local-dev",
+  "source": {
+    "revision": "local-dev",
+    "state": "dirty_worktree"
+  },
+  "claim_eligible": false,
+  "manifest": {
+    "path": "benchmarks/geometry/manifests/geometry_uv_atlas_patch_merge_diagnostic.yaml",
+    "sha256": "ea8a5556ea5b1cd386b8b409da10021e7d9807ad2cb45fb3f95503280e3824b4"
+  },
+  "resolved_params": {
+    "cohort": [
+      "frog",
+      "sculpt",
+      "bunny10k",
+      "fandisk"
+    ],
+    "same_surface_resolution_controls": [
+      "frog_subdivide1",
+      "sculpt_subdivide1"
+    ],
+    "arms": [
+      "feature",
+      "blind",
+      "growth-only",
+      "merge-only",
+      "xatlas"
+    ],
+    "patches": 64,
+    "feature_weight": 2.0,
+    "stretch_limits": [
+      1.25,
+      1.35,
+      1.5
+    ],
+    "anisotropy_limit": 2.0,
+    "native_resolution": 1024,
+    "native_padding": 2,
+    "prototype_packer": "continuous_shelf",
+    "native_preset": "ci",
+    "warmup_iterations": 0,
+    "measured_iterations": 1,
+    "adoption_claim": false,
+    "timing_claim": false,
+    "scope": "offline_diagnostic_not_default_smoke"
+  },
+  "config_digest": "cb8ddc21cee350a3a2db2d0585473ec507813518063205a8433aadbc3a5656a2",
+  "warmup_policy": {
+    "warmup_iterations": 0,
+    "measured_iterations": 1
+  },
+  "metrics": {
+    "runtime_ms": 3509.3487398698926,
+    "quality_error_linf": 0.0
+  },
+  "diagnostics": {
+    "cell": {
+      "arm": "feature",
+      "patches": 64,
+      "stretch_limit": 1.5,
+      "subdivide": 1,
+      "faces": 29368,
+      "source": "/home/alex/Dropbox/Work/Datasets/obj/sculpt.obj",
+      "source_sha256": "210dc85f20cdec11cb0b50bec255b86126fb6b47f9f938369049570de3f88a25",
+      "implementation_sha256": "cbfc28a60ee2bb43c8b7d1e9d8aa45b9a417835efbc5c8d7dc27ead220cff6bb",
+      "claim_eligible": false,
+      "metrics": {
+        "input_vertices": 14682,
+        "input_faces": 29368,
+        "initial_charts": 64,
+        "chart_count": 6,
+        "merge_attempts": 84,
+        "accepted_merges": 58,
+        "parameterization_attempts": 148,
+        "uv_solves": 135,
+        "factorized_degrees_of_freedom": 317710,
+        "rejections": {
+          "merge_topology": 13,
+          "merge_distortion": 11,
+          "merge_boundary_overlap": 2
+        },
+        "max_stretch": 1.418132727683688,
+        "mean_stretch": 1.0941490396549327,
+        "max_anisotropy": 1.0410979013567707,
+        "mean_anisotropy": 1.007003556481157,
+        "seam_length_over_sqrt_area": 6.572030529483017,
+        "continuous_packing_utilization": 0.3515086051557111,
+        "all_charts_valid": true,
+        "runtime_seconds": 3.5093487398698926,
+        "phases_seconds": {
+          "geometry": 0.6518367158714682,
+          "clustering": 0.17880259500816464,
+          "initial_validation": 0.35724060516804457,
+          "merging": 2.305654815863818,
+          "packing": 0.01581400795839727
+        },
+        "independent_audit": {
+          "chart_count": 6,
+          "invalid_charts": [],
+          "non_disk_charts": [],
+          "positive_area_overlap_count": 0,
+          "overlap_pairs_sample": [],
+          "global_chart_reflections": 0,
+          "all_charts_valid": true,
+          "max_stretch": 1.4181327276836955,
+          "mean_stretch": 1.094149039654933,
+          "area_weighted_p95_stretch": 1.2719201700474256,
+          "max_anisotropy": 1.0410979013567674,
+          "mean_anisotropy": 1.007003556481157,
+          "seam_length_over_sqrt_area": 6.572030529483017,
+          "smallest_chart_area_fraction": 0.059420970688509614
+        }
+      }
+    },
+    "validity_error_definition": "max of invalid-map indicator and prototype stretch excess; native has no imposed stretch bound",
+    "timed_scope": "resident geometry through internal validation and packing; excludes independent audit, IO, and rendering",
+    "implementation_comparability": "Python reference versus ci Debug native adapter; no speedup claim"
+  },
+  "thresholds": {
+    "quality_error_linf_max": 0.0
+  },
+  "threshold_disposition": [
+    {
+      "threshold": "quality_error_linf_max",
+      "metric": "quality_error_linf",
+      "operator": "<=",
+      "limit": 0.0,
+      "observed": 0.0,
+      "passed": true
+    }
+  ],
+  "execution_status": "passed",
+  "status": "passed"
+}

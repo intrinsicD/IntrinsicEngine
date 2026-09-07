@@ -1,0 +1,44 @@
+{
+  "schema": "intrinsic.atlas-patch-merge.diagnostic.v1",
+  "source": "/home/alex/Dropbox/Work/Datasets/obj/sculpt.obj",
+  "source_sha256": "210dc85f20cdec11cb0b50bec255b86126fb6b47f9f938369049570de3f88a25",
+  "implementation": "python_scipy_lscm_patch_merge",
+  "claim_eligible": false,
+  "parameters": {
+    "mesh": "/home/alex/Dropbox/Work/Datasets/obj/sculpt.obj",
+    "output": "/tmp/atlas-round1/sculpt_feature.json",
+    "patches": 64,
+    "feature_weight": 2.0,
+    "stretch_limit": 1.5,
+    "anisotropy_limit": 2.0,
+    "no_merge": false
+  },
+  "metrics": {
+    "input_vertices": 3669,
+    "input_faces": 7342,
+    "initial_charts": 64,
+    "chart_count": 5,
+    "merge_attempts": 87,
+    "accepted_merges": 59,
+    "uv_solves": 151,
+    "rejections": {
+      "merge_topology": 19,
+      "merge_distortion": 9
+    },
+    "max_stretch": 1.4015427948691017,
+    "mean_stretch": 1.104893569028469,
+    "max_anisotropy": 1.222311178530763,
+    "mean_anisotropy": 1.0149285101353653,
+    "seam_length_over_sqrt_area": 6.071418770701031,
+    "continuous_packing_utilization": 0.3667696852350159,
+    "all_charts_valid": true,
+    "runtime_seconds": 1.7681352279614657,
+    "phases_seconds": {
+      "geometry": 0.12001709593459964,
+      "clustering": 0.04972151713445783,
+      "initial_validation": 0.1779953739605844,
+      "merging": 1.415905816014856,
+      "packing": 0.00449542491696775
+    }
+  }
+}

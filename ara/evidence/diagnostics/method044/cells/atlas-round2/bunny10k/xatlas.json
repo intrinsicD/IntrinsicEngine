@@ -1,0 +1,49 @@
+{
+  "arm": "xatlas",
+  "patches": 64,
+  "stretch_limit": 1.5,
+  "subdivide": 0,
+  "faces": 9999,
+  "source": "/home/alex/Dropbox/Work/Datasets/obj/bunny10k.obj",
+  "source_sha256": "a0430239f795e94b7305b6f2f668ad29e76cc8df533ea8713614dc99fec08e2b",
+  "implementation_sha256": "cbfc28a60ee2bb43c8b7d1e9d8aa45b9a417835efbc5c8d7dc27ead220cff6bb",
+  "claim_eligible": false,
+  "metrics": {
+    "chart_count": 130,
+    "invalid_charts": [
+      [
+        4294967295,
+        "orientation"
+      ]
+    ],
+    "non_disk_charts": [
+      3,
+      18,
+      29,
+      44,
+      118
+    ],
+    "positive_area_overlap_count": 2,
+    "overlap_pairs_sample": [
+      [
+        7833,
+        7854
+      ],
+      [
+        7833,
+        7834
+      ]
+    ],
+    "global_chart_reflections": 64,
+    "all_charts_valid": false,
+    "max_stretch": null,
+    "mean_stretch": null,
+    "area_weighted_p95_stretch": null,
+    "max_anisotropy": null,
+    "mean_anisotropy": null,
+    "seam_length_over_sqrt_area": 22.493370871837396,
+    "smallest_chart_area_fraction": 1.4454655273660124e-06,
+    "runtime_seconds": 4.376059706,
+    "implementation": "native_engine_xatlas"
+  }
+}

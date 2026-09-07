@@ -1,0 +1,18 @@
+{
+  "schema": "intrinsic.parts-pilot.v1",
+  "purpose": "Provisional coordinate seams for hypothesis testing; not human ground truth or an automatic part model.",
+  "input_sha256": "c72c55b72392f55e02b846267424c9069c580e1bede1c9b7ee7ff189fa4656aa",
+  "coordinates": "q=(position-bbox_min)/bbox_extent; planes evaluated on native face centroids",
+  "preserve": "All regions except the largest in the METHOD-039 local comparison remain fixed.",
+  "planes": [
+    {"name": "upper_transition", "normal": [0, 1, 0], "offset": 0.68},
+    {"name": "left_appendage", "normal": [-1, -0.35, 0], "offset": -0.32},
+    {"name": "right_appendage", "normal": [1, -0.35, 0], "offset": 0.68}
+  ],
+  "candidates": [
+    {"name": "upper_transition", "planes": ["upper_transition"]},
+    {"name": "left_appendage", "planes": ["left_appendage"]},
+    {"name": "right_appendage", "planes": ["right_appendage"]},
+    {"name": "combined_provisional", "planes": ["upper_transition", "left_appendage", "right_appendage"]}
+  ]
+}

@@ -9,6 +9,9 @@ picking backlog work; theme priorities and rationale live in
 ## Active tasks
 
 - `METHOD-040` — Global multicut curvature-patch CPU reference (tasks/active/METHOD-040-global-multicut-curvature-patch-reference.md)
+- `METHOD-042` — Region-aware parts experiment (tasks/active/METHOD-042-region-aware-parts-experiment.md)
+- `METHOD-043` — Thickness and curve-aligned parts comparison (tasks/active/METHOD-043-thickness-and-curve-parts-comparison.md)
+- `METHOD-044` — Feature-aware patches and distortion-aware atlas merging (tasks/active/METHOD-044-feature-aware-atlas-merge-experiment.md)
 - `UI-053` — Curvature-extremum engine overlay (tasks/active/UI-053-curvature-extremum-engine-overlay.md)
 
 ## Theme B — Rendering modernization
@@ -127,6 +130,7 @@ picking backlog work; theme priorities and rationale live in
 
 ## Unthemed
 
+- unblocked: `BUG-177` — Root hygiene rejects local agent metadata (tasks/backlog/bugs/BUG-177-root-hygiene-local-agent-metadata.md)
 - unblocked: `GRAPHICS-109` — Offscreen frame capture to PNG (headless figure renders) (tasks/backlog/rendering/GRAPHICS-109-offscreen-frame-capture-png.md)
 
 ## Audits

@@ -1,0 +1,12 @@
+{
+  "schema": "intrinsic.shape-diameter-experiment.v1",
+  "implementation": "shape_diameter_cpu_diagnostic_v1",
+  "round": 1,
+  "maximum_rounds": 4,
+  "cone_opening_degrees": 120.0,
+  "ray_count": 30,
+  "ray_layout": "equal_solid_angle_fibonacci",
+  "minimum_valid_rays": 6,
+  "ray_epsilon_over_sqrt_area": 1e-9,
+  "purpose": "Independent thickness measurement; no segmentation or production-backend claim."
+}

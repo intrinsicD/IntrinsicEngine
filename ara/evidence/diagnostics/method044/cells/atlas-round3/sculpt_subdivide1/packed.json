@@ -1,0 +1,53 @@
+{
+  "input": "/tmp/atlas-round2/sculpt_subdivide1/feature.npz",
+  "input_sha256": "fe423b8fe1df40ab2b8749b557354a3ac9753dd40ad1ae02870def8a3c9068a2",
+  "runner_sha256": "b8c16ea48468a2450fab2d9280291fd7f43d6c9c3d83867f0923bf34f9ae705b",
+  "packer": {
+    "chart_count": 6,
+    "height": 1373,
+    "implementation": "xatlas_pack_existing_uv_mesh",
+    "padding": 2,
+    "raster_utilization": 0.5217452645301819,
+    "resolution": 1024,
+    "runtime_seconds": 0.682840832,
+    "width": 1555
+  },
+  "stretch_limit": 1.5,
+  "postpack_bound_passed": true,
+  "metrics": {
+    "chart_count": 6,
+    "invalid_charts": [],
+    "chart_texel_density_ratio": 1.0016307695146123,
+    "non_disk_charts": [],
+    "positive_area_overlap_count": 0,
+    "overlap_pairs_sample": [],
+    "global_chart_reflections": 2,
+    "all_charts_valid": true,
+    "max_stretch": 1.4180348114835724,
+    "mean_stretch": 1.0942605742759643,
+    "area_weighted_p95_stretch": 1.2719529964998884,
+    "max_anisotropy": 1.0412363245448129,
+    "mean_anisotropy": 1.0072263437647755,
+    "seam_length_over_sqrt_area": 6.572030529483017,
+    "smallest_chart_area_fraction": 0.059420970688509614,
+    "continuous_packing_utilization": 0.49565955313106214
+  },
+  "prepack_metrics": {
+    "chart_count": 6,
+    "invalid_charts": [],
+    "chart_texel_density_ratio": 1.0000000000000002,
+    "non_disk_charts": [],
+    "positive_area_overlap_count": 0,
+    "overlap_pairs_sample": [],
+    "global_chart_reflections": 0,
+    "all_charts_valid": true,
+    "max_stretch": 1.4181327276836955,
+    "mean_stretch": 1.094149039654933,
+    "area_weighted_p95_stretch": 1.2719201700474256,
+    "max_anisotropy": 1.0410979013567674,
+    "mean_anisotropy": 1.007003556481157,
+    "seam_length_over_sqrt_area": 6.572030529483017,
+    "smallest_chart_area_fraction": 0.059420970688509614
+  },
+  "claim_eligible": false
+}

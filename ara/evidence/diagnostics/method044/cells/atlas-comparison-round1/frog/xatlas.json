@@ -1,0 +1,30 @@
+{
+  "arm": "xatlas",
+  "patches": 64,
+  "subdivide": 0,
+  "faces": 19106,
+  "source": "/home/alex/Dropbox/Work/Datasets/obj/frog.obj",
+  "source_sha256": "c72c55b72392f55e02b846267424c9069c580e1bede1c9b7ee7ff189fa4656aa",
+  "implementation_sha256": "d8a4290f6c50e0ab9229b5ac5389a01dcce6567aab13b2921aefc4e256e3b5e7",
+  "claim_eligible": false,
+  "metrics": {
+    "chart_count": 26,
+    "invalid_charts": [
+      [
+        1,
+        "topology"
+      ]
+    ],
+    "global_chart_reflections": 12,
+    "all_charts_valid": false,
+    "max_stretch": null,
+    "mean_stretch": null,
+    "area_weighted_p95_stretch": null,
+    "max_anisotropy": null,
+    "mean_anisotropy": null,
+    "seam_length_over_sqrt_area": 11.892689963084408,
+    "smallest_chart_area_fraction": 1.9302192660102362e-05,
+    "runtime_seconds": 15.525363519,
+    "implementation": "native_engine_xatlas"
+  }
+}

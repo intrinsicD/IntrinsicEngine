@@ -65,6 +65,7 @@ benchmarks:
   - "../../../benchmarks/geometry/manifests/curvature_local_mesh_local_cohort.yaml"
   - "../../../benchmarks/geometry/manifests/curvature_regional_mesh_local_cohort.yaml"
 known_limitations:
+  - "METHOD-042's offline seam oracle and neck-sweep experiment are documented in docs/methods/frog_parts_experiment.md. The neck-sweep diagnostic is not an engine backend; sampling stability is refuted and its frozen frog run adds no splits. METHOD-043's four-round offline thickness continuation is documented in docs/methods/frog_thickness_parts_experiment.md; it remains unadopted and curve-aligned separator integration is unimplemented."
   - "This is a repository formulation informed by curvature-tensor segmentation, Gaussian mixtures, information criteria, and pairwise spatial models; it is not an equation-level reproduction of Lavoue et al. or another single publication."
   - "Signed principal curvatures depend on a consistent surface-orientation convention and on the scale, noise, and boundary behavior of the upstream curvature estimator."
   - "The existing Gaussian-mixture carrier is three-dimensional, so normalized (k1,k2) samples use a constant zero third coordinate with covariance flooring; automatic selection applies a two-dimensional 6k-1 parameter penalty."

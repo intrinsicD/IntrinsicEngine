@@ -1,0 +1,179 @@
+{
+  "attempt_id": "1",
+  "backend": "cpu_reference",
+  "benchmark_id": "geometry.curvature_segmentation.curves_mesh.local_cohort",
+  "claim_eligible": false,
+  "commit": "0b1d7f4dfc70408f0b1b1cf386937f5dcd916b1b",
+  "config_digest": "0d8fd682325bb34bc7729a1334af4f96c93f80766249c515e3410796921ab5c5",
+  "dataset": "local.method_040.mesh_cohort.v1",
+  "diagnostics": {
+    "accepted_moves": 0,
+    "area_merges": 0,
+    "attempted_moves": 7337,
+    "attenuation_curves": 6,
+    "attenuation_hard_edges": 384,
+    "boundaries": 384,
+    "boundary_scale": 0.04,
+    "closure": 0,
+    "contractions": 7337,
+    "curvature_ms": 64.91556,
+    "energy": 0.3022780930083699,
+    "exact": false,
+    "faces": 7342,
+    "feature_exponent": 3,
+    "feature_length_recall": 0.3124892389064154,
+    "feature_ms": 170.521327,
+    "feature_weight": 4,
+    "hard": 384,
+    "hard_feature_exclusion_ratio": 0.04,
+    "implementation": "boundary_feature_curve_coverage_v1",
+    "input": "/home/alex/Dropbox/Work/Datasets/obj/sculpt.obj",
+    "load_ms": 51.179689,
+    "lower_bound": 0.2821719000253952,
+    "minimum_exclusion_curve_length": 0.04,
+    "minimum_region_area": 0.00502654824574367,
+    "model_weight": 0,
+    "optimized_energy": 0.3022780930083699,
+    "partition_ms": 69.0524,
+    "region_area_fractions": [
+      0.1109482401712266,
+      0.21104839120456792,
+      0.11093777029432864,
+      0.11093774481445982,
+      0.4561278535154175
+    ],
+    "region_cost": 0.00502654824574367,
+    "region_sizes": [
+      926,
+      1488,
+      788,
+      792,
+      3348
+    ],
+    "soft": 0,
+    "source_hard": 384,
+    "source_soft": 808,
+    "sweeps": 1,
+    "unmergeable_small_regions": 0,
+    "unsupported_length_fraction": 0,
+    "vertices": 3669
+  },
+  "execution_status": "passed",
+  "manifest": {
+    "path": "benchmarks/geometry/manifests/curvature_curves_mesh_local_cohort.yaml",
+    "sha256": "4d9db29cc898e589b623312e6e07a13d06e4615520da41975a236c811d307040"
+  },
+  "method": "geometry.curvature_segmentation",
+  "metrics": {
+    "memory_peak_bytes": 19660800,
+    "population_count": 5,
+    "quality_error_l2": 0,
+    "quality_error_linf": 0,
+    "runtime_ms": 372.439415
+  },
+  "resolved_params": {
+    "aggregation": "per_mesh",
+    "baseline": "method_039_default_local_patch",
+    "boundary_scale": 0.04,
+    "candidate_adopted": false,
+    "cleanup": "adjacent_least_energy_increase_with_exact_hard_barriers",
+    "cohort": [
+      "sculpt",
+      "frog",
+      "fandisk",
+      "bunny10k",
+      "dolphin",
+      "elephant",
+      "bumpy_torus",
+      "genus3",
+      "office_chair",
+      "sphere",
+      "cube",
+      "saddle2"
+    ],
+    "curvature_radius_ratio": 0.02,
+    "detector": "method_039_defaults",
+    "feature_exponent": 3,
+    "feature_weight": 4,
+    "hard_feature_exclusion_ratio": 0.04,
+    "implementation": "boundary_feature_curve_coverage_v1",
+    "inputs": "external_local_read_only_obj",
+    "intent": "nightly",
+    "maximum_flow_edge_visits": 20000000,
+    "maximum_moves": 2000000,
+    "maximum_non_improving_moves": 64,
+    "maximum_split_trials": 4,
+    "maximum_sweeps": 8,
+    "measured_iterations": 1,
+    "minimum_exclusion_curve_length": 0.04,
+    "minimum_region_area": 0.00502654824574367,
+    "model_weight": 0,
+    "quality_error_l2_unit": "unassigned_face_fraction",
+    "quality_error_linf_unit": "hard_constraint_violation_count",
+    "region_cost": 0.00502654824574367,
+    "relative_energy_tolerance": 1e-12,
+    "split": "known_sculpt_frog_and_preselected_comparison",
+    "threshold_scope": "correctness_and_bounded_health_not_segmentation_quality",
+    "warmup_iterations": 0
+  },
+  "run_id": "method042-native-sculpt-20260907",
+  "schema_version": 2,
+  "source": {
+    "revision": "0b1d7f4dfc70408f0b1b1cf386937f5dcd916b1b",
+    "state": "dirty_worktree"
+  },
+  "status": "passed",
+  "threshold_disposition": [
+    {
+      "limit": 300000,
+      "metric": "runtime_ms",
+      "observed": 372.439415,
+      "operator": "<=",
+      "passed": true,
+      "threshold": "runtime_ms_max"
+    },
+    {
+      "limit": 2147483648,
+      "metric": "memory_peak_bytes",
+      "observed": 19660800,
+      "operator": "<=",
+      "passed": true,
+      "threshold": "memory_peak_bytes_max"
+    },
+    {
+      "limit": 0,
+      "metric": "quality_error_l2",
+      "observed": 0,
+      "operator": "<=",
+      "passed": true,
+      "threshold": "quality_error_l2_max"
+    },
+    {
+      "limit": 0,
+      "metric": "quality_error_linf",
+      "observed": 0,
+      "operator": "<=",
+      "passed": true,
+      "threshold": "quality_error_linf_max"
+    },
+    {
+      "limit": 1,
+      "metric": "population_count",
+      "observed": 5,
+      "operator": ">=",
+      "passed": true,
+      "threshold": "population_count_min"
+    }
+  ],
+  "thresholds": {
+    "memory_peak_bytes_max": 2147483648,
+    "population_count_min": 1,
+    "quality_error_l2_max": 0,
+    "quality_error_linf_max": 0,
+    "runtime_ms_max": 300000
+  },
+  "warmup_policy": {
+    "measured_iterations": 1,
+    "warmup_iterations": 0
+  }
+}

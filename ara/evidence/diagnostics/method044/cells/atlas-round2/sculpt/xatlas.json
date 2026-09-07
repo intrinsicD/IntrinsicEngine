@@ -1,0 +1,29 @@
+{
+  "arm": "xatlas",
+  "patches": 64,
+  "stretch_limit": 1.5,
+  "subdivide": 0,
+  "faces": 7342,
+  "source": "/home/alex/Dropbox/Work/Datasets/obj/sculpt.obj",
+  "source_sha256": "210dc85f20cdec11cb0b50bec255b86126fb6b47f9f938369049570de3f88a25",
+  "implementation_sha256": "cbfc28a60ee2bb43c8b7d1e9d8aa45b9a417835efbc5c8d7dc27ead220cff6bb",
+  "claim_eligible": false,
+  "metrics": {
+    "chart_count": 17,
+    "invalid_charts": [],
+    "non_disk_charts": [],
+    "positive_area_overlap_count": 0,
+    "overlap_pairs_sample": [],
+    "global_chart_reflections": 6,
+    "all_charts_valid": true,
+    "max_stretch": 1.2454729418300423,
+    "mean_stretch": 1.0213506889525836,
+    "area_weighted_p95_stretch": 1.0565472083593674,
+    "max_anisotropy": 1.2732246128187574,
+    "mean_anisotropy": 1.0103264013596693,
+    "seam_length_over_sqrt_area": 10.329607549620073,
+    "smallest_chart_area_fraction": 0.02871834406864473,
+    "runtime_seconds": 1.959145684,
+    "implementation": "native_engine_xatlas"
+  }
+}

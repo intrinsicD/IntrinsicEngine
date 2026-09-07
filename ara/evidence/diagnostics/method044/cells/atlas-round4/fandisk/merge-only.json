@@ -1,0 +1,60 @@
+{
+  "arm": "merge-only",
+  "patches": 64,
+  "stretch_limit": 1.5,
+  "subdivide": 0,
+  "faces": 12946,
+  "source": "/home/alex/Dropbox/Work/Datasets/obj/fandisk.obj",
+  "source_sha256": "9bb0e3fa76f175ed8995a43131f900f721f32cea9a32297ca37078d1d519b880",
+  "implementation_sha256": "d91563c25f0105e402a79f2ef550b1bebe7bba1f8abb31a16ee8d000e136c9f9",
+  "claim_eligible": false,
+  "metrics": {
+    "input_vertices": 6475,
+    "input_faces": 12946,
+    "initial_charts": 117,
+    "chart_count": 8,
+    "merge_attempts": 361,
+    "accepted_merges": 109,
+    "parameterization_attempts": 531,
+    "uv_solves": 433,
+    "factorized_degrees_of_freedom": 862896,
+    "rejections": {
+      "initial_distortion": 50,
+      "initial_boundary_overlap": 3,
+      "merge_distortion": 154,
+      "merge_topology": 98
+    },
+    "max_stretch": 1.48256761042205,
+    "mean_stretch": 1.0965469600358633,
+    "max_anisotropy": 1.7680180013851676,
+    "mean_anisotropy": 1.0115804062889069,
+    "seam_length_over_sqrt_area": 8.46370938802801,
+    "continuous_packing_utilization": 0.40781215480741073,
+    "all_charts_valid": true,
+    "runtime_seconds": 6.019535014871508,
+    "phases_seconds": {
+      "geometry": 0.22208633995614946,
+      "clustering": 0.0490729499142617,
+      "initial_validation": 0.26853410014882684,
+      "merging": 5.473075274843723,
+      "packing": 0.006766350008547306
+    },
+    "independent_audit": {
+      "chart_count": 8,
+      "invalid_charts": [],
+      "chart_texel_density_ratio": 1.0000000000000047,
+      "non_disk_charts": [],
+      "positive_area_overlap_count": 0,
+      "overlap_pairs_sample": [],
+      "global_chart_reflections": 0,
+      "all_charts_valid": true,
+      "max_stretch": 1.4825676104220484,
+      "mean_stretch": 1.0965469600358633,
+      "area_weighted_p95_stretch": 1.3010309056273464,
+      "max_anisotropy": 1.7680180013851403,
+      "mean_anisotropy": 1.011580406288907,
+      "seam_length_over_sqrt_area": 8.46370938802801,
+      "smallest_chart_area_fraction": 0.00021070603516977295
+    }
+  }
+}

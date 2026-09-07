@@ -1,0 +1,2779 @@
+{
+  "schema": "intrinsic.atlas-campaign.v1",
+  "claim_eligible": false,
+  "source_state": "dirty_worktree",
+  "environment": {
+    "python": "3.11.15",
+    "numpy": "2.2.4",
+    "scipy": "1.15.2",
+    "native_preset": "ci",
+    "native_build_type": "Debug",
+    "native_compiler": "Clang 23.0.0",
+    "xatlas_revision": "f700c7790aaa030e794b52ba7791a05c085faf0c"
+  },
+  "cells": [
+    {
+      "path": "cells/atlas-round1/frog_feature.json",
+      "record": {
+        "schema": "intrinsic.atlas-patch-merge.diagnostic.v1",
+        "source": "/home/alex/Dropbox/Work/Datasets/obj/frog.obj",
+        "source_sha256": "c72c55b72392f55e02b846267424c9069c580e1bede1c9b7ee7ff189fa4656aa",
+        "implementation": "python_scipy_lscm_patch_merge",
+        "claim_eligible": false,
+        "parameters": {
+          "mesh": "/home/alex/Dropbox/Work/Datasets/obj/frog.obj",
+          "output": "/tmp/atlas-round1/frog_feature.json",
+          "patches": 64,
+          "feature_weight": 2.0,
+          "stretch_limit": 1.5,
+          "anisotropy_limit": 2.0,
+          "no_merge": false
+        },
+        "metrics": {
+          "input_vertices": 9555,
+          "input_faces": 19106,
+          "initial_charts": 70,
+          "chart_count": 12,
+          "merge_attempts": 139,
+          "accepted_merges": 58,
+          "uv_solves": 215,
+          "rejections": {
+            "initial_distortion": 6,
+            "merge_distortion": 67,
+            "merge_topology": 14
+          },
+          "max_stretch": 1.4924442741284885,
+          "mean_stretch": 1.1137357343230003,
+          "max_anisotropy": 1.2922087860582858,
+          "mean_anisotropy": 1.0159241893602744,
+          "seam_length_over_sqrt_area": 9.214261253453577,
+          "continuous_packing_utilization": 0.4671182178155126,
+          "all_charts_valid": true,
+          "runtime_seconds": 6.103117220103741,
+          "phases_seconds": {
+            "geometry": 0.35492218914441764,
+            "clustering": 0.12430495000444353,
+            "initial_validation": 0.36774453590624034,
+            "merging": 5.243736834032461,
+            "packing": 0.012408711016178131
+          }
+        }
+      }
+    },
+    {
+      "path": "cells/atlas-round1/profile-frog.json",
+      "record": {
+        "schema": "intrinsic.atlas-patch-merge.diagnostic.v1",
+        "source": "/home/alex/Dropbox/Work/Datasets/obj/frog.obj",
+        "source_sha256": "c72c55b72392f55e02b846267424c9069c580e1bede1c9b7ee7ff189fa4656aa",
+        "implementation": "python_scipy_lscm_patch_merge",
+        "claim_eligible": false,
+        "parameters": {
+          "mesh": "/home/alex/Dropbox/Work/Datasets/obj/frog.obj",
+          "output": "/tmp/atlas-round1/profile-frog.json",
+          "patches": 64,
+          "feature_weight": 2.0,
+          "stretch_limit": 1.5,
+          "anisotropy_limit": 2.0,
+          "no_merge": false
+        },
+        "metrics": {
+          "input_vertices": 9555,
+          "input_faces": 19106,
+          "initial_charts": 70,
+          "chart_count": 12,
+          "merge_attempts": 139,
+          "accepted_merges": 58,
+          "uv_solves": 215,
+          "rejections": {
+            "initial_distortion": 6,
+            "merge_distortion": 67,
+            "merge_topology": 14
+          },
+          "max_stretch": 1.4924442741284885,
+          "mean_stretch": 1.1137357343230003,
+          "max_anisotropy": 1.2922087860582858,
+          "mean_anisotropy": 1.0159241893602744,
+          "seam_length_over_sqrt_area": 9.214261253453577,
+          "continuous_packing_utilization": 0.4671182178155126,
+          "all_charts_valid": true,
+          "runtime_seconds": 9.69435972115025,
+          "phases_seconds": {
+            "geometry": 0.5487476061098278,
+            "clustering": 0.13278035493567586,
+            "initial_validation": 0.5551373469643295,
+            "merging": 8.443873098120093,
+            "packing": 0.0138213150203228
+          }
+        }
+      }
+    },
+    {
+      "path": "cells/atlas-round1/sculpt_feature.json",
+      "record": {
+        "schema": "intrinsic.atlas-patch-merge.diagnostic.v1",
+        "source": "/home/alex/Dropbox/Work/Datasets/obj/sculpt.obj",
+        "source_sha256": "210dc85f20cdec11cb0b50bec255b86126fb6b47f9f938369049570de3f88a25",
+        "implementation": "python_scipy_lscm_patch_merge",
+        "claim_eligible": false,
+        "parameters": {
+          "mesh": "/home/alex/Dropbox/Work/Datasets/obj/sculpt.obj",
+          "output": "/tmp/atlas-round1/sculpt_feature.json",
+          "patches": 64,
+          "feature_weight": 2.0,
+          "stretch_limit": 1.5,
+          "anisotropy_limit": 2.0,
+          "no_merge": false
+        },
+        "metrics": {
+          "input_vertices": 3669,
+          "input_faces": 7342,
+          "initial_charts": 64,
+          "chart_count": 5,
+          "merge_attempts": 87,
+          "accepted_merges": 59,
+          "uv_solves": 151,
+          "rejections": {
+            "merge_topology": 19,
+            "merge_distortion": 9
+          },
+          "max_stretch": 1.4015427948691017,
+          "mean_stretch": 1.104893569028469,
+          "max_anisotropy": 1.222311178530763,
+          "mean_anisotropy": 1.0149285101353653,
+          "seam_length_over_sqrt_area": 6.071418770701031,
+          "continuous_packing_utilization": 0.3667696852350159,
+          "all_charts_valid": true,
+          "runtime_seconds": 1.7681352279614657,
+          "phases_seconds": {
+            "geometry": 0.12001709593459964,
+            "clustering": 0.04972151713445783,
+            "initial_validation": 0.1779953739605844,
+            "merging": 1.415905816014856,
+            "packing": 0.00449542491696775
+          }
+        }
+      }
+    },
+    {
+      "path": "cells/atlas-comparison-round1/frog/blind.json",
+      "record": {
+        "arm": "blind",
+        "patches": 64,
+        "subdivide": 0,
+        "faces": 19106,
+        "source": "/home/alex/Dropbox/Work/Datasets/obj/frog.obj",
+        "source_sha256": "c72c55b72392f55e02b846267424c9069c580e1bede1c9b7ee7ff189fa4656aa",
+        "implementation_sha256": "d8a4290f6c50e0ab9229b5ac5389a01dcce6567aab13b2921aefc4e256e3b5e7",
+        "claim_eligible": false,
+        "metrics": {
+          "input_vertices": 9555,
+          "input_faces": 19106,
+          "initial_charts": 75,
+          "chart_count": 16,
+          "merge_attempts": 153,
+          "accepted_merges": 59,
+          "uv_solves": 239,
+          "rejections": {
+            "initial_distortion": 11,
+            "merge_distortion": 79,
+            "merge_topology": 15
+          },
+          "max_stretch": 1.4886085783201957,
+          "mean_stretch": 1.101364539066396,
+          "max_anisotropy": 1.3252471030381026,
+          "mean_anisotropy": 1.0177994918135167,
+          "seam_length_over_sqrt_area": 9.2504921861482,
+          "continuous_packing_utilization": 0.4425449331860154,
+          "all_charts_valid": true,
+          "runtime_seconds": 6.998900228179991,
+          "phases_seconds": {
+            "geometry": 0.331319633172825,
+            "clustering": 0.08995249983854592,
+            "initial_validation": 0.34952185209840536,
+            "merging": 6.214091060915962,
+            "packing": 0.014015182154253125
+          },
+          "independent_audit": {
+            "chart_count": 16,
+            "invalid_charts": [],
+            "global_chart_reflections": 0,
+            "all_charts_valid": true,
+            "max_stretch": 1.4886085783202037,
+            "mean_stretch": 1.1013645390663962,
+            "area_weighted_p95_stretch": 1.2731899010066383,
+            "max_anisotropy": 1.3252471030380204,
+            "mean_anisotropy": 1.0177994918135167,
+            "seam_length_over_sqrt_area": 9.2504921861482,
+            "smallest_chart_area_fraction": 0.0007393715190527978
+          }
+        }
+      }
+    },
+    {
+      "path": "cells/atlas-comparison-round1/frog/feature.json",
+      "record": {
+        "arm": "feature",
+        "patches": 64,
+        "subdivide": 0,
+        "faces": 19106,
+        "source": "/home/alex/Dropbox/Work/Datasets/obj/frog.obj",
+        "source_sha256": "c72c55b72392f55e02b846267424c9069c580e1bede1c9b7ee7ff189fa4656aa",
+        "implementation_sha256": "d8a4290f6c50e0ab9229b5ac5389a01dcce6567aab13b2921aefc4e256e3b5e7",
+        "claim_eligible": false,
+        "metrics": {
+          "input_vertices": 9555,
+          "input_faces": 19106,
+          "initial_charts": 70,
+          "chart_count": 12,
+          "merge_attempts": 139,
+          "accepted_merges": 58,
+          "uv_solves": 215,
+          "rejections": {
+            "initial_distortion": 6,
+            "merge_distortion": 67,
+            "merge_topology": 14
+          },
+          "max_stretch": 1.4924442741284885,
+          "mean_stretch": 1.1137357343230003,
+          "max_anisotropy": 1.2922087860582858,
+          "mean_anisotropy": 1.0159241893602744,
+          "seam_length_over_sqrt_area": 9.214261253453577,
+          "continuous_packing_utilization": 0.4671182178155126,
+          "all_charts_valid": true,
+          "runtime_seconds": 5.717736154096201,
+          "phases_seconds": {
+            "geometry": 0.30803229520097375,
+            "clustering": 0.08112160000018775,
+            "initial_validation": 0.3123198689427227,
+            "merging": 5.003721572924405,
+            "packing": 0.012540817027911544
+          },
+          "independent_audit": {
+            "chart_count": 12,
+            "invalid_charts": [],
+            "global_chart_reflections": 0,
+            "all_charts_valid": true,
+            "max_stretch": 1.492444274128467,
+            "mean_stretch": 1.1137357343230003,
+            "area_weighted_p95_stretch": 1.2686501623703113,
+            "max_anisotropy": 1.2922087860582856,
+            "mean_anisotropy": 1.0159241893602746,
+            "seam_length_over_sqrt_area": 9.214261253453577,
+            "smallest_chart_area_fraction": 0.0018265980874492425
+          }
+        }
+      }
+    },
+    {
+      "path": "cells/atlas-comparison-round1/frog/xatlas.json",
+      "record": {
+        "arm": "xatlas",
+        "patches": 64,
+        "subdivide": 0,
+        "faces": 19106,
+        "source": "/home/alex/Dropbox/Work/Datasets/obj/frog.obj",
+        "source_sha256": "c72c55b72392f55e02b846267424c9069c580e1bede1c9b7ee7ff189fa4656aa",
+        "implementation_sha256": "d8a4290f6c50e0ab9229b5ac5389a01dcce6567aab13b2921aefc4e256e3b5e7",
+        "claim_eligible": false,
+        "metrics": {
+          "chart_count": 26,
+          "invalid_charts": [
+            [
+              1,
+              "topology"
+            ]
+          ],
+          "global_chart_reflections": 12,
+          "all_charts_valid": false,
+          "max_stretch": null,
+          "mean_stretch": null,
+          "area_weighted_p95_stretch": null,
+          "max_anisotropy": null,
+          "mean_anisotropy": null,
+          "seam_length_over_sqrt_area": 11.892689963084408,
+          "smallest_chart_area_fraction": 1.9302192660102362e-05,
+          "runtime_seconds": 15.525363519,
+          "implementation": "native_engine_xatlas"
+        }
+      }
+    },
+    {
+      "path": "cells/atlas-comparison-round1/sculpt/blind.json",
+      "record": {
+        "arm": "blind",
+        "patches": 64,
+        "subdivide": 0,
+        "faces": 7342,
+        "source": "/home/alex/Dropbox/Work/Datasets/obj/sculpt.obj",
+        "source_sha256": "210dc85f20cdec11cb0b50bec255b86126fb6b47f9f938369049570de3f88a25",
+        "implementation_sha256": "d8a4290f6c50e0ab9229b5ac5389a01dcce6567aab13b2921aefc4e256e3b5e7",
+        "claim_eligible": false,
+        "metrics": {
+          "input_vertices": 3669,
+          "input_faces": 7342,
+          "initial_charts": 64,
+          "chart_count": 8,
+          "merge_attempts": 142,
+          "accepted_merges": 56,
+          "uv_solves": 206,
+          "rejections": {
+            "merge_distortion": 35,
+            "merge_topology": 51
+          },
+          "max_stretch": 1.4915008519600945,
+          "mean_stretch": 1.1362397944399374,
+          "max_anisotropy": 1.3682287437138227,
+          "mean_anisotropy": 1.025531074271412,
+          "seam_length_over_sqrt_area": 7.1315740096501266,
+          "continuous_packing_utilization": 0.4549941134421096,
+          "all_charts_valid": true,
+          "runtime_seconds": 2.8518984771799296,
+          "phases_seconds": {
+            "geometry": 0.1319019931834191,
+            "clustering": 0.031241182005032897,
+            "initial_validation": 0.14320103800855577,
+            "merging": 2.541480549843982,
+            "packing": 0.004073714138939977
+          },
+          "independent_audit": {
+            "chart_count": 8,
+            "invalid_charts": [],
+            "global_chart_reflections": 0,
+            "all_charts_valid": true,
+            "max_stretch": 1.4915008519601078,
+            "mean_stretch": 1.1362397944399374,
+            "area_weighted_p95_stretch": 1.2874932381104882,
+            "max_anisotropy": 1.368228743713822,
+            "mean_anisotropy": 1.0255310742714123,
+            "seam_length_over_sqrt_area": 7.1315740096501266,
+            "smallest_chart_area_fraction": 0.012961740143851028
+          }
+        }
+      }
+    },
+    {
+      "path": "cells/atlas-comparison-round1/sculpt/feature.json",
+      "record": {
+        "arm": "feature",
+        "patches": 64,
+        "subdivide": 0,
+        "faces": 7342,
+        "source": "/home/alex/Dropbox/Work/Datasets/obj/sculpt.obj",
+        "source_sha256": "210dc85f20cdec11cb0b50bec255b86126fb6b47f9f938369049570de3f88a25",
+        "implementation_sha256": "d8a4290f6c50e0ab9229b5ac5389a01dcce6567aab13b2921aefc4e256e3b5e7",
+        "claim_eligible": false,
+        "metrics": {
+          "input_vertices": 3669,
+          "input_faces": 7342,
+          "initial_charts": 64,
+          "chart_count": 5,
+          "merge_attempts": 87,
+          "accepted_merges": 59,
+          "uv_solves": 151,
+          "rejections": {
+            "merge_topology": 19,
+            "merge_distortion": 9
+          },
+          "max_stretch": 1.4015427948691017,
+          "mean_stretch": 1.104893569028469,
+          "max_anisotropy": 1.222311178530763,
+          "mean_anisotropy": 1.0149285101353653,
+          "seam_length_over_sqrt_area": 6.071418770701031,
+          "continuous_packing_utilization": 0.3667696852350159,
+          "all_charts_valid": true,
+          "runtime_seconds": 1.6100596801843494,
+          "phases_seconds": {
+            "geometry": 0.118322579190135,
+            "clustering": 0.033278145827353,
+            "initial_validation": 0.16158650210127234,
+            "merging": 1.2916481159627438,
+            "packing": 0.005224337102845311
+          },
+          "independent_audit": {
+            "chart_count": 5,
+            "invalid_charts": [],
+            "global_chart_reflections": 0,
+            "all_charts_valid": true,
+            "max_stretch": 1.4015427948690995,
+            "mean_stretch": 1.104893569028469,
+            "area_weighted_p95_stretch": 1.2678672159662265,
+            "max_anisotropy": 1.2223111785307648,
+            "mean_anisotropy": 1.0149285101353656,
+            "seam_length_over_sqrt_area": 6.071418770701031,
+            "smallest_chart_area_fraction": 0.06066077728595545
+          }
+        }
+      }
+    },
+    {
+      "path": "cells/atlas-comparison-round1/sculpt/xatlas.json",
+      "record": {
+        "arm": "xatlas",
+        "patches": 64,
+        "subdivide": 0,
+        "faces": 7342,
+        "source": "/home/alex/Dropbox/Work/Datasets/obj/sculpt.obj",
+        "source_sha256": "210dc85f20cdec11cb0b50bec255b86126fb6b47f9f938369049570de3f88a25",
+        "implementation_sha256": "d8a4290f6c50e0ab9229b5ac5389a01dcce6567aab13b2921aefc4e256e3b5e7",
+        "claim_eligible": false,
+        "metrics": {
+          "chart_count": 17,
+          "invalid_charts": [],
+          "global_chart_reflections": 6,
+          "all_charts_valid": true,
+          "max_stretch": 1.2454729418300423,
+          "mean_stretch": 1.0213506889525836,
+          "area_weighted_p95_stretch": 1.0565472083593674,
+          "max_anisotropy": 1.2732246128187574,
+          "mean_anisotropy": 1.0103264013596693,
+          "seam_length_over_sqrt_area": 10.329607549620073,
+          "smallest_chart_area_fraction": 0.02871834406864473,
+          "runtime_seconds": 1.973821859,
+          "implementation": "native_engine_xatlas"
+        }
+      }
+    },
+    {
+      "path": "cells/atlas-round2/bunny10k/blind.json",
+      "record": {
+        "arm": "blind",
+        "patches": 64,
+        "stretch_limit": 1.5,
+        "subdivide": 0,
+        "faces": 9999,
+        "source": "/home/alex/Dropbox/Work/Datasets/obj/bunny10k.obj",
+        "source_sha256": "a0430239f795e94b7305b6f2f668ad29e76cc8df533ea8713614dc99fec08e2b",
+        "implementation_sha256": "cbfc28a60ee2bb43c8b7d1e9d8aa45b9a417835efbc5c8d7dc27ead220cff6bb",
+        "claim_eligible": false,
+        "metrics": {
+          "input_vertices": 6164,
+          "input_faces": 9999,
+          "initial_charts": 104,
+          "chart_count": 23,
+          "merge_attempts": 302,
+          "accepted_merges": 81,
+          "parameterization_attempts": 446,
+          "uv_solves": 402,
+          "factorized_degrees_of_freedom": 288496,
+          "rejections": {
+            "initial_distortion": 35,
+            "initial_boundary_overlap": 5,
+            "merge_distortion": 176,
+            "merge_topology": 44,
+            "merge_boundary_overlap": 1
+          },
+          "max_stretch": 1.4965112086291603,
+          "mean_stretch": 1.1072542386822972,
+          "max_anisotropy": 1.632584263721662,
+          "mean_anisotropy": 1.034055325093801,
+          "seam_length_over_sqrt_area": 12.18044322862779,
+          "continuous_packing_utilization": 0.37891461026299034,
+          "all_charts_valid": true,
+          "runtime_seconds": 2.1140379048883915,
+          "phases_seconds": {
+            "geometry": 0.1842681358102709,
+            "clustering": 0.04692492913454771,
+            "initial_validation": 0.23177096992731094,
+            "merging": 1.6426248450297862,
+            "packing": 0.008449024986475706
+          },
+          "independent_audit": {
+            "chart_count": 23,
+            "invalid_charts": [],
+            "non_disk_charts": [],
+            "positive_area_overlap_count": 0,
+            "overlap_pairs_sample": [],
+            "global_chart_reflections": 0,
+            "all_charts_valid": true,
+            "max_stretch": 1.4965112086290984,
+            "mean_stretch": 1.1072542386822972,
+            "area_weighted_p95_stretch": 1.2604357592145878,
+            "max_anisotropy": 1.6325842637216832,
+            "mean_anisotropy": 1.034055325093801,
+            "seam_length_over_sqrt_area": 12.18044322862779,
+            "smallest_chart_area_fraction": 6.615482591888525e-05
+          }
+        }
+      }
+    },
+    {
+      "path": "cells/atlas-round2/bunny10k/feature.json",
+      "record": {
+        "arm": "feature",
+        "patches": 64,
+        "stretch_limit": 1.5,
+        "subdivide": 0,
+        "faces": 9999,
+        "source": "/home/alex/Dropbox/Work/Datasets/obj/bunny10k.obj",
+        "source_sha256": "a0430239f795e94b7305b6f2f668ad29e76cc8df533ea8713614dc99fec08e2b",
+        "implementation_sha256": "cbfc28a60ee2bb43c8b7d1e9d8aa45b9a417835efbc5c8d7dc27ead220cff6bb",
+        "claim_eligible": false,
+        "metrics": {
+          "input_vertices": 6164,
+          "input_faces": 9999,
+          "initial_charts": 86,
+          "chart_count": 18,
+          "merge_attempts": 180,
+          "accepted_merges": 68,
+          "parameterization_attempts": 288,
+          "uv_solves": 259,
+          "factorized_degrees_of_freedom": 181958,
+          "rejections": {
+            "initial_distortion": 22,
+            "merge_distortion": 83,
+            "merge_topology": 29
+          },
+          "max_stretch": 1.4897610655999356,
+          "mean_stretch": 1.1285648086698044,
+          "max_anisotropy": 1.5169956471007975,
+          "mean_anisotropy": 1.03144293313944,
+          "seam_length_over_sqrt_area": 10.256137444943608,
+          "continuous_packing_utilization": 0.38056533197834824,
+          "all_charts_valid": true,
+          "runtime_seconds": 1.535201411927119,
+          "phases_seconds": {
+            "geometry": 0.17108827992342412,
+            "clustering": 0.04442506795749068,
+            "initial_validation": 0.20552788907662034,
+            "merging": 1.105914190877229,
+            "packing": 0.008245984092354774
+          },
+          "independent_audit": {
+            "chart_count": 18,
+            "invalid_charts": [],
+            "non_disk_charts": [],
+            "positive_area_overlap_count": 0,
+            "overlap_pairs_sample": [],
+            "global_chart_reflections": 0,
+            "all_charts_valid": true,
+            "max_stretch": 1.4897610656000504,
+            "mean_stretch": 1.1285648086698046,
+            "area_weighted_p95_stretch": 1.3532808149532218,
+            "max_anisotropy": 1.5169956471006467,
+            "mean_anisotropy": 1.03144293313944,
+            "seam_length_over_sqrt_area": 10.256137444943608,
+            "smallest_chart_area_fraction": 0.0008180588951720651
+          }
+        }
+      }
+    },
+    {
+      "path": "cells/atlas-round2/bunny10k/xatlas.json",
+      "record": {
+        "arm": "xatlas",
+        "patches": 64,
+        "stretch_limit": 1.5,
+        "subdivide": 0,
+        "faces": 9999,
+        "source": "/home/alex/Dropbox/Work/Datasets/obj/bunny10k.obj",
+        "source_sha256": "a0430239f795e94b7305b6f2f668ad29e76cc8df533ea8713614dc99fec08e2b",
+        "implementation_sha256": "cbfc28a60ee2bb43c8b7d1e9d8aa45b9a417835efbc5c8d7dc27ead220cff6bb",
+        "claim_eligible": false,
+        "metrics": {
+          "chart_count": 130,
+          "invalid_charts": [
+            [
+              4294967295,
+              "orientation"
+            ]
+          ],
+          "non_disk_charts": [
+            3,
+            18,
+            29,
+            44,
+            118
+          ],
+          "positive_area_overlap_count": 2,
+          "overlap_pairs_sample": [
+            [
+              7833,
+              7854
+            ],
+            [
+              7833,
+              7834
+            ]
+          ],
+          "global_chart_reflections": 64,
+          "all_charts_valid": false,
+          "max_stretch": null,
+          "mean_stretch": null,
+          "area_weighted_p95_stretch": null,
+          "max_anisotropy": null,
+          "mean_anisotropy": null,
+          "seam_length_over_sqrt_area": 22.493370871837396,
+          "smallest_chart_area_fraction": 1.4454655273660124e-06,
+          "runtime_seconds": 4.376059706,
+          "implementation": "native_engine_xatlas"
+        }
+      }
+    },
+    {
+      "path": "cells/atlas-round2/fandisk/blind.json",
+      "record": {
+        "arm": "blind",
+        "patches": 64,
+        "stretch_limit": 1.5,
+        "subdivide": 0,
+        "faces": 12946,
+        "source": "/home/alex/Dropbox/Work/Datasets/obj/fandisk.obj",
+        "source_sha256": "9bb0e3fa76f175ed8995a43131f900f721f32cea9a32297ca37078d1d519b880",
+        "implementation_sha256": "cbfc28a60ee2bb43c8b7d1e9d8aa45b9a417835efbc5c8d7dc27ead220cff6bb",
+        "claim_eligible": false,
+        "metrics": {
+          "input_vertices": 6475,
+          "input_faces": 12946,
+          "initial_charts": 117,
+          "chart_count": 8,
+          "merge_attempts": 403,
+          "accepted_merges": 109,
+          "parameterization_attempts": 573,
+          "uv_solves": 466,
+          "factorized_degrees_of_freedom": 885982,
+          "rejections": {
+            "initial_distortion": 50,
+            "initial_boundary_overlap": 3,
+            "merge_distortion": 187,
+            "merge_topology": 107
+          },
+          "max_stretch": 1.4860307524155427,
+          "mean_stretch": 1.1081660489264435,
+          "max_anisotropy": 1.7680180013851676,
+          "mean_anisotropy": 1.011100359880575,
+          "seam_length_over_sqrt_area": 8.815390841660687,
+          "continuous_packing_utilization": 0.3834313558759265,
+          "all_charts_valid": true,
+          "runtime_seconds": 6.47837117803283,
+          "phases_seconds": {
+            "geometry": 0.25522619020193815,
+            "clustering": 0.0764957929495722,
+            "initial_validation": 0.2855060510337353,
+            "merging": 5.854259931948036,
+            "packing": 0.006883211899548769
+          },
+          "independent_audit": {
+            "chart_count": 8,
+            "invalid_charts": [],
+            "non_disk_charts": [],
+            "positive_area_overlap_count": 0,
+            "overlap_pairs_sample": [],
+            "global_chart_reflections": 0,
+            "all_charts_valid": true,
+            "max_stretch": 1.4860307524154974,
+            "mean_stretch": 1.1081660489264433,
+            "area_weighted_p95_stretch": 1.3359297073182086,
+            "max_anisotropy": 1.7680180013851667,
+            "mean_anisotropy": 1.0111003598805752,
+            "seam_length_over_sqrt_area": 8.815390841660687,
+            "smallest_chart_area_fraction": 0.00021070603516977295
+          }
+        }
+      }
+    },
+    {
+      "path": "cells/atlas-round2/fandisk/feature.json",
+      "record": {
+        "arm": "feature",
+        "patches": 64,
+        "stretch_limit": 1.5,
+        "subdivide": 0,
+        "faces": 12946,
+        "source": "/home/alex/Dropbox/Work/Datasets/obj/fandisk.obj",
+        "source_sha256": "9bb0e3fa76f175ed8995a43131f900f721f32cea9a32297ca37078d1d519b880",
+        "implementation_sha256": "cbfc28a60ee2bb43c8b7d1e9d8aa45b9a417835efbc5c8d7dc27ead220cff6bb",
+        "claim_eligible": false,
+        "metrics": {
+          "input_vertices": 6475,
+          "input_faces": 12946,
+          "initial_charts": 70,
+          "chart_count": 5,
+          "merge_attempts": 93,
+          "accepted_merges": 65,
+          "parameterization_attempts": 169,
+          "uv_solves": 168,
+          "factorized_degrees_of_freedom": 230856,
+          "rejections": {
+            "initial_boundary_overlap": 6,
+            "merge_distortion": 25,
+            "merge_boundary_overlap": 2,
+            "merge_topology": 1
+          },
+          "max_stretch": 1.3195541134075155,
+          "mean_stretch": 1.04738579714896,
+          "max_anisotropy": 1.095211034863598,
+          "mean_anisotropy": 1.003179099130174,
+          "seam_length_over_sqrt_area": 6.023020428549194,
+          "continuous_packing_utilization": 0.3304841865186226,
+          "all_charts_valid": true,
+          "runtime_seconds": 1.7992659118026495,
+          "phases_seconds": {
+            "geometry": 0.20516059594228864,
+            "clustering": 0.05522424494847655,
+            "initial_validation": 0.18017036211676896,
+            "merging": 1.3510029099415988,
+            "packing": 0.007707798853516579
+          },
+          "independent_audit": {
+            "chart_count": 5,
+            "invalid_charts": [],
+            "non_disk_charts": [],
+            "positive_area_overlap_count": 0,
+            "overlap_pairs_sample": [],
+            "global_chart_reflections": 0,
+            "all_charts_valid": true,
+            "max_stretch": 1.3195541134075413,
+            "mean_stretch": 1.04738579714896,
+            "area_weighted_p95_stretch": 1.193187748820485,
+            "max_anisotropy": 1.0952110348636208,
+            "mean_anisotropy": 1.003179099130174,
+            "seam_length_over_sqrt_area": 6.023020428549194,
+            "smallest_chart_area_fraction": 0.02641006506293477
+          }
+        }
+      }
+    },
+    {
+      "path": "cells/atlas-round2/fandisk/xatlas.json",
+      "record": {
+        "arm": "xatlas",
+        "patches": 64,
+        "stretch_limit": 1.5,
+        "subdivide": 0,
+        "faces": 12946,
+        "source": "/home/alex/Dropbox/Work/Datasets/obj/fandisk.obj",
+        "source_sha256": "9bb0e3fa76f175ed8995a43131f900f721f32cea9a32297ca37078d1d519b880",
+        "implementation_sha256": "cbfc28a60ee2bb43c8b7d1e9d8aa45b9a417835efbc5c8d7dc27ead220cff6bb",
+        "claim_eligible": false,
+        "metrics": {
+          "chart_count": 15,
+          "invalid_charts": [],
+          "non_disk_charts": [],
+          "positive_area_overlap_count": 0,
+          "overlap_pairs_sample": [],
+          "global_chart_reflections": 12,
+          "all_charts_valid": true,
+          "max_stretch": 1.1822834561965394,
+          "mean_stretch": 1.0146635102323047,
+          "area_weighted_p95_stretch": 1.0768700321390454,
+          "max_anisotropy": 1.2019562191902073,
+          "mean_anisotropy": 1.0097134360253244,
+          "seam_length_over_sqrt_area": 9.168793742642988,
+          "smallest_chart_area_fraction": 0.007708534623467304,
+          "runtime_seconds": 1.633104397,
+          "implementation": "native_engine_xatlas"
+        }
+      }
+    },
+    {
+      "path": "cells/atlas-round2/frog/blind.json",
+      "record": {
+        "arm": "blind",
+        "patches": 64,
+        "stretch_limit": 1.5,
+        "subdivide": 0,
+        "faces": 19106,
+        "source": "/home/alex/Dropbox/Work/Datasets/obj/frog.obj",
+        "source_sha256": "c72c55b72392f55e02b846267424c9069c580e1bede1c9b7ee7ff189fa4656aa",
+        "implementation_sha256": "cbfc28a60ee2bb43c8b7d1e9d8aa45b9a417835efbc5c8d7dc27ead220cff6bb",
+        "claim_eligible": false,
+        "metrics": {
+          "input_vertices": 9555,
+          "input_faces": 19106,
+          "initial_charts": 75,
+          "chart_count": 16,
+          "merge_attempts": 153,
+          "accepted_merges": 59,
+          "parameterization_attempts": 239,
+          "uv_solves": 224,
+          "factorized_degrees_of_freedom": 440414,
+          "rejections": {
+            "initial_distortion": 11,
+            "merge_distortion": 79,
+            "merge_topology": 15
+          },
+          "max_stretch": 1.4886085783201957,
+          "mean_stretch": 1.101364539066396,
+          "max_anisotropy": 1.3252471030381026,
+          "mean_anisotropy": 1.0177994918135167,
+          "seam_length_over_sqrt_area": 9.2504921861482,
+          "continuous_packing_utilization": 0.4425449331860154,
+          "all_charts_valid": true,
+          "runtime_seconds": 3.316273228963837,
+          "phases_seconds": {
+            "geometry": 0.35496772709302604,
+            "clustering": 0.07839063205756247,
+            "initial_validation": 0.2370886248536408,
+            "merging": 2.6281167541164905,
+            "packing": 0.017709490843117237
+          },
+          "independent_audit": {
+            "chart_count": 16,
+            "invalid_charts": [],
+            "non_disk_charts": [],
+            "positive_area_overlap_count": 0,
+            "overlap_pairs_sample": [],
+            "global_chart_reflections": 0,
+            "all_charts_valid": true,
+            "max_stretch": 1.4886085783202037,
+            "mean_stretch": 1.1013645390663962,
+            "area_weighted_p95_stretch": 1.2731899010066383,
+            "max_anisotropy": 1.3252471030380204,
+            "mean_anisotropy": 1.0177994918135167,
+            "seam_length_over_sqrt_area": 9.2504921861482,
+            "smallest_chart_area_fraction": 0.0007393715190527978
+          }
+        }
+      }
+    },
+    {
+      "path": "cells/atlas-round2/frog/feature.json",
+      "record": {
+        "arm": "feature",
+        "patches": 64,
+        "stretch_limit": 1.5,
+        "subdivide": 0,
+        "faces": 19106,
+        "source": "/home/alex/Dropbox/Work/Datasets/obj/frog.obj",
+        "source_sha256": "c72c55b72392f55e02b846267424c9069c580e1bede1c9b7ee7ff189fa4656aa",
+        "implementation_sha256": "cbfc28a60ee2bb43c8b7d1e9d8aa45b9a417835efbc5c8d7dc27ead220cff6bb",
+        "claim_eligible": false,
+        "metrics": {
+          "input_vertices": 9555,
+          "input_faces": 19106,
+          "initial_charts": 70,
+          "chart_count": 12,
+          "merge_attempts": 139,
+          "accepted_merges": 58,
+          "parameterization_attempts": 215,
+          "uv_solves": 201,
+          "factorized_degrees_of_freedom": 360828,
+          "rejections": {
+            "initial_distortion": 6,
+            "merge_distortion": 67,
+            "merge_topology": 14
+          },
+          "max_stretch": 1.4924442741284885,
+          "mean_stretch": 1.1137357343230003,
+          "max_anisotropy": 1.2922087860582858,
+          "mean_anisotropy": 1.0159241893602744,
+          "seam_length_over_sqrt_area": 9.214261253453577,
+          "continuous_packing_utilization": 0.4671182178155126,
+          "all_charts_valid": true,
+          "runtime_seconds": 2.742842582054436,
+          "phases_seconds": {
+            "geometry": 0.30812885891646147,
+            "clustering": 0.08395421504974365,
+            "initial_validation": 0.22816887008957565,
+            "merging": 2.1121106119826436,
+            "packing": 0.010480026016011834
+          },
+          "independent_audit": {
+            "chart_count": 12,
+            "invalid_charts": [],
+            "non_disk_charts": [],
+            "positive_area_overlap_count": 0,
+            "overlap_pairs_sample": [],
+            "global_chart_reflections": 0,
+            "all_charts_valid": true,
+            "max_stretch": 1.492444274128467,
+            "mean_stretch": 1.1137357343230003,
+            "area_weighted_p95_stretch": 1.2686501623703113,
+            "max_anisotropy": 1.2922087860582856,
+            "mean_anisotropy": 1.0159241893602746,
+            "seam_length_over_sqrt_area": 9.214261253453577,
+            "smallest_chart_area_fraction": 0.0018265980874492425
+          }
+        }
+      }
+    },
+    {
+      "path": "cells/atlas-round2/frog/xatlas.json",
+      "record": {
+        "arm": "xatlas",
+        "patches": 64,
+        "stretch_limit": 1.5,
+        "subdivide": 0,
+        "faces": 19106,
+        "source": "/home/alex/Dropbox/Work/Datasets/obj/frog.obj",
+        "source_sha256": "c72c55b72392f55e02b846267424c9069c580e1bede1c9b7ee7ff189fa4656aa",
+        "implementation_sha256": "cbfc28a60ee2bb43c8b7d1e9d8aa45b9a417835efbc5c8d7dc27ead220cff6bb",
+        "claim_eligible": false,
+        "metrics": {
+          "chart_count": 26,
+          "invalid_charts": [],
+          "non_disk_charts": [
+            1
+          ],
+          "positive_area_overlap_count": 0,
+          "overlap_pairs_sample": [],
+          "global_chart_reflections": 12,
+          "all_charts_valid": true,
+          "max_stretch": 1.8580732017811024,
+          "mean_stretch": 1.0478501909851838,
+          "area_weighted_p95_stretch": 1.1878461802171223,
+          "max_anisotropy": 1.3285081578289666,
+          "mean_anisotropy": 1.0105923336274483,
+          "seam_length_over_sqrt_area": 11.892689963084408,
+          "smallest_chart_area_fraction": 1.9302192660102362e-05,
+          "runtime_seconds": 15.454200833,
+          "implementation": "native_engine_xatlas"
+        }
+      }
+    },
+    {
+      "path": "cells/atlas-round2/frog_stretch125/feature.json",
+      "record": {
+        "arm": "feature",
+        "patches": 64,
+        "stretch_limit": 1.25,
+        "subdivide": 0,
+        "faces": 19106,
+        "source": "/home/alex/Dropbox/Work/Datasets/obj/frog.obj",
+        "source_sha256": "c72c55b72392f55e02b846267424c9069c580e1bede1c9b7ee7ff189fa4656aa",
+        "implementation_sha256": "cbfc28a60ee2bb43c8b7d1e9d8aa45b9a417835efbc5c8d7dc27ead220cff6bb",
+        "claim_eligible": false,
+        "metrics": {
+          "input_vertices": 9555,
+          "input_faces": 19106,
+          "initial_charts": 85,
+          "chart_count": 23,
+          "merge_attempts": 190,
+          "accepted_merges": 62,
+          "parameterization_attempts": 296,
+          "uv_solves": 277,
+          "factorized_degrees_of_freedom": 399864,
+          "rejections": {
+            "initial_distortion": 21,
+            "merge_distortion": 109,
+            "merge_topology": 19
+          },
+          "max_stretch": 1.2429458830024804,
+          "mean_stretch": 1.0706211597678799,
+          "max_anisotropy": 1.2344964119960835,
+          "mean_anisotropy": 1.0128169068200052,
+          "seam_length_over_sqrt_area": 11.289306296682875,
+          "continuous_packing_utilization": 0.3931851663264395,
+          "all_charts_valid": true,
+          "runtime_seconds": 2.903003963874653,
+          "phases_seconds": {
+            "geometry": 0.31936477590352297,
+            "clustering": 0.09243142697960138,
+            "initial_validation": 0.2855285410769284,
+            "merging": 2.1887539378367364,
+            "packing": 0.016925282077863812
+          },
+          "independent_audit": {
+            "chart_count": 23,
+            "invalid_charts": [],
+            "non_disk_charts": [],
+            "positive_area_overlap_count": 0,
+            "overlap_pairs_sample": [],
+            "global_chart_reflections": 0,
+            "all_charts_valid": true,
+            "max_stretch": 1.2429458830025082,
+            "mean_stretch": 1.0706211597678799,
+            "area_weighted_p95_stretch": 1.1702501428135692,
+            "max_anisotropy": 1.2344964119960697,
+            "mean_anisotropy": 1.0128169068200055,
+            "seam_length_over_sqrt_area": 11.289306296682875,
+            "smallest_chart_area_fraction": 0.0004374769429640612
+          }
+        }
+      }
+    },
+    {
+      "path": "cells/atlas-round2/frog_stretch135/feature.json",
+      "record": {
+        "arm": "feature",
+        "patches": 64,
+        "stretch_limit": 1.35,
+        "subdivide": 0,
+        "faces": 19106,
+        "source": "/home/alex/Dropbox/Work/Datasets/obj/frog.obj",
+        "source_sha256": "c72c55b72392f55e02b846267424c9069c580e1bede1c9b7ee7ff189fa4656aa",
+        "implementation_sha256": "cbfc28a60ee2bb43c8b7d1e9d8aa45b9a417835efbc5c8d7dc27ead220cff6bb",
+        "claim_eligible": false,
+        "metrics": {
+          "input_vertices": 9555,
+          "input_faces": 19106,
+          "initial_charts": 73,
+          "chart_count": 15,
+          "merge_attempts": 155,
+          "accepted_merges": 58,
+          "parameterization_attempts": 237,
+          "uv_solves": 216,
+          "factorized_degrees_of_freedom": 398640,
+          "rejections": {
+            "initial_distortion": 9,
+            "merge_distortion": 76,
+            "merge_topology": 21
+          },
+          "max_stretch": 1.3454934355719825,
+          "mean_stretch": 1.0703441623306567,
+          "max_anisotropy": 1.2645417285479195,
+          "mean_anisotropy": 1.0148552729611122,
+          "seam_length_over_sqrt_area": 9.394231496642266,
+          "continuous_packing_utilization": 0.40778487181882606,
+          "all_charts_valid": true,
+          "runtime_seconds": 3.347193712135777,
+          "phases_seconds": {
+            "geometry": 0.31826638407073915,
+            "clustering": 0.10070430696941912,
+            "initial_validation": 0.2872310329694301,
+            "merging": 2.6217715069651604,
+            "packing": 0.019220481161028147
+          },
+          "independent_audit": {
+            "chart_count": 15,
+            "invalid_charts": [],
+            "non_disk_charts": [],
+            "positive_area_overlap_count": 0,
+            "overlap_pairs_sample": [],
+            "global_chart_reflections": 0,
+            "all_charts_valid": true,
+            "max_stretch": 1.3454934355719044,
+            "mean_stretch": 1.0703441623306567,
+            "area_weighted_p95_stretch": 1.1799294101710402,
+            "max_anisotropy": 1.2645417285479454,
+            "mean_anisotropy": 1.0148552729611127,
+            "seam_length_over_sqrt_area": 9.394231496642266,
+            "smallest_chart_area_fraction": 0.0010533231626742151
+          }
+        }
+      }
+    },
+    {
+      "path": "cells/atlas-round2/frog_subdivide1/blind.json",
+      "record": {
+        "arm": "blind",
+        "patches": 64,
+        "stretch_limit": 1.5,
+        "subdivide": 1,
+        "faces": 76424,
+        "source": "/home/alex/Dropbox/Work/Datasets/obj/frog.obj",
+        "source_sha256": "c72c55b72392f55e02b846267424c9069c580e1bede1c9b7ee7ff189fa4656aa",
+        "implementation_sha256": "cbfc28a60ee2bb43c8b7d1e9d8aa45b9a417835efbc5c8d7dc27ead220cff6bb",
+        "claim_eligible": false,
+        "metrics": {
+          "input_vertices": 38214,
+          "input_faces": 76424,
+          "initial_charts": 81,
+          "chart_count": 14,
+          "merge_attempts": 197,
+          "accepted_merges": 67,
+          "parameterization_attempts": 295,
+          "uv_solves": 261,
+          "factorized_degrees_of_freedom": 1937366,
+          "rejections": {
+            "initial_distortion": 17,
+            "merge_distortion": 96,
+            "merge_topology": 34
+          },
+          "max_stretch": 1.497153648871748,
+          "mean_stretch": 1.1167455305508573,
+          "max_anisotropy": 1.1905681133980317,
+          "mean_anisotropy": 1.0090950404892494,
+          "seam_length_over_sqrt_area": 10.381166748975389,
+          "continuous_packing_utilization": 0.4129625899685702,
+          "all_charts_valid": true,
+          "runtime_seconds": 16.92990005412139,
+          "phases_seconds": {
+            "geometry": 1.5301694942172617,
+            "clustering": 0.44463563384488225,
+            "initial_validation": 0.7497587960679084,
+            "merging": 14.159180345013738,
+            "packing": 0.04615578497759998
+          },
+          "independent_audit": {
+            "chart_count": 14,
+            "invalid_charts": [],
+            "non_disk_charts": [],
+            "positive_area_overlap_count": 0,
+            "overlap_pairs_sample": [],
+            "global_chart_reflections": 0,
+            "all_charts_valid": true,
+            "max_stretch": 1.497153648871728,
+            "mean_stretch": 1.1167455305508573,
+            "area_weighted_p95_stretch": 1.2576185541930152,
+            "max_anisotropy": 1.1905681133980774,
+            "mean_anisotropy": 1.0090950404892498,
+            "seam_length_over_sqrt_area": 10.381166748975389,
+            "smallest_chart_area_fraction": 0.0018025736217844686
+          }
+        }
+      }
+    },
+    {
+      "path": "cells/atlas-round2/frog_subdivide1/feature.json",
+      "record": {
+        "arm": "feature",
+        "patches": 64,
+        "stretch_limit": 1.5,
+        "subdivide": 1,
+        "faces": 76424,
+        "source": "/home/alex/Dropbox/Work/Datasets/obj/frog.obj",
+        "source_sha256": "c72c55b72392f55e02b846267424c9069c580e1bede1c9b7ee7ff189fa4656aa",
+        "implementation_sha256": "cbfc28a60ee2bb43c8b7d1e9d8aa45b9a417835efbc5c8d7dc27ead220cff6bb",
+        "claim_eligible": false,
+        "metrics": {
+          "input_vertices": 38214,
+          "input_faces": 76424,
+          "initial_charts": 69,
+          "chart_count": 13,
+          "merge_attempts": 126,
+          "accepted_merges": 56,
+          "parameterization_attempts": 200,
+          "uv_solves": 188,
+          "factorized_degrees_of_freedom": 1134452,
+          "rejections": {
+            "initial_distortion": 5,
+            "merge_distortion": 58,
+            "merge_topology": 12
+          },
+          "max_stretch": 1.4926776746170152,
+          "mean_stretch": 1.1028494823957813,
+          "max_anisotropy": 1.1973537273934958,
+          "mean_anisotropy": 1.008418612911733,
+          "seam_length_over_sqrt_area": 8.51532707634762,
+          "continuous_packing_utilization": 0.4252608314943449,
+          "all_charts_valid": true,
+          "runtime_seconds": 11.138300483115017,
+          "phases_seconds": {
+            "geometry": 1.8918961910530925,
+            "clustering": 0.4534534609410912,
+            "initial_validation": 0.6622581540141255,
+            "merging": 8.078493305016309,
+            "packing": 0.052199372090399265
+          },
+          "independent_audit": {
+            "chart_count": 13,
+            "invalid_charts": [],
+            "non_disk_charts": [],
+            "positive_area_overlap_count": 0,
+            "overlap_pairs_sample": [],
+            "global_chart_reflections": 0,
+            "all_charts_valid": true,
+            "max_stretch": 1.49267767461699,
+            "mean_stretch": 1.1028494823957813,
+            "area_weighted_p95_stretch": 1.2744272885806007,
+            "max_anisotropy": 1.1973537273935044,
+            "mean_anisotropy": 1.0084186129117327,
+            "seam_length_over_sqrt_area": 8.51532707634762,
+            "smallest_chart_area_fraction": 0.002045411193992155
+          }
+        }
+      }
+    },
+    {
+      "path": "cells/atlas-round2/sculpt/blind.json",
+      "record": {
+        "arm": "blind",
+        "patches": 64,
+        "stretch_limit": 1.5,
+        "subdivide": 0,
+        "faces": 7342,
+        "source": "/home/alex/Dropbox/Work/Datasets/obj/sculpt.obj",
+        "source_sha256": "210dc85f20cdec11cb0b50bec255b86126fb6b47f9f938369049570de3f88a25",
+        "implementation_sha256": "cbfc28a60ee2bb43c8b7d1e9d8aa45b9a417835efbc5c8d7dc27ead220cff6bb",
+        "claim_eligible": false,
+        "metrics": {
+          "input_vertices": 3669,
+          "input_faces": 7342,
+          "initial_charts": 64,
+          "chart_count": 8,
+          "merge_attempts": 142,
+          "accepted_merges": 56,
+          "parameterization_attempts": 206,
+          "uv_solves": 155,
+          "factorized_degrees_of_freedom": 136134,
+          "rejections": {
+            "merge_distortion": 35,
+            "merge_topology": 51
+          },
+          "max_stretch": 1.4915008519600945,
+          "mean_stretch": 1.1362397944399374,
+          "max_anisotropy": 1.3682287437138227,
+          "mean_anisotropy": 1.025531074271412,
+          "seam_length_over_sqrt_area": 7.1315740096501266,
+          "continuous_packing_utilization": 0.4549941134421096,
+          "all_charts_valid": true,
+          "runtime_seconds": 1.203969620866701,
+          "phases_seconds": {
+            "geometry": 0.13022922491654754,
+            "clustering": 0.028225247049704194,
+            "initial_validation": 0.12233202205970883,
+            "merging": 0.9190030589234084,
+            "packing": 0.004180067917332053
+          },
+          "independent_audit": {
+            "chart_count": 8,
+            "invalid_charts": [],
+            "non_disk_charts": [],
+            "positive_area_overlap_count": 0,
+            "overlap_pairs_sample": [],
+            "global_chart_reflections": 0,
+            "all_charts_valid": true,
+            "max_stretch": 1.4915008519601078,
+            "mean_stretch": 1.1362397944399374,
+            "area_weighted_p95_stretch": 1.2874932381104882,
+            "max_anisotropy": 1.368228743713822,
+            "mean_anisotropy": 1.0255310742714123,
+            "seam_length_over_sqrt_area": 7.1315740096501266,
+            "smallest_chart_area_fraction": 0.012961740143851028
+          }
+        }
+      }
+    },
+    {
+      "path": "cells/atlas-round2/sculpt/feature.json",
+      "record": {
+        "arm": "feature",
+        "patches": 64,
+        "stretch_limit": 1.5,
+        "subdivide": 0,
+        "faces": 7342,
+        "source": "/home/alex/Dropbox/Work/Datasets/obj/sculpt.obj",
+        "source_sha256": "210dc85f20cdec11cb0b50bec255b86126fb6b47f9f938369049570de3f88a25",
+        "implementation_sha256": "cbfc28a60ee2bb43c8b7d1e9d8aa45b9a417835efbc5c8d7dc27ead220cff6bb",
+        "claim_eligible": false,
+        "metrics": {
+          "input_vertices": 3669,
+          "input_faces": 7342,
+          "initial_charts": 64,
+          "chart_count": 5,
+          "merge_attempts": 87,
+          "accepted_merges": 59,
+          "parameterization_attempts": 151,
+          "uv_solves": 132,
+          "factorized_degrees_of_freedom": 79634,
+          "rejections": {
+            "merge_topology": 19,
+            "merge_distortion": 9
+          },
+          "max_stretch": 1.4015427948691017,
+          "mean_stretch": 1.104893569028469,
+          "max_anisotropy": 1.222311178530763,
+          "mean_anisotropy": 1.0149285101353653,
+          "seam_length_over_sqrt_area": 6.071418770701031,
+          "continuous_packing_utilization": 0.3667696852350159,
+          "all_charts_valid": true,
+          "runtime_seconds": 0.8474367519374937,
+          "phases_seconds": {
+            "geometry": 0.11900996486656368,
+            "clustering": 0.030948032159358263,
+            "initial_validation": 0.12792701600119472,
+            "merging": 0.5642066898290068,
+            "packing": 0.0053450490813702345
+          },
+          "independent_audit": {
+            "chart_count": 5,
+            "invalid_charts": [],
+            "non_disk_charts": [],
+            "positive_area_overlap_count": 0,
+            "overlap_pairs_sample": [],
+            "global_chart_reflections": 0,
+            "all_charts_valid": true,
+            "max_stretch": 1.4015427948690995,
+            "mean_stretch": 1.104893569028469,
+            "area_weighted_p95_stretch": 1.2678672159662265,
+            "max_anisotropy": 1.2223111785307648,
+            "mean_anisotropy": 1.0149285101353656,
+            "seam_length_over_sqrt_area": 6.071418770701031,
+            "smallest_chart_area_fraction": 0.06066077728595545
+          }
+        }
+      }
+    },
+    {
+      "path": "cells/atlas-round2/sculpt/xatlas.json",
+      "record": {
+        "arm": "xatlas",
+        "patches": 64,
+        "stretch_limit": 1.5,
+        "subdivide": 0,
+        "faces": 7342,
+        "source": "/home/alex/Dropbox/Work/Datasets/obj/sculpt.obj",
+        "source_sha256": "210dc85f20cdec11cb0b50bec255b86126fb6b47f9f938369049570de3f88a25",
+        "implementation_sha256": "cbfc28a60ee2bb43c8b7d1e9d8aa45b9a417835efbc5c8d7dc27ead220cff6bb",
+        "claim_eligible": false,
+        "metrics": {
+          "chart_count": 17,
+          "invalid_charts": [],
+          "non_disk_charts": [],
+          "positive_area_overlap_count": 0,
+          "overlap_pairs_sample": [],
+          "global_chart_reflections": 6,
+          "all_charts_valid": true,
+          "max_stretch": 1.2454729418300423,
+          "mean_stretch": 1.0213506889525836,
+          "area_weighted_p95_stretch": 1.0565472083593674,
+          "max_anisotropy": 1.2732246128187574,
+          "mean_anisotropy": 1.0103264013596693,
+          "seam_length_over_sqrt_area": 10.329607549620073,
+          "smallest_chart_area_fraction": 0.02871834406864473,
+          "runtime_seconds": 1.959145684,
+          "implementation": "native_engine_xatlas"
+        }
+      }
+    },
+    {
+      "path": "cells/atlas-round2/sculpt_stretch125/feature.json",
+      "record": {
+        "arm": "feature",
+        "patches": 64,
+        "stretch_limit": 1.25,
+        "subdivide": 0,
+        "faces": 7342,
+        "source": "/home/alex/Dropbox/Work/Datasets/obj/sculpt.obj",
+        "source_sha256": "210dc85f20cdec11cb0b50bec255b86126fb6b47f9f938369049570de3f88a25",
+        "implementation_sha256": "cbfc28a60ee2bb43c8b7d1e9d8aa45b9a417835efbc5c8d7dc27ead220cff6bb",
+        "claim_eligible": false,
+        "metrics": {
+          "input_vertices": 3669,
+          "input_faces": 7342,
+          "initial_charts": 64,
+          "chart_count": 8,
+          "merge_attempts": 96,
+          "accepted_merges": 56,
+          "parameterization_attempts": 160,
+          "uv_solves": 145,
+          "factorized_degrees_of_freedom": 102784,
+          "rejections": {
+            "merge_distortion": 25,
+            "merge_topology": 15
+          },
+          "max_stretch": 1.2211768583244649,
+          "mean_stretch": 1.0597937873806231,
+          "max_anisotropy": 1.0444992527183077,
+          "mean_anisotropy": 1.0089506168023312,
+          "seam_length_over_sqrt_area": 7.439368705408714,
+          "continuous_packing_utilization": 0.2943335666549183,
+          "all_charts_valid": true,
+          "runtime_seconds": 0.9610936590470374,
+          "phases_seconds": {
+            "geometry": 0.1205854439176619,
+            "clustering": 0.03184566809795797,
+            "initial_validation": 0.1419011929538101,
+            "merging": 0.6611973780672997,
+            "packing": 0.00556397601030767
+          },
+          "independent_audit": {
+            "chart_count": 8,
+            "invalid_charts": [],
+            "non_disk_charts": [],
+            "positive_area_overlap_count": 0,
+            "overlap_pairs_sample": [],
+            "global_chart_reflections": 0,
+            "all_charts_valid": true,
+            "max_stretch": 1.2211768583244667,
+            "mean_stretch": 1.0597937873806231,
+            "area_weighted_p95_stretch": 1.1520249181630318,
+            "max_anisotropy": 1.0444992527183148,
+            "mean_anisotropy": 1.0089506168023312,
+            "seam_length_over_sqrt_area": 7.439368705408714,
+            "smallest_chart_area_fraction": 0.015572741875880444
+          }
+        }
+      }
+    },
+    {
+      "path": "cells/atlas-round2/sculpt_stretch135/feature.json",
+      "record": {
+        "arm": "feature",
+        "patches": 64,
+        "stretch_limit": 1.35,
+        "subdivide": 0,
+        "faces": 7342,
+        "source": "/home/alex/Dropbox/Work/Datasets/obj/sculpt.obj",
+        "source_sha256": "210dc85f20cdec11cb0b50bec255b86126fb6b47f9f938369049570de3f88a25",
+        "implementation_sha256": "cbfc28a60ee2bb43c8b7d1e9d8aa45b9a417835efbc5c8d7dc27ead220cff6bb",
+        "claim_eligible": false,
+        "metrics": {
+          "input_vertices": 3669,
+          "input_faces": 7342,
+          "initial_charts": 64,
+          "chart_count": 5,
+          "merge_attempts": 93,
+          "accepted_merges": 59,
+          "parameterization_attempts": 157,
+          "uv_solves": 136,
+          "factorized_degrees_of_freedom": 86436,
+          "rejections": {
+            "merge_topology": 21,
+            "merge_distortion": 13
+          },
+          "max_stretch": 1.301891381826381,
+          "mean_stretch": 1.070825089211533,
+          "max_anisotropy": 1.22553889881658,
+          "mean_anisotropy": 1.010749540277976,
+          "seam_length_over_sqrt_area": 6.801343312639815,
+          "continuous_packing_utilization": 0.27580513754230307,
+          "all_charts_valid": true,
+          "runtime_seconds": 0.9487404490355402,
+          "phases_seconds": {
+            "geometry": 0.17819934687577188,
+            "clustering": 0.03201618907041848,
+            "initial_validation": 0.13292372692376375,
+            "merging": 0.600209719967097,
+            "packing": 0.00539146619848907
+          },
+          "independent_audit": {
+            "chart_count": 5,
+            "invalid_charts": [],
+            "non_disk_charts": [],
+            "positive_area_overlap_count": 0,
+            "overlap_pairs_sample": [],
+            "global_chart_reflections": 0,
+            "all_charts_valid": true,
+            "max_stretch": 1.3018913818263942,
+            "mean_stretch": 1.070825089211533,
+            "area_weighted_p95_stretch": 1.1730802998098577,
+            "max_anisotropy": 1.2255388988165543,
+            "mean_anisotropy": 1.0107495402779763,
+            "seam_length_over_sqrt_area": 6.801343312639815,
+            "smallest_chart_area_fraction": 0.08208452651479066
+          }
+        }
+      }
+    },
+    {
+      "path": "cells/atlas-round2/sculpt_subdivide1/blind.json",
+      "record": {
+        "arm": "blind",
+        "patches": 64,
+        "stretch_limit": 1.5,
+        "subdivide": 1,
+        "faces": 29368,
+        "source": "/home/alex/Dropbox/Work/Datasets/obj/sculpt.obj",
+        "source_sha256": "210dc85f20cdec11cb0b50bec255b86126fb6b47f9f938369049570de3f88a25",
+        "implementation_sha256": "cbfc28a60ee2bb43c8b7d1e9d8aa45b9a417835efbc5c8d7dc27ead220cff6bb",
+        "claim_eligible": false,
+        "metrics": {
+          "input_vertices": 14682,
+          "input_faces": 29368,
+          "initial_charts": 66,
+          "chart_count": 10,
+          "merge_attempts": 162,
+          "accepted_merges": 56,
+          "parameterization_attempts": 230,
+          "uv_solves": 167,
+          "factorized_degrees_of_freedom": 508954,
+          "rejections": {
+            "initial_distortion": 2,
+            "merge_topology": 63,
+            "merge_distortion": 43
+          },
+          "max_stretch": 1.4690024406718671,
+          "mean_stretch": 1.113142673215932,
+          "max_anisotropy": 1.2444600316320524,
+          "mean_anisotropy": 1.0122018296908195,
+          "seam_length_over_sqrt_area": 8.49268727438952,
+          "continuous_packing_utilization": 0.43414816047098287,
+          "all_charts_valid": true,
+          "runtime_seconds": 5.050704970024526,
+          "phases_seconds": {
+            "geometry": 0.6313422070816159,
+            "clustering": 0.18050877284258604,
+            "initial_validation": 0.2849917879793793,
+            "merging": 3.9338549990206957,
+            "packing": 0.02000720310024917
+          },
+          "independent_audit": {
+            "chart_count": 10,
+            "invalid_charts": [],
+            "non_disk_charts": [],
+            "positive_area_overlap_count": 0,
+            "overlap_pairs_sample": [],
+            "global_chart_reflections": 0,
+            "all_charts_valid": true,
+            "max_stretch": 1.4690024406718545,
+            "mean_stretch": 1.1131426732159317,
+            "area_weighted_p95_stretch": 1.2779495413111224,
+            "max_anisotropy": 1.2444600316320802,
+            "mean_anisotropy": 1.0122018296908197,
+            "seam_length_over_sqrt_area": 8.49268727438952,
+            "smallest_chart_area_fraction": 0.00930487417960605
+          }
+        }
+      }
+    },
+    {
+      "path": "cells/atlas-round2/sculpt_subdivide1/feature.json",
+      "record": {
+        "arm": "feature",
+        "patches": 64,
+        "stretch_limit": 1.5,
+        "subdivide": 1,
+        "faces": 29368,
+        "source": "/home/alex/Dropbox/Work/Datasets/obj/sculpt.obj",
+        "source_sha256": "210dc85f20cdec11cb0b50bec255b86126fb6b47f9f938369049570de3f88a25",
+        "implementation_sha256": "cbfc28a60ee2bb43c8b7d1e9d8aa45b9a417835efbc5c8d7dc27ead220cff6bb",
+        "claim_eligible": false,
+        "metrics": {
+          "input_vertices": 14682,
+          "input_faces": 29368,
+          "initial_charts": 64,
+          "chart_count": 6,
+          "merge_attempts": 84,
+          "accepted_merges": 58,
+          "parameterization_attempts": 148,
+          "uv_solves": 135,
+          "factorized_degrees_of_freedom": 317710,
+          "rejections": {
+            "merge_topology": 13,
+            "merge_distortion": 11,
+            "merge_boundary_overlap": 2
+          },
+          "max_stretch": 1.418132727683688,
+          "mean_stretch": 1.0941490396549327,
+          "max_anisotropy": 1.0410979013567707,
+          "mean_anisotropy": 1.007003556481157,
+          "seam_length_over_sqrt_area": 6.572030529483017,
+          "continuous_packing_utilization": 0.3515086051557111,
+          "all_charts_valid": true,
+          "runtime_seconds": 3.5093487398698926,
+          "phases_seconds": {
+            "geometry": 0.6518367158714682,
+            "clustering": 0.17880259500816464,
+            "initial_validation": 0.35724060516804457,
+            "merging": 2.305654815863818,
+            "packing": 0.01581400795839727
+          },
+          "independent_audit": {
+            "chart_count": 6,
+            "invalid_charts": [],
+            "non_disk_charts": [],
+            "positive_area_overlap_count": 0,
+            "overlap_pairs_sample": [],
+            "global_chart_reflections": 0,
+            "all_charts_valid": true,
+            "max_stretch": 1.4181327276836955,
+            "mean_stretch": 1.094149039654933,
+            "area_weighted_p95_stretch": 1.2719201700474256,
+            "max_anisotropy": 1.0410979013567674,
+            "mean_anisotropy": 1.007003556481157,
+            "seam_length_over_sqrt_area": 6.572030529483017,
+            "smallest_chart_area_fraction": 0.059420970688509614
+          }
+        }
+      }
+    },
+    {
+      "path": "cells/atlas-round3/bunny10k/packed.json",
+      "record": {
+        "input": "/tmp/atlas-round2/bunny10k/feature.npz",
+        "input_sha256": "ebb5b94386806ab0e34a95212f961320305f25994cd3062a8406d9aab63f3f62",
+        "runner_sha256": "b8c16ea48468a2450fab2d9280291fd7f43d6c9c3d83867f0923bf34f9ae705b",
+        "packer": {
+          "chart_count": 18,
+          "height": 1347,
+          "implementation": "xatlas_pack_existing_uv_mesh",
+          "padding": 2,
+          "raster_utilization": 0.6592749953269958,
+          "resolution": 1024,
+          "runtime_seconds": 0.496204662,
+          "width": 1289
+        },
+        "stretch_limit": 1.5,
+        "postpack_bound_passed": true,
+        "metrics": {
+          "chart_count": 18,
+          "invalid_charts": [],
+          "chart_texel_density_ratio": 1.004546101307995,
+          "non_disk_charts": [],
+          "positive_area_overlap_count": 0,
+          "overlap_pairs_sample": [],
+          "global_chart_reflections": 8,
+          "all_charts_valid": true,
+          "max_stretch": 1.4894786272985778,
+          "mean_stretch": 1.1285832631306119,
+          "area_weighted_p95_stretch": 1.3532990154436542,
+          "max_anisotropy": 1.5168413332548076,
+          "mean_anisotropy": 1.0314783773921896,
+          "seam_length_over_sqrt_area": 10.256137444943608,
+          "smallest_chart_area_fraction": 0.0008180588951720651,
+          "continuous_packing_utilization": 0.6101575373486898
+        },
+        "prepack_metrics": {
+          "chart_count": 18,
+          "invalid_charts": [],
+          "chart_texel_density_ratio": 1.0000000000000044,
+          "non_disk_charts": [],
+          "positive_area_overlap_count": 0,
+          "overlap_pairs_sample": [],
+          "global_chart_reflections": 0,
+          "all_charts_valid": true,
+          "max_stretch": 1.4897610656000504,
+          "mean_stretch": 1.1285648086698046,
+          "area_weighted_p95_stretch": 1.3532808149532218,
+          "max_anisotropy": 1.5169956471006467,
+          "mean_anisotropy": 1.03144293313944,
+          "seam_length_over_sqrt_area": 10.256137444943608,
+          "smallest_chart_area_fraction": 0.0008180588951720651
+        },
+        "claim_eligible": false
+      }
+    },
+    {
+      "path": "cells/atlas-round3/fandisk/packed.json",
+      "record": {
+        "input": "/tmp/atlas-round2/fandisk/feature.npz",
+        "input_sha256": "bf62e27f95f967f9abe035b67befe2139bd5fee566a181f1a01f55b7b98d5b2d",
+        "runner_sha256": "b8c16ea48468a2450fab2d9280291fd7f43d6c9c3d83867f0923bf34f9ae705b",
+        "packer": {
+          "chart_count": 5,
+          "height": 1286,
+          "implementation": "xatlas_pack_existing_uv_mesh",
+          "padding": 2,
+          "raster_utilization": 0.496612012386322,
+          "resolution": 1024,
+          "runtime_seconds": 0.490236356,
+          "width": 1723
+        },
+        "stretch_limit": 1.5,
+        "postpack_bound_passed": true,
+        "metrics": {
+          "chart_count": 5,
+          "invalid_charts": [],
+          "chart_texel_density_ratio": 1.00305613051701,
+          "non_disk_charts": [],
+          "positive_area_overlap_count": 0,
+          "overlap_pairs_sample": [],
+          "global_chart_reflections": 0,
+          "all_charts_valid": true,
+          "max_stretch": 1.3198130444701177,
+          "mean_stretch": 1.0475654721334844,
+          "area_weighted_p95_stretch": 1.1932613438313,
+          "max_anisotropy": 1.0956389323320408,
+          "mean_anisotropy": 1.0035288652810386,
+          "seam_length_over_sqrt_area": 6.023020428549194,
+          "smallest_chart_area_fraction": 0.02641006506293477,
+          "continuous_packing_utilization": 0.47798866008865293
+        },
+        "prepack_metrics": {
+          "chart_count": 5,
+          "invalid_charts": [],
+          "chart_texel_density_ratio": 1.0000000000000007,
+          "non_disk_charts": [],
+          "positive_area_overlap_count": 0,
+          "overlap_pairs_sample": [],
+          "global_chart_reflections": 0,
+          "all_charts_valid": true,
+          "max_stretch": 1.3195541134075413,
+          "mean_stretch": 1.04738579714896,
+          "area_weighted_p95_stretch": 1.193187748820485,
+          "max_anisotropy": 1.0952110348636208,
+          "mean_anisotropy": 1.003179099130174,
+          "seam_length_over_sqrt_area": 6.023020428549194,
+          "smallest_chart_area_fraction": 0.02641006506293477
+        },
+        "claim_eligible": false
+      }
+    },
+    {
+      "path": "cells/atlas-round3/frog/packed.json",
+      "record": {
+        "input": "/tmp/atlas-round2/frog/feature.npz",
+        "packer": {
+          "chart_count": 12,
+          "height": 1269,
+          "implementation": "xatlas_pack_existing_uv_mesh",
+          "padding": 2,
+          "raster_utilization": 0.6357028484344482,
+          "resolution": 1024,
+          "runtime_seconds": 0.511916701,
+          "width": 1399
+        },
+        "metrics": {
+          "chart_count": 12,
+          "invalid_charts": [],
+          "non_disk_charts": [],
+          "positive_area_overlap_count": 0,
+          "overlap_pairs_sample": [],
+          "global_chart_reflections": 5,
+          "all_charts_valid": true,
+          "max_stretch": 1.4957912514214824,
+          "mean_stretch": 1.113765635946785,
+          "area_weighted_p95_stretch": 1.2686369948626743,
+          "max_anisotropy": 1.2922442131254586,
+          "mean_anisotropy": 1.0159798991312308,
+          "seam_length_over_sqrt_area": 9.214261253453577,
+          "smallest_chart_area_fraction": 0.0018265980874492425,
+          "continuous_packing_utilization": 0.596890622532109,
+          "chart_texel_density_ratio": 1.0124220740667051
+        },
+        "prepack_metrics": {
+          "chart_count": 12,
+          "invalid_charts": [],
+          "non_disk_charts": [],
+          "positive_area_overlap_count": 0,
+          "overlap_pairs_sample": [],
+          "global_chart_reflections": 0,
+          "all_charts_valid": true,
+          "max_stretch": 1.492444274128467,
+          "mean_stretch": 1.1137357343230003,
+          "area_weighted_p95_stretch": 1.2686501623703113,
+          "max_anisotropy": 1.2922087860582856,
+          "mean_anisotropy": 1.0159241893602746,
+          "seam_length_over_sqrt_area": 9.214261253453577,
+          "smallest_chart_area_fraction": 0.0018265980874492425
+        },
+        "claim_eligible": false
+      }
+    },
+    {
+      "path": "cells/atlas-round3/frog_stretch125/packed.json",
+      "record": {
+        "input": "/tmp/atlas-round2/frog_stretch125/feature.npz",
+        "input_sha256": "b5bc2b6558280f9b6f3ead588539b4eaa711a2604dccb433634ccbc63e2ba15f",
+        "runner_sha256": "b8c16ea48468a2450fab2d9280291fd7f43d6c9c3d83867f0923bf34f9ae705b",
+        "packer": {
+          "chart_count": 23,
+          "height": 1366,
+          "implementation": "xatlas_pack_existing_uv_mesh",
+          "padding": 2,
+          "raster_utilization": 0.6442504525184631,
+          "resolution": 1024,
+          "runtime_seconds": 0.544942857,
+          "width": 1300
+        },
+        "stretch_limit": 1.25,
+        "postpack_bound_passed": true,
+        "metrics": {
+          "chart_count": 23,
+          "invalid_charts": [],
+          "chart_texel_density_ratio": 1.0154926348200808,
+          "non_disk_charts": [],
+          "positive_area_overlap_count": 0,
+          "overlap_pairs_sample": [],
+          "global_chart_reflections": 8,
+          "all_charts_valid": true,
+          "max_stretch": 1.2423636965473648,
+          "mean_stretch": 1.0706631735891206,
+          "area_weighted_p95_stretch": 1.170251091224918,
+          "max_anisotropy": 1.226956495481234,
+          "mean_anisotropy": 1.0128974586729922,
+          "seam_length_over_sqrt_area": 11.289306296682875,
+          "smallest_chart_area_fraction": 0.0004374769429640612,
+          "continuous_packing_utilization": 0.5965967617883245
+        },
+        "prepack_metrics": {
+          "chart_count": 23,
+          "invalid_charts": [],
+          "chart_texel_density_ratio": 1.0000000000000036,
+          "non_disk_charts": [],
+          "positive_area_overlap_count": 0,
+          "overlap_pairs_sample": [],
+          "global_chart_reflections": 0,
+          "all_charts_valid": true,
+          "max_stretch": 1.2429458830025082,
+          "mean_stretch": 1.0706211597678799,
+          "area_weighted_p95_stretch": 1.1702501428135692,
+          "max_anisotropy": 1.2344964119960697,
+          "mean_anisotropy": 1.0128169068200055,
+          "seam_length_over_sqrt_area": 11.289306296682875,
+          "smallest_chart_area_fraction": 0.0004374769429640612
+        },
+        "claim_eligible": false
+      }
+    },
+    {
+      "path": "cells/atlas-round3/frog_stretch135/packed.json",
+      "record": {
+        "input": "/tmp/atlas-round2/frog_stretch135/feature.npz",
+        "packer": {
+          "chart_count": 15,
+          "height": 1364,
+          "implementation": "xatlas_pack_existing_uv_mesh",
+          "padding": 2,
+          "raster_utilization": 0.6344636678695679,
+          "resolution": 1024,
+          "runtime_seconds": 0.542780023,
+          "width": 1305
+        },
+        "metrics": {
+          "chart_count": 15,
+          "invalid_charts": [],
+          "non_disk_charts": [],
+          "positive_area_overlap_count": 0,
+          "overlap_pairs_sample": [],
+          "global_chart_reflections": 5,
+          "all_charts_valid": true,
+          "max_stretch": 1.3468856730502328,
+          "mean_stretch": 1.0704061920972199,
+          "area_weighted_p95_stretch": 1.180217206972853,
+          "max_anisotropy": 1.2657971720111463,
+          "mean_anisotropy": 1.01497463634286,
+          "seam_length_over_sqrt_area": 9.394231496642266,
+          "smallest_chart_area_fraction": 0.0010533231626742151,
+          "continuous_packing_utilization": 0.5951471438614038,
+          "chart_texel_density_ratio": 1.014972698498178
+        },
+        "prepack_metrics": {
+          "chart_count": 15,
+          "invalid_charts": [],
+          "non_disk_charts": [],
+          "positive_area_overlap_count": 0,
+          "overlap_pairs_sample": [],
+          "global_chart_reflections": 0,
+          "all_charts_valid": true,
+          "max_stretch": 1.3454934355719044,
+          "mean_stretch": 1.0703441623306567,
+          "area_weighted_p95_stretch": 1.1799294101710402,
+          "max_anisotropy": 1.2645417285479454,
+          "mean_anisotropy": 1.0148552729611127,
+          "seam_length_over_sqrt_area": 9.394231496642266,
+          "smallest_chart_area_fraction": 0.0010533231626742151
+        },
+        "claim_eligible": false
+      }
+    },
+    {
+      "path": "cells/atlas-round3/frog_stretch135_final/packed.json",
+      "record": {
+        "input": "/tmp/atlas-round2/frog_stretch135/feature.npz",
+        "input_sha256": "91c530d8698af8370cd4b184987f7a49746e23e613347c359d8f03beb36d0ffc",
+        "runner_sha256": "b8c16ea48468a2450fab2d9280291fd7f43d6c9c3d83867f0923bf34f9ae705b",
+        "packer": {
+          "chart_count": 15,
+          "height": 1364,
+          "implementation": "xatlas_pack_existing_uv_mesh",
+          "padding": 2,
+          "raster_utilization": 0.6344636678695679,
+          "resolution": 1024,
+          "runtime_seconds": 0.529641147,
+          "width": 1305
+        },
+        "stretch_limit": 1.35,
+        "postpack_bound_passed": true,
+        "metrics": {
+          "chart_count": 15,
+          "invalid_charts": [],
+          "chart_texel_density_ratio": 1.014972698498178,
+          "non_disk_charts": [],
+          "positive_area_overlap_count": 0,
+          "overlap_pairs_sample": [],
+          "global_chart_reflections": 5,
+          "all_charts_valid": true,
+          "max_stretch": 1.3468856730502328,
+          "mean_stretch": 1.0704061920972199,
+          "area_weighted_p95_stretch": 1.180217206972853,
+          "max_anisotropy": 1.2657971720111463,
+          "mean_anisotropy": 1.01497463634286,
+          "seam_length_over_sqrt_area": 9.394231496642266,
+          "smallest_chart_area_fraction": 0.0010533231626742151,
+          "continuous_packing_utilization": 0.5951471438614038
+        },
+        "prepack_metrics": {
+          "chart_count": 15,
+          "invalid_charts": [],
+          "chart_texel_density_ratio": 1.0000000000000038,
+          "non_disk_charts": [],
+          "positive_area_overlap_count": 0,
+          "overlap_pairs_sample": [],
+          "global_chart_reflections": 0,
+          "all_charts_valid": true,
+          "max_stretch": 1.3454934355719044,
+          "mean_stretch": 1.0703441623306567,
+          "area_weighted_p95_stretch": 1.1799294101710402,
+          "max_anisotropy": 1.2645417285479454,
+          "mean_anisotropy": 1.0148552729611127,
+          "seam_length_over_sqrt_area": 9.394231496642266,
+          "smallest_chart_area_fraction": 0.0010533231626742151
+        },
+        "claim_eligible": false
+      }
+    },
+    {
+      "path": "cells/atlas-round3/frog_subdivide1/packed.json",
+      "record": {
+        "input": "/tmp/atlas-round2/frog_subdivide1/feature.npz",
+        "input_sha256": "874055602d0f07965a7d8fcd9f42100d98792edac5f98be60873028b5a9b354f",
+        "runner_sha256": "b8c16ea48468a2450fab2d9280291fd7f43d6c9c3d83867f0923bf34f9ae705b",
+        "packer": {
+          "chart_count": 13,
+          "height": 1430,
+          "implementation": "xatlas_pack_existing_uv_mesh",
+          "padding": 2,
+          "raster_utilization": 0.5596221089363098,
+          "resolution": 1024,
+          "runtime_seconds": 0.832359359,
+          "width": 1402
+        },
+        "stretch_limit": 1.5,
+        "postpack_bound_passed": true,
+        "metrics": {
+          "chart_count": 13,
+          "invalid_charts": [],
+          "chart_texel_density_ratio": 1.01293227490777,
+          "non_disk_charts": [],
+          "positive_area_overlap_count": 0,
+          "overlap_pairs_sample": [],
+          "global_chart_reflections": 6,
+          "all_charts_valid": true,
+          "max_stretch": 1.4928002756748597,
+          "mean_stretch": 1.1028966806035934,
+          "area_weighted_p95_stretch": 1.2744210648572396,
+          "max_anisotropy": 1.1955223748121007,
+          "mean_anisotropy": 1.00850568228676,
+          "seam_length_over_sqrt_area": 8.51532707634762,
+          "smallest_chart_area_fraction": 0.002045411193992155,
+          "continuous_packing_utilization": 0.5284909016098495
+        },
+        "prepack_metrics": {
+          "chart_count": 13,
+          "invalid_charts": [],
+          "chart_texel_density_ratio": 1.000000000000001,
+          "non_disk_charts": [],
+          "positive_area_overlap_count": 0,
+          "overlap_pairs_sample": [],
+          "global_chart_reflections": 0,
+          "all_charts_valid": true,
+          "max_stretch": 1.49267767461699,
+          "mean_stretch": 1.1028494823957813,
+          "area_weighted_p95_stretch": 1.2744272885806007,
+          "max_anisotropy": 1.1973537273935044,
+          "mean_anisotropy": 1.0084186129117327,
+          "seam_length_over_sqrt_area": 8.51532707634762,
+          "smallest_chart_area_fraction": 0.002045411193992155
+        },
+        "claim_eligible": false
+      }
+    },
+    {
+      "path": "cells/atlas-round3/sculpt/packed.json",
+      "record": {
+        "input": "/tmp/atlas-round2/sculpt/feature.npz",
+        "packer": {
+          "chart_count": 5,
+          "height": 1443,
+          "implementation": "xatlas_pack_existing_uv_mesh",
+          "padding": 2,
+          "raster_utilization": 0.5015964508056641,
+          "resolution": 1024,
+          "runtime_seconds": 0.506608277,
+          "width": 1533
+        },
+        "metrics": {
+          "chart_count": 5,
+          "invalid_charts": [],
+          "non_disk_charts": [],
+          "positive_area_overlap_count": 0,
+          "overlap_pairs_sample": [],
+          "global_chart_reflections": 2,
+          "all_charts_valid": true,
+          "max_stretch": 1.4015711731826517,
+          "mean_stretch": 1.1049439433117365,
+          "area_weighted_p95_stretch": 1.2679154257601626,
+          "max_anisotropy": 1.2223247542509723,
+          "mean_anisotropy": 1.0150266246976674,
+          "seam_length_over_sqrt_area": 6.071418770701031,
+          "smallest_chart_area_fraction": 0.06066077728595545,
+          "continuous_packing_utilization": 0.4783060767660581,
+          "chart_texel_density_ratio": 1.0015440658201467
+        },
+        "prepack_metrics": {
+          "chart_count": 5,
+          "invalid_charts": [],
+          "non_disk_charts": [],
+          "positive_area_overlap_count": 0,
+          "overlap_pairs_sample": [],
+          "global_chart_reflections": 0,
+          "all_charts_valid": true,
+          "max_stretch": 1.4015427948690995,
+          "mean_stretch": 1.104893569028469,
+          "area_weighted_p95_stretch": 1.2678672159662265,
+          "max_anisotropy": 1.2223111785307648,
+          "mean_anisotropy": 1.0149285101353656,
+          "seam_length_over_sqrt_area": 6.071418770701031,
+          "smallest_chart_area_fraction": 0.06066077728595545
+        },
+        "claim_eligible": false
+      }
+    },
+    {
+      "path": "cells/atlas-round3/sculpt_stretch125/packed.json",
+      "record": {
+        "input": "/tmp/atlas-round2/sculpt_stretch125/feature.npz",
+        "input_sha256": "bfab3bc8f248c43aef33f9ffce7a1701308e5360a34c85aefd92dc9572328d62",
+        "runner_sha256": "b8c16ea48468a2450fab2d9280291fd7f43d6c9c3d83867f0923bf34f9ae705b",
+        "packer": {
+          "chart_count": 8,
+          "height": 1468,
+          "implementation": "xatlas_pack_existing_uv_mesh",
+          "padding": 2,
+          "raster_utilization": 0.5431002378463745,
+          "resolution": 1024,
+          "runtime_seconds": 0.531886116,
+          "width": 1405
+        },
+        "stretch_limit": 1.25,
+        "postpack_bound_passed": true,
+        "metrics": {
+          "chart_count": 8,
+          "invalid_charts": [],
+          "chart_texel_density_ratio": 1.002370103657444,
+          "non_disk_charts": [],
+          "positive_area_overlap_count": 0,
+          "overlap_pairs_sample": [],
+          "global_chart_reflections": 4,
+          "all_charts_valid": true,
+          "max_stretch": 1.2206117108920185,
+          "mean_stretch": 1.0598863595253047,
+          "area_weighted_p95_stretch": 1.1520985670676454,
+          "max_anisotropy": 1.0455462084071174,
+          "mean_anisotropy": 1.0091346488578048,
+          "seam_length_over_sqrt_area": 7.439368705408714,
+          "smallest_chart_area_fraction": 0.015572741875880444,
+          "continuous_packing_utilization": 0.5133448809599368
+        },
+        "prepack_metrics": {
+          "chart_count": 8,
+          "invalid_charts": [],
+          "chart_texel_density_ratio": 1.0000000000000004,
+          "non_disk_charts": [],
+          "positive_area_overlap_count": 0,
+          "overlap_pairs_sample": [],
+          "global_chart_reflections": 0,
+          "all_charts_valid": true,
+          "max_stretch": 1.2211768583244667,
+          "mean_stretch": 1.0597937873806231,
+          "area_weighted_p95_stretch": 1.1520249181630318,
+          "max_anisotropy": 1.0444992527183148,
+          "mean_anisotropy": 1.0089506168023312,
+          "seam_length_over_sqrt_area": 7.439368705408714,
+          "smallest_chart_area_fraction": 0.015572741875880444
+        },
+        "claim_eligible": false
+      }
+    },
+    {
+      "path": "cells/atlas-round3/sculpt_stretch135/packed.json",
+      "record": {
+        "input": "/tmp/atlas-round2/sculpt_stretch135/feature.npz",
+        "packer": {
+          "chart_count": 5,
+          "height": 1468,
+          "implementation": "xatlas_pack_existing_uv_mesh",
+          "padding": 2,
+          "raster_utilization": 0.5385358333587646,
+          "resolution": 1024,
+          "runtime_seconds": 0.564347253,
+          "width": 1409
+        },
+        "metrics": {
+          "chart_count": 5,
+          "invalid_charts": [],
+          "non_disk_charts": [],
+          "positive_area_overlap_count": 0,
+          "overlap_pairs_sample": [],
+          "global_chart_reflections": 1,
+          "all_charts_valid": true,
+          "max_stretch": 1.3014057266029726,
+          "mean_stretch": 1.0708499770376463,
+          "area_weighted_p95_stretch": 1.1731468037539923,
+          "max_anisotropy": 1.2255017269552402,
+          "mean_anisotropy": 1.010798431028641,
+          "seam_length_over_sqrt_area": 6.801343312639815,
+          "smallest_chart_area_fraction": 0.08208452651479066,
+          "continuous_packing_utilization": 0.5116099400089357,
+          "chart_texel_density_ratio": 1.0011844037673745
+        },
+        "prepack_metrics": {
+          "chart_count": 5,
+          "invalid_charts": [],
+          "non_disk_charts": [],
+          "positive_area_overlap_count": 0,
+          "overlap_pairs_sample": [],
+          "global_chart_reflections": 0,
+          "all_charts_valid": true,
+          "max_stretch": 1.3018913818263942,
+          "mean_stretch": 1.070825089211533,
+          "area_weighted_p95_stretch": 1.1730802998098577,
+          "max_anisotropy": 1.2255388988165543,
+          "mean_anisotropy": 1.0107495402779763,
+          "seam_length_over_sqrt_area": 6.801343312639815,
+          "smallest_chart_area_fraction": 0.08208452651479066
+        },
+        "claim_eligible": false
+      }
+    },
+    {
+      "path": "cells/atlas-round3/sculpt_stretch135_final/packed.json",
+      "record": {
+        "input": "/tmp/atlas-round2/sculpt_stretch135/feature.npz",
+        "input_sha256": "d1aaff6c640339783bb6a1eedbb66a0d479cf0bd961a9ee1bc4c366d9623d5cb",
+        "runner_sha256": "b8c16ea48468a2450fab2d9280291fd7f43d6c9c3d83867f0923bf34f9ae705b",
+        "packer": {
+          "chart_count": 5,
+          "height": 1468,
+          "implementation": "xatlas_pack_existing_uv_mesh",
+          "padding": 2,
+          "raster_utilization": 0.5385358333587646,
+          "resolution": 1024,
+          "runtime_seconds": 0.517349864,
+          "width": 1409
+        },
+        "stretch_limit": 1.35,
+        "postpack_bound_passed": true,
+        "metrics": {
+          "chart_count": 5,
+          "invalid_charts": [],
+          "chart_texel_density_ratio": 1.0011844037673745,
+          "non_disk_charts": [],
+          "positive_area_overlap_count": 0,
+          "overlap_pairs_sample": [],
+          "global_chart_reflections": 1,
+          "all_charts_valid": true,
+          "max_stretch": 1.3014057266029726,
+          "mean_stretch": 1.0708499770376463,
+          "area_weighted_p95_stretch": 1.1731468037539923,
+          "max_anisotropy": 1.2255017269552402,
+          "mean_anisotropy": 1.010798431028641,
+          "seam_length_over_sqrt_area": 6.801343312639815,
+          "smallest_chart_area_fraction": 0.08208452651479066,
+          "continuous_packing_utilization": 0.5116099400089357
+        },
+        "prepack_metrics": {
+          "chart_count": 5,
+          "invalid_charts": [],
+          "chart_texel_density_ratio": 1.0000000000000004,
+          "non_disk_charts": [],
+          "positive_area_overlap_count": 0,
+          "overlap_pairs_sample": [],
+          "global_chart_reflections": 0,
+          "all_charts_valid": true,
+          "max_stretch": 1.3018913818263942,
+          "mean_stretch": 1.070825089211533,
+          "area_weighted_p95_stretch": 1.1730802998098577,
+          "max_anisotropy": 1.2255388988165543,
+          "mean_anisotropy": 1.0107495402779763,
+          "seam_length_over_sqrt_area": 6.801343312639815,
+          "smallest_chart_area_fraction": 0.08208452651479066
+        },
+        "claim_eligible": false
+      }
+    },
+    {
+      "path": "cells/atlas-round3/sculpt_subdivide1/packed.json",
+      "record": {
+        "input": "/tmp/atlas-round2/sculpt_subdivide1/feature.npz",
+        "input_sha256": "fe423b8fe1df40ab2b8749b557354a3ac9753dd40ad1ae02870def8a3c9068a2",
+        "runner_sha256": "b8c16ea48468a2450fab2d9280291fd7f43d6c9c3d83867f0923bf34f9ae705b",
+        "packer": {
+          "chart_count": 6,
+          "height": 1373,
+          "implementation": "xatlas_pack_existing_uv_mesh",
+          "padding": 2,
+          "raster_utilization": 0.5217452645301819,
+          "resolution": 1024,
+          "runtime_seconds": 0.682840832,
+          "width": 1555
+        },
+        "stretch_limit": 1.5,
+        "postpack_bound_passed": true,
+        "metrics": {
+          "chart_count": 6,
+          "invalid_charts": [],
+          "chart_texel_density_ratio": 1.0016307695146123,
+          "non_disk_charts": [],
+          "positive_area_overlap_count": 0,
+          "overlap_pairs_sample": [],
+          "global_chart_reflections": 2,
+          "all_charts_valid": true,
+          "max_stretch": 1.4180348114835724,
+          "mean_stretch": 1.0942605742759643,
+          "area_weighted_p95_stretch": 1.2719529964998884,
+          "max_anisotropy": 1.0412363245448129,
+          "mean_anisotropy": 1.0072263437647755,
+          "seam_length_over_sqrt_area": 6.572030529483017,
+          "smallest_chart_area_fraction": 0.059420970688509614,
+          "continuous_packing_utilization": 0.49565955313106214
+        },
+        "prepack_metrics": {
+          "chart_count": 6,
+          "invalid_charts": [],
+          "chart_texel_density_ratio": 1.0000000000000002,
+          "non_disk_charts": [],
+          "positive_area_overlap_count": 0,
+          "overlap_pairs_sample": [],
+          "global_chart_reflections": 0,
+          "all_charts_valid": true,
+          "max_stretch": 1.4181327276836955,
+          "mean_stretch": 1.094149039654933,
+          "area_weighted_p95_stretch": 1.2719201700474256,
+          "max_anisotropy": 1.0410979013567674,
+          "mean_anisotropy": 1.007003556481157,
+          "seam_length_over_sqrt_area": 6.572030529483017,
+          "smallest_chart_area_fraction": 0.059420970688509614
+        },
+        "claim_eligible": false
+      }
+    },
+    {
+      "path": "cells/atlas-round4/bunny10k/growth-only.json",
+      "record": {
+        "arm": "growth-only",
+        "patches": 64,
+        "stretch_limit": 1.5,
+        "subdivide": 0,
+        "faces": 9999,
+        "source": "/home/alex/Dropbox/Work/Datasets/obj/bunny10k.obj",
+        "source_sha256": "a0430239f795e94b7305b6f2f668ad29e76cc8df533ea8713614dc99fec08e2b",
+        "implementation_sha256": "d91563c25f0105e402a79f2ef550b1bebe7bba1f8abb31a16ee8d000e136c9f9",
+        "claim_eligible": false,
+        "metrics": {
+          "input_vertices": 6164,
+          "input_faces": 9999,
+          "initial_charts": 86,
+          "chart_count": 16,
+          "merge_attempts": 197,
+          "accepted_merges": 70,
+          "parameterization_attempts": 305,
+          "uv_solves": 279,
+          "factorized_degrees_of_freedom": 238650,
+          "rejections": {
+            "initial_distortion": 22,
+            "merge_distortion": 101,
+            "merge_topology": 26
+          },
+          "max_stretch": 1.4955286265365424,
+          "mean_stretch": 1.1268329310184886,
+          "max_anisotropy": 1.5033752282984008,
+          "mean_anisotropy": 1.031577522638427,
+          "seam_length_over_sqrt_area": 10.005422919335937,
+          "continuous_packing_utilization": 0.40051794030111115,
+          "all_charts_valid": true,
+          "runtime_seconds": 1.9422008381225169,
+          "phases_seconds": {
+            "geometry": 0.18257307214662433,
+            "clustering": 0.05708217993378639,
+            "initial_validation": 0.21944617293775082,
+            "merging": 1.4748944321181625,
+            "packing": 0.008204980986192822
+          },
+          "independent_audit": {
+            "chart_count": 16,
+            "invalid_charts": [],
+            "chart_texel_density_ratio": 1.0000000000000009,
+            "non_disk_charts": [],
+            "positive_area_overlap_count": 0,
+            "overlap_pairs_sample": [],
+            "global_chart_reflections": 0,
+            "all_charts_valid": true,
+            "max_stretch": 1.4955286265365901,
+            "mean_stretch": 1.1268329310184886,
+            "area_weighted_p95_stretch": 1.3092267677187182,
+            "max_anisotropy": 1.5033752282984079,
+            "mean_anisotropy": 1.031577522638427,
+            "seam_length_over_sqrt_area": 10.005422919335937,
+            "smallest_chart_area_fraction": 0.0016798680601039174
+          }
+        }
+      }
+    },
+    {
+      "path": "cells/atlas-round4/bunny10k/merge-only.json",
+      "record": {
+        "arm": "merge-only",
+        "patches": 64,
+        "stretch_limit": 1.5,
+        "subdivide": 0,
+        "faces": 9999,
+        "source": "/home/alex/Dropbox/Work/Datasets/obj/bunny10k.obj",
+        "source_sha256": "a0430239f795e94b7305b6f2f668ad29e76cc8df533ea8713614dc99fec08e2b",
+        "implementation_sha256": "d91563c25f0105e402a79f2ef550b1bebe7bba1f8abb31a16ee8d000e136c9f9",
+        "claim_eligible": false,
+        "metrics": {
+          "input_vertices": 6164,
+          "input_faces": 9999,
+          "initial_charts": 104,
+          "chart_count": 23,
+          "merge_attempts": 312,
+          "accepted_merges": 81,
+          "parameterization_attempts": 456,
+          "uv_solves": 394,
+          "factorized_degrees_of_freedom": 357936,
+          "rejections": {
+            "initial_distortion": 35,
+            "initial_boundary_overlap": 5,
+            "merge_distortion": 168,
+            "merge_topology": 62,
+            "merge_boundary_overlap": 1
+          },
+          "max_stretch": 1.4965112086291603,
+          "mean_stretch": 1.1297683720511,
+          "max_anisotropy": 1.6082593022820137,
+          "mean_anisotropy": 1.034445660078707,
+          "seam_length_over_sqrt_area": 11.465355962633533,
+          "continuous_packing_utilization": 0.39756754719789283,
+          "all_charts_valid": true,
+          "runtime_seconds": 2.7238829520065337,
+          "phases_seconds": {
+            "geometry": 0.19755362207069993,
+            "clustering": 0.05060504097491503,
+            "initial_validation": 0.2316942228935659,
+            "merging": 2.2355694440193474,
+            "packing": 0.008460622048005462
+          },
+          "independent_audit": {
+            "chart_count": 23,
+            "invalid_charts": [],
+            "chart_texel_density_ratio": 1.0000000000000038,
+            "non_disk_charts": [],
+            "positive_area_overlap_count": 0,
+            "overlap_pairs_sample": [],
+            "global_chart_reflections": 0,
+            "all_charts_valid": true,
+            "max_stretch": 1.4965112086292007,
+            "mean_stretch": 1.1297683720511003,
+            "area_weighted_p95_stretch": 1.2927884003013461,
+            "max_anisotropy": 1.6082593022820437,
+            "mean_anisotropy": 1.0344456600787073,
+            "seam_length_over_sqrt_area": 11.465355962633533,
+            "smallest_chart_area_fraction": 6.615482591888525e-05
+          }
+        }
+      }
+    },
+    {
+      "path": "cells/atlas-round4/fandisk/growth-only.json",
+      "record": {
+        "arm": "growth-only",
+        "patches": 64,
+        "stretch_limit": 1.5,
+        "subdivide": 0,
+        "faces": 12946,
+        "source": "/home/alex/Dropbox/Work/Datasets/obj/fandisk.obj",
+        "source_sha256": "9bb0e3fa76f175ed8995a43131f900f721f32cea9a32297ca37078d1d519b880",
+        "implementation_sha256": "d91563c25f0105e402a79f2ef550b1bebe7bba1f8abb31a16ee8d000e136c9f9",
+        "claim_eligible": false,
+        "metrics": {
+          "input_vertices": 6475,
+          "input_faces": 12946,
+          "initial_charts": 70,
+          "chart_count": 4,
+          "merge_attempts": 114,
+          "accepted_merges": 66,
+          "parameterization_attempts": 190,
+          "uv_solves": 179,
+          "factorized_degrees_of_freedom": 277558,
+          "rejections": {
+            "initial_boundary_overlap": 6,
+            "merge_boundary_overlap": 1,
+            "merge_distortion": 36,
+            "merge_topology": 11
+          },
+          "max_stretch": 1.2734401879244839,
+          "mean_stretch": 1.0502499569646426,
+          "max_anisotropy": 1.0950380333351217,
+          "mean_anisotropy": 1.004399530832077,
+          "seam_length_over_sqrt_area": 5.5511102472155525,
+          "continuous_packing_utilization": 0.4268389314188987,
+          "all_charts_valid": true,
+          "runtime_seconds": 2.2029579640366137,
+          "phases_seconds": {
+            "geometry": 0.21346011711284518,
+            "clustering": 0.059626718051731586,
+            "initial_validation": 0.18282318185083568,
+            "merging": 1.7388391559943557,
+            "packing": 0.008208791026845574
+          },
+          "independent_audit": {
+            "chart_count": 4,
+            "invalid_charts": [],
+            "chart_texel_density_ratio": 1.0000000000000002,
+            "non_disk_charts": [],
+            "positive_area_overlap_count": 0,
+            "overlap_pairs_sample": [],
+            "global_chart_reflections": 0,
+            "all_charts_valid": true,
+            "max_stretch": 1.2734401879244555,
+            "mean_stretch": 1.0502499569646426,
+            "area_weighted_p95_stretch": 1.1481572387411247,
+            "max_anisotropy": 1.0950380333351355,
+            "mean_anisotropy": 1.0043995308320768,
+            "seam_length_over_sqrt_area": 5.5511102472155525,
+            "smallest_chart_area_fraction": 0.05887428511795949
+          }
+        }
+      }
+    },
+    {
+      "path": "cells/atlas-round4/fandisk/merge-only.json",
+      "record": {
+        "arm": "merge-only",
+        "patches": 64,
+        "stretch_limit": 1.5,
+        "subdivide": 0,
+        "faces": 12946,
+        "source": "/home/alex/Dropbox/Work/Datasets/obj/fandisk.obj",
+        "source_sha256": "9bb0e3fa76f175ed8995a43131f900f721f32cea9a32297ca37078d1d519b880",
+        "implementation_sha256": "d91563c25f0105e402a79f2ef550b1bebe7bba1f8abb31a16ee8d000e136c9f9",
+        "claim_eligible": false,
+        "metrics": {
+          "input_vertices": 6475,
+          "input_faces": 12946,
+          "initial_charts": 117,
+          "chart_count": 8,
+          "merge_attempts": 361,
+          "accepted_merges": 109,
+          "parameterization_attempts": 531,
+          "uv_solves": 433,
+          "factorized_degrees_of_freedom": 862896,
+          "rejections": {
+            "initial_distortion": 50,
+            "initial_boundary_overlap": 3,
+            "merge_distortion": 154,
+            "merge_topology": 98
+          },
+          "max_stretch": 1.48256761042205,
+          "mean_stretch": 1.0965469600358633,
+          "max_anisotropy": 1.7680180013851676,
+          "mean_anisotropy": 1.0115804062889069,
+          "seam_length_over_sqrt_area": 8.46370938802801,
+          "continuous_packing_utilization": 0.40781215480741073,
+          "all_charts_valid": true,
+          "runtime_seconds": 6.019535014871508,
+          "phases_seconds": {
+            "geometry": 0.22208633995614946,
+            "clustering": 0.0490729499142617,
+            "initial_validation": 0.26853410014882684,
+            "merging": 5.473075274843723,
+            "packing": 0.006766350008547306
+          },
+          "independent_audit": {
+            "chart_count": 8,
+            "invalid_charts": [],
+            "chart_texel_density_ratio": 1.0000000000000047,
+            "non_disk_charts": [],
+            "positive_area_overlap_count": 0,
+            "overlap_pairs_sample": [],
+            "global_chart_reflections": 0,
+            "all_charts_valid": true,
+            "max_stretch": 1.4825676104220484,
+            "mean_stretch": 1.0965469600358633,
+            "area_weighted_p95_stretch": 1.3010309056273464,
+            "max_anisotropy": 1.7680180013851403,
+            "mean_anisotropy": 1.011580406288907,
+            "seam_length_over_sqrt_area": 8.46370938802801,
+            "smallest_chart_area_fraction": 0.00021070603516977295
+          }
+        }
+      }
+    },
+    {
+      "path": "cells/atlas-round4/frog/growth-only.json",
+      "record": {
+        "arm": "growth-only",
+        "patches": 64,
+        "stretch_limit": 1.5,
+        "subdivide": 0,
+        "faces": 19106,
+        "source": "/home/alex/Dropbox/Work/Datasets/obj/frog.obj",
+        "source_sha256": "c72c55b72392f55e02b846267424c9069c580e1bede1c9b7ee7ff189fa4656aa",
+        "implementation_sha256": "d91563c25f0105e402a79f2ef550b1bebe7bba1f8abb31a16ee8d000e136c9f9",
+        "claim_eligible": false,
+        "metrics": {
+          "input_vertices": 9555,
+          "input_faces": 19106,
+          "initial_charts": 70,
+          "chart_count": 14,
+          "merge_attempts": 146,
+          "accepted_merges": 56,
+          "parameterization_attempts": 222,
+          "uv_solves": 218,
+          "factorized_degrees_of_freedom": 521110,
+          "rejections": {
+            "initial_distortion": 6,
+            "merge_distortion": 86,
+            "merge_topology": 4
+          },
+          "max_stretch": 1.4924442741284885,
+          "mean_stretch": 1.077785235353948,
+          "max_anisotropy": 1.2859208446055894,
+          "mean_anisotropy": 1.0157884787747713,
+          "seam_length_over_sqrt_area": 8.946394264208635,
+          "continuous_packing_utilization": 0.4474262442387599,
+          "all_charts_valid": true,
+          "runtime_seconds": 3.9933041320182383,
+          "phases_seconds": {
+            "geometry": 0.3434572529513389,
+            "clustering": 0.1207863709423691,
+            "initial_validation": 0.2682543280534446,
+            "merging": 3.248932433081791,
+            "packing": 0.011873746989294887
+          },
+          "independent_audit": {
+            "chart_count": 14,
+            "invalid_charts": [],
+            "chart_texel_density_ratio": 1.000000000000001,
+            "non_disk_charts": [],
+            "positive_area_overlap_count": 0,
+            "overlap_pairs_sample": [],
+            "global_chart_reflections": 0,
+            "all_charts_valid": true,
+            "max_stretch": 1.4924442741285016,
+            "mean_stretch": 1.077785235353948,
+            "area_weighted_p95_stretch": 1.2133503957749048,
+            "max_anisotropy": 1.2859208446055568,
+            "mean_anisotropy": 1.0157884787747715,
+            "seam_length_over_sqrt_area": 8.946394264208635,
+            "smallest_chart_area_fraction": 0.0018265980874492425
+          }
+        }
+      }
+    },
+    {
+      "path": "cells/atlas-round4/frog/merge-only.json",
+      "record": {
+        "arm": "merge-only",
+        "patches": 64,
+        "stretch_limit": 1.5,
+        "subdivide": 0,
+        "faces": 19106,
+        "source": "/home/alex/Dropbox/Work/Datasets/obj/frog.obj",
+        "source_sha256": "c72c55b72392f55e02b846267424c9069c580e1bede1c9b7ee7ff189fa4656aa",
+        "implementation_sha256": "d91563c25f0105e402a79f2ef550b1bebe7bba1f8abb31a16ee8d000e136c9f9",
+        "claim_eligible": false,
+        "metrics": {
+          "input_vertices": 9555,
+          "input_faces": 19106,
+          "initial_charts": 75,
+          "chart_count": 13,
+          "merge_attempts": 149,
+          "accepted_merges": 62,
+          "parameterization_attempts": 235,
+          "uv_solves": 219,
+          "factorized_degrees_of_freedom": 403910,
+          "rejections": {
+            "initial_distortion": 11,
+            "merge_distortion": 71,
+            "merge_topology": 16
+          },
+          "max_stretch": 1.4970339598454492,
+          "mean_stretch": 1.100782691116464,
+          "max_anisotropy": 1.3252471030381026,
+          "mean_anisotropy": 1.0184458022063707,
+          "seam_length_over_sqrt_area": 8.774839559422576,
+          "continuous_packing_utilization": 0.3749717331131155,
+          "all_charts_valid": true,
+          "runtime_seconds": 3.2876665329094976,
+          "phases_seconds": {
+            "geometry": 0.4072365800384432,
+            "clustering": 0.11681747995316982,
+            "initial_validation": 0.2533184359781444,
+            "merging": 2.497803264996037,
+            "packing": 0.012490771943703294
+          },
+          "independent_audit": {
+            "chart_count": 13,
+            "invalid_charts": [],
+            "chart_texel_density_ratio": 1.000000000000002,
+            "non_disk_charts": [],
+            "positive_area_overlap_count": 0,
+            "overlap_pairs_sample": [],
+            "global_chart_reflections": 0,
+            "all_charts_valid": true,
+            "max_stretch": 1.497033959845543,
+            "mean_stretch": 1.100782691116464,
+            "area_weighted_p95_stretch": 1.263797388163429,
+            "max_anisotropy": 1.325247103037992,
+            "mean_anisotropy": 1.0184458022063707,
+            "seam_length_over_sqrt_area": 8.774839559422576,
+            "smallest_chart_area_fraction": 0.0007393715190527978
+          }
+        }
+      }
+    },
+    {
+      "path": "cells/atlas-round4/sculpt/growth-only.json",
+      "record": {
+        "arm": "growth-only",
+        "patches": 64,
+        "stretch_limit": 1.5,
+        "subdivide": 0,
+        "faces": 7342,
+        "source": "/home/alex/Dropbox/Work/Datasets/obj/sculpt.obj",
+        "source_sha256": "210dc85f20cdec11cb0b50bec255b86126fb6b47f9f938369049570de3f88a25",
+        "implementation_sha256": "d91563c25f0105e402a79f2ef550b1bebe7bba1f8abb31a16ee8d000e136c9f9",
+        "claim_eligible": false,
+        "metrics": {
+          "input_vertices": 3669,
+          "input_faces": 7342,
+          "initial_charts": 64,
+          "chart_count": 5,
+          "merge_attempts": 89,
+          "accepted_merges": 59,
+          "parameterization_attempts": 153,
+          "uv_solves": 142,
+          "factorized_degrees_of_freedom": 110658,
+          "rejections": {
+            "merge_distortion": 19,
+            "merge_topology": 11
+          },
+          "max_stretch": 1.4935383730822651,
+          "mean_stretch": 1.1204972632991308,
+          "max_anisotropy": 1.0719311170481645,
+          "mean_anisotropy": 1.0202880920066772,
+          "seam_length_over_sqrt_area": 5.6882883477211355,
+          "continuous_packing_utilization": 0.3816546487610417,
+          "all_charts_valid": true,
+          "runtime_seconds": 1.078815208049491,
+          "phases_seconds": {
+            "geometry": 0.12061309698037803,
+            "clustering": 0.047370288986712694,
+            "initial_validation": 0.15287206508219242,
+            "merging": 0.752154943998903,
+            "packing": 0.005804813001304865
+          },
+          "independent_audit": {
+            "chart_count": 5,
+            "invalid_charts": [],
+            "chart_texel_density_ratio": 1.0000000000000002,
+            "non_disk_charts": [],
+            "positive_area_overlap_count": 0,
+            "overlap_pairs_sample": [],
+            "global_chart_reflections": 0,
+            "all_charts_valid": true,
+            "max_stretch": 1.4935383730822567,
+            "mean_stretch": 1.1204972632991308,
+            "area_weighted_p95_stretch": 1.2826972387430637,
+            "max_anisotropy": 1.0719311170481605,
+            "mean_anisotropy": 1.0202880920066775,
+            "seam_length_over_sqrt_area": 5.6882883477211355,
+            "smallest_chart_area_fraction": 0.10158569294946342
+          }
+        }
+      }
+    },
+    {
+      "path": "cells/atlas-round4/sculpt/merge-only.json",
+      "record": {
+        "arm": "merge-only",
+        "patches": 64,
+        "stretch_limit": 1.5,
+        "subdivide": 0,
+        "faces": 7342,
+        "source": "/home/alex/Dropbox/Work/Datasets/obj/sculpt.obj",
+        "source_sha256": "210dc85f20cdec11cb0b50bec255b86126fb6b47f9f938369049570de3f88a25",
+        "implementation_sha256": "d91563c25f0105e402a79f2ef550b1bebe7bba1f8abb31a16ee8d000e136c9f9",
+        "claim_eligible": false,
+        "metrics": {
+          "input_vertices": 3669,
+          "input_faces": 7342,
+          "initial_charts": 64,
+          "chart_count": 8,
+          "merge_attempts": 146,
+          "accepted_merges": 56,
+          "parameterization_attempts": 210,
+          "uv_solves": 158,
+          "factorized_degrees_of_freedom": 141948,
+          "rejections": {
+            "merge_distortion": 38,
+            "merge_topology": 52
+          },
+          "max_stretch": 1.4915008519600945,
+          "mean_stretch": 1.1362397944399374,
+          "max_anisotropy": 1.3682287437138227,
+          "mean_anisotropy": 1.025531074271412,
+          "seam_length_over_sqrt_area": 7.1315740096501266,
+          "continuous_packing_utilization": 0.4549941134421096,
+          "all_charts_valid": true,
+          "runtime_seconds": 1.3409906630404294,
+          "phases_seconds": {
+            "geometry": 0.14615406491793692,
+            "clustering": 0.04363248101435602,
+            "initial_validation": 0.12828701408579946,
+            "merging": 1.017625333974138,
+            "packing": 0.005291769048199058
+          },
+          "independent_audit": {
+            "chart_count": 8,
+            "invalid_charts": [],
+            "chart_texel_density_ratio": 1.0000000000000007,
+            "non_disk_charts": [],
+            "positive_area_overlap_count": 0,
+            "overlap_pairs_sample": [],
+            "global_chart_reflections": 0,
+            "all_charts_valid": true,
+            "max_stretch": 1.4915008519601078,
+            "mean_stretch": 1.1362397944399374,
+            "area_weighted_p95_stretch": 1.2874932381104882,
+            "max_anisotropy": 1.368228743713822,
+            "mean_anisotropy": 1.0255310742714123,
+            "seam_length_over_sqrt_area": 7.1315740096501266,
+            "smallest_chart_area_fraction": 0.012961740143851028
+          }
+        }
+      }
+    }
+  ],
+  "cell_digests": {
+    "cells/atlas-round1/frog_feature.json": "42ea9cf9aad085b95fc02b2c21fd47eebd3d6c49216c2057ea88412ebdaa336f",
+    "cells/atlas-round1/profile-frog.json": "ace08240fe51e69232785f3c768d1f213632811abab9e4905713701e7c7b9192",
+    "cells/atlas-round1/sculpt_feature.json": "3716219a53dbac652268bd05f8cc0826ddb568227b493001b7ddd8a8c4efe13f",
+    "cells/atlas-comparison-round1/frog/blind.json": "56d0a37475ac95af26a26cf1dfb0cb64af731b3b5055f4273aae8beea3f2edb6",
+    "cells/atlas-comparison-round1/frog/feature.json": "89fd07b9457179a82a475a374f378192ea57c8bbbc61d5d112d9c37bc1302171",
+    "cells/atlas-comparison-round1/frog/xatlas.json": "1b878b638da2115aa01c135b12327d1c3759c61e3732b6b4856a49a7c691699f",
+    "cells/atlas-comparison-round1/sculpt/blind.json": "cf5ef9b61ed7c947e4ca7e8f2aeb4218027ee006e98fe4694d6e2ce439c8d482",
+    "cells/atlas-comparison-round1/sculpt/feature.json": "f05c8e61ab045b33c0befaf652d4a8492299f5e0ab274a0a2d3f120cb72cd141",
+    "cells/atlas-comparison-round1/sculpt/xatlas.json": "f2c652455e1c182fdbeebb2f1344c50106a0be61e1184d4cbd6d1298ce7384b4",
+    "cells/atlas-round2/bunny10k/blind.json": "4af3374e7512d5970bc50f82456447a16533edf6c918aa0fef572bd24c0b773f",
+    "cells/atlas-round2/bunny10k/feature.json": "8554b4a06104ba125135d35383da992cd90fa0ca6617f97cab3f3ee0506b02af",
+    "cells/atlas-round2/bunny10k/xatlas.json": "2b5ef5546613ff318ee5360b3a8f5258a255dc27b41eddb73f1b6b9f32e08945",
+    "cells/atlas-round2/fandisk/blind.json": "9ff7acbcbfdf69d0b51cfc7510cc183a44e5e8551d8f5851d7c124e9b7d4b073",
+    "cells/atlas-round2/fandisk/feature.json": "4f8e349b9c681fcd3599e284a8a44a7d415498cd84203e86278d894240d0be1c",
+    "cells/atlas-round2/fandisk/xatlas.json": "db0273fb909bdd064f7add4c5f0d082a8a206b6d6d7f89f0042e357b6d8bdd21",
+    "cells/atlas-round2/frog/blind.json": "545bc9476ed6de5f28f345af0e21bf28b384ec8c47e90564a3fbeb51289eb53f",
+    "cells/atlas-round2/frog/feature.json": "5f8c12725726ffec2413bd27eeadc619d83572a932e1860672f40449149f1f62",
+    "cells/atlas-round2/frog/xatlas.json": "0a1f51889a60a56177303f43082920f72da5574b6c62881a4e46634e0873dd38",
+    "cells/atlas-round2/frog_stretch125/feature.json": "b1c70d0ae8673c2ed4e27550389ee91c58f03901b64884b7d8e0fcaa9676c011",
+    "cells/atlas-round2/frog_stretch135/feature.json": "529d7743e499fed3c8c7bee8b78faadf23112b20b891b1c0ecffa60ed5bc6128",
+    "cells/atlas-round2/frog_subdivide1/blind.json": "e026244d9d2a20793a737af4a9038af74f3307524383c593c7c6d26e77d00c18",
+    "cells/atlas-round2/frog_subdivide1/feature.json": "225026a6da9fb6ae75c590da43e51d459746e746cdeca37e7a0e931c2d61db9c",
+    "cells/atlas-round2/sculpt/blind.json": "e348c446fec91e1cf0bd8e3303d6406a76245d7df45b8ce5c07dca879c2a2ac8",
+    "cells/atlas-round2/sculpt/feature.json": "dfcdb9c5623fd1b0adc0cfedd0304e30c854ac34b7757ba5f352db4e80ccde2f",
+    "cells/atlas-round2/sculpt/xatlas.json": "9ef948742cbb1d3543abfc2c239895fd43c1d7bcb0c69a9fa904f29f45b2498d",
+    "cells/atlas-round2/sculpt_stretch125/feature.json": "0b9bc5b41ba4da2f5db1b7d76cdf0495bab2970921e6ff287a1c1d7210094288",
+    "cells/atlas-round2/sculpt_stretch135/feature.json": "5bd5ac1f17d6eff676589cb6d54671225c2b10a15e7cbd24f66494754a13ea57",
+    "cells/atlas-round2/sculpt_subdivide1/blind.json": "f25aa463ea0fba52012bcec00e29a84401a6bbdd09e26468583902350db1ae2d",
+    "cells/atlas-round2/sculpt_subdivide1/feature.json": "d656a058df408c71a5e6081cab7920d006311851640c90901c4a9edfe5c04656",
+    "cells/atlas-round3/bunny10k/packed.json": "51e41f1277be9283bc2a2b61a584a9132fe598a89fdcf8519aa3efd8d4d449c8",
+    "cells/atlas-round3/fandisk/packed.json": "3c74374ce7a7795577170a1067f00cffa1640d03e9141cde098acd7fd232d95a",
+    "cells/atlas-round3/frog/packed.json": "d50dfd90f5b9c6144b702ed9c154c418c793a4cf9e53c1cdbe2301ecc8be010c",
+    "cells/atlas-round3/frog_stretch125/packed.json": "20cdd0bf348833751b98fb8a5d5d11d186b3109798967df45a6a264c79c3c8d6",
+    "cells/atlas-round3/frog_stretch135/packed.json": "3672423e4cb314a5da986981e39a94ff4192f92f95932c3657eab430b87adb6a",
+    "cells/atlas-round3/frog_stretch135_final/packed.json": "fc86f53abc47bb2678a3b9a7ffc7344550375f0284a760ce51a11fb07fd88319",
+    "cells/atlas-round3/frog_subdivide1/packed.json": "ee05243bcbfcde840037aff2c001794632fa16b8dcbb3ce10de357b71f0ee9f9",
+    "cells/atlas-round3/sculpt/packed.json": "34632971d1646c445ac8e9fb6e8feeb82d08ad6cba7ed49ba0b5d3086ad1e06d",
+    "cells/atlas-round3/sculpt_stretch125/packed.json": "af6f88f97060edf355dfcc3d924977ade1eec1086211f2f4aae3c55a90bce8df",
+    "cells/atlas-round3/sculpt_stretch135/packed.json": "a606dd1baf7829eedd421249ef3f927c8e81bc58505ae00bd8fc0412a32082ba",
+    "cells/atlas-round3/sculpt_stretch135_final/packed.json": "7e1d2a9557303a6e652d4cd6f37753fcdeefa78de67971bb5662d9a9802e0633",
+    "cells/atlas-round3/sculpt_subdivide1/packed.json": "d4a4dba8db3eca4e19d9446f35797f28ecda205ba8090ef6e51283b1ec473314",
+    "cells/atlas-round4/bunny10k/growth-only.json": "93c572d0d1ea9f663be613444742813df0e01950b99ff392deedee3ed34e0c12",
+    "cells/atlas-round4/bunny10k/merge-only.json": "ac98debf822e6b9bddb33f2515da0e5cf234fe75a7a03710f9dddc5002e02b96",
+    "cells/atlas-round4/fandisk/growth-only.json": "c9730a4a9e9716c6cfb92cb68f2eb37449ef4385012c9f4a3c2ef6157f2c25ee",
+    "cells/atlas-round4/fandisk/merge-only.json": "66910d63d61aa802d0ef4c378bdf14dc9308eca2a5ffb60e3b0179ce3a92a4b2",
+    "cells/atlas-round4/frog/growth-only.json": "3065d327841d998dbc11a65af0574c8d275f7851843d6b4afe2c05064bfe9359",
+    "cells/atlas-round4/frog/merge-only.json": "e9a29d733b142165cce1d6c49f7a2f8bd7f73a84fe92b01eaeb42e99d8ec825c",
+    "cells/atlas-round4/sculpt/growth-only.json": "b7e64150f936fc230a7cbb9cfec94c2651f10698c668539f4faba6310fe4ff18",
+    "cells/atlas-round4/sculpt/merge-only.json": "2a775166e4dfd273f9cb95c57519fd2ad48694cfbc45f9d2d07ef6cd42818f31"
+  },
+  "current_implementation": {
+    "tools/diagnostics/atlas/collect_evidence.py": "47b3e85b7e183ee690f617aa16b1e60fa468c4cc3ee1e89d01d5ae0425712ae5",
+    "tools/diagnostics/atlas/compare_atlases.py": "739aefffaa2f7c7b1a20cd1b9c66bfca76859a11b500a9bf1a8f493da261cc7d",
+    "tools/diagnostics/atlas/controls.py": "0cf90a1ca63763dd8d95cd0db53105cb9e870874a68b6f9f84bd14fc0cd6f1eb",
+    "tools/diagnostics/atlas/patch_merge.py": "d91563c25f0105e402a79f2ef550b1bebe7bba1f8abb31a16ee8d000e136c9f9",
+    "tools/diagnostics/atlas/repack.py": "fb601ed9ddd7b4efefc17080152bba2d724106127b9cacd309492a536814bf93"
+  },
+  "limitations": [
+    "not a native performance benchmark",
+    "single-sample timings may overlap other local work",
+    "disk-only prototype; native non-disk charts not automatically invalid",
+    "no production defaults changed",
+    "uniform subdivision is not an independent remeshing test"
+  ]
+}

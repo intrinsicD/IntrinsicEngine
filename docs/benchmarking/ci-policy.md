@@ -2,6 +2,12 @@
 
 Benchmark execution is split by cost so CI remains fast while still guarding quality.
 
+The `ci-docs` tooling checks include the offline parts seam-energy oracle,
+neck-sweep and shape-diameter/region-selection regression suites. They generate small synthetic meshes using only
+the Python standard library; local frog/sculpt cohorts remain opt-in and are
+never downloaded for this CI route. These are diagnostic correctness checks,
+not performance or accepted part-quality benchmarks.
+
 ## PR-fast expectations
 
 - Classify the exact merge-base-to-head pull-request diff before toolchain

@@ -100,3 +100,17 @@ The method package records production and diagnostic paths separately.
 The [local mesh comparison](../../methods/geometry/curvature_segmentation/boundary_partition_report.md)
 includes fixed-profile results, rejected inputs, the failed adoption control,
 and reproduction commands.
+
+The [frog parts experiment](frog_parts_experiment.md) provides an exact
+provisional-seam evaluator and a separate offline neck-sweep diagnostic,
+including its retained sampling failure. Neither is a production backend.
+
+The four-round [thickness-parts continuation](frog_thickness_parts_experiment.md)
+adds an offline ray-thickness reference, persistent-region controls and a
+withheld taper/bulge test. It remains unadopted; the retained results do not
+establish sculpt-quality frog decomposition.
+
+The [feature-aware atlas experiment](feature_aware_atlas_experiment.md) tests
+connected patches and distortion-validated chart merging, with actual packed UV
+examples, feature ablations and resolution controls. It is an offline reference,
+not a production atlas backend.

@@ -1,0 +1,47 @@
+{
+  "schema": "intrinsic.parts-round-ledger.v1",
+  "maximum_rounds": 4,
+  "claim_eligible": false,
+  "rounds": [
+    {
+      "round": 1,
+      "status": "completed",
+      "observation": "All 18 synthetic fields fully supported, no ray misses. Lobe median thickness exceeds waist in all nine neck cases. Native frog has 11 unsupported faces despite zero missed rays; sculpt is fully supported.",
+      "hypothesis": "An inward-cone shape-diameter field supplies independent lobe-versus-neck information without geodesic-ball cut proposals.",
+      "prediction": "Sphere is approximately uniform; lobe-center thickness exceeds the severe waist in symmetric/asymmetric/bent controls. Decorative perturbations are measured, not declared parts.",
+      "null": "Opposite-surface ray lengths are dominated by local orientation/sampling or unrelated intersections and do not distinguish the controlled waist.",
+      "config": "tools/diagnostics/curvature/shape_diameter_round1.json",
+      "stop_rule": "No segmentation quality inference from scalar histograms. Do not inspect frog until analytic and synthetic field checks finish."
+    },
+    {
+      "round": 2,
+      "status": "refuted",
+      "observation": "Sphere/groove/ridge stay one region, but symmetric neck counts are 5/101/5, asymmetric 3/3/3 and bent 4/4/4. Two large lobe regions coexist with tiny residual caps/fragments. Frog rejects incomplete field; sculpt fragments into 89 baseline-intersected regions.",
+      "hypothesis": "Area-filtered persistent thickness maxima distinguish substantive lobes without geodesic-ball cut proposals or fixed part count.",
+      "prediction": "Two regions on symmetric/asymmetric/bent severe necks across declared samplings, one on sphere/groove/ridge. Frog is exploratory, not a threshold-selection set.",
+      "config": "tools/diagnostics/curvature/thickness_parts_round2.json",
+      "rule": "Descending superlevel components, simultaneous plateaus, elder-rule peak death; keep relative persistence >= .25 and above-saddle core area >= .02 of total, plus global root. Cancel other peaks through parent tree, canonicalize connected drainage regions, intersect native baseline labels.",
+      "stop_rule": "Reject incomplete fields; no silent imputation, no parameter changes after the first Round 2 segmentation."
+    },
+    {
+      "round": 3,
+      "status": "completed",
+      "observation": "All nine neck controls yield two regions and all nine convex/decorative controls one. Frog yields seven substantive thickness regions plus four preserved baseline islands (11 total); two-view inspection still shows non-anatomical front/back patches and jagged boundaries. Sculpt regresses from five to 24 baseline-intersected regions. No adoption.",
+      "hypothesis": "Applying the area threshold to exclusive connected regions removes residual pole/root fragments without losing the substantive thickness lobes.",
+      "prediction": "All nine neck controls produce two connected regions, all nine decorative/convex controls remain one. Native comparisons remain exploratory and may still regress sculpt or miss tapering frog limbs.",
+      "config": "tools/diagnostics/curvature/thickness_parts_round3.json",
+      "rule": "Explicit nearest-valid completion limited to .005 total area and .02 sqrt(area) graph distance. Unchanged persistence selector, then merge the smallest sub-.02 connected region into its longest shared boundary neighbor, including root fragments. Intersect baseline only after cleanup.",
+      "stop_rule": "No hidden lowering of valid-ray threshold, no post-intersection removal of baseline boundaries. Any next scientific change consumes Round 4."
+    },
+    {
+      "round": 4,
+      "status": "completed_with_refutation",
+      "observation": "Taper remains one thickness region in all five variants; bulge has three, not the predicted two, with seams t=.46875..625 rather than attachment t=0. Base native METHOD-039/040 counts are taper2/2 and bulge4/3. Reordered/rigid-scaled copies preserve boundary edges but scalar differences reach about .000438 in normalized units. No hard-edge guard was implemented; sculpt remains a documented regression under the diagnostic.",
+      "hypothesis": "Persistent thickness maxima are not sufficient for tapering-limb decomposition: without a competing limb maximum the attachment may remain uncut.",
+      "prediction": "Frozen Round 3 returns one region on a body with a monotone tapered appendage, but two on the same appendage with a substantial mid-length bulge; any new bulge seam lies between the body and bulge, not at the bulge maximum. Counts should survive density, diagonal, ordering and rigid/scale changes. Native METHOD-039/040 base-fixture counts are descriptive, not presupposed.",
+      "config": "tools/diagnostics/curvature/thickness_parts_round4.json",
+      "rule": "No method change. Sphere portion x in [-1,.9], radius sqrt(1-x*x), joined to taper r=sqrt(.19)*(1-t), x=.9+1.7*t. Bulged variant adds .45*sin(pi*t)*exp(-((t-.55)/.16)^2). Base32x24, dense64x48, diagonal flip, reversed vertex+face numbering, and scale3.7 with two rotations/translation. Measure actual field and labels, do not assume radius equals measured thickness.",
+      "stop_rule": "Final round. Preserve failures and raw fields; no hard-edge guard, no smoothing changes, no fifth tuning pass."
+    }
+  ]
+}

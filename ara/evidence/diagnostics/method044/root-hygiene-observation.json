@@ -1,0 +1,8 @@
+{
+  "command": "python3 tools/repo/check_root_hygiene.py --root . --strict",
+  "exit_code": 1,
+  "unexpected_root_entries": [".agents/"],
+  "git_ls_files_agents": [],
+  "task_created_this_directory": false,
+  "disposition": "Unrelated local/session metadata classification failure; directory left untouched. No root gate or allowlist was changed."
+}
