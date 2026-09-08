@@ -72,4 +72,12 @@ python3 tools/repo/check_test_layout.py --root . --strict
 - All original region labels and borders remain fixed. Frog extra seams shorten, with distinct native/curve/length/packing tradeoffs; sculpt changes twelve faces along an extra chart border and retains its distortion quality, with a small square-occupancy decrease. No anatomical/default acceptance is inferred.
 - Review findings added per-move area ratios, fixed-face contact counts, failed-chart IDs, wide-range capacity and evidence-field tests. Exact replay preserves all labels, UVs and accepted stages across the ten final cells.
 - Verification: twelve new and ten existing Python controls; ten packed cells; ci build; 136 focused CTest entries and 4308 full CPU entries with zero failures, one expected unsanitized leak-check skip; all 185 browser modes. No GPU-method or sanitizer result claimed.
-- This interactive note remains active with the uncommitted local change. Production adoption remains with METHOD-044; semantic quality and area/remeshing/internal-cut follow-ups are not silently retired.
+- Completed 2026-09-08 in implementation commit `910a1ed36b32dad5d8a6491519a49cd7f1deca77`, published to `origin/main`. Production adoption remains with METHOD-044; remaining quality investigations stay with METHOD-045 and anatomical-method work with METHOD-043.
+
+## Maturity
+- Reached `CPUContracted` for the offline diagnostic reference, with the reported controls and source-bound evidence. This closes the bounded experiment only.
+- `Operational` owned by `METHOD-044` after quality acceptance; no production backend or anatomical-quality verdict is implied.
+
+## Completion
+- Completed: 2026-09-08.
+- PR/commit: `910a1ed36b32dad5d8a6491519a49cd7f1deca77` (verified on `origin/main`).

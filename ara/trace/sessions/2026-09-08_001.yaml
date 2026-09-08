@@ -2,10 +2,11 @@ session:
   id: 2026-09-08_001
   date: '2026-09-08'
   started: '2026-09-08T02:12:46+02:00'
-  last_turn: '2026-09-08T03:27:09+02:00'
-  turn_count: 2
-  summary: Audited atlas stages, then implemented and reviewed constrained boundary relocation with Claude.
-    Source regions and UV limits are preserved; anatomical quality and production adoption remain open.
+  last_turn: '2026-09-08T08:56:00+02:00'
+  turn_count: 3
+  summary: Audited and refined atlas boundaries with Claude, then published the complete code, evidence
+    and portable viewers/models to origin/main. METHOD-046 is complete; broader quality and engine adoption
+    remain open.
 events_logged:
 - turn: 1
   type: question
@@ -55,6 +56,18 @@ events_logged:
   routing: crystallized
   provenance: ai-executed
   summary: C74 binds the bounded preservation, seam and tradeoff measurements
+- turn: 3
+  type: decision
+  id: N489
+  routing: direct
+  provenance: user
+  summary: Authorize all-work publication and resume after interruption
+- turn: 3
+  type: experiment
+  id: N490
+  routing: direct
+  provenance: ai-executed
+  summary: Verify implementation commit on origin/main and close the bounded task
 ai_actions:
 - turn: 1
   action: Added native diagnostic export, a passive Python decision observer, scalar/curve viewer and
@@ -83,6 +96,18 @@ ai_actions:
   - tools/diagnostics/atlas/collect_boundary_refinement.py
   - tests/regression/tooling/Test.AtlasBoundaryRefine.py
   - docs/methods/uv_boundary_refinement_experiment.md
+- turn: 3
+  action: Fetched origin, verified no unmerged worktrees, preserved all intended local changes and portable
+    research exports, ran 33 atlas controls and structural/result checks, committed 910a1ed36b32dad5d8a6491519a49cd7f1deca77,
+    resumed the interrupted push, and verified its exact remote SHA. Updated task retirement and publication
+    history. Raw captured log bytes remain unchanged; historical benchmark eligibility stays dirty/local.
+  provenance: ai-executed
+  files_changed:
+  - tasks/done/METHOD-046-feature-guided-uv-boundary-refinement.md
+  - tasks/active/METHOD-045-baseline-preserving-atlas-cuts.md
+  - tasks/done/RETIREMENT-LOG.md
+  - docs/methods/atlas_stage_inspection.md
+  - docs/methods/uv_boundary_refinement_experiment.md
 claims_touched:
 - id: C73
   action: created
@@ -97,9 +122,13 @@ key_context:
 - turn: 2
   excerpt: 'User: cowork with Claude, first decide what to do from the findings, then implement and review
     again. No runtime-default adoption or publication instruction.'
+- turn: 3
+  excerpt: User asked to commit and merge everything to main, push it for use at work, then said continue
+    after interruption.
 open_threads:
-- 'METHOD-046 / METHOD-045: independent anatomical alignment, chart-area balance, remeshing robustness,
-  internal-cut placement and feature-aware merge policy remain open; original sculpt regions are preserved.'
+- 'METHOD-045: independent anatomical alignment, chart-area balance, remeshing robustness, internal-cut
+  placement and feature-aware merge policy remain open. METHOD-046 bounded refinement is complete and
+  published.'
 - 'METHOD-044: native/config/UI atlas adoption remains deferred.'
 - 'METHOD-043: anatomical/thickness segmentation failures remain unresolved.'
 - 'UI-053: detached curvature curves still need shared engine/config/UI publication.'

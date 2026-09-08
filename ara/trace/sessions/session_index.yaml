@@ -362,10 +362,11 @@ sessions:
     open_threads: 5
   - id: 2026-09-08_001
     date: '2026-09-08'
-    summary: Audited atlas stages, then implemented and reviewed constrained boundary relocation with Claude.
-      Source regions and UV limits are preserved; anatomical quality and production adoption remain open.
-    turn_count: 2
-    events_count: 8
+    summary: Audited and refined atlas boundaries with Claude, then published the complete code, evidence
+      and portable viewers/models to origin/main. METHOD-046 is complete; broader quality and engine adoption
+      remain open.
+    turn_count: 3
+    events_count: 10
     claims_touched:
     - C73
     - C74

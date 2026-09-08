@@ -8103,3 +8103,15 @@ partition adoption remains a later experiment. Implementation: `362b794ac`.
 Build-identity correction to the earlier UI-052 entry: the `dev` preset is
 Debug, so its wording "optimized Sandbox" was incorrect. METHOD-041's final
 native inspection used the distinct `ci-release` preset; no speedup is claimed.
+
+### METHOD-046 — 2026-09-08
+
+Completed the bounded offline collective UV-boundary refinement at
+`CPUContracted`, with native/curve/length/shuffled controls and actual Claude
+planning and source/result review. The original region and distortion contracts
+remain explicit; anatomical quality and uniform packing improvement are not
+claimed. Twelve new Python controls, native-packed cohort and replay checks,
+and the full CPU gate support the recorded outcome. METHOD-044 owns production
+adoption; METHOD-045 retains the broader quality investigations.
+Implementation and portable artifacts: `910a1ed36b32dad5d8a6491519a49cd7f1deca77`,
+verified on `origin/main`.

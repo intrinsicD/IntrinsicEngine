@@ -1856,3 +1856,13 @@ entries:
       native dominance, packing noise and downstream tangent-space defects.
     - No unrelated staging observations are promoted. No production backend, default, commit or push is
       inferred from this local interactive experiment.
+
+  - turn: 2026-09-08_001#3
+    notes:
+    - N489 records explicit publication authorization, including the resumed interrupted push. N490 records
+      actual remote verification of the implementation commit; no successful first push is fabricated.
+    - Retired the completed bounded METHOD-046 reference and left METHOD-045 quality work and METHOD-044
+      production adoption open. Publishing the code does not promote historical dirty-source benchmark eligibility
+      or any pending anatomical hypothesis.
+    - No new research claim or staging promotion is needed for Git publication. Raw captured log line endings
+      are retained for evidence fidelity; the code/document diff passes whitespace review.

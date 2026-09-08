@@ -11190,7 +11190,7 @@ tree:
     choice: Continue from the stage findings with actual Claude collaboration, choose a bounded implementation,
       then review it again. Preserve the earlier sculpt baseline-quality priority and deferred engine integration.
     evidence:
-    - tasks/active/METHOD-046-feature-guided-uv-boundary-refinement.md
+    - tasks/done/METHOD-046-feature-guided-uv-boundary-refinement.md
     status: resolved
   - id: N487
     type: decision
@@ -11226,4 +11226,33 @@ tree:
     - ara/evidence/diagnostics/method046/record.json
     - ara/evidence/diagnostics/method046/reviews/resolution.md
     - docs/methods/uv_boundary_refinement_experiment.md
+    status: resolved
+
+  - id: N489
+    type: decision
+    title: Publish all accumulated atlas work for the work machine
+    provenance: user
+    timestamp: '2026-09-08T08:56:00+02:00'
+    choice: Explicitly request committing all accumulated work onto main and pushing to the configured remote,
+      then resume the interrupted push with continue. This is publication authorization, not anatomical-quality
+      or production-backend adoption.
+    evidence:
+    - tasks/done/METHOD-046-feature-guided-uv-boundary-refinement.md
+    status: resolved
+  - id: N490
+    type: experiment
+    title: Verify publication of the complete atlas work on origin/main
+    provenance: ai-executed
+    timestamp: '2026-09-08T08:56:00+02:00'
+    result: Reviewed and committed the combined METHOD-045/046 source, tests, reports and evidence, plus
+      portable compressed viewers and current frog/sculpt OBJ exports. The interrupted first push had not
+      advanced origin; the resumed push succeeded and git ls-remote independently reported 910a1ed36b32dad5d8a6491519a49cd7f1deca77.
+      All 33 atlas Python controls and task/claim/doc/root/benchmark checks passed. Other existing worktrees
+      are clean and their commits are already ancestors of main. The completed bounded METHOD-046 task is
+      retired; METHOD-045 retains broader quality investigations.
+    evidence:
+    - 910a1ed36b32dad5d8a6491519a49cd7f1deca77
+    - tasks/done/METHOD-046-feature-guided-uv-boundary-refinement.md
+    - docs/methods/uv_boundary_refinement_experiment.md
+    - ara/evidence/diagnostics/method046/record.json
     status: resolved

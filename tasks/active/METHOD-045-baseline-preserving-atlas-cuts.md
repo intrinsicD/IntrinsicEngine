@@ -118,4 +118,8 @@ python3 tools/repo/check_test_layout.py --root . --strict
   controls, and rendered all 265 viewer modes. No full CPU or sanitizer rerun is
   claimed for this diagnostic-only turn.
 
-- The subsequent operator-directed implementation and review of additional-boundary relocation is recorded in [METHOD-046](METHOD-046-feature-guided-uv-boundary-refinement.md); the frozen METHOD-045 evidence remains unchanged.
+- The subsequent operator-directed implementation and review of additional-boundary relocation is recorded in [METHOD-046](../done/METHOD-046-feature-guided-uv-boundary-refinement.md); the frozen METHOD-045 evidence remains unchanged.
+
+## Publication and remaining scope
+- The completed protected-atlas, stage-audit and refinement artifacts were published to `origin/main` in `910a1ed36b32dad5d8a6491519a49cd7f1deca77` on 2026-09-08. Portable compressed viewers and frog/sculpt OBJ examples travel with the repository.
+- This note remains active for the uncompleted quality investigations: chart-area balance, remeshing robustness, internal-cut placement and feature-aware merge policy. METHOD-046's bounded reference experiment is complete; METHOD-044 still owns production adoption.
