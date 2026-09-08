@@ -101,3 +101,8 @@ Claude's [final focused source/evidence review](../../ara/evidence/diagnostics/m
 Continue with **feature-aware connected initialization + distortion-validated merging**. It is better aligned with the atlas objective than the earlier thickness/anatomical parts experiments. Do not add expensive full crease-curve reconstruction until it fixes a demonstrated failure.
 
 Before production adoption: port the bounded reference to the existing geometry numerical infrastructure; measure a matched Release/native cohort including all required validation/packing; add arbitrary-remeshing/large-mesh controls; and evaluate local boundary moves or a packing/compactness term to address jagged seams and empty atlas space. Greedy merge-only atoms cannot relocate every bad initial cut, and repeated large union solves have no proven near-linear worst-case bound. A global direct-growth/optimization comparison remains open. Native/config/UI/publication follow-ups remain owned by METHOD-044; GEOM-076 is not silently declared complete.
+
+
+The [baseline-preserving continuation](baseline_preserving_atlas_experiment.md)
+(METHOD-045) investigates preserving existing region boundaries with internal UV
+cuts. It retains the earlier campaign above and does not promote a backend.

@@ -1,0 +1,62 @@
+[
+  {
+    "mesh": "frog",
+    "counts_from_saved_arrays": [
+      {
+        "stage": "feature: Initial 64 seeded clusters",
+        "clusters": 64,
+        "lost_baseline_edges": 44
+      },
+      {
+        "stage": "feature: Validated charts before merging",
+        "clusters": 73,
+        "lost_baseline_edges": 41
+      },
+      {
+        "stage": "feature: Final charts before native packing",
+        "clusters": 15,
+        "lost_baseline_edges": 41
+      },
+      {
+        "stage": "protected: Validated charts before merging",
+        "clusters": 63,
+        "lost_baseline_edges": 0
+      },
+      {
+        "stage": "protected: Final charts before native packing",
+        "clusters": 23,
+        "lost_baseline_edges": 0
+      }
+    ]
+  },
+  {
+    "mesh": "sculpt",
+    "counts_from_saved_arrays": [
+      {
+        "stage": "feature: Initial 64 seeded clusters",
+        "clusters": 64,
+        "lost_baseline_edges": 5
+      },
+      {
+        "stage": "feature: Validated charts before merging",
+        "clusters": 64,
+        "lost_baseline_edges": 5
+      },
+      {
+        "stage": "feature: Final charts before native packing",
+        "clusters": 5,
+        "lost_baseline_edges": 63
+      },
+      {
+        "stage": "protected: Validated charts before merging",
+        "clusters": 6,
+        "lost_baseline_edges": 0
+      },
+      {
+        "stage": "protected: Final charts before native packing",
+        "clusters": 6,
+        "lost_baseline_edges": 0
+      }
+    ]
+  }
+]

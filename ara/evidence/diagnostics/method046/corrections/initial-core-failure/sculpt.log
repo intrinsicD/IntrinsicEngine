@@ -1,0 +1,10 @@
+sculpt: reference refinement
+sculpt: reference: 0 accepted, 0 moved faces, support 0.01902, additional length 0.94121, statuses {}
+sculpt: length refinement
+sculpt: length: 1 accepted, 12 moved faces, support 0.02372, additional length 0.76584, statuses {'accepted': 1, 'no_border_descent': 1}
+sculpt: native refinement
+sculpt: native: 1 accepted, 12 moved faces, support 0.02372, additional length 0.76584, statuses {'accepted': 1, 'no_border_descent': 1}
+sculpt: curves refinement
+sculpt: curves: 1 accepted, 12 moved faces, support 0.02372, additional length 0.76584, statuses {'accepted': 1, 'no_border_descent': 1}
+sculpt: shuffled refinement
+sculpt: shuffled: 1 accepted, 12 moved faces, support 0.02369, additional length 0.76686, statuses {'accepted': 1, 'no_border_descent': 1}

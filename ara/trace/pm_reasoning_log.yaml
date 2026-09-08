@@ -1810,3 +1810,49 @@ entries:
       scope; dirty local measurements do not become claim-eligible merely because code was merged.
     - O180 remains partly implemented, with boundary selection/merging and UI-053 integration still open.
       Publication does not affirm every staged algorithm suggestion.
+
+  - turn: 2026-09-07_001#3
+    notes:
+    - Captured the user redirect as N480 and the executed bounded experiment as N481. C71/O195 binds only
+      region preservation and numerical UV validity; C72/O196 retains the negative square-packing result.
+    - No baseline-return policy is presented as a thickness or anatomical segmentation improvement. Native
+      xatlas still has better mean/p95 sculpt distortion and square occupancy than the candidate.
+    - Claude completed two public-material reviews; new code and local aggregate review await explicit sharing
+      approval after automatic review rejection. No source-review or visual-acceptance claim is fabricated.
+    - No unrelated staging observation has a new closure signal. Production integration is explicitly postponed;
+      current files remain local and uncommitted.
+
+  - turn: 2026-09-07_001#4
+    notes:
+    - N482 records approval of the pending sharing request, not endorsement of every
+      staged idea or anatomical quality. N483 records actual source review and local
+      resolution of its caveats; no independent execution or image review by Claude.
+    - C71 wording now explicitly says preservation by construction and per-chart
+      normalization. Existing numerical results and C72 disposition are unchanged.
+    - The frog image remains fragmented; showing it does not create a new improvement
+      claim. The source remains local and uncommitted. No unrelated staged observation
+      has a new closure signal.
+
+  - turn: 2026-09-08_001#1
+    notes:
+    - N484 records investigation questions, not approval of every suggested metric or seed objective.
+      N485/O197/C73 bind observed boundary losses; O198 remains a proposed follow-up.
+    - No visual overlay establishes curve alignment or anatomical correctness. Native hard flags and
+      soft scores are distinct from METHOD-041 extrema, confidence is not probability, and nonzero
+      soft confidence is not inherently low confidence. Corrected Claude's overinterpretation.
+    - Preserved native-stage ordering limits and recorded every actual Python atlas partition change.
+      Final label identity is diagnostic equivalence, not a new quality or performance result.
+    - No unrelated staging observations are promoted. Current implementation and evidence remain local.
+
+  - turn: 2026-09-08_001#2
+    notes:
+    - N486 records the user-directed workflow, while N487 retains AI provenance for the frozen formulation.
+      O198 is only partially exercised, so its broad heuristic remains staged.
+    - 'O199 crystallizes into C74 by artifact commitment: the source-bound report and benchmark cells depend
+      on the measured results. Support is an optimized detector score, not anatomical truth; packing and
+      shrinkage tradeoffs are explicit.'
+    - Claude completed a substantive source/aggregate review after an incomplete tool-request response.
+      Resolved actionable code findings; corrected unsupported claims of no measurable curve effect, universal
+      native dominance, packing noise and downstream tangent-space defects.
+    - No unrelated staging observations are promoted. No production backend, default, commit or push is
+      inferred from this local interactive experiment.

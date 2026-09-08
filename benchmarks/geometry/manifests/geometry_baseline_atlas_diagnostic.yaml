@@ -1,0 +1,26 @@
+benchmark_id: geometry.uv_atlas.baseline_preservation.diagnostic
+method: geometry.uv_atlas.baseline_preservation
+dataset: external.baseline_atlas_cohort_v1
+params:
+  intent: correctness
+  cohort: [sculpt, frog, fandisk, bunny10k]
+  additional_smooth_control: dolphin
+  baseline: native_curvature_local
+  arms: [protected, protected-merge, feature, growth-only, xatlas]
+  stretch_limit: 1.35
+  anisotropy_limit: 2.0
+  patches: 64
+  packing: xatlas_uv_only
+  packing_search: [default, exhaustive]
+  native_resolution: 1024
+  native_padding: 2
+  native_preset: ci
+  warmup_iterations: 0
+  measured_iterations: 1
+  same_surface_subdivision: [sculpt, frog]
+  scope: offline_diagnostic_not_default_smoke
+  timing_claim: false
+  adoption_claim: false
+metrics: [quality_error_linf]
+thresholds:
+  quality_error_linf_max: 0.0

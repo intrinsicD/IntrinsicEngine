@@ -1,0 +1,480 @@
+User explicitly requests: collaborate with Claude to decide next action from the audit, implement, then review again. Need a concrete bounded implementation that improves boundary placement, preserving original sculpt regions and current UV limits; do not spend turn only adding instrumentation or merely veto old sculpt merges. Existing protected output already preserves baseline. Frog is the hard case. We can add offline reference functions but no runtime wiring/new backend. No input geometry in this approved source/results packet.
+Please choose the smallest useful next algorithm, mathematical objective/constraints and frozen tests/ablation. Assess proposal below critically. <850 words. No tools, no edits, no data requests.
+Proposal: start from current protected atlas and optimize only additional chart borders via local boundary-face reassignment inside immutable source regions. Objective is strictly positive, feature-weighted seam length, possibly boundary turning only if needed; arbitrary cut length reduces unsupported zigzags. Admissibility re-opens/re-solves both affected charts with existing topology, positive map, simple boundary and max per-chart normalized stretch 1.35/aniso2. Keep chart count fixed initially, originals fixed, no cross-surface Euclidean assignment. Native hard/soft edge evidence and a conservative projected curvature-curve alignment score (surface-local proximity + tangent agreement, tied to support scale) are separable candidate weights. Projection must avoid close disconnected sheets. Report native-soft-only and curve contribution ablation; do not hard-lock noisy extrema or treat score as probability. Single-face energy descent alone may get trapped by simultaneous topological or UV constraints; if so consider bounded pair/strip moves, not unbounded framework. Cut curves inside charts should be included in seam accounting; fixed original labels remain untouched. Re-solving every face is costly; cheap discrete delta before solve, deterministic best-first candidates and rejected-candidate caching keyed chart revisions. We need one credible baseline experiment and review-driven correction, not a parameter sweep. How should this be tightened or replaced?
+
+# Atlas stages, curvature evidence and merge decisions
+
+The 2026-09-08 audit answers the operator's questions about intermediate clusters,
+curvature alignment, merge criteria and seed movement. Before this audit we had
+not visualized every atlas partition change, and the atlas decisions did not use
+the available curvature-extremum curves. The new trace observes existing decisions;
+it does not change growth, splitting, merging or their parameters.
+
+The [stage record](../../ara/evidence/diagnostics/method045/stages/record.json)
+and [C73](../../ara/logic/claims.md#c73-atlas-boundary-loss-occurs-at-different-stages)
+bind the local CPU findings. The original
+[baseline-preserving experiment](baseline_preserving_atlas_experiment.md) remains
+unchanged. These are source-bound local diagnostics, not publication-grade results.
+
+## What can now be inspected
+
+The standalone viewer generated at `build/method045-stage-audit-final/index.html`
+has 265 stage/scalar views across frog and sculpt, synchronized orbit/zoom,
+previous/next buttons, initial seed markers, principal/mean curve overlays,
+support-scale and confidence/strength/agreement filters, and scalar colors.
+
+It records every accepted Python atlas partition split and merge, and each
+attempted union's status and available numerical values. It includes native
+baseline initial/final regions and existing native merge-energy records.
+**It does not reconstruct every native refinement state**, nor show every solver
+iteration or internal UV-cut construction. Native merge records interleave face
+refinements without a common event order. A curve overlay is not a quantified
+alignment test. Final-stage colors identify UV charts; internal cuts within one
+chart are separate from those colored borders.
+
+![Frog stages](../../ara/evidence/diagnostics/method045/stages/frog-stages.png)
+
+![Sculpt stages](../../ara/evidence/diagnostics/method045/stages/sculpt-stages.png)
+
+These figures use depth-tested WebGL captures so hidden curves do not appear
+through the surface. Curve scale is medium for frog and large for sculpt;
+confidence cutoff 0.15 is display-only. The viewer exposes other scales and
+filters. These choices are not anatomical ground truth or tuned decision limits.
+
+## Three distinct pipelines
+
+| Pipeline | Initial regions | Merge decisions | Boundary movement |
+| --- | --- | --- | --- |
+| Native baseline | Hard-blocked graph growth using curvature descriptors and soft-feature confidence; 1038 frog / 1393 sculpt seeds in these runs | Requires decreased energy: curvature-mixture fit and region complexity plus boundary length, turning and feature support; hard borders block merges | Local face reassignment/refinement; 12 accepted frog moves, 0 sculpt moves |
+| Earlier feature atlas | 64 farthest-point face seeds; graph distance plus unsigned dihedral penalty | Curvature affects priority only; any topologically/numerically admissible union is accepted | No seed relocation or boundary refinement |
+| Protected atlas | Original native region components; open with cuts, split rejected charts | Same-original-region restriction; shared-border priority and fresh cut/UV validity checks | No relocation/refinement; source-region borders fixed |
+
+Native baseline complexity cost is the existing local diagnostic value 0.5.
+Native fields originate in
+[CurvatureSegmentation.Patches](../../src/geometry/Geometry.HalfedgeMesh.CurvatureSegmentation.Patches.cpp),
+not in the Python atlas. Native curvature-mixture components also differ from
+spatial regions: identical curvature descriptors can occur on distant parts.
+
+In [the earlier atlas](../../tools/diagnostics/atlas/patch_merge.py), seeds start
+at the largest triangle and then at farthest graph-distance faces. Seed selection
+uses distances without the dihedral penalty. Growth then uses
+`centroid_distance + 2 * (1/sqrt(64)) * unsigned_dihedral_angle` per dual edge.
+This discourages crossing face-normal changes; it does not follow extracted
+curvature-extremum lines or enforce native hard barriers.
+
+For adjacent charts A and B, the earlier merge priority is
+
+`shared_length / sqrt(min(area_A, area_B)) / (1 + 2 * mean_dihedral)`.
+
+Mean dihedral is shared-edge-length weighted and measured in radians. Larger
+scores are attempted first. The
+[protected atlas](../../tools/diagnostics/atlas/baseline_atlas.py) omits the last
+factor and considers only pairs from the same original region.
+
+Both construct a fresh LSCM map of the union and require valid disk topology
+(after explicit cuts in the protected arm), finite positive triangle orientation,
+a simple non-self-intersecting boundary, maximum bidirectional stretch at most
+1.35 and anisotropy at most 2. Stretch is per-chart area normalized, excluding
+between-chart density variation. The later packer has a separate post-pack audit.
+**Neither merge requires distortion to improve**, compares boundary quality
+before/after, or optimizes packing occupancy in its acceptance decision.
+
+## Where boundaries disappear
+
+Counts recomputed independently from saved stage labels:
+
+| Earlier atlas stage | Frog: lost out of 55 baseline edges | Sculpt: lost out of 384 |
+| --- | ---: | ---: |
+| Raw 64-cluster growth | 44 | 5 |
+| After initial UV validation/subdivision | 41 | 5 |
+| After merging | 41 | 63 |
+
+The event trace identifies all 58 additional sculpt losses during merging as
+native hard-feature edges. Frog loses its remaining baseline borders before
+merging; a merge veto alone cannot restore them. Initial subdivision happens
+to reintroduce three frog baseline edges; it does not optimize their recovery.
+
+| Atlas arm | Frog merges accepted / attempted | Sculpt merges accepted / attempted |
+| --- | ---: | ---: |
+| Earlier feature | 58 / 155; 73 → 15 charts | 59 / 93; 64 → 5 charts |
+| Protected | 40 / 149; 63 → 23 charts | 0 / 1; 6 → 6 charts |
+
+The protected arm loses no baseline edge. Its frog merges nevertheless remove
+64 other edges with nonzero native soft-feature evidence. That is a diagnostic
+fact, **not proof of destroying 64 good anatomical boundaries**. These scores
+are neither probabilities nor an established ground-truth partition.
+The [saved-array reconciliation](../../ara/evidence/diagnostics/method045/stages/boundary-reconciliation.json)
+and per-mesh decision JSON retain the distinction.
+
+## Available scalars and whether decisions use them
+
+![Frog scalar fields](../../ara/evidence/diagnostics/method045/stages/frog-scalars.png)
+
+[Sculpt scalar fields](../../ara/evidence/diagnostics/method045/stages/sculpt-scalars.png)
+use the same definitions. Scalars are unlit; display ranges are clipped to the
+2nd–98th percentiles except fixed confidence/stretch limits. Gray indicates no
+curve segment in that face, not zero confidence.
+
+| Signal | Native baseline | Earlier atlas | Protected atlas |
+| --- | --- | --- | --- |
+| Signed k1/k2 and curvature-mixture fit | Growth/region objective | Unused | Only inherited through original labels |
+| Native hard barriers | Growth and merge constraints | Unused | Preserved when represented by original borders |
+| Native soft confidence | Growth and boundary energy | Unused | Only inherited through original labels |
+| Unsigned dihedral angle | Contributes to upstream hard-feature detection | Growth cost and merge priority | No angle term in additional cuts, splits or merges |
+| Principal/mean extrema curves | Separate METHOD-041 detector | Unused | Unused |
+| Curve confidence, strength, sharpness, fit residual, scale agreement | Detached detector diagnostics | Unused | Unused |
+| UV stretch/anisotropy, orientation, topology | No UV test | Union admissibility and explicit subdivision | Union admissibility and explicit subdivision |
+| Boundary turning/smoothness | Native objective/refinement | Unused | Unused for added UV borders |
+| Packing utilization | No atlas | Measured afterward | Measured afterward |
+
+The viewer adds growth-distance, signed-curvature, dihedral, soft-confidence,
+local UV-stretch and curve-score maps. The event JSON includes candidate priority,
+shared-border length/mean angle, removed evidence counts, rejection reason and
+maximum stretch/anisotropy when the solver reached that stage. Topology failures
+have no invented UV metric. The native stage JSON includes merge-energy changes.
+
+## Moving centers or boundaries
+
+Seed positions can be changed and regions regrown on the surface graph. A
+surface-constrained representative such as a graph medoid avoids an unconstrained
+3D centroid falling off the surface. But none of these atlas runs relocates seeds,
+and moving a seed is not enough to express arbitrary borders after merges.
+Direct boundary-face moves or cut-curve movement are more flexible candidates.
+The native patch method already exposes seed overrides and performs local face
+refinement; the atlas currently uses neither capability.
+
+Alternating region fitting/assignment is an established approach in
+[Variational Shape Approximation](https://geometry.caltech.edu/pubs.html).
+[Variational Surface Cutting](https://www.cs.cmu.edu/~kmcrane/Projects/VariationalCuts/)
+provides a separate example of optimizing cut placement for flattening distortion.
+Neither formulation has been adopted here, and neither implies anatomical
+segmentation from distortion alone.
+
+A bounded next experiment should distinguish hard evidence from uncertain
+curves, measure curve proximity **and tangent agreement** against borders at
+matched support scales, and test local boundary movement under an explicit
+boundary-quality objective while retaining topology/UV limits. Hard locking every
+curve or adding every available scalar would not be justified by the current
+observations. Existing protected original borders remain the sculpt quality floor.
+
+## Review, verification and replay
+
+Claude reviewed code and aggregate counts. The
+[review resolution](../../ara/evidence/diagnostics/method045/stages/review-resolution.md)
+corrects its stale statement that no ordered atlas trace exists and its unsupported
+characterization of every soft flag as low confidence. It did not inspect meshes
+or images, execute the pipelines, or approve visual quality.
+
+Verification: `ci` configured with Clang 23, `IntrinsicTests` and the native
+exporter built; 30 focused curvature CTest cases and 10 Python controls passed.
+A new analytic control compares observed versus unobserved reference labels and
+UVs. Four cohort final label arrays match retained references exactly. Chrome
+rendered all 265 views without WebGL errors, and curve filtering was exercised.
+The final viewer is byte-identical to the browser-checked artifact. No full CPU,
+sanitizer or GPU-method run is claimed for this audit turn.
+
+The evidence directory retains compressed native stage fields, edge scores,
+curvature curves, reference labels and the full viewer payload. Baseline geometry
+and region labels remain in the parent experiment's `baselines/` directory.
+
+To regenerate the viewer from retained data without rerunning algorithms:
+
+```bash
+python3 - <<'PY'
+from pathlib import Path
+import gzip, json
+root = Path('ara/evidence/diagnostics/method045/stages')
+data = json.loads(gzip.decompress((root/'stages.json.gz').read_bytes()))
+template = Path('tools/diagnostics/atlas/trace_atlas_viewer.html').read_text()
+Path('/tmp/atlas-stage-inspection.html').write_text(template.replace('__STAGE_DATA__', json.dumps(data, separators=(',', ':'), allow_nan=False).replace('<', '\\u003c')))
+PY
+```
+
+A native replay uses `IntrinsicCurvatureBoundaryMesh input.obj prefix local`;
+its new `prefix.stages.json` exports existing public result fields. The trace CLI
+requires frog/sculpt native export prefixes in one directory and METHOD-041
+curve JSONs named `0-frog.extrema.json` / `1-sculpt.extrema.json` in another:
+
+```bash
+OPENBLAS_NUM_THREADS=1 python3 tools/diagnostics/atlas/trace_atlas.py /tmp/native /tmp/new-stage-trace --curves /tmp/curves
+```
+
+`--references` can select another explicit directory of retained label arrays;
+the default binds this diagnostic's recorded references. Use a fresh output
+folder. The adjacent JSON files retain every merge attempt. For exported figures,
+start a separate headless Chrome session with a temporary profile and local CDP
+port 9348, then run `capture_atlas_trace.py /tmp/new-stage-trace` followed by
+`render_atlas_trace.py /tmp/new-stage-trace`. The optional capture helper uses
+`websocket-client`; the standalone viewer needs no network or Python packages.
+
+
+#!/usr/bin/env python3
+"""Offline UV charts preserving source-bound regions and their borders.
+
+Connect boundary loops by shortest primal paths before LSCM. Unsupported or
+distorted regions are bisected explicitly; semantic labels never become UV IDs.
+"""
+from __future__ import annotations
+import argparse
+from collections import Counter
+import hashlib
+import heapq
+import json
+from pathlib import Path
+
+import numpy as np
+import patch_merge as pm
+from compare_atlases import audit, render
+
+
+def incidence(faces):
+    edges = {}
+    for i, face in enumerate(faces):
+        for k in range(3):
+            a, b = int(face[k]), int(face[(k+1)%3])
+            edges.setdefault(tuple(sorted((a, b))), []).append((i, k, a, b))
+    return edges
+
+
+def cut_corners(faces, edges, cuts):
+    """Join corners across uncut edges and retain the source-vertex map."""
+    parent = np.arange(faces.size)
+    def root(a):
+        while parent[a] != a:
+            parent[a] = parent[parent[a]]
+            a = parent[a]
+        return a
+    def join(a, b):
+        a, b = root(a), root(b)
+        parent[max(a,b)] = min(a,b)
+    for edge, entries in edges.items():
+        if len(entries) == 2 and edge not in cuts:
+            (i,k,a,b), (j,l,c,d) = entries
+            if (a,b) != (d,c):
+                raise ValueError('inconsistent orientation')
+            join(3*i+k, 3*j+(l+1)%3)
+            join(3*i+(k+1)%3, 3*j+l)
+    roots = np.array([root(i) for i in range(faces.size)])
+    unique, inverse = np.unique(roots, return_inverse=True)
+    return faces.ravel()[unique], inverse.reshape(-1,3)
+
+
+def topology(faces):
+    edges = incidence(faces)
+    if any(len(x)>2 for x in edges.values()):
+        raise ValueError('nonmanifold edge')
+    vertices, _ = cut_corners(faces, edges, set())
+    if len(vertices) != len(np.unique(faces)):
+        raise ValueError('nonmanifold vertex fan')
+    outgoing, incoming = {}, {}
+    for entries in edges.values():
+        if len(entries) == 1:
+            _,_,a,b = entries[0]
+            if a in outgoing or b in incoming:
+                raise ValueError('nonmanifold boundary')
+            outgoing[a] = b; incoming[b] = a
+    if outgoing.keys() != incoming.keys():
+        raise ValueError('open boundary chain')
+    loops, remaining = [], set(outgoing)
+    while remaining:
+        start = min(remaining); loop = []; current = start
+        while current in remaining:
+            remaining.remove(current); loop.append(current); current = outgoing[current]
+        if current != start:
+            raise ValueError('non-simple boundary loop')
+        loops.append(loop)
+    return edges, loops, len(vertices)-len(edges)+len(faces)
+
+
+def open_region(g, ids):
+    """Cut a connected genus-zero region with boundary; report other topology."""
+    faces = g['f'][ids]
+    try:
+        edges, loops, euler = topology(faces)
+    except ValueError as error:
+        # A valid source can induce a pinched region boundary. Split the region
+        # explicitly; never mistake corner duplication for source repair.
+        return None, 'region_topology', dict(euler_characteristic=None,
+                                            boundary_loops=None, cut_edges=0,
+                                            topology_failure=str(error))
+    diagnostics = dict(euler_characteristic=euler, boundary_loops=len(loops), cut_edges=0)
+    if not loops or euler != 2-len(loops):
+        return None, 'unsupported_topology', diagnostics
+    adjacent = {int(v): [] for v in np.unique(faces)}
+    for a,b in edges:
+        length = float(np.linalg.norm(g['v'][a]-g['v'][b]))
+        adjacent[a].append((b,length)); adjacent[b].append((a,length))
+    connected = set(loops[0]); waiting = [set(x) for x in loops[1:]]; cuts = set()
+    while waiting:
+        targets = set().union(*waiting)
+        distance = {v:0. for v in connected}; previous = {}
+        queue = [(0.,v) for v in sorted(connected)]; heapq.heapify(queue)
+        hit = None
+        while queue:
+            d,v = heapq.heappop(queue)
+            if d != distance[v]:
+                continue
+            if v in targets:
+                hit = v; break
+            for w,length in sorted(adjacent[v]):
+                value = d+length
+                if value < distance.get(w, np.inf):
+                    distance[w] = value; previous[w] = v; heapq.heappush(queue,(value,w))
+        if hit is None:
+            return None, 'disconnected_region', diagnostics
+        current = hit
+        while current not in connected:
+            parent = previous[current]
+            cuts.add(tuple(sorted((current,parent)))); connected.add(current); current = parent
+        reached = next(i for i,loop in enumerate(waiting) if hit in loop)
+        connected.update(waiting.pop(reached))
+    vertices, local = cut_corners(faces, edges, cuts)
+    diagnostics['cut_edges'] = len(cuts)
+    if pm.disk_boundary_fast(local) is None:
+        return None, 'cut_topology', diagnostics
+    return (vertices, local), 'accepted', diagnostics
+
+
+def region_components(g, labels):
+    visited = np.zeros(len(labels),bool); result = []
+    for seed in range(len(labels)):
+        if visited[seed]:
+            continue
+        stack = [seed]; visited[seed] = True; ids = []
+        while stack:
+            i = stack.pop(); ids.append(i)
+            for j,*_ in g['adjacent'][i]:
+                if not visited[j] and labels[j] == labels[i]:
+                    visited[j] = True; stack.append(j)
+        result.append(np.asarray(sorted(ids),np.int64))
+    return result
+
+
+def boundary_metrics(g, regions, labels, corners):
+    retained = lost = extra = internal = 0
+    total = baseline_length = internal_length = 0.
+    for a,b,length,_,_,v,w in g['edges']:
+        cut = labels[a] != labels[b]
+        if not cut:
+            for vertex in (v,w):
+                ia = int(np.flatnonzero(g['f'][a] == vertex)[0])
+                ib = int(np.flatnonzero(g['f'][b] == vertex)[0])
+                cut = cut or not np.array_equal(corners[a,ia],corners[b,ib])
+        protected = regions[a] != regions[b]
+        retained += int(protected and cut); lost += int(protected and not cut)
+        extra += int(not protected and labels[a] != labels[b])
+        internal += int(cut and labels[a] == labels[b])
+        total += length if cut else 0.
+        baseline_length += length if protected else 0.
+        internal_length += length if cut and labels[a] == labels[b] else 0.
+    return dict(retained_baseline_edges=retained, lost_baseline_edges=lost,
+                extra_chart_boundary_edges=extra, internal_uv_cut_edges=internal,
+                total_uv_seam_length_over_sqrt_area=total,
+                baseline_seam_length_over_sqrt_area=baseline_length,
+                internal_uv_seam_length_over_sqrt_area=internal_length)
+
+
+def merge_within_regions(g, regions, charts, stretch_limit, anisotropy_limit):
+    """Rejoin only subdivisions of the same region, revalidating each union."""
+    rejected = set(); attempts = []; next_id = len(charts)
+    while True:
+        labels = np.empty(len(regions),np.int64)
+        for i,c in charts.items():
+            labels[c['ids']] = i
+        seams = Counter()
+        for a,b,length,*_ in g['edges']:
+            i,j = sorted((int(labels[a]),int(labels[b])))
+            if i!=j and regions[a]==regions[b] and (i,j) not in rejected:
+                seams[i,j] += length
+        candidates = []
+        for (i,j),length in seams.items():
+            area = min(g['area'][charts[i]['ids']].sum(),g['area'][charts[j]['ids']].sum())
+            candidates.append((-length/np.sqrt(area),i,j))
+        accepted = False
+        for _,i,j in sorted(candidates):
+            ids = np.sort(np.concatenate((charts[i]['ids'],charts[j]['ids'])))
+            opened,reason,topo = open_region(g,ids); chart = None
+            if opened is not None:
+                chart,reason = pm.parameterize_local(g,ids,*opened,stretch_limit,anisotropy_limit)
+            attempts.append(dict(region=int(regions[ids[0]]),faces=len(ids),status=reason,**topo))
+            if chart is None:
+                rejected.add((i,j)); continue
+            del charts[i]; del charts[j]; charts[next_id] = chart; next_id += 1
+            accepted = True; break
+        if not accepted:
+            return charts, attempts
+
+
+def execute(vertices, faces, regions, *, stretch_limit=1.35, anisotropy_limit=2., merge=False):
+    regions = np.asarray(regions)
+    if regions.shape != (len(faces),) or regions.dtype.kind not in 'iu' or np.any(regions<0):
+        raise ValueError('one nonnegative integer baseline label per face required')
+    if not np.isfinite([stretch_limit,anisotropy_limit]).all() or min(stretch_limit,anisotropy_limit)<1:
+        raise ValueError('invalid distortion limits')
+    g = pm.geometry(vertices,faces)
+    # Validate the source before duplication could hide a pinched vertex.
+    topology(g['f'])
+    components = region_components(g,regions)
+    pending = list(reversed(components)); charts = {}; records = []; splits = Counter()
+    while pending:
+        ids = np.asarray(sorted(pending.pop()),np.int64)
+        opened, reason, topo = open_region(g,ids)
+        chart = None
+        if opened is not None:
+            chart, reason = pm.parameterize_local(g,ids,*opened,stretch_limit,anisotropy_limit)
+        records.append(dict(region=int(regions[ids[0]]),faces=len(ids),status=reason,**topo))
+        if chart is None:
+            splits[reason] += 1
+            pending.extend(reversed(pm.bisect(g,ids)))
+        else:
+            charts[len(charts)] = chart
+    initial_count = len(charts); merges = []
+    if merge:
+        charts, merges = merge_within_regions(g,regions,charts,stretch_limit,anisotropy_limit)
+    labels = np.empty(len(faces),np.int64); chart_uv = np.empty((len(faces),3,2))
+    corners = np.empty_like(chart_uv); packed,_ = pm.pack(charts)
+    for i,c in charts.items():
+        labels[c['ids']] = i
+        chart_uv[c['ids']] = c['uv'][c['local_faces']]
+        corners[c['ids']] = packed[i][c['local_faces']]
+    metrics = audit(vertices,faces,labels,corners)
+    metrics.update(boundary_metrics(g,regions,labels,corners))
+    metrics.update(region_count=len(np.unique(regions)), region_component_count=len(components),
+                   split_reasons=dict(splits), uv_solves=g.get('actual_uv_solves',0),
+                   initial_charts=initial_count, accepted_merges=initial_count-len(charts),
+                   merge_attempts=merges,
+                   outcome='protected_with_chart_splits' if splits else 'protected_without_chart_splits')
+    if (not metrics['all_charts_valid'] or metrics['lost_baseline_edges'] or
+            metrics['max_stretch'] > stretch_limit or metrics['max_anisotropy'] > anisotropy_limit):
+        raise ValueError('final source/UV audit failed: '+str(metrics))
+    return dict(labels=labels,region_labels=regions.copy(),chart_uv=chart_uv,corner_uv=corners,
+                metrics=metrics,component_attempts=records)
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('baseline',type=Path,help='native export prefix (.geometry.json and .labels)')
+    parser.add_argument('output',type=Path)
+    parser.add_argument('--stretch-limit',type=float,default=1.35)
+    parser.add_argument('--merge',action='store_true',help='rejoin valid subdivisions inside each region')
+    args = parser.parse_args()
+    geometry = args.baseline.with_suffix('.geometry.json'); labels = args.baseline.with_suffix('.labels')
+    source = json.loads(geometry.read_text()); v = np.asarray(source['positions']); f = np.asarray(source['triangles'])
+    regions = np.loadtxt(labels,dtype=np.int64,ndmin=1)
+    result = execute(v,f,regions,stretch_limit=args.stretch_limit,merge=args.merge)
+    record = dict(schema='intrinsic.baseline-atlas.diagnostic.v1',claim_eligible=False,
+                  implementation='python_baseline_boundary_cuts_lscm',stretch_limit=args.stretch_limit,merge=args.merge,
+                  source_sha256=hashlib.sha256(geometry.read_bytes()).hexdigest(),
+                  baseline_labels_sha256=hashlib.sha256(labels.read_bytes()).hexdigest(),
+                  implementation_sha256=hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
+                  metrics=result['metrics'],component_attempts=result['component_attempts'])
+    args.output.parent.mkdir(parents=True,exist_ok=True)
+    args.output.with_suffix('.json').write_text(json.dumps(record,indent=2,allow_nan=False)+'\n')
+    arrays = {k:x for k,x in result.items() if k not in ('metrics','component_attempts')}
+    np.savez_compressed(args.output.with_suffix('.npz'),vertices=v,faces=f,**arrays)
+    render(v,f,result,args.output.with_suffix('.png'),f'{args.baseline.name} · protected regions · {record["metrics"]["chart_count"]} UV charts')
+    print(json.dumps(record,allow_nan=False),flush=True)
+
+
+if __name__ == '__main__':
+    main()

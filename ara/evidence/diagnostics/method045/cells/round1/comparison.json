@@ -1,0 +1,1927 @@
+[
+  {
+    "mesh": "sculpt",
+    "arm": "protected",
+    "subdivided": false,
+    "faces": 7342,
+    "source_sha256": "941c988ce43502c48b6d0eae0f6d0f6ff0a410c4e2d88e8c3857ab0b9d3cef0f",
+    "baseline_labels_sha256": "c2b1ea735efb706b16c29dd40fa2ac69da60624b0a30566cd9928aff4575daaf",
+    "claim_eligible": false,
+    "stretch_limit": 1.35,
+    "anisotropy_limit": 2.0,
+    "outcome": "protected_with_chart_splits",
+    "metrics": {
+      "chart_count": 6,
+      "invalid_charts": [],
+      "chart_texel_density_ratio": 1.0011074725307612,
+      "non_disk_charts": [],
+      "positive_area_overlap_count": 0,
+      "overlap_pairs_sample": [],
+      "global_chart_reflections": 5,
+      "all_charts_valid": true,
+      "max_stretch": 1.244345247138066,
+      "mean_stretch": 1.0487083346655288,
+      "area_weighted_p95_stretch": 1.1475699323471271,
+      "max_anisotropy": 1.0501158452947517,
+      "mean_anisotropy": 1.0091720540397529,
+      "seam_length_over_sqrt_area": 6.770872302044108,
+      "smallest_chart_area_fraction": 0.11093774485004262,
+      "continuous_packing_utilization": 0.4078911021415708,
+      "postpack_bound_passed": true,
+      "square_texture_occupancy": 0.39912732769408465,
+      "retained_baseline_edges": 384,
+      "lost_baseline_edges": 0,
+      "extra_chart_boundary_edges": 24,
+      "internal_uv_cut_edges": 29,
+      "total_uv_seam_length_over_sqrt_area": 7.298727030988109,
+      "baseline_seam_length_over_sqrt_area": 6.357515016553575,
+      "internal_uv_seam_length_over_sqrt_area": 0.5278547289439997,
+      "region_count": 5
+    },
+    "prepack_metrics": {
+      "chart_count": 6,
+      "invalid_charts": [],
+      "chart_texel_density_ratio": 1.0000000000000002,
+      "non_disk_charts": [],
+      "positive_area_overlap_count": 0,
+      "overlap_pairs_sample": [],
+      "global_chart_reflections": 0,
+      "all_charts_valid": true,
+      "max_stretch": 1.244654738665716,
+      "mean_stretch": 1.0486330515497244,
+      "area_weighted_p95_stretch": 1.1477442181156428,
+      "max_anisotropy": 1.0502808944873419,
+      "mean_anisotropy": 1.009022115567012,
+      "seam_length_over_sqrt_area": 6.770872302044108,
+      "smallest_chart_area_fraction": 0.11093774485004262,
+      "retained_baseline_edges": 384,
+      "lost_baseline_edges": 0,
+      "extra_chart_boundary_edges": 24,
+      "internal_uv_cut_edges": 29,
+      "total_uv_seam_length_over_sqrt_area": 7.298727030988109,
+      "baseline_seam_length_over_sqrt_area": 6.357515016553575,
+      "internal_uv_seam_length_over_sqrt_area": 0.5278547289439997,
+      "region_count": 5,
+      "region_component_count": 5,
+      "split_reasons": {
+        "distortion": 1
+      },
+      "uv_solves": 7,
+      "outcome": "protected_with_chart_splits"
+    },
+    "component_attempts": [
+      {
+        "region": 0,
+        "faces": 926,
+        "status": "accepted",
+        "euler_characteristic": 0,
+        "boundary_loops": 2,
+        "cut_edges": 7
+      },
+      {
+        "region": 1,
+        "faces": 1488,
+        "status": "accepted",
+        "euler_characteristic": -1,
+        "boundary_loops": 3,
+        "cut_edges": 12
+      },
+      {
+        "region": 2,
+        "faces": 788,
+        "status": "accepted",
+        "euler_characteristic": 0,
+        "boundary_loops": 2,
+        "cut_edges": 5
+      },
+      {
+        "region": 3,
+        "faces": 792,
+        "status": "accepted",
+        "euler_characteristic": 0,
+        "boundary_loops": 2,
+        "cut_edges": 5
+      },
+      {
+        "region": 4,
+        "faces": 3348,
+        "status": "distortion",
+        "euler_characteristic": -1,
+        "boundary_loops": 3,
+        "cut_edges": 9
+      },
+      {
+        "region": 4,
+        "faces": 1662,
+        "status": "accepted",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 4,
+        "faces": 1686,
+        "status": "accepted",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      }
+    ]
+  },
+  {
+    "mesh": "sculpt",
+    "arm": "feature",
+    "subdivided": false,
+    "faces": 7342,
+    "source_sha256": "941c988ce43502c48b6d0eae0f6d0f6ff0a410c4e2d88e8c3857ab0b9d3cef0f",
+    "baseline_labels_sha256": "c2b1ea735efb706b16c29dd40fa2ac69da60624b0a30566cd9928aff4575daaf",
+    "claim_eligible": false,
+    "stretch_limit": 1.35,
+    "anisotropy_limit": 2.0,
+    "outcome": "seeded_atlas",
+    "metrics": {
+      "chart_count": 5,
+      "invalid_charts": [],
+      "chart_texel_density_ratio": 1.0011843979594324,
+      "non_disk_charts": [],
+      "positive_area_overlap_count": 0,
+      "overlap_pairs_sample": [],
+      "global_chart_reflections": 1,
+      "all_charts_valid": true,
+      "max_stretch": 1.3014054407017892,
+      "mean_stretch": 1.070849980129627,
+      "area_weighted_p95_stretch": 1.1731462553003729,
+      "max_anisotropy": 1.225505882195932,
+      "mean_anisotropy": 1.0107984292515588,
+      "seam_length_over_sqrt_area": 6.801343326226663,
+      "smallest_chart_area_fraction": 0.08208452630631706,
+      "continuous_packing_utilization": 0.5116099640116705,
+      "postpack_bound_passed": true,
+      "square_texture_occupancy": 0.4910479831692396,
+      "retained_baseline_edges": 321,
+      "lost_baseline_edges": 63,
+      "extra_chart_boundary_edges": 87,
+      "internal_uv_cut_edges": 0,
+      "total_uv_seam_length_over_sqrt_area": 6.801343326226663,
+      "baseline_seam_length_over_sqrt_area": 6.357515016553575,
+      "internal_uv_seam_length_over_sqrt_area": 0.0,
+      "region_count": 5
+    },
+    "prepack_metrics": {
+      "input_vertices": 3669,
+      "input_faces": 7342,
+      "initial_charts": 64,
+      "chart_count": 5,
+      "merge_attempts": 93,
+      "accepted_merges": 59,
+      "parameterization_attempts": 157,
+      "uv_solves": 136,
+      "factorized_degrees_of_freedom": 86436,
+      "rejections": {
+        "merge_topology": 21,
+        "merge_distortion": 13
+      },
+      "max_stretch": 1.301891416146789,
+      "mean_stretch": 1.0708250908937482,
+      "max_anisotropy": 1.2255389336409945,
+      "mean_anisotropy": 1.010749540800563,
+      "seam_length_over_sqrt_area": 6.801343326226663,
+      "continuous_packing_utilization": 0.27580513955973956,
+      "all_charts_valid": true,
+      "runtime_seconds": 1.6551325809850823,
+      "phases_seconds": {
+        "geometry": 0.2834487459913362,
+        "clustering": 0.08427111100172624,
+        "initial_validation": 0.29385731101501733,
+        "merging": 0.9885796009912156,
+        "packing": 0.004975811985787004
+      }
+    },
+    "component_attempts": []
+  },
+  {
+    "mesh": "sculpt",
+    "arm": "growth-only",
+    "subdivided": false,
+    "faces": 7342,
+    "source_sha256": "941c988ce43502c48b6d0eae0f6d0f6ff0a410c4e2d88e8c3857ab0b9d3cef0f",
+    "baseline_labels_sha256": "c2b1ea735efb706b16c29dd40fa2ac69da60624b0a30566cd9928aff4575daaf",
+    "claim_eligible": false,
+    "stretch_limit": 1.35,
+    "anisotropy_limit": 2.0,
+    "outcome": "seeded_atlas",
+    "metrics": {
+      "chart_count": 8,
+      "invalid_charts": [],
+      "chart_texel_density_ratio": 1.0034929960672725,
+      "non_disk_charts": [],
+      "positive_area_overlap_count": 0,
+      "overlap_pairs_sample": [],
+      "global_chart_reflections": 2,
+      "all_charts_valid": true,
+      "max_stretch": 1.33312695670724,
+      "mean_stretch": 1.0912642592955855,
+      "area_weighted_p95_stretch": 1.2153830401345258,
+      "max_anisotropy": 1.0915611800297556,
+      "mean_anisotropy": 1.0163047811737904,
+      "seam_length_over_sqrt_area": 6.701259250725925,
+      "smallest_chart_area_fraction": 0.01865528666847019,
+      "continuous_packing_utilization": 0.5684802382509897,
+      "postpack_bound_passed": true,
+      "square_texture_occupancy": 0.5432325485865475,
+      "retained_baseline_edges": 227,
+      "lost_baseline_edges": 157,
+      "extra_chart_boundary_edges": 167,
+      "internal_uv_cut_edges": 0,
+      "total_uv_seam_length_over_sqrt_area": 6.70125925072592,
+      "baseline_seam_length_over_sqrt_area": 6.357515016553575,
+      "internal_uv_seam_length_over_sqrt_area": 0.0,
+      "region_count": 5
+    },
+    "prepack_metrics": {
+      "input_vertices": 3669,
+      "input_faces": 7342,
+      "initial_charts": 64,
+      "chart_count": 8,
+      "merge_attempts": 114,
+      "accepted_merges": 56,
+      "parameterization_attempts": 178,
+      "uv_solves": 168,
+      "factorized_degrees_of_freedom": 158254,
+      "rejections": {
+        "merge_distortion": 47,
+        "merge_topology": 10,
+        "merge_boundary_overlap": 1
+      },
+      "max_stretch": 1.3326314883108203,
+      "mean_stretch": 1.0911412901731317,
+      "max_anisotropy": 1.0918945419244572,
+      "mean_anisotropy": 1.0160610562217394,
+      "seam_length_over_sqrt_area": 6.701259250725925,
+      "continuous_packing_utilization": 0.32651089648547,
+      "all_charts_valid": true,
+      "runtime_seconds": 1.4408848729799502,
+      "phases_seconds": {
+        "geometry": 0.1666843019775115,
+        "clustering": 0.03758021202520467,
+        "initial_validation": 0.16177169099682942,
+        "merging": 1.0704433999781031,
+        "packing": 0.0044052680023014545
+      }
+    },
+    "component_attempts": []
+  },
+  {
+    "mesh": "sculpt",
+    "arm": "xatlas",
+    "subdivided": false,
+    "faces": 7342,
+    "source_sha256": "941c988ce43502c48b6d0eae0f6d0f6ff0a410c4e2d88e8c3857ab0b9d3cef0f",
+    "baseline_labels_sha256": "c2b1ea735efb706b16c29dd40fa2ac69da60624b0a30566cd9928aff4575daaf",
+    "claim_eligible": false,
+    "stretch_limit": 1.35,
+    "anisotropy_limit": 2.0,
+    "outcome": "native_end_to_end",
+    "metrics": {
+      "chart_count": 17,
+      "invalid_charts": [],
+      "chart_texel_density_ratio": 1.0036587590992867,
+      "non_disk_charts": [],
+      "positive_area_overlap_count": 0,
+      "overlap_pairs_sample": [],
+      "global_chart_reflections": 6,
+      "all_charts_valid": true,
+      "max_stretch": 1.2454733408519247,
+      "mean_stretch": 1.0213506890637516,
+      "area_weighted_p95_stretch": 1.0565466922753732,
+      "max_anisotropy": 1.2732250892307444,
+      "mean_anisotropy": 1.0103264005389752,
+      "seam_length_over_sqrt_area": 10.329607553408483,
+      "smallest_chart_area_fraction": 0.028718344075208322,
+      "runtime_seconds": 2.154952698,
+      "implementation": "native_engine_xatlas",
+      "square_texture_occupancy": 0.5090326771461945,
+      "continuous_packing_utilization": 0.5177305503927935,
+      "retained_baseline_edges": 384,
+      "lost_baseline_edges": 0,
+      "extra_chart_boundary_edges": 227,
+      "internal_uv_cut_edges": 0,
+      "total_uv_seam_length_over_sqrt_area": 10.329607553408485,
+      "baseline_seam_length_over_sqrt_area": 6.357515016553575,
+      "internal_uv_seam_length_over_sqrt_area": 0.0,
+      "region_count": 5
+    },
+    "prepack_metrics": null,
+    "component_attempts": []
+  },
+  {
+    "mesh": "frog",
+    "arm": "protected",
+    "subdivided": false,
+    "faces": 19106,
+    "source_sha256": "f272713be39dc528b36a0be29d8e0439fcbce28f3d3d5edc302291155d6b5d2f",
+    "baseline_labels_sha256": "23817553e6515f245e5f22e515a03acc1aebdafce28ead039b2a0bff265e8399",
+    "claim_eligible": false,
+    "stretch_limit": 1.35,
+    "anisotropy_limit": 2.0,
+    "outcome": "protected_with_chart_splits",
+    "metrics": {
+      "chart_count": 63,
+      "invalid_charts": [],
+      "chart_texel_density_ratio": 1.0267759522382371,
+      "non_disk_charts": [],
+      "positive_area_overlap_count": 0,
+      "overlap_pairs_sample": [],
+      "global_chart_reflections": 27,
+      "all_charts_valid": true,
+      "max_stretch": 1.324780210362341,
+      "mean_stretch": 1.03778890905932,
+      "area_weighted_p95_stretch": 1.1218308722501211,
+      "max_anisotropy": 1.2544494546453644,
+      "mean_anisotropy": 1.0127464206074166,
+      "seam_length_over_sqrt_area": 19.112045928926147,
+      "smallest_chart_area_fraction": 0.0001807946160678882,
+      "continuous_packing_utilization": 0.6229466517277056,
+      "postpack_bound_passed": true,
+      "square_texture_occupancy": 0.6125405573176755,
+      "retained_baseline_edges": 55,
+      "lost_baseline_edges": 0,
+      "extra_chart_boundary_edges": 1648,
+      "internal_uv_cut_edges": 2,
+      "total_uv_seam_length_over_sqrt_area": 19.124356154701,
+      "baseline_seam_length_over_sqrt_area": 0.4769557913777354,
+      "internal_uv_seam_length_over_sqrt_area": 0.01231022577482761,
+      "region_count": 5
+    },
+    "prepack_metrics": {
+      "chart_count": 63,
+      "invalid_charts": [],
+      "chart_texel_density_ratio": 1.0000000000000093,
+      "non_disk_charts": [],
+      "positive_area_overlap_count": 0,
+      "overlap_pairs_sample": [],
+      "global_chart_reflections": 0,
+      "all_charts_valid": true,
+      "max_stretch": 1.3241192694521475,
+      "mean_stretch": 1.0375607201005095,
+      "area_weighted_p95_stretch": 1.1216471132685997,
+      "max_anisotropy": 1.2538804742638259,
+      "mean_anisotropy": 1.0122938250626579,
+      "seam_length_over_sqrt_area": 19.112045928926147,
+      "smallest_chart_area_fraction": 0.0001807946160678882,
+      "retained_baseline_edges": 55,
+      "lost_baseline_edges": 0,
+      "extra_chart_boundary_edges": 1648,
+      "internal_uv_cut_edges": 2,
+      "total_uv_seam_length_over_sqrt_area": 19.124356154701,
+      "baseline_seam_length_over_sqrt_area": 0.4769557913777354,
+      "internal_uv_seam_length_over_sqrt_area": 0.01231022577482761,
+      "region_count": 5,
+      "region_component_count": 5,
+      "split_reasons": {
+        "distortion": 58
+      },
+      "uv_solves": 121,
+      "outcome": "protected_with_chart_splits"
+    },
+    "component_attempts": [
+      {
+        "region": 0,
+        "faces": 19019,
+        "status": "distortion",
+        "euler_characteristic": -2,
+        "boundary_loops": 4,
+        "cut_edges": 66
+      },
+      {
+        "region": 0,
+        "faces": 8118,
+        "status": "distortion",
+        "euler_characteristic": -1,
+        "boundary_loops": 3,
+        "cut_edges": 18
+      },
+      {
+        "region": 0,
+        "faces": 5064,
+        "status": "distortion",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 3008,
+        "status": "distortion",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 1417,
+        "status": "distortion",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 1011,
+        "status": "distortion",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 680,
+        "status": "distortion",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 469,
+        "status": "distortion",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 284,
+        "status": "distortion",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 155,
+        "status": "distortion",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 98,
+        "status": "distortion",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 29,
+        "status": "accepted",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 69,
+        "status": "accepted",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 57,
+        "status": "accepted",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 129,
+        "status": "accepted",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 185,
+        "status": "accepted",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 211,
+        "status": "accepted",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 331,
+        "status": "accepted",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 406,
+        "status": "accepted",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 1591,
+        "status": "distortion",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 623,
+        "status": "accepted",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 968,
+        "status": "accepted",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 2056,
+        "status": "distortion",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 963,
+        "status": "distortion",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 657,
+        "status": "distortion",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 340,
+        "status": "distortion",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 169,
+        "status": "distortion",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 129,
+        "status": "distortion",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 43,
+        "status": "accepted",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 86,
+        "status": "distortion",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 13,
+        "status": "accepted",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 73,
+        "status": "distortion",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 39,
+        "status": "accepted",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 34,
+        "status": "accepted",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 40,
+        "status": "accepted",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 171,
+        "status": "accepted",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 317,
+        "status": "accepted",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 306,
+        "status": "accepted",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 1093,
+        "status": "accepted",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 3054,
+        "status": "distortion",
+        "euler_characteristic": -1,
+        "boundary_loops": 3,
+        "cut_edges": 15
+      },
+      {
+        "region": 0,
+        "faces": 1630,
+        "status": "distortion",
+        "euler_characteristic": 0,
+        "boundary_loops": 2,
+        "cut_edges": 2
+      },
+      {
+        "region": 0,
+        "faces": 802,
+        "status": "accepted",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 828,
+        "status": "accepted",
+        "euler_characteristic": 0,
+        "boundary_loops": 2,
+        "cut_edges": 2
+      },
+      {
+        "region": 0,
+        "faces": 1424,
+        "status": "distortion",
+        "euler_characteristic": 0,
+        "boundary_loops": 2,
+        "cut_edges": 3
+      },
+      {
+        "region": 0,
+        "faces": 840,
+        "status": "distortion",
+        "euler_characteristic": 0,
+        "boundary_loops": 2,
+        "cut_edges": 3
+      },
+      {
+        "region": 0,
+        "faces": 598,
+        "status": "distortion",
+        "euler_characteristic": 0,
+        "boundary_loops": 2,
+        "cut_edges": 3
+      },
+      {
+        "region": 0,
+        "faces": 380,
+        "status": "distortion",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 157,
+        "status": "accepted",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 223,
+        "status": "accepted",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 218,
+        "status": "distortion",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 81,
+        "status": "accepted",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 137,
+        "status": "accepted",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 242,
+        "status": "accepted",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 584,
+        "status": "accepted",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 10901,
+        "status": "distortion",
+        "euler_characteristic": -1,
+        "boundary_loops": 3,
+        "cut_edges": 25
+      },
+      {
+        "region": 0,
+        "faces": 4448,
+        "status": "distortion",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 1964,
+        "status": "distortion",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 860,
+        "status": "accepted",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 1104,
+        "status": "distortion",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 473,
+        "status": "accepted",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 631,
+        "status": "distortion",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 450,
+        "status": "distortion",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 247,
+        "status": "accepted",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 203,
+        "status": "accepted",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 181,
+        "status": "accepted",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 2484,
+        "status": "accepted",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 6453,
+        "status": "distortion",
+        "euler_characteristic": -1,
+        "boundary_loops": 3,
+        "cut_edges": 17
+      },
+      {
+        "region": 0,
+        "faces": 3220,
+        "status": "distortion",
+        "euler_characteristic": -1,
+        "boundary_loops": 3,
+        "cut_edges": 17
+      },
+      {
+        "region": 0,
+        "faces": 1776,
+        "status": "distortion",
+        "euler_characteristic": 0,
+        "boundary_loops": 2,
+        "cut_edges": 10
+      },
+      {
+        "region": 0,
+        "faces": 1045,
+        "status": "distortion",
+        "euler_characteristic": 0,
+        "boundary_loops": 2,
+        "cut_edges": 4
+      },
+      {
+        "region": 0,
+        "faces": 792,
+        "status": "distortion",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 593,
+        "status": "distortion",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 321,
+        "status": "distortion",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 188,
+        "status": "distortion",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 136,
+        "status": "accepted",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 52,
+        "status": "accepted",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 133,
+        "status": "accepted",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 272,
+        "status": "accepted",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 199,
+        "status": "accepted",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 253,
+        "status": "distortion",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 116,
+        "status": "accepted",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 137,
+        "status": "accepted",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 731,
+        "status": "accepted",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 1444,
+        "status": "distortion",
+        "euler_characteristic": 0,
+        "boundary_loops": 2,
+        "cut_edges": 7
+      },
+      {
+        "region": 0,
+        "faces": 550,
+        "status": "distortion",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 316,
+        "status": "accepted",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 234,
+        "status": "distortion",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 111,
+        "status": "accepted",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 123,
+        "status": "distortion",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 35,
+        "status": "accepted",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 88,
+        "status": "distortion",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 19,
+        "status": "accepted",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 69,
+        "status": "distortion",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 29,
+        "status": "accepted",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 40,
+        "status": "accepted",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 894,
+        "status": "distortion",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 592,
+        "status": "distortion",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 164,
+        "status": "accepted",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 428,
+        "status": "distortion",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 177,
+        "status": "accepted",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 251,
+        "status": "distortion",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 137,
+        "status": "distortion",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 40,
+        "status": "accepted",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 97,
+        "status": "accepted",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 114,
+        "status": "accepted",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 302,
+        "status": "accepted",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 3233,
+        "status": "distortion",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 2015,
+        "status": "distortion",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 1042,
+        "status": "distortion",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 587,
+        "status": "accepted",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 455,
+        "status": "accepted",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 973,
+        "status": "distortion",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 441,
+        "status": "accepted",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 532,
+        "status": "accepted",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 1218,
+        "status": "distortion",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 514,
+        "status": "accepted",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 704,
+        "status": "accepted",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 1,
+        "faces": 5,
+        "status": "accepted",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 2,
+        "faces": 28,
+        "status": "accepted",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 3,
+        "faces": 42,
+        "status": "accepted",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 4,
+        "faces": 12,
+        "status": "accepted",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      }
+    ]
+  },
+  {
+    "mesh": "frog",
+    "arm": "feature",
+    "subdivided": false,
+    "faces": 19106,
+    "source_sha256": "f272713be39dc528b36a0be29d8e0439fcbce28f3d3d5edc302291155d6b5d2f",
+    "baseline_labels_sha256": "23817553e6515f245e5f22e515a03acc1aebdafce28ead039b2a0bff265e8399",
+    "claim_eligible": false,
+    "stretch_limit": 1.35,
+    "anisotropy_limit": 2.0,
+    "outcome": "seeded_atlas",
+    "metrics": {
+      "chart_count": 15,
+      "invalid_charts": [],
+      "chart_texel_density_ratio": 1.0149726500774563,
+      "non_disk_charts": [],
+      "positive_area_overlap_count": 0,
+      "overlap_pairs_sample": [],
+      "global_chart_reflections": 5,
+      "all_charts_valid": true,
+      "max_stretch": 1.3469228691653015,
+      "mean_stretch": 1.0704062025798826,
+      "area_weighted_p95_stretch": 1.1802235753226367,
+      "max_anisotropy": 1.2657919464088954,
+      "mean_anisotropy": 1.0149746383483877,
+      "seam_length_over_sqrt_area": 9.394231446803346,
+      "smallest_chart_area_fraction": 0.0010533232460716022,
+      "continuous_packing_utilization": 0.5951471610562701,
+      "postpack_bound_passed": true,
+      "square_texture_occupancy": 0.5694039920662994,
+      "retained_baseline_edges": 14,
+      "lost_baseline_edges": 41,
+      "extra_chart_boundary_edges": 894,
+      "internal_uv_cut_edges": 0,
+      "total_uv_seam_length_over_sqrt_area": 9.39423144680335,
+      "baseline_seam_length_over_sqrt_area": 0.4769557913777354,
+      "internal_uv_seam_length_over_sqrt_area": 0.0,
+      "region_count": 5
+    },
+    "prepack_metrics": {
+      "input_vertices": 9555,
+      "input_faces": 19106,
+      "initial_charts": 73,
+      "chart_count": 15,
+      "merge_attempts": 155,
+      "accepted_merges": 58,
+      "parameterization_attempts": 237,
+      "uv_solves": 216,
+      "factorized_degrees_of_freedom": 398640,
+      "rejections": {
+        "initial_distortion": 9,
+        "merge_distortion": 76,
+        "merge_topology": 21
+      },
+      "max_stretch": 1.3454930819790076,
+      "mean_stretch": 1.0703441648609802,
+      "max_anisotropy": 1.2645420556068006,
+      "mean_anisotropy": 1.014855273811895,
+      "seam_length_over_sqrt_area": 9.394231446803346,
+      "continuous_packing_utilization": 0.4077848756436696,
+      "all_charts_valid": true,
+      "runtime_seconds": 3.674691381980665,
+      "phases_seconds": {
+        "geometry": 0.5780477949883789,
+        "clustering": 0.15089415799593553,
+        "initial_validation": 0.3203589850163553,
+        "merging": 2.612882642977638,
+        "packing": 0.012507801002357155
+      }
+    },
+    "component_attempts": []
+  },
+  {
+    "mesh": "frog",
+    "arm": "growth-only",
+    "subdivided": false,
+    "faces": 19106,
+    "source_sha256": "f272713be39dc528b36a0be29d8e0439fcbce28f3d3d5edc302291155d6b5d2f",
+    "baseline_labels_sha256": "23817553e6515f245e5f22e515a03acc1aebdafce28ead039b2a0bff265e8399",
+    "claim_eligible": false,
+    "stretch_limit": 1.35,
+    "anisotropy_limit": 2.0,
+    "outcome": "seeded_atlas",
+    "metrics": {
+      "chart_count": 16,
+      "invalid_charts": [],
+      "chart_texel_density_ratio": 1.0153025271573934,
+      "non_disk_charts": [],
+      "positive_area_overlap_count": 0,
+      "overlap_pairs_sample": [],
+      "global_chart_reflections": 8,
+      "all_charts_valid": true,
+      "max_stretch": 1.3469229237035387,
+      "mean_stretch": 1.0723263253868502,
+      "area_weighted_p95_stretch": 1.1967057967524446,
+      "max_anisotropy": 1.2657923343874875,
+      "mean_anisotropy": 1.0144691631957534,
+      "seam_length_over_sqrt_area": 9.692836803704079,
+      "smallest_chart_area_fraction": 0.0010533232460716022,
+      "continuous_packing_utilization": 0.5989660769658238,
+      "postpack_bound_passed": true,
+      "square_texture_occupancy": 0.5708208281216147,
+      "retained_baseline_edges": 14,
+      "lost_baseline_edges": 41,
+      "extra_chart_boundary_edges": 908,
+      "internal_uv_cut_edges": 0,
+      "total_uv_seam_length_over_sqrt_area": 9.692836803704077,
+      "baseline_seam_length_over_sqrt_area": 0.4769557913777354,
+      "internal_uv_seam_length_over_sqrt_area": 0.0,
+      "region_count": 5
+    },
+    "prepack_metrics": {
+      "input_vertices": 9555,
+      "input_faces": 19106,
+      "initial_charts": 73,
+      "chart_count": 16,
+      "merge_attempts": 177,
+      "accepted_merges": 57,
+      "parameterization_attempts": 259,
+      "uv_solves": 237,
+      "factorized_degrees_of_freedom": 484826,
+      "rejections": {
+        "initial_distortion": 9,
+        "merge_distortion": 98,
+        "merge_topology": 22
+      },
+      "max_stretch": 1.3454930819790076,
+      "mean_stretch": 1.0722737688747914,
+      "max_anisotropy": 1.2645420556068006,
+      "mean_anisotropy": 1.0143677234947144,
+      "seam_length_over_sqrt_area": 9.692836803704079,
+      "continuous_packing_utilization": 0.41348260806973064,
+      "all_charts_valid": true,
+      "runtime_seconds": 3.9591082319966517,
+      "phases_seconds": {
+        "geometry": 0.5005048479943071,
+        "clustering": 0.12812514099641703,
+        "initial_validation": 0.3155155580025166,
+        "merging": 3.003236809017835,
+        "packing": 0.01172587598557584
+      }
+    },
+    "component_attempts": []
+  },
+  {
+    "mesh": "frog",
+    "arm": "xatlas",
+    "subdivided": false,
+    "faces": 19106,
+    "source_sha256": "f272713be39dc528b36a0be29d8e0439fcbce28f3d3d5edc302291155d6b5d2f",
+    "baseline_labels_sha256": "23817553e6515f245e5f22e515a03acc1aebdafce28ead039b2a0bff265e8399",
+    "claim_eligible": false,
+    "stretch_limit": 1.35,
+    "anisotropy_limit": 2.0,
+    "outcome": "native_end_to_end",
+    "metrics": {
+      "chart_count": 26,
+      "invalid_charts": [],
+      "chart_texel_density_ratio": 1.0839004312260487,
+      "non_disk_charts": [
+        1
+      ],
+      "positive_area_overlap_count": 0,
+      "overlap_pairs_sample": [],
+      "global_chart_reflections": 12,
+      "all_charts_valid": true,
+      "max_stretch": 1.8580724639968995,
+      "mean_stretch": 1.0478501889843108,
+      "area_weighted_p95_stretch": 1.1878459272414648,
+      "max_anisotropy": 1.3285090402663933,
+      "mean_anisotropy": 1.0105923346910548,
+      "seam_length_over_sqrt_area": 11.892689868129407,
+      "smallest_chart_area_fraction": 1.9302178504964925e-05,
+      "runtime_seconds": 16.851309256,
+      "implementation": "native_engine_xatlas",
+      "square_texture_occupancy": 0.5148549301218837,
+      "continuous_packing_utilization": 0.5359838175389459,
+      "retained_baseline_edges": 14,
+      "lost_baseline_edges": 41,
+      "extra_chart_boundary_edges": 1155,
+      "internal_uv_cut_edges": 0,
+      "total_uv_seam_length_over_sqrt_area": 11.892689868129413,
+      "baseline_seam_length_over_sqrt_area": 0.4769557913777354,
+      "internal_uv_seam_length_over_sqrt_area": 0.0,
+      "region_count": 5
+    },
+    "prepack_metrics": null,
+    "component_attempts": []
+  },
+  {
+    "mesh": "fandisk",
+    "arm": "protected",
+    "subdivided": false,
+    "faces": 12946,
+    "source_sha256": "70f4be631fa9feb757bfc43581feed3f2a8fd13e538fba3fb38297769ab50557",
+    "baseline_labels_sha256": "d66b3d215a241914f7362584840d111f416b76a047c208ec589d9efa3dd14ed7",
+    "claim_eligible": false,
+    "stretch_limit": 1.35,
+    "anisotropy_limit": 2.0,
+    "outcome": "protected_without_chart_splits",
+    "metrics": {
+      "chart_count": 15,
+      "invalid_charts": [],
+      "chart_texel_density_ratio": 1.0053317360488314,
+      "non_disk_charts": [],
+      "positive_area_overlap_count": 0,
+      "overlap_pairs_sample": [],
+      "global_chart_reflections": 10,
+      "all_charts_valid": true,
+      "max_stretch": 1.0285596175836498,
+      "mean_stretch": 1.0024899819530209,
+      "area_weighted_p95_stretch": 1.0151456613052903,
+      "max_anisotropy": 1.0058711763947086,
+      "mean_anisotropy": 1.0013498554149776,
+      "seam_length_over_sqrt_area": 9.56222195433226,
+      "smallest_chart_area_fraction": 0.014676021158168108,
+      "continuous_packing_utilization": 0.6109457455301412,
+      "postpack_bound_passed": true,
+      "square_texture_occupancy": 0.6072458469955151,
+      "retained_baseline_edges": 769,
+      "lost_baseline_edges": 0,
+      "extra_chart_boundary_edges": 0,
+      "internal_uv_cut_edges": 0,
+      "total_uv_seam_length_over_sqrt_area": 9.562221954332257,
+      "baseline_seam_length_over_sqrt_area": 9.562221954332257,
+      "internal_uv_seam_length_over_sqrt_area": 0.0,
+      "region_count": 15
+    },
+    "prepack_metrics": {
+      "chart_count": 15,
+      "invalid_charts": [],
+      "chart_texel_density_ratio": 1.0000000000000007,
+      "non_disk_charts": [],
+      "positive_area_overlap_count": 0,
+      "overlap_pairs_sample": [],
+      "global_chart_reflections": 0,
+      "all_charts_valid": true,
+      "max_stretch": 1.0286887388506587,
+      "mean_stretch": 1.0019850466043012,
+      "area_weighted_p95_stretch": 1.0151700322124717,
+      "max_anisotropy": 1.0056048801705737,
+      "mean_anisotropy": 1.0003408767469073,
+      "seam_length_over_sqrt_area": 9.56222195433226,
+      "smallest_chart_area_fraction": 0.014676021158168108,
+      "retained_baseline_edges": 769,
+      "lost_baseline_edges": 0,
+      "extra_chart_boundary_edges": 0,
+      "internal_uv_cut_edges": 0,
+      "total_uv_seam_length_over_sqrt_area": 9.562221954332257,
+      "baseline_seam_length_over_sqrt_area": 9.562221954332257,
+      "internal_uv_seam_length_over_sqrt_area": 0.0,
+      "region_count": 15,
+      "region_component_count": 15,
+      "split_reasons": {},
+      "uv_solves": 15,
+      "outcome": "protected_without_chart_splits"
+    },
+    "component_attempts": [
+      {
+        "region": 14,
+        "faces": 543,
+        "status": "accepted",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 1,
+        "faces": 263,
+        "status": "accepted",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 1056,
+        "status": "accepted",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 2,
+        "faces": 1815,
+        "status": "accepted",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 3,
+        "faces": 944,
+        "status": "accepted",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 4,
+        "faces": 378,
+        "status": "accepted",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 5,
+        "faces": 424,
+        "status": "accepted",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 6,
+        "faces": 412,
+        "status": "accepted",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 7,
+        "faces": 198,
+        "status": "accepted",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 8,
+        "faces": 3020,
+        "status": "accepted",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 9,
+        "faces": 563,
+        "status": "accepted",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 10,
+        "faces": 2048,
+        "status": "accepted",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 11,
+        "faces": 612,
+        "status": "accepted",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 12,
+        "faces": 340,
+        "status": "accepted",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 13,
+        "faces": 330,
+        "status": "accepted",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      }
+    ]
+  },
+  {
+    "mesh": "fandisk",
+    "arm": "feature",
+    "subdivided": false,
+    "faces": 12946,
+    "source_sha256": "70f4be631fa9feb757bfc43581feed3f2a8fd13e538fba3fb38297769ab50557",
+    "baseline_labels_sha256": "d66b3d215a241914f7362584840d111f416b76a047c208ec589d9efa3dd14ed7",
+    "claim_eligible": false,
+    "stretch_limit": 1.35,
+    "anisotropy_limit": 2.0,
+    "outcome": "seeded_atlas",
+    "metrics": {
+      "chart_count": 5,
+      "invalid_charts": [],
+      "chart_texel_density_ratio": 1.0030563024434302,
+      "non_disk_charts": [],
+      "positive_area_overlap_count": 0,
+      "overlap_pairs_sample": [],
+      "global_chart_reflections": 1,
+      "all_charts_valid": true,
+      "max_stretch": 1.319808772428766,
+      "mean_stretch": 1.0475653575138448,
+      "area_weighted_p95_stretch": 1.1932625376400046,
+      "max_anisotropy": 1.0956354188627613,
+      "mean_anisotropy": 1.0035288521426575,
+      "seam_length_over_sqrt_area": 6.023020068484281,
+      "smallest_chart_area_fraction": 0.02641006847331912,
+      "continuous_packing_utilization": 0.4913615453537513,
+      "postpack_bound_passed": true,
+      "square_texture_occupancy": 0.35675757007402376,
+      "retained_baseline_edges": 442,
+      "lost_baseline_edges": 327,
+      "extra_chart_boundary_edges": 41,
+      "internal_uv_cut_edges": 0,
+      "total_uv_seam_length_over_sqrt_area": 6.023020068484281,
+      "baseline_seam_length_over_sqrt_area": 9.562221954332257,
+      "internal_uv_seam_length_over_sqrt_area": 0.0,
+      "region_count": 15
+    },
+    "prepack_metrics": {
+      "input_vertices": 6475,
+      "input_faces": 12946,
+      "initial_charts": 70,
+      "chart_count": 5,
+      "merge_attempts": 93,
+      "accepted_merges": 65,
+      "parameterization_attempts": 169,
+      "uv_solves": 168,
+      "factorized_degrees_of_freedom": 230856,
+      "rejections": {
+        "initial_boundary_overlap": 6,
+        "merge_distortion": 25,
+        "merge_boundary_overlap": 2,
+        "merge_topology": 1
+      },
+      "max_stretch": 1.3195538955941248,
+      "mean_stretch": 1.0473856529578898,
+      "max_anisotropy": 1.0952110367555008,
+      "mean_anisotropy": 1.0031790982366773,
+      "seam_length_over_sqrt_area": 6.023020068484281,
+      "continuous_packing_utilization": 0.3304841999166938,
+      "all_charts_valid": true,
+      "runtime_seconds": 2.1010684780194424,
+      "phases_seconds": {
+        "geometry": 0.29298785101855174,
+        "clustering": 0.06701565100229345,
+        "initial_validation": 0.22968453099019825,
+        "merging": 1.503703663998749,
+        "packing": 0.007676781009649858
+      }
+    },
+    "component_attempts": []
+  },
+  {
+    "mesh": "fandisk",
+    "arm": "growth-only",
+    "subdivided": false,
+    "faces": 12946,
+    "source_sha256": "70f4be631fa9feb757bfc43581feed3f2a8fd13e538fba3fb38297769ab50557",
+    "baseline_labels_sha256": "d66b3d215a241914f7362584840d111f416b76a047c208ec589d9efa3dd14ed7",
+    "claim_eligible": false,
+    "stretch_limit": 1.35,
+    "anisotropy_limit": 2.0,
+    "outcome": "seeded_atlas",
+    "metrics": {
+      "chart_count": 4,
+      "invalid_charts": [],
+      "chart_texel_density_ratio": 1.0012630286912207,
+      "non_disk_charts": [],
+      "positive_area_overlap_count": 0,
+      "overlap_pairs_sample": [],
+      "global_chart_reflections": 3,
+      "all_charts_valid": true,
+      "max_stretch": 1.2735262471905413,
+      "mean_stretch": 1.050375100092915,
+      "area_weighted_p95_stretch": 1.148083376665708,
+      "max_anisotropy": 1.0944239225566563,
+      "mean_anisotropy": 1.0046471927798561,
+      "seam_length_over_sqrt_area": 5.551110096470129,
+      "smallest_chart_area_fraction": 0.058874286793603396,
+      "continuous_packing_utilization": 0.5714022818110418,
+      "postpack_bound_passed": true,
+      "square_texture_occupancy": 0.5110456822034821,
+      "retained_baseline_edges": 362,
+      "lost_baseline_edges": 407,
+      "extra_chart_boundary_edges": 80,
+      "internal_uv_cut_edges": 0,
+      "total_uv_seam_length_over_sqrt_area": 5.551110096470131,
+      "baseline_seam_length_over_sqrt_area": 9.562221954332257,
+      "internal_uv_seam_length_over_sqrt_area": 0.0,
+      "region_count": 15
+    },
+    "prepack_metrics": {
+      "input_vertices": 6475,
+      "input_faces": 12946,
+      "initial_charts": 70,
+      "chart_count": 4,
+      "merge_attempts": 114,
+      "accepted_merges": 66,
+      "parameterization_attempts": 190,
+      "uv_solves": 179,
+      "factorized_degrees_of_freedom": 277558,
+      "rejections": {
+        "initial_boundary_overlap": 6,
+        "merge_boundary_overlap": 1,
+        "merge_distortion": 36,
+        "merge_topology": 11
+      },
+      "max_stretch": 1.27343598175202,
+      "mean_stretch": 1.0502498495389598,
+      "max_anisotropy": 1.095038037901295,
+      "mean_anisotropy": 1.0043995261400254,
+      "seam_length_over_sqrt_area": 5.551110096470129,
+      "continuous_packing_utilization": 0.4268389988588755,
+      "all_charts_valid": true,
+      "runtime_seconds": 2.592533374001505,
+      "phases_seconds": {
+        "geometry": 0.2843157800089102,
+        "clustering": 0.0950699370005168,
+        "initial_validation": 0.2699490029772278,
+        "merging": 1.9355194250238128,
+        "packing": 0.007679228991037235
+      }
+    },
+    "component_attempts": []
+  },
+  {
+    "mesh": "fandisk",
+    "arm": "xatlas",
+    "subdivided": false,
+    "faces": 12946,
+    "source_sha256": "70f4be631fa9feb757bfc43581feed3f2a8fd13e538fba3fb38297769ab50557",
+    "baseline_labels_sha256": "d66b3d215a241914f7362584840d111f416b76a047c208ec589d9efa3dd14ed7",
+    "claim_eligible": false,
+    "stretch_limit": 1.35,
+    "anisotropy_limit": 2.0,
+    "outcome": "native_end_to_end",
+    "metrics": {
+      "chart_count": 15,
+      "invalid_charts": [],
+      "chart_texel_density_ratio": 1.0128017114816228,
+      "non_disk_charts": [],
+      "positive_area_overlap_count": 0,
+      "overlap_pairs_sample": [],
+      "global_chart_reflections": 12,
+      "all_charts_valid": true,
+      "max_stretch": 1.1822839263539904,
+      "mean_stretch": 1.0146633902080846,
+      "area_weighted_p95_stretch": 1.0768682285674371,
+      "max_anisotropy": 1.201956677267029,
+      "mean_anisotropy": 1.0097134365450884,
+      "seam_length_over_sqrt_area": 9.168793594668935,
+      "smallest_chart_area_fraction": 0.007708532211611241,
+      "runtime_seconds": 1.503966761,
+      "implementation": "native_engine_xatlas",
+      "square_texture_occupancy": 0.6235443694521778,
+      "continuous_packing_utilization": 0.6291117298937151,
+      "retained_baseline_edges": 632,
+      "lost_baseline_edges": 137,
+      "extra_chart_boundary_edges": 94,
+      "internal_uv_cut_edges": 0,
+      "total_uv_seam_length_over_sqrt_area": 9.168793594668937,
+      "baseline_seam_length_over_sqrt_area": 9.562221954332257,
+      "internal_uv_seam_length_over_sqrt_area": 0.0,
+      "region_count": 15
+    },
+    "prepack_metrics": null,
+    "component_attempts": []
+  }
+]

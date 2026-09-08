@@ -1924,3 +1924,50 @@
 - **Dependencies**: [C69]
 - **Tags**: geometry, CPU diagnostic, feature ablation, non-universal
 - **From staging**: O194
+
+
+## C71: Baseline regions and UV cuts can remain separate
+- **Statement**: The METHOD-045 local CPU diagnostic preserves by construction the source-bound METHOD-039 local labels and every original inter-region edge on sculpt, frog, fandisk and dolphin while producing respectively 6, 23, 15 and 16 valid packed UV charts at maximum per-chart area-normalized bidirectional stretch 1.35 and anisotropy 2. Sculpt retains five semantic regions and all 384 original boundary edges; one region requires an extra UV chart. Fourfold same-surface subdivision preserves all protected borders, with 6 sculpt and 25 frog charts rather than general partition invariance.
+- **Status**: supported — bounded local observations with numerical overlap checks; not a new segmentation model, exact-predicate certificate, native performance result, xatlas-quality dominance or editor integration. Dirty-source benchmark cells remain non-claim-eligible for publication.
+- **Provenance**: ai-executed
+- **Crystallized via**: artifact-commitment
+- **Falsification criteria**: Replaying the retained source/label inputs produces a missing face, changed protected region, lost baseline boundary, UV intersection at the stated tolerance or post-pack bound violation in these candidate cells.
+- **Proof**: [ara/evidence/diagnostics/method045/record.json, tools/diagnostics/atlas/baseline_atlas.py, tools/diagnostics/atlas/compare_baseline_atlases.py, tests/regression/tooling/Test.BaselineAtlas.py, benchmarks/geometry/manifests/geometry_baseline_atlas_diagnostic.yaml]
+- **Dependencies**: []
+- **Review clarification**: [Claude source review and resolution](../evidence/diagnostics/method045/reviews/resolution.md) distinguish correspondence checks from segmentation quality, per-chart stretch from texel-density variation, and whole-chart mirroring from mixed orientation. This review is not an independent rerun or visual acceptance.
+- **Tags**: geometry, CPU diagnostic, region preservation, UV cuts, offline
+- **From staging**: O195
+
+## C72: Exhaustive placement is not a uniform square-texture improvement
+- **Statement**: Replacing default xatlas placement with exhaustive placement improves square-texture occupancy on both frozen METHOD-045 sculpt and frog chart sets without altering the quality limits.
+- **Status**: refuted — sculpt square occupancy falls from 0.3991273 to 0.3952358 despite higher cropped rectangular utilization; frog rises from 0.5824177 to 0.5946973. Both runs retain the tested post-pack bounds. No packing default is promoted.
+- **Provenance**: ai-executed
+- **Crystallized via**: artifact-commitment
+- **Falsification criteria**: Recomputing the sum of triangle areas in the exported square UV domain contradicts the recorded decrease on sculpt with the same frozen chart UVs, resolution and padding.
+- **Proof**: [ara/evidence/diagnostics/method045/packing/sculpt.json, ara/evidence/diagnostics/method045/packing/frog.json, ara/evidence/diagnostics/method045/cells/round2/comparison.json, benchmarks/runners/UvChartPackDiagnosticRunner.cpp, tools/diagnostics/atlas/repack.py]
+- **Dependencies**: [C71]
+- **Tags**: geometry, CPU diagnostic, packing, negative result, metric accounting
+- **From staging**: O196
+
+## C73: Atlas boundary loss occurs at different stages
+- **Statement**: In the source-bound METHOD-045 frog/sculpt local CPU replay, the earlier feature atlas misses respectively 44/5 original boundary edges after raw 64-seed growth and 41/5 after UV validation/subdivision. Merging adds zero frog losses and 58 sculpt losses; all 58 sculpt edges carry native hard-feature flags. The protected arm retains all original borders, while its frog re-merging removes 64 other soft-flagged edges whose anatomical merit is unestablished. Native hard/soft evidence and detached curvature-extremum curves are not direct atlas decision inputs; feature priority alone is not a border-preservation constraint.
+- **Status**: supported — bounded observed calls and saved-array reconciliation, with unchanged final partitions. No quantified curvature-curve alignment, anatomical quality improvement, seed-relocation benefit, native performance or production adoption is established.
+- **Provenance**: ai-executed
+- **Crystallized via**: artifact-commitment
+- **Falsification criteria**: Recomputing boundary loss from the retained initial/pre-merge/final arrays or native edge flags contradicts these counts, or observed atlas final labels differ from their retained references.
+- **Proof**: [ara/evidence/diagnostics/method045/stages/record.json, ara/evidence/diagnostics/method045/stages/boundary-reconciliation.json, ara/evidence/diagnostics/method045/stages/frog-decisions.json, ara/evidence/diagnostics/method045/stages/sculpt-decisions.json, tools/diagnostics/atlas/trace_atlas.py, tests/regression/tooling/Test.BaselineAtlas.py]
+- **Dependencies**: [C71]
+- **Tags**: geometry, CPU diagnostic, stage audit, boundary preservation, offline
+- **From staging**: O197
+
+
+## C74: Constrained collective moves shorten extra UV seams while preserving regions
+- **Statement**: On the frozen METHOD-046 local CPU frog/sculpt cohort, native-plus-curve band refinement reduces additional seam length (including internal UV cuts, normalized by square root of source area) from 11.766352 to 9.246411 and from 0.941212 to 0.765845. Chart counts remain 23/6, original region labels and all 55/384 original border edges remain unchanged, and all five arms per mesh pass the existing post-pack stretch 1.35 and anisotropy 2 limits. Frog curve-support score rises from 0.108440 to 0.132976 versus 0.114768 for length-only and 0.109418 for shuffled guidance. Sculpt square occupancy decreases from 39.9127% to 39.1913%.
+- **Status**: supported — bounded deterministic CPU observations and numerical audits only. The support field is an optimization input, not an independent anatomical oracle. Native guidance has lower common objective than combined guidance; no uniform UV-quality improvement, balanced-area guarantee, global optimality, statistical significance, native speedup or production adoption is established. Dirty-source benchmark records remain non-claim-eligible for publication.
+- **Provenance**: ai-executed
+- **Crystallized via**: artifact-commitment
+- **Falsification criteria**: Replaying the retained inputs and frozen parameters contradicts the stated measurements, changes source/region identity or chart count, loses an original border, violates a recorded post-pack bound, or reveals an accepted non-decreasing full seam-energy move.
+- **Proof**: [ara/evidence/diagnostics/method046/record.json, ara/evidence/diagnostics/method046/benchmarks/frog-curves.json, ara/evidence/diagnostics/method046/benchmarks/sculpt-curves.json, ara/evidence/diagnostics/method046/reviews/resolution.md, tools/diagnostics/atlas/boundary_refine.py, tools/diagnostics/atlas/collect_boundary_refinement.py, tests/regression/tooling/Test.AtlasBoundaryRefine.py, benchmarks/geometry/manifests/geometry_uv_boundary_refinement_diagnostic.yaml]
+- **Dependencies**: [C71, C73]
+- **Tags**: geometry, CPU diagnostic, constrained boundary refinement, feature ablation, offline
+- **From staging**: O199

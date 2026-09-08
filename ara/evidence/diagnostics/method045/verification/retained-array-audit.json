@@ -1,0 +1,126 @@
+[
+  {
+    "mesh": "sculpt",
+    "source_and_region_arrays_exact": true,
+    "charts_do_not_cross_regions": true,
+    "audit": {
+      "chart_count": 6,
+      "invalid_charts": [],
+      "chart_texel_density_ratio": 1.0011074725307612,
+      "non_disk_charts": [],
+      "positive_area_overlap_count": 0,
+      "overlap_pairs_sample": [],
+      "global_chart_reflections": 5,
+      "all_charts_valid": true,
+      "max_stretch": 1.244345247138066,
+      "mean_stretch": 1.0487083346655288,
+      "area_weighted_p95_stretch": 1.1475699323471271,
+      "max_anisotropy": 1.0501158452947517,
+      "mean_anisotropy": 1.0091720540397529,
+      "seam_length_over_sqrt_area": 6.770872302044108,
+      "smallest_chart_area_fraction": 0.11093774485004262
+    },
+    "borders": {
+      "retained_baseline_edges": 384,
+      "lost_baseline_edges": 0,
+      "extra_chart_boundary_edges": 24,
+      "internal_uv_cut_edges": 29,
+      "total_uv_seam_length_over_sqrt_area": 7.298727030988109,
+      "baseline_seam_length_over_sqrt_area": 6.357515016553575,
+      "internal_uv_seam_length_over_sqrt_area": 0.5278547289439997
+    }
+  },
+  {
+    "mesh": "frog",
+    "source_and_region_arrays_exact": true,
+    "charts_do_not_cross_regions": true,
+    "audit": {
+      "chart_count": 23,
+      "invalid_charts": [],
+      "chart_texel_density_ratio": 1.0268832195525204,
+      "non_disk_charts": [],
+      "positive_area_overlap_count": 0,
+      "overlap_pairs_sample": [],
+      "global_chart_reflections": 9,
+      "all_charts_valid": true,
+      "max_stretch": 1.349355216680261,
+      "mean_stretch": 1.0660937892359936,
+      "area_weighted_p95_stretch": 1.169638071181839,
+      "max_anisotropy": 1.254425207543235,
+      "mean_anisotropy": 1.0152840164533934,
+      "seam_length_over_sqrt_area": 12.202605102562654,
+      "smallest_chart_area_fraction": 0.0001807946160678882
+    },
+    "borders": {
+      "retained_baseline_edges": 55,
+      "lost_baseline_edges": 0,
+      "extra_chart_boundary_edges": 1042,
+      "internal_uv_cut_edges": 5,
+      "total_uv_seam_length_over_sqrt_area": 12.24330756908775,
+      "baseline_seam_length_over_sqrt_area": 0.4769557913777354,
+      "internal_uv_seam_length_over_sqrt_area": 0.04070246652509486
+    }
+  },
+  {
+    "mesh": "fandisk",
+    "source_and_region_arrays_exact": true,
+    "charts_do_not_cross_regions": true,
+    "audit": {
+      "chart_count": 15,
+      "invalid_charts": [],
+      "chart_texel_density_ratio": 1.0053317360488316,
+      "non_disk_charts": [],
+      "positive_area_overlap_count": 0,
+      "overlap_pairs_sample": [],
+      "global_chart_reflections": 10,
+      "all_charts_valid": true,
+      "max_stretch": 1.0285596175836498,
+      "mean_stretch": 1.0024899819530206,
+      "area_weighted_p95_stretch": 1.0151456613052903,
+      "max_anisotropy": 1.0058711763947086,
+      "mean_anisotropy": 1.0013498554149778,
+      "seam_length_over_sqrt_area": 9.56222195433226,
+      "smallest_chart_area_fraction": 0.014676021158168108
+    },
+    "borders": {
+      "retained_baseline_edges": 769,
+      "lost_baseline_edges": 0,
+      "extra_chart_boundary_edges": 0,
+      "internal_uv_cut_edges": 0,
+      "total_uv_seam_length_over_sqrt_area": 9.562221954332257,
+      "baseline_seam_length_over_sqrt_area": 9.562221954332257,
+      "internal_uv_seam_length_over_sqrt_area": 0.0
+    }
+  },
+  {
+    "mesh": "dolphin",
+    "source_and_region_arrays_exact": true,
+    "charts_do_not_cross_regions": true,
+    "audit": {
+      "chart_count": 16,
+      "invalid_charts": [],
+      "chart_texel_density_ratio": 1.1174902964178874,
+      "non_disk_charts": [],
+      "positive_area_overlap_count": 0,
+      "overlap_pairs_sample": [],
+      "global_chart_reflections": 9,
+      "all_charts_valid": true,
+      "max_stretch": 1.3454084829506063,
+      "mean_stretch": 1.049136179799087,
+      "area_weighted_p95_stretch": 1.1244253905062733,
+      "max_anisotropy": 1.3806910370265433,
+      "mean_anisotropy": 1.0135206045125358,
+      "seam_length_over_sqrt_area": 8.912913221180743,
+      "smallest_chart_area_fraction": 4.3155805907875905e-05
+    },
+    "borders": {
+      "retained_baseline_edges": 100,
+      "lost_baseline_edges": 0,
+      "extra_chart_boundary_edges": 231,
+      "internal_uv_cut_edges": 0,
+      "total_uv_seam_length_over_sqrt_area": 8.912913221180737,
+      "baseline_seam_length_over_sqrt_area": 3.739846369698682,
+      "internal_uv_seam_length_over_sqrt_area": 0.0
+    }
+  }
+]

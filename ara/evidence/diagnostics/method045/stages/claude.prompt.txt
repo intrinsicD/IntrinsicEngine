@@ -1,0 +1,408 @@
+User asks whether all initial/intermediate clusters were visualized, alignment with curvature-extremum lines, exact merge criteria and scalars, moving seeds on the surface, whether distortion merging destroys good clusters, and whether available evidence informs decisions. Review this diagnosis and recommend a bounded next formulation; do not claim that adding every signal or hard-locking every noisy curvature curve is justified. No tools, no data requests, no edits. Keep under 650 words. This packet has approved local code and aggregate results, no input geometry.
+
+def execute(vertices, faces, *, patches=64, feature_weight=2., stretch_limit=1.5,
+            anisotropy_limit=2., merge=True, max_merges=None, merge_feature_weight=None):
+    if type(patches) is not int or patches<2 or not np.isfinite([feature_weight,stretch_limit,anisotropy_limit]).all() or feature_weight<0 or stretch_limit<1 or anisotropy_limit<1:
+        raise ValueError('invalid experiment parameters')
+    rank_weight=feature_weight if merge_feature_weight is None else merge_feature_weight
+    if not np.isfinite(rank_weight) or rank_weight<0:
+        raise ValueError('invalid merge feature weight')
+    started = time.perf_counter(); g = geometry(vertices,faces)
+    prepared = time.perf_counter()
+    seeds = seeds_for(g,patches)
+    _, labels = propagate(g,seeds,feature_weight,1/np.sqrt(patches))
+    clustered = time.perf_counter()
+    charts, rejects = {}, Counter(); solves = 0; next_id = 0
+    stack = [np.flatnonzero(labels==i).tolist() for i in range(len(seeds))]
+    while stack:
+        ids = stack.pop()
+        if not ids:
+            continue
+        chart,reason = parameterize(g,ids,stretch_limit,anisotropy_limit); solves += 1
+        if chart is None:
+            rejects['initial_'+reason] += 1
+            stack.extend(bisect(g,ids))
+        else:
+            charts[next_id] = chart; next_id += 1
+    validated = time.perf_counter(); initial_count = len(charts)
+    labels[:] = -1
+    for i,c in charts.items():
+        labels[c['ids']] = i
+    initial_labels = labels.copy()
+    adjacent = {i:{} for i in charts}
+    for f,h,length,angle,distance,_,_ in g['edges']:
+        a,b = int(labels[f]),int(labels[h])
+        if a != b:
+            for x,y in ((a,b),(b,a)):
+                old = adjacent[x].get(y,(0.,0.))
+                adjacent[x][y] = (old[0]+length,old[1]+length*angle)
+    queue = []
+    def enqueue(a,b):
+        if a > b:
+            a,b = b,a
+        length,turn = adjacent[a][b]
+        small_area = min(g['area'][charts[a]['ids']].sum(),g['area'][charts[b]['ids']].sum())
+        # Feature influence orders candidates, never forbids a low-distortion union.
+        score = length/np.sqrt(small_area)/(1+rank_weight*turn/max(length,1e-15))
+        heapq.heappush(queue,(-float(score),a,b))
+    for a,neighbors in adjacent.items():
+        for b in neighbors:
+            if a < b:
+                enqueue(a,b)
+    attempts,accepted = 0,0
+    while merge and queue and (max_merges is None or accepted < max_merges):
+        _,a,b = heapq.heappop(queue)
+        if a not in charts or b not in charts:
+            continue
+        attempts += 1
+        chart,reason = parameterize(g,np.concatenate((charts[a]['ids'],charts[b]['ids'])),
+                                    stretch_limit,anisotropy_limit); solves += 1
+        if chart is None:
+            rejects['merge_'+reason] += 1
+            continue
+        c = next_id; next_id += 1; accepted += 1
+        charts[c] = chart; adjacent[c] = {}
+        for old in (a,b):
+            for neighbor,pair in adjacent[old].items():
+                if neighbor in (a,b):
+                    continue
+                before = adjacent[c].get(neighbor,(0.,0.))
+                adjacent[c][neighbor] = (before[0]+pair[0],before[1]+pair[1])
+                adjacent[neighbor].pop(old,None)
+            del charts[old]; del adjacent[old]
+        for neighbor,pair in adjacent[c].items():
+            adjacent[neighbor][c] = pair
+            enqueue(c,neighbor)
+    merged = time.perf_counter()
+    packed,utilization = pack(charts)
+    corner_uv = np.zeros((len(faces),3,2)); chart_uv = corner_uv.copy()
+    stretches,anisotropies = np.zeros(len(faces)),np.zeros(len(faces))
+    for label,(i,c) in enumerate(sorted(charts.items())):
+        labels[c['ids']] = label
+        corner_uv[c['ids']] = packed[i][c['local_faces']]
+        chart_uv[c['ids']] = c['uv'][c['local_faces']]
+        stretches[c['ids']] = c['stretch']; anisotropies[c['ids']] = c['anisotropy']
+    seam = sum(length for a,b,length,*_ in g['edges'] if labels[a] != labels[b])
+    ended = time.perf_counter()
+    metrics = dict(input_vertices=len(vertices),input_faces=len(faces),initial_charts=initial_count,
+                   chart_count=len(charts),merge_attempts=attempts,accepted_merges=accepted,
+                   parameterization_attempts=solves,uv_solves=g.get('actual_uv_solves',0),
+                   factorized_degrees_of_freedom=g.get('factorized_degrees_of_freedom',0),
+                   rejections=dict(rejects),max_stretch=float(stretches.max()),
+                   mean_stretch=float(g['area']@stretches),max_anisotropy=float(anisotropies.max()),
+                   mean_anisotropy=float(g['area']@anisotropies),seam_length_over_sqrt_area=float(seam),
+                   continuous_packing_utilization=utilization,all_charts_valid=True,
+                   runtime_seconds=ended-started,
+                   phases_seconds=dict(geometry=prepared-started,clustering=clustered-prepared,
+                                       initial_validation=validated-clustered,merging=merged-validated,packing=ended-merged))
+    return dict(metrics=metrics,labels=labels,initial_labels=initial_labels,corner_uv=corner_uv,
+                chart_uv=chart_uv,stretch=stretches,anisotropy=anisotropies)
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('mesh',type=Path); parser.add_argument('output',type=Path)
+    parser.add_argument('--patches',type=int,default=64)
+    parser.add_argument('--feature-weight',type=float,default=2.)
+    parser.add_argument('--stretch-limit',type=float,default=1.5)
+    parser.add_argument('--anisotropy-limit',type=float,default=2.)
+    parser.add_argument('--no-merge',action='store_true')
+    args = parser.parse_args()
+    if args.patches < 2 or not np.isfinite([args.feature_weight,args.stretch_limit,args.anisotropy_limit]).all() or args.feature_weight < 0 or args.stretch_limit < 1 or args.anisotropy_limit < 1:
+        parser.error('invalid experiment parameters')
+    v,f = read_obj(args.mesh)
+    result = execute(v,f,patches=args.patches,feature_weight=args.feature_weight,
+                     stretch_limit=args.stretch_limit,anisotropy_limit=args.anisotropy_limit,merge=not args.no_merge)
+    args.output.parent.mkdir(parents=True,exist_ok=True)
+    np.savez_compressed(args.output.with_suffix('.npz'),vertices=v,faces=f,
+                        **{k:x for k,x in result.items() if k!='metrics'})
+    record = dict(schema='intrinsic.atlas-patch-merge.diagnostic.v1',source=str(args.mesh),
+                  source_sha256=hashlib.sha256(args.mesh.read_bytes()).hexdigest(),
+                  implementation='python_scipy_lscm_patch_merge',claim_eligible=False,
+                  parameters={k:str(x) if isinstance(x,Path) else x for k,x in vars(args).items()},
+                  metrics=result['metrics'])
+    args.output.write_text(json.dumps(record,indent=2,allow_nan=False)+'\n')
+    print(json.dumps(result['metrics'],allow_nan=False),flush=True)
+
+
+if __name__ == '__main__':
+    main()
+
+
+#!/usr/bin/env python3
+"""Offline UV charts preserving source-bound regions and their borders.
+
+Connect boundary loops by shortest primal paths before LSCM. Unsupported or
+distorted regions are bisected explicitly; semantic labels never become UV IDs.
+"""
+from __future__ import annotations
+import argparse
+from collections import Counter
+import hashlib
+import heapq
+import json
+from pathlib import Path
+
+import numpy as np
+import patch_merge as pm
+from compare_atlases import audit, render
+
+
+def incidence(faces):
+    edges = {}
+    for i, face in enumerate(faces):
+        for k in range(3):
+            a, b = int(face[k]), int(face[(k+1)%3])
+            edges.setdefault(tuple(sorted((a, b))), []).append((i, k, a, b))
+    return edges
+
+
+def cut_corners(faces, edges, cuts):
+    """Join corners across uncut edges and retain the source-vertex map."""
+    parent = np.arange(faces.size)
+    def root(a):
+        while parent[a] != a:
+            parent[a] = parent[parent[a]]
+            a = parent[a]
+        return a
+    def join(a, b):
+        a, b = root(a), root(b)
+        parent[max(a,b)] = min(a,b)
+    for edge, entries in edges.items():
+        if len(entries) == 2 and edge not in cuts:
+            (i,k,a,b), (j,l,c,d) = entries
+            if (a,b) != (d,c):
+                raise ValueError('inconsistent orientation')
+            join(3*i+k, 3*j+(l+1)%3)
+            join(3*i+(k+1)%3, 3*j+l)
+    roots = np.array([root(i) for i in range(faces.size)])
+    unique, inverse = np.unique(roots, return_inverse=True)
+    return faces.ravel()[unique], inverse.reshape(-1,3)
+
+
+def topology(faces):
+    edges = incidence(faces)
+    if any(len(x)>2 for x in edges.values()):
+        raise ValueError('nonmanifold edge')
+    vertices, _ = cut_corners(faces, edges, set())
+    if len(vertices) != len(np.unique(faces)):
+        raise ValueError('nonmanifold vertex fan')
+    outgoing, incoming = {}, {}
+    for entries in edges.values():
+        if len(entries) == 1:
+            _,_,a,b = entries[0]
+            if a in outgoing or b in incoming:
+                raise ValueError('nonmanifold boundary')
+            outgoing[a] = b; incoming[b] = a
+    if outgoing.keys() != incoming.keys():
+        raise ValueError('open boundary chain')
+    loops, remaining = [], set(outgoing)
+    while remaining:
+        start = min(remaining); loop = []; current = start
+        while current in remaining:
+            remaining.remove(current); loop.append(current); current = outgoing[current]
+        if current != start:
+            raise ValueError('non-simple boundary loop')
+        loops.append(loop)
+    return edges, loops, len(vertices)-len(edges)+len(faces)
+
+
+def open_region(g, ids):
+    """Cut a connected genus-zero region with boundary; report other topology."""
+    faces = g['f'][ids]
+    try:
+        edges, loops, euler = topology(faces)
+    except ValueError as error:
+        # A valid source can induce a pinched region boundary. Split the region
+        # explicitly; never mistake corner duplication for source repair.
+        return None, 'region_topology', dict(euler_characteristic=None,
+                                            boundary_loops=None, cut_edges=0,
+                                            topology_failure=str(error))
+    diagnostics = dict(euler_characteristic=euler, boundary_loops=len(loops), cut_edges=0)
+    if not loops or euler != 2-len(loops):
+        return None, 'unsupported_topology', diagnostics
+    adjacent = {int(v): [] for v in np.unique(faces)}
+    for a,b in edges:
+        length = float(np.linalg.norm(g['v'][a]-g['v'][b]))
+        adjacent[a].append((b,length)); adjacent[b].append((a,length))
+    connected = set(loops[0]); waiting = [set(x) for x in loops[1:]]; cuts = set()
+    while waiting:
+        targets = set().union(*waiting)
+        distance = {v:0. for v in connected}; previous = {}
+        queue = [(0.,v) for v in sorted(connected)]; heapq.heapify(queue)
+        hit = None
+        while queue:
+            d,v = heapq.heappop(queue)
+            if d != distance[v]:
+                continue
+            if v in targets:
+                hit = v; break
+            for w,length in sorted(adjacent[v]):
+                value = d+length
+                if value < distance.get(w, np.inf):
+                    distance[w] = value; previous[w] = v; heapq.heappush(queue,(value,w))
+        if hit is None:
+            return None, 'disconnected_region', diagnostics
+        current = hit
+        while current not in connected:
+            parent = previous[current]
+            cuts.add(tuple(sorted((current,parent)))); connected.add(current); current = parent
+        reached = next(i for i,loop in enumerate(waiting) if hit in loop)
+        connected.update(waiting.pop(reached))
+    vertices, local = cut_corners(faces, edges, cuts)
+    diagnostics['cut_edges'] = len(cuts)
+    if pm.disk_boundary_fast(local) is None:
+        return None, 'cut_topology', diagnostics
+    return (vertices, local), 'accepted', diagnostics
+
+
+def region_components(g, labels):
+    visited = np.zeros(len(labels),bool); result = []
+    for seed in range(len(labels)):
+        if visited[seed]:
+            continue
+        stack = [seed]; visited[seed] = True; ids = []
+        while stack:
+            i = stack.pop(); ids.append(i)
+            for j,*_ in g['adjacent'][i]:
+                if not visited[j] and labels[j] == labels[i]:
+                    visited[j] = True; stack.append(j)
+        result.append(np.asarray(sorted(ids),np.int64))
+    return result
+
+
+def boundary_metrics(g, regions, labels, corners):
+    retained = lost = extra = internal = 0
+    total = baseline_length = internal_length = 0.
+    for a,b,length,_,_,v,w in g['edges']:
+        cut = labels[a] != labels[b]
+        if not cut:
+            for vertex in (v,w):
+                ia = int(np.flatnonzero(g['f'][a] == vertex)[0])
+                ib = int(np.flatnonzero(g['f'][b] == vertex)[0])
+                cut = cut or not np.array_equal(corners[a,ia],corners[b,ib])
+        protected = regions[a] != regions[b]
+        retained += int(protected and cut); lost += int(protected and not cut)
+        extra += int(not protected and labels[a] != labels[b])
+        internal += int(cut and labels[a] == labels[b])
+        total += length if cut else 0.
+        baseline_length += length if protected else 0.
+        internal_length += length if cut and labels[a] == labels[b] else 0.
+    return dict(retained_baseline_edges=retained, lost_baseline_edges=lost,
+                extra_chart_boundary_edges=extra, internal_uv_cut_edges=internal,
+                total_uv_seam_length_over_sqrt_area=total,
+                baseline_seam_length_over_sqrt_area=baseline_length,
+                internal_uv_seam_length_over_sqrt_area=internal_length)
+
+
+def merge_within_regions(g, regions, charts, stretch_limit, anisotropy_limit):
+    """Rejoin only subdivisions of the same region, revalidating each union."""
+    rejected = set(); attempts = []; next_id = len(charts)
+    while True:
+        labels = np.empty(len(regions),np.int64)
+        for i,c in charts.items():
+            labels[c['ids']] = i
+        seams = Counter()
+        for a,b,length,*_ in g['edges']:
+            i,j = sorted((int(labels[a]),int(labels[b])))
+            if i!=j and regions[a]==regions[b] and (i,j) not in rejected:
+                seams[i,j] += length
+        candidates = []
+        for (i,j),length in seams.items():
+            area = min(g['area'][charts[i]['ids']].sum(),g['area'][charts[j]['ids']].sum())
+            candidates.append((-length/np.sqrt(area),i,j))
+        accepted = False
+        for _,i,j in sorted(candidates):
+            ids = np.sort(np.concatenate((charts[i]['ids'],charts[j]['ids'])))
+            opened,reason,topo = open_region(g,ids); chart = None
+            if opened is not None:
+                chart,reason = pm.parameterize_local(g,ids,*opened,stretch_limit,anisotropy_limit)
+            attempts.append(dict(region=int(regions[ids[0]]),faces=len(ids),status=reason,**topo))
+            if chart is None:
+                rejected.add((i,j)); continue
+            del charts[i]; del charts[j]; charts[next_id] = chart; next_id += 1
+            accepted = True; break
+        if not accepted:
+            return charts, attempts
+
+
+def execute(vertices, faces, regions, *, stretch_limit=1.35, anisotropy_limit=2., merge=False):
+    regions = np.asarray(regions)
+    if regions.shape != (len(faces),) or regions.dtype.kind not in 'iu' or np.any(regions<0):
+        raise ValueError('one nonnegative integer baseline label per face required')
+    if not np.isfinite([stretch_limit,anisotropy_limit]).all() or min(stretch_limit,anisotropy_limit)<1:
+        raise ValueError('invalid distortion limits')
+    g = pm.geometry(vertices,faces)
+    # Validate the source before duplication could hide a pinched vertex.
+    topology(g['f'])
+    components = region_components(g,regions)
+    pending = list(reversed(components)); charts = {}; records = []; splits = Counter()
+    while pending:
+        ids = np.asarray(sorted(pending.pop()),np.int64)
+        opened, reason, topo = open_region(g,ids)
+        chart = None
+        if opened is not None:
+            chart, reason = pm.parameterize_local(g,ids,*opened,stretch_limit,anisotropy_limit)
+        records.append(dict(region=int(regions[ids[0]]),faces=len(ids),status=reason,**topo))
+        if chart is None:
+            splits[reason] += 1
+            pending.extend(reversed(pm.bisect(g,ids)))
+        else:
+            charts[len(charts)] = chart
+    initial_count = len(charts); merges = []
+    if merge:
+        charts, merges = merge_within_regions(g,regions,charts,stretch_limit,anisotropy_limit)
+    labels = np.empty(len(faces),np.int64); chart_uv = np.empty((len(faces),3,2))
+    corners = np.empty_like(chart_uv); packed,_ = pm.pack(charts)
+    for i,c in charts.items():
+        labels[c['ids']] = i
+        chart_uv[c['ids']] = c['uv'][c['local_faces']]
+        corners[c['ids']] = packed[i][c['local_faces']]
+    metrics = audit(vertices,faces,labels,corners)
+    metrics.update(boundary_metrics(g,regions,labels,corners))
+    metrics.update(region_count=len(np.unique(regions)), region_component_count=len(components),
+                   split_reasons=dict(splits), uv_solves=g.get('actual_uv_solves',0),
+                   initial_charts=initial_count, accepted_merges=initial_count-len(charts),
+                   merge_attempts=merges,
+                   outcome='protected_with_chart_splits' if splits else 'protected_without_chart_splits')
+    if (not metrics['all_charts_valid'] or metrics['lost_baseline_edges'] or
+            metrics['max_stretch'] > stretch_limit or metrics['max_anisotropy'] > anisotropy_limit):
+        raise ValueError('final source/UV audit failed: '+str(metrics))
+    return dict(labels=labels,region_labels=regions.copy(),chart_uv=chart_uv,corner_uv=corners,
+                metrics=metrics,component_attempts=records)
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('baseline',type=Path,help='native export prefix (.geometry.json and .labels)')
+    parser.add_argument('output',type=Path)
+    parser.add_argument('--stretch-limit',type=float,default=1.35)
+    parser.add_argument('--merge',action='store_true',help='rejoin valid subdivisions inside each region')
+    args = parser.parse_args()
+    geometry = args.baseline.with_suffix('.geometry.json'); labels = args.baseline.with_suffix('.labels')
+    source = json.loads(geometry.read_text()); v = np.asarray(source['positions']); f = np.asarray(source['triangles'])
+    regions = np.loadtxt(labels,dtype=np.int64,ndmin=1)
+    result = execute(v,f,regions,stretch_limit=args.stretch_limit,merge=args.merge)
+    record = dict(schema='intrinsic.baseline-atlas.diagnostic.v1',claim_eligible=False,
+                  implementation='python_baseline_boundary_cuts_lscm',stretch_limit=args.stretch_limit,merge=args.merge,
+                  source_sha256=hashlib.sha256(geometry.read_bytes()).hexdigest(),
+                  baseline_labels_sha256=hashlib.sha256(labels.read_bytes()).hexdigest(),
+                  implementation_sha256=hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
+                  metrics=result['metrics'],component_attempts=result['component_attempts'])
+    args.output.parent.mkdir(parents=True,exist_ok=True)
+    args.output.with_suffix('.json').write_text(json.dumps(record,indent=2,allow_nan=False)+'\n')
+    arrays = {k:x for k,x in result.items() if k not in ('metrics','component_attempts')}
+    np.savez_compressed(args.output.with_suffix('.npz'),vertices=v,faces=f,**arrays)
+    render(v,f,result,args.output.with_suffix('.png'),f'{args.baseline.name} · protected regions · {record["metrics"]["chart_count"]} UV charts')
+    print(json.dumps(record,allow_nan=False),flush=True)
+
+
+if __name__ == '__main__':
+    main()
+
+
+{"mesh": "frog", "summary": {"feature": {"initial_charts": 73, "final_charts": 15, "merge_attempts": 155, "accepted_merges": 58, "rejection_counts": {"distortion": 76, "topology": 21}, "removed_baseline_edges": 0, "removed_hard_edges": 0, "removed_soft_edges": 103, "exact_retained_labels": true}, "protected": {"initial_charts": 63, "final_charts": 23, "merge_attempts": 149, "accepted_merges": 40, "rejection_counts": {"distortion": 109}, "removed_baseline_edges": 0, "removed_hard_edges": 0, "removed_soft_edges": 64, "exact_retained_labels": true}}, "native_refinement_moves": 12}
+
+{"mesh": "sculpt", "summary": {"feature": {"initial_charts": 64, "final_charts": 5, "merge_attempts": 93, "accepted_merges": 59, "rejection_counts": {"topology": 21, "distortion": 13}, "removed_baseline_edges": 58, "removed_hard_edges": 58, "removed_soft_edges": 28, "exact_retained_labels": true}, "protected": {"initial_charts": 6, "final_charts": 6, "merge_attempts": 1, "accepted_merges": 0, "rejection_counts": {"distortion": 1}, "removed_baseline_edges": 0, "removed_hard_edges": 0, "removed_soft_edges": 0, "exact_retained_labels": true}}, "native_refinement_moves": 0}
+
+Native baseline uses k1/k2 descriptors, hard barriers, soft confidence in growth, curvature-mixture unary fit and complexity, boundary length/turn/support in merge energy, then face-boundary refinement. Atlas ignores that data except original labels in protected arm. Detached METHOD041 principal/mean extrema already export confidence, strength, sharpness, residual and scale agreement, but no atlas decision consumes them. We are exposing these as scalars/overlays, not declaring a new alignment oracle. Frog earlier atlas loses 41/55 baseline edges before merges and none of remaining original edges during merges. Sculpt earlier atlas loses 5/384 before merges plus 58 during merges; all 58 are hard features in native detector. Protected intra-region merges erase 64 soft-flagged edges on frog while preserving all original borders. No seed-relocation or cut-smoothing currently runs in the atlas. Distortion is an admissibility limit, not a requirement that distortion improves. New field/trace export preserves exact old final label arrays. Native baseline only initial/final states plus unordered relative-to-refinement merge history, not all native stages.

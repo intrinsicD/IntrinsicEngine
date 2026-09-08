@@ -1097,3 +1097,12 @@ retains its full confidence result and timing artifact.
   run the benchmark producer target before treating validation as actionable.
 - Smoke threshold regressions fail PR-fast once enabled in strict mode.
 - Heavy-suite regressions are triaged with explicit follow-up tasks.
+
+
+The offline atlas diagnostic controls (`Test.AtlasPatchMerge.py` and
+`Test.BaselineAtlas.py`) run in `ci-docs` with NumPy/SciPy and a single BLAS thread.
+They generate analytic inputs without external datasets. Native adapter cases
+remain opt-in through `INTRINSIC_TEST_NATIVE_ATLAS=1` after building their producers.
+The `geometry.uv_atlas.baseline_preservation.diagnostic` manifest describes local
+quality comparisons; its external mesh campaign and exhaustive packing search are
+not default CI smoke workloads or performance evidence.

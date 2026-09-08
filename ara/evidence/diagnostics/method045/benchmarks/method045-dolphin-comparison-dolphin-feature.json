@@ -1,0 +1,159 @@
+{
+  "schema_version": 2,
+  "benchmark_id": "geometry.uv_atlas.baseline_preservation.diagnostic",
+  "run_id": "method045-dolphin-comparison-dolphin-feature",
+  "attempt_id": "attempt-001",
+  "method": "geometry.uv_atlas.baseline_preservation",
+  "backend": "cpu_reference",
+  "dataset": "external.baseline_atlas_cohort_v1",
+  "commit": "local-dev",
+  "source": {
+    "revision": "local-dev",
+    "state": "dirty_worktree"
+  },
+  "claim_eligible": false,
+  "manifest": {
+    "path": "benchmarks/geometry/manifests/geometry_baseline_atlas_diagnostic.yaml",
+    "sha256": "3f5845f4b4fef23360f7424095099e0032dab6cf0d77ef1209bc91eeb1405c1c"
+  },
+  "resolved_params": {
+    "intent": "correctness",
+    "cohort": [
+      "sculpt",
+      "frog",
+      "fandisk",
+      "bunny10k"
+    ],
+    "additional_smooth_control": "dolphin",
+    "baseline": "native_curvature_local",
+    "arms": [
+      "protected",
+      "protected-merge",
+      "feature",
+      "growth-only",
+      "xatlas"
+    ],
+    "stretch_limit": 1.35,
+    "anisotropy_limit": 2.0,
+    "patches": 64,
+    "packing": "xatlas_uv_only",
+    "packing_search": [
+      "default",
+      "exhaustive"
+    ],
+    "native_resolution": 1024,
+    "native_padding": 2,
+    "native_preset": "ci",
+    "warmup_iterations": 0,
+    "measured_iterations": 1,
+    "same_surface_subdivision": [
+      "sculpt",
+      "frog"
+    ],
+    "scope": "offline_diagnostic_not_default_smoke",
+    "timing_claim": false,
+    "adoption_claim": false
+  },
+  "config_digest": "97036e12d0b0cb89cac3b8319858f116cb9784660ccf9def94d2ce48dbfe366b",
+  "warmup_policy": {
+    "warmup_iterations": 0,
+    "measured_iterations": 1
+  },
+  "metrics": {
+    "quality_error_linf": 0.0
+  },
+  "diagnostics": {
+    "cell": {
+      "mesh": "dolphin",
+      "arm": "feature",
+      "subdivided": false,
+      "faces": 5120,
+      "source_sha256": "100cb0d2eae776d57a0f6dac61aa8a1b624d867e9fcdc360508e62867d58711e",
+      "baseline_labels_sha256": "be06515fd74c6ebc08d47ca5e05720c3bffb5aed71cf519c8ce307651018dd26",
+      "claim_eligible": false,
+      "stretch_limit": 1.35,
+      "anisotropy_limit": 2.0,
+      "outcome": "seeded_atlas",
+      "metrics": {
+        "chart_count": 4,
+        "invalid_charts": [],
+        "chart_texel_density_ratio": 1.0003906516990853,
+        "non_disk_charts": [],
+        "positive_area_overlap_count": 0,
+        "overlap_pairs_sample": [],
+        "global_chart_reflections": 1,
+        "all_charts_valid": true,
+        "max_stretch": 1.3052442552689516,
+        "mean_stretch": 1.0541824857388633,
+        "area_weighted_p95_stretch": 1.1473393763421909,
+        "max_anisotropy": 1.3531906785499186,
+        "mean_anisotropy": 1.0136596781890443,
+        "seam_length_over_sqrt_area": 7.509107705888072,
+        "smallest_chart_area_fraction": 0.09391742040081821,
+        "continuous_packing_utilization": 0.4858120586304957,
+        "postpack_bound_passed": true,
+        "square_texture_occupancy": 0.4359212182063113,
+        "retained_baseline_edges": 24,
+        "lost_baseline_edges": 76,
+        "extra_chart_boundary_edges": 246,
+        "internal_uv_cut_edges": 0,
+        "total_uv_seam_length_over_sqrt_area": 7.509107705888073,
+        "baseline_seam_length_over_sqrt_area": 3.739846369698682,
+        "internal_uv_seam_length_over_sqrt_area": 0.0,
+        "region_count": 11
+      },
+      "prepack_metrics": {
+        "input_vertices": 2562,
+        "input_faces": 5120,
+        "initial_charts": 65,
+        "chart_count": 4,
+        "merge_attempts": 100,
+        "accepted_merges": 61,
+        "parameterization_attempts": 166,
+        "uv_solves": 163,
+        "factorized_degrees_of_freedom": 99296,
+        "rejections": {
+          "initial_distortion": 1,
+          "merge_boundary_overlap": 3,
+          "merge_distortion": 31,
+          "merge_topology": 3,
+          "merge_orientation": 2
+        },
+        "max_stretch": 1.3056946397426217,
+        "mean_stretch": 1.0541589998433916,
+        "max_anisotropy": 1.3542787168034105,
+        "mean_anisotropy": 1.0136142651001971,
+        "seam_length_over_sqrt_area": 7.509107705888072,
+        "continuous_packing_utilization": 0.2550191675908691,
+        "all_charts_valid": true,
+        "runtime_seconds": 0.9981809119926766,
+        "phases_seconds": {
+          "geometry": 0.09982412398676388,
+          "clustering": 0.028889829001855105,
+          "initial_validation": 0.14448760700179264,
+          "merging": 0.7218052879907191,
+          "packing": 0.003174064011545852
+        }
+      },
+      "component_attempts": []
+    },
+    "batch": "dolphin-comparison",
+    "quality_error_definition": "invalid map indicator; candidate stretch/anisotropy excess; protected candidate lost baseline edges; missing baseline is an execution error",
+    "limitation": "Exploratory manifest consolidated after the first probe; quality gates do not mean baseline dominance or production adoption."
+  },
+  "thresholds": {
+    "quality_error_linf_max": 0.0
+  },
+  "threshold_disposition": [
+    {
+      "threshold": "quality_error_linf_max",
+      "metric": "quality_error_linf",
+      "operator": "<=",
+      "limit": 0.0,
+      "observed": 0.0,
+      "passed": true
+    }
+  ],
+  "execution_status": "passed",
+  "status": "passed"
+}

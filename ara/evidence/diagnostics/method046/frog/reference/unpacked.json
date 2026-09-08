@@ -1,0 +1,43 @@
+{
+  "parameters": {
+    "band_hops": 6,
+    "rounds": 0,
+    "beta": 0.8,
+    "curve_scale": 2,
+    "stretch_limit": 1.35,
+    "anisotropy_limit": 2.0,
+    "shuffle_seed": 20260908
+  },
+  "stretch_limit": 1.35,
+  "metrics": {
+    "chart_count": 23,
+    "invalid_charts": [],
+    "chart_texel_density_ratio": 1.0000000000000056,
+    "non_disk_charts": [],
+    "positive_area_overlap_count": 0,
+    "overlap_pairs_sample": [],
+    "global_chart_reflections": 0,
+    "all_charts_valid": true,
+    "max_stretch": 1.3499719104964807,
+    "mean_stretch": 1.0660320686351934,
+    "area_weighted_p95_stretch": 1.1697368179354588,
+    "max_anisotropy": 1.2538804742639116,
+    "mean_anisotropy": 1.0151650919398414,
+    "seam_length_over_sqrt_area": 12.202605102562654,
+    "smallest_chart_area_fraction": 0.0001807946160678882,
+    "retained_baseline_edges": 55,
+    "lost_baseline_edges": 0,
+    "extra_chart_boundary_edges": 1042,
+    "internal_uv_cut_edges": 5,
+    "total_uv_seam_length_over_sqrt_area": 12.24330756908775,
+    "baseline_seam_length_over_sqrt_area": 0.4769557913777354,
+    "internal_uv_seam_length_over_sqrt_area": 0.04070246652509486,
+    "initial_energy": 10.555872284088199,
+    "final_energy": 10.555872284088199,
+    "accepted_moves": 0,
+    "moved_faces": 0,
+    "statuses": {},
+    "uv_solves": 23
+  },
+  "events": []
+}

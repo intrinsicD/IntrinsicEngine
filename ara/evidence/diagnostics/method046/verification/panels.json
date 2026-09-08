@@ -1,0 +1,338 @@
+[
+  {
+    "mesh": "frog",
+    "stage": "reference: Protected atlas",
+    "file": "frog-0.png",
+    "html_sha256": "ccd3f541ac226a149d603dae73f10debafdea2e5ad3011a82b40c65782193208",
+    "inspection": {
+      "status": "ready",
+      "meshes": 2,
+      "runs": 185,
+      "rejected": 0,
+      "selectedMesh": "frog",
+      "left": "0",
+      "right": "0",
+      "curveSegments": [
+        2773,
+        2773
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1.65
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    }
+  },
+  {
+    "mesh": "frog",
+    "stage": "length: Final",
+    "file": "frog-1.png",
+    "html_sha256": "ccd3f541ac226a149d603dae73f10debafdea2e5ad3011a82b40c65782193208",
+    "inspection": {
+      "status": "ready",
+      "meshes": 2,
+      "runs": 185,
+      "rejected": 0,
+      "selectedMesh": "frog",
+      "left": "0",
+      "right": "42",
+      "curveSegments": [
+        2773,
+        2773
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1.65
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    }
+  },
+  {
+    "mesh": "frog",
+    "stage": "native: Final",
+    "file": "frog-2.png",
+    "html_sha256": "ccd3f541ac226a149d603dae73f10debafdea2e5ad3011a82b40c65782193208",
+    "inspection": {
+      "status": "ready",
+      "meshes": 2,
+      "runs": 185,
+      "rejected": 0,
+      "selectedMesh": "frog",
+      "left": "0",
+      "right": "81",
+      "curveSegments": [
+        2773,
+        2773
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1.65
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    }
+  },
+  {
+    "mesh": "frog",
+    "stage": "curves: Final",
+    "file": "frog-3.png",
+    "html_sha256": "ccd3f541ac226a149d603dae73f10debafdea2e5ad3011a82b40c65782193208",
+    "inspection": {
+      "status": "ready",
+      "meshes": 2,
+      "runs": 185,
+      "rejected": 0,
+      "selectedMesh": "frog",
+      "left": "0",
+      "right": "120",
+      "curveSegments": [
+        2773,
+        2773
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1.65
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    }
+  },
+  {
+    "mesh": "frog",
+    "stage": "shuffled: Final",
+    "file": "frog-4.png",
+    "html_sha256": "ccd3f541ac226a149d603dae73f10debafdea2e5ad3011a82b40c65782193208",
+    "inspection": {
+      "status": "ready",
+      "meshes": 2,
+      "runs": 185,
+      "rejected": 0,
+      "selectedMesh": "frog",
+      "left": "0",
+      "right": "167",
+      "curveSegments": [
+        2773,
+        2773
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1.65
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    }
+  },
+  {
+    "mesh": "frog",
+    "stage": "Score: combined",
+    "file": "frog-5.png",
+    "html_sha256": "ccd3f541ac226a149d603dae73f10debafdea2e5ad3011a82b40c65782193208",
+    "inspection": {
+      "status": "ready",
+      "meshes": 2,
+      "runs": 185,
+      "rejected": 0,
+      "selectedMesh": "frog",
+      "left": "0",
+      "right": "170",
+      "curveSegments": [
+        2773,
+        2773
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1.65
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    }
+  },
+  {
+    "mesh": "sculpt",
+    "stage": "reference: Protected atlas",
+    "file": "sculpt-0.png",
+    "html_sha256": "ccd3f541ac226a149d603dae73f10debafdea2e5ad3011a82b40c65782193208",
+    "inspection": {
+      "status": "ready",
+      "meshes": 2,
+      "runs": 185,
+      "rejected": 0,
+      "selectedMesh": "sculpt",
+      "left": "0",
+      "right": "0",
+      "curveSegments": [
+        435,
+        435
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1.65
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    }
+  },
+  {
+    "mesh": "sculpt",
+    "stage": "length: Final",
+    "file": "sculpt-1.png",
+    "html_sha256": "ccd3f541ac226a149d603dae73f10debafdea2e5ad3011a82b40c65782193208",
+    "inspection": {
+      "status": "ready",
+      "meshes": 2,
+      "runs": 185,
+      "rejected": 0,
+      "selectedMesh": "sculpt",
+      "left": "0",
+      "right": "2",
+      "curveSegments": [
+        435,
+        435
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1.65
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    }
+  },
+  {
+    "mesh": "sculpt",
+    "stage": "native: Final",
+    "file": "sculpt-2.png",
+    "html_sha256": "ccd3f541ac226a149d603dae73f10debafdea2e5ad3011a82b40c65782193208",
+    "inspection": {
+      "status": "ready",
+      "meshes": 2,
+      "runs": 185,
+      "rejected": 0,
+      "selectedMesh": "sculpt",
+      "left": "0",
+      "right": "4",
+      "curveSegments": [
+        435,
+        435
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1.65
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    }
+  },
+  {
+    "mesh": "sculpt",
+    "stage": "curves: Final",
+    "file": "sculpt-3.png",
+    "html_sha256": "ccd3f541ac226a149d603dae73f10debafdea2e5ad3011a82b40c65782193208",
+    "inspection": {
+      "status": "ready",
+      "meshes": 2,
+      "runs": 185,
+      "rejected": 0,
+      "selectedMesh": "sculpt",
+      "left": "0",
+      "right": "6",
+      "curveSegments": [
+        435,
+        435
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1.65
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    }
+  },
+  {
+    "mesh": "sculpt",
+    "stage": "shuffled: Final",
+    "file": "sculpt-4.png",
+    "html_sha256": "ccd3f541ac226a149d603dae73f10debafdea2e5ad3011a82b40c65782193208",
+    "inspection": {
+      "status": "ready",
+      "meshes": 2,
+      "runs": 185,
+      "rejected": 0,
+      "selectedMesh": "sculpt",
+      "left": "0",
+      "right": "8",
+      "curveSegments": [
+        435,
+        435
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1.65
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    }
+  },
+  {
+    "mesh": "sculpt",
+    "stage": "Score: combined",
+    "file": "sculpt-5.png",
+    "html_sha256": "ccd3f541ac226a149d603dae73f10debafdea2e5ad3011a82b40c65782193208",
+    "inspection": {
+      "status": "ready",
+      "meshes": 2,
+      "runs": 185,
+      "rejected": 0,
+      "selectedMesh": "sculpt",
+      "left": "0",
+      "right": "11",
+      "curveSegments": [
+        435,
+        435
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1.65
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    }
+  }
+]

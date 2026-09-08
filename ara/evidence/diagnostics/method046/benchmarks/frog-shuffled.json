@@ -1,0 +1,153 @@
+{
+  "schema_version": 2,
+  "benchmark_id": "geometry.uv_atlas.boundary_refinement.diagnostic",
+  "run_id": "method046-frog-shuffled",
+  "attempt_id": "attempt-003",
+  "method": "geometry.uv_atlas.boundary_refinement",
+  "backend": "cpu_reference",
+  "dataset": "external.baseline_atlas_cohort_v1",
+  "commit": "local-dev",
+  "source": {
+    "revision": "local-dev",
+    "state": "dirty_worktree"
+  },
+  "claim_eligible": false,
+  "manifest": {
+    "path": "benchmarks/geometry/manifests/geometry_uv_boundary_refinement_diagnostic.yaml",
+    "sha256": "604f8c25672e85c8f010e4e5053beea661641c581dfca6281e4353e883d48e13"
+  },
+  "resolved_params": {
+    "intent": "correctness",
+    "cohort": [
+      "frog",
+      "sculpt"
+    ],
+    "baseline": "method045_protected_merge",
+    "arms": [
+      "reference",
+      "length",
+      "native",
+      "curves",
+      "shuffled"
+    ],
+    "beta": 0.8,
+    "band_hops": 6,
+    "rounds": 3,
+    "curve_scale": 2,
+    "shuffle_seed": 20260908,
+    "stretch_limit": 1.35,
+    "anisotropy_limit": 2.0,
+    "packing": "xatlas_uv_only",
+    "native_resolution": 1024,
+    "native_padding": 2,
+    "native_preset": "ci",
+    "warmup_iterations": 0,
+    "measured_iterations": 1,
+    "scope": "offline_diagnostic_not_default_smoke",
+    "timing_claim": false,
+    "adoption_claim": false
+  },
+  "config_digest": "86d3d3e1e9a05112af0b39506cdf50602e99979176bf76413fd516b3e4ffa1e2",
+  "warmup_policy": {
+    "warmup_iterations": 0,
+    "measured_iterations": 1
+  },
+  "metrics": {
+    "quality_error_linf": 0.0
+  },
+  "diagnostics": {
+    "cell": {
+      "mesh": "frog",
+      "arm": "shuffled",
+      "metrics": {
+        "chart_count": 23,
+        "invalid_charts": [],
+        "chart_texel_density_ratio": 1.0000000000000089,
+        "non_disk_charts": [],
+        "positive_area_overlap_count": 0,
+        "overlap_pairs_sample": [],
+        "global_chart_reflections": 0,
+        "all_charts_valid": true,
+        "max_stretch": 1.3375738554888226,
+        "mean_stretch": 1.0669502398491737,
+        "area_weighted_p95_stretch": 1.1799100518246852,
+        "max_anisotropy": 1.2538804742638796,
+        "mean_anisotropy": 1.015878965241887,
+        "seam_length_over_sqrt_area": 9.711710440092299,
+        "smallest_chart_area_fraction": 0.0001807946160678882,
+        "retained_baseline_edges": 55,
+        "lost_baseline_edges": 0,
+        "extra_chart_boundary_edges": 865,
+        "internal_uv_cut_edges": 9,
+        "total_uv_seam_length_over_sqrt_area": 9.788003962690372,
+        "baseline_seam_length_over_sqrt_area": 0.4769557913777354,
+        "internal_uv_seam_length_over_sqrt_area": 0.07629352259807488,
+        "initial_energy": 10.322213372120565,
+        "final_energy": 7.102430431227247,
+        "accepted_moves": 46,
+        "moved_faces": 2181,
+        "statuses": {
+          "accepted": 46,
+          "distortion": 31,
+          "disconnected_chart": 3,
+          "no_border_descent": 45
+        },
+        "uv_solves": 161,
+        "postpack": {
+          "chart_count": 23,
+          "invalid_charts": [],
+          "chart_texel_density_ratio": 1.0265269014786558,
+          "non_disk_charts": [],
+          "positive_area_overlap_count": 0,
+          "overlap_pairs_sample": [],
+          "global_chart_reflections": 11,
+          "all_charts_valid": true,
+          "max_stretch": 1.3375358545958973,
+          "mean_stretch": 1.067002221615344,
+          "area_weighted_p95_stretch": 1.1798685196343672,
+          "max_anisotropy": 1.2544507762676191,
+          "mean_anisotropy": 1.015980931033134,
+          "seam_length_over_sqrt_area": 9.711710440092299,
+          "smallest_chart_area_fraction": 0.0001807946160678882,
+          "continuous_packing_utilization": 0.665021547227318
+        },
+        "postpack_bound_passed": true,
+        "additional_seam_length": 9.311048171312638,
+        "common_guided_energy": 8.453993528775218,
+        "curve_support_mean": 0.1094175729298718,
+        "native_support_mean": 0.06115481142091941,
+        "soft_chart_edges_gained": 39,
+        "soft_chart_edges_lost": 62,
+        "chart_area_min_ratio": 0.6829404169460487
+      },
+      "postpack_boundaries": {
+        "retained_baseline_edges": 55,
+        "lost_baseline_edges": 0,
+        "extra_chart_boundary_edges": 865,
+        "internal_uv_cut_edges": 9,
+        "total_uv_seam_length_over_sqrt_area": 9.788003962690372,
+        "baseline_seam_length_over_sqrt_area": 0.4769557913777354,
+        "internal_uv_seam_length_over_sqrt_area": 0.07629352259807488
+      },
+      "square_texture_occupancy": 0.636667915368789,
+      "reconciled_stages": 47,
+      "quality_error_linf": 0.0
+    },
+    "limitation": "Frozen local diagnostic; support score is optimized evidence, not anatomical ground truth. No runtime, timing or uniform-quality claim."
+  },
+  "thresholds": {
+    "quality_error_linf_max": 0.0
+  },
+  "threshold_disposition": [
+    {
+      "threshold": "quality_error_linf_max",
+      "metric": "quality_error_linf",
+      "operator": "<=",
+      "limit": 0.0,
+      "observed": 0.0,
+      "passed": true
+    }
+  ],
+  "execution_status": "passed",
+  "status": "passed"
+}

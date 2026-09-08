@@ -1,0 +1,109 @@
+session:
+  id: 2026-09-08_001
+  date: '2026-09-08'
+  started: '2026-09-08T02:12:46+02:00'
+  last_turn: '2026-09-08T03:27:09+02:00'
+  turn_count: 2
+  summary: Audited atlas stages, then implemented and reviewed constrained boundary relocation with Claude.
+    Source regions and UV limits are preserved; anatomical quality and production adoption remain open.
+events_logged:
+- turn: 1
+  type: question
+  id: N484
+  routing: direct
+  provenance: user
+  summary: Request a stage, curvature-alignment and merge-decision audit
+- turn: 1
+  type: experiment
+  id: N485
+  routing: direct
+  provenance: ai-executed
+  summary: Trace actual atlas decisions and visualize available scalars
+- turn: 1
+  type: claim
+  id: O197
+  routing: crystallized
+  provenance: ai-executed
+  summary: C73 binds stage-specific boundary losses
+- turn: 1
+  type: heuristic
+  id: O198
+  routing: staged
+  provenance: ai-suggested
+  summary: Alignment measurement and boundary movement remain proposed
+- turn: 2
+  type: decision
+  id: N486
+  routing: direct
+  provenance: user
+  summary: Request Claude planning, implementation and renewed review
+- turn: 2
+  type: decision
+  id: N487
+  routing: direct
+  provenance: ai-suggested
+  summary: Choose frozen-band collective moves and controlled guidance ablation
+- turn: 2
+  type: experiment
+  id: N488
+  routing: direct
+  provenance: ai-executed
+  summary: Implement, audit, visualize and review the candidate
+- turn: 2
+  type: claim
+  id: O199
+  routing: crystallized
+  provenance: ai-executed
+  summary: C74 binds the bounded preservation, seam and tradeoff measurements
+ai_actions:
+- turn: 1
+  action: Added native diagnostic export, a passive Python decision observer, scalar/curve viewer and
+    portable depth-tested figure capture. Replayed exact sources, verified final labels, passed 10 analytic/native
+    Python controls and 30 focused CTest cases, and exercised 265 browser views. Corrected JSON serialization
+    and Matplotlib empty-line/depth issues during verification. Archived Claude critique with explicit
+    corrections. No algorithm acceptance or seed changed.
+  provenance: ai-executed
+  files_changed:
+  - benchmarks/runners/CurvatureBoundaryMeshRunner.cpp
+  - tools/diagnostics/atlas/trace_atlas.py
+  - tools/diagnostics/atlas/trace_atlas_viewer.html
+  - tests/regression/tooling/Test.BaselineAtlas.py
+  - docs/methods/atlas_stage_inspection.md
+- turn: 2
+  action: Added the offline boundary-refinement reference, five-arm runner, viewer adapter, evidence reconciler,
+    twelve analytic tests and CI registration. Ran actual Claude plan/result reviews, fixed core lifetime
+    and cut accounting, preserved failed attempt evidence, passed ten packed cells and exact post-review
+    replay. ci built; 136 focused and 4308 full CPU entries had zero failures, with one expected unsanitized
+    leak-check skip. Checked all 185 viewer modes.
+  provenance: ai-executed
+  files_changed:
+  - tools/diagnostics/atlas/boundary_refine.py
+  - tools/diagnostics/atlas/run_boundary_refinement.py
+  - tools/diagnostics/atlas/inspect_boundary_refinement.py
+  - tools/diagnostics/atlas/collect_boundary_refinement.py
+  - tests/regression/tooling/Test.AtlasBoundaryRefine.py
+  - docs/methods/uv_boundary_refinement_experiment.md
+claims_touched:
+- id: C73
+  action: created
+  turn: 1
+- id: C74
+  action: created
+  turn: 2
+key_context:
+- turn: 1
+  excerpt: User asked whether initial clusters and intermediate steps were visualized and curvature-aligned,
+    how merges are decided, which scalars are used, and whether centers can move on the surface.
+- turn: 2
+  excerpt: 'User: cowork with Claude, first decide what to do from the findings, then implement and review
+    again. No runtime-default adoption or publication instruction.'
+open_threads:
+- 'METHOD-046 / METHOD-045: independent anatomical alignment, chart-area balance, remeshing robustness,
+  internal-cut placement and feature-aware merge policy remain open; original sculpt regions are preserved.'
+- 'METHOD-044: native/config/UI atlas adoption remains deferred.'
+- 'METHOD-043: anatomical/thickness segmentation failures remain unresolved.'
+- 'UI-053: detached curvature curves still need shared engine/config/UI publication.'
+ai_suggestions_pending:
+- O198 is partially exercised by METHOD-046. Its broader independent-alignment and seed-relocation alternatives
+  remain unsettled; no blanket heuristic or production default is promoted.
+- Prior curvature-boundary proposals remain staged; no unrelated observation gained a closure signal.

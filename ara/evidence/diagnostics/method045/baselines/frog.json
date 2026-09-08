@@ -1,0 +1,9 @@
+{
+"status":"passed",
+"benchmark_id":"geometry.curvature_segmentation.local_mesh.local_cohort",
+"method":"geometry.curvature_segmentation",
+"backend":"cpu_reference",
+"dataset":"local.method_040.mesh_cohort.v1",
+"commit":"local-dev",
+"metrics":{"runtime_ms":55051.459796000003,"memory_peak_bytes":27828224,"quality_error_l2":0,"quality_error_linf":0,"population_count":5},
+"diagnostics":{"input":"/home/alex/Dropbox/Work/Datasets/obj/frog.obj","implementation":"method_039_local_patch_unadopted","feature_weight":1.5,"feature_exponent":1,"model_weight":0,"boundary_scale":1,"region_cost":0,"hard_feature_exclusion_ratio":0,"faces":19106,"vertices":9555,"load_ms":91.150459999999995,"curvature_ms":122.356672,"feature_ms":1066.9446849999999,"partition_ms":53732.557443999998,"minimum_exclusion_curve_length":0,"minimum_region_area":0,"attenuation_curves":0,"attenuation_hard_edges":0,"area_merges":0,"unmergeable_small_regions":0,"optimized_energy":15.118312581905833,"energy":15.118312581905833,"lower_bound":null,"exact":false,"attempted_moves":0,"accepted_moves":0,"contractions":0,"sweeps":0,"source_hard":4,"source_soft":3010,"boundaries":55,"hard":4,"soft":15,"closure":36,"feature_length_recall":0.0044617963775264525,"unsupported_length_fraction":0.69067064269413081,"region_sizes":[19019,5,28,42,12],"region_area_fractions":[0.99730418298323797,0.00018079461802017414,0.00055675993487900102,0.001719897260305902,0.00023836520355657254]}}

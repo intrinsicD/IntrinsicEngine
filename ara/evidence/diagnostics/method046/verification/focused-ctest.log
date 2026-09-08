@@ -1,0 +1,288 @@
+Internal ctest changing into directory: /home/alex/Documents/IntrinsicEngine/build/ci
+Test project /home/alex/Documents/IntrinsicEngine/build/ci
+        Start    8: IntrinsicUvAtlasRemapSmoke.Run
+  1/136 Test    #8: IntrinsicUvAtlasRemapSmoke.Run ................................................................   Passed    0.58 sec
+        Start  349: RuntimeAssetImportFormatCoverage.DirectObjImportPreservesAuthoredCornerUvs
+  2/136 Test  #349: RuntimeAssetImportFormatCoverage.DirectObjImportPreservesAuthoredCornerUvs ....................   Passed    0.07 sec
+        Start  351: RuntimeAssetImportFormatCoverage.NonManifoldObjImportStillResolvesVertexUvs
+  3/136 Test  #351: RuntimeAssetImportFormatCoverage.NonManifoldObjImportStillResolvesVertexUvs ...................   Passed    0.07 sec
+        Start  352: RuntimeAssetImportFormatCoverage.DirectObjImportKeepsVertexUvsWhenTheAtlasNeedsNoSeam
+  4/136 Test  #352: RuntimeAssetImportFormatCoverage.DirectObjImportKeepsVertexUvsWhenTheAtlasNeedsNoSeam .........   Passed    0.07 sec
+        Start  463: MeshGeometryExtraction.MissingTexcoordsUploadsWithDefaultUvFallback
+  5/136 Test  #463: MeshGeometryExtraction.MissingTexcoordsUploadsWithDefaultUvFallback ...........................   Passed    0.11 sec
+        Start  464: MeshGeometryExtraction.NonFiniteTexcoordsUploadWithDefaultUvFallback
+  6/136 Test  #464: MeshGeometryExtraction.NonFiniteTexcoordsUploadWithDefaultUvFallback ..........................   Passed    0.07 sec
+        Start  589: ParameterizationOperations.StableTokensAndAllImplementedStrategiesWriteFiniteUvs
+  7/136 Test  #589: ParameterizationOperations.StableTokensAndAllImplementedStrategiesWriteFiniteUvs ..............   Passed    0.01 sec
+        Start  590: ParameterizationOperations.UndoRedoRestoresAbsentUvProperty
+  8/136 Test  #590: ParameterizationOperations.UndoRedoRestoresAbsentUvProperty ...................................   Passed    0.01 sec
+        Start  591: ParameterizationOperations.UndoRedoRestoresPresentUvValues
+  9/136 Test  #591: ParameterizationOperations.UndoRedoRestoresPresentUvValues ....................................   Passed    0.01 sec
+        Start  592: ParameterizationOperations.HistoryRejectsInterveningGeometryState
+ 10/136 Test  #592: ParameterizationOperations.HistoryRejectsInterveningGeometryState .............................   Passed    0.01 sec
+        Start  593: ParameterizationOperations.HistoryDoesNotRetainSessionOwnedModelCache
+ 11/136 Test  #593: ParameterizationOperations.HistoryDoesNotRetainSessionOwnedModelCache .........................   Passed    0.01 sec
+        Start  594: ParameterizationOperations.DeletedVertexTombstonePreservesStorageUvs
+ 12/136 Test  #594: ParameterizationOperations.DeletedVertexTombstonePreservesStorageUvs ..........................   Passed    0.01 sec
+        Start  595: ParameterizationOperations.ConfiguredPathReadsActiveEngineConfig
+ 13/136 Test  #595: ParameterizationOperations.ConfiguredPathReadsActiveEngineConfig ..............................   Passed    0.01 sec
+        Start  596: ParameterizationOperations.EditorConfigHelperUsesValidatedHotApplyLane
+ 14/136 Test  #596: ParameterizationOperations.EditorConfigHelperUsesValidatedHotApplyLane ........................   Passed    0.06 sec
+        Start  597: ParameterizationOperations.ConfigSourcesProduceIdenticalStateAndUvs
+ 15/136 Test  #597: ParameterizationOperations.ConfigSourcesProduceIdenticalStateAndUvs ...........................   Passed    0.15 sec
+        Start  598: ParameterizationOperations.IdenticalInputAndConfigAreDeterministic
+ 16/136 Test  #598: ParameterizationOperations.IdenticalInputAndConfigAreDeterministic ............................   Passed    0.01 sec
+        Start  599: ParameterizationOperations.SectionValidationKeepsNestedReferenceFallbackAtomic
+ 17/136 Test  #599: ParameterizationOperations.SectionValidationKeepsNestedReferenceFallbackAtomic ................   Passed    0.01 sec
+        Start  600: ParameterizationOperations.InvalidEnumsAndNarrowingFailClosed
+ 18/136 Test  #600: ParameterizationOperations.InvalidEnumsAndNarrowingFailClosed .................................   Passed    0.01 sec
+        Start  601: ParameterizationOperations.InvalidConfigEditDoesNotSerializeFallbackToken
+ 19/136 Test  #601: ParameterizationOperations.InvalidConfigEditDoesNotSerializeFallbackToken .....................   Passed    0.01 sec
+        Start  602: ParameterizationOperations.WrongTypedUvAndNonTriangleFacesFailClosed
+ 20/136 Test  #602: ParameterizationOperations.WrongTypedUvAndNonTriangleFacesFailClosed ..........................   Passed    0.01 sec
+        Start  603: ParameterizationOperations.SolverRejectionCarriesStructuredTopologyCause
+ 21/136 Test  #603: ParameterizationOperations.SolverRejectionCarriesStructuredTopologyCause ......................   Passed    0.01 sec
+        Start  604: ParameterizationOperations.RetiresSupersededCornerUvsAndUndoRestoresThem
+ 22/136 Test  #604: ParameterizationOperations.RetiresSupersededCornerUvsAndUndoRestoresThem ......................   Passed    0.01 sec
+        Start  605: ParameterizationOperations.ViewModelNamesCornerDomainUvsItCannotDraw
+ 23/136 Test  #605: ParameterizationOperations.ViewModelNamesCornerDomainUvsItCannotDraw ..........................   Passed    0.01 sec
+        Start  606: ParameterizationOperations.ViewModelDoesNotMirrorTheLastResultMessage
+ 24/136 Test  #606: ParameterizationOperations.ViewModelDoesNotMirrorTheLastResultMessage .........................   Passed    0.01 sec
+        Start  607: ParameterizationOperations.ViewModelIsPointerFreeAndCarriesAggregateDiagnostics
+ 25/136 Test  #607: ParameterizationOperations.ViewModelIsPointerFreeAndCarriesAggregateDiagnostics ...............   Passed    0.01 sec
+        Start  608: ParameterizationOperations.ViewModelFansFaceDiagnosticsIntoRenderedTriangles
+ 26/136 Test  #608: ParameterizationOperations.ViewModelFansFaceDiagnosticsIntoRenderedTriangles ..................   Passed    0.01 sec
+        Start  609: ParameterizationOperations.FaceDiagnosticsRequireTheExactGeometryAndUvFingerprint
+ 27/136 Test  #609: ParameterizationOperations.FaceDiagnosticsRequireTheExactGeometryAndUvFingerprint .............   Passed    0.01 sec
+        Start  610: ParameterizationOperations.DeletedFaceTombstoneKeepsDiagnosticsAlignedWithSourceFaceStorage
+ 28/136 Test  #610: ParameterizationOperations.DeletedFaceTombstoneKeepsDiagnosticsAlignedWithSourceFaceStorage ...   Passed    0.01 sec
+        Start  611: ParameterizationOperations.CpuViewDisablesGpuWorkAndReportsBackgroundFallback
+ 29/136 Test  #611: ParameterizationOperations.CpuViewDisablesGpuWorkAndReportsBackgroundFallback .................   Passed    0.01 sec
+        Start  612: ParameterizationOperations.GpuViewWithoutCommandSurfaceReportsCpuFallback
+ 30/136 Test  #612: ParameterizationOperations.GpuViewWithoutCommandSurfaceReportsCpuFallback .....................   Passed    0.01 sec
+        Start  613: ParameterizationOperations.GpuViewRequestTokenIsStableAndSemantic
+ 31/136 Test  #613: ParameterizationOperations.GpuViewRequestTokenIsStableAndSemantic .............................   Passed    0.01 sec
+        Start  979: SandboxEditorUi.PlatformDropNoUvObjUploadsRawSurfaceBeforeDeferredPostProcess
+ 32/136 Test  #979: SandboxEditorUi.PlatformDropNoUvObjUploadsRawSurfaceBeforeDeferredPostProcess .................   Passed    0.07 sec
+        Start 1051: SandboxEditorUi.MeshSimplifyPreservesUvSeamsWhenTexcoordsPresent
+ 33/136 Test #1051: SandboxEditorUi.MeshSimplifyPreservesUvSeamsWhenTexcoordsPresent ..............................   Passed    0.01 sec
+        Start 1052: SandboxEditorUi.MeshSimplifyPreservesCornerUvSeamsAcrossTheTopologyEdit
+ 34/136 Test #1052: SandboxEditorUi.MeshSimplifyPreservesCornerUvSeamsAcrossTheTopologyEdit .......................   Passed    0.01 sec
+        Start 1053: SandboxEditorUi.TopologyOperationsReportWhatTheyDidToTheParameterization
+ 35/136 Test #1053: SandboxEditorUi.TopologyOperationsReportWhatTheyDidToTheParameterization ......................   Passed    0.02 sec
+        Start 1062: SandboxEditorUi.DirectMeshPostProcessPreservesNewerUvAndSourceProperties
+ 36/136 Test #1062: SandboxEditorUi.DirectMeshPostProcessPreservesNewerUvAndSourceProperties ......................   Passed    0.06 sec
+        Start 1075: SandboxEditorUi.UvRegenerationThatReproducesStoredUvsReportsNoChange
+ 37/136 Test #1075: SandboxEditorUi.UvRegenerationThatReproducesStoredUvsReportsNoChange ..........................   Passed    0.01 sec
+        Start 1076: SandboxEditorUi.UvRegenerationPreservesClosedManifoldTopology
+ 38/136 Test #1076: SandboxEditorUi.UvRegenerationPreservesClosedManifoldTopology .................................   Passed    0.01 sec
+        Start 1077: SandboxEditorUi.UvRegenerationWithoutASeamStaysOnTheVertexDomain
+ 39/136 Test #1077: SandboxEditorUi.UvRegenerationWithoutASeamStaysOnTheVertexDomain ..............................   Passed    0.01 sec
+        Start 1078: SandboxEditorUi.UvRegenerationCommandRepairsSelectedMeshTexcoords
+ 40/136 Test #1078: SandboxEditorUi.UvRegenerationCommandRepairsSelectedMeshTexcoords .............................   Passed    0.01 sec
+        Start 1079: SandboxEditorUi.UvRegenerationRequestQueuesDerivedJobAndPublishesOnApply
+ 41/136 Test #1079: SandboxEditorUi.UvRegenerationRequestQueuesDerivedJobAndPublishesOnApply ......................   Passed    0.02 sec
+        Start 1080: SandboxEditorUi.UvRegenerationDuplicateSubmitUsesExistingActiveJob
+ 42/136 Test #1080: SandboxEditorUi.UvRegenerationDuplicateSubmitUsesExistingActiveJob ............................   Passed    0.02 sec
+        Start 1081: SandboxEditorUi.UvRegenerationDerivedJobDiscardsStaleSource
+ 43/136 Test #1081: SandboxEditorUi.UvRegenerationDerivedJobDiscardsStaleSource ...................................   Passed    0.03 sec
+        Start 1082: SandboxEditorUi.UvRegenerationDerivedJobDiscardsStaleAuthoredProperty
+ 44/136 Test #1082: SandboxEditorUi.UvRegenerationDerivedJobDiscardsStaleAuthoredProperty .........................   Passed    0.02 sec
+        Start 1083: SandboxEditorUi.UvRegenerationPanelModelTracksDerivedJobStateThroughCache
+ 45/136 Test #1083: SandboxEditorUi.UvRegenerationPanelModelTracksDerivedJobStateThroughCache .....................   Passed    0.02 sec
+        Start 1084: SandboxEditorUi.TextureBakeControlsReportUvSourcesAndRequireRuntimeModule
+ 46/136 Test #1084: SandboxEditorUi.TextureBakeControlsReportUvSourcesAndRequireRuntimeModule .....................   Passed    0.01 sec
+        Start 1193: VertexChannelStreams.PositionUvLayoutMatchesLineAndPointStride
+ 47/136 Test #1193: VertexChannelStreams.PositionUvLayoutMatchesLineAndPointStride ................................   Passed    0.01 sec
+        Start 1280: SandboxParameterizationPanel.RegistrationIsStableAndIdempotent
+ 48/136 Test #1280: SandboxParameterizationPanel.RegistrationIsStableAndIdempotent ................................   Passed    0.06 sec
+        Start 1281: SandboxParameterizationPanel.StrategiesAndTypedRequestAreExact
+ 49/136 Test #1281: SandboxParameterizationPanel.StrategiesAndTypedRequestAreExact ................................   Passed    0.00 sec
+        Start 1282: SandboxParameterizationPanel.ProjectionFitsAndFailsClosed
+ 50/136 Test #1282: SandboxParameterizationPanel.ProjectionFitsAndFailsClosed .....................................   Passed    0.00 sec
+        Start 1283: SandboxParameterizationPanel.ResultSummaryCarriesAggregateDiagnostics
+ 51/136 Test #1283: SandboxParameterizationPanel.ResultSummaryCarriesAggregateDiagnostics .........................   Passed    0.00 sec
+        Start 1284: SandboxParameterizationPanel.RealWindowAndTypedActionAreOperational
+ 52/136 Test #1284: SandboxParameterizationPanel.RealWindowAndTypedActionAreOperational ...........................   Passed    0.10 sec
+        Start 1811: ParameterizationDiagnostics.IdentityTriangleHasZeroNormalizedError
+ 53/136 Test #1811: ParameterizationDiagnostics.IdentityTriangleHasZeroNormalizedError ............................   Passed    0.01 sec
+        Start 1812: ParameterizationDiagnostics.IdentitySquareReportsBoundaryMetrics
+ 54/136 Test #1812: ParameterizationDiagnostics.IdentitySquareReportsBoundaryMetrics ..............................   Passed    0.01 sec
+        Start 1813: ParameterizationDiagnostics.StretchedRectangleHasPredictableDistortion
+ 55/136 Test #1813: ParameterizationDiagnostics.StretchedRectangleHasPredictableDistortion ........................   Passed    0.01 sec
+        Start 1814: ParameterizationDiagnostics.FlippedUvReportsElementWithoutFailing
+ 56/136 Test #1814: ParameterizationDiagnostics.FlippedUvReportsElementWithoutFailing .............................   Passed    0.01 sec
+        Start 1815: ParameterizationDiagnostics.DegeneratePositionTriangleIsSkipped
+ 57/136 Test #1815: ParameterizationDiagnostics.DegeneratePositionTriangleIsSkipped ...............................   Passed    0.01 sec
+        Start 1816: ParameterizationDiagnostics.DegenerateUvTriangleIsSkipped
+ 58/136 Test #1816: ParameterizationDiagnostics.DegenerateUvTriangleIsSkipped .....................................   Passed    0.01 sec
+        Start 1817: ParameterizationDiagnostics.DeletedFaceKeepsStorageAlignedNanSentinel
+ 59/136 Test #1817: ParameterizationDiagnostics.DeletedFaceKeepsStorageAlignedNanSentinel .........................   Passed    0.01 sec
+        Start 1818: ParameterizationDiagnostics.NonTriangleFaceIsReported
+ 60/136 Test #1818: ParameterizationDiagnostics.NonTriangleFaceIsReported .........................................   Passed    0.01 sec
+        Start 1819: ParameterizationDiagnostics.MissingUvsFailBeforeEvaluation
+ 61/136 Test #1819: ParameterizationDiagnostics.MissingUvsFailBeforeEvaluation ....................................   Passed    0.01 sec
+        Start 1820: ParameterizationDiagnostics.NonFiniteUvsAreReported
+ 62/136 Test #1820: ParameterizationDiagnostics.NonFiniteUvsAreReported ...........................................   Passed    0.01 sec
+        Start 1821: HarmonicParameterization.SquareFanCenterAtHarmonicAverage
+ 63/136 Test #1821: HarmonicParameterization.SquareFanCenterAtHarmonicAverage .....................................   Passed    0.01 sec
+        Start 1822: HarmonicParameterization.CircleBoundaryIsOnCircleAndDeterministic
+ 64/136 Test #1822: HarmonicParameterization.CircleBoundaryIsOnCircleAndDeterministic .............................   Passed    0.01 sec
+        Start 1823: HarmonicParameterization.SquareArcLengthBoundaryProducesValidEmbedding
+ 65/136 Test #1823: HarmonicParameterization.SquareArcLengthBoundaryProducesValidEmbedding ........................   Passed    0.01 sec
+        Start 1824: HarmonicParameterization.TutteEmbeddingHasNoFlippedTriangles
+ 66/136 Test #1824: HarmonicParameterization.TutteEmbeddingHasNoFlippedTriangles ..................................   Passed    0.01 sec
+        Start 1825: HarmonicParameterization.ClosedMeshIsNotDiskTopology
+ 67/136 Test #1825: HarmonicParameterization.ClosedMeshIsNotDiskTopology ..........................................   Passed    0.01 sec
+        Start 1826: HarmonicParameterization.MultipleBoundaryLoopsAreNotDiskTopology
+ 68/136 Test #1826: HarmonicParameterization.MultipleBoundaryLoopsAreNotDiskTopology ..............................   Passed    0.01 sec
+        Start 1827: HarmonicParameterization.PuncturedGenusOneMeshIsNotDiskTopology
+ 69/136 Test #1827: HarmonicParameterization.PuncturedGenusOneMeshIsNotDiskTopology ...............................   Passed    0.01 sec
+        Start 1828: HarmonicParameterization.FewerThanThreeVerticesAreReported
+ 70/136 Test #1828: HarmonicParameterization.FewerThanThreeVerticesAreReported ....................................   Passed    0.01 sec
+        Start 1829: HarmonicParameterization.NonTriangleMeshIsRejected
+ 71/136 Test #1829: HarmonicParameterization.NonTriangleMeshIsRejected ............................................   Passed    0.01 sec
+        Start 1830: HarmonicParameterization.MismatchedBoundaryArrayIsRejected
+ 72/136 Test #1830: HarmonicParameterization.MismatchedBoundaryArrayIsRejected ....................................   Passed    0.01 sec
+        Start 1831: HarmonicParameterization.DuplicatePinIsRejected
+ 73/136 Test #1831: HarmonicParameterization.DuplicatePinIsRejected ...............................................   Passed    0.01 sec
+        Start 1832: HarmonicParameterization.DeletedPinIsRejected
+ 74/136 Test #1832: HarmonicParameterization.DeletedPinIsRejected .................................................   Passed    0.01 sec
+        Start 1833: HarmonicParameterization.NonFinitePinUvIsRejected
+ 75/136 Test #1833: HarmonicParameterization.NonFinitePinUvIsRejected .............................................   Passed    0.01 sec
+        Start 1834: HarmonicParameterization.CustomBoundaryNotFullyPinnedIsRejected
+ 76/136 Test #1834: HarmonicParameterization.CustomBoundaryNotFullyPinnedIsRejected ...............................   Passed    0.01 sec
+        Start 1835: HarmonicParameterization.LscmApiRemainsReachable
+ 77/136 Test #1835: HarmonicParameterization.LscmApiRemainsReachable ..............................................   Passed    0.01 sec
+        Start 1836: ParameterizationOptimize.ReferencePreparationIsStorageAlignedAndFailClosed
+ 78/136 Test #1836: ParameterizationOptimize.ReferencePreparationIsStorageAlignedAndFailClosed ....................   Passed    0.01 sec
+        Start 1837: ParameterizationOptimize.ProperRotationFitRecoversRotationAndScale
+ 79/136 Test #1837: ParameterizationOptimize.ProperRotationFitRecoversRotationAndScale ............................   Passed    0.01 sec
+        Start 1838: ParameterizationOptimize.SymmetricDirichletMatchesReportingDiagnostics
+ 80/136 Test #1838: ParameterizationOptimize.SymmetricDirichletMatchesReportingDiagnostics ........................   Passed    0.01 sec
+        Start 1839: ParameterizationOptimize.ReflectionUsesProperRotationButTripsBarrier
+ 81/136 Test #1839: ParameterizationOptimize.ReflectionUsesProperRotationButTripsBarrier ..........................   Passed    0.01 sec
+        Start 1840: ParameterizationOptimize.AnalyticDirichletGradientMatchesFiniteDifference
+ 82/136 Test #1840: ParameterizationOptimize.AnalyticDirichletGradientMatchesFiniteDifference .....................   Passed    0.01 sec
+        Start 1841: ParameterizationOptimize.ProxySystemsArePsdAndMatchCurrentGradients
+ 83/136 Test #1841: ParameterizationOptimize.ProxySystemsArePsdAndMatchCurrentGradients ...........................   Passed    0.01 sec
+        Start 1842: ParameterizationOptimize.InjectiveSearchStopsInsideFirstFlipRoot
+ 84/136 Test #1842: ParameterizationOptimize.InjectiveSearchStopsInsideFirstFlipRoot ..............................   Passed    0.01 sec
+        Start 1843: ParameterizationOptimize.IdenticalInputsProduceBitwiseIdenticalOutputs
+ 85/136 Test #1843: ParameterizationOptimize.IdenticalInputsProduceBitwiseIdenticalOutputs ........................   Passed    0.01 sec
+        Start 1844: ParameterizationOptimize.InvalidDynamicInputsReturnExplicitStatuses
+ 86/136 Test #1844: ParameterizationOptimize.InvalidDynamicInputsReturnExplicitStatuses ...........................   Passed    0.01 sec
+        Start 1845: ParameterizationOptimize.PublicRecordsAreRevalidatedBeforeIndexing
+ 87/136 Test #1845: ParameterizationOptimize.PublicRecordsAreRevalidatedBeforeIndexing ............................   Passed    0.01 sec
+        Start 1846: ParameterizationDispatch.LscmMatchesDirectSolverAndCarriesDiagnostics
+ 88/136 Test #1846: ParameterizationDispatch.LscmMatchesDirectSolverAndCarriesDiagnostics .........................   Passed    0.01 sec
+        Start 1847: ParameterizationDispatch.HarmonicAndTutteMatchDirectSolver
+ 89/136 Test #1847: ParameterizationDispatch.HarmonicAndTutteMatchDirectSolver ....................................   Passed    0.01 sec
+        Start 1848: ParameterizationDispatch.InvalidInputsFailClosedThroughStatus
+ 90/136 Test #1848: ParameterizationDispatch.InvalidInputsFailClosedThroughStatus .................................   Passed    0.01 sec
+        Start 1849: ParameterizationDispatch.RejectionCarriesConnectedComponentAndBoundaryLoopCounts
+ 91/136 Test #1849: ParameterizationDispatch.RejectionCarriesConnectedComponentAndBoundaryLoopCounts ..............   Passed    0.01 sec
+        Start 1850: ParameterizationDispatch.UnusableDiagnosticsFailClosedWithoutUvs
+ 92/136 Test #1850: ParameterizationDispatch.UnusableDiagnosticsFailClosedWithoutUvs ..............................   Passed    0.01 sec
+        Start 1851: ParameterizationDispatch.LscmNonConvergenceIsSolverFailureWithoutUvs
+ 93/136 Test #1851: ParameterizationDispatch.LscmNonConvergenceIsSolverFailureWithoutUvs ..........................   Passed    0.01 sec
+        Start 1852: ParameterizationDispatch.RepeatedCallsAreDeterministic
+ 94/136 Test #1852: ParameterizationDispatch.RepeatedCallsAreDeterministic ........................................   Passed    0.01 sec
+        Start 1863: UvAtlas.FakeBackendCanReplaceDefault
+ 95/136 Test #1863: UvAtlas.FakeBackendCanReplaceDefault ..........................................................   Passed    0.01 sec
+        Start 1864: UvAtlas.FastStagedRequestUsesBuiltInBackendWithoutXAtlasFallback
+ 96/136 Test #1864: UvAtlas.FastStagedRequestUsesBuiltInBackendWithoutXAtlasFallback ..............................   Passed    0.01 sec
+        Start 1865: UvAtlas.FastStagedCubeCutsFaceChartsAndCopiesProperties
+ 97/136 Test #1865: UvAtlas.FastStagedCubeCutsFaceChartsAndCopiesProperties .......................................   Passed    0.01 sec
+        Start 1866: UvAtlas.FastStagedHighCardinalityGridIsFiniteAndDeterministic
+ 98/136 Test #1866: UvAtlas.FastStagedHighCardinalityGridIsFiniteAndDeterministic .................................   Passed    0.08 sec
+        Start 1867: UvAtlas.FastStagedKeepsFirstSeenBoundaryAndNonmanifoldSeamOrder
+ 99/136 Test #1867: UvAtlas.FastStagedKeepsFirstSeenBoundaryAndNonmanifoldSeamOrder ...............................   Passed    0.01 sec
+        Start 1868: UvAtlas.FastStagedManyChartsPreserveSparseSourceIndices
+100/136 Test #1868: UvAtlas.FastStagedManyChartsPreserveSparseSourceIndices .......................................   Passed    0.20 sec
+        Start 1869: UvAtlas.FastStagedFailingBackendFallsBackToXAtlasWhenAllowed
+101/136 Test #1869: UvAtlas.FastStagedFailingBackendFallsBackToXAtlasWhenAllowed ..................................   Passed    0.11 sec
+        Start 1870: UvAtlas.FastStagedFailingBackendFailsClosedWhenXAtlasFallbackDisabled
+102/136 Test #1870: UvAtlas.FastStagedFailingBackendFailsClosedWhenXAtlasFallbackDisabled .........................   Passed    0.00 sec
+        Start 1871: UvAtlas.FastStagedRequestCanUseCallerSuppliedBackend
+103/136 Test #1871: UvAtlas.FastStagedRequestCanUseCallerSuppliedBackend ..........................................   Passed    0.00 sec
+        Start 1872: UvAtlas.ValidAuthoredUvsArePreservedWithoutCallingBackend
+104/136 Test #1872: UvAtlas.ValidAuthoredUvsArePreservedWithoutCallingBackend .....................................   Passed    0.00 sec
+        Start 1873: UvAtlas.MissingUvsGenerateFiniteNormalizedFastStagedUvsByDefault
+105/136 Test #1873: UvAtlas.MissingUvsGenerateFiniteNormalizedFastStagedUvsByDefault ..............................   Passed    0.00 sec
+        Start 1874: UvAtlas.ExplicitXAtlasMethodGeneratesFiniteNormalizedUvs
+106/136 Test #1874: UvAtlas.ExplicitXAtlasMethodGeneratesFiniteNormalizedUvs ......................................   Passed    0.01 sec
+        Start 1875: UvAtlas.SeamSplitXrefsPreserveVertexProperties
+107/136 Test #1875: UvAtlas.SeamSplitXrefsPreserveVertexProperties ................................................   Passed    0.01 sec
+        Start 1876: UvAtlas.InvalidInputsReturnExplicitStatuses
+108/136 Test #1876: UvAtlas.InvalidInputsReturnExplicitStatuses ...................................................   Passed    0.00 sec
+        Start 1877: UvAtlas.InvalidAuthoredUvsFallBackToDefaultBackend
+109/136 Test #1877: UvAtlas.InvalidAuthoredUvsFallBackToDefaultBackend ............................................   Passed    0.00 sec
+        Start 2074: HalfedgeMesh_PropertyAccess.ParameterizationMutableOverloadPublishesUvAndPinProperties
+110/136 Test #2074: HalfedgeMesh_PropertyAccess.ParameterizationMutableOverloadPublishesUvAndPinProperties ........   Passed    0.00 sec
+        Start 2127: CornerTexcoords.ResolvesNoneWhenMeshCarriesNoUvs
+111/136 Test #2127: CornerTexcoords.ResolvesNoneWhenMeshCarriesNoUvs ..............................................   Passed    0.00 sec
+        Start 2128: CornerTexcoords.ResolvesVertexDomainWhenOnlyVertexUvsExist
+112/136 Test #2128: CornerTexcoords.ResolvesVertexDomainWhenOnlyVertexUvsExist ....................................   Passed    0.00 sec
+        Start 2129: CornerTexcoords.CornerUvsWinOverVertexUvs
+113/136 Test #2129: CornerTexcoords.CornerUvsWinOverVertexUvs .....................................................   Passed    0.00 sec
+        Start 2130: CornerTexcoords.CornerReadFallsBackToTargetVertexUv
+114/136 Test #2130: CornerTexcoords.CornerReadFallsBackToTargetVertexUv ...........................................   Passed    0.00 sec
+        Start 2132: CornerTexcoords.UniformCornerUvsHaveNoSeams
+115/136 Test #2132: CornerTexcoords.UniformCornerUvsHaveNoSeams ...................................................   Passed    0.00 sec
+        Start 2133: CornerTexcoords.VertexOwnedUvsCanNeverProduceSeams
+116/136 Test #2133: CornerTexcoords.VertexOwnedUvsCanNeverProduceSeams ............................................   Passed    0.00 sec
+        Start 2367: Simplification.FeatureAwarePreservesUvSeams
+117/136 Test #2367: Simplification.FeatureAwarePreservesUvSeams ...................................................   Passed    0.01 sec
+        Start 2368: Simplification.FeatureAwarePreservesCornerUvSeams
+118/136 Test #2368: Simplification.FeatureAwarePreservesCornerUvSeams .............................................   Passed    0.02 sec
+        Start 2369: Simplification.UniformCornerUvsPinNoSeam
+119/136 Test #2369: Simplification.UniformCornerUvsPinNoSeam ......................................................   Passed    0.03 sec
+        Start 3716: GraphicsVisualizationPackets.ResolvedUvBakeProvenanceIsReportedWithoutImplicitHtex
+120/136 Test #3716: GraphicsVisualizationPackets.ResolvedUvBakeProvenanceIsReportedWithoutImplicitHtex ............   Passed    0.00 sec
+        Start 3718: GraphicsVisualizationPackets.TexcoordBakesRequireExistingUvData
+121/136 Test #3718: GraphicsVisualizationPackets.TexcoordBakesRequireExistingUvData ...............................   Passed    0.00 sec
+        Start 3732: PropertyTextureBake.PipelineContractIsUvRasterWithoutDepthOrCulling
+122/136 Test #3732: PropertyTextureBake.PipelineContractIsUvRasterWithoutDepthOrCulling ...........................   Passed    0.00 sec
+        Start 3892: FrameRecipeContract.UvViewIsAbsentFromTheDisabledDefaultRecipe
+123/136 Test #3892: FrameRecipeContract.UvViewIsAbsentFromTheDisabledDefaultRecipe ................................   Passed    0.00 sec
+        Start 3893: FrameRecipeContract.UvViewWritesRetainedImportBeforeImGuiSamplesIt
+124/136 Test #3893: FrameRecipeContract.UvViewWritesRetainedImportBeforeImGuiSamplesIt ............................   Passed    0.00 sec
+        Start 3894: FrameRecipeContract.FirstGenerationUvViewTransitionsFromUndefinedToShaderRead
+125/136 Test #3894: FrameRecipeContract.FirstGenerationUvViewTransitionsFromUndefinedToShaderRead .................   Passed    0.00 sec
+        Start 3895: FrameRecipeContract.UvViewRequiresRetainedTextureImport
+126/136 Test #3895: FrameRecipeContract.UvViewRequiresRetainedTextureImport .......................................   Passed    0.00 sec
+        Start 4287: GraphicsUvViewContract.DisabledAndNonOperationalRequestsStayOnCpuWithoutResources
+127/136 Test #4287: GraphicsUvViewContract.DisabledAndNonOperationalRequestsStayOnCpuWithoutResources .............   Passed    0.00 sec
+        Start 4288: GraphicsUvViewContract.InvalidBoundsTopologyAndMissingTexcoordsFailClosed
+128/136 Test #4288: GraphicsUvViewContract.InvalidBoundsTopologyAndMissingTexcoordsFailClosed .....................   Passed    0.00 sec
+        Start 4289: GraphicsUvViewContract.ResidentTriangleCreatesRetainedSampledTargetAndRecordsAllDraws
+129/136 Test #4289: GraphicsUvViewContract.ResidentTriangleCreatesRetainedSampledTargetAndRecordsAllDraws .........   Passed    0.00 sec
+        Start 4290: GraphicsUvViewContract.TextureAndHeatmapFallbacksRemainExplicit
+130/136 Test #4290: GraphicsUvViewContract.TextureAndHeatmapFallbacksRemainExplicit ...............................   Passed    0.00 sec
+        Start 4291: GraphicsUvViewContract.ResizeReplacesTargetAndIncrementsGeneration
+131/136 Test #4291: GraphicsUvViewContract.ResizeReplacesTargetAndIncrementsGeneration ............................   Passed    0.00 sec
+        Start 4292: GraphicsUvViewContract.SubmissionHeartbeatDisablesUnrefreshedRetainedWork
+132/136 Test #4292: GraphicsUvViewContract.SubmissionHeartbeatDisablesUnrefreshedRetainedWork .....................   Passed    0.00 sec
+        Start 4293: GraphicsUvViewContract.RebuildClearsPublishedReadinessAndRequiresRefresh
+133/136 Test #4293: GraphicsUvViewContract.RebuildClearsPublishedReadinessAndRequiresRefresh ......................   Passed    0.00 sec
+        Start 4294: GraphicsUvViewContract.TargetExtentAndUvFitLimitsFailClosed
+134/136 Test #4294: GraphicsUvViewContract.TargetExtentAndUvFitLimitsFailClosed ...................................   Passed    0.00 sec
+        Start 4295: GraphicsUvViewContract.EveryBackgroundModeReachesTheShaderContract
+135/136 Test #4295: GraphicsUvViewContract.EveryBackgroundModeReachesTheShaderContract ............................   Passed    0.00 sec
+        Start 4296: GraphicsUvViewContract.GeometryRecordLookupReturnsResidentDataAndRejectsFreedHandle
+136/136 Test #4296: GraphicsUvViewContract.GeometryRecordLookupReturnsResidentDataAndRejectsFreedHandle ...........   Passed    0.00 sec
+
+100% tests passed, 0 tests failed out of 136
+
+Label Time Summary:
+benchmark      =   0.58 sec*proc (1 test)
+contract       =   1.16 sec*proc (61 tests)
+geometry       =   1.47 sec*proc (68 tests)
+graphics       =   0.05 sec*proc (17 tests)
+integration    =   0.16 sec*proc (5 tests)
+regression     =   0.58 sec*proc (1 test)
+runtime        =   1.29 sec*proc (51 tests)
+unit           =   0.89 sec*proc (69 tests)
+
+Total Test time (real) =   3.76 sec

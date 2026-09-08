@@ -2,10 +2,11 @@ session:
   id: 2026-09-07_001
   date: '2026-09-07'
   started: 2026-09-07T00:36+02:00
-  last_turn: 2026-09-07T01:28+02:00
-  turn_count: 2
-  summary: Completed METHOD-041 inspection and published all eleven pending commits on main after the full
-    CPU gate; UI-053 integration and part-quality/adoption remain open.
+  last_turn: '2026-09-07T21:10:56+02:00'
+  turn_count: 4
+  summary: Completed METHOD-041 inspection and publication; continued METHOD-045 baseline-preserving atlas
+    work and the explicitly approved Claude source/result review. Frog UV fragmentation and anatomical
+    segmentation, quality tradeoffs and production adoption remain open.
 events_logged:
 - turn: 1
   type: decision
@@ -55,6 +56,30 @@ events_logged:
   routing: direct
   provenance: user
   summary: Publish the committed work on main for the next workday
+- turn: 3
+  type: decision
+  id: N480
+  routing: direct
+  provenance: user
+  summary: Prioritize baseline quality before integrating offline methods
+- turn: 3
+  type: experiment
+  id: N481
+  routing: direct
+  provenance: ai-executed
+  summary: Preserve original regions while constructing and packing cut UV charts
+- turn: 4
+  type: decision
+  id: N482
+  routing: direct
+  provenance: user
+  summary: Approve unpublished atlas review and request frog appearance
+- turn: 4
+  type: experiment
+  id: N483
+  routing: direct
+  provenance: ai-executed
+  summary: Resolve source-review caveats against local packing source and saved arrays
 ai_actions:
 - turn: 1
   action: Read primary feature-line/curvature formulations; implemented CPU detector, exact JSON export
@@ -79,6 +104,13 @@ ai_actions:
     build artifacts remain local. This is publication/verification bookkeeping, not a new research result.'
   provenance: ai-executed
   files_changed: []
+- turn: 4
+  action: Completed approved Claude review without input geometry; inspected saved frog figures and audited
+    chart orientation. Archived the review and resolved reporting findings without algorithm changes.
+  provenance: ai-executed
+  files_changed:
+  - docs/methods/baseline_preserving_atlas_experiment.md
+  - ara/evidence/diagnostics/method045/reviews/resolution.md
 claims_touched:
 - id: C61
   action: created
@@ -86,18 +118,34 @@ claims_touched:
 - id: C62
   action: created
   turn: 1
+- id: C71
+  action: created
+  turn: 3
+- id: C72
+  action: created
+  turn: 3
+- id: C71
+  action: clarified scope without changing measured result
+  turn: 4
 key_context:
 - turn: 1
   excerpt: 'User: yes, please cowork on this with claude.'
 - turn: 2
   excerpt: 'User: please commit and merge everything to main. then push to remote. i need it tomorrow
     at work'
+- turn: 3
+  excerpt: User postponed full wiring and requested working with Claude on open problems, preserving baseline
+    quality for sculpt if possible.
+- turn: 4
+  excerpt: 'User: yes, after this fix, how does frog looks like?'
 open_threads:
 - 'UI-053: integrate detached curves through shared engine/config/UI publication.'
 - Inspect candidate curve placement with the operator before choosing boundary completion, selection and
   merging.
 - METHOD-040 remains experimental; C59 frozen closure rejection and BUG-171 custody blocker remain unchanged.
 - Keep BUG-172 import attribution and BUG-176 concurrent CTest discovery separate from this detector work.
+- 'METHOD-045: added UV cut placement, packing and remeshing remain quality tradeoffs; METHOD-044 owns
+  native/config/UI adoption.'
 ai_suggestions_pending:
 - 'O180 is only partly implemented: detector inspection is delivered, while joint boundary selection/continuation/merging
   and its complexity cost remain unadopted.'

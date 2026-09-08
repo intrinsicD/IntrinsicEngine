@@ -1,0 +1,6187 @@
+{
+  "initial": {
+    "status": "ready",
+    "meshes": 2,
+    "runs": 265,
+    "rejected": 0,
+    "selectedMesh": "frog",
+    "left": "0",
+    "right": "174",
+    "curveSegments": [
+      4055,
+      4055
+    ],
+    "camera": {
+      "yaw": 0.55,
+      "pitch": -0.2,
+      "zoom": 1
+    },
+    "glErrors": [
+      0,
+      0
+    ]
+  },
+  "coverage": [
+    {
+      "name": "Native baseline: initial growth",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "frog",
+      "left": "0",
+      "right": "0",
+      "curveSegments": [
+        4055,
+        4055
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "Native baseline: final regions",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "frog",
+      "left": "0",
+      "right": "1",
+      "curveSegments": [
+        4055,
+        4055
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "feature: Initial 64 seeded clusters",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "frog",
+      "left": "0",
+      "right": "2",
+      "curveSegments": [
+        4055,
+        4055
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "feature: Split 1",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "frog",
+      "left": "0",
+      "right": "3",
+      "curveSegments": [
+        4055,
+        4055
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "feature: Split 2",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "frog",
+      "left": "0",
+      "right": "4",
+      "curveSegments": [
+        4055,
+        4055
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "feature: Split 3",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "frog",
+      "left": "0",
+      "right": "5",
+      "curveSegments": [
+        4055,
+        4055
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "feature: Split 4",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "frog",
+      "left": "0",
+      "right": "6",
+      "curveSegments": [
+        4055,
+        4055
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "feature: Split 5",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "frog",
+      "left": "0",
+      "right": "7",
+      "curveSegments": [
+        4055,
+        4055
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "feature: Split 6",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "frog",
+      "left": "0",
+      "right": "8",
+      "curveSegments": [
+        4055,
+        4055
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "feature: Split 7",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "frog",
+      "left": "0",
+      "right": "9",
+      "curveSegments": [
+        4055,
+        4055
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "feature: Split 8",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "frog",
+      "left": "0",
+      "right": "10",
+      "curveSegments": [
+        4055,
+        4055
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "feature: Split 9",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "frog",
+      "left": "0",
+      "right": "11",
+      "curveSegments": [
+        4055,
+        4055
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "feature: Validated charts before merging",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "frog",
+      "left": "0",
+      "right": "12",
+      "curveSegments": [
+        4055,
+        4055
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "feature: Merge 1",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "frog",
+      "left": "0",
+      "right": "13",
+      "curveSegments": [
+        4055,
+        4055
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "feature: Merge 2",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "frog",
+      "left": "0",
+      "right": "14",
+      "curveSegments": [
+        4055,
+        4055
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "feature: Merge 3",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "frog",
+      "left": "0",
+      "right": "15",
+      "curveSegments": [
+        4055,
+        4055
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "feature: Merge 4",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "frog",
+      "left": "0",
+      "right": "16",
+      "curveSegments": [
+        4055,
+        4055
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "feature: Merge 5",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "frog",
+      "left": "0",
+      "right": "17",
+      "curveSegments": [
+        4055,
+        4055
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "feature: Merge 6",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "frog",
+      "left": "0",
+      "right": "18",
+      "curveSegments": [
+        4055,
+        4055
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "feature: Merge 7",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "frog",
+      "left": "0",
+      "right": "19",
+      "curveSegments": [
+        4055,
+        4055
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "feature: Merge 8",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "frog",
+      "left": "0",
+      "right": "20",
+      "curveSegments": [
+        4055,
+        4055
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "feature: Merge 9",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "frog",
+      "left": "0",
+      "right": "21",
+      "curveSegments": [
+        4055,
+        4055
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "feature: Merge 10",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "frog",
+      "left": "0",
+      "right": "22",
+      "curveSegments": [
+        4055,
+        4055
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "feature: Merge 11",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "frog",
+      "left": "0",
+      "right": "23",
+      "curveSegments": [
+        4055,
+        4055
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "feature: Merge 12",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "frog",
+      "left": "0",
+      "right": "24",
+      "curveSegments": [
+        4055,
+        4055
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "feature: Merge 13",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "frog",
+      "left": "0",
+      "right": "25",
+      "curveSegments": [
+        4055,
+        4055
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "feature: Merge 14",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "frog",
+      "left": "0",
+      "right": "26",
+      "curveSegments": [
+        4055,
+        4055
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "feature: Merge 15",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "frog",
+      "left": "0",
+      "right": "27",
+      "curveSegments": [
+        4055,
+        4055
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "feature: Merge 16",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "frog",
+      "left": "0",
+      "right": "28",
+      "curveSegments": [
+        4055,
+        4055
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "feature: Merge 17",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "frog",
+      "left": "0",
+      "right": "29",
+      "curveSegments": [
+        4055,
+        4055
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "feature: Merge 18",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "frog",
+      "left": "0",
+      "right": "30",
+      "curveSegments": [
+        4055,
+        4055
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "feature: Merge 19",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "frog",
+      "left": "0",
+      "right": "31",
+      "curveSegments": [
+        4055,
+        4055
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "feature: Merge 20",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "frog",
+      "left": "0",
+      "right": "32",
+      "curveSegments": [
+        4055,
+        4055
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "feature: Merge 21",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "frog",
+      "left": "0",
+      "right": "33",
+      "curveSegments": [
+        4055,
+        4055
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "feature: Merge 22",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "frog",
+      "left": "0",
+      "right": "34",
+      "curveSegments": [
+        4055,
+        4055
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "feature: Merge 23",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "frog",
+      "left": "0",
+      "right": "35",
+      "curveSegments": [
+        4055,
+        4055
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "feature: Merge 24",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "frog",
+      "left": "0",
+      "right": "36",
+      "curveSegments": [
+        4055,
+        4055
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "feature: Merge 25",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "frog",
+      "left": "0",
+      "right": "37",
+      "curveSegments": [
+        4055,
+        4055
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "feature: Merge 26",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "frog",
+      "left": "0",
+      "right": "38",
+      "curveSegments": [
+        4055,
+        4055
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "feature: Merge 27",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "frog",
+      "left": "0",
+      "right": "39",
+      "curveSegments": [
+        4055,
+        4055
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "feature: Merge 28",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "frog",
+      "left": "0",
+      "right": "40",
+      "curveSegments": [
+        4055,
+        4055
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "feature: Merge 29",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "frog",
+      "left": "0",
+      "right": "41",
+      "curveSegments": [
+        4055,
+        4055
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "feature: Merge 30",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "frog",
+      "left": "0",
+      "right": "42",
+      "curveSegments": [
+        4055,
+        4055
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "feature: Merge 31",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "frog",
+      "left": "0",
+      "right": "43",
+      "curveSegments": [
+        4055,
+        4055
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "feature: Merge 32",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "frog",
+      "left": "0",
+      "right": "44",
+      "curveSegments": [
+        4055,
+        4055
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "feature: Merge 33",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "frog",
+      "left": "0",
+      "right": "45",
+      "curveSegments": [
+        4055,
+        4055
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "feature: Merge 34",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "frog",
+      "left": "0",
+      "right": "46",
+      "curveSegments": [
+        4055,
+        4055
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "feature: Merge 35",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "frog",
+      "left": "0",
+      "right": "47",
+      "curveSegments": [
+        4055,
+        4055
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "feature: Merge 36",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "frog",
+      "left": "0",
+      "right": "48",
+      "curveSegments": [
+        4055,
+        4055
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "feature: Merge 37",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "frog",
+      "left": "0",
+      "right": "49",
+      "curveSegments": [
+        4055,
+        4055
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "feature: Merge 38",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "frog",
+      "left": "0",
+      "right": "50",
+      "curveSegments": [
+        4055,
+        4055
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "feature: Merge 39",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "frog",
+      "left": "0",
+      "right": "51",
+      "curveSegments": [
+        4055,
+        4055
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "feature: Merge 40",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "frog",
+      "left": "0",
+      "right": "52",
+      "curveSegments": [
+        4055,
+        4055
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "feature: Merge 41",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "frog",
+      "left": "0",
+      "right": "53",
+      "curveSegments": [
+        4055,
+        4055
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "feature: Merge 42",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "frog",
+      "left": "0",
+      "right": "54",
+      "curveSegments": [
+        4055,
+        4055
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "feature: Merge 43",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "frog",
+      "left": "0",
+      "right": "55",
+      "curveSegments": [
+        4055,
+        4055
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "feature: Merge 44",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "frog",
+      "left": "0",
+      "right": "56",
+      "curveSegments": [
+        4055,
+        4055
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "feature: Merge 45",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "frog",
+      "left": "0",
+      "right": "57",
+      "curveSegments": [
+        4055,
+        4055
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "feature: Merge 46",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "frog",
+      "left": "0",
+      "right": "58",
+      "curveSegments": [
+        4055,
+        4055
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "feature: Merge 47",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "frog",
+      "left": "0",
+      "right": "59",
+      "curveSegments": [
+        4055,
+        4055
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "feature: Merge 48",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "frog",
+      "left": "0",
+      "right": "60",
+      "curveSegments": [
+        4055,
+        4055
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "feature: Merge 49",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "frog",
+      "left": "0",
+      "right": "61",
+      "curveSegments": [
+        4055,
+        4055
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "feature: Merge 50",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "frog",
+      "left": "0",
+      "right": "62",
+      "curveSegments": [
+        4055,
+        4055
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "feature: Merge 51",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "frog",
+      "left": "0",
+      "right": "63",
+      "curveSegments": [
+        4055,
+        4055
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "feature: Merge 52",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "frog",
+      "left": "0",
+      "right": "64",
+      "curveSegments": [
+        4055,
+        4055
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "feature: Merge 53",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "frog",
+      "left": "0",
+      "right": "65",
+      "curveSegments": [
+        4055,
+        4055
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "feature: Merge 54",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "frog",
+      "left": "0",
+      "right": "66",
+      "curveSegments": [
+        4055,
+        4055
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "feature: Merge 55",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "frog",
+      "left": "0",
+      "right": "67",
+      "curveSegments": [
+        4055,
+        4055
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "feature: Merge 56",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "frog",
+      "left": "0",
+      "right": "68",
+      "curveSegments": [
+        4055,
+        4055
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "feature: Merge 57",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "frog",
+      "left": "0",
+      "right": "69",
+      "curveSegments": [
+        4055,
+        4055
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "feature: Merge 58",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "frog",
+      "left": "0",
+      "right": "70",
+      "curveSegments": [
+        4055,
+        4055
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "feature: Final charts before native packing",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "frog",
+      "left": "0",
+      "right": "71",
+      "curveSegments": [
+        4055,
+        4055
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "feature: growth distance",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "frog",
+      "left": "0",
+      "right": "72",
+      "curveSegments": [
+        4055,
+        4055
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "feature: final local UV stretch",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "frog",
+      "left": "0",
+      "right": "73",
+      "curveSegments": [
+        4055,
+        4055
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "protected: Original baseline components",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "frog",
+      "left": "0",
+      "right": "74",
+      "curveSegments": [
+        4055,
+        4055
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "protected: Split 1",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "frog",
+      "left": "0",
+      "right": "75",
+      "curveSegments": [
+        4055,
+        4055
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "protected: Split 2",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "frog",
+      "left": "0",
+      "right": "76",
+      "curveSegments": [
+        4055,
+        4055
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "protected: Split 3",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "frog",
+      "left": "0",
+      "right": "77",
+      "curveSegments": [
+        4055,
+        4055
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "protected: Split 4",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "frog",
+      "left": "0",
+      "right": "78",
+      "curveSegments": [
+        4055,
+        4055
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "protected: Split 5",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "frog",
+      "left": "0",
+      "right": "79",
+      "curveSegments": [
+        4055,
+        4055
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "protected: Split 6",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "frog",
+      "left": "0",
+      "right": "80",
+      "curveSegments": [
+        4055,
+        4055
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "protected: Split 7",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "frog",
+      "left": "0",
+      "right": "81",
+      "curveSegments": [
+        4055,
+        4055
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "protected: Split 8",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "frog",
+      "left": "0",
+      "right": "82",
+      "curveSegments": [
+        4055,
+        4055
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "protected: Split 9",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "frog",
+      "left": "0",
+      "right": "83",
+      "curveSegments": [
+        4055,
+        4055
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "protected: Split 10",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "frog",
+      "left": "0",
+      "right": "84",
+      "curveSegments": [
+        4055,
+        4055
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "protected: Split 11",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "frog",
+      "left": "0",
+      "right": "85",
+      "curveSegments": [
+        4055,
+        4055
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "protected: Split 12",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "frog",
+      "left": "0",
+      "right": "86",
+      "curveSegments": [
+        4055,
+        4055
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "protected: Split 13",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "frog",
+      "left": "0",
+      "right": "87",
+      "curveSegments": [
+        4055,
+        4055
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "protected: Split 14",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "frog",
+      "left": "0",
+      "right": "88",
+      "curveSegments": [
+        4055,
+        4055
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "protected: Split 15",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "frog",
+      "left": "0",
+      "right": "89",
+      "curveSegments": [
+        4055,
+        4055
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "protected: Split 16",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "frog",
+      "left": "0",
+      "right": "90",
+      "curveSegments": [
+        4055,
+        4055
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "protected: Split 17",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "frog",
+      "left": "0",
+      "right": "91",
+      "curveSegments": [
+        4055,
+        4055
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "protected: Split 18",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "frog",
+      "left": "0",
+      "right": "92",
+      "curveSegments": [
+        4055,
+        4055
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "protected: Split 19",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "frog",
+      "left": "0",
+      "right": "93",
+      "curveSegments": [
+        4055,
+        4055
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "protected: Split 20",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "frog",
+      "left": "0",
+      "right": "94",
+      "curveSegments": [
+        4055,
+        4055
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "protected: Split 21",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "frog",
+      "left": "0",
+      "right": "95",
+      "curveSegments": [
+        4055,
+        4055
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "protected: Split 22",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "frog",
+      "left": "0",
+      "right": "96",
+      "curveSegments": [
+        4055,
+        4055
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "protected: Split 23",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "frog",
+      "left": "0",
+      "right": "97",
+      "curveSegments": [
+        4055,
+        4055
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "protected: Split 24",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "frog",
+      "left": "0",
+      "right": "98",
+      "curveSegments": [
+        4055,
+        4055
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "protected: Split 25",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "frog",
+      "left": "0",
+      "right": "99",
+      "curveSegments": [
+        4055,
+        4055
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "protected: Split 26",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "frog",
+      "left": "0",
+      "right": "100",
+      "curveSegments": [
+        4055,
+        4055
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "protected: Split 27",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "frog",
+      "left": "0",
+      "right": "101",
+      "curveSegments": [
+        4055,
+        4055
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "protected: Split 28",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "frog",
+      "left": "0",
+      "right": "102",
+      "curveSegments": [
+        4055,
+        4055
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "protected: Split 29",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "frog",
+      "left": "0",
+      "right": "103",
+      "curveSegments": [
+        4055,
+        4055
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "protected: Split 30",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "frog",
+      "left": "0",
+      "right": "104",
+      "curveSegments": [
+        4055,
+        4055
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "protected: Split 31",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "frog",
+      "left": "0",
+      "right": "105",
+      "curveSegments": [
+        4055,
+        4055
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "protected: Split 32",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "frog",
+      "left": "0",
+      "right": "106",
+      "curveSegments": [
+        4055,
+        4055
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "protected: Split 33",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "frog",
+      "left": "0",
+      "right": "107",
+      "curveSegments": [
+        4055,
+        4055
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "protected: Split 34",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "frog",
+      "left": "0",
+      "right": "108",
+      "curveSegments": [
+        4055,
+        4055
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "protected: Split 35",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "frog",
+      "left": "0",
+      "right": "109",
+      "curveSegments": [
+        4055,
+        4055
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "protected: Split 36",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "frog",
+      "left": "0",
+      "right": "110",
+      "curveSegments": [
+        4055,
+        4055
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "protected: Split 37",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "frog",
+      "left": "0",
+      "right": "111",
+      "curveSegments": [
+        4055,
+        4055
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "protected: Split 38",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "frog",
+      "left": "0",
+      "right": "112",
+      "curveSegments": [
+        4055,
+        4055
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "protected: Split 39",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "frog",
+      "left": "0",
+      "right": "113",
+      "curveSegments": [
+        4055,
+        4055
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "protected: Split 40",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "frog",
+      "left": "0",
+      "right": "114",
+      "curveSegments": [
+        4055,
+        4055
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "protected: Split 41",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "frog",
+      "left": "0",
+      "right": "115",
+      "curveSegments": [
+        4055,
+        4055
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "protected: Split 42",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "frog",
+      "left": "0",
+      "right": "116",
+      "curveSegments": [
+        4055,
+        4055
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "protected: Split 43",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "frog",
+      "left": "0",
+      "right": "117",
+      "curveSegments": [
+        4055,
+        4055
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "protected: Split 44",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "frog",
+      "left": "0",
+      "right": "118",
+      "curveSegments": [
+        4055,
+        4055
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "protected: Split 45",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "frog",
+      "left": "0",
+      "right": "119",
+      "curveSegments": [
+        4055,
+        4055
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "protected: Split 46",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "frog",
+      "left": "0",
+      "right": "120",
+      "curveSegments": [
+        4055,
+        4055
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "protected: Split 47",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "frog",
+      "left": "0",
+      "right": "121",
+      "curveSegments": [
+        4055,
+        4055
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "protected: Split 48",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "frog",
+      "left": "0",
+      "right": "122",
+      "curveSegments": [
+        4055,
+        4055
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "protected: Split 49",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "frog",
+      "left": "0",
+      "right": "123",
+      "curveSegments": [
+        4055,
+        4055
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "protected: Split 50",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "frog",
+      "left": "0",
+      "right": "124",
+      "curveSegments": [
+        4055,
+        4055
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "protected: Split 51",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "frog",
+      "left": "0",
+      "right": "125",
+      "curveSegments": [
+        4055,
+        4055
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "protected: Split 52",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "frog",
+      "left": "0",
+      "right": "126",
+      "curveSegments": [
+        4055,
+        4055
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "protected: Split 53",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "frog",
+      "left": "0",
+      "right": "127",
+      "curveSegments": [
+        4055,
+        4055
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "protected: Split 54",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "frog",
+      "left": "0",
+      "right": "128",
+      "curveSegments": [
+        4055,
+        4055
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "protected: Split 55",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "frog",
+      "left": "0",
+      "right": "129",
+      "curveSegments": [
+        4055,
+        4055
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "protected: Split 56",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "frog",
+      "left": "0",
+      "right": "130",
+      "curveSegments": [
+        4055,
+        4055
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "protected: Split 57",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "frog",
+      "left": "0",
+      "right": "131",
+      "curveSegments": [
+        4055,
+        4055
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "protected: Split 58",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "frog",
+      "left": "0",
+      "right": "132",
+      "curveSegments": [
+        4055,
+        4055
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "protected: Validated charts before merging",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "frog",
+      "left": "0",
+      "right": "133",
+      "curveSegments": [
+        4055,
+        4055
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "protected: Merge 1",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "frog",
+      "left": "0",
+      "right": "134",
+      "curveSegments": [
+        4055,
+        4055
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "protected: Merge 2",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "frog",
+      "left": "0",
+      "right": "135",
+      "curveSegments": [
+        4055,
+        4055
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "protected: Merge 3",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "frog",
+      "left": "0",
+      "right": "136",
+      "curveSegments": [
+        4055,
+        4055
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "protected: Merge 4",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "frog",
+      "left": "0",
+      "right": "137",
+      "curveSegments": [
+        4055,
+        4055
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "protected: Merge 5",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "frog",
+      "left": "0",
+      "right": "138",
+      "curveSegments": [
+        4055,
+        4055
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "protected: Merge 6",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "frog",
+      "left": "0",
+      "right": "139",
+      "curveSegments": [
+        4055,
+        4055
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "protected: Merge 7",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "frog",
+      "left": "0",
+      "right": "140",
+      "curveSegments": [
+        4055,
+        4055
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "protected: Merge 8",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "frog",
+      "left": "0",
+      "right": "141",
+      "curveSegments": [
+        4055,
+        4055
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "protected: Merge 9",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "frog",
+      "left": "0",
+      "right": "142",
+      "curveSegments": [
+        4055,
+        4055
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "protected: Merge 10",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "frog",
+      "left": "0",
+      "right": "143",
+      "curveSegments": [
+        4055,
+        4055
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "protected: Merge 11",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "frog",
+      "left": "0",
+      "right": "144",
+      "curveSegments": [
+        4055,
+        4055
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "protected: Merge 12",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "frog",
+      "left": "0",
+      "right": "145",
+      "curveSegments": [
+        4055,
+        4055
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "protected: Merge 13",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "frog",
+      "left": "0",
+      "right": "146",
+      "curveSegments": [
+        4055,
+        4055
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "protected: Merge 14",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "frog",
+      "left": "0",
+      "right": "147",
+      "curveSegments": [
+        4055,
+        4055
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "protected: Merge 15",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "frog",
+      "left": "0",
+      "right": "148",
+      "curveSegments": [
+        4055,
+        4055
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "protected: Merge 16",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "frog",
+      "left": "0",
+      "right": "149",
+      "curveSegments": [
+        4055,
+        4055
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "protected: Merge 17",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "frog",
+      "left": "0",
+      "right": "150",
+      "curveSegments": [
+        4055,
+        4055
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "protected: Merge 18",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "frog",
+      "left": "0",
+      "right": "151",
+      "curveSegments": [
+        4055,
+        4055
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "protected: Merge 19",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "frog",
+      "left": "0",
+      "right": "152",
+      "curveSegments": [
+        4055,
+        4055
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "protected: Merge 20",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "frog",
+      "left": "0",
+      "right": "153",
+      "curveSegments": [
+        4055,
+        4055
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "protected: Merge 21",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "frog",
+      "left": "0",
+      "right": "154",
+      "curveSegments": [
+        4055,
+        4055
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "protected: Merge 22",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "frog",
+      "left": "0",
+      "right": "155",
+      "curveSegments": [
+        4055,
+        4055
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "protected: Merge 23",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "frog",
+      "left": "0",
+      "right": "156",
+      "curveSegments": [
+        4055,
+        4055
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "protected: Merge 24",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "frog",
+      "left": "0",
+      "right": "157",
+      "curveSegments": [
+        4055,
+        4055
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "protected: Merge 25",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "frog",
+      "left": "0",
+      "right": "158",
+      "curveSegments": [
+        4055,
+        4055
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "protected: Merge 26",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "frog",
+      "left": "0",
+      "right": "159",
+      "curveSegments": [
+        4055,
+        4055
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "protected: Merge 27",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "frog",
+      "left": "0",
+      "right": "160",
+      "curveSegments": [
+        4055,
+        4055
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "protected: Merge 28",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "frog",
+      "left": "0",
+      "right": "161",
+      "curveSegments": [
+        4055,
+        4055
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "protected: Merge 29",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "frog",
+      "left": "0",
+      "right": "162",
+      "curveSegments": [
+        4055,
+        4055
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "protected: Merge 30",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "frog",
+      "left": "0",
+      "right": "163",
+      "curveSegments": [
+        4055,
+        4055
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "protected: Merge 31",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "frog",
+      "left": "0",
+      "right": "164",
+      "curveSegments": [
+        4055,
+        4055
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "protected: Merge 32",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "frog",
+      "left": "0",
+      "right": "165",
+      "curveSegments": [
+        4055,
+        4055
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "protected: Merge 33",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "frog",
+      "left": "0",
+      "right": "166",
+      "curveSegments": [
+        4055,
+        4055
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "protected: Merge 34",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "frog",
+      "left": "0",
+      "right": "167",
+      "curveSegments": [
+        4055,
+        4055
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "protected: Merge 35",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "frog",
+      "left": "0",
+      "right": "168",
+      "curveSegments": [
+        4055,
+        4055
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "protected: Merge 36",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "frog",
+      "left": "0",
+      "right": "169",
+      "curveSegments": [
+        4055,
+        4055
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "protected: Merge 37",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "frog",
+      "left": "0",
+      "right": "170",
+      "curveSegments": [
+        4055,
+        4055
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "protected: Merge 38",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "frog",
+      "left": "0",
+      "right": "171",
+      "curveSegments": [
+        4055,
+        4055
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "protected: Merge 39",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "frog",
+      "left": "0",
+      "right": "172",
+      "curveSegments": [
+        4055,
+        4055
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "protected: Merge 40",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "frog",
+      "left": "0",
+      "right": "173",
+      "curveSegments": [
+        4055,
+        4055
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "protected: Final charts before native packing",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "frog",
+      "left": "0",
+      "right": "174",
+      "curveSegments": [
+        4055,
+        4055
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "protected: final local UV stretch",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "frog",
+      "left": "0",
+      "right": "175",
+      "curveSegments": [
+        4055,
+        4055
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "Scalar: max incident dihedral",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "frog",
+      "left": "0",
+      "right": "176",
+      "curveSegments": [
+        4055,
+        4055
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "Scalar: native soft feature confidence",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "frog",
+      "left": "0",
+      "right": "177",
+      "curveSegments": [
+        4055,
+        4055
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "Scalar: native baseline growth cost",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "frog",
+      "left": "0",
+      "right": "178",
+      "curveSegments": [
+        4055,
+        4055
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "Scalar: signed k1",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "frog",
+      "left": "0",
+      "right": "179",
+      "curveSegments": [
+        4055,
+        4055
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "Scalar: signed k2",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "frog",
+      "left": "0",
+      "right": "180",
+      "curveSegments": [
+        4055,
+        4055
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "Unused curve scalar: confidence",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "frog",
+      "left": "0",
+      "right": "181",
+      "curveSegments": [
+        4055,
+        4055
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "Unused curve scalar: strength",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "frog",
+      "left": "0",
+      "right": "182",
+      "curveSegments": [
+        4055,
+        4055
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "Unused curve scalar: fit_residual",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "frog",
+      "left": "0",
+      "right": "183",
+      "curveSegments": [
+        4055,
+        4055
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "Unused curve scalar: sharpness",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "frog",
+      "left": "0",
+      "right": "184",
+      "curveSegments": [
+        4055,
+        4055
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "Native baseline: initial growth",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "sculpt",
+      "left": "0",
+      "right": "0",
+      "curveSegments": [
+        59,
+        59
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "Native baseline: final regions",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "sculpt",
+      "left": "0",
+      "right": "1",
+      "curveSegments": [
+        59,
+        59
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "feature: Initial 64 seeded clusters",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "sculpt",
+      "left": "0",
+      "right": "2",
+      "curveSegments": [
+        59,
+        59
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "feature: Validated charts before merging",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "sculpt",
+      "left": "0",
+      "right": "3",
+      "curveSegments": [
+        59,
+        59
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "feature: Merge 1",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "sculpt",
+      "left": "0",
+      "right": "4",
+      "curveSegments": [
+        59,
+        59
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "feature: Merge 2",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "sculpt",
+      "left": "0",
+      "right": "5",
+      "curveSegments": [
+        59,
+        59
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "feature: Merge 3",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "sculpt",
+      "left": "0",
+      "right": "6",
+      "curveSegments": [
+        59,
+        59
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "feature: Merge 4",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "sculpt",
+      "left": "0",
+      "right": "7",
+      "curveSegments": [
+        59,
+        59
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "feature: Merge 5",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "sculpt",
+      "left": "0",
+      "right": "8",
+      "curveSegments": [
+        59,
+        59
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "feature: Merge 6",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "sculpt",
+      "left": "0",
+      "right": "9",
+      "curveSegments": [
+        59,
+        59
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "feature: Merge 7",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "sculpt",
+      "left": "0",
+      "right": "10",
+      "curveSegments": [
+        59,
+        59
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "feature: Merge 8",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "sculpt",
+      "left": "0",
+      "right": "11",
+      "curveSegments": [
+        59,
+        59
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "feature: Merge 9",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "sculpt",
+      "left": "0",
+      "right": "12",
+      "curveSegments": [
+        59,
+        59
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "feature: Merge 10",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "sculpt",
+      "left": "0",
+      "right": "13",
+      "curveSegments": [
+        59,
+        59
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "feature: Merge 11",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "sculpt",
+      "left": "0",
+      "right": "14",
+      "curveSegments": [
+        59,
+        59
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "feature: Merge 12",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "sculpt",
+      "left": "0",
+      "right": "15",
+      "curveSegments": [
+        59,
+        59
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "feature: Merge 13",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "sculpt",
+      "left": "0",
+      "right": "16",
+      "curveSegments": [
+        59,
+        59
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "feature: Merge 14",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "sculpt",
+      "left": "0",
+      "right": "17",
+      "curveSegments": [
+        59,
+        59
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "feature: Merge 15",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "sculpt",
+      "left": "0",
+      "right": "18",
+      "curveSegments": [
+        59,
+        59
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "feature: Merge 16",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "sculpt",
+      "left": "0",
+      "right": "19",
+      "curveSegments": [
+        59,
+        59
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "feature: Merge 17",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "sculpt",
+      "left": "0",
+      "right": "20",
+      "curveSegments": [
+        59,
+        59
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "feature: Merge 18",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "sculpt",
+      "left": "0",
+      "right": "21",
+      "curveSegments": [
+        59,
+        59
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "feature: Merge 19",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "sculpt",
+      "left": "0",
+      "right": "22",
+      "curveSegments": [
+        59,
+        59
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "feature: Merge 20",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "sculpt",
+      "left": "0",
+      "right": "23",
+      "curveSegments": [
+        59,
+        59
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "feature: Merge 21",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "sculpt",
+      "left": "0",
+      "right": "24",
+      "curveSegments": [
+        59,
+        59
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "feature: Merge 22",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "sculpt",
+      "left": "0",
+      "right": "25",
+      "curveSegments": [
+        59,
+        59
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "feature: Merge 23",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "sculpt",
+      "left": "0",
+      "right": "26",
+      "curveSegments": [
+        59,
+        59
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "feature: Merge 24",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "sculpt",
+      "left": "0",
+      "right": "27",
+      "curveSegments": [
+        59,
+        59
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "feature: Merge 25",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "sculpt",
+      "left": "0",
+      "right": "28",
+      "curveSegments": [
+        59,
+        59
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "feature: Merge 26",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "sculpt",
+      "left": "0",
+      "right": "29",
+      "curveSegments": [
+        59,
+        59
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "feature: Merge 27",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "sculpt",
+      "left": "0",
+      "right": "30",
+      "curveSegments": [
+        59,
+        59
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "feature: Merge 28",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "sculpt",
+      "left": "0",
+      "right": "31",
+      "curveSegments": [
+        59,
+        59
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "feature: Merge 29",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "sculpt",
+      "left": "0",
+      "right": "32",
+      "curveSegments": [
+        59,
+        59
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "feature: Merge 30",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "sculpt",
+      "left": "0",
+      "right": "33",
+      "curveSegments": [
+        59,
+        59
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "feature: Merge 31",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "sculpt",
+      "left": "0",
+      "right": "34",
+      "curveSegments": [
+        59,
+        59
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "feature: Merge 32",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "sculpt",
+      "left": "0",
+      "right": "35",
+      "curveSegments": [
+        59,
+        59
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "feature: Merge 33",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "sculpt",
+      "left": "0",
+      "right": "36",
+      "curveSegments": [
+        59,
+        59
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "feature: Merge 34",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "sculpt",
+      "left": "0",
+      "right": "37",
+      "curveSegments": [
+        59,
+        59
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "feature: Merge 35",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "sculpt",
+      "left": "0",
+      "right": "38",
+      "curveSegments": [
+        59,
+        59
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "feature: Merge 36",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "sculpt",
+      "left": "0",
+      "right": "39",
+      "curveSegments": [
+        59,
+        59
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "feature: Merge 37",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "sculpt",
+      "left": "0",
+      "right": "40",
+      "curveSegments": [
+        59,
+        59
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "feature: Merge 38",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "sculpt",
+      "left": "0",
+      "right": "41",
+      "curveSegments": [
+        59,
+        59
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "feature: Merge 39",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "sculpt",
+      "left": "0",
+      "right": "42",
+      "curveSegments": [
+        59,
+        59
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "feature: Merge 40",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "sculpt",
+      "left": "0",
+      "right": "43",
+      "curveSegments": [
+        59,
+        59
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "feature: Merge 41",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "sculpt",
+      "left": "0",
+      "right": "44",
+      "curveSegments": [
+        59,
+        59
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "feature: Merge 42",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "sculpt",
+      "left": "0",
+      "right": "45",
+      "curveSegments": [
+        59,
+        59
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "feature: Merge 43",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "sculpt",
+      "left": "0",
+      "right": "46",
+      "curveSegments": [
+        59,
+        59
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "feature: Merge 44",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "sculpt",
+      "left": "0",
+      "right": "47",
+      "curveSegments": [
+        59,
+        59
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "feature: Merge 45",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "sculpt",
+      "left": "0",
+      "right": "48",
+      "curveSegments": [
+        59,
+        59
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "feature: Merge 46",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "sculpt",
+      "left": "0",
+      "right": "49",
+      "curveSegments": [
+        59,
+        59
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "feature: Merge 47",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "sculpt",
+      "left": "0",
+      "right": "50",
+      "curveSegments": [
+        59,
+        59
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "feature: Merge 48",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "sculpt",
+      "left": "0",
+      "right": "51",
+      "curveSegments": [
+        59,
+        59
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "feature: Merge 49",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "sculpt",
+      "left": "0",
+      "right": "52",
+      "curveSegments": [
+        59,
+        59
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "feature: Merge 50",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "sculpt",
+      "left": "0",
+      "right": "53",
+      "curveSegments": [
+        59,
+        59
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "feature: Merge 51",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "sculpt",
+      "left": "0",
+      "right": "54",
+      "curveSegments": [
+        59,
+        59
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "feature: Merge 52",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "sculpt",
+      "left": "0",
+      "right": "55",
+      "curveSegments": [
+        59,
+        59
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "feature: Merge 53",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "sculpt",
+      "left": "0",
+      "right": "56",
+      "curveSegments": [
+        59,
+        59
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "feature: Merge 54",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "sculpt",
+      "left": "0",
+      "right": "57",
+      "curveSegments": [
+        59,
+        59
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "feature: Merge 55",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "sculpt",
+      "left": "0",
+      "right": "58",
+      "curveSegments": [
+        59,
+        59
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "feature: Merge 56",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "sculpt",
+      "left": "0",
+      "right": "59",
+      "curveSegments": [
+        59,
+        59
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "feature: Merge 57",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "sculpt",
+      "left": "0",
+      "right": "60",
+      "curveSegments": [
+        59,
+        59
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "feature: Merge 58",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "sculpt",
+      "left": "0",
+      "right": "61",
+      "curveSegments": [
+        59,
+        59
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "feature: Merge 59",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "sculpt",
+      "left": "0",
+      "right": "62",
+      "curveSegments": [
+        59,
+        59
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "feature: Final charts before native packing",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "sculpt",
+      "left": "0",
+      "right": "63",
+      "curveSegments": [
+        59,
+        59
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "feature: growth distance",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "sculpt",
+      "left": "0",
+      "right": "64",
+      "curveSegments": [
+        59,
+        59
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "feature: final local UV stretch",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "sculpt",
+      "left": "0",
+      "right": "65",
+      "curveSegments": [
+        59,
+        59
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "protected: Original baseline components",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "sculpt",
+      "left": "0",
+      "right": "66",
+      "curveSegments": [
+        59,
+        59
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "protected: Split 1",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "sculpt",
+      "left": "0",
+      "right": "67",
+      "curveSegments": [
+        59,
+        59
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "protected: Validated charts before merging",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "sculpt",
+      "left": "0",
+      "right": "68",
+      "curveSegments": [
+        59,
+        59
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "protected: Final charts before native packing",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "sculpt",
+      "left": "0",
+      "right": "69",
+      "curveSegments": [
+        59,
+        59
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "protected: final local UV stretch",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "sculpt",
+      "left": "0",
+      "right": "70",
+      "curveSegments": [
+        59,
+        59
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "Scalar: max incident dihedral",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "sculpt",
+      "left": "0",
+      "right": "71",
+      "curveSegments": [
+        59,
+        59
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "Scalar: native soft feature confidence",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "sculpt",
+      "left": "0",
+      "right": "72",
+      "curveSegments": [
+        59,
+        59
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "Scalar: native baseline growth cost",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "sculpt",
+      "left": "0",
+      "right": "73",
+      "curveSegments": [
+        59,
+        59
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "Scalar: signed k1",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "sculpt",
+      "left": "0",
+      "right": "74",
+      "curveSegments": [
+        59,
+        59
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "Scalar: signed k2",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "sculpt",
+      "left": "0",
+      "right": "75",
+      "curveSegments": [
+        59,
+        59
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "Unused curve scalar: confidence",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "sculpt",
+      "left": "0",
+      "right": "76",
+      "curveSegments": [
+        59,
+        59
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "Unused curve scalar: strength",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "sculpt",
+      "left": "0",
+      "right": "77",
+      "curveSegments": [
+        59,
+        59
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "Unused curve scalar: fit_residual",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "sculpt",
+      "left": "0",
+      "right": "78",
+      "curveSegments": [
+        59,
+        59
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "Unused curve scalar: sharpness",
+      "status": "ready",
+      "meshes": 2,
+      "runs": 265,
+      "rejected": 0,
+      "selectedMesh": "sculpt",
+      "left": "0",
+      "right": "79",
+      "curveSegments": [
+        59,
+        59
+      ],
+      "camera": {
+        "yaw": 0.55,
+        "pitch": -0.2,
+        "zoom": 1
+      },
+      "glErrors": [
+        0,
+        0
+      ]
+    }
+  ],
+  "unfiltered": {
+    "status": "ready",
+    "meshes": 2,
+    "runs": 265,
+    "rejected": 0,
+    "selectedMesh": "frog",
+    "left": "2",
+    "right": "71",
+    "curveSegments": [
+      4055,
+      4055
+    ],
+    "camera": {
+      "yaw": 0.55,
+      "pitch": -0.2,
+      "zoom": 1
+    },
+    "glErrors": [
+      0,
+      0
+    ]
+  },
+  "filtered": {
+    "status": "ready",
+    "meshes": 2,
+    "runs": 265,
+    "rejected": 0,
+    "selectedMesh": "frog",
+    "left": "2",
+    "right": "71",
+    "curveSegments": [
+      0,
+      0
+    ],
+    "camera": {
+      "yaw": 0.55,
+      "pitch": -0.2,
+      "zoom": 1
+    },
+    "glErrors": [
+      0,
+      0
+    ]
+  },
+  "sculpt_large": {
+    "status": "ready",
+    "meshes": 2,
+    "runs": 265,
+    "rejected": 0,
+    "selectedMesh": "sculpt",
+    "left": "2",
+    "right": "71",
+    "curveSegments": [
+      435,
+      435
+    ],
+    "camera": {
+      "yaw": 0.55,
+      "pitch": -0.2,
+      "zoom": 1
+    },
+    "glErrors": [
+      0,
+      0
+    ]
+  }
+}

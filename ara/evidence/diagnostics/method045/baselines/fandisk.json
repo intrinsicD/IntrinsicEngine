@@ -1,0 +1,9 @@
+{
+"status":"passed",
+"benchmark_id":"geometry.curvature_segmentation.local_mesh.local_cohort",
+"method":"geometry.curvature_segmentation",
+"backend":"cpu_reference",
+"dataset":"local.method_040.mesh_cohort.v1",
+"commit":"local-dev",
+"metrics":{"runtime_ms":23964.432652,"memory_peak_bytes":22384640,"quality_error_l2":0,"quality_error_linf":0,"population_count":15},
+"diagnostics":{"input":"/home/alex/Dropbox/Work/Datasets/obj/fandisk.obj","implementation":"method_039_local_patch_unadopted","feature_weight":1.5,"feature_exponent":1,"model_weight":0,"boundary_scale":1,"region_cost":0,"hard_feature_exclusion_ratio":0,"faces":12946,"vertices":6475,"load_ms":67.889290000000003,"curvature_ms":74.803244000000007,"feature_ms":354.127972,"partition_ms":23442.384612000002,"minimum_exclusion_curve_length":0,"minimum_region_area":0,"attenuation_curves":0,"attenuation_hard_edges":0,"area_merges":0,"unmergeable_small_regions":0,"optimized_energy":15.600685147720544,"energy":15.600685147720544,"lower_bound":null,"exact":false,"attempted_moves":0,"accepted_moves":0,"contractions":0,"sweeps":0,"source_hard":706,"source_soft":2099,"boundaries":769,"hard":706,"soft":56,"closure":7,"feature_length_recall":0.26439544590505432,"unsupported_length_fraction":0.0094721369766333236,"region_sizes":[1056,263,1815,944,378,424,412,198,3020,563,2048,612,340,330,543],"region_area_fractions":[0.069072461848073238,0.014676021224206217,0.13336163319990135,0.082924493090126394,0.032492801349103005,0.033246861028040357,0.035184645202662665,0.016474859600483907,0.24456456036256466,0.041287738248994447,0.16726740529378217,0.047033070663768821,0.023566849232075918,0.023786566901088702,0.035060032755128895]}}

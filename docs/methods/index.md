@@ -114,3 +114,12 @@ The [feature-aware atlas experiment](feature_aware_atlas_experiment.md) tests
 connected patches and distortion-validated chart merging, with actual packed UV
 examples, feature ablations and resolution controls. It is an offline reference,
 not a production atlas backend.
+
+The [baseline-preserving atlas experiment](baseline_preserving_atlas_experiment.md)
+keeps original face regions separate from UV charts, tests internal topology cuts
+and constrained re-merging, and reports packing/distortion tradeoffs before any
+production adoption (METHOD-045).
+
+- [Atlas stages and curvature decision audit](atlas_stage_inspection.md) — initial clusters, merge losses, scalar overlays and replay.
+
+- [Constrained UV boundary refinement](uv_boundary_refinement_experiment.md) — collective boundary moves, guidance controls and preservation/packing tradeoffs (METHOD-046, offline).

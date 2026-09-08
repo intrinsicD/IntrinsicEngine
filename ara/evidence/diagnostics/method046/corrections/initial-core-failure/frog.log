@@ -1,0 +1,18 @@
+frog: reference refinement
+frog: reference: 0 accepted, 0 moved faces, support 0.10844, additional length 11.76635, statuses {}
+frog: length refinement
+Traceback (most recent call last):
+  File "/home/alex/Documents/IntrinsicEngine/tools/diagnostics/atlas/run_boundary_refinement.py", line 96, in <module>
+    main()
+  File "/home/alex/Documents/IntrinsicEngine/tools/diagnostics/atlas/run_boundary_refinement.py", line 91, in main
+    run(args.mesh, args.source, args.output, band_hops=args.band_hops, rounds=args.rounds,
+  File "/home/alex/Documents/IntrinsicEngine/tools/diagnostics/atlas/run_boundary_refinement.py", line 48, in run
+    result = br.execute(v, f, regions, initial, score, hard=hard, beta=weight,
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/alex/Documents/IntrinsicEngine/tools/diagnostics/atlas/boundary_refine.py", line 251, in execute
+    chart, reason = solve_chart(g, np.flatnonzero(candidate == label), edge_index,
+                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/alex/Documents/IntrinsicEngine/tools/diagnostics/atlas/boundary_refine.py", line 134, in solve_chart
+    allowed = set(ids); seen = {int(ids[0])}; queue = list(seen)
+                                    ~~~^^^
+IndexError: index 0 is out of bounds for axis 0 with size 0

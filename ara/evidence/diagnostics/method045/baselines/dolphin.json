@@ -1,0 +1,9 @@
+{
+"status":"passed",
+"benchmark_id":"geometry.curvature_segmentation.local_mesh.local_cohort",
+"method":"geometry.curvature_segmentation",
+"backend":"cpu_reference",
+"dataset":"local.method_040.mesh_cohort.v1",
+"commit":"local-dev",
+"metrics":{"runtime_ms":12954.508868000001,"memory_peak_bytes":11890688,"quality_error_l2":0,"quality_error_linf":0,"population_count":11},
+"diagnostics":{"input":"/home/alex/Dropbox/Work/Datasets/obj/dolphin.obj","implementation":"method_039_local_patch_unadopted","feature_weight":1.5,"feature_exponent":1,"model_weight":0,"boundary_scale":1,"region_cost":0,"hard_feature_exclusion_ratio":0,"faces":5120,"vertices":2562,"load_ms":26.559871000000001,"curvature_ms":34.298743000000002,"feature_ms":149.085497,"partition_ms":12733.975515,"minimum_exclusion_curve_length":0,"minimum_region_area":0,"attenuation_curves":0,"attenuation_hard_edges":0,"area_merges":0,"unmergeable_small_regions":0,"optimized_energy":12.019044209806651,"energy":12.019044209806651,"lower_bound":null,"exact":false,"attempted_moves":0,"accepted_moves":0,"contractions":0,"sweeps":0,"source_hard":28,"source_soft":358,"boundaries":100,"hard":28,"soft":15,"closure":57,"feature_length_recall":0.17232753721856181,"unsupported_length_fraction":0.4276751908683214,"region_sizes":[4965,11,87,12,12,1,22,2,1,4,3],"region_area_fractions":[0.95160224979374786,0.0018968537262563643,0.011100048210176771,0.0064490931766978286,0.001153226186807317,4.3155802463082158e-05,0.022509248823606064,0.0012027400589306532,0.0011030779706063063,0.0026488481854841689,0.00029145806522417293]}}

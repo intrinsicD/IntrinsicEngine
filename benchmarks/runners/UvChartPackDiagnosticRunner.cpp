@@ -30,6 +30,7 @@ int main(int argc, char** argv) {
   }
   xatlas::PackOptions options;
   options.resolution = 1024; options.padding = 2;
+  options.bruteForce = source.value("brute_force", false);
   // For UvMesh input this identifies supplied UV components; there is no 3D
   // embedding to re-segment or parameterize. The caller verifies chart identity.
   xatlas::ComputeCharts(atlas);
@@ -41,7 +42,8 @@ int main(int argc, char** argv) {
   const auto& output = atlas->meshes[0];
   nlohmann::json result{{"chart_count", atlas->chartCount}, {"runtime_seconds", seconds},
       {"width", atlas->width}, {"height", atlas->height}, {"raster_utilization", atlas->utilization[0]},
-      {"implementation", "xatlas_pack_existing_uv_mesh"}, {"resolution", 1024}, {"padding", 2}};
+      {"implementation", "xatlas_pack_existing_uv_mesh"}, {"resolution", 1024}, {"padding", 2},
+      {"brute_force", options.bruteForce}};
   for (std::uint32_t i = 0; i < output.vertexCount; ++i) {
     result["uvs"].push_back({output.vertexArray[i].uv[0], output.vertexArray[i].uv[1]});
     result["source_vertices"].push_back(output.vertexArray[i].xref);

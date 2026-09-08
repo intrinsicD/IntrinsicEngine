@@ -1,0 +1,9 @@
+{
+"status":"passed",
+"benchmark_id":"geometry.curvature_segmentation.local_mesh.local_cohort",
+"method":"geometry.curvature_segmentation",
+"backend":"cpu_reference",
+"dataset":"local.method_040.mesh_cohort.v1",
+"commit":"local-dev",
+"metrics":{"runtime_ms":13904.980835,"memory_peak_bytes":15822848,"quality_error_l2":0,"quality_error_linf":0,"population_count":5},
+"diagnostics":{"input":"/home/alex/Dropbox/Work/Datasets/obj/sculpt.obj","implementation":"method_039_local_patch_unadopted","feature_weight":1.5,"feature_exponent":1,"model_weight":0,"boundary_scale":1,"region_cost":0,"hard_feature_exclusion_ratio":0,"faces":7342,"vertices":3669,"load_ms":37.843313000000002,"curvature_ms":46.282114,"feature_ms":107.213436,"partition_ms":13698.594282,"minimum_exclusion_curve_length":0,"minimum_region_area":0,"attenuation_curves":0,"attenuation_hard_edges":0,"area_merges":0,"unmergeable_small_regions":0,"optimized_energy":8.9475174656224148,"energy":8.9475174656224148,"lower_bound":null,"exact":false,"attempted_moves":0,"accepted_moves":0,"contractions":0,"sweeps":0,"source_hard":384,"source_soft":808,"boundaries":384,"hard":384,"soft":0,"closure":0,"feature_length_recall":0.31248923890641539,"unsupported_length_fraction":0,"region_sizes":[926,1488,788,792,3348],"region_area_fractions":[0.11094824017122661,0.21104839120456792,0.11093777029432864,0.11093774481445982,0.45612785351541751]}}

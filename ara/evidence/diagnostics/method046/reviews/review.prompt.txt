@@ -1,0 +1,2308 @@
+All dependencies needed for this review are inline below. Tools are disabled intentionally to keep mesh geometry private. Do not attempt tool calls, XML invokes, or file access. Deliver a completed textual review from the supplied source and actual aggregates. If you cannot verify a helper, state that specific limit, then complete the review.
+User explicitly authorized actual Claude collaboration, source review, and mesh-free aggregates. No input geometry is included. Review the final boundary refinement implementation and actual frozen five-arm results. Identify correctness blockers, scientific overclaims, test gaps and minimal actionable fixes. Be critical of my changes to your plan: globally fixed chart cores, initial pair bands, scale 2 for both meshes, strict border surrogate descent followed by full internal-cut energy acceptance. First cohort caught core loss across pairs; fixed globally and regression added. Internal cut comparison checks both endpoints. All ten new analytic tests pass; native focused UV tests and ten existing baseline tests pass. All five arms per mesh completed packing and passed bounds. Do not equate optimizing the support field with independent anatomical alignment. Do not claim full algorithm optimality from binary surrogate cuts. Explain what candidate should be shown to the user and remaining quality problem. Maximum 1000 words.
+
+FILE tools/diagnostics/atlas/boundary_refine.py
+#!/usr/bin/env python3
+"""Offline, feature-guided chart boundary moves with immutable source regions.
+
+Binary cuts propose collective moves inside frozen bands. The existing cut/LSCM
+reference validates both charts; acceptance includes internal UV seam cost.
+"""
+from __future__ import annotations
+from collections import Counter, deque
+import heapq
+
+import numpy as np
+from scipy.sparse import csr_matrix
+from scipy.sparse.csgraph import maximum_flow
+
+import baseline_atlas as ba
+import patch_merge as pm
+from compare_atlases import audit
+
+
+def binary_cut(count, edges, fixed):
+    """Minimize a positive binary Potts energy, with fixed 0/1 terminals.
+
+Integer capacity sum stays below 2**31 for scipy's flow implementation. The
+caller rechecks the floating-point objective, including terms absent here.
+"""
+    total = sum(w for _, _, w in edges)
+    if total <= 0 or not np.isfinite(total):
+        raise ValueError('positive finite graph weights required')
+    if any(w <= 0 or not np.isfinite(w) for _, _, w in edges):
+        raise ValueError('positive finite graph weights required')
+    capacity = [max(1, int(round(w / total * 10_000_000))) for _, _, w in edges]
+    infinity = sum(capacity) + 1
+    if infinity >= 2**30:
+        raise ValueError('capacity budget exceeded')
+    rows, cols, values = [], [], []
+    for (a, b, _), w in zip(edges, capacity):
+        rows.extend((a, b)); cols.extend((b, a)); values.extend((w, w))
+    for i, label in sorted(fixed.items()):
+        if label not in (0, 1):
+            raise ValueError('binary terminal required')
+        a, b = (count, i) if label == 0 else (i, count+1)
+        rows.append(a); cols.append(b); values.append(infinity)
+    graph = csr_matrix((np.asarray(values, np.int64), (rows, cols)), shape=(count+2, count+2))
+    flow = maximum_flow(graph, count, count+1)
+    residual = (graph-flow.flow).tocsr()
+    reached = {count}; queue = [count]
+    while queue:
+        i = queue.pop()
+        for k in range(residual.indptr[i], residual.indptr[i+1]):
+            j = int(residual.indices[k])
+            if residual.data[k] > 0 and j not in reached:
+                reached.add(j); queue.append(j)
+    labels = np.array([0 if i in reached else 1 for i in range(count)])
+    if any(labels[i] != x for i, x in fixed.items()):
+        raise ValueError('min cut violated fixed terminal')
+    return labels
+
+
+def curve_support(g, vertices, curves, scale=2):
+    """Conservative dual-path proximity and ambient tangent agreement.
+
+Paths start at the segment's source face and cannot jump between disconnected
+surface sheets. Outside that face, center-path length is a distance proxy, not
+an exact geodesic. A score is evidence strength, not an alignment oracle.
+"""
+    if (not np.array_equal(np.asarray(curves['triangles']), g['f']) or
+            not np.array_equal(np.asarray(curves['positions'], np.float32),
+                               np.asarray(vertices, np.float32))):
+        raise ValueError('curve/source identity mismatch')
+    if scale not in range(len(curves['scales'])):
+        raise ValueError('unknown curve support scale')
+    radius = curves['scales'][scale]['radius'] / g['scale']
+    if not np.isfinite(radius) or radius <= 0:
+        raise ValueError('positive curve radius required')
+    center = np.asarray(vertices).mean(axis=0)
+    points = (np.array([p['position'] for p in curves['points']])-center)/g['scale']
+    mid = np.array([(g['v'][v]+g['v'][w])/2 for *_, v, w in g['edges']])
+    tangent = np.array([(g['v'][w]-g['v'][v])/length for _, _, length, _, _, v, w in g['edges']])
+    incident = [[] for _ in g['f']]
+    for e, (a, b, *_) in enumerate(g['edges']):
+        incident[a].append(e); incident[b].append(e)
+    score = np.zeros(len(g['edges']))
+    for segment in curves['segments']:
+        if segment['scale'] != scale or segment['kind'] not in ('principal_ridge', 'principal_valley'):
+            continue
+        confidence = segment['confidence']
+        if not np.isfinite(confidence) or not 0 <= confidence <= 1:
+            raise ValueError('invalid curve confidence')
+        p, q = points[segment['points']]; delta = q-p; length = np.linalg.norm(delta)
+        if length <= 0:
+            continue
+        direction = delta/length; source = int(segment['face'])
+        if not 0 <= source < len(g['f']):
+            raise ValueError('curve source face out of range')
+        def segment_distance(x):
+            return float(np.linalg.norm(x-(p+np.clip((x-p)@direction, 0, length)*direction)))
+        # Start with the in-face distance to the center. Edges on the source
+        # face use their direct segment distance instead of a center detour.
+        distance = {source: segment_distance(g['center'][source])}
+        queue = [(distance[source], source)]
+        while queue:
+            d, face = heapq.heappop(queue)
+            if d != distance[face]:
+                continue
+            for e in incident[face]:
+                reach = (segment_distance(mid[e]) if face == source else
+                         d+float(np.linalg.norm(mid[e]-g['center'][face])))
+                value = confidence*abs(float(direction@tangent[e]))*max(0., 1-reach/radius)
+                score[e] = max(score[e], value)
+            if d > radius:
+                continue
+            for other, step, _ in g['adjacent'][face]:
+                candidate = d+step
+                if candidate < radius and candidate < distance.get(other, np.inf):
+                    distance[other] = candidate; heapq.heappush(queue, (candidate, other))
+    return score
+
+
+def edge_evidence(g, rows):
+    """Bind native hard flags and soft confidence by source vertex pair."""
+    lookup = {tuple(sorted((int(r[0]), int(r[1])))): r for r in rows}
+    hard = np.zeros(len(g['edges']), bool); soft = np.zeros(len(g['edges']))
+    for e, (*_, a, b) in enumerate(g['edges']):
+        if (a, b) not in lookup:
+            raise ValueError('native edge evidence missing source edge')
+        row = lookup[a, b]; hard[e] = bool(row[2]); soft[e] = row[3]
+    if not np.isfinite(soft).all() or np.any((soft < 0) | (soft > 1)):
+        raise ValueError('invalid native soft confidence')
+    return hard, soft
+
+
+def solve_chart(g, ids, edge_index, stretch_limit, anisotropy_limit):
+    ids = np.sort(ids)
+    if not len(ids):
+        return None, 'empty_chart'
+    allowed = set(ids); seen = {int(ids[0])}; queue = list(seen)
+    while queue:
+        for j, *_ in g['adjacent'][queue.pop()]:
+            if j in allowed and j not in seen:
+                seen.add(j); queue.append(j)
+    if len(seen) != len(ids):
+        return None, 'disconnected_chart'
+    opened, reason, _ = ba.open_region(g, ids)
+    if opened is None:
+        return None, reason
+    chart, reason = pm.parameterize_local(g, ids, *opened, stretch_limit, anisotropy_limit)
+    if chart is None:
+        return None, reason
+    cuts = set(); original = ba.incidence(g['f'][ids])
+    for edge, entries in original.items():
+        if len(entries) == 2:
+            (a, k, _, _), (b, l, _, _) = entries
+            if (chart['local_faces'][a, k] != chart['local_faces'][b, (l+1)%3] or
+                    chart['local_faces'][a, (k+1)%3] != chart['local_faces'][b, l]):
+                cuts.add(edge_index[edge])
+    chart['internal_edges'] = cuts
+    return chart, 'accepted'
+
+
+def seam_mask(g, labels, charts):
+    seams = np.array([labels[a] != labels[b] for a, b, *_ in g['edges']])
+    for chart in charts.values():
+        if chart['internal_edges']:
+            seams[list(chart['internal_edges'])] = True
+    return seams
+
+
+def frozen_bands(g, labels, regions, hard, hops):
+    pairs = {}
+    pinned = set()
+    for e, (a, b, length, *_) in enumerate(g['edges']):
+        if labels[a] != labels[b]:
+            if hard[e]:
+                pinned.update((a, b))
+            if regions[a] == regions[b]:
+                pair = tuple(sorted((int(labels[a]), int(labels[b]))))
+                entry = pairs.setdefault(pair, dict(length=0., seeds=set()))
+                entry['length'] += length; entry['seeds'].update((a, b))
+    # Cores are global: a face fixed for one pair must not be consumed by a
+    # later move involving a third chart. Freeze deep original interiors; if
+    # a chart has none, freeze the whole tiny chart rather than invent a seed.
+    rim = {i for a, b, *_ in g['edges'] if labels[a] != labels[b] for i in (a, b)}
+    distance = {i: 0 for i in rim}; queue = deque(sorted(rim))
+    while queue:
+        i = queue.popleft()
+        if distance[i] == hops:
+            continue
+        for j, *_ in g['adjacent'][i]:
+            if labels[j] == labels[i] and j not in distance:
+                distance[j] = distance[i]+1; queue.append(j)
+    for label in np.unique(labels):
+        ids = set(np.flatnonzero(labels == label))
+        core = ids-set(distance)
+        pinned.update(core if core else ids)
+    result = []
+    for pair, entry in sorted(pairs.items(), key=lambda x: (-x[1]['length'], x[0])):
+        distance = {i: 0 for i in entry['seeds']}; queue = deque(sorted(distance))
+        while queue:
+            i = queue.popleft()
+            if distance[i] == hops:
+                continue
+            for j, *_ in g['adjacent'][i]:
+                if labels[j] in pair and j not in distance:
+                    distance[j] = distance[i]+1; queue.append(j)
+        mutable = set(distance)-pinned
+        # Tiny charts with no fixed interior do not get an artificial seed/core.
+        cores = [set(np.flatnonzero(labels == x))-mutable for x in pair]
+        result.append((pair, mutable if all(cores) else set()))
+    return result
+
+
+def execute(vertices, faces, regions, initial, support, *, hard=None, beta=.8,
+            band_hops=6, rounds=3, stretch_limit=1.35, anisotropy_limit=2.):
+    if (not np.isfinite([beta, stretch_limit, anisotropy_limit]).all() or
+            not 0 <= beta <= .9 or min(stretch_limit, anisotropy_limit) < 1 or
+            not isinstance(band_hops, int) or band_hops < 0 or
+            not isinstance(rounds, int) or rounds < 0):
+        raise ValueError('invalid refinement parameters')
+    g = pm.geometry(vertices, faces); ba.topology(g['f'])
+    regions = np.asarray(regions); labels = np.asarray(initial).copy()
+    for array in (regions, labels):
+        if array.shape != (len(faces),) or array.dtype.kind not in 'iu' or np.any(array < 0):
+            raise ValueError('nonnegative integer face labels required')
+    score = np.asarray(support, float)
+    hard = np.zeros(len(score), bool) if hard is None else np.asarray(hard, bool)
+    if (score.shape != (len(g['edges']),) or hard.shape != score.shape or
+            not np.isfinite(score).all() or np.any((score < 0) | (score > 1))):
+        raise ValueError('source-edge scores in [0,1] required')
+    edge_index = {(v, w): e for e, (*_, v, w) in enumerate(g['edges'])}
+    charts = {}
+    for label in np.unique(labels):
+        ids = np.flatnonzero(labels == label)
+        if len(np.unique(regions[ids])) != 1:
+            raise ValueError('initial chart crosses an original region')
+        chart, reason = solve_chart(g, ids, edge_index, stretch_limit, anisotropy_limit)
+        if chart is None:
+            raise ValueError('initial chart invalid: '+reason)
+        charts[int(label)] = chart
+    weights = np.array([e[2] for e in g['edges']])*(1-beta*score)
+    mask = seam_mask(g, labels, charts); energy = float(weights@mask)
+    initial_energy = energy; initial_mask = mask.copy()
+    stages = [labels.copy()]; events = []; rejected = set()
+    revisions = {i: 0 for i in charts}; bands = frozen_bands(g, labels, regions, hard, band_hops)
+    for round_id in range(rounds):
+        accepted = 0
+        for pair, mutable in bands:
+            key = (*pair, *(revisions[i] for i in pair))
+            if key in rejected:
+                continue
+            record = dict(round=round_id, pair=list(pair), revisions=[revisions[i] for i in pair])
+            def reject(reason):
+                record['status'] = reason; events.append(record); rejected.add(key)
+            if not mutable:
+                reject('no_fixed_core'); continue
+            ids = np.flatnonzero(np.isin(labels, pair)); index = {int(v): i for i, v in enumerate(ids)}
+            edges = [(index[a], index[b], weights[e]) for e, (a, b, *_) in enumerate(g['edges'])
+                     if a in index and b in index]
+            fixed = {i: int(labels[v] == pair[1]) for i, v in enumerate(ids) if v not in mutable}
+            candidate = labels.copy()
+            candidate[ids] = np.asarray(pair)[binary_cut(len(ids), edges, fixed)]
+            record['moved_faces'] = int(np.count_nonzero(candidate != labels))
+            border_delta = sum(weights[e]*((int(candidate[a] != candidate[b]))-
+                                          int(labels[a] != labels[b]))
+                               for e, (a, b, *_) in enumerate(g['edges']))
+            record['border_delta'] = float(border_delta)
+            if not record['moved_faces'] or border_delta >= -1e-10:
+                reject('no_border_descent'); continue
+            proposed = charts.copy(); reason = 'accepted'
+            for label in pair:
+                chart, reason = solve_chart(g, np.flatnonzero(candidate == label), edge_index,
+                                            stretch_limit, anisotropy_limit)
+                if chart is None:
+                    break
+                proposed[label] = chart
+            if reason != 'accepted':
+                reject(reason); continue
+            new_mask = seam_mask(g, candidate, proposed); new_energy = float(weights@new_mask)
+            if np.any(hard & initial_mask & ~new_mask):
+                reject('hard_seam_loss'); continue
+            record.update(energy_before=energy, energy_after=new_energy)
+            if new_energy >= energy-1e-10:
+                reject('internal_cut_energy'); continue
+            charts = proposed; labels = candidate; mask = new_mask; energy = new_energy
+            for label in pair:
+                revisions[label] += 1
+            record['status'] = 'accepted'; events.append(record); accepted += 1; stages.append(labels.copy())
+        if not accepted:
+            break
+    packed, _ = pm.pack(charts); uv = np.empty((len(faces), 3, 2)); corners = np.empty_like(uv)
+    for label, chart in charts.items():
+        uv[chart['ids']] = chart['uv'][chart['local_faces']]
+        corners[chart['ids']] = packed[label][chart['local_faces']]
+    metrics = audit(vertices, faces, labels, corners)
+    metrics.update(ba.boundary_metrics(g, regions, labels, corners))
+    metrics.update(initial_energy=initial_energy, final_energy=energy,
+                   accepted_moves=len(stages)-1, moved_faces=int(np.count_nonzero(labels != initial)),
+                   statuses=dict(Counter(e['status'] for e in events)), uv_solves=g.get('actual_uv_solves', 0))
+    if (not metrics['all_charts_valid'] or metrics['lost_baseline_edges'] or
+            metrics['max_stretch'] > stretch_limit or metrics['max_anisotropy'] > anisotropy_limit or
+            not np.array_equal(np.unique(labels), np.unique(initial)) or np.any(hard & initial_mask & ~mask)):
+        raise ValueError('final refinement audit failed')
+    return dict(labels=labels, region_labels=regions.copy(), chart_uv=uv, corner_uv=corners,
+                metrics=metrics, events=events, stages=stages, initial_seams=initial_mask, final_seams=mask)
+
+
+FILE tools/diagnostics/atlas/run_boundary_refinement.py
+#!/usr/bin/env python3
+"""Replay a frozen, five-arm boundary-refinement diagnostic on source-bound inputs."""
+import argparse
+import gzip
+import hashlib
+import json
+from pathlib import Path
+import subprocess
+import sys
+
+import numpy as np
+import boundary_refine as br
+import patch_merge as pm
+
+
+def write_json(path, value):
+    path.write_text(json.dumps(value, indent=2, allow_nan=False)+'\n')
+
+
+def run(mesh, source, output, *, band_hops=6, rounds=3, beta=.8, curve_scale=2):
+    source = source.resolve(); output = output.resolve(); output.mkdir(parents=True, exist_ok=True)
+    atlas_path = source/'examples'/mesh/'result.npz'
+    curve_path = source/'stages'/f'{mesh}.extrema.json.gz'
+    edge_path = source/'stages'/f'{mesh}.edges.gz'
+    data = np.load(atlas_path)
+    v, f, regions, initial = (data[k] for k in ('vertices', 'faces', 'region_labels', 'labels'))
+    g = pm.geometry(v, f)
+    with gzip.open(curve_path, 'rt') as stream:
+        curves = json.load(stream)
+    with gzip.open(edge_path, 'rt') as stream:
+        rows = np.loadtxt(stream)
+    hard, soft = br.edge_evidence(g, rows)
+    curve = br.curve_support(g, v, curves, curve_scale); combined = np.maximum(soft, curve)
+    shuffled = np.random.default_rng(20260908).permutation(combined)
+    np.savez_compressed(output/'scores.npz', hard=hard, soft=soft, curve=curve, combined=combined, shuffled=shuffled)
+    length = np.array([e[2] for e in g['edges']])
+    protected = np.array([regions[a] != regions[b] for a, b, *_ in g['edges']])
+    original = np.array([initial[a] != initial[b] for a, b, *_ in g['edges']])
+    parameters = dict(band_hops=band_hops, rounds=rounds, beta=beta, curve_scale=curve_scale,
+                      stretch_limit=1.35, anisotropy_limit=2., shuffle_seed=20260908)
+    records = []
+    for arm, score, weight, iterations in (
+            ('reference', combined, beta, 0), ('length', combined, 0., rounds),
+            ('native', soft, beta, rounds), ('curves', combined, beta, rounds),
+            ('shuffled', shuffled, beta, rounds)):
+        print(f'{mesh}: {arm} refinement', flush=True)
+        folder = output/arm; folder.mkdir(exist_ok=True)
+        result = br.execute(v, f, regions, initial, score, hard=hard, beta=weight,
+                            band_hops=band_hops, rounds=iterations)
+        np.savez_compressed(folder/'unpacked.npz', vertices=v, faces=f,
+                            **{k: result[k] for k in ('labels', 'region_labels', 'chart_uv', 'corner_uv')})
+        np.savez_compressed(folder/'moves.npz', labels=np.stack(result['stages']),
+                            initial_seams=result['initial_seams'], final_seams=result['final_seams'])
+        write_json(folder/'unpacked.json', dict(parameters=dict(parameters, beta=weight, rounds=iterations), stretch_limit=1.35,
+                                               metrics=result['metrics'], events=result['events']))
+        call = subprocess.run([sys.executable, str(Path(__file__).with_name('repack.py')),
+                               str(folder/'unpacked.npz'), str(folder/'packed.json')], capture_output=True, text=True)
+        (folder/'pack.log').write_text(call.stdout+call.stderr)
+        if call.returncode:
+            raise RuntimeError(f'{mesh}/{arm} postpack failed; see {folder}/pack.log')
+        packed = json.loads((folder/'packed.json').read_text())
+        seams = result['final_seams']; additional = seams & ~protected
+        charts = np.array([result['labels'][a] != result['labels'][b] for a, b, *_ in g['edges']])
+        additional_length = float(length@additional)
+        metrics = dict(result['metrics'], postpack=packed['metrics'],
+                       postpack_bound_passed=packed['postpack_bound_passed'],
+                       additional_seam_length=additional_length,
+                       common_guided_energy=float((length*(1-beta*combined))@seams),
+                       curve_support_mean=float((length*curve)@additional/additional_length) if additional_length else 0.,
+                       native_support_mean=float((length*soft)@additional/additional_length) if additional_length else 0.,
+                       soft_chart_edges_gained=int(np.count_nonzero(charts & ~original & (soft > 0))),
+                       soft_chart_edges_lost=int(np.count_nonzero(original & ~charts & (soft > 0))),
+                       chart_area_min_ratio=min(float(g['area'][result['labels'] == i].sum()/g['area'][initial == i].sum()) for i in np.unique(initial)))
+        record = dict(arm=arm, beta=weight, rounds=iterations, metrics=metrics)
+        records.append(record)
+        write_json(output/'results.json', dict(mesh=mesh, claim_eligible=False, parameters=parameters, arms=records,
+                   inputs={str(p.relative_to(source)): hashlib.sha256(p.read_bytes()).hexdigest()
+                           for p in (atlas_path, curve_path, edge_path)}))
+        print(f'{mesh}: {arm}: {metrics["accepted_moves"]} accepted, '
+              f'{metrics["moved_faces"]} moved faces, support {metrics["curve_support_mean"]:.5f}, '
+              f'additional length {additional_length:.5f}, statuses {metrics["statuses"]}', flush=True)
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('mesh'); parser.add_argument('output', type=Path)
+    parser.add_argument('--source', type=Path, default=Path('ara/evidence/diagnostics/method045'))
+    parser.add_argument('--band-hops', type=int, default=6); parser.add_argument('--rounds', type=int, default=3)
+    parser.add_argument('--beta', type=float, default=.8); parser.add_argument('--curve-scale', type=int, default=2)
+    args = parser.parse_args()
+    run(args.mesh, args.source, args.output, band_hops=args.band_hops, rounds=args.rounds,
+        beta=args.beta, curve_scale=args.curve_scale)
+
+
+if __name__ == '__main__':
+    main()
+
+
+FILE tests/regression/tooling/Test.AtlasBoundaryRefine.py
+#!/usr/bin/env python3
+"""Independent cut oracle, known-crease relocation and preservation controls."""
+import itertools
+from pathlib import Path
+import sys
+import unittest
+from unittest.mock import patch
+
+import numpy as np
+
+ROOT = Path(__file__).resolve().parents[3]
+sys.path.insert(0, str(ROOT/'tools/diagnostics/atlas'))
+import boundary_refine as br
+import patch_merge as pm
+
+
+def folded_sheet(n=16, rows=8):
+    v = np.array([(x, y, 0.) for y in range(rows+1) for x in range(n+1)])
+    fold = v[:, 0] > 9
+    offset = v[fold, 0]-9
+    v[fold, 0] = 9+offset/np.sqrt(2); v[fold, 2] = offset/np.sqrt(2)
+    faces = []
+    for y in range(rows):
+        for x in range(n):
+            a = y*(n+1)+x
+            faces.extend(((a, a+1, a+n+2), (a, a+n+2, a+n+1)))
+    f = np.array(faces); labels = np.array([int((face[0] % (n+1)) >= 7) for face in f])
+    g = pm.geometry(v, f)
+    score = np.array([float(a % (n+1) == 9 and b % (n+1) == 9) for *_, a, b in g['edges']])
+    return v, f, labels, score
+
+
+class BoundaryRefineTests(unittest.TestCase):
+    def test_binary_cut_matches_exhaustive_energy(self):
+        rng = np.random.default_rng(11)
+        for _ in range(12):
+            edges = [(i, j, float(rng.integers(1, 25))) for i in range(7) for j in range(i+1, 7)]
+            fixed = {0: 0, 6: 1}
+            def energy(labels):
+                return sum(w for i, j, w in edges if labels[i] != labels[j])
+            optimum = min(energy((0, *inner, 1)) for inner in itertools.product((0, 1), repeat=5))
+            actual = br.binary_cut(7, edges, fixed)
+            self.assertEqual(energy(actual), optimum)
+
+    def test_feature_guidance_reaches_known_crease(self):
+        v, f, labels, score = folded_sheet(); original = labels.copy()
+        regions = np.zeros(len(f), int)
+        plain = br.execute(v, f, regions, labels, score, beta=0)
+        guided = br.execute(v, f, regions, labels, score)
+        np.testing.assert_array_equal(plain['labels'], labels)
+        g = pm.geometry(v, f)
+        border = np.array([guided['labels'][a] != guided['labels'][b] for a, b, *_ in g['edges']])
+        np.testing.assert_array_equal(border, score.astype(bool))
+        self.assertGreater(guided['metrics']['accepted_moves'], 0)
+        self.assertLess(guided['metrics']['max_stretch'], 1.000001)
+        self.assertTrue(all(e['energy_after'] < e['energy_before'] for e in guided['events'] if e['status'] == 'accepted'))
+        np.testing.assert_array_equal(labels, original)
+
+    def test_original_regions_and_hard_seams_fixed(self):
+        v, f, labels, score = folded_sheet(); g = pm.geometry(v, f)
+        hard = np.array([labels[a] != labels[b] for a, b, *_ in g['edges']])
+        for regions, flags in ((labels.copy(), None), (np.zeros(len(f), int), hard)):
+            result = br.execute(v, f, regions, labels, score, hard=flags)
+            np.testing.assert_array_equal(result['labels'], labels)
+            self.assertEqual(result['metrics']['lost_baseline_edges'], 0)
+
+    def test_frozen_band_and_missing_core(self):
+        v, f, labels, score = folded_sheet()
+        result = br.execute(v, f, np.zeros(len(f), int), labels, score, band_hops=100)
+        np.testing.assert_array_equal(result['labels'], labels)
+        self.assertEqual(result['metrics']['statuses']['no_fixed_core'], 1)
+        result = br.execute(v, f, np.zeros(len(f), int), labels, score, band_hops=0, rounds=10)
+        np.testing.assert_array_equal(result['labels'], labels)
+
+    def test_uv_rejection_keeps_source_atlas(self):
+        v, f, labels, score = folded_sheet(); solve = br.solve_chart; calls = 0
+        def reject_proposal(*args):
+            nonlocal calls
+            calls += 1
+            return solve(*args) if calls <= 2 else (None, 'distortion')
+        with patch.object(br, 'solve_chart', reject_proposal):
+            result = br.execute(v, f, np.zeros(len(f), int), labels, score)
+        np.testing.assert_array_equal(result['labels'], labels)
+        self.assertEqual(result['metrics']['statuses']['distortion'], 1)
+
+    def test_internal_seams_increase_can_reject_border_descent(self):
+        v, f, labels, score = folded_sheet(); solve = br.solve_chart; calls = 0
+        # Force an admissible candidate to report expensive new internal cuts.
+        # The acceptance guard must consider these even when border energy drops.
+        def extra_cuts(g, *args):
+            nonlocal calls
+            calls += 1
+            chart, reason = solve(g, *args)
+            if calls > 2 and chart is not None:
+                chart['internal_edges'] = set(range(len(g['edges'])))
+            return chart, reason
+        with patch.object(br, 'solve_chart', extra_cuts):
+            result = br.execute(v, f, np.zeros(len(f), int), labels, score)
+        np.testing.assert_array_equal(result['labels'], labels)
+        self.assertEqual(result['metrics']['statuses']['internal_cut_energy'], 1)
+
+    def test_curve_support_does_not_jump_disconnected_sheets(self):
+        v = np.array([[0, 0, 0], [1, 0, 0], [0, 1, 0], [1, 1, 0.]], float)
+        f = np.array([[0, 1, 2], [1, 3, 2]])
+        v = np.vstack((v, v+[0, 0, .001])); f = np.vstack((f, f+4))
+        g = pm.geometry(v, f)
+        curves = dict(positions=v.tolist(), triangles=f.tolist(), scales=[dict(radius=2.)],
+                      points=[dict(position=[.8, .1, 0]), dict(position=[.1, .8, 0])],
+                      segments=[dict(scale=0, kind='principal_ridge', confidence=.9, face=0, points=[0, 1])])
+        score = br.curve_support(g, v, curves, 0)
+        self.assertGreater(score[0], .5); self.assertEqual(score[1], 0)
+        curves['positions'][0][0] = .01
+        with self.assertRaisesRegex(ValueError, 'identity'):
+            br.curve_support(g, v, curves, 0)
+
+    def test_global_core_survives_overlapping_pair_bands(self):
+        v, f, _, score = folded_sheet(n=20)
+        x = f[:, 0] % 21
+        labels = np.where(x < 6, 0, np.where(x < 11, 1, 2))
+        g = pm.geometry(v, f); regions = np.zeros(len(f), int)
+        # The thin middle chart has no deep core: it is frozen as a whole,
+        # even though it participates in two independently optimized pairs.
+        middle = set(np.flatnonzero(labels == 1))
+        for _, mutable in br.frozen_bands(g, labels, regions, np.zeros(len(score), bool), 6):
+            self.assertFalse(middle & mutable)
+        result = br.execute(v, f, regions, labels, score)
+        for stage in result['stages']:
+            np.testing.assert_array_equal(stage[list(middle)], labels[list(middle)])
+            self.assertEqual(len(np.unique(stage)), 3)
+
+    def test_internal_cut_mask_matches_independent_corner_audit(self):
+        n = 12; rows = 4
+        v = np.array([(np.cos(a), np.sin(a), y/rows)
+                      for y in range(rows+1) for a in np.arange(n)*2*np.pi/n])
+        f = []
+        for y in range(rows):
+            for i in range(n):
+                a = y*n+i; b = y*n+(i+1)%n
+                f.extend(((a, b, b+n), (a, b+n, a+n)))
+        f = np.array(f); labels = np.zeros(len(f), int); g = pm.geometry(v, f)
+        result = br.execute(v, f, labels, labels, np.zeros(len(g['edges'])), rounds=0)
+        self.assertEqual(result['metrics']['internal_uv_cut_edges'], rows)
+        self.assertEqual(int(result['final_seams'].sum()), rows)
+        lengths = np.array([e[2] for e in g['edges']])
+        self.assertAlmostEqual(float(lengths@result['final_seams']),
+                               result['metrics']['total_uv_seam_length_over_sqrt_area'])
+
+    def test_repeat_and_invalid_inputs(self):
+        v, f, labels, score = folded_sheet(); regions = np.zeros(len(f), int)
+        a = br.execute(v, f, regions, labels, score); b = br.execute(v, f, regions, labels, score)
+        np.testing.assert_array_equal(a['labels'], b['labels'])
+        np.testing.assert_array_equal(a['corner_uv'], b['corner_uv'])
+        for kwargs in (dict(beta=1), dict(rounds=-1), dict(band_hops=.5), dict(stretch_limit=float('nan'))):
+            with self.assertRaises(ValueError):
+                br.execute(v, f, regions, labels, score, **kwargs)
+        with self.assertRaises(ValueError):
+            br.execute(v, f, regions, labels, score+1)
+
+
+if __name__ == '__main__':
+    unittest.main()
+
+
+FILE tasks/active/METHOD-046-feature-guided-uv-boundary-refinement.md
+---
+id: METHOD-046
+theme: I
+depends_on: []
+template: micro
+workflow_schema: 1
+workflow_profile: micro
+evidence: not_applicable
+evidence_skip_reason: "Operator-directed interactive CPU experiment with retained controls and actual Claude review; no publication custody."
+owner: codex
+branch: main
+worktree: /home/alex/Documents/IntrinsicEngine
+claimed_at: "2026-09-08"
+contract_schema: 1
+contracts: [geometry.element-domain-sources, method.engine-integration]
+contract_review: "Oriented embedded triangles and source-bound face regions/charts are semantic inputs. Original geometry and region labels remain immutable; output is detached chart labels and corner UVs."
+---
+# METHOD-046 — Move additional UV borders toward feature evidence
+
+## Goal
+- Implement and evaluate a bounded boundary relocation after METHOD-045, planned and reviewed with Claude, while retaining original sculpt borders and the existing UV quality limits.
+
+## Context
+- The operator explicitly requested collaborative planning, implementation and renewed review on 2026-09-08, directing this research outside the standing product-convergence focus. C73 identifies earlier sculpt hard-border loss during merging and frog placement problems before merging.
+- Claude proposed binary band min-cuts instead of single-face descent. Adopt the edge-weighted Potts formulation from Boykov, Veksler and Zabih (2001), [original paper](https://www.cs.cornell.edu/~rdz/Papers/BVZ-PAMI01.pdf). This is a constrained two-label subproblem, not the paper's complete multi-label algorithm or its approximation guarantee.
+- [Sharp and Crane (2018)](https://www.cs.cmu.edu/~kmcrane/Projects/VariationalCuts/) provides the relevant continuous distortion-aware cutting alternative; this experiment remains on mesh edges and reuses explicit LSCM validation rather than implementing that formulation.
+
+## Frozen experiment
+- Hypotheses, ranked: collective moves can escape jagged single-face minima; curve support helps beyond shortening; topology/distortion constraints may reject the useful collective moves. Preserve rejected outcomes.
+- Minimize sum of seam edge length times `(1 - beta * support)`, beta 0.8, support in [0,1]. Count chart borders AND internal UV cuts for final acceptance. Require strict full-energy decrease; the graph cut optimizes only the border surrogate.
+- Freeze a six-dual-hop band around each initial same-region chart-pair seam. Freeze all faces outside it and existing hard-feature seam endpoints. Skip pairs without a fixed core on each side. Three deterministic rounds maximum. Original region membership, chart count and chart cores remain fixed.
+- This tightens Claude's current-seam band to an initial-seam band so multiple rounds cannot drift arbitrarily. No chart centers need moving. No area penalty, turning term or new framework.
+- Controls: protected reference; beta-zero shortening; native soft guidance; max(native soft, principal curve support); fixed-seed shuffled combined guidance. Use the same large detector scale (index 2) on both meshes, avoiding shape-specific scale choices. Curves contribute confidence times absolute tangent cosine times surface-local distance falloff over their recorded radius. Detector scores are not probabilities.
+- Exact frog/sculpt source and METHOD-045 labels; analytic folded sheet with known crease, fixed-core/region/hard constraints, binary-cut brute-force oracle, disconnected-sheet evidence isolation, and internal-cut accounting. Audit and native-pack every cohort arm independently. No parameter sweep or default promotion based on the guidance's own score.
+
+## Acceptance criteria
+- [ ] Deterministic CPU reference moves boundaries with explicit topology/UV rejection; controls pass.
+- [ ] Matched arms, intermediate accepted moves, scores, baseline-border retention, distortion and packing measurements are inspectable.
+- [ ] Actual Claude review of final implementation and aggregate results, with findings resolved or explicitly bounded.
+- [ ] Focused verification, source-bound report, and ARA outcome record.
+
+## Engine integration
+| Field | Decision / owner |
+| --- | --- |
+| Least-structured input | Embedded oriented triangle surface with face regions/chart labels and source-bound feature evidence. |
+| Compatible entity sources | Any mesh satisfying this typed topology contract; no point/graph provenance restriction beyond required faces. |
+| RuntimeModule | Offline experiment; METHOD-044 owns runtime adoption after quality acceptance. |
+| Config/agent | Serializable offline CLI parameters; METHOD-044 owns shared production apply path. |
+| UI | Interactive diagnostic viewer; METHOD-044 owns editor integration. |
+| Publication | Source geometry/regions unchanged; detached face chart labels and corner UVs. |
+| End-to-end tests | Source-bound inputs through refinement and native packing; METHOD-044 owns ECS publication. |
+
+## Verification
+```bash
+cmake --preset ci
+cmake --build --preset ci --target IntrinsicTests IntrinsicUvChartPackDiagnostic
+OPENBLAS_NUM_THREADS=1 python3 tests/regression/tooling/Test.AtlasBoundaryRefine.py
+OPENBLAS_NUM_THREADS=1 INTRINSIC_TEST_NATIVE_ATLAS=1 python3 tests/regression/tooling/Test.BaselineAtlas.py
+ctest --test-dir build/ci --output-on-failure -R 'Uv|Parameterization' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
+python3 tools/agents/check_task_policy.py --root . --strict
+python3 tools/agents/check_ara_claims.py --root . --strict
+python3 tools/docs/check_doc_links.py --root .
+python3 tools/repo/check_test_layout.py --root . --strict
+```
+
+
+ACTUAL AGGREGATE frog
+{
+  "mesh": "frog",
+  "claim_eligible": false,
+  "parameters": {
+    "band_hops": 6,
+    "rounds": 3,
+    "beta": 0.8,
+    "curve_scale": 2,
+    "stretch_limit": 1.35,
+    "anisotropy_limit": 2.0,
+    "shuffle_seed": 20260908
+  },
+  "arms": [
+    {
+      "arm": "reference",
+      "beta": 0.8,
+      "rounds": 0,
+      "metrics": {
+        "chart_count": 23,
+        "invalid_charts": [],
+        "chart_texel_density_ratio": 1.0000000000000056,
+        "non_disk_charts": [],
+        "positive_area_overlap_count": 0,
+        "overlap_pairs_sample": [],
+        "global_chart_reflections": 0,
+        "all_charts_valid": true,
+        "max_stretch": 1.3499719104964807,
+        "mean_stretch": 1.0660320686351934,
+        "area_weighted_p95_stretch": 1.1697368179354588,
+        "max_anisotropy": 1.2538804742639116,
+        "mean_anisotropy": 1.0151650919398414,
+        "seam_length_over_sqrt_area": 12.202605102562654,
+        "smallest_chart_area_fraction": 0.0001807946160678882,
+        "retained_baseline_edges": 55,
+        "lost_baseline_edges": 0,
+        "extra_chart_boundary_edges": 1042,
+        "internal_uv_cut_edges": 5,
+        "total_uv_seam_length_over_sqrt_area": 12.24330756908775,
+        "baseline_seam_length_over_sqrt_area": 0.4769557913777354,
+        "internal_uv_seam_length_over_sqrt_area": 0.04070246652509486,
+        "initial_energy": 10.555872284088199,
+        "final_energy": 10.555872284088199,
+        "accepted_moves": 0,
+        "moved_faces": 0,
+        "statuses": {},
+        "uv_solves": 23,
+        "postpack": {
+          "chart_count": 23,
+          "invalid_charts": [],
+          "chart_texel_density_ratio": 1.0268832195525208,
+          "non_disk_charts": [],
+          "positive_area_overlap_count": 0,
+          "overlap_pairs_sample": [],
+          "global_chart_reflections": 9,
+          "all_charts_valid": true,
+          "max_stretch": 1.349355216680261,
+          "mean_stretch": 1.0660937892359936,
+          "area_weighted_p95_stretch": 1.169638071181839,
+          "max_anisotropy": 1.254425207543235,
+          "mean_anisotropy": 1.0152840164533932,
+          "seam_length_over_sqrt_area": 12.202605102562654,
+          "smallest_chart_area_fraction": 0.0001807946160678882,
+          "continuous_packing_utilization": 0.5929671568629542
+        },
+        "postpack_bound_passed": true,
+        "additional_seam_length": 11.766351777710016,
+        "common_guided_energy": 10.555872284088199,
+        "curve_support_mean": 0.10844035778076933,
+        "native_support_mean": 0.06628185788727706,
+        "soft_chart_edges_gained": 0,
+        "soft_chart_edges_lost": 0,
+        "chart_area_min_ratio": 1.0
+      }
+    },
+    {
+      "arm": "length",
+      "beta": 0.0,
+      "rounds": 3,
+      "metrics": {
+        "chart_count": 23,
+        "invalid_charts": [],
+        "chart_texel_density_ratio": 1.0000000000000064,
+        "non_disk_charts": [],
+        "positive_area_overlap_count": 0,
+        "overlap_pairs_sample": [],
+        "global_chart_reflections": 0,
+        "all_charts_valid": true,
+        "max_stretch": 1.3462164140526836,
+        "mean_stretch": 1.0654672329344446,
+        "area_weighted_p95_stretch": 1.1698143850855982,
+        "max_anisotropy": 1.2538804742639211,
+        "mean_anisotropy": 1.0156881905404993,
+        "seam_length_over_sqrt_area": 9.18281364653483,
+        "smallest_chart_area_fraction": 0.0001807946160678882,
+        "retained_baseline_edges": 55,
+        "lost_baseline_edges": 0,
+        "extra_chart_boundary_edges": 806,
+        "internal_uv_cut_edges": 9,
+        "total_uv_seam_length_over_sqrt_area": 9.2591071691329,
+        "baseline_seam_length_over_sqrt_area": 0.4769557913777354,
+        "internal_uv_seam_length_over_sqrt_area": 0.07629352259807488,
+        "initial_energy": 12.24330756908775,
+        "final_energy": 9.259107169132903,
+        "accepted_moves": 41,
+        "moved_faces": 2131,
+        "statuses": {
+          "distortion": 28,
+          "accepted": 41,
+          "no_border_descent": 49
+        },
+        "uv_solves": 153,
+        "postpack": {
+          "chart_count": 23,
+          "invalid_charts": [],
+          "chart_texel_density_ratio": 1.0266377923593093,
+          "non_disk_charts": [],
+          "positive_area_overlap_count": 0,
+          "overlap_pairs_sample": [],
+          "global_chart_reflections": 11,
+          "all_charts_valid": true,
+          "max_stretch": 1.346360351338345,
+          "mean_stretch": 1.065505853601225,
+          "area_weighted_p95_stretch": 1.1697214351808058,
+          "max_anisotropy": 1.2544517794475452,
+          "mean_anisotropy": 1.0157636525330975,
+          "seam_length_over_sqrt_area": 9.18281364653483,
+          "smallest_chart_area_fraction": 0.0001807946160678882,
+          "continuous_packing_utilization": 0.6001264450164846
+        },
+        "postpack_bound_passed": true,
+        "additional_seam_length": 8.78215137775517,
+        "common_guided_energy": 7.869978964794708,
+        "curve_support_mean": 0.11476817275806708,
+        "native_support_mean": 0.0756621462979722,
+        "soft_chart_edges_gained": 46,
+        "soft_chart_edges_lost": 58,
+        "chart_area_min_ratio": 0.14344967691984115
+      }
+    },
+    {
+      "arm": "native",
+      "beta": 0.8,
+      "rounds": 3,
+      "metrics": {
+        "chart_count": 23,
+        "invalid_charts": [],
+        "chart_texel_density_ratio": 1.0000000000000042,
+        "non_disk_charts": [],
+        "positive_area_overlap_count": 0,
+        "overlap_pairs_sample": [],
+        "global_chart_reflections": 0,
+        "all_charts_valid": true,
+        "max_stretch": 1.3420657968787637,
+        "mean_stretch": 1.0711207293880791,
+        "area_weighted_p95_stretch": 1.1743624179329055,
+        "max_anisotropy": 1.2538804742639063,
+        "mean_anisotropy": 1.0154325407777183,
+        "seam_length_over_sqrt_area": 9.735862847676465,
+        "smallest_chart_area_fraction": 0.0001807946160678882,
+        "retained_baseline_edges": 55,
+        "lost_baseline_edges": 0,
+        "extra_chart_boundary_edges": 909,
+        "internal_uv_cut_edges": 8,
+        "total_uv_seam_length_over_sqrt_area": 9.804270655729514,
+        "baseline_seam_length_over_sqrt_area": 0.4769557913777354,
+        "internal_uv_seam_length_over_sqrt_area": 0.0684078080530448,
+        "initial_energy": 11.523097963936124,
+        "final_energy": 7.349092862748676,
+        "accepted_moves": 38,
+        "moved_faces": 2273,
+        "statuses": {
+          "accepted": 38,
+          "distortion": 27,
+          "disconnected_chart": 6,
+          "no_border_descent": 41
+        },
+        "uv_solves": 141,
+        "postpack": {
+          "chart_count": 23,
+          "invalid_charts": [],
+          "chart_texel_density_ratio": 1.0260010604073075,
+          "non_disk_charts": [],
+          "positive_area_overlap_count": 0,
+          "overlap_pairs_sample": [],
+          "global_chart_reflections": 13,
+          "all_charts_valid": true,
+          "max_stretch": 1.3424188800017742,
+          "mean_stretch": 1.0711875025310091,
+          "area_weighted_p95_stretch": 1.1745229384768385,
+          "max_anisotropy": 1.2544252075432467,
+          "mean_anisotropy": 1.0155622854929116,
+          "seam_length_over_sqrt_area": 9.735862847676465,
+          "smallest_chart_area_fraction": 0.0001807946160678882,
+          "continuous_packing_utilization": 0.5809493885088299
+        },
+        "postpack_bound_passed": true,
+        "additional_seam_length": 9.327314864351774,
+        "common_guided_energy": 6.795891755005476,
+        "curve_support_mean": 0.1134080892834516,
+        "native_support_mean": 0.3161259091228627,
+        "soft_chart_edges_gained": 297,
+        "soft_chart_edges_lost": 44,
+        "chart_area_min_ratio": 0.4831983034537712
+      }
+    },
+    {
+      "arm": "curves",
+      "beta": 0.8,
+      "rounds": 3,
+      "metrics": {
+        "chart_count": 23,
+        "invalid_charts": [],
+        "chart_texel_density_ratio": 1.0000000000000056,
+        "non_disk_charts": [],
+        "positive_area_overlap_count": 0,
+        "overlap_pairs_sample": [],
+        "global_chart_reflections": 0,
+        "all_charts_valid": true,
+        "max_stretch": 1.3487588040237695,
+        "mean_stretch": 1.0704012195719625,
+        "area_weighted_p95_stretch": 1.1733486461505216,
+        "max_anisotropy": 1.253880474263876,
+        "mean_anisotropy": 1.0152090469000314,
+        "seam_length_over_sqrt_area": 9.654959460855526,
+        "smallest_chart_area_fraction": 0.0001807946160678882,
+        "retained_baseline_edges": 55,
+        "lost_baseline_edges": 0,
+        "extra_chart_boundary_edges": 894,
+        "internal_uv_cut_edges": 8,
+        "total_uv_seam_length_over_sqrt_area": 9.723367268908575,
+        "baseline_seam_length_over_sqrt_area": 0.4769557913777354,
+        "internal_uv_seam_length_over_sqrt_area": 0.0684078080530448,
+        "initial_energy": 10.555872284088199,
+        "final_energy": 6.831835945834589,
+        "accepted_moves": 38,
+        "moved_faces": 2229,
+        "statuses": {
+          "accepted": 38,
+          "distortion": 29,
+          "disconnected_chart": 7,
+          "no_border_descent": 39
+        },
+        "uv_solves": 145,
+        "postpack": {
+          "chart_count": 23,
+          "invalid_charts": [],
+          "chart_texel_density_ratio": 1.0262697810598094,
+          "non_disk_charts": [],
+          "positive_area_overlap_count": 0,
+          "overlap_pairs_sample": [],
+          "global_chart_reflections": 12,
+          "all_charts_valid": true,
+          "max_stretch": 1.3495329485818395,
+          "mean_stretch": 1.0704362862956127,
+          "area_weighted_p95_stretch": 1.1734351318983745,
+          "max_anisotropy": 1.2544517794475427,
+          "mean_anisotropy": 1.0152775069848503,
+          "seam_length_over_sqrt_area": 9.654959460855526,
+          "smallest_chart_area_fraction": 0.0001807946160678882,
+          "continuous_packing_utilization": 0.6010921737408506
+        },
+        "postpack_bound_passed": true,
+        "additional_seam_length": 9.246411477530835,
+        "common_guided_energy": 6.831835945834589,
+        "curve_support_mean": 0.13297630673274252,
+        "native_support_mean": 0.2790590740332911,
+        "soft_chart_edges_gained": 250,
+        "soft_chart_edges_lost": 43,
+        "chart_area_min_ratio": 0.4831983034537712
+      }
+    },
+    {
+      "arm": "shuffled",
+      "beta": 0.8,
+      "rounds": 3,
+      "metrics": {
+        "chart_count": 23,
+        "invalid_charts": [],
+        "chart_texel_density_ratio": 1.0000000000000089,
+        "non_disk_charts": [],
+        "positive_area_overlap_count": 0,
+        "overlap_pairs_sample": [],
+        "global_chart_reflections": 0,
+        "all_charts_valid": true,
+        "max_stretch": 1.3375738554888226,
+        "mean_stretch": 1.0669502398491737,
+        "area_weighted_p95_stretch": 1.1799100518246852,
+        "max_anisotropy": 1.2538804742638796,
+        "mean_anisotropy": 1.015878965241887,
+        "seam_length_over_sqrt_area": 9.711710440092299,
+        "smallest_chart_area_fraction": 0.0001807946160678882,
+        "retained_baseline_edges": 55,
+        "lost_baseline_edges": 0,
+        "extra_chart_boundary_edges": 865,
+        "internal_uv_cut_edges": 9,
+        "total_uv_seam_length_over_sqrt_area": 9.788003962690372,
+        "baseline_seam_length_over_sqrt_area": 0.4769557913777354,
+        "internal_uv_seam_length_over_sqrt_area": 0.07629352259807488,
+        "initial_energy": 10.322213372120565,
+        "final_energy": 7.102430431227247,
+        "accepted_moves": 46,
+        "moved_faces": 2181,
+        "statuses": {
+          "accepted": 46,
+          "distortion": 31,
+          "disconnected_chart": 3,
+          "no_border_descent": 45
+        },
+        "uv_solves": 161,
+        "postpack": {
+          "chart_count": 23,
+          "invalid_charts": [],
+          "chart_texel_density_ratio": 1.0265269014786558,
+          "non_disk_charts": [],
+          "positive_area_overlap_count": 0,
+          "overlap_pairs_sample": [],
+          "global_chart_reflections": 11,
+          "all_charts_valid": true,
+          "max_stretch": 1.3375358545958973,
+          "mean_stretch": 1.067002221615344,
+          "area_weighted_p95_stretch": 1.1798685196343672,
+          "max_anisotropy": 1.2544507762676191,
+          "mean_anisotropy": 1.015980931033134,
+          "seam_length_over_sqrt_area": 9.711710440092299,
+          "smallest_chart_area_fraction": 0.0001807946160678882,
+          "continuous_packing_utilization": 0.665021547227318
+        },
+        "postpack_bound_passed": true,
+        "additional_seam_length": 9.311048171312638,
+        "common_guided_energy": 8.453993528775218,
+        "curve_support_mean": 0.1094175729298718,
+        "native_support_mean": 0.06115481142091941,
+        "soft_chart_edges_gained": 39,
+        "soft_chart_edges_lost": 62,
+        "chart_area_min_ratio": 0.6829404169460487
+      }
+    }
+  ],
+  "inputs": {
+    "examples/frog/result.npz": "af5f0adf0f0d2138529a2f14bc6a0d92a8dc020db6457822348d17a514059ecb",
+    "stages/frog.extrema.json.gz": "2d1e2921203f7fe116b6be7ce2c07261d8e6d7a7961e571baca37cc8774d0715",
+    "stages/frog.edges.gz": "419d145d1d041df92e179c3bacf74823d8032a7497b15e12509f2e91492cc57a"
+  }
+}
+
+
+ACTUAL AGGREGATE sculpt
+{
+  "mesh": "sculpt",
+  "claim_eligible": false,
+  "parameters": {
+    "band_hops": 6,
+    "rounds": 3,
+    "beta": 0.8,
+    "curve_scale": 2,
+    "stretch_limit": 1.35,
+    "anisotropy_limit": 2.0,
+    "shuffle_seed": 20260908
+  },
+  "arms": [
+    {
+      "arm": "reference",
+      "beta": 0.8,
+      "rounds": 0,
+      "metrics": {
+        "chart_count": 6,
+        "invalid_charts": [],
+        "chart_texel_density_ratio": 1.0000000000000002,
+        "non_disk_charts": [],
+        "positive_area_overlap_count": 0,
+        "overlap_pairs_sample": [],
+        "global_chart_reflections": 0,
+        "all_charts_valid": true,
+        "max_stretch": 1.244654738665716,
+        "mean_stretch": 1.0486330515497244,
+        "area_weighted_p95_stretch": 1.1477442181156428,
+        "max_anisotropy": 1.0502808944873419,
+        "mean_anisotropy": 1.009022115567012,
+        "seam_length_over_sqrt_area": 6.770872302044108,
+        "smallest_chart_area_fraction": 0.11093774485004262,
+        "retained_baseline_edges": 384,
+        "lost_baseline_edges": 0,
+        "extra_chart_boundary_edges": 24,
+        "internal_uv_cut_edges": 29,
+        "total_uv_seam_length_over_sqrt_area": 7.298727030988109,
+        "baseline_seam_length_over_sqrt_area": 6.357515016553575,
+        "internal_uv_seam_length_over_sqrt_area": 0.5278547289439997,
+        "initial_energy": 7.079145191805961,
+        "final_energy": 7.079145191805961,
+        "accepted_moves": 0,
+        "moved_faces": 0,
+        "statuses": {},
+        "uv_solves": 6,
+        "postpack": {
+          "chart_count": 6,
+          "invalid_charts": [],
+          "chart_texel_density_ratio": 1.0011074725307612,
+          "non_disk_charts": [],
+          "positive_area_overlap_count": 0,
+          "overlap_pairs_sample": [],
+          "global_chart_reflections": 5,
+          "all_charts_valid": true,
+          "max_stretch": 1.244345247138066,
+          "mean_stretch": 1.0487083346655288,
+          "area_weighted_p95_stretch": 1.1475699323471271,
+          "max_anisotropy": 1.0501158452947517,
+          "mean_anisotropy": 1.0091720540397529,
+          "seam_length_over_sqrt_area": 6.770872302044108,
+          "smallest_chart_area_fraction": 0.11093774485004262,
+          "continuous_packing_utilization": 0.4078911021415708
+        },
+        "postpack_bound_passed": true,
+        "additional_seam_length": 0.9412120144345336,
+        "common_guided_energy": 7.079145191805961,
+        "curve_support_mean": 0.019019530869088315,
+        "native_support_mean": 0.08227383399002806,
+        "soft_chart_edges_gained": 0,
+        "soft_chart_edges_lost": 0,
+        "chart_area_min_ratio": 1.0
+      }
+    },
+    {
+      "arm": "length",
+      "beta": 0.0,
+      "rounds": 3,
+      "metrics": {
+        "chart_count": 6,
+        "invalid_charts": [],
+        "chart_texel_density_ratio": 1.0000000000000004,
+        "non_disk_charts": [],
+        "positive_area_overlap_count": 0,
+        "overlap_pairs_sample": [],
+        "global_chart_reflections": 0,
+        "all_charts_valid": true,
+        "max_stretch": 1.2446547386657167,
+        "mean_stretch": 1.048496089403078,
+        "area_weighted_p95_stretch": 1.1469463684519017,
+        "max_anisotropy": 1.0502808944873403,
+        "mean_anisotropy": 1.0090242861424148,
+        "seam_length_over_sqrt_area": 6.595504992851679,
+        "smallest_chart_area_fraction": 0.11093774485004262,
+        "retained_baseline_edges": 384,
+        "lost_baseline_edges": 0,
+        "extra_chart_boundary_edges": 14,
+        "internal_uv_cut_edges": 29,
+        "total_uv_seam_length_over_sqrt_area": 7.12335972179568,
+        "baseline_seam_length_over_sqrt_area": 6.357515016553575,
+        "internal_uv_seam_length_over_sqrt_area": 0.5278547289439997,
+        "initial_energy": 7.298727030988108,
+        "final_energy": 7.123359721795678,
+        "accepted_moves": 1,
+        "moved_faces": 12,
+        "statuses": {
+          "accepted": 1,
+          "no_border_descent": 1
+        },
+        "uv_solves": 8,
+        "postpack": {
+          "chart_count": 6,
+          "invalid_charts": [],
+          "chart_texel_density_ratio": 1.0011223806691125,
+          "non_disk_charts": [],
+          "positive_area_overlap_count": 0,
+          "overlap_pairs_sample": [],
+          "global_chart_reflections": 3,
+          "all_charts_valid": true,
+          "max_stretch": 1.244345246806348,
+          "mean_stretch": 1.0485665875911945,
+          "area_weighted_p95_stretch": 1.1471733386080982,
+          "max_anisotropy": 1.0501158452947534,
+          "mean_anisotropy": 1.0091652775949538,
+          "seam_length_over_sqrt_area": 6.595504992851679,
+          "smallest_chart_area_fraction": 0.11093774485004262,
+          "continuous_packing_utilization": 0.40446002170058104
+        },
+        "postpack_bound_passed": true,
+        "additional_seam_length": 0.7658447052421047,
+        "common_guided_energy": 6.952518550097212,
+        "curve_support_mean": 0.02371801822583449,
+        "native_support_mean": 0.021216284247958583,
+        "soft_chart_edges_gained": 0,
+        "soft_chart_edges_lost": 5,
+        "chart_area_min_ratio": 0.9981829839029029
+      }
+    },
+    {
+      "arm": "native",
+      "beta": 0.8,
+      "rounds": 3,
+      "metrics": {
+        "chart_count": 6,
+        "invalid_charts": [],
+        "chart_texel_density_ratio": 1.0000000000000004,
+        "non_disk_charts": [],
+        "positive_area_overlap_count": 0,
+        "overlap_pairs_sample": [],
+        "global_chart_reflections": 0,
+        "all_charts_valid": true,
+        "max_stretch": 1.2446547386657167,
+        "mean_stretch": 1.048496089403078,
+        "area_weighted_p95_stretch": 1.1469463684519017,
+        "max_anisotropy": 1.0502808944873403,
+        "mean_anisotropy": 1.0090242861424148,
+        "seam_length_over_sqrt_area": 6.595504992851679,
+        "smallest_chart_area_fraction": 0.11093774485004262,
+        "retained_baseline_edges": 384,
+        "lost_baseline_edges": 0,
+        "extra_chart_boundary_edges": 14,
+        "internal_uv_cut_edges": 29,
+        "total_uv_seam_length_over_sqrt_area": 7.12335972179568,
+        "baseline_seam_length_over_sqrt_area": 6.357515016553575,
+        "internal_uv_seam_length_over_sqrt_area": 0.5278547289439997,
+        "initial_energy": 7.236777334168101,
+        "final_energy": 7.1103610186307105,
+        "accepted_moves": 1,
+        "moved_faces": 12,
+        "statuses": {
+          "accepted": 1,
+          "no_border_descent": 1
+        },
+        "uv_solves": 8,
+        "postpack": {
+          "chart_count": 6,
+          "invalid_charts": [],
+          "chart_texel_density_ratio": 1.0011223806691125,
+          "non_disk_charts": [],
+          "positive_area_overlap_count": 0,
+          "overlap_pairs_sample": [],
+          "global_chart_reflections": 3,
+          "all_charts_valid": true,
+          "max_stretch": 1.244345246806348,
+          "mean_stretch": 1.0485665875911945,
+          "area_weighted_p95_stretch": 1.1471733386080982,
+          "max_anisotropy": 1.0501158452947534,
+          "mean_anisotropy": 1.0091652775949538,
+          "seam_length_over_sqrt_area": 6.595504992851679,
+          "smallest_chart_area_fraction": 0.11093774485004262,
+          "continuous_packing_utilization": 0.40446002170058104
+        },
+        "postpack_bound_passed": true,
+        "additional_seam_length": 0.7658447052421047,
+        "common_guided_energy": 6.952518550097212,
+        "curve_support_mean": 0.02371801822583449,
+        "native_support_mean": 0.021216284247958583,
+        "soft_chart_edges_gained": 0,
+        "soft_chart_edges_lost": 5,
+        "chart_area_min_ratio": 0.9981829839029029
+      }
+    },
+    {
+      "arm": "curves",
+      "beta": 0.8,
+      "rounds": 3,
+      "metrics": {
+        "chart_count": 6,
+        "invalid_charts": [],
+        "chart_texel_density_ratio": 1.0000000000000004,
+        "non_disk_charts": [],
+        "positive_area_overlap_count": 0,
+        "overlap_pairs_sample": [],
+        "global_chart_reflections": 0,
+        "all_charts_valid": true,
+        "max_stretch": 1.2446547386657167,
+        "mean_stretch": 1.048496089403078,
+        "area_weighted_p95_stretch": 1.1469463684519017,
+        "max_anisotropy": 1.0502808944873403,
+        "mean_anisotropy": 1.0090242861424148,
+        "seam_length_over_sqrt_area": 6.595504992851679,
+        "smallest_chart_area_fraction": 0.11093774485004262,
+        "retained_baseline_edges": 384,
+        "lost_baseline_edges": 0,
+        "extra_chart_boundary_edges": 14,
+        "internal_uv_cut_edges": 29,
+        "total_uv_seam_length_over_sqrt_area": 7.12335972179568,
+        "baseline_seam_length_over_sqrt_area": 6.357515016553575,
+        "internal_uv_seam_length_over_sqrt_area": 0.5278547289439997,
+        "initial_energy": 7.079145191805961,
+        "final_energy": 6.952518550097212,
+        "accepted_moves": 1,
+        "moved_faces": 12,
+        "statuses": {
+          "accepted": 1,
+          "no_border_descent": 1
+        },
+        "uv_solves": 8,
+        "postpack": {
+          "chart_count": 6,
+          "invalid_charts": [],
+          "chart_texel_density_ratio": 1.0011223806691125,
+          "non_disk_charts": [],
+          "positive_area_overlap_count": 0,
+          "overlap_pairs_sample": [],
+          "global_chart_reflections": 3,
+          "all_charts_valid": true,
+          "max_stretch": 1.244345246806348,
+          "mean_stretch": 1.0485665875911945,
+          "area_weighted_p95_stretch": 1.1471733386080982,
+          "max_anisotropy": 1.0501158452947534,
+          "mean_anisotropy": 1.0091652775949538,
+          "seam_length_over_sqrt_area": 6.595504992851679,
+          "smallest_chart_area_fraction": 0.11093774485004262,
+          "continuous_packing_utilization": 0.40446002170058104
+        },
+        "postpack_bound_passed": true,
+        "additional_seam_length": 0.7658447052421047,
+        "common_guided_energy": 6.952518550097212,
+        "curve_support_mean": 0.02371801822583449,
+        "native_support_mean": 0.021216284247958583,
+        "soft_chart_edges_gained": 0,
+        "soft_chart_edges_lost": 5,
+        "chart_area_min_ratio": 0.9981829839029029
+      }
+    },
+    {
+      "arm": "shuffled",
+      "beta": 0.8,
+      "rounds": 3,
+      "metrics": {
+        "chart_count": 6,
+        "invalid_charts": [],
+        "chart_texel_density_ratio": 1.0000000000000004,
+        "non_disk_charts": [],
+        "positive_area_overlap_count": 0,
+        "overlap_pairs_sample": [],
+        "global_chart_reflections": 0,
+        "all_charts_valid": true,
+        "max_stretch": 1.2446547386657145,
+        "mean_stretch": 1.0485101343770857,
+        "area_weighted_p95_stretch": 1.1471809139251492,
+        "max_anisotropy": 1.0502808944873407,
+        "mean_anisotropy": 1.0090246428252843,
+        "seam_length_over_sqrt_area": 6.596521479515907,
+        "smallest_chart_area_fraction": 0.11093774485004262,
+        "retained_baseline_edges": 384,
+        "lost_baseline_edges": 0,
+        "extra_chart_boundary_edges": 14,
+        "internal_uv_cut_edges": 29,
+        "total_uv_seam_length_over_sqrt_area": 7.124376208459908,
+        "baseline_seam_length_over_sqrt_area": 6.357515016553575,
+        "internal_uv_seam_length_over_sqrt_area": 0.5278547289439997,
+        "initial_energy": 6.636537662736238,
+        "final_energy": 6.459066775306361,
+        "accepted_moves": 1,
+        "moved_faces": 12,
+        "statuses": {
+          "accepted": 1,
+          "no_border_descent": 1
+        },
+        "uv_solves": 8,
+        "postpack": {
+          "chart_count": 6,
+          "invalid_charts": [],
+          "chart_texel_density_ratio": 1.0011714443215496,
+          "non_disk_charts": [],
+          "positive_area_overlap_count": 0,
+          "overlap_pairs_sample": [],
+          "global_chart_reflections": 3,
+          "all_charts_valid": true,
+          "max_stretch": 1.2443452341721928,
+          "mean_stretch": 1.0485829841115413,
+          "area_weighted_p95_stretch": 1.1472263202169546,
+          "max_anisotropy": 1.0501158452947517,
+          "mean_anisotropy": 1.0091700636840941,
+          "seam_length_over_sqrt_area": 6.596521479515907,
+          "smallest_chart_area_fraction": 0.11093774485004262,
+          "continuous_packing_utilization": 0.42979854512809257
+        },
+        "postpack_bound_passed": true,
+        "additional_seam_length": 0.7668611919063331,
+        "common_guided_energy": 6.953535036761441,
+        "curve_support_mean": 0.023686579616757724,
+        "native_support_mean": 0.02118816172692069,
+        "soft_chart_edges_gained": 0,
+        "soft_chart_edges_lost": 5,
+        "chart_area_min_ratio": 0.996490572756538
+      }
+    }
+  ],
+  "inputs": {
+    "examples/sculpt/result.npz": "94d1fa6dbf8a33c1b0207883a7dd93b47f2e14e877930f015c1f66412abf3159",
+    "stages/sculpt.extrema.json.gz": "a7032bb3e7d9e82ec2f39b470c2f0ae468bd7b4f4b394707189871fea1a3fea5",
+    "stages/sculpt.edges.gz": "9a510986d1a54f9c76c7f33e448fcb1060c64630bdf19d60be34d3b2a0b49a83"
+  }
+}
+
+HELPER SOURCE tools/diagnostics/atlas/patch_merge.py
+#!/usr/bin/env python3
+"""Offline classical atlas reference: geodesic atoms and UV-validated unions.
+
+No engine backend or production dependency. NumPy/SciPy provide double-precision
+reference numerics; timings are not native-engine performance claims.
+"""
+from __future__ import annotations
+import argparse
+from collections import Counter
+import hashlib
+import heapq
+import json
+from pathlib import Path
+import time
+import warnings
+
+import numpy as np
+from scipy import sparse
+from scipy.sparse.linalg import MatrixRankWarning, spsolve
+from scipy.sparse.csgraph import connected_components
+
+
+def read_obj(path):
+    """Read positions and source-index triangles; reject implicit mesh repair."""
+    vertices, faces = [], []
+    for line in Path(path).read_text().splitlines():
+        words = line.split('#', 1)[0].split()
+        if not words:
+            continue
+        if words[0] == 'v':
+            vertices.append([float(x) for x in words[1:4]])
+        elif words[0] == 'f':
+            ids = [int(x.split('/')[0]) for x in words[1:]]
+            ids = [x - 1 if x > 0 else len(vertices) + x for x in ids]
+            if len(ids) != 3:
+                raise ValueError('triangle OBJ required; triangulation must be explicit')
+            faces.append(ids)
+    return np.asarray(vertices, float), np.asarray(faces, np.int64)
+
+
+def geometry(vertices, faces):
+    v, f = np.asarray(vertices, float), np.asarray(faces, np.int64)
+    if v.ndim != 2 or v.shape[1] != 3 or f.ndim != 2 or f.shape[1] != 3 or not len(f):
+        raise ValueError('nonempty indexed triangles required')
+    if not np.isfinite(v).all() or f.min() < 0 or f.max() >= len(v):
+        raise ValueError('invalid positions or indices')
+    v = v - v.mean(axis=0)
+    cross = np.cross(v[f[:, 1]]-v[f[:, 0]], v[f[:, 2]]-v[f[:, 0]])
+    twice = np.linalg.norm(cross, axis=1)
+    if np.any(twice <= np.max(twice)*1e-14):
+        raise ValueError('degenerate triangle')
+    scale = np.sqrt(twice.sum()/2)
+    v = v/scale
+    area = twice/(2*scale**2)
+    normal = cross/twice[:, None]
+    center = v[f].mean(axis=1)
+    incidence = {}
+    for i, face in enumerate(f):
+        for a, b in zip(face, np.roll(face, -1)):
+            incidence.setdefault(tuple(sorted((int(a), int(b)))), []).append((i, int(a), int(b)))
+    adjacent = [[] for _ in f]
+    edges = []
+    for (a, b), entries in sorted(incidence.items()):
+        if len(entries) > 2:
+            raise ValueError('nonmanifold edge')
+        if len(entries) == 2:
+            (i, x, y), (j, z, w) = entries
+            if (x, y) != (w, z):
+                raise ValueError('inconsistent orientation')
+            length = float(np.linalg.norm(v[a]-v[b]))
+            distance = float(np.linalg.norm(center[i]-center[j]))
+            angle = float(np.arccos(np.clip(normal[i]@normal[j], -1, 1)))
+            adjacent[i].append((j, distance, angle))
+            adjacent[j].append((i, distance, angle))
+            edges.append((i, j, length, angle, distance, a, b))
+    return dict(v=v, f=f, area=area, normal=normal, center=center,
+                adjacent=adjacent, edges=edges, scale=float(scale))
+
+
+def propagate(g, seeds, weight=0., radius=1., allowed=None, distances=None):
+    """Deterministic Dijkstra; labels are connected by their shortest-path tree."""
+    n = len(g['f'])
+    d = np.full(n, np.inf) if distances is None else distances.copy()
+    labels = np.full(n, -1, np.int64)
+    queue = []
+    for label, seed in enumerate(seeds):
+        d[seed] = 0.
+        labels[seed] = label
+        heapq.heappush(queue, (0., label, int(seed)))
+    while queue:
+        dist, label, i = heapq.heappop(queue)
+        if dist != d[i] or label != labels[i]:
+            continue
+        for j, length, angle in g['adjacent'][i]:
+            if allowed is not None and j not in allowed:
+                continue
+            candidate = dist + length + weight*radius*angle
+            if candidate < d[j]:
+                d[j], labels[j] = candidate, label
+                heapq.heappush(queue, (candidate, label, j))
+    return d, labels
+
+
+def seeds_for(g, count):
+    # Incremental farthest-point updates visit only nodes whose distance improves.
+    seeds = [int(np.argmax(g['area']))]
+    d, _ = propagate(g, seeds)
+    for _ in range(min(count, len(d))-1):
+        seed = int(np.argmax(d))
+        if d[seed] == 0:
+            break
+        seeds.append(seed)
+        d, _ = propagate(g, [seed], distances=d)
+    # Every disconnected component must have a seed even beyond the target count.
+    while not np.isfinite(d).all():
+        seed = int(np.flatnonzero(~np.isfinite(d))[0])
+        seeds.append(seed)
+        d, _ = propagate(g, [seed], distances=d)
+    return seeds
+
+
+def disk_boundary(faces):
+    """Require a connected oriented manifold disk, including vertex links."""
+    incidence, vertex_faces = {}, {}
+    for i, face in enumerate(faces):
+        for v in face:
+            vertex_faces.setdefault(int(v), []).append(i)
+        for a, b in zip(face, np.roll(face, -1)):
+            incidence.setdefault(tuple(sorted((int(a), int(b)))), []).append((i, int(a), int(b)))
+    face_adj = [[] for _ in faces]
+    next_vertex = {}
+    vertex_adj = {v: {} for v in vertex_faces}
+    for (a, b), entries in incidence.items():
+        if len(entries) == 1:
+            _, x, y = entries[0]
+            if x in next_vertex:
+                return None
+            next_vertex[x] = y
+        elif len(entries) == 2:
+            (i, x, y), (j, z, w) = entries
+            if (x, y) != (w, z):
+                return None
+            face_adj[i].append(j); face_adj[j].append(i)
+            for v in (a, b):
+                vertex_adj[v].setdefault(i, []).append(j)
+                vertex_adj[v].setdefault(j, []).append(i)
+        else:
+            return None
+    if len(vertex_faces)-len(incidence)+len(faces) != 1 or not next_vertex:
+        return None
+    def connected(ids, adj):
+        visited = {ids[0]}; stack = [ids[0]]
+        while stack:
+            for j in adj[stack.pop()]:
+                if j not in visited:
+                    visited.add(j); stack.append(j)
+        return len(visited) == len(ids)
+    if not connected(list(range(len(faces))), face_adj):
+        return None
+    for v, ids in vertex_faces.items():
+        local = vertex_adj[v]
+        if not connected(ids, {i: local.get(i, []) for i in ids}):
+            return None
+    boundary = [min(next_vertex)]
+    while True:
+        j = next_vertex.get(boundary[-1])
+        if j == boundary[0]:
+            break
+        if j is None or j in boundary:
+            return None
+        boundary.append(j)
+    if len(boundary) != len(next_vertex):
+        return None
+    return np.asarray(boundary, np.int64)
+
+
+def cross2(a, b):
+    return a[..., 0]*b[..., 1] - a[..., 1]*b[..., 0]
+
+
+def disk_boundary_fast(faces):
+    """Same disk predicate as the scalar reference, using corner-link components."""
+    nfaces=len(faces)
+    if not nfaces:
+        return None
+    vertices,flat=np.unique(faces,return_inverse=True)
+    f=flat.reshape(-1,3); nvertices=len(vertices)
+    directed=f[:,[0,1,1,2,2,0]].reshape(-1,2)
+    edges=np.sort(directed,axis=1)
+    unique,inverse,counts=np.unique(edges,axis=0,return_inverse=True,return_counts=True)
+    if np.any(counts>2) or nvertices-len(unique)+nfaces!=1:
+        return None
+    order=np.argsort(inverse,kind='stable')
+    starts=np.concatenate(([0],np.cumsum(counts)[:-1]))
+    first=order[starts[counts==2]]; second=order[starts[counts==2]+1]
+    if np.any(directed[first]!=directed[second,::-1]):
+        return None
+    def component_count(a,b,n):
+        matrix=sparse.coo_matrix((np.ones(len(a),np.int8),(a,b)),shape=(n,n)).tocsr()
+        return connected_components(matrix,directed=False,return_labels=False)
+    if component_count(first//3,second//3,nfaces)!=1:
+        return None
+    first_end=first//3*3+(first%3+1)%3
+    second_end=second//3*3+(second%3+1)%3
+    # Each node is a face corner. Links cross a shared edge at the same vertex;
+    # exactly V components means every vertex has one connected incident fan.
+    if component_count(np.concatenate((first,first_end)),np.concatenate((second_end,second)),3*nfaces)!=nvertices:
+        return None
+    boundary=directed[order[starts[counts==1]]]
+    if not len(boundary) or len(np.unique(boundary[:,0]))!=len(boundary):
+        return None
+    next_vertex=dict(boundary.tolist()); ring=[min(next_vertex)]; visited=set(ring)
+    while True:
+        j=next_vertex.get(ring[-1])
+        if j==ring[0]:
+            break
+        if j is None or j in visited:
+            return None
+        ring.append(j); visited.add(j)
+    if len(ring)!=len(boundary):
+        return None
+    return vertices[np.asarray(ring)]
+
+
+def simple_boundary(points, epsilon=1e-10):
+    """Reject nonadjacent crossings or contacts, including collinear overlap."""
+    scale = max(float(np.ptp(points, axis=0).max()), np.finfo(float).tiny)
+    p = (points-points[0])/scale
+    q = np.roll(p, -1, axis=0)
+    if np.any(np.linalg.norm(q-p, axis=1) <= epsilon):
+        return False
+    for i in range(len(p)-2):
+        ids = np.arange(i+2, len(p)-(i == 0))
+        a, b, c, d = p[i], q[i], p[ids], q[ids]
+        boxes = np.all(np.maximum(np.minimum(a,b), np.minimum(c,d)) <=
+                       np.minimum(np.maximum(a,b), np.maximum(c,d))+epsilon, axis=1)
+        c, d = c[boxes], d[boxes]
+        ab_c, ab_d = cross2(b-a,c-a), cross2(b-a,d-a)
+        cd_a, cd_b = cross2(d-c,a-c), cross2(d-c,b-c)
+        if np.any((np.minimum(ab_c,ab_d) <= epsilon) & (np.maximum(ab_c,ab_d) >= -epsilon) &
+                  (np.minimum(cd_a,cd_b) <= epsilon) & (np.maximum(cd_a,cd_b) >= -epsilon)):
+            return False
+    return True
+
+
+def triangle_frames(v, f):
+    e1, e2 = v[f[:, 1]]-v[f[:, 0]], v[f[:, 2]]-v[f[:, 0]]
+    length = np.linalg.norm(e1, axis=1)
+    x = np.einsum('ij,ij->i', e1, e2)/length
+    y = np.linalg.norm(np.cross(e1,e2), axis=1)/length
+    return length, x, y
+
+
+def measure_uv(v, f, uv):
+    """Per-chart area normalization removes packing/global-scale choices."""
+    length, x, y = triangle_frames(v,f)
+    q1, q2 = uv[f[:,1]]-uv[f[:,0]], uv[f[:,2]]-uv[f[:,0]]
+    signed = cross2(q1,q2)
+    if not np.isfinite(uv).all() or np.any(signed <= 1e-13*length*y):
+        return None
+    factor = np.sqrt(np.sum(length*y)/np.sum(signed))
+    uv = uv*factor
+    a = q1/length[:,None]*factor
+    b = (q2-q1*(x/length)[:,None])/y[:,None]*factor
+    jacobian = np.stack((a,b),axis=2)
+    singular = np.linalg.svd(jacobian,compute_uv=False)
+    if np.any(singular[:,1] <= 0) or not np.isfinite(singular).all():
+        return None
+    stretch = np.maximum(singular[:,0],1/singular[:,1])
+    anisotropy = singular[:,0]/singular[:,1]
+    return dict(uv=uv, stretch=stretch, anisotropy=anisotropy,
+                max_stretch=float(stretch.max()), max_anisotropy=float(anisotropy.max()))
+
+
+def parameterize(g, ids, stretch_limit=1.5, anisotropy_limit=2.):
+    ids = np.asarray(sorted(ids),np.int64)
+    vertices, inverse = np.unique(g['f'][ids],return_inverse=True)
+    return parameterize_local(g, ids, vertices, inverse.reshape(-1,3),
+                              stretch_limit, anisotropy_limit)
+
+
+def parameterize_local(g, ids, vertices, f, stretch_limit=1.5, anisotropy_limit=2.):
+    """Solve an explicit chart, allowing duplicated source vertices at UV cuts."""
+    v = g['v'][vertices]
+    boundary = disk_boundary_fast(f)
+    if boundary is None:
+        return None, 'topology'
+    length, x, y = triangle_frames(v,f)
+    # Weighted Cauchy-Riemann least squares (LSCM), with two separated boundary pins.
+    gx = np.column_stack((-y,y,np.zeros(len(f))))/(length*y)[:,None]
+    gy = np.column_stack((x-length,-x,length))/(length*y)[:,None]
+    w = np.sqrt(length*y/2)[:,None]
+    m, n = len(f), len(v)
+    rows = np.repeat(np.arange(2*m),6)
+    cols = np.concatenate((np.column_stack((f,f+n)), np.column_stack((f,f+n)))).ravel()
+    values = np.concatenate((np.column_stack((gx*w,-gy*w)),np.column_stack((gy*w,gx*w)))).ravel()
+    matrix = sparse.coo_matrix((values,(rows,cols)),shape=(2*m,2*n)).tocsr()
+    p = int(boundary[np.argmax(np.linalg.norm(v[boundary]-v[boundary[0]],axis=1))])
+    q = int(boundary[np.argmax(np.linalg.norm(v[boundary]-v[p],axis=1))])
+    pins = np.array([p,q,p+n,q+n]); fixed = np.array([0.,np.linalg.norm(v[q]-v[p]),0.,0.])
+    free = np.setdiff1d(np.arange(2*n),pins)
+    a = matrix[:,free]; rhs = -matrix[:,pins]@fixed
+    g['actual_uv_solves']=g.get('actual_uv_solves',0)+1
+    g['factorized_degrees_of_freedom']=g.get('factorized_degrees_of_freedom',0)+len(free)
+    with warnings.catch_warnings():
+        warnings.simplefilter('error',MatrixRankWarning)
+        try:
+            solution = spsolve((a.T@a).tocsc(), a.T@rhs)
+        except (MatrixRankWarning, RuntimeError):
+            return None, 'solver'
+    flat = np.zeros(2*n); flat[pins] = fixed; flat[free] = solution
+    measured = measure_uv(v,f,flat.reshape(2,n).T)
+    if measured is None:
+        return None, 'orientation'
+    if measured['max_stretch'] > stretch_limit or measured['max_anisotropy'] > anisotropy_limit:
+        return None, 'distortion'
+    if not simple_boundary(measured['uv'][boundary]):
+        return None, 'boundary_overlap'
+    # A continuous positive map of a manifold disk with a simple boundary is injective.
+    measured.update(ids=ids, vertices=vertices, local_faces=f, boundary=boundary)
+    return measured, 'accepted'
+
+
+def bisect(g, ids):
+    allowed = set(ids)
+    if len(ids) < 2:
+        raise ValueError('invalid single triangle cannot be repaired')
+    d, _ = propagate(g,[min(ids)],allowed=allowed)
+    a = max(ids,key=lambda i:(d[i],-i))
+    d, _ = propagate(g,[a],allowed=allowed)
+    b = max(ids,key=lambda i:(d[i],-i))
+    _, labels = propagate(g,[a,b],allowed=allowed)
+    # Separate any disconnected components explicitly, rather than dropping faces.
+    groups = {}
+    for i in ids:
+        groups.setdefault(int(labels[i]),[]).append(i)
+    if len(groups) < 2:
+        raise ValueError('bisection made no progress')
+    return list(groups.values())
+
+
+def pack(charts):
+    """Deterministic common shelf packer; no raster-padding guarantee is claimed."""
+    boxes, local_uv = {}, {}
+    for i,c in charts.items():
+        uv = c['uv'].copy()
+        _, axes = np.linalg.eigh(np.cov(uv.T))
+        uv = uv@axes
+        # Orthogonal reorientation must preserve winding.
+        if np.linalg.det(axes) < 0:
+            uv[:,0] *= -1
+        uv -= uv.min(axis=0)
+        extent = uv.max(axis=0)
+        if extent[0] > extent[1]:
+            uv = np.column_stack((uv[:,1], extent[0]-uv[:,0]))
+        local_uv[i] = uv
+        boxes[i] = uv.max(axis=0)
+    total = sum(float(np.prod(x)) for x in boxes.values())
+    gap = np.sqrt(total)*0.002
+    best = None
+    for factor in (.7,1.,1.3,1.7,2.2):
+        width = max(max(x[0] for x in boxes.values())+2*gap,np.sqrt(total)*factor)
+        x, y, height = gap, gap, 0.; placements = {}
+        for i in sorted(boxes,key=lambda i:(-boxes[i][1],i)):
+            w,h = boxes[i]
+            if x+w+gap > width:
+                x,y,height = gap,y+height+gap,0.
+            placements[i] = np.array([x,y]); x += w+gap; height = max(height,h)
+        atlas_height = y+height+gap
+        if best is None or width*atlas_height < best[0]:
+            best = (width*atlas_height,width,atlas_height,placements)
+    _,width,height,placements = best
+    scale = max(width,height)
+    packed = {i:(local_uv[i]+placements[i])/scale for i in charts}
+    occupied = sum(np.sum(cross2(c['uv'][c['local_faces'][:,1]]-c['uv'][c['local_faces'][:,0]],
+                                c['uv'][c['local_faces'][:,2]]-c['uv'][c['local_faces'][:,0]]))/2 for c in charts.values())
+    return packed, float(occupied/(width*height))
+
+
+def execute(vertices, faces, *, patches=64, feature_weight=2., stretch_limit=1.5,
+            anisotropy_limit=2., merge=True, max_merges=None, merge_feature_weight=None):
+    if type(patches) is not int or patches<2 or not np.isfinite([feature_weight,stretch_limit,anisotropy_limit]).all() or feature_weight<0 or stretch_limit<1 or anisotropy_limit<1:
+        raise ValueError('invalid experiment parameters')
+    rank_weight=feature_weight if merge_feature_weight is None else merge_feature_weight
+    if not np.isfinite(rank_weight) or rank_weight<0:
+        raise ValueError('invalid merge feature weight')
+    started = time.perf_counter(); g = geometry(vertices,faces)
+    prepared = time.perf_counter()
+    seeds = seeds_for(g,patches)
+    _, labels = propagate(g,seeds,feature_weight,1/np.sqrt(patches))
+    clustered = time.perf_counter()
+    charts, rejects = {}, Counter(); solves = 0; next_id = 0
+    stack = [np.flatnonzero(labels==i).tolist() for i in range(len(seeds))]
+    while stack:
+        ids = stack.pop()
+        if not ids:
+            continue
+        chart,reason = parameterize(g,ids,stretch_limit,anisotropy_limit); solves += 1
+        if chart is None:
+            rejects['initial_'+reason] += 1
+            stack.extend(bisect(g,ids))
+        else:
+            charts[next_id] = chart; next_id += 1
+    validated = time.perf_counter(); initial_count = len(charts)
+    labels[:] = -1
+    for i,c in charts.items():
+        labels[c['ids']] = i
+    initial_labels = labels.copy()
+    adjacent = {i:{} for i in charts}
+    for f,h,length,angle,distance,_,_ in g['edges']:
+        a,b = int(labels[f]),int(labels[h])
+        if a != b:
+            for x,y in ((a,b),(b,a)):
+                old = adjacent[x].get(y,(0.,0.))
+                adjacent[x][y] = (old[0]+length,old[1]+length*angle)
+    queue = []
+    def enqueue(a,b):
+        if a > b:
+            a,b = b,a
+        length,turn = adjacent[a][b]
+        small_area = min(g['area'][charts[a]['ids']].sum(),g['area'][charts[b]['ids']].sum())
+        # Feature influence orders candidates, never forbids a low-distortion union.
+        score = length/np.sqrt(small_area)/(1+rank_weight*turn/max(length,1e-15))
+        heapq.heappush(queue,(-float(score),a,b))
+    for a,neighbors in adjacent.items():
+        for b in neighbors:
+            if a < b:
+                enqueue(a,b)
+    attempts,accepted = 0,0
+    while merge and queue and (max_merges is None or accepted < max_merges):
+        _,a,b = heapq.heappop(queue)
+        if a not in charts or b not in charts:
+            continue
+        attempts += 1
+        chart,reason = parameterize(g,np.concatenate((charts[a]['ids'],charts[b]['ids'])),
+                                    stretch_limit,anisotropy_limit); solves += 1
+        if chart is None:
+            rejects['merge_'+reason] += 1
+            continue
+        c = next_id; next_id += 1; accepted += 1
+        charts[c] = chart; adjacent[c] = {}
+        for old in (a,b):
+            for neighbor,pair in adjacent[old].items():
+                if neighbor in (a,b):
+                    continue
+                before = adjacent[c].get(neighbor,(0.,0.))
+                adjacent[c][neighbor] = (before[0]+pair[0],before[1]+pair[1])
+                adjacent[neighbor].pop(old,None)
+            del charts[old]; del adjacent[old]
+        for neighbor,pair in adjacent[c].items():
+            adjacent[neighbor][c] = pair
+            enqueue(c,neighbor)
+    merged = time.perf_counter()
+    packed,utilization = pack(charts)
+    corner_uv = np.zeros((len(faces),3,2)); chart_uv = corner_uv.copy()
+    stretches,anisotropies = np.zeros(len(faces)),np.zeros(len(faces))
+    for label,(i,c) in enumerate(sorted(charts.items())):
+        labels[c['ids']] = label
+        corner_uv[c['ids']] = packed[i][c['local_faces']]
+        chart_uv[c['ids']] = c['uv'][c['local_faces']]
+        stretches[c['ids']] = c['stretch']; anisotropies[c['ids']] = c['anisotropy']
+    seam = sum(length for a,b,length,*_ in g['edges'] if labels[a] != labels[b])
+    ended = time.perf_counter()
+    metrics = dict(input_vertices=len(vertices),input_faces=len(faces),initial_charts=initial_count,
+                   chart_count=len(charts),merge_attempts=attempts,accepted_merges=accepted,
+                   parameterization_attempts=solves,uv_solves=g.get('actual_uv_solves',0),
+                   factorized_degrees_of_freedom=g.get('factorized_degrees_of_freedom',0),
+                   rejections=dict(rejects),max_stretch=float(stretches.max()),
+                   mean_stretch=float(g['area']@stretches),max_anisotropy=float(anisotropies.max()),
+                   mean_anisotropy=float(g['area']@anisotropies),seam_length_over_sqrt_area=float(seam),
+                   continuous_packing_utilization=utilization,all_charts_valid=True,
+                   runtime_seconds=ended-started,
+                   phases_seconds=dict(geometry=prepared-started,clustering=clustered-prepared,
+                                       initial_validation=validated-clustered,merging=merged-validated,packing=ended-merged))
+    return dict(metrics=metrics,labels=labels,initial_labels=initial_labels,corner_uv=corner_uv,
+                chart_uv=chart_uv,stretch=stretches,anisotropy=anisotropies)
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('mesh',type=Path); parser.add_argument('output',type=Path)
+    parser.add_argument('--patches',type=int,default=64)
+    parser.add_argument('--feature-weight',type=float,default=2.)
+    parser.add_argument('--stretch-limit',type=float,default=1.5)
+    parser.add_argument('--anisotropy-limit',type=float,default=2.)
+    parser.add_argument('--no-merge',action='store_true')
+    args = parser.parse_args()
+    if args.patches < 2 or not np.isfinite([args.feature_weight,args.stretch_limit,args.anisotropy_limit]).all() or args.feature_weight < 0 or args.stretch_limit < 1 or args.anisotropy_limit < 1:
+        parser.error('invalid experiment parameters')
+    v,f = read_obj(args.mesh)
+    result = execute(v,f,patches=args.patches,feature_weight=args.feature_weight,
+                     stretch_limit=args.stretch_limit,anisotropy_limit=args.anisotropy_limit,merge=not args.no_merge)
+    args.output.parent.mkdir(parents=True,exist_ok=True)
+    np.savez_compressed(args.output.with_suffix('.npz'),vertices=v,faces=f,
+                        **{k:x for k,x in result.items() if k!='metrics'})
+    record = dict(schema='intrinsic.atlas-patch-merge.diagnostic.v1',source=str(args.mesh),
+                  source_sha256=hashlib.sha256(args.mesh.read_bytes()).hexdigest(),
+                  implementation='python_scipy_lscm_patch_merge',claim_eligible=False,
+                  parameters={k:str(x) if isinstance(x,Path) else x for k,x in vars(args).items()},
+                  metrics=result['metrics'])
+    args.output.write_text(json.dumps(record,indent=2,allow_nan=False)+'\n')
+    print(json.dumps(result['metrics'],allow_nan=False),flush=True)
+
+
+if __name__ == '__main__':
+    main()
+
+HELPER SOURCE tools/diagnostics/atlas/baseline_atlas.py
+#!/usr/bin/env python3
+"""Offline UV charts preserving source-bound regions and their borders.
+
+Connect boundary loops by shortest primal paths before LSCM. Unsupported or
+distorted regions are bisected explicitly; semantic labels never become UV IDs.
+"""
+from __future__ import annotations
+import argparse
+from collections import Counter
+import hashlib
+import heapq
+import json
+from pathlib import Path
+
+import numpy as np
+import patch_merge as pm
+from compare_atlases import audit, render
+
+
+def incidence(faces):
+    edges = {}
+    for i, face in enumerate(faces):
+        for k in range(3):
+            a, b = int(face[k]), int(face[(k+1)%3])
+            edges.setdefault(tuple(sorted((a, b))), []).append((i, k, a, b))
+    return edges
+
+
+def cut_corners(faces, edges, cuts):
+    """Join corners across uncut edges and retain the source-vertex map."""
+    parent = np.arange(faces.size)
+    def root(a):
+        while parent[a] != a:
+            parent[a] = parent[parent[a]]
+            a = parent[a]
+        return a
+    def join(a, b):
+        a, b = root(a), root(b)
+        parent[max(a,b)] = min(a,b)
+    for edge, entries in edges.items():
+        if len(entries) == 2 and edge not in cuts:
+            (i,k,a,b), (j,l,c,d) = entries
+            if (a,b) != (d,c):
+                raise ValueError('inconsistent orientation')
+            join(3*i+k, 3*j+(l+1)%3)
+            join(3*i+(k+1)%3, 3*j+l)
+    roots = np.array([root(i) for i in range(faces.size)])
+    unique, inverse = np.unique(roots, return_inverse=True)
+    return faces.ravel()[unique], inverse.reshape(-1,3)
+
+
+def topology(faces):
+    edges = incidence(faces)
+    if any(len(x)>2 for x in edges.values()):
+        raise ValueError('nonmanifold edge')
+    vertices, _ = cut_corners(faces, edges, set())
+    if len(vertices) != len(np.unique(faces)):
+        raise ValueError('nonmanifold vertex fan')
+    outgoing, incoming = {}, {}
+    for entries in edges.values():
+        if len(entries) == 1:
+            _,_,a,b = entries[0]
+            if a in outgoing or b in incoming:
+                raise ValueError('nonmanifold boundary')
+            outgoing[a] = b; incoming[b] = a
+    if outgoing.keys() != incoming.keys():
+        raise ValueError('open boundary chain')
+    loops, remaining = [], set(outgoing)
+    while remaining:
+        start = min(remaining); loop = []; current = start
+        while current in remaining:
+            remaining.remove(current); loop.append(current); current = outgoing[current]
+        if current != start:
+            raise ValueError('non-simple boundary loop')
+        loops.append(loop)
+    return edges, loops, len(vertices)-len(edges)+len(faces)
+
+
+def open_region(g, ids):
+    """Cut a connected genus-zero region with boundary; report other topology."""
+    faces = g['f'][ids]
+    try:
+        edges, loops, euler = topology(faces)
+    except ValueError as error:
+        # A valid source can induce a pinched region boundary. Split the region
+        # explicitly; never mistake corner duplication for source repair.
+        return None, 'region_topology', dict(euler_characteristic=None,
+                                            boundary_loops=None, cut_edges=0,
+                                            topology_failure=str(error))
+    diagnostics = dict(euler_characteristic=euler, boundary_loops=len(loops), cut_edges=0)
+    if not loops or euler != 2-len(loops):
+        return None, 'unsupported_topology', diagnostics
+    adjacent = {int(v): [] for v in np.unique(faces)}
+    for a,b in edges:
+        length = float(np.linalg.norm(g['v'][a]-g['v'][b]))
+        adjacent[a].append((b,length)); adjacent[b].append((a,length))
+    connected = set(loops[0]); waiting = [set(x) for x in loops[1:]]; cuts = set()
+    while waiting:
+        targets = set().union(*waiting)
+        distance = {v:0. for v in connected}; previous = {}
+        queue = [(0.,v) for v in sorted(connected)]; heapq.heapify(queue)
+        hit = None
+        while queue:
+            d,v = heapq.heappop(queue)
+            if d != distance[v]:
+                continue
+            if v in targets:
+                hit = v; break
+            for w,length in sorted(adjacent[v]):
+                value = d+length
+                if value < distance.get(w, np.inf):
+                    distance[w] = value; previous[w] = v; heapq.heappush(queue,(value,w))
+        if hit is None:
+            return None, 'disconnected_region', diagnostics
+        current = hit
+        while current not in connected:
+            parent = previous[current]
+            cuts.add(tuple(sorted((current,parent)))); connected.add(current); current = parent
+        reached = next(i for i,loop in enumerate(waiting) if hit in loop)
+        connected.update(waiting.pop(reached))
+    vertices, local = cut_corners(faces, edges, cuts)
+    diagnostics['cut_edges'] = len(cuts)
+    if pm.disk_boundary_fast(local) is None:
+        return None, 'cut_topology', diagnostics
+    return (vertices, local), 'accepted', diagnostics
+
+
+def region_components(g, labels):
+    visited = np.zeros(len(labels),bool); result = []
+    for seed in range(len(labels)):
+        if visited[seed]:
+            continue
+        stack = [seed]; visited[seed] = True; ids = []
+        while stack:
+            i = stack.pop(); ids.append(i)
+            for j,*_ in g['adjacent'][i]:
+                if not visited[j] and labels[j] == labels[i]:
+                    visited[j] = True; stack.append(j)
+        result.append(np.asarray(sorted(ids),np.int64))
+    return result
+
+
+def boundary_metrics(g, regions, labels, corners):
+    retained = lost = extra = internal = 0
+    total = baseline_length = internal_length = 0.
+    for a,b,length,_,_,v,w in g['edges']:
+        cut = labels[a] != labels[b]
+        if not cut:
+            for vertex in (v,w):
+                ia = int(np.flatnonzero(g['f'][a] == vertex)[0])
+                ib = int(np.flatnonzero(g['f'][b] == vertex)[0])
+                cut = cut or not np.array_equal(corners[a,ia],corners[b,ib])
+        protected = regions[a] != regions[b]
+        retained += int(protected and cut); lost += int(protected and not cut)
+        extra += int(not protected and labels[a] != labels[b])
+        internal += int(cut and labels[a] == labels[b])
+        total += length if cut else 0.
+        baseline_length += length if protected else 0.
+        internal_length += length if cut and labels[a] == labels[b] else 0.
+    return dict(retained_baseline_edges=retained, lost_baseline_edges=lost,
+                extra_chart_boundary_edges=extra, internal_uv_cut_edges=internal,
+                total_uv_seam_length_over_sqrt_area=total,
+                baseline_seam_length_over_sqrt_area=baseline_length,
+                internal_uv_seam_length_over_sqrt_area=internal_length)
+
+
+def merge_within_regions(g, regions, charts, stretch_limit, anisotropy_limit):
+    """Rejoin only subdivisions of the same region, revalidating each union."""
+    rejected = set(); attempts = []; next_id = len(charts)
+    while True:
+        labels = np.empty(len(regions),np.int64)
+        for i,c in charts.items():
+            labels[c['ids']] = i
+        seams = Counter()
+        for a,b,length,*_ in g['edges']:
+            i,j = sorted((int(labels[a]),int(labels[b])))
+            if i!=j and regions[a]==regions[b] and (i,j) not in rejected:
+                seams[i,j] += length
+        candidates = []
+        for (i,j),length in seams.items():
+            area = min(g['area'][charts[i]['ids']].sum(),g['area'][charts[j]['ids']].sum())
+            candidates.append((-length/np.sqrt(area),i,j))
+        accepted = False
+        for _,i,j in sorted(candidates):
+            ids = np.sort(np.concatenate((charts[i]['ids'],charts[j]['ids'])))
+            opened,reason,topo = open_region(g,ids); chart = None
+            if opened is not None:
+                chart,reason = pm.parameterize_local(g,ids,*opened,stretch_limit,anisotropy_limit)
+            attempts.append(dict(region=int(regions[ids[0]]),faces=len(ids),status=reason,**topo))
+            if chart is None:
+                rejected.add((i,j)); continue
+            del charts[i]; del charts[j]; charts[next_id] = chart; next_id += 1
+            accepted = True; break
+        if not accepted:
+            return charts, attempts
+
+
+def execute(vertices, faces, regions, *, stretch_limit=1.35, anisotropy_limit=2., merge=False):
+    regions = np.asarray(regions)
+    if regions.shape != (len(faces),) or regions.dtype.kind not in 'iu' or np.any(regions<0):
+        raise ValueError('one nonnegative integer baseline label per face required')
+    if not np.isfinite([stretch_limit,anisotropy_limit]).all() or min(stretch_limit,anisotropy_limit)<1:
+        raise ValueError('invalid distortion limits')
+    g = pm.geometry(vertices,faces)
+    # Validate the source before duplication could hide a pinched vertex.
+    topology(g['f'])
+    components = region_components(g,regions)
+    pending = list(reversed(components)); charts = {}; records = []; splits = Counter()
+    while pending:
+        ids = np.asarray(sorted(pending.pop()),np.int64)
+        opened, reason, topo = open_region(g,ids)
+        chart = None
+        if opened is not None:
+            chart, reason = pm.parameterize_local(g,ids,*opened,stretch_limit,anisotropy_limit)
+        records.append(dict(region=int(regions[ids[0]]),faces=len(ids),status=reason,**topo))
+        if chart is None:
+            splits[reason] += 1
+            pending.extend(reversed(pm.bisect(g,ids)))
+        else:
+            charts[len(charts)] = chart
+    initial_count = len(charts); merges = []
+    if merge:
+        charts, merges = merge_within_regions(g,regions,charts,stretch_limit,anisotropy_limit)
+    labels = np.empty(len(faces),np.int64); chart_uv = np.empty((len(faces),3,2))
+    corners = np.empty_like(chart_uv); packed,_ = pm.pack(charts)
+    for i,c in charts.items():
+        labels[c['ids']] = i
+        chart_uv[c['ids']] = c['uv'][c['local_faces']]
+        corners[c['ids']] = packed[i][c['local_faces']]
+    metrics = audit(vertices,faces,labels,corners)
+    metrics.update(boundary_metrics(g,regions,labels,corners))
+    metrics.update(region_count=len(np.unique(regions)), region_component_count=len(components),
+                   split_reasons=dict(splits), uv_solves=g.get('actual_uv_solves',0),
+                   initial_charts=initial_count, accepted_merges=initial_count-len(charts),
+                   merge_attempts=merges,
+                   outcome='protected_with_chart_splits' if splits else 'protected_without_chart_splits')
+    if (not metrics['all_charts_valid'] or metrics['lost_baseline_edges'] or
+            metrics['max_stretch'] > stretch_limit or metrics['max_anisotropy'] > anisotropy_limit):
+        raise ValueError('final source/UV audit failed: '+str(metrics))
+    return dict(labels=labels,region_labels=regions.copy(),chart_uv=chart_uv,corner_uv=corners,
+                metrics=metrics,component_attempts=records)
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('baseline',type=Path,help='native export prefix (.geometry.json and .labels)')
+    parser.add_argument('output',type=Path)
+    parser.add_argument('--stretch-limit',type=float,default=1.35)
+    parser.add_argument('--merge',action='store_true',help='rejoin valid subdivisions inside each region')
+    args = parser.parse_args()
+    geometry = args.baseline.with_suffix('.geometry.json'); labels = args.baseline.with_suffix('.labels')
+    source = json.loads(geometry.read_text()); v = np.asarray(source['positions']); f = np.asarray(source['triangles'])
+    regions = np.loadtxt(labels,dtype=np.int64,ndmin=1)
+    result = execute(v,f,regions,stretch_limit=args.stretch_limit,merge=args.merge)
+    record = dict(schema='intrinsic.baseline-atlas.diagnostic.v1',claim_eligible=False,
+                  implementation='python_baseline_boundary_cuts_lscm',stretch_limit=args.stretch_limit,merge=args.merge,
+                  source_sha256=hashlib.sha256(geometry.read_bytes()).hexdigest(),
+                  baseline_labels_sha256=hashlib.sha256(labels.read_bytes()).hexdigest(),
+                  implementation_sha256=hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
+                  metrics=result['metrics'],component_attempts=result['component_attempts'])
+    args.output.parent.mkdir(parents=True,exist_ok=True)
+    args.output.with_suffix('.json').write_text(json.dumps(record,indent=2,allow_nan=False)+'\n')
+    arrays = {k:x for k,x in result.items() if k not in ('metrics','component_attempts')}
+    np.savez_compressed(args.output.with_suffix('.npz'),vertices=v,faces=f,**arrays)
+    render(v,f,result,args.output.with_suffix('.png'),f'{args.baseline.name} · protected regions · {record["metrics"]["chart_count"]} UV charts')
+    print(json.dumps(record,allow_nan=False),flush=True)
+
+
+if __name__ == '__main__':
+    main()
+
+HELPER SOURCE tools/diagnostics/atlas/compare_atlases.py
+#!/usr/bin/env python3
+"""Reproducible offline comparisons and source-face UV inspection artifacts."""
+from __future__ import annotations
+import argparse
+import hashlib
+import json
+from pathlib import Path
+import subprocess
+import time
+import numpy as np
+import patch_merge as pm
+
+
+def overlapping_triangles(triangles, epsilon=1e-10):
+    """Independent positive-area SAT overlap test, including across chart labels.
+
+    Sweep/AABB broad phase; shared boundaries are allowed, positive-area triangle
+    intersection is not. This does not require disk topology or a boundary theorem.
+    """
+    triangles=np.asarray(triangles,float)
+    triangles=(triangles-triangles.reshape(-1,2).min(axis=0))/max(float(np.ptp(triangles.reshape(-1,2),axis=0).max()),1e-30)
+    lo,hi=triangles.min(axis=1),triangles.max(axis=1)
+    order=np.argsort(lo[:,0],kind='stable'); lower=lo[order,0]
+    collisions=[]
+    for position,i in enumerate(order):
+        end=np.searchsorted(lower,hi[i,0]-epsilon,side='left')
+        ids=order[position+1:end]
+        ids=ids[(lo[ids,1]<hi[i,1]-epsilon)&(hi[ids,1]>lo[i,1]+epsilon)]
+        if not len(ids):
+            continue
+        a,b=triangles[i],triangles[ids]
+        ea=np.roll(a,-1,axis=0)-a; eb=np.roll(b,-1,axis=1)-b
+        edges=np.concatenate((np.broadcast_to(ea,eb.shape),eb),axis=1)
+        axes=np.stack((-edges[:,:,1],edges[:,:,0]),axis=2)
+        axes/=np.maximum(np.linalg.norm(axes,axis=2,keepdims=True),1e-30)
+        pa=np.einsum('nki,ji->nkj',axes,a); pb=np.einsum('nki,nji->nkj',axes,b)
+        gaps=np.minimum(pa.max(axis=2),pb.max(axis=2))-np.maximum(pa.min(axis=2),pb.min(axis=2))
+        for j in ids[np.all(gaps>epsilon,axis=1)]:
+            collisions.append((int(i),int(j)))
+    return collisions
+
+
+def audit(v, f, labels, corners):
+    """Recompute stretch through the 2x2 metric tensor, not the solver's SVD."""
+    g = pm.geometry(v,f)
+    stretch = np.zeros(len(f)); anisotropy = stretch.copy()
+    failures, disk_failures, reflections, scales = [], [], 0, []
+    for label in np.unique(labels):
+        ids = np.flatnonzero(labels==label)
+        # Permit intentional cuts duplicating one source vertex inside a chart.
+        keys, local, points, positions = {}, [], [], []
+        for face,uvs in zip(f[ids],corners[ids]):
+            indices = []
+            for vertex,uv in zip(face,uvs):
+                key = (int(vertex),float(uv[0]),float(uv[1]))
+                if key not in keys:
+                    keys[key] = len(points); points.append(uv); positions.append(g['v'][vertex])
+                indices.append(keys[key])
+            local.append(indices)
+        local=np.asarray(local); points=np.asarray(points); positions=np.asarray(positions)
+        boundary=pm.disk_boundary(local)
+        if boundary is None:
+            disk_failures.append(int(label))
+        uv=points[local]
+        q1,q2=uv[:,1]-uv[:,0],uv[:,2]-uv[:,0]
+        signed=pm.cross2(q1,q2)
+        if np.all(signed<0):
+            points[:,0]*=-1; q1[:,0]*=-1; q2[:,0]*=-1; signed*=-1; reflections+=1
+        if not np.isfinite(points).all() or np.any(signed<=0):
+            failures.append([int(label),'orientation']); continue
+        if boundary is not None and not pm.simple_boundary(points[boundary]):
+            failures.append([int(label),'overlap']); continue
+        length,x,y=pm.triangle_frames(positions,local)
+        factor=np.sqrt(np.sum(length*y)/signed.sum())
+        scales.append(float(1/factor))
+        a=q1/length[:,None]*factor; b=(q2-q1*(x/length)[:,None])/y[:,None]*factor
+        aa=np.einsum('ij,ij->i',a,a); bb=np.einsum('ij,ij->i',b,b); ab=np.einsum('ij,ij->i',a,b)
+        delta=np.sqrt((aa-bb)**2+4*ab**2)
+        hi=np.sqrt((aa+bb+delta)/2); lo=np.sqrt(np.maximum((aa+bb-delta)/2,0))
+        if np.any(lo<=0):
+            failures.append([int(label),'singular']); continue
+        stretch[ids]=np.maximum(hi,1/lo); anisotropy[ids]=hi/lo
+    overlaps=overlapping_triangles(corners)
+    valid=not failures and not overlaps
+    def percentile(values):
+        order=np.argsort(values)
+        return float(values[order[np.searchsorted(np.cumsum(g['area'][order]),.95)]])
+    metrics=dict(chart_count=len(np.unique(labels)),invalid_charts=failures,
+                 chart_texel_density_ratio=max(scales)/min(scales) if not failures else None,
+                 non_disk_charts=disk_failures,positive_area_overlap_count=len(overlaps),
+                 overlap_pairs_sample=overlaps[:8],
+                 global_chart_reflections=reflections,all_charts_valid=valid,
+                 max_stretch=float(stretch.max()) if not failures else None,
+                 mean_stretch=float(g['area']@stretch) if not failures else None,
+                 area_weighted_p95_stretch=percentile(stretch) if not failures else None,
+                 max_anisotropy=float(anisotropy.max()) if not failures else None,
+                 mean_anisotropy=float(g['area']@anisotropy) if not failures else None,
+                 seam_length_over_sqrt_area=float(sum(length for a,b,length,*_ in g['edges'] if labels[a]!=labels[b])),
+                 smallest_chart_area_fraction=float(min(g['area'][labels==x].sum() for x in np.unique(labels))))
+    return metrics
+
+
+def native(v,f,runner,directory,method='xatlas'):
+    input_path=directory/'native-input.json'; output_path=directory/(method+'-raw.json')
+    input_path.write_text(json.dumps(dict(vertices=v.tolist(),faces=f.tolist())))
+    call=subprocess.run([str(runner),str(input_path),str(output_path),method],capture_output=True,text=True,timeout=180)
+    if call.returncode:
+        raise RuntimeError(call.stdout+call.stderr)
+    raw=json.loads(output_path.read_text())
+    if raw['used_fallback']:
+        raise ValueError('baseline unexpectedly fell back')
+    sf=np.asarray(raw['source_faces']); sv=np.asarray(raw['source_vertices'])
+    outfaces=np.asarray(raw['faces']); outuv=np.asarray(raw['uvs'])
+    if len(sf)!=len(f) or not np.array_equal(np.sort(sf),np.arange(len(f))):
+        raise ValueError('source face coverage mismatch')
+    labels=np.empty(len(f),np.int64); corners=np.empty((len(f),3,2))
+    for i,source in enumerate(sf):
+        source_vertices=sv[outfaces[i]]
+        if sorted(source_vertices)!=sorted(f[source]):
+            raise ValueError('source corner mapping mismatch')
+        labels[source]=raw['face_charts'][i]
+        for j,vertex in enumerate(f[source]):
+            corners[source,j]=outuv[outfaces[i,np.flatnonzero(source_vertices==vertex)[0]]]
+    # Native API normalizes each atlas axis independently; measure in pixel aspect.
+    corners*=np.array([raw['atlas_width'],raw['atlas_height']])/max(raw['atlas_width'],raw['atlas_height'])
+    metrics=audit(v,f,labels,corners)
+    metrics.update(runtime_seconds=raw['runtime_seconds'],implementation='native_engine_'+method)
+    result=dict(labels=labels,corner_uv=corners)
+    return result,metrics
+
+
+def render(v,f,result,path,title):
+    import matplotlib
+    matplotlib.use('Agg')
+    import matplotlib.pyplot as plt
+    from mpl_toolkits.mplot3d.art3d import Poly3DCollection
+    from matplotlib.collections import PolyCollection
+    labels=result['labels']; uvs=result['corner_uv']
+    # Stable high-contrast palette; no semantic or anatomical meaning is asserted.
+    colors=plt.cm.tab20((labels*7)%20/19)
+    normal=np.cross(v[f[:,1]]-v[f[:,0]],v[f[:,2]]-v[f[:,0]])
+    normal/=np.linalg.norm(normal,axis=1)[:,None]
+    light=np.array([.4,-.5,.75]); light/=np.linalg.norm(light)
+    surface_colors=colors.copy(); surface_colors[:,:3]*=(.45+.55*np.abs(normal@light))[:,None]
+    fig=plt.figure(figsize=(16,5.2),layout='constrained')
+    for panel,azimuth in enumerate((-60,120),1):
+        ax=fig.add_subplot(1,3,panel,projection='3d')
+        collection=Poly3DCollection(v[f],facecolors=surface_colors,linewidth=0,antialiased=False,rasterized=True)
+        ax.add_collection3d(collection)
+        lo,hi=v.min(axis=0),v.max(axis=0); center=(lo+hi)/2; extent=(hi-lo).max()/2
+        ax.set_xlim(center[0]-extent,center[0]+extent); ax.set_ylim(center[1]-extent,center[1]+extent)
+        ax.set_zlim(center[2]-extent,center[2]+extent)
+        ax.set_box_aspect((1,1,1)); ax.view_init(elev=25,azim=azimuth); ax.set_axis_off()
+    ax=fig.add_subplot(1,3,3)
+    ax.add_collection(PolyCollection(uvs,facecolors=colors,edgecolors='none',antialiased=False,rasterized=True))
+    ax.autoscale_view(); ax.set_aspect('equal'); ax.set_axis_off(); ax.set_title('UV charts (actual mapping)')
+    fig.suptitle(title); fig.savefig(path,dpi=150); plt.close(fig)
+
+
+def main():
+    parser=argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('mesh',type=Path); parser.add_argument('output',type=Path)
+    parser.add_argument('--runner',type=Path,default=Path('build/ci/bin/IntrinsicUvAtlasMeshDiagnostic'))
+    parser.add_argument('--patches',type=int,default=64)
+    parser.add_argument('--stretch-limit',type=float,default=1.5)
+    parser.add_argument('--arms',nargs='+',choices=['feature','blind','growth-only','merge-only','xatlas','fast-staged'],default=['feature','blind','xatlas'])
+    parser.add_argument('--subdivide',type=int,default=0)
+    args=parser.parse_args(); args.output.mkdir(parents=True,exist_ok=True)
+    v,f=pm.read_obj(args.mesh)
+    if args.subdivide:
+        import trimesh
+        for _ in range(args.subdivide):
+            v,f=trimesh.remesh.subdivide(v,f)
+    records=[]
+    for arm in args.arms:
+        if arm in ('xatlas','fast-staged'):
+            result,metrics=native(v,f,args.runner.resolve(),args.output,arm)
+        else:
+            growth_weight=2. if arm in ('feature','growth-only') else 0.
+            rank_weight=2. if arm in ('feature','merge-only') else 0.
+            result=pm.execute(v,f,patches=args.patches,feature_weight=growth_weight,
+                              merge_feature_weight=rank_weight,stretch_limit=args.stretch_limit)
+            metrics=result.pop('metrics')
+            independent=audit(v,f,result['labels'],result['corner_uv'])
+            if not independent['all_charts_valid'] or abs(independent['max_stretch']-metrics['max_stretch'])>1e-6:
+                raise ValueError('independent final UV audit disagrees: '+str(independent))
+            metrics['independent_audit']=independent
+        record=dict(arm=arm,patches=args.patches,stretch_limit=args.stretch_limit,subdivide=args.subdivide,faces=len(f),
+                    source=str(args.mesh),source_sha256=hashlib.sha256(args.mesh.read_bytes()).hexdigest(),
+                    implementation_sha256=hashlib.sha256(Path(pm.__file__).read_bytes()).hexdigest(),
+                    claim_eligible=False,metrics=metrics)
+        (args.output/(arm+'.json')).write_text(json.dumps(record,indent=2,allow_nan=False)+'\n')
+        np.savez_compressed(args.output/(arm+'.npz'),vertices=v,faces=f,**result)
+        value=metrics['max_stretch']; quality=f'{value:.3f}' if value is not None else 'invalid'
+        render(v,f,result,args.output/(arm+'.png'),f'{args.mesh.stem} · {arm} · {metrics["chart_count"]} charts · max stretch {quality}')
+        records.append(record)
+        print(json.dumps(record,allow_nan=False),flush=True)
+    (args.output/'comparison.json').write_text(json.dumps(records,indent=2,allow_nan=False)+'\n')
+
+
+if __name__=='__main__':
+    main()

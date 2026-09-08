@@ -80,3 +80,12 @@ python3 tools/agents/check_task_policy.py --root . --strict
 python3 tools/agents/check_ara_claims.py --root . --strict
 python3 tools/docs/check_doc_links.py --root .
 ```
+
+
+## Operator-directed quality continuation
+- The operator subsequently postponed runtime integration and requested continued
+  work with Claude while preserving baseline quality, particularly sculpt.
+  [METHOD-045](METHOD-045-baseline-preserving-atlas-cuts.md) owns the bounded
+  region-preserving UV-cut comparison; this task continues to own later native,
+  config, UI and publication adoption. No positive atlas-quality or thickness
+  segmentation conclusion is inferred from preserving input labels.

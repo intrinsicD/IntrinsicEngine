@@ -149,6 +149,15 @@ jobs:
           python3 tests/regression/tooling/Test.CcacheWorkflow.py
           python3 tests/regression/tooling/Test.CcacheModuleInvalidationProbe.py
 
+      - name: Validate offline atlas diagnostic controls
+        env:
+          OPENBLAS_NUM_THREADS: '1'
+        run: |
+          python3 -m pip install --disable-pip-version-check --only-binary=:all: numpy scipy
+          python3 tests/regression/tooling/Test.AtlasPatchMerge.py
+          python3 tests/regression/tooling/Test.BaselineAtlas.py
+          python3 tests/regression/tooling/Test.AtlasBoundaryRefine.py
+
       - name: Validate test build aggregate policy
         run: |
           python3 tests/regression/tooling/Test.TestBuildAggregates.py

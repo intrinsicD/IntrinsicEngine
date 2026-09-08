@@ -1,0 +1,199 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Atlas stage and decision inspection</title>
+<style>
+:root{color-scheme:dark;font:14px system-ui,sans-serif;background:#111923;color:#e1e9ef}*{box-sizing:border-box}body{margin:0;padding:24px;max-width:1800px;margin-inline:auto}h1{margin:8px 0;font-size:25px;letter-spacing:-.5px}p{color:#a9bbca;line-height:1.5;margin:8px 0}.tag{color:#f3c77d;font-size:12px;letter-spacing:1.3px;text-transform:uppercase}.toolbar{display:flex;align-items:center;gap:16px;flex-wrap:wrap;margin:20px 0}select,button,input[type=number]{border:1px solid #3d5164;background:#1a2937;color:#eaf3fa;border-radius:5px;padding:8px;font:inherit;max-width:100%}button{cursor:pointer}label{display:flex;align-items:center;gap:8px}.compare{display:grid;grid-template-columns:1fr 1fr;gap:18px}.pane{min-width:0;border:1px solid #344656;border-radius:8px;overflow:hidden;background:#17232f}.pane-head{padding:14px 16px}.pane-head label{display:block}.pane-head select{width:100%;margin-top:8px}.facts{display:flex;flex-wrap:wrap;gap:20px;padding:0 16px 14px}.fact{color:#a9bbca;font-size:12px}.fact b{display:block;font-size:21px;font-weight:600;color:#eef4f7;margin-bottom:3px}canvas{display:block;width:100%;height:480px;touch-action:none;background:#202d3a;cursor:grab}canvas:active{cursor:grabbing}.provenance{font:11px ui-monospace,monospace;color:#94a8bb;padding:12px 16px;overflow-wrap:anywhere;line-height:1.6;min-height:105px}.legend{display:flex;gap:22px;flex-wrap:wrap;margin:14px 0;font-size:12px;color:#afbdca}.swatch{display:inline-block;width:22px;height:3px;vertical-align:middle;margin-right:6px}.status{padding:10px 14px;background:#192c33;border:1px solid #30515d;border-radius:5px;margin:14px 0;color:#b8d4dc}.error{background:#3b2529;border-color:#84505a;color:#ffd0d0}details{margin-top:16px}summary{cursor:pointer;color:#c6d7e2}table{border-collapse:collapse;width:100%;font-size:12px;margin-top:12px}th,td{text-align:left;padding:9px;border-bottom:1px solid #30414f;vertical-align:top}td:last-child{overflow-wrap:anywhere}th{color:#93adbe}.note{font-size:12px}.mesh-info{font:12px ui-monospace,monospace;color:#8fa9bc;overflow-wrap:anywhere}@media(max-width:850px){body{padding:14px}.compare{grid-template-columns:1fr}canvas{height:390px}}
+</style>
+<div class="tag">METHOD-045 / observed reference decisions</div>
+<h1>Where do useful boundaries disappear?</h1>
+<p>Compare face partitions on the same geometry. Drag either view to orbit; scroll to zoom. Both cameras stay synchronized.</p>
+<div class="toolbar">
+<label>Mesh <select id="mesh" aria-label="Mesh"></select></label>
+<label><input id="boundary" type="checkbox" checked> Stage boundaries</label>
+<label><input id="features" type="checkbox"> Input features</label>
+<label><input id="curves" type="checkbox" checked> Curvature curves</label><label><input id="seeds" type="checkbox" checked> Seeds</label><label>Curve scale <select id="curveScale"><option value="0">Small</option><option value="1" selected>Medium</option><option value="2">Large</option></select></label><label>Curve family <select id="curveKind"><option value="principal">Principal</option><option value="mean">Mean</option></select></label><span id="curveControls" style="display:flex;gap:16px;align-items:center;flex-wrap:wrap">
+<label>Curve confidence <input id="curveConfidence" type="range" min="0" max="1" step="0.05" value="0.15"><output id="confidenceValue">0.15</output></label>
+<label title="Support radius times absolute curvature">Min. strength <input id="curveStrength" type="number" min="0" step="0.01" value="0" style="width:75px"></label>
+<label>Scales agreeing <select id="curvePersistence"><option value="1">1 or more</option><option value="2">2 or more</option><option value="3">All 3</option></select></label>
+<label><input id="sharpCurves" type="checkbox" checked> Sharp edges</label></span>
+<button id="reset">Reset view</button>
+</div>
+<div id="meshInfo" class="mesh-info"></div>
+<div id="status" class="status" role="status"></div>
+<div class="compare">
+<section class="pane"><div class="pane-head"><label>Left partition<select id="leftMode" aria-label="Left partition mode"></select></label></div><div id="leftFacts" class="facts"></div><canvas id="leftCanvas" aria-label="Left interactive mesh"></canvas><div id="leftProvenance" class="provenance"></div></section>
+<section class="pane"><div class="pane-head"><label>Right partition<select id="rightMode" aria-label="Right partition mode"></select></label></div><div id="rightFacts" class="facts"></div><canvas id="rightCanvas" aria-label="Right interactive mesh"></canvas><div id="rightProvenance" class="provenance"></div></section>
+</div>
+<div class="legend"><span><i class="swatch" style="background:#101721"></i>Stage boundary</span><span><i class="swatch" style="background:#d91508"></i>Principal / mean ridge</span><span><i class="swatch" style="background:#123acc"></i>Principal / mean valley</span><span><i class="swatch" style="background:#ff6c65"></i>Hard input feature</span><span><i class="swatch" style="background:#ffe38a"></i>Soft input feature</span></div>
+<p class="note">Colors identify clusters within a stage; matching colors across stages do not imply corresponding parts. Yellow points show actual initial seeds. Curvature curves are diagnostic overlays; the atlas does not use them. Largest region is measured by triangle area. Regions below 0.1% area are counted as small. Input features overlay final boundaries when both are enabled.</p>
+<p class="note">Local CPU replay, with unchanged algorithm parameters. Curve confidence and agreement are detector scores, not probabilities or ground truth. Scalar color limits affect display only. Native baseline merge records interleave refinement and cannot reconstruct every native step.</p>
+<details id="exclusions"><summary id="exclusionSummary"></summary><div style="overflow:auto"><table><thead><tr><th>Mesh</th><th>Requested mode</th><th>Cohort</th><th>Excluded reason</th></tr></thead><tbody id="excludedRows"></tbody></table></div></details>
+<script id="cohort-data" type="application/json">__STAGE_DATA__</script>
+<script>
+'use strict';
+const DATA = JSON.parse(document.getElementById('cohort-data').textContent);
+DATA.rejected=[];
+for(const mesh of DATA.meshes){
+ const p=mesh.positions,t=mesh.triangles,areas=[];
+ for(let f=0;f<t.length;f+=3){const a=t[f]*3,b=t[f+1]*3,c=t[f+2]*3,u=[0,1,2].map(k=>p[b+k]-p[a+k]),v=[0,1,2].map(k=>p[c+k]-p[a+k]);areas.push(Math.hypot(u[1]*v[2]-u[2]*v[1],u[2]*v[0]-u[0]*v[2],u[0]*v[1]-u[1]*v[0])/2);}
+ const total=areas.reduce((a,b)=>a+b,0);
+ mesh.runs=mesh.stages.map((stage,i)=>{const sums={};stage.labels.forEach((label,f)=>sums[label]=(sums[label]||0)+areas[f]);const values=Object.values(sums);return {...stage,key:stage.name,mode:String(i),regions:values.length,largestArea:Math.max(...values)/total,smallRegions:values.filter(x=>x/total<.001).length};});
+}
+const $ = id => document.getElementById(id);
+const camera = {yaw:0.55, pitch:-0.2, zoom:1};
+const views = [];
+let selectedMesh, geometry;
+const vertexShader = `attribute vec3 position;attribute vec3 normal;attribute vec3 color;
+uniform mat4 transform;uniform mat3 rotation;varying vec3 shade;uniform float unlit;
+void main(){vec3 n=normalize(rotation*normal);float light=.45+.55*abs(dot(n,normalize(vec3(.3,.6,1.))));shade=color*mix(light,1.,unlit);gl_Position=transform*vec4(position,1.);gl_PointSize=7.;}`;
+const fragmentShader = `precision mediump float;varying vec3 shade;void main(){gl_FragColor=vec4(shade,1.);}`;
+function fail(error){$('status').textContent=String(error.message||error);$('status').classList.add('error');document.body.dataset.viewerStatus='error';}
+window.addEventListener('error',e=>fail(e.error||e.message));
+function shader(gl,type,source){const s=gl.createShader(type);gl.shaderSource(s,source);gl.compileShader(s);if(!gl.getShaderParameter(s,gl.COMPILE_STATUS))throw Error(gl.getShaderInfoLog(s));return s;}
+function createView(side){
+ const canvas=$(side+'Canvas'), gl=canvas.getContext('webgl',{antialias:true,alpha:false,preserveDrawingBuffer:true});
+ if(!gl)throw Error('WebGL is unavailable. Enable hardware acceleration or use a WebGL-capable browser.');
+ const program=gl.createProgram();gl.attachShader(program,shader(gl,gl.VERTEX_SHADER,vertexShader));gl.attachShader(program,shader(gl,gl.FRAGMENT_SHADER,fragmentShader));gl.linkProgram(program);
+ if(!gl.getProgramParameter(program,gl.LINK_STATUS))throw Error(gl.getProgramInfoLog(program));
+ gl.useProgram(program);gl.enable(gl.DEPTH_TEST);gl.depthFunc(gl.LEQUAL);
+ const view={side,canvas,gl,program,attributes:{},uniforms:{},buffers:[]};
+ for(const n of ['position','normal','color'])view.attributes[n]=gl.getAttribLocation(program,n);
+ for(const n of ['transform','rotation','unlit'])view.uniforms[n]=gl.getUniformLocation(program,n);
+ let drag=null;
+ canvas.addEventListener('pointerdown',e=>{drag={x:e.clientX,y:e.clientY};canvas.setPointerCapture(e.pointerId);});
+ canvas.addEventListener('pointermove',e=>{if(!drag)return;camera.yaw+=(e.clientX-drag.x)*.007;camera.pitch=Math.max(-1.5,Math.min(1.5,camera.pitch+(e.clientY-drag.y)*.007));drag={x:e.clientX,y:e.clientY};renderAll();});
+ canvas.addEventListener('pointerup',()=>drag=null);canvas.addEventListener('pointercancel',()=>drag=null);canvas.addEventListener('lostpointercapture',()=>drag=null);
+ canvas.addEventListener('wheel',e=>{e.preventDefault();camera.zoom=Math.max(.25,Math.min(8,camera.zoom*Math.exp(-e.deltaY*.001)));renderAll();},{passive:false});
+ canvas.addEventListener('webglcontextlost',e=>{e.preventDefault();fail('WebGL context lost. Reload this page to restore both views.');});
+ $(side+'Mode').addEventListener('change',()=>{updateView(view);renderAll();});
+ return view;
+}
+function prepareGeometry(mesh){
+ const p=mesh.positions,t=mesh.triangles,min=[Infinity,Infinity,Infinity],max=[-Infinity,-Infinity,-Infinity];
+ for(let i=0;i<p.length;i++) {const k=i%3;min[k]=Math.min(min[k],p[i]);max[k]=Math.max(max[k],p[i]);}
+ const center=min.map((x,k)=>(x+max[k])/2), radius=Math.hypot(...min.map((x,k)=>(max[k]-x)/2));
+ const normalized=new Float32Array(p.length);for(let i=0;i<p.length;i++)normalized[i]=(p[i]-center[i%3])/radius;
+ const positions=new Float32Array(t.length*3),normals=new Float32Array(t.length*3);
+ for(let f=0;f<t.length;f+=3){
+  const a=t[f]*3,b=t[f+1]*3,c=t[f+2]*3;
+  const u=[0,1,2].map(k=>normalized[b+k]-normalized[a+k]),v=[0,1,2].map(k=>normalized[c+k]-normalized[a+k]);
+  const n=[u[1]*v[2]-u[2]*v[1],u[2]*v[0]-u[0]*v[2],u[0]*v[1]-u[1]*v[0]],length=Math.hypot(...n)||1;
+  for(let j=0;j<3;j++)for(let k=0;k<3;k++){positions[(f+j)*3+k]=normalized[t[f+j]*3+k];normals[(f+j)*3+k]=n[k]/length;}
+ }
+ return {normalized,positions,normals,count:t.length,center,radius};
+}
+function colorFor(label){
+ const h=((label*.61803398875+.08)%1)*6,c=.53,x=c*(1-Math.abs(h%2-1)),m=.31;
+ const rgb=h<1?[c,x,0]:h<2?[x,c,0]:h<3?[0,c,x]:h<4?[0,x,c]:h<5?[x,0,c]:[c,0,x];return rgb.map(v=>v+m);
+}
+function buffer(view,data){const b=view.gl.createBuffer();view.gl.bindBuffer(view.gl.ARRAY_BUFFER,b);view.gl.bufferData(view.gl.ARRAY_BUFFER,data,view.gl.STATIC_DRAW);view.buffers.push(b);return b;}
+function edgeBuffer(view,run,kind){
+ const positions=[],colors=[];
+ for(const [a,b,f,h,hard,soft] of selectedMesh.sharedEdges){
+  if(kind==='boundary'?run.labels[f]===run.labels[h]:!(hard||soft))continue;
+  const color=kind==='boundary'?[.025,.03,.04]:hard?[1,.42,.4]:[1,.88,.52];
+  for(const id of [a,b]){positions.push(...geometry.normalized.subarray(id*3,id*3+3));colors.push(...color);}
+ }
+ return {position:buffer(view,new Float32Array(positions)),color:buffer(view,new Float32Array(colors)),count:positions.length/3};
+}
+function seedBuffer(view,run){
+ const positions=[],colors=[];
+ for(const face of run.seeds||[]){for(let k=0;k<3;k++)positions.push([0,1,2].reduce((sum,j)=>sum+geometry.normalized[selectedMesh.triangles[face*3+j]*3+k],0)/3);colors.push(1,.95,.2);}
+ return {position:buffer(view,new Float32Array(positions)),color:buffer(view,new Float32Array(colors)),count:positions.length/3};
+}
+function scalarColor(value,range){
+ if(value===null)return [.45,.47,.49];
+ const t=Math.max(0,Math.min(1,(value-range[0])/(range[1]-range[0])));
+ return [.12+.83*t,.38+.25*Math.sin(Math.PI*t),.88-.77*t];
+}
+function curveBuffer(view,run){
+ const positions=[],colors=[],curves=new Set();let kept=0;
+ const threshold=Number($('curveConfidence').value),persistence=Number($('curvePersistence').value),strength=Math.max(0,Number($('curveStrength').value)||0);
+ for(const segment of selectedMesh.curveSegments){
+  if(segment.scale!==Number($('curveScale').value)||!segment.kind.startsWith($('curveKind').value))continue;
+  const sharp=segment.kind==='sharp_edge',count=segment.scale_mask.toString(2).split('1').length-1;
+  if(sharp?!$('sharpCurves').checked:segment.confidence<threshold||segment.strength<strength||count<persistence)continue;
+  const color=sharp?[.04,.07,.11]:segment.kind.endsWith('ridge')?[.85,.08,.03]:[.06,.22,.8];
+  for(const id of segment.points){const p=selectedMesh.curvePoints[id];for(let k=0;k<3;k++)positions.push((p[k]-geometry.center[k])/geometry.radius);colors.push(...color);}
+  if(!sharp){kept++;curves.add(segment.curve);}
+ }
+ view.curveCount=curves.size;view.curveSegmentCount=kept;
+ return {position:buffer(view,new Float32Array(positions)),color:buffer(view,new Float32Array(colors)),count:positions.length/3};
+}
+function updateView(view){
+ const run=selectedMesh.runs[Number($(view.side+'Mode').value)],gl=view.gl;view.run=run;
+ for(const b of view.buffers)gl.deleteBuffer(b);view.buffers=[];view.curveCount=0;view.curveSegmentCount=0;
+ const colors=new Float32Array(geometry.count*3);
+ for(let f=0;f<run.labels.length;f++){const c=run.scalars?scalarColor(run.scalars[f],run.range):colorFor(run.labels[f]);for(let j=0;j<3;j++)colors.set(c,(f*3+j)*3);}
+ view.surface={position:buffer(view,geometry.positions),normal:buffer(view,geometry.normals),color:buffer(view,colors),count:geometry.count};
+ view.boundary=edgeBuffer(view,run,'boundary');view.features=edgeBuffer(view,run,'features');view.curves=curveBuffer(view,run);view.seeds=seedBuffer(view,run);
+ const facts=$(view.side+'Facts');facts.replaceChildren();
+ const factsList=run.curveSegments?[[view.curveSegmentCount,'visible smooth segments'],[view.curveCount,'source curves represented'],[(100*run.supportFraction).toFixed(0)+'%','vertices with curvature support']]:[[run.regions.toLocaleString(),'regions'],[(run.largestArea*100).toFixed(1)+'%','largest region area'],[run.smallRegions,'small regions']];
+ for(const [value,label] of factsList){
+  const div=document.createElement('div');div.className='fact';const b=document.createElement('b');b.textContent=value;div.append(b,document.createTextNode(label));facts.append(div);
+ }
+ $(view.side+'Provenance').textContent=run.name+'\n'+(run.scalars?'Blue → orange: '+run.range.map(x=>x.toPrecision(4)).join(' → ')+' '+run.units+'. Display clipped to this range; gray = missing.\n':'')+(run.decision?JSON.stringify(run.decision,null,2):'')+'\n'+view.curveSegmentCount+' visible curve segments. Curves are overlays, not atlas decision inputs.';
+ $(view.side+'Provenance').style.whiteSpace='pre-wrap';
+}
+function bind(view,name,b){const gl=view.gl,loc=view.attributes[name];if(b){gl.bindBuffer(gl.ARRAY_BUFFER,b);gl.enableVertexAttribArray(loc);gl.vertexAttribPointer(loc,3,gl.FLOAT,false,0,0);}else{gl.disableVertexAttribArray(loc);gl.vertexAttrib3f(loc,0,0,1);}}
+function render(view){
+ const {gl,canvas}=view;if(!view.surface)return;
+ const dpr=Math.min(devicePixelRatio||1,2),w=Math.round(canvas.clientWidth*dpr),h=Math.round(canvas.clientHeight*dpr);
+ if(canvas.width!==w||canvas.height!==h){canvas.width=w;canvas.height=h;}gl.viewport(0,0,w,h);gl.clearColor(.125,.176,.227,1);gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);
+ const cy=Math.cos(camera.yaw),sy=Math.sin(camera.yaw),cp=Math.cos(camera.pitch),sp=Math.sin(camera.pitch);
+ const r=[cy,sp*sy,-cp*sy,0,cp,sp,sy,-sp*cy,cp*cy];
+ const sx=.86*camera.zoom/Math.max(1,w/h),syScale=.86*camera.zoom*Math.min(1,w/h);
+ const transform=[r[0]*sx,r[1]*syScale,r[2]*-.3,0,r[3]*sx,r[4]*syScale,r[5]*-.3,0,r[6]*sx,r[7]*syScale,r[8]*-.3,0,0,0,0,1];
+ gl.uniformMatrix4fv(view.uniforms.transform,false,transform);gl.uniformMatrix3fv(view.uniforms.rotation,false,r);gl.uniform1f(view.uniforms.unlit,view.run.scalars?1:0);
+ bind(view,'position',view.surface.position);bind(view,'normal',view.surface.normal);bind(view,'color',view.surface.color);
+ gl.enable(gl.POLYGON_OFFSET_FILL);gl.polygonOffset(1,1);gl.drawArrays(gl.TRIANGLES,0,view.surface.count);gl.disable(gl.POLYGON_OFFSET_FILL);
+ gl.uniform1f(view.uniforms.unlit,1);bind(view,'normal',null);
+ for(const kind of ['boundary','features','curves','seeds'])if($(kind).checked){const edges=view[kind];bind(view,'position',edges.position);bind(view,'color',edges.color);gl.drawArrays(kind==='seeds'?gl.POINTS:gl.LINES,0,edges.count);}
+ const error=gl.getError();if(error!==gl.NO_ERROR)throw Error('WebGL draw error '+error);
+}
+function renderAll(){for(const v of views)render(v);}
+function reset(){camera.yaw=.55;camera.pitch=-.2;camera.zoom=1;renderAll();}
+function chooseMesh(){
+ selectedMesh=DATA.meshes[Number($('mesh').value)];geometry=prepareGeometry(selectedMesh);
+ for(const view of views){const select=$(view.side+'Mode'),previous=view.run?.mode;select.replaceChildren();
+  selectedMesh.runs.forEach((run,i)=>select.add(new Option(run.key,i)));
+  const preserved=selectedMesh.runs.findIndex(r=>r.mode===previous);select.value=String(preserved>=0?preserved:view.side==='left'?0:(selectedMesh.runs.findIndex(r=>r.mode==='principal_1')>=0?selectedMesh.runs.findIndex(r=>r.mode==='principal_1'):selectedMesh.runs.findIndex(r=>r.name==='protected: Final charts before native packing')));updateView(view);
+ }
+ $('meshInfo').textContent=`${selectedMesh.name} · ${(selectedMesh.positions.length/3).toLocaleString()} vertices · ${(selectedMesh.triangles.length/3).toLocaleString()} triangles · SHA-256 ${selectedMesh.sha256.slice(0,16)}`;
+ reset();document.body.dataset.viewerStatus='ready';
+}
+function main(){
+ $('sharpCurves').parentElement.style.display='none';
+ const count=DATA.meshes.reduce((n,m)=>n+m.runs.length,0);
+ if(DATA.curveInspection){
+  document.title='Curvature creases · surface inspection';document.querySelector('h1').textContent='Where are the curvature creases?';
+  document.querySelector('.tag').textContent='Curvature-extremum inspection';
+  document.querySelectorAll('.pane-head label').forEach((label,i)=>label.firstChild.textContent=i?'Right view':'Left view');
+  $('boundary').parentElement.lastChild.textContent=' Show curves / boundaries';
+  $('features').parentElement.lastChild.textContent=' METHOD-040 input features';
+  document.querySelector('h1+p').textContent='Compare curvature signals and support scales on the unchanged surface. Drag either view to orbit; scroll to zoom.';
+  $('curveControls').style.display='flex';document.querySelector('.legend').textContent='Red: positive crests · Blue: negative crests · Black: sharp edges or partition boundaries';
+  const notes=document.querySelectorAll('p.note');notes[0].textContent='Support scale changes which details are visible. Compare principal-curvature and mean-curvature curves using the selectors. Increasing scale agreement hides curves without nearby matching evidence at other scales.';
+  notes[1].textContent='These are candidate feature curves, not a new part segmentation. METHOD-040 comparisons retain their existing boundaries.';
+  for(const id of ['curveConfidence','curveStrength','curvePersistence','sharpCurves'])$(id).addEventListener('input',()=>{$('confidenceValue').textContent=$('curveConfidence').value;for(const v of views)updateView(v);renderAll();});
+ }
+ $('status').textContent=`${DATA.meshes.length} meshes · ${count} observed stages and scalar views. Exact final partitions match saved results. Native baseline: initial/final only; Python atlases: all accepted splits and merges. Rejected attempts are in the neighboring decisions JSON.`;
+ if(DATA.curveInspection)$('status').textContent=`${DATA.meshes.length} meshes · ${count} comparison views · ${DATA.rejected.length} excluded records`;
+ $('exclusionSummary').textContent=`Excluded and failed records (${DATA.rejected.length})`;
+ for(const record of DATA.rejected){const tr=document.createElement('tr');for(const k of ['mesh','mode','cohort','reason']){const td=document.createElement('td');td.textContent=record[k];tr.append(td);}$('excludedRows').append(tr);}
+ if(!count){$('exclusions').open=true;throw Error('No validated runs available. See excluded records below.');}
+ DATA.meshes.forEach((m,i)=>$('mesh').add(new Option(m.name,i)));
+ views.push(createView('left'),createView('right'));
+ for(const side of ['left','right'])for(const delta of [-1,1]){const button=document.createElement('button');button.textContent=delta<0?'Previous stage':'Next stage';button.addEventListener('click',()=>{const select=$(side+'Mode');select.selectedIndex=Math.max(0,Math.min(select.options.length-1,select.selectedIndex+delta));select.dispatchEvent(new Event('change'));});$(side+'Mode').parentElement.append(button);}
+ $('mesh').addEventListener('change',chooseMesh);$('reset').addEventListener('click',reset);
+ for(const id of ['boundary','features','curves','seeds'])$(id).addEventListener('change',renderAll);
+ for(const id of ['curveScale','curveKind','curveConfidence','curveStrength','curvePersistence','sharpCurves'])$(id).addEventListener('input',()=>{$('confidenceValue').textContent=$('curveConfidence').value;for(const v of views)updateView(v);renderAll();});
+ window.addEventListener('resize',renderAll);chooseMesh();
+ // Read-only inspection hook used by the offline browser smoke check.
+ window.viewerInspection=()=>({status:document.body.dataset.viewerStatus,meshes:DATA.meshes.length,runs:count,rejected:DATA.rejected.length,selectedMesh:selectedMesh.name,left:views[0].run.mode,right:views[1].run.mode,curveSegments:views.map(v=>v.curveSegmentCount||0),camera:{...camera},glErrors:views.map(v=>v.gl.getError())});
+}
+try{main();}catch(error){fail(error);}
+</script>
+</html>

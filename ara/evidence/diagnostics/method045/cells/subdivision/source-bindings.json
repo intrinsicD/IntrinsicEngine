@@ -1,0 +1,9 @@
+{
+  "/home/alex/Documents/IntrinsicEngine/tools/diagnostics/atlas/compare_baseline_atlases.py": "7172b3787aff7573d69b514ac2e0f8b3d5da117820ffcee6141508b811d00c25",
+  "/home/alex/Documents/IntrinsicEngine/tools/diagnostics/atlas/patch_merge.py": "d4c09f85ff5c90c15efc77930b196e188d25b3c39b05310317826ab6c3bb6481",
+  "/home/alex/Documents/IntrinsicEngine/tools/diagnostics/atlas/baseline_atlas.py": "65c6e022c084de2ba5291c0a8c0696f8a9124b4ef1e379305c9c163bc88085fd",
+  "/home/alex/Documents/IntrinsicEngine/tools/diagnostics/atlas/compare_atlases.py": "739aefffaa2f7c7b1a20cd1b9c66bfca76859a11b500a9bf1a8f493da261cc7d",
+  "/home/alex/Documents/IntrinsicEngine/tools/diagnostics/atlas/repack.py": "aad4520180b920c2019c2409dbb5c126ad393ce954631fc608a23ba8e8fa004b",
+  "build/ci/bin/IntrinsicUvAtlasMeshDiagnostic": "1d5d86b99f22b2edddef54d11045a72a4be61fbe7fe66aa79b8be1643edbd7c3",
+  "build/ci/bin/IntrinsicUvChartPackDiagnostic": "0c073cb712085e66a90ce09d2a177d6dd549a142a9e5a243d0263e8d75828183"
+}

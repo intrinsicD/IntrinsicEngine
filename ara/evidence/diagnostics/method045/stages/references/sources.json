@@ -1,0 +1,22 @@
+{
+  "frog-feature": {
+    "source": "build/method045/final-comparators/frog/feature/packed.npz",
+    "source_sha256": "e59bac8af2f220e48e8d660aa296545472fe128515ec171ae08878f6c2183f0e",
+    "array_sha256": "9db35678244d43a1994ec5cd1e8fca74f232628e796c5b315c25260d703d9c7d"
+  },
+  "frog-protected": {
+    "source": "ara/evidence/diagnostics/method045/examples/frog/result.npz",
+    "source_sha256": "af5f0adf0f0d2138529a2f14bc6a0d92a8dc020db6457822348d17a514059ecb",
+    "array_sha256": "2aa1d1f05aa2083e0970361b5cd0a14c6fbe8a7a78e3edbdb4cfb84775f0c580"
+  },
+  "sculpt-feature": {
+    "source": "build/method045/final-comparators/sculpt/feature/packed.npz",
+    "source_sha256": "969cff2b62001c34af8472778fac172c113e865cb269b21f6ba82cbd8bac7955",
+    "array_sha256": "c007663c227be35ed46ea095e99b48a997500aeec494b988c272f3870d9c6419"
+  },
+  "sculpt-protected": {
+    "source": "ara/evidence/diagnostics/method045/examples/sculpt/result.npz",
+    "source_sha256": "94d1fa6dbf8a33c1b0207883a7dd93b47f2e14e877930f015c1f66412abf3159",
+    "array_sha256": "c4945157fd293c8a603aa0c274794bfeac1098fe72585e1c6bf8f9e58aeef16d"
+  }
+}

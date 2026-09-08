@@ -1,6 +1,7 @@
 // Opt-in local OBJ comparison through public geometry APIs; no dataset is copied.
 #include <algorithm>
 #include <chrono>
+#include <cmath>
 #include <cstdlib>
 #include <fstream>
 #include <iomanip>
@@ -162,6 +163,50 @@ int main(int argc, char **argv)
             curvature.MinPrincipalCurvatureProperty.Vector(), evidence.View(), p);
         if (!result.Succeeded())
             return failed("partition", C::ToString(result.Diagnostics.Status));
+        // Detached stage fields retain source slots for offline decision inspection.
+        std::ofstream stages(std::string(argv[2]) + ".stages.json");
+        if (!stages)
+            return failed("output", "open_failed");
+        stages << std::setprecision(std::numeric_limits<double>::max_digits10);
+        auto array = [&](const auto& values)
+        {
+            stages << '[';
+            bool comma = false;
+            for (const auto value : values)
+            {
+                if (comma) stages << ',';
+                comma = true;
+                if (std::isfinite(static_cast<double>(value))) stages << +value;
+                else stages << "null";
+            }
+            stages << ']';
+        };
+        stages << "{\"schema\":\"intrinsic.curvature-patch-stages.v1\",\"seed_faces\":";
+        array(result.SeedFaceSlots);
+        stages << ",\"initial_labels\":"; array(result.ProvisionalFaceRegions);
+        stages << ",\"final_labels\":"; array(result.FaceRegions);
+        stages << ",\"growth_cost\":"; array(result.FaceGrowthCosts);
+        stages << ",\"k1\":"; array(curvature.MaxPrincipalCurvatureProperty.Vector());
+        stages << ",\"k2\":"; array(curvature.MinPrincipalCurvatureProperty.Vector());
+        stages << ",\"accepted_energy\":"; array(result.AcceptedEnergyHistory);
+        stages << ",\"merges\":[";
+        bool mergeComma = false;
+        for (const auto& merge : result.AcceptedMerges)
+        {
+            if (mergeComma) stages << ',';
+            mergeComma = true;
+            stages << "{\"a\":" << merge.RegionA << ",\"b\":" << merge.RegionB
+                   << ",\"result\":" << merge.ResultRegion
+                   << ",\"regional_cost_increase\":" << merge.RegionalCostIncrease
+                   << ",\"boundary_credit\":" << merge.BoundaryCredit
+                   << ",\"delta\":" << merge.DeltaMerge
+                   << ",\"energy_after\":" << merge.EnergyAfter << '}';
+        }
+        stages << "],\"refinement_move_count\":" << result.RefinementMoves.size()
+               << ",\"merge_history_interleaves_refinement\":true}\n";
+        stages.close();
+        if (!stages)
+            return failed("output", "write_failed");
         labels = std::move(result.FaceRegions);
         boundary = std::move(result.EdgeBoundaries);
         auto &d = result.Diagnostics;

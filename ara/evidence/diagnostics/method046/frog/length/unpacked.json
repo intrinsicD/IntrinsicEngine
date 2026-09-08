@@ -1,0 +1,2400 @@
+{
+  "parameters": {
+    "band_hops": 6,
+    "rounds": 3,
+    "beta": 0.0,
+    "curve_scale": 2,
+    "stretch_limit": 1.35,
+    "anisotropy_limit": 2.0,
+    "shuffle_seed": 20260908
+  },
+  "stretch_limit": 1.35,
+  "metrics": {
+    "chart_count": 23,
+    "invalid_charts": [],
+    "chart_texel_density_ratio": 1.0000000000000064,
+    "non_disk_charts": [],
+    "positive_area_overlap_count": 0,
+    "overlap_pairs_sample": [],
+    "global_chart_reflections": 0,
+    "all_charts_valid": true,
+    "max_stretch": 1.3462164140526836,
+    "mean_stretch": 1.0654672329344446,
+    "area_weighted_p95_stretch": 1.1698143850855982,
+    "max_anisotropy": 1.2538804742639211,
+    "mean_anisotropy": 1.0156881905404993,
+    "seam_length_over_sqrt_area": 9.18281364653483,
+    "smallest_chart_area_fraction": 0.0001807946160678882,
+    "retained_baseline_edges": 55,
+    "lost_baseline_edges": 0,
+    "extra_chart_boundary_edges": 806,
+    "internal_uv_cut_edges": 9,
+    "total_uv_seam_length_over_sqrt_area": 9.2591071691329,
+    "baseline_seam_length_over_sqrt_area": 0.4769557913777354,
+    "internal_uv_seam_length_over_sqrt_area": 0.07629352259807488,
+    "initial_energy": 12.24330756908775,
+    "final_energy": 9.259107169132903,
+    "accepted_moves": 41,
+    "moved_faces": 2131,
+    "statuses": {
+      "distortion": 28,
+      "accepted": 41,
+      "no_border_descent": 49
+    },
+    "uv_solves": 153
+  },
+  "events": [
+    {
+      "round": 0,
+      "pair": [
+        67,
+        102
+      ],
+      "revisions": [
+        0,
+        0
+      ],
+      "moved_faces": 181,
+      "moved_faces_adjacent_to_fixed_faces": 10,
+      "chart_area_ratios_from_initial": {
+        "67": 1.0250567573904863,
+        "102": 0.9863021791142289
+      },
+      "border_delta": -0.46857908702680734,
+      "failed_chart": 67,
+      "status": "distortion"
+    },
+    {
+      "round": 0,
+      "pair": [
+        96,
+        102
+      ],
+      "revisions": [
+        0,
+        0
+      ],
+      "moved_faces": 168,
+      "moved_faces_adjacent_to_fixed_faces": 17,
+      "chart_area_ratios_from_initial": {
+        "96": 0.9837321693795033,
+        "102": 1.027924829584651
+      },
+      "border_delta": -0.2996725034191336,
+      "energy_before": 12.24330756908775,
+      "energy_after": 11.943635065668616,
+      "status": "accepted"
+    },
+    {
+      "round": 0,
+      "pair": [
+        95,
+        101
+      ],
+      "revisions": [
+        0,
+        0
+      ],
+      "moved_faces": 109,
+      "moved_faces_adjacent_to_fixed_faces": 6,
+      "chart_area_ratios_from_initial": {
+        "95": 0.9875977331389912,
+        "101": 1.0121053653504684
+      },
+      "border_delta": -0.240393919404308,
+      "failed_chart": 101,
+      "status": "distortion"
+    },
+    {
+      "round": 0,
+      "pair": [
+        96,
+        100
+      ],
+      "revisions": [
+        1,
+        0
+      ],
+      "moved_faces": 205,
+      "moved_faces_adjacent_to_fixed_faces": 5,
+      "chart_area_ratios_from_initial": {
+        "96": 0.954169661177888,
+        "100": 1.060221178393838
+      },
+      "border_delta": -0.21340018973318303,
+      "failed_chart": 100,
+      "status": "distortion"
+    },
+    {
+      "round": 0,
+      "pair": [
+        9,
+        95
+      ],
+      "revisions": [
+        0,
+        0
+      ],
+      "moved_faces": 194,
+      "moved_faces_adjacent_to_fixed_faces": 11,
+      "chart_area_ratios_from_initial": {
+        "9": 0.7864082045705639,
+        "95": 1.058352853371507
+      },
+      "border_delta": -0.2231115470780122,
+      "energy_before": 11.943635065668616,
+      "energy_after": 11.720523518590603,
+      "status": "accepted"
+    },
+    {
+      "round": 0,
+      "pair": [
+        67,
+        96
+      ],
+      "revisions": [
+        0,
+        1
+      ],
+      "moved_faces": 149,
+      "moved_faces_adjacent_to_fixed_faces": 12,
+      "chart_area_ratios_from_initial": {
+        "67": 0.8694188021852136,
+        "96": 1.0253180951035645
+      },
+      "border_delta": -0.1378489637819533,
+      "failed_chart": 96,
+      "status": "distortion"
+    },
+    {
+      "round": 0,
+      "pair": [
+        95,
+        100
+      ],
+      "revisions": [
+        1,
+        0
+      ],
+      "moved_faces": 128,
+      "moved_faces_adjacent_to_fixed_faces": 6,
+      "chart_area_ratios_from_initial": {
+        "95": 1.0541126591724908,
+        "100": 1.0065472727078022
+      },
+      "border_delta": -0.1736794704998744,
+      "energy_before": 11.720523518590603,
+      "energy_after": 11.54684404809073,
+      "status": "accepted"
+    },
+    {
+      "round": 0,
+      "pair": [
+        94,
+        102
+      ],
+      "revisions": [
+        0,
+        1
+      ],
+      "moved_faces": 162,
+      "moved_faces_adjacent_to_fixed_faces": 9,
+      "chart_area_ratios_from_initial": {
+        "94": 0.6608219742129735,
+        "102": 1.1167320783571693
+      },
+      "border_delta": -0.18098782922722467,
+      "energy_before": 11.54684404809073,
+      "energy_after": 11.365856218863506,
+      "status": "accepted"
+    },
+    {
+      "round": 0,
+      "pair": [
+        98,
+        101
+      ],
+      "revisions": [
+        0,
+        0
+      ],
+      "moved_faces": 128,
+      "moved_faces_adjacent_to_fixed_faces": 11,
+      "chart_area_ratios_from_initial": {
+        "98": 0.8391104413553133,
+        "101": 1.047071157439063
+      },
+      "border_delta": -0.15096314884512596,
+      "energy_before": 11.365856218863506,
+      "energy_after": 11.214893070018379,
+      "status": "accepted"
+    },
+    {
+      "round": 0,
+      "pair": [
+        95,
+        96
+      ],
+      "revisions": [
+        2,
+        1
+      ],
+      "moved_faces": 70,
+      "moved_faces_adjacent_to_fixed_faces": 1,
+      "chart_area_ratios_from_initial": {
+        "95": 1.0282136473580799,
+        "96": 1.0033635076234162
+      },
+      "border_delta": -0.12666049341650987,
+      "energy_before": 11.214893070018379,
+      "energy_after": 11.08823257660187,
+      "status": "accepted"
+    },
+    {
+      "round": 0,
+      "pair": [
+        98,
+        100
+      ],
+      "revisions": [
+        1,
+        1
+      ],
+      "moved_faces": 77,
+      "moved_faces_adjacent_to_fixed_faces": 5,
+      "chart_area_ratios_from_initial": {
+        "98": 0.8225367627751947,
+        "100": 1.0142181278715146
+      },
+      "border_delta": -0.12408289403401118,
+      "energy_before": 11.08823257660187,
+      "energy_after": 10.999740738640837,
+      "status": "accepted"
+    },
+    {
+      "round": 0,
+      "pair": [
+        86,
+        101
+      ],
+      "revisions": [
+        0,
+        1
+      ],
+      "moved_faces": 75,
+      "moved_faces_adjacent_to_fixed_faces": 2,
+      "chart_area_ratios_from_initial": {
+        "86": 0.8319959852541562,
+        "101": 1.0814558024386038
+      },
+      "border_delta": -0.14534044008414007,
+      "energy_before": 10.999740738640837,
+      "energy_after": 10.854400298556698,
+      "status": "accepted"
+    },
+    {
+      "round": 0,
+      "pair": [
+        17,
+        101
+      ],
+      "revisions": [
+        0,
+        2
+      ],
+      "moved_faces": 100,
+      "moved_faces_adjacent_to_fixed_faces": 10,
+      "chart_area_ratios_from_initial": {
+        "17": 0.7046400490634003,
+        "101": 1.1130429342139758
+      },
+      "border_delta": -0.14198947211045415,
+      "failed_chart": 101,
+      "status": "distortion"
+    },
+    {
+      "round": 0,
+      "pair": [
+        33,
+        98
+      ],
+      "revisions": [
+        0,
+        2
+      ],
+      "moved_faces": 133,
+      "moved_faces_adjacent_to_fixed_faces": 5,
+      "chart_area_ratios_from_initial": {
+        "33": 0.015495282864610467,
+        "98": 0.9157277970634566
+      },
+      "border_delta": -0.25659161123743096,
+      "failed_chart": 98,
+      "status": "distortion"
+    },
+    {
+      "round": 0,
+      "pair": [
+        9,
+        96
+      ],
+      "revisions": [
+        1,
+        2
+      ],
+      "moved_faces": 70,
+      "moved_faces_adjacent_to_fixed_faces": 2,
+      "chart_area_ratios_from_initial": {
+        "9": 0.7107229367910403,
+        "96": 1.0190366325370641
+      },
+      "border_delta": -0.08648030182749443,
+      "energy_before": 10.854400298556698,
+      "energy_after": 10.767919996729203,
+      "status": "accepted"
+    },
+    {
+      "round": 0,
+      "pair": [
+        94,
+        101
+      ],
+      "revisions": [
+        1,
+        2
+      ],
+      "moved_faces": 81,
+      "moved_faces_adjacent_to_fixed_faces": 8,
+      "chart_area_ratios_from_initial": {
+        "94": 0.5340070767737598,
+        "101": 1.1063638800627076
+      },
+      "border_delta": -0.07393636644151132,
+      "energy_before": 10.767919996729203,
+      "energy_after": 10.693983630287693,
+      "status": "accepted"
+    },
+    {
+      "round": 0,
+      "pair": [
+        98,
+        102
+      ],
+      "revisions": [
+        2,
+        2
+      ],
+      "moved_faces": 79,
+      "moved_faces_adjacent_to_fixed_faces": 2,
+      "chart_area_ratios_from_initial": {
+        "98": 0.875193257632101,
+        "102": 1.096195422018121
+      },
+      "border_delta": -0.15149663628011753,
+      "energy_before": 10.693983630287693,
+      "energy_after": 10.542486994007575,
+      "status": "accepted"
+    },
+    {
+      "round": 0,
+      "pair": [
+        100,
+        102
+      ],
+      "revisions": [
+        2,
+        3
+      ],
+      "moved_faces": 41,
+      "moved_faces_adjacent_to_fixed_faces": 0,
+      "chart_area_ratios_from_initial": {
+        "100": 1.0301291724026471,
+        "102": 1.0827878045726729
+      },
+      "border_delta": -0.0945450288258775,
+      "energy_before": 10.542486994007575,
+      "energy_after": 10.447941965181696,
+      "status": "accepted"
+    },
+    {
+      "round": 0,
+      "pair": [
+        85,
+        89
+      ],
+      "revisions": [
+        0,
+        0
+      ],
+      "moved_faces": 106,
+      "moved_faces_adjacent_to_fixed_faces": 9,
+      "chart_area_ratios_from_initial": {
+        "85": 0.8603569311987682,
+        "89": 1.1012287929108173
+      },
+      "border_delta": -0.07258253159058177,
+      "failed_chart": 85,
+      "status": "distortion"
+    },
+    {
+      "round": 0,
+      "pair": [
+        9,
+        17
+      ],
+      "revisions": [
+        2,
+        0
+      ],
+      "moved_faces": 52,
+      "moved_faces_adjacent_to_fixed_faces": 2,
+      "chart_area_ratios_from_initial": {
+        "9": 0.764481752192528,
+        "17": 0.865956590580401
+      },
+      "border_delta": -0.04203195166925299,
+      "energy_before": 10.447941965181696,
+      "energy_after": 10.405910013512443,
+      "status": "accepted"
+    },
+    {
+      "round": 0,
+      "pair": [
+        22,
+        101
+      ],
+      "revisions": [
+        0,
+        3
+      ],
+      "moved_faces": 72,
+      "moved_faces_adjacent_to_fixed_faces": 4,
+      "chart_area_ratios_from_initial": {
+        "22": 0.6355447231934548,
+        "101": 1.123695968434694
+      },
+      "border_delta": -0.07716947233061897,
+      "energy_before": 10.405910013512443,
+      "energy_after": 10.328740541181826,
+      "status": "accepted"
+    },
+    {
+      "round": 0,
+      "pair": [
+        17,
+        86
+      ],
+      "revisions": [
+        1,
+        1
+      ],
+      "moved_faces": 61,
+      "moved_faces_adjacent_to_fixed_faces": 7,
+      "chart_area_ratios_from_initial": {
+        "17": 0.5417942852325777,
+        "86": 1.001381478241033
+      },
+      "border_delta": -0.09655181442563056,
+      "energy_before": 10.328740541181826,
+      "energy_after": 10.232188726756194,
+      "status": "accepted"
+    },
+    {
+      "round": 0,
+      "pair": [
+        86,
+        89
+      ],
+      "revisions": [
+        2,
+        0
+      ],
+      "moved_faces": 43,
+      "moved_faces_adjacent_to_fixed_faces": 3,
+      "chart_area_ratios_from_initial": {
+        "86": 0.9718444588775919,
+        "89": 1.0651847555367888
+      },
+      "border_delta": -0.04803264870916473,
+      "energy_before": 10.232188726756194,
+      "energy_after": 10.18415607804703,
+      "status": "accepted"
+    },
+    {
+      "round": 0,
+      "pair": [
+        89,
+        95
+      ],
+      "revisions": [
+        1,
+        3
+      ],
+      "moved_faces": 19,
+      "moved_faces_adjacent_to_fixed_faces": 1,
+      "chart_area_ratios_from_initial": {
+        "89": 1.0068500834432588,
+        "95": 1.0337562716762523
+      },
+      "border_delta": -0.05502100712150366,
+      "energy_before": 10.18415607804703,
+      "energy_after": 10.129135070925527,
+      "status": "accepted"
+    },
+    {
+      "round": 0,
+      "pair": [
+        100,
+        101
+      ],
+      "revisions": [
+        3,
+        4
+      ],
+      "moved_faces": 16,
+      "moved_faces_adjacent_to_fixed_faces": 3,
+      "chart_area_ratios_from_initial": {
+        "100": 1.031969404243245,
+        "101": 1.1225327140793515
+      },
+      "border_delta": -0.0949565572315613,
+      "energy_before": 10.129135070925527,
+      "energy_after": 10.034178513693965,
+      "status": "accepted"
+    },
+    {
+      "round": 0,
+      "pair": [
+        24,
+        101
+      ],
+      "revisions": [
+        0,
+        5
+      ],
+      "moved_faces": 12,
+      "moved_faces_adjacent_to_fixed_faces": 10,
+      "chart_area_ratios_from_initial": {
+        "24": 1.08472341290286,
+        "101": 1.1190763335079705
+      },
+      "border_delta": -0.014684763103609211,
+      "energy_before": 10.034178513693965,
+      "energy_after": 10.019493750590357,
+      "status": "accepted"
+    },
+    {
+      "round": 0,
+      "pair": [
+        79,
+        94
+      ],
+      "revisions": [
+        0,
+        2
+      ],
+      "moved_faces": 65,
+      "moved_faces_adjacent_to_fixed_faces": 8,
+      "chart_area_ratios_from_initial": {
+        "79": 1.4563350810177653,
+        "94": 0.47508843618118185
+      },
+      "border_delta": -0.09151116001528473,
+      "failed_chart": 79,
+      "status": "distortion"
+    },
+    {
+      "round": 0,
+      "pair": [
+        50,
+        94
+      ],
+      "revisions": [
+        0,
+        2
+      ],
+      "moved_faces": 14,
+      "moved_faces_adjacent_to_fixed_faces": 4,
+      "chart_area_ratios_from_initial": {
+        "50": 1.1615466786599418,
+        "94": 0.5202034686713257
+      },
+      "border_delta": -0.024827824988689278,
+      "energy_before": 10.019493750590357,
+      "energy_after": 9.994665925601666,
+      "status": "accepted"
+    },
+    {
+      "round": 0,
+      "pair": [
+        1,
+        89
+      ],
+      "revisions": [
+        0,
+        2
+      ],
+      "moved_faces": 6,
+      "moved_faces_adjacent_to_fixed_faces": 5,
+      "chart_area_ratios_from_initial": {
+        "1": 1.1141513880680194,
+        "89": 0.9918332122309914
+      },
+      "border_delta": -0.043194283251916675,
+      "energy_before": 9.994665925601666,
+      "energy_after": 9.95147164234975,
+      "status": "accepted"
+    },
+    {
+      "round": 0,
+      "pair": [
+        86,
+        95
+      ],
+      "revisions": [
+        3,
+        4
+      ],
+      "moved_faces": 7,
+      "moved_faces_adjacent_to_fixed_faces": 2,
+      "chart_area_ratios_from_initial": {
+        "86": 0.9759980041165334,
+        "95": 1.032885334156319
+      },
+      "border_delta": -0.01729479173894361,
+      "failed_chart": 95,
+      "status": "distortion"
+    },
+    {
+      "round": 0,
+      "pair": [
+        94,
+        98
+      ],
+      "revisions": [
+        3,
+        3
+      ],
+      "moved_faces": 64,
+      "moved_faces_adjacent_to_fixed_faces": 7,
+      "chart_area_ratios_from_initial": {
+        "94": 0.43123762631483714,
+        "98": 0.9349196404817678
+      },
+      "border_delta": -0.02196880424070773,
+      "energy_before": 9.95147164234975,
+      "energy_after": 9.929502838109041,
+      "status": "accepted"
+    },
+    {
+      "round": 0,
+      "pair": [
+        22,
+        95
+      ],
+      "revisions": [
+        1,
+        4
+      ],
+      "moved_faces": 59,
+      "moved_faces_adjacent_to_fixed_faces": 3,
+      "chart_area_ratios_from_initial": {
+        "22": 0.33560593736611993,
+        "95": 1.048370047862781
+      },
+      "border_delta": -0.01340204342998493,
+      "energy_before": 9.929502838109041,
+      "energy_after": 9.916100794679057,
+      "status": "accepted"
+    },
+    {
+      "round": 0,
+      "pair": [
+        101,
+        102
+      ],
+      "revisions": [
+        6,
+        4
+      ],
+      "moved_faces": 9,
+      "moved_faces_adjacent_to_fixed_faces": 2,
+      "chart_area_ratios_from_initial": {
+        "101": 1.1199980296924428,
+        "102": 1.0815591252153411
+      },
+      "border_delta": -0.019070785866176148,
+      "energy_before": 9.916100794679057,
+      "energy_after": 9.89703000881288,
+      "status": "accepted"
+    },
+    {
+      "round": 0,
+      "pair": [
+        24,
+        100
+      ],
+      "revisions": [
+        1,
+        4
+      ],
+      "moved_faces": 0,
+      "moved_faces_adjacent_to_fixed_faces": 0,
+      "chart_area_ratios_from_initial": {
+        "24": 1.08472341290286,
+        "100": 1.031969404243245
+      },
+      "border_delta": 0.0,
+      "status": "no_border_descent"
+    },
+    {
+      "round": 0,
+      "pair": [
+        96,
+        101
+      ],
+      "revisions": [
+        3,
+        7
+      ],
+      "moved_faces": 11,
+      "moved_faces_adjacent_to_fixed_faces": 2,
+      "chart_area_ratios_from_initial": {
+        "96": 1.0200717260901264,
+        "101": 1.1186651537755905
+      },
+      "border_delta": -0.021484135966517395,
+      "energy_before": 9.89703000881288,
+      "energy_after": 9.875545872846363,
+      "status": "accepted"
+    },
+    {
+      "round": 0,
+      "pair": [
+        85,
+        95
+      ],
+      "revisions": [
+        0,
+        5
+      ],
+      "moved_faces": 53,
+      "moved_faces_adjacent_to_fixed_faces": 3,
+      "chart_area_ratios_from_initial": {
+        "85": 1.197856986772365,
+        "95": 1.034742279390138
+      },
+      "border_delta": -0.047032440531325694,
+      "failed_chart": 95,
+      "status": "distortion"
+    },
+    {
+      "round": 0,
+      "pair": [
+        85,
+        86
+      ],
+      "revisions": [
+        0,
+        3
+      ],
+      "moved_faces": 50,
+      "moved_faces_adjacent_to_fixed_faces": 4,
+      "chart_area_ratios_from_initial": {
+        "85": 0.8914044175648923,
+        "86": 1.0075156375123622
+      },
+      "border_delta": -0.06611392006353856,
+      "failed_chart": 86,
+      "status": "distortion"
+    },
+    {
+      "round": 0,
+      "pair": [
+        50,
+        79
+      ],
+      "revisions": [
+        1,
+        0
+      ],
+      "moved_faces": 57,
+      "moved_faces_adjacent_to_fixed_faces": 19,
+      "chart_area_ratios_from_initial": {
+        "50": 1.7190316188537376,
+        "79": 0.6310573474146577
+      },
+      "border_delta": -0.05616784933539258,
+      "failed_chart": 50,
+      "status": "distortion"
+    },
+    {
+      "round": 0,
+      "pair": [
+        22,
+        24
+      ],
+      "revisions": [
+        2,
+        1
+      ],
+      "moved_faces": 23,
+      "moved_faces_adjacent_to_fixed_faces": 11,
+      "chart_area_ratios_from_initial": {
+        "22": 0.23887660082085618,
+        "24": 1.1974812529221424
+      },
+      "border_delta": -0.03311078857819119,
+      "energy_before": 9.875545872846363,
+      "energy_after": 9.842435084268171,
+      "status": "accepted"
+    },
+    {
+      "round": 0,
+      "pair": [
+        1,
+        85
+      ],
+      "revisions": [
+        1,
+        0
+      ],
+      "moved_faces": 13,
+      "moved_faces_adjacent_to_fixed_faces": 8,
+      "chart_area_ratios_from_initial": {
+        "1": 1.2841318431740456,
+        "85": 0.9691530255912625
+      },
+      "border_delta": -0.029744648945895878,
+      "energy_before": 9.842435084268171,
+      "energy_after": 9.812690435322276,
+      "status": "accepted"
+    },
+    {
+      "round": 0,
+      "pair": [
+        9,
+        101
+      ],
+      "revisions": [
+        3,
+        8
+      ],
+      "moved_faces": 4,
+      "moved_faces_adjacent_to_fixed_faces": 2,
+      "chart_area_ratios_from_initial": {
+        "9": 0.7680781841296037,
+        "101": 1.1177061369958325
+      },
+      "border_delta": -0.008798433066176146,
+      "energy_before": 9.812690435322276,
+      "energy_after": 9.8038920022561,
+      "status": "accepted"
+    },
+    {
+      "round": 0,
+      "pair": [
+        79,
+        101
+      ],
+      "revisions": [
+        0,
+        9
+      ],
+      "moved_faces": 11,
+      "moved_faces_adjacent_to_fixed_faces": 1,
+      "chart_area_ratios_from_initial": {
+        "79": 1.065929411781018,
+        "101": 1.116034207352142
+      },
+      "border_delta": -0.03637741536882018,
+      "energy_before": 9.8038920022561,
+      "energy_after": 9.76751458688728,
+      "status": "accepted"
+    },
+    {
+      "round": 0,
+      "pair": [
+        17,
+        95
+      ],
+      "revisions": [
+        2,
+        5
+      ],
+      "moved_faces": 6,
+      "moved_faces_adjacent_to_fixed_faces": 1,
+      "chart_area_ratios_from_initial": {
+        "17": 0.5151761613882984,
+        "95": 1.051286529167517
+      },
+      "border_delta": -0.006998383728854512,
+      "energy_before": 9.76751458688728,
+      "energy_after": 9.760516203158426,
+      "status": "accepted"
+    },
+    {
+      "round": 0,
+      "pair": [
+        24,
+        95
+      ],
+      "revisions": [
+        2,
+        6
+      ],
+      "moved_faces": 0,
+      "moved_faces_adjacent_to_fixed_faces": 0,
+      "chart_area_ratios_from_initial": {
+        "24": 1.1974812529221424,
+        "95": 1.051286529167517
+      },
+      "border_delta": 0.0,
+      "status": "no_border_descent"
+    },
+    {
+      "round": 0,
+      "pair": [
+        50,
+        101
+      ],
+      "revisions": [
+        1,
+        10
+      ],
+      "moved_faces": 0,
+      "moved_faces_adjacent_to_fixed_faces": 0,
+      "chart_area_ratios_from_initial": {
+        "50": 1.1615466786599418,
+        "101": 1.116034207352142
+      },
+      "border_delta": 0.0,
+      "status": "no_border_descent"
+    },
+    {
+      "round": 1,
+      "pair": [
+        67,
+        102
+      ],
+      "revisions": [
+        0,
+        5
+      ],
+      "moved_faces": 202,
+      "moved_faces_adjacent_to_fixed_faces": 7,
+      "chart_area_ratios_from_initial": {
+        "67": 0.9019089216966094,
+        "102": 1.1351827445908538
+      },
+      "border_delta": -0.42826673784584973,
+      "energy_before": 9.760516203158426,
+      "energy_after": 9.332249465312575,
+      "status": "accepted"
+    },
+    {
+      "round": 1,
+      "pair": [
+        96,
+        102
+      ],
+      "revisions": [
+        4,
+        6
+      ],
+      "moved_faces": 147,
+      "moved_faces_adjacent_to_fixed_faces": 2,
+      "chart_area_ratios_from_initial": {
+        "96": 1.0619579610790697,
+        "102": 1.0632821942780686
+      },
+      "border_delta": -0.009368593004325155,
+      "energy_before": 9.332249465312575,
+      "energy_after": 9.32288087230825,
+      "status": "accepted"
+    },
+    {
+      "round": 1,
+      "pair": [
+        95,
+        101
+      ],
+      "revisions": [
+        6,
+        10
+      ],
+      "moved_faces": 113,
+      "moved_faces_adjacent_to_fixed_faces": 7,
+      "chart_area_ratios_from_initial": {
+        "95": 1.0351464482496733,
+        "101": 1.131787906130458
+      },
+      "border_delta": -0.23617315850197595,
+      "failed_chart": 101,
+      "status": "distortion"
+    },
+    {
+      "round": 1,
+      "pair": [
+        96,
+        100
+      ],
+      "revisions": [
+        5,
+        4
+      ],
+      "moved_faces": 196,
+      "moved_faces_adjacent_to_fixed_faces": 3,
+      "chart_area_ratios_from_initial": {
+        "96": 1.0296866655191483,
+        "100": 1.0977085977399632
+      },
+      "border_delta": -0.19401533972534002,
+      "failed_chart": 100,
+      "status": "distortion"
+    },
+    {
+      "round": 1,
+      "pair": [
+        9,
+        95
+      ],
+      "revisions": [
+        4,
+        6
+      ],
+      "moved_faces": 0,
+      "moved_faces_adjacent_to_fixed_faces": 0,
+      "chart_area_ratios_from_initial": {
+        "9": 0.7680781841296037,
+        "95": 1.051286529167517
+      },
+      "border_delta": 0.0,
+      "status": "no_border_descent"
+    },
+    {
+      "round": 1,
+      "pair": [
+        67,
+        96
+      ],
+      "revisions": [
+        1,
+        5
+      ],
+      "moved_faces": 149,
+      "moved_faces_adjacent_to_fixed_faces": 12,
+      "chart_area_ratios_from_initial": {
+        "67": 0.7713277238818229,
+        "96": 1.1035438868031309
+      },
+      "border_delta": -0.1378489637819533,
+      "failed_chart": 96,
+      "status": "distortion"
+    },
+    {
+      "round": 1,
+      "pair": [
+        95,
+        100
+      ],
+      "revisions": [
+        6,
+        4
+      ],
+      "moved_faces": 0,
+      "moved_faces_adjacent_to_fixed_faces": 0,
+      "chart_area_ratios_from_initial": {
+        "95": 1.051286529167517,
+        "100": 1.031969404243245
+      },
+      "border_delta": 0.0,
+      "status": "no_border_descent"
+    },
+    {
+      "round": 1,
+      "pair": [
+        94,
+        102
+      ],
+      "revisions": [
+        4,
+        7
+      ],
+      "moved_faces": 1,
+      "moved_faces_adjacent_to_fixed_faces": 1,
+      "chart_area_ratios_from_initial": {
+        "94": 0.42911888109075674,
+        "102": 1.0638369470034668
+      },
+      "border_delta": -0.0006631986793588056,
+      "energy_before": 9.32288087230825,
+      "energy_after": 9.322217673628892,
+      "status": "accepted"
+    },
+    {
+      "round": 1,
+      "pair": [
+        98,
+        101
+      ],
+      "revisions": [
+        4,
+        10
+      ],
+      "moved_faces": 0,
+      "moved_faces_adjacent_to_fixed_faces": 0,
+      "chart_area_ratios_from_initial": {
+        "98": 0.9349196404817678,
+        "101": 1.116034207352142
+      },
+      "border_delta": 0.0,
+      "status": "no_border_descent"
+    },
+    {
+      "round": 1,
+      "pair": [
+        95,
+        96
+      ],
+      "revisions": [
+        6,
+        5
+      ],
+      "moved_faces": 0,
+      "moved_faces_adjacent_to_fixed_faces": 0,
+      "chart_area_ratios_from_initial": {
+        "95": 1.051286529167517,
+        "96": 1.0619579610790697
+      },
+      "border_delta": 0.0,
+      "status": "no_border_descent"
+    },
+    {
+      "round": 1,
+      "pair": [
+        98,
+        100
+      ],
+      "revisions": [
+        4,
+        4
+      ],
+      "moved_faces": 0,
+      "moved_faces_adjacent_to_fixed_faces": 0,
+      "chart_area_ratios_from_initial": {
+        "98": 0.9349196404817678,
+        "100": 1.031969404243245
+      },
+      "border_delta": 0.0,
+      "status": "no_border_descent"
+    },
+    {
+      "round": 1,
+      "pair": [
+        86,
+        101
+      ],
+      "revisions": [
+        3,
+        10
+      ],
+      "moved_faces": 0,
+      "moved_faces_adjacent_to_fixed_faces": 0,
+      "chart_area_ratios_from_initial": {
+        "86": 0.9718444588775919,
+        "101": 1.116034207352142
+      },
+      "border_delta": 0.0,
+      "status": "no_border_descent"
+    },
+    {
+      "round": 1,
+      "pair": [
+        17,
+        101
+      ],
+      "revisions": [
+        3,
+        10
+      ],
+      "moved_faces": 96,
+      "moved_faces_adjacent_to_fixed_faces": 8,
+      "chart_area_ratios_from_initial": {
+        "17": 0.25378155594366,
+        "101": 1.1439889311438032
+      },
+      "border_delta": -0.1252989355752983,
+      "failed_chart": 101,
+      "status": "distortion"
+    },
+    {
+      "round": 1,
+      "pair": [
+        33,
+        98
+      ],
+      "revisions": [
+        0,
+        4
+      ],
+      "moved_faces": 133,
+      "moved_faces_adjacent_to_fixed_faces": 5,
+      "chart_area_ratios_from_initial": {
+        "33": 0.015495282864610467,
+        "98": 1.0281106747700297
+      },
+      "border_delta": -0.25659161123743096,
+      "failed_chart": 98,
+      "status": "distortion"
+    },
+    {
+      "round": 1,
+      "pair": [
+        9,
+        96
+      ],
+      "revisions": [
+        4,
+        5
+      ],
+      "moved_faces": 0,
+      "moved_faces_adjacent_to_fixed_faces": 0,
+      "chart_area_ratios_from_initial": {
+        "9": 0.7680781841296037,
+        "96": 1.0619579610790697
+      },
+      "border_delta": 0.0,
+      "status": "no_border_descent"
+    },
+    {
+      "round": 1,
+      "pair": [
+        94,
+        101
+      ],
+      "revisions": [
+        5,
+        10
+      ],
+      "moved_faces": 6,
+      "moved_faces_adjacent_to_fixed_faces": 2,
+      "chart_area_ratios_from_initial": {
+        "94": 0.42607298667241855,
+        "101": 1.1166324602083821
+      },
+      "border_delta": -0.0035706555064119842,
+      "energy_before": 9.322217673628892,
+      "energy_after": 9.31864701812248,
+      "status": "accepted"
+    },
+    {
+      "round": 1,
+      "pair": [
+        98,
+        102
+      ],
+      "revisions": [
+        4,
+        8
+      ],
+      "moved_faces": 12,
+      "moved_faces_adjacent_to_fixed_faces": 2,
+      "chart_area_ratios_from_initial": {
+        "98": 0.9431381901052511,
+        "102": 1.060631615359544
+      },
+      "border_delta": -0.008439318891833542,
+      "energy_before": 9.31864701812248,
+      "energy_after": 9.310207699230647,
+      "status": "accepted"
+    },
+    {
+      "round": 1,
+      "pair": [
+        100,
+        102
+      ],
+      "revisions": [
+        4,
+        9
+      ],
+      "moved_faces": 0,
+      "moved_faces_adjacent_to_fixed_faces": 0,
+      "chart_area_ratios_from_initial": {
+        "100": 1.031969404243245,
+        "102": 1.060631615359544
+      },
+      "border_delta": 0.0,
+      "status": "no_border_descent"
+    },
+    {
+      "round": 1,
+      "pair": [
+        85,
+        89
+      ],
+      "revisions": [
+        1,
+        3
+      ],
+      "moved_faces": 96,
+      "moved_faces_adjacent_to_fixed_faces": 7,
+      "chart_area_ratios_from_initial": {
+        "85": 0.8168035874825397,
+        "89": 1.1022729916828398
+      },
+      "border_delta": -0.05596369895794787,
+      "failed_chart": 85,
+      "status": "distortion"
+    },
+    {
+      "round": 1,
+      "pair": [
+        9,
+        17
+      ],
+      "revisions": [
+        4,
+        3
+      ],
+      "moved_faces": 11,
+      "moved_faces_adjacent_to_fixed_faces": 2,
+      "chart_area_ratios_from_initial": {
+        "9": 0.7806373929284713,
+        "17": 0.4838607547068067
+      },
+      "border_delta": -0.011404092548839012,
+      "energy_before": 9.310207699230647,
+      "energy_after": 9.298803606681808,
+      "status": "accepted"
+    },
+    {
+      "round": 1,
+      "pair": [
+        22,
+        101
+      ],
+      "revisions": [
+        3,
+        11
+      ],
+      "moved_faces": 23,
+      "moved_faces_adjacent_to_fixed_faces": 4,
+      "chart_area_ratios_from_initial": {
+        "22": 0.14538418721819435,
+        "101": 1.1210785990841041
+      },
+      "border_delta": -0.009011856353379042,
+      "energy_before": 9.298803606681808,
+      "energy_after": 9.289791750328426,
+      "status": "accepted"
+    },
+    {
+      "round": 1,
+      "pair": [
+        17,
+        86
+      ],
+      "revisions": [
+        4,
+        3
+      ],
+      "moved_faces": 0,
+      "moved_faces_adjacent_to_fixed_faces": 0,
+      "chart_area_ratios_from_initial": {
+        "17": 0.4838607547068067,
+        "86": 0.9718444588775919
+      },
+      "border_delta": 0.0,
+      "status": "no_border_descent"
+    },
+    {
+      "round": 1,
+      "pair": [
+        86,
+        89
+      ],
+      "revisions": [
+        3,
+        3
+      ],
+      "moved_faces": 18,
+      "moved_faces_adjacent_to_fixed_faces": 2,
+      "chart_area_ratios_from_initial": {
+        "86": 0.9525980712598845,
+        "89": 1.0343077441527655
+      },
+      "border_delta": -0.011580448703405386,
+      "energy_before": 9.289791750328426,
+      "energy_after": 9.27821130162502,
+      "status": "accepted"
+    },
+    {
+      "round": 1,
+      "pair": [
+        89,
+        95
+      ],
+      "revisions": [
+        4,
+        6
+      ],
+      "moved_faces": 42,
+      "moved_faces_adjacent_to_fixed_faces": 3,
+      "chart_area_ratios_from_initial": {
+        "89": 0.9027619387378493,
+        "95": 1.0637852534061187
+      },
+      "border_delta": -0.022714682563046026,
+      "failed_chart": 95,
+      "status": "distortion"
+    },
+    {
+      "round": 1,
+      "pair": [
+        100,
+        101
+      ],
+      "revisions": [
+        4,
+        12
+      ],
+      "moved_faces": 0,
+      "moved_faces_adjacent_to_fixed_faces": 0,
+      "chart_area_ratios_from_initial": {
+        "100": 1.031969404243245,
+        "101": 1.1210785990841041
+      },
+      "border_delta": 0.0,
+      "status": "no_border_descent"
+    },
+    {
+      "round": 1,
+      "pair": [
+        24,
+        101
+      ],
+      "revisions": [
+        2,
+        12
+      ],
+      "moved_faces": 0,
+      "moved_faces_adjacent_to_fixed_faces": 0,
+      "chart_area_ratios_from_initial": {
+        "24": 1.1974812529221424,
+        "101": 1.1210785990841041
+      },
+      "border_delta": 0.0,
+      "status": "no_border_descent"
+    },
+    {
+      "round": 1,
+      "pair": [
+        79,
+        94
+      ],
+      "revisions": [
+        1,
+        6
+      ],
+      "moved_faces": 59,
+      "moved_faces_adjacent_to_fixed_faces": 7,
+      "chart_area_ratios_from_initial": {
+        "79": 1.4986735127255089,
+        "94": 0.3702002404981788
+      },
+      "border_delta": -0.0761116421401233,
+      "failed_chart": 79,
+      "status": "distortion"
+    },
+    {
+      "round": 1,
+      "pair": [
+        50,
+        94
+      ],
+      "revisions": [
+        1,
+        6
+      ],
+      "moved_faces": 0,
+      "moved_faces_adjacent_to_fixed_faces": 0,
+      "chart_area_ratios_from_initial": {
+        "50": 1.1615466786599418,
+        "94": 0.42607298667241855
+      },
+      "border_delta": 0.0,
+      "status": "no_border_descent"
+    },
+    {
+      "round": 1,
+      "pair": [
+        1,
+        89
+      ],
+      "revisions": [
+        2,
+        4
+      ],
+      "moved_faces": 0,
+      "moved_faces_adjacent_to_fixed_faces": 0,
+      "chart_area_ratios_from_initial": {
+        "1": 1.2841318431740456,
+        "89": 1.0343077441527655
+      },
+      "border_delta": 0.0,
+      "status": "no_border_descent"
+    },
+    {
+      "round": 1,
+      "pair": [
+        86,
+        95
+      ],
+      "revisions": [
+        4,
+        6
+      ],
+      "moved_faces": 2,
+      "moved_faces_adjacent_to_fixed_faces": 0,
+      "chart_area_ratios_from_initial": {
+        "86": 0.9496334855428686,
+        "95": 1.0519081593132058
+      },
+      "border_delta": -0.012363047611693795,
+      "energy_before": 9.27821130162502,
+      "energy_after": 9.265848254013328,
+      "status": "accepted"
+    },
+    {
+      "round": 1,
+      "pair": [
+        94,
+        98
+      ],
+      "revisions": [
+        6,
+        5
+      ],
+      "moved_faces": 0,
+      "moved_faces_adjacent_to_fixed_faces": 0,
+      "chart_area_ratios_from_initial": {
+        "94": 0.42607298667241855,
+        "98": 0.9431381901052511
+      },
+      "border_delta": 0.0,
+      "status": "no_border_descent"
+    },
+    {
+      "round": 1,
+      "pair": [
+        22,
+        95
+      ],
+      "revisions": [
+        4,
+        7
+      ],
+      "moved_faces": 1,
+      "moved_faces_adjacent_to_fixed_faces": 1,
+      "chart_area_ratios_from_initial": {
+        "22": 0.14344967691984115,
+        "95": 1.0520024135472912
+      },
+      "border_delta": -0.00295311617946932,
+      "energy_before": 9.265848254013328,
+      "energy_after": 9.262895137833858,
+      "status": "accepted"
+    },
+    {
+      "round": 1,
+      "pair": [
+        101,
+        102
+      ],
+      "revisions": [
+        12,
+        9
+      ],
+      "moved_faces": 0,
+      "moved_faces_adjacent_to_fixed_faces": 0,
+      "chart_area_ratios_from_initial": {
+        "101": 1.1210785990841041,
+        "102": 1.060631615359544
+      },
+      "border_delta": 0.0,
+      "status": "no_border_descent"
+    },
+    {
+      "round": 1,
+      "pair": [
+        24,
+        100
+      ],
+      "revisions": [
+        2,
+        4
+      ],
+      "moved_faces": 0,
+      "moved_faces_adjacent_to_fixed_faces": 0,
+      "chart_area_ratios_from_initial": {
+        "24": 1.1974812529221424,
+        "100": 1.031969404243245
+      },
+      "border_delta": 0.0,
+      "status": "no_border_descent"
+    },
+    {
+      "round": 1,
+      "pair": [
+        96,
+        101
+      ],
+      "revisions": [
+        5,
+        12
+      ],
+      "moved_faces": 0,
+      "moved_faces_adjacent_to_fixed_faces": 0,
+      "chart_area_ratios_from_initial": {
+        "96": 1.0619579610790697,
+        "101": 1.1210785990841041
+      },
+      "border_delta": 0.0,
+      "status": "no_border_descent"
+    },
+    {
+      "round": 1,
+      "pair": [
+        85,
+        95
+      ],
+      "revisions": [
+        1,
+        8
+      ],
+      "moved_faces": 53,
+      "moved_faces_adjacent_to_fixed_faces": 3,
+      "chart_area_ratios_from_initial": {
+        "85": 1.1670100123636278,
+        "95": 1.038374645074648
+      },
+      "border_delta": -0.047032440531325694,
+      "failed_chart": 95,
+      "status": "distortion"
+    },
+    {
+      "round": 1,
+      "pair": [
+        85,
+        86
+      ],
+      "revisions": [
+        1,
+        5
+      ],
+      "moved_faces": 50,
+      "moved_faces_adjacent_to_fixed_faces": 4,
+      "chart_area_ratios_from_initial": {
+        "85": 0.860557443156155,
+        "86": 0.9853046641776388
+      },
+      "border_delta": -0.06611392006353856,
+      "failed_chart": 86,
+      "status": "distortion"
+    },
+    {
+      "round": 1,
+      "pair": [
+        50,
+        79
+      ],
+      "revisions": [
+        1,
+        1
+      ],
+      "moved_faces": 45,
+      "moved_faces_adjacent_to_fixed_faces": 16,
+      "chart_area_ratios_from_initial": {
+        "50": 1.6207180618846866,
+        "79": 0.7620505158608382
+      },
+      "border_delta": -0.04546455540317774,
+      "failed_chart": 50,
+      "status": "distortion"
+    },
+    {
+      "round": 1,
+      "pair": [
+        22,
+        24
+      ],
+      "revisions": [
+        5,
+        2
+      ],
+      "moved_faces": 0,
+      "moved_faces_adjacent_to_fixed_faces": 0,
+      "chart_area_ratios_from_initial": {
+        "22": 0.14344967691984115,
+        "24": 1.1974812529221424
+      },
+      "border_delta": 0.0,
+      "status": "no_border_descent"
+    },
+    {
+      "round": 1,
+      "pair": [
+        1,
+        85
+      ],
+      "revisions": [
+        2,
+        1
+      ],
+      "moved_faces": 0,
+      "moved_faces_adjacent_to_fixed_faces": 0,
+      "chart_area_ratios_from_initial": {
+        "1": 1.2841318431740456,
+        "85": 0.9691530255912625
+      },
+      "border_delta": 0.0,
+      "status": "no_border_descent"
+    },
+    {
+      "round": 1,
+      "pair": [
+        9,
+        101
+      ],
+      "revisions": [
+        5,
+        12
+      ],
+      "moved_faces": 14,
+      "moved_faces_adjacent_to_fixed_faces": 1,
+      "chart_area_ratios_from_initial": {
+        "9": 0.7993275688660358,
+        "101": 1.1160947170993045
+      },
+      "border_delta": -0.003787968700954396,
+      "energy_before": 9.262895137833858,
+      "energy_after": 9.259107169132903,
+      "status": "accepted"
+    },
+    {
+      "round": 1,
+      "pair": [
+        79,
+        101
+      ],
+      "revisions": [
+        1,
+        13
+      ],
+      "moved_faces": 0,
+      "moved_faces_adjacent_to_fixed_faces": 0,
+      "chart_area_ratios_from_initial": {
+        "79": 1.065929411781018,
+        "101": 1.1160947170993045
+      },
+      "border_delta": 0.0,
+      "status": "no_border_descent"
+    },
+    {
+      "round": 1,
+      "pair": [
+        17,
+        95
+      ],
+      "revisions": [
+        4,
+        8
+      ],
+      "moved_faces": 0,
+      "moved_faces_adjacent_to_fixed_faces": 0,
+      "chart_area_ratios_from_initial": {
+        "17": 0.4838607547068067,
+        "95": 1.0520024135472912
+      },
+      "border_delta": 0.0,
+      "status": "no_border_descent"
+    },
+    {
+      "round": 1,
+      "pair": [
+        24,
+        95
+      ],
+      "revisions": [
+        2,
+        8
+      ],
+      "moved_faces": 0,
+      "moved_faces_adjacent_to_fixed_faces": 0,
+      "chart_area_ratios_from_initial": {
+        "24": 1.1974812529221424,
+        "95": 1.0520024135472912
+      },
+      "border_delta": 0.0,
+      "status": "no_border_descent"
+    },
+    {
+      "round": 1,
+      "pair": [
+        50,
+        101
+      ],
+      "revisions": [
+        1,
+        13
+      ],
+      "moved_faces": 0,
+      "moved_faces_adjacent_to_fixed_faces": 0,
+      "chart_area_ratios_from_initial": {
+        "50": 1.1615466786599418,
+        "101": 1.1160947170993045
+      },
+      "border_delta": 0.0,
+      "status": "no_border_descent"
+    },
+    {
+      "round": 2,
+      "pair": [
+        67,
+        102
+      ],
+      "revisions": [
+        1,
+        9
+      ],
+      "moved_faces": 0,
+      "moved_faces_adjacent_to_fixed_faces": 0,
+      "chart_area_ratios_from_initial": {
+        "67": 0.9019089216966094,
+        "102": 1.060631615359544
+      },
+      "border_delta": 0.0,
+      "status": "no_border_descent"
+    },
+    {
+      "round": 2,
+      "pair": [
+        96,
+        102
+      ],
+      "revisions": [
+        5,
+        9
+      ],
+      "moved_faces": 0,
+      "moved_faces_adjacent_to_fixed_faces": 0,
+      "chart_area_ratios_from_initial": {
+        "96": 1.0619579610790697,
+        "102": 1.060631615359544
+      },
+      "border_delta": 0.0,
+      "status": "no_border_descent"
+    },
+    {
+      "round": 2,
+      "pair": [
+        95,
+        101
+      ],
+      "revisions": [
+        8,
+        13
+      ],
+      "moved_faces": 112,
+      "moved_faces_adjacent_to_fixed_faces": 6,
+      "chart_area_ratios_from_initial": {
+        "95": 1.0362321489956958,
+        "101": 1.1314874526540266
+      },
+      "border_delta": -0.2344894355984739,
+      "failed_chart": 101,
+      "status": "distortion"
+    },
+    {
+      "round": 2,
+      "pair": [
+        9,
+        95
+      ],
+      "revisions": [
+        6,
+        8
+      ],
+      "moved_faces": 0,
+      "moved_faces_adjacent_to_fixed_faces": 0,
+      "chart_area_ratios_from_initial": {
+        "9": 0.7993275688660358,
+        "95": 1.0520024135472912
+      },
+      "border_delta": 0.0,
+      "status": "no_border_descent"
+    },
+    {
+      "round": 2,
+      "pair": [
+        95,
+        100
+      ],
+      "revisions": [
+        8,
+        4
+      ],
+      "moved_faces": 0,
+      "moved_faces_adjacent_to_fixed_faces": 0,
+      "chart_area_ratios_from_initial": {
+        "95": 1.0520024135472912,
+        "100": 1.031969404243245
+      },
+      "border_delta": 0.0,
+      "status": "no_border_descent"
+    },
+    {
+      "round": 2,
+      "pair": [
+        94,
+        102
+      ],
+      "revisions": [
+        6,
+        9
+      ],
+      "moved_faces": 0,
+      "moved_faces_adjacent_to_fixed_faces": 0,
+      "chart_area_ratios_from_initial": {
+        "94": 0.42607298667241855,
+        "102": 1.060631615359544
+      },
+      "border_delta": 0.0,
+      "status": "no_border_descent"
+    },
+    {
+      "round": 2,
+      "pair": [
+        98,
+        101
+      ],
+      "revisions": [
+        5,
+        13
+      ],
+      "moved_faces": 0,
+      "moved_faces_adjacent_to_fixed_faces": 0,
+      "chart_area_ratios_from_initial": {
+        "98": 0.9431381901052511,
+        "101": 1.1160947170993045
+      },
+      "border_delta": 0.0,
+      "status": "no_border_descent"
+    },
+    {
+      "round": 2,
+      "pair": [
+        95,
+        96
+      ],
+      "revisions": [
+        8,
+        5
+      ],
+      "moved_faces": 0,
+      "moved_faces_adjacent_to_fixed_faces": 0,
+      "chart_area_ratios_from_initial": {
+        "95": 1.0520024135472912,
+        "96": 1.0619579610790697
+      },
+      "border_delta": 0.0,
+      "status": "no_border_descent"
+    },
+    {
+      "round": 2,
+      "pair": [
+        98,
+        100
+      ],
+      "revisions": [
+        5,
+        4
+      ],
+      "moved_faces": 0,
+      "moved_faces_adjacent_to_fixed_faces": 0,
+      "chart_area_ratios_from_initial": {
+        "98": 0.9431381901052511,
+        "100": 1.031969404243245
+      },
+      "border_delta": 0.0,
+      "status": "no_border_descent"
+    },
+    {
+      "round": 2,
+      "pair": [
+        86,
+        101
+      ],
+      "revisions": [
+        5,
+        13
+      ],
+      "moved_faces": 0,
+      "moved_faces_adjacent_to_fixed_faces": 0,
+      "chart_area_ratios_from_initial": {
+        "86": 0.9496334855428686,
+        "101": 1.1160947170993045
+      },
+      "border_delta": 0.0,
+      "status": "no_border_descent"
+    },
+    {
+      "round": 2,
+      "pair": [
+        17,
+        101
+      ],
+      "revisions": [
+        4,
+        13
+      ],
+      "moved_faces": 86,
+      "moved_faces_adjacent_to_fixed_faces": 6,
+      "chart_area_ratios_from_initial": {
+        "17": 0.25349210034172137,
+        "101": 1.1407313850675593
+      },
+      "border_delta": -0.10756366642854204,
+      "failed_chart": 101,
+      "status": "distortion"
+    },
+    {
+      "round": 2,
+      "pair": [
+        33,
+        98
+      ],
+      "revisions": [
+        0,
+        5
+      ],
+      "moved_faces": 133,
+      "moved_faces_adjacent_to_fixed_faces": 5,
+      "chart_area_ratios_from_initial": {
+        "33": 0.015495282864610467,
+        "98": 1.0363292243935127
+      },
+      "border_delta": -0.25659161123743096,
+      "failed_chart": 98,
+      "status": "distortion"
+    },
+    {
+      "round": 2,
+      "pair": [
+        9,
+        96
+      ],
+      "revisions": [
+        6,
+        5
+      ],
+      "moved_faces": 0,
+      "moved_faces_adjacent_to_fixed_faces": 0,
+      "chart_area_ratios_from_initial": {
+        "9": 0.7993275688660358,
+        "96": 1.0619579610790697
+      },
+      "border_delta": 0.0,
+      "status": "no_border_descent"
+    },
+    {
+      "round": 2,
+      "pair": [
+        94,
+        101
+      ],
+      "revisions": [
+        6,
+        13
+      ],
+      "moved_faces": 0,
+      "moved_faces_adjacent_to_fixed_faces": 0,
+      "chart_area_ratios_from_initial": {
+        "94": 0.42607298667241855,
+        "101": 1.1160947170993045
+      },
+      "border_delta": 0.0,
+      "status": "no_border_descent"
+    },
+    {
+      "round": 2,
+      "pair": [
+        98,
+        102
+      ],
+      "revisions": [
+        5,
+        9
+      ],
+      "moved_faces": 0,
+      "moved_faces_adjacent_to_fixed_faces": 0,
+      "chart_area_ratios_from_initial": {
+        "98": 0.9431381901052511,
+        "102": 1.060631615359544
+      },
+      "border_delta": 0.0,
+      "status": "no_border_descent"
+    },
+    {
+      "round": 2,
+      "pair": [
+        85,
+        89
+      ],
+      "revisions": [
+        1,
+        4
+      ],
+      "moved_faces": 96,
+      "moved_faces_adjacent_to_fixed_faces": 7,
+      "chart_area_ratios_from_initial": {
+        "85": 0.8168035874825397,
+        "89": 1.1447475236046134
+      },
+      "border_delta": -0.05596369895794787,
+      "failed_chart": 85,
+      "status": "distortion"
+    },
+    {
+      "round": 2,
+      "pair": [
+        9,
+        17
+      ],
+      "revisions": [
+        6,
+        4
+      ],
+      "moved_faces": 0,
+      "moved_faces_adjacent_to_fixed_faces": 0,
+      "chart_area_ratios_from_initial": {
+        "9": 0.7993275688660358,
+        "17": 0.4838607547068067
+      },
+      "border_delta": 0.0,
+      "status": "no_border_descent"
+    },
+    {
+      "round": 2,
+      "pair": [
+        22,
+        101
+      ],
+      "revisions": [
+        5,
+        13
+      ],
+      "moved_faces": 0,
+      "moved_faces_adjacent_to_fixed_faces": 0,
+      "chart_area_ratios_from_initial": {
+        "22": 0.14344967691984115,
+        "101": 1.1160947170993045
+      },
+      "border_delta": 0.0,
+      "status": "no_border_descent"
+    },
+    {
+      "round": 2,
+      "pair": [
+        17,
+        86
+      ],
+      "revisions": [
+        4,
+        5
+      ],
+      "moved_faces": 0,
+      "moved_faces_adjacent_to_fixed_faces": 0,
+      "chart_area_ratios_from_initial": {
+        "17": 0.4838607547068067,
+        "86": 0.9496334855428686
+      },
+      "border_delta": 0.0,
+      "status": "no_border_descent"
+    },
+    {
+      "round": 2,
+      "pair": [
+        86,
+        89
+      ],
+      "revisions": [
+        5,
+        4
+      ],
+      "moved_faces": 0,
+      "moved_faces_adjacent_to_fixed_faces": 0,
+      "chart_area_ratios_from_initial": {
+        "86": 0.9496334855428686,
+        "89": 1.0343077441527655
+      },
+      "border_delta": 0.0,
+      "status": "no_border_descent"
+    },
+    {
+      "round": 2,
+      "pair": [
+        89,
+        95
+      ],
+      "revisions": [
+        4,
+        8
+      ],
+      "moved_faces": 42,
+      "moved_faces_adjacent_to_fixed_faces": 3,
+      "chart_area_ratios_from_initial": {
+        "89": 0.9027619387378493,
+        "95": 1.064501137785893
+      },
+      "border_delta": -0.022714682563046026,
+      "failed_chart": 95,
+      "status": "distortion"
+    },
+    {
+      "round": 2,
+      "pair": [
+        100,
+        101
+      ],
+      "revisions": [
+        4,
+        13
+      ],
+      "moved_faces": 0,
+      "moved_faces_adjacent_to_fixed_faces": 0,
+      "chart_area_ratios_from_initial": {
+        "100": 1.031969404243245,
+        "101": 1.1160947170993045
+      },
+      "border_delta": 0.0,
+      "status": "no_border_descent"
+    },
+    {
+      "round": 2,
+      "pair": [
+        24,
+        101
+      ],
+      "revisions": [
+        2,
+        13
+      ],
+      "moved_faces": 0,
+      "moved_faces_adjacent_to_fixed_faces": 0,
+      "chart_area_ratios_from_initial": {
+        "24": 1.1974812529221424,
+        "101": 1.1160947170993045
+      },
+      "border_delta": 0.0,
+      "status": "no_border_descent"
+    },
+    {
+      "round": 2,
+      "pair": [
+        86,
+        95
+      ],
+      "revisions": [
+        5,
+        8
+      ],
+      "moved_faces": 0,
+      "moved_faces_adjacent_to_fixed_faces": 0,
+      "chart_area_ratios_from_initial": {
+        "86": 0.9496334855428686,
+        "95": 1.0520024135472912
+      },
+      "border_delta": 0.0,
+      "status": "no_border_descent"
+    },
+    {
+      "round": 2,
+      "pair": [
+        22,
+        95
+      ],
+      "revisions": [
+        5,
+        8
+      ],
+      "moved_faces": 0,
+      "moved_faces_adjacent_to_fixed_faces": 0,
+      "chart_area_ratios_from_initial": {
+        "22": 0.14344967691984115,
+        "95": 1.0520024135472912
+      },
+      "border_delta": 0.0,
+      "status": "no_border_descent"
+    },
+    {
+      "round": 2,
+      "pair": [
+        101,
+        102
+      ],
+      "revisions": [
+        13,
+        9
+      ],
+      "moved_faces": 0,
+      "moved_faces_adjacent_to_fixed_faces": 0,
+      "chart_area_ratios_from_initial": {
+        "101": 1.1160947170993045,
+        "102": 1.060631615359544
+      },
+      "border_delta": 0.0,
+      "status": "no_border_descent"
+    },
+    {
+      "round": 2,
+      "pair": [
+        96,
+        101
+      ],
+      "revisions": [
+        5,
+        13
+      ],
+      "moved_faces": 0,
+      "moved_faces_adjacent_to_fixed_faces": 0,
+      "chart_area_ratios_from_initial": {
+        "96": 1.0619579610790697,
+        "101": 1.1160947170993045
+      },
+      "border_delta": 0.0,
+      "status": "no_border_descent"
+    },
+    {
+      "round": 2,
+      "pair": [
+        9,
+        101
+      ],
+      "revisions": [
+        6,
+        13
+      ],
+      "moved_faces": 0,
+      "moved_faces_adjacent_to_fixed_faces": 0,
+      "chart_area_ratios_from_initial": {
+        "9": 0.7993275688660358,
+        "101": 1.1160947170993045
+      },
+      "border_delta": 0.0,
+      "status": "no_border_descent"
+    }
+  ]
+}

@@ -1,0 +1,87 @@
+{
+  "parameters": {
+    "band_hops": 6,
+    "rounds": 3,
+    "beta": 0.8,
+    "curve_scale": 2,
+    "stretch_limit": 1.35,
+    "anisotropy_limit": 2.0,
+    "shuffle_seed": 20260908
+  },
+  "stretch_limit": 1.35,
+  "metrics": {
+    "chart_count": 6,
+    "invalid_charts": [],
+    "chart_texel_density_ratio": 1.0000000000000004,
+    "non_disk_charts": [],
+    "positive_area_overlap_count": 0,
+    "overlap_pairs_sample": [],
+    "global_chart_reflections": 0,
+    "all_charts_valid": true,
+    "max_stretch": 1.2446547386657167,
+    "mean_stretch": 1.048496089403078,
+    "area_weighted_p95_stretch": 1.1469463684519017,
+    "max_anisotropy": 1.0502808944873403,
+    "mean_anisotropy": 1.0090242861424148,
+    "seam_length_over_sqrt_area": 6.595504992851679,
+    "smallest_chart_area_fraction": 0.11093774485004262,
+    "retained_baseline_edges": 384,
+    "lost_baseline_edges": 0,
+    "extra_chart_boundary_edges": 14,
+    "internal_uv_cut_edges": 29,
+    "total_uv_seam_length_over_sqrt_area": 7.12335972179568,
+    "baseline_seam_length_over_sqrt_area": 6.357515016553575,
+    "internal_uv_seam_length_over_sqrt_area": 0.5278547289439997,
+    "initial_energy": 7.079145191805961,
+    "final_energy": 6.952518550097212,
+    "accepted_moves": 1,
+    "moved_faces": 12,
+    "statuses": {
+      "accepted": 1,
+      "no_border_descent": 1
+    },
+    "uv_solves": 8
+  },
+  "events": [
+    {
+      "round": 0,
+      "pair": [
+        4,
+        5
+      ],
+      "revisions": [
+        0,
+        0
+      ],
+      "moved_faces": 12,
+      "moved_faces_adjacent_to_fixed_faces": 5,
+      "chart_area_ratios_from_initial": {
+        "4": 1.0018142795708962,
+        "5": 0.9981829839029029
+      },
+      "border_delta": -0.1266266417087492,
+      "energy_before": 7.079145191805961,
+      "energy_after": 6.952518550097212,
+      "status": "accepted"
+    },
+    {
+      "round": 1,
+      "pair": [
+        4,
+        5
+      ],
+      "revisions": [
+        1,
+        1
+      ],
+      "moved_faces": 0,
+      "moved_faces_adjacent_to_fixed_faces": 0,
+      "chart_area_ratios_from_initial": {
+        "4": 1.0018142795708962,
+        "5": 0.9981829839029029
+      },
+      "border_delta": 0.0,
+      "status": "no_border_descent"
+    }
+  ]
+}

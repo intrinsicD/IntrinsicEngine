@@ -1,0 +1,70 @@
+Internal ctest changing into directory: /home/alex/Documents/IntrinsicEngine/build/ci
+Test project /home/alex/Documents/IntrinsicEngine/build/ci
+      Start 1768: CurvatureSegmentation.DisconnectedEqualCurvaturePatchesShareComponentButNotRegion
+ 1/30 Test #1768: CurvatureSegmentation.DisconnectedEqualCurvaturePatchesShareComponentButNotRegion ..................   Passed    0.01 sec
+      Start 2789: CurvaturePatchContract.GeneratedOracleCatalogHasValidEvidenceAndPartitionTopology
+ 2/30 Test #2789: CurvaturePatchContract.GeneratedOracleCatalogHasValidEvidenceAndPartitionTopology ..................   Passed    0.02 sec
+      Start 2790: CurvaturePatchContract.PatchReferenceMatchesSuppliedFeatureOracleCatalog
+ 3/30 Test #2790: CurvaturePatchContract.PatchReferenceMatchesSuppliedFeatureOracleCatalog ...........................   Passed    0.26 sec
+      Start 2791: CurvaturePatchContract.PatchGrowthIsDeterministicAndSeedFrontsHaveNoAuthority
+ 4/30 Test #2791: CurvaturePatchContract.PatchGrowthIsDeterministicAndSeedFrontsHaveNoAuthority ......................   Passed    0.01 sec
+      Start 2792: CurvaturePatchContract.PatchHardBarriersRemainDistinctFromGrowthThroughPublication
+ 5/30 Test #2792: CurvaturePatchContract.PatchHardBarriersRemainDistinctFromGrowthThroughPublication .................   Passed    0.01 sec
+      Start 2793: CurvaturePatchContract.PatchCurvatureClosureSurvivesWithoutFeatureEvidence
+ 6/30 Test #2793: CurvaturePatchContract.PatchCurvatureClosureSurvivesWithoutFeatureEvidence .........................   Passed    0.02 sec
+      Start 2794: CurvaturePatchContract.PatchCompletionReplaysWithDetectedFeatureEvidence
+ 7/30 Test #2794: CurvaturePatchContract.PatchCompletionReplaysWithDetectedFeatureEvidence ...........................   Passed    1.90 sec
+      Start 2795: CurvaturePatchContract.SuppliedOracleIsolatesPatchCompletionFromCorruptedDetectorEvidence
+ 8/30 Test #2795: CurvaturePatchContract.SuppliedOracleIsolatesPatchCompletionFromCorruptedDetectorEvidence ..........   Passed    0.03 sec
+      Start 2796: CurvaturePatchContract.DetectedHardFoldBlocksWhileDetectedHomogeneousControlsStayWhole
+ 9/30 Test #2796: CurvaturePatchContract.DetectedHardFoldBlocksWhileDetectedHomogeneousControlsStayWhole .............   Passed    0.06 sec
+      Start 2797: CurvaturePatchContract.PatchReferenceFailsClosedForMalformedProductionInputs
+10/30 Test #2797: CurvaturePatchContract.PatchReferenceFailsClosedForMalformedProductionInputs .......................   Passed    0.01 sec
+      Start 2798: CurvaturePatchContract.PatchPartitionPassesFrozenDensityDiagonalScaleNoiseAndOrientationControls
+11/30 Test #2798: CurvaturePatchContract.PatchPartitionPassesFrozenDensityDiagonalScaleNoiseAndOrientationControls ...   Passed    0.15 sec
+      Start 2799: CurvaturePatchContract.LocalRagOneStepSeedPerturbationRefutesFrozenStabilityGate
+12/30 Test #2799: CurvaturePatchContract.LocalRagOneStepSeedPerturbationRefutesFrozenStabilityGate ...................   Passed    0.03 sec
+      Start 2800: CurvaturePatchContract.SharedStrictFoldClassifierMatchesOracle
+13/30 Test #2800: CurvaturePatchContract.SharedStrictFoldClassifierMatchesOracle .....................................   Passed    0.01 sec
+      Start 2801: CurvaturePatchContract.SuppliedEvidenceFailsClosedBeforePatchWork
+14/30 Test #2801: CurvaturePatchContract.SuppliedEvidenceFailsClosedBeforePatchWork ..................................   Passed    0.00 sec
+      Start 2802: CurvaturePatchContract.FeatureDetectorConsumesSharedHardFactsAndRejectsConstantSoftSignals
+15/30 Test #2802: CurvaturePatchContract.FeatureDetectorConsumesSharedHardFactsAndRejectsConstantSoftSignals .........   Passed    0.03 sec
+      Start 2803: CurvaturePatchContract.FeatureDetectorImplementsFrozenPerSignalScaleEquations
+16/30 Test #2803: CurvaturePatchContract.FeatureDetectorImplementsFrozenPerSignalScaleEquations ......................   Passed    0.00 sec
+      Start 2804: CurvaturePatchContract.FeatureDetectorRecoversPersistentLinesEndpointsAndJunctions
+17/30 Test #2804: CurvaturePatchContract.FeatureDetectorRecoversPersistentLinesEndpointsAndJunctions .................   Passed    0.38 sec
+      Start 2805: CurvaturePatchContract.FeatureDetectorSupportIsInvariantUnderGlobalOrientationReversal
+18/30 Test #2805: CurvaturePatchContract.FeatureDetectorSupportIsInvariantUnderGlobalOrientationReversal .............   Passed    0.19 sec
+      Start 2806: CurvaturePatchContract.FeatureDetectorFailsClosedBeforeBoundedSearches
+19/30 Test #2806: CurvaturePatchContract.FeatureDetectorFailsClosedBeforeBoundedSearches .............................   Passed    0.00 sec
+      Start 2807: CurvaturePatchContract.FeatureDetectorIsDeterministicAndComputePathOwnsItsResult
+20/30 Test #2807: CurvaturePatchContract.FeatureDetectorIsDeterministicAndComputePathOwnsItsResult ...................   Passed    0.10 sec
+      Start 2837: CurvatureExtrema.GaussianExtrusionFindsGeometricTransverseExtremum
+21/30 Test #2837: CurvatureExtrema.GaussianExtrusionFindsGeometricTransverseExtremum .................................   Passed    3.28 sec
+      Start 2838: CurvatureExtrema.PlaneHasNoArtificialCurves
+22/30 Test #2838: CurvatureExtrema.PlaneHasNoArtificialCurves ........................................................   Passed    1.31 sec
+      Start 2839: CurvatureExtrema.OrientationReversalExchangesRidgeValley
+23/30 Test #2839: CurvatureExtrema.OrientationReversalExchangesRidgeValley ...........................................   Passed    6.45 sec
+      Start 2840: CurvatureExtrema.RetriangulationAndRefinementRetainCenterCurve
+24/30 Test #2840: CurvatureExtrema.RetriangulationAndRefinementRetainCenterCurve .....................................   Passed   17.25 sec
+      Start 2841: CurvatureExtrema.ScaleTranslationAndSourcePreservation
+25/30 Test #2841: CurvatureExtrema.ScaleTranslationAndSourcePreservation .............................................   Passed    1.34 sec
+      Start 2842: CurvatureExtrema.InvalidInputsAndWorkLimitHaveNoPartialCurves
+26/30 Test #2842: CurvatureExtrema.InvalidInputsAndWorkLimitHaveNoPartialCurves ......................................   Passed    0.01 sec
+      Start 2843: CurvatureExtrema.ConstantCurvatureCylinderHasNoInteriorCreases
+27/30 Test #2843: CurvatureExtrema.ConstantCurvatureCylinderHasNoInteriorCreases .....................................   Passed    0.37 sec
+      Start 2844: CurvatureExtrema.SphereRejectsUmbilicPrincipalDirections
+28/30 Test #2844: CurvatureExtrema.SphereRejectsUmbilicPrincipalDirections ...........................................   Passed    0.64 sec
+      Start 2845: CurvatureExtrema.NoisyExtrusionRetainsDominantCenter
+29/30 Test #2845: CurvatureExtrema.NoisyExtrusionRetainsDominantCenter ...............................................   Passed    3.26 sec
+      Start 2846: CurvatureExtrema.SharpFoldDoesNotCreateParallelSmoothCurves
+30/30 Test #2846: CurvatureExtrema.SharpFoldDoesNotCreateParallelSmoothCurves ........................................   Passed    1.10 sec
+
+100% tests passed, 0 tests failed out of 30
+
+Label Time Summary:
+geometry    =  38.22 sec*proc (30 tests)
+unit        =  38.22 sec*proc (30 tests)
+
+Total Test time (real) =  39.03 sec

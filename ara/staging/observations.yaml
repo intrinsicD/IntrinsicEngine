@@ -3441,3 +3441,72 @@ observations:
     promoted_to: logic/claims.md:C70
     crystallized_via: artifact-commitment
     stale: false
+
+  - id: O195
+    timestamp: "2026-09-07T20:49:40+02:00"
+    provenance: ai-executed
+    content: 'METHOD-045 preserves the original local-region labels and all inter-region edges by treating semantic regions and UV charts separately. Boundary-loop cuts plus bounded within-region subdivision/merging yield six sculpt, 23 frog, 15 fandisk and 16 dolphin UV charts; both subdivided inputs retain their protected borders.'
+    context: 'The operator prioritized baseline quality and redirected integration into offline quality work with Claude. Sculpt needs one additional UV chart at the unchanged 1.35 stretch cap. No whole-part segmentation improvement, xatlas dominance or runtime integration is established.'
+    potential_type: claim
+    bound_to: []
+    promoted: true
+    promoted_to: logic/claims.md:C71
+    crystallized_via: artifact-commitment
+    stale: false
+  - id: O196
+    timestamp: "2026-09-07T20:49:40+02:00"
+    provenance: ai-executed
+    content: 'Exhaustive xatlas placement improves cropped rectangular occupancy for sculpt, but square-texture occupancy decreases from 0.3991273 to 0.3952358. Frog square occupancy increases from 0.5824177 to 0.5946973 on frozen candidate charts. Placement search is not a uniform quality improvement.'
+    context: 'Chart labels and input UVs are frozen; resolution 1024 and padding 2 are unchanged. Actual output dimensions and post-pack quality are measured. Keep the original packing default and expose exhaustive search only in the offline diagnostic.'
+    potential_type: claim
+    bound_to: []
+    promoted: true
+    promoted_to: logic/claims.md:C72
+    crystallized_via: artifact-commitment
+    stale: false
+
+  - id: O197
+    timestamp: '2026-09-08T02:12:46+02:00'
+    provenance: ai-executed
+    content: Earlier atlas growth misses 44 frog baseline edges, initial subdivision restores three,
+      and merging leaves 41 missing. Sculpt starts with five missing and loses 58 more during merges;
+      all 58 carry native hard-feature flags. Protected atlas preserves every original border but
+      its frog merges erase 64 other soft-flagged edges of unestablished semantic merit.
+    context: Observed actual reference calls and reconciled saved stage arrays; final partitions
+      match retained references exactly. No curve-alignment oracle or algorithm improvement is claimed.
+    potential_type: claim
+    bound_to: [N485]
+    promoted: true
+    promoted_to: logic/claims.md:C73
+    crystallized_via: artifact-commitment
+    stale: false
+  - id: O198
+    timestamp: '2026-09-08T02:12:46+02:00'
+    provenance: ai-suggested
+    content: Test measured curve proximity and tangent agreement at matched scales, then local
+      surface boundary movement under an explicit boundary-quality objective and existing UV limits.
+      Seed relocation is another candidate; hard-locking every curve or adding every scalar is unjustified.
+    context: The operator asked whether centers can move and whether available data guides decisions.
+      This requests investigation, not approval of a particular boundary objective or detector threshold.
+    potential_type: heuristic
+    bound_to: [N484, N485]
+    promoted: false
+    stale: false
+
+  - id: O199
+    timestamp: '2026-09-08T03:27:09+02:00'
+    provenance: ai-executed
+    content: Frozen binary-band boundary refinement preserves original regions and UV limits on frog/sculpt
+      while shortening extra seams. Guidance changes placements and support scores; packing and area tradeoffs
+      prevent uniform-quality or anatomical claims.
+    context: User requested actual Claude planning, implementation and renewed review. Twelve analytic controls,
+      ten native-packed cells, exact post-review replay and the full CPU gate support the bounded record.
+      The report and C74 depend on these artifacts.
+    potential_type: claim
+    bound_to:
+    - N487
+    - N488
+    promoted: true
+    promoted_to: logic/claims.md:C74
+    crystallized_via: artifact-commitment
+    stale: false

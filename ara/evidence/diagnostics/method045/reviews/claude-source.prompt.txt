@@ -1,0 +1,1554 @@
+Source review of the offline baseline-preserving atlas candidate. No input mesh geometry, credentials, personal configuration or conversation history. Review topology cuts, source-corner packing, region preservation and whether the bounded quality claims match the measurements. No tools or edits; keep the review under 1000 words.
+
+FILE tools/diagnostics/atlas/baseline_atlas.py
+#!/usr/bin/env python3
+"""Offline UV charts preserving source-bound regions and their borders.
+
+Connect boundary loops by shortest primal paths before LSCM. Unsupported or
+distorted regions are bisected explicitly; semantic labels never become UV IDs.
+"""
+from __future__ import annotations
+import argparse
+from collections import Counter
+import hashlib
+import heapq
+import json
+from pathlib import Path
+
+import numpy as np
+import patch_merge as pm
+from compare_atlases import audit, render
+
+
+def incidence(faces):
+    edges = {}
+    for i, face in enumerate(faces):
+        for k in range(3):
+            a, b = int(face[k]), int(face[(k+1)%3])
+            edges.setdefault(tuple(sorted((a, b))), []).append((i, k, a, b))
+    return edges
+
+
+def cut_corners(faces, edges, cuts):
+    """Join corners across uncut edges and retain the source-vertex map."""
+    parent = np.arange(faces.size)
+    def root(a):
+        while parent[a] != a:
+            parent[a] = parent[parent[a]]
+            a = parent[a]
+        return a
+    def join(a, b):
+        a, b = root(a), root(b)
+        parent[max(a,b)] = min(a,b)
+    for edge, entries in edges.items():
+        if len(entries) == 2 and edge not in cuts:
+            (i,k,a,b), (j,l,c,d) = entries
+            if (a,b) != (d,c):
+                raise ValueError('inconsistent orientation')
+            join(3*i+k, 3*j+(l+1)%3)
+            join(3*i+(k+1)%3, 3*j+l)
+    roots = np.array([root(i) for i in range(faces.size)])
+    unique, inverse = np.unique(roots, return_inverse=True)
+    return faces.ravel()[unique], inverse.reshape(-1,3)
+
+
+def topology(faces):
+    edges = incidence(faces)
+    if any(len(x)>2 for x in edges.values()):
+        raise ValueError('nonmanifold edge')
+    vertices, _ = cut_corners(faces, edges, set())
+    if len(vertices) != len(np.unique(faces)):
+        raise ValueError('nonmanifold vertex fan')
+    outgoing, incoming = {}, {}
+    for entries in edges.values():
+        if len(entries) == 1:
+            _,_,a,b = entries[0]
+            if a in outgoing or b in incoming:
+                raise ValueError('nonmanifold boundary')
+            outgoing[a] = b; incoming[b] = a
+    if outgoing.keys() != incoming.keys():
+        raise ValueError('open boundary chain')
+    loops, remaining = [], set(outgoing)
+    while remaining:
+        start = min(remaining); loop = []; current = start
+        while current in remaining:
+            remaining.remove(current); loop.append(current); current = outgoing[current]
+        if current != start:
+            raise ValueError('non-simple boundary loop')
+        loops.append(loop)
+    return edges, loops, len(vertices)-len(edges)+len(faces)
+
+
+def open_region(g, ids):
+    """Cut a connected genus-zero region with boundary; report other topology."""
+    faces = g['f'][ids]
+    try:
+        edges, loops, euler = topology(faces)
+    except ValueError as error:
+        # A valid source can induce a pinched region boundary. Split the region
+        # explicitly; never mistake corner duplication for source repair.
+        return None, 'region_topology', dict(euler_characteristic=None,
+                                            boundary_loops=None, cut_edges=0,
+                                            topology_failure=str(error))
+    diagnostics = dict(euler_characteristic=euler, boundary_loops=len(loops), cut_edges=0)
+    if not loops or euler != 2-len(loops):
+        return None, 'unsupported_topology', diagnostics
+    adjacent = {int(v): [] for v in np.unique(faces)}
+    for a,b in edges:
+        length = float(np.linalg.norm(g['v'][a]-g['v'][b]))
+        adjacent[a].append((b,length)); adjacent[b].append((a,length))
+    connected = set(loops[0]); waiting = [set(x) for x in loops[1:]]; cuts = set()
+    while waiting:
+        targets = set().union(*waiting)
+        distance = {v:0. for v in connected}; previous = {}
+        queue = [(0.,v) for v in sorted(connected)]; heapq.heapify(queue)
+        hit = None
+        while queue:
+            d,v = heapq.heappop(queue)
+            if d != distance[v]:
+                continue
+            if v in targets:
+                hit = v; break
+            for w,length in sorted(adjacent[v]):
+                value = d+length
+                if value < distance.get(w, np.inf):
+                    distance[w] = value; previous[w] = v; heapq.heappush(queue,(value,w))
+        if hit is None:
+            return None, 'disconnected_region', diagnostics
+        current = hit
+        while current not in connected:
+            parent = previous[current]
+            cuts.add(tuple(sorted((current,parent)))); connected.add(current); current = parent
+        reached = next(i for i,loop in enumerate(waiting) if hit in loop)
+        connected.update(waiting.pop(reached))
+    vertices, local = cut_corners(faces, edges, cuts)
+    diagnostics['cut_edges'] = len(cuts)
+    if pm.disk_boundary_fast(local) is None:
+        return None, 'cut_topology', diagnostics
+    return (vertices, local), 'accepted', diagnostics
+
+
+def region_components(g, labels):
+    visited = np.zeros(len(labels),bool); result = []
+    for seed in range(len(labels)):
+        if visited[seed]:
+            continue
+        stack = [seed]; visited[seed] = True; ids = []
+        while stack:
+            i = stack.pop(); ids.append(i)
+            for j,*_ in g['adjacent'][i]:
+                if not visited[j] and labels[j] == labels[i]:
+                    visited[j] = True; stack.append(j)
+        result.append(np.asarray(sorted(ids),np.int64))
+    return result
+
+
+def boundary_metrics(g, regions, labels, corners):
+    retained = lost = extra = internal = 0
+    total = baseline_length = internal_length = 0.
+    for a,b,length,_,_,v,w in g['edges']:
+        cut = labels[a] != labels[b]
+        if not cut:
+            for vertex in (v,w):
+                ia = int(np.flatnonzero(g['f'][a] == vertex)[0])
+                ib = int(np.flatnonzero(g['f'][b] == vertex)[0])
+                cut = cut or not np.array_equal(corners[a,ia],corners[b,ib])
+        protected = regions[a] != regions[b]
+        retained += int(protected and cut); lost += int(protected and not cut)
+        extra += int(not protected and labels[a] != labels[b])
+        internal += int(cut and labels[a] == labels[b])
+        total += length if cut else 0.
+        baseline_length += length if protected else 0.
+        internal_length += length if cut and labels[a] == labels[b] else 0.
+    return dict(retained_baseline_edges=retained, lost_baseline_edges=lost,
+                extra_chart_boundary_edges=extra, internal_uv_cut_edges=internal,
+                total_uv_seam_length_over_sqrt_area=total,
+                baseline_seam_length_over_sqrt_area=baseline_length,
+                internal_uv_seam_length_over_sqrt_area=internal_length)
+
+
+def merge_within_regions(g, regions, charts, stretch_limit, anisotropy_limit):
+    """Rejoin only subdivisions of the same region, revalidating each union."""
+    rejected = set(); attempts = []; next_id = len(charts)
+    while True:
+        labels = np.empty(len(regions),np.int64)
+        for i,c in charts.items():
+            labels[c['ids']] = i
+        seams = Counter()
+        for a,b,length,*_ in g['edges']:
+            i,j = sorted((int(labels[a]),int(labels[b])))
+            if i!=j and regions[a]==regions[b] and (i,j) not in rejected:
+                seams[i,j] += length
+        candidates = []
+        for (i,j),length in seams.items():
+            area = min(g['area'][charts[i]['ids']].sum(),g['area'][charts[j]['ids']].sum())
+            candidates.append((-length/np.sqrt(area),i,j))
+        accepted = False
+        for _,i,j in sorted(candidates):
+            ids = np.sort(np.concatenate((charts[i]['ids'],charts[j]['ids'])))
+            opened,reason,topo = open_region(g,ids); chart = None
+            if opened is not None:
+                chart,reason = pm.parameterize_local(g,ids,*opened,stretch_limit,anisotropy_limit)
+            attempts.append(dict(region=int(regions[ids[0]]),faces=len(ids),status=reason,**topo))
+            if chart is None:
+                rejected.add((i,j)); continue
+            del charts[i]; del charts[j]; charts[next_id] = chart; next_id += 1
+            accepted = True; break
+        if not accepted:
+            return charts, attempts
+
+
+def execute(vertices, faces, regions, *, stretch_limit=1.35, anisotropy_limit=2., merge=False):
+    regions = np.asarray(regions)
+    if regions.shape != (len(faces),) or regions.dtype.kind not in 'iu' or np.any(regions<0):
+        raise ValueError('one nonnegative integer baseline label per face required')
+    if not np.isfinite([stretch_limit,anisotropy_limit]).all() or min(stretch_limit,anisotropy_limit)<1:
+        raise ValueError('invalid distortion limits')
+    g = pm.geometry(vertices,faces)
+    # Validate the source before duplication could hide a pinched vertex.
+    topology(g['f'])
+    components = region_components(g,regions)
+    pending = list(reversed(components)); charts = {}; records = []; splits = Counter()
+    while pending:
+        ids = np.asarray(sorted(pending.pop()),np.int64)
+        opened, reason, topo = open_region(g,ids)
+        chart = None
+        if opened is not None:
+            chart, reason = pm.parameterize_local(g,ids,*opened,stretch_limit,anisotropy_limit)
+        records.append(dict(region=int(regions[ids[0]]),faces=len(ids),status=reason,**topo))
+        if chart is None:
+            splits[reason] += 1
+            pending.extend(reversed(pm.bisect(g,ids)))
+        else:
+            charts[len(charts)] = chart
+    initial_count = len(charts); merges = []
+    if merge:
+        charts, merges = merge_within_regions(g,regions,charts,stretch_limit,anisotropy_limit)
+    labels = np.empty(len(faces),np.int64); chart_uv = np.empty((len(faces),3,2))
+    corners = np.empty_like(chart_uv); packed,_ = pm.pack(charts)
+    for i,c in charts.items():
+        labels[c['ids']] = i
+        chart_uv[c['ids']] = c['uv'][c['local_faces']]
+        corners[c['ids']] = packed[i][c['local_faces']]
+    metrics = audit(vertices,faces,labels,corners)
+    metrics.update(boundary_metrics(g,regions,labels,corners))
+    metrics.update(region_count=len(np.unique(regions)), region_component_count=len(components),
+                   split_reasons=dict(splits), uv_solves=g.get('actual_uv_solves',0),
+                   initial_charts=initial_count, accepted_merges=initial_count-len(charts),
+                   merge_attempts=merges,
+                   outcome='protected_with_chart_splits' if splits else 'protected_without_chart_splits')
+    if (not metrics['all_charts_valid'] or metrics['lost_baseline_edges'] or
+            metrics['max_stretch'] > stretch_limit or metrics['max_anisotropy'] > anisotropy_limit):
+        raise ValueError('final source/UV audit failed: '+str(metrics))
+    return dict(labels=labels,region_labels=regions.copy(),chart_uv=chart_uv,corner_uv=corners,
+                metrics=metrics,component_attempts=records)
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('baseline',type=Path,help='native export prefix (.geometry.json and .labels)')
+    parser.add_argument('output',type=Path)
+    parser.add_argument('--stretch-limit',type=float,default=1.35)
+    parser.add_argument('--merge',action='store_true',help='rejoin valid subdivisions inside each region')
+    args = parser.parse_args()
+    geometry = args.baseline.with_suffix('.geometry.json'); labels = args.baseline.with_suffix('.labels')
+    source = json.loads(geometry.read_text()); v = np.asarray(source['positions']); f = np.asarray(source['triangles'])
+    regions = np.loadtxt(labels,dtype=np.int64,ndmin=1)
+    result = execute(v,f,regions,stretch_limit=args.stretch_limit,merge=args.merge)
+    record = dict(schema='intrinsic.baseline-atlas.diagnostic.v1',claim_eligible=False,
+                  implementation='python_baseline_boundary_cuts_lscm',stretch_limit=args.stretch_limit,merge=args.merge,
+                  source_sha256=hashlib.sha256(geometry.read_bytes()).hexdigest(),
+                  baseline_labels_sha256=hashlib.sha256(labels.read_bytes()).hexdigest(),
+                  implementation_sha256=hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
+                  metrics=result['metrics'],component_attempts=result['component_attempts'])
+    args.output.parent.mkdir(parents=True,exist_ok=True)
+    args.output.with_suffix('.json').write_text(json.dumps(record,indent=2,allow_nan=False)+'\n')
+    arrays = {k:x for k,x in result.items() if k not in ('metrics','component_attempts')}
+    np.savez_compressed(args.output.with_suffix('.npz'),vertices=v,faces=f,**arrays)
+    render(v,f,result,args.output.with_suffix('.png'),f'{args.baseline.name} · protected regions · {record["metrics"]["chart_count"]} UV charts')
+    print(json.dumps(record,allow_nan=False),flush=True)
+
+
+if __name__ == '__main__':
+    main()
+
+FILE tools/diagnostics/atlas/patch_merge.py
+#!/usr/bin/env python3
+"""Offline classical atlas reference: geodesic atoms and UV-validated unions.
+
+No engine backend or production dependency. NumPy/SciPy provide double-precision
+reference numerics; timings are not native-engine performance claims.
+"""
+from __future__ import annotations
+import argparse
+from collections import Counter
+import hashlib
+import heapq
+import json
+from pathlib import Path
+import time
+import warnings
+
+import numpy as np
+from scipy import sparse
+from scipy.sparse.linalg import MatrixRankWarning, spsolve
+from scipy.sparse.csgraph import connected_components
+
+
+def read_obj(path):
+    """Read positions and source-index triangles; reject implicit mesh repair."""
+    vertices, faces = [], []
+    for line in Path(path).read_text().splitlines():
+        words = line.split('#', 1)[0].split()
+        if not words:
+            continue
+        if words[0] == 'v':
+            vertices.append([float(x) for x in words[1:4]])
+        elif words[0] == 'f':
+            ids = [int(x.split('/')[0]) for x in words[1:]]
+            ids = [x - 1 if x > 0 else len(vertices) + x for x in ids]
+            if len(ids) != 3:
+                raise ValueError('triangle OBJ required; triangulation must be explicit')
+            faces.append(ids)
+    return np.asarray(vertices, float), np.asarray(faces, np.int64)
+
+
+def geometry(vertices, faces):
+    v, f = np.asarray(vertices, float), np.asarray(faces, np.int64)
+    if v.ndim != 2 or v.shape[1] != 3 or f.ndim != 2 or f.shape[1] != 3 or not len(f):
+        raise ValueError('nonempty indexed triangles required')
+    if not np.isfinite(v).all() or f.min() < 0 or f.max() >= len(v):
+        raise ValueError('invalid positions or indices')
+    v = v - v.mean(axis=0)
+    cross = np.cross(v[f[:, 1]]-v[f[:, 0]], v[f[:, 2]]-v[f[:, 0]])
+    twice = np.linalg.norm(cross, axis=1)
+    if np.any(twice <= np.max(twice)*1e-14):
+        raise ValueError('degenerate triangle')
+    scale = np.sqrt(twice.sum()/2)
+    v = v/scale
+    area = twice/(2*scale**2)
+    normal = cross/twice[:, None]
+    center = v[f].mean(axis=1)
+    incidence = {}
+    for i, face in enumerate(f):
+        for a, b in zip(face, np.roll(face, -1)):
+            incidence.setdefault(tuple(sorted((int(a), int(b)))), []).append((i, int(a), int(b)))
+    adjacent = [[] for _ in f]
+    edges = []
+    for (a, b), entries in sorted(incidence.items()):
+        if len(entries) > 2:
+            raise ValueError('nonmanifold edge')
+        if len(entries) == 2:
+            (i, x, y), (j, z, w) = entries
+            if (x, y) != (w, z):
+                raise ValueError('inconsistent orientation')
+            length = float(np.linalg.norm(v[a]-v[b]))
+            distance = float(np.linalg.norm(center[i]-center[j]))
+            angle = float(np.arccos(np.clip(normal[i]@normal[j], -1, 1)))
+            adjacent[i].append((j, distance, angle))
+            adjacent[j].append((i, distance, angle))
+            edges.append((i, j, length, angle, distance, a, b))
+    return dict(v=v, f=f, area=area, normal=normal, center=center,
+                adjacent=adjacent, edges=edges, scale=float(scale))
+
+
+def propagate(g, seeds, weight=0., radius=1., allowed=None, distances=None):
+    """Deterministic Dijkstra; labels are connected by their shortest-path tree."""
+    n = len(g['f'])
+    d = np.full(n, np.inf) if distances is None else distances.copy()
+    labels = np.full(n, -1, np.int64)
+    queue = []
+    for label, seed in enumerate(seeds):
+        d[seed] = 0.
+        labels[seed] = label
+        heapq.heappush(queue, (0., label, int(seed)))
+    while queue:
+        dist, label, i = heapq.heappop(queue)
+        if dist != d[i] or label != labels[i]:
+            continue
+        for j, length, angle in g['adjacent'][i]:
+            if allowed is not None and j not in allowed:
+                continue
+            candidate = dist + length + weight*radius*angle
+            if candidate < d[j]:
+                d[j], labels[j] = candidate, label
+                heapq.heappush(queue, (candidate, label, j))
+    return d, labels
+
+
+def seeds_for(g, count):
+    # Incremental farthest-point updates visit only nodes whose distance improves.
+    seeds = [int(np.argmax(g['area']))]
+    d, _ = propagate(g, seeds)
+    for _ in range(min(count, len(d))-1):
+        seed = int(np.argmax(d))
+        if d[seed] == 0:
+            break
+        seeds.append(seed)
+        d, _ = propagate(g, [seed], distances=d)
+    # Every disconnected component must have a seed even beyond the target count.
+    while not np.isfinite(d).all():
+        seed = int(np.flatnonzero(~np.isfinite(d))[0])
+        seeds.append(seed)
+        d, _ = propagate(g, [seed], distances=d)
+    return seeds
+
+
+def disk_boundary(faces):
+    """Require a connected oriented manifold disk, including vertex links."""
+    incidence, vertex_faces = {}, {}
+    for i, face in enumerate(faces):
+        for v in face:
+            vertex_faces.setdefault(int(v), []).append(i)
+        for a, b in zip(face, np.roll(face, -1)):
+            incidence.setdefault(tuple(sorted((int(a), int(b)))), []).append((i, int(a), int(b)))
+    face_adj = [[] for _ in faces]
+    next_vertex = {}
+    vertex_adj = {v: {} for v in vertex_faces}
+    for (a, b), entries in incidence.items():
+        if len(entries) == 1:
+            _, x, y = entries[0]
+            if x in next_vertex:
+                return None
+            next_vertex[x] = y
+        elif len(entries) == 2:
+            (i, x, y), (j, z, w) = entries
+            if (x, y) != (w, z):
+                return None
+            face_adj[i].append(j); face_adj[j].append(i)
+            for v in (a, b):
+                vertex_adj[v].setdefault(i, []).append(j)
+                vertex_adj[v].setdefault(j, []).append(i)
+        else:
+            return None
+    if len(vertex_faces)-len(incidence)+len(faces) != 1 or not next_vertex:
+        return None
+    def connected(ids, adj):
+        visited = {ids[0]}; stack = [ids[0]]
+        while stack:
+            for j in adj[stack.pop()]:
+                if j not in visited:
+                    visited.add(j); stack.append(j)
+        return len(visited) == len(ids)
+    if not connected(list(range(len(faces))), face_adj):
+        return None
+    for v, ids in vertex_faces.items():
+        local = vertex_adj[v]
+        if not connected(ids, {i: local.get(i, []) for i in ids}):
+            return None
+    boundary = [min(next_vertex)]
+    while True:
+        j = next_vertex.get(boundary[-1])
+        if j == boundary[0]:
+            break
+        if j is None or j in boundary:
+            return None
+        boundary.append(j)
+    if len(boundary) != len(next_vertex):
+        return None
+    return np.asarray(boundary, np.int64)
+
+
+def cross2(a, b):
+    return a[..., 0]*b[..., 1] - a[..., 1]*b[..., 0]
+
+
+def disk_boundary_fast(faces):
+    """Same disk predicate as the scalar reference, using corner-link components."""
+    nfaces=len(faces)
+    if not nfaces:
+        return None
+    vertices,flat=np.unique(faces,return_inverse=True)
+    f=flat.reshape(-1,3); nvertices=len(vertices)
+    directed=f[:,[0,1,1,2,2,0]].reshape(-1,2)
+    edges=np.sort(directed,axis=1)
+    unique,inverse,counts=np.unique(edges,axis=0,return_inverse=True,return_counts=True)
+    if np.any(counts>2) or nvertices-len(unique)+nfaces!=1:
+        return None
+    order=np.argsort(inverse,kind='stable')
+    starts=np.concatenate(([0],np.cumsum(counts)[:-1]))
+    first=order[starts[counts==2]]; second=order[starts[counts==2]+1]
+    if np.any(directed[first]!=directed[second,::-1]):
+        return None
+    def component_count(a,b,n):
+        matrix=sparse.coo_matrix((np.ones(len(a),np.int8),(a,b)),shape=(n,n)).tocsr()
+        return connected_components(matrix,directed=False,return_labels=False)
+    if component_count(first//3,second//3,nfaces)!=1:
+        return None
+    first_end=first//3*3+(first%3+1)%3
+    second_end=second//3*3+(second%3+1)%3
+    # Each node is a face corner. Links cross a shared edge at the same vertex;
+    # exactly V components means every vertex has one connected incident fan.
+    if component_count(np.concatenate((first,first_end)),np.concatenate((second_end,second)),3*nfaces)!=nvertices:
+        return None
+    boundary=directed[order[starts[counts==1]]]
+    if not len(boundary) or len(np.unique(boundary[:,0]))!=len(boundary):
+        return None
+    next_vertex=dict(boundary.tolist()); ring=[min(next_vertex)]; visited=set(ring)
+    while True:
+        j=next_vertex.get(ring[-1])
+        if j==ring[0]:
+            break
+        if j is None or j in visited:
+            return None
+        ring.append(j); visited.add(j)
+    if len(ring)!=len(boundary):
+        return None
+    return vertices[np.asarray(ring)]
+
+
+def simple_boundary(points, epsilon=1e-10):
+    """Reject nonadjacent crossings or contacts, including collinear overlap."""
+    scale = max(float(np.ptp(points, axis=0).max()), np.finfo(float).tiny)
+    p = (points-points[0])/scale
+    q = np.roll(p, -1, axis=0)
+    if np.any(np.linalg.norm(q-p, axis=1) <= epsilon):
+        return False
+    for i in range(len(p)-2):
+        ids = np.arange(i+2, len(p)-(i == 0))
+        a, b, c, d = p[i], q[i], p[ids], q[ids]
+        boxes = np.all(np.maximum(np.minimum(a,b), np.minimum(c,d)) <=
+                       np.minimum(np.maximum(a,b), np.maximum(c,d))+epsilon, axis=1)
+        c, d = c[boxes], d[boxes]
+        ab_c, ab_d = cross2(b-a,c-a), cross2(b-a,d-a)
+        cd_a, cd_b = cross2(d-c,a-c), cross2(d-c,b-c)
+        if np.any((np.minimum(ab_c,ab_d) <= epsilon) & (np.maximum(ab_c,ab_d) >= -epsilon) &
+                  (np.minimum(cd_a,cd_b) <= epsilon) & (np.maximum(cd_a,cd_b) >= -epsilon)):
+            return False
+    return True
+
+
+def triangle_frames(v, f):
+    e1, e2 = v[f[:, 1]]-v[f[:, 0]], v[f[:, 2]]-v[f[:, 0]]
+    length = np.linalg.norm(e1, axis=1)
+    x = np.einsum('ij,ij->i', e1, e2)/length
+    y = np.linalg.norm(np.cross(e1,e2), axis=1)/length
+    return length, x, y
+
+
+def measure_uv(v, f, uv):
+    """Per-chart area normalization removes packing/global-scale choices."""
+    length, x, y = triangle_frames(v,f)
+    q1, q2 = uv[f[:,1]]-uv[f[:,0]], uv[f[:,2]]-uv[f[:,0]]
+    signed = cross2(q1,q2)
+    if not np.isfinite(uv).all() or np.any(signed <= 1e-13*length*y):
+        return None
+    factor = np.sqrt(np.sum(length*y)/np.sum(signed))
+    uv = uv*factor
+    a = q1/length[:,None]*factor
+    b = (q2-q1*(x/length)[:,None])/y[:,None]*factor
+    jacobian = np.stack((a,b),axis=2)
+    singular = np.linalg.svd(jacobian,compute_uv=False)
+    if np.any(singular[:,1] <= 0) or not np.isfinite(singular).all():
+        return None
+    stretch = np.maximum(singular[:,0],1/singular[:,1])
+    anisotropy = singular[:,0]/singular[:,1]
+    return dict(uv=uv, stretch=stretch, anisotropy=anisotropy,
+                max_stretch=float(stretch.max()), max_anisotropy=float(anisotropy.max()))
+
+
+def parameterize(g, ids, stretch_limit=1.5, anisotropy_limit=2.):
+    ids = np.asarray(sorted(ids),np.int64)
+    vertices, inverse = np.unique(g['f'][ids],return_inverse=True)
+    return parameterize_local(g, ids, vertices, inverse.reshape(-1,3),
+                              stretch_limit, anisotropy_limit)
+
+
+def parameterize_local(g, ids, vertices, f, stretch_limit=1.5, anisotropy_limit=2.):
+    """Solve an explicit chart, allowing duplicated source vertices at UV cuts."""
+    v = g['v'][vertices]
+    boundary = disk_boundary_fast(f)
+    if boundary is None:
+        return None, 'topology'
+    length, x, y = triangle_frames(v,f)
+    # Weighted Cauchy-Riemann least squares (LSCM), with two separated boundary pins.
+    gx = np.column_stack((-y,y,np.zeros(len(f))))/(length*y)[:,None]
+    gy = np.column_stack((x-length,-x,length))/(length*y)[:,None]
+    w = np.sqrt(length*y/2)[:,None]
+    m, n = len(f), len(v)
+    rows = np.repeat(np.arange(2*m),6)
+    cols = np.concatenate((np.column_stack((f,f+n)), np.column_stack((f,f+n)))).ravel()
+    values = np.concatenate((np.column_stack((gx*w,-gy*w)),np.column_stack((gy*w,gx*w)))).ravel()
+    matrix = sparse.coo_matrix((values,(rows,cols)),shape=(2*m,2*n)).tocsr()
+    p = int(boundary[np.argmax(np.linalg.norm(v[boundary]-v[boundary[0]],axis=1))])
+    q = int(boundary[np.argmax(np.linalg.norm(v[boundary]-v[p],axis=1))])
+    pins = np.array([p,q,p+n,q+n]); fixed = np.array([0.,np.linalg.norm(v[q]-v[p]),0.,0.])
+    free = np.setdiff1d(np.arange(2*n),pins)
+    a = matrix[:,free]; rhs = -matrix[:,pins]@fixed
+    g['actual_uv_solves']=g.get('actual_uv_solves',0)+1
+    g['factorized_degrees_of_freedom']=g.get('factorized_degrees_of_freedom',0)+len(free)
+    with warnings.catch_warnings():
+        warnings.simplefilter('error',MatrixRankWarning)
+        try:
+            solution = spsolve((a.T@a).tocsc(), a.T@rhs)
+        except (MatrixRankWarning, RuntimeError):
+            return None, 'solver'
+    flat = np.zeros(2*n); flat[pins] = fixed; flat[free] = solution
+    measured = measure_uv(v,f,flat.reshape(2,n).T)
+    if measured is None:
+        return None, 'orientation'
+    if measured['max_stretch'] > stretch_limit or measured['max_anisotropy'] > anisotropy_limit:
+        return None, 'distortion'
+    if not simple_boundary(measured['uv'][boundary]):
+        return None, 'boundary_overlap'
+    # A continuous positive map of a manifold disk with a simple boundary is injective.
+    measured.update(ids=ids, vertices=vertices, local_faces=f, boundary=boundary)
+    return measured, 'accepted'
+
+
+def bisect(g, ids):
+    allowed = set(ids)
+    if len(ids) < 2:
+        raise ValueError('invalid single triangle cannot be repaired')
+    d, _ = propagate(g,[min(ids)],allowed=allowed)
+    a = max(ids,key=lambda i:(d[i],-i))
+    d, _ = propagate(g,[a],allowed=allowed)
+    b = max(ids,key=lambda i:(d[i],-i))
+    _, labels = propagate(g,[a,b],allowed=allowed)
+    # Separate any disconnected components explicitly, rather than dropping faces.
+    groups = {}
+    for i in ids:
+        groups.setdefault(int(labels[i]),[]).append(i)
+    if len(groups) < 2:
+        raise ValueError('bisection made no progress')
+    return list(groups.values())
+
+
+def pack(charts):
+    """Deterministic common shelf packer; no raster-padding guarantee is claimed."""
+    boxes, local_uv = {}, {}
+    for i,c in charts.items():
+        uv = c['uv'].copy()
+        _, axes = np.linalg.eigh(np.cov(uv.T))
+        uv = uv@axes
+        # Orthogonal reorientation must preserve winding.
+        if np.linalg.det(axes) < 0:
+            uv[:,0] *= -1
+        uv -= uv.min(axis=0)
+        extent = uv.max(axis=0)
+        if extent[0] > extent[1]:
+            uv = np.column_stack((uv[:,1], extent[0]-uv[:,0]))
+        local_uv[i] = uv
+        boxes[i] = uv.max(axis=0)
+    total = sum(float(np.prod(x)) for x in boxes.values())
+    gap = np.sqrt(total)*0.002
+    best = None
+    for factor in (.7,1.,1.3,1.7,2.2):
+        width = max(max(x[0] for x in boxes.values())+2*gap,np.sqrt(total)*factor)
+        x, y, height = gap, gap, 0.; placements = {}
+        for i in sorted(boxes,key=lambda i:(-boxes[i][1],i)):
+            w,h = boxes[i]
+            if x+w+gap > width:
+                x,y,height = gap,y+height+gap,0.
+            placements[i] = np.array([x,y]); x += w+gap; height = max(height,h)
+        atlas_height = y+height+gap
+        if best is None or width*atlas_height < best[0]:
+            best = (width*atlas_height,width,atlas_height,placements)
+    _,width,height,placements = best
+    scale = max(width,height)
+    packed = {i:(local_uv[i]+placements[i])/scale for i in charts}
+    occupied = sum(np.sum(cross2(c['uv'][c['local_faces'][:,1]]-c['uv'][c['local_faces'][:,0]],
+                                c['uv'][c['local_faces'][:,2]]-c['uv'][c['local_faces'][:,0]]))/2 for c in charts.values())
+    return packed, float(occupied/(width*height))
+
+
+def execute(vertices, faces, *, patches=64, feature_weight=2., stretch_limit=1.5,
+            anisotropy_limit=2., merge=True, max_merges=None, merge_feature_weight=None):
+    if type(patches) is not int or patches<2 or not np.isfinite([feature_weight,stretch_limit,anisotropy_limit]).all() or feature_weight<0 or stretch_limit<1 or anisotropy_limit<1:
+        raise ValueError('invalid experiment parameters')
+    rank_weight=feature_weight if merge_feature_weight is None else merge_feature_weight
+    if not np.isfinite(rank_weight) or rank_weight<0:
+        raise ValueError('invalid merge feature weight')
+    started = time.perf_counter(); g = geometry(vertices,faces)
+    prepared = time.perf_counter()
+    seeds = seeds_for(g,patches)
+    _, labels = propagate(g,seeds,feature_weight,1/np.sqrt(patches))
+    clustered = time.perf_counter()
+    charts, rejects = {}, Counter(); solves = 0; next_id = 0
+    stack = [np.flatnonzero(labels==i).tolist() for i in range(len(seeds))]
+    while stack:
+        ids = stack.pop()
+        if not ids:
+            continue
+        chart,reason = parameterize(g,ids,stretch_limit,anisotropy_limit); solves += 1
+        if chart is None:
+            rejects['initial_'+reason] += 1
+            stack.extend(bisect(g,ids))
+        else:
+            charts[next_id] = chart; next_id += 1
+    validated = time.perf_counter(); initial_count = len(charts)
+    labels[:] = -1
+    for i,c in charts.items():
+        labels[c['ids']] = i
+    initial_labels = labels.copy()
+    adjacent = {i:{} for i in charts}
+    for f,h,length,angle,distance,_,_ in g['edges']:
+        a,b = int(labels[f]),int(labels[h])
+        if a != b:
+            for x,y in ((a,b),(b,a)):
+                old = adjacent[x].get(y,(0.,0.))
+                adjacent[x][y] = (old[0]+length,old[1]+length*angle)
+    queue = []
+    def enqueue(a,b):
+        if a > b:
+            a,b = b,a
+        length,turn = adjacent[a][b]
+        small_area = min(g['area'][charts[a]['ids']].sum(),g['area'][charts[b]['ids']].sum())
+        # Feature influence orders candidates, never forbids a low-distortion union.
+        score = length/np.sqrt(small_area)/(1+rank_weight*turn/max(length,1e-15))
+        heapq.heappush(queue,(-float(score),a,b))
+    for a,neighbors in adjacent.items():
+        for b in neighbors:
+            if a < b:
+                enqueue(a,b)
+    attempts,accepted = 0,0
+    while merge and queue and (max_merges is None or accepted < max_merges):
+        _,a,b = heapq.heappop(queue)
+        if a not in charts or b not in charts:
+            continue
+        attempts += 1
+        chart,reason = parameterize(g,np.concatenate((charts[a]['ids'],charts[b]['ids'])),
+                                    stretch_limit,anisotropy_limit); solves += 1
+        if chart is None:
+            rejects['merge_'+reason] += 1
+            continue
+        c = next_id; next_id += 1; accepted += 1
+        charts[c] = chart; adjacent[c] = {}
+        for old in (a,b):
+            for neighbor,pair in adjacent[old].items():
+                if neighbor in (a,b):
+                    continue
+                before = adjacent[c].get(neighbor,(0.,0.))
+                adjacent[c][neighbor] = (before[0]+pair[0],before[1]+pair[1])
+                adjacent[neighbor].pop(old,None)
+            del charts[old]; del adjacent[old]
+        for neighbor,pair in adjacent[c].items():
+            adjacent[neighbor][c] = pair
+            enqueue(c,neighbor)
+    merged = time.perf_counter()
+    packed,utilization = pack(charts)
+    corner_uv = np.zeros((len(faces),3,2)); chart_uv = corner_uv.copy()
+    stretches,anisotropies = np.zeros(len(faces)),np.zeros(len(faces))
+    for label,(i,c) in enumerate(sorted(charts.items())):
+        labels[c['ids']] = label
+        corner_uv[c['ids']] = packed[i][c['local_faces']]
+        chart_uv[c['ids']] = c['uv'][c['local_faces']]
+        stretches[c['ids']] = c['stretch']; anisotropies[c['ids']] = c['anisotropy']
+    seam = sum(length for a,b,length,*_ in g['edges'] if labels[a] != labels[b])
+    ended = time.perf_counter()
+    metrics = dict(input_vertices=len(vertices),input_faces=len(faces),initial_charts=initial_count,
+                   chart_count=len(charts),merge_attempts=attempts,accepted_merges=accepted,
+                   parameterization_attempts=solves,uv_solves=g.get('actual_uv_solves',0),
+                   factorized_degrees_of_freedom=g.get('factorized_degrees_of_freedom',0),
+                   rejections=dict(rejects),max_stretch=float(stretches.max()),
+                   mean_stretch=float(g['area']@stretches),max_anisotropy=float(anisotropies.max()),
+                   mean_anisotropy=float(g['area']@anisotropies),seam_length_over_sqrt_area=float(seam),
+                   continuous_packing_utilization=utilization,all_charts_valid=True,
+                   runtime_seconds=ended-started,
+                   phases_seconds=dict(geometry=prepared-started,clustering=clustered-prepared,
+                                       initial_validation=validated-clustered,merging=merged-validated,packing=ended-merged))
+    return dict(metrics=metrics,labels=labels,initial_labels=initial_labels,corner_uv=corner_uv,
+                chart_uv=chart_uv,stretch=stretches,anisotropy=anisotropies)
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('mesh',type=Path); parser.add_argument('output',type=Path)
+    parser.add_argument('--patches',type=int,default=64)
+    parser.add_argument('--feature-weight',type=float,default=2.)
+    parser.add_argument('--stretch-limit',type=float,default=1.5)
+    parser.add_argument('--anisotropy-limit',type=float,default=2.)
+    parser.add_argument('--no-merge',action='store_true')
+    args = parser.parse_args()
+    if args.patches < 2 or not np.isfinite([args.feature_weight,args.stretch_limit,args.anisotropy_limit]).all() or args.feature_weight < 0 or args.stretch_limit < 1 or args.anisotropy_limit < 1:
+        parser.error('invalid experiment parameters')
+    v,f = read_obj(args.mesh)
+    result = execute(v,f,patches=args.patches,feature_weight=args.feature_weight,
+                     stretch_limit=args.stretch_limit,anisotropy_limit=args.anisotropy_limit,merge=not args.no_merge)
+    args.output.parent.mkdir(parents=True,exist_ok=True)
+    np.savez_compressed(args.output.with_suffix('.npz'),vertices=v,faces=f,
+                        **{k:x for k,x in result.items() if k!='metrics'})
+    record = dict(schema='intrinsic.atlas-patch-merge.diagnostic.v1',source=str(args.mesh),
+                  source_sha256=hashlib.sha256(args.mesh.read_bytes()).hexdigest(),
+                  implementation='python_scipy_lscm_patch_merge',claim_eligible=False,
+                  parameters={k:str(x) if isinstance(x,Path) else x for k,x in vars(args).items()},
+                  metrics=result['metrics'])
+    args.output.write_text(json.dumps(record,indent=2,allow_nan=False)+'\n')
+    print(json.dumps(result['metrics'],allow_nan=False),flush=True)
+
+
+if __name__ == '__main__':
+    main()
+
+FILE tools/diagnostics/atlas/repack.py
+#!/usr/bin/env python3
+"""Use xatlas only as a packer for frozen source-face labels and LSCM UVs."""
+import argparse
+import json
+import hashlib
+from pathlib import Path
+import subprocess
+import numpy as np
+from compare_atlases import audit, render
+import patch_merge as pm
+
+
+def export_obj(path,v,f,labels,corners):
+    """Derived, importable mesh with source geometry and independent corner UVs."""
+    import matplotlib
+    matplotlib.use('Agg')
+    import matplotlib.pyplot as plt
+    material=path.with_suffix('.mtl'); texture=path.with_suffix('.checker.png')
+    lines=['# Derived atlas; source triangle geometry is unchanged.',f'mtllib {material.name}']
+    lines.extend('v '+' '.join(format(float(x),'.17g') for x in p) for p in v)
+    lines.extend('vt '+' '.join(format(float(x),'.17g') for x in uv) for uv in corners.reshape(-1,2))
+    lines.append('usemtl atlas_checker')
+    for label in np.unique(labels):
+        lines.append(f'g chart_{label}')
+        for i in np.flatnonzero(labels==label):
+            lines.append('f '+' '.join(f'{int(vertex)+1}/{3*i+j+1}' for j,vertex in enumerate(f[i])))
+    path.write_text('\n'.join(lines)+'\n')
+    material.write_text(f'newmtl atlas_checker\nKd 1 1 1\nmap_Kd {texture.name}\n')
+    x,y=np.meshgrid(np.arange(512),np.arange(512))
+    checker=np.where(((x//16+y//16)%2)[...,None],np.array([.16,.25,.34]),np.array([.88,.9,.92]))
+    plt.imsave(texture,checker)
+
+
+def main():
+    parser=argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('input',type=Path); parser.add_argument('output',type=Path)
+    parser.add_argument('--runner',type=Path,default=Path('build/ci/bin/IntrinsicUvChartPackDiagnostic'))
+    parser.add_argument('--stretch-limit',type=float)
+    parser.add_argument('--brute-force',action='store_true',help='exhaustive native chart placement')
+    args=parser.parse_args(); data=np.load(args.input)
+    settings=json.loads(args.input.with_suffix('.json').read_text())
+    limit=args.stretch_limit or settings.get('stretch_limit',settings.get('parameters',{}).get('stretch_limit',1.5))
+    v,f,labels,uv=data['vertices'],data['faces'],data['labels'],data['chart_uv']
+    points,indices,keys=[],[],{}
+    for face,label,corners in zip(f,labels,uv):
+        for vertex,point in zip(face,corners):
+            # Preserve both sides of an internal UV cut within the same chart.
+            key=(int(vertex),int(label),float(point[0]),float(point[1]))
+            if key not in keys:
+                keys[key]=len(points); points.append(point.tolist())
+            indices.append(keys[key])
+    args.output.parent.mkdir(parents=True,exist_ok=True)
+    source=args.output.with_suffix('.input.json'); destination=args.output.with_suffix('.raw.json')
+    source.write_text(json.dumps(dict(uvs=points,indices=indices,materials=labels.tolist(),brute_force=args.brute_force)))
+    subprocess.run([str(args.runner.resolve()),str(source),str(destination)],check=True,timeout=180)
+    raw=json.loads(destination.read_text()); outindices=np.asarray(raw['indices']).reshape(-1,3)
+    xref=np.asarray(raw['source_vertices'])
+    if not np.array_equal(xref[outindices].ravel(),indices) or raw['chart_count']!=len(np.unique(labels)):
+        raise ValueError('packer changed chart/corner correspondence')
+    corners=np.asarray(raw['uvs'])[outindices]/max(raw['width'],raw['height'])
+    measured=audit(v,f,labels,corners)
+    packed_area=np.abs(pm.cross2(corners[:,1]-corners[:,0],corners[:,2]-corners[:,0])).sum()/2
+    measured['continuous_packing_utilization']=float(packed_area/(raw['width']*raw['height']/max(raw['width'],raw['height'])**2))
+    # Report texel-density variation that per-chart normalization deliberately removes.
+    areas=pm.geometry(v,f)['area']; scales=[]
+    for label in np.unique(labels):
+        ids=labels==label
+        scales.append(float(np.sqrt(np.abs(pm.cross2(corners[ids,1]-corners[ids,0],corners[ids,2]-corners[ids,0])).sum()/2/areas[ids].sum())))
+    measured['chart_texel_density_ratio']=max(scales)/min(scales)
+    before=audit(v,f,labels,data['corner_uv'])
+    passed=measured['all_charts_valid'] and measured['max_stretch']<=limit and measured['max_anisotropy']<=2.
+    record=dict(input=str(args.input),input_sha256=hashlib.sha256(args.input.read_bytes()).hexdigest(),
+                runner_sha256=hashlib.sha256(args.runner.read_bytes()).hexdigest(),
+                packer={k:x for k,x in raw.items() if k not in ('uvs','indices','source_vertices')},
+                stretch_limit=limit,postpack_bound_passed=passed,
+                metrics=measured,prepack_metrics=before,claim_eligible=False)
+    args.output.write_text(json.dumps(record,indent=2,allow_nan=False)+'\n')
+    result=dict(labels=labels,corner_uv=corners)
+    if 'region_labels' in data:
+        result['region_labels']=data['region_labels'].copy()
+    np.savez_compressed(args.output.with_suffix('.npz'),vertices=v,faces=f,**result)
+    render(v,f,result,args.output.with_suffix('.png'),f'{args.input.parent.name} · {len(scales)} charts · packed UV atlas')
+    export_obj(args.output.with_suffix('.obj'),v,f,labels,corners)
+    print(json.dumps(record,allow_nan=False),flush=True)
+    return 0 if passed else 1
+
+
+if __name__=='__main__':
+    raise SystemExit(main())
+
+FILE tests/regression/tooling/Test.BaselineAtlas.py
+#!/usr/bin/env python3
+"""Topology, source preservation and UV-cut packing regression controls."""
+import json
+import os
+from pathlib import Path
+import subprocess
+import sys
+import tempfile
+import unittest
+import numpy as np
+
+ROOT = Path(__file__).resolve().parents[3]
+sys.path.insert(0,str(ROOT/'tools/diagnostics/atlas'))
+import baseline_atlas as ba
+import patch_merge as pm
+
+
+def cylinder(n=16, rows=4, planar=False):
+    v = []
+    for j in range(rows+1):
+        for a in np.arange(n)*2*np.pi/n:
+            radius = 1+j/rows if planar else 1
+            v.append((radius*np.cos(a),radius*np.sin(a),0 if planar else j/rows))
+    f = []
+    for j in range(rows):
+        for i in range(n):
+            a = j*n+i; b = j*n+(i+1)%n
+            f.extend(((a,b,b+n),(a,b+n,a+n)))
+    return np.array(v),np.array(f)
+
+
+class BaselineAtlasTests(unittest.TestCase):
+    def test_cylinder_cut_is_one_isometric_chart(self):
+        v,f = cylinder(); regions = np.full(len(f),7)
+        result = ba.execute(v,f,regions)
+        self.assertEqual(result['metrics']['chart_count'],1)
+        self.assertAlmostEqual(result['metrics']['max_stretch'],1.,places=8)
+        self.assertEqual(result['metrics']['internal_uv_cut_edges'],4)
+        np.testing.assert_array_equal(result['region_labels'],regions)
+        self.assertTrue(result['metrics']['all_charts_valid'])
+
+    def test_annulus_cuts_without_new_region(self):
+        v,f = cylinder(planar=True)
+        result = ba.execute(v,f,np.zeros(len(f),int))
+        # The planar conformal solution closes the slit again. A simple-boundary
+        # rejection must trigger explicit UV subdivision, not a false disk pass.
+        self.assertEqual(result['metrics']['region_count'],1)
+        self.assertEqual(result['metrics']['chart_count'],2)
+        self.assertGreater(result['metrics']['split_reasons']['boundary_overlap'],0)
+        self.assertLess(result['metrics']['max_stretch'],1.35)
+
+    def test_protected_regions_are_not_merged(self):
+        v,f = cylinder(); original_v=v.copy(); original_f=f.copy()
+        regions=np.repeat([11,22],len(f)//2); before=regions.copy()
+        result=ba.execute(v,f,regions,merge=True)
+        self.assertEqual(result['metrics']['chart_count'],2)
+        self.assertEqual(result['metrics']['retained_baseline_edges'],16)
+        self.assertEqual(result['metrics']['lost_baseline_edges'],0)
+        np.testing.assert_array_equal(v,original_v); np.testing.assert_array_equal(f,original_f)
+        np.testing.assert_array_equal(regions,before)
+        for label in np.unique(result['labels']):
+            self.assertEqual(len(np.unique(regions[result['labels']==label])),1)
+
+    def test_same_label_disconnected_components(self):
+        v,f=cylinder(n=8,rows=2)
+        v=np.vstack((v,v+5)); f=np.vstack((f,f+len(v)//2))
+        result=ba.execute(v,f,np.zeros(len(f),int))
+        self.assertEqual(result['metrics']['region_count'],1)
+        self.assertEqual(result['metrics']['region_component_count'],2)
+        self.assertEqual(result['metrics']['chart_count'],2)
+
+    def test_repeat_and_similarity(self):
+        v,f=cylinder(); labels=np.zeros(len(f),int)
+        a=ba.execute(v,f,labels); b=ba.execute(v,f,labels)
+        np.testing.assert_array_equal(a['corner_uv'],b['corner_uv'])
+        # Generic shortest paths can have equal-cost alternatives: similarity
+        # must preserve quality/coverage, not an arbitrarily chosen seam edge.
+        c=ba.execute(v[:,[1,2,0]]*13+7,f,labels)
+        self.assertEqual(c['metrics']['chart_count'],1)
+        self.assertLess(c['metrics']['max_stretch'],1.000001)
+
+    def test_pinched_source_rejected_without_repair(self):
+        v=np.array([[0,0,0],[1,0,0],[0,1,0],[-1,0,0],[0,-1,0]],float)
+        f=np.array([[0,1,2],[0,3,4]])
+        with self.assertRaisesRegex(ValueError,'vertex fan'):
+            ba.execute(v,f,np.array([0,1]))
+
+    def test_closed_topology_explicit_split(self):
+        v=np.array([[1,1,1],[-1,-1,1],[-1,1,-1],[1,-1,-1]],float)
+        f=np.array([[0,2,1],[0,1,3],[1,2,3],[2,0,3]])
+        result=ba.execute(v,f,np.full(4,5))
+        self.assertGreater(result['metrics']['split_reasons']['unsupported_topology'],0)
+        self.assertEqual(result['metrics']['outcome'],'protected_with_chart_splits')
+        self.assertEqual(result['metrics']['region_count'],1)
+        self.assertTrue(result['metrics']['all_charts_valid'])
+
+    def test_invalid_labels_and_limits(self):
+        v,f=cylinder()
+        for labels in (np.zeros(len(f)-1,int),np.zeros(len(f)),np.full(len(f),-1)):
+            with self.assertRaises(ValueError):
+                ba.execute(v,f,labels)
+        with self.assertRaises(ValueError):
+            ba.execute(v,f,np.zeros(len(f),int),stretch_limit=float('nan'))
+
+    @unittest.skipUnless(os.environ.get('INTRINSIC_TEST_NATIVE_ATLAS'),'opt-in native packer')
+    def test_native_packer_preserves_internal_cut(self):
+        v,f=cylinder(); result=ba.execute(v,f,np.zeros(len(f),int))
+        with tempfile.TemporaryDirectory(prefix='baseline-atlas-test-') as directory:
+            path=Path(directory)
+            np.savez(path/'source.npz',vertices=v,faces=f,
+                     **{k:x for k,x in result.items() if k not in ('metrics','component_attempts')})
+            (path/'source.json').write_text(json.dumps({'stretch_limit':1.35}))
+            call=subprocess.run([sys.executable,str(ROOT/'tools/diagnostics/atlas/repack.py'),
+                                 str(path/'source.npz'),str(path/'packed.json'),'--brute-force'],cwd=ROOT,capture_output=True,text=True)
+            self.assertEqual(call.returncode,0,call.stderr)
+            record=json.loads((path/'packed.json').read_text())
+            self.assertEqual(record['metrics']['chart_count'],1)
+            self.assertTrue(record['postpack_bound_passed'])
+            self.assertTrue(record['packer']['brute_force'])
+            data=np.load(path/'packed.npz')
+            np.testing.assert_array_equal(data['region_labels'],result['region_labels'])
+            borders=ba.boundary_metrics(pm.geometry(v,f),np.zeros(len(f),int),data['labels'],data['corner_uv'])
+            self.assertEqual(borders['internal_uv_cut_edges'],4)
+
+
+if __name__=='__main__':
+    unittest.main()
+
+FILE benchmarks/runners/UvChartPackDiagnosticRunner.cpp
+// Packs precomputed UV charts without running segmentation or parameterization.
+#include <array>
+#include <chrono>
+#include <cstdint>
+#include <fstream>
+#include <iostream>
+#include <vector>
+#include <nlohmann/json.hpp>
+#include <xatlas.h>
+
+int main(int argc, char** argv) {
+  if (argc != 3) return 2;
+  std::ifstream input{argv[1]};
+  const auto source = nlohmann::json::parse(input, nullptr, false);
+  if (source.is_discarded()) return 2;
+  const auto uvs = source.at("uvs").get<std::vector<std::array<float, 2>>>();
+  const auto indices = source.at("indices").get<std::vector<std::uint32_t>>();
+  const auto materials = source.at("materials").get<std::vector<std::uint32_t>>();
+  if (indices.size() % 3 || materials.size() != indices.size()/3) return 2;
+  const auto start = std::chrono::steady_clock::now();
+  auto* atlas = xatlas::Create();
+  if (!atlas) return 1;
+  xatlas::UvMeshDecl mesh;
+  mesh.vertexUvData = uvs.data(); mesh.vertexCount = static_cast<std::uint32_t>(uvs.size());
+  mesh.vertexStride = sizeof(uvs[0]); mesh.indexData = indices.data();
+  mesh.indexCount = static_cast<std::uint32_t>(indices.size()); mesh.indexFormat = xatlas::IndexFormat::UInt32;
+  mesh.faceMaterialData = materials.data();
+  if (xatlas::AddUvMesh(atlas, mesh) != xatlas::AddMeshError::Success) {
+    xatlas::Destroy(atlas); return 1;
+  }
+  xatlas::PackOptions options;
+  options.resolution = 1024; options.padding = 2;
+  options.bruteForce = source.value("brute_force", false);
+  // For UvMesh input this identifies supplied UV components; there is no 3D
+  // embedding to re-segment or parameterize. The caller verifies chart identity.
+  xatlas::ComputeCharts(atlas);
+  xatlas::PackCharts(atlas, options);
+  const double seconds = std::chrono::duration<double>(std::chrono::steady_clock::now()-start).count();
+  if (atlas->meshCount != 1 || atlas->atlasCount != 1 || atlas->width == 0 || atlas->height == 0) {
+    xatlas::Destroy(atlas); return 1;
+  }
+  const auto& output = atlas->meshes[0];
+  nlohmann::json result{{"chart_count", atlas->chartCount}, {"runtime_seconds", seconds},
+      {"width", atlas->width}, {"height", atlas->height}, {"raster_utilization", atlas->utilization[0]},
+      {"implementation", "xatlas_pack_existing_uv_mesh"}, {"resolution", 1024}, {"padding", 2},
+      {"brute_force", options.bruteForce}};
+  for (std::uint32_t i = 0; i < output.vertexCount; ++i) {
+    result["uvs"].push_back({output.vertexArray[i].uv[0], output.vertexArray[i].uv[1]});
+    result["source_vertices"].push_back(output.vertexArray[i].xref);
+  }
+  for (std::uint32_t i = 0; i < output.indexCount; ++i) result["indices"].push_back(output.indexArray[i]);
+  xatlas::Destroy(atlas);
+  std::ofstream destination{argv[2]}; destination << result.dump() << '\n';
+  return destination.good() ? 0 : 1;
+}
+
+MEASURED round2
+[
+  {
+    "mesh": "sculpt",
+    "arm": "protected-merge",
+    "metrics": {
+      "chart_count": 6,
+      "invalid_charts": [],
+      "chart_texel_density_ratio": 1.0011074725307612,
+      "non_disk_charts": [],
+      "positive_area_overlap_count": 0,
+      "overlap_pairs_sample": [],
+      "global_chart_reflections": 5,
+      "all_charts_valid": true,
+      "max_stretch": 1.244345247138066,
+      "mean_stretch": 1.0487083346655288,
+      "area_weighted_p95_stretch": 1.1475699323471271,
+      "max_anisotropy": 1.0501158452947517,
+      "mean_anisotropy": 1.0091720540397529,
+      "seam_length_over_sqrt_area": 6.770872302044108,
+      "smallest_chart_area_fraction": 0.11093774485004262,
+      "continuous_packing_utilization": 0.4078911021415708,
+      "postpack_bound_passed": true,
+      "square_texture_occupancy": 0.39912732769408465,
+      "retained_baseline_edges": 384,
+      "lost_baseline_edges": 0,
+      "extra_chart_boundary_edges": 24,
+      "internal_uv_cut_edges": 29,
+      "total_uv_seam_length_over_sqrt_area": 7.298727030988109,
+      "baseline_seam_length_over_sqrt_area": 6.357515016553575,
+      "internal_uv_seam_length_over_sqrt_area": 0.5278547289439997,
+      "region_count": 5
+    }
+  },
+  {
+    "mesh": "frog",
+    "arm": "protected-merge",
+    "metrics": {
+      "chart_count": 23,
+      "invalid_charts": [],
+      "chart_texel_density_ratio": 1.0268832195525208,
+      "non_disk_charts": [],
+      "positive_area_overlap_count": 0,
+      "overlap_pairs_sample": [],
+      "global_chart_reflections": 9,
+      "all_charts_valid": true,
+      "max_stretch": 1.349355216680261,
+      "mean_stretch": 1.0660937892359936,
+      "area_weighted_p95_stretch": 1.169638071181839,
+      "max_anisotropy": 1.254425207543235,
+      "mean_anisotropy": 1.0152840164533932,
+      "seam_length_over_sqrt_area": 12.202605102562654,
+      "smallest_chart_area_fraction": 0.0001807946160678882,
+      "continuous_packing_utilization": 0.5929671568629542,
+      "postpack_bound_passed": true,
+      "square_texture_occupancy": 0.5824177041092767,
+      "retained_baseline_edges": 55,
+      "lost_baseline_edges": 0,
+      "extra_chart_boundary_edges": 1042,
+      "internal_uv_cut_edges": 5,
+      "total_uv_seam_length_over_sqrt_area": 12.24330756908775,
+      "baseline_seam_length_over_sqrt_area": 0.4769557913777354,
+      "internal_uv_seam_length_over_sqrt_area": 0.04070246652509486,
+      "region_count": 5
+    }
+  },
+  {
+    "mesh": "fandisk",
+    "arm": "protected-merge",
+    "metrics": {
+      "chart_count": 15,
+      "invalid_charts": [],
+      "chart_texel_density_ratio": 1.0053317360488314,
+      "non_disk_charts": [],
+      "positive_area_overlap_count": 0,
+      "overlap_pairs_sample": [],
+      "global_chart_reflections": 10,
+      "all_charts_valid": true,
+      "max_stretch": 1.0285596175836498,
+      "mean_stretch": 1.0024899819530209,
+      "area_weighted_p95_stretch": 1.0151456613052903,
+      "max_anisotropy": 1.0058711763947086,
+      "mean_anisotropy": 1.0013498554149776,
+      "seam_length_over_sqrt_area": 9.56222195433226,
+      "smallest_chart_area_fraction": 0.014676021158168108,
+      "continuous_packing_utilization": 0.6109457455301412,
+      "postpack_bound_passed": true,
+      "square_texture_occupancy": 0.6072458469955151,
+      "retained_baseline_edges": 769,
+      "lost_baseline_edges": 0,
+      "extra_chart_boundary_edges": 0,
+      "internal_uv_cut_edges": 0,
+      "total_uv_seam_length_over_sqrt_area": 9.562221954332257,
+      "baseline_seam_length_over_sqrt_area": 9.562221954332257,
+      "internal_uv_seam_length_over_sqrt_area": 0.0,
+      "region_count": 15
+    }
+  },
+  {
+    "mesh": "dolphin",
+    "arm": "protected-merge",
+    "metrics": {
+      "chart_count": 16,
+      "invalid_charts": [],
+      "chart_texel_density_ratio": 1.1174902964178846,
+      "non_disk_charts": [],
+      "positive_area_overlap_count": 0,
+      "overlap_pairs_sample": [],
+      "global_chart_reflections": 9,
+      "all_charts_valid": true,
+      "max_stretch": 1.3454084829506063,
+      "mean_stretch": 1.049136179799087,
+      "area_weighted_p95_stretch": 1.1244253905062733,
+      "max_anisotropy": 1.3806910370265433,
+      "mean_anisotropy": 1.0135206045125358,
+      "seam_length_over_sqrt_area": 8.912913221180743,
+      "smallest_chart_area_fraction": 4.3155805907875905e-05,
+      "continuous_packing_utilization": 0.4459822563009113,
+      "postpack_bound_passed": true,
+      "square_texture_occupancy": 0.4215024731474859,
+      "retained_baseline_edges": 100,
+      "lost_baseline_edges": 0,
+      "extra_chart_boundary_edges": 231,
+      "internal_uv_cut_edges": 0,
+      "total_uv_seam_length_over_sqrt_area": 8.912913221180737,
+      "baseline_seam_length_over_sqrt_area": 3.739846369698682,
+      "internal_uv_seam_length_over_sqrt_area": 0.0,
+      "region_count": 11
+    }
+  }
+]
+MEASURED final-comparators
+[
+  {
+    "mesh": "sculpt",
+    "arm": "feature",
+    "metrics": {
+      "chart_count": 5,
+      "invalid_charts": [],
+      "chart_texel_density_ratio": 1.0011843979594324,
+      "non_disk_charts": [],
+      "positive_area_overlap_count": 0,
+      "overlap_pairs_sample": [],
+      "global_chart_reflections": 1,
+      "all_charts_valid": true,
+      "max_stretch": 1.3014054407017892,
+      "mean_stretch": 1.070849980129627,
+      "area_weighted_p95_stretch": 1.1731462553003729,
+      "max_anisotropy": 1.225505882195932,
+      "mean_anisotropy": 1.0107984292515588,
+      "seam_length_over_sqrt_area": 6.801343326226663,
+      "smallest_chart_area_fraction": 0.08208452630631706,
+      "continuous_packing_utilization": 0.5116099640116705,
+      "postpack_bound_passed": true,
+      "square_texture_occupancy": 0.4910479831692396,
+      "retained_baseline_edges": 321,
+      "lost_baseline_edges": 63,
+      "extra_chart_boundary_edges": 87,
+      "internal_uv_cut_edges": 0,
+      "total_uv_seam_length_over_sqrt_area": 6.801343326226663,
+      "baseline_seam_length_over_sqrt_area": 6.357515016553575,
+      "internal_uv_seam_length_over_sqrt_area": 0.0,
+      "region_count": 5
+    }
+  },
+  {
+    "mesh": "sculpt",
+    "arm": "growth-only",
+    "metrics": {
+      "chart_count": 8,
+      "invalid_charts": [],
+      "chart_texel_density_ratio": 1.0034929960672725,
+      "non_disk_charts": [],
+      "positive_area_overlap_count": 0,
+      "overlap_pairs_sample": [],
+      "global_chart_reflections": 2,
+      "all_charts_valid": true,
+      "max_stretch": 1.33312695670724,
+      "mean_stretch": 1.0912642592955855,
+      "area_weighted_p95_stretch": 1.2153830401345258,
+      "max_anisotropy": 1.0915611800297556,
+      "mean_anisotropy": 1.0163047811737904,
+      "seam_length_over_sqrt_area": 6.701259250725925,
+      "smallest_chart_area_fraction": 0.01865528666847019,
+      "continuous_packing_utilization": 0.5684802382509897,
+      "postpack_bound_passed": true,
+      "square_texture_occupancy": 0.5432325485865475,
+      "retained_baseline_edges": 227,
+      "lost_baseline_edges": 157,
+      "extra_chart_boundary_edges": 167,
+      "internal_uv_cut_edges": 0,
+      "total_uv_seam_length_over_sqrt_area": 6.70125925072592,
+      "baseline_seam_length_over_sqrt_area": 6.357515016553575,
+      "internal_uv_seam_length_over_sqrt_area": 0.0,
+      "region_count": 5
+    }
+  },
+  {
+    "mesh": "sculpt",
+    "arm": "xatlas",
+    "metrics": {
+      "chart_count": 17,
+      "invalid_charts": [],
+      "chart_texel_density_ratio": 1.0036587590992867,
+      "non_disk_charts": [],
+      "positive_area_overlap_count": 0,
+      "overlap_pairs_sample": [],
+      "global_chart_reflections": 6,
+      "all_charts_valid": true,
+      "max_stretch": 1.2454733408519247,
+      "mean_stretch": 1.0213506890637516,
+      "area_weighted_p95_stretch": 1.0565466922753732,
+      "max_anisotropy": 1.2732250892307444,
+      "mean_anisotropy": 1.0103264005389752,
+      "seam_length_over_sqrt_area": 10.329607553408483,
+      "smallest_chart_area_fraction": 0.028718344075208322,
+      "runtime_seconds": 2.061702515,
+      "implementation": "native_engine_xatlas",
+      "square_texture_occupancy": 0.5090326771461945,
+      "continuous_packing_utilization": 0.5177305503927935,
+      "retained_baseline_edges": 384,
+      "lost_baseline_edges": 0,
+      "extra_chart_boundary_edges": 227,
+      "internal_uv_cut_edges": 0,
+      "total_uv_seam_length_over_sqrt_area": 10.329607553408485,
+      "baseline_seam_length_over_sqrt_area": 6.357515016553575,
+      "internal_uv_seam_length_over_sqrt_area": 0.0,
+      "region_count": 5
+    }
+  },
+  {
+    "mesh": "frog",
+    "arm": "feature",
+    "metrics": {
+      "chart_count": 15,
+      "invalid_charts": [],
+      "chart_texel_density_ratio": 1.0149726500774563,
+      "non_disk_charts": [],
+      "positive_area_overlap_count": 0,
+      "overlap_pairs_sample": [],
+      "global_chart_reflections": 5,
+      "all_charts_valid": true,
+      "max_stretch": 1.3469228691653015,
+      "mean_stretch": 1.0704062025798826,
+      "area_weighted_p95_stretch": 1.1802235753226367,
+      "max_anisotropy": 1.2657919464088954,
+      "mean_anisotropy": 1.0149746383483877,
+      "seam_length_over_sqrt_area": 9.394231446803346,
+      "smallest_chart_area_fraction": 0.0010533232460716022,
+      "continuous_packing_utilization": 0.5951471610562701,
+      "postpack_bound_passed": true,
+      "square_texture_occupancy": 0.5694039920662994,
+      "retained_baseline_edges": 14,
+      "lost_baseline_edges": 41,
+      "extra_chart_boundary_edges": 894,
+      "internal_uv_cut_edges": 0,
+      "total_uv_seam_length_over_sqrt_area": 9.39423144680335,
+      "baseline_seam_length_over_sqrt_area": 0.4769557913777354,
+      "internal_uv_seam_length_over_sqrt_area": 0.0,
+      "region_count": 5
+    }
+  },
+  {
+    "mesh": "frog",
+    "arm": "growth-only",
+    "metrics": {
+      "chart_count": 16,
+      "invalid_charts": [],
+      "chart_texel_density_ratio": 1.0153025271573934,
+      "non_disk_charts": [],
+      "positive_area_overlap_count": 0,
+      "overlap_pairs_sample": [],
+      "global_chart_reflections": 8,
+      "all_charts_valid": true,
+      "max_stretch": 1.3469229237035387,
+      "mean_stretch": 1.0723263253868502,
+      "area_weighted_p95_stretch": 1.1967057967524446,
+      "max_anisotropy": 1.2657923343874875,
+      "mean_anisotropy": 1.0144691631957534,
+      "seam_length_over_sqrt_area": 9.692836803704079,
+      "smallest_chart_area_fraction": 0.0010533232460716022,
+      "continuous_packing_utilization": 0.5989660769658238,
+      "postpack_bound_passed": true,
+      "square_texture_occupancy": 0.5708208281216147,
+      "retained_baseline_edges": 14,
+      "lost_baseline_edges": 41,
+      "extra_chart_boundary_edges": 908,
+      "internal_uv_cut_edges": 0,
+      "total_uv_seam_length_over_sqrt_area": 9.692836803704077,
+      "baseline_seam_length_over_sqrt_area": 0.4769557913777354,
+      "internal_uv_seam_length_over_sqrt_area": 0.0,
+      "region_count": 5
+    }
+  },
+  {
+    "mesh": "frog",
+    "arm": "xatlas",
+    "metrics": {
+      "chart_count": 26,
+      "invalid_charts": [],
+      "chart_texel_density_ratio": 1.0839004312260487,
+      "non_disk_charts": [
+        1
+      ],
+      "positive_area_overlap_count": 0,
+      "overlap_pairs_sample": [],
+      "global_chart_reflections": 12,
+      "all_charts_valid": true,
+      "max_stretch": 1.8580724639968995,
+      "mean_stretch": 1.0478501889843108,
+      "area_weighted_p95_stretch": 1.1878459272414648,
+      "max_anisotropy": 1.3285090402663933,
+      "mean_anisotropy": 1.0105923346910548,
+      "seam_length_over_sqrt_area": 11.892689868129407,
+      "smallest_chart_area_fraction": 1.9302178504964925e-05,
+      "runtime_seconds": 15.664611137,
+      "implementation": "native_engine_xatlas",
+      "square_texture_occupancy": 0.5148549301218837,
+      "continuous_packing_utilization": 0.5359838175389459,
+      "retained_baseline_edges": 14,
+      "lost_baseline_edges": 41,
+      "extra_chart_boundary_edges": 1155,
+      "internal_uv_cut_edges": 0,
+      "total_uv_seam_length_over_sqrt_area": 11.892689868129413,
+      "baseline_seam_length_over_sqrt_area": 0.4769557913777354,
+      "internal_uv_seam_length_over_sqrt_area": 0.0,
+      "region_count": 5
+    }
+  },
+  {
+    "mesh": "fandisk",
+    "arm": "feature",
+    "metrics": {
+      "chart_count": 5,
+      "invalid_charts": [],
+      "chart_texel_density_ratio": 1.0030563024434302,
+      "non_disk_charts": [],
+      "positive_area_overlap_count": 0,
+      "overlap_pairs_sample": [],
+      "global_chart_reflections": 1,
+      "all_charts_valid": true,
+      "max_stretch": 1.319808772428766,
+      "mean_stretch": 1.0475653575138448,
+      "area_weighted_p95_stretch": 1.1932625376400046,
+      "max_anisotropy": 1.0956354188627613,
+      "mean_anisotropy": 1.0035288521426575,
+      "seam_length_over_sqrt_area": 6.023020068484281,
+      "smallest_chart_area_fraction": 0.02641006847331912,
+      "continuous_packing_utilization": 0.4913615453537513,
+      "postpack_bound_passed": true,
+      "square_texture_occupancy": 0.35675757007402376,
+      "retained_baseline_edges": 442,
+      "lost_baseline_edges": 327,
+      "extra_chart_boundary_edges": 41,
+      "internal_uv_cut_edges": 0,
+      "total_uv_seam_length_over_sqrt_area": 6.023020068484281,
+      "baseline_seam_length_over_sqrt_area": 9.562221954332257,
+      "internal_uv_seam_length_over_sqrt_area": 0.0,
+      "region_count": 15
+    }
+  },
+  {
+    "mesh": "fandisk",
+    "arm": "growth-only",
+    "metrics": {
+      "chart_count": 4,
+      "invalid_charts": [],
+      "chart_texel_density_ratio": 1.0012630286912207,
+      "non_disk_charts": [],
+      "positive_area_overlap_count": 0,
+      "overlap_pairs_sample": [],
+      "global_chart_reflections": 3,
+      "all_charts_valid": true,
+      "max_stretch": 1.2735262471905413,
+      "mean_stretch": 1.050375100092915,
+      "area_weighted_p95_stretch": 1.148083376665708,
+      "max_anisotropy": 1.0944239225566563,
+      "mean_anisotropy": 1.0046471927798561,
+      "seam_length_over_sqrt_area": 5.551110096470129,
+      "smallest_chart_area_fraction": 0.058874286793603396,
+      "continuous_packing_utilization": 0.5714022818110418,
+      "postpack_bound_passed": true,
+      "square_texture_occupancy": 0.5110456822034821,
+      "retained_baseline_edges": 362,
+      "lost_baseline_edges": 407,
+      "extra_chart_boundary_edges": 80,
+      "internal_uv_cut_edges": 0,
+      "total_uv_seam_length_over_sqrt_area": 5.551110096470131,
+      "baseline_seam_length_over_sqrt_area": 9.562221954332257,
+      "internal_uv_seam_length_over_sqrt_area": 0.0,
+      "region_count": 15
+    }
+  },
+  {
+    "mesh": "fandisk",
+    "arm": "xatlas",
+    "metrics": {
+      "chart_count": 15,
+      "invalid_charts": [],
+      "chart_texel_density_ratio": 1.0128017114816228,
+      "non_disk_charts": [],
+      "positive_area_overlap_count": 0,
+      "overlap_pairs_sample": [],
+      "global_chart_reflections": 12,
+      "all_charts_valid": true,
+      "max_stretch": 1.1822839263539904,
+      "mean_stretch": 1.0146633902080846,
+      "area_weighted_p95_stretch": 1.0768682285674371,
+      "max_anisotropy": 1.201956677267029,
+      "mean_anisotropy": 1.0097134365450884,
+      "seam_length_over_sqrt_area": 9.168793594668935,
+      "smallest_chart_area_fraction": 0.007708532211611241,
+      "runtime_seconds": 1.496424476,
+      "implementation": "native_engine_xatlas",
+      "square_texture_occupancy": 0.6235443694521778,
+      "continuous_packing_utilization": 0.6291117298937151,
+      "retained_baseline_edges": 632,
+      "lost_baseline_edges": 137,
+      "extra_chart_boundary_edges": 94,
+      "internal_uv_cut_edges": 0,
+      "total_uv_seam_length_over_sqrt_area": 9.168793594668937,
+      "baseline_seam_length_over_sqrt_area": 9.562221954332257,
+      "internal_uv_seam_length_over_sqrt_area": 0.0,
+      "region_count": 15
+    }
+  }
+]
+MEASURED subdivision
+[
+  {
+    "mesh": "sculpt",
+    "arm": "protected-merge",
+    "metrics": {
+      "chart_count": 6,
+      "invalid_charts": [],
+      "chart_texel_density_ratio": 1.0012292808574272,
+      "non_disk_charts": [],
+      "positive_area_overlap_count": 0,
+      "overlap_pairs_sample": [],
+      "global_chart_reflections": 2,
+      "all_charts_valid": true,
+      "max_stretch": 1.245704484346655,
+      "mean_stretch": 1.0463990147505078,
+      "area_weighted_p95_stretch": 1.1437977187299262,
+      "max_anisotropy": 1.0252608024473484,
+      "mean_anisotropy": 1.0046459291531613,
+      "seam_length_over_sqrt_area": 6.7636084962776035,
+      "smallest_chart_area_fraction": 0.1109377448500426,
+      "continuous_packing_utilization": 0.43618982599632716,
+      "postpack_bound_passed": true,
+      "square_texture_occupancy": 0.37565842072107747,
+      "retained_baseline_edges": 768,
+      "lost_baseline_edges": 0,
+      "extra_chart_boundary_edges": 47,
+      "internal_uv_cut_edges": 58,
+      "total_uv_seam_length_over_sqrt_area": 7.291463225221604,
+      "baseline_seam_length_over_sqrt_area": 6.357515016553579,
+      "internal_uv_seam_length_over_sqrt_area": 0.5278547289439997,
+      "region_count": 5
+    }
+  },
+  {
+    "mesh": "frog",
+    "arm": "protected-merge",
+    "metrics": {
+      "chart_count": 25,
+      "invalid_charts": [],
+      "chart_texel_density_ratio": 1.0266155294652184,
+      "non_disk_charts": [],
+      "positive_area_overlap_count": 0,
+      "overlap_pairs_sample": [],
+      "global_chart_reflections": 10,
+      "all_charts_valid": true,
+      "max_stretch": 1.3449118076119218,
+      "mean_stretch": 1.0769702406642767,
+      "area_weighted_p95_stretch": 1.1991899967812505,
+      "max_anisotropy": 1.2152669562305576,
+      "mean_anisotropy": 1.008621802605426,
+      "seam_length_over_sqrt_area": 12.446081353007623,
+      "smallest_chart_area_fraction": 0.0001807946160678882,
+      "continuous_packing_utilization": 0.5831182768187078,
+      "postpack_bound_passed": true,
+      "square_texture_occupancy": 0.46187586282669923,
+      "retained_baseline_edges": 110,
+      "lost_baseline_edges": 0,
+      "extra_chart_boundary_edges": 2174,
+      "internal_uv_cut_edges": 22,
+      "total_uv_seam_length_over_sqrt_area": 12.552270704676374,
+      "baseline_seam_length_over_sqrt_area": 0.4769557913777355,
+      "internal_uv_seam_length_over_sqrt_area": 0.10618935166875962,
+      "region_count": 5
+    }
+  }
+]
+Verification: 9 new and 11 existing Python tests passed including real native packing; canonical Clang 23 ci IntrinsicTests build and 4308 CPU entries with zero failures and one skip; final 90 atlas/parameterization CTests passed. Source arrays and original region labels checked exactly against retained native baseline exports. No production integration, anatomical segmentation improvement, native speedup or uniform packing superiority is claimed.

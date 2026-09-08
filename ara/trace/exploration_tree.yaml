@@ -11096,3 +11096,134 @@ tree:
     - 6799e1970
     - tasks/done/METHOD-041-curvature-extremum-curve-inspection.md
     status: resolved
+
+  - id: N480
+    type: decision
+    title: Prioritize baseline quality before integrating offline methods
+    provenance: user
+    timestamp: '2026-09-07T20:56:16+02:00'
+    choice: Redirect requested method wiring into collaboration with Claude on unresolved quality, preserving
+      baseline quality especially sculpt. The working interpretation is original curvature regions; no reply
+      to the optional UV-versus-segmentation clarification was received.
+    alternatives:
+    - Integrate the current offline prototypes immediately.
+    evidence:
+    - tasks/active/METHOD-045-baseline-preserving-atlas-cuts.md
+    status: resolved
+  - id: N481
+    type: experiment
+    title: Preserve original regions while constructing and packing cut UV charts
+    provenance: ai-executed
+    timestamp: '2026-09-07T20:56:16+02:00'
+    result: Native sculpt regions fail direct disk preflight; boundary-loop cuts plus within-region subdivision/merging
+      preserve all original labels and borders, yielding six sculpt UV charts. Frog split-only overfragmentation
+      is reduced by constrained re-merging. Exhaustive packing has mixed square-texture outcomes. Public-material
+      Claude reviews guided the design; unpublished source/results review awaits sharing approval after
+      automatic review rejection.
+    evidence:
+    - N480
+    - ara/evidence/diagnostics/method045/record.json
+    - ara/evidence/diagnostics/method045/verification/retained-array-audit.json
+    - docs/methods/baseline_preserving_atlas_experiment.md
+    status: resolved
+
+  - id: N482
+    type: decision
+    title: Authorize unpublished atlas review and inspect the frog
+    provenance: user
+    timestamp: '2026-09-07T21:10:56+02:00'
+    choice: Approve the pending Claude source and mesh-free aggregate review; request
+      the frog appearance after the baseline-preserving fix. This is sharing approval,
+      not acceptance of anatomical segmentation quality or production adoption.
+    evidence:
+    - ara/evidence/diagnostics/method045/reviews/claude-source.prompt.txt
+    status: resolved
+  - id: N483
+    type: experiment
+    title: Resolve source-review caveats against saved atlas arrays
+    provenance: ai-executed
+    timestamp: '2026-09-07T21:10:56+02:00'
+    result: Claude source/result inspection supports the preservation logic and requests
+      reporting clarifications. Local xatlas source permits axis-swap mirroring;
+      retained arrays have uniformly negative charts but no mixed-or-zero chart.
+      Clarify per-chart normalization and expose frog chart inflation and jagged seams.
+      No algorithm change, new quality improvement, or independent rerun is inferred.
+    evidence:
+    - N482
+    - ara/evidence/diagnostics/method045/reviews/claude-source.md
+    - ara/evidence/diagnostics/method045/reviews/resolution.md
+    - ara/evidence/diagnostics/method045/verification/packed-orientation-audit.json
+    - docs/methods/baseline_preserving_atlas_experiment.md
+    status: resolved
+
+  - id: N484
+    type: question
+    title: Inspect clustering stages, curvature alignment and decision evidence
+    provenance: user
+    timestamp: '2026-09-08T02:12:46+02:00'
+    description: Ask whether all initial/intermediate clusters were visualized, whether borders
+      follow curvature lines, exact merge rules and scalars, possible surface seed movement,
+      destructive distortion merging, and use of available signals at critical decisions.
+    evidence:
+    - tasks/active/METHOD-045-baseline-preserving-atlas-cuts.md
+    status: resolved
+  - id: N485
+    type: experiment
+    title: Trace atlas decisions and expose unused curvature fields
+    provenance: ai-executed
+    timestamp: '2026-09-08T02:12:46+02:00'
+    result: Export native initial/final regions and existing scalars; observe every Python atlas
+      split/merge without changing outputs. Localize frog losses before merging and sculpt hard-edge
+      losses during merging. Render 265 checked viewer modes and depth-tested scalar/stage figures.
+      Claude reviewed source/counts; no geometry or image acceptance is attributed to that review.
+    evidence:
+    - N484
+    - ara/evidence/diagnostics/method045/stages/record.json
+    - docs/methods/atlas_stage_inspection.md
+    status: resolved
+
+  - id: N486
+    type: decision
+    title: Plan, implement and review the boundary fix with Claude
+    provenance: user
+    timestamp: '2026-09-08T03:27:09+02:00'
+    choice: Continue from the stage findings with actual Claude collaboration, choose a bounded implementation,
+      then review it again. Preserve the earlier sculpt baseline-quality priority and deferred engine integration.
+    evidence:
+    - tasks/active/METHOD-046-feature-guided-uv-boundary-refinement.md
+    status: resolved
+  - id: N487
+    type: decision
+    title: Use collective binary cuts inside immutable original seam bands
+    provenance: ai-suggested
+    timestamp: '2026-09-08T03:27:09+02:00'
+    choice: Adopt a positive weighted Potts border objective in fixed six-hop bands with global immutable
+      chart cores, native hard-border constraints and full cut/LSCM validation. Compare length/native/curve/shuffled
+      arms at frozen parameters. This realizes part of O198 without adopting a seed-relocation or anatomical-quality
+      claim.
+    alternatives:
+    - Single-face local descent
+    - Continuous variational cutting
+    - Immediate runtime adoption
+    evidence:
+    - N486
+    - ara/evidence/diagnostics/method046/reviews/plan.md
+    - tools/diagnostics/atlas/boundary_refine.py
+    status: resolved
+  - id: N488
+    type: experiment
+    title: Run and review the five-arm boundary-refinement experiment
+    provenance: ai-executed
+    timestamp: '2026-09-08T03:27:09+02:00'
+    result: Corrected a first-run core-consumption defect and independently checked internal cuts. All ten
+      final native-packed cells retain source regions, chart counts and UV limits. Frog borders become less
+      jagged; native/curve/length objectives trade off. Sculpt original borders remain fixed with one twelve-face
+      change and a small square-packing decrease. Claude source/aggregate review led to numerical controls
+      and richer rejection/area diagnostics; exact replay preserves labels, UVs and all accepted stages.
+      No independent anatomical acceptance is attributed to Claude.
+    evidence:
+    - N487
+    - ara/evidence/diagnostics/method046/record.json
+    - ara/evidence/diagnostics/method046/reviews/resolution.md
+    - docs/methods/uv_boundary_refinement_experiment.md
+    status: resolved

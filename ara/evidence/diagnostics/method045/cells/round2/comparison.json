@@ -1,0 +1,3459 @@
+[
+  {
+    "mesh": "sculpt",
+    "arm": "protected-merge",
+    "subdivided": false,
+    "faces": 7342,
+    "source_sha256": "941c988ce43502c48b6d0eae0f6d0f6ff0a410c4e2d88e8c3857ab0b9d3cef0f",
+    "baseline_labels_sha256": "c2b1ea735efb706b16c29dd40fa2ac69da60624b0a30566cd9928aff4575daaf",
+    "claim_eligible": false,
+    "stretch_limit": 1.35,
+    "anisotropy_limit": 2.0,
+    "outcome": "protected_with_chart_splits",
+    "metrics": {
+      "chart_count": 6,
+      "invalid_charts": [],
+      "chart_texel_density_ratio": 1.0011074725307612,
+      "non_disk_charts": [],
+      "positive_area_overlap_count": 0,
+      "overlap_pairs_sample": [],
+      "global_chart_reflections": 5,
+      "all_charts_valid": true,
+      "max_stretch": 1.244345247138066,
+      "mean_stretch": 1.0487083346655288,
+      "area_weighted_p95_stretch": 1.1475699323471271,
+      "max_anisotropy": 1.0501158452947517,
+      "mean_anisotropy": 1.0091720540397529,
+      "seam_length_over_sqrt_area": 6.770872302044108,
+      "smallest_chart_area_fraction": 0.11093774485004262,
+      "continuous_packing_utilization": 0.4078911021415708,
+      "postpack_bound_passed": true,
+      "square_texture_occupancy": 0.39912732769408465,
+      "retained_baseline_edges": 384,
+      "lost_baseline_edges": 0,
+      "extra_chart_boundary_edges": 24,
+      "internal_uv_cut_edges": 29,
+      "total_uv_seam_length_over_sqrt_area": 7.298727030988109,
+      "baseline_seam_length_over_sqrt_area": 6.357515016553575,
+      "internal_uv_seam_length_over_sqrt_area": 0.5278547289439997,
+      "region_count": 5
+    },
+    "prepack_metrics": {
+      "chart_count": 6,
+      "invalid_charts": [],
+      "chart_texel_density_ratio": 1.0000000000000002,
+      "non_disk_charts": [],
+      "positive_area_overlap_count": 0,
+      "overlap_pairs_sample": [],
+      "global_chart_reflections": 0,
+      "all_charts_valid": true,
+      "max_stretch": 1.244654738665716,
+      "mean_stretch": 1.0486330515497244,
+      "area_weighted_p95_stretch": 1.1477442181156428,
+      "max_anisotropy": 1.0502808944873419,
+      "mean_anisotropy": 1.009022115567012,
+      "seam_length_over_sqrt_area": 6.770872302044108,
+      "smallest_chart_area_fraction": 0.11093774485004262,
+      "retained_baseline_edges": 384,
+      "lost_baseline_edges": 0,
+      "extra_chart_boundary_edges": 24,
+      "internal_uv_cut_edges": 29,
+      "total_uv_seam_length_over_sqrt_area": 7.298727030988109,
+      "baseline_seam_length_over_sqrt_area": 6.357515016553575,
+      "internal_uv_seam_length_over_sqrt_area": 0.5278547289439997,
+      "region_count": 5,
+      "region_component_count": 5,
+      "split_reasons": {
+        "distortion": 1
+      },
+      "uv_solves": 8,
+      "initial_charts": 6,
+      "accepted_merges": 0,
+      "merge_attempts": [
+        {
+          "region": 4,
+          "faces": 3348,
+          "status": "distortion",
+          "euler_characteristic": -1,
+          "boundary_loops": 3,
+          "cut_edges": 9
+        }
+      ],
+      "outcome": "protected_with_chart_splits"
+    },
+    "component_attempts": [
+      {
+        "region": 0,
+        "faces": 926,
+        "status": "accepted",
+        "euler_characteristic": 0,
+        "boundary_loops": 2,
+        "cut_edges": 7
+      },
+      {
+        "region": 1,
+        "faces": 1488,
+        "status": "accepted",
+        "euler_characteristic": -1,
+        "boundary_loops": 3,
+        "cut_edges": 12
+      },
+      {
+        "region": 2,
+        "faces": 788,
+        "status": "accepted",
+        "euler_characteristic": 0,
+        "boundary_loops": 2,
+        "cut_edges": 5
+      },
+      {
+        "region": 3,
+        "faces": 792,
+        "status": "accepted",
+        "euler_characteristic": 0,
+        "boundary_loops": 2,
+        "cut_edges": 5
+      },
+      {
+        "region": 4,
+        "faces": 3348,
+        "status": "distortion",
+        "euler_characteristic": -1,
+        "boundary_loops": 3,
+        "cut_edges": 9
+      },
+      {
+        "region": 4,
+        "faces": 1662,
+        "status": "accepted",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 4,
+        "faces": 1686,
+        "status": "accepted",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      }
+    ]
+  },
+  {
+    "mesh": "frog",
+    "arm": "protected-merge",
+    "subdivided": false,
+    "faces": 19106,
+    "source_sha256": "f272713be39dc528b36a0be29d8e0439fcbce28f3d3d5edc302291155d6b5d2f",
+    "baseline_labels_sha256": "23817553e6515f245e5f22e515a03acc1aebdafce28ead039b2a0bff265e8399",
+    "claim_eligible": false,
+    "stretch_limit": 1.35,
+    "anisotropy_limit": 2.0,
+    "outcome": "protected_with_chart_splits",
+    "metrics": {
+      "chart_count": 23,
+      "invalid_charts": [],
+      "chart_texel_density_ratio": 1.0268832195525208,
+      "non_disk_charts": [],
+      "positive_area_overlap_count": 0,
+      "overlap_pairs_sample": [],
+      "global_chart_reflections": 9,
+      "all_charts_valid": true,
+      "max_stretch": 1.349355216680261,
+      "mean_stretch": 1.0660937892359936,
+      "area_weighted_p95_stretch": 1.169638071181839,
+      "max_anisotropy": 1.254425207543235,
+      "mean_anisotropy": 1.0152840164533932,
+      "seam_length_over_sqrt_area": 12.202605102562654,
+      "smallest_chart_area_fraction": 0.0001807946160678882,
+      "continuous_packing_utilization": 0.5929671568629542,
+      "postpack_bound_passed": true,
+      "square_texture_occupancy": 0.5824177041092767,
+      "retained_baseline_edges": 55,
+      "lost_baseline_edges": 0,
+      "extra_chart_boundary_edges": 1042,
+      "internal_uv_cut_edges": 5,
+      "total_uv_seam_length_over_sqrt_area": 12.24330756908775,
+      "baseline_seam_length_over_sqrt_area": 0.4769557913777354,
+      "internal_uv_seam_length_over_sqrt_area": 0.04070246652509486,
+      "region_count": 5
+    },
+    "prepack_metrics": {
+      "chart_count": 23,
+      "invalid_charts": [],
+      "chart_texel_density_ratio": 1.0000000000000056,
+      "non_disk_charts": [],
+      "positive_area_overlap_count": 0,
+      "overlap_pairs_sample": [],
+      "global_chart_reflections": 0,
+      "all_charts_valid": true,
+      "max_stretch": 1.3499719104964807,
+      "mean_stretch": 1.0660320686351934,
+      "area_weighted_p95_stretch": 1.1697368179354588,
+      "max_anisotropy": 1.2538804742639116,
+      "mean_anisotropy": 1.0151650919398414,
+      "seam_length_over_sqrt_area": 12.202605102562654,
+      "smallest_chart_area_fraction": 0.0001807946160678882,
+      "retained_baseline_edges": 55,
+      "lost_baseline_edges": 0,
+      "extra_chart_boundary_edges": 1042,
+      "internal_uv_cut_edges": 5,
+      "total_uv_seam_length_over_sqrt_area": 12.24330756908775,
+      "baseline_seam_length_over_sqrt_area": 0.4769557913777354,
+      "internal_uv_seam_length_over_sqrt_area": 0.04070246652509486,
+      "region_count": 5,
+      "region_component_count": 5,
+      "split_reasons": {
+        "distortion": 58
+      },
+      "uv_solves": 270,
+      "initial_charts": 63,
+      "accepted_merges": 40,
+      "merge_attempts": [
+        {
+          "region": 0,
+          "faces": 868,
+          "status": "accepted",
+          "euler_characteristic": 1,
+          "boundary_loops": 1,
+          "cut_edges": 0
+        },
+        {
+          "region": 0,
+          "faces": 137,
+          "status": "distortion",
+          "euler_characteristic": 1,
+          "boundary_loops": 1,
+          "cut_edges": 0
+        },
+        {
+          "region": 0,
+          "faces": 2925,
+          "status": "accepted",
+          "euler_characteristic": 1,
+          "boundary_loops": 1,
+          "cut_edges": 0
+        },
+        {
+          "region": 0,
+          "faces": 1042,
+          "status": "distortion",
+          "euler_characteristic": 1,
+          "boundary_loops": 1,
+          "cut_edges": 0
+        },
+        {
+          "region": 0,
+          "faces": 1399,
+          "status": "distortion",
+          "euler_characteristic": 1,
+          "boundary_loops": 1,
+          "cut_edges": 0
+        },
+        {
+          "region": 0,
+          "faces": 985,
+          "status": "distortion",
+          "euler_characteristic": 0,
+          "boundary_loops": 2,
+          "cut_edges": 4
+        },
+        {
+          "region": 0,
+          "faces": 86,
+          "status": "accepted",
+          "euler_characteristic": 1,
+          "boundary_loops": 1,
+          "cut_edges": 0
+        },
+        {
+          "region": 0,
+          "faces": 155,
+          "status": "distortion",
+          "euler_characteristic": 1,
+          "boundary_loops": 1,
+          "cut_edges": 0
+        },
+        {
+          "region": 0,
+          "faces": 314,
+          "status": "accepted",
+          "euler_characteristic": 1,
+          "boundary_loops": 1,
+          "cut_edges": 0
+        },
+        {
+          "region": 0,
+          "faces": 383,
+          "status": "distortion",
+          "euler_characteristic": 1,
+          "boundary_loops": 1,
+          "cut_edges": 0
+        },
+        {
+          "region": 0,
+          "faces": 380,
+          "status": "distortion",
+          "euler_characteristic": 1,
+          "boundary_loops": 1,
+          "cut_edges": 0
+        },
+        {
+          "region": 0,
+          "faces": 1119,
+          "status": "accepted",
+          "euler_characteristic": 1,
+          "boundary_loops": 1,
+          "cut_edges": 0
+        },
+        {
+          "region": 0,
+          "faces": 1574,
+          "status": "distortion",
+          "euler_characteristic": 1,
+          "boundary_loops": 1,
+          "cut_edges": 0
+        },
+        {
+          "region": 0,
+          "faces": 1823,
+          "status": "distortion",
+          "euler_characteristic": 1,
+          "boundary_loops": 1,
+          "cut_edges": 0
+        },
+        {
+          "region": 0,
+          "faces": 53,
+          "status": "accepted",
+          "euler_characteristic": 1,
+          "boundary_loops": 1,
+          "cut_edges": 0
+        },
+        {
+          "region": 0,
+          "faces": 54,
+          "status": "accepted",
+          "euler_characteristic": 1,
+          "boundary_loops": 1,
+          "cut_edges": 0
+        },
+        {
+          "region": 0,
+          "faces": 165,
+          "status": "accepted",
+          "euler_characteristic": 1,
+          "boundary_loops": 1,
+          "cut_edges": 0
+        },
+        {
+          "region": 0,
+          "faces": 405,
+          "status": "accepted",
+          "euler_characteristic": 1,
+          "boundary_loops": 1,
+          "cut_edges": 0
+        },
+        {
+          "region": 0,
+          "faces": 541,
+          "status": "distortion",
+          "euler_characteristic": 1,
+          "boundary_loops": 1,
+          "cut_edges": 0
+        },
+        {
+          "region": 0,
+          "faces": 3380,
+          "status": "distortion",
+          "euler_characteristic": 1,
+          "boundary_loops": 1,
+          "cut_edges": 0
+        },
+        {
+          "region": 0,
+          "faces": 211,
+          "status": "distortion",
+          "euler_characteristic": 1,
+          "boundary_loops": 1,
+          "cut_edges": 0
+        },
+        {
+          "region": 0,
+          "faces": 87,
+          "status": "accepted",
+          "euler_characteristic": 1,
+          "boundary_loops": 1,
+          "cut_edges": 0
+        },
+        {
+          "region": 0,
+          "faces": 126,
+          "status": "distortion",
+          "euler_characteristic": 1,
+          "boundary_loops": 1,
+          "cut_edges": 0
+        },
+        {
+          "region": 0,
+          "faces": 258,
+          "status": "accepted",
+          "euler_characteristic": 1,
+          "boundary_loops": 1,
+          "cut_edges": 0
+        },
+        {
+          "region": 0,
+          "faces": 297,
+          "status": "distortion",
+          "euler_characteristic": 1,
+          "boundary_loops": 1,
+          "cut_edges": 0
+        },
+        {
+          "region": 0,
+          "faces": 251,
+          "status": "accepted",
+          "euler_characteristic": 1,
+          "boundary_loops": 1,
+          "cut_edges": 0
+        },
+        {
+          "region": 0,
+          "faces": 1257,
+          "status": "distortion",
+          "euler_characteristic": 1,
+          "boundary_loops": 1,
+          "cut_edges": 0
+        },
+        {
+          "region": 0,
+          "faces": 654,
+          "status": "accepted",
+          "euler_characteristic": 1,
+          "boundary_loops": 1,
+          "cut_edges": 0
+        },
+        {
+          "region": 0,
+          "faces": 901,
+          "status": "accepted",
+          "euler_characteristic": 1,
+          "boundary_loops": 1,
+          "cut_edges": 0
+        },
+        {
+          "region": 0,
+          "faces": 1104,
+          "status": "distortion",
+          "euler_characteristic": 1,
+          "boundary_loops": 1,
+          "cut_edges": 0
+        },
+        {
+          "region": 0,
+          "faces": 1761,
+          "status": "accepted",
+          "euler_characteristic": 1,
+          "boundary_loops": 1,
+          "cut_edges": 0
+        },
+        {
+          "region": 0,
+          "faces": 1964,
+          "status": "distortion",
+          "euler_characteristic": 1,
+          "boundary_loops": 1,
+          "cut_edges": 0
+        },
+        {
+          "region": 0,
+          "faces": 826,
+          "status": "accepted",
+          "euler_characteristic": 1,
+          "boundary_loops": 1,
+          "cut_edges": 0
+        },
+        {
+          "region": 0,
+          "faces": 154,
+          "status": "accepted",
+          "euler_characteristic": 1,
+          "boundary_loops": 1,
+          "cut_edges": 0
+        },
+        {
+          "region": 0,
+          "faces": 183,
+          "status": "distortion",
+          "euler_characteristic": 1,
+          "boundary_loops": 1,
+          "cut_edges": 0
+        },
+        {
+          "region": 0,
+          "faces": 251,
+          "status": "distortion",
+          "euler_characteristic": 1,
+          "boundary_loops": 1,
+          "cut_edges": 0
+        },
+        {
+          "region": 0,
+          "faces": 984,
+          "status": "distortion",
+          "euler_characteristic": 1,
+          "boundary_loops": 1,
+          "cut_edges": 0
+        },
+        {
+          "region": 0,
+          "faces": 297,
+          "status": "accepted",
+          "euler_characteristic": 1,
+          "boundary_loops": 1,
+          "cut_edges": 0
+        },
+        {
+          "region": 0,
+          "faces": 366,
+          "status": "distortion",
+          "euler_characteristic": 1,
+          "boundary_loops": 1,
+          "cut_edges": 0
+        },
+        {
+          "region": 0,
+          "faces": 466,
+          "status": "accepted",
+          "euler_characteristic": 1,
+          "boundary_loops": 1,
+          "cut_edges": 0
+        },
+        {
+          "region": 0,
+          "faces": 1208,
+          "status": "accepted",
+          "euler_characteristic": 1,
+          "boundary_loops": 1,
+          "cut_edges": 0
+        },
+        {
+          "region": 0,
+          "faces": 1831,
+          "status": "accepted",
+          "euler_characteristic": 1,
+          "boundary_loops": 1,
+          "cut_edges": 0
+        },
+        {
+          "region": 0,
+          "faces": 2799,
+          "status": "distortion",
+          "euler_characteristic": 1,
+          "boundary_loops": 1,
+          "cut_edges": 0
+        },
+        {
+          "region": 0,
+          "faces": 2589,
+          "status": "distortion",
+          "euler_characteristic": 0,
+          "boundary_loops": 2,
+          "cut_edges": 2
+        },
+        {
+          "region": 0,
+          "faces": 3439,
+          "status": "accepted",
+          "euler_characteristic": 1,
+          "boundary_loops": 1,
+          "cut_edges": 0
+        },
+        {
+          "region": 0,
+          "faces": 3894,
+          "status": "distortion",
+          "euler_characteristic": 1,
+          "boundary_loops": 1,
+          "cut_edges": 0
+        },
+        {
+          "region": 0,
+          "faces": 218,
+          "status": "distortion",
+          "euler_characteristic": 1,
+          "boundary_loops": 1,
+          "cut_edges": 0
+        },
+        {
+          "region": 0,
+          "faces": 367,
+          "status": "distortion",
+          "euler_characteristic": 1,
+          "boundary_loops": 1,
+          "cut_edges": 0
+        },
+        {
+          "region": 0,
+          "faces": 353,
+          "status": "accepted",
+          "euler_characteristic": 1,
+          "boundary_loops": 1,
+          "cut_edges": 0
+        },
+        {
+          "region": 0,
+          "faces": 422,
+          "status": "distortion",
+          "euler_characteristic": 1,
+          "boundary_loops": 1,
+          "cut_edges": 0
+        },
+        {
+          "region": 0,
+          "faces": 396,
+          "status": "distortion",
+          "euler_characteristic": 1,
+          "boundary_loops": 1,
+          "cut_edges": 0
+        },
+        {
+          "region": 0,
+          "faces": 575,
+          "status": "accepted",
+          "euler_characteristic": 1,
+          "boundary_loops": 1,
+          "cut_edges": 0
+        },
+        {
+          "region": 0,
+          "faces": 1170,
+          "status": "distortion",
+          "euler_characteristic": 1,
+          "boundary_loops": 1,
+          "cut_edges": 0
+        },
+        {
+          "region": 0,
+          "faces": 4558,
+          "status": "distortion",
+          "euler_characteristic": 1,
+          "boundary_loops": 1,
+          "cut_edges": 0
+        },
+        {
+          "region": 0,
+          "faces": 643,
+          "status": "distortion",
+          "euler_characteristic": 1,
+          "boundary_loops": 1,
+          "cut_edges": 0
+        },
+        {
+          "region": 0,
+          "faces": 907,
+          "status": "accepted",
+          "euler_characteristic": 1,
+          "boundary_loops": 1,
+          "cut_edges": 0
+        },
+        {
+          "region": 0,
+          "faces": 1044,
+          "status": "distortion",
+          "euler_characteristic": 1,
+          "boundary_loops": 1,
+          "cut_edges": 0
+        },
+        {
+          "region": 0,
+          "faces": 1064,
+          "status": "accepted",
+          "euler_characteristic": 1,
+          "boundary_loops": 1,
+          "cut_edges": 0
+        },
+        {
+          "region": 0,
+          "faces": 1287,
+          "status": "distortion",
+          "euler_characteristic": 1,
+          "boundary_loops": 1,
+          "cut_edges": 0
+        },
+        {
+          "region": 0,
+          "faces": 1201,
+          "status": "distortion",
+          "euler_characteristic": 1,
+          "boundary_loops": 1,
+          "cut_edges": 0
+        },
+        {
+          "region": 0,
+          "faces": 1892,
+          "status": "distortion",
+          "euler_characteristic": 0,
+          "boundary_loops": 2,
+          "cut_edges": 4
+        },
+        {
+          "region": 0,
+          "faces": 331,
+          "status": "distortion",
+          "euler_characteristic": 1,
+          "boundary_loops": 1,
+          "cut_edges": 0
+        },
+        {
+          "region": 0,
+          "faces": 481,
+          "status": "distortion",
+          "euler_characteristic": 1,
+          "boundary_loops": 1,
+          "cut_edges": 0
+        },
+        {
+          "region": 0,
+          "faces": 1274,
+          "status": "distortion",
+          "euler_characteristic": 1,
+          "boundary_loops": 1,
+          "cut_edges": 0
+        },
+        {
+          "region": 0,
+          "faces": 340,
+          "status": "accepted",
+          "euler_characteristic": 1,
+          "boundary_loops": 1,
+          "cut_edges": 0
+        },
+        {
+          "region": 0,
+          "faces": 409,
+          "status": "distortion",
+          "euler_characteristic": 1,
+          "boundary_loops": 1,
+          "cut_edges": 0
+        },
+        {
+          "region": 0,
+          "faces": 693,
+          "status": "distortion",
+          "euler_characteristic": 0,
+          "boundary_loops": 2,
+          "cut_edges": 5
+        },
+        {
+          "region": 0,
+          "faces": 915,
+          "status": "distortion",
+          "euler_characteristic": 1,
+          "boundary_loops": 1,
+          "cut_edges": 0
+        },
+        {
+          "region": 0,
+          "faces": 881,
+          "status": "distortion",
+          "euler_characteristic": 1,
+          "boundary_loops": 1,
+          "cut_edges": 0
+        },
+        {
+          "region": 0,
+          "faces": 2659,
+          "status": "accepted",
+          "euler_characteristic": 0,
+          "boundary_loops": 2,
+          "cut_edges": 2
+        },
+        {
+          "region": 0,
+          "faces": 3723,
+          "status": "distortion",
+          "euler_characteristic": 0,
+          "boundary_loops": 2,
+          "cut_edges": 4
+        },
+        {
+          "region": 0,
+          "faces": 3627,
+          "status": "distortion",
+          "euler_characteristic": 0,
+          "boundary_loops": 2,
+          "cut_edges": 2
+        },
+        {
+          "region": 0,
+          "faces": 1258,
+          "status": "accepted",
+          "euler_characteristic": 1,
+          "boundary_loops": 1,
+          "cut_edges": 0
+        },
+        {
+          "region": 0,
+          "faces": 1564,
+          "status": "distortion",
+          "euler_characteristic": 1,
+          "boundary_loops": 1,
+          "cut_edges": 0
+        },
+        {
+          "region": 0,
+          "faces": 1574,
+          "status": "distortion",
+          "euler_characteristic": 1,
+          "boundary_loops": 1,
+          "cut_edges": 0
+        },
+        {
+          "region": 0,
+          "faces": 1898,
+          "status": "distortion",
+          "euler_characteristic": 1,
+          "boundary_loops": 1,
+          "cut_edges": 0
+        },
+        {
+          "region": 0,
+          "faces": 206,
+          "status": "accepted",
+          "euler_characteristic": 1,
+          "boundary_loops": 1,
+          "cut_edges": 0
+        },
+        {
+          "region": 0,
+          "faces": 360,
+          "status": "distortion",
+          "euler_characteristic": 1,
+          "boundary_loops": 1,
+          "cut_edges": 0
+        },
+        {
+          "region": 0,
+          "faces": 672,
+          "status": "accepted",
+          "euler_characteristic": 1,
+          "boundary_loops": 1,
+          "cut_edges": 0
+        },
+        {
+          "region": 0,
+          "faces": 826,
+          "status": "distortion",
+          "euler_characteristic": 1,
+          "boundary_loops": 1,
+          "cut_edges": 0
+        },
+        {
+          "region": 0,
+          "faces": 712,
+          "status": "accepted",
+          "euler_characteristic": 1,
+          "boundary_loops": 1,
+          "cut_edges": 0
+        },
+        {
+          "region": 0,
+          "faces": 866,
+          "status": "distortion",
+          "euler_characteristic": 1,
+          "boundary_loops": 1,
+          "cut_edges": 0
+        },
+        {
+          "region": 0,
+          "faces": 809,
+          "status": "distortion",
+          "euler_characteristic": 1,
+          "boundary_loops": 1,
+          "cut_edges": 0
+        },
+        {
+          "region": 0,
+          "faces": 1416,
+          "status": "distortion",
+          "euler_characteristic": 1,
+          "boundary_loops": 1,
+          "cut_edges": 0
+        },
+        {
+          "region": 0,
+          "faces": 1970,
+          "status": "distortion",
+          "euler_characteristic": -1,
+          "boundary_loops": 3,
+          "cut_edges": 3
+        },
+        {
+          "region": 0,
+          "faces": 2882,
+          "status": "distortion",
+          "euler_characteristic": 0,
+          "boundary_loops": 2,
+          "cut_edges": 2
+        },
+        {
+          "region": 0,
+          "faces": 2990,
+          "status": "accepted",
+          "euler_characteristic": 0,
+          "boundary_loops": 2,
+          "cut_edges": 2
+        },
+        {
+          "region": 0,
+          "faces": 3958,
+          "status": "distortion",
+          "euler_characteristic": 0,
+          "boundary_loops": 2,
+          "cut_edges": 2
+        },
+        {
+          "region": 0,
+          "faces": 4054,
+          "status": "distortion",
+          "euler_characteristic": 0,
+          "boundary_loops": 2,
+          "cut_edges": 4
+        },
+        {
+          "region": 0,
+          "faces": 3330,
+          "status": "distortion",
+          "euler_characteristic": 0,
+          "boundary_loops": 2,
+          "cut_edges": 2
+        },
+        {
+          "region": 0,
+          "faces": 3213,
+          "status": "distortion",
+          "euler_characteristic": 0,
+          "boundary_loops": 2,
+          "cut_edges": 2
+        },
+        {
+          "region": 0,
+          "faces": 4751,
+          "status": "distortion",
+          "euler_characteristic": 0,
+          "boundary_loops": 2,
+          "cut_edges": 2
+        },
+        {
+          "region": 0,
+          "faces": 4407,
+          "status": "distortion",
+          "euler_characteristic": 1,
+          "boundary_loops": 1,
+          "cut_edges": 0
+        },
+        {
+          "region": 0,
+          "faces": 3642,
+          "status": "accepted",
+          "euler_characteristic": 1,
+          "boundary_loops": 1,
+          "cut_edges": 0
+        },
+        {
+          "region": 0,
+          "faces": 5403,
+          "status": "distortion",
+          "euler_characteristic": 1,
+          "boundary_loops": 1,
+          "cut_edges": 0
+        },
+        {
+          "region": 0,
+          "faces": 4097,
+          "status": "distortion",
+          "euler_characteristic": 1,
+          "boundary_loops": 1,
+          "cut_edges": 0
+        },
+        {
+          "region": 0,
+          "faces": 4761,
+          "status": "distortion",
+          "euler_characteristic": 1,
+          "boundary_loops": 1,
+          "cut_edges": 0
+        },
+        {
+          "region": 0,
+          "faces": 4610,
+          "status": "distortion",
+          "euler_characteristic": 1,
+          "boundary_loops": 1,
+          "cut_edges": 0
+        },
+        {
+          "region": 0,
+          "faces": 4510,
+          "status": "distortion",
+          "euler_characteristic": 1,
+          "boundary_loops": 1,
+          "cut_edges": 0
+        },
+        {
+          "region": 0,
+          "faces": 567,
+          "status": "accepted",
+          "euler_characteristic": 1,
+          "boundary_loops": 1,
+          "cut_edges": 0
+        },
+        {
+          "region": 0,
+          "faces": 683,
+          "status": "distortion",
+          "euler_characteristic": 1,
+          "boundary_loops": 1,
+          "cut_edges": 0
+        },
+        {
+          "region": 0,
+          "faces": 972,
+          "status": "accepted",
+          "euler_characteristic": 0,
+          "boundary_loops": 2,
+          "cut_edges": 3
+        },
+        {
+          "region": 0,
+          "faces": 1108,
+          "status": "distortion",
+          "euler_characteristic": 1,
+          "boundary_loops": 1,
+          "cut_edges": 0
+        },
+        {
+          "region": 0,
+          "faces": 1088,
+          "status": "distortion",
+          "euler_characteristic": -1,
+          "boundary_loops": 3,
+          "cut_edges": 7
+        },
+        {
+          "region": 0,
+          "faces": 4346,
+          "status": "distortion",
+          "euler_characteristic": 1,
+          "boundary_loops": 1,
+          "cut_edges": 0
+        },
+        {
+          "region": 0,
+          "faces": 1323,
+          "status": "accepted",
+          "euler_characteristic": 1,
+          "boundary_loops": 1,
+          "cut_edges": 0
+        },
+        {
+          "region": 0,
+          "faces": 4965,
+          "status": "distortion",
+          "euler_characteristic": 1,
+          "boundary_loops": 1,
+          "cut_edges": 0
+        },
+        {
+          "region": 0,
+          "faces": 1439,
+          "status": "distortion",
+          "euler_characteristic": 1,
+          "boundary_loops": 1,
+          "cut_edges": 0
+        },
+        {
+          "region": 0,
+          "faces": 2442,
+          "status": "distortion",
+          "euler_characteristic": 1,
+          "boundary_loops": 1,
+          "cut_edges": 0
+        },
+        {
+          "region": 0,
+          "faces": 1877,
+          "status": "accepted",
+          "euler_characteristic": 1,
+          "boundary_loops": 1,
+          "cut_edges": 0
+        },
+        {
+          "region": 0,
+          "faces": 5519,
+          "status": "distortion",
+          "euler_characteristic": 1,
+          "boundary_loops": 1,
+          "cut_edges": 0
+        },
+        {
+          "region": 0,
+          "faces": 2849,
+          "status": "distortion",
+          "euler_characteristic": -1,
+          "boundary_loops": 3,
+          "cut_edges": 7
+        },
+        {
+          "region": 0,
+          "faces": 2014,
+          "status": "distortion",
+          "euler_characteristic": 1,
+          "boundary_loops": 1,
+          "cut_edges": 0
+        },
+        {
+          "region": 0,
+          "faces": 4867,
+          "status": "distortion",
+          "euler_characteristic": 0,
+          "boundary_loops": 2,
+          "cut_edges": 2
+        },
+        {
+          "region": 0,
+          "faces": 360,
+          "status": "distortion",
+          "euler_characteristic": 0,
+          "boundary_loops": 2,
+          "cut_edges": 3
+        },
+        {
+          "region": 0,
+          "faces": 1412,
+          "status": "distortion",
+          "euler_characteristic": 1,
+          "boundary_loops": 1,
+          "cut_edges": 0
+        },
+        {
+          "region": 0,
+          "faces": 3343,
+          "status": "distortion",
+          "euler_characteristic": 0,
+          "boundary_loops": 2,
+          "cut_edges": 2
+        },
+        {
+          "region": 0,
+          "faces": 1833,
+          "status": "distortion",
+          "euler_characteristic": 1,
+          "boundary_loops": 1,
+          "cut_edges": 0
+        },
+        {
+          "region": 0,
+          "faces": 2295,
+          "status": "distortion",
+          "euler_characteristic": 0,
+          "boundary_loops": 2,
+          "cut_edges": 3
+        },
+        {
+          "region": 0,
+          "faces": 928,
+          "status": "distortion",
+          "euler_characteristic": 1,
+          "boundary_loops": 1,
+          "cut_edges": 0
+        },
+        {
+          "region": 0,
+          "faces": 2230,
+          "status": "distortion",
+          "euler_characteristic": 0,
+          "boundary_loops": 2,
+          "cut_edges": 3
+        },
+        {
+          "region": 0,
+          "faces": 6632,
+          "status": "distortion",
+          "euler_characteristic": 0,
+          "boundary_loops": 2,
+          "cut_edges": 2
+        },
+        {
+          "region": 0,
+          "faces": 2322,
+          "status": "accepted",
+          "euler_characteristic": 1,
+          "boundary_loops": 1,
+          "cut_edges": 0
+        },
+        {
+          "region": 0,
+          "faces": 2628,
+          "status": "distortion",
+          "euler_characteristic": 1,
+          "boundary_loops": 1,
+          "cut_edges": 0
+        },
+        {
+          "region": 0,
+          "faces": 2545,
+          "status": "distortion",
+          "euler_characteristic": 1,
+          "boundary_loops": 1,
+          "cut_edges": 0
+        },
+        {
+          "region": 0,
+          "faces": 2459,
+          "status": "distortion",
+          "euler_characteristic": 1,
+          "boundary_loops": 1,
+          "cut_edges": 0
+        },
+        {
+          "region": 0,
+          "faces": 2897,
+          "status": "distortion",
+          "euler_characteristic": 1,
+          "boundary_loops": 1,
+          "cut_edges": 0
+        },
+        {
+          "region": 0,
+          "faces": 3294,
+          "status": "distortion",
+          "euler_characteristic": 0,
+          "boundary_loops": 2,
+          "cut_edges": 3
+        },
+        {
+          "region": 0,
+          "faces": 5312,
+          "status": "distortion",
+          "euler_characteristic": 0,
+          "boundary_loops": 2,
+          "cut_edges": 4
+        },
+        {
+          "region": 0,
+          "faces": 3034,
+          "status": "distortion",
+          "euler_characteristic": -1,
+          "boundary_loops": 3,
+          "cut_edges": 3
+        },
+        {
+          "region": 0,
+          "faces": 2476,
+          "status": "distortion",
+          "euler_characteristic": 1,
+          "boundary_loops": 1,
+          "cut_edges": 0
+        },
+        {
+          "region": 0,
+          "faces": 2419,
+          "status": "distortion",
+          "euler_characteristic": 1,
+          "boundary_loops": 1,
+          "cut_edges": 0
+        },
+        {
+          "region": 0,
+          "faces": 3200,
+          "status": "distortion",
+          "euler_characteristic": 1,
+          "boundary_loops": 1,
+          "cut_edges": 0
+        },
+        {
+          "region": 0,
+          "faces": 2035,
+          "status": "distortion",
+          "euler_characteristic": 1,
+          "boundary_loops": 1,
+          "cut_edges": 0
+        },
+        {
+          "region": 0,
+          "faces": 1684,
+          "status": "distortion",
+          "euler_characteristic": 0,
+          "boundary_loops": 2,
+          "cut_edges": 3
+        },
+        {
+          "region": 0,
+          "faces": 3565,
+          "status": "distortion",
+          "euler_characteristic": -1,
+          "boundary_loops": 3,
+          "cut_edges": 5
+        },
+        {
+          "region": 0,
+          "faces": 3026,
+          "status": "distortion",
+          "euler_characteristic": 1,
+          "boundary_loops": 1,
+          "cut_edges": 0
+        },
+        {
+          "region": 0,
+          "faces": 3127,
+          "status": "distortion",
+          "euler_characteristic": 0,
+          "boundary_loops": 2,
+          "cut_edges": 2
+        },
+        {
+          "region": 0,
+          "faces": 4199,
+          "status": "distortion",
+          "euler_characteristic": 1,
+          "boundary_loops": 1,
+          "cut_edges": 0
+        },
+        {
+          "region": 0,
+          "faces": 3296,
+          "status": "distortion",
+          "euler_characteristic": 0,
+          "boundary_loops": 2,
+          "cut_edges": 2
+        },
+        {
+          "region": 0,
+          "faces": 2027,
+          "status": "accepted",
+          "euler_characteristic": 1,
+          "boundary_loops": 1,
+          "cut_edges": 0
+        },
+        {
+          "region": 0,
+          "faces": 3146,
+          "status": "distortion",
+          "euler_characteristic": 1,
+          "boundary_loops": 1,
+          "cut_edges": 0
+        },
+        {
+          "region": 0,
+          "faces": 5669,
+          "status": "distortion",
+          "euler_characteristic": 0,
+          "boundary_loops": 2,
+          "cut_edges": 6
+        },
+        {
+          "region": 0,
+          "faces": 2739,
+          "status": "distortion",
+          "euler_characteristic": 1,
+          "boundary_loops": 1,
+          "cut_edges": 0
+        },
+        {
+          "region": 0,
+          "faces": 2999,
+          "status": "distortion",
+          "euler_characteristic": 0,
+          "boundary_loops": 2,
+          "cut_edges": 3
+        },
+        {
+          "region": 0,
+          "faces": 3904,
+          "status": "distortion",
+          "euler_characteristic": 1,
+          "boundary_loops": 1,
+          "cut_edges": 0
+        },
+        {
+          "region": 0,
+          "faces": 3290,
+          "status": "distortion",
+          "euler_characteristic": 1,
+          "boundary_loops": 1,
+          "cut_edges": 0
+        },
+        {
+          "region": 0,
+          "faces": 4349,
+          "status": "distortion",
+          "euler_characteristic": 1,
+          "boundary_loops": 1,
+          "cut_edges": 0
+        },
+        {
+          "region": 0,
+          "faces": 5964,
+          "status": "distortion",
+          "euler_characteristic": 1,
+          "boundary_loops": 1,
+          "cut_edges": 0
+        }
+      ],
+      "outcome": "protected_with_chart_splits"
+    },
+    "component_attempts": [
+      {
+        "region": 0,
+        "faces": 19019,
+        "status": "distortion",
+        "euler_characteristic": -2,
+        "boundary_loops": 4,
+        "cut_edges": 66
+      },
+      {
+        "region": 0,
+        "faces": 8118,
+        "status": "distortion",
+        "euler_characteristic": -1,
+        "boundary_loops": 3,
+        "cut_edges": 18
+      },
+      {
+        "region": 0,
+        "faces": 5064,
+        "status": "distortion",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 3008,
+        "status": "distortion",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 1417,
+        "status": "distortion",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 1011,
+        "status": "distortion",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 680,
+        "status": "distortion",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 469,
+        "status": "distortion",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 284,
+        "status": "distortion",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 155,
+        "status": "distortion",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 98,
+        "status": "distortion",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 29,
+        "status": "accepted",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 69,
+        "status": "accepted",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 57,
+        "status": "accepted",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 129,
+        "status": "accepted",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 185,
+        "status": "accepted",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 211,
+        "status": "accepted",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 331,
+        "status": "accepted",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 406,
+        "status": "accepted",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 1591,
+        "status": "distortion",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 623,
+        "status": "accepted",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 968,
+        "status": "accepted",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 2056,
+        "status": "distortion",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 963,
+        "status": "distortion",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 657,
+        "status": "distortion",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 340,
+        "status": "distortion",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 169,
+        "status": "distortion",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 129,
+        "status": "distortion",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 43,
+        "status": "accepted",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 86,
+        "status": "distortion",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 13,
+        "status": "accepted",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 73,
+        "status": "distortion",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 39,
+        "status": "accepted",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 34,
+        "status": "accepted",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 40,
+        "status": "accepted",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 171,
+        "status": "accepted",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 317,
+        "status": "accepted",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 306,
+        "status": "accepted",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 1093,
+        "status": "accepted",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 3054,
+        "status": "distortion",
+        "euler_characteristic": -1,
+        "boundary_loops": 3,
+        "cut_edges": 15
+      },
+      {
+        "region": 0,
+        "faces": 1630,
+        "status": "distortion",
+        "euler_characteristic": 0,
+        "boundary_loops": 2,
+        "cut_edges": 2
+      },
+      {
+        "region": 0,
+        "faces": 802,
+        "status": "accepted",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 828,
+        "status": "accepted",
+        "euler_characteristic": 0,
+        "boundary_loops": 2,
+        "cut_edges": 2
+      },
+      {
+        "region": 0,
+        "faces": 1424,
+        "status": "distortion",
+        "euler_characteristic": 0,
+        "boundary_loops": 2,
+        "cut_edges": 3
+      },
+      {
+        "region": 0,
+        "faces": 840,
+        "status": "distortion",
+        "euler_characteristic": 0,
+        "boundary_loops": 2,
+        "cut_edges": 3
+      },
+      {
+        "region": 0,
+        "faces": 598,
+        "status": "distortion",
+        "euler_characteristic": 0,
+        "boundary_loops": 2,
+        "cut_edges": 3
+      },
+      {
+        "region": 0,
+        "faces": 380,
+        "status": "distortion",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 157,
+        "status": "accepted",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 223,
+        "status": "accepted",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 218,
+        "status": "distortion",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 81,
+        "status": "accepted",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 137,
+        "status": "accepted",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 242,
+        "status": "accepted",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 584,
+        "status": "accepted",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 10901,
+        "status": "distortion",
+        "euler_characteristic": -1,
+        "boundary_loops": 3,
+        "cut_edges": 25
+      },
+      {
+        "region": 0,
+        "faces": 4448,
+        "status": "distortion",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 1964,
+        "status": "distortion",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 860,
+        "status": "accepted",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 1104,
+        "status": "distortion",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 473,
+        "status": "accepted",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 631,
+        "status": "distortion",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 450,
+        "status": "distortion",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 247,
+        "status": "accepted",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 203,
+        "status": "accepted",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 181,
+        "status": "accepted",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 2484,
+        "status": "accepted",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 6453,
+        "status": "distortion",
+        "euler_characteristic": -1,
+        "boundary_loops": 3,
+        "cut_edges": 17
+      },
+      {
+        "region": 0,
+        "faces": 3220,
+        "status": "distortion",
+        "euler_characteristic": -1,
+        "boundary_loops": 3,
+        "cut_edges": 17
+      },
+      {
+        "region": 0,
+        "faces": 1776,
+        "status": "distortion",
+        "euler_characteristic": 0,
+        "boundary_loops": 2,
+        "cut_edges": 10
+      },
+      {
+        "region": 0,
+        "faces": 1045,
+        "status": "distortion",
+        "euler_characteristic": 0,
+        "boundary_loops": 2,
+        "cut_edges": 4
+      },
+      {
+        "region": 0,
+        "faces": 792,
+        "status": "distortion",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 593,
+        "status": "distortion",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 321,
+        "status": "distortion",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 188,
+        "status": "distortion",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 136,
+        "status": "accepted",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 52,
+        "status": "accepted",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 133,
+        "status": "accepted",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 272,
+        "status": "accepted",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 199,
+        "status": "accepted",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 253,
+        "status": "distortion",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 116,
+        "status": "accepted",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 137,
+        "status": "accepted",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 731,
+        "status": "accepted",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 1444,
+        "status": "distortion",
+        "euler_characteristic": 0,
+        "boundary_loops": 2,
+        "cut_edges": 7
+      },
+      {
+        "region": 0,
+        "faces": 550,
+        "status": "distortion",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 316,
+        "status": "accepted",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 234,
+        "status": "distortion",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 111,
+        "status": "accepted",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 123,
+        "status": "distortion",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 35,
+        "status": "accepted",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 88,
+        "status": "distortion",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 19,
+        "status": "accepted",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 69,
+        "status": "distortion",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 29,
+        "status": "accepted",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 40,
+        "status": "accepted",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 894,
+        "status": "distortion",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 592,
+        "status": "distortion",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 164,
+        "status": "accepted",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 428,
+        "status": "distortion",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 177,
+        "status": "accepted",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 251,
+        "status": "distortion",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 137,
+        "status": "distortion",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 40,
+        "status": "accepted",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 97,
+        "status": "accepted",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 114,
+        "status": "accepted",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 302,
+        "status": "accepted",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 3233,
+        "status": "distortion",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 2015,
+        "status": "distortion",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 1042,
+        "status": "distortion",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 587,
+        "status": "accepted",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 455,
+        "status": "accepted",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 973,
+        "status": "distortion",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 441,
+        "status": "accepted",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 532,
+        "status": "accepted",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 1218,
+        "status": "distortion",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 514,
+        "status": "accepted",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 704,
+        "status": "accepted",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 1,
+        "faces": 5,
+        "status": "accepted",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 2,
+        "faces": 28,
+        "status": "accepted",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 3,
+        "faces": 42,
+        "status": "accepted",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 4,
+        "faces": 12,
+        "status": "accepted",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      }
+    ]
+  },
+  {
+    "mesh": "fandisk",
+    "arm": "protected-merge",
+    "subdivided": false,
+    "faces": 12946,
+    "source_sha256": "70f4be631fa9feb757bfc43581feed3f2a8fd13e538fba3fb38297769ab50557",
+    "baseline_labels_sha256": "d66b3d215a241914f7362584840d111f416b76a047c208ec589d9efa3dd14ed7",
+    "claim_eligible": false,
+    "stretch_limit": 1.35,
+    "anisotropy_limit": 2.0,
+    "outcome": "protected_without_chart_splits",
+    "metrics": {
+      "chart_count": 15,
+      "invalid_charts": [],
+      "chart_texel_density_ratio": 1.0053317360488314,
+      "non_disk_charts": [],
+      "positive_area_overlap_count": 0,
+      "overlap_pairs_sample": [],
+      "global_chart_reflections": 10,
+      "all_charts_valid": true,
+      "max_stretch": 1.0285596175836498,
+      "mean_stretch": 1.0024899819530209,
+      "area_weighted_p95_stretch": 1.0151456613052903,
+      "max_anisotropy": 1.0058711763947086,
+      "mean_anisotropy": 1.0013498554149776,
+      "seam_length_over_sqrt_area": 9.56222195433226,
+      "smallest_chart_area_fraction": 0.014676021158168108,
+      "continuous_packing_utilization": 0.6109457455301412,
+      "postpack_bound_passed": true,
+      "square_texture_occupancy": 0.6072458469955151,
+      "retained_baseline_edges": 769,
+      "lost_baseline_edges": 0,
+      "extra_chart_boundary_edges": 0,
+      "internal_uv_cut_edges": 0,
+      "total_uv_seam_length_over_sqrt_area": 9.562221954332257,
+      "baseline_seam_length_over_sqrt_area": 9.562221954332257,
+      "internal_uv_seam_length_over_sqrt_area": 0.0,
+      "region_count": 15
+    },
+    "prepack_metrics": {
+      "chart_count": 15,
+      "invalid_charts": [],
+      "chart_texel_density_ratio": 1.0000000000000007,
+      "non_disk_charts": [],
+      "positive_area_overlap_count": 0,
+      "overlap_pairs_sample": [],
+      "global_chart_reflections": 0,
+      "all_charts_valid": true,
+      "max_stretch": 1.0286887388506587,
+      "mean_stretch": 1.0019850466043012,
+      "area_weighted_p95_stretch": 1.0151700322124717,
+      "max_anisotropy": 1.0056048801705737,
+      "mean_anisotropy": 1.0003408767469073,
+      "seam_length_over_sqrt_area": 9.56222195433226,
+      "smallest_chart_area_fraction": 0.014676021158168108,
+      "retained_baseline_edges": 769,
+      "lost_baseline_edges": 0,
+      "extra_chart_boundary_edges": 0,
+      "internal_uv_cut_edges": 0,
+      "total_uv_seam_length_over_sqrt_area": 9.562221954332257,
+      "baseline_seam_length_over_sqrt_area": 9.562221954332257,
+      "internal_uv_seam_length_over_sqrt_area": 0.0,
+      "region_count": 15,
+      "region_component_count": 15,
+      "split_reasons": {},
+      "uv_solves": 15,
+      "initial_charts": 15,
+      "accepted_merges": 0,
+      "merge_attempts": [],
+      "outcome": "protected_without_chart_splits"
+    },
+    "component_attempts": [
+      {
+        "region": 14,
+        "faces": 543,
+        "status": "accepted",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 1,
+        "faces": 263,
+        "status": "accepted",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 1056,
+        "status": "accepted",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 2,
+        "faces": 1815,
+        "status": "accepted",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 3,
+        "faces": 944,
+        "status": "accepted",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 4,
+        "faces": 378,
+        "status": "accepted",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 5,
+        "faces": 424,
+        "status": "accepted",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 6,
+        "faces": 412,
+        "status": "accepted",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 7,
+        "faces": 198,
+        "status": "accepted",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 8,
+        "faces": 3020,
+        "status": "accepted",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 9,
+        "faces": 563,
+        "status": "accepted",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 10,
+        "faces": 2048,
+        "status": "accepted",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 11,
+        "faces": 612,
+        "status": "accepted",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 12,
+        "faces": 340,
+        "status": "accepted",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 13,
+        "faces": 330,
+        "status": "accepted",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      }
+    ]
+  },
+  {
+    "mesh": "dolphin",
+    "arm": "protected-merge",
+    "subdivided": false,
+    "faces": 5120,
+    "source_sha256": "100cb0d2eae776d57a0f6dac61aa8a1b624d867e9fcdc360508e62867d58711e",
+    "baseline_labels_sha256": "be06515fd74c6ebc08d47ca5e05720c3bffb5aed71cf519c8ce307651018dd26",
+    "claim_eligible": false,
+    "stretch_limit": 1.35,
+    "anisotropy_limit": 2.0,
+    "outcome": "protected_with_chart_splits",
+    "metrics": {
+      "chart_count": 16,
+      "invalid_charts": [],
+      "chart_texel_density_ratio": 1.1174902964178846,
+      "non_disk_charts": [],
+      "positive_area_overlap_count": 0,
+      "overlap_pairs_sample": [],
+      "global_chart_reflections": 9,
+      "all_charts_valid": true,
+      "max_stretch": 1.3454084829506063,
+      "mean_stretch": 1.049136179799087,
+      "area_weighted_p95_stretch": 1.1244253905062733,
+      "max_anisotropy": 1.3806910370265433,
+      "mean_anisotropy": 1.0135206045125358,
+      "seam_length_over_sqrt_area": 8.912913221180743,
+      "smallest_chart_area_fraction": 4.3155805907875905e-05,
+      "continuous_packing_utilization": 0.4459822563009113,
+      "postpack_bound_passed": true,
+      "square_texture_occupancy": 0.4215024731474859,
+      "retained_baseline_edges": 100,
+      "lost_baseline_edges": 0,
+      "extra_chart_boundary_edges": 231,
+      "internal_uv_cut_edges": 0,
+      "total_uv_seam_length_over_sqrt_area": 8.912913221180737,
+      "baseline_seam_length_over_sqrt_area": 3.739846369698682,
+      "internal_uv_seam_length_over_sqrt_area": 0.0,
+      "region_count": 11
+    },
+    "prepack_metrics": {
+      "chart_count": 16,
+      "invalid_charts": [],
+      "chart_texel_density_ratio": 1.0000000000000078,
+      "non_disk_charts": [],
+      "positive_area_overlap_count": 0,
+      "overlap_pairs_sample": [],
+      "global_chart_reflections": 0,
+      "all_charts_valid": true,
+      "max_stretch": 1.3443995910397122,
+      "mean_stretch": 1.0490297893665592,
+      "area_weighted_p95_stretch": 1.1245332128547438,
+      "max_anisotropy": 1.3833945180770633,
+      "mean_anisotropy": 1.0133087225762822,
+      "seam_length_over_sqrt_area": 8.912913221180743,
+      "smallest_chart_area_fraction": 4.3155805907875905e-05,
+      "retained_baseline_edges": 100,
+      "lost_baseline_edges": 0,
+      "extra_chart_boundary_edges": 231,
+      "internal_uv_cut_edges": 0,
+      "total_uv_seam_length_over_sqrt_area": 8.912913221180737,
+      "baseline_seam_length_over_sqrt_area": 3.739846369698682,
+      "internal_uv_seam_length_over_sqrt_area": 0.0,
+      "region_count": 11,
+      "region_component_count": 11,
+      "split_reasons": {
+        "region_topology": 15,
+        "distortion": 3,
+        "boundary_overlap": 8
+      },
+      "uv_solves": 79,
+      "initial_charts": 37,
+      "accepted_merges": 21,
+      "merge_attempts": [
+        {
+          "region": 0,
+          "faces": 368,
+          "status": "accepted",
+          "euler_characteristic": 1,
+          "boundary_loops": 1,
+          "cut_edges": 0
+        },
+        {
+          "region": 0,
+          "faces": 499,
+          "status": "accepted",
+          "euler_characteristic": 1,
+          "boundary_loops": 1,
+          "cut_edges": 0
+        },
+        {
+          "region": 0,
+          "faces": 141,
+          "status": "accepted",
+          "euler_characteristic": 1,
+          "boundary_loops": 1,
+          "cut_edges": 0
+        },
+        {
+          "region": 0,
+          "faces": 552,
+          "status": "boundary_overlap",
+          "euler_characteristic": 1,
+          "boundary_loops": 1,
+          "cut_edges": 0
+        },
+        {
+          "region": 0,
+          "faces": 1063,
+          "status": "accepted",
+          "euler_characteristic": 1,
+          "boundary_loops": 1,
+          "cut_edges": 0
+        },
+        {
+          "region": 0,
+          "faces": 304,
+          "status": "accepted",
+          "euler_characteristic": 1,
+          "boundary_loops": 1,
+          "cut_edges": 0
+        },
+        {
+          "region": 0,
+          "faces": 668,
+          "status": "accepted",
+          "euler_characteristic": 1,
+          "boundary_loops": 1,
+          "cut_edges": 0
+        },
+        {
+          "region": 0,
+          "faces": 809,
+          "status": "accepted",
+          "euler_characteristic": 1,
+          "boundary_loops": 1,
+          "cut_edges": 0
+        },
+        {
+          "region": 0,
+          "faces": 883,
+          "status": "accepted",
+          "euler_characteristic": 1,
+          "boundary_loops": 1,
+          "cut_edges": 0
+        },
+        {
+          "region": 0,
+          "faces": 1210,
+          "status": "accepted",
+          "euler_characteristic": 1,
+          "boundary_loops": 1,
+          "cut_edges": 0
+        },
+        {
+          "region": 0,
+          "faces": 2019,
+          "status": "distortion",
+          "euler_characteristic": 0,
+          "boundary_loops": 2,
+          "cut_edges": 14
+        },
+        {
+          "region": 0,
+          "faces": 1152,
+          "status": "accepted",
+          "euler_characteristic": 1,
+          "boundary_loops": 1,
+          "cut_edges": 0
+        },
+        {
+          "region": 0,
+          "faces": 575,
+          "status": "accepted",
+          "euler_characteristic": 1,
+          "boundary_loops": 1,
+          "cut_edges": 0
+        },
+        {
+          "region": 0,
+          "faces": 858,
+          "status": "accepted",
+          "euler_characteristic": 1,
+          "boundary_loops": 1,
+          "cut_edges": 0
+        },
+        {
+          "region": 0,
+          "faces": 898,
+          "status": "accepted",
+          "euler_characteristic": 1,
+          "boundary_loops": 1,
+          "cut_edges": 0
+        },
+        {
+          "region": 0,
+          "faces": 908,
+          "status": "accepted",
+          "euler_characteristic": 1,
+          "boundary_loops": 1,
+          "cut_edges": 0
+        },
+        {
+          "region": 0,
+          "faces": 1242,
+          "status": "accepted",
+          "euler_characteristic": 1,
+          "boundary_loops": 1,
+          "cut_edges": 0
+        },
+        {
+          "region": 0,
+          "faces": 2051,
+          "status": "distortion",
+          "euler_characteristic": 0,
+          "boundary_loops": 2,
+          "cut_edges": 13
+        },
+        {
+          "region": 0,
+          "faces": 2060,
+          "status": "distortion",
+          "euler_characteristic": 0,
+          "boundary_loops": 2,
+          "cut_edges": 7
+        },
+        {
+          "region": 0,
+          "faces": 1429,
+          "status": "accepted",
+          "euler_characteristic": 1,
+          "boundary_loops": 1,
+          "cut_edges": 0
+        },
+        {
+          "region": 0,
+          "faces": 2238,
+          "status": "distortion",
+          "euler_characteristic": 0,
+          "boundary_loops": 2,
+          "cut_edges": 11
+        },
+        {
+          "region": 0,
+          "faces": 914,
+          "status": "region_topology",
+          "euler_characteristic": null,
+          "boundary_loops": null,
+          "cut_edges": 0,
+          "topology_failure": "nonmanifold vertex fan"
+        },
+        {
+          "region": 0,
+          "faces": 1160,
+          "status": "accepted",
+          "euler_characteristic": 1,
+          "boundary_loops": 1,
+          "cut_edges": 0
+        },
+        {
+          "region": 0,
+          "faces": 2589,
+          "status": "distortion",
+          "euler_characteristic": 0,
+          "boundary_loops": 2,
+          "cut_edges": 11
+        },
+        {
+          "region": 0,
+          "faces": 1470,
+          "status": "accepted",
+          "euler_characteristic": 1,
+          "boundary_loops": 1,
+          "cut_edges": 0
+        },
+        {
+          "region": 0,
+          "faces": 2899,
+          "status": "region_topology",
+          "euler_characteristic": null,
+          "boundary_loops": null,
+          "cut_edges": 0,
+          "topology_failure": "nonmanifold vertex fan"
+        },
+        {
+          "region": 2,
+          "faces": 63,
+          "status": "accepted",
+          "euler_characteristic": 1,
+          "boundary_loops": 1,
+          "cut_edges": 0
+        },
+        {
+          "region": 2,
+          "faces": 74,
+          "status": "accepted",
+          "euler_characteristic": 1,
+          "boundary_loops": 1,
+          "cut_edges": 0
+        },
+        {
+          "region": 2,
+          "faces": 81,
+          "status": "accepted",
+          "euler_characteristic": 1,
+          "boundary_loops": 1,
+          "cut_edges": 0
+        },
+        {
+          "region": 0,
+          "faces": 2581,
+          "status": "distortion",
+          "euler_characteristic": 0,
+          "boundary_loops": 2,
+          "cut_edges": 14
+        },
+        {
+          "region": 2,
+          "faces": 87,
+          "status": "region_topology",
+          "euler_characteristic": null,
+          "boundary_loops": null,
+          "cut_edges": 0,
+          "topology_failure": "nonmanifold vertex fan"
+        },
+        {
+          "region": 0,
+          "faces": 2337,
+          "status": "distortion",
+          "euler_characteristic": 1,
+          "boundary_loops": 1,
+          "cut_edges": 0
+        },
+        {
+          "region": 0,
+          "faces": 2378,
+          "status": "distortion",
+          "euler_characteristic": 1,
+          "boundary_loops": 1,
+          "cut_edges": 0
+        },
+        {
+          "region": 0,
+          "faces": 2622,
+          "status": "distortion",
+          "euler_characteristic": 1,
+          "boundary_loops": 1,
+          "cut_edges": 0
+        }
+      ],
+      "outcome": "protected_with_chart_splits"
+    },
+    "component_attempts": [
+      {
+        "region": 0,
+        "faces": 4965,
+        "status": "region_topology",
+        "euler_characteristic": null,
+        "boundary_loops": null,
+        "cut_edges": 0,
+        "topology_failure": "nonmanifold vertex fan"
+      },
+      {
+        "region": 0,
+        "faces": 3327,
+        "status": "region_topology",
+        "euler_characteristic": null,
+        "boundary_loops": null,
+        "cut_edges": 0,
+        "topology_failure": "nonmanifold vertex fan"
+      },
+      {
+        "region": 0,
+        "faces": 1560,
+        "status": "region_topology",
+        "euler_characteristic": null,
+        "boundary_loops": null,
+        "cut_edges": 0,
+        "topology_failure": "nonmanifold vertex fan"
+      },
+      {
+        "region": 0,
+        "faces": 810,
+        "status": "region_topology",
+        "euler_characteristic": null,
+        "boundary_loops": null,
+        "cut_edges": 0,
+        "topology_failure": "nonmanifold vertex fan"
+      },
+      {
+        "region": 0,
+        "faces": 313,
+        "status": "accepted",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 497,
+        "status": "region_topology",
+        "euler_characteristic": null,
+        "boundary_loops": null,
+        "cut_edges": 0,
+        "topology_failure": "nonmanifold vertex fan"
+      },
+      {
+        "region": 0,
+        "faces": 310,
+        "status": "accepted",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 187,
+        "status": "accepted",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 750,
+        "status": "accepted",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 1767,
+        "status": "region_topology",
+        "euler_characteristic": null,
+        "boundary_loops": null,
+        "cut_edges": 0,
+        "topology_failure": "nonmanifold vertex fan"
+      },
+      {
+        "region": 0,
+        "faces": 1012,
+        "status": "distortion",
+        "euler_characteristic": 0,
+        "boundary_loops": 2,
+        "cut_edges": 6
+      },
+      {
+        "region": 0,
+        "faces": 518,
+        "status": "accepted",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 494,
+        "status": "boundary_overlap",
+        "euler_characteristic": 0,
+        "boundary_loops": 2,
+        "cut_edges": 1
+      },
+      {
+        "region": 0,
+        "faces": 351,
+        "status": "accepted",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 143,
+        "status": "distortion",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 57,
+        "status": "accepted",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 86,
+        "status": "accepted",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 755,
+        "status": "region_topology",
+        "euler_characteristic": null,
+        "boundary_loops": null,
+        "cut_edges": 0,
+        "topology_failure": "nonmanifold vertex fan"
+      },
+      {
+        "region": 0,
+        "faces": 428,
+        "status": "region_topology",
+        "euler_characteristic": null,
+        "boundary_loops": null,
+        "cut_edges": 0,
+        "topology_failure": "nonmanifold vertex fan"
+      },
+      {
+        "region": 0,
+        "faces": 283,
+        "status": "accepted",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 145,
+        "status": "region_topology",
+        "euler_characteristic": null,
+        "boundary_loops": null,
+        "cut_edges": 0,
+        "topology_failure": "nonmanifold vertex fan"
+      },
+      {
+        "region": 0,
+        "faces": 89,
+        "status": "accepted",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 56,
+        "status": "region_topology",
+        "euler_characteristic": null,
+        "boundary_loops": null,
+        "cut_edges": 0,
+        "topology_failure": "nonmanifold vertex fan"
+      },
+      {
+        "region": 0,
+        "faces": 40,
+        "status": "accepted",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 16,
+        "status": "region_topology",
+        "euler_characteristic": null,
+        "boundary_loops": null,
+        "cut_edges": 0,
+        "topology_failure": "nonmanifold vertex fan"
+      },
+      {
+        "region": 0,
+        "faces": 10,
+        "status": "accepted",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 6,
+        "status": "accepted",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 327,
+        "status": "accepted",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 1638,
+        "status": "distortion",
+        "euler_characteristic": 0,
+        "boundary_loops": 2,
+        "cut_edges": 13
+      },
+      {
+        "region": 0,
+        "faces": 921,
+        "status": "boundary_overlap",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 384,
+        "status": "accepted",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 537,
+        "status": "boundary_overlap",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 364,
+        "status": "accepted",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 173,
+        "status": "boundary_overlap",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 94,
+        "status": "accepted",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 79,
+        "status": "boundary_overlap",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 47,
+        "status": "accepted",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 32,
+        "status": "accepted",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 717,
+        "status": "boundary_overlap",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 282,
+        "status": "accepted",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 435,
+        "status": "boundary_overlap",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 251,
+        "status": "accepted",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 184,
+        "status": "boundary_overlap",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 53,
+        "status": "accepted",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 0,
+        "faces": 131,
+        "status": "accepted",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 2,
+        "faces": 87,
+        "status": "region_topology",
+        "euler_characteristic": null,
+        "boundary_loops": null,
+        "cut_edges": 0,
+        "topology_failure": "nonmanifold vertex fan"
+      },
+      {
+        "region": 2,
+        "faces": 45,
+        "status": "region_topology",
+        "euler_characteristic": null,
+        "boundary_loops": null,
+        "cut_edges": 0,
+        "topology_failure": "nonmanifold vertex fan"
+      },
+      {
+        "region": 2,
+        "faces": 24,
+        "status": "region_topology",
+        "euler_characteristic": null,
+        "boundary_loops": null,
+        "cut_edges": 0,
+        "topology_failure": "nonmanifold vertex fan"
+      },
+      {
+        "region": 2,
+        "faces": 11,
+        "status": "accepted",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 2,
+        "faces": 13,
+        "status": "region_topology",
+        "euler_characteristic": null,
+        "boundary_loops": null,
+        "cut_edges": 0,
+        "topology_failure": "nonmanifold vertex fan"
+      },
+      {
+        "region": 2,
+        "faces": 7,
+        "status": "accepted",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 2,
+        "faces": 6,
+        "status": "accepted",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 2,
+        "faces": 21,
+        "status": "accepted",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 2,
+        "faces": 42,
+        "status": "accepted",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 1,
+        "faces": 11,
+        "status": "accepted",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 3,
+        "faces": 12,
+        "status": "accepted",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 10,
+        "faces": 3,
+        "status": "accepted",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 4,
+        "faces": 12,
+        "status": "accepted",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 5,
+        "faces": 1,
+        "status": "accepted",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 6,
+        "faces": 22,
+        "status": "accepted",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 7,
+        "faces": 2,
+        "status": "accepted",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 9,
+        "faces": 4,
+        "status": "accepted",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      },
+      {
+        "region": 8,
+        "faces": 1,
+        "status": "accepted",
+        "euler_characteristic": 1,
+        "boundary_loops": 1,
+        "cut_edges": 0
+      }
+    ]
+  },
+  {
+    "mesh": "bunny10k",
+    "status": "baseline_unavailable",
+    "claim_eligible": false,
+    "diagnostic": {
+      "status": "error",
+      "stage": "features",
+      "diagnostic": "invalid_topology",
+      "input": "/home/alex/Dropbox/Work/Datasets/obj/bunny10k.obj",
+      "diagnostics": {}
+    }
+  }
+]

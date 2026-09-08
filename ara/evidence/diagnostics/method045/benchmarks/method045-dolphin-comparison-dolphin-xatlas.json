@@ -1,0 +1,128 @@
+{
+  "schema_version": 2,
+  "benchmark_id": "geometry.uv_atlas.baseline_preservation.diagnostic",
+  "run_id": "method045-dolphin-comparison-dolphin-xatlas",
+  "attempt_id": "attempt-001",
+  "method": "geometry.uv_atlas.baseline_preservation",
+  "backend": "cpu_reference",
+  "dataset": "external.baseline_atlas_cohort_v1",
+  "commit": "local-dev",
+  "source": {
+    "revision": "local-dev",
+    "state": "dirty_worktree"
+  },
+  "claim_eligible": false,
+  "manifest": {
+    "path": "benchmarks/geometry/manifests/geometry_baseline_atlas_diagnostic.yaml",
+    "sha256": "3f5845f4b4fef23360f7424095099e0032dab6cf0d77ef1209bc91eeb1405c1c"
+  },
+  "resolved_params": {
+    "intent": "correctness",
+    "cohort": [
+      "sculpt",
+      "frog",
+      "fandisk",
+      "bunny10k"
+    ],
+    "additional_smooth_control": "dolphin",
+    "baseline": "native_curvature_local",
+    "arms": [
+      "protected",
+      "protected-merge",
+      "feature",
+      "growth-only",
+      "xatlas"
+    ],
+    "stretch_limit": 1.35,
+    "anisotropy_limit": 2.0,
+    "patches": 64,
+    "packing": "xatlas_uv_only",
+    "packing_search": [
+      "default",
+      "exhaustive"
+    ],
+    "native_resolution": 1024,
+    "native_padding": 2,
+    "native_preset": "ci",
+    "warmup_iterations": 0,
+    "measured_iterations": 1,
+    "same_surface_subdivision": [
+      "sculpt",
+      "frog"
+    ],
+    "scope": "offline_diagnostic_not_default_smoke",
+    "timing_claim": false,
+    "adoption_claim": false
+  },
+  "config_digest": "97036e12d0b0cb89cac3b8319858f116cb9784660ccf9def94d2ce48dbfe366b",
+  "warmup_policy": {
+    "warmup_iterations": 0,
+    "measured_iterations": 1
+  },
+  "metrics": {
+    "quality_error_linf": 0.0
+  },
+  "diagnostics": {
+    "cell": {
+      "mesh": "dolphin",
+      "arm": "xatlas",
+      "subdivided": false,
+      "faces": 5120,
+      "source_sha256": "100cb0d2eae776d57a0f6dac61aa8a1b624d867e9fcdc360508e62867d58711e",
+      "baseline_labels_sha256": "be06515fd74c6ebc08d47ca5e05720c3bffb5aed71cf519c8ce307651018dd26",
+      "claim_eligible": false,
+      "stretch_limit": 1.35,
+      "anisotropy_limit": 2.0,
+      "outcome": "native_end_to_end",
+      "metrics": {
+        "chart_count": 18,
+        "invalid_charts": [],
+        "chart_texel_density_ratio": 1.3397916617911294,
+        "non_disk_charts": [],
+        "positive_area_overlap_count": 0,
+        "overlap_pairs_sample": [],
+        "global_chart_reflections": 8,
+        "all_charts_valid": true,
+        "max_stretch": 1.6333740666134804,
+        "mean_stretch": 1.0292613686621466,
+        "area_weighted_p95_stretch": 1.07678949245887,
+        "max_anisotropy": 1.6898369534447686,
+        "mean_anisotropy": 1.0095874493561554,
+        "seam_length_over_sqrt_area": 9.565047783570268,
+        "smallest_chart_area_fraction": 2.7460531286908945e-05,
+        "runtime_seconds": 1.913517489,
+        "implementation": "native_engine_xatlas",
+        "square_texture_occupancy": 0.4639190979570888,
+        "continuous_packing_utilization": 0.4864668062417589,
+        "retained_baseline_edges": 27,
+        "lost_baseline_edges": 73,
+        "extra_chart_boundary_edges": 278,
+        "internal_uv_cut_edges": 0,
+        "total_uv_seam_length_over_sqrt_area": 9.565047783570266,
+        "baseline_seam_length_over_sqrt_area": 3.739846369698682,
+        "internal_uv_seam_length_over_sqrt_area": 0.0,
+        "region_count": 11
+      },
+      "prepack_metrics": null,
+      "component_attempts": []
+    },
+    "batch": "dolphin-comparison",
+    "quality_error_definition": "invalid map indicator; candidate stretch/anisotropy excess; protected candidate lost baseline edges; missing baseline is an execution error",
+    "limitation": "Exploratory manifest consolidated after the first probe; quality gates do not mean baseline dominance or production adoption."
+  },
+  "thresholds": {
+    "quality_error_linf_max": 0.0
+  },
+  "threshold_disposition": [
+    {
+      "threshold": "quality_error_linf_max",
+      "metric": "quality_error_linf",
+      "operator": "<=",
+      "limit": 0.0,
+      "observed": 0.0,
+      "passed": true
+    }
+  ],
+  "execution_status": "passed",
+  "status": "passed"
+}

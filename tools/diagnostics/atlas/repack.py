@@ -36,6 +36,7 @@ def main():
     parser.add_argument('input',type=Path); parser.add_argument('output',type=Path)
     parser.add_argument('--runner',type=Path,default=Path('build/ci/bin/IntrinsicUvChartPackDiagnostic'))
     parser.add_argument('--stretch-limit',type=float)
+    parser.add_argument('--brute-force',action='store_true',help='exhaustive native chart placement')
     args=parser.parse_args(); data=np.load(args.input)
     settings=json.loads(args.input.with_suffix('.json').read_text())
     limit=args.stretch_limit or settings.get('stretch_limit',settings.get('parameters',{}).get('stretch_limit',1.5))
@@ -43,13 +44,14 @@ def main():
     points,indices,keys=[],[],{}
     for face,label,corners in zip(f,labels,uv):
         for vertex,point in zip(face,corners):
-            key=(int(vertex),int(label))
+            # Preserve both sides of an internal UV cut within the same chart.
+            key=(int(vertex),int(label),float(point[0]),float(point[1]))
             if key not in keys:
                 keys[key]=len(points); points.append(point.tolist())
             indices.append(keys[key])
     args.output.parent.mkdir(parents=True,exist_ok=True)
     source=args.output.with_suffix('.input.json'); destination=args.output.with_suffix('.raw.json')
-    source.write_text(json.dumps(dict(uvs=points,indices=indices,materials=labels.tolist())))
+    source.write_text(json.dumps(dict(uvs=points,indices=indices,materials=labels.tolist(),brute_force=args.brute_force)))
     subprocess.run([str(args.runner.resolve()),str(source),str(destination)],check=True,timeout=180)
     raw=json.loads(destination.read_text()); outindices=np.asarray(raw['indices']).reshape(-1,3)
     xref=np.asarray(raw['source_vertices'])
@@ -74,6 +76,8 @@ def main():
                 metrics=measured,prepack_metrics=before,claim_eligible=False)
     args.output.write_text(json.dumps(record,indent=2,allow_nan=False)+'\n')
     result=dict(labels=labels,corner_uv=corners)
+    if 'region_labels' in data:
+        result['region_labels']=data['region_labels'].copy()
     np.savez_compressed(args.output.with_suffix('.npz'),vertices=v,faces=f,**result)
     render(v,f,result,args.output.with_suffix('.png'),f'{args.input.parent.name} · {len(scales)} charts · packed UV atlas')
     export_obj(args.output.with_suffix('.obj'),v,f,labels,corners)

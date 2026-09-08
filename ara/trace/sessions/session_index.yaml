@@ -349,11 +349,24 @@ sessions:
     open_threads: 5
   - id: 2026-09-07_001
     date: '2026-09-07'
-    summary: Completed METHOD-041 inspection and published all eleven pending commits on main after the full
-      CPU gate; UI-053 integration and part-quality/adoption remain open.
-    turn_count: 2
-    events_count: 8
+    summary: Completed METHOD-041 inspection and publication; continued METHOD-045 baseline-preserving atlas
+      work and the explicitly approved Claude source/result review. Frog UV fragmentation and anatomical
+      segmentation, quality tradeoffs and production adoption remain open.
+    turn_count: 4
+    events_count: 12
     claims_touched:
     - C61
     - C62
+    - C71
+    - C72
+    open_threads: 5
+  - id: 2026-09-08_001
+    date: '2026-09-08'
+    summary: Audited atlas stages, then implemented and reviewed constrained boundary relocation with Claude.
+      Source regions and UV limits are preserved; anatomical quality and production adoption remain open.
+    turn_count: 2
+    events_count: 8
+    claims_touched:
+    - C73
+    - C74
     open_threads: 4

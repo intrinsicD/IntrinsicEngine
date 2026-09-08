@@ -1,0 +1,29 @@
+{
+  "procedure": "For each retained result.npz chart, compute signed 2D cross products of each source-order corner triangle; count wholly negative and mixed-or-zero charts. This does not modify UVs.",
+  "results": [
+    {
+      "mesh": "sculpt",
+      "charts": 6,
+      "wholly_negative_charts": 5,
+      "mixed_or_zero_charts": 0
+    },
+    {
+      "mesh": "frog",
+      "charts": 23,
+      "wholly_negative_charts": 9,
+      "mixed_or_zero_charts": 0
+    },
+    {
+      "mesh": "fandisk",
+      "charts": 15,
+      "wholly_negative_charts": 10,
+      "mixed_or_zero_charts": 0
+    },
+    {
+      "mesh": "dolphin",
+      "charts": 16,
+      "wholly_negative_charts": 9,
+      "mixed_or_zero_charts": 0
+    }
+  ]
+}

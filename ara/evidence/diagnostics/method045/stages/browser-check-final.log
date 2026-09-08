@@ -1,0 +1,2 @@
+Covered 265 views
+{"views": 265, "initial": {"status": "ready", "meshes": 2, "runs": 265, "rejected": 0, "selectedMesh": "frog", "left": "0", "right": "174", "curveSegments": [4055, 4055], "camera": {"yaw": 0.55, "pitch": -0.2, "zoom": 1}, "glErrors": [0, 0]}, "filtered": {"status": "ready", "meshes": 2, "runs": 265, "rejected": 0, "selectedMesh": "frog", "left": "2", "right": "71", "curveSegments": [0, 0], "camera": {"yaw": 0.55, "pitch": -0.2, "zoom": 1}, "glErrors": [0, 0]}}

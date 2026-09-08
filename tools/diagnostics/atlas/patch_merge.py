@@ -275,7 +275,13 @@ def measure_uv(v, f, uv):
 def parameterize(g, ids, stretch_limit=1.5, anisotropy_limit=2.):
     ids = np.asarray(sorted(ids),np.int64)
     vertices, inverse = np.unique(g['f'][ids],return_inverse=True)
-    f = inverse.reshape(-1,3); v = g['v'][vertices]
+    return parameterize_local(g, ids, vertices, inverse.reshape(-1,3),
+                              stretch_limit, anisotropy_limit)
+
+
+def parameterize_local(g, ids, vertices, f, stretch_limit=1.5, anisotropy_limit=2.):
+    """Solve an explicit chart, allowing duplicated source vertices at UV cuts."""
+    v = g['v'][vertices]
     boundary = disk_boundary_fast(f)
     if boundary is None:
         return None, 'topology'
