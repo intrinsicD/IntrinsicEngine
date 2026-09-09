@@ -2,9 +2,11 @@
 id: GEOM-077
 theme: J
 depends_on: []
+template: micro
 workflow_schema: 1
-workflow_profile: standard
-evidence: required
+workflow_profile: micro
+evidence: not_applicable
+evidence_skip_reason: "Interactive implementation and publication; evidence is the reviewed diff, tests and existing method records."
 owner: codex-interactive
 branch: main
 worktree: /home/alex/Documents/IntrinsicEngine
@@ -86,8 +88,16 @@ bash tools/ci/run_clean_workshop_review.sh . --strict
 - Initial Vulkan run: standalone nearest/radius, new kNN/exclusion oracle and framed ICP passed. The new framed-kNN fixture exited during expected cold-start validation; corrected the fixture to wait for operational promotion within its existing deadline. This was test lifecycle handling, not a query-oracle tolerance change.
 
 ## Verification result (2026-09-08)
-- Implementation complete in the shared working tree; review/commit and formal retirement remain pending.
+- Implementation complete; see the completion record below.
 - Clang 23 `ci`: configured, built `IntrinsicGeometryTests`, `IntrinsicCpuTests` and `IntrinsicBenchmarkSmoke`; five focused PointLBVH tests passed before GPU work. Final full CPU selector: 4,352 selected, 4,351 passed, one expected unsanitized `GlfwLifecycleLsan` skip, zero failures (107.53 s).
 - Clang 23 `ci-vulkan` with ASan+UBSan: built PointLBVH and clustering smoke targets. Standalone nearest/radius, new kNN/exclusion and existing framed ICP passed; after correcting only the cold-start fixture wait, framed kNN and existing Vulkan k-means passed. Five current capability cases passed, none skipped. This cohort uses its existing leak-disabled test environment; it does not close BUG-180 or prove whole-process leak freedom.
 - CPU smoke runner emitted 34 passing results; all seal and validate under schema v2 as dirty-source, non-claim-eligible artifacts. New fixture has zero neighbor mismatches and zero normal component error. Supplied-LBVH normal time exceeds KD-tree time on this small fixture; preserve the default. Separate build/query/PCA timings are diagnostic, with background compilation present during this local run.
 - All automated clean-workshop rows, task policy, method/benchmark manifests, skill mirrors, documentation links, test layout and diff whitespace checks pass. RUNTIME-213/UI-045 own normal config/UI/publication; RUNTIME-209/UI-041 own outlier adoption.
+
+## Completion — 2026-09-09
+
+- PR/commit: `3276c70597761b089bea0364e3fad7eb091fa869`
+
+Completed in implementation commit `3276c70597761b089bea0364e3fad7eb091fa869`. Operational CPU and Vulkan point-query integration, with bounded reference comparisons recorded in the point-LBVH kNN evidence. Supplied-LBVH PCA remains CPU work. Normal adoption is completed by RUNTIME-213/UI-045; outlier adoption remains RUNTIME-209/UI-041.
+
+Publication verification on the combined source: Clang 23 `ci` configured; `IntrinsicTests` and `ExtrinsicSandbox` built. The full CPU selector passed 4,363 tests with one expected unsanitized GLFW/LSan skip and zero failures (115.50 s). Strict layering, task policy, doc links, test layout, manifests and skill mirrors pass. GPU/sanitizer evidence above is from 2026-09-08; this publication check did not rerun those lanes.

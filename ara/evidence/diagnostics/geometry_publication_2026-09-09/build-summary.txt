@@ -1,0 +1,25 @@
+[1163/1187] Scanning /home/alex/Documents/IntrinsicEngine/tests/integration/runtime/Test.CoreFrameGraphParallel.cpp for CXX dependencies
+[1164/1187] Scanning /home/alex/Documents/IntrinsicEngine/tests/integration/runtime/Test.CoreGraphStress.cpp for CXX dependencies
+[1165/1187] Scanning /home/alex/Documents/IntrinsicEngine/tests/integration/runtime/Test.GpuResultReadbackGpuSmoke.cpp for CXX dependencies
+[1166/1187] Scanning /home/alex/Documents/IntrinsicEngine/tests/integration/runtime/Test.CoreProcess.cpp for CXX dependencies
+[1167/1187] Generating CXX dyndep file tests/CMakeFiles/GraphicsIntegrationCpuTestObjs.dir/CXX.dd
+[1168/1187] Generating CXX dyndep file tests/CMakeFiles/RuntimeIntegrationCpuTestObjs.dir/CXX.dd
+[1169/1187] Generating CXX dyndep file tests/CMakeFiles/RuntimeGpuResultReadbackSmokeTestObjs.dir/CXX.dd
+[1170/1187] Building CXX object CMakeFiles/tinygltf.dir/generated/deps/tinygltf_impl.cpp.o
+[1171/1187] Linking CXX static library lib/libtinygltf.a
+[1172/1187] Linking CXX executable bin/IntrinsicRuntimeIntegrationTests
+[1173/1187] Linking CXX executable bin/IntrinsicRuntimeProgressivePoissonResultGpuSmokeTests
+[1174/1187] Linking CXX executable bin/IntrinsicRuntimeGpuResultReadbackSmokeTests
+[1175/1187] Linking CXX executable bin/IntrinsicRuntimePhysicsModuleTests
+[1176/1187] Linking CXX executable bin/IntrinsicKMeansGpuBenchmarkSmoke
+[1177/1187] Linking CXX executable bin/IntrinsicRuntimeContractSlowTests
+[1178/1187] Linking CXX executable bin/IntrinsicLopFamilyGpuBenchmarkSmoke
+[1179/1187] Linking CXX executable bin/IntrinsicRuntimeClusteringServiceGpuSmokeTests
+[1180/1187] Linking CXX executable bin/IntrinsicRuntimePointCloudConsolidationGpuParityTests
+[1181/1187] Linking CXX executable bin/IntrinsicGraphicsVulkanSmokeTests
+[1182/1187] Linking CXX executable bin/IntrinsicPointLBVHGpuTests
+[1183/1187] Linking CXX executable bin/IntrinsicRuntimeGraphicsCpuTests
+[1184/1187] Linking CXX executable bin/ExtrinsicSandbox
+[1185/1187] Linking CXX executable bin/IntrinsicSandboxEditorIntegrationTests
+[1186/1187] Linking CXX executable bin/IntrinsicRuntimeSandboxAcceptanceGpuSmokeTests
+[1187/1187] Linking CXX executable bin/IntrinsicRuntimeContractTests

@@ -1,0 +1,57 @@
+session:
+  id: 2026-09-09_001
+  date: '2026-09-09'
+  started: '2026-09-09T10:54:47+02:00'
+  last_turn: '2026-09-09T10:54:47+02:00'
+  turn_count: 1
+  summary: Published the completed geometry toolset in 3276c7059 after a fresh passing full CPU gate; retire six
+    completed task notes and preserve existing GPU/performance limitations.
+events_logged:
+- turn: 1
+  type: decision
+  id: N512
+  routing: direct
+  provenance: user
+  summary: User authorized commit/push for work; implementation is verified on origin/main.
+- turn: 1
+  type: experiment
+  id: N513
+  routing: direct
+  provenance: ai-executed
+  summary: Fresh combined build and 4363 CPU passes plus one expected skip; direct shader outputs pass.
+ai_actions:
+- turn: 1
+  action: Committed and pushed the completed code, method evidence and workflow inventory. Retired six completed
+    interactive task notes with the implementation reference; updated live links and category indexes. Recorded
+    BUG-181 for the observed existing planner defect. C17 proof paths follow task retirement without changing claim
+    disposition.
+  provenance: ai-executed
+  files_changed:
+  - tasks/done/RETIREMENT-LOG.md
+  - tasks/SESSION-BRIEF.md
+  - tasks/backlog/bugs/BUG-181-touched-scope-shader-output-command.md
+  - ara/logic/claims.md
+claims_touched: []
+key_context:
+- turn: 1
+  excerpt: Commit and push please. I need it at work
+open_threads:
+- 'Spatial consumer inventory: shared kNN/exclusion and the normal adapter are implemented; remaining method migrations
+  and primitive/ray extensions stay open. METHOD-003A owns legacy-reference adoption intake.'
+- 'REVIEW-004/BENCH-001: broader performance qualification remains open; local ICP comparisons support retaining
+  the CPU default, and display-off timing failed the smoke target.'
+- 'METHOD-045: independent anatomical alignment, chart-area balance, remeshing robustness, internal-cut placement
+  and feature-aware merge policy remain open. METHOD-046 bounded refinement is complete and published.'
+- 'METHOD-044: native/config/UI atlas adoption remains deferred.'
+- 'METHOD-043: anatomical/thickness segmentation failures remain unresolved.'
+- 'UI-053: detached curvature curves still need shared engine/config/UI publication.'
+- 'BUG-178/BUG-180: isolate incremental module-cache failure and leak-enabled pipeline allocation retention; no
+  engine or driver ownership conclusion yet.'
+- RUNTIME-209/UI-041 outlier adoption remains open. GEOM-077, RUNTIME-207/UI-040, RUNTIME-213/UI-045 and BUG-179
+  have completion records tied to the pushed implementation commit.
+- 'BUG-181: correct touched-scope shader-output CLI arguments and producer ordering on a fresh build tree.'
+ai_suggestions_pending:
+- O198 is partially exercised by METHOD-046. Its broader independent-alignment and seed-relocation alternatives
+  remain unsettled; no blanket heuristic or production default is promoted.
+- Prior curvature-boundary proposals remain staged; no unrelated observation gained a closure signal.
+- O204 broader migration priorities remain staged; only the explicit ICP portion of O205 was adopted.

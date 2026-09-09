@@ -20,9 +20,6 @@ map.
   [`UI-051`](UI-051-domain-agnostic-appearance-properties-selection-windows.md)
   domain-agnostic appearance selection are the bounded UI dependencies of
   `REVIEW-004`.
-- [UI-045 — Point-set normal property-domain panel](../../active/UI-045-point-normal-property-domain-panel.md)
-  (generic estimator on every compatible property; topology-aware variants
-  only where their real adjacency resolves after `RUNTIME-213`).
 - [UI-044 — Progressive Poisson property-domain panel](UI-044-progressive-poisson-property-domain-panel.md)
   (extends the retired shared provenance panel with catalog-backed
   vertex/edge/halfedge/face property selection after `RUNTIME-212`).
@@ -35,9 +32,6 @@ map.
 - [UI-041 — Point-set outlier multi-domain panel](UI-041-point-set-outlier-multi-domain-panel.md)
   (Detect on any typed Mesh/Graph/PointCloud element property; explicit Remove
   only on point clouds after `RUNTIME-209`).
-- [UI-040 — ICP compatible-source selection and discovery](../../active/UI-040-icp-compatible-source-selection.md)
-  (all mixed Mesh/Graph/PointCloud property-source pairs through one shared
-  runtime config/readiness window after `RUNTIME-207`).
 - [UI-037 — Linear domain-action readiness and disabled-reason tooltips](UI-037-linear-domain-action-readiness-tooltips.md)
   (one shared readiness value reused by each feature-owned typed operation for
   mesh, UV, bake, point-cloud, registration, and parameterization actions;

@@ -1,0 +1,30 @@
+{
+  "timestamp": "2026-09-09T10:54:47+02:00",
+  "implementation_commit": "3276c70597761b089bea0364e3fad7eb091fa869",
+  "remote_branch": "origin/main",
+  "verified_remote_commit": "3276c70597761b089bea0364e3fad7eb091fa869",
+  "execution_source": {
+    "base_commit": "4ca256267",
+    "state": "dirty_worktree",
+    "binding": "The tested engine and test source was committed unchanged in the implementation commit; only saved-log trailing whitespace was normalized before commit."
+  },
+  "configure": "cmake --preset ci -DINTRINSIC_BUILD_SANDBOX=ON",
+  "compiler": "Clang 23.0.0",
+  "sanitizers": false,
+  "build_targets": [
+    "IntrinsicTests",
+    "ExtrinsicSandbox"
+  ],
+  "ctest": {
+    "selector": "-LE gpu|vulkan|slow|flaky-quarantine",
+    "timeout_seconds": 60,
+    "selected": 4364,
+    "passed": 4363,
+    "skipped": 1,
+    "failed": 0,
+    "wall_seconds": 115.5,
+    "skip": "GlfwLifecycleLsan.EngineStaticTeardownAndLeakControl"
+  },
+  "scope": "Publication CPU verification only. No new benchmark, GPU or sanitizer run. Earlier evidence retains its original scope and source identity.",
+  "diagnosed_tooling_followup": "BUG-181: planner emits unsupported shader checker --root; direct --dir build/ci/bin/shaders validation passes."
+}

@@ -46,6 +46,14 @@ ctest --test-dir build/ci-vulkan --output-on-failure -R '^PointLBVHGpuSmoke\.' -
 python3 tools/agents/check_task_policy.py --root . --strict
 ```
 
-Implementation remains in the shared working tree pending review/commit. See the [ICP review](../../docs/reviews/2026-09-08-icp-spatial-integration.md).
+Implementation is committed; see the completion record below. See the [ICP review](../../docs/reviews/2026-09-08-icp-spatial-integration.md).
 
 Final CTest registry confirmed 30 s for the query test and 120 s only for the framed comparison. The display-off cohort passed 2/2 in 63.60 s (16.74 s queries, 46.72 s registration). The final registration run used 45 frames and built each target index once. Its sealed runtime benchmark reports a failed timing disposition at 12,999.1 ms versus the unchanged 5,000 ms threshold; transform error is zero.
+
+## Completion — 2026-09-09
+
+- PR/commit: `3276c70597761b089bea0364e3fad7eb091fa869`
+
+Completed in implementation commit `3276c70597761b089bea0364e3fad7eb091fa869`. Operational test-harness correction. The recorded display-off Vulkan run completed all seven ICP comparisons within the diagnosed bound. The original benchmark timing threshold is unchanged; BUG-180 retains the separate leak-enabled process-retention investigation.
+
+Publication verification on the combined source: Clang 23 `ci` configured; `IntrinsicTests` and `ExtrinsicSandbox` built. The full CPU selector passed 4,363 tests with one expected unsanitized GLFW/LSan skip and zero failures (115.50 s). Strict layering, task policy, doc links, test layout, manifests and skill mirrors pass. GPU/sanitizer evidence above is from 2026-09-08; this publication check did not rerun those lanes.

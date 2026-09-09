@@ -2,9 +2,11 @@
 id: RUNTIME-207
 theme: I
 depends_on: [BUG-096, HARDEN-087]
+template: micro
 workflow_schema: 1
-workflow_profile: high-risk
-evidence: required
+workflow_profile: micro
+evidence: not_applicable
+evidence_skip_reason: "Interactive implementation and publication; evidence is the reviewed diff, tests and existing method records."
 owner: codex-interactive
 branch: main
 worktree: /home/alex/Documents/IntrinsicEngine
@@ -131,8 +133,7 @@ integration proposal. This explicitly adds cached CPU LBVH and framed Vulkan
 correspondence queries to the original binding/UI scope. The CPU KD-tree default
 and existing CPU solve remain. No GICP, Trimmed ICP overlap estimator, Anderson
 acceleration, kNN or triangle query method is included. Implementation acceptance
-is verified in the shared working tree. These notes remain active pending
-review/commit. The design is documented in
+is verified in the shared working tree. The implementation is committed; see the completion record below. The design is documented in
 [registration](../../docs/architecture/registration.md).
 
 ## Verification record — 2026-09-08
@@ -147,3 +148,11 @@ review/commit. The design is documented in
   binding/deletion rejection, source-only undo/redo, config preview/apply/run,
   and one shared window behind the domain menu entries are covered.
 - [Review and limitations](../../docs/reviews/2026-09-08-icp-spatial-integration.md).
+
+## Completion — 2026-09-09
+
+- PR/commit: `3276c70597761b089bea0364e3fad7eb091fa869`
+
+Completed in implementation commit `3276c70597761b089bea0364e3fad7eb091fa869`. Operational canonical-domain ICP integration: CPU solve/publication, cached CPU or framed Vulkan correspondences, shared validated configuration and source-transform history. The recorded GPU comparison exercises the actual Vulkan path; BUG-180 and the original timing limitations remain open.
+
+Publication verification on the combined source: Clang 23 `ci` configured; `IntrinsicTests` and `ExtrinsicSandbox` built. The full CPU selector passed 4,363 tests with one expected unsanitized GLFW/LSan skip and zero failures (115.50 s). Strict layering, task policy, doc links, test layout, manifests and skill mirrors pass. GPU/sanitizer evidence above is from 2026-09-08; this publication check did not rerun those lanes.

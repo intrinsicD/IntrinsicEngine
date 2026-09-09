@@ -12,4 +12,4 @@ Local dirty-source implementation evidence for C78. The [record](../diagnostics/
 
 GPU evidence uses ci-vulkan ASan+UBSan with the existing leak-disabled cohort environment; see the [registry](../diagnostics/point_lbvh_knn_2026-09-08/gpu-registry.txt). It is not evidence for whole-process leak freedom or the isolated full CPU sanitizer gates. BUG-180 remains open. Structural checks pass; BUG-177's pre-existing local root entry remains.
 
-[GEOM-077](../../../tasks/active/GEOM-077-point-lbvh-knn-exclusion.md) records the implementation scope. RUNTIME-213/UI-045 own normal canonical config/UI/publication; outlier adoption remains RUNTIME-209/UI-041. GPU PCA, arbitrary predicates and primitive/ray traversal are not provided by this slice.
+[GEOM-077](../../../tasks/done/GEOM-077-point-lbvh-knn-exclusion.md) records the implementation scope. RUNTIME-213/UI-045 own normal canonical config/UI/publication; outlier adoption remains RUNTIME-209/UI-041. GPU PCA, arbitrary predicates and primitive/ray traversal are not provided by this slice.

@@ -131,8 +131,7 @@ remain discoverable here; allocate a scoped task only when work is selected.
 
 | Work area | Open task owners with local reminders |
 | --- | --- |
-| Registration | [RUNTIME-207](../../tasks/active/RUNTIME-207-icp-element-domain-source-integration.md), [UI-040](../../tasks/active/UI-040-icp-compatible-source-selection.md) |
-| Point analysis | [RUNTIME-209](../../tasks/backlog/runtime/RUNTIME-209-point-set-outlier-analysis-publication.md), [RUNTIME-213](../../tasks/active/RUNTIME-213-point-normal-property-domain-integration.md), [UI-041](../../tasks/backlog/ui/UI-041-point-set-outlier-multi-domain-panel.md), [UI-045](../../tasks/active/UI-045-point-normal-property-domain-panel.md), [UI-051](../../tasks/backlog/ui/UI-051-domain-agnostic-appearance-properties-selection-windows.md), [GEOM-073](../../tasks/backlog/geometry/GEOM-073-point-analysis-property-span-contracts.md) |
+| Point analysis | [RUNTIME-209](../../tasks/backlog/runtime/RUNTIME-209-point-set-outlier-analysis-publication.md), [UI-041](../../tasks/backlog/ui/UI-041-point-set-outlier-multi-domain-panel.md), [UI-051](../../tasks/backlog/ui/UI-051-domain-agnostic-appearance-properties-selection-windows.md), [GEOM-073](../../tasks/backlog/geometry/GEOM-073-point-analysis-property-span-contracts.md) |
 | Clustering | [RUNTIME-211](../../tasks/backlog/runtime/RUNTIME-211-kmeans-property-domain-integration.md), [UI-043](../../tasks/backlog/ui/UI-043-kmeans-property-domain-panel.md) |
 | Sampling | [RUNTIME-212](../../tasks/backlog/runtime/RUNTIME-212-progressive-poisson-property-domain-publication.md), [UI-044](../../tasks/backlog/ui/UI-044-progressive-poisson-property-domain-panel.md), [GEOM-061](../../tasks/backlog/geometry/GEOM-061-grid-downsampling-reduction-strategies.md), [METHOD-014](../../tasks/backlog/methods/METHOD-014-progressive-poisson-gpu-operational-parity.md) |
 | Graphs | [GEOM-074](../../tasks/backlog/geometry/GEOM-074-graph-property-adjacency-contracts.md) |

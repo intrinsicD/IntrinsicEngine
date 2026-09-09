@@ -1962,3 +1962,14 @@ entries:
       ownership; no unrelated knowledge is promoted or discarded.
     - Corrected the session open-thread summary that still described implemented kNN as future work; historical event
       records are preserved.
+
+  - turn: 2026-09-09_001#1
+    notes:
+    - Publication authorization and the new CPU run are direct journey facts. No new claim or general heuristic is
+      inferred from a request to push.
+    - The full CPU run supports publication of the tested source, without upgrading prior dirty benchmark evidence
+      to claim-grade or rerunning GPU/sanitizer lanes.
+    - Retirement updates current task/proof links while preserving earlier trace records and experimental failure
+      evidence. C17 retains its disposition.
+    - Broader migration priorities, selection architecture and unrelated atlas/DAG observations remain unsettled;
+      publishing this implementation is not a blanket endorsement of those interpretations.

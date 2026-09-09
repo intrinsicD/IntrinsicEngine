@@ -2,9 +2,11 @@
 id: UI-045
 theme: I
 depends_on: [RUNTIME-213]
+template: micro
 workflow_schema: 1
-workflow_profile: standard
-evidence: required
+workflow_profile: micro
+evidence: not_applicable
+evidence_skip_reason: "Interactive implementation and publication; evidence is the reviewed diff, tests and existing method records."
 owner: codex-interactive
 branch: main
 worktree: /home/alex/Documents/IntrinsicEngine
@@ -99,7 +101,7 @@ The shared configuration, typed normal command, copied job/publication/history p
 
 ## Verification and review — 2026-09-08
 
-Implemented and CPU-verified in the shared working tree; awaiting commit/retirement.
+Implemented and CPU-verified; see the completion record below.
 
 - Configured `cmake --preset ci`; enabled `INTRINSIC_BUILD_SANDBOX=ON` for the app build. Clang 23, Debug, unsanitized, CUDA off; promoted Vulkan remains off.
 - Built `IntrinsicTests`, `IntrinsicRuntimeContractTests`, `IntrinsicSandboxEditorIntegrationTests` and `ExtrinsicSandbox` with `CCACHE_DISABLE=1`.
@@ -113,3 +115,11 @@ Scope/layering/tests/docs sweep: pass. The existing geometry-processing owner ho
 Clean-workshop rows: 1 imports pass; 2 target links pass; 3 exported-type direction pass; 4 renderer growth n/a; 5 new passes n/a; 6 recipe dependency changes n/a (uses the existing vector recipe); 7 scaffold retirement n/a (no retirement in this session); 8 temporary architecture exceptions n/a.
 
 Evidence scope is CPU computation/publication and editor integration. No new GPU normal solve, GPU visualization readback, sanitizer result, performance improvement or complete Framework24 PCA/feature/saliency parity is claimed.
+
+## Completion — 2026-09-09
+
+- PR/commit: `3276c70597761b089bea0364e3fad7eb091fa869`
+
+Completed in implementation commit `3276c70597761b089bea0364e3fad7eb091fa869`. Operational normal-estimation editor integration, verified by the shared-window drawing, discovery/configuration and runtime publication tests. The existing vector recipe is reused; this closure makes no new GPU visualization readback claim.
+
+Publication verification on the combined source: Clang 23 `ci` configured; `IntrinsicTests` and `ExtrinsicSandbox` built. The full CPU selector passed 4,363 tests with one expected unsanitized GLFW/LSan skip and zero failures (115.50 s). Strict layering, task policy, doc links, test layout, manifests and skill mirrors pass. GPU/sanitizer evidence above is from 2026-09-08; this publication check did not rerun those lanes.

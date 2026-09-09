@@ -11542,3 +11542,34 @@ tree:
     - O209
     - ara/evidence/diagnostics/normal_estimation_2026-09-08/record.json
     status: resolved
+
+  - id: N512
+    type: decision
+    title: Publish the completed geometry toolset for use at work
+    provenance: user
+    timestamp: '2026-09-09T10:54:47+02:00'
+    choice: Commit and push the completed geodesics, selection, spatial-index, ICP and normal-estimation work to origin/main.
+      Implementation commit 3276c70597761b089bea0364e3fad7eb091fa869 was pushed and matched the remote tracking ref.
+    alternatives:
+    - Keep the completed work only in the local checkout
+    evidence:
+    - N511
+    - ara/evidence/diagnostics/geometry_publication_2026-09-09/record.json
+    status: resolved
+  - id: N513
+    type: experiment
+    title: Verify the combined source before publication
+    provenance: ai-executed
+    timestamp: '2026-09-09T10:54:47+02:00'
+    result: 'Clang 23 ci built IntrinsicTests and ExtrinsicSandbox. CPU selector: 4363 passed, one expected unsanitized
+      skip, zero failures in 115.50 seconds. Structural and direct shader-output checks pass. BUG-181 records the
+      pre-existing planner/checker argument mismatch; the direct shader check used the supported --dir argument. No
+      new GPU/sanitizer or performance qualification.'
+    evidence:
+    - ara/evidence/diagnostics/geometry_publication_2026-09-09/record.json
+    - ara/evidence/diagnostics/geometry_publication_2026-09-09/cpu-summary.txt
+    - ara/evidence/diagnostics/geometry_publication_2026-09-09/build-summary.txt
+    - tasks/backlog/bugs/BUG-181-touched-scope-shader-output-command.md
+    also_depends_on:
+    - N510
+    status: resolved

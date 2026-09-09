@@ -8,6 +8,17 @@ so blocks moved from the old active-README history work verbatim.
 
 ## Retired task narratives
 
+Completed 2026-09-09 in implementation commit `3276c7059`:
+
+- [BUG-179](BUG-179-framed-icp-display-off-timeout.md) — Operational test-harness correction. The recorded display-off Vulkan run completed all seven ICP comparisons within the diagnosed bound. The original benchmark timing threshold is unchanged; BUG-180 retains the separate leak-enabled process-retention investigation.
+- [GEOM-077](GEOM-077-point-lbvh-knn-exclusion.md) — Operational CPU and Vulkan point-query integration, with bounded reference comparisons recorded in the point-LBVH kNN evidence. Supplied-LBVH PCA remains CPU work. Normal adoption is completed by RUNTIME-213/UI-045; outlier adoption remains RUNTIME-209/UI-041.
+- [RUNTIME-207](RUNTIME-207-icp-element-domain-source-integration.md) — Operational canonical-domain ICP integration: CPU solve/publication, cached CPU or framed Vulkan correspondences, shared validated configuration and source-transform history. The recorded GPU comparison exercises the actual Vulkan path; BUG-180 and the original timing limitations remain open.
+- [UI-040](UI-040-icp-compatible-source-selection.md) — Operational shared ICP editor integration, with the CPU editor/domain tests and recorded framed Vulkan correspondence comparisons. The panel uses runtime property catalogs, readiness, configuration and transform history.
+- [RUNTIME-213](RUNTIME-213-point-normal-property-domain-integration.md) — Operational CPU normal computation/publication and editor integration, verified by the normal/domain/history/config tests and full CPU suite. PCA/MST remain CPU computations; no GPU normal solve or complete Framework24 workflow parity is claimed.
+- [UI-045](UI-045-point-normal-property-domain-panel.md) — Operational normal-estimation editor integration, verified by the shared-window drawing, discovery/configuration and runtime publication tests. The existing vector recipe is reused; this closure makes no new GPU visualization readback claim.
+
+The combined `ci` build includes the Sandbox executable. Publication CPU verification passed 4,363 cases with one expected unsanitized GLFW/LSan skip and no failures. Earlier Vulkan and benchmark records retain their original evidence scope; BUG-178 and BUG-180 remain open.
+
 [`BUG-159`](BUG-159-fast-staged-atlas-per-chart-global-remaps.md) — completed
 2026-09-05 in implementation commit `1846a5692`, at `Operational` maturity
 for the built-in CPU FastStaged backend. One reusable source lookup and

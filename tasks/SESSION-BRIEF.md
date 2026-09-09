@@ -8,17 +8,11 @@ picking backlog work; theme priorities and rationale live in
 
 ## Active tasks
 
-- `BUG-179` — Framed ICP comparison exceeds the cohort timeout with display off (tasks/active/BUG-179-framed-icp-display-off-timeout.md)
-- `GEOM-077` — Shared point-LBVH k-nearest and exclusion queries (tasks/active/GEOM-077-point-lbvh-knn-exclusion.md)
 - `METHOD-040` — Global multicut curvature-patch CPU reference (tasks/active/METHOD-040-global-multicut-curvature-patch-reference.md)
 - `METHOD-042` — Region-aware parts experiment (tasks/active/METHOD-042-region-aware-parts-experiment.md)
 - `METHOD-043` — Thickness and curve-aligned parts comparison (tasks/active/METHOD-043-thickness-and-curve-parts-comparison.md)
 - `METHOD-044` — Feature-aware patches and distortion-aware atlas merging (tasks/active/METHOD-044-feature-aware-atlas-merge-experiment.md)
 - `METHOD-045` — Preserve baseline regions while constructing UV charts (tasks/active/METHOD-045-baseline-preserving-atlas-cuts.md)
-- `RUNTIME-207` — ICP element-domain source integration (tasks/active/RUNTIME-207-icp-element-domain-source-integration.md)
-- `RUNTIME-213` — Point-set normal property-domain integration (tasks/active/RUNTIME-213-point-normal-property-domain-integration.md)
-- `UI-040` — ICP compatible-source selection and discovery (tasks/active/UI-040-icp-compatible-source-selection.md)
-- `UI-045` — Point-set normal property-domain panel (tasks/active/UI-045-point-normal-property-domain-panel.md)
 - `UI-053` — Curvature-extremum engine overlay (tasks/active/UI-053-curvature-extremum-engine-overlay.md)
 
 ## Theme B — Rendering modernization
@@ -137,6 +131,7 @@ picking backlog work; theme priorities and rationale live in
 - unblocked: `BUG-177` — Root hygiene rejects local agent metadata (tasks/backlog/bugs/BUG-177-root-hygiene-local-agent-metadata.md)
 - unblocked: `BUG-178` — Clang 23 crashes during an incremental module rebuild (tasks/backlog/bugs/BUG-178-clang23-incremental-module-ice.md)
 - unblocked: `BUG-180` — Leak-enabled framed ICP process reports 240 retained bytes (tasks/backlog/bugs/BUG-180-framed-icp-leak-enabled-process-retention.md)
+- unblocked: `BUG-181` — Touched-scope shader-output command uses an unsupported flag (tasks/backlog/bugs/BUG-181-touched-scope-shader-output-command.md)
 - unblocked: `GRAPHICS-109` — Offscreen frame capture to PNG (headless figure renders) (tasks/backlog/rendering/GRAPHICS-109-offscreen-frame-capture-png.md)
 
 ## Audits

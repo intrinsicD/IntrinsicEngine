@@ -425,8 +425,8 @@ Open members (kernel-seam priority set first):
 The 2026-08-07 Sandbox UI workflow pass (`sculpt.obj` driven end-to-end through
 the promoted Vulkan build) opened the capability-gap set below alongside
 `BUG-137..142` in Theme G. `UI-051` covers only the remaining domain windows;
-the method panels stay owned by `RUNTIME-209/211/212/213` and
-`UI-040/041/043/044/045`, and disabled-reason tooltips stay owned by `UI-037`.
+the method panels stay owned by `RUNTIME-209/211/212` and
+`UI-041/043/044`, and disabled-reason tooltips stay owned by `UI-037`.
 - [`runtime/RUNTIME-218-default-scene-lighting-and-light-authoring.md`](runtime/RUNTIME-218-default-scene-lighting-and-light-authoring.md)
   (no light is authored anywhere, so every shading path collapses to ambient).
 - [`ui/UI-046-sandbox-geometry-export.md`](ui/UI-046-sandbox-geometry-export.md)
