@@ -107,3 +107,16 @@ seal and validate its output as for the normal runtime smoke above.
 ## Point spacing and radius consumer
 
 The [spacing/radius contract](../../../docs/architecture/point-spacing.md) preserves min(n,max(k,1)+1) candidates followed by self removal. Radii average retained distances times scale; nearest-other spacing is a separate statistic from the same rows. CPU octree remains reference; cached CPU/Vulkan LBVH provide candidates. The geometry supplied-statistics adapter retains sampled-row stride. `geometry.point_lbvh.spacing_runtime_smoke` measures framed eight-domain publication and CPU comparisons; it does not evaluate splat coverage or establish a performance win.
+
+### Local distance-ratio consumer
+The outlier analysis `local_distance_ratio` option reuses the scalar mask/score
+publication path. It preserves the existing `EstimateOutlierProbability`
+heuristic: query min(n,max(k,2)+1), discard self after candidate selection,
+compute each mean distance and divide by neighboring mean distances. Supplied
+rows are validated and mapped from GPU source slots to compact samples. GPU
+retention limits k to 63. It is not the reachability-density definition of LOF,
+the probability normalization of LoOP, or Framework24's covariance likelihood.
+See [outlier analysis](../../../docs/architecture/outlier-analysis.md) for
+zero-density behavior, controls and limits. The diagnostic smoke manifest is
+`geometry.point_lbvh.distance_ratio_runtime_smoke`; runtime timing includes
+framed scheduling and publication, and does not establish a speedup.

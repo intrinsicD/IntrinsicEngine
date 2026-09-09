@@ -24,7 +24,7 @@ namespace Extrinsic::Runtime
         OutlierAnalysisConfig Parse(const Json& data)
         {
             OutlierAnalysisConfig c;c.StableEntityId=data.at("entity");
-            c.Method=data.at("method")=="radius"?OutlierAnalysisMethod::Radius:OutlierAnalysisMethod::Statistical;
+            for(unsigned i=0;i<3;++i)if(data.at("method")==ToString(OutlierAnalysisMethod(i)))c.Method=OutlierAnalysisMethod(i);
             c.Operation=data.at("operation")=="remove_marked"?OutlierAnalysisOperation::RemoveMarked:OutlierAnalysisOperation::Analyze;
             for(unsigned i=0;i<3;++i)if(data.at("backend")==ToString(OutlierAnalysisBackend(i)))c.Backend=OutlierAnalysisBackend(i);
             auto read=[&](const char* name,GeometryPropertyRef& ref){
@@ -34,7 +34,7 @@ namespace Extrinsic::Runtime
             };
             read("positions",c.Positions);read("mask",c.Mask);read("score",c.Score);
             c.KNeighbors=data.at("k_neighbors");c.MinimumNeighbors=data.at("minimum_neighbors");
-            c.GpuQueryBatchSize=data.at("gpu_query_batch_size");c.Radius=data.at("radius");c.StdDevMultiplier=data.at("stddev_multiplier");
+            c.GpuQueryBatchSize=data.at("gpu_query_batch_size");c.Radius=data.at("radius");c.StdDevMultiplier=data.at("stddev_multiplier");c.ScoreThreshold=data.at("score_threshold");
             return c;
         }
         Core::Config::EngineConfigSection Section(const OutlierAnalysisConfig& c)
@@ -45,7 +45,7 @@ namespace Extrinsic::Runtime
     }
     const char* ToString(OutlierAnalysisMethod m) noexcept
     {
-        switch(m){case OutlierAnalysisMethod::Statistical:return "statistical";case OutlierAnalysisMethod::Radius:return "radius";}
+        switch(m){case OutlierAnalysisMethod::Statistical:return "statistical";case OutlierAnalysisMethod::Radius:return "radius";case OutlierAnalysisMethod::LocalDistanceRatio:return "local_distance_ratio";}
         return "invalid";
     }
     const char* ToString(OutlierAnalysisBackend b) noexcept
@@ -63,7 +63,7 @@ namespace Extrinsic::Runtime
         return Json{{"entity",c.StableEntityId},{"method",ToString(c.Method)},{"backend",ToString(c.Backend)},
                     {"operation",ToString(c.Operation)},{"positions",Ref(c.Positions)},{"mask",Ref(c.Mask)},{"score",Ref(c.Score)},
                     {"k_neighbors",c.KNeighbors},{"minimum_neighbors",c.MinimumNeighbors},{"gpu_query_batch_size",c.GpuQueryBatchSize},
-                    {"radius",c.Radius},{"stddev_multiplier",c.StdDevMultiplier}}.dump();
+                    {"radius",c.Radius},{"stddev_multiplier",c.StdDevMultiplier},{"score_threshold",c.ScoreThreshold}}.dump();
     }
     Core::Config::EngineConfigSectionValidationResult ValidateOutlierAnalysisConfigSection(
         std::string_view payload,std::string_view,std::string_view subject)
@@ -84,10 +84,10 @@ namespace Extrinsic::Runtime
                 return reject(std::string(key)+" must be an unsigned 32-bit integer.");
         if(data["k_neighbors"]==0 || data["gpu_query_batch_size"]==0 || data["gpu_query_batch_size"]>16384)
             return reject("k must be positive and GPU query batch size must be 1..16384.");
-        if(data["method"]!="statistical" && data["method"]!="radius")return reject("Unknown outlier method.");
+        if(data["method"]!="statistical" && data["method"]!="radius" && data["method"]!="local_distance_ratio")return reject("Unknown outlier method.");
         if(data["operation"]!="analyze" && data["operation"]!="remove_marked")return reject("Unknown outlier operation.");
         if(data["backend"]!="cpu_octree" && data["backend"]!="cpu_lbvh" && data["backend"]!="vulkan_lbvh")return reject("Unknown outlier backend.");
-        for(auto key:{"radius","stddev_multiplier"})
+        for(auto key:{"radius","stddev_multiplier","score_threshold"})
             if(!data[key].is_number() || !std::isfinite(data[key].get<double>()) || data[key]<0 ||
                data[key].get<double>()>std::numeric_limits<float>::max())return reject(std::string(key)+" must be a finite nonnegative float.");
         if(data["method"]=="radius" && data["radius"]<=0)return reject("Radius must be positive.");

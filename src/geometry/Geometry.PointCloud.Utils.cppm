@@ -285,9 +285,19 @@ export namespace Geometry::PointCloud
     };
 
     // Publishes "p:outlier_score" property on the cloud.
-    // Reject fewer than two samples, nonfinite inputs/results or negative scale.
+    // Reject fewer than two samples, nonfinite inputs/results or a negative threshold.
     [[nodiscard]] std::optional<OutlierEstimationResult> EstimateOutlierProbability(
         Cloud& cloud,
+        const OutlierEstimationParams& params = {});
+
+    // This distance-ratio heuristic is not a calibrated probability or full LOF.
+    [[nodiscard]] std::optional<OutlierEstimationResult> EstimateOutlierProbability(
+        std::span<const glm::vec3> positions, const OutlierEstimationParams& params = {});
+
+    // Packed rows contain min(n,max(k,2)+1) IDs, sorted by squared distance/ID.
+    // Query without self exclusion, then discard the source ID in the reduction.
+    [[nodiscard]] std::optional<OutlierEstimationResult> EstimateOutlierProbabilityFromNeighbors(
+        std::span<const glm::vec3> positions, std::span<const std::uint32_t> candidates,
         const OutlierEstimationParams& params = {});
 
     // -------------------------------------------------------------------------

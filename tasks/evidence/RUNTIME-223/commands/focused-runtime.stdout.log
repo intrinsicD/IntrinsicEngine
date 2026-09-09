@@ -1,0 +1,101 @@
+Internal ctest changing into directory: /home/alex/Documents/IntrinsicEngine/build/ci
+Test project /home/alex/Documents/IntrinsicEngine/build/ci
+      Start  670: OutlierAnalysis.EveryDomainMatchesReferenceAndPublishesOnlyNamedProperties
+ 1/44 Test  #670: OutlierAnalysis.EveryDomainMatchesReferenceAndPublishesOnlyNamedProperties ..................   Passed    0.06 sec
+      Start  671: OutlierAnalysis.RemovalRequiresCurrentDetectionAndPreservesEveryPropertyThroughHistory
+ 2/44 Test  #671: OutlierAnalysis.RemovalRequiresCurrentDetectionAndPreservesEveryPropertyThroughHistory ......   Passed    0.01 sec
+      Start  672: OutlierAnalysis.DeletedRowsRemainUntouchedAndMaskOrInputEditsInvalidateRemoval
+ 3/44 Test  #672: OutlierAnalysis.DeletedRowsRemainUntouchedAndMaskOrInputEditsInvalidateRemoval ..............   Passed    0.01 sec
+      Start  673: OutlierAnalysis.RadiusUsesAllCountsAndRetainsCoincidentPeers
+ 4/44 Test  #673: OutlierAnalysis.RadiusUsesAllCountsAndRetainsCoincidentPeers ................................   Passed    0.29 sec
+      Start  674: OutlierAnalysis.InvalidParametersAndReservedOutputsFailBeforeMutation
+ 5/44 Test  #674: OutlierAnalysis.InvalidParametersAndReservedOutputsFailBeforeMutation .......................   Passed    0.01 sec
+      Start  675: OutlierAnalysis.QueuedJobsRejectStaleInputsOutputsAndCancellation
+ 6/44 Test  #675: OutlierAnalysis.QueuedJobsRejectStaleInputsOutputsAndCancellation ...........................   Passed    0.10 sec
+      Start  676: OutlierAnalysis.MaskAndScoreUseSharedVisualizationRecipesOnEveryDomain
+ 7/44 Test  #676: OutlierAnalysis.MaskAndScoreUseSharedVisualizationRecipesOnEveryDomain ......................   Passed    0.01 sec
+      Start  677: OutlierAnalysis.RadiusBoundaryAndStatisticalMinimumMatchAcrossCpuBackends
+ 8/44 Test  #677: OutlierAnalysis.RadiusBoundaryAndStatisticalMinimumMatchAcrossCpuBackends ...................   Passed    0.01 sec
+      Start  678: OutlierAnalysis.UndoAnotherOutputCannotMakeAnEditedMaskCurrent
+ 9/44 Test  #678: OutlierAnalysis.UndoAnotherOutputCannotMakeAnEditedMaskCurrent ..............................   Passed    0.01 sec
+      Start  679: OutlierAnalysisConfig.RoundTripAndSharedPreviewApplyRun
+10/44 Test  #679: OutlierAnalysisConfig.RoundTripAndSharedPreviewApplyRun .....................................   Passed    0.01 sec
+      Start  680: OutlierAnalysisConfig.DistanceRatioRoundTripsDefaultsAndGpuCandidateLimit
+11/44 Test  #680: OutlierAnalysisConfig.DistanceRatioRoundTripsDefaultsAndGpuCandidateLimit ...................   Passed    0.01 sec
+      Start 1336: SandboxEditorPresentation.DefaultDrawStartsWithOnlyMenuBarVisible
+12/44 Test #1336: SandboxEditorPresentation.DefaultDrawStartsWithOnlyMenuBarVisible ...........................   Passed    0.04 sec
+      Start 1337: SandboxEditorPresentation.DomainMenusUseAppearanceAndFocusedProcessingWindows
+13/44 Test #1337: SandboxEditorPresentation.DomainMenusUseAppearanceAndFocusedProcessingWindows ...............   Passed    0.04 sec
+      Start 1338: SandboxEditorPresentation.DomainPanelsPreserveLifetimeCacheAndResultPublication
+14/44 Test #1338: SandboxEditorPresentation.DomainPanelsPreserveLifetimeCacheAndResultPublication .............   Passed    0.00 sec
+      Start 1339: SandboxEditorPresentation.MeshProcessingPanelsPreserveLifetimeAndResultPublication
+15/44 Test #1339: SandboxEditorPresentation.MeshProcessingPanelsPreserveLifetimeAndResultPublication ..........   Passed    0.01 sec
+      Start 1340: SandboxEditorPresentation.ExtrinsicSandboxAppStaysRuntimeOnly
+16/44 Test #1340: SandboxEditorPresentation.ExtrinsicSandboxAppStaysRuntimeOnly ...............................   Passed    0.02 sec
+      Start 1341: SandboxEditorPresentation.RuntimeFeatureModulesCompileSeparatelyFromEditorShell
+17/44 Test #1341: SandboxEditorPresentation.RuntimeFeatureModulesCompileSeparatelyFromEditorShell .............   Passed    0.15 sec
+      Start 1342: SandboxEditorPresentation.GeometryProcessingMenusExposeDomainElementSubmenus
+18/44 Test #1342: SandboxEditorPresentation.GeometryProcessingMenusExposeDomainElementSubmenus ................   Passed    0.00 sec
+      Start 1343: SandboxEditorPresentation.AdapterCallbackDrawsDeterministicMenuOnlyFrame
+19/44 Test #1343: SandboxEditorPresentation.AdapterCallbackDrawsDeterministicMenuOnlyFrame ....................   Passed    0.04 sec
+      Start 1344: SandboxEditorPresentation.FileImportDisabledReasonRendersThroughRealHoveredControl
+20/44 Test #1344: SandboxEditorPresentation.FileImportDisabledReasonRendersThroughRealHoveredControl ..........   Passed    0.23 sec
+      Start 1345: SandboxEditorPresentation.DisabledReasonTooltipConventionIsSharedByImportAndQueueControls
+21/44 Test #1345: SandboxEditorPresentation.DisabledReasonTooltipConventionIsSharedByImportAndQueueControls ...   Passed    0.01 sec
+      Start 1346: SandboxEditorPresentation.RuntimeImportEventIsReflectedByAppFilePanel
+22/44 Test #1346: SandboxEditorPresentation.RuntimeImportEventIsReflectedByAppFilePanel .......................   Passed    0.04 sec
+      Start 1347: SandboxEditorPresentation.EngineAttachmentRegistersEditorCallback
+23/44 Test #1347: SandboxEditorPresentation.EngineAttachmentRegistersEditorCallback ...........................   Passed    0.04 sec
+      Start 1348: SandboxEditorPresentation.ControllerReattachPinsPanelAttachmentResetPolicy
+24/44 Test #1348: SandboxEditorPresentation.ControllerReattachPinsPanelAttachmentResetPolicy ..................   Passed    0.09 sec
+      Start 1349: SandboxEditorPresentation.EditorShellStartsWithOnlyBuiltinWindows
+25/44 Test #1349: SandboxEditorPresentation.EditorShellStartsWithOnlyBuiltinWindows ...........................   Passed    0.04 sec
+      Start 1350: SandboxEditorPresentation.GpuProfilingControlsReuseTheExistingFrameGraphWindow
+26/44 Test #1350: SandboxEditorPresentation.GpuProfilingControlsReuseTheExistingFrameGraphWindow ..............   Passed    0.01 sec
+      Start 1351: SandboxEditorPresentation.ExternalWindowContributionNeedsNoLegacySwitchEntry
+27/44 Test #1351: SandboxEditorPresentation.ExternalWindowContributionNeedsNoLegacySwitchEntry ................   Passed    0.04 sec
+      Start 1352: SandboxEditorPresentation.ContextWindowContributionReceivesAppOwnedContext
+28/44 Test #1352: SandboxEditorPresentation.ContextWindowContributionReceivesAppOwnedContext ..................   Passed    0.04 sec
+      Start 1353: SandboxEditorPresentation.GlobalVisibilityHotkeyUsesTheVisibilityCommandPath
+29/44 Test #1353: SandboxEditorPresentation.GlobalVisibilityHotkeyUsesTheVisibilityCommandPath ................   Passed    0.04 sec
+      Start 1354: SandboxEditorPresentation.RegistrationDomainMenusOpenOneSharedWindow
+30/44 Test #1354: SandboxEditorPresentation.RegistrationDomainMenusOpenOneSharedWindow ........................   Passed    0.04 sec
+      Start 1355: SandboxEditorPresentation.NormalDomainMenusOpenOneSharedWindow
+31/44 Test #1355: SandboxEditorPresentation.NormalDomainMenusOpenOneSharedWindow ..............................   Passed    0.04 sec
+      Start 1356: SandboxEditorPresentation.OutlierDomainMenusOpenOneSharedWindow
+32/44 Test #1356: SandboxEditorPresentation.OutlierDomainMenusOpenOneSharedWindow .............................   Passed    0.04 sec
+      Start 1357: SandboxEditorPresentation.DensityDomainMenusOpenOneSharedWindow
+33/44 Test #1357: SandboxEditorPresentation.DensityDomainMenusOpenOneSharedWindow .............................   Passed    0.04 sec
+      Start 1358: SandboxEditorPresentation.SpacingDomainMenusOpenOneSharedWindow
+34/44 Test #1358: SandboxEditorPresentation.SpacingDomainMenusOpenOneSharedWindow .............................   Passed    0.04 sec
+      Start 2694: OutlierEstimation.NulloptOnEmptyCloud
+35/44 Test #2694: OutlierEstimation.NulloptOnEmptyCloud .......................................................   Passed    0.01 sec
+      Start 2695: OutlierEstimation.NulloptOnSinglePoint
+36/44 Test #2695: OutlierEstimation.NulloptOnSinglePoint ......................................................   Passed    0.01 sec
+      Start 2696: OutlierEstimation.UniformCloudLowScores
+37/44 Test #2696: OutlierEstimation.UniformCloudLowScores .....................................................   Passed    0.01 sec
+      Start 2697: OutlierEstimation.DetectsOutliers
+38/44 Test #2697: OutlierEstimation.DetectsOutliers ...........................................................   Passed    0.01 sec
+      Start 2698: OutlierEstimation.PublishesProperty
+39/44 Test #2698: OutlierEstimation.PublishesProperty .........................................................   Passed    0.01 sec
+      Start 2699: OutlierEstimation.ScoreThresholdAffectsCount
+40/44 Test #2699: OutlierEstimation.ScoreThresholdAffectsCount ................................................   Passed    0.01 sec
+      Start 2700: OutlierEstimation.ResultDiagnosticsComplete
+41/44 Test #2700: OutlierEstimation.ResultDiagnosticsComplete .................................................   Passed    0.01 sec
+      Start 2726: LocalDistanceRatio.AnalyticRatiosAndStrictThreshold
+42/44 Test #2726: LocalDistanceRatio.AnalyticRatiosAndStrictThreshold .........................................   Passed    0.01 sec
+      Start 2727: LocalDistanceRatio.SuppliedRowsPreserveCandidateTiesAndExtremeK
+43/44 Test #2727: LocalDistanceRatio.SuppliedRowsPreserveCandidateTiesAndExtremeK .............................   Passed    0.01 sec
+      Start 2728: LocalDistanceRatio.MalformedAndNonfiniteInputsRejectWithoutPublication
+44/44 Test #2728: LocalDistanceRatio.MalformedAndNonfiniteInputsRejectWithoutPublication ......................   Passed    0.01 sec
+
+100% tests passed, 0 tests failed out of 44
+
+Label Time Summary:
+contract       =   0.51 sec*proc (11 tests)
+geometry       =   0.07 sec*proc (10 tests)
+integration    =   1.13 sec*proc (23 tests)
+runtime        =   1.63 sec*proc (34 tests)
+unit           =   0.07 sec*proc (10 tests)
+
+Total Test time (real) =   2.15 sec

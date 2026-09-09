@@ -1,4 +1,4 @@
-// Persisted statistical/radius detection and explicit marked-point removal controls.
+// Persisted statistical/radius/distance-ratio detection and explicit marked-point removal controls.
 module;
 #include <cstdint>
 #include <optional>
@@ -13,7 +13,7 @@ export namespace Extrinsic::Runtime
 {
     inline constexpr std::string_view kOutlierAnalysisConfigSectionName="sandbox.outlier_analysis";
     inline constexpr std::string_view kOutlierAnalysisConfigSectionSchemaId="intrinsic.runtime.sandbox.outlier_analysis";
-    enum class OutlierAnalysisMethod : std::uint8_t { Statistical, Radius };
+    enum class OutlierAnalysisMethod : std::uint8_t { Statistical, Radius, LocalDistanceRatio };
     enum class OutlierAnalysisBackend : std::uint8_t { CpuOctree, CpuLBVH, VulkanLBVH };
     enum class OutlierAnalysisOperation : std::uint8_t { Analyze, RemoveMarked };
     [[nodiscard]] const char* ToString(OutlierAnalysisMethod) noexcept;
@@ -29,7 +29,7 @@ export namespace Extrinsic::Runtime
         GeometryPropertyRef Mask{.Domain=GeometryElementDomain::Unknown,.Name="outlier_mask",.ValueKind=Geometry::PropertyValueKind::UInt32};
         GeometryPropertyRef Score{.Domain=GeometryElementDomain::Unknown,.Name="outlier_score",.ValueKind=Geometry::PropertyValueKind::Float};
         std::uint32_t KNeighbors{16}, MinimumNeighbors{4}, GpuQueryBatchSize{4096};
-        float StdDevMultiplier{1}, Radius{1};
+        float StdDevMultiplier{1}, Radius{1}, ScoreThreshold{2};
     };
     [[nodiscard]] std::string SerializeOutlierAnalysisConfig(const OutlierAnalysisConfig&);
     [[nodiscard]] Core::Config::EngineConfigSectionValidationResult ValidateOutlierAnalysisConfigSection(

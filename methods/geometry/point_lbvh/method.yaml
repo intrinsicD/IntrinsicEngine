@@ -35,6 +35,7 @@ benchmarks:
   - ../../../benchmarks/geometry/manifests/point_lbvh_outlier_runtime_smoke.yaml
   - ../../../benchmarks/geometry/manifests/point_lbvh_density_runtime_smoke.yaml
   - ../../../benchmarks/geometry/manifests/point_lbvh_spacing_runtime_smoke.yaml
+  - ../../../benchmarks/geometry/manifests/point_lbvh_distance_ratio_runtime_smoke.yaml
 known_limitations:
   - Point-neighbor queries only; no triangle distance, ray tracing, arbitrary subset predicates, or refit implementation.
   - CPU indices support at most 2^24 points; GPU supports at most 2^20 points and 2^20 queries per batch.

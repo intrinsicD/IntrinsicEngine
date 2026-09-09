@@ -621,87 +621,76 @@ namespace Geometry::PointCloud
     // EstimateOutlierProbability
     // =========================================================================
 
+    namespace
+    {
+        std::size_t OutlierCandidateWidth(std::size_t n, std::size_t k)
+        {
+            return n < 2 ? n : std::min(n - 1, std::max(k, std::size_t{2})) + 1;
+        }
+        template<class Query>
+        std::optional<OutlierEstimationResult> DistanceRatioWithQueries(
+            std::span<const glm::vec3> points, const OutlierEstimationParams& params, Query query)
+        {
+            if (points.size() < 2 || !std::isfinite(params.ScoreThreshold) || params.ScoreThreshold < 0 ||
+                !std::ranges::all_of(points, IsFinite)) return std::nullopt;
+            const auto width = OutlierCandidateWidth(points.size(), params.KNeighbors);
+            std::vector<float> means(points.size());
+            for (std::size_t i = 0; i < points.size(); ++i)
+            {
+                float sum, nearest; std::size_t count;
+                const auto row = query(i);
+                if (row.size() != width || !NeighborDistances(points, i, row, sum, nearest, count)) return std::nullopt;
+                means[i] = sum / float(count);
+            }
+            OutlierEstimationResult result;
+            result.Scores.reserve(points.size());
+            float scoreSum = 0;
+            for (std::size_t i = 0; i < points.size(); ++i)
+            {
+                float sum = 0; std::size_t count = 0;
+                for (const auto id : query(i))
+                    if (id != i) { sum += means[id]; ++count; }
+                if (!std::isfinite(sum)) return std::nullopt;
+                const float neighborMean = count ? sum / float(count) : 1.f;
+                const float score = neighborMean > 1e-12f ? means[i] / neighborMean : 0.f;
+                if (!std::isfinite(score)) return std::nullopt;
+                result.Scores.push_back(score);
+                scoreSum += score;
+                result.MaxScore = std::max(result.MaxScore, score);
+                result.OutlierCount += score > params.ScoreThreshold;
+            }
+            result.MeanScore = scoreSum / float(points.size());
+            if (!std::isfinite(result.MeanScore)) return std::nullopt;
+            return result;
+        }
+    }
     std::optional<OutlierEstimationResult> EstimateOutlierProbability(
-        Cloud& cloud,
+        std::span<const glm::vec3> positions, const OutlierEstimationParams& params)
+    {
+        if (positions.size() < 2 || !std::ranges::all_of(positions, IsFinite)) return std::nullopt;
+        Octree tree;
+        Octree::SplitPolicy policy{}; policy.SplitPoint = Octree::SplitPoint::Center; policy.TightChildren = true;
+        if (!tree.BuildFromPoints(positions, policy, 32, 10)) return std::nullopt;
+        std::vector<std::vector<std::size_t>> rows(positions.size());
+        const auto width = OutlierCandidateWidth(positions.size(), params.KNeighbors);
+        for (std::size_t i = 0; i < positions.size(); ++i) tree.QueryKNN(positions[i], width, rows[i]);
+        return DistanceRatioWithQueries(positions, params, [&](std::size_t i) { return std::span<const std::size_t>(rows[i]); });
+    }
+    std::optional<OutlierEstimationResult> EstimateOutlierProbabilityFromNeighbors(
+        std::span<const glm::vec3> positions, std::span<const std::uint32_t> candidates,
         const OutlierEstimationParams& params)
     {
-        const std::size_t n = cloud.VerticesSize();
-        if (n < 2)
-            return std::nullopt;
-
-        auto positions = cloud.Positions();
-
-        Octree octree;
-        Octree::SplitPolicy policy{};
-        policy.SplitPoint = Octree::SplitPoint::Center;
-        policy.TightChildren = true;
-
-        if (!octree.BuildFromPoints(positions, policy, 32, 10))
-            return std::nullopt;
-
-        const std::size_t k = std::max(params.KNeighbors, std::size_t{2});
-        const std::size_t kQuery = k + 1; // +1 for self
-
-        // Phase 1: Compute mean kNN distance for each point and cache neighbor lists.
-        std::vector<float> meanKnnDist(n, 0.0f);
-        std::vector<std::vector<std::size_t>> neighborCache(n);
-        std::vector<std::size_t> knnIndices;
-
-        for (std::size_t i = 0; i < n; ++i)
-        {
-            knnIndices.clear();
-            octree.QueryKNN(positions[i], kQuery, knnIndices);
-
-            float distSum = 0.0f;
-            uint32_t neighborCount = 0;
-            for (std::size_t ni : knnIndices)
-            {
-                if (ni == i) continue;
-                distSum += glm::length(positions[ni] - positions[i]);
-                ++neighborCount;
-            }
-            meanKnnDist[i] = (neighborCount > 0) ? distSum / static_cast<float>(neighborCount) : 0.0f;
-            neighborCache[i] = std::move(knnIndices);
-        }
-
-        // Phase 2: Compute Local Outlier Factor (simplified LOF) using cached neighbors.
-        // Score_i = meanKnnDist(i) / avg_j_in_kNN(meanKnnDist(j))
-        OutlierEstimationResult result{};
-        result.Scores.resize(n, 0.0f);
-        float scoreSum = 0.0f;
-        float maxScore = 0.0f;
-        std::size_t outlierCount = 0;
-
-        for (std::size_t i = 0; i < n; ++i)
-        {
-            float neighborDistSum = 0.0f;
-            uint32_t neighborCount = 0;
-            for (std::size_t ni : neighborCache[i])
-            {
-                if (ni == i) continue;
-                neighborDistSum += meanKnnDist[ni];
-                ++neighborCount;
-            }
-
-            float neighborMean = (neighborCount > 0) ? neighborDistSum / static_cast<float>(neighborCount) : 1.0f;
-            float score = (neighborMean > 1e-12f) ? meanKnnDist[i] / neighborMean : 0.0f;
-
-            result.Scores[i] = score;
-            scoreSum += score;
-            maxScore = std::max(maxScore, score);
-            if (score > params.ScoreThreshold)
-                ++outlierCount;
-        }
-
-        result.OutlierCount = outlierCount;
-        result.MeanScore = (n > 0) ? scoreSum / static_cast<float>(n) : 0.0f;
-        result.MaxScore = maxScore;
-
-        // Publish as property.
-        auto prop = cloud.GetOrAddVertexProperty<float>("p:outlier_score", 0.0f);
-        for (std::size_t i = 0; i < n; ++i)
-            prop[Cloud::Handle(i)] = result.Scores[i];
-
+        const auto width = OutlierCandidateWidth(positions.size(), params.KNeighbors);
+        if (positions.size() < 2 || positions.size() > std::numeric_limits<std::size_t>::max() / width ||
+            candidates.size() != positions.size() * width) return std::nullopt;
+        return DistanceRatioWithQueries(positions, params, [&](std::size_t i) { return candidates.subspan(i * width, width); });
+    }
+    std::optional<OutlierEstimationResult> EstimateOutlierProbability(Cloud& cloud, const OutlierEstimationParams& params)
+    {
+        auto result = EstimateOutlierProbability(cloud.Positions(), params);
+        if (!result) return std::nullopt;
+        auto property = cloud.GetOrAddVertexProperty<float>("p:outlier_score", 0.f);
+        for (std::size_t i = 0; i < result->Scores.size(); ++i) property[Cloud::Handle(i)] = result->Scores[i];
         return result;
     }
 

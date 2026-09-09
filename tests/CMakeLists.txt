@@ -514,6 +514,7 @@ set(_geometry_test_files
     Test.PointCloudOutlierRemoval.cpp
     Test.KernelDensity.cpp
     Test.PointSpacing.cpp
+    Test.LocalDistanceRatio.cpp
     Test.IntersectionClassification.cpp
     Test.RaycastClassify.cpp
     Test.RobustPredicates.cpp

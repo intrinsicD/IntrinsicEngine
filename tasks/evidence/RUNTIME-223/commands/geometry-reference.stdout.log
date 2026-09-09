@@ -1,0 +1,30 @@
+Internal ctest changing into directory: /home/alex/Documents/IntrinsicEngine/build/ci
+Test project /home/alex/Documents/IntrinsicEngine/build/ci
+      Start 2692: OutlierEstimation.NulloptOnEmptyCloud
+ 1/10 Test #2692: OutlierEstimation.NulloptOnEmptyCloud ....................................   Passed    0.01 sec
+      Start 2693: OutlierEstimation.NulloptOnSinglePoint
+ 2/10 Test #2693: OutlierEstimation.NulloptOnSinglePoint ...................................   Passed    0.01 sec
+      Start 2694: OutlierEstimation.UniformCloudLowScores
+ 3/10 Test #2694: OutlierEstimation.UniformCloudLowScores ..................................   Passed    0.01 sec
+      Start 2695: OutlierEstimation.DetectsOutliers
+ 4/10 Test #2695: OutlierEstimation.DetectsOutliers ........................................   Passed    0.01 sec
+      Start 2696: OutlierEstimation.PublishesProperty
+ 5/10 Test #2696: OutlierEstimation.PublishesProperty ......................................   Passed    0.01 sec
+      Start 2697: OutlierEstimation.ScoreThresholdAffectsCount
+ 6/10 Test #2697: OutlierEstimation.ScoreThresholdAffectsCount .............................   Passed    0.01 sec
+      Start 2698: OutlierEstimation.ResultDiagnosticsComplete
+ 7/10 Test #2698: OutlierEstimation.ResultDiagnosticsComplete ..............................   Passed    0.01 sec
+      Start 2724: LocalDistanceRatio.AnalyticRatiosAndStrictThreshold
+ 8/10 Test #2724: LocalDistanceRatio.AnalyticRatiosAndStrictThreshold ......................   Passed    0.01 sec
+      Start 2725: LocalDistanceRatio.SuppliedRowsPreserveCandidateTiesAndExtremeK
+ 9/10 Test #2725: LocalDistanceRatio.SuppliedRowsPreserveCandidateTiesAndExtremeK ..........   Passed    0.01 sec
+      Start 2726: LocalDistanceRatio.MalformedAndNonfiniteInputsRejectWithoutPublication
+10/10 Test #2726: LocalDistanceRatio.MalformedAndNonfiniteInputsRejectWithoutPublication ...   Passed    0.01 sec
+
+100% tests passed, 0 tests failed out of 10
+
+Label Time Summary:
+geometry    =   0.09 sec*proc (10 tests)
+unit        =   0.09 sec*proc (10 tests)
+
+Total Test time (real) =   0.33 sec

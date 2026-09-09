@@ -95,7 +95,7 @@ namespace
 TEST(OutlierAnalysis, EveryDomainMatchesReferenceAndPublishesOnlyNamedProperties)
 {
     for(unsigned d=1;d<=8;++d)
-        for(auto method : {R::OutlierAnalysisMethod::Statistical,R::OutlierAnalysisMethod::Radius})
+        for(auto method : {R::OutlierAnalysisMethod::Statistical,R::OutlierAnalysisMethod::Radius,R::OutlierAnalysisMethod::LocalDistanceRatio})
         {
             SCOPED_TRACE(std::to_string(d)+R::ToString(method));
             R::WorldRegistry worlds;auto world=worlds.CreateWorld("outliers");auto& scene=*worlds.Get(world);
@@ -202,10 +202,11 @@ TEST(OutlierAnalysis, InvalidParametersAndReservedOutputsFailBeforeMutation)
 }
 TEST(OutlierAnalysis, QueuedJobsRejectStaleInputsOutputsAndCancellation)
 {
+    for(auto method : {R::OutlierAnalysisMethod::Statistical,R::OutlierAnalysisMethod::LocalDistanceRatio})
     for(unsigned change=0;change<6;++change)
     {
         SCOPED_TRACE(change);
-        Extrinsic::ECS::Scene::Registry scene;auto entity=Make(scene,D::MeshVertex);auto config=Config(entity,D::MeshVertex);
+        Extrinsic::ECS::Scene::Registry scene;auto entity=Make(scene,D::MeshVertex);auto config=Config(entity,D::MeshVertex);config.Method=method;
         auto& props=Properties(scene,entity,D::MeshVertex);
         Intrinsic::Tests::EditorFeatureTestContext context;context.Scene=&scene;
         R::EditorCommandHistory history;context.CommandHistory=&history;
@@ -233,47 +234,51 @@ TEST(OutlierAnalysis, QueuedJobsRejectStaleInputsOutputsAndCancellation)
 }
 TEST(OutlierAnalysisConfig, RoundTripAndSharedPreviewApplyRun)
 {
-    namespace C = Extrinsic::Core::Config;
-    Extrinsic::ECS::Scene::Registry scene;
-    auto entity = Make(scene, D::MeshFace);
-    auto config = Config(entity, D::MeshFace);
-    config.Method = R::OutlierAnalysisMethod::Radius;
-    config.Radius = 5;
-    C::EngineConfigSectionRegistry registry;
-    ASSERT_TRUE(registry.Register(R::MakeOutlierAnalysisConfigSectionRegistration()));
-    R::RuntimeEngineConfigControlState state;
-    C::PopulateEngineConfigSectionDefaults(state.ActiveConfig, registry);
-    R::EditorGeometryProcessingContext context{.Scene = &scene};
-    context.EngineConfigControlState = &state;
-    context.EngineConfigCommandsAvailable = true;
-    unsigned previews = 0, applies = 0;
-    context.PreviewEngineConfigDocument = [&](const auto &document, const auto &origin) {
-        ++previews;
-        return C::PreviewEngineConfig(document, state.ActiveConfig, {origin, &registry});
-    };
-    context.ApplyEngineConfigHotSubset = [&](const auto &preview) {
-        ++applies;
-        state.ActiveConfig = preview.Preview.Config;
-        return R::RuntimeEngineConfigApplyResult{.Status = R::RuntimeEngineConfigApplyStatus::Applied};
-    };
-    auto commands = R::BindEditorGeometryProcessingCommands(context);
-    ASSERT_TRUE(R::PreviewEditorOutlierAnalysisCommand(commands, config).Ready);
-    EXPECT_FALSE(Properties(scene, entity, D::MeshFace).Exists("outliers"));
-    ASSERT_TRUE(R::ApplyEditorOutlierAnalysisConfig(commands, config).Succeeded());
-    ASSERT_TRUE(R::GetEditorOutlierAnalysisConfig(commands));
-    EXPECT_EQ(R::SerializeOutlierAnalysisConfig(*R::GetEditorOutlierAnalysisConfig(commands)),
-              R::SerializeOutlierAnalysisConfig(config));
-    ASSERT_TRUE(R::ApplyEditorConfiguredOutlierAnalysis(commands).Succeeded());
-    EXPECT_EQ(previews, 1);
-    EXPECT_EQ(applies, 1);
-    for (auto payload : {R"({"method":"automatic"})", R"({"backend":"vulkan"})", R"({"k_neighbors":0})",
-                         R"({"minimum_neighbors":-1})", R"({"operation":"delete"})", R"({"gpu_query_batch_size":0})",
-                         R"({"method":"radius","radius":0})", R"({"radius":1e100})", R"({"unknown":1})",
-                         R"({"mask":{"domain":"unknown","name":"outliers","kind":"float"}})"})
-        EXPECT_FALSE(R::ValidateOutlierAnalysisConfigSection(payload, {}, "test").Usable()) << payload;
-    config.KNeighbors = 0;
-    EXPECT_FALSE(R::ApplyEditorOutlierAnalysisConfig(commands, config).Succeeded());
-    EXPECT_EQ(applies, 1);
+    for (auto method : {R::OutlierAnalysisMethod::Radius, R::OutlierAnalysisMethod::LocalDistanceRatio})
+    {
+        namespace C = Extrinsic::Core::Config;
+        Extrinsic::ECS::Scene::Registry scene;
+        auto entity = Make(scene, D::MeshFace);
+        auto config = Config(entity, D::MeshFace);
+        config.Method = method;
+        config.ScoreThreshold = 1.25f;
+        config.Radius = 5;
+        C::EngineConfigSectionRegistry registry;
+        ASSERT_TRUE(registry.Register(R::MakeOutlierAnalysisConfigSectionRegistration()));
+        R::RuntimeEngineConfigControlState state;
+        C::PopulateEngineConfigSectionDefaults(state.ActiveConfig, registry);
+        R::EditorGeometryProcessingContext context{.Scene = &scene};
+        context.EngineConfigControlState = &state;
+        context.EngineConfigCommandsAvailable = true;
+        unsigned previews = 0, applies = 0;
+        context.PreviewEngineConfigDocument = [&](const auto &document, const auto &origin) {
+            ++previews;
+            return C::PreviewEngineConfig(document, state.ActiveConfig, {origin, &registry});
+        };
+        context.ApplyEngineConfigHotSubset = [&](const auto &preview) {
+            ++applies;
+            state.ActiveConfig = preview.Preview.Config;
+            return R::RuntimeEngineConfigApplyResult{.Status = R::RuntimeEngineConfigApplyStatus::Applied};
+        };
+        auto commands = R::BindEditorGeometryProcessingCommands(context);
+        ASSERT_TRUE(R::PreviewEditorOutlierAnalysisCommand(commands, config).Ready);
+        EXPECT_FALSE(Properties(scene, entity, D::MeshFace).Exists("outliers"));
+        ASSERT_TRUE(R::ApplyEditorOutlierAnalysisConfig(commands, config).Succeeded());
+        ASSERT_TRUE(R::GetEditorOutlierAnalysisConfig(commands));
+        EXPECT_EQ(R::SerializeOutlierAnalysisConfig(*R::GetEditorOutlierAnalysisConfig(commands)),
+                  R::SerializeOutlierAnalysisConfig(config));
+        ASSERT_TRUE(R::ApplyEditorConfiguredOutlierAnalysis(commands).Succeeded());
+        EXPECT_EQ(previews, 1);
+        EXPECT_EQ(applies, 1);
+        for (auto payload : {R"({"method":"automatic"})", R"({"backend":"vulkan"})", R"({"k_neighbors":0})",
+                             R"({"minimum_neighbors":-1})", R"({"operation":"delete"})", R"({"gpu_query_batch_size":0})",
+                             R"({"method":"radius","radius":0})", R"({"radius":1e100})", R"({"unknown":1})", R"({"score_threshold":-1})", R"({"score_threshold":1e100})",
+                             R"({"mask":{"domain":"unknown","name":"outliers","kind":"float"}})"})
+            EXPECT_FALSE(R::ValidateOutlierAnalysisConfigSection(payload, {}, "test").Usable()) << payload;
+        config.KNeighbors = 0;
+        EXPECT_FALSE(R::ApplyEditorOutlierAnalysisConfig(commands, config).Succeeded());
+        EXPECT_EQ(applies, 1);
+    }
 }
 
 TEST(OutlierAnalysis, MaskAndScoreUseSharedVisualizationRecipesOnEveryDomain)
@@ -326,4 +331,24 @@ TEST(OutlierAnalysis, UndoAnotherOutputCannotMakeAnEditedMaskCurrent)
     EXPECT_FALSE(R::PreviewEditorOutlierAnalysisCommand(context,first).Ready);
     EXPECT_FALSE(R::ApplyEditorOutlierAnalysisCommand(context,first).Succeeded());
     EXPECT_EQ(props.Size(),5);
+}
+
+TEST(OutlierAnalysisConfig, DistanceRatioRoundTripsDefaultsAndClampsKToSmallInputs)
+{
+    namespace C = Extrinsic::Core::Config;
+    C::EngineConfig engine;
+    R::OutlierAnalysisConfig config;
+    config.Method=R::OutlierAnalysisMethod::LocalDistanceRatio;
+    config.ScoreThreshold=1.25f;config.KNeighbors=63;
+    R::SetOutlierAnalysisConfig(engine,config);
+    const auto restored=R::GetOutlierAnalysisConfig(engine);ASSERT_TRUE(restored);
+    EXPECT_EQ(restored->Method,config.Method);EXPECT_EQ(restored->ScoreThreshold,1.25f);
+    const auto defaults=R::ValidateOutlierAnalysisConfigSection(R"({"method":"local_distance_ratio"})",{},"test");
+    EXPECT_TRUE(defaults.Usable());
+    R::WorldRegistry worlds;auto world=worlds.CreateWorld("distance ratio");auto& scene=*worlds.Get(world);
+    R::SpatialIndexCache cache(worlds);auto entity=Make(scene,D::PointCloudPoint);
+    auto c=Config(entity,D::PointCloudPoint);c.Method=config.Method;c.KNeighbors=63;c.Backend=R::OutlierAnalysisBackend::CpuLBVH;
+    R::EditorGeometryProcessingContext context{.Scene=&scene,.World=world,.SpatialIndices=&cache};
+    EXPECT_TRUE(R::PreviewEditorOutlierAnalysisCommand(context,c).Ready);
+    EXPECT_TRUE(R::ApplyEditorOutlierAnalysisCommand(context,c).Succeeded());
 }

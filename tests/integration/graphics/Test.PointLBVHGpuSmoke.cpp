@@ -774,6 +774,7 @@ namespace
     class OutlierApp final : public Intrinsic::Tests::RuntimeTestModule
     {
     public:
+        explicit OutlierApp(bool ratio=false) : Ratio(ratio) {}
         Geometry::PropertySet& Props(unsigned d)
         {
             return *const_cast<Geometry::PropertySet*>(Runtime::ResolveGeometryPropertySet(
@@ -786,7 +787,9 @@ namespace
             c.Positions={.Domain=Domain(d),.Name="samples",.ValueKind=Geometry::PropertyValueKind::Vec3};
             c.Mask={Domain(d),"outliers",Geometry::PropertyValueKind::UInt32};
             c.Score={Domain(d),"scores",Geometry::PropertyValueKind::Float};
-            c.KNeighbors=8;c.Method=Phase==2?Runtime::OutlierAnalysisMethod::Radius:Runtime::OutlierAnalysisMethod::Statistical;c.Radius=.5f;c.MinimumNeighbors=1;
+            c.KNeighbors=Ratio && Phase==2 ? 63 : 8;
+            c.Method=Ratio ? Runtime::OutlierAnalysisMethod::LocalDistanceRatio :
+                Phase==2 ? Runtime::OutlierAnalysisMethod::Radius : Runtime::OutlierAnalysisMethod::Statistical;c.Radius=.5f;c.MinimumNeighbors=1;
             c.Backend=Runtime::OutlierAnalysisBackend::VulkanLBVH;
             c.GpuQueryBatchSize=64; // Exercise a final partial chunk and buffer lifetime.
             return c;
@@ -853,8 +856,8 @@ namespace
                     {
                         EXPECT_TRUE(Results.back().Succeeded())<<Results.back().Message;
                         EXPECT_EQ(Results.back().ActualBackend,"vulkan_lbvh");
-                        EXPECT_EQ(Results.back().RejectedCount,1);
-                        EXPECT_EQ(std::as_const(Props(8)).Get<float>("scores")[0],1027.f);
+                        EXPECT_EQ(Results.back().RejectedCount,Ratio ? 0u : 1u);
+                        EXPECT_EQ(std::as_const(Props(8)).Get<float>("scores")[0],Ratio ? 0.f : 1027.f);
                         EXPECT_EQ(std::as_const(Props(8)).Get<std::uint32_t>("outliers")[0],0);
                         Done=true;Kernel().RequestExit();return;
                     }
@@ -920,7 +923,7 @@ namespace
             {
                 if(Phase==0)
                 {
-                    auto unsupported=Config(8);unsupported.KNeighbors=65;
+                    auto unsupported=Config(8);unsupported.KNeighbors=Ratio ? 64 : 65;
                     EXPECT_FALSE(Runtime::PreviewEditorOutlierAnalysisCommand(Context,unsupported).Ready);
                 }
                 for(unsigned d=1;d<=8;++d)
@@ -938,7 +941,7 @@ namespace
                     auto& p=Props(8);p.Resize(1030);
                     p.Get<glm::vec3>("samples").Vector().assign(1030,glm::vec3(0));
                     p.Get<glm::vec3>("samples")[1029]={10,0,0};
-                    c.Method=Runtime::OutlierAnalysisMethod::Radius;c.Radius=1;c.MinimumNeighbors=1027;c.GpuQueryBatchSize=4096;
+                    c.Method=Ratio ? Runtime::OutlierAnalysisMethod::LocalDistanceRatio : Runtime::OutlierAnalysisMethod::Radius;c.KNeighbors=2;c.Radius=1;c.MinimumNeighbors=1027;c.GpuQueryBatchSize=4096;
                 }
                 else Props(8).Get<std::uint32_t>("outliers").Vector().assign(66,77);
                 const auto result=Runtime::ApplyEditorOutlierAnalysisCommand(Context,c);
@@ -957,7 +960,7 @@ namespace
         std::vector<std::size_t> BatchCounts;
         std::chrono::steady_clock::time_point Started{},PhaseStarted{};
         Runtime::JobToken FitToken{};
-        std::size_t ExpectedResults{};unsigned Phase{},CancelFrames{},ColdFrames{};bool Submitted{},Done{},TimedOut{};double MaxError{};
+        std::size_t ExpectedResults{};unsigned Phase{},CancelFrames{},ColdFrames{};bool Ratio{},Submitted{},Done{},TimedOut{};double MaxError{};
     };
 }
 TEST(PointLBVHGpuSmoke, OutlierNeighborhoodsPublishAcrossDomainsAndCountDenseSupport)
@@ -982,6 +985,33 @@ TEST(PointLBVHGpuSmoke, OutlierNeighborhoodsPublishAcrossDomainsAndCountDenseSup
                 {"cpu_reference_total_ms",run->CpuMs[1]},{"vulkan_cold_total_ms",run->PhaseMs[0]},
                 {"vulkan_warm_total_ms",run->PhaseMs[1]},{"vulkan_radius_total_ms",run->PhaseMs[2]},
                 {"cpu_radius_total_ms",run->CpuMs[2]},{"warmup_iterations",1},{"measured_iterations",1},
+                {"cpu_classification",true},{"gpu_neighborhood_elapsed_sum_ms",run->NeighborhoodMs},
+                {"cpu_classification_sum_ms",run->FitMs},{"gpu_query_batch_counts",run->BatchCounts}}},{"status",::testing::Test::HasFailure()?"failed":"passed"}};
+        std::ofstream stream(output);ASSERT_TRUE(stream.good());stream<<json.dump(2)<<'\n';ASSERT_TRUE(stream.good());
+    }
+}
+TEST(PointLBVHGpuSmoke, LocalDistanceRatioPublishesAcrossDomains)
+{
+    if(!Extrinsic::Platform::Backends::Glfw::CanInitialize())GTEST_SKIP()<<"GLFW unavailable";
+    auto config=Runtime::CreateReferenceEngineConfig();
+    config.Window.Width=64;config.Window.Height=64;config.Render.EnableValidation=true;
+    config.Render.EnableVSync=false;config.ReferenceScene.Enabled=false;
+    auto app=std::make_unique<OutlierApp>(true);auto* run=app.get();
+    Intrinsic::Tests::RuntimeTestKernel engine(config,std::move(app));
+    engine.EmplaceModule<Runtime::SpatialIndexCache>();engine.Initialize();Shutdown shutdown{engine};
+    engine.Run();ASSERT_TRUE(engine.GetDevice().IsOperational());
+    ASSERT_FALSE(run->TimedOut)<<"phase="<<run->Phase;ASSERT_TRUE(run->Done);
+    EXPECT_LE(run->MaxError,1e-5);ASSERT_EQ(run->PhaseMs.size(),3);
+    if(const auto* output=std::getenv("INTRINSIC_DISTANCE_RATIO_BENCHMARK_OUTPUT"))
+    {
+        nlohmann::json json{{"benchmark_id","geometry.point_lbvh.distance_ratio_runtime_smoke"},
+            {"method","geometry.point_lbvh"},{"backend","gpu_vulkan_compute"},
+            {"dataset","builtin.outlier_clusters.eight_domains.seed241"},{"commit","local-dev"},
+            {"metrics",{{"runtime_ms",run->PhaseMs[1]},{"quality_error_linf",run->MaxError}}},
+            {"diagnostics",{{"runner","IntrinsicPointLBVHGpuTests"},{"mode","smoke"},
+                {"cpu_reference_total_ms",run->CpuMs[1]},{"vulkan_cold_total_ms",run->PhaseMs[0]},
+                {"vulkan_warm_total_ms",run->PhaseMs[1]},{"vulkan_k63_total_ms",run->PhaseMs[2]},
+                {"cpu_k63_total_ms",run->CpuMs[2]},{"warmup_iterations",1},{"measured_iterations",1},
                 {"cpu_classification",true},{"gpu_neighborhood_elapsed_sum_ms",run->NeighborhoodMs},
                 {"cpu_classification_sum_ms",run->FitMs},{"gpu_query_batch_counts",run->BatchCounts}}},{"status",::testing::Test::HasFailure()?"failed":"passed"}};
         std::ofstream stream(output);ASSERT_TRUE(stream.good());stream<<json.dump(2)<<'\n';ASSERT_TRUE(stream.good());

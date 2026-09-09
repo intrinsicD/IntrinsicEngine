@@ -11,7 +11,8 @@ Each active task should include:
 
 ## Currently active
 
-- None.
+See the generated [session brief](../SESSION-BRIEF.md) for the current task list
+and readiness state.
 
 ## Records
 

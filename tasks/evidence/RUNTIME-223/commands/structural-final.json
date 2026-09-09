@@ -1,0 +1,23 @@
+{
+  "command": [
+    "python3",
+    "tools/agents/check_task_policy.py",
+    "--root",
+    ".",
+    "--strict"
+  ],
+  "command_display": "python3 tools/agents/check_task_policy.py --root . --strict",
+  "cwd": ".",
+  "duration_ms": 854,
+  "exit_code": 0,
+  "finished_at": "2026-09-09T23:32:39Z",
+  "label": "structural-final",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-09-09T23:32:39Z",
+  "stderr_path": "tasks/evidence/RUNTIME-223/commands/structural-final.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/RUNTIME-223/commands/structural-final.stdout.log",
+  "stdout_sha256": "33a62ce336abb264e6fb4a97ecde3fc9a18ff71397c80486f6deb1cb427a980f",
+  "task_id": "RUNTIME-223"
+}

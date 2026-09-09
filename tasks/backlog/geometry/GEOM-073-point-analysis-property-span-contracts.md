@@ -119,3 +119,9 @@ nearest-other spacing diagnostics. Sampled statistics retain deterministic strid
 invalid/nonfinite or unrepresentable float results now fail closed. Keep this
 task open for bilateral filtering, simplified probability and feature utilities.
 RUNTIME-222 owns model-space radius rendering; do not reinterpret radii as pixels.
+
+## Local-distance-ratio slice
+RUNTIME-223 adds typed-span and supplied-neighbor overloads for the existing
+ratio heuristic and integrates it into the shared outlier workflow. Bilateral
+filtering and point features remain separate slices; Framework24 covariance
+probability must not be confused with this existing distance-ratio formula.

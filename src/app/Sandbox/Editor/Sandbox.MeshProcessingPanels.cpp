@@ -2329,13 +2329,19 @@ namespace Extrinsic::Sandbox::Editor
             if (ImGui::InputText(label,name.data(),name.size())) {ref->Name=name.data();changed=true;}
         }
         int method=int(config.Method), backend=int(config.Backend);
-        if(ImGui::Combo("Method",&method,"Statistical\0Radius\0")) {config.Method=Runtime::OutlierAnalysisMethod(method);changed=true;}
+        if(ImGui::Combo("Method",&method,"Statistical\0Radius\0Local distance ratio\0")) {config.Method=Runtime::OutlierAnalysisMethod(method);changed=true;}
         if(ImGui::Combo("Neighbors",&backend,"CPU octree\0CPU LBVH (cached)\0Vulkan LBVH\0")) {config.Backend=Runtime::OutlierAnalysisBackend(backend);changed=true;}
         if(config.Method==Runtime::OutlierAnalysisMethod::Statistical)
         {
             changed |= ImGui::InputScalar("Neighbors k",ImGuiDataType_U32,&config.KNeighbors);
             changed |= ImGui::InputFloat("Standard deviation multiplier",&config.StdDevMultiplier);
             ImGui::TextWrapped("Mark mean neighbor distances above the global mean plus this multiple of the population standard deviation.");
+        }
+        else if(config.Method==Runtime::OutlierAnalysisMethod::LocalDistanceRatio)
+        {
+            changed |= ImGui::InputScalar("Neighbors k",ImGuiDataType_U32,&config.KNeighbors);
+            changed |= ImGui::InputFloat("Score threshold",&config.ScoreThreshold);
+            ImGui::TextWrapped("Compare each sample's mean neighbor distance to its neighbors' mean distances. Scores above the threshold are marked. This is a density-deviation heuristic, not a calibrated probability.");
         }
         else
         {

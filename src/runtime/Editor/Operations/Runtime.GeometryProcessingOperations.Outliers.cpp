@@ -198,6 +198,8 @@ namespace Extrinsic::Runtime
                 if (!CurrentStamp(context, *entity, c)) return fail("Detect outliers again: the source or published mask changed, or this mask has no current analysis.");
                 return w;
             }
+            if (c.Method == OutlierAnalysisMethod::LocalDistanceRatio && w->Result.LiveCount < 2)
+                return fail("Local distance ratio requires at least two live samples.");
             if (c.Method == OutlierAnalysisMethod::Statistical && c.KNeighbors >= w->Result.LiveCount)
                 return fail("Statistical outlier analysis requires more live samples than k.");
             if (c.Backend != OutlierAnalysisBackend::CpuOctree)
@@ -210,8 +212,9 @@ namespace Extrinsic::Runtime
                     if (!context.JobCommands.Available() || !context.SpatialIndices->GpuQueriesAvailable())
                         return fail("Vulkan outlier neighborhoods require the framed spatial cache and job service.");
                     if (w->Result.LiveCount > (1u << 20) ||
-                        (c.Method == OutlierAnalysisMethod::Statistical && c.KNeighbors > 64))
-                        return fail("Vulkan outlier queries support at most 2^20 live samples and statistical k=1..64.");
+                        (c.Method == OutlierAnalysisMethod::Statistical && c.KNeighbors > 64) ||
+                        (c.Method == OutlierAnalysisMethod::LocalDistanceRatio && c.KNeighbors > 63))
+                        return fail("Vulkan outlier queries support at most 2^20 live samples and statistical k=1..64 or distance-ratio k<=63 (64 candidates).");
                 }
             }
             if (purpose == CapturePurpose::Execute)
@@ -223,6 +226,12 @@ namespace Extrinsic::Runtime
             }
             return w;
         }
+        std::uint32_t QueryWidth(const OutlierAnalysisConfig& c, std::size_t count)
+        {
+            if (c.Method == OutlierAnalysisMethod::LocalDistanceRatio)
+                return std::uint32_t(std::min(count - 1, std::max<std::size_t>(c.KNeighbors, 2)) + 1);
+            return std::uint32_t(std::min<std::size_t>(c.KNeighbors, count - 1));
+        }
         void Compute(OutlierWork& w)
         {
             const auto started = std::chrono::steady_clock::now();
@@ -231,7 +240,41 @@ namespace Extrinsic::Runtime
             r.Status = EditorCommandStatus::GeometryProcessingFailed;
             r.ActualBackend = ToString(c.Backend);
             PC::OutlierAnalysisResult analysis;
-            if (c.Backend == OutlierAnalysisBackend::CpuOctree)
+            if (c.Method == OutlierAnalysisMethod::LocalDistanceRatio)
+            {
+                const PC::OutlierEstimationParams params{.KNeighbors=c.KNeighbors,.ScoreThreshold=c.ScoreThreshold};
+                std::optional<PC::OutlierEstimationResult> ratio;
+                if (c.Backend == OutlierAnalysisBackend::CpuOctree)
+                    ratio = PC::EstimateOutlierProbability(w.Points, params);
+                else
+                {
+                    const auto width = QueryWidth(c, w.Points.size());
+                    if (c.Backend == OutlierAnalysisBackend::CpuLBVH)
+                    {
+                        w.NeighborIds.reserve(w.Points.size() * width);
+                        for (auto point : w.Points)
+                        {
+                            const auto neighbors = w.Index->Index.KNearest(point, width);
+                            if (neighbors.size() != width) { r.Message="Incomplete CPU kNN neighborhood."; return; }
+                            for (const auto& neighbor : neighbors) w.NeighborIds.push_back(neighbor.Index);
+                        }
+                    }
+                    else
+                        for (auto& id : w.NeighborIds)
+                        {
+                            const auto found = std::lower_bound(w.Slots.begin(), w.Slots.end(), id);
+                            if (found == w.Slots.end() || *found != id) { r.Message="Invalid Vulkan neighbor source row."; return; }
+                            id = std::uint32_t(found - w.Slots.begin());
+                        }
+                    ratio = PC::EstimateOutlierProbabilityFromNeighbors(w.Points, w.NeighborIds, params);
+                }
+                if (!ratio) { r.Message="Local distance ratio failed: invalid neighborhoods or unrepresentable float scores."; return; }
+                analysis.Scores = std::move(ratio->Scores);
+                analysis.Mask.reserve(analysis.Scores.size());
+                for (const float score : analysis.Scores) analysis.Mask.push_back(score > c.ScoreThreshold);
+                analysis.RejectedCount = ratio->OutlierCount;
+            }
+            else if (c.Backend == OutlierAnalysisBackend::CpuOctree)
             {
                 if (c.Method == OutlierAnalysisMethod::Statistical)
                     analysis = PC::AnalyzeStatisticalOutliers(w.Points, {.KNeighbors=c.KNeighbors, .StdDevMultiplier=c.StdDevMultiplier});
@@ -299,7 +342,7 @@ namespace Extrinsic::Runtime
                     if (w.Config.Method==OutlierAnalysisMethod::Radius) w.Counts.push_back(w.Batch->Counts[row]);
                     else
                     {
-                        if (w.Batch->Counts[row]!=std::min<std::size_t>(w.Config.KNeighbors,w.Points.size()-1))
+                        if (w.Batch->Counts[row]!=QueryWidth(w.Config,w.Points.size()))
                             return fail("Incomplete Vulkan kNN neighborhood.");
                         for (std::uint32_t j=0;j<w.Batch->Counts[row];++j)
                             w.NeighborIds.push_back(w.Batch->Neighbors[row*w.Batch->Capacity+j].Index);
@@ -316,11 +359,12 @@ namespace Extrinsic::Runtime
             const auto count=std::min<std::size_t>(w.Config.GpuQueryBatchSize,w.Points.size()-w.NextQuery);
             if (w.Batch && w.Batch->Counts.size()!=count) w.Batch.reset();
             const auto queries=std::span(w.Points).subspan(w.NextQuery,count);
-            const auto exclusions=std::span(w.Slots).subspan(w.NextQuery,count);
+            const auto exclusions=w.Config.Method==OutlierAnalysisMethod::LocalDistanceRatio ?
+                std::span<const std::uint32_t>{} : std::span<const std::uint32_t>(w.Slots).subspan(w.NextQuery,count);
             if (w.Config.Method==OutlierAnalysisMethod::Radius)
                 w.Batch=context.SpatialIndices->QueueGpuRadius(w.GpuIndex,queries,w.Config.Radius,1,exclusions,std::move(w.Batch));
             else w.Batch=context.SpatialIndices->QueueGpuKNearest(w.GpuIndex,queries,
-                std::uint32_t(std::min<std::size_t>(w.Config.KNeighbors,w.Points.size()-1)),exclusions,std::move(w.Batch));
+                QueryWidth(w.Config,w.Points.size()),exclusions,std::move(w.Batch));
             ++w.Result.GpuQueryBatches;
             if (w.Batch->State==SpatialQueryState::Failed) return fail(w.Batch->Diagnostic);
             return false;

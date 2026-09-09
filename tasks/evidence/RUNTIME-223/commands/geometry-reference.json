@@ -1,0 +1,26 @@
+{
+  "command": [
+    "ctest",
+    "--test-dir",
+    "build/ci",
+    "--output-on-failure",
+    "-R",
+    "^(LocalDistanceRatio|OutlierEstimation)\\.",
+    "--timeout",
+    "60"
+  ],
+  "command_display": "ctest --test-dir build/ci --output-on-failure -R '^(LocalDistanceRatio|OutlierEstimation)\\.' --timeout 60",
+  "cwd": ".",
+  "duration_ms": 339,
+  "exit_code": 0,
+  "finished_at": "2026-09-09T23:19:58Z",
+  "label": "geometry-reference",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-09-09T23:19:58Z",
+  "stderr_path": "tasks/evidence/RUNTIME-223/commands/geometry-reference.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/RUNTIME-223/commands/geometry-reference.stdout.log",
+  "stdout_sha256": "fc1421a1239abb0748a29e1a8186f42303a1e3468245b5df401ecdb15f38e301",
+  "task_id": "RUNTIME-223"
+}

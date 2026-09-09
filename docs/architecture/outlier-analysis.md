@@ -2,7 +2,7 @@
 
 **View → Outlier Analysis** and the Mesh, Graph, and PointCloud Processing menus
 open one window. Select an entity and a canonical `vec3` property, choose
-Statistical or Radius, then **Detect outliers**. Detection publishes two named
+Statistical, Radius or Local distance ratio, then **Detect outliers**. Detection publishes two named
 properties on the selected element domain: `outlier_mask` (`uint32`, 1 rejects,
 0 keeps) and `outlier_score` (`float`). **Show mask** and **Show score** use the
 shared label/scalar visualization recipes.
@@ -27,13 +27,25 @@ Radius analysis scores each sample by the count of other live samples in the
 inclusive radius. A count below `minimum_neighbors` is marked. A zero minimum
 keeps every finite live sample. Radius must be positive and finite.
 
+Local distance ratio (`local_distance_ratio`) divides each sample's mean neighbor
+distance by the average of its neighbors' mean distances. The unbounded,
+dimensionless score is marked only when it exceeds `score_threshold` (default
+2). It queries `min(n,max(k,2)+1)` candidates **before removing self**. This
+preserves the existing kernel's duplicate-point/cutoff tie behavior. A
+neighboring mean at most 1e-12 produces zero; this heuristic can therefore miss
+an isolated point next to an exactly coincident cluster. It is neither full
+LOF/LoOP nor a calibrated probability. The separately named Framework24
+covariance-based probability is not implemented by this token. The geometry
+cloud wrapper still publishes `p:outlier_score`; runtime uses the selected named
+property. Fewer than two live samples or nonfinite/unrepresentable scores fail.
+
 | Backend token | Neighborhood execution | Classification |
 | --- | --- | --- |
 | `cpu_octree` (default) | Existing geometry octree reference | CPU |
 | `cpu_lbvh` | Immutable lease from the shared canonical-property spatial cache | CPU |
 | `vulkan_lbvh` | Framed cache kNN or radius queries, bounded batches/readback | CPU |
 
-GPU statistical k is 1..64; GPU input is at most 2^20 live samples. CPU LBVH is
+GPU statistical k is 1..64; local-distance-ratio k is at most 63 (64 candidates); GPU input is at most 2^20 live samples. CPU LBVH is
 limited to 2^24. LBVH coordinates/radius must remain within 1e18. GPU batch size
 is 1..16384 (default 4096). Radius requests retain one hit but consume the full
 hit count, including dense neighborhoods exceeding 1024. Counts are exact within
@@ -71,7 +83,8 @@ history entries even after a later structural undo.
 
 Section `sandbox.outlier_analysis`, schema `intrinsic.runtime.sandbox.outlier_analysis`
 version 1, serializes entity, method, backend, operation, canonical positions,
-mask and score references, k, multiplier, radius, minimum count and batch size.
+mask and score references, k, multiplier, radius, minimum count, score threshold
+and batch size. Existing version-1 payloads receive the default score threshold.
 The three references must name distinct, correctly typed properties on the same
 domain (`unknown` resolves to the entity's natural vertex/node/point domain).
 Output names cannot replace topology or deletion properties.

@@ -1,0 +1,16 @@
+Internal ctest changing into directory: /home/alex/Documents/IntrinsicEngine/build/ci-vulkan
+Test project /home/alex/Documents/IntrinsicEngine/build/ci-vulkan
+    Start 15: PointLBVHGpuSmoke.OutlierNeighborhoodsPublishAcrossDomainsAndCountDenseSupport
+1/2 Test #15: PointLBVHGpuSmoke.OutlierNeighborhoodsPublishAcrossDomainsAndCountDenseSupport ...   Passed   44.98 sec
+    Start 16: PointLBVHGpuSmoke.LocalDistanceRatioPublishesAcrossDomains
+2/2 Test #16: PointLBVHGpuSmoke.LocalDistanceRatioPublishesAcrossDomains .......................   Passed    8.21 sec
+
+100% tests passed, 0 tests failed out of 2
+
+Label Time Summary:
+gpu            =  53.19 sec*proc (2 tests)
+graphics       =  53.19 sec*proc (2 tests)
+integration    =  53.19 sec*proc (2 tests)
+vulkan         =  53.19 sec*proc (2 tests)
+
+Total Test time (real) =  73.30 sec
