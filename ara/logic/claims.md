@@ -2070,3 +2070,14 @@
 - **Dependencies**: [C78]
 - **Tags**: point spacing, splat radii, LBVH, canonical domains, CPU, Vulkan, bounded parity, runtime
 - **From staging**: O215
+
+## C84: Bounded local distance-ratio outlier workflow with Vulkan neighborhoods
+- **Statement**: The source-bound 2026-09-10 fixtures publish local-distance-ratio scores and masks on all eight canonical domains through CPU octree, cached CPU LBVH and actual framed Vulkan candidates with shared CPU reduction. Vulkan masks match exactly and scores stay within 1e-5 absolute tolerance (observed zero) at k=8 and k=63. The declared candidate/duplicate, config, deleted/unrelated preservation, cache/history and stale/cancel checks pass.
+- **Status**: supported — bounded ci CPU and actual ci-vulkan ASan+UBSan cases only. No full LOF/LoOP or Framework24 covariance probability, general-input proof, GPU score evaluation, new visualization readback, whole-process leak-freedom, speedup or default-change claim. Dirty Debug smoke is not performance claim eligible.
+- **Provenance**: ai-executed
+- **Crystallized via**: artifact-commitment
+- **Falsification criteria**: Replaying the recorded source/fixtures exceeds the score tolerance, changes a mask or the specified candidate/self policy, rejects a compatible domain, corrupts unrelated/deleted rows, accepts stale/cancelled publication or fails the declared config/cache/history assertions.
+- **Proof**: [ara/evidence/diagnostics/distance_ratio_vulkan_2026-09-10/record.json, ara/evidence/tables/distance_ratio_verification_2026-09-10.md, tasks/evidence/RUNTIME-223/commands/actual-vulkan.stdout.log, tasks/evidence/RUNTIME-223/commands/full-cpu.stdout.log, tests/unit/geometry/Test.LocalDistanceRatio.cpp, tests/contract/runtime/Test.OutlierAnalysis.cpp, tests/integration/graphics/Test.PointLBVHGpuSmoke.cpp]
+- **Dependencies**: [C81]
+- **Tags**: local distance ratio, outliers, LBVH, CPU, Vulkan, bounded integration
+- **From staging**: O216

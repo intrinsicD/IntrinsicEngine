@@ -66,7 +66,7 @@ One slice: reference span and supplied rows, analytic tests, benchmark manifest,
 ## Acceptance criteria
 - [x] All three backends produce scores and masks through the existing outlier workflow.
 - [x] Existing statistical/radius methods remain unchanged and full CPU gate passes.
-- [ ] Fixed-surface independent review and completion evidence are recorded.
+- [x] Fixed-surface independent review and completion evidence are recorded.
 
 ## Verification
 ```bash
@@ -87,3 +87,6 @@ python3 tools/benchmark/validate_benchmark_manifests.py
 
 ## Verification constraints
 BUG-178 requires CCACHE_DISABLE=1. BUG-180 owns the existing GPU LeakSanitizer exclusion; ASan and UBSan stay enabled. Record actual capability skips separately from passes.
+
+## Completion — 2026-09-10
+Commit: `0dbff4609`; terminal evidence and independent acceptance are bound in `tasks/evidence/RUNTIME-223/report.yaml`. C84 records the bounded CPU and actual Vulkan result. All 4,413 CPU cases were selected: 4,412 distinct passes after native-window follow-up, one expected unsanitized leak-control skip. Two actual Vulkan cases pass under the existing BUG-180 LSan exclusion. No speedup or Framework24 covariance-probability equivalence is claimed.

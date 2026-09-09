@@ -1,0 +1,153 @@
+schema_version: 1
+task_id: RUNTIME-223
+workflow_profile: high-risk
+status: complete
+generated_by: tools/agents/workflow_evidence.py
+generated_at: '2026-09-09T23:44:48Z'
+claim_eligible: false
+source:
+  base_ref: a469dd31a
+  base_revision: a469dd31a4b4b9d04368d70b0f3ff37546595f4b
+  head_revision: 0dbff4609b3de9103f5fb36c184dd225d846285e
+  branch: main
+  worktree: /home/alex/Documents/IntrinsicEngine
+  dirty: true
+  surface:
+  - path: ara/evidence/diagnostics/distance_ratio_vulkan_2026-09-10/benchmark/runtime-smoke.json
+    sha256: a71dcf278a4ed54eaaa5308e6f8b8dbe49a45280468002b180c8ceb006f09678
+  - path: ara/evidence/diagnostics/distance_ratio_vulkan_2026-09-10/record.json
+    sha256: 6201564759ba71b45ad9884eda813bbcbb965e5b682a4a5464d80a26bba28e48
+  - path: ara/evidence/tables/distance_ratio_verification_2026-09-10.md
+    sha256: bf6bb58e6aa725180937f4527bb7974dbe9ca8dd03e06fd7034f6e7a90a5a11f
+  - path: ara/logic/claims.md
+    sha256: 942f4a1d9f7bc86e30aa29b9c5c723a326c8ff9dae458db0d3e374785d012abe
+  - path: ara/staging/observations.yaml
+    sha256: a138082ff9a17acb8bf670ea00dca534bf38370093329e4da916fa5e02ff319d
+  - path: ara/trace/exploration_tree.yaml
+    sha256: 2d5684879a5d31e62bb4d5340316ac9b7ed3a24c2a72db0280834f8473bebb4c
+  - path: benchmarks/geometry/manifests/point_lbvh_distance_ratio_runtime_smoke.yaml
+    sha256: d6d92cdfb3ccb3d3542f7e7c450cc51239c6f3b2449aa6640f8e33fdc09082ba
+  - path: docs/architecture/outlier-analysis.md
+    sha256: 9a8f01e6505b09c32042fb8a488f25597c4448be080b1cc96597acdef6445b18
+  - path: docs/architecture/spatial-index-consumers.md
+    sha256: c1ce82035c1528881e3f69381c3fbccd2c58d2216a88224ce9011b733387a817
+  - path: methods/geometry/point_lbvh/method.yaml
+    sha256: f693874cef6fc2a4039f875a90ddb1b8b48ea43baf1cd7ded7daba0f1d0a01af
+  - path: methods/geometry/point_lbvh/paper.md
+    sha256: a3c825f8094bceee0d68b660cba36825b9fb040bdca72190ec04dab1358bba6c
+  - path: src/app/Sandbox/Editor/Sandbox.MeshProcessingPanels.cpp
+    sha256: 066337c1ae1a0f2e7841263865eccc242b22780a647151bcc122951c77104b7e
+  - path: src/geometry/Geometry.PointCloud.Utils.cpp
+    sha256: 972cb55dfe9a1ba06d748ade175ed91194efbd557db77aeddedea4a9531af7d2
+  - path: src/geometry/Geometry.PointCloud.Utils.cppm
+    sha256: 9ee994769a17fd000837498433f5e024145d4d71b0f0a6997f76aa852df69800
+  - path: src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Outliers.cpp
+    sha256: 74e888935e291aa3e65571e443e692108d2b31969446dcbfdc953179404b1b39
+  - path: src/runtime/Modules/OutlierAnalysis/Runtime.OutlierAnalysisConfig.cpp
+    sha256: c67c9cc392b5a6616a2a78d7ee4830283be78903810435e0b419d63f090b02c9
+  - path: src/runtime/Modules/OutlierAnalysis/Runtime.OutlierAnalysisConfig.cppm
+    sha256: 12f02fac95ab60280e1997379e0889a1ff970dc18a0d3c422961b3cddc6e71f1
+  - path: tasks/active/README.md
+    sha256: cf0e8351b78925cb6db9c2e119bfd73a21230ff2abb1f464788b25f83cf2610b
+  - path: tasks/backlog/geometry/GEOM-073-point-analysis-property-span-contracts.md
+    sha256: bd47b0a890ba5255e02124b916cec76583932a65d396a61a2cac3de77cf40e4f
+  - path: tasks/done/RETIREMENT-LOG.md
+    sha256: 953dcca35aa511b702cde17850d15f5c0627598480c9d24416567da5c97d5228
+  - path: tasks/done/RUNTIME-223-local-distance-ratio-spatial-backends.md
+    sha256: 44f47936f76604c12fe9aa4df5476dde2189fc434b5061c68874817c52caabdd
+  - path: tests/CMakeLists.txt
+    sha256: e3e834091cb602693384ca6d00a492852da61aea176caddacfdf9c46ce61650f
+  - path: tests/contract/runtime/Test.OutlierAnalysis.cpp
+    sha256: 7cd3a87abb32a4758d3275f2f40b70effb46468c028a8ba04e2fd9843fe8fbb1
+  - path: tests/integration/graphics/Test.PointLBVHGpuSmoke.cpp
+    sha256: 9ea540d5638636d71fe1e65faf56d8a33825bc69bf78bac0bc7221749cbdebc0
+  - path: tests/unit/geometry/Test.LocalDistanceRatio.cpp
+    sha256: 5f214e1cb1e7fa3d7c0a21ce27b7bc5ad969a5470a4603d6f31e61aafcda675a
+  content_digest: 78badf96782c53bfd24b92e0ae2bc663e5a52ce8a8b933154b591cc1695c15a4
+touched:
+  paths:
+  - ara/evidence/diagnostics/distance_ratio_vulkan_2026-09-10/benchmark/runtime-smoke.json
+  - ara/evidence/diagnostics/distance_ratio_vulkan_2026-09-10/record.json
+  - ara/evidence/tables/distance_ratio_verification_2026-09-10.md
+  - ara/logic/claims.md
+  - ara/staging/observations.yaml
+  - ara/trace/exploration_tree.yaml
+  - benchmarks/geometry/manifests/point_lbvh_distance_ratio_runtime_smoke.yaml
+  - docs/architecture/outlier-analysis.md
+  - docs/architecture/spatial-index-consumers.md
+  - methods/geometry/point_lbvh/method.yaml
+  - methods/geometry/point_lbvh/paper.md
+  - src/app/Sandbox/Editor/Sandbox.MeshProcessingPanels.cpp
+  - src/geometry/Geometry.PointCloud.Utils.cpp
+  - src/geometry/Geometry.PointCloud.Utils.cppm
+  - src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Outliers.cpp
+  - src/runtime/Modules/OutlierAnalysis/Runtime.OutlierAnalysisConfig.cpp
+  - src/runtime/Modules/OutlierAnalysis/Runtime.OutlierAnalysisConfig.cppm
+  - tasks/active/README.md
+  - tasks/backlog/geometry/GEOM-073-point-analysis-property-span-contracts.md
+  - tasks/done/RETIREMENT-LOG.md
+  - tasks/done/RUNTIME-223-local-distance-ratio-spatial-backends.md
+  - tests/CMakeLists.txt
+  - tests/contract/runtime/Test.OutlierAnalysis.cpp
+  - tests/integration/graphics/Test.PointLBVHGpuSmoke.cpp
+  - tests/unit/geometry/Test.LocalDistanceRatio.cpp
+  layers:
+  - geometry
+  - runtime
+  modules:
+  - Geometry.PointCloud.Utils
+  - Runtime.GeometryProcessingOperations
+extension_seam: Existing outlier method variant and supplied-neighbor reducer
+future_change_plan: Bilateral filtering uses moving-point workspaces; Framework24 covariance probability
+  remains a distinct formulation.
+acceptance:
+- criterion: All three backends produce scores and masks through the existing outlier workflow.
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: Existing statistical/radius methods remain unchanged and full CPU gate passes.
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: Fixed-surface independent review and completion evidence are recorded.
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+commands:
+- receipt: tasks/evidence/RUNTIME-223/commands/actual-vulkan.json
+- receipt: tasks/evidence/RUNTIME-223/commands/focused-runtime.json
+- receipt: tasks/evidence/RUNTIME-223/commands/full-cpu.json
+- receipt: tasks/evidence/RUNTIME-223/commands/geometry-reference.json
+- receipt: tasks/evidence/RUNTIME-223/commands/native-cpu.json
+- receipt: tasks/evidence/RUNTIME-223/commands/structural-final.json
+- receipt: tasks/evidence/RUNTIME-223/commands/structural-initial.json
+changed_public_contracts:
+- Canonical same-domain score and mask; k<=63 for Vulkan ratio; no silent fallback
+diagnostics_and_previews:
+- Requested and actual backend, query and CPU reduction timing
+benchmark_or_parity_evidence:
+- ara/evidence/diagnostics/distance_ratio_vulkan_2026-09-10/benchmark/runtime-smoke.json
+docs_sync:
+  task_file: tasks/done/RUNTIME-223-local-distance-ratio-spatial-backends.md
+  session_brief_present: true
+  canonical_docs_changed: true
+  skill_mirrors_checked: true
+residual_risks:
+- Tiny dirty Debug fixture does not support speedup or broad numerical claims; BUG-180 LSan exclusion
+  remains.
+skipped_checks: []
+artifacts:
+- path: ara/evidence/tables/distance_ratio_verification_2026-09-10.md
+  sha256: bf6bb58e6aa725180937f4527bb7974dbe9ca8dd03e06fd7034f6e7a90a5a11f
+  kind: file
+self_review:
+  completed: true
+  scope_matches_task: true
+  layering_preserved: true
+  tests_and_docs_accounted_for: true
+  mechanical_and_semantic_changes_separated: true
+handoff: tasks/evidence/RUNTIME-223/handoff.jsonl
+review: tasks/evidence/RUNTIME-223/reviews.jsonl

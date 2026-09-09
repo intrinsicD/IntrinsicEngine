@@ -17,7 +17,6 @@ picking backlog work; theme priorities and rationale live in
 - `RUNTIME-219` — Vulkan LBVH neighborhoods for normal estimation (tasks/active/RUNTIME-219-vulkan-normal-neighborhoods.md)
 - `RUNTIME-220` — Kernel density with shared spatial backends (tasks/active/RUNTIME-220-kernel-density-spatial-backends.md)
 - `RUNTIME-221` — Point spacing and radius estimation with shared spatial backends (tasks/active/RUNTIME-221-point-spacing-spatial-backends.md)
-- `RUNTIME-223` — Local distance ratio with shared spatial backends (tasks/active/RUNTIME-223-local-distance-ratio-spatial-backends.md)
 - `UI-041` — Point-set outlier multi-domain panel (tasks/active/UI-041-point-set-outlier-multi-domain-panel.md)
 - `UI-053` — Curvature-extremum engine overlay (tasks/active/UI-053-curvature-extremum-engine-overlay.md)
 

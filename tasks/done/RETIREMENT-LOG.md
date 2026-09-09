@@ -8126,3 +8126,7 @@ and the full CPU gate support the recorded outcome. METHOD-044 owns production
 adoption; METHOD-045 retains the broader quality investigations.
 Implementation and portable artifacts: `910a1ed36b32dad5d8a6491519a49cd7f1deca77`,
 verified on `origin/main`.
+
+### RUNTIME-223 — 2026-09-10
+
+Added the existing local distance-ratio heuristic to Outlier Analysis with shared CPU and framed Vulkan LBVH neighborhoods, canonical property domains, config/UI and revision-safe history. Implementation `0dbff4609`; bounded evidence C84 and `tasks/evidence/RUNTIME-223/report.yaml`. Full CPU and actual Vulkan comparisons pass with the documented unsanitized control skip and BUG-180 leak-check exclusion. This does not implement full LOF/LoOP or Framework24 covariance probability.

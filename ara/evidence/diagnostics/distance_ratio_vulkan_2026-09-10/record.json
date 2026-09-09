@@ -1,0 +1,91 @@
+{
+  "recorded_at": "2026-09-10T01:38:27+02:00",
+  "implementation_commit": "0dbff4609b3de9103f5fb36c184dd225d846285e",
+  "comparison_base": "a469dd31a4b4b9d04368d70b0f3ff37546595f4b",
+  "source_sha256": {
+    "assets/shaders/lbvh_query.comp": "aa2ad7c9681e2e0a5380c35c3b19e94f54e48fd450a945f7b4463ad3793d5f39",
+    "benchmarks/geometry/manifests/point_lbvh_distance_ratio_runtime_smoke.yaml": "d6d92cdfb3ccb3d3542f7e7c450cc51239c6f3b2449aa6640f8e33fdc09082ba",
+    "methods/geometry/point_lbvh/method.yaml": "f693874cef6fc2a4039f875a90ddb1b8b48ea43baf1cd7ded7daba0f1d0a01af",
+    "methods/geometry/point_lbvh/paper.md": "a3c825f8094bceee0d68b660cba36825b9fb040bdca72190ec04dab1358bba6c",
+    "src/app/Sandbox/Editor/Sandbox.MeshProcessingPanels.cpp": "066337c1ae1a0f2e7841263865eccc242b22780a647151bcc122951c77104b7e",
+    "src/geometry/Geometry.PointCloud.Utils.cpp": "972cb55dfe9a1ba06d748ade175ed91194efbd557db77aeddedea4a9531af7d2",
+    "src/geometry/Geometry.PointCloud.Utils.cppm": "9ee994769a17fd000837498433f5e024145d4d71b0f0a6997f76aa852df69800",
+    "src/geometry/Geometry.PointLBVH.cpp": "e7e1f18f640dadcf76f8660c34780580eb1bb5ed2b8da710aa305488c62eb676",
+    "src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Outliers.cpp": "74e888935e291aa3e65571e443e692108d2b31969446dcbfdc953179404b1b39",
+    "src/runtime/GeometryIntegration/Runtime.SpatialIndexCache.cpp": "6ef63313af7f38a9ced8c01da3a4c9158372b1dcd14408d8683f2b83c49c3660",
+    "src/runtime/GeometryIntegration/Runtime.SpatialIndexCache.cppm": "ba611ca834b270be4469f2f7876d8a0802b79d5c454a4afea3dfb8b8836ff9e5",
+    "src/runtime/Modules/OutlierAnalysis/Runtime.OutlierAnalysisConfig.cpp": "c67c9cc392b5a6616a2a78d7ee4830283be78903810435e0b419d63f090b02c9",
+    "src/runtime/Modules/OutlierAnalysis/Runtime.OutlierAnalysisConfig.cppm": "12f02fac95ab60280e1997379e0889a1ff970dc18a0d3c422961b3cddc6e71f1",
+    "tests/CMakeLists.txt": "e3e834091cb602693384ca6d00a492852da61aea176caddacfdf9c46ce61650f",
+    "tests/contract/runtime/Test.OutlierAnalysis.cpp": "7cd3a87abb32a4758d3275f2f40b70effb46468c028a8ba04e2fd9843fe8fbb1",
+    "tests/integration/graphics/Test.PointLBVHGpuSmoke.cpp": "9ea540d5638636d71fe1e65faf56d8a33825bc69bf78bac0bc7221749cbdebc0",
+    "tests/unit/geometry/Test.LocalDistanceRatio.cpp": "5f214e1cb1e7fa3d7c0a21ce27b7bc5ad969a5470a4603d6f31e61aafcda675a"
+  },
+  "cpu": {
+    "selected": 4413,
+    "passed_in_sandbox": 4407,
+    "skipped_in_sandbox": 6,
+    "native_followup_passed": 5,
+    "distinct_passes": 4412,
+    "remaining_skips": 1,
+    "full_gate_seconds": 117.01
+  },
+  "gpu": {
+    "preset": "ci-vulkan",
+    "sanitizers": "address,undefined; detect_leaks=0 under BUG-180",
+    "actual_cases": [
+      "PointLBVHGpuSmoke.OutlierNeighborhoodsPublishAcrossDomainsAndCountDenseSupport",
+      "PointLBVHGpuSmoke.LocalDistanceRatioPublishesAcrossDomains"
+    ],
+    "case_seconds": [
+      44.98,
+      8.21
+    ],
+    "skips": 0,
+    "quality_error_linf": 0,
+    "absolute_tolerance": 1e-05
+  },
+  "receipts": {
+    "full-cpu": {
+      "exit_code": 0,
+      "stdout_path": "tasks/evidence/RUNTIME-223/commands/full-cpu.stdout.log",
+      "stdout_sha256": "878f676b0e89198c07667ed0599a2d2e808d9a7da7d356f3e2185c134a896cd7"
+    },
+    "focused-runtime": {
+      "exit_code": 0,
+      "stdout_path": "tasks/evidence/RUNTIME-223/commands/focused-runtime.stdout.log",
+      "stdout_sha256": "e3274d3c3734a52939fd46059aa6f2a821624b328b13f4376ad4fb19d01210e8"
+    },
+    "native-cpu": {
+      "exit_code": 0,
+      "stdout_path": "tasks/evidence/RUNTIME-223/commands/native-cpu.stdout.log",
+      "stdout_sha256": "9cab525533f84098ba39948ceba17f6a218e7966e99f4fcd13a50145d3a28383"
+    },
+    "actual-vulkan": {
+      "exit_code": 0,
+      "stdout_path": "tasks/evidence/RUNTIME-223/commands/actual-vulkan.stdout.log",
+      "stdout_sha256": "58c9a930e32eff03c421e79fe5249230776fa4815397dc3a54fee82c166ee802"
+    },
+    "structural-initial": {
+      "exit_code": 0,
+      "stdout_path": "tasks/evidence/RUNTIME-223/commands/structural-initial.stdout.log",
+      "stdout_sha256": "33a62ce336abb264e6fb4a97ecde3fc9a18ff71397c80486f6deb1cb427a980f"
+    },
+    "geometry-reference": {
+      "exit_code": 0,
+      "stdout_path": "tasks/evidence/RUNTIME-223/commands/geometry-reference.stdout.log",
+      "stdout_sha256": "fc1421a1239abb0748a29e1a8186f42303a1e3468245b5df401ecdb15f38e301"
+    },
+    "structural-final": {
+      "exit_code": 0,
+      "stdout_path": "tasks/evidence/RUNTIME-223/commands/structural-final.stdout.log",
+      "stdout_sha256": "33a62ce336abb264e6fb4a97ecde3fc9a18ff71397c80486f6deb1cb427a980f"
+    }
+  },
+  "limitations": [
+    "Shared CPU classification with actual Vulkan queries; not GPU score evaluation.",
+    "Single bounded fixture; not general LOF/LoOP/Framework24 covariance parity.",
+    "Dirty Debug smoke is not performance claim eligible; no speedup or default change.",
+    "Full separate CPU sanitizer suites were not rerun; combined ASan/UBSan exercised actual Vulkan runtime path."
+  ]
+}

@@ -11707,3 +11707,22 @@ tree:
     alternatives: [Claim GPU radius rendering or hole-free coverage, Change the backend default from a tiny framed smoke]
     evidence: [N525, O215, docs/architecture/point-spacing.md]
     status: resolved
+
+  - id: N527
+    type: experiment
+    title: Execute the local-distance-ratio consumer through shared CPU and Vulkan neighborhoods
+    provenance: ai-executed
+    timestamp: '2026-09-10T01:38:27+02:00'
+    result: Implementation 0dbff4609b3de9103f5fb36c184dd225d846285e passes the analytic/reference, canonical runtime and actual Vulkan fixtures. Full CPU has 4412 distinct passes after native follow-up and one expected skip; the new Vulkan case observes zero score error under 1e-5. Dirty smoke remains diagnostic.
+    evidence: [ara/evidence/diagnostics/distance_ratio_vulkan_2026-09-10/record.json, tasks/evidence/RUNTIME-223/commands/actual-vulkan.stdout.log]
+    status: resolved
+
+  - id: N528
+    type: decision
+    title: Bind only the tested local-distance-ratio integration scope
+    provenance: ai-executed
+    timestamp: '2026-09-10T01:38:27+02:00'
+    choice: Implementation commit 0dbff4609b3de9103f5fb36c184dd225d846285e adopts the existing ratio formula into shared controls and publication. Bind O216/C84 before method-task maturity closure as required by AGENTS.md section 8b; retain CPU score evaluation and distinguish Framework24 covariance probability.
+    alternatives: [Mislabel the ratio as full LOF or covariance probability, Infer a performance improvement from a dirty framed smoke]
+    evidence: [N527, O216, docs/architecture/outlier-analysis.md]
+    status: resolved

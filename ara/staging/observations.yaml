@@ -3737,3 +3737,15 @@ observations:
     promoted_to: logic/claims.md:C83
     crystallized_via: artifact-commitment
     stale: false
+
+  - id: O216
+    timestamp: '2026-09-10T01:38:27+02:00'
+    provenance: ai-executed
+    content: Bounded local-distance-ratio scores and masks match the CPU octree through shared CPU and actual Vulkan LBVH neighborhoods on all eight canonical domains, with guarded configuration, publication and history.
+    context: N528 commits only the tested scope into method-task closure; no user reaction or broad method/performance equivalence is inferred. Full overnight PM recording remains an end-of-turn step.
+    potential_type: claim
+    bound_to: [N527, N528]
+    promoted: true
+    promoted_to: logic/claims.md:C84
+    crystallized_via: artifact-commitment
+    stale: false
