@@ -2072,3 +2072,76 @@ TEST(SandboxEditorUi,
     EXPECT_EQ(history.RedoCount(), 0u);
     EXPECT_EQ(history.Snapshot().Revision, beforeRejectedUndo.Revision);
 }
+
+TEST(SandboxEditorUi,
+     SurfaceBakingRejectsUnavailableBackendWithoutChangingAppearance) {
+  ECS::Scene::Registry registry;
+  Runtime::SelectionController selection;
+  const auto mesh = MakeSelectable(registry, "AppearanceMesh");
+  AddTriangleMeshSource(registry, mesh);
+  registry.Raw()
+      .get<GS::Vertices>(mesh)
+      .Properties.GetOrAdd<float>("v:temperature", 0.0f)
+      .Vector() = {0.0f, 0.5f, 1.0f};
+  ASSERT_TRUE(selection.SetSelectedEntity(registry, mesh));
+  auto context = MakeContext(registry, selection);
+  context.VisualizationCommandsAvailable = true;
+  Runtime::EditorVisualizationConfigCommand command{
+      .StableEntityId = Runtime::SelectionController::ToStableEntityId(mesh),
+      .Target = Runtime::EditorVisualizationTarget::Surface,
+      .Source = G::VisualizationConfig::ColorSource::ScalarField,
+      .ScalarFieldName = "v:temperature",
+  };
+  ASSERT_EQ(Runtime::ApplyEditorVisualizationConfigCommand(context, command),
+            Runtime::EditorCommandStatus::Applied);
+  command.UseBakedTexture = true;
+  EXPECT_NE(Runtime::ApplyEditorVisualizationConfigCommand(context, command),
+            Runtime::EditorCommandStatus::Applied);
+  const auto &stored = registry.Raw().get<G::VisualizationLaneOverrides>(mesh);
+  ASSERT_TRUE(stored.Surface.has_value());
+  EXPECT_FALSE(stored.Surface->UseBakedTexture);
+  EXPECT_EQ(stored.Surface->ScalarFieldName, "v:temperature");
+  for (auto target : {Runtime::EditorVisualizationTarget::Edges,
+                      Runtime::EditorVisualizationTarget::Points}) {
+    command.Target = target;
+    EXPECT_EQ(Runtime::ApplyEditorVisualizationConfigCommand(context, command),
+              Runtime::EditorCommandStatus::UnsupportedGeometryDomain);
+  }
+  EXPECT_FALSE(stored.Edges.has_value());
+  EXPECT_FALSE(stored.Points.has_value());
+}
+
+TEST(SandboxEditorUi,
+     DisablingSurfaceBakingPreservesPropertyAndIndependentLanes) {
+  ECS::Scene::Registry registry;
+  Runtime::SelectionController selection;
+  const auto mesh = MakeSelectable(registry, "AppearanceMesh");
+  AddTriangleMeshSource(registry, mesh);
+  ASSERT_TRUE(selection.SetSelectedEntity(registry, mesh));
+  auto context = MakeContext(registry, selection);
+  context.VisualizationCommandsAvailable = true;
+  auto &stored =
+      registry.Raw().get_or_emplace<G::VisualizationLaneOverrides>(mesh);
+  stored.Surface = G::VisualizationConfig{};
+  stored.Surface->Source = G::VisualizationConfig::ColorSource::ScalarField;
+  stored.Surface->ScalarFieldName = "v:temperature";
+  stored.Surface->UseBakedTexture = true;
+  stored.Edges = G::VisualizationConfig{};
+  stored.Edges->Source = G::VisualizationConfig::ColorSource::PerEdgeBuffer;
+  stored.Edges->ColorBufferName = "e:color";
+  Runtime::EditorVisualizationConfigCommand command{
+      .StableEntityId = Runtime::SelectionController::ToStableEntityId(mesh),
+      .Target = Runtime::EditorVisualizationTarget::Surface,
+      .Source = G::VisualizationConfig::ColorSource::ScalarField,
+      .ScalarFieldName = "v:temperature",
+      .ScalarColormap = Extrinsic::Graphics::Colormap::Type::Plasma,
+      .UseBakedTexture = false,
+  };
+  EXPECT_EQ(Runtime::ApplyEditorVisualizationConfigCommand(context, command),
+            Runtime::EditorCommandStatus::Applied);
+  EXPECT_FALSE(stored.Surface->UseBakedTexture);
+  EXPECT_EQ(stored.Surface->ScalarFieldName, "v:temperature");
+  EXPECT_EQ(stored.Surface->Scalar.Map,
+            Extrinsic::Graphics::Colormap::Type::Plasma);
+  EXPECT_EQ(stored.Edges->ColorBufferName, "e:color");
+}

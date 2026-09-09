@@ -178,6 +178,7 @@ namespace {
             config.ScalarFieldName = command.ScalarFieldName;
             config.ScalarDomain = command.ScalarDomain;
             config.ColorBufferName = command.ColorBufferName;
+            config.UseBakedTexture = command.UseBakedTexture;
             config.Scalar.AutoRange = command.ScalarAutoRange;
             config.Scalar.RangeMin = command.ScalarRangeMin;
             config.Scalar.RangeMax = command.ScalarRangeMax;
@@ -327,14 +328,13 @@ namespace {
                 if (lhs.Scalar.Isolines.Values[i] != rhs.Scalar.Isolines.Values[i])
                     return false;
             }
-            return lhs.Source == rhs.Source &&
-                   lhs.Color.x == rhs.Color.x &&
-                   lhs.Color.y == rhs.Color.y &&
-                   lhs.Color.z == rhs.Color.z &&
+            return lhs.Source == rhs.Source && lhs.Color.x == rhs.Color.x &&
+                   lhs.Color.y == rhs.Color.y && lhs.Color.z == rhs.Color.z &&
                    lhs.Color.w == rhs.Color.w &&
                    lhs.ScalarFieldName == rhs.ScalarFieldName &&
                    lhs.ScalarDomain == rhs.ScalarDomain &&
                    lhs.ColorBufferName == rhs.ColorBufferName &&
+                   lhs.UseBakedTexture == rhs.UseBakedTexture &&
                    lhs.Scalar.Map == rhs.Scalar.Map &&
                    lhs.Scalar.AutoRange == rhs.Scalar.AutoRange &&
                    lhs.Scalar.RangeMin == rhs.Scalar.RangeMin &&
@@ -604,7 +604,9 @@ namespace {
                 const bool scalar =
                     !internal && IsScalarVisualizationKind(kind);
                 const bool color =
-                    !internal && kind == Geometry::PropertyValueKind::Vec4;
+                    (!internal || name == GS::PropertyNames::kNormal) &&
+                    (kind == Geometry::PropertyValueKind::Vec3 ||
+                     kind == Geometry::PropertyValueKind::Vec4);
                 const bool vector =
                     !connectivity && kind == Geometry::PropertyValueKind::Vec3;
                 const bool integer =
@@ -1121,6 +1123,7 @@ namespace {
         struct EditorRenderHintState
         {
             std::optional<G::RenderSurface> Surface{};
+            std::optional<G::VisualizationConfig> SurfaceVisualization{};
             std::optional<G::RenderEdges> Edges{};
             std::optional<G::RenderPoints> Points{};
         };
@@ -1130,6 +1133,8 @@ namespace {
             const ECS::EntityHandle entity)
         {
             EditorRenderHintState state{};
+            state.SurfaceVisualization = StoredVisualizationConfigForTarget(
+                raw, entity, EditorVisualizationTarget::Surface);
             if (const auto* surface = raw.try_get<G::RenderSurface>(entity))
                 state.Surface = *surface;
             if (const auto* lines = raw.try_get<G::RenderEdges>(entity))
@@ -1200,7 +1205,8 @@ namespace {
                    SameOptionalRenderComponent(
                        lhs.Edges, rhs.Edges, SameRenderEdges) &&
                    SameOptionalRenderComponent(
-                       lhs.Points, rhs.Points, SameRenderPoints);
+                       lhs.Points, rhs.Points, SameRenderPoints) &&
+                   SameOptionalVisualizationConfig(lhs.SurfaceVisualization, rhs.SurfaceVisualization);
         }
 
         [[nodiscard]] bool IsFinitePositive(const float value) noexcept
@@ -1276,6 +1282,8 @@ namespace {
                 {
                     G::RenderSurface surface =
                         state.Surface.value_or(G::RenderSurface{});
+                    if (surface.Domain != command.SurfaceDomain)
+                        state.SurfaceVisualization = G::VisualizationConfig{};
                     surface.Domain = command.SurfaceDomain;
                     state.Surface = surface;
                 }
@@ -1347,6 +1355,8 @@ namespace {
             if (entity == ECS::InvalidEntityHandle || !raw.valid(entity))
                 return EditorCommandHistoryStatus::StaleEntity;
 
+            (void)ApplyVisualizationConfigTarget(scene, stableEntityId,
+                EditorVisualizationTarget::Surface, state.SurfaceVisualization);
             if (state.Surface.has_value())
                 raw.emplace_or_replace<G::RenderSurface>(entity, *state.Surface);
             else if (raw.all_of<G::RenderSurface>(entity))
@@ -2209,6 +2219,69 @@ ApplyEditorRenderHintCommand(
             return EditorCommandStatus::NoChange;
         }
 
+        if (after.has_value() && after->UseBakedTexture) {
+          if (command.Target != EditorVisualizationTarget::Surface ||
+              (command.Source !=
+                   G::VisualizationConfig::ColorSource::ScalarField &&
+               command.Source !=
+                   G::VisualizationConfig::ColorSource::PerVertexBuffer &&
+               command.Source !=
+                   G::VisualizationConfig::ColorSource::PerFaceBuffer))
+            return EditorCommandStatus::UnsupportedGeometryDomain;
+
+          const bool scalar = command.Source ==
+                              G::VisualizationConfig::ColorSource::ScalarField;
+          const auto domain =
+              scalar
+                  ? command.ScalarDomain
+                  : (command.Source ==
+                             G::VisualizationConfig::ColorSource::PerFaceBuffer
+                         ? G::VisualizationConfig::Domain::Face
+                         : G::VisualizationConfig::Domain::Vertex);
+          if (domain == G::VisualizationConfig::Domain::Edge)
+            return EditorCommandStatus::UnsupportedGeometryDomain;
+          const GeometryElementDomain sourceDomain =
+              domain == G::VisualizationConfig::Domain::Face
+                  ? GeometryElementDomain::MeshFace
+                  : GeometryElementDomain::MeshVertex;
+          const auto availability = BuildGeometryAvailability(raw, entity);
+          const std::string &name =
+              scalar ? command.ScalarFieldName : command.ColorBufferName;
+          const auto resolved = ResolveGeometryProperty(
+              availability,
+              GeometryPropertyRef{.Domain = sourceDomain, .Name = name},
+              ResolveGeometryElementCount(availability, sourceDomain));
+          if (!resolved.Resolved())
+            return EditorCommandStatus::InvalidVisualizationProperty;
+          const auto baked = ApplyEditorTextureBakeCommand(
+              context,
+              EditorTextureBakeCommand{
+                  .StableEntityId = command.StableEntityId,
+                  .SourceDomain = sourceDomain,
+                  .ExpectedValueKind = resolved.ResolvedValueKind,
+                  .PropertyName = name,
+                  .Encoder = scalar
+                                 ? PropertyTextureBakeEncoding::ScalarColormap
+                                 : ((name == GS::PropertyNames::kNormal || name == "f:normal") &&
+                                    resolved.ResolvedValueKind == Geometry::PropertyValueKind::Vec3
+                                        ? PropertyTextureBakeEncoding::Normal
+                                        : PropertyTextureBakeEncoding::RgbaColor),
+                  .RangePolicy =
+                      command.ScalarAutoRange
+                          ? PropertyTextureBakeRangePolicy::AutoFinite
+                          : PropertyTextureBakeRangePolicy::Manual,
+                  .RangeMin = command.ScalarRangeMin,
+                  .RangeMax = command.ScalarRangeMax,
+                  .PaddingTexels = 2u,
+                  .OutputName = std::string{kSurfaceAppearanceTextureOutput},
+                  .Storage = PropertyTextureBakeStorage::EncodedRgba,
+                  .EncodingColormap = command.ScalarColormap,
+                  .BindGeneratedTexture = false,
+              });
+          if (!baked.Succeeded())
+            return baked.Status;
+        }
+
         if (context.CommandHistory != nullptr)
         {
             const EditorCommandHistoryResult result =
@@ -2306,6 +2379,7 @@ ApplyEditorRenderHintCommand(
             configCommand.IsolineColor = existing->Scalar.Isolines.Color;
             configCommand.IsolineValues = existing->Scalar.Isolines.Values;
             configCommand.IsolineValueCount = existing->Scalar.Isolines.ValueCount;
+            configCommand.UseBakedTexture = existing->UseBakedTexture;
         }
 
         switch (command.Preset)

@@ -19,7 +19,7 @@ namespace Extrinsic::Runtime
         {
             NormalEstimationConfig c;
             c.StableEntityId = d.at("entity");
-            for (unsigned i = 0; i < 3; ++i)
+            for (unsigned i = 0; i < 4; ++i)
                 if (d.at("method") == ToString(NormalEstimationMethod(i)))
                     c.Method = NormalEstimationMethod(i);
             c.Backend = d.at("backend") == "cpu_lbvh" ? NormalEstimationBackend::CpuLBVH
@@ -65,6 +65,8 @@ namespace Extrinsic::Runtime
             return "mesh_face_weighted";
         case NormalEstimationMethod::GraphNeighborhood:
             return "graph_neighborhood";
+        case NormalEstimationMethod::MeshFaceNormals:
+            return "mesh_face_normals";
         }
         return "invalid";
     }
@@ -127,7 +129,7 @@ namespace Extrinsic::Runtime
             d["weighting"] > 4)
             return reject("Positive neighborhood sizes, orientation 0..1 and weighting 0..4 are required.");
         if (d["method"] != "point_set_pca" && d["method"] != "mesh_face_weighted" &&
-            d["method"] != "graph_neighborhood")
+            d["method"] != "graph_neighborhood" && d["method"] != "mesh_face_normals")
             return reject("Unknown normal method.");
         if (d["backend"] != "cpu_kdtree" && d["backend"] != "cpu_lbvh")
             return reject("Normal backend must be cpu_kdtree or cpu_lbvh.");
@@ -160,8 +162,19 @@ namespace Extrinsic::Runtime
             if (!valid)
                 return reject(std::string(key) + " has an unknown element domain.");
         }
-        if (d["positions"]["domain"] != d["output"]["domain"] ||
-            d["positions"]["name"] == d["output"]["name"])
+        if (d["method"] == "mesh_face_normals")
+        {
+            for (const auto key : {"positions", "output"})
+            {
+                const auto expected = key == std::string_view{"positions"}
+                    ? GeometryElementDomain::MeshVertex : GeometryElementDomain::MeshFace;
+                if (d[key]["domain"] != ToString(expected) &&
+                    d[key]["domain"] != ToString(GeometryElementDomain::Unknown))
+                    return reject("Face normals require mesh vertex positions and a mesh face output.");
+            }
+        }
+        else if (d["positions"]["domain"] != d["output"]["domain"] ||
+                 d["positions"]["name"] == d["output"]["name"])
             return reject("Normals must use a distinct output property on the input domain.");
         result.State = EngineConfigState::Valid;
         result.CanonicalPayloadJson = SerializeNormalEstimationConfig(Parse(d));

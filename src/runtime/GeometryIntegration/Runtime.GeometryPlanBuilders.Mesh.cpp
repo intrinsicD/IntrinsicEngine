@@ -73,6 +73,7 @@ namespace Extrinsic::Runtime
         PackedColors.clear();
         SurfaceIndices.clear();
         SourceVertexForGpuVertex.clear();
+        SourceFaceForGpuTriangle.clear();
     }
 
     MeshPlanBuildResult BuildMeshGeometryPlan(
@@ -115,7 +116,7 @@ namespace Extrinsic::Runtime
             return Failure(MeshPackStatus::EmptyMesh, outBuffer);
         }
 
-        std::vector<std::uint32_t> triangleToFace;
+        auto& triangleToFace = outBuffer.SourceFaceForGpuTriangle;
         std::vector<std::uint32_t> cornerHalfedges;
         const MeshSurfaceTopologyStatus topology =
             BuildMeshSurfaceTriangleCornerTopology(

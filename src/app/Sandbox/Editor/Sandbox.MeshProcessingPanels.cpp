@@ -357,6 +357,7 @@ namespace Extrinsic::Sandbox::Editor
 
         struct NormalsState
         {
+            bool OpenFacePreset{false};
             std::optional<Runtime::EditorNormalEstimationResult> LastResult{};
             Runtime::NormalEstimationConfig Draft{};
             std::string LastApplied{}, ConfigDiagnostic{}, VisualizationDiagnostic{};
@@ -477,6 +478,16 @@ namespace Extrinsic::Sandbox::Editor
                     (void)Shell->SetEditorWindowOpen("view.normal_estimation", true);
                     (void)Shell->SetEditorWindowOpen(id, false);
                 }}));
+        Handles.push_back(Shell->RegisterEditorWindow({
+            .Id = "mesh.processing.faces.normals", .MenuPath = {"Mesh", "Processing", "Faces"},
+            .Title = "Normals",
+            .Draw = [](bool& open, const SandboxEditorContext&) { open = false; },
+            .OpenStateChanged = [this](bool open) {
+                if (!open) return;
+                Normals.OpenFacePreset = true;
+                (void)Shell->SetEditorWindowOpen("view.normal_estimation", true);
+                (void)Shell->SetEditorWindowOpen("mesh.processing.faces.normals", false);
+            }}));
         RegisterWindow("view.registration", {"View"},
                        "ICP Registration", &Impl::DrawRegistrationWindow);
         for (const auto& [id, domain] : std::array<std::pair<const char*, const char*>, 3>{
@@ -1908,6 +1919,18 @@ namespace Extrinsic::Sandbox::Editor
         }
         auto &config = Normals.Draft;
         bool changed = false;
+        if (Normals.OpenFacePreset)
+        {
+            Normals.OpenFacePreset = false;
+            config.Method = Runtime::NormalEstimationMethod::MeshFaceNormals;
+            config.Positions = {Runtime::GeometryElementDomain::MeshVertex, "v:position",
+                                decltype(config.Positions.ValueKind)::Vec3};
+            config.Output = {Runtime::GeometryElementDomain::MeshFace, "f:normal",
+                             decltype(config.Output.ValueKind)::Vec3};
+            if (context.Selection && !context.Selection->SelectedStableIds.empty())
+                config.StableEntityId = context.Selection->SelectedStableIds.front();
+            changed = true;
+        }
         const auto workspace =
             Runtime::BuildEditorWorkspaceSnapshot(context.SnapshotQueries, {.Hierarchy = true,
                                                                             .Inspector = false,
@@ -1956,6 +1979,9 @@ namespace Extrinsic::Sandbox::Editor
             auto previousDomain = Runtime::GeometryElementDomain::Unknown;
             for (const auto &row : catalog.Entries)
             {
+                if (config.Method == Runtime::NormalEstimationMethod::MeshFaceNormals &&
+                    row.Ref.Domain != Runtime::GeometryElementDomain::MeshVertex)
+                    continue;
                 if (row.Ref.Domain != previousDomain)
                 {
                     ImGui::SeparatorText(std::string(Runtime::ToString(row.Ref.Domain)).c_str());
@@ -1966,7 +1992,8 @@ namespace Extrinsic::Sandbox::Editor
                 if (ImGui::Selectable(label.c_str(), row.Ref == config.Positions))
                 {
                     config.Positions = row.Ref;
-                    config.Output.Domain = row.Ref.Domain;
+                    config.Output.Domain = config.Method == Runtime::NormalEstimationMethod::MeshFaceNormals
+                        ? Runtime::GeometryElementDomain::MeshFace : row.Ref.Domain;
                     changed = true;
                 }
             }
@@ -1984,16 +2011,22 @@ namespace Extrinsic::Sandbox::Editor
         {
             for (auto method : {Runtime::NormalEstimationMethod::PointSetPCA,
                                 Runtime::NormalEstimationMethod::MeshFaceWeighted,
-                                Runtime::NormalEstimationMethod::GraphNeighborhood})
+                                Runtime::NormalEstimationMethod::GraphNeighborhood,
+                                Runtime::NormalEstimationMethod::MeshFaceNormals})
             {
                 auto candidate = config;
                 candidate.Method = method;
+                candidate.Output.Domain = method == Runtime::NormalEstimationMethod::MeshFaceNormals
+                    ? Runtime::GeometryElementDomain::MeshFace : candidate.Positions.Domain;
+                if (candidate.Output.Name == "v:normal" || candidate.Output.Name == "f:normal")
+                    candidate.Output.Name = method == Runtime::NormalEstimationMethod::MeshFaceNormals
+                        ? "f:normal" : "v:normal";
                 const auto readiness =
                     Runtime::PreviewEditorNormalEstimationCommand(context.GeometryCommands, candidate);
                 ImGui::BeginDisabled(!readiness.Ready);
                 if (ImGui::Selectable(Runtime::ToString(method), config.Method == method))
                 {
-                    config.Method = method;
+                    config = candidate;
                     changed = true;
                 }
                 ImGui::EndDisabled();
@@ -2038,6 +2071,11 @@ namespace Extrinsic::Sandbox::Editor
                 changed = true;
             }
         }
+        else if (config.Method == Runtime::NormalEstimationMethod::MeshFaceNormals)
+        {
+            ImGui::TextWrapped("Compute one object-space normal per polygon from its full face ring. "
+                               "Face winding determines the direction.");
+        }
         else
         {
             ImGui::TextWrapped("Fit normals from incident edge neighbors. Compatible mesh adjacency is "
@@ -2072,7 +2110,27 @@ namespace Extrinsic::Sandbox::Editor
                                  Runtime::ApplyEditorConfiguredNormalEstimation(context.GeometryCommands),
                                  context.MethodResultSinks.NormalEstimation);
         ImGui::SameLine();
-        if (ImGui::Button("Show normal vectors"))
+        if (config.Method == Runtime::NormalEstimationMethod::MeshFaceNormals)
+        {
+            if (ImGui::Button("Show face normals"))
+            {
+                const auto hint = Runtime::ApplyEditorRenderHintCommand(
+                    context.VisualizationCommands,
+                    {.StableEntityId = config.StableEntityId,
+                     .SetSurface = true, .EnableSurface = true,
+                     .SurfaceDomain = decltype(Runtime::EditorRenderHintCommand{}.SurfaceDomain)::Face});
+                const auto status = Runtime::ApplyEditorVisualizationPropertyCommand(
+                    context.VisualizationCommands,
+                    {.StableEntityId = config.StableEntityId,
+                     .Target = Runtime::EditorVisualizationTarget::Surface,
+                     .Domain = Runtime::EditorVisualizationPropertyDomain::MeshFaces,
+                     .Preset = Runtime::EditorVisualizationPropertyPreset::ColorBuffer,
+                     .PropertyName = readiness.Resolved.Output.Name});
+                (void)hint;
+                Normals.VisualizationDiagnostic = Runtime::DebugNameForEditorCommandStatus(status);
+            }
+        }
+        else if (ImGui::Button("Show normal vectors"))
         {
             const auto status = Runtime::ApplyEditorVisualizationRecipeCommand(
                 context.VisualizationCommands,
@@ -2085,7 +2143,7 @@ namespace Extrinsic::Sandbox::Editor
         }
         ImGui::EndDisabled();
         if (!Normals.VisualizationDiagnostic.empty())
-            ImGui::Text("Vector display: %s", Normals.VisualizationDiagnostic.c_str());
+            ImGui::Text("Normal display: %s", Normals.VisualizationDiagnostic.c_str());
         if (Normals.LastResult)
         {
             const auto &result = *Normals.LastResult;

@@ -7612,3 +7612,258 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke, SeamSplitCornerUvMeshDeIndexesAtUploadAnd
     device.DestroyBuffer(readbackBuffer);
     engine.Shutdown();
 }
+
+TEST(RuntimeSandboxAcceptanceGpuSmoke,
+     SurfaceAppearanceBakesSelectedPropertyAndRestoresAttributes) {
+  EntityHandle triangle{Extrinsic::ECS::InvalidEntityHandle};
+  std::array<Extrinsic::RHI::BufferHandle, 9> readbacks{};
+  std::uint32_t phase = 0u;
+  std::uint32_t settle = 0u;
+  bool commandFailed = false;
+  bool bakedRenderingObserved = false;
+  const auto ready = [&](Engine &engine) {
+    auto *scene = engine.Worlds().Get(engine.ActiveWorld());
+    auto *baker = engine.Services().Find<RT::TextureBakeService>();
+    if (scene == nullptr || baker == nullptr || !baker->Available())
+      return false;
+    const auto stableId = RT::SelectionController::ToStableEntityId(triangle);
+    Intrinsic::Tests::EditorFeatureTestContext context{
+        .Scene = scene,
+        .World = engine.ActiveWorld(),
+        .Device = &engine.GetDevice(),
+        .TextureBake = baker,
+    };
+    context.CommandHistory = engine.Services().Find<RT::EditorCommandHistory>();
+    context.Selection = &Selection(engine);
+    context.VisualizationCommandsAvailable = true;
+    const auto apply =
+        [&](const RT::EditorVisualizationConfigCommand &command) {
+          const auto status =
+              RT::ApplyEditorVisualizationConfigCommand(context, command);
+          commandFailed |= status != RT::EditorCommandStatus::Applied &&
+                           status != RT::EditorCommandStatus::NoChange;
+        };
+    if (phase == 0u) {
+      apply(RT::EditorVisualizationConfigCommand{
+          .StableEntityId = stableId,
+          .Target = RT::EditorVisualizationTarget::Surface,
+          .Source = G::VisualizationConfig::ColorSource::PerVertexBuffer,
+          .ColorBufferName = "v:appearance_red",
+          .UseBakedTexture = true,
+      });
+      phase = 1u;
+    } else if (phase == 1u || phase == 3u || phase == 6u || phase == 8u || phase == 11u) {
+      const auto snapshot = baker->Snapshot(stableId);
+      const auto record = std::ranges::find(
+          snapshot.Textures, RT::kSurfaceAppearanceTextureOutput,
+          &RT::PropertyTextureBakeRecord::OutputName);
+      if (record != snapshot.Textures.end() &&
+          record->State == RT::PropertyTextureBakeOutputState::Failed) {
+        ADD_FAILURE() << record->Diagnostic;
+        return true;
+      }
+      const std::string_view expected =
+          phase == 11u ? "f:normal" : phase == 8u ? "v:normal" : (phase == 3u ? "v:appearance_blue" : "v:appearance_red");
+      if (record != snapshot.Textures.end() &&
+          record->State == RT::PropertyTextureBakeOutputState::Ready &&
+          record->Source.Name == expected) {
+        engine.GetRenderer().SetDefaultRecipeBackbufferReadbackBuffer(
+            readbacks[phase == 11u ? 6 : phase == 8u ? 4 : (phase == 1u ? 0 : (phase == 3u ? 1 : 3))]);
+        if (phase == 8u || phase == 11u)
+          EXPECT_EQ(record->Encoding, RT::PropertyTextureBakeEncoding::Normal);
+        ++phase;
+        settle = 4u;
+      }
+    } else if (settle > 0u) {
+      --settle;
+    } else if (phase == 2u) {
+      if (engine.Services().Find<RT::RenderExtractionCache>() != nullptr) {
+        const auto world = engine.GetRenderer().ExtractRenderWorld({});
+        bakedRenderingObserved = world.Visualization.Colors.empty() &&
+                                 world.Visualization.Scalars.empty();
+      }
+      engine.GetRenderer().SetDefaultRecipeBackbufferReadbackBuffer({});
+      const auto status = RT::ApplyEditorVisualizationPropertyCommand(
+          context,
+          RT::EditorVisualizationPropertyCommand{
+              .StableEntityId = stableId,
+              .Target = RT::EditorVisualizationTarget::Surface,
+              .Domain = RT::EditorVisualizationPropertyDomain::MeshVertices,
+              .Preset = RT::EditorVisualizationPropertyPreset::ColorBuffer,
+              .PropertyName = "v:appearance_blue",
+          });
+      commandFailed |= status != RT::EditorCommandStatus::Applied;
+      phase = 3u;
+    } else if (phase == 4u) {
+      apply(RT::EditorVisualizationConfigCommand{
+          .StableEntityId = stableId,
+          .Target = RT::EditorVisualizationTarget::Surface,
+          .Source = G::VisualizationConfig::ColorSource::PerVertexBuffer,
+          .ColorBufferName = "v:appearance_blue",
+          .UseBakedTexture = false,
+      });
+      engine.GetRenderer().SetDefaultRecipeBackbufferReadbackBuffer(
+          readbacks[2]);
+      phase = 5u;
+      settle = 4u;
+    } else if (phase == 5u) {
+      engine.GetRenderer().SetDefaultRecipeBackbufferReadbackBuffer({});
+      if (context.CommandHistory == nullptr) return true;
+      commandFailed |= context.CommandHistory->Undo().Status != RT::EditorCommandHistoryStatus::Undone;
+      commandFailed |= context.CommandHistory->Undo().Status != RT::EditorCommandHistoryStatus::Undone;
+      phase = 6u;
+    } else if (phase == 7u) {
+      engine.GetRenderer().SetDefaultRecipeBackbufferReadbackBuffer({});
+      const auto rotated = RT::ApplyEditorTransformEdit(
+          context, RT::EditorTransformEditCommand{
+              .StableEntityId = stableId,
+              .SetRotation = true,
+              .Rotation = glm::quat{0.70710678f, 0.0f, 0.0f, 0.70710678f}});
+      EXPECT_EQ(rotated, RT::EditorCommandStatus::Applied);
+      commandFailed |= rotated != RT::EditorCommandStatus::Applied;
+      const auto status = RT::ApplyEditorVisualizationPropertyCommand(
+          context, RT::EditorVisualizationPropertyCommand{
+              .StableEntityId = stableId,
+              .Target = RT::EditorVisualizationTarget::Surface,
+              .Domain = RT::EditorVisualizationPropertyDomain::MeshVertices,
+              .Preset = RT::EditorVisualizationPropertyPreset::ColorBuffer,
+              .PropertyName = "v:normal"});
+      commandFailed |= status != RT::EditorCommandStatus::Applied;
+      phase = 8u;
+    } else if (phase == 9u) {
+      apply(RT::EditorVisualizationConfigCommand{
+          .StableEntityId = stableId,
+          .Target = RT::EditorVisualizationTarget::Surface,
+          .Source = G::VisualizationConfig::ColorSource::PerVertexBuffer,
+          .ColorBufferName = "v:normal",
+          .UseBakedTexture = false});
+      engine.GetRenderer().SetDefaultRecipeBackbufferReadbackBuffer(readbacks[5]);
+      phase = 10u;
+      settle = 4u;
+    } else if (phase == 10u) {
+      engine.GetRenderer().SetDefaultRecipeBackbufferReadbackBuffer({});
+      RT::NormalEstimationConfig normals;
+      normals.StableEntityId = stableId;
+      normals.Method = RT::NormalEstimationMethod::MeshFaceNormals;
+      normals.Positions.Domain = RT::GeometryElementDomain::MeshVertex;
+      normals.Output = {RT::GeometryElementDomain::MeshFace, "f:normal",
+                        Geometry::PropertyValueKind::Vec3};
+      const auto computed = RT::ApplyEditorNormalEstimationCommand(context, normals);
+      EXPECT_TRUE(computed.Succeeded()) << computed.Message;
+      commandFailed |= !computed.Succeeded();
+      const auto hint = RT::ApplyEditorRenderHintCommand(context,
+          {.StableEntityId = stableId, .SetSurface = true, .EnableSurface = true,
+           .SurfaceDomain = G::RenderSurface::SourceDomain::Face});
+      commandFailed |= hint != RT::EditorCommandStatus::Applied;
+      apply(RT::EditorVisualizationConfigCommand{
+          .StableEntityId = stableId,
+          .Target = RT::EditorVisualizationTarget::Surface,
+          .Source = G::VisualizationConfig::ColorSource::PerFaceBuffer,
+          .ColorBufferName = "f:normal_reference", .UseBakedTexture = false});
+      engine.GetRenderer().SetDefaultRecipeBackbufferReadbackBuffer(readbacks[8]);
+      phase = 14u;
+      settle = 4u;
+    } else if (phase == 14u) {
+      engine.GetRenderer().SetDefaultRecipeBackbufferReadbackBuffer({});
+      apply(RT::EditorVisualizationConfigCommand{
+          .StableEntityId = stableId,
+          .Target = RT::EditorVisualizationTarget::Surface,
+          .Source = G::VisualizationConfig::ColorSource::PerFaceBuffer,
+          .ColorBufferName = "f:normal", .UseBakedTexture = true});
+      phase = 11u;
+    } else if (phase == 12u) {
+      const auto world = engine.GetRenderer().ExtractRenderWorld({});
+      EXPECT_TRUE(world.Visualization.Colors.empty());
+      EXPECT_TRUE(world.Visualization.Scalars.empty());
+      apply(RT::EditorVisualizationConfigCommand{
+          .StableEntityId = stableId,
+          .Target = RT::EditorVisualizationTarget::Surface,
+          .Source = G::VisualizationConfig::ColorSource::PerFaceBuffer,
+          .ColorBufferName = "f:normal", .UseBakedTexture = false});
+      engine.GetRenderer().SetDefaultRecipeBackbufferReadbackBuffer(readbacks[7]);
+      phase = 13u;
+      settle = 4u;
+    } else if (phase == 13u) {
+      return true;
+    }
+    return commandFailed;
+  };
+  auto bootstrap = BootstrapDefaultSandboxAppEngineWithApp(
+      std::make_unique<ExitWhenReadyApp>(ready, 2u, 240u,
+                                         std::chrono::seconds{45}, false));
+  if (bootstrap.Skipped)
+    GTEST_SKIP() << bootstrap.SkipReason;
+  auto &engine = *bootstrap.EnginePtr;
+  auto &scene = *engine.Worlds().Get(engine.ActiveWorld());
+  triangle = FindEntityByName(scene, "ReferenceTriangle");
+  ASSERT_TRUE(IsReferenceTriangleEntityValid(scene, triangle));
+  auto presentation = MakeRuntime190PresentationBindings();
+  scene.Raw().emplace_or_replace<RT::GeometryPresentationRecipe>(
+      triangle, std::move(presentation));
+  auto &faces = scene.Raw().get<gs::Faces>(triangle).Properties;
+  faces.GetOrAdd<glm::vec4>("f:normal_reference").Vector() =
+      std::vector<glm::vec4>(faces.Size(), glm::vec4{.5f, .5f, 1, 1});
+  auto &vertices = scene.Raw().get<gs::Vertices>(triangle).Properties;
+  (void)vertices.GetOrAdd<float>("v:runtime190_scalar", 0.5f);
+  vertices.GetOrAdd<glm::vec3>("v:normal", {}).Vector() =
+      std::vector<glm::vec3>(vertices.Size(), glm::vec3{-2, 0, 0});
+  vertices.GetOrAdd<glm::vec4>("v:appearance_red", glm::vec4{1, 0, 0, 1})
+      .Vector() =
+      std::vector<glm::vec4>(vertices.Size(), glm::vec4{1, 0, 0, 1});
+  vertices.GetOrAdd<glm::vec4>("v:appearance_blue", glm::vec4{0, 0, 1, 1})
+      .Vector() =
+      std::vector<glm::vec4>(vertices.Size(), glm::vec4{0, 0, 1, 1});
+  auto &device = engine.GetDevice();
+  const auto extent = device.GetBackbufferExtent();
+  const auto format = device.GetBackbufferFormat();
+  const auto pixelBytes = Extrinsic::RHI::BytesPerBlock(format);
+  const std::uint64_t byteCount =
+      static_cast<std::uint64_t>(extent.Width) * extent.Height * pixelBytes;
+  for (auto &readback : readbacks) {
+    readback = device.CreateBuffer(Extrinsic::RHI::BufferDesc{
+        .SizeBytes = byteCount,
+        .Usage = Extrinsic::RHI::BufferUsage::TransferDst,
+        .HostVisible = true,
+        .DebugName = "Appearance surface readback"});
+    ASSERT_TRUE(readback.IsValid());
+  }
+  const auto run = DriveAcceptanceAndCapture(engine);
+  engine.GetRenderer().SetDefaultRecipeBackbufferReadbackBuffer({});
+  EXPECT_TRUE(run.DeviceOperational);
+  EXPECT_FALSE(commandFailed);
+  EXPECT_EQ(phase, 13u);
+  EXPECT_TRUE(bakedRenderingObserved);
+  std::array<RgbaPixel, 9> pixels{};
+  for (std::size_t i = 0; i < readbacks.size(); ++i) {
+    std::vector<std::uint8_t> bytes(byteCount);
+    device.ReadBuffer(readbacks[i], bytes.data(), byteCount, 0u);
+    pixels[i] = ReadPixel(bytes, format, pixelBytes, extent, extent.Width / 2u,
+                          extent.Height / 2u);
+    device.DestroyBuffer(readbacks[i]);
+  }
+  EXPECT_GT(pixels[0].R, pixels[0].B + 30u) << PixelText(pixels[0]);
+  EXPECT_GT(pixels[1].B, pixels[1].R + 30u) << PixelText(pixels[1]);
+  EXPECT_GT(pixels[2].B, pixels[2].R + 30u) << PixelText(pixels[2]);
+  EXPECT_GT(pixels[3].R, pixels[3].B + 30u) << PixelText(pixels[3]);
+  // Object -X encodes cyan even though the object rotates that normal to world -Y.
+  for (const auto i : {4u, 5u}) {
+    EXPECT_GT(pixels[i].G, pixels[i].R + 30u) << PixelText(pixels[i]);
+    EXPECT_GT(pixels[i].B, pixels[i].R + 30u) << PixelText(pixels[i]);
+    EXPECT_NEAR(pixels[i].G, pixels[i].B, 3) << PixelText(pixels[i]);
+  }
+  EXPECT_NEAR(pixels[4].R, pixels[5].R, 3);
+  EXPECT_NEAR(pixels[4].G, pixels[5].G, 3);
+  EXPECT_NEAR(pixels[4].B, pixels[5].B, 3);
+  // +Z encodes (.5,.5,1). The explicit color control uses the same
+  // post-rotation lighting and tone mapper as both face-normal paths.
+  EXPECT_GT(pixels[8].B, pixels[8].R);
+  for (const auto i : {6u, 7u}) {
+    EXPECT_NEAR(pixels[i].R, pixels[8].R, 3) << PixelText(pixels[i]);
+    EXPECT_NEAR(pixels[i].G, pixels[8].G, 3) << PixelText(pixels[i]);
+    EXPECT_NEAR(pixels[i].B, pixels[8].B, 3) << PixelText(pixels[i]);
+  }
+  EXPECT_NEAR(pixels[6].R, pixels[7].R, 3);
+  EXPECT_NEAR(pixels[6].G, pixels[7].G, 3);
+  EXPECT_NEAR(pixels[6].B, pixels[7].B, 3);
+  engine.Shutdown();
+}

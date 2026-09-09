@@ -232,6 +232,7 @@ MakeScalarVisualizationConfigCommandFromModel(
       .IsolineColor = model.IsolineColor,
       .IsolineValues = model.IsolineValues,
       .IsolineValueCount = model.IsolineValueCount,
+      .UseBakedTexture = model.UseBakedTexture,
   };
 }
 
@@ -1287,8 +1288,6 @@ void DrawMeshRenderHintControls(const EditorDomainWindowModel &model,
     }
   }
 
-  DrawEdgeRenderHintControls(model, context, canEditRenderHints);
-  DrawPointRenderHintControls(model, context, canEditRenderHints);
 }
 
 void DrawPointRenderHintControls(const EditorDomainWindowModel &model,
@@ -1336,108 +1335,71 @@ void DrawGraphRenderHintControls(const EditorDomainWindowModel &model,
                                  const SandboxEditorContext &context,
                                  const bool canEditRenderHints) {
   DrawEdgeRenderHintControls(model, context, canEditRenderHints);
-  DrawPointRenderHintControls(model, context, canEditRenderHints);
 }
 
-void DrawVisualizationPropertyPresets(
-    const std::vector<EditorVisualizationPropertyInfo> &properties,
-    const EditorVisualizationConfigModel &visualization,
-    const SandboxEditorContext &context, const std::uint32_t selectedStableId,
-    const EditorVisualizationTarget target,
-    const bool canEditVisualization) {
-  ImGui::SeparatorText("Properties");
-  if (properties.empty()) {
-    ImGui::TextDisabled("No visualization-eligible properties.");
+void DrawVisualizationPropertyDropdown(const EditorDomainWindowModel &model,
+                                       const SandboxEditorContext &context,
+                                       EditorCommandStatus &lastStatus) {
+  const auto &visualization = model.Visualization.Visualization;
+  const auto &properties = model.Visualization.Properties;
+  const bool scalar = visualization.Source == kScalarFieldSource;
+  const bool color = static_cast<int>(visualization.Source) >= 3;
+  const std::string &propertyName =
+      scalar ? visualization.ScalarFieldName : visualization.ColorBufferName;
+  const char *preview =
+      !visualization.HasConfig || (!scalar && !color)
+          ? (visualization.Source == kUniformColorSource ? "Uniform color"
+                                                         : "Material / default")
+          : propertyName.c_str();
+  if (!ImGui::BeginCombo("Property", preview))
     return;
+  if (ImGui::Selectable("Material / default", !visualization.HasConfig)) {
+    lastStatus = ApplyEditorVisualizationConfigCommand(
+        context.VisualizationCommands,
+        EditorVisualizationConfigCommand{.StableEntityId =
+                                             model.SelectedStableId,
+                                         .Target = model.VisualizationTarget,
+                                         .EnableConfig = false});
   }
-
-  if (!canEditVisualization)
-    ImGui::BeginDisabled();
-
-  // Reapplying a preset preserves the target's tuned range and binning.
-  const bool scalarAutoRange =
-      visualization.HasConfig ? visualization.ScalarAutoRange : true;
-  const float scalarRangeMin =
-      visualization.HasConfig ? visualization.ScalarRangeMin : 0.0f;
-  const float scalarRangeMax =
-      visualization.HasConfig ? visualization.ScalarRangeMax : 1.0f;
-  const std::uint32_t scalarBinCount =
-      visualization.HasConfig ? visualization.ScalarBinCount : 0u;
-
-  for (std::size_t i = 0u; i < properties.size(); ++i) {
-    const EditorVisualizationPropertyInfo &property = properties[i];
-    ImGui::PushID(static_cast<int>(i));
-    ImGui::Text(
-        "%s  [%s, %s, %llu]", property.Name.c_str(),
-        DebugNameForEditorVisualizationPropertyDomain(property.Domain),
-        DebugNameForGeometryPropertyValueKind(property.ValueKind),
-        static_cast<unsigned long long>(property.ElementCount));
-
-    bool wroteButton = false;
-    if (property.ScalarPresetAvailable) {
-      if (ImGui::SmallButton("Scalar") && canEditVisualization) {
-        (void)ApplyEditorVisualizationPropertyCommand(
-            context.VisualizationCommands,
-            EditorVisualizationPropertyCommand{
-                .StableEntityId = selectedStableId,
-                .Target = target,
-                .Domain = property.Domain,
-                .Preset = EditorVisualizationPropertyPreset::Scalar,
-                .PropertyName = property.Name,
-                .ScalarAutoRange = scalarAutoRange,
-                .ScalarRangeMin = scalarRangeMin,
-                .ScalarRangeMax = scalarRangeMax,
-                .ScalarBinCount = scalarBinCount,
-            });
-      }
-      wroteButton = true;
-    }
-    if (property.IsolinePresetAvailable) {
-      if (wroteButton)
-        ImGui::SameLine();
-      if (ImGui::SmallButton("Isolines") && canEditVisualization) {
-        (void)ApplyEditorVisualizationPropertyCommand(
-            context.VisualizationCommands,
-            EditorVisualizationPropertyCommand{
-                .StableEntityId = selectedStableId,
-                .Target = target,
-                .Domain = property.Domain,
-                .Preset = EditorVisualizationPropertyPreset::Isoline,
-                .PropertyName = property.Name,
-                .ScalarAutoRange = scalarAutoRange,
-                .ScalarRangeMin = scalarRangeMin,
-                .ScalarRangeMax = scalarRangeMax,
-                .ScalarBinCount = scalarBinCount,
-                .IsolineCount = 12u,
-            });
-      }
-      wroteButton = true;
-    }
-    if (property.ColorBufferPresetAvailable) {
-      if (wroteButton)
-        ImGui::SameLine();
-      if (ImGui::SmallButton("Color buffer") && canEditVisualization) {
-        (void)ApplyEditorVisualizationPropertyCommand(
-            context.VisualizationCommands,
-            EditorVisualizationPropertyCommand{
-                .StableEntityId = selectedStableId,
-                .Target = target,
-                .Domain = property.Domain,
-                .Preset = EditorVisualizationPropertyPreset::ColorBuffer,
-                .PropertyName = property.Name,
-            });
-      }
-      wroteButton = true;
-    }
-    if (property.VectorFieldCandidate && !wroteButton) {
-      ImGui::TextDisabled("Vector-field candidate; adapter residency is not "
-                          "owned by this UI slice.");
-    }
-    ImGui::PopID();
+  if (ImGui::Selectable("Uniform color",
+                        visualization.Source == kUniformColorSource)) {
+    lastStatus = ApplyEditorVisualizationConfigCommand(
+        context.VisualizationCommands,
+        MakeUniformVisualizationConfigCommandFromModel(
+            model.SelectedStableId, visualization, model.VisualizationTarget,
+            visualization.Color));
   }
-
-  if (!canEditVisualization)
-    ImGui::EndDisabled();
+  for (const auto &property : properties) {
+    if (!property.ScalarPresetAvailable && !property.ColorBufferPresetAvailable)
+      continue;
+    const std::string label =
+        property.Name + "  (" +
+        DebugNameForEditorVisualizationPropertyDomain(property.Domain) + ")";
+    const bool selected =
+        property.Name == propertyName && (scalar || color) &&
+        ((property.Domain == EditorVisualizationPropertyDomain::MeshFaces) ==
+         (static_cast<int>(visualization.ScalarDomain) == 2));
+    if (ImGui::Selectable(label.c_str(), selected)) {
+      lastStatus = ApplyEditorVisualizationPropertyCommand(
+          context.VisualizationCommands,
+          EditorVisualizationPropertyCommand{
+              .StableEntityId = model.SelectedStableId,
+              .Target = model.VisualizationTarget,
+              .Domain = property.Domain,
+              .Preset = property.ScalarPresetAvailable
+                            ? EditorVisualizationPropertyPreset::Scalar
+                            : EditorVisualizationPropertyPreset::ColorBuffer,
+              .PropertyName = property.Name,
+              .ScalarAutoRange = visualization.ScalarAutoRange,
+              .ScalarRangeMin = visualization.ScalarRangeMin,
+              .ScalarRangeMax = visualization.ScalarRangeMax,
+              .ScalarBinCount = visualization.ScalarBinCount,
+          });
+    }
+    if (selected)
+      ImGui::SetItemDefaultFocus();
+  }
+  ImGui::EndCombo();
 }
 
 void DrawUniformVisualizationColorEdit(
@@ -1515,6 +1477,12 @@ void DrawScalarVisualizationControls(
     }
   }
 
+  if (visualization.UseBakedTexture) {
+    ImGui::TextDisabled(
+        "Binning and isolines are available with attribute rendering.");
+    return;
+  }
+
   int binCount = static_cast<int>(visualization.ScalarBinCount);
   if (ImGui::DragInt("Bins (0 = continuous)", &binCount, 0.25f, 0, 64) &&
       binCount >= 0) {
@@ -1579,99 +1547,102 @@ void DrawScalarVisualizationControls(
   }
 }
 
-void DrawDomainVisualizationControls(
-    const EditorDomainWindowModel &model,
-    const SandboxEditorContext &context);
+void DrawDomainVisualizationControls(const EditorDomainWindowModel &model,
+                                     const SandboxEditorContext &context,
+                                     EditorCommandStatus &lastStatus);
 
 // Appearance owns render hints and state, visualization controls, property and
 // attribute bindings, and texture baking.
-void DrawDomainRenderWindow(const EditorDomainWindowModel &model,
-                            const SandboxEditorContext &context,
-                            TextureBakeUiState *textureBakeState) {
-  DrawDomainWindowHeader(model);
-  ImGui::SeparatorText("Render hint status");
-  DrawRenderHintStatus(model.RenderHints);
-
-  ImGui::SeparatorText("Render controls");
-  const bool canEditRenderHints = DomainAppearanceReady(model);
-  if (!canEditRenderHints)
-    ImGui::BeginDisabled();
-  switch (model.Kind) {
-  case EditorDomainWindowKind::Mesh:
-    DrawMeshRenderHintControls(model, context, canEditRenderHints);
-    break;
-  case EditorDomainWindowKind::Graph:
-    DrawGraphRenderHintControls(model, context, canEditRenderHints);
-    break;
-  case EditorDomainWindowKind::PointCloud:
-    DrawPointRenderHintControls(model, context, canEditRenderHints);
-    break;
-  }
-  if (!canEditRenderHints)
+void DrawDomainRenderWindow(
+    const std::span<const EditorDomainWindowModel *const> models,
+    const SandboxEditorContext &context, TextureBakeUiState *textureBakeState,
+    std::array<EditorCommandStatus, 3> &statuses) {
+  DrawDomainWindowHeader(*models.front());
+  for (const auto *current : models) {
+    const auto &model = *current;
+    ImGui::PushID(static_cast<int>(model.Kind));
+    ImGui::SeparatorText(
+        model.Kind == EditorDomainWindowKind::Mesh    ? "Faces / surface"
+        : model.Kind == EditorDomainWindowKind::Graph ? "Edges"
+                                                      : "Vertices");
+    const bool available = DomainAppearanceReady(model);
+    ImGui::BeginDisabled(!available);
+    switch (model.Kind) {
+    case EditorDomainWindowKind::Mesh:
+      DrawMeshRenderHintControls(model, context, available);
+      break;
+    case EditorDomainWindowKind::Graph:
+      DrawGraphRenderHintControls(model, context, available);
+      break;
+    case EditorDomainWindowKind::PointCloud:
+      DrawPointRenderHintControls(model, context, available);
+      break;
+    }
+    if (available)
+      DrawDomainVisualizationControls(
+          model, context, statuses[static_cast<std::size_t>(model.Kind)]);
     ImGui::EndDisabled();
-
-  if (DomainAppearanceReady(model)) {
-    ImGui::SeparatorText("Visualization");
-    DrawDomainVisualizationControls(model, context);
-    ImGui::SeparatorText("Bound render state");
-    DrawBoundRenderStateRows(model.BoundState);
-    ImGui::SeparatorText("Property / attribute assignment");
-    DrawPropertyBindingTargets(model.PropertyCatalog);
-    DrawVertexChannelBindingTargets(model.PropertyCatalog, &context);
-    ImGui::SeparatorText("Texture baking");
-    DrawTextureBakeControls(model.TextureBake, &context, textureBakeState);
+    if (available && ImGui::CollapsingHeader("Advanced")) {
+      DrawRenderHintStatus(model.RenderHints);
+      DrawBoundRenderStateRows(model.BoundState);
+      DrawPropertyBindingTargets(model.PropertyCatalog);
+      DrawVertexChannelBindingTargets(model.PropertyCatalog, &context);
+      if (model.Kind == EditorDomainWindowKind::Mesh)
+        DrawTextureBakeControls(model.TextureBake, &context, textureBakeState);
+    }
+    ImGui::PopID();
   }
 }
 
-void DrawDomainVisualizationControls(
-    const EditorDomainWindowModel &model,
-    const SandboxEditorContext &context) {
-  const EditorVisualizationModel &visualization = model.Visualization;
-
-  if (visualization.Visualization.HasConfig) {
-    ImGui::Text("Visualization: %s",
-                DebugNameForEditorVisualizationColorSource(
-                    visualization.Visualization.Source));
-  } else {
-    ImGui::TextDisabled("Visualization: material/default");
-  }
-
-  const bool canEditVisualization = model.VisualizationTargetAvailable &&
-                                    model.VisualizationControlsAvailable;
-  if (!canEditVisualization)
-    ImGui::BeginDisabled();
-
-  if (ImGui::Button("Uniform color") && canEditVisualization) {
-    (void)ApplyEditorVisualizationConfigCommand(
-        context.VisualizationCommands,
-        MakeUniformVisualizationConfigCommandFromModel(
-            model.SelectedStableId, visualization.Visualization,
-            model.VisualizationTarget, visualization.Visualization.Color));
-  }
-  ImGui::SameLine();
-  if (ImGui::Button("Clear vis") && canEditVisualization) {
-    (void)ApplyEditorVisualizationConfigCommand(
-        context.VisualizationCommands, EditorVisualizationConfigCommand{
-                     .StableEntityId = model.SelectedStableId,
-                     .Target = model.VisualizationTarget,
-                     .EnableConfig = false,
-                 });
-  }
-
-  DrawUniformVisualizationColorEdit(
-      visualization.Visualization, context, model.SelectedStableId,
-      model.VisualizationTarget, canEditVisualization);
-
-  DrawScalarVisualizationControls(
-      visualization.Visualization, context, model.SelectedStableId,
-      model.VisualizationTarget, canEditVisualization);
-
-  if (!canEditVisualization)
+void DrawDomainVisualizationControls(const EditorDomainWindowModel &model,
+                                     const SandboxEditorContext &context,
+                                     EditorCommandStatus &lastStatus) {
+  const auto &visualization = model.Visualization.Visualization;
+  const bool available = model.VisualizationTargetAvailable &&
+                         model.VisualizationControlsAvailable;
+  ImGui::BeginDisabled(!available);
+  DrawVisualizationPropertyDropdown(model, context, lastStatus);
+  DrawUniformVisualizationColorEdit(visualization, context,
+                                    model.SelectedStableId,
+                                    model.VisualizationTarget, available);
+  if (model.Kind == EditorDomainWindowKind::Mesh) {
+    bool baked = visualization.UseBakedTexture;
+    const bool hasProperty = visualization.HasConfig &&
+                             (visualization.Source == kScalarFieldSource ||
+                              static_cast<int>(visualization.Source) >= 3);
+    const bool canEnable = hasProperty && model.TextureBake.CanBake;
+    ImGui::BeginDisabled(!baked && !canEnable);
+    if (ImGui::Checkbox("Use baked texture", &baked)) {
+      auto command = MakeScalarVisualizationConfigCommandFromModel(
+          model.SelectedStableId, visualization, model.VisualizationTarget);
+      command.UseBakedTexture = baked;
+      lastStatus = ApplyEditorVisualizationConfigCommand(
+          context.VisualizationCommands, command);
+    }
     ImGui::EndDisabled();
-
-  DrawVisualizationPropertyPresets(
-      visualization.Properties, visualization.Visualization, context,
-      model.SelectedStableId, model.VisualizationTarget, canEditVisualization);
+    if (!canEnable && !baked) {
+      ImGui::TextDisabled("%s", !hasProperty
+                                    ? "Select a property to bake."
+                                    : model.TextureBake.DisabledReason.c_str());
+    }
+    if (baked) {
+      const auto output = std::ranges::find(
+          model.TextureBake.BakedTextures, kSurfaceAppearanceTextureOutput,
+          &PropertyTextureBakeRecord::OutputName);
+      if (output != model.TextureBake.BakedTextures.end())
+        ImGui::TextWrapped("%s", output->Diagnostic.c_str());
+    }
+  }
+  if (lastStatus != EditorCommandStatus::Applied &&
+      lastStatus != EditorCommandStatus::NoChange)
+    ImGui::TextWrapped("Appearance change failed: %s",
+                       DebugNameForEditorCommandStatus(lastStatus));
+  if (visualization.Source == kScalarFieldSource &&
+      ImGui::CollapsingHeader("Color mapping"))
+    DrawScalarVisualizationControls(visualization, context,
+                                    model.SelectedStableId,
+                                    model.VisualizationTarget, available);
+  ImGui::EndDisabled();
 }
 
 void DrawPrimitiveDetails(const EditorPrimitiveDetailModel &primitive) {
@@ -1931,6 +1902,10 @@ void DrawDomainProcessingWindow(
 } // namespace
 
 struct DomainPanels::Impl {
+  std::array<EditorCommandStatus, 3> AppearanceStatuses{
+      EditorCommandStatus::NoChange, EditorCommandStatus::NoChange,
+      EditorCommandStatus::NoChange};
+  std::uint32_t AppearanceEntity{0u};
   int SelectionElementIndex{0};
   int SelectionDomainIndex{0};
   std::string SelectionMessage{};
@@ -2141,8 +2116,23 @@ void DomainPanels::Impl::DrawWindow(
     const Runtime::EditorDomainWindowModel &model =
         GetDomainWindowModel(context, kind);
     switch (section) {
-    case Section::Appearance:
-      DrawDomainRenderWindow(model, context, &textureBakeState);
+    case Section::Appearance: {
+      if (AppearanceEntity != model.SelectedStableId) {
+        AppearanceStatuses.fill(EditorCommandStatus::NoChange);
+        AppearanceEntity = model.SelectedStableId;
+      }
+      std::array<const EditorDomainWindowModel *, 3> appearanceModels{&model};
+      std::size_t count = 1;
+      if (kind == EditorDomainWindowKind::Mesh &&
+          model.VisualizationTargetAvailable)
+        appearanceModels[count++] =
+            &GetDomainWindowModel(context, EditorDomainWindowKind::Graph);
+      if (kind != EditorDomainWindowKind::PointCloud && model.HasSelectedEntity)
+        appearanceModels[count++] =
+            &GetDomainWindowModel(context, EditorDomainWindowKind::PointCloud);
+      DrawDomainRenderWindow({appearanceModels.data(), count}, context,
+                             &textureBakeState, AppearanceStatuses);
+    }
       if (kind == Runtime::EditorDomainWindowKind::Mesh &&
           model.DomainMatches) {
         const auto properties =

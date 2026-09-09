@@ -1,3 +1,5 @@
+// Defines per-lane property visualization settings shared by runtime and
+// rendering.
 module;
 
 #include <cstdint>
@@ -94,6 +96,9 @@ export namespace Extrinsic::Graphics::Components
         /// Used when Source is PerVertex/Edge/FaceBuffer.
         /// e.g. "colors", "edge_colors", "face_colors".
         std::string ColorBufferName;
+
+        // Surface rendering may use a baked copy of the selected property.
+        bool UseBakedTexture{false};
     };
 
     struct VisualizationLaneOverrides

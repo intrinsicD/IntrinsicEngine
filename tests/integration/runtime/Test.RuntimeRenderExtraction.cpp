@@ -51,6 +51,7 @@ import Extrinsic.Runtime.VisualizationRecipes;
 import Extrinsic.Runtime.StableEntityLookup;
 import Geometry.AABB;
 import Geometry.Graph;
+import Geometry.HalfedgeMesh;
 import Geometry.Plane;
 import Geometry.Properties;
 
@@ -2071,4 +2072,80 @@ TEST(RuntimeRenderExtraction, ExtractAndSubmitDoesNotAutoAcknowledgeRebinds)
     EXPECT_EQ(second.SourceAssetRebindRequiredCount, 1u);
     EXPECT_EQ(second.SourceAssetUpToDateCount, 0u);
     EXPECT_EQ(second.SourceAssetRebindAcknowledgedCount, 0u);
+}
+
+
+TEST(RuntimeRenderExtraction, PolygonFacePropertiesRepeatAcrossTheirTriangles)
+{
+    namespace GS = ECS::Components::GeometrySources;
+    using V = Graphics::Components::VisualizationConfig;
+    for (const bool scalar : {false, true})
+    {
+        RendererFixture fixture;
+        ECS::Scene::Registry scene;
+        const auto entity = scene.Create();
+        auto &raw = scene.Raw();
+        raw.emplace<ECS::Components::Transform::WorldMatrix>(entity).Matrix = glm::mat4(1);
+        raw.emplace<Graphics::Components::RenderSurface>(entity).Domain =
+            Graphics::Components::RenderSurface::SourceDomain::Face;
+        Geometry::HalfedgeMesh::Mesh mesh;
+        const auto a = mesh.AddVertex({0, 0, 0}), b = mesh.AddVertex({1, 0, 0}),
+                   c = mesh.AddVertex({1, 1, 0}), d = mesh.AddVertex({0, 1, 0}),
+                   e = mesh.AddVertex({2, 0, 0});
+        ASSERT_TRUE(mesh.AddQuad(a, b, c, d));
+        ASSERT_TRUE(mesh.AddTriangle(c, b, e));
+        GS::PopulateFromMesh(raw, entity, mesh);
+        auto &faces = raw.get<GS::Faces>(entity).Properties;
+        faces.GetOrAdd<glm::vec3>("f:normal").Vector() = {{0, 0, 1}, {-1, 0, 0}};
+        faces.GetOrAdd<float>("f:heat").Vector() = {3, 7};
+        auto &vis = raw.emplace<V>(entity);
+        vis.Source = scalar ? V::ColorSource::ScalarField : V::ColorSource::PerFaceBuffer;
+        vis.ScalarDomain = V::Domain::Face;
+        vis.ScalarFieldName = "f:heat";
+        vis.ColorBufferName = "f:normal";
+        const auto verify = [&](std::size_t triangleCount) {
+            const auto stats = fixture.Extract(scene);
+            EXPECT_EQ(stats.VisualizationRecipeInvalidBufferCount, 0u);
+            auto world = fixture.Renderer->ExtractRenderWorld({});
+            fixture.Renderer->PrepareFrame(world);
+            const auto sidecar = fixture.Extraction.FindRenderableSidecarForTest(StableId(entity));
+            ASSERT_TRUE(sidecar);
+            const auto gpu = fixture.Renderer->GetGpuWorld().GetEntityConfigForTest(sidecar->Instance);
+            const auto address = scalar ? gpu.ScalarBDA : gpu.ColorBDA;
+            ASSERT_GE(address, 0x1'0000'0000ull);
+            const auto handle = (address - 0x1'0000'0000ull) / 0x1000ull;
+            const Tests::MockDevice::BufferWriteRecord *write = nullptr;
+            for (auto it = fixture.Device.BufferWrites.rbegin(); it != fixture.Device.BufferWrites.rend(); ++it)
+                if (it->Handle.Index == handle && it->Offset == 0u) { write = &*it; break; }
+            ASSERT_NE(write, nullptr);
+            ASSERT_EQ(write->Data.size(), triangleCount * (scalar ? sizeof(float) : sizeof(glm::vec4)));
+            EXPECT_EQ(gpu.ElementCount, triangleCount);
+            for (std::size_t i = 0; i < triangleCount; ++i)
+            {
+                if (scalar)
+                {
+                    float value;
+                    std::memcpy(&value, write->Data.data() + i * sizeof(float), sizeof(float));
+                    EXPECT_EQ(value, i < triangleCount - 1 ? 3.f : 7.f);
+                }
+                else
+                {
+                    glm::vec4 value;
+                    std::memcpy(&value, write->Data.data() + i * sizeof(value), sizeof(value));
+                    EXPECT_EQ(value, i < triangleCount - 1 ? glm::vec4(.5f, .5f, 1, 1)
+                                                          : glm::vec4(0, .5f, .5f, 1));
+                }
+            }
+        };
+        verify(3);
+        EXPECT_EQ(faces.Size(), 2u);
+        // Remove a corner from the first polygon without changing the property contents.
+        auto &halves = raw.get<GS::Halfedges>(entity).Properties;
+        const auto ring = faces.Get<std::uint32_t>(GS::PropertyNames::kFaceHalfedge);
+        auto next = halves.Get<std::uint32_t>(GS::PropertyNames::kHalfedgeNext);
+        next[ring[0]] = next[next[ring[0]]];
+        ECS::Components::DirtyTags::MarkFaceTopologyDirty(raw, entity);
+        verify(2);
+        EXPECT_EQ(faces.Size(), 2u);
+    }
 }

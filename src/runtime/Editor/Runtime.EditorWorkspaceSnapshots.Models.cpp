@@ -466,6 +466,7 @@ namespace {
                 .IsolineColor = config.Scalar.Isolines.Color,
                 .IsolineValues = config.Scalar.Isolines.Values,
                 .IsolineValueCount = config.Scalar.Isolines.ValueCount,
+                .UseBakedTexture = config.UseBakedTexture,
             };
         }
 
@@ -727,8 +728,10 @@ namespace {
                 append(EditorVisualizationPropertyDomain::PointCloudPoints);
                 break;
             case EditorVisualizationTarget::Surface:
-                append(EditorVisualizationPropertyDomain::MeshVertices);
-                append(EditorVisualizationPropertyDomain::MeshFaces);
+                append(availability.Surface &&
+                               availability.Surface->Domain == G::RenderSurface::SourceDomain::Face
+                           ? EditorVisualizationPropertyDomain::MeshFaces
+                           : EditorVisualizationPropertyDomain::MeshVertices);
                 break;
             case EditorVisualizationTarget::Edges:
                 append(EditorVisualizationPropertyDomain::MeshEdges);
@@ -767,7 +770,9 @@ namespace {
                 const bool scalar =
                     !internal && IsScalarVisualizationKind(kind);
                 const bool color =
-                    !internal && kind == Geometry::PropertyValueKind::Vec4;
+                    (!internal || name == GS::PropertyNames::kNormal) &&
+                    (kind == Geometry::PropertyValueKind::Vec3 ||
+                     kind == Geometry::PropertyValueKind::Vec4);
                 const bool vector =
                     !connectivity && kind == Geometry::PropertyValueKind::Vec3;
                 const bool integer =

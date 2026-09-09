@@ -2578,7 +2578,7 @@ TEST(SandboxEditorUi, VisualizationModelEnumeratesPromotedGeometryProperties)
         FindVisualizationProperty(properties, Domain::MeshVertices, "v:normal");
     ASSERT_NE(normal, nullptr);
     EXPECT_TRUE(normal->VectorFieldCandidate);
-    EXPECT_FALSE(normal->ColorBufferPresetAvailable);
+    EXPECT_TRUE(normal->ColorBufferPresetAvailable);
 
     const auto* edgeWeight =
         FindVisualizationProperty(properties, Domain::MeshEdges, "e:weight");
@@ -3643,4 +3643,55 @@ TEST(SandboxEditorUi, RenderRecipeEditorModelListsDeclaredRecipeControls)
     EXPECT_FALSE(artifact->CanApply);
     EXPECT_EQ(artifact->Status,
               Runtime::RenderArtifactUiStatus::Unpublished);
+}
+
+
+TEST(SandboxEditorUi, SurfacePropertySelectorFollowsFaceDomainAndUndo)
+{
+    using Target = Runtime::EditorVisualizationTarget;
+    using Domain = Runtime::EditorVisualizationPropertyDomain;
+    ECS::Scene::Registry registry;
+    Runtime::SelectionController selection;
+    const auto mesh = MakeSelectable(registry, "Face properties");
+    AddTriangleMeshSource(registry, mesh);
+    registry.Raw().emplace<G::RenderSurface>(mesh);
+    (void)registry.Raw().get<GS::Vertices>(mesh).Properties.GetOrAdd<float>("v:heat", 2.f);
+    (void)registry.Raw().get<GS::Faces>(mesh).Properties.GetOrAdd<glm::vec3>("f:normal", {0, 0, 1});
+    ASSERT_TRUE(selection.SetSelectedEntity(registry, mesh));
+    auto context = MakeContext(registry, selection);
+    Runtime::EditorCommandHistory history;
+    Runtime::EditorSelectedModelCache cache;
+    context.CommandHistory = &history;
+    context.SelectedModelCache = &cache;
+    context.VisualizationCommandsAvailable = true;
+    const auto id = Runtime::SelectionController::ToStableEntityId(mesh);
+    ASSERT_EQ(Runtime::ApplyEditorVisualizationPropertyCommand(context,
+        {.StableEntityId = id, .Target = Target::Surface, .Domain = Domain::MeshVertices,
+         .Preset = Runtime::EditorVisualizationPropertyPreset::Scalar, .PropertyName = "v:heat"}),
+        Runtime::EditorCommandStatus::Applied);
+    const auto model = [&] {
+        return Runtime::BuildEditorDomainWindowModel(context, Runtime::EditorDomainWindowKind::Mesh);
+    };
+    auto before = model();
+    EXPECT_NE(FindVisualizationProperty(before.Visualization.Properties, Domain::MeshVertices, "v:heat"), nullptr);
+    EXPECT_EQ(FindVisualizationProperty(before.Visualization.Properties, Domain::MeshFaces, "f:normal"), nullptr);
+    ASSERT_EQ(Runtime::ApplyEditorRenderHintCommand(context,
+        {.StableEntityId = id, .SetSurface = true, .EnableSurface = true,
+         .SurfaceDomain = G::RenderSurface::SourceDomain::Face}), Runtime::EditorCommandStatus::Applied);
+    auto after = model();
+    EXPECT_EQ(FindVisualizationProperty(after.Visualization.Properties, Domain::MeshVertices, "v:heat"), nullptr);
+    const auto *normal = FindVisualizationProperty(after.Visualization.Properties, Domain::MeshFaces, "f:normal");
+    ASSERT_NE(normal, nullptr);
+    EXPECT_TRUE(normal->ColorBufferPresetAvailable);
+    EXPECT_EQ(after.Visualization.Visualization.Source, G::VisualizationConfig::ColorSource::Material);
+    ASSERT_EQ(history.Undo().Status, Runtime::EditorCommandHistoryStatus::Undone);
+    auto undone = model();
+    EXPECT_NE(FindVisualizationProperty(undone.Visualization.Properties, Domain::MeshVertices, "v:heat"), nullptr);
+    EXPECT_EQ(undone.Visualization.Visualization.ScalarFieldName, "v:heat");
+    ASSERT_EQ(history.Redo().Status, Runtime::EditorCommandHistoryStatus::Redone);
+    ASSERT_EQ(Runtime::ApplyEditorVisualizationPropertyCommand(context,
+        {.StableEntityId = id, .Target = Target::Surface, .Domain = Domain::MeshFaces,
+         .Preset = Runtime::EditorVisualizationPropertyPreset::ColorBuffer, .PropertyName = "f:normal"}),
+        Runtime::EditorCommandStatus::Applied);
+    EXPECT_EQ(model().Visualization.Visualization.Source, G::VisualizationConfig::ColorSource::PerFaceBuffer);
 }

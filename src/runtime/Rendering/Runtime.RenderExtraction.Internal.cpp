@@ -183,6 +183,7 @@ namespace Extrinsic::Runtime
             Graphics::Components::MaterialInstance Material{};
             Graphics::Components::VisualizationConfig Visualization{};
             bool HasVisualization{false};
+            bool SurfaceAppearanceTextureReady{false};
             Graphics::Components::VisualizationLaneOverrides
                 VisualizationOverrides{};
             bool HasVisualizationOverrides{false};
@@ -192,6 +193,8 @@ namespace Extrinsic::Runtime
             RenderExtractionGeometrySourceRevisions MeshSourceRevisions{};
             std::vector<std::uint32_t> MeshSourceVertexForGpuVertex{};
             std::uint64_t MeshVertexRemapRevision{0u};
+            std::vector<std::uint32_t> MeshSourceFaceForGpuTriangle{};
+            std::uint64_t MeshFaceRemapRevision{0u};
             Graphics::GpuGeometryHandle GraphGeometry{};
             RenderExtractionGeometrySourceRevisions GraphSourceRevisions{};
             bool GraphPackedLines{false};
@@ -302,7 +305,9 @@ namespace Extrinsic::Runtime
             const VisualizationRecipe& recipe,
             RuntimeRenderExtractionStats& stats,
             std::span<const std::uint32_t> surfaceVertexRemap = {},
-            std::uint64_t surfaceVertexRemapRevision = 0u);
+            std::uint64_t surfaceVertexRemapRevision = 0u,
+            std::span<const std::uint32_t> surfaceFaceRemap = {},
+            std::uint64_t surfaceFaceRemapRevision = 0u);
         void ExtractLightsForEntity(
             entt::registry& registry,
             entt::entity entity,

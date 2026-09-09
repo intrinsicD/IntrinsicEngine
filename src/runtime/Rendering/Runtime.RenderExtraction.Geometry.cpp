@@ -518,6 +518,7 @@ namespace Extrinsic::Runtime
             if (!sidecar.MeshGeometry.IsValid())
             {
                 sidecar.MeshSourceVertexForGpuVertex.clear();
+                sidecar.MeshSourceFaceForGpuTriangle.clear();
                 return;
             }
             (void)ReleaseGeometryResidency(residencyKey);
@@ -526,6 +527,7 @@ namespace Extrinsic::Runtime
                 Graphics::GpuGeometryHandle{});
             sidecar.MeshGeometry = {};
             sidecar.MeshSourceVertexForGpuVertex.clear();
+            sidecar.MeshSourceFaceForGpuTriangle.clear();
             ++stats.MeshGeometryReleases;
         };
 
@@ -656,6 +658,13 @@ namespace Extrinsic::Runtime
         }
         sidecar.MeshSourceVertexForGpuVertex =
             m_MeshPack.SourceVertexForGpuVertex;
+        if (sidecar.MeshSourceFaceForGpuTriangle != m_MeshPack.SourceFaceForGpuTriangle)
+        {
+            ++sidecar.MeshFaceRemapRevision;
+            if (sidecar.MeshFaceRemapRevision == 0u)
+                ++sidecar.MeshFaceRemapRevision;
+        }
+        sidecar.MeshSourceFaceForGpuTriangle = m_MeshPack.SourceFaceForGpuTriangle;
         sidecar.MeshGeometry = residency.Handle;
         sidecar.MeshSourceRevisions = sourceRevisions;
         sidecar.Geometry = residency.Handle;

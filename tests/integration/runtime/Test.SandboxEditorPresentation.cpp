@@ -327,7 +327,7 @@ TEST(SandboxEditorPresentation, DefaultDrawStartsWithOnlyMenuBarVisible)
 
     EXPECT_TRUE(ImGuiWindowExists("##MainMenuBar"));
     const auto menu = shell.BuildEditorWindowMenuModel();
-    ASSERT_EQ(menu.size(), 44u);
+    ASSERT_EQ(menu.size(), 45u);
     for (const Runtime::EditorWindowMenuEntry& entry : menu)
     {
         EXPECT_FALSE(entry.Open) << entry.Id;
@@ -345,7 +345,7 @@ TEST(SandboxEditorPresentation, DomainMenusUseAppearanceAndFocusedProcessingWind
         std::string_view Id;
         std::vector<std::string> MenuPath;
     };
-    const std::array<ExpectedWindow, 34> expected{{
+    const std::array<ExpectedWindow, 35> expected{{
         {"pointcloud.appearance", {"PointCloud"}},
         {"pointcloud.properties", {"PointCloud"}},
         {"pointcloud.selection", {"PointCloud"}},
@@ -373,6 +373,7 @@ TEST(SandboxEditorPresentation, DomainMenusUseAppearanceAndFocusedProcessingWind
         {"mesh.processing.subdivide", {"Mesh", "Processing"}},
         {"mesh.processing.simplify", {"Mesh", "Processing"}},
         {"mesh.processing.vertices.normals", {"Mesh", "Processing", "Vertices"}},
+        {"mesh.processing.faces.normals", {"Mesh", "Processing", "Faces"}},
         {"graph.processing.vertices.normals", {"Graph", "Processing", "Vertices"}},
         {"pointcloud.processing.vertices.normals", {"PointCloud", "Processing", "Vertices"}},
         {"view.normal_estimation", {"View"}},
@@ -1458,7 +1459,7 @@ TEST(SandboxEditorPresentation, NormalDomainMenusOpenOneSharedWindow)
     shell.Attach(engine.Worlds(), engine.Services());
     Editor::MeshProcessingPanels panels;
     panels.Register(shell);
-    for (const auto* id : {"mesh.processing.vertices.normals", "graph.processing.vertices.normals", "pointcloud.processing.vertices.normals"})
+    for (const auto* id : {"mesh.processing.vertices.normals", "graph.processing.vertices.normals", "pointcloud.processing.vertices.normals", "mesh.processing.faces.normals"})
     {
         ASSERT_TRUE(shell.SetEditorWindowOpen(id, true));
         const auto menu = shell.BuildEditorWindowMenuModel();

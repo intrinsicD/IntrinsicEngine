@@ -800,6 +800,7 @@ namespace Extrinsic::Runtime
                 {"scalarFieldName", config.ScalarFieldName},
                 {"scalarDomain", VisualizationDomainToString(config.ScalarDomain)},
                 {"colorBufferName", config.ColorBufferName},
+                {"useBakedTexture", config.UseBakedTexture},
                 {"scalar", json{
                     {"map", ColormapToString(config.Scalar.Map)},
                     {"autoRange", config.Scalar.AutoRange},
@@ -840,6 +841,13 @@ namespace Extrinsic::Runtime
 
             if (value.contains("color") && !TryReadVec4(value["color"], config.Color))
                 return false;
+
+            if (value.contains("useBakedTexture"))
+            {
+                if (!value["useBakedTexture"].is_boolean())
+                    return false;
+                config.UseBakedTexture = value["useBakedTexture"].get<bool>();
+            }
 
             if (value.contains("scalarFieldName"))
             {

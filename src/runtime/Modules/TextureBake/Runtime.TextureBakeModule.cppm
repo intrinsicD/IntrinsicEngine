@@ -1,3 +1,4 @@
+// Exposes property texture baking and generated outputs to runtime composition.
 module;
 
 #include <cstddef>
@@ -28,6 +29,9 @@ import Geometry.Properties;
 
 namespace Extrinsic::Runtime
 {
+    // Reserved output: rebinding the selected surface property replaces this texture.
+    export inline constexpr std::string_view kSurfaceAppearanceTextureOutput = "appearance.color";
+
     export enum class PropertyTextureBakeStatus : std::uint8_t
     {
         Success,
@@ -189,6 +193,8 @@ namespace Extrinsic::Runtime
         PropertyTextureBakeOutputState State{
             PropertyTextureBakeOutputState::Pending};
         std::string Diagnostic{};
+        PropertyTextureBakeRangePolicy RangePolicy{
+            PropertyTextureBakeRangePolicy::AutoFinite};
     };
 
     export struct PropertyTextureBakeOutputs

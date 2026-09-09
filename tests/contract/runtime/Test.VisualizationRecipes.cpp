@@ -1,5 +1,6 @@
 #include <chrono>
 #include <cstdint>
+#include <cstring>
 #include <limits>
 #include <optional>
 #include <string>
@@ -753,4 +754,50 @@ TEST(VisualizationRecipes, RecipeIdentityIsClosedAndComparable)
     EXPECT_TRUE(R::SameVisualizationRecipe(scalar, same));
     EXPECT_FALSE(R::SameVisualizationRecipe(scalar, different));
     EXPECT_FALSE(R::SameVisualizationRecipe(scalar, {}));
+}
+
+TEST(VisualizationRecipes, RgbPropertiesPublishRgbaWithoutChangingTheSource) {
+  RecipeSourceFixture source{};
+  const auto encoded = R::EncodeVisualizationRecipe(
+      source.Availability,
+      R::VisualizationRecipe{
+          .Data = R::ColorVisualizationRecipe{
+              .Source = {.Domain = R::GeometryElementDomain::MeshFace,
+                         .Name = "color",
+                         .ValueKind = Geometry::PropertyValueKind::Vec3},
+          }});
+  ASSERT_TRUE(encoded.Succeeded());
+  ASSERT_EQ(encoded.Batch.PropertyBufferPayloads.size(), 1u);
+  const auto &payload = encoded.Batch.PropertyBufferPayloads.front();
+  ASSERT_EQ(payload.size(), 4u * sizeof(glm::vec4));
+  glm::vec4 first{};
+  std::memcpy(&first, payload.data(), sizeof(first));
+  EXPECT_EQ(first, glm::vec4(1, 0, 0, 1));
+  EXPECT_TRUE(source.Faces.Properties.Get<glm::vec3>("color").IsValid());
+  EXPECT_FALSE(source.Faces.Properties.Get<glm::vec4>("color").IsValid());
+}
+
+TEST(VisualizationRecipes, VertexNormalsMapObjectSpaceDirectionsToRgb) {
+  RecipeSourceFixture source{};
+  auto normals = source.Vertices.Properties.Add<glm::vec3>("v:normal", {});
+  normals.Vector() = {{-2, 0, 0}, {0, 3, 0}, {0, 0, -4}, {0, 0, 0}};
+  const auto original = normals.Vector();
+  const auto encoded = R::EncodeVisualizationRecipe(
+      source.Availability,
+      R::VisualizationRecipe{
+          .Data = R::ColorVisualizationRecipe{
+              .Source = {.Domain = R::GeometryElementDomain::MeshVertex,
+                         .Name = "v:normal",
+                         .ValueKind = Geometry::PropertyValueKind::Vec3}}});
+  ASSERT_TRUE(encoded.Succeeded());
+  ASSERT_EQ(encoded.Batch.PropertyBufferPayloads.size(), 1u);
+  const auto &payload = encoded.Batch.PropertyBufferPayloads.front();
+  ASSERT_EQ(payload.size(), 4u * sizeof(glm::vec4));
+  std::vector<glm::vec4> colors(4);
+  std::memcpy(colors.data(), payload.data(), payload.size());
+  EXPECT_EQ(colors[0], glm::vec4(0, 0.5f, 0.5f, 1));
+  EXPECT_EQ(colors[1], glm::vec4(0.5f, 1, 0.5f, 1));
+  EXPECT_EQ(colors[2], glm::vec4(0.5f, 0.5f, 0, 1));
+  EXPECT_EQ(colors[3], glm::vec4(0.5f, 0.5f, 1, 1));
+  EXPECT_EQ(normals.Vector(), original);
 }

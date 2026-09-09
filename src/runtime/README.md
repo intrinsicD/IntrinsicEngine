@@ -411,6 +411,12 @@ opportunity. If a direct mesh import's deferred materialization applies after
 an edit, runtime preserves count-matched current `v:normal` values so
 editor-authored normals remain the CPU authority.
 
+Face normals use the shared [normal-estimation config and processing window](../../docs/architecture/normal-estimation.md)
+with method `mesh_face_normals`. **Mesh / Processing / Faces / Normals** selects
+vertex positions and the face output `f:normal`; **Show face normals** applies
+that output to Face surface appearance. Polygon normals use the full face ring,
+with source face indices preserved during publication and rendering.
+
 ### Sandbox Editor Mesh Denoise
 
 `UI-024` adds a mesh-only denoise editor command at
@@ -821,37 +827,38 @@ is now refused rather than degraded, the two variants agree on every successful
 run; the field exists so that a disagreement would be visible rather than
 invisible, and the panel renders both.
 
-### Sandbox Editor Appearance / Properties Reorganization
+### Sandbox Editor Appearance
 
-`UI-031` reorganizes the per-domain windows so concern ownership is clear. The
-former `Render` window is renamed `Appearance`
-(`Mesh/Graph/PointCloud / Appearance`, opened from the `Appearance` menu item)
-and now co-locates render hints, visualization controls (including uniform/lane
-color and visualization-property presets), bound render-state inspection,
-property/attribute assignment (`DrawPropertyBindingTargets` +
-`DrawVertexChannelBindingTargets`), and texture baking
-(`DrawTextureBakeControls`). The `Properties` window is now a pure property
-explorer — it lists every property and its value preview
-(`DrawPropertyCatalogRows`) plus diagnostics only, keeping
-internal/connectivity/generated rows visible, and no longer hosts render-hint,
-visualization, binding, or texture-bake controls. Processing menu leaves open
-focused method windows such as `Mesh / Processing / Denoise`,
-`Mesh / Processing / Simplify`, `PointCloud / Processing / Remove Outliers`,
-and `Graph / Processing / Vertices / Normals`; the old omnibus per-domain
-`Processing` window is no longer the primary execution surface. Delivered
-selected-model caching remains, while any future async derivation requires a
-measured feature-local need rather than the retired RUNTIME-138 umbrella.
+`Mesh / Appearance` groups face/surface, edge, and vertex controls for the
+selected mesh. `Graph / Appearance` groups edges and vertices, and
+`PointCloud / Appearance` exposes the vertex/point controls. Each group has a
+property dropdown with material/default, uniform color, and compatible scalar
+or RGB/RGBA color properties. The surface source domain selects either the vertex
+or face property set; changing it clears the previous property selection with
+undo support. Face values are expanded through the surface triangulation's
+source-face map, so a polygon keeps one constant value across all its triangles.
+Vertex and face normals (`v:normal`, `f:normal`) display object-space
+directions as `0.5 * normalize(normal) + 0.5` in both attribute and baked form;
+the source property is preserved. Selections use
+independent visualization lane overrides.
+Color mapping controls expose the selected scalar property's range and colormap;
+attribute rendering additionally supports binning and isolines.
 
-`UI-033` makes the `Appearance` windows compositional over render lanes rather
-than exact provenance-domain gates. `PointCloud / Appearance` is the point/vertex
-lane surface and can show controls for selected point clouds, graphs, or meshes
-when the points lane is available; `Graph / Appearance` owns edge/connectivity
-appearance; `Mesh / Appearance` owns surface/face appearance. The exact-domain
-gate remains in the raw `Properties` window and provenance-specific
-`Processing` windows. Semantic point-set method windows instead enumerate
-typed slots from the provenance-neutral property catalog and reuse their
-runtime method preflight, so a richer source is accepted only when it satisfies
-the same explicit property/publication contract.
+Surface appearance offers **Use baked texture** when a compatible selected
+property, usable corner or vertex UVs, and an operational bake backend are
+available. The shared visualization command schedules the selected property
+as a surface appearance override, and property or color-mapping changes schedule a
+replacement bake. Attributes remain visible until the matching texture resolves.
+Disabling the toggle restores attribute rendering of the same property. Authored
+material textures remain intact for the material/default choice.
+`useBakedTexture` round-trips with scene visualization configuration; the bake
+module reconciles the saved property choice after scene loading and undo/redo. Edge and
+vertex appearance do not expose texture baking.
+
+**Advanced** contains bound render state, channel bindings, and the surface's
+full texture-bake controls. `Properties` remains a property explorer with value
+previews and diagnostics. Processing menu leaves open focused method windows;
+typed method preflight determines compatible property domains.
 
 ### Sandbox Editor Vertex Channel Bindings
 

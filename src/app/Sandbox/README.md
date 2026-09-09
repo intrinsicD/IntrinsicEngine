@@ -134,7 +134,9 @@ actual backend/fallback, and measured average/maximum displacement.
 `Sandbox.Editor.MeshProcessingPanels`
 owns the ICP registration window plus the mesh denoise, curvature, remesh,
 subdivide, simplify, and the shared [normal-estimation window](../../../docs/architecture/normal-estimation.md).
-The normal menus under Mesh, Graph and PointCloud open that shared window; it
+The normal menus under Mesh, Graph and PointCloud open that shared window.
+Mesh / Processing / Faces / Normals presets full-polygon face-normal computation
+and a face output (`f:normal`), with a button to display its object-space colors. It
 uses the persisted `sandbox.normal_estimation` config and canonical property bindings. The panels own their ImGui
 input/result-presentation state, and consumes only runtime snapshots and typed
 operations. The Curvature window includes production METHOD-037 and diagnostic
@@ -146,7 +148,9 @@ preflight and undoable property publication; Show result enables
 `f:curvature_region_color` on the surface and `e:curvature_feature_patch_color`
 on the edge overlay. METHOD-040 hides unused GMM controls and reports its own
 boundary/cleanup diagnostics. It remains experimental and exposes no cut or
-UV-atlas action. `Sandbox.Editor.DomainPanels` registers the existing Appearance,
+UV-atlas action. Appearance groups surface, edge, and vertex property dropdowns
+for a selected mesh. Surface properties can use the shared UV texture-bake
+command; advanced binding and bake controls are collapsed. `Sandbox.Editor.DomainPanels` registers the existing Appearance,
 Properties, and Selection windows for Mesh, Graph, and PointCloud plus
 PointCloud Remove Outliers. It owns their menu paths, lazy per-frame model
 cache, texture-bake and property-widget draft state, outlier controls, and

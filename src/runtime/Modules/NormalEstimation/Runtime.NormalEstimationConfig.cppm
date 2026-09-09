@@ -20,7 +20,8 @@ export namespace Extrinsic::Runtime
     {
         PointSetPCA,
         MeshFaceWeighted,
-        GraphNeighborhood
+        GraphNeighborhood,
+        MeshFaceNormals
     };
     enum class NormalEstimationBackend : std::uint8_t
     {

@@ -1,3 +1,4 @@
+// Exposes selected-entity appearance models and validated editor commands.
 module;
 
 #include <array>
@@ -417,6 +418,7 @@ export namespace Extrinsic::Runtime
         std::array<float, Graphics::Components::ScalarFieldConfig::kMaxIsolineValues>
             IsolineValues{};
         std::uint32_t IsolineValueCount{0u};
+        bool UseBakedTexture{false};
     };
     struct EditorVisualizationPropertyInfo
     {
@@ -498,6 +500,7 @@ export namespace Extrinsic::Runtime
         std::array<float, Graphics::Components::ScalarFieldConfig::kMaxIsolineValues>
             IsolineValues{};
         std::uint32_t IsolineValueCount{0u};
+        bool UseBakedTexture{false};
     };
     struct EditorVisualizationPropertyCommand
     {

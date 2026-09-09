@@ -21,6 +21,7 @@ module;
 module Extrinsic.Runtime.VisualizationRecipes;
 
 import Geometry.Properties;
+import Extrinsic.ECS.Components.GeometrySources;
 import Extrinsic.Graphics.VisualizationPackets;
 import Extrinsic.Runtime.GeometryAvailability;
 import Extrinsic.Runtime.JobService;
@@ -426,42 +427,57 @@ namespace Extrinsic::Runtime
             return true;
         }
 
-        bool AppendColorPacket(const Geometry::ConstProperty<glm::vec4>& property,
-                               VisualizationEncodingBatch& out,
-                               const VisualizationEncodingOptions& options,
-                               VisualizationEncodingDiagnostics& stats)
-        {
-            const std::span<const glm::vec4> values = property.Span();
-            if (!ValidateSourceSpan(values, stats))
-                return false;
+        template <typename T>
+        bool AppendColorPacket(const Geometry::ConstProperty<T> &property,
+                               VisualizationEncodingBatch &out,
+                               const VisualizationEncodingOptions &options,
+                               VisualizationEncodingDiagnostics &stats) {
+          const std::span<const T> values = property.Span();
+          if (!ValidateSourceSpan(values, stats))
+            return false;
 
-            const std::string sourceKey =
-                options.OutputName.empty() ? options.SourceName : options.OutputName;
-            const std::string bufferSourceKey =
-                options.PropertyBufferSourceKey.empty()
-                    ? sourceKey
-                    : options.PropertyBufferSourceKey;
-            if (options.ColorBufferBDA == 0u)
-            {
-                AppendPropertyBuffer(out,
-                                     bufferSourceKey,
-                                     options.Domain,
-                                     Graphics::VisualizationValueType::RgbaFloat4,
-                                     static_cast<std::uint32_t>(values.size()),
-                                     sizeof(glm::vec4),
-                                     options.DirtyStamp,
-                                     CopyBytes(values));
-            }
+          const std::string sourceKey = options.OutputName.empty()
+                                            ? options.SourceName
+                                            : options.OutputName;
+          const std::string bufferSourceKey =
+              options.PropertyBufferSourceKey.empty()
+                  ? sourceKey
+                  : options.PropertyBufferSourceKey;
+          if (options.ColorBufferBDA == 0u) {
+            std::vector<std::byte> payload;
+            if constexpr (std::is_same_v<T, glm::vec3>) {
+              std::vector<glm::vec4> colors;
+              colors.reserve(values.size());
+              const bool normals = (options.SourceName == GeometrySources::PropertyNames::kNormal || options.SourceName == "f:normal");
+              for (const auto value : values) {
+                if (normals) {
+                  // Match the normal bake encoder without applying an entity transform.
+                  const float lengthSquared = glm::dot(value, value);
+                  const glm::vec3 normal = lengthSquared > 1.0e-12f
+                      ? value / std::sqrt(lengthSquared) : glm::vec3{0, 0, 1};
+                  colors.emplace_back(normal * 0.5f + 0.5f, 1.0f);
+                } else
+                  colors.emplace_back(value, 1.0f);
+              }
+              payload = CopyBytes(std::span<const glm::vec4>{colors});
+            } else
+              payload = CopyBytes(values);
+            AppendPropertyBuffer(out, bufferSourceKey, options.Domain,
+                                 Graphics::VisualizationValueType::RgbaFloat4,
+                                 static_cast<std::uint32_t>(values.size()),
+                                 sizeof(glm::vec4), options.DirtyStamp,
+                                 std::move(payload));
+          }
 
-            out.Colors.push_back(Graphics::ColorAttributePacket{
-                .Name = sourceKey,
-                .SourceBufferKey = bufferSourceKey,
-                .Domain = options.Domain,
-                .ElementCount = static_cast<std::uint32_t>(values.size()),
-                .ColorBufferBDA = options.ColorBufferBDA,
-            });
-            ++stats.PacketAppendCount;
-            return true;
+          out.Colors.push_back(Graphics::ColorAttributePacket{
+              .Name = sourceKey,
+              .SourceBufferKey = bufferSourceKey,
+              .Domain = options.Domain,
+              .ElementCount = static_cast<std::uint32_t>(values.size()),
+              .ColorBufferBDA = options.ColorBufferBDA,
+          });
+          ++stats.PacketAppendCount;
+          return true;
         }
 
         template <typename T>
@@ -640,6 +656,13 @@ namespace Extrinsic::Runtime
             {
                 (void)AppendColorPacket(property, out, options, diagnostics);
                 return;
+            }
+
+            if (const auto property =
+                    properties.Get<glm::vec3>(options.SourceName);
+                property.IsValid()) {
+              (void)AppendColorPacket(property, out, options, diagnostics);
+              return;
             }
 
             if (properties.Exists(options.SourceName))

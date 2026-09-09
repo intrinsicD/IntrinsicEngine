@@ -5,13 +5,17 @@ Vertices → Normals**. These menu entries open one shared window. Choose the
 entity, canonical position property, method and named output; then select
 **Estimate normals**. **Show normal vectors** binds the selected output and
 position properties through the existing vector-field visualization recipe.
-The visualization window owns glyph styling.
+The visualization window owns glyph styling. **Mesh → Processing → Faces → Normals**
+opens the same window with `mesh_face_normals`, vertex positions and `f:normal`
+on the face property set selected. **Show face normals** selects Face surface
+appearance and displays the output as a constant color per original face.
 
 ## Method and input contract
 
 | Method | Required inputs | Neighborhood and output |
 | --- | --- | --- |
 | `point_set_pca` | At least three live finite float3 samples on any resolved element domain | Existing local PCA kernel with kNN or complete radius neighborhoods; optional minimum-spanning-tree orientation |
+| `mesh_face_normals` | Named mesh vertex positions, polygon face rings and halfedge topology | Normalized full-polygon area vector; one object-space float3 normal on each source face |
 | `mesh_face_weighted` | Named vertex positions, polygon face rings and halfedge topology | Incident polygon normals with uniform, area, angle, area-angle or Max weighting |
 | `graph_neighborhood` | Named vertex/node positions and canonical edge endpoints | Existing adjacency-based local normal kernel; mesh adjacency is accepted without creating a graph entity |
 
@@ -24,7 +28,13 @@ Readiness checks resolve typed inputs without rebuilding an owned mesh or graph.
 Execution snapshots are constructed at submission. Their spatial support remains
 incident topology, independent of the selected PCA query backend. Missing or malformed topology fails before publication.
 
-Every variant writes only a distinct, same-domain float3 output property.
+PCA, mesh vertex weighting and graph normals write only a distinct, same-domain
+float3 output property. `mesh_face_normals` reads mesh vertex positions and writes
+only its named MeshFace output; face slots retain their original indices even
+when the execution snapshot omits deleted faces. It normalizes the existing
+`MeshUtils::FaceAreaVector` result from the full polygon ring, preserving winding.
+Degenerate polygons and faces touching deleted vertices receive the configured
+normalized fallback (or +Z for a zero fallback).
 Existing deleted-row values are preserved; deleted slots in a newly created
 output are zero. Point-set PCA excludes deleted rows, including halfedges of
 deleted edges. Mesh face weighting excludes deleted faces and faces touching
@@ -110,7 +120,10 @@ not change the oracle, its orientation construction or its numerical policy.
 [Normal workflow contracts](../../tests/contract/runtime/Test.NormalEstimation.cpp)
 cover all canonical domains, same-domain publication/history, cached CPU LBVH,
 radius/fallback behavior, custom-position topology methods, deletion masks,
-queued staleness/cancellation, config parity and vector recipe binding.
+queued staleness/cancellation, config parity and vector recipe binding. Face-normal
+cases cover full polygon rings, winding, degenerate fallback, source face slots
+and queued publication to the face property set. [Render extraction tests](../../tests/integration/runtime/Test.RuntimeRenderExtraction.cpp)
+check that face scalar and normal-color values follow the surface's triangle map.
 [Sandbox integration tests](../../tests/integration/runtime/Test.SandboxEditorPresentation.cpp)
 cover the shared window aliases. Existing point-normal kernel tests and the
 [point-LBVH smoke manifest](../../benchmarks/geometry/manifests/point_lbvh_knn_smoke.yaml)

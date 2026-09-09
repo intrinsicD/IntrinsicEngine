@@ -264,6 +264,7 @@ namespace Extrinsic::Sandbox::Editor
                 .IsolineColor = model.IsolineColor,
                 .IsolineValues = model.IsolineValues,
                 .IsolineValueCount = model.IsolineValueCount,
+                .UseBakedTexture = model.UseBakedTexture,
             };
         }
 

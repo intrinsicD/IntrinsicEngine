@@ -23,6 +23,7 @@ import Extrinsic.Runtime.SelectionController;
 import Geometry.Graph;
 import Geometry.Graph.Vertex.Normals;
 import Geometry.HalfedgeMesh;
+import Geometry.HalfedgeMesh.Utils;
 import Geometry.HalfedgeMesh.Vertices.Normals;
 import Geometry.PointCloud.Normals;
 import Geometry.Properties;
@@ -178,15 +179,21 @@ namespace Extrinsic::Runtime
             const auto a = BuildGeometryAvailability(context.Scene->Raw(), *entity);
             if (c.Positions.Domain == D::Unknown)
                 c.Positions.Domain = DefaultDomain(a);
+            const bool faceNormals = c.Method == NormalEstimationMethod::MeshFaceNormals;
             if (c.Output.Domain == D::Unknown)
-                c.Output.Domain = c.Positions.Domain;
+                c.Output.Domain = faceNormals ? D::MeshFace : c.Positions.Domain;
             const auto *props = ResolveGeometryPropertySet(a, c.Positions.Domain);
             if (!props || !ResolveGeometryProperty(a, c.Positions, props->Size(), false).Resolved())
                 return fail("Choose a count-matched vec3 position property on a resolved element domain.");
-            if (c.Output.Domain != c.Positions.Domain || c.Output.Name == c.Positions.Name)
-                return fail("Normals require a distinct output on the input domain.");
-            if (props->Exists(c.Output.Name) &&
-                !ResolveGeometryProperty(a, c.Output, props->Size(), false).Resolved())
+            if (faceNormals ? (c.Positions.Domain != D::MeshVertex || c.Output.Domain != D::MeshFace)
+                            : (c.Output.Domain != c.Positions.Domain || c.Output.Name == c.Positions.Name))
+                return fail(faceNormals ? "Face normals require mesh vertex positions and a mesh face output."
+                                        : "Normals require a distinct output on the input domain.");
+            const auto *outputProps = ResolveGeometryPropertySet(a, c.Output.Domain);
+            if (!outputProps)
+                return fail("Normal output domain is unavailable.");
+            if (outputProps->Exists(c.Output.Name) &&
+                !ResolveGeometryProperty(a, c.Output, outputProps->Size(), false).Resolved())
                 return fail("Normal output must be absent or a count-matched vec3 property.");
             if (c.Output.Name == "v:deleted" || c.Output.Name == "e:deleted" ||
                 c.Output.Name == "f:deleted" || c.Output.Name == "h:deleted")
@@ -199,15 +206,15 @@ namespace Extrinsic::Runtime
             work->Result.Method = c.Method;
             work->Result.RequestedBackend = c.Backend;
             work->Result.Output = c.Output;
-            work->Result.SlotCount = props->Size();
+            work->Result.SlotCount = outputProps->Size();
             work->Inputs.push_back(Observe(a, c.Positions.Domain, c.Positions.Name, WatchKind::Vec3));
             work->OutputWatch = Observe(a, c.Output.Domain, c.Output.Name, WatchKind::Vec3);
             if (purpose == CapturePurpose::Execute)
             {
                 if (work->OutputWatch.Exists)
-                    work->Before = props->Get<glm::vec3>(c.Output.Name).Vector();
+                    work->Before = outputProps->Get<glm::vec3>(c.Output.Name).Vector();
                 work->After = work->OutputWatch.Exists ? work->Before
-                                                       : std::vector<glm::vec3>(props->Size(), glm::vec3(0));
+                                                       : std::vector<glm::vec3>(outputProps->Size(), glm::vec3(0));
             }
             auto maskDomain = c.Positions.Domain;
             std::string maskName = "v:deleted";
@@ -262,7 +269,7 @@ namespace Extrinsic::Runtime
             }
             if (c.Positions.Domain != D::MeshVertex && c.Positions.Domain != D::GraphNode)
                 return fail("Topology normals require a vertex/node position domain and its adjacency.");
-            if (c.Method == NormalEstimationMethod::MeshFaceWeighted)
+            if (c.Method == NormalEstimationMethod::MeshFaceWeighted || faceNormals)
             {
                 if (!a.SourceView.FaceSource || !a.SourceView.HalfedgeSource)
                     return fail("Mesh normals require face rings and halfedge topology.");
@@ -289,6 +296,8 @@ namespace Extrinsic::Runtime
                 if (!edges || halves->Size() != 2 * edges->Size() ||
                     !ReadMask(a, D::MeshEdge, "e:deleted", edges->Size(), deletedEdges, work->Inputs))
                     return fail("Invalid mesh edge deletion mask or halfedge cardinality.");
+                if (faceNormals)
+                    work->Result.LiveCount = std::ranges::count(deletedFaces, false);
                 if (purpose == CapturePurpose::Readiness)
                     return work;
                 // Snapshot reconstruction is submission work, never a per-frame UI readiness operation.
@@ -297,6 +306,11 @@ namespace Extrinsic::Runtime
                 if (built.Status != EditorCommandStatus::Applied)
                     return fail(built.Diagnostic);
                 built.Mesh.VertexProperties().GetOrAdd<bool>("v:deleted").Vector() = work->Deleted;
+                if (faceNormals)
+                {
+                    work->Slots = std::move(built.SourceFaceForMeshFace);
+                    work->Result.LiveCount = work->Slots.size();
+                }
                 work->Mesh = std::move(built.Mesh);
                 return work;
             }
@@ -378,6 +392,29 @@ namespace Extrinsic::Runtime
                 r.FallbackCount = estimate->Diagnostics.FallbackPointCount;
                 for (std::size_t i = 0; i < w.Slots.size(); ++i)
                     w.After[w.Slots[i]] = estimate->Normals[i];
+            }
+            else if (c.Method == NormalEstimationMethod::MeshFaceNormals)
+            {
+                r.ActualBackend = "cpu_mesh_face_normals";
+                const glm::dvec3 fallback(c.FallbackNormal);
+                const double fallbackLength = glm::length(fallback);
+                const glm::vec3 fallbackNormal = fallbackLength > c.DegenerateNormalLengthEpsilon
+                    ? glm::vec3(fallback / fallbackLength) : glm::vec3{0, 0, 1};
+                for (std::uint32_t face = 0; face < w.Slots.size(); ++face)
+                {
+                    const auto handle = Geometry::FaceHandle{face};
+                    bool deletedCorner = false;
+                    for (const auto vertex : w.Mesh.VerticesAroundFace(handle))
+                        deletedCorner |= w.Mesh.IsDeleted(vertex);
+                    const auto area = deletedCorner ? glm::dvec3(0)
+                        : Geometry::MeshUtils::FaceAreaVector(w.Mesh, handle);
+                    const double length = glm::length(area);
+                    const bool valid = std::isfinite(length) && length > c.DegenerateNormalLengthEpsilon;
+                    w.After[w.Slots[face]] = valid ? glm::vec3(area / length) : fallbackNormal;
+                    r.ValidCount += valid;
+                    r.FallbackCount += !valid;
+                    ++r.ProcessedFaces;
+                }
             }
             else if (c.Method == NormalEstimationMethod::MeshFaceWeighted)
             {
@@ -468,8 +505,13 @@ namespace Extrinsic::Runtime
                     props->Remove(p);
                 *revision = Observe(BuildGeometryAvailability(context.Scene->Raw(), entity), revision->Domain,
                                     revision->Name, revision->Kind);
-                ECS::Components::DirtyTags::MarkVertexNormalsDirty(context.Scene->Raw(), entity);
-                ECS::Components::DirtyTags::MarkVertexAttributesDirty(context.Scene->Raw(), entity);
+                if (output.Domain == D::MeshFace)
+                    ECS::Components::DirtyTags::MarkGpuDirty(context.Scene->Raw(), entity);
+                else
+                {
+                    ECS::Components::DirtyTags::MarkVertexNormalsDirty(context.Scene->Raw(), entity);
+                    ECS::Components::DirtyTags::MarkVertexAttributesDirty(context.Scene->Raw(), entity);
+                }
                 if (context.InvalidateWorkspaceSnapshotCache)
                     context.InvalidateWorkspaceSnapshotCache();
                 return EditorCommandHistoryStatus::Applied;

@@ -49,9 +49,11 @@ import Extrinsic.Graphics.Component.Material;
 import Extrinsic.Graphics.Component.RenderGeometry;
 import Extrinsic.Graphics.Component.VisualizationConfig;
 import Extrinsic.RHI.Types;
+import Extrinsic.RHI.Bindless;
 import Extrinsic.Runtime.GeometryPlanBuilders;
 import Extrinsic.Runtime.GeometryAvailability;
 import Extrinsic.Runtime.GeometryPresentation;
+import Extrinsic.Runtime.TextureBakeModule;
 import Extrinsic.Runtime.StableEntityLookup;
 import Extrinsic.Runtime.RenderWorldPool;
 import Extrinsic.Runtime.VisualizationRecipes;
@@ -361,7 +363,7 @@ namespace Extrinsic::Runtime
                     .Domain = ToColorGeometryElementDomain(
                         availability, visualization->Source),
                     .Name = visualization->ColorBufferName,
-                    .ValueKind = Geometry::PropertyValueKind::Vec4,
+                    .ValueKind = Geometry::PropertyValueKind::Unknown,
                 },
                 .OutputName = visualization->ColorBufferName,
                 .BufferSourceKey = BuildVisualizationPropertySourceKey(
@@ -1133,20 +1135,28 @@ namespace Extrinsic::Runtime
         Graphics::GpuAssetCache* gpuAssets,
         RuntimeRenderExtractionStats& stats)
     {
+        const bool previousAppearanceTexture = sidecar.SurfaceAppearanceTextureReady;
+        sidecar.SurfaceAppearanceTextureReady = false;
+        const auto* surfaceConfig = VisualizationConfigForPresentationLane(
+            sidecar.HasVisualization ? &sidecar.Visualization : nullptr,
+            sidecar.HasVisualizationOverrides ? &sidecar.VisualizationOverrides : nullptr,
+            GeometryRenderLane::Surface);
+        const bool useAppearanceTexture = surfaceConfig != nullptr && surfaceConfig->UseBakedTexture;
         const auto* recipe = registry.try_get<GeometryPresentationRecipe>(entity);
-        if (recipe == nullptr)
+        if (recipe == nullptr && !useAppearanceTexture && !previousAppearanceTexture)
             return false;
 
         const auto* runtimeState =
             registry.try_get<GeometryPresentationRuntimeState>(entity);
         const GeometryPresentationSnapshot snapshot =
-            BuildGeometryPresentationSnapshot(
+            recipe != nullptr ? BuildGeometryPresentationSnapshot(
                 availability.SourceView,
                 *recipe,
                 runtimeState != nullptr
                     ? *runtimeState
-                    : GeometryPresentationRuntimeState{});
-        ++stats.GeometryPresentationEntityCount;
+                    : GeometryPresentationRuntimeState{}) : GeometryPresentationSnapshot{};
+        if (recipe != nullptr)
+            ++stats.GeometryPresentationEntityCount;
         stats.GeometryPresentationLaneCount += snapshot.Stats.LaneCount;
         stats.GeometryPresentationSlotCount += snapshot.Stats.SlotCount;
         stats.GeometryPresentationDefaultSlotCount += snapshot.Stats.DefaultSlotCount;
@@ -1162,6 +1172,10 @@ namespace Extrinsic::Runtime
         {
             for (const GeometryPresentationSlotSnapshot& slot : snapshot.Slots)
             {
+                // An explicit Appearance selection takes precedence over stored buffer bindings.
+                if (sidecar.HasVisualizationOverrides && VisualizationConfigForPresentationLane(
+                        nullptr, &sidecar.VisualizationOverrides, slot.Lane) != nullptr)
+                    continue;
                 const auto projected = BuildPresentationVisualizationRecipe(
                     stableId,
                     slot,
@@ -1191,7 +1205,11 @@ namespace Extrinsic::Runtime
                         : std::span<const std::uint32_t>{},
                     meshSurfaceSlot
                         ? sidecar.MeshVertexRemapRevision
-                        : 0u);
+                        : 0u,
+                    meshSurfaceSlot
+                        ? std::span<const std::uint32_t>{sidecar.MeshSourceFaceForGpuTriangle}
+                        : std::span<const std::uint32_t>{},
+                    meshSurfaceSlot ? sidecar.MeshFaceRemapRevision : 0u);
                 projectedVisualizationRecipes = true;
             }
         }
@@ -1211,12 +1229,30 @@ namespace Extrinsic::Runtime
             textureBindings.MetallicRoughness.IsValid() ||
             textureBindings.Emissive.IsValid();
         for (const GeometryPresentationSlotSnapshot& slot : snapshot.Slots)
-        {
-            hasTextureBinding =
-                AssignGeometryPresentationTextureBinding(textureBindings, slot) || hasTextureBinding;
-        }
+            hasTextureBinding = AssignGeometryPresentationTextureBinding(textureBindings, slot) || hasTextureBinding;
 
-        if (!hasTextureBinding)
+        bool appearanceTextureAssigned = false;
+        if (useAppearanceTexture)
+        {
+            if (const auto* outputs = registry.try_get<PropertyTextureBakeOutputs>(entity))
+            {
+                const auto record = std::ranges::find(outputs->Records,
+                    kSurfaceAppearanceTextureOutput, &PropertyTextureBakeRecord::OutputName);
+                const bool scalar = surfaceConfig->Source == Graphics::Components::VisualizationConfig::ColorSource::ScalarField;
+                const bool face = scalar ? surfaceConfig->ScalarDomain == Graphics::Components::VisualizationConfig::Domain::Face
+                    : surfaceConfig->Source == Graphics::Components::VisualizationConfig::ColorSource::PerFaceBuffer;
+                if (record != outputs->Records.end() && record->State == PropertyTextureBakeOutputState::Ready &&
+                    record->Source.Name == (scalar ? surfaceConfig->ScalarFieldName : surfaceConfig->ColorBufferName) &&
+                    record->Source.Domain == (face ? GeometryElementDomain::MeshFace : GeometryElementDomain::MeshVertex))
+                {
+                    textureBindings.Albedo = record->Texture;
+                    textureBindings.AlbedoInterpretation = Graphics::MaterialAlbedoTextureInterpretation::Color;
+                    appearanceTextureAssigned = record->Texture.IsValid();
+                    hasTextureBinding |= appearanceTextureAssigned;
+                }
+            }
+        }
+        if (!hasTextureBinding && !previousAppearanceTexture)
             return projectedVisualizationRecipes;
 
         if (gpuAssets == nullptr || !sidecar.Material.Lease.IsValid())
@@ -1232,6 +1268,9 @@ namespace Extrinsic::Runtime
             &renderer.GetColormapSystem());
         if (resolved.has_value())
         {
+            const auto appearanceView = gpuAssets->GetView(textureBindings.Albedo);
+            sidecar.SurfaceAppearanceTextureReady = appearanceTextureAssigned && appearanceView.has_value() &&
+                appearanceView->BindlessIdx != RHI::kInvalidBindlessIndex;
             sidecar.Material.EffectiveSlot =
                 renderer.GetMaterialSystem().GetMaterialSlot(
                     sidecar.Material.Lease.GetHandle());
@@ -1684,6 +1723,7 @@ namespace Extrinsic::Runtime
             }
             sidecar->MeshGeometry = {};
             sidecar->MeshSourceVertexForGpuVertex.clear();
+            sidecar->MeshSourceFaceForGpuTriangle.clear();
             ++stats.MeshGeometryReleases;
         }
 
@@ -1781,6 +1821,8 @@ namespace Extrinsic::Runtime
                 visualization,
                 visualizationOverrides,
                 VisualizationLane::Surface);
+        if (sidecar->SurfaceAppearanceTextureReady)
+            surfaceVisualization = nullptr;
         const auto* edgeVisualization =
             ResolveVisualizationForLane(
                 visualization,
@@ -1926,17 +1968,27 @@ namespace Extrinsic::Runtime
                         : std::span<const std::uint32_t>{},
                     meshBoundThisFrame
                         ? sidecar->MeshVertexRemapRevision
-                        : 0u);
+                        : 0u,
+                    meshBoundThisFrame
+                        ? std::span<const std::uint32_t>{sidecar->MeshSourceFaceForGpuTriangle}
+                        : std::span<const std::uint32_t>{},
+                    meshBoundThisFrame ? sidecar->MeshFaceRemapRevision : 0u);
             }
-            else if (!presentationRecipesProjected)
+            else
             {
                 const std::array<
                     const Graphics::Components::VisualizationConfig*, 3u>
                     configs{surfaceVisualization,
                             edgeVisualization,
                             pointVisualization};
+                const std::array<const Graphics::Components::VisualizationConfig*, 3u> overrides{
+                    ResolveVisualizationForLane(nullptr, visualizationOverrides, VisualizationLane::Surface),
+                    ResolveVisualizationForLane(nullptr, visualizationOverrides, VisualizationLane::Edges),
+                    ResolveVisualizationForLane(nullptr, visualizationOverrides, VisualizationLane::Points)};
                 for (std::size_t i = 0u; i < configs.size(); ++i)
                 {
+                    if (presentationRecipesProjected && overrides[i] == nullptr)
+                        continue;
                     bool alreadyAppended = false;
                     for (std::size_t j = 0u; j < i; ++j)
                         alreadyAppended = alreadyAppended || configs[j] == configs[i];
@@ -1960,7 +2012,11 @@ namespace Extrinsic::Runtime
                                 : std::span<const std::uint32_t>{},
                             i == 0u && meshBoundThisFrame
                                 ? sidecar->MeshVertexRemapRevision
-                                : 0u);
+                                : 0u,
+                            i == 0u && meshBoundThisFrame
+                                ? std::span<const std::uint32_t>{sidecar->MeshSourceFaceForGpuTriangle}
+                                : std::span<const std::uint32_t>{},
+                            i == 0u && meshBoundThisFrame ? sidecar->MeshFaceRemapRevision : 0u);
                     }
                     if (const auto color = BuildColorVisualizationRecipe(
                             stableId,
@@ -1978,7 +2034,11 @@ namespace Extrinsic::Runtime
                                 : std::span<const std::uint32_t>{},
                             i == 0u && meshBoundThisFrame
                                 ? sidecar->MeshVertexRemapRevision
-                                : 0u);
+                                : 0u,
+                            i == 0u && meshBoundThisFrame
+                                ? std::span<const std::uint32_t>{sidecar->MeshSourceFaceForGpuTriangle}
+                                : std::span<const std::uint32_t>{},
+                            i == 0u && meshBoundThisFrame ? sidecar->MeshFaceRemapRevision : 0u);
                     }
                 }
             }

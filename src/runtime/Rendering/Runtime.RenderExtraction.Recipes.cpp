@@ -46,15 +46,16 @@ namespace Extrinsic::Runtime
 {
     namespace
     {
-        [[nodiscard]] bool RemapSurfaceVertexPropertyBuffers(
+        [[nodiscard]] bool RemapSurfacePropertyBuffers(
             VisualizationEncodingBatch& batch,
-            const std::span<const std::uint32_t> sourceVertexForGpuVertex,
-            const std::uint64_t remapRevision)
+            const std::span<const std::uint32_t> sourceForGpuElement,
+            const std::uint64_t remapRevision,
+            const Graphics::VisualizationAttributeDomain domain)
         {
-            if (sourceVertexForGpuVertex.empty())
+            if (sourceForGpuElement.empty())
                 return true;
             if (remapRevision == 0u ||
-                sourceVertexForGpuVertex.size() >
+                sourceForGpuElement.size() >
                     std::numeric_limits<std::uint32_t>::max())
             {
                 return false;
@@ -66,7 +67,7 @@ namespace Extrinsic::Runtime
             {
                 auto& descriptor = batch.PropertyBuffers[descriptorIndex];
                 if (descriptor.Domain !=
-                    Graphics::VisualizationAttributeDomain::Vertex)
+                    domain)
                 {
                     continue;
                 }
@@ -78,7 +79,7 @@ namespace Extrinsic::Runtime
                 {
                     usedBySurfacePacket = usedBySurfacePacket ||
                         (scalar.Domain ==
-                             Graphics::VisualizationAttributeDomain::Vertex &&
+                             domain &&
                          scalar.SourceBufferKey == sourceKey);
                 }
                 for (const Graphics::ColorAttributePacket& color :
@@ -86,7 +87,7 @@ namespace Extrinsic::Runtime
                 {
                     usedBySurfacePacket = usedBySurfacePacket ||
                         (color.Domain ==
-                             Graphics::VisualizationAttributeDomain::Vertex &&
+                             domain &&
                          color.SourceBufferKey == sourceKey);
                 }
                 for (const Graphics::IsolineOverlayPacket& isoline :
@@ -94,7 +95,7 @@ namespace Extrinsic::Runtime
                 {
                     usedBySurfacePacket = usedBySurfacePacket ||
                         (isoline.Domain ==
-                             Graphics::VisualizationAttributeDomain::Vertex &&
+                             domain &&
                          isoline.ScalarBufferSourceKey == sourceKey);
                 }
                 if (!usedBySurfacePacket)
@@ -111,20 +112,20 @@ namespace Extrinsic::Runtime
                 }
 
                 std::vector<std::byte> remapped(
-                    sourceVertexForGpuVertex.size() *
+                    sourceForGpuElement.size() *
                     descriptor.StrideBytes);
-                for (std::size_t gpuVertex = 0u;
-                     gpuVertex < sourceVertexForGpuVertex.size();
-                     ++gpuVertex)
+                for (std::size_t gpuElement = 0u;
+                     gpuElement < sourceForGpuElement.size();
+                     ++gpuElement)
                 {
-                    const std::uint32_t sourceVertex =
-                        sourceVertexForGpuVertex[gpuVertex];
-                    if (sourceVertex >= descriptor.ElementCount)
+                    const std::uint32_t sourceElement =
+                        sourceForGpuElement[gpuElement];
+                    if (sourceElement >= descriptor.ElementCount)
                         return false;
                     std::memcpy(
-                        remapped.data() + gpuVertex * descriptor.StrideBytes,
+                        remapped.data() + gpuElement * descriptor.StrideBytes,
                         descriptor.Bytes.data() +
-                            static_cast<std::size_t>(sourceVertex) *
+                            static_cast<std::size_t>(sourceElement) *
                                 descriptor.StrideBytes,
                         descriptor.StrideBytes);
                 }
@@ -134,7 +135,7 @@ namespace Extrinsic::Runtime
                 const auto& payload =
                     batch.PropertyBufferPayloads[descriptorIndex];
                 descriptor.ElementCount = static_cast<std::uint32_t>(
-                    sourceVertexForGpuVertex.size());
+                    sourceForGpuElement.size());
                 descriptor.SourceLayoutStamp = remapRevision;
                 descriptor.Bytes = std::span<const std::byte>{
                     payload.data(), payload.size()};
@@ -142,7 +143,7 @@ namespace Extrinsic::Runtime
                 for (Graphics::ScalarAttributePacket& scalar : batch.Scalars)
                 {
                     if (scalar.Domain ==
-                            Graphics::VisualizationAttributeDomain::Vertex &&
+                            domain &&
                         scalar.SourceBufferKey == sourceKey)
                     {
                         scalar.ElementCount = descriptor.ElementCount;
@@ -151,7 +152,7 @@ namespace Extrinsic::Runtime
                 for (Graphics::ColorAttributePacket& color : batch.Colors)
                 {
                     if (color.Domain ==
-                            Graphics::VisualizationAttributeDomain::Vertex &&
+                            domain &&
                         color.SourceBufferKey == sourceKey)
                     {
                         color.ElementCount = descriptor.ElementCount;
@@ -167,14 +168,20 @@ namespace Extrinsic::Runtime
         const VisualizationRecipe& recipe,
         RuntimeRenderExtractionStats& stats,
         const std::span<const std::uint32_t> surfaceVertexRemap,
-        const std::uint64_t surfaceVertexRemapRevision)
+        const std::uint64_t surfaceVertexRemapRevision,
+        const std::span<const std::uint32_t> surfaceFaceRemap,
+        const std::uint64_t surfaceFaceRemapRevision)
     {
         VisualizationEncodingResult encoded =
             EncodeVisualizationRecipe(availability, recipe);
-        if (!RemapSurfaceVertexPropertyBuffers(
+        if (!RemapSurfacePropertyBuffers(
                 encoded.Batch,
                 surfaceVertexRemap,
-                surfaceVertexRemapRevision))
+                surfaceVertexRemapRevision,
+                Graphics::VisualizationAttributeDomain::Vertex) ||
+            !RemapSurfacePropertyBuffers(
+                encoded.Batch, surfaceFaceRemap, surfaceFaceRemapRevision,
+                Graphics::VisualizationAttributeDomain::Face))
         {
             encoded.Batch.Clear();
             encoded.Status = VisualizationRecipeStatus::InvalidBuffer;

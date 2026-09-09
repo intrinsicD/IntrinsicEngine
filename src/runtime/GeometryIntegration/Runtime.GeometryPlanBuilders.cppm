@@ -76,6 +76,8 @@ export namespace Extrinsic::Runtime
         // GPU vertex i so vertex-domain visualization data can follow the
         // exact same split.
         std::vector<std::uint32_t> SourceVertexForGpuVertex{};
+        // Face attributes index source polygons; the GPU draws their fan triangles.
+        std::vector<std::uint32_t> SourceFaceForGpuTriangle{};
 
         void Clear() noexcept;
     };

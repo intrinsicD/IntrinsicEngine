@@ -33,6 +33,7 @@ import Extrinsic.Graphics.GpuWorld;
 import Extrinsic.Graphics.Colormap;
 import Extrinsic.Graphics.ColormapSystem;
 import Extrinsic.Graphics.Material;
+import Extrinsic.Graphics.Component.VisualizationConfig;
 import Extrinsic.Graphics.PropertyTextureBake;
 import Extrinsic.Graphics.Renderer;
 import Extrinsic.RHI.BufferManager;
@@ -1497,7 +1498,8 @@ namespace Extrinsic::Runtime
                 prepared.OutputName,
                 &PropertyTextureBakeRecord::OutputName);
             const bool replacing = found != catalog.Records.end();
-            if (replacing &&
+            // Appearance owns a stable output slot while its selected property changes.
+            if (replacing && prepared.OutputName != kSurfaceAppearanceTextureOutput &&
                 (found->Source.Domain != request.Source.Domain ||
                  found->Source.Name != request.Source.Name ||
                  found->Texcoords != request.Texcoords))
@@ -1584,6 +1586,7 @@ namespace Extrinsic::Runtime
                 .Generation = replacing ? found->Generation : 1u,
                 .State = PropertyTextureBakeOutputState::Pending,
                 .Diagnostic = "GPU property texture bake pending",
+                .RangePolicy = request.RangePolicy,
             };
             if (replacing)
             {
@@ -2517,6 +2520,100 @@ namespace Extrinsic::Runtime
         m_Impl->Participant = {};
     }
 
+    namespace
+    {
+        // Replay persisted appearance and undo/redo through the same bake producer.
+        void ReconcileSurfaceAppearance(TextureBakeService& service,
+                                        ECS::Scene::Registry* scene,
+                                        const WorldHandle world)
+        {
+            if (scene == nullptr || !service.Available())
+                return;
+            namespace G = Graphics::Components;
+            auto& raw = scene->Raw();
+            auto entities = raw.view<G::VisualizationLaneOverrides>();
+            for (auto&& [entity, overrides] : entities.each())
+            {
+                const G::VisualizationConfig* config = overrides.Surface.has_value()
+                    ? &*overrides.Surface : nullptr;
+                if (config == nullptr || !config->UseBakedTexture)
+                    continue;
+                const bool scalar = config->Source == G::VisualizationConfig::ColorSource::ScalarField;
+                if (!scalar && config->Source != G::VisualizationConfig::ColorSource::PerVertexBuffer &&
+                    config->Source != G::VisualizationConfig::ColorSource::PerFaceBuffer)
+                    continue;
+                const bool face = scalar ? config->ScalarDomain == G::VisualizationConfig::Domain::Face
+                    : config->Source == G::VisualizationConfig::ColorSource::PerFaceBuffer;
+                if (scalar && config->ScalarDomain == G::VisualizationConfig::Domain::Edge)
+                    continue;
+                GeometryPropertyRef property{
+                    .Domain = face ? GeometryElementDomain::MeshFace : GeometryElementDomain::MeshVertex,
+                    .Name = scalar ? config->ScalarFieldName : config->ColorBufferName,
+                };
+                const auto availability = BuildGeometryAvailability(GS::BuildConstView(raw, entity));
+                const auto resolved = ResolveGeometryProperty(availability, property,
+                    ResolveGeometryElementCount(availability, property.Domain));
+                if (!resolved.Resolved())
+                    continue;
+                property.ValueKind = resolved.ResolvedValueKind;
+                const auto rangePolicy = config->Scalar.AutoRange
+                    ? PropertyTextureBakeRangePolicy::AutoFinite : PropertyTextureBakeRangePolicy::Manual;
+                const auto encoding = scalar
+                    ? PropertyTextureBakeEncoding::ScalarColormap
+                    : ((property.Name == GS::PropertyNames::kNormal || property.Name == "f:normal") &&
+                       property.ValueKind == Geometry::PropertyValueKind::Vec3
+                           ? PropertyTextureBakeEncoding::Normal : PropertyTextureBakeEncoding::RgbaColor);
+                if (const auto* outputs = raw.try_get<PropertyTextureBakeOutputs>(entity))
+                {
+                    const auto record = std::ranges::find(outputs->Records,
+                        kSurfaceAppearanceTextureOutput, &PropertyTextureBakeRecord::OutputName);
+                    if (record != outputs->Records.end() && record->Source.Name == property.Name &&
+                        record->Source.Domain == property.Domain && record->Source.ValueKind == property.ValueKind &&
+                        record->Encoding == encoding && record->RangePolicy == rangePolicy &&
+                        record->EncodingColormap == config->Scalar.Map &&
+                        (config->Scalar.AutoRange || (record->RangeMin == config->Scalar.RangeMin &&
+                                                     record->RangeMax == config->Scalar.RangeMax)))
+                        continue;
+                }
+                const auto baked = service.Bake(PropertyTextureBakeRequest{
+                    .World = world,
+                    .StableEntityId = SelectionController::ToStableEntityId(entity),
+                    .Source = property,
+                    .Storage = PropertyTextureBakeStorage::EncodedRgba,
+                    .Encoding = encoding,
+                    .RangePolicy = rangePolicy,
+                    .RangeMin = config->Scalar.RangeMin,
+                    .RangeMax = config->Scalar.RangeMax,
+                    .EncodingColormap = config->Scalar.Map,
+                    .PaddingTexels = 2u,
+                    .OutputName = std::string{kSurfaceAppearanceTextureOutput},
+                });
+                if (!baked.Succeeded())
+                {
+                    auto& outputs = raw.get_or_emplace<PropertyTextureBakeOutputs>(entity);
+                    auto failed = std::ranges::find(outputs.Records, kSurfaceAppearanceTextureOutput,
+                        &PropertyTextureBakeRecord::OutputName);
+                    if (failed == outputs.Records.end())
+                    {
+                        outputs.Records.push_back(PropertyTextureBakeRecord{
+                            .OutputName = std::string{kSurfaceAppearanceTextureOutput}});
+                        failed = std::prev(outputs.Records.end());
+                    }
+                    failed->Source = property;
+                    failed->Encoding = encoding;
+                    failed->RangePolicy = rangePolicy;
+                    failed->EncodingColormap = config->Scalar.Map;
+                    failed->RangeMin = config->Scalar.RangeMin;
+                    failed->RangeMax = config->Scalar.RangeMax;
+                    failed->State = PropertyTextureBakeOutputState::Failed;
+                    failed->Diagnostic = baked.Diagnostic;
+                    ++outputs.Generation;
+                    continue;
+                }
+            }
+        }
+    }
+
     struct TextureBakeModule::Impl
     {
         struct State
@@ -2880,7 +2977,8 @@ namespace Extrinsic::Runtime
                 {
                     if (const auto state = weakState.lock())
                     {
-                        (void)state->ValidateBinding();
+                        if (state->ValidateBinding())
+                            ReconcileSurfaceAppearance(state->Service, state->BoundRegistry, state->BoundWorld);
                     }
                 });
             !hook.has_value())

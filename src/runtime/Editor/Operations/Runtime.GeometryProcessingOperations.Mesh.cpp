@@ -1202,6 +1202,7 @@ struct EditorJobResult { std::string Diagnostic{}; };
         struct MeshForVertexNormalsResult
         {
             Geometry::HalfedgeMesh::Mesh Mesh{};
+            std::vector<std::uint32_t> SourceFaceForMeshFace{};
             EditorCommandStatus Status{
                 EditorCommandStatus::NoChange};
             Core::ErrorCode Error{Core::ErrorCode::Success};
@@ -1355,6 +1356,7 @@ struct EditorJobResult { std::string Diagnostic{}; };
                                         "for normal recompute";
                     return result;
                 }
+                result.SourceFaceForMeshFace.push_back(static_cast<std::uint32_t>(faceIndex));
             }
 
             result.Status = EditorCommandStatus::Applied;
@@ -12620,7 +12622,11 @@ namespace Extrinsic::Runtime::GeometryProcessingDetail
     {
         auto built = BuildHalfedgeMeshForVertexNormalRecompute(view, positionProperty, false, true);
         EditorMeshSourceSnapshot result;
-        result.Mesh=std::move(built.Mesh);result.Status=built.Status;result.Error=built.Error;result.Diagnostic=std::move(built.Diagnostic);
+        result.Mesh = std::move(built.Mesh);
+        result.SourceFaceForMeshFace = std::move(built.SourceFaceForMeshFace);
+        result.Status = built.Status;
+        result.Error = built.Error;
+        result.Diagnostic = std::move(built.Diagnostic);
         return result;
     }
 }

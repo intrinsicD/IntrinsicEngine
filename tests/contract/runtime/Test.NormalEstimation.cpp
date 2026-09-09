@@ -466,3 +466,118 @@ TEST(NormalEstimation, GraphPositionSlotMayBindAnExistingNormalNamedProperty)
     EXPECT_EQ(std::as_const(vertices).Get<glm::vec3>("v:normal").Revision(), revision);
     EXPECT_EQ(std::as_const(vertices).Get<glm::vec3>("v:normal")[1], plane[1]);
 }
+
+
+TEST(NormalEstimation, FaceNormalsUseFullPolygonRingAndPublishOnlyFaceOutput)
+{
+    Extrinsic::ECS::Scene::Registry scene;
+    const auto entity = scene.Create();
+    Geometry::HalfedgeMesh::Mesh mesh;
+    // First three corners are collinear; the full pentagon still has a +Z normal.
+    std::vector<Geometry::VertexHandle> ring;
+    for (const glm::vec3 p : {glm::vec3{0, 0, 0}, {1, 0, 0}, {2, 0, 0}, {2, 1, 0}, {0, 1, 0}})
+        ring.push_back(mesh.AddVertex(p));
+    ASSERT_TRUE(mesh.AddFace(ring));
+    const auto a = mesh.AddVertex({3, 0, 0}), b = mesh.AddVertex({3, 0, 1}),
+               c = mesh.AddVertex({3, 1, 0});
+    ASSERT_TRUE(mesh.AddTriangle(a, b, c)); // -X from winding.
+    GS::PopulateFromMesh(scene.Raw(), entity, mesh);
+    auto &vertices = Properties(scene, entity, D::MeshVertex);
+    auto &faces = Properties(scene, entity, D::MeshFace);
+    (void)vertices.GetOrAdd<glm::vec3>("v:normal", {0, 1, 0});
+    (void)faces.GetOrAdd<float>("keep", 42.f);
+    const auto positions = std::as_const(vertices).Get<glm::vec3>("v:position");
+    const auto revision = positions.Revision();
+    R::NormalEstimationConfig config;
+    config.StableEntityId = R::SelectionController::ToStableEntityId(entity);
+    config.Method = R::NormalEstimationMethod::MeshFaceNormals;
+    config.Positions.Domain = D::MeshVertex;
+    config.Output = {D::MeshFace, "f:normal", Geometry::PropertyValueKind::Vec3};
+    const auto json = R::SerializeNormalEstimationConfig(config);
+    EXPECT_TRUE(R::ValidateNormalEstimationConfigSection(json, {}, {}).Usable());
+    Extrinsic::Core::Config::EngineConfig engineConfig;
+    R::SetNormalEstimationConfig(engineConfig, config);
+    ASSERT_TRUE(R::GetNormalEstimationConfig(engineConfig));
+    EXPECT_EQ(R::GetNormalEstimationConfig(engineConfig)->Method, config.Method);
+    R::EditorCommandHistory history;
+    R::EditorGeometryProcessingContext context{.Scene = &scene, .CommandHistory = &history};
+    ASSERT_TRUE(R::PreviewEditorNormalEstimationCommand(context, config).Ready);
+    const auto result = R::ApplyEditorNormalEstimationCommand(context, config);
+    ASSERT_TRUE(result.Succeeded()) << result.Message;
+    EXPECT_EQ(result.SlotCount, 2u);
+    EXPECT_EQ(result.ValidCount, 2u);
+    EXPECT_EQ(result.ProcessedFaces, 2u);
+    EXPECT_EQ(result.ActualBackend, "cpu_mesh_face_normals");
+    const auto normals = std::as_const(faces).Get<glm::vec3>("f:normal");
+    ASSERT_EQ(normals.Size(), 2u);
+    EXPECT_EQ(normals[0], (glm::vec3{0, 0, 1}));
+    EXPECT_EQ(normals[1], (glm::vec3{-1, 0, 0}));
+    EXPECT_EQ(positions.Revision(), revision);
+    EXPECT_EQ(std::as_const(vertices).Get<glm::vec3>("v:normal")[0], (glm::vec3{0, 1, 0}));
+    EXPECT_EQ(std::as_const(faces).Get<float>("keep")[1], 42.f);
+    EXPECT_EQ(history.Undo().Status, R::EditorCommandHistoryStatus::Undone);
+    EXPECT_FALSE(faces.Exists("f:normal"));
+    EXPECT_EQ(history.Redo().Status, R::EditorCommandHistoryStatus::Redone);
+    EXPECT_EQ(std::as_const(faces).Get<glm::vec3>("f:normal")[1], (glm::vec3{-1, 0, 0}));
+}
+
+TEST(NormalEstimation, FaceNormalsPreserveDeletedSlotsAndReportDegenerateFallback)
+{
+    Extrinsic::ECS::Scene::Registry scene;
+    const auto entity = Make(scene, D::MeshVertex);
+    auto &faces = Properties(scene, entity, D::MeshFace);
+    faces.GetOrAdd<bool>("f:deleted")[0] = true;
+    faces.Get<std::uint32_t>("f:halfedge")[0] = std::numeric_limits<std::uint32_t>::max();
+    (void)faces.GetOrAdd<glm::vec3>("f:normal", {0, -1, 0});
+    auto config = Config(entity, D::MeshVertex);
+    config.Method = R::NormalEstimationMethod::MeshFaceNormals;
+    config.Output = {D::MeshFace, "f:normal", Geometry::PropertyValueKind::Vec3};
+    R::EditorGeometryProcessingContext context{.Scene = &scene};
+    auto result = R::ApplyEditorNormalEstimationCommand(context, config);
+    ASSERT_TRUE(result.Succeeded()) << result.Message;
+    EXPECT_EQ(result.WrittenCount, 1u);
+    EXPECT_EQ(result.SlotCount, 2u);
+    EXPECT_EQ(std::as_const(faces).Get<glm::vec3>("f:normal")[0], (glm::vec3{0, -1, 0}));
+    EXPECT_EQ(std::as_const(faces).Get<glm::vec3>("f:normal")[1], (glm::vec3{0, 0, 1}));
+    Properties(scene, entity, D::MeshVertex).Get<glm::vec3>("samples").Vector() =
+        {{0, 0, 0}, {1, 0, 0}, {2, 0, 0}, {3, 0, 0}};
+    config.FallbackNormal = {0, 2, 0};
+    result = R::ApplyEditorNormalEstimationCommand(context, config);
+    ASSERT_TRUE(result.Succeeded()) << result.Message;
+    EXPECT_EQ(result.FallbackCount, 1u);
+    EXPECT_EQ(result.ValidCount, 0u);
+    EXPECT_EQ(std::as_const(faces).Get<glm::vec3>("f:normal")[1], (glm::vec3{0, 1, 0}));
+    config.Output.Domain = D::MeshVertex;
+    EXPECT_FALSE(R::PreviewEditorNormalEstimationCommand(context, config).Ready);
+}
+
+
+TEST(NormalEstimation, QueuedFaceNormalsPublishToFacesAndRejectStaleTopology)
+{
+    for (const bool stale : {false, true})
+    {
+        Extrinsic::ECS::Scene::Registry scene;
+        const auto entity = Make(scene, D::MeshVertex);
+        auto config = Config(entity, D::MeshVertex);
+        config.Method = R::NormalEstimationMethod::MeshFaceNormals;
+        config.Output = {D::MeshFace, "f:normal", Geometry::PropertyValueKind::Vec3};
+        Intrinsic::Tests::EditorFeatureTestContext context;
+        context.Scene = &scene;
+        std::optional<R::EditorNormalEstimationResult> delivered;
+        context.MethodResultSinks.NormalEstimation = [&](auto result) { delivered = std::move(result); };
+        Extrinsic::Tests::EditorJobHarness jobs;
+        jobs.Attach(context);
+        ASSERT_EQ(R::ApplyEditorNormalEstimationCommand(context, config).Status, R::EditorCommandStatus::Pending);
+        auto &faces = Properties(scene, entity, D::MeshFace);
+        if (stale)
+            faces.GetOrAdd<bool>("f:deleted")[0] = true;
+        ASSERT_TRUE(jobs.DrainUntilTerminal());
+        ASSERT_TRUE(delivered);
+        EXPECT_EQ(delivered->Succeeded(), !stale) << delivered->Message;
+        EXPECT_EQ(faces.Exists("f:normal"), !stale);
+        EXPECT_FALSE(Properties(scene, entity, D::MeshVertex).Exists("f:normal"));
+        if (!stale)
+            EXPECT_EQ(std::as_const(faces).Get<glm::vec3>("f:normal").Vector(),
+                      (std::vector<glm::vec3>{{0, 0, 1}, {0, 0, 1}}));
+    }
+}
