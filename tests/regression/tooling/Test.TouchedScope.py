@@ -1140,5 +1140,109 @@ class TouchedScopeTests(unittest.TestCase):
             )
 
 
+class LocalChangeTests(unittest.TestCase):
+    def setUp(self) -> None:
+        directory = tempfile.TemporaryDirectory()
+        self.addCleanup(directory.cleanup)
+        self.root = Path(directory.name)
+        self.git("init", "-q")
+        self.git("config", "user.email", "fixture@example.com")
+        self.git("config", "user.name", "Fixture")
+        self.write("docs/file.md", "base\n")
+        self.write("src/geometry/Geometry.Local.cpp", "base\n")
+        self.write(".gitignore", "build/\n")
+        self.git("add", ".")
+        self.git("commit", "-qm", "base")
+        self.base = self.git("rev-parse", "HEAD")
+        self.write("docs/file.md", "committed documentation change\n")
+        self.git("commit", "-qam", "docs change")
+
+    def git(self, *args: str) -> str:
+        return subprocess.run(
+            ["git", *args], cwd=self.root, check=True, capture_output=True, text=True
+        ).stdout.strip()
+
+    def write(self, path: str, content: str) -> None:
+        destination = self.root / path
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        destination.write_text(content, encoding="utf-8")
+
+    def plan(self, *args: str) -> dict:
+        parsed = touched_scope.parse_args(
+            ["--root", str(self.root), "--base-ref", self.base, *args]
+        )
+        return touched_scope._plan_from_args(parsed, self.root)
+
+    def test_local_includes_staged_unstaged_and_untracked_source(self) -> None:
+        path = "src/geometry/Geometry.Local.cpp"
+        for state in ("unstaged", "staged", "untracked"):
+            with self.subTest(state=state):
+                self.write(path, "changed\n")
+                if state == "staged":
+                    self.git("add", path)
+                elif state == "untracked":
+                    self.git("reset", "-q", "HEAD", "--", path)
+                    self.git("checkout", "--", path)
+                    path = "src/geometry/Geometry.New.cpp"
+                    self.write(path, "new\n")
+                route = self.plan("--local")
+                self.assertIn(path, route["changed_files"])
+                self.assertIn("docs/file.md", route["changed_files"])
+                self.assertTrue(route["needs_cpp"])
+                self.assertEqual(route["diff"]["scope"], "local")
+                revision_route = self.plan()
+                self.assertEqual(revision_route["changed_files"], ["docs/file.md"])
+                self.assertFalse(revision_route["needs_cpp"])
+                self.assertEqual(revision_route["diff"]["scope"], "revisions")
+
+    def test_local_preserves_staged_edit_undone_in_worktree(self) -> None:
+        path = "src/geometry/Geometry.Local.cpp"
+        self.write(path, "staged\n")
+        self.git("add", path)
+        self.write(path, "base\n")
+        route = self.plan("--local")
+        self.assertTrue(route["needs_cpp"])
+        self.assertEqual(route["changed_files"].count(path), 1)
+
+    def test_local_new_module_broadens_and_ignored_files_stay_excluded(self) -> None:
+        self.write("build/generated.cppm", "ignored\n")
+        self.assertFalse(self.plan("--local")["needs_cpp"])
+        self.write("src/geometry/Geometry.New.cppm", "export module Geometry.New;\n")
+        route = self.plan("--local")
+        self.assertEqual(route["route"], "broad")
+        self.assertNotIn("build/generated.cppm", route["changed_files"])
+
+    def test_local_deletion_and_staged_rename_broaden(self) -> None:
+        path = "src/geometry/Geometry.Local.cpp"
+        (self.root / path).unlink()
+        self.assertEqual(self.plan("--local")["route"], "broad")
+        self.git("checkout", "--", path)
+        self.git("mv", path, "src/geometry/Geometry.Renamed.cpp")
+        self.assertEqual(self.plan("--local")["route"], "broad")
+
+    def test_local_untracked_names_are_nul_delimited(self) -> None:
+        path = "src/geometry/Geometry. space\nand-tab\t.cpp"
+        self.write(path, "new\n")
+        self.assertIn(path, self.plan("--local")["changed_files"])
+
+    def test_local_collection_failure_broadens_instead_of_using_committed_docs(self) -> None:
+        with mock.patch.object(
+            touched_scope, "collect_local_change_records",
+            side_effect=touched_scope.DiffError("cannot inspect index"),
+        ):
+            route = self.plan("--local")
+        self.assertEqual(route["route"], "broad")
+        self.assertEqual(route["diff"]["status"], "error")
+
+    def test_local_cannot_mix_with_explicit_paths_or_another_revision(self) -> None:
+        for args in (
+            ["--local", "--changed-file", "docs/file.md"],
+            ["--local", "--head-ref", self.base],
+        ):
+            with self.subTest(args=args), mock.patch("sys.stderr"):
+                with self.assertRaises(SystemExit):
+                    touched_scope.parse_args(args)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

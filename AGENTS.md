@@ -302,9 +302,11 @@ For each change:
     - Prefer configured presets and task-specific focused targets before broad or long-running targets.
     - Treat non-default build trees as valid evidence only after confirming their compiler/toolchain satisfies the
       repository C++23 requirements; stale trees with older compilers are not valid verification.
-    - For local iteration on changed paths, use `python3 tools/ci/touched_scope.py --root . --base-ref origin/main
-      --head-ref HEAD --preset ci-fast --preset-build-dir build/ci-fast --build-dir build/ci-fast --print` (or
-      `--run`). The same staged planner drives `pr-fast`: it runs structural-only changes before C++ setup, configures
+    - For local iteration on changed paths, use `python3 tools/ci/touched_scope.py --root . --local --base-ref origin/main
+      --preset ci-fast --preset-build-dir build/ci-fast --build-dir build/ci-fast --print` (or `--run`). Local mode
+      includes committed changes through `HEAD`, staged and unstaged changes, and non-ignored untracked files.
+      CI omits `--local` to compare only its supplied base/head revisions. The same staged planner drives `pr-fast`:
+      it runs structural-only changes before C++ setup, configures
       the unsanitized Null/headless `ci-fast` identity for source routes, and reconciles selected producers against the
       fresh test registry before build. Missing/ambiguous diffs, module interfaces, headers, build/dependency inputs,
       and unknown paths fail closed to the bounded broad feedback route. This helper and workflow are feedback aids,
@@ -390,6 +392,10 @@ heuristics (`H<NN>`).
 - A `supported` or `refuted` claim must cite at least one repository path that exists; moving a
   cited artifact means updating the claim in the same change.
 - Benchmark-backed claims still owe the manifest and baseline comparison required by §8.
+- Evidence must address the claim: performance improvements need matched benchmark comparisons;
+  parity needs reference comparisons with stated tolerances; operational capability needs a run
+  of the named backend or integration path. A capability or parity statement alone does not
+  require a new performance benchmark. Method implementation still follows §6.
 - CPU, GPU/Vulkan, and sanitizer results are distinct evidence classes; a claim must say which one
   it rests on.
 
@@ -443,6 +449,18 @@ copilot), Delegate (bounded hand-off), Advisor (direction, method selection,
 literature research) — with review effort gated by risk signals (new
 dependency edges, public module surfaces, research claims, destructive
 actions) instead of applied uniformly to every change.
+
+Authorization persists for the agreed task. Necessary implementation choices within its scope
+and the existing layer policy do not require repeated approval. Obtain a new human decision
+before landing a change to agreed scope, layer policy or its exceptions, compatibility commitments,
+or a destructive/irreversible action that has not already been authorized. Complete authorized
+preparation first so the decision concerns a concrete diff and its impact. Review and verification
+remain required even when no new approval is needed.
+
+Use one writer per checkout and build directory in every posture. Concurrent writing agents use
+separate branches/worktrees and their own build directories; read-only review uses a fixed diff.
+Before integrating, reconcile changes and re-run affected verification on the combined source.
+Interactive work does not need the overnight claim/work-graph machinery to observe this rule.
 
 Task files under `tasks/` are shared memory between sessions, not process
 contracts. Single-session work needs no task file. Work that outlives the

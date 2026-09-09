@@ -90,7 +90,9 @@ feeds the generated `tasks/SESSION-BRIEF.md`:
 - `evidence` — `required` except for `micro`, which uses `not_applicable`.
 - `evidence_skip_reason` — required for the micro exemption.
 - `owner`, `branch`, `worktree`, `claimed_at` — null while a backlog task is
-  unclaimed and non-empty ISO-8601 ownership metadata in `tasks/active/`.
+  unclaimed; required for active non-micro tasks, with an ISO-8601 claim time.
+  Optional context for interactive micro notes, which do not acquire task claims.
+  Unattended claim requirements still follow `prompt/prompt.md`.
 - `contract_schema` (required for new/changed tasks) — currently `1`.
 - `contracts` (required, may be `[]`) — unique stable IDs from
   [`contract-catalog.yaml`](../architecture/contract-catalog.yaml). Determine
@@ -223,9 +225,10 @@ Micro tasks are the lane for work whose evidence is the PR itself:
 
 Unattended overnight work uses the full template (or the method/bug/review
 variants) with the `standard` or higher profile. The risk gates apply on top
-of the lane: dependency-boundary or public `.cppm` surface changes need the
-explicit human OK and inventory refresh, and research claims need
-ARA/benchmark evidence regardless of profile. Record the maturity stop-state
+of the lane: dependency changes need impact review, public `.cppm` changes
+need an inventory refresh, and new human decisions follow the authorization
+boundaries in `prompt/prompt.md` §"Risk gates". Research claims need ARA rows
+and evidence appropriate to their statement regardless of profile. Record the maturity stop-state
 in the note when it is ambiguous. Micro tasks set `workflow_profile: micro`,
 `evidence: not_applicable`, and a concrete `evidence_skip_reason`; they do not
 inherit high-risk, claim-grade, or protected custody. Retirement rules

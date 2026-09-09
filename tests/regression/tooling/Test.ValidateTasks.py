@@ -252,6 +252,55 @@ contract_review: mechanical fixture
         self.assertEqual(result.returncode, 1, result.stdout)
         self.assertIn("`evidence_skip_reason`", result.stdout)
 
+    def test_micro_note_accepts_no_custody_metadata_but_validates_optional_fields(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            path = write_task(
+                root,
+                micro=True,
+                front_matter="""id: TEST-001
+theme: none
+depends_on: []
+template: micro
+workflow_schema: 1
+workflow_profile: micro
+evidence: not_applicable
+evidence_skip_reason: interactive session; evidence is the diff, tests, and CI
+contract_schema: 1
+contracts: [repo.task-contract-discovery]
+""",
+            )
+            result = run_validator(root)
+            self.assertEqual(result.returncode, 0, result.stdout)
+            path.write_text(
+                path.read_text().replace("theme: none", "theme: none\nowner: 42\nclaimed_at: invalid"),
+                encoding="utf-8",
+            )
+            result = run_validator(root)
+            self.assertEqual(result.returncode, 1, result.stdout)
+            self.assertIn("`owner`", result.stdout)
+            self.assertIn("`claimed_at`", result.stdout)
+
+    def test_active_standard_task_still_requires_custody_metadata(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            write_task(
+                root,
+                front_matter="""id: TEST-001
+theme: none
+depends_on: []
+workflow_schema: 1
+workflow_profile: standard
+evidence: required
+contract_schema: 1
+contracts: [repo.task-contract-discovery]
+""",
+            )
+            result = run_validator(root)
+            self.assertEqual(result.returncode, 1, result.stdout)
+            for field in ("owner", "branch", "worktree", "claimed_at"):
+                self.assertIn(f"`{field}`", result.stdout)
+
     def test_micro_profile_cannot_be_applied_to_full_task(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

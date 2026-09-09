@@ -1,264 +1,77 @@
 ---
 name: intrinsicengine-task-workflow
-description: How to author, promote, slice, and retire task files in the IntrinsicEngine `tasks/` directory tree (`tasks/backlog/`, `tasks/active/`, `tasks/done/`). Defines the required nine-section task template, the optional `## Maturity` section for ambiguous stop-states, and the full `Scaffolded → CPUContracted → Operational → ParityProven → Retired` taxonomy with the `Scaffolded` closure rule. Use this skill whenever creating a new task file, promoting a backlog task to active, retiring an active task to done, splitting work into slices, writing acceptance criteria, deciding what maturity level a slice closes at, or whenever the user mentions task IDs (e.g. `GRAPHICS-072`, `RUNTIME-095`), task slicing, "scaffold", "stub", "fail-closed", or "minimal" wording in a closing task.
+description: Author, promote, slice, and retire IntrinsicEngine task notes. Selects the interactive micro or unattended template and routes contract declarations, maturity closure, and evidence requirements.
 ---
 
 # IntrinsicEngine Task Workflow
 
-This skill governs task files under `tasks/` in IntrinsicEngine. Task files are
-the unit of agent work: they capture the scope, slice plan, tests, docs, and
-acceptance criteria for one reviewable change.
+Task notes preserve scope and decisions between sessions. `AGENTS.md` and
+`references/session-onboarding.md` in the core skill own the execution policy;
+this skill routes task-specific details. Read canonical docs or their generated
+references once, without loading both.
 
-## The three task lifecycle directories
+## Choose the lane
 
-- `tasks/backlog/` — proposed or planned work; one file per task. May contain
-  the slice plan even before activation.
-- `tasks/active/` — work currently in-progress on a branch/owner. Promote here
-  when you intend to land more than one slice.
-- `tasks/done/` — retired tasks with a completion date and commit/PR reference.
+- Single-session interactive work needs no task file.
+- Interactive work needing persistent context uses `tasks/templates/task-micro.md`,
+  regardless of slice count. Required sections: Goal, checkbox Acceptance
+  criteria, and exact Verification commands. Context, decisions, and slice plans
+  are optional when useful. `workflow_profile: micro` exempts completion reports,
+  not applicable engineering contracts, risk review, or research evidence.
+- Unattended non-mechanical work uses the full template or its bug/review/method
+  variant and `standard` or higher profile. One-slice mechanical work may use
+  micro with a concrete evidence exemption. Publication custody is opt-in.
 
-Base every new task on a template in `tasks/templates/`. Do not create
-long-lived root-level planning checklists once work belongs in one of these
-directories.
+Read `references/task-format.md` when creating or materially changing a task.
+It owns front-matter, contract declarations, method integration fields, and
+retirement. Read `references/task-template.md` only for the full unattended
+format. Micro notes omit custody ownership fields unless useful as context.
 
-## Required task file structure
+Before materially changing a task, inspect
+`docs/architecture/contract-catalog.yaml`, declare applicable IDs, and read their
+canonical sources. If none apply, record a concrete `contract_review` reason.
+Task wording must not narrow a canonical contract; method tasks still need the
+applicable engine-integration matrix and follow-up ownership.
 
-All new task files use the nine-section template. See
-`references/task-template.md` for the exact template, and
-`references/task-format.md` for full field guidance and a worked example.
+## Questions and scope
 
-```markdown
-# <TASK-ID> — <Task title>
+Follow the core session workflow's question protocol: inspect the repository
+first, ask only material unresolved questions, and preserve answers and existing
+authorization. A routine task does not trigger an interview or require a second
+scope confirmation. Use `grilling` when the user requests a design stress test.
+Record useful decisions in the task note or commit message.
 
-## Goal
-## Non-goals
-## Context
-## Required changes
-## Tests
-## Docs
-## Acceptance criteria
-## Verification
-## Forbidden changes
-```
+## Lifecycle and maturity
 
-Field rules (summary; see `references/task-format.md` for full detail):
+Keep planned work in `tasks/backlog/`, ongoing work in `tasks/active/`, and
+completed notes in `tasks/done/`. Retire with closed acceptance criteria,
+completion date, commit/PR reference, and an append to `tasks/done/RETIREMENT-LOG.md`;
+regenerate `tasks/SESSION-BRIEF.md` after opening, retiring, or re-gating work.
+Do not create a separate root-level planning tree.
 
-- **Goal:** one specific outcome.
-- **Non-goals:** explicit exclusions to prevent scope creep.
-- **Context:** architectural owner/layer and relevant constraints.
-- **Required changes:** concrete file-level work as markable checkbox todos (`- [ ]`).
-- **Tests:** required verification commands and new/updated tests as checkbox todos.
-- **Docs:** documentation updates as checkbox todos.
-- **Acceptance criteria:** objective done-state checklist as checkbox todos.
-- **Verification:** exact commands to run.
-- **Forbidden changes:** things this task must not do.
+When a stop-state is ambiguous, use `references/task-maturity.md` to distinguish
+`Scaffolded`, `CPUContracted`, `Operational`, `ParityProven`, and `Retired`.
+Scaffolded/backend-facing CPUContracted closures name the next maturity owner
+or explicitly justify the intended endpoint. CPU/null tests alone do not prove
+an operational backend. See `intrinsicengine-review` for the completion sweep.
 
-Plain bullets for `Non-goals`, `Context`, and `Forbidden changes`. **Checkboxes
-(`- [ ]` / `- [x]`) for actionable sections** so task status is visible at a
-glance. Completed task files under `tasks/done/` must not contain unchecked
-actionable todos — unresolved work goes into a follow-up task.
+## Architecture decisions
 
-## Contract discovery and declaration
+Use an ADR only when the decision is hard to reverse, surprising without
+context, and the result of a real trade-off. Otherwise retain the rationale in
+the task note. For an ADR, follow `docs/adr/` numbering and link it from the task.
 
-Before creating, promoting, or materially changing a task, inspect
-`docs/architecture/contract-catalog.yaml`. Determine applicability from both
-owning and consuming layers, the least-structured data domain,
-publication/cardinality behavior, and config, agent, runtime, and UI control
-surfaces. Add `contract_schema: 1` and the unique stable IDs under `contracts`;
-when none apply, use `contracts: []` plus a non-empty `contract_review` reason.
+## Verification and unattended evidence
 
-Task wording cannot narrow a canonical contract. Read the `source` for every
-declared ID and use its `proofs` as the starting verification surface. A new
-reusable contract needs canonical prose, a catalog entry, and executable proof
-in the same reviewed change. For `method.engine-integration`, the task also
-needs the complete `## Engine integration` matrix defined by the method
-workflow.
-
-## Optional `## Maturity` section
-
-For tasks where the stop-state is ambiguous — typically rendering, Vulkan, asset
-ingest, hot reload, pass command bodies, runtime composition, and legacy
-retirement — add a `## Maturity` section to pin the intended endpoint. The
-validator does not enforce this field, but reviewers will ask for it whenever a
-task could plausibly stop at multiple levels.
-
-Suggested shape:
-
-```markdown
-## Maturity
-
-- Target: `Operational` on Vulkan-capable hosts; `CPUContracted` everywhere else.
-- Slice 1 closes `Scaffolded → CPUContracted`; `Operational` is owned by the
-  follow-up <TASK-ID>.
-```
-
-## The maturity taxonomy
-
-The taxonomy is shared vocabulary for distinguishing partial completion from
-full capability. Levels are **cumulative** — a task at a higher level meets all
-criteria below it.
-
-| Level | Meaning |
-| --- | --- |
-| `Scaffolded` | Structure or API exists; behavior may be stubbed, fail-closed, or return defaults. The seam is reachable but does not yet prove the engine does the thing. |
-| `CPUContracted` | CPU/null/backend-neutral contract tests exist for the seam. Default CPU gate (`ctest -LE 'gpu\|vulkan\|slow\|flaky-quarantine'`) verifies the contract. Backend-specific behavior may still be unverified. |
-| `Operational` | A concrete backend or real runtime path exercises the seam under appropriate test labels (e.g. opt-in `gpu;vulkan` smoke, or wiring into `Engine::Run()` with the reference config). |
-| `ParityProven` | The non-legacy path either matches legacy behavior with tests/evidence, or records an explicit "no-parity" decision. This is the gate that lets a legacy module retire. |
-| `Retired` | The legacy path or shim is deleted; docs, generated inventories, and allowlists are updated. There is no compatibility re-export. |
-
-**Critical reading rule:** CPU-only contract coverage is **insufficient** to
-claim `Operational`. The corresponding backend-labeled or integration-labeled
-run must be cited in the task's `Verification` as having actually run in the
-session. Do not let "foundation exists" be read as "capability shipped".
-
-For the full taxonomy with signals, the vocabulary mapping for older docs, and
-how-to-use guidance, read `references/task-maturity.md`.
-
-## The `Scaffolded` closure rule
-
-A task that retires to `tasks/done/` at `Scaffolded` maturity must do **one** of:
-
-1. **Name a follow-up task ID** that owns the `CPUContracted` (or higher) gate,
-   linked from the done task's `Acceptance criteria` or `Status` block, **or**
-2. **Record an explicit `Non-goals` line** stating that the scaffold is the
-   intended endpoint and that no follow-up gate is owed.
-
-The same rule applies one level up: a task that retires at `CPUContracted` when
-the seam exists to be operational on a real backend (graphics, Vulkan, CUDA,
-runtime composition) should name the `Operational` follow-up or explicitly
-record the deferral. For open task files, the accepted deterministic forms are
-`` `Operational` owned by `<TASK-ID>` `` or `` no `Operational` follow-up is owed ``.
-
-The rule is enforced by review (see `intrinsicengine-review`), not by the
-validator, because "scaffold", "stub", "fail-closed", and "minimal" are domain
-language that legitimately appears in many tasks.
-
-## Slice planning
-
-For tasks too large to land in a single reviewable patch (typical of rendering
-work), write the slice plan into the task file **before** implementing. The
-GRAPHICS-072/073/074 series is the reference pattern:
-
-- Each slice is independently reviewable.
-- Earlier slices preserve the CPU/null correctness gate.
-- Only the final slice exercises the operational backend.
-- The plan names what each slice owns and what each slice **defers** to later
-  slices, so reviewers can confirm scope.
-
-A slice plan reads like:
-
-```markdown
-## Slice plan
-
-- **Slice A (this slice).** Wire the seam at <layer>. Preserves CPU gate.
-  Test: `<contract test name>`. Defers <X, Y> to Slices B/C.
-- **Slice B.** ...
-- **Slice C.** ...
-- **Slice D.** Operational backend wiring + smoke. Cites `gpu;vulkan` run.
-```
-
-## Grilling alignment before authoring a task
-
-This section is the IntrinsicEngine-specialized form of the `grilling` skill;
-if the interview mechanics here ever diverge from `grilling/SKILL.md`, follow
-`grilling` for the mechanics and this section for the engine-specific probes.
-
-Before writing a task file for any non-trivial change, **interview the user
-relentlessly** about the change until you reach a shared understanding. Walk
-down each branch of the design tree, resolving dependencies one at a time.
-For every question, provide your recommended answer.
-
-- Ask **one question at a time** — wait for the user's answer before asking
-  the next.
-- If a question can be answered by exploring the codebase or reading an ADR
-  under `docs/adr/`, explore instead of asking.
-- When the user uses a term that conflicts with existing engine vocabulary
-  (`AGENTS.md` layer names, maturity levels, backend identities, RHI
-  terminology), call it out immediately and ask which is meant.
-- When the user uses a fuzzy term ("the renderer", "the pipeline", "this
-  pass"), propose the precise canonical name (e.g. `Extrinsic.Graphics.Renderer.PassRegistry`)
-  before continuing.
-- Stress-test domain relationships with **concrete scenarios** that probe
-  edge cases — what happens on a Vulkan-incapable host, with a 0-element
-  mesh, on hot reload, with the legacy path active.
-- Cross-reference what the user says with the code. If they contradict, surface
-  it: "you said the asset service drives this, but the call site is in
-  `runtime` — which is right?".
-
-The output of the grilling is the task file (sections per
-`references/task-template.md`). Do not start implementing before the file is
-written and the user has confirmed scope.
-
-## When to record an ADR
-
-The engine already keeps ADRs under `docs/adr/` with the `NNNN-<slug>.md`
-naming. Add a new ADR only when **all three** are true:
-
-1. **Hard to reverse** — the cost of changing your mind later is meaningful
-   (layering decisions, backend selection rules, public method contracts,
-   data-format decisions, runtime composition order).
-2. **Surprising without context** — a future reader will wonder "why was it
-   done this way?" and the answer is not obvious from the code.
-3. **The result of a real trade-off** — there were genuine alternatives and
-   you picked one for specific reasons.
-
-If any of the three is missing, skip the ADR. Capture the decision in the
-task file's `Context` or `Non-goals` instead. ADRs are expensive; over-using
-them dilutes the signal of the ones that matter.
-
-When you do write one, follow the numbering of the existing ADRs and link it
-from the owning task's `Context` section.
-
-## Task execution sequence
-
-Every task execution should follow:
-
-1. Inspect existing code and docs.
-2. Identify owning subsystem and layer (see `intrinsicengine-core` for layering).
-3. If the change is non-trivial, run a grilling alignment pass (see above).
-4. Write or update task file from `tasks/templates/`.
-5. Unattended overnight lane only: claim the task and, for non-micro work,
-   start or resume `tools/agents/agent_work_graph.py` with the checked-in
-   review-diamond recipe (graph state is live observability, not completion
-   evidence). Interactive sessions use the micro lane and skip claims and the
-   graph — the conversation is the control flow.
-6. Implement the smallest useful patch.
-7. Add or update tests with correct labels.
-8. Add or update docs; record an ADR only if the three-condition rule applies.
-9. Run verification (focused targets first, then broaden).
-10. Update generated inventories if module surfaces changed.
-11. Self-review against the review checklist (see `intrinsicengine-review`).
-
-## Validation tools
+For task changes run:
 
 ```bash
-# Strict task-policy check (must pass for tasks/ changes)
 python3 tools/agents/check_task_policy.py --root . --strict
-
-# Full task validator
-python3 tools/agents/validate_tasks.py --root tasks --strict
-
-# Prospective enrolled-task evidence
-python3 tools/agents/workflow_evidence.py validate --root .
+python3 tools/agents/generate_session_brief.py --check
 ```
 
-The validator enforces the nine required sections; the optional `## Maturity`
-section is not validator-enforced. New or materially changed open tasks use the
-prospective workflow profile and evidence fields described in
-`references/workflow-evidence.md` and the prospective contract declaration
-fields described in `references/task-format.md`.
-
-## References
-
-- `references/task-format.md` — full field guidance, worked example, optional
-  `## Maturity` shape. Read this when authoring or materially editing any task.
-- `references/task-maturity.md` — full taxonomy with signals per level,
-  `Scaffolded` closure rule with both forms of follow-up, vocabulary mapping
-  for older docs. Read this when deciding what maturity level a slice closes
-  at, or when reviewing a `Scaffolded`/`CPUContracted` retirement.
-- `references/workflow-evidence.md` — workflow profiles, atomic task claims,
-  generated command/report evidence, high-risk handoff/review, claim-grade
-  experiment custody, and protected attempt controls. Read this for any task
-  enrolled with `workflow_schema`.
-- `references/task-template.md` — the bare template to copy when creating a
-  new task file.
+`references/workflow-evidence.md` is needed only for unattended execution or
+opt-in custody. It owns task claims, work graphs, reports, and independent
+review. When that evidence is touched, run `workflow_evidence.py validate` and
+`experiment_custody.py validate` as documented there. Interactive task notes
+alone do not activate this machinery.

@@ -52,7 +52,9 @@ A hint the human rejects or ignores is dropped for the session unless it escalat
 6. Run the pre-commit sweep, commit (imperative subject ≤ 72 chars; body says why and lists the verification actually run), push.
 7. Report back: **what changed, how it was verified, what remains uncertain, and at most one suggestion.**
 
-No claims, no work graph, no receipts, no generated reports — the diff, the tests, and CI are the evidence.
+Interactive implementation uses the diff, tests, and CI as evidence; no task claims,
+work graph, receipts, or completion reports. Research claims still follow `AGENTS.md` §8b;
+publication custody remains opt-in.
 
 ## Advisor (when they are stuck or ask for direction)
 
@@ -68,13 +70,21 @@ Trigger: any form of "I don't know where/how to continue", or an explicit reques
 
 Everything beyond the compact loops is owed only on these signals:
 
+Authorization persists for the agreed task. Carry out necessary implementation choices
+within that scope and the existing contract. Ask for a new decision only when scope,
+layer policy or an exception, compatibility commitments, or an unauthorized destructive
+consequence changes. Complete authorized preparation before asking: present the concrete
+diff, impact, and remaining decision. Existing approval satisfies the same decision;
+do not ask again at each implementation step. These rules do not waive verification.
+
 | Signal in the change | Additional step owed |
 |---|---|
-| New dependency edge, layering-table change, layering-allowlist entry | Present module-level impact (knowledge-graph neighbors + `check_layering`) and get an explicit human OK before landing |
+| New dependency edge allowed by the existing layer table | Review module-level impact and run `check_layering`; proceed within the agreed scope |
+| Layering-table change, new/changed policy exception, scope or compatibility commitment changes | Present the concrete diff and impact; get a human decision before landing unless that exact decision is already authorized |
 | Public `.cppm` surface change | Regenerate the module inventory; one-paragraph impact statement in the commit/PR body |
-| A research result — method, benchmark, parity, or capability claim — entering `README.md`, `docs/`, or a method report | Evidence mode: benchmark manifest + baseline comparison + `ara/logic/claims.md` row (`AGENTS.md` §8b). Implementation and refactoring work owes nothing to the ledger |
+| A research result — method, benchmark, parity, or capability claim — entering `README.md`, `docs/`, or a method report | Bind an `ara/logic/claims.md` row to evidence appropriate to the claim (see `docs/agent/ara-evidence-policy.md`). Performance improvements need matched benchmarks; parity needs reference comparisons; operational capability needs a run of the named backend/path. Ordinary implementation and refactoring owes no claim row |
 | Optimized or GPU backend beyond the CPU reference | Parity evidence versus the reference before the backend token is claimable |
-| Destructive or hard-to-reverse action (history rewrite, deleting evidence or fixtures, retiring a public surface) | Ask first, always |
+| Destructive or hard-to-reverse action (history rewrite, deleting evidence or fixtures, retiring a public surface) | Confirm the concrete action is authorized before executing it; ask if that authorization is missing |
 | Publication-bound experiment | Opt-in custody: the `claim-grade`/`protected` chain in `docs/agent/workflow-evidence.md` |
 
 # Work selection
@@ -89,13 +99,22 @@ The full `tasks/templates/task.md` and the `standard`/`high-risk` profiles are t
 
 # Verification
 
+One writer owns each checkout and build directory, including during interactive work.
+Use separate branches/worktrees and build directories for concurrent writing agents.
+Read-only reviewers inspect a fixed diff; source edits invalidate affected review/test
+results. Reconcile integrations and verify the combined source before reporting it complete.
+Interactive isolation does not require task claims or a work graph.
+
 Run focused targets first; broaden only when the focused gate passes and the change warrants it.
 
 Touched-scope helper for local iteration:
 ```
-python3 tools/ci/touched_scope.py --root . --base-ref origin/main --head-ref HEAD --preset ci-fast --preset-build-dir build/ci-fast --build-dir build/ci-fast --print
-python3 tools/ci/touched_scope.py --root . --base-ref origin/main --head-ref HEAD --preset ci-fast --preset-build-dir build/ci-fast --build-dir build/ci-fast --run
+python3 tools/ci/touched_scope.py --root . --local --base-ref origin/main --preset ci-fast --preset-build-dir build/ci-fast --build-dir build/ci-fast --print
+python3 tools/ci/touched_scope.py --root . --local --base-ref origin/main --preset ci-fast --preset-build-dir build/ci-fast --build-dir build/ci-fast --run
 ```
+
+`--local` includes committed changes through `HEAD`, staged/unstaged edits, and
+non-ignored untracked files. CI omits it and supplies exact base/head revisions.
 
 Default CPU gate (when code/tests touched):
 ```

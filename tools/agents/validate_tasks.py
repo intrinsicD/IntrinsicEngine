@@ -42,8 +42,8 @@ ACTIONABLE_TODO_SECTIONS = [
 ]
 
 # Micro tasks (`template: micro` in the front-matter, seeded from
-# tasks/templates/task-micro.md) are single-slice mechanical work; they
-# carry a reduced section set. Retirement rules (closed todos, completion
+# tasks/templates/task-micro.md) cover interactive or one-slice mechanical
+# work with a reduced section set. Retirement rules (closed todos, completion
 # date, commit/PR reference) apply unchanged.
 MICRO_TEMPLATE_RE = re.compile(r"^template:\s*micro\s*$", re.MULTILINE)
 WORKFLOW_SCHEMA_VERSION = 1
@@ -1028,7 +1028,7 @@ def validate_front_matter(
 
         for key in ("owner", "branch", "worktree"):
             value = data.get(key)
-            if "active" in path_parts:
+            if "active" in path_parts and profile != "micro":
                 if not isinstance(value, str) or not value.strip():
                     findings.append(
                         Finding(
@@ -1049,7 +1049,7 @@ def validate_front_matter(
                 )
 
         claimed_at = data.get("claimed_at")
-        if "active" in path_parts:
+        if "active" in path_parts and profile != "micro":
             if claimed_at is None or not _is_timestamp_like(claimed_at):
                 findings.append(
                     Finding(

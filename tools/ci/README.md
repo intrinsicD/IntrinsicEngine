@@ -41,7 +41,9 @@ CI helper scripts and workflow validation tools.
 - `ccache_module_invalidation_probe.py`: exercises ccache reuse across hermetic C++23 module-input changes, proving interface, directory/target definition, target-option, and GMF-header edits invalidate importers while unchanged rebuilds still hit. Part of the retained CI-007 `pr-fast.yml` policy.
 - `touched_scope.py`: plans (or runs) conservative build/test/structural
   verification for the exact name-status diff from the unique merge base of
-  the supplied base/head refs to the head. It drives `pr-fast` through
+  the supplied base/head refs to the head. `--local` additionally includes staged,
+  unstaged, and non-ignored untracked changes for working-tree iteration.
+  CI keeps revision-only selection. It drives `pr-fast` through
   pre-configure classification, structural-only execution, strict
   post-configure test-registry reconciliation, and focused or bounded broad
   build/test actions. Its route directory records changed files, reasons,

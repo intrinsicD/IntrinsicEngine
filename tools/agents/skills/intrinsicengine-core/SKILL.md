@@ -1,163 +1,28 @@
 ---
 name: intrinsicengine-core
-description: Authoritative repository contract for IntrinsicEngine — a modular C++23 Vulkan-based research engine for graphics and geometry processing. Defines layering invariants (core/geometry/assets/ecs/physics/graphics/platform/runtime/app), C++23 module rules with clang-20 + clang-scan-deps-20, the CMake preset workflow, the task-driven slice discipline, and the default CPU correctness gate. Use this skill whenever working in any clone of `IntrinsicEngine`, touching any file under `src/`, `tasks/`, `methods/`, `benchmarks/`, `docs/`, or `tools/`, or when asked about layer ownership, module conventions, build commands, the CI preset, the agentic workflow, or anything that mentions IntrinsicEngine, `AGENTS.md`, or repository policy — even if the user does not explicitly ask for the contract.
+description: Entry point for IntrinsicEngine repository work and workflow questions. Routes from the authoritative AGENTS.md contract to the specialist procedure needed for the touched scope.
 ---
 
-# IntrinsicEngine Core Contract
+# IntrinsicEngine Core
 
-This skill is the agent-facing entry point for working in the IntrinsicEngine
-repository. The authoritative on-disk contract is `AGENTS.md` at the repo root;
-this skill mirrors it and routes to expanded procedures.
+`AGENTS.md` at the repository root owns the engineering contract and takes
+precedence over this router. Read it and
+`references/session-onboarding.md` at session start, then the task note being
+continued, if one exists. Read each source once; use either a canonical doc
+or its generated reference, never both. Do not reload material already read
+in the current session unless it changed.
 
-If `AGENTS.md` in the checkout ever disagrees with this skill, **`AGENTS.md` wins**.
-Always re-read `AGENTS.md` at the start of a session — this skill is a routing
-aid, not a replacement.
+The onboarding document owns postures, authorization, work selection,
+isolation, verification, and commit hygiene. Read `tasks/SESSION-BRIEF.md`
+and `tasks/backlog/README.md` only when selecting backlog work. Interactive
+work uses the micro lane when a persistent note is needed; task claims,
+work graphs, and completion reports belong to unattended or opt-in custody
+work. Research claims still follow `AGENTS.md` §8b in every posture.
 
-## Session start sequence
+## Specialist routing
 
-Read in this order, only as deep as the touched scope requires:
-
-1. `/AGENTS.md` — authoritative contract. Re-read every session.
-2. `references/session-onboarding.md` (mirror of
-   `docs/agent/prompt/prompt.md`) — the pair workflow: postures
-   (Pair/Delegate/Advisor), hint tiers, question protocol, risk gates,
-   deferred-hint ledger, unattended overnight mode.
-3. The task note you are continuing (`tasks/active/`), when one exists —
-   read completely before touching code.
-4. `tasks/SESSION-BRIEF.md` (generated open/unblocked view; regenerate with
-   `python3 tools/agents/generate_session_brief.py` after opening, retiring,
-   or re-gating any task) and `tasks/backlog/README.md` — only when picking
-   backlog work.
-5. The specialist procedure for your touched scope (see "Routing" below).
-
-Default posture is **Pair** (observant copilot); Delegate and Advisor switch
-verbally. Claim, work-graph, and completion-evidence machinery is scoped to
-unattended overnight runs and opt-in custody profiles — interactive sessions
-owe none of it (see the session-onboarding reference).
-
-Then inspect repo state before choosing work:
-
-```bash
-git status --short --branch
-git log --oneline -10
-ls tasks/active/
-```
-
-For the full default session onboarding (work selection, slice picking, anti-patterns
-to refuse), read `references/session-onboarding.md`.
-
-## Architecture invariants (non-negotiable)
-
-Dependency boundaries — lower layers never import higher layers:
-
-- `core` → nothing
-- `geometry` → `core`
-- `assets` → `core`
-- `ecs` → `core`; geometry handles/types only when explicitly required
-- `physics` → `core`, `geometry`; no live ECS/runtime/graphics/platform/app ownership
-- `graphics/rhi` → `core`
-- `graphics/assets` → `core`, asset IDs (`Asset.Registry` types only), `graphics/rhi`; no live `AssetService` traffic
-- `graphics/vulkan` → `core`, `graphics/rhi`, backend-local Vulkan deps (`Vulkan::Vulkan`, `volk`, `VulkanMemoryAllocator`, `glfw`); **no ECS, runtime, or live asset-service knowledge**, and no `Vk*` types through RHI/renderer APIs
-- `graphics/*` → `core`, asset IDs, `graphics/rhi`, geometry GPU views; **no live ECS knowledge**
-- `platform` → `core`
-- `runtime` → all lower layers; owns composition/wiring, including physics bridge ownership
-- `app` → `runtime` only
-- `methods` → public method API + declared backend integration only
-- `benchmarks` → public method APIs only
-- `tests` → explicit test seams only
-
-Cross-layer convenience imports that violate this table are prohibited.
-
-## Coding rules
-
-- Use C++23.
-- Preserve existing module names during mechanical directory moves.
-- Do not mix mechanical moves with semantic refactors.
-- Avoid introducing new engine features during reorganization tasks.
-- Keep patches small and scoped to one task unless explicitly batched.
-- Prefer deterministic, testable APIs with explicit ownership and failure states.
-- Out-of-source CMake presets only; `CMakeLists.txt` rejects in-source configure.
-- Presets require Clang 20 as the minimum supported major version and auto-select the highest
-  complete installed Clang toolchain (`clang`, `clang++`, and matching `clang-scan-deps`) at
-  version 20 or newer. **GCC and stale non-preset build trees are not valid verification for
-  module changes.**
-- Declare module libraries with `intrinsic_add_module_library(...)` from
-  `cmake/IntrinsicModule.cmake`, and module interfaces via
-  `target_sources(... FILE_SET CXX_MODULES TYPE CXX_MODULES FILES ...)`.
-- Keep `.cppm` module interfaces focused on exported types, declarations, small
-  inline accessors, and templates that must be visible to importers. Put
-  non-trivial implementations in matching `.cpp` module implementation units and
-  add them as private target sources. Treat an implementation as non-trivial when
-  it owns algorithm/control-flow bodies, allocation-heavy work, topology/container
-  traversal, backend calls, diagnostics assembly, file/IO handling, or imports
-  other modules only needed by the implementation rather than the public API.
-- Keep source documentation concise: each project-owned `.cppm` and header has
-  a brief what-and-why synopsis, declaration comments exist only for mandatory
-  non-obvious contracts, implementation rationale stays with implementation,
-  and README files describe current state. Route audits and cleanup through
-  `intrinsicengine-source-documentation`.
-- Third-party C/C++ deps go through `vcpkg.json` and the repository-local vcpkg
-  toolchain (`external/vcpkg/scripts/buildsystems/vcpkg.cmake`) chainloaded with
-  `cmake/IntrinsicClangToolchain.cmake`. Run `tools/setup/bootstrap_vcpkg.sh` on
-  fresh checkouts; use `VCPKG_BINARY_SOURCES` for local/CI binary caching.
-  `cmake/Dependencies.cmake` is vcpkg-manifest-only; new dependency traffic must
-  go through `vcpkg.json`, `vcpkg-configuration.json`, or repository overlay
-  ports.
-
-## Default build and test commands
-
-```bash
-# Configure
-cmake --preset ci
-
-# Build tests
-cmake --build --preset ci --target IntrinsicTests
-
-# Default CPU-supported correctness gate
-ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
-```
-
-Note: `CMakePresets.json` defines configure/build presets but no CTest presets;
-invoke CTest with `--test-dir build/ci` rather than `ctest --preset ci`.
-
-For local iteration on changed paths, prefer the touched-scope helper before the
-full gate:
-
-```bash
-python3 tools/ci/touched_scope.py --root . --base-ref origin/main --head-ref HEAD --preset ci-fast --preset-build-dir build/ci-fast --build-dir build/ci-fast --print
-python3 tools/ci/touched_scope.py --root . --base-ref origin/main --head-ref HEAD --preset ci-fast --preset-build-dir build/ci-fast --build-dir build/ci-fast --run
-```
-
-The helper drives the staged `pr-fast` feedback lane: structural-only changes
-skip C++ setup, focused source changes use the unsanitized Null/headless
-`ci-fast` preset, and ambiguous or graph-affecting changes broaden. It is not a
-replacement for the full CPU, sanitizer, or capability-specific PR/merge
-gates.
-
-Touched-scope structural checks (run when relevant):
-
-```bash
-python3 tools/agents/check_task_policy.py --root . --strict
-python3 tools/docs/check_doc_links.py --root .
-python3 tools/repo/check_layering.py --root src --strict
-python3 tools/repo/check_test_layout.py --root . --strict
-```
-
-## Platform and runtime configuration
-
-- Platform backend is explicit: `INTRINSIC_PLATFORM_BACKEND=Auto|Null|Glfw`.
-  Use `Null` / `INTRINSIC_HEADLESS_NO_GLFW=ON` for headless work unless a task
-  specifically needs GLFW/Vulkan surface coverage.
-- Runtime owns graphics backend selection. Promoted Vulkan is opt-in only when
-  both `INTRINSIC_RUNTIME_ENABLE_PROMOTED_VULKAN=ON` and
-  `RenderConfig::EnablePromotedVulkanDevice` are enabled; otherwise Vulkan
-  requests fall back to the Null device.
-- Renderer/runtime code must gate on `RHI::IDevice::IsOperational()`, not on
-  Vulkan diagnostics.
-
-## Routing — specialist skills and references
-
-Load the specialist skill for the touched scope rather than reading every guide:
+Load only the procedure whose scope applies. The names below resolve under
+`tools/agents/skills/<name>/SKILL.md`.
 
 | Touched scope | Skill to consult |
 | --- | --- |
@@ -183,87 +48,15 @@ Load the specialist skill for the touched scope rather than reading every guide:
 | Navigating module deps, change impact, or paper→method→code links | Knowledge-graph discovery aid (below) |
 | Compacting a long session into a handoff doc for the next agent | `intrinsicengine-handoff` |
 
-## Knowledge-graph discovery aid (use it before manual tracing)
+## Discovery and expanded references
 
-A `knowledge-graph` MCP server (registered in `.mcp.json`, provisioned by session
-setup) serves a merged graph of the whole-repo C++23 module DAG **and** the
-paper→method→code chain. Its dependency edges come **only from C++23 module
-`import` statements** — the adapters do not parse `#include`, so header include
-dependencies are absent from the graph. Reach for it in these cases:
+The optional knowledge graph helps navigate module imports and paper/method
+links. It omits header includes and is never a gate: confirm findings in
+source and with `tools/repo/check_layering.py`. If unavailable, use source
+search. Read `references/contract.md` §"Knowledge-graph discovery aid
+(optional)" for query details only when needed.
 
-- **Before touching a `.cppm` interface** — `get_neighbors` to see which modules
-  it imports and who imports it.
-- **Scoping a change's module-level blast radius** (review, docs-sync) —
-  `shortest_path` and reverse-dependency walks over module `import` edges to
-  find downstream consumers.
-- **Suspected layering problem** — edges are pre-tagged
-  `same-layer`/`allowed`/`violation`; spot it on the graph, then **confirm with
-  `tools/repo/check_layering.py --root src --strict`**, which stays the sole gate.
-- **Architecture hot-spots** — `god_nodes`/`graph_stats` for over-connected modules.
-- **Paper-claim ↔ code traceability** — trace which paper claim a method
-  implements and which modules realize it (see `intrinsicengine-method`).
-
-**For `#include`-based dependencies the graph is incomplete** — any unit still
-using C/C++ headers will have include edges the graph does not show. For those
-units, fall back to source search (Grep/Glob) and to
-`tools/repo/check_layering.py`, which is the authority that covers **both**
-`import` and `#include` edges. The graph is a module-import navigation aid, never
-an authority: confirm every finding against the gate (`check_layering.py`) or the
-method contract (`method.yaml` + `docs/methods/*`) before you act. If the server
-is absent, proceed normally — no task depends on it. Full use-case detail:
-`references/contract.md` §"Knowledge-graph discovery aid".
-
-References bundled with this skill (read on demand):
-
-- `references/contract.md` — expanded rationale for invariants, mission, and protocols.
-  Read during onboarding, contract edits, or when you need the *why* behind a rule.
-- `references/roles.md` — the pair-workflow postures (Pair, Delegate, Advisor)
-  and the unattended overnight / custody responsibilities.
-- `references/session-onboarding.md` — the default generic session prompt: how to
-  find work, scope it, verify it, and ship it; commit/PR hygiene; anti-patterns.
-
-## Method implementation protocol (high-level)
-
-Method/paper work must follow this order — see `intrinsicengine-method` for the
-full procedure and review checklist:
-
-1. Intake paper + define method contract.
-2. Implement CPU reference backend first.
-3. Add correctness tests.
-4. Add benchmark harness/manifests.
-5. Add optimized CPU backend.
-6. Add GPU backend only after reference parity exists.
-7. Document numerical limitations and diagnostics.
-
-## Commit and PR hygiene
-
-- One task per PR unless explicitly batched.
-- Separate commits for independent slices and for non-trivial docs/task sync.
-- Stage only intentional changes; never include editor/build artifacts.
-- **Never use `--no-verify`, `--amend` on shared history, or force-push to `main`/`master`.**
-- Commit messages: imperative subject ≤ 72 chars; body explains *why* and lists
-  verification commands actually run.
-- Retire completed active tasks to `tasks/done/` with completion date (`YYYY-MM-DD`)
-  and commit/PR reference, append the narrative to `tasks/done/RETIREMENT-LOG.md`,
-  and regenerate `tasks/SESSION-BRIEF.md`.
-
-## Temporary migration exceptions
-
-Allowed only when **all** of the following hold:
-
-- documented in a current task under `tasks/active/`,
-- linked to a specific removal task ID,
-- time-bounded and reviewed,
-- does not create new violations in promoted final layers.
-
-Undocumented exceptions are policy violations.
-
-## When stuck
-
-- Add a nonblocking clarification question to the relevant task file rather
-  than blocking; pick the more robust default and continue.
-- Prefer the more deterministic, more testable, smaller-blast-radius option.
-- If a task is too large for one slice, write the slice plan into the task file
-  *before* implementing.
-- If state on disk surprises you (unfamiliar files, branches, locks), investigate
-  before deleting or overwriting — it may be in-progress work on another branch.
+- `references/session-onboarding.md` — the session loop and risk decisions.
+- `references/contract.md` — expanded engineering rationale and setup details;
+  consult for contract changes or questions not answered by `AGENTS.md`.
+- `references/roles.md` — responsibilities by posture and lane.

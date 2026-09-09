@@ -81,6 +81,25 @@ Aligns with the maturity taxonomy in `docs/agent/task-maturity.md`: a task closi
 `Scaffolded` or `CPUContracted` rarely owns a claim, while `Operational` and `ParityProven`
 usually do, because both assert observed behavior.
 
+## Evidence appropriate to the claim
+
+Every research-result claim still needs its ledger row and concrete proof.
+Choose evidence that can falsify the particular statement:
+
+| Claim | Required supporting evidence |
+|---|---|
+| Performance improvement | Declared benchmark manifest, matched baseline comparison, and source-bound results under `AGENTS.md` §8 |
+| Numerical or behavioral parity | Reference comparison covering the claimed cases, tolerances, and failure behavior |
+| Operational capability | A recorded run of the named backend or integration path, including actual execution versus skip/fallback |
+| Method correctness or limitations | Correctness tests, reference/analytic comparisons, or discriminating experiments appropriate to the formulation |
+
+Combined statements owe each applicable evidence class. A capability/parity
+statement alone does not require a new performance benchmark; new method
+implementations still owe the benchmark harness in the method workflow.
+CPU, GPU/Vulkan, and sanitizer results remain distinct evidence classes.
+Ordinary implementation and refactoring does not enter the research ledger
+unless it produces a research-result claim (`AGENTS.md` §8b).
+
 ## Running an evidence campaign (the experiment loop)
 
 The ledger records outcomes; this loop produces them. It applies whenever an

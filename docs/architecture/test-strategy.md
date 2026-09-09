@@ -88,10 +88,12 @@ Operational expectations:
   or run conservative affected checks from changed paths:
 
   ```bash
-  python3 tools/ci/touched_scope.py --root . --base-ref origin/main --head-ref HEAD --preset ci-fast --preset-build-dir build/ci-fast --build-dir build/ci-fast --print
-  python3 tools/ci/touched_scope.py --root . --base-ref origin/main --head-ref HEAD --preset ci-fast --preset-build-dir build/ci-fast --build-dir build/ci-fast --run
+  python3 tools/ci/touched_scope.py --root . --local --base-ref origin/main --preset ci-fast --preset-build-dir build/ci-fast --build-dir build/ci-fast --print
+  python3 tools/ci/touched_scope.py --root . --local --base-ref origin/main --preset ci-fast --preset-build-dir build/ci-fast --build-dir build/ci-fast --run
   ```
 
+  `--local` includes committed, staged, unstaged, and non-ignored untracked
+  changes. CI omits it and compares supplied revisions only.
   The route artifact records changed files, reasons, fallback state, targets,
   labels, selected cases, command closure, and per-batch timing. This feedback
   lane is not a replacement for the full CPU, sanitizer, or capability-specific

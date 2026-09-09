@@ -22,6 +22,10 @@ a rotating weekly-review ownership). Responsibilities now attach to
 - Honors the risk gates (dependency edges, public surfaces, claims,
   destructive actions) before landing.
 
+All postures retain the agreed authorization and use one writer per checkout
+and build directory (`AGENTS.md` §11). New decisions follow the risk gates;
+routine implementation choices within scope do not require repeated approval.
+
 ## Advisor (direction and research)
 
 - Situates from real state; maps 2–3 directions and recommends one.

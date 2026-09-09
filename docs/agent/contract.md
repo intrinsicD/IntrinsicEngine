@@ -151,12 +151,16 @@ normally — no task depends on it.
   - Treat `Testing/Temporary/LastTestsFailed.log` as historical state only. A failure is current only when reproduced by the CTest command just run.
   - For noisy or long builds, preserve the full log with `tee` and display only the tail, for example `2>&1 | tee /tmp/intrinsic-build.log | tail -n 120`. Use `set -o pipefail` so failures are not hidden by filtering.
   - Do not use long-running broad targets as the first verification step. Run focused build/test targets first, then broaden only when the focused gate passes and the task requires it.
-  - For local iteration on changed paths, `python3 tools/ci/touched_scope.py --root . --base-ref origin/main --head-ref HEAD --preset ci-fast --preset-build-dir build/ci-fast --build-dir build/ci-fast --print` can plan conservative affected build targets, CTest labels, and structural checks; use `--run` to execute the staged plan. The same planner drives `pr-fast`: structural-only routes skip C++ setup, source routes configure the unsanitized Null/headless `ci-fast` preset, and selected test producers are reconciled against the fresh registry before build. Missing or ambiguous diffs, module interfaces, headers, build/dependency inputs, and unknown paths fail closed to the bounded broad route. This feedback lane is not a substitute for the full CPU, sanitizer, or capability-specific PR/merge gates.
+  - For local iteration on changed paths, `python3 tools/ci/touched_scope.py --root . --local --base-ref origin/main --preset ci-fast --preset-build-dir build/ci-fast --build-dir build/ci-fast --print` can plan conservative affected build targets, CTest labels, and structural checks; use `--run` to execute the staged plan. The same planner drives `pr-fast`: structural-only routes skip C++ setup, source routes configure the unsanitized Null/headless `ci-fast` preset, and selected test producers are reconciled against the fresh registry before build. Missing or ambiguous diffs, module interfaces, headers, build/dependency inputs, and unknown paths fail closed to the bounded broad route. This feedback lane is not a substitute for the full CPU, sanitizer, or capability-specific PR/merge gates.
 - The default CPU-supported correctness gate is:
 
   ```bash
   ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
   ```
+
+- Working-tree iteration uses `--local` to include committed, staged, unstaged,
+  and non-ignored untracked changes. CI omits it and compares only supplied
+  base/head revisions.
 
 - Codex verification must configure the `ci` preset, build a real target such as `IntrinsicTests`, and run CTest. It must not use build-only or `--target help` verification as a substitute for tests.
 

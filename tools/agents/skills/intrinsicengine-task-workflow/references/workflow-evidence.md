@@ -59,8 +59,10 @@ worktree: /absolute/worktree/path
 claimed_at: "2026-07-29T12:00:00Z"
 ```
 
-Use one writer per worktree. Parallel coding work uses separate branches and
-worktrees. Acquire ownership before substantive edits:
+The one-writer-per-checkout/build-directory rule in `AGENTS.md` §11 applies
+in every posture. Parallel coding uses separate branches, worktrees, and build
+directories. In this unattended/custody lane, additionally acquire ownership
+before substantive edits:
 
 ```bash
 python3 tools/agents/task_claim.py acquire \

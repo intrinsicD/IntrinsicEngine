@@ -1,76 +1,25 @@
-## Summary
-- Task ID(s): <!-- e.g. RORG-080 -->
-- What changed:
-- Why this change is needed:
+## Change
 
-## Type
-- [ ] Documentation-only
-- [ ] Mechanical move/refactor (no semantic changes)
-- [ ] Behavioral/code change
-- [ ] Build/CI/tooling change
+<!-- State the concrete problem, resulting behavior, and why. Link a task when
+one exists; single-session work does not require a task file. -->
 
-## Layering
-- [ ] I verified this change preserves the architecture invariants in `AGENTS.md`.
-- [ ] I verified no prohibited cross-layer dependency was added.
-- [ ] If a temporary exception was introduced, it is tracked by a current task under `tasks/active/` with a removal task ID.
+## Verification
 
-## Tests
-- Test category decision (required):
-  - [ ] `unit`
-  - [ ] `contract`
-  - [ ] `integration`
-  - [ ] `regression`
-  - [ ] `gpu`
-  - [ ] `benchmark`
-- [ ] I ran the strongest relevant subset of checks for this change.
-- [ ] If I used `tools/ci/touched_scope.py`, I pasted the selected commands/results and noted whether full CPU CI is still required.
-- [ ] If tests were not run/updated, I explained why.
+<!-- Commands actually run and results; relevant test categories/capabilities.
+For touched-scope feedback, state the selected scope and any required full CI
+still pending. Explain omitted verification and material limitations. -->
 
-## Docs
-- Docs-sync decision (required):
-  - [ ] Docs updated in this PR.
-  - [ ] Docs not required (reason provided below).
-- Docs touched / rationale:
-  - <!-- list files or explain why no docs change is required -->
+## Review
 
-## Performance
-- [ ] No measurable performance impact expected.
-- [ ] Performance-sensitive code changed; benchmark/SLO impact was checked.
-- Notes:
-  - <!-- include benchmark links/results if applicable -->
+<!-- Address only what applies: dependency/public-surface impact, docs updates
+or why none are needed, and temporary exceptions with owner/removal task.
+The four-point sweep remains required: scope, layering, tests, docs. -->
 
-## Benchmarking
-- [ ] Method manifests changed (`methods/**/method.yaml`) and validator considerations were reviewed.
-- [ ] Benchmark manifests changed (`benchmarks/**`) and validator considerations were reviewed.
-- [ ] Benchmark result JSON schema impact considered/updated.
-- Notes:
-  - <!-- N/A is acceptable with a short reason -->
-
-## Agent self-review
-- Workflow profile:
-- Evidence report:
-- Fixed reviewed revision/content digest (high-risk+):
-- [ ] Scope matches one task (or approved batch).
-- [ ] Mechanical and semantic changes are not mixed.
-- [ ] Build/test/docs/tooling updates are synchronized for touched scope.
-- [ ] I reviewed diff for accidental unrelated changes.
-- [ ] Enrolled completion evidence validates; self-review is not presented as
-      independent acceptance.
-
-## Temporary shims
-- [ ] No temporary shim introduced.
-- [ ] Temporary shim introduced and tracked with owner + removal task.
-- Shim details:
-  - <!-- shim path, removal task ID, expected removal date -->
-
-## References
-- Contract: `/AGENTS.md`
-- Task format: `/docs/agent/task-format.md`
-- Review doc (sweep + deep review): `/docs/agent/review.md`
-- Touched-scope verification helper: `/docs/build-troubleshooting.md#fast-touched-scope-verification`
-- Architecture deep review: `/docs/agent/review.md` ("Deep review: architecture")
-- Method workflow: `/docs/agent/method-workflow.md`
-- Method review checklist: `/docs/agent/method-workflow.md` ("Review checklist")
-- Benchmark workflow: `/docs/agent/benchmark-workflow.md`
-
-- Benchmark review checklist: `/docs/agent/benchmark-workflow.md` ("Review checklist")
+<!-- Add an Evidence section only when required:
+- Research claims: claim IDs and appropriate proof; matched benchmarks for
+  performance improvements, reference comparisons for parity, actual backend
+  or integration runs for operational capability.
+- Unattended standard+ or opt-in custody: workflow profile and completion
+  report. High-risk+ also names the fixed reviewed revision/digest and
+  independent acceptance. Interactive work owes no completion report.
+See docs/agent/review.md and docs/agent/workflow-evidence.md. -->

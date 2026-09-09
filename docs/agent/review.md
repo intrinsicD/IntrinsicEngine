@@ -61,9 +61,10 @@ When a task moves to `tasks/done/`:
 ## Deep review: architecture (risk-gated)
 
 Run when a change touches dependency boundaries, module ownership, source
-layout, runtime wiring, or architecture docs — after presenting the
-module-level impact and getting the explicit human OK required by the risk
-gates in `docs/agent/prompt/prompt.md`.
+layout, runtime wiring, or architecture docs. Review the module-level impact;
+request a human decision only for the authorization boundaries in
+`docs/agent/prompt/prompt.md` §"Risk gates". An allowed dependency edge within
+the agreed task needs review, not a repeated approval.
 
 **Layering and ownership**
 

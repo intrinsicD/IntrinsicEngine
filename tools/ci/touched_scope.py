@@ -389,6 +389,43 @@ def collect_change_records(
     return merge_base, parse_name_status_z(result.stdout)
 
 
+def collect_local_change_records(
+    root: Path,
+    base_ref: str,
+) -> tuple[str, list[ChangeRecord]]:
+    """Include committed, staged, unstaged, and non-ignored untracked paths.
+
+    Keep each status rather than collapsing to a net diff: an unstaged edit
+    can undo a staged edit, and a delete/rename must still broaden routing.
+    """
+    merge_base, records = collect_change_records(root, base_ref, "HEAD")
+    commands = (
+        ["git", "diff", "--cached", "--name-status", "-z", "--find-renames", "HEAD", "--"],
+        ["git", "diff", "--name-status", "-z", "--find-renames", "--"],
+        ["git", "ls-files", "--others", "--exclude-standard", "-z"],
+    )
+    for command in commands:
+        try:
+            result = subprocess.run(command, cwd=root, check=False, capture_output=True)
+        except OSError as exc:
+            raise DiffError(f"could not collect local changes: {exc}") from exc
+        if result.returncode != 0:
+            stderr = result.stderr.decode("utf-8", errors="replace").strip()
+            raise DiffError(
+                f"{shlex.join(command)} failed: {stderr or f'exit {result.returncode}'}"
+            )
+        if command[1] == "ls-files":
+            if result.stdout and not result.stdout.endswith(b"\0"):
+                raise DiffError("git ls-files output is not NUL-terminated")
+            payload = b"".join(
+                b"A\0" + path + b"\0" for path in result.stdout.split(b"\0")[:-1]
+            )
+        else:
+            payload = result.stdout
+        records.extend(parse_name_status_z(payload))
+    return merge_base, list(dict.fromkeys(records))
+
+
 def _reason(
     reasons: list[dict[str, str]],
     code: str,
@@ -1631,6 +1668,7 @@ def execute_tests(
 
 def print_plan(route: dict[str, Any], args: argparse.Namespace) -> None:
     print("Touched-scope verification plan")
+    print(f"Change scope: {route['diff'].get('scope', 'revisions')}")
     print(f"Route: {route['route']}")
     print(f"C++ setup required: {'yes' if route['needs_cpp'] else 'no'}")
     print("Changed files:")
@@ -1681,11 +1719,14 @@ def _plan_from_args(args: argparse.Namespace, root: Path) -> dict[str, Any]:
             )
     else:
         try:
-            merge_base, records = collect_change_records(
-                root,
-                args.base_ref,
-                args.head_ref,
-            )
+            if args.local:
+                merge_base, records = collect_local_change_records(root, args.base_ref)
+            else:
+                merge_base, records = collect_change_records(
+                    root,
+                    args.base_ref,
+                    args.head_ref,
+                )
             route = analyze_change_records(
                 records,
                 base_ref=args.base_ref,
@@ -1698,6 +1739,9 @@ def _plan_from_args(args: argparse.Namespace, root: Path) -> dict[str, Any]:
                 base_ref=args.base_ref,
                 head_ref=args.head_ref,
             )
+    route["diff"]["scope"] = (
+        "local" if args.local else "explicit" if args.changed_file else "revisions"
+    )
     route["planning"] = {
         "elapsed_seconds": round(time.monotonic() - started, 6),
     }
@@ -1945,7 +1989,13 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     )
     parser.add_argument("--base-ref", default="origin/main")
     parser.add_argument("--head-ref", default="HEAD")
-    parser.add_argument("--changed-file", action="append", default=[])
+    scope = parser.add_mutually_exclusive_group()
+    scope.add_argument(
+        "--local",
+        action="store_true",
+        help="Include changes through HEAD plus staged, unstaged, and untracked files",
+    )
+    scope.add_argument("--changed-file", action="append", default=[])
     parser.add_argument("--output", help="Route JSON output for plan action")
     parser.add_argument("--plan", help="Existing route JSON for later actions")
     parser.add_argument("--build-dir", default="build/ci-fast")
@@ -1964,6 +2014,8 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     args = parser.parse_args(argv)
     if args.print_only and args.run:
         parser.error("choose only one of --print or --run")
+    if args.local and (args.head_ref != "HEAD" or args.action != "plan"):
+        parser.error("--local requires --head-ref HEAD and the plan action")
     if args.action != "plan" and not args.plan:
         parser.error(f"--action {args.action} requires --plan")
     if args.jobs <= 0 or args.timeout <= 0:

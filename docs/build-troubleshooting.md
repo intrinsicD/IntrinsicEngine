@@ -386,13 +386,20 @@ to plan or run the strongest relevant subset without waiting for the full CPU
 gate every time:
 
 ```bash
-python3 tools/ci/touched_scope.py --root . --base-ref origin/main --head-ref HEAD --preset ci-fast --preset-build-dir build/ci-fast --build-dir build/ci-fast --print
-python3 tools/ci/touched_scope.py --root . --base-ref origin/main --head-ref HEAD --preset ci-fast --preset-build-dir build/ci-fast --build-dir build/ci-fast --run
+python3 tools/ci/touched_scope.py --root . --local --base-ref origin/main --preset ci-fast --preset-build-dir build/ci-fast --build-dir build/ci-fast --print
+python3 tools/ci/touched_scope.py --root . --local --base-ref origin/main --preset ci-fast --preset-build-dir build/ci-fast --build-dir build/ci-fast --run
 ```
 
-The helper first resolves the unique merge base of the supplied base/head refs
-and computes the exact merge-base-to-head name-status diff. Docs/tasks-only
-changes select structural validators without C++ setup. Known implementation
+Local mode combines the merge-base-to-HEAD diff with staged and unstaged
+changes and non-ignored untracked files. It preserves rename/delete/type
+statuses even when changes at different stages cancel each other. Use this
+mode against the current checkout; it cannot be combined with a different
+`--head-ref` or explicit `--changed-file` selection. The route artifact records
+`diff.scope` as `local`, `revisions`, or `explicit`.
+
+CI omits `--local` and supplies exact base/head revisions, so its selection
+remains independent of working-tree state. Docs/tasks-only changes select
+structural validators without C++ setup. Known implementation
 units configure `ci-fast`, then reconcile every owner-labeled producer against
 the generated registry before build. Missing/empty diffs, rename/delete/type
 ambiguity, module interfaces, headers, build/dependency inputs, foundational

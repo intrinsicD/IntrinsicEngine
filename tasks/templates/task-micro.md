@@ -6,11 +6,7 @@ template: micro
 workflow_schema: 1
 workflow_profile: micro
 evidence: not_applicable
-evidence_skip_reason: <why a full completion report is disproportionate>
-owner:
-branch:
-worktree:
-claimed_at:
+evidence_skip_reason: interactive session; evidence is the diff, tests, and CI
 contract_schema: 1
 contracts: []
 contract_review: <why no catalog contract applies>
@@ -32,12 +28,12 @@ contract_review: <why no catalog contract applies>
      ## Log (dated decisions/defaults chosen during interactive work). -->
 
 <!--
-Micro template: for single-slice mechanical work only (small fixes, doc/link
-sweeps, config toggles, test-only additions). `template: micro` in the
-front-matter relaxes validate_tasks.py to these three sections. NOT allowed
-for work that changes dependency boundaries, module ownership, public module
-surfaces, methods/benchmarks, or anything with an ambiguous maturity
-stop-state — those use tasks/templates/task.md (or the method/bug/review
-variants) with the full nine sections. Retirement rules are unchanged:
-checkboxes closed, completion date, commit/PR reference, retirement-log entry.
+Use for interactive work, regardless of slice count, or one-slice mechanical
+work. Single-session work needs no task file. For mechanical unattended work,
+replace evidence_skip_reason with its actual justification. Risk review,
+contract declarations, method integration fields, and research-claim evidence
+still apply when relevant; add a maturity stop-state when ambiguous.
+Unattended non-mechanical work uses the full template and its evidence profile;
+publication custody is opt-in. Retirement rules are unchanged: checkboxes
+closed, completion date, commit/PR reference, retirement-log entry.
 -->
