@@ -1,0 +1,12 @@
+schema_version: 1
+task_id: RUNTIME-223
+sealed_revision: 7bd6c014af927b024204c364d5a5209d7a2db9ed
+source_content_digest: 78badf96782c53bfd24b92e0ae2bc663e5a52ce8a8b933154b591cc1695c15a4
+report_sha256: 926f61ccc5205b9236f0ec8ca5d9cf931d92fbdd5374dd1472b5251bb39f0d45
+records:
+- path: tasks/evidence/RUNTIME-223/handoff.jsonl
+  sha256: d156f4bf8384c74797e2217fcd2da5e9f0a8f061d455ed6664941b18d743ab17
+- path: tasks/evidence/RUNTIME-223/reviews.jsonl
+  sha256: cc1164d27c25d62cea99b66db073e8dc45a160cea6cfff44f2da8a64c4a5aa86
+reason: Bind independently accepted completion evidence to retirement commit.
+generated_by: tools/agents/workflow_evidence.py
