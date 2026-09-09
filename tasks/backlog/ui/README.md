@@ -29,7 +29,7 @@ map.
 - [UI-042 — Signed Heat mesh method panel](UI-042-signed-heat-mesh-panel.md)
   (mesh-only source-curve selection, shared config, runtime execution,
   diagnostics, publication, and scalar visualization after `RUNTIME-210`).
-- [UI-041 — Point-set outlier multi-domain panel](UI-041-point-set-outlier-multi-domain-panel.md)
+- [UI-041 — Point-set outlier multi-domain panel](../../active/UI-041-point-set-outlier-multi-domain-panel.md)
   (Detect on any typed Mesh/Graph/PointCloud element property; explicit Remove
   only on point clouds after `RUNTIME-209`).
 - [UI-037 — Linear domain-action readiness and disabled-reason tooltips](UI-037-linear-domain-action-readiness-tooltips.md)

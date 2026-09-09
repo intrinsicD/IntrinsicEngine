@@ -1,0 +1,89 @@
+Internal ctest changing into directory: /home/alex/Documents/IntrinsicEngine/build/ci
+Test project /home/alex/Documents/IntrinsicEngine/build/ci
+      Start  684: PointSpacingOperations.QueuedJobsRejectStaleInputsOutputsAndCancellation
+ 1/38 Test  #684: PointSpacingOperations.QueuedJobsRejectStaleInputsOutputsAndCancellation ....................   Passed    0.04 sec
+      Start  685: PointSpacingOperations.EveryDomainPublishesNamedRadiiAndPreservesDeletedRowsWithHistory
+ 2/38 Test  #685: PointSpacingOperations.EveryDomainPublishesNamedRadiiAndPreservesDeletedRowsWithHistory .....   Passed    0.02 sec
+      Start  686: PointSpacingOperations.InvalidUnsupportedAndNumericalFailuresRetainOutput
+ 3/38 Test  #686: PointSpacingOperations.InvalidUnsupportedAndNumericalFailuresRetainOutput ...................   Passed    0.01 sec
+      Start  687: PointSpacingOperations.NewOutputUndoAndPositionEditsRebuildTheCache
+ 4/38 Test  #687: PointSpacingOperations.NewOutputUndoAndPositionEditsRebuildTheCache .........................   Passed    0.00 sec
+      Start  688: PointSpacingConfig.RoundTripAndSharedPreviewApplyRun
+ 5/38 Test  #688: PointSpacingConfig.RoundTripAndSharedPreviewApplyRun ........................................   Passed    0.01 sec
+      Start 1334: SandboxEditorPresentation.DefaultDrawStartsWithOnlyMenuBarVisible
+ 6/38 Test #1334: SandboxEditorPresentation.DefaultDrawStartsWithOnlyMenuBarVisible ...........................   Passed    0.04 sec
+      Start 1335: SandboxEditorPresentation.DomainMenusUseAppearanceAndFocusedProcessingWindows
+ 7/38 Test #1335: SandboxEditorPresentation.DomainMenusUseAppearanceAndFocusedProcessingWindows ...............   Passed    0.04 sec
+      Start 1336: SandboxEditorPresentation.DomainPanelsPreserveLifetimeCacheAndResultPublication
+ 8/38 Test #1336: SandboxEditorPresentation.DomainPanelsPreserveLifetimeCacheAndResultPublication .............   Passed    0.00 sec
+      Start 1337: SandboxEditorPresentation.MeshProcessingPanelsPreserveLifetimeAndResultPublication
+ 9/38 Test #1337: SandboxEditorPresentation.MeshProcessingPanelsPreserveLifetimeAndResultPublication ..........   Passed    0.01 sec
+      Start 1338: SandboxEditorPresentation.ExtrinsicSandboxAppStaysRuntimeOnly
+10/38 Test #1338: SandboxEditorPresentation.ExtrinsicSandboxAppStaysRuntimeOnly ...............................   Passed    0.02 sec
+      Start 1339: SandboxEditorPresentation.RuntimeFeatureModulesCompileSeparatelyFromEditorShell
+11/38 Test #1339: SandboxEditorPresentation.RuntimeFeatureModulesCompileSeparatelyFromEditorShell .............   Passed    0.14 sec
+      Start 1340: SandboxEditorPresentation.GeometryProcessingMenusExposeDomainElementSubmenus
+12/38 Test #1340: SandboxEditorPresentation.GeometryProcessingMenusExposeDomainElementSubmenus ................   Passed    0.00 sec
+      Start 1341: SandboxEditorPresentation.AdapterCallbackDrawsDeterministicMenuOnlyFrame
+13/38 Test #1341: SandboxEditorPresentation.AdapterCallbackDrawsDeterministicMenuOnlyFrame ....................   Passed    0.04 sec
+      Start 1342: SandboxEditorPresentation.FileImportDisabledReasonRendersThroughRealHoveredControl
+14/38 Test #1342: SandboxEditorPresentation.FileImportDisabledReasonRendersThroughRealHoveredControl ..........   Passed    0.26 sec
+      Start 1343: SandboxEditorPresentation.DisabledReasonTooltipConventionIsSharedByImportAndQueueControls
+15/38 Test #1343: SandboxEditorPresentation.DisabledReasonTooltipConventionIsSharedByImportAndQueueControls ...   Passed    0.02 sec
+      Start 1344: SandboxEditorPresentation.RuntimeImportEventIsReflectedByAppFilePanel
+16/38 Test #1344: SandboxEditorPresentation.RuntimeImportEventIsReflectedByAppFilePanel .......................   Passed    0.05 sec
+      Start 1345: SandboxEditorPresentation.EngineAttachmentRegistersEditorCallback
+17/38 Test #1345: SandboxEditorPresentation.EngineAttachmentRegistersEditorCallback ...........................   Passed    0.04 sec
+      Start 1346: SandboxEditorPresentation.ControllerReattachPinsPanelAttachmentResetPolicy
+18/38 Test #1346: SandboxEditorPresentation.ControllerReattachPinsPanelAttachmentResetPolicy ..................   Passed    0.09 sec
+      Start 1347: SandboxEditorPresentation.EditorShellStartsWithOnlyBuiltinWindows
+19/38 Test #1347: SandboxEditorPresentation.EditorShellStartsWithOnlyBuiltinWindows ...........................   Passed    0.04 sec
+      Start 1348: SandboxEditorPresentation.GpuProfilingControlsReuseTheExistingFrameGraphWindow
+20/38 Test #1348: SandboxEditorPresentation.GpuProfilingControlsReuseTheExistingFrameGraphWindow ..............   Passed    0.01 sec
+      Start 1349: SandboxEditorPresentation.ExternalWindowContributionNeedsNoLegacySwitchEntry
+21/38 Test #1349: SandboxEditorPresentation.ExternalWindowContributionNeedsNoLegacySwitchEntry ................   Passed    0.04 sec
+      Start 1350: SandboxEditorPresentation.ContextWindowContributionReceivesAppOwnedContext
+22/38 Test #1350: SandboxEditorPresentation.ContextWindowContributionReceivesAppOwnedContext ..................   Passed    0.04 sec
+      Start 1351: SandboxEditorPresentation.GlobalVisibilityHotkeyUsesTheVisibilityCommandPath
+23/38 Test #1351: SandboxEditorPresentation.GlobalVisibilityHotkeyUsesTheVisibilityCommandPath ................   Passed    0.04 sec
+      Start 1352: SandboxEditorPresentation.RegistrationDomainMenusOpenOneSharedWindow
+24/38 Test #1352: SandboxEditorPresentation.RegistrationDomainMenusOpenOneSharedWindow ........................   Passed    0.04 sec
+      Start 1353: SandboxEditorPresentation.NormalDomainMenusOpenOneSharedWindow
+25/38 Test #1353: SandboxEditorPresentation.NormalDomainMenusOpenOneSharedWindow ..............................   Passed    0.04 sec
+      Start 1354: SandboxEditorPresentation.OutlierDomainMenusOpenOneSharedWindow
+26/38 Test #1354: SandboxEditorPresentation.OutlierDomainMenusOpenOneSharedWindow .............................   Passed    0.04 sec
+      Start 1355: SandboxEditorPresentation.DensityDomainMenusOpenOneSharedWindow
+27/38 Test #1355: SandboxEditorPresentation.DensityDomainMenusOpenOneSharedWindow .............................   Passed    0.04 sec
+      Start 1356: SandboxEditorPresentation.SpacingDomainMenusOpenOneSharedWindow
+28/38 Test #1356: SandboxEditorPresentation.SpacingDomainMenusOpenOneSharedWindow .............................   Passed    0.04 sec
+      Start 2024: PointCloud_Statistics.EmptyReturnsNullopt
+29/38 Test #2024: PointCloud_Statistics.EmptyReturnsNullopt ...................................................   Passed    0.00 sec
+      Start 2025: PointCloud_Statistics.SinglePointStats
+30/38 Test #2025: PointCloud_Statistics.SinglePointStats ......................................................   Passed    0.00 sec
+      Start 2026: PointCloud_Statistics.SphereStatistics
+31/38 Test #2026: PointCloud_Statistics.SphereStatistics ......................................................   Passed    0.01 sec
+      Start 2039: PointCloud_Radius.TooFewPointsReturnsNullopt
+32/38 Test #2039: PointCloud_Radius.TooFewPointsReturnsNullopt ................................................   Passed    0.00 sec
+      Start 2040: PointCloud_Radius.SphereRadiiReasonable
+33/38 Test #2040: PointCloud_Radius.SphereRadiiReasonable .....................................................   Passed    0.01 sec
+      Start 2041: PointCloud_Radius.ScaleFactorMultipliesRadius
+34/38 Test #2041: PointCloud_Radius.ScaleFactorMultipliesRadius ...............................................   Passed    0.01 sec
+      Start 2720: PointSpacing.AnalyticRadiiAndNearestSpacingRemainDistinct
+35/38 Test #2720: PointSpacing.AnalyticRadiiAndNearestSpacingRemainDistinct ...................................   Passed    0.00 sec
+      Start 2721: PointSpacing.SuppliedCandidatesMatchOctreeAndCloudForTiesScalesAndExtremeK
+36/38 Test #2721: PointSpacing.SuppliedCandidatesMatchOctreeAndCloudForTiesScalesAndExtremeK ..................   Passed    0.01 sec
+      Start 2722: PointSpacing.StatisticsPreserveDeterministicStrideSampling
+37/38 Test #2722: PointSpacing.StatisticsPreserveDeterministicStrideSampling ..................................   Passed    0.00 sec
+      Start 2723: PointSpacing.MalformedAndUnrepresentableInputsFail
+38/38 Test #2723: PointSpacing.MalformedAndUnrepresentableInputsFail ..........................................   Passed    0.00 sec
+
+100% tests passed, 0 tests failed out of 38
+
+Label Time Summary:
+contract       =   0.09 sec*proc (5 tests)
+geometry       =   0.06 sec*proc (10 tests)
+integration    =   1.14 sec*proc (23 tests)
+runtime        =   1.22 sec*proc (28 tests)
+unit           =   0.06 sec*proc (10 tests)
+
+Total Test time (real) =   1.69 sec

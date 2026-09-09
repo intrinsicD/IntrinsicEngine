@@ -1,0 +1,83 @@
+Internal ctest changing into directory: /home/alex/Documents/IntrinsicEngine/build/ci-vulkan
+UpdateCTestConfiguration  from :/home/alex/Documents/IntrinsicEngine/build/ci-vulkan/DartConfiguration.tcl
+Parse Config file:/home/alex/Documents/IntrinsicEngine/build/ci-vulkan/DartConfiguration.tcl
+UpdateCTestConfiguration  from :/home/alex/Documents/IntrinsicEngine/build/ci-vulkan/DartConfiguration.tcl
+Parse Config file:/home/alex/Documents/IntrinsicEngine/build/ci-vulkan/DartConfiguration.tcl
+Test project /home/alex/Documents/IntrinsicEngine/build/ci-vulkan
+Constructing a list of tests
+Done constructing a list of tests
+Updating test list for fixtures
+Added 0 tests to meet fixture requirements
+Checking test dependency graph...
+Checking test dependency graph end
+test 13
+    Start 13: PointLBVHGpuSmoke.FramedRadiusPreservesOverflowExclusionAndBufferReuse
+
+13: Test command: /home/alex/Documents/IntrinsicEngine/build/ci-vulkan/bin/IntrinsicPointLBVHGpuTests "--gtest_filter=PointLBVHGpuSmoke.FramedRadiusPreservesOverflowExclusionAndBufferReuse" "--gtest_also_run_disabled_tests"
+13: Working Directory: /home/alex/Documents/IntrinsicEngine/build/ci-vulkan/tests
+13: Environment variables: 
+13:  LSAN_OPTIONS=fast_unwind_on_malloc=0:detect_leaks=0
+13:  ASAN_OPTIONS=symbolize=1:detect_leaks=0:fast_unwind_on_malloc=0
+13:  ASAN_SYMBOLIZER_PATH=/usr/bin/llvm-symbolizer-18
+13: Test timeout computed to be: 30
+13: Running main() from /home/alex/Documents/IntrinsicEngine/external/vcpkg/buildtrees/gtest/src/v1.17.0-0c449efaff.clean/googletest/src/gtest_main.cc
+13: Note: Google Test filter = PointLBVHGpuSmoke.FramedRadiusPreservesOverflowExclusionAndBufferReuse
+13: [==========] Running 1 test from 1 test suite.
+13: [----------] Global test environment set-up.
+13: [----------] 1 test from PointLBVHGpuSmoke
+13: [ RUN      ] PointLBVHGpuSmoke.FramedRadiusPreservesOverflowExclusionAndBufferReuse
+13: [INFO] Initialized Scheduler with 15 worker threads.
+13: [WARN] [Runtime] Promoted Vulkan device selected; backend remains fail-closed until the first clean default-recipe validation promotes it.
+13: [WARN] [VulkanDevice::Initialize] Vulkan bootstrap created logical-device, queue, VMA, per-frame command/sync, swapchain image/view/handle, bindless heap, transfer queue, and global pipeline-layout state; canonical frame execution waits for the first clean recipe validation publish, so device remains non-operational during cold start.
+13: [WARN] [Runtime] VulkanRequestedButNotOperational status=RequestedButIncompleteGate reason=BarrierValidationFailed
+13: [       OK ] PointLBVHGpuSmoke.FramedRadiusPreservesOverflowExclusionAndBufferReuse (12640 ms)
+13: [----------] 1 test from PointLBVHGpuSmoke (12640 ms total)
+13: 
+13: [----------] Global test environment tear-down
+13: [==========] 1 test from 1 test suite ran. (12641 ms total)
+13: [  PASSED  ] 1 test.
+1/2 Test #13: PointLBVHGpuSmoke.FramedRadiusPreservesOverflowExclusionAndBufferReuse ................   Passed   12.69 sec
+test 14
+    Start 14: PointLBVHGpuSmoke.NormalNeighborhoodsPublishAcrossDomainsAndRejectIncompleteSupport
+
+14: Test command: /home/alex/Documents/IntrinsicEngine/build/ci-vulkan/bin/IntrinsicPointLBVHGpuTests "--gtest_filter=PointLBVHGpuSmoke.NormalNeighborhoodsPublishAcrossDomainsAndRejectIncompleteSupport" "--gtest_also_run_disabled_tests"
+14: Working Directory: /home/alex/Documents/IntrinsicEngine/build/ci-vulkan/tests
+14: Environment variables: 
+14:  LSAN_OPTIONS=fast_unwind_on_malloc=0:detect_leaks=0
+14:  ASAN_OPTIONS=symbolize=1:detect_leaks=0:fast_unwind_on_malloc=0
+14:  ASAN_SYMBOLIZER_PATH=/usr/bin/llvm-symbolizer-18
+14: Test timeout computed to be: 120
+14: Running main() from /home/alex/Documents/IntrinsicEngine/external/vcpkg/buildtrees/gtest/src/v1.17.0-0c449efaff.clean/googletest/src/gtest_main.cc
+14: Note: Google Test filter = PointLBVHGpuSmoke.NormalNeighborhoodsPublishAcrossDomainsAndRejectIncompleteSupport
+14: [==========] Running 1 test from 1 test suite.
+14: [----------] Global test environment set-up.
+14: [----------] 1 test from PointLBVHGpuSmoke
+14: [ RUN      ] PointLBVHGpuSmoke.NormalNeighborhoodsPublishAcrossDomainsAndRejectIncompleteSupport
+14: [INFO] Initialized Scheduler with 15 worker threads.
+14: [WARN] [Runtime] Promoted Vulkan device selected; backend remains fail-closed until the first clean default-recipe validation promotes it.
+14: [WARN] [VulkanDevice::Initialize] Vulkan bootstrap created logical-device, queue, VMA, per-frame command/sync, swapchain image/view/handle, bindless heap, transfer queue, and global pipeline-layout state; canonical frame execution waits for the first clean recipe validation publish, so device remains non-operational during cold start.
+14: [WARN] [Runtime] VulkanRequestedButNotOperational status=RequestedButIncompleteGate reason=BarrierValidationFailed
+14: [ERR]  [JobService] Job 'Normal neighborhoods (Vulkan)' completion publisher rejected result type 'std::string_view Extrinsic::Runtime::JobResultTypeNameOf() [TResult = bool]'; completion dropped.
+14: [ERR]  [JobService] Job 'Normal neighborhoods (Vulkan)' completion publisher rejected result type 'std::string_view Extrinsic::Runtime::JobResultTypeNameOf() [TResult = bool]'; completion dropped.
+14: [ERR]  [JobService] Job 'Normal neighborhoods (Vulkan)' completion publisher rejected result type 'std::string_view Extrinsic::Runtime::JobResultTypeNameOf() [TResult = bool]'; completion dropped.
+14: [       OK ] PointLBVHGpuSmoke.NormalNeighborhoodsPublishAcrossDomainsAndRejectIncompleteSupport (43662 ms)
+14: [----------] 1 test from PointLBVHGpuSmoke (43662 ms total)
+14: 
+14: [----------] Global test environment tear-down
+14: [==========] 1 test from 1 test suite ran. (43662 ms total)
+14: [  PASSED  ] 1 test.
+2/2 Test #14: PointLBVHGpuSmoke.NormalNeighborhoodsPublishAcrossDomainsAndRejectIncompleteSupport ...   Passed   43.70 sec
+
+The following tests passed:
+	PointLBVHGpuSmoke.FramedRadiusPreservesOverflowExclusionAndBufferReuse
+	PointLBVHGpuSmoke.NormalNeighborhoodsPublishAcrossDomainsAndRejectIncompleteSupport
+
+100% tests passed, 0 tests failed out of 2
+
+Label Time Summary:
+gpu            =  56.39 sec*proc (2 tests)
+graphics       =  56.39 sec*proc (2 tests)
+integration    =  56.39 sec*proc (2 tests)
+vulkan         =  56.39 sec*proc (2 tests)
+
+Total Test time (real) =  56.57 sec

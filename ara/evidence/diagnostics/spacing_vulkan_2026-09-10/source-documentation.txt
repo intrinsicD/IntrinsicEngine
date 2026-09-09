@@ -1,0 +1,5 @@
+[source-documentation] files=6 interfaces=4 cpp=6 readmes=0 errors=0 review=31
+[source-documentation] rules: declaration-comment=30, source-large=1
+HOTSPOT src/geometry/Geometry.PointCloud.Utils.cppm findings=27 errors=0 review=27
+HOTSPOT src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.cppm findings=3 errors=0 review=3
+HOTSPOT src/runtime/Editor/internal/Runtime.EditorFeatures.Detail.cppm findings=1 errors=0 review=1

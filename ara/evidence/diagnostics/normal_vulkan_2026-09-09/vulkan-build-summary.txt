@@ -1,0 +1,12 @@
+[714/725] Scanning /home/alex/Documents/IntrinsicEngine/src/runtime/AssetWorkflow/Runtime.AssetWorkflowGeometryMaterialization.cppm for CXX dependencies
+[715/725] Scanning /home/alex/Documents/IntrinsicEngine/src/runtime/Editor/internal/Runtime.EditorWorkspaceAttachment.Detail.cppm for CXX dependencies
+[716/725] Scanning /home/alex/Documents/IntrinsicEngine/src/runtime/AssetWorkflow/Runtime.AssetWorkflowModelMaterialization.cppm for CXX dependencies
+[717/725] Scanning /home/alex/Documents/IntrinsicEngine/src/runtime/AssetWorkflow/Runtime.AssetWorkflowTextureResidency.cppm for CXX dependencies
+[718/725] Scanning /home/alex/Documents/IntrinsicEngine/src/runtime/Editor/internal/Runtime.EditorFeatures.Detail.cppm for CXX dependencies
+[719/725] Scanning /home/alex/Documents/IntrinsicEngine/src/runtime/AssetWorkflow/Runtime.AssetWorkflowImportExecutor.cppm for CXX dependencies
+[720/725] Scanning /home/alex/Documents/IntrinsicEngine/src/runtime/Rendering/Runtime.RenderExtraction.Internal.cpp for CXX dependencies
+[721/725] Scanning /home/alex/Documents/IntrinsicEngine/tests/integration/graphics/Test.PointLBVHGpuSmoke.cpp for CXX dependencies
+[722/725] Generating CXX dyndep file src/runtime/CMakeFiles/ExtrinsicRuntime.dir/CXX.dd
+[723/725] Generating CXX dyndep file tests/CMakeFiles/PointLBVHGpuTestObjs.dir/CXX.dd
+[724/725] Building CXX object tests/CMakeFiles/PointLBVHGpuTestObjs.dir/integration/graphics/Test.PointLBVHGpuSmoke.cpp.o
+[725/725] Linking CXX executable bin/IntrinsicPointLBVHGpuTests

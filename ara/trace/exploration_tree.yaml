@@ -11573,3 +11573,137 @@ tree:
     also_depends_on:
     - N510
     status: resolved
+
+  - id: N514
+    type: question
+    title: Identify remaining Vulkan LBVH consumer and query gaps
+    provenance: user
+    timestamp: '2026-09-09T19:31:11+02:00'
+    description: After pulling e508e7792, the operator asks where Vulkan LBVH is still missing. Source review distinguishes
+      existing k-means/ICP integration, CPU-only normal neighborhoods, remaining point-analysis consumers and primitive/ray
+      traversal requirements.
+    evidence:
+    - docs/architecture/spatial-index-consumers.md
+    - src/runtime/Modules/NormalEstimation/Runtime.NormalEstimationConfig.cppm
+    - src/runtime/GeometryIntegration/Runtime.SpatialIndexCache.cppm
+    status: resolved
+
+  - id: N515
+    type: decision
+    title: Implement Vulkan normal neighborhoods before further consumers
+    provenance: user
+    timestamp: '2026-09-09T20:14:13+02:00'
+    choice: Continue the accepted consumer list with normal estimation now; implement the remaining methods one by one. GPU neighborhoods feed the existing CPU PCA/orientation through shared config and publication.
+    alternatives: [Migrate all consumers together, Replace the CPU normal solver in this slice]
+    evidence: [N514, O210, tasks/active/RUNTIME-219-vulkan-normal-neighborhoods.md]
+    status: resolved
+
+  - id: N516
+    type: experiment
+    title: Verify framed radius queries and Vulkan normal publication
+    provenance: ai-executed
+    timestamp: '2026-09-09T20:14:13+02:00'
+    result: 45 focused CPU checks and 4376 full CPU passes with one expected skip; four existing GPU cases pass initially and two new cases pass after correcting premature readiness skips. Final normal fixture matches CPU components exactly across eight domains and passes cancellation/staleness/history/overflow assertions. Schema-v2 smoke passes; dirty timing is non-claim-eligible and CPU remains the default.
+    evidence: [ara/evidence/diagnostics/normal_vulkan_2026-09-09/record.json, ara/evidence/diagnostics/normal_vulkan_2026-09-09/vulkan-final.txt, ara/evidence/diagnostics/normal_vulkan_2026-09-09/benchmark/runtime-smoke.json]
+    also_depends_on: [N515]
+    status: resolved
+
+  - id: N517
+    type: decision
+    title: Document only the tested hybrid normal capability
+    provenance: ai-executed
+    timestamp: '2026-09-09T20:14:13+02:00'
+    choice: Bind the normal workflow and consumer inventory to O211/C80. Preserve GPU query limits, CPU fitting, KD-tree defaults and deferred outlier adoption; do not infer a speedup from the smoke.
+    alternatives: [Claim full GPU normal solving, Change the backend default without scaling evidence]
+    evidence: [O211, N516, docs/architecture/normal-estimation.md]
+    status: resolved
+
+  - id: N518
+    type: decision
+    title: Continue the consumer sequence with outlier analysis
+    provenance: user
+    timestamp: '2026-09-09T21:49:47+02:00'
+    choice: Implement outlier analysis next after the normal-neighborhood slice; retain separate remaining consumers.
+    alternatives: [Migrate all remaining consumers together]
+    evidence: [N515, tasks/active/RUNTIME-209-point-set-outlier-analysis-publication.md, tasks/active/UI-041-point-set-outlier-multi-domain-panel.md]
+    status: resolved
+
+  - id: N519
+    type: experiment
+    title: Verify canonical statistical and radius detection plus explicit removal
+    provenance: ai-executed
+    timestamp: '2026-09-09T21:49:47+02:00'
+    result: 4389 distinct CPU tests passed across the full selector and native-window follow-up, with one expected unsanitized control skip. The actual Vulkan case passed in 44.70 seconds with zero score delta, exact masks, eight domains, dense counts, stale input and cancellation. Initial stale UI assertions were corrected. The dirty schema-v2 smoke passed without supporting a speedup.
+    evidence: [ara/evidence/diagnostics/outlier_vulkan_2026-09-09/record.json, ara/evidence/diagnostics/outlier_vulkan_2026-09-09/vulkan.txt, ara/evidence/diagnostics/outlier_vulkan_2026-09-09/benchmark/runtime-smoke.json]
+    also_depends_on: [N518]
+    status: resolved
+
+  - id: N520
+    type: decision
+    title: Publish the bounded outlier contract with explicit estimator and removal limits
+    provenance: ai-executed
+    timestamp: '2026-09-09T21:49:47+02:00'
+    choice: Bind the implemented config/window/job contract to O212/C81. Retain CPU population-variance classification, source identity exclusion, complete radius counts, point-cloud-only current-mask removal and CPU defaults. Keep density and LOF-like utilities on the follow-up inventory.
+    alternatives: [Infer full GPU classification or a speedup, Replace LOF-like probability as part of this slice]
+    evidence: [N519, O212, docs/architecture/outlier-analysis.md]
+    status: resolved
+
+  - id: N521
+    type: decision
+    title: Select kernel density as the next bounded spatial consumer
+    provenance: ai-executed
+    timestamp: '2026-09-09T23:11:32+02:00'
+    choice: The user requested the next method in the accepted sequence. Select the existing local Gaussian density utility; preserve its k+1 candidate filtering and spacing bandwidth, add canonical-domain CPU/Vulkan cache execution and shared controls.
+    alternatives: [Migrate all remaining consumers, Substitute full-sample KDE or a Gaussian radius cutoff]
+    evidence: [N515, tasks/active/RUNTIME-220-kernel-density-spatial-backends.md, docs/architecture/spatial-index-consumers.md]
+    status: resolved
+
+  - id: N522
+    type: experiment
+    title: Verify canonical density publication with actual Vulkan candidates
+    provenance: ai-executed
+    timestamp: '2026-09-09T23:11:32+02:00'
+    result: 38 focused CPU checks and 4398 distinct full/native CPU passes, with one expected unsanitized control skip. Actual Vulkan case passed in 44.76 seconds with zero density delta across eight domains for automatic bandwidth and manual bandwidth at k=63, plus dense duplicates and stale/cancel/history checks. Corrected an editor-test shutdown ordering failure. Schema-v2 dirty smoke validates without supporting a speedup.
+    evidence: [ara/evidence/diagnostics/density_vulkan_2026-09-09/record.json, ara/evidence/diagnostics/density_vulkan_2026-09-09/vulkan.txt, ara/evidence/diagnostics/density_vulkan_2026-09-09/benchmark/runtime-smoke.json]
+    also_depends_on: [N521]
+    status: resolved
+
+  - id: N523
+    type: decision
+    title: Bind the density workflow to its tested local estimator
+    provenance: ai-executed
+    timestamp: '2026-09-09T23:11:32+02:00'
+    choice: Adopt O214/C82 into the density contract and consumer inventory. Keep CPU bandwidth and Gaussian evaluation, CPU octree default, original candidate policy and explicit GPU limits. No optimal multivariate bandwidth, full-sample KDE or speedup is inferred.
+    alternatives: [Report the whole estimator as GPU computation, Change bandwidth formulation or backend default]
+    evidence: [N522, O214, docs/architecture/kernel-density.md]
+    status: resolved
+
+  - id: N524
+    type: decision
+    title: Select point spacing and radius estimation as the next spatial consumer
+    provenance: ai-executed
+    timestamp: '2026-09-10T00:25:43+02:00'
+    choice: The user requests the next method. Select existing statistics/radius utilities, preserving k+1 then self removal, radius scale and distinct nearest-other spacing. Bind canonical properties through existing cache/jobs/config/UI; track model-space radius rendering separately.
+    alternatives: [Migrate all remaining consumers, Reinterpret model-space radii as pixel sizes]
+    evidence: [N515, tasks/active/RUNTIME-221-point-spacing-spatial-backends.md, tasks/backlog/runtime/RUNTIME-222-model-space-point-radius-rendering.md]
+    status: resolved
+
+  - id: N525
+    type: experiment
+    title: Verify canonical radii and nearest spacing through actual Vulkan queries
+    provenance: ai-executed
+    timestamp: '2026-09-10T00:25:43+02:00'
+    result: 38 focused CPU checks and 4408 distinct full/native CPU passes, with one expected unsanitized control skip. Actual Vulkan case passes in 45.38 seconds with zero radius/spacing delta for eight domains, cold/warm k=8 scale=1 and k=63 scale=2, dense coincidence, stale/cancelled work and history. Dirty schema-v2 smoke validates; warm framed GPU 9903.50 ms versus CPU reference 95.18 ms is not a speedup.
+    evidence: [ara/evidence/diagnostics/spacing_vulkan_2026-09-10/record.json, ara/evidence/diagnostics/spacing_vulkan_2026-09-10/vulkan.txt, ara/evidence/diagnostics/spacing_vulkan_2026-09-10/benchmark/runtime-smoke.json]
+    also_depends_on: [N524]
+    status: resolved
+
+  - id: N526
+    type: decision
+    title: Bind the spacing and radius workflow to bounded numerical evidence
+    provenance: ai-executed
+    timestamp: '2026-09-10T00:25:43+02:00'
+    choice: Adopt O215/C83 into the documented consumer contract. Retain CPU distance reduction and default, preserve coordinate units and candidate policy, and keep radius rendering and coverage guarantees outside the tested capability.
+    alternatives: [Claim GPU radius rendering or hole-free coverage, Change the backend default from a tiny framed smoke]
+    evidence: [N525, O215, docs/architecture/point-spacing.md]
+    status: resolved

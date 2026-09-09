@@ -1,0 +1,114 @@
+Internal ctest changing into directory: /home/alex/Documents/IntrinsicEngine/build/ci
+Test project /home/alex/Documents/IntrinsicEngine/build/ci
+      Start  678: KernelDensityOperations.QueuedJobsRejectStaleInputsOutputsAndCancellation
+ 1/37 Test  #678: KernelDensityOperations.QueuedJobsRejectStaleInputsOutputsAndCancellation ....................   Passed    0.05 sec
+      Start  679: KernelDensityOperations.EveryDomainPublishesNamedDensityAndPreservesDeletedRowsWithHistory
+ 2/37 Test  #679: KernelDensityOperations.EveryDomainPublishesNamedDensityAndPreservesDeletedRowsWithHistory ...   Passed    0.02 sec
+      Start  680: KernelDensityOperations.InvalidUnsupportedAndNumericalFailuresRetainOutput
+ 3/37 Test  #680: KernelDensityOperations.InvalidUnsupportedAndNumericalFailuresRetainOutput ...................   Passed    0.01 sec
+      Start  681: KernelDensityOperations.NewOutputUndoAndPositionEditsRebuildTheCache
+ 4/37 Test  #681: KernelDensityOperations.NewOutputUndoAndPositionEditsRebuildTheCache .........................   Passed    0.00 sec
+      Start  682: KernelDensityConfig.RoundTripAndSharedPreviewApplyRun
+ 5/37 Test  #682: KernelDensityConfig.RoundTripAndSharedPreviewApplyRun ........................................   Passed    0.01 sec
+      Start 1328: SandboxEditorPresentation.DefaultDrawStartsWithOnlyMenuBarVisible
+ 6/37 Test #1328: SandboxEditorPresentation.DefaultDrawStartsWithOnlyMenuBarVisible ............................   Passed    0.04 sec
+      Start 1329: SandboxEditorPresentation.DomainMenusUseAppearanceAndFocusedProcessingWindows
+ 7/37 Test #1329: SandboxEditorPresentation.DomainMenusUseAppearanceAndFocusedProcessingWindows ................   Passed    0.04 sec
+      Start 1330: SandboxEditorPresentation.DomainPanelsPreserveLifetimeCacheAndResultPublication
+ 8/37 Test #1330: SandboxEditorPresentation.DomainPanelsPreserveLifetimeCacheAndResultPublication ..............   Passed    0.00 sec
+      Start 1331: SandboxEditorPresentation.MeshProcessingPanelsPreserveLifetimeAndResultPublication
+ 9/37 Test #1331: SandboxEditorPresentation.MeshProcessingPanelsPreserveLifetimeAndResultPublication ...........   Passed    0.01 sec
+      Start 1332: SandboxEditorPresentation.ExtrinsicSandboxAppStaysRuntimeOnly
+10/37 Test #1332: SandboxEditorPresentation.ExtrinsicSandboxAppStaysRuntimeOnly ................................   Passed    0.02 sec
+      Start 1333: SandboxEditorPresentation.RuntimeFeatureModulesCompileSeparatelyFromEditorShell
+11/37 Test #1333: SandboxEditorPresentation.RuntimeFeatureModulesCompileSeparatelyFromEditorShell ..............   Passed    0.14 sec
+      Start 1334: SandboxEditorPresentation.GeometryProcessingMenusExposeDomainElementSubmenus
+12/37 Test #1334: SandboxEditorPresentation.GeometryProcessingMenusExposeDomainElementSubmenus .................   Passed    0.00 sec
+      Start 1335: SandboxEditorPresentation.AdapterCallbackDrawsDeterministicMenuOnlyFrame
+13/37 Test #1335: SandboxEditorPresentation.AdapterCallbackDrawsDeterministicMenuOnlyFrame .....................   Passed    0.04 sec
+      Start 1336: SandboxEditorPresentation.FileImportDisabledReasonRendersThroughRealHoveredControl
+14/37 Test #1336: SandboxEditorPresentation.FileImportDisabledReasonRendersThroughRealHoveredControl ...........   Passed    0.24 sec
+      Start 1337: SandboxEditorPresentation.DisabledReasonTooltipConventionIsSharedByImportAndQueueControls
+15/37 Test #1337: SandboxEditorPresentation.DisabledReasonTooltipConventionIsSharedByImportAndQueueControls ....   Passed    0.01 sec
+      Start 1338: SandboxEditorPresentation.RuntimeImportEventIsReflectedByAppFilePanel
+16/37 Test #1338: SandboxEditorPresentation.RuntimeImportEventIsReflectedByAppFilePanel ........................   Passed    0.04 sec
+      Start 1339: SandboxEditorPresentation.EngineAttachmentRegistersEditorCallback
+17/37 Test #1339: SandboxEditorPresentation.EngineAttachmentRegistersEditorCallback ............................   Passed    0.04 sec
+      Start 1340: SandboxEditorPresentation.ControllerReattachPinsPanelAttachmentResetPolicy
+18/37 Test #1340: SandboxEditorPresentation.ControllerReattachPinsPanelAttachmentResetPolicy ...................   Passed    0.08 sec
+      Start 1341: SandboxEditorPresentation.EditorShellStartsWithOnlyBuiltinWindows
+19/37 Test #1341: SandboxEditorPresentation.EditorShellStartsWithOnlyBuiltinWindows ............................   Passed    0.04 sec
+      Start 1342: SandboxEditorPresentation.GpuProfilingControlsReuseTheExistingFrameGraphWindow
+20/37 Test #1342: SandboxEditorPresentation.GpuProfilingControlsReuseTheExistingFrameGraphWindow ...............   Passed    0.01 sec
+      Start 1343: SandboxEditorPresentation.ExternalWindowContributionNeedsNoLegacySwitchEntry
+21/37 Test #1343: SandboxEditorPresentation.ExternalWindowContributionNeedsNoLegacySwitchEntry .................   Passed    0.04 sec
+      Start 1344: SandboxEditorPresentation.ContextWindowContributionReceivesAppOwnedContext
+22/37 Test #1344: SandboxEditorPresentation.ContextWindowContributionReceivesAppOwnedContext ...................   Passed    0.04 sec
+      Start 1345: SandboxEditorPresentation.GlobalVisibilityHotkeyUsesTheVisibilityCommandPath
+23/37 Test #1345: SandboxEditorPresentation.GlobalVisibilityHotkeyUsesTheVisibilityCommandPath .................   Passed    0.04 sec
+      Start 1346: SandboxEditorPresentation.RegistrationDomainMenusOpenOneSharedWindow
+24/37 Test #1346: SandboxEditorPresentation.RegistrationDomainMenusOpenOneSharedWindow .........................   Passed    0.04 sec
+      Start 1347: SandboxEditorPresentation.NormalDomainMenusOpenOneSharedWindow
+25/37 Test #1347: SandboxEditorPresentation.NormalDomainMenusOpenOneSharedWindow ...............................   Passed    0.04 sec
+      Start 1348: SandboxEditorPresentation.OutlierDomainMenusOpenOneSharedWindow
+26/37 Test #1348: SandboxEditorPresentation.OutlierDomainMenusOpenOneSharedWindow ..............................***Failed    0.04 sec
+Running main() from /home/alex/Documents/IntrinsicEngine/external/vcpkg/buildtrees/gtest/src/v1.17.0-0c449efaff.clean/googletest/src/gtest_main.cc
+Note: Google Test filter = SandboxEditorPresentation.OutlierDomainMenusOpenOneSharedWindow
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from SandboxEditorPresentation
+[ RUN      ] SandboxEditorPresentation.OutlierDomainMenusOpenOneSharedWindow
+[32m[INFO] Initialized Scheduler with 1 worker threads.[0m
+/home/alex/Documents/IntrinsicEngine/tests/integration/runtime/Test.SandboxEditorPresentation.cpp:1509: Failure
+Value of: shell.SetEditorWindowOpen(id, true)
+  Actual: false
+Expected: true
+
+[  FAILED  ] SandboxEditorPresentation.OutlierDomainMenusOpenOneSharedWindow (38 ms)
+[----------] 1 test from SandboxEditorPresentation (38 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (38 ms total)
+[  PASSED  ] 0 tests.
+[  FAILED  ] 1 test, listed below:
+[  FAILED  ] SandboxEditorPresentation.OutlierDomainMenusOpenOneSharedWindow
+
+ 1 FAILED TEST
+
+      Start 2691: KDE.NulloptOnEmptyCloud
+27/37 Test #2691: KDE.NulloptOnEmptyCloud ......................................................................   Passed    0.00 sec
+      Start 2692: KDE.NulloptOnSinglePoint
+28/37 Test #2692: KDE.NulloptOnSinglePoint .....................................................................   Passed    0.00 sec
+      Start 2693: KDE.UniformCloudSimilarDensities
+29/37 Test #2693: KDE.UniformCloudSimilarDensities .............................................................   Passed    0.01 sec
+      Start 2694: KDE.HigherDensityInDenseRegion
+30/37 Test #2694: KDE.HigherDensityInDenseRegion ...............................................................   Passed    0.01 sec
+      Start 2695: KDE.PublishesProperty
+31/37 Test #2695: KDE.PublishesProperty ........................................................................   Passed    0.01 sec
+      Start 2696: KDE.CustomBandwidth
+32/37 Test #2696: KDE.CustomBandwidth ..........................................................................   Passed    0.01 sec
+      Start 2697: KDE.SilvermanBandwidthAutomatic
+33/37 Test #2697: KDE.SilvermanBandwidthAutomatic ..............................................................   Passed    0.01 sec
+      Start 2698: KDE.ResultDiagnosticsComplete
+34/37 Test #2698: KDE.ResultDiagnosticsComplete ................................................................   Passed    0.01 sec
+      Start 2709: KernelDensity.AnalyticGaussianAndSpacingBandwidth
+35/37 Test #2709: KernelDensity.AnalyticGaussianAndSpacingBandwidth ............................................   Passed    0.01 sec
+      Start 2710: KernelDensity.ExhaustiveCandidatesMatchOctreeAndCloudWithTiesAndCoincidentPeers
+36/37 Test #2710: KernelDensity.ExhaustiveCandidatesMatchOctreeAndCloudWithTiesAndCoincidentPeers ..............   Passed    0.01 sec
+      Start 2711: KernelDensity.DegenerateAndMalformedInputsFailWithoutPublication
+37/37 Test #2711: KernelDensity.DegenerateAndMalformedInputsFailWithoutPublication .............................   Passed    0.00 sec
+
+97% tests passed, 1 tests failed out of 37
+
+Label Time Summary:
+contract       =   0.09 sec*proc (5 tests)
+geometry       =   0.07 sec*proc (11 tests)
+integration    =   1.00 sec*proc (21 tests)
+runtime        =   1.09 sec*proc (26 tests)
+unit           =   0.07 sec*proc (11 tests)
+
+Total Test time (real) =   1.98 sec
+
+The following tests FAILED:
+	1348 - SandboxEditorPresentation.OutlierDomainMenusOpenOneSharedWindow (Failed)
+Errors while running CTest

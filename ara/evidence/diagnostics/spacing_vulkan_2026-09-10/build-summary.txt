@@ -1,0 +1,23 @@
+Clang 23 preset builds, CCACHE_DISABLE=1 (BUG-178).
+ci IntrinsicTests + ExtrinsicSandbox, final:
+[1257/1264] Linking CXX executable bin/IntrinsicGraphicsVulkanSmokeTests
+[1258/1264] Linking CXX executable bin/IntrinsicRuntimePointCloudConsolidationGpuParityTests
+[1259/1264] Linking CXX executable bin/ExtrinsicSandbox
+[1260/1264] Linking CXX executable bin/IntrinsicPointLBVHGpuTests
+[1261/1264] Linking CXX executable bin/IntrinsicSandboxEditorIntegrationTests
+[1262/1264] Linking CXX executable bin/IntrinsicRuntimeGraphicsCpuTests
+[1263/1264] Linking CXX executable bin/IntrinsicRuntimeSandboxAcceptanceGpuSmokeTests
+[1264/1264] Linking CXX executable bin/IntrinsicRuntimeContractTests
+ci-vulkan IntrinsicPointLBVHGpuTests:
+[768/773] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Editor/Operations/Runtime.VisualizationEditingOperations.Public.cpp.o
+[769/773] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Editor/Operations/Runtime.GeometryProcessingOperations.Public.cpp.o
+[770/773] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Editor/Operations/Runtime.RenderRecipeEditingOperations.Public.cpp.o
+[771/773] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Editor/Runtime.EditorWorkspaceSnapshots.Public.cpp.o
+[772/773] Linking CXX static library lib/libExtrinsicRuntime.a
+[773/773] Linking CXX executable bin/IntrinsicPointLBVHGpuTests
+Final source reconciliation (dependency scan only, no further C++ compilation):
+[728/732] Generating CXX dyndep file tests/CMakeFiles/TestSupportObjs.dir/CXX.dd
+[729/732] Scanning /home/alex/Documents/IntrinsicEngine/src/runtime/Rendering/Runtime.RenderExtraction.Internal.cpp for CXX dependencies
+[730/732] Generating CXX dyndep file src/runtime/CMakeFiles/ExtrinsicRuntime.dir/CXX.dd
+[731/732] Scanning /home/alex/Documents/IntrinsicEngine/tests/integration/graphics/Test.PointLBVHGpuSmoke.cpp for CXX dependencies
+[732/732] Generating CXX dyndep file tests/CMakeFiles/PointLBVHGpuTestObjs.dir/CXX.dd

@@ -1,0 +1,95 @@
+{
+  "recorded_at": "2026-09-09T20:14:13+02:00",
+  "base_commit": "e508e779271c96246ee5b50454678b45217f5170",
+  "source_state": "dirty_worktree",
+  "performance_claim_eligible": false,
+  "source_sha256": {
+    "CMakePresets.json": "773fdc8903c975001628b849497cdec7827839827fd8e0e8a9c18f497c78e085",
+    "benchmarks/geometry/manifests/point_lbvh_normal_runtime_smoke.yaml": "56a2fd7ea7a2148f867196b3754032986442d0a65f42865bf8e82ec5bbe73aa9",
+    "methods/geometry/point_lbvh/README.md": "379c84ce3f4efe382b21c35f6f00962aab21454a212d2de818981a131f2d1dd1",
+    "methods/geometry/point_lbvh/method.yaml": "7dbda0e8865c79bf17c66982f2fd3ed5c6dd62c4adcf35e13361575e3cddec60",
+    "methods/geometry/point_lbvh/paper.md": "9fc2f0880b120c0fe16e2190b0def7712a0f020ed50c713e961d4ead29461bd3",
+    "src/app/Sandbox/Editor/Sandbox.MeshProcessingPanels.cpp": "ac1ab7d4bc0a320e169effa10fa951ed8938334efab26b8407b78b1c468169e4",
+    "src/app/Sandbox/README.md": "465962741f91c0f8dd8af8735f513290ff705a49158360ab0a9dce1a250f0311",
+    "src/geometry/Geometry.PointCloud.Normals.cpp": "d45ce418a2d1bcfccb4dd0473fd453984ade9f6227778cd0fd2c37d5631b5290",
+    "src/geometry/Geometry.PointCloud.Normals.cppm": "b526a24804043b05606fea00a68f6b9c94f94678bc04682ddc9e76316e67b6d3",
+    "src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Normals.cpp": "b9e41587ad67b1c0a6e39b97b2d986212fea22afebeccfb9ecdc73659f03e32c",
+    "src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.cppm": "3c56fa6d9180a729a97984729727e06f8053dcc9ddbaa3ac2e18c14935a469dc",
+    "src/runtime/GeometryIntegration/Runtime.SpatialIndexCache.cpp": "6ef63313af7f38a9ced8c01da3a4c9158372b1dcd14408d8683f2b83c49c3660",
+    "src/runtime/GeometryIntegration/Runtime.SpatialIndexCache.cppm": "ba611ca834b270be4469f2f7876d8a0802b79d5c454a4afea3dfb8b8836ff9e5",
+    "src/runtime/Modules/NormalEstimation/Runtime.NormalEstimationConfig.cpp": "ee17ec350c17ddcc1a579d40e80938439636b4bb61a4aeca26f6ee7f748d27be",
+    "src/runtime/Modules/NormalEstimation/Runtime.NormalEstimationConfig.cppm": "97c098f4ff563df2b729492d1515f944d813ac4d53043fbbacd30ad19cc8efd4",
+    "tests/CMakeLists.txt": "b61acda59ed93cb7504eeb31ca1ec054009dd5902387dfce85f625f689e56b56",
+    "tests/contract/runtime/Test.NormalEstimation.cpp": "af44c7d3f9047b08433422e633ea7f16d81e93331411e7fe836288c5f286322d",
+    "tests/contract/runtime/Test.SpatialIndexCache.cpp": "a325e769a2f156a6215b90ff1ce61d14c410dce50ace56ddd720f9d9f7c18001",
+    "tests/integration/graphics/Test.PointLBVHGpuSmoke.cpp": "c374fc9a7bdeccf716d1f99fef89c253362e5ec74989ac6a68bc13dc38cb74e8",
+    "tests/unit/geometry/Test.PointLBVH.cpp": "5fe339012e650b55dbbee5f2791d8d533c8395507a7d8495b1cc8bd5caabfadc"
+  },
+  "compiler": "Clang 23",
+  "cpu": {
+    "preset": "ci",
+    "sandbox_enabled": true,
+    "targets": [
+      "IntrinsicTests",
+      "ExtrinsicSandbox",
+      "IntrinsicBenchmarkSmoke"
+    ],
+    "focused_passed": 45,
+    "full_selected": 4377,
+    "full_passed": 4376,
+    "full_skipped": 1,
+    "full_failed": 0,
+    "elapsed_seconds": 111.75,
+    "exclusion": "gpu|vulkan|slow|flaky-quarantine",
+    "expected_skip": "GlfwLifecycleLsan.EngineStaticTeardownAndLeakControl"
+  },
+  "vulkan": {
+    "preset": "ci-vulkan",
+    "target": "IntrinsicPointLBVHGpuTests",
+    "gpu": "NVIDIA GeForce RTX 3050",
+    "driver": "590.48.01",
+    "sanitizers": "address,undefined; existing detect_leaks=0 (BUG-180 remains open)",
+    "initial_run": {
+      "passed": 4,
+      "skipped": 2,
+      "failed": 0,
+      "note": "New fixtures checked readiness before cold-start recipe promotion; no GPU normal evidence from these skips."
+    },
+    "final_run": {
+      "passed": 2,
+      "skipped": 0,
+      "failed": 0,
+      "elapsed_seconds": 56.57,
+      "selector": "^PointLBVHGpuSmoke\\.(FramedRadius|NormalNeighborhoods)",
+      "fixture_correction": "Wait for operational during bounded bootstrap; assert operational after run; no post-work capability skip."
+    },
+    "distinct_passed_cases": 6,
+    "normal_domains": 8,
+    "normal_phases": [
+      "cold kNN",
+      "warm kNN",
+      "radius",
+      "stale input rejection",
+      "in-flight cancellation",
+      "radius overflow rejection"
+    ],
+    "tolerance_component_absolute": 1e-05,
+    "observed_max_normal_component_error": 0.0,
+    "expected_negative_logs": "Three JobService publisher rejections for stale/cancelled/overflow prerequisites; no Vulkan VUID or ASan/UBSan finding in these logs."
+  },
+  "benchmark": {
+    "manifest": "benchmarks/geometry/manifests/point_lbvh_normal_runtime_smoke.yaml",
+    "result": "ara/evidence/diagnostics/normal_vulkan_2026-09-09/benchmark/runtime-smoke.json",
+    "schema_validation": "passed",
+    "timing_gate": "passed",
+    "note": "Small eight-domain fixture; dirty source; frame-paced GPU elapsed times are not kernel timings or a speedup claim."
+  },
+  "limits": [
+    "CPU PCA and MST orientation remain shared; GPU accelerates neighborhood queries only.",
+    "No arbitrary-input or full Framework24 PCA/features/saliency parity claim.",
+    "No whole-process leak-freedom claim; no GPU normal-vector visualization readback added.",
+    "No commit or push in this implementation turn.",
+    "Existing BUG-177 root metadata, BUG-178 module-cache and BUG-180 leak investigation remain separate.",
+    "BUG-182 records accidental capability-test selection in the ci CPU lane."
+  ]
+}

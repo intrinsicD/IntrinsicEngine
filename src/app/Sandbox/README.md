@@ -134,7 +134,14 @@ actual backend/fallback, and measured average/maximum displacement.
 `Sandbox.Editor.MeshProcessingPanels`
 owns the ICP registration window plus the mesh denoise, curvature, remesh,
 subdivide, simplify, and the shared [normal-estimation window](../../../docs/architecture/normal-estimation.md).
+The shared [Outlier Analysis window](../../../docs/architecture/outlier-analysis.md)
+provides statistical/radius detection on any compatible property domain, named
+mask/score display, and separate undoable point-cloud removal. Mesh, Graph and
+PointCloud Processing menus open it; `sandbox.outlier_analysis` controls the same
+CPU octree, cached CPU LBVH and Vulkan LBVH execution paths.
 The normal menus under Mesh, Graph and PointCloud open that shared window.
+Point PCA offers KD-tree, cached CPU LBVH and Vulkan LBVH neighborhoods with CPU
+fitting/orientation through the same persisted config.
 Mesh / Processing / Faces / Normals presets full-polygon face-normal computation
 and a face output (`f:normal`), with a button to display its object-space colors. It
 uses the persisted `sandbox.normal_estimation` config and canonical property bindings. The panels own their ImGui
@@ -151,9 +158,8 @@ boundary/cleanup diagnostics. It remains experimental and exposes no cut or
 UV-atlas action. Appearance groups surface, edge, and vertex property dropdowns
 for a selected mesh. Surface properties can use the shared UV texture-bake
 command; advanced binding and bake controls are collapsed. `Sandbox.Editor.DomainPanels` registers the existing Appearance,
-Properties, and Selection windows for Mesh, Graph, and PointCloud plus
-PointCloud Remove Outliers. It owns their menu paths, lazy per-frame model
-cache, texture-bake and property-widget draft state, outlier controls, and
+Properties, and Selection windows for Mesh, Graph, and PointCloud. It owns their menu paths, lazy per-frame model
+cache, texture-bake and property-widget draft state, and
 result presentation. K-Means and Progressive Poisson command/config/result
 implementations compile in a private runtime operation unit; all other feature
 snapshots, processing commands, history/jobs, validation, and result sinks likewise
@@ -448,3 +454,11 @@ capture to zero samples.
 - `main.cpp`
 
 ICP registration supports named point properties across mesh, graph and point-cloud domains. See the [workflow](../../../docs/architecture/registration.md) for controls, target-index reuse and backend diagnostics.
+
+[Kernel Density](../../../docs/architecture/kernel-density.md) binds point-valued
+properties on all domains to CPU octree, cached CPU LBVH or Vulkan neighborhoods.
+Open **View → Kernel Density**, choose the input/backend/bandwidth and run
+**Estimate density**; **Show density** displays the named output. The same
+`sandbox.kernel_density` config drives UI and agent commands.
+
+[Point Spacing and Radii](../../../docs/architecture/point-spacing.md) exposes canonical positions, radius output, k, scale and CPU/Vulkan neighborhoods through View and geometry Processing menus. Show radii uses scalar colors; model-space radius rendering is tracked by RUNTIME-222.

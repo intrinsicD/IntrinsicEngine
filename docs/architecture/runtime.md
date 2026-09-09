@@ -452,14 +452,13 @@ result presentation are app-owned, while model construction, command execution,
 job scheduling, config validation, and result publication remain runtime-owned.
 `Extrinsic.Sandbox.Editor.MeshProcessingPanels` applies the same boundary to ICP
 registration, mesh denoise/curvature/remesh/subdivide/simplify, and the
-shared [normal-estimation window](normal-estimation.md), with aliases in mesh/graph/point-cloud menus. Runtime retains their exported
+shared [normal-estimation](normal-estimation.md), [outlier-analysis](outlier-analysis.md), [kernel-density](kernel-density.md) and [point-spacing](point-spacing.md) windows, with aliases in mesh/graph/point-cloud menus. Runtime retains their exported
 models, command validation/execution, undo/history integration, derived-job
 submission, stale-result rejection, and result sinks; the application owns the
 stable registrations, menu paths, lazy per-frame domain-model cache, widget
 state, and result presentation.
-`Extrinsic.Sandbox.Editor.DomainPanels` owns the ten remaining domain windows:
-Appearance, Properties, and Selection for PointCloud, Graph, and Mesh, plus
-PointCloud / Processing / Remove Outliers. It preserves their stable ids, menu
+`Extrinsic.Sandbox.Editor.DomainPanels` owns nine domain windows:
+Appearance, Properties, and Selection for PointCloud, Graph, and Mesh. It preserves their stable ids, menu
 paths, titles, closed defaults, controls, per-frame lazy model cache, and
 immediate/asynchronous result publication. Runtime retains the exported domain
 models, callback-scoped borrowed property view, command/job execution,

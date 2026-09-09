@@ -1,0 +1,48 @@
+Internal ctest changing into directory: /home/alex/Documents/IntrinsicEngine/build/ci
+Test project /home/alex/Documents/IntrinsicEngine/build/ci
+      Start 1067: SandboxEditorUi.PointCloudOutlierRemovalStatisticalPublishesKeptPointsWithUndoRedo
+ 1/18 Test #1067: SandboxEditorUi.PointCloudOutlierRemovalStatisticalPublishesKeptPointsWithUndoRedo .......   Passed    0.01 sec
+      Start 1068: SandboxEditorUi.PointCloudOutlierRemovalRequestQueuesDerivedJobAndPublishesOnApply
+ 2/18 Test #1068: SandboxEditorUi.PointCloudOutlierRemovalRequestQueuesDerivedJobAndPublishesOnApply .......   Passed    0.02 sec
+      Start 1069: SandboxEditorUi.PointCloudOutlierRemovalDerivedJobDiscardsStaleSource
+ 3/18 Test #1069: SandboxEditorUi.PointCloudOutlierRemovalDerivedJobDiscardsStaleSource ....................   Passed    0.02 sec
+      Start 1070: SandboxEditorUi.PointCloudOutlierRemovalDerivedJobDiscardsStaleProperty
+ 4/18 Test #1070: SandboxEditorUi.PointCloudOutlierRemovalDerivedJobDiscardsStaleProperty ..................   Passed    0.02 sec
+      Start 1071: SandboxEditorUi.PointCloudOutlierRemovalRadiusPublishesAndFailsClosed
+ 5/18 Test #1071: SandboxEditorUi.PointCloudOutlierRemovalRadiusPublishesAndFailsClosed ....................   Passed    0.01 sec
+      Start 1072: SandboxEditorUi.PointCloudOutlierRemovalPreservesSurvivingPointProperties
+ 6/18 Test #1072: SandboxEditorUi.PointCloudOutlierRemovalPreservesSurvivingPointProperties ................   Passed    0.01 sec
+      Start 1073: SandboxEditorUi.PointCloudOutlierRemovalRespectsDeletedSlots
+ 7/18 Test #1073: SandboxEditorUi.PointCloudOutlierRemovalRespectsDeletedSlots .............................   Passed    0.00 sec
+      Start 1081: SandboxEditorUi.PointCloudOutlierRemovalRejectingNothingReportsNoChange
+ 8/18 Test #1081: SandboxEditorUi.PointCloudOutlierRemovalRejectingNothingReportsNoChange ..................   Passed    0.00 sec
+      Start 2681: PointCloudOutlierRemoval.StatisticalRejectsKnownOutliers
+ 9/18 Test #2681: PointCloudOutlierRemoval.StatisticalRejectsKnownOutliers .................................   Passed    0.01 sec
+      Start 2682: PointCloudOutlierRemoval.StatisticalIsDeterministic
+10/18 Test #2682: PointCloudOutlierRemoval.StatisticalIsDeterministic ......................................   Passed    0.01 sec
+      Start 2683: PointCloudOutlierRemoval.StatisticalRejectsNonFinitePositions
+11/18 Test #2683: PointCloudOutlierRemoval.StatisticalRejectsNonFinitePositions ............................   Passed    0.01 sec
+      Start 2684: PointCloudOutlierRemoval.StatisticalInvalidInputs
+12/18 Test #2684: PointCloudOutlierRemoval.StatisticalInvalidInputs ........................................   Passed    0.00 sec
+      Start 2685: PointCloudOutlierRemoval.RadiusRejectsIsolatedPoints
+13/18 Test #2685: PointCloudOutlierRemoval.RadiusRejectsIsolatedPoints .....................................   Passed    0.01 sec
+      Start 2686: PointCloudOutlierRemoval.RadiusIsDeterministicAndAscending
+14/18 Test #2686: PointCloudOutlierRemoval.RadiusIsDeterministicAndAscending ...............................   Passed    0.01 sec
+      Start 2687: PointCloudOutlierRemoval.RadiusInvalidInputs
+15/18 Test #2687: PointCloudOutlierRemoval.RadiusInvalidInputs .............................................   Passed    0.01 sec
+      Start 2688: PointCloudOutlierRemoval.RadiusRejectsNonFinitePositions
+16/18 Test #2688: PointCloudOutlierRemoval.RadiusRejectsNonFinitePositions .................................   Passed    0.01 sec
+      Start 2689: PointCloudOutlierAnalysis.SpanScoresAndMaskMatchIndependentDistanceOracle
+17/18 Test #2689: PointCloudOutlierAnalysis.SpanScoresAndMaskMatchIndependentDistanceOracle ................   Passed    0.01 sec
+      Start 2690: PointCloudOutlierAnalysis.SuppliedSummariesRetainPopulationVarianceAndDegeneratePolicy
+18/18 Test #2690: PointCloudOutlierAnalysis.SuppliedSummariesRetainPopulationVarianceAndDegeneratePolicy ...   Passed    0.01 sec
+
+100% tests passed, 0 tests failed out of 18
+
+Label Time Summary:
+contract    =   0.07 sec*proc (8 tests)
+geometry    =   0.06 sec*proc (10 tests)
+runtime     =   0.07 sec*proc (8 tests)
+unit        =   0.06 sec*proc (10 tests)
+
+Total Test time (real) =   0.48 sec

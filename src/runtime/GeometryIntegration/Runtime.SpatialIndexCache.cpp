@@ -127,6 +127,7 @@ namespace Extrinsic::Runtime
             std::vector<glm::vec3> Queries{};
             std::vector<std::uint32_t> Headers{}, Excluded{};
             std::uint32_t Capacity{1};
+            float Radius{-1.f};
             RHI::IDevice* Device{};
             RHI::BufferHandle Input{}, Output{}, Header{}, Exclusions{};
             std::uint64_t SubmittedFrame{};
@@ -167,7 +168,8 @@ namespace Extrinsic::Runtime
                             const auto available = batch->Target->Snapshot->Slots.size() -
                                 (CompactSlot(*batch->Target->Snapshot, batch->Excluded[i]) != Geometry::PointLBVH::InvalidIndex);
                             const auto expected = std::min(std::size_t(batch->Capacity), available);
-                            valid &= batch->Headers[2*i] == expected && batch->Headers[2*i+1] == 0;
+                            valid &= batch->Headers[2*i+1] == 0 && (batch->Radius < 0
+                                ? batch->Headers[2*i] == expected : batch->Headers[2*i] <= available);
                             batch->State->Counts[i] = batch->Headers[2*i];
                         }
                         batch->State->State = valid ? SpatialQueryState::Ready : SpatialQueryState::Failed;
@@ -249,7 +251,8 @@ namespace Extrinsic::Runtime
                         if (!RecordGpuQueries({batch->Target->Id}, commands,
                             {.Queries = {.Buffer = batch->Input, .Count = std::uint32_t(batch->Queries.size())},
                              .Neighbors = batch->Output, .Headers = batch->Header,
-                             .Capacity = batch->Capacity, .KNearestCount = batch->Capacity == 1 ? 0u : batch->Capacity,
+                             .Capacity = batch->Capacity, .Radius = batch->Radius,
+                             .KNearestCount = batch->Radius < 0 ? batch->Capacity : 0u,
                              .ExcludedIndices = batch->Exclusions}))
                         {
                             batch->State->State = SpatialQueryState::Failed;
@@ -340,6 +343,30 @@ namespace Extrinsic::Runtime
         SpatialIndexHandle handle, std::span<const glm::vec3> queries, std::uint32_t k,
         std::span<const std::uint32_t> excludedSlots, std::shared_ptr<SpatialNearestBatch> reuse)
     {
+        return QueueGpuBatch(handle, queries, k, -1.f, excludedSlots, std::move(reuse));
+    }
+    std::shared_ptr<SpatialNearestBatch> SpatialIndexCache::QueueGpuRadius(
+        SpatialIndexHandle handle, std::span<const glm::vec3> queries, float radius,
+        std::uint32_t capacity, std::span<const std::uint32_t> excludedSlots,
+        std::shared_ptr<SpatialNearestBatch> reuse)
+    {
+        if (!std::isfinite(radius) || radius < 0 || radius > Geometry::PointLBVH::CoordinateLimit)
+        {
+            auto result = std::make_shared<SpatialNearestBatch>();
+            result->State = SpatialQueryState::Failed;
+            result->Diagnostic = "GPU radius must be finite and in [0, 1e18].";
+            return result;
+        }
+        return QueueGpuBatch(handle, queries, capacity, radius, excludedSlots, std::move(reuse));
+    }
+    bool SpatialIndexCache::GpuQueriesAvailable() const noexcept
+    {
+        return m_Impl->Device && m_Impl->Device->IsOperational() && m_Impl->Participant.IsValid();
+    }
+    std::shared_ptr<SpatialNearestBatch> SpatialIndexCache::QueueGpuBatch(
+        SpatialIndexHandle handle, std::span<const glm::vec3> queries, std::uint32_t k, float radius,
+        std::span<const std::uint32_t> excludedSlots, std::shared_ptr<SpatialNearestBatch> reuse)
+    {
         auto& s = *m_Impl;
         auto fail = [](std::string diagnostic) {
             auto result = std::make_shared<SpatialNearestBatch>();
@@ -350,10 +377,10 @@ namespace Extrinsic::Runtime
         const auto* entry = s.Find(handle);
         if (!entry || !s.Device || !s.Device->IsOperational() || !s.Participant.IsValid() ||
             entry->Snapshot->Slots.empty() || entry->Snapshot->Slots.size() > (1u << 20) ||
-            queries.empty() || queries.size() > (1u << 20) || k == 0 || k > 64 ||
+            queries.empty() || queries.size() > (1u << 20) || k == 0 || k > (radius < 0 ? 64u : 1024u) ||
             (!excludedSlots.empty() && excludedSlots.size() != queries.size()) ||
             !std::ranges::all_of(queries, Geometry::PointLBVH::ValidPoint))
-            return fail("Vulkan kNN requires an operational framed device, a current target (1..2^20 rows), finite queries (1..2^20), k in 1..64, and zero or query-count exclusions.");
+            return fail("Vulkan queries require an operational framed device, a current target (1..2^20 rows), finite queries (1..2^20), k in 1..64 or radius capacity in 1..1024, and zero or query-count exclusions.");
         std::shared_ptr<Impl::Batch> batch;
         if (reuse)
         {
@@ -383,6 +410,7 @@ namespace Extrinsic::Runtime
         batch->Target = *std::ranges::find_if(s.Entries, [&](const auto& e) { return e->Id == handle.Value; });
         batch->Queries.assign(queries.begin(), queries.end());
         batch->Capacity = k;
+        batch->Radius = radius;
         batch->Excluded.assign(queries.size(), Geometry::PointLBVH::InvalidIndex);
         if (!excludedSlots.empty()) std::ranges::copy(excludedSlots, batch->Excluded.begin());
         batch->Headers.assign(queries.size()*2, 0);

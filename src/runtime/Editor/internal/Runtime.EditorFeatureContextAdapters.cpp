@@ -93,6 +93,9 @@ MakeEditorGeometryProcessingContext(const EditorFeatureBindings &bindings) {
       .LastProgressivePoissonResult = bindings.LastProgressivePoissonResult,
       .LastRegistrationResult = bindings.LastRegistrationResult,
       .LastNormalEstimationResult = bindings.LastNormalEstimationResult,
+      .LastOutlierAnalysisResult = bindings.LastOutlierAnalysisResult,
+      .LastKernelDensityResult = bindings.LastKernelDensityResult,
+      .LastPointSpacingResult = bindings.LastPointSpacingResult,
       .EngineConfigControlState = bindings.EngineConfigControlState,
       .PreviewEngineConfigDocument = bindings.PreviewEngineConfigDocument,
       .ApplyEngineConfigHotSubset = bindings.ApplyEngineConfigHotSubset,
@@ -255,6 +258,9 @@ ToEditorFeatureBindingsImpl(const EditorGeometryProcessingContext &context) {
       .LastProgressivePoissonResult = context.LastProgressivePoissonResult,
       .LastRegistrationResult = context.LastRegistrationResult,
       .LastNormalEstimationResult = context.LastNormalEstimationResult,
+      .LastOutlierAnalysisResult = context.LastOutlierAnalysisResult,
+      .LastKernelDensityResult = context.LastKernelDensityResult,
+      .LastPointSpacingResult = context.LastPointSpacingResult,
       .EngineConfigControlState = context.EngineConfigControlState,
       .AttachmentActive = context.AttachmentActive,
       .InvalidateWorkspaceSnapshotCache =
@@ -390,6 +396,9 @@ ToEditorFeatureBindingsImpl(const EditorWorkspaceSnapshotContext &context) {
   bindings.LastProgressivePoissonResult = geometry.LastProgressivePoissonResult;
   bindings.LastRegistrationResult = geometry.LastRegistrationResult;
   bindings.LastNormalEstimationResult = geometry.LastNormalEstimationResult;
+  bindings.LastOutlierAnalysisResult = geometry.LastOutlierAnalysisResult;
+  bindings.LastKernelDensityResult = geometry.LastKernelDensityResult;
+  bindings.LastPointSpacingResult = geometry.LastPointSpacingResult;
   bindings.MeshDenoiseKernelAvailable = geometry.MeshDenoiseKernelAvailable;
   bindings.MeshCurvatureKernelAvailable = geometry.MeshCurvatureKernelAvailable;
   bindings.MeshCurvatureDirectionsAvailable =

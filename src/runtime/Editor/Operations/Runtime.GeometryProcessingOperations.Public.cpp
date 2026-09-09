@@ -130,6 +130,9 @@ EditorGeometryProcessingPreparedFrame PrepareEditorGeometryProcessingFrame(
             .LastRegistrationResult =
                 CopyOptional(bindings.LastRegistrationResult),
             .LastNormalEstimationResult = CopyOptional(bindings.LastNormalEstimationResult),
+            .LastOutlierAnalysisResult = CopyOptional(bindings.LastOutlierAnalysisResult),
+            .LastKernelDensityResult = CopyOptional(bindings.LastKernelDensityResult),
+            .LastPointSpacingResult = CopyOptional(bindings.LastPointSpacingResult),
         };
       });
   return prepared;
@@ -613,9 +616,27 @@ namespace Extrinsic::Runtime
 namespace Extrinsic::Runtime
 {
     EditorNormalEstimationReadiness PreviewEditorNormalEstimationCommand(const EditorGeometryProcessingCommands& commands,const NormalEstimationConfig& config){return PreviewEditorNormalEstimationCommand(ContextOrEmpty(commands),config);}
+    EditorOutlierAnalysisReadiness PreviewEditorOutlierAnalysisCommand(const EditorGeometryProcessingCommands& commands,const OutlierAnalysisConfig& config){return PreviewEditorOutlierAnalysisCommand(ContextOrEmpty(commands),config);}
+    EditorKernelDensityReadiness PreviewEditorKernelDensityCommand(const EditorGeometryProcessingCommands& commands,const KernelDensityConfig& config){return PreviewEditorKernelDensityCommand(ContextOrEmpty(commands),config);}
+    EditorPointSpacingReadiness PreviewEditorPointSpacingCommand(const EditorGeometryProcessingCommands& commands,const PointSpacingConfig& config){return PreviewEditorPointSpacingCommand(ContextOrEmpty(commands),config);}
     GeometryPropertyCatalogSnapshot GetEditorNormalEstimationInputCatalog(const EditorGeometryProcessingCommands& commands,std::uint32_t stableId){return GetEditorNormalEstimationInputCatalog(ContextOrEmpty(commands),stableId);}
+    GeometryPropertyCatalogSnapshot GetEditorOutlierAnalysisInputCatalog(const EditorGeometryProcessingCommands& commands,std::uint32_t stableId){return GetEditorOutlierAnalysisInputCatalog(ContextOrEmpty(commands),stableId);}
+    GeometryPropertyCatalogSnapshot GetEditorKernelDensityInputCatalog(const EditorGeometryProcessingCommands& commands,std::uint32_t stableId){return GetEditorKernelDensityInputCatalog(ContextOrEmpty(commands),stableId);}
+    GeometryPropertyCatalogSnapshot GetEditorPointSpacingInputCatalog(const EditorGeometryProcessingCommands& commands,std::uint32_t stableId){return GetEditorPointSpacingInputCatalog(ContextOrEmpty(commands),stableId);}
     EditorNormalEstimationResult ApplyEditorNormalEstimationCommand(const EditorGeometryProcessingCommands& commands,const NormalEstimationConfig& config){return ApplyEditorNormalEstimationCommand(ContextOrEmpty(commands),config);}
+    EditorOutlierAnalysisResult ApplyEditorOutlierAnalysisCommand(const EditorGeometryProcessingCommands& commands,const OutlierAnalysisConfig& config){return ApplyEditorOutlierAnalysisCommand(ContextOrEmpty(commands),config);}
+    EditorKernelDensityResult ApplyEditorKernelDensityCommand(const EditorGeometryProcessingCommands& commands,const KernelDensityConfig& config){return ApplyEditorKernelDensityCommand(ContextOrEmpty(commands),config);}
+    EditorPointSpacingResult ApplyEditorPointSpacingCommand(const EditorGeometryProcessingCommands& commands,const PointSpacingConfig& config){return ApplyEditorPointSpacingCommand(ContextOrEmpty(commands),config);}
     RuntimeEngineConfigApplyResult ApplyEditorNormalEstimationConfig(const EditorGeometryProcessingCommands& commands,const NormalEstimationConfig& config,std::string sourceId){return ApplyEditorNormalEstimationConfig(ContextOrEmpty(commands),config,std::move(sourceId));}
+    RuntimeEngineConfigApplyResult ApplyEditorOutlierAnalysisConfig(const EditorGeometryProcessingCommands& commands,const OutlierAnalysisConfig& config,std::string sourceId){return ApplyEditorOutlierAnalysisConfig(ContextOrEmpty(commands),config,std::move(sourceId));}
+    RuntimeEngineConfigApplyResult ApplyEditorKernelDensityConfig(const EditorGeometryProcessingCommands& commands,const KernelDensityConfig& config,std::string sourceId){return ApplyEditorKernelDensityConfig(ContextOrEmpty(commands),config,std::move(sourceId));}
+    RuntimeEngineConfigApplyResult ApplyEditorPointSpacingConfig(const EditorGeometryProcessingCommands& commands,const PointSpacingConfig& config,std::string sourceId){return ApplyEditorPointSpacingConfig(ContextOrEmpty(commands),config,std::move(sourceId));}
     std::optional<NormalEstimationConfig> GetEditorNormalEstimationConfig(const EditorGeometryProcessingCommands& commands){return GetEditorNormalEstimationConfig(ContextOrEmpty(commands));}
+    std::optional<OutlierAnalysisConfig> GetEditorOutlierAnalysisConfig(const EditorGeometryProcessingCommands& commands){return GetEditorOutlierAnalysisConfig(ContextOrEmpty(commands));}
+    std::optional<KernelDensityConfig> GetEditorKernelDensityConfig(const EditorGeometryProcessingCommands& commands){return GetEditorKernelDensityConfig(ContextOrEmpty(commands));}
+    std::optional<PointSpacingConfig> GetEditorPointSpacingConfig(const EditorGeometryProcessingCommands& commands){return GetEditorPointSpacingConfig(ContextOrEmpty(commands));}
     EditorNormalEstimationResult ApplyEditorConfiguredNormalEstimation(const EditorGeometryProcessingCommands& commands){return ApplyEditorConfiguredNormalEstimation(ContextOrEmpty(commands));}
+    EditorOutlierAnalysisResult ApplyEditorConfiguredOutlierAnalysis(const EditorGeometryProcessingCommands& commands){return ApplyEditorConfiguredOutlierAnalysis(ContextOrEmpty(commands));}
+    EditorKernelDensityResult ApplyEditorConfiguredKernelDensity(const EditorGeometryProcessingCommands& commands){return ApplyEditorConfiguredKernelDensity(ContextOrEmpty(commands));}
+    EditorPointSpacingResult ApplyEditorConfiguredPointSpacing(const EditorGeometryProcessingCommands& commands){return ApplyEditorConfiguredPointSpacing(ContextOrEmpty(commands));}
 }

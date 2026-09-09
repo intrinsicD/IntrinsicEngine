@@ -1,0 +1,18 @@
+ci IntrinsicTests + ExtrinsicSandbox; final UI fixture rebuild:
+[1232/1238] Building CXX object src/app/Sandbox/CMakeFiles/ExtrinsicSandboxEditor.dir/Editor/Sandbox.MethodPanels.cpp.o
+[1233/1238] Linking CXX static library lib/libExtrinsicSandboxEditor.a
+[1234/1238] Building CXX object tests/CMakeFiles/SandboxEditorIntegrationTestObjs.dir/integration/runtime/Test.SandboxEditorPresentation.cpp.o
+[1235/1238] Building CXX object tests/CMakeFiles/SandboxEditorIntegrationTestObjs.dir/integration/runtime/Test.SandboxPointCloudConsolidationPanel.cpp.o
+[1236/1238] Linking CXX executable bin/ExtrinsicSandbox
+[1237/1238] Linking CXX executable bin/IntrinsicRuntimeSandboxAcceptanceGpuSmokeTests
+[1238/1238] Linking CXX executable bin/IntrinsicSandboxEditorIntegrationTests
+[724/727] Generating CXX dyndep file tests/CMakeFiles/SandboxEditorIntegrationTestObjs.dir/CXX.dd
+[725/727] Building CXX object tests/CMakeFiles/SandboxEditorIntegrationTestObjs.dir/integration/runtime/Test.SandboxEditorPresentation.cpp.o
+[726/727] Generating CXX dyndep file tests/CMakeFiles/TestSupportObjs.dir/CXX.dd
+[727/727] Linking CXX executable bin/IntrinsicSandboxEditorIntegrationTests
+ci-vulkan IntrinsicPointLBVHGpuTests:
+[763/767] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Editor/Operations/Runtime.SceneEditingOperations.Public.cpp.o
+[764/767] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Editor/Operations/Runtime.GeometryProcessingOperations.Public.cpp.o
+[765/767] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Editor/Runtime.EditorWorkspaceSnapshots.Public.cpp.o
+[766/767] Linking CXX static library lib/libExtrinsicRuntime.a
+[767/767] Linking CXX executable bin/IntrinsicPointLBVHGpuTests

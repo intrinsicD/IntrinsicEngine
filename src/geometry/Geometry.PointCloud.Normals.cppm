@@ -29,6 +29,7 @@ export namespace Geometry::PointCloud::Normals
         SuppliedKDTree,
         SuppliedOctree,
         SuppliedPointLBVH,
+        SuppliedNeighborhoods,
     };
 
     enum class OrientationMode : std::uint8_t
@@ -97,6 +98,14 @@ export namespace Geometry::PointCloud::Normals
         Diagnostics Diagnostics{};
     };
 
+    // Row i contains candidate point indices in [Offsets[i], Offsets[i+1]).
+    // Supply complete radius support or the reference's k+1 candidates. The
+    // estimator removes self/duplicates and orders samples before fitting.
+    struct Neighborhoods
+    {
+        std::span<const std::uint32_t> Offsets{}, Indices{};
+    };
+
     struct PropertySetResult
     {
         RecomputeStatus Status{RecomputeStatus::Success};
@@ -118,6 +127,11 @@ export namespace Geometry::PointCloud::Normals
     [[nodiscard]] std::string_view DebugName(RecomputeStatus status) noexcept;
 
     [[nodiscard]] std::optional<EstimateResult> Estimate(std::span<const glm::vec3> points,
+                                                         const Params& params = {});
+
+    // Offsets have points.size()+1 entries; invalid layouts/indices fail before fitting.
+    [[nodiscard]] std::optional<EstimateResult> Estimate(std::span<const glm::vec3> points,
+                                                         Neighborhoods neighborhoods,
                                                          const Params& params = {});
 
     [[nodiscard]] std::optional<EstimateResult> Estimate(std::span<const glm::vec3> points,

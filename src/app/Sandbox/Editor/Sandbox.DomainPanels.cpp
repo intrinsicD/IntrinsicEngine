@@ -125,16 +125,6 @@ inline constexpr std::array<const char *, 2> kNormalSpaceNames{{
   return "unknown";
 }
 
-struct PointCloudOutlierRemovalUiState {
-  std::optional<EditorPointCloudOutlierRemovalResult> *LastResult{
-      nullptr};
-  std::int32_t *Method{nullptr};
-  std::int32_t *KNeighbors{nullptr};
-  float *StdDevMultiplier{nullptr};
-  float *SearchRadius{nullptr};
-  std::int32_t *MinNeighbors{nullptr};
-};
-
 struct TextureBakeUiState {
   std::optional<EditorUvRegenerationCommandResult>
       *LastUvRegenerationResult{nullptr};
@@ -1768,137 +1758,6 @@ void DrawDomainSelectionWindow(const EditorDomainWindowModel& model,
         DrawPrimitiveDetails(model.Primitive);
 }
 
-void DrawPointCloudOutlierRemovalResultStatus(
-    const std::optional<EditorPointCloudOutlierRemovalResult>
-        &lastResult) {
-  if (!lastResult.has_value()) {
-    ImGui::TextDisabled("Last outlier removal: none");
-    return;
-  }
-
-  const EditorPointCloudOutlierRemovalResult &result = *lastResult;
-  ImGui::Text("Last outlier removal: %s",
-              DebugNameForEditorCommandStatus(result.Status));
-  ImGui::Text("Method: %s",
-              result.Method == EditorPointCloudOutlierMethod::Statistical
-                  ? "Statistical"
-                  : "Radius");
-  // NoChange still means the kernel executed, so its counters remain relevant.
-  if (result.Succeeded() ||
-      result.Status == EditorCommandStatus::NoChange) {
-    ImGui::Text("Kept %zu / %zu  rejected %zu  non-finite %zu",
-                result.KeptCount, result.OriginalCount, result.RejectedCount,
-                result.NonFiniteCount);
-    if (result.Method == EditorPointCloudOutlierMethod::Statistical) {
-      ImGui::Text("Mean %.4f  stddev %.4f  threshold %.4f",
-                  static_cast<double>(result.MeanDistance),
-                  static_cast<double>(result.StdDevDistance),
-                  static_cast<double>(result.DistanceThreshold));
-    }
-  }
-  if (!result.Message.empty())
-    ImGui::TextWrapped("%s", result.Message.c_str());
-}
-
-void DrawPointCloudOutlierRemovalControls(
-    const EditorDomainWindowModel &model,
-    const SandboxEditorContext &context,
-    const EditorGeometryProcessingModel &processing,
-    PointCloudOutlierRemovalUiState *outlierState) {
-  ImGui::SeparatorText("Remove Outliers");
-  if (!processing.PointCloudOutlierRemovalAvailable) {
-    ImGui::TextDisabled(
-        "Point-cloud outlier removal is unavailable for this selection.");
-    return;
-  }
-  if (outlierState == nullptr || outlierState->LastResult == nullptr ||
-      outlierState->Method == nullptr || outlierState->KNeighbors == nullptr ||
-      outlierState->StdDevMultiplier == nullptr ||
-      outlierState->SearchRadius == nullptr ||
-      outlierState->MinNeighbors == nullptr) {
-    ImGui::TextDisabled("Point-cloud outlier-removal controls are not bound.");
-    return;
-  }
-
-  *outlierState->Method = std::clamp(*outlierState->Method, 0, 1);
-  const bool statistical = *outlierState->Method == 0;
-  if (ImGui::BeginCombo("Method##PointCloudOutlierRemoval",
-                        statistical ? "Statistical" : "Radius")) {
-    if (ImGui::Selectable("Statistical##PointCloudOutlierRemoval", statistical))
-      *outlierState->Method = 0;
-    if (statistical)
-      ImGui::SetItemDefaultFocus();
-    if (ImGui::Selectable("Radius##PointCloudOutlierRemoval", !statistical))
-      *outlierState->Method = 1;
-    if (!statistical)
-      ImGui::SetItemDefaultFocus();
-    ImGui::EndCombo();
-  }
-
-  if (statistical) {
-    ImGui::TextDisabled(
-        "Reject points beyond mean + k*stddev of mean-kNN distance.");
-    *outlierState->KNeighbors = std::clamp(*outlierState->KNeighbors, 1, 512);
-    *outlierState->StdDevMultiplier =
-        std::clamp(*outlierState->StdDevMultiplier, 0.0f, 100.0f);
-    ImGui::DragInt("K neighbors##PointCloudOutlierRemoval",
-                   outlierState->KNeighbors, 1.0f, 1, 512);
-    ImGui::DragFloat("Std-dev multiplier##PointCloudOutlierRemoval",
-                     outlierState->StdDevMultiplier, 0.05f, 0.0f, 100.0f);
-  } else {
-    ImGui::TextDisabled(
-        "Reject points with too few neighbors inside the search radius.");
-    *outlierState->SearchRadius = std::max(*outlierState->SearchRadius, 0.0f);
-    *outlierState->MinNeighbors =
-        std::clamp(*outlierState->MinNeighbors, 0, 512);
-    ImGui::DragFloat("Search radius##PointCloudOutlierRemoval",
-                     outlierState->SearchRadius, 0.01f, 0.0f, 1000.0f);
-    ImGui::DragInt("Min neighbors##PointCloudOutlierRemoval",
-                   outlierState->MinNeighbors, 1.0f, 0, 512);
-  }
-
-  if (ImGui::Button("Remove Outliers##PointCloudOutlierRemoval")) {
-    *outlierState
-         ->LastResult = ApplyEditorPointCloudOutlierRemovalCommand(
-        context.GeometryCommands,
-        EditorPointCloudOutlierRemovalCommand{
-            .StableEntityId = model.SelectedStableId,
-            .Method = statistical
-                          ? EditorPointCloudOutlierMethod::Statistical
-                          : EditorPointCloudOutlierMethod::Radius,
-            .KNeighbors = static_cast<std::uint32_t>(*outlierState->KNeighbors),
-            .StdDevMultiplier = *outlierState->StdDevMultiplier,
-            .SearchRadius = *outlierState->SearchRadius,
-            .MinNeighbors =
-                static_cast<std::uint32_t>(*outlierState->MinNeighbors),
-        });
-  }
-
-  const std::optional<EditorPointCloudOutlierRemovalResult> &result =
-      outlierState->LastResult->has_value()
-          ? *outlierState->LastResult
-          : processing.LastPointCloudOutlierRemovalResult;
-  DrawPointCloudOutlierRemovalResultStatus(result);
-}
-
-void DrawDomainProcessingWindow(
-    const EditorDomainWindowModel &model,
-    const SandboxEditorContext &context,
-    PointCloudOutlierRemovalUiState *pointCloudOutlierState) {
-  // The header already includes processing diagnostics; render them only once.
-  DrawDomainWindowHeader(model);
-
-  const EditorGeometryProcessingModel &processing = model.Processing;
-  if (!DomainWindowReady(model) || !processing.HasSelectedEntity) {
-    ImGui::TextDisabled(
-        "Select a matching domain entity to inspect processing affordances.");
-    return;
-  }
-
-  DrawPointCloudOutlierRemovalControls(model, context, processing,
-                                       pointCloudOutlierState);
-}
-
 } // namespace
 
 struct DomainPanels::Impl {
@@ -1914,7 +1773,6 @@ struct DomainPanels::Impl {
     Appearance,
     Properties,
     Selection,
-    PointCloudOutlierRemoval,
   };
 
   EditorShell *Shell{nullptr};
@@ -1924,17 +1782,10 @@ struct DomainPanels::Impl {
       CachedDomainModels{};
 
   Runtime::EditorPropertyPlotWidgetState MeshPropertyPlotState{};
-  std::optional<Runtime::EditorPointCloudOutlierRemovalResult>
-      LastPointCloudOutlierRemovalResult{};
   std::optional<Runtime::EditorUvRegenerationCommandResult>
       LastUvRegenerationResult{};
   std::optional<Runtime::EditorUvRegenerationCommandResult>
       LastUvExtentAdoption{};
-  std::int32_t PointCloudOutlierMethod{0};
-  std::int32_t PointCloudOutlierKNeighbors{16};
-  float PointCloudOutlierStdDevMultiplier{1.0f};
-  float PointCloudOutlierSearchRadius{0.0f};
-  std::int32_t PointCloudOutlierMinNeighbors{4};
   std::int32_t TextureBakeSourceIndex{0};
   std::int32_t TextureBakeTargetSemanticIndex{0};
   std::int32_t TextureBakeEncoderIndex{0};
@@ -1979,10 +1830,7 @@ void DomainPanels::Impl::Register(EditorShell &editorShell) {
   RegisterWindow("pointcloud.selection", {"PointCloud"}, "Selection",
                  Runtime::EditorDomainWindowKind::PointCloud,
                  Section::Selection);
-  RegisterWindow("pointcloud.processing.remove_outliers",
-                 {"PointCloud", "Processing"}, "Remove Outliers",
-                 Runtime::EditorDomainWindowKind::PointCloud,
-                 Section::PointCloudOutlierRemoval);
+
 
   RegisterWindow("graph.appearance", {"Graph"}, "Appearance",
                  Runtime::EditorDomainWindowKind::Graph,
@@ -2013,7 +1861,6 @@ void DomainPanels::Impl::Unregister() {
   Handles.clear();
   Shell = nullptr;
   ResetModelCache();
-  LastPointCloudOutlierRemovalResult.reset();
   LastUvRegenerationResult.reset();
   LastUvExtentAdoption.reset();
   MeshPropertyPlotState.SelectedProperty.clear();
@@ -2025,10 +1872,7 @@ void DomainPanels::Impl::RegisterWindow(
   const std::string windowTitle =
       std::string(Runtime::DebugNameForEditorDomainWindowKind(kind)) +
       " / " +
-      (section == Section::PointCloudOutlierRemoval
-           ? "Processing / Remove Outliers"
-       : section == Section::Selection ? "Selection"
-                                       : title);
+      title;
 
   Handles.push_back(
       Shell->RegisterEditorWindow(EditorWindowDescriptor{
@@ -2076,21 +1920,11 @@ void DomainPanels::Impl::DrawWindow(
     bool &open, const SandboxEditorContext &context,
     const Runtime::EditorDomainWindowKind kind, const Section section,
     const char *title) {
-  if (context.GeometryResults.LastPointCloudOutlierRemovalResult.has_value()) {
-    LastPointCloudOutlierRemovalResult =
-        *context.GeometryResults.LastPointCloudOutlierRemovalResult;
-  }
+
   if (context.GeometryResults.LastUvRegenerationResult.has_value())
     LastUvRegenerationResult = *context.GeometryResults.LastUvRegenerationResult;
 
-  PointCloudOutlierRemovalUiState outlierState{
-      .LastResult = &LastPointCloudOutlierRemovalResult,
-      .Method = &PointCloudOutlierMethod,
-      .KNeighbors = &PointCloudOutlierKNeighbors,
-      .StdDevMultiplier = &PointCloudOutlierStdDevMultiplier,
-      .SearchRadius = &PointCloudOutlierSearchRadius,
-      .MinNeighbors = &PointCloudOutlierMinNeighbors,
-  };
+
   TextureBakeUiState textureBakeState{
       .LastUvRegenerationResult = &LastUvRegenerationResult,
       .LastUvExtentAdoption = &LastUvExtentAdoption,
@@ -2149,9 +1983,6 @@ void DomainPanels::Impl::DrawWindow(
       break;
     case Section::Selection:
       DrawDomainSelectionWindow(model, context, SelectionElementIndex, SelectionDomainIndex, SelectionMessage);
-      break;
-    case Section::PointCloudOutlierRemoval:
-      DrawDomainProcessingWindow(model, context, &outlierState);
       break;
     }
   }

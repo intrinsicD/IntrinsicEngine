@@ -3661,3 +3661,79 @@ observations:
     promoted_to: logic/claims.md:C79
     crystallized_via: artifact-commitment
     stale: false
+
+  - id: O210
+    timestamp: '2026-09-09T19:31:11+02:00'
+    provenance: user-revised
+    content: Finish Vulkan neighborhood queries in the existing canonical normal-estimation workflow next, initially
+      retaining the CPU PCA/orientation oracle and truthful stage reporting; then adopt the shared queries for statistical/radius
+      outlier analysis through RUNTIME-209/UI-041. Compare complete execution costs before changing defaults.
+    context: Read-only source audit at e508e7792. Normal configuration still offers only CPU KD-tree/LBVH, while framed
+      GPU kNN exists. This is a proposed sequence, not an authorized implementation or measured speedup.
+    potential_type: heuristic
+    bound_to:
+    - N514
+    promoted: true
+    promoted_to: logic/solution/heuristics.md:H21
+    crystallized_via: verbal-affirmation
+    stale: false
+
+  - id: O211
+    timestamp: '2026-09-09T20:14:13+02:00'
+    provenance: ai-executed
+    content: Bounded CPU and actual Vulkan fixtures preserve normal outputs across eight canonical domains with GPU kNN/radius neighborhoods and shared CPU fitting, plus radius counts, rejection and history contracts.
+    context: N517 adopts the bounded result into the method documentation; no user comment on numerical measurements or performance advantage is inferred.
+    potential_type: claim
+    bound_to: [N516, N517]
+    promoted: true
+    promoted_to: logic/claims.md:C80
+    crystallized_via: artifact-commitment
+    stale: false
+
+  - id: O212
+    timestamp: '2026-09-09T21:49:47+02:00'
+    provenance: ai-executed
+    content: Bounded statistical/radius analysis fixtures match CPU octree masks and scores using cached CPU and actual Vulkan LBVH neighborhoods across eight canonical domains, with complete dense radius counts and guarded publication/removal/history.
+    context: N520 adopts the tested scope into the method contract. No researcher reaction to measured timings or general speedup is inferred.
+    potential_type: claim
+    bound_to: [N518, N519, N520]
+    promoted: true
+    promoted_to: logic/claims.md:C81
+    crystallized_via: artifact-commitment
+    stale: false
+
+  - id: O213
+    timestamp: '2026-09-09T21:49:47+02:00'
+    provenance: ai-suggested
+    content: For future count-only spatial consumers, complete total counts may eliminate retained-neighborhood overflow handling; consumers requiring weights or vectors still need complete support or a separately verified reduction.
+    context: Radius outlier classification uses capacity one and a complete hit count; broader adoption has not been selected by the operator.
+    potential_type: heuristic
+    bound_to: [N519]
+    promoted: false
+    promoted_to: null
+    crystallized_via: null
+    stale: false
+
+  - id: O214
+    timestamp: '2026-09-09T23:11:32+02:00'
+    provenance: ai-executed
+    content: Bounded local Gaussian density fixtures match CPU octree outputs using shared CPU/Vulkan LBVH candidates across all eight canonical domains, preserving inherited bandwidth and duplicate/self policy with guarded config/publication/history.
+    context: N523 adopts the tested scope into the method contract. No user reaction to the numerical result or a general performance advantage is inferred.
+    potential_type: claim
+    bound_to: [N521, N522, N523]
+    promoted: true
+    promoted_to: logic/claims.md:C82
+    crystallized_via: artifact-commitment
+    stale: false
+
+  - id: O215
+    timestamp: '2026-09-10T00:25:43+02:00'
+    provenance: ai-executed
+    content: Bounded canonical radius and nearest-spacing fixtures match CPU octree outputs using cached CPU and framed Vulkan LBVH candidates on all eight domains, with guarded config/publication/history.
+    context: N526 adopts only the tested distance-reduction contract. Renderer radius projection remains RUNTIME-222; no user affirmation or speedup is inferred.
+    potential_type: claim
+    bound_to: [N524, N525, N526]
+    promoted: true
+    promoted_to: logic/claims.md:C83
+    crystallized_via: artifact-commitment
+    stale: false

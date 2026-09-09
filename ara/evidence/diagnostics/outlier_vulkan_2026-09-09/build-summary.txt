@@ -1,0 +1,25 @@
+ci: IntrinsicTests and ExtrinsicSandbox
+[1208/1222] Linking CXX executable bin/IntrinsicLopFamilyGpuBenchmarkSmoke
+[1209/1222] Linking CXX executable bin/IntrinsicRuntimePointCloudConsolidationGpuParityTests
+[1210/1222] Linking CXX executable bin/IntrinsicGraphicsVulkanSmokeTests
+[1211/1222] Linking CXX executable bin/ExtrinsicSandbox
+[1212/1222] Building CXX object tests/CMakeFiles/SandboxEditorIntegrationTestObjs.dir/integration/runtime/Test.SandboxEditorPresentation.cpp.o
+[1213/1222] Building CXX object tests/CMakeFiles/RuntimeContractTestObjs.dir/contract/runtime/Test.OutlierAnalysis.cpp.o
+[1214/1222] Linking CXX executable bin/IntrinsicSandboxEditorIntegrationTests
+[1215/1222] Linking CXX executable bin/IntrinsicRuntimeContractTests
+[1216/1222] Building CXX object tests/CMakeFiles/RuntimeGraphicsCpuTestObjs.dir/integration/runtime/Test.RuntimeSandboxAcceptance.cpp.o
+[1217/1222] Building CXX object tests/CMakeFiles/PointLBVHGpuTestObjs.dir/integration/graphics/Test.PointLBVHGpuSmoke.cpp.o
+[1218/1222] Building CXX object tests/CMakeFiles/RuntimeGraphicsCpuTestObjs.dir/integration/runtime/Test.RuntimeRenderExtraction.cpp.o
+[1219/1222] Linking CXX executable bin/IntrinsicPointLBVHGpuTests
+[1220/1222] Linking CXX executable bin/IntrinsicRuntimeGraphicsCpuTests
+[1221/1222] Building CXX object tests/CMakeFiles/RuntimeSandboxAcceptanceGpuSmokeTestObjs.dir/integration/runtime/Test.RuntimeSandboxAcceptanceGpuSmoke.cpp.o
+[1222/1222] Linking CXX executable bin/IntrinsicRuntimeSandboxAcceptanceGpuSmokeTests
+ci-vulkan: IntrinsicPointLBVHGpuTests
+[722/729] Scanning /home/alex/Documents/IntrinsicEngine/src/runtime/AssetWorkflow/Runtime.AssetWorkflowTextureResidency.cppm for CXX dependencies
+[723/729] Scanning /home/alex/Documents/IntrinsicEngine/src/runtime/Rendering/Runtime.RenderExtraction.Internal.cpp for CXX dependencies
+[724/729] Scanning /home/alex/Documents/IntrinsicEngine/tests/integration/graphics/Test.PointLBVHGpuSmoke.cpp for CXX dependencies
+[725/729] Generating CXX dyndep file src/runtime/CMakeFiles/ExtrinsicRuntime.dir/CXX.dd
+[726/729] Generating CXX dyndep file tests/CMakeFiles/PointLBVHGpuTestObjs.dir/CXX.dd
+[727/729] Building CXX object src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Editor/Operations/Runtime.GeometryProcessingOperations.Outliers.cpp.o
+[728/729] Linking CXX static library lib/libExtrinsicRuntime.a
+[729/729] Linking CXX executable bin/IntrinsicPointLBVHGpuTests

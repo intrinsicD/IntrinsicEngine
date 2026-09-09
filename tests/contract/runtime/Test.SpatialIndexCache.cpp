@@ -132,3 +132,18 @@ TEST(SpatialIndexCache, CanonicalDomainsAndWorldEntityIdentity)
     check(D::GraphHalfedge, scene.Raw().get<GS::Halfedges>(entity).Properties);
     EXPECT_FALSE(cache.Nearest(one.Handle, {}));
 }
+
+TEST(SpatialIndexCache, FramedRadiusWithoutDeviceFailsExplicitly)
+{
+    R::WorldRegistry worlds;
+    R::SpatialIndexCache cache(worlds);
+    EXPECT_FALSE(cache.GpuQueriesAvailable());
+    const std::vector<glm::vec3> queries{{0,0,0}};
+    for (float radius : {-1.f, 0.f, 1.f})
+    {
+        const auto batch = cache.QueueGpuRadius({}, queries, radius, 2);
+        ASSERT_TRUE(batch);
+        EXPECT_EQ(batch->State, R::SpatialQueryState::Failed);
+        EXPECT_FALSE(batch->Diagnostic.empty());
+    }
+}

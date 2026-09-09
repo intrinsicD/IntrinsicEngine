@@ -1973,3 +1973,41 @@ entries:
       evidence. C17 retains its disposition.
     - Broader migration priorities, selection architecture and unrelated atlas/DAG observations remain unsettled;
       publishing this implementation is not a blanket endorsement of those interpretations.
+
+  - turn: 2026-09-09_001#2
+    notes:
+    - N514 records the requested source audit; no experiment or new capability evidence is invented. O210 is an unaccepted
+      implementation-priority recommendation and remains staged.
+    - The recently pulled face-normal visualization does not add Vulkan point-normal computation. Separate GPU neighbor
+      queries, PCA/orientation work and display paths.
+    - Existing consumer facts are supported by current source and the inventory. No new general claim, speedup or
+      automatic grid/primitive-index replacement follows. Broader O204 priorities remain unsettled.
+
+  - turn: 2026-09-09_001#3
+    notes:
+    - O210 gains explicit adoption for normal-first sequencing and crystallizes as H21 with user-revised provenance; remaining outlier implementation is not silently started.
+    - O211 crystallizes into C80 via N517 artifact commitment, not an invented user reaction to the measurements.
+    - Initial new GPU skips are retained; only the corrected operational readback run supports the new capability. Three rejected prerequisite logs are expected negative cases.
+    - Dirty smoke timings remain non-claim-eligible; CPU fitting/orientation, no speedup/default change, and BUG-177/178/180/182 limits stay explicit. Unrelated observations remain staged.
+
+  - turn: 2026-09-09_001#4
+    notes:
+    - N518 records only the accepted outlier slice. O212 becomes C81 through N520 artifact commitment, not an invented researcher response to measurements. O213 and unrelated staged observations remain unpromoted.
+    - Preserve initial UI assertion failures and sandbox capability skips; final CPU/native runs and actual Vulkan execution provide the evidence. The GPU job rejection logs are intentional stale/cancelled prerequisites.
+    - Count-based radius classification uses complete totals, not retained hits; other radius consumers still require their own semantics review. CPU classification/defaults and dirty timing limits remain explicit.
+    - C17 and H21 proof paths follow task promotion only; historical dispositions are unchanged. BUG-177/178/180 remain separate. No publication occurred.
+
+  - turn: 2026-09-09_001#5
+    notes:
+    - The user requested the next method but did not name density; N521's specific selection retains ai-executed provenance. O214 becomes C82 through N523 artifact commitment, not invented user affirmation of the measurements.
+    - Preserve initial editor-fixture failure and sandbox skips alongside corrected CPU/native and actual Vulkan evidence. Local timing is dirty and frame-paced; it supports no speedup or default change.
+    - Density preserves local Gaussian averaging and the inherited univariate spacing heuristic. No full-sample KDE, GPU evaluation or multivariate optimality is claimed. O213 and broader migration/segmentation observations gain no new closure signal.
+    - Existing open research context remains retained; this turn makes no new claim about DAG design, segmentation quality or count-only consumer adoption. No publication occurred.
+
+  - turn: 2026-09-10_001#1
+    notes:
+    - The latest continuation request did not name spacing/radii; N524 records the agent's bounded selection. O215 crystallizes through N526 artifact commitment, not fabricated user affirmation.
+    - CPU/GPU tests support only the source-bound radius and nearest-spacing contract. Model-space radii cannot be substituted for pixel sizes; RUNTIME-222 records the renderer gap. No coverage, GPU reduction or visualization-readback claim is made.
+    - Retain initial passing tests and final-source reconciliation. An unused generic enum addition was removed during review; final enum values remain unchanged. Expected stale/cancel prerequisite logs are not numerical failures.
+    - Dirty framed timing supports no speedup or default change. BUG-177/178/180 remain separate; no commit or push occurred.
+    - Reviewed retained observations conservatively: O93's operation lifecycle and O204's spatial adoption remain topical, O213 count-only guidance is not adopted, and retained atlas/DAG/selection context receives no new closure signal. No unrelated promotion or inferred researcher endorsement.

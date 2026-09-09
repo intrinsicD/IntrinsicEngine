@@ -316,6 +316,14 @@ fraction is an identity operation, while empty input, non-finite positions,
 negative/non-finite fractions, and non-zero requests with degenerate scale report
 explicit status values.
 
+### Local Gaussian density contracts
+
+`EstimateKernelDensity(span, params)` accepts arbitrary finite float3 samples;
+`EstimateKernelDensityFromNeighbors` consumes supplied nearest candidate IDs.
+The Cloud overload remains a property-publishing convenience. The
+[runtime workflow](kernel-density.md) binds all eight domains through shared
+CPU/Vulkan spatial indices, preserving the local estimator and named outputs.
+
 ### Point-cloud filtering and outlier-removal contracts
 
 `Geometry.PointCloud.Utils` owns the deterministic point-cloud filtering pack:
@@ -330,6 +338,11 @@ operators that return an owned partition instead of a raw score:
   over the cloud-wide distribution.
 - `RemoveRadiusOutliers` rejects points with fewer than `MinNeighbors` other
   points inside `SearchRadius`.
+
+`AnalyzeStatisticalOutliers` and `AnalyzeRadiusOutliers` accept position spans and
+return same-cardinality masks and scores. Supplied distance/count classifiers
+support cached CPU/Vulkan queries through the [runtime outlier workflow](outlier-analysis.md).
+The cloud removal functions remain compatibility wrappers around these analyses.
 
 Both share `OutlierRemovalResult`: an explicit `OutlierRemovalStatus`, an owned
 `Filtered` cloud carrying the kept points (with their normals/colors/radii),
@@ -1329,3 +1342,5 @@ As of RORG-093, canonical Geometry code is promoted to `src/geometry`. As of the
   splits UV parameterization, atlas, distortion, and surface-map gaps into
   method-compliant diagnostics, harmonic/Tutte, ARAP/SLIM, charting, and map
   representation packs without claiming those packs are already implemented.
+
+[Point spacing and radii](point-spacing.md) expose span and supplied-candidate kernels. Runtime binds all canonical domains through shared CPU/Vulkan neighborhoods and publishes named model-space radii with nearest-spacing statistics.

@@ -95,3 +95,27 @@ python3 tools/agents/validate_tasks.py --root tasks --strict
 
 - No ECS/runtime import, unreviewed algorithm substitution, implicit
   topology/cardinality edit, or handle-specific generic API.
+
+## Outlier slice progress (2026-09-09)
+
+RUNTIME-209/UI-041 add span statistical/radius analysis plus cached CPU/Vulkan
+query execution and canonical-domain publication. Keep this task open for the
+remaining statistics/radii, bilateral, density, simplified probability and
+feature utilities. Reuse SpatialIndexCache where the estimator semantics fit;
+do not conflate LOF-like probability with the statistical/radius masks.
+
+## Density slice progress (2026-09-09)
+
+RUNTIME-220 adds span/supplied-candidate density kernels and canonical-domain
+CPU/Vulkan runtime/config/UI publication. The inherited local Gaussian average
+and spacing bandwidth remain distinct from full-sample KDE. This task remains
+open for statistics/radii, bilateral, simplified probability and features.
+
+## Spacing/radii slice progress
+
+RUNTIME-221 adds span/supplied-candidate statistics and radius estimation, plus
+canonical-domain CPU/Vulkan runtime/config/UI radius publication with full
+nearest-other spacing diagnostics. Sampled statistics retain deterministic stride;
+invalid/nonfinite or unrepresentable float results now fail closed. Keep this
+task open for bilateral filtering, simplified probability and feature utilities.
+RUNTIME-222 owns model-space radius rendering; do not reinterpret radii as pixels.

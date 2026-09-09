@@ -129,3 +129,49 @@ TEST(PointLBVH, SuppliedNormalIndexPreservesReferenceNeighborhoodPolicy)
     points.pop_back();
     EXPECT_FALSE(N::Estimate(points,index));
 }
+
+TEST(PointLBVH, SuppliedNormalNeighborhoodsReuseCpuFitAndOrientation)
+{
+    namespace N = Geometry::PointCloud::Normals;
+    std::vector<glm::vec3> points;
+    for (int y = 0; y < 9; ++y) for (int x = 0; x < 9; ++x)
+        points.push_back({float(x), float(y), .01f*x*x + .02f*y*y});
+    for (int i = 0; i < 20; ++i) points.push_back(points.front());
+    for (bool radius : {false, true})
+        for (auto orientation : {N::OrientationMode::None, N::OrientationMode::MinimumSpanningTree})
+        {
+            N::Params params{.KNeighbors=15, .UseRadiusSearch=radius, .Radius=2.5f,
+                             .Orientation=orientation};
+            std::vector<std::uint32_t> offsets{0}, indices;
+            for (auto point : points)
+            {
+                const auto neighbors = radius ? LB::RadiusReference(points, point, 2.5f, points.size()).Neighbors
+                                              : LB::KNearestReference(points, point, 16);
+                for (auto neighbor : neighbors) indices.push_back(neighbor.Index);
+                offsets.push_back(indices.size());
+            }
+            const auto reference = N::Estimate(points, params);
+            const auto actual = N::Estimate(points, N::Neighborhoods{offsets, indices}, params);
+            ASSERT_TRUE(reference); ASSERT_TRUE(actual);
+            EXPECT_EQ(actual->Backend, N::NeighborhoodBackend::SuppliedNeighborhoods);
+            EXPECT_EQ(actual->Diagnostics.ValidNormalPointCount, reference->Diagnostics.ValidNormalPointCount);
+            EXPECT_EQ(actual->Diagnostics.DuplicatePositionCount, reference->Diagnostics.DuplicatePositionCount);
+            EXPECT_EQ(actual->Diagnostics.FlippedOrientationCount, reference->Diagnostics.FlippedOrientationCount);
+            for (std::size_t i = 0; i < points.size(); ++i)
+                for (unsigned axis = 0; axis < 3; ++axis)
+                    EXPECT_NEAR(actual->Normals[i][axis], reference->Normals[i][axis], 1e-5);
+        }
+}
+TEST(PointLBVH, SuppliedNormalNeighborhoodsRejectMalformedLayout)
+{
+    namespace N = Geometry::PointCloud::Normals;
+    std::vector<glm::vec3> points{{0,0,0}, {1,0,0}, {0,1,0}};
+    std::vector<std::uint32_t> indices{0,1,2}, offsets{0,3,3,3};
+    EXPECT_TRUE(N::Estimate(points, N::Neighborhoods{offsets, indices}));
+    EXPECT_FALSE(N::Estimate(points, N::Neighborhoods{{}, indices}));
+    offsets = {1,3,3,3}; EXPECT_FALSE(N::Estimate(points, N::Neighborhoods{offsets, indices}));
+    offsets = {0,3,2,3}; EXPECT_FALSE(N::Estimate(points, N::Neighborhoods{offsets, indices}));
+    offsets = {0,1,1,2}; EXPECT_FALSE(N::Estimate(points, N::Neighborhoods{offsets, indices}));
+    offsets = {0,3,3,3}; indices[1]=3;
+    EXPECT_FALSE(N::Estimate(points, N::Neighborhoods{offsets, indices}));
+}

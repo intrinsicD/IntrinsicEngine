@@ -23,6 +23,9 @@ target_sources(${target_name}
         Modules/CurvatureSegmentation/Runtime.CurvatureSegmentationConfig.cppm
         Modules/ProgressivePoisson/Runtime.ProgressivePoissonConfig.cppm
         Modules/Geodesics/Runtime.GeodesicsConfig.cppm
+        Modules/OutlierAnalysis/Runtime.OutlierAnalysisConfig.cppm
+        Modules/KernelDensity/Runtime.KernelDensityConfig.cppm
+        Modules/PointSpacing/Runtime.PointSpacingConfig.cppm
         Modules/NormalEstimation/Runtime.NormalEstimationConfig.cppm
         Modules/Registration/Runtime.RegistrationConfig.cppm
         Modules/Parameterization/Runtime.ParameterizationConfig.cppm
@@ -118,6 +121,12 @@ target_sources(${target_name}
         Modules/CurvatureSegmentation/Runtime.CurvatureSegmentationConfig.cpp
         Modules/ProgressivePoisson/Runtime.ProgressivePoissonConfig.cpp
         Modules/Geodesics/Runtime.GeodesicsConfig.cpp
+        Modules/OutlierAnalysis/Runtime.OutlierAnalysisConfig.cpp
+        Modules/KernelDensity/Runtime.KernelDensityConfig.cpp
+        Modules/PointSpacing/Runtime.PointSpacingConfig.cpp
+        Editor/Operations/Runtime.GeometryProcessingOperations.Outliers.cpp
+        Editor/Operations/Runtime.GeometryProcessingOperations.Density.cpp
+        Editor/Operations/Runtime.GeometryProcessingOperations.Spacing.cpp
         Modules/NormalEstimation/Runtime.NormalEstimationConfig.cpp
         Editor/Operations/Runtime.GeometryProcessingOperations.Normals.cpp
         Modules/Registration/Runtime.RegistrationConfig.cpp

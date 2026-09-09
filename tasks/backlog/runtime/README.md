@@ -22,7 +22,7 @@ handle-specific property wrappers, are the semantic boundary. Runtime fixes
 precede their paired UI tasks; graph-capable fixes also wait for `HARDEN-087`
 to align physical ECS materialization with the element-domain contract:
 
-- [RUNTIME-209 — Point-set outlier analysis and publication split](RUNTIME-209-point-set-outlier-analysis-publication.md)
+- [RUNTIME-209 — Point-set outlier analysis and publication split](../../active/RUNTIME-209-point-set-outlier-analysis-publication.md)
   exposes topology-safe detection on all typed sample properties and retains
   explicit destructive removal only for point clouds.
 - [RUNTIME-210 — Signed Heat runtime and config integration](RUNTIME-210-signed-heat-runtime-config-integration.md)
@@ -1208,3 +1208,6 @@ split; narratives live in the retirement log.
 - [`GRAPHICS-001 — Rendering parity inventory and task index`](../../archive/GRAPHICS-001-rendering-parity-inventory.md) —
   retired rendering parity seed; current rendering selection lives in the
   rendering backlog DAG above.
+
+- [RUNTIME-221 — Point spacing and radius spatial backends](../../active/RUNTIME-221-point-spacing-spatial-backends.md): active canonical-domain radius/spacing integration.
+- [RUNTIME-222 — Model-space point radius rendering](RUNTIME-222-model-space-point-radius-rendering.md): config binding, buffer residency and projection of published radii.

@@ -8,6 +8,7 @@
 #include <iostream>
 #include <random>
 #include <chrono>
+#include <cmath>
 #include <cstdlib>
 #include <fstream>
 #include <nlohmann/json.hpp>
@@ -30,6 +31,9 @@ import Extrinsic.Runtime.ServiceRegistry;
 import Extrinsic.ECS.Scene.Registry;
 import Extrinsic.ECS.Components.GeometrySources;
 import Geometry.PointLBVH;
+import Geometry.HalfedgeMesh;
+import Geometry.Graph;
+import Extrinsic.ECS.Components.GeometrySourcesPopulate;
 import Extrinsic.Runtime.GeometryProcessingOperations;
 import Extrinsic.Runtime.SelectionController;
 import Extrinsic.Runtime.JobService;
@@ -447,6 +451,7 @@ namespace
     class KnnBatchApp final : public Intrinsic::Tests::RuntimeTestModule
     {
     public:
+        explicit KnnBatchApp(bool radius = false) : RadiusMode(radius) {}
         void Resolve() override
         {
             Started=std::chrono::steady_clock::now();
@@ -465,7 +470,11 @@ namespace
         {
             if (std::chrono::steady_clock::now()-Started>std::chrono::seconds(40))
             { TimedOut=true; Kernel().RequestExit();return; }
-            if (!Kernel().GetDevice().IsOperational()) return;
+            if (!Kernel().GetDevice().IsOperational())
+            {
+                if (RadiusMode && ++ColdFrames > 4) { TimedOut=true;Kernel().RequestExit(); }
+                return;
+            }
             if (Batch)
             {
                 if (Batch->State==Runtime::SpatialQueryState::Queued || Batch->State==Runtime::SpatialQueryState::Submitted) return;
@@ -477,12 +486,23 @@ namespace
                 }
                 EXPECT_EQ(Batch->State,Runtime::SpatialQueryState::Ready) << Batch->Diagnostic;
                 if (Batch->State!=Runtime::SpatialQueryState::Ready) { Kernel().RequestExit();return; }
+                if (RadiusMode)
+                {
+                    EXPECT_EQ(Batch->Counts, Round==0 ? (std::vector<std::uint32_t>{1,2})
+                                                       : (std::vector<std::uint32_t>{3,4}));
+                    ASSERT_EQ(Batch->Neighbors.size(),2);
+                    EXPECT_EQ(Batch->Neighbors[0].Index,Round==0?2u:0u);
+                    EXPECT_EQ(Batch->Neighbors[1].Index,0u);
+                }
+                else
+                {
                 EXPECT_EQ(Batch->Counts,(std::vector<std::uint32_t>{3,4}));
                 const std::vector<std::uint32_t> expected=Round==0?
                     std::vector<std::uint32_t>{2,3,4,LB::InvalidIndex,0,2,3,4}:
                     std::vector<std::uint32_t>{0,3,4,LB::InvalidIndex,0,2,3,4};
                 EXPECT_EQ(Batch->Neighbors.size(),expected.size());
                 for (std::size_t i=0;i<expected.size();++i) EXPECT_EQ(Batch->Neighbors[i].Index,expected[i]);
+                }
                 ++Round;
             }
             const std::vector<glm::vec3> queries{{0,0,0},{0,0,0}};
@@ -494,7 +514,8 @@ namespace
                 EXPECT_EQ(Cache->QueueGpuKNearest(Handle,queries,4,std::vector<std::uint32_t>{0})->State,Runtime::SpatialQueryState::Failed);
             }
             auto old=Batch;
-            Batch=Cache->QueueGpuKNearest(Handle,queries,4,exclusions,Batch);
+            Batch=RadiusMode ? Cache->QueueGpuRadius(Handle,queries,Round==0?.5f:1.f,1,exclusions,Batch)
+                             : Cache->QueueGpuKNearest(Handle,queries,4,exclusions,Batch);
             if (old) EXPECT_EQ(old,Batch);
             if (Round==2) Positions[4]={-2,0,0}; // Queued work must reject a stale target before submission.
         }
@@ -506,7 +527,7 @@ namespace
         Runtime::SpatialIndexCacheStats Stats{};
         entt::entity Entity{};
         std::chrono::steady_clock::time_point Started{};
-        unsigned Round{}; bool TimedOut{},Done{};
+        unsigned Round{},ColdFrames{}; bool TimedOut{},Done{},RadiusMode{};
     };
 }
 TEST(PointLBVHGpuSmoke, FramedKNearestReusesBuffersAndRejectsStaleTarget)
@@ -522,4 +543,881 @@ TEST(PointLBVHGpuSmoke, FramedKNearestReusesBuffersAndRejectsStaleTarget)
     if (!engine.GetDevice().IsOperational()) GTEST_SKIP() << "Operational Vulkan unavailable";
     ASSERT_FALSE(run->TimedOut);ASSERT_TRUE(run->Done);
     EXPECT_EQ(run->Stats.Builds,1);EXPECT_EQ(run->Stats.GpuBuilds,1);
+}
+
+TEST(PointLBVHGpuSmoke, FramedRadiusPreservesOverflowExclusionAndBufferReuse)
+{
+    if (!Extrinsic::Platform::Backends::Glfw::CanInitialize()) GTEST_SKIP() << "GLFW unavailable";
+    auto config=Runtime::CreateReferenceEngineConfig();
+    config.Window.Width=64;config.Window.Height=64;config.Render.EnableValidation=true;
+    config.Render.EnableVSync=false;config.ReferenceScene.Enabled=false;
+    auto app=std::make_unique<KnnBatchApp>(true);auto* run=app.get();
+    Intrinsic::Tests::RuntimeTestKernel engine(config,std::move(app));
+    engine.EmplaceModule<Runtime::SpatialIndexCache>();
+    engine.Initialize();Shutdown shutdown{engine};
+    engine.Run();ASSERT_TRUE(engine.GetDevice().IsOperational());
+    ASSERT_FALSE(run->TimedOut);ASSERT_TRUE(run->Done);
+    EXPECT_EQ(run->Stats.Builds,1);EXPECT_EQ(run->Stats.GpuBuilds,1);
+}
+
+namespace
+{
+    using Domain = Runtime::GeometryElementDomain;
+    class NormalApp final : public Intrinsic::Tests::RuntimeTestModule
+    {
+    public:
+        Geometry::PropertySet& Props(unsigned d)
+        {
+            return *const_cast<Geometry::PropertySet*>(Runtime::ResolveGeometryPropertySet(
+                Runtime::BuildGeometryAvailability(Context.Scene->Raw(), Entities[d-1]), Domain(d)));
+        }
+        Runtime::NormalEstimationConfig Config(unsigned d) const
+        {
+            Runtime::NormalEstimationConfig c;
+            c.StableEntityId=Runtime::SelectionController::ToStableEntityId(Entities[d-1]);
+            c.Positions={.Domain=Domain(d),.Name="samples",.ValueKind=Geometry::PropertyValueKind::Vec3};
+            c.Output={.Domain=Domain(d),.Name="estimated",.ValueKind=Geometry::PropertyValueKind::Vec3};
+            c.KNeighbors=15;c.UseRadiusSearch=Phase==2;c.Radius=1.1f;
+            c.Backend=Runtime::NormalEstimationBackend::VulkanLBVH;
+            c.GpuQueryBatchSize=64; // Exercise a final partial chunk and buffer lifetime.
+            return c;
+        }
+        void Resolve() override
+        {
+            Started=std::chrono::steady_clock::now();
+            Context.Scene=Kernel().Worlds().Get(Kernel().ActiveWorld());Context.World=Kernel().ActiveWorld();
+            Context.SpatialIndices=Kernel().Services().Find<Runtime::SpatialIndexCache>();
+            std::mt19937 random(241);std::uniform_real_distribution<float> dist(-1,1);
+            std::vector<glm::vec3> points;
+            for(unsigned i=0;i<66;++i){const float x=dist(random),y=dist(random);points.push_back({x,y,.2f*x*x+.1f*y*y});}
+            points[2]=points[0];
+            for(unsigned d=1;d<=8;++d)
+            {
+                auto entity=Context.Scene->Create();Entities.push_back(entity);
+                if(d<=unsigned(Domain::MeshFace))
+                {
+                    Geometry::HalfedgeMesh::Mesh mesh;
+                    auto a=mesh.AddVertex({0,0,0}),b=mesh.AddVertex({1,0,0}),c=mesh.AddVertex({0,1,0});
+                    (void)mesh.AddTriangle(a,b,c);GS::PopulateFromMesh(Context.Scene->Raw(),entity,mesh);
+                }
+                else if(d<unsigned(Domain::PointCloudPoint))
+                {
+                    Geometry::Graph::Graph graph;
+                    auto a=graph.AddVertex({0,0,0}),b=graph.AddVertex({1,0,0});
+                    (void)graph.AddEdge(a,b);GS::PopulateFromGraph(Context.Scene->Raw(),entity,graph);
+                }
+                else Context.Scene->Raw().emplace<GS::Vertices>(entity);
+                auto& p=Props(d);p.Resize(points.size());p.GetOrAdd<glm::vec3>("samples").Vector()=points;
+                p.GetOrAdd<float>("keep").Vector().assign(points.size(),42.f);
+                p.GetOrAdd<glm::vec3>("estimated").Vector().assign(points.size(),glm::vec3(7,8,9));
+                const bool half=d==unsigned(Domain::MeshHalfedge)||d==unsigned(Domain::GraphHalfedge);
+                if(half)
+                {
+                    auto& edges=Context.Scene->Raw().get<GS::Edges>(entity).Properties;
+                    edges.Resize(points.size()/2);edges.GetOrAdd<bool>("e:deleted")[2]=true;
+                }
+                else p.GetOrAdd<bool>(d==unsigned(Domain::MeshFace)?"f:deleted":
+                    (d==unsigned(Domain::MeshEdge)||d==unsigned(Domain::GraphEdge))?"e:deleted":"v:deleted")[4]=true;
+                p.Get<glm::vec3>("samples")[4]={std::numeric_limits<float>::quiet_NaN(),0,0};
+            }
+            Context.MethodResultSinks.NormalEstimation=[this](auto result){Results.push_back(std::move(result));};
+        }
+        void Frame(double,double) override
+        {
+            if(std::chrono::steady_clock::now()-Started>std::chrono::seconds(95))
+            {TimedOut=true;Kernel().RequestExit();return;}
+            if(!Kernel().GetDevice().IsOperational())
+            {
+                if(++ColdFrames>4){TimedOut=true;Kernel().RequestExit();}
+                return;
+            }
+            if(Submitted)
+            {
+                if(Phase==4 && ++CancelFrames==3)
+                    EXPECT_TRUE(Kernel().Jobs().Cancel(FitToken));
+                if(Results.size()<ExpectedResults)return;
+                if(Phase>=3)
+                {
+                    EXPECT_FALSE(Results.back().Succeeded())<<Results.back().Message;
+                    EXPECT_EQ(Props(8).Get<glm::vec3>("estimated")[0],glm::vec3(7,8,9));
+                    if(Phase==5)
+                    {
+                        EXPECT_NE(Results.back().Message.find("1024"),std::string::npos);
+                        Done=true;Kernel().RequestExit();return;
+                    }
+                }
+                else
+                {
+                    PhaseMs.push_back(std::chrono::duration<double,std::milli>(std::chrono::steady_clock::now()-PhaseStarted).count());
+                    double neighborhoodMs=0,fitMs=0;
+                    std::size_t batches=0;
+                    for(const auto& result:Results)
+                    {
+                        neighborhoodMs+=result.GpuNeighborhoodMilliseconds;
+                        fitMs+=result.CpuComputeMilliseconds;
+                        batches+=result.GpuQueryBatches;
+                        EXPECT_TRUE(result.Succeeded())<<result.Message;
+                        EXPECT_EQ(result.ActualBackend,"vulkan_lbvh");
+                        EXPECT_GT(result.GpuQueryBatches,0);
+                        if(Phase>0)EXPECT_TRUE(result.IndexReused);
+                    }
+                    NeighborhoodMs.push_back(neighborhoodMs);FitMs.push_back(fitMs);BatchCounts.push_back(batches);
+                    for(unsigned d=1;d<=8;++d)
+                    {
+                        const auto& values=std::as_const(Props(d)).Get<glm::vec3>("estimated").Vector();
+                        ASSERT_EQ(values.size(),Reference[d-1].size());
+                        for(std::size_t i=0;i<values.size();++i)for(unsigned axis=0;axis<3;++axis)
+                        {
+                            EXPECT_TRUE(std::isfinite(values[i][axis]));
+                            const double error=std::abs(values[i][axis]-Reference[d-1][i][axis]);
+                            MaxError=std::isfinite(error)?std::max(MaxError,error):std::numeric_limits<double>::infinity();
+                        }
+                        EXPECT_EQ(std::as_const(Props(d)).Get<float>("keep")[0],42.f);
+                    }
+                    EXPECT_LE(MaxError,1e-5);
+                    EXPECT_EQ(History.UndoCount(),8);
+                    for(unsigned i=0;i<8;++i)EXPECT_EQ(History.Undo().Status,Runtime::EditorCommandHistoryStatus::Undone);
+                    for(unsigned d=1;d<=8;++d)EXPECT_EQ(std::as_const(Props(d)).Get<glm::vec3>("estimated")[0],glm::vec3(7,8,9));
+                    for(unsigned i=0;i<8;++i)EXPECT_EQ(History.Redo().Status,Runtime::EditorCommandHistoryStatus::Redone);
+                }
+                Results.clear();Submitted=false;++Phase;
+            }
+            if(Phase<3)
+            {
+                Reference.clear();History.ClearHistory();Context.JobCommands={};Context.CommandHistory=nullptr;
+                const auto cpuStart=std::chrono::steady_clock::now();
+                for(unsigned d=1;d<=8;++d)
+                {
+                    auto c=Config(d);c.Backend=Runtime::NormalEstimationBackend::CpuKDTree;
+                    const auto result=Runtime::ApplyEditorNormalEstimationCommand(Context,c);
+                    ASSERT_TRUE(result.Succeeded())<<result.Message;
+                    Reference.push_back(std::as_const(Props(d)).Get<glm::vec3>("estimated").Vector());
+                    Props(d).Get<glm::vec3>("estimated").Vector().assign(66,glm::vec3(7,8,9));
+                }
+                CpuMs.push_back(std::chrono::duration<double,std::milli>(std::chrono::steady_clock::now()-cpuStart).count());
+            }
+            Context.JobCommands.Submit=[this](Runtime::JobDesc desc,Runtime::EditorJobIdentity){FitToken=Kernel().Jobs().Submit(std::move(desc));return FitToken;};
+            Context.CommandHistory=&History;ExpectedResults=Phase<3?8:1;Submitted=true;PhaseStarted=std::chrono::steady_clock::now();
+            if(Phase<3)
+            {
+                if(Phase==0)
+                {
+                    auto unsupported=Config(8);unsupported.KNeighbors=64;
+                    EXPECT_FALSE(Runtime::PreviewEditorNormalEstimationCommand(Context,unsupported).Ready);
+                }
+                for(unsigned d=1;d<=8;++d)
+                {
+                    const auto result=Runtime::ApplyEditorNormalEstimationCommand(Context,Config(d));
+                    if(result.Status!=Runtime::EditorCommandStatus::Pending)Results.push_back(result);
+                }
+            }
+            else
+            {
+                auto c=Config(8);
+                if(Phase==4)c.GpuQueryBatchSize=1; // Cancel after GPU submission, before all 65 rows complete.
+                if(Phase==5)
+                {
+                    auto& p=Props(8);p.Resize(1026);
+                    p.Get<glm::vec3>("samples").Vector().assign(1026,glm::vec3(0));
+                    p.Get<glm::vec3>("estimated").Vector().assign(1026,glm::vec3(7,8,9));
+                    c.UseRadiusSearch=true;c.Radius=1;c.GpuQueryBatchSize=1;
+                }
+                else Props(8).Get<glm::vec3>("estimated").Vector().assign(66,glm::vec3(7,8,9));
+                const auto result=Runtime::ApplyEditorNormalEstimationCommand(Context,c);
+                if(result.Status!=Runtime::EditorCommandStatus::Pending)Results.push_back(result);
+                if(Phase==3)Props(8).Get<glm::vec3>("samples")[0]+=.1f; // stale before GPU recording
+            }
+        }
+        void Shutdown() override {Context={};}
+        Runtime::EditorGeometryProcessingContext Context{};
+        Runtime::EditorCommandHistory History{};
+        std::vector<entt::entity> Entities;
+        std::vector<std::vector<glm::vec3>> Reference;
+        std::vector<Runtime::EditorNormalEstimationResult> Results;
+        std::vector<double> PhaseMs,CpuMs,NeighborhoodMs,FitMs;
+        std::vector<std::size_t> BatchCounts;
+        std::chrono::steady_clock::time_point Started{},PhaseStarted{};
+        Runtime::JobToken FitToken{};
+        std::size_t ExpectedResults{};unsigned Phase{},CancelFrames{},ColdFrames{};bool Submitted{},Done{},TimedOut{};double MaxError{};
+    };
+}
+TEST(PointLBVHGpuSmoke, NormalNeighborhoodsPublishAcrossDomainsAndRejectIncompleteSupport)
+{
+    if(!Extrinsic::Platform::Backends::Glfw::CanInitialize())GTEST_SKIP()<<"GLFW unavailable";
+    auto config=Runtime::CreateReferenceEngineConfig();
+    config.Window.Width=64;config.Window.Height=64;config.Render.EnableValidation=true;
+    config.Render.EnableVSync=false;config.ReferenceScene.Enabled=false;
+    auto app=std::make_unique<NormalApp>();auto* run=app.get();
+    Intrinsic::Tests::RuntimeTestKernel engine(config,std::move(app));
+    engine.EmplaceModule<Runtime::SpatialIndexCache>();engine.Initialize();Shutdown shutdown{engine};
+    engine.Run();ASSERT_TRUE(engine.GetDevice().IsOperational());
+    ASSERT_FALSE(run->TimedOut)<<"phase="<<run->Phase;ASSERT_TRUE(run->Done);
+    EXPECT_LE(run->MaxError,1e-5);ASSERT_EQ(run->PhaseMs.size(),3);
+    if(const auto* output=std::getenv("INTRINSIC_NORMAL_BENCHMARK_OUTPUT"))
+    {
+        nlohmann::json json{{"benchmark_id","geometry.point_lbvh.normal_runtime_smoke"},
+            {"method","geometry.point_lbvh"},{"backend","gpu_vulkan_compute"},
+            {"dataset","builtin.paraboloid.66_slots.eight_domains.seed241"},{"commit","local-dev"},
+            {"metrics",{{"runtime_ms",run->PhaseMs[1]},{"quality_error_linf",run->MaxError}}},
+            {"diagnostics",{{"runner","IntrinsicPointLBVHGpuTests"},{"mode","smoke"},
+                {"cpu_reference_total_ms",run->CpuMs[1]},{"vulkan_cold_total_ms",run->PhaseMs[0]},
+                {"vulkan_warm_total_ms",run->PhaseMs[1]},{"vulkan_radius_total_ms",run->PhaseMs[2]},
+                {"cpu_radius_total_ms",run->CpuMs[2]},{"warmup_iterations",1},{"measured_iterations",1},
+                {"cpu_fit_and_orientation",true},{"gpu_neighborhood_elapsed_sum_ms",run->NeighborhoodMs},
+                {"cpu_fit_sum_ms",run->FitMs},{"gpu_query_batch_counts",run->BatchCounts}}},{"status",::testing::Test::HasFailure()?"failed":"passed"}};
+        std::ofstream stream(output);ASSERT_TRUE(stream.good());stream<<json.dump(2)<<'\n';ASSERT_TRUE(stream.good());
+    }
+}
+
+namespace
+{
+    class OutlierApp final : public Intrinsic::Tests::RuntimeTestModule
+    {
+    public:
+        Geometry::PropertySet& Props(unsigned d)
+        {
+            return *const_cast<Geometry::PropertySet*>(Runtime::ResolveGeometryPropertySet(
+                Runtime::BuildGeometryAvailability(Context.Scene->Raw(), Entities[d-1]), Domain(d)));
+        }
+        Runtime::OutlierAnalysisConfig Config(unsigned d) const
+        {
+            Runtime::OutlierAnalysisConfig c;
+            c.StableEntityId=Runtime::SelectionController::ToStableEntityId(Entities[d-1]);
+            c.Positions={.Domain=Domain(d),.Name="samples",.ValueKind=Geometry::PropertyValueKind::Vec3};
+            c.Mask={Domain(d),"outliers",Geometry::PropertyValueKind::UInt32};
+            c.Score={Domain(d),"scores",Geometry::PropertyValueKind::Float};
+            c.KNeighbors=8;c.Method=Phase==2?Runtime::OutlierAnalysisMethod::Radius:Runtime::OutlierAnalysisMethod::Statistical;c.Radius=.5f;c.MinimumNeighbors=1;
+            c.Backend=Runtime::OutlierAnalysisBackend::VulkanLBVH;
+            c.GpuQueryBatchSize=64; // Exercise a final partial chunk and buffer lifetime.
+            return c;
+        }
+        void Resolve() override
+        {
+            Started=std::chrono::steady_clock::now();
+            Context.Scene=Kernel().Worlds().Get(Kernel().ActiveWorld());Context.World=Kernel().ActiveWorld();
+            Context.SpatialIndices=Kernel().Services().Find<Runtime::SpatialIndexCache>();
+            std::mt19937 random(241);std::uniform_real_distribution<float> dist(-1,1);
+            std::vector<glm::vec3> points;
+            for(unsigned i=0;i<66;++i){const float x=dist(random),y=dist(random);points.push_back({.1f*x,.1f*y,0});}
+            points[0]={0,0,0};points[1]={.3f,.4f,0};points[2]=points[0];
+            points[3]={std::nextafter(.5f,1.f),0,0};points[65]={10,0,0};
+            for(unsigned d=1;d<=8;++d)
+            {
+                auto entity=Context.Scene->Create();Entities.push_back(entity);
+                if(d<=unsigned(Domain::MeshFace))
+                {
+                    Geometry::HalfedgeMesh::Mesh mesh;
+                    auto a=mesh.AddVertex({0,0,0}),b=mesh.AddVertex({1,0,0}),c=mesh.AddVertex({0,1,0});
+                    (void)mesh.AddTriangle(a,b,c);GS::PopulateFromMesh(Context.Scene->Raw(),entity,mesh);
+                }
+                else if(d<unsigned(Domain::PointCloudPoint))
+                {
+                    Geometry::Graph::Graph graph;
+                    auto a=graph.AddVertex({0,0,0}),b=graph.AddVertex({1,0,0});
+                    (void)graph.AddEdge(a,b);GS::PopulateFromGraph(Context.Scene->Raw(),entity,graph);
+                }
+                else Context.Scene->Raw().emplace<GS::Vertices>(entity);
+                auto& p=Props(d);p.Resize(points.size());p.GetOrAdd<glm::vec3>("samples").Vector()=points;
+                p.GetOrAdd<float>("keep").Vector().assign(points.size(),42.f);
+                p.GetOrAdd<std::uint32_t>("outliers").Vector().assign(points.size(),77);
+                p.GetOrAdd<float>("scores").Vector().assign(points.size(),77.f);
+                const bool half=d==unsigned(Domain::MeshHalfedge)||d==unsigned(Domain::GraphHalfedge);
+                if(half)
+                {
+                    auto& edges=Context.Scene->Raw().get<GS::Edges>(entity).Properties;
+                    edges.Resize(points.size()/2);edges.GetOrAdd<bool>("e:deleted")[2]=true;
+                }
+                else p.GetOrAdd<bool>(d==unsigned(Domain::MeshFace)?"f:deleted":
+                    (d==unsigned(Domain::MeshEdge)||d==unsigned(Domain::GraphEdge))?"e:deleted":"v:deleted")[4]=true;
+                p.Get<glm::vec3>("samples")[4]={std::numeric_limits<float>::quiet_NaN(),0,0};
+            }
+            Context.MethodResultSinks.OutlierAnalysis=[this](auto result){Results.push_back(std::move(result));};
+        }
+        void Frame(double,double) override
+        {
+            if(std::chrono::steady_clock::now()-Started>std::chrono::seconds(95))
+            {TimedOut=true;Kernel().RequestExit();return;}
+            if(!Kernel().GetDevice().IsOperational())
+            {
+                if(++ColdFrames>4){TimedOut=true;Kernel().RequestExit();}
+                return;
+            }
+            if(Submitted)
+            {
+                if(Phase==4 && ++CancelFrames==3)
+                    EXPECT_TRUE(Kernel().Jobs().Cancel(FitToken));
+                if(Results.size()<ExpectedResults)return;
+                if(Phase>=3)
+                {
+                    if(Phase==5)
+                    {
+                        EXPECT_TRUE(Results.back().Succeeded())<<Results.back().Message;
+                        EXPECT_EQ(Results.back().ActualBackend,"vulkan_lbvh");
+                        EXPECT_EQ(Results.back().RejectedCount,1);
+                        EXPECT_EQ(std::as_const(Props(8)).Get<float>("scores")[0],1027.f);
+                        EXPECT_EQ(std::as_const(Props(8)).Get<std::uint32_t>("outliers")[0],0);
+                        Done=true;Kernel().RequestExit();return;
+                    }
+                    EXPECT_FALSE(Results.back().Succeeded())<<Results.back().Message;
+                    EXPECT_EQ(std::as_const(Props(8)).Get<std::uint32_t>("outliers")[0],77);
+                }
+                else
+                {
+                    PhaseMs.push_back(std::chrono::duration<double,std::milli>(std::chrono::steady_clock::now()-PhaseStarted).count());
+                    double neighborhoodMs=0,fitMs=0;
+                    std::size_t batches=0;
+                    for(const auto& result:Results)
+                    {
+                        neighborhoodMs+=result.GpuNeighborhoodMilliseconds;
+                        fitMs+=result.CpuComputeMilliseconds;
+                        batches+=result.GpuQueryBatches;
+                        EXPECT_TRUE(result.Succeeded())<<result.Message;
+                        EXPECT_EQ(result.ActualBackend,"vulkan_lbvh");
+                        EXPECT_GT(result.GpuQueryBatches,0);
+                        if(Phase>0)EXPECT_TRUE(result.IndexReused);
+                    }
+                    NeighborhoodMs.push_back(neighborhoodMs);FitMs.push_back(fitMs);BatchCounts.push_back(batches);
+                    for(unsigned d=1;d<=8;++d)
+                    {
+                        const auto& values=std::as_const(Props(d)).Get<float>("scores").Vector();
+                        EXPECT_EQ(std::as_const(Props(d)).Get<std::uint32_t>("outliers").Vector(),ReferenceMasks[d-1]);
+                        ASSERT_EQ(values.size(),Reference[d-1].size());
+                        for(std::size_t i=0;i<values.size();++i)
+                        {
+                            EXPECT_TRUE(std::isfinite(values[i]));
+                            const double error=std::abs(values[i]-Reference[d-1][i]);
+                            MaxError=std::isfinite(error)?std::max(MaxError,error):std::numeric_limits<double>::infinity();
+                        }
+                        EXPECT_EQ(std::as_const(Props(d)).Get<float>("keep")[0],42.f);
+                    }
+                    EXPECT_LE(MaxError,1e-5);
+                    EXPECT_EQ(History.UndoCount(),8);
+                    for(unsigned i=0;i<8;++i)EXPECT_EQ(History.Undo().Status,Runtime::EditorCommandHistoryStatus::Undone);
+                    for(unsigned d=1;d<=8;++d)EXPECT_EQ(std::as_const(Props(d)).Get<std::uint32_t>("outliers")[0],77);
+                    for(unsigned i=0;i<8;++i)EXPECT_EQ(History.Redo().Status,Runtime::EditorCommandHistoryStatus::Redone);
+                }
+                Results.clear();Submitted=false;++Phase;
+            }
+            if(Phase<3)
+            {
+                Reference.clear();ReferenceMasks.clear();History.ClearHistory();Context.JobCommands={};Context.CommandHistory=nullptr;
+                const auto cpuStart=std::chrono::steady_clock::now();
+                for(unsigned d=1;d<=8;++d)
+                {
+                    auto c=Config(d);c.Backend=Runtime::OutlierAnalysisBackend::CpuOctree;
+                    const auto result=Runtime::ApplyEditorOutlierAnalysisCommand(Context,c);
+                    ASSERT_TRUE(result.Succeeded())<<result.Message;
+                    Reference.push_back(std::as_const(Props(d)).Get<float>("scores").Vector());
+                    ReferenceMasks.push_back(std::as_const(Props(d)).Get<std::uint32_t>("outliers").Vector());
+                    Props(d).Get<float>("scores").Vector().assign(66,77.f);
+                    Props(d).Get<std::uint32_t>("outliers").Vector().assign(66,77);
+                }
+                CpuMs.push_back(std::chrono::duration<double,std::milli>(std::chrono::steady_clock::now()-cpuStart).count());
+            }
+            Context.JobCommands.Submit=[this](Runtime::JobDesc desc,Runtime::EditorJobIdentity){FitToken=Kernel().Jobs().Submit(std::move(desc));return FitToken;};
+            Context.CommandHistory=&History;ExpectedResults=Phase<3?8:1;Submitted=true;PhaseStarted=std::chrono::steady_clock::now();
+            if(Phase<3)
+            {
+                if(Phase==0)
+                {
+                    auto unsupported=Config(8);unsupported.KNeighbors=65;
+                    EXPECT_FALSE(Runtime::PreviewEditorOutlierAnalysisCommand(Context,unsupported).Ready);
+                }
+                for(unsigned d=1;d<=8;++d)
+                {
+                    const auto result=Runtime::ApplyEditorOutlierAnalysisCommand(Context,Config(d));
+                    if(result.Status!=Runtime::EditorCommandStatus::Pending)Results.push_back(result);
+                }
+            }
+            else
+            {
+                auto c=Config(8);
+                if(Phase==4)c.GpuQueryBatchSize=1; // Cancel after GPU submission, before all 65 rows complete.
+                if(Phase==5)
+                {
+                    auto& p=Props(8);p.Resize(1030);
+                    p.Get<glm::vec3>("samples").Vector().assign(1030,glm::vec3(0));
+                    p.Get<glm::vec3>("samples")[1029]={10,0,0};
+                    c.Method=Runtime::OutlierAnalysisMethod::Radius;c.Radius=1;c.MinimumNeighbors=1027;c.GpuQueryBatchSize=4096;
+                }
+                else Props(8).Get<std::uint32_t>("outliers").Vector().assign(66,77);
+                const auto result=Runtime::ApplyEditorOutlierAnalysisCommand(Context,c);
+                if(result.Status!=Runtime::EditorCommandStatus::Pending)Results.push_back(result);
+                if(Phase==3)Props(8).Get<glm::vec3>("samples")[0]+=.1f; // stale before GPU recording
+            }
+        }
+        void Shutdown() override {Context={};}
+        Runtime::EditorGeometryProcessingContext Context{};
+        Runtime::EditorCommandHistory History{};
+        std::vector<entt::entity> Entities;
+        std::vector<std::vector<float>> Reference;
+        std::vector<std::vector<std::uint32_t>> ReferenceMasks;
+        std::vector<Runtime::EditorOutlierAnalysisResult> Results;
+        std::vector<double> PhaseMs,CpuMs,NeighborhoodMs,FitMs;
+        std::vector<std::size_t> BatchCounts;
+        std::chrono::steady_clock::time_point Started{},PhaseStarted{};
+        Runtime::JobToken FitToken{};
+        std::size_t ExpectedResults{};unsigned Phase{},CancelFrames{},ColdFrames{};bool Submitted{},Done{},TimedOut{};double MaxError{};
+    };
+}
+TEST(PointLBVHGpuSmoke, OutlierNeighborhoodsPublishAcrossDomainsAndCountDenseSupport)
+{
+    if(!Extrinsic::Platform::Backends::Glfw::CanInitialize())GTEST_SKIP()<<"GLFW unavailable";
+    auto config=Runtime::CreateReferenceEngineConfig();
+    config.Window.Width=64;config.Window.Height=64;config.Render.EnableValidation=true;
+    config.Render.EnableVSync=false;config.ReferenceScene.Enabled=false;
+    auto app=std::make_unique<OutlierApp>();auto* run=app.get();
+    Intrinsic::Tests::RuntimeTestKernel engine(config,std::move(app));
+    engine.EmplaceModule<Runtime::SpatialIndexCache>();engine.Initialize();Shutdown shutdown{engine};
+    engine.Run();ASSERT_TRUE(engine.GetDevice().IsOperational());
+    ASSERT_FALSE(run->TimedOut)<<"phase="<<run->Phase;ASSERT_TRUE(run->Done);
+    EXPECT_LE(run->MaxError,1e-5);ASSERT_EQ(run->PhaseMs.size(),3);
+    if(const auto* output=std::getenv("INTRINSIC_OUTLIER_BENCHMARK_OUTPUT"))
+    {
+        nlohmann::json json{{"benchmark_id","geometry.point_lbvh.outlier_runtime_smoke"},
+            {"method","geometry.point_lbvh"},{"backend","gpu_vulkan_compute"},
+            {"dataset","builtin.outlier_clusters.eight_domains.seed241"},{"commit","local-dev"},
+            {"metrics",{{"runtime_ms",run->PhaseMs[1]},{"quality_error_linf",run->MaxError}}},
+            {"diagnostics",{{"runner","IntrinsicPointLBVHGpuTests"},{"mode","smoke"},
+                {"cpu_reference_total_ms",run->CpuMs[1]},{"vulkan_cold_total_ms",run->PhaseMs[0]},
+                {"vulkan_warm_total_ms",run->PhaseMs[1]},{"vulkan_radius_total_ms",run->PhaseMs[2]},
+                {"cpu_radius_total_ms",run->CpuMs[2]},{"warmup_iterations",1},{"measured_iterations",1},
+                {"cpu_classification",true},{"gpu_neighborhood_elapsed_sum_ms",run->NeighborhoodMs},
+                {"cpu_classification_sum_ms",run->FitMs},{"gpu_query_batch_counts",run->BatchCounts}}},{"status",::testing::Test::HasFailure()?"failed":"passed"}};
+        std::ofstream stream(output);ASSERT_TRUE(stream.good());stream<<json.dump(2)<<'\n';ASSERT_TRUE(stream.good());
+    }
+}
+
+namespace
+{
+    class DensityApp final : public Intrinsic::Tests::RuntimeTestModule
+    {
+    public:
+        Geometry::PropertySet& Props(unsigned d)
+        {
+            return *const_cast<Geometry::PropertySet*>(Runtime::ResolveGeometryPropertySet(
+                Runtime::BuildGeometryAvailability(Context.Scene->Raw(), Entities[d-1]), Domain(d)));
+        }
+        Runtime::KernelDensityConfig Config(unsigned d) const
+        {
+            Runtime::KernelDensityConfig c;
+            c.StableEntityId=Runtime::SelectionController::ToStableEntityId(Entities[d-1]);
+            c.Positions={.Domain=Domain(d),.Name="samples",.ValueKind=Geometry::PropertyValueKind::Vec3};
+            c.Density={Domain(d),"density",Geometry::PropertyValueKind::Float};
+            c.KNeighbors=Phase==2?63:8;c.Bandwidth=Phase==2?.2f:0;
+            c.Backend=Runtime::KernelDensityBackend::VulkanLBVH;
+            c.GpuQueryBatchSize=64; // Exercise a final partial chunk and buffer lifetime.
+            return c;
+        }
+        void Resolve() override
+        {
+            Started=std::chrono::steady_clock::now();
+            Context.Scene=Kernel().Worlds().Get(Kernel().ActiveWorld());Context.World=Kernel().ActiveWorld();
+            Context.SpatialIndices=Kernel().Services().Find<Runtime::SpatialIndexCache>();
+            std::mt19937 random(241);std::uniform_real_distribution<float> dist(-1,1);
+            std::vector<glm::vec3> points;
+            for(unsigned i=0;i<66;++i){const float x=dist(random),y=dist(random);points.push_back({.1f*x,.1f*y,0});}
+            points[0]={0,0,0};points[1]={.3f,.4f,0};points[2]=points[0];
+            points[3]={std::nextafter(.5f,1.f),0,0};points[65]={10,0,0};
+            for(unsigned d=1;d<=8;++d)
+            {
+                auto entity=Context.Scene->Create();Entities.push_back(entity);
+                if(d<=unsigned(Domain::MeshFace))
+                {
+                    Geometry::HalfedgeMesh::Mesh mesh;
+                    auto a=mesh.AddVertex({0,0,0}),b=mesh.AddVertex({1,0,0}),c=mesh.AddVertex({0,1,0});
+                    (void)mesh.AddTriangle(a,b,c);GS::PopulateFromMesh(Context.Scene->Raw(),entity,mesh);
+                }
+                else if(d<unsigned(Domain::PointCloudPoint))
+                {
+                    Geometry::Graph::Graph graph;
+                    auto a=graph.AddVertex({0,0,0}),b=graph.AddVertex({1,0,0});
+                    (void)graph.AddEdge(a,b);GS::PopulateFromGraph(Context.Scene->Raw(),entity,graph);
+                }
+                else Context.Scene->Raw().emplace<GS::Vertices>(entity);
+                auto& p=Props(d);p.Resize(points.size());p.GetOrAdd<glm::vec3>("samples").Vector()=points;
+                p.GetOrAdd<float>("keep").Vector().assign(points.size(),42.f);
+                p.GetOrAdd<float>("density").Vector().assign(points.size(),77.f);
+                const bool half=d==unsigned(Domain::MeshHalfedge)||d==unsigned(Domain::GraphHalfedge);
+                if(half)
+                {
+                    auto& edges=Context.Scene->Raw().get<GS::Edges>(entity).Properties;
+                    edges.Resize(points.size()/2);edges.GetOrAdd<bool>("e:deleted")[2]=true;
+                }
+                else p.GetOrAdd<bool>(d==unsigned(Domain::MeshFace)?"f:deleted":
+                    (d==unsigned(Domain::MeshEdge)||d==unsigned(Domain::GraphEdge))?"e:deleted":"v:deleted")[4]=true;
+                p.Get<glm::vec3>("samples")[4]={std::numeric_limits<float>::quiet_NaN(),0,0};
+            }
+            Context.MethodResultSinks.KernelDensity=[this](auto result){Results.push_back(std::move(result));};
+        }
+        void Frame(double,double) override
+        {
+            if(std::chrono::steady_clock::now()-Started>std::chrono::seconds(95))
+            {TimedOut=true;Kernel().RequestExit();return;}
+            if(!Kernel().GetDevice().IsOperational())
+            {
+                if(++ColdFrames>4){TimedOut=true;Kernel().RequestExit();}
+                return;
+            }
+            if(Submitted)
+            {
+                if(Phase==4 && ++CancelFrames==3)
+                    EXPECT_TRUE(Kernel().Jobs().Cancel(FitToken));
+                if(Results.size()<ExpectedResults)return;
+                if(Phase>=3)
+                {
+                    if(Phase==5)
+                    {
+                        EXPECT_TRUE(Results.back().Succeeded())<<Results.back().Message;
+                        EXPECT_EQ(Results.back().ActualBackend,"vulkan_lbvh");
+                        EXPECT_NEAR(std::as_const(Props(8)).Get<float>("density")[0],std::pow(2*std::acos(-1.),-1.5),1e-7);
+                        Done=true;Kernel().RequestExit();return;
+                    }
+                    EXPECT_FALSE(Results.back().Succeeded())<<Results.back().Message;
+                    EXPECT_EQ(std::as_const(Props(8)).Get<float>("density")[0],77);
+                }
+                else
+                {
+                    PhaseMs.push_back(std::chrono::duration<double,std::milli>(std::chrono::steady_clock::now()-PhaseStarted).count());
+                    double neighborhoodMs=0,fitMs=0;
+                    std::size_t batches=0;
+                    for(const auto& result:Results)
+                    {
+                        neighborhoodMs+=result.GpuNeighborhoodMilliseconds;
+                        fitMs+=result.CpuComputeMilliseconds;
+                        batches+=result.GpuQueryBatches;
+                        EXPECT_TRUE(result.Succeeded())<<result.Message;
+                        EXPECT_EQ(result.ActualBackend,"vulkan_lbvh");
+                        EXPECT_GT(result.GpuQueryBatches,0);
+                        if(Phase>0)EXPECT_TRUE(result.IndexReused);
+                    }
+                    NeighborhoodMs.push_back(neighborhoodMs);FitMs.push_back(fitMs);BatchCounts.push_back(batches);
+                    for(unsigned d=1;d<=8;++d)
+                    {
+                        const auto& values=std::as_const(Props(d)).Get<float>("density").Vector();
+                        ASSERT_EQ(values.size(),Reference[d-1].size());
+                        for(std::size_t i=0;i<values.size();++i)
+                        {
+                            EXPECT_TRUE(std::isfinite(values[i]));
+                            const double error=std::abs(values[i]-Reference[d-1][i]);
+                            MaxError=std::isfinite(error)?std::max(MaxError,error):std::numeric_limits<double>::infinity();
+                        }
+                        EXPECT_EQ(std::as_const(Props(d)).Get<float>("keep")[0],42.f);
+                    }
+                    EXPECT_LE(MaxError,1e-5);
+                    EXPECT_EQ(History.UndoCount(),8);
+                    for(unsigned i=0;i<8;++i)EXPECT_EQ(History.Undo().Status,Runtime::EditorCommandHistoryStatus::Undone);
+                    for(unsigned d=1;d<=8;++d)EXPECT_EQ(std::as_const(Props(d)).Get<float>("density")[0],77);
+                    for(unsigned i=0;i<8;++i)EXPECT_EQ(History.Redo().Status,Runtime::EditorCommandHistoryStatus::Redone);
+                }
+                Results.clear();Submitted=false;++Phase;
+            }
+            if(Phase<3)
+            {
+                Reference.clear();History.ClearHistory();Context.JobCommands={};Context.CommandHistory=nullptr;
+                const auto cpuStart=std::chrono::steady_clock::now();
+                for(unsigned d=1;d<=8;++d)
+                {
+                    auto c=Config(d);c.Backend=Runtime::KernelDensityBackend::CpuOctree;
+                    const auto result=Runtime::ApplyEditorKernelDensityCommand(Context,c);
+                    ASSERT_TRUE(result.Succeeded())<<result.Message;
+                    Reference.push_back(std::as_const(Props(d)).Get<float>("density").Vector());
+                    Props(d).Get<float>("density").Vector().assign(66,77.f);
+                }
+                CpuMs.push_back(std::chrono::duration<double,std::milli>(std::chrono::steady_clock::now()-cpuStart).count());
+            }
+            Context.JobCommands.Submit=[this](Runtime::JobDesc desc,Runtime::EditorJobIdentity){FitToken=Kernel().Jobs().Submit(std::move(desc));return FitToken;};
+            Context.CommandHistory=&History;ExpectedResults=Phase<3?8:1;Submitted=true;PhaseStarted=std::chrono::steady_clock::now();
+            if(Phase<3)
+            {
+                if(Phase==0)
+                {
+                    auto unsupported=Config(8);unsupported.KNeighbors=64;
+                    EXPECT_FALSE(Runtime::PreviewEditorKernelDensityCommand(Context,unsupported).Ready);
+                }
+                for(unsigned d=1;d<=8;++d)
+                {
+                    const auto result=Runtime::ApplyEditorKernelDensityCommand(Context,Config(d));
+                    if(result.Status!=Runtime::EditorCommandStatus::Pending)Results.push_back(result);
+                }
+            }
+            else
+            {
+                auto c=Config(8);
+                if(Phase==4)c.GpuQueryBatchSize=1; // Cancel after GPU submission, before all 65 rows complete.
+                if(Phase==5)
+                {
+                    auto& p=Props(8);p.Resize(1030);
+                    p.Get<glm::vec3>("samples").Vector().assign(1030,glm::vec3(0));
+                    p.Get<glm::vec3>("samples")[1029]={10,0,0};
+                    c.Bandwidth=1;c.GpuQueryBatchSize=4096;
+                }
+                else Props(8).Get<float>("density").Vector().assign(66,77);
+                const auto result=Runtime::ApplyEditorKernelDensityCommand(Context,c);
+                if(result.Status!=Runtime::EditorCommandStatus::Pending)Results.push_back(result);
+                if(Phase==3)Props(8).Get<glm::vec3>("samples")[0]+=.1f; // stale before GPU recording
+            }
+        }
+        void Shutdown() override {Context={};}
+        Runtime::EditorGeometryProcessingContext Context{};
+        Runtime::EditorCommandHistory History{};
+        std::vector<entt::entity> Entities;
+        std::vector<std::vector<float>> Reference;
+        std::vector<Runtime::EditorKernelDensityResult> Results;
+        std::vector<double> PhaseMs,CpuMs,NeighborhoodMs,FitMs;
+        std::vector<std::size_t> BatchCounts;
+        std::chrono::steady_clock::time_point Started{},PhaseStarted{};
+        Runtime::JobToken FitToken{};
+        std::size_t ExpectedResults{};unsigned Phase{},CancelFrames{},ColdFrames{};bool Submitted{},Done{},TimedOut{};double MaxError{};
+    };
+}
+TEST(PointLBVHGpuSmoke, KernelDensityPublishesAcrossDomainsAndPreservesCandidatePolicy)
+{
+    if(!Extrinsic::Platform::Backends::Glfw::CanInitialize())GTEST_SKIP()<<"GLFW unavailable";
+    auto config=Runtime::CreateReferenceEngineConfig();
+    config.Window.Width=64;config.Window.Height=64;config.Render.EnableValidation=true;
+    config.Render.EnableVSync=false;config.ReferenceScene.Enabled=false;
+    auto app=std::make_unique<DensityApp>();auto* run=app.get();
+    Intrinsic::Tests::RuntimeTestKernel engine(config,std::move(app));
+    engine.EmplaceModule<Runtime::SpatialIndexCache>();engine.Initialize();Shutdown shutdown{engine};
+    engine.Run();ASSERT_TRUE(engine.GetDevice().IsOperational());
+    ASSERT_FALSE(run->TimedOut)<<"phase="<<run->Phase;ASSERT_TRUE(run->Done);
+    EXPECT_LE(run->MaxError,1e-5);ASSERT_EQ(run->PhaseMs.size(),3);
+    if(const auto* output=std::getenv("INTRINSIC_DENSITY_BENCHMARK_OUTPUT"))
+    {
+        nlohmann::json json{{"benchmark_id","geometry.point_lbvh.density_runtime_smoke"},
+            {"method","geometry.point_lbvh"},{"backend","gpu_vulkan_compute"},
+            {"dataset","builtin.density_clusters.eight_domains.seed241"},{"commit","local-dev"},
+            {"metrics",{{"runtime_ms",run->PhaseMs[1]},{"quality_error_linf",run->MaxError}}},
+            {"diagnostics",{{"runner","IntrinsicPointLBVHGpuTests"},{"mode","smoke"},
+                {"cpu_reference_total_ms",run->CpuMs[1]},{"vulkan_cold_total_ms",run->PhaseMs[0]},
+                {"vulkan_warm_total_ms",run->PhaseMs[1]},{"vulkan_manual_bandwidth_k63_total_ms",run->PhaseMs[2]},
+                {"cpu_manual_bandwidth_k63_total_ms",run->CpuMs[2]},{"warmup_iterations",1},{"measured_iterations",1},
+                {"cpu_bandwidth_and_gaussian",true},{"gpu_neighborhood_elapsed_sum_ms",run->NeighborhoodMs},
+                {"cpu_bandwidth_and_gaussian_sum_ms",run->FitMs},{"gpu_query_batch_counts",run->BatchCounts}}},{"status",::testing::Test::HasFailure()?"failed":"passed"}};
+        std::ofstream stream(output);ASSERT_TRUE(stream.good());stream<<json.dump(2)<<'\n';ASSERT_TRUE(stream.good());
+    }
+}
+
+namespace
+{
+    class SpacingApp final : public Intrinsic::Tests::RuntimeTestModule
+    {
+    public:
+        Geometry::PropertySet& Props(unsigned d)
+        {
+            return *const_cast<Geometry::PropertySet*>(Runtime::ResolveGeometryPropertySet(
+                Runtime::BuildGeometryAvailability(Context.Scene->Raw(), Entities[d-1]), Domain(d)));
+        }
+        Runtime::PointSpacingConfig Config(unsigned d) const
+        {
+            Runtime::PointSpacingConfig c;
+            c.StableEntityId=Runtime::SelectionController::ToStableEntityId(Entities[d-1]);
+            c.Positions={.Domain=Domain(d),.Name="samples",.ValueKind=Geometry::PropertyValueKind::Vec3};
+            c.Radii={Domain(d),"radii",Geometry::PropertyValueKind::Float};
+            c.KNeighbors=Phase==2?63:8;c.ScaleFactor=Phase==2?2.f:1.f;
+            c.Backend=Runtime::PointSpacingBackend::VulkanLBVH;
+            c.GpuQueryBatchSize=64; // Exercise a final partial chunk and buffer lifetime.
+            return c;
+        }
+        void Resolve() override
+        {
+            Started=std::chrono::steady_clock::now();
+            Context.Scene=Kernel().Worlds().Get(Kernel().ActiveWorld());Context.World=Kernel().ActiveWorld();
+            Context.SpatialIndices=Kernel().Services().Find<Runtime::SpatialIndexCache>();
+            std::mt19937 random(241);std::uniform_real_distribution<float> dist(-1,1);
+            std::vector<glm::vec3> points;
+            for(unsigned i=0;i<66;++i){const float x=dist(random),y=dist(random);points.push_back({.1f*x,.1f*y,0});}
+            points[0]={0,0,0};points[1]={.3f,.4f,0};points[2]=points[0];
+            points[3]={std::nextafter(.5f,1.f),0,0};points[65]={10,0,0};
+            for(unsigned d=1;d<=8;++d)
+            {
+                auto entity=Context.Scene->Create();Entities.push_back(entity);
+                if(d<=unsigned(Domain::MeshFace))
+                {
+                    Geometry::HalfedgeMesh::Mesh mesh;
+                    auto a=mesh.AddVertex({0,0,0}),b=mesh.AddVertex({1,0,0}),c=mesh.AddVertex({0,1,0});
+                    (void)mesh.AddTriangle(a,b,c);GS::PopulateFromMesh(Context.Scene->Raw(),entity,mesh);
+                }
+                else if(d<unsigned(Domain::PointCloudPoint))
+                {
+                    Geometry::Graph::Graph graph;
+                    auto a=graph.AddVertex({0,0,0}),b=graph.AddVertex({1,0,0});
+                    (void)graph.AddEdge(a,b);GS::PopulateFromGraph(Context.Scene->Raw(),entity,graph);
+                }
+                else Context.Scene->Raw().emplace<GS::Vertices>(entity);
+                auto& p=Props(d);p.Resize(points.size());p.GetOrAdd<glm::vec3>("samples").Vector()=points;
+                p.GetOrAdd<float>("keep").Vector().assign(points.size(),42.f);
+                p.GetOrAdd<float>("radii").Vector().assign(points.size(),77.f);
+                const bool half=d==unsigned(Domain::MeshHalfedge)||d==unsigned(Domain::GraphHalfedge);
+                if(half)
+                {
+                    auto& edges=Context.Scene->Raw().get<GS::Edges>(entity).Properties;
+                    edges.Resize(points.size()/2);edges.GetOrAdd<bool>("e:deleted")[2]=true;
+                }
+                else p.GetOrAdd<bool>(d==unsigned(Domain::MeshFace)?"f:deleted":
+                    (d==unsigned(Domain::MeshEdge)||d==unsigned(Domain::GraphEdge))?"e:deleted":"v:deleted")[4]=true;
+                p.Get<glm::vec3>("samples")[4]={std::numeric_limits<float>::quiet_NaN(),0,0};
+            }
+            Context.MethodResultSinks.PointSpacing=[this](auto result){Results.push_back(std::move(result));};
+        }
+        void Frame(double,double) override
+        {
+            if(std::chrono::steady_clock::now()-Started>std::chrono::seconds(95))
+            {TimedOut=true;Kernel().RequestExit();return;}
+            if(!Kernel().GetDevice().IsOperational())
+            {
+                if(++ColdFrames>4){TimedOut=true;Kernel().RequestExit();}
+                return;
+            }
+            if(Submitted)
+            {
+                if(Phase==4 && ++CancelFrames==3)
+                    EXPECT_TRUE(Kernel().Jobs().Cancel(FitToken));
+                if(Results.size()<ExpectedResults)return;
+                if(Phase>=3)
+                {
+                    if(Phase==5)
+                    {
+                        EXPECT_TRUE(Results.back().Succeeded())<<Results.back().Message;
+                        EXPECT_EQ(Results.back().ActualBackend,"vulkan_lbvh");
+                        EXPECT_NEAR(std::as_const(Props(8)).Get<float>("radii")[0],0.f,1e-7);
+                        Done=true;Kernel().RequestExit();return;
+                    }
+                    EXPECT_FALSE(Results.back().Succeeded())<<Results.back().Message;
+                    EXPECT_EQ(std::as_const(Props(8)).Get<float>("radii")[0],77);
+                }
+                else
+                {
+                    PhaseMs.push_back(std::chrono::duration<double,std::milli>(std::chrono::steady_clock::now()-PhaseStarted).count());
+                    double neighborhoodMs=0,fitMs=0;
+                    std::size_t batches=0;
+                    for(const auto& result:Results)
+                    {
+                        neighborhoodMs+=result.GpuNeighborhoodMilliseconds;
+                        fitMs+=result.CpuComputeMilliseconds;
+                        batches+=result.GpuQueryBatches;
+                        EXPECT_TRUE(result.Succeeded())<<result.Message;
+                        EXPECT_EQ(result.ActualBackend,"vulkan_lbvh");
+                        EXPECT_GT(result.GpuQueryBatches,0);
+                        if(Phase>0)EXPECT_TRUE(result.IndexReused);
+                        const auto& ref=ReferenceResults[unsigned(result.Radii.Domain)-1];
+                        for(auto [actual,expected] : {std::pair{result.MeanRadius,ref.MeanRadius},
+                            std::pair{result.MinRadius,ref.MinRadius},std::pair{result.MaxRadius,ref.MaxRadius},
+                            std::pair{result.Statistics.AverageSpacing,ref.Statistics.AverageSpacing},
+                            std::pair{result.Statistics.MinSpacing,ref.Statistics.MinSpacing},
+                            std::pair{result.Statistics.MaxSpacing,ref.Statistics.MaxSpacing}})
+                        {
+                            EXPECT_NEAR(actual,expected,1e-5);
+                            MaxError=std::max(MaxError,double(std::abs(actual-expected)));
+                        }
+
+                    }
+                    NeighborhoodMs.push_back(neighborhoodMs);FitMs.push_back(fitMs);BatchCounts.push_back(batches);
+                    for(unsigned d=1;d<=8;++d)
+                    {
+                        const auto& values=std::as_const(Props(d)).Get<float>("radii").Vector();
+                        ASSERT_EQ(values.size(),Reference[d-1].size());
+                        for(std::size_t i=0;i<values.size();++i)
+                        {
+                            EXPECT_TRUE(std::isfinite(values[i]));
+                            const double error=std::abs(values[i]-Reference[d-1][i]);
+                            MaxError=std::isfinite(error)?std::max(MaxError,error):std::numeric_limits<double>::infinity();
+                        }
+                        EXPECT_EQ(std::as_const(Props(d)).Get<float>("keep")[0],42.f);
+                    }
+                    EXPECT_LE(MaxError,1e-5);
+                    EXPECT_EQ(History.UndoCount(),8);
+                    for(unsigned i=0;i<8;++i)EXPECT_EQ(History.Undo().Status,Runtime::EditorCommandHistoryStatus::Undone);
+                    for(unsigned d=1;d<=8;++d)EXPECT_EQ(std::as_const(Props(d)).Get<float>("radii")[0],77);
+                    for(unsigned i=0;i<8;++i)EXPECT_EQ(History.Redo().Status,Runtime::EditorCommandHistoryStatus::Redone);
+                }
+                Results.clear();Submitted=false;++Phase;
+            }
+            if(Phase<3)
+            {
+                Reference.clear();ReferenceResults.clear();History.ClearHistory();Context.JobCommands={};Context.CommandHistory=nullptr;
+                const auto cpuStart=std::chrono::steady_clock::now();
+                for(unsigned d=1;d<=8;++d)
+                {
+                    auto c=Config(d);c.Backend=Runtime::PointSpacingBackend::CpuOctree;
+                    const auto result=Runtime::ApplyEditorPointSpacingCommand(Context,c);
+                    ASSERT_TRUE(result.Succeeded())<<result.Message;
+                    ReferenceResults.push_back(result);
+                    Reference.push_back(std::as_const(Props(d)).Get<float>("radii").Vector());
+                    Props(d).Get<float>("radii").Vector().assign(66,77.f);
+                }
+                CpuMs.push_back(std::chrono::duration<double,std::milli>(std::chrono::steady_clock::now()-cpuStart).count());
+            }
+            Context.JobCommands.Submit=[this](Runtime::JobDesc desc,Runtime::EditorJobIdentity){FitToken=Kernel().Jobs().Submit(std::move(desc));return FitToken;};
+            Context.CommandHistory=&History;ExpectedResults=Phase<3?8:1;Submitted=true;PhaseStarted=std::chrono::steady_clock::now();
+            if(Phase<3)
+            {
+                if(Phase==0)
+                {
+                    auto unsupported=Config(8);unsupported.KNeighbors=64;
+                    EXPECT_FALSE(Runtime::PreviewEditorPointSpacingCommand(Context,unsupported).Ready);
+                }
+                for(unsigned d=1;d<=8;++d)
+                {
+                    const auto result=Runtime::ApplyEditorPointSpacingCommand(Context,Config(d));
+                    if(result.Status!=Runtime::EditorCommandStatus::Pending)Results.push_back(result);
+                }
+            }
+            else
+            {
+                auto c=Config(8);
+                if(Phase==4)c.GpuQueryBatchSize=1; // Cancel after GPU submission, before all 65 rows complete.
+                if(Phase==5)
+                {
+                    auto& p=Props(8);p.Resize(1030);
+                    p.Get<glm::vec3>("samples").Vector().assign(1030,glm::vec3(0));
+                    p.Get<glm::vec3>("samples")[1029]={10,0,0};
+                    c.ScaleFactor=1;c.GpuQueryBatchSize=4096;
+                }
+                else Props(8).Get<float>("radii").Vector().assign(66,77);
+                const auto result=Runtime::ApplyEditorPointSpacingCommand(Context,c);
+                if(result.Status!=Runtime::EditorCommandStatus::Pending)Results.push_back(result);
+                if(Phase==3)Props(8).Get<glm::vec3>("samples")[0]+=.1f; // stale before GPU recording
+            }
+        }
+        void Shutdown() override {Context={};}
+        Runtime::EditorGeometryProcessingContext Context{};
+        Runtime::EditorCommandHistory History{};
+        std::vector<entt::entity> Entities;
+        std::vector<std::vector<float>> Reference;
+        std::vector<Runtime::EditorPointSpacingResult> Results, ReferenceResults;
+        std::vector<double> PhaseMs,CpuMs,NeighborhoodMs,FitMs;
+        std::vector<std::size_t> BatchCounts;
+        std::chrono::steady_clock::time_point Started{},PhaseStarted{};
+        Runtime::JobToken FitToken{};
+        std::size_t ExpectedResults{};unsigned Phase{},CancelFrames{},ColdFrames{};bool Submitted{},Done{},TimedOut{};double MaxError{};
+    };
+}
+TEST(PointLBVHGpuSmoke, PointSpacingPublishesAcrossDomainsAndPreservesCandidatePolicy)
+{
+    if(!Extrinsic::Platform::Backends::Glfw::CanInitialize())GTEST_SKIP()<<"GLFW unavailable";
+    auto config=Runtime::CreateReferenceEngineConfig();
+    config.Window.Width=64;config.Window.Height=64;config.Render.EnableValidation=true;
+    config.Render.EnableVSync=false;config.ReferenceScene.Enabled=false;
+    auto app=std::make_unique<SpacingApp>();auto* run=app.get();
+    Intrinsic::Tests::RuntimeTestKernel engine(config,std::move(app));
+    engine.EmplaceModule<Runtime::SpatialIndexCache>();engine.Initialize();Shutdown shutdown{engine};
+    engine.Run();ASSERT_TRUE(engine.GetDevice().IsOperational());
+    ASSERT_FALSE(run->TimedOut)<<"phase="<<run->Phase;ASSERT_TRUE(run->Done);
+    EXPECT_LE(run->MaxError,1e-5);ASSERT_EQ(run->PhaseMs.size(),3);
+    if(const auto* output=std::getenv("INTRINSIC_SPACING_BENCHMARK_OUTPUT"))
+    {
+        nlohmann::json json{{"benchmark_id","geometry.point_lbvh.spacing_runtime_smoke"},
+            {"method","geometry.point_lbvh"},{"backend","gpu_vulkan_compute"},
+            {"dataset","builtin.spacing_clusters.eight_domains.seed241"},{"commit","local-dev"},
+            {"metrics",{{"runtime_ms",run->PhaseMs[1]},{"quality_error_linf",run->MaxError}}},
+            {"diagnostics",{{"runner","IntrinsicPointLBVHGpuTests"},{"mode","smoke"},
+                {"cpu_reference_total_ms",run->CpuMs[1]},{"vulkan_cold_total_ms",run->PhaseMs[0]},
+                {"vulkan_warm_total_ms",run->PhaseMs[1]},{"vulkan_scale2_k63_total_ms",run->PhaseMs[2]},
+                {"cpu_scale2_k63_total_ms",run->CpuMs[2]},{"warmup_iterations",1},{"measured_iterations",1},
+                {"cpu_spacing_and_radii",true},{"gpu_neighborhood_elapsed_sum_ms",run->NeighborhoodMs},
+                {"cpu_spacing_and_radii_sum_ms",run->FitMs},{"gpu_query_batch_counts",run->BatchCounts}}},{"status",::testing::Test::HasFailure()?"failed":"passed"}};
+        std::ofstream stream(output);ASSERT_TRUE(stream.good());stream<<json.dump(2)<<'\n';ASSERT_TRUE(stream.good());
+    }
 }

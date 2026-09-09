@@ -1,0 +1,41 @@
+Running main() from /home/alex/Documents/IntrinsicEngine/external/vcpkg/buildtrees/gtest/src/v1.17.0-0c449efaff.clean/googletest/src/gtest_main.cc
+Note: Google Test filter = PointSpacing.*:PointCloud_Radius.*:PointCloud_Statistics.*:PointCloud_Integration.DownsampleThenEstimateRadii
+[==========] Running 11 tests from 4 test suites.
+[----------] Global test environment set-up.
+[----------] 3 tests from PointCloud_Statistics
+[ RUN      ] PointCloud_Statistics.EmptyReturnsNullopt
+[       OK ] PointCloud_Statistics.EmptyReturnsNullopt (0 ms)
+[ RUN      ] PointCloud_Statistics.SinglePointStats
+[       OK ] PointCloud_Statistics.SinglePointStats (0 ms)
+[ RUN      ] PointCloud_Statistics.SphereStatistics
+[       OK ] PointCloud_Statistics.SphereStatistics (1 ms)
+[----------] 3 tests from PointCloud_Statistics (2 ms total)
+
+[----------] 3 tests from PointCloud_Radius
+[ RUN      ] PointCloud_Radius.TooFewPointsReturnsNullopt
+[       OK ] PointCloud_Radius.TooFewPointsReturnsNullopt (0 ms)
+[ RUN      ] PointCloud_Radius.SphereRadiiReasonable
+[       OK ] PointCloud_Radius.SphereRadiiReasonable (10 ms)
+[ RUN      ] PointCloud_Radius.ScaleFactorMultipliesRadius
+[       OK ] PointCloud_Radius.ScaleFactorMultipliesRadius (8 ms)
+[----------] 3 tests from PointCloud_Radius (18 ms total)
+
+[----------] 1 test from PointCloud_Integration
+[ RUN      ] PointCloud_Integration.DownsampleThenEstimateRadii
+[       OK ] PointCloud_Integration.DownsampleThenEstimateRadii (6 ms)
+[----------] 1 test from PointCloud_Integration (7 ms total)
+
+[----------] 4 tests from PointSpacing
+[ RUN      ] PointSpacing.AnalyticRadiiAndNearestSpacingRemainDistinct
+[       OK ] PointSpacing.AnalyticRadiiAndNearestSpacingRemainDistinct (0 ms)
+[ RUN      ] PointSpacing.SuppliedCandidatesMatchOctreeAndCloudForTiesScalesAndExtremeK
+[       OK ] PointSpacing.SuppliedCandidatesMatchOctreeAndCloudForTiesScalesAndExtremeK (1 ms)
+[ RUN      ] PointSpacing.StatisticsPreserveDeterministicStrideSampling
+[       OK ] PointSpacing.StatisticsPreserveDeterministicStrideSampling (0 ms)
+[ RUN      ] PointSpacing.MalformedAndUnrepresentableInputsFail
+[       OK ] PointSpacing.MalformedAndUnrepresentableInputsFail (0 ms)
+[----------] 4 tests from PointSpacing (1 ms total)
+
+[----------] Global test environment tear-down
+[==========] 11 tests from 4 test suites ran. (29 ms total)
+[  PASSED  ] 11 tests.

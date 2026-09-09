@@ -91,11 +91,11 @@ used for face/edge bounds, or `Geometry.KDTree` consumers. It supplies nearest
 k-nearest and radius queries. Triangle distance, ray traversal and renderer
 scene acceleration require other primitives and traversal.
 
-## Registration leases and framed batches
+## Consumer leases and framed batches
 
-ICP uses the cache through immutable `Snapshot` CPU leases and
-`QueueGpuNearest` or `QueueGpuKNearest` batches. A completed batch can be reused at the same query
-count and k without reallocating buffers. The cache owns its JobService GPU
+ICP and point PCA use immutable `Snapshot` leases and framed GPU batches:
+`QueueGpuNearest`, `QueueGpuKNearest` and `QueueGpuRadius`. A completed batch
+can be reused at the same query count and capacity without reallocating buffers. The cache owns its JobService GPU
 participant, producer/readback ordering and device shutdown. Batches retain
 entries until completion, so pruning does not invalidate submitted resources.
 Results retain original property row IDs; CPU snapshot indices are compact and
@@ -127,12 +127,25 @@ query count; unsupported sizes fail explicitly. On `Ready`, query i has
 before recording fails the batch; an already-submitted batch retains its input
 snapshot until completion. Consumers still own result-publication freshness.
 
+`QueueGpuRadius(handle, queries, radius, capacity, excludedSlots, reuse)` uses
+the same frame/readback machinery with capacity 1..1024. On `Ready`,
+`Counts[i]` is the total hit count; only `min(Counts[i], Capacity)` entries
+are stored, ordered by source ID. Consumers requiring complete support must
+reject overflow. `GpuQueriesAvailable()` reports operational device/frame
+composition; per-request validation still checks sizes, bounds and freshness.
+
 CPU normal kernels can call `Geometry::PointCloud::Normals::Estimate(points,
 index, params)`. The supplied index must match the points exactly. The adapter
 preserves PCA and orientation behavior, including the existing k+1-then-filter
 neighborhood policy. It does not change default method selection. The [normal-estimation workflow](normal-estimation.md) integrates canonical
-config/UI/publication with cached CPU LBVH acquisition (RUNTIME-213/UI-045);
-statistical-outlier adoption remains RUNTIME-209/UI-041. See the
+config/UI/publication with cached CPU LBVH acquisition and Vulkan query chunks.
+The `Estimate(points, Neighborhoods{offsets, indices}, params)` overload accepts
+complete candidate rows, validates their CSR layout/indices, and reuses the
+existing CPU PCA/orientation implementation. Runtime maps GPU source IDs back
+to compact input rows before fitting. Radius overflow fails without publishing.
+[Outlier analysis](outlier-analysis.md) uses shared kNN/exclusion and framed radius
+counts through RUNTIME-209/UI-041; CPU classification publishes named mask/score
+properties. Radius counts remain complete beyond retained-hit capacity. See the
 [consumer inventory](spatial-index-consumers.md) for the other adapters.
 
 For an entity consumer, query source IDs directly:
@@ -155,3 +168,9 @@ if (auto snapshot = cache.Snapshot(acquired.Handle)) {
     // and validates the originating source revisions before applying.
 }
 ```
+
+[Kernel density](kernel-density.md) reuses framed kNN candidates for nearest-other
+spacing and local Gaussian support. CPU bandwidth/evaluation remains shared;
+Vulkan preserves the extra candidate (k<=63) and canonical-domain publication.
+
+[Point spacing and radii](point-spacing.md) reuse the same framed kNN cache with k+1-then-self-filter semantics. CPU reduction computes radii and nearest-other spacing from one query set; rendering these model-space radii is tracked separately by RUNTIME-222.

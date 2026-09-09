@@ -327,7 +327,7 @@ TEST(SandboxEditorPresentation, DefaultDrawStartsWithOnlyMenuBarVisible)
 
     EXPECT_TRUE(ImGuiWindowExists("##MainMenuBar"));
     const auto menu = shell.BuildEditorWindowMenuModel();
-    ASSERT_EQ(menu.size(), 45u);
+    ASSERT_EQ(menu.size(), 56u);
     for (const Runtime::EditorWindowMenuEntry& entry : menu)
     {
         EXPECT_FALSE(entry.Open) << entry.Id;
@@ -345,7 +345,7 @@ TEST(SandboxEditorPresentation, DomainMenusUseAppearanceAndFocusedProcessingWind
         std::string_view Id;
         std::vector<std::string> MenuPath;
     };
-    const std::array<ExpectedWindow, 35> expected{{
+    const std::array<ExpectedWindow, 46> expected{{
         {"pointcloud.appearance", {"PointCloud"}},
         {"pointcloud.properties", {"PointCloud"}},
         {"pointcloud.selection", {"PointCloud"}},
@@ -377,6 +377,17 @@ TEST(SandboxEditorPresentation, DomainMenusUseAppearanceAndFocusedProcessingWind
         {"graph.processing.vertices.normals", {"Graph", "Processing", "Vertices"}},
         {"pointcloud.processing.vertices.normals", {"PointCloud", "Processing", "Vertices"}},
         {"view.normal_estimation", {"View"}},
+        {"view.kernel_density", {"View"}},
+        {"view.point_spacing", {"View"}},
+        {"mesh.processing.kernel_density", {"Mesh", "Processing"}},
+        {"mesh.processing.point_spacing", {"Mesh", "Processing"}},
+        {"graph.processing.kernel_density", {"Graph", "Processing"}},
+        {"graph.processing.point_spacing", {"Graph", "Processing"}},
+        {"pointcloud.processing.kernel_density", {"PointCloud", "Processing"}},
+        {"pointcloud.processing.point_spacing", {"PointCloud", "Processing"}},
+        {"view.outlier_analysis", {"View"}},
+        {"mesh.processing.outliers", {"Mesh", "Processing"}},
+        {"graph.processing.outliers", {"Graph", "Processing"}},
         {"view.registration", {"View"}},
         {"mesh.processing.registration", {"Mesh", "Processing"}},
         {"graph.processing.registration", {"Graph", "Processing"}},
@@ -508,14 +519,12 @@ TEST(SandboxEditorPresentation, DomainPanelsPreserveLifetimeCacheAndResultPublic
           "CachedModelFrame != frame",
           "CachedDomainModels",
           "DomainWindowModelCacheHits",
-        "ApplyEditorPointCloudOutlierRemovalCommand",
         "ApplyEditorUvRegenerationCommand",
         "context.GeometryResults.LastUvRegenerationResult",
         "lastUvRegenerationResult->value().AtlasWidth",
         "ImGui::InputInt(\"Bake padding\"",
         ".PaddingTexels = paddingSupported",
         "std::int32_t TextureBakeWidth{1024};",
-        "LastPointCloudOutlierRemovalResult.reset();",
         "LastUvRegenerationResult.reset();",
         "LastUvExtentAdoption.reset();",
         "MeshPropertyPlotState.SelectedProperty.clear();",
@@ -531,22 +540,28 @@ TEST(SandboxEditorPresentation, MeshProcessingPanelsPreserveLifetimeAndResultPub
         "src/app/Sandbox/Editor/Sandbox.MeshProcessingPanels.cpp");
     ASSERT_FALSE(source.empty());
 
-    constexpr std::array<std::string_view, 7> commands{{
+    constexpr std::array<std::string_view, 10> commands{{
       "ApplyEditorMeshDenoiseCommand",
       "ApplyEditorMeshCurvatureCommand",
       "ApplyEditorMeshRemeshCommand",
       "ApplyEditorMeshSubdivideCommand",
       "ApplyEditorMeshSimplifyCommand",
       "ApplyEditorConfiguredNormalEstimation",
+      "ApplyEditorConfiguredOutlierAnalysis",
+      "ApplyEditorConfiguredKernelDensity",
+      "ApplyEditorConfiguredPointSpacing",
       "ApplyEditorConfiguredRegistrationCommand",
     }};
-    constexpr std::array<std::string_view, 7> sinks{{
+    constexpr std::array<std::string_view, 10> sinks{{
         "context.MethodResultSinks.MeshDenoise",
         "context.MethodResultSinks.MeshCurvature",
         "context.MethodResultSinks.MeshRemesh",
         "context.MethodResultSinks.MeshSubdivide",
         "context.MethodResultSinks.MeshSimplify",
         "context.MethodResultSinks.NormalEstimation",
+        "context.MethodResultSinks.OutlierAnalysis",
+        "context.MethodResultSinks.KernelDensity",
+        "context.MethodResultSinks.PointSpacing",
         "context.MethodResultSinks.Registration",
     }};
     for (const std::string_view required : commands)
@@ -1249,9 +1264,7 @@ TEST(SandboxEditorPresentation, ControllerReattachPinsPanelAttachmentResetPolicy
     EXPECT_NE(meshPanels.find("Normals = {};"), std::string::npos);
     EXPECT_NE(meshPanels.find("Registration.LastResult.reset();"),
               std::string::npos);
-    EXPECT_NE(domainPanels.find(
-                  "LastPointCloudOutlierRemovalResult.reset();"),
-              std::string::npos);
+    EXPECT_NE(meshPanels.find("Outliers = {};"), std::string::npos);
     EXPECT_NE(domainPanels.find("LastUvRegenerationResult.reset();"),
               std::string::npos);
     EXPECT_NE(domainPanels.find("LastUvExtentAdoption.reset();"),
@@ -1470,6 +1483,78 @@ TEST(SandboxEditorPresentation, NormalDomainMenusOpenOneSharedWindow)
         ASSERT_TRUE(shell.SetEditorWindowOpen("view.normal_estimation", false));
     }
     ASSERT_TRUE(shell.SetEditorWindowOpen("view.normal_estimation", true));
+    engine.Run();
+    shell.Detach();
+    engine.Shutdown();
+}
+
+TEST(SandboxEditorPresentation, OutlierDomainMenusOpenOneSharedWindow)
+{
+    Intrinsic::Tests::RuntimeTestKernel engine(HeadlessConfig(), std::make_unique<OneFrameApplication>());
+    ComposeEditorUiAndInitialize(engine);
+    Editor::EditorShell shell;
+    shell.Attach(engine.Worlds(), engine.Services());
+    Editor::MeshProcessingPanels panels;
+    panels.Register(shell);
+    for (const auto* id : {"mesh.processing.outliers", "graph.processing.outliers", "pointcloud.processing.remove_outliers"})
+    {
+        ASSERT_TRUE(shell.SetEditorWindowOpen(id, true));
+        const auto menu = shell.BuildEditorWindowMenuModel();
+        ASSERT_NE(FindWindow(menu, "view.outlier_analysis"), nullptr);
+        EXPECT_TRUE(FindWindow(menu, "view.outlier_analysis")->Open);
+        ASSERT_NE(FindWindow(menu, id), nullptr);
+        EXPECT_FALSE(FindWindow(menu, id)->Open);
+        ASSERT_TRUE(shell.SetEditorWindowOpen("view.outlier_analysis", false));
+    }
+    ASSERT_TRUE(shell.SetEditorWindowOpen("view.outlier_analysis", true));
+    engine.Run();
+    shell.Detach();
+    engine.Shutdown();
+}
+
+TEST(SandboxEditorPresentation, DensityDomainMenusOpenOneSharedWindow)
+{
+    Intrinsic::Tests::RuntimeTestKernel engine(HeadlessConfig(), std::make_unique<OneFrameApplication>());
+    ComposeEditorUiAndInitialize(engine);
+    Editor::EditorShell shell;
+    shell.Attach(engine.Worlds(), engine.Services());
+    Editor::MeshProcessingPanels panels;
+    panels.Register(shell);
+    for (const auto* id : {"mesh.processing.kernel_density", "graph.processing.kernel_density", "pointcloud.processing.kernel_density"})
+    {
+        ASSERT_TRUE(shell.SetEditorWindowOpen(id, true));
+        const auto menu = shell.BuildEditorWindowMenuModel();
+        ASSERT_NE(FindWindow(menu, "view.kernel_density"), nullptr);
+        EXPECT_TRUE(FindWindow(menu, "view.kernel_density")->Open);
+        ASSERT_NE(FindWindow(menu, id), nullptr);
+        EXPECT_FALSE(FindWindow(menu, id)->Open);
+        ASSERT_TRUE(shell.SetEditorWindowOpen("view.kernel_density", false));
+    }
+    ASSERT_TRUE(shell.SetEditorWindowOpen("view.kernel_density", true));
+    engine.Run();
+    shell.Detach();
+    engine.Shutdown();
+}
+
+TEST(SandboxEditorPresentation, SpacingDomainMenusOpenOneSharedWindow)
+{
+    Intrinsic::Tests::RuntimeTestKernel engine(HeadlessConfig(), std::make_unique<OneFrameApplication>());
+    ComposeEditorUiAndInitialize(engine);
+    Editor::EditorShell shell;
+    shell.Attach(engine.Worlds(), engine.Services());
+    Editor::MeshProcessingPanels panels;
+    panels.Register(shell);
+    for (const auto* id : {"mesh.processing.point_spacing", "graph.processing.point_spacing", "pointcloud.processing.point_spacing"})
+    {
+        ASSERT_TRUE(shell.SetEditorWindowOpen(id, true));
+        const auto menu = shell.BuildEditorWindowMenuModel();
+        ASSERT_NE(FindWindow(menu, "view.point_spacing"), nullptr);
+        EXPECT_TRUE(FindWindow(menu, "view.point_spacing")->Open);
+        ASSERT_NE(FindWindow(menu, id), nullptr);
+        EXPECT_FALSE(FindWindow(menu, id)->Open);
+        ASSERT_TRUE(shell.SetEditorWindowOpen("view.point_spacing", false));
+    }
+    ASSERT_TRUE(shell.SetEditorWindowOpen("view.point_spacing", true));
     engine.Run();
     shell.Detach();
     engine.Shutdown();

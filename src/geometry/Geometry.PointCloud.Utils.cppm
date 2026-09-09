@@ -1,8 +1,10 @@
+// Point-set utilities and outlier analysis over typed samples, with owning cloud adapters.
 module;
 
 #include <cstddef>
 #include <cstdint>
 #include <optional>
+#include <span>
 #include <vector>
 
 #include <glm/glm.hpp>
@@ -88,6 +90,15 @@ export namespace Geometry::PointCloud
         const Cloud& cloud,
         const StatisticsParams& params = {});
 
+    [[nodiscard]] std::optional<CloudStatistics> ComputeStatistics(
+        std::span<const glm::vec3> positions, const StatisticsParams& params = {});
+    // Two nearest candidates per sampled row (none for a singleton). Sample i
+    // addresses i*floor(n/sampleCount), preserving StatisticsParams sampling.
+    // Sorted by squared distance then ID; caller guarantees nearest membership.
+    [[nodiscard]] std::optional<CloudStatistics> ComputeStatisticsFromNeighbors(
+        std::span<const glm::vec3> positions, std::span<const std::uint32_t> candidates,
+        const StatisticsParams& params = {});
+
     // -------------------------------------------------------------------------
     // Voxel Grid Downsampling
     // -------------------------------------------------------------------------
@@ -139,13 +150,9 @@ export namespace Geometry::PointCloud
     // Radius Estimation
     // -------------------------------------------------------------------------
     //
-    // Estimates per-point splat radius from local point density using k nearest
-    // neighbors. The radius at each point is set to a fraction of the average
-    // distance to its k neighbors, ensuring overlap for hole-free rendering.
-    //
-    // r_i = scale * (1/k) * sum_{j in kNN(i)} ||p_i - p_j||
-    //
-    // Typical scale factor: 1.0 (touching surfels) to 1.5 (overlapping).
+    // Heuristic radius in input-coordinate units: mean retained neighbor distance
+    // times ScaleFactor. This does not guarantee surface coverage or hole-free rendering.
+    // Query min(n,max(k,1)+1), then remove self; coincident peers remain eligible.
 
     struct RadiusEstimationParams
     {
@@ -161,11 +168,20 @@ export namespace Geometry::PointCloud
         float AverageRadius{0.0f};
         float MinRadius{0.0f};
         float MaxRadius{0.0f};
+        CloudStatistics Statistics{}; // Full nearest-other spacing, bounds and centroid.
     };
 
-    // Returns nullopt if cloud has < 2 points.
+    // Reject fewer than two samples, nonfinite inputs/results or negative scale.
     [[nodiscard]] std::optional<RadiusEstimationResult> EstimateRadii(
         const Cloud& cloud,
+        const RadiusEstimationParams& params = {});
+
+    [[nodiscard]] std::optional<RadiusEstimationResult> EstimateRadii(
+        std::span<const glm::vec3> positions, const RadiusEstimationParams& params = {});
+    // Row-major min(n,max(k,1)+1) candidates per input, sorted by squared distance
+    // then source ID, including self if selected. Caller guarantees nearest membership.
+    [[nodiscard]] std::optional<RadiusEstimationResult> EstimateRadiiFromNeighbors(
+        std::span<const glm::vec3> positions, std::span<const std::uint32_t> candidates,
         const RadiusEstimationParams& params = {});
 
     // -------------------------------------------------------------------------
@@ -269,7 +285,7 @@ export namespace Geometry::PointCloud
     };
 
     // Publishes "p:outlier_score" property on the cloud.
-    // Returns nullopt if cloud has < 2 points.
+    // Reject fewer than two samples, nonfinite inputs/results or negative scale.
     [[nodiscard]] std::optional<OutlierEstimationResult> EstimateOutlierProbability(
         Cloud& cloud,
         const OutlierEstimationParams& params = {});
@@ -357,25 +373,41 @@ export namespace Geometry::PointCloud
         const Cloud& cloud,
         const RadiusOutlierRemovalParams& params = {});
 
+    // Analysis preserves input cardinality: 1 marks an outlier. Statistical
+    // scores are mean neighbor distances; radius scores are counts excluding self.
+    struct OutlierAnalysisResult
+    {
+        OutlierRemovalStatus Status{OutlierRemovalStatus::Success};
+        std::vector<std::uint32_t> Mask{};
+        std::vector<float> Scores{};
+        std::size_t NonFiniteCount{}, RejectedCount{};
+        float MeanDistance{}, StdDevDistance{}, DistanceThreshold{};
+    };
+    [[nodiscard]] OutlierAnalysisResult AnalyzeStatisticalOutliers(
+        std::span<const glm::vec3> points, const StatisticalOutlierRemovalParams& params = {});
+    [[nodiscard]] OutlierAnalysisResult AnalyzeRadiusOutliers(
+        std::span<const glm::vec3> points, const RadiusOutlierRemovalParams& params = {});
+    // Query backends supply per-row mean distances or exact radius counts.
+    // NaN distance denotes an invalid input row; classification keeps the existing
+    // population-variance rule and strict greater-than rejection threshold.
+    [[nodiscard]] OutlierAnalysisResult ClassifyStatisticalOutliers(
+        std::span<const float> meanDistances, float stdDevMultiplier);
+    [[nodiscard]] OutlierAnalysisResult ClassifyRadiusOutliers(
+        std::span<const std::uint32_t> counts, std::uint32_t minimumNeighbors);
+
     // -------------------------------------------------------------------------
     // Kernel Density Estimation (KDE)
     // -------------------------------------------------------------------------
     //
-    // Per-point density estimation using Gaussian KDE with adaptive bandwidth.
-    //
-    //   ρ(p_i) = (1/k) * sum_{j in kNN(i)} K_h(||p_i - p_j||)
-    //
-    // where K_h is a Gaussian kernel with bandwidth h. Bandwidth selection
-    // follows Silverman's rule of thumb: h = (4σ⁵/3n)^(1/5) ≈ 1.06·σ·n^(-1/5)
-    // where σ is the standard deviation of nearest-neighbor distances.
-    //
-    // Reference:
-    //   - Silverman, "Density Estimation for Statistics and Data Analysis" (1986)
+    // Local Gaussian density: average over max(k,2)+1 nearest candidates after
+    // removing the source ID. Coincident peers remain eligible. Units: length^-3.
+    // Auto bandwidth uses 1.06*max(stddev(NN),mean(NN))*n^-0.2, floored at 1e-8.
+    // This inherited spacing heuristic is not full-sample multivariate KDE.
 
     struct KDEParams
     {
         std::size_t KNeighbors{15};        // Neighbors for density estimation.
-        float       Bandwidth{0.0f};       // Gaussian bandwidth h. 0 = auto (Silverman's rule).
+        float       Bandwidth{0.0f};       // Gaussian bandwidth h. 0 = spacing heuristic.
     };
 
     struct KDEResult
@@ -387,8 +419,19 @@ export namespace Geometry::PointCloud
         float              UsedBandwidth{0.0f}; // Actual bandwidth used.
     };
 
+    // Finite samples, at least two rows; no mutation. Invalid parameters or
+    // unrepresentable float kernel values return nullopt.
+    [[nodiscard]] std::optional<KDEResult> EstimateKernelDensity(
+        std::span<const glm::vec3> positions, const KDEParams& params = {});
+    // Row-major min(n,max(k,2)+1) nearest candidate IDs per sample, including
+    // self if selected, sorted by distance then source ID. The caller guarantees
+    // nearest membership; bounds, uniqueness and cardinality are validated here.
+    [[nodiscard]] std::optional<KDEResult> EstimateKernelDensityFromNeighbors(
+        std::span<const glm::vec3> positions, std::span<const std::uint32_t> candidates,
+        const KDEParams& params = {});
+
     // Publishes "p:density" property on the cloud.
-    // Returns nullopt if cloud has < 2 points.
+    // Reject fewer than two samples, nonfinite inputs/results or negative scale.
     [[nodiscard]] std::optional<KDEResult> EstimateKernelDensity(
         Cloud& cloud,
         const KDEParams& params = {});

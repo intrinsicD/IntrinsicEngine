@@ -13,6 +13,11 @@ picking backlog work; theme priorities and rationale live in
 - `METHOD-043` — Thickness and curve-aligned parts comparison (tasks/active/METHOD-043-thickness-and-curve-parts-comparison.md)
 - `METHOD-044` — Feature-aware patches and distortion-aware atlas merging (tasks/active/METHOD-044-feature-aware-atlas-merge-experiment.md)
 - `METHOD-045` — Preserve baseline regions while constructing UV charts (tasks/active/METHOD-045-baseline-preserving-atlas-cuts.md)
+- `RUNTIME-209` — Point-set outlier analysis and publication split (tasks/active/RUNTIME-209-point-set-outlier-analysis-publication.md)
+- `RUNTIME-219` — Vulkan LBVH neighborhoods for normal estimation (tasks/active/RUNTIME-219-vulkan-normal-neighborhoods.md)
+- `RUNTIME-220` — Kernel density with shared spatial backends (tasks/active/RUNTIME-220-kernel-density-spatial-backends.md)
+- `RUNTIME-221` — Point spacing and radius estimation with shared spatial backends (tasks/active/RUNTIME-221-point-spacing-spatial-backends.md)
+- `UI-041` — Point-set outlier multi-domain panel (tasks/active/UI-041-point-set-outlier-multi-domain-panel.md)
 - `UI-053` — Curvature-extremum engine overlay (tasks/active/UI-053-curvature-extremum-engine-overlay.md)
 
 ## Theme B — Rendering modernization
@@ -99,11 +104,9 @@ picking backlog work; theme priorities and rationale live in
 - blocked by `METHOD-033`: `METHOD-034` — iPSR normal orientation baseline (reference backend) (tasks/backlog/methods/METHOD-034-ipsr-orientation-baseline.md)
 - unblocked: `METHOD-035` — Parametric Gauss (winding-number) orientation baseline (reference backend) (tasks/backlog/methods/METHOD-035-pgr-winding-number-orientation-baseline.md)
 - blocked by `METHOD-032`: `METHOD-036` — Normal-orientation method comparison evidence (publication protocol) (tasks/backlog/methods/METHOD-036-orientation-comparison-evidence.md)
-- unblocked: `RUNTIME-209` — Point-set outlier analysis and publication split (tasks/backlog/runtime/RUNTIME-209-point-set-outlier-analysis-publication.md)
 - unblocked: `RUNTIME-210` — Signed Heat runtime and config integration (tasks/backlog/runtime/RUNTIME-210-signed-heat-runtime-config-integration.md)
 - unblocked: `RUNTIME-211` — K-Means property-domain integration (tasks/backlog/runtime/RUNTIME-211-kmeans-property-domain-integration.md)
 - unblocked: `RUNTIME-212` — Progressive Poisson property-domain publication (tasks/backlog/runtime/RUNTIME-212-progressive-poisson-property-domain-publication.md)
-- blocked by `RUNTIME-209`: `UI-041` — Point-set outlier multi-domain panel (tasks/backlog/ui/UI-041-point-set-outlier-multi-domain-panel.md)
 - blocked by `RUNTIME-210`: `UI-042` — Signed Heat mesh method panel (tasks/backlog/ui/UI-042-signed-heat-mesh-panel.md)
 - blocked by `RUNTIME-211`: `UI-043` — K-Means property-domain panel (tasks/backlog/ui/UI-043-kmeans-property-domain-panel.md)
 - blocked by `RUNTIME-212`: `UI-044` — Progressive Poisson property-domain panel (tasks/backlog/ui/UI-044-progressive-poisson-property-domain-panel.md)
@@ -119,6 +122,7 @@ picking backlog work; theme priorities and rationale live in
 - unblocked: `GRAPHICS-135` — Measure current render-prep scheduling and material-sync overhead (tasks/backlog/rendering/GRAPHICS-135-renderprep-per-frame-taskgraph-overhead.md)
 - blocked by `ASSETIO-012`: `REVIEW-004` — Framework24 product-convergence audit (tasks/backlog/architecture/REVIEW-004-framework24-product-convergence-audit.md)
 - unblocked: `RUNTIME-218` — Nothing in the scene is ever lit: add default lighting and light authoring (tasks/backlog/runtime/RUNTIME-218-default-scene-lighting-and-light-authoring.md)
+- blocked by `RUNTIME-221`: `RUNTIME-222` — Model-space point radius rendering (tasks/backlog/runtime/RUNTIME-222-model-space-point-radius-rendering.md)
 - unblocked: `UI-046` — Sandbox cannot export geometry at all (tasks/backlog/ui/UI-046-sandbox-geometry-export.md)
 - unblocked: `UI-047` — File paths must be hand-typed into a raw text field (tasks/backlog/ui/UI-047-file-chooser-for-import-and-scene-paths.md)
 - unblocked: `UI-048` — Editor opens empty, hides file operations under View, and never remembers layout (tasks/backlog/ui/UI-048-first-run-workspace-and-layout-persistence.md)
@@ -132,6 +136,7 @@ picking backlog work; theme priorities and rationale live in
 - unblocked: `BUG-178` — Clang 23 crashes during an incremental module rebuild (tasks/backlog/bugs/BUG-178-clang23-incremental-module-ice.md)
 - unblocked: `BUG-180` — Leak-enabled framed ICP process reports 240 retained bytes (tasks/backlog/bugs/BUG-180-framed-icp-leak-enabled-process-retention.md)
 - unblocked: `BUG-181` — Touched-scope shader-output command uses an unsupported flag (tasks/backlog/bugs/BUG-181-touched-scope-shader-output-command.md)
+- unblocked: `BUG-182` — Framed kNN smoke times out when promoted Vulkan is not compiled (tasks/backlog/bugs/BUG-182-framed-knn-unavailable-device-timeout.md)
 - unblocked: `GRAPHICS-109` — Offscreen frame capture to PNG (headless figure renders) (tasks/backlog/rendering/GRAPHICS-109-offscreen-frame-capture-png.md)
 
 ## Audits

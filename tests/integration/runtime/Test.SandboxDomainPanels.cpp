@@ -80,7 +80,7 @@ namespace
     }
 }
 
-TEST(SandboxDomainPanels, RegistersTheTenAppOwnedWindowsWithStableMenuMetadata)
+TEST(SandboxDomainPanels, RegistersTheNineAppOwnedWindowsWithStableMenuMetadata)
 {
     struct ExpectedWindow
     {
@@ -88,13 +88,10 @@ TEST(SandboxDomainPanels, RegistersTheTenAppOwnedWindowsWithStableMenuMetadata)
         std::vector<std::string> MenuPath;
         std::string_view Title;
     };
-    const std::array<ExpectedWindow, 10> expected{{
+    const std::array<ExpectedWindow, 9> expected{{
         {"pointcloud.appearance", {"PointCloud"}, "Appearance"},
         {"pointcloud.properties", {"PointCloud"}, "Properties"},
         {"pointcloud.selection", {"PointCloud"}, "Selection"},
-        {"pointcloud.processing.remove_outliers",
-         {"PointCloud", "Processing"},
-         "Remove Outliers"},
         {"graph.appearance", {"Graph"}, "Appearance"},
         {"graph.properties", {"Graph"}, "Properties"},
         {"graph.selection", {"Graph"}, "Selection"},
@@ -128,20 +125,20 @@ TEST(SandboxDomainPanels, RegistrationIsIdempotentAndLifetimeUnregistersEveryWin
     {
         Editor::DomainPanels panels;
         panels.Register(first.Shell);
-        ASSERT_EQ(first.Shell.BuildEditorWindowMenuModel().size(), 20u);
+        ASSERT_EQ(first.Shell.BuildEditorWindowMenuModel().size(), 19u);
 
         panels.Register(first.Shell);
-        EXPECT_EQ(first.Shell.BuildEditorWindowMenuModel().size(), 20u);
+        EXPECT_EQ(first.Shell.BuildEditorWindowMenuModel().size(), 19u);
 
         panels.Register(second.Shell);
         EXPECT_EQ(first.Shell.BuildEditorWindowMenuModel().size(), 10u);
-        EXPECT_EQ(second.Shell.BuildEditorWindowMenuModel().size(), 20u);
+        EXPECT_EQ(second.Shell.BuildEditorWindowMenuModel().size(), 19u);
 
         panels.Unregister();
         EXPECT_EQ(second.Shell.BuildEditorWindowMenuModel().size(), 10u);
 
         panels.Register(second.Shell);
-        ASSERT_EQ(second.Shell.BuildEditorWindowMenuModel().size(), 20u);
+        ASSERT_EQ(second.Shell.BuildEditorWindowMenuModel().size(), 19u);
     }
 
     EXPECT_EQ(first.Shell.BuildEditorWindowMenuModel().size(), 10u);
@@ -171,8 +168,7 @@ TEST(SandboxDomainPanels, OpenSameDomainWindowsShareOneModelBuildPerFrame)
     for (const std::string_view id :
          {"pointcloud.appearance",
           "pointcloud.properties",
-          "pointcloud.selection",
-          "pointcloud.processing.remove_outliers"})
+          "pointcloud.selection"})
     {
         ASSERT_TRUE(harness.Shell.SetEditorWindowOpen(id, true)) << id;
     }
@@ -184,5 +180,5 @@ TEST(SandboxDomainPanels, OpenSameDomainWindowsShareOneModelBuildPerFrame)
         1u);
     EXPECT_EQ(
         harness.Shell.GetLastFrame().ModelBuildStats.DomainWindowModelCacheHits,
-        3u);
+        2u);
 }

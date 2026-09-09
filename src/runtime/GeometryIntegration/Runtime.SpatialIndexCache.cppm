@@ -48,7 +48,8 @@ export namespace Extrinsic::Runtime
     struct SpatialNearestBatch
     {
         SpatialQueryState State{SpatialQueryState::Queued};
-        // Query i owns Capacity entries starting at i*Capacity; only Counts[i] are valid.
+        // Query i owns Capacity entries. Radius Counts report all hits, so only
+        // min(Counts[i], Capacity) entries are stored; callers must handle overflow.
         std::vector<Geometry::PointLBVH::Neighbor> Neighbors{};
         std::vector<std::uint32_t> Counts{};
         std::uint32_t Capacity{1};
@@ -80,6 +81,12 @@ export namespace Extrinsic::Runtime
             SpatialIndexHandle handle, std::span<const glm::vec3> queries, std::uint32_t k,
             std::span<const std::uint32_t> excludedSlots = {},
             std::shared_ptr<SpatialNearestBatch> reuse = {});
+        // Inclusive radius; counts remain complete when retained hits exceed capacity (1..1024).
+        [[nodiscard]] std::shared_ptr<SpatialNearestBatch> QueueGpuRadius(
+            SpatialIndexHandle handle, std::span<const glm::vec3> queries, float radius,
+            std::uint32_t capacity, std::span<const std::uint32_t> excludedSlots = {},
+            std::shared_ptr<SpatialNearestBatch> reuse = {});
+        [[nodiscard]] bool GpuQueriesAvailable() const noexcept;
         // Stale world/entity/property/deletion revisions return nullopt; reacquire to rebuild.
         [[nodiscard]] std::optional<Geometry::PointLBVH::Neighbor> Nearest(
             SpatialIndexHandle handle, glm::vec3 query,
@@ -101,6 +108,10 @@ export namespace Extrinsic::Runtime
         [[nodiscard]] SpatialIndexCacheStats Stats() const noexcept;
 
       private:
+        [[nodiscard]] std::shared_ptr<SpatialNearestBatch> QueueGpuBatch(
+            SpatialIndexHandle handle, std::span<const glm::vec3> queries, std::uint32_t capacity,
+            float radius, std::span<const std::uint32_t> excludedSlots,
+            std::shared_ptr<SpatialNearestBatch> reuse);
         struct Impl;
         std::unique_ptr<Impl> m_Impl;
     };

@@ -2,10 +2,9 @@ session:
   id: 2026-09-09_001
   date: '2026-09-09'
   started: '2026-09-09T10:54:47+02:00'
-  last_turn: '2026-09-09T10:54:47+02:00'
-  turn_count: 1
-  summary: Published the completed geometry toolset in 3276c7059 after a fresh passing full CPU gate; retire six
-    completed task notes and preserve existing GPU/performance limitations.
+  last_turn: "2026-09-09T23:11:32+02:00"
+  turn_count: 5
+  summary: "Published earlier geometry work and completed Vulkan normal/outlier/density neighborhood integration with CPU numerical stages, canonical config/UI/publication and bounded CPU/GPU evidence. Remaining consumers and publication are separate."
 events_logged:
 - turn: 1
   type: decision
@@ -19,6 +18,96 @@ events_logged:
   routing: direct
   provenance: ai-executed
   summary: Fresh combined build and 4363 CPU passes plus one expected skip; direct shader outputs pass.
+- turn: 2
+  type: question
+  id: N514
+  routing: direct
+  provenance: user
+  summary: Locate remaining Vulkan LBVH gaps against current consumers and query API.
+- turn: 2
+  type: observation
+  id: O210
+  routing: staged
+  provenance: ai-suggested
+  summary: Propose GPU normal neighborhoods then outlier adoption; preserve CPU oracles and compare total cost.
+- turn: 3
+  type: decision
+  id: N515
+  routing: direct
+  provenance: user
+  summary: Accept normal estimation as the current GPU consumer slice, then proceed one method at a time.
+- turn: 3
+  type: experiment
+  id: N516
+  routing: direct
+  provenance: ai-executed
+  summary: CPU and Vulkan parity/rejection/history checks pass; bounded timing smoke validates.
+- turn: 3
+  type: decision
+  id: N517
+  routing: direct
+  provenance: ai-executed
+  summary: Adopt the bounded hybrid capability into documentation; retain default and numerical policy.
+- turn: 3
+  type: observation
+  id: O211
+  routing: crystallized
+  provenance: ai-executed
+  summary: C80 binds actual GPU normal-neighborhood evidence; H21 crystallizes accepted O210 sequencing.
+- turn: 4
+  type: decision
+  id: N518
+  routing: direct
+  provenance: user
+  summary: Accept outlier analysis as the next GPU consumer.
+- turn: 4
+  type: experiment
+  id: N519
+  routing: direct
+  provenance: ai-executed
+  summary: CPU, native-window and Vulkan fixtures pass; bounded runtime benchmark validates.
+- turn: 4
+  type: decision
+  id: N520
+  routing: direct
+  provenance: ai-executed
+  summary: Adopt only the tested query/classification/publication contract.
+- turn: 4
+  type: observation
+  id: O212
+  routing: crystallized
+  provenance: ai-executed
+  summary: C81 records bounded outlier parity and integration evidence.
+- turn: 4
+  type: observation
+  id: O213
+  routing: staged
+  provenance: ai-suggested
+  summary: Keep broader count-only consumer guidance staged.
+- turn: 5
+  type: decision
+  id: N521
+  routing: direct
+  provenance: ai-executed
+  summary: Select density for the user-requested next consumer, preserving the existing formulation.
+- turn: 5
+  type: experiment
+  id: N522
+  routing: direct
+  provenance: ai-executed
+  summary: CPU/native and actual Vulkan checks pass; bounded schema-v2 density smoke validates.
+- turn: 5
+  type: decision
+  id: N523
+  routing: direct
+  provenance: ai-executed
+  summary: Document only the tested hybrid density contract with explicit limits.
+- turn: 5
+  type: observation
+  id: O214
+  routing: crystallized
+  provenance: ai-executed
+  summary: C82 binds the bounded density evidence via artifact commitment.
 ai_actions:
 - turn: 1
   action: Committed and pushed the completed code, method evidence and workflow inventory. Retired six completed
@@ -31,10 +120,48 @@ ai_actions:
   - tasks/SESSION-BRIEF.md
   - tasks/backlog/bugs/BUG-181-touched-scope-shader-output-command.md
   - ara/logic/claims.md
-claims_touched: []
+- turn: 2
+  action: Read current cache/query interfaces, method call sites, CPU neighbor kernels and consumer/task inventory.
+    Found framed nearest/kNN but no framed radius helper; raw radius queries retain exact counts with bounded storage.
+    No implementation, benchmark or test run.
+  provenance: ai-executed
+  files_changed: []
+- turn: 3
+  action: Implemented framed radius batches, supplied neighborhood CPU fitting, Vulkan normal config/UI/jobs, and tests. Updated consumer/task reminders and retained source-bound CPU/Vulkan and smoke evidence. No commit or push.
+  provenance: ai-executed
+  files_changed: [src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Normals.cpp, src/runtime/GeometryIntegration/Runtime.SpatialIndexCache.cpp, src/geometry/Geometry.PointCloud.Normals.cpp, tests/integration/graphics/Test.PointLBVHGpuSmoke.cpp, tasks/active/RUNTIME-219-vulkan-normal-neighborhoods.md]
+- turn: 4
+  action: Added span reference analysis, cached CPU/Vulkan queries, shared outlier config/window/jobs, named mask/score publication and guarded property-preserving removal. Updated tests, method notes, consumer reminders and source-bound evidence; no commit or push.
+  provenance: ai-executed
+  files_changed: [src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Outliers.cpp, src/runtime/Modules/OutlierAnalysis/Runtime.OutlierAnalysisConfig.cppm, src/geometry/Geometry.PointCloud.Utils.cpp, tests/contract/runtime/Test.OutlierAnalysis.cpp, docs/architecture/outlier-analysis.md]
+- turn: 5
+  action: Added span and supplied-neighbor density entry points, canonical CPU/Vulkan runtime/config/window publication, analytical and integration tests, and source-bound evidence. Preserved the streaming CPU reference and default. No commit or push.
+  provenance: ai-executed
+  files_changed: [src/geometry/Geometry.PointCloud.Utils.cpp, src/runtime/Modules/KernelDensity/Runtime.KernelDensityConfig.cppm, src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Density.cpp, tests/contract/runtime/Test.KernelDensityOperations.cpp, docs/architecture/kernel-density.md]
+claims_touched:
+- id: C80
+  action: crystallized
+  turn: 3
+- id: C81
+  action: crystallized
+  turn: 4
+- id: C17
+  action: advanced
+  turn: 4
+- id: C82
+  action: crystallized
+  turn: 5
 key_context:
 - turn: 1
   excerpt: Commit and push please. I need it at work
+- turn: 2
+  excerpt: Ok where else is the gpu Vulkan lbvh still missing?
+- turn: 3
+  excerpt: Ok then please continue through the list with normal estimation. Then we’ll do the rest one by one
+- turn: 4
+  excerpt: Ok continue with outlier analysis.
+- turn: 5
+  excerpt: Ok now continue with the next method
 open_threads:
 - 'Spatial consumer inventory: shared kNN/exclusion and the normal adapter are implemented; remaining method migrations
   and primitive/ray extensions stay open. METHOD-003A owns legacy-reference adoption intake.'
@@ -47,11 +174,13 @@ open_threads:
 - 'UI-053: detached curvature curves still need shared engine/config/UI publication.'
 - 'BUG-178/BUG-180: isolate incremental module-cache failure and leak-enabled pipeline allocation retention; no
   engine or driver ownership conclusion yet.'
-- RUNTIME-209/UI-041 outlier adoption remains open. GEOM-077, RUNTIME-207/UI-040, RUNTIME-213/UI-045 and BUG-179
-  have completion records tied to the pushed implementation commit.
+- RUNTIME-209/UI-041 outlier analysis is implemented and verified locally, pending publication. GEOM-073 still owns remaining point statistics, probability, bilateral and feature adapters.
 - 'BUG-181: correct touched-scope shader-output CLI arguments and producer ordering on a fresh build tree.'
+- RUNTIME-219 normal GPU neighborhoods are verified locally; publication and remaining consumers are separate. BUG-182 tracks the unavailable framed kNN fixture timeout.
+- RUNTIME-220 density is implemented and verified locally, pending publication; GPU bandwidth/Gaussian evaluation and full-sample KDE are outside this slice.
 ai_suggestions_pending:
 - O198 is partially exercised by METHOD-046. Its broader independent-alignment and seed-relocation alternatives
   remain unsettled; no blanket heuristic or production default is promoted.
 - Prior curvature-boundary proposals remain staged; no unrelated observation gained a closure signal.
 - O204 broader migration priorities remain staged; only the explicit ICP portion of O205 was adopted.
+- O213 count-only spatial-consumer guidance remains staged; density needs weighted candidate evaluation and does not adopt the count-only shortcut.

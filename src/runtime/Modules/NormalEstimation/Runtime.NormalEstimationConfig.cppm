@@ -26,7 +26,8 @@ export namespace Extrinsic::Runtime
     enum class NormalEstimationBackend : std::uint8_t
     {
         CpuKDTree,
-        CpuLBVH
+        CpuLBVH,
+        VulkanLBVH
     };
     [[nodiscard]] const char *ToString(NormalEstimationMethod method) noexcept;
     [[nodiscard]] const char *ToString(NormalEstimationBackend backend) noexcept;
@@ -42,6 +43,7 @@ export namespace Extrinsic::Runtime
                                    .Name = "v:normal",
                                    .ValueKind = Geometry::PropertyValueKind::Vec3};
         std::uint32_t KNeighbors{15}, MinimumNeighbors{2};
+        std::uint32_t GpuQueryBatchSize{4096};
         bool UseRadiusSearch{};
         float Radius{};
         Geometry::PointCloud::Normals::OrientationMode Orientation{

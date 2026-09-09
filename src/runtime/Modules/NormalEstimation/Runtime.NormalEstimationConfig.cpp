@@ -22,8 +22,9 @@ namespace Extrinsic::Runtime
             for (unsigned i = 0; i < 4; ++i)
                 if (d.at("method") == ToString(NormalEstimationMethod(i)))
                     c.Method = NormalEstimationMethod(i);
-            c.Backend = d.at("backend") == "cpu_lbvh" ? NormalEstimationBackend::CpuLBVH
-                                                      : NormalEstimationBackend::CpuKDTree;
+            for (unsigned i = 0; i < 3; ++i)
+                if (d.at("backend") == ToString(NormalEstimationBackend(i)))
+                    c.Backend = NormalEstimationBackend(i);
             auto readRef = [&](const char *key, GeometryPropertyRef &r) {
                 r.Name = d.at(key).at("name");
                 for (unsigned i = 0; i <= unsigned(GeometryElementDomain::PointCloudPoint); ++i)
@@ -34,6 +35,7 @@ namespace Extrinsic::Runtime
             readRef("output", c.Output);
             c.KNeighbors = d.at("k_neighbors");
             c.MinimumNeighbors = d.at("minimum_neighbors");
+            c.GpuQueryBatchSize = d.at("gpu_query_batch_size");
             c.UseRadiusSearch = d.at("use_radius");
             c.Radius = d.at("radius");
             c.Orientation =
@@ -78,6 +80,8 @@ namespace Extrinsic::Runtime
             return "cpu_kdtree";
         case NormalEstimationBackend::CpuLBVH:
             return "cpu_lbvh";
+        case NormalEstimationBackend::VulkanLBVH:
+            return "vulkan_lbvh";
         }
         return "invalid";
     }
@@ -90,6 +94,7 @@ namespace Extrinsic::Runtime
                     {"output", Ref(c.Output)},
                     {"k_neighbors", c.KNeighbors},
                     {"minimum_neighbors", c.MinimumNeighbors},
+                    {"gpu_query_batch_size", c.GpuQueryBatchSize},
                     {"use_radius", c.UseRadiusSearch},
                     {"radius", c.Radius},
                     {"orientation", unsigned(c.Orientation)},
@@ -121,7 +126,7 @@ namespace Extrinsic::Runtime
                 return reject("Unknown normal field: " + it.key());
             d[it.key()] = it.value();
         }
-        for (auto key : {"entity", "k_neighbors", "minimum_neighbors", "orientation", "weighting"})
+        for (auto key : {"entity", "k_neighbors", "minimum_neighbors", "orientation", "weighting", "gpu_query_batch_size"})
             if (!d[key].is_number_unsigned() ||
                 d[key].get<std::uint64_t>() > std::numeric_limits<std::uint32_t>::max())
                 return reject(std::string(key) + " must be an unsigned 32-bit integer.");
@@ -131,8 +136,10 @@ namespace Extrinsic::Runtime
         if (d["method"] != "point_set_pca" && d["method"] != "mesh_face_weighted" &&
             d["method"] != "graph_neighborhood" && d["method"] != "mesh_face_normals")
             return reject("Unknown normal method.");
-        if (d["backend"] != "cpu_kdtree" && d["backend"] != "cpu_lbvh")
-            return reject("Normal backend must be cpu_kdtree or cpu_lbvh.");
+        if (d["backend"] != "cpu_kdtree" && d["backend"] != "cpu_lbvh" && d["backend"] != "vulkan_lbvh")
+            return reject("Normal backend must be cpu_kdtree, cpu_lbvh or vulkan_lbvh.");
+        if (d["gpu_query_batch_size"] == 0 || d["gpu_query_batch_size"] > 16384)
+            return reject("GPU query batch size must be in 1..16384.");
         if (!d["use_radius"].is_boolean() || !d["orient_toward_fallback"].is_boolean())
             return reject("Normal toggles must be boolean.");
         for (auto key : {"radius", "degenerate_epsilon", "collinear_epsilon"})

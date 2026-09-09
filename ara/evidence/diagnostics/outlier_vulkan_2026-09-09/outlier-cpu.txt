@@ -1,0 +1,134 @@
+          Start  667: OutlierAnalysis.EveryDomainMatchesReferenceAndPublishesOnlyNamedProperties
+ 653/4390 Test  #667: OutlierAnalysis.EveryDomainMatchesReferenceAndPublishesOnlyNamedProperties ......................................   Passed    0.04 sec
+          Start  668: OutlierAnalysis.RemovalRequiresCurrentDetectionAndPreservesEveryPropertyThroughHistory
+ 654/4390 Test  #668: OutlierAnalysis.RemovalRequiresCurrentDetectionAndPreservesEveryPropertyThroughHistory ..........................   Passed    0.01 sec
+          Start  669: OutlierAnalysis.DeletedRowsRemainUntouchedAndMaskOrInputEditsInvalidateRemoval
+ 655/4390 Test  #669: OutlierAnalysis.DeletedRowsRemainUntouchedAndMaskOrInputEditsInvalidateRemoval ..................................   Passed    0.01 sec
+          Start  670: OutlierAnalysis.RadiusUsesAllCountsAndRetainsCoincidentPeers
+ 656/4390 Test  #670: OutlierAnalysis.RadiusUsesAllCountsAndRetainsCoincidentPeers ....................................................   Passed    0.26 sec
+          Start  671: OutlierAnalysis.InvalidParametersAndReservedOutputsFailBeforeMutation
+ 657/4390 Test  #671: OutlierAnalysis.InvalidParametersAndReservedOutputsFailBeforeMutation ...........................................   Passed    0.01 sec
+          Start  672: OutlierAnalysis.QueuedJobsRejectStaleInputsOutputsAndCancellation
+ 658/4390 Test  #672: OutlierAnalysis.QueuedJobsRejectStaleInputsOutputsAndCancellation ...............................................   Passed    0.05 sec
+          Start  673: OutlierAnalysis.MaskAndScoreUseSharedVisualizationRecipesOnEveryDomain
+ 659/4390 Test  #673: OutlierAnalysis.MaskAndScoreUseSharedVisualizationRecipesOnEveryDomain ..........................................   Passed    0.01 sec
+          Start  674: OutlierAnalysis.RadiusBoundaryAndStatisticalMinimumMatchAcrossCpuBackends
+ 660/4390 Test  #674: OutlierAnalysis.RadiusBoundaryAndStatisticalMinimumMatchAcrossCpuBackends .......................................   Passed    0.01 sec
+          Start  675: OutlierAnalysis.UndoAnotherOutputCannotMakeAnEditedMaskCurrent
+ 661/4390 Test  #675: OutlierAnalysis.UndoAnotherOutputCannotMakeAnEditedMaskCurrent ..................................................   Passed    0.01 sec
+          Start  676: OutlierAnalysisConfig.RoundTripAndSharedPreviewApplyRun
+ 662/4390 Test  #676: OutlierAnalysisConfig.RoundTripAndSharedPreviewApplyRun .........................................................   Passed    0.01 sec
+          Start 1078: SandboxEditorUi.PointCloudOutlierRemovalStatisticalPublishesKeptPointsWithUndoRedo
+1064/4390 Test #1078: SandboxEditorUi.PointCloudOutlierRemovalStatisticalPublishesKeptPointsWithUndoRedo ..............................   Passed    0.01 sec
+          Start 1079: SandboxEditorUi.PointCloudOutlierRemovalRequestQueuesDerivedJobAndPublishesOnApply
+1065/4390 Test #1079: SandboxEditorUi.PointCloudOutlierRemovalRequestQueuesDerivedJobAndPublishesOnApply ..............................   Passed    0.01 sec
+          Start 1080: SandboxEditorUi.PointCloudOutlierRemovalDerivedJobDiscardsStaleSource
+1066/4390 Test #1080: SandboxEditorUi.PointCloudOutlierRemovalDerivedJobDiscardsStaleSource ...........................................   Passed    0.02 sec
+          Start 1081: SandboxEditorUi.PointCloudOutlierRemovalDerivedJobDiscardsStaleProperty
+1067/4390 Test #1081: SandboxEditorUi.PointCloudOutlierRemovalDerivedJobDiscardsStaleProperty .........................................   Passed    0.02 sec
+          Start 1082: SandboxEditorUi.PointCloudOutlierRemovalRadiusPublishesAndFailsClosed
+1068/4390 Test #1082: SandboxEditorUi.PointCloudOutlierRemovalRadiusPublishesAndFailsClosed ...........................................   Passed    0.01 sec
+          Start 1083: SandboxEditorUi.PointCloudOutlierRemovalPreservesSurvivingPointProperties
+1069/4390 Test #1083: SandboxEditorUi.PointCloudOutlierRemovalPreservesSurvivingPointProperties .......................................   Passed    0.01 sec
+          Start 1084: SandboxEditorUi.PointCloudOutlierRemovalRespectsDeletedSlots
+1070/4390 Test #1084: SandboxEditorUi.PointCloudOutlierRemovalRespectsDeletedSlots ....................................................   Passed    0.01 sec
+          Start 1092: SandboxEditorUi.PointCloudOutlierRemovalRejectingNothingReportsNoChange
+1078/4390 Test #1092: SandboxEditorUi.PointCloudOutlierRemovalRejectingNothingReportsNoChange .........................................   Passed    0.00 sec
+          Start 1307: SandboxDomainPanels.RegistersTheNineAppOwnedWindowsWithStableMenuMetadata
+1292/4390 Test #1307: SandboxDomainPanels.RegistersTheNineAppOwnedWindowsWithStableMenuMetadata .......................................   Passed    0.04 sec
+          Start 1308: SandboxDomainPanels.RegistrationIsIdempotentAndLifetimeUnregistersEveryWindow
+1293/4390 Test #1308: SandboxDomainPanels.RegistrationIsIdempotentAndLifetimeUnregistersEveryWindow ...................................   Passed    0.06 sec
+          Start 1309: SandboxDomainPanels.ClosedRegisteredWindowsBuildNoDomainModels
+1294/4390 Test #1309: SandboxDomainPanels.ClosedRegisteredWindowsBuildNoDomainModels ..................................................   Passed    0.04 sec
+          Start 1310: SandboxDomainPanels.OpenSameDomainWindowsShareOneModelBuildPerFrame
+1295/4390 Test #1310: SandboxDomainPanels.OpenSameDomainWindowsShareOneModelBuildPerFrame .............................................   Passed    0.04 sec
+          Start 1322: SandboxEditorPresentation.DefaultDrawStartsWithOnlyMenuBarVisible
+1307/4390 Test #1322: SandboxEditorPresentation.DefaultDrawStartsWithOnlyMenuBarVisible ...............................................   Passed    0.04 sec
+          Start 1323: SandboxEditorPresentation.DomainMenusUseAppearanceAndFocusedProcessingWindows
+1308/4390 Test #1323: SandboxEditorPresentation.DomainMenusUseAppearanceAndFocusedProcessingWindows ...................................   Passed    0.04 sec
+          Start 1324: SandboxEditorPresentation.DomainPanelsPreserveLifetimeCacheAndResultPublication
+1309/4390 Test #1324: SandboxEditorPresentation.DomainPanelsPreserveLifetimeCacheAndResultPublication .................................   Passed    0.00 sec
+          Start 1325: SandboxEditorPresentation.MeshProcessingPanelsPreserveLifetimeAndResultPublication
+1310/4390 Test #1325: SandboxEditorPresentation.MeshProcessingPanelsPreserveLifetimeAndResultPublication ..............................   Passed    0.01 sec
+          Start 1326: SandboxEditorPresentation.ExtrinsicSandboxAppStaysRuntimeOnly
+1311/4390 Test #1326: SandboxEditorPresentation.ExtrinsicSandboxAppStaysRuntimeOnly ...................................................   Passed    0.02 sec
+          Start 1327: SandboxEditorPresentation.RuntimeFeatureModulesCompileSeparatelyFromEditorShell
+1312/4390 Test #1327: SandboxEditorPresentation.RuntimeFeatureModulesCompileSeparatelyFromEditorShell .................................   Passed    0.14 sec
+          Start 1328: SandboxEditorPresentation.GeometryProcessingMenusExposeDomainElementSubmenus
+1313/4390 Test #1328: SandboxEditorPresentation.GeometryProcessingMenusExposeDomainElementSubmenus ....................................   Passed    0.00 sec
+          Start 1329: SandboxEditorPresentation.AdapterCallbackDrawsDeterministicMenuOnlyFrame
+1314/4390 Test #1329: SandboxEditorPresentation.AdapterCallbackDrawsDeterministicMenuOnlyFrame ........................................   Passed    0.04 sec
+          Start 1330: SandboxEditorPresentation.FileImportDisabledReasonRendersThroughRealHoveredControl
+1315/4390 Test #1330: SandboxEditorPresentation.FileImportDisabledReasonRendersThroughRealHoveredControl ..............................   Passed    0.24 sec
+          Start 1331: SandboxEditorPresentation.DisabledReasonTooltipConventionIsSharedByImportAndQueueControls
+1316/4390 Test #1331: SandboxEditorPresentation.DisabledReasonTooltipConventionIsSharedByImportAndQueueControls .......................   Passed    0.01 sec
+          Start 1332: SandboxEditorPresentation.RuntimeImportEventIsReflectedByAppFilePanel
+1317/4390 Test #1332: SandboxEditorPresentation.RuntimeImportEventIsReflectedByAppFilePanel ...........................................   Passed    0.07 sec
+          Start 1333: SandboxEditorPresentation.EngineAttachmentRegistersEditorCallback
+1318/4390 Test #1333: SandboxEditorPresentation.EngineAttachmentRegistersEditorCallback ...............................................   Passed    0.06 sec
+          Start 1334: SandboxEditorPresentation.ControllerReattachPinsPanelAttachmentResetPolicy
+1319/4390 Test #1334: SandboxEditorPresentation.ControllerReattachPinsPanelAttachmentResetPolicy ......................................   Passed    0.09 sec
+          Start 1335: SandboxEditorPresentation.EditorShellStartsWithOnlyBuiltinWindows
+1320/4390 Test #1335: SandboxEditorPresentation.EditorShellStartsWithOnlyBuiltinWindows ...............................................   Passed    0.04 sec
+          Start 1336: SandboxEditorPresentation.GpuProfilingControlsReuseTheExistingFrameGraphWindow
+1321/4390 Test #1336: SandboxEditorPresentation.GpuProfilingControlsReuseTheExistingFrameGraphWindow ..................................   Passed    0.01 sec
+          Start 1337: SandboxEditorPresentation.ExternalWindowContributionNeedsNoLegacySwitchEntry
+1322/4390 Test #1337: SandboxEditorPresentation.ExternalWindowContributionNeedsNoLegacySwitchEntry ....................................   Passed    0.04 sec
+          Start 1338: SandboxEditorPresentation.ContextWindowContributionReceivesAppOwnedContext
+1323/4390 Test #1338: SandboxEditorPresentation.ContextWindowContributionReceivesAppOwnedContext ......................................   Passed    0.04 sec
+          Start 1339: SandboxEditorPresentation.GlobalVisibilityHotkeyUsesTheVisibilityCommandPath
+1324/4390 Test #1339: SandboxEditorPresentation.GlobalVisibilityHotkeyUsesTheVisibilityCommandPath ....................................   Passed    0.04 sec
+          Start 1340: SandboxEditorPresentation.RegistrationDomainMenusOpenOneSharedWindow
+1325/4390 Test #1340: SandboxEditorPresentation.RegistrationDomainMenusOpenOneSharedWindow ............................................   Passed    0.04 sec
+          Start 1341: SandboxEditorPresentation.NormalDomainMenusOpenOneSharedWindow
+1326/4390 Test #1341: SandboxEditorPresentation.NormalDomainMenusOpenOneSharedWindow ..................................................   Passed    0.04 sec
+          Start 1342: SandboxEditorPresentation.OutlierDomainMenusOpenOneSharedWindow
+1327/4390 Test #1342: SandboxEditorPresentation.OutlierDomainMenusOpenOneSharedWindow .................................................   Passed    0.04 sec
+          Start 1498: GeometryRotationAveraging.MediansStayCloserToInliersThanMeansWithOutliers
+1478/4390 Test #1498: GeometryRotationAveraging.MediansStayCloserToInliersThanMeansWithOutliers .......................................   Passed    0.01 sec
+          Start 1841: CurvatureSegmentation.MinimumRegionCleanupDeterministicallyMergesTheSingleFaceOutlier
+1821/4390 Test #1841: CurvatureSegmentation.MinimumRegionCleanupDeterministicallyMergesTheSingleFaceOutlier ...........................   Passed    0.00 sec
+          Start 2602: PointCloudConsolidation.InSupportOutliersHaveBoundedInfluenceOnPlanePatch
+2582/4390 Test #2602: PointCloudConsolidation.InSupportOutliersHaveBoundedInfluenceOnPlanePatch .......................................   Passed    0.01 sec
+          Start 2606: PointCloudConsolidation.ClopKeepsSparseOutlierInfluenceBounded
+2586/4390 Test #2606: PointCloudConsolidation.ClopKeepsSparseOutlierInfluenceBounded ..................................................   Passed    0.01 sec
+          Start 2626: PointCloudFeatures.CoarseAlignmentRejectsOutliers
+2606/4390 Test #2626: PointCloudFeatures.CoarseAlignmentRejectsOutliers ...............................................................   Passed    0.09 sec
+          Start 2660: Registration_ICP.OutlierRejectionImproveAlignment
+2640/4390 Test #2660: Registration_ICP.OutlierRejectionImproveAlignment ...............................................................   Passed    0.01 sec
+          Start 2661: Registration_ICP.RobustKernelDownweightsGrossOutliers
+2641/4390 Test #2661: Registration_ICP.RobustKernelDownweightsGrossOutliers ...........................................................   Passed    0.01 sec
+          Start 2678: OutlierEstimation.NulloptOnEmptyCloud
+2658/4390 Test #2678: OutlierEstimation.NulloptOnEmptyCloud ...........................................................................   Passed    0.00 sec
+          Start 2679: OutlierEstimation.NulloptOnSinglePoint
+2659/4390 Test #2679: OutlierEstimation.NulloptOnSinglePoint ..........................................................................   Passed    0.00 sec
+          Start 2680: OutlierEstimation.UniformCloudLowScores
+2660/4390 Test #2680: OutlierEstimation.UniformCloudLowScores .........................................................................   Passed    0.01 sec
+          Start 2681: OutlierEstimation.DetectsOutliers
+2661/4390 Test #2681: OutlierEstimation.DetectsOutliers ...............................................................................   Passed    0.01 sec
+          Start 2682: OutlierEstimation.PublishesProperty
+2662/4390 Test #2682: OutlierEstimation.PublishesProperty .............................................................................   Passed    0.01 sec
+          Start 2683: OutlierEstimation.ScoreThresholdAffectsCount
+2663/4390 Test #2683: OutlierEstimation.ScoreThresholdAffectsCount ....................................................................   Passed    0.01 sec
+          Start 2684: OutlierEstimation.ResultDiagnosticsComplete
+2664/4390 Test #2684: OutlierEstimation.ResultDiagnosticsComplete .....................................................................   Passed    0.01 sec
+          Start 2693: PointCloudOutlierRemoval.StatisticalRejectsKnownOutliers
+2673/4390 Test #2693: PointCloudOutlierRemoval.StatisticalRejectsKnownOutliers ........................................................   Passed    0.01 sec
+          Start 2694: PointCloudOutlierRemoval.StatisticalIsDeterministic
+2674/4390 Test #2694: PointCloudOutlierRemoval.StatisticalIsDeterministic .............................................................   Passed    0.01 sec
+          Start 2695: PointCloudOutlierRemoval.StatisticalRejectsNonFinitePositions
+2675/4390 Test #2695: PointCloudOutlierRemoval.StatisticalRejectsNonFinitePositions ...................................................   Passed    0.01 sec
+          Start 2696: PointCloudOutlierRemoval.StatisticalInvalidInputs
+2676/4390 Test #2696: PointCloudOutlierRemoval.StatisticalInvalidInputs ...............................................................   Passed    0.00 sec
+          Start 2697: PointCloudOutlierRemoval.RadiusRejectsIsolatedPoints
+2677/4390 Test #2697: PointCloudOutlierRemoval.RadiusRejectsIsolatedPoints ............................................................   Passed    0.00 sec
+          Start 2698: PointCloudOutlierRemoval.RadiusIsDeterministicAndAscending
+2678/4390 Test #2698: PointCloudOutlierRemoval.RadiusIsDeterministicAndAscending ......................................................   Passed    0.01 sec
+          Start 2699: PointCloudOutlierRemoval.RadiusInvalidInputs
+2679/4390 Test #2699: PointCloudOutlierRemoval.RadiusInvalidInputs ....................................................................   Passed    0.01 sec
+          Start 2700: PointCloudOutlierRemoval.RadiusRejectsNonFinitePositions
+2680/4390 Test #2700: PointCloudOutlierRemoval.RadiusRejectsNonFinitePositions ........................................................   Passed    0.01 sec
+          Start 2701: PointCloudOutlierAnalysis.SpanScoresAndMaskMatchIndependentDistanceOracle
+2681/4390 Test #2701: PointCloudOutlierAnalysis.SpanScoresAndMaskMatchIndependentDistanceOracle .......................................   Passed    0.01 sec
+          Start 2702: PointCloudOutlierAnalysis.SuppliedSummariesRetainPopulationVarianceAndDegeneratePolicy
+2682/4390 Test #2702: PointCloudOutlierAnalysis.SuppliedSummariesRetainPopulationVarianceAndDegeneratePolicy ..........................   Passed    0.01 sec

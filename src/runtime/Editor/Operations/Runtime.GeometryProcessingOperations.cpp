@@ -2222,6 +2222,129 @@ namespace Extrinsic::Runtime
             return std::nullopt;
         return GetNormalEstimationConfig(context.EngineConfigControlState->ActiveConfig);
     }
+    RuntimeEngineConfigApplyResult ApplyEditorOutlierAnalysisConfig(
+        const EditorGeometryProcessingContext& context, const OutlierAnalysisConfig& config,
+        std::string sourceId)
+    {
+        RuntimeEngineConfigApplyResult result{
+            .Status = RuntimeEngineConfigApplyStatus::Rejected,
+            .Source = RuntimeConfigControlSource::Editor,
+        };
+        const auto validation = ValidateOutlierAnalysisConfigSection(
+            SerializeOutlierAnalysisConfig(config), {}, kOutlierAnalysisConfigSectionName);
+        if (!validation.Usable())
+        {
+            result.LoadResult.Diagnostics = validation.Diagnostics;
+            return result;
+        }
+        if (context.EngineConfigControlState == nullptr || !context.PreviewEngineConfigDocument ||
+            !context.ApplyEngineConfigHotSubset || !context.EngineConfigCommandsAvailable)
+        {
+            return result;
+        }
+
+        Core::Config::EngineConfig candidate = context.EngineConfigControlState->ActiveConfig;
+        SetOutlierAnalysisConfig(candidate, config);
+        if (sourceId.empty())
+        {
+            sourceId = std::string{kOutlierAnalysisConfigSectionName};
+        }
+        result.LoadResult = context.PreviewEngineConfigDocument(
+            Core::Config::SerializeEngineConfig(candidate), sourceId);
+        if (!Core::Config::IsConfigUsable(result.LoadResult))
+            return result;
+        return context.ApplyEngineConfigHotSubset(result.LoadResult);
+    }
+
+    std::optional<OutlierAnalysisConfig> GetEditorOutlierAnalysisConfig(
+        const EditorGeometryProcessingContext& context)
+    {
+        if (context.EngineConfigControlState == nullptr)
+            return std::nullopt;
+        return GetOutlierAnalysisConfig(context.EngineConfigControlState->ActiveConfig);
+    }
+    RuntimeEngineConfigApplyResult ApplyEditorKernelDensityConfig(
+        const EditorGeometryProcessingContext& context, const KernelDensityConfig& config,
+        std::string sourceId)
+    {
+        RuntimeEngineConfigApplyResult result{
+            .Status = RuntimeEngineConfigApplyStatus::Rejected,
+            .Source = RuntimeConfigControlSource::Editor,
+        };
+        const auto validation = ValidateKernelDensityConfigSection(
+            SerializeKernelDensityConfig(config), {}, kKernelDensityConfigSectionName);
+        if (!validation.Usable())
+        {
+            result.LoadResult.Diagnostics = validation.Diagnostics;
+            return result;
+        }
+        if (context.EngineConfigControlState == nullptr || !context.PreviewEngineConfigDocument ||
+            !context.ApplyEngineConfigHotSubset || !context.EngineConfigCommandsAvailable)
+        {
+            return result;
+        }
+
+        Core::Config::EngineConfig candidate = context.EngineConfigControlState->ActiveConfig;
+        SetKernelDensityConfig(candidate, config);
+        if (sourceId.empty())
+        {
+            sourceId = std::string{kKernelDensityConfigSectionName};
+        }
+        result.LoadResult = context.PreviewEngineConfigDocument(
+            Core::Config::SerializeEngineConfig(candidate), sourceId);
+        if (!Core::Config::IsConfigUsable(result.LoadResult))
+            return result;
+        return context.ApplyEngineConfigHotSubset(result.LoadResult);
+    }
+
+    std::optional<KernelDensityConfig> GetEditorKernelDensityConfig(
+        const EditorGeometryProcessingContext& context)
+    {
+        if (context.EngineConfigControlState == nullptr)
+            return std::nullopt;
+        return GetKernelDensityConfig(context.EngineConfigControlState->ActiveConfig);
+    }
+    RuntimeEngineConfigApplyResult ApplyEditorPointSpacingConfig(
+        const EditorGeometryProcessingContext& context, const PointSpacingConfig& config,
+        std::string sourceId)
+    {
+        RuntimeEngineConfigApplyResult result{
+            .Status = RuntimeEngineConfigApplyStatus::Rejected,
+            .Source = RuntimeConfigControlSource::Editor,
+        };
+        const auto validation = ValidatePointSpacingConfigSection(
+            SerializePointSpacingConfig(config), {}, kPointSpacingConfigSectionName);
+        if (!validation.Usable())
+        {
+            result.LoadResult.Diagnostics = validation.Diagnostics;
+            return result;
+        }
+        if (context.EngineConfigControlState == nullptr || !context.PreviewEngineConfigDocument ||
+            !context.ApplyEngineConfigHotSubset || !context.EngineConfigCommandsAvailable)
+        {
+            return result;
+        }
+
+        Core::Config::EngineConfig candidate = context.EngineConfigControlState->ActiveConfig;
+        SetPointSpacingConfig(candidate, config);
+        if (sourceId.empty())
+        {
+            sourceId = std::string{kPointSpacingConfigSectionName};
+        }
+        result.LoadResult = context.PreviewEngineConfigDocument(
+            Core::Config::SerializeEngineConfig(candidate), sourceId);
+        if (!Core::Config::IsConfigUsable(result.LoadResult))
+            return result;
+        return context.ApplyEngineConfigHotSubset(result.LoadResult);
+    }
+
+    std::optional<PointSpacingConfig> GetEditorPointSpacingConfig(
+        const EditorGeometryProcessingContext& context)
+    {
+        if (context.EngineConfigControlState == nullptr)
+            return std::nullopt;
+        return GetPointSpacingConfig(context.EngineConfigControlState->ActiveConfig);
+    }
 
 
 }

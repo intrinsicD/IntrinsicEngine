@@ -1,0 +1,103 @@
+Internal ctest changing into directory: /home/alex/Documents/IntrinsicEngine/build/ci
+Test project /home/alex/Documents/IntrinsicEngine/build/ci
+      Start  642: SpatialIndexCache.ReusesOnlyUnchangedPropertyAndLiveElementIdentity
+ 1/45 Test  #642: SpatialIndexCache.ReusesOnlyUnchangedPropertyAndLiveElementIdentity .........................   Passed    0.01 sec
+      Start  643: SpatialIndexCache.CanonicalDomainsAndWorldEntityIdentity
+ 2/45 Test  #643: SpatialIndexCache.CanonicalDomainsAndWorldEntityIdentity ....................................   Passed    0.01 sec
+      Start  650: NormalEstimation.EveryCanonicalDomainPublishesNamedNormalsAndSupportsUndoRedo
+ 3/45 Test  #650: NormalEstimation.EveryCanonicalDomainPublishesNamedNormalsAndSupportsUndoRedo ...............   Passed    0.03 sec
+      Start  651: NormalEstimation.PreservesDeletedRowsAndUnrelatedEditsButGuardsOutputHistory
+ 4/45 Test  #651: NormalEstimation.PreservesDeletedRowsAndUnrelatedEditsButGuardsOutputHistory ................   Passed    0.01 sec
+      Start  652: NormalEstimation.TopologyVariantsConsumeCustomPositionsAndGraphMethodAcceptsMesh
+ 5/45 Test  #652: NormalEstimation.TopologyVariantsConsumeCustomPositionsAndGraphMethodAcceptsMesh ............   Passed    0.01 sec
+      Start  653: NormalEstimation.MeshDeletionMasksExcludeFacesAndEdgesWithoutRenumberingOutput
+ 6/45 Test  #653: NormalEstimation.MeshDeletionMasksExcludeFacesAndEdgesWithoutRenumberingOutput ..............   Passed    0.01 sec
+      Start  654: NormalEstimation.RejectsInvalidBindingsAndUnavailableBackendsWithoutMutation
+ 7/45 Test  #654: NormalEstimation.RejectsInvalidBindingsAndUnavailableBackendsWithoutMutation ................   Passed    0.01 sec
+      Start  655: NormalEstimation.RadiusNeighborhoodAndDegenerateFallbackMatchAcrossBackends
+ 8/45 Test  #655: NormalEstimation.RadiusNeighborhoodAndDegenerateFallbackMatchAcrossBackends .................   Passed    0.01 sec
+      Start  656: NormalEstimation.QueuedJobsGuardInputsTopologyDeletionAndOutputButAllowUnrelatedEdits
+ 9/45 Test  #656: NormalEstimation.QueuedJobsGuardInputsTopologyDeletionAndOutputButAllowUnrelatedEdits .......   Passed    0.05 sec
+      Start  657: NormalEstimation.NamedOutputUsesSharedVectorVisualizationRecipe
+10/45 Test  #657: NormalEstimation.NamedOutputUsesSharedVectorVisualizationRecipe .............................   Passed    0.01 sec
+      Start  658: NormalEstimation.TopologyCatalogRetainsSmallGraphsAndReportsPcaMinimum
+11/45 Test  #658: NormalEstimation.TopologyCatalogRetainsSmallGraphsAndReportsPcaMinimum ......................   Passed    0.01 sec
+      Start  659: NormalEstimation.GraphPositionSlotMayBindAnExistingNormalNamedProperty
+12/45 Test  #659: NormalEstimation.GraphPositionSlotMayBindAnExistingNormalNamedProperty ......................   Passed    0.01 sec
+      Start  660: NormalEstimation.FaceNormalsUseFullPolygonRingAndPublishOnlyFaceOutput
+13/45 Test  #660: NormalEstimation.FaceNormalsUseFullPolygonRingAndPublishOnlyFaceOutput ......................   Passed    0.01 sec
+      Start  661: NormalEstimation.FaceNormalsPreserveDeletedSlotsAndReportDegenerateFallback
+14/45 Test  #661: NormalEstimation.FaceNormalsPreserveDeletedSlotsAndReportDegenerateFallback .................   Passed    0.01 sec
+      Start  662: NormalEstimation.QueuedFaceNormalsPublishToFacesAndRejectStaleTopology
+15/45 Test  #662: NormalEstimation.QueuedFaceNormalsPublishToFacesAndRejectStaleTopology ......................   Passed    0.03 sec
+      Start  663: NormalEstimation.VulkanUnavailablePreservesOutputsOnEveryDomain
+16/45 Test  #663: NormalEstimation.VulkanUnavailablePreservesOutputsOnEveryDomain .............................   Passed    0.01 sec
+      Start  664: NormalEstimationConfig.RoundTripAndSharedPreviewApplyRun
+17/45 Test  #664: NormalEstimationConfig.RoundTripAndSharedPreviewApplyRun ....................................   Passed    0.01 sec
+      Start  665: NormalEstimationConfig.VulkanSelectionRoundTripsAndRejectsInvalidBatchSizes
+18/45 Test  #665: NormalEstimationConfig.VulkanSelectionRoundTripsAndRejectsInvalidBatchSizes .................   Passed    0.01 sec
+      Start 1311: SandboxEditorPresentation.DefaultDrawStartsWithOnlyMenuBarVisible
+19/45 Test #1311: SandboxEditorPresentation.DefaultDrawStartsWithOnlyMenuBarVisible ...........................   Passed    0.06 sec
+      Start 1312: SandboxEditorPresentation.DomainMenusUseAppearanceAndFocusedProcessingWindows
+20/45 Test #1312: SandboxEditorPresentation.DomainMenusUseAppearanceAndFocusedProcessingWindows ...............   Passed    0.04 sec
+      Start 1313: SandboxEditorPresentation.DomainPanelsPreserveLifetimeCacheAndResultPublication
+21/45 Test #1313: SandboxEditorPresentation.DomainPanelsPreserveLifetimeCacheAndResultPublication .............   Passed    0.00 sec
+      Start 1314: SandboxEditorPresentation.MeshProcessingPanelsPreserveLifetimeAndResultPublication
+22/45 Test #1314: SandboxEditorPresentation.MeshProcessingPanelsPreserveLifetimeAndResultPublication ..........   Passed    0.00 sec
+      Start 1315: SandboxEditorPresentation.ExtrinsicSandboxAppStaysRuntimeOnly
+23/45 Test #1315: SandboxEditorPresentation.ExtrinsicSandboxAppStaysRuntimeOnly ...............................   Passed    0.02 sec
+      Start 1316: SandboxEditorPresentation.RuntimeFeatureModulesCompileSeparatelyFromEditorShell
+24/45 Test #1316: SandboxEditorPresentation.RuntimeFeatureModulesCompileSeparatelyFromEditorShell .............   Passed    0.14 sec
+      Start 1317: SandboxEditorPresentation.GeometryProcessingMenusExposeDomainElementSubmenus
+25/45 Test #1317: SandboxEditorPresentation.GeometryProcessingMenusExposeDomainElementSubmenus ................   Passed    0.00 sec
+      Start 1318: SandboxEditorPresentation.AdapterCallbackDrawsDeterministicMenuOnlyFrame
+26/45 Test #1318: SandboxEditorPresentation.AdapterCallbackDrawsDeterministicMenuOnlyFrame ....................   Passed    0.04 sec
+      Start 1319: SandboxEditorPresentation.FileImportDisabledReasonRendersThroughRealHoveredControl
+27/45 Test #1319: SandboxEditorPresentation.FileImportDisabledReasonRendersThroughRealHoveredControl ..........   Passed    0.23 sec
+      Start 1320: SandboxEditorPresentation.DisabledReasonTooltipConventionIsSharedByImportAndQueueControls
+28/45 Test #1320: SandboxEditorPresentation.DisabledReasonTooltipConventionIsSharedByImportAndQueueControls ...   Passed    0.01 sec
+      Start 1321: SandboxEditorPresentation.RuntimeImportEventIsReflectedByAppFilePanel
+29/45 Test #1321: SandboxEditorPresentation.RuntimeImportEventIsReflectedByAppFilePanel .......................   Passed    0.05 sec
+      Start 1322: SandboxEditorPresentation.EngineAttachmentRegistersEditorCallback
+30/45 Test #1322: SandboxEditorPresentation.EngineAttachmentRegistersEditorCallback ...........................   Passed    0.04 sec
+      Start 1323: SandboxEditorPresentation.ControllerReattachPinsPanelAttachmentResetPolicy
+31/45 Test #1323: SandboxEditorPresentation.ControllerReattachPinsPanelAttachmentResetPolicy ..................   Passed    0.09 sec
+      Start 1324: SandboxEditorPresentation.EditorShellStartsWithOnlyBuiltinWindows
+32/45 Test #1324: SandboxEditorPresentation.EditorShellStartsWithOnlyBuiltinWindows ...........................   Passed    0.04 sec
+      Start 1325: SandboxEditorPresentation.GpuProfilingControlsReuseTheExistingFrameGraphWindow
+33/45 Test #1325: SandboxEditorPresentation.GpuProfilingControlsReuseTheExistingFrameGraphWindow ..............   Passed    0.01 sec
+      Start 1326: SandboxEditorPresentation.ExternalWindowContributionNeedsNoLegacySwitchEntry
+34/45 Test #1326: SandboxEditorPresentation.ExternalWindowContributionNeedsNoLegacySwitchEntry ................   Passed    0.04 sec
+      Start 1327: SandboxEditorPresentation.ContextWindowContributionReceivesAppOwnedContext
+35/45 Test #1327: SandboxEditorPresentation.ContextWindowContributionReceivesAppOwnedContext ..................   Passed    0.04 sec
+      Start 1328: SandboxEditorPresentation.GlobalVisibilityHotkeyUsesTheVisibilityCommandPath
+36/45 Test #1328: SandboxEditorPresentation.GlobalVisibilityHotkeyUsesTheVisibilityCommandPath ................   Passed    0.04 sec
+      Start 1329: SandboxEditorPresentation.RegistrationDomainMenusOpenOneSharedWindow
+37/45 Test #1329: SandboxEditorPresentation.RegistrationDomainMenusOpenOneSharedWindow ........................   Passed    0.04 sec
+      Start 1330: SandboxEditorPresentation.NormalDomainMenusOpenOneSharedWindow
+38/45 Test #1330: SandboxEditorPresentation.NormalDomainMenusOpenOneSharedWindow ..............................   Passed    0.04 sec
+      Start 1566: PointLBVH.EmptySingletonCoincidentAndInvalidInputs
+39/45 Test #1566: PointLBVH.EmptySingletonCoincidentAndInvalidInputs ..........................................   Passed    0.01 sec
+      Start 1567: PointLBVH.TreeQueriesMatchIndependentExhaustiveOracle
+40/45 Test #1567: PointLBVH.TreeQueriesMatchIndependentExhaustiveOracle .......................................   Passed    0.08 sec
+      Start 1568: PointLBVH.KNearestExcludesIdentityAndKeepsCoincidentPeers
+41/45 Test #1568: PointLBVH.KNearestExcludesIdentityAndKeepsCoincidentPeers ...................................   Passed    0.01 sec
+      Start 1569: PointLBVH.KNearestTreeMatchesExhaustiveSortedOracle
+42/45 Test #1569: PointLBVH.KNearestTreeMatchesExhaustiveSortedOracle .........................................   Passed    0.17 sec
+      Start 1570: PointLBVH.SuppliedNormalIndexPreservesReferenceNeighborhoodPolicy
+43/45 Test #1570: PointLBVH.SuppliedNormalIndexPreservesReferenceNeighborhoodPolicy ...........................   Passed    0.02 sec
+      Start 1571: PointLBVH.SuppliedNormalNeighborhoodsReuseCpuFitAndOrientation
+44/45 Test #1571: PointLBVH.SuppliedNormalNeighborhoodsReuseCpuFitAndOrientation ..............................   Passed    0.03 sec
+      Start 1572: PointLBVH.SuppliedNormalNeighborhoodsRejectMalformedLayout
+45/45 Test #1572: PointLBVH.SuppliedNormalNeighborhoodsRejectMalformedLayout ..................................   Passed    0.00 sec
+
+100% tests passed, 0 tests failed out of 45
+
+Label Time Summary:
+contract       =   0.21 sec*proc (18 tests)
+geometry       =   0.31 sec*proc (7 tests)
+integration    =   0.99 sec*proc (20 tests)
+runtime        =   1.20 sec*proc (38 tests)
+unit           =   0.31 sec*proc (7 tests)
+
+Total Test time (real) =   6.74 sec

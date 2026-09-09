@@ -20,7 +20,7 @@ Root scanned: `src`
 | `graphics/vulkan` | 13 |
 | `physics` | 1 |
 | `platform` | 5 |
-| `runtime` | 77 |
+| `runtime` | 80 |
 
 ## Modules
 
@@ -402,11 +402,14 @@ Root scanned: `src`
 | `Extrinsic.Runtime.ClusteringModule` | `src/runtime/Modules/Clustering/Runtime.ClusteringModule.cppm` | `runtime` |
 | `Extrinsic.Runtime.CurvatureSegmentationConfig` | `src/runtime/Modules/CurvatureSegmentation/Runtime.CurvatureSegmentationConfig.cppm` | `runtime` |
 | `Extrinsic.Runtime.GeodesicsConfig` | `src/runtime/Modules/Geodesics/Runtime.GeodesicsConfig.cppm` | `runtime` |
+| `Extrinsic.Runtime.KernelDensityConfig` | `src/runtime/Modules/KernelDensity/Runtime.KernelDensityConfig.cppm` | `runtime` |
 | `Extrinsic.Runtime.NormalEstimationConfig` | `src/runtime/Modules/NormalEstimation/Runtime.NormalEstimationConfig.cppm` | `runtime` |
+| `Extrinsic.Runtime.OutlierAnalysisConfig` | `src/runtime/Modules/OutlierAnalysis/Runtime.OutlierAnalysisConfig.cppm` | `runtime` |
 | `Extrinsic.Runtime.ParameterizationConfig` | `src/runtime/Modules/Parameterization/Runtime.ParameterizationConfig.cppm` | `runtime` |
 | `Extrinsic.Runtime.PhysicsModule` | `src/runtime/Modules/PhysicsIntegration/Runtime.PhysicsModule.cppm` | `runtime` |
 | `Extrinsic.Runtime.PointCloudConsolidationConfig` | `src/runtime/Modules/PointCloudConsolidation/Runtime.PointCloudConsolidationConfig.cppm` | `runtime` |
 | `Extrinsic.Runtime.PointCloudConsolidationModule` | `src/runtime/Modules/PointCloudConsolidation/Runtime.PointCloudConsolidationModule.cppm` | `runtime` |
+| `Extrinsic.Runtime.PointSpacingConfig` | `src/runtime/Modules/PointSpacing/Runtime.PointSpacingConfig.cppm` | `runtime` |
 | `Extrinsic.Runtime.ProgressivePoissonConfig` | `src/runtime/Modules/ProgressivePoisson/Runtime.ProgressivePoissonConfig.cppm` | `runtime` |
 | `Extrinsic.Runtime.ProgressivePoissonGpuBackend` | `src/runtime/Modules/ProgressivePoisson/Runtime.ProgressivePoissonGpuBackend.cppm` | `runtime` |
 | `Extrinsic.Runtime.RegistrationConfig` | `src/runtime/Modules/Registration/Runtime.RegistrationConfig.cppm` | `runtime` |
@@ -422,4 +425,4 @@ Root scanned: `src`
 | `Extrinsic.Runtime.StableEntityLookup` | `src/runtime/Scene/Runtime.StableEntityLookup.cppm` | `runtime` |
 | `Extrinsic.Runtime.VisualizationRecipes` | `src/runtime/Visualization/Runtime.VisualizationRecipes.cppm` | `runtime` |
 
-Total modules: **395**
+Total modules: **398**

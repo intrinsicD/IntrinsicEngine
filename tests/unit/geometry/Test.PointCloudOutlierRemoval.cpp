@@ -4,6 +4,7 @@
 // + isolated-outlier fixtures, deterministic kept/rejected ordering, invalid
 // input handling, non-finite rejection, and kept-attribute preservation.
 
+#include <algorithm>
 #include <cmath>
 #include <cstddef>
 #include <limits>
@@ -264,4 +265,40 @@ TEST(PointCloudOutlierRemoval, RadiusRejectsNonFinitePositions)
     ASSERT_EQ(result.Status, PC::OutlierRemovalStatus::Success);
     EXPECT_TRUE(Contains(result.RejectedIndices, nanIdx));
     EXPECT_GE(result.NonFiniteCount, std::size_t{1});
+}
+
+TEST(PointCloudOutlierAnalysis, SpanScoresAndMaskMatchIndependentDistanceOracle)
+{
+    std::vector<glm::vec3> points{{0,0,0},{.1f,0,0},{.2f,0,0},{.3f,0,0},{10,0,0}};
+    const auto actual=PC::AnalyzeStatisticalOutliers(points,{.KNeighbors=2,.StdDevMultiplier=1});
+    ASSERT_EQ(actual.Status,PC::OutlierRemovalStatus::Success);
+    EXPECT_EQ(actual.Mask,(std::vector<std::uint32_t>{0,0,0,0,1}));
+    for(std::size_t i=0;i<points.size();++i)
+    {
+        std::vector<float> distances;
+        for(std::size_t j=0;j<points.size();++j)if(i!=j)distances.push_back(glm::length(points[j]-points[i]));
+        std::sort(distances.begin(),distances.end());
+        EXPECT_FLOAT_EQ(actual.Scores[i],(distances[0]+distances[1])/2);
+    }
+    const auto radius=PC::AnalyzeRadiusOutliers(points,{.SearchRadius=.15f,.MinNeighbors=1});
+    EXPECT_EQ(radius.Scores,(std::vector<float>{1,2,2,1,0}));
+    EXPECT_EQ(radius.Mask,(std::vector<std::uint32_t>{0,0,0,0,1}));
+    const auto counts=PC::ClassifyRadiusOutliers(std::vector<std::uint32_t>{2000,0,1},1);
+    EXPECT_EQ(counts.Mask,(std::vector<std::uint32_t>{0,1,0}));
+    EXPECT_EQ(counts.Scores[0],2000);
+}
+
+TEST(PointCloudOutlierAnalysis, SuppliedSummariesRetainPopulationVarianceAndDegeneratePolicy)
+{
+    const auto result=PC::ClassifyStatisticalOutliers(std::vector<float>{0,0,0,4},1);
+    EXPECT_FLOAT_EQ(result.MeanDistance,1);
+    EXPECT_NEAR(result.StdDevDistance,std::sqrt(3.f),1e-6);
+    EXPECT_EQ(result.Mask,(std::vector<std::uint32_t>{0,0,0,1}));
+    std::vector<glm::vec3> tied(20,glm::vec3(0));
+    const auto coincident=PC::AnalyzeStatisticalOutliers(tied,{.KNeighbors=3});
+    EXPECT_EQ(coincident.RejectedCount,0);
+    EXPECT_TRUE(std::ranges::all_of(coincident.Scores,[](float value){return value==0;}));
+    const auto zeroMinimum=PC::AnalyzeRadiusOutliers(tied,{.SearchRadius=1,.MinNeighbors=0});
+    EXPECT_EQ(zeroMinimum.RejectedCount,0);
+    EXPECT_TRUE(std::ranges::all_of(zeroMinimum.Scores,[](float value){return value==19;}));
 }

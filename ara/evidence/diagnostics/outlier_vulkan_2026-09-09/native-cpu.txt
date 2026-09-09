@@ -1,0 +1,20 @@
+Internal ctest changing into directory: /home/alex/Documents/IntrinsicEngine/build/ci
+Test project /home/alex/Documents/IntrinsicEngine/build/ci
+    Start 451: ImGuiAdapterEngineWiring.RunProducesOneOverlayFramePerEngineFrame
+1/5 Test #451: ImGuiAdapterEngineWiring.RunProducesOneOverlayFramePerEngineFrame ............   Passed    0.06 sec
+    Start 452: ImGuiAdapterEngineWiring.EditorHookInvokedOncePerFrameAndProducesDrawLists
+2/5 Test #452: ImGuiAdapterEngineWiring.EditorHookInvokedOncePerFrameAndProducesDrawLists ...   Passed    0.06 sec
+    Start 456: ImGuiAdapterEngineWiring.RunNormalizesNativeCloseBeforeFirstFrame
+3/5 Test #456: ImGuiAdapterEngineWiring.RunNormalizesNativeCloseBeforeFirstFrame ............   Passed    0.05 sec
+    Start 457: ImGuiAdapterEngineWiring.RunNormalizesNativeCloseAfterInteractiveInput
+4/5 Test #457: ImGuiAdapterEngineWiring.RunNormalizesNativeCloseAfterInteractiveInput .......   Passed    0.06 sec
+    Start 538: GizmoInteractionEngineWiring.RunFramePublishesSelectedEntityGizmoPacket
+5/5 Test #538: GizmoInteractionEngineWiring.RunFramePublishesSelectedEntityGizmoPacket ......   Passed    0.06 sec
+
+100% tests passed, 0 tests failed out of 5
+
+Label Time Summary:
+contract    =   0.30 sec*proc (5 tests)
+runtime     =   0.30 sec*proc (5 tests)
+
+Total Test time (real) =   0.46 sec

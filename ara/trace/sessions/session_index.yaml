@@ -377,9 +377,16 @@ sessions:
 
   - id: 2026-09-09_001
     date: '2026-09-09'
-    summary: Published the completed geometry toolset in 3276c7059 after a fresh passing full CPU gate; retire six
-      completed task notes and preserve existing GPU/performance limitations.
+    summary: "Published earlier geometry work and completed Vulkan normal/outlier/density neighborhood integration with CPU numerical stages, canonical config/UI/publication and bounded CPU/GPU evidence. Remaining consumers and publication are separate."
+    turn_count: 5
+    events_count: 17
+    claims_touched: [C80, C81, C17, C82]
+    open_threads: 11
+
+  - id: 2026-09-10_001
+    date: '2026-09-10'
+    summary: "Implemented canonical point spacing/radii with shared CPU/Vulkan neighborhoods and bounded numerical evidence; CPU default retained, model-space rendering tracked separately."
     turn_count: 1
-    events_count: 2
-    claims_touched: []
-    open_threads: 9
+    events_count: 4
+    claims_touched: [C83]
+    open_threads: 12

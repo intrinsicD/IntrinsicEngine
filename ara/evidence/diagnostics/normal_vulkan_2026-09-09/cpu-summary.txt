@@ -1,0 +1,40 @@
+          Start 4443: RuntimeSandboxAcceptance.SelectionControllerSelectsEntityOfEachFamily
+4370/4377 Test #4443: RuntimeSandboxAcceptance.SelectionControllerSelectsEntityOfEachFamily ...........................................   Passed    0.04 sec
+          Start 4444: RuntimeSandboxAcceptance.EditorWorkspaceSnapshotEnumeratesAcceptanceScene
+4371/4377 Test #4444: RuntimeSandboxAcceptance.EditorWorkspaceSnapshotEnumeratesAcceptanceScene .......................................   Passed    0.04 sec
+          Start 4445: RuntimeSandboxAcceptance.PrimitiveRefinementResolvesOneDomainPerFamily
+4372/4377 Test #4445: RuntimeSandboxAcceptance.PrimitiveRefinementResolvesOneDomainPerFamily ..........................................   Passed    0.04 sec
+          Start 4446: RuntimeSandboxAcceptance.SelectionOutlineSnapshotPopulatedForSelectedEntity
+4373/4377 Test #4446: RuntimeSandboxAcceptance.SelectionOutlineSnapshotPopulatedForSelectedEntity .....................................   Passed    0.04 sec
+          Start 4447: RuntimeSandboxAcceptance.ViewportLeftClickSubmitsSelectionPick
+4374/4377 Test #4447: RuntimeSandboxAcceptance.ViewportLeftClickSubmitsSelectionPick ..................................................   Passed    0.04 sec
+          Start 4448: RuntimeSandboxAcceptance.IdleFrameSkipsPreRenderTransformFlush
+4375/4377 Test #4448: RuntimeSandboxAcceptance.IdleFrameSkipsPreRenderTransformFlush ..................................................   Passed    0.04 sec
+          Start 4449: RuntimeSandboxAcceptance.InspectorTransformEditFlushedToRenderStateSameFrame
+4376/4377 Test #4449: RuntimeSandboxAcceptance.InspectorTransformEditFlushedToRenderStateSameFrame ....................................   Passed    0.04 sec
+          Start 4450: GlfwLifecycleLsan.EngineStaticTeardownAndLeakControl
+4377/4377 Test #4450: GlfwLifecycleLsan.EngineStaticTeardownAndLeakControl ............................................................***Skipped   0.01 sec
+
+100% tests passed, 0 tests failed out of 4377
+
+Label Time Summary:
+assets         =   0.18 sec*proc (90 tests)
+benchmark      =   0.60 sec*proc (1 test)
+contract       =  41.30 sec*proc (1579 tests)
+core           =   3.90 sec*proc (292 tests)
+ecs            =   0.53 sec*proc (133 tests)
+geometry       =  60.46 sec*proc (1827 tests)
+glfw           =   0.01 sec*proc (1 test)
+graphics       =  17.00 sec*proc (853 tests)
+headless       =   0.01 sec*proc (4 tests)
+integration    =   8.40 sec*proc (269 tests)
+physics        =   0.22 sec*proc (80 tests)
+platform       =   0.02 sec*proc (5 tests)
+regression     =   0.61 sec*proc (2 tests)
+runtime        =  34.76 sec*proc (1162 tests)
+unit           =  64.78 sec*proc (2531 tests)
+
+Total Test time (real) = 111.75 sec
+
+The following tests did not run:
+	4450 - GlfwLifecycleLsan.EngineStaticTeardownAndLeakControl (Skipped)

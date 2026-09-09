@@ -437,6 +437,21 @@ TEST(SandboxEditorSession, DismissClearsOneGeometryProcessingResultSlot)
                                            .ActualBackend = "cpu_lbvh", .Message = "named normals published"});
     ASSERT_TRUE(observe().LastNormalEstimationResult);
     EXPECT_EQ(observe().LastNormalEstimationResult->ActualBackend, "cpu_lbvh");
+    ASSERT_TRUE(static_cast<bool>(prepared.ResultSinks.OutlierAnalysis));
+    prepared.ResultSinks.OutlierAnalysis({.Status = Runtime::EditorCommandStatus::Applied,
+                                           .ActualBackend = "cpu_lbvh", .Message = "named normals published"});
+    ASSERT_TRUE(observe().LastOutlierAnalysisResult);
+    EXPECT_EQ(observe().LastOutlierAnalysisResult->ActualBackend, "cpu_lbvh");
+    ASSERT_TRUE(static_cast<bool>(prepared.ResultSinks.KernelDensity));
+    prepared.ResultSinks.KernelDensity({.Status = Runtime::EditorCommandStatus::Applied,
+                                           .ActualBackend = "cpu_lbvh", .Message = "named density published"});
+    ASSERT_TRUE(observe().LastKernelDensityResult);
+    EXPECT_EQ(observe().LastKernelDensityResult->ActualBackend, "cpu_lbvh");
+    ASSERT_TRUE(static_cast<bool>(prepared.ResultSinks.PointSpacing));
+    prepared.ResultSinks.PointSpacing({.Status = Runtime::EditorCommandStatus::Applied,
+                                           .ActualBackend = "cpu_lbvh", .Message = "named density published"});
+    ASSERT_TRUE(observe().LastPointSpacingResult);
+    EXPECT_EQ(observe().LastPointSpacingResult->ActualBackend, "cpu_lbvh");
 
     Runtime::EditorMeshSimplifyResult simplify{};
     simplify.Status = Runtime::EditorCommandStatus::GeometryProcessingFailed;
@@ -482,6 +497,15 @@ TEST(SandboxEditorSession, DismissClearsOneGeometryProcessingResultSlot)
     EXPECT_TRUE(observe().LastNormalEstimationResult);
     prepared.ResultSinks.DismissResult(Runtime::EditorGeometryProcessingResultSlot::NormalEstimation);
     EXPECT_FALSE(observe().LastNormalEstimationResult);
+    EXPECT_TRUE(observe().LastOutlierAnalysisResult);
+    EXPECT_TRUE(observe().LastKernelDensityResult);
+    EXPECT_TRUE(observe().LastPointSpacingResult);
+    prepared.ResultSinks.DismissResult(Runtime::EditorGeometryProcessingResultSlot::OutlierAnalysis);
+    prepared.ResultSinks.DismissResult(Runtime::EditorGeometryProcessingResultSlot::KernelDensity);
+    prepared.ResultSinks.DismissResult(Runtime::EditorGeometryProcessingResultSlot::PointSpacing);
+    EXPECT_FALSE(observe().LastOutlierAnalysisResult);
+    EXPECT_FALSE(observe().LastKernelDensityResult);
+    EXPECT_FALSE(observe().LastPointSpacingResult);
 
     // A dismissal sink copied out of a prepared frame must not reach into a
     // detached session, which is the same epoch rule every result sink obeys.

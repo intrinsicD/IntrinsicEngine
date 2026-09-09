@@ -1,0 +1,81 @@
+session:
+  id: 2026-09-10_001
+  date: '2026-09-10'
+  started: '2026-09-10T00:25:43+02:00'
+  last_turn: '2026-09-10T00:25:43+02:00'
+  turn_count: 1
+  summary: Implemented canonical point spacing/radii with shared CPU/Vulkan neighborhoods and bounded numerical
+    evidence; CPU default retained, model-space rendering tracked separately.
+events_logged:
+- turn: 1
+  type: decision
+  id: N524
+  routing: direct
+  provenance: ai-executed
+  summary: Select spacing/radii for the user-requested next consumer.
+- turn: 1
+  type: experiment
+  id: N525
+  routing: direct
+  provenance: ai-executed
+  summary: CPU and actual Vulkan checks pass; dirty schema-v2 smoke validates.
+- turn: 1
+  type: decision
+  id: N526
+  routing: direct
+  provenance: ai-executed
+  summary: Document the tested distance contract with explicit renderer and performance limits.
+- turn: 1
+  type: observation
+  id: O215
+  routing: crystallized
+  provenance: ai-executed
+  summary: C83 binds bounded spacing/radius evidence via artifact commitment.
+ai_actions:
+- turn: 1
+  action: Added span and supplied-candidate statistics/radii, canonical config/runtime/window publication, analytical/CPU/GPU
+    tests and a sealed dirty smoke. Preserved coordinate units and deferred renderer integration to RUNTIME-222.
+    No commit or push.
+  provenance: ai-executed
+  files_changed:
+  - src/geometry/Geometry.PointCloud.Utils.cpp
+  - src/runtime/Modules/PointSpacing/Runtime.PointSpacingConfig.cppm
+  - src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Spacing.cpp
+  - tests/contract/runtime/Test.PointSpacingOperations.cpp
+  - docs/architecture/point-spacing.md
+claims_touched:
+- id: C83
+  action: crystallized
+  turn: 1
+key_context:
+- turn: 1
+  excerpt: Ok now continue with the next method. Specific choice of spacing/radii was agent-selected within the
+    accepted sequence; no user reaction to results is inferred.
+open_threads:
+- 'Spatial consumer inventory: shared kNN/exclusion and the normal adapter are implemented; remaining method migrations
+  and primitive/ray extensions stay open. METHOD-003A owns legacy-reference adoption intake.'
+- 'REVIEW-004/BENCH-001: broader performance qualification remains open; local ICP comparisons support retaining
+  the CPU default, and display-off timing failed the smoke target.'
+- 'METHOD-045: independent anatomical alignment, chart-area balance, remeshing robustness, internal-cut placement
+  and feature-aware merge policy remain open. METHOD-046 bounded refinement is complete and published.'
+- 'METHOD-044: native/config/UI atlas adoption remains deferred.'
+- 'METHOD-043: anatomical/thickness segmentation failures remain unresolved.'
+- 'UI-053: detached curvature curves still need shared engine/config/UI publication.'
+- 'BUG-178/BUG-180: isolate incremental module-cache failure and leak-enabled pipeline allocation retention; no
+  engine or driver ownership conclusion yet.'
+- RUNTIME-209/UI-041 outlier analysis is implemented and verified locally, pending publication. GEOM-073 still owns
+  remaining probability, bilateral and feature adapters.
+- 'BUG-181: correct touched-scope shader-output CLI arguments and producer ordering on a fresh build tree.'
+- RUNTIME-219 normal GPU neighborhoods are verified locally; publication and remaining consumers are separate. BUG-182
+  tracks the unavailable framed kNN fixture timeout.
+- RUNTIME-220 density is implemented and verified locally, pending publication; GPU bandwidth/Gaussian evaluation
+  and full-sample KDE are outside this slice.
+- RUNTIME-221 spacing/radii is verified locally and pending publication. RUNTIME-222 owns model-space radius binding/upload/projection;
+  no radius rendering or coverage guarantee was added.
+ai_suggestions_pending:
+- O198 is partially exercised by METHOD-046. Its broader independent-alignment and seed-relocation alternatives
+  remain unsettled; no blanket heuristic or production default is promoted.
+- Prior curvature-boundary proposals remain staged; no unrelated observation gained a closure signal.
+- O204 broader migration priorities remain staged; only the explicit ICP portion of O205 was adopted.
+- O213 count-only spatial-consumer guidance remains staged; density needs weighted candidate evaluation and does
+  not adopt the count-only shortcut.

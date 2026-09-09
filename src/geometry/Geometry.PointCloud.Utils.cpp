@@ -12,6 +12,7 @@ module;
 #include <unordered_map>
 #include <vector>
 #include <span>
+#include <utility>
 
 #include <glm/glm.hpp>
 
@@ -107,88 +108,102 @@ namespace Geometry::PointCloud
     // ComputeStatistics
     // =========================================================================
 
-    std::optional<CloudStatistics> ComputeStatistics(
-        const Cloud& cloud,
+    namespace
+    {
+        std::optional<CloudStatistics> BaseStatistics(std::span<const glm::vec3> points)
+        {
+            if (points.empty()) return std::nullopt;
+            CloudStatistics stats;
+            stats.PointCount = points.size();
+            glm::vec3 low = points[0], high = low, sum{0};
+            for (const auto p : points)
+            {
+                if (!IsFinite(p)) return std::nullopt;
+                low = glm::min(low, p); high = glm::max(high, p); sum += p;
+            }
+            stats.BoundingBox = AABB{low, high};
+            stats.BoundingBoxDiagonal = glm::length(high-low);
+            stats.Centroid = sum / float(points.size());
+            if (!IsFinite(stats.Centroid) || !std::isfinite(stats.BoundingBoxDiagonal)) return std::nullopt;
+            return stats;
+        }
+        std::size_t SpacingSamples(std::size_t count, const StatisticsParams& params)
+        {
+            return params.SpacingSampleCount ? std::min(count, params.SpacingSampleCount) : count;
+        }
+        // Monotonic distance/ID ordering also rejects duplicate IDs without a set per row.
+        template<class Id>
+        bool NeighborDistances(std::span<const glm::vec3> points, std::size_t source,
+            std::span<const Id> row, float& sum, float& nearest, std::size_t& count)
+        {
+            float previous = -1;
+            std::size_t previousId = 0;
+            sum = 0; nearest = std::numeric_limits<float>::max(); count = 0;
+            for (const auto id : row)
+            {
+                if (id >= points.size()) return false;
+                const auto delta = points[id]-points[source];
+                const float squared = glm::dot(delta, delta);
+                if (!std::isfinite(squared) || squared < previous ||
+                    (squared == previous && id <= previousId)) return false;
+                previous = squared; previousId = id;
+                if (id == source) continue;
+                const float distance = std::sqrt(squared);
+                sum += distance; nearest = std::min(nearest, distance); ++count;
+            }
+            return count && std::isfinite(sum);
+        }
+        void AddSpacing(CloudStatistics& stats, float distance, std::size_t sample)
+        {
+            stats.AverageSpacing += distance;
+            stats.MinSpacing = sample ? std::min(stats.MinSpacing, distance) : distance;
+            stats.MaxSpacing = std::max(stats.MaxSpacing, distance);
+        }
+        template<class Query>
+        std::optional<CloudStatistics> StatisticsWithQueries(std::span<const glm::vec3> points,
+            const StatisticsParams& params, Query query)
+        {
+            auto stats = BaseStatistics(points);
+            if (!stats || points.size() < 2) return stats;
+            const auto samples = SpacingSamples(points.size(), params);
+            const auto stride = points.size()/samples;
+            for (std::size_t i=0; i<samples; ++i)
+            {
+                float sum, nearest; std::size_t count;
+                const auto row = query(i, i*stride);
+                if (row.size()!=2 || !NeighborDistances(points, i*stride, row, sum, nearest, count)) return std::nullopt;
+                AddSpacing(*stats, nearest, i);
+            }
+            stats->AverageSpacing /= float(samples);
+            if (!std::isfinite(stats->AverageSpacing)) return std::nullopt;
+            return stats;
+        }
+    }
+    std::optional<CloudStatistics> ComputeStatistics(const Cloud& cloud, const StatisticsParams& params)
+    {
+        return ComputeStatistics(cloud.Positions(), params);
+    }
+    std::optional<CloudStatistics> ComputeStatistics(std::span<const glm::vec3> positions,
         const StatisticsParams& params)
     {
-        if (cloud.IsEmpty())
+        if (!BaseStatistics(positions)) return std::nullopt;
+        Octree tree;
+        Octree::SplitPolicy policy{}; policy.SplitPoint=Octree::SplitPoint::Center; policy.TightChildren=true;
+        if (positions.size()>1 && !tree.BuildFromPoints(positions, policy, params.OctreeMaxPerNode, params.OctreeMaxDepth))
             return std::nullopt;
-
-        CloudStatistics stats{};
-        stats.PointCount = cloud.VerticesSize();
-        stats.BoundingBox = ComputeBoundingBox(cloud);
-        stats.BoundingBoxDiagonal = glm::length(stats.BoundingBox.Max - stats.BoundingBox.Min);
-
-        auto positions = cloud.Positions();
-
-        // Centroid
-        glm::vec3 sum(0.0f);
-        for (const auto& p : positions)
-            sum += p;
-        stats.Centroid = sum / static_cast<float>(stats.PointCount);
-
-        // Spacing statistics via nearest-neighbor queries.
-        if (stats.PointCount < 2)
-        {
-            stats.AverageSpacing = 0.0f;
-            stats.MinSpacing = 0.0f;
-            stats.MaxSpacing = 0.0f;
-            return stats;
-        }
-
-        Octree octree;
-        Octree::SplitPolicy policy{};
-        policy.SplitPoint = Octree::SplitPoint::Center;
-        policy.TightChildren = true;
-
-        if (!octree.BuildFromPoints(positions, policy, params.OctreeMaxPerNode, params.OctreeMaxDepth))
-            return stats;
-
-        std::size_t sampleCount = params.SpacingSampleCount;
-        if (sampleCount == 0 || sampleCount > stats.PointCount)
-            sampleCount = stats.PointCount;
-
-        const std::size_t stride = stats.PointCount / sampleCount;
-
-        float spacingSum = 0.0f;
-        float minSpacing = std::numeric_limits<float>::max();
-        float maxSpacing = 0.0f;
-        std::size_t validSamples = 0;
-
-        std::vector<std::size_t> knnIndices;
-        for (std::size_t si = 0; si < sampleCount; ++si)
-        {
-            const std::size_t idx = si * stride;
-            if (idx >= stats.PointCount) break;
-
-            knnIndices.clear();
-            octree.QueryKNN(positions[idx], 2, knnIndices);
-
-            float nearestDist = std::numeric_limits<float>::max();
-            for (std::size_t ni : knnIndices)
-            {
-                if (ni == idx) continue;
-                float d = glm::length(positions[ni] - positions[idx]);
-                nearestDist = std::min(nearestDist, d);
-            }
-
-            if (nearestDist < std::numeric_limits<float>::max())
-            {
-                spacingSum += nearestDist;
-                minSpacing = std::min(minSpacing, nearestDist);
-                maxSpacing = std::max(maxSpacing, nearestDist);
-                ++validSamples;
-            }
-        }
-
-        if (validSamples > 0)
-        {
-            stats.AverageSpacing = spacingSum / static_cast<float>(validSamples);
-            stats.MinSpacing = minSpacing;
-            stats.MaxSpacing = maxSpacing;
-        }
-
-        return stats;
+        std::vector<std::size_t> ids;
+        return StatisticsWithQueries(positions, params, [&](std::size_t, std::size_t source) {
+            ids.clear(); tree.QueryKNN(positions[source], 2, ids); return std::span<const std::size_t>(ids);
+        });
+    }
+    std::optional<CloudStatistics> ComputeStatisticsFromNeighbors(std::span<const glm::vec3> positions,
+        std::span<const std::uint32_t> candidates, const StatisticsParams& params)
+    {
+        const auto samples = positions.size()<2 ? 0 : SpacingSamples(positions.size(), params);
+        if (samples > std::numeric_limits<std::size_t>::max()/2 || candidates.size()!=samples*2) return std::nullopt;
+        return StatisticsWithQueries(positions, params, [&](std::size_t sample, std::size_t) {
+            return candidates.subspan(sample*2, 2);
+        });
     }
 
     // =========================================================================
@@ -341,63 +356,69 @@ namespace Geometry::PointCloud
     // EstimateRadii
     // =========================================================================
 
-    std::optional<RadiusEstimationResult> EstimateRadii(
-        const Cloud& cloud,
+    namespace
+    {
+        std::size_t RadiusWidth(std::size_t n, std::size_t k)
+        {
+            return n<2 ? n : std::min(n-1, std::max(k, std::size_t{1}))+1;
+        }
+        template<class Query>
+        std::optional<RadiusEstimationResult> RadiiWithQueries(std::span<const glm::vec3> points,
+            const RadiusEstimationParams& params, Query query)
+        {
+            if (points.size()<2 || !std::isfinite(params.ScaleFactor) || params.ScaleFactor<0) return std::nullopt;
+            auto stats = BaseStatistics(points);
+            if (!stats) return std::nullopt;
+            RadiusEstimationResult result;
+            result.Radii.reserve(points.size());
+            const auto width = RadiusWidth(points.size(), params.KNeighbors);
+            float radiusSum = 0;
+            for (std::size_t i=0; i<points.size(); ++i)
+            {
+                float sum, nearest; std::size_t count;
+                const auto row = query(i);
+                if (row.size()!=width || !NeighborDistances(points, i, row, sum, nearest, count)) return std::nullopt;
+                const float radius = (sum/float(count))*params.ScaleFactor;
+                if (!std::isfinite(radius)) return std::nullopt;
+                result.Radii.push_back(radius); radiusSum += radius;
+                result.MinRadius = i ? std::min(result.MinRadius, radius) : radius;
+                result.MaxRadius = std::max(result.MaxRadius, radius);
+                AddSpacing(*stats, nearest, i);
+            }
+            result.AverageRadius = radiusSum/float(points.size());
+            stats->AverageSpacing /= float(points.size());
+            result.Statistics = *stats;
+            if (!std::isfinite(result.AverageRadius) || !std::isfinite(stats->AverageSpacing)) return std::nullopt;
+            return result;
+        }
+    }
+    std::optional<RadiusEstimationResult> EstimateRadii(const Cloud& cloud, const RadiusEstimationParams& params)
+    {
+        return EstimateRadii(cloud.Positions(), params);
+    }
+    std::optional<RadiusEstimationResult> EstimateRadii(std::span<const glm::vec3> positions,
         const RadiusEstimationParams& params)
     {
-        if (cloud.VerticesSize() < 2)
+        if (positions.size()<2 || !BaseStatistics(positions) || !std::isfinite(params.ScaleFactor) || params.ScaleFactor<0)
             return std::nullopt;
-
-        auto positions = cloud.Positions();
-
-        Octree octree;
-        Octree::SplitPolicy policy{};
-        policy.SplitPoint = Octree::SplitPoint::Center;
-        policy.TightChildren = true;
-
-        if (!octree.BuildFromPoints(positions, policy, params.OctreeMaxPerNode, params.OctreeMaxDepth))
-            return std::nullopt;
-
-        const std::size_t k      = std::max(params.KNeighbors, std::size_t{1});
-        const std::size_t kQuery = k + 1;
-
-        RadiusEstimationResult result;
-        result.Radii.resize(cloud.VerticesSize());
-        float radiusSum = 0.0f;
-        float minRadius = std::numeric_limits<float>::max();
-        float maxRadius = 0.0f;
-
-        std::vector<std::size_t> knnIndices;
-        for (std::size_t i = 0; i < cloud.VerticesSize(); ++i)
-        {
-            knnIndices.clear();
-            octree.QueryKNN(positions[i], kQuery, knnIndices);
-
-            float distSum = 0.0f;
-            uint32_t neighborCount = 0;
-            for (std::size_t ni : knnIndices)
-            {
-                if (ni == i) continue;
-                distSum += glm::length(positions[ni] - positions[i]);
-                ++neighborCount;
-            }
-
-            const float avgDist = (neighborCount > 0)
-                ? distSum / static_cast<float>(neighborCount)
-                : 0.0f;
-
-            const float r = avgDist * params.ScaleFactor;
-            result.Radii[i] = r;
-            radiusSum += r;
-            minRadius = std::min(minRadius, r);
-            maxRadius = std::max(maxRadius, r);
-        }
-
-        result.AverageRadius = radiusSum / static_cast<float>(cloud.VerticesSize());
-        result.MinRadius = minRadius;
-        result.MaxRadius = maxRadius;
-
-        return result;
+        Octree tree;
+        Octree::SplitPolicy policy{}; policy.SplitPoint=Octree::SplitPoint::Center; policy.TightChildren=true;
+        if (!tree.BuildFromPoints(positions, policy, params.OctreeMaxPerNode, params.OctreeMaxDepth)) return std::nullopt;
+        std::vector<std::size_t> ids;
+        return RadiiWithQueries(positions, params, [&](std::size_t source) {
+            ids.clear(); tree.QueryKNN(positions[source], RadiusWidth(positions.size(), params.KNeighbors), ids);
+            return std::span<const std::size_t>(ids);
+        });
+    }
+    std::optional<RadiusEstimationResult> EstimateRadiiFromNeighbors(std::span<const glm::vec3> positions,
+        std::span<const std::uint32_t> candidates, const RadiusEstimationParams& params)
+    {
+        const auto width = RadiusWidth(positions.size(), params.KNeighbors);
+        if (!width || positions.size()>std::numeric_limits<std::size_t>::max()/width ||
+            candidates.size()!=positions.size()*width) return std::nullopt;
+        return RadiiWithQueries(positions, params, [&](std::size_t source) {
+            return candidates.subspan(source*width, width);
+        });
     }
 
     // =========================================================================
@@ -688,13 +709,13 @@ namespace Geometry::PointCloud
     // RemoveStatisticalOutliers
     // =========================================================================
 
-    OutlierRemovalResult RemoveStatisticalOutliers(
-        const Cloud& cloud,
+    OutlierAnalysisResult AnalyzeStatisticalOutliers(
+        std::span<const glm::vec3> positions,
         const StatisticalOutlierRemovalParams& params)
     {
-        OutlierRemovalResult result{};
+        OutlierAnalysisResult result{};
 
-        const std::size_t n = cloud.VerticesSize();
+        const std::size_t n = positions.size();
         if (n == 0)
         {
             result.Status = OutlierRemovalStatus::EmptyInput;
@@ -715,7 +736,6 @@ namespace Geometry::PointCloud
             return result;
         }
 
-        auto positions = cloud.Positions();
 
         Octree octree;
         Octree::SplitPolicy policy{};
@@ -734,9 +754,6 @@ namespace Geometry::PointCloud
         std::vector<float> meanDist(n, 0.0f);
         std::vector<std::size_t> knn;
 
-        double sum = 0.0;
-        double sumSq = 0.0;
-        std::size_t finiteCount = 0;
 
         for (std::size_t i = 0; i < n; ++i)
         {
@@ -762,102 +779,221 @@ namespace Geometry::PointCloud
 
             const float m = (count > 0) ? distSum / static_cast<float>(count) : 0.0f;
             meanDist[i] = m;
-            sum += m;
-            sumSq += static_cast<double>(m) * static_cast<double>(m);
-            ++finiteCount;
         }
 
-        const double meanD = (finiteCount > 0) ? sum / static_cast<double>(finiteCount) : 0.0;
-        const double variance =
-            (finiteCount > 0) ? std::max(0.0, sumSq / static_cast<double>(finiteCount) - meanD * meanD) : 0.0;
-        const double stdD = std::sqrt(variance);
-        const double threshold = meanD + static_cast<double>(params.StdDevMultiplier) * stdD;
+        return ClassifyStatisticalOutliers(meanDist, params.StdDevMultiplier);
+    }
 
-        result.MeanDistance      = static_cast<float>(meanD);
-        result.StdDevDistance    = static_cast<float>(stdD);
-        result.DistanceThreshold = static_cast<float>(threshold);
-
-        FinalizeRemoval(cloud, n, result, [&](std::size_t i) {
-            const float m = meanDist[i];
-            return std::isfinite(m) && static_cast<double>(m) <= threshold;
-        });
+    OutlierAnalysisResult ClassifyStatisticalOutliers(std::span<const float> distances, float multiplier)
+    {
+        OutlierAnalysisResult result;
+        if (distances.empty()) { result.Status = OutlierRemovalStatus::EmptyInput; return result; }
+        result.Scores.assign(distances.begin(), distances.end());
+        double sum=0, sumSq=0;
+        std::size_t count=0;
+        for (const float distance : distances)
+        {
+            if (std::isnan(distance)) { ++result.NonFiniteCount; continue; }
+            sum += distance;
+            sumSq += double(distance)*double(distance);
+            ++count;
+        }
+        const double mean = count ? sum/double(count) : 0;
+        const double variance = count ? std::max(0.0, sumSq/double(count)-mean*mean) : 0;
+        const double stddev = std::sqrt(variance);
+        const double threshold = mean + double(multiplier)*stddev;
+        result.MeanDistance=float(mean);result.StdDevDistance=float(stddev);result.DistanceThreshold=float(threshold);
+        for (float distance : distances)
+        {
+            const bool rejected = !std::isfinite(distance) || !(double(distance)<=threshold);
+            result.Mask.push_back(rejected);result.RejectedCount += rejected;
+        }
         return result;
     }
 
-    // =========================================================================
-    // RemoveRadiusOutliers
-    // =========================================================================
-
-    OutlierRemovalResult RemoveRadiusOutliers(
-        const Cloud& cloud,
-        const RadiusOutlierRemovalParams& params)
+    OutlierAnalysisResult ClassifyRadiusOutliers(std::span<const std::uint32_t> counts, std::uint32_t minimum)
     {
-        OutlierRemovalResult result{};
-
-        const std::size_t n = cloud.VerticesSize();
-        if (n == 0)
+        OutlierAnalysisResult result;
+        if (counts.empty()) { result.Status=OutlierRemovalStatus::EmptyInput;return result; }
+        for (auto count : counts)
         {
-            result.Status = OutlierRemovalStatus::EmptyInput;
-            return result;
+            result.Scores.push_back(float(count));result.Mask.push_back(count<minimum);
+            result.RejectedCount += count<minimum;
         }
-        if (!(params.SearchRadius > 0.0f) || !std::isfinite(params.SearchRadius))
-        {
-            result.Status = OutlierRemovalStatus::InvalidParameters;
-            return result;
-        }
+        return result;
+    }
 
-        auto positions = cloud.Positions();
-
-        Octree octree;
-        Octree::SplitPolicy policy{};
-        policy.SplitPoint = Octree::SplitPoint::Center;
-        policy.TightChildren = true;
-        if (!octree.BuildFromPoints(positions, policy, params.OctreeMaxPerNode, params.OctreeMaxDepth))
-        {
-            result.Status = OutlierRemovalStatus::BuildFailed;
-            return result;
-        }
-
-        const float radius = params.SearchRadius;
+    OutlierAnalysisResult AnalyzeRadiusOutliers(std::span<const glm::vec3> positions,
+                                               const RadiusOutlierRemovalParams& params)
+    {
+        OutlierAnalysisResult result;
+        if (positions.empty()) { result.Status=OutlierRemovalStatus::EmptyInput;return result; }
+        if (!(params.SearchRadius>0) || !std::isfinite(params.SearchRadius))
+        { result.Status=OutlierRemovalStatus::InvalidParameters;return result; }
+        Octree tree;
+        Octree::SplitPolicy policy{};policy.SplitPoint=Octree::SplitPoint::Center;policy.TightChildren=true;
+        if (!tree.BuildFromPoints(positions,policy,params.OctreeMaxPerNode,params.OctreeMaxDepth))
+        { result.Status=OutlierRemovalStatus::BuildFailed;return result; }
         std::vector<std::size_t> hits;
-
-        FinalizeRemoval(cloud, n, result, [&](std::size_t i) {
+        for (std::size_t i=0;i<positions.size();++i)
+        {
             if (!IsFinite(positions[i]))
             {
-                ++result.NonFiniteCount;
-                return false;
+                result.Mask.push_back(1);result.Scores.push_back(std::numeric_limits<float>::quiet_NaN());
+                ++result.NonFiniteCount;++result.RejectedCount;continue;
             }
-            hits.clear();
-            octree.QuerySphere(Sphere{positions[i], radius}, hits);
-
-            std::size_t neighbors = 0;
-            for (std::size_t ni : hits)
-            {
-                if (ni == i || !IsFinite(positions[ni]))
-                    continue;
-                // QuerySphere may return broad-phase candidates; confirm by exact
-                // distance so the kept/rejected partition is radius-exact.
-                if (glm::length(positions[ni] - positions[i]) <= radius)
-                    ++neighbors;
-            }
-            return neighbors >= params.MinNeighbors;
-        });
+            hits.clear();tree.QuerySphere(Sphere{positions[i],params.SearchRadius},hits);
+            std::size_t count=0;
+            for (auto neighbor : hits)
+                if (neighbor!=i && IsFinite(positions[neighbor]) &&
+                    glm::length(positions[neighbor]-positions[i])<=params.SearchRadius) ++count;
+            result.Scores.push_back(float(count));result.Mask.push_back(count<params.MinNeighbors);
+            result.RejectedCount += count<params.MinNeighbors;
+        }
         return result;
+    }
+
+    namespace
+    {
+        OutlierRemovalResult MaterializeOutlierRemoval(const Cloud& cloud, const OutlierAnalysisResult& analysis)
+        {
+            OutlierRemovalResult result;
+            result.Status=analysis.Status;
+            if (analysis.Status!=OutlierRemovalStatus::Success) return result;
+            result.NonFiniteCount=analysis.NonFiniteCount;
+            result.MeanDistance=analysis.MeanDistance;result.StdDevDistance=analysis.StdDevDistance;
+            result.DistanceThreshold=analysis.DistanceThreshold;
+            FinalizeRemoval(cloud,cloud.VerticesSize(),result,[&](std::size_t i){return analysis.Mask[i]==0;});
+            return result;
+        }
+    }
+    OutlierRemovalResult RemoveStatisticalOutliers(const Cloud& cloud,const StatisticalOutlierRemovalParams& params)
+    {
+        return MaterializeOutlierRemoval(cloud,AnalyzeStatisticalOutliers(cloud.Positions(),params));
+    }
+    OutlierRemovalResult RemoveRadiusOutliers(const Cloud& cloud,const RadiusOutlierRemovalParams& params)
+    {
+        return MaterializeOutlierRemoval(cloud,AnalyzeRadiusOutliers(cloud.Positions(),params));
     }
 
     // =========================================================================
     // EstimateKernelDensity
     // =========================================================================
 
-    std::optional<KDEResult> EstimateKernelDensity(
-        Cloud& cloud,
+    std::optional<KDEResult> EstimateKernelDensityFromNeighbors(
+        std::span<const glm::vec3> positions, std::span<const std::uint32_t> candidates,
         const KDEParams& params)
     {
-        const std::size_t n = cloud.VerticesSize();
+        const std::size_t n = positions.size();
+        if (n < 2 || n > std::numeric_limits<std::uint32_t>::max() ||
+            !std::isfinite(params.Bandwidth) || params.Bandwidth < 0 ||
+            params.KNeighbors == std::numeric_limits<std::size_t>::max()) return std::nullopt;
+        const auto width = std::min(n, std::max(params.KNeighbors, std::size_t{2}) + 1);
+        if (n > std::numeric_limits<std::size_t>::max() / width || candidates.size() != n * width)
+            return std::nullopt;
+        for (auto p : positions)
+            if (!std::isfinite(p.x) || !std::isfinite(p.y) || !std::isfinite(p.z)) return std::nullopt;
+        std::vector<float> nnDists(n);
+        std::vector<std::size_t> seen(n, n);
+        for (std::size_t i = 0; i < n; ++i)
+        {
+            float nearest = std::numeric_limits<float>::infinity();
+            for (auto id : candidates.subspan(i * width, width))
+            {
+                if (id >= n || seen[id] == i) return std::nullopt;
+                seen[id] = i;
+                if (id != i) nearest = std::min(nearest, glm::length(positions[id] - positions[i]));
+            }
+            if (!std::isfinite(nearest)) return std::nullopt;
+            nnDists[i] = nearest;
+        }
+        // Preserve the spacing heuristic: a univariate rule applied to NN distances,
+        // with mean-spacing and absolute floors. This is not a multivariate bandwidth fit.
+        float bandwidth = params.Bandwidth;
+        if (bandwidth <= 0.0f)
+        {
+            // Use standard deviation of NN distances, floored by mean NN distance
+            // to avoid degenerate bandwidth on uniform point clouds.
+            float mean = 0.0f;
+            for (float d : nnDists) mean += d;
+            mean /= static_cast<float>(n);
+
+            float variance = 0.0f;
+            for (float d : nnDists)
+            {
+                float diff = d - mean;
+                variance += diff * diff;
+            }
+            variance /= static_cast<float>(n);
+            float sigma = std::sqrt(variance);
+
+            // For uniform point clouds, σ ≈ 0 but mean spacing is meaningful.
+            // Use max(σ, mean) so the bandwidth scales with point density.
+            sigma = std::max(sigma, mean);
+
+            bandwidth = 1.06f * sigma * std::pow(static_cast<float>(n), -0.2f);
+            bandwidth = std::max(bandwidth, 1e-8f);
+        }
+
+        const float invH2 = -0.5f / (bandwidth * bandwidth);
+        // 3D isotropic Gaussian normalization: 1 / ((2π)^(3/2) * h³)
+        const float pi = static_cast<float>(std::numbers::pi);
+        const float normFactor = 1.0f / (std::pow(2.0f * pi, 1.5f) * bandwidth * bandwidth * bandwidth);
+
+        if (!std::isfinite(bandwidth) || !std::isfinite(invH2) || !std::isfinite(normFactor) || normFactor <= 0)
+            return std::nullopt;
+
+        // Phase 2: Compute density at each point via KNN Gaussian KDE.
+        KDEResult result{};
+        result.Densities.resize(n, 0.0f);
+        result.UsedBandwidth = bandwidth;
+        float densitySum = 0.0f;
+        float minDensity = std::numeric_limits<float>::max();
+        float maxDensity = 0.0f;
+
+        for (std::size_t i = 0; i < n; ++i)
+        {
+
+            float kde = 0.0f;
+            uint32_t neighborCount = 0;
+            for (auto ni : candidates.subspan(i * width, width))
+            {
+                if (ni == i) continue;
+                float dist = glm::length(positions[ni] - positions[i]);
+                kde += normFactor * std::exp(dist * dist * invH2);
+                ++neighborCount;
+            }
+
+            if (neighborCount > 0)
+                kde /= static_cast<float>(neighborCount);
+
+            if (!std::isfinite(kde)) return std::nullopt;
+            result.Densities[i] = kde;
+            densitySum += kde;
+            minDensity = std::min(minDensity, kde);
+            maxDensity = std::max(maxDensity, kde);
+        }
+
+        if (!std::isfinite(densitySum)) return std::nullopt;
+        result.MeanDensity = (n > 0) ? densitySum / static_cast<float>(n) : 0.0f;
+        result.MinDensity = minDensity;
+        result.MaxDensity = maxDensity;
+
+        return result;
+    }
+
+    std::optional<KDEResult> EstimateKernelDensity(
+        std::span<const glm::vec3> positions,
+        const KDEParams& params)
+    {
+        const std::size_t n = positions.size();
         if (n < 2)
             return std::nullopt;
 
-        auto positions = cloud.Positions();
+        if (!std::isfinite(params.Bandwidth) || params.Bandwidth < 0 ||
+            params.KNeighbors == std::numeric_limits<std::size_t>::max()) return std::nullopt;
+        for (auto p : positions)
+            if (!std::isfinite(p.x) || !std::isfinite(p.y) || !std::isfinite(p.z)) return std::nullopt;
 
         Octree octree;
         Octree::SplitPolicy policy{};
@@ -868,7 +1004,7 @@ namespace Geometry::PointCloud
             return std::nullopt;
 
         const std::size_t k = std::max(params.KNeighbors, std::size_t{2});
-        const std::size_t kQuery = k + 1; // +1 for self
+        const std::size_t kQuery = std::min(n, k + 1); // +1 for self
 
         // Phase 1: Compute nearest-neighbor distances for bandwidth estimation.
         std::vector<float> nnDists(n, 0.0f);
@@ -886,10 +1022,11 @@ namespace Geometry::PointCloud
                 nearestDist = glm::length(positions[ni] - positions[i]);
                 break;
             }
+            if (!std::isfinite(nearestDist)) return std::nullopt;
             nnDists[i] = nearestDist;
         }
 
-        // Bandwidth: user-specified or Silverman's rule.
+        // Preserve the inherited univariate NN-spacing heuristic and its floors.
         float bandwidth = params.Bandwidth;
         if (bandwidth <= 0.0f)
         {
@@ -922,6 +1059,9 @@ namespace Geometry::PointCloud
         const float pi = static_cast<float>(std::numbers::pi);
         const float normFactor = 1.0f / (std::pow(2.0f * pi, 1.5f) * bandwidth * bandwidth * bandwidth);
 
+        if (!std::isfinite(bandwidth) || !std::isfinite(invH2) || !std::isfinite(normFactor) || normFactor <= 0)
+            return std::nullopt;
+
         // Phase 2: Compute density at each point via KNN Gaussian KDE.
         KDEResult result{};
         result.Densities.resize(n, 0.0f);
@@ -948,21 +1088,29 @@ namespace Geometry::PointCloud
             if (neighborCount > 0)
                 kde /= static_cast<float>(neighborCount);
 
+            if (!std::isfinite(kde)) return std::nullopt;
             result.Densities[i] = kde;
             densitySum += kde;
             minDensity = std::min(minDensity, kde);
             maxDensity = std::max(maxDensity, kde);
         }
 
+        if (!std::isfinite(densitySum)) return std::nullopt;
         result.MeanDensity = (n > 0) ? densitySum / static_cast<float>(n) : 0.0f;
         result.MinDensity = minDensity;
         result.MaxDensity = maxDensity;
 
-        // Publish as property.
-        auto prop = cloud.GetOrAddVertexProperty<float>("p:density", 0.0f);
-        for (std::size_t i = 0; i < n; ++i)
-            prop[Cloud::Handle(i)] = result.Densities[i];
+        return result;
+    }
 
+    std::optional<KDEResult> EstimateKernelDensity(Cloud& cloud, const KDEParams& params)
+    {
+        const auto positions = std::as_const(cloud).Positions();
+        auto result = EstimateKernelDensity(positions, params);
+        if (!result) return std::nullopt;
+        auto prop = cloud.GetOrAddVertexProperty<float>("p:density", 0.0f);
+        for (std::size_t i = 0; i < result->Densities.size(); ++i)
+            prop[Cloud::Handle(i)] = result->Densities[i];
         return result;
     }
 

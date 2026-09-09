@@ -581,3 +581,41 @@ TEST(NormalEstimation, QueuedFaceNormalsPublishToFacesAndRejectStaleTopology)
                       (std::vector<glm::vec3>{{0, 0, 1}, {0, 0, 1}}));
     }
 }
+
+TEST(NormalEstimationConfig, VulkanSelectionRoundTripsAndRejectsInvalidBatchSizes)
+{
+    R::NormalEstimationConfig config;
+    config.Backend = R::NormalEstimationBackend::VulkanLBVH;
+    config.GpuQueryBatchSize = 256;
+    const auto payload = R::SerializeNormalEstimationConfig(config);
+    EXPECT_NE(payload.find("vulkan_lbvh"), std::string::npos);
+    EXPECT_TRUE(R::ValidateNormalEstimationConfigSection(payload, {}, "test").Usable());
+    Extrinsic::Core::Config::EngineConfig engine;
+    R::SetNormalEstimationConfig(engine, config);
+    const auto restored = R::GetNormalEstimationConfig(engine);
+    ASSERT_TRUE(restored);
+    EXPECT_EQ(restored->Backend, R::NormalEstimationBackend::VulkanLBVH);
+    EXPECT_EQ(restored->GpuQueryBatchSize, 256);
+    for (auto invalid : {0u, 16385u})
+    {
+        config.GpuQueryBatchSize = invalid;
+        EXPECT_FALSE(R::ValidateNormalEstimationConfigSection(R::SerializeNormalEstimationConfig(config), {}, "test").Usable());
+    }
+}
+TEST(NormalEstimation, VulkanUnavailablePreservesOutputsOnEveryDomain)
+{
+    for (unsigned d = 1; d <= 8; ++d)
+    {
+        Extrinsic::ECS::Scene::Registry scene;
+        auto entity = Make(scene, D(d));
+        auto config = Config(entity, D(d));
+        config.Backend = R::NormalEstimationBackend::VulkanLBVH;
+        R::EditorGeometryProcessingContext context{.Scene=&scene};
+        EXPECT_FALSE(R::PreviewEditorNormalEstimationCommand(context, config).Ready);
+        const auto result = R::ApplyEditorNormalEstimationCommand(context, config);
+        EXPECT_EQ(result.RequestedBackend, R::NormalEstimationBackend::VulkanLBVH);
+        EXPECT_FALSE(result.Succeeded());
+        EXPECT_TRUE(result.ActualBackend.empty());
+        EXPECT_FALSE(Properties(scene, entity, D(d)).Exists(config.Output.Name));
+    }
+}

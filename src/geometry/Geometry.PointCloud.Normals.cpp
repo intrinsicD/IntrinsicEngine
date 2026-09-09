@@ -39,6 +39,7 @@ namespace Geometry::PointCloud::Normals
             const KDTree* KdTree{nullptr};
             const Octree* OctreeIndex{nullptr};
             const PointLBVH::Index* LbvhIndex{nullptr};
+            Neighborhoods Supplied{};
             KDTree OwnedKdTree{};
             std::vector<glm::vec3> CompactPoints{};
             std::vector<std::size_t> CompactToOriginal{};
@@ -525,6 +526,14 @@ namespace Geometry::PointCloud::Normals
                     }
                     if (!queryOk) ++result.Diagnostics.SpatialQueryFailureCount;
                 }
+                else if (context.Backend == NeighborhoodBackend::SuppliedNeighborhoods)
+                {
+                    const auto begin = context.Supplied.Offsets[index];
+                    const auto end = context.Supplied.Offsets[index + 1];
+                    neighbors.assign(context.Supplied.Indices.begin() + begin,
+                                     context.Supplied.Indices.begin() + end);
+                    queryOk = true;
+                }
                 else
                 {
                     queryOk = context.OctreeIndex != nullptr
@@ -738,6 +747,8 @@ namespace Geometry::PointCloud::Normals
             return "SuppliedOctree";
         case NeighborhoodBackend::SuppliedPointLBVH:
             return "SuppliedPointLBVH";
+        case NeighborhoodBackend::SuppliedNeighborhoods:
+            return "SuppliedNeighborhoods";
         }
 
         return "Unknown";
@@ -813,6 +824,21 @@ namespace Geometry::PointCloud::Normals
         QueryContext context{};
         context.Backend = NeighborhoodBackend::SuppliedPointLBVH;
         context.LbvhIndex = &index;
+        return ToOptional(Compute(points, ConstProperty<bool>{}, context, params));
+    }
+
+    std::optional<EstimateResult> Estimate(std::span<const glm::vec3> points,
+                                         Neighborhoods neighborhoods, const Params& params)
+    {
+        if (neighborhoods.Offsets.size() != points.size() + 1 ||
+            neighborhoods.Offsets.front() != 0 ||
+            neighborhoods.Offsets.back() != neighborhoods.Indices.size() ||
+            !std::ranges::is_sorted(neighborhoods.Offsets) ||
+            !std::ranges::all_of(neighborhoods.Indices, [points](auto i) { return i < points.size(); }))
+            return std::nullopt;
+        QueryContext context{};
+        context.Backend = NeighborhoodBackend::SuppliedNeighborhoods;
+        context.Supplied = neighborhoods;
         return ToOptional(Compute(points, ConstProperty<bool>{}, context, params));
     }
 

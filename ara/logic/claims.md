@@ -468,12 +468,12 @@
   tasks/done/RUNTIME-206-lop-element-domain-source-integration.md,
   tasks/done/RUNTIME-207-icp-element-domain-source-integration.md,
   tasks/done/RUNTIME-208-progressive-poisson-element-domain-publication.md,
-  tasks/backlog/runtime/RUNTIME-209-point-set-outlier-analysis-publication.md,
+  tasks/active/RUNTIME-209-point-set-outlier-analysis-publication.md,
   tasks/backlog/runtime/RUNTIME-210-signed-heat-runtime-config-integration.md,
   tasks/done/UI-038-progressive-poisson-multi-domain-panel.md,
   tasks/done/UI-039-lop-multi-domain-discovery.md,
   tasks/done/UI-040-icp-compatible-source-selection.md,
-  tasks/backlog/ui/UI-041-point-set-outlier-multi-domain-panel.md,
+  tasks/active/UI-041-point-set-outlier-multi-domain-panel.md,
   tasks/backlog/ui/UI-042-signed-heat-mesh-panel.md,
   tools/agents/validate_tasks.py,
   tests/regression/tooling/Test.ValidateTasks.py,
@@ -2026,3 +2026,47 @@
 - **Dependencies**: [C78, H20]
 - **Tags**: normals, canonical domains, CPU, PCA, LBVH, runtime, editor, bounded integration
 - **From staging**: O209
+
+## C80: Bounded Vulkan normal neighborhoods with shared CPU fitting
+- **Statement**: The source-hashed 2026-09-09 local fixtures publish normal outputs from Vulkan LBVH kNN and complete radius neighborhoods on all eight canonical property domains within 1e-5 component tolerance of the CPU KD-tree estimator (observed maximum zero). They preserve deleted/unrelated rows, cache reuse, undo/redo, stale/cancelled output retention and explicit dense-radius rejection. Framed radius queries preserve total counts, source-ID exclusion, reuse and stale-target rejection.
+- **Status**: supported — two final ci-vulkan ASan+UBSan tests on RTX 3050 driver 590.48.01, plus 45 focused ci CPU checks and the full CPU gate. PCA/orientation remain CPU work. Bounded fixtures only; no full Framework24 parity, arbitrary-input proof, GPU normal visualization, whole-process leak-freedom, speedup or default-change claim. Dirty-source smoke is non-claim-eligible for performance.
+- **Provenance**: ai-executed
+- **Crystallized via**: artifact-commitment
+- **Falsification criteria**: Replaying the recorded source and fixtures produces an output error above the stated tolerance, domain rejection, changed deleted/unrelated rows, history/reuse failure, stale or cancelled publication, silent radius truncation, or incorrect radius count/exclusion mapping.
+- **Proof**: [ara/evidence/diagnostics/normal_vulkan_2026-09-09/record.json, ara/evidence/diagnostics/normal_vulkan_2026-09-09/vulkan-final.txt, ara/evidence/diagnostics/normal_vulkan_2026-09-09/focused-cpu.txt, ara/evidence/diagnostics/normal_vulkan_2026-09-09/cpu-summary.txt, tests/integration/graphics/Test.PointLBVHGpuSmoke.cpp, tests/unit/geometry/Test.PointLBVH.cpp, tests/contract/runtime/Test.NormalEstimation.cpp]
+- **Dependencies**: [C78, C79, H21]
+- **Tags**: normals, LBVH, canonical domains, Vulkan, CPU fitting, bounded parity, runtime
+- **From staging**: O211
+
+## C81: Bounded canonical outlier analysis with Vulkan neighborhoods
+- **Statement**: The source-hashed 2026-09-09 local statistical/radius fixtures publish named mask/score properties on all eight canonical domains through CPU octree, cached CPU LBVH and framed Vulkan LBVH queries with shared CPU classification. The Vulkan fixture matches reference masks exactly and scores within 1e-5 absolute tolerance (observed zero), including radius-boundary samples and a 1027-neighbor dense case. The declared config, visualization-recipe, history, stale/cancelled completion and point-cloud-only removal checks pass.
+- **Status**: supported — bounded ci CPU and one actual ci-vulkan ASan+UBSan integration case on RTX 3050 driver 590.48.01. No arbitrary-input, full Framework24/LOF parity, new rendered mask/score readback, GPU classification, whole-process leak-freedom, speedup or backend-default claim. Dirty-source timing remains non-claim-eligible for performance.
+- **Provenance**: ai-executed
+- **Crystallized via**: artifact-commitment
+- **Falsification criteria**: Replaying the recorded source and fixtures changes a mask, exceeds the score tolerance, truncates dense counts, rejects a compatible domain, mutates unrelated/deleted rows, accepts stale/cancelled publication or a stale removal mask, loses surviving custom properties, or breaks config/history/window/recipe assertions.
+- **Proof**: [ara/evidence/diagnostics/outlier_vulkan_2026-09-09/record.json, ara/evidence/diagnostics/outlier_vulkan_2026-09-09/vulkan.txt, ara/evidence/diagnostics/outlier_vulkan_2026-09-09/outlier-cpu.txt, ara/evidence/diagnostics/outlier_vulkan_2026-09-09/cpu-summary.txt, ara/evidence/diagnostics/outlier_vulkan_2026-09-09/native-cpu.txt, tests/contract/runtime/Test.OutlierAnalysis.cpp, tests/unit/geometry/Test.PointCloudOutlierRemoval.cpp, tests/integration/graphics/Test.PointLBVHGpuSmoke.cpp]
+- **Dependencies**: [C78, C80, H21]
+- **Tags**: outliers, LBVH, statistical, radius, canonical domains, CPU, Vulkan, bounded parity, runtime
+- **From staging**: O212
+
+## C82: Bounded canonical kernel density with Vulkan neighborhoods
+- **Statement**: The source-hashed 2026-09-09 local Gaussian density fixtures publish a named scalar on all eight canonical domains through CPU octree, cached CPU LBVH and actual framed Vulkan candidates with shared CPU bandwidth/evaluation. Vulkan matches the CPU reference within 1e-5 absolute density tolerance (observed zero) for automatic bandwidth at k=8 and explicit bandwidth at k=63. Dense coincidence, deleted/unrelated preservation, stale/cancelled work, history, config and scalar-recipe assertions pass in the declared fixtures.
+- **Status**: supported — bounded ci CPU and one ci-vulkan ASan+UBSan case on RTX 3050 driver 590.48.01. No arbitrary-input proof, full-sample KDE or optimal bandwidth, GPU Gaussian evaluation, new visualization readback, whole-process leak-freedom, speedup or backend-default claim. Dirty-source smoke timing is non-claim-eligible for performance.
+- **Provenance**: ai-executed
+- **Crystallized via**: artifact-commitment
+- **Falsification criteria**: Replaying the recorded sources and fixtures exceeds the density tolerance, rejects a compatible domain, changes the specified nearest candidate/bandwidth policy, mutates unrelated/deleted rows, accepts stale/cancelled publication or breaks the declared cache/history/config/window/recipe assertions.
+- **Proof**: [ara/evidence/diagnostics/density_vulkan_2026-09-09/record.json, ara/evidence/diagnostics/density_vulkan_2026-09-09/vulkan.txt, ara/evidence/diagnostics/density_vulkan_2026-09-09/focused-cpu.txt, ara/evidence/diagnostics/density_vulkan_2026-09-09/cpu-summary.txt, ara/evidence/diagnostics/density_vulkan_2026-09-09/native-cpu.txt, tests/contract/runtime/Test.KernelDensityOperations.cpp, tests/unit/geometry/Test.KernelDensity.cpp, tests/integration/graphics/Test.PointLBVHGpuSmoke.cpp]
+- **Dependencies**: [C78]
+- **Tags**: density, local Gaussian, LBVH, canonical domains, CPU, Vulkan, bounded parity, runtime
+- **From staging**: O214
+
+## C83: Bounded canonical point radii and spacing with Vulkan neighborhoods
+- **Statement**: The source-hashed 2026-09-10 fixtures publish named radii on all eight canonical domains using CPU octree, cached CPU LBVH and actual framed Vulkan candidates with shared CPU distance reduction. Vulkan radius values and nearest-spacing aggregates match CPU octree within 1e-5 absolute tolerance (observed zero) for k=8/scale=1 and k=63/scale=2. Dense coincidence, deleted/unrelated preservation, config, scalar recipe/window, cache/history and stale/cancelled publication checks pass in the declared fixtures. Geometry tests preserve sampled-statistics stride and distinguish nearest spacing from mean-k radii.
+- **Status**: supported — bounded ci CPU and one ci-vulkan ASan+UBSan integration case on RTX 3050 driver 590.48.01. No arbitrary-input, hole-free coverage, rendered model-space radius, full Framework24 parity, GPU distance reduction, whole-process leak-freedom, speedup or backend-default claim. Dirty-source smoke timing is non-claim-eligible for performance.
+- **Provenance**: ai-executed
+- **Crystallized via**: artifact-commitment
+- **Falsification criteria**: Replaying the recorded sources/fixtures exceeds the radius or spacing tolerance, changes candidate/self/scale/sampling policy, rejects a compatible domain, corrupts deleted/unrelated rows, accepts stale/cancelled publication or breaks the declared cache/history/config/window/recipe assertions.
+- **Proof**: [ara/evidence/diagnostics/spacing_vulkan_2026-09-10/record.json, ara/evidence/diagnostics/spacing_vulkan_2026-09-10/vulkan.txt, ara/evidence/diagnostics/spacing_vulkan_2026-09-10/focused-cpu.txt, ara/evidence/diagnostics/spacing_vulkan_2026-09-10/cpu-summary.txt, ara/evidence/diagnostics/spacing_vulkan_2026-09-10/native-cpu.txt, tests/unit/geometry/Test.PointSpacing.cpp, tests/contract/runtime/Test.PointSpacingOperations.cpp, tests/integration/graphics/Test.PointLBVHGpuSmoke.cpp]
+- **Dependencies**: [C78]
+- **Tags**: point spacing, splat radii, LBVH, canonical domains, CPU, Vulkan, bounded parity, runtime
+- **From staging**: O215

@@ -303,3 +303,11 @@
 - **Sensitivity**: high
 - **Code ref**: [N509, src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Normals.cpp, src/runtime/Modules/NormalEstimation/Runtime.NormalEstimationConfig.cppm, src/app/Sandbox/Editor/Sandbox.MeshProcessingPanels.cpp, docs/architecture/normal-estimation.md]
 - **From staging**: O208
+
+## H21: Advance point-query consumers one method at a time
+- **Rationale**: The operator accepted Vulkan neighborhoods for the existing normal workflow as the current slice and the remaining consumers one by one. Retain CPU PCA/orientation and truthful stage reporting; keep the KD-tree default until complete-method comparisons justify adoption. Outlier analysis remains the next separate RUNTIME-209/UI-041 slice; the normal estimator's k+1 support rule must not replace outlier self-exclusion semantics.
+- **Provenance**: user-revised
+- **Crystallized via**: verbal-affirmation
+- **Sensitivity**: high
+- **Code ref**: [N515, src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Normals.cpp, src/runtime/GeometryIntegration/Runtime.SpatialIndexCache.cpp, tasks/active/RUNTIME-209-point-set-outlier-analysis-publication.md]
+- **From staging**: O210

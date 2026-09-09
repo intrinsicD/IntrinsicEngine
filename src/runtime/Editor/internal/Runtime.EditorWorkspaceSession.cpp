@@ -565,6 +565,27 @@ namespace Extrinsic::Runtime::EditorFeatureDetail
                 if (AttachmentEpochIsActive(epoch))
                     m_LastNormalEstimationResult = std::move(result);
             };
+        context.MethodResultSinks.OutlierAnalysis =
+            [epoch = m_AttachmentEpoch, this](
+                EditorOutlierAnalysisResult result)
+            {
+                if (AttachmentEpochIsActive(epoch))
+                    m_LastOutlierAnalysisResult = std::move(result);
+            };
+        context.MethodResultSinks.KernelDensity =
+            [epoch = m_AttachmentEpoch, this](
+                EditorKernelDensityResult result)
+            {
+                if (AttachmentEpochIsActive(epoch))
+                    m_LastKernelDensityResult = std::move(result);
+            };
+        context.MethodResultSinks.PointSpacing =
+            [epoch = m_AttachmentEpoch, this](
+                EditorPointSpacingResult result)
+            {
+                if (AttachmentEpochIsActive(epoch))
+                    m_LastPointSpacingResult = std::move(result);
+            };
         context.PendingAssetImportPath =
             std::move(pendingAssetImportPath);
         context.PendingAssetImportPayloadKind =
@@ -622,6 +643,15 @@ namespace Extrinsic::Runtime::EditorFeatureDetail
         if (m_LastNormalEstimationResult.has_value())
             context.LastNormalEstimationResult =
                 &*m_LastNormalEstimationResult;
+        if (m_LastOutlierAnalysisResult.has_value())
+            context.LastOutlierAnalysisResult =
+                &*m_LastOutlierAnalysisResult;
+        if (m_LastKernelDensityResult.has_value())
+            context.LastKernelDensityResult =
+                &*m_LastKernelDensityResult;
+        if (m_LastPointSpacingResult.has_value())
+            context.LastPointSpacingResult =
+                &*m_LastPointSpacingResult;
         const Core::Extent2D viewport =
             context.CameraViewport.Width != 0u &&
                     context.CameraViewport.Height != 0u
@@ -806,6 +836,15 @@ namespace Extrinsic::Runtime::EditorFeatureDetail
         case EditorGeometryProcessingResultSlot::NormalEstimation:
             m_LastNormalEstimationResult.reset();
             break;
+        case EditorGeometryProcessingResultSlot::OutlierAnalysis:
+            m_LastOutlierAnalysisResult.reset();
+            break;
+        case EditorGeometryProcessingResultSlot::KernelDensity:
+            m_LastKernelDensityResult.reset();
+            break;
+        case EditorGeometryProcessingResultSlot::PointSpacing:
+            m_LastPointSpacingResult.reset();
+            break;
         case EditorGeometryProcessingResultSlot::Registration:
             m_LastRegistrationResult.reset();
             return;
@@ -838,6 +877,9 @@ namespace Extrinsic::Runtime::EditorFeatureDetail
         m_LastParameterizationResult.reset();
         m_LastRegistrationResult.reset();
         m_LastNormalEstimationResult.reset();
+        m_LastOutlierAnalysisResult.reset();
+        m_LastKernelDensityResult.reset();
+        m_LastPointSpacingResult.reset();
         m_JobIdentities.clear();
         m_RenderRecipeContext = {};
         m_RenderRecipeState = {};

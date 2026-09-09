@@ -1,0 +1,54 @@
+Internal ctest changing into directory: /home/alex/Documents/IntrinsicEngine/build/ci-vulkan
+UpdateCTestConfiguration  from :/home/alex/Documents/IntrinsicEngine/build/ci-vulkan/DartConfiguration.tcl
+Parse Config file:/home/alex/Documents/IntrinsicEngine/build/ci-vulkan/DartConfiguration.tcl
+UpdateCTestConfiguration  from :/home/alex/Documents/IntrinsicEngine/build/ci-vulkan/DartConfiguration.tcl
+Parse Config file:/home/alex/Documents/IntrinsicEngine/build/ci-vulkan/DartConfiguration.tcl
+Test project /home/alex/Documents/IntrinsicEngine/build/ci-vulkan
+Constructing a list of tests
+Done constructing a list of tests
+Updating test list for fixtures
+Added 0 tests to meet fixture requirements
+Checking test dependency graph...
+Checking test dependency graph end
+test 17
+    Start 17: PointLBVHGpuSmoke.PointSpacingPublishesAcrossDomainsAndPreservesCandidatePolicy
+
+17: Test command: /home/alex/Documents/IntrinsicEngine/build/ci-vulkan/bin/IntrinsicPointLBVHGpuTests "--gtest_filter=PointLBVHGpuSmoke.PointSpacingPublishesAcrossDomainsAndPreservesCandidatePolicy" "--gtest_also_run_disabled_tests"
+17: Working Directory: /home/alex/Documents/IntrinsicEngine/build/ci-vulkan/tests
+17: Environment variables: 
+17:  LSAN_OPTIONS=fast_unwind_on_malloc=0:detect_leaks=0
+17:  ASAN_OPTIONS=symbolize=1:detect_leaks=0:fast_unwind_on_malloc=0
+17:  ASAN_SYMBOLIZER_PATH=/usr/bin/llvm-symbolizer-18
+17: Test timeout computed to be: 120
+17: Running main() from /home/alex/Documents/IntrinsicEngine/external/vcpkg/buildtrees/gtest/src/v1.17.0-0c449efaff.clean/googletest/src/gtest_main.cc
+17: Note: Google Test filter = PointLBVHGpuSmoke.PointSpacingPublishesAcrossDomainsAndPreservesCandidatePolicy
+17: [==========] Running 1 test from 1 test suite.
+17: [----------] Global test environment set-up.
+17: [----------] 1 test from PointLBVHGpuSmoke
+17: [ RUN      ] PointLBVHGpuSmoke.PointSpacingPublishesAcrossDomainsAndPreservesCandidatePolicy
+17: [32m[INFO] Initialized Scheduler with 15 worker threads.[0m
+17: [33m[WARN] [Runtime] Promoted Vulkan device selected; backend remains fail-closed until the first clean default-recipe validation promotes it.[0m
+17: [33m[WARN] [VulkanDevice::Initialize] Vulkan bootstrap created logical-device, queue, VMA, per-frame command/sync, swapchain image/view/handle, bindless heap, transfer queue, and global pipeline-layout state; canonical frame execution waits for the first clean recipe validation publish, so device remains non-operational during cold start.[0m
+17: [33m[WARN] [Runtime] VulkanRequestedButNotOperational status=RequestedButIncompleteGate reason=BarrierValidationFailed[0m
+17: [31m[ERR]  [JobService] Job 'Radii neighborhoods (Vulkan)' completion publisher rejected result type 'std::string_view Extrinsic::Runtime::JobResultTypeNameOf() [TResult = bool]'; completion dropped.[0m
+17: [31m[ERR]  [JobService] Job 'Radii neighborhoods (Vulkan)' completion publisher rejected result type 'std::string_view Extrinsic::Runtime::JobResultTypeNameOf() [TResult = bool]'; completion dropped.[0m
+17: [       OK ] PointLBVHGpuSmoke.PointSpacingPublishesAcrossDomainsAndPreservesCandidatePolicy (45335 ms)
+17: [----------] 1 test from PointLBVHGpuSmoke (45335 ms total)
+17: 
+17: [----------] Global test environment tear-down
+17: [==========] 1 test from 1 test suite ran. (45336 ms total)
+17: [  PASSED  ] 1 test.
+1/1 Test #17: PointLBVHGpuSmoke.PointSpacingPublishesAcrossDomainsAndPreservesCandidatePolicy ...   Passed   45.38 sec
+
+The following tests passed:
+	PointLBVHGpuSmoke.PointSpacingPublishesAcrossDomainsAndPreservesCandidatePolicy
+
+100% tests passed, 0 tests failed out of 1
+
+Label Time Summary:
+gpu            =  45.38 sec*proc (1 test)
+graphics       =  45.38 sec*proc (1 test)
+integration    =  45.38 sec*proc (1 test)
+vulkan         =  45.38 sec*proc (1 test)
+
+Total Test time (real) =  45.58 sec

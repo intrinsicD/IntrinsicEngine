@@ -1,0 +1,54 @@
+Internal ctest changing into directory: /home/alex/Documents/IntrinsicEngine/build/ci-vulkan
+UpdateCTestConfiguration  from :/home/alex/Documents/IntrinsicEngine/build/ci-vulkan/DartConfiguration.tcl
+Parse Config file:/home/alex/Documents/IntrinsicEngine/build/ci-vulkan/DartConfiguration.tcl
+UpdateCTestConfiguration  from :/home/alex/Documents/IntrinsicEngine/build/ci-vulkan/DartConfiguration.tcl
+Parse Config file:/home/alex/Documents/IntrinsicEngine/build/ci-vulkan/DartConfiguration.tcl
+Test project /home/alex/Documents/IntrinsicEngine/build/ci-vulkan
+Constructing a list of tests
+Done constructing a list of tests
+Updating test list for fixtures
+Added 0 tests to meet fixture requirements
+Checking test dependency graph...
+Checking test dependency graph end
+test 15
+    Start 15: PointLBVHGpuSmoke.OutlierNeighborhoodsPublishAcrossDomainsAndCountDenseSupport
+
+15: Test command: /home/alex/Documents/IntrinsicEngine/build/ci-vulkan/bin/IntrinsicPointLBVHGpuTests "--gtest_filter=PointLBVHGpuSmoke.OutlierNeighborhoodsPublishAcrossDomainsAndCountDenseSupport" "--gtest_also_run_disabled_tests"
+15: Working Directory: /home/alex/Documents/IntrinsicEngine/build/ci-vulkan/tests
+15: Environment variables: 
+15:  LSAN_OPTIONS=fast_unwind_on_malloc=0:detect_leaks=0
+15:  ASAN_OPTIONS=symbolize=1:detect_leaks=0:fast_unwind_on_malloc=0
+15:  ASAN_SYMBOLIZER_PATH=/usr/bin/llvm-symbolizer-18
+15: Test timeout computed to be: 120
+15: Running main() from /home/alex/Documents/IntrinsicEngine/external/vcpkg/buildtrees/gtest/src/v1.17.0-0c449efaff.clean/googletest/src/gtest_main.cc
+15: Note: Google Test filter = PointLBVHGpuSmoke.OutlierNeighborhoodsPublishAcrossDomainsAndCountDenseSupport
+15: [==========] Running 1 test from 1 test suite.
+15: [----------] Global test environment set-up.
+15: [----------] 1 test from PointLBVHGpuSmoke
+15: [ RUN      ] PointLBVHGpuSmoke.OutlierNeighborhoodsPublishAcrossDomainsAndCountDenseSupport
+15: [32m[INFO] Initialized Scheduler with 15 worker threads.[0m
+15: [33m[WARN] [Runtime] Promoted Vulkan device selected; backend remains fail-closed until the first clean default-recipe validation promotes it.[0m
+15: [33m[WARN] [VulkanDevice::Initialize] Vulkan bootstrap created logical-device, queue, VMA, per-frame command/sync, swapchain image/view/handle, bindless heap, transfer queue, and global pipeline-layout state; canonical frame execution waits for the first clean recipe validation publish, so device remains non-operational during cold start.[0m
+15: [33m[WARN] [Runtime] VulkanRequestedButNotOperational status=RequestedButIncompleteGate reason=BarrierValidationFailed[0m
+15: [31m[ERR]  [JobService] Job 'Outlier neighborhoods (Vulkan)' completion publisher rejected result type 'std::string_view Extrinsic::Runtime::JobResultTypeNameOf() [TResult = bool]'; completion dropped.[0m
+15: [31m[ERR]  [JobService] Job 'Outlier neighborhoods (Vulkan)' completion publisher rejected result type 'std::string_view Extrinsic::Runtime::JobResultTypeNameOf() [TResult = bool]'; completion dropped.[0m
+15: [       OK ] PointLBVHGpuSmoke.OutlierNeighborhoodsPublishAcrossDomainsAndCountDenseSupport (44653 ms)
+15: [----------] 1 test from PointLBVHGpuSmoke (44653 ms total)
+15: 
+15: [----------] Global test environment tear-down
+15: [==========] 1 test from 1 test suite ran. (44653 ms total)
+15: [  PASSED  ] 1 test.
+1/1 Test #15: PointLBVHGpuSmoke.OutlierNeighborhoodsPublishAcrossDomainsAndCountDenseSupport ...   Passed   44.70 sec
+
+The following tests passed:
+	PointLBVHGpuSmoke.OutlierNeighborhoodsPublishAcrossDomainsAndCountDenseSupport
+
+100% tests passed, 0 tests failed out of 1
+
+Label Time Summary:
+gpu            =  44.70 sec*proc (1 test)
+graphics       =  44.70 sec*proc (1 test)
+integration    =  44.70 sec*proc (1 test)
+vulkan         =  44.70 sec*proc (1 test)
+
+Total Test time (real) =  46.06 sec

@@ -1,6 +1,7 @@
 module;
 #include <algorithm>
 #include <bit>
+#include <chrono>
 #include <cmath>
 #include <cstdint>
 #include <memory>
@@ -134,6 +135,12 @@ namespace Extrinsic::Runtime
             Geometry::HalfedgeMesh::Mesh Mesh{};
             Geometry::PropertySet GraphVertices{}, GraphHalfedges{}, GraphEdges{};
             std::shared_ptr<const SpatialIndexSnapshot> Index{};
+            SpatialIndexHandle GpuIndex{};
+            std::shared_ptr<SpatialNearestBatch> Batch{};
+            std::vector<std::uint32_t> NeighborOffsets{0}, NeighborIndices{};
+            std::size_t NextQuery{};
+            bool GpuFinished{}, Abandoned{};
+            std::chrono::steady_clock::time_point GpuStarted{};
             EditorNormalEstimationResult Result{};
         };
         bool ReadMask(const GeometryEntityAvailability &a, D domain, std::string name, std::size_t count,
@@ -265,6 +272,19 @@ namespace Extrinsic::Runtime
                      (c.UseRadiusSearch && c.Radius > Geometry::PointLBVH::CoordinateLimit)))
                     return fail("CPU LBVH requires the spatial cache, at most 2^24 samples and "
                                 "coordinates/radius within 1e18.");
+                if (c.Backend == NormalEstimationBackend::VulkanLBVH)
+                {
+                    if (!context.JobCommands.Available() || !context.SpatialIndices ||
+                        !context.SpatialIndices->GpuQueriesAvailable())
+                        return fail("Vulkan normal neighborhoods require the framed spatial cache and job service.");
+                    if (!lbvhCoordinatesValid || work->Result.LiveCount > (1u << 20) ||
+                        (c.UseRadiusSearch && c.Radius > Geometry::PointLBVH::CoordinateLimit))
+                        return fail("Vulkan normal neighborhoods support at most 2^20 live samples and coordinates/radius within 1e18.");
+                    const auto candidates = std::min<std::uint64_t>(work->Result.LiveCount,
+                        std::uint64_t(std::max(c.KNeighbors, c.MinimumNeighbors)) + 1);
+                    if (!c.UseRadiusSearch && candidates > 64)
+                        return fail("Vulkan normal kNN supports at most 64 candidates including the extra self candidate; use k/minimum <=63 or a CPU backend.");
+                }
                 return work;
             }
             if (c.Positions.Domain != D::MeshVertex && c.Positions.Domain != D::GraphNode)
@@ -367,6 +387,7 @@ namespace Extrinsic::Runtime
         {
             auto &r = w.Result;
             const auto &c = w.Config;
+            const auto started = std::chrono::steady_clock::now();
             r.Status = EditorCommandStatus::GeometryProcessingFailed;
             if (c.Method == NormalEstimationMethod::PointSetPCA)
             {
@@ -379,9 +400,28 @@ namespace Extrinsic::Runtime
                 p.FallbackNormal = c.FallbackNormal;
                 p.DegenerateNormalLengthEpsilon = c.DegenerateNormalLengthEpsilon;
                 p.CollinearEigenvalueRatioEpsilon = c.CollinearEigenvalueRatioEpsilon;
-                const auto estimate =
-                    w.Index ? PN::Estimate(w.Points, w.Index->Index, p) : PN::Estimate(w.Points, p);
-                r.ActualBackend = w.Index ? "cpu_lbvh" : "cpu_kdtree";
+                std::optional<PN::EstimateResult> estimate;
+                if (c.Backend == NormalEstimationBackend::VulkanLBVH)
+                {
+                    r.ActualBackend = "vulkan_lbvh";
+                    // Readback IDs are source rows. Conversion and fitting stay on the CPU worker.
+                    for (auto& id : w.NeighborIndices)
+                    {
+                        const auto found = std::lower_bound(w.Slots.begin(), w.Slots.end(), id);
+                        if (found == w.Slots.end() || *found != id)
+                        {
+                            r.Message = "Vulkan normal query returned an invalid source row.";
+                            return;
+                        }
+                        id = std::uint32_t(found - w.Slots.begin());
+                    }
+                    estimate = PN::Estimate(w.Points, PN::Neighborhoods{w.NeighborOffsets, w.NeighborIndices}, p);
+                }
+                else
+                {
+                    estimate = w.Index ? PN::Estimate(w.Points, w.Index->Index, p) : PN::Estimate(w.Points, p);
+                    r.ActualBackend = w.Index ? "cpu_lbvh" : "cpu_kdtree";
+                }
                 if (!estimate || estimate->Status != PN::RecomputeStatus::Success)
                 {
                     r.Message = "PCA normal estimation failed.";
@@ -465,7 +505,65 @@ namespace Extrinsic::Runtime
             for (auto i : w.Slots)
                 r.ChangedCount += !w.OutputWatch.Exists || w.Before[i] != w.After[i];
             r.Status = r.ChangedCount ? EditorCommandStatus::Applied : EditorCommandStatus::NoChange;
-            r.Message = "Normals computed using " + r.ActualBackend + ".";
+            r.CpuComputeMilliseconds = std::chrono::duration<double, std::milli>(
+                std::chrono::steady_clock::now() - started).count();
+            r.Message = c.Method == NormalEstimationMethod::PointSetPCA &&
+                        c.Backend == NormalEstimationBackend::VulkanLBVH
+                ? "Normals computed using Vulkan LBVH neighborhoods and CPU PCA/orientation."
+                : "Normals computed using " + r.ActualBackend + ".";
+        }
+        bool AdvanceNormalGpu(const EditorGeometryProcessingContext& context, NormalWork& w)
+        {
+            auto fail = [&](std::string message, EditorCommandStatus status = EditorCommandStatus::GeometryProcessingFailed) {
+                w.Result.Status = status;
+                w.Result.Message = std::move(message);
+                w.Batch.reset();
+                return true;
+            };
+            if (w.Abandoned || !CurrentNormalInput(context, w, true))
+                return fail("Normal inputs changed or the job was cancelled before GPU completion.", EditorCommandStatus::StaleEntity);
+            if (w.GpuFinished) return true;
+            if (w.GpuStarted == std::chrono::steady_clock::time_point{})
+                w.GpuStarted = std::chrono::steady_clock::now();
+            if (w.Batch)
+            {
+                if (w.Batch->State == SpatialQueryState::Failed) return fail(w.Batch->Diagnostic);
+                if (w.Batch->State != SpatialQueryState::Ready) return false;
+                const auto& batch = *w.Batch;
+                for (auto count : batch.Counts)
+                    if (count > batch.Capacity)
+                        return fail("Vulkan radius neighborhood exceeds 1024 candidates; use a CPU backend or a smaller radius. Previous normals retained.");
+                for (std::size_t row = 0; row < batch.Counts.size(); ++row)
+                {
+                    for (std::uint32_t j = 0; j < batch.Counts[row]; ++j)
+                        w.NeighborIndices.push_back(batch.Neighbors[row * batch.Capacity + j].Index);
+                    w.NeighborOffsets.push_back(std::uint32_t(w.NeighborIndices.size()));
+                }
+                w.NextQuery += batch.Counts.size();
+                if (w.NextQuery == w.Points.size())
+                {
+                    w.Batch.reset();
+                    w.GpuFinished = true;
+                    w.Result.ActualBackend = "vulkan_lbvh";
+                    w.Result.GpuNeighborhoodMilliseconds = std::chrono::duration<double, std::milli>(
+                        std::chrono::steady_clock::now() - w.GpuStarted).count();
+                    return true;
+                }
+            }
+            const auto count = std::min<std::size_t>(w.Config.GpuQueryBatchSize, w.Points.size() - w.NextQuery);
+            if (w.Batch && w.Batch->Counts.size() != count) w.Batch.reset();
+            const auto queries = std::span(w.Points).subspan(w.NextQuery, count);
+            if (w.Config.UseRadiusSearch)
+                w.Batch = context.SpatialIndices->QueueGpuRadius(w.GpuIndex, queries, w.Config.Radius,
+                    std::uint32_t(std::min<std::size_t>(1024, w.Points.size())), {}, std::move(w.Batch));
+            else
+                w.Batch = context.SpatialIndices->QueueGpuKNearest(w.GpuIndex, queries,
+                    std::uint32_t(std::min<std::uint64_t>(w.Points.size(),
+                        std::uint64_t(std::max(w.Config.KNeighbors, w.Config.MinimumNeighbors)) + 1)),
+                    {}, std::move(w.Batch));
+            ++w.Result.GpuQueryBatches;
+            if (w.Batch->State == SpatialQueryState::Failed) return fail(w.Batch->Diagnostic);
+            return false;
         }
         EditorNormalEstimationResult PublishNormals(const EditorGeometryProcessingContext &context,
                                                     const std::shared_ptr<NormalWork> &w)
@@ -594,11 +692,12 @@ namespace Extrinsic::Runtime
         if (!w)
             return report(EditorCommandStatus::InvalidProcessingParameters, std::move(diagnostic));
         if (w->Config.Method == NormalEstimationMethod::PointSetPCA &&
-            w->Config.Backend == NormalEstimationBackend::CpuLBVH)
+            w->Config.Backend != NormalEstimationBackend::CpuKDTree)
         {
             auto acquired = context.SpatialIndices->Acquire(context.World, w->Entity, w->Config.Positions);
             if (!acquired.Ready())
                 return report(EditorCommandStatus::InvalidProcessingParameters, acquired.Diagnostic);
+            w->GpuIndex = acquired.Handle;
             w->Index = context.SpatialIndices->Snapshot(acquired.Handle);
             w->Result.IndexReused = acquired.Reused;
             if (!w->Index || w->Index->Slots != w->Slots ||
@@ -648,18 +747,39 @@ namespace Extrinsic::Runtime
                     return result.Succeeded();
                 },
             .FinalizeUnpublishedOnMainThread =
-                [sink, delivered, pending]() mutable {
+                [sink, delivered, w, pending]() mutable {
+                    w->Abandoned = true;
                     if (sink && !*delivered)
                     {
-                        pending.Status = EditorCommandStatus::StaleEntity;
-                        pending.Message =
-                            "Normal job was cancelled or its source became stale; previous output retained.";
+                        if (w->Result.Status == EditorCommandStatus::GeometryProcessingFailed)
+                            pending = w->Result;
+                        else
+                        {
+                            pending.Status = EditorCommandStatus::StaleEntity;
+                            pending.Message = "Normal job was cancelled or its source became stale; previous output retained.";
+                        }
                         sink(std::move(pending));
                     }
                 }};
+        if (w->Config.Method == NormalEstimationMethod::PointSetPCA &&
+            w->Config.Backend == NormalEstimationBackend::VulkanLBVH)
+        {
+            JobDesc gpu{
+                .DebugName = "Normal neighborhoods (Vulkan)", .Scope = context.World,
+                .Kind = RuntimeTaskKinds::GeometryProcess,
+                .Work = [](const JobCancellation&) { return JobResultEnvelope::Make(true); },
+                .IsReadyToApply = [context, w] { return AdvanceNormalGpu(context, *w); },
+                .PublishCompletion = [w](KernelEventBus&, const JobResultEnvelope&) { return w->GpuFinished; },
+                .FinalizeUnpublishedOnMainThread = [w] { w->Abandoned = true; }};
+            const auto prerequisite = context.JobCommands.Submit(std::move(gpu), identity);
+            if (!prerequisite.IsValid())
+                return report(EditorCommandStatus::GeometryProcessingFailed, "GPU normal job submission was rejected.");
+            desc.DependsOn.push_back({prerequisite, "Complete Vulkan normal neighborhoods before CPU PCA"});
+        }
         const auto token = context.JobCommands.Submit(std::move(desc), identity);
         if (!token.IsValid())
         {
+            w->Abandoned = true;
             pending.Status = EditorCommandStatus::GeometryProcessingFailed;
             pending.Message = "Normal job submission was rejected.";
         }

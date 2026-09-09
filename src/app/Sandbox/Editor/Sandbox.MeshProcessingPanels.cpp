@@ -363,6 +363,25 @@ namespace Extrinsic::Sandbox::Editor
             std::string LastApplied{}, ConfigDiagnostic{}, VisualizationDiagnostic{};
         };
 
+        struct OutliersState
+        {
+            std::optional<Runtime::EditorOutlierAnalysisResult> LastResult{};
+            Runtime::OutlierAnalysisConfig Draft{};
+            std::string LastApplied{}, ConfigDiagnostic{}, VisualizationDiagnostic{};
+        };
+        struct DensityState
+        {
+            std::optional<Runtime::EditorKernelDensityResult> LastResult{};
+            Runtime::KernelDensityConfig Draft{};
+            std::string LastApplied{}, ConfigDiagnostic{}, VisualizationDiagnostic{};
+        };
+        struct SpacingState
+        {
+            std::optional<Runtime::EditorPointSpacingResult> LastResult{};
+            Runtime::PointSpacingConfig Draft{};
+            std::string LastApplied{}, ConfigDiagnostic{}, VisualizationDiagnostic{};
+        };
+
         struct RegistrationState
         {
             std::optional<Runtime::EditorRegistrationResult> LastResult{};
@@ -398,6 +417,9 @@ namespace Extrinsic::Sandbox::Editor
         SimplifyState Simplify{};
         RegistrationState Registration{};
         NormalsState Normals{};
+        OutliersState Outliers{};
+        DensityState Density{};
+        SpacingState Spacing{};
 
         void Register(EditorShell& editorShell);
         void Unregister();
@@ -427,6 +449,9 @@ namespace Extrinsic::Sandbox::Editor
         void DrawSubdivideWindow(bool&, const SandboxEditorContext&);
         void DrawSimplifyWindow(bool&, const SandboxEditorContext&);
         void DrawNormalsWindow(bool&, const SandboxEditorContext&);
+        void DrawOutliersWindow(bool&, const SandboxEditorContext&);
+        void DrawDensityWindow(bool&, const SandboxEditorContext&);
+        void DrawSpacingWindow(bool&, const SandboxEditorContext&);
         void DrawRegistrationWindow(bool&, const SandboxEditorContext&);
 
         void DrawDenoiseControls(
@@ -466,6 +491,42 @@ namespace Extrinsic::Sandbox::Editor
                        "Subdivide", &Impl::DrawSubdivideWindow);
         RegisterWindow("mesh.processing.simplify", {"Mesh", "Processing"},
                        "Simplify", &Impl::DrawSimplifyWindow);
+        RegisterWindow("view.outlier_analysis", {"View"}, "Outlier Analysis", &Impl::DrawOutliersWindow);
+        for (const auto& [id, domain] : std::array<std::pair<const char*, const char*>, 3>{
+                 {{"mesh.processing.outliers", "Mesh"}, {"graph.processing.outliers", "Graph"},
+                  {"pointcloud.processing.remove_outliers", "PointCloud"}}})
+            Handles.push_back(Shell->RegisterEditorWindow({
+                .Id=id, .MenuPath={domain,"Processing"}, .Title="Outlier Analysis",
+                .Draw=[](bool& open,const SandboxEditorContext&){open=false;},
+                .OpenStateChanged=[this,id](bool open){
+                    if(!open)return;
+                    (void)Shell->SetEditorWindowOpen("view.outlier_analysis",true);
+                    (void)Shell->SetEditorWindowOpen(id,false);
+                }}));
+        RegisterWindow("view.kernel_density", {"View"}, "Kernel Density", &Impl::DrawDensityWindow);
+        for (const auto& [id, domain] : std::array<std::pair<const char*, const char*>, 3>{
+                 {{"mesh.processing.kernel_density", "Mesh"}, {"graph.processing.kernel_density", "Graph"},
+                  {"pointcloud.processing.kernel_density", "PointCloud"}}})
+            Handles.push_back(Shell->RegisterEditorWindow({
+                .Id=id, .MenuPath={domain,"Processing"}, .Title="Kernel Density",
+                .Draw=[](bool& open,const SandboxEditorContext&){open=false;},
+                .OpenStateChanged=[this,id](bool open){
+                    if(!open)return;
+                    (void)Shell->SetEditorWindowOpen("view.kernel_density",true);
+                    (void)Shell->SetEditorWindowOpen(id,false);
+                }}));
+        RegisterWindow("view.point_spacing", {"View"}, "Point Spacing and Radii", &Impl::DrawSpacingWindow);
+        for (const auto& [id, domain] : std::array<std::pair<const char*, const char*>, 3>{
+                 {{"mesh.processing.point_spacing", "Mesh"}, {"graph.processing.point_spacing", "Graph"},
+                  {"pointcloud.processing.point_spacing", "PointCloud"}}})
+            Handles.push_back(Shell->RegisterEditorWindow({
+                .Id=id, .MenuPath={domain,"Processing"}, .Title="Point Spacing and Radii",
+                .Draw=[](bool& open,const SandboxEditorContext&){open=false;},
+                .OpenStateChanged=[this,id](bool open){
+                    if(!open)return;
+                    (void)Shell->SetEditorWindowOpen("view.point_spacing",true);
+                    (void)Shell->SetEditorWindowOpen(id,false);
+                }}));
         RegisterWindow("view.normal_estimation", {"View"}, "Normal Estimation", &Impl::DrawNormalsWindow);
         for (const auto& [id, domain] : std::array<std::pair<const char*, const char*>, 3>{
                  {{"mesh.processing.vertices.normals", "Mesh"}, {"graph.processing.vertices.normals", "Graph"},
@@ -532,6 +593,9 @@ namespace Extrinsic::Sandbox::Editor
         Simplify.LastResult.reset();
         Registration.LastResult.reset();
         Normals = {};
+        Outliers = {};
+        Density = {};
+        Spacing = {};
     }
 
     void MeshProcessingPanels::Impl::RegisterWindow(
@@ -2041,10 +2105,17 @@ namespace Extrinsic::Sandbox::Editor
                 "PCA fits local planes to spatial neighbors on the selected element domain. Radius mode uses "
                 "all neighbors within the radius; otherwise k nearest neighbors are used.");
             int backend = int(config.Backend);
-            if (ImGui::Combo("Neighbors##Normals", &backend, "CPU KD-tree\0CPU LBVH (cached)\0"))
+            if (ImGui::Combo("Neighbors##Normals", &backend, "CPU KD-tree\0CPU LBVH (cached)\0Vulkan LBVH (CPU fit)\0"))
             {
                 config.Backend = Runtime::NormalEstimationBackend(backend);
                 changed = true;
+            }
+            if (config.Backend == Runtime::NormalEstimationBackend::VulkanLBVH)
+            {
+                ImGui::TextWrapped("GPU neighborhood queries; PCA and orientation run on CPU. "
+                                   "Dense radius neighborhoods exceeding 1024 candidates are rejected.");
+                changed |= ImGui::InputScalar("GPU query batch size##Normals", ImGuiDataType_U32,
+                                              &config.GpuQueryBatchSize);
             }
             changed |= ImGui::Checkbox("Use radius##Normals", &config.UseRadiusSearch);
             if (config.UseRadiusSearch)
@@ -2162,6 +2233,445 @@ namespace Extrinsic::Sandbox::Editor
             DrawDismissLastResultButton("Dismiss##Normals", Normals.LastResult,
                                         Runtime::EditorGeometryProcessingResultSlot::NormalEstimation,
                                         context);
+        }
+        ImGui::End();
+    }
+
+    void MeshProcessingPanels::Impl::DrawOutliersWindow(bool &open, const SandboxEditorContext &context)
+    {
+        if (context.GeometryResults.LastOutlierAnalysisResult)
+            Outliers.LastResult = context.GeometryResults.LastOutlierAnalysisResult;
+        ImGui::SetNextWindowSize(ImVec2(460, 600), ImGuiCond_FirstUseEver);
+        if (!ImGui::Begin("Outlier Analysis", &open))
+        {
+            ImGui::End();
+            return;
+        }
+        const auto active = Runtime::GetEditorOutlierAnalysisConfig(context.GeometryCommands)
+                                .value_or(Runtime::OutlierAnalysisConfig{});
+        const auto serialized = Runtime::SerializeOutlierAnalysisConfig(active);
+        if (serialized != Outliers.LastApplied)
+        {
+            Outliers.Draft = active;
+            Outliers.LastApplied = serialized;
+            Outliers.ConfigDiagnostic.clear();
+        }
+        auto &config = Outliers.Draft;
+        bool changed = false;
+        const auto workspace =
+            Runtime::BuildEditorWorkspaceSnapshot(context.SnapshotQueries, {.Hierarchy = true,
+                                                                            .Inspector = false,
+                                                                            .Selection = false,
+                                                                            .Document = false,
+                                                                            .SceneFile = false,
+                                                                            .FileImport = false,
+                                                                            .AssetImportQueue = false,
+                                                                            .RenderGraph = false,
+                                                                            .RenderRecipe = false,
+                                                                            .CameraRender = false,
+                                                                            .Visualization = false});
+        if (context.Selection && !context.Selection->SelectedStableIds.empty() &&
+            ImGui::Button("Use selected entity"))
+        {
+            config.StableEntityId = context.Selection->SelectedStableIds.front();
+            changed = true;
+        }
+        std::string entityName =
+            config.StableEntityId ? std::to_string(config.StableEntityId) : "Choose entity";
+        for (const auto &row : workspace.Hierarchy)
+            if (row.StableEntityId == config.StableEntityId)
+                entityName = row.Name;
+        if (ImGui::BeginCombo("Entity##Outliers", entityName.c_str()))
+        {
+            for (const auto &row : workspace.Hierarchy)
+            {
+                if (Runtime::GetEditorOutlierAnalysisInputCatalog(context.GeometryCommands,
+                                                                   row.StableEntityId)
+                        .Entries.empty())
+                    continue;
+                const auto title = row.Name + " (" + std::to_string(row.StableEntityId) + ")";
+                if (ImGui::Selectable(title.c_str(), row.StableEntityId == config.StableEntityId))
+                {
+                    config.StableEntityId = row.StableEntityId;
+                    changed = true;
+                }
+            }
+            ImGui::EndCombo();
+        }
+        const auto inputName =
+            std::string(Runtime::ToString(config.Positions.Domain)) + ": " + config.Positions.Name;
+        if (ImGui::BeginCombo("Positions##Outliers", inputName.c_str()))
+        {
+            const auto catalog = Runtime::GetEditorOutlierAnalysisInputCatalog(context.GeometryCommands, config.StableEntityId);
+            auto previousDomain = Runtime::GeometryElementDomain::Unknown;
+            for (const auto &row : catalog.Entries)
+            {
+                if (row.Ref.Domain != previousDomain)
+                {
+                    ImGui::SeparatorText(std::string(Runtime::ToString(row.Ref.Domain)).c_str());
+                    previousDomain = row.Ref.Domain;
+                }
+                const auto label = std::string(Runtime::ToString(row.Ref.Domain)) + ": " + row.Ref.Name +
+                                   " (" + std::to_string(row.ElementCount) + ")";
+                if (ImGui::Selectable(label.c_str(), row.Ref == config.Positions))
+                {
+                    config.Positions = row.Ref;
+                    config.Mask.Domain = config.Score.Domain = row.Ref.Domain;
+                    changed = true;
+                }
+            }
+            ImGui::EndCombo();
+        }
+        for (auto [label, ref] : {std::pair{"Mask property", &config.Mask}, std::pair{"Score property", &config.Score}})
+        {
+            std::array<char,512> name{};
+            std::copy_n(ref->Name.c_str(),std::min(ref->Name.size(),name.size()-1),name.data());
+            if (ImGui::InputText(label,name.data(),name.size())) {ref->Name=name.data();changed=true;}
+        }
+        int method=int(config.Method), backend=int(config.Backend);
+        if(ImGui::Combo("Method",&method,"Statistical\0Radius\0")) {config.Method=Runtime::OutlierAnalysisMethod(method);changed=true;}
+        if(ImGui::Combo("Neighbors",&backend,"CPU octree\0CPU LBVH (cached)\0Vulkan LBVH\0")) {config.Backend=Runtime::OutlierAnalysisBackend(backend);changed=true;}
+        if(config.Method==Runtime::OutlierAnalysisMethod::Statistical)
+        {
+            changed |= ImGui::InputScalar("Neighbors k",ImGuiDataType_U32,&config.KNeighbors);
+            changed |= ImGui::InputFloat("Standard deviation multiplier",&config.StdDevMultiplier);
+            ImGui::TextWrapped("Mark mean neighbor distances above the global mean plus this multiple of the population standard deviation.");
+        }
+        else
+        {
+            changed |= ImGui::InputFloat("Radius",&config.Radius);
+            changed |= ImGui::InputScalar("Minimum neighbors",ImGuiDataType_U32,&config.MinimumNeighbors);
+            ImGui::TextWrapped("Mark samples with fewer than this many other samples inside the inclusive radius.");
+        }
+        if(config.Backend==Runtime::OutlierAnalysisBackend::VulkanLBVH)
+            changed |= ImGui::InputScalar("GPU query batch size",ImGuiDataType_U32,&config.GpuQueryBatchSize);
+        if(changed)
+        {
+            config.Operation=Runtime::OutlierAnalysisOperation::Analyze;
+            const auto applied=Runtime::ApplyEditorOutlierAnalysisConfig(context.GeometryCommands,config);
+            Outliers.ConfigDiagnostic=applied.Succeeded()?"":"Controls were rejected by outlier config validation.";
+        }
+        if(!Outliers.ConfigDiagnostic.empty())ImGui::TextWrapped("%s",Outliers.ConfigDiagnostic.c_str());
+        auto analyze=config;analyze.Operation=Runtime::OutlierAnalysisOperation::Analyze;
+        const auto readiness=Runtime::PreviewEditorOutlierAnalysisCommand(context.GeometryCommands,analyze);
+        if(!readiness.Ready)ImGui::TextWrapped("%s",readiness.Diagnostic.c_str());
+        const auto execute=[&](Runtime::OutlierAnalysisConfig request){
+            const auto applied=Runtime::ApplyEditorOutlierAnalysisConfig(context.GeometryCommands,request);
+            if(applied.Succeeded())
+                PublishCommandResult(Outliers.LastResult,Runtime::ApplyEditorConfiguredOutlierAnalysis(context.GeometryCommands),context.MethodResultSinks.OutlierAnalysis);
+            else Outliers.ConfigDiagnostic="Outlier config was rejected.";
+        };
+        ImGui::BeginDisabled(!context.GeometryConfigCommandsAvailable || !readiness.Ready || !Outliers.ConfigDiagnostic.empty());
+        if(ImGui::Button("Detect outliers"))execute(analyze);
+        ImGui::EndDisabled();
+        ImGui::TextWrapped("Detection writes a mask (1 = outlier) and a score. Geometry stays in source order.");
+        auto remove=config;remove.Operation=Runtime::OutlierAnalysisOperation::RemoveMarked;
+        const auto removal=Runtime::PreviewEditorOutlierAnalysisCommand(context.GeometryCommands,remove);
+        ImGui::BeginDisabled(!context.GeometryConfigCommandsAvailable || !removal.Ready || !Outliers.ConfigDiagnostic.empty());
+        if(ImGui::Button("Remove marked points"))execute(remove);
+        ImGui::EndDisabled();
+        if(!removal.Ready && ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
+            ImGui::SetTooltip("%s",removal.Diagnostic.c_str());
+        ImGui::TextWrapped("Removal compacts point clouds and supports Undo. Detect again after changing positions or the mask.");
+        auto mask=config.Mask, score=config.Score;
+        if(readiness.Ready){mask=readiness.Resolved.Mask;score=readiness.Resolved.Score;}
+        if(ImGui::Button("Show mask"))
+            Outliers.VisualizationDiagnostic=Runtime::DebugNameForEditorCommandStatus(Runtime::ApplyEditorVisualizationRecipeCommand(
+                context.VisualizationCommands,{.StableEntityId=config.StableEntityId,
+                .Recipe={.Data=Runtime::LabelVisualizationRecipe{.Source=mask,.OutputName=mask.Name+".colors"}}}));
+        ImGui::SameLine();
+        if(ImGui::Button("Show score"))
+            Outliers.VisualizationDiagnostic=Runtime::DebugNameForEditorCommandStatus(Runtime::ApplyEditorVisualizationRecipeCommand(
+                context.VisualizationCommands,{.StableEntityId=config.StableEntityId,
+                .Recipe={.Data=Runtime::ScalarVisualizationRecipe{.Source=score,.OutputName=score.Name+".colors"}}}));
+        if(!Outliers.VisualizationDiagnostic.empty())ImGui::Text("Display: %s",Outliers.VisualizationDiagnostic.c_str());
+        if(Outliers.LastResult)
+        {
+            const auto& result=*Outliers.LastResult;
+            ImGui::Separator();
+            ImGui::Text("Status: %s",Runtime::DebugNameForEditorCommandStatus(result.Status));
+            ImGui::Text("Requested: %s; ran: %s",Runtime::ToString(result.RequestedBackend),result.ActualBackend.c_str());
+            ImGui::Text("Live / total: %zu / %zu; outliers: %zu",result.LiveCount,result.SlotCount,result.RejectedCount);
+            if(result.Method==Runtime::OutlierAnalysisMethod::Statistical)
+                ImGui::Text("Mean %.5g; standard deviation %.5g; threshold %.5g",double(result.MeanDistance),double(result.StdDevDistance),double(result.DistanceThreshold));
+            ImGui::TextWrapped("%s",result.Message.c_str());
+            DrawDismissLastResultButton("Dismiss##Outliers",Outliers.LastResult,Runtime::EditorGeometryProcessingResultSlot::OutlierAnalysis,context);
+        }
+        ImGui::End();
+    }
+
+    void MeshProcessingPanels::Impl::DrawDensityWindow(bool &open, const SandboxEditorContext &context)
+    {
+        if (context.GeometryResults.LastKernelDensityResult)
+            Density.LastResult = context.GeometryResults.LastKernelDensityResult;
+        ImGui::SetNextWindowSize(ImVec2(460, 600), ImGuiCond_FirstUseEver);
+        if (!ImGui::Begin("Kernel Density", &open))
+        {
+            ImGui::End();
+            return;
+        }
+        const auto active = Runtime::GetEditorKernelDensityConfig(context.GeometryCommands)
+                                .value_or(Runtime::KernelDensityConfig{});
+        const auto serialized = Runtime::SerializeKernelDensityConfig(active);
+        if (serialized != Density.LastApplied)
+        {
+            Density.Draft = active;
+            Density.LastApplied = serialized;
+            Density.ConfigDiagnostic.clear();
+        }
+        auto &config = Density.Draft;
+        bool changed = false;
+        const auto workspace =
+            Runtime::BuildEditorWorkspaceSnapshot(context.SnapshotQueries, {.Hierarchy = true,
+                                                                            .Inspector = false,
+                                                                            .Selection = false,
+                                                                            .Document = false,
+                                                                            .SceneFile = false,
+                                                                            .FileImport = false,
+                                                                            .AssetImportQueue = false,
+                                                                            .RenderGraph = false,
+                                                                            .RenderRecipe = false,
+                                                                            .CameraRender = false,
+                                                                            .Visualization = false});
+        if (context.Selection && !context.Selection->SelectedStableIds.empty() &&
+            ImGui::Button("Use selected entity"))
+        {
+            config.StableEntityId = context.Selection->SelectedStableIds.front();
+            changed = true;
+        }
+        std::string entityName =
+            config.StableEntityId ? std::to_string(config.StableEntityId) : "Choose entity";
+        for (const auto &row : workspace.Hierarchy)
+            if (row.StableEntityId == config.StableEntityId)
+                entityName = row.Name;
+        if (ImGui::BeginCombo("Entity##Density", entityName.c_str()))
+        {
+            for (const auto &row : workspace.Hierarchy)
+            {
+                if (Runtime::GetEditorKernelDensityInputCatalog(context.GeometryCommands,
+                                                                   row.StableEntityId)
+                        .Entries.empty())
+                    continue;
+                const auto title = row.Name + " (" + std::to_string(row.StableEntityId) + ")";
+                if (ImGui::Selectable(title.c_str(), row.StableEntityId == config.StableEntityId))
+                {
+                    config.StableEntityId = row.StableEntityId;
+                    changed = true;
+                }
+            }
+            ImGui::EndCombo();
+        }
+        const auto inputName =
+            std::string(Runtime::ToString(config.Positions.Domain)) + ": " + config.Positions.Name;
+        if (ImGui::BeginCombo("Positions##Density", inputName.c_str()))
+        {
+            const auto catalog = Runtime::GetEditorKernelDensityInputCatalog(context.GeometryCommands, config.StableEntityId);
+            auto previousDomain = Runtime::GeometryElementDomain::Unknown;
+            for (const auto &row : catalog.Entries)
+            {
+                if (row.Ref.Domain != previousDomain)
+                {
+                    ImGui::SeparatorText(std::string(Runtime::ToString(row.Ref.Domain)).c_str());
+                    previousDomain = row.Ref.Domain;
+                }
+                const auto label = std::string(Runtime::ToString(row.Ref.Domain)) + ": " + row.Ref.Name +
+                                   " (" + std::to_string(row.ElementCount) + ")";
+                if (ImGui::Selectable(label.c_str(), row.Ref == config.Positions))
+                {
+                    config.Positions = row.Ref;
+                    config.Density.Domain = row.Ref.Domain;
+                    changed = true;
+                }
+            }
+            ImGui::EndCombo();
+        }
+        for (auto [label, ref] : {std::pair{"Density property", &config.Density}})
+        {
+            std::array<char,512> name{};
+            std::copy_n(ref->Name.c_str(),std::min(ref->Name.size(),name.size()-1),name.data());
+            if (ImGui::InputText(label,name.data(),name.size())) {ref->Name=name.data();changed=true;}
+        }
+        int backend=int(config.Backend);
+        if(ImGui::Combo("Neighbors",&backend,"CPU octree\0CPU LBVH (cached)\0Vulkan LBVH\0")) {config.Backend=Runtime::KernelDensityBackend(backend);changed=true;}
+        changed |= ImGui::InputScalar("Neighbors k",ImGuiDataType_U32,&config.KNeighbors);
+        changed |= ImGui::InputFloat("Bandwidth (0 = automatic)",&config.Bandwidth);
+        ImGui::TextWrapped("Local Gaussian average over nearest candidates. Automatic bandwidth uses nearest-other spacing. Distances use the selected property coordinates.");
+        if(config.Backend==Runtime::KernelDensityBackend::VulkanLBVH)
+            changed |= ImGui::InputScalar("GPU query batch size",ImGuiDataType_U32,&config.GpuQueryBatchSize);
+        if(changed)
+        {
+            const auto applied=Runtime::ApplyEditorKernelDensityConfig(context.GeometryCommands,config);
+            Density.ConfigDiagnostic=applied.Succeeded()?"":"Controls were rejected by density config validation.";
+        }
+        if(!Density.ConfigDiagnostic.empty())ImGui::TextWrapped("%s",Density.ConfigDiagnostic.c_str());
+        auto analyze=config;
+        const auto readiness=Runtime::PreviewEditorKernelDensityCommand(context.GeometryCommands,analyze);
+        if(!readiness.Ready)ImGui::TextWrapped("%s",readiness.Diagnostic.c_str());
+        const auto execute=[&](Runtime::KernelDensityConfig request){
+            const auto applied=Runtime::ApplyEditorKernelDensityConfig(context.GeometryCommands,request);
+            if(applied.Succeeded())
+                PublishCommandResult(Density.LastResult,Runtime::ApplyEditorConfiguredKernelDensity(context.GeometryCommands),context.MethodResultSinks.KernelDensity);
+            else Density.ConfigDiagnostic="Density config was rejected.";
+        };
+        ImGui::BeginDisabled(!context.GeometryConfigCommandsAvailable || !readiness.Ready || !Density.ConfigDiagnostic.empty());
+        if(ImGui::Button("Estimate density"))execute(analyze);
+        ImGui::EndDisabled();
+        ImGui::TextWrapped("Vulkan computes neighbors; bandwidth and Gaussian evaluation run on CPU. The named density property supports Undo.");
+        auto density=readiness.Ready?readiness.Resolved.Density:config.Density;
+        if(ImGui::Button("Show density"))
+            Density.VisualizationDiagnostic=Runtime::DebugNameForEditorCommandStatus(Runtime::ApplyEditorVisualizationRecipeCommand(
+                context.VisualizationCommands,{.StableEntityId=config.StableEntityId,
+                .Recipe={.Data=Runtime::ScalarVisualizationRecipe{.Source=density,.OutputName=density.Name+".colors"}}}));
+        if(!Density.VisualizationDiagnostic.empty())ImGui::Text("Display: %s",Density.VisualizationDiagnostic.c_str());
+        if(Density.LastResult)
+        {
+            const auto& result=*Density.LastResult;
+            ImGui::Separator();
+            ImGui::Text("Status: %s",Runtime::DebugNameForEditorCommandStatus(result.Status));
+            ImGui::Text("Requested: %s; ran: %s",Runtime::ToString(result.RequestedBackend),result.ActualBackend.c_str());
+            ImGui::Text("Live / total: %zu / %zu",result.LiveCount,result.SlotCount);
+            ImGui::Text("Bandwidth %.5g; density min / mean / max: %.5g / %.5g / %.5g",double(result.UsedBandwidth),double(result.MinDensity),double(result.MeanDensity),double(result.MaxDensity));
+            ImGui::TextWrapped("%s",result.Message.c_str());
+            DrawDismissLastResultButton("Dismiss##Density",Density.LastResult,Runtime::EditorGeometryProcessingResultSlot::KernelDensity,context);
+        }
+        ImGui::End();
+    }
+
+    void MeshProcessingPanels::Impl::DrawSpacingWindow(bool &open, const SandboxEditorContext &context)
+    {
+        if (context.GeometryResults.LastPointSpacingResult)
+            Spacing.LastResult = context.GeometryResults.LastPointSpacingResult;
+        ImGui::SetNextWindowSize(ImVec2(460, 600), ImGuiCond_FirstUseEver);
+        if (!ImGui::Begin("Point Spacing and Radii", &open))
+        {
+            ImGui::End();
+            return;
+        }
+        const auto active = Runtime::GetEditorPointSpacingConfig(context.GeometryCommands)
+                                .value_or(Runtime::PointSpacingConfig{});
+        const auto serialized = Runtime::SerializePointSpacingConfig(active);
+        if (serialized != Spacing.LastApplied)
+        {
+            Spacing.Draft = active;
+            Spacing.LastApplied = serialized;
+            Spacing.ConfigDiagnostic.clear();
+        }
+        auto &config = Spacing.Draft;
+        bool changed = false;
+        const auto workspace =
+            Runtime::BuildEditorWorkspaceSnapshot(context.SnapshotQueries, {.Hierarchy = true,
+                                                                            .Inspector = false,
+                                                                            .Selection = false,
+                                                                            .Document = false,
+                                                                            .SceneFile = false,
+                                                                            .FileImport = false,
+                                                                            .AssetImportQueue = false,
+                                                                            .RenderGraph = false,
+                                                                            .RenderRecipe = false,
+                                                                            .CameraRender = false,
+                                                                            .Visualization = false});
+        if (context.Selection && !context.Selection->SelectedStableIds.empty() &&
+            ImGui::Button("Use selected entity"))
+        {
+            config.StableEntityId = context.Selection->SelectedStableIds.front();
+            changed = true;
+        }
+        std::string entityName =
+            config.StableEntityId ? std::to_string(config.StableEntityId) : "Choose entity";
+        for (const auto &row : workspace.Hierarchy)
+            if (row.StableEntityId == config.StableEntityId)
+                entityName = row.Name;
+        if (ImGui::BeginCombo("Entity##Spacing", entityName.c_str()))
+        {
+            for (const auto &row : workspace.Hierarchy)
+            {
+                if (Runtime::GetEditorPointSpacingInputCatalog(context.GeometryCommands,
+                                                                   row.StableEntityId)
+                        .Entries.empty())
+                    continue;
+                const auto title = row.Name + " (" + std::to_string(row.StableEntityId) + ")";
+                if (ImGui::Selectable(title.c_str(), row.StableEntityId == config.StableEntityId))
+                {
+                    config.StableEntityId = row.StableEntityId;
+                    changed = true;
+                }
+            }
+            ImGui::EndCombo();
+        }
+        const auto inputName =
+            std::string(Runtime::ToString(config.Positions.Domain)) + ": " + config.Positions.Name;
+        if (ImGui::BeginCombo("Positions##Spacing", inputName.c_str()))
+        {
+            const auto catalog = Runtime::GetEditorPointSpacingInputCatalog(context.GeometryCommands, config.StableEntityId);
+            auto previousDomain = Runtime::GeometryElementDomain::Unknown;
+            for (const auto &row : catalog.Entries)
+            {
+                if (row.Ref.Domain != previousDomain)
+                {
+                    ImGui::SeparatorText(std::string(Runtime::ToString(row.Ref.Domain)).c_str());
+                    previousDomain = row.Ref.Domain;
+                }
+                const auto label = std::string(Runtime::ToString(row.Ref.Domain)) + ": " + row.Ref.Name +
+                                   " (" + std::to_string(row.ElementCount) + ")";
+                if (ImGui::Selectable(label.c_str(), row.Ref == config.Positions))
+                {
+                    config.Positions = row.Ref;
+                    config.Radii.Domain = row.Ref.Domain;
+                    changed = true;
+                }
+            }
+            ImGui::EndCombo();
+        }
+        for (auto [label, ref] : {std::pair{"Radii property", &config.Radii}})
+        {
+            std::array<char,512> name{};
+            std::copy_n(ref->Name.c_str(),std::min(ref->Name.size(),name.size()-1),name.data());
+            if (ImGui::InputText(label,name.data(),name.size())) {ref->Name=name.data();changed=true;}
+        }
+        int backend=int(config.Backend);
+        if(ImGui::Combo("Neighbors",&backend,"CPU octree\0CPU LBVH (cached)\0Vulkan LBVH\0")) {config.Backend=Runtime::PointSpacingBackend(backend);changed=true;}
+        changed |= ImGui::InputScalar("Neighbors k",ImGuiDataType_U32,&config.KNeighbors);
+        changed |= ImGui::InputFloat("Radius scale",&config.ScaleFactor);
+        ImGui::TextWrapped("Radius = scale times mean retained neighbor distance. Nearest-other spacing is reported separately. Values use the selected property coordinates; coverage is not guaranteed.");
+        if(config.Backend==Runtime::PointSpacingBackend::VulkanLBVH)
+            changed |= ImGui::InputScalar("GPU query batch size",ImGuiDataType_U32,&config.GpuQueryBatchSize);
+        if(changed)
+        {
+            const auto applied=Runtime::ApplyEditorPointSpacingConfig(context.GeometryCommands,config);
+            Spacing.ConfigDiagnostic=applied.Succeeded()?"":"Controls were rejected by radii config validation.";
+        }
+        if(!Spacing.ConfigDiagnostic.empty())ImGui::TextWrapped("%s",Spacing.ConfigDiagnostic.c_str());
+        auto analyze=config;
+        const auto readiness=Runtime::PreviewEditorPointSpacingCommand(context.GeometryCommands,analyze);
+        if(!readiness.Ready)ImGui::TextWrapped("%s",readiness.Diagnostic.c_str());
+        const auto execute=[&](Runtime::PointSpacingConfig request){
+            const auto applied=Runtime::ApplyEditorPointSpacingConfig(context.GeometryCommands,request);
+            if(applied.Succeeded())
+                PublishCommandResult(Spacing.LastResult,Runtime::ApplyEditorConfiguredPointSpacing(context.GeometryCommands),context.MethodResultSinks.PointSpacing);
+            else Spacing.ConfigDiagnostic="Spacing config was rejected.";
+        };
+        ImGui::BeginDisabled(!context.GeometryConfigCommandsAvailable || !readiness.Ready || !Spacing.ConfigDiagnostic.empty());
+        if(ImGui::Button("Estimate radii"))execute(analyze);
+        ImGui::EndDisabled();
+        ImGui::TextWrapped("Vulkan computes neighbors; spacing and radii are evaluated on CPU. Undo restores the named radius property. Show radii maps values to colors; point rendering currently expects pixel sizes.");
+        auto radii=readiness.Ready?readiness.Resolved.Radii:config.Radii;
+        if(ImGui::Button("Show radii"))
+            Spacing.VisualizationDiagnostic=Runtime::DebugNameForEditorCommandStatus(Runtime::ApplyEditorVisualizationRecipeCommand(
+                context.VisualizationCommands,{.StableEntityId=config.StableEntityId,
+                .Recipe={.Data=Runtime::ScalarVisualizationRecipe{.Source=radii,.OutputName=radii.Name+".colors"}}}));
+        if(!Spacing.VisualizationDiagnostic.empty())ImGui::Text("Display: %s",Spacing.VisualizationDiagnostic.c_str());
+        if(Spacing.LastResult)
+        {
+            const auto& result=*Spacing.LastResult;
+            ImGui::Separator();
+            ImGui::Text("Status: %s",Runtime::DebugNameForEditorCommandStatus(result.Status));
+            ImGui::Text("Requested: %s; ran: %s",Runtime::ToString(result.RequestedBackend),result.ActualBackend.c_str());
+            ImGui::Text("Live / total: %zu / %zu",result.LiveCount,result.SlotCount);
+            ImGui::Text("Radius min / mean / max: %.5g / %.5g / %.5g",double(result.MinRadius),double(result.MeanRadius),double(result.MaxRadius));
+            ImGui::Text("Nearest spacing min / mean / max: %.5g / %.5g / %.5g", double(result.Statistics.MinSpacing), double(result.Statistics.AverageSpacing), double(result.Statistics.MaxSpacing));
+            ImGui::Text("Centroid: %.5g / %.5g / %.5g; bounds diagonal: %.5g", double(result.Statistics.Centroid.x), double(result.Statistics.Centroid.y), double(result.Statistics.Centroid.z), double(result.Statistics.BoundingBoxDiagonal));
+            ImGui::TextWrapped("%s",result.Message.c_str());
+            DrawDismissLastResultButton("Dismiss##Spacing",Spacing.LastResult,Runtime::EditorGeometryProcessingResultSlot::PointSpacing,context);
         }
         ImGui::End();
     }
