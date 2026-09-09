@@ -1,0 +1,31 @@
+Internal ctest changing into directory: /home/alex/Documents/IntrinsicEngine/build/ci-vulkan
+Test project /home/alex/Documents/IntrinsicEngine/build/ci-vulkan
+    Start  9: PointLBVHGpuSmoke.VulkanBuildAndQueriesMatchExhaustiveCpuAndReuseAllocations
+1/2 Test  #9: PointLBVHGpuSmoke.VulkanBuildAndQueriesMatchExhaustiveCpuAndReuseAllocations ...   Passed   16.72 sec
+    Start 10: PointLBVHGpuSmoke.FramedRegistrationReusesTargetAcrossRunsAndMatchesCpuSolve
+2/2 Test #10: PointLBVHGpuSmoke.FramedRegistrationReusesTargetAcrossRunsAndMatchesCpuSolve ...***Timeout  30.17 sec
+Running main() from /home/alex/Documents/IntrinsicEngine/external/vcpkg/buildtrees/gtest/src/v1.17.0-0c449efaff.clean/googletest/src/gtest_main.cc
+Note: Google Test filter = PointLBVHGpuSmoke.FramedRegistrationReusesTargetAcrossRunsAndMatchesCpuSolve
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from PointLBVHGpuSmoke
+[ RUN      ] PointLBVHGpuSmoke.FramedRegistrationReusesTargetAcrossRunsAndMatchesCpuSolve
+[32m[INFO] Initialized Scheduler with 15 worker threads.[0m
+[33m[WARN] [Runtime] Promoted Vulkan device selected; backend remains fail-closed until the first clean default-recipe validation promotes it.[0m
+[33m[WARN] [VulkanDevice::Initialize] Vulkan bootstrap created logical-device, queue, VMA, per-frame command/sync, swapchain image/view/handle, bindless heap, transfer queue, and global pipeline-layout state; canonical frame execution waits for the first clean recipe validation publish, so device remains non-operational during cold start.[0m
+[33m[WARN] [Runtime] VulkanRequestedButNotOperational status=RequestedButIncompleteGate reason=BarrierValidationFailed[0m
+
+
+50% tests passed, 1 tests failed out of 2
+
+Label Time Summary:
+gpu            =  46.89 sec*proc (2 tests)
+graphics       =  46.89 sec*proc (2 tests)
+integration    =  46.89 sec*proc (2 tests)
+vulkan         =  46.89 sec*proc (2 tests)
+
+Total Test time (real) =  48.70 sec
+
+The following tests FAILED:
+	 10 - PointLBVHGpuSmoke.FramedRegistrationReusesTargetAcrossRunsAndMatchesCpuSolve (Timeout)
+Errors while running CTest

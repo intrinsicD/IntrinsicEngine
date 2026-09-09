@@ -1301,6 +1301,8 @@ namespace Extrinsic::Runtime
     void RenderExtractionCache::State::SubmitSceneInteractionSnapshot(
         const RuntimeSceneInteractionRenderSnapshot& snapshot)
     {
+        m_SceneInteraction.DebugPoints = snapshot.DebugPoints;
+        m_SceneInteraction.DebugLines = snapshot.DebugLines;
         m_SceneInteraction.World = snapshot.World;
         m_SceneInteraction.SelectedRenderIds.assign(
             snapshot.SelectedRenderIds.begin(),
@@ -2132,6 +2134,8 @@ namespace Extrinsic::Runtime
         };
         if (interactionMatches)
         {
+            batch.DebugPoints = m_SceneInteraction.DebugPoints;
+            batch.DebugLines = m_SceneInteraction.DebugLines;
             batch.SelectionSelectedStableIds =
                 m_SceneInteraction.SelectedRenderIds;
             batch.SelectionHoveredStableId =

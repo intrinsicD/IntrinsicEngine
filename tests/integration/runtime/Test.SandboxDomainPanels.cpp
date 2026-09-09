@@ -91,16 +91,16 @@ TEST(SandboxDomainPanels, RegistersTheTenAppOwnedWindowsWithStableMenuMetadata)
     const std::array<ExpectedWindow, 10> expected{{
         {"pointcloud.appearance", {"PointCloud"}, "Appearance"},
         {"pointcloud.properties", {"PointCloud"}, "Properties"},
-        {"pointcloud.selection", {"PointCloud"}, "Selection details"},
+        {"pointcloud.selection", {"PointCloud"}, "Selection"},
         {"pointcloud.processing.remove_outliers",
          {"PointCloud", "Processing"},
          "Remove Outliers"},
         {"graph.appearance", {"Graph"}, "Appearance"},
         {"graph.properties", {"Graph"}, "Properties"},
-        {"graph.selection", {"Graph"}, "Selection details"},
+        {"graph.selection", {"Graph"}, "Selection"},
         {"mesh.appearance", {"Mesh"}, "Appearance"},
         {"mesh.properties", {"Mesh"}, "Properties"},
-        {"mesh.selection", {"Mesh"}, "Selection details"},
+        {"mesh.selection", {"Mesh"}, "Selection"},
     }};
 
     EditorUiShellHarness harness;

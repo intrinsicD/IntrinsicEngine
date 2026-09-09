@@ -2,6 +2,15 @@
 id: METHOD-027
 theme: I
 depends_on: [REVIEW-003, GEOM-013, METHOD-007]
+workflow_schema: 1
+workflow_profile: standard
+evidence: required
+owner:
+branch:
+worktree:
+claimed_at:
+contract_schema: 1
+contracts: [repo.source-documentation, geometry.element-domain-sources, method.engine-integration]
 ---
 # METHOD-027 — Adaptive Delaunay/QEF implicit meshing reference
 
@@ -82,6 +91,28 @@ depends_on: [REVIEW-003, GEOM-013, METHOD-007]
 - Backend axis: deterministic `cpu_reference` only. No optimized CPU or GPU
   backend is owed unless the reference survives the evidence gate and a later
   task names a concrete consumer.
+
+## Engine integration
+
+| Field | Disposition |
+| --- | --- |
+| Least-structured input | An implicit field oracle and selected exact Delaunay/QEF inputs; mesh topology is required only by a mesh-backed oracle. |
+| Compatible entity sources | Every canonical property/topology source satisfying the input above; binding is owned by METHOD-003A after reference acceptance and selection. |
+| RuntimeModule | Deferred to [METHOD-003A](METHOD-003A-spatial-query-reference-integration-intake.md), which allocates the concrete operation owner without widening this reference slice. |
+| Config/agent | Typed reference parameters now; METHOD-003A owns validated serializable engine controls at adoption. |
+| UI | METHOD-003A owns adoption/discovery planning; no editor-integrated claim from this CPU slice. |
+| Publication | Return a new mesh with diagnostics, preserving any source geometry; runtime ownership/history is a later adoption decision. METHOD-003A owns engine publication planning. |
+| End-to-end tests | Reference/oracle and method tests here; METHOD-003A allocates compatible-source/config/publication/UI coverage at adoption. |
+
+## Spatial acceleration consideration
+
+Consider index reuse only for actual sample proximity, constraint candidates or
+mesh-backed implicit/closest-surface oracles. Point LBVH does not supply Delaunay
+containment, exact insertion predicates, a field discretization or triangle
+distance. Keep the 2D killing slice and CPU scope; if 3D is admitted, reuse exact
+primitive queries and rebuild any changed sample/primitive index explicitly.
+
+See the [shared spatial-index consumer inventory](../../../docs/architecture/spatial-index-consumers.md).
 
 ## Required changes
 

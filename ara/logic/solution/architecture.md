@@ -736,3 +736,10 @@
 - **Evidence**: [tasks/done/ARCH-017-framework24-product-convergence-gate.md,
   tasks/done/ARCH-018-framework24-feature-parity-goal-clarification.md,
   docs/product/framework24-convergence.md]
+
+## A46: Runtime-owned spatial indices and reusable method workspaces
+- **Decision**: Entity point indices are derived runtime state, qualified by world/entity generation and canonical property/domain revisions. GPU buffers stay outside ECS components. Stable sources share lazy cached indices; changing temporary method targets rebuild a private reusable workspace. Both paths use the same lower-level LBVH construction/query kernels. The current implementation has fixed build parameters and one device lifetime per owner; future tunable parameters or device replacement must participate in identity/invalidation.
+- **Provenance**: user-revised
+- **Crystallized via**: verbal-affirmation
+- **Evidence**: [N497, src/runtime/GeometryIntegration/Runtime.SpatialIndexCache.cppm, src/graphics/renderer/Graphics.PointLBVH.cppm, src/runtime/Modules/Clustering/Runtime.ClusteringGpuState.cpp, docs/architecture/spatial-indices.md]
+- **From staging**: O202

@@ -42,6 +42,15 @@ maturity_target: Operational
 | Publication | Display same-domain output and history consequences. |
 | End-to-end tests | Menu/property discovery, config/backend routing, diagnostics, visualization, undo/redo. |
 
+## Spatial acceleration consideration
+
+Preserve the existing Vulkan k-means LBVH diagnostic and sole ClusteringService
+config path when adding property-domain controls. Moving-centroid workspace reuse
+stays in runtime; the panel must not build an entity centroid component or infer
+that the CPU path also uses LBVH.
+
+See the [shared spatial-index consumer inventory](../../../docs/architecture/spatial-index-consumers.md).
+
 ## Required changes
 
 - [ ] Replace vertex-only choices with compatible catalog rows, grouped by

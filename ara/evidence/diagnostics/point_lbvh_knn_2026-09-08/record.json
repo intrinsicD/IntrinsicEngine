@@ -1,0 +1,69 @@
+{
+  "recorded_at": "2026-09-08T19:44:10+02:00",
+  "base_commit": "314db9ea5be314c732458649775103c461992fbb",
+  "source_state": "dirty_worktree",
+  "claim_eligible": false,
+  "source_sha256": {
+    "CMakePresets.json": "773fdc8903c975001628b849497cdec7827839827fd8e0e8a9c18f497c78e085",
+    "tests/CMakeLists.txt": "f30380f23b62b41a85fac8c637e5e28a01884d1914e8fc98adcae465b2270a0f",
+    "src/geometry/Geometry.PointLBVH.cppm": "cc18499152956ee15c77a52dae6582fd4df0896b5c2afa95aca12f0883dff176",
+    "src/geometry/Geometry.PointLBVH.cpp": "e7e1f18f640dadcf76f8660c34780580eb1bb5ed2b8da710aa305488c62eb676",
+    "src/geometry/Geometry.PointCloud.Normals.cppm": "f9178632f0426a390ac013a560d56221b61bc53d6b1f20d189cb15c6409ad7bc",
+    "src/geometry/Geometry.PointCloud.Normals.cpp": "63595dfa622969324b898daa9969e56df24ea8ecf06294d087b2230ae553d619",
+    "src/geometry/Geometry.KDTree.cppm": "139fb1b4f1175eb14f80567d6e8c4111e07dfbd61fd965aeaacd503e543d5c35",
+    "src/geometry/Geometry.KDTree.cpp": "5ab92b1f8eb8030ddbc7f3a7045f1f0b642dd525846c99019024523a3515c560",
+    "src/graphics/renderer/Graphics.PointLBVH.cppm": "2903ac75815b6fa9a0d73b2a3725a9c7f9d25ae32862d583bf094e69de609e2b",
+    "src/graphics/renderer/Graphics.PointLBVH.cpp": "45d35835edee280f457b444c580dfd58682a1a673c5bf59309a16a546bf476a1",
+    "assets/shaders/lbvh_query.comp": "aa2ad7c9681e2e0a5380c35c3b19e94f54e48fd450a945f7b4463ad3793d5f39",
+    "assets/shaders/include/point_lbvh.glsl": "b54d1c31104093f1192b7d388cfcb61ae68db01b8e2e38fa2fe0297bfce7ca97",
+    "src/runtime/GeometryIntegration/Runtime.SpatialIndexCache.cppm": "5e15fbcf69002a92cf210c7d877500569b5994f601f849dc3e287359dd52cf3e",
+    "src/runtime/GeometryIntegration/Runtime.SpatialIndexCache.cpp": "a159c6a936dc0c769631f7f824f80da1e73a7f701b5e82a54981e92459694707",
+    "tests/unit/geometry/Test.PointLBVH.cpp": "9c931aab0838d268236dcc1f907487ef58e2fe98f859bfd4b53e65e965b030e9",
+    "tests/contract/runtime/Test.SpatialIndexCache.cpp": "816d5506aaecf1330867adb800d3abf6de9806d8118b50bd3a66a43952138239",
+    "tests/integration/graphics/Test.PointLBVHGpuSmoke.cpp": "aa28f748bee8c508bcd97a782a1944ff964bdc60325686fcfedfe5de711fc7e9",
+    "tests/integration/runtime/Test.ClusteringServiceGpuSmoke.cpp": "511beb16fc833b32f3380964ba8b18d9bb323b54741334760e5f83871bc9659a",
+    "benchmarks/geometry/Bench.PointLBVHSmoke.cpp": "b83c43aacb7f875124327e73d6e0fa1e468c399d3ae43192f8d94751adebbdb4",
+    "benchmarks/geometry/Bench.PointLBVHSmoke.hpp": "dc12422090e907db45f4cb69761d6e46971ba7de4506714ea6fb75cced4bb839",
+    "benchmarks/geometry/manifests/point_lbvh_knn_smoke.yaml": "9a89876d316887e1874c8969cb14fa9da42025d6be992a050f41da3b8b18ea11",
+    "benchmarks/runners/BenchmarkSmokeRunner.cpp": "ca35b87650c890fb3542bec4e0f2257b64c695ad60e15d773823bbb5b5e6f667",
+    "methods/geometry/point_lbvh/method.yaml": "b4453bca023605d18dafc525ff44242ed5f52ab50c69a548c5e2dddbfdd58ed5",
+    "methods/geometry/point_lbvh/paper.md": "b9be5d66656ed055f3127b73f432e3e6b81176500ddff6064cb3365391f69f15"
+  },
+  "compiler": "Clang 23",
+  "cpu": {
+    "preset": "ci",
+    "sanitizers": "none",
+    "selected": 4352,
+    "passed": 4351,
+    "skipped": 1,
+    "failed": 0,
+    "elapsed_seconds": 107.53,
+    "skip": "GlfwLifecycleLsan.EngineStaticTeardownAndLeakControl; expected unsanitized skip"
+  },
+  "vulkan": {
+    "preset": "ci-vulkan",
+    "sanitizers": "address,undefined; existing detect_leaks=0 cohort",
+    "passed_cases": 5,
+    "skipped": 0,
+    "initial_fixture_failure": "FramedKNearest exited during normal cold-start promotion; fixed startup wait only. First three query/ICP cases passed before that fixture-only edit; final framed kNN and k-means tests passed.",
+    "proof": [
+      "vulkan-first-run.txt",
+      "vulkan-final-focused.txt",
+      "gpu-registry.txt"
+    ]
+  },
+  "benchmark": {
+    "proof": "benchmarks/cpu-knn-pca-smoke.json",
+    "runner_results": 34,
+    "schema_v2_validated": 34,
+    "query_mismatches": 0,
+    "normal_error_linf": 0.0,
+    "scope": "512-point paraboloid; query k=16, normal k=15; warmup=1, measured=4. Background compilation present. Supplied PCA excludes separately reported LBVH build; KD-tree PCA includes its internal build. No performance claim or default change."
+  },
+  "limits": [
+    "GPU k=1..64; arbitrary subset predicates, triangle/ray support and GPU PCA solve excluded.",
+    "Normal config/UI/publication: RUNTIME-213/UI-045; outlier adapters: RUNTIME-209/UI-041.",
+    "BUG-177 pre-existing root-hygiene warning and BUG-180 leak-enabled retention remain unresolved.",
+    "Full ci-asan/ci-ubsan CPU gates were not rerun in this turn; GPU cohort sanitizer evidence is distinct."
+  ]
+}

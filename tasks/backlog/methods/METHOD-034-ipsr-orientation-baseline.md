@@ -29,7 +29,7 @@ contracts: [geometry.element-domain-sources, method.engine-integration]
 ## Context
 - Paper/method: Hou, Wang, Bao, et al. — "Iterative Poisson Surface Reconstruction (iPSR) for Unoriented Points", SIGGRAPH 2022.
 - Method package: `methods/geometry/ipsr/`; implementation is package-local (`include/` + `src/`, the `progressive_poisson` pattern) — a research baseline does not warrant a `src/geometry` module surface.
-- Reuse: `Geometry.SurfaceReconstruction.Poisson` (`METHOD-033`) for the inner solve; `Geometry.KDTree` for point-to-face normal transfer; `Geometry.PointCloud.SurfaceSampling` for fixtures.
+- Reuse: `Geometry.SurfaceReconstruction.Poisson` (`METHOD-033`) for the inner solve; `Geometry.MeshClosestFace` for the declared exact nearest-face normal transfer; `Geometry.PointCloud.SurfaceSampling` for fixtures. A sampled/centroid transfer is a distinct approximation requiring an explicit intake decision.
 - Seeding: iPSR legitimately requires an RNG for the initial normals; the seed is an explicit param, and the `METHOD-036` comparison protocol pins it.
 - Diagnostics use the same orientation-correctness definition as METHOD-032,
   plus iterations and final flip fraction. Shared names alone do not make
@@ -51,6 +51,17 @@ contracts: [geometry.element-domain-sources, method.engine-integration]
 | UI | Not applicable to the deliberately comparison-only baseline; any later production promotion requires a separate task. |
 | Publication | Return float normals with unchanged input cardinality/order, plus status/diagnostics; do not mutate ECS or source topology. METHOD-036 stores result evidence only. |
 | End-to-end tests | METHOD-036 owns benchmark invocation/input-identity/result-validation coverage; this task owns CPU convergence, determinism, and failure controls. No editor-integration claim is owed. |
+
+## Spatial acceleration consideration
+
+Normal transfer from an evolving reconstructed surface needs an index rebuilt
+after each reconstruction. For the declared nearest-face semantics use
+MeshClosestFaceIndex (triangle bounds plus exact projection), not nearest face
+centroids. A point KD-tree/LBVH fits only an explicitly sampled approximate
+transfer selected during joint intake; a future GPU triangle hierarchy is separate
+work.
+
+See the [shared spatial-index consumer inventory](../../../docs/architecture/spatial-index-consumers.md).
 
 ## Required changes
 - [ ] Complete primary-source intake with METHOD-033, confirming the inner

@@ -8,11 +8,17 @@ picking backlog work; theme priorities and rationale live in
 
 ## Active tasks
 
+- `BUG-179` — Framed ICP comparison exceeds the cohort timeout with display off (tasks/active/BUG-179-framed-icp-display-off-timeout.md)
+- `GEOM-077` — Shared point-LBVH k-nearest and exclusion queries (tasks/active/GEOM-077-point-lbvh-knn-exclusion.md)
 - `METHOD-040` — Global multicut curvature-patch CPU reference (tasks/active/METHOD-040-global-multicut-curvature-patch-reference.md)
 - `METHOD-042` — Region-aware parts experiment (tasks/active/METHOD-042-region-aware-parts-experiment.md)
 - `METHOD-043` — Thickness and curve-aligned parts comparison (tasks/active/METHOD-043-thickness-and-curve-parts-comparison.md)
 - `METHOD-044` — Feature-aware patches and distortion-aware atlas merging (tasks/active/METHOD-044-feature-aware-atlas-merge-experiment.md)
 - `METHOD-045` — Preserve baseline regions while constructing UV charts (tasks/active/METHOD-045-baseline-preserving-atlas-cuts.md)
+- `RUNTIME-207` — ICP element-domain source integration (tasks/active/RUNTIME-207-icp-element-domain-source-integration.md)
+- `RUNTIME-213` — Point-set normal property-domain integration (tasks/active/RUNTIME-213-point-normal-property-domain-integration.md)
+- `UI-040` — ICP compatible-source selection and discovery (tasks/active/UI-040-icp-compatible-source-selection.md)
+- `UI-045` — Point-set normal property-domain panel (tasks/active/UI-045-point-normal-property-domain-panel.md)
 - `UI-053` — Curvature-extremum engine overlay (tasks/active/UI-053-curvature-extremum-engine-overlay.md)
 
 ## Theme B — Rendering modernization
@@ -75,6 +81,7 @@ picking backlog work; theme priorities and rationale live in
 - blocked by `METHOD-040`: `GEOM-076` — Evidence-gated curvature-region UV atlas cuts (tasks/backlog/geometry/GEOM-076-curvature-region-guided-uv-atlas-cuts.md)
 - blocked by `METHOD-014`: `HARDEN-084` — Localized CPU/GPU parity signatures (tasks/backlog/methods/HARDEN-084-localized-cpu-gpu-parity-signatures.md)
 - unblocked: `METHOD-003` — Closest Point Method PDE solver reference backend (tasks/backlog/methods/METHOD-003-closest-point-method-pde-reference-backend.md)
+- unblocked: `METHOD-003A` — Spatial-query CPU-reference integration intake (tasks/backlog/methods/METHOD-003A-spatial-query-reference-integration-intake.md)
 - unblocked: `METHOD-004` — Walk on Stars PDE solver reference backend (tasks/backlog/methods/METHOD-004-walk-on-spheres-reference-backend.md)
 - unblocked: `METHOD-005` — Robust mesh boolean reference backend (tasks/backlog/methods/METHOD-005-robust-mesh-boolean-reference-backend.md)
 - blocked by `GEOM-024`: `METHOD-006` — Surface cross-field design CPU reference backend (tasks/backlog/methods/METHOD-006-cross-field-design-reference-backend.md)
@@ -98,18 +105,14 @@ picking backlog work; theme priorities and rationale live in
 - blocked by `METHOD-033`: `METHOD-034` — iPSR normal orientation baseline (reference backend) (tasks/backlog/methods/METHOD-034-ipsr-orientation-baseline.md)
 - unblocked: `METHOD-035` — Parametric Gauss (winding-number) orientation baseline (reference backend) (tasks/backlog/methods/METHOD-035-pgr-winding-number-orientation-baseline.md)
 - blocked by `METHOD-032`: `METHOD-036` — Normal-orientation method comparison evidence (publication protocol) (tasks/backlog/methods/METHOD-036-orientation-comparison-evidence.md)
-- unblocked: `RUNTIME-207` — ICP element-domain source integration (tasks/backlog/runtime/RUNTIME-207-icp-element-domain-source-integration.md)
 - unblocked: `RUNTIME-209` — Point-set outlier analysis and publication split (tasks/backlog/runtime/RUNTIME-209-point-set-outlier-analysis-publication.md)
 - unblocked: `RUNTIME-210` — Signed Heat runtime and config integration (tasks/backlog/runtime/RUNTIME-210-signed-heat-runtime-config-integration.md)
 - unblocked: `RUNTIME-211` — K-Means property-domain integration (tasks/backlog/runtime/RUNTIME-211-kmeans-property-domain-integration.md)
 - unblocked: `RUNTIME-212` — Progressive Poisson property-domain publication (tasks/backlog/runtime/RUNTIME-212-progressive-poisson-property-domain-publication.md)
-- unblocked: `RUNTIME-213` — Point-set normal property-domain integration (tasks/backlog/runtime/RUNTIME-213-point-normal-property-domain-integration.md)
-- blocked by `RUNTIME-207`: `UI-040` — ICP compatible-source selection and discovery (tasks/backlog/ui/UI-040-icp-compatible-source-selection.md)
 - blocked by `RUNTIME-209`: `UI-041` — Point-set outlier multi-domain panel (tasks/backlog/ui/UI-041-point-set-outlier-multi-domain-panel.md)
 - blocked by `RUNTIME-210`: `UI-042` — Signed Heat mesh method panel (tasks/backlog/ui/UI-042-signed-heat-mesh-panel.md)
 - blocked by `RUNTIME-211`: `UI-043` — K-Means property-domain panel (tasks/backlog/ui/UI-043-kmeans-property-domain-panel.md)
 - blocked by `RUNTIME-212`: `UI-044` — Progressive Poisson property-domain panel (tasks/backlog/ui/UI-044-progressive-poisson-property-domain-panel.md)
-- blocked by `RUNTIME-213`: `UI-045` — Point-set normal property-domain panel (tasks/backlog/ui/UI-045-point-normal-property-domain-panel.md)
 
 ## Theme J — Framework24 product convergence
 
@@ -132,6 +135,8 @@ picking backlog work; theme priorities and rationale live in
 ## Unthemed
 
 - unblocked: `BUG-177` — Root hygiene rejects local agent metadata (tasks/backlog/bugs/BUG-177-root-hygiene-local-agent-metadata.md)
+- unblocked: `BUG-178` — Clang 23 crashes during an incremental module rebuild (tasks/backlog/bugs/BUG-178-clang23-incremental-module-ice.md)
+- unblocked: `BUG-180` — Leak-enabled framed ICP process reports 240 retained bytes (tasks/backlog/bugs/BUG-180-framed-icp-leak-enabled-process-retention.md)
 - unblocked: `GRAPHICS-109` — Offscreen frame capture to PNG (headless figure renders) (tasks/backlog/rendering/GRAPHICS-109-offscreen-frame-capture-png.md)
 
 ## Audits

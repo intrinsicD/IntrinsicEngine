@@ -42,6 +42,15 @@ maturity_target: Operational
 | Publication | Visualize named same-domain hierarchy properties. |
 | End-to-end tests | Property discovery, CPU/GPU routing, visualization, disabled reasons, history. |
 
+## Spatial acceleration consideration
+
+Preserve the existing sampler backend/phase semantics through RUNTIME-212. A
+future LBVH query backend needs algorithm-level active-set and parity evidence
+before any selector appears; this property-selection panel adds no private spatial
+index.
+
+See the [shared spatial-index consumer inventory](../../../docs/architecture/spatial-index-consumers.md).
+
 ## Required changes
 
 - [ ] Populate compatible properties from the canonical runtime catalog and

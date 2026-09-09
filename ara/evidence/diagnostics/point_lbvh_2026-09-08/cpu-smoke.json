@@ -1,0 +1,64 @@
+{
+  "attempt_id": "attempt-002",
+  "backend": "cpu_reference",
+  "benchmark_id": "geometry.point_lbvh.smoke",
+  "claim_eligible": false,
+  "commit": "local-dev",
+  "config_digest": "143720a539c0474f31b2af8f749bebb94e8d65a0784684d18d771afd1def2536",
+  "dataset": "builtin.grid3d.8",
+  "diagnostics": {
+    "index_mismatches": 0,
+    "measured_iterations": 8,
+    "mode": "smoke",
+    "runner": "IntrinsicBenchmarkSmoke",
+    "warmup_iterations": 1
+  },
+  "execution_status": "passed",
+  "manifest": {
+    "path": "benchmarks/geometry/manifests/point_lbvh_smoke.yaml",
+    "sha256": "4b75f37fe891d52b8ad7e0f8c08bfa10e032b182fdf4ab58ec1e2dbff798a4e6"
+  },
+  "method": "geometry.point_lbvh",
+  "metrics": {
+    "quality_error_linf": 0,
+    "runtime_ms": 5.13809
+  },
+  "resolved_params": {
+    "intent": "smoke",
+    "measured_iterations": 8,
+    "warmup_iterations": 1
+  },
+  "run_id": "lbvh-2026-09-08-local",
+  "schema_version": 2,
+  "source": {
+    "revision": "local-dev",
+    "state": "dirty_worktree"
+  },
+  "status": "passed",
+  "threshold_disposition": [
+    {
+      "limit": 250,
+      "metric": "runtime_ms",
+      "observed": 5.13809,
+      "operator": "<=",
+      "passed": true,
+      "threshold": "smoke_runtime_ms_max"
+    },
+    {
+      "limit": 0,
+      "metric": "quality_error_linf",
+      "observed": 0,
+      "operator": "<=",
+      "passed": true,
+      "threshold": "quality_error_linf_max"
+    }
+  ],
+  "thresholds": {
+    "quality_error_linf_max": 0,
+    "smoke_runtime_ms_max": 250
+  },
+  "warmup_policy": {
+    "measured_iterations": 8,
+    "warmup_iterations": 1
+  }
+}

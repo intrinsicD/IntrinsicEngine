@@ -1,3 +1,4 @@
+// Extracts owned runtime render snapshots and geometry uploads from canonical scene sources.
 module;
 
 #include <cstddef>
@@ -300,6 +301,8 @@ export namespace Extrinsic::Runtime
         bool HasHovered{false};
         std::uint32_t HoveredRenderId{0u};
         std::vector<Graphics::TransformGizmoRenderPacket> GizmoDrawPackets{};
+        std::vector<Graphics::DebugPointPacket> DebugPoints{};
+        std::vector<Graphics::DebugLinePacket> DebugLines{};
     };
 
     // GRAPHICS-036B — copy the authoritative `RenderWorldPool` diagnostics

@@ -1,24 +1,11 @@
 #version 460
-
-// GEOM-056 Slice B — k-means assignment (the hot pass).
-//
-// One invocation per point: find the nearest centroid under squared Euclidean
-// distance, and write the label and squared distance. The update pass performs
-// the per-cluster scan so this shader does not require optional float or int64
-// atomic features. Dispatched with ceil(PointCount / GroupSize).
-
-#extension GL_EXT_scalar_block_layout : require
-#extension GL_EXT_buffer_reference2 : require
-#extension GL_EXT_shader_explicit_arithmetic_types_int64 : require
-
-layout(local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
-
-const uint KMEANS_SHARED_CLUSTER_CAPACITY = 256u;
-
+// Batched nearest-centroid assignment through the shared device LBVH.
+#extension GL_GOOGLE_include_directive : require
+#include "include/point_lbvh.glsl"
+layout(local_size_x=256) in;
 layout(buffer_reference, scalar) readonly buffer FloatArrayRO { float Values[]; };
 layout(buffer_reference, scalar) buffer FloatArray { float Values[]; };
 layout(buffer_reference, scalar) buffer UIntArray { uint Values[]; };
-
 layout(buffer_reference, scalar) readonly buffer KMeansStateRef
 {
     uint64_t PositionXBDA;
@@ -44,82 +31,17 @@ layout(push_constant, scalar) uniform KMeansPush
     uint Iteration;
     float ConvergenceTolSquared;
     float Reserved0;
+    uint64_t NodesBDA;
 } pc;
-
-shared float sCentroidX[KMEANS_SHARED_CLUSTER_CAPACITY];
-shared float sCentroidY[KMEANS_SHARED_CLUSTER_CAPACITY];
-shared float sCentroidZ[KMEANS_SHARED_CLUSTER_CAPACITY];
 
 void main()
 {
-    if (pc.StateBDA == uint64_t(0))
-    {
-        return;
-    }
-
-    KMeansStateRef state = KMeansStateRef(pc.StateBDA);
-    FloatArrayRO centroids = FloatArrayRO(state.CentroidsBDA);
-
-    const bool useSharedReduction =
-        pc.ClusterCount <= KMEANS_SHARED_CLUSTER_CAPACITY;
-    if (useSharedReduction)
-    {
-        for (uint cluster = gl_LocalInvocationID.x;
-             cluster < pc.ClusterCount;
-             cluster += gl_WorkGroupSize.x)
-        {
-            sCentroidX[cluster] = centroids.Values[cluster * 3u + 0u];
-            sCentroidY[cluster] = centroids.Values[cluster * 3u + 1u];
-            sCentroidZ[cluster] = centroids.Values[cluster * 3u + 2u];
-        }
-        barrier();
-    }
-
-    const uint index = gl_GlobalInvocationID.x;
-    const bool activePoint = index < pc.PointCount;
-    if (!activePoint && !useSharedReduction)
-    {
-        return;
-    }
-
-    if (activePoint)
-    {
-        FloatArrayRO px = FloatArrayRO(state.PositionXBDA);
-        FloatArrayRO py = FloatArrayRO(state.PositionYBDA);
-        FloatArrayRO pz = FloatArrayRO(state.PositionZBDA);
-
-        const float x = px.Values[index];
-        const float y = py.Values[index];
-        const float z = pz.Values[index];
-
-        uint bestCluster = 0u;
-        float bestDistance = 3.402823466e+38; // FLT_MAX
-        for (uint cluster = 0u; cluster < pc.ClusterCount; ++cluster)
-        {
-            const float cx = useSharedReduction
-                ? sCentroidX[cluster]
-                : centroids.Values[cluster * 3u + 0u];
-            const float cy = useSharedReduction
-                ? sCentroidY[cluster]
-                : centroids.Values[cluster * 3u + 1u];
-            const float cz = useSharedReduction
-                ? sCentroidZ[cluster]
-                : centroids.Values[cluster * 3u + 2u];
-            const float dx = x - cx;
-            const float dy = y - cy;
-            const float dz = z - cz;
-            const float distance = dx * dx + dy * dy + dz * dz;
-            if (distance < bestDistance)
-            {
-                bestDistance = distance;
-                bestCluster = cluster;
-            }
-        }
-
-        // Publish per-point outputs. Only this invocation touches these slots.
-        UIntArray labels = UIntArray(state.LabelsBDA);
-        FloatArray distances = FloatArray(state.SquaredDistancesBDA);
-        labels.Values[index] = bestCluster;
-        distances.Values[index] = bestDistance;
-    }
+    uint i=gl_GlobalInvocationID.x;
+    if(i>=pc.PointCount || pc.StateBDA==uint64_t(0) || pc.NodesBDA==uint64_t(0))return;
+    KMeansStateRef state=KMeansStateRef(pc.StateBDA);
+    vec3 p=vec3(FloatArrayRO(state.PositionXBDA).Values[i],
+                FloatArrayRO(state.PositionYBDA).Values[i],FloatArrayRO(state.PositionZBDA).Values[i]);
+    LbvhNeighbor nearest=lbvhNearest(pc.NodesBDA,pc.ClusterCount,p);
+    UIntArray(state.LabelsBDA).Values[i]=nearest.index;
+    FloatArray(state.SquaredDistancesBDA).Values[i]=nearest.distance;
 }

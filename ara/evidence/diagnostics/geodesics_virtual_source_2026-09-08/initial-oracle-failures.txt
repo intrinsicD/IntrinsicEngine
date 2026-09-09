@@ -1,0 +1,140 @@
+Internal ctest changing into directory: /home/alex/Documents/IntrinsicEngine/build/ci
+Test project /home/alex/Documents/IntrinsicEngine/build/ci
+    Start 2379: GeodesicVirtualSource.BoundaryAndInteriorSourcesBoundPlanarError
+1/8 Test #2379: GeodesicVirtualSource.BoundaryAndInteriorSourcesBoundPlanarError ........***Failed    0.01 sec
+Running main() from /home/alex/Documents/IntrinsicEngine/external/vcpkg/buildtrees/gtest/src/v1.17.0-0c449efaff.clean/googletest/src/gtest_main.cc
+Note: Google Test filter = GeodesicVirtualSource.BoundaryAndInteriorSourcesBoundPlanarError
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from GeodesicVirtualSource
+[ RUN      ] GeodesicVirtualSource.BoundaryAndInteriorSourcesBoundPlanarError
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.GeodesicVirtualSource.cpp:52: Failure
+The difference between result.Distances[v] and exact is 0.06449510224598054, which exceeds source == 40 ? 1e-5 : std::max(1e-5, .01 * exact), where
+result.Distances[v] evaluates to 5.0644951022459805,
+exact evaluates to 5, and
+source == 40 ? 1e-5 : std::max(1e-5, .01 * exact) evaluates to 1.0000000000000001e-05.
+7
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.GeodesicVirtualSource.cpp:52: Failure
+The difference between result.Distances[v] and exact is 0.1847650034713979, which exceeds source == 40 ? 1e-5 : std::max(1e-5, .01 * exact), where
+result.Distances[v] evaluates to 5.8416192529637785,
+exact evaluates to 5.6568542494923806, and
+source == 40 ? 1e-5 : std::max(1e-5, .01 * exact) evaluates to 1.0000000000000001e-05.
+8
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.GeodesicVirtualSource.cpp:52: Failure
+The difference between result.Distances[v] and exact is 0.044730264408896048, which exceeds source == 40 ? 1e-5 : std::max(1e-5, .01 * exact), where
+result.Distances[v] evaluates to 3.6502815398728852,
+exact evaluates to 3.6055512754639891, and
+source == 40 ? 1e-5 : std::max(1e-5, .01 * exact) evaluates to 1.0000000000000001e-05.
+15
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.GeodesicVirtualSource.cpp:52: Failure
+The difference between result.Distances[v] and exact is 0.22949526788029484, which exceeds source == 40 ? 1e-5 : std::max(1e-5, .01 * exact), where
+result.Distances[v] evaluates to 4.4721359549995796,
+exact evaluates to 4.2426406871192848, and
+source == 40 ? 1e-5 : std::max(1e-5, .01 * exact) evaluates to 1.0000000000000001e-05.
+16
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.GeodesicVirtualSource.cpp:52: Failure
+The difference between result.Distances[v] and exact is 0.064495102245979652, which exceeds source == 40 ? 1e-5 : std::max(1e-5, .01 * exact), where
+result.Distances[v] evaluates to 5.0644951022459797,
+exact evaluates to 5, and
+source == 40 ? 1e-5 : std::max(1e-5, .01 * exact) evaluates to 1.0000000000000001e-05.
+17
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.GeodesicVirtualSource.cpp:52: Failure
+The difference between result.Distances[v] and exact is 0.04473026440889516, which exceeds source == 40 ? 1e-5 : std::max(1e-5, .01 * exact), where
+result.Distances[v] evaluates to 3.6502815398728843,
+exact evaluates to 3.6055512754639891, and
+source == 40 ? 1e-5 : std::max(1e-5, .01 * exact) evaluates to 1.0000000000000001e-05.
+25
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.GeodesicVirtualSource.cpp:52: Failure
+The difference between result.Distances[v] and exact is 0.019764837837083604, which exceeds source == 40 ? 1e-5 : std::max(1e-5, .01 * exact), where
+result.Distances[v] evaluates to 5.0197648378370836,
+exact evaluates to 5, and
+source == 40 ? 1e-5 : std::max(1e-5, .01 * exact) evaluates to 1.0000000000000001e-05.
+63
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.GeodesicVirtualSource.cpp:52: Failure
+The difference between result.Distances[v] and exact is 0.18476500347139879, which exceeds source == 40 ? 1e-5 : std::max(1e-5, .01 * exact), where
+result.Distances[v] evaluates to 5.8416192529637794,
+exact evaluates to 5.6568542494923806, and
+source == 40 ? 1e-5 : std::max(1e-5, .01 * exact) evaluates to 1.0000000000000001e-05.
+72
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.GeodesicVirtualSource.cpp:52: Failure
+The difference between result.Distances[v] and exact is 0.019764837837083604, which exceeds source == 40 ? 1e-5 : std::max(1e-5, .01 * exact), where
+result.Distances[v] evaluates to 5.0197648378370836,
+exact evaluates to 5, and
+source == 40 ? 1e-5 : std::max(1e-5, .01 * exact) evaluates to 1.0000000000000001e-05.
+73
+
+[  FAILED  ] GeodesicVirtualSource.BoundaryAndInteriorSourcesBoundPlanarError (2 ms)
+[----------] 1 test from GeodesicVirtualSource (2 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (2 ms total)
+[  PASSED  ] 0 tests.
+[  FAILED  ] 1 test, listed below:
+[  FAILED  ] GeodesicVirtualSource.BoundaryAndInteriorSourcesBoundPlanarError
+
+ 1 FAILED TEST
+
+    Start 2380: GeodesicVirtualSource.FoldedSurfaceUsesIntrinsicDistanceAndScales
+2/8 Test #2380: GeodesicVirtualSource.FoldedSurfaceUsesIntrinsicDistanceAndScales .......***Failed    0.01 sec
+Running main() from /home/alex/Documents/IntrinsicEngine/external/vcpkg/buildtrees/gtest/src/v1.17.0-0c449efaff.clean/googletest/src/gtest_main.cc
+Note: Google Test filter = GeodesicVirtualSource.FoldedSurfaceUsesIntrinsicDistanceAndScales
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from GeodesicVirtualSource
+[ RUN      ] GeodesicVirtualSource.FoldedSurfaceUsesIntrinsicDistanceAndScales
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.GeodesicVirtualSource.cpp:73: Failure
+The difference between result.Distances[y * 9 + x] and reference.Distances[y * 9 + x] is 1.0532193575946668e-05, which exceeds 1e-5 * scale, where
+result.Distances[y * 9 + x] evaluates to 0.0073245555518191476,
+reference.Distances[y * 9 + x] evaluates to 0.0073350877453950943, and
+1e-5 * scale evaluates to 1.0000000474974515e-08.
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.GeodesicVirtualSource.cpp:73: Failure
+The difference between result.Distances[y * 9 + x] and reference.Distances[y * 9 + x] is 1.0667370186493233e-05, which exceeds 1e-5 * scale, where
+result.Distances[y * 9 + x] evaluates to 0.0089932299715532078,
+reference.Distances[y * 9 + x] evaluates to 0.0090038973417397011, and
+1e-5 * scale evaluates to 1.0000000474974515e-08.
+
+[  FAILED  ] GeodesicVirtualSource.FoldedSurfaceUsesIntrinsicDistanceAndScales (4 ms)
+[----------] 1 test from GeodesicVirtualSource (4 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (4 ms total)
+[  PASSED  ] 0 tests.
+[  FAILED  ] 1 test, listed below:
+[  FAILED  ] GeodesicVirtualSource.FoldedSurfaceUsesIntrinsicDistanceAndScales
+
+ 1 FAILED TEST
+
+    Start 2381: GeodesicVirtualSource.MultipleSourcesAreOrderIndependentAndRepeatable
+3/8 Test #2381: GeodesicVirtualSource.MultipleSourcesAreOrderIndependentAndRepeatable ...   Passed    0.01 sec
+    Start 2382: GeodesicVirtualSource.UnreachableAndIsolatedSourcesRemainExplicit
+4/8 Test #2382: GeodesicVirtualSource.UnreachableAndIsolatedSourcesRemainExplicit .......   Passed    0.00 sec
+    Start 2383: GeodesicVirtualSource.RejectsInvalidInputsAndBudgetWithoutPublishing
+5/8 Test #2383: GeodesicVirtualSource.RejectsInvalidInputsAndBudgetWithoutPublishing ....   Passed    0.01 sec
+    Start 2384: GeodesicVirtualSource.TypedPositionsAndDeletedSlotsPreserveInput
+6/8 Test #2384: GeodesicVirtualSource.TypedPositionsAndDeletedSlotsPreserveInput ........   Passed    0.01 sec
+    Start 2385: GeodesicVirtualSource.ConcaveBoundaryRoutesAroundMissingSurface
+7/8 Test #2385: GeodesicVirtualSource.ConcaveBoundaryRoutesAroundMissingSurface .........   Passed    0.01 sec
+    Start 2386: GeodesicVirtualSource.RejectsPolygonFacesAndSubmeshViews
+8/8 Test #2386: GeodesicVirtualSource.RejectsPolygonFacesAndSubmeshViews ................   Passed    0.01 sec
+
+75% tests passed, 2 tests failed out of 8
+
+Label Time Summary:
+geometry    =   0.05 sec*proc (8 tests)
+unit        =   0.05 sec*proc (8 tests)
+
+Total Test time (real) =   1.06 sec
+
+The following tests FAILED:
+	2379 - GeodesicVirtualSource.BoundaryAndInteriorSourcesBoundPlanarError (Failed)
+	2380 - GeodesicVirtualSource.FoldedSurfaceUsesIntrinsicDistanceAndScales (Failed)
+Errors while running CTest

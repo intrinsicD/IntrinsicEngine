@@ -125,6 +125,14 @@ Method-only scientific slices may defer runtime/config/UI/publication work, but
 each deferred matrix row names the task that owns it. A package is not described
 as end-to-end or editor-integrated until those rows and their tests close.
 
+For spatial searches, record the index/query ownership and reuse decision
+beside this matrix using the
+[method workflow's spatial acceleration review](../agent/method-workflow.md#spatial-acceleration-review).
+The [consumer inventory](spatial-index-consumers.md) distinguishes supported
+point queries from missing kNN/primitive traversal and non-spatial method
+structure. Its task reminders do not broaden a CPU-reference slice into a GPU
+port or authorize replacing a method's neighborhood semantics.
+
 ## Complexity and diagnostics expectations
 
 Each method package should document:

@@ -1,0 +1,77 @@
+{
+  "recorded_at": "2026-09-08T16:44:04+02:00",
+  "base_commit": "314db9ea5be314c732458649775103c461992fbb",
+  "source_state": "dirty_worktree",
+  "claim_eligible": false,
+  "source_sha256": {
+    "CMakePresets.json": "773fdc8903c975001628b849497cdec7827839827fd8e0e8a9c18f497c78e085",
+    "tests/CMakeLists.txt": "f30380f23b62b41a85fac8c637e5e28a01884d1914e8fc98adcae465b2270a0f",
+    "src/runtime/CMakeLists.txt": "b12252731abf4338319ca78a9d14ef571ebf05aeadd055fe9db72c9b93da6931",
+    "src/geometry/Geometry.Registration.cppm": "df316b220c91003e4145e1c0a481373793faea00de5e362de70fee1c982f76ef",
+    "src/geometry/Geometry.Registration.cpp": "bf5f61702e8697f8417359cad392cfe91deb1a0ebac38d635f772e7f09e36bce",
+    "src/runtime/Modules/Registration/Runtime.RegistrationConfig.cppm": "d98754894dbfb071a9856c56a879e244f8e9f1680e35fd917a495bdb7267e6ad",
+    "src/runtime/Modules/Registration/Runtime.RegistrationConfig.cpp": "4a714cbd5fee460e4c091271a42f26f2398760bc5693e6dd5c930d19dec0704a",
+    "src/runtime/GeometryIntegration/Runtime.SpatialIndexCache.cppm": "1135c1260022aaf637cdfcebaaa543e5712f78ff22e9645fe1e1f313f491fb97",
+    "src/runtime/GeometryIntegration/Runtime.SpatialIndexCache.cpp": "3346076da48efebd5916fcc6f8b2467f40a8802aa06835b09bb0ac5a1a610c7d",
+    "src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.cppm": "07b93c810f9dd253f120ecbd1189d250a8dd215b2e5003613e559aa378183b48",
+    "src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.cpp": "8533a506adae0c3f7fa71af1bd7689693f018f5dcd2850b4e232945a61845e0c",
+    "src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Public.cpp": "035956e1908aae124fee6f24e80c611deec621a4b2ed19d7a47e0882dbbc4905",
+    "src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Mesh.cpp": "8870a6138292bb4d9630c47b224861a66dbebd613cf72e29f839b65fa12ae9e4",
+    "src/runtime/Editor/internal/Runtime.EditorFeatures.Detail.cppm": "b4236d3f506311ec1f74dfc77c14f3a691a7800f391a470855927b70efb5a870",
+    "src/runtime/Editor/internal/Runtime.EditorFeatureContextAdapters.cpp": "7428ddf42f02ea797bcb8ca2d751f0479aa803c88e69a952b04aeb070db586da",
+    "src/runtime/Editor/internal/Runtime.EditorWorkspaceSession.cpp": "add7999c82de8b1267b536558cbc4f52267549bec23c4424cb15da6f5ad29b38",
+    "src/app/Sandbox/Editor/Sandbox.MeshProcessingPanels.cpp": "a594847b402a1cac0d9fdf1c6ec0a01676829c5debddcd2ef270eb31609ffa80",
+    "src/app/Sandbox/Sandbox.ConfigSections.cpp": "919299591807efb866089af991363602c1f1b60c5c1a02b59b1c14acaafa63de",
+    "tests/contract/runtime/Test.RegistrationDomains.cpp": "ea2024cc4fd107dba719464502d668abb3c3335e4c48a5b9e04e11337866c181",
+    "tests/contract/runtime/Test.SandboxEditorClusteringMethods.cpp": "99fff10f4fd0239fdef514d84dbd76e6b19b042e1c53b62407ae53e98f7fb303",
+    "tests/integration/runtime/Test.SandboxEditorPresentation.cpp": "2c76d3cbee0d636b82d7bde8ad5b3e26c86d692f37438eb4b274eb5d05e79c6c",
+    "tests/integration/graphics/Test.PointLBVHGpuSmoke.cpp": "efb76ec7ce4b037976d026fb63ef6432d1692214b9c604994d726ed9faf586d5",
+    "tests/unit/geometry/Test_Registration.cpp": "d4b1c18f0c72029d0326ece34829650fe41d026f74b1bc01358d14ee0f062898",
+    "benchmarks/geometry/Bench.RegistrationSpatialSmoke.cpp": "b10054a4e3dabcfc0329182aa090f0f3d357483f094f9e5cd8fab6b88efc0a6d",
+    "benchmarks/geometry/Bench.RegistrationSpatialSmoke.hpp": "99f8ee87fca069f98f09cfd639c0e1060f172e1ae984e7bb544f299042526cb9",
+    "benchmarks/geometry/manifests/registration_spatial_smoke.yaml": "5a508602000891e6c23295638518a9ec09f91000cec034f9f7c4d1cf0d0f31f0",
+    "benchmarks/geometry/manifests/registration_runtime_spatial_smoke.yaml": "a34d1e94d9e0b945858ec0af139a58bbe7b932028d0f157d711c2cf4b90f9148",
+    "methods/geometry/registration/method.yaml": "c004bbbfd0d8c36cd63c0cf00cdf37c1e6812aa7ecfeffa2c9e7482867ee48d7",
+    "methods/geometry/registration/paper.md": "50ced1dd4d6e2f544cf336323d801558593e5c2d3e138f5692e046a064cb81d0"
+  },
+  "compiler": "Clang 23 with matching clang-scan-deps; configured ci and ci-vulkan presets; final builds use CCACHE_DISABLE=1",
+  "cpu": {
+    "preset": "ci",
+    "selected": 4349,
+    "passed": 4348,
+    "skipped": 1,
+    "failed": 0,
+    "seconds": 108.35,
+    "sanitizers": false,
+    "skip": "GlfwLifecycleLsan.EngineStaticTeardownAndLeakControl"
+  },
+  "vulkan": {
+    "preset": "ci-vulkan",
+    "sanitizers": [
+      "address",
+      "undefined"
+    ],
+    "leak_detection": false,
+    "passed": 2,
+    "skipped": 0,
+    "failed": 0,
+    "seconds": 63.6,
+    "display_state": "DPMS off",
+    "note": "No whole-process leak-freedom claim; direct leak-enabled diagnostic exits 1 after successful assertions, with 240 retained bytes (BUG-180)."
+  },
+  "benchmarks": {
+    "cpu": "benchmarks/cpu-smoke.json",
+    "earlier_runtime": "benchmarks/runtime-display-active-smoke.json",
+    "final_runtime": "benchmarks/runtime-display-off-smoke.json",
+    "final_runtime_status": "failed",
+    "reason": "12999.105329 ms exceeds unchanged 5000 ms threshold; transform error 0.0",
+    "comparison_limit": "Local dirty-source smoke only. CPU kernel benchmark is unsanitized; runtime benchmarks use ASan+UBSan and include present pacing. Earlier runtime attempt predates signed-scale publication fix. No speedup or default-adoption claim."
+  },
+  "limits": [
+    "64 canonical source/target domain fixtures; GPU correspondence fixture has 1024 live seeded points and same-variant CPU references.",
+    "Entity TRS only; ancestor transform composition is unchanged and not covered.",
+    "Trajectory rerun starts from current pose; undo restores the earlier input pose.",
+    "CPU KD-tree remains default. GPU uses shared CPU transform solve.",
+    "BUG-178 owns incremental compiler crash isolation; BUG-179 owns the diagnosed display-off test budget; BUG-180 owns leak-enabled process-retention isolation."
+  ]
+}

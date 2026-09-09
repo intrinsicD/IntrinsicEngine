@@ -93,6 +93,17 @@ contracts: [geometry.element-domain-sources, method.engine-integration]
   optimized CPU, and GPU paths require separate tasks after the implicit-point
   oracle and materialization diagnostics are proven.
 
+## Spatial acceleration consideration
+
+Review index reuse for constraint-facet candidates, proximity checks and any
+nearest-sample seed for point location. Point LBVH can only supply point
+proximity; simplex containment, constrained insertion and boundary intersection
+still require topology and exact predicates, with conservative primitive bounds
+for pruning. Keep the selected CPU CDT builder and its existing BVH contract;
+METHOD-007A owns later engine lifetime decisions.
+
+See the [shared spatial-index consumer inventory](../../../docs/architecture/spatial-index-consumers.md).
+
 ## Required changes
 
 ### Method package scaffolding

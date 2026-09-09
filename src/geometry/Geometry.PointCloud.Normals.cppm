@@ -1,3 +1,4 @@
+// PCA point normals with explicit neighborhood indices and deterministic orientation.
 module;
 
 #include <cstddef>
@@ -12,6 +13,7 @@ module;
 export module Geometry.PointCloud.Normals;
 
 import Geometry.KDTree;
+import Geometry.PointLBVH;
 import Geometry.Octree;
 import Geometry.PointCloud;
 import Geometry.Properties;
@@ -26,6 +28,7 @@ export namespace Geometry::PointCloud::Normals
         KDTree,
         SuppliedKDTree,
         SuppliedOctree,
+        SuppliedPointLBVH,
     };
 
     enum class OrientationMode : std::uint8_t
@@ -123,6 +126,11 @@ export namespace Geometry::PointCloud::Normals
 
     [[nodiscard]] std::optional<EstimateResult> Estimate(std::span<const glm::vec3> points,
                                                          const Octree& index,
+                                                         const Params& params = {});
+
+    // The supplied index must contain exactly these points in the same order/space.
+    [[nodiscard]] std::optional<EstimateResult> Estimate(std::span<const glm::vec3> points,
+                                                         const PointLBVH::Index& index,
                                                          const Params& params = {});
 
     [[nodiscard]] PropertySetResult Recompute(Vertices& vertices,

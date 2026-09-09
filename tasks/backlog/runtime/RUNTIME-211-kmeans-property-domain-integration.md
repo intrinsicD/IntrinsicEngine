@@ -50,6 +50,16 @@ maturity_target: Operational
 | Publication | Same-cardinality named label/color/scalar properties on the originating element domain; topology and unrelated properties remain unchanged. |
 | End-to-end tests | CPU and Vulkan/fallback source matrix, stale validation, property publication/history, config/direct/UI parity. |
 
+## Spatial acceleration consideration
+
+Preserve the existing Vulkan centroid LBVH: ClusteringGpuState owns a private
+PointLbvhWorkspace and rebuilds it per iteration with reused allocations.
+Canonical input-domain generalization must preserve source-slot mapping and
+requested/actual/fallback reporting. Moving centroids do not belong in the stable
+entity-property cache; this note requests no backend change.
+
+See the [shared spatial-index consumer inventory](../../../docs/architecture/spatial-index-consumers.md).
+
 ## Required changes
 
 - [ ] Replace the three-domain switches with canonical property-set resolution

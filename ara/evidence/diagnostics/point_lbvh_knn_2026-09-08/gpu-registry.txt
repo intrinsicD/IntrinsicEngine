@@ -1,0 +1,208 @@
+[
+  {
+    "command": [
+      "/home/alex/Documents/IntrinsicEngine/build/ci-vulkan/bin/IntrinsicPointLBVHGpuTests",
+      "--gtest_filter=PointLBVHGpuSmoke.VulkanBuildAndQueriesMatchExhaustiveCpuAndReuseAllocations",
+      "--gtest_also_run_disabled_tests"
+    ],
+    "name": "PointLBVHGpuSmoke.VulkanBuildAndQueriesMatchExhaustiveCpuAndReuseAllocations",
+    "properties": [
+      {
+        "name": "ENVIRONMENT",
+        "value": [
+          "LSAN_OPTIONS=fast_unwind_on_malloc=0:detect_leaks=0",
+          "ASAN_OPTIONS=symbolize=1:detect_leaks=0:fast_unwind_on_malloc=0",
+          "ASAN_SYMBOLIZER_PATH=/usr/bin/llvm-symbolizer-18"
+        ]
+      },
+      {
+        "name": "SKIP_REGULAR_EXPRESSION",
+        "value": [
+          "\\[  SKIPPED \\]"
+        ]
+      },
+      {
+        "name": "LABELS",
+        "value": [
+          "gpu",
+          "graphics",
+          "integration",
+          "vulkan"
+        ]
+      },
+      {
+        "name": "TIMEOUT",
+        "value": 30.0
+      },
+      {
+        "name": "WORKING_DIRECTORY",
+        "value": "/home/alex/Documents/IntrinsicEngine/build/ci-vulkan/tests"
+      }
+    ]
+  },
+  {
+    "command": [
+      "/home/alex/Documents/IntrinsicEngine/build/ci-vulkan/bin/IntrinsicPointLBVHGpuTests",
+      "--gtest_filter=PointLBVHGpuSmoke.FramedRegistrationReusesTargetAcrossRunsAndMatchesCpuSolve",
+      "--gtest_also_run_disabled_tests"
+    ],
+    "name": "PointLBVHGpuSmoke.FramedRegistrationReusesTargetAcrossRunsAndMatchesCpuSolve",
+    "properties": [
+      {
+        "name": "ENVIRONMENT",
+        "value": [
+          "LSAN_OPTIONS=fast_unwind_on_malloc=0:detect_leaks=0",
+          "ASAN_OPTIONS=symbolize=1:detect_leaks=0:fast_unwind_on_malloc=0",
+          "ASAN_SYMBOLIZER_PATH=/usr/bin/llvm-symbolizer-18"
+        ]
+      },
+      {
+        "name": "SKIP_REGULAR_EXPRESSION",
+        "value": [
+          "\\[  SKIPPED \\]"
+        ]
+      },
+      {
+        "name": "LABELS",
+        "value": [
+          "gpu",
+          "graphics",
+          "integration",
+          "vulkan"
+        ]
+      },
+      {
+        "name": "TIMEOUT",
+        "value": 120.0
+      },
+      {
+        "name": "WORKING_DIRECTORY",
+        "value": "/home/alex/Documents/IntrinsicEngine/build/ci-vulkan/tests"
+      }
+    ]
+  },
+  {
+    "command": [
+      "/home/alex/Documents/IntrinsicEngine/build/ci-vulkan/bin/IntrinsicPointLBVHGpuTests",
+      "--gtest_filter=PointLBVHGpuSmoke.KNearestAndExclusionMatchExhaustiveOracle",
+      "--gtest_also_run_disabled_tests"
+    ],
+    "name": "PointLBVHGpuSmoke.KNearestAndExclusionMatchExhaustiveOracle",
+    "properties": [
+      {
+        "name": "ENVIRONMENT",
+        "value": [
+          "LSAN_OPTIONS=fast_unwind_on_malloc=0:detect_leaks=0",
+          "ASAN_OPTIONS=symbolize=1:detect_leaks=0:fast_unwind_on_malloc=0",
+          "ASAN_SYMBOLIZER_PATH=/usr/bin/llvm-symbolizer-18"
+        ]
+      },
+      {
+        "name": "SKIP_REGULAR_EXPRESSION",
+        "value": [
+          "\\[  SKIPPED \\]"
+        ]
+      },
+      {
+        "name": "LABELS",
+        "value": [
+          "gpu",
+          "graphics",
+          "integration",
+          "vulkan"
+        ]
+      },
+      {
+        "name": "TIMEOUT",
+        "value": 30.0
+      },
+      {
+        "name": "WORKING_DIRECTORY",
+        "value": "/home/alex/Documents/IntrinsicEngine/build/ci-vulkan/tests"
+      }
+    ]
+  },
+  {
+    "command": [
+      "/home/alex/Documents/IntrinsicEngine/build/ci-vulkan/bin/IntrinsicPointLBVHGpuTests",
+      "--gtest_filter=PointLBVHGpuSmoke.FramedKNearestReusesBuffersAndRejectsStaleTarget",
+      "--gtest_also_run_disabled_tests"
+    ],
+    "name": "PointLBVHGpuSmoke.FramedKNearestReusesBuffersAndRejectsStaleTarget",
+    "properties": [
+      {
+        "name": "ENVIRONMENT",
+        "value": [
+          "LSAN_OPTIONS=fast_unwind_on_malloc=0:detect_leaks=0",
+          "ASAN_OPTIONS=symbolize=1:detect_leaks=0:fast_unwind_on_malloc=0",
+          "ASAN_SYMBOLIZER_PATH=/usr/bin/llvm-symbolizer-18"
+        ]
+      },
+      {
+        "name": "SKIP_REGULAR_EXPRESSION",
+        "value": [
+          "\\[  SKIPPED \\]"
+        ]
+      },
+      {
+        "name": "LABELS",
+        "value": [
+          "gpu",
+          "graphics",
+          "integration",
+          "vulkan"
+        ]
+      },
+      {
+        "name": "TIMEOUT",
+        "value": 30.0
+      },
+      {
+        "name": "WORKING_DIRECTORY",
+        "value": "/home/alex/Documents/IntrinsicEngine/build/ci-vulkan/tests"
+      }
+    ]
+  },
+  {
+    "command": [
+      "/home/alex/Documents/IntrinsicEngine/build/ci-vulkan/bin/IntrinsicRuntimeClusteringServiceGpuSmokeTests",
+      "--gtest_filter=ClusteringServiceGpuSmoke.VulkanExecutionMatchesCpuReferenceAndCommitsCanonicalProperties",
+      "--gtest_also_run_disabled_tests"
+    ],
+    "name": "ClusteringServiceGpuSmoke.VulkanExecutionMatchesCpuReferenceAndCommitsCanonicalProperties",
+    "properties": [
+      {
+        "name": "ENVIRONMENT",
+        "value": [
+          "LSAN_OPTIONS=fast_unwind_on_malloc=0:detect_leaks=0",
+          "ASAN_OPTIONS=symbolize=1:detect_leaks=0:fast_unwind_on_malloc=0",
+          "ASAN_SYMBOLIZER_PATH=/usr/bin/llvm-symbolizer-18"
+        ]
+      },
+      {
+        "name": "SKIP_REGULAR_EXPRESSION",
+        "value": [
+          "\\[  SKIPPED \\]"
+        ]
+      },
+      {
+        "name": "LABELS",
+        "value": [
+          "geometry",
+          "gpu",
+          "integration",
+          "runtime",
+          "vulkan"
+        ]
+      },
+      {
+        "name": "TIMEOUT",
+        "value": 30.0
+      },
+      {
+        "name": "WORKING_DIRECTORY",
+        "value": "/home/alex/Documents/IntrinsicEngine/build/ci-vulkan/tests"
+      }
+    ]
+  }
+]

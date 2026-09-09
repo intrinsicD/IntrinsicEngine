@@ -12,15 +12,15 @@ Root scanned: `src`
 | `assets` | 11 |
 | `core` | 40 |
 | `ecs` | 27 |
-| `geometry` | 115 |
+| `geometry` | 116 |
 | `graphics/assets` | 1 |
 | `graphics/framegraph` | 7 |
-| `graphics/renderer` | 71 |
+| `graphics/renderer` | 72 |
 | `graphics/rhi` | 18 |
 | `graphics/vulkan` | 13 |
 | `physics` | 1 |
 | `platform` | 5 |
-| `runtime` | 73 |
+| `runtime` | 77 |
 
 ## Modules
 
@@ -199,6 +199,7 @@ Root scanned: `src`
 | `Geometry.PointCloud.SurfaceSampling` | `src/geometry/Geometry.PointCloud.SurfaceSampling.cppm` | `geometry` |
 | `Geometry.PointCloud.Utils` | `src/geometry/Geometry.PointCloud.Utils.cppm` | `geometry` |
 | `Geometry.PointCloud` | `src/geometry/Geometry.PointCloud.cppm` | `geometry` |
+| `Geometry.PointLBVH` | `src/geometry/Geometry.PointLBVH.cppm` | `geometry` |
 | `Geometry.Primitives` | `src/geometry/Geometry.Primitives.cppm` | `geometry` |
 | `Geometry.Properties` | `src/geometry/Geometry.Properties.cppm` | `geometry` |
 | `Geometry.Quadric` | `src/geometry/Geometry.Quadric.cppm` | `geometry` |
@@ -260,6 +261,7 @@ Root scanned: `src`
 | `Extrinsic.Graphics.LightSystem` | `src/graphics/renderer/Graphics.LightSystem.cppm` | `graphics/renderer` |
 | `Extrinsic.Graphics.Material` | `src/graphics/renderer/Graphics.Material.cppm` | `graphics/renderer` |
 | `Extrinsic.Graphics.MaterialSystem` | `src/graphics/renderer/Graphics.MaterialSystem.cppm` | `graphics/renderer` |
+| `Extrinsic.Graphics.PointLBVH` | `src/graphics/renderer/Graphics.PointLBVH.cppm` | `graphics/renderer` |
 | `Extrinsic.Graphics.PostProcessSystem` | `src/graphics/renderer/Graphics.PostProcessSystem.cppm` | `graphics/renderer` |
 | `Extrinsic.Graphics.PropertyTextureBake` | `src/graphics/renderer/Graphics.PropertyTextureBake.cppm` | `graphics/renderer` |
 | `Extrinsic.Graphics.Reconstruction` | `src/graphics/renderer/Graphics.Reconstruction.cppm` | `graphics/renderer` |
@@ -378,6 +380,7 @@ Root scanned: `src`
 | `Extrinsic.Runtime.MeshPrimitiveView` | `src/runtime/GeometryIntegration/Runtime.MeshPrimitiveView.cppm` | `runtime` |
 | `Extrinsic.Runtime.MeshSurfaceTopology` | `src/runtime/GeometryIntegration/Runtime.MeshSurfaceTopology.cppm` | `runtime` |
 | `Extrinsic.Runtime.PrimitiveSelectionRefinement` | `src/runtime/GeometryIntegration/Runtime.PrimitiveSelectionRefinement.cppm` | `runtime` |
+| `Extrinsic.Runtime.SpatialIndexCache` | `src/runtime/GeometryIntegration/Runtime.SpatialIndexCache.cppm` | `runtime` |
 | `Extrinsic.Runtime.VertexAttributeBinding` | `src/runtime/GeometryIntegration/Runtime.VertexAttributeBinding.cppm` | `runtime` |
 | `Extrinsic.Runtime.VertexChannelBindings` | `src/runtime/GeometryIntegration/Runtime.VertexChannelBindings.cppm` | `runtime` |
 | `Extrinsic.Runtime.VertexChannelStreams` | `src/runtime/GeometryIntegration/Runtime.VertexChannelStreams.cppm` | `runtime` |
@@ -398,12 +401,15 @@ Root scanned: `src`
 | `Extrinsic.Runtime.ClusteringConfig` | `src/runtime/Modules/Clustering/Runtime.ClusteringConfig.cppm` | `runtime` |
 | `Extrinsic.Runtime.ClusteringModule` | `src/runtime/Modules/Clustering/Runtime.ClusteringModule.cppm` | `runtime` |
 | `Extrinsic.Runtime.CurvatureSegmentationConfig` | `src/runtime/Modules/CurvatureSegmentation/Runtime.CurvatureSegmentationConfig.cppm` | `runtime` |
+| `Extrinsic.Runtime.GeodesicsConfig` | `src/runtime/Modules/Geodesics/Runtime.GeodesicsConfig.cppm` | `runtime` |
+| `Extrinsic.Runtime.NormalEstimationConfig` | `src/runtime/Modules/NormalEstimation/Runtime.NormalEstimationConfig.cppm` | `runtime` |
 | `Extrinsic.Runtime.ParameterizationConfig` | `src/runtime/Modules/Parameterization/Runtime.ParameterizationConfig.cppm` | `runtime` |
 | `Extrinsic.Runtime.PhysicsModule` | `src/runtime/Modules/PhysicsIntegration/Runtime.PhysicsModule.cppm` | `runtime` |
 | `Extrinsic.Runtime.PointCloudConsolidationConfig` | `src/runtime/Modules/PointCloudConsolidation/Runtime.PointCloudConsolidationConfig.cppm` | `runtime` |
 | `Extrinsic.Runtime.PointCloudConsolidationModule` | `src/runtime/Modules/PointCloudConsolidation/Runtime.PointCloudConsolidationModule.cppm` | `runtime` |
 | `Extrinsic.Runtime.ProgressivePoissonConfig` | `src/runtime/Modules/ProgressivePoisson/Runtime.ProgressivePoissonConfig.cppm` | `runtime` |
 | `Extrinsic.Runtime.ProgressivePoissonGpuBackend` | `src/runtime/Modules/ProgressivePoisson/Runtime.ProgressivePoissonGpuBackend.cppm` | `runtime` |
+| `Extrinsic.Runtime.RegistrationConfig` | `src/runtime/Modules/Registration/Runtime.RegistrationConfig.cppm` | `runtime` |
 | `Extrinsic.Runtime.TextureBakeModule` | `src/runtime/Modules/TextureBake/Runtime.TextureBakeModule.cppm` | `runtime` |
 | `Extrinsic.Runtime.RenderArtifactPublication` | `src/runtime/Rendering/Runtime.RenderArtifactPublication.cppm` | `runtime` |
 | `Extrinsic.Runtime.RenderExtraction` | `src/runtime/Rendering/Runtime.RenderExtraction.cppm` | `runtime` |
@@ -416,4 +422,4 @@ Root scanned: `src`
 | `Extrinsic.Runtime.StableEntityLookup` | `src/runtime/Scene/Runtime.StableEntityLookup.cppm` | `runtime` |
 | `Extrinsic.Runtime.VisualizationRecipes` | `src/runtime/Visualization/Runtime.VisualizationRecipes.cppm` | `runtime` |
 
-Total modules: **389**
+Total modules: **395**

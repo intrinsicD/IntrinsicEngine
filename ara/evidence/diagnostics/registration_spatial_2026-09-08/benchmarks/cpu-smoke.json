@@ -1,0 +1,67 @@
+{
+  "attempt_id": "cpu-01",
+  "backend": "cpu_reference",
+  "benchmark_id": "geometry.registration.spatial_smoke",
+  "claim_eligible": false,
+  "commit": "local-dev",
+  "config_digest": "143720a539c0474f31b2af8f749bebb94e8d65a0784684d18d771afd1def2536",
+  "dataset": "builtin.random3d.1025.seed917",
+  "diagnostics": {
+    "failures": 0,
+    "lbvh_cold_total_ms": 73.8602,
+    "lbvh_warm_total_ms": 72.7844,
+    "measured_iterations": 8,
+    "mode": "smoke",
+    "reference_total_ms": 29.7255,
+    "runner": "IntrinsicBenchmarkSmoke",
+    "warmup_iterations": 1
+  },
+  "execution_status": "passed",
+  "manifest": {
+    "path": "benchmarks/geometry/manifests/registration_spatial_smoke.yaml",
+    "sha256": "5a508602000891e6c23295638518a9ec09f91000cec034f9f7c4d1cf0d0f31f0"
+  },
+  "method": "geometry.registration",
+  "metrics": {
+    "quality_error_linf": 0,
+    "runtime_ms": 73.8602
+  },
+  "resolved_params": {
+    "intent": "smoke",
+    "measured_iterations": 8,
+    "warmup_iterations": 1
+  },
+  "run_id": "registration-spatial-20260908",
+  "schema_version": 2,
+  "source": {
+    "revision": "local-dev",
+    "state": "dirty_worktree"
+  },
+  "status": "passed",
+  "threshold_disposition": [
+    {
+      "limit": 500,
+      "metric": "runtime_ms",
+      "observed": 73.8602,
+      "operator": "<=",
+      "passed": true,
+      "threshold": "smoke_runtime_ms_max"
+    },
+    {
+      "limit": 1e-06,
+      "metric": "quality_error_linf",
+      "observed": 0,
+      "operator": "<=",
+      "passed": true,
+      "threshold": "quality_error_linf_max"
+    }
+  ],
+  "thresholds": {
+    "quality_error_linf_max": 1e-06,
+    "smoke_runtime_ms_max": 500
+  },
+  "warmup_policy": {
+    "measured_iterations": 8,
+    "warmup_iterations": 1
+  }
+}

@@ -1,0 +1,54 @@
+#version 460
+#extension GL_GOOGLE_include_directive : require
+#include "include/point_lbvh.glsl"
+layout(local_size_x=256) in;
+layout(push_constant,scalar) uniform QueryPush
+{
+    uint64_t nodes;uint64_t bounds;uint64_t queries;uint64_t neighbors;uint64_t headers;
+    uint pointCount;uint queryCount;uint stride;uint capacity;float radius;uint kNearestCount;uint64_t excludedIndices;
+}pc;
+void main()
+{
+    uint i=gl_GlobalInvocationID.x;if(i>=pc.queryCount)return;
+    LbvhNeighbors neighbors=LbvhNeighbors(pc.neighbors);LbvhHeaders headers=LbvhHeaders(pc.headers);
+    uint base=i*max(pc.capacity,1u);
+    for(uint j=0;j<max(pc.capacity,1u);++j)neighbors.v[base+j]=LbvhNeighbor(LBVH_INVALID,uintBitsToFloat(0x7f800000u));
+    vec3 q=lbvhPoint(pc.queries,pc.stride,i);
+    if(!lbvhValid(q) || LbvhBounds(pc.bounds).invalid!=0){headers.v[i]=uvec2(0,1);return;}
+    uint excluded=pc.excludedIndices==0?LBVH_INVALID:LbvhIndices(pc.excludedIndices).v[i];
+    if(pc.radius<0 && pc.kNearestCount==0)
+    {
+        LbvhNeighbor best=lbvhNearest(pc.nodes,pc.pointCount,q,excluded);neighbors.v[base]=best;
+        headers.v[i]=uvec2(best.index==LBVH_INVALID?0:1,0);return;
+    }
+    uint count=0,size=pc.pointCount==0?0:1;uint stack[64];stack[0]=0;
+    LbvhNodes tree=LbvhNodes(pc.nodes);float limit=pc.kNearestCount>0?uintBitsToFloat(0x7f800000u):pc.radius*pc.radius;
+    while(size>0)
+    {
+        LbvhNode node=tree.v[stack[--size]];
+        if(lbvhDistance(q,clamp(q,node.lo,node.hi))>limit)continue;
+        if(node.object==LBVH_INVALID){stack[size++]=node.right;stack[size++]=node.left;continue;}
+        if(node.object==excluded)continue;
+        float distance=lbvhDistance(q,node.lo);if(distance>limit)continue;
+        if(pc.kNearestCount>0)
+        {
+            LbvhNeighbor value=LbvhNeighbor(node.object,distance);
+            // One invocation owns this result slice. Equal-distance candidates remain traversable.
+            for(uint k=0;k<pc.capacity;++k)
+            {
+                LbvhNeighbor old=neighbors.v[base+k];
+                if(value.distance<old.distance || (value.distance==old.distance && value.index<old.index))
+                { neighbors.v[base+k]=value;value=old; }
+            }
+            count=min(count+1,pc.capacity);
+            if(count==pc.capacity)limit=neighbors.v[base+pc.capacity-1].distance;
+            continue;
+        }
+        ++count;
+        LbvhNeighbor value=LbvhNeighbor(node.object,distance);
+        // Keep the lowest source indices, independent of Morton/traversal ordering.
+        for(uint k=0;k<pc.capacity;++k)
+            if(value.index<neighbors.v[base+k].index){LbvhNeighbor old=neighbors.v[base+k];neighbors.v[base+k]=value;value=old;}
+    }
+    headers.v[i]=uvec2(count,0);
+}

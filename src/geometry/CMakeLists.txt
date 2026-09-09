@@ -6,6 +6,7 @@ target_sources(${target_name}
         FILE_SET CXX_MODULES TYPE CXX_MODULES FILES
         Geometry.AABB.cppm
         Geometry.BVH.cppm
+        Geometry.PointLBVH.cppm
         Geometry.Capsule.cppm
         Geometry.Circulators.cppm
         Geometry.ContactManifold.cppm
@@ -119,6 +120,7 @@ target_sources(${target_name}
         PRIVATE
         Geometry.AABB.cpp
         Geometry.BVH.cpp
+        Geometry.PointLBVH.cpp
         Geometry.Capsule.cpp
         Geometry.ContactManifold.cpp
         Geometry.Containment.cpp
@@ -155,6 +157,7 @@ target_sources(${target_name}
         Geometry.HalfedgeMesh.DEC.cpp
         Geometry.HalfedgeMesh.Features.cpp
         Geometry.HalfedgeMesh.Geodesic.cpp
+        Geometry.HalfedgeMesh.Geodesic.VirtualSource.cpp
         Geometry.HalfedgeMesh.IO.cpp
         Geometry.HalfedgeMesh.Parameterization.cpp
         Geometry.HalfedgeMesh.Quality.cpp

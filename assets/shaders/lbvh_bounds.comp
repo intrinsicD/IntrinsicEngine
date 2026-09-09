@@ -1,0 +1,23 @@
+#version 460
+#extension GL_GOOGLE_include_directive : require
+#include "include/point_lbvh_build.glsl"
+shared vec3 lows[256], highs[256];
+shared uint invalids[256];
+void main()
+{
+    uint lane=gl_LocalInvocationID.x;
+    vec3 lo=vec3(1e18),hi=vec3(-1e18); uint invalid=0;
+    for(uint i=lane;i<pc.count;i+=256)
+    {
+        vec3 p=lbvhPoint(pc.points,pc.stride,i);
+        if(!lbvhValid(p)) invalid=1;
+        else {lo=min(lo,p);hi=max(hi,p);}
+    }
+    lows[lane]=lo;highs[lane]=hi;invalids[lane]=invalid;barrier();
+    for(uint step=128;step>0;step/=2)
+    {
+        if(lane<step){lows[lane]=min(lows[lane],lows[lane+step]);highs[lane]=max(highs[lane],highs[lane+step]);invalids[lane]|=invalids[lane+step];}
+        barrier();
+    }
+    if(lane==0){LbvhBounds b=LbvhBounds(pc.bounds);b.lo=lows[0];b.hi=highs[0];b.invalid=invalids[0];}
+}

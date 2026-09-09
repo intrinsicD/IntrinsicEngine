@@ -1,0 +1,38 @@
+id: geometry.point_lbvh
+name: Point Linear Bounding Volume Hierarchy
+domain: geometry
+status: reference
+paper:
+  title: Maximizing Parallelism in the Construction of BVHs, Octrees, and k-d Trees
+  authors: Tero Karras
+  year: 2012
+  doi: "10.2312/EGGH/HPG12/033-037"
+  url: "https://research.nvidia.com/publication/2012-06_maximizing-parallelism-construction-bvhs-octrees-and-k-d-trees"
+inputs:
+  - Finite float3 points on any canonical element domain, in the explicitly chosen index space
+  - Batched float3 nearest, k-nearest or inclusive-radius queries with explicit result capacity and optional excluded source ID
+outputs:
+  - Original element indices and squared Euclidean distances with deterministic index ties
+  - Total radius hit counts and invalid-input status; no topology or property mutations
+backends:
+  - cpu_reference
+  - gpu_vulkan_compute
+metrics:
+  - runtime_ms
+  - quality_error_linf
+correctness_tests:
+  - ../../../tests/unit/geometry/Test.PointLBVH.cpp
+  - ../../../tests/contract/runtime/Test.SpatialIndexCache.cpp
+  - ../../../tests/integration/graphics/Test.PointLBVHGpuSmoke.cpp
+  - ../../../tests/integration/runtime/Test.ClusteringServiceGpuSmoke.cpp
+benchmarks:
+  - ../../../benchmarks/geometry/manifests/point_lbvh_smoke.yaml
+  - ../../../benchmarks/geometry/manifests/point_lbvh_knn_smoke.yaml
+known_limitations:
+  - Point-neighbor queries only; no triangle distance, ray tracing, arbitrary subset predicates, or refit implementation.
+  - CPU indices support at most 2^24 points; GPU supports at most 2^20 points and 2^20 queries per batch.
+  - GPU k-nearest supports k=1..64 with capacity equal to k; CPU k=0 returns empty and k>N returns all eligible rows.
+  - GPU radius capacity is at most 1024 hits per query; total count exposes overflow, including capacity zero.
+  - Coordinates and radii are bounded by 1e18; world-space nearest under nonuniform transforms requires an explicit metric conversion.
+  - GPU sorting is bitonic and internal bounds use sorted-range unions; no radix-sort, SAH optimization, or performance improvement is claimed.
+  - Standalone GPU views require caller-controlled buffer sizes, submission ordering, and device lifetime.

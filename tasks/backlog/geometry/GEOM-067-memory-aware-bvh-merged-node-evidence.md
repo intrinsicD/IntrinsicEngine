@@ -4,6 +4,15 @@ theme: B
 depends_on:
   - REVIEW-003
 maturity_target: CPUContracted
+workflow_schema: 1
+workflow_profile: standard
+evidence: required
+owner:
+branch:
+worktree:
+claimed_at:
+contract_schema: 1
+contracts: [repo.source-documentation]
 ---
 # GEOM-067 — Memory-aware BVH and merged-node evidence
 
@@ -51,6 +60,16 @@ maturity_target: CPUContracted
   manifest/runner, and evidence report. Existing consumers remain unchanged.
 - Reintroduction trigger: a later default-layout task may open only if the
   preregistered parity and win thresholds pass on representative workloads.
+
+## Spatial acceleration consideration
+
+Account for the existing point LBVH when discussing reusable hierarchy work, but
+keep the frozen median/SAH/MSAH AABB comparison. Current point queries do not
+support this task's rays/overlaps; a future LBVH baseline requires matching
+primitive bounds, traversal and exact query outputs before timings are comparable.
+Do not silently add a fourth builder, GPU backend or default migration.
+
+See the [shared spatial-index consumer inventory](../../../docs/architecture/spatial-index-consumers.md).
 
 ## Required changes
 

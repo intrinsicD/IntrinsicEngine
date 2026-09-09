@@ -1,3 +1,4 @@
+// Shared geometry snapshots and command helpers used by runtime implementation units.
 #pragma once
 
 namespace Extrinsic::Runtime::GeometryProcessingDetail
@@ -36,4 +37,7 @@ namespace Extrinsic::Runtime::GeometryProcessingDetail
 
     [[nodiscard]] EditorCommandStatus
     ToEditorMethodCommandStatus(EditorCommandHistoryStatus status) noexcept;
+    [[nodiscard]] EditorMeshSourceSnapshot BuildEditorNormalMeshSnapshot(
+        const ECS::Components::GeometrySources::ConstSourceView& view, std::string_view positionProperty);
+
 }

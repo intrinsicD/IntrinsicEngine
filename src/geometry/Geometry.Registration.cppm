@@ -1,3 +1,4 @@
+// Rigid ICP with shared CPU solve stages and an optional batched correspondence provider.
 module;
 
 #include <cstddef>
@@ -16,51 +17,6 @@ export import Geometry.Robust;
 
 export namespace Geometry::Registration
 {
-    // =========================================================================
-    // Point Cloud Registration — Iterative Closest Point (ICP)
-    // =========================================================================
-    //
-    // Aligns a source point cloud to a target point cloud by iteratively
-    // minimizing the distance between corresponding point pairs.
-    //
-    // Two variants are provided:
-    //
-    //   1. **Point-to-Point ICP** (Besl & McKay 1992):
-    //      Minimizes sum_i ||R * s_i + t - c_i||^2 where c_i is the nearest
-    //      target point. Uses SVD-based closed-form rigid alignment per
-    //      iteration. Simple, robust, but converges slowly on smooth surfaces.
-    //
-    //   2. **Point-to-Plane ICP** (Chen & Medioni 1992):
-    //      Minimizes sum_i ((R * s_i + t - c_i) . n_i)^2 where n_i is the
-    //      target surface normal at c_i. Converges much faster on smooth
-    //      surfaces (typically 5-10x fewer iterations). Requires target normals.
-    //      Uses linearized rotation (small-angle approximation) solved via
-    //      normal equations on a 6x6 system per iteration.
-    //
-    // Both variants support:
-    //   - Maximum correspondence distance (reject pairs farther than threshold)
-    //   - Outlier rejection by percentile (keep only the closest N% of pairs)
-    //   - Optional robust IRLS-style per-residual weights (default off)
-    //   - Convergence detection (RMSE change below threshold)
-    //
-    // Algorithm (per iteration):
-    //   1. Transform source points by current estimate.
-    //   2. Find nearest target point for each transformed source point (KDTree).
-    //   3. Reject outlier pairs (distance threshold + percentile).
-    //   4. Solve for incremental rigid transform (SVD or linear system).
-    //   5. Update cumulative transform. Check convergence.
-    //
-    // References:
-    //   - Besl & McKay, "A Method for Registration of 3-D Shapes" (PAMI 1992)
-    //   - Chen & Medioni, "Object Modelling by Registration of Multiple Range
-    //     Images" (Image & Vision Computing 1992)
-    //   - Rusinkiewicz & Levoy, "Efficient Variants of the ICP Algorithm"
-    //     (3DIM 2001)
-
-    // -------------------------------------------------------------------------
-    // ICP Variant
-    // -------------------------------------------------------------------------
-
     enum class ICPVariant : uint8_t
     {
         PointToPoint,  // SVD-based (Besl & McKay 1992)
@@ -161,6 +117,26 @@ export namespace Geometry::Registration
     // pure value (a std::function is not serializable). The callback must be
     // read-only with respect to solver state.
     using IterationObserver = std::function<void(const IterationTrace&)>;
+
+    // Query coordinates are float3; the solve and residual accumulation use doubles.
+    // Return one compact target index per query, or UINT32_MAX for no match.
+    using NearestQuery = std::function<bool(std::span<const glm::vec3>,
+                                           std::span<std::uint32_t>)>;
+    enum class ICPStepStatus : std::uint8_t { Continue, Finished, InvalidInput };
+
+    [[nodiscard]] std::vector<glm::vec3> MakeICPQueries(
+        std::span<const glm::vec3> source, const glm::dmat4& transform);
+    // Indices must correspond to MakeICPQueries(source, result.Transform).
+    // A fresh RegistrationResult starts a run; Finished means no further steps are needed.
+    [[nodiscard]] ICPStepStatus AdvanceICP(
+        std::span<const glm::vec3> source, std::span<const glm::vec3> target,
+        std::span<const glm::vec3> normals, const RegistrationParams& params,
+        std::span<const std::uint32_t> indices, RegistrationResult& result,
+        const IterationObserver& observer = {});
+    [[nodiscard]] std::optional<RegistrationResult> AlignICPWithQueries(
+        std::span<const glm::vec3> source, std::span<const glm::vec3> target,
+        std::span<const glm::vec3> normals, const RegistrationParams& params,
+        const NearestQuery& query, const IterationObserver& observer = {});
 
     // -------------------------------------------------------------------------
     // ICP Alignment

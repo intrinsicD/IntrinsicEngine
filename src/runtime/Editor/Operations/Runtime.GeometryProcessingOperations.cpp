@@ -1965,6 +1965,90 @@ namespace Extrinsic::Runtime
             context.EngineConfigControlState->ActiveConfig);
     }
 
+    RuntimeEngineConfigApplyResult ApplyEditorGeodesicsConfig(
+        const EditorGeometryProcessingContext& context, const GeodesicsConfig& config,
+        std::string sourceId)
+    {
+        RuntimeEngineConfigApplyResult result{
+            .Status = RuntimeEngineConfigApplyStatus::Rejected,
+            .Source = RuntimeConfigControlSource::Editor,
+        };
+        const auto validation = ValidateGeodesicsConfigSection(
+            SerializeGeodesicsConfig(config), {}, kGeodesicsConfigSectionName);
+        if (!validation.Usable())
+        {
+            result.LoadResult.Diagnostics = validation.Diagnostics;
+            return result;
+        }
+        if (context.EngineConfigControlState == nullptr || !context.PreviewEngineConfigDocument ||
+            !context.ApplyEngineConfigHotSubset || !context.EngineConfigCommandsAvailable)
+        {
+            return result;
+        }
+
+        Core::Config::EngineConfig candidate = context.EngineConfigControlState->ActiveConfig;
+        SetGeodesicsConfig(candidate, config);
+        if (sourceId.empty())
+        {
+            sourceId = std::string{kGeodesicsConfigSectionName};
+        }
+        result.LoadResult = context.PreviewEngineConfigDocument(
+            Core::Config::SerializeEngineConfig(candidate), sourceId);
+        if (!Core::Config::IsConfigUsable(result.LoadResult))
+            return result;
+        return context.ApplyEngineConfigHotSubset(result.LoadResult);
+    }
+
+    std::optional<GeodesicsConfig> GetEditorGeodesicsConfig(
+        const EditorGeometryProcessingContext& context) noexcept
+    {
+        if (context.EngineConfigControlState == nullptr)
+            return std::nullopt;
+        return GetGeodesicsConfig(context.EngineConfigControlState->ActiveConfig);
+    }
+
+    RuntimeEngineConfigApplyResult ApplyEditorRegistrationConfig(
+        const EditorGeometryProcessingContext& context, const RegistrationConfig& config,
+        std::string sourceId)
+    {
+        RuntimeEngineConfigApplyResult result{
+            .Status = RuntimeEngineConfigApplyStatus::Rejected,
+            .Source = RuntimeConfigControlSource::Editor,
+        };
+        const auto validation = ValidateRegistrationConfigSection(
+            SerializeRegistrationConfig(config), {}, kRegistrationConfigSectionName);
+        if (!validation.Usable())
+        {
+            result.LoadResult.Diagnostics = validation.Diagnostics;
+            return result;
+        }
+        if (context.EngineConfigControlState == nullptr || !context.PreviewEngineConfigDocument ||
+            !context.ApplyEngineConfigHotSubset || !context.EngineConfigCommandsAvailable)
+        {
+            return result;
+        }
+
+        Core::Config::EngineConfig candidate = context.EngineConfigControlState->ActiveConfig;
+        SetRegistrationConfig(candidate, config);
+        if (sourceId.empty())
+        {
+            sourceId = std::string{kRegistrationConfigSectionName};
+        }
+        result.LoadResult = context.PreviewEngineConfigDocument(
+            Core::Config::SerializeEngineConfig(candidate), sourceId);
+        if (!Core::Config::IsConfigUsable(result.LoadResult))
+            return result;
+        return context.ApplyEngineConfigHotSubset(result.LoadResult);
+    }
+
+    std::optional<RegistrationConfig> GetEditorRegistrationConfig(
+        const EditorGeometryProcessingContext& context) noexcept
+    {
+        if (context.EngineConfigControlState == nullptr)
+            return std::nullopt;
+        return GetRegistrationConfig(context.EngineConfigControlState->ActiveConfig);
+    }
+
     RuntimeEngineConfigApplyResult ApplyEditorPointCloudConsolidationConfig(
         const EditorGeometryProcessingContext& context,
         const PointCloudConsolidationConfig& config,
@@ -2092,5 +2176,52 @@ namespace Extrinsic::Runtime
             return std::nullopt;
         return MakeEditorProgressivePoissonConfig(*config);
     }
+
+}
+
+namespace Extrinsic::Runtime
+{
+    RuntimeEngineConfigApplyResult ApplyEditorNormalEstimationConfig(
+        const EditorGeometryProcessingContext& context, const NormalEstimationConfig& config,
+        std::string sourceId)
+    {
+        RuntimeEngineConfigApplyResult result{
+            .Status = RuntimeEngineConfigApplyStatus::Rejected,
+            .Source = RuntimeConfigControlSource::Editor,
+        };
+        const auto validation = ValidateNormalEstimationConfigSection(
+            SerializeNormalEstimationConfig(config), {}, kNormalEstimationConfigSectionName);
+        if (!validation.Usable())
+        {
+            result.LoadResult.Diagnostics = validation.Diagnostics;
+            return result;
+        }
+        if (context.EngineConfigControlState == nullptr || !context.PreviewEngineConfigDocument ||
+            !context.ApplyEngineConfigHotSubset || !context.EngineConfigCommandsAvailable)
+        {
+            return result;
+        }
+
+        Core::Config::EngineConfig candidate = context.EngineConfigControlState->ActiveConfig;
+        SetNormalEstimationConfig(candidate, config);
+        if (sourceId.empty())
+        {
+            sourceId = std::string{kNormalEstimationConfigSectionName};
+        }
+        result.LoadResult = context.PreviewEngineConfigDocument(
+            Core::Config::SerializeEngineConfig(candidate), sourceId);
+        if (!Core::Config::IsConfigUsable(result.LoadResult))
+            return result;
+        return context.ApplyEngineConfigHotSubset(result.LoadResult);
+    }
+
+    std::optional<NormalEstimationConfig> GetEditorNormalEstimationConfig(
+        const EditorGeometryProcessingContext& context)
+    {
+        if (context.EngineConfigControlState == nullptr)
+            return std::nullopt;
+        return GetNormalEstimationConfig(context.EngineConfigControlState->ActiveConfig);
+    }
+
 
 }

@@ -19,6 +19,10 @@ import Extrinsic.Core.Error;
 import Extrinsic.ECS.Component.Transform;
 import Extrinsic.ECS.Component.StableId;
 import Extrinsic.ECS.Components.Selection;
+import Extrinsic.ECS.Components.GeometrySources;
+import Extrinsic.ECS.Components.GeometrySourcesPopulate;
+import Geometry.HalfedgeMesh;
+import Geometry.Properties;
 import Extrinsic.ECS.Scene.Handle;
 import Extrinsic.ECS.Scene.Registry;
 import Extrinsic.Graphics.CameraSnapshots;
@@ -291,8 +295,8 @@ namespace
                 .Width = 64,
                 .Height = 32})
         {
-            const Core::Config::EngineConfig config =
-                HeadlessConfig();
+            Core::Config::EngineConfig config = HeadlessConfig();
+            Runtime::SetSelectionInteractionConfig(config, SelectionSettings);
             const Platform::Input::Context input{};
             Runtime::RuntimeViewportInputHookContext context{
                 .Config = config,
@@ -336,6 +340,7 @@ namespace
                 Renderer->Shutdown();
         }
 
+        Runtime::SelectionInteractionConfig SelectionSettings{};
         Runtime::CommandBus Commands{};
         Runtime::KernelEventBus Events{};
         Runtime::JobService Jobs{};
@@ -1519,4 +1524,69 @@ TEST(SceneInteractionModule,
         interaction->LastRefinedPrimitiveGeneration(),
         0u);
     engine.Shutdown();
+}
+
+TEST(SceneInteractionModule, PrimitiveClicksReachSharedSelectionAndRejectChangedTopology)
+{
+    DirectHarness harness;
+    harness.InitializeRendererForHooks();
+    ASSERT_TRUE(harness.Start().has_value());
+    auto& selection = *harness.Services.Find<Runtime::SelectionController>();
+    auto& scene = *harness.Worlds.Get(harness.InitialWorld);
+    namespace GS = ECS::Components::GeometrySources;
+    Geometry::HalfedgeMesh::Mesh mesh;
+    const auto a = mesh.AddVertex({0, 0, 0}), b = mesh.AddVertex({1, 0, 0}), c = mesh.AddVertex({0, 1, 0});
+    ASSERT_TRUE(mesh.AddTriangle(a, b, c));
+    const auto entity = MakeSelectable(scene);
+    GS::PopulateFromMesh(scene.Raw(), entity, mesh);
+    const auto id = Runtime::SelectionController::ToStableEntityId(entity);
+    Runtime::EditorInputCaptureSnapshot capture{};
+    Runtime::RuntimeFramePacingDiagnostics pacing{};
+    harness.SelectionSettings.Target = Runtime::SelectionTarget::Vertex;
+    auto& window = harness.InputWindow();
+    auto issue = [&](bool shift, bool control) {
+        window.QueueMouseButton(0, false);
+        window.PollEvents();
+        window.QueueKey(Platform::Input::Key::LeftShift, shift);
+        window.QueueKey(Platform::Input::Key::LeftControl, control);
+        window.QueueCursor(12, 12);
+        window.QueueMouseButton(0, true);
+        window.PollEvents();
+        Graphics::RenderFrameInput input{};
+        harness.InvokeViewportHook(0, input, capture);
+        harness.InvokeFrameHook(0, capture, pacing);
+        EXPECT_TRUE(input.HasPendingPick);
+        (void)harness.Renderer->GetSelectionSystem().ConsumePick();
+        return input.Pick.Sequence;
+    };
+    auto complete = [&](std::uint64_t sequence, std::uint32_t vertex) {
+        harness.Renderer->GetSelectionSystem().PublishPickResult({
+            .EncodedId = Graphics::EncodeSelectionId(Graphics::SelectionPrimitiveDomain::Point, vertex),
+            .StableEntityId = id, .Hit = true, .Sequence = sequence});
+        harness.InvokeFrameHook(1, capture, pacing);
+    };
+    complete(issue(false, false), 2);
+    EXPECT_EQ(selection.ReadPrimitives(scene, id, Runtime::GeometryElementDomain::MeshVertex).Indices,
+              (std::vector<std::uint32_t>{2}));
+    complete(issue(true, false), 0);
+    EXPECT_EQ(selection.ReadPrimitives(scene, id, Runtime::GeometryElementDomain::MeshVertex).Indices,
+              (std::vector<std::uint32_t>{2, 0}));
+    complete(issue(false, true), 2);
+    EXPECT_EQ(selection.ReadPrimitives(scene, id, Runtime::GeometryElementDomain::MeshVertex).Indices,
+              (std::vector<std::uint32_t>{0}));
+    selection.ClearPrimitives();
+    const auto first = issue(true, false), second = issue(true, false);
+    harness.Renderer->GetSelectionSystem().PublishPickResult({
+        .EncodedId = Graphics::EncodeSelectionId(Graphics::SelectionPrimitiveDomain::Point, 0),
+        .StableEntityId = id, .Hit = true, .Sequence = second});
+    complete(first, 1);
+    EXPECT_EQ(selection.ReadPrimitives(scene, id, Runtime::GeometryElementDomain::MeshVertex).Indices,
+              (std::vector<std::uint32_t>{1, 0}));
+    const auto pending = issue(true, false);
+    scene.Raw().get<GS::Halfedges>(entity).Properties.Get<std::uint32_t>("h:to_vertex")[0] = 2;
+    complete(pending, 1);
+    EXPECT_EQ(selection.InFlightPickCount(), 0);
+    EXPECT_TRUE(selection.ReadPrimitives(scene, id, Runtime::GeometryElementDomain::MeshVertex).Indices.empty());
+    harness.InvokeFrameHook(0, capture, pacing);
+    EXPECT_TRUE(selection.PrimitiveSnapshots(scene).empty());
 }

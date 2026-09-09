@@ -258,8 +258,13 @@ if(TARGET ExtrinsicRuntime)
         Test.GeometryAvailability.cpp
         Test.GeometryPresentation.cpp
         Test.PointCloudGeometryExtraction.cpp
+        Test.GeodesicsOperations.cpp
         Test.ParameterizationOperations.cpp
         Test.CurvatureSegmentationOperations.cpp
+        Test.PrimitiveSelection.cpp
+        Test.SpatialIndexCache.cpp
+        Test.RegistrationDomains.cpp
+        Test.NormalEstimation.cpp
         Test.PrimitiveSelectionRefinement.cpp
         Test.PrimitiveSelectionRefinementWiring.cpp
         Test.ProceduralGeometryExtraction.cpp
@@ -438,6 +443,7 @@ set(_geometry_test_files
     Test.GraphQueries.cpp
     Test.GeometryProperties.cpp
     Test_KDTree.cpp
+    Test.PointLBVH.cpp
     Test_Octree.cpp
     Test_BVH.cpp
     Test_DEC.cpp
@@ -488,6 +494,7 @@ set(_geometry_test_files
     Test.SupportRadius.cpp
     Test_Simplification.cpp
     Test_Geodesic.cpp
+    Test.GeodesicVirtualSource.cpp
     Test_VectorHeatMethod.cpp
     Test_ShortestPath.cpp
     Test_Subdivision.cpp
@@ -725,6 +732,16 @@ if(INTRINSIC_PLATFORM_BACKEND_SELECTED STREQUAL "Glfw")
 endif()
 
 if(TARGET ExtrinsicBackendsVulkan AND INTRINSIC_PLATFORM_BACKEND_SELECTED STREQUAL "Glfw")
+    intrinsic_test_object_lib(PointLBVHGpuTestObjs
+        SOURCES integration/graphics/Test.PointLBVHGpuSmoke.cpp
+        DEPS ExtrinsicRuntime ExtrinsicGraphics ExtrinsicBackendsVulkan ExtrinsicPlatform ExtrinsicRHI ExtrinsicCore
+    )
+    intrinsic_test_executable(IntrinsicPointLBVHGpuTests
+        OBJECTS PointLBVHGpuTestObjs
+        LINK_LIBS ExtrinsicRuntime ExtrinsicGraphics ExtrinsicBackendsVulkan ExtrinsicPlatform ExtrinsicRHI ExtrinsicCore
+        LABELS integration graphics gpu vulkan
+    )
+    intrinsic_add_glsl_shaders(IntrinsicPointLBVHGpuTests)
     set(_graphics_vulkan_smoke_test_files
         Test.BufferReadbackGpuSmoke.cpp
         Test.ComputeParallelPrimitivesGpuSmoke.cpp
@@ -1718,6 +1735,13 @@ if(_intrinsic_registered_test_targets)
             "endif()\n"
         )
     endforeach()
+    # BUG-179: three sequential framed ICP GPU runs take ~47 s under DPMS-off
+    # present pacing. The fixture stops itself at 70 s with round/frame diagnostics.
+    string(APPEND _intrinsic_property_fixup_script
+        "if(DEFINED IntrinsicPointLBVHGpuTests_TESTS)\n"
+        "  set_tests_properties(PointLBVHGpuSmoke.FramedRegistrationReusesTargetAcrossRunsAndMatchesCpuSolve PROPERTIES TIMEOUT 120)\n"
+        "endif()\n"
+    )
     set(_intrinsic_property_fixup_file "${CMAKE_CURRENT_BINARY_DIR}/IntrinsicTestPropertyFixups.cmake")
     file(GENERATE OUTPUT "${_intrinsic_property_fixup_file}" CONTENT "${_intrinsic_property_fixup_script}")
     set_property(DIRECTORY APPEND PROPERTY TEST_INCLUDE_FILES "${_intrinsic_property_fixup_file}")

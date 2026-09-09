@@ -16,6 +16,8 @@ module Extrinsic.Runtime.ClusteringModule;
 
 import Extrinsic.Core.Filesystem.PathResolver;
 import Extrinsic.Graphics.GpuTransfer;
+import Extrinsic.Graphics.PointLBVH;
+import Geometry.PointLBVH;
 import Extrinsic.RHI.BufferManager;
 import Extrinsic.RHI.CommandContext;
 import Extrinsic.RHI.Descriptors;
@@ -147,6 +149,7 @@ namespace Extrinsic::Runtime
             , Transfer(transferQueue)
             , Cache(buffers)
             , Readbacks(Transfer)
+            , Index(device)
         {
         }
 
@@ -178,6 +181,8 @@ namespace Extrinsic::Runtime
 
             const std::uint32_t clusterCount =
                 EffectiveClusterCount(snapshot);
+            if (clusterCount > (1u << 20u) || !std::ranges::all_of(snapshot.Points, Geometry::PointLBVH::ValidPoint))
+                return {.Diagnostic="Vulkan LBVH requires at most 2^20 centroids and finite positions within +/-1e18."};
             std::vector<glm::vec3> seeds = GK::BuildInitialCentroids(
                 std::span<const glm::vec3>{
                     snapshot.Points.data(), snapshot.Points.size()},
@@ -266,6 +271,8 @@ namespace Extrinsic::Runtime
             }
 
             KMeansSnapshot snapshot = std::move(Active->Snapshot);
+            snapshot.BackendDiagnostic = "Vulkan compute with LBVH centroid assignment; " +
+                std::to_string(Active->Plan.MaxIterations) + " index rebuilds with reusable storage.";
             GK::KMeansResult clustered = BuildGeometryResult(
                 snapshot, Active->Plan, std::move(readback));
             Completed = ClusteringGpuResult{
@@ -342,6 +349,7 @@ namespace Extrinsic::Runtime
 
             const KMeansGpuExecutionResult execution =
                 RecordKMeansGpuExecution(KMeansGpuExecutionDesc{
+                    .Index = &Index,
                     .Device = Device,
                     .CommandContext = &commandContext,
                     .ResourceCache = &Cache,
@@ -404,6 +412,7 @@ namespace Extrinsic::Runtime
         KMeansGpuResourceCache Cache;
         KMeansGpuResultReadback Readbacks;
         KMeansGpuPipelineSet Pipelines{};
+        Graphics::PointLbvhWorkspace Index;
         std::optional<ActiveOperation> Active{};
         std::optional<ClusteringGpuResult> Completed{};
     };

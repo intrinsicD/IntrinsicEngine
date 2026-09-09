@@ -1,3 +1,4 @@
+// Private editor bindings and workspace state keep live runtime dependencies behind copied UI surfaces.
 module;
 
 #include <array>
@@ -41,6 +42,7 @@ import Extrinsic.Runtime.AssetWorkflowModule;
 import Extrinsic.Runtime.AssetIngestStateMachine;
 import Extrinsic.Runtime.CameraControllers;
 import Extrinsic.Runtime.ClusteringModule;
+import Extrinsic.Runtime.SpatialIndexCache;
 import Extrinsic.Runtime.PointCloudConsolidationModule;
 import Extrinsic.Runtime.CommandBus;
 import Extrinsic.Runtime.EditorCommandHistory;
@@ -99,6 +101,7 @@ export namespace Extrinsic::Runtime::EditorFeatureDetail
         Core::Extent2D CameraViewport{};
         RHI::IDevice* Device{nullptr};
         TextureBakeService* TextureBake{nullptr};
+        SpatialIndexCache* SpatialIndices{};
         ClusteringService* Clustering{nullptr};
         PointCloudConsolidationService* PointCloudConsolidation{nullptr};
         EditorAssetImportCommandSurface AssetImportCommands{};
@@ -131,6 +134,7 @@ export namespace Extrinsic::Runtime::EditorFeatureDetail
         const EditorParameterizationResult* LastParameterizationResult{nullptr};
         const EditorProgressivePoissonResult* LastProgressivePoissonResult{nullptr};
         const EditorRegistrationResult* LastRegistrationResult{nullptr};
+        const EditorNormalEstimationResult* LastNormalEstimationResult{nullptr};
         const Graphics::RenderGraphFrameStats* RenderGraphStats{nullptr};
         const Graphics::RenderRecipeConfigContext* RenderRecipeContext{nullptr};
         EditorRenderRecipeEditorState* RenderRecipeEditorState{nullptr};
@@ -260,6 +264,7 @@ export namespace Extrinsic::Runtime::EditorFeatureDetail
         std::optional<EditorFileImportResult> m_LastImportResult{};
         std::optional<EditorSceneFileResult> m_LastSceneFileResult{};
         std::optional<KMeansRunCompleted> m_LastKMeansResult{};
+        SpatialIndexCache* m_SpatialIndices{};
         ClusteringService* m_ClusteringService{};
         KernelEventSubscription m_KMeansCompletionSubscription{};
         PointCloudConsolidationService* m_PointCloudConsolidationService{};
@@ -279,6 +284,7 @@ export namespace Extrinsic::Runtime::EditorFeatureDetail
         std::optional<EditorUvRegenerationCommandResult> m_LastUvRegenerationResult{};
         std::optional<EditorParameterizationResult> m_LastParameterizationResult{};
         std::optional<EditorRegistrationResult> m_LastRegistrationResult{};
+        std::optional<EditorNormalEstimationResult> m_LastNormalEstimationResult{};
         // Submit-time identity for jobs this session put on `JobService`, which
         // stores none itself. The index is pruned against `SnapshotAll()` each
         // frame and projected by `EditorJobCommandSurface` queries.

@@ -10,6 +10,9 @@ This workflow governs scientific paper/method implementation in IntrinsicEngine.
      formulation actually implemented from later variants.
    - Capture claims, assumptions, and required inputs/outputs.
    - Define method contract and failure modes.
+   - For spatial searches, review the shared-index consumer inventory and
+     record the query, metric, membership rules, owner, update frequency and
+     reuse decision before adding another index (see below).
 2. **CPU reference backend first**
    - Implement deterministic, correctness-first baseline.
 3. **Correctness tests**
@@ -72,6 +75,34 @@ alias properties. A method that genuinely requires a public double-vector
 contract must declare that exception, add typed catalog support, and test every
 control surface explicitly.
 
+## Spatial acceleration review
+
+When a method performs nearest-neighbor, radius, correspondence, proximity,
+intersection or visibility queries, consult the
+[spatial acceleration consumer inventory](../architecture/spatial-index-consumers.md)
+and [shared-index contract](../architecture/spatial-indices.md). Record the
+decision beside the existing engine-integration matrix (or in its
+`RuntimeModule` row): reuse the entity cache, use a private reusable workspace,
+retain an existing index/scan with a reason, or defer to a named task for
+missing query support. This is a reuse review, not a mandate to select LBVH.
+
+Specify the indexed primitive/property domain and metric, kNN versus radius
+versus nearest, self/active-set filtering, exact predicates, overflow policy,
+source-ID mapping, lifetime and invalidation. Stable canonical entity properties
+can use `Runtime::SpatialIndexCache`; moving method-owned data can reuse
+`Graphics::PointLbvhWorkspace` allocations. Geometry and physics kernels never
+import runtime or graphics to obtain an index. Existing typed KD-tree APIs need
+a scoped adaptation before they can consume a different index.
+
+Preserve the CPU reference, backend progression and task non-goals. A point
+LBVH supplies kNN with source-ID exclusion (GPU k=1..64), but not arbitrary
+subset predicates, exact primitive/ray queries, geodesic connectivity or
+Gaussian far-field approximations. A bounded radius output must not silently
+truncate a method's support. Compare total method cost, build/upload/rebuild,
+warm reuse, traversal, readback and memory against the present scan/tree/grid
+before selecting an acceleration default or claiming a win. Update the consumer
+inventory and relevant open task when adding, adopting or deferring a consumer.
+
 ## Backend policy summary
 
 - Reference backend is the canonical truth for correctness.
@@ -109,6 +140,11 @@ domain and never silently discard richer source data.
 handled; the CPU reference backend exists and is the correctness baseline;
 correctness tests include analytic/simple cases and regressions; tolerances
 and acceptance criteria are documented.
+
+**Spatial acceleration** — applicable searches have an explicit reuse decision;
+the selected index preserves metric, primitive, membership, complete-neighborhood
+and source-identity semantics; missing traversal support is recorded in the
+owning task rather than assumed from the presence of a shared cache.
 
 **Benchmarking and parity** — a benchmark manifest exists for the method
 scope; quality metrics are defined (not runtime-only); optimized CPU and GPU

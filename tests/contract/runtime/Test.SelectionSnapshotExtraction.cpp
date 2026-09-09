@@ -363,3 +363,23 @@ TEST(SelectionSnapshotExtraction,
     extraction.Shutdown(engine.GetRenderer());
     engine.Shutdown();
 }
+
+TEST(SelectionSnapshotExtraction, PrimitiveHighlightsReachRendererAndRespectWorldBoundary)
+{
+    Extrinsic::Runtime::Engine engine(HeadlessConfig());
+    InitializeAssetWorkflowEngine(engine);
+    auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
+    Extrinsic::Runtime::RenderExtractionCache extraction;
+    Extrinsic::Runtime::RuntimeSceneInteractionRenderSnapshot snapshot{.World = engine.ActiveWorld()};
+    snapshot.DebugPoints.push_back({.Position = {1, 2, 3}, .Radius = 0.02f, .DepthTested = false});
+    snapshot.DebugLines.push_back({.Start = {0, 0, 0}, .End = {1, 0, 0}});
+    auto world = ExtractWorld(engine, extraction, scene, &snapshot);
+    EXPECT_EQ(world.DebugPrimitives.Points.size(), 1);
+    EXPECT_EQ(world.DebugPrimitives.Lines.size(), 1);
+    snapshot.World = {};
+    world = ExtractWorld(engine, extraction, scene, &snapshot);
+    EXPECT_TRUE(world.DebugPrimitives.Points.empty());
+    EXPECT_TRUE(world.DebugPrimitives.Lines.empty());
+    extraction.Shutdown(engine.GetRenderer());
+    engine.Shutdown();
+}

@@ -1,0 +1,125 @@
+Running main() from /home/alex/Documents/IntrinsicEngine/external/vcpkg/buildtrees/gtest/src/v1.17.0-0c449efaff.clean/googletest/src/gtest_main.cc
+Note: Google Test filter = PointLBVHGpuSmoke.FramedRegistrationReusesTargetAcrossRunsAndMatchesCpuSolve
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from PointLBVHGpuSmoke
+[ RUN      ] PointLBVHGpuSmoke.FramedRegistrationReusesTargetAcrossRunsAndMatchesCpuSolve
+[32m[INFO] Initialized Scheduler with 15 worker threads.[0m
+[33m[WARN] [Runtime] Promoted Vulkan device selected; backend remains fail-closed until the first clean default-recipe validation promotes it.[0m
+[33m[WARN] [VulkanDevice::Initialize] Vulkan bootstrap created logical-device, queue, VMA, per-frame command/sync, swapchain image/view/handle, bindless heap, transfer queue, and global pipeline-layout state; canonical frame execution waits for the first clean recipe validation publish, so device remains non-operational during cold start.[0m
+[33m[WARN] [Runtime] VulkanRequestedButNotOperational status=RequestedButIncompleteGate reason=BarrierValidationFailed[0m
+ICP round=0 backend=cpu_kdtree total_us=210779 rmse=6.79407e-08 iterations=3
+ICP round=1 backend=cpu_lbvh total_us=232300 rmse=6.79407e-08 iterations=3
+ICP round=2 backend=cpu_lbvh total_us=231788 rmse=6.79407e-08 iterations=3
+ICP round=3 backend=vulkan_lbvh total_us=1.30099e+07 rmse=6.79407e-08 iterations=3
+ICP round=4 backend=vulkan_lbvh total_us=1.30031e+07 rmse=6.79407e-08 iterations=3
+ICP round=5 backend=cpu_kdtree total_us=211021 rmse=7.01657e-08 iterations=3
+ICP round=6 backend=vulkan_lbvh total_us=1.30121e+07 rmse=7.01657e-08 iterations=3
+[       OK ] PointLBVHGpuSmoke.FramedRegistrationReusesTargetAcrossRunsAndMatchesCpuSolve (46715 ms)
+[----------] 1 test from PointLBVHGpuSmoke (46715 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (46715 ms total)
+[  PASSED  ] 1 test.
+
+=================================================================
+==2963479==ERROR: LeakSanitizer: detected memory leaks
+
+Direct leak of 80 byte(s) in 1 object(s) allocated from:
+    #0 0x617e8a6a1d88 in malloc (/home/alex/Documents/IntrinsicEngine/build/ci-vulkan/bin/IntrinsicPointLBVHGpuTests+0x2cacd88) (BuildId: 5726021646ac01a0b9f17d9b17d6a4bdc5841a7c)
+    #1 0x7b336dff1e31  (<unknown module>)
+    #2 0x7b336e4663e1  (<unknown module>)
+    #3 0x7b336e57b129  (<unknown module>)
+    #4 0x7b336e32d9d4  (<unknown module>)
+    #5 0x7b3345a05039  (<unknown module>)
+    #6 0x7b33459f8c12  (<unknown module>)
+    #7 0x617e8bfa6064 in Extrinsic::Backends::Vulkan::VulkanDevice@Extrinsic.Backends.Vulkan::CreatePipeline(Extrinsic::RHI::PipelineDesc@Extrinsic.RHI.Descriptors const&) /home/alex/Documents/IntrinsicEngine/src/graphics/vulkan/Backends.Vulkan.Device.cpp:5540:18
+    #8 0x617e8c2478ae in Extrinsic::RHI::PipelineManager@Extrinsic.RHI.PipelineManager::Create(Extrinsic::RHI::PipelineDesc@Extrinsic.RHI.Descriptors const&, std::function<void (Extrinsic::Core::StrongHandle@Extrinsic.Core.StrongHandle<Extrinsic::RHI::PipelineTag@Extrinsic.RHI.Handles>)>) /home/alex/Documents/IntrinsicEngine/src/graphics/rhi/RHI.PipelineManager.cpp:180:54
+    #9 0x617e8bd3232d in Extrinsic::Graphics::CullingSystem@Extrinsic.Graphics.CullingSystem::Initialize(Extrinsic::RHI::IDevice@Extrinsic.RHI.Device&, Extrinsic::RHI::BufferManager@Extrinsic.RHI.BufferManager&, Extrinsic::RHI::PipelineManager@Extrinsic.RHI.PipelineManager&, std::basic_string_view<char, std::char_traits<char>>) /home/alex/Documents/IntrinsicEngine/src/graphics/renderer/Graphics.CullingSystem.cpp:370:43
+    #10 0x617e8b91c8bd in Extrinsic::Graphics::NullRenderer@Extrinsic.Graphics.Renderer::InitializeOperationalPassResources(Extrinsic::RHI::IDevice@Extrinsic.RHI.Device&) /home/alex/Documents/IntrinsicEngine/src/graphics/renderer/Graphics.Renderer.cpp:6340:78
+    #11 0x617e8b92faae in Extrinsic::Graphics::NullRenderer@Extrinsic.Graphics.Renderer::RebuildOperationalResources(Extrinsic::RHI::IDevice@Extrinsic.RHI.Device&) /home/alex/Documents/IntrinsicEngine/src/graphics/renderer/Graphics.Renderer.cpp:1979:45
+    #12 0x617e8ac30c91 in Extrinsic::Runtime::Engine@Extrinsic.Runtime.Engine::RunFrame() /home/alex/Documents/IntrinsicEngine/src/runtime/Kernel/Runtime.Engine.cpp:762:37
+    #13 0x617e8ac2dffc in Extrinsic::Runtime::Engine@Extrinsic.Runtime.Engine::Run() /home/alex/Documents/IntrinsicEngine/src/runtime/Kernel/Runtime.Engine.cpp:683:13
+    #14 0x617e8a6f0cee in PointLBVHGpuSmoke_FramedRegistrationReusesTargetAcrossRunsAndMatchesCpuSolve_Test::TestBody() /home/alex/Documents/IntrinsicEngine/tests/integration/graphics/Test.PointLBVHGpuSmoke.cpp:347:58
+    #15 0x617e8d487de4 in void testing::internal::HandleSehExceptionsInMethodIfSupported<testing::Test, void>(testing::Test*, void (testing::Test::*)(), char const*) /home/alex/Documents/IntrinsicEngine/external/vcpkg/buildtrees/gtest/src/v1.17.0-0c449efaff.clean/googletest/src/gtest.cc:2664:27
+    #16 0x617e8d480272 in void testing::internal::HandleExceptionsInMethodIfSupported<testing::Test, void>(testing::Test*, void (testing::Test::*)(), char const*) /home/alex/Documents/IntrinsicEngine/external/vcpkg/buildtrees/gtest/src/v1.17.0-0c449efaff.clean/googletest/src/gtest.cc:2700:52
+    #17 0x617e8d457264 in testing::Test::Run() /home/alex/Documents/IntrinsicEngine/external/vcpkg/buildtrees/gtest/src/v1.17.0-0c449efaff.clean/googletest/src/gtest.cc:2739:50
+    #18 0x617e8d457d62 in testing::TestInfo::Run() /home/alex/Documents/IntrinsicEngine/external/vcpkg/buildtrees/gtest/src/v1.17.0-0c449efaff.clean/googletest/src/gtest.cc:2885:14
+    #19 0x617e8d458744 in testing::TestSuite::Run() /home/alex/Documents/IntrinsicEngine/external/vcpkg/buildtrees/gtest/src/v1.17.0-0c449efaff.clean/googletest/src/gtest.cc:3063:33
+    #20 0x617e8d46a22b in testing::internal::UnitTestImpl::RunAllTests() /home/alex/Documents/IntrinsicEngine/external/vcpkg/buildtrees/gtest/src/v1.17.0-0c449efaff.clean/googletest/src/gtest.cc:6054:47
+    #21 0x617e8d488f35 in bool testing::internal::HandleSehExceptionsInMethodIfSupported<testing::internal::UnitTestImpl, bool>(testing::internal::UnitTestImpl*, bool (testing::internal::UnitTestImpl::*)(), char const*) /home/alex/Documents/IntrinsicEngine/external/vcpkg/buildtrees/gtest/src/v1.17.0-0c449efaff.clean/googletest/src/gtest.cc:2664:27
+    #22 0x617e8d4815d8 in bool testing::internal::HandleExceptionsInMethodIfSupported<testing::internal::UnitTestImpl, bool>(testing::internal::UnitTestImpl*, bool (testing::internal::UnitTestImpl::*)(), char const*) /home/alex/Documents/IntrinsicEngine/external/vcpkg/buildtrees/gtest/src/v1.17.0-0c449efaff.clean/googletest/src/gtest.cc:2700:52
+    #23 0x617e8d4681ea in testing::UnitTest::Run() /home/alex/Documents/IntrinsicEngine/external/vcpkg/buildtrees/gtest/src/v1.17.0-0c449efaff.clean/googletest/src/gtest.cc:5594:55
+    #24 0x617e8c39811c in RUN_ALL_TESTS() /home/alex/Documents/IntrinsicEngine/external/vcpkg/buildtrees/gtest/src/v1.17.0-0c449efaff.clean/googletest/include/gtest/gtest.h:2334:76
+    #25 0x617e8c398104 in main /home/alex/Documents/IntrinsicEngine/external/vcpkg/buildtrees/gtest/src/v1.17.0-0c449efaff.clean/googletest/src/gtest_main.cc:64:23
+    #26 0x7f338702a1c9 in __libc_start_call_main csu/../sysdeps/nptl/libc_start_call_main.h:58:16
+    #27 0x7f338702a28a in __libc_start_main csu/../csu/libc-start.c:360:3
+
+Direct leak of 80 byte(s) in 1 object(s) allocated from:
+    #0 0x617e8a6a1d88 in malloc (/home/alex/Documents/IntrinsicEngine/build/ci-vulkan/bin/IntrinsicPointLBVHGpuTests+0x2cacd88) (BuildId: 5726021646ac01a0b9f17d9b17d6a4bdc5841a7c)
+    #1 0x7b336dff1e31  (<unknown module>)
+    #2 0x7b336e4663e1  (<unknown module>)
+    #3 0x7b336e44dda8  (<unknown module>)
+    #4 0x7b336e577c59  (<unknown module>)
+    #5 0x7b336e32fbfd  (<unknown module>)
+    #6 0x7b3345a05b3d  (<unknown module>)
+    #7 0x7b33459f8292  (<unknown module>)
+    #8 0x617e8bfa9d79 in Extrinsic::Backends::Vulkan::VulkanDevice@Extrinsic.Backends.Vulkan::CreatePipeline(Extrinsic::RHI::PipelineDesc@Extrinsic.RHI.Descriptors const&) /home/alex/Documents/IntrinsicEngine/src/graphics/vulkan/Backends.Vulkan.Device.cpp:5703:14
+    #9 0x617e8c2478ae in Extrinsic::RHI::PipelineManager@Extrinsic.RHI.PipelineManager::Create(Extrinsic::RHI::PipelineDesc@Extrinsic.RHI.Descriptors const&, std::function<void (Extrinsic::Core::StrongHandle@Extrinsic.Core.StrongHandle<Extrinsic::RHI::PipelineTag@Extrinsic.RHI.Handles>)>) /home/alex/Documents/IntrinsicEngine/src/graphics/rhi/RHI.PipelineManager.cpp:180:54
+    #10 0x617e8b923e88 in Extrinsic::Graphics::NullRenderer@Extrinsic.Graphics.Renderer::InitializeOperationalPassResources(Extrinsic::RHI::IDevice@Extrinsic.RHI.Device&) /home/alex/Documents/IntrinsicEngine/src/graphics/renderer/Graphics.Renderer.cpp:6860:79
+    #11 0x617e8b92faae in Extrinsic::Graphics::NullRenderer@Extrinsic.Graphics.Renderer::RebuildOperationalResources(Extrinsic::RHI::IDevice@Extrinsic.RHI.Device&) /home/alex/Documents/IntrinsicEngine/src/graphics/renderer/Graphics.Renderer.cpp:1979:45
+    #12 0x617e8ac30c91 in Extrinsic::Runtime::Engine@Extrinsic.Runtime.Engine::RunFrame() /home/alex/Documents/IntrinsicEngine/src/runtime/Kernel/Runtime.Engine.cpp:762:37
+    #13 0x617e8ac2dffc in Extrinsic::Runtime::Engine@Extrinsic.Runtime.Engine::Run() /home/alex/Documents/IntrinsicEngine/src/runtime/Kernel/Runtime.Engine.cpp:683:13
+    #14 0x617e8a6f0cee in PointLBVHGpuSmoke_FramedRegistrationReusesTargetAcrossRunsAndMatchesCpuSolve_Test::TestBody() /home/alex/Documents/IntrinsicEngine/tests/integration/graphics/Test.PointLBVHGpuSmoke.cpp:347:58
+    #15 0x617e8d487de4 in void testing::internal::HandleSehExceptionsInMethodIfSupported<testing::Test, void>(testing::Test*, void (testing::Test::*)(), char const*) /home/alex/Documents/IntrinsicEngine/external/vcpkg/buildtrees/gtest/src/v1.17.0-0c449efaff.clean/googletest/src/gtest.cc:2664:27
+    #16 0x617e8d480272 in void testing::internal::HandleExceptionsInMethodIfSupported<testing::Test, void>(testing::Test*, void (testing::Test::*)(), char const*) /home/alex/Documents/IntrinsicEngine/external/vcpkg/buildtrees/gtest/src/v1.17.0-0c449efaff.clean/googletest/src/gtest.cc:2700:52
+    #17 0x617e8d457264 in testing::Test::Run() /home/alex/Documents/IntrinsicEngine/external/vcpkg/buildtrees/gtest/src/v1.17.0-0c449efaff.clean/googletest/src/gtest.cc:2739:50
+    #18 0x617e8d457d62 in testing::TestInfo::Run() /home/alex/Documents/IntrinsicEngine/external/vcpkg/buildtrees/gtest/src/v1.17.0-0c449efaff.clean/googletest/src/gtest.cc:2885:14
+    #19 0x617e8d458744 in testing::TestSuite::Run() /home/alex/Documents/IntrinsicEngine/external/vcpkg/buildtrees/gtest/src/v1.17.0-0c449efaff.clean/googletest/src/gtest.cc:3063:33
+    #20 0x617e8d46a22b in testing::internal::UnitTestImpl::RunAllTests() /home/alex/Documents/IntrinsicEngine/external/vcpkg/buildtrees/gtest/src/v1.17.0-0c449efaff.clean/googletest/src/gtest.cc:6054:47
+    #21 0x617e8d488f35 in bool testing::internal::HandleSehExceptionsInMethodIfSupported<testing::internal::UnitTestImpl, bool>(testing::internal::UnitTestImpl*, bool (testing::internal::UnitTestImpl::*)(), char const*) /home/alex/Documents/IntrinsicEngine/external/vcpkg/buildtrees/gtest/src/v1.17.0-0c449efaff.clean/googletest/src/gtest.cc:2664:27
+    #22 0x617e8d4815d8 in bool testing::internal::HandleExceptionsInMethodIfSupported<testing::internal::UnitTestImpl, bool>(testing::internal::UnitTestImpl*, bool (testing::internal::UnitTestImpl::*)(), char const*) /home/alex/Documents/IntrinsicEngine/external/vcpkg/buildtrees/gtest/src/v1.17.0-0c449efaff.clean/googletest/src/gtest.cc:2700:52
+    #23 0x617e8d4681ea in testing::UnitTest::Run() /home/alex/Documents/IntrinsicEngine/external/vcpkg/buildtrees/gtest/src/v1.17.0-0c449efaff.clean/googletest/src/gtest.cc:5594:55
+    #24 0x617e8c39811c in RUN_ALL_TESTS() /home/alex/Documents/IntrinsicEngine/external/vcpkg/buildtrees/gtest/src/v1.17.0-0c449efaff.clean/googletest/include/gtest/gtest.h:2334:76
+    #25 0x617e8c398104 in main /home/alex/Documents/IntrinsicEngine/external/vcpkg/buildtrees/gtest/src/v1.17.0-0c449efaff.clean/googletest/src/gtest_main.cc:64:23
+    #26 0x7f338702a1c9 in __libc_start_call_main csu/../sysdeps/nptl/libc_start_call_main.h:58:16
+    #27 0x7f338702a28a in __libc_start_main csu/../csu/libc-start.c:360:3
+
+Direct leak of 80 byte(s) in 1 object(s) allocated from:
+    #0 0x617e8a6a1d88 in malloc (/home/alex/Documents/IntrinsicEngine/build/ci-vulkan/bin/IntrinsicPointLBVHGpuTests+0x2cacd88) (BuildId: 5726021646ac01a0b9f17d9b17d6a4bdc5841a7c)
+    #1 0x7b336dff1e31  (<unknown module>)
+    #2 0x7b336e4663e1  (<unknown module>)
+    #3 0x7b336e57b129  (<unknown module>)
+    #4 0x7b336e32d9d4  (<unknown module>)
+    #5 0x7b3345a05039  (<unknown module>)
+    #6 0x7b33459f8c12  (<unknown module>)
+    #7 0x617e8bfa6064 in Extrinsic::Backends::Vulkan::VulkanDevice@Extrinsic.Backends.Vulkan::CreatePipeline(Extrinsic::RHI::PipelineDesc@Extrinsic.RHI.Descriptors const&) /home/alex/Documents/IntrinsicEngine/src/graphics/vulkan/Backends.Vulkan.Device.cpp:5540:18
+    #8 0x617e8c2478ae in Extrinsic::RHI::PipelineManager@Extrinsic.RHI.PipelineManager::Create(Extrinsic::RHI::PipelineDesc@Extrinsic.RHI.Descriptors const&, std::function<void (Extrinsic::Core::StrongHandle@Extrinsic.Core.StrongHandle<Extrinsic::RHI::PipelineTag@Extrinsic.RHI.Handles>)>) /home/alex/Documents/IntrinsicEngine/src/graphics/rhi/RHI.PipelineManager.cpp:180:54
+    #9 0x617e8b92b950 in Extrinsic::Graphics::NullRenderer@Extrinsic.Graphics.Renderer::InitializeOperationalPassResources(Extrinsic::RHI::IDevice@Extrinsic.RHI.Device&) /home/alex/Documents/IntrinsicEngine/src/graphics/renderer/Graphics.Renderer.cpp:7412:77
+    #10 0x617e8b92faae in Extrinsic::Graphics::NullRenderer@Extrinsic.Graphics.Renderer::RebuildOperationalResources(Extrinsic::RHI::IDevice@Extrinsic.RHI.Device&) /home/alex/Documents/IntrinsicEngine/src/graphics/renderer/Graphics.Renderer.cpp:1979:45
+    #11 0x617e8ac30c91 in Extrinsic::Runtime::Engine@Extrinsic.Runtime.Engine::RunFrame() /home/alex/Documents/IntrinsicEngine/src/runtime/Kernel/Runtime.Engine.cpp:762:37
+    #12 0x617e8ac2dffc in Extrinsic::Runtime::Engine@Extrinsic.Runtime.Engine::Run() /home/alex/Documents/IntrinsicEngine/src/runtime/Kernel/Runtime.Engine.cpp:683:13
+    #13 0x617e8a6f0cee in PointLBVHGpuSmoke_FramedRegistrationReusesTargetAcrossRunsAndMatchesCpuSolve_Test::TestBody() /home/alex/Documents/IntrinsicEngine/tests/integration/graphics/Test.PointLBVHGpuSmoke.cpp:347:58
+    #14 0x617e8d487de4 in void testing::internal::HandleSehExceptionsInMethodIfSupported<testing::Test, void>(testing::Test*, void (testing::Test::*)(), char const*) /home/alex/Documents/IntrinsicEngine/external/vcpkg/buildtrees/gtest/src/v1.17.0-0c449efaff.clean/googletest/src/gtest.cc:2664:27
+    #15 0x617e8d480272 in void testing::internal::HandleExceptionsInMethodIfSupported<testing::Test, void>(testing::Test*, void (testing::Test::*)(), char const*) /home/alex/Documents/IntrinsicEngine/external/vcpkg/buildtrees/gtest/src/v1.17.0-0c449efaff.clean/googletest/src/gtest.cc:2700:52
+    #16 0x617e8d457264 in testing::Test::Run() /home/alex/Documents/IntrinsicEngine/external/vcpkg/buildtrees/gtest/src/v1.17.0-0c449efaff.clean/googletest/src/gtest.cc:2739:50
+    #17 0x617e8d457d62 in testing::TestInfo::Run() /home/alex/Documents/IntrinsicEngine/external/vcpkg/buildtrees/gtest/src/v1.17.0-0c449efaff.clean/googletest/src/gtest.cc:2885:14
+    #18 0x617e8d458744 in testing::TestSuite::Run() /home/alex/Documents/IntrinsicEngine/external/vcpkg/buildtrees/gtest/src/v1.17.0-0c449efaff.clean/googletest/src/gtest.cc:3063:33
+    #19 0x617e8d46a22b in testing::internal::UnitTestImpl::RunAllTests() /home/alex/Documents/IntrinsicEngine/external/vcpkg/buildtrees/gtest/src/v1.17.0-0c449efaff.clean/googletest/src/gtest.cc:6054:47
+    #20 0x617e8d488f35 in bool testing::internal::HandleSehExceptionsInMethodIfSupported<testing::internal::UnitTestImpl, bool>(testing::internal::UnitTestImpl*, bool (testing::internal::UnitTestImpl::*)(), char const*) /home/alex/Documents/IntrinsicEngine/external/vcpkg/buildtrees/gtest/src/v1.17.0-0c449efaff.clean/googletest/src/gtest.cc:2664:27
+    #21 0x617e8d4815d8 in bool testing::internal::HandleExceptionsInMethodIfSupported<testing::internal::UnitTestImpl, bool>(testing::internal::UnitTestImpl*, bool (testing::internal::UnitTestImpl::*)(), char const*) /home/alex/Documents/IntrinsicEngine/external/vcpkg/buildtrees/gtest/src/v1.17.0-0c449efaff.clean/googletest/src/gtest.cc:2700:52
+    #22 0x617e8d4681ea in testing::UnitTest::Run() /home/alex/Documents/IntrinsicEngine/external/vcpkg/buildtrees/gtest/src/v1.17.0-0c449efaff.clean/googletest/src/gtest.cc:5594:55
+    #23 0x617e8c39811c in RUN_ALL_TESTS() /home/alex/Documents/IntrinsicEngine/external/vcpkg/buildtrees/gtest/src/v1.17.0-0c449efaff.clean/googletest/include/gtest/gtest.h:2334:76
+    #24 0x617e8c398104 in main /home/alex/Documents/IntrinsicEngine/external/vcpkg/buildtrees/gtest/src/v1.17.0-0c449efaff.clean/googletest/src/gtest_main.cc:64:23
+    #25 0x7f338702a1c9 in __libc_start_call_main csu/../sysdeps/nptl/libc_start_call_main.h:58:16
+    #26 0x7f338702a28a in __libc_start_main csu/../csu/libc-start.c:360:3
+    #27 0x617e8a5fbed4 in _start (/home/alex/Documents/IntrinsicEngine/build/ci-vulkan/bin/IntrinsicPointLBVHGpuTests+0x2c06ed4) (BuildId: 5726021646ac01a0b9f17d9b17d6a4bdc5841a7c)
+
+-----------------------------------------------------
+Suppressions used:
+  count      bytes template
+     18     113760 VulkanCommandContext@Extrinsic.Backends.Vulkan::PushConstants
+      3       1989 dbus_connection_send_with_reply_and_block
+-----------------------------------------------------
+
+SUMMARY: AddressSanitizer: 240 byte(s) leaked in 3 allocation(s).

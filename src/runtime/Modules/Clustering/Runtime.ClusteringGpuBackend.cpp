@@ -24,6 +24,7 @@ import Extrinsic.RHI.Descriptors;
 import Extrinsic.RHI.Device;
 import Extrinsic.RHI.Handles;
 import Extrinsic.Graphics.GpuTransfer;
+import Extrinsic.Graphics.PointLBVH;
 
 namespace Extrinsic::Runtime
 {
@@ -602,7 +603,8 @@ namespace Extrinsic::Runtime
             return result;
         }
 
-        if (!desc.Resources.IsValid() || !desc.Pipelines.IsValid())
+        if (!desc.Resources.IsValid() || !desc.Pipelines.IsValid() || desc.Index == nullptr ||
+            !desc.Index->Reserve(result.Plan.ClusterCount))
         {
             result.Status = KMeansGpuStatus::InvalidGpuResource;
             return result;
@@ -640,6 +642,17 @@ namespace Extrinsic::Runtime
             case KMeansGpuPassKind::Update: pipeline = desc.Pipelines.Update; break;
             }
 
+            if (dispatch.Kind == KMeansGpuPassKind::Assign)
+            {
+                const auto centroidOffset = stateRecord.CentroidsBDA -
+                    device.GetBufferDeviceAddress(desc.Resources.Work);
+                if (!desc.Index->RecordBuild(cmd, {.Buffer=desc.Resources.Work,
+                        .Offset=centroidOffset, .Count=result.Plan.ClusterCount}))
+                {
+                    result.Status=KMeansGpuStatus::InvalidGpuResource;
+                    return result;
+                }
+            }
             const KMeansGpuPassPushConstants push{
                 .StateBDA = stateBDA,
                 .PointCount = result.Plan.PointCount,
@@ -648,6 +661,7 @@ namespace Extrinsic::Runtime
                 .Iteration = dispatch.Iteration,
                 .ConvergenceTolSquared = tolSquared,
                 .Reserved0 = 0.0f,
+                .NodesBDA = desc.Index->View().NodesBDA,
             };
 
             cmd.BindPipeline(pipeline);
@@ -939,6 +953,7 @@ namespace Extrinsic::Runtime
                               result);
 
         result.Record = RecordKMeansGpuPasses(KMeansGpuRecordDesc{
+            .Index = desc.Index,
             .Device = desc.Device,
             .CommandContext = desc.CommandContext,
             .Pipelines = desc.Pipelines,

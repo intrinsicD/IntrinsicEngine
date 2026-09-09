@@ -287,3 +287,19 @@
   ara/evidence/tables/curvature_segmentation_performance_diagnostic_2026-09-03.md,
   N456, N457, N458]
 - **From staging**: O169
+
+## H19: Use ICP as the next bounded shared-target consumer
+- **Rationale**: The operator adopted canonical-domain ICP runtime/config/UI and explicit shared-target correspondence integration as the next slice. Keep the existing CPU solve and KD-tree default, reuse stable targets across requests, and compare complete registration cost before default adoption. This closes an existing Framework24 workflow gap using present nearest-query support. Later kNN/exclusion and primitive/ray work remains deferred, not authorized by this slice.
+- **Provenance**: user-revised
+- **Crystallized via**: verbal-affirmation
+- **Sensitivity**: high
+- **Code ref**: [N502, src/geometry/Geometry.Registration.cpp, src/runtime/GeometryIntegration/Runtime.SpatialIndexCache.cpp, src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Mesh.cpp, docs/architecture/registration.md]
+- **From staging**: O205
+
+## H20: Complete canonical normal integration after the query foundation
+- **Rationale**: The operator adopted RUNTIME-213/UI-045 as the next user-facing slice after shared kNN/exclusion. Expose named-domain inputs, same-domain output, shared config/window and publication through the existing operation owner; reuse the supplied CPU LBVH where explicitly selected and retain the KD-tree default. Topology normal methods retain incident adjacency rather than substituting spatial neighborhoods.
+- **Provenance**: user-revised
+- **Crystallized via**: verbal-affirmation
+- **Sensitivity**: high
+- **Code ref**: [N509, src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Normals.cpp, src/runtime/Modules/NormalEstimation/Runtime.NormalEstimationConfig.cppm, src/app/Sandbox/Editor/Sandbox.MeshProcessingPanels.cpp, docs/architecture/normal-estimation.md]
+- **From staging**: O208

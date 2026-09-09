@@ -2,11 +2,10 @@ session:
   id: 2026-09-08_001
   date: '2026-09-08'
   started: '2026-09-08T02:12:46+02:00'
-  last_turn: '2026-09-08T08:56:00+02:00'
-  turn_count: 3
-  summary: Audited and refined atlas boundaries with Claude, then published the complete code, evidence
-    and portable viewers/models to origin/main. METHOD-046 is complete; broader quality and engine adoption
-    remain open.
+  last_turn: "2026-09-08T21:33:09+02:00"
+  turn_count: 12
+  summary: "Audited and refined atlas boundaries with Claude, then published the complete code, evidence and portable viewers/models to origin/main. METHOD-046 is complete; broader quality and engine adoption remain open. Ported Framework24 virtual-source geodesics through geometry, config and UI with CPU verification. Added shared primitive selection and method-seed controls. Audited GPU LBVH availability and proposed cache ownership. Implemented the approved CPU/Vulkan point-LBVH cache and k-means integration with bounded readback evidence. Documented spatial-acceleration consumers and 39 open-task reminders with workflow/template reuse decisions. Implemented accepted canonical ICP/config/UI and cached CPU/Vulkan correspondences; bounded correctness passes, display-off timing qualification fails, CPU default retained. Extended shared CPU/Vulkan kNN and source-ID exclusion with a supplied CPU PCA adapter; bounded CPU/GPU checks pass, KD-tree defaults retained. Completed accepted canonical normal estimation with CPU KD-tree/cached LBVH, distinct topology methods and shared config/window/history; 179 focused checks and full CPU gate pass."
+
 events_logged:
 - turn: 1
   type: question
@@ -68,6 +67,211 @@ events_logged:
   routing: direct
   provenance: ai-executed
   summary: Verify implementation commit on origin/main and close the bounded task
+- turn: 4
+  type: decision
+  id: N491
+  routing: direct
+  provenance: user
+  summary: Broaden the method toolset with Framework24 geodesics before further part decomposition
+- turn: 4
+  type: dead_end
+  id: N492
+  routing: direct
+  provenance: ai-executed
+  summary: Reject the exact planar oracle and retain its failed native output
+- turn: 4
+  type: experiment
+  id: N493
+  routing: direct
+  provenance: ai-executed
+  summary: Verify CPU geometry, validated config, guarded publication and headless panel drawing
+- turn: 4
+  type: claim
+  id: O200
+  routing: crystallized
+  provenance: ai-suggested
+  summary: C75 preserves the rejected exact-distance assumption
+- turn: 5
+  type: decision
+  id: N494
+  routing: direct
+  provenance: ai-executed
+  summary: Extend the existing interaction owner/controller with shared primitive sets
+- turn: 5
+  type: experiment
+  id: N495
+  routing: direct
+  provenance: ai-executed
+  summary: Final build, 145 focused and 4337 selected CPU cases have zero failures
+- turn: 5
+  type: observation
+  id: O201
+  routing: staged
+  provenance: ai-suggested
+  summary: Canonical-domain selection snapshots keep method kernels independent of interaction
+- turn: 6
+  type: question
+  id: N496
+  routing: direct
+  provenance: user
+  summary: Audit GPU LBVH availability and component versus operation lifetime
+- turn: 6
+  type: observation
+  id: O202
+  routing: staged
+  provenance: ai-suggested
+  summary: Propose a lazy shared index cache plus method-local changing-target workspaces
+- turn: 7
+  type: decision
+  id: N497
+  routing: direct
+  provenance: user-revised
+  summary: Adopt O202 shared-cache and temporary-workspace ownership
+- turn: 7
+  type: experiment
+  id: N498
+  routing: direct
+  provenance: ai-executed
+  summary: CPU gate and two real Vulkan LBVH/cache/k-means readbacks pass
+- turn: 7
+  type: decision
+  id: N499
+  routing: direct
+  provenance: ai-executed
+  summary: Record bounded C76 and exclude performance extrapolation
+- turn: 7
+  type: observation
+  id: O203
+  routing: crystallized
+  provenance: ai-executed
+  summary: Crystallize tested LBVH behavior through the source-bound verification artifact
+- turn: 8
+  type: decision
+  id: N500
+  routing: direct
+  provenance: user
+  summary: Maintain a sourced spatial-acceleration inventory and task/workflow reminders with exact query limits.
+- turn: 8
+  type: observation
+  id: O204
+  routing: staged
+  provenance: ai-suggested
+  summary: Candidate migration priorities remain profile-dependent; no new consumer or speed claim.
+- turn: 9
+  type: question
+  id: N501
+  routing: direct
+  provenance: user
+  summary: Choose the next concrete integration.
+- turn: 9
+  type: observation
+  id: O205
+  routing: staged
+  provenance: ai-suggested
+  summary: Recommend ICP workflow plus separately scoped shared-target correspondence adoption; await operator selection.
+- turn: 10
+  type: decision
+  id: N502
+  routing: direct
+  provenance: user-revised
+  summary: Accept canonical ICP workflow and shared target-index adoption
+- turn: 10
+  type: experiment
+  id: N503
+  routing: direct
+  provenance: ai-executed
+  summary: Verify canonical ICP operands and cached Vulkan correspondence publication
+- turn: 10
+  type: decision
+  id: N504
+  routing: direct
+  provenance: ai-executed
+  summary: Bind ICP capability statements to bounded source and fixture evidence
+- turn: 10
+  type: experiment
+  id: N505
+  routing: direct
+  provenance: ai-executed
+  summary: Separate display-off timing failure and leak-enabled shutdown retention
+- turn: 10
+  type: heuristic
+  id: O205
+  routing: crystallized
+  provenance: user-revised
+  summary: H19 records the explicitly accepted ICP slice; later query extensions stay deferred.
+- turn: 10
+  type: claim
+  id: O206
+  routing: crystallized
+  provenance: ai-executed
+  summary: C77 binds local correctness separately from failed timing and unresolved shutdown retention.
+- turn: 11
+  type: decision
+  id: N506
+  routing: direct
+  provenance: ai-executed
+  summary: Continue after ICP with shared kNN and identity exclusion
+- turn: 11
+  type: experiment
+  id: N507
+  routing: direct
+  provenance: ai-executed
+  summary: Verify kNN, framed cache and supplied PCA with existing consumer regressions
+- turn: 11
+  type: decision
+  id: N508
+  routing: direct
+  provenance: ai-executed
+  summary: Commit bounded kNN integration evidence and preserve adoption boundaries
+- turn: 11
+  type: observation
+  id: O207
+  routing: crystallized
+  provenance: ai-executed
+  summary: Shared CPU/Vulkan kNN and source-ID exclusion, framed cache reuse/staleness and supplied CPU
+    PCA pass the stated local fixtures. This is bounded implementation evidence, not speedup or completed
+    normal config/UI/publication.
+- turn: 11
+  type: observation
+  id: O208
+  routing: staged
+  provenance: ai-suggested
+  summary: Next user-facing slice should wire normal estimation through canonical-domain config, UI and
+    same-domain publication using RUNTIME-213/UI-045, reusing the supplied index where selected. Retain
+    the KD-tree default until representative complete-method evidence supports a change.
+- turn: 12
+  type: decision
+  id: N509
+  routing: direct
+  provenance: user
+  summary: Adopt the canonical normal workflow as the next engine slice
+- turn: 12
+  type: experiment
+  id: N510
+  routing: direct
+  provenance: ai-executed
+  summary: Verify normal computation, canonical publication and the shared editor window
+- turn: 12
+  type: decision
+  id: N511
+  routing: direct
+  provenance: ai-executed
+  summary: Bind bounded CPU normal-workflow evidence without broadening GPU or parity claims
+- turn: 12
+  type: heuristic
+  id: H20
+  routing: crystallized
+  provenance: user-revised
+  summary: O208 adopted through the explicit normal-estimation request.
+- turn: 12
+  type: observation
+  id: O209
+  routing: crystallized
+  provenance: ai-executed
+  summary: Bounded CPU fixtures cover normal estimation on all eight canonical domains with both PCA query choices,
+    distinct mesh/graph methods, named output preservation/history, stale/cancelled jobs, shared config and editor/vector
+    recipe routing.
+
 ai_actions:
 - turn: 1
   action: Added native diagnostic export, a passive Python decision observer, scalar/curve viewer and
@@ -108,13 +312,188 @@ ai_actions:
   - tasks/done/RETIREMENT-LOG.md
   - docs/methods/atlas_stage_inspection.md
   - docs/methods/uv_boundary_refinement_experiment.md
+- turn: 4
+  action: Implemented the CPU virtual-source method after paper and Framework24 intake; added typed position binding, multiple sources, explicit failure diagnostics and an expansion budget. Wired the mesh menu, config preview/apply, named scalar/source properties, visualization and guarded undo/redo. Corrected publication guards and menu inventories during testing. Clang 23 ci build, 36 focused tests, the full CPU gate and sealed smoke validation pass. No standalone graphical application, sanitizer or GPU run is claimed.
+  provenance: ai-executed
+  files_changed:
+  - src/geometry/Geometry.HalfedgeMesh.Geodesic.VirtualSource.cpp
+  - src/runtime/Modules/Geodesics/Runtime.GeodesicsConfig.cppm
+  - src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Mesh.cpp
+  - src/app/Sandbox/Editor/Sandbox.MeshProcessingPanels.cpp
+  - tests/unit/geometry/Test.GeodesicVirtualSource.cpp
+  - tests/contract/runtime/Test.GeodesicsOperations.cpp
+  - tests/integration/runtime/Test.SandboxEditorPresentation.cpp
+  - benchmarks/geometry/Bench.GeodesicsReferenceSmoke.cpp
+  - methods/geometry/geodesics_virtual_source/paper.md
+- turn: 5
+  action: Added ordered entity/domain primitive sets, atomic editing, row-identity expiry, serialized selection settings, viewport modifiers, delayed-pick guards, batch replay ordering and copied highlight packets. Added selection panels and copying into geodesics sources and parameterization pins. Passed the final ci build, focused/full CPU gates and structural checks. Changes remain local and uncommitted.
+  provenance: ai-executed
+  files_changed:
+  - src/runtime/Scene/Runtime.SelectionController.Primitives.cpp
+  - src/runtime/Scene/Runtime.SelectionController.Config.cpp
+  - src/runtime/Scene/Runtime.SceneInteractionModule.cpp
+  - src/runtime/Scene/Runtime.SceneInteractionModule.Selection.cpp
+  - src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Public.cpp
+  - src/app/Sandbox/Editor/Sandbox.DomainPanels.cpp
+  - src/app/Sandbox/Editor/Sandbox.MethodPanels.cpp
+  - tests/contract/runtime/Test.PrimitiveSelection.cpp
+  - docs/architecture/primitive-selection.md
+- turn: 6
+  action: Inspected promoted builders, method consumers, shaders and CMake registrations, then compared Framework24 entity KDTree state with its CUDA K-Means LBVH. Confirmed the current CPU builder uses median splits and the Vulkan assignment shader scans centroids. Ran ten existing BVH/KDTree tests successfully. Proposed ownership and invalidation rules; no engine implementation or GPU verification performed.
+  provenance: ai-executed
+  files_changed: []
+- turn: 7
+  action: Implemented CPU exhaustive/tree queries, shared Vulkan Morton/sort/build/traversal kernels, canonical-domain runtime caching and private centroid-workspace reuse. Wired Sandbox composition and the existing k-means config/UI path. Corrected new fixture setup, self-snapshot rebuilding and successful GPU diagnostic labeling. Final full CPU gate, two ASan+UBSan Vulkan readbacks, Sandbox build, 32 smoke payloads and structural checks pass. Changes remain local and uncommitted.
+  provenance: ai-executed
+  files_changed:
+  - src/geometry/Geometry.PointLBVH.cpp
+  - src/graphics/renderer/Graphics.PointLBVH.cpp
+  - src/runtime/GeometryIntegration/Runtime.SpatialIndexCache.cpp
+  - src/runtime/Modules/Clustering/Runtime.ClusteringGpuBackend.cpp
+  - assets/shaders/lbvh_build.comp
+  - assets/shaders/lbvh_query.comp
+  - tests/integration/graphics/Test.PointLBVHGpuSmoke.cpp
+  - docs/architecture/spatial-indices.md
+- turn: 8
+  action: Audited current geometry/runtime/graphics/physics queries and Framework24 callers. Added a consumer inventory,
+    39 existing task reminders, and a named adoption intake for seven legacy reference tasks; enrolled 14 older
+    records without changing algorithm scope. Updated workflow/review/task/package templates and generated mirrors.
+    Strict task/link/docs checks, 23 validator tests, Clang 23 ci geometry/runtime builds and four focused CPU LBVH/cache
+    tests pass. No engine algorithm or new GPU execution changed in this turn.
+  provenance: ai-executed
+  files_changed:
+  - docs/architecture/spatial-index-consumers.md
+  - docs/agent/method-workflow.md
+  - docs/agent/review.md
+  - tasks/templates/method-task.md
+  - methods/_template/paper.md
+  - tasks/backlog/methods/METHOD-003A-spatial-query-reference-integration-intake.md
+  - tools/agents/contract_legacy_tasks.json
+- turn: 9
+  action: Reviewed task dependencies, Framework24 inventory, current spatial-query contract and ICP source/editor
+    restrictions. Proposed a bounded ICP integration sequence and subsequent neighborhood/primitive capability work.
+    No engine/task implementation changes, tests, benchmark runs or new capability claims.
+  provenance: ai-executed
+  files_changed: []
+- turn: 10
+  action: Implemented canonical property snapshots, shared config/readiness/UI aliases, immutable target leases
+    and framed Vulkan batch queries with the existing CPU solve. Added 64-domain/config/staleness/history and GPU
+    comparisons, corrected signed-scale publication, measured cold/warm/runtime costs, and retained the failed display-off
+    timing qualification. Fixed the diagnosed test budget; recorded incremental compiler and leak-enabled process-retention
+    follow-ups. No commit or push.
+  provenance: ai-executed
+  files_changed:
+  - CMakePresets.json
+  - tests/CMakeLists.txt
+  - src/runtime/CMakeLists.txt
+  - src/geometry/Geometry.Registration.cppm
+  - src/geometry/Geometry.Registration.cpp
+  - src/runtime/Modules/Registration/Runtime.RegistrationConfig.cppm
+  - src/runtime/Modules/Registration/Runtime.RegistrationConfig.cpp
+  - src/runtime/GeometryIntegration/Runtime.SpatialIndexCache.cppm
+  - src/runtime/GeometryIntegration/Runtime.SpatialIndexCache.cpp
+  - src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.cppm
+  - src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.cpp
+  - src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Public.cpp
+  - src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Mesh.cpp
+  - src/runtime/Editor/internal/Runtime.EditorFeatures.Detail.cppm
+  - src/runtime/Editor/internal/Runtime.EditorFeatureContextAdapters.cpp
+  - src/runtime/Editor/internal/Runtime.EditorWorkspaceSession.cpp
+  - src/app/Sandbox/Editor/Sandbox.MeshProcessingPanels.cpp
+  - src/app/Sandbox/Sandbox.ConfigSections.cpp
+  - tests/contract/runtime/Test.RegistrationDomains.cpp
+  - tests/contract/runtime/Test.SandboxEditorClusteringMethods.cpp
+  - tests/integration/runtime/Test.SandboxEditorPresentation.cpp
+  - tests/integration/graphics/Test.PointLBVHGpuSmoke.cpp
+  - tests/unit/geometry/Test_Registration.cpp
+  - benchmarks/geometry/Bench.RegistrationSpatialSmoke.cpp
+  - benchmarks/geometry/Bench.RegistrationSpatialSmoke.hpp
+  - benchmarks/geometry/manifests/registration_spatial_smoke.yaml
+  - benchmarks/geometry/manifests/registration_runtime_spatial_smoke.yaml
+  - methods/geometry/registration/method.yaml
+  - methods/geometry/registration/paper.md
+- turn: 11
+  action: Implemented exact kNN/exclusion in existing CPU/Vulkan/cache owners, supplied-LBVH PCA, analytic/random/domain/framed
+    tests and a stable cold/warm/PCA smoke manifest. Updated spatial workflow and consumer reminders.
+    Fixed a new test cold-start wait; ran full CPU and focused real Vulkan regressions. No commit or push.
+  provenance: ai-executed
+  files_changed:
+  - src/geometry/Geometry.PointLBVH.cppm
+  - src/geometry/Geometry.PointLBVH.cpp
+  - src/geometry/Geometry.PointCloud.Normals.cppm
+  - src/geometry/Geometry.PointCloud.Normals.cpp
+  - src/geometry/Geometry.KDTree.cppm
+  - src/geometry/Geometry.KDTree.cpp
+  - src/graphics/renderer/Graphics.PointLBVH.cppm
+  - src/graphics/renderer/Graphics.PointLBVH.cpp
+  - assets/shaders/lbvh_query.comp
+  - assets/shaders/include/point_lbvh.glsl
+  - src/runtime/GeometryIntegration/Runtime.SpatialIndexCache.cppm
+  - src/runtime/GeometryIntegration/Runtime.SpatialIndexCache.cpp
+  - tests/unit/geometry/Test.PointLBVH.cpp
+  - tests/contract/runtime/Test.SpatialIndexCache.cpp
+  - tests/integration/graphics/Test.PointLBVHGpuSmoke.cpp
+  - tests/integration/runtime/Test.ClusteringServiceGpuSmoke.cpp
+  - benchmarks/geometry/Bench.PointLBVHSmoke.cpp
+  - benchmarks/geometry/Bench.PointLBVHSmoke.hpp
+  - benchmarks/geometry/manifests/point_lbvh_knn_smoke.yaml
+  - benchmarks/runners/BenchmarkSmokeRunner.cpp
+  - methods/geometry/point_lbvh/method.yaml
+  - methods/geometry/point_lbvh/paper.md
+- turn: 12
+  action: Implemented normal config, canonical preflight/catalogs, copied CPU jobs, LBVH leases, topology snapshots
+    and guarded output history in the existing owner; replaced three UI implementations with a shared window/aliases
+    and recipe binding. Preserved deleted NaNs and reduced readiness/history retention. Built Sandbox and IntrinsicTests;
+    final focused/full CPU checks pass; updated docs/task notes. No commit or push.
+  provenance: ai-executed
+  files_changed:
+  - src/runtime/CMakeLists.txt
+  - src/runtime/Modules/NormalEstimation/Runtime.NormalEstimationConfig.cppm
+  - src/runtime/Modules/NormalEstimation/Runtime.NormalEstimationConfig.cpp
+  - src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.cppm
+  - src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.cpp
+  - src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Normals.cpp
+  - src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Mesh.cpp
+  - src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Public.cpp
+  - src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Internal.hpp
+  - src/runtime/Editor/internal/Runtime.EditorFeatureContextAdapters.cpp
+  - src/runtime/Editor/internal/Runtime.EditorFeatures.Detail.cppm
+  - src/runtime/Editor/internal/Runtime.EditorWorkspaceSession.cpp
+  - src/runtime/GeometryIntegration/Runtime.SpatialIndexCache.cpp
+  - src/runtime/GeometryIntegration/Runtime.SpatialIndexCache.cppm
+  - src/geometry/Geometry.PointCloud.Normals.cpp
+  - src/geometry/Geometry.PointCloud.Normals.cppm
+  - src/geometry/Geometry.Graph.Vertex.Normals.cpp
+  - src/geometry/Geometry.HalfedgeMesh.Vertices.Normals.cpp
+  - src/app/Sandbox/Editor/Sandbox.MeshProcessingPanels.cpp
+  - src/app/Sandbox/Sandbox.ConfigSections.cpp
+  - tests/contract/runtime/Test.NormalEstimation.cpp
+  - tests/contract/runtime/Test.SandboxEditorSessionLifecycle.cpp
+  - tests/integration/runtime/Test.SandboxEditorPresentation.cpp
+
 claims_touched:
+- id: C76
+  action: created
+  turn: 7
 - id: C73
   action: created
   turn: 1
 - id: C74
   action: created
   turn: 2
+- id: C75
+  action: created
+  turn: 4
+- id: C77
+  action: created
+  turn: 10
+- id: C78
+  action: created
+  turn: 11
+- id: C79
+  action: created
+  turn: 12
+
 key_context:
 - turn: 1
   excerpt: User asked whether initial clusters and intermediate steps were visualized and curvature-aligned,
@@ -125,14 +504,43 @@ key_context:
 - turn: 3
   excerpt: User asked to commit and merge everything to main, push it for use at work, then said continue
     after interruption.
+- turn: 4
+  excerpt: User realized segmentation and part decomposition need a greater method toolset and requested implementing/porting and wiring Framework24 geodesics.
+- turn: 5
+  excerpt: User asked how vertices and other primitives can be selected, whether every method can share that selection, and requested a fitting implementation inspired by Framework24 if the workflow was incomplete.
+- turn: 6
+  excerpt: User asked whether GPU LBVH is already reusable by entities/methods and whether integration should use a component or ad-hoc rebuilding, with Framework24 as inspiration.
+- turn: 7
+  excerpt: 'User explicitly accepted the GPU LBVH ownership/integration proposal: Ok yes, please do that.'
+- turn: 8
+  excerpt: User requested a list of every sensible spatial-acceleration consumer and reminders in workflow and unimplemented
+    tasks so integration is not forgotten.
+- turn: 9
+  excerpt: User thanked the inventory work and asked what to do next; this is a request for a recommendation.
+- turn: 10
+  excerpt: "User explicitly accepted the proposed ICP integration: Great, yes let\u2019\
+    s do that."
+- turn: 11
+  excerpt: 'User: Continue with the next steps you recommend to do after the icp Integration. Agent selected
+    bounded shared kNN/exclusion and supplied PCA, with normal config/UI deferred.'
+- turn: 12
+  excerpt: 'User explicitly accepted the next normal-estimation slice: Ok continue with Normal estimation.'
+
 open_threads:
+- "Spatial consumer inventory: shared kNN/exclusion and the normal adapter are implemented; remaining method migrations and primitive/ray extensions stay open. METHOD-003A owns legacy-reference adoption intake."
+- 'REVIEW-004/BENCH-001: broader performance qualification remains open; local ICP comparisons support retaining the CPU default, and display-off timing failed the smoke target.'
 - 'METHOD-045: independent anatomical alignment, chart-area balance, remeshing robustness, internal-cut
   placement and feature-aware merge policy remain open. METHOD-046 bounded refinement is complete and
   published.'
 - 'METHOD-044: native/config/UI atlas adoption remains deferred.'
 - 'METHOD-043: anatomical/thickness segmentation failures remain unresolved.'
 - 'UI-053: detached curvature curves still need shared engine/config/UI publication.'
+- 'BUG-178/BUG-180: isolate incremental module-cache failure and leak-enabled pipeline allocation retention; no engine or driver ownership conclusion yet.'
+- GEOM-077 and RUNTIME-213/UI-045 are implemented and verified locally; commit/retirement pending. RUNTIME-209/UI-041 outlier adapters remain open; no further migration is authorized by the normal slice.
+
 ai_suggestions_pending:
 - O198 is partially exercised by METHOD-046. Its broader independent-alignment and seed-relocation alternatives
   remain unsettled; no blanket heuristic or production default is promoted.
 - Prior curvature-boundary proposals remain staged; no unrelated observation gained a closure signal.
+
+- "O204 broader migration priorities remain staged; only the explicit ICP portion of O205 was adopted."

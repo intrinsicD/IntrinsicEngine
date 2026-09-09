@@ -6,6 +6,16 @@ depends_on:
   - GEOM-066
   - GEOM-067
 maturity_target: CPUContracted
+workflow_schema: 1
+workflow_profile: standard
+evidence: required
+owner:
+branch:
+worktree:
+claimed_at:
+contract_schema: 1
+contracts: []
+contract_review: "Reviewed the catalog: offline hierarchy evidence only; no ECS property binding/publication, runtime/UI integration, method package, public engine interface or policy change. Existing public geometry APIs are consumed without a new layer edge."
 ---
 # GRAPHICS-125 — Memory-priced cluster hierarchy evidence
 
@@ -66,6 +76,16 @@ maturity_target: CPUContracted
   fails, record the reason and close this task without a hierarchy tool.
 - Reintroduction trigger: GPU-facing implementation children may open only if
   exactness and preregistered error-per-byte thresholds pass.
+
+## Spatial acceleration consideration
+
+Keep point-query acceleration distinct from the proposed meshlet/cluster
+hierarchy. A future scene broad phase may reuse LBVH construction ideas only with
+conservative primitive bounds and matching traversal; it does not provide
+simplification errors, valid hierarchy cuts or source-triangle coverage. Preserve
+this offline evidence task and its start gates; no renderer/GPU adoption is added.
+
+See the [shared spatial-index consumer inventory](../../../docs/architecture/spatial-index-consumers.md).
 
 ## Required changes
 

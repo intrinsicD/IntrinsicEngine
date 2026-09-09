@@ -90,6 +90,11 @@ the agreed task needs review, not a repeated approval.
   readable phase-list main loop (P5).
 - New parallelizable algorithms declare their backend axis: a CPU/GPU hook
   exists or GPU execution is explicitly deferred to a task ID.
+- Spatial-query work checks the [consumer inventory](../architecture/spatial-index-consumers.md)
+  for shared-index reuse, records ownership and missing query capabilities,
+  and preserves primitive/metric/membership semantics. Keep the relevant task
+  reminder current; grids, topology and exact primitive predicates remain
+  valid choices when the point LBVH does not satisfy the operation.
 
 **Lifetime, concurrency, failure**
 

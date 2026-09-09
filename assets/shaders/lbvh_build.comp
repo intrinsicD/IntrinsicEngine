@@ -1,0 +1,33 @@
+#version 460
+#extension GL_GOOGLE_include_directive : require
+#include "include/point_lbvh_build.glsl"
+int prefix(int i,int j)
+{
+    if(j<0 || j>=int(pc.count))return -1;
+    uvec2 a=LbvhKeys(pc.keys).v[i]^LbvhKeys(pc.keys).v[j];
+    return a.x!=0?31-findMSB(a.x):63-findMSB(a.y);
+}
+void main()
+{
+    uint slot=gl_GlobalInvocationID.x;if(slot>=pc.count)return;
+    LbvhKeys keys=LbvhKeys(pc.keys);LbvhNodes tree=LbvhNodes(pc.nodes);
+    uint object=keys.v[slot].y;
+    vec3 p=lbvhPoint(pc.points,pc.stride,object);
+    if(pc.objectIndices!=uint64_t(0))object=LbvhIndices(pc.objectIndices).v[object];
+    tree.v[pc.count-1+slot]=LbvhNode(p,LBVH_INVALID,p,LBVH_INVALID,object,slot,slot,0);
+    if(slot==pc.count-1)return;
+    int i=int(slot),d=prefix(i,i+1)>prefix(i,i-1)?1:-1;
+    int minimum=prefix(i,i-d),maximum=2;
+    while(prefix(i,i+maximum*d)>minimum)maximum*=2;
+    int length=0;
+    for(int step=maximum/2;step>0;step/=2)if(prefix(i,i+(length+step)*d)>minimum)length+=step;
+    int j=i+length*d,first=min(i,j),last=max(i,j),sharedPrefix=prefix(first,last);
+    int split=first,step=last-first;
+    do{step=(step+1)/2;int candidate=split+step;if(candidate<last && prefix(first,candidate)>sharedPrefix)split=candidate;}while(step>1);
+    uint left=split==first?pc.count-1+uint(split):uint(split);
+    uint right=split+1==last?pc.count+uint(split):uint(split+1);
+    // Range unions avoid cross-workgroup publication/atomic visibility assumptions.
+    vec3 lo=vec3(1e18),hi=vec3(-1e18);
+    for(int k=first;k<=last;++k){vec3 v=lbvhPoint(pc.points,pc.stride,keys.v[k].y);lo=min(lo,v);hi=max(hi,v);}
+    tree.v[i]=LbvhNode(lo,left,hi,right,LBVH_INVALID,uint(first),uint(last),0);
+}

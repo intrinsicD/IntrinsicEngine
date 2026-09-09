@@ -327,7 +327,7 @@ TEST(SandboxEditorPresentation, DefaultDrawStartsWithOnlyMenuBarVisible)
 
     EXPECT_TRUE(ImGuiWindowExists("##MainMenuBar"));
     const auto menu = shell.BuildEditorWindowMenuModel();
-    ASSERT_EQ(menu.size(), 39u);
+    ASSERT_EQ(menu.size(), 44u);
     for (const Runtime::EditorWindowMenuEntry& entry : menu)
     {
         EXPECT_FALSE(entry.Open) << entry.Id;
@@ -345,7 +345,7 @@ TEST(SandboxEditorPresentation, DomainMenusUseAppearanceAndFocusedProcessingWind
         std::string_view Id;
         std::vector<std::string> MenuPath;
     };
-    const std::array<ExpectedWindow, 29> expected{{
+    const std::array<ExpectedWindow, 34> expected{{
         {"pointcloud.appearance", {"PointCloud"}},
         {"pointcloud.properties", {"PointCloud"}},
         {"pointcloud.selection", {"PointCloud"}},
@@ -367,6 +367,7 @@ TEST(SandboxEditorPresentation, DomainMenusUseAppearanceAndFocusedProcessingWind
         {"mesh.processing.progressive_poisson", {"Mesh", "Processing"}},
         {"mesh.processing.parameterize_uv", {"Mesh", "Processing"}},
         {"mesh.processing.denoise", {"Mesh", "Processing"}},
+        {"mesh.processing.geodesics", {"Mesh", "Geodesics"}},
         {"mesh.processing.curvature", {"Mesh", "Processing"}},
         {"mesh.processing.remesh", {"Mesh", "Processing"}},
         {"mesh.processing.subdivide", {"Mesh", "Processing"}},
@@ -374,7 +375,11 @@ TEST(SandboxEditorPresentation, DomainMenusUseAppearanceAndFocusedProcessingWind
         {"mesh.processing.vertices.normals", {"Mesh", "Processing", "Vertices"}},
         {"graph.processing.vertices.normals", {"Graph", "Processing", "Vertices"}},
         {"pointcloud.processing.vertices.normals", {"PointCloud", "Processing", "Vertices"}},
+        {"view.normal_estimation", {"View"}},
         {"view.registration", {"View"}},
+        {"mesh.processing.registration", {"Mesh", "Processing"}},
+        {"graph.processing.registration", {"Graph", "Processing"}},
+        {"pointcloud.processing.registration", {"PointCloud", "Processing"}},
     }};
 
     Intrinsic::Tests::RuntimeTestKernel engine(HeadlessConfig(),
@@ -401,6 +406,34 @@ TEST(SandboxEditorPresentation, DomainMenusUseAppearanceAndFocusedProcessingWind
     domainPanels.Unregister();
     meshProcessingPanels.Unregister();
     methodPanels.Unregister();
+    shell.Detach();
+    engine.Shutdown();
+}
+
+TEST(SandboxEditorGeodesics, RegistersAndDrawsWindow)
+{
+    Intrinsic::Tests::RuntimeTestKernel engine(
+        HeadlessConfig(), std::make_unique<OneFrameApplication>());
+    ComposeEditorUiAndInitialize(engine);
+    Editor::EditorShell shell;
+    shell.Attach(engine.Worlds(), engine.Services());
+    Editor::MeshProcessingPanels panels;
+    panels.Register(shell);
+    panels.Register(shell);
+
+    const auto menu = shell.BuildEditorWindowMenuModel();
+    const auto* entry = FindWindow(menu, "mesh.processing.geodesics");
+    ASSERT_NE(entry, nullptr);
+    EXPECT_EQ(entry->Title, "Virtual Source Propagation");
+    EXPECT_EQ(entry->MenuPath, (std::vector<std::string>{"Mesh", "Geodesics"}));
+    EXPECT_EQ(std::ranges::count_if(menu, [](const auto& row) {
+        return row.Id == "mesh.processing.geodesics";
+    }), 1);
+    ASSERT_TRUE(shell.SetEditorWindowOpen("mesh.processing.geodesics", true));
+    engine.Run();
+    EXPECT_TRUE(ImGuiWindowExists("Mesh / Geodesics / Virtual Source Propagation"));
+
+    panels.Unregister();
     shell.Detach();
     engine.Shutdown();
 }
@@ -497,26 +530,22 @@ TEST(SandboxEditorPresentation, MeshProcessingPanelsPreserveLifetimeAndResultPub
         "src/app/Sandbox/Editor/Sandbox.MeshProcessingPanels.cpp");
     ASSERT_FALSE(source.empty());
 
-    constexpr std::array<std::string_view, 9> commands{{
+    constexpr std::array<std::string_view, 7> commands{{
       "ApplyEditorMeshDenoiseCommand",
       "ApplyEditorMeshCurvatureCommand",
       "ApplyEditorMeshRemeshCommand",
       "ApplyEditorMeshSubdivideCommand",
       "ApplyEditorMeshSimplifyCommand",
-      "ApplyEditorMeshVertexNormalsCommand",
-      "ApplyEditorGraphVertexNormalsCommand",
-      "ApplyEditorPointCloudVertexNormalsCommand",
-      "ApplyEditorRegistrationCommand",
+      "ApplyEditorConfiguredNormalEstimation",
+      "ApplyEditorConfiguredRegistrationCommand",
     }};
-    constexpr std::array<std::string_view, 9> sinks{{
+    constexpr std::array<std::string_view, 7> sinks{{
         "context.MethodResultSinks.MeshDenoise",
         "context.MethodResultSinks.MeshCurvature",
         "context.MethodResultSinks.MeshRemesh",
         "context.MethodResultSinks.MeshSubdivide",
         "context.MethodResultSinks.MeshSimplify",
-        "context.MethodResultSinks.MeshVertexNormals",
-        "context.MethodResultSinks.GraphVertexNormals",
-        "context.MethodResultSinks.PointCloudVertexNormals",
+        "context.MethodResultSinks.NormalEstimation",
         "context.MethodResultSinks.Registration",
     }};
     for (const std::string_view required : commands)
@@ -1216,13 +1245,8 @@ TEST(SandboxEditorPresentation, ControllerReattachPinsPanelAttachmentResetPolicy
               std::string::npos);
     EXPECT_NE(meshPanels.find("Simplify.LastResult.reset();"),
               std::string::npos);
-    EXPECT_NE(meshPanels.find("MeshNormals.LastResult.reset();"),
-              std::string::npos);
-    EXPECT_NE(meshPanels.find("GraphNormals.LastResult.reset();"),
-              std::string::npos);
+    EXPECT_NE(meshPanels.find("Normals = {};"), std::string::npos);
     EXPECT_NE(meshPanels.find("Registration.LastResult.reset();"),
-              std::string::npos);
-    EXPECT_NE(meshPanels.find("PointNormals.LastResult.reset();"),
               std::string::npos);
     EXPECT_NE(domainPanels.find(
                   "LastPointCloudOutlierRemovalResult.reset();"),
@@ -1400,6 +1424,52 @@ TEST(SandboxEditorPresentation, GlobalVisibilityHotkeyUsesTheVisibilityCommandPa
     EXPECT_TRUE(restored.Changed);
     EXPECT_TRUE(shell.IsEditorVisible());
 
+    shell.Detach();
+    engine.Shutdown();
+}
+
+TEST(SandboxEditorPresentation, RegistrationDomainMenusOpenOneSharedWindow)
+{
+    Intrinsic::Tests::RuntimeTestKernel engine(HeadlessConfig(), std::make_unique<OneFrameApplication>());
+    ComposeEditorUiAndInitialize(engine);
+    Editor::EditorShell shell;
+    shell.Attach(engine.Worlds(), engine.Services());
+    Editor::MeshProcessingPanels panels;
+    panels.Register(shell);
+    for (const auto* id : {"mesh.processing.registration", "graph.processing.registration", "pointcloud.processing.registration"})
+    {
+        ASSERT_TRUE(shell.SetEditorWindowOpen(id, true));
+        const auto menu = shell.BuildEditorWindowMenuModel();
+        ASSERT_NE(FindWindow(menu, "view.registration"), nullptr);
+        EXPECT_TRUE(FindWindow(menu, "view.registration")->Open);
+        ASSERT_NE(FindWindow(menu, id), nullptr);
+        EXPECT_FALSE(FindWindow(menu, id)->Open);
+        ASSERT_TRUE(shell.SetEditorWindowOpen("view.registration", false));
+    }
+    shell.Detach();
+    engine.Shutdown();
+}
+
+TEST(SandboxEditorPresentation, NormalDomainMenusOpenOneSharedWindow)
+{
+    Intrinsic::Tests::RuntimeTestKernel engine(HeadlessConfig(), std::make_unique<OneFrameApplication>());
+    ComposeEditorUiAndInitialize(engine);
+    Editor::EditorShell shell;
+    shell.Attach(engine.Worlds(), engine.Services());
+    Editor::MeshProcessingPanels panels;
+    panels.Register(shell);
+    for (const auto* id : {"mesh.processing.vertices.normals", "graph.processing.vertices.normals", "pointcloud.processing.vertices.normals"})
+    {
+        ASSERT_TRUE(shell.SetEditorWindowOpen(id, true));
+        const auto menu = shell.BuildEditorWindowMenuModel();
+        ASSERT_NE(FindWindow(menu, "view.normal_estimation"), nullptr);
+        EXPECT_TRUE(FindWindow(menu, "view.normal_estimation")->Open);
+        ASSERT_NE(FindWindow(menu, id), nullptr);
+        EXPECT_FALSE(FindWindow(menu, id)->Open);
+        ASSERT_TRUE(shell.SetEditorWindowOpen("view.normal_estimation", false));
+    }
+    ASSERT_TRUE(shell.SetEditorWindowOpen("view.normal_estimation", true));
+    engine.Run();
     shell.Detach();
     engine.Shutdown();
 }

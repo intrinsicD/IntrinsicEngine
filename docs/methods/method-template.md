@@ -19,6 +19,12 @@ Use `methods/_template/` as the starting point for each new method package.
 4. Optimized CPU backend.
 5. GPU backend (only after reference parity).
 
+During intake, spatial-query methods also record the index reuse decision from
+the [consumer inventory](../architecture/spatial-index-consumers.md) using the
+[method workflow](../agent/method-workflow.md#spatial-acceleration-review).
+Specify exact query semantics and missing support before assuming the shared
+point LBVH can replace an existing scan, grid, tree or primitive oracle.
+
 ## Manifest checklist
 
 A method manifest must follow [method-manifest-schema.md](method-manifest-schema.md) and include:

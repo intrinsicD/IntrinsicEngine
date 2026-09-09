@@ -1700,10 +1700,101 @@ void DrawPrimitiveDetails(const EditorPrimitiveDetailModel &primitive) {
   }
 }
 
-void DrawDomainSelectionWindow(const EditorDomainWindowModel &model) {
-  DrawDomainWindowHeader(model);
-  ImGui::SeparatorText("Primitive selection");
-  DrawPrimitiveDetails(model.Primitive);
+void DrawDomainSelectionWindow(const EditorDomainWindowModel& model,
+                               const SandboxEditorContext& context, int& index, int& domainIndex,
+                               std::string& message)
+{
+    DrawDomainWindowHeader(model);
+    ImGui::SeparatorText("Selection tool");
+    auto config = GetEditorSelectionInteractionConfig(context.GeometryCommands);
+    int target = static_cast<int>(config.Target);
+    bool changed = ImGui::Combo("Pick", &target, "Entities\0Vertices / points\0Edges\0Faces\0");
+    config.Target = static_cast<SelectionTarget>(target);
+    changed |= ImGui::Checkbox("Highlight selected primitives", &config.Highlight);
+    changed |=
+        ImGui::InputFloat("Point radius (world units)", &config.PointRadius, 0.001f, 0.01f, "%.4f");
+    if (changed)
+    {
+        const auto applied =
+            ApplyEditorSelectionInteractionConfig(context.GeometryCommands, config);
+        message = applied.Succeeded() ? "Selection settings applied."
+                                      : "Selection settings could not be applied.";
+    }
+    ImGui::TextWrapped("Click to replace; Shift-click to add; Ctrl-click to toggle. A background "
+                       "click clears primitive selections. Vertex and edge picks on a surface use "
+                       "the nearest corner or edge of the hit face.");
+    if (!model.HasSelectedEntity)
+        return;
+    ImGui::SeparatorText("Selected elements");
+    constexpr GeometryElementDomain domains[] = {
+        GeometryElementDomain::MeshVertex,    GeometryElementDomain::MeshEdge,
+        GeometryElementDomain::MeshHalfedge,  GeometryElementDomain::MeshFace,
+        GeometryElementDomain::GraphNode,     GeometryElementDomain::GraphEdge,
+        GeometryElementDomain::GraphHalfedge, GeometryElementDomain::PointCloudPoint};
+    std::vector<GeometryElementDomain> available;
+    for (auto domain : domains)
+    {
+        const auto selection =
+            ReadEditorPrimitiveSelection(context.GeometryCommands, model.SelectedStableId, domain);
+        if (selection.Status != PrimitiveSelectionStatus::UnsupportedDomain &&
+            selection.Status != PrimitiveSelectionStatus::Unavailable)
+            available.push_back(domain);
+    }
+    if (available.empty())
+    {
+        ImGui::TextDisabled("No selectable element domain.");
+        return;
+    }
+    domainIndex = std::clamp(domainIndex, 0, static_cast<int>(available.size()) - 1);
+    if (ImGui::BeginCombo("Element domain", ToString(available[domainIndex]).data()))
+    {
+        for (std::size_t i = 0; i < available.size(); ++i)
+            if (ImGui::Selectable(ToString(available[i]).data(),
+                                  domainIndex == static_cast<int>(i)))
+                domainIndex = static_cast<int>(i);
+        ImGui::EndCombo();
+    }
+    const auto domain = available[domainIndex];
+    const auto edit = [&](PrimitiveSelectionEdit operation,
+                          std::span<const std::uint32_t> indices = {}) {
+        auto result = ApplyEditorPrimitiveSelection(
+            context.GeometryCommands, model.SelectedStableId, domain, operation, indices);
+        message = result.Usable() ? "Selection updated." : result.Message;
+    };
+    ImGui::InputInt("Element index", &index);
+    if (index >= 0)
+    {
+        const auto value = static_cast<std::uint32_t>(index);
+        if (ImGui::Button("Add"))
+            edit(PrimitiveSelectionEdit::Add, std::span{&value, 1u});
+        ImGui::SameLine();
+        if (ImGui::Button("Remove"))
+            edit(PrimitiveSelectionEdit::Remove, std::span{&value, 1u});
+    }
+    if (ImGui::Button("Select all"))
+        edit(PrimitiveSelectionEdit::All);
+    ImGui::SameLine();
+    if (ImGui::Button("Invert"))
+        edit(PrimitiveSelectionEdit::Invert);
+    ImGui::SameLine();
+    if (ImGui::Button("Clear"))
+        edit(PrimitiveSelectionEdit::Clear);
+    const auto selected =
+        ReadEditorPrimitiveSelection(context.GeometryCommands, model.SelectedStableId, domain);
+    ImGui::Text("%zu selected / %zu elements", selected.Indices.size(), selected.ElementCount);
+    std::string indices = "In selection order:";
+    const auto displayed = std::min<std::size_t>(selected.Indices.size(), 64);
+    for (std::size_t i = 0; i < displayed; ++i)
+        indices += " " + std::to_string(selected.Indices[i]);
+    if (displayed < selected.Indices.size())
+        indices += " ...";
+    ImGui::TextWrapped("%s", indices.c_str());
+    if (!selected.Message.empty())
+        ImGui::TextWrapped("%s", selected.Message.c_str());
+    if (!message.empty())
+        ImGui::TextWrapped("%s", message.c_str());
+    if (ImGui::CollapsingHeader("Last pick details"))
+        DrawPrimitiveDetails(model.Primitive);
 }
 
 void DrawPointCloudOutlierRemovalResultStatus(
@@ -1840,6 +1931,10 @@ void DrawDomainProcessingWindow(
 } // namespace
 
 struct DomainPanels::Impl {
+  int SelectionElementIndex{0};
+  int SelectionDomainIndex{0};
+  std::string SelectionMessage{};
+
   enum class Section : std::uint8_t {
     Appearance,
     Properties,
@@ -1906,7 +2001,7 @@ void DomainPanels::Impl::Register(EditorShell &editorShell) {
   RegisterWindow("pointcloud.properties", {"PointCloud"}, "Properties",
                  Runtime::EditorDomainWindowKind::PointCloud,
                  Section::Properties);
-  RegisterWindow("pointcloud.selection", {"PointCloud"}, "Selection details",
+  RegisterWindow("pointcloud.selection", {"PointCloud"}, "Selection",
                  Runtime::EditorDomainWindowKind::PointCloud,
                  Section::Selection);
   RegisterWindow("pointcloud.processing.remove_outliers",
@@ -1920,7 +2015,7 @@ void DomainPanels::Impl::Register(EditorShell &editorShell) {
   RegisterWindow("graph.properties", {"Graph"}, "Properties",
                  Runtime::EditorDomainWindowKind::Graph,
                  Section::Properties);
-  RegisterWindow("graph.selection", {"Graph"}, "Selection details",
+  RegisterWindow("graph.selection", {"Graph"}, "Selection",
                  Runtime::EditorDomainWindowKind::Graph,
                  Section::Selection);
 
@@ -1930,7 +2025,7 @@ void DomainPanels::Impl::Register(EditorShell &editorShell) {
   RegisterWindow("mesh.properties", {"Mesh"}, "Properties",
                  Runtime::EditorDomainWindowKind::Mesh,
                  Section::Properties);
-  RegisterWindow("mesh.selection", {"Mesh"}, "Selection details",
+  RegisterWindow("mesh.selection", {"Mesh"}, "Selection",
                  Runtime::EditorDomainWindowKind::Mesh,
                  Section::Selection);
 }
@@ -2063,7 +2158,7 @@ void DomainPanels::Impl::DrawWindow(
       DrawDomainPropertyWindow(model);
       break;
     case Section::Selection:
-      DrawDomainSelectionWindow(model);
+      DrawDomainSelectionWindow(model, context, SelectionElementIndex, SelectionDomainIndex, SelectionMessage);
       break;
     case Section::PointCloudOutlierRemoval:
       DrawDomainProcessingWindow(model, context, &outlierState);

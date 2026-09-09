@@ -21,6 +21,7 @@ import Extrinsic.Graphics.RenderRecipeConfig;
 import Extrinsic.Graphics.RenderingContract;
 import Extrinsic.Runtime.AssetWorkflowModule;
 import Extrinsic.Runtime.ClusteringModule;
+import Extrinsic.Runtime.SpatialIndexCache;
 import Extrinsic.Runtime.EngineConfigControl;
 import Extrinsic.Runtime.JobService;
 import Extrinsic.Runtime.KernelEvents;
@@ -313,6 +314,7 @@ namespace Extrinsic::Runtime::EditorFeatureDetail
         m_Services        = &services;
         m_AttachmentEpoch = std::make_shared<std::atomic_bool>(true);
         m_Jobs = services.Find<JobService>();
+        m_SpatialIndices = services.Find<SpatialIndexCache>();
         m_ClusteringService = services.Find<ClusteringService>();
         if (m_ClusteringService != nullptr &&
             m_ClusteringService->Available())
@@ -449,6 +451,7 @@ namespace Extrinsic::Runtime::EditorFeatureDetail
                         stableEntityId);
                 };
         }
+        context.SpatialIndices = m_SpatialIndices;
         context.Clustering = m_ClusteringService;
         context.PointCloudConsolidation =
             m_PointCloudConsolidationService;
@@ -555,6 +558,13 @@ namespace Extrinsic::Runtime::EditorFeatureDetail
                 if (AttachmentEpochIsActive(epoch))
                     m_LastRegistrationResult = std::move(result);
             };
+        context.MethodResultSinks.NormalEstimation =
+            [epoch = m_AttachmentEpoch, this](
+                EditorNormalEstimationResult result)
+            {
+                if (AttachmentEpochIsActive(epoch))
+                    m_LastNormalEstimationResult = std::move(result);
+            };
         context.PendingAssetImportPath =
             std::move(pendingAssetImportPath);
         context.PendingAssetImportPayloadKind =
@@ -609,6 +619,9 @@ namespace Extrinsic::Runtime::EditorFeatureDetail
         if (m_LastRegistrationResult.has_value())
             context.LastRegistrationResult =
                 &*m_LastRegistrationResult;
+        if (m_LastNormalEstimationResult.has_value())
+            context.LastNormalEstimationResult =
+                &*m_LastNormalEstimationResult;
         const Core::Extent2D viewport =
             context.CameraViewport.Width != 0u &&
                     context.CameraViewport.Height != 0u
@@ -790,6 +803,9 @@ namespace Extrinsic::Runtime::EditorFeatureDetail
         case EditorGeometryProcessingResultSlot::PointCloudOutlierRemoval:
             m_LastPointCloudOutlierRemovalResult.reset();
             return;
+        case EditorGeometryProcessingResultSlot::NormalEstimation:
+            m_LastNormalEstimationResult.reset();
+            break;
         case EditorGeometryProcessingResultSlot::Registration:
             m_LastRegistrationResult.reset();
             return;
@@ -821,6 +837,7 @@ namespace Extrinsic::Runtime::EditorFeatureDetail
         m_LastUvRegenerationResult.reset();
         m_LastParameterizationResult.reset();
         m_LastRegistrationResult.reset();
+        m_LastNormalEstimationResult.reset();
         m_JobIdentities.clear();
         m_RenderRecipeContext = {};
         m_RenderRecipeState = {};

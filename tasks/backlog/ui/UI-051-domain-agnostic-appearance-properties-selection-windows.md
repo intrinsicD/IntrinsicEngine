@@ -71,6 +71,16 @@ contracts:
   element domain they are reading.
 - Agent/CLI: unchanged.
 
+## Spatial acceleration consideration
+
+For future spatial brush/radius selection over displayed point-valued properties,
+consider the shared canonical-property cache and preserve original domain IDs,
+stale checks and complete radius results. Nearest segment/face or screen-space
+lasso/visibility queries need their own exact query semantics. This note does not
+add brush/lasso implementation to the current property/selection-window scope.
+
+See the [shared spatial-index consumer inventory](../../../docs/architecture/spatial-index-consumers.md).
+
 ## Required changes
 - [ ] Replace the exact-provenance `DomainMatches` gate in these windows with a
       capability test over the selected entity's element-domain availability and

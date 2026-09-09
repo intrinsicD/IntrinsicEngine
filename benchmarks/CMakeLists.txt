@@ -35,6 +35,9 @@ add_executable(IntrinsicBenchmarkSmoke
     geometry/Bench_ProgressivePoissonReferenceSmoke.cpp
     geometry/Bench_QualityMetricsSmoke.cpp
     geometry/Bench_SignedHeatReferenceSmoke.cpp
+    geometry/Bench.GeodesicsReferenceSmoke.cpp
+    geometry/Bench.PointLBVHSmoke.cpp
+    geometry/Bench.RegistrationSpatialSmoke.cpp
     geometry/Bench_SimplificationQualitySmoke.cpp
     geometry/Bench_SurfaceSamplingSmoke.cpp
     geometry/Bench_UvAtlasSmoke.cpp

@@ -9,6 +9,7 @@ target_sources(${target_name}
         Graphics.Colormap.cppm
         Graphics.CurrentRendererContractAdapter.cppm
         Graphics.ComputeParallelPrimitives.cppm
+        Graphics.PointLBVH.cppm
         Graphics.FrameRecipe.cppm
         Graphics.RenderRecipeConfig.cppm
         Graphics.RenderCommandRouter.cppm
@@ -51,6 +52,7 @@ target_sources(${target_name}
         PRIVATE
         Graphics.CameraSnapshots.cpp
         Graphics.ComputeParallelPrimitives.cpp
+        Graphics.PointLBVH.cpp
         Graphics.CurrentRendererContractAdapter.cpp
         Graphics.RenderRecipeConfig.cpp
         Graphics.RenderCommandRouter.cpp

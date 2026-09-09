@@ -51,6 +51,16 @@ variant. REVIEW-004 and the accepted parent contract gate selection.
       the parent's deferred matrix rows before retiring this intake. No
       editor-integrated capability is claimed by this planning record.
 
+## Spatial acceleration consideration
+
+At adoption intake, consider the shared cache for stable canonical position
+properties if METHOD-033's accepted splat/query contract benefits from it. Grid
+stencils and the PDE solver remain separate. Record neighborhood completeness,
+normal/position revision handling and query ownership before allocating an
+implementation task; no GPU capability is implied by composing the cache.
+
+See the [shared spatial-index consumer inventory](../../../docs/architecture/spatial-index-consumers.md).
+
 ## Verification
 
 ```bash

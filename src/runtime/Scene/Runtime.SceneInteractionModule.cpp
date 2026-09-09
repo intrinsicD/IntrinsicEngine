@@ -1,6 +1,7 @@
 module;
 
 #include <algorithm>
+#include <bit>
 #include <chrono>
 #include <cmath>
 #include <cstddef>
@@ -11,6 +12,8 @@ module;
 #include <string_view>
 #include <utility>
 #include <vector>
+#include <unordered_map>
+#include <entt/entity/registry.hpp>
 
 #include <glm/glm.hpp>
 
@@ -19,6 +22,8 @@ module Extrinsic.Runtime.SceneInteractionModule;
 import Extrinsic.Core.Error;
 import Extrinsic.Core.Geometry2D;
 import Extrinsic.ECS.Scene.Registry;
+import Extrinsic.ECS.Components.GeometrySources;
+import Extrinsic.ECS.Component.Transform.WorldMatrix;
 import Extrinsic.Graphics.CameraSnapshots;
 import Extrinsic.Graphics.RenderFrameInput;
 import Extrinsic.Graphics.Renderer;
@@ -50,6 +55,21 @@ namespace Extrinsic::Runtime
                 std::chrono::duration_cast<std::chrono::microseconds>(
                     std::chrono::steady_clock::now() - start)
                     .count());
+        }
+
+        std::vector<std::uint64_t> PrimitivePickStamp(const ECS::Scene::Registry& scene, std::uint32_t id)
+        {
+            auto stamp = BuildSelectionTopologyStamp(scene, id);
+            const auto entity = SelectionController::ToEntityHandle(id);
+            if (!id || !scene.IsValid(entity)) return {};
+            const auto source = ECS::Components::GeometrySources::BuildConstView(scene.Raw(), entity);
+            stamp.push_back(source.VertexSource ? source.VertexSource->Properties.FindPropertyRevision("v:position").value_or(0) : 0);
+            const auto* world = scene.Raw().try_get<ECS::Components::Transform::WorldMatrix>(entity);
+            const auto matrix = world ? world->Matrix : glm::mat4{1.f};
+            for (int column = 0; column < 4; ++column)
+                for (int row = 0; row < 4; ++row)
+                    stamp.push_back(std::bit_cast<std::uint32_t>(matrix[column][row]));
+            return stamp;
         }
 
         constexpr int kGizmoMouseButton = 0;
@@ -127,9 +147,15 @@ namespace Extrinsic::Runtime
             if (!CursorInsideViewport(cursor, viewport))
                 return;
 
+            const auto mode = (input.IsKeyPressed(Platform::Input::Key::LeftControl) ||
+                               input.IsKeyPressed(Platform::Input::Key::RightControl))
+                ? SelectionPickMode::Toggle
+                : (input.IsKeyPressed(Platform::Input::Key::LeftShift) ||
+                   input.IsKeyPressed(Platform::Input::Key::RightShift))
+                    ? SelectionPickMode::Add : SelectionPickMode::Replace;
             selection.RequestClickPick(
                 ClampCursorPixel(cursor.x, viewport.Width),
-                ClampCursorPixel(cursor.y, viewport.Height));
+                ClampCursorPixel(cursor.y, viewport.Height), mode);
         }
 
         [[nodiscard]] std::uint32_t BuildGizmoModifierMask(
@@ -298,6 +324,8 @@ namespace Extrinsic::Runtime
                 WorldHandle World{};
                 std::uint64_t InteractionEpoch{0u};
                 std::optional<PickReadbackContext> Context{};
+                SelectionTarget Target{SelectionTarget::Entity};
+                std::unordered_map<std::uint32_t, std::vector<std::uint64_t>> TopologyStamps{};
             };
 
             WorldRegistry* Worlds{nullptr};
@@ -352,6 +380,8 @@ namespace Extrinsic::Runtime
                 RenderSnapshot.HasHovered = false;
                 RenderSnapshot.HoveredRenderId = 0u;
                 RenderSnapshot.GizmoDrawPackets.clear();
+                RenderSnapshot.DebugPoints.clear();
+                RenderSnapshot.DebugLines.clear();
                 if (Extraction == nullptr)
                     return;
                 Extraction->SubmitSceneInteractionSnapshot(
@@ -448,6 +478,8 @@ namespace Extrinsic::Runtime
                 FrameWorld = BoundWorld;
                 FrameEpoch = InteractionEpoch;
 
+                Selection.GetConfig().Interaction = GetSelectionInteractionConfig(context.Config)
+                    .value_or(SelectionInteractionConfig{});
                 if (Window == nullptr)
                     return;
 
@@ -460,6 +492,11 @@ namespace Extrinsic::Runtime
                     inputWindow.GetInput();
                 const Platform::Extent2D windowExtent =
                     inputWindow.GetWindowExtent();
+                if (Selection.GetConfig().Interaction.Target != SelectionTarget::Entity)
+                {
+                    if (Gizmo.IsDragging()) Gizmo.DragCancel(*BoundRegistry);
+                    GizmoSelectedEntities.clear();
+                }
                 DriveGizmoInteractionForFrame(
                     Gizmo,
                     *BoundRegistry,
@@ -476,8 +513,7 @@ namespace Extrinsic::Runtime
                     input,
                     windowExtent,
                     context.Viewport,
-                    context.EditorCapture.CapturedMouse ||
-                        context.EditorCapture.WidgetsActive,
+                    context.EditorCapture.CapturesViewportInput(),
                     Gizmo.IsDragging());
             }
 
@@ -539,7 +575,17 @@ namespace Extrinsic::Runtime
                                     BuildPickReadbackContextForFrame(
                                         *FrameRenderInput,
                                         FrameViewport),
+                                .Target = pick->Target,
                             });
+                        if (pick->Target != SelectionTarget::Entity)
+                        {
+                            auto& stamps = InFlightPickContexts.back().TopologyStamps;
+                            for (const auto entity : BoundRegistry->Raw().view<ECS::Components::GeometrySources::Vertices>())
+                            {
+                                const auto id = SelectionController::ToStableEntityId(entity);
+                                stamps.emplace(id, PrimitivePickStamp(*BoundRegistry, id));
+                            }
+                        }
                     }
                 }
                 context.Pacing.SelectionPickDrainMicros +=
@@ -556,7 +602,8 @@ namespace Extrinsic::Runtime
                         Gizmo.Orientation(),
                         Gizmo.Config().AxisLength);
 
-                RenderSnapshot.World = BoundWorld;
+                Selection.PrunePrimitives(*BoundRegistry);
+                RenderSnapshot = BuildPrimitiveSelectionRenderSnapshot(*BoundRegistry, Selection, BoundWorld);
                 RenderSnapshot.SelectedRenderIds.assign(
                     Selection.SelectedStableIds().begin(),
                     Selection.SelectedStableIds().end());
@@ -590,10 +637,15 @@ namespace Extrinsic::Runtime
                     std::chrono::steady_clock::now();
                 Graphics::SelectionSystem& selectionSystem =
                     Renderer->GetSelectionSystem();
-                while (const std::optional<
-                           Graphics::PickReadbackResult> result =
-                           selectionSystem.PopPickResult())
+                std::vector<Graphics::PickReadbackResult> completed;
+                while (const auto result = selectionSystem.PopPickResult())
+                    completed.push_back(*result);
+                // Completed GPU slots may be published in slot order. Replay a
+                // drained batch in click order so ordered method seeds are stable.
+                std::ranges::sort(completed, {}, &Graphics::PickReadbackResult::Sequence);
+                for (const auto& readback : completed)
                 {
+                    const auto* result = &readback;
                     // Never forward a zero/unknown sequence into the
                     // controller's standalone convenience fallback.
                     if (result->Sequence == 0u)
@@ -620,24 +672,32 @@ namespace Extrinsic::Runtime
                         continue;
                     }
 
+                    const auto refined = RefinePickReadbackResult(
+                        *BoundRegistry, *result, pickContext.Context ? &*pickContext.Context : nullptr);
+                    std::optional<PrimitiveSelectionHit> primitive;
+                    if (refined && IsResolved(refined->Status) && pickContext.Target != SelectionTarget::Entity)
+                    {
+                        const auto stamp = pickContext.TopologyStamps.find(result->StableEntityId);
+                        if (stamp == pickContext.TopologyStamps.end() ||
+                            stamp->second != PrimitivePickStamp(*BoundRegistry, result->StableEntityId))
+                        {
+                            (void)Selection.DiscardInFlightPick(result->Sequence);
+                            continue;
+                        }
+                        const auto source = BuildGeometryAvailability(BoundRegistry->Raw(),
+                            SelectionController::ToEntityHandle(result->StableEntityId));
+                        const auto domain = ResolveSelectionTargetDomain(source, pickContext.Target);
+                        const auto index = pickContext.Target == SelectionTarget::Face ? refined->FaceId
+                            : pickContext.Target == SelectionTarget::Edge ? refined->EdgeId
+                            : refined->VertexId != kInvalidPrimitiveIndex ? refined->VertexId : refined->PointId;
+                        if (domain != GeometryElementDomain::Unknown && index != kInvalidPrimitiveIndex)
+                            primitive = PrimitiveSelectionHit{domain, index};
+                    }
                     const bool consumed = result->Hit
-                        ? Selection.ConsumeHit(
-                              *BoundRegistry,
-                              result->StableEntityId,
-                              result->Sequence)
-                        : Selection.ConsumeNoHit(
-                              *BoundRegistry,
-                              result->Sequence);
-                    if (!consumed)
-                        continue;
-
-                    LastRefinedPrimitive =
-                        RefinePickReadbackResult(
-                            *BoundRegistry,
-                            *result,
-                            pickContext.Context
-                                ? &*pickContext.Context
-                                : nullptr);
+                        ? Selection.ConsumeHit(*BoundRegistry, result->StableEntityId, result->Sequence, primitive)
+                        : Selection.ConsumeNoHit(*BoundRegistry, result->Sequence);
+                    if (!consumed) continue;
+                    LastRefinedPrimitive = refined;
                     ++LastRefinedPrimitiveGeneration;
                 }
                 context.Pacing.SelectionReadbackMicros +=

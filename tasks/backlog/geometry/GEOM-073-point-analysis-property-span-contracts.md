@@ -38,6 +38,18 @@ maturity_target: CPUContracted
   FPFH (DOI `10.1109/ROBOT.2009.5152473`), plus later robustness/scalability
   improvements. Preserve the current algorithms and record exclusions.
 
+## Spatial acceleration consideration
+
+Preserve the generic property/span boundary so future callers can supply or reuse
+a geometry-owned neighborhood index. Radius outliers/ISS/FPFH are candidates;
+spacing, splat radii, bilateral/statistical analysis and automatic feature scales
+need kNN/self exclusion. The shared point LBVH now supplies these queries
+(GPU k=1..64); consumer adapters remain to be integrated. Retain
+numerical behavior here; do not import Runtime.SpatialIndexCache or add a
+universal query interface just for a future backend.
+
+See the [shared spatial-index consumer inventory](../../../docs/architecture/spatial-index-consumers.md).
+
 ## Required changes
 
 - [ ] Inventory every `Cloud`-taking utility/feature and classify its real

@@ -432,6 +432,11 @@ TEST(SandboxEditorSession, DismissClearsOneGeometryProcessingResultSlot)
     ASSERT_TRUE(static_cast<bool>(prepared.ResultSinks.MeshSimplify));
     ASSERT_TRUE(static_cast<bool>(prepared.ResultSinks.MeshDenoise));
     ASSERT_TRUE(static_cast<bool>(prepared.ResultSinks.DismissResult));
+    ASSERT_TRUE(static_cast<bool>(prepared.ResultSinks.NormalEstimation));
+    prepared.ResultSinks.NormalEstimation({.Status = Runtime::EditorCommandStatus::Applied,
+                                           .ActualBackend = "cpu_lbvh", .Message = "named normals published"});
+    ASSERT_TRUE(observe().LastNormalEstimationResult);
+    EXPECT_EQ(observe().LastNormalEstimationResult->ActualBackend, "cpu_lbvh");
 
     Runtime::EditorMeshSimplifyResult simplify{};
     simplify.Status = Runtime::EditorCommandStatus::GeometryProcessingFailed;
@@ -473,6 +478,10 @@ TEST(SandboxEditorSession, DismissClearsOneGeometryProcessingResultSlot)
     prepared.ResultSinks.DismissResult(
         Runtime::EditorGeometryProcessingResultSlot::MeshDenoise);
     EXPECT_FALSE(observe().LastMeshDenoiseResult.has_value());
+
+    EXPECT_TRUE(observe().LastNormalEstimationResult);
+    prepared.ResultSinks.DismissResult(Runtime::EditorGeometryProcessingResultSlot::NormalEstimation);
+    EXPECT_FALSE(observe().LastNormalEstimationResult);
 
     // A dismissal sink copied out of a prepared frame must not reach into a
     // detached session, which is the same epoch rule every result sink obeys.

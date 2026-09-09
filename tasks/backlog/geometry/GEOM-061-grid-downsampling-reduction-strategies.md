@@ -3,6 +3,15 @@ id: GEOM-061
 theme: I
 depends_on: [BUG-109]
 maturity_target: CPUContracted
+workflow_schema: 1
+workflow_profile: standard
+evidence: required
+owner:
+branch:
+worktree:
+claimed_at:
+contract_schema: 1
+contracts: [repo.source-documentation, geometry.element-domain-sources]
 ---
 # GEOM-061 — Point-cloud grid-downsampling reduction strategies
 
@@ -20,6 +29,16 @@ maturity_target: CPUContracted
 - Retired `GEOM-016` hardened centroid voxel downsampling with deterministic ordering and stable tie-breaking; this task adds index-returning strategies under the same determinism and invalid-input contract.
 - `BUG-109` first makes that intended baseline true in the current implementation by validating non-finite/out-of-range quantization and sorting occupied cells. This task must build on that fix rather than duplicate or bypass it.
 - Index-returning selection is what makes downstream property transfer exact (select rows from every property), which the centroid path cannot do.
+
+## Spatial acceleration consideration
+
+Retain direct voxel bucketing and per-cell reductions. Closest-to-cell-
+center/centroid must select among that cell's members; a global nearest-point LBVH
+query can choose a different cell and change the operation. Only consider an index
+later for a separately named cross-cell proximity operation, not for these
+representative selectors.
+
+See the [shared spatial-index consumer inventory](../../../docs/architecture/spatial-index-consumers.md).
 
 ## Required changes
 - [ ] Add a `GridReduction` strategy selector (`Centroid` = existing behavior, `First`, `Last`, `ClosestToCellCenter`, `ClosestToCellCentroid`, `RandomUniform`) to the voxel-downsampling surface in `Geometry.PointCloud.Utils` (or a focused sibling partition if the module split prefers it).

@@ -3,6 +3,15 @@ id: METHOD-003
 theme: I
 depends_on: [GEOM-023]
 maturity_target: CPUContracted
+workflow_schema: 1
+workflow_profile: standard
+evidence: required
+owner:
+branch:
+worktree:
+claimed_at:
+contract_schema: 1
+contracts: [repo.source-documentation, geometry.element-domain-sources, method.engine-integration]
 ---
 # METHOD-003 — Closest Point Method PDE solver reference backend
 
@@ -71,6 +80,28 @@ maturity_target: CPUContracted
 - Backend axis: deterministic `cpu_reference` only. Any optimized CPU or GPU
   implementation opens as a separate method task after this oracle and its
   convergence evidence exist.
+
+## Engine integration
+
+| Field | Disposition |
+| --- | --- |
+| Least-structured input | An exact closest-point/normal oracle plus the declared narrow-band grid and PDE data; point-based and mesh-based adapters add only their required properties/topology. |
+| Compatible entity sources | Every canonical property/topology source satisfying the input above; binding is owned by METHOD-003A after reference acceptance and selection. |
+| RuntimeModule | Deferred to [METHOD-003A](METHOD-003A-spatial-query-reference-integration-intake.md), which allocates the concrete operation owner without widening this reference slice. |
+| Config/agent | Typed reference parameters now; METHOD-003A owns validated serializable engine controls at adoption. |
+| UI | METHOD-003A owns adoption/discovery planning; no editor-integrated claim from this CPU slice. |
+| Publication | Return sampled PDE fields and diagnostics; later binding must name the query/grid destination, not overwrite arbitrary source geometry. METHOD-003A owns engine publication planning. |
+| End-to-end tests | Reference/oracle and method tests here; METHOD-003A allocates compatible-source/config/publication/UI coverage at adoption. |
+
+## Spatial acceleration consideration
+
+Consider a reusable fixed-source index inside each closest-point oracle. Sampled
+point nearest queries fit the point LBVH; neighborhood-based normal/MLS evaluation
+may use shared kNN support (GPU k=1..64) after a scoped adapter and parity tests. Mesh closest points need MeshClosestFaceIndex or
+a future triangle hierarchy with exact projection. Keep the CPU reference and
+analytic oracles; a point centroid is not an exact closest surface point.
+
+See the [shared spatial-index consumer inventory](../../../docs/architecture/spatial-index-consumers.md).
 
 ## Required changes
 

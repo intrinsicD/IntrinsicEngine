@@ -1,0 +1,36 @@
+{
+  "date": "2026-09-08",
+  "base_revision": "314db9ea5be314c732458649775103c461992fbb",
+  "source_state": "dirty_worktree",
+  "claim_eligible": false,
+  "preset": "ci",
+  "compiler": "/bin/clang++-23",
+  "build_type": "Debug",
+  "backend": "cpu_reference",
+  "cpu_gate": {
+    "command": "ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60",
+    "selected": 4326,
+    "passed": 4320,
+    "skipped": 6,
+    "failed": 0
+  },
+  "focused_gate": {
+    "command": "ctest --test-dir build/ci -R '^(GeodesicVirtualSource|GeodesicsOperations|SandboxEditorGeodesics|SandboxEditorPresentation)\\.' --output-on-failure --timeout 60",
+    "selected": 36,
+    "passed": 36,
+    "skipped": 0,
+    "failed": 0
+  },
+  "benchmark_result": "benchmarks/smoke.json",
+  "source_sha256": {
+    "src/geometry/Geometry.HalfedgeMesh.Geodesic.VirtualSource.cpp": "db240d76274eaad99cbb052b2ee9245e32edb97598edc25ee337dab3f027fef7",
+    "src/geometry/Geometry.HalfedgeMesh.Geodesic.cppm": "d837110e31ed7e49af969b2315b8efd8489944fa45c900326d26c757766130b2",
+    "src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Mesh.cpp": "1fc777217a59af353bef9b221007f728a1cb8060a3a658909f68c11f618db35f",
+    "src/runtime/Modules/Geodesics/Runtime.GeodesicsConfig.cpp": "f7154f584f94e2bcf12556fa7388d3a5e721ce91cb994cb771925cf1fb5398e1",
+    "tests/unit/geometry/Test.GeodesicVirtualSource.cpp": "89b93c178a1f7324d344dde8783a3daf6a8d6ebe6cfa98f6a2c8bcb859bcd9fe",
+    "tests/contract/runtime/Test.GeodesicsOperations.cpp": "58d0f20d08301ee7ac6d99e56407009e665503199b1901ab55fa860d0325a1ad",
+    "tests/integration/runtime/Test.SandboxEditorPresentation.cpp": "803280c0abfe8ab4dd6c0bf93c6eb66d6a243ea5f73a995e06c6ea89e723541a",
+    "benchmarks/geometry/Bench.GeodesicsReferenceSmoke.cpp": "9b4f2f0c020150e4c1d3bd3c3e022ec81d291704e84780690ac332d818da3bfd",
+    "benchmarks/geometry/manifests/geodesics_virtual_source_reference_smoke.yaml": "7f3194dfee989a482904c3a4441adf0d7c3d3875a8a229d4ce17d9dc1c4b2249"
+  }
+}

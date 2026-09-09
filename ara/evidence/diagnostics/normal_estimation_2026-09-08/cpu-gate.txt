@@ -1,0 +1,56 @@
+          Start  648: NormalEstimation.EveryCanonicalDomainPublishesNamedNormalsAndSupportsUndoRedo
+ 637/4364 Test  #648: NormalEstimation.EveryCanonicalDomainPublishesNamedNormalsAndSupportsUndoRedo ...................................   Passed    0.03 sec
+          Start  649: NormalEstimation.PreservesDeletedRowsAndUnrelatedEditsButGuardsOutputHistory
+ 638/4364 Test  #649: NormalEstimation.PreservesDeletedRowsAndUnrelatedEditsButGuardsOutputHistory ....................................   Passed    0.01 sec
+          Start  650: NormalEstimation.TopologyVariantsConsumeCustomPositionsAndGraphMethodAcceptsMesh
+ 639/4364 Test  #650: NormalEstimation.TopologyVariantsConsumeCustomPositionsAndGraphMethodAcceptsMesh ................................   Passed    0.01 sec
+          Start  651: NormalEstimation.MeshDeletionMasksExcludeFacesAndEdgesWithoutRenumberingOutput
+ 640/4364 Test  #651: NormalEstimation.MeshDeletionMasksExcludeFacesAndEdgesWithoutRenumberingOutput ..................................   Passed    0.01 sec
+          Start  652: NormalEstimation.RejectsInvalidBindingsAndUnavailableBackendsWithoutMutation
+ 641/4364 Test  #652: NormalEstimation.RejectsInvalidBindingsAndUnavailableBackendsWithoutMutation ....................................   Passed    0.01 sec
+          Start  653: NormalEstimation.RadiusNeighborhoodAndDegenerateFallbackMatchAcrossBackends
+ 642/4364 Test  #653: NormalEstimation.RadiusNeighborhoodAndDegenerateFallbackMatchAcrossBackends .....................................   Passed    0.01 sec
+          Start  654: NormalEstimation.QueuedJobsGuardInputsTopologyDeletionAndOutputButAllowUnrelatedEdits
+ 643/4364 Test  #654: NormalEstimation.QueuedJobsGuardInputsTopologyDeletionAndOutputButAllowUnrelatedEdits ...........................   Passed    0.06 sec
+          Start  655: NormalEstimation.NamedOutputUsesSharedVectorVisualizationRecipe
+ 644/4364 Test  #655: NormalEstimation.NamedOutputUsesSharedVectorVisualizationRecipe .................................................   Passed    0.01 sec
+          Start  656: NormalEstimation.TopologyCatalogRetainsSmallGraphsAndReportsPcaMinimum
+ 645/4364 Test  #656: NormalEstimation.TopologyCatalogRetainsSmallGraphsAndReportsPcaMinimum ..........................................   Passed    0.01 sec
+          Start  657: NormalEstimation.GraphPositionSlotMayBindAnExistingNormalNamedProperty
+ 646/4364 Test  #657: NormalEstimation.GraphPositionSlotMayBindAnExistingNormalNamedProperty ..........................................   Passed    0.01 sec
+          Start  658: NormalEstimationConfig.RoundTripAndSharedPreviewApplyRun
+ 647/4364 Test  #658: NormalEstimationConfig.RoundTripAndSharedPreviewApplyRun ........................................................   Passed    0.01 sec
+          Start 1154: SandboxEditorSession.DismissClearsOneGeometryProcessingResultSlot
+1143/4364 Test #1154: SandboxEditorSession.DismissClearsOneGeometryProcessingResultSlot ...............................................   Passed    0.04 sec
+          Start 1318: SandboxEditorPresentation.NormalDomainMenusOpenOneSharedWindow
+1306/4364 Test #1318: SandboxEditorPresentation.NormalDomainMenusOpenOneSharedWindow ..................................................   Passed    0.04 sec
+          Start 4432: RuntimeSandboxAcceptance.IdleFrameSkipsPreRenderTransformFlush
+4362/4364 Test #4432: RuntimeSandboxAcceptance.IdleFrameSkipsPreRenderTransformFlush ..................................................   Passed    0.04 sec
+          Start 4433: RuntimeSandboxAcceptance.InspectorTransformEditFlushedToRenderStateSameFrame
+4363/4364 Test #4433: RuntimeSandboxAcceptance.InspectorTransformEditFlushedToRenderStateSameFrame ....................................   Passed    0.04 sec
+          Start 4434: GlfwLifecycleLsan.EngineStaticTeardownAndLeakControl
+4364/4364 Test #4434: GlfwLifecycleLsan.EngineStaticTeardownAndLeakControl ............................................................***Skipped   0.01 sec
+
+100% tests passed, 0 tests failed out of 4364
+
+Label Time Summary:
+assets         =   0.18 sec*proc (90 tests)
+benchmark      =   0.56 sec*proc (1 test)
+contract       =  52.28 sec*proc (1569 tests)
+core           =   3.95 sec*proc (292 tests)
+ecs            =   0.40 sec*proc (133 tests)
+geometry       =  62.27 sec*proc (1825 tests)
+glfw           =   0.01 sec*proc (1 test)
+graphics       =  17.16 sec*proc (852 tests)
+headless       =   0.01 sec*proc (4 tests)
+integration    =   8.19 sec*proc (268 tests)
+physics        =   0.21 sec*proc (80 tests)
+platform       =   0.02 sec*proc (5 tests)
+regression     =   0.57 sec*proc (2 tests)
+runtime        =  45.30 sec*proc (1151 tests)
+unit           =  66.55 sec*proc (2529 tests)
+
+Total Test time (real) = 132.33 sec
+
+The following tests did not run:
+	4434 - GlfwLifecycleLsan.EngineStaticTeardownAndLeakControl (Skipped)

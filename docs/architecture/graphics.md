@@ -1,5 +1,9 @@
 # Graphics Architecture
 
+`Extrinsic.Graphics.PointLBVH` owns reusable RHI buffers and Vulkan point-tree
+build/query recording. Entity identity and invalidation remain in runtime;
+see [spatial indices](spatial-indices.md) for the ownership and lifetime contract.
+
 Graphics is organized into explicit sublayers:
 
 - `graphics/rhi`: low-level rendering hardware abstraction.

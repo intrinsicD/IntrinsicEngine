@@ -44,54 +44,6 @@ namespace Geometry::Registration
             return glm::dvec3(result.x, result.y, result.z);
         }
 
-        // Reference interface #1 — correspondence estimator (see
-        // docs/architecture/geometry-pipeline-modularity.md §2). Currently a
-        // fixed KDTree k=1 nearest search; a later slice makes this swappable via
-        // a CorrespondenceKind axis. Returns correspondence pairs with distances.
-        void FindCorrespondences(
-            std::span<const glm::vec3> sourcePoints,
-            const glm::dmat4& currentTransform,
-            const KDTree& targetTree,
-            double maxDistSq,
-            std::vector<CorrespondencePair>& outPairs,
-            std::vector<glm::dvec3>& transformedSourceCache)
-        {
-            outPairs.clear();
-            const std::size_t n = sourcePoints.size();
-            transformedSourceCache.resize(n);
-
-            // Transform all source points by current estimate
-            for (std::size_t i = 0; i < n; ++i)
-                transformedSourceCache[i] = TransformPoint(currentTransform, sourcePoints[i]);
-
-            std::vector<KDTree::ElementIndex> neighbors;
-
-            for (std::size_t i = 0; i < n; ++i)
-            {
-                const glm::vec3 query(
-                    static_cast<float>(transformedSourceCache[i].x),
-                    static_cast<float>(transformedSourceCache[i].y),
-                    static_cast<float>(transformedSourceCache[i].z));
-
-                auto knnResult = targetTree.QueryKNN(query, 1, neighbors);
-                if (!knnResult || neighbors.empty())
-                    continue;
-
-                const std::size_t targetIdx = neighbors[0];
-                const auto& targetAabbs = targetTree.ElementAabbs();
-                const glm::dvec3 targetPt(
-                    (targetAabbs[targetIdx].Min.x + targetAabbs[targetIdx].Max.x) * 0.5,
-                    (targetAabbs[targetIdx].Min.y + targetAabbs[targetIdx].Max.y) * 0.5,
-                    (targetAabbs[targetIdx].Min.z + targetAabbs[targetIdx].Max.z) * 0.5);
-
-                const glm::dvec3 diff = transformedSourceCache[i] - targetPt;
-                const double distSq = glm::dot(diff, diff);
-
-                if (distSq <= maxDistSq)
-                    outPairs.push_back({i, targetIdx, distSq, 1.0});
-            }
-        }
-
         // Reference interface #2 — correspondence rejector (hard cut). Keeps only
         // the closest inlierRatio fraction of pairs; a later slice generalizes
         // this to a composable RejectorChain.
@@ -434,106 +386,106 @@ namespace Geometry::Registration
             return relChange < threshold && iter > 0;
         }
 
-        // =====================================================================
-        // ICP loop driver — runs the named stage sequence per iteration.
-        // =====================================================================
-        //
-        // Pure CPU reference path (geometry -> core only). Each iteration runs, in
-        // order:
-        //   #1 correspondence  (FindCorrespondences)
-        //   #2 rejection       (RejectOutliers)
-        //   #4 robust weights  (ApplyRobustWeights, optional)
-        //   #3 transform solve (SolveIncrement)
-        //   #5 convergence     (EvaluateConvergence)
-        // Behavior is bit-for-bit identical to the historical monolithic loop;
-        // this driver only makes the stage boundaries explicit so later slices can
-        // make each axis swappable. See
-        // docs/architecture/geometry-pipeline-modularity.md.
-        [[nodiscard]] RegistrationResult RunIcpLoop(
-            std::span<const glm::vec3> sourcePoints,
-            std::span<const glm::vec3> targetPoints,
-            std::span<const glm::vec3> targetNormals,
-            const KDTree& targetTree,
-            ICPVariant effectiveVariant,
-            double maxDistSq,
-            const RegistrationParams& params,
-            const IterationObserver& observer)
-        {
-            const bool robustWeightingEnabled = params.RobustKernelKind.has_value();
-
-            RegistrationResult result;
-            result.Transform = glm::dmat4(1.0);
-            result.RMSEHistory.reserve(params.MaxIterations);
-
-            std::vector<CorrespondencePair> pairs;
-            std::vector<glm::dvec3> transformedSourceCache;
-            pairs.reserve(sourcePoints.size());
-            transformedSourceCache.reserve(sourcePoints.size());
-
-            double prevRMSE = std::numeric_limits<double>::max();
-
-            for (std::size_t iter = 0; iter < params.MaxIterations; ++iter)
-            {
-                // #1 Correspondence estimation.
-                FindCorrespondences(sourcePoints, result.Transform, targetTree,
-                                    maxDistSq, pairs, transformedSourceCache);
-
-                if (pairs.size() < 3)
-                    break;
-
-                // #2 Outlier rejection (+ #4 optional robust weighting).
-                RejectOutliers(pairs, params.InlierRatio);
-
-                if (robustWeightingEnabled)
-                {
-                    ApplyRobustWeights(pairs, *params.RobustKernelKind, params.RobustScale);
-                }
-
-                if (pairs.size() < 3)
-                    break;
-
-                // Objective before solving (weighted for robust ICP).
-                const double rmse = ComputeRMSE(pairs, robustWeightingEnabled);
-                result.RMSEHistory.push_back(rmse);
-
-                // #3 Incremental transform solve.
-                const glm::dmat4 increment = SolveIncrement(
-                    effectiveVariant, pairs, transformedSourceCache,
-                    targetPoints, targetNormals);
-
-                // Update cumulative transform.
-                result.Transform = increment * result.Transform;
-
-                result.IterationsPerformed = iter + 1;
-                result.FinalRMSE = rmse;
-                result.FinalInlierCount = pairs.size();
-
-                // Optional observability: emit a read-only snapshot of the
-                // current solution. Null observer => a single skipped branch, no
-                // per-point cost (see geometry-pipeline-modularity.md §3.4).
-                if (observer)
-                {
-                    observer(IterationTrace{iter, result.Transform, rmse, pairs.size()});
-                }
-
-                // #5 Convergence check.
-                if (EvaluateConvergence(prevRMSE, rmse, params.ConvergenceThreshold, iter))
-                {
-                    result.Converged = true;
-                    break;
-                }
-
-                prevRMSE = rmse;
-            }
-
-            return result;
-        }
-
     } // anonymous namespace
 
     // =========================================================================
     // Public API
     // =========================================================================
+
+    std::vector<glm::vec3> MakeICPQueries(std::span<const glm::vec3> source,
+                                           const glm::dmat4& transform)
+    {
+        std::vector<glm::vec3> queries;
+        queries.reserve(source.size());
+        for (auto p : source)
+            queries.emplace_back(TransformPoint(transform, p));
+        return queries;
+    }
+
+    ICPStepStatus AdvanceICP(std::span<const glm::vec3> source,
+                            std::span<const glm::vec3> target,
+                            std::span<const glm::vec3> normals,
+                            const RegistrationParams& params,
+                            std::span<const std::uint32_t> indices,
+                            RegistrationResult& result,
+                            const IterationObserver& observer)
+    {
+        if (source.size() < 3 || target.size() < 3 || indices.size() != source.size() ||
+            !params.MaxIterations || !std::isfinite(params.InlierRatio) ||
+            params.InlierRatio <= 0 || params.InlierRatio > 1 ||
+            !std::isfinite(params.MaxCorrespondenceDistance) || params.MaxCorrespondenceDistance < 0 ||
+            !std::isfinite(params.ConvergenceThreshold) || params.ConvergenceThreshold < 0 ||
+            (params.RobustKernelKind && (!std::isfinite(params.RobustScale) || params.RobustScale <= 0)))
+            return ICPStepStatus::InvalidInput;
+        if (result.Converged || result.IterationsPerformed >= params.MaxIterations)
+            return ICPStepStatus::Finished;
+        std::vector<CorrespondencePair> pairs;
+        std::vector<glm::dvec3> transformed;
+        pairs.reserve(source.size());
+        transformed.reserve(source.size());
+        const double maxDistanceSq = params.MaxCorrespondenceDistance * params.MaxCorrespondenceDistance;
+        for (std::size_t i = 0; i < source.size(); ++i)
+        {
+            transformed.push_back(TransformPoint(result.Transform, source[i]));
+            if (indices[i] == std::numeric_limits<std::uint32_t>::max())
+                continue;
+            if (indices[i] >= target.size())
+                return ICPStepStatus::InvalidInput;
+            const auto delta = transformed.back() - glm::dvec3(target[indices[i]]);
+            const double distanceSq = glm::dot(delta, delta);
+            if (!std::isfinite(distanceSq))
+                return ICPStepStatus::InvalidInput;
+            if (distanceSq <= maxDistanceSq)
+                pairs.push_back({i, indices[i], distanceSq, 1.0});
+        }
+        if (pairs.size() < 3)
+            return ICPStepStatus::Finished;
+        RejectOutliers(pairs, params.InlierRatio);
+        if (params.RobustKernelKind)
+            ApplyRobustWeights(pairs, *params.RobustKernelKind, params.RobustScale);
+        if (pairs.size() < 3)
+            return ICPStepStatus::Finished;
+        auto variant = params.Variant;
+        if (variant == ICPVariant::PointToPlane && normals.size() != target.size())
+            variant = ICPVariant::PointToPoint;
+        const auto iteration = result.IterationsPerformed;
+        const double previous = result.RMSEHistory.empty() ? std::numeric_limits<double>::max()
+                                                         : result.RMSEHistory.back();
+        const double rmse = ComputeRMSE(pairs, params.RobustKernelKind.has_value());
+        result.Transform = SolveIncrement(variant, pairs, transformed, target, normals) * result.Transform;
+        result.RMSEHistory.push_back(rmse);
+        result.IterationsPerformed++;
+        result.FinalRMSE = rmse;
+        result.FinalInlierCount = pairs.size();
+        result.Converged = EvaluateConvergence(previous, rmse, params.ConvergenceThreshold, iteration);
+        if (observer)
+            observer({iteration, result.Transform, rmse, pairs.size()});
+        return result.Converged || result.IterationsPerformed == params.MaxIterations
+            ? ICPStepStatus::Finished : ICPStepStatus::Continue;
+    }
+
+    std::optional<RegistrationResult> AlignICPWithQueries(
+        std::span<const glm::vec3> source, std::span<const glm::vec3> target,
+        std::span<const glm::vec3> normals, const RegistrationParams& params,
+        const NearestQuery& query, const IterationObserver& observer)
+    {
+        if (!query || source.size() < 3 || target.size() < 3 || !params.MaxIterations)
+            return {};
+        RegistrationResult result;
+        std::vector<std::uint32_t> indices(source.size());
+        for (;;)
+        {
+            const auto queries = MakeICPQueries(source, result.Transform);
+            std::fill(indices.begin(), indices.end(), std::numeric_limits<std::uint32_t>::max());
+            if (!query(queries, indices))
+                return {};
+            const auto status = AdvanceICP(source, target, normals, params, indices, result, observer);
+            if (status == ICPStepStatus::InvalidInput)
+                return {};
+            if (status == ICPStepStatus::Finished)
+                return result;
+        }
+    }
 
     std::optional<RegistrationResult> AlignICP(
         std::span<const glm::vec3> sourcePoints,
@@ -542,48 +494,22 @@ namespace Geometry::Registration
         const RegistrationParams& params,
         const IterationObserver& observer)
     {
-        // --- Input validation ---
-        if (sourcePoints.size() < 3 || targetPoints.size() < 3)
-            return std::nullopt;
-
-        if (params.MaxIterations == 0)
-            return std::nullopt;
-
-        if (params.InlierRatio <= 0.0 || params.InlierRatio > 1.0)
-            return std::nullopt;
-
-        const bool robustWeightingEnabled = params.RobustKernelKind.has_value();
-        if (robustWeightingEnabled &&
-            (!std::isfinite(params.RobustScale) || !(params.RobustScale > 0.0)))
-        {
-            return std::nullopt;
-        }
-
-        // Determine effective variant: fall back to PointToPoint if normals unavailable
-        ICPVariant effectiveVariant = params.Variant;
-        if (effectiveVariant == ICPVariant::PointToPlane &&
-            (targetNormals.empty() || targetNormals.size() != targetPoints.size()))
-        {
-            effectiveVariant = ICPVariant::PointToPoint;
-        }
-
-        // --- Build KDTree for target points ---
         KDTree targetTree;
         KDTreeBuildParams kdParams;
         kdParams.LeafSize = static_cast<uint32_t>(params.KDTreeLeafSize);
-        auto buildResult = targetTree.BuildFromPoints(targetPoints, kdParams);
-        if (!buildResult)
-            return std::nullopt;
-
-        // --- ICP loop ---
-        // The per-iteration stage sequence (correspondence, rejection, robust
-        // weighting, transform solve, convergence) lives in RunIcpLoop so the
-        // stage boundaries are explicit and independently swappable in later
-        // slices. See docs/architecture/geometry-pipeline-modularity.md.
-        const double maxDistSq = params.MaxCorrespondenceDistance * params.MaxCorrespondenceDistance;
-
-        return RunIcpLoop(sourcePoints, targetPoints, targetNormals, targetTree,
-                          effectiveVariant, maxDistSq, params, observer);
+        if (!targetTree.BuildFromPoints(targetPoints, kdParams))
+            return {};
+        return AlignICPWithQueries(sourcePoints, targetPoints, targetNormals, params,
+            [&](std::span<const glm::vec3> queries, std::span<std::uint32_t> indices) {
+                std::vector<KDTree::ElementIndex> neighbors;
+                for (std::size_t i = 0; i < queries.size(); ++i)
+                {
+                    if (!targetTree.QueryKNN(queries[i], 1, neighbors))
+                        return false;
+                    if (!neighbors.empty())
+                        indices[i] = neighbors.front();
+                }
+                return true;
+            }, observer);
     }
-
 } // namespace Geometry::Registration

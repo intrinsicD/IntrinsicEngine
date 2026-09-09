@@ -40,8 +40,18 @@ contracts:
 | Publication | <target entity/domain/property and cardinality/topology policy> |
 | End-to-end tests | <domain matrix tests or named follow-up task> |
 
+## Spatial acceleration consideration
+
+<!-- Apply to spatial-query methods; otherwise state why it is inapplicable.
+Consult docs/architecture/spatial-index-consumers.md and the spatial review in
+docs/agent/method-workflow.md. Keep CPU-reference semantics and current scope. -->
+- Query, primitive/property domain, metric and self/active-set membership:
+- Shared entity cache, private evolving workspace, existing index/scan, or named deferred owner:
+- Invalidation, source-slot identity, complete-neighborhood/overflow handling and missing query support:
+
 ## Required changes
 - [ ] Complete literature intake for the original paper plus relevant extensions/improvements and define the selected method contract.
+- [ ] For spatial queries, record the shared-index reuse decision, preserve query semantics, and update the consumer inventory and any deferred owner.
 - [ ] Implement CPU reference backend first.
 - [ ] Add correctness tests.
 - [ ] Add benchmark harness/manifests.

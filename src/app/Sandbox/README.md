@@ -80,6 +80,9 @@ key/slot/age, per-queue envelopes, and named pass rows. It never presents a
 summed cross-queue duration, and the displayed timestamps are diagnostics
 rather than a performance claim.
 
+For vertex/edge/face selection, shared method inputs, and selection settings, see
+[primitive selection](../../../docs/architecture/primitive-selection.md).
+
 Sandbox separately composes optional `Runtime::SceneInteractionModule`. It
 owns one active-world interaction cohort—selection, stable lookup, pick
 readback/refinement, gizmo drag/undo/scratch/packets—and publishes the exact
@@ -130,8 +133,9 @@ terminal readout shows requested/selected Auto ranks, any work-budget backoff,
 actual backend/fallback, and measured average/maximum displacement.
 `Sandbox.Editor.MeshProcessingPanels`
 owns the ICP registration window plus the mesh denoise, curvature, remesh,
-subdivide, simplify, and mesh/graph/point-cloud vertex-normal windows. It
-registers those nine windows under their existing menu paths, owns their ImGui
+subdivide, simplify, and the shared [normal-estimation window](../../../docs/architecture/normal-estimation.md).
+The normal menus under Mesh, Graph and PointCloud open that shared window; it
+uses the persisted `sandbox.normal_estimation` config and canonical property bindings. The panels own their ImGui
 input/result-presentation state, and consumes only runtime snapshots and typed
 operations. The Curvature window includes production METHOD-037 and diagnostic
 METHOD-039/METHOD-040 choices through the registered
@@ -438,3 +442,5 @@ capture to zero samples.
 - `Sandbox.cpp`
 - `Sandbox.cppm`
 - `main.cpp`
+
+ICP registration supports named point properties across mesh, graph and point-cloud domains. See the [workflow](../../../docs/architecture/registration.md) for controls, target-index reuse and backend diagnostics.

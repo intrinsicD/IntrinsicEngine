@@ -3,6 +3,15 @@ id: METHOD-015
 theme: I
 depends_on: [GEOM-058]
 maturity_target: CPUContracted
+workflow_schema: 1
+workflow_profile: standard
+evidence: required
+owner:
+branch:
+worktree:
+claimed_at:
+contract_schema: 1
+contracts: [repo.source-documentation, geometry.element-domain-sources, method.engine-integration]
 ---
 # METHOD-015 — Coherent Point Drift registration family reference backend
 
@@ -63,6 +72,29 @@ maturity_target: CPUContracted
   GEOM-058's already-tested Anderson policy may be an explicit convergence
   option, but does not create an optimized backend identity. Fast-summation,
   low-rank, or GPU implementations require later parity-gated tasks.
+
+## Engine integration
+
+| Field | Disposition |
+| --- | --- |
+| Least-structured input | Two finite point-position spans on any compatible element domains, plus explicit variant and EM parameters. |
+| Compatible entity sources | Every canonical property/topology source satisfying the input above; binding is owned by METHOD-003A after reference acceptance and selection. |
+| RuntimeModule | Deferred to [METHOD-003A](METHOD-003A-spatial-query-reference-integration-intake.md), which allocates the concrete operation owner without widening this reference slice. |
+| Config/agent | Typed reference parameters now; METHOD-003A owns validated serializable engine controls at adoption. |
+| UI | METHOD-003A owns adoption/discovery planning; no editor-integrated claim from this CPU slice. |
+| Publication | Return the selected transform or slot-aligned displacement result; later adoption must separate source-transform application from explicit nonrigid property publication. METHOD-003A owns engine publication planning. |
+| End-to-end tests | Reference/oracle and method tests here; METHOD-003A allocates compatible-source/config/publication/UI coverage at adoption. |
+
+## Spatial acceleration consideration
+
+Retain the explicit all-pairs CPU EM reference. Point-LBVH nearest/radius queries
+are suitable only for a separately specified neighborhood stage or an
+approximation with a proven tail/error bound; they cannot silently truncate CPD
+Gaussian responsibilities or nonrigid regularization. A future optimized task must
+own parity and moving-point rebuilds; no acceleration is added to this reference
+slice.
+
+See the [shared spatial-index consumer inventory](../../../docs/architecture/spatial-index-consumers.md).
 
 ## Required changes
 

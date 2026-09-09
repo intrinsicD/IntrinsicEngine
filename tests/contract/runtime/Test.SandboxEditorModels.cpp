@@ -2287,7 +2287,7 @@ TEST(SandboxEditorUi, GeometrySourcesReportProcessingCapabilitiesAndStableEntrie
 
     const std::vector<Runtime::EditorGeometryProcessingEntry> meshEntries =
         Runtime::ResolveEditorGeometryProcessingEntries(meshCaps);
-    ASSERT_EQ(meshEntries.size(), 16u);
+    ASSERT_EQ(meshEntries.size(), 17u);
     EXPECT_EQ(meshEntries[0].Algorithm, Algorithm::KMeans);
     EXPECT_EQ(meshEntries[1].Algorithm, Algorithm::NormalEstimation);
     EXPECT_EQ(meshEntries[2].Algorithm, Algorithm::MeshDenoise);
@@ -2301,6 +2301,7 @@ TEST(SandboxEditorUi, GeometrySourcesReportProcessingCapabilitiesAndStableEntrie
     EXPECT_EQ(meshEntries[10].Algorithm, Algorithm::BooleanCSG);
     EXPECT_EQ(meshEntries[11].Algorithm, Algorithm::Remeshing);
     EXPECT_EQ(meshEntries[15].Algorithm, Algorithm::Repair);
+    EXPECT_EQ(meshEntries[16].Algorithm, Algorithm::Geodesics);
 
     const std::vector<Domain> meshKMeans =
         Runtime::GetAvailableEditorKMeansDomains(registry, mesh);

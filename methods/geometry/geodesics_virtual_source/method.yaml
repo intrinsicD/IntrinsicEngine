@@ -1,0 +1,34 @@
+id: geometry.geodesics_virtual_source
+name: Geodesic Distance via Virtual Source Propagation
+domain: geometry
+status: reference
+paper:
+  title: Geodesic Distance Computation via Virtual Source Propagation
+  authors: Philip Trettner, David Bommes, Leif Kobbelt
+  year: 2021
+  doi: "10.1111/cgf.14371"
+  url: "https://www.graphics.rwth-aachen.de/publication/03334/"
+inputs:
+  - Live nondegenerate triangle mesh with finite vertex-domain float3 positions
+  - Source vertex slots and a positive halfedge expansion budget
+outputs:
+  - Approximate vertex distances in position units; infinity for unreachable slots
+  - Explicit status, source count, unreachable count, iterations, expansions, and triangle updates
+backends:
+  - cpu_reference
+metrics:
+  - runtime_ms
+  - quality_error_l2
+  - quality_error_linf
+correctness_tests:
+  - ../../../tests/unit/geometry/Test.GeodesicVirtualSource.cpp
+  - ../../../tests/contract/runtime/Test.GeodesicsOperations.cpp
+  - ../../../tests/integration/runtime/Test.SandboxEditorPresentation.cpp
+benchmarks:
+  - ../../../benchmarks/geometry/manifests/geodesics_virtual_source_reference_smoke.yaml
+known_limitations:
+  - One virtual source per triangle is an approximation; the visibility heuristic can overestimate or underestimate true distances.
+  - Only triangle surfaces and vertex sources are implemented; no point-cloud, triangle-soup, line-source, anisotropic, optimized CPU, or GPU variants are selectable.
+  - Nonfinite positions, degenerate faces, polygons, and submesh views fail closed.
+  - Propagation is synchronous and bounded by max_halfedge_expansions; exhaustion produces no published result.
+  - No exact-geodesic, Framework24 numerical parity, or performance improvement claim is made.

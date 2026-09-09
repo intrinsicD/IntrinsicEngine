@@ -1,3 +1,4 @@
+// Owns active-world viewport interaction and publishes selection/gizmo snapshots.
 module;
 
 #include <cstdint>
@@ -10,13 +11,20 @@ export module Extrinsic.Runtime.SceneInteractionModule;
 import Extrinsic.Core.Error;
 import Extrinsic.ECS.Component.StableId;
 import Extrinsic.ECS.Scene.Handle;
+import Extrinsic.ECS.Scene.Registry;
+import Extrinsic.Runtime.WorldHandle;
 import Extrinsic.Runtime.GizmoInteraction;
+import Extrinsic.Runtime.SelectionController;
+import Extrinsic.Runtime.RenderExtraction;
 import Extrinsic.Runtime.Module;
 import Extrinsic.Runtime.PrimitiveSelectionRefinement;
 import Extrinsic.Runtime.StableEntityLookup;
 
 namespace Extrinsic::Runtime
 {
+    export RuntimeSceneInteractionRenderSnapshot BuildPrimitiveSelectionRenderSnapshot(
+        const ECS::Scene::Registry& scene, const SelectionController& selection, WorldHandle world);
+
     // Optional app-composed owner for every active-world interaction record.
     // The object has app-global lifetime; its mutable cohort binds to exactly
     // one WorldHandle/Registry pair and never retains per-world history.

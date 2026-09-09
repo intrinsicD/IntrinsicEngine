@@ -242,6 +242,7 @@ TEST(ClusteringServiceGpuSmoke,
               Runtime::ClusteringBackend::VulkanCompute);
     EXPECT_FALSE(appPtr->Completion->FellBackToCpu)
         << appPtr->Completion->BackendDiagnostic;
+    EXPECT_NE(appPtr->Completion->BackendDiagnostic.find("LBVH centroid assignment"), std::string::npos);
     EXPECT_EQ(appPtr->Completion->LabelCount, kPoints.size());
     EXPECT_EQ(appPtr->Completion->ClusterCount,
               kParameters.ClusterCount);

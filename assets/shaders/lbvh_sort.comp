@@ -1,0 +1,12 @@
+#version 460
+#extension GL_GOOGLE_include_directive : require
+#include "include/point_lbvh_build.glsl"
+bool lessKey(uvec2 a,uvec2 b){return a.x<b.x || (a.x==b.x && a.y<b.y);}
+void main()
+{
+    uint i=gl_GlobalInvocationID.x;if(i>=pc.padded)return;
+    uint other=i^pc.j;if(other<=i)return;
+    LbvhKeys keys=LbvhKeys(pc.keys);uvec2 a=keys.v[i],b=keys.v[other];
+    bool ascending=(i&pc.k)==0;
+    if(ascending?lessKey(b,a):lessKey(a,b)){keys.v[i]=b;keys.v[other]=a;}
+}

@@ -2260,7 +2260,7 @@ namespace Extrinsic::Sandbox::Editor
             if (!result.BackendDiagnostic.empty())
             {
                 ImGui::TextWrapped(
-                    "Backend fallback: %s",
+                    result.FellBackToCpu ? "Backend fallback: %s" : "Backend diagnostic: %s",
                     result.BackendDiagnostic.c_str());
             }
             if (!result.Message.empty())
@@ -3173,6 +3173,45 @@ namespace Extrinsic::Sandbox::Editor
             if (context.GeometryResults.LastParameterizationResult.has_value())
                 Parameterization.LastResult = *context.GeometryResults.LastParameterizationResult;
 
+            const auto selectedPins = Runtime::ReadEditorPrimitiveSelection(
+                context.GeometryCommands, model.SelectedStableEntityId,
+                Runtime::GeometryElementDomain::MeshVertex);
+            if (Parameterization.Draft.Strategy == Runtime::EditorParameterizationStrategy::Lscm)
+            {
+                ImGui::BeginDisabled(!selectedPins.Usable() || selectedPins.Indices.size() != 2);
+                if (ImGui::Button("Use two selected vertices as LSCM pins"))
+                {
+                    auto& pins = Parameterization.Draft.Lscm;
+                    pins.AutoPins = false;
+                    pins.PinVertex0 = selectedPins.Indices[0];
+                    pins.PinVertex1 = selectedPins.Indices[1];
+                    Parameterization.Dirty = true;
+                }
+                ImGui::EndDisabled();
+            }
+            else if (Parameterization.Draft.Strategy ==
+                         Runtime::EditorParameterizationStrategy::HarmonicCotangent ||
+                     Parameterization.Draft.Strategy ==
+                         Runtime::EditorParameterizationStrategy::TutteUniform)
+            {
+                ImGui::BeginDisabled(!selectedPins.Usable() || selectedPins.Indices.empty());
+                if (ImGui::Button("Use selected vertices as boundary pins"))
+                {
+                    auto& pins = Parameterization.Draft.Harmonic;
+                    pins.PinnedVertices = selectedPins.Indices;
+                    pins.PinnedUvs.clear();
+                    for (auto index : selectedPins.Indices)
+                    {
+                        const auto uv =
+                            index < model.UVs.size() ? model.UVs[index] : glm::vec2(0.f);
+                        pins.PinnedUvs.push_back({uv.x, uv.y});
+                    }
+                    Parameterization.Dirty = true;
+                }
+                ImGui::EndDisabled();
+                ImGui::TextWrapped("Pin UVs start from the current UV map (zero if absent); edit "
+                                   "them below. The method validates boundary eligibility.");
+            }
             Parameterization.Dirty |=
                 DrawParameterizationConfigControls(Parameterization.Draft);
             if (Parameterization.Dirty)

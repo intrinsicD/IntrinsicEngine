@@ -6,6 +6,10 @@ module;
 module Extrinsic.Sandbox.ConfigSections;
 
 import Extrinsic.Runtime.ClusteringConfig;
+import Extrinsic.Runtime.GeodesicsConfig;
+import Extrinsic.Runtime.RegistrationConfig;
+import Extrinsic.Runtime.NormalEstimationConfig;
+import Extrinsic.Runtime.SelectionController;
 import Extrinsic.Runtime.CurvatureSegmentationConfig;
 import Extrinsic.Runtime.ParameterizationConfig;
 import Extrinsic.Runtime.PhysicsModule;
@@ -18,7 +22,11 @@ namespace Extrinsic::Sandbox
         SandboxConfigSectionCallbacks callbacks)
     {
         Runtime::RuntimeEngineConfigSectionRegistry registry{};
-        if (!registry.Register(
+        if (!registry.Register(Runtime::MakeSelectionConfigSectionRegistration()) ||
+            !registry.Register(Runtime::MakeGeodesicsConfigSectionRegistration()) ||
+            !registry.Register(Runtime::MakeRegistrationConfigSectionRegistration()) ||
+            !registry.Register(Runtime::MakeNormalEstimationConfigSectionRegistration()) ||
+            !registry.Register(
                 Runtime::MakeClusteringConfigSectionRegistration(
                     std::move(callbacks.Clustering))) ||
             !registry.Register(

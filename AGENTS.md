@@ -281,6 +281,12 @@ Every new or materially changed geometry-method task must declare
 applicable, spell out these decisions in its `## Engine integration` matrix,
 and name follow-up tasks for deferred runtime/config/UI/publication rows.
 
+For spatial-query work, review `docs/architecture/spatial-index-consumers.md`
+and record the query semantics, index ownership/reuse and missing capabilities
+using `docs/agent/method-workflow.md#spatial-acceleration-review`. Keep relevant
+open-task reminders synchronized; proximity acceleration must preserve the
+method's primitive, metric, topology and neighborhood contract.
+
 Method manifests live at `methods/**/method.yaml` and are validated by
 `python3 tools/agents/validate_method_manifests.py`.
 

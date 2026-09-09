@@ -34,10 +34,15 @@ import Extrinsic.Runtime.EngineConfigControl;
 import Extrinsic.Runtime.GeometryPresentation;
 import Extrinsic.Runtime.JobService;
 export import Extrinsic.Runtime.ParameterizationConfig;
+export import Extrinsic.Runtime.GeodesicsConfig;
+export import Extrinsic.Runtime.RegistrationConfig;
+export import Extrinsic.Runtime.NormalEstimationConfig;
+import Extrinsic.Runtime.SpatialIndexCache;
+export import Geometry.Geodesic;
 export import Extrinsic.Runtime.PointCloudConsolidationConfig;
 import Extrinsic.Runtime.PointCloudConsolidationModule;
 export import Extrinsic.Runtime.ProgressivePoissonConfig;
-import Extrinsic.Runtime.SelectionController;
+export import Extrinsic.Runtime.SelectionController;
 import Extrinsic.Runtime.WorldHandle;
 import Geometry.Graph.Vertex.Normals;
 export import Geometry.HalfedgeMesh.CurvatureSegmentation;
@@ -127,6 +132,7 @@ export namespace Extrinsic::Runtime
         StatisticalOutlierRemoval,
         RadiusOutlierRemoval,
         ProgressivePoissonSampling,
+        Geodesics,
     };
 
     struct EditorGeometryProcessingCapabilities
@@ -415,6 +421,26 @@ export namespace Extrinsic::Runtime
         }
     };
 
+    struct EditorGeodesicsCommand
+    {
+        std::uint32_t StableEntityId{0u};
+        GeodesicsConfig Config{};
+    };
+
+    struct EditorGeodesicsResult
+    {
+        EditorCommandStatus Status{EditorCommandStatus::NoChange};
+        Geometry::Geodesic::VirtualSourceResult Diagnostics{};
+        std::string BackendId{"cpu_reference"};
+        std::string Message{};
+        [[nodiscard]] bool Succeeded() const noexcept
+        {
+            return (Status == EditorCommandStatus::Applied ||
+                    Status == EditorCommandStatus::NoChange) &&
+                   Diagnostics.Succeeded();
+        }
+    };
+
     struct EditorMeshCurvatureCommand
     {
         std::uint32_t StableEntityId{0u};
@@ -656,33 +682,18 @@ export namespace Extrinsic::Runtime
             return Status == EditorCommandStatus::Applied;
         }
     };
-    enum class EditorICPVariant : std::uint8_t
-    {
-        PointToPoint,
-        PointToPlane,
-    };
-
+    using EditorRegistrationCommand = RegistrationConfig;
     [[nodiscard]] const char* DebugNameForEditorICPVariant(EditorICPVariant variant) noexcept;
-
-    struct EditorRegistrationCommand
-    {
-        std::uint32_t SourceStableEntityId{0u};
-        std::uint32_t TargetStableEntityId{0u};
-        EditorICPVariant Variant{EditorICPVariant::PointToPoint};
-        std::uint32_t MaxIterations{50u};
-        // World-space correspondence cutoff; <= 0 disables the cutoff.
-        double MaxCorrespondenceDistance{0.0};
-        double InlierRatio{0.9};
-        // Trajectory step whose cumulative source->target pose is written to the
-        // source entity Transform. 0 = identity (un-registered start); values at
-        // or beyond the completed iteration count clamp to the converged pose.
-        std::size_t TrajectoryStep{0u};
-    };
 
     struct EditorRegistrationResult
     {
         EditorCommandStatus Status{EditorCommandStatus::NoChange};
         bool HasResult{false};
+        RegistrationBackend RequestedBackend{RegistrationBackend::CpuKDTree};
+        RegistrationBackend ActualBackend{RegistrationBackend::CpuKDTree};
+        bool FellBackToCPU{};
+        bool TargetIndexReused{};
+        std::string BackendDiagnostic{};
         // The variant the command asked for.
         EditorICPVariant Variant{EditorICPVariant::PointToPoint};
         // The variant the solver actually ran. Runtime preflight rejects a
@@ -844,6 +855,25 @@ export namespace Extrinsic::Runtime
             return Status == EditorCommandStatus::Applied;
         }
     };
+    struct EditorNormalEstimationResult
+    {
+        EditorCommandStatus Status{EditorCommandStatus::NoChange};
+        NormalEstimationMethod Method{NormalEstimationMethod::PointSetPCA};
+        NormalEstimationBackend RequestedBackend{NormalEstimationBackend::CpuKDTree};
+        GeometryPropertyRef Output{};
+        std::string ActualBackend{}, Message{};
+        std::size_t SlotCount{}, LiveCount{}, WrittenCount{}, ChangedCount{}, ValidCount{}, FallbackCount{};
+        std::size_t ProcessedFaces{}, InvalidEdges{};
+        Geometry::PointCloud::Normals::Diagnostics PointDiagnostics{};
+        bool IndexReused{};
+        [[nodiscard]] bool Succeeded() const noexcept { return Status==EditorCommandStatus::Applied || Status==EditorCommandStatus::NoChange; }
+    };
+    struct EditorNormalEstimationReadiness
+    {
+        bool Ready{};
+        std::string Diagnostic{};
+        NormalEstimationConfig Resolved{};
+    };
     enum class EditorPointCloudOutlierMethod : std::uint8_t
     {
         Statistical, // GEOM-016 RemoveStatisticalOutliers (mean-kNN distance).
@@ -931,6 +961,7 @@ export namespace Extrinsic::Runtime
         PointCloudVertexNormals,
         PointCloudOutlierRemoval,
         Registration,
+        NormalEstimation,
     };
 
     struct EditorMethodResultSinks
@@ -949,6 +980,7 @@ export namespace Extrinsic::Runtime
         std::function<void(EditorPointCloudVertexNormalsResult)> PointCloudVertexNormals{};
         std::function<void(EditorPointCloudOutlierRemovalResult)> PointCloudOutlierRemoval{};
         std::function<void(EditorRegistrationResult)> Registration{};
+        std::function<void(EditorNormalEstimationResult)> NormalEstimation{};
     };
 
     struct EditorGeometryProcessingModel
@@ -1057,6 +1089,7 @@ export namespace Extrinsic::Runtime
         SelectionController* Selection{nullptr};
         EditorCommandHistory* CommandHistory{nullptr};
         RHI::IDevice* Device{nullptr};
+        SpatialIndexCache* SpatialIndices{};
         ClusteringService* Clustering{nullptr};
         PointCloudConsolidationService* PointCloudConsolidation{nullptr};
         EditorParameterizationUvViewCommandSurface ParameterizationUvViewCommands{};
@@ -1077,6 +1110,7 @@ export namespace Extrinsic::Runtime
         const EditorParameterizationResult* LastParameterizationResult{nullptr};
         const EditorProgressivePoissonResult* LastProgressivePoissonResult{nullptr};
         const EditorRegistrationResult* LastRegistrationResult{nullptr};
+        const EditorNormalEstimationResult* LastNormalEstimationResult{nullptr};
         const RuntimeEngineConfigControlState* EngineConfigControlState{nullptr};
         std::function<Core::Config::EngineConfigLoadResult(const std::string&, const std::string&)>
             PreviewEngineConfigDocument{};
@@ -1532,6 +1566,7 @@ export namespace Extrinsic::Runtime
         std::optional<EditorParameterizationResult> LastParameterizationResult{};
         std::optional<EditorProgressivePoissonResult> LastProgressivePoissonResult{};
         std::optional<EditorRegistrationResult> LastRegistrationResult{};
+        std::optional<EditorNormalEstimationResult> LastNormalEstimationResult{};
     };
 
     struct EditorGeometryProcessingPreparedFrame
@@ -1547,6 +1582,87 @@ export namespace Extrinsic::Runtime
     [[nodiscard]] EditorGeometryProcessingPreparedFrame
     PrepareEditorGeometryProcessingFrame(
         const EditorWorkspaceAttachment& attachment);
+    [[nodiscard]] PrimitiveSelectionSnapshot ReadEditorPrimitiveSelection(
+        const EditorGeometryProcessingCommands& commands, std::uint32_t entityId,
+        GeometryElementDomain domain);
+    [[nodiscard]] PrimitiveSelectionSnapshot ApplyEditorPrimitiveSelection(
+        const EditorGeometryProcessingCommands& commands, std::uint32_t entityId,
+        GeometryElementDomain domain, PrimitiveSelectionEdit edit,
+        std::span<const std::uint32_t> indices = {});
+    [[nodiscard]] SelectionInteractionConfig GetEditorSelectionInteractionConfig(
+        const EditorGeometryProcessingCommands& commands);
+    [[nodiscard]] RuntimeEngineConfigApplyResult ApplyEditorSelectionInteractionConfig(
+        const EditorGeometryProcessingCommands& commands, const SelectionInteractionConfig& config);
+
+    struct EditorRegistrationReadiness
+    {
+        bool Ready{};
+        EditorCommandStatus Status{EditorCommandStatus::NoChange};
+        std::string Diagnostic{};
+    };
+    [[nodiscard]] EditorRegistrationReadiness PreviewEditorRegistrationCommand(
+        const EditorGeometryProcessingContext& context, const EditorRegistrationCommand& command);
+    [[nodiscard]] EditorRegistrationReadiness PreviewEditorRegistrationCommand(
+        const EditorGeometryProcessingCommands& commands, const EditorRegistrationCommand& command);
+    [[nodiscard]] GeometryPropertyCatalogSnapshot GetEditorRegistrationInputCatalog(
+        const EditorGeometryProcessingContext& context, std::uint32_t stableId);
+    [[nodiscard]] GeometryPropertyCatalogSnapshot GetEditorRegistrationInputCatalog(
+        const EditorGeometryProcessingCommands& commands, std::uint32_t stableId);
+    [[nodiscard]] RuntimeEngineConfigApplyResult ApplyEditorRegistrationConfig(
+        const EditorGeometryProcessingContext& context, const RegistrationConfig& config, std::string sourceId = {});
+    [[nodiscard]] RuntimeEngineConfigApplyResult ApplyEditorRegistrationConfig(
+        const EditorGeometryProcessingCommands& commands, const RegistrationConfig& config, std::string sourceId = {});
+    [[nodiscard]] std::optional<RegistrationConfig> GetEditorRegistrationConfig(
+        const EditorGeometryProcessingContext& context) noexcept;
+    [[nodiscard]] std::optional<RegistrationConfig> GetEditorRegistrationConfig(
+        const EditorGeometryProcessingCommands& commands) noexcept;
+    [[nodiscard]] EditorRegistrationResult ApplyEditorConfiguredRegistrationCommand(
+        const EditorGeometryProcessingCommands& commands);
+    [[nodiscard]] EditorGeodesicsResult ApplyEditorGeodesicsCommand(
+        const EditorGeometryProcessingContext& context, const EditorGeodesicsCommand& command);
+    [[nodiscard]] EditorGeodesicsResult ApplyEditorGeodesicsCommand(
+        const EditorGeometryProcessingCommands& commands, const EditorGeodesicsCommand& command);
+    [[nodiscard]] EditorGeodesicsResult ApplyEditorConfiguredGeodesicsCommand(
+        const EditorGeometryProcessingCommands& commands, std::uint32_t stableEntityId);
+    [[nodiscard]] RuntimeEngineConfigApplyResult ApplyEditorGeodesicsConfig(
+        const EditorGeometryProcessingContext& context, const GeodesicsConfig& config,
+        std::string sourceId = "sandbox.geodesics");
+    [[nodiscard]] RuntimeEngineConfigApplyResult ApplyEditorGeodesicsConfig(
+        const EditorGeometryProcessingCommands& commands, const GeodesicsConfig& config,
+        std::string sourceId = "sandbox.geodesics");
+    [[nodiscard]] std::optional<GeodesicsConfig> GetEditorGeodesicsConfig(
+        const EditorGeometryProcessingContext& context) noexcept;
+    [[nodiscard]] std::optional<GeodesicsConfig> GetEditorGeodesicsConfig(
+        const EditorGeometryProcessingCommands& commands) noexcept;
+    [[nodiscard]] EditorNormalEstimationReadiness PreviewEditorNormalEstimationCommand(
+        const EditorGeometryProcessingContext &context, const NormalEstimationConfig &config);
+    [[nodiscard]] GeometryPropertyCatalogSnapshot GetEditorNormalEstimationInputCatalog(
+        const EditorGeometryProcessingContext &context, std::uint32_t stableId);
+    [[nodiscard]] EditorNormalEstimationResult ApplyEditorNormalEstimationCommand(
+        const EditorGeometryProcessingContext &context, const NormalEstimationConfig &config);
+    [[nodiscard]] RuntimeEngineConfigApplyResult ApplyEditorNormalEstimationConfig(
+        const EditorGeometryProcessingContext &context, const NormalEstimationConfig &config,
+        std::string sourceId = {});
+    [[nodiscard]] std::optional<NormalEstimationConfig> GetEditorNormalEstimationConfig(
+        const EditorGeometryProcessingContext &context);
+    [[nodiscard]] EditorNormalEstimationResult ApplyEditorConfiguredNormalEstimation(
+        const EditorGeometryProcessingContext &context);
+
+    [[nodiscard]] EditorNormalEstimationReadiness PreviewEditorNormalEstimationCommand(
+        const EditorGeometryProcessingCommands &commands, const NormalEstimationConfig &config);
+    [[nodiscard]] GeometryPropertyCatalogSnapshot GetEditorNormalEstimationInputCatalog(
+        const EditorGeometryProcessingCommands &commands, std::uint32_t stableId);
+    [[nodiscard]] EditorNormalEstimationResult ApplyEditorNormalEstimationCommand(
+        const EditorGeometryProcessingCommands &commands, const NormalEstimationConfig &config);
+    [[nodiscard]] RuntimeEngineConfigApplyResult ApplyEditorNormalEstimationConfig(
+        const EditorGeometryProcessingCommands &commands, const NormalEstimationConfig &config,
+        std::string sourceId = {});
+    [[nodiscard]] std::optional<NormalEstimationConfig> GetEditorNormalEstimationConfig(
+        const EditorGeometryProcessingCommands &commands);
+    [[nodiscard]] EditorNormalEstimationResult ApplyEditorConfiguredNormalEstimation(
+        const EditorGeometryProcessingCommands &commands);
+
+
 } // namespace Extrinsic::Runtime
 
 namespace Extrinsic::Runtime

@@ -3510,3 +3510,154 @@ observations:
     promoted_to: logic/claims.md:C74
     crystallized_via: artifact-commitment
     stale: false
+
+  - id: O200
+    timestamp: '2026-09-08T10:53:00+02:00'
+    provenance: ai-suggested
+    content: The initial virtual-source intake oracle assumed exact planar distances within 1e-5 for interior source 40 on an 8-by-8 grid. Native and supplemental-formulation experiments contradict that assumption; the selected method remains approximate.
+    context: The rejected oracle is retained. The method definition and tests adopt bounded fixture errors after source comparison, without a general error, canonical-dataset parity or performance claim.
+    potential_type: claim
+    bound_to: [N492, N493]
+    promoted: true
+    promoted_to: logic/claims.md:C75
+    crystallized_via: artifact-commitment
+    stale: false
+
+  - id: O201
+    timestamp: '2026-09-08T12:18:27+02:00'
+    provenance: ai-suggested
+    content: Shared selection is most useful as a runtime-owned source of copied, canonical-domain indices. Method adapters can snapshot seeds or constraints into their own serializable inputs while keeping geometry kernels independent of interaction state. The current slice exercises geodesics and parameterization; additional method adapters still need their own semantic preflight.
+    context: The user requested reusable primitive selection and asked whether it should be a runtime module or service. Implementation extends the existing interaction owner and controller service rather than creating another lifetime.
+    potential_type: architecture
+    bound_to: [N494, N495]
+    promoted: false
+    promoted_to: null
+    crystallized_via: null
+    stale: false
+
+  - id: O202
+    timestamp: '2026-09-08T12:39:11+02:00'
+    provenance: ai-suggested
+    content: Integrate a GPU LBVH as derived data in a runtime-owned lazy cache keyed by world/entity, canonical element/property binding, input revisions and build parameters. Optional ECS state should store CPU authoring intent only. Methods with changing temporary targets should reuse an operation-owned GPU workspace and rebuild the hierarchy as their indexed data changes. Both lifetimes should use the same lower-level build/query implementation.
+    context: Read-only source audit found promoted CPU BVH/KDTree and all-centroid Vulkan K-Means assignment, but no promoted GPU LBVH or shared runtime spatial-index cache. Framework24 stores CPU KDTree indices on entities and rebuilds its CUDA LBVH over K-Means centroids each iteration. The historical rendering target document is not implementation evidence. This is a recommendation, not implemented or operator-approved GPU integration.
+    potential_type: architecture
+    bound_to: [N496]
+    promoted: true
+    promoted_to: logic/solution/architecture.md:A46
+    crystallized_via: verbal-affirmation
+    stale: false
+
+  - id: O203
+    timestamp: '2026-09-08T13:44:25+02:00'
+    provenance: ai-executed
+    content: The declared local CPU and Vulkan fixtures pass for the point LBVH, canonical-domain entity cache and existing K-Means service using GPU LBVH assignment. Results establish bounded tested behavior, not comparative speed or full Framework24 equivalence.
+    context: CPU exhaustive scans preceded the tree and Vulkan kernels. GPU readbacks ran after normal engine warm-up on RTX 3050 with ASan+UBSan. A source-bound verification record and N499 depend on this bounded observation.
+    potential_type: claim
+    bound_to: [N498, N499]
+    promoted: true
+    promoted_to: logic/claims.md:C76
+    crystallized_via: artifact-commitment
+    stale: false
+
+  - id: O204
+    timestamp: '2026-09-08T14:22:27+02:00'
+    provenance: ai-suggested
+    content: Registration nearest-target searches and compact-support point neighborhoods are candidate next consumers
+      of shared spatial acceleration. Choose a migration only from actual end-to-end profiles; other rows need explicit
+      kNN/exclusion, complete-neighborhood or primitive/ray support.
+    context: Source inventory and 39 existing task reminders record opportunities and exclusions; no additional consumer
+      implementation, migration ordering or performance result is selected in this documentation turn.
+    potential_type: heuristic
+    bound_to:
+    - N500
+    promoted: false
+    promoted_to: null
+    crystallized_via: null
+    stale: false
+
+  - id: O205
+    timestamp: '2026-09-08T14:41:03+02:00'
+    provenance: ai-suggested
+    content: 'Next recommended slice: complete canonical-domain ICP runtime/config/UI, then separately adapt correspondence
+      search to reuse the stable target index and evaluate batched Vulkan queries against the existing CPU path. Retain
+      the transform solve on CPU initially. This offers a present nearest-query consumer without waiting for kNN or
+      triangle traversal. Later kNN/self exclusion can serve normals/outliers; primitive-ray support is a separate
+      thickness prerequisite.'
+    context: Current ICP owns one target KD-tree per run and the editor limits operands to point clouds. Recommendation
+      closes a listed Framework24 workflow gap; no acceleration speedup or migration default is asserted.
+    potential_type: heuristic
+    bound_to:
+    - N501
+    - N500
+    promoted: true
+    promoted_to: logic/solution/heuristics.md:H19
+    crystallized_via: verbal-affirmation
+    stale: false
+
+  - id: O206
+    timestamp: '2026-09-08T16:44:04+02:00'
+    provenance: ai-executed
+    content: Canonical-domain ICP/config/UI, shared CPU target leases and framed Vulkan correspondences pass the bounded
+      local CPU and GPU fixtures. This does not imply speedup, arbitrary-input parity or leak freedom.
+    context: N504 and the source-hashed verification artifact explicitly depend on this bounded observation; the display-off
+      runtime timing gate remains failed.
+    potential_type: claim
+    bound_to:
+    - N503
+    - N504
+    - N505
+    promoted: true
+    promoted_to: logic/claims.md:C77
+    crystallized_via: artifact-commitment
+    stale: false
+
+  - id: O207
+    timestamp: '2026-09-08T19:44:10+02:00'
+    provenance: ai-executed
+    content: Shared CPU/Vulkan kNN and source-ID exclusion, framed cache reuse/staleness and supplied CPU PCA
+      pass the stated local fixtures. This is bounded implementation evidence, not speedup or completed normal
+      config/UI/publication.
+    context: N508 and the source-hashed verification record commit this bounded observation; no user response
+      to results is inferred.
+    potential_type: claim
+    bound_to:
+    - N507
+    - N508
+    promoted: true
+    promoted_to: logic/claims.md:C78
+    crystallized_via: artifact-commitment
+    stale: false
+  - id: O208
+    timestamp: '2026-09-08T19:44:10+02:00'
+    provenance: ai-suggested
+    content: Next user-facing slice should wire normal estimation through canonical-domain config, UI and same-domain
+      publication using RUNTIME-213/UI-045, reusing the supplied index where selected. Retain the KD-tree default
+      until representative complete-method evidence supports a change.
+    context: Post-ICP GEOM-077 query foundation is verified; user has not yet specifically accepted the next
+      normal workflow implementation.
+    potential_type: heuristic
+    bound_to:
+    - N506
+    - N507
+    promoted: true
+    promoted_to: logic/solution/heuristics.md:H20
+    crystallized_via: verbal-affirmation
+    stale: false
+
+  - id: O209
+    timestamp: '2026-09-08T21:33:09+02:00'
+    provenance: ai-executed
+    content: Bounded CPU fixtures cover normal estimation on all eight canonical domains with both PCA query choices,
+      distinct mesh/graph methods, named output preservation/history, stale/cancelled jobs, shared config and editor/vector
+      recipe routing.
+    context: The accepted normal workflow is implemented and tested; code and the N511 evidence decision depend on
+      the bounded result. No researcher comment on the measured results or new GPU evidence is inferred.
+    potential_type: claim
+    bound_to:
+    - N509
+    - N510
+    - N511
+    promoted: true
+    promoted_to: logic/claims.md:C79
+    crystallized_via: artifact-commitment
+    stale: false

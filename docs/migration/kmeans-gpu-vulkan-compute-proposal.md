@@ -9,7 +9,9 @@ recorder, resource cache, shared readback adapter, and one GPU participant are
 private `ClusteringModule` state. Sandbox UI/config/agent callers, the Vulkan
 smoke, and the benchmark all use that operation. The current promoted shader
 path avoids optional Vulkan float-atomic and int64-atomic feature requirements;
-the faster segmented-reduction path remains a follow-up.
+the faster segmented-reduction path remains a follow-up. Assignment now traverses
+the shared [point LBVH](../architecture/spatial-indices.md), rebuilt on the GPU
+over current centroids each iteration with reusable workspace storage.
 Scope: analyze the Framework24 CUDA k-means and propose a parity-gated GPU
 backend for `Geometry.KMeans` in IntrinsicEngine.
 
@@ -157,7 +159,7 @@ descriptor-set storage bindings**).
 
 1. `kmeans_reset.comp` — zero the compatibility accumulator spans and reduction
    scratch (`maxShiftBits` plus legacy fields kept in the BDA record).
-2. `kmeans_assign.comp` — one thread per point: scan centroids, write label, and
+2. `kmeans_assign.comp` — one thread per point: traverse the centroid LBVH, write label, and
    write squared distance. It deliberately does not use
    `GL_EXT_shader_atomic_float`, `GL_EXT_shader_atomic_int64`, float atomics, or
    64-bit atomics, so shader-module creation does not require optional device
@@ -173,8 +175,12 @@ descriptor-set storage bindings**).
 
 ### 4.2 Buffers — persistent, allocated once, reused every iteration
 
+The private `Graphics::PointLbvhWorkspace` separately owns reusable sorting,
+node, and bound buffers through the RHI device. Its build uses the current
+centroid span in the packed Work buffer directly.
+
 This is the core of the "reuse all GPU buffers / avoid GPU I/O" requirement. All
-buffers are `RHI::BufferManager::BufferLease`s created **once** per solve (and
+method data buffers are `RHI::BufferManager::BufferLease`s created **once** per solve (and
 cacheable across solves keyed by `(n, k)`), `BufferUsage::Storage |
 TransferSrc | TransferDst`, reached by BDA:
 

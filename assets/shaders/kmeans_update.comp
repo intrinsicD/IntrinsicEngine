@@ -57,6 +57,7 @@ layout(push_constant, scalar) uniform KMeansPush
     uint Iteration;
     float ConvergenceTolSquared;
     float Reserved0;
+    uint64_t NodesBDA;
 } pc;
 
 void main()

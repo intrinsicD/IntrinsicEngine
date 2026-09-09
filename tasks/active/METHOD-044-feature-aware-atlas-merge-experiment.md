@@ -70,6 +70,16 @@ contract_review: "Embedded oriented triangle surfaces are semantic inputs. Detac
 - Complete the feature ablation without changing quality limits, 64 seed locations, UV solver or packing: add growth-only (growth weight 2, merge ranking weight 0) and merge-only (growth 0, ranking 2) on the original four-mesh cohort. Previous feature-on/off results alone conflate these two effects.
 - Prediction: most feature benefit on sharp meshes comes from initialization, while the weak merge-order term has a smaller effect. This round tests attribution, not a new tuned algorithm. Retain any contradictory result; no feature-only production claim from two confounded arms.
 
+## Spatial acceleration consideration
+
+Potential future acceleration is confined to actual large UV triangle-
+overlap/boundary-segment checks, using conservative primitive bounds and exact 2D
+tests. Farthest geodesic seeds, connected patches and adjacent merges keep their
+surface topology. Point LBVH is not a replacement for those structures; this
+reminder does not reopen the frozen experiment or authorize adoption.
+
+See the [shared spatial-index consumer inventory](../../docs/architecture/spatial-index-consumers.md).
+
 ## Verification
 ```bash
 python3 tests/regression/tooling/Test.AtlasPatchMerge.py

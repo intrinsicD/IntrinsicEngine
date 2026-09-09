@@ -655,3 +655,36 @@ TEST(Registration_ICP, ObserverReceivesPerIterationTraces)
         for (int row = 0; row < 4; ++row)
             EXPECT_DOUBLE_EQ(traces.back().Transform[col][row], result->Transform[col][row]);
 }
+
+TEST(Registration, BatchedCorrespondenceProviderMatchesReferenceAndRejectsInvalidResults)
+{
+    namespace Reg = Geometry::Registration;
+    const auto target = MakeSpherePoints(8,13);
+    auto source = target;
+    for(auto& p:source) p += glm::vec3(.02f,-.03f,.04f);
+    const auto normals=MakeSphereNormals(target);
+    for(auto variant:{Reg::ICPVariant::PointToPoint,Reg::ICPVariant::PointToPlane})
+    {
+        Reg::RegistrationParams params{.Variant=variant,.InlierRatio=1.};
+        const auto reference=Reg::AlignICP(source,target,normals,params);
+        const auto batched=Reg::AlignICPWithQueries(source,target,normals,params,
+            [&](std::span<const glm::vec3> queries,std::span<std::uint32_t> ids){
+                for(std::size_t i=0;i<queries.size();++i)
+                {
+                    float best=std::numeric_limits<float>::infinity();
+                    for(std::size_t j=0;j<target.size();++j)
+                    {
+                        const auto d=queries[i]-target[j]; const float distance=glm::dot(d,d);
+                        if(distance<best){best=distance;ids[i]=static_cast<std::uint32_t>(j);}
+                    }
+                }
+                return true;
+            });
+        ASSERT_TRUE(reference); ASSERT_TRUE(batched);
+        EXPECT_EQ(reference->IterationsPerformed,batched->IterationsPerformed);
+        EXPECT_NEAR(reference->FinalRMSE,batched->FinalRMSE,1e-8);
+        for(int i=0;i<4;++i)for(int j=0;j<4;++j) EXPECT_NEAR(reference->Transform[i][j],batched->Transform[i][j],1e-8);
+    }
+    EXPECT_FALSE(Reg::AlignICPWithQueries(source,target,{}, {},[](auto,auto){return false;}));
+    EXPECT_FALSE(Reg::AlignICPWithQueries(source,target,{}, {},[&](auto,auto ids){ids[0]=target.size();return true;}));
+}

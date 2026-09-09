@@ -3,6 +3,15 @@ id: GEOM-060
 theme: I
 depends_on: []
 maturity_target: CPUContracted
+workflow_schema: 1
+workflow_profile: standard
+evidence: required
+owner:
+branch:
+worktree:
+claimed_at:
+contract_schema: 1
+contracts: [repo.source-documentation, geometry.element-domain-sources]
 ---
 # GEOM-060 — Permutohedral lattice fast high-dimensional filtering seam
 
@@ -19,6 +28,16 @@ maturity_target: CPUContracted
 - Paper: Adams, Baek, Davis — "Fast High-Dimensional Filtering Using the Permutohedral Lattice", Computer Graphics Forum (Eurographics) 2010.
 - Port source: framework24 `lib_bcg_framework/include/bcg_permutohedral_lattice.h` (untested in bcg; this port adds a brute-force oracle test).
 - Named future consumers: the fast Gauss transform for the nonrigid Coherent Point Drift optimized backend (follow-up to `METHOD-015`) and bilateral point-cloud/mesh filtering fast paths (`Geometry.PointCloud.Utils`, retired `GEOM-042`).
+
+## Spatial acceleration consideration
+
+The shared point LBVH is 3D Euclidean nearest/radius infrastructure; it does not
+implement high-dimensional Gaussian filtering or replace the permutohedral
+lattice. A consumer may later compare a spatial-neighborhood method only with its
+own metric/support/error contract. Keep this lattice reference and the no-
+consumer-rewiring scope intact.
+
+See the [shared spatial-index consumer inventory](../../../docs/architecture/spatial-index-consumers.md).
 
 ## Required changes
 - [ ] Add module `Geometry.PermutohedralLattice` (`.cppm` + `.cpp`): build the lattice from d-dimensional feature vectors and expose a one-call `Filter(features, values)` entry plus the reusable splat/blur/slice stages.

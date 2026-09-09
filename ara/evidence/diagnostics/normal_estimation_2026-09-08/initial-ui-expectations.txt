@@ -1,0 +1,79 @@
+Running main() from /home/alex/Documents/IntrinsicEngine/external/vcpkg/buildtrees/gtest/src/v1.17.0-0c449efaff.clean/googletest/src/gtest_main.cc
+Note: Google Test filter = SandboxEditorPresentation.DefaultDrawStartsWithOnlyMenuBarVisible
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from SandboxEditorPresentation
+[ RUN      ] SandboxEditorPresentation.DefaultDrawStartsWithOnlyMenuBarVisible
+[32m[INFO] Initialized Scheduler with 1 worker threads.[0m
+/home/alex/Documents/IntrinsicEngine/tests/integration/runtime/Test.SandboxEditorPresentation.cpp:330: Failure
+Expected equality of these values:
+  menu.size()
+    Which is: 44
+  43u
+    Which is: 43
+
+[  FAILED  ] SandboxEditorPresentation.DefaultDrawStartsWithOnlyMenuBarVisible (41 ms)
+[----------] 1 test from SandboxEditorPresentation (41 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (41 ms total)
+[  PASSED  ] 0 tests.
+[  FAILED  ] 1 test, listed below:
+[  FAILED  ] SandboxEditorPresentation.DefaultDrawStartsWithOnlyMenuBarVisible
+
+ 1 FAILED TEST
+Running main() from /home/alex/Documents/IntrinsicEngine/external/vcpkg/buildtrees/gtest/src/v1.17.0-0c449efaff.clean/googletest/src/gtest_main.cc
+Note: Google Test filter = SandboxEditorPresentation.MeshProcessingPanelsPreserveLifetimeAndResultPublication
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from SandboxEditorPresentation
+[ RUN      ] SandboxEditorPresentation.MeshProcessingPanelsPreserveLifetimeAndResultPublication
+/home/alex/Documents/IntrinsicEngine/tests/integration/runtime/Test.SandboxEditorPresentation.cpp:556: Failure
+Expected: (source.find(required)) != (std::string::npos), actual: 18446744073709551615 vs 18446744073709551615
+ApplyEditorMeshVertexNormalsCommand
+
+/home/alex/Documents/IntrinsicEngine/tests/integration/runtime/Test.SandboxEditorPresentation.cpp:556: Failure
+Expected: (source.find(required)) != (std::string::npos), actual: 18446744073709551615 vs 18446744073709551615
+ApplyEditorGraphVertexNormalsCommand
+
+/home/alex/Documents/IntrinsicEngine/tests/integration/runtime/Test.SandboxEditorPresentation.cpp:556: Failure
+Expected: (source.find(required)) != (std::string::npos), actual: 18446744073709551615 vs 18446744073709551615
+ApplyEditorPointCloudVertexNormalsCommand
+
+/home/alex/Documents/IntrinsicEngine/tests/integration/runtime/Test.SandboxEditorPresentation.cpp:558: Failure
+Expected: (source.find(required)) != (std::string::npos), actual: 18446744073709551615 vs 18446744073709551615
+context.MethodResultSinks.MeshVertexNormals
+
+/home/alex/Documents/IntrinsicEngine/tests/integration/runtime/Test.SandboxEditorPresentation.cpp:558: Failure
+Expected: (source.find(required)) != (std::string::npos), actual: 18446744073709551615 vs 18446744073709551615
+context.MethodResultSinks.GraphVertexNormals
+
+/home/alex/Documents/IntrinsicEngine/tests/integration/runtime/Test.SandboxEditorPresentation.cpp:558: Failure
+Expected: (source.find(required)) != (std::string::npos), actual: 18446744073709551615 vs 18446744073709551615
+context.MethodResultSinks.PointCloudVertexNormals
+
+[  FAILED  ] SandboxEditorPresentation.MeshProcessingPanelsPreserveLifetimeAndResultPublication (2 ms)
+[----------] 1 test from SandboxEditorPresentation (2 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (2 ms total)
+[  PASSED  ] 0 tests.
+[  FAILED  ] 1 test, listed below:
+[  FAILED  ] SandboxEditorPresentation.MeshProcessingPanelsPreserveLifetimeAndResultPublication
+
+ 1 FAILED TEST
+
+          Start 1303: SandboxEditorPresentation.ExtrinsicSandboxAppStaysRuntimeOnly
+1291/4364 Test #1303: SandboxEditorPresentation.ExtrinsicSandboxAppStaysRuntimeOnly ...................................................   Passed    0.02 sec
+unit           =  63.97 sec*proc (2529 tests)
+
+Total Test time (real) = 108.73 sec
+
+The following tests did not run:
+	4434 - GlfwLifecycleLsan.EngineStaticTeardownAndLeakControl (Skipped)
+
+The following tests FAILED:
+	1299 - SandboxEditorPresentation.DefaultDrawStartsWithOnlyMenuBarVisible (Failed)
+	1302 - SandboxEditorPresentation.MeshProcessingPanelsPreserveLifetimeAndResultPublication (Failed)
+	1311 - SandboxEditorPresentation.ControllerReattachPinsPanelAttachmentResetPolicy (Failed)
+Errors while running CTest

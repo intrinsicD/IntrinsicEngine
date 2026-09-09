@@ -1,3 +1,4 @@
+#include <nlohmann/json.hpp>
 // GEOM-009 — geometry smoke benchmark runner.
 //
 // Invokes the registered geometry smoke workloads and emits result JSON
@@ -26,6 +27,9 @@
 #include "../geometry/Bench.ProgressivePoissonReferenceSmoke.hpp"
 #include "../geometry/Bench.QualityMetricsSmoke.hpp"
 #include "../geometry/Bench.SignedHeatReferenceSmoke.hpp"
+#include "../geometry/Bench.GeodesicsReferenceSmoke.hpp"
+#include "../geometry/Bench.PointLBVHSmoke.hpp"
+#include "../geometry/Bench.RegistrationSpatialSmoke.hpp"
 #include "../geometry/Bench.SimplificationQualitySmoke.hpp"
 #include "../geometry/Bench.SurfaceSamplingSmoke.hpp"
 #include "../geometry/Bench.UvAtlasSmoke.hpp"
@@ -596,6 +600,92 @@ auto EmitSignedHeatReferenceSmoke(const std::string &commit)
 
   return EmittedBenchmark{kSignedHeatReferenceSmokeBenchmarkId, out.str(),
                           metrics.Succeeded};
+}
+
+auto EmitGeodesicsReferenceSmoke(const std::string& commit) -> EmittedBenchmark
+{
+    using namespace Intrinsic::Bench::Geometry;
+
+    const auto metrics = RunGeodesicsReferenceSmoke();
+
+    std::ostringstream out;
+    out.setf(std::ios::fixed);
+    out.precision(6);
+    out << "{\n"
+        << "  \"benchmark_id\": \"" << EscapeJson("geometry.geodesics_virtual_source.smoke")
+        << "\",\n"
+        << "  \"method\": \"" << EscapeJson("geometry.geodesics_virtual_source") << "\",\n"
+        << "  \"backend\": \"cpu_reference\",\n"
+        << "  \"dataset\": \"" << EscapeJson("builtin.flat_grid.corner_source.8") << "\",\n"
+        << "  \"commit\": \"" << EscapeJson(commit) << "\",\n"
+        << "  \"metrics\": {\n"
+        << "    \"runtime_ms\": " << metrics.RuntimeMilliseconds << ",\n"
+        << "    \"quality_error_l2\": " << metrics.QualityErrorL2 << ",\n"
+        << "    \"quality_error_linf\": " << metrics.MaxAbsoluteError << "\n"
+        << "  },\n"
+        << "  \"diagnostics\": {\n"
+        << "    \"runner\": \"IntrinsicBenchmarkSmoke\",\n"
+        << "    \"mode\": \"smoke\",\n"
+        << "    \"warmup_iterations\": 1,\n"
+        << "    \"measured_iterations\": 8,\n"
+        << "    \"halfedge_expansions\": " << metrics.HalfedgeExpansions << "\n"
+        << "  },\n"
+        << "  \"status\": \"" << (metrics.Succeeded ? "passed" : "failed") << "\"\n"
+        << "}\n";
+
+    return EmittedBenchmark{"geometry.geodesics_virtual_source.smoke", out.str(),
+                            metrics.Succeeded};
+}
+
+auto EmitPointLBVHSmoke(const std::string& commit) -> EmittedBenchmark
+{
+    const auto r = Intrinsic::Bench::Geometry::RunPointLBVHSmoke();
+    const bool passed = r.Mismatches == 0 && r.MaxDistanceError == 0;
+    std::ostringstream out;
+    out << "{\"benchmark_id\":\"geometry.point_lbvh.smoke\","
+        << "\"method\":\"geometry.point_lbvh\",\"backend\":\"cpu_reference\","
+        << "\"dataset\":\"builtin.grid3d.8\",\"commit\":\"" << EscapeJson(commit)
+        << "\",\"metrics\":{\"runtime_ms\":" << r.RuntimeMilliseconds
+        << ",\"quality_error_linf\":" << r.MaxDistanceError
+        << "},\"diagnostics\":{\"runner\":\"IntrinsicBenchmarkSmoke\",\"mode\":\"smoke\","
+        << "\"warmup_iterations\":1,\"measured_iterations\":8,\"index_mismatches\":" << r.Mismatches
+        << "},\"status\":\"" << (passed ? "passed" : "failed") << "\"}\n";
+    return {"geometry.point_lbvh.smoke",out.str(),passed};
+}
+
+auto EmitPointLBVHKnnSmoke(const std::string& commit) -> EmittedBenchmark
+{
+    const auto r = Intrinsic::Bench::Geometry::RunPointLBVHKnnSmoke();
+    const bool passed = r.Mismatches == 0 && r.MaxDistanceError == 0 && r.MaxNormalError <= 1e-5;
+    nlohmann::json result{{"benchmark_id","geometry.point_lbvh.knn_smoke"},
+        {"method","geometry.point_lbvh"},{"backend","cpu_reference"},
+        {"dataset","builtin.paraboloid.32x16"},{"commit",commit},
+        {"metrics",{{"runtime_ms",r.BuildMilliseconds+r.WarmMilliseconds},{"quality_error_linf",std::max(r.MaxDistanceError,r.MaxNormalError)}}},
+        {"diagnostics",{{"runner","IntrinsicBenchmarkSmoke"},{"mode","smoke"},{"warmup_iterations",1},{"measured_iterations",4},
+            {"build_ms",r.BuildMilliseconds},{"warm_query_ms",r.WarmMilliseconds},{"exhaustive_query_ms",r.ReferenceMilliseconds},
+            {"normal_kdtree_ms",r.NormalReferenceMilliseconds},{"normal_supplied_lbvh_ms",r.NormalLbvhMilliseconds},
+            {"normal_error_linf",r.MaxNormalError},{"index_mismatches",r.Mismatches}}},
+        {"status",passed?"passed":"failed"}};
+    return {"geometry.point_lbvh.knn_smoke",result.dump(2),passed};
+}
+
+auto EmitRegistrationSpatialSmoke(const std::string& commit) -> EmittedBenchmark
+{
+    const auto r = Intrinsic::Bench::Geometry::RunRegistrationSpatialSmoke();
+    const bool passed = r.Failures == 0 && r.MaxTransformError <= 1e-6;
+    std::ostringstream out;
+    out << "{\"benchmark_id\":\"geometry.registration.spatial_smoke\","
+        << "\"method\":\"geometry.registration\",\"backend\":\"cpu_reference\","
+        << "\"dataset\":\"builtin.random3d.1025.seed917\",\"commit\":\"" << EscapeJson(commit)
+        << "\",\"metrics\":{\"runtime_ms\":" << r.ColdMilliseconds
+        << ",\"quality_error_linf\":" << r.MaxTransformError
+        << "},\"diagnostics\":{\"runner\":\"IntrinsicBenchmarkSmoke\",\"mode\":\"smoke\","
+        << "\"warmup_iterations\":1,\"measured_iterations\":8,\"failures\":" << r.Failures
+        << ",\"reference_total_ms\":" << r.ReferenceMilliseconds
+        << ",\"lbvh_cold_total_ms\":" << r.ColdMilliseconds
+        << ",\"lbvh_warm_total_ms\":" << r.WarmMilliseconds
+        << "},\"status\":\"" << (passed ? "passed" : "failed") << "\"}\n";
+    return {"geometry.registration.spatial_smoke",out.str(),passed};
 }
 
 auto EmitCurvatureSegmentationReferenceSmoke(const std::string &commit)
@@ -1904,6 +1994,10 @@ auto main(int argc, char **argv) -> int {
   emitted.push_back(EmitUvAtlasEdgeGroupingScaling(commit));
   emitted.push_back(EmitProgressivePoissonReferenceSmoke(commit));
   emitted.push_back(EmitSignedHeatReferenceSmoke(commit));
+  emitted.push_back(EmitGeodesicsReferenceSmoke(commit));
+  emitted.push_back(EmitPointLBVHSmoke(commit));
+  emitted.push_back(EmitPointLBVHKnnSmoke(commit));
+  emitted.push_back(EmitRegistrationSpatialSmoke(commit));
   emitted.push_back(EmitCurvatureSegmentationReferenceSmoke(commit));
   emitted.push_back(EmitPointCloudConsolidationReferenceSmoke(commit));
   emitted.push_back(EmitLopFamilyComparisonSmoke(commit));

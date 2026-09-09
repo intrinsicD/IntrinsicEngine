@@ -51,6 +51,16 @@ maturity_target: Operational
 | Publication | Named same-cardinality level/rank/radius/prefix properties on the originating element domain. |
 | End-to-end tests | CPU/GPU/fallback property-domain matrix, visualization binding, staleness, history, and UI parity. |
 
+## Spatial acceleration consideration
+
+Keep the current Progressive Poisson grid and phase/active-set semantics during
+property publication work. A later LBVH alternative must index the accepted subset
+or support its membership predicate, preserve acceptance order, and handle
+nearest-other spacing; an all-input radius query is not equivalent. Record this
+boundary when planning acceleration; no sampler rewrite is added here.
+
+See the [shared spatial-index consumer inventory](../../../docs/architecture/spatial-index-consumers.md).
+
 ## Required changes
 
 - [ ] Add canonical input/output property refs and resolve every logical

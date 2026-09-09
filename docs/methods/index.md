@@ -1,5 +1,7 @@
 # Methods Documentation
 
+- [Point LBVH](../../methods/geometry/point_lbvh/README.md): nearest/radius queries, entity caching, and Vulkan k-means assignment.
+
 This index is the canonical entry point for method/paper implementation documentation.
 
 > **Pathfinder method.** [`METHOD-002 — Signed Heat Method reference backend`](../../tasks/archive/METHOD-002-signed-heat-method-reference-backend.md) is the first method driven end-to-end through the methods pipeline (paper intake → CPU reference → correctness tests → benchmark harness → docs). See retired [`METHODS-001`](../../tasks/archive/METHODS-001-signed-heat-pathfinder.md) for the rationale and dependency chain. Treat the resulting [`methods/geometry/signed_heat/`](../../methods/geometry/signed_heat/) package as the canonical pattern when authoring future method packages.
@@ -17,6 +19,7 @@ This index is the canonical entry point for method/paper implementation document
 ## Related docs
 
 - [Agent method workflow](../agent/method-workflow.md)
+- [Spatial acceleration consumers and open-task reminders](../architecture/spatial-index-consumers.md)
 - [Methods directory overview](../../methods/README.md)
 
 ## Physics Methods
@@ -39,6 +42,8 @@ This index is the canonical entry point for method/paper implementation document
   tasks.
 
 ## Geometry Methods
+
+- [Normal estimation](../architecture/normal-estimation.md): canonical-domain PCA and distinct mesh/graph topology normal workflows.
 
 - [`geometry.boundary_first_flattening`](../../methods/geometry/boundary_first_flattening/)
   is the CPU-reference method contract for Sawhney and Crane's Boundary
@@ -123,3 +128,7 @@ production adoption (METHOD-045).
 - [Atlas stages and curvature decision audit](atlas_stage_inspection.md) — initial clusters, merge losses, scalar overlays and replay.
 
 - [Constrained UV boundary refinement](uv_boundary_refinement_experiment.md) — collective boundary moves, guidance controls and preservation/packing tradeoffs (METHOD-046, offline).
+
+- [Virtual-source geodesics](../../methods/geometry/geodesics_virtual_source/README.md): CPU reference, config, mesh panel, and distance properties.
+
+- [Rigid ICP registration](../../methods/geometry/registration/README.md): canonical operands and selectable correspondence providers with a shared CPU solve.

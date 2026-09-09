@@ -70,6 +70,17 @@ contracts: [geometry.element-domain-sources, method.engine-integration]
 | Publication | Result JSON and audited evidence tables only; no mutation of source properties, cardinality, or ECS state. |
 | End-to-end tests | Benchmark invocation, per-group input guards, result validation, failed-cell accounting, and audit replay. |
 
+## Spatial acceleration consideration
+
+When admitted by the parent gate, report each method's actual
+neighborhood/primitive index and cold build versus reuse costs with preprocessing.
+A shared point LBVH is not yet wired into these orientation baselines, and iPSR
+needs exact face queries. Keep independent scoring/oracles and the declared
+information groups; index availability does not establish matched work or a speed
+advantage.
+
+See the [shared spatial-index consumer inventory](../../../docs/architecture/spatial-index-consumers.md).
+
 ## Required changes
 - [ ] Record the METHOD-032 start-gate verdict before allocating comparison
       runs. The measurement requirements below apply only when that gate admits

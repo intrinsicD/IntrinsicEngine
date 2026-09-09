@@ -1,5 +1,9 @@
 # Geometry Methods
 
+[Point LBVH](point_lbvh/README.md) provides CPU reference queries, reusable Vulkan construction/traversal, and runtime entity-cache integration.
+
+- [Virtual-source geodesics](geodesics_virtual_source/README.md): triangle-surface distance fields and the mesh geodesics panel.
+
 Method packages for geometry processing research (remeshing, parameterization, distance fields, etc.).
 
 - [`signed_heat`](signed_heat/) — `geometry.signed_heat` CPU reference for

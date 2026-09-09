@@ -1,0 +1,72 @@
+{
+  "recorded_at": "2026-09-08T21:33:09+02:00",
+  "base_commit": "314db9ea5be314c732458649775103c461992fbb",
+  "source_state": "dirty_worktree",
+  "claim_eligible": false,
+  "source_sha256": {
+    "CMakePresets.json": "773fdc8903c975001628b849497cdec7827839827fd8e0e8a9c18f497c78e085",
+    "tests/CMakeLists.txt": "54ab14a7d81e23c37ee37aedb20c2370f44d58f03ad12349c57dc1ca101dd827",
+    "src/runtime/CMakeLists.txt": "803c67ef036724424fb38f54941da8edc8aebd34dd38b02a28589fb639b1fff7",
+    "src/runtime/Modules/NormalEstimation/Runtime.NormalEstimationConfig.cppm": "7a7f252a314a0fdd66e426ea7a928067191005a1ba65cfee4ab02ec98e089cc6",
+    "src/runtime/Modules/NormalEstimation/Runtime.NormalEstimationConfig.cpp": "6e4a9d911b7325e820fdef4231d5922ec2a57c81e46e26b7c2080bec00a5e154",
+    "src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.cppm": "3b0310d90a787eefc2172f6fc4e7f139c16aba40f3ed93d75204d3a1e92c3ef4",
+    "src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.cpp": "c56582b481fba9a9e76ae998e30a85beeb8894cc3216fc30d0c56a6b79cdea17",
+    "src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Normals.cpp": "a06fef91a2940962e4740a613383335152d0d7d5a83e8387db5d0e2755aa08d8",
+    "src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Mesh.cpp": "1d0e0d66b6121ba57abf07233f5d97e69ce55cfad3daef4fc4cdf67203ea7429",
+    "src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Public.cpp": "9027037192333fd29689b843cbe66bbc3a43d99abde6209dcc08200a62d617d2",
+    "src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Internal.hpp": "0e4c1fea8927848d2211849c1dcde10a40ad632a13f10e0f71199dda5906adf2",
+    "src/runtime/Editor/internal/Runtime.EditorFeatureContextAdapters.cpp": "e426640895624fd5828b7018dee716b18a3dd7f80b8494f9bb84e0753b9cbf8b",
+    "src/runtime/Editor/internal/Runtime.EditorFeatures.Detail.cppm": "98ddf8c817ebbc25a58a54602f2dc3b0937c35a4eef6b9ad25798dee70855f4f",
+    "src/runtime/Editor/internal/Runtime.EditorWorkspaceSession.cpp": "0cec4d5440b543a35e9a9b3c26e37ea0e129f20f4e5fbddbbdef0e4cb40cf545",
+    "src/runtime/GeometryIntegration/Runtime.SpatialIndexCache.cpp": "a159c6a936dc0c769631f7f824f80da1e73a7f701b5e82a54981e92459694707",
+    "src/runtime/GeometryIntegration/Runtime.SpatialIndexCache.cppm": "5e15fbcf69002a92cf210c7d877500569b5994f601f849dc3e287359dd52cf3e",
+    "src/geometry/Geometry.PointCloud.Normals.cpp": "63595dfa622969324b898daa9969e56df24ea8ecf06294d087b2230ae553d619",
+    "src/geometry/Geometry.PointCloud.Normals.cppm": "f9178632f0426a390ac013a560d56221b61bc53d6b1f20d189cb15c6409ad7bc",
+    "src/geometry/Geometry.Graph.Vertex.Normals.cpp": "5521d96b9f1110a7bf9aa36a6d6f2478333353d6df93d847730b320bcf04044b",
+    "src/geometry/Geometry.HalfedgeMesh.Vertices.Normals.cpp": "3548db64f678a03b655a1094bffedeed584887dbd9001bca71e711fa46977fcd",
+    "src/app/Sandbox/Editor/Sandbox.MeshProcessingPanels.cpp": "005381732fd067503388f74ebb208494131839c9715354a7d2338ef50d634bae",
+    "src/app/Sandbox/Sandbox.ConfigSections.cpp": "c2171f11de3165103a9cd7a6371c6ac6b33039bae567149e42be5e93c0d6a7dc",
+    "tests/contract/runtime/Test.NormalEstimation.cpp": "f76b9b059a3bd6af323e5729d8d0fc97f609b857efa7724e343404c6baaa5b72",
+    "tests/contract/runtime/Test.SandboxEditorSessionLifecycle.cpp": "c1c73a65eecb82a5d8a91e4534a14f54511c91126fcb3f65cc3c321c2593c445",
+    "tests/integration/runtime/Test.SandboxEditorPresentation.cpp": "a505616921a3c7d70899d7eb424b3582fa937899a4cbce669472a1df3d4864b2"
+  },
+  "compiler": "Clang 23",
+  "preset": "ci",
+  "configure_override": {
+    "INTRINSIC_BUILD_SANDBOX": "ON"
+  },
+  "sanitizers": "none",
+  "built_targets": [
+    "IntrinsicTests",
+    "IntrinsicRuntimeContractTests",
+    "IntrinsicSandboxEditorIntegrationTests",
+    "ExtrinsicSandbox"
+  ],
+  "focused": {
+    "selector": "Normal|SandboxEditorPresentation|DismissClearsOneGeometry",
+    "excluded": "gpu|vulkan|slow|flaky-quarantine",
+    "passed": 179,
+    "failed": 0,
+    "elapsed_seconds": 3.62
+  },
+  "full_cpu": {
+    "selected": 4364,
+    "passed": 4363,
+    "skipped": 1,
+    "failed": 0,
+    "elapsed_seconds": 132.33,
+    "timeout_seconds": 60,
+    "skip": "GlfwLifecycleLsan.EngineStaticTeardownAndLeakControl; expected unsanitized skip"
+  },
+  "fixture_corrections": [
+    "Enabled the visualization capability in a fixture that already supplied recipe callbacks.",
+    "Updated existing UI command/reset pins and total window count for the shared normal window; normal alias test also draws the window."
+  ],
+  "limits": [
+    "Bounded analytic CPU integration fixtures, not arbitrary-input or complete Framework24 parity.",
+    "PCA query backends are CPU KD-tree/default or explicit cached CPU LBVH; solve and orientation remain CPU.",
+    "No new Vulkan visualization readback, sanitizer run, speedup or default-adoption evidence.",
+    "No commit or push; RUNTIME-213/UI-045 remain active with verified implementation notes.",
+    "BUG-177 root-hygiene warning and earlier BUG-178/BUG-180 investigations remain separate."
+  ]
+}

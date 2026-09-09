@@ -8,6 +8,15 @@ depends_on:
   - RUNTIME-195
   - RUNTIME-202
 maturity_target: ParityProven
+workflow_schema: 1
+workflow_profile: standard
+evidence: required
+owner:
+branch:
+worktree:
+claimed_at:
+contract_schema: 1
+contracts: [repo.source-documentation, geometry.element-domain-sources, method.engine-integration]
 ---
 # METHOD-014 — Progressive Poisson GPU operational parity
 
@@ -64,6 +73,28 @@ maturity_target: ParityProven
 - Add one dedicated GPU smoke runner because actual-device evidence cannot be
   emitted by the CPU smoke. Reuse the benchmark result schema and the fixed
   METHOD-012 fixtures rather than creating GPU-benchmark infrastructure.
+
+## Engine integration
+
+| Field | Disposition |
+| --- | --- |
+| Least-structured input | Finite point-position spans and the existing Progressive Poisson request/config contract. |
+| Compatible entity sources | Existing supported request sources here; RUNTIME-212 and UI-044 own canonical element-domain generalization. |
+| RuntimeModule | Existing typed Progressive Poisson request/job/GPU participant path; this task closes actual GPU readback/parity. |
+| Config/agent | Preserve the sole validated backend/parameter path and requested/actual/fallback reporting. |
+| UI | Existing controls consume that path; new domain discovery remains UI-044. |
+| Publication | Validated hierarchy result through existing typed completion; RUNTIME-212 owns same-domain property generalization and stale/history coverage. |
+| End-to-end tests | This task proves GPU output/readback/parity through the public request path; RUNTIME-212 and UI-044 own generalized source/publication/UI tests. |
+
+## Spatial acceleration consideration
+
+First complete the existing grid-based GPU readback/parity objective. A later LBVH
+experiment must preserve phase conflict order and accepted-set membership; a tree
+over all input points changes the sampler. Nearest-other hierarchy spacing also
+needs exclusion support. Keep the grid as the reference comparison and record
+build/rebuild plus complete sampling cost before adopting another structure.
+
+See the [shared spatial-index consumer inventory](../../../docs/architecture/spatial-index-consumers.md).
 
 ## Required changes
 - [ ] Complete one typed Progressive Poisson runtime operation so CPU and GPU

@@ -10,6 +10,8 @@ branch:
 worktree:
 claimed_at:
 maturity_target: CPUContracted
+contract_schema: 1
+contracts: [repo.source-documentation, geometry.element-domain-sources, method.engine-integration]
 ---
 # METHOD-032 — Octree parity normal orientation reference backend
 
@@ -76,6 +78,29 @@ maturity_target: CPUContracted
 - Backend axis: deterministic `cpu_reference` only after the killing gate
   passes. MST is a comparison baseline, not canonical truth. No optimized CPU,
   GPU, runtime, or UI backend is owed.
+
+## Engine integration
+
+| Field | Disposition |
+| --- | --- |
+| Least-structured input | Finite paired point-position and precomputed unoriented-normal spans on any compatible element domain; closed-sampling assumptions remain explicit. |
+| Compatible entity sources | Every canonical property/topology source satisfying the input above; binding is owned by METHOD-003A after reference acceptance and selection. |
+| RuntimeModule | Deferred to [METHOD-003A](METHOD-003A-spatial-query-reference-integration-intake.md), which allocates the concrete operation owner without widening this reference slice. |
+| Config/agent | Typed reference parameters now; METHOD-003A owns validated serializable engine controls at adoption. |
+| UI | METHOD-003A owns adoption/discovery planning; no editor-integrated claim from this CPU slice. |
+| Publication | Return same-cardinality oriented float normals and confidence/diagnostics, preserving positions, supplied normals and unrelated properties unless explicitly published. METHOD-003A owns engine publication planning. |
+| End-to-end tests | Reference/oracle and method tests here; METHOD-003A allocates compatible-source/config/publication/UI coverage at adoption. |
+
+## Spatial acceleration consideration
+
+Spacing and local sample-neighborhood queries are possible shared-index consumers
+through the available kNN/self-exclusion API (GPU k=1..64), after adapter parity. Retain the actual corner-sharing octree
+lattice, clipped tangent patches and parity connectivity; the point LBVH
+represents none of them. Keep supplied normals and the CPU killing/reference gates
+unchanged; spatial acceleration cannot repair an invalid watertight-barrier
+assumption.
+
+See the [shared spatial-index consumer inventory](../../../docs/architecture/spatial-index-consumers.md).
 
 ## Required changes
 

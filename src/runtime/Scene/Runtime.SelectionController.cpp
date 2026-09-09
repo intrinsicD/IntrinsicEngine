@@ -118,6 +118,7 @@ namespace Extrinsic::Runtime
             .PixelY = pixelY,
             .Kind   = SelectionPickKind::Click,
             .Mode   = mode,
+            .Target = m_Config.Interaction.Target,
         };
     }
 
@@ -297,7 +298,8 @@ namespace Extrinsic::Runtime
     bool SelectionController::ApplyHitReadback(
         Registry& registry,
         const std::uint32_t stableEntityId,
-        const std::optional<std::uint64_t> pickSequence)
+        const std::optional<std::uint64_t> pickSequence,
+        const std::optional<PrimitiveSelectionHit> primitive)
     {
         const std::optional<PendingSelectionPick> pick =
             TakeInFlightPick(pickSequence);
@@ -321,8 +323,19 @@ namespace Extrinsic::Runtime
 
         if (pick->Kind == SelectionPickKind::Hover)
             ApplyHover(registry, entity);
-        else
+        else if (pick->Target == SelectionTarget::Entity)
             ApplyClickSelection(registry, entity, pick->Mode);
+        else if (primitive && primitive->Domain == ResolveSelectionTargetDomain(
+                     BuildGeometryAvailability(registry.Raw(), entity), pick->Target))
+        {
+            const auto edit = pick->Mode == SelectionPickMode::Add ? PrimitiveSelectionEdit::Add
+                : pick->Mode == SelectionPickMode::Toggle ? PrimitiveSelectionEdit::Toggle
+                : PrimitiveSelectionEdit::Replace;
+            const auto result = EditPrimitives(registry, stableEntityId, primitive->Domain,
+                                               edit, std::span{&primitive->Index, 1u});
+            if (result.Usable())
+                ApplyClickSelection(registry, entity, SelectionPickMode::Replace);
+        }
         return true;
     }
 
@@ -347,7 +360,12 @@ namespace Extrinsic::Runtime
 
         if (pick->Mode == SelectionPickMode::Replace &&
             m_Config.ClearSelectionOnBackgroundClick)
-            SetSelectionSet(registry, {});
+        {
+            if (pick->Target == SelectionTarget::Entity)
+                ClearSelection(registry);
+            else
+                ClearPrimitives();
+        }
         return true;
     }
 
@@ -358,6 +376,13 @@ namespace Extrinsic::Runtime
     {
         return ApplyHitReadback(
             registry, stableEntityId, pickSequence);
+    }
+
+    bool SelectionController::ConsumeHit(Registry& registry, std::uint32_t stableEntityId,
+                                         std::uint64_t sequence,
+                                         std::optional<PrimitiveSelectionHit> primitive)
+    {
+        return ApplyHitReadback(registry, stableEntityId, sequence, primitive);
     }
 
     void SelectionController::ConsumeHit(Registry& registry, std::uint32_t stableEntityId)
@@ -400,11 +425,13 @@ namespace Extrinsic::Runtime
 
     void SelectionController::ClearSelection(Registry& registry)
     {
+        ClearPrimitives();
         SetSelectionSet(registry, {});
     }
 
     void SelectionController::ClearSceneState(Registry& registry)
     {
+        ClearPrimitives();
         SetSelectionSet(registry, {});
         ClearHover(registry);
         m_PendingPick.reset();

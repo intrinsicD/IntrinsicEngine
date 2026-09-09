@@ -1,0 +1,39 @@
+ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
+Host display access enabled. This file retains the final 36 lines of the full output.
+
+          Start 4411: RuntimeSandboxAcceptance.PrimitiveRefinementResolvesOneDomainPerFamily
+4344/4349 Test #4411: RuntimeSandboxAcceptance.PrimitiveRefinementResolvesOneDomainPerFamily ..........................................   Passed    0.04 sec
+          Start 4412: RuntimeSandboxAcceptance.SelectionOutlineSnapshotPopulatedForSelectedEntity
+4345/4349 Test #4412: RuntimeSandboxAcceptance.SelectionOutlineSnapshotPopulatedForSelectedEntity .....................................   Passed    0.04 sec
+          Start 4413: RuntimeSandboxAcceptance.ViewportLeftClickSubmitsSelectionPick
+4346/4349 Test #4413: RuntimeSandboxAcceptance.ViewportLeftClickSubmitsSelectionPick ..................................................   Passed    0.04 sec
+          Start 4414: RuntimeSandboxAcceptance.IdleFrameSkipsPreRenderTransformFlush
+4347/4349 Test #4414: RuntimeSandboxAcceptance.IdleFrameSkipsPreRenderTransformFlush ..................................................   Passed    0.04 sec
+          Start 4415: RuntimeSandboxAcceptance.InspectorTransformEditFlushedToRenderStateSameFrame
+4348/4349 Test #4415: RuntimeSandboxAcceptance.InspectorTransformEditFlushedToRenderStateSameFrame ....................................   Passed    0.04 sec
+          Start 4416: GlfwLifecycleLsan.EngineStaticTeardownAndLeakControl
+4349/4349 Test #4416: GlfwLifecycleLsan.EngineStaticTeardownAndLeakControl ............................................................***Skipped   0.01 sec
+
+100% tests passed, 0 tests failed out of 4349
+
+Label Time Summary:
+assets         =   0.22 sec*proc (90 tests)
+benchmark      =   0.48 sec*proc (1 test)
+contract       =  40.24 sec*proc (1558 tests)
+core           =   4.21 sec*proc (292 tests)
+ecs            =   0.40 sec*proc (133 tests)
+geometry       =  58.10 sec*proc (1822 tests)
+glfw           =   0.01 sec*proc (1 test)
+graphics       =  16.71 sec*proc (852 tests)
+headless       =   0.01 sec*proc (4 tests)
+integration    =   8.28 sec*proc (267 tests)
+physics        =   0.20 sec*proc (80 tests)
+platform       =   0.02 sec*proc (5 tests)
+regression     =   0.49 sec*proc (2 tests)
+runtime        =  33.61 sec*proc (1139 tests)
+unit           =  62.71 sec*proc (2526 tests)
+
+Total Test time (real) = 108.35 sec
+
+The following tests did not run:
+	4416 - GlfwLifecycleLsan.EngineStaticTeardownAndLeakControl (Skipped)

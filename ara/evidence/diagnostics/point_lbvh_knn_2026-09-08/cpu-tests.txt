@@ -1,0 +1,46 @@
+          Start  637: SpatialIndexCache.ReusesOnlyUnchangedPropertyAndLiveElementIdentity
+ 629/4352 Test  #637: SpatialIndexCache.ReusesOnlyUnchangedPropertyAndLiveElementIdentity .............................................   Passed    0.00 sec
+          Start  638: SpatialIndexCache.CanonicalDomainsAndWorldEntityIdentity
+ 630/4352 Test  #638: SpatialIndexCache.CanonicalDomainsAndWorldEntityIdentity ........................................................   Passed    0.01 sec
+          Start 1539: PointLBVH.EmptySingletonCoincidentAndInvalidInputs
+1525/4352 Test #1539: PointLBVH.EmptySingletonCoincidentAndInvalidInputs ..............................................................   Passed    0.01 sec
+          Start 1540: PointLBVH.TreeQueriesMatchIndependentExhaustiveOracle
+1526/4352 Test #1540: PointLBVH.TreeQueriesMatchIndependentExhaustiveOracle ...........................................................   Passed    0.07 sec
+          Start 1541: PointLBVH.KNearestExcludesIdentityAndKeepsCoincidentPeers
+1527/4352 Test #1541: PointLBVH.KNearestExcludesIdentityAndKeepsCoincidentPeers .......................................................   Passed    0.00 sec
+          Start 1542: PointLBVH.KNearestTreeMatchesExhaustiveSortedOracle
+1528/4352 Test #1542: PointLBVH.KNearestTreeMatchesExhaustiveSortedOracle .............................................................   Passed    0.16 sec
+          Start 1543: PointLBVH.SuppliedNormalIndexPreservesReferenceNeighborhoodPolicy
+1529/4352 Test #1543: PointLBVH.SuppliedNormalIndexPreservesReferenceNeighborhoodPolicy ...............................................   Passed    0.02 sec
+          Start 4416: RuntimeSandboxAcceptance.ViewportLeftClickSubmitsSelectionPick
+4349/4352 Test #4416: RuntimeSandboxAcceptance.ViewportLeftClickSubmitsSelectionPick ..................................................   Passed    0.04 sec
+          Start 4417: RuntimeSandboxAcceptance.IdleFrameSkipsPreRenderTransformFlush
+4350/4352 Test #4417: RuntimeSandboxAcceptance.IdleFrameSkipsPreRenderTransformFlush ..................................................   Passed    0.04 sec
+          Start 4418: RuntimeSandboxAcceptance.InspectorTransformEditFlushedToRenderStateSameFrame
+4351/4352 Test #4418: RuntimeSandboxAcceptance.InspectorTransformEditFlushedToRenderStateSameFrame ....................................   Passed    0.04 sec
+          Start 4419: GlfwLifecycleLsan.EngineStaticTeardownAndLeakControl
+4352/4352 Test #4419: GlfwLifecycleLsan.EngineStaticTeardownAndLeakControl ............................................................***Skipped   0.01 sec
+
+100% tests passed, 0 tests failed out of 4352
+
+Label Time Summary:
+assets         =   0.15 sec*proc (90 tests)
+benchmark      =   0.49 sec*proc (1 test)
+contract       =  38.74 sec*proc (1558 tests)
+core           =   4.16 sec*proc (292 tests)
+ecs            =   0.48 sec*proc (133 tests)
+geometry       =  58.97 sec*proc (1825 tests)
+glfw           =   0.01 sec*proc (1 test)
+graphics       =  16.44 sec*proc (852 tests)
+headless       =   0.01 sec*proc (4 tests)
+integration    =   8.13 sec*proc (267 tests)
+physics        =   0.19 sec*proc (80 tests)
+platform       =   0.02 sec*proc (5 tests)
+regression     =   0.50 sec*proc (2 tests)
+runtime        =  32.26 sec*proc (1139 tests)
+unit           =  63.55 sec*proc (2529 tests)
+
+Total Test time (real) = 107.53 sec
+
+The following tests did not run:
+	4419 - GlfwLifecycleLsan.EngineStaticTeardownAndLeakControl (Skipped)

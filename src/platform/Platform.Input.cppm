@@ -1,3 +1,4 @@
+// Stores polled keyboard, mouse, and cursor state independently of the window backend.
 module;
 
 #include <array>
@@ -23,6 +24,8 @@ export namespace Extrinsic::Platform::Input {
         constexpr int Escape = 256;
         constexpr int LeftShift = 340;
         constexpr int LeftControl = 341;
+        constexpr int RightShift = 344;
+        constexpr int RightControl = 345;
     }
 
     class Context {

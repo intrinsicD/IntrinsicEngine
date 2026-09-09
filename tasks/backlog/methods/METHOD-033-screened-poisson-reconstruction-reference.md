@@ -54,6 +54,17 @@ contracts: [geometry.element-domain-sources, method.engine-integration]
 | Publication | Return a new float-position mesh. Never overwrite the richer source entity/property domains; explicit runtime ownership and history are deferred to METHOD-033A. |
 | End-to-end tests | CPU quality/failure tests and METHOD-034 intermediate-input compatibility here; METHOD-033A owns planning and task allocation for engine publication/control-surface tests. |
 
+## Spatial acceleration consideration
+
+Consider reusable point-radius queries for splatting only when the frozen
+formulation actually searches points around grid samples. Direct grid-stencil
+deposition needs no tree. Preserve complete support and weights; GPU radius output
+is currently bounded to 1024 hits. Keep the uniform-grid CPU solve/reference and
+shared METHOD-034 intermediate-input contract; METHOD-033A owns any runtime cache
+adaptation.
+
+See the [shared spatial-index consumer inventory](../../../docs/architecture/spatial-index-consumers.md).
+
 ## Required changes
 - [ ] Before implementation, review both original reconstruction papers and
       the iPSR paper plus relevant follow-ups. Freeze shared input validity,

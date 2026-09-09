@@ -2177,7 +2177,7 @@ TEST(SandboxEditorUi, RegistrationRequestQueuesDerivedJobAndPublishesOnApply)
     Runtime::EditorJobQueueSnapshot queued =
         jobs.Snapshot();
     ASSERT_EQ(queued.Entries.size(), 1u);
-    EXPECT_EQ(queued.Entries[0].Name, "Sandbox.RegistrationICP.CPU");
+    EXPECT_EQ(queued.Entries[0].Name, "Sandbox.RegistrationICP");
     // `JobService` dispatches at submit, so the pre-drain state races
     // between Queued/Running/AwaitingGate; assert only that it is active.
     EXPECT_TRUE(
@@ -2861,7 +2861,7 @@ TEST(SandboxEditorUi, RegistrationCommandFailsClosedForInvalidSelectionAndParame
                 .TargetStableEntityId = meshId,
             })
             .Status,
-        Runtime::EditorCommandStatus::UnsupportedGeometryDomain);
+        Runtime::EditorCommandStatus::Applied);
 }
 TEST(SandboxEditorUi, RegistrationCommandAlignsAcrossEntityTransforms)
 {

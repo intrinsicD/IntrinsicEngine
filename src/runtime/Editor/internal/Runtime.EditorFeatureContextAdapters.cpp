@@ -68,6 +68,7 @@ MakeEditorGeometryProcessingContext(const EditorFeatureBindings &bindings) {
       .Selection = bindings.Selection,
       .CommandHistory = bindings.CommandHistory,
       .Device = bindings.Device,
+      .SpatialIndices = bindings.SpatialIndices,
       .Clustering = bindings.Clustering,
       .PointCloudConsolidation = bindings.PointCloudConsolidation,
       .ParameterizationUvViewCommands = bindings.ParameterizationUvViewCommands,
@@ -91,6 +92,7 @@ MakeEditorGeometryProcessingContext(const EditorFeatureBindings &bindings) {
       .LastParameterizationResult = bindings.LastParameterizationResult,
       .LastProgressivePoissonResult = bindings.LastProgressivePoissonResult,
       .LastRegistrationResult = bindings.LastRegistrationResult,
+      .LastNormalEstimationResult = bindings.LastNormalEstimationResult,
       .EngineConfigControlState = bindings.EngineConfigControlState,
       .PreviewEngineConfigDocument = bindings.PreviewEngineConfigDocument,
       .ApplyEngineConfigHotSubset = bindings.ApplyEngineConfigHotSubset,
@@ -228,6 +230,7 @@ ToEditorFeatureBindingsImpl(const EditorGeometryProcessingContext &context) {
       .Selection = context.Selection,
       .CommandHistory = context.CommandHistory,
       .Device = context.Device,
+      .SpatialIndices = context.SpatialIndices,
       .Clustering = context.Clustering,
       .PointCloudConsolidation = context.PointCloudConsolidation,
       .ParameterizationUvViewCommands = context.ParameterizationUvViewCommands,
@@ -251,6 +254,7 @@ ToEditorFeatureBindingsImpl(const EditorGeometryProcessingContext &context) {
       .LastParameterizationResult = context.LastParameterizationResult,
       .LastProgressivePoissonResult = context.LastProgressivePoissonResult,
       .LastRegistrationResult = context.LastRegistrationResult,
+      .LastNormalEstimationResult = context.LastNormalEstimationResult,
       .EngineConfigControlState = context.EngineConfigControlState,
       .AttachmentActive = context.AttachmentActive,
       .InvalidateWorkspaceSnapshotCache =
@@ -360,6 +364,7 @@ ToEditorFeatureBindingsImpl(const EditorWorkspaceSnapshotContext &context) {
       ToEditorFeatureBindingsImpl(context.RenderRecipe);
 
   bindings.Device = geometry.Device;
+  bindings.SpatialIndices = geometry.SpatialIndices;
   bindings.Clustering = geometry.Clustering;
   bindings.PointCloudConsolidation = geometry.PointCloudConsolidation;
   bindings.ParameterizationUvViewCommands =
@@ -384,6 +389,7 @@ ToEditorFeatureBindingsImpl(const EditorWorkspaceSnapshotContext &context) {
   bindings.LastParameterizationResult = geometry.LastParameterizationResult;
   bindings.LastProgressivePoissonResult = geometry.LastProgressivePoissonResult;
   bindings.LastRegistrationResult = geometry.LastRegistrationResult;
+  bindings.LastNormalEstimationResult = geometry.LastNormalEstimationResult;
   bindings.MeshDenoiseKernelAvailable = geometry.MeshDenoiseKernelAvailable;
   bindings.MeshCurvatureKernelAvailable = geometry.MeshCurvatureKernelAvailable;
   bindings.MeshCurvatureDirectionsAvailable =

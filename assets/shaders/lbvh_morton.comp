@@ -1,0 +1,19 @@
+#version 460
+#extension GL_GOOGLE_include_directive : require
+#include "include/point_lbvh_build.glsl"
+uint spread(uint x)
+{
+    x=(x|(x<<16u))&0x030000ffu;x=(x|(x<<8u))&0x0300f00fu;
+    x=(x|(x<<4u))&0x030c30c3u;return (x|(x<<2u))&0x09249249u;
+}
+void main()
+{
+    uint i=gl_GlobalInvocationID.x;if(i>=pc.padded)return;
+    LbvhKeys keys=LbvhKeys(pc.keys);
+    if(i>=pc.count){keys.v[i]=uvec2(LBVH_INVALID);return;}
+    LbvhBounds b=LbvhBounds(pc.bounds);
+    vec3 p=lbvhPoint(pc.points,pc.stride,i);uvec3 q=uvec3(0);
+    if(b.invalid==0)
+        for(int a=0;a<3;++a) if(b.hi[a]>b.lo[a]) q[a]=uint(clamp((p[a]-b.lo[a])/(b.hi[a]-b.lo[a])*1024.,0.,1023.));
+    keys.v[i]=uvec2((spread(q.x)<<2u)|(spread(q.y)<<1u)|spread(q.z),i);
+}

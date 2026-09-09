@@ -2,6 +2,15 @@
 id: METHOD-028
 theme: I
 depends_on: [REVIEW-003, METHOD-004]
+workflow_schema: 1
+workflow_profile: standard
+evidence: required
+owner:
+branch:
+worktree:
+claimed_at:
+contract_schema: 1
+contracts: [repo.source-documentation, geometry.element-domain-sources, method.engine-integration]
 ---
 # METHOD-028 — Confidence-driven spatial guiding for Walk on Stars
 
@@ -67,6 +76,28 @@ depends_on: [REVIEW-003, METHOD-004]
 
 - Backend axis: deterministic `cpu_reference` only; neural and GPU variants
   are explicitly excluded.
+
+## Engine integration
+
+| Field | Disposition |
+| --- | --- |
+| Least-structured input | METHOD-004 boundary/query data plus method-local guide statistics, seeded sampling and guide policy. |
+| Compatible entity sources | Every canonical property/topology source satisfying the input above; binding is owned by METHOD-003A after reference acceptance and selection. |
+| RuntimeModule | Deferred to [METHOD-003A](METHOD-003A-spatial-query-reference-integration-intake.md), which allocates the concrete operation owner without widening this reference slice. |
+| Config/agent | Typed reference parameters now; METHOD-003A owns validated serializable engine controls at adoption. |
+| UI | METHOD-003A owns adoption/discovery planning; no editor-integrated claim from this CPU slice. |
+| Publication | Return PDE estimates and guide diagnostics without mutating boundary geometry; guide storage stays method-local. METHOD-003A owns engine publication planning. |
+| End-to-end tests | Reference/oracle and method tests here; METHOD-003A allocates compatible-source/config/publication/UI coverage at adoption. |
+
+## Spatial acceleration consideration
+
+Reuse METHOD-004's boundary-query acceleration separately from the method-local
+guide-cell partition. A guide cell carries a sampling distribution and uncertainty
+statistics, so replacing it by a nearest-point LBVH changes the estimator.
+Primitive LBVH traversal remains a possible later oracle implementation once exact
+boundary queries exist; no GPU or partition-framework work is added here.
+
+See the [shared spatial-index consumer inventory](../../../docs/architecture/spatial-index-consumers.md).
 
 ## Required changes
 

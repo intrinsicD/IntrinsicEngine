@@ -56,6 +56,16 @@ eligibility boundary.
 | UI | |
 | Publication | |
 | End-to-end tests | |
+
+For methods with spatial searches, record a spatial acceleration consideration
+beside this matrix: query/metric/membership, canonical source property or
+primitive, shared cache versus private workspace/existing index, invalidation,
+overflow and missing capabilities. Consult
+docs/architecture/spatial-index-consumers.md and
+docs/agent/method-workflow.md#spatial-acceleration-review; retain CPU-reference
+semantics and name a follow-up for deferred integration. Do not add a runtime
+dependency to a lower-layer kernel or assume a point tree supplies kNN/ray/
+triangle queries.
 -->
 
 ## Required changes

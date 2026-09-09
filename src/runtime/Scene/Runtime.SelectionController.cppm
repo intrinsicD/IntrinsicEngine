@@ -1,3 +1,4 @@
+// Ordered entity and primitive selection shared by viewport input, editor commands, and methods.
 module;
 
 #include <cstddef>
@@ -6,15 +7,67 @@ module;
 #include <optional>
 #include <span>
 #include <vector>
+#include <string>
+#include <string_view>
 
 export module Extrinsic.Runtime.SelectionController;
 
 import Extrinsic.ECS.Scene.Handle;
 import Extrinsic.ECS.Scene.Registry;
 import Extrinsic.Runtime.StableEntityLookup;
+export import Extrinsic.Runtime.GeometryAvailability;
+import Extrinsic.Core.Config.Engine;
+import Extrinsic.Core.Config.EngineLoad;
 
 export namespace Extrinsic::Runtime
 {
+    enum class SelectionTarget : std::uint8_t { Entity, Vertex, Edge, Face };
+
+    struct SelectionInteractionConfig
+    {
+        SelectionTarget Target{SelectionTarget::Entity};
+        bool Highlight{true};
+        // World-space radius of vertex/point markers.
+        float PointRadius{0.01f};
+    };
+    inline constexpr std::string_view kSelectionConfigSectionName = "runtime.selection";
+    [[nodiscard]] std::string SerializeSelectionInteractionConfig(const SelectionInteractionConfig& config);
+    [[nodiscard]] Core::Config::EngineConfigSectionValidationResult ValidateSelectionConfigSection(
+        std::string_view payload, std::string_view reference, std::string_view subject);
+    [[nodiscard]] std::optional<SelectionInteractionConfig> GetSelectionInteractionConfig(
+        const Core::Config::EngineConfig& config);
+    void SetSelectionInteractionConfig(Core::Config::EngineConfig& config,
+                                       const SelectionInteractionConfig& value);
+    [[nodiscard]] Core::Config::EngineConfigSectionRegistration MakeSelectionConfigSectionRegistration();
+
+    enum class PrimitiveSelectionStatus : std::uint8_t
+    { Ready, Empty, Unavailable, UnsupportedDomain, StaleTopology, InvalidIndex };
+    enum class PrimitiveSelectionEdit : std::uint8_t
+    { Replace, Add, Toggle, Remove, Clear, All, Invert };
+    struct PrimitiveSelectionSnapshot
+    {
+        std::uint32_t EntityId{0};
+        GeometryElementDomain Domain{GeometryElementDomain::Unknown};
+        PrimitiveSelectionStatus Status{PrimitiveSelectionStatus::Unavailable};
+        // Unique, in selection order. Removing and re-adding moves an index to the end.
+        std::vector<std::uint32_t> Indices{};
+        std::size_t ElementCount{0};
+        std::string Message{};
+        [[nodiscard]] bool Usable() const noexcept
+        { return Status == PrimitiveSelectionStatus::Ready || Status == PrimitiveSelectionStatus::Empty; }
+    };
+    struct PrimitiveSelectionHit
+    {
+        GeometryElementDomain Domain{GeometryElementDomain::Unknown};
+        std::uint32_t Index{0};
+    };
+    // Revision tokens for topology, deletion masks and cardinality; position/attribute
+    // edits preserve selection. Issuing-frame tokens also reject delayed topology picks.
+    [[nodiscard]] std::vector<std::uint64_t> BuildSelectionTopologyStamp(
+        const ECS::Scene::Registry& scene, std::uint32_t entityId);
+    [[nodiscard]] GeometryElementDomain ResolveSelectionTargetDomain(
+        const GeometryEntityAvailability& availability, SelectionTarget target) noexcept;
+
     // How a resolved *click* pick combines with the existing selection set.
     enum class SelectionPickMode : std::uint8_t
     {
@@ -55,6 +108,7 @@ export namespace Extrinsic::Runtime
         std::uint32_t     PixelY   = 0u;
         SelectionPickKind Kind     = SelectionPickKind::Click;
         SelectionPickMode Mode     = SelectionPickMode::Replace;
+        SelectionTarget Target = SelectionTarget::Entity;
     };
 
     // Default sandbox selection policy knobs (RUNTIME-089 required policy:
@@ -65,6 +119,7 @@ export namespace Extrinsic::Runtime
         // Combination mode applied to a click pick when no per-request modifier
         // is supplied. The sandbox default is single-select.
         SelectionPickMode ClickMode = SelectionPickMode::Replace;
+        SelectionInteractionConfig Interaction{};
         // Clear the whole selection when a Replace-mode click resolves to the
         // background (no hit). Add / Toggle background clicks never clear.
         bool ClearSelectionOnBackgroundClick = true;
@@ -99,23 +154,10 @@ export namespace Extrinsic::Runtime
         std::uint32_t UntrackedReadbacks        = 0u; // readbacks with no matching in-flight pick
     };
 
-    // Runtime / editor-owned selection controller (RUNTIME-089, Slice A).
-    //
-    // The controller is the authority for selected / hovered state. Input ports
-    // submit hover / click picks; the controller coalesces them into one
-    // pending pixel pick per frame (click supersedes hover, latest position
-    // wins). Slice B drains the pending pick into the renderer / SelectionSystem
-    // before extraction, then feeds the readback result back through
-    // `ConsumeHit` / `ConsumeNoHit`. The controller resolves the runtime stable
-    // entity id to a live `entt::entity`, rejects stale / non-selectable hits,
-    // mutates ECS `SelectedTag` / `HoveredTag` per the documented policy, and
-    // maintains the `RenderWorld.Selection` snapshot buffers that Slice B copies
-    // into the render world without graphics ever reading live ECS.
-    //
-    // Layering: this module imports only the promoted ECS registry / handle and
-    // selection components; it never imports graphics, platform input, or the
-    // renderer. The renderer / SelectionSystem bridge lives in Slice B
-    // (`Engine::RunFrame`), keeping graphics reporting-only.
+    // Active-world authority for entity tags and ordered primitive sets. The
+    // interaction module supplies correlated readbacks; methods consume copied,
+    // domain-qualified indices. No graphics or input device owns mutable selection.
+    // ClearSceneState must run before replacing the bound registry.
     class SelectionController
     {
     public:
@@ -149,7 +191,18 @@ export namespace Extrinsic::Runtime
         // whether correlation succeeded so refinement can use the same guard.
         bool ConsumeHit(Registry& registry, std::uint32_t stableEntityId,
                         std::uint64_t pickSequence);
+        bool ConsumeHit(Registry& registry, std::uint32_t stableEntityId,
+                        std::uint64_t pickSequence, std::optional<PrimitiveSelectionHit> primitive);
         bool ConsumeNoHit(Registry& registry, std::uint64_t pickSequence);
+        [[nodiscard]] PrimitiveSelectionSnapshot ReadPrimitives(
+            const Registry& registry, std::uint32_t entityId, GeometryElementDomain domain) const;
+        [[nodiscard]] PrimitiveSelectionSnapshot EditPrimitives(
+            Registry& registry, std::uint32_t entityId, GeometryElementDomain domain,
+            PrimitiveSelectionEdit edit, std::span<const std::uint32_t> indices = {});
+        void ClearPrimitives() noexcept;
+        void PrunePrimitives(const Registry& registry);
+        [[nodiscard]] std::vector<PrimitiveSelectionSnapshot> PrimitiveSnapshots(const Registry& registry) const;
+
         // Release one tracked request without applying a hit/miss mutation.
         bool DiscardInFlightPick(std::uint64_t pickSequence) noexcept;
         // Convenience overloads for callers with at most one pick outstanding (or
@@ -230,7 +283,8 @@ export namespace Extrinsic::Runtime
         [[nodiscard]] std::optional<PendingSelectionPick> TakeInFlightPick(
             std::optional<std::uint64_t> pickSequence) noexcept;
         bool ApplyHitReadback(Registry& registry, std::uint32_t stableEntityId,
-                              std::optional<std::uint64_t> pickSequence);
+                              std::optional<std::uint64_t> pickSequence,
+                              std::optional<PrimitiveSelectionHit> primitive = std::nullopt);
         bool ApplyNoHitReadback(Registry& registry,
                                 std::optional<std::uint64_t> pickSequence);
         // Resolve an incoming render/extraction stable id to a live entity
@@ -240,6 +294,14 @@ export namespace Extrinsic::Runtime
         [[nodiscard]] EntityHandle ResolveStableEntityId(Registry& registry,
                                                          std::uint32_t stableEntityId);
 
+        struct PrimitiveRecord
+        {
+            std::uint32_t EntityId;
+            GeometryElementDomain Domain;
+            std::vector<std::uint64_t> TopologyStamp;
+            std::vector<std::uint32_t> Indices;
+        };
+        std::vector<PrimitiveRecord> m_Primitives{};
         SelectionControllerConfig      m_Config{};
         SelectionControllerDiagnostics m_Diagnostics{};
 

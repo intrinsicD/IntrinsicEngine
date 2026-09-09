@@ -5,10 +5,10 @@ depends_on: [BUG-096, HARDEN-087]
 workflow_schema: 1
 workflow_profile: high-risk
 evidence: required
-owner:
-branch:
-worktree:
-claimed_at:
+owner: codex-interactive
+branch: main
+worktree: /home/alex/Documents/IntrinsicEngine
+claimed_at: "2026-09-08T14:06:03.847080+00:00"
 contract_schema: 1
 contracts: [geometry.element-domain-sources, method.engine-integration]
 maturity_target: Operational
@@ -54,48 +54,59 @@ maturity_target: Operational
 | Publication | Apply the solved transform to the source entity only; geometry sources and target transform remain unchanged. |
 | End-to-end tests | Parameterized cross-provenance and non-vertex property cases, normal readiness, async staleness, transform history, config round-trip, and UI discovery. |
 
+## Spatial acceleration consideration
+
+Consider sharing the unchanged target-property index across ICP iterations and
+requests. Point-LBVH nearest queries fit correspondence search, but the current
+kernel owns a KD-tree; record a scoped adapter decision without widening this
+property-integration task into a kernel/GPU rewrite. Preserve target-
+normal/source-slot mapping and the world/local distance metric, especially under
+nonuniform scale.
+
+See the [shared spatial-index consumer inventory](../../docs/architecture/spatial-index-consumers.md).
+
 ## Required changes
 
-- [ ] Carry canonical `GeometryPropertyRef` identities for both operands and
+- [x] Carry canonical `GeometryPropertyRef` identities for both operands and
       resolve them through the property catalog; retain each element domain in
       diagnostics/job identity without requiring matching provenance or a
       `VertexProperty` wrapper.
-- [ ] Keep world-space transform handling and generation validation for all
+- [x] Keep world-space transform handling and generation validation for all
       source pairs; point-to-plane readiness uses the corrected target-normal
       contract from `BUG-096`.
-- [ ] Add a right-sized serializable ICP config section with side-effect-free
+- [x] Add a right-sized serializable ICP config section with side-effect-free
       preview/validate then apply, and make runtime command creation consume the
       resolved config used by agents and UI.
-- [ ] Preserve the existing typed job and command-history owner; publish only
+- [x] Preserve the existing typed job and command-history owner; publish only
       one undoable source-transform mutation and no geometry replacement.
-- [ ] Expose copied availability/disabled-reason data for `UI-040`, including
+- [x] Expose copied availability/disabled-reason data for `UI-040`, including
       missing positions, normals, transform, stale entity, and same-entity
       rejection.
 
 ## Tests
 
-- [ ] Parameterize registration contracts over all provenance pairs and every
+- [x] Parameterize registration contracts over all provenance pairs and every
       physical property-domain family, including mesh face centers, and verify
       the named finite spans reach the same kernel.
-- [ ] Cover point-to-plane normal requirements independently of provenance and
+- [x] Cover point-to-plane normal requirements independently of provenance and
       preserve `BUG-096` regressions.
-- [ ] Verify only the source transform changes and undo/redo round-trips it for
+- [x] Verify only the source transform changes and undo/redo round-trips it for
       mesh, graph, and point-cloud sources.
-- [ ] Add config serialization/preview/apply parity plus stale async result
+- [x] Add config serialization/preview/apply parity plus stale async result
       rejection across mixed-domain pairs.
 
 ## Docs
 
-- [ ] Update runtime/config docs and the ICP literature/limitations note with
+- [x] Update runtime/config docs and the ICP literature/limitations note with
       the element-source matrix and transform-only publication policy.
 
 ## Acceptance criteria
 
-- [ ] Any two live entities with valid required typed properties can be
+- [x] Any two live entities with valid required typed properties can be
       registered, regardless of property domain or mesh/graph/point-cloud
       provenance.
-- [ ] Config, agent, UI, and direct commands share validation and diagnostics.
-- [ ] No registration path converts or mutates geometry topology.
+- [x] Config, agent, UI, and direct commands share validation and diagnostics.
+- [x] No registration path converts or mutates geometry topology.
 
 ## Verification
 
@@ -112,3 +123,27 @@ python3 tools/agents/validate_tasks.py --root tasks --strict
 - No exact provenance gate, mesh/graph conversion, target mutation, UI-owned
   registration state, or second registration service.
 - No point-to-plane fallback that silently substitutes source normals.
+
+## Interactive implementation note — 2026-09-08
+
+The operator accepted the combined canonical ICP workflow and shared-index
+integration proposal. This explicitly adds cached CPU LBVH and framed Vulkan
+correspondence queries to the original binding/UI scope. The CPU KD-tree default
+and existing CPU solve remain. No GICP, Trimmed ICP overlap estimator, Anderson
+acceleration, kNN or triangle query method is included. Implementation acceptance
+is verified in the shared working tree. These notes remain active pending
+review/commit. The design is documented in
+[registration](../../docs/architecture/registration.md).
+
+## Verification record — 2026-09-08
+
+- CPU cohort: 4,349 selected; 4,348 passed with host display access, no
+  failures, and one expected unsanitized LeakSanitizer-control skip.
+- Two Vulkan/ASan/UBSan readback tests passed, including framed point-to-point
+  and point-to-plane registration with same-variant CPU references.
+- CPU and runtime GPU comparison output is schema-v2 validated, dirty-source,
+  and non-claim-eligible. The default remains CPU KD-tree.
+- Canonical 8-by-8 domain pairs, live-row mapping, normal preflight, stale
+  binding/deletion rejection, source-only undo/redo, config preview/apply/run,
+  and one shared window behind the domain menu entries are covered.
+- [Review and limitations](../../docs/reviews/2026-09-08-icp-spatial-integration.md).

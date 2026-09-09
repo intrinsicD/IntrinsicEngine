@@ -38,6 +38,7 @@ namespace Geometry::PointCloud::Normals
             NeighborhoodBackend Backend{NeighborhoodBackend::KDTree};
             const KDTree* KdTree{nullptr};
             const Octree* OctreeIndex{nullptr};
+            const PointLBVH::Index* LbvhIndex{nullptr};
             KDTree OwnedKdTree{};
             std::vector<glm::vec3> CompactPoints{};
             std::vector<std::size_t> CompactToOriginal{};
@@ -499,6 +500,31 @@ namespace Geometry::PointCloud::Normals
                                                 result,
                                                 neighbors);
                 }
+                else if (context.Backend == NeighborhoodBackend::SuppliedPointLBVH)
+                {
+                    neighbors.clear();
+                    queryOk = context.LbvhIndex != nullptr;
+                    if (queryOk && params.UseRadiusSearch)
+                    {
+                        queryOk = std::isfinite(params.Radius) && params.Radius > 0.f &&
+                                  params.Radius <= PointLBVH::CoordinateLimit;
+                        if (queryOk)
+                        {
+                            // Full membership is required for radius PCA; never truncate support.
+                            const auto hits = context.LbvhIndex->Radius(points[index], params.Radius,
+                                                                       std::uint32_t(points.size()));
+                            for (const auto& hit : hits.Neighbors) neighbors.push_back(hit.Index);
+                        }
+                    }
+                    else if (queryOk)
+                    {
+                        // Retain the reference's k+1 then identity-filter policy even on ties.
+                        const auto count = std::min(EffectiveNeighborTarget(params), points.size()) + 1;
+                        for (const auto& hit : context.LbvhIndex->KNearest(points[index], std::uint32_t(count)))
+                            neighbors.push_back(hit.Index);
+                    }
+                    if (!queryOk) ++result.Diagnostics.SpatialQueryFailureCount;
+                }
                 else
                 {
                     queryOk = context.OctreeIndex != nullptr
@@ -710,6 +736,8 @@ namespace Geometry::PointCloud::Normals
             return "SuppliedKDTree";
         case NeighborhoodBackend::SuppliedOctree:
             return "SuppliedOctree";
+        case NeighborhoodBackend::SuppliedPointLBVH:
+            return "SuppliedPointLBVH";
         }
 
         return "Unknown";
@@ -773,6 +801,19 @@ namespace Geometry::PointCloud::Normals
                                            const Params& params)
     {
         return ToOptional(ComputeWithOctree(points, ConstProperty<bool>{}, index, params));
+    }
+
+    std::optional<EstimateResult> Estimate(std::span<const glm::vec3> points,
+                                           const PointLBVH::Index& index,
+                                           const Params& params)
+    {
+        if (points.size() != index.Points().size() ||
+            !std::equal(points.begin(), points.end(), index.Points().begin()))
+            return std::nullopt;
+        QueryContext context{};
+        context.Backend = NeighborhoodBackend::SuppliedPointLBVH;
+        context.LbvhIndex = &index;
+        return ToOptional(Compute(points, ConstProperty<bool>{}, context, params));
     }
 
     PropertySetResult Recompute(Vertices& vertices, const Params& params)

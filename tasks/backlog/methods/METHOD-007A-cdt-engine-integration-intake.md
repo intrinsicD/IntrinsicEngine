@@ -50,6 +50,16 @@ remains behind REVIEW-004 and an accepted CPU reference.
       publication/tests; update METHOD-007's matrix to those owners before
       retiring this intake. This note alone never counts as engine integration.
 
+## Spatial acceleration consideration
+
+During adoption intake, distinguish any stable input-point cache from the evolving
+tetrahedralization and boundary-primitive index. Runtime may resolve canonical
+source properties, but the CPU CDT kernel must remain geometry-only; the point
+LBVH does not implement tetrahedron containment or exact boundary intersections.
+Record the needed query owner when seeding an implementation task.
+
+See the [shared spatial-index consumer inventory](../../../docs/architecture/spatial-index-consumers.md).
+
 ## Verification
 
 ```bash

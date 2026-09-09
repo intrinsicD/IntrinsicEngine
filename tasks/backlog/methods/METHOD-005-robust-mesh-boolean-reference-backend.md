@@ -3,6 +3,15 @@ id: METHOD-005
 theme: I
 depends_on: [GEOM-007]
 maturity_target: CPUContracted
+workflow_schema: 1
+workflow_profile: standard
+evidence: required
+owner:
+branch:
+worktree:
+claimed_at:
+contract_schema: 1
+contracts: [repo.source-documentation, geometry.element-domain-sources, method.engine-integration]
 ---
 # METHOD-005 — Robust mesh boolean reference backend
 
@@ -72,6 +81,28 @@ maturity_target: CPUContracted
 - Backend axis: `cpu_reference` for the selected robust method. The existing
   Boolean kernel is a comparison/legacy implementation, not an alternative
   backend token; optimized CPU or GPU work requires a later parity-gated task.
+
+## Engine integration
+
+| Field | Disposition |
+| --- | --- |
+| Least-structured input | Two embedded owning triangle surfaces satisfying the frozen robust-boolean topology/predicate contract. |
+| Compatible entity sources | Every canonical property/topology source satisfying the input above; binding is owned by METHOD-003A after reference acceptance and selection. |
+| RuntimeModule | Deferred to [METHOD-003A](METHOD-003A-spatial-query-reference-integration-intake.md), which allocates the concrete operation owner without widening this reference slice. |
+| Config/agent | Typed reference parameters now; METHOD-003A owns validated serializable engine controls at adoption. |
+| UI | METHOD-003A owns adoption/discovery planning; no editor-integrated claim from this CPU slice. |
+| Publication | Return a separate boolean-result mesh and provenance; source meshes stay unchanged and owning history is explicit at adoption. METHOD-003A owns engine publication planning. |
+| End-to-end tests | Reference/oracle and method tests here; METHOD-003A allocates compatible-source/config/publication/UI coverage at adoption. |
+
+## Spatial acceleration consideration
+
+Triangle-pair overlap and ray classification are candidates for a reusable
+primitive hierarchy. The current point LBVH has no triangle/AABB-pair/ray
+traversal: retain Geometry.BVH and exact intersection predicates for the CPU
+reference, original primitive provenance and degeneracy behavior. Any later GPU
+hierarchy must prove candidate completeness before narrow-phase parity.
+
+See the [shared spatial-index consumer inventory](../../../docs/architecture/spatial-index-consumers.md).
 
 ## Required changes
 

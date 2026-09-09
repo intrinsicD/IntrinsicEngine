@@ -16,6 +16,7 @@ import Extrinsic.Runtime.Private.EditorFeatures;
 import Extrinsic.Runtime.Private.EditorWorkspaceAttachment;
 import Extrinsic.Runtime.GeometryAvailability;
 import Extrinsic.Runtime.SelectionController;
+import Extrinsic.Core.Config.EngineLoad;
 
 namespace {
 template <typename T>
@@ -128,6 +129,7 @@ EditorGeometryProcessingPreparedFrame PrepareEditorGeometryProcessingFrame(
                 CopyOptional(bindings.LastProgressivePoissonResult),
             .LastRegistrationResult =
                 CopyOptional(bindings.LastRegistrationResult),
+            .LastNormalEstimationResult = CopyOptional(bindings.LastNormalEstimationResult),
         };
       });
   return prepared;
@@ -489,3 +491,131 @@ GetEditorProgressivePoissonConfig(
   return GetEditorProgressivePoissonConfig(ContextOrEmpty(commands));
 }
 } // namespace Extrinsic::Runtime
+
+namespace Extrinsic::Runtime
+{
+    EditorGeodesicsResult ApplyEditorGeodesicsCommand(
+        const EditorGeometryProcessingCommands& commands, const EditorGeodesicsCommand& command)
+    {
+        return ApplyEditorGeodesicsCommand(ContextOrEmpty(commands), command);
+    }
+    EditorGeodesicsResult ApplyEditorConfiguredGeodesicsCommand(
+        const EditorGeometryProcessingCommands& commands, std::uint32_t stableEntityId)
+    {
+        const auto config = GetEditorGeodesicsConfig(commands);
+        if (!config)
+            return {.Status = EditorCommandStatus::InvalidProcessingParameters,
+                    .Message = "Geodesics configuration is unavailable or invalid."};
+        return ApplyEditorGeodesicsCommand(commands, {stableEntityId, *config});
+    }
+    RuntimeEngineConfigApplyResult ApplyEditorGeodesicsConfig(
+        const EditorGeometryProcessingCommands& commands, const GeodesicsConfig& config,
+        std::string sourceId)
+    {
+        return ApplyEditorGeodesicsConfig(ContextOrEmpty(commands), config, std::move(sourceId));
+    }
+    std::optional<GeodesicsConfig> GetEditorGeodesicsConfig(
+        const EditorGeometryProcessingCommands& commands) noexcept
+    {
+        return GetEditorGeodesicsConfig(ContextOrEmpty(commands));
+    }    RuntimeEngineConfigApplyResult ApplyEditorRegistrationConfig(
+        const EditorGeometryProcessingCommands& commands, const RegistrationConfig& config,
+        std::string sourceId)
+    {
+        return ApplyEditorRegistrationConfig(ContextOrEmpty(commands), config, std::move(sourceId));
+    }
+    std::optional<RegistrationConfig> GetEditorRegistrationConfig(
+        const EditorGeometryProcessingCommands& commands) noexcept
+    {
+        return GetEditorRegistrationConfig(ContextOrEmpty(commands));
+    }
+    EditorRegistrationReadiness PreviewEditorRegistrationCommand(
+        const EditorGeometryProcessingCommands& commands, const EditorRegistrationCommand& command)
+    {
+        return PreviewEditorRegistrationCommand(ContextOrEmpty(commands), command);
+    }
+    GeometryPropertyCatalogSnapshot GetEditorRegistrationInputCatalog(
+        const EditorGeometryProcessingCommands& commands, std::uint32_t stableId)
+    {
+        return GetEditorRegistrationInputCatalog(ContextOrEmpty(commands), stableId);
+    }
+    EditorRegistrationResult ApplyEditorConfiguredRegistrationCommand(const EditorGeometryProcessingCommands& commands)
+    {
+        const auto config = GetEditorRegistrationConfig(commands);
+        if (!config) return {.Status = EditorCommandStatus::InvalidProcessingParameters,
+                             .Message = "Registration config is unavailable."};
+        return ApplyEditorRegistrationCommand(commands, *config);
+    }
+
+}
+
+namespace Extrinsic::Runtime
+{
+    PrimitiveSelectionSnapshot ReadEditorPrimitiveSelection(
+        const EditorGeometryProcessingCommands& commands, std::uint32_t id,
+        GeometryElementDomain domain)
+    {
+        const auto& context = ContextOrEmpty(commands);
+        if (!context.Scene || !context.Selection)
+            return {.Message = "Selection service is unavailable."};
+        return context.Selection->ReadPrimitives(*context.Scene, id, domain);
+    }
+    PrimitiveSelectionSnapshot ApplyEditorPrimitiveSelection(
+        const EditorGeometryProcessingCommands& commands, std::uint32_t id,
+        GeometryElementDomain domain, PrimitiveSelectionEdit edit,
+        std::span<const std::uint32_t> indices)
+    {
+        const auto& context = ContextOrEmpty(commands);
+        if (!context.Scene || !context.Selection)
+            return {.Message = "Selection service is unavailable."};
+        auto result = context.Selection->EditPrimitives(*context.Scene, id, domain, edit, indices);
+        if (result.Usable() && context.InvalidateWorkspaceSnapshotCache)
+            context.InvalidateWorkspaceSnapshotCache();
+        return result;
+    }
+    SelectionInteractionConfig GetEditorSelectionInteractionConfig(
+        const EditorGeometryProcessingCommands& commands)
+    {
+        const auto& context = ContextOrEmpty(commands);
+        if (context.EngineConfigControlState)
+            return GetSelectionInteractionConfig(context.EngineConfigControlState->ActiveConfig)
+                .value_or(SelectionInteractionConfig{});
+        return context.Selection ? context.Selection->GetConfig().Interaction
+                                 : SelectionInteractionConfig{};
+    }
+    RuntimeEngineConfigApplyResult ApplyEditorSelectionInteractionConfig(
+        const EditorGeometryProcessingCommands& commands, const SelectionInteractionConfig& config)
+    {
+        const auto& context = ContextOrEmpty(commands);
+        RuntimeEngineConfigApplyResult result{.Status = RuntimeEngineConfigApplyStatus::Rejected,
+                                              .Source = RuntimeConfigControlSource::Editor};
+        const auto validation = ValidateSelectionConfigSection(
+            SerializeSelectionInteractionConfig(config), {}, kSelectionConfigSectionName);
+        if (!validation.Usable())
+        {
+            result.LoadResult.Diagnostics = validation.Diagnostics;
+            return result;
+        }
+        if (!context.EngineConfigControlState || !context.PreviewEngineConfigDocument ||
+            !context.ApplyEngineConfigHotSubset || !context.EngineConfigCommandsAvailable)
+            return result;
+        auto candidate = context.EngineConfigControlState->ActiveConfig;
+        SetSelectionInteractionConfig(candidate, config);
+        result.LoadResult =
+            context.PreviewEngineConfigDocument(Core::Config::SerializeEngineConfig(candidate),
+                                                std::string{kSelectionConfigSectionName});
+        if (!Core::Config::IsConfigUsable(result.LoadResult))
+            return result;
+        return context.ApplyEngineConfigHotSubset(result.LoadResult);
+    }
+} // namespace Extrinsic::Runtime
+
+namespace Extrinsic::Runtime
+{
+    EditorNormalEstimationReadiness PreviewEditorNormalEstimationCommand(const EditorGeometryProcessingCommands& commands,const NormalEstimationConfig& config){return PreviewEditorNormalEstimationCommand(ContextOrEmpty(commands),config);}
+    GeometryPropertyCatalogSnapshot GetEditorNormalEstimationInputCatalog(const EditorGeometryProcessingCommands& commands,std::uint32_t stableId){return GetEditorNormalEstimationInputCatalog(ContextOrEmpty(commands),stableId);}
+    EditorNormalEstimationResult ApplyEditorNormalEstimationCommand(const EditorGeometryProcessingCommands& commands,const NormalEstimationConfig& config){return ApplyEditorNormalEstimationCommand(ContextOrEmpty(commands),config);}
+    RuntimeEngineConfigApplyResult ApplyEditorNormalEstimationConfig(const EditorGeometryProcessingCommands& commands,const NormalEstimationConfig& config,std::string sourceId){return ApplyEditorNormalEstimationConfig(ContextOrEmpty(commands),config,std::move(sourceId));}
+    std::optional<NormalEstimationConfig> GetEditorNormalEstimationConfig(const EditorGeometryProcessingCommands& commands){return GetEditorNormalEstimationConfig(ContextOrEmpty(commands));}
+    EditorNormalEstimationResult ApplyEditorConfiguredNormalEstimation(const EditorGeometryProcessingCommands& commands){return ApplyEditorConfiguredNormalEstimation(ContextOrEmpty(commands));}
+}

@@ -715,6 +715,7 @@ namespace Extrinsic::Runtime
             result.Completion.MaxDistanceIndex = clustered.MaxDistanceIndex;
             result.Completion.ActualBackend = actualBackend;
             result.Completion.FellBackToCpu = clustered.FellBackToCPU;
+            result.Completion.BackendDiagnostic = result.Snapshot.BackendDiagnostic;
             if (result.Completion.FellBackToCpu)
             {
                 result.Completion.BackendDiagnostic =

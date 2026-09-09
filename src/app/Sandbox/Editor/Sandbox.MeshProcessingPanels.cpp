@@ -26,15 +26,12 @@ import Extrinsic.Runtime.EngineConfigControl;
 import Extrinsic.Runtime.GeometryProcessingOperations;
 import Extrinsic.Runtime.SelectionController;
 import Extrinsic.Runtime.VisualizationEditingOperations;
+import Extrinsic.Runtime.VisualizationRecipes;
 
 namespace Extrinsic::Sandbox::Editor
 {
     namespace
     {
-        using MeshNormalWeighting = decltype(
-            Runtime::EditorMeshVertexNormalsCommand{}.Weighting);
-        using PointNormalOrientation = decltype(
-            Runtime::EditorPointCloudVertexNormalsCommand{}.Orientation);
         constexpr std::array<Runtime::EditorMeshDenoiseStage, 1>
             kMeshDenoiseStages{{
                 Runtime::EditorMeshDenoiseStage::FullBilateral,
@@ -98,33 +95,6 @@ namespace Extrinsic::Sandbox::Editor
                 Runtime::EditorMeshSimplifyMetric::ClassicalQEM,
                 Runtime::EditorMeshSimplifyMetric::FA_QEM,
             }};
-        constexpr std::array<Runtime::EditorICPVariant, 2>
-            kIcpVariants{{
-                Runtime::EditorICPVariant::PointToPoint,
-                Runtime::EditorICPVariant::PointToPlane,
-            }};
-        constexpr std::array<MeshNormalWeighting, 4> kMeshNormalWeightings{{
-            static_cast<MeshNormalWeighting>(0),
-            static_cast<MeshNormalWeighting>(1),
-            static_cast<MeshNormalWeighting>(2),
-            static_cast<MeshNormalWeighting>(4),
-        }};
-        constexpr std::array<const char*, 5> kMeshNormalWeightingNames{{
-            "UniformFace",
-            "AreaWeighted",
-            "AngleWeighted",
-            "AreaAngleWeighted",
-            "MaxWeighted",
-        }};
-        constexpr std::array<PointNormalOrientation, 2>
-            kPointNormalOrientations{{
-                static_cast<PointNormalOrientation>(0),
-                static_cast<PointNormalOrientation>(1),
-            }};
-        constexpr std::array<const char*, 2> kPointNormalOrientationNames{{
-            "None",
-            "MinimumSpanningTree",
-        }};
         constexpr std::array<const char*, 6> kDenoiseStatusNames{{
             "Success",
             "EmptyMesh",
@@ -133,38 +103,6 @@ namespace Extrinsic::Sandbox::Editor
             "NonFiniteInput",
             "InvalidParams",
         }};
-        constexpr std::array<const char*, 4> kMeshNormalStatusNames{{
-            "Success",
-            "EmptyMesh",
-            "InvalidOutputProperty",
-            "PropertyTypeConflict",
-        }};
-        constexpr std::array<const char*, 7> kGraphNormalStatusNames{{
-            "Success",
-            "EmptyGraph",
-            "InvalidPositionProperty",
-            "InvalidTopologyProperty",
-            "InvalidOutputProperty",
-            "PropertyTypeConflict",
-            "CountMismatch",
-        }};
-        constexpr std::array<const char*, 9> kPointNormalStatusNames{{
-            "Success",
-            "EmptyInput",
-            "TooFewFinitePoints",
-            "InvalidPositionProperty",
-            "InvalidOutputProperty",
-            "PropertyTypeConflict",
-            "CountMismatch",
-            "SpatialIndexBuildFailed",
-            "SpatialIndexQueryFailed",
-        }};
-        constexpr std::array<const char*, 3> kPointNormalBackendNames{{
-            "KDTree",
-            "SuppliedKDTree",
-            "SuppliedOctree",
-        }};
-
         template <typename Enum, std::size_t N>
         [[nodiscard]] const char* IndexedName(
             const Enum value,
@@ -417,43 +355,19 @@ namespace Extrinsic::Sandbox::Editor
             bool PreserveUvSeams{true};
         };
 
-        struct MeshNormalsState
+        struct NormalsState
         {
-            std::optional<Runtime::EditorMeshVertexNormalsResult>
-                LastResult{};
-            std::int32_t Weighting{1};
-            glm::vec3 Fallback{0.0f, 1.0f, 0.0f};
-        };
-
-        struct GraphNormalsState
-        {
-            std::optional<Runtime::EditorGraphVertexNormalsResult>
-                LastResult{};
-            glm::vec3 Fallback{0.0f, 0.0f, 1.0f};
-            bool OrientTowardFallback{true};
-        };
-
-        struct PointNormalsState
-        {
-            std::optional<Runtime::EditorPointCloudVertexNormalsResult>
-                LastResult{};
-            std::int32_t KNeighbors{15};
-            std::int32_t MinimumNeighbors{2};
-            bool UseRadius{false};
-            float Radius{0.0f};
-            std::int32_t Orientation{1};
-            glm::vec3 Fallback{0.0f, 0.0f, 1.0f};
+            std::optional<Runtime::EditorNormalEstimationResult> LastResult{};
+            Runtime::NormalEstimationConfig Draft{};
+            std::string LastApplied{}, ConfigDiagnostic{}, VisualizationDiagnostic{};
         };
 
         struct RegistrationState
         {
             std::optional<Runtime::EditorRegistrationResult> LastResult{};
-            std::int32_t Variant{0};
-            std::int32_t MaxIterations{50};
-            float MaxCorrespondenceDistance{0.0f};
-            float InlierRatio{0.9f};
-            std::int32_t TrajectoryStep{0};
-            bool SwapSourceTarget{false};
+            std::string ConfigDiagnostic{};
+            Runtime::RegistrationConfig Draft{};
+            std::string LastApplied{};
         };
 
         using DrawWindow = void (Impl::*)(
@@ -472,13 +386,17 @@ namespace Extrinsic::Sandbox::Editor
             CachedDomainModels{};
         DenoiseState Denoise{};
         CurvatureState Curvature{};
+        Runtime::GeodesicsConfig GeodesicsConfig{};
+        bool GeodesicsInitialized{false};
+        bool GeodesicsDirty{false};
+        int GeodesicsSourceVertex{0};
+        std::optional<Runtime::EditorGeodesicsResult> GeodesicsResult{};
+        std::string GeodesicsMessage{};
         RemeshState Remesh{};
         SubdivideState Subdivide{};
         SimplifyState Simplify{};
-        MeshNormalsState MeshNormals{};
-        GraphNormalsState GraphNormals{};
-        PointNormalsState PointNormals{};
         RegistrationState Registration{};
+        NormalsState Normals{};
 
         void Register(EditorShell& editorShell);
         void Unregister();
@@ -501,12 +419,13 @@ namespace Extrinsic::Sandbox::Editor
 
         void DrawDenoiseWindow(bool&, const SandboxEditorContext&);
         void DrawCurvatureWindow(bool&, const SandboxEditorContext&);
+        void DrawGeodesicsWindow(bool&, const SandboxEditorContext&);
+        void DrawGeodesicsControls(const Runtime::EditorDomainWindowModel&,
+                                   const SandboxEditorContext&);
         void DrawRemeshWindow(bool&, const SandboxEditorContext&);
         void DrawSubdivideWindow(bool&, const SandboxEditorContext&);
         void DrawSimplifyWindow(bool&, const SandboxEditorContext&);
-        void DrawMeshNormalsWindow(bool&, const SandboxEditorContext&);
-        void DrawGraphNormalsWindow(bool&, const SandboxEditorContext&);
-        void DrawPointNormalsWindow(bool&, const SandboxEditorContext&);
+        void DrawNormalsWindow(bool&, const SandboxEditorContext&);
         void DrawRegistrationWindow(bool&, const SandboxEditorContext&);
 
         void DrawDenoiseControls(
@@ -527,15 +446,6 @@ namespace Extrinsic::Sandbox::Editor
         void DrawSimplifyControls(
             const Runtime::EditorDomainWindowModel&,
             const SandboxEditorContext&);
-        void DrawMeshNormalsControls(
-            const Runtime::EditorDomainWindowModel&,
-            const SandboxEditorContext&);
-        void DrawGraphNormalsControls(
-            const Runtime::EditorDomainWindowModel&,
-            const SandboxEditorContext&);
-        void DrawPointNormalsControls(
-            const Runtime::EditorDomainWindowModel&,
-            const SandboxEditorContext&);
     };
 
     void MeshProcessingPanels::Impl::Register(
@@ -545,6 +455,8 @@ namespace Extrinsic::Sandbox::Editor
         Shell = &editorShell;
         RegisterWindow("mesh.processing.denoise", {"Mesh", "Processing"},
                        "Denoise", &Impl::DrawDenoiseWindow);
+        RegisterWindow("mesh.processing.geodesics", {"Mesh", "Geodesics"},
+                       "Virtual Source Propagation", &Impl::DrawGeodesicsWindow);
         RegisterWindow("mesh.processing.curvature", {"Mesh", "Processing"},
                        "Curvature", &Impl::DrawCurvatureWindow);
         RegisterWindow("mesh.processing.remesh", {"Mesh", "Processing"},
@@ -553,23 +465,31 @@ namespace Extrinsic::Sandbox::Editor
                        "Subdivide", &Impl::DrawSubdivideWindow);
         RegisterWindow("mesh.processing.simplify", {"Mesh", "Processing"},
                        "Simplify", &Impl::DrawSimplifyWindow);
-        RegisterWindow(
-            "mesh.processing.vertices.normals",
-            {"Mesh", "Processing", "Vertices"},
-            "Normals",
-            &Impl::DrawMeshNormalsWindow);
-        RegisterWindow(
-            "graph.processing.vertices.normals",
-            {"Graph", "Processing", "Vertices"},
-            "Normals",
-            &Impl::DrawGraphNormalsWindow);
-        RegisterWindow(
-            "pointcloud.processing.vertices.normals",
-            {"PointCloud", "Processing", "Vertices"},
-            "Normals",
-            &Impl::DrawPointNormalsWindow);
+        RegisterWindow("view.normal_estimation", {"View"}, "Normal Estimation", &Impl::DrawNormalsWindow);
+        for (const auto& [id, domain] : std::array<std::pair<const char*, const char*>, 3>{
+                 {{"mesh.processing.vertices.normals", "Mesh"}, {"graph.processing.vertices.normals", "Graph"},
+                  {"pointcloud.processing.vertices.normals", "PointCloud"}}})
+            Handles.push_back(Shell->RegisterEditorWindow({
+                .Id = id, .MenuPath = {domain, "Processing", "Vertices"}, .Title = "Normals",
+                .Draw = [](bool& open, const SandboxEditorContext&) { open = false; },
+                .OpenStateChanged = [this, id](bool open) {
+                    if (!open) return;
+                    (void)Shell->SetEditorWindowOpen("view.normal_estimation", true);
+                    (void)Shell->SetEditorWindowOpen(id, false);
+                }}));
         RegisterWindow("view.registration", {"View"},
                        "ICP Registration", &Impl::DrawRegistrationWindow);
+        for (const auto& [id, domain] : std::array<std::pair<const char*, const char*>, 3>{
+                 {{"mesh.processing.registration", "Mesh"}, {"graph.processing.registration", "Graph"},
+                  {"pointcloud.processing.registration", "PointCloud"}}})
+            Handles.push_back(Shell->RegisterEditorWindow({
+                .Id = id, .MenuPath = {domain, "Processing"}, .Title = "ICP Registration",
+                .Draw = [](bool& open, const SandboxEditorContext&) { open = false; },
+                .OpenStateChanged = [this, id](bool open) {
+                    if (!open) return;
+                    (void)Shell->SetEditorWindowOpen("view.registration", true);
+                    (void)Shell->SetEditorWindowOpen(id, false);
+                }}));
     }
 
     void MeshProcessingPanels::Impl::Unregister()
@@ -584,6 +504,10 @@ namespace Extrinsic::Sandbox::Editor
         ResetModelCache();
         Denoise.LastResult.reset();
         Curvature.LastResult.reset();
+        GeodesicsInitialized = false;
+        GeodesicsDirty = false;
+        GeodesicsResult.reset();
+        GeodesicsMessage.clear();
         Curvature.LastSegmentationResult.reset();
         Curvature.LastSegmentationStableEntityId.reset();
         Curvature.LastSegmentationConfigApply.reset();
@@ -595,10 +519,8 @@ namespace Extrinsic::Sandbox::Editor
         Remesh.LastResult.reset();
         Subdivide.LastResult.reset();
         Simplify.LastResult.reset();
-        MeshNormals.LastResult.reset();
-        GraphNormals.LastResult.reset();
-        PointNormals.LastResult.reset();
         Registration.LastResult.reset();
+        Normals = {};
     }
 
     void MeshProcessingPanels::Impl::RegisterWindow(
@@ -730,33 +652,6 @@ namespace Extrinsic::Sandbox::Editor
         DrawDomainWindow(
             open, context, Runtime::EditorDomainWindowKind::Mesh,
             "Mesh / Processing / Simplify", &Impl::DrawSimplifyControls);
-    }
-
-    void MeshProcessingPanels::Impl::DrawMeshNormalsWindow(
-        bool& open, const SandboxEditorContext& context)
-    {
-        DrawDomainWindow(
-            open, context, Runtime::EditorDomainWindowKind::Mesh,
-            "Mesh / Processing / Vertices / Normals",
-            &Impl::DrawMeshNormalsControls);
-    }
-
-    void MeshProcessingPanels::Impl::DrawGraphNormalsWindow(
-        bool& open, const SandboxEditorContext& context)
-    {
-        DrawDomainWindow(
-            open, context, Runtime::EditorDomainWindowKind::Graph,
-            "Graph / Processing / Vertices / Normals",
-            &Impl::DrawGraphNormalsControls);
-    }
-
-    void MeshProcessingPanels::Impl::DrawPointNormalsWindow(
-        bool& open, const SandboxEditorContext& context)
-    {
-        DrawDomainWindow(
-            open, context, Runtime::EditorDomainWindowKind::PointCloud,
-            "PointCloud / Processing / Vertices / Normals",
-            &Impl::DrawPointNormalsControls);
     }
 
     void MeshProcessingPanels::Impl::DrawDenoiseControls(
@@ -1992,341 +1887,225 @@ namespace Extrinsic::Sandbox::Editor
             context);
     }
 
-    void MeshProcessingPanels::Impl::DrawMeshNormalsControls(
-        const Runtime::EditorDomainWindowModel& model,
-        const SandboxEditorContext& context)
+    void MeshProcessingPanels::Impl::DrawNormalsWindow(bool &open, const SandboxEditorContext &context)
     {
-        const Runtime::EditorGeometryProcessingModel& processing =
-            model.Processing;
-        if (context.GeometryResults.LastMeshVertexNormalsResult.has_value())
-            MeshNormals.LastResult = *context.GeometryResults.LastMeshVertexNormalsResult;
-        ImGui::SeparatorText("Normals");
-        if (!processing.MeshVertexNormalsAvailable)
+        if (context.GeometryResults.LastNormalEstimationResult)
+            Normals.LastResult = context.GeometryResults.LastNormalEstimationResult;
+        ImGui::SetNextWindowSize(ImVec2(460, 600), ImGuiCond_FirstUseEver);
+        if (!ImGui::Begin("Normal Estimation", &open))
         {
-            ImGui::TextDisabled(
-                "Mesh vertex normals are unavailable for this selection.");
+            ImGui::End();
             return;
         }
-
-        MeshNormals.Weighting = std::clamp(
-            MeshNormals.Weighting, 0,
-            static_cast<std::int32_t>(kMeshNormalWeightings.size() - 1u));
-        const MeshNormalWeighting weighting =
-            FromIndex(kMeshNormalWeightings, MeshNormals.Weighting);
-        if (ImGui::BeginCombo(
-                "Weighting##MeshVertexNormals",
-                IndexedName(weighting, kMeshNormalWeightingNames)))
+        const auto active = Runtime::GetEditorNormalEstimationConfig(context.GeometryCommands)
+                                .value_or(Runtime::NormalEstimationConfig{});
+        const auto serialized = Runtime::SerializeNormalEstimationConfig(active);
+        if (serialized != Normals.LastApplied)
         {
-            for (std::size_t i = 0u; i < kMeshNormalWeightings.size(); ++i)
+            Normals.Draft = active;
+            Normals.LastApplied = serialized;
+            Normals.ConfigDiagnostic.clear();
+        }
+        auto &config = Normals.Draft;
+        bool changed = false;
+        const auto workspace =
+            Runtime::BuildEditorWorkspaceSnapshot(context.SnapshotQueries, {.Hierarchy = true,
+                                                                            .Inspector = false,
+                                                                            .Selection = false,
+                                                                            .Document = false,
+                                                                            .SceneFile = false,
+                                                                            .FileImport = false,
+                                                                            .AssetImportQueue = false,
+                                                                            .RenderGraph = false,
+                                                                            .RenderRecipe = false,
+                                                                            .CameraRender = false,
+                                                                            .Visualization = false});
+        if (context.Selection && !context.Selection->SelectedStableIds.empty() &&
+            ImGui::Button("Use selected entity"))
+        {
+            config.StableEntityId = context.Selection->SelectedStableIds.front();
+            changed = true;
+        }
+        std::string entityName =
+            config.StableEntityId ? std::to_string(config.StableEntityId) : "Choose entity";
+        for (const auto &row : workspace.Hierarchy)
+            if (row.StableEntityId == config.StableEntityId)
+                entityName = row.Name;
+        if (ImGui::BeginCombo("Entity##Normals", entityName.c_str()))
+        {
+            for (const auto &row : workspace.Hierarchy)
             {
-                const bool selected =
-                    MeshNormals.Weighting == static_cast<std::int32_t>(i);
-                if (ImGui::Selectable(
-                        IndexedName(
-                            kMeshNormalWeightings[i],
-                            kMeshNormalWeightingNames),
-                        selected))
+                if (Runtime::GetEditorNormalEstimationInputCatalog(context.GeometryCommands,
+                                                                   row.StableEntityId)
+                        .Entries.empty())
+                    continue;
+                const auto title = row.Name + " (" + std::to_string(row.StableEntityId) + ")";
+                if (ImGui::Selectable(title.c_str(), row.StableEntityId == config.StableEntityId))
                 {
-                    MeshNormals.Weighting = static_cast<std::int32_t>(i);
+                    config.StableEntityId = row.StableEntityId;
+                    changed = true;
                 }
-                if (selected)
-                    ImGui::SetItemDefaultFocus();
             }
             ImGui::EndCombo();
         }
-        ImGui::DragFloat3(
-            "Fallback normal##MeshVertexNormals", &MeshNormals.Fallback.x,
-            0.01f, -1.0f, 1.0f);
-        if (ImGui::Button("Recompute##MeshVertexNormals"))
+        const auto inputName =
+            std::string(Runtime::ToString(config.Positions.Domain)) + ": " + config.Positions.Name;
+        if (ImGui::BeginCombo("Positions##Normals", inputName.c_str()))
         {
-            PublishCommandResult(
-                MeshNormals.LastResult,
-                Runtime::ApplyEditorMeshVertexNormalsCommand(
-                    context.GeometryCommands,
-                    Runtime::EditorMeshVertexNormalsCommand{
-                        .StableEntityId = model.SelectedStableId,
-                        .Weighting = weighting,
-                        .FallbackNormal = MeshNormals.Fallback,
-                    }),
-                context.MethodResultSinks.MeshVertexNormals);
-        }
-
-        const auto& result = MeshNormals.LastResult.has_value()
-            ? MeshNormals.LastResult
-            : processing.LastMeshVertexNormalsResult;
-        if (!result.has_value())
-        {
-            ImGui::TextDisabled("Last normals run: none");
-            return;
-        }
-        ImGui::Text(
-            "Last normals run: %s",
-            Runtime::DebugNameForEditorCommandStatus(result->Status));
-        ImGui::Text(
-            "Geometry status: %s",
-            IndexedName(result->NormalStatus, kMeshNormalStatusNames));
-        ImGui::Text(
-            "Weighting: %s",
-            IndexedName(result->Weighting, kMeshNormalWeightingNames));
-        // NoChange still means the kernel executed, so its counters remain
-        // relevant.
-        if (result->Succeeded() ||
-            result->Status == Runtime::EditorCommandStatus::NoChange)
-        {
-            ImGui::Text(
-                "Written: %zu / %zu  changed: %zu  valid: %zu  fallback: %zu",
-                result->WrittenCount, result->VertexSlotCount,
-                result->ChangedNormalCount,
-                result->ValidNormalVertexCount, result->FallbackVertexCount);
-            ImGui::Text(
-                "Faces: processed=%zu  degenerate=%zu  nonfinite=%zu  invalid=%zu",
-                result->ProcessedFaceCount, result->DegenerateFaceCount,
-                result->NonFiniteFaceCount,
-                result->InvalidTopologyFaceCount);
-            ImGui::Text(
-                "Corners: degenerate=%zu  deleted faces=%zu  deleted vertices=%zu",
-                result->DegenerateCornerCount,
-                result->SkippedDeletedFaceCount,
-                result->SkippedDeletedVertexCount);
-            ImGui::Text(
-                "Fallback repaired: %s",
-                result->FallbackNormalWasRepaired ? "yes" : "no");
-        }
-        if (!result->Message.empty())
-            ImGui::TextWrapped("%s", result->Message.c_str());
-        DrawDismissLastResultButton(
-            "Dismiss##MeshNormals",
-            MeshNormals.LastResult,
-            Runtime::EditorGeometryProcessingResultSlot::MeshVertexNormals,
-            context);
-    }
-
-    void MeshProcessingPanels::Impl::DrawGraphNormalsControls(
-        const Runtime::EditorDomainWindowModel& model,
-        const SandboxEditorContext& context)
-    {
-        const Runtime::EditorGeometryProcessingModel& processing =
-            model.Processing;
-        if (context.GeometryResults.LastGraphVertexNormalsResult.has_value())
-            GraphNormals.LastResult = *context.GeometryResults.LastGraphVertexNormalsResult;
-        ImGui::SeparatorText("Normals");
-        if (!processing.GraphVertexNormalsAvailable)
-        {
-            ImGui::TextDisabled(
-                "Graph vertex normals are unavailable for this selection.");
-            return;
-        }
-
-        ImGui::DragFloat3(
-            "Fallback normal##GraphVertexNormals", &GraphNormals.Fallback.x,
-            0.01f, -1.0f, 1.0f);
-        ImGui::Checkbox(
-            "Orient toward fallback##GraphVertexNormals",
-            &GraphNormals.OrientTowardFallback);
-        if (ImGui::Button("Recompute##GraphVertexNormals"))
-        {
-            PublishCommandResult(
-                GraphNormals.LastResult,
-                Runtime::ApplyEditorGraphVertexNormalsCommand(
-                    context.GeometryCommands,
-                    Runtime::EditorGraphVertexNormalsCommand{
-                        .StableEntityId = model.SelectedStableId,
-                        .FallbackNormal = GraphNormals.Fallback,
-                        .OrientTowardFallback =
-                            GraphNormals.OrientTowardFallback,
-                    }),
-                context.MethodResultSinks.GraphVertexNormals);
-        }
-
-        const auto& result = GraphNormals.LastResult.has_value()
-            ? GraphNormals.LastResult
-            : processing.LastGraphVertexNormalsResult;
-        if (!result.has_value())
-        {
-            ImGui::TextDisabled("Last normals run: none");
-            return;
-        }
-        ImGui::Text(
-            "Last normals run: %s",
-            Runtime::DebugNameForEditorCommandStatus(result->Status));
-        ImGui::Text(
-            "Geometry status: %s",
-            IndexedName(result->NormalStatus, kGraphNormalStatusNames));
-        if (result->Succeeded() ||
-            result->Status == Runtime::EditorCommandStatus::NoChange)
-        {
-            ImGui::Text(
-                "Written: %zu / %zu  changed: %zu  valid: %zu  fallback: %zu",
-                result->WrittenCount, result->VertexSlotCount,
-                result->ChangedNormalCount,
-                result->ValidNormalVertexCount, result->FallbackVertexCount);
-            ImGui::Text(
-                "Edges: %zu  invalid=%zu  deleted=%zu",
-                result->EdgeSlotCount, result->InvalidEdgeCount,
-                result->SkippedDeletedEdgeCount);
-            ImGui::Text(
-                "Neighborhoods: isolated=%zu  degree1=%zu  collinear=%zu",
-                result->IsolatedVertexCount, result->DegreeOneVertexCount,
-                result->CollinearNeighborhoodCount);
-            ImGui::Text(
-                "Positions: duplicate=%zu  nonfinite=%zu",
-                result->DuplicatePositionCount,
-                result->NonFinitePositionCount);
-            ImGui::Text(
-                "Fallback repaired: %s",
-                result->FallbackNormalWasRepaired ? "yes" : "no");
-        }
-        if (!result->Message.empty())
-            ImGui::TextWrapped("%s", result->Message.c_str());
-        DrawDismissLastResultButton(
-            "Dismiss##GraphNormals",
-            GraphNormals.LastResult,
-            Runtime::EditorGeometryProcessingResultSlot::GraphVertexNormals,
-            context);
-    }
-
-    void MeshProcessingPanels::Impl::DrawPointNormalsControls(
-        const Runtime::EditorDomainWindowModel& model,
-        const SandboxEditorContext& context)
-    {
-        const Runtime::EditorGeometryProcessingModel& processing =
-            model.Processing;
-        if (context.GeometryResults.LastPointCloudVertexNormalsResult.has_value())
-        {
-            PointNormals.LastResult =
-                *context.GeometryResults.LastPointCloudVertexNormalsResult;
-        }
-        ImGui::SeparatorText("Normals");
-        if (!processing.PointCloudVertexNormalsAvailable)
-        {
-            ImGui::TextDisabled(
-                "Point-cloud vertex normals are unavailable for this selection.");
-            return;
-        }
-
-        PointNormals.KNeighbors =
-            std::clamp(PointNormals.KNeighbors, 1, 512);
-        PointNormals.MinimumNeighbors =
-            std::clamp(PointNormals.MinimumNeighbors, 1, 512);
-        PointNormals.Orientation = std::clamp(
-            PointNormals.Orientation, 0,
-            static_cast<std::int32_t>(kPointNormalOrientations.size() - 1u));
-        ImGui::DragInt(
-            "K##PointCloudVertexNormals", &PointNormals.KNeighbors,
-            1.0f, 1, 512);
-        ImGui::DragInt(
-            "Minimum neighbors##PointCloudVertexNormals",
-            &PointNormals.MinimumNeighbors, 1.0f, 1, 512);
-        ImGui::Checkbox(
-            "Use radius##PointCloudVertexNormals", &PointNormals.UseRadius);
-        if (PointNormals.UseRadius)
-        {
-            PointNormals.Radius = std::max(PointNormals.Radius, 0.001f);
-            ImGui::DragFloat(
-                "Radius##PointCloudVertexNormals", &PointNormals.Radius,
-                0.01f, 0.001f, 1000.0f);
-        }
-
-        const PointNormalOrientation orientation =
-            FromIndex(kPointNormalOrientations, PointNormals.Orientation);
-        if (ImGui::BeginCombo(
-                "Orientation##PointCloudVertexNormals",
-                IndexedName(orientation, kPointNormalOrientationNames)))
-        {
-            for (std::size_t i = 0u;
-                 i < kPointNormalOrientations.size(); ++i)
+            const auto catalog = Runtime::GetEditorNormalEstimationInputCatalog(context.GeometryCommands, config.StableEntityId);
+            auto previousDomain = Runtime::GeometryElementDomain::Unknown;
+            for (const auto &row : catalog.Entries)
             {
-                const bool selected =
-                    PointNormals.Orientation == static_cast<std::int32_t>(i);
-                if (ImGui::Selectable(
-                        IndexedName(
-                            kPointNormalOrientations[i],
-                            kPointNormalOrientationNames),
-                        selected))
+                if (row.Ref.Domain != previousDomain)
                 {
-                    PointNormals.Orientation = static_cast<std::int32_t>(i);
+                    ImGui::SeparatorText(std::string(Runtime::ToString(row.Ref.Domain)).c_str());
+                    previousDomain = row.Ref.Domain;
                 }
-                if (selected)
-                    ImGui::SetItemDefaultFocus();
+                const auto label = std::string(Runtime::ToString(row.Ref.Domain)) + ": " + row.Ref.Name +
+                                   " (" + std::to_string(row.ElementCount) + ")";
+                if (ImGui::Selectable(label.c_str(), row.Ref == config.Positions))
+                {
+                    config.Positions = row.Ref;
+                    config.Output.Domain = row.Ref.Domain;
+                    changed = true;
+                }
             }
             ImGui::EndCombo();
         }
-        ImGui::DragFloat3(
-            "Fallback normal##PointCloudVertexNormals",
-            &PointNormals.Fallback.x, 0.01f, -1.0f, 1.0f);
-        if (ImGui::Button("Recompute##PointCloudVertexNormals"))
+        std::array<char, 512> output{};
+        std::copy_n(config.Output.Name.c_str(), std::min(config.Output.Name.size(), output.size() - 1),
+                    output.data());
+        if (ImGui::InputText("Output property##Normals", output.data(), output.size()))
         {
-            PublishCommandResult(
-                PointNormals.LastResult,
-                Runtime::ApplyEditorPointCloudVertexNormalsCommand(
-                    context.GeometryCommands,
-                    Runtime::EditorPointCloudVertexNormalsCommand{
-                        .StableEntityId = model.SelectedStableId,
-                        .KNeighbors = static_cast<std::uint32_t>(
-                            PointNormals.KNeighbors),
-                        .MinimumNeighbors = static_cast<std::uint32_t>(
-                            PointNormals.MinimumNeighbors),
-                        .UseRadiusSearch = PointNormals.UseRadius,
-                        .Radius = PointNormals.Radius,
-                        .Orientation = orientation,
-                        .FallbackNormal = PointNormals.Fallback,
-                    }),
-                context.MethodResultSinks.PointCloudVertexNormals);
+            config.Output.Name = output.data();
+            changed = true;
         }
-
-        const auto& result = PointNormals.LastResult.has_value()
-            ? PointNormals.LastResult
-            : processing.LastPointCloudVertexNormalsResult;
-        if (!result.has_value())
+        if (ImGui::BeginCombo("Method##Normals", Runtime::ToString(config.Method)))
         {
-            ImGui::TextDisabled("Last normals run: none");
-            return;
+            for (auto method : {Runtime::NormalEstimationMethod::PointSetPCA,
+                                Runtime::NormalEstimationMethod::MeshFaceWeighted,
+                                Runtime::NormalEstimationMethod::GraphNeighborhood})
+            {
+                auto candidate = config;
+                candidate.Method = method;
+                const auto readiness =
+                    Runtime::PreviewEditorNormalEstimationCommand(context.GeometryCommands, candidate);
+                ImGui::BeginDisabled(!readiness.Ready);
+                if (ImGui::Selectable(Runtime::ToString(method), config.Method == method))
+                {
+                    config.Method = method;
+                    changed = true;
+                }
+                ImGui::EndDisabled();
+                if (!readiness.Ready && ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
+                    ImGui::SetTooltip("%s", readiness.Diagnostic.c_str());
+            }
+            ImGui::EndCombo();
         }
-        ImGui::Text(
-            "Last normals run: %s",
-            Runtime::DebugNameForEditorCommandStatus(result->Status));
-        ImGui::Text(
-            "Geometry status: %s",
-            IndexedName(result->NormalStatus, kPointNormalStatusNames));
-        ImGui::Text(
-            "Backend: %s  orientation: %s",
-            IndexedName(result->Backend, kPointNormalBackendNames),
-            IndexedName(result->Orientation, kPointNormalOrientationNames));
-        if (result->Succeeded() ||
-            result->Status == Runtime::EditorCommandStatus::NoChange)
+        if (config.Method == Runtime::NormalEstimationMethod::PointSetPCA)
         {
-            ImGui::Text(
-                "Written: %zu / %zu  changed: %zu  finite: %zu  valid: %zu",
-                result->WrittenCount, result->PointSlotCount,
-                result->ChangedNormalCount,
-                result->FinitePointCount, result->ValidNormalPointCount);
-            ImGui::Text(
-                "Fallback: %zu  tooFew=%zu  degenerate=%zu  collinear=%zu",
-                result->FallbackPointCount, result->TooFewNeighborCount,
-                result->DegenerateNeighborhoodCount,
-                result->CollinearNeighborhoodCount);
-            ImGui::Text(
-                "Positions: duplicate=%zu  nonfinite=%zu  deleted=%zu",
-                result->DuplicatePositionCount,
-                result->NonFinitePointCount,
-                result->SkippedDeletedPointCount);
-            ImGui::Text(
-                "Queries: failures=%zu  visited=%zu  distances=%zu",
-                result->SpatialQueryFailureCount,
-                result->KNNVisitedNodeCount,
-                result->KNNDistanceEvaluationCount);
-            ImGui::Text(
-                "Flipped: %zu  fallback repaired: %s",
-                result->FlippedOrientationCount,
-                result->FallbackNormalWasRepaired ? "yes" : "no");
+            ImGui::TextWrapped(
+                "PCA fits local planes to spatial neighbors on the selected element domain. Radius mode uses "
+                "all neighbors within the radius; otherwise k nearest neighbors are used.");
+            int backend = int(config.Backend);
+            if (ImGui::Combo("Neighbors##Normals", &backend, "CPU KD-tree\0CPU LBVH (cached)\0"))
+            {
+                config.Backend = Runtime::NormalEstimationBackend(backend);
+                changed = true;
+            }
+            changed |= ImGui::Checkbox("Use radius##Normals", &config.UseRadiusSearch);
+            if (config.UseRadiusSearch)
+                changed |= ImGui::InputFloat("Radius##Normals", &config.Radius);
+            else
+                changed |= ImGui::InputScalar("Neighbors k##Normals", ImGuiDataType_U32, &config.KNeighbors);
+            changed |=
+                ImGui::InputScalar("Minimum neighbors##Normals", ImGuiDataType_U32, &config.MinimumNeighbors);
+            int orientation = int(config.Orientation);
+            if (ImGui::Combo("Orientation##Normals", &orientation, "Unoriented\0Minimum spanning tree\0"))
+            {
+                config.Orientation = decltype(config.Orientation)(orientation);
+                changed = true;
+            }
         }
-        if (!result->Message.empty())
-            ImGui::TextWrapped("%s", result->Message.c_str());
-        DrawDismissLastResultButton(
-            "Dismiss##PointNormals",
-            PointNormals.LastResult,
-            Runtime::EditorGeometryProcessingResultSlot::PointCloudVertexNormals,
-            context);
+        else if (config.Method == Runtime::NormalEstimationMethod::MeshFaceWeighted)
+        {
+            ImGui::TextWrapped("Average incident polygon face normals using mesh topology and the selected "
+                               "vertex positions.");
+            int weighting = int(config.Weighting);
+            if (ImGui::Combo("Weighting##Normals", &weighting, "Uniform\0Area\0Angle\0Area and angle\0Max\0"))
+            {
+                config.Weighting = decltype(config.Weighting)(weighting);
+                changed = true;
+            }
+        }
+        else
+        {
+            ImGui::TextWrapped("Fit normals from incident edge neighbors. Compatible mesh adjacency is "
+                               "accepted as well as graph adjacency.");
+            changed |= ImGui::Checkbox("Orient toward fallback##Normals", &config.OrientTowardFallback);
+        }
+        changed |= ImGui::InputFloat3("Fallback normal##Normals", &config.FallbackNormal.x);
+        if (ImGui::TreeNode("Numerical tolerances##Normals"))
+        {
+            changed |= ImGui::InputDouble("Degenerate length epsilon##Normals",
+                                          &config.DegenerateNormalLengthEpsilon, 0, 0, "%.8g");
+            changed |= ImGui::InputDouble("Collinear eigenvalue ratio##Normals",
+                                          &config.CollinearEigenvalueRatioEpsilon, 0, 0, "%.8g");
+            ImGui::TreePop();
+        }
+        if (changed)
+        {
+            const auto applied = Runtime::ApplyEditorNormalEstimationConfig(context.GeometryCommands, config);
+            Normals.ConfigDiagnostic =
+                applied.Succeeded() ? "" : "Controls were rejected by normal config validation.";
+        }
+        if (!Normals.ConfigDiagnostic.empty())
+            ImGui::TextWrapped("%s", Normals.ConfigDiagnostic.c_str());
+        const auto readiness =
+            Runtime::PreviewEditorNormalEstimationCommand(context.GeometryCommands, config);
+        if (!readiness.Ready)
+            ImGui::TextWrapped("%s", readiness.Diagnostic.c_str());
+        ImGui::BeginDisabled(!context.GeometryConfigCommandsAvailable || !readiness.Ready ||
+                             !Normals.ConfigDiagnostic.empty());
+        if (ImGui::Button("Estimate normals"))
+            PublishCommandResult(Normals.LastResult,
+                                 Runtime::ApplyEditorConfiguredNormalEstimation(context.GeometryCommands),
+                                 context.MethodResultSinks.NormalEstimation);
+        ImGui::SameLine();
+        if (ImGui::Button("Show normal vectors"))
+        {
+            const auto status = Runtime::ApplyEditorVisualizationRecipeCommand(
+                context.VisualizationCommands,
+                {.StableEntityId = config.StableEntityId,
+                 .Recipe = {.Data = Runtime::VectorFieldVisualizationRecipe{
+                                .Source = readiness.Resolved.Output,
+                                .PositionSource = readiness.Resolved.Positions,
+                                .OutputName = readiness.Resolved.Output.Name + ".vectors"}}});
+            Normals.VisualizationDiagnostic = Runtime::DebugNameForEditorCommandStatus(status);
+        }
+        ImGui::EndDisabled();
+        if (!Normals.VisualizationDiagnostic.empty())
+            ImGui::Text("Vector display: %s", Normals.VisualizationDiagnostic.c_str());
+        if (Normals.LastResult)
+        {
+            const auto &result = *Normals.LastResult;
+            ImGui::Separator();
+            ImGui::Text("Status: %s", Runtime::DebugNameForEditorCommandStatus(result.Status));
+            ImGui::Text("Method: %s", Runtime::ToString(result.Method));
+            if (result.Method == Runtime::NormalEstimationMethod::PointSetPCA)
+                ImGui::Text("Requested: %s", Runtime::ToString(result.RequestedBackend));
+            if (!result.ActualBackend.empty())
+                ImGui::Text("Ran: %s", result.ActualBackend.c_str());
+            ImGui::Text("Live / total: %zu / %zu; valid: %zu; fallback: %zu", result.LiveCount,
+                        result.SlotCount, result.ValidCount, result.FallbackCount);
+            ImGui::Text("Written: %zu; changed: %zu; cached index reused: %s", result.WrittenCount,
+                        result.ChangedCount, result.IndexReused ? "yes" : "no");
+            ImGui::TextWrapped("%s", result.Message.c_str());
+            DrawDismissLastResultButton("Dismiss##Normals", Normals.LastResult,
+                                        Runtime::EditorGeometryProcessingResultSlot::NormalEstimation,
+                                        context);
+        }
+        ImGui::End();
     }
 
     void MeshProcessingPanels::Impl::DrawRegistrationWindow(
@@ -2342,121 +2121,106 @@ namespace Extrinsic::Sandbox::Editor
             return;
         }
 
-        ImGui::TextWrapped(
-            "Aligns a source point cloud onto a target point cloud with ICP "
-            "and drives the source entity Transform along the convergence "
-            "trajectory.");
-        std::vector<std::uint32_t> selected{};
-        if (context.Selection != nullptr)
-        {
-            for (const std::uint32_t id :
-                 context.Selection->SelectedStableIds)
+        ImGui::TextWrapped("Align named point samples from mesh, graph or point-cloud domains. Applies an undoable transform to the source entity.");
+        const auto activeConfig = Runtime::GetEditorRegistrationConfig(context.GeometryCommands).value_or(Runtime::RegistrationConfig{});
+        const auto activeText = Runtime::SerializeRegistrationConfig(activeConfig);
+        if (activeText != Registration.LastApplied)
+        { Registration.Draft = activeConfig; Registration.LastApplied = activeText; Registration.ConfigDiagnostic.clear(); }
+        auto& config = Registration.Draft;
+        bool changed = false;
+        const auto workspace = Runtime::BuildEditorWorkspaceSnapshot(context.SnapshotQueries,
+            {.Hierarchy = true, .Inspector = false, .Selection = false, .Document = false,
+             .SceneFile = false, .FileImport = false, .AssetImportQueue = false,
+             .RenderGraph = false, .RenderRecipe = false, .CameraRender = false, .Visualization = false});
+        auto entityChoice = [&](const char* label, std::uint32_t& id) {
+            std::string preview = id ? std::to_string(id) : "Choose entity";
+            for (const auto& row : workspace.Hierarchy)
+                if (row.StableEntityId == id) preview = row.Name + " (" + std::to_string(id) + ")";
+            if (ImGui::BeginCombo(label, preview.c_str()))
             {
-                selected.push_back(id);
-            }
-        }
-        if (selected.size() < 2u)
-        {
-            ImGui::TextDisabled(
-                "Select two point-cloud entities (source + target) to register.");
-        }
-        else
-        {
-            const std::uint32_t sourceId =
-                selected[Registration.SwapSourceTarget ? 1u : 0u];
-            const std::uint32_t targetId =
-                selected[Registration.SwapSourceTarget ? 0u : 1u];
-            ImGui::Text("Source entity: %u", sourceId);
-            ImGui::Text("Target entity: %u", targetId);
-            ImGui::Checkbox(
-                "Swap source / target##ICP",
-                &Registration.SwapSourceTarget);
-
-            Registration.Variant = std::clamp(
-                Registration.Variant, 0,
-                static_cast<std::int32_t>(kIcpVariants.size() - 1u));
-            const Runtime::EditorICPVariant variant =
-                FromIndex(kIcpVariants, Registration.Variant);
-            if (ImGui::BeginCombo(
-                    "Variant##ICP",
-                    Runtime::DebugNameForEditorICPVariant(variant)))
-            {
-                for (std::size_t i = 0u; i < kIcpVariants.size(); ++i)
+                for (const auto& row : workspace.Hierarchy)
                 {
-                    const bool selectedOption =
-                        Registration.Variant == static_cast<std::int32_t>(i);
-                    std::string label =
-                        Runtime::DebugNameForEditorICPVariant(
-                            kIcpVariants[i]);
-                    label += "##ICPVariant" + std::to_string(i);
-                    if (ImGui::Selectable(label.c_str(), selectedOption))
-                        Registration.Variant = static_cast<std::int32_t>(i);
-                    if (selectedOption)
-                        ImGui::SetItemDefaultFocus();
+                    const auto catalog = Runtime::GetEditorRegistrationInputCatalog(context.GeometryCommands, row.StableEntityId);
+                    if (catalog.Entries.empty()) continue;
+                    const auto title = row.Name + " (" + std::to_string(row.StableEntityId) + ")";
+                    if (ImGui::Selectable(title.c_str(), id == row.StableEntityId)) { id = row.StableEntityId; changed = true; }
                 }
                 ImGui::EndCombo();
             }
-
-            Registration.MaxIterations =
-                std::clamp(Registration.MaxIterations, 1, 1000);
-            ImGui::DragInt(
-                "Max iterations##ICP", &Registration.MaxIterations,
-                1.0f, 1, 1000);
-            Registration.MaxCorrespondenceDistance =
-                std::max(Registration.MaxCorrespondenceDistance, 0.0f);
-            ImGui::DragFloat(
-                "Max correspondence distance (0 = unlimited)##ICP",
-                &Registration.MaxCorrespondenceDistance,
-                0.01f, 0.0f, 1.0e6f, "%.4f");
-            Registration.InlierRatio =
-                std::clamp(Registration.InlierRatio, 0.01f, 1.0f);
-            ImGui::DragFloat(
-                "Inlier ratio##ICP", &Registration.InlierRatio,
-                0.01f, 0.01f, 1.0f, "%.2f");
-
-            const std::size_t trajectoryLength =
-                Registration.LastResult.has_value()
-                ? Registration.LastResult->TrajectoryLength
-                : 0u;
-            bool run = ImGui::Button("Run ICP##ICP");
-            std::size_t requestedStep = static_cast<std::size_t>(
-                Registration.MaxIterations);
-            if (trajectoryLength > 0u)
-            {
-                Registration.TrajectoryStep = std::clamp(
-                    Registration.TrajectoryStep, 0,
-                    static_cast<std::int32_t>(trajectoryLength));
-                ImGui::SliderInt(
-                    "Trajectory step##ICP", &Registration.TrajectoryStep,
-                    0, static_cast<int>(trajectoryLength));
-                if (ImGui::IsItemDeactivatedAfterEdit())
-                {
-                    run = true;
-                    requestedStep = static_cast<std::size_t>(
-                        Registration.TrajectoryStep);
-                }
-            }
-            if (run)
-            {
-                PublishCommandResult(
-                    Registration.LastResult,
-                    Runtime::ApplyEditorRegistrationCommand(
-                        context.GeometryCommands,
-                        Runtime::EditorRegistrationCommand{
-                            .SourceStableEntityId = sourceId,
-                            .TargetStableEntityId = targetId,
-                            .Variant = variant,
-                            .MaxIterations = static_cast<std::uint32_t>(
-                                Registration.MaxIterations),
-                            .MaxCorrespondenceDistance = static_cast<double>(
-                                Registration.MaxCorrespondenceDistance),
-                            .InlierRatio = static_cast<double>(
-                                Registration.InlierRatio),
-                            .TrajectoryStep = requestedStep,
-                        }),
-                    context.MethodResultSinks.Registration);
-            }
+        };
+        if (context.Selection && context.Selection->SelectedStableIds.size() >= 2 &&
+            ImGui::Button("Use two selected entities"))
+        {
+            config.SourceStableEntityId = context.Selection->SelectedStableIds[0];
+            config.TargetStableEntityId = context.Selection->SelectedStableIds[1];
+            changed = true;
         }
+        entityChoice("Source##ICP", config.SourceStableEntityId);
+        entityChoice("Target##ICP", config.TargetStableEntityId);
+        if (ImGui::Button("Swap source and target"))
+        {
+            std::swap(config.SourceStableEntityId, config.TargetStableEntityId);
+            std::swap(config.SourcePositions, config.TargetPositions);
+            changed = true;
+        }
+        const auto sourceCatalog = Runtime::GetEditorRegistrationInputCatalog(context.GeometryCommands, config.SourceStableEntityId);
+        const auto targetCatalog = Runtime::GetEditorRegistrationInputCatalog(context.GeometryCommands, config.TargetStableEntityId);
+        auto propertyChoice = [&](const char* label, const auto& catalog, Runtime::GeometryPropertyRef& ref,
+                                  Runtime::GeometryElementDomain required = Runtime::GeometryElementDomain::Unknown) {
+            const auto preview = std::string(Runtime::ToString(ref.Domain)) + ": " + ref.Name;
+            if (ImGui::BeginCombo(label, preview.c_str()))
+            {
+                for (const auto& row : catalog.Entries)
+                {
+                    if (required != Runtime::GeometryElementDomain::Unknown && row.Ref.Domain != required) continue;
+                    const auto title = std::string(Runtime::ToString(row.Ref.Domain)) + ": " + row.Ref.Name +
+                        " (" + std::to_string(row.ElementCount) + ")";
+                    if (ImGui::Selectable(title.c_str(), row.Ref == ref)) { ref = row.Ref; changed = true; }
+                }
+                ImGui::EndCombo();
+            }
+        };
+        propertyChoice("Source positions##ICP", sourceCatalog, config.SourcePositions);
+        propertyChoice("Target positions##ICP", targetCatalog, config.TargetPositions);
+        int variant = int(config.Variant);
+        if (ImGui::Combo("Variant##ICP", &variant, "Point to point\0Point to plane\0"))
+        { config.Variant = Runtime::EditorICPVariant(variant); changed = true; }
+        if (config.Variant == Runtime::EditorICPVariant::PointToPlane)
+            propertyChoice("Target normals##ICP", targetCatalog, config.TargetNormals, config.TargetPositions.Domain);
+        int backend = int(config.Backend);
+        if (ImGui::Combo("Correspondences##ICP", &backend, "CPU KD-tree (reference)\0CPU LBVH (cached)\0Vulkan LBVH (CPU solve)\0"))
+        { config.Backend = Runtime::RegistrationBackend(backend); changed = true; }
+        changed |= ImGui::InputScalar("Max iterations##ICP", ImGuiDataType_U32, &config.MaxIterations);
+        changed |= ImGui::InputDouble("Max distance (0 = 1e6)##ICP", &config.MaxCorrespondenceDistance);
+        changed |= ImGui::InputDouble("Inlier ratio##ICP", &config.InlierRatio);
+        changed |= ImGui::InputDouble("Convergence threshold##ICP", &config.ConvergenceThreshold, 0, 0, "%.8g");
+        bool applyTrajectory = false;
+        std::uint32_t step = std::uint32_t(config.TrajectoryStep);
+        if (ImGui::InputScalar("Apply trajectory step (0 = start)##ICP", ImGuiDataType_U32, &step))
+        { config.TrajectoryStep = step; changed = true; }
+        applyTrajectory = ImGui::IsItemDeactivatedAfterEdit();
+        if (ImGui::Button("Use final pose"))
+        { config.TrajectoryStep = config.MaxIterations; changed = true; }
+        if (changed)
+        {
+            const auto applied = Runtime::ApplyEditorRegistrationConfig(context.GeometryCommands, config);
+            Registration.ConfigDiagnostic = applied.Status == Runtime::RuntimeEngineConfigApplyStatus::Rejected
+                ? "Registration controls were rejected by config validation." : "";
+        }
+        if (!Registration.ConfigDiagnostic.empty()) ImGui::TextWrapped("%s", Registration.ConfigDiagnostic.c_str());
+        const auto readiness = Runtime::PreviewEditorRegistrationCommand(context.GeometryCommands, config);
+        if (!readiness.Ready) ImGui::TextWrapped("%s", readiness.Diagnostic.c_str());
+        ImGui::BeginDisabled(!context.GeometryConfigCommandsAvailable || !Registration.ConfigDiagnostic.empty() || !readiness.Ready);
+        const bool runFinal = ImGui::Button("Run ICP##ICP");
+        if (runFinal)
+        {
+            config.TrajectoryStep = config.MaxIterations;
+            (void)Runtime::ApplyEditorRegistrationConfig(context.GeometryCommands, config);
+        }
+        if (runFinal || (applyTrajectory && readiness.Ready && Registration.ConfigDiagnostic.empty()))
+            PublishCommandResult(Registration.LastResult,
+                Runtime::ApplyEditorConfiguredRegistrationCommand(context.GeometryCommands), context.MethodResultSinks.Registration);
+        ImGui::EndDisabled();
 
         if (!Registration.LastResult.has_value())
         {
@@ -2476,6 +2240,12 @@ namespace Extrinsic::Sandbox::Editor
                 "Variant: %s (ran %s)",
                 Runtime::DebugNameForEditorICPVariant(result.Variant),
                 Runtime::DebugNameForEditorICPVariant(result.EffectiveVariant));
+            if (result.HasResult)
+                ImGui::Text("Correspondences: %s (ran %s)", Runtime::ToString(result.RequestedBackend), Runtime::ToString(result.ActualBackend));
+            else
+                ImGui::Text("Requested correspondences: %s", Runtime::ToString(result.RequestedBackend));
+            ImGui::Text("Target index: %s", result.TargetIndexReused ? "reused" : "new / reference");
+            if (!result.BackendDiagnostic.empty()) ImGui::TextWrapped("%s", result.BackendDiagnostic.c_str());
             if (result.Succeeded() && result.HasResult)
             {
                 ImGui::Text(
@@ -2522,4 +2292,124 @@ namespace Extrinsic::Sandbox::Editor
         m_Impl->Unregister();
     }
 
+}
+
+namespace Extrinsic::Sandbox::Editor
+{
+    void MeshProcessingPanels::Impl::DrawGeodesicsWindow(bool& open,
+                                                         const SandboxEditorContext& context)
+    {
+        DrawDomainWindow(open, context, Runtime::EditorDomainWindowKind::Mesh,
+                         "Mesh / Geodesics / Virtual Source Propagation",
+                         &Impl::DrawGeodesicsControls);
+    }
+    void MeshProcessingPanels::Impl::DrawGeodesicsControls(
+        const Runtime::EditorDomainWindowModel& model, const SandboxEditorContext& context)
+    {
+        if (!GeodesicsDirty)
+        {
+            if (auto config = Runtime::GetEditorGeodesicsConfig(context.GeometryCommands))
+            {
+                GeodesicsConfig = *config;
+                GeodesicsInitialized = true;
+            }
+        }
+        if (!GeodesicsInitialized)
+        {
+            ImGui::TextDisabled("Geodesics configuration is unavailable.");
+            return;
+        }
+        ImGui::TextWrapped(
+            "Approximate surface distance from source vertices. Pick a vertex and add "
+            "it, or enter its index below.");
+        if (model.Primitive.HasVertexId && ImGui::Button("Add picked vertex"))
+        {
+            GeodesicsConfig.SourceVertices.push_back(model.Primitive.Primitive.VertexId);
+            GeodesicsDirty = true;
+        }
+        const auto selected = Runtime::ReadEditorPrimitiveSelection(
+            context.GeometryCommands, model.SelectedStableId, Runtime::GeometryElementDomain::MeshVertex);
+        ImGui::BeginDisabled(!selected.Usable() || selected.Indices.empty());
+        if (ImGui::Button("Use selected vertices as sources"))
+        {
+            GeodesicsConfig.SourceVertices = selected.Indices;
+            GeodesicsDirty = true;
+        }
+        ImGui::EndDisabled();
+        ImGui::TextDisabled("Select vertices in Mesh / Selection, then copy them here.");
+        ImGui::InputInt("Source vertex", &GeodesicsSourceVertex);
+        if (ImGui::Button("Add source") && GeodesicsSourceVertex >= 0)
+        {
+            GeodesicsConfig.SourceVertices.push_back(
+                static_cast<std::uint32_t>(GeodesicsSourceVertex));
+            GeodesicsDirty = true;
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("Clear sources"))
+        {
+            GeodesicsConfig.SourceVertices.clear();
+            GeodesicsDirty = true;
+        }
+        if (GeodesicsDirty)
+        {
+            auto& vertices = GeodesicsConfig.SourceVertices;
+            std::sort(vertices.begin(), vertices.end());
+            vertices.erase(std::unique(vertices.begin(), vertices.end()), vertices.end());
+        }
+        std::string sourceText = "Sources:";
+        for (auto vertex : GeodesicsConfig.SourceVertices)
+            sourceText += " " + std::to_string(vertex);
+        ImGui::TextWrapped("%s", sourceText.c_str());
+        if (ImGui::BeginCombo("Position property", GeodesicsConfig.PositionProperty.c_str()))
+        {
+            for (const auto& row : model.PropertyCatalog.Rows)
+            {
+                if (row.Domain != Runtime::EditorPropertyCatalogDomain::MeshVertices ||
+                    row.ValueKind != decltype(row.ValueKind)::Vec3 || row.Internal)
+                    continue;
+                if (ImGui::Selectable(row.Name.c_str(),
+                                      row.Name == GeodesicsConfig.PositionProperty))
+                {
+                    GeodesicsConfig.PositionProperty = row.Name;
+                    GeodesicsDirty = true;
+                }
+            }
+            ImGui::EndCombo();
+        }
+        if (ImGui::InputScalar("Expansion budget", ImGuiDataType_U32,
+                               &GeodesicsConfig.MaxHalfedgeExpansions))
+            GeodesicsDirty = true;
+        if (ImGui::Button("Compute geodesics"))
+        {
+            const auto applied =
+                Runtime::ApplyEditorGeodesicsConfig(context.GeometryCommands, GeodesicsConfig);
+            if (applied.Succeeded())
+            {
+                GeodesicsDirty = false;
+                GeodesicsResult = Runtime::ApplyEditorConfiguredGeodesicsCommand(
+                    context.GeometryCommands, model.SelectedStableId);
+                GeodesicsMessage = GeodesicsResult->Message;
+                if (GeodesicsResult->Succeeded())
+                {
+                    const auto status = ShowCurvatureScalarVisualization(
+                        context, model.SelectedStableId, "v:geodesic_distance");
+                    if (status != Runtime::EditorCommandStatus::Applied &&
+                        status != Runtime::EditorCommandStatus::NoChange)
+                        GeodesicsMessage += " Distance display could not be enabled.";
+                }
+            }
+            else
+                GeodesicsMessage = "Geodesics config was rejected; check source indices, position "
+                                   "property, and expansion budget.";
+        }
+        ImGui::TextWrapped("%s", GeodesicsMessage.c_str());
+        if (GeodesicsResult)
+        {
+            const auto& diagnostics = GeodesicsResult->Diagnostics;
+            ImGui::Text("Sources: %zu | Expansions: %zu | Triangle updates: %zu",
+                        diagnostics.SourceCount, diagnostics.HalfedgeExpansions,
+                        diagnostics.TriangleUpdates);
+            ImGui::Text("Unreachable vertices: %zu", diagnostics.UnreachableVertexCount);
+        }
+    }
 }

@@ -17,6 +17,7 @@ import Extrinsic.RHI.Descriptors;
 import Extrinsic.RHI.Device;
 import Extrinsic.RHI.Handles;
 import Extrinsic.Graphics.GpuTransfer;
+import Extrinsic.Graphics.PointLBVH;
 
 // ============================================================
 // ClusteringModule private K-Means Vulkan implementation partition.
@@ -138,8 +139,9 @@ namespace Extrinsic::Runtime
         std::uint32_t Iteration{0u};
         float ConvergenceTolSquared{0.0f};
         float Reserved0{0.0f};
+        std::uint64_t NodesBDA{};
     };
-    static_assert(sizeof(KMeansGpuPassPushConstants) == 32u);
+    static_assert(sizeof(KMeansGpuPassPushConstants) == 40u);
 
     // Matches the `KMeansReductionRef` buffer_reference record in kmeans_*.comp.
     struct KMeansGpuReductionRecord
@@ -332,6 +334,7 @@ namespace Extrinsic::Runtime
 
     struct KMeansGpuRecordDesc
     {
+        Graphics::PointLbvhWorkspace* Index{};
         RHI::IDevice* Device{nullptr};
         RHI::ICommandContext* CommandContext{nullptr};
         KMeansGpuPipelineSet Pipelines{};
@@ -377,6 +380,7 @@ namespace Extrinsic::Runtime
 
     struct KMeansGpuExecutionDesc
     {
+        Graphics::PointLbvhWorkspace* Index{};
         RHI::IDevice* Device{nullptr};
         RHI::ICommandContext* CommandContext{nullptr};
         KMeansGpuResourceCache* ResourceCache{nullptr};

@@ -22,7 +22,7 @@ handle-specific property wrappers, are the semantic boundary. Runtime fixes
 precede their paired UI tasks; graph-capable fixes also wait for `HARDEN-087`
 to align physical ECS materialization with the element-domain contract:
 
-- [RUNTIME-207 — ICP element-domain source integration](RUNTIME-207-icp-element-domain-source-integration.md)
+- [RUNTIME-207 — ICP element-domain source integration](../../active/RUNTIME-207-icp-element-domain-source-integration.md)
   accepts arbitrary mixed property-domain pairs and adds the shared config lane
   after `BUG-096` makes point-to-plane readiness truthful.
 - [RUNTIME-209 — Point-set outlier analysis and publication split](RUNTIME-209-point-set-outlier-analysis-publication.md)
@@ -37,7 +37,7 @@ to align physical ECS materialization with the element-domain contract:
 - [RUNTIME-212 — Progressive Poisson property-domain publication](RUNTIME-212-progressive-poisson-property-domain-publication.md)
   extends retired `RUNTIME-208` without rewriting it: arbitrary typed sample
   properties receive the same source-cardinality hierarchy attributes.
-- [RUNTIME-213 — Point-set normal property-domain integration](RUNTIME-213-point-normal-property-domain-integration.md)
+- [RUNTIME-213 — Point-set normal property-domain integration](../../active/RUNTIME-213-point-normal-property-domain-integration.md)
   exposes the generic span-based normal estimator on every element domain while
   retaining genuinely topology-aware mesh/graph methods.
 

@@ -39,6 +39,17 @@ maturity_target: CPUContracted
   improvements before each migrated family. Preserve current formulations and
   keep `GEOM-068`/`GEOM-069` ownership distinct.
 
+## Spatial acceleration consideration
+
+Future acceleration of BuildKNNGraph needs kNN/self exclusion; nearest-
+edge/radius-edge operations need segment bounds and exact segment distance, not
+point centroids. Preserve the current graph algorithms and property/adjacency
+contract in this slice. Dijkstra, layouts and connectivity are not replaced by
+proximity queries; a later index adaptation must keep geometry independent of
+runtime.
+
+See the [shared spatial-index consumer inventory](../../../docs/architecture/spatial-index-consumers.md).
+
 ## Required changes
 
 - [ ] Inventory graph algorithms by exact node, edge, halfedge, position/cost,

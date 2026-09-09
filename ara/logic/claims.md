@@ -466,13 +466,13 @@
   docs/architecture/contract-catalog.yaml,
   tasks/done/HARDEN-087-unified-geometry-element-source-components.md,
   tasks/done/RUNTIME-206-lop-element-domain-source-integration.md,
-  tasks/backlog/runtime/RUNTIME-207-icp-element-domain-source-integration.md,
+  tasks/active/RUNTIME-207-icp-element-domain-source-integration.md,
   tasks/done/RUNTIME-208-progressive-poisson-element-domain-publication.md,
   tasks/backlog/runtime/RUNTIME-209-point-set-outlier-analysis-publication.md,
   tasks/backlog/runtime/RUNTIME-210-signed-heat-runtime-config-integration.md,
   tasks/done/UI-038-progressive-poisson-multi-domain-panel.md,
   tasks/done/UI-039-lop-multi-domain-discovery.md,
-  tasks/backlog/ui/UI-040-icp-compatible-source-selection.md,
+  tasks/active/UI-040-icp-compatible-source-selection.md,
   tasks/backlog/ui/UI-041-point-set-outlier-multi-domain-panel.md,
   tasks/backlog/ui/UI-042-signed-heat-mesh-panel.md,
   tools/agents/validate_tasks.py,
@@ -1971,3 +1971,58 @@
 - **Dependencies**: [C71, C73]
 - **Tags**: geometry, CPU diagnostic, constrained boundary refinement, feature ablation, offline
 - **From staging**: O199
+
+## C75: Exact planar oracle for virtual-source geodesics
+- **Statement**: The imported one-source-per-face virtual-source formulation reproduces analytic planar distances within 1e-5 at every vertex of the 8-by-8 grid with interior source vertex 40.
+- **Status**: refuted — local CPU intake only. The initial native test rejects this oracle; the final method contract uses explicit approximate-distance fixture bounds. This is not a Framework24 parity or performance result.
+- **Provenance**: ai-suggested
+- **Crystallized via**: artifact-commitment
+- **Falsification criteria**: Any vertex exceeds the original 1e-5 absolute-error bound on the declared grid; the retained failed oracle supplies such counterexamples.
+- **Proof**: [ara/evidence/diagnostics/geodesics_virtual_source_2026-09-08/initial-oracle-failures.txt, ara/evidence/tables/geodesics_virtual_source_intake_2026-09-08.md, tests/unit/geometry/Test.GeodesicVirtualSource.cpp, methods/geometry/geodesics_virtual_source/paper.md]
+- **Dependencies**: []
+- **Tags**: geometry, CPU reference, negative result, approximate geodesics
+- **From staging**: O200
+
+## C76: Bounded CPU and Vulkan point-LBVH integration
+- **Statement**: On the source-hashed local 2026-09-08 cohort, GPU point-LBVH nearest/radius readbacks match exhaustive CPU indices and distances within the tests' 1e-5 absolute bound, including coincident inputs, overflow counts and deleted-slot remapping. Entity cache reuse/invalidation checks pass, and ClusteringService completes its existing k-means fixture through Vulkan LBVH assignment without CPU fallback while matching its CPU label/inertia checks.
+- **Status**: supported — two ci-vulkan ASan+UBSan readback tests on NVIDIA RTX 3050 driver 590.48.01, plus CPU kernel/cache contracts. This is a bounded local implementation result, not full Framework24 parity, arbitrary-input proof, statistical performance evidence or a speedup claim. Dirty-source smoke timings remain non-claim-eligible.
+- **Provenance**: ai-executed
+- **Crystallized via**: artifact-commitment
+- **Falsification criteria**: Replaying the recorded source on an operational Vulkan device produces an asserted index/distance/count mismatch, stale-handle acceptance, unintended rebuild, wrong source-slot mapping, CPU fallback, or k-means publication failure in the stated cohort.
+- **Proof**: [ara/evidence/diagnostics/point_lbvh_2026-09-08/record.json, ara/evidence/diagnostics/point_lbvh_2026-09-08/vulkan-test-output.txt, ara/evidence/tables/point_lbvh_verification_2026-09-08.md, tests/unit/geometry/Test.PointLBVH.cpp, tests/contract/runtime/Test.SpatialIndexCache.cpp, tests/integration/graphics/Test.PointLBVHGpuSmoke.cpp, tests/integration/runtime/Test.ClusteringServiceGpuSmoke.cpp]
+- **Dependencies**: [A46]
+- **Tags**: geometry, LBVH, bounded parity, Vulkan, CPU reference, sanitizer, runtime
+- **From staging**: O203
+
+## C77: Bounded canonical-domain ICP and shared correspondence integration
+- **Statement**: The source-hashed local 2026-09-08 CPU fixtures accept all 64 canonical operand-domain pairs, preserve geometry and source-transform history, reject stale inputs, and preserve signed/nonuniform/zero scales. In the 1,024-live-sample framed Vulkan fixture, both ICP variants match their corresponding CPU reference within 1e-4 matrix and 1e-5 RMSE bounds without CPU fallback, with one CPU and one GPU target-index build across the declared repeated runs.
+- **Status**: supported — bounded ci CPU and two ci-vulkan ASan+UBSan readback tests only. No arbitrary-input proof, full Framework24 parity, speedup, default adoption or whole-process leak-freedom claim. The final display-off runtime smoke fails its unchanged five-second timing gate; all benchmark sources are dirty and non-claim-eligible.
+- **Provenance**: ai-executed
+- **Crystallized via**: artifact-commitment
+- **Falsification criteria**: Replaying the recorded sources and fixtures produces a canonical-domain rejection, geometry mutation, stale publication, scale/history mismatch, CPU/GPU matrix or RMSE error beyond the stated tolerances, fallback, or additional target rebuild contrary to the fixture assertions.
+- **Proof**: [ara/evidence/diagnostics/registration_spatial_2026-09-08/record.json, ara/evidence/diagnostics/registration_spatial_2026-09-08/vulkan-tests.txt, ara/evidence/diagnostics/registration_spatial_2026-09-08/domain-tests.txt, ara/evidence/tables/registration_spatial_verification_2026-09-08.md, tests/contract/runtime/Test.RegistrationDomains.cpp, tests/integration/graphics/Test.PointLBVHGpuSmoke.cpp]
+- **Dependencies**: [C76, H19]
+- **Tags**: geometry, ICP, canonical domains, CPU, Vulkan, bounded parity, runtime
+- **From staging**: O206
+
+## C78: Bounded shared kNN, exclusion and supplied CPU PCA integration
+- **Statement**: The source-hashed 2026-09-08 local fixtures match exhaustive CPU k-nearest ordering and identity exclusion, including coincident peers and deleted source slots. Vulkan k=1..64 fixtures and framed batches preserve counts, ordering, reuse and stale-before-record rejection. The supplied CPU LBVH PCA adapter matches the existing KD-tree estimator on the declared kNN/radius fixtures within 1e-5 component tolerance while retaining its k+1-then-filter policy.
+- **Status**: supported — bounded ci CPU and ci-vulkan ASan+UBSan fixtures only. Five current capability cases pass across the initial and corrected-fixture runs; no arbitrary-input proof, GPU PCA, normal config/UI completion, speedup, default adoption or whole-process leak-freedom claim. Dirty-source smoke remains non-claim-eligible for performance.
+- **Provenance**: ai-executed
+- **Crystallized via**: artifact-commitment
+- **Falsification criteria**: Replaying the recorded source and fixtures produces a wrong neighbor ID/order/distance/count, excludes coincident peers by position, accepts a stale queued target, rebuilds contrary to reuse assertions, or changes normal components beyond the stated tolerance.
+- **Proof**: [ara/evidence/diagnostics/point_lbvh_knn_2026-09-08/record.json, ara/evidence/diagnostics/point_lbvh_knn_2026-09-08/cpu-tests.txt, ara/evidence/diagnostics/point_lbvh_knn_2026-09-08/vulkan-first-run.txt, ara/evidence/diagnostics/point_lbvh_knn_2026-09-08/vulkan-final-focused.txt, ara/evidence/tables/point_lbvh_knn_verification_2026-09-08.md, tests/unit/geometry/Test.PointLBVH.cpp, tests/contract/runtime/Test.SpatialIndexCache.cpp, tests/integration/graphics/Test.PointLBVHGpuSmoke.cpp]
+- **Dependencies**: [C76, C77]
+- **Tags**: geometry, LBVH, kNN, exclusion, normals, CPU, Vulkan, bounded parity, runtime
+- **From staging**: O207
+
+## C79: Bounded canonical normal-estimation workflow
+- **Statement**: The source-hashed 2026-09-08 local CPU fixtures publish named planar normals on all eight canonical element domains with KD-tree and cached CPU LBVH within 1e-5 component/length bounds, preserving unrelated properties and deleted output rows. The declared mesh/graph topology cases, cache reuse, guarded job/history cases, config round-trip and shared editor/vector-recipe routing pass their assertions.
+- **Status**: supported — bounded ci unsanitized CPU and headless editor integration only; 179 focused tests and the full CPU gate pass, with the expected LSan-control skip. No arbitrary-input proof, new GPU normal solve or visualization readback, sanitizer qualification, performance improvement, default change or full Framework24 PCA/features/saliency parity claim.
+- **Provenance**: ai-executed
+- **Crystallized via**: artifact-commitment
+- **Falsification criteria**: Replaying the recorded sources and fixtures rejects a compatible domain, violates a normal/error or reuse assertion, changes unrelated/deleted rows, accepts a stale job/history write, or breaks configured execution, shared normal-window/result routing or canonical vector-recipe bindings.
+- **Proof**: [ara/evidence/diagnostics/normal_estimation_2026-09-08/record.json, ara/evidence/diagnostics/normal_estimation_2026-09-08/focused-tests.txt, ara/evidence/diagnostics/normal_estimation_2026-09-08/cpu-gate.txt, ara/evidence/tables/normal_estimation_verification_2026-09-08.md, tests/contract/runtime/Test.NormalEstimation.cpp, tests/contract/runtime/Test.SandboxEditorSessionLifecycle.cpp, tests/integration/runtime/Test.SandboxEditorPresentation.cpp]
+- **Dependencies**: [C78, H20]
+- **Tags**: normals, canonical domains, CPU, PCA, LBVH, runtime, editor, bounded integration
+- **From staging**: O209

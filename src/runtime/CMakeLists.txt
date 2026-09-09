@@ -22,6 +22,9 @@ target_sources(${target_name}
         Modules/Clustering/Runtime.ClusteringConfig.cppm
         Modules/CurvatureSegmentation/Runtime.CurvatureSegmentationConfig.cppm
         Modules/ProgressivePoisson/Runtime.ProgressivePoissonConfig.cppm
+        Modules/Geodesics/Runtime.GeodesicsConfig.cppm
+        Modules/NormalEstimation/Runtime.NormalEstimationConfig.cppm
+        Modules/Registration/Runtime.RegistrationConfig.cppm
         Modules/Parameterization/Runtime.ParameterizationConfig.cppm
         Modules/PointCloudConsolidation/Runtime.PointCloudConsolidationConfig.cppm
         Modules/PointCloudConsolidation/Runtime.PointCloudConsolidationModule.cppm
@@ -49,6 +52,7 @@ target_sources(${target_name}
         Kernel/Runtime.WorldHandle.cppm
         Kernel/Runtime.WorldRegistry.cppm
         GeometryIntegration/Runtime.GeometryAvailability.cppm
+        GeometryIntegration/Runtime.SpatialIndexCache.cppm
         Modules/PhysicsIntegration/Runtime.PhysicsModule.cppm
         Scene/Runtime.SceneDocumentModule.cppm
         Scene/Runtime.SceneInteractionModule.cppm
@@ -113,6 +117,10 @@ target_sources(${target_name}
         Modules/Clustering/Runtime.ClusteringConfig.cpp
         Modules/CurvatureSegmentation/Runtime.CurvatureSegmentationConfig.cpp
         Modules/ProgressivePoisson/Runtime.ProgressivePoissonConfig.cpp
+        Modules/Geodesics/Runtime.GeodesicsConfig.cpp
+        Modules/NormalEstimation/Runtime.NormalEstimationConfig.cpp
+        Editor/Operations/Runtime.GeometryProcessingOperations.Normals.cpp
+        Modules/Registration/Runtime.RegistrationConfig.cpp
         Modules/Parameterization/Runtime.ParameterizationConfig.cpp
         Modules/PointCloudConsolidation/Runtime.PointCloudConsolidationConfig.cpp
         Modules/PointCloudConsolidation/Runtime.PointCloudConsolidationModule.cpp
@@ -152,9 +160,11 @@ target_sources(${target_name}
         Kernel/Runtime.ServiceRegistry.cpp
         Kernel/Runtime.WorldRegistry.cpp
         GeometryIntegration/Runtime.GeometryAvailability.cpp
+        GeometryIntegration/Runtime.SpatialIndexCache.cpp
         Modules/PhysicsIntegration/Runtime.PhysicsModule.cpp
         Scene/Runtime.SceneDocumentModule.cpp
         Scene/Runtime.SceneInteractionModule.cpp
+        Scene/Runtime.SceneInteractionModule.Selection.cpp
         Scene/Runtime.SceneSerialization.cpp
         Cameras/Runtime.CameraModule.cpp
         Cameras/Runtime.CameraControllers.cpp
@@ -175,6 +185,8 @@ target_sources(${target_name}
         Rendering/Runtime.RenderExtraction.Geometry.cpp
         Rendering/Runtime.RenderWorldPool.cpp
         Scene/Runtime.SelectionController.cpp
+        Scene/Runtime.SelectionController.Primitives.cpp
+        Scene/Runtime.SelectionController.Config.cpp
         Scene/Runtime.StableEntityLookup.cpp
         Modules/TextureBake/Runtime.TextureBakeModule.cpp
         GeometryIntegration/Runtime.VertexAttributeBinding.cpp

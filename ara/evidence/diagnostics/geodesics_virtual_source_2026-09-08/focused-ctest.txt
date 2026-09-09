@@ -1,0 +1,85 @@
+Internal ctest changing into directory: /home/alex/Documents/IntrinsicEngine/build/ci
+Test project /home/alex/Documents/IntrinsicEngine/build/ci
+      Start  589: GeodesicsOperations.PublishesWithoutChangingMeshAndSupportsUndoRedo
+ 1/36 Test  #589: GeodesicsOperations.PublishesWithoutChangingMeshAndSupportsUndoRedo .........................   Passed    0.00 sec
+      Start  590: GeodesicsOperations.AcceptsAlternateVertexPositionsAndRejectsWrongTypes
+ 2/36 Test  #590: GeodesicsOperations.AcceptsAlternateVertexPositionsAndRejectsWrongTypes .....................   Passed    0.00 sec
+      Start  591: GeodesicsOperations.ConfigRoundTripsAndRejectsInvalidPayloads
+ 3/36 Test  #591: GeodesicsOperations.ConfigRoundTripsAndRejectsInvalidPayloads ...............................   Passed    0.00 sec
+      Start  592: GeodesicsOperations.UndoRejectsChangedGeometry
+ 4/36 Test  #592: GeodesicsOperations.UndoRejectsChangedGeometry ..............................................   Passed    0.00 sec
+      Start  593: GeodesicsOperations.ExhaustedBudgetPreservesExistingOutput
+ 5/36 Test  #593: GeodesicsOperations.ExhaustedBudgetPreservesExistingOutput ..................................   Passed    0.00 sec
+      Start  594: GeodesicsOperations.RejectsMalformedVertexSourcesBeforePublishing
+ 6/36 Test  #594: GeodesicsOperations.RejectsMalformedVertexSourcesBeforePublishing ...........................   Passed    0.00 sec
+      Start  595: GeodesicsOperations.UndoRejectsChangedDeletionState
+ 7/36 Test  #595: GeodesicsOperations.UndoRejectsChangedDeletionState .........................................   Passed    0.01 sec
+      Start  596: GeodesicsOperations.UsesSharedPreviewApplyAndConfiguredCommand
+ 8/36 Test  #596: GeodesicsOperations.UsesSharedPreviewApplyAndConfiguredCommand ..............................   Passed    0.00 sec
+      Start 1265: SandboxEditorPresentation.DefaultDrawStartsWithOnlyMenuBarVisible
+ 9/36 Test #1265: SandboxEditorPresentation.DefaultDrawStartsWithOnlyMenuBarVisible ...........................   Passed    0.04 sec
+      Start 1266: SandboxEditorPresentation.DomainMenusUseAppearanceAndFocusedProcessingWindows
+10/36 Test #1266: SandboxEditorPresentation.DomainMenusUseAppearanceAndFocusedProcessingWindows ...............   Passed    0.04 sec
+      Start 1267: SandboxEditorPresentation.DomainPanelsPreserveLifetimeCacheAndResultPublication
+11/36 Test #1267: SandboxEditorPresentation.DomainPanelsPreserveLifetimeCacheAndResultPublication .............   Passed    0.00 sec
+      Start 1268: SandboxEditorPresentation.MeshProcessingPanelsPreserveLifetimeAndResultPublication
+12/36 Test #1268: SandboxEditorPresentation.MeshProcessingPanelsPreserveLifetimeAndResultPublication ..........   Passed    0.00 sec
+      Start 1269: SandboxEditorPresentation.ExtrinsicSandboxAppStaysRuntimeOnly
+13/36 Test #1269: SandboxEditorPresentation.ExtrinsicSandboxAppStaysRuntimeOnly ...............................   Passed    0.02 sec
+      Start 1270: SandboxEditorPresentation.RuntimeFeatureModulesCompileSeparatelyFromEditorShell
+14/36 Test #1270: SandboxEditorPresentation.RuntimeFeatureModulesCompileSeparatelyFromEditorShell .............   Passed    0.12 sec
+      Start 1271: SandboxEditorPresentation.GeometryProcessingMenusExposeDomainElementSubmenus
+15/36 Test #1271: SandboxEditorPresentation.GeometryProcessingMenusExposeDomainElementSubmenus ................   Passed    0.00 sec
+      Start 1272: SandboxEditorPresentation.AdapterCallbackDrawsDeterministicMenuOnlyFrame
+16/36 Test #1272: SandboxEditorPresentation.AdapterCallbackDrawsDeterministicMenuOnlyFrame ....................   Passed    0.04 sec
+      Start 1273: SandboxEditorPresentation.FileImportDisabledReasonRendersThroughRealHoveredControl
+17/36 Test #1273: SandboxEditorPresentation.FileImportDisabledReasonRendersThroughRealHoveredControl ..........   Passed    0.25 sec
+      Start 1274: SandboxEditorPresentation.DisabledReasonTooltipConventionIsSharedByImportAndQueueControls
+18/36 Test #1274: SandboxEditorPresentation.DisabledReasonTooltipConventionIsSharedByImportAndQueueControls ...   Passed    0.01 sec
+      Start 1275: SandboxEditorPresentation.RuntimeImportEventIsReflectedByAppFilePanel
+19/36 Test #1275: SandboxEditorPresentation.RuntimeImportEventIsReflectedByAppFilePanel .......................   Passed    0.05 sec
+      Start 1276: SandboxEditorPresentation.EngineAttachmentRegistersEditorCallback
+20/36 Test #1276: SandboxEditorPresentation.EngineAttachmentRegistersEditorCallback ...........................   Passed    0.04 sec
+      Start 1277: SandboxEditorPresentation.ControllerReattachPinsPanelAttachmentResetPolicy
+21/36 Test #1277: SandboxEditorPresentation.ControllerReattachPinsPanelAttachmentResetPolicy ..................   Passed    0.08 sec
+      Start 1278: SandboxEditorPresentation.EditorShellStartsWithOnlyBuiltinWindows
+22/36 Test #1278: SandboxEditorPresentation.EditorShellStartsWithOnlyBuiltinWindows ...........................   Passed    0.04 sec
+      Start 1279: SandboxEditorPresentation.GpuProfilingControlsReuseTheExistingFrameGraphWindow
+23/36 Test #1279: SandboxEditorPresentation.GpuProfilingControlsReuseTheExistingFrameGraphWindow ..............   Passed    0.01 sec
+      Start 1280: SandboxEditorPresentation.ExternalWindowContributionNeedsNoLegacySwitchEntry
+24/36 Test #1280: SandboxEditorPresentation.ExternalWindowContributionNeedsNoLegacySwitchEntry ................   Passed    0.04 sec
+      Start 1281: SandboxEditorPresentation.ContextWindowContributionReceivesAppOwnedContext
+25/36 Test #1281: SandboxEditorPresentation.ContextWindowContributionReceivesAppOwnedContext ..................   Passed    0.04 sec
+      Start 1282: SandboxEditorPresentation.GlobalVisibilityHotkeyUsesTheVisibilityCommandPath
+26/36 Test #1282: SandboxEditorPresentation.GlobalVisibilityHotkeyUsesTheVisibilityCommandPath ................   Passed    0.04 sec
+      Start 1283: SandboxEditorGeodesics.RegistersAndDrawsWindow
+27/36 Test #1283: SandboxEditorGeodesics.RegistersAndDrawsWindow ..............................................   Passed    0.04 sec
+      Start 2388: GeodesicVirtualSource.BoundaryAndInteriorSourcesBoundPlanarError
+28/36 Test #2388: GeodesicVirtualSource.BoundaryAndInteriorSourcesBoundPlanarError ............................   Passed    0.01 sec
+      Start 2389: GeodesicVirtualSource.FoldedSurfaceUsesIntrinsicDistanceAndScales
+29/36 Test #2389: GeodesicVirtualSource.FoldedSurfaceUsesIntrinsicDistanceAndScales ...........................   Passed    0.01 sec
+      Start 2390: GeodesicVirtualSource.MultipleSourcesAreOrderIndependentAndRepeatable
+30/36 Test #2390: GeodesicVirtualSource.MultipleSourcesAreOrderIndependentAndRepeatable .......................   Passed    0.01 sec
+      Start 2391: GeodesicVirtualSource.UnreachableAndIsolatedSourcesRemainExplicit
+31/36 Test #2391: GeodesicVirtualSource.UnreachableAndIsolatedSourcesRemainExplicit ...........................   Passed    0.00 sec
+      Start 2392: GeodesicVirtualSource.RejectsInvalidInputsAndBudgetWithoutPublishing
+32/36 Test #2392: GeodesicVirtualSource.RejectsInvalidInputsAndBudgetWithoutPublishing ........................   Passed    0.00 sec
+      Start 2393: GeodesicVirtualSource.TypedPositionsAndDeletedSlotsPreserveInput
+33/36 Test #2393: GeodesicVirtualSource.TypedPositionsAndDeletedSlotsPreserveInput ............................   Passed    0.00 sec
+      Start 2394: GeodesicVirtualSource.ConcaveBoundaryRoutesAroundMissingSurface
+34/36 Test #2394: GeodesicVirtualSource.ConcaveBoundaryRoutesAroundMissingSurface .............................   Passed    0.00 sec
+      Start 2395: GeodesicVirtualSource.RejectsPolygonFacesAndSubmeshViews
+35/36 Test #2395: GeodesicVirtualSource.RejectsPolygonFacesAndSubmeshViews ....................................   Passed    0.00 sec
+      Start 2396: GeodesicVirtualSource.ClosedOctahedronUsesUnfoldedSurfaceDistance
+36/36 Test #2396: GeodesicVirtualSource.ClosedOctahedronUsesUnfoldedSurfaceDistance ...........................   Passed    0.00 sec
+
+100% tests passed, 0 tests failed out of 36
+
+Label Time Summary:
+contract       =   0.04 sec*proc (8 tests)
+geometry       =   0.05 sec*proc (9 tests)
+integration    =   0.91 sec*proc (19 tests)
+runtime        =   0.94 sec*proc (27 tests)
+unit           =   0.05 sec*proc (9 tests)
+
+Total Test time (real) =   1.16 sec

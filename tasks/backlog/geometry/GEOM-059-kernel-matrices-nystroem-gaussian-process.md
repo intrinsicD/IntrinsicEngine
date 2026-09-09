@@ -3,6 +3,15 @@ id: GEOM-059
 theme: I
 depends_on: []
 maturity_target: CPUContracted
+workflow_schema: 1
+workflow_profile: standard
+evidence: required
+owner:
+branch:
+worktree:
+claimed_at:
+contract_schema: 1
+contracts: [repo.source-documentation, geometry.element-domain-sources]
 ---
 # GEOM-059 — Kernel matrices, Nyström approximation, and Gaussian-process interpolation seam
 
@@ -21,6 +30,17 @@ maturity_target: CPUContracted
 - The bcg originals are header-only and untested; this port adds explicit SPD safeguards (jitter escalation with a capped, reported failure state) and correctness tests.
 - Dense factorizations stay internal (Eigen LLT/LDLT); the sparse solver seams from retired `GEOM-020`/`GEOM-023` are untouched.
 - Engine motivation: scattered scalar-field interpolation on scanned point clouds and mesh vertices (for example, propagating sparse measurements or editing weights) without requiring a mesh Laplacian solve.
+
+## Spatial acceleration consideration
+
+A point LBVH may help a future explicitly compact-support kernel or landmark-
+neighborhood operation, but dense Gaussian matrices, Nystrom terms and GP
+predictions have nonlocal contributions. Keep the declared dense/reference
+semantics; finite-radius truncation or hierarchical aggregate approximations
+require a separately contracted error/parity study and are not supplied by the
+current tree.
+
+See the [shared spatial-index consumer inventory](../../../docs/architecture/spatial-index-consumers.md).
 
 ## Required changes
 - [ ] Add module `Geometry.Kernels` (`.cppm` + `.cpp`): kernel evaluators (Gaussian/RBF and Laplacian at minimum) with explicit bandwidth parameters, plus dense kernel-matrix assembly for `K(X, Y)`.

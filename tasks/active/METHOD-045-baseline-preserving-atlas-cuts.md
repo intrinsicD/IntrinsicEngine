@@ -57,6 +57,16 @@ contract_review: "Embedded oriented triangle connectivity is required. Baseline 
 | Publication | Immutable source geometry and semantic regions, detached corner UVs and chart IDs. |
 | End-to-end tests | Native baseline export to offline atlas and packer now; METHOD-044 owns ECS publication. |
 
+## Spatial acceleration consideration
+
+If geometric overlap audits become a measured bottleneck, consider a CPU primitive
+broad phase while retaining exact UV triangle/segment predicates. Current point
+LBVH cannot establish chart injectivity or preserve semantic regions by nearest-
+centroid clustering. Keep the existing bounded experiment, baseline labels,
+independent audit and deferred runtime decision.
+
+See the [shared spatial-index consumer inventory](../../docs/architecture/spatial-index-consumers.md).
+
 ## Verification
 ```bash
 cmake --preset ci

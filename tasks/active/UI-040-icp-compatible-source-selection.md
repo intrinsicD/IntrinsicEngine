@@ -5,10 +5,10 @@ depends_on: [RUNTIME-207]
 workflow_schema: 1
 workflow_profile: standard
 evidence: required
-owner:
-branch:
-worktree:
-claimed_at:
+owner: codex-interactive
+branch: main
+worktree: /home/alex/Documents/IntrinsicEngine
+claimed_at: "2026-09-08T14:06:03.847241+00:00"
 contract_schema: 1
 contracts: [geometry.element-domain-sources, method.engine-integration]
 maturity_target: Operational
@@ -45,38 +45,47 @@ maturity_target: Operational
 | Publication | Show source-transform-only consequences; never mutate geometry or target transform. |
 | End-to-end tests | Domain menu discovery, cross-provenance and non-vertex property selection/readiness, config parity, run/trajectory, undo/redo. |
 
+## Spatial acceleration consideration
+
+Use RUNTIME-207's shared readiness/config path for any future cached
+correspondence backend. The selected target property, domain and metric must reach
+runtime unchanged; UI must not build a private index or imply LBVH acceleration
+before the registration consumer is wired.
+
+See the [shared spatial-index consumer inventory](../../docs/architecture/spatial-index-consumers.md).
+
 ## Required changes
 
-- [ ] Register stable Mesh, Graph, and PointCloud Processing entries that open
+- [x] Register stable Mesh, Graph, and PointCloud Processing entries that open
       one shared ICP window; retain a View alias only if existing compatibility
       tests/users require it.
-- [ ] Populate both entity/property selectors from runtime catalogs and display
+- [x] Populate both entity/property selectors from runtime catalogs and display
       provenance, element-domain, value-count, normal readiness, transform
       readiness, and exact disabled reasons.
-- [ ] Route parameter edits through the shared runtime config preview/apply path
+- [x] Route parameter edits through the shared runtime config preview/apply path
       and submit only the typed registration command.
-- [ ] Preserve trajectory scrubbing and source-transform undo/redo without
+- [x] Preserve trajectory scrubbing and source-transform undo/redo without
       app-owned copies of geometry or method state.
 
 ## Tests
 
-- [ ] Assert all domain menu entries, every provenance pairing, and
+- [x] Assert all domain menu entries, every provenance pairing, and
       representative vertex/edge/halfedge/face property selector options.
-- [ ] Cover point-to-point success for mixed domains, point-to-plane normal
+- [x] Cover point-to-point success for mixed domains, point-to-plane normal
       readiness, same-entity rejection, and stale/missing entity diagnostics.
-- [ ] Verify config/agent/UI parity and source-transform-only undo/redo.
+- [x] Verify config/agent/UI parity and source-transform-only undo/redo.
 
 ## Docs
 
-- [ ] Update Sandbox registration documentation with compatible sources,
+- [x] Update Sandbox registration documentation with compatible sources,
       variant requirements, and transform-only publication.
 
 ## Acceptance criteria
 
-- [ ] Any compatible typed property on mesh, graph, or point-cloud entities is
+- [x] Any compatible typed property on mesh, graph, or point-cloud entities is
       selectable as either ICP operand.
-- [ ] Panel availability and diagnostics exactly match runtime readiness.
-- [ ] No converter or UI-private mutation path exists.
+- [x] Panel availability and diagnostics exactly match runtime readiness.
+- [x] No converter or UI-private mutation path exists.
 
 ## Verification
 
@@ -91,3 +100,27 @@ python3 tools/agents/validate_tasks.py --root tasks --strict
 
 - No exact-provenance filtering, mesh/graph conversion, target mutation,
   duplicated domain windows, or app-owned config/history truth.
+
+## Interactive implementation note — 2026-09-08
+
+The operator accepted the combined canonical ICP workflow and shared-index
+integration proposal. This explicitly adds cached CPU LBVH and framed Vulkan
+correspondence queries to the original binding/UI scope. The CPU KD-tree default
+and existing CPU solve remain. No GICP, Trimmed ICP overlap estimator, Anderson
+acceleration, kNN or triangle query method is included. Implementation acceptance
+is verified in the shared working tree. These notes remain active pending
+review/commit. The design is documented in
+[registration](../../docs/architecture/registration.md).
+
+## Verification record — 2026-09-08
+
+- CPU cohort: 4,349 selected; 4,348 passed with host display access, no
+  failures, and one expected unsanitized LeakSanitizer-control skip.
+- Two Vulkan/ASan/UBSan readback tests passed, including framed point-to-point
+  and point-to-plane registration with same-variant CPU references.
+- CPU and runtime GPU comparison output is schema-v2 validated, dirty-source,
+  and non-claim-eligible. The default remains CPU KD-tree.
+- Canonical 8-by-8 domain pairs, live-row mapping, normal preflight, stale
+  binding/deletion rejection, source-only undo/redo, config preview/apply/run,
+  and one shared window behind the domain menu entries are covered.
+- [Review and limitations](../../docs/reviews/2026-09-08-icp-spatial-integration.md).

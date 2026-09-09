@@ -1,0 +1,15 @@
+benchmark_id: geometry.point_lbvh.knn_smoke
+method: geometry.point_lbvh
+dataset: builtin.paraboloid.32x16
+params:
+  intent: smoke
+  warmup_iterations: 1
+  measured_iterations: 4
+  k_neighbors: 16
+  normal_k_neighbors: 15
+metrics:
+  - runtime_ms
+  - quality_error_linf
+thresholds:
+  smoke_runtime_ms_max: 250
+  quality_error_linf_max: 0.00001

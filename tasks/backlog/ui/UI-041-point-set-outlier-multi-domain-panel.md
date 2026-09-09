@@ -46,6 +46,15 @@ maturity_target: Operational
 | Publication | Visualize same-domain, same-count mask/score; label point-cloud compaction as a separate destructive history command. |
 | End-to-end tests | Three-domain discovery/detection, visualization, point-cloud removal, disabled reasons, and undo/redo. |
 
+## Spatial acceleration consideration
+
+Keep acceleration ownership in RUNTIME-209. If an accelerated radius detector is
+later exposed, surface unsupported/overflow/fallback diagnostics through the same
+validated request; statistical kNN can use the shared point LBVH (GPU k=1..64) after method-adapter parity. No
+panel-local index or new backend token belongs in this UI slice.
+
+See the [shared spatial-index consumer inventory](../../../docs/architecture/spatial-index-consumers.md).
+
 ## Required changes
 
 - [ ] Register one feature panel under Mesh, Graph, and PointCloud Processing

@@ -1,0 +1,79 @@
+{
+  "attempt_id": "attempt-001",
+  "backend": "cpu_reference",
+  "benchmark_id": "geometry.geodesics_virtual_source.smoke",
+  "claim_eligible": false,
+  "commit": "local-dev",
+  "config_digest": "d3d3fbac1c15aa392e5858a671de012c316e695fa0ea9d6751273ae0b1368ae6",
+  "dataset": "builtin.flat_grid.corner_source.8",
+  "diagnostics": {
+    "halfedge_expansions": 296,
+    "measured_iterations": 8,
+    "mode": "smoke",
+    "runner": "IntrinsicBenchmarkSmoke",
+    "warmup_iterations": 1
+  },
+  "execution_status": "passed",
+  "manifest": {
+    "path": "benchmarks/geometry/manifests/geodesics_virtual_source_reference_smoke.yaml",
+    "sha256": "7f3194dfee989a482904c3a4441adf0d7c3d3875a8a229d4ce17d9dc1c4b2249"
+  },
+  "method": "geometry.geodesics_virtual_source",
+  "metrics": {
+    "quality_error_l2": 0.015199,
+    "quality_error_linf": 0.059625,
+    "runtime_ms": 0.185285
+  },
+  "resolved_params": {
+    "grid_columns": 8,
+    "intent": "smoke",
+    "max_halfedge_expansions": 10000000,
+    "measured_iterations": 8,
+    "source_vertices": [
+      0
+    ],
+    "warmup_iterations": 1
+  },
+  "run_id": "geodesics-local-20260908",
+  "schema_version": 2,
+  "source": {
+    "revision": "local-dev",
+    "state": "dirty_worktree"
+  },
+  "status": "passed",
+  "threshold_disposition": [
+    {
+      "limit": 250,
+      "metric": "runtime_ms",
+      "observed": 0.185285,
+      "operator": "<=",
+      "passed": true,
+      "threshold": "smoke_runtime_ms_max"
+    },
+    {
+      "limit": 0.05,
+      "metric": "quality_error_l2",
+      "observed": 0.015199,
+      "operator": "<=",
+      "passed": true,
+      "threshold": "quality_error_l2_max"
+    },
+    {
+      "limit": 0.075,
+      "metric": "quality_error_linf",
+      "observed": 0.059625,
+      "operator": "<=",
+      "passed": true,
+      "threshold": "quality_error_linf_max"
+    }
+  ],
+  "thresholds": {
+    "quality_error_l2_max": 0.05,
+    "quality_error_linf_max": 0.075,
+    "smoke_runtime_ms_max": 250
+  },
+  "warmup_policy": {
+    "measured_iterations": 8,
+    "warmup_iterations": 1
+  }
+}

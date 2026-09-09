@@ -11256,3 +11256,289 @@ tree:
     - docs/methods/uv_boundary_refinement_experiment.md
     - ara/evidence/diagnostics/method046/record.json
     status: resolved
+
+  - id: N491
+    type: decision
+    title: Broaden the method toolset before further part decomposition
+    provenance: user
+    timestamp: '2026-09-08T10:53:00+02:00'
+    choice: Implement and wire Framework24 geodesics as a prerequisite tool for segmentation and part-decomposition work. Source inspection identifies Mesh / Geodesics / Virtual Source Propagation.
+    alternatives: [Continue segmentation with the existing toolset]
+    evidence:
+    - methods/geometry/geodesics_virtual_source/paper.md
+    status: resolved
+  - id: N492
+    type: dead_end
+    title: Reject the exact planar virtual-source test oracle
+    provenance: ai-executed
+    timestamp: '2026-09-08T10:53:00+02:00'
+    hypothesis: The imported approximate formulation is exact on the planar interior-source fixture.
+    failure_mode: Native results exceed the exact bound. Removing side flags or restoring all seed edges does not rescue it; supplemental-formulation comparison also produces planar error.
+    lesson: Preserve the rejected oracle and specify approximation checks. Decimal float folding is not an exact isometry control; use binary-exact coordinates and leave perturbation continuity unclaimed.
+    evidence:
+    - ara/evidence/tables/geodesics_virtual_source_intake_2026-09-08.md
+    - ara/evidence/diagnostics/geodesics_virtual_source_2026-09-08/initial-oracle-failures.txt
+    status: resolved
+  - id: N493
+    type: experiment
+    title: Verify native virtual-source geometry and editor integration
+    provenance: ai-executed
+    timestamp: '2026-09-08T10:53:00+02:00'
+    result: The CPU reference passes analytic and failure controls; runtime uses validated config, typed vertex positions and guarded property-only undo/redo. The new panel opens in a headless UI frame. All 36 focused cases pass; the final full CPU gate has 4320 passed, six skipped and zero failed. The declared local smoke and all emitted result schemas validate, with claim eligibility false.
+    evidence:
+    - N491
+    - N492
+    - ara/evidence/diagnostics/geodesics_virtual_source_2026-09-08/verification.json
+    - ara/evidence/diagnostics/geodesics_virtual_source_2026-09-08/benchmarks/smoke.json
+    - methods/geometry/geodesics_virtual_source/README.md
+    status: resolved
+
+  - id: N494
+    type: decision
+    title: Extend the existing selection owner for shared primitive sets
+    provenance: ai-executed
+    timestamp: '2026-09-08T12:18:27+02:00'
+    choice: Keep SceneInteractionModule as the active-world owner and extend its published SelectionController with ordered canonical-domain primitive sets, validated config, editor commands and method-input snapshots. Reuse graphics debug packets for highlights.
+    alternatives: [Create another selection module with a separate lifetime, Keep per-method picked-index state]
+    evidence:
+    - docs/architecture/primitive-selection.md
+    - src/runtime/Scene/Runtime.SelectionController.cppm
+    - experimental/framework24/lib_bcg_viewer/src/bcg_system_selection.cpp
+    status: resolved
+  - id: N495
+    type: experiment
+    title: Verify primitive selection through runtime hooks and method inputs
+    provenance: ai-executed
+    timestamp: '2026-09-08T12:18:27+02:00'
+    result: Final Clang 23 ci build passes; 145 focused cases pass. Full CPU selector has 4331 passed, six skipped and zero failed. Tests exercise canonical set semantics, config commands, production input/readback hooks, stale topology, seed consumption and highlight extraction. No Vulkan pixel, sanitizer, performance or complete Framework24 interaction-parity result is asserted.
+    evidence:
+    - N494
+    - ara/evidence/tables/primitive_selection_verification_2026-09-08.md
+    status: resolved
+
+  - id: N496
+    type: question
+    title: GPU LBVH availability and reusable index ownership
+    provenance: user
+    timestamp: '2026-09-08T12:39:11+02:00'
+    description: Is GPU LBVH integrated for entities and methods, and should it be a component or rebuilt per operation? Review Framework24 for the ownership model.
+    evidence:
+    - src/geometry/Geometry.BVH.cpp
+    - assets/shaders/kmeans_assign.comp
+    - experimental/framework24/lib_bcg_viewer/src/bcg_system_nearest_neighbors.cpp
+    - experimental/framework24/lib_bcg_framework/src/cuda/src/bcg_kmeans.cu
+    status: resolved
+
+  - id: N497
+    type: decision
+    title: Adopt shared LBVH cache and operation-owned workspaces
+    provenance: user-revised
+    timestamp: '2026-09-08T13:44:25+02:00'
+    choice: Implement O202 after the user's explicit yes. Runtime owns revision-aware entity indices; moving method data uses a reusable private GPU workspace with shared lower-level kernels.
+    alternatives: [GPU buffers in ECS components, rebuilding every entity index for every method call]
+    evidence: [N496, O202, docs/architecture/spatial-indices.md]
+    status: resolved
+  - id: N498
+    type: experiment
+    title: CPU oracle and Vulkan LBVH readback integration
+    provenance: ai-executed
+    timestamp: '2026-09-08T13:44:25+02:00'
+    result: Final Clang 23 ci gate selected 4341 tests, passed 4340 and skipped one unsanitized LSan case. Both ci-vulkan ASan+UBSan readback tests passed on RTX 3050 driver 590.48.01, including standalone nearest/radius, entity cache reuse/deletion mapping and K-Means LBVH assignment. Thirty-two local smoke outputs validate; no timing comparison exists.
+    evidence: [ara/evidence/diagnostics/point_lbvh_2026-09-08/record.json, tests/unit/geometry/Test.PointLBVH.cpp, tests/contract/runtime/Test.SpatialIndexCache.cpp, tests/integration/graphics/Test.PointLBVHGpuSmoke.cpp, tests/integration/runtime/Test.ClusteringServiceGpuSmoke.cpp]
+    status: resolved
+  - id: N499
+    type: decision
+    title: Publish bounded LBVH verification without a speedup claim
+    provenance: ai-executed
+    timestamp: '2026-09-08T13:44:25+02:00'
+    choice: Record O203 as bounded query/runtime evidence in C76. Keep bitonic sorting, sorted-range bounds, coordinate/capacity limits and unmeasured large-input performance explicit.
+    alternatives: [Inferring Framework24 numerical parity or performance superiority from readback smoke]
+    evidence: [N498, O203, ara/evidence/diagnostics/point_lbvh_2026-09-08/record.json]
+    status: resolved
+
+  - id: N500
+    type: decision
+    title: Keep spatial-index consumer and future-task integration decisions discoverable
+    provenance: user
+    timestamp: '2026-09-08T14:22:27+02:00'
+    choice: Document every identified sensible spatial-acceleration consumer and carry explicit reuse/query-capability
+      reminders into workflow and open implementation tasks. Preserve existing algorithm semantics and distinguish
+      integrated consumers from candidates.
+    alternatives:
+    - Leave integration opportunities only in conversation
+    - Assume every method should replace its index with point LBVH
+    evidence:
+    - docs/architecture/spatial-index-consumers.md
+    - docs/agent/method-workflow.md
+    - tasks/templates/method-task.md
+    - tasks/backlog/methods/METHOD-003A-spatial-query-reference-integration-intake.md
+    status: resolved
+
+  - id: N501
+    type: question
+    title: Choose the next concrete toolset integration after shared LBVH
+    provenance: user
+    timestamp: '2026-09-08T14:41:03+02:00'
+    description: User asks what to do next after the spatial-acceleration inventory and task reminders. Advisor recommendation
+      is ICP canonical-domain workflow followed by explicit cached/GPU correspondence integration and measured comparison.
+      No implementation is authorized by this question.
+    evidence:
+    - tasks/active/RUNTIME-207-icp-element-domain-source-integration.md
+    - tasks/active/UI-040-icp-compatible-source-selection.md
+    - src/geometry/Geometry.Registration.cpp
+    - docs/product/framework24-feature-inventory.md
+    status: resolved
+
+  - id: N502
+    type: decision
+    title: Accept canonical ICP workflow and shared target-index adoption
+    provenance: user-revised
+    timestamp: '2026-09-08T16:44:04+02:00'
+    choice: 'Implement the ICP portion of O205: canonical runtime/config/UI, cached CPU target queries, framed Vulkan
+      correspondences and comparative measurement while retaining the CPU solve/default. Later kNN/primitive/ray work
+      remains deferred.'
+    alternatives:
+    - Continue toolset proposals without a concrete consumer
+    - Change the default without end-to-end evidence
+    evidence:
+    - N501
+    - O205
+    - tasks/active/RUNTIME-207-icp-element-domain-source-integration.md
+    - tasks/active/UI-040-icp-compatible-source-selection.md
+    status: resolved
+  - id: N503
+    type: experiment
+    title: Verify canonical ICP operands and cached Vulkan correspondence publication
+    provenance: ai-executed
+    timestamp: '2026-09-08T16:44:04+02:00'
+    result: 'Final CPU cohort: 4348 passed, one expected unsanitized LSan skip. Final Vulkan ASan+UBSan cohort: two
+      passed with display off. 64 operand-domain pairs preserve geometry and history; 1024-live-row GPU fixture matches
+      each variant against its CPU reference with zero matrix error, and one CPU/GPU target build. Signed/nonuniform/zero
+      scales survive publication and undo/redo.'
+    evidence:
+    - ara/evidence/diagnostics/registration_spatial_2026-09-08/record.json
+    - ara/evidence/diagnostics/registration_spatial_2026-09-08/vulkan-tests.txt
+    - tests/contract/runtime/Test.RegistrationDomains.cpp
+    status: resolved
+  - id: N504
+    type: decision
+    title: Bind ICP capability statements to bounded source and fixture evidence
+    provenance: ai-executed
+    timestamp: '2026-09-08T16:44:04+02:00'
+    choice: Use O206 and C77 for the verified local method integration. Preserve numerical limitations, entity-TRS-only
+      metric, trajectory rerun semantics and CPU default. No full Framework24 parity, speedup or leak-freedom claim.
+    alternatives:
+    - Treat successful readbacks as a production performance qualification
+    evidence:
+    - N503
+    - O206
+    - ara/evidence/diagnostics/registration_spatial_2026-09-08/record.json
+    - ara/evidence/tables/registration_spatial_verification_2026-09-08.md
+    status: resolved
+  - id: N505
+    type: experiment
+    title: Separate display-off timing failure and leak-enabled shutdown retention
+    provenance: ai-executed
+    timestamp: '2026-09-08T16:44:04+02:00'
+    result: Display-off present pacing gives ~13 s GPU registration and a failed 5 s benchmark disposition, despite
+      zero transform error. An unchanged diagnostic completes assertions in 46.715 s, ruling out a stalled query in
+      this run, then reports 240 retained bytes at leak-enabled shutdown. BUG-179 fixes the diagnosed test time budget;
+      BUG-180 leaves allocation ownership unresolved. The first CTest override guard also failed and is retained in
+      the ledger.
+    evidence:
+    - ara/evidence/diagnostics/registration_spatial_2026-09-08/benchmarks/runtime-display-off-smoke.json
+    - ara/evidence/diagnostics/registration_spatial_2026-09-08/initial-timeout.txt
+    - ara/evidence/diagnostics/registration_spatial_2026-09-08/registry-timeout.txt
+    - ara/evidence/diagnostics/registration_spatial_2026-09-08/leak-enabled-diagnostic.txt
+    - tasks/active/BUG-179-framed-icp-display-off-timeout.md
+    - tasks/backlog/bugs/BUG-180-framed-icp-leak-enabled-process-retention.md
+    status: resolved
+
+  - id: N506
+    type: decision
+    title: Continue after ICP with shared kNN and identity exclusion
+    provenance: ai-executed
+    timestamp: '2026-09-08T19:44:10+02:00'
+    choice: 'Within the operator request to continue recommended post-ICP work, implement GEOM-077: exact CPU/Vulkan
+      kNN and single-ID exclusion in existing owners, plus a supplied CPU PCA overload. Preserve defaults and
+      defer normal config/UI/publication to RUNTIME-213/UI-045.'
+    alternatives:
+    - Immediately migrate every point analysis or add primitive/ray traversal
+    evidence:
+    - tasks/active/GEOM-077-point-lbvh-knn-exclusion.md
+    - docs/architecture/spatial-index-consumers.md
+    - N501
+    status: resolved
+  - id: N507
+    type: experiment
+    title: Verify kNN, framed cache and supplied PCA with existing consumer regressions
+    provenance: ai-executed
+    timestamp: '2026-09-08T19:44:10+02:00'
+    result: 'CPU oracle parity passed before GPU work. Final ci selected 4352: 4351 passed, one expected unsanitized
+      skip. Five current Vulkan cases passed across focused runs; initial new fixture cold-start exit corrected
+      without changing query assertions. Thirty-four smoke results seal/validate as dirty-source v2; new fixture
+      has zero ID and normal errors. Supplied PCA is slower than KD-tree on this small concurrent-build run,
+      so no speed/default claim.'
+    evidence:
+    - ara/evidence/diagnostics/point_lbvh_knn_2026-09-08/record.json
+    - ara/evidence/tables/point_lbvh_knn_verification_2026-09-08.md
+    status: resolved
+  - id: N508
+    type: decision
+    title: Commit bounded kNN integration evidence and preserve adoption boundaries
+    provenance: ai-executed
+    timestamp: '2026-09-08T19:44:10+02:00'
+    choice: Bind O207/C78 to the tested local source and verification record. Retain k=1..64 GPU bounds, existing
+      PCA support policy and CPU defaults. Do not infer GPU PCA, full normal workflow parity, performance qualification
+      or leak freedom.
+    alternatives:
+    - Treat an available query API as every method being integrated
+    evidence:
+    - N507
+    - O207
+    - ara/evidence/diagnostics/point_lbvh_knn_2026-09-08/record.json
+    - ara/evidence/tables/point_lbvh_knn_verification_2026-09-08.md
+    status: resolved
+
+  - id: N509
+    type: decision
+    title: Adopt the canonical normal workflow as the next engine slice
+    provenance: user
+    timestamp: '2026-09-08T21:33:09+02:00'
+    choice: 'The operator explicitly accepted normal estimation after shared kNN/exclusion: implement RUNTIME-213/UI-045
+      with typed property bindings, cached CPU LBVH as an explicit PCA option, distinct topology methods and shared
+      config/UI/publication.'
+    alternatives:
+    - Leave the supplied PCA query adapter without its user-facing workflow
+    evidence:
+    - O208
+    - tasks/active/RUNTIME-213-point-normal-property-domain-integration.md
+    - tasks/active/UI-045-point-normal-property-domain-panel.md
+    status: resolved
+  - id: N510
+    type: experiment
+    title: Verify normal computation, canonical publication and the shared editor window
+    provenance: ai-executed
+    timestamp: '2026-09-08T21:33:09+02:00'
+    result: 'Final ci Clang 23 run: 179 focused checks passed; full CPU gate 4363 passed, one expected unsanitized
+      LSan-control skip, zero failures. Sandbox built. Initial failures were a missing fixture capability and old
+      separate-panel source/count assertions; corrected without weakening numerical tests.'
+    evidence:
+    - ara/evidence/diagnostics/normal_estimation_2026-09-08/record.json
+    - ara/evidence/tables/normal_estimation_verification_2026-09-08.md
+    status: resolved
+  - id: N511
+    type: decision
+    title: Bind bounded CPU normal-workflow evidence without broadening GPU or parity claims
+    provenance: ai-executed
+    timestamp: '2026-09-08T21:33:09+02:00'
+    choice: Bind O209/C79 to the tested source and fixtures. Preserve KD-tree defaults, topology support and CPU PCA/orientation.
+      Treat generic vector-recipe binding and a drawn shared window separately from GPU visualization readback; no
+      new performance, sanitizer or full Framework24 claim.
+    alternatives:
+    - Infer a GPU normal solver or all PCA/feature workflows from query availability
+    evidence:
+    - N510
+    - O209
+    - ara/evidence/diagnostics/normal_estimation_2026-09-08/record.json
+    status: resolved

@@ -1,0 +1,39 @@
+id: geometry.registration
+name: Rigid iterative closest point registration
+domain: geometry
+status: reference
+paper:
+  title: A Method for Registration of 3-D Shapes
+  authors: Paul J. Besl and Neil D. McKay
+  year: 1992
+  doi: "10.1109/34.121791"
+  url: "https://doi.org/10.1109/34.121791"
+inputs:
+  - Two finite float3 point spans from independently selected canonical element domains
+  - Same-domain target normals for point-to-plane registration
+outputs:
+  - Rigid source-to-target transform, convergence history, RMSE and inlier counts
+  - Runtime source-transform history mutation and requested/actual correspondence backend diagnostics
+backends:
+  - cpu_reference
+  - cpu_optimized
+  - gpu_vulkan_compute
+metrics:
+  - runtime_ms
+  - quality_error_linf
+correctness_tests:
+  - ../../../tests/unit/geometry/Test_Registration.cpp
+  - ../../../tests/contract/runtime/Test.RegistrationDomains.cpp
+  - ../../../tests/contract/runtime/Test.SandboxEditorClusteringMethods.cpp
+  - ../../../tests/integration/graphics/Test.PointLBVHGpuSmoke.cpp
+benchmarks:
+  - ../../../benchmarks/geometry/manifests/registration_spatial_smoke.yaml
+  - ../../../benchmarks/geometry/manifests/registration_runtime_spatial_smoke.yaml
+known_limitations:
+  - Vulkan accelerates nearest correspondences only; rejection, transform solve and convergence remain on CPU.
+  - Local optimization needs a useful initial pose; runtime applies centroid prealignment.
+  - Point-to-plane solves require at least six usable constraints; singular systems return an identity increment.
+  - RMSE is Euclidean correspondence RMSE before the current transform update, including for point-to-plane.
+  - LBVH distances use float arithmetic and deterministic lower-index ties; KD-tree ties can select another equally near point.
+  - GPU target and query batches are bounded to 2^20 live rows and coordinates to absolute value 1e18.
+  - No speed improvement or Framework24 numerical parity is claimed by these implementation tokens.

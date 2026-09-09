@@ -115,6 +115,7 @@ import Geometry.PointCloud.SurfaceSampling;
 import Geometry.PointCloud.Utils;
 import Geometry.Properties;
 import Geometry.Registration;
+import Extrinsic.Runtime.SpatialIndexCache;
 import Geometry.Remeshing;
 import Geometry.Simplification;
 import Geometry.Smoothing;
@@ -195,14 +196,12 @@ struct RegistrationAlignmentOutcome {
 AlignPointClouds(const std::span<const glm::vec3> sourcePoints,
                  const std::span<const glm::vec3> targetPoints,
                  const std::span<const glm::vec3> targetNormals,
-                 const Reg::RegistrationParams &params) {
+                 const Reg::RegistrationParams &params, const Reg::NearestQuery& query = {}) {
   RegistrationAlignmentOutcome outcome;
   outcome.Traces.reserve(params.MaxIterations);
-  const auto result =
-      Reg::AlignICP(sourcePoints, targetPoints, targetNormals, params,
-                    [&outcome](const Reg::IterationTrace &trace) {
-                      outcome.Traces.push_back(trace);
-                    });
+  const Reg::IterationObserver observe = [&outcome](const Reg::IterationTrace& trace) { outcome.Traces.push_back(trace); };
+  const auto result = query ? Reg::AlignICPWithQueries(sourcePoints, targetPoints, targetNormals, params, query, observe)
+                            : Reg::AlignICP(sourcePoints, targetPoints, targetNormals, params, observe);
   if (result) {
     outcome.HasResult = true;
     outcome.Result = *result;
@@ -277,6 +276,7 @@ struct EditorJobResult { std::string Diagnostic{}; };
         {
             switch (algorithm)
             {
+            case EditorGeometryProcessingAlgorithm::Geodesics:
             case EditorGeometryProcessingAlgorithm::MeshDenoise:
             case EditorGeometryProcessingAlgorithm::Curvature:
             case EditorGeometryProcessingAlgorithm::CurvatureSegmentation:
@@ -433,7 +433,8 @@ struct EditorJobResult { std::string Diagnostic{}; };
         };
 
         [[nodiscard]] MeshSoupFromGeometrySourcesResult BuildMeshSoupFromGeometrySources(
-            const GS::ConstSourceView& view)
+            const GS::ConstSourceView& view,
+            std::string_view positionProperty = GS::PropertyNames::kPosition)
         {
             MeshSoupFromGeometrySourcesResult result{};
             const GS::SourceAvailability availability =
@@ -448,9 +449,7 @@ struct EditorJobResult { std::string Diagnostic{}; };
                 return result;
             }
 
-            const auto positions =
-                view.VertexSource->Properties.Get<glm::vec3>(
-                    GS::PropertyNames::kPosition);
+            const auto positions = view.VertexSource->Properties.Get<glm::vec3>(positionProperty);
             if (!positions || positions.Vector().empty())
             {
                 result.Status = EditorCommandStatus::InvalidProcessingParameters;
@@ -1069,7 +1068,7 @@ struct EditorJobResult { std::string Diagnostic{}; };
             case RegistrationNormalStatus::Ok:
                 return "";
             case RegistrationNormalStatus::Absent:
-                return "the target point cloud has no vec3 v:normal property";
+                return "the target normal binding is missing, non-finite or not float3";
             case RegistrationNormalStatus::CountMismatch:
                 return "the target v:normal property does not carry exactly "
                        "one vector per target point";
@@ -1077,47 +1076,13 @@ struct EditorJobResult { std::string Diagnostic{}; };
                 return "the target v:normal property contains a non-finite "
                        "value";
             case RegistrationNormalStatus::ZeroLength:
-                return "the target v:normal property contains a zero-length "
+                return "the target normal binding contains a zero-length "
                        "vector";
             case RegistrationNormalStatus::TargetTransformNotInvertible:
                 return "the target entity transform is not invertible, so "
                        "normals cannot be carried into world space";
             }
             return "the target normals are unusable";
-        }
-
-        // Local-space read and validation. World-space conversion is separate
-        // because the queued path snapshots local normals at submit and
-        // converts them in the worker, exactly as it does for positions.
-        [[nodiscard]] RegistrationNormalStatus CollectTargetRegistrationNormals(
-            const Geometry::PropertySet& properties,
-            std::vector<glm::vec3>& out)
-        {
-            out.clear();
-            const auto normals =
-                properties.Get<glm::vec3>(GS::PropertyNames::kNormal);
-            if (!normals || normals.Vector().empty())
-                return RegistrationNormalStatus::Absent;
-            if (normals.Vector().size() != properties.Size())
-                return RegistrationNormalStatus::CountMismatch;
-
-            out.reserve(normals.Vector().size());
-            for (const glm::vec3& normal : normals.Vector())
-            {
-                if (!std::isfinite(normal.x) || !std::isfinite(normal.y) ||
-                    !std::isfinite(normal.z))
-                {
-                    out.clear();
-                    return RegistrationNormalStatus::NonFinite;
-                }
-                if (glm::dot(normal, normal) <= 0.0f)
-                {
-                    out.clear();
-                    return RegistrationNormalStatus::ZeroLength;
-                }
-                out.push_back(normal);
-            }
-            return RegistrationNormalStatus::Ok;
         }
 
         // Normals transform by the inverse transpose of the model's linear
@@ -1248,13 +1213,16 @@ struct EditorJobResult { std::string Diagnostic{}; };
             }
         };
 
+        template<class View>
         [[nodiscard]] MeshForVertexNormalsResult
-        BuildHalfedgeMeshForVertexNormalRecompute(const GS::MutableSourceView& view)
+        BuildHalfedgeMeshForVertexNormalRecompute(const View& view,
+            std::string_view positionProperty = GS::PropertyNames::kPosition,
+            bool requireMeshProvenance = true, bool skipDeletedGeometry = false)
         {
             MeshForVertexNormalsResult result{};
             const GS::SourceAvailability availability =
                 GS::BuildSourceAvailability(view);
-            if (availability.ProvenanceDomain != GS::Domain::Mesh ||
+            if ((requireMeshProvenance && availability.ProvenanceDomain != GS::Domain::Mesh) ||
                 view.VertexSource == nullptr ||
                 view.HalfedgeSource == nullptr ||
                 view.FaceSource == nullptr)
@@ -1267,8 +1235,8 @@ struct EditorJobResult { std::string Diagnostic{}; };
             }
 
             const auto positions =
-                view.VertexSource->Properties.Get<glm::vec3>(
-                    GS::PropertyNames::kPosition);
+                view.VertexSource->Properties.template Get<glm::vec3>(
+                    positionProperty);
             if (!positions || positions.Vector().empty() ||
                 positions.Vector().size() != view.VertexSource->Properties.Size())
             {
@@ -1292,16 +1260,16 @@ struct EditorJobResult { std::string Diagnostic{}; };
             }
 
             const auto toVertices =
-                view.HalfedgeSource->Properties.Get<std::uint32_t>(
+                view.HalfedgeSource->Properties.template Get<std::uint32_t>(
                     GS::PropertyNames::kHalfedgeToVertex);
             const auto nextHalfedges =
-                view.HalfedgeSource->Properties.Get<std::uint32_t>(
+                view.HalfedgeSource->Properties.template Get<std::uint32_t>(
                     GS::PropertyNames::kHalfedgeNext);
             const auto halfedgeFaces =
-                view.HalfedgeSource->Properties.Get<std::uint32_t>(
+                view.HalfedgeSource->Properties.template Get<std::uint32_t>(
                     GS::PropertyNames::kHalfedgeFace);
             const auto faceHalfedges =
-                view.FaceSource->Properties.Get<std::uint32_t>(
+                view.FaceSource->Properties.template Get<std::uint32_t>(
                     GS::PropertyNames::kFaceHalfedge);
             if (!toVertices || !nextHalfedges || !halfedgeFaces ||
                 !faceHalfedges ||
@@ -1326,6 +1294,10 @@ struct EditorJobResult { std::string Diagnostic{}; };
             for (const glm::vec3 position : positions.Vector())
                 (void)result.Mesh.AddVertex(position);
 
+            const auto deletedFaces = view.FaceSource->Properties.template Get<bool>("f:deleted");
+            const auto deletedEdges = view.EdgeSource
+                ? view.EdgeSource->Properties.template Get<bool>("e:deleted")
+                : decltype(view.FaceSource->Properties.template Get<bool>("f:deleted")){};
             std::vector<std::uint32_t> ring{};
             ring.reserve(8u);
             std::vector<Geometry::VertexHandle> faceVertices{};
@@ -1334,6 +1306,8 @@ struct EditorJobResult { std::string Diagnostic{}; };
                  faceIndex < faceHalfedges.Vector().size();
                  ++faceIndex)
             {
+                if (skipDeletedGeometry && deletedFaces && faceIndex < deletedFaces.Size() && deletedFaces[faceIndex])
+                    continue;
                 const MeshFaceRingStatus status = BuildMeshFaceRing(
                     faceHalfedges.Vector(),
                     halfedgeFaces.Vector(),
@@ -1342,7 +1316,7 @@ struct EditorJobResult { std::string Diagnostic{}; };
                     faceIndex,
                     static_cast<std::uint32_t>(positions.Vector().size()),
                     ring);
-                if (status == MeshFaceRingStatus::Invalid)
+                if (status == MeshFaceRingStatus::Invalid || (skipDeletedGeometry && status == MeshFaceRingStatus::Skip))
                 {
                     result.Status =
                         EditorCommandStatus::InvalidProcessingParameters;
@@ -1354,6 +1328,17 @@ struct EditorJobResult { std::string Diagnostic{}; };
                 if (status == MeshFaceRingStatus::Skip)
                     continue;
 
+                if (skipDeletedGeometry && deletedEdges)
+                {
+                    auto h = faceHalfedges[faceIndex];
+                    bool touchesDeletedEdge = false;
+                    for (std::size_t corner = 0; corner < ring.size(); ++corner)
+                    {
+                        if (h / 2 < deletedEdges.Size() && deletedEdges[h / 2]) touchesDeletedEdge = true;
+                        h = nextHalfedges[h];
+                    }
+                    if (touchesDeletedEdge) continue;
+                }
                 faceVertices.clear();
                 for (const std::uint32_t vertex : ring)
                 {
@@ -1777,7 +1762,8 @@ struct EditorJobResult { std::string Diagnostic{}; };
         };
 
         [[nodiscard]] MeshDenoiseSourceResult BuildHalfedgeMeshForDenoise(
-            const GS::ConstSourceView& view)
+            const GS::ConstSourceView& view,
+            std::string_view positionProperty = GS::PropertyNames::kPosition)
         {
             MeshDenoiseSourceResult result{};
             const GS::SourceAvailability availability =
@@ -1795,9 +1781,7 @@ struct EditorJobResult { std::string Diagnostic{}; };
                 return result;
             }
 
-            const auto positions =
-                view.VertexSource->Properties.Get<glm::vec3>(
-                    GS::PropertyNames::kPosition);
+            const auto positions = view.VertexSource->Properties.Get<glm::vec3>(positionProperty);
             if (!positions || positions.Vector().empty())
             {
                 result.Status =
@@ -1827,7 +1811,7 @@ struct EditorJobResult { std::string Diagnostic{}; };
             }
 
             MeshSoupFromGeometrySourcesResult soup =
-                BuildMeshSoupFromGeometrySources(view);
+                BuildMeshSoupFromGeometrySources(view, positionProperty);
             if (!soup.Succeeded())
             {
                 result.Status = soup.Status;
@@ -8023,27 +8007,6 @@ struct EditorJobResult { std::string Diagnostic{}; };
             return model;
         }
 
-        // Decompose a composed model matrix back into a Transform::Component.
-        // The ICP delta is rigid, so the scale carried by the source model is
-        // preserved; rotation is recovered from the scale-normalized columns.
-        void DecomposeModelToTransform(
-            const glm::mat4& model,
-            ECSC::Transform::Component& out) noexcept
-        {
-            out.Position = glm::vec3(model[3]);
-            const glm::vec3 col0(model[0]);
-            const glm::vec3 col1(model[1]);
-            const glm::vec3 col2(model[2]);
-            const glm::vec3 scale(
-                glm::length(col0), glm::length(col1), glm::length(col2));
-            const glm::mat3 rotation(
-                scale.x > 0.0f ? col0 / scale.x : glm::vec3(1.0f, 0.0f, 0.0f),
-                scale.y > 0.0f ? col1 / scale.y : glm::vec3(0.0f, 1.0f, 0.0f),
-                scale.z > 0.0f ? col2 / scale.z : glm::vec3(0.0f, 0.0f, 1.0f));
-            out.Rotation = glm::quat_cast(rotation);
-            out.Scale = scale;
-        }
-
         [[nodiscard]] glm::vec3 ComputePointCentroid(
             const std::span<const glm::vec3> points) noexcept
         {
@@ -8062,6 +8025,7 @@ struct EditorJobResult { std::string Diagnostic{}; };
         {
             return EditorRegistrationResult{
                 .Status = EditorCommandStatus::NoChange,
+                .RequestedBackend = command.Backend,
                 .Variant = command.Variant,
                 // A result that never reached the solver has run
                 // nothing, so the effective variant stays point-to-point until
@@ -8188,12 +8152,61 @@ struct EditorJobResult { std::string Diagnostic{}; };
                 });
         }
 
+        GeometryPropertyRef ResolveRegistrationDefault(const GeometryEntityAvailability& available, GeometryPropertyRef ref)
+        {
+            if (ref.Domain == GeometryElementDomain::Unknown)
+                for (auto domain : {GeometryElementDomain::PointCloudPoint, GeometryElementDomain::MeshVertex,
+                                    GeometryElementDomain::GraphNode})
+                    if (SupportsGeometryElementDomain(available, domain)) { ref.Domain = domain; break; }
+            return ref;
+        }
+        struct RegistrationPropertySnapshot
+        {
+            std::vector<glm::vec3> Points{};
+            std::uint64_t Revision{}, DeletedRevision{};
+            std::size_t Size{};
+        };
+        std::optional<RegistrationPropertySnapshot> CaptureRegistrationProperty(
+            const GeometryEntityAvailability& available, const GeometryPropertyRef& ref)
+        {
+            const auto* properties = ResolveGeometryPropertySet(available, ref.Domain);
+            if (!properties || ref.ValueKind != Geometry::PropertyValueKind::Vec3 ||
+                !ResolveGeometryProperty(available, ref, properties->Size(), false).Resolved()) return {};
+            const auto values = properties->Get<glm::vec3>(ref.Name);
+            std::string_view deletedName = "v:deleted";
+            std::size_t divisor = 1;
+            if (ref.Domain == GeometryElementDomain::MeshFace) deletedName = "f:deleted";
+            if (ref.Domain == GeometryElementDomain::MeshEdge || ref.Domain == GeometryElementDomain::GraphEdge)
+                deletedName = "e:deleted";
+            if (ref.Domain == GeometryElementDomain::MeshHalfedge || ref.Domain == GeometryElementDomain::GraphHalfedge)
+            {
+                if (!available.SourceView.EdgeSource) return {};
+                properties = &available.SourceView.EdgeSource->Properties;
+                deletedName = "e:deleted";
+                divisor = 2;
+            }
+            const auto deleted = properties->Get<bool>(deletedName);
+            if (deleted && deleted.Size()*divisor != values.Size()) return {};
+            RegistrationPropertySnapshot snapshot{.Revision = values.Revision(),
+                .DeletedRevision = deleted ? deleted.Revision() : 0, .Size = values.Size()};
+            for (std::size_t i = 0; i < values.Size(); ++i)
+            {
+                if (deleted && deleted[i/divisor]) continue;
+                const auto point = values[i];
+                if (!std::isfinite(point.x) || !std::isfinite(point.y) || !std::isfinite(point.z)) return {};
+                snapshot.Points.push_back(point);
+            }
+            return snapshot;
+        }
+        bool SameRegistrationSnapshot(const RegistrationPropertySnapshot& a, const RegistrationPropertySnapshot& b)
+        {
+            return a.Revision == b.Revision && a.DeletedRevision == b.DeletedRevision && a.Size == b.Size &&
+                   SameGeometryPositions(a.Points, b.Points);
+        }
         struct EditorRegistrationCpuJobState
         {
             std::uint32_t SourceStableEntityId{0u};
             std::uint32_t TargetStableEntityId{0u};
-            std::uint64_t SourceGeometryMetadataSignature{0u};
-            std::uint64_t TargetGeometryMetadataSignature{0u};
             EditorRegistrationCommand Command{};
             std::vector<glm::vec3> SourceLocalPoints{};
             std::vector<glm::vec3> TargetLocalPoints{};
@@ -8207,6 +8220,14 @@ struct EditorJobResult { std::string Diagnostic{}; };
             ECSC::Transform::Component TargetBeforeTransform{};
             EditorRegistrationResult Result{};
             ECSC::Transform::Component SourceAfterTransform{};
+            RegistrationPropertySnapshot SourceBinding{}, TargetBinding{}, NormalBinding{};
+            SpatialIndexHandle TargetIndex{};
+            std::shared_ptr<const SpatialIndexSnapshot> IndexSnapshot{};
+            std::shared_ptr<SpatialNearestBatch> Batch{};
+            std::vector<glm::vec3> SourceWorld{}, TargetWorld{}, WorldNormals{};
+            glm::mat4 PrealignPose{1.f};
+            Reg::RegistrationParams Params{};
+            RegistrationAlignmentOutcome Outcome{};
         };
 
         [[nodiscard]] std::vector<glm::vec3> TransformPointsToWorld(
@@ -8237,57 +8258,15 @@ struct EditorJobResult { std::string Diagnostic{}; };
             if (!sourceEntity.has_value() || !targetEntity.has_value())
                 return JobApplyValidation::MissingTarget;
 
-            const GS::ConstSourceView sourceView =
-                GS::BuildConstView(raw, *sourceEntity);
-            const GS::ConstSourceView targetView =
-                GS::BuildConstView(raw, *targetEntity);
-            if (GS::BuildSourceAvailability(sourceView).ProvenanceDomain !=
-                    GS::Domain::PointCloud ||
-                GS::BuildSourceAvailability(targetView).ProvenanceDomain !=
-                    GS::Domain::PointCloud ||
-                sourceView.VertexSource == nullptr ||
-                targetView.VertexSource == nullptr)
-            {
-                return JobApplyValidation::StaleGeneration;
-            }
-
-            if (GeometryMetadataSignatureForEntity(raw, *sourceEntity) !=
-                    job.SourceGeometryMetadataSignature ||
-                GeometryMetadataSignatureForEntity(raw, *targetEntity) !=
-                    job.TargetGeometryMetadataSignature)
-            {
-                return JobApplyValidation::StaleGeneration;
-            }
-
-            const std::optional<std::vector<glm::vec3>> sourcePoints =
-                CollectFiniteGeometryPositions(
-                    sourceView.VertexSource->Properties);
-            const std::optional<std::vector<glm::vec3>> targetPoints =
-                CollectFiniteGeometryPositions(
-                    targetView.VertexSource->Properties);
-            if (!sourcePoints.has_value() || !targetPoints.has_value() ||
-                !SameGeometryPositions(*sourcePoints,
-                                          job.SourceLocalPoints) ||
-                !SameGeometryPositions(*targetPoints,
-                                          job.TargetLocalPoints))
-            {
-                return JobApplyValidation::StaleGeneration;
-            }
-
-            // A point-to-plane job that snapshotted target normals is
-            // stale the moment those normals change, exactly as it is when the
-            // positions change.
+            const auto source = CaptureRegistrationProperty(BuildGeometryAvailability(raw, *sourceEntity), job.Command.SourcePositions);
+            const auto target = CaptureRegistrationProperty(BuildGeometryAvailability(raw, *targetEntity), job.Command.TargetPositions);
+            if (!source || !target || !SameRegistrationSnapshot(*source, job.SourceBinding) ||
+                !SameRegistrationSnapshot(*target, job.TargetBinding)) return JobApplyValidation::StaleGeneration;
             if (!job.TargetLocalNormals.empty())
             {
-                std::vector<glm::vec3> currentNormals{};
-                if (CollectTargetRegistrationNormals(
-                        targetView.VertexSource->Properties,
-                        currentNormals) != RegistrationNormalStatus::Ok ||
-                    !SameGeometryPositions(currentNormals,
-                                           job.TargetLocalNormals))
-                {
+                const auto normals = CaptureRegistrationProperty(BuildGeometryAvailability(raw, *targetEntity), job.Command.TargetNormals);
+                if (!normals || !SameRegistrationSnapshot(*normals, job.NormalBinding))
                     return JobApplyValidation::StaleGeneration;
-                }
             }
 
             const ECSC::Transform::Component* sourceTransform =
@@ -8321,6 +8300,37 @@ struct EditorJobResult { std::string Diagnostic{}; };
         {
             if (context.MethodResultSinks.Registration)
                 context.MethodResultSinks.Registration(std::move(result));
+        }
+
+        void FinishRegistrationSolve(EditorRegistrationCpuJobState& state)
+        {
+            auto& result = state.Result;
+            const auto& outcome = state.Outcome;
+            result.HasResult = true;
+            result.IterationsPerformed = outcome.Result.IterationsPerformed;
+            result.TrajectoryLength = outcome.IterationCount();
+            result.FinalRMSE = outcome.Result.FinalRMSE;
+            result.Converged = outcome.Result.Converged;
+            result.FinalInlierCount = outcome.Result.FinalInlierCount;
+
+            const std::size_t step =
+                std::min(state.Command.TrajectoryStep,
+                         outcome.IterationCount());
+            result.AppliedStep = step;
+            const glm::mat4 pose =
+                step == 0u ? glm::mat4(1.0f)
+                           : TrajectoryPose(outcome, step) * state.PrealignPose;
+
+            state.SourceAfterTransform = state.SourceBeforeTransform;
+            // Compose the rigid delta directly; decomposing column lengths would
+            // erase signed scale and lose the orientation of collapsed axes.
+            state.SourceAfterTransform.Position = glm::vec3(
+                pose * glm::vec4(state.SourceBeforeTransform.Position, 1.f));
+            state.SourceAfterTransform.Rotation = glm::normalize(
+                glm::quat_cast(glm::mat3(pose)) * state.SourceBeforeTransform.Rotation);
+
+            result.Status = EditorCommandStatus::Applied;
+            result.Error = Core::ErrorCode::Success;
         }
 
         [[nodiscard]] JobResultEnvelope RunRegistrationCpuWorker(
@@ -8378,6 +8388,7 @@ struct EditorJobResult { std::string Diagnostic{}; };
             Reg::RegistrationParams params{};
             params.Variant = ToGeometryICPVariant(state->Command.Variant);
             params.MaxIterations = state->Command.MaxIterations;
+            params.ConvergenceThreshold = state->Command.ConvergenceThreshold;
             params.MaxCorrespondenceDistance =
                 state->Command.MaxCorrespondenceDistance > 0.0
                     ? state->Command.MaxCorrespondenceDistance
@@ -8389,12 +8400,25 @@ struct EditorJobResult { std::string Diagnostic{}; };
                     ? EditorICPVariant::PointToPlane
                     : EditorICPVariant::PointToPoint;
 
-            const RegistrationAlignmentOutcome outcome =
-                AlignPointClouds(
-                    prealignedSourceWorld,
-                    targetWorld,
-                    targetWorldNormals,
-                    params);
+            state->SourceWorld = std::move(prealignedSourceWorld);
+            state->TargetWorld = targetWorld;
+            state->WorldNormals = std::move(targetWorldNormals);
+            state->PrealignPose = prealignPose;
+            state->Params = params;
+            if (result.ActualBackend == RegistrationBackend::VulkanLBVH)
+                return JobResultEnvelope::Make<EditorJobResult>(EditorJobResult{.Diagnostic = "ICP GPU correspondences ready to queue"});
+            Reg::NearestQuery query;
+            if (state->IndexSnapshot)
+                query = [index = state->IndexSnapshot](std::span<const glm::vec3> queries, std::span<std::uint32_t> ids) {
+                    for (std::size_t i = 0; i < queries.size(); ++i)
+                    {
+                        if (!Geometry::PointLBVH::ValidPoint(queries[i])) return false;
+                        ids[i] = index->Index.Nearest(queries[i]).Index;
+                    }
+                    return true;
+                };
+            const RegistrationAlignmentOutcome outcome = AlignPointClouds(
+                state->SourceWorld, state->TargetWorld, state->WorldNormals, params, query);
             if (!outcome.HasResult)
             {
                 result.Status =
@@ -8408,32 +8432,53 @@ struct EditorJobResult { std::string Diagnostic{}; };
                     });
             }
 
-            result.HasResult = true;
-            result.IterationsPerformed = outcome.Result.IterationsPerformed;
-            result.TrajectoryLength = outcome.IterationCount();
-            result.FinalRMSE = outcome.Result.FinalRMSE;
-            result.Converged = outcome.Result.Converged;
-            result.FinalInlierCount = outcome.Result.FinalInlierCount;
+            state->Outcome = outcome;
+            FinishRegistrationSolve(*state);
+            return JobResultEnvelope::Make<EditorJobResult>(EditorJobResult{.Diagnostic = "ICP registration result ready"});
+        }
 
-            const std::size_t step =
-                std::min(state->Command.TrajectoryStep,
-                         outcome.IterationCount());
-            result.AppliedStep = step;
-            const glm::mat4 pose =
-                step == 0u ? glm::mat4(1.0f)
-                           : TrajectoryPose(outcome, step) * prealignPose;
-
-            state->SourceAfterTransform = state->SourceBeforeTransform;
-            DecomposeModelToTransform(
-                pose * ModelMatrixFromTransform(state->SourceBeforeTransform),
-                state->SourceAfterTransform);
-
-            result.Status = EditorCommandStatus::Applied;
-            result.Error = Core::ErrorCode::Success;
-            return JobResultEnvelope::Make<EditorJobResult>(
-                EditorJobResult{
-                    .Diagnostic = "ICP registration CPU result ready",
-                });
+        bool AdvanceRegistrationGpu(const EditorGeometryProcessingContext& context,
+                                    EditorRegistrationCpuJobState& state)
+        {
+            if (state.Result.ActualBackend != RegistrationBackend::VulkanLBVH ||
+                state.Result.Status != EditorCommandStatus::NoChange) return true;
+            auto fail = [&](std::string message) {
+                state.Result.Status = EditorCommandStatus::GeometryProcessingFailed;
+                state.Result.Error = Core::ErrorCode::InvalidState;
+                state.Result.BackendDiagnostic = message;
+                state.Result.Message = std::move(message);
+                return true;
+            };
+            if (!context.SpatialIndices || ValidateRegistrationCpuJobApply(context, state) != JobApplyValidation::Current)
+                return fail("ICP inputs changed while GPU correspondences were pending.");
+            if (state.Batch)
+            {
+                if (state.Batch->State == SpatialQueryState::Failed) return fail(state.Batch->Diagnostic);
+                if (state.Batch->State != SpatialQueryState::Ready) return false;
+                std::vector<std::uint32_t> indices;
+                const auto& slots = state.IndexSnapshot->Slots;
+                for (const auto neighbor : state.Batch->Neighbors)
+                {
+                    const auto found = std::lower_bound(slots.begin(), slots.end(), neighbor.Index);
+                    indices.push_back(found != slots.end() && *found == neighbor.Index
+                        ? static_cast<std::uint32_t>(found - slots.begin()) : ~0u);
+                }
+                const auto status = Reg::AdvanceICP(state.SourceWorld, state.TargetWorld, state.WorldNormals,
+                    state.Params, indices, state.Outcome.Result,
+                    [&](const Reg::IterationTrace& trace) { state.Outcome.Traces.push_back(trace); });
+                if (status == Reg::ICPStepStatus::InvalidInput) return fail("ICP rejected GPU correspondences.");
+                if (status == Reg::ICPStepStatus::Finished)
+                {
+                    state.Outcome.HasResult = true;
+                    FinishRegistrationSolve(state);
+                    state.Batch.reset();
+                    return true;
+                }
+            }
+            state.Batch = context.SpatialIndices->QueueGpuNearest(state.TargetIndex,
+                Reg::MakeICPQueries(state.SourceWorld, state.Outcome.Result.Transform), state.Batch);
+            if (state.Batch->State == SpatialQueryState::Failed) return fail(state.Batch->Diagnostic);
+            return false;
         }
 
         [[nodiscard]] Core::Result PublishRegistrationCpuJob(
@@ -8443,6 +8488,7 @@ struct EditorJobResult { std::string Diagnostic{}; };
             EditorRegistrationResult result = job.Result;
             if (!result.Succeeded())
             {
+                job.Result = result;
                 PublishRegistrationResultSink(context, result);
                 return Core::Err(ResultErrorOrUnknown(result.Error));
             }
@@ -8452,6 +8498,7 @@ struct EditorJobResult { std::string Diagnostic{}; };
                 result.Status = EditorCommandStatus::MissingScene;
                 result.Error = Core::ErrorCode::InvalidState;
                 result.Message = "ICP registration requires an attached scene.";
+                job.Result = result;
                 PublishRegistrationResultSink(context, result);
                 return Core::Err(result.Error);
             }
@@ -8465,6 +8512,7 @@ struct EditorJobResult { std::string Diagnostic{}; };
                 result.Error = Core::ErrorCode::ResourceNotFound;
                 result.Message =
                     "ICP registration source entity is stale or no longer live.";
+                job.Result = result;
                 PublishRegistrationResultSink(context, result);
                 return Core::Err(result.Error);
             }
@@ -8477,6 +8525,7 @@ struct EditorJobResult { std::string Diagnostic{}; };
                 result.Error = Core::ErrorCode::InvalidState;
                 result.Message =
                     "ICP registration source entity has no Transform to drive.";
+                job.Result = result;
                 PublishRegistrationResultSink(context, result);
                 return Core::Err(result.Error);
             }
@@ -8507,25 +8556,26 @@ struct EditorJobResult { std::string Diagnostic{}; };
                 result.Error = Core::ErrorCode::Unknown;
                 result.Message =
                     "ICP registration pose failed during editor history commit.";
+                job.Result = result;
                 PublishRegistrationResultSink(context, result);
                 return Core::Err(result.Error);
             }
 
             result.Error = Core::ErrorCode::Success;
             result.Message = BuildRegistrationSuccessMessage(result);
-            PublishRegistrationResultSink(context, result);
+            job.Result = result;
+                PublishRegistrationResultSink(context, result);
             return Core::Ok();
         }
 
-        // Dedup identity omits source and target geometry signatures; the dedup
-        // guard does not compare them, while `ValidateRegistrationCpuJobApply`
-        // rechecks both immediately before apply.
+        // Output identity serializes requests on a source/domain; binding and
+        // transform snapshots are revalidated immediately before publication.
         [[nodiscard]] EditorJobIdentity MakeRegistrationCpuJobIdentity(
             const EditorRegistrationCpuJobState& state)
         {
             return EditorJobIdentity{
                 .EntityId = state.SourceStableEntityId,
-                .Scope = EditorJobScope::PointCloudPoint,
+                .Scope = ToEditorJobScope(state.Command.SourcePositions.Domain),
                 .OutputSemantic = GeometryPresentationSlotSemantic::Displacement,
                 .OutputName = "registration_transform",
             };
@@ -8544,7 +8594,7 @@ struct EditorJobResult { std::string Diagnostic{}; };
                          1023u) /
                         1024u));
             return JobDesc{
-                .DebugName = "Sandbox.RegistrationICP.CPU",
+                .DebugName = "Sandbox.RegistrationICP",
                 .Scope = context.World,
                 .Priority = Core::Dag::TaskPriority::Normal,
                 .Kind = RuntimeTaskKinds::GeometryProcess,
@@ -8554,6 +8604,7 @@ struct EditorJobResult { std::string Diagnostic{}; };
                     {
                         return RunRegistrationCpuWorker(state);
                     },
+                .IsReadyToApply = [context, state]() { return AdvanceRegistrationGpu(context, *state); },
                 .ValidateBeforeApply =
                     [context, state]()
                     {
@@ -8579,18 +8630,12 @@ struct EditorJobResult { std::string Diagnostic{}; };
             std::vector<glm::vec3> targetPoints,
             std::vector<glm::vec3> targetNormals,
             const ECSC::Transform::Component& sourceTransform,
-            const ECSC::Transform::Component* targetTransform,
-            const std::uint64_t sourceGeometryMetadataSignature,
-            const std::uint64_t targetGeometryMetadataSignature)
+            const ECSC::Transform::Component* targetTransform)
         {
             auto state =
                 std::make_shared<EditorRegistrationCpuJobState>();
             state->SourceStableEntityId = command.SourceStableEntityId;
             state->TargetStableEntityId = command.TargetStableEntityId;
-            state->SourceGeometryMetadataSignature =
-                sourceGeometryMetadataSignature;
-            state->TargetGeometryMetadataSignature =
-                targetGeometryMetadataSignature;
             state->Command = command;
             state->SourceLocalPoints = std::move(sourcePoints);
             state->TargetLocalPoints = std::move(targetPoints);
@@ -8604,6 +8649,47 @@ struct EditorJobResult { std::string Diagnostic{}; };
             state->Result = MakeRegistrationBaseResult(command);
             state->Result.SourcePointCount = state->SourceLocalPoints.size();
             state->Result.TargetPointCount = state->TargetLocalPoints.size();
+
+            const auto sourceEntity = ResolveStableEntity(context.Scene->Raw(), command.SourceStableEntityId);
+            const auto targetEntity = ResolveStableEntity(context.Scene->Raw(), command.TargetStableEntityId);
+            state->SourceBinding = *CaptureRegistrationProperty(BuildGeometryAvailability(context.Scene->Raw(), *sourceEntity), command.SourcePositions);
+            state->TargetBinding = *CaptureRegistrationProperty(BuildGeometryAvailability(context.Scene->Raw(), *targetEntity), command.TargetPositions);
+            if (!state->TargetLocalNormals.empty())
+                state->NormalBinding = *CaptureRegistrationProperty(BuildGeometryAvailability(context.Scene->Raw(), *targetEntity), command.TargetNormals);
+            if (command.Backend != RegistrationBackend::CpuKDTree)
+            {
+                if (context.SpatialIndices)
+                {
+                    const auto acquired = context.SpatialIndices->Acquire(context.World, *targetEntity,
+                        command.TargetPositions, SpatialIndexSpace::EntityTransform);
+                    state->TargetIndex = acquired.Handle;
+                    state->IndexSnapshot = context.SpatialIndices->Snapshot(acquired.Handle);
+                    state->Result.TargetIndexReused = acquired.Reused;
+                    state->Result.BackendDiagnostic = acquired.Diagnostic;
+                }
+                if (state->IndexSnapshot)
+                    state->Result.ActualBackend = RegistrationBackend::CpuLBVH;
+                else
+                    state->Result.BackendDiagnostic = "Shared target index unavailable; using CPU KD-tree.";
+                if (command.Backend == RegistrationBackend::VulkanLBVH)
+                {
+                    if (state->IndexSnapshot && context.JobCommands.Available() && context.Device && context.Device->IsOperational() &&
+                        state->TargetLocalPoints.size() <= (1u << 20))
+                        state->Result.ActualBackend = RegistrationBackend::VulkanLBVH;
+                    else
+                    {
+                        state->Result.FellBackToCPU = true;
+                        state->Result.BackendDiagnostic = "Vulkan correspondence execution unavailable; using " +
+                            std::string(ToString(state->Result.ActualBackend)) + ".";
+                    }
+                }
+            }
+            if (!context.JobCommands.Available())
+            {
+                (void)RunRegistrationCpuWorker(state);
+                (void)PublishRegistrationCpuJob(context, *state);
+                return state->Result;
+            }
 
             const EditorJobIdentity identity =
                 MakeRegistrationCpuJobIdentity(*state);
@@ -8622,6 +8708,7 @@ struct EditorJobResult { std::string Diagnostic{}; };
                 return pending;
             }
 
+            auto pending = state->Result;
             const JobToken handle = context.JobCommands.Submit(
                 std::move(desc),
                 identity);
@@ -8639,11 +8726,10 @@ struct EditorJobResult { std::string Diagnostic{}; };
                 return result;
             }
 
-            return MakePendingRegistrationResult(
-                command,
-                state->SourceLocalPoints.size(),
-                state->TargetLocalPoints.size(),
-                handle);
+            pending.Status = EditorCommandStatus::Pending;
+            pending.Message = "ICP registration job queued (" + std::string(ToString(pending.ActualBackend)) + ")";
+            AppendDerivedJobHandleToMessage(pending.Message, handle);
+            return pending;
         }
 } // namespace
 
@@ -8763,6 +8849,8 @@ GetEditorGeometryProcessingMenuItems(
         using Domain = EditorGeometryProcessingDomain;
         switch (algorithm)
         {
+        case EditorGeometryProcessingAlgorithm::Geodesics:
+            return Domain::MeshVertices;
         case EditorGeometryProcessingAlgorithm::KMeans:
             return Domain::MeshVertices |
                    Domain::GraphVertices |
@@ -8850,32 +8938,32 @@ GetEditorGeometryProcessingCapabilities(
 ResolveEditorGeometryProcessingEntries(
         const EditorGeometryProcessingCapabilities capabilities)
     {
-        static constexpr std::array<EditorGeometryProcessingAlgorithm, 23>
-            kAlgorithmOrder{
-                EditorGeometryProcessingAlgorithm::KMeans,
-                EditorGeometryProcessingAlgorithm::NormalEstimation,
-                EditorGeometryProcessingAlgorithm::MeshDenoise,
-                EditorGeometryProcessingAlgorithm::Curvature,
-                EditorGeometryProcessingAlgorithm::CurvatureSegmentation,
-                EditorGeometryProcessingAlgorithm::Registration,
-                EditorGeometryProcessingAlgorithm::BilateralFilter,
-                EditorGeometryProcessingAlgorithm::OutlierEstimation,
-                EditorGeometryProcessingAlgorithm::KernelDensity,
-                EditorGeometryProcessingAlgorithm::ProgressivePoissonSampling,
-                EditorGeometryProcessingAlgorithm::StatisticalOutlierRemoval,
-                EditorGeometryProcessingAlgorithm::RadiusOutlierRemoval,
-                EditorGeometryProcessingAlgorithm::ShortestPath,
-                EditorGeometryProcessingAlgorithm::VectorHeat,
-                EditorGeometryProcessingAlgorithm::Parameterization,
-                EditorGeometryProcessingAlgorithm::ConvexHull,
-                EditorGeometryProcessingAlgorithm::SurfaceReconstruction,
-                EditorGeometryProcessingAlgorithm::BooleanCSG,
-                EditorGeometryProcessingAlgorithm::Remeshing,
-                EditorGeometryProcessingAlgorithm::Simplification,
-                EditorGeometryProcessingAlgorithm::Smoothing,
-                EditorGeometryProcessingAlgorithm::Subdivision,
-                EditorGeometryProcessingAlgorithm::Repair,
-            };
+        static constexpr std::array<EditorGeometryProcessingAlgorithm, 24> kAlgorithmOrder{
+            EditorGeometryProcessingAlgorithm::KMeans,
+            EditorGeometryProcessingAlgorithm::NormalEstimation,
+            EditorGeometryProcessingAlgorithm::MeshDenoise,
+            EditorGeometryProcessingAlgorithm::Curvature,
+            EditorGeometryProcessingAlgorithm::CurvatureSegmentation,
+            EditorGeometryProcessingAlgorithm::Registration,
+            EditorGeometryProcessingAlgorithm::BilateralFilter,
+            EditorGeometryProcessingAlgorithm::OutlierEstimation,
+            EditorGeometryProcessingAlgorithm::KernelDensity,
+            EditorGeometryProcessingAlgorithm::ProgressivePoissonSampling,
+            EditorGeometryProcessingAlgorithm::StatisticalOutlierRemoval,
+            EditorGeometryProcessingAlgorithm::RadiusOutlierRemoval,
+            EditorGeometryProcessingAlgorithm::ShortestPath,
+            EditorGeometryProcessingAlgorithm::VectorHeat,
+            EditorGeometryProcessingAlgorithm::Parameterization,
+            EditorGeometryProcessingAlgorithm::ConvexHull,
+            EditorGeometryProcessingAlgorithm::SurfaceReconstruction,
+            EditorGeometryProcessingAlgorithm::BooleanCSG,
+            EditorGeometryProcessingAlgorithm::Remeshing,
+            EditorGeometryProcessingAlgorithm::Simplification,
+            EditorGeometryProcessingAlgorithm::Smoothing,
+            EditorGeometryProcessingAlgorithm::Subdivision,
+            EditorGeometryProcessingAlgorithm::Repair,
+            EditorGeometryProcessingAlgorithm::Geodesics,
+        };
 
         std::vector<EditorGeometryProcessingEntry> entries{};
         entries.reserve(kAlgorithmOrder.size());
@@ -8945,6 +9033,8 @@ ResolveEditorGeometryProcessingEntries(
     {
         switch (algorithm)
         {
+        case EditorGeometryProcessingAlgorithm::Geodesics:
+            return "Geodesics (Virtual Source Propagation)";
         case EditorGeometryProcessingAlgorithm::KMeans:
             return "K-Means";
         case EditorGeometryProcessingAlgorithm::MeshDenoise:
@@ -12189,10 +12279,11 @@ ApplyEditorPointCloudOutlierRemovalCommand(
     }
 
     EditorRegistrationResult
-ApplyEditorRegistrationCommand(
+ApplyRegistrationChecked(
         const EditorGeometryProcessingContext& context,
-        const EditorRegistrationCommand& command)
+        const EditorRegistrationCommand& input, bool preview)
     {
+        EditorRegistrationCommand command = input;
         EditorRegistrationResult result =
             MakeRegistrationBaseResult(command);
 
@@ -12215,7 +12306,9 @@ ApplyEditorRegistrationCommand(
         if (!ValidEditorICPVariant(command.Variant) ||
             command.MaxIterations == 0u ||
             !(command.InlierRatio > 0.0 && command.InlierRatio <= 1.0) ||
-            !std::isfinite(command.MaxCorrespondenceDistance))
+            !std::isfinite(command.MaxCorrespondenceDistance) ||
+            !std::isfinite(command.ConvergenceThreshold) || command.ConvergenceThreshold < 0 ||
+            command.Backend > RegistrationBackend::VulkanLBVH)
         {
             result.Status =
                 EditorCommandStatus::InvalidProcessingParameters;
@@ -12248,82 +12341,50 @@ ApplyEditorRegistrationCommand(
             return result;
         }
 
-        const GS::ConstSourceView sourceView =
-            GS::BuildConstView(raw, *sourceEntity);
-        if (GS::BuildSourceAvailability(sourceView).ProvenanceDomain !=
-                GS::Domain::PointCloud ||
-            sourceView.VertexSource == nullptr)
+        const auto sourceAvailable = BuildGeometryAvailability(raw, *sourceEntity);
+        const auto targetAvailable = BuildGeometryAvailability(raw, *targetEntity);
+        command.SourcePositions = ResolveRegistrationDefault(sourceAvailable, command.SourcePositions);
+        command.TargetPositions = ResolveRegistrationDefault(targetAvailable, command.TargetPositions);
+        if (command.TargetNormals.Domain == GeometryElementDomain::Unknown)
+            command.TargetNormals.Domain = command.TargetPositions.Domain;
+        if (!SupportsGeometryElementDomain(sourceAvailable, command.SourcePositions.Domain) ||
+            !SupportsGeometryElementDomain(targetAvailable, command.TargetPositions.Domain))
         {
-            result.Status =
-                EditorCommandStatus::UnsupportedGeometryDomain;
+            result.Status = EditorCommandStatus::UnsupportedGeometryDomain;
             result.Error = Core::ErrorCode::InvalidArgument;
-            result.Message =
-                "ICP registration source must be a point-cloud entity.";
+            result.Message = "ICP requires compatible source and target element domains.";
             return result;
         }
-        const GS::ConstSourceView targetView =
-            GS::BuildConstView(raw, *targetEntity);
-        if (GS::BuildSourceAvailability(targetView).ProvenanceDomain !=
-                GS::Domain::PointCloud ||
-            targetView.VertexSource == nullptr)
+        const auto source = CaptureRegistrationProperty(sourceAvailable, command.SourcePositions);
+        const auto target = CaptureRegistrationProperty(targetAvailable, command.TargetPositions);
+        if (!source || !target)
         {
-            result.Status =
-                EditorCommandStatus::UnsupportedGeometryDomain;
+            result.Status = EditorCommandStatus::InvalidProcessingParameters;
             result.Error = Core::ErrorCode::InvalidArgument;
-            result.Message =
-                "ICP registration target must be a point-cloud entity.";
+            result.Message = "ICP requires count-matched finite float3 position bindings on live rows.";
             return result;
         }
-
-        const std::optional<std::vector<glm::vec3>> sourcePoints =
-            CollectFiniteGeometryPositions(
-                sourceView.VertexSource->Properties);
-        const std::optional<std::vector<glm::vec3>> targetPoints =
-            CollectFiniteGeometryPositions(
-                targetView.VertexSource->Properties);
-        if (!sourcePoints.has_value() || !targetPoints.has_value())
-        {
-            result.Status =
-                EditorCommandStatus::InvalidProcessingParameters;
-            result.Error = Core::ErrorCode::InvalidArgument;
-            result.Message = "ICP registration requires both point clouds to expose a "
-                             "count-matched, finite v:position property.";
-            return result;
-        }
+        std::optional<std::vector<glm::vec3>> sourcePoints{source->Points}, targetPoints{target->Points};
         result.SourcePointCount = sourcePoints->size();
         result.TargetPointCount = targetPoints->size();
-
-        // Resolve and validate target normals before anything is
-        // dispatched or mutated, so a point-to-plane request with unusable
-        // normals fails closed instead of degrading to point-to-point behind a
-        // point-to-plane label.
-        const bool pointToPlane =
-            command.Variant == EditorICPVariant::PointToPlane;
-        std::vector<glm::vec3> targetLocalNormals{};
-        if (pointToPlane)
+        std::vector<glm::vec3> targetLocalNormals;
+        if (command.Variant == EditorICPVariant::PointToPlane)
         {
-            const RegistrationNormalStatus normalStatus =
-                CollectTargetRegistrationNormals(
-                    targetView.VertexSource->Properties,
-                    targetLocalNormals);
-            if (normalStatus != RegistrationNormalStatus::Ok)
+            const auto normals = CaptureRegistrationProperty(targetAvailable, command.TargetNormals);
+            RegistrationNormalStatus status = RegistrationNormalStatus::Ok;
+            if (!normals) status = RegistrationNormalStatus::Absent;
+            else if (command.TargetNormals.Domain != command.TargetPositions.Domain || normals->Points.size() != target->Points.size())
+                status = RegistrationNormalStatus::CountMismatch;
+            else if (std::ranges::any_of(normals->Points, [](auto n) { return !(glm::dot(n,n) > 0); }))
+                status = RegistrationNormalStatus::ZeroLength;
+            if (status != RegistrationNormalStatus::Ok)
             {
-                result.Status =
-                    EditorCommandStatus::InvalidProcessingParameters;
+                result.Status = EditorCommandStatus::InvalidProcessingParameters;
                 result.Error = Core::ErrorCode::InvalidArgument;
-                result.Message =
-                    BuildRegistrationNormalRejectionMessage(normalStatus);
+                result.Message = BuildRegistrationNormalRejectionMessage(status);
                 return result;
             }
-            if (targetLocalNormals.size() != targetPoints->size())
-            {
-                result.Status =
-                    EditorCommandStatus::InvalidProcessingParameters;
-                result.Error = Core::ErrorCode::InvalidArgument;
-                result.Message = BuildRegistrationNormalRejectionMessage(
-                    RegistrationNormalStatus::CountMismatch);
-                return result;
-            }
+            targetLocalNormals = normals->Points;
         }
 
         ECSC::Transform::Component* transform =
@@ -12340,145 +12401,226 @@ ApplyEditorRegistrationCommand(
         const ECSC::Transform::Component* targetTransform =
             raw.try_get<ECSC::Transform::Component>(*targetEntity);
 
-        if (context.JobCommands.Available())
+        if (sourcePoints->size() < 3 || targetPoints->size() < 3)
         {
-            return SubmitRegistrationCpuJob(
-                context,
-                command,
-                *sourcePoints,
-                *targetPoints,
-                targetLocalNormals,
-                *transform,
-                targetTransform,
-                GeometryMetadataSignatureForEntity(raw, *sourceEntity),
-                GeometryMetadataSignatureForEntity(raw, *targetEntity));
+            result.Status = EditorCommandStatus::InvalidProcessingParameters;
+            result.Message = "ICP requires at least three live samples per operand.";
+            return result;
         }
-
-        // Register in world space: transform each cloud's local v:position by its
-        // entity model matrix so a non-identity source/target Transform is
-        // respected (identical local clouds with a translated target must still
-        // converge onto the target). The ICP delta is composed with the existing
-        // source model matrix before being written back as the source Transform.
-        const glm::mat4 sourceModel = ModelMatrixFromTransform(*transform);
-        glm::mat4 targetModel(1.0f);
-        if (targetTransform != nullptr)
-            targetModel = ModelMatrixFromTransform(*targetTransform);
-
-        std::vector<glm::vec3> sourceWorld;
-        sourceWorld.reserve(sourcePoints->size());
-        for (const glm::vec3& p : *sourcePoints)
-            sourceWorld.push_back(glm::vec3(sourceModel * glm::vec4(p, 1.0f)));
-        std::vector<glm::vec3> targetWorld;
-        targetWorld.reserve(targetPoints->size());
-        for (const glm::vec3& p : *targetPoints)
-            targetWorld.push_back(glm::vec3(targetModel * glm::vec4(p, 1.0f)));
-
-        const glm::vec3 prealignDelta =
-            ComputePointCentroid(std::span<const glm::vec3>(targetWorld)) -
-            ComputePointCentroid(std::span<const glm::vec3>(sourceWorld));
-        std::vector<glm::vec3> prealignedSourceWorld = sourceWorld;
-        for (glm::vec3& point : prealignedSourceWorld)
-            point += prealignDelta;
-        glm::mat4 prealignPose(1.0f);
-        prealignPose[3] = glm::vec4(prealignDelta, 1.0f);
-
-        std::vector<glm::vec3> targetWorldNormals{};
-        if (pointToPlane)
+        if (!targetLocalNormals.empty())
         {
-            const RegistrationNormalStatus worldStatus =
-                TransformRegistrationNormalsToWorld(
-                    targetLocalNormals, targetModel, targetWorldNormals);
-            if (worldStatus != RegistrationNormalStatus::Ok)
+            std::vector<glm::vec3> worldNormals;
+            const auto status = TransformRegistrationNormalsToWorld(targetLocalNormals,
+                targetTransform ? ModelMatrixFromTransform(*targetTransform) : glm::mat4(1.f), worldNormals);
+            if (status != RegistrationNormalStatus::Ok)
             {
-                result.Status =
-                    EditorCommandStatus::InvalidProcessingParameters;
-                result.Error = Core::ErrorCode::InvalidArgument;
-                result.Message =
-                    BuildRegistrationNormalRejectionMessage(worldStatus);
+                result.Status = EditorCommandStatus::InvalidProcessingParameters;
+                result.Message = BuildRegistrationNormalRejectionMessage(status);
                 return result;
             }
         }
-        result.TargetNormalCount = targetWorldNormals.size();
-
-        Reg::RegistrationParams params{};
-        params.Variant = ToGeometryICPVariant(command.Variant);
-        params.MaxIterations = command.MaxIterations;
-        params.MaxCorrespondenceDistance =
-            command.MaxCorrespondenceDistance > 0.0
-                ? command.MaxCorrespondenceDistance
-                : 1.0e6;
-        params.InlierRatio = command.InlierRatio;
-        // The solver degrades to point-to-point when the span is empty, and
-        // the span is non-empty here exactly when point-to-plane was requested
-        // and validated, so the two agree by construction.
-        result.EffectiveVariant =
-            pointToPlane && targetWorldNormals.size() == targetWorld.size()
-                ? EditorICPVariant::PointToPlane
-                : EditorICPVariant::PointToPoint;
-
-        const RegistrationAlignmentOutcome outcome =
-            AlignPointClouds(
-                prealignedSourceWorld, targetWorld, targetWorldNormals, params);
-        if (!outcome.HasResult)
+        if (preview)
         {
-            result.Status = EditorCommandStatus::GeometryProcessingFailed;
-            result.Error = Core::ErrorCode::InvalidArgument;
-            result.Message = "ICP rejected the selected point clouds (fewer than 3 "
-                             "points or invalid parameters).";
-            return result;
-        }
-
-        result.HasResult = true;
-        result.IterationsPerformed = outcome.Result.IterationsPerformed;
-        result.TrajectoryLength = outcome.IterationCount();
-        result.FinalRMSE = outcome.Result.FinalRMSE;
-        result.Converged = outcome.Result.Converged;
-        result.FinalInlierCount = outcome.Result.FinalInlierCount;
-
-        const std::size_t step =
-            std::min(command.TrajectoryStep, outcome.IterationCount());
-        result.AppliedStep = step;
-        const glm::mat4 pose =
-            step == 0u ? glm::mat4(1.0f)
-                       : TrajectoryPose(outcome, step) * prealignPose;
-
-        // The pose is the world-space source->target delta; compose it with the
-        // source's current model matrix and decompose the result back into the
-        // local Transform (position/rotation, preserving the existing scale).
-        ECSC::Transform::Component next = *transform;
-        DecomposeModelToTransform(pose * sourceModel, next);
-
-        if (context.CommandHistory != nullptr)
-        {
-            const EditorCommandHistoryResult history =
-                ExecuteEditorTransformMutation(
-                    *context.CommandHistory,
-                    context.Scene,
-                    context.World,
-                    command.SourceStableEntityId,
-                    *transform,
-                    next,
-                    "Align point clouds (ICP)");
-            result.Status = ToEditorCommandStatus(history.Status);
-        }
-        else
-        {
-            *transform = next;
-            raw.emplace_or_replace<ECSC::Transform::IsDirtyTag>(*sourceEntity);
             result.Status = EditorCommandStatus::Applied;
-        }
-
-        if (result.Status != EditorCommandStatus::Applied)
-        {
-            result.Error = Core::ErrorCode::Unknown;
-            result.Message =
-                "ICP registration pose failed during editor history commit.";
+            result.Message = "Ready to register the selected property domains.";
             return result;
         }
+        return SubmitRegistrationCpuJob(context, command, *sourcePoints, *targetPoints, targetLocalNormals,
+            *transform, targetTransform);
+    }
 
-        result.Error = Core::ErrorCode::Success;
-        result.Message = BuildRegistrationSuccessMessage(result);
-        return result;
+    EditorRegistrationResult ApplyEditorRegistrationCommand(
+        const EditorGeometryProcessingContext& context, const EditorRegistrationCommand& command)
+    {
+        return ApplyRegistrationChecked(context, command, false);
+    }
+    EditorRegistrationReadiness PreviewEditorRegistrationCommand(
+        const EditorGeometryProcessingContext& context, const EditorRegistrationCommand& command)
+    {
+        const auto result = ApplyRegistrationChecked(context, command, true);
+        return {result.Succeeded(), result.Status, result.Message};
     }
 
 } // namespace Extrinsic::Runtime
+
+namespace Extrinsic::Runtime
+{
+    GeometryPropertyCatalogSnapshot GetEditorRegistrationInputCatalog(
+        const EditorGeometryProcessingContext& context, std::uint32_t stableId)
+    {
+        if (!context.Scene) return {};
+        const auto entity = ResolveStableEntity(context.Scene->Raw(), stableId);
+        if (!entity) return {};
+        const auto available = BuildGeometryAvailability(context.Scene->Raw(), *entity);
+        auto catalog = BuildGeometryPropertyCatalogSnapshot(available, stableId);
+        std::erase_if(catalog.Entries, [&](const auto& entry) {
+            if (entry.Ref.ValueKind != Geometry::PropertyValueKind::Vec3) return true;
+            const auto snapshot = CaptureRegistrationProperty(available, entry.Ref);
+            return !snapshot || snapshot->Points.size() < 3;
+        });
+        return catalog;
+    }
+    EditorGeodesicsResult ApplyEditorGeodesicsCommand(
+        const EditorGeometryProcessingContext& context, const EditorGeodesicsCommand& command)
+    {
+        EditorGeodesicsResult result;
+        auto fail = [&](EditorCommandStatus status, std::string message) {
+            result.Status = status;
+            result.Message = std::move(message);
+            return result;
+        };
+        if (!context.Scene)
+            return fail(EditorCommandStatus::MissingScene, "Scene is unavailable.");
+        const auto validated = ValidateGeodesicsConfigSection(
+            SerializeGeodesicsConfig(command.Config), {}, kGeodesicsConfigSectionName);
+        if (!validated.Usable())
+            return fail(EditorCommandStatus::InvalidProcessingParameters,
+                        validated.Diagnostics.front().Message);
+        auto& raw = context.Scene->Raw();
+        const auto entity = ResolveStableEntity(raw, command.StableEntityId);
+        if (!entity)
+            return fail(EditorCommandStatus::StaleEntity, "Geodesics target is stale.");
+        auto source = BuildHalfedgeMeshForDenoise(GS::BuildConstView(raw, *entity),
+                                                  command.Config.PositionProperty);
+        if (!source.Succeeded())
+            return fail(source.Status, "Geodesics input: " + source.Diagnostic);
+        for (auto face : source.Mesh.LiveFaces())
+            for (auto vertex : source.Mesh.VerticesAroundFace(face))
+                if (source.DeletedVertices[vertex.Index])
+                    return fail(EditorCommandStatus::InvalidProcessingParameters,
+                                "Geodesics triangle references a deleted vertex.");
+        // Reject polygon triangulation: the method contract is a triangle surface.
+        auto faceIds = source.SourceFaceForMeshFace;
+        std::sort(faceIds.begin(), faceIds.end());
+        if (std::adjacent_find(faceIds.begin(), faceIds.end()) != faceIds.end())
+            return fail(EditorCommandStatus::InvalidProcessingParameters,
+                        "Geodesics require triangle source faces.");
+        std::vector<std::size_t> sources(command.Config.SourceVertices.begin(),
+                                         command.Config.SourceVertices.end());
+        for (auto v : sources)
+            if (v >= source.DeletedVertices.size() || source.DeletedVertices[v])
+                return fail(EditorCommandStatus::InvalidProcessingParameters,
+                            "Geodesics source vertex is deleted or out of range.");
+        auto view = GS::BuildMutableView(raw, *entity);
+        auto& properties = view.VertexSource->Properties;
+        if (source.BeforePositions.size() != properties.Size())
+            return fail(EditorCommandStatus::InvalidProcessingParameters,
+                        "Geodesics position property must match the vertex slot count.");
+        constexpr std::string_view distanceName = "v:geodesic_distance";
+        constexpr std::string_view sourceName = "v:is_geodesic_source";
+        struct State
+        {
+            bool HadDistance{false}, HadSource{false};
+            std::vector<double> Distance;
+            std::vector<bool> Source;
+            bool operator==(const State&) const = default;
+        };
+        auto capture = [distanceName, sourceName](Geometry::PropertySet& props, State& state) {
+            std::string diagnostic;
+            return CaptureCurvatureProperty<double>(props, distanceName, props.Size(),
+                                                    state.HadDistance, state.Distance,
+                                                    diagnostic) &&
+                   CaptureCurvatureProperty<bool>(props, sourceName, props.Size(), state.HadSource,
+                                                  state.Source, diagnostic);
+        };
+        State before;
+        if (!capture(properties, before))
+            return fail(EditorCommandStatus::InvalidProcessingParameters,
+                        "Geodesics output properties have incompatible types or sizes.");
+        result.Diagnostics = Geometry::Geodesic::ComputeVirtualSourceDistance(
+            source.Mesh, sources,
+            Geometry::Geodesic::VirtualSourceParams{command.Config.MaxHalfedgeExpansions});
+        if (!result.Diagnostics.Succeeded())
+            return fail(EditorCommandStatus::GeometryProcessingFailed,
+                        Geometry::Geodesic::ToString(result.Diagnostics.Status));
+        for (std::size_t v = 0; v < source.DeletedVertices.size(); ++v)
+            if (source.DeletedVertices[v])
+            {
+                result.Diagnostics.Distances[v] = std::numeric_limits<double>::infinity();
+                --result.Diagnostics.UnreachableVertexCount;
+            }
+        State after{true, true, result.Diagnostics.Distances,
+                    std::vector<bool>(source.Mesh.VerticesSize(), false)};
+        for (auto v : sources)
+            after.Source[v] = true;
+        if (before == after)
+        {
+            result.Status = EditorCommandStatus::NoChange;
+            result.Message = "Geodesics are unchanged.";
+            return result;
+        }
+        const auto signature = MeshTopologyValueSignature(GS::BuildConstView(raw, *entity));
+        if (!signature)
+            return fail(EditorCommandStatus::InvalidProcessingParameters,
+                        "Geodesics topology is invalid.");
+        const auto positions =
+            std::make_shared<const std::vector<glm::vec3>>(std::move(source.BeforePositions));
+        const auto deletedVertices =
+            std::make_shared<const std::vector<bool>>(std::move(source.DeletedVertices));
+        const auto mutate = [scene = context.Scene, entity = *entity, signature, positions,
+                             deletedVertices,
+                             distanceName, sourceName,
+                             positionProperty = command.Config.PositionProperty, capture,
+                             invalidate = context.InvalidateWorkspaceSnapshotCache](
+                                const State& expected, const State& target) {
+            auto& raw = scene->Raw();
+            if (!raw.valid(entity) ||
+                MeshTopologyValueSignature(GS::BuildConstView(raw, entity)) != signature)
+                return EditorCommandHistoryStatus::StaleEntity;
+            auto view = GS::BuildMutableView(raw, entity);
+            if (!view.VertexSource)
+                return EditorCommandHistoryStatus::StaleEntity;
+            auto& props = view.VertexSource->Properties;
+            const auto currentPositions = props.Get<glm::vec3>(positionProperty);
+            const auto currentDeleted = props.Get<bool>("v:deleted");
+            if ((props.Exists("v:deleted") && !currentDeleted) ||
+                (currentDeleted ? currentDeleted.Vector() != *deletedVertices
+                                : std::ranges::any_of(*deletedVertices, [](bool v) { return v; })))
+                return EditorCommandHistoryStatus::StaleEntity;
+            State current;
+            if (props.Size() != positions->size() || !currentPositions ||
+                currentPositions.Vector() != *positions ||
+                !capture(props, current) || current != expected)
+                return EditorCommandHistoryStatus::StaleEntity;
+            if (!ApplyCurvatureProperty<double>(props, distanceName, target.HadDistance,
+                                                target.Distance, 0.0) ||
+                !ApplyCurvatureProperty<bool>(props, sourceName, target.HadSource, target.Source,
+                                              false))
+                return EditorCommandHistoryStatus::CommandFailed;
+            Dirty::MarkVertexAttributesDirty(raw, entity);
+            if (invalidate)
+                invalidate();
+            return EditorCommandHistoryStatus::Applied;
+        };
+        if (context.CommandHistory)
+        {
+            const auto history =
+                context.CommandHistory->Execute({.Label = "Compute geodesics",
+                                                 .Redo =
+                                                     [mutate, before, after] {
+                                                         return mutate(before, after);
+                                                     },
+                                                 .Undo =
+                                                     [mutate, before, after] {
+                                                         return mutate(after, before);
+                                                     }});
+            result.Status = ToEditorCommandStatus(history.Status);
+        }
+        else
+            result.Status = ToEditorCommandStatus(mutate(before, after));
+        result.Message = result.Succeeded() ? "Virtual-source geodesics computed (cpu_reference)."
+                                            : "Geodesics publication rejected.";
+        return result;
+    }
+}
+
+namespace Extrinsic::Runtime::GeometryProcessingDetail
+{
+    EditorMeshSourceSnapshot BuildEditorNormalMeshSnapshot(const ECS::Components::GeometrySources::ConstSourceView& view, std::string_view positionProperty)
+    {
+        auto built = BuildHalfedgeMeshForVertexNormalRecompute(view, positionProperty, false, true);
+        EditorMeshSourceSnapshot result;
+        result.Mesh=std::move(built.Mesh);result.Status=built.Status;result.Error=built.Error;result.Diagnostic=std::move(built.Diagnostic);
+        return result;
+    }
+}

@@ -3,6 +3,15 @@ id: METHOD-004
 theme: I
 depends_on: []
 maturity_target: CPUContracted
+workflow_schema: 1
+workflow_profile: standard
+evidence: required
+owner:
+branch:
+worktree:
+claimed_at:
+contract_schema: 1
+contracts: [repo.source-documentation, geometry.element-domain-sources, method.engine-integration]
 ---
 # METHOD-004 — Walk on Stars PDE solver reference backend
 
@@ -68,6 +77,28 @@ maturity_target: CPUContracted
 - Backend axis: seeded deterministic `cpu_reference` only. `METHOD-028`
   evaluates a distinct guiding policy, not a replacement correctness backend;
   no GPU backend task is reserved.
+
+## Engine integration
+
+| Field | Disposition |
+| --- | --- |
+| Least-structured input | Analytic or exact mesh-boundary distance/ray oracles, boundary-condition data and query positions for the contracted volumetric PDE. |
+| Compatible entity sources | Every canonical property/topology source satisfying the input above; binding is owned by METHOD-003A after reference acceptance and selection. |
+| RuntimeModule | Deferred to [METHOD-003A](METHOD-003A-spatial-query-reference-integration-intake.md), which allocates the concrete operation owner without widening this reference slice. |
+| Config/agent | Typed reference parameters now; METHOD-003A owns validated serializable engine controls at adoption. |
+| UI | METHOD-003A owns adoption/discovery planning; no editor-integrated claim from this CPU slice. |
+| Publication | Return values/uncertainty at supplied query positions; preserve boundary geometry and its properties. METHOD-003A owns engine publication planning. |
+| End-to-end tests | Reference/oracle and method tests here; METHOD-003A allocates compatible-source/config/publication/UI coverage at adoption. |
+
+## Spatial acceleration consideration
+
+Reuse the CPU BVH/exact boundary-query path for closest distance, ray visibility
+and mixed-boundary traversal. A future primitive LBVH may accelerate the same
+oracle only after conservative segment/triangle bounds and exact predicates exist;
+the current point LBVH cannot provide the boundary distance or inside
+classification. No GPU or altered estimator is added to this reference task.
+
+See the [shared spatial-index consumer inventory](../../../docs/architecture/spatial-index-consumers.md).
 
 ## Required changes
 

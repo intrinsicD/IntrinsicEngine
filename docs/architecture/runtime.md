@@ -1,5 +1,7 @@
 # Runtime Architecture
 
+Point-neighbor consumers share the runtime-owned [spatial index cache](spatial-indices.md). Vulkan k-means uses the same LBVH kernels with a reusable centroid workspace.
+
 `runtime` is the composition root for IntrinsicEngine.
 
 ## Responsibilities
@@ -230,7 +232,10 @@ and the history cursor unchanged. Direct/ICP transforms, coalesced gizmo
 transforms, and default or lane-targeted visualization config edits use this
 shape. Mesh, graph, and point-cloud vertex-normal publishers use it for both
 immediate and queued completion paths, validating exact non-output source
-properties plus the optional current normal property. Clustering likewise
+properties plus the optional current normal property. The canonical normal workflow
+also publishes on edge, halfedge and face domains through one output-only history
+transaction, watching only consumed property revisions and retaining unrelated edits.
+See [normal estimation](normal-estimation.md) for config, topology and spatial-cache ownership. Clustering likewise
 captures exact input points and the optional label/color/scalar output cohort;
 its CPU and Vulkan completions enter the transaction when document history is
 composed, while the module stays independently usable without it.
@@ -447,7 +452,7 @@ result presentation are app-owned, while model construction, command execution,
 job scheduling, config validation, and result publication remain runtime-owned.
 `Extrinsic.Sandbox.Editor.MeshProcessingPanels` applies the same boundary to ICP
 registration, mesh denoise/curvature/remesh/subdivide/simplify, and the
-mesh/graph/point-cloud vertex-normal windows. Runtime retains their exported
+shared [normal-estimation window](normal-estimation.md), with aliases in mesh/graph/point-cloud menus. Runtime retains their exported
 models, command validation/execution, undo/history integration, derived-job
 submission, stale-result rejection, and result sinks; the application owns the
 stable registrations, menu paths, lazy per-frame domain-model cache, widget
@@ -900,3 +905,11 @@ test-only `Extrinsic.Runtime.PhysicsBridge` public module is retired.
 - Historical details: `runtime-subsystem-boundaries.md` (`legacy-background`).
 - Physics module ownership: [physics.md](physics.md).
 - Layer policy: [layering.md](layering.md).
+
+## Primitive selection
+
+The existing interaction module owns a shared selection service for entity and
+canonical primitive domains. See [primitive selection](primitive-selection.md)
+for lifecycle, config, method-input, and viewport contracts.
+
+ICP uses the existing editor command/job owner with the shared spatial-index cache. [Registration ownership and config](registration.md) describes canonical operand binding and framed GPU correspondence batches.

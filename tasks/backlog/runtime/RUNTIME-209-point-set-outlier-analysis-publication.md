@@ -57,6 +57,17 @@ maturity_target: Operational
 | Publication | Analyze writes named same-domain mask and score/diagnostic properties; Remove compacts only point-cloud `Vertices` through history. |
 | End-to-end tests | All property-domain families including face centers, point-cloud-only removal, config parity, async staleness, and UI readiness tests. |
 
+## Spatial acceleration consideration
+
+Radius detection can reuse the canonical position-property cache with exact self
+filtering and complete-hit/count handling. Statistical detection needs kNN and
+self exclusion, now available in the shared point LBVH (GEOM-077; GPU k=1..64).
+Consumer adapter integration and parity remain part of this task. Preserve current
+estimators and the Analyze/Remove split; record deferred acceleration rather than
+silently substituting a radius or truncated neighborhood.
+
+See the [shared spatial-index consumer inventory](../../../docs/architecture/spatial-index-consumers.md).
+
 ## Required changes
 
 - [ ] Introduce an explicit operation mode and property-aware capability

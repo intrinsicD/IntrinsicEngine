@@ -57,6 +57,17 @@ contract_review: "Reviewed the full catalog. This one-shot audit evaluates exist
 - The complete audit restarts on a fresh clean revision after every blocker
   retires; rejected partial evidence is diagnostic only.
 
+## Spatial acceleration consideration
+
+Use the consumer inventory during the nearest-neighbor, selection and method
+workflow audit: verify actual call paths and query semantics, not just a
+registered cache. Distinguish existing Vulkan k-means integration from proposed
+ICP/neighborhood consumers and remaining consumer adapters and primitive/ray support. Record a
+concrete scoped owner for any required product gap; the inventory itself is not
+parity evidence or a new universal LBVH requirement.
+
+See the [shared spatial-index consumer inventory](../../../docs/architecture/spatial-index-consumers.md).
+
 ## Required changes
 
 - [ ] Confirm every static dependency is retired before beginning the audit.

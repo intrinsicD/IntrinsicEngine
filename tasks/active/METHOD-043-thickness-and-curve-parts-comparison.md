@@ -54,6 +54,16 @@ contract_review: "Surface topology and embedding are semantic requirements. Same
 | Publication | METHOD-043 owns detached face properties, preserving geometry and unrelated properties. |
 | End-to-end tests | METHOD-043 owns compatible-source-to-publication coverage if a method is selected. |
 
+## Spatial acceleration consideration
+
+For a later approved native thickness implementation, reuse or extend a triangle-
+bound ray hierarchy over the fixed surface, preserving self-hit, sidedness and
+interior rules. Current point LBVH nearest/radius queries cannot measure shape
+diameter; curve distance would need segment traversal. This reminder does not
+reopen the completed four-round experiment or change its recorded verdicts.
+
+See the [shared spatial-index consumer inventory](../../docs/architecture/spatial-index-consumers.md).
+
 ## Verification
 - `python3 tests/regression/tooling/Test.ShapeDiameterParts.py`
 - `python3 tests/regression/tooling/Test.PartSeamOracle.py`

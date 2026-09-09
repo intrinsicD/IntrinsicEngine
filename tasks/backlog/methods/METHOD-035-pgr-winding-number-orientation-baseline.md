@@ -3,6 +3,15 @@ id: METHOD-035
 theme: I
 depends_on: []
 maturity_target: CPUContracted
+workflow_schema: 1
+workflow_profile: standard
+evidence: required
+owner:
+branch:
+worktree:
+claimed_at:
+contract_schema: 1
+contracts: [repo.source-documentation, geometry.element-domain-sources, method.engine-integration]
 ---
 # METHOD-035 — Parametric Gauss (winding-number) orientation baseline (reference backend)
 
@@ -20,6 +29,28 @@ maturity_target: CPUContracted
 - Reuse: `Geometry.KDTree` for the near-field regularization width (kNN spacing); `Geometry.PointCloud.SurfaceSampling` for fixtures. The exported `Geometry.LinearSolver` targets assembled sparse systems; the dense matrix-free CG here is method-local by design (documented, not exported).
 - Fully deterministic: no RNG anywhere; fixed CG iteration count and summation order.
 - Metrics use the same names as `METHOD-032` (`oriented_correct_fraction`, `runtime_ms`) plus `confidence_mean` and `cg_residual` so results are directly comparable in `METHOD-036`.
+
+## Engine integration
+
+| Field | Disposition |
+| --- | --- |
+| Least-structured input | Finite point-position spans, regularization parameters and explicit CPU workload bounds. |
+| Compatible entity sources | Any compatible point-valued property domain may supply benchmark arrays; no ECS adapter or provenance restriction is introduced. |
+| RuntimeModule | Not applicable to this comparison-only baseline; METHOD-036 invokes its public CPU API. |
+| Config/agent | METHOD-036 manifests bind reference parameters, consumed inputs and budgets. |
+| UI | No editor selector is intended for this comparison-only contract; later production promotion requires a separate intake. |
+| Publication | Return same-cardinality float normals/confidence and diagnostics; METHOD-036 records evidence without ECS mutation. |
+| End-to-end tests | CPU determinism/failure/convergence here; METHOD-036 owns benchmark invocation, input identity and result validation. |
+
+## Spatial acceleration consideration
+
+Near-field regularization-width estimation may later reuse point neighborhoods
+through the available kNN/self-exclusion API (GPU k=1..64), after adapter parity. Preserve the dense matrix-free winding-number
+sum and CG reference: a point LBVH contains no far-field moments, and radius
+truncation changes PGR. Hierarchical aggregation requires its own
+approximation/error and parity task.
+
+See the [shared spatial-index consumer inventory](../../../docs/architecture/spatial-index-consumers.md).
 
 ## Required changes
 - [ ] Clone `methods/_template/` to `methods/geometry/parametric_gauss_orientation/`; fill `method.yaml` (`id: geometry.parametric_gauss_orientation`; status `reference`; metrics above; paper block) and `paper.md`.

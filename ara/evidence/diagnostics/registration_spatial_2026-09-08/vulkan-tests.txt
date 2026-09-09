@@ -1,0 +1,16 @@
+Internal ctest changing into directory: /home/alex/Documents/IntrinsicEngine/build/ci-vulkan
+Test project /home/alex/Documents/IntrinsicEngine/build/ci-vulkan
+    Start  9: PointLBVHGpuSmoke.VulkanBuildAndQueriesMatchExhaustiveCpuAndReuseAllocations
+1/2 Test  #9: PointLBVHGpuSmoke.VulkanBuildAndQueriesMatchExhaustiveCpuAndReuseAllocations ...   Passed   16.74 sec
+    Start 10: PointLBVHGpuSmoke.FramedRegistrationReusesTargetAcrossRunsAndMatchesCpuSolve
+2/2 Test #10: PointLBVHGpuSmoke.FramedRegistrationReusesTargetAcrossRunsAndMatchesCpuSolve ...   Passed   46.72 sec
+
+100% tests passed, 0 tests failed out of 2
+
+Label Time Summary:
+gpu            =  63.46 sec*proc (2 tests)
+graphics       =  63.46 sec*proc (2 tests)
+integration    =  63.46 sec*proc (2 tests)
+vulkan         =  63.46 sec*proc (2 tests)
+
+Total Test time (real) =  63.60 sec

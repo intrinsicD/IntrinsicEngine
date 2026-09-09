@@ -56,6 +56,17 @@ contract_review: "Reviewed the catalog. This task adds benchmark manifests, proc
 - Backend axis: record requested, actual, and fallback for every method run;
   compare only real implementations declared by the corresponding manifest.
 
+## Spatial acceleration consideration
+
+For implemented spatial-query consumers, include cold build/upload, unchanged-
+source reuse, per-iteration rebuild, queries/reductions/readback, memory and
+complete-method time. Vulkan k-means already uses the shared LBVH kernels; other
+inventory candidates are not integrated by implication. Compare against the actual
+scan/KD-tree/octree/grid/primitive-BVH baseline with matched semantics and
+independent correctness checks, including small workloads and dense-radius limits.
+
+See the [shared spatial-index consumer inventory](../../../docs/architecture/spatial-index-consumers.md).
+
 ## Required changes
 
 - [ ] Add stable benchmark manifests for the required product timing boundaries

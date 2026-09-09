@@ -148,6 +148,14 @@ slice may defer a surface, but the matrix must name the owning follow-up task;
 `N/A` is valid only when the canonical method contract makes engine integration
 inapplicable.
 
+For spatial-query work, consult the
+[consumer inventory](../architecture/spatial-index-consumers.md) and record a
+task-local spatial acceleration consideration: query/metric/membership,
+index owner and reuse, invalidation, overflow and missing support. Preserve
+existing non-goals and reference semantics; follow the
+[method workflow](method-workflow.md#spatial-acceleration-review) when the
+consumer is a method. Update the inventory when that decision changes.
+
 For geometry methods, “least structured” is property/topology based, not
 container based. A point-set input names a compatible typed property/span on
 any element domain (including face, edge, or halfedge properties); it must not

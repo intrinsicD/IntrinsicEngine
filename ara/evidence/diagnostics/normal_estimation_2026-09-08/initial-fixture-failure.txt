@@ -1,0 +1,371 @@
+Internal ctest changing into directory: /home/alex/Documents/IntrinsicEngine/build/ci
+Test project /home/alex/Documents/IntrinsicEngine/build/ci
+        Start  275: ECSGeometryDirtyDomains.MarkVertexNormalsDirtyStampsOnlyThatTag
+  1/161 Test  #275: ECSGeometryDirtyDomains.MarkVertexNormalsDirtyStampsOnlyThatTag ......................................   Passed    0.00 sec
+        Start  297: ECSGeometrySourcesPopulate.PopulateFromCloudWritesCanonicalPositionsAndNormals
+  2/161 Test  #297: ECSGeometrySourcesPopulate.PopulateFromCloudWritesCanonicalPositionsAndNormals .......................   Passed    0.00 sec
+        Start  298: ECSGeometrySourcesPopulate.PopulateFromCloudSkipsNormalsWhenSourceLacksThem
+  3/161 Test  #298: ECSGeometrySourcesPopulate.PopulateFromCloudSkipsNormalsWhenSourceLacksThem ..........................   Passed    0.00 sec
+        Start  347: RuntimeAssetImportFormatCoverage.DirectObjImportPreservesVertexNormalsInGeometrySources
+  4/161 Test  #347: RuntimeAssetImportFormatCoverage.DirectObjImportPreservesVertexNormalsInGeometrySources ..............   Passed    0.05 sec
+        Start  351: RuntimeAssetImportFormatCoverage.DirectObjImportPreservesAuthoredCornerNormals
+  5/161 Test  #351: RuntimeAssetImportFormatCoverage.DirectObjImportPreservesAuthoredCornerNormals .......................   Passed    0.05 sec
+        Start  367: RuntimeAssetImportFormatCoverage.DirectObjImportQueuesGeneratedNormalBakeFromAuthoredVertexNormals
+  6/161 Test  #367: RuntimeAssetImportFormatCoverage.DirectObjImportQueuesGeneratedNormalBakeFromAuthoredVertexNormals ...   Passed    0.04 sec
+        Start  368: RuntimeAssetImportFormatCoverage.DirectObjImportComputesVertexNormalsWhenMissing
+  7/161 Test  #368: RuntimeAssetImportFormatCoverage.DirectObjImportComputesVertexNormalsWhenMissing .....................   Passed    0.04 sec
+        Start  369: RuntimeAssetImportFormatCoverage.DirectObjImportComputesNormalsAndQueuesGeneratedNormalBake
+  8/161 Test  #369: RuntimeAssetImportFormatCoverage.DirectObjImportComputesNormalsAndQueuesGeneratedNormalBake ..........   Passed    0.05 sec
+        Start  450: ImGuiAdapterEngineWiring.RunNormalizesNativeCloseBeforeFirstFrame
+  9/161 Test  #450: ImGuiAdapterEngineWiring.RunNormalizesNativeCloseBeforeFirstFrame ....................................   Passed    0.08 sec
+        Start  451: ImGuiAdapterEngineWiring.RunNormalizesNativeCloseAfterInteractiveInput
+ 10/161 Test  #451: ImGuiAdapterEngineWiring.RunNormalizesNativeCloseAfterInteractiveInput ...............................   Passed    0.06 sec
+        Start  476: MeshGeometryExtraction.DisagreeingCornerNormalsSplitOnlyGpuShadingVertices
+ 11/161 Test  #476: MeshGeometryExtraction.DisagreeingCornerNormalsSplitOnlyGpuShadingVertices ...........................   Passed    0.07 sec
+        Start  477: MeshGeometryExtraction.ExplicitNormalBindingOverridesCornerNormalsAndTheirRevision
+ 12/161 Test  #477: MeshGeometryExtraction.ExplicitNormalBindingOverridesCornerNormalsAndTheirRevision ...................   Passed    0.07 sec
+        Start  480: CornerTexcoordUpload.CompleteSplitCarriesAuthoredCornerNormals
+ 13/161 Test  #480: CornerTexcoordUpload.CompleteSplitCarriesAuthoredCornerNormals .......................................   Passed    0.00 sec
+        Start  645: NormalEstimation.EveryCanonicalDomainPublishesNamedNormalsAndSupportsUndoRedo
+ 14/161 Test  #645: NormalEstimation.EveryCanonicalDomainPublishesNamedNormalsAndSupportsUndoRedo ........................   Passed    0.03 sec
+        Start  646: NormalEstimation.PreservesDeletedRowsAndUnrelatedEditsButGuardsOutputHistory
+ 15/161 Test  #646: NormalEstimation.PreservesDeletedRowsAndUnrelatedEditsButGuardsOutputHistory .........................   Passed    0.01 sec
+        Start  647: NormalEstimation.TopologyVariantsConsumeCustomPositionsAndGraphMethodAcceptsMesh
+ 16/161 Test  #647: NormalEstimation.TopologyVariantsConsumeCustomPositionsAndGraphMethodAcceptsMesh .....................   Passed    0.01 sec
+        Start  648: NormalEstimation.MeshDeletionMasksExcludeFacesAndEdgesWithoutRenumberingOutput
+ 17/161 Test  #648: NormalEstimation.MeshDeletionMasksExcludeFacesAndEdgesWithoutRenumberingOutput .......................   Passed    0.01 sec
+        Start  649: NormalEstimation.RejectsInvalidBindingsAndUnavailableBackendsWithoutMutation
+ 18/161 Test  #649: NormalEstimation.RejectsInvalidBindingsAndUnavailableBackendsWithoutMutation .........................   Passed    0.01 sec
+        Start  650: NormalEstimation.RadiusNeighborhoodAndDegenerateFallbackMatchAcrossBackends
+ 19/161 Test  #650: NormalEstimation.RadiusNeighborhoodAndDegenerateFallbackMatchAcrossBackends ..........................   Passed    0.01 sec
+        Start  651: NormalEstimation.QueuedJobsGuardInputsTopologyDeletionAndOutputButAllowUnrelatedEdits
+ 20/161 Test  #651: NormalEstimation.QueuedJobsGuardInputsTopologyDeletionAndOutputButAllowUnrelatedEdits ................   Passed    0.06 sec
+        Start  652: NormalEstimation.NamedOutputUsesSharedVectorVisualizationRecipe
+ 21/161 Test  #652: NormalEstimation.NamedOutputUsesSharedVectorVisualizationRecipe ......................................***Failed    0.01 sec
+Running main() from /home/alex/Documents/IntrinsicEngine/external/vcpkg/buildtrees/gtest/src/v1.17.0-0c449efaff.clean/googletest/src/gtest_main.cc
+Note: Google Test filter = NormalEstimation.NamedOutputUsesSharedVectorVisualizationRecipe
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from NormalEstimation
+[ RUN      ] NormalEstimation.NamedOutputUsesSharedVectorVisualizationRecipe
+/home/alex/Documents/IntrinsicEngine/tests/contract/runtime/Test.NormalEstimation.cpp:422: Failure
+Expected equality of these values:
+  R::ApplyEditorVisualizationRecipeCommand( context, {.StableEntityId = config.StableEntityId, .Recipe = {.Data = R::VectorFieldVisualizationRecipe{.Source = config.Output, .PositionSource = config.Positions, .OutputName = "normal_vectors"}}})
+    Which is: 1-byte object <09>
+  R::EditorCommandStatus::Applied
+    Which is: 1-byte object <00>
+
+/home/alex/Documents/IntrinsicEngine/tests/contract/runtime/Test.NormalEstimation.cpp:423: Failure
+Value of: stored
+  Actual: false
+Expected: true
+
+[  FAILED  ] NormalEstimation.NamedOutputUsesSharedVectorVisualizationRecipe (0 ms)
+[----------] 1 test from NormalEstimation (0 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (0 ms total)
+[  PASSED  ] 0 tests.
+[  FAILED  ] 1 test, listed below:
+[  FAILED  ] NormalEstimation.NamedOutputUsesSharedVectorVisualizationRecipe
+
+ 1 FAILED TEST
+
+        Start  653: NormalEstimation.TopologyCatalogRetainsSmallGraphsAndReportsPcaMinimum
+ 22/161 Test  #653: NormalEstimation.TopologyCatalogRetainsSmallGraphsAndReportsPcaMinimum ...............................   Passed    0.01 sec
+        Start  654: NormalEstimation.GraphPositionSlotMayBindAnExistingNormalNamedProperty
+ 23/161 Test  #654: NormalEstimation.GraphPositionSlotMayBindAnExistingNormalNamedProperty ...............................   Passed    0.01 sec
+        Start  655: NormalEstimationConfig.RoundTripAndSharedPreviewApplyRun
+ 24/161 Test  #655: NormalEstimationConfig.RoundTripAndSharedPreviewApplyRun .............................................   Passed    0.01 sec
+        Start  954: RuntimeSceneSerialization.SaveLoadRoundTripPreservesCornerDomainNormals
+ 25/161 Test  #954: RuntimeSceneSerialization.SaveLoadRoundTripPreservesCornerDomainNormals ..............................   Passed    0.01 sec
+        Start 1044: SandboxEditorUi.RegistrationPointToPlaneUsesTargetNormals
+ 26/161 Test #1044: SandboxEditorUi.RegistrationPointToPlaneUsesTargetNormals ............................................   Passed    0.02 sec
+        Start 1045: SandboxEditorUi.QueuedRegistrationPointToPlaneUsesTargetNormals
+ 27/161 Test #1045: SandboxEditorUi.QueuedRegistrationPointToPlaneUsesTargetNormals ......................................   Passed    0.06 sec
+        Start 1046: SandboxEditorUi.RegistrationPointToPlaneRejectsInvalidTargetNormals
+ 28/161 Test #1046: SandboxEditorUi.RegistrationPointToPlaneRejectsInvalidTargetNormals ..................................   Passed    0.01 sec
+        Start 1047: SandboxEditorUi.RegistrationPointToPlaneTransformsNormalsByInverseTranspose
+ 29/161 Test #1047: SandboxEditorUi.RegistrationPointToPlaneTransformsNormalsByInverseTranspose ..........................   Passed    0.01 sec
+        Start 1048: SandboxEditorUi.QueuedRegistrationPointToPlaneDiscardsStaleTargetNormals
+ 30/161 Test #1048: SandboxEditorUi.QueuedRegistrationPointToPlaneDiscardsStaleTargetNormals .............................   Passed    0.02 sec
+        Start 1093: SandboxEditorUi.MeshVertexNormalsCommandPublishesCanonicalNormalsForAllWeightings
+ 31/161 Test #1093: SandboxEditorUi.MeshVertexNormalsCommandPublishesCanonicalNormalsForAllWeightings ....................   Passed    0.01 sec
+        Start 1094: SandboxEditorUi.VertexNormalRecomputeThatChangesNothingReportsNoChange
+ 32/161 Test #1094: SandboxEditorUi.VertexNormalRecomputeThatChangesNothingReportsNoChange ...............................   Passed    0.01 sec
+        Start 1095: SandboxEditorUi.VertexNormalCpuJobThatChangesNothingReportsNoChange
+ 33/161 Test #1095: SandboxEditorUi.VertexNormalCpuJobThatChangesNothingReportsNoChange ..................................   Passed    0.02 sec
+        Start 1096: SandboxEditorUi.MeshVertexNormalsRequestQueuesDerivedJobAndPublishesOnApply
+ 34/161 Test #1096: SandboxEditorUi.MeshVertexNormalsRequestQueuesDerivedJobAndPublishesOnApply ..........................   Passed    0.02 sec
+        Start 1097: SandboxEditorUi.GraphAndPointCloudVertexNormalsRequestsQueueDerivedJobsAndPublishOnApply
+ 35/161 Test #1097: SandboxEditorUi.GraphAndPointCloudVertexNormalsRequestsQueueDerivedJobsAndPublishOnApply .............   Passed    0.02 sec
+        Start 1098: SandboxEditorUi.VertexNormalsDerivedJobsDiscardStaleSourcesBeforeApply
+ 36/161 Test #1098: SandboxEditorUi.VertexNormalsDerivedJobsDiscardStaleSourcesBeforeApply ...............................   Passed    0.03 sec
+        Start 1108: SandboxEditorUi.MeshVertexNormalsCommandFailsClosedForInvalidTargets
+ 37/161 Test #1108: SandboxEditorUi.MeshVertexNormalsCommandFailsClosedForInvalidTargets .................................   Passed    0.01 sec
+        Start 1111: SandboxEditorUi.GraphAndPointCloudVertexNormalsCommandsPublishCanonicalNormals
+ 38/161 Test #1111: SandboxEditorUi.GraphAndPointCloudVertexNormalsCommandsPublishCanonicalNormals .......................   Passed    0.01 sec
+        Start 1112: SandboxEditorUi.GraphAndPointCloudVertexNormalsCommandsFailClosedForInvalidTargets
+ 39/161 Test #1112: SandboxEditorUi.GraphAndPointCloudVertexNormalsCommandsFailClosedForInvalidTargets ...................   Passed    0.01 sec
+        Start 1128: SandboxEditorUi.VertexChannelBindingCommandRebindsNormalsForMeshGraphAndPointCloud
+ 40/161 Test #1128: SandboxEditorUi.VertexChannelBindingCommandRebindsNormalsForMeshGraphAndPointCloud ...................   Passed    0.01 sec
+        Start 1151: SandboxEditorSession.DismissClearsOneGeometryProcessingResultSlot
+ 41/161 Test #1151: SandboxEditorSession.DismissClearsOneGeometryProcessingResultSlot ....................................   Passed    0.04 sec
+        Start 1154: RuntimeTextureBakeModule.NormalAndLabelDefaultsChooseEncodedStorage
+ 42/161 Test #1154: RuntimeTextureBakeModule.NormalAndLabelDefaultsChooseEncodedStorage ..................................   Passed    0.00 sec
+        Start 1263: AllDirtyDomains/MeshGeometryExtractionDirtyTag.DirtyTagTriggersReupload/"DirtyVertexNormals"
+ 43/161 Test #1263: AllDirtyDomains/MeshGeometryExtractionDirtyTag.DirtyTagTriggersReupload/"DirtyVertexNormals" .........   Passed    0.07 sec
+        Start 1271: AllDirtyDomains/GraphGeometryExtractionDirtyTag.DirtyTagTriggersReupload/"DirtyVertexNormals"
+ 44/161 Test #1271: AllDirtyDomains/GraphGeometryExtractionDirtyTag.DirtyTagTriggersReupload/"DirtyVertexNormals" ........   Passed    0.07 sec
+        Start 1278: AllDirtyDomains/PointCloudGeometryExtractionDirtyTag.DirtyTagTriggersReupload/"DirtyVertexNormals"
+ 45/161 Test #1278: AllDirtyDomains/PointCloudGeometryExtractionDirtyTag.DirtyTagTriggersReupload/"DirtyVertexNormals" ...   Passed    0.07 sec
+        Start 1297: SandboxEditorPresentation.DomainMenusUseAppearanceAndFocusedProcessingWindows
+ 46/161 Test #1297: SandboxEditorPresentation.DomainMenusUseAppearanceAndFocusedProcessingWindows ........................   Passed    0.04 sec
+        Start 1315: SandboxEditorPresentation.NormalDomainMenusOpenOneSharedWindow
+ 47/161 Test #1315: SandboxEditorPresentation.NormalDomainMenusOpenOneSharedWindow .......................................   Passed    0.04 sec
+        Start 1339: RigidBodyReference.InelasticSphereCollisionSettlesAtSharedNormalVelocity
+ 48/161 Test #1339: RigidBodyReference.InelasticSphereCollisionSettlesAtSharedNormalVelocity .............................   Passed    0.00 sec
+        Start 1366: XpbdClothReference.HalfSpaceColliderWithNonUnitNormalProjectsToPlane
+ 49/161 Test #1366: XpbdClothReference.HalfSpaceColliderWithNonUnitNormalProjectsToPlane .................................   Passed    0.00 sec
+        Start 1383: SphFluidReference.BoundaryPlaneWithNonUnitNormalProjectsAndReflectsExactly
+ 50/161 Test #1383: SphFluidReference.BoundaryPlaneWithNonUnitNormalProjectsAndReflectsExactly ...........................   Passed    0.00 sec
+        Start 1418: PhysicsWorld.ContactRecordNormalFollowsAToBConvention
+ 51/161 Test #1418: PhysicsWorld.ContactRecordNormalFollowsAToBConvention ................................................   Passed    0.00 sec
+        Start 1483: GeometryMeshQuantities.ProjectToUnitSphereLeavesOriginAndNormalizesFiniteVertices
+ 52/161 Test #1483: GeometryMeshQuantities.ProjectToUnitSphereLeavesOriginAndNormalizesFiniteVertices ....................   Passed    0.00 sec
+        Start 1484: GeometryMeshQuantities.VertexOneRingPcaAlignsWithSphereNormal
+ 53/161 Test #1484: GeometryMeshQuantities.VertexOneRingPcaAlignsWithSphereNormal ........................................   Passed    0.01 sec
+        Start 1507: RuntimeGraph.SpectralLayoutNormalizedVariantProducesFiniteEmbedding
+ 54/161 Test #1507: RuntimeGraph.SpectralLayoutNormalizedVariantProducesFiniteEmbedding ..................................   Passed    0.00 sec
+        Start 1555: PointLBVH.SuppliedNormalIndexPreservesReferenceNeighborhoodPolicy
+ 55/161 Test #1555: PointLBVH.SuppliedNormalIndexPreservesReferenceNeighborhoodPolicy ....................................   Passed    0.02 sec
+        Start 1628: DEC_LaplacianCache.SymNormalizedLaplacianIsSymmetric
+ 56/161 Test #1628: DEC_LaplacianCache.SymNormalizedLaplacianIsSymmetric .................................................   Passed    0.00 sec
+        Start 1629: DEC_LaplacianCache.SymNormalizedRowSumsAreZero
+ 57/161 Test #1629: DEC_LaplacianCache.SymNormalizedRowSumsAreZero .......................................................   Passed    0.00 sec
+        Start 1646: DEC_HeatKernel.SymNormalizedLaplacianSymmetric
+ 58/161 Test #1646: DEC_HeatKernel.SymNormalizedLaplacianSymmetric .......................................................   Passed    0.01 sec
+        Start 1653: DEC_StiffnessModes.ModifiedNormalEqualsCotanTimesNormalDot
+ 59/161 Test #1653: DEC_StiffnessModes.ModifiedNormalEqualsCotanTimesNormalDot ...........................................   Passed    0.01 sec
+        Start 1823: SurfaceReconstruction.MismatchedNormalsReturnsNullopt
+ 60/161 Test #1823: SurfaceReconstruction.MismatchedNormalsReturnsNullopt ................................................   Passed    0.01 sec
+        Start 1824: SurfaceReconstruction.NoNormalsAndNoEstimationReturnsNullopt
+ 61/161 Test #1824: SurfaceReconstruction.NoNormalsAndNoEstimationReturnsNullopt .........................................   Passed    0.01 sec
+        Start 1826: SurfaceReconstruction.InvalidNormalsAreRejected
+ 62/161 Test #1826: SurfaceReconstruction.InvalidNormalsAreRejected ......................................................   Passed    0.04 sec
+        Start 1827: SurfaceReconstruction.AllInvalidNormalsReturnNullopt
+ 63/161 Test #1827: SurfaceReconstruction.AllInvalidNormalsReturnNullopt .................................................   Passed    0.01 sec
+        Start 1828: SurfaceReconstruction.SphereWithProvidedNormals
+ 64/161 Test #1828: SurfaceReconstruction.SphereWithProvidedNormals ......................................................   Passed    0.07 sec
+        Start 1829: SurfaceReconstruction.SphereWithEstimatedNormals
+ 65/161 Test #1829: SurfaceReconstruction.SphereWithEstimatedNormals .....................................................   Passed    0.08 sec
+        Start 1858: ParameterizationDiagnostics.IdentityTriangleHasZeroNormalizedError
+ 66/161 Test #1858: ParameterizationDiagnostics.IdentityTriangleHasZeroNormalizedError ...................................   Passed    0.01 sec
+        Start 1920: UvAtlas.MissingUvsGenerateFiniteNormalizedFastStagedUvsByDefault
+ 67/161 Test #1920: UvAtlas.MissingUvsGenerateFiniteNormalizedFastStagedUvsByDefault .....................................   Passed    0.00 sec
+        Start 1921: UvAtlas.ExplicitXAtlasMethodGeneratesFiniteNormalizedUvs
+ 68/161 Test #1921: UvAtlas.ExplicitXAtlasMethodGeneratesFiniteNormalizedUvs .............................................   Passed    0.01 sec
+        Start 1946: ConvexHull_Tetrahedron.PlanesHaveOutwardNormals
+ 69/161 Test #1946: ConvexHull_Tetrahedron.PlanesHaveOutwardNormals ......................................................   Passed    0.00 sec
+        Start 1957: ConvexHull_HRep.PlanesAreNormalized
+ 70/161 Test #1957: ConvexHull_HRep.PlanesAreNormalized ..................................................................   Passed    0.00 sec
+        Start 1969: ConvexHull_Convexity.AllFaceNormalsPointOutward
+ 71/161 Test #1969: ConvexHull_Convexity.AllFaceNormalsPointOutward ......................................................   Passed    0.01 sec
+        Start 1976: PointCloud_Cloud.MismatchedNormalsInvalid
+ 72/161 Test #1976: PointCloud_Cloud.MismatchedNormalsInvalid ............................................................   Passed    0.01 sec
+        Start 1988: PointCloud_Downsample.PreservesNormals
+ 73/161 Test #1988: PointCloud_Downsample.PreservesNormals ...............................................................   Passed    0.01 sec
+        Start 2080: GraphVertexNormals.DebugNamesAreStable
+ 74/161 Test #2080: GraphVertexNormals.DebugNamesAreStable ...............................................................   Passed    0.00 sec
+        Start 2081: GraphVertexNormals.PlanarCycleWritesCanonicalNormals
+ 75/161 Test #2081: GraphVertexNormals.PlanarCycleWritesCanonicalNormals .................................................   Passed    0.00 sec
+        Start 2082: GraphVertexNormals.LineGraphReportsDegreeOneAndCollinearFallbacks
+ 76/161 Test #2082: GraphVertexNormals.LineGraphReportsDegreeOneAndCollinearFallbacks ....................................   Passed    0.00 sec
+        Start 2083: GraphVertexNormals.IsolatedDuplicateAndNonFiniteInputsStayFinite
+ 77/161 Test #2083: GraphVertexNormals.IsolatedDuplicateAndNonFiniteInputsStayFinite .....................................   Passed    0.00 sec
+        Start 2084: GraphVertexNormals.RawPropertySetOverloadReportsInvalidEdges
+ 78/161 Test #2084: GraphVertexNormals.RawPropertySetOverloadReportsInvalidEdges .........................................   Passed    0.00 sec
+        Start 2085: GraphVertexNormals.OutputPropertyTypeConflictFailsClosed
+ 79/161 Test #2085: GraphVertexNormals.OutputPropertyTypeConflictFailsClosed .............................................   Passed    0.01 sec
+        Start 2089: HalfedgeMeshFeatures.RejectsInvalidThresholdAndNormalSlotCount
+ 80/161 Test #2089: HalfedgeMeshFeatures.RejectsInvalidThresholdAndNormalSlotCount .......................................   Passed    0.00 sec
+        Start 2091: HalfedgeMeshFeatures.InvalidNormalsAndNonFiniteGeometryFailClosed
+ 81/161 Test #2091: HalfedgeMeshFeatures.InvalidNormalsAndNonFiniteGeometryFailClosed ....................................   Passed    0.00 sec
+        Start 2092: HalfedgeMeshFeatures.InvalidBoundaryFaceNormalOverridesDisabledBoundaryPolicy
+ 82/161 Test #2092: HalfedgeMeshFeatures.InvalidBoundaryFaceNormalOverridesDisabledBoundaryPolicy ........................   Passed    0.01 sec
+        Start 2094: HalfedgeMeshFeatures.CanonicalPolygonNormalsClassifyQuadPair
+ 83/161 Test #2094: HalfedgeMeshFeatures.CanonicalPolygonNormalsClassifyQuadPair .........................................   Passed    0.00 sec
+        Start 2095: HalfedgeMeshFeatures.EvolvingSimplificationPredicateReadsCurrentNormals
+ 84/161 Test #2095: HalfedgeMeshFeatures.EvolvingSimplificationPredicateReadsCurrentNormals ..............................   Passed    0.00 sec
+        Start 2097: HalfedgeMeshVertexNormals.DebugNamesAreStable
+ 85/161 Test #2097: HalfedgeMeshVertexNormals.DebugNamesAreStable ........................................................   Passed    0.01 sec
+        Start 2098: HalfedgeMeshVertexNormals.WeightingModesProduceExpectedCornerNormal
+ 86/161 Test #2098: HalfedgeMeshVertexNormals.WeightingModesProduceExpectedCornerNormal ..................................   Passed    0.00 sec
+        Start 2099: HalfedgeMeshVertexNormals.DegenerateFaceWritesFallbackNormals
+ 87/161 Test #2099: HalfedgeMeshVertexNormals.DegenerateFaceWritesFallbackNormals ........................................   Passed    0.00 sec
+        Start 2100: HalfedgeMeshVertexNormals.InvalidFallbackIsRepairedDeterministically
+ 88/161 Test #2100: HalfedgeMeshVertexNormals.InvalidFallbackIsRepairedDeterministically .................................   Passed    0.01 sec
+        Start 2101: HalfedgeMeshVertexNormals.NonFiniteFaceDoesNotProduceNaNNormals
+ 89/161 Test #2101: HalfedgeMeshVertexNormals.NonFiniteFaceDoesNotProduceNaNNormals ......................................   Passed    0.01 sec
+        Start 2102: HalfedgeMeshVertexNormals.EmptyMeshReturnsEmptyProperty
+ 90/161 Test #2102: HalfedgeMeshVertexNormals.EmptyMeshReturnsEmptyProperty ..............................................   Passed    0.00 sec
+        Start 2103: HalfedgeMeshVertexNormals.InvalidOutputPropertyFailsClosed
+ 91/161 Test #2103: HalfedgeMeshVertexNormals.InvalidOutputPropertyFailsClosed ...........................................   Passed    0.01 sec
+        Start 2104: HalfedgeMeshVertexNormals.ExistingPropertyWithWrongTypeFailsClosed
+ 92/161 Test #2104: HalfedgeMeshVertexNormals.ExistingPropertyWithWrongTypeFailsClosed ...................................   Passed    0.01 sec
+        Start 2193: Validation_Vector.IsNormalized_UnitVectors
+ 93/161 Test #2193: Validation_Vector.IsNormalized_UnitVectors ...........................................................   Passed    0.01 sec
+        Start 2194: Validation_Vector.IsNormalized_NonUnitVectors
+ 94/161 Test #2194: Validation_Vector.IsNormalized_NonUnitVectors ........................................................   Passed    0.01 sec
+        Start 2219: MeshUtils_VertexNormal.ClosedConvexMesh_NormalsPointOutward
+ 95/161 Test #2219: MeshUtils_VertexNormal.ClosedConvexMesh_NormalsPointOutward ..........................................   Passed    0.01 sec
+        Start 2220: MeshUtils_VertexNormal.FlatMesh_NormalsPointAlongFaceNormal
+ 96/161 Test #2220: MeshUtils_VertexNormal.FlatMesh_NormalsPointAlongFaceNormal ..........................................   Passed    0.01 sec
+        Start 2221: MeshUtils_PublishNormals.VertexNormals_StoredAsProperty
+ 97/161 Test #2221: MeshUtils_PublishNormals.VertexNormals_StoredAsProperty ..............................................   Passed    0.01 sec
+        Start 2222: MeshUtils_PublishNormals.FaceNormals_StoredAsProperty
+ 98/161 Test #2222: MeshUtils_PublishNormals.FaceNormals_StoredAsProperty ................................................   Passed    0.01 sec
+        Start 2319: MarchingCubes.SphereExtractionWithNormals
+ 99/161 Test #2319: MarchingCubes.SphereExtractionWithNormals ............................................................   Passed    0.00 sec
+        Start 2409: Simplification.EvolvingFeatureLegalityUsesRecomputedNormals
+100/161 Test #2409: Simplification.EvolvingFeatureLegalityUsesRecomputedNormals ..........................................   Passed    0.02 sec
+        Start 2410: Simplification.NonTriangleFeatureNormalsKeepLeadingTriangleCompatibility
+101/161 Test #2410: Simplification.NonTriangleFeatureNormalsKeepLeadingTriangleCompatibility .............................   Passed    0.01 sec
+        Start 2510: Smoothing.FilterFaceNormalsFlatMeshIsIdentity
+102/161 Test #2510: Smoothing.FilterFaceNormalsFlatMeshIsIdentity ........................................................   Passed    0.00 sec
+        Start 2511: Smoothing.FilterFaceNormalsCleanMeshNearIdentity
+103/161 Test #2511: Smoothing.FilterFaceNormalsCleanMeshNearIdentity .....................................................   Passed    0.01 sec
+        Start 2512: Smoothing.FilterFaceNormalsIsDeterministic
+104/161 Test #2512: Smoothing.FilterFaceNormalsIsDeterministic ...........................................................   Passed    0.01 sec
+        Start 2513: Smoothing.FilterFaceNormalsFailsClosedOnEmptyMesh
+105/161 Test #2513: Smoothing.FilterFaceNormalsFailsClosedOnEmptyMesh ....................................................   Passed    0.01 sec
+        Start 2514: Smoothing.FilterFaceNormalsFailsClosedOnNonFiniteSigma
+106/161 Test #2514: Smoothing.FilterFaceNormalsFailsClosedOnNonFiniteSigma ...............................................   Passed    0.01 sec
+        Start 2547: SurfaceSampling.InterpolatesSourceVertexNormalsIntoPointCloudNormals
+107/161 Test #2547: SurfaceSampling.InterpolatesSourceVertexNormalsIntoPointCloudNormals .................................   Passed    0.01 sec
+        Start 2548: SurfaceSampling.FallsBackToGeometricFaceNormalsWhenNoSourceNormalsExist
+108/161 Test #2548: SurfaceSampling.FallsBackToGeometricFaceNormalsWhenNoSourceNormalsExist ..............................   Passed    0.00 sec
+        Start 2552: PointCloudNormals.DebugNamesAreStable
+109/161 Test #2552: PointCloudNormals.DebugNamesAreStable ................................................................   Passed    0.00 sec
+        Start 2553: PointCloudNormals.FlatGridEstimatePointsAlongZ
+110/161 Test #2553: PointCloudNormals.FlatGridEstimatePointsAlongZ .......................................................   Passed    0.01 sec
+        Start 2554: PointCloudNormals.SphereNormalsAreUnitAndMostlyOutwardAfterOrientation
+111/161 Test #2554: PointCloudNormals.SphereNormalsAreUnitAndMostlyOutwardAfterOrientation ...............................   Passed    0.01 sec
+        Start 2555: PointCloudNormals.EstimateReturnsNulloptForEmptyOrTooFewPoints
+112/161 Test #2555: PointCloudNormals.EstimateReturnsNulloptForEmptyOrTooFewPoints .......................................   Passed    0.01 sec
+        Start 2556: PointCloudNormals.OrientationCanBeDisabled
+113/161 Test #2556: PointCloudNormals.OrientationCanBeDisabled ...........................................................   Passed    0.01 sec
+        Start 2557: PointCloudNormals.CloudRecomputeWritesCanonicalVertexNormalProperty
+114/161 Test #2557: PointCloudNormals.CloudRecomputeWritesCanonicalVertexNormalProperty ..................................   Passed    0.01 sec
+        Start 2558: PointCloudNormals.SuppliedKDTreePathReusesCallerIndex
+115/161 Test #2558: PointCloudNormals.SuppliedKDTreePathReusesCallerIndex ................................................   Passed    0.01 sec
+        Start 2559: PointCloudNormals.SuppliedOctreePathReusesCallerIndex
+116/161 Test #2559: PointCloudNormals.SuppliedOctreePathReusesCallerIndex ................................................   Passed    0.01 sec
+        Start 2560: PointCloudNormals.RadiusSearchFailsClosedWhenTooFewNeighbors
+117/161 Test #2560: PointCloudNormals.RadiusSearchFailsClosedWhenTooFewNeighbors .........................................   Passed    0.01 sec
+        Start 2561: PointCloudNormals.NonFinitePointDoesNotProduceNaNNormal
+118/161 Test #2561: PointCloudNormals.NonFinitePointDoesNotProduceNaNNormal ..............................................   Passed    0.01 sec
+        Start 2562: PointCloudNormals.WrongOutputPropertyTypeFailsClosed
+119/161 Test #2562: PointCloudNormals.WrongOutputPropertyTypeFailsClosed .................................................   Passed    0.01 sec
+        Start 2568: PointCloudConsolidation.AnisotropicNormalPolicyIsExplicitAndImmutable
+120/161 Test #2568: PointCloudConsolidation.AnisotropicNormalPolicyIsExplicitAndImmutable ................................   Passed    0.01 sec
+        Start 2592: PointCloudFeatures.ComputeDescriptorsRequiresNormals
+121/161 Test #2592: PointCloudFeatures.ComputeDescriptorsRequiresNormals .................................................   Passed    0.01 sec
+        Start 2628: Registration_ICP.PointToPlane_FallbackWithoutNormals
+122/161 Test #2628: Registration_ICP.PointToPlane_FallbackWithoutNormals .................................................   Passed    0.01 sec
+        Start 2642: BilateralFilter.NulloptWithoutNormals
+123/161 Test #2642: BilateralFilter.NulloptWithoutNormals ................................................................   Passed    0.01 sec
+        Start 2647: BilateralFilter.DegenerateNormalsSkipped
+124/161 Test #2647: BilateralFilter.DegenerateNormalsSkipped .............................................................   Passed    0.01 sec
+        Start 2724: RobustPredicatesSignedDistanceToHessianPlane.MatchesOriginFormForUnitNormal
+125/161 Test #2724: RobustPredicatesSignedDistanceToHessianPlane.MatchesOriginFormForUnitNormal ..........................   Passed    0.00 sec
+        Start 2725: RobustPredicatesSignedDistanceToHessianPlane.ScaledNormalScalesValueButNotSign
+126/161 Test #2725: RobustPredicatesSignedDistanceToHessianPlane.ScaledNormalScalesValueButNotSign .......................   Passed    0.00 sec
+        Start 2781: SubmeshView_Cloud.ViewNormalsReturnSubspan
+127/161 Test #2781: SubmeshView_Cloud.ViewNormalsReturnSubspan ...........................................................   Passed    0.01 sec
+        Start 2795: SubmeshViewDomainBorrows.MeshAsCloudReusesExistingVertexNormalProperty
+128/161 Test #2795: SubmeshViewDomainBorrows.MeshAsCloudReusesExistingVertexNormalProperty ...............................   Passed    0.00 sec
+        Start 2808: SubmeshViewDomainBorrows.GraphAsCloudReusesExistingVertexNormalProperty
+129/161 Test #2808: SubmeshViewDomainBorrows.GraphAsCloudReusesExistingVertexNormalProperty ..............................   Passed    0.00 sec
+        Start 2909: GeometryIO_MeshIO.LoadsNOFFTriangleWithVertexNormals
+130/161 Test #2909: GeometryIO_MeshIO.LoadsNOFFTriangleWithVertexNormals .................................................   Passed    0.00 sec
+        Start 2910: GeometryIO_MeshIO.LoadsCNOFFTriangleWithNormalsAndColors
+131/161 Test #2910: GeometryIO_MeshIO.LoadsCNOFFTriangleWithNormalsAndColors .............................................   Passed    0.00 sec
+        Start 2918: GeometryIO_MeshIO.LoadsOBJTriangleWithVertexNormals
+132/161 Test #2918: GeometryIO_MeshIO.LoadsOBJTriangleWithVertexNormals ..................................................   Passed    0.00 sec
+        Start 2919: GeometryIO_MeshIO.LoadOBJIgnoresMismatchedVertexNormalCount
+133/161 Test #2919: GeometryIO_MeshIO.LoadOBJIgnoresMismatchedVertexNormalCount ..........................................   Passed    0.00 sec
+        Start 2920: GeometryIO_MeshIO.LoadOBJRejectsMalformedVertexNormal
+134/161 Test #2920: GeometryIO_MeshIO.LoadOBJRejectsMalformedVertexNormal ................................................   Passed    0.00 sec
+        Start 2925: GeometryIO_MeshIO.LoadOBJVertexTexcoordAndNormalCoexist
+135/161 Test #2925: GeometryIO_MeshIO.LoadOBJVertexTexcoordAndNormalCoexist ..............................................   Passed    0.00 sec
+        Start 2937: GeometryIO_MeshIO.LoadsOBJFaceNormalIndicesWithoutLockstepNormals
+136/161 Test #2937: GeometryIO_MeshIO.LoadsOBJFaceNormalIndicesWithoutLockstepNormals ....................................   Passed    0.00 sec
+        Start 2939: GeometryIO_MeshIO.LoadsOBJNormalSeamOnCornersWithoutDuplicatingPositions
+137/161 Test #2939: GeometryIO_MeshIO.LoadsOBJNormalSeamOnCornersWithoutDuplicatingPositions .............................   Passed    0.00 sec
+        Start 2940: GeometryIO_MeshIO.ObjCornerNormalsSurviveWriteAndReload
+138/161 Test #2940: GeometryIO_MeshIO.ObjCornerNormalsSurviveWriteAndReload ..............................................   Passed    0.00 sec
+        Start 2943: GeometryIO_MeshIO.LoadsASCIIPLYTriangleWithVertexNormalsAndColors
+139/161 Test #2943: GeometryIO_MeshIO.LoadsASCIIPLYTriangleWithVertexNormalsAndColors ....................................   Passed    0.00 sec
+        Start 2950: GeometryIO_MeshIO.MeshImportersRejectNonFiniteVertexNormals
+140/161 Test #2950: GeometryIO_MeshIO.MeshImportersRejectNonFiniteVertexNormals ..........................................   Passed    0.00 sec
+        Start 2956: GeometryIO_MeshIO.WritesOBJTriangleWithNormals
+141/161 Test #2956: GeometryIO_MeshIO.WritesOBJTriangleWithNormals .......................................................   Passed    0.00 sec
+        Start 2958: GeometryIO_MeshIO.WritesOBJTriangleWithTexcoordsAndNormals
+142/161 Test #2958: GeometryIO_MeshIO.WritesOBJTriangleWithTexcoordsAndNormals ...........................................   Passed    0.00 sec
+        Start 2960: GeometryIO_MeshIO.WritesOBJTriangleWithColorsAndNormals
+143/161 Test #2960: GeometryIO_MeshIO.WritesOBJTriangleWithColorsAndNormals ..............................................   Passed    0.00 sec
+        Start 2971: GeometryIO_MeshIO.WritesPLYTriangleWithNormals
+144/161 Test #2971: GeometryIO_MeshIO.WritesPLYTriangleWithNormals .......................................................   Passed    0.00 sec
+        Start 2979: GeometryIO_MeshIO.WritesPLYBinaryTriangleWithNormals
+145/161 Test #2979: GeometryIO_MeshIO.WritesPLYBinaryTriangleWithNormals .................................................   Passed    0.00 sec
+        Start 2988: GeometryIO_MeshIO.MeshExportersRejectNonFiniteVertexNormals
+146/161 Test #2988: GeometryIO_MeshIO.MeshExportersRejectNonFiniteVertexNormals ..........................................   Passed    0.00 sec
+        Start 2995: GeometryIO_MeshIO.WritesSTLTriangleEmitsFacetNormal
+147/161 Test #2995: GeometryIO_MeshIO.WritesSTLTriangleEmitsFacetNormal ..................................................   Passed    0.00 sec
+        Start 3028: GeometryIO_PointCloudIO.LoadsPWNFixtureWithNormals
+148/161 Test #3028: GeometryIO_PointCloudIO.LoadsPWNFixtureWithNormals ...................................................   Passed    0.00 sec
+        Start 3029: GeometryIO_PointCloudIO.LoadsCSVFixtureWithNormals
+149/161 Test #3029: GeometryIO_PointCloudIO.LoadsCSVFixtureWithNormals ...................................................   Passed    0.00 sec
+        Start 3036: GeometryIO_PointCloudIO.PointCloudImportersRejectNonFiniteNormals
+150/161 Test #3036: GeometryIO_PointCloudIO.PointCloudImportersRejectNonFiniteNormals ....................................   Passed    0.00 sec
+        Start 3037: GeometryIO_PointCloudIO.LoadsASCIIPCDWithNormalsAndColor
+151/161 Test #3037: GeometryIO_PointCloudIO.LoadsASCIIPCDWithNormalsAndColor .............................................   Passed    0.00 sec
+        Start 3047: GeometryIO_PointCloudIO.LoadsBinaryPLYPointCloudWithNormalsAndColor
+152/161 Test #3047: GeometryIO_PointCloudIO.LoadsBinaryPLYPointCloudWithNormalsAndColor ..................................   Passed    0.00 sec
+        Start 3062: GeometryIO_PointCloudIO.LoadsBinaryPCDPointCloudWithNormalsAndColor
+153/161 Test #3062: GeometryIO_PointCloudIO.LoadsBinaryPCDPointCloudWithNormalsAndColor ..................................   Passed    0.00 sec
+        Start 3071: GeometryIO_PointCloudIO.WritesPLYPointCloudWithNormalsAndColors
+154/161 Test #3071: GeometryIO_PointCloudIO.WritesPLYPointCloudWithNormalsAndColors ......................................   Passed    0.00 sec
+        Start 3076: GeometryIO_PointCloudIO.WritesPLYBinaryPointCloudWithNormalsAndColors
+155/161 Test #3076: GeometryIO_PointCloudIO.WritesPLYBinaryPointCloudWithNormalsAndColors ................................   Passed    0.00 sec
+        Start 3082: GeometryIO_PointCloudIO.WritesXYZIgnoresRadiiAndNormals
+156/161 Test #3082: GeometryIO_PointCloudIO.WritesXYZIgnoresRadiiAndNormals ..............................................   Passed    0.00 sec
+        Start 3086: GeometryIO_PointCloudIO.WritesPCDWithNormalsAndColorsRoundTrips
+157/161 Test #3086: GeometryIO_PointCloudIO.WritesPCDWithNormalsAndColorsRoundTrips ......................................   Passed    0.00 sec
+        Start 3091: GeometryIO_PointCloudIO.WritesPCDBinaryWithNormalsAndColorsRoundTrips
+158/161 Test #3091: GeometryIO_PointCloudIO.WritesPCDBinaryWithNormalsAndColorsRoundTrips ................................   Passed    0.00 sec
+        Start 3097: GeometryIO_PointCloudIO.PointCloudExportersRejectNonFiniteNormalsWhenSerialized
+159/161 Test #3097: GeometryIO_PointCloudIO.PointCloudExportersRejectNonFiniteNormalsWhenSerialized ......................   Passed    0.00 sec
+        Start 3201: ContactManifold.RayCast_Sphere_CenterOriginHasFiniteFallbackNormal
+160/161 Test #3201: ContactManifold.RayCast_Sphere_CenterOriginHasFiniteFallbackNormal ...................................   Passed    0.00 sec
+        Start 3750: GraphicsMaterialSystem.ObjectSpaceNormalBindingsSetExplicitMaterialFlag
+161/161 Test #3750: GraphicsMaterialSystem.ObjectSpaceNormalBindingsSetExplicitMaterialFlag ..............................   Passed    0.00 sec
+
+99% tests passed, 1 tests failed out of 161
+
+Label Time Summary:
+contract       =   1.14 sec*proc (42 tests)
+ecs            =   0.01 sec*proc (3 tests)
+geometry       =   0.71 sec*proc (109 tests)
+graphics       =   0.00 sec*proc (1 test)
+integration    =   0.09 sec*proc (2 tests)
+physics        =   0.01 sec*proc (4 tests)
+runtime        =   1.23 sec*proc (44 tests)
+unit           =   0.73 sec*proc (117 tests)
+
+Total Test time (real) =   2.94 sec
+
+The following tests FAILED:
+	652 - NormalEstimation.NamedOutputUsesSharedVectorVisualizationRecipe (Failed)
+Errors while running CTest

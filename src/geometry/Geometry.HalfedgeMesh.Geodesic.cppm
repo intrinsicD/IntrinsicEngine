@@ -1,9 +1,13 @@
+// Triangle-surface distance methods: heat diffusion and virtual-source
+// propagation, with separate formulations and explicit propagation diagnostics.
 module;
 
 #include <cstddef>
+#include <cstdint>
 #include <optional>
 #include <span>
 #include <vector>
+#include <glm/glm.hpp>
 
 export module Geometry.Geodesic;
 
@@ -12,6 +16,57 @@ import Geometry.HalfedgeMesh;
 
 export namespace Geometry::Geodesic
 {
+    enum class VirtualSourceStatus : std::uint8_t
+    {
+        Success,
+        EmptyMesh,
+        UnsupportedSubmeshView,
+        InvalidParameters,
+        InvalidSources,
+        InvalidPositions,
+        NonTriangleFace,
+        DegenerateFace,
+        ExpansionLimit,
+        NumericalFailure,
+    };
+
+    struct VirtualSourceParams
+    {
+        std::size_t MaxHalfedgeExpansions{10000000};
+    };
+
+    struct VirtualSourceResult
+    {
+        VirtualSourceStatus Status{VirtualSourceStatus::EmptyMesh};
+        std::size_t Iterations{0};
+        std::size_t HalfedgeExpansions{0};
+        std::size_t TriangleUpdates{0};
+        std::size_t SourceCount{0};
+        std::size_t UnreachableVertexCount{0};
+        double MeanEdgeLength{0};
+        // Absolute vertex slots, in position units. Unreachable/deleted slots
+        // are +infinity; sources, including isolated sources, are exactly zero.
+        // Failure returns no distance field and never changes mesh properties.
+        std::vector<double> Distances{};
+        [[nodiscard]] bool Succeeded() const noexcept
+        {
+            return Status == VirtualSourceStatus::Success;
+        }
+    };
+
+    [[nodiscard]] const char* ToString(VirtualSourceStatus status) noexcept;
+
+    // CPU reference of Trettner, Bommes & Kobbelt (2021). Requires live,
+    // nondegenerate triangles. Sources are vertex slots; duplicates are ignored.
+    // The typed position span can bind any float3 property on mesh vertices.
+    [[nodiscard]] VirtualSourceResult ComputeVirtualSourceDistance(
+        const HalfedgeMesh::Mesh& mesh, std::span<const glm::vec3> positions,
+        std::span<const std::size_t> sourceVertices, const VirtualSourceParams& params = {});
+
+    [[nodiscard]] VirtualSourceResult ComputeVirtualSourceDistance(
+        const HalfedgeMesh::Mesh& mesh, std::span<const std::size_t> sourceVertices,
+        const VirtualSourceParams& params = {});
+
     // =========================================================================
     // Geodesic Distance via the Heat Method
     // =========================================================================

@@ -23,6 +23,7 @@ import Extrinsic.Runtime.AssetWorkflowModule;
 import Extrinsic.Runtime.AsyncWorkModule;
 import Extrinsic.Runtime.CameraModule;
 import Extrinsic.Runtime.ClusteringModule;
+import Extrinsic.Runtime.SpatialIndexCache;
 import Extrinsic.Runtime.PointCloudConsolidationModule;
 import Extrinsic.Runtime.EditorUiModule;
 import Extrinsic.Runtime.Module;
@@ -443,6 +444,7 @@ int main(int argc, char** argv)
     engine.EmplaceModule<Extrinsic::Runtime::AsyncWorkModule>();
     engine.EmplaceModule<Extrinsic::Runtime::CameraModule>();
     engine.EmplaceModule<Extrinsic::Runtime::ClusteringModule>();
+    engine.EmplaceModule<Extrinsic::Runtime::SpatialIndexCache>();
     engine.EmplaceModule<
         Extrinsic::Runtime::PointCloudConsolidationModule>();
     engine.EmplaceModule<Extrinsic::Runtime::EditorUiModule>();

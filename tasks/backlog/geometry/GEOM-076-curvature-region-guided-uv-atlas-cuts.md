@@ -49,6 +49,16 @@ contract_review: "This follow-up consumes only a future accepted METHOD-040 glob
 | Publication | Preserve source topology. Publish atlas chart/seam records and one authoritative UV domain, preferring `h:texcoord` when cuts require distinct corner values; preserve unrelated properties with undo/redo and coherence revisions. |
 | End-to-end tests | Property/topology preflight, deterministic chart constraints, UV quality, fallback, stale rejection, config source parity, UI comparison, publication, and undo/redo. |
 
+## Spatial acceleration consideration
+
+Keep segmentation adjacency, geodesic seeds and seam topology explicit. Large UV
+overlap or boundary-crossing checks may later benefit from a conservative
+triangle/segment broad phase with exact 2D predicates; the current point LBVH
+lacks those queries. Do not substitute ambient point neighborhoods for connected
+surface patches or expand the evidence-gated adoption scope.
+
+See the [shared spatial-index consumer inventory](../../../docs/architecture/spatial-index-consumers.md).
+
 ## Required changes
 - [ ] Freeze a deterministic evaluation corpus covering plane/cylinder/sphere-like patches, saddles, sharp folds, smooth curvature transitions, thin features, open boundaries, disconnected components, and representative imported meshes; record dataset identities and exact source state.
 - [ ] Preregister quality gates for finite UVs, zero overlaps/flips where required, conformal/stretch/area diagnostics, seam length, chart count, packing utilization, determinism, perturbation stability, and bounded runtime. Separate hard correctness gates from descriptive trade-offs.

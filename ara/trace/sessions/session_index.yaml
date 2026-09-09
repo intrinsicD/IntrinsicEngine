@@ -362,12 +362,15 @@ sessions:
     open_threads: 5
   - id: 2026-09-08_001
     date: '2026-09-08'
-    summary: Audited and refined atlas boundaries with Claude, then published the complete code, evidence
-      and portable viewers/models to origin/main. METHOD-046 is complete; broader quality and engine adoption
-      remain open.
-    turn_count: 3
-    events_count: 10
+    summary: "Audited and refined atlas boundaries with Claude, then published the complete code, evidence and portable viewers/models to origin/main. METHOD-046 is complete; broader quality and engine adoption remain open. Ported Framework24 virtual-source geodesics through geometry, config and UI with CPU verification. Added shared primitive selection and method-seed controls. Audited GPU LBVH availability and proposed cache ownership. Implemented the approved CPU/Vulkan point-LBVH cache and k-means integration with bounded readback evidence. Documented spatial-acceleration consumers and 39 open-task reminders with workflow/template reuse decisions. Implemented accepted canonical ICP/config/UI and cached CPU/Vulkan correspondences; bounded correctness passes, display-off timing qualification fails, CPU default retained. Extended shared CPU/Vulkan kNN and source-ID exclusion with a supplied CPU PCA adapter; bounded CPU/GPU checks pass, KD-tree defaults retained. Completed accepted canonical normal estimation with CPU KD-tree/cached LBVH, distinct topology methods and shared config/window/history; 179 focused checks and full CPU gate pass."
+    turn_count: 12
+    events_count: 43
     claims_touched:
     - C73
     - C74
-    open_threads: 4
+    - C75
+    - C76
+    - C77
+    - C78
+    - C79
+    open_threads: 8

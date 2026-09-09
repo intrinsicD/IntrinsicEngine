@@ -1,0 +1,18 @@
+Internal ctest changing into directory: /home/alex/Documents/IntrinsicEngine/build/ci
+Test project /home/alex/Documents/IntrinsicEngine/build/ci
+    Start 639: RegistrationDomains.EveryCanonicalPointDomainAcceptsCrossDomainBindingsAndPreservesProperties
+1/4 Test #639: RegistrationDomains.EveryCanonicalPointDomainAcceptsCrossDomainBindingsAndPreservesProperties ...   Passed    0.03 sec
+    Start 640: RegistrationDomains.CacheUsesEntityMetricAndRebuildsAfterTargetTransformOrPropertyChanges
+2/4 Test #640: RegistrationDomains.CacheUsesEntityMetricAndRebuildsAfterTargetTransformOrPropertyChanges .......   Passed    0.01 sec
+    Start 641: RegistrationDomains.QueuedMixedDomainBindingRevisionAndDeletionChangesDiscardResults
+3/4 Test #641: RegistrationDomains.QueuedMixedDomainBindingRevisionAndDeletionChangesDiscardResults ............   Passed    0.03 sec
+    Start 642: RegistrationDomains.RigidPublicationPreservesSignedNonuniformAndZeroScale
+4/4 Test #642: RegistrationDomains.RigidPublicationPreservesSignedNonuniformAndZeroScale .......................   Passed    0.01 sec
+
+100% tests passed, 0 tests failed out of 4
+
+Label Time Summary:
+contract    =   0.06 sec*proc (4 tests)
+runtime     =   0.06 sec*proc (4 tests)
+
+Total Test time (real) =   0.41 sec
