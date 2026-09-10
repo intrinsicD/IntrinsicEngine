@@ -1,0 +1,12 @@
+schema_version: 1
+task_id: RUNTIME-225
+sealed_revision: 965cd65a98f38ec68a1260537e47ff2631b5a2c2
+source_content_digest: 9f9c60e953bd77fa3f8273b938cb592bb33e95315d90a6fd2e69cff471d8c14d
+report_sha256: 178905832ba8a953aee409827aea8dc4940591ade5433c5468e0abff9949f44b
+records:
+- path: tasks/evidence/RUNTIME-225/handoff.jsonl
+  sha256: 813c65f539e97e224d6b360831c4ed89a23c2069ccf347f8ea141f38eedb1ae1
+- path: tasks/evidence/RUNTIME-225/reviews.jsonl
+  sha256: 515a5d436441d3e347b8fb1500c26277ce0c3e100cb21065ef38a85baf42bd4c
+reason: Seal independently accepted keypoint implementation and retirement at clean HEAD
+generated_by: tools/agents/workflow_evidence.py
