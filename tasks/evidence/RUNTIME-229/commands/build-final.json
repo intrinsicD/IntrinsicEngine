@@ -1,0 +1,29 @@
+{
+  "command": [
+    "env",
+    "CCACHE_DISABLE=1",
+    "cmake",
+    "--build",
+    "--preset",
+    "ci",
+    "--target",
+    "IntrinsicTests",
+    "ExtrinsicSandbox",
+    "-j",
+    "6"
+  ],
+  "command_display": "env CCACHE_DISABLE=1 cmake --build --preset ci --target IntrinsicTests ExtrinsicSandbox -j 6",
+  "cwd": ".",
+  "duration_ms": 30226,
+  "exit_code": 0,
+  "finished_at": "2026-09-10T04:46:38Z",
+  "label": "build-final",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-09-10T04:46:08Z",
+  "stderr_path": "tasks/evidence/RUNTIME-229/commands/build-final.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/RUNTIME-229/commands/build-final.stdout.log",
+  "stdout_sha256": "8f716a330069c9074b5ebf6350ee062b6492ef6583cb32bf9676bd809cc33765",
+  "task_id": "RUNTIME-229"
+}

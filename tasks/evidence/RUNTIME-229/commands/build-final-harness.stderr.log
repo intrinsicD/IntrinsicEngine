@@ -1,0 +1,9 @@
+CMake Error at external/vcpkg/scripts/buildsystems/vcpkg.cmake:955 (message):
+  vcpkg install failed.  See logs for more information:
+  /home/alex/Documents/IntrinsicEngine/build/ci/vcpkg-manifest-install.log
+Call Stack (most recent call first):
+  build/ci/CMakeFiles/3.28.3/CMakeSystem.cmake:6 (include)
+  CMakeLists.txt:79 (project)
+
+
+ninja: error: rebuilding 'build.ninja': subcommand failed

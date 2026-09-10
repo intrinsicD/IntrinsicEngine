@@ -1,0 +1,24 @@
+{
+  "command": [
+    "python3",
+    "tools/repo/generate_module_inventory.py",
+    "--root",
+    "src",
+    "--out",
+    "docs/api/generated/module_inventory.md"
+  ],
+  "command_display": "python3 tools/repo/generate_module_inventory.py --root src --out docs/api/generated/module_inventory.md",
+  "cwd": ".",
+  "duration_ms": 46,
+  "exit_code": 0,
+  "finished_at": "2026-09-10T04:45:11Z",
+  "label": "source-documentation",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-09-10T04:45:11Z",
+  "stderr_path": "tasks/evidence/RUNTIME-229/commands/source-documentation.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/RUNTIME-229/commands/source-documentation.stdout.log",
+  "stdout_sha256": "ad235cf0cfce4b30f8055fc33d6787ff15e8587ea641d144442d3306a55ccd57",
+  "task_id": "RUNTIME-229"
+}

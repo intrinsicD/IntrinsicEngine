@@ -1,0 +1,28 @@
+{
+  "command": [
+    "env",
+    "CCACHE_DISABLE=1",
+    "cmake",
+    "--build",
+    "--preset",
+    "ci-vulkan",
+    "--target",
+    "IntrinsicRuntimePointCloudConsolidationGpuParityTests",
+    "-j",
+    "6"
+  ],
+  "command_display": "env CCACHE_DISABLE=1 cmake --build --preset ci-vulkan --target IntrinsicRuntimePointCloudConsolidationGpuParityTests -j 6",
+  "cwd": ".",
+  "duration_ms": 23763,
+  "exit_code": 0,
+  "finished_at": "2026-09-10T04:53:33Z",
+  "label": "build-vulkan-reuse-fix",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-09-10T04:53:09Z",
+  "stderr_path": "tasks/evidence/RUNTIME-229/commands/build-vulkan-reuse-fix.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/RUNTIME-229/commands/build-vulkan-reuse-fix.stdout.log",
+  "stdout_sha256": "b2e19c089723f7e0b21b0420e15e7b587dde9435e85ed9d663ea39f1c458205b",
+  "task_id": "RUNTIME-229"
+}

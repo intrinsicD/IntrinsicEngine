@@ -1,0 +1,22 @@
+Internal ctest changing into directory: /home/alex/Documents/IntrinsicEngine/build/ci-vulkan
+Test project /home/alex/Documents/IntrinsicEngine/build/ci-vulkan
+    Start 3572: PointCloudConsolidationGpuParity.VulkanLopAndIsotropicWlopMatchFrozenCpuReferencesAndRepeat
+1/3 Test #3572: PointCloudConsolidationGpuParity.VulkanLopAndIsotropicWlopMatchFrozenCpuReferencesAndRepeat ......   Passed   29.24 sec
+    Start 3573: PointCloudConsolidationGpuParity.VulkanAutoProcessesChildMeshPositionsAndPublishesDisplacement
+2/3 Test #3573: PointCloudConsolidationGpuParity.VulkanAutoProcessesChildMeshPositionsAndPublishesDisplacement ...   Passed   27.24 sec
+    Start 3574: PointCloudConsolidationGpuParity.VulkanLbvhMovingStepsAcrossDomainsAndFailures
+3/3 Test #3574: PointCloudConsolidationGpuParity.VulkanLbvhMovingStepsAcrossDomainsAndFailures ...................***Skipped   2.80 sec
+
+100% tests passed, 0 tests failed out of 3
+
+Label Time Summary:
+geometry       =  59.28 sec*proc (3 tests)
+gpu            =  59.28 sec*proc (3 tests)
+integration    =  59.28 sec*proc (3 tests)
+runtime        =  59.28 sec*proc (3 tests)
+vulkan         =  59.28 sec*proc (3 tests)
+
+Total Test time (real) =  60.80 sec
+
+The following tests did not run:
+	3574 - PointCloudConsolidationGpuParity.VulkanLbvhMovingStepsAcrossDomainsAndFailures (Skipped)

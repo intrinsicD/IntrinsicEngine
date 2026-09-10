@@ -2136,3 +2136,14 @@
 - **Dependencies**: [C88]
 - **Tags**: LOP, CPU LBVH, supplied neighborhoods, bounded integration
 - **From staging**: O221
+
+## C90: Framed Vulkan LBVH supplies the bounded LOP projection fixtures
+- **Statement**: The source-bound 2026-09-10 actual Vulkan fixture supplies complete neighborhoods to the existing CPU LOP projection steps for three moving iterations on all eight canonical domains, agreeing with the CPU reference within 1e-6 position error. Cold/explicitly primed current-storage reuse, point-cloud downsampling, early convergence, undo/redo and unchanged output/history on capacity overflow, stale input and pending-stage cancellation are exercised. Existing Vulkan grid regressions remain passing.
+- **Status**: supported — bounded ci CPU and actual ci-vulkan checks only. No GPU projection reduction, general-input or all-interleaving proof, injected partial-submission failure, original inverse-cubic guarantee, speedup or default change.
+- **Provenance**: ai-executed
+- **Crystallized via**: artifact-commitment
+- **Falsification criteria**: Replaying the bound fixture exceeds 1e-6 CPU position error, changes source/query identity or iteration behavior, loses cache/history behavior, publishes failed work, or regresses the existing grid cases.
+- **Proof**: [ara/evidence/diagnostics/lop_vulkan_lbvh_2026-09-10/record.json, ara/evidence/tables/lop_vulkan_lbvh_verification_2026-09-10.md, tests/integration/runtime/Test.PointCloudConsolidationGpuParity.cpp]
+- **Dependencies**: [C89]
+- **Tags**: LOP, Vulkan LBVH, moving neighborhoods, bounded integration
+- **From staging**: O222

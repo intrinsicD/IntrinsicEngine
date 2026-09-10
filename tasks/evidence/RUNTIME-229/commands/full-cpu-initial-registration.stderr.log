@@ -1,0 +1,24 @@
+CMake Warning (dev) at /home/alex/Documents/IntrinsicEngine/build/ci/tests/IntrinsicTestPropertyFixups.cmake:1172 (if):
+  Policy CMP0064 is not set: Support new TEST if() operator.  Run "cmake
+  --help-policy CMP0064" for policy details.  Use the cmake_policy command to
+  set the policy and suppress this warning.
+
+  TEST will be interpreted as an operator when the policy is set to NEW.
+  Since the policy is not set the OLD behavior will be used.
+Call Stack (most recent call first):
+  /home/alex/Documents/IntrinsicEngine/build/ci/tests/CTestTestfile.cmake:48 (include)
+  CTestTestfile.cmake:21 (subdirs)
+This warning is for project developers.  Use -Wno-dev to suppress it.
+
+CMake Error at /home/alex/Documents/IntrinsicEngine/build/ci/tests/IntrinsicTestPropertyFixups.cmake:1172 (if):
+  if given arguments:
+
+    "TEST" "PointCloudConsolidationGpuParity.VulkanLbvhMovingStepsAcrossDomainsAndFailures"
+
+  Unknown arguments specified
+Call Stack (most recent call first):
+  /home/alex/Documents/IntrinsicEngine/build/ci/tests/CTestTestfile.cmake:48 (include)
+  CTestTestfile.cmake:21 (subdirs)
+
+
+Errors while running CTest

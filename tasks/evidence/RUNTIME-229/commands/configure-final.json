@@ -1,0 +1,21 @@
+{
+  "command": [
+    "cmake",
+    "--preset",
+    "ci"
+  ],
+  "command_display": "cmake --preset ci",
+  "cwd": ".",
+  "duration_ms": 2390,
+  "exit_code": 0,
+  "finished_at": "2026-09-10T04:47:36Z",
+  "label": "configure-final",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-09-10T04:47:34Z",
+  "stderr_path": "tasks/evidence/RUNTIME-229/commands/configure-final.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/RUNTIME-229/commands/configure-final.stdout.log",
+  "stdout_sha256": "dabe9d43e7274e4e068543708eed180c38d1603b0fc32dc6eee0927976ef89e4",
+  "task_id": "RUNTIME-229"
+}

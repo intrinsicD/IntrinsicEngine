@@ -8148,3 +8148,5 @@ Retain terminal job outcomes while pending consumers reference them, so reaping 
 - 2026-09-10 — **BUG-185**: Corrected tiny support occupancy that could bypass workload budgets; reused conservative radius candidates and avoided double support-square underflow. Before/after regression and 4457 distinct CPU passes bind `e3ac231d8fc709e0a83233e07ebf5eb0c1fe10a9`; [task](BUG-185-tiny-support-workload-underestimate.md).
 
 - 2026-09-10 — **RUNTIME-228**: Added reusable LOP neighborhood steps and cached CPU LBVH through existing config/UI/publication. C89 binds 4463 CPU passes and two existing grid checks. Implementation `020622c844d1809e4614d5ed120925e63aa3bdad`; [task](RUNTIME-228-lop-cached-spatial-steps.md).
+
+- 2026-09-10 — **RUNTIME-229**: Added framed Vulkan LBVH neighborhoods to shared LOP CPU projection steps through existing config/UI/publication. C90 binds 4465 CPU passes and 3 actual Vulkan checks. Implementation `caa85ce781be772faf30de920322010825413afa`; [task](RUNTIME-229-lop-framed-lbvh-projection.md).

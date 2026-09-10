@@ -45,22 +45,22 @@ Reuse SpatialIndexCache workspaces, JobService dependency/finalization and the R
 One slice: bounded config and framed query stages, shared CPU projection updates, actual GPU and CPU/config tests, benchmark, documentation and independent review.
 
 ## Required changes
-- [ ] Add explicit Vulkan LBVH config/UI eligibility with bounded batches, capacity and iteration count.
-- [ ] Implement leased source and moving workspace queries with one final publication.
+- [x] Add explicit Vulkan LBVH config/UI eligibility with bounded batches, capacity and iteration count.
+- [x] Implement leased source and moving workspace queries with one final publication.
 
 ## Tests
-- [ ] CPU config/device rejection and actual GPU domain/reuse/reference/overflow/stale/cancel cases pass.
-- [ ] Full CPU and actual GPU checks pass without new backend skips.
+- [x] CPU config/device rejection and actual GPU domain/reuse/reference/overflow/stale/cancel cases pass.
+- [x] Full CPU and actual GPU checks pass without new backend skips.
 
 ## Docs
-- [ ] Synchronize the spatial inventory, method/benchmark and bounded capability record.
+- [x] Synchronize the spatial inventory, method/benchmark and bounded capability record.
 
 ## Acceptance criteria
-- [ ] Framed jobs retain source/workspace leases through terminal completion and cancellation.
-- [ ] Partial submission cannot race worker state or publish incomplete results.
-- [ ] Three moving iterations agree with reference on all eight domains; point-cloud downsampling covers different source/query IDs while mesh/graph cardinality stays fixed.
-- [ ] Actual GPU benchmark and failure tests pass; register framed CTest timeout explicitly.
-- [ ] Docs, requested/actual diagnostics and follow-up WLOP/CLOP/EAR reminders stay synchronized.
+- [x] Framed jobs retain source/workspace leases through terminal completion and cancellation.
+- [x] Partial submission cannot race worker state or publish incomplete results.
+- [x] Three moving iterations agree with reference on all eight domains; point-cloud downsampling covers different source/query IDs while mesh/graph cardinality stays fixed.
+- [x] Actual GPU benchmark and failure tests pass; register framed CTest timeout explicitly.
+- [x] Docs, requested/actual diagnostics and follow-up WLOP/CLOP/EAR reminders stay synchronized.
 
 ## Verification
 ```bash
@@ -85,3 +85,9 @@ The first new GPU-case attempt incorrectly tested operational readiness during c
 The first operational run matched CPU positions on all eight cold and repeated domains, but its warm-cache assertion assumed publication retained input property storage. Existing history publication replaces storage and invalidates prior property revisions. The warm phase now explicitly primes the current source storage before acquisition, as in the CPU fixture. Eighteen successful projections plus three failure requests exceeded the original 95-second watchdog; the unchanged workload receives 150 seconds internally and a 180-second CTest limit. This does not assert cache reuse across storage replacement.
 
 A final test-only rebuild attempted CMake regeneration inside the sandbox and hit the known vcpkg egress restriction tracked by BUG-065. Native preset regeneration is the verification path; the failed command is preserved and excluded from successful gate receipts.
+
+## Completion
+**Completed:** 2026-09-10
+**Commit:** `caa85ce781be772faf30de920322010825413afa`
+
+C90 and [bound verification](../../ara/evidence/tables/lop_vulkan_lbvh_verification_2026-09-10.md) record 48 focused cases, 4465 distinct CPU passes and 3 actual Vulkan checks. Partial-submission safety is statically reviewed only. WLOP/CLOP/EAR remain separate spatial-inventory follow-ups.

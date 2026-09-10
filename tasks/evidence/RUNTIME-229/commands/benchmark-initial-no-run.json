@@ -1,0 +1,21 @@
+{
+  "command": [
+    "bash",
+    "-c",
+    "python3 tools/benchmark/seal_benchmark_results.py --root /tmp/lop-gpu-benchmark/raw --manifests-root benchmarks --run-id lop-vulkan-2026-09-10 --attempt-id attempt-001 --output-root /tmp/lop-gpu-benchmark/canonical && python3 tools/benchmark/validate_benchmark_results.py --root /tmp/lop-gpu-benchmark/canonical --manifests-root benchmarks --strict"
+  ],
+  "command_display": "bash -c 'python3 tools/benchmark/seal_benchmark_results.py --root /tmp/lop-gpu-benchmark/raw --manifests-root benchmarks --run-id lop-vulkan-2026-09-10 --attempt-id attempt-001 --output-root /tmp/lop-gpu-benchmark/canonical && python3 tools/benchmark/validate_benchmark_results.py --root /tmp/lop-gpu-benchmark/canonical --manifests-root benchmarks --strict'",
+  "cwd": ".",
+  "duration_ms": 126,
+  "exit_code": 2,
+  "finished_at": "2026-09-10T04:48:12Z",
+  "label": "benchmark-initial-no-run",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-09-10T04:48:12Z",
+  "stderr_path": "tasks/evidence/RUNTIME-229/commands/benchmark-initial-no-run.stderr.log",
+  "stderr_sha256": "dd1ad0fa7dcd8234c9cf67912766a848b43d4036f56df9e12bef1dfc5f9e22ef",
+  "stdout_path": "tasks/evidence/RUNTIME-229/commands/benchmark-initial-no-run.stdout.log",
+  "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "task_id": "RUNTIME-229"
+}

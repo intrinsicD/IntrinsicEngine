@@ -1,0 +1,65 @@
+{
+  "attempt_id": "attempt-001",
+  "backend": "gpu_vulkan_compute",
+  "benchmark_id": "geometry.point_lbvh.lop_vulkan_runtime_smoke",
+  "claim_eligible": false,
+  "commit": "local-dev",
+  "config_digest": "97b1af6c5289fb4d8119f70fdd143b28ed43ee3985c749505683ff16f32ee5eb",
+  "dataset": "builtin.lop_domains.32x8.three_iterations",
+  "diagnostics": {
+    "measured_iterations": 1,
+    "mode": "smoke",
+    "query_backend": "vulkan_lbvh",
+    "reduction_backend": "cpu_reference",
+    "runner": "IntrinsicRuntimePointCloudConsolidationGpuParityTests",
+    "warmup_iterations": 1
+  },
+  "execution_status": "passed",
+  "manifest": {
+    "path": "benchmarks/geometry/manifests/point_lbvh_lop_vulkan_runtime_smoke.yaml",
+    "sha256": "822fcc3969eabc2a6961feef62787e91d62ac89eb6d0594072d93e5927a2a8e2"
+  },
+  "method": "geometry.point_lbvh",
+  "metrics": {
+    "quality_error_linf": 0,
+    "runtime_ms": 39009.1
+  },
+  "resolved_params": {
+    "intent": "gpu",
+    "measured_iterations": 1,
+    "warmup_iterations": 1
+  },
+  "run_id": "lop-vulkan-2026-09-10",
+  "schema_version": 2,
+  "source": {
+    "revision": "local-dev",
+    "state": "dirty_worktree"
+  },
+  "status": "passed",
+  "threshold_disposition": [
+    {
+      "limit": 90000,
+      "metric": "runtime_ms",
+      "observed": 39009.1,
+      "operator": "<=",
+      "passed": true,
+      "threshold": "smoke_runtime_ms_max"
+    },
+    {
+      "limit": 1e-06,
+      "metric": "quality_error_linf",
+      "observed": 0,
+      "operator": "<=",
+      "passed": true,
+      "threshold": "quality_error_linf_max"
+    }
+  ],
+  "thresholds": {
+    "quality_error_linf_max": 1e-06,
+    "smoke_runtime_ms_max": 90000
+  },
+  "warmup_policy": {
+    "measured_iterations": 1,
+    "warmup_iterations": 1
+  }
+}

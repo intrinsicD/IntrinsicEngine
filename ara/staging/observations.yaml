@@ -3809,3 +3809,15 @@ observations:
     promoted_to: logic/claims.md:C89
     crystallized_via: artifact-commitment
     stale: false
+
+  - id: O222
+    timestamp: '2026-09-10T06:50:00+02:00'
+    provenance: ai-executed
+    content: Framed Vulkan LBVH neighborhoods feed the selected CPU LOP steps across bounded moving-sample and canonical-domain fixtures.
+    context: C90 binds execution artifacts; no user reaction or speedup is inferred.
+    potential_type: claim
+    bound_to: [C90]
+    promoted: true
+    promoted_to: logic/claims.md:C90
+    crystallized_via: artifact-commitment
+    stale: false

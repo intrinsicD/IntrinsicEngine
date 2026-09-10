@@ -1,0 +1,178 @@
+schema_version: 1
+task_id: RUNTIME-229
+workflow_profile: high-risk
+status: complete
+generated_by: tools/agents/workflow_evidence.py
+generated_at: '2026-09-10T04:56:34Z'
+claim_eligible: false
+source:
+  base_ref: c7f0553ed
+  base_revision: c7f0553eda0b11c79ce99442cd3d17fe9615c231
+  head_revision: caa85ce781be772faf30de920322010825413afa
+  branch: main
+  worktree: /home/alex/Documents/IntrinsicEngine
+  dirty: true
+  surface:
+  - path: ara/evidence/diagnostics/lop_vulkan_lbvh_2026-09-10/benchmark.json
+    sha256: 0dc21c310525f38b131652e3b1400451bf1150f4e7df9d09defda935314cade3
+  - path: ara/evidence/diagnostics/lop_vulkan_lbvh_2026-09-10/record.json
+    sha256: c154c524a97c6e00cbed742b1f7aa5261b85d289fd0d30b748276b8d2a5f222f
+  - path: ara/evidence/tables/lop_vulkan_lbvh_verification_2026-09-10.md
+    sha256: 2de436c4fde21a3d1d53b594c507a337955ec3d21ce2263c6463de059ae695cc
+  - path: ara/logic/claims.md
+    sha256: 3efb3144651510dc07c4dba0f0a7256209792d39239e54f5db258f03c543a3b4
+  - path: ara/staging/observations.yaml
+    sha256: 84cf95948308322d95a7afd08b4029e1a6f7d471a341553e121968ccbb0ab9a3
+  - path: benchmarks/geometry/manifests/point_lbvh_lop_vulkan_runtime_smoke.yaml
+    sha256: 822fcc3969eabc2a6961feef62787e91d62ac89eb6d0594072d93e5927a2a8e2
+  - path: docs/architecture/runtime.md
+    sha256: 7247b86c6b97d256c408be88354e121714995da5b40889509526bd6e3ac9f5aa
+  - path: docs/architecture/spatial-index-consumers.md
+    sha256: 8abcc84d3c2bfe527de2b3d4a291508b63ee24843f7ad0c78cba846590df7ff1
+  - path: methods/geometry/locally_optimal_projection/method.yaml
+    sha256: 6eade310c416a8967b57a4a54773430d173c1f6ae42326a7bd1242f0c61d3e43
+  - path: methods/geometry/locally_optimal_projection/paper.md
+    sha256: ebad3d2a8f57d2e5f4546d005d411352b4629604c637ee4b516779d9477e4afa
+  - path: methods/geometry/point_lbvh/method.yaml
+    sha256: 7b42052e79d5780f12091fc96bdb0092e5667ba9453a207f0320bda478ffd207
+  - path: src/app/Sandbox/Editor/Sandbox.MethodPanels.cpp
+    sha256: 1ebc46d491d087797a50a385e1e53dcd97a6b733c6dafdfa3f34d8de6b0ccc65
+  - path: src/runtime/Config/internal/Runtime.FeatureConfigCodecs.Detail.cpp
+    sha256: 636a3df01bbb49520dd647a15d52c81d1554893093e1a82e28ff6370207d365d
+  - path: src/runtime/Modules/PointCloudConsolidation/Runtime.PointCloudConsolidationConfig.cpp
+    sha256: c0901731c365f666dc943c7c8bdb1ced0ead8ba5456d2abb6b5ac87272992576
+  - path: src/runtime/Modules/PointCloudConsolidation/Runtime.PointCloudConsolidationConfig.cppm
+    sha256: c9dfab106f5570621eb11c08627ab4cb7052d8535db786e3b6b6f42c54aae1b0
+  - path: src/runtime/Modules/PointCloudConsolidation/Runtime.PointCloudConsolidationGpu.Internal.hpp
+    sha256: 47433b82842bdfb43fce0db5d58294f29ab2a94d76986945d760f16bae51f004
+  - path: src/runtime/Modules/PointCloudConsolidation/Runtime.PointCloudConsolidationModule.cpp
+    sha256: 7ac06e1a38d84612e04625d8b3341b1158322ff0d54d5a157f8abc4ad0315ed4
+  - path: src/runtime/Modules/PointCloudConsolidation/Runtime.PointCloudConsolidationModule.cppm
+    sha256: 70c3d07ac295f06be4e2ecd48bcea248567d34d723feaa0790ab5ac790a06732
+  - path: tasks/SESSION-BRIEF.md
+    sha256: 186ce86aca3562f33929c2372e33e15b46665bfaae88d43238e6b2ae68181951
+  - path: tasks/backlog/runtime/RUNTIME-229-lop-framed-lbvh-projection.md
+    sha256: null
+  - path: tasks/done/RETIREMENT-LOG.md
+    sha256: 938ec19f1f375e76323807145902526b56c7d41ff3a68958c89f6c15d3cf32a9
+  - path: tasks/done/RUNTIME-229-lop-framed-lbvh-projection.md
+    sha256: 2014ca790cd39ec2f4c7b4bc81bb03b5645e3b94c7bdeb5a698ed980f74d5fca
+  - path: tests/CMakeLists.txt
+    sha256: 75a1f2a3ec0fa3aee2a8c2cff2e03e09b1356020bc16e61454e056f666222743
+  - path: tests/contract/runtime/Test.PointCloudConsolidationConfig.cpp
+    sha256: 3c045eda5912614a5c4b7b2810c532b928b46b267c5d76a5904f866d3ca3b393
+  - path: tests/contract/runtime/Test.PointCloudConsolidationModule.cpp
+    sha256: ee01388551463976d4d4adfed49639f8774d432aa321094e87a26ec7af59b623
+  - path: tests/integration/runtime/Test.PointCloudConsolidationGpuParity.cpp
+    sha256: eed321276c4285550832f3aba60e2c150c73625eb0004ed2631cf3998870c6ee
+  content_digest: e62cba5ce724c6da322ace6178d6257057d7f0e3a42ebca2adc4814710bd5af9
+touched:
+  paths:
+  - ara/evidence/diagnostics/lop_vulkan_lbvh_2026-09-10/benchmark.json
+  - ara/evidence/diagnostics/lop_vulkan_lbvh_2026-09-10/record.json
+  - ara/evidence/tables/lop_vulkan_lbvh_verification_2026-09-10.md
+  - ara/logic/claims.md
+  - ara/staging/observations.yaml
+  - benchmarks/geometry/manifests/point_lbvh_lop_vulkan_runtime_smoke.yaml
+  - docs/architecture/runtime.md
+  - docs/architecture/spatial-index-consumers.md
+  - methods/geometry/locally_optimal_projection/method.yaml
+  - methods/geometry/locally_optimal_projection/paper.md
+  - methods/geometry/point_lbvh/method.yaml
+  - src/app/Sandbox/Editor/Sandbox.MethodPanels.cpp
+  - src/runtime/Config/internal/Runtime.FeatureConfigCodecs.Detail.cpp
+  - src/runtime/Modules/PointCloudConsolidation/Runtime.PointCloudConsolidationConfig.cpp
+  - src/runtime/Modules/PointCloudConsolidation/Runtime.PointCloudConsolidationConfig.cppm
+  - src/runtime/Modules/PointCloudConsolidation/Runtime.PointCloudConsolidationGpu.Internal.hpp
+  - src/runtime/Modules/PointCloudConsolidation/Runtime.PointCloudConsolidationModule.cpp
+  - src/runtime/Modules/PointCloudConsolidation/Runtime.PointCloudConsolidationModule.cppm
+  - tasks/SESSION-BRIEF.md
+  - tasks/backlog/runtime/RUNTIME-229-lop-framed-lbvh-projection.md
+  - tasks/done/RETIREMENT-LOG.md
+  - tasks/done/RUNTIME-229-lop-framed-lbvh-projection.md
+  - tests/CMakeLists.txt
+  - tests/contract/runtime/Test.PointCloudConsolidationConfig.cpp
+  - tests/contract/runtime/Test.PointCloudConsolidationModule.cpp
+  - tests/integration/runtime/Test.PointCloudConsolidationGpuParity.cpp
+  layers:
+  - runtime
+  modules:
+  - Geometry.PointCloud.Consolidation
+extension_seam: Reuse CPU LOP arithmetic, framed SpatialIndexCache radius queries and moving workspaces.
+future_change_plan: WLOP/CLOP/EAR framed adapters remain in the spatial inventory.
+acceptance:
+- criterion: Framed jobs retain source/workspace leases through terminal completion and cancellation.
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: Partial submission cannot race worker state or publish incomplete results.
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: Three moving iterations agree with reference on all eight domains; point-cloud downsampling
+    covers different source/query IDs while mesh/graph cardinality stays fixed.
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: Actual GPU benchmark and failure tests pass; register framed CTest timeout explicitly.
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: Docs, requested/actual diagnostics and follow-up WLOP/CLOP/EAR reminders stay synchronized.
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+commands:
+- receipt: tasks/evidence/RUNTIME-229/commands/actual-vulkan.json
+- receipt: tasks/evidence/RUNTIME-229/commands/benchmark.json
+- receipt: tasks/evidence/RUNTIME-229/commands/build-final-harness-native.json
+- receipt: tasks/evidence/RUNTIME-229/commands/build-final.json
+- receipt: tasks/evidence/RUNTIME-229/commands/build-test-fix.json
+- receipt: tasks/evidence/RUNTIME-229/commands/build-vulkan-final.json
+- receipt: tasks/evidence/RUNTIME-229/commands/build-vulkan-fixed.json
+- receipt: tasks/evidence/RUNTIME-229/commands/build-vulkan-reuse-fix.json
+- receipt: tasks/evidence/RUNTIME-229/commands/build-vulkan.json
+- receipt: tasks/evidence/RUNTIME-229/commands/build.json
+- receipt: tasks/evidence/RUNTIME-229/commands/configure-final.json
+- receipt: tasks/evidence/RUNTIME-229/commands/configure-vulkan.json
+- receipt: tasks/evidence/RUNTIME-229/commands/configure.json
+- receipt: tasks/evidence/RUNTIME-229/commands/final-harness-structural.json
+- receipt: tasks/evidence/RUNTIME-229/commands/final-structural.json
+- receipt: tasks/evidence/RUNTIME-229/commands/focused.json
+- receipt: tasks/evidence/RUNTIME-229/commands/full-cpu.json
+- receipt: tasks/evidence/RUNTIME-229/commands/grid-vulkan-and-initial-coldstart.json
+- receipt: tasks/evidence/RUNTIME-229/commands/retirement-structural.json
+- receipt: tasks/evidence/RUNTIME-229/commands/source-documentation.json
+- receipt: tasks/evidence/RUNTIME-229/commands/structural-final.json
+- receipt: tasks/evidence/RUNTIME-229/commands/structural-fixed.json
+- receipt: tasks/evidence/RUNTIME-229/commands/structural.json
+- receipt: tasks/evidence/RUNTIME-229/commands/workshop.json
+changed_public_contracts:
+- Complete sorted candidate rows, source and projected ID separation, unchanged LOP arithmetic and guarded
+  publication.
+diagnostics_and_previews:
+- Explicit vulkan_lbvh_cpu_projection, cache reuse, GPU query and workspace counts.
+benchmark_or_parity_evidence: []
+docs_sync:
+  task_file: tasks/done/RUNTIME-229-lop-framed-lbvh-projection.md
+  session_brief_present: true
+  canonical_docs_changed: true
+  skill_mirrors_checked: true
+residual_risks:
+- GPU neighborhoods with CPU projection; partial submission statically reviewed only; no speedup or full
+  CPU sanitizer rerun. GPU uses BUG-180 LSan exclusion.
+skipped_checks: []
+artifacts: []
+self_review:
+  completed: true
+  scope_matches_task: true
+  layering_preserved: true
+  tests_and_docs_accounted_for: true
+  mechanical_and_semantic_changes_separated: true
+handoff: tasks/evidence/RUNTIME-229/handoff.jsonl
+review: tasks/evidence/RUNTIME-229/reviews.jsonl

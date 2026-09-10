@@ -1,0 +1,26 @@
+{
+  "command": [
+    "ctest",
+    "--test-dir",
+    "build/ci",
+    "--output-on-failure",
+    "-R",
+    "^(PointCloudConsolidation|PointCloudConsolidationConfig|PointCloudConsolidationModule|SandboxPointCloudConsolidationPanel)\\.",
+    "--timeout",
+    "60"
+  ],
+  "command_display": "ctest --test-dir build/ci --output-on-failure -R '^(PointCloudConsolidation|PointCloudConsolidationConfig|PointCloudConsolidationModule|SandboxPointCloudConsolidationPanel)\\.' --timeout 60",
+  "cwd": ".",
+  "duration_ms": 2228,
+  "exit_code": 0,
+  "finished_at": "2026-09-10T04:46:41Z",
+  "label": "focused",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-09-10T04:46:38Z",
+  "stderr_path": "tasks/evidence/RUNTIME-229/commands/focused.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/RUNTIME-229/commands/focused.stdout.log",
+  "stdout_sha256": "ec302773bffc9ba2adbc60a4422fa6a5fd0d0aef8e5db0740546c13cc8de74f0",
+  "task_id": "RUNTIME-229"
+}

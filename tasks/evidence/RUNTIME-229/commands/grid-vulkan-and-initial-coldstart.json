@@ -1,0 +1,33 @@
+{
+  "command": [
+    "env",
+    "ASAN_OPTIONS=detect_leaks=0",
+    "INTRINSIC_LOP_LBVH_BENCHMARK_PATH=/tmp/lop-gpu-benchmark/raw/result.json",
+    "ctest",
+    "--test-dir",
+    "build/ci-vulkan",
+    "--output-on-failure",
+    "-R",
+    "^PointCloudConsolidationGpuParity\\.",
+    "-L",
+    "gpu",
+    "-L",
+    "vulkan",
+    "--timeout",
+    "120"
+  ],
+  "command_display": "env ASAN_OPTIONS=detect_leaks=0 INTRINSIC_LOP_LBVH_BENCHMARK_PATH=/tmp/lop-gpu-benchmark/raw/result.json ctest --test-dir build/ci-vulkan --output-on-failure -R '^PointCloudConsolidationGpuParity\\.' -L gpu -L vulkan --timeout 120",
+  "cwd": ".",
+  "duration_ms": 60810,
+  "exit_code": 0,
+  "finished_at": "2026-09-10T04:48:12Z",
+  "label": "grid-vulkan-and-initial-coldstart",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-09-10T04:47:11Z",
+  "stderr_path": "tasks/evidence/RUNTIME-229/commands/grid-vulkan-and-initial-coldstart.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/RUNTIME-229/commands/grid-vulkan-and-initial-coldstart.stdout.log",
+  "stdout_sha256": "f6f391459f195ea1215ffd86439ff3d71eb96b88a1a7657bd24a72ebbc5acf7e",
+  "task_id": "RUNTIME-229"
+}

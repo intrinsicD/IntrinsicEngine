@@ -1,0 +1,28 @@
+{
+  "command": [
+    "env",
+    "CCACHE_DISABLE=1",
+    "cmake",
+    "--build",
+    "--preset",
+    "ci",
+    "--target",
+    "IntrinsicTests",
+    "-j",
+    "6"
+  ],
+  "command_display": "env CCACHE_DISABLE=1 cmake --build --preset ci --target IntrinsicTests -j 6",
+  "cwd": ".",
+  "duration_ms": 28163,
+  "exit_code": 0,
+  "finished_at": "2026-09-10T04:50:34Z",
+  "label": "build-test-fix",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-09-10T04:50:06Z",
+  "stderr_path": "tasks/evidence/RUNTIME-229/commands/build-test-fix.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/RUNTIME-229/commands/build-test-fix.stdout.log",
+  "stdout_sha256": "658a1c72e903f5002865e95a24a5ea3d0e12efe7a3811d4da2aa197053aa07ea",
+  "task_id": "RUNTIME-229"
+}

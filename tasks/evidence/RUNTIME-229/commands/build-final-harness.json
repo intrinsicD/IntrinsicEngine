@@ -1,0 +1,28 @@
+{
+  "command": [
+    "env",
+    "CCACHE_DISABLE=1",
+    "cmake",
+    "--build",
+    "--preset",
+    "ci",
+    "--target",
+    "IntrinsicTests",
+    "-j",
+    "6"
+  ],
+  "command_display": "env CCACHE_DISABLE=1 cmake --build --preset ci --target IntrinsicTests -j 6",
+  "cwd": ".",
+  "duration_ms": 149,
+  "exit_code": 1,
+  "finished_at": "2026-09-10T04:53:36Z",
+  "label": "build-final-harness",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-09-10T04:53:35Z",
+  "stderr_path": "tasks/evidence/RUNTIME-229/commands/build-final-harness.stderr.log",
+  "stderr_sha256": "cdaba77d1b1bbb63041235b3da65115e1e83084dd563cbb5c7e3e5cd32021b04",
+  "stdout_path": "tasks/evidence/RUNTIME-229/commands/build-final-harness.stdout.log",
+  "stdout_sha256": "20b46a02a3dc1bc9756172a13364d81dbcec231cbbc5d5b12f5139ccad31cc9a",
+  "task_id": "RUNTIME-229"
+}
