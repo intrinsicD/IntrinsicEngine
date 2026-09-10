@@ -1,3 +1,4 @@
+#include <array>
 #include <chrono>
 #include <cstdint>
 #include <cstring>
@@ -237,6 +238,35 @@ TEST(VisualizationRecipes, CpuBackedDirtyStampTracksCanonicalPropertyRevision)
     ASSERT_TRUE(second.Succeeded());
     ASSERT_EQ(second.Batch.PropertyBuffers.size(), 1u);
     EXPECT_GT(second.Batch.PropertyBuffers.front().DirtyStamp, firstRevision);
+}
+
+TEST(VisualizationRecipes, IntegerLabelsEncodeDistinctDeterministicRgbaWithoutMutatingSource)
+{
+    RecipeSourceFixture source{};
+    auto labels = source.Vertices.Properties.Add<std::uint32_t>("keypoint_mask", 0u);
+    labels.Vector() = {0u, 1u, 0u, 1u};
+    const auto revision = source.Vertices.Properties.Revision();
+    const R::VisualizationRecipe recipe{.Data = R::LabelVisualizationRecipe{
+        .Source = {.Domain = R::GeometryElementDomain::MeshVertex,
+                   .Name = "keypoint_mask", .ValueKind = Geometry::PropertyValueKind::UInt32},
+        .OutputName = "mask.colors"}};
+    const auto encoded = R::EncodeVisualizationRecipe(source.Availability, recipe);
+    ASSERT_TRUE(encoded.Succeeded()) << R::ToString(encoded.Status);
+    ASSERT_EQ(encoded.Batch.PropertyBuffers.size(), 1u);
+    const auto& buffer = encoded.Batch.PropertyBuffers.front();
+    ASSERT_EQ(buffer.Bytes.size(), 4u * sizeof(glm::vec4));
+    std::array<glm::vec4, 4> colors{};
+    std::memcpy(colors.data(), buffer.Bytes.data(), buffer.Bytes.size());
+    EXPECT_NE(colors[0], colors[1]);
+    EXPECT_EQ(colors[0], colors[2]);
+    EXPECT_EQ(colors[1], colors[3]);
+    EXPECT_EQ(colors[0].w, 1.0f);
+    EXPECT_EQ(colors[1].w, 1.0f);
+    EXPECT_EQ(colors[0], (glm::vec4{226.0f / 255, 47.0f / 255, 187.0f / 255, 1}));
+    EXPECT_EQ(colors[1], (glm::vec4{60.0f / 255, 234.0f / 255, 190.0f / 255, 1}));
+    EXPECT_EQ(source.Vertices.Properties.Revision(), revision);
+    EXPECT_EQ(R::EncodeVisualizationRecipe(source.Availability, recipe).Batch.PropertyBufferPayloads,
+              encoded.Batch.PropertyBufferPayloads);
 }
 
 TEST(VisualizationRecipes, EncodesVectorAndIsolineProperties)

@@ -57,6 +57,8 @@ inline constexpr EdgeDomain kEdgeEdge = static_cast<EdgeDomain>(1);
 inline constexpr PointRenderType kPointFlat = static_cast<PointRenderType>(0);
 inline constexpr PointRenderType kPointSphere = static_cast<PointRenderType>(1);
 inline constexpr PointRenderType kPointSurfel = static_cast<PointRenderType>(2);
+inline constexpr VisualizationColorSource kMaterialSource =
+    static_cast<VisualizationColorSource>(0);
 inline constexpr VisualizationColorSource kUniformColorSource =
     static_cast<VisualizationColorSource>(1);
 inline constexpr VisualizationColorSource kScalarFieldSource =
@@ -1211,21 +1213,7 @@ void DrawPointRenderHintControls(const EditorDomainWindowModel &model,
 
 void DrawEdgeRenderHintControls(const EditorDomainWindowModel &model,
                                 const SandboxEditorContext &context,
-                                const bool canEditRenderHints) {
-  bool edges = model.RenderHints.HasRenderEdges;
-  if (ImGui::Checkbox("Edges", &edges) && canEditRenderHints) {
-    (void)ApplyEditorRenderHintCommand(
-        context.VisualizationCommands, EditorRenderHintCommand{
-                     .StableEntityId = model.SelectedStableId,
-                     .SetEdges = true,
-                     .EnableEdges = edges,
-                     .EdgeDomain = model.RenderHints.EdgeDomainValue,
-                 });
-  }
-
-  if (!model.RenderHints.HasRenderEdges)
-    return;
-
+                                 const bool canEditRenderHints) {
   EdgeDomain edgeDomain = model.RenderHints.EdgeDomainValue;
   if (DrawEdgeDomainCombo(&edgeDomain) && canEditRenderHints) {
     (void)ApplyEditorRenderHintCommand(
@@ -1239,7 +1227,8 @@ void DrawEdgeRenderHintControls(const EditorDomainWindowModel &model,
 
   if (model.RenderHints.HasUniformEdgeWidth) {
     float edgeWidth = model.RenderHints.UniformEdgeWidth;
-    if (ImGui::DragFloat("Edge width", &edgeWidth, 0.05f, 0.1f, 32.0f) &&
+    if (ImGui::DragFloat("Edge width", &edgeWidth, 0.05f, 0.01f, 32.0f,
+                         "%.3f", ImGuiSliderFlags_AlwaysClamp) &&
         canEditRenderHints) {
       (void)ApplyEditorRenderHintCommand(
           context.VisualizationCommands, EditorRenderHintCommand{
@@ -1254,17 +1243,6 @@ void DrawEdgeRenderHintControls(const EditorDomainWindowModel &model,
 void DrawMeshRenderHintControls(const EditorDomainWindowModel &model,
                                 const SandboxEditorContext &context,
                                 const bool canEditRenderHints) {
-  bool surface = model.RenderHints.HasRenderSurface;
-  if (ImGui::Checkbox("Surface", &surface) && canEditRenderHints) {
-    (void)ApplyEditorRenderHintCommand(
-        context.VisualizationCommands, EditorRenderHintCommand{
-                     .StableEntityId = model.SelectedStableId,
-                     .SetSurface = true,
-                     .EnableSurface = surface,
-                     .SurfaceDomain = model.RenderHints.SurfaceDomainValue,
-                 });
-  }
-
   if (model.RenderHints.HasRenderSurface) {
     SurfaceDomain domain = model.RenderHints.SurfaceDomainValue;
     if (DrawSurfaceDomainCombo(&domain) && canEditRenderHints) {
@@ -1283,20 +1261,6 @@ void DrawMeshRenderHintControls(const EditorDomainWindowModel &model,
 void DrawPointRenderHintControls(const EditorDomainWindowModel &model,
                                  const SandboxEditorContext &context,
                                  const bool canEditRenderHints) {
-  bool points = model.RenderHints.HasRenderPoints;
-  if (ImGui::Checkbox("Points", &points) && canEditRenderHints) {
-    (void)ApplyEditorRenderHintCommand(
-        context.VisualizationCommands, EditorRenderHintCommand{
-                     .StableEntityId = model.SelectedStableId,
-                     .SetPoints = true,
-                     .EnablePoints = points,
-                     .PointType = model.RenderHints.PointRenderTypeValue,
-                 });
-  }
-
-  if (!model.RenderHints.HasRenderPoints)
-    return;
-
   PointRenderType pointType = model.RenderHints.PointRenderTypeValue;
   if (DrawPointTypeCombo(&pointType) && canEditRenderHints) {
     (void)ApplyEditorRenderHintCommand(
@@ -1309,7 +1273,8 @@ void DrawPointRenderHintControls(const EditorDomainWindowModel &model,
 
   if (model.RenderHints.HasUniformPointSize) {
     float pointSize = model.RenderHints.UniformPointSize;
-    if (ImGui::DragFloat("Point size", &pointSize, 0.05f, 0.5f, 32.0f) &&
+    if (ImGui::DragFloat("Point size", &pointSize, 0.05f, 0.01f, 32.0f,
+                         "%.3f", ImGuiSliderFlags_AlwaysClamp) &&
         canEditRenderHints) {
       (void)ApplyEditorRenderHintCommand(
           context.VisualizationCommands, EditorRenderHintCommand{
@@ -1343,13 +1308,15 @@ void DrawVisualizationPropertyDropdown(const EditorDomainWindowModel &model,
           : propertyName.c_str();
   if (!ImGui::BeginCombo("Property", preview))
     return;
-  if (ImGui::Selectable("Material / default", !visualization.HasConfig)) {
+  if (ImGui::Selectable("Material / default", !visualization.HasConfig ||
+                        visualization.Source == kMaterialSource)) {
     lastStatus = ApplyEditorVisualizationConfigCommand(
         context.VisualizationCommands,
         EditorVisualizationConfigCommand{.StableEntityId =
                                              model.SelectedStableId,
                                          .Target = model.VisualizationTarget,
-                                         .EnableConfig = false});
+                                          .EnableConfig = true,
+                                          .Source = kMaterialSource});
   }
   if (ImGui::Selectable("Uniform color",
                         visualization.Source == kUniformColorSource)) {
@@ -1365,10 +1332,16 @@ void DrawVisualizationPropertyDropdown(const EditorDomainWindowModel &model,
     const std::string label =
         property.Name + "  (" +
         DebugNameForEditorVisualizationPropertyDomain(property.Domain) + ")";
+    const int propertyDomain =
+        property.Domain == EditorVisualizationPropertyDomain::MeshFaces ? 2
+        : (property.Domain == EditorVisualizationPropertyDomain::MeshEdges ||
+           property.Domain == EditorVisualizationPropertyDomain::GraphEdges) ? 1
+                                                                             : 0;
+    const int activeDomain = scalar ? static_cast<int>(visualization.ScalarDomain)
+                                   : static_cast<int>(visualization.Source) - 3;
     const bool selected =
         property.Name == propertyName && (scalar || color) &&
-        ((property.Domain == EditorVisualizationPropertyDomain::MeshFaces) ==
-         (static_cast<int>(visualization.ScalarDomain) == 2));
+        propertyDomain == activeDomain;
     if (ImGui::Selectable(label.c_str(), selected)) {
       lastStatus = ApplyEditorVisualizationPropertyCommand(
           context.VisualizationCommands,
@@ -1377,13 +1350,16 @@ void DrawVisualizationPropertyDropdown(const EditorDomainWindowModel &model,
               .Target = model.VisualizationTarget,
               .Domain = property.Domain,
               .Preset = property.ScalarPresetAvailable
-                            ? EditorVisualizationPropertyPreset::Scalar
+                            ? (visualization.IsolineCount > 0u
+                                   ? EditorVisualizationPropertyPreset::Isoline
+                                   : EditorVisualizationPropertyPreset::Scalar)
                             : EditorVisualizationPropertyPreset::ColorBuffer,
               .PropertyName = property.Name,
               .ScalarAutoRange = visualization.ScalarAutoRange,
               .ScalarRangeMin = visualization.ScalarRangeMin,
               .ScalarRangeMax = visualization.ScalarRangeMax,
               .ScalarBinCount = visualization.ScalarBinCount,
+              .IsolineCount = visualization.IsolineCount,
           });
     }
     if (selected)
@@ -1547,16 +1523,49 @@ void DrawDomainRenderWindow(
     const std::span<const EditorDomainWindowModel *const> models,
     const SandboxEditorContext &context, TextureBakeUiState *textureBakeState,
     std::array<EditorCommandStatus, 3> &statuses) {
-  DrawDomainWindowHeader(*models.front());
+  const auto &selected = *models.front();
+  if (!selected.HasSelectedEntity) {
+    ImGui::TextDisabled("Select a mesh, graph, or point cloud.");
+    return;
+  }
+  ImGui::TextUnformatted(selected.SelectedEntity.Name.c_str());
   for (const auto *current : models) {
     const auto &model = *current;
-    ImGui::PushID(static_cast<int>(model.Kind));
-    ImGui::SeparatorText(
-        model.Kind == EditorDomainWindowKind::Mesh    ? "Faces / surface"
-        : model.Kind == EditorDomainWindowKind::Graph ? "Edges"
-                                                      : "Vertices");
     const bool available = DomainAppearanceReady(model);
-    ImGui::BeginDisabled(!available);
+    if (!available)
+      continue;
+    ImGui::PushID(static_cast<int>(model.Kind));
+    auto &status = statuses[static_cast<std::size_t>(model.Kind)];
+    const bool mesh = model.Kind == EditorDomainWindowKind::Mesh;
+    const bool graph = model.Kind == EditorDomainWindowKind::Graph;
+    const char *label = mesh ? "Surface" : graph ? "Edges" : "Points";
+    bool visible = mesh ? model.RenderHints.HasRenderSurface
+                        : graph ? model.RenderHints.HasRenderEdges
+                                : model.RenderHints.HasRenderPoints;
+    if (ImGui::Checkbox(label, &visible)) {
+      status = ApplyEditorRenderHintCommand(
+          context.VisualizationCommands,
+          EditorRenderHintCommand{
+              .StableEntityId = model.SelectedStableId,
+              .SetSurface = mesh,
+              .EnableSurface = visible,
+              .SurfaceDomain = model.RenderHints.SurfaceDomainValue,
+              .SetEdges = graph,
+              .EnableEdges = visible,
+              .EdgeDomain = model.RenderHints.EdgeDomainValue,
+              .SetPoints = !mesh && !graph,
+              .EnablePoints = visible,
+              .PointType = model.RenderHints.PointRenderTypeValue,
+          });
+    }
+    if (status != EditorCommandStatus::Applied &&
+        status != EditorCommandStatus::NoChange)
+      ImGui::TextWrapped("Appearance change failed: %s",
+                         DebugNameForEditorCommandStatus(status));
+    if (!visible || !ImGui::TreeNode("Settings")) {
+      ImGui::PopID();
+      continue;
+    }
     switch (model.Kind) {
     case EditorDomainWindowKind::Mesh:
       DrawMeshRenderHintControls(model, context, available);
@@ -1568,11 +1577,8 @@ void DrawDomainRenderWindow(
       DrawPointRenderHintControls(model, context, available);
       break;
     }
-    if (available)
-      DrawDomainVisualizationControls(
-          model, context, statuses[static_cast<std::size_t>(model.Kind)]);
-    ImGui::EndDisabled();
-    if (available && ImGui::CollapsingHeader("Advanced")) {
+    DrawDomainVisualizationControls(model, context, status);
+    if (ImGui::CollapsingHeader("Advanced")) {
       DrawRenderHintStatus(model.RenderHints);
       DrawBoundRenderStateRows(model.BoundState);
       DrawPropertyBindingTargets(model.PropertyCatalog);
@@ -1580,6 +1586,7 @@ void DrawDomainRenderWindow(
       if (model.Kind == EditorDomainWindowKind::Mesh)
         DrawTextureBakeControls(model.TextureBake, &context, textureBakeState);
     }
+    ImGui::TreePop();
     ImGui::PopID();
   }
 }
@@ -1595,7 +1602,8 @@ void DrawDomainVisualizationControls(const EditorDomainWindowModel &model,
   DrawUniformVisualizationColorEdit(visualization, context,
                                     model.SelectedStableId,
                                     model.VisualizationTarget, available);
-  if (model.Kind == EditorDomainWindowKind::Mesh) {
+  if (model.Kind == EditorDomainWindowKind::Mesh &&
+      ImGui::CollapsingHeader("Texture baking")) {
     bool baked = visualization.UseBakedTexture;
     const bool hasProperty = visualization.HasConfig &&
                              (visualization.Source == kScalarFieldSource ||
@@ -1623,10 +1631,6 @@ void DrawDomainVisualizationControls(const EditorDomainWindowModel &model,
         ImGui::TextWrapped("%s", output->Diagnostic.c_str());
     }
   }
-  if (lastStatus != EditorCommandStatus::Applied &&
-      lastStatus != EditorCommandStatus::NoChange)
-    ImGui::TextWrapped("Appearance change failed: %s",
-                       DebugNameForEditorCommandStatus(lastStatus));
   if (visualization.Source == kScalarFieldSource &&
       ImGui::CollapsingHeader("Color mapping"))
     DrawScalarVisualizationControls(visualization, context,
@@ -1957,8 +1961,7 @@ void DomainPanels::Impl::DrawWindow(
       }
       std::array<const EditorDomainWindowModel *, 3> appearanceModels{&model};
       std::size_t count = 1;
-      if (kind == EditorDomainWindowKind::Mesh &&
-          model.VisualizationTargetAvailable)
+      if (kind == EditorDomainWindowKind::Mesh && model.HasSelectedEntity)
         appearanceModels[count++] =
             &GetDomainWindowModel(context, EditorDomainWindowKind::Graph);
       if (kind != EditorDomainWindowKind::PointCloud && model.HasSelectedEntity)
@@ -1968,11 +1971,10 @@ void DomainPanels::Impl::DrawWindow(
                              &textureBakeState, AppearanceStatuses);
     }
       if (kind == Runtime::EditorDomainWindowKind::Mesh &&
-          model.DomainMatches) {
+          model.DomainMatches && ImGui::CollapsingHeader("Property distribution")) {
         const auto properties =
             Runtime::ResolveEditorSelectedMeshVertexProperties(context.GeometryCommands);
         if (properties) {
-          ImGui::SeparatorText("Property distribution");
           (void)Runtime::DrawEditorScalarPropertyPlotWidget(
               "mesh.appearance.properties", properties, MeshPropertyPlotState);
         }

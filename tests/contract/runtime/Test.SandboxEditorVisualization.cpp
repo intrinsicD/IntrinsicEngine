@@ -879,6 +879,87 @@ TEST(SandboxEditorUi, VisualizationPropertyPresetCommandRoutesThroughConfig)
                      Runtime::EditorCommandStatus::InvalidVisualizationProperty),
                  "InvalidVisualizationProperty");
 }
+TEST(SandboxEditorUi, AppearanceRemainsEditableAcrossRepeatedVisibilityChanges)
+{
+    ECS::Scene::Registry registry;
+    Runtime::SelectionController selection;
+    auto context = MakeContext(registry, selection);
+    context.VisualizationCommandsAvailable = true;
+    using Kind = Runtime::EditorDomainWindowKind;
+    const auto mesh = MakeSelectable(registry, "Mesh");
+    AddTriangleMeshSource(registry, mesh);
+    const auto graph = MakeSelectable(registry, "Graph");
+    AddGraphSource(registry, graph);
+    const auto cloud = MakeSelectable(registry, "Cloud");
+    AddPointCloudSource(registry, cloud, 3u);
+    const auto empty = MakeSelectable(registry, "Empty");
+
+    for (const auto entity : {mesh, graph, cloud, empty})
+    {
+        ASSERT_TRUE(selection.SetSelectedEntity(registry, entity));
+        for (const auto kind : {Kind::Mesh, Kind::Graph, Kind::PointCloud})
+        {
+            const bool supported = entity != empty &&
+                (kind == Kind::PointCloud || entity == mesh ||
+                 (entity == graph && kind == Kind::Graph));
+            SCOPED_TRACE(std::to_string(static_cast<std::uint32_t>(entity)) +
+                         "/" + Runtime::DebugNameForEditorDomainWindowKind(kind));
+            for (const bool enabled : {false, true, false, true})
+            {
+                const auto status = Runtime::ApplyEditorRenderHintCommand(
+                    context, Runtime::EditorRenderHintCommand{
+                        .StableEntityId = Runtime::SelectionController::ToStableEntityId(entity),
+                        .SetSurface = kind == Kind::Mesh,
+                        .EnableSurface = enabled,
+                        .SetEdges = kind == Kind::Graph,
+                        .EnableEdges = enabled,
+                        .SetPoints = kind == Kind::PointCloud,
+                        .EnablePoints = enabled,
+                    });
+                if (supported)
+                    EXPECT_TRUE(status == Runtime::EditorCommandStatus::Applied ||
+                                status == Runtime::EditorCommandStatus::NoChange);
+                else
+                    EXPECT_EQ(status, Runtime::EditorCommandStatus::UnsupportedGeometryDomain);
+                const auto model = Runtime::BuildEditorDomainWindowModel(context, kind);
+                EXPECT_EQ(model.VisualizationTargetAvailable, supported);
+                EXPECT_EQ(model.Visualization.TargetAvailable, supported);
+                if (supported)
+                    EXPECT_EQ(kind == Kind::Mesh ? model.RenderHints.HasRenderSurface
+                              : kind == Kind::Graph ? model.RenderHints.HasRenderEdges
+                                                    : model.RenderHints.HasRenderPoints,
+                              enabled);
+            }
+        }
+    }
+}
+
+TEST(SandboxEditorUi, EdgeAppearanceListsPropertiesFromTheSelectedSourceDomain)
+{
+    ECS::Scene::Registry registry;
+    Runtime::SelectionController selection;
+    auto context = MakeContext(registry, selection);
+    context.VisualizationCommandsAvailable = true;
+    const auto graph = MakeSelectable(registry, "Graph");
+    AddGraphSource(registry, graph);
+    ASSERT_TRUE(selection.SetSelectedEntity(registry, graph));
+    (void)registry.Raw().get<GS::Vertices>(graph).Properties.GetOrAdd<float>("v:test", 1.0f);
+    (void)registry.Raw().get<GS::Edges>(graph).Properties.GetOrAdd<float>("e:test", 2.0f);
+    for (const auto domain : {G::RenderEdges::SourceDomain::Vertex,
+                              G::RenderEdges::SourceDomain::Edge})
+    {
+        registry.Raw().get<G::RenderEdges>(graph).Domain = domain;
+        const auto model = Runtime::BuildEditorDomainWindowModel(
+            context, Runtime::EditorDomainWindowKind::Graph);
+        const auto expected = domain == G::RenderEdges::SourceDomain::Vertex
+            ? Runtime::EditorVisualizationPropertyDomain::GraphVertices
+            : Runtime::EditorVisualizationPropertyDomain::GraphEdges;
+        ASSERT_FALSE(model.Visualization.Properties.empty());
+        for (const auto& property : model.Visualization.Properties)
+            EXPECT_EQ(property.Domain, expected) << property.Name;
+    }
+}
+
 TEST(SandboxEditorUi, RenderHintCommandEditsDomainComponentsAndHistory)
 {
     ECS::Scene::Registry registry;

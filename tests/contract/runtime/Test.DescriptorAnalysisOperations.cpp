@@ -23,6 +23,7 @@ import Extrinsic.Runtime.EngineConfigControl;
 import Extrinsic.ECS.Scene.Registry;
 import Extrinsic.ECS.Components.GeometrySources;
 import Extrinsic.ECS.Components.GeometrySourcesPopulate;
+import Extrinsic.Graphics.Component.VisualizationConfig;
 import Geometry.HalfedgeMesh;
 import Geometry.Graph;
 
@@ -178,9 +179,25 @@ TEST(DescriptorAnalysisOperations, EveryDomainReferenceCacheHistoryAndDeletedRow
         visualization.VisualizationRecipes.GetRecipe=[&](std::uint32_t){return stored;};
         visualization.VisualizationRecipes.SetRecipe=[&](std::uint32_t,R::VisualizationRecipe value){stored=std::move(value);};
         visualization.VisualizationRecipes.ClearRecipe=[&](std::uint32_t){stored.reset();};
-        EXPECT_EQ(R::ApplyEditorVisualizationRecipeCommand(visualization,{.StableEntityId=c.StableEntityId,
-            .Recipe={.Data=R::ScalarVisualizationRecipe{.Source=c.Outputs[32],.OutputName="histogram_colors"}}}),R::EditorCommandStatus::Applied);
-        ASSERT_TRUE(stored);ASSERT_TRUE(std::get_if<R::ScalarVisualizationRecipe>(&stored->Data));
+        const auto displayStatus = R::ApplyEditorVisualizationRecipeCommand(
+            visualization, {.StableEntityId=c.StableEntityId,
+                .Recipe={.Data=R::ScalarVisualizationRecipe{.Source=c.Outputs[32],.OutputName="histogram_colors"}}});
+        EXPECT_FALSE(stored);
+        if (half)
+        {
+            EXPECT_EQ(displayStatus, R::EditorCommandStatus::InvalidVisualizationProperty);
+            continue;
+        }
+        EXPECT_EQ(displayStatus, R::EditorCommandStatus::Applied);
+        const auto* overrides = scene.Raw().try_get<
+            Extrinsic::Graphics::Components::VisualizationLaneOverrides>(entity);
+        ASSERT_NE(overrides, nullptr);
+        const auto& lane = D(d) == D::MeshVertex || D(d) == D::MeshFace
+            ? overrides->Surface : D(d) == D::PointCloudPoint ? overrides->Points : overrides->Edges;
+        ASSERT_TRUE(lane);
+        EXPECT_EQ(lane->Source,
+                  Extrinsic::Graphics::Components::VisualizationConfig::ColorSource::ScalarField);
+        EXPECT_EQ(lane->ScalarFieldName, c.Outputs[32].Name);
     }
 }
 TEST(DescriptorAnalysisOperations, JobsRejectChangedNormalsEveryOutputAndCancellation)

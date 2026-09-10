@@ -757,6 +757,162 @@ TEST(RuntimeRenderExtraction, VisualizationPropertyBufferKeysAreStableIdScoped)
     EXPECT_FALSE(world.Visualization.Diagnostics.HasErrors);
 }
 
+TEST(RuntimeRenderExtraction, AnalysisDisplayCommandsShareAppearanceAndRecover)
+{
+    namespace GS = ECS::Components::GeometrySources;
+    using Target = Runtime::EditorVisualizationTarget;
+    using Domain = Runtime::GeometryElementDomain;
+    using PropertyDomain = Runtime::EditorVisualizationPropertyDomain;
+    using Kind = Geometry::PropertyValueKind;
+
+    for (const auto domain : {Domain::MeshVertex, Domain::GraphNode, Domain::PointCloudPoint})
+    {
+        SCOPED_TRACE(static_cast<int>(domain));
+        RendererFixture fixture;
+        ECS::Scene::Registry scene;
+        const auto entity = scene.Create();
+        auto& raw = scene.Raw();
+        raw.emplace<ECS::Components::Transform::WorldMatrix>(entity);
+        Target target{};
+        PropertyDomain propertyDomain{};
+        if (domain == Domain::MeshVertex)
+        {
+            AttachTriangleMeshSources(scene, entity);
+            raw.emplace<Graphics::Components::RenderSurface>(entity);
+            target = Target::Surface;
+            propertyDomain = PropertyDomain::MeshVertices;
+        }
+        else if (domain == Domain::GraphNode)
+        {
+            AttachLineGraphSources(scene, entity);
+            raw.emplace<Graphics::Components::RenderEdges>(entity);
+            target = Target::Edges;
+            propertyDomain = PropertyDomain::GraphVertices;
+        }
+        else
+        {
+            AttachPointCloudSources(scene, entity);
+            raw.emplace<Graphics::Components::RenderPoints>(entity);
+            target = Target::Points;
+            propertyDomain = PropertyDomain::PointCloudPoints;
+        }
+        auto& properties = raw.get<GS::Vertices>(entity).Properties;
+        properties.GetOrAdd<std::uint32_t>("keypoint_mask", 0u).Vector() = {0u, 1u, 0u};
+        properties.GetOrAdd<float>("keypoint_saliency", 0.0f).Vector() = {0.0f, 0.5f, 1.0f};
+        properties.GetOrAdd<float>("other_score", 0.0f).Vector() = {-2.0f, 0.0f, 2.0f};
+        const auto stableId = StableId(entity);
+        Runtime::EditorCommandHistory history;
+        const Intrinsic::Tests::EditorFeatureTestContext context{
+            .Scene = &scene,
+            .CommandHistory = &history,
+            .VisualizationRecipes = {
+                .GetRecipe = [&](std::uint32_t id) { return fixture.Extraction.GetVisualizationRecipe(id); },
+                .SetRecipe = [&](std::uint32_t id, Runtime::VisualizationRecipe recipe) {
+                    fixture.Extraction.SetVisualizationRecipe(id, std::move(recipe));
+                },
+                .ClearRecipe = [&](std::uint32_t id) { fixture.Extraction.ClearVisualizationRecipe(id); },
+            },
+            .VisualizationCommandsAvailable = true,
+        };
+        const auto prepare = [&] {
+            fixture.Extract(scene);
+            auto world = fixture.Renderer->ExtractRenderWorld({});
+            fixture.Renderer->PrepareFrame(world);
+            const auto sidecar = fixture.Extraction.FindRenderableSidecarForTest(stableId);
+            EXPECT_TRUE(sidecar.has_value());
+            return fixture.Renderer->GetGpuWorld().GetEntityConfigForTest(sidecar->Instance);
+        };
+        const auto selectOther = [&] {
+            return Runtime::ApplyEditorVisualizationPropertyCommand(
+                context, {.StableEntityId = stableId, .Target = target,
+                          .Domain = propertyDomain, .PropertyName = "other_score"});
+        };
+        ASSERT_EQ(selectOther(), Runtime::EditorCommandStatus::Applied);
+        ASSERT_NE(prepare().ScalarBDA, 0u);
+
+        for (int cycle = 0; cycle != 2; ++cycle)
+        {
+            SCOPED_TRACE(cycle);
+            ASSERT_EQ(Runtime::ApplyEditorVisualizationRecipeCommand(
+                context, {.StableEntityId = stableId,
+                          .Recipe = {.Data = Runtime::LabelVisualizationRecipe{
+                              .Source = {.Domain = domain, .Name = "keypoint_mask", .ValueKind = Kind::UInt32},
+                              .OutputName = "keypoint_mask.colors"}}}),
+                Runtime::EditorCommandStatus::Applied);
+            const auto mask = prepare();
+            EXPECT_EQ(mask.ColorSourceMode, 3u);
+            EXPECT_NE(mask.ColorBDA, 0u);
+            EXPECT_EQ(mask.ElementCount, 3u);
+
+            ASSERT_EQ(Runtime::ApplyEditorVisualizationRecipeCommand(
+                context, {.StableEntityId = stableId,
+                          .Recipe = {.Data = Runtime::ScalarVisualizationRecipe{
+                              .Source = {.Domain = domain, .Name = "keypoint_saliency", .ValueKind = Kind::Float},
+                              .OutputName = "keypoint_saliency.colors"}}}),
+                Runtime::EditorCommandStatus::Applied);
+            const auto saliency = prepare();
+            EXPECT_EQ(saliency.ColorSourceMode, 2u);
+            EXPECT_NE(saliency.ScalarBDA, 0u);
+            EXPECT_FLOAT_EQ(saliency.ScalarRangeMin, 0.0f);
+            EXPECT_FLOAT_EQ(saliency.ScalarRangeMax, 1.0f);
+
+            ASSERT_EQ(history.Undo().Status, Runtime::EditorCommandHistoryStatus::Undone);
+            EXPECT_EQ(prepare().ColorSourceMode, 3u);
+            ASSERT_EQ(history.Redo().Status, Runtime::EditorCommandHistoryStatus::Redone);
+            EXPECT_NE(prepare().ScalarBDA, 0u);
+            ASSERT_EQ(selectOther(), Runtime::EditorCommandStatus::Applied);
+            const auto restored = prepare();
+            EXPECT_NE(restored.ScalarBDA, 0u);
+            EXPECT_FLOAT_EQ(restored.ScalarRangeMin, -2.0f);
+            EXPECT_FLOAT_EQ(restored.ScalarRangeMax, 2.0f);
+        }
+        EXPECT_EQ(Runtime::ApplyEditorVisualizationRecipeCommand(
+            context, {.StableEntityId = stableId,
+                      .Recipe = {.Data = Runtime::ScalarVisualizationRecipe{
+                          .Source = {.Domain = domain, .Name = "not_computed", .ValueKind = Kind::Float}}}}),
+            Runtime::EditorCommandStatus::InvalidVisualizationProperty);
+        EXPECT_FLOAT_EQ(prepare().ScalarRangeMin, -2.0f);
+        EXPECT_EQ(Runtime::ApplyEditorVisualizationRecipeCommand(
+            context, {.StableEntityId = stableId,
+                      .Recipe = {.Data = Runtime::ScalarVisualizationRecipe{
+                          .Source = {.Domain = domain, .Name = "keypoint_mask", .ValueKind = Kind::UInt32}}}}),
+            Runtime::EditorCommandStatus::InvalidVisualizationProperty);
+        EXPECT_FLOAT_EQ(prepare().ScalarRangeMin, -2.0f);
+        ASSERT_EQ(Runtime::ApplyEditorVisualizationPropertyCommand(
+            context, {.StableEntityId = stableId, .Target = target,
+                      .Domain = propertyDomain,
+                      .Preset = Runtime::EditorVisualizationPropertyPreset::ColorBuffer,
+                      .PropertyName = "keypoint_mask"}),
+            Runtime::EditorCommandStatus::Applied);
+        EXPECT_NE(prepare().ColorBDA, 0u);
+    }
+}
+
+TEST(RuntimeRenderExtraction, ExplicitOverlayDoesNotStarveAppearancePropertyBuffers)
+{
+    namespace GS = ECS::Components::GeometrySources;
+    RendererFixture fixture;
+    ECS::Scene::Registry scene;
+    const auto entity = scene.Create();
+    ConfigureMeshColorVisualization(scene, entity, "v:color");
+    const auto stableId = StableId(entity);
+    fixture.Extraction.SetVisualizationRecipe(stableId, {
+        .Data = Runtime::VectorFieldVisualizationRecipe{
+            .Source = {.Domain = Runtime::GeometryElementDomain::MeshVertex,
+                       .Name = "v:normal", .ValueKind = Geometry::PropertyValueKind::Vec3},
+            .PositionSource = {.Domain = Runtime::GeometryElementDomain::MeshVertex,
+                               .Name = "v:position", .ValueKind = Geometry::PropertyValueKind::Vec3},
+            .OutputName = "normal_vectors"}});
+    fixture.Extract(scene);
+    auto world = fixture.Renderer->ExtractRenderWorld({});
+    fixture.Renderer->PrepareFrame(world);
+    ASSERT_EQ(world.Visualization.VectorFields.size(), 1u);
+    ASSERT_EQ(world.Visualization.Colors.size(), 1u);
+    const auto sidecar = fixture.Extraction.FindRenderableSidecarForTest(stableId);
+    ASSERT_TRUE(sidecar);
+    EXPECT_NE(fixture.Renderer->GetGpuWorld().GetEntityConfigForTest(sidecar->Instance).ColorBDA, 0u);
+}
+
 TEST(RuntimeRenderExtraction, MeshColorVisualizationPropertyBufferUploadsFromGeometrySources)
 {
     RendererFixture fixture;
@@ -914,6 +1070,96 @@ TEST(RuntimeRenderExtraction,
     EXPECT_EQ(
         reorderedUpload,
         (std::array<float, 6u>{3.0f, 4.0f, 1.0f, 2.0f, 3.0f, 1.0f}));
+}
+
+TEST(RuntimeRenderExtraction, MeshSurfaceAndCanonicalLanesKeepDistinctPropertyLayouts)
+{
+    namespace GS = ECS::Components::GeometrySources;
+    using Config = Graphics::Components::VisualizationConfig;
+    for (const bool scalar : {false, true})
+    for (const bool separateOverrides : {false, true})
+    {
+        SCOPED_TRACE(scalar ? "scalar" : "color");
+        SCOPED_TRACE(separateOverrides ? "lane overrides" : "shared config");
+        RendererFixture fixture;
+        ECS::Scene::Registry scene;
+        const auto entity = scene.Create();
+        auto& registry = scene.Raw();
+        registry.emplace<ECS::Components::Transform::WorldMatrix>(entity).Matrix = glm::mat4{1};
+        registry.emplace<Graphics::Components::RenderSurface>(entity);
+        registry.emplace<Graphics::Components::RenderEdges>(entity);
+        registry.emplace<Graphics::Components::RenderPoints>(entity);
+        AttachCornerSplitQuadMeshSources(scene, entity);
+        const std::array colors{
+            glm::vec4{1, 0, 0, 1}, glm::vec4{0, 1, 0, 1},
+            glm::vec4{0, 0, 1, 1}, glm::vec4{1, 1, 0, 1}};
+        registry.get<GS::Vertices>(entity).Properties.GetOrAdd<glm::vec4>("v:split_color")
+            .Vector().assign(colors.begin(), colors.end());
+        Config config;
+        config.Source = scalar ? Config::ColorSource::ScalarField : Config::ColorSource::PerVertexBuffer;
+        config.ScalarDomain = Config::Domain::Vertex;
+        config.ScalarFieldName = "v:split_scalar";
+        config.ColorBufferName = "v:split_color";
+        if (separateOverrides)
+        {
+            auto& overrides = registry.emplace<Graphics::Components::VisualizationLaneOverrides>(entity);
+            overrides.Surface = config;
+            overrides.Edges = config;
+            overrides.Points = config;
+        }
+        else
+            registry.emplace<Config>(entity, config);
+
+        for (unsigned frame = 0; frame < 2; ++frame)
+        {
+            const auto stats = fixture.Extract(scene);
+            EXPECT_EQ(stats.VisualizationRecipeInvalidBufferCount, 0u);
+            auto world = fixture.Renderer->ExtractRenderWorld({});
+            fixture.Renderer->PrepareFrame(world);
+            EXPECT_EQ(scalar ? world.Visualization.Scalars.size() : world.Visualization.Colors.size(), 2u);
+            const auto sidecar = fixture.Extraction.FindRenderableSidecarForTest(StableId(entity));
+            ASSERT_TRUE(sidecar);
+            ASSERT_TRUE(sidecar->MeshEdgeViewInstance.IsValid());
+            ASSERT_TRUE(sidecar->MeshVertexViewInstance.IsValid());
+            const auto surface = fixture.Renderer->GetGpuWorld().GetEntityConfigForTest(sidecar->Instance);
+            const auto edge = fixture.Renderer->GetGpuWorld().GetEntityConfigForTest(sidecar->MeshEdgeViewInstance);
+            const auto point = fixture.Renderer->GetGpuWorld().GetEntityConfigForTest(sidecar->MeshVertexViewInstance);
+            const auto surfaceAddress = scalar ? surface.ScalarBDA : surface.ColorBDA;
+            const auto canonicalAddress = scalar ? point.ScalarBDA : point.ColorBDA;
+            EXPECT_NE(surfaceAddress, canonicalAddress);
+            EXPECT_EQ(scalar ? edge.ScalarBDA : edge.ColorBDA, canonicalAddress);
+            EXPECT_EQ(surface.ElementCount, 6u);
+            EXPECT_EQ(point.ElementCount, 4u);
+            EXPECT_EQ(edge.ElementCount, 4u);
+            const auto checkUpload = [&](std::uint64_t address, std::span<const unsigned> sourceIndices) {
+                ASSERT_GE(address, 0x1'0000'0000ull);
+                const auto handle = (address - 0x1'0000'0000ull) / 0x1000ull;
+                const Tests::MockDevice::BufferWriteRecord* write = nullptr;
+                for (auto it = fixture.Device.BufferWrites.rbegin(); it != fixture.Device.BufferWrites.rend(); ++it)
+                    if (it->Handle.Index == handle && it->Offset == 0u) { write = &*it; break; }
+                ASSERT_NE(write, nullptr);
+                const auto stride = scalar ? sizeof(float) : sizeof(glm::vec4);
+                ASSERT_EQ(write->Data.size(), sourceIndices.size() * stride);
+                for (std::size_t i = 0; i < sourceIndices.size(); ++i)
+                {
+                    if (scalar)
+                    {
+                        float value{};
+                        std::memcpy(&value, write->Data.data() + i * stride, stride);
+                        EXPECT_EQ(value, static_cast<float>(sourceIndices[i] + 1u));
+                    }
+                    else
+                    {
+                        glm::vec4 value{};
+                        std::memcpy(&value, write->Data.data() + i * stride, stride);
+                        EXPECT_EQ(value, colors[sourceIndices[i]]);
+                    }
+                }
+            };
+            checkUpload(surfaceAddress, std::array{1u, 2u, 0u, 2u, 3u, 0u});
+            checkUpload(canonicalAddress, std::array{0u, 1u, 2u, 3u});
+        }
+    }
 }
 
 TEST(RuntimeRenderExtraction, PointCloudVisualizationPropertyBuffersUploadFromGeometrySources)
@@ -1746,14 +1992,20 @@ TEST(RuntimeRenderExtraction, VisualizationNonScalarRecipesReachRenderWorld)
 
     EXPECT_EQ(scene.Raw().storage<entt::entity>().size(),
               entityCountBeforeExtraction);
-    EXPECT_EQ(stats.VisualizationRecipeEncodeCount, 5u);
-    EXPECT_EQ(stats.VisualizationRecipePacketAppendCount, 5u);
+    EXPECT_EQ(stats.VisualizationRecipeEncodeCount, 6u);
+    EXPECT_EQ(stats.VisualizationRecipePacketAppendCount, 6u);
+    EXPECT_EQ(stats.VisualizationScalarPacketCount, 1u);
     EXPECT_EQ(stats.VisualizationColorPacketCount, 1u);
     EXPECT_EQ(stats.VisualizationVectorFieldPacketCount, 1u);
     EXPECT_EQ(stats.VisualizationIsolinePacketCount, 1u);
     EXPECT_EQ(stats.VisualizationHtexAtlasPacketCount, 1u);
     EXPECT_EQ(stats.VisualizationFragmentBakeAtlasPacketCount, 1u);
-    EXPECT_EQ(stats.VisualizationRecipeScalarValueScanCount, 6u);
+    EXPECT_EQ(stats.VisualizationRecipeScalarValueScanCount, 9u);
+
+    ASSERT_EQ(world.Visualization.Scalars.size(), 1u);
+    EXPECT_EQ(world.Visualization.Scalars.front().SourceBufferKey,
+              std::to_string(StableId(isolineEntity)) + ":scalar:curvature");
+    EXPECT_NE(world.Visualization.Scalars.front().ScalarBufferBDA, 0u);
 
     ASSERT_EQ(world.Visualization.Colors.size(), 1u);
     EXPECT_EQ(world.Visualization.Colors.front().Name, "v:kmeans_color");
@@ -1791,11 +2043,11 @@ TEST(RuntimeRenderExtraction, VisualizationNonScalarRecipesReachRenderWorld)
     EXPECT_EQ(world.Visualization.FragmentBakeAtlases.front().TexcoordBufferBDA,
               0xFEED'CAFEu);
 
-    EXPECT_EQ(world.Visualization.Diagnostics.InputPacketCount, 5u);
-    EXPECT_EQ(world.Visualization.Diagnostics.AcceptedPacketCount, 5u);
+    EXPECT_EQ(world.Visualization.Diagnostics.InputPacketCount, 6u);
+    EXPECT_EQ(world.Visualization.Diagnostics.AcceptedPacketCount, 6u);
     EXPECT_EQ(world.Visualization.Diagnostics.TextureResidencyDeferredCount, 2u);
-    EXPECT_EQ(world.Visualization.PropertyBufferDiagnostics.InputBufferCount, 1u);
-    EXPECT_EQ(world.Visualization.PropertyBufferDiagnostics.UploadedBufferCount, 1u);
+    EXPECT_EQ(world.Visualization.PropertyBufferDiagnostics.InputBufferCount, 2u);
+    EXPECT_EQ(world.Visualization.PropertyBufferDiagnostics.UploadedBufferCount, 2u);
     EXPECT_FALSE(world.Visualization.Diagnostics.HasErrors);
     EXPECT_EQ(world.Visualization.OverlaySummary.VectorFieldCount, 1u);
     EXPECT_EQ(world.Visualization.OverlaySummary.VectorGlyphCount, 3u);

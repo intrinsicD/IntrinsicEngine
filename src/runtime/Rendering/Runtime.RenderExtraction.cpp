@@ -11,6 +11,7 @@ module;
 #include <span>
 #include <string>
 #include <string_view>
+#include <type_traits>
 #include <unordered_map>
 #include <unordered_set>
 #include <utility>
@@ -323,9 +324,9 @@ namespace Extrinsic::Runtime
 
         [[nodiscard]] std::optional<VisualizationRecipe>
         BuildScalarVisualizationRecipe(
-            const std::uint32_t stableId,
             const GeometryEntityAvailability& availability,
-            const Graphics::Components::VisualizationConfig* visualization)
+            const Graphics::Components::VisualizationConfig* visualization,
+            std::string bufferSourceKey)
         {
             if (!IsScalarVisualizationSource(visualization) ||
                 visualization->ScalarFieldName.empty())
@@ -339,8 +340,7 @@ namespace Extrinsic::Runtime
                     .ValueKind = Geometry::PropertyValueKind::Unknown,
                 },
                 .OutputName = visualization->ScalarFieldName,
-                .BufferSourceKey = BuildVisualizationPropertySourceKey(
-                    stableId, "scalar", visualization->ScalarFieldName),
+                .BufferSourceKey = std::move(bufferSourceKey),
                 .AutoRange = visualization->Scalar.AutoRange,
                 .RangeMin = visualization->Scalar.RangeMin,
                 .RangeMax = visualization->Scalar.RangeMax,
@@ -350,9 +350,9 @@ namespace Extrinsic::Runtime
 
         [[nodiscard]] std::optional<VisualizationRecipe>
         BuildColorVisualizationRecipe(
-            const std::uint32_t stableId,
             const GeometryEntityAvailability& availability,
-            const Graphics::Components::VisualizationConfig* visualization)
+            const Graphics::Components::VisualizationConfig* visualization,
+            std::string bufferSourceKey)
         {
             if (!IsColorBufferVisualizationSource(visualization) ||
                 visualization->ColorBufferName.empty())
@@ -366,8 +366,7 @@ namespace Extrinsic::Runtime
                     .ValueKind = Geometry::PropertyValueKind::Unknown,
                 },
                 .OutputName = visualization->ColorBufferName,
-                .BufferSourceKey = BuildVisualizationPropertySourceKey(
-                    stableId, "color", visualization->ColorBufferName),
+                .BufferSourceKey = std::move(bufferSourceKey),
             }};
         }
 
@@ -1168,7 +1167,6 @@ namespace Extrinsic::Runtime
         stats.GeometryPresentationDiagnosticCount += snapshot.Stats.DiagnosticCount;
 
         bool projectedVisualizationRecipes = false;
-        if (!m_VisualizationState->Recipes.contains(stableId))
         {
             for (const GeometryPresentationSlotSnapshot& slot : snapshot.Slots)
             {
@@ -1838,27 +1836,29 @@ namespace Extrinsic::Runtime
         const auto* renderPoints =
             registry.try_get<Graphics::Components::RenderPoints>(entity);
         const auto scalarKeyFor =
-            [stableId](const Graphics::Components::VisualizationConfig* config)
+            [stableId](const Graphics::Components::VisualizationConfig* config,
+                       const bool canonicalMeshLane = false)
             {
                 if (IsScalarVisualizationSource(config) &&
                     !config->ScalarFieldName.empty())
                 {
                     return BuildVisualizationPropertySourceKey(
                         stableId,
-                        "scalar",
+                        canonicalMeshLane ? "scalar.canonical" : "scalar",
                         config->ScalarFieldName);
                 }
                 return std::string{};
             };
         const auto colorKeyFor =
-            [stableId](const Graphics::Components::VisualizationConfig* config)
+            [stableId](const Graphics::Components::VisualizationConfig* config,
+                       const bool canonicalMeshLane = false)
             {
                 if (IsColorBufferVisualizationSource(config) &&
                     !config->ColorBufferName.empty())
                 {
                     return BuildVisualizationPropertySourceKey(
                         stableId,
-                        "color",
+                        canonicalMeshLane ? "color.canonical" : "color",
                         config->ColorBufferName);
                 }
                 return std::string{};
@@ -1936,8 +1936,8 @@ namespace Extrinsic::Runtime
                 .Visualization = edgeVisualization,
                 .Edges = renderEdges,
                 .TargetInstance = sidecar->MeshEdgeViewInstance,
-                .ScalarPropertyBufferSourceKey = scalarKeyFor(edgeVisualization),
-                .ColorPropertyBufferSourceKey = colorKeyFor(edgeVisualization),
+                .ScalarPropertyBufferSourceKey = scalarKeyFor(edgeVisualization, true),
+                .ColorPropertyBufferSourceKey = colorKeyFor(edgeVisualization, true),
             });
         }
         if (renderPoints != nullptr && sidecar->MeshVertexViewInstance.IsValid())
@@ -1948,8 +1948,8 @@ namespace Extrinsic::Runtime
                 .Visualization = pointVisualization,
                 .Points = renderPoints,
                 .TargetInstance = sidecar->MeshVertexViewInstance,
-                .ScalarPropertyBufferSourceKey = scalarKeyFor(pointVisualization),
-                .ColorPropertyBufferSourceKey = colorKeyFor(pointVisualization),
+                .ScalarPropertyBufferSourceKey = scalarKeyFor(pointVisualization, true),
+                .ColorPropertyBufferSourceKey = colorKeyFor(pointVisualization, true),
             });
         }
         if (availabilityThisFrame.has_value())
@@ -1958,9 +1958,22 @@ namespace Extrinsic::Runtime
                 m_VisualizationState->Recipes.find(stableId);
             if (explicitRecipe != m_VisualizationState->Recipes.end())
             {
+                auto recipe = explicitRecipe->second;
+                std::visit([&](auto& value) {
+                    using T = std::decay_t<decltype(value)>;
+                    if constexpr (std::is_same_v<T, ScalarVisualizationRecipe> ||
+                                  std::is_same_v<T, ColorVisualizationRecipe> ||
+                                  std::is_same_v<T, LabelVisualizationRecipe>)
+                    {
+                        if (value.BufferSourceKey.empty())
+                            value.BufferSourceKey = BuildVisualizationPropertySourceKey(
+                                stableId, std::is_same_v<T, ScalarVisualizationRecipe> ? "scalar" : "color",
+                                value.Source.Name);
+                    }
+                }, recipe.Data);
                 AppendVisualizationRecipe(
                     *availabilityThisFrame,
-                    explicitRecipe->second,
+                    recipe,
                     stats,
                     meshBoundThisFrame
                         ? std::span<const std::uint32_t>{
@@ -1974,13 +1987,26 @@ namespace Extrinsic::Runtime
                         : std::span<const std::uint32_t>{},
                     meshBoundThisFrame ? sidecar->MeshFaceRemapRevision : 0u);
             }
-            else
             {
+                const auto alreadyEncoded = [](const auto& packets, const auto& recipe) {
+                    using Domain = Graphics::VisualizationAttributeDomain;
+                    const auto domain =
+                        recipe.Source.Domain == GeometryElementDomain::MeshFace ? Domain::Face :
+                        recipe.Source.Domain == GeometryElementDomain::MeshEdge ||
+                        recipe.Source.Domain == GeometryElementDomain::GraphEdge ? Domain::Edge : Domain::Vertex;
+                    return std::any_of(packets.begin(), packets.end(), [&](const auto& packet) {
+                        return packet.SourceBufferKey == recipe.BufferSourceKey && packet.Domain == domain;
+                    });
+                };
                 const std::array<
                     const Graphics::Components::VisualizationConfig*, 3u>
                     configs{surfaceVisualization,
-                            edgeVisualization,
-                            pointVisualization};
+                            meshDomainThisFrame &&
+                                    (renderEdges == nullptr || !sidecar->MeshEdgeViewInstance.IsValid())
+                                ? nullptr : edgeVisualization,
+                            meshDomainThisFrame &&
+                                    (renderPoints == nullptr || !sidecar->MeshVertexViewInstance.IsValid())
+                                ? nullptr : pointVisualization};
                 const std::array<const Graphics::Components::VisualizationConfig*, 3u> overrides{
                     ResolveVisualizationForLane(nullptr, visualizationOverrides, VisualizationLane::Surface),
                     ResolveVisualizationForLane(nullptr, visualizationOverrides, VisualizationLane::Edges),
@@ -1989,19 +2015,27 @@ namespace Extrinsic::Runtime
                 {
                     if (presentationRecipesProjected && overrides[i] == nullptr)
                         continue;
+                    const bool canonicalMeshLane = meshDomainThisFrame && i != 0u;
                     bool alreadyAppended = false;
                     for (std::size_t j = 0u; j < i; ++j)
-                        alreadyAppended = alreadyAppended || configs[j] == configs[i];
+                    {
+                        // Surface streams may split vertices; point/edge streams keep canonical order.
+                        const bool sameLayout = !canonicalMeshLane || j != 0u;
+                        alreadyAppended = alreadyAppended || (sameLayout && configs[j] == configs[i]);
+                    }
                     if (alreadyAppended)
                         continue;
 
                     if (const auto scalar = BuildScalarVisualizationRecipe(
-                            stableId,
                             *availabilityThisFrame,
-                            configs[i]);
+                            configs[i],
+                            scalarKeyFor(configs[i], canonicalMeshLane));
                         scalar.has_value())
                     {
                         ++stats.VisualizationRecipeScalarConfigsObserved;
+                        if (alreadyEncoded(m_VisualizationState->Batch.Scalars,
+                                           std::get<ScalarVisualizationRecipe>(scalar->Data)))
+                            continue;
                         AppendVisualizationRecipe(
                             *availabilityThisFrame,
                             *scalar,
@@ -2019,11 +2053,14 @@ namespace Extrinsic::Runtime
                             i == 0u && meshBoundThisFrame ? sidecar->MeshFaceRemapRevision : 0u);
                     }
                     if (const auto color = BuildColorVisualizationRecipe(
-                            stableId,
                             *availabilityThisFrame,
-                            configs[i]);
+                            configs[i],
+                            colorKeyFor(configs[i], canonicalMeshLane));
                         color.has_value())
                     {
+                        if (alreadyEncoded(m_VisualizationState->Batch.Colors,
+                                           std::get<ColorVisualizationRecipe>(color->Data)))
+                            continue;
                         AppendVisualizationRecipe(
                             *availabilityThisFrame,
                             *color,

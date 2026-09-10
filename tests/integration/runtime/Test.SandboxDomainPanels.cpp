@@ -1,12 +1,15 @@
 // ARCH-006 Slice 4 app/runtime composition coverage.
 #include <algorithm>
 #include <array>
+#include <functional>
 #include <memory>
 #include <string>
 #include <string_view>
 #include <vector>
 
 #include <gtest/gtest.h>
+#include <imgui.h>
+#include <imgui_internal.h>
 
 #include "RuntimeTestModule.hpp"
 
@@ -18,6 +21,18 @@ import Extrinsic.Runtime.EditorWindowRegistry;
 import Extrinsic.Sandbox.Editor.DomainPanels;
 import Extrinsic.Sandbox.Editor.Shell;
 
+import Extrinsic.ECS.Scene.Registry;
+import Extrinsic.ECS.Components.GeometrySourcesPopulate;
+import Extrinsic.ECS.Components.Selection;
+import Extrinsic.Graphics.Component.RenderGeometry;
+import Extrinsic.Graphics.Component.VisualizationConfig;
+import Extrinsic.Runtime.SelectionController;
+import Extrinsic.Runtime.SceneInteractionModule;
+import Extrinsic.Runtime.EditorCommon;
+import Geometry.HalfedgeMesh;
+import Geometry.Graph;
+import Geometry.PointCloud;
+
 namespace Core = Extrinsic::Core;
 namespace Runtime = Extrinsic::Runtime;
 namespace Editor = Extrinsic::Sandbox::Editor;
@@ -27,11 +42,15 @@ namespace
     class OneFrameApplication final : public Intrinsic::Tests::RuntimeTestModule
     {
     public:
+        std::function<void(Runtime::Engine&)> OnFrame{};
         void Resolve() override {}
         void Frame(double, double) override
         {
             auto& engine = Kernel();
-            engine.RequestExit();
+            if (OnFrame)
+                OnFrame(engine);
+            else
+                engine.RequestExit();
         }
         void Shutdown() override {}
     };
@@ -181,4 +200,147 @@ TEST(SandboxDomainPanels, OpenSameDomainWindowsShareOneModelBuildPerFrame)
     EXPECT_EQ(
         harness.Shell.GetLastFrame().ModelBuildStats.DomainWindowModelCacheHits,
         2u);
+}
+
+TEST(SandboxDomainPanels, AppearanceCheckboxesCanEnableAndReenableEverySupportedLayer)
+{
+    namespace GS = Extrinsic::ECS::Components::GeometrySources;
+    namespace G = Extrinsic::Graphics::Components;
+    using Kind = Runtime::EditorDomainWindowKind;
+    for (const auto kind : {Kind::Mesh, Kind::Graph, Kind::PointCloud})
+    {
+        SCOPED_TRACE(Runtime::DebugNameForEditorDomainWindowKind(kind));
+        auto application = std::make_unique<OneFrameApplication>();
+        auto* driver = application.get();
+        Intrinsic::Tests::RuntimeTestKernel engine(HeadlessConfig(), std::move(application));
+        engine.EmplaceModule<Runtime::SceneInteractionModule>();
+        engine.EmplaceModule<Runtime::EditorUiModule>();
+        engine.Initialize();
+        auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
+        auto& raw = scene.Raw();
+        const auto entity = scene.Create();
+        raw.emplace<Extrinsic::ECS::Components::Selection::SelectableTag>(entity);
+        if (kind == Kind::Mesh)
+        {
+            Geometry::HalfedgeMesh::Mesh mesh;
+            const auto a = mesh.AddVertex({0.0f, 0.0f, 0.0f});
+            const auto b = mesh.AddVertex({1.0f, 0.0f, 0.0f});
+            const auto c = mesh.AddVertex({0.0f, 1.0f, 0.0f});
+            (void)mesh.AddTriangle(a, b, c);
+            GS::PopulateFromMesh(raw, entity, mesh);
+        }
+        else if (kind == Kind::Graph)
+        {
+            Geometry::Graph::Graph graph;
+            const auto a = graph.AddVertex({0.0f, 0.0f, 0.0f});
+            const auto b = graph.AddVertex({1.0f, 0.0f, 0.0f});
+            (void)graph.AddEdge(a, b);
+            GS::PopulateFromGraph(raw, entity, graph);
+        }
+        else
+        {
+            Geometry::PointCloud::Cloud cloud;
+            (void)cloud.AddPoint({0.0f, 0.0f, 0.0f});
+            GS::PopulateFromCloud(raw, entity, cloud);
+        }
+        raw.emplace<G::VisualizationConfig>(entity).Source =
+            G::VisualizationConfig::ColorSource::UniformColor;
+        auto* selection = engine.Services().Find<Runtime::SelectionController>();
+        ASSERT_NE(selection, nullptr);
+        ASSERT_TRUE(selection->SetSelectedEntity(scene, entity));
+        Editor::EditorShell shell;
+        shell.Attach(engine.Worlds(), engine.Services());
+        Editor::DomainPanels panels;
+        panels.Register(shell);
+        const char* windowId = kind == Kind::Mesh ? "mesh.appearance"
+            : kind == Kind::Graph ? "graph.appearance" : "pointcloud.appearance";
+        ASSERT_TRUE(shell.SetEditorWindowOpen(windowId, true));
+        const std::string title = std::string(Runtime::DebugNameForEditorDomainWindowKind(kind)) +
+                                  " / Appearance";
+        const std::vector<Kind> lanes = kind == Kind::Mesh
+            ? std::vector{Kind::Mesh, Kind::Graph, Kind::PointCloud}
+            : kind == Kind::Graph ? std::vector{Kind::Graph, Kind::PointCloud}
+                                  : std::vector{Kind::PointCloud};
+        int frame = 0;
+        std::size_t checked = 0;
+        int materialStep = 0;
+        driver->OnFrame = [&](Runtime::Engine& kernel) {
+            ++frame;
+            if (frame < 3)
+                return;
+            if (checked == lanes.size() * 4u)
+            {
+                auto* window = ImGui::FindWindowByName(title.c_str());
+                if (window == nullptr)
+                {
+                    ADD_FAILURE() << "Appearance window disappeared";
+                    kernel.RequestExit();
+                    return;
+                }
+                const int scope = static_cast<int>(Kind::PointCloud);
+                const auto seed = ImHashData(&scope, sizeof(scope), window->ID);
+                const auto settings = ImHashStr("Settings", 0, seed);
+                if (materialStep == 0)
+                    ImGui::ActivateItemByID(ImHashStr("Points", 0, seed));
+                if (materialStep == 3)
+                    ImGui::ActivateItemByID(settings);
+                if (materialStep == 6)
+                    ImGui::ActivateItemByID(ImHashStr("Property", 0, settings));
+                if (materialStep == 9)
+                {
+                    const auto& popups = ImGui::GetCurrentContext()->OpenPopupStack;
+                    if (popups.empty() || popups.back().Window == nullptr)
+                    {
+                        ADD_FAILURE() << "Property dropdown did not open";
+                        kernel.RequestExit();
+                        return;
+                    }
+                    ImGui::ActivateItemByID(
+                        popups.back().Window->GetID("Material / default"));
+                }
+                if (++materialStep == 12)
+                {
+                    const auto* overrides = raw.try_get<G::VisualizationLaneOverrides>(entity);
+                    EXPECT_TRUE(overrides != nullptr && overrides->Points.has_value());
+                    if (overrides != nullptr && overrides->Points.has_value())
+                        EXPECT_EQ(overrides->Points->Source,
+                                  G::VisualizationConfig::ColorSource::Material);
+                    kernel.RequestExit();
+                }
+                return;
+            }
+            auto* window = ImGui::FindWindowByName(title.c_str());
+            if (window == nullptr)
+            {
+                ADD_FAILURE() << "Appearance window did not open";
+                kernel.RequestExit();
+                return;
+            }
+            ImGui::SetWindowSize(window, ImVec2{600.0f, 900.0f});
+            const auto lane = lanes[checked / 4u];
+            if (frame % 3 == 0)
+            {
+                const int scope = static_cast<int>(lane);
+                const auto seed = ImHashData(&scope, sizeof(scope), window->ID);
+                const auto id = ImHashStr(lane == Kind::Mesh ? "Surface"
+                    : lane == Kind::Graph ? "Edges" : "Points", 0, seed);
+                ImGui::FocusWindow(window);
+                ImGui::ActivateItemByID(id);
+            }
+            if (frame % 3 == 2)
+            {
+                const bool visible = lane == Kind::Mesh ? raw.all_of<G::RenderSurface>(entity)
+                    : lane == Kind::Graph ? raw.all_of<G::RenderEdges>(entity)
+                                          : raw.all_of<G::RenderPoints>(entity);
+                EXPECT_EQ(visible, checked % 2u == 0u) << "toggle " << checked;
+                ++checked;
+            }
+        };
+        engine.Run();
+        EXPECT_EQ(checked, lanes.size() * 4u);
+        EXPECT_EQ(materialStep, 12);
+        panels.Unregister();
+        shell.Detach();
+        engine.Shutdown();
+    }
 }

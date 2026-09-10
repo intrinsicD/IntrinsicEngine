@@ -477,6 +477,27 @@ paths, titles, closed defaults, controls, per-frame lazy model cache, and
 immediate/asynchronous result publication. Runtime retains the exported domain
 models, callback-scoped borrowed property view, command/job execution,
 UV/outlier result state, and result sinks; the app module imports runtime only.
+Appearance keeps supported Surface/Edges/Points visibility checkboxes reachable
+when their render components are absent. Editor availability checks the source
+capabilities for the requested layer; render extraction still requires an enabled
+layer. Each visible layer has collapsed Settings for domain/type, width/size and
+color/property selection, with optional color mapping, texture baking and advanced
+bindings. Mesh property distributions are collapsed separately. Material/default
+selects an explicit material source for that layer rather than inheriting an
+entity-level visualization override. Edge property choices follow the selected
+vertex/edge source domain.
+Analysis display buttons for scalar, color, and integer-label properties apply
+the same undoable lane configuration as Appearance; they do not install a
+competing transient recipe. UInt32 labels use the same deterministic palette for
+buffer and texture-baked colors. Explicit GPU-buffer recipes and vector overlays
+remain separate, but do not suppress uploads for unrelated Appearance properties
+or presentation slots. Mesh surface buffers use the GPU vertex/triangle layout;
+point and edge lanes use separate canonical-layout keys, even when they select
+the same property. Clear vis removes entity and lane overrides and the transient
+recipe.
+After a successful FPFH histogram display request, moving the display-bin slider
+selects the corresponding output property without recomputing descriptors.
+Changing the analysis configuration resets this live display selection.
 Progressive Poisson operation bodies and clustering config-control helpers compile
 in the private `Runtime.GeometryProcessingOperations.cpp` implementation unit. K-Means
 execution goes directly from the app panel to the borrowed `ClusteringService`;

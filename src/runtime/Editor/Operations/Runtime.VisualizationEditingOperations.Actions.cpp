@@ -15,6 +15,7 @@ module;
 #include <span>
 #include <string>
 #include <string_view>
+#include <type_traits>
 #include <utility>
 #include <variant>
 #include <vector>
@@ -624,7 +625,7 @@ namespace {
                     .ElementCount = properties.Size(),
                     .ScalarPresetAvailable = scalar,
                     .IsolinePresetAvailable = scalar,
-                    .ColorBufferPresetAvailable = color,
+                    .ColorBufferPresetAvailable = color || integer,
                     .VectorFieldCandidate = vector,
                 });
             }
@@ -2265,7 +2266,9 @@ ApplyEditorRenderHintCommand(
                                  : ((name == GS::PropertyNames::kNormal || name == "f:normal") &&
                                     resolved.ResolvedValueKind == Geometry::PropertyValueKind::Vec3
                                         ? PropertyTextureBakeEncoding::Normal
-                                        : PropertyTextureBakeEncoding::RgbaColor),
+                                        : (resolved.ResolvedValueKind == Geometry::PropertyValueKind::UInt32
+                                               ? PropertyTextureBakeEncoding::LabelPalette
+                                               : PropertyTextureBakeEncoding::RgbaColor)),
                   .RangePolicy =
                       command.ScalarAutoRange
                           ? PropertyTextureBakeRangePolicy::AutoFinite
@@ -2420,8 +2423,7 @@ ApplyEditorRenderHintCommand(
         const EditorVisualizationEditingContext& context,
         const EditorVisualizationRecipeCommand& command)
     {
-        if (!context.VisualizationCommandsAvailable ||
-            !context.VisualizationRecipes.Available())
+        if (!context.VisualizationCommandsAvailable)
             return EditorCommandStatus::MissingVisualizationCommands;
         if (context.Scene == nullptr)
             return EditorCommandStatus::MissingScene;
@@ -2437,6 +2439,81 @@ ApplyEditorRenderHintCommand(
         if (!availability.HasGeometry())
             return EditorCommandStatus::UnsupportedGeometryDomain;
 
+        if (command.EnableRecipe)
+        {
+            const auto propertyStatus = std::visit(
+                [&](const auto& recipe) -> std::optional<EditorCommandStatus> {
+                    using T = std::decay_t<decltype(recipe)>;
+                    if constexpr (std::is_same_v<T, ScalarVisualizationRecipe> ||
+                                  std::is_same_v<T, ColorVisualizationRecipe> ||
+                                  std::is_same_v<T, LabelVisualizationRecipe>)
+                    {
+                        if (recipe.BufferBDA != 0u || !recipe.BufferSourceKey.empty())
+                            return std::nullopt;
+                        if (!EncodeVisualizationRecipe(availability, command.Recipe).Succeeded())
+                            return EditorCommandStatus::InvalidVisualizationProperty;
+
+                        EditorVisualizationConfigCommand config{
+                            .StableEntityId = command.StableEntityId,
+                            .Target = EditorVisualizationTarget::Surface,
+                            .Source = G::VisualizationConfig::ColorSource::PerVertexBuffer,
+                            .ColorBufferName = recipe.Source.Name,
+                        };
+                        switch (recipe.Source.Domain)
+                        {
+                        case GeometryElementDomain::MeshVertex:
+                            break;
+                        case GeometryElementDomain::MeshFace:
+                            config.Source = G::VisualizationConfig::ColorSource::PerFaceBuffer;
+                            config.ScalarDomain = G::VisualizationConfig::Domain::Face;
+                            break;
+                        case GeometryElementDomain::MeshEdge:
+                        case GeometryElementDomain::GraphEdge:
+                            config.Target = EditorVisualizationTarget::Edges;
+                            config.Source = G::VisualizationConfig::ColorSource::PerEdgeBuffer;
+                            config.ScalarDomain = G::VisualizationConfig::Domain::Edge;
+                            break;
+                        case GeometryElementDomain::GraphNode:
+                            config.Target = EditorVisualizationTarget::Edges;
+                            break;
+                        case GeometryElementDomain::PointCloudPoint:
+                            config.Target = EditorVisualizationTarget::Points;
+                            break;
+                        default:
+                            return EditorCommandStatus::UnsupportedGeometryDomain;
+                        }
+                        if (const auto existing = EffectiveVisualizationConfigForTarget(
+                                raw, entity, config.Target))
+                        {
+                            config.UseBakedTexture = existing->UseBakedTexture;
+                            config.ScalarColormap = existing->Scalar.Map;
+                            config.ScalarBinCount = existing->Scalar.BinCount;
+                            config.IsolineCount = existing->Scalar.Isolines.Num;
+                            config.IsolineWidth = existing->Scalar.Isolines.Width;
+                            config.IsolineColor = existing->Scalar.Isolines.Color;
+                            config.IsolineValues = existing->Scalar.Isolines.Values;
+                            config.IsolineValueCount = existing->Scalar.Isolines.ValueCount;
+                        }
+                        if constexpr (std::is_same_v<T, ScalarVisualizationRecipe>)
+                        {
+                            config.Source = G::VisualizationConfig::ColorSource::ScalarField;
+                            config.ScalarFieldName = recipe.Source.Name;
+                            config.ScalarAutoRange = recipe.AutoRange;
+                            config.ScalarRangeMin = recipe.RangeMin;
+                            config.ScalarRangeMax = recipe.RangeMax;
+                            config.ScalarColormap = recipe.Colormap;
+                        }
+                        // Property-only display requests use the same undoable lane state as Appearance.
+                        return ApplyEditorVisualizationConfigCommand(context, config);
+                    }
+                    return std::nullopt;
+                }, command.Recipe.Data);
+            if (propertyStatus)
+                return *propertyStatus;
+        }
+
+        if (!context.VisualizationRecipes.Available())
+            return EditorCommandStatus::MissingVisualizationCommands;
         const std::optional<VisualizationRecipe> current =
             context.VisualizationRecipes.GetRecipe(command.StableEntityId);
         if (!command.EnableRecipe)

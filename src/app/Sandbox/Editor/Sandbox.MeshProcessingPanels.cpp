@@ -382,6 +382,7 @@ namespace Extrinsic::Sandbox::Editor
             std::string LastApplied{}, ConfigDiagnostic{}, VisualizationDiagnostic{};
             std::array<char,256> Prefix{"fpfh"};
             int DisplayBin{};
+            bool FollowDisplayBin{false};
         };
         struct DensityState
         {
@@ -2661,6 +2662,7 @@ namespace Extrinsic::Sandbox::Editor
             Descriptors.Draft = active;
             Descriptors.LastApplied = serialized;
             Descriptors.ConfigDiagnostic.clear();
+            Descriptors.FollowDisplayBin = false;
         }
         auto &config = Descriptors.Draft;
         bool changed = false;
@@ -2782,13 +2784,22 @@ namespace Extrinsic::Sandbox::Editor
         if(ImGui::Button("Compute FPFH descriptors"))execute(analyze);
         ImGui::EndDisabled();
         ImGui::TextWrapped("Writes 33 named float histogram properties in one undoable operation. Each nonempty eleven-bin block sums to 100.");
-        ImGui::SliderInt("Display histogram bin",&Descriptors.DisplayBin,0,32);
+        const bool displayBinChanged =
+            ImGui::SliderInt("Display histogram bin", &Descriptors.DisplayBin, 0, 32,
+                             "%d", ImGuiSliderFlags_AlwaysClamp);
         const auto score=readiness.Ready?readiness.Resolved.Outputs[Descriptors.DisplayBin]:config.Outputs[Descriptors.DisplayBin];
         ImGui::Text("Property: %s",score.Name.c_str());
-        if(ImGui::Button("Show histogram bin"))
-            Descriptors.VisualizationDiagnostic=Runtime::DebugNameForEditorCommandStatus(Runtime::ApplyEditorVisualizationRecipeCommand(
+        if(ImGui::Button("Show histogram bin") ||
+           (displayBinChanged && Descriptors.FollowDisplayBin))
+        {
+            const auto status = Runtime::ApplyEditorVisualizationRecipeCommand(
                 context.VisualizationCommands,{.StableEntityId=config.StableEntityId,
-                .Recipe={.Data=Runtime::ScalarVisualizationRecipe{.Source=score,.OutputName=score.Name+".colors"}}}));
+                .Recipe={.Data=Runtime::ScalarVisualizationRecipe{.Source=score,.OutputName=score.Name+".colors"}}});
+            Descriptors.VisualizationDiagnostic = Runtime::DebugNameForEditorCommandStatus(status);
+            if (status == Runtime::EditorCommandStatus::Applied ||
+                status == Runtime::EditorCommandStatus::NoChange)
+                Descriptors.FollowDisplayBin = true;
+        }
         if(!Descriptors.VisualizationDiagnostic.empty())ImGui::Text("Display: %s",Descriptors.VisualizationDiagnostic.c_str());
         if(Descriptors.LastResult)
         {

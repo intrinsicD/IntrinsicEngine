@@ -348,6 +348,7 @@ if(TARGET ExtrinsicSandboxEditor)
             Test.SandboxAppComposition.cpp
             Test.SandboxEditorPresentation.cpp
             Test.SandboxCurvatureSegmentationPanel.cpp
+            Test.SandboxDescriptorAnalysisPanel.cpp
             Test.SandboxParameterizationPanel.cpp
             Test.SandboxPointCloudConsolidationPanel.cpp
     )

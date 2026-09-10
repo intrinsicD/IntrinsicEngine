@@ -3176,14 +3176,25 @@ namespace Extrinsic::Sandbox::Editor
                         ImGui::SameLine();
                         if (ImGui::Button("Clear vis"))
                         {
-                            (void)ApplyEditorVisualizationConfigCommand(
+                            for (const auto target : {
+                                     EditorVisualizationTarget::Surface,
+                                     EditorVisualizationTarget::Edges,
+                                     EditorVisualizationTarget::Points,
+                                     EditorVisualizationTarget::Entity})
+                            {
+                                (void)ApplyEditorVisualizationConfigCommand(
+                                    context->VisualizationCommands,
+                                    EditorVisualizationConfigCommand{
+                                        .StableEntityId = frame.Visualization.SelectedStableId,
+                                        .Target = target,
+                                        .EnableConfig = false,
+                                    });
+                            }
+                            (void)ApplyEditorVisualizationRecipeCommand(
                                 context->VisualizationCommands,
-                                EditorVisualizationConfigCommand{
-                                    .StableEntityId =
-                                        frame.Visualization.SelectedStableId,
-                                    .Target =
-                                        EditorVisualizationTarget::Entity,
-                                    .EnableConfig = false,
+                                EditorVisualizationRecipeCommand{
+                                    .StableEntityId = frame.Visualization.SelectedStableId,
+                                    .EnableRecipe = false,
                                 });
                         }
                         DrawUniformVisualizationColorEdit(

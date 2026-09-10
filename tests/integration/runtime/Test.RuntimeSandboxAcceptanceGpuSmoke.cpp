@@ -3488,6 +3488,112 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke, ReferenceTriangleScalarFieldColormapResol
 // `BinCount == IsolineCount`: the non-contour probe has raw t=0.4 but binned
 // t=0.5, so a shader that still applies isolines to the binned value paints it
 // as a false contour instead of the Viridis mid-point colour.
+TEST(RuntimeSandboxAcceptanceGpuSmoke, AnalysisMaskSaliencyAndAppearanceRecoveryReachGpu)
+{
+    using Kind = Geometry::PropertyValueKind;
+    for (int stage = 0; stage != 3; ++stage)
+    {
+        SCOPED_TRACE(stage);
+        auto bootstrap = BootstrapDefaultSandboxAppEngine();
+        if (bootstrap.Skipped)
+            GTEST_SKIP() << bootstrap.SkipReason;
+        Engine& engine = *bootstrap.EnginePtr;
+        auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
+        const auto triangle = FindEntityByName(scene, "ReferenceTriangle");
+        ASSERT_TRUE(IsReferenceTriangleEntityValid(scene, triangle));
+        const auto id = RT::SelectionController::ToStableEntityId(triangle);
+        auto& properties = scene.Raw().get<gs::Vertices>(triangle).Properties;
+        properties.GetOrAdd<std::uint32_t>("keypoint_mask", 0u).Vector() = {0u, 1u, 0u};
+        properties.GetOrAdd<float>("keypoint_saliency", 0.0f).Vector() = {0.0f, 1.0f, 0.0f};
+        properties.GetOrAdd<glm::vec3>("recovery_color", glm::vec3{0.0f}).Vector() =
+            {{1, 0, 0}, {0, 1, 0}, {0, 0, 1}};
+        auto& extraction = RequiredEngineService<RT::RenderExtractionCache>(engine);
+        const Intrinsic::Tests::EditorFeatureTestContext context{
+            .Scene = &scene,
+            .VisualizationRecipes = {
+                .GetRecipe = [&](std::uint32_t entity) { return extraction.GetVisualizationRecipe(entity); },
+                .SetRecipe = [&](std::uint32_t entity, RT::VisualizationRecipe recipe) {
+                    extraction.SetVisualizationRecipe(entity, std::move(recipe));
+                },
+                .ClearRecipe = [&](std::uint32_t entity) { extraction.ClearVisualizationRecipe(entity); },
+            },
+            .VisualizationCommandsAvailable = true,
+        };
+        const RT::EditorVisualizationPropertyCommand recovery{
+            .StableEntityId = id, .Target = RT::EditorVisualizationTarget::Surface,
+            .Domain = RT::EditorVisualizationPropertyDomain::MeshVertices,
+            .Preset = RT::EditorVisualizationPropertyPreset::ColorBuffer,
+            .PropertyName = "recovery_color"};
+        ASSERT_EQ(RT::ApplyEditorVisualizationPropertyCommand(context, recovery),
+                  RT::EditorCommandStatus::Applied);
+        ASSERT_EQ(RT::ApplyEditorVisualizationRecipeCommand(context, {
+            .StableEntityId = id,
+            .Recipe = {.Data = RT::LabelVisualizationRecipe{
+                .Source = {.Domain = RT::GeometryElementDomain::MeshVertex,
+                           .Name = "keypoint_mask", .ValueKind = Kind::UInt32},
+                .OutputName = "keypoint_mask.colors"}}}), RT::EditorCommandStatus::Applied);
+        if (stage >= 1)
+        {
+            ASSERT_EQ(RT::ApplyEditorVisualizationRecipeCommand(context, {
+                .StableEntityId = id,
+                .Recipe = {.Data = RT::ScalarVisualizationRecipe{
+                    .Source = {.Domain = RT::GeometryElementDomain::MeshVertex,
+                               .Name = "keypoint_saliency", .ValueKind = Kind::Float},
+                    .OutputName = "keypoint_saliency.colors"}}}), RT::EditorCommandStatus::Applied);
+        }
+        if (stage == 2)
+            ASSERT_EQ(RT::ApplyEditorVisualizationPropertyCommand(context, recovery),
+                      RT::EditorCommandStatus::Applied);
+
+        auto& renderer = engine.GetRenderer();
+        auto& device = engine.GetDevice();
+        const auto format = device.GetBackbufferFormat();
+        const auto pixelBytes = Extrinsic::RHI::BytesPerBlock(format);
+        const auto extent = device.GetBackbufferExtent();
+        ASSERT_GE(pixelBytes, 4u);
+        ASSERT_GT(extent.Width, 0u);
+        ASSERT_GT(extent.Height, 0u);
+        const std::uint64_t size = static_cast<std::uint64_t>(extent.Width) * extent.Height * pixelBytes;
+        const auto readback = device.CreateBuffer({
+            .SizeBytes = size, .Usage = Extrinsic::RHI::BufferUsage::TransferDst,
+            .HostVisible = true, .DebugName = "AnalysisDisplay.Readback"});
+        ASSERT_TRUE(readback.IsValid());
+        renderer.SetDefaultRecipeBackbufferReadbackBuffer(readback);
+        const auto run = DriveAcceptanceAndCapture(engine);
+        EXPECT_TRUE(run.DeviceOperational);
+        EXPECT_TRUE(run.Stats.Execute.Succeeded) << run.Stats.Diagnostic;
+        EXPECT_GE(run.Stats.DefaultRecipeBackbufferReadbackCopyCount, 1u);
+        const auto surface = ReadVisibleInstanceConfigByEntityId(
+            device, renderer, id, Extrinsic::RHI::GpuRender_Surface);
+        EXPECT_TRUE(surface.Found);
+        EXPECT_EQ(surface.Config.ColorSourceMode, stage == 1 ? 2u : 3u);
+        EXPECT_NE(stage == 1 ? surface.Config.ScalarBDA : surface.Config.ColorBDA, 0u);
+        EXPECT_EQ(surface.Config.ElementCount, 3u);
+
+        std::vector<std::uint8_t> pixels(size);
+        device.ReadBuffer(readback, pixels.data(), size, 0u);
+        const auto leftPoint = ProjectMainCameraPixel(engine, {-0.15f, 0.0f, 0.0f}, extent);
+        const auto rightPoint = ProjectMainCameraPixel(engine, {0.15f, 0.0f, 0.0f}, extent);
+        ASSERT_TRUE(leftPoint);
+        ASSERT_TRUE(rightPoint);
+        const auto sample = [&](const auto& point) {
+            const auto [x, y] = point;
+            const auto offset = (std::size_t{y} * extent.Width + x) * pixelBytes;
+            return ToLinearPixel(format, ReorderToRgba(
+                format, pixels[offset], pixels[offset + 1],
+                pixels[offset + 2], pixels[offset + 3]));
+        };
+        const auto left = sample(*leftPoint);
+        const auto right = sample(*rightPoint);
+        EXPECT_GT(RgbDistance(left, right), 20)
+            << "Property visualization collapsed to a uniform color: "
+            << PixelText(left) << " / " << PixelText(right);
+        renderer.SetDefaultRecipeBackbufferReadbackBuffer({});
+        device.DestroyBuffer(readback);
+        engine.Shutdown();
+    }
+}
+
 TEST(RuntimeSandboxAcceptanceGpuSmoke, ReferenceTriangleScalarFieldSurfaceAndIsolinesResolveOnGpu)
 {
     auto bootstrap = BootstrapDefaultSandboxAppEngine();

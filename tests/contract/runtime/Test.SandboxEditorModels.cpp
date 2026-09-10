@@ -2572,7 +2572,7 @@ TEST(SandboxEditorUi, VisualizationModelEnumeratesPromotedGeometryProperties)
     ASSERT_NE(label, nullptr);
     EXPECT_EQ(label->ValueKind, Kind::UInt32);
     EXPECT_FALSE(label->ScalarPresetAvailable);
-    EXPECT_FALSE(label->ColorBufferPresetAvailable);
+    EXPECT_TRUE(label->ColorBufferPresetAvailable);
 
     const auto* normal =
         FindVisualizationProperty(properties, Domain::MeshVertices, "v:normal");

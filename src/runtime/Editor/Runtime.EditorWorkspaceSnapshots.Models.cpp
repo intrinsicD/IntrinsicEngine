@@ -679,21 +679,27 @@ namespace {
             const GeometryEntityAvailability& availability,
             const EditorVisualizationTarget target) noexcept
         {
+            // Editing asks whether a lane can be enabled, not whether it is
+            // already requested. Keep extraction's requested/ready gate intact.
+            GeometryEntityAvailability requested = availability;
             switch (target)
             {
             case EditorVisualizationTarget::Entity:
                 return availability.HasGeometry();
             case EditorVisualizationTarget::Surface:
+                requested.Surface.emplace();
                 return ResolveRenderLaneAvailability(
-                    availability,
+                    requested,
                     GeometryRenderLane::Surface).Ready();
             case EditorVisualizationTarget::Edges:
+                requested.Edges.emplace();
                 return ResolveRenderLaneAvailability(
-                    availability,
+                    requested,
                     GeometryRenderLane::Edges).Ready();
             case EditorVisualizationTarget::Points:
+                requested.Points.emplace();
                 return ResolveRenderLaneAvailability(
-                    availability,
+                    requested,
                     GeometryRenderLane::Points).Ready();
             }
             return false;
@@ -734,8 +740,17 @@ namespace {
                            : EditorVisualizationPropertyDomain::MeshVertices);
                 break;
             case EditorVisualizationTarget::Edges:
-                append(EditorVisualizationPropertyDomain::MeshEdges);
-                append(EditorVisualizationPropertyDomain::GraphEdges);
+                if (availability.Edges &&
+                    availability.Edges->Domain == G::RenderEdges::SourceDomain::Edge)
+                {
+                    append(EditorVisualizationPropertyDomain::MeshEdges);
+                    append(EditorVisualizationPropertyDomain::GraphEdges);
+                }
+                else
+                {
+                    append(EditorVisualizationPropertyDomain::MeshVertices);
+                    append(EditorVisualizationPropertyDomain::GraphVertices);
+                }
                 break;
             case EditorVisualizationTarget::Points:
                 append(EditorVisualizationPropertyDomain::MeshVertices);
@@ -790,7 +805,7 @@ namespace {
                     .ElementCount = properties.Size(),
                     .ScalarPresetAvailable = scalar,
                     .IsolinePresetAvailable = scalar,
-                    .ColorBufferPresetAvailable = color,
+                    .ColorBufferPresetAvailable = color || integer,
                     .VectorFieldCandidate = vector,
                 });
             }

@@ -460,6 +460,20 @@ namespace Extrinsic::Runtime
                   colors.emplace_back(value, 1.0f);
               }
               payload = CopyBytes(std::span<const glm::vec4>{colors});
+            } else if constexpr (std::is_same_v<T, std::uint32_t>) {
+              std::vector<glm::vec4> colors;
+              colors.reserve(values.size());
+              for (const auto label : values) {
+                // Keep buffer colors identical to property_texture_bake.frag's label palette.
+                std::uint32_t hash = label * 747796405u + 2891336453u;
+                hash = ((hash >> ((hash >> 28u) + 4u)) ^ hash) * 277803737u;
+                hash = (hash >> 22u) ^ hash;
+                colors.emplace_back(
+                    float(hash & 255u) / 255.0f,
+                    float((hash >> 8u) & 255u) / 255.0f,
+                    float((hash >> 16u) & 255u) / 255.0f, 1.0f);
+              }
+              payload = CopyBytes(std::span<const glm::vec4>{colors});
             } else
               payload = CopyBytes(values);
             AppendPropertyBuffer(out, bufferSourceKey, options.Domain,
@@ -663,6 +677,13 @@ namespace Extrinsic::Runtime
                 property.IsValid()) {
               (void)AppendColorPacket(property, out, options, diagnostics);
               return;
+            }
+
+            if (const auto property = properties.Get<std::uint32_t>(options.SourceName);
+                property.IsValid())
+            {
+                (void)AppendColorPacket(property, out, options, diagnostics);
+                return;
             }
 
             if (properties.Exists(options.SourceName))
