@@ -1,0 +1,12 @@
+schema_version: 1
+task_id: RUNTIME-229
+sealed_revision: 5e2233d9bb36a1ca3a8841a8b161a638eeb2db86
+source_content_digest: e62cba5ce724c6da322ace6178d6257057d7f0e3a42ebca2adc4814710bd5af9
+report_sha256: b21f57da901d8ed04dc12030a687969448cc628663d905293d9e2797010587d0
+records:
+- path: tasks/evidence/RUNTIME-229/handoff.jsonl
+  sha256: eaf7e632cc6779ed5296d9bbc5f20682b3d9889f07d6629aa8f7a265ab3312e2
+- path: tasks/evidence/RUNTIME-229/reviews.jsonl
+  sha256: 221c8d52ecd5b1b21764d0bcc090ac18db70435c4fdd25630fc919a42259d5ab
+reason: Seal independently accepted framed Vulkan LOP source and execution evidence.
+generated_by: tools/agents/workflow_evidence.py
