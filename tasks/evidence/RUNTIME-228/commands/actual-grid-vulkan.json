@@ -1,0 +1,32 @@
+{
+  "command": [
+    "env",
+    "ASAN_OPTIONS=detect_leaks=0",
+    "ctest",
+    "--test-dir",
+    "build/ci-vulkan",
+    "--output-on-failure",
+    "-R",
+    "^PointCloudConsolidationGpuParity\\.",
+    "-L",
+    "gpu",
+    "-L",
+    "vulkan",
+    "--timeout",
+    "120"
+  ],
+  "command_display": "env ASAN_OPTIONS=detect_leaks=0 ctest --test-dir build/ci-vulkan --output-on-failure -R '^PointCloudConsolidationGpuParity\\.' -L gpu -L vulkan --timeout 120",
+  "cwd": ".",
+  "duration_ms": 55901,
+  "exit_code": 0,
+  "finished_at": "2026-09-10T04:24:09Z",
+  "label": "actual-grid-vulkan",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-09-10T04:23:13Z",
+  "stderr_path": "tasks/evidence/RUNTIME-228/commands/actual-grid-vulkan.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/RUNTIME-228/commands/actual-grid-vulkan.stdout.log",
+  "stdout_sha256": "1f1e12265116eee66d001765a9dc01b6dc4149166cec589c6ecb667f15b608b5",
+  "task_id": "RUNTIME-228"
+}

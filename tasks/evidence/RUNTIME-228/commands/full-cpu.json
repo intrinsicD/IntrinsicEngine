@@ -1,0 +1,26 @@
+{
+  "command": [
+    "ctest",
+    "--test-dir",
+    "build/ci",
+    "--output-on-failure",
+    "-LE",
+    "gpu|vulkan|slow|flaky-quarantine",
+    "--timeout",
+    "60"
+  ],
+  "command_display": "ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60",
+  "cwd": ".",
+  "duration_ms": 107836,
+  "exit_code": 0,
+  "finished_at": "2026-09-10T04:24:13Z",
+  "label": "full-cpu",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-09-10T04:22:25Z",
+  "stderr_path": "tasks/evidence/RUNTIME-228/commands/full-cpu.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/RUNTIME-228/commands/full-cpu.stdout.log",
+  "stdout_sha256": "19fe97ee490f8675fd1019ba864b3477574581ab33c7f81eb42dcb48d06f004d",
+  "task_id": "RUNTIME-228"
+}

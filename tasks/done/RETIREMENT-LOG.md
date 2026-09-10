@@ -8146,3 +8146,5 @@ Retain terminal job outcomes while pending consumers reference them, so reaping 
 - 2026-09-10 — **RUNTIME-227**: Integrated compact density weights with conservative CPU/Vulkan radius candidates, shared pagination, canonical config/UI and one guarded float output. C88 binds 4455 CPU passes plus eight actual Vulkan cases. Implementation `618a8c54aa07d4754cbb6a18ab60fb248cfd8ded`; [task](RUNTIME-227-compact-density-weight-spatial-backends.md).
 
 - 2026-09-10 — **BUG-185**: Corrected tiny support occupancy that could bypass workload budgets; reused conservative radius candidates and avoided double support-square underflow. Before/after regression and 4457 distinct CPU passes bind `e3ac231d8fc709e0a83233e07ebf5eb0c1fe10a9`; [task](BUG-185-tiny-support-workload-underestimate.md).
+
+- 2026-09-10 — **RUNTIME-228**: Added reusable LOP neighborhood steps and cached CPU LBVH through existing config/UI/publication. C89 binds 4463 CPU passes and two existing grid checks. Implementation `020622c844d1809e4614d5ed120925e63aa3bdad`; [task](RUNTIME-228-lop-cached-spatial-steps.md).

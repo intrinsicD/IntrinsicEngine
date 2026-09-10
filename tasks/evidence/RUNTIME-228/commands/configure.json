@@ -1,0 +1,22 @@
+{
+  "command": [
+    "cmake",
+    "--preset",
+    "ci",
+    "-DINTRINSIC_BUILD_SANDBOX=ON"
+  ],
+  "command_display": "cmake --preset ci -DINTRINSIC_BUILD_SANDBOX=ON",
+  "cwd": ".",
+  "duration_ms": 2408,
+  "exit_code": 0,
+  "finished_at": "2026-09-10T04:02:55Z",
+  "label": "configure",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-09-10T04:02:53Z",
+  "stderr_path": "tasks/evidence/RUNTIME-228/commands/configure.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/RUNTIME-228/commands/configure.stdout.log",
+  "stdout_sha256": "009f9b772a616ce73de6c1e482c9635cdc04c0b0e15fa253b3aa2edc8581ca7e",
+  "task_id": "RUNTIME-228"
+}

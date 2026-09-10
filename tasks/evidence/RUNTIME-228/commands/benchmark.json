@@ -1,0 +1,30 @@
+{
+  "command": [
+    "python3",
+    "tools/benchmark/run_and_seal.py",
+    "--executable",
+    "build/ci/bin/IntrinsicBenchmarkSmoke",
+    "--output",
+    "/tmp/lop-cpu-benchmark",
+    "--manifests-root",
+    "benchmarks",
+    "--run-id",
+    "lop-cpu-2026-09-10",
+    "--attempt-id",
+    "attempt-001"
+  ],
+  "command_display": "python3 tools/benchmark/run_and_seal.py --executable build/ci/bin/IntrinsicBenchmarkSmoke --output /tmp/lop-cpu-benchmark --manifests-root benchmarks --run-id lop-cpu-2026-09-10 --attempt-id attempt-001",
+  "cwd": ".",
+  "duration_ms": 16957,
+  "exit_code": 0,
+  "finished_at": "2026-09-10T04:22:30Z",
+  "label": "benchmark",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-09-10T04:22:13Z",
+  "stderr_path": "tasks/evidence/RUNTIME-228/commands/benchmark.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/RUNTIME-228/commands/benchmark.stdout.log",
+  "stdout_sha256": "47a7c233952ffec271a7971f1d9a92edc558a653156e946bd5262cb2d60f3625",
+  "task_id": "RUNTIME-228"
+}

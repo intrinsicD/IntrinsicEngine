@@ -2125,3 +2125,14 @@
 - **Dependencies**: [C87]
 - **Tags**: compact density weights, conservative radius, LBVH, CPU, Vulkan, bounded integration
 - **From staging**: O220
+
+## C89: Cached CPU LBVH preserves the bounded LOP projection fixtures
+- **Statement**: The source-bound 2026-09-10 CPU fixtures retain the engine's LOP positions and contribution counts through complete supplied neighborhoods and cached CPU LBVH, including three moving iterations, downsampling and tiny support. Eight canonical domains reuse cached indices, reject stale sources and use the existing publication/history path. The two existing actual Vulkan grid regression cases remain passing.
+- **Status**: supported — bounded ci CPU and existing ci-vulkan grid checks only. No Vulkan LBVH projection, original inverse-cubic repulsion guarantee, general-input proof, speedup or default change.
+- **Provenance**: ai-executed
+- **Crystallized via**: artifact-commitment
+- **Falsification criteria**: Replaying the bound fixtures changes reference positions/contribution counts, accepts malformed rows or stale sources, loses cache/domain/history behavior, or regresses the existing grid cases.
+- **Proof**: [ara/evidence/diagnostics/lop_cpu_lbvh_2026-09-10/record.json, ara/evidence/tables/lop_cpu_lbvh_verification_2026-09-10.md, tests/unit/geometry/Test.PointCloudConsolidation.cpp, tests/contract/runtime/Test.PointCloudConsolidationModule.cpp]
+- **Dependencies**: [C88]
+- **Tags**: LOP, CPU LBVH, supplied neighborhoods, bounded integration
+- **From staging**: O221

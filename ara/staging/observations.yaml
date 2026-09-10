@@ -3797,3 +3797,15 @@ observations:
     promoted_to: logic/claims.md:C88
     crystallized_via: artifact-commitment
     stale: false
+
+  - id: O221
+    timestamp: '2026-09-10T06:25:00+02:00'
+    provenance: ai-executed
+    content: Complete CPU LBVH neighborhoods retain the selected LOP arithmetic on bounded moving-sample fixtures and canonical runtime domains.
+    context: Implementation and verified artifacts bind C89; no user reaction or speedup is inferred.
+    potential_type: claim
+    bound_to: [C89]
+    promoted: true
+    promoted_to: logic/claims.md:C89
+    crystallized_via: artifact-commitment
+    stale: false

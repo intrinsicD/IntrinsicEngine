@@ -1,0 +1,28 @@
+{
+  "command": [
+    "env",
+    "CCACHE_DISABLE=1",
+    "cmake",
+    "--build",
+    "--preset",
+    "ci-vulkan",
+    "--target",
+    "IntrinsicRuntimePointCloudConsolidationGpuParityTests",
+    "-j",
+    "6"
+  ],
+  "command_display": "env CCACHE_DISABLE=1 cmake --build --preset ci-vulkan --target IntrinsicRuntimePointCloudConsolidationGpuParityTests -j 6",
+  "cwd": ".",
+  "duration_ms": 767207,
+  "exit_code": 0,
+  "finished_at": "2026-09-10T04:22:21Z",
+  "label": "build-vulkan",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-09-10T04:09:33Z",
+  "stderr_path": "tasks/evidence/RUNTIME-228/commands/build-vulkan.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/RUNTIME-228/commands/build-vulkan.stdout.log",
+  "stdout_sha256": "2305d08ce4fcfad89b259cccea140ddc03a0ed70bf131220b61d43fbdf76456d",
+  "task_id": "RUNTIME-228"
+}

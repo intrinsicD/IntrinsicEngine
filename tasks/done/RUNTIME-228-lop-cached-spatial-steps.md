@@ -48,21 +48,21 @@ No GPU LBVH driver, WLOP/CLOP/EAR adapter, new projection formula, deleted-slot 
 One slice: supplied-neighborhood reference seam and CPU adapter, correctness tests and benchmark manifest, runtime/config/UI, verification and independent review.
 
 ## Required changes
-- [ ] Shared neighborhood-driven LOP seed/initialization/iteration and cached CPU runner.
-- [ ] Runtime cache lease and honest backend diagnostics with shared config/UI.
+- [x] Shared neighborhood-driven LOP seed/initialization/iteration and cached CPU runner.
+- [x] Runtime cache lease and honest backend diagnostics with shared config/UI.
 
 ## Tests
-- [ ] Complete candidate rows and cached index agree with reference through moving iterations and downsampling.
-- [ ] Malformed rows, mismatched source identity and unsupported strategies fail closed.
-- [ ] Tiny support, config, publication/history and existing CPU suite pass.
+- [x] Complete candidate rows and cached index agree with reference through moving iterations and downsampling.
+- [x] Malformed rows, mismatched source identity and unsupported strategies fail closed.
+- [x] Tiny support, config, publication/history and existing CPU suite pass.
 
 ## Docs
-- [ ] Synchronize method/spatial inventory and record GPU follow-up.
+- [x] Synchronize method/spatial inventory and record GPU follow-up.
 
 ## Acceptance criteria
-- [ ] New selectable CPU backend has reference tests and benchmark evidence without a speedup claim.
-- [ ] Existing arithmetic, publication and Vulkan grid behavior remain passing.
-- [ ] Full CPU, structural and independent fixed-surface review pass.
+- [x] New selectable CPU backend has reference tests and benchmark evidence without a speedup claim.
+- [x] Existing arithmetic, publication and Vulkan grid behavior remain passing.
+- [x] Full CPU, structural and independent fixed-surface review pass.
 
 ## Verification
 ```bash
@@ -76,3 +76,9 @@ python3 tools/repo/check_layering.py --root src --strict
 
 ## Forbidden changes
 No new GPU token, silent fallback, altered projection formula, layer exception or performance claim.
+
+## Completion
+**Completed:** 2026-09-10
+**Commit:** `020622c844d1809e4614d5ed120925e63aa3bdad`
+
+C89 and [bound verification](../../ara/evidence/tables/lop_cpu_lbvh_verification_2026-09-10.md) record 46 focused cases, 4463 distinct CPU passes and two existing Vulkan grid checks. CPU LBVH is explicit; framed GPU LBVH remains RUNTIME-229.

@@ -1,0 +1,21 @@
+{
+  "command": [
+    "tools/ci/run_clean_workshop_review.sh",
+    ".",
+    "--strict"
+  ],
+  "command_display": "tools/ci/run_clean_workshop_review.sh . --strict",
+  "cwd": ".",
+  "duration_ms": 2560,
+  "exit_code": 0,
+  "finished_at": "2026-09-10T04:12:51Z",
+  "label": "workshop",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-09-10T04:12:48Z",
+  "stderr_path": "tasks/evidence/RUNTIME-228/commands/workshop.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/RUNTIME-228/commands/workshop.stdout.log",
+  "stdout_sha256": "51c4ce17604e4d93bcd4571fd95379bf9a1eb58defe7938f2b2315b0e17f5a8a",
+  "task_id": "RUNTIME-228"
+}

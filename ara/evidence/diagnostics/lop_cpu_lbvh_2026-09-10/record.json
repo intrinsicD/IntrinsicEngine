@@ -1,0 +1,129 @@
+{
+  "implementation_commit": "020622c844d1809e4614d5ed120925e63aa3bdad",
+  "comparison_base": "e9bdbbcca",
+  "source_sha256": {
+    "benchmarks/geometry/Bench.PointLBVHSmoke.cpp": "8afe592fcaed88e48a8bdd3134482edb3e7a24014816d851e745a41746b4a687",
+    "benchmarks/geometry/Bench.PointLBVHSmoke.hpp": "fb4ef5c5c2b9375bc3984c6587f29680a5bc16fc947325dfab2e3d54c23bd177",
+    "benchmarks/geometry/manifests/point_lbvh_lop_cpu_smoke.yaml": "e3aa809045982b1e41e31d9b42644b152da8cd41c694e081f3f5c527e10235c8",
+    "benchmarks/runners/BenchmarkSmokeRunner.cpp": "f1ac6eda13fae693df436ffce067cbad8ecaf5c7c7960bf7904436a5d0144dd0",
+    "methods/geometry/locally_optimal_projection/method.yaml": "de560092adb91200a18e5c1ae0df21e603b6baf636d352f3c3c08bec632b317d",
+    "methods/geometry/locally_optimal_projection/paper.md": "2045fb517c00361d244d6ed9af9c7ff54af9627912056443b72977efb8d10ca4",
+    "methods/geometry/point_lbvh/method.yaml": "f072aab2272d7a19637243035b016b69f2d39b1acabda0cb36bd587d09da9080",
+    "src/app/Sandbox/Editor/Sandbox.MethodPanels.cpp": "03d956e128d73be8cd7580c19c34c3eb0fcf4dc09ff8f02368d78a0f4a9019b5",
+    "src/geometry/Geometry.PointCloud.Consolidation.cpp": "252a19308fdf3488c407da6aaad66c1f55ce661efadc7452c5c871a5095ff3f0",
+    "src/geometry/Geometry.PointCloud.Consolidation.cppm": "e49b14a17531fff8a5bab7abf06d464883e25a4b2148a6cfc7f06e835df13011",
+    "src/runtime/Config/internal/Runtime.FeatureConfigCodecs.Detail.cpp": "e72aafd819de7a16a367e035474b5bfc447ace9ee809b09a98fcfe589f0cd0f3",
+    "src/runtime/Modules/PointCloudConsolidation/Runtime.PointCloudConsolidationConfig.cpp": "7015198ac0d2b7b55f00d0407e83ddf3d0f10890df2df565e58bba437f7a04b2",
+    "src/runtime/Modules/PointCloudConsolidation/Runtime.PointCloudConsolidationConfig.cppm": "eeabf0b02a2f6d148dd620842e107fb4513453e1dd861a7086d316c7857a3012",
+    "src/runtime/Modules/PointCloudConsolidation/Runtime.PointCloudConsolidationGpu.Internal.hpp": "5b0867c9c59c52fcf469dfd7a85f4d18cd097666630c491b85fb2cff885ae95d",
+    "src/runtime/Modules/PointCloudConsolidation/Runtime.PointCloudConsolidationGpu.cpp": "1a6bb9c6fd4f64ac0ab99a3d47772b064ad4ec373330ffa65cf00da1557dab25",
+    "src/runtime/Modules/PointCloudConsolidation/Runtime.PointCloudConsolidationModule.cpp": "c5c69f4b19057d05b637b49e9e1ed7da9f6dcb6227d0164df277b7bd492014a0",
+    "src/runtime/Modules/PointCloudConsolidation/Runtime.PointCloudConsolidationModule.cppm": "88dca1e31bb707dd5a09d97aeb0bc3af136c31f3777d43a8ef9fec44ee80ca55",
+    "tests/contract/runtime/Test.PointCloudConsolidationConfig.cpp": "30e77e4dd4252bab1c2ebadecc2f0a1c96ab208a099a30f09551987bb275486d",
+    "tests/contract/runtime/Test.PointCloudConsolidationModule.cpp": "972636dd2696a716697b607b1766a3da07117fe5459df1308bad69fe0b8494b8",
+    "tests/unit/geometry/Test.PointCloudConsolidation.cpp": "b28bd75e7e5c00291158b5d1fe66cd56d81737abf2bd220a4b886f10398c2b52"
+  },
+  "cpu": {
+    "selected": 4464,
+    "sandbox_skips": 6,
+    "native_passes": 5,
+    "distinct_passes": 4463,
+    "remaining_skips": 1
+  },
+  "focused_cases": 46,
+  "existing_grid_gpu_cases": 2,
+  "gpu_sanitizers": "ci-vulkan ASan+UBSan, detect_leaks=0 under BUG-180",
+  "receipts": {
+    "build-vulkan": {
+      "exit_code": 0,
+      "stdout_path": "tasks/evidence/RUNTIME-228/commands/build-vulkan.stdout.log",
+      "stdout_sha256": "2305d08ce4fcfad89b259cccea140ddc03a0ed70bf131220b61d43fbdf76456d"
+    },
+    "workshop": {
+      "exit_code": 0,
+      "stdout_path": "tasks/evidence/RUNTIME-228/commands/workshop.stdout.log",
+      "stdout_sha256": "51c4ce17604e4d93bcd4571fd95379bf9a1eb58defe7938f2b2315b0e17f5a8a"
+    },
+    "full-cpu": {
+      "exit_code": 0,
+      "stdout_path": "tasks/evidence/RUNTIME-228/commands/full-cpu.stdout.log",
+      "stdout_sha256": "19fe97ee490f8675fd1019ba864b3477574581ab33c7f81eb42dcb48d06f004d"
+    },
+    "build-fixed": {
+      "exit_code": 0,
+      "stdout_path": "tasks/evidence/RUNTIME-228/commands/build-fixed.stdout.log",
+      "stdout_sha256": "dacb649a1b01bdc6e6ecc50ecc7daacdcff85f0aadf85bf07f6cb327c4fab000"
+    },
+    "build-vulkan-final": {
+      "exit_code": 0,
+      "stdout_path": "tasks/evidence/RUNTIME-228/commands/build-vulkan-final.stdout.log",
+      "stdout_sha256": "42c426687a8e6afa2cf20f6592a9172586aa53d93a2aec6ed9e20b83a09da08f"
+    },
+    "configure": {
+      "exit_code": 0,
+      "stdout_path": "tasks/evidence/RUNTIME-228/commands/configure.stdout.log",
+      "stdout_sha256": "009f9b772a616ce73de6c1e482c9635cdc04c0b0e15fa253b3aa2edc8581ca7e"
+    },
+    "geometry-focused": {
+      "exit_code": 0,
+      "stdout_path": "tasks/evidence/RUNTIME-228/commands/geometry-focused.stdout.log",
+      "stdout_sha256": "81ed38c754e687b19045b6ca5355cb5328991b50559aead66147cb4c1fadc203"
+    },
+    "native-cpu": {
+      "exit_code": 0,
+      "stdout_path": "tasks/evidence/RUNTIME-228/commands/native-cpu.stdout.log",
+      "stdout_sha256": "5aa107009422df946519f03ddc0fb3822da1005db50875ea427e207554c451b7"
+    },
+    "structural": {
+      "exit_code": 1,
+      "stdout_path": "tasks/evidence/RUNTIME-228/commands/structural.stdout.log",
+      "stdout_sha256": "302dcd66713243de2aaa800384972aa85d4ed64ca51e21e1e58db021200bf7dd"
+    },
+    "build-final": {
+      "exit_code": 0,
+      "stdout_path": "tasks/evidence/RUNTIME-228/commands/build-final.stdout.log",
+      "stdout_sha256": "8cfb47240f470fab57cd73d7ebcca2328af6e24c29023a01ce44d9afdd72ba42"
+    },
+    "configure-vulkan": {
+      "exit_code": 0,
+      "stdout_path": "tasks/evidence/RUNTIME-228/commands/configure-vulkan.stdout.log",
+      "stdout_sha256": "ad2c15e9084c9b72ed0e3da478847b7ca9080da0ee276147aa9203647c6b4189"
+    },
+    "benchmark": {
+      "exit_code": 0,
+      "stdout_path": "tasks/evidence/RUNTIME-228/commands/benchmark.stdout.log",
+      "stdout_sha256": "47a7c233952ffec271a7971f1d9a92edc558a653156e946bd5262cb2d60f3625"
+    },
+    "actual-grid-vulkan": {
+      "exit_code": 0,
+      "stdout_path": "tasks/evidence/RUNTIME-228/commands/actual-grid-vulkan.stdout.log",
+      "stdout_sha256": "1f1e12265116eee66d001765a9dc01b6dc4149166cec589c6ecb667f15b608b5"
+    },
+    "focused": {
+      "exit_code": 0,
+      "stdout_path": "tasks/evidence/RUNTIME-228/commands/focused.stdout.log",
+      "stdout_sha256": "3e327384358252abd99f24ea5b1773cb9b0f93353570bf879ad78358b19989f0"
+    },
+    "structural-fixed": {
+      "exit_code": 0,
+      "stdout_path": "tasks/evidence/RUNTIME-228/commands/structural-fixed.stdout.log",
+      "stdout_sha256": "5d42bd25a32dfcd2519316fff966d794ba50730186d0479be3af4fd27a9fe411"
+    },
+    "build": {
+      "exit_code": 1,
+      "stdout_path": "tasks/evidence/RUNTIME-228/commands/build.stdout.log",
+      "stdout_sha256": "9044ed9c2433f6923e2c4ae6435d2aabf7de1dbb534ab6d425878fe1ac44177b"
+    },
+    "structural-final": {
+      "exit_code": 0,
+      "stdout_path": "tasks/evidence/RUNTIME-228/commands/structural-final.stdout.log",
+      "stdout_sha256": "5d42bd25a32dfcd2519316fff966d794ba50730186d0479be3af4fd27a9fe411"
+    }
+  },
+  "limitations": [
+    "No Vulkan LBVH projection; RUNTIME-229 owns it.",
+    "CPU double projection arithmetic unchanged; selected linear repulsion differs from original inverse-cubic LOP examples.",
+    "Dirty Debug benchmark is diagnostic, not a speedup or default-change claim.",
+    "Full isolated CPU sanitizer suites were not rerun."
+  ]
+}

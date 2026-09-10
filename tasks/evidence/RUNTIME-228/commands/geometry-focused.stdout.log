@@ -1,0 +1,66 @@
+Internal ctest changing into directory: /home/alex/Documents/IntrinsicEngine/build/ci
+Test project /home/alex/Documents/IntrinsicEngine/build/ci
+      Start 2644: PointCloudConsolidation.OptimizedCandidatesMatchReferenceAndAreDeterministic
+ 1/28 Test #2644: PointCloudConsolidation.OptimizedCandidatesMatchReferenceAndAreDeterministic .....   Passed    0.02 sec
+      Start 2645: PointCloudConsolidation.IsolatedWlopDensityMatchesReference
+ 2/28 Test #2645: PointCloudConsolidation.IsolatedWlopDensityMatchesReference ......................   Passed    0.01 sec
+      Start 2646: PointCloudConsolidation.WlopDenoisesPlaneAndSphere
+ 3/28 Test #2646: PointCloudConsolidation.WlopDenoisesPlaneAndSphere ...............................   Passed    0.01 sec
+      Start 2647: PointCloudConsolidation.AnisotropicWlopPreservesDihedralContrast
+ 4/28 Test #2647: PointCloudConsolidation.AnisotropicWlopPreservesDihedralContrast .................   Passed    0.01 sec
+      Start 2648: PointCloudConsolidation.EarUpsamplesTowardDihedralFeature
+ 5/28 Test #2648: PointCloudConsolidation.EarUpsamplesTowardDihedralFeature ........................   Passed    0.01 sec
+      Start 2649: PointCloudConsolidation.AnisotropicNormalPolicyIsExplicitAndImmutable
+ 6/28 Test #2649: PointCloudConsolidation.AnisotropicNormalPolicyIsExplicitAndImmutable ............   Passed    0.01 sec
+      Start 2650: PointCloudConsolidation.EarAndAnisotropicFailuresPublishNoPayload
+ 7/28 Test #2650: PointCloudConsolidation.EarAndAnisotropicFailuresPublishNoPayload ................   Passed    0.00 sec
+      Start 2651: PointCloudConsolidation.LopRepulsionImprovesMinimumSpacing
+ 8/28 Test #2651: PointCloudConsolidation.LopRepulsionImprovesMinimumSpacing .......................   Passed    0.01 sec
+      Start 2652: PointCloudConsolidation.LopOneStepMatchesPaperEquationOracle
+ 9/28 Test #2652: PointCloudConsolidation.LopOneStepMatchesPaperEquationOracle .....................   Passed    0.01 sec
+      Start 2653: PointCloudConsolidation.WlopCorrectsNonUniformDensityMoreThanLop
+10/28 Test #2653: PointCloudConsolidation.WlopCorrectsNonUniformDensityMoreThanLop .................   Passed    0.01 sec
+      Start 2654: PointCloudConsolidation.InSupportOutliersHaveBoundedInfluenceOnPlanePatch
+11/28 Test #2654: PointCloudConsolidation.InSupportOutliersHaveBoundedInfluenceOnPlanePatch ........   Passed    0.01 sec
+      Start 2655: PointCloudConsolidation.ClopOneStepMatchesGaussianProductEquation
+12/28 Test #2655: PointCloudConsolidation.ClopOneStepMatchesGaussianProductEquation ................   Passed    0.01 sec
+      Start 2656: PointCloudConsolidation.ClopDenoisesPlaneAndSphere
+13/28 Test #2656: PointCloudConsolidation.ClopDenoisesPlaneAndSphere ...............................   Passed    0.02 sec
+      Start 2657: PointCloudConsolidation.ClopTracksMixtureWorkAndAgreesWithWlop
+14/28 Test #2657: PointCloudConsolidation.ClopTracksMixtureWorkAndAgreesWithWlop ...................   Passed    0.02 sec
+      Start 2658: PointCloudConsolidation.ClopKeepsSparseOutlierInfluenceBounded
+15/28 Test #2658: PointCloudConsolidation.ClopKeepsSparseOutlierInfluenceBounded ...................   Passed    0.01 sec
+      Start 2659: PointCloudConsolidation.ClopIsDeterministicAndFailsClosed
+16/28 Test #2659: PointCloudConsolidation.ClopIsDeterministicAndFailsClosed ........................   Passed    0.01 sec
+      Start 2660: PointCloudConsolidation.StrategyAndSeedAreBitwiseDeterministic
+17/28 Test #2660: PointCloudConsolidation.StrategyAndSeedAreBitwiseDeterministic ...................   Passed    0.05 sec
+      Start 2661: PointCloudConsolidation.ConcurrentCallersAreBitwiseDeterministic
+18/28 Test #2661: PointCloudConsolidation.ConcurrentCallersAreBitwiseDeterministic .................   Passed    0.01 sec
+      Start 2662: PointCloudConsolidation.ClopConcurrentCallersAreBitwiseDeterministic
+19/28 Test #2662: PointCloudConsolidation.ClopConcurrentCallersAreBitwiseDeterministic .............   Passed    0.01 sec
+      Start 2663: PointCloudConsolidation.InvalidRequestsFailWithoutPublishingPositions
+20/28 Test #2663: PointCloudConsolidation.InvalidRequestsFailWithoutPublishingPositions ............   Passed    0.01 sec
+      Start 2664: PointCloudConsolidation.DegenerateAndNonConvergedStatesStayFinite
+21/28 Test #2664: PointCloudConsolidation.DegenerateAndNonConvergedStatesStayFinite ................   Passed    0.01 sec
+      Start 2665: PointCloudConsolidation.CloudOverloadRejectsDeletedSlots
+22/28 Test #2665: PointCloudConsolidation.CloudOverloadRejectsDeletedSlots .........................   Passed    0.01 sec
+      Start 2666: PointCloudConsolidation.ConservativeDensitySupportMatchesCachedCandidate
+23/28 Test #2666: PointCloudConsolidation.ConservativeDensitySupportMatchesCachedCandidate .........   Passed    0.01 sec
+      Start 2667: PointCloudConsolidation.ExtremeShellDoesNotEvaluateUnusedRepulsionDerivative
+24/28 Test #2667: PointCloudConsolidation.ExtremeShellDoesNotEvaluateUnusedRepulsionDerivative .....   Passed    0.01 sec
+      Start 2668: PointCloudConsolidation.DirectionalAttractionRejectsRoundedOutsideSupport
+25/28 Test #2668: PointCloudConsolidation.DirectionalAttractionRejectsRoundedOutsideSupport ........   Passed    0.01 sec
+      Start 2669: PointCloudConsolidation.LopSuppliedRowsAndCachedIndexPreserveMovingIterations
+26/28 Test #2669: PointCloudConsolidation.LopSuppliedRowsAndCachedIndexPreserveMovingIterations ....   Passed    0.02 sec
+      Start 2670: PointCloudConsolidation.LopRowsValidateIdentityStructureAndStrategy
+27/28 Test #2670: PointCloudConsolidation.LopRowsValidateIdentityStructureAndStrategy ..............   Passed    0.01 sec
+      Start 2671: PointCloudConsolidation.LopTinySupportPreservesCoincidentAndStrictContributors
+28/28 Test #2671: PointCloudConsolidation.LopTinySupportPreservesCoincidentAndStrictContributors ...   Passed    0.01 sec
+
+100% tests passed, 0 tests failed out of 28
+
+Label Time Summary:
+geometry    =   0.30 sec*proc (28 tests)
+unit        =   0.30 sec*proc (28 tests)
+
+Total Test time (real) =   1.15 sec

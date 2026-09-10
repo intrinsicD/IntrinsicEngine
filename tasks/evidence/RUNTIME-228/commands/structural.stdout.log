@@ -1,0 +1,8 @@
+[ERROR] tasks/active/RUNTIME-228-lop-cached-spatial-steps.md: missing required section(s): Non-goals
+[ERROR] tasks/backlog/runtime/RUNTIME-229-lop-framed-lbvh-projection.md: missing required section(s): Verification
+[ERROR] tasks/backlog/runtime/RUNTIME-229-lop-framed-lbvh-projection.md: new or changed open task is outside the prospective workflow inventory and must declare `workflow_schema: 1`; untouched historical tasks alone are grandfathered.
+Validated 329 task file(s); findings: 3; mode: strict.
+[check_task_maturity_followups] Root: /home/alex/Documents/IntrinsicEngine
+[check_task_maturity_followups] Open task files scanned: 114
+[check_task_maturity_followups] No maturity follow-up findings.
+ERROR: validate_tasks.py strict mode reported task-format violations

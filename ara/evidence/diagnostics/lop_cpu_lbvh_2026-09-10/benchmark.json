@@ -1,0 +1,66 @@
+{
+  "attempt_id": "attempt-001",
+  "backend": "cpu_reference",
+  "benchmark_id": "geometry.point_lbvh.lop_cpu_smoke",
+  "claim_eligible": false,
+  "commit": "local-dev",
+  "config_digest": "09fce09c9abe947b1f42d48e791891bd28b5540f6a1c2a57f2445c402361b325",
+  "dataset": "builtin.noisy_plane.16x16.lop64.seed257",
+  "diagnostics": {
+    "index_mismatches": 0,
+    "measured_iterations": 4,
+    "mode": "smoke",
+    "query_backend": "cpu_lbvh",
+    "reduction_backend": "cpu_reference",
+    "runner": "IntrinsicBenchmarkSmoke",
+    "warmup_iterations": 1
+  },
+  "execution_status": "passed",
+  "manifest": {
+    "path": "benchmarks/geometry/manifests/point_lbvh_lop_cpu_smoke.yaml",
+    "sha256": "e3aa809045982b1e41e31d9b42644b152da8cd41c694e081f3f5c527e10235c8"
+  },
+  "method": "geometry.point_lbvh",
+  "metrics": {
+    "quality_error_linf": 0,
+    "runtime_ms": 6.50472
+  },
+  "resolved_params": {
+    "intent": "smoke",
+    "measured_iterations": 4,
+    "warmup_iterations": 1
+  },
+  "run_id": "lop-cpu-2026-09-10",
+  "schema_version": 2,
+  "source": {
+    "revision": "local-dev",
+    "state": "dirty_worktree"
+  },
+  "status": "passed",
+  "threshold_disposition": [
+    {
+      "limit": 1000,
+      "metric": "runtime_ms",
+      "observed": 6.50472,
+      "operator": "<=",
+      "passed": true,
+      "threshold": "smoke_runtime_ms_max"
+    },
+    {
+      "limit": 0,
+      "metric": "quality_error_linf",
+      "observed": 0,
+      "operator": "<=",
+      "passed": true,
+      "threshold": "quality_error_linf_max"
+    }
+  ],
+  "thresholds": {
+    "quality_error_linf_max": 0,
+    "smoke_runtime_ms_max": 1000
+  },
+  "warmup_policy": {
+    "measured_iterations": 4,
+    "warmup_iterations": 1
+  }
+}

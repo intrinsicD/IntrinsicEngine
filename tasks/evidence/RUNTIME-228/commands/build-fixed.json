@@ -1,0 +1,30 @@
+{
+  "command": [
+    "env",
+    "CCACHE_DISABLE=1",
+    "cmake",
+    "--build",
+    "--preset",
+    "ci",
+    "--target",
+    "IntrinsicTests",
+    "ExtrinsicSandbox",
+    "IntrinsicBenchmarkSmoke",
+    "-j",
+    "6"
+  ],
+  "command_display": "env CCACHE_DISABLE=1 cmake --build --preset ci --target IntrinsicTests ExtrinsicSandbox IntrinsicBenchmarkSmoke -j 6",
+  "cwd": ".",
+  "duration_ms": 795114,
+  "exit_code": 0,
+  "finished_at": "2026-09-10T04:19:40Z",
+  "label": "build-fixed",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-09-10T04:06:25Z",
+  "stderr_path": "tasks/evidence/RUNTIME-228/commands/build-fixed.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/RUNTIME-228/commands/build-fixed.stdout.log",
+  "stdout_sha256": "dacb649a1b01bdc6e6ecc50ecc7daacdcff85f0aadf85bf07f6cb327c4fab000",
+  "task_id": "RUNTIME-228"
+}
