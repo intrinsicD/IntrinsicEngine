@@ -147,3 +147,17 @@ TEST(SpatialIndexCache, FramedRadiusWithoutDeviceFailsExplicitly)
         EXPECT_FALSE(batch->Diagnostic.empty());
     }
 }
+
+TEST(SpatialIndexCache, PrivateWorkspaceLeaseOwnsImmutableIndependentPositions)
+{
+    R::SpatialIndexCache cache;
+    std::vector<glm::vec3> points{{0,0,0},{2,0,0}};
+    auto a=cache.CreateWorkspace(points);ASSERT_TRUE(a.Ready())<<a.Diagnostic;
+    points[0]={5,0,0};auto b=cache.CreateWorkspace(points);ASSERT_TRUE(b.Ready());
+    EXPECT_NE(a.Handle.Value,b.Handle.Value);EXPECT_EQ(a.Snapshot->Slots,(std::vector<std::uint32_t>{0,1}));
+    EXPECT_EQ(cache.Nearest(a.Handle,{})->Index,0);EXPECT_EQ(cache.Nearest(b.Handle,{})->Index,1);
+    auto lease=a.Snapshot;const auto handle=a.Handle;a={};cache.Prune();EXPECT_TRUE(cache.Nearest(handle,{}));
+    lease.reset();EXPECT_FALSE(cache.Nearest(handle,{}));cache.Prune();EXPECT_EQ(cache.Stats().Evictions,1);
+    EXPECT_TRUE(cache.Nearest(b.Handle,{}));b={};cache.Prune();EXPECT_EQ(cache.Stats().Evictions,2);
+    EXPECT_FALSE(cache.CreateWorkspace({}).Ready());points[0].x=1e30f;EXPECT_FALSE(cache.CreateWorkspace(points).Ready());
+}

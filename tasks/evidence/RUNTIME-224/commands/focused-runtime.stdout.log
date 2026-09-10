@@ -1,0 +1,31 @@
+Internal ctest changing into directory: /home/alex/Documents/IntrinsicEngine/build/ci
+Test project /home/alex/Documents/IntrinsicEngine/build/ci
+      Start  647: SpatialIndexCache.ReusesOnlyUnchangedPropertyAndLiveElementIdentity
+ 1/10 Test  #647: SpatialIndexCache.ReusesOnlyUnchangedPropertyAndLiveElementIdentity .............   Passed    0.00 sec
+      Start  648: SpatialIndexCache.CanonicalDomainsAndWorldEntityIdentity
+ 2/10 Test  #648: SpatialIndexCache.CanonicalDomainsAndWorldEntityIdentity ........................   Passed    0.00 sec
+      Start  649: SpatialIndexCache.FramedRadiusWithoutDeviceFailsExplicitly
+ 3/10 Test  #649: SpatialIndexCache.FramedRadiusWithoutDeviceFailsExplicitly ......................   Passed    0.00 sec
+      Start  650: SpatialIndexCache.PrivateWorkspaceLeaseOwnsImmutableIndependentPositions
+ 4/10 Test  #650: SpatialIndexCache.PrivateWorkspaceLeaseOwnsImmutableIndependentPositions ........   Passed    0.00 sec
+      Start  689: BilateralFilterConfig.RoundTripAndSharedPreviewApplyRun
+ 5/10 Test  #689: BilateralFilterConfig.RoundTripAndSharedPreviewApplyRun .........................   Passed    0.01 sec
+      Start  690: BilateralFilterOperations.EveryDomainCopyAndInPlaceHistory
+ 6/10 Test  #690: BilateralFilterOperations.EveryDomainCopyAndInPlaceHistory ......................   Passed    0.03 sec
+      Start  691: BilateralFilterOperations.JobsRejectChangedInputsOutputsAndCancellation
+ 7/10 Test  #691: BilateralFilterOperations.JobsRejectChangedInputsOutputsAndCancellation .........   Passed    0.05 sec
+      Start  692: BilateralFilterOperations.ZeroPassAndOutputPreflight
+ 8/10 Test  #692: BilateralFilterOperations.ZeroPassAndOutputPreflight ............................   Passed    0.01 sec
+      Start 1344: SandboxEditorPresentation.DomainMenusUseAppearanceAndFocusedProcessingWindows
+ 9/10 Test #1344: SandboxEditorPresentation.DomainMenusUseAppearanceAndFocusedProcessingWindows ...   Passed    0.04 sec
+      Start 1366: SandboxEditorPresentation.BilateralDomainMenusOpenOneSharedWindow
+10/10 Test #1366: SandboxEditorPresentation.BilateralDomainMenusOpenOneSharedWindow ...............   Passed    0.04 sec
+
+100% tests passed, 0 tests failed out of 10
+
+Label Time Summary:
+contract       =   0.12 sec*proc (8 tests)
+integration    =   0.09 sec*proc (2 tests)
+runtime        =   0.20 sec*proc (10 tests)
+
+Total Test time (real) =   0.61 sec

@@ -1,0 +1,21 @@
+{
+  "command": [
+    "bash",
+    "-c",
+    "python3 tools/agents/check_task_policy.py --root . --strict && python3 tools/repo/check_layering.py --root src --strict && python3 tools/repo/check_test_layout.py --root . --strict && python3 tools/agents/validate_method_manifests.py && python3 tools/benchmark/validate_benchmark_manifests.py && python3 tools/docs/check_doc_links.py --root . && python3 tools/agents/sync_skills.py --check && git diff --check"
+  ],
+  "command_display": "bash -c 'python3 tools/agents/check_task_policy.py --root . --strict && python3 tools/repo/check_layering.py --root src --strict && python3 tools/repo/check_test_layout.py --root . --strict && python3 tools/agents/validate_method_manifests.py && python3 tools/benchmark/validate_benchmark_manifests.py && python3 tools/docs/check_doc_links.py --root . && python3 tools/agents/sync_skills.py --check && git diff --check'",
+  "cwd": ".",
+  "duration_ms": 2933,
+  "exit_code": 0,
+  "finished_at": "2026-09-10T00:09:37Z",
+  "label": "structural-initial",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-09-10T00:09:34Z",
+  "stderr_path": "tasks/evidence/RUNTIME-224/commands/structural-initial.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/RUNTIME-224/commands/structural-initial.stdout.log",
+  "stdout_sha256": "f1b235af50faa771790b925c1bceaef41b68d3b7d4a7fa7a4ee28f629da59154",
+  "task_id": "RUNTIME-224"
+}

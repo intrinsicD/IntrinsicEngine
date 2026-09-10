@@ -134,7 +134,7 @@ namespace Geometry::PointCloud
         // Monotonic distance/ID ordering also rejects duplicate IDs without a set per row.
         template<class Id>
         bool NeighborDistances(std::span<const glm::vec3> points, std::size_t source,
-            std::span<const Id> row, float& sum, float& nearest, std::size_t& count)
+            std::span<const Id> row, float& sum, float& nearest, std::size_t& count, bool requireOther = true)
         {
             float previous = -1;
             std::size_t previousId = 0;
@@ -151,7 +151,7 @@ namespace Geometry::PointCloud
                 const float distance = std::sqrt(squared);
                 sum += distance; nearest = std::min(nearest, distance); ++count;
             }
-            return count && std::isfinite(sum);
+            return (count || !requireOther) && std::isfinite(sum);
         }
         void AddSpacing(CloudStatistics& stats, float distance, std::size_t sample)
         {
@@ -478,143 +478,121 @@ namespace Geometry::PointCloud
     // BilateralFilter
     // =========================================================================
 
-    std::optional<BilateralFilterResult> BilateralFilter(
-        Cloud& cloud,
-        const BilateralFilterParams& params)
+    namespace
     {
-        if (cloud.VerticesSize() < 2)
-            return std::nullopt;
-        if (!cloud.HasNormals())
-            return std::nullopt;
-        if (params.Iterations == 0)
-            return BilateralFilterResult{};
-
-        auto positions = cloud.Positions();
-        auto normals   = cloud.Normals();
-        const std::size_t n = cloud.VerticesSize();
-
-        // Build KDTree for nearest-neighbor queries.
-        // We use Octree (consistent with EstimateRadii / ComputeStatistics).
-        Octree octree;
-        Octree::SplitPolicy policy{};
-        policy.SplitPoint = Octree::SplitPoint::Center;
-        policy.TightChildren = true;
-
-        if (!octree.BuildFromPoints(positions, policy, 32, 10))
-            return std::nullopt;
-
-        // Auto spatial sigma: 2× average nearest-neighbor spacing.
-        float spatialSigma = params.SpatialSigma;
-        if (spatialSigma <= 0.0f)
+        std::size_t BilateralWidth(std::size_t n, std::size_t k)
         {
-            float spacingSum = 0.0f;
-            std::size_t validCount = 0;
-            std::vector<std::size_t> knnTemp;
-            const std::size_t sampleCount = std::min(n, std::size_t{500});
-            const std::size_t stride = n / sampleCount;
-            for (std::size_t si = 0; si < sampleCount; ++si)
-            {
-                const std::size_t idx = si * stride;
-                if (idx >= n) break;
-                knnTemp.clear();
-                octree.QueryKNN(positions[idx], 2, knnTemp);
-                for (std::size_t ni : knnTemp)
-                {
-                    if (ni == idx) continue;
-                    spacingSum += glm::length(positions[ni] - positions[idx]);
-                    ++validCount;
-                    break;
-                }
-            }
-            spatialSigma = (validCount > 0) ? 2.0f * (spacingSum / static_cast<float>(validCount)) : 0.01f;
+            return n < 2 ? n : std::min(n - 1, k) + 1;
         }
-
-        const float normalSigma = std::max(params.NormalSigma, 1e-6f);
-        const float invSpatial2 = -0.5f / (spatialSigma * spatialSigma);
-        const float invNormal2  = -0.5f / (normalSigma * normalSigma);
-        const std::size_t kQuery = params.KNeighbors + 1; // +1 for self
-
-        BilateralFilterResult result{};
-        std::vector<glm::vec3> newPositions(n);
-        std::vector<std::size_t> knnIndices;
-
-        for (uint32_t iter = 0; iter < params.Iterations; ++iter)
+        bool ValidBilateralInput(std::span<const glm::vec3> positions, std::span<const glm::vec3> normals,
+            const BilateralFilterParams& params)
         {
-            // Rebuild octree each iteration (positions change).
-            if (iter > 0)
-            {
-                octree = Octree{};
-                if (!octree.BuildFromPoints(positions, policy, 32, 10))
-                    break;
-            }
-
-            float dispSum = 0.0f;
-            float dispMax = 0.0f;
-            std::size_t degenerateCount = 0;
-
-            for (std::size_t i = 0; i < n; ++i)
-            {
-                const glm::vec3& pi = positions[i];
-                const glm::vec3& ni = normals[i];
-                const float nLen = glm::length(ni);
-
-                if (nLen < 1e-8f)
-                {
-                    newPositions[i] = pi;
-                    ++degenerateCount;
-                    continue;
-                }
-
-                const glm::vec3 nHat = ni / nLen;
-
-                knnIndices.clear();
-                octree.QueryKNN(pi, kQuery, knnIndices);
-
-                float weightSum = 0.0f;
-                float signedDistSum = 0.0f;
-
-                for (std::size_t ji : knnIndices)
-                {
-                    if (ji == i) continue;
-                    const glm::vec3 diff = positions[ji] - pi;
-                    const float dist = glm::length(diff);
-
-                    // Spatial weight
-                    const float ws = std::exp(dist * dist * invSpatial2);
-
-                    // Normal similarity weight
-                    float normalDot = glm::dot(nHat, normals[ji]);
-                    float nLen2 = glm::length(normals[ji]);
-                    if (nLen2 > 1e-8f) normalDot /= nLen2;
-                    const float normalDiff = 1.0f - std::abs(normalDot);
-                    const float wn = std::exp(normalDiff * normalDiff * invNormal2);
-
-                    const float w = ws * wn;
-                    weightSum += w;
-                    signedDistSum += w * glm::dot(diff, nHat);
-                }
-
-                float displacement = 0.0f;
-                if (weightSum > 1e-12f)
-                    displacement = signedDistSum / weightSum;
-
-                newPositions[i] = pi + nHat * displacement;
-                const float absDist = std::abs(displacement);
-                dispSum += absDist;
-                dispMax = std::max(dispMax, absDist);
-            }
-
-            // Apply filtered positions.
-            for (std::size_t i = 0; i < n; ++i)
-                positions[i] = newPositions[i];
-
-            result.PointsFiltered = n - degenerateCount;
-            result.DegenerateNormals = degenerateCount;
-            result.AverageDisplacement = (n > 0) ? dispSum / static_cast<float>(n) : 0.0f;
-            result.MaxDisplacement = dispMax;
+            return positions.size() >= 2 && positions.size() == normals.size() &&
+                std::isfinite(params.SpatialSigma) && std::isfinite(params.NormalSigma) &&
+                std::ranges::all_of(positions, IsFinite) && std::ranges::all_of(normals, IsFinite);
         }
-
-        return result;
+        template<class Query>
+        std::optional<BilateralFilterOutput> BilateralStepWithQueries(
+            std::span<const glm::vec3> points, std::span<const glm::vec3> normals,
+            const BilateralFilterParams& params, Query query)
+        {
+            if (!ValidBilateralInput(points, normals, params) || params.SpatialSigma <= 0 || params.Iterations != 1)
+                return std::nullopt;
+            const float spatialSquared = params.SpatialSigma * params.SpatialSigma;
+            const float normalSigma = std::max(params.NormalSigma, 1e-6f);
+            const float normalSquared = normalSigma * normalSigma;
+            const float invSpatial = -0.5f / spatialSquared, invNormal = -0.5f / normalSquared;
+            if (!(spatialSquared > 0) || !std::isfinite(spatialSquared) ||
+                !std::isfinite(normalSquared) || !std::isfinite(invSpatial) || !std::isfinite(invNormal)) return std::nullopt;
+            BilateralFilterOutput output;
+            output.Positions.assign(points.begin(), points.end());
+            output.SpatialSigmaUsed = params.SpatialSigma;
+            float displacementSum = 0;
+            const auto width = BilateralWidth(points.size(), params.KNeighbors);
+            for (std::size_t i = 0; i < points.size(); ++i)
+            {
+                const auto row = query(i);
+                float distanceSum, nearest; std::size_t count;
+                if (row.size() != width || !NeighborDistances(points, i, row, distanceSum, nearest, count, false))
+                    return std::nullopt;
+                const float length = glm::length(normals[i]);
+                if (!std::isfinite(length)) return std::nullopt;
+                if (length < 1e-8f) { ++output.Diagnostics.DegenerateNormals; continue; }
+                const glm::vec3 normal = normals[i] / length;
+                float weights = 0, signedDistances = 0;
+                for (const auto id : row)
+                {
+                    if (id == i) continue;
+                    const glm::vec3 difference = points[id] - points[i];
+                    const float distance = glm::length(difference);
+                    const float neighborLength = glm::length(normals[id]);
+                    if (!std::isfinite(neighborLength)) return std::nullopt;
+                    float normalDot = glm::dot(normal, normals[id]);
+                    if (neighborLength > 1e-8f) normalDot /= neighborLength;
+                    const float normalDifference = 1.f - std::abs(normalDot);
+                    const float weight = std::exp(distance * distance * invSpatial) *
+                                         std::exp(normalDifference * normalDifference * invNormal);
+                    weights += weight; signedDistances += weight * glm::dot(difference, normal);
+                }
+                if (!std::isfinite(weights) || !std::isfinite(signedDistances)) return std::nullopt;
+                const float displacement = weights > 1e-12f ? signedDistances / weights : 0.f;
+                output.Positions[i] = points[i] + normal * displacement;
+                if (!IsFinite(output.Positions[i])) return std::nullopt;
+                displacementSum += std::abs(displacement);
+                output.Diagnostics.MaxDisplacement = std::max(output.Diagnostics.MaxDisplacement, std::abs(displacement));
+            }
+            output.Diagnostics.PointsFiltered = points.size() - output.Diagnostics.DegenerateNormals;
+            output.Diagnostics.AverageDisplacement = displacementSum / float(points.size());
+            if (!std::isfinite(output.Diagnostics.AverageDisplacement)) return std::nullopt;
+            return output;
+        }
+    }
+    std::optional<BilateralFilterOutput> BilateralFilter(std::span<const glm::vec3> positions,
+        std::span<const glm::vec3> normals, const BilateralFilterParams& params)
+    {
+        if (!ValidBilateralInput(positions, normals, params)) return std::nullopt;
+        BilateralFilterOutput output;
+        output.Positions.assign(positions.begin(), positions.end());
+        if (!params.Iterations) return output;
+        auto step = params; step.Iterations = 1;
+        if (step.SpatialSigma <= 0)
+        {
+            const auto stats = ComputeStatistics(positions, {.SpacingSampleCount = std::min(positions.size(), std::size_t{500})});
+            if (!stats) return std::nullopt;
+            step.SpatialSigma = stats->AverageSpacing > 0 ? 2.f * stats->AverageSpacing : 0.01f;
+        }
+        for (std::uint32_t iteration = 0; iteration < params.Iterations; ++iteration)
+        {
+            Octree tree;
+            Octree::SplitPolicy policy{}; policy.SplitPoint = Octree::SplitPoint::Center; policy.TightChildren = true;
+            if (!tree.BuildFromPoints(output.Positions, policy, 32, 10)) return std::nullopt;
+            std::vector<std::size_t> ids;
+            auto filtered = BilateralStepWithQueries(output.Positions, normals, step, [&](std::size_t i) {
+                ids.clear(); tree.QueryKNN(output.Positions[i], BilateralWidth(positions.size(), params.KNeighbors), ids);
+                return std::span<const std::size_t>(ids);
+            });
+            if (!filtered) return std::nullopt;
+            output = std::move(*filtered);
+        }
+        return output;
+    }
+    std::optional<BilateralFilterOutput> BilateralFilterStepFromNeighbors(
+        std::span<const glm::vec3> positions, std::span<const glm::vec3> normals,
+        std::span<const std::uint32_t> candidates, const BilateralFilterParams& params)
+    {
+        const auto width = BilateralWidth(positions.size(), params.KNeighbors);
+        if (positions.size() < 2 || positions.size() > std::numeric_limits<std::size_t>::max() / width ||
+            candidates.size() != positions.size() * width) return std::nullopt;
+        return BilateralStepWithQueries(positions, normals, params,
+            [&](std::size_t i) { return candidates.subspan(i * width, width); });
+    }
+    std::optional<BilateralFilterResult> BilateralFilter(Cloud& cloud, const BilateralFilterParams& params)
+    {
+        if (!cloud.HasNormals()) return std::nullopt;
+        const auto filtered = BilateralFilter(cloud.Positions(), cloud.Normals(), params);
+        if (!filtered) return std::nullopt;
+        if (params.Iterations) std::ranges::copy(filtered->Positions, cloud.Positions().begin());
+        return filtered->Diagnostics;
     }
 
     // =========================================================================

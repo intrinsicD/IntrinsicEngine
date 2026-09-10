@@ -1,0 +1,26 @@
+{
+  "command": [
+    "ctest",
+    "--test-dir",
+    "build/ci",
+    "--output-on-failure",
+    "-R",
+    "^BilateralFilter\\.",
+    "--timeout",
+    "60"
+  ],
+  "command_display": "ctest --test-dir build/ci --output-on-failure -R '^BilateralFilter\\.' --timeout 60",
+  "cwd": ".",
+  "duration_ms": 443,
+  "exit_code": 0,
+  "finished_at": "2026-09-10T00:08:02Z",
+  "label": "geometry-legacy",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-09-10T00:08:02Z",
+  "stderr_path": "tasks/evidence/RUNTIME-224/commands/geometry-legacy.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/RUNTIME-224/commands/geometry-legacy.stdout.log",
+  "stdout_sha256": "2240229aabdb65330d2fc9015293b804370f3cb36b3fa80b3cce2d2de285d8dd",
+  "task_id": "RUNTIME-224"
+}

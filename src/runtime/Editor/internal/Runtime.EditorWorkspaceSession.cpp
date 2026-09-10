@@ -586,6 +586,13 @@ namespace Extrinsic::Runtime::EditorFeatureDetail
                 if (AttachmentEpochIsActive(epoch))
                     m_LastPointSpacingResult = std::move(result);
             };
+        context.MethodResultSinks.BilateralFilter =
+            [epoch = m_AttachmentEpoch, this](
+                EditorBilateralFilterResult result)
+            {
+                if (AttachmentEpochIsActive(epoch))
+                    m_LastBilateralFilterResult = std::move(result);
+            };
         context.PendingAssetImportPath =
             std::move(pendingAssetImportPath);
         context.PendingAssetImportPayloadKind =
@@ -652,6 +659,9 @@ namespace Extrinsic::Runtime::EditorFeatureDetail
         if (m_LastPointSpacingResult.has_value())
             context.LastPointSpacingResult =
                 &*m_LastPointSpacingResult;
+        if (m_LastBilateralFilterResult.has_value())
+            context.LastBilateralFilterResult =
+                &*m_LastBilateralFilterResult;
         const Core::Extent2D viewport =
             context.CameraViewport.Width != 0u &&
                     context.CameraViewport.Height != 0u
@@ -845,6 +855,9 @@ namespace Extrinsic::Runtime::EditorFeatureDetail
         case EditorGeometryProcessingResultSlot::PointSpacing:
             m_LastPointSpacingResult.reset();
             break;
+        case EditorGeometryProcessingResultSlot::BilateralFilter:
+            m_LastBilateralFilterResult.reset();
+            break;
         case EditorGeometryProcessingResultSlot::Registration:
             m_LastRegistrationResult.reset();
             return;
@@ -880,6 +893,7 @@ namespace Extrinsic::Runtime::EditorFeatureDetail
         m_LastOutlierAnalysisResult.reset();
         m_LastKernelDensityResult.reset();
         m_LastPointSpacingResult.reset();
+        m_LastBilateralFilterResult.reset();
         m_JobIdentities.clear();
         m_RenderRecipeContext = {};
         m_RenderRecipeState = {};

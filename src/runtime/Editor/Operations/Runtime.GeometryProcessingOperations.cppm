@@ -40,6 +40,7 @@ export import Extrinsic.Runtime.NormalEstimationConfig;
 export import Extrinsic.Runtime.OutlierAnalysisConfig;
 export import Extrinsic.Runtime.KernelDensityConfig;
 export import Extrinsic.Runtime.PointSpacingConfig;
+export import Extrinsic.Runtime.BilateralFilterConfig;
 import Extrinsic.Runtime.SpatialIndexCache;
 export import Geometry.Geodesic;
 export import Extrinsic.Runtime.PointCloudConsolidationConfig;
@@ -939,6 +940,28 @@ export namespace Extrinsic::Runtime
         std::string Diagnostic{};
         PointSpacingConfig Resolved{};
     };
+    struct EditorBilateralFilterResult
+    {
+        EditorCommandStatus Status{EditorCommandStatus::NoChange};
+        BilateralFilterBackend RequestedBackend{BilateralFilterBackend::CpuOctree};
+        GeometryPropertyRef Output{};
+        std::string ActualBackend{}, Message{};
+        std::size_t SlotCount{}, LiveCount{}, WrittenCount{};
+        float SpatialSigmaUsed{};
+        Geometry::PointCloud::BilateralFilterResult Diagnostics{};
+        std::uint32_t CompletedIterations{};
+        std::size_t WorkspaceBuilds{};
+        bool IndexReused{};
+        std::size_t GpuQueryBatches{};
+        double GpuNeighborhoodMilliseconds{}, CpuComputeMilliseconds{};
+        [[nodiscard]] bool Succeeded() const noexcept { return Status==EditorCommandStatus::Applied || Status==EditorCommandStatus::NoChange; }
+    };
+    struct EditorBilateralFilterReadiness
+    {
+        bool Ready{};
+        std::string Diagnostic{};
+        BilateralFilterConfig Resolved{};
+    };
     enum class EditorPointCloudOutlierMethod : std::uint8_t
     {
         Statistical, // GEOM-016 RemoveStatisticalOutliers (mean-kNN distance).
@@ -1030,6 +1053,7 @@ export namespace Extrinsic::Runtime
         OutlierAnalysis,
         KernelDensity,
         PointSpacing,
+        BilateralFilter,
     };
 
     struct EditorMethodResultSinks
@@ -1052,6 +1076,7 @@ export namespace Extrinsic::Runtime
         std::function<void(EditorOutlierAnalysisResult)> OutlierAnalysis{};
         std::function<void(EditorKernelDensityResult)> KernelDensity{};
         std::function<void(EditorPointSpacingResult)> PointSpacing{};
+        std::function<void(EditorBilateralFilterResult)> BilateralFilter{};
     };
 
     struct EditorGeometryProcessingModel
@@ -1185,6 +1210,7 @@ export namespace Extrinsic::Runtime
         const EditorOutlierAnalysisResult* LastOutlierAnalysisResult{nullptr};
         const EditorKernelDensityResult* LastKernelDensityResult{nullptr};
         const EditorPointSpacingResult* LastPointSpacingResult{nullptr};
+        const EditorBilateralFilterResult* LastBilateralFilterResult{nullptr};
         const RuntimeEngineConfigControlState* EngineConfigControlState{nullptr};
         std::function<Core::Config::EngineConfigLoadResult(const std::string&, const std::string&)>
             PreviewEngineConfigDocument{};
@@ -1644,6 +1670,7 @@ export namespace Extrinsic::Runtime
         std::optional<EditorOutlierAnalysisResult> LastOutlierAnalysisResult{};
         std::optional<EditorKernelDensityResult> LastKernelDensityResult{};
         std::optional<EditorPointSpacingResult> LastPointSpacingResult{};
+        std::optional<EditorBilateralFilterResult> LastBilateralFilterResult{};
     };
 
     struct EditorGeometryProcessingPreparedFrame
@@ -1765,7 +1792,9 @@ export namespace Extrinsic::Runtime
     [[nodiscard]] std::optional<OutlierAnalysisConfig> GetEditorOutlierAnalysisConfig(
         const EditorGeometryProcessingCommands &commands);
     [[nodiscard]] EditorOutlierAnalysisResult ApplyEditorConfiguredOutlierAnalysis(
-        const EditorGeometryProcessingCommands &commands);    [[nodiscard]] EditorKernelDensityReadiness PreviewEditorKernelDensityCommand(
+        const EditorGeometryProcessingCommands &commands);
+
+    [[nodiscard]] EditorKernelDensityReadiness PreviewEditorKernelDensityCommand(
         const EditorGeometryProcessingContext &context, const KernelDensityConfig &config);
     [[nodiscard]] GeometryPropertyCatalogSnapshot GetEditorKernelDensityInputCatalog(
         const EditorGeometryProcessingContext &context, std::uint32_t stableId);
@@ -1819,6 +1848,34 @@ export namespace Extrinsic::Runtime
     [[nodiscard]] std::optional<PointSpacingConfig> GetEditorPointSpacingConfig(
         const EditorGeometryProcessingCommands &commands);
     [[nodiscard]] EditorPointSpacingResult ApplyEditorConfiguredPointSpacing(
+        const EditorGeometryProcessingCommands &commands);
+
+    [[nodiscard]] EditorBilateralFilterReadiness PreviewEditorBilateralFilterCommand(
+        const EditorGeometryProcessingContext &context, const BilateralFilterConfig &config);
+    [[nodiscard]] GeometryPropertyCatalogSnapshot GetEditorBilateralFilterInputCatalog(
+        const EditorGeometryProcessingContext &context, std::uint32_t stableId);
+    [[nodiscard]] EditorBilateralFilterResult ApplyEditorBilateralFilterCommand(
+        const EditorGeometryProcessingContext &context, const BilateralFilterConfig &config);
+    [[nodiscard]] RuntimeEngineConfigApplyResult ApplyEditorBilateralFilterConfig(
+        const EditorGeometryProcessingContext &context, const BilateralFilterConfig &config,
+        std::string sourceId = {});
+    [[nodiscard]] std::optional<BilateralFilterConfig> GetEditorBilateralFilterConfig(
+        const EditorGeometryProcessingContext &context);
+    [[nodiscard]] EditorBilateralFilterResult ApplyEditorConfiguredBilateralFilter(
+        const EditorGeometryProcessingContext &context);
+
+    [[nodiscard]] EditorBilateralFilterReadiness PreviewEditorBilateralFilterCommand(
+        const EditorGeometryProcessingCommands &commands, const BilateralFilterConfig &config);
+    [[nodiscard]] GeometryPropertyCatalogSnapshot GetEditorBilateralFilterInputCatalog(
+        const EditorGeometryProcessingCommands &commands, std::uint32_t stableId);
+    [[nodiscard]] EditorBilateralFilterResult ApplyEditorBilateralFilterCommand(
+        const EditorGeometryProcessingCommands &commands, const BilateralFilterConfig &config);
+    [[nodiscard]] RuntimeEngineConfigApplyResult ApplyEditorBilateralFilterConfig(
+        const EditorGeometryProcessingCommands &commands, const BilateralFilterConfig &config,
+        std::string sourceId = {});
+    [[nodiscard]] std::optional<BilateralFilterConfig> GetEditorBilateralFilterConfig(
+        const EditorGeometryProcessingCommands &commands);
+    [[nodiscard]] EditorBilateralFilterResult ApplyEditorConfiguredBilateralFilter(
         const EditorGeometryProcessingCommands &commands);
 
 

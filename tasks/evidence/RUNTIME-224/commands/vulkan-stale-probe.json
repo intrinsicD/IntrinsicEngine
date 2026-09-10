@@ -1,0 +1,26 @@
+{
+  "command": [
+    "ctest",
+    "--test-dir",
+    "build/ci-vulkan",
+    "--output-on-failure",
+    "-R",
+    "^PointLBVHGpuSmoke.BilateralPublishesMovingPassesAcrossDomains$",
+    "--timeout",
+    "120"
+  ],
+  "command_display": "ctest --test-dir build/ci-vulkan --output-on-failure -R '^PointLBVHGpuSmoke.BilateralPublishesMovingPassesAcrossDomains$' --timeout 120",
+  "cwd": ".",
+  "duration_ms": 57495,
+  "exit_code": 0,
+  "finished_at": "2026-09-10T00:20:44Z",
+  "label": "vulkan-stale-probe",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-09-10T00:19:47Z",
+  "stderr_path": "tasks/evidence/RUNTIME-224/commands/vulkan-stale-probe.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/RUNTIME-224/commands/vulkan-stale-probe.stdout.log",
+  "stdout_sha256": "45a8b2191a41add48305a93b25348804d874355e5f2fd69fa3fc8ac7e1ba9656",
+  "task_id": "RUNTIME-224"
+}

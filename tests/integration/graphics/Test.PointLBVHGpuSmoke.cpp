@@ -1451,3 +1451,269 @@ TEST(PointLBVHGpuSmoke, PointSpacingPublishesAcrossDomainsAndPreservesCandidateP
         std::ofstream stream(output);ASSERT_TRUE(stream.good());stream<<json.dump(2)<<'\n';ASSERT_TRUE(stream.good());
     }
 }
+
+namespace
+{
+    class BilateralApp final : public Intrinsic::Tests::RuntimeTestModule
+    {
+    public:
+        Geometry::PropertySet& Props(unsigned d)
+        {
+            return *const_cast<Geometry::PropertySet*>(Runtime::ResolveGeometryPropertySet(
+                Runtime::BuildGeometryAvailability(Context.Scene->Raw(), Entities[d-1]), Domain(d)));
+        }
+        Runtime::BilateralFilterConfig Config(unsigned d) const
+        {
+            Runtime::BilateralFilterConfig c;
+            c.StableEntityId=Runtime::SelectionController::ToStableEntityId(Entities[d-1]);
+            c.Positions={.Domain=Domain(d),.Name="samples",.ValueKind=Geometry::PropertyValueKind::Vec3};
+            c.Normals={Domain(d),"directions",Geometry::PropertyValueKind::Vec3};
+            c.Output={Domain(d),Phase==2?"samples":"filtered",Geometry::PropertyValueKind::Vec3};
+            c.KNeighbors=Phase==2?63:8;c.SpatialSigma=2;c.NormalSigma=.25f;c.Iterations=3;
+            c.Backend=Runtime::BilateralFilterBackend::VulkanLBVH;
+            c.GpuQueryBatchSize=128; // One partial batch per small domain keeps nine moving passes bounded.
+            return c;
+        }
+        void Resolve() override
+        {
+            Started=std::chrono::steady_clock::now();
+            Context.Scene=Kernel().Worlds().Get(Kernel().ActiveWorld());Context.World=Kernel().ActiveWorld();
+            Context.SpatialIndices=Kernel().Services().Find<Runtime::SpatialIndexCache>();
+            std::mt19937 random(241);std::uniform_real_distribution<float> dist(-1,1);
+            std::vector<glm::vec3> points;
+            for(unsigned i=0;i<66;++i){const float x=dist(random),y=dist(random);points.push_back({x,y,.1f*dist(random)});}
+            points[0]={0,0,0};points[1]={.3f,.4f,0};points[2]=points[0];
+            points[3]={std::nextafter(.5f,1.f),0,0};points[65]={10,0,0};
+            for(unsigned d=1;d<=8;++d)
+            {
+                auto entity=Context.Scene->Create();Entities.push_back(entity);
+                if(d<=unsigned(Domain::MeshFace))
+                {
+                    Geometry::HalfedgeMesh::Mesh mesh;
+                    auto a=mesh.AddVertex({0,0,0}),b=mesh.AddVertex({1,0,0}),c=mesh.AddVertex({0,1,0});
+                    (void)mesh.AddTriangle(a,b,c);GS::PopulateFromMesh(Context.Scene->Raw(),entity,mesh);
+                }
+                else if(d<unsigned(Domain::PointCloudPoint))
+                {
+                    Geometry::Graph::Graph graph;
+                    auto a=graph.AddVertex({0,0,0}),b=graph.AddVertex({1,0,0});
+                    (void)graph.AddEdge(a,b);GS::PopulateFromGraph(Context.Scene->Raw(),entity,graph);
+                }
+                else Context.Scene->Raw().emplace<GS::Vertices>(entity);
+                auto& p=Props(d);p.Resize(points.size());p.GetOrAdd<glm::vec3>("samples").Vector()=points;
+                p.GetOrAdd<float>("keep").Vector().assign(points.size(),42.f);
+                p.GetOrAdd<glm::vec3>("filtered").Vector().assign(points.size(),glm::vec3(77));
+                p.GetOrAdd<glm::vec3>("directions").Vector().assign(points.size(),glm::vec3(0,0,1));
+                const bool half=d==unsigned(Domain::MeshHalfedge)||d==unsigned(Domain::GraphHalfedge);
+                if(half)
+                {
+                    auto& edges=Context.Scene->Raw().get<GS::Edges>(entity).Properties;
+                    edges.Resize(points.size()/2);edges.GetOrAdd<bool>("e:deleted")[2]=true;
+                }
+                else p.GetOrAdd<bool>(d==unsigned(Domain::MeshFace)?"f:deleted":
+                    (d==unsigned(Domain::MeshEdge)||d==unsigned(Domain::GraphEdge))?"e:deleted":"v:deleted")[4]=true;
+                p.Get<glm::vec3>("samples")[4]={std::numeric_limits<float>::quiet_NaN(),0,0};
+            }
+            Context.MethodResultSinks.BilateralFilter=[this](auto result){Results.push_back(std::move(result));};
+        }
+        void Frame(double,double) override
+        {
+            if(std::chrono::steady_clock::now()-Started>std::chrono::seconds(95))
+            {
+                ADD_FAILURE() << "Bilateral timeout: phase=" << Phase << " phase_ms="
+                              << std::chrono::duration<double,std::milli>(std::chrono::steady_clock::now()-PhaseStarted).count()
+                              << " results=" << Results.size() << " expected=" << ExpectedResults;
+                for(auto token:StageTokens)
+                    ADD_FAILURE() << "Unfinished bilateral stage state: " << Runtime::ToString(Kernel().Jobs().GetState(token));
+                TimedOut=true;Kernel().RequestExit();return;
+            }
+            if(!Kernel().GetDevice().IsOperational())
+            {
+                if(++ColdFrames>4){TimedOut=true;Kernel().RequestExit();}
+                return;
+            }
+            if(Submitted)
+            {
+                if(Phase==4 && !CancelledIntermediate && Kernel().Jobs().GetState(IntermediateToken)==Runtime::JobState::AwaitingApply)
+                {EXPECT_TRUE(Kernel().Jobs().Cancel(IntermediateToken));CancelledIntermediate=true;}
+                if(Phase==4)(void)Kernel().Jobs().ReapCompleted();
+                if(Phase<3)
+                    for(unsigned d=1;d<=8;++d)
+                    {
+                        const bool published=std::ranges::any_of(Results,[&](const auto& r){return unsigned(r.Output.Domain)==d;});
+                        if(Phase==2 && published)continue;
+                        const auto current=std::as_const(Props(d)).Get<glm::vec3>("samples");
+                        for(std::size_t i=0;i<current.Size();++i)
+                            if(i!=4)EXPECT_EQ(current[i],BeforePositions[d-1][i]);
+                    }
+                if(Results.size()<ExpectedResults)return;
+                if(Phase>=3)
+                {
+                    if(Phase==5)
+                    {
+                        EXPECT_TRUE(Results.back().Succeeded())<<Results.back().Message;
+                        EXPECT_EQ(Results.back().ActualBackend,"vulkan_lbvh");
+                        EXPECT_NEAR(glm::length(std::as_const(Props(8)).Get<glm::vec3>("filtered")[0]),0.f,1e-7);
+                        Done=true;Kernel().RequestExit();return;
+                    }
+                    EXPECT_FALSE(Results.back().Succeeded())<<Results.back().Message;
+                    EXPECT_EQ(std::as_const(Props(8)).Get<glm::vec3>("filtered")[0],glm::vec3(77));
+                    if(Phase==4){EXPECT_TRUE(CancelledIntermediate);EXPECT_EQ(History.UndoCount(),0);}
+                }
+                else
+                {
+                    PhaseMs.push_back(std::chrono::duration<double,std::milli>(std::chrono::steady_clock::now()-PhaseStarted).count());
+                    double neighborhoodMs=0,fitMs=0;
+                    std::size_t batches=0;
+                    for(const auto& result:Results)
+                    {
+                        neighborhoodMs+=result.GpuNeighborhoodMilliseconds;
+                        fitMs+=result.CpuComputeMilliseconds;
+                        batches+=result.GpuQueryBatches;
+                        EXPECT_TRUE(result.Succeeded())<<result.Message;
+                        EXPECT_EQ(result.ActualBackend,"vulkan_lbvh");
+                        EXPECT_GT(result.GpuQueryBatches,0);
+                        if(Phase==1)EXPECT_TRUE(result.IndexReused);
+                        EXPECT_EQ(result.CompletedIterations,3);EXPECT_EQ(result.WorkspaceBuilds,2);
+                        const auto& ref=ReferenceResults[unsigned(result.Output.Domain)-1];
+                        EXPECT_NEAR(result.Diagnostics.AverageDisplacement,ref.Diagnostics.AverageDisplacement,1e-5);
+                        EXPECT_NEAR(result.Diagnostics.MaxDisplacement,ref.Diagnostics.MaxDisplacement,1e-5);
+
+                    }
+                    NeighborhoodMs.push_back(neighborhoodMs);FitMs.push_back(fitMs);BatchCounts.push_back(batches);
+                    for(unsigned d=1;d<=8;++d)
+                    {
+                        const auto& values=std::as_const(Props(d)).Get<glm::vec3>(Config(d).Output.Name).Vector();
+                        ASSERT_EQ(values.size(),Reference[d-1].size());
+                        for(std::size_t i=0;i<values.size();++i)
+                        {
+                            if(Phase==2 && i==4) {EXPECT_TRUE(std::isnan(values[i].x));continue;}
+                            const double error=glm::length(values[i]-Reference[d-1][i]);
+                            MaxError=std::isfinite(error)?std::max(MaxError,error):std::numeric_limits<double>::infinity();
+                        }
+                        EXPECT_EQ(std::as_const(Props(d)).Get<float>("keep")[0],42.f);
+                    }
+                    EXPECT_LE(MaxError,1e-5);
+                    EXPECT_EQ(History.UndoCount(),8);
+                    for(unsigned i=0;i<8;++i)EXPECT_EQ(History.Undo().Status,Runtime::EditorCommandHistoryStatus::Undone);
+                    for(unsigned d=1;d<=8;++d)EXPECT_EQ(std::as_const(Props(d)).Get<glm::vec3>(Config(d).Output.Name)[0],Phase==2?BeforePositions[d-1][0]:glm::vec3(77));
+                    for(unsigned i=0;i<8;++i)EXPECT_EQ(History.Redo().Status,Runtime::EditorCommandHistoryStatus::Redone);
+                    if(Phase==2){Done=true;Kernel().RequestExit();return;}
+                }
+                Results.clear();Submitted=false;++Phase;
+            }
+            if(Phase<3)
+            {
+                Reference.clear();ReferenceResults.clear();BeforePositions.clear();History.ClearHistory();Context.JobCommands={};Context.CommandHistory=nullptr;
+                const auto cpuStart=std::chrono::steady_clock::now();
+                for(unsigned d=1;d<=8;++d)
+                {
+                    BeforePositions.push_back(std::as_const(Props(d)).Get<glm::vec3>("samples").Vector());
+                    auto c=Config(d);c.Backend=Runtime::BilateralFilterBackend::CpuOctree;
+                    const auto result=Runtime::ApplyEditorBilateralFilterCommand(Context,c);
+                    ASSERT_TRUE(result.Succeeded())<<result.Message;
+                    ReferenceResults.push_back(result);
+                    Reference.push_back(std::as_const(Props(d)).Get<glm::vec3>(Config(d).Output.Name).Vector());
+                    if(Phase==2)Props(d).Get<glm::vec3>("samples").Vector()=BeforePositions.back();
+                    else Props(d).Get<glm::vec3>("filtered").Vector().assign(66,glm::vec3(77));
+                }
+                CpuMs.push_back(std::chrono::duration<double,std::milli>(std::chrono::steady_clock::now()-cpuStart).count());
+            }
+            Context.JobCommands.Submit=[this](Runtime::JobDesc desc,Runtime::EditorJobIdentity){
+                const bool intermediate=Phase==4 && desc.DebugName=="Bilateral position update" && !IntermediateToken.IsValid();
+                if(intermediate)desc.IsReadyToApply=[] {return false;};
+                FitToken=Kernel().Jobs().Submit(std::move(desc));StageTokens.push_back(FitToken);if(intermediate)IntermediateToken=FitToken;return FitToken;};
+            StageTokens.clear();Context.CommandHistory=&History;ExpectedResults=Phase<3?8:1;Submitted=true;PhaseStarted=std::chrono::steady_clock::now();
+            if(Phase<3)
+            {
+                if(Phase==0)
+                {
+                    auto unsupported=Config(8);unsupported.KNeighbors=64;
+                    EXPECT_FALSE(Runtime::PreviewEditorBilateralFilterCommand(Context,unsupported).Ready);
+                }
+                for(unsigned d=1;d<=8;++d)
+                {
+                    const auto result=Runtime::ApplyEditorBilateralFilterCommand(Context,Config(d));
+                    if(result.Status!=Runtime::EditorCommandStatus::Pending)Results.push_back(result);
+                }
+            }
+            else
+            {
+                auto c=Config(8);
+                if(Phase==4)
+                {
+                    // A completed update with zero normals leaves full, still-valid
+                    // neighborhoods behind. Cancel it at the publication gate.
+                    Props(8).Get<glm::vec3>("directions").Vector().assign(66,glm::vec3(0));
+                    c.Iterations=2; // The parked update directly precedes the final query/update pair.
+                    History.ClearHistory();
+                }
+                if(Phase==5)
+                {
+                    auto& p=Props(8);p.Resize(1030);
+                    p.Get<glm::vec3>("samples").Vector().assign(1030,glm::vec3(0));
+                    p.Get<glm::vec3>("samples")[1029]={10,0,0};
+                    p.Get<glm::vec3>("directions").Vector().assign(1030,glm::vec3(0,0,1));
+                    c.GpuQueryBatchSize=4096;
+                }
+                else Props(8).Get<glm::vec3>("filtered").Vector().assign(66,glm::vec3(77));
+                const auto result=Runtime::ApplyEditorBilateralFilterCommand(Context,c);
+                if(result.Status!=Runtime::EditorCommandStatus::Pending)Results.push_back(result);
+                if(Phase==3)Props(8).Get<glm::vec3>("samples")[0]+=.1f; // stale before GPU recording
+            }
+        }
+        void Shutdown() override {Context={};}
+        Runtime::EditorGeometryProcessingContext Context{};
+        Runtime::EditorCommandHistory History{};
+        std::vector<Runtime::JobToken> StageTokens;
+        std::vector<entt::entity> Entities;
+        std::vector<std::vector<glm::vec3>> Reference,BeforePositions;
+        std::vector<Runtime::EditorBilateralFilterResult> Results, ReferenceResults;
+        std::vector<double> PhaseMs,CpuMs,NeighborhoodMs,FitMs;
+        std::vector<std::size_t> BatchCounts;
+        std::chrono::steady_clock::time_point Started{},PhaseStarted{};
+        Runtime::JobToken FitToken{},IntermediateToken{};
+        std::size_t ExpectedResults{};unsigned Phase{},CancelFrames{},ColdFrames{};bool Submitted{},Done{},TimedOut{},CancelledIntermediate{};double MaxError{};
+    };
+}
+TEST(PointLBVHGpuSmoke, BilateralPublishesMovingPassesAcrossDomains)
+{
+    if(!Extrinsic::Platform::Backends::Glfw::CanInitialize())GTEST_SKIP()<<"GLFW unavailable";
+    auto config=Runtime::CreateReferenceEngineConfig();
+    config.Window.Width=64;config.Window.Height=64;config.Render.EnableValidation=true;
+    config.Render.EnableVSync=false;config.ReferenceScene.Enabled=false;
+    auto app=std::make_unique<BilateralApp>();auto* run=app.get();
+    Intrinsic::Tests::RuntimeTestKernel engine(config,std::move(app));
+    engine.EmplaceModule<Runtime::SpatialIndexCache>();engine.Initialize();Shutdown shutdown{engine};
+    engine.Run();ASSERT_TRUE(engine.GetDevice().IsOperational());
+    ASSERT_FALSE(run->TimedOut)<<"phase="<<run->Phase;ASSERT_TRUE(run->Done);
+    EXPECT_LE(run->MaxError,1e-5);ASSERT_EQ(run->PhaseMs.size(),3);
+    if(const auto* output=std::getenv("INTRINSIC_BILATERAL_BENCHMARK_OUTPUT"))
+    {
+        nlohmann::json json{{"benchmark_id","geometry.point_lbvh.bilateral_runtime_smoke"},
+            {"method","geometry.point_lbvh"},{"backend","gpu_vulkan_compute"},
+            {"dataset","builtin.bilateral_samples.eight_domains.seed241"},{"commit","local-dev"},
+            {"metrics",{{"runtime_ms",run->PhaseMs[1]},{"quality_error_linf",run->MaxError}}},
+            {"diagnostics",{{"runner","IntrinsicPointLBVHGpuTests"},{"mode","smoke"},
+                {"cpu_reference_total_ms",run->CpuMs[1]},{"vulkan_cold_total_ms",run->PhaseMs[0]},
+                {"vulkan_warm_total_ms",run->PhaseMs[1]},{"vulkan_in_place_k63_total_ms",run->PhaseMs[2]},
+                {"cpu_in_place_k63_total_ms",run->CpuMs[2]},{"warmup_iterations",1},{"measured_iterations",1},
+                {"cpu_weights_and_position_updates",true},{"gpu_neighborhood_elapsed_sum_ms",run->NeighborhoodMs},
+                {"cpu_weights_and_position_updates_sum_ms",run->FitMs},{"gpu_query_batch_counts",run->BatchCounts}}},{"status",::testing::Test::HasFailure()?"failed":"passed"}};
+        std::ofstream stream(output);ASSERT_TRUE(stream.good());stream<<json.dump(2)<<'\n';ASSERT_TRUE(stream.good());
+    }
+}
+
+TEST(PointLBVHGpuSmoke, BilateralRejectsStaleAndCancelledPasses)
+{
+    if(!Extrinsic::Platform::Backends::Glfw::CanInitialize())GTEST_SKIP()<<"GLFW unavailable";
+    auto config=Runtime::CreateReferenceEngineConfig();
+    config.Window.Width=64;config.Window.Height=64;config.Render.EnableValidation=true;
+    config.Render.EnableVSync=false;config.ReferenceScene.Enabled=false;
+    auto app=std::make_unique<BilateralApp>();auto* run=app.get();run->Phase=3;
+    Intrinsic::Tests::RuntimeTestKernel engine(config,std::move(app));
+    engine.EmplaceModule<Runtime::SpatialIndexCache>();engine.Initialize();Shutdown shutdown{engine};
+    engine.Run();ASSERT_TRUE(engine.GetDevice().IsOperational());
+    ASSERT_FALSE(run->TimedOut)<<"phase="<<run->Phase;ASSERT_TRUE(run->Done);
+    EXPECT_TRUE(run->CancelledIntermediate);
+}

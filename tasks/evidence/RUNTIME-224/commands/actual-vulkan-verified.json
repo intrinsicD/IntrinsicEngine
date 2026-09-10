@@ -1,0 +1,26 @@
+{
+  "command": [
+    "ctest",
+    "--test-dir",
+    "build/ci-vulkan",
+    "--output-on-failure",
+    "-R",
+    "^PointLBVHGpuSmoke.Bilateral",
+    "--timeout",
+    "120"
+  ],
+  "command_display": "ctest --test-dir build/ci-vulkan --output-on-failure -R '^PointLBVHGpuSmoke.Bilateral' --timeout 120",
+  "cwd": ".",
+  "duration_ms": 101783,
+  "exit_code": 0,
+  "finished_at": "2026-09-10T00:34:48Z",
+  "label": "actual-vulkan-verified",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-09-10T00:33:06Z",
+  "stderr_path": "tasks/evidence/RUNTIME-224/commands/actual-vulkan-verified.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/RUNTIME-224/commands/actual-vulkan-verified.stdout.log",
+  "stdout_sha256": "a74f6c4d9beea230d5ed74ece5d7769f36b4d886c24482b77d088a7085aecab5",
+  "task_id": "RUNTIME-224"
+}

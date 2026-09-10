@@ -12,6 +12,7 @@ import Extrinsic.Runtime.NormalEstimationConfig;
 import Extrinsic.Runtime.OutlierAnalysisConfig;
 import Extrinsic.Runtime.KernelDensityConfig;
 import Extrinsic.Runtime.PointSpacingConfig;
+import Extrinsic.Runtime.BilateralFilterConfig;
 import Extrinsic.Runtime.SelectionController;
 import Extrinsic.Runtime.CurvatureSegmentationConfig;
 import Extrinsic.Runtime.ParameterizationConfig;
@@ -32,6 +33,7 @@ namespace Extrinsic::Sandbox
             !registry.Register(Runtime::MakeOutlierAnalysisConfigSectionRegistration()) ||
             !registry.Register(Runtime::MakeKernelDensityConfigSectionRegistration()) ||
             !registry.Register(Runtime::MakePointSpacingConfigSectionRegistration()) ||
+            !registry.Register(Runtime::MakeBilateralFilterConfigSectionRegistration()) ||
             !registry.Register(
                 Runtime::MakeClusteringConfigSectionRegistration(
                     std::move(callbacks.Clustering))) ||

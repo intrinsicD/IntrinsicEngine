@@ -267,6 +267,7 @@ if(TARGET ExtrinsicRuntime)
         Test.NormalEstimation.cpp
         Test.OutlierAnalysis.cpp
         Test.KernelDensityOperations.cpp
+    Test.BilateralFilterOperations.cpp
     Test.PointSpacingOperations.cpp
         Test.PrimitiveSelectionRefinement.cpp
         Test.PrimitiveSelectionRefinementWiring.cpp
@@ -514,6 +515,7 @@ set(_geometry_test_files
     Test.PointCloudOutlierRemoval.cpp
     Test.KernelDensity.cpp
     Test.PointSpacing.cpp
+    Test.BilateralPointFilter.cpp
     Test.LocalDistanceRatio.cpp
     Test.IntersectionClassification.cpp
     Test.RaycastClassify.cpp
@@ -1750,6 +1752,7 @@ if(_intrinsic_registered_test_targets)
         "  set_tests_properties(PointLBVHGpuSmoke.OutlierNeighborhoodsPublishAcrossDomainsAndCountDenseSupport PROPERTIES TIMEOUT 120)\n"
         "  set_tests_properties(PointLBVHGpuSmoke.KernelDensityPublishesAcrossDomainsAndPreservesCandidatePolicy PROPERTIES TIMEOUT 120)\n"
         "  set_tests_properties(PointLBVHGpuSmoke.PointSpacingPublishesAcrossDomainsAndPreservesCandidatePolicy PROPERTIES TIMEOUT 120)\n"
+        "  set_tests_properties(PointLBVHGpuSmoke.BilateralPublishesMovingPassesAcrossDomains PointLBVHGpuSmoke.BilateralRejectsStaleAndCancelledPasses PROPERTIES TIMEOUT 120)\n"
         "endif()\n"
     )
     set(_intrinsic_property_fixup_file "${CMAKE_CURRENT_BINARY_DIR}/IntrinsicTestPropertyFixups.cmake")

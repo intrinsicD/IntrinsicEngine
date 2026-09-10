@@ -1,0 +1,18 @@
+Internal ctest changing into directory: /home/alex/Documents/IntrinsicEngine/build/ci
+Test project /home/alex/Documents/IntrinsicEngine/build/ci
+    Start 2726: BilateralPointFilter.SimultaneousUpdateAndFixedNormals
+1/4 Test #2726: BilateralPointFilter.SimultaneousUpdateAndFixedNormals ...................   Passed    0.01 sec
+    Start 2727: BilateralPointFilter.IndependentNeighborhoodsAcrossMovingPassesAndTies
+2/4 Test #2727: BilateralPointFilter.IndependentNeighborhoodsAcrossMovingPassesAndTies ...   Passed    0.01 sec
+    Start 2728: BilateralPointFilter.PlaneCoincidentAndDegenerateNormalsStayFinite
+3/4 Test #2728: BilateralPointFilter.PlaneCoincidentAndDegenerateNormalsStayFinite .......   Passed    0.01 sec
+    Start 2729: BilateralPointFilter.InvalidRowsAndParametersNeverPartiallyPublish
+4/4 Test #2729: BilateralPointFilter.InvalidRowsAndParametersNeverPartiallyPublish .......   Passed    0.01 sec
+
+100% tests passed, 0 tests failed out of 4
+
+Label Time Summary:
+geometry    =   0.02 sec*proc (4 tests)
+unit        =   0.02 sec*proc (4 tests)
+
+Total Test time (real) =   0.24 sec

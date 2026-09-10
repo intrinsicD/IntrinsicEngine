@@ -1,0 +1,30 @@
+Internal ctest changing into directory: /home/alex/Documents/IntrinsicEngine/build/ci-vulkan
+Test project /home/alex/Documents/IntrinsicEngine/build/ci-vulkan
+    Start 19: PointLBVHGpuSmoke.BilateralPublishesMovingPassesAcrossDomains
+1/2 Test #19: PointLBVHGpuSmoke.BilateralPublishesMovingPassesAcrossDomains ...   Passed   60.77 sec
+    Start 20: PointLBVHGpuSmoke.BilateralRejectsStaleAndCancelledPasses
+2/2 Test #20: PointLBVHGpuSmoke.BilateralRejectsStaleAndCancelledPasses .......***Timeout  30.15 sec
+Running main() from /home/alex/Documents/IntrinsicEngine/external/vcpkg/buildtrees/gtest/src/v1.17.0-0c449efaff.clean/googletest/src/gtest_main.cc
+Note: Google Test filter = PointLBVHGpuSmoke.BilateralRejectsStaleAndCancelledPasses
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from PointLBVHGpuSmoke
+[ RUN      ] PointLBVHGpuSmoke.BilateralRejectsStaleAndCancelledPasses
+[32m[INFO] Initialized Scheduler with 15 worker threads.[0m
+[33m[WARN] [Runtime] Promoted Vulkan device selected; backend remains fail-closed until the first clean default-recipe validation promotes it.[0m
+[33m[WARN] [VulkanDevice::Initialize] Vulkan bootstrap created logical-device, queue, VMA, per-frame command/sync, swapchain image/view/handle, bindless heap, transfer queue, and global pipeline-layout state; canonical frame execution waits for the first clean recipe validation publish, so device remains non-operational during cold start.[0m
+[33m[WARN] [Runtime] VulkanRequestedButNotOperational status=RequestedButIncompleteGate reason=BarrierValidationFailed[0m
+
+
+50% tests passed, 1 tests failed out of 2
+
+Label Time Summary:
+gpu            =  90.91 sec*proc (2 tests)
+graphics       =  90.91 sec*proc (2 tests)
+integration    =  90.91 sec*proc (2 tests)
+vulkan         =  90.91 sec*proc (2 tests)
+
+Total Test time (real) =  91.08 sec
+
+The following tests FAILED:
+	 20 - PointLBVHGpuSmoke.BilateralRejectsStaleAndCancelledPasses (Timeout)

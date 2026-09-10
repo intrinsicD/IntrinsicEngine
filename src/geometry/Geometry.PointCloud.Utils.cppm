@@ -211,24 +211,9 @@ export namespace Geometry::PointCloud
     // Bilateral Filter (Edge-Preserving Smoothing)
     // -------------------------------------------------------------------------
     //
-    // Edge-preserving point cloud smoothing using spatial and normal-space
-    // Gaussian weighting. Preserves sharp features that uniform Laplacian
-    // smoothing destroys.
-    //
-    // For each point p_i with normal n_i, the filtered position is:
-    //
-    //   p_i' = p_i + n_i * [ sum_j w_s(||p_j - p_i||) * w_n(1 - n_i·n_j)
-    //                         * <p_j - p_i, n_i> ]
-    //          / [ sum_j w_s(||p_j - p_i||) * w_n(1 - n_i·n_j) ]
-    //
-    // where w_s and w_n are Gaussian kernels with spatial and normal bandwidths.
-    // Positions move only along the normal direction, preserving tangential
-    // geometry.
-    //
-    // References:
-    //   - Fleishman, Drori, Cohen-Or, "Bilateral Mesh Denoising" (SIGGRAPH 2003)
-    //   - Zheng, Fu, Au, Tai, "Bilateral Normal Filtering for Mesh Denoising"
-    //     (IEEE TVCG 2011)
+    // Fixed-normal point filtering with spatial and absolute-normal-dot Gaussian
+    // weights. Each pass moves points simultaneously along their input normals.
+    // This is not the face-normal/reconstruction pipeline of mesh denoising.
 
     struct BilateralFilterParams
     {
@@ -251,6 +236,25 @@ export namespace Geometry::PointCloud
     [[nodiscard]] std::optional<BilateralFilterResult> BilateralFilter(
         Cloud& cloud,
         const BilateralFilterParams& params = {});
+
+    struct BilateralFilterOutput
+    {
+        std::vector<glm::vec3> Positions;
+        BilateralFilterResult Diagnostics{};
+        float SpatialSigmaUsed{};
+    };
+
+    // Returns an owned result; failures never partially modify either input span.
+    // Normals stay fixed across passes. Zero sampled spacing uses sigma 0.01.
+    [[nodiscard]] std::optional<BilateralFilterOutput> BilateralFilter(
+        std::span<const glm::vec3> positions, std::span<const glm::vec3> normals,
+        const BilateralFilterParams& params = {});
+
+    // Exactly one pass with positive resolved SpatialSigma and Iterations == 1.
+    // Rows hold min(n,k+1) candidates in squared-distance/ID order, then self is discarded.
+    [[nodiscard]] std::optional<BilateralFilterOutput> BilateralFilterStepFromNeighbors(
+        std::span<const glm::vec3> positions, std::span<const glm::vec3> normals,
+        std::span<const std::uint32_t> candidates, const BilateralFilterParams& params);
 
     // -------------------------------------------------------------------------
     // Outlier Probability Estimation

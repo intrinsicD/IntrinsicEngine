@@ -125,3 +125,6 @@ RUNTIME-223 adds typed-span and supplied-neighbor overloads for the existing
 ratio heuristic and integrates it into the shared outlier workflow. Bilateral
 filtering and point features remain separate slices; Framework24 covariance
 probability must not be confused with this existing distance-ratio formula.
+
+## Bilateral slice
+RUNTIME-224 adds owned span results and a supplied-neighbor single-pass reducer for the fixed-normal point filter, preserving the Cloud wrapper with atomic publication. Runtime uses all canonical domains and private cache workspaces for moving iterations. Feature utilities and the distinct Framework24 covariance probability remain separate work; older progress paragraphs above record their slice-time remainder.

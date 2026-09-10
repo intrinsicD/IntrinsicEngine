@@ -44,6 +44,13 @@ export namespace Extrinsic::Runtime
         Geometry::PointLBVH::Index Index{};
         std::vector<std::uint32_t> Slots{};
     };
+    struct SpatialIndexWorkspace
+    {
+        SpatialIndexHandle Handle{};
+        std::shared_ptr<const SpatialIndexSnapshot> Snapshot{};
+        std::string Diagnostic{};
+        [[nodiscard]] bool Ready() const noexcept { return Handle.Value && bool(Snapshot); }
+    };
     enum class SpatialQueryState : std::uint8_t { Queued, Submitted, Ready, Failed };
     struct SpatialNearestBatch
     {
@@ -68,6 +75,10 @@ export namespace Extrinsic::Runtime
         [[nodiscard]] SpatialIndexAcquisition Acquire(WorldHandle world, entt::entity entity,
                                                       const GeometryPropertyRef& positions,
                                                       SpatialIndexSpace space = SpatialIndexSpace::Property);
+        // Device-owner thread only. Owns private positions with identity row IDs.
+        // Keep the snapshot lease alive while querying; dropping its last caller
+        // lease expires the handle. Pending GPU work retains resources until safe.
+        [[nodiscard]] SpatialIndexWorkspace CreateWorkspace(std::span<const glm::vec3> positions);
         // Immutable CPU lease survives eviction; indices here are compact, Slots maps to original rows.
         [[nodiscard]] std::shared_ptr<const SpatialIndexSnapshot> Snapshot(SpatialIndexHandle handle) const;
         // Device-owner thread only. Reuse a completed batch to retain its buffer allocation.

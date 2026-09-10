@@ -327,7 +327,7 @@ TEST(SandboxEditorPresentation, DefaultDrawStartsWithOnlyMenuBarVisible)
 
     EXPECT_TRUE(ImGuiWindowExists("##MainMenuBar"));
     const auto menu = shell.BuildEditorWindowMenuModel();
-    ASSERT_EQ(menu.size(), 56u);
+    ASSERT_EQ(menu.size(), 60u);
     for (const Runtime::EditorWindowMenuEntry& entry : menu)
     {
         EXPECT_FALSE(entry.Open) << entry.Id;
@@ -345,7 +345,7 @@ TEST(SandboxEditorPresentation, DomainMenusUseAppearanceAndFocusedProcessingWind
         std::string_view Id;
         std::vector<std::string> MenuPath;
     };
-    const std::array<ExpectedWindow, 46> expected{{
+    const std::array<ExpectedWindow, 50> expected{{
         {"pointcloud.appearance", {"PointCloud"}},
         {"pointcloud.properties", {"PointCloud"}},
         {"pointcloud.selection", {"PointCloud"}},
@@ -379,12 +379,16 @@ TEST(SandboxEditorPresentation, DomainMenusUseAppearanceAndFocusedProcessingWind
         {"view.normal_estimation", {"View"}},
         {"view.kernel_density", {"View"}},
         {"view.point_spacing", {"View"}},
+        {"view.bilateral_filter", {"View"}},
         {"mesh.processing.kernel_density", {"Mesh", "Processing"}},
         {"mesh.processing.point_spacing", {"Mesh", "Processing"}},
+        {"mesh.processing.bilateral_filter", {"Mesh", "Processing"}},
         {"graph.processing.kernel_density", {"Graph", "Processing"}},
         {"graph.processing.point_spacing", {"Graph", "Processing"}},
+        {"graph.processing.bilateral_filter", {"Graph", "Processing"}},
         {"pointcloud.processing.kernel_density", {"PointCloud", "Processing"}},
         {"pointcloud.processing.point_spacing", {"PointCloud", "Processing"}},
+        {"pointcloud.processing.bilateral_filter", {"PointCloud", "Processing"}},
         {"view.outlier_analysis", {"View"}},
         {"mesh.processing.outliers", {"Mesh", "Processing"}},
         {"graph.processing.outliers", {"Graph", "Processing"}},
@@ -1555,6 +1559,30 @@ TEST(SandboxEditorPresentation, SpacingDomainMenusOpenOneSharedWindow)
         ASSERT_TRUE(shell.SetEditorWindowOpen("view.point_spacing", false));
     }
     ASSERT_TRUE(shell.SetEditorWindowOpen("view.point_spacing", true));
+    engine.Run();
+    shell.Detach();
+    engine.Shutdown();
+}
+
+TEST(SandboxEditorPresentation, BilateralDomainMenusOpenOneSharedWindow)
+{
+    Intrinsic::Tests::RuntimeTestKernel engine(HeadlessConfig(), std::make_unique<OneFrameApplication>());
+    ComposeEditorUiAndInitialize(engine);
+    Editor::EditorShell shell;
+    shell.Attach(engine.Worlds(), engine.Services());
+    Editor::MeshProcessingPanels panels;
+    panels.Register(shell);
+    for (const auto* id : {"mesh.processing.bilateral_filter", "graph.processing.bilateral_filter", "pointcloud.processing.bilateral_filter"})
+    {
+        ASSERT_TRUE(shell.SetEditorWindowOpen(id, true));
+        const auto menu = shell.BuildEditorWindowMenuModel();
+        ASSERT_NE(FindWindow(menu, "view.bilateral_filter"), nullptr);
+        EXPECT_TRUE(FindWindow(menu, "view.bilateral_filter")->Open);
+        ASSERT_NE(FindWindow(menu, id), nullptr);
+        EXPECT_FALSE(FindWindow(menu, id)->Open);
+        ASSERT_TRUE(shell.SetEditorWindowOpen("view.bilateral_filter", false));
+    }
+    ASSERT_TRUE(shell.SetEditorWindowOpen("view.bilateral_filter", true));
     engine.Run();
     shell.Detach();
     engine.Shutdown();

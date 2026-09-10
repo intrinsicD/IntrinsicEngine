@@ -20,7 +20,7 @@ Root scanned: `src`
 | `graphics/vulkan` | 13 |
 | `physics` | 1 |
 | `platform` | 5 |
-| `runtime` | 80 |
+| `runtime` | 81 |
 
 ## Modules
 
@@ -398,6 +398,7 @@ Root scanned: `src`
 | `Extrinsic.Runtime.ServiceRegistry` | `src/runtime/Kernel/Runtime.ServiceRegistry.cppm` | `runtime` |
 | `Extrinsic.Runtime.WorldHandle` | `src/runtime/Kernel/Runtime.WorldHandle.cppm` | `runtime` |
 | `Extrinsic.Runtime.WorldRegistry` | `src/runtime/Kernel/Runtime.WorldRegistry.cppm` | `runtime` |
+| `Extrinsic.Runtime.BilateralFilterConfig` | `src/runtime/Modules/BilateralFilter/Runtime.BilateralFilterConfig.cppm` | `runtime` |
 | `Extrinsic.Runtime.ClusteringConfig` | `src/runtime/Modules/Clustering/Runtime.ClusteringConfig.cppm` | `runtime` |
 | `Extrinsic.Runtime.ClusteringModule` | `src/runtime/Modules/Clustering/Runtime.ClusteringModule.cppm` | `runtime` |
 | `Extrinsic.Runtime.CurvatureSegmentationConfig` | `src/runtime/Modules/CurvatureSegmentation/Runtime.CurvatureSegmentationConfig.cppm` | `runtime` |
@@ -425,4 +426,4 @@ Root scanned: `src`
 | `Extrinsic.Runtime.StableEntityLookup` | `src/runtime/Scene/Runtime.StableEntityLookup.cppm` | `runtime` |
 | `Extrinsic.Runtime.VisualizationRecipes` | `src/runtime/Visualization/Runtime.VisualizationRecipes.cppm` | `runtime` |
 
-Total modules: **398**
+Total modules: **399**

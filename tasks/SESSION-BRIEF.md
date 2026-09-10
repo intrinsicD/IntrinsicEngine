@@ -17,6 +17,7 @@ picking backlog work; theme priorities and rationale live in
 - `RUNTIME-219` — Vulkan LBVH neighborhoods for normal estimation (tasks/active/RUNTIME-219-vulkan-normal-neighborhoods.md)
 - `RUNTIME-220` — Kernel density with shared spatial backends (tasks/active/RUNTIME-220-kernel-density-spatial-backends.md)
 - `RUNTIME-221` — Point spacing and radius estimation with shared spatial backends (tasks/active/RUNTIME-221-point-spacing-spatial-backends.md)
+- `RUNTIME-224` — Bilateral point filtering with shared spatial backends (tasks/active/RUNTIME-224-bilateral-point-filter-spatial-backends.md)
 - `UI-041` — Point-set outlier multi-domain panel (tasks/active/UI-041-point-set-outlier-multi-domain-panel.md)
 - `UI-053` — Curvature-extremum engine overlay (tasks/active/UI-053-curvature-extremum-engine-overlay.md)
 
@@ -137,6 +138,7 @@ picking backlog work; theme priorities and rationale live in
 - unblocked: `BUG-180` — Leak-enabled framed ICP process reports 240 retained bytes (tasks/backlog/bugs/BUG-180-framed-icp-leak-enabled-process-retention.md)
 - unblocked: `BUG-181` — Touched-scope shader-output command uses an unsupported flag (tasks/backlog/bugs/BUG-181-touched-scope-shader-output-command.md)
 - unblocked: `BUG-182` — Framed kNN smoke times out when promoted Vulkan is not compiled (tasks/backlog/bugs/BUG-182-framed-knn-unavailable-device-timeout.md)
+- unblocked: `BUG-183` — Preserve failed dependency state through job reaping (tasks/backlog/bugs/BUG-183-reaped-job-dependency-cancellation.md)
 - unblocked: `GRAPHICS-109` — Offscreen frame capture to PNG (headless figure renders) (tasks/backlog/rendering/GRAPHICS-109-offscreen-frame-capture-png.md)
 
 ## Audits

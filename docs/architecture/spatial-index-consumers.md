@@ -3,8 +3,8 @@
 This is the implementation-planning inventory for the shared
 [point LBVH](spatial-indices.md). It covers current geometry, runtime, graphics,
 physics and method consumers, Framework24 counterparts, and open work reviewed
-on 2026-09-09. **Candidate means a place to evaluate integration, not a shipped
-backend or a measured improvement.** The shared cache, Vulkan k-means, ICP and CPU/Vulkan normal/outlier/density-neighborhood
+on 2026-09-10. **Candidate means a place to evaluate integration, not a shipped
+backend or a measured improvement.** The shared cache, Vulkan k-means, ICP and CPU/Vulkan normal/outlier/density/spacing/bilateral-neighborhood
 rows below identify implemented LBVH consumers. Existing KD-tree, octree, grid and primitive
 BVH paths remain in place.
 
@@ -28,13 +28,15 @@ Runtime resolves the property and arranges borrowing/snapshots; existing
 KD-tree-specific APIs need an explicit adapter or scoped overload before they
 can consume an LBVH. A cache alone does not accelerate those callers.
 
-Moving private samples, centroids or solver iterates use a method-owned
-`Graphics::PointLbvhWorkspace` on the GPU (or a geometry index on the CPU),
-rebuilding after coordinate changes while reusing allocations. It is not an
-ECS component and is not built unconditionally every frame. GPU work must obey
-device-thread submission, barriers and resource-retirement rules. Physics owns
-its CPU simulation index; graphics owns scene-snapshot indices. Neither imports
-the runtime service.
+Moving runtime samples can use `SpatialIndexCache::CreateWorkspace`, retaining
+its immutable snapshot lease while querying. The handle expires when the last
+caller lease is released; pending GPU batches keep resources alive to safe
+completion. Bilateral filtering rebuilds these private indices after each pass.
+Lower-layer kernels and dedicated compute pipelines can continue using a
+method-owned `Graphics::PointLbvhWorkspace` or geometry index; neither requires
+an ECS component or unconditional per-frame build. Device-thread submission,
+barriers and retirement rules still apply. Physics owns its CPU simulation
+index; graphics owns scene-snapshot indices without importing runtime.
 
 Preserve original source slots, deletion masks, deterministic ties, units and
 query membership when integrating. Local-space caches need explicit treatment
@@ -55,12 +57,12 @@ path; selecting Vulkan must not imply every stage uses an LBVH.
 | [PCA point normals and MST orientation](../../src/geometry/Geometry.PointCloud.Normals.cpp) | **Integrated CPU and Vulkan LBVH neighborhood consumer** through shared normal config/commands, alongside existing KD-tree/octree kernel paths; radius or kNN neighborhoods feed local PCA and orientation edges. | Preserve complete radius support and existing k+1-then-filter policy. [Normal estimation](normal-estimation.md) uses canonical-domain cache leases and named publication (RUNTIME-213/UI-045, RUNTIME-219). Vulkan queries use bounded chunks, at most 64 kNN candidates including the extra self candidate, and reject radius support above 1024 hits. MST orientation and PCA solve remain CPU work; topology normal methods do not use proximity indices. |
 | [ISS saliency, nonmaximum suppression and FPFH](../../src/geometry/Geometry.PointCloud.Features.cpp) | KD-tree radius neighborhoods; automatic scale uses nearest-other spacing. | Shared positions can serve several analyses. Use available exclusion/kNN through a scoped adapter for scale and preserve neighbor caps/order. FPFH **descriptor matching** uses descriptor-space distance, so a 3D position LBVH cannot replace it. |
 | [Point statistics and splat radii](point-spacing.md) | CPU octree reference, cached CPU LBVH and framed Vulkan kNN feed CPU radius/nearest-spacing reductions. | RUNTIME-221 binds all eight domains with config/UI and named radius publication; preserve k+1-then-self-filter, duplicates and sampled statistics stride. RUNTIME-222 owns model-space radius rendering; current point sizes are pixels. |
-| [Bilateral filtering](../../src/geometry/Geometry.PointCloud.Utils.cpp) | Octree kNN neighborhoods and spacing-based scale. | kNN is available; adoption needs a scoped adapter; any tree over updated positions must rebuild per iteration. Preserve joint position/normal weights and the declared neighborhood rule. |
+| [Bilateral point filtering](bilateral-point-filter.md) | CPU octree, first-pass cached CPU LBVH and framed Vulkan kNN feed fixed-normal CPU updates. | RUNTIME-224 uses private working-set leases for later passes; rebuild each iteration, preserve k+1-then-self-filter and joint weights. Named or in-place same-domain output publishes only after all passes. |
 | [Statistical/radius outlier analysis](outlier-analysis.md) | CPU octree reference, cached CPU LBVH and framed Vulkan LBVH queries feed CPU classification. | RUNTIME-209/UI-041: named same-domain mask/score on all eight domains, strict population threshold or inclusive radius count, exact source exclusion. Radius consumes complete counts with capacity one. Separate current-mask removal only for point clouds. |
 | [Local distance-ratio score](outlier-analysis.md) | Existing mean-neighbor-distance ratio, with span and supplied-neighbor reducers. | RUNTIME-223 extends Outlier Analysis with shared CPU/framed Vulkan LBVH. Query k+1 candidates before self filtering; GPU k<=63. Distinct from Framework24 covariance probability, full LOF and LoOP. |
 | [Kernel density estimation](kernel-density.md) | CPU octree reference, cached CPU LBVH and framed Vulkan LBVH candidates feed CPU spacing bandwidth and local Gaussian averaging. | RUNTIME-220: all eight domains, named scalar publication/config/UI; preserves k+1-then-self-filter, duplicates, and automatic/manual bandwidth. Vulkan k<=63; no Gaussian radius cutoff or full-sample KDE claim. |
 | [Compact-support kernel reductions](../../src/geometry/Geometry.PointCloud.Kernels.cpp) | KD-tree radius traversal, with supplied-index/scratch overloads. | Strong radius candidate. Use complete neighborhoods or a parity-tested in-traversal reduction; the current 1024-hit GPU buffer cannot silently bound the kernel sum. |
-| [LOP / WLOP / CLOP / EAR](../../src/geometry/Geometry.PointCloud.Consolidation.cpp), [GPU path](../../src/runtime/Modules/PointCloudConsolidation/Runtime.PointCloudConsolidationGpu.cpp) | CPU radius KD-trees; existing GPU LOP/WLOP grid passes. Source attraction, density and moving-sample repulsion query compact support. | Stable source cache plus separate evolving sample workspace. Preserve the selected variant's support, weights, neighbor limits and reduction order; compare against the grid before replacing it. EAR insertions change cardinality. |
+| [LOP / WLOP / CLOP / EAR](../../src/geometry/Geometry.PointCloud.Consolidation.cpp), [GPU path](../../src/runtime/Modules/PointCloudConsolidation/Runtime.PointCloudConsolidationGpu.cpp) | CPU radius KD-trees; existing GPU LOP/WLOP grid passes. Source attraction, density and moving-sample repulsion query compact support. | Stable source cache plus separate evolving sample workspace; runtime iterations can reuse the leased `CreateWorkspace` path introduced for bilateral filtering. Preserve the selected variant's support, weights, neighbor limits and reduction order; compare against the grid before replacing it. EAR insertions change cardinality. |
 | [Automatic support radius and occupancy guards](../../src/geometry/Geometry.SupportRadius.cpp) | KD-tree kNN chooses scale, then radius queries estimate occupancy/workload. | Radius/counting fits; automatic rank selection can use available kNN/exclusion through an adapter. Never truncate occupancy and thereby understate the work budget. |
 | [Hoppe surface reconstruction](../../src/geometry/Geometry.SurfaceReconstruction.cpp) | Octree nearest or kNN oriented samples for grid signed-distance values. | Stable oriented-point index: nearest mode fits now; multi-neighbor mode can use available kNN after adapter parity. This accelerates field evaluation, not grid storage or Marching Cubes. |
 | [Progressive Poisson sampling](../../methods/geometry/progressive_poisson/src/ProgressivePoissonReference.cpp), [GPU acceptance](../../assets/shaders/progressive_poisson_accept_phase.comp) | Phase-specific spatial hashing and exact conflict checks; nearest-other distances support hierarchy construction. | Candidate only after comparing the paper's grid strategy. Accepted-set membership and phase order matter: indexing all input points as blockers changes the sampler. Needs an active subset/predicate or private rebuilt tree, and exclusion for spacing. |

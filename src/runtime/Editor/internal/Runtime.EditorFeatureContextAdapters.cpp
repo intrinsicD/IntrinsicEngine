@@ -96,6 +96,7 @@ MakeEditorGeometryProcessingContext(const EditorFeatureBindings &bindings) {
       .LastOutlierAnalysisResult = bindings.LastOutlierAnalysisResult,
       .LastKernelDensityResult = bindings.LastKernelDensityResult,
       .LastPointSpacingResult = bindings.LastPointSpacingResult,
+      .LastBilateralFilterResult = bindings.LastBilateralFilterResult,
       .EngineConfigControlState = bindings.EngineConfigControlState,
       .PreviewEngineConfigDocument = bindings.PreviewEngineConfigDocument,
       .ApplyEngineConfigHotSubset = bindings.ApplyEngineConfigHotSubset,
@@ -261,6 +262,7 @@ ToEditorFeatureBindingsImpl(const EditorGeometryProcessingContext &context) {
       .LastOutlierAnalysisResult = context.LastOutlierAnalysisResult,
       .LastKernelDensityResult = context.LastKernelDensityResult,
       .LastPointSpacingResult = context.LastPointSpacingResult,
+      .LastBilateralFilterResult = context.LastBilateralFilterResult,
       .EngineConfigControlState = context.EngineConfigControlState,
       .AttachmentActive = context.AttachmentActive,
       .InvalidateWorkspaceSnapshotCache =
@@ -399,6 +401,7 @@ ToEditorFeatureBindingsImpl(const EditorWorkspaceSnapshotContext &context) {
   bindings.LastOutlierAnalysisResult = geometry.LastOutlierAnalysisResult;
   bindings.LastKernelDensityResult = geometry.LastKernelDensityResult;
   bindings.LastPointSpacingResult = geometry.LastPointSpacingResult;
+  bindings.LastBilateralFilterResult = geometry.LastBilateralFilterResult;
   bindings.MeshDenoiseKernelAvailable = geometry.MeshDenoiseKernelAvailable;
   bindings.MeshCurvatureKernelAvailable = geometry.MeshCurvatureKernelAvailable;
   bindings.MeshCurvatureDirectionsAvailable =

@@ -1,0 +1,28 @@
+Internal ctest changing into directory: /home/alex/Documents/IntrinsicEngine/build/ci
+Test project /home/alex/Documents/IntrinsicEngine/build/ci
+    Start 2685: BilateralFilter.NulloptOnEmptyCloud
+1/9 Test #2685: BilateralFilter.NulloptOnEmptyCloud ................   Passed    0.01 sec
+    Start 2686: BilateralFilter.NulloptOnSinglePoint
+2/9 Test #2686: BilateralFilter.NulloptOnSinglePoint ...............   Passed    0.01 sec
+    Start 2687: BilateralFilter.NulloptWithoutNormals
+3/9 Test #2687: BilateralFilter.NulloptWithoutNormals ..............   Passed    0.01 sec
+    Start 2688: BilateralFilter.ZeroIterationsReturnsEmptyResult
+4/9 Test #2688: BilateralFilter.ZeroIterationsReturnsEmptyResult ...   Passed    0.01 sec
+    Start 2689: BilateralFilter.FlatGridUnchanged
+5/9 Test #2689: BilateralFilter.FlatGridUnchanged ..................   Passed    0.01 sec
+    Start 2690: BilateralFilter.ReducesNoise
+6/9 Test #2690: BilateralFilter.ReducesNoise .......................   Passed    0.03 sec
+    Start 2691: BilateralFilter.MultipleIterationsConverge
+7/9 Test #2691: BilateralFilter.MultipleIterationsConverge .........   Passed    0.02 sec
+    Start 2692: BilateralFilter.DegenerateNormalsSkipped
+8/9 Test #2692: BilateralFilter.DegenerateNormalsSkipped ...........   Passed    0.01 sec
+    Start 2693: BilateralFilter.ResultDiagnosticsComplete
+9/9 Test #2693: BilateralFilter.ResultDiagnosticsComplete ..........   Passed    0.01 sec
+
+100% tests passed, 0 tests failed out of 9
+
+Label Time Summary:
+geometry    =   0.12 sec*proc (9 tests)
+unit        =   0.12 sec*proc (9 tests)
+
+Total Test time (real) =   0.43 sec

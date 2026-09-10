@@ -1,0 +1,44 @@
+Internal ctest changing into directory: /home/alex/Documents/IntrinsicEngine/build/ci-vulkan
+Test project /home/alex/Documents/IntrinsicEngine/build/ci-vulkan
+    Start 19: PointLBVHGpuSmoke.BilateralPublishesMovingPassesAcrossDomains
+1/1 Test #19: PointLBVHGpuSmoke.BilateralPublishesMovingPassesAcrossDomains ...***Failed   98.74 sec
+Running main() from /home/alex/Documents/IntrinsicEngine/external/vcpkg/buildtrees/gtest/src/v1.17.0-0c449efaff.clean/googletest/src/gtest_main.cc
+Note: Google Test filter = PointLBVHGpuSmoke.BilateralPublishesMovingPassesAcrossDomains
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from PointLBVHGpuSmoke
+[ RUN      ] PointLBVHGpuSmoke.BilateralPublishesMovingPassesAcrossDomains
+[32m[INFO] Initialized Scheduler with 15 worker threads.[0m
+[33m[WARN] [Runtime] Promoted Vulkan device selected; backend remains fail-closed until the first clean default-recipe validation promotes it.[0m
+[33m[WARN] [VulkanDevice::Initialize] Vulkan bootstrap created logical-device, queue, VMA, per-frame command/sync, swapchain image/view/handle, bindless heap, transfer queue, and global pipeline-layout state; canonical frame execution waits for the first clean recipe validation publish, so device remains non-operational during cold start.[0m
+[33m[WARN] [Runtime] VulkanRequestedButNotOperational status=RequestedButIncompleteGate reason=BarrierValidationFailed[0m
+/home/alex/Documents/IntrinsicEngine/tests/integration/graphics/Test.PointLBVHGpuSmoke.cpp:1680: Failure
+Value of: run->TimedOut
+  Actual: true
+Expected: false
+phase=3
+
+[  FAILED  ] PointLBVHGpuSmoke.BilateralPublishesMovingPassesAcrossDomains (98688 ms)
+[----------] 1 test from PointLBVHGpuSmoke (98688 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (98688 ms total)
+[  PASSED  ] 0 tests.
+[  FAILED  ] 1 test, listed below:
+[  FAILED  ] PointLBVHGpuSmoke.BilateralPublishesMovingPassesAcrossDomains
+
+ 1 FAILED TEST
+
+
+0% tests passed, 1 tests failed out of 1
+
+Label Time Summary:
+gpu            =  98.74 sec*proc (1 test)
+graphics       =  98.74 sec*proc (1 test)
+integration    =  98.74 sec*proc (1 test)
+vulkan         =  98.74 sec*proc (1 test)
+
+Total Test time (real) = 100.21 sec
+
+The following tests FAILED:
+	 19 - PointLBVHGpuSmoke.BilateralPublishesMovingPassesAcrossDomains (Failed)

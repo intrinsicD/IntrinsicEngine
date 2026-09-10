@@ -138,6 +138,7 @@ export namespace Extrinsic::Runtime::EditorFeatureDetail
         const EditorOutlierAnalysisResult* LastOutlierAnalysisResult{nullptr};
         const EditorKernelDensityResult* LastKernelDensityResult{nullptr};
         const EditorPointSpacingResult* LastPointSpacingResult{nullptr};
+        const EditorBilateralFilterResult* LastBilateralFilterResult{nullptr};
         const Graphics::RenderGraphFrameStats* RenderGraphStats{nullptr};
         const Graphics::RenderRecipeConfigContext* RenderRecipeContext{nullptr};
         EditorRenderRecipeEditorState* RenderRecipeEditorState{nullptr};
@@ -291,6 +292,7 @@ export namespace Extrinsic::Runtime::EditorFeatureDetail
         std::optional<EditorOutlierAnalysisResult> m_LastOutlierAnalysisResult{};
         std::optional<EditorKernelDensityResult> m_LastKernelDensityResult{};
         std::optional<EditorPointSpacingResult> m_LastPointSpacingResult{};
+        std::optional<EditorBilateralFilterResult> m_LastBilateralFilterResult{};
         // Submit-time identity for jobs this session put on `JobService`, which
         // stores none itself. The index is pruned against `SnapshotAll()` each
         // frame and projected by `EditorJobCommandSurface` queries.

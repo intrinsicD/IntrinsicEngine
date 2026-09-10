@@ -93,6 +93,7 @@ namespace Extrinsic::Runtime
         struct Entry
         {
             std::uint64_t Id{};
+            bool Transient{};
             WorldHandle World{};
             entt::entity Entity{};
             GeometryPropertyRef Ref{};
@@ -206,6 +207,7 @@ namespace Extrinsic::Runtime
         SpatialIndexCacheStats Stats{};
         bool Current(const Entry& e) const
         {
+            if (e.Transient) return e.Snapshot.use_count() > 1;
             auto source = Resolve(Worlds, e.World, e.Entity, e.Ref);
             return source && source->Points.Revision() == e.Revision &&
                    source->Points.Size() == e.Size &&
@@ -290,7 +292,7 @@ namespace Extrinsic::Runtime
             return {.Diagnostic =
                         "A live entity and compatible canonical float3 property are required."};
         auto old = std::ranges::find_if(s.Entries, [&](const auto& e) {
-            return e->World == world && e->Entity == entity && e->Ref == ref && e->Space == space;
+            return !e->Transient && e->World == world && e->Entity == entity && e->Ref == ref && e->Space == space;
         });
         if (old != s.Entries.end())
         {
@@ -327,6 +329,21 @@ namespace Extrinsic::Runtime
         s.Entries.push_back(std::move(e));
         ++s.Stats.Builds;
         return {{id}, false, {}};
+    }
+    SpatialIndexWorkspace SpatialIndexCache::CreateWorkspace(std::span<const glm::vec3> positions)
+    {
+        auto e = std::make_shared<Impl::Entry>();
+        if (positions.empty() || !e->Snapshot->Index.Build(positions))
+            return {.Diagnostic = "A private LBVH workspace requires 1..2^24 finite points within +/-1e18."};
+        e->Transient = true;
+        e->Device = m_Impl->Device;
+        e->Id = m_Impl->Next++;
+        e->Snapshot->Slots.resize(positions.size());
+        for (std::uint32_t i = 0; i < positions.size(); ++i) e->Snapshot->Slots[i] = i;
+        SpatialIndexWorkspace result{{e->Id}, e->Snapshot, {}};
+        m_Impl->Entries.push_back(std::move(e));
+        ++m_Impl->Stats.Builds;
+        return result;
     }
     std::shared_ptr<const SpatialIndexSnapshot> SpatialIndexCache::Snapshot(SpatialIndexHandle handle) const
     {

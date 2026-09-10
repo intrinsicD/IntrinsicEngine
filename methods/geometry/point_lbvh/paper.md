@@ -120,3 +120,6 @@ See [outlier analysis](../../../docs/architecture/outlier-analysis.md) for
 zero-density behavior, controls and limits. The diagnostic smoke manifest is
 `geometry.point_lbvh.distance_ratio_runtime_smoke`; runtime timing includes
 framed scheduling and publication, and does not establish a speedup.
+
+### Bilateral point-filter consumer
+The [bilateral point-filter contract](../../../docs/architecture/bilateral-point-filter.md) preserves fixed normal-dot/spatial weights and simultaneous updates. Its first pass can reuse an entity index; subsequent framed Vulkan passes create leased private working sets over the updated positions. The job chain publishes only its terminal result and reports CPU reductions separately. `geometry.point_lbvh.bilateral_runtime_smoke` compares three-pass eight-domain publication with the octree reference. This is not the complete Fleishman or Zheng mesh pipeline, a refit implementation, or a speedup claim.

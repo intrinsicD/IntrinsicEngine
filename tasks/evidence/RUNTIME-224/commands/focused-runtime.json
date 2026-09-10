@@ -1,0 +1,26 @@
+{
+  "command": [
+    "ctest",
+    "--test-dir",
+    "build/ci",
+    "--output-on-failure",
+    "-R",
+    "^(BilateralFilterOperations|BilateralFilterConfig|SpatialIndexCache)\\.|^SandboxEditorPresentation\\.(BilateralDomainMenusOpenOneSharedWindow|DomainMenusUseAppearanceAndFocusedProcessingWindows)$",
+    "--timeout",
+    "60"
+  ],
+  "command_display": "ctest --test-dir build/ci --output-on-failure -R '^(BilateralFilterOperations|BilateralFilterConfig|SpatialIndexCache)\\.|^SandboxEditorPresentation\\.(BilateralDomainMenusOpenOneSharedWindow|DomainMenusUseAppearanceAndFocusedProcessingWindows)$' --timeout 60",
+  "cwd": ".",
+  "duration_ms": 616,
+  "exit_code": 0,
+  "finished_at": "2026-09-10T00:15:10Z",
+  "label": "focused-runtime",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-09-10T00:15:09Z",
+  "stderr_path": "tasks/evidence/RUNTIME-224/commands/focused-runtime.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/RUNTIME-224/commands/focused-runtime.stdout.log",
+  "stdout_sha256": "dd3fb9a56ed0339a69e048797b27f1fc58c0988779c9101cc023f76c3e52085b",
+  "task_id": "RUNTIME-224"
+}

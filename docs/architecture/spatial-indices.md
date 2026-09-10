@@ -174,3 +174,9 @@ spacing and local Gaussian support. CPU bandwidth/evaluation remains shared;
 Vulkan preserves the extra candidate (k<=63) and canonical-domain publication.
 
 [Point spacing and radii](point-spacing.md) reuse the same framed kNN cache with k+1-then-self-filter semantics. CPU reduction computes radii and nearest-other spacing from one query set; rendering these model-space radii is tracked separately by RUNTIME-222.
+
+## Private moving-point working sets
+
+`SpatialIndexCache::CreateWorkspace` creates an owned immutable point index with identity source IDs. The returned snapshot is the caller's lifetime lease; releasing the final caller lease expires the handle, and `Prune` evicts the entry. Queued/submitted batches retain the underlying entry and GPU resources through safe completion. Calls and GPU resource retirement stay on the device-owner thread. Immutable CPU snapshots can outlive cache eviction.
+
+[Bilateral point filtering](bilateral-point-filter.md) uses the entity cache for its initial positions and private workspaces for subsequent passes. Original ECS revisions independently guard terminal publication. These workspaces rebuild indices; they do not implement refit or allocation reuse across iterations. Lower-layer methods can still own direct geometry/graphics workspaces without runtime dependencies.
