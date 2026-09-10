@@ -11802,3 +11802,22 @@ tree:
     alternatives: [Silently truncate density sums, Change strict support to float distance, Add a new service for one kernel consumer, Assume device denormal preservation]
     evidence: [N535, O220, docs/architecture/density-weights.md]
     status: resolved
+
+  - id: N537
+    type: experiment
+    title: Finish cached CPU and framed Vulkan LOP integration
+    provenance: ai-executed
+    timestamp: '2026-09-10T06:59:01+02:00'
+    result: C89 and C90 bind shared LOP projection arithmetic to cached CPU and framed Vulkan neighborhoods. Final CPU gate has 4465 passes and one expected skip; 48 focused cases and three distinct actual Vulkan cases pass. GPU reduction remains CPU arithmetic.
+    evidence: [ara/evidence/diagnostics/lop_cpu_lbvh_2026-09-10/record.json, ara/evidence/diagnostics/lop_vulkan_lbvh_2026-09-10/record.json]
+    status: resolved
+
+  - id: N538
+    type: decision
+    title: Follow the operator's sequential overnight deadline
+    provenance: user
+    timestamp: '2026-09-10T06:59:01+02:00'
+    choice: Continue remaining spatial consumers, then Framework24 ports, one by one until 07:00 Europe/Berlin; reuse existing code and useful abstractions.
+    alternatives: []
+    evidence: [docs/architecture/spatial-index-consumers.md, tasks/done/RUNTIME-229-lop-framed-lbvh-projection.md]
+    status: resolved

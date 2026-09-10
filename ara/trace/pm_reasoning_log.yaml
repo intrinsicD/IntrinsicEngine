@@ -2011,3 +2011,10 @@ entries:
     - Retain initial passing tests and final-source reconciliation. An unused generic enum addition was removed during review; final enum values remain unchanged. Expected stale/cancel prerequisite logs are not numerical failures.
     - Dirty framed timing supports no speedup or default change. BUG-177/178/180 remain separate; no commit or push occurred.
     - Reviewed retained observations conservatively: O93's operation lifecycle and O204's spatial adoption remain topical, O213 count-only guidance is not adopted, and retained atlas/DAG/selection context receives no new closure signal. No unrelated promotion or inferred researcher endorsement.
+
+  - turn: 2026-09-10_001#2
+    notes:
+    - C84 through C90 are bounded source-bound capability records crystallized by artifact commitment, not inferred user affirmation. Dirty timings support no speedup or default change.
+    - Preserve failed experiments and harness corrections: rejected source assumptions, GPU cold-start skip, cache priming after property storage replacement, complete capacity overflow and measured timeout sizing. No cross-storage cache reuse claim.
+    - Vulkan neighborhood execution and CPU numerical reductions remain distinct. Partial LOP submission is statically reviewed only; no all-interleaving or leak-freedom proof.
+    - The 07:00 deadline ends this authorized run. Remaining projection adapters and Framework24 ports stay open; unrelated staged observations receive no promotion or inferred abandonment.

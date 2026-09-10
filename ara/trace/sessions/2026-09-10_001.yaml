@@ -2,10 +2,10 @@ session:
   id: 2026-09-10_001
   date: '2026-09-10'
   started: '2026-09-10T00:25:43+02:00'
-  last_turn: '2026-09-10T00:25:43+02:00'
-  turn_count: 1
-  summary: Implemented canonical point spacing/radii with shared CPU/Vulkan neighborhoods and bounded numerical
-    evidence; CPU default retained, model-space rendering tracked separately.
+  last_turn: '2026-09-10T06:59:01+02:00'
+  turn_count: 2
+  summary: Completed sequential spatial integrations through LOP with CPU/Vulkan tests, shared neighborhoods and
+    explicit remaining Framework24 work.
 events_logged:
 - turn: 1
   type: decision
@@ -31,6 +31,60 @@ events_logged:
   routing: crystallized
   provenance: ai-executed
   summary: C83 binds bounded spacing/radius evidence via artifact commitment.
+- turn: 2
+  type: experiment
+  id: N537
+  routing: direct
+  provenance: ai-executed
+  summary: CPU and framed Vulkan LOP pass bounded source-bound verification.
+- turn: 2
+  type: decision
+  id: N538
+  routing: direct
+  provenance: user
+  summary: Operator authorized sequential work until 07:00.
+- turn: 2
+  type: observation
+  id: O216
+  routing: crystallized
+  provenance: ai-executed
+  summary: C84 binds bounded implementation artifacts; no user endorsement or speedup inferred.
+- turn: 2
+  type: observation
+  id: O217
+  routing: crystallized
+  provenance: ai-executed
+  summary: C85 binds bounded implementation artifacts; no user endorsement or speedup inferred.
+- turn: 2
+  type: observation
+  id: O218
+  routing: crystallized
+  provenance: ai-executed
+  summary: C86 binds bounded implementation artifacts; no user endorsement or speedup inferred.
+- turn: 2
+  type: observation
+  id: O219
+  routing: crystallized
+  provenance: ai-executed
+  summary: C87 binds bounded implementation artifacts; no user endorsement or speedup inferred.
+- turn: 2
+  type: observation
+  id: O220
+  routing: crystallized
+  provenance: ai-executed
+  summary: C88 binds bounded implementation artifacts; no user endorsement or speedup inferred.
+- turn: 2
+  type: observation
+  id: O221
+  routing: crystallized
+  provenance: ai-executed
+  summary: C89 binds bounded implementation artifacts; no user endorsement or speedup inferred.
+- turn: 2
+  type: observation
+  id: O222
+  routing: crystallized
+  provenance: ai-executed
+  summary: C90 binds bounded implementation artifacts; no user endorsement or speedup inferred.
 ai_actions:
 - turn: 1
   action: Added span and supplied-candidate statistics/radii, canonical config/runtime/window publication, analytical/CPU/GPU
@@ -43,14 +97,49 @@ ai_actions:
   - src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Spacing.cpp
   - tests/contract/runtime/Test.PointSpacingOperations.cpp
   - docs/architecture/point-spacing.md
+- turn: 2
+  action: Committed and published the initial normal/outlier/density/spacing checkpoint and completed distance ratio,
+    bilateral, keypoint, FPFH, compact density weights and CPU LOP. Completed framed Vulkan LOP verification and
+    prepared final publication. Fixed failed-job ancestor retention and tiny support occupancy. Preserved initial
+    failures, cold-start skip and cache-priming correction; independent review gates were used for each high-risk
+    slice.
+  provenance: ai-executed
+  files_changed:
+  - docs/architecture/spatial-index-consumers.md
+  - src/runtime/Modules/PointCloudConsolidation/Runtime.PointCloudConsolidationModule.cpp
+  - ara/logic/claims.md
 claims_touched:
 - id: C83
   action: crystallized
   turn: 1
+- id: C84
+  action: crystallized
+  turn: 2
+- id: C85
+  action: crystallized
+  turn: 2
+- id: C86
+  action: crystallized
+  turn: 2
+- id: C87
+  action: crystallized
+  turn: 2
+- id: C88
+  action: crystallized
+  turn: 2
+- id: C89
+  action: crystallized
+  turn: 2
+- id: C90
+  action: crystallized
+  turn: 2
 key_context:
 - turn: 1
   excerpt: Ok now continue with the next method. Specific choice of spacing/radii was agent-selected within the
     accepted sequence; no user reaction to results is inferred.
+- turn: 2
+  excerpt: The user authorized iterating remaining methods until 07:00. No subsequent reaction to outcomes or numerical
+    measurements is inferred.
 open_threads:
 - 'Spatial consumer inventory: shared kNN/exclusion and the normal adapter are implemented; remaining method migrations
   and primitive/ray extensions stay open. METHOD-003A owns legacy-reference adoption intake.'
@@ -63,15 +152,15 @@ open_threads:
 - 'UI-053: detached curvature curves still need shared engine/config/UI publication.'
 - 'BUG-178/BUG-180: isolate incremental module-cache failure and leak-enabled pipeline allocation retention; no
   engine or driver ownership conclusion yet.'
-- RUNTIME-209/UI-041 outlier analysis is implemented and verified locally, pending publication. GEOM-073 still owns
-  remaining probability, bilateral and feature adapters.
 - 'BUG-181: correct touched-scope shader-output CLI arguments and producer ordering on a fresh build tree.'
-- RUNTIME-219 normal GPU neighborhoods are verified locally; publication and remaining consumers are separate. BUG-182
-  tracks the unavailable framed kNN fixture timeout.
-- RUNTIME-220 density is implemented and verified locally, pending publication; GPU bandwidth/Gaussian evaluation
-  and full-sample KDE are outside this slice.
-- RUNTIME-221 spacing/radii is verified locally and pending publication. RUNTIME-222 owns model-space radius binding/upload/projection;
-  no radius rendering or coverage guarantee was added.
+- WLOP/CLOP/EAR framed Vulkan LBVH adapters remain; reuse fixed-source leases, moving workspaces and compact-density
+  reducers.
+- 'GEOM-073: Framework24 scalar Gaussian saliency, covariance probability and remaining descriptor matching/utilities
+  remain. No new saliency port was started before the deadline.'
+- RUNTIME-222 model-space radius rendering remains open. Earlier normal/outlier/density/spacing implementation is
+  published; old microtask retirement metadata still needs cleanup.
+- BUG-184 aggregate waiting-state job statistics remain open. BUG-178/180 toolchain/leak limitations remain; no
+  full isolated CPU sanitizer rerun or speedup claim.
 ai_suggestions_pending:
 - O198 is partially exercised by METHOD-046. Its broader independent-alignment and seed-relocation alternatives
   remain unsettled; no blanket heuristic or production default is promoted.

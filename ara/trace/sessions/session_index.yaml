@@ -1,392 +1,562 @@
 sessions:
-  - id: "2026-06-15_001"
-    date: "2026-06-15"
-    summary: "Implemented and retired RUNTIME-109 CPU mesh attribute texture bakes; retired GRAPHICS-088 at CPUContracted with GRAPHICS-089 tracking the Vulkan generated-UV proof."
-    turn_count: 2
-    events_count: 6
-    claims_touched: []
-    open_threads: 2
-  - id: "2026-06-16_001"
-    date: "2026-06-16"
-    summary: "Implemented and retired ASSETIO-005, GEOM-018, GEOM-025, ASSETIO-008, and BUG-044; accepted ADR-0021; retired RUNTIME-110 into follow-up runtime/UI/rendering implementation slices."
-    turn_count: 9
-    events_count: 26
-    claims_touched: []
-    open_threads: 2
-  - id: "2026-06-17_001"
-    date: "2026-06-17"
-    summary: "Implemented, verified, committed, and retired UI-018 so the sandbox editor starts menu-first with all panels closed by default."
-    turn_count: 1
-    events_count: 2
-    claims_touched: []
-    open_threads: 0
-  - id: "2026-06-18_001"
-    date: "2026-06-18"
-    summary: "Diagnosed and fixed GRAPHICS-091 sandbox UI-enabled line/point colormap rendering; Vulkan and CPU gates passed."
-    turn_count: 1
-    events_count: 2
-    claims_touched: []
-    open_threads: 1
-  - id: "2026-06-20_001"
-    date: "2026-06-20"
-    summary: "Implemented UI-022 mesh vertex-normal recompute and fixed BUG-047 so current surface shading uses packed vertex-normal attributes."
-    turn_count: 3
-    events_count: 6
-    claims_touched: []
-    open_threads: 2
-  - id: "2026-06-21_001"
-    date: "2026-06-21"
-    summary: "Diagnosed, fixed, verified, and committed the GEOM-026 mesh normal recompute slice with UI-022 integration and BUG-047/048/049 shader/runtime/renderer fixes."
-    turn_count: 3
-    events_count: 5
-    claims_touched: []
-    open_threads: 2
-  - id: "2026-06-22_001"
-    date: "2026-06-22"
-    summary: "Implemented, verified, committed, and retired GRAPHICS-095 through GRAPHICS-098 for the CPU/GPU transfer foundation, imported third-party productivity skills, audited stale BUG backlog tasks, and progressed rendering-design grilling through configurable data/channel policies, recipes, preview validation, diagnostics, provenance, lifecycle, renderer snapshot ownership, atomic snapshot publication, fallback generation scheduling, explicit async job outcome reporting, async outcome UI surfacing, selected-lens fail-closed behavior, typed render-lens input binding, scoped binding ambiguity resolution, research-lens shader/material ownership, surface-shading normal-channel policy, color-channel/base-color separation, explicit channel-domain rendering/conversion, and GPU-ready snapshot upload generations."
-    turn_count: 45
-    events_count: 53
-    claims_touched: []
-    open_threads: 4
-  - id: "2026-06-23_001"
-    date: "2026-06-23"
-    summary: "Continued rendering-design grilling by accepting lease-based GPU resource lifetime/eviction semantics, declarative renderer pass-graph composition, project-data-pure render passes, derived-candidate readback/write-back publication, readback job state/attempt semantics, bounded fair scheduling priorities, runtime-owned executor policy with subsystem contracts, shared job/diagnostic registry retention, typed registry query/actions, scoped diagnostic severity/blocking semantics, audited runtime diagnostic actions, undo/redo scope for rendering mutations, persisted reload-validated undo/redo history, transaction grouping/coalescing/naming, undo/redo conflict handling for async jobs and newer revisions, the audit-log versus undo-history boundary, explicit schema versioning/migration/validation for persisted rendering documents, source-of-truth boundaries for authored files versus generated artifacts/caches, portable reproducibility bundle contents/validation/replay behavior, fast tiered activation validation, design-driven validation optimization without fixed latency budgets, concrete fast-validation mechanisms, loadable low-risk/high-impact activation classification, high-impact approval/degraded-state policy, the overarching changeability goal, renderer/runtime extension seams, autonomous agent quality-evidence bundles, changeability-aware planning/self-review skills, required future-change plan/self-review contents, structured implementation evidence reports, blocking/warning rules for evidence-report validation, task-linked implementation evidence report storage/generation, an open-ended continuation mandate for remaining concrete rendering process decisions, canonical frame pipeline phase ownership, a general extensible immutable render snapshot contract, and a pivot toward renderer-specific input contracts where full-scene snapshots are optional."
-    turn_count: 34
-    events_count: 37
-    claims_touched: []
-    open_threads: 4
-  - id: "2026-06-24_001"
-    date: "2026-06-24"
-    summary: "Continued rendering-design grilling by opening the renderer input contract visibility question, refining it into whether snapshots are the dependency boundary, accepting scoped immutable prepared snapshots as renderer-specific input boundaries, accepting public metadata envelopes for renderer-private snapshot payloads, separating renderer descriptors from per-snapshot envelopes, accepting renderer-independent binding intents for material/shader/channel bindings, fixing/retiring BUG-046 TaskGraph main-thread ready-queue flakiness, accepting runtime renderer/snapshot pairing with renderer-owned frame recipes over the engine render graph, fixing renderer frame-recipe cores while making optional recipe parts loadable, constraining loadable recipe parts to declared renderer extension slots, making visibility/culling/batching/grouping a shared configurable recipe usable by all renderers, accepting renderer-neutral visibility/grouping recipe outputs, accepting lighting/environment as a shared configurable recipe layer, accepting shared view/output recipes for interactive and headless rendering, accepting runtime-owned render artifacts with explicit publish/apply semantics, choosing contract-first implementation before renderer behavior changes, making the first task a CPU-only rendering contract foundation, creating/validating the contract-first rendering task pack, reviewing that plan for stale lifecycle state and semantic contradictions, staging a recommended execution order, completing the requested task-only hygiene cleanup, implementing/retiring GRAPHICS-099, implementing/retiring the remaining renderer/snapshot/recipe chain through GRAPHICS-103, reviewing the remaining runtime task queue for validity, applying the runtime task hygiene retargeting, preparing the runtime multi-task loop prompt, implementing/retiring RUNTIME-121 through RUNTIME-124, and stopping before RUNTIME-125 because its benchmark/profile gate lacks baseline evidence."
-    turn_count: 28
-    events_count: 31
-    claims_touched: []
-    open_threads: 2
-  - id: "2026-06-25_001"
-    date: "2026-06-25"
-    summary: "Implemented and retired RUNTIME-126 with the runtime GPU readback job/write-back path, marked the runtime Theme B goal blocked at RUNTIME-125 because its benchmark/profile gate remains unsatisfied, committed the accumulated work, then diagnosed and fixed direct OBJ generated-normal bake texel-center sampling plus direct mesh import's unlit visualization override."
-    turn_count: 7
-    events_count: 10
-    claims_touched: []
-    open_threads: 2
-  - id: "2026-07-09_001"
-    date: "2026-07-09"
-    summary: "Implemented, verified, and committed the ADR-0024 Runtime.Engine decomposition through RUNTIME-165, and landed RUNTIME-129's CPUContracted object-space normal bake GPU-queue participant."
-    turn_count: 8
-    events_count: 17
-    claims_touched: []
-    open_threads: 2
-  - id: "2026-07-10_001"
-    date: "2026-07-10"
-    summary: "Opened module-surface diet tasks, fixed BUG-078 and BUG-080, then made CI-007 dispatchable and collected four passing hosted cold-cache samples."
-    turn_count: 9
-    events_count: 19
-    claims_touched: []
-    open_threads: 2
-  - id: "2026-07-11_001"
-    date: "2026-07-11"
-    summary: "Reported CI-007 incomplete, validated cold sample 4, and dispatched cold sample 5 as the warm-cache seed."
-    turn_count: 1
-    events_count: 1
-    claims_touched: []
-    open_threads: 2
-  - id: "2026-07-13_001"
-    date: "2026-07-13"
-    summary: "Completed and published CI-007, reconciled the branch graph, then integrated and verified a ten-workstream backlog batch with nine bug closures and ARCH-006 Slices 2B/3."
-    turn_count: 5
-    events_count: 23
-    claims_touched: [C01]
-    open_threads: 3
-  - id: "2026-07-14_001"
-    date: "2026-07-14"
-    summary: "Retired ARCH-006, then audited all 69 backlog tasks and identified verified false-open GEOM-019 as the immediate closure before GEOM-063."
-    turn_count: 2
-    events_count: 6
-    claims_touched: []
-    open_threads: 5
-  - id: "2026-07-15_001"
-    date: "2026-07-15"
-    summary: "Completed the parameterization chain through an Operational GPU UV view, then deferred fourteen Issue 445 research tasks behind a shared architecture-stability audit."
-    turn_count: 7
-    events_count: 41
-    claims_touched: [C02, C03, C04, C05]
-    open_threads: 7
-  - id: "2026-07-16_001"
-    date: "2026-07-16"
-    summary: "Completed Runtime.Engine convergence and six prior bug closures, audited and repaired the first Sandbox model-workflow defects, published the verified series to remote main, excluded unprovenanced datasets plus incomplete stale task refs, materialized and locally integrated the CI/test audit as a validated dependency-ordered backlog, and compared nine historical repositories into a selective IntrinsicEngine adaptation roadmap."
-    turn_count: 9
-    events_count: 20
-    claims_touched: []
-    open_threads: 13
-  - id: "2026-07-17_001"
-    date: "2026-07-17"
-    summary: "Materialized and committed the selective-adaptation backlog, reproduced BUG-107's configure-history drift, implemented BUG-106 routing, established and adversarially validated CI-010's exact source-coverage lane, and mapped CI-005 plus CI-006's smallest safe CI topology slices."
-    turn_count: 11
-    events_count: 13
-    claims_touched: []
-    open_threads: 17
-  - id: "2026-07-18_001"
-    date: "2026-07-18"
-    summary: "Completed the classification-first CI stack, calibrated and routed Release confidence, refreshed two repository-native research skills, retired every process backlog task, passed the canonical CORE-005 sanitizer gates, audited CORE-008's paired plan-reuse evidence, and verified CORE-009's generic Core plus typed Runtime/Sandbox config-section integration."
-    turn_count: 6
-    events_count: 13
-    claims_touched: []
-    open_threads: 9
-  - id: "2026-07-19_001"
-    date: "2026-07-19"
-    summary: "Implemented and verified app-composed RUNTIME-181 config control and RUNTIME-172 scene documents, migrated existing tests to RUNTIME-183's exact-service AssetWorkflow composition, added real-Sandbox RUNTIME-168 policy lifecycle coverage, and implemented RUNTIME-129's exact residency validation plus Sandbox editor producer wiring."
-    turn_count: 6
-    events_count: 7
-    claims_touched: []
-    open_threads: 13
-  - id: "2026-07-20_001"
-    date: "2026-07-20"
-    summary: "Completed, verified, and retired RUNTIME-129 at Operational after live Vulkan readback exposed and closed a physical-storage texcoord alignment defect."
-    turn_count: 1
-    events_count: 2
-    claims_touched: []
-    open_threads: 0
-  - id: "2026-07-23_001"
-    date: "2026-07-23"
-    summary: "Audited the runtime layout, completed ARCH-014's exact 12/0/0/5 Engine convergence chain, and fast-forwarded the verified result into remote main."
-    turn_count: 3
-    events_count: 11
-    claims_touched: []
-    open_threads: 2
-  - id: "2026-07-27_001"
-    date: "2026-07-27"
-    summary: "Retired RUNTIME-194 and RUNTIME-195, converging runtime work on JobService and compute-result readback on Graphics.GpuTransfer with complete CPU and operational Vulkan evidence."
-    turn_count: 1
-    events_count: 10
-    claims_touched: [C06, C07, C08, C09, C10]
-    open_threads: 4
-  - id: "2026-07-28_001"
-    date: "2026-07-28"
-    summary: "Retired RUNTIME-196, RUNTIME-193, RUNTIME-197, and RUNTIME-198, converging clustering, geometry presentation/residency, and visualization recipes with complete CPU and operational Vulkan evidence."
-    turn_count: 1
-    events_count: 8
-    claims_touched: [C11, C12, C13, C14]
-    open_threads: 4
-  - id: "2026-07-28_002"
-    date: "2026-07-28"
-    summary: "Retired RUNTIME-191 after converging property-to-texture baking on one caller-owned runtime/graphics lifecycle with complete CPU and exact operational Vulkan evidence."
-    turn_count: 1
-    events_count: 2
-    claims_touched: [C15]
-    open_threads: 2
-  - id: "2026-07-29_001"
-    date: "2026-07-29"
-    summary: "Implemented PROC-028's repository-native evidence, review, experiment-custody, strict benchmark-result, and concurrent-ownership workflow; retirement remains gated by independent review and BUG-120."
-    turn_count: 1
-    events_count: 9
-    claims_touched: []
-    open_threads: 2
-  - id: "2026-07-29_002"
-    date: "2026-07-29"
-    summary: "Recovered the completed RUNTIME-201 retirement trace after converging editor mutations on one validated history transaction with complete CPU evidence."
-    turn_count: 1
-    events_count: 2
-    claims_touched: [C16]
-    open_threads: 3
-  - id: "2026-07-30_001"
-    date: "2026-07-30"
-    summary: "Integrated PROC-028 before RUNTIME-201, revalidated main, shipped the Operational architecture-diagram skill, and independently rejected PROC-028's recorded fixed revision on four enforcement defects."
-    turn_count: 9
-    events_count: 21
-    claims_touched: []
-    open_threads: 4
-  - id: "2026-07-31_001"
-    date: "2026-07-31"
-    summary: "Repaired all four rejected PROC-028 enforcement paths, passed 96 focused regressions and strict structural gates, and preserved independent re-review as the remaining acceptance gate."
-    turn_count: 1
-    events_count: 2
-    claims_touched: []
-    open_threads: 4
-  - id: "2026-08-01_001"
-    date: "2026-08-01"
-    summary: "Reconciled the runtime task graph, clarified conditional GEOM/METHOD/RUNTIME ownership, and designed a separate live cross-worktree agent-plan layer."
-    turn_count: 5
-    events_count: 25
-    claims_touched: [C11, C16]
-    open_threads: 5
-  - id: "2026-08-02_001"
-    date: "2026-08-02"
-    summary: "Affirmed literature and method architecture, operationalized reusable-contract enrollment, and published the canonical geometry element-source matrix with accepted fixed-surface evidence."
-    turn_count: 6
-    events_count: 20
-    claims_touched: [C17, C18]
-    open_threads: 6
-  - id: "2026-08-02_002"
-    date: "2026-08-02"
-    summary: "Diagnosed the LOP contract regression and opened a scalable contract-discovery workflow with a staged catalog/task/test enforcement proposal."
-    turn_count: 3
-    events_count: 7
-    claims_touched: []
-    open_threads: 4
-  - id: "2026-08-03_001"
-    date: "2026-08-03"
-    summary: "Taskized verification redesign, reconciled every local branch, retired BUG-128 plus GEOM-064, and implemented PHYSICS-004's Operational CPU/Null runtime path pending independent review."
-    turn_count: 6
-    events_count: 28
-    claims_touched: [C19, C26, C27]
-    open_threads: 4
-  - id: "2026-08-03_002"
-    date: "2026-08-03"
-    summary: "Retired the runtime and three-domain Sandbox halves of non-destructive canonical-vertex Progressive Poisson integration with complete CPU evidence."
-    turn_count: 2
-    events_count: 6
-    claims_touched: [C20, C21]
-    open_threads: 2
-  - id: "2026-08-03_003"
-    date: "2026-08-03"
-    summary: "Generalized LOP runtime publication to every geometry element domain and crystallized the least-structured-domain method contract."
-    turn_count: 1
-    events_count: 4
-    claims_touched: [C17, C28]
-    open_threads: 2
-  - id: "2026-08-04_001"
-    date: "2026-08-04"
-    summary: "Retired the final active tasks, converged every branch history, diagnosed child.obj's pending LOP publication, adopted property-specific radius profiles, and evaluated a Vulkan grid acceleration path."
-    turn_count: 7
-    events_count: 24
-    claims_touched: [C27, C28, C29, C30]
-    open_threads: 4
-  - id: "2026-08-05_001"
-    date: "2026-08-05"
-    summary: "Implemented support-radius and Vulkan LOP work, committed universal property coherence, and completed a path-only runtime organization while taskizing semantic seam reduction."
-    turn_count: 6
-    events_count: 29
-    claims_touched: [C31, C32, C33, C34, C35, C36]
-    open_threads: 5
-  - id: "2026-08-06_001"
-    date: "2026-08-06"
-    summary: "Retired every active task and every REVIEW-003 remediation leaf, then sealed and pushed the fresh architecture-readiness baseline after revision-2 independent acceptance."
-    turn_count: 3
-    events_count: 10
-    claims_touched: [C36]
-    open_threads: 0
-  - id: "2026-08-07_001"
-    date: "2026-08-07"
-    summary: "Analyzed graph engineering, then implemented and self-hosted a bounded repository-native review diamond through a real repair cycle and full CPU verification."
-    turn_count: 2
-    events_count: 16
-    claims_touched: []
-    open_threads: 4
-  - id: "2026-08-10_001"
-    date: "2026-08-10"
-    summary: "Retired METHOD-037 and GEOM-071, activated METHOD-038, and advanced its frozen baseline through an audited cold/reusable/continuous fixture cohort that refutes Automatic count stability."
-    turn_count: 2
-    events_count: 8
-    claims_touched: [C38, C39, C40, C41]
-    open_threads: 3
-  - id: "2026-08-11_001"
-    date: "2026-08-11"
-    summary: "Advanced curvature-segmentation controls, diagnosed the failed raw-curvature workflow, and implemented the PMP-parity/corner-normal repair through full CPU, sanitizer, and Vulkan verification."
-    turn_count: 5
-    events_count: 29
-    claims_touched: [C41, C42, C43, C46, C47, C48]
-    open_threads: 4
-  - id: "2026-08-12_001"
-    date: "2026-08-12"
-    summary: "Validated current one-ring curvature live against archived BCG, localized BCG normalization and Sandbox presentation differences, and rejected eig3x3 as the curvature fix while defining a reusable solver direction."
-    turn_count: 3
-    events_count: 17
-    claims_touched: [C48, C49]
-    open_threads: 7
-  - id: "2026-08-13_001"
-    date: "2026-08-13"
-    summary: "Validated and pushed the exact eigensolver/live-curvature diagnostic to main, then crystallized its bounded solver, normalization, publication, and visualization conclusions."
-    turn_count: 1
-    events_count: 11
-    claims_touched: [C51, C52]
-    open_threads: 7
-  - id: "2026-09-01_001"
-    date: "2026-09-01"
-    summary: "Defined and exercised Core.Dag, then compared it with the promoted graph systems and identified the minimal remaining shared-topology seams."
-    turn_count: 5
-    events_count: 10
-    claims_touched: []
-    open_threads: 3
-  - id: "2026-09-02_001"
-    date: "2026-09-02"
-    summary: "Added reset-scoped DAG handle epochs and exact cycle-edge provenance, completed BUG-156 atomic principal-curvature publication, and diagnosed and retired BUG-155 with repeated promoted-Vulkan evidence."
-    turn_count: 3
-    events_count: 4
-    claims_touched: []
-    open_threads: 4
-  - id: "2026-09-03_001"
-    date: "2026-09-03"
-    summary: "Closed the curvature repair and bounded METHOD-039 evidence, then localized feature-patch latency to build mode, repeated topology lookup, merge/seed/refinement work, and multi-scale geodesic search."
-    turn_count: 3
-    events_count: 6
-    claims_touched: [C54, C55, C56]
-    open_threads: 3
-  - id: "2026-09-04_001"
-    date: "2026-09-04"
-    summary: "Implemented exact-preserving curvature acceleration, published the Clang 20 compatibility fixes, and committed a deterministic BUG-165 queue-test barrier locally pending authorized GitHub publication."
-    turn_count: 3
-    events_count: 6
-    claims_touched: []
-    open_threads: 4
-  - id: "2026-09-05_001"
-    date: "2026-09-05"
-    summary: "Applied approved backlog contract corrections and made interim BUG-097 repair conditional on current need while preserving the operator's UV-atlas replacement direction."
-    turn_count: 1
-    events_count: 2
-    claims_touched: []
-    open_threads: 2
-  - id: 2026-09-06_001
-    date: '2026-09-06'
-    summary: Implemented experimental METHOD-040 and UI access; operator feedback now prioritizes explicit
-      curvature-extremum curves, while negative adoption and custody findings remain open.
-    turn_count: 5
-    events_count: 22
-    claims_touched:
-    - C57
-    - C58
-    - C59
-    - C60
-    open_threads: 5
-  - id: 2026-09-07_001
-    date: '2026-09-07'
-    summary: Completed METHOD-041 inspection and publication; continued METHOD-045 baseline-preserving atlas
-      work and the explicitly approved Claude source/result review. Frog UV fragmentation and anatomical
-      segmentation, quality tradeoffs and production adoption remain open.
-    turn_count: 4
-    events_count: 12
-    claims_touched:
-    - C61
-    - C62
-    - C71
-    - C72
-    open_threads: 5
-  - id: 2026-09-08_001
-    date: '2026-09-08'
-    summary: "Audited and refined atlas boundaries with Claude, then published the complete code, evidence and portable viewers/models to origin/main. METHOD-046 is complete; broader quality and engine adoption remain open. Ported Framework24 virtual-source geodesics through geometry, config and UI with CPU verification. Added shared primitive selection and method-seed controls. Audited GPU LBVH availability and proposed cache ownership. Implemented the approved CPU/Vulkan point-LBVH cache and k-means integration with bounded readback evidence. Documented spatial-acceleration consumers and 39 open-task reminders with workflow/template reuse decisions. Implemented accepted canonical ICP/config/UI and cached CPU/Vulkan correspondences; bounded correctness passes, display-off timing qualification fails, CPU default retained. Extended shared CPU/Vulkan kNN and source-ID exclusion with a supplied CPU PCA adapter; bounded CPU/GPU checks pass, KD-tree defaults retained. Completed accepted canonical normal estimation with CPU KD-tree/cached LBVH, distinct topology methods and shared config/window/history; 179 focused checks and full CPU gate pass."
-    turn_count: 12
-    events_count: 43
-    claims_touched:
-    - C73
-    - C74
-    - C75
-    - C76
-    - C77
-    - C78
-    - C79
-    open_threads: 8
-
-  - id: 2026-09-09_001
-    date: '2026-09-09'
-    summary: "Published earlier geometry work and completed Vulkan normal/outlier/density neighborhood integration with CPU numerical stages, canonical config/UI/publication and bounded CPU/GPU evidence. Remaining consumers and publication are separate."
-    turn_count: 5
-    events_count: 17
-    claims_touched: [C80, C81, C17, C82]
-    open_threads: 11
-
-  - id: 2026-09-10_001
-    date: '2026-09-10'
-    summary: "Implemented canonical point spacing/radii with shared CPU/Vulkan neighborhoods and bounded numerical evidence; CPU default retained, model-space rendering tracked separately."
-    turn_count: 1
-    events_count: 4
-    claims_touched: [C83]
-    open_threads: 12
+- id: 2026-06-15_001
+  date: '2026-06-15'
+  summary: Implemented and retired RUNTIME-109 CPU mesh attribute texture bakes; retired GRAPHICS-088 at CPUContracted
+    with GRAPHICS-089 tracking the Vulkan generated-UV proof.
+  turn_count: 2
+  events_count: 6
+  claims_touched: []
+  open_threads: 2
+- id: 2026-06-16_001
+  date: '2026-06-16'
+  summary: Implemented and retired ASSETIO-005, GEOM-018, GEOM-025, ASSETIO-008, and BUG-044; accepted ADR-0021;
+    retired RUNTIME-110 into follow-up runtime/UI/rendering implementation slices.
+  turn_count: 9
+  events_count: 26
+  claims_touched: []
+  open_threads: 2
+- id: 2026-06-17_001
+  date: '2026-06-17'
+  summary: Implemented, verified, committed, and retired UI-018 so the sandbox editor starts menu-first with all
+    panels closed by default.
+  turn_count: 1
+  events_count: 2
+  claims_touched: []
+  open_threads: 0
+- id: 2026-06-18_001
+  date: '2026-06-18'
+  summary: Diagnosed and fixed GRAPHICS-091 sandbox UI-enabled line/point colormap rendering; Vulkan and CPU gates
+    passed.
+  turn_count: 1
+  events_count: 2
+  claims_touched: []
+  open_threads: 1
+- id: 2026-06-20_001
+  date: '2026-06-20'
+  summary: Implemented UI-022 mesh vertex-normal recompute and fixed BUG-047 so current surface shading uses packed
+    vertex-normal attributes.
+  turn_count: 3
+  events_count: 6
+  claims_touched: []
+  open_threads: 2
+- id: 2026-06-21_001
+  date: '2026-06-21'
+  summary: Diagnosed, fixed, verified, and committed the GEOM-026 mesh normal recompute slice with UI-022 integration
+    and BUG-047/048/049 shader/runtime/renderer fixes.
+  turn_count: 3
+  events_count: 5
+  claims_touched: []
+  open_threads: 2
+- id: 2026-06-22_001
+  date: '2026-06-22'
+  summary: Implemented, verified, committed, and retired GRAPHICS-095 through GRAPHICS-098 for the CPU/GPU transfer
+    foundation, imported third-party productivity skills, audited stale BUG backlog tasks, and progressed rendering-design
+    grilling through configurable data/channel policies, recipes, preview validation, diagnostics, provenance, lifecycle,
+    renderer snapshot ownership, atomic snapshot publication, fallback generation scheduling, explicit async job
+    outcome reporting, async outcome UI surfacing, selected-lens fail-closed behavior, typed render-lens input binding,
+    scoped binding ambiguity resolution, research-lens shader/material ownership, surface-shading normal-channel
+    policy, color-channel/base-color separation, explicit channel-domain rendering/conversion, and GPU-ready snapshot
+    upload generations.
+  turn_count: 45
+  events_count: 53
+  claims_touched: []
+  open_threads: 4
+- id: 2026-06-23_001
+  date: '2026-06-23'
+  summary: Continued rendering-design grilling by accepting lease-based GPU resource lifetime/eviction semantics,
+    declarative renderer pass-graph composition, project-data-pure render passes, derived-candidate readback/write-back
+    publication, readback job state/attempt semantics, bounded fair scheduling priorities, runtime-owned executor
+    policy with subsystem contracts, shared job/diagnostic registry retention, typed registry query/actions, scoped
+    diagnostic severity/blocking semantics, audited runtime diagnostic actions, undo/redo scope for rendering mutations,
+    persisted reload-validated undo/redo history, transaction grouping/coalescing/naming, undo/redo conflict handling
+    for async jobs and newer revisions, the audit-log versus undo-history boundary, explicit schema versioning/migration/validation
+    for persisted rendering documents, source-of-truth boundaries for authored files versus generated artifacts/caches,
+    portable reproducibility bundle contents/validation/replay behavior, fast tiered activation validation, design-driven
+    validation optimization without fixed latency budgets, concrete fast-validation mechanisms, loadable low-risk/high-impact
+    activation classification, high-impact approval/degraded-state policy, the overarching changeability goal, renderer/runtime
+    extension seams, autonomous agent quality-evidence bundles, changeability-aware planning/self-review skills,
+    required future-change plan/self-review contents, structured implementation evidence reports, blocking/warning
+    rules for evidence-report validation, task-linked implementation evidence report storage/generation, an open-ended
+    continuation mandate for remaining concrete rendering process decisions, canonical frame pipeline phase ownership,
+    a general extensible immutable render snapshot contract, and a pivot toward renderer-specific input contracts
+    where full-scene snapshots are optional.
+  turn_count: 34
+  events_count: 37
+  claims_touched: []
+  open_threads: 4
+- id: 2026-06-24_001
+  date: '2026-06-24'
+  summary: Continued rendering-design grilling by opening the renderer input contract visibility question, refining
+    it into whether snapshots are the dependency boundary, accepting scoped immutable prepared snapshots as renderer-specific
+    input boundaries, accepting public metadata envelopes for renderer-private snapshot payloads, separating renderer
+    descriptors from per-snapshot envelopes, accepting renderer-independent binding intents for material/shader/channel
+    bindings, fixing/retiring BUG-046 TaskGraph main-thread ready-queue flakiness, accepting runtime renderer/snapshot
+    pairing with renderer-owned frame recipes over the engine render graph, fixing renderer frame-recipe cores while
+    making optional recipe parts loadable, constraining loadable recipe parts to declared renderer extension slots,
+    making visibility/culling/batching/grouping a shared configurable recipe usable by all renderers, accepting
+    renderer-neutral visibility/grouping recipe outputs, accepting lighting/environment as a shared configurable
+    recipe layer, accepting shared view/output recipes for interactive and headless rendering, accepting runtime-owned
+    render artifacts with explicit publish/apply semantics, choosing contract-first implementation before renderer
+    behavior changes, making the first task a CPU-only rendering contract foundation, creating/validating the contract-first
+    rendering task pack, reviewing that plan for stale lifecycle state and semantic contradictions, staging a recommended
+    execution order, completing the requested task-only hygiene cleanup, implementing/retiring GRAPHICS-099, implementing/retiring
+    the remaining renderer/snapshot/recipe chain through GRAPHICS-103, reviewing the remaining runtime task queue
+    for validity, applying the runtime task hygiene retargeting, preparing the runtime multi-task loop prompt, implementing/retiring
+    RUNTIME-121 through RUNTIME-124, and stopping before RUNTIME-125 because its benchmark/profile gate lacks baseline
+    evidence.
+  turn_count: 28
+  events_count: 31
+  claims_touched: []
+  open_threads: 2
+- id: 2026-06-25_001
+  date: '2026-06-25'
+  summary: Implemented and retired RUNTIME-126 with the runtime GPU readback job/write-back path, marked the runtime
+    Theme B goal blocked at RUNTIME-125 because its benchmark/profile gate remains unsatisfied, committed the accumulated
+    work, then diagnosed and fixed direct OBJ generated-normal bake texel-center sampling plus direct mesh import's
+    unlit visualization override.
+  turn_count: 7
+  events_count: 10
+  claims_touched: []
+  open_threads: 2
+- id: 2026-07-09_001
+  date: '2026-07-09'
+  summary: Implemented, verified, and committed the ADR-0024 Runtime.Engine decomposition through RUNTIME-165, and
+    landed RUNTIME-129's CPUContracted object-space normal bake GPU-queue participant.
+  turn_count: 8
+  events_count: 17
+  claims_touched: []
+  open_threads: 2
+- id: 2026-07-10_001
+  date: '2026-07-10'
+  summary: Opened module-surface diet tasks, fixed BUG-078 and BUG-080, then made CI-007 dispatchable and collected
+    four passing hosted cold-cache samples.
+  turn_count: 9
+  events_count: 19
+  claims_touched: []
+  open_threads: 2
+- id: 2026-07-11_001
+  date: '2026-07-11'
+  summary: Reported CI-007 incomplete, validated cold sample 4, and dispatched cold sample 5 as the warm-cache seed.
+  turn_count: 1
+  events_count: 1
+  claims_touched: []
+  open_threads: 2
+- id: 2026-07-13_001
+  date: '2026-07-13'
+  summary: Completed and published CI-007, reconciled the branch graph, then integrated and verified a ten-workstream
+    backlog batch with nine bug closures and ARCH-006 Slices 2B/3.
+  turn_count: 5
+  events_count: 23
+  claims_touched:
+  - C01
+  open_threads: 3
+- id: 2026-07-14_001
+  date: '2026-07-14'
+  summary: Retired ARCH-006, then audited all 69 backlog tasks and identified verified false-open GEOM-019 as the
+    immediate closure before GEOM-063.
+  turn_count: 2
+  events_count: 6
+  claims_touched: []
+  open_threads: 5
+- id: 2026-07-15_001
+  date: '2026-07-15'
+  summary: Completed the parameterization chain through an Operational GPU UV view, then deferred fourteen Issue
+    445 research tasks behind a shared architecture-stability audit.
+  turn_count: 7
+  events_count: 41
+  claims_touched:
+  - C02
+  - C03
+  - C04
+  - C05
+  open_threads: 7
+- id: 2026-07-16_001
+  date: '2026-07-16'
+  summary: Completed Runtime.Engine convergence and six prior bug closures, audited and repaired the first Sandbox
+    model-workflow defects, published the verified series to remote main, excluded unprovenanced datasets plus incomplete
+    stale task refs, materialized and locally integrated the CI/test audit as a validated dependency-ordered backlog,
+    and compared nine historical repositories into a selective IntrinsicEngine adaptation roadmap.
+  turn_count: 9
+  events_count: 20
+  claims_touched: []
+  open_threads: 13
+- id: 2026-07-17_001
+  date: '2026-07-17'
+  summary: Materialized and committed the selective-adaptation backlog, reproduced BUG-107's configure-history drift,
+    implemented BUG-106 routing, established and adversarially validated CI-010's exact source-coverage lane, and
+    mapped CI-005 plus CI-006's smallest safe CI topology slices.
+  turn_count: 11
+  events_count: 13
+  claims_touched: []
+  open_threads: 17
+- id: 2026-07-18_001
+  date: '2026-07-18'
+  summary: Completed the classification-first CI stack, calibrated and routed Release confidence, refreshed two
+    repository-native research skills, retired every process backlog task, passed the canonical CORE-005 sanitizer
+    gates, audited CORE-008's paired plan-reuse evidence, and verified CORE-009's generic Core plus typed Runtime/Sandbox
+    config-section integration.
+  turn_count: 6
+  events_count: 13
+  claims_touched: []
+  open_threads: 9
+- id: 2026-07-19_001
+  date: '2026-07-19'
+  summary: Implemented and verified app-composed RUNTIME-181 config control and RUNTIME-172 scene documents, migrated
+    existing tests to RUNTIME-183's exact-service AssetWorkflow composition, added real-Sandbox RUNTIME-168 policy
+    lifecycle coverage, and implemented RUNTIME-129's exact residency validation plus Sandbox editor producer wiring.
+  turn_count: 6
+  events_count: 7
+  claims_touched: []
+  open_threads: 13
+- id: 2026-07-20_001
+  date: '2026-07-20'
+  summary: Completed, verified, and retired RUNTIME-129 at Operational after live Vulkan readback exposed and closed
+    a physical-storage texcoord alignment defect.
+  turn_count: 1
+  events_count: 2
+  claims_touched: []
+  open_threads: 0
+- id: 2026-07-23_001
+  date: '2026-07-23'
+  summary: Audited the runtime layout, completed ARCH-014's exact 12/0/0/5 Engine convergence chain, and fast-forwarded
+    the verified result into remote main.
+  turn_count: 3
+  events_count: 11
+  claims_touched: []
+  open_threads: 2
+- id: 2026-07-27_001
+  date: '2026-07-27'
+  summary: Retired RUNTIME-194 and RUNTIME-195, converging runtime work on JobService and compute-result readback
+    on Graphics.GpuTransfer with complete CPU and operational Vulkan evidence.
+  turn_count: 1
+  events_count: 10
+  claims_touched:
+  - C06
+  - C07
+  - C08
+  - C09
+  - C10
+  open_threads: 4
+- id: 2026-07-28_001
+  date: '2026-07-28'
+  summary: Retired RUNTIME-196, RUNTIME-193, RUNTIME-197, and RUNTIME-198, converging clustering, geometry presentation/residency,
+    and visualization recipes with complete CPU and operational Vulkan evidence.
+  turn_count: 1
+  events_count: 8
+  claims_touched:
+  - C11
+  - C12
+  - C13
+  - C14
+  open_threads: 4
+- id: 2026-07-28_002
+  date: '2026-07-28'
+  summary: Retired RUNTIME-191 after converging property-to-texture baking on one caller-owned runtime/graphics
+    lifecycle with complete CPU and exact operational Vulkan evidence.
+  turn_count: 1
+  events_count: 2
+  claims_touched:
+  - C15
+  open_threads: 2
+- id: 2026-07-29_001
+  date: '2026-07-29'
+  summary: Implemented PROC-028's repository-native evidence, review, experiment-custody, strict benchmark-result,
+    and concurrent-ownership workflow; retirement remains gated by independent review and BUG-120.
+  turn_count: 1
+  events_count: 9
+  claims_touched: []
+  open_threads: 2
+- id: 2026-07-29_002
+  date: '2026-07-29'
+  summary: Recovered the completed RUNTIME-201 retirement trace after converging editor mutations on one validated
+    history transaction with complete CPU evidence.
+  turn_count: 1
+  events_count: 2
+  claims_touched:
+  - C16
+  open_threads: 3
+- id: 2026-07-30_001
+  date: '2026-07-30'
+  summary: Integrated PROC-028 before RUNTIME-201, revalidated main, shipped the Operational architecture-diagram
+    skill, and independently rejected PROC-028's recorded fixed revision on four enforcement defects.
+  turn_count: 9
+  events_count: 21
+  claims_touched: []
+  open_threads: 4
+- id: 2026-07-31_001
+  date: '2026-07-31'
+  summary: Repaired all four rejected PROC-028 enforcement paths, passed 96 focused regressions and strict structural
+    gates, and preserved independent re-review as the remaining acceptance gate.
+  turn_count: 1
+  events_count: 2
+  claims_touched: []
+  open_threads: 4
+- id: 2026-08-01_001
+  date: '2026-08-01'
+  summary: Reconciled the runtime task graph, clarified conditional GEOM/METHOD/RUNTIME ownership, and designed
+    a separate live cross-worktree agent-plan layer.
+  turn_count: 5
+  events_count: 25
+  claims_touched:
+  - C11
+  - C16
+  open_threads: 5
+- id: 2026-08-02_001
+  date: '2026-08-02'
+  summary: Affirmed literature and method architecture, operationalized reusable-contract enrollment, and published
+    the canonical geometry element-source matrix with accepted fixed-surface evidence.
+  turn_count: 6
+  events_count: 20
+  claims_touched:
+  - C17
+  - C18
+  open_threads: 6
+- id: 2026-08-02_002
+  date: '2026-08-02'
+  summary: Diagnosed the LOP contract regression and opened a scalable contract-discovery workflow with a staged
+    catalog/task/test enforcement proposal.
+  turn_count: 3
+  events_count: 7
+  claims_touched: []
+  open_threads: 4
+- id: 2026-08-03_001
+  date: '2026-08-03'
+  summary: Taskized verification redesign, reconciled every local branch, retired BUG-128 plus GEOM-064, and implemented
+    PHYSICS-004's Operational CPU/Null runtime path pending independent review.
+  turn_count: 6
+  events_count: 28
+  claims_touched:
+  - C19
+  - C26
+  - C27
+  open_threads: 4
+- id: 2026-08-03_002
+  date: '2026-08-03'
+  summary: Retired the runtime and three-domain Sandbox halves of non-destructive canonical-vertex Progressive Poisson
+    integration with complete CPU evidence.
+  turn_count: 2
+  events_count: 6
+  claims_touched:
+  - C20
+  - C21
+  open_threads: 2
+- id: 2026-08-03_003
+  date: '2026-08-03'
+  summary: Generalized LOP runtime publication to every geometry element domain and crystallized the least-structured-domain
+    method contract.
+  turn_count: 1
+  events_count: 4
+  claims_touched:
+  - C17
+  - C28
+  open_threads: 2
+- id: 2026-08-04_001
+  date: '2026-08-04'
+  summary: Retired the final active tasks, converged every branch history, diagnosed child.obj's pending LOP publication,
+    adopted property-specific radius profiles, and evaluated a Vulkan grid acceleration path.
+  turn_count: 7
+  events_count: 24
+  claims_touched:
+  - C27
+  - C28
+  - C29
+  - C30
+  open_threads: 4
+- id: 2026-08-05_001
+  date: '2026-08-05'
+  summary: Implemented support-radius and Vulkan LOP work, committed universal property coherence, and completed
+    a path-only runtime organization while taskizing semantic seam reduction.
+  turn_count: 6
+  events_count: 29
+  claims_touched:
+  - C31
+  - C32
+  - C33
+  - C34
+  - C35
+  - C36
+  open_threads: 5
+- id: 2026-08-06_001
+  date: '2026-08-06'
+  summary: Retired every active task and every REVIEW-003 remediation leaf, then sealed and pushed the fresh architecture-readiness
+    baseline after revision-2 independent acceptance.
+  turn_count: 3
+  events_count: 10
+  claims_touched:
+  - C36
+  open_threads: 0
+- id: 2026-08-07_001
+  date: '2026-08-07'
+  summary: Analyzed graph engineering, then implemented and self-hosted a bounded repository-native review diamond
+    through a real repair cycle and full CPU verification.
+  turn_count: 2
+  events_count: 16
+  claims_touched: []
+  open_threads: 4
+- id: 2026-08-10_001
+  date: '2026-08-10'
+  summary: Retired METHOD-037 and GEOM-071, activated METHOD-038, and advanced its frozen baseline through an audited
+    cold/reusable/continuous fixture cohort that refutes Automatic count stability.
+  turn_count: 2
+  events_count: 8
+  claims_touched:
+  - C38
+  - C39
+  - C40
+  - C41
+  open_threads: 3
+- id: 2026-08-11_001
+  date: '2026-08-11'
+  summary: Advanced curvature-segmentation controls, diagnosed the failed raw-curvature workflow, and implemented
+    the PMP-parity/corner-normal repair through full CPU, sanitizer, and Vulkan verification.
+  turn_count: 5
+  events_count: 29
+  claims_touched:
+  - C41
+  - C42
+  - C43
+  - C46
+  - C47
+  - C48
+  open_threads: 4
+- id: 2026-08-12_001
+  date: '2026-08-12'
+  summary: Validated current one-ring curvature live against archived BCG, localized BCG normalization and Sandbox
+    presentation differences, and rejected eig3x3 as the curvature fix while defining a reusable solver direction.
+  turn_count: 3
+  events_count: 17
+  claims_touched:
+  - C48
+  - C49
+  open_threads: 7
+- id: 2026-08-13_001
+  date: '2026-08-13'
+  summary: Validated and pushed the exact eigensolver/live-curvature diagnostic to main, then crystallized its bounded
+    solver, normalization, publication, and visualization conclusions.
+  turn_count: 1
+  events_count: 11
+  claims_touched:
+  - C51
+  - C52
+  open_threads: 7
+- id: 2026-09-01_001
+  date: '2026-09-01'
+  summary: Defined and exercised Core.Dag, then compared it with the promoted graph systems and identified the minimal
+    remaining shared-topology seams.
+  turn_count: 5
+  events_count: 10
+  claims_touched: []
+  open_threads: 3
+- id: 2026-09-02_001
+  date: '2026-09-02'
+  summary: Added reset-scoped DAG handle epochs and exact cycle-edge provenance, completed BUG-156 atomic principal-curvature
+    publication, and diagnosed and retired BUG-155 with repeated promoted-Vulkan evidence.
+  turn_count: 3
+  events_count: 4
+  claims_touched: []
+  open_threads: 4
+- id: 2026-09-03_001
+  date: '2026-09-03'
+  summary: Closed the curvature repair and bounded METHOD-039 evidence, then localized feature-patch latency to
+    build mode, repeated topology lookup, merge/seed/refinement work, and multi-scale geodesic search.
+  turn_count: 3
+  events_count: 6
+  claims_touched:
+  - C54
+  - C55
+  - C56
+  open_threads: 3
+- id: 2026-09-04_001
+  date: '2026-09-04'
+  summary: Implemented exact-preserving curvature acceleration, published the Clang 20 compatibility fixes, and
+    committed a deterministic BUG-165 queue-test barrier locally pending authorized GitHub publication.
+  turn_count: 3
+  events_count: 6
+  claims_touched: []
+  open_threads: 4
+- id: 2026-09-05_001
+  date: '2026-09-05'
+  summary: Applied approved backlog contract corrections and made interim BUG-097 repair conditional on current
+    need while preserving the operator's UV-atlas replacement direction.
+  turn_count: 1
+  events_count: 2
+  claims_touched: []
+  open_threads: 2
+- id: 2026-09-06_001
+  date: '2026-09-06'
+  summary: Implemented experimental METHOD-040 and UI access; operator feedback now prioritizes explicit curvature-extremum
+    curves, while negative adoption and custody findings remain open.
+  turn_count: 5
+  events_count: 22
+  claims_touched:
+  - C57
+  - C58
+  - C59
+  - C60
+  open_threads: 5
+- id: 2026-09-07_001
+  date: '2026-09-07'
+  summary: Completed METHOD-041 inspection and publication; continued METHOD-045 baseline-preserving atlas work
+    and the explicitly approved Claude source/result review. Frog UV fragmentation and anatomical segmentation,
+    quality tradeoffs and production adoption remain open.
+  turn_count: 4
+  events_count: 12
+  claims_touched:
+  - C61
+  - C62
+  - C71
+  - C72
+  open_threads: 5
+- id: 2026-09-08_001
+  date: '2026-09-08'
+  summary: Audited and refined atlas boundaries with Claude, then published the complete code, evidence and portable
+    viewers/models to origin/main. METHOD-046 is complete; broader quality and engine adoption remain open. Ported
+    Framework24 virtual-source geodesics through geometry, config and UI with CPU verification. Added shared primitive
+    selection and method-seed controls. Audited GPU LBVH availability and proposed cache ownership. Implemented
+    the approved CPU/Vulkan point-LBVH cache and k-means integration with bounded readback evidence. Documented
+    spatial-acceleration consumers and 39 open-task reminders with workflow/template reuse decisions. Implemented
+    accepted canonical ICP/config/UI and cached CPU/Vulkan correspondences; bounded correctness passes, display-off
+    timing qualification fails, CPU default retained. Extended shared CPU/Vulkan kNN and source-ID exclusion with
+    a supplied CPU PCA adapter; bounded CPU/GPU checks pass, KD-tree defaults retained. Completed accepted canonical
+    normal estimation with CPU KD-tree/cached LBVH, distinct topology methods and shared config/window/history;
+    179 focused checks and full CPU gate pass.
+  turn_count: 12
+  events_count: 43
+  claims_touched:
+  - C73
+  - C74
+  - C75
+  - C76
+  - C77
+  - C78
+  - C79
+  open_threads: 8
+- id: 2026-09-09_001
+  date: '2026-09-09'
+  summary: Published earlier geometry work and completed Vulkan normal/outlier/density neighborhood integration
+    with CPU numerical stages, canonical config/UI/publication and bounded CPU/GPU evidence. Remaining consumers
+    and publication are separate.
+  turn_count: 5
+  events_count: 17
+  claims_touched:
+  - C80
+  - C81
+  - C17
+  - C82
+  open_threads: 11
+- id: 2026-09-10_001
+  date: '2026-09-10'
+  summary: Completed sequential spatial integrations through LOP with CPU/Vulkan tests, shared neighborhoods and
+    explicit remaining Framework24 work.
+  turn_count: 2
+  events_count: 13
+  claims_touched:
+  - C83
+  - C84
+  - C85
+  - C86
+  - C87
+  - C88
+  - C89
+  - C90
+  open_threads: 12
