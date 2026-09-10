@@ -1764,6 +1764,7 @@ if(_intrinsic_registered_test_targets)
         "endif()\n"
         "if(DEFINED IntrinsicRuntimePointCloudConsolidationGpuParityTests_TESTS)\n"
         "  set_tests_properties(PointCloudConsolidationGpuParity.VulkanLbvhMovingStepsAcrossDomainsAndFailures PROPERTIES TIMEOUT 180)\n"
+        "  set_tests_properties(PointCloudConsolidationGpuParity.VulkanLbvhWlopAcrossDomainsAndFailures PointCloudConsolidationGpuParity.VulkanLbvhAnisotropicWlopAcrossDomainsAndFailures PointCloudConsolidationGpuParity.VulkanLbvhClopAcrossDomainsAndFailures PointCloudConsolidationGpuParity.VulkanLbvhEarAcrossDomainsInsertionAndFailures PROPERTIES TIMEOUT 360)\n"
         "endif()\n"
     )
     set(_intrinsic_property_fixup_file "${CMAKE_CURRENT_BINARY_DIR}/IntrinsicTestPropertyFixups.cmake")

@@ -1,0 +1,22 @@
+benchmark_id: geometry.point_lbvh.clop_vulkan_runtime_smoke
+method: geometry.point_lbvh
+dataset: builtin.projection_domains.32x8.three_iterations
+params:
+  intent: gpu
+  strategy: clop
+  mixture_components: 2
+  mixture_max_iterations: 256
+  mixture_relative_tolerance: 0.00001
+  support_radius: 0.35
+  repulsion_weight: 0.2
+  max_iterations: 3
+  query_batch_size: 17
+  radius_capacity: 64
+  warmup_iterations: 1
+  measured_iterations: 1
+metrics:
+  - runtime_ms
+  - quality_error_linf
+thresholds:
+  smoke_runtime_ms_max: 180000
+  quality_error_linf_max: 0.000001

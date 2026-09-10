@@ -125,6 +125,16 @@ fixed index order.
 
 ## Inputs, outputs, and normal policy
 
+The runtime `vulkan_lbvh` adapter supplies complete source-density/attraction
+and moving-sample neighborhoods for the alternating projection phase. Moving
+rows include self for direct density and bilateral normal refinement; repulsion
+alone excludes self. Initial normal estimation, CPU weighting/reductions and
+the progressive insertion scans are unchanged. In particular, selecting LBVH
+does not replace tangent-plane clearance with Euclidean nearest-point distance.
+The existing grid `gpu_vulkan_compute` token remains unavailable for EAR and
+anisotropic WLOP. Shared bounds and publication rules are described in the
+[LOP-family adapter](../locally_optimal_projection/paper.md#cached-and-framed-neighborhood-adapters).
+
 - `Cloud` input consumes a valid built-in `p:normal` property without mutation.
 - A position-plus-normal span overload supplies authored normals without an ECS
   or property dependency.

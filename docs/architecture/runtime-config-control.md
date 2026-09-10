@@ -107,7 +107,8 @@ second UI-only parameter path, and the GPU view selector is not a
 parameterization solver-backend selector.
 
 The `sandbox.point_cloud_consolidation` payload carries the requested
-`cpu_reference`/`gpu_vulkan_compute` backend, LOP/WLOP/CLOP/EAR strategy, and
+`cpu_reference`, `cpu_lbvh`, `vulkan_lbvh` or `gpu_vulkan_compute` backend,
+LOP/WLOP/CLOP/EAR strategy, and
 the complete promoted parameter set, including the
 authored-or-estimated normal policy, Auto/Manual support-radius intent, and
 bounded sampled-neighbor/contribution limits. The additive fields retain schema
@@ -124,9 +125,14 @@ world/entity/source at main-thread completion and commits a current result
 through one undoable geometry mutation. The pointer-free result reports
 requested/actual backend identity, explicit CPU fallback and backend
 diagnostics, resolved-radius/occupancy/work diagnostics, and convergence
-diagnostics. Vulkan is eligible only for ordinary LOP and isotropic WLOP;
-anisotropic WLOP, CLOP, and EAR fail the shared preview instead of substituting
-a different kernel. A finite `NotConverged` iterate remains an explicit
+diagnostics. The `gpu_vulkan_compute` grid backend is eligible only for ordinary
+LOP and isotropic WLOP; other strategies fail that backend's shared preview.
+`cpu_lbvh` remains LOP-only. `vulkan_lbvh` supplies bounded complete neighborhoods
+for all four strategies, including anisotropic WLOP, with CPU reductions and no
+fallback. Its `gpu_query_batch_size` (1..16384), `gpu_radius_capacity` (1..1024)
+and iteration cap (at most 64) apply through the same config/UI path. CLOP dense
+attraction and EAR insertion are CPU stages, not GPU approximations.
+A finite `NotConverged` iterate remains an explicit
 published preview with `Converged=false`, while hard failures publish no
 geometry.
 

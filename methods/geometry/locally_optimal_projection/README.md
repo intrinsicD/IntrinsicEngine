@@ -14,6 +14,8 @@ kept out of the method backend.
 | `cpu_reference` | LOP, WLOP | implemented | METHOD-016 |
 | optimized CPU candidate | LOP, WLOP | parity passed; ratios 0.961824 / 0.966845 missed the 0.80 gate; not selectable | METHOD-019 |
 | `gpu_vulkan_compute` | ordinary LOP, isotropic WLOP | implemented behind the METHOD-020 opt-in v3 parity and benchmark gates | METHOD-020 |
+| `cpu_lbvh` | LOP | cached neighborhoods, CPU projection | runtime spatial cache |
+| `vulkan_lbvh` | LOP, isotropic/anisotropic WLOP | framed complete neighborhoods, CPU projection | runtime spatial cache |
 
 WLOP is the default strategy. Plain LOP follows the same update but uses unit
 source/projected density weights.
@@ -49,8 +51,10 @@ source/projected density weights.
   uses float shader arithmetic, one bounded `h`-cell grid, and a single
   in-flight operation; unavailable, busy, or transport-invalid GPU work falls
   back to the CPU reference with explicit requested/actual backend telemetry.
-- Anisotropic WLOP remains CPU-only. Its normal preparation and directional
-  kernel are not aliases for the isotropic Vulkan shader.
+- Anisotropic WLOP may use `vulkan_lbvh` neighborhoods, but its normal preparation
+  and directional reductions remain CPU work, not aliases for the isotropic
+  Vulkan grid shader. Bounds and failure rules are in the
+  [adapter contract](paper.md#cached-and-framed-neighborhood-adapters).
 - METHOD-019 retained its exact execution candidates as benchmark-only
   negative evidence. They do not add a backend token, config value, or UI
   choice.

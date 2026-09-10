@@ -16,6 +16,7 @@
 
 import Geometry.PointCloud;
 import Geometry.PointCloud.Consolidation;
+import Geometry.PointCloud.Kernels;
 import Geometry.GaussianMixture;
 import Geometry.PointLBVH;
 import Geometry.SpatialQueries;
@@ -1302,10 +1303,14 @@ namespace
     struct CompleteLopRows
     {
         std::vector<std::uint32_t> Offsets{0}, Indices{};
-        CompleteLopRows(std::size_t queries, std::uint32_t count)
+        CompleteLopRows(std::size_t queries, std::uint32_t count, bool excludeSelf = false)
         {
             for (std::size_t i = 0; i < queries; ++i)
-            { for (std::uint32_t j = 0; j < count; ++j) Indices.push_back(j); Offsets.push_back(Indices.size()); }
+            {
+                for (std::uint32_t j = 0; j < count; ++j)
+                    if (!excludeSelf || j != i) Indices.push_back(j);
+                Offsets.push_back(static_cast<std::uint32_t>(Indices.size()));
+            }
         }
         Geometry::PointNeighborhoods View() const { return {Offsets, Indices}; }
     };
@@ -1370,4 +1375,536 @@ TEST(PointCloudConsolidation, LopTinySupportPreservesCoincidentAndStrictContribu
         EXPECT_EQ(cached.State, reference.State); EXPECT_EQ(cached.Positions,reference.Positions);
         EXPECT_EQ(cached.Diagnostics.AttractionContributionCount,reference.Diagnostics.AttractionContributionCount);
     }
+}
+
+namespace
+{
+    using ProjectionPhase = Consolidation::ProjectionPhase;
+
+    CompleteLopRows ProjectionRows(
+        const std::span<const glm::vec3> points,
+        const std::span<const glm::vec3> queries,
+        const double supportRadius,
+        const bool useRadius,
+        const bool excludeSelf = false)
+    {
+        const auto count = static_cast<std::uint32_t>(points.size());
+        if (!useRadius)
+            return CompleteLopRows(queries.size(), count, excludeSelf);
+
+        CompleteLopRows rows(0u, 0u);
+        Geometry::PointLBVH::Index index;
+        const bool built = index.Build(points);
+        EXPECT_TRUE(built);
+        const auto radius =
+            Geometry::PointCloud::Kernels::ConservativeQueryRadius(supportRadius);
+        EXPECT_TRUE(radius.has_value());
+        if (!built || !radius)
+            return rows;
+        for (std::size_t i = 0u; i < queries.size(); ++i)
+        {
+            auto hits = index.Radius(
+                queries[i], *radius, count,
+                excludeSelf ? static_cast<std::uint32_t>(i)
+                            : Geometry::PointLBVH::InvalidIndex);
+            EXPECT_FALSE(hits.Overflowed());
+            std::sort(hits.Neighbors.begin(), hits.Neighbors.end(),
+                [](const auto& a, const auto& b) { return a.Index < b.Index; });
+            for (const auto hit : hits.Neighbors)
+                rows.Indices.push_back(hit.Index);
+            rows.Offsets.push_back(static_cast<std::uint32_t>(rows.Indices.size()));
+        }
+        return rows;
+    }
+
+    void AdvanceProjection(
+        Consolidation::NeighborhoodProjection& projection,
+        const std::span<const glm::vec3> source,
+        const Consolidation::Params& params,
+        const bool useRadius)
+    {
+        CompleteLopRows sourceRows(0u, 0u), projectedRows(0u, 0u);
+        if (projection.Phase() == ProjectionPhase::SourceDensity)
+        {
+            EXPECT_FALSE(projection.NeedsAttraction());
+            EXPECT_FALSE(projection.NeedsRepulsion());
+            sourceRows = ProjectionRows(
+                source, source, params.SupportRadius, useRadius);
+        }
+        else if (projection.NeedsAttraction())
+        {
+            sourceRows = ProjectionRows(
+                source, projection.Positions(), params.SupportRadius, useRadius);
+        }
+        if (projection.NeedsRepulsion())
+        {
+            projectedRows = ProjectionRows(
+                projection.Positions(), projection.Positions(),
+                params.SupportRadius, useRadius, !projection.IncludesSelf());
+        }
+        projection.Advance(sourceRows.View(), projectedRows.View());
+    }
+
+    Consolidation::Result ProjectWithRows(
+        const std::span<const glm::vec3> source,
+        const std::span<const glm::vec3> normals,
+        const Consolidation::Params& params,
+        const bool useRadius)
+    {
+        Consolidation::NeighborhoodProjection projection(source, normals, params);
+        for (std::uint32_t stage = 0u;
+             stage < params.MaxIterations + 2u &&
+                 projection.Phase() != ProjectionPhase::Finished;
+             ++stage)
+        {
+            AdvanceProjection(projection, source, params, useRadius);
+        }
+        EXPECT_EQ(projection.Phase(), ProjectionPhase::Finished);
+        if (projection.Phase() != ProjectionPhase::Finished)
+            return {};
+        EXPECT_FALSE(projection.NeedsAttraction());
+        EXPECT_FALSE(projection.NeedsRepulsion());
+        projection.Advance({}, {});
+        return projection.TakeResult();
+    }
+
+    void ExpectProjectionDiagnostics(
+        const Consolidation::Diagnostics& actual,
+        const Consolidation::Diagnostics& expected)
+    {
+        EXPECT_EQ(actual.Implementation, expected.Implementation);
+        EXPECT_EQ(actual.Strategy, expected.Strategy);
+        EXPECT_EQ(actual.InputPointCount, expected.InputPointCount);
+        EXPECT_EQ(actual.OutputPointCount, expected.OutputPointCount);
+        EXPECT_EQ(actual.Iterations, expected.Iterations);
+        EXPECT_EQ(actual.Converged, expected.Converged);
+        EXPECT_EQ(actual.UsedDensityWeighting, expected.UsedDensityWeighting);
+        EXPECT_EQ(actual.UsedContinuousAttraction, expected.UsedContinuousAttraction);
+        EXPECT_EQ(actual.UsedAnisotropicWeighting, expected.UsedAnisotropicWeighting);
+        EXPECT_EQ(actual.UsedAuthoredNormals, expected.UsedAuthoredNormals);
+        EXPECT_EQ(actual.EstimatedNormals, expected.EstimatedNormals);
+        EXPECT_EQ(actual.NormalRefinementIterations, expected.NormalRefinementIterations);
+        EXPECT_EQ(actual.InsertedPointCount, expected.InsertedPointCount);
+        EXPECT_EQ(actual.EdgePriorityEvaluations, expected.EdgePriorityEvaluations);
+        EXPECT_EQ(actual.MixtureComponentCount, expected.MixtureComponentCount);
+        EXPECT_EQ(actual.MixtureIterations, expected.MixtureIterations);
+        EXPECT_EQ(actual.MixtureConverged, expected.MixtureConverged);
+        EXPECT_EQ(actual.AttractionContributionCount, expected.AttractionContributionCount);
+        EXPECT_EQ(actual.RepulsionContributionCount, expected.RepulsionContributionCount);
+        EXPECT_EQ(actual.DensityContributionCount, expected.DensityContributionCount);
+        EXPECT_EQ(actual.EmptyNeighborhoodCount, expected.EmptyNeighborhoodCount);
+        EXPECT_EQ(actual.AverageDisplacement, expected.AverageDisplacement);
+        EXPECT_EQ(actual.MaxDisplacement, expected.MaxDisplacement);
+    }
+
+    void ExpectProjectionResult(
+        const Consolidation::Result& actual,
+        const Consolidation::Result& expected)
+    {
+        ASSERT_EQ(actual.State, expected.State)
+            << Consolidation::DebugName(actual.State) << " vs "
+            << Consolidation::DebugName(expected.State);
+        EXPECT_EQ(actual.Positions, expected.Positions);
+        EXPECT_EQ(actual.Normals, expected.Normals);
+        ExpectProjectionDiagnostics(actual.Diagnostics, expected.Diagnostics);
+    }
+}
+
+TEST(PointCloudConsolidation, NeighborhoodProjectionMatchesMovingReferenceIterations)
+{
+    const auto source = NoisyPlane(5);
+    for (const auto method : {
+             Consolidation::Strategy{Consolidation::LopStrategy{}},
+             Consolidation::Strategy{Consolidation::WlopStrategy{}},
+             Consolidation::Strategy{Consolidation::ClopStrategy{
+                 .MixtureComponentCount = 1u}}})
+    {
+        SCOPED_TRACE(Consolidation::DebugName(Consolidation::Kind(method)));
+        for (const std::size_t target : {0u, 9u})
+        {
+            SCOPED_TRACE(target);
+            auto params = ReferenceParams();
+            params.Method = method;
+            params.TargetPointCount = target;
+            params.MaxIterations = 4u;
+            params.ConvergenceTolerance = 0.0;
+            const auto reference = Consolidation::Consolidate(source, params);
+            ASSERT_TRUE(reference.State == Consolidation::Status::Success ||
+                        reference.State == Consolidation::Status::NotConverged)
+                << Consolidation::DebugName(reference.State);
+            ASSERT_GE(reference.Diagnostics.Iterations, 3u);
+            for (const bool useRadius : {false, true})
+            {
+                SCOPED_TRACE(useRadius);
+                ExpectProjectionResult(
+                    ProjectWithRows(source, {}, params, useRadius), reference);
+            }
+        }
+    }
+}
+
+TEST(PointCloudConsolidation, NeighborhoodProjectionAlternatesAuthoredAndEstimatedNormals)
+{
+    const auto dihedral = NoisyDihedral(3, 3);
+    const auto plane = NoisyPlane(5);
+    for (const bool authored : {false, true})
+    {
+        SCOPED_TRACE(authored);
+        const auto& source = authored ? dihedral.Positions : plane;
+        const std::span<const glm::vec3> normals = authored
+            ? std::span<const glm::vec3>(dihedral.Normals)
+            : std::span<const glm::vec3>{};
+        auto params = ReferenceParams();
+        params.Method = Consolidation::WlopStrategy{
+            .Weighting = Consolidation::WeightingMode::Anisotropic,
+            .NormalSource = authored
+                ? Consolidation::NormalSourcePolicy::RequireAuthored
+                : Consolidation::NormalSourcePolicy::AuthoredOrEstimate,
+            .NormalRefinementRounds = 3u,
+        };
+        params.MaxIterations = 5u;
+        params.ConvergenceTolerance = 1.0e6;
+        params.TargetPointCount = 9u;
+        const auto reference = Consolidation::Consolidate(source, normals, params);
+        ASSERT_TRUE(reference.Succeeded()) << Consolidation::DebugName(reference.State);
+        EXPECT_EQ(reference.Diagnostics.NormalRefinementIterations, 3u);
+        EXPECT_EQ(reference.Diagnostics.Iterations, 3u);
+        EXPECT_EQ(reference.Diagnostics.UsedAuthoredNormals, authored);
+        EXPECT_EQ(reference.Diagnostics.EstimatedNormals, !authored);
+        for (const bool useRadius : {false, true})
+            ExpectProjectionResult(
+                ProjectWithRows(source, normals, params, useRadius), reference);
+    }
+}
+
+TEST(PointCloudConsolidation, NeighborhoodProjectionEarPreservesInsertionAndDownsampling)
+{
+    const auto fixture = NoisyDihedral(3, 3);
+    for (const std::size_t target : {0u, 9u, 24u})
+    {
+        SCOPED_TRACE(target);
+        auto params = ReferenceParams();
+        params.Method = Consolidation::EarStrategy{
+            .NormalSource = Consolidation::NormalSourcePolicy::RequireAuthored,
+            .NormalRefinementRounds = 3u,
+        };
+        params.RepulsionWeight = 0.1;
+        params.MaxIterations = 5u;
+        params.ConvergenceTolerance = 1.0e6;
+        params.TargetPointCount = target;
+        const auto reference = Consolidation::Consolidate(
+            fixture.Positions, fixture.Normals, params);
+        ASSERT_TRUE(reference.Succeeded()) << Consolidation::DebugName(reference.State);
+        ASSERT_EQ(reference.Diagnostics.Iterations, 3u);
+        EXPECT_EQ(reference.Diagnostics.InsertedPointCount, target == 24u ? 6u : 0u);
+        for (const bool useRadius : {false, true})
+            ExpectProjectionResult(ProjectWithRows(
+                fixture.Positions, fixture.Normals, params, useRadius), reference);
+    }
+}
+
+TEST(PointCloudConsolidation, NeighborhoodProjectionOwnsNormalizedNormalsAndParameters)
+{
+    const auto source = NoisyPlane(4);
+    std::vector<glm::vec3> normals(source.size(), glm::vec3{0.0f, 0.0f, 2.0f});
+    auto params = ReferenceParams();
+    params.Method = Consolidation::WlopStrategy{
+        .Weighting = Consolidation::WeightingMode::Anisotropic,
+        .NormalSource = Consolidation::NormalSourcePolicy::RequireAuthored,
+        .NormalRefinementRounds = 3u,
+    };
+    params.MaxIterations = 3u;
+    const auto expected = Consolidation::Consolidate(source, normals, params);
+    ASSERT_TRUE(expected.Succeeded());
+    Consolidation::NeighborhoodProjection projection(source, normals, params);
+    const auto retainedParams = params;
+    std::fill(normals.begin(), normals.end(), glm::vec3{0.0f});
+    params.SupportRadius = -1.0;
+    for (unsigned stage = 0u; stage < 4u; ++stage)
+        AdvanceProjection(projection, source, retainedParams, true);
+    ASSERT_EQ(projection.Phase(), ProjectionPhase::Finished);
+    ExpectProjectionResult(projection.TakeResult(), expected);
+}
+
+TEST(PointCloudConsolidation, NeighborhoodProjectionEarlyConvergenceAndTerminalExtraction)
+{
+    const std::vector<glm::vec3> source(4u, glm::vec3{0.0f});
+    for (const auto method : {
+             Consolidation::Strategy{Consolidation::LopStrategy{}},
+             Consolidation::Strategy{Consolidation::WlopStrategy{}},
+             Consolidation::Strategy{Consolidation::ClopStrategy{
+                 .MixtureComponentCount = 1u}}})
+    {
+        auto params = ReferenceParams();
+        params.Method = method;
+        const auto expected = Consolidation::Consolidate(source, params);
+        ASSERT_TRUE(expected.Succeeded()) << Consolidation::DebugName(expected.State);
+        ASSERT_EQ(expected.Diagnostics.Iterations, 1u);
+        Consolidation::NeighborhoodProjection projection(source, {}, params);
+        EXPECT_EQ(projection.Phase(),
+            Consolidation::Kind(method) == Consolidation::StrategyKind::Clop
+                ? ProjectionPhase::Iterate
+                : Consolidation::Kind(method) == Consolidation::StrategyKind::Wlop
+                    ? ProjectionPhase::SourceDensity : ProjectionPhase::Initialize);
+        for (unsigned stage = 0u;
+             stage < 3u && projection.Phase() != ProjectionPhase::Finished; ++stage)
+        {
+            const auto positions = projection.Positions();
+            const auto phase = projection.Phase();
+            const auto premature = projection.TakeResult();
+            EXPECT_EQ(premature.State, Consolidation::Status::InvalidProjectionState);
+            EXPECT_TRUE(premature.Positions.empty());
+            EXPECT_TRUE(premature.Normals.empty());
+            EXPECT_EQ(projection.Phase(), phase);
+            EXPECT_EQ(projection.Positions().data(), positions.data());
+            AdvanceProjection(projection, source, params, true);
+        }
+        ASSERT_EQ(projection.Phase(), ProjectionPhase::Finished);
+        projection.Advance({}, {});
+        ExpectProjectionResult(projection.TakeResult(), expected);
+        EXPECT_EQ(projection.TakeResult().State, Consolidation::Status::InvalidProjectionState);
+    }
+}
+
+TEST(PointCloudConsolidation, NeighborhoodProjectionValidatesEveryRequiredRowBeforeReduction)
+{
+    const auto source = NoisyPlane(3);
+    const std::vector<glm::vec3> normals(source.size(), glm::vec3{0.0f, 0.0f, 1.0f});
+    // Source density, anisotropic attraction, shared moving rows, WLOP/LOP L2.
+    for (unsigned channel = 0u; channel < 5u; ++channel)
+    {
+        SCOPED_TRACE(channel);
+        auto params = ReferenceParams();
+        params.Method = channel == 4u
+            ? Consolidation::Strategy{Consolidation::LopStrategy{}}
+            : channel == 3u
+                ? Consolidation::Strategy{Consolidation::WlopStrategy{}}
+                : Consolidation::Strategy{Consolidation::WlopStrategy{
+                    .Weighting = Consolidation::WeightingMode::Anisotropic,
+                    .NormalSource = Consolidation::NormalSourcePolicy::RequireAuthored}};
+        params.TargetPointCount = 5u;
+        const auto prepare = [&](Consolidation::NeighborhoodProjection& projection)
+        {
+            if (channel != 0u && channel != 4u)
+                AdvanceProjection(projection, source, params, false);
+        };
+        Consolidation::NeighborhoodProjection baseline(source, normals, params);
+        prepare(baseline);
+        baseline.Advance({}, {});
+        ASSERT_EQ(baseline.Phase(), ProjectionPhase::Finished);
+        const auto expected = baseline.TakeResult();
+        ASSERT_EQ(expected.State, Consolidation::Status::InvalidNeighborhoods);
+
+        for (unsigned corruption = 0u; corruption < 10u; ++corruption)
+        {
+            if (corruption == 9u && channel != 0u && channel != 2u)
+                continue;
+            SCOPED_TRACE(corruption);
+            Consolidation::NeighborhoodProjection projection(source, normals, params);
+            prepare(projection);
+            const std::size_t queries = channel == 0u
+                ? source.size() : projection.Positions().size();
+            CompleteLopRows sourceRows(queries, static_cast<std::uint32_t>(source.size()));
+            CompleteLopRows movingRows(queries, static_cast<std::uint32_t>(queries));
+            auto& malformed = channel == 2u ? movingRows : sourceRows;
+            const auto count = static_cast<std::uint32_t>(
+                channel == 2u ? queries : source.size());
+            switch (corruption)
+            {
+            case 0u: malformed.Offsets.clear(); break;
+            case 1u: malformed.Offsets.pop_back(); break;
+            case 2u: malformed.Offsets.front() = 1u; break;
+            case 3u: --malformed.Offsets.back(); break;
+            case 4u: malformed.Offsets[2] = malformed.Offsets[1] - 1u; break;
+            case 5u: malformed.Offsets[1] = static_cast<std::uint32_t>(malformed.Indices.size() + 1u); break;
+            case 6u: malformed.Indices.back() = malformed.Indices[malformed.Indices.size() - 2u]; break;
+            case 7u: std::swap(malformed.Indices.back(), malformed.Indices[malformed.Indices.size() - 2u]); break;
+            case 8u: malformed.Indices.back() = count; break;
+            case 9u: malformed = CompleteLopRows(queries, count, true); break;
+            }
+            projection.Advance(sourceRows.View(), movingRows.View());
+            ASSERT_EQ(projection.Phase(), ProjectionPhase::Finished);
+            EXPECT_TRUE(projection.Positions().empty());
+            projection.Advance({}, {});
+            const auto actual = projection.TakeResult();
+            EXPECT_TRUE(actual.Positions.empty());
+            EXPECT_TRUE(actual.Normals.empty());
+            ExpectProjectionResult(actual, expected);
+        }
+    }
+}
+
+TEST(PointCloudConsolidation, NeighborhoodProjectionClopKeepsDenseAttractionWithoutSourceRows)
+{
+    const std::vector<glm::vec3> source{
+        {-1.0f, -1.0f, 0.0f}, {-1.0f, 1.0f, 0.0f},
+        {1.0f, -1.0f, 0.0f}, {1.0f, 1.0f, 0.0f}};
+    auto params = ClopParams(1u);
+    params.SupportRadius = 0.01;
+    params.MaxIterations = 4u;
+    params.ConvergenceTolerance = 0.0;
+    const auto expected = Consolidation::Consolidate(source, params);
+    ASSERT_TRUE(expected.State == Consolidation::Status::Success ||
+                expected.State == Consolidation::Status::NotConverged);
+    EXPECT_GT(expected.Diagnostics.AttractionContributionCount, 0u);
+    EXPECT_EQ(expected.Diagnostics.RepulsionContributionCount, 0u);
+    Consolidation::NeighborhoodProjection projection(source, {}, params);
+    ASSERT_EQ(projection.Phase(), ProjectionPhase::Iterate);
+    EXPECT_FALSE(projection.IncludesSelf());
+    const std::array<std::uint32_t, 1u> invalidOffsets{99u};
+    for (unsigned stage = 0u;
+         stage < params.MaxIterations && projection.Phase() != ProjectionPhase::Finished;
+         ++stage)
+    {
+        EXPECT_FALSE(projection.NeedsAttraction());
+        auto rows = ProjectionRows(
+            projection.Positions(), projection.Positions(),
+            params.SupportRadius, true, true);
+        EXPECT_TRUE(rows.Indices.empty());
+        projection.Advance({invalidOffsets, {}}, rows.View());
+    }
+    ASSERT_EQ(projection.Phase(), ProjectionPhase::Finished);
+    ExpectProjectionResult(projection.TakeResult(), expected);
+}
+
+TEST(PointCloudConsolidation, NeighborhoodProjectionPreservesInputAndNormalValidation)
+{
+    const auto source = NoisyPlane(3);
+    const auto expectInvalid = [](
+        const std::span<const glm::vec3> points,
+        const std::span<const glm::vec3> normals,
+        const Consolidation::Params& params)
+    {
+        const auto expected = Consolidation::Consolidate(points, normals, params);
+        ASSERT_FALSE(expected.Succeeded());
+        ASSERT_NE(expected.State, Consolidation::Status::NotConverged);
+        Consolidation::NeighborhoodProjection projection(points, normals, params);
+        ASSERT_EQ(projection.Phase(), ProjectionPhase::Finished);
+        EXPECT_TRUE(projection.Positions().empty());
+        projection.Advance({}, {});
+        ExpectProjectionResult(projection.TakeResult(), expected);
+    };
+    expectInvalid({}, {}, ReferenceParams());
+    expectInvalid(std::span(source).first(1u), {}, ReferenceParams());
+    auto nonFinite = source;
+    nonFinite.back().x = std::numeric_limits<float>::infinity();
+    expectInvalid(nonFinite, {}, ReferenceParams());
+    nonFinite.back().x = std::numeric_limits<float>::quiet_NaN();
+    expectInvalid(nonFinite, {}, ReferenceParams());
+    for (unsigned invalid = 0u; invalid < 8u; ++invalid)
+    {
+        auto params = ReferenceParams();
+        switch (invalid)
+        {
+        case 0u: params.SupportRadius = 0.0; break;
+        case 1u: params.SupportRadius = std::numeric_limits<double>::quiet_NaN(); break;
+        case 2u: params.RepulsionWeight = 0.5; break;
+        case 3u: params.MaxIterations = 0u; break;
+        case 4u: params.ConvergenceTolerance = -1.0; break;
+        case 5u: params.TargetPointCount = 1u; break;
+        case 6u: params.MaxInputPointCount = 2u; break;
+        case 7u: params.MaxOutputPointCount = 2u; break;
+        }
+        expectInvalid(source, {}, params);
+    }
+    auto params = ReferenceParams();
+    params.Method = Consolidation::WlopStrategy{
+        .Weighting = Consolidation::WeightingMode::Anisotropic,
+        .NormalSource = Consolidation::NormalSourcePolicy::RequireAuthored};
+    expectInvalid(source, {}, params);
+    std::vector<glm::vec3> normals(source.size(), glm::vec3{0.0f, 0.0f, 1.0f});
+    expectInvalid(source, std::span(normals).first(normals.size() - 1u), params);
+    for (const glm::vec3 invalid : {
+             glm::vec3{0.0f}, glm::vec3{std::numeric_limits<float>::infinity()},
+             glm::vec3{std::numeric_limits<float>::quiet_NaN()},
+             glm::vec3{0.0f, 0.0f, -1.0f}})
+    {
+        normals.back() = invalid;
+        expectInvalid(source, normals, params);
+    }
+    std::get<Consolidation::WlopStrategy>(params.Method).NormalSource =
+        Consolidation::NormalSourcePolicy::AuthoredOrEstimate;
+    const std::vector<glm::vec3> coincident(4u, glm::vec3{0.0f});
+    expectInvalid(coincident, {}, params);
+
+    params = ClopParams(1u);
+    std::get<Consolidation::ClopStrategy>(params.Method).CovarianceFloor =
+        std::numeric_limits<double>::max();
+    expectInvalid(source, {}, params);
+
+    // Isotropic reference strategies validate normal cardinality, not values.
+    params = ReferenceParams();
+    params.MaxIterations = 3u;
+    normals.back() = glm::vec3{std::numeric_limits<float>::quiet_NaN()};
+    ExpectProjectionResult(ProjectWithRows(source, normals, params, true),
+        Consolidation::Consolidate(source, normals, params));
+}
+
+TEST(PointCloudConsolidation, NeighborhoodProjectionReductionAndInsertionFailuresPublishNothing)
+{
+    const auto source = NoisyPlane(3);
+    auto params = ReferenceParams();
+    params.Method = Consolidation::LopStrategy{};
+    Consolidation::NeighborhoodProjection projection(source, {}, params);
+    const std::vector<std::uint32_t> emptyOffsets(source.size() + 1u, 0u);
+    projection.Advance({emptyOffsets, {}}, {});
+    ASSERT_EQ(projection.Phase(), ProjectionPhase::Finished);
+    auto failed = projection.TakeResult();
+    EXPECT_EQ(failed.State, Consolidation::Status::EmptyNeighborhood);
+    EXPECT_EQ(failed.Diagnostics.EmptyNeighborhoodCount, 1u);
+    EXPECT_EQ(failed.Diagnostics.OutputPointCount, 0u);
+    EXPECT_TRUE(failed.Positions.empty());
+    EXPECT_TRUE(failed.Normals.empty());
+
+    const std::vector<glm::vec3> coincident(4u, glm::vec3{0.0f});
+    const std::vector<glm::vec3> normals(4u, glm::vec3{0.0f, 0.0f, 1.0f});
+    params.Method = Consolidation::EarStrategy{
+        .NormalSource = Consolidation::NormalSourcePolicy::RequireAuthored};
+    params.TargetPointCount = 5u;
+    const auto expected = Consolidation::Consolidate(coincident, normals, params);
+    ASSERT_EQ(expected.State, Consolidation::Status::UpsamplingFailed);
+    EXPECT_TRUE(expected.Positions.empty());
+    EXPECT_TRUE(expected.Normals.empty());
+    for (const bool useRadius : {false, true})
+        ExpectProjectionResult(ProjectWithRows(coincident, normals, params, useRadius), expected);
+}
+
+TEST(PointCloudConsolidation, NeighborhoodProjectionFiltersStrictShellsAndTinySupport)
+{
+    const float tiny = std::bit_cast<float>(0x1a01460fu);
+    for (const double support : {4.6766236639043417e-23, 1.0e-310})
+    {
+        for (const auto method : {
+                 Consolidation::Strategy{Consolidation::LopStrategy{}},
+                 Consolidation::Strategy{Consolidation::WlopStrategy{}}})
+        {
+            const std::vector<glm::vec3> source{{0.0f, 0.0f, 0.0f}, {tiny, tiny, tiny}};
+            auto params = ReferenceParams();
+            params.Method = method;
+            params.SupportRadius = support;
+            params.MaxIterations = 3u;
+            params.ConvergenceTolerance = 0.0;
+            const auto expected = Consolidation::Consolidate(source, params);
+            ASSERT_TRUE(expected.State == Consolidation::Status::Success ||
+                        expected.State == Consolidation::Status::NotConverged);
+            for (const bool useRadius : {false, true})
+                ExpectProjectionResult(ProjectWithRows(source, {}, params, useRadius), expected);
+        }
+    }
+
+    const std::vector<glm::vec3> source{{1.0f, 0.0f, 0.0f}, {-0x1p-24f, 0.0f, 0.0f}};
+    const std::vector<glm::vec3> normals(2u, glm::vec3{0.0f, 0.0f, 1.0f});
+    auto params = ReferenceParams();
+    params.Method = Consolidation::WlopStrategy{
+        .Weighting = Consolidation::WeightingMode::Anisotropic,
+        .NormalSource = Consolidation::NormalSourcePolicy::RequireAuthored};
+    params.SupportRadius = 1.0 + 0x1p-25;
+    params.MaxIterations = 3u;
+    params.RepulsionWeight = 0.0;
+    const auto expected = Consolidation::Consolidate(source, normals, params);
+    ASSERT_TRUE(expected.Succeeded());
+    EXPECT_EQ(expected.Positions, source);
+    EXPECT_EQ(expected.Diagnostics.AttractionContributionCount, 6u);
+    for (const bool useRadius : {false, true})
+        ExpectProjectionResult(ProjectWithRows(source, normals, params, useRadius), expected);
 }

@@ -13,6 +13,7 @@ it does not create a method-owned engine module, registry, or normal service.
 | `cpu_reference` | implemented | METHOD-018 |
 | optimized CPU candidate | parity passed; ratio 1.037145 missed the 0.80 gate; not selectable | METHOD-019 |
 | `gpu_vulkan_compute` | capability-negative: anisotropic WLOP normal kernels and EAR refinement/insertion are not implemented | METHOD-020 |
+| `vulkan_lbvh` | framed complete neighborhoods; CPU reductions, initial normal estimation and insertion | runtime spatial cache |
 
 ## Selection guidance
 
@@ -43,9 +44,10 @@ a method-local copy and never overwrites the source property.
 - METHOD-019's exact local-scan candidate remains a benchmark validation seam;
   it does not add a method-manifest backend, runtime config token, or UI
   choice.
-- METHOD-020 keeps anisotropic WLOP and EAR CPU-only. The canonical Vulkan
-  preview rejects both pairs instead of dropping normal weighting or silently
-  changing EAR's progressive-insertion/cardinality semantics.
+- The grid `gpu_vulkan_compute` preview rejects anisotropic WLOP and EAR.
+  The separate `vulkan_lbvh` choice supplies complete neighborhoods without
+  changing normal weighting, fixed-round refinement, or progressive-insertion
+  semantics. EAR insertion remains CPU work.
 
 Runtime defaults anisotropic WLOP and EAR to the directional Auto support
 policy (rank 24, P75, multiplier 1.25); Manual keeps the configured world-unit
@@ -70,7 +72,8 @@ determinism, and fail-closed identity. Its runtime is descriptive only.
 
 Select `ear` (or anisotropic `wlop`) in
 `sandbox.point_cloud_consolidation`. The runtime operation honors the same
-authored-or-estimated normal policy, runs the CPU reference asynchronously,
+authored-or-estimated normal policy, runs CPU reference arithmetic asynchronously
+with reference or framed Vulkan LBVH neighborhoods,
 and publishes pointer-free normal/refinement diagnostics. Input positions and
 optional normals are named, count-matched `vec3` properties on any one resolved
 element domain; they need not be vertex properties. Same-cardinality output is

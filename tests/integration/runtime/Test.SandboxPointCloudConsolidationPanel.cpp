@@ -483,6 +483,35 @@ TEST(SandboxPointCloudConsolidationPanel,
     EXPECT_EQ(failure.Message, "source changed");
 }
 
+TEST(SandboxPointCloudConsolidationPanel, VulkanLbvhVariantsPreserveSharedControls)
+{
+    auto properties = Runtime::MakePointCloudConsolidationPropertyRefs(
+        Runtime::GeometryElementDomain::MeshFace, "f:centroid", "f:normal");
+    properties.OutputPositions.Name = "projection:position";
+    properties.OutputNormals->Name = "projection:normal";
+    for (const auto strategy : {Runtime::PointCloudConsolidationStrategy::Wlop,
+             Runtime::PointCloudConsolidationStrategy::Clop,
+             Runtime::PointCloudConsolidationStrategy::Ear})
+    {
+        Runtime::PointCloudConsolidationConfig config;
+        config.Backend = Runtime::PointCloudConsolidationBackend::VulkanLBVH;
+        config.Strategy = strategy;
+        config.WlopAnisotropic = true;
+        config.GpuQueryBatchSize = 17;
+        config.GpuRadiusCapacity = 64;
+        const auto request = Editor::BuildSandboxPointCloudConsolidationPanelApplyRequest(
+            91, properties, config);
+        ASSERT_TRUE(request);
+        EXPECT_EQ(request->Execute.Config.Backend, config.Backend);
+        EXPECT_EQ(request->Execute.Config.Strategy, strategy);
+        EXPECT_TRUE(request->Execute.Config.WlopAnisotropic);
+        EXPECT_EQ(request->Execute.Config.GpuQueryBatchSize, 17u);
+        EXPECT_EQ(request->Execute.Config.GpuRadiusCapacity, 64u);
+        EXPECT_EQ(request->Execute.Properties.InputPositions, properties.InputPositions);
+        EXPECT_EQ(request->Execute.Properties.OutputNormals, properties.OutputNormals);
+    }
+}
+
 TEST(SandboxPointCloudConsolidationPanel,
      MeshVertexAndFaceSlotsUseTheSameEditorPreflight)
 {

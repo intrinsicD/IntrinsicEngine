@@ -1,9 +1,10 @@
-// Point-set projection strategies, diagnostics and reusable LOP neighborhood steps.
+// Point-set projection strategies, diagnostics and externally queried neighborhood steps.
 module;
 
 #include <cstddef>
 #include <cstdint>
 #include <limits>
+#include <memory>
 #include <span>
 #include <string_view>
 #include <variant>
@@ -110,6 +111,7 @@ export namespace Geometry::PointCloud::Consolidation
         NotConverged,
         UnsupportedStrategy,
         InvalidNeighborhoods,
+        InvalidProjectionState,
     };
 
     struct Params
@@ -216,6 +218,53 @@ export namespace Geometry::PointCloud::Consolidation
     [[nodiscard]] Result Consolidate(
         const Cloud& cloud,
         const Params& params = {});
+
+    enum class ProjectionPhase : std::uint8_t
+    {
+        SourceDensity,
+        Initialize,
+        Iterate,
+        Finished,
+    };
+
+    // Source storage must remain alive and unchanged until destruction. Parameters
+    // are copied; authored normals are consumed only during construction. Query
+    // positions remain valid until Advance or destruction. CLOP fits and
+    // initializes its dense CPU mixture immediately.
+    class NeighborhoodProjection
+    {
+    public:
+        NeighborhoodProjection(
+            std::span<const glm::vec3> source,
+            std::span<const glm::vec3> normals,
+            const Params& params);
+        ~NeighborhoodProjection();
+        NeighborhoodProjection(const NeighborhoodProjection&) = delete;
+        NeighborhoodProjection& operator=(const NeighborhoodProjection&) = delete;
+
+        [[nodiscard]] ProjectionPhase Phase() const noexcept;
+        [[nodiscard]] std::span<const glm::vec3> Positions() const noexcept;
+        [[nodiscard]] bool NeedsAttraction() const noexcept;
+        [[nodiscard]] bool NeedsRepulsion() const noexcept;
+        // WLOP/EAR moving rows must include self for shared density/refinement.
+        [[nodiscard]] bool IncludesSelf() const noexcept;
+
+        // SourceDensity takes source-to-source rows including self. Otherwise
+        // sourceRows address source points for Positions(); projectedRows address
+        // Positions() for itself. Required rows must be ascending, unique, valid
+        // and complete within strict support; conservative shells are filtered.
+        // Unneeded rows are ignored. Finished advances are no-ops.
+        void Advance(
+            Geometry::PointNeighborhoods sourceRows,
+            Geometry::PointNeighborhoods projectedRows);
+        // One terminal extraction; otherwise returns InvalidProjectionState
+        // without consuming work. Only Success/NotConverged carry finite payloads.
+        [[nodiscard]] Result TakeResult();
+
+    private:
+        struct Impl;
+        std::unique_ptr<Impl> m_Impl;
+    };
 
     // LOP only. Seed selection matches Consolidate; each successful step owns
     // finite positions. Step success does not imply whole-solver convergence.

@@ -17,6 +17,7 @@ outputs:
   - "CPU-reference diagnostics with mixture resolution, EM convergence, projection convergence, displacement, and contribution counts"
 backends:
   - cpu_reference
+  - gpu_vulkan_compute
 metrics:
   - "mean_distance_to_reference_surface"
   - "uniformity_min_pairwise_distance"
@@ -25,7 +26,9 @@ metrics:
   - "runtime_ms"
 correctness_tests:
   - "../../../tests/unit/geometry/Test.PointCloudConsolidation.cpp"
+  - "../../../tests/integration/runtime/Test.PointCloudConsolidationGpuParity.cpp"
 benchmarks:
+  - "../../../benchmarks/geometry/manifests/point_lbvh_clop_vulkan_runtime_smoke.yaml"
   - "../../../benchmarks/geometry/manifests/continuous_lop_reference_smoke.yaml"
   - "../../../benchmarks/geometry/manifests/lop_family_comparison_smoke.yaml"
 known_limitations:
@@ -35,3 +38,4 @@ known_limitations:
   - "The serial CPU reference is correctness-oriented and makes no performance claim."
   - "METHOD-019's exact optimized CLOP candidate preserved parity but missed the frozen useful-acceleration gate; no optimized backend is selectable."
   - "METHOD-020 records CLOP as capability-negative for gpu_vulkan_compute because its fitted Gaussian-mixture continuous attraction is a distinct kernel; runtime preview rejects the pair rather than substituting LOP/WLOP."
+  - "The GPU backend category additionally covers the distinct vulkan_lbvh runtime token: only complete compact repulsion neighborhoods use Vulkan. Seeded mixture fitting, dense Gaussian-product attraction and projection arithmetic stay on CPU; no spatial cutoff, fallback, speedup or default change is introduced."

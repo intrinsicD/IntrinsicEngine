@@ -1256,7 +1256,7 @@ namespace Extrinsic::Sandbox::Editor
             bool changed = false;
             const auto label = [](Runtime::PointCloudConsolidationBackend backend)
             {
-                if (backend == Runtime::PointCloudConsolidationBackend::VulkanLBVH) return "Vulkan LBVH (LOP)";
+                if (backend == Runtime::PointCloudConsolidationBackend::VulkanLBVH) return "Vulkan LBVH neighborhoods";
                 if (backend == Runtime::PointCloudConsolidationBackend::CpuLBVH) return "CPU LBVH (LOP)";
                 if (backend == Runtime::PointCloudConsolidationBackend::VulkanCompute) return "Vulkan compute";
                 return "CPU reference";

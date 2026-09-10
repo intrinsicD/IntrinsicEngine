@@ -97,7 +97,7 @@ the preregistered comparison in
 [`reports/METHOD-019-protocol.md`](reports/METHOD-019-protocol.md); it preserved
 parity but missed the fixed acceleration gate and was not adopted.
 
-## Cached LOP neighborhood adapter
+## Cached and framed neighborhood adapters
 
 The `cpu_lbvh` runtime choice gathers complete source-attraction and moving-sample
 repulsion rows, then calls the existing double CPU arithmetic. The source index is
@@ -112,12 +112,17 @@ The original [LOP technical report](https://www.wisdom.weizmann.ac.il/~ylipman/l
 uses a different inverse-cubic repulsion in its examples; no original-formulation
 or general convergence guarantee is added. The `vulkan_lbvh` adapter gathers the same complete rows through framed queries,
 retaining the source lease and a private projected workspace until dependent work
-finishes. Attraction has source IDs without self exclusion; repulsion excludes
-only the matching projected ID. Projection arithmetic stays on the CPU. Capacity
+finishes. Attraction has source IDs without self exclusion. LOP repulsion excludes
+only the matching projected ID. WLOP source-density rows and moving rows include
+self: the latter feed direct density and, for anisotropic WLOP, bilateral normal
+refinement before repulsion filters self. The resumable `NeighborhoodProjection`
+state reuses the same CPU helpers and preserves the fixed normal-refinement stop
+rule. Initial normal estimation stays on CPU. Projection arithmetic stays on the CPU. Capacity
 overflow, cancellation and stale input reject publication without fallback.
 The bounded config accepts at most 64 iterations, query batches 1..16384 and
 row capacities 1..1024; float coordinates must be normal or zero and conservative
-query radius must be representable and at most 1e18. WLOP/CLOP/EAR adapters remain
-follow-up work in the spatial consumer inventory. Existing `gpu_vulkan_compute` grid execution and the frozen METHOD-019
+query radius must be representable and at most 1e18. The same framed adapter serves
+CLOP compact repulsion and EAR's anisotropic projection phase; dense CLOP attraction
+and progressive EAR insertion remain CPU computations. Existing `gpu_vulkan_compute` grid execution and the frozen METHOD-019
 candidate retain their separate identities. CPU LBVH benchmark timing is diagnostic;
 no default change or acceleration result is asserted.

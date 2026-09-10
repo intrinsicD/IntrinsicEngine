@@ -153,12 +153,39 @@ namespace
             .TargetPointCount = config.TargetPointCount,
             .Seed = config.Seed,
         };
-        params.Method = config.Strategy ==
-                Runtime::PointCloudConsolidationStrategy::Lop
-            ? Consolidation::Strategy{Consolidation::LopStrategy{}}
-            : Consolidation::Strategy{Consolidation::WlopStrategy{
-                  .Weighting = Consolidation::WeightingMode::Isotropic,
-              }};
+        const auto normalSource = config.NormalSource ==
+                Runtime::PointCloudConsolidationNormalSource::RequireAuthored
+            ? Consolidation::NormalSourcePolicy::RequireAuthored
+            : Consolidation::NormalSourcePolicy::AuthoredOrEstimate;
+        switch (config.Strategy)
+        {
+        case Runtime::PointCloudConsolidationStrategy::Lop:
+            params.Method = Consolidation::LopStrategy{};
+            break;
+        case Runtime::PointCloudConsolidationStrategy::Wlop:
+            params.Method = Consolidation::WlopStrategy{
+                .Weighting = config.WlopAnisotropic
+                    ? Consolidation::WeightingMode::Anisotropic
+                    : Consolidation::WeightingMode::Isotropic,
+                .NormalSource = normalSource,
+                .NormalAngleRadians = config.NormalAngleRadians,
+                .NormalRefinementRounds = config.NormalRefinementRounds};
+            break;
+        case Runtime::PointCloudConsolidationStrategy::Clop:
+            params.Method = Consolidation::ClopStrategy{
+                .MixtureComponentCount = config.ClopMixtureComponentCount,
+                .MixtureMaxIterations = config.ClopMixtureMaxIterations,
+                .MixtureRelativeTolerance = config.ClopMixtureRelativeTolerance,
+                .CovarianceFloor = config.ClopCovarianceFloor};
+            break;
+        case Runtime::PointCloudConsolidationStrategy::Ear:
+            params.Method = Consolidation::EarStrategy{
+                .NormalSource = normalSource,
+                .NormalAngleRadians = config.NormalAngleRadians,
+                .EdgeSensitivity = config.EarEdgeSensitivity,
+                .NormalRefinementRounds = config.NormalRefinementRounds};
+            break;
+        }
         return params;
     }
 
@@ -769,6 +796,16 @@ namespace
     class LopLbvhApp final : public Intrinsic::Tests::RuntimeTestModule
     {
     public:
+        explicit LopLbvhApp(
+            Runtime::PointCloudConsolidationStrategy strategy = Runtime::PointCloudConsolidationStrategy::Lop,
+            bool anisotropic = false)
+            : Strategy(strategy), Anisotropic(anisotropic)
+        {
+        }
+        bool UsesNormals() const
+        {
+            return Strategy == Runtime::PointCloudConsolidationStrategy::Ear || Anisotropic;
+        }
         using Domain=Runtime::GeometryElementDomain;
         Geometry::PropertySet& Props(unsigned d)
         {
@@ -780,13 +817,26 @@ namespace
         }
         Runtime::PointCloudConsolidationRequest Request(unsigned d)
         {
-            auto refs=Runtime::MakePointCloudConsolidationPropertyRefs(Domain(d),"samples",std::nullopt);
+            auto refs=Runtime::MakePointCloudConsolidationPropertyRefs(Domain(d),"samples",
+                UsesNormals() ? std::optional<std::string>{"normals"} : std::nullopt);
             refs.OutputPositions.Name="projected";
+            if(UsesNormals())refs.OutputNormals->Name="projected_normals";
             Runtime::PointCloudConsolidationConfig c;
-            c.Backend=Runtime::PointCloudConsolidationBackend::VulkanLBVH;c.Strategy=Runtime::PointCloudConsolidationStrategy::Lop;
+            c.Backend=Runtime::PointCloudConsolidationBackend::VulkanLBVH;c.Strategy=Strategy;
+            c.WlopAnisotropic=Anisotropic;c.NormalSource=Runtime::PointCloudConsolidationNormalSource::RequireAuthored;
+            c.ClopMixtureComponentCount=2;c.ClopMixtureMaxIterations=256;c.ClopMixtureRelativeTolerance=1e-5;
             c.SupportRadiusMode=Runtime::PointCloudConsolidationSupportRadiusMode::Manual;c.SupportRadius=.35;
-            c.RepulsionWeight=.2;c.MaxIterations=3;c.ConvergenceTolerance=0;c.GpuRadiusCapacity=64;c.GpuQueryBatchSize=64;
+            c.RepulsionWeight=.2;c.MaxIterations=3;c.ConvergenceTolerance=0;c.GpuRadiusCapacity=64;
+            c.GpuQueryBatchSize=Strategy==Runtime::PointCloudConsolidationStrategy::Lop?64:17;
             return {Runtime::SelectionController::ToStableEntityId(Entities[d-1]),refs,c};
+        }
+        Consolidation::Result Reference(unsigned d, const Runtime::PointCloudConsolidationRequest& request)
+        {
+            const auto normals = request.Properties.InputNormals
+                ? std::span<const glm::vec3>{Props(d).Get<glm::vec3>("normals").Vector()}
+                : std::span<const glm::vec3>{};
+            return Consolidation::Consolidate(Props(d).Get<glm::vec3>("samples").Vector(),
+                normals,MakeCpuParams(request.Config));
         }
         void Resolve() override
         {
@@ -807,24 +857,38 @@ namespace
                 auto& props=Props(d);props.Resize(32);
                 auto p=props.GetOrAdd<glm::vec3>("samples");
                 for(unsigned i=0;i<32;++i)p[i]={float(i%8)*.05f,float(i/8)*.05f,.01f*std::sin(float(i*7))};
+                if(UsesNormals())
+                {
+                    auto normals=props.GetOrAdd<glm::vec3>("normals");
+                    for(unsigned i=0;i<32;++i)normals[i]=glm::normalize(glm::vec3{.05f*std::sin(float(i)),0.f,1.f});
+                    props.GetOrAdd<glm::vec3>("projected_normals").Vector().assign(32,glm::vec3{77});
+                }
                 props.GetOrAdd<glm::vec3>("projected").Vector().assign(32,glm::vec3(77));
                 props.GetOrAdd<float>("untouched").Vector().assign(32,19);
-                auto request=Request(d);auto params=MakeCpuParams(request.Config);
-                References.push_back(Consolidation::Consolidate(p.Vector(),params));
+                auto request=Request(d);
+                References.push_back(Reference(d,request));
                 ASSERT_FALSE(References.back().Positions.empty());
             }
             Subscription=Service->SubscribeCompleted([this](const Runtime::PointCloudConsolidationResult& r){Results.push_back(r);});
         }
         void Frame(double,double) override
         {
-            if(std::chrono::steady_clock::now()-Started>std::chrono::seconds(150)){TimedOut=true;Kernel().RequestExit();return;}
+            if(::testing::Test::HasFatalFailure()){Kernel().RequestExit();return;}
+            SCOPED_TRACE("projection phase "+std::to_string(Phase));
+            const auto budget=Strategy==Runtime::PointCloudConsolidationStrategy::Lop?150:300;
+            if(std::chrono::steady_clock::now()-Started>std::chrono::seconds(budget)){TimedOut=true;Kernel().RequestExit();return;}
             if(!Kernel().GetDevice().IsOperational())return;
             if(Submitted && (Phase==3 || Phase==4) && !Mutated)
             {
                 for(const auto& job:Kernel().Jobs().SnapshotAll())
-                    if(job.DebugName=="LOP Vulkan neighborhoods" && job.State==Runtime::JobState::AwaitingApply)
+                    if(job.DebugName=="Consolidation Vulkan neighborhoods" && job.State==Runtime::JobState::AwaitingApply)
                     {
-                        if(Phase==3)Props(8).Get<glm::vec3>("samples")[0].z+=.01f;
+                        if(Phase==3)
+                        {
+                            auto sample=Props(8).Get<glm::vec3>("samples");
+                            BeforeSourceMutation=sample[0];
+                            sample[0].z+=.01f;
+                        }
                         else EXPECT_TRUE(Kernel().Jobs().Cancel(job.Token));
                         Mutated=true;break;
                     }
@@ -843,20 +907,38 @@ namespace
                         const auto actual=Props(d).Get<glm::vec3>("projected").Vector();
                         const auto error=MeasurePositionError(actual,References[d-1].Positions);MaxError=std::max(MaxError,error.Linf);
                         EXPECT_LE(error.Linf,1e-6);EXPECT_EQ(Props(d).Get<float>("untouched").Vector(),std::vector<float>(32,19));
+                        EXPECT_EQ(r.GeometryStatus,References[d-1].State);
+                        EXPECT_EQ(r.NormalRefinementIterations,References[d-1].Diagnostics.NormalRefinementIterations);
+                        if(UsesNormals())
+                        {
+                            const auto normalError=MeasurePositionError(Props(d).Get<glm::vec3>("projected_normals").Vector(),References[d-1].Normals);
+                            MaxNormalError=std::max(MaxNormalError,normalError.Linf);
+                            EXPECT_LE(normalError.Linf,1e-6);
+                            EXPECT_TRUE(r.UsedAuthoredNormals);
+                        }
                     }
                 }
                 else if(Phase>=5)
                 {
                     ASSERT_EQ(Results.size(),1u);ASSERT_TRUE(Results.front().Succeeded())<<Results.front().Message;
                     const auto name=Phase==5?"v:position":"projected";
-                    EXPECT_LE(MeasurePositionError(Props(8).Get<glm::vec3>(name).Vector(),SpecialReference.Positions).Linf,1e-6);
+                    const auto error=MeasurePositionError(Props(8).Get<glm::vec3>(name).Vector(),SpecialReference.Positions);
+                    MaxError=std::max(MaxError,error.Linf);EXPECT_LE(error.Linf,1e-6);
                     EXPECT_EQ(Results.front().Iterations,SpecialReference.Diagnostics.Iterations);
                     EXPECT_EQ(Results.front().SpatialWorkspaceBuilds,SpecialReference.Diagnostics.Iterations);
+                    EXPECT_EQ(Results.front().InsertedPointCount,SpecialReference.Diagnostics.InsertedPointCount);
+                    if(UsesNormals())
+                    {
+                        const auto normalName=Phase==5?"v:normal":"projected_normals";
+                        const auto normalError=MeasurePositionError(Props(8).Get<glm::vec3>(normalName).Vector(),SpecialReference.Normals);
+                        MaxNormalError=std::max(MaxNormalError,normalError.Linf);EXPECT_LE(normalError.Linf,1e-6);
+                        if(Phase==7)EXPECT_TRUE(Results.front().EstimatedNormals);
+                    }
                     EXPECT_EQ(History->UndoCount(),17u);
                     EXPECT_EQ(History->Undo().Status,Runtime::EditorCommandHistoryStatus::Undone);
                     EXPECT_EQ(Props(8).Size(),32u);
                     EXPECT_EQ(History->Redo().Status,Runtime::EditorCommandHistoryStatus::Redone);
-                    EXPECT_EQ(Props(8).Size(),Phase==5?16u:32u);
+                    EXPECT_EQ(Props(8).Size(),Phase==5?(Strategy==Runtime::PointCloudConsolidationStrategy::Ear?40u:16u):32u);
                     EXPECT_EQ(History->Undo().Status,Runtime::EditorCommandHistoryStatus::Undone);
                 }
                 else
@@ -864,13 +946,19 @@ namespace
                     EXPECT_EQ(History->UndoCount(),16u);
                     ASSERT_EQ(Results.size(),1u);EXPECT_FALSE(Results.front().Succeeded());
                     EXPECT_EQ(Props(8).Get<glm::vec3>("projected").Vector(),BeforeFailure);
+                    if(UsesNormals())EXPECT_EQ(Props(8).Get<glm::vec3>("projected_normals").Vector(),BeforeFailureNormals);
                     if(Phase==2)EXPECT_NE(Results.front().Message.find("capacity"),std::string::npos);
-                    if(Phase==3){EXPECT_TRUE(Mutated);EXPECT_EQ(Results.front().Status,Runtime::PointCloudConsolidationRunStatus::StaleSource);}
+                    if(Phase==3)
+                    {
+                        EXPECT_TRUE(Mutated);EXPECT_EQ(Results.front().Status,Runtime::PointCloudConsolidationRunStatus::StaleSource);
+                        // Keep later cases on the original fitted-density fixture.
+                        if(Mutated)Props(8).Get<glm::vec3>("samples")[0]=BeforeSourceMutation;
+                    }
                     if(Phase==4){EXPECT_TRUE(Mutated);EXPECT_EQ(Results.front().Status,Runtime::PointCloudConsolidationRunStatus::Cancelled);}
                 }
                 if(Phase==1)WarmMs=std::chrono::duration<double,std::milli>(std::chrono::steady_clock::now()-PhaseStarted).count();
                 Results.clear();Submitted=false;Mutated=false;++Phase;
-                if(Phase==7){Done=true;Kernel().RequestExit();return;}
+                if(Phase==(UsesNormals()?8u:7u)){Done=true;Kernel().RequestExit();return;}
             }
             if(!Submitted)
             {
@@ -887,28 +975,46 @@ namespace
                 else
                 {
                     BeforeFailure=Props(8).Get<glm::vec3>("projected").Vector();auto request=Request(8);
+                    if(UsesNormals())BeforeFailureNormals=Props(8).Get<glm::vec3>("projected_normals").Vector();
                     if(Phase==2)request.Config.GpuRadiusCapacity=1;
-                    if(Phase==5){request.Config.TargetPointCount=16;request.Properties.OutputPositions.Name="v:position";}
+                    if(Phase==5)
+                    {
+                        request.Config.TargetPointCount=Strategy==Runtime::PointCloudConsolidationStrategy::Ear?40:16;
+                        request.Properties.OutputPositions.Name="v:position";
+                        if(UsesNormals())request.Properties.OutputNormals->Name="v:normal";
+                    }
                     if(Phase==6)request.Config.ConvergenceTolerance=1;
-                    if(Phase>=5)SpecialReference=Consolidation::Consolidate(Props(8).Get<glm::vec3>("samples").Vector(),MakeCpuParams(request.Config));
+                    if(Phase==7)
+                    {
+                        request.Properties.InputNormals.reset();
+                        request.Config.NormalSource=Runtime::PointCloudConsolidationNormalSource::AuthoredOrEstimate;
+                    }
+                    if(Phase>=5)
+                    {
+                        SpecialReference=Reference(8,request);
+                        ASSERT_FALSE(SpecialReference.Positions.empty())
+                            <<"phase "<<Phase<<": "<<Consolidation::DebugName(SpecialReference.State);
+                    }
                     (void)Service->Run(request);
                 }
             }
         }
         void Shutdown() override {if(Service)Service->Unsubscribe(Subscription);}
         Runtime::EditorCommandHistory* History{};Consolidation::Result SpecialReference{};
+        Runtime::PointCloudConsolidationStrategy Strategy;bool Anisotropic{};
         ECS::Scene::Registry* Scene{};Runtime::PointCloudConsolidationService* Service{};Runtime::KernelEventSubscription Subscription{};
         std::vector<ECS::EntityHandle> Entities;std::vector<Consolidation::Result> References;
-        std::vector<Runtime::PointCloudConsolidationResult> Results;std::vector<glm::vec3> BeforeFailure;
-        std::chrono::steady_clock::time_point Started{},PhaseStarted{};unsigned Phase{},Expected{};bool Submitted{},TimedOut{},Done{},Mutated{};double MaxError{},WarmMs{};
+        std::vector<Runtime::PointCloudConsolidationResult> Results;std::vector<glm::vec3> BeforeFailure,BeforeFailureNormals;
+        glm::vec3 BeforeSourceMutation{};
+        std::chrono::steady_clock::time_point Started{},PhaseStarted{};unsigned Phase{},Expected{};bool Submitted{},TimedOut{},Done{},Mutated{};double MaxError{},MaxNormalError{},WarmMs{};
     };
-}
-TEST(PointCloudConsolidationGpuParity, VulkanLbvhMovingStepsAcrossDomainsAndFailures)
+void RunProjectionLbvhCase(
+    Runtime::PointCloudConsolidationStrategy strategy, bool anisotropic, const std::string& variant)
 {
     if(!Extrinsic::Platform::Backends::Glfw::CanInitialize())GTEST_SKIP()<<"GLFW unavailable";
     auto config=Runtime::CreateReferenceEngineConfig();config.Window.Width=64;config.Window.Height=64;
     config.Render.EnableValidation=true;config.Render.EnableVSync=false;config.ReferenceScene.Enabled=false;
-    auto app=std::make_unique<LopLbvhApp>();auto* observed=app.get();
+    auto app=std::make_unique<LopLbvhApp>(strategy,anisotropic);auto* observed=app.get();
     Intrinsic::Tests::RuntimeTestKernel engine(config,std::move(app));
     engine.EmplaceModule<Runtime::SpatialIndexCache>();engine.EmplaceModule<Runtime::PointCloudConsolidationModule>();engine.EmplaceModule<Runtime::SceneDocumentModule>();
     engine.Initialize();
@@ -916,8 +1022,9 @@ TEST(PointCloudConsolidationGpuParity, VulkanLbvhMovingStepsAcrossDomainsAndFail
     if(!readiness.LogicalDeviceReady || !readiness.SwapchainReady || !readiness.CommandSyncReady)
     {engine.Shutdown();GTEST_SKIP()<<"Vulkan bootstrap unavailable";}
     const auto before=Extrinsic::Backends::Vulkan::GetVulkanOperationalDiagnosticsSnapshot();engine.Run();
-    EXPECT_FALSE(observed->TimedOut);EXPECT_TRUE(observed->Done);EXPECT_LE(observed->MaxError,1e-6);
-    if(const char* path=std::getenv("INTRINSIC_LOP_LBVH_BENCHMARK_PATH"))
+    EXPECT_FALSE(observed->TimedOut);EXPECT_TRUE(observed->Done);EXPECT_LE(observed->MaxError,1e-6);EXPECT_LE(observed->MaxNormalError,1e-6);
+    if(const char* path=std::getenv("INTRINSIC_LOP_LBVH_BENCHMARK_PATH");
+        path && strategy==Runtime::PointCloudConsolidationStrategy::Lop)
     {
         std::ofstream output(path);
         output << "{\"benchmark_id\":\"geometry.point_lbvh.lop_vulkan_runtime_smoke\",\"method\":\"geometry.point_lbvh\","
@@ -928,6 +1035,51 @@ TEST(PointCloudConsolidationGpuParity, VulkanLbvhMovingStepsAcrossDomainsAndFail
             << "\"status\":\"" << (observed->Done&&!observed->TimedOut&&observed->MaxError<=1e-6&&!::testing::Test::HasFailure()?"passed":"failed") << "\"}\n";
         EXPECT_TRUE(output.good());
     }
+    const auto warmMs=observed->WarmMs,positionError=observed->MaxError,normalError=observed->MaxNormalError;
+    const bool completed=observed->Done&&!observed->TimedOut;
     engine.Shutdown();const auto after=Extrinsic::Backends::Vulkan::GetVulkanOperationalDiagnosticsSnapshot();
     EXPECT_EQ(before.VulkanValidationErrorCount,after.VulkanValidationErrorCount);
+    if(const char* directory=std::getenv("INTRINSIC_PROJECTION_LBVH_BENCHMARK_DIR");
+        directory && strategy!=Runtime::PointCloudConsolidationStrategy::Lop)
+    {
+        std::ofstream output(std::string(directory)+"/"+variant+".json");
+        output.precision(17);
+        output << "{\"benchmark_id\":\"geometry.point_lbvh." << variant << "_vulkan_runtime_smoke\","
+            << "\"method\":\"geometry.point_lbvh\",\"backend\":\"gpu_vulkan_compute\","
+            << "\"dataset\":\"builtin.projection_domains.32x8.three_iterations\",\"commit\":\"local-dev\","
+            << "\"metrics\":{\"runtime_ms\":" << warmMs << ",\"quality_error_linf\":" << positionError << "},"
+            << "\"diagnostics\":{\"runner\":\"IntrinsicRuntimePointCloudConsolidationGpuParityTests\",\"mode\":\"smoke\","
+            << "\"normal_error_linf\":" << normalError << ",\"normal_error_linf_limit\":0.000001,"
+            << "\"warmup_iterations\":1,\"measured_iterations\":1,\"variant\":\"" << variant << "\","
+            << "\"query_backend\":\"vulkan_lbvh\",\"reduction_backend\":\"cpu_reference\","
+            << "\"clop_attraction\":\"cpu_dense_gaussian\",\"ear_insertion\":\"cpu_reference\"},"
+            << "\"status\":\"" << (completed&&!::testing::Test::HasFailure()?"passed":"failed") << "\"}\n";
+        EXPECT_TRUE(output.good());
+    }
+}
+}
+
+TEST(PointCloudConsolidationGpuParity, VulkanLbvhMovingStepsAcrossDomainsAndFailures)
+{
+    RunProjectionLbvhCase(Runtime::PointCloudConsolidationStrategy::Lop,false,"lop");
+}
+
+TEST(PointCloudConsolidationGpuParity, VulkanLbvhWlopAcrossDomainsAndFailures)
+{
+    RunProjectionLbvhCase(Runtime::PointCloudConsolidationStrategy::Wlop,false,"wlop");
+}
+
+TEST(PointCloudConsolidationGpuParity, VulkanLbvhAnisotropicWlopAcrossDomainsAndFailures)
+{
+    RunProjectionLbvhCase(Runtime::PointCloudConsolidationStrategy::Wlop,true,"wlop_anisotropic");
+}
+
+TEST(PointCloudConsolidationGpuParity, VulkanLbvhClopAcrossDomainsAndFailures)
+{
+    RunProjectionLbvhCase(Runtime::PointCloudConsolidationStrategy::Clop,false,"clop");
+}
+
+TEST(PointCloudConsolidationGpuParity, VulkanLbvhEarAcrossDomainsInsertionAndFailures)
+{
+    RunProjectionLbvhCase(Runtime::PointCloudConsolidationStrategy::Ear,false,"ear");
 }

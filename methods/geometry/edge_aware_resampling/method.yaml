@@ -17,6 +17,7 @@ outputs:
   - "CPU-reference diagnostics for normal source/refinement, anisotropic projection, insertion, convergence, and failures"
 backends:
   - cpu_reference
+  - gpu_vulkan_compute
 metrics:
   - "edge_sharpness_preservation"
   - "mean_distance_to_reference_surface"
@@ -27,7 +28,10 @@ metrics:
 correctness_tests:
   - "../../../tests/unit/geometry/Test.PointCloudConsolidation.cpp"
   - "../../../tests/unit/geometry/Test.PointCloudKernels.cpp"
+  - "../../../tests/integration/runtime/Test.PointCloudConsolidationGpuParity.cpp"
 benchmarks:
+  - "../../../benchmarks/geometry/manifests/point_lbvh_ear_vulkan_runtime_smoke.yaml"
+  - "../../../benchmarks/geometry/manifests/point_lbvh_wlop_anisotropic_vulkan_runtime_smoke.yaml"
   - "../../../benchmarks/geometry/manifests/edge_aware_resampling_reference_smoke.yaml"
   - "../../../benchmarks/geometry/manifests/lop_family_comparison_smoke.yaml"
 known_limitations:
@@ -37,3 +41,4 @@ known_limitations:
   - "The serial CPU reference is correctness-oriented and makes no performance claim."
   - "METHOD-019's exact optimized EAR candidate preserved parity but missed the frozen useful-acceleration gate; no optimized backend is selectable."
   - "METHOD-020 records anisotropic WLOP and EAR as capability-negative for gpu_vulkan_compute; runtime preview rejects them rather than dropping normal weighting, refinement, or insertion semantics."
+  - "The GPU backend category additionally covers the distinct vulkan_lbvh runtime token: complete source-density/attraction and moving density/normal-refinement/repulsion neighborhoods use Vulkan. Initial normal estimation, weighting/reductions and progressive insertion stay on CPU. The fixed-round normal rule and insertion cardinality rules are unchanged; no speedup or default change is claimed."

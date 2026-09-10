@@ -6,6 +6,7 @@ module;
 #include <cstddef>
 #include <cstdint>
 #include <limits>
+#include <memory>
 #include <optional>
 #include <span>
 #include <string_view>
@@ -1127,7 +1128,8 @@ namespace Geometry::PointCloud::Consolidation
             std::vector<glm::vec3>& normals,
             Diagnostics& diagnostics,
             Status& failure,
-            Geometry::KDTree::RadiusQueryScratch* const scratch = nullptr)
+            Geometry::KDTree::RadiusQueryScratch* const scratch = nullptr,
+            const Geometry::PointNeighborhoods* supplied = nullptr)
         {
             if (points.size() != normals.size())
             {
@@ -1135,7 +1137,7 @@ namespace Geometry::PointCloud::Consolidation
                 return false;
             }
             Geometry::KDTree index{};
-            if (!BuildIndex(points, index))
+            if (supplied == nullptr && !BuildIndex(points, index))
             {
                 failure = Status::SpatialIndexBuildFailed;
                 return false;
@@ -1145,7 +1147,14 @@ namespace Geometry::PointCloud::Consolidation
             std::vector<Geometry::KDTree::ElementIndex> neighbors{};
             for (std::size_t i = 0u; i < points.size(); ++i)
             {
-                if (!QueryNeighbors(
+                if (supplied != nullptr)
+                {
+                    const auto row = supplied->Indices.subspan(
+                        supplied->Offsets[i],
+                        supplied->Offsets[i + 1u] - supplied->Offsets[i]);
+                    neighbors.assign(row.begin(), row.end());
+                }
+                else if (!QueryNeighbors(
                         index, points[i], supportRadius, neighbors, scratch))
                 {
                     failure = Status::SpatialQueryFailed;
@@ -1216,7 +1225,7 @@ namespace Geometry::PointCloud::Consolidation
             std::vector<float> projectedWeights(projected.size(), 1.0f);
             if (diagnostics.UsedDensityWeighting)
             {
-                if (optimizedScratch != nullptr)
+                if (optimizedScratch != nullptr && repulsionRows == nullptr)
                 {
                     if (!BuildNeighborhoodCache(
                             projectedIndex, projected, params.SupportRadius,
@@ -1236,12 +1245,15 @@ namespace Geometry::PointCloud::Consolidation
                 }
                 else
                 {
-                    const auto density = Kernels::ComputeDensityWeights(
-                        projected,
-                        projectedIndex,
-                        params.SupportRadius,
-                        Kernels::KernelType::ThetaLop,
-                        Kernels::DensityWeightMode::Direct);
+                    const auto density = repulsionRows != nullptr
+                        ? Kernels::ComputeDensityWeightsFromNeighbors(
+                            projected, *repulsionRows, params.SupportRadius,
+                            Kernels::KernelType::ThetaLop,
+                            Kernels::DensityWeightMode::Direct)
+                        : Kernels::ComputeDensityWeights(
+                            projected, projectedIndex, params.SupportRadius,
+                            Kernels::KernelType::ThetaLop,
+                            Kernels::DensityWeightMode::Direct);
                     if (!density.Succeeded())
                     {
                         failure = density.Status ==
@@ -1956,6 +1968,7 @@ namespace Geometry::PointCloud::Consolidation
         case Status::NumericalFailure: return "numerical_failure";
         case Status::UnsupportedStrategy: return "unsupported_strategy";
         case Status::InvalidNeighborhoods: return "invalid_neighborhoods";
+        case Status::InvalidProjectionState: return "invalid_projection_state";
         case Status::NotConverged: return "not_converged";
         }
         return "invalid";
@@ -2225,15 +2238,22 @@ namespace Geometry::PointCloud::Consolidation
 
     namespace
     {
-        bool ValidLopRows(Geometry::PointNeighborhoods rows, std::size_t queries, std::size_t count)
+        bool ValidProjectionRows(
+            Geometry::PointNeighborhoods rows, std::size_t queries,
+            std::size_t count, bool requireSelf = false)
         {
             if (rows.Offsets.size() != queries + 1 || rows.Offsets.front() != 0 ||
                 rows.Offsets.back() != rows.Indices.size()) return false;
             for (std::size_t i = 0; i < queries; ++i)
             {
                 if (rows.Offsets[i] > rows.Offsets[i + 1] || rows.Offsets[i + 1] > rows.Indices.size()) return false;
+                bool hasSelf = !requireSelf;
                 for (auto k = rows.Offsets[i]; k < rows.Offsets[i + 1]; ++k)
+                {
                     if (rows.Indices[k] >= count || (k > rows.Offsets[i] && rows.Indices[k - 1] >= rows.Indices[k])) return false;
+                    hasSelf = hasSelf || rows.Indices[k] == i;
+                }
+                if (!hasSelf) return false;
             }
             return true;
         }
@@ -2254,8 +2274,8 @@ namespace Geometry::PointCloud::Consolidation
             if (projected.size() != target) { result.State = Status::InvalidTargetCount; return result; }
             if (!std::all_of(projected.begin(), projected.end(), [](auto p) { return IsFinite(p); }))
             { result.State = Status::NonFiniteInput; return result; }
-            if (!ValidLopRows(attraction, projected.size(), source.size()) ||
-                (repulsion && !ValidLopRows(*repulsion, projected.size(), projected.size())))
+            if (!ValidProjectionRows(attraction, projected.size(), source.size()) ||
+                (repulsion && !ValidProjectionRows(*repulsion, projected.size(), projected.size())))
             { result.State = Status::InvalidNeighborhoods; return result; }
             std::vector<glm::vec3> points(projected.begin(), projected.end());
             const std::vector<float> weights(source.size(), 1.f);
@@ -2293,6 +2313,284 @@ namespace Geometry::PointCloud::Consolidation
             }
             return true;
         }
+    }
+
+    struct NeighborhoodProjection::Impl
+    {
+        std::span<const glm::vec3> Source{};
+        Params Parameters{};
+        Result Output{};
+        ProjectionPhase CurrentPhase{ProjectionPhase::Finished};
+        std::vector<float> SourceWeights{};
+        std::vector<glm::vec3> Projected{};
+        std::vector<glm::vec3> ProjectedNormals{};
+        ContinuousAttractionModel ContinuousModel{};
+        bool ResultTaken{false};
+
+        Impl(
+            const std::span<const glm::vec3> source,
+            const std::span<const glm::vec3> normals,
+            const Params& params)
+            : Source(source), Parameters(params),
+              Output(InvalidRequest(source, normals, params))
+        {
+            if (!Output.Succeeded())
+                return;
+
+            Status failure = Status::NumericalFailure;
+            std::vector<glm::vec3> sourceNormals{};
+            if (Output.Diagnostics.UsedAnisotropicWeighting &&
+                !PrepareSourceNormals(
+                    source, normals, params, sourceNormals,
+                    Output.Diagnostics, failure))
+            {
+                Fail(failure);
+                return;
+            }
+            if (const auto* clop = std::get_if<ClopStrategy>(&params.Method))
+            {
+                if (!FitContinuousAttractionModel(
+                        source, *clop, params.Seed, ContinuousModel,
+                        Output.Diagnostics, failure))
+                {
+                    Fail(failure);
+                    return;
+                }
+            }
+
+            SourceWeights.assign(source.size(), 1.0f);
+            const std::size_t target = params.TargetPointCount == 0u
+                ? source.size()
+                : params.TargetPointCount;
+            std::vector<std::size_t> selectedIndices{};
+            if (!InitializeProjected(
+                    source, std::min(target, source.size()), params.Seed,
+                    Projected, selectedIndices))
+            {
+                Fail(Status::NumericalFailure);
+                return;
+            }
+            if (Output.Diagnostics.UsedAnisotropicWeighting)
+            {
+                ProjectedNormals.reserve(selectedIndices.size());
+                for (const std::size_t selected : selectedIndices)
+                {
+                    if (selected >= sourceNormals.size())
+                    {
+                        Fail(Status::InvalidNormals);
+                        return;
+                    }
+                    ProjectedNormals.push_back(sourceNormals[selected]);
+                }
+            }
+
+            if (Output.Diagnostics.UsedContinuousAttraction)
+            {
+                if (!ContinuousL2Initialize(
+                        ContinuousModel, params.SupportRadius, Projected,
+                        Output.Diagnostics, failure, false))
+                {
+                    Fail(failure);
+                    return;
+                }
+                CurrentPhase = ProjectionPhase::Iterate;
+            }
+            else
+            {
+                CurrentPhase = Output.Diagnostics.UsedDensityWeighting
+                    ? ProjectionPhase::SourceDensity
+                    : ProjectionPhase::Initialize;
+            }
+        }
+
+        void Fail(const Status failure)
+        {
+            Output.State = failure;
+            Projected.clear();
+            ProjectedNormals.clear();
+            CurrentPhase = ProjectionPhase::Finished;
+        }
+
+        void Advance(
+            const Geometry::PointNeighborhoods sourceRows,
+            const Geometry::PointNeighborhoods projectedRows)
+        {
+            if (CurrentPhase == ProjectionPhase::Finished)
+                return;
+
+            const bool sourceDensity =
+                CurrentPhase == ProjectionPhase::SourceDensity;
+            const bool continuous = Output.Diagnostics.UsedContinuousAttraction;
+            const bool iterating = CurrentPhase == ProjectionPhase::Iterate;
+            if ((sourceDensity && !ValidProjectionRows(
+                     sourceRows, Source.size(), Source.size(), true)) ||
+                (!sourceDensity && !continuous && !ValidProjectionRows(
+                     sourceRows, Projected.size(), Source.size())) ||
+                (iterating && !ValidProjectionRows(
+                     projectedRows, Projected.size(), Projected.size(),
+                     Output.Diagnostics.UsedDensityWeighting)))
+            {
+                Fail(Status::InvalidNeighborhoods);
+                return;
+            }
+
+            if (sourceDensity)
+            {
+                auto density = Kernels::ComputeDensityWeightsFromNeighbors(
+                    Source, sourceRows, Parameters.SupportRadius,
+                    Kernels::KernelType::ThetaLop,
+                    Kernels::DensityWeightMode::Reciprocal);
+                if (!density.Succeeded())
+                {
+                    Output.Diagnostics.EmptyNeighborhoodCount +=
+                        density.Diagnostics.EmptyNeighborhoodCount;
+                    Fail(density.Status ==
+                             Kernels::DensityWeightStatus::EmptyNeighborhood
+                         ? Status::EmptyNeighborhood
+                         : Status::DensityEstimationFailed);
+                    return;
+                }
+                SourceWeights = std::move(density.Weights);
+                Output.Diagnostics.DensityContributionCount +=
+                    density.Diagnostics.NeighborContributionCount;
+                CurrentPhase = Output.Diagnostics.UsedAnisotropicWeighting
+                    ? ProjectionPhase::Iterate
+                    : ProjectionPhase::Initialize;
+                return;
+            }
+
+            // Supplied rows bypass both source and moving KD-tree queries.
+            const Geometry::KDTree unusedIndex{};
+            Status failure = Status::NumericalFailure;
+            if (CurrentPhase == ProjectionPhase::Initialize)
+            {
+                if (!L2Initialize(
+                        Source, unusedIndex, SourceWeights,
+                        Parameters.SupportRadius, Projected,
+                        Output.Diagnostics, failure, nullptr, &sourceRows))
+                {
+                    Fail(failure);
+                    return;
+                }
+                CurrentPhase = ProjectionPhase::Iterate;
+                return;
+            }
+
+            if (Output.Diagnostics.UsedAnisotropicWeighting &&
+                !RefineNormals(
+                    Projected, Parameters.SupportRadius,
+                    NormalAngle(Parameters.Method), ProjectedNormals,
+                    Output.Diagnostics, failure, nullptr, &projectedRows))
+            {
+                Fail(failure);
+                return;
+            }
+            if (!Iterate(
+                    Source, unusedIndex, SourceWeights,
+                    continuous ? &ContinuousModel : nullptr,
+                    ProjectedNormals, Parameters, Projected,
+                    Output.Diagnostics, failure, nullptr,
+                    continuous ? nullptr : &sourceRows, &projectedRows))
+            {
+                Fail(failure);
+                return;
+            }
+
+            ++Output.Diagnostics.Iterations;
+            const std::uint32_t iterationLimit =
+                Output.Diagnostics.UsedAnisotropicWeighting
+                    ? NormalRefinementRounds(Parameters.Method)
+                    : Parameters.MaxIterations;
+            Output.Diagnostics.Converged =
+                Output.Diagnostics.UsedAnisotropicWeighting
+                    ? Output.Diagnostics.Iterations == iterationLimit
+                    : Output.Diagnostics.MaxDisplacement <=
+                        Parameters.ConvergenceTolerance;
+            if (!Output.Diagnostics.Converged &&
+                Output.Diagnostics.Iterations < iterationLimit)
+            {
+                return;
+            }
+
+            const std::size_t target = Parameters.TargetPointCount == 0u
+                ? Source.size()
+                : Parameters.TargetPointCount;
+            if (const auto* ear = std::get_if<EarStrategy>(&Parameters.Method);
+                ear != nullptr && Output.Diagnostics.Converged &&
+                Projected.size() < target)
+            {
+                if (!ProgressiveInsert(
+                        *ear, Parameters, target, Projected, ProjectedNormals,
+                        Output.Diagnostics, failure))
+                {
+                    Fail(failure);
+                    return;
+                }
+            }
+
+            Output.Diagnostics.OutputPointCount = Projected.size();
+            Output.Positions = std::move(Projected);
+            if (Output.Diagnostics.UsedAnisotropicWeighting)
+                Output.Normals = std::move(ProjectedNormals);
+            Output.State = Output.Diagnostics.Converged
+                ? Status::Success
+                : Status::NotConverged;
+            CurrentPhase = ProjectionPhase::Finished;
+        }
+    };
+
+    NeighborhoodProjection::NeighborhoodProjection(
+        const std::span<const glm::vec3> source,
+        const std::span<const glm::vec3> normals,
+        const Params& params)
+        : m_Impl(std::make_unique<Impl>(source, normals, params))
+    {
+    }
+
+    NeighborhoodProjection::~NeighborhoodProjection() = default;
+
+    ProjectionPhase NeighborhoodProjection::Phase() const noexcept
+    {
+        return m_Impl->CurrentPhase;
+    }
+
+    std::span<const glm::vec3> NeighborhoodProjection::Positions() const noexcept
+    {
+        return m_Impl->Projected;
+    }
+
+    bool NeighborhoodProjection::NeedsAttraction() const noexcept
+    {
+        return (Phase() == ProjectionPhase::Initialize ||
+                Phase() == ProjectionPhase::Iterate) &&
+            !m_Impl->Output.Diagnostics.UsedContinuousAttraction;
+    }
+
+    bool NeighborhoodProjection::NeedsRepulsion() const noexcept
+    {
+        return Phase() == ProjectionPhase::Iterate;
+    }
+
+    bool NeighborhoodProjection::IncludesSelf() const noexcept
+    {
+        return m_Impl->Output.Diagnostics.UsedDensityWeighting;
+    }
+
+    void NeighborhoodProjection::Advance(
+        const Geometry::PointNeighborhoods sourceRows,
+        const Geometry::PointNeighborhoods projectedRows)
+    {
+        m_Impl->Advance(sourceRows, projectedRows);
+    }
+
+    Result NeighborhoodProjection::TakeResult()
+    {
+        if (Phase() != ProjectionPhase::Finished || m_Impl->ResultTaken)
+            return Result{
+                .State = Status::InvalidProjectionState,
+                .Diagnostics = m_Impl->Output.Diagnostics};
+        m_Impl->ResultTaken = true;
+        return std::move(m_Impl->Output);
     }
 
     Result SeedLop(std::span<const glm::vec3> source, const Params& params)

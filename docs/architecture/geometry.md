@@ -428,6 +428,16 @@ normal/edge controls are explicit failures. Runtime
 configuration, ECS writeback/history, editor controls, and future optimized
 backend selection remain higher-layer responsibilities.
 
+`NeighborhoodProjection` exposes the same arithmetic as resumable source-density,
+initialization and iteration phases for externally supplied neighborhoods. It
+borrows immutable source positions, owns parameters, normalized sample normals
+and CLOP's private mixture, and requires sorted unique complete radius rows.
+WLOP/EAR moving rows include self for density and normal refinement before
+repulsion filters self. CLOP fitting/attraction and EAR insertion remain CPU
+computations. Only terminal `TakeResult` transfers output; premature or repeated
+extraction returns `InvalidProjectionState`. Runtime supplies framed LBVH rows
+without introducing graphics/runtime dependencies into geometry.
+
 `Geometry.PointCloud.SurfaceSampling` converts a triangle `HalfedgeMesh::Mesh`
 into a deterministic dense `PointCloud::Cloud` by area-weighted face selection
 and sqrt-corrected barycentric sampling. The API returns a result record rather

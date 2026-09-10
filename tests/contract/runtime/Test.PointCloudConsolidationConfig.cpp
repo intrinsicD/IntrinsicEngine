@@ -152,10 +152,25 @@ TEST(PointCloudConsolidationConfig, CachedLopBackendRoundTrips)
 TEST(PointCloudConsolidationConfig, VulkanLbvhControlsRoundTrip)
 {
     namespace R=Extrinsic::Runtime;
-    Extrinsic::Core::Config::EngineConfig engine;
-    R::PointCloudConsolidationConfig value;value.Backend=R::PointCloudConsolidationBackend::VulkanLBVH;
-    value.Strategy=R::PointCloudConsolidationStrategy::Lop;value.GpuQueryBatchSize=17;value.GpuRadiusCapacity=113;
-    R::SetPointCloudConsolidationConfig(engine,value);const auto read=R::GetPointCloudConsolidationConfig(engine);
-    ASSERT_TRUE(read);EXPECT_EQ(read->Backend,value.Backend);EXPECT_EQ(read->GpuQueryBatchSize,17u);EXPECT_EQ(read->GpuRadiusCapacity,113u);
-    EXPECT_TRUE(R::ValidatePointCloudConsolidationConfigSection(R::SerializePointCloudConsolidationConfig(value),{},"test").Usable());
+    for (const auto strategy : {R::PointCloudConsolidationStrategy::Lop,
+             R::PointCloudConsolidationStrategy::Wlop,
+             R::PointCloudConsolidationStrategy::Clop,
+             R::PointCloudConsolidationStrategy::Ear})
+    {
+        Extrinsic::Core::Config::EngineConfig engine;
+        R::PointCloudConsolidationConfig value;
+        value.Backend = R::PointCloudConsolidationBackend::VulkanLBVH;
+        value.Strategy = strategy;
+        value.GpuQueryBatchSize = 17;
+        value.GpuRadiusCapacity = 113;
+        R::SetPointCloudConsolidationConfig(engine, value);
+        const auto read = R::GetPointCloudConsolidationConfig(engine);
+        ASSERT_TRUE(read);
+        EXPECT_EQ(read->Backend, value.Backend);
+        EXPECT_EQ(read->Strategy, strategy);
+        EXPECT_EQ(read->GpuQueryBatchSize, 17u);
+        EXPECT_EQ(read->GpuRadiusCapacity, 113u);
+        EXPECT_TRUE(R::ValidatePointCloudConsolidationConfigSection(
+            R::SerializePointCloudConsolidationConfig(value), {}, "test").Usable());
+    }
 }

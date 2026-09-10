@@ -919,6 +919,47 @@ namespace
     };
 }
 
+TEST(PointCloudConsolidationModule, VulkanLbvhVariantsShareDomainAndCapacityPreflight)
+{
+    ECS::Scene::Registry scene{};
+    const auto sources = AddDomainSources(scene);
+    for (const auto domain : kAllElementDomains)
+    {
+        SCOPED_TRACE(std::string{Runtime::ToString(domain)});
+        const auto availability = Runtime::BuildGeometryAvailability(
+            scene.Raw(), ResolveTestEntity(sources, domain));
+        auto properties = Runtime::MakePointCloudConsolidationPropertyRefs(
+            domain, "sample:position", std::nullopt);
+        properties.OutputPositions.Name = "sample:projected";
+        for (const auto strategy : {Runtime::PointCloudConsolidationStrategy::Wlop,
+                 Runtime::PointCloudConsolidationStrategy::Clop,
+                 Runtime::PointCloudConsolidationStrategy::Ear})
+        {
+            auto config = SameCardinalityConfig();
+            config.Backend = Runtime::PointCloudConsolidationBackend::VulkanLBVH;
+            config.Strategy = strategy;
+            for (const bool anisotropic : {false, true})
+            {
+                config.WlopAnisotropic = anisotropic;
+                const auto ready = Runtime::ResolvePointCloudConsolidationAvailability(
+                    availability, properties, config);
+                EXPECT_TRUE(ready.Available) << ready.Message;
+            }
+            config.GpuRadiusCapacity = 1025;
+            EXPECT_FALSE(Runtime::ResolvePointCloudConsolidationAvailability(
+                availability, properties, config).Available);
+            config.GpuRadiusCapacity = 64;
+            config.GpuQueryBatchSize = 0;
+            EXPECT_FALSE(Runtime::ResolvePointCloudConsolidationAvailability(
+                availability, properties, config).Available);
+            config.GpuQueryBatchSize = 64;
+            config.Backend = Runtime::PointCloudConsolidationBackend::CpuLBVH;
+            EXPECT_FALSE(Runtime::ResolvePointCloudConsolidationAvailability(
+                availability, properties, config).Available);
+        }
+    }
+}
+
 TEST(PointCloudConsolidationModule,
      AvailabilityIsTypedPropertyBasedAcrossEveryElementDomain)
 {

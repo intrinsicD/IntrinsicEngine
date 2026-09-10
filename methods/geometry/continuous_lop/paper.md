@@ -117,6 +117,13 @@ EM code or mixture service. Matrix-product assembly is file-local inside
 `Geometry.PointCloud.Consolidation`. The reference evaluates components and
 the three Gaussian terms in fixed order and remains serial.
 
+The runtime `vulkan_lbvh` adapter supplies complete compact-support repulsion
+rows from a private moving-sample index each iteration. Mixture fitting,
+continuous L2 initialization and dense Gaussian-product attraction stay on CPU;
+the point LBVH never truncates the continuous attraction. The existing
+`gpu_vulkan_compute` grid token still rejects CLOP. Config, failure and
+publication rules are shared with the [LOP-family adapter](../locally_optimal_projection/paper.md#cached-and-framed-neighborhood-adapters).
+
 ## METHOD-019 optimization review
 
 The original CLOP paper reports grid-based neighbor queries and also proposes

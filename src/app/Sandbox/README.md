@@ -249,7 +249,8 @@ property in the selected entity's canonical property catalog, including mesh
 `v:position` or `f:centroid`, and an optional Normal slot accepts a
 count-matched `vec3` on the same element domain. Named Position/Normal outputs
 publish on that domain without a property alias or converted entity. Shared
-controls cover CPU-reference/Vulkan-compute backend intent, Auto/Manual support radius, sampled-neighbor/contribution
+controls cover CPU reference, LOP-only CPU LBVH, framed Vulkan LBVH neighborhoods,
+and the separate Vulkan grid backend, Auto/Manual support radius, sampled-neighbor/contribution
 limits, repulsion, stopping criteria, target count, and seed; strategy-specific
 controls cover WLOP anisotropy, CLOP mixture fitting, and EAR normal policy,
 refinement, and edge sensitivity. The window keeps a panel-local draft and
@@ -260,9 +261,11 @@ config to
 `PointCloudConsolidationService`; completion reports requested and actual
 backend identities, explicit fallback diagnostics, strategy, resolved radius,
 profile occupancy/work, convergence/displacement, normal, and insertion
-diagnostics. Vulkan is selectable for ordinary LOP and isotropic WLOP; the
-shared preflight disables anisotropic WLOP, CLOP, and EAR Vulkan pairs rather
-than silently substituting another method. The runtime then
+diagnostics. Framed Vulkan LBVH covers all four strategies, including anisotropic
+WLOP, with bounded query batches/capacities and CPU reductions. CLOP dense
+attraction, initial normal estimation and EAR insertion remain CPU work.
+The grid backend remains restricted to ordinary LOP and isotropic WLOP.
+The runtime then
 performs the single `GeometrySources`
 mutation, so the viewport observes the originating entity and the window's
 undo/redo affordances use the shared document history. The Run button uses the
