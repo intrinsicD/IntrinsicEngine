@@ -11783,3 +11783,22 @@ tree:
     alternatives: [Reject all dense capped queries, Add a bespoke descriptor property type, Substitute nearest-k neighborhoods, Claim PCL numerical interchangeability]
     evidence: [N533, O219, docs/architecture/descriptor-analysis.md]
     status: resolved
+
+  - id: N535
+    type: experiment
+    title: Exercise compact density weights and tiny support through CPU and Vulkan candidates
+    provenance: ai-executed
+    timestamp: '2026-09-10T05:41:24+02:00'
+    result: Implementation 618a8c54aa07d4754cbb6a18ab60fb248cfd8ded passes 4455 distinct CPU cases after native follow-up and eight actual Vulkan fixtures including three density-weight cases. The old tiny-radius exclusion fails its regression before correction and passes afterward; all-domain weights remain within 1e-5.
+    evidence: [ara/evidence/diagnostics/density_weight_vulkan_2026-09-10/record.json, tasks/evidence/RUNTIME-227/commands/tiny-before-fix.stdout.log]
+    status: resolved
+
+  - id: N536
+    type: decision
+    title: Reuse complete radius rows while preserving exact compact support
+    provenance: ai-executed
+    timestamp: '2026-09-10T05:41:24+02:00'
+    choice: Adopt the tested density-weight path in 618a8c54aa07d4754cbb6a18ab60fb248cfd8ded; share private pagination with keypoints and descriptors, expand only candidate support, and retain double kernel filtering. Reject unsupported Vulkan subnormal coordinates and insufficient capacity explicitly. Preserve projection grid ownership.
+    alternatives: [Silently truncate density sums, Change strict support to float distance, Add a new service for one kernel consumer, Assume device denormal preservation]
+    evidence: [N535, O220, docs/architecture/density-weights.md]
+    status: resolved

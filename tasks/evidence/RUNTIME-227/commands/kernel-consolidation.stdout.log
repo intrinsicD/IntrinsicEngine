@@ -1,0 +1,92 @@
+Internal ctest changing into directory: /home/alex/Documents/IntrinsicEngine/build/ci
+Test project /home/alex/Documents/IntrinsicEngine/build/ci
+      Start 2634: PointCloudConsolidation.OptimizedCandidatesMatchReferenceAndAreDeterministic
+ 1/41 Test #2634: PointCloudConsolidation.OptimizedCandidatesMatchReferenceAndAreDeterministic ...   Passed    0.02 sec
+      Start 2635: PointCloudConsolidation.IsolatedWlopDensityMatchesReference
+ 2/41 Test #2635: PointCloudConsolidation.IsolatedWlopDensityMatchesReference ....................   Passed    0.00 sec
+      Start 2636: PointCloudConsolidation.WlopDenoisesPlaneAndSphere
+ 3/41 Test #2636: PointCloudConsolidation.WlopDenoisesPlaneAndSphere .............................   Passed    0.01 sec
+      Start 2637: PointCloudConsolidation.AnisotropicWlopPreservesDihedralContrast
+ 4/41 Test #2637: PointCloudConsolidation.AnisotropicWlopPreservesDihedralContrast ...............   Passed    0.01 sec
+      Start 2638: PointCloudConsolidation.EarUpsamplesTowardDihedralFeature
+ 5/41 Test #2638: PointCloudConsolidation.EarUpsamplesTowardDihedralFeature ......................   Passed    0.01 sec
+      Start 2639: PointCloudConsolidation.AnisotropicNormalPolicyIsExplicitAndImmutable
+ 6/41 Test #2639: PointCloudConsolidation.AnisotropicNormalPolicyIsExplicitAndImmutable ..........   Passed    0.01 sec
+      Start 2640: PointCloudConsolidation.EarAndAnisotropicFailuresPublishNoPayload
+ 7/41 Test #2640: PointCloudConsolidation.EarAndAnisotropicFailuresPublishNoPayload ..............   Passed    0.00 sec
+      Start 2641: PointCloudConsolidation.LopRepulsionImprovesMinimumSpacing
+ 8/41 Test #2641: PointCloudConsolidation.LopRepulsionImprovesMinimumSpacing .....................   Passed    0.01 sec
+      Start 2642: PointCloudConsolidation.LopOneStepMatchesPaperEquationOracle
+ 9/41 Test #2642: PointCloudConsolidation.LopOneStepMatchesPaperEquationOracle ...................   Passed    0.00 sec
+      Start 2643: PointCloudConsolidation.WlopCorrectsNonUniformDensityMoreThanLop
+10/41 Test #2643: PointCloudConsolidation.WlopCorrectsNonUniformDensityMoreThanLop ...............   Passed    0.01 sec
+      Start 2644: PointCloudConsolidation.InSupportOutliersHaveBoundedInfluenceOnPlanePatch
+11/41 Test #2644: PointCloudConsolidation.InSupportOutliersHaveBoundedInfluenceOnPlanePatch ......   Passed    0.01 sec
+      Start 2645: PointCloudConsolidation.ClopOneStepMatchesGaussianProductEquation
+12/41 Test #2645: PointCloudConsolidation.ClopOneStepMatchesGaussianProductEquation ..............   Passed    0.01 sec
+      Start 2646: PointCloudConsolidation.ClopDenoisesPlaneAndSphere
+13/41 Test #2646: PointCloudConsolidation.ClopDenoisesPlaneAndSphere .............................   Passed    0.02 sec
+      Start 2647: PointCloudConsolidation.ClopTracksMixtureWorkAndAgreesWithWlop
+14/41 Test #2647: PointCloudConsolidation.ClopTracksMixtureWorkAndAgreesWithWlop .................   Passed    0.02 sec
+      Start 2648: PointCloudConsolidation.ClopKeepsSparseOutlierInfluenceBounded
+15/41 Test #2648: PointCloudConsolidation.ClopKeepsSparseOutlierInfluenceBounded .................   Passed    0.01 sec
+      Start 2649: PointCloudConsolidation.ClopIsDeterministicAndFailsClosed
+16/41 Test #2649: PointCloudConsolidation.ClopIsDeterministicAndFailsClosed ......................   Passed    0.01 sec
+      Start 2650: PointCloudConsolidation.StrategyAndSeedAreBitwiseDeterministic
+17/41 Test #2650: PointCloudConsolidation.StrategyAndSeedAreBitwiseDeterministic .................   Passed    0.05 sec
+      Start 2651: PointCloudConsolidation.ConcurrentCallersAreBitwiseDeterministic
+18/41 Test #2651: PointCloudConsolidation.ConcurrentCallersAreBitwiseDeterministic ...............   Passed    0.01 sec
+      Start 2652: PointCloudConsolidation.ClopConcurrentCallersAreBitwiseDeterministic
+19/41 Test #2652: PointCloudConsolidation.ClopConcurrentCallersAreBitwiseDeterministic ...........   Passed    0.01 sec
+      Start 2653: PointCloudConsolidation.InvalidRequestsFailWithoutPublishingPositions
+20/41 Test #2653: PointCloudConsolidation.InvalidRequestsFailWithoutPublishingPositions ..........   Passed    0.00 sec
+      Start 2654: PointCloudConsolidation.DegenerateAndNonConvergedStatesStayFinite
+21/41 Test #2654: PointCloudConsolidation.DegenerateAndNonConvergedStatesStayFinite ..............   Passed    0.01 sec
+      Start 2655: PointCloudConsolidation.CloudOverloadRejectsDeletedSlots
+22/41 Test #2655: PointCloudConsolidation.CloudOverloadRejectsDeletedSlots .......................   Passed    0.00 sec
+      Start 2656: PointCloudConsolidation.ConservativeDensitySupportMatchesCachedCandidate
+23/41 Test #2656: PointCloudConsolidation.ConservativeDensitySupportMatchesCachedCandidate .......   Passed    0.00 sec
+      Start 2657: PointCloudConsolidation.ExtremeShellDoesNotEvaluateUnusedRepulsionDerivative
+24/41 Test #2657: PointCloudConsolidation.ExtremeShellDoesNotEvaluateUnusedRepulsionDerivative ...   Passed    0.00 sec
+      Start 2658: PointCloudConsolidation.DirectionalAttractionRejectsRoundedOutsideSupport
+25/41 Test #2658: PointCloudConsolidation.DirectionalAttractionRejectsRoundedOutsideSupport ......   Passed    0.00 sec
+      Start 2684: PointCloudKernels.RadialWeightsMatchDocumentedClosedForms
+26/41 Test #2684: PointCloudKernels.RadialWeightsMatchDocumentedClosedForms ......................   Passed    0.00 sec
+      Start 2685: PointCloudKernels.RadialWeightsFailClosed
+27/41 Test #2685: PointCloudKernels.RadialWeightsFailClosed ......................................   Passed    0.00 sec
+      Start 2686: PointCloudKernels.RadialWeightsPreserveZeroDistanceAtExtremeSupportScales
+28/41 Test #2686: PointCloudKernels.RadialWeightsPreserveZeroDistanceAtExtremeSupportScales ......   Passed    0.00 sec
+      Start 2687: PointCloudKernels.DirectionalWeightMatchesEdgeAwareEquation
+29/41 Test #2687: PointCloudKernels.DirectionalWeightMatchesEdgeAwareEquation ....................   Passed    0.01 sec
+      Start 2688: PointCloudKernels.DirectionalWeightFailsClosed
+30/41 Test #2688: PointCloudKernels.DirectionalWeightFailsClosed .................................   Passed    0.01 sec
+      Start 2689: PointCloudKernels.LinearRepulsionHasFiniteZeroLimit
+31/41 Test #2689: PointCloudKernels.LinearRepulsionHasFiniteZeroLimit ............................   Passed    0.00 sec
+      Start 2690: PointCloudKernels.DensityDistinguishesDenseClusterFromSparseTail
+32/41 Test #2690: PointCloudKernels.DensityDistinguishesDenseClusterFromSparseTail ...............   Passed    0.01 sec
+      Start 2691: PointCloudKernels.UniformGridInteriorHasConstantDensity
+33/41 Test #2691: PointCloudKernels.UniformGridInteriorHasConstantDensity ........................   Passed    0.01 sec
+      Start 2692: PointCloudKernels.SuppliedIndexAndRepeatedRunsAreBitwiseDeterministic
+34/41 Test #2692: PointCloudKernels.SuppliedIndexAndRepeatedRunsAreBitwiseDeterministic ..........   Passed    0.01 sec
+      Start 2693: PointCloudKernels.RadiusScratchPreservesDensityWeightsAcrossReuse
+35/41 Test #2693: PointCloudKernels.RadiusScratchPreservesDensityWeightsAcrossReuse ..............   Passed    0.01 sec
+      Start 2694: PointCloudKernels.DensityBroadPhaseIncludesDoubleSupportBoundary
+36/41 Test #2694: PointCloudKernels.DensityBroadPhaseIncludesDoubleSupportBoundary ...............   Passed    0.01 sec
+      Start 2695: PointCloudKernels.DensityFailuresPublishNoWeights
+37/41 Test #2695: PointCloudKernels.DensityFailuresPublishNoWeights ..............................   Passed    0.01 sec
+      Start 2696: PointCloudKernels.DensityIncludesTinySupportAcrossInternalNodes
+38/41 Test #2696: PointCloudKernels.DensityIncludesTinySupportAcrossInternalNodes ................   Passed    0.01 sec
+      Start 2697: PointCloudKernels.SuppliedDensityRowsPreserveKernelsAndFilterShell
+39/41 Test #2697: PointCloudKernels.SuppliedDensityRowsPreserveKernelsAndFilterShell .............   Passed    0.01 sec
+      Start 2698: PointCloudKernels.InvalidDensityRowsPublishNoWeights
+40/41 Test #2698: PointCloudKernels.InvalidDensityRowsPublishNoWeights ...........................   Passed    0.01 sec
+      Start 2699: PointCloudKernels.ConservativeRadiusRetainsExtremeReferenceSupport
+41/41 Test #2699: PointCloudKernels.ConservativeRadiusRetainsExtremeReferenceSupport .............   Passed    0.01 sec
+
+100% tests passed, 0 tests failed out of 41
+
+Label Time Summary:
+geometry    =   0.37 sec*proc (41 tests)
+unit        =   0.37 sec*proc (41 tests)
+
+Total Test time (real) =   0.72 sec

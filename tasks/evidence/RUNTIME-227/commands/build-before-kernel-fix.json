@@ -1,0 +1,26 @@
+{
+  "command": [
+    "env",
+    "CCACHE_DISABLE=1",
+    "cmake",
+    "--build",
+    "--preset",
+    "ci",
+    "--target",
+    "IntrinsicGeometryTests"
+  ],
+  "command_display": "env CCACHE_DISABLE=1 cmake --build --preset ci --target IntrinsicGeometryTests",
+  "cwd": ".",
+  "duration_ms": 5682,
+  "exit_code": 0,
+  "finished_at": "2026-09-10T02:54:08Z",
+  "label": "build-before-kernel-fix",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-09-10T02:54:02Z",
+  "stderr_path": "tasks/evidence/RUNTIME-227/commands/build-before-kernel-fix.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/RUNTIME-227/commands/build-before-kernel-fix.stdout.log",
+  "stdout_sha256": "66f0039677e9635a31d63f6ce623d9764fd00243c3d99f3a1d6021139bcba27d",
+  "task_id": "RUNTIME-227"
+}

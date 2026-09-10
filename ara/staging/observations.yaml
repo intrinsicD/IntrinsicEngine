@@ -3785,3 +3785,15 @@ observations:
     promoted_to: logic/claims.md:C87
     crystallized_via: artifact-commitment
     stale: false
+
+  - id: O220
+    timestamp: '2026-09-10T05:41:24+02:00'
+    provenance: ai-executed
+    content: Bounded compact density weights match the reference through complete CPU and actual Vulkan candidates, including tiny support and a single sample, while guarded publication and shared keypoint/descriptor pagination remain intact.
+    context: N536 binds verified implementation into task closure. No user response, general floating-point proof or speedup is inferred; full overnight process recording remains an end-of-turn step.
+    potential_type: claim
+    bound_to: [N535, N536]
+    promoted: true
+    promoted_to: logic/claims.md:C88
+    crystallized_via: artifact-commitment
+    stale: false

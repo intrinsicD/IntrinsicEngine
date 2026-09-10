@@ -1,0 +1,21 @@
+{
+  "command": [
+    "bash",
+    "-c",
+    "python3 tools/agents/check_task_policy.py --root . --strict && python3 tools/docs/check_doc_links.py --root . && python3 tools/agents/check_ara_claims.py --root . --strict"
+  ],
+  "command_display": "bash -c 'python3 tools/agents/check_task_policy.py --root . --strict && python3 tools/docs/check_doc_links.py --root . && python3 tools/agents/check_ara_claims.py --root . --strict'",
+  "cwd": ".",
+  "duration_ms": 1920,
+  "exit_code": 0,
+  "finished_at": "2026-09-10T03:41:26Z",
+  "label": "retirement-structure",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-09-10T03:41:25Z",
+  "stderr_path": "tasks/evidence/RUNTIME-227/commands/retirement-structure.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/RUNTIME-227/commands/retirement-structure.stdout.log",
+  "stdout_sha256": "731c7d1e3784ecd99fcdeb9cedee2620222a99a2350489781c7da38081d48e84",
+  "task_id": "RUNTIME-227"
+}

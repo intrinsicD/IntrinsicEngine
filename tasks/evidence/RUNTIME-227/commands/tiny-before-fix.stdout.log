@@ -1,0 +1,291 @@
+Internal ctest changing into directory: /home/alex/Documents/IntrinsicEngine/build/ci
+Test project /home/alex/Documents/IntrinsicEngine/build/ci
+    Start 2693: PointCloudKernels.DensityIncludesTinySupportAcrossInternalNodes
+1/1 Test #2693: PointCloudKernels.DensityIncludesTinySupportAcrossInternalNodes ...***Failed    0.01 sec
+Running main() from /home/alex/Documents/IntrinsicEngine/external/vcpkg/buildtrees/gtest/src/v1.17.0-0c449efaff.clean/googletest/src/gtest_main.cc
+Note: Google Test filter = PointCloudKernels.DensityIncludesTinySupportAcrossInternalNodes
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from PointCloudKernels
+[ RUN      ] PointCloudKernels.DensityIncludesTinySupportAcrossInternalNodes
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.PointCloudKernels.cpp:421: Failure
+Expected equality of these values:
+  result.Weights[0]
+    Which is: 1
+  float(1+count*contribution)
+    Which is: 1.0003928
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.PointCloudKernels.cpp:422: Failure
+Expected equality of these values:
+  result.Weights[i]
+    Which is: 1
+  float(count+contribution)
+    Which is: 1.0003928
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.PointCloudKernels.cpp:423: Failure
+Expected equality of these values:
+  result.Diagnostics.NeighborContributionCount
+    Which is: 0
+  std::size_t(count)*(count+1)
+    Which is: 2
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.PointCloudKernels.cpp:421: Failure
+Expected equality of these values:
+  result.Weights[0]
+    Which is: 1
+  float(1+count*contribution)
+    Which is: 1.0125676
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.PointCloudKernels.cpp:422: Failure
+Expected equality of these values:
+  result.Weights[i]
+    Which is: 32
+  float(count+contribution)
+    Which is: 32.000393
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.PointCloudKernels.cpp:422: Failure
+Expected equality of these values:
+  result.Weights[i]
+    Which is: 32
+  float(count+contribution)
+    Which is: 32.000393
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.PointCloudKernels.cpp:422: Failure
+Expected equality of these values:
+  result.Weights[i]
+    Which is: 32
+  float(count+contribution)
+    Which is: 32.000393
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.PointCloudKernels.cpp:422: Failure
+Expected equality of these values:
+  result.Weights[i]
+    Which is: 32
+  float(count+contribution)
+    Which is: 32.000393
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.PointCloudKernels.cpp:422: Failure
+Expected equality of these values:
+  result.Weights[i]
+    Which is: 32
+  float(count+contribution)
+    Which is: 32.000393
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.PointCloudKernels.cpp:422: Failure
+Expected equality of these values:
+  result.Weights[i]
+    Which is: 32
+  float(count+contribution)
+    Which is: 32.000393
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.PointCloudKernels.cpp:422: Failure
+Expected equality of these values:
+  result.Weights[i]
+    Which is: 32
+  float(count+contribution)
+    Which is: 32.000393
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.PointCloudKernels.cpp:422: Failure
+Expected equality of these values:
+  result.Weights[i]
+    Which is: 32
+  float(count+contribution)
+    Which is: 32.000393
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.PointCloudKernels.cpp:422: Failure
+Expected equality of these values:
+  result.Weights[i]
+    Which is: 32
+  float(count+contribution)
+    Which is: 32.000393
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.PointCloudKernels.cpp:422: Failure
+Expected equality of these values:
+  result.Weights[i]
+    Which is: 32
+  float(count+contribution)
+    Which is: 32.000393
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.PointCloudKernels.cpp:422: Failure
+Expected equality of these values:
+  result.Weights[i]
+    Which is: 32
+  float(count+contribution)
+    Which is: 32.000393
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.PointCloudKernels.cpp:422: Failure
+Expected equality of these values:
+  result.Weights[i]
+    Which is: 32
+  float(count+contribution)
+    Which is: 32.000393
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.PointCloudKernels.cpp:422: Failure
+Expected equality of these values:
+  result.Weights[i]
+    Which is: 32
+  float(count+contribution)
+    Which is: 32.000393
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.PointCloudKernels.cpp:422: Failure
+Expected equality of these values:
+  result.Weights[i]
+    Which is: 32
+  float(count+contribution)
+    Which is: 32.000393
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.PointCloudKernels.cpp:422: Failure
+Expected equality of these values:
+  result.Weights[i]
+    Which is: 32
+  float(count+contribution)
+    Which is: 32.000393
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.PointCloudKernels.cpp:422: Failure
+Expected equality of these values:
+  result.Weights[i]
+    Which is: 32
+  float(count+contribution)
+    Which is: 32.000393
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.PointCloudKernels.cpp:422: Failure
+Expected equality of these values:
+  result.Weights[i]
+    Which is: 32
+  float(count+contribution)
+    Which is: 32.000393
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.PointCloudKernels.cpp:422: Failure
+Expected equality of these values:
+  result.Weights[i]
+    Which is: 32
+  float(count+contribution)
+    Which is: 32.000393
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.PointCloudKernels.cpp:422: Failure
+Expected equality of these values:
+  result.Weights[i]
+    Which is: 32
+  float(count+contribution)
+    Which is: 32.000393
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.PointCloudKernels.cpp:422: Failure
+Expected equality of these values:
+  result.Weights[i]
+    Which is: 32
+  float(count+contribution)
+    Which is: 32.000393
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.PointCloudKernels.cpp:422: Failure
+Expected equality of these values:
+  result.Weights[i]
+    Which is: 32
+  float(count+contribution)
+    Which is: 32.000393
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.PointCloudKernels.cpp:422: Failure
+Expected equality of these values:
+  result.Weights[i]
+    Which is: 32
+  float(count+contribution)
+    Which is: 32.000393
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.PointCloudKernels.cpp:422: Failure
+Expected equality of these values:
+  result.Weights[i]
+    Which is: 32
+  float(count+contribution)
+    Which is: 32.000393
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.PointCloudKernels.cpp:422: Failure
+Expected equality of these values:
+  result.Weights[i]
+    Which is: 32
+  float(count+contribution)
+    Which is: 32.000393
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.PointCloudKernels.cpp:422: Failure
+Expected equality of these values:
+  result.Weights[i]
+    Which is: 32
+  float(count+contribution)
+    Which is: 32.000393
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.PointCloudKernels.cpp:422: Failure
+Expected equality of these values:
+  result.Weights[i]
+    Which is: 32
+  float(count+contribution)
+    Which is: 32.000393
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.PointCloudKernels.cpp:422: Failure
+Expected equality of these values:
+  result.Weights[i]
+    Which is: 32
+  float(count+contribution)
+    Which is: 32.000393
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.PointCloudKernels.cpp:422: Failure
+Expected equality of these values:
+  result.Weights[i]
+    Which is: 32
+  float(count+contribution)
+    Which is: 32.000393
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.PointCloudKernels.cpp:422: Failure
+Expected equality of these values:
+  result.Weights[i]
+    Which is: 32
+  float(count+contribution)
+    Which is: 32.000393
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.PointCloudKernels.cpp:422: Failure
+Expected equality of these values:
+  result.Weights[i]
+    Which is: 32
+  float(count+contribution)
+    Which is: 32.000393
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.PointCloudKernels.cpp:422: Failure
+Expected equality of these values:
+  result.Weights[i]
+    Which is: 32
+  float(count+contribution)
+    Which is: 32.000393
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.PointCloudKernels.cpp:422: Failure
+Expected equality of these values:
+  result.Weights[i]
+    Which is: 32
+  float(count+contribution)
+    Which is: 32.000393
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.PointCloudKernels.cpp:423: Failure
+Expected equality of these values:
+  result.Diagnostics.NeighborContributionCount
+    Which is: 992
+  std::size_t(count)*(count+1)
+    Which is: 1056
+
+[  FAILED  ] PointCloudKernels.DensityIncludesTinySupportAcrossInternalNodes (0 ms)
+[----------] 1 test from PointCloudKernels (0 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (0 ms total)
+[  PASSED  ] 0 tests.
+[  FAILED  ] 1 test, listed below:
+[  FAILED  ] PointCloudKernels.DensityIncludesTinySupportAcrossInternalNodes
+
+ 1 FAILED TEST
+
+
+0% tests passed, 1 tests failed out of 1
+
+Label Time Summary:
+geometry    =   0.01 sec*proc (1 test)
+unit        =   0.01 sec*proc (1 test)
+
+Total Test time (real) =   0.34 sec
+
+The following tests FAILED:
+	2693 - PointCloudKernels.DensityIncludesTinySupportAcrossInternalNodes (Failed)

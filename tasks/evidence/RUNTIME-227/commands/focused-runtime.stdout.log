@@ -1,0 +1,91 @@
+Internal ctest changing into directory: /home/alex/Documents/IntrinsicEngine/build/ci
+Test project /home/alex/Documents/IntrinsicEngine/build/ci
+      Start  710: DensityWeightConfig.RoundTripAndSharedPreviewApplyRun
+ 1/39 Test  #710: DensityWeightConfig.RoundTripAndSharedPreviewApplyRun .......................................   Passed    0.01 sec
+      Start  711: DensityWeightOperations.EveryDomainKernelModeCacheHistoryAndDeletedRows
+ 2/39 Test  #711: DensityWeightOperations.EveryDomainKernelModeCacheHistoryAndDeletedRows .....................   Passed    0.09 sec
+      Start  712: DensityWeightOperations.JobsRejectChangedSourceOutputAndCancellation
+ 3/39 Test  #712: DensityWeightOperations.JobsRejectChangedSourceOutputAndCancellation ........................   Passed    0.04 sec
+      Start  713: DensityWeightOperations.OneSampleAndBackendPreflightPreserveOutputs
+ 4/39 Test  #713: DensityWeightOperations.OneSampleAndBackendPreflightPreserveOutputs .........................   Passed    0.01 sec
+      Start 1366: SandboxEditorPresentation.DefaultDrawStartsWithOnlyMenuBarVisible
+ 5/39 Test #1366: SandboxEditorPresentation.DefaultDrawStartsWithOnlyMenuBarVisible ...........................   Passed    0.04 sec
+      Start 1367: SandboxEditorPresentation.DomainMenusUseAppearanceAndFocusedProcessingWindows
+ 6/39 Test #1367: SandboxEditorPresentation.DomainMenusUseAppearanceAndFocusedProcessingWindows ...............   Passed    0.04 sec
+      Start 1368: SandboxEditorPresentation.DomainPanelsPreserveLifetimeCacheAndResultPublication
+ 7/39 Test #1368: SandboxEditorPresentation.DomainPanelsPreserveLifetimeCacheAndResultPublication .............   Passed    0.00 sec
+      Start 1369: SandboxEditorPresentation.MeshProcessingPanelsPreserveLifetimeAndResultPublication
+ 8/39 Test #1369: SandboxEditorPresentation.MeshProcessingPanelsPreserveLifetimeAndResultPublication ..........   Passed    0.01 sec
+      Start 1370: SandboxEditorPresentation.ExtrinsicSandboxAppStaysRuntimeOnly
+ 9/39 Test #1370: SandboxEditorPresentation.ExtrinsicSandboxAppStaysRuntimeOnly ...............................   Passed    0.02 sec
+      Start 1371: SandboxEditorPresentation.RuntimeFeatureModulesCompileSeparatelyFromEditorShell
+10/39 Test #1371: SandboxEditorPresentation.RuntimeFeatureModulesCompileSeparatelyFromEditorShell .............   Passed    0.15 sec
+      Start 1372: SandboxEditorPresentation.GeometryProcessingMenusExposeDomainElementSubmenus
+11/39 Test #1372: SandboxEditorPresentation.GeometryProcessingMenusExposeDomainElementSubmenus ................   Passed    0.00 sec
+      Start 1373: SandboxEditorPresentation.AdapterCallbackDrawsDeterministicMenuOnlyFrame
+12/39 Test #1373: SandboxEditorPresentation.AdapterCallbackDrawsDeterministicMenuOnlyFrame ....................   Passed    0.04 sec
+      Start 1374: SandboxEditorPresentation.FileImportDisabledReasonRendersThroughRealHoveredControl
+13/39 Test #1374: SandboxEditorPresentation.FileImportDisabledReasonRendersThroughRealHoveredControl ..........   Passed    0.24 sec
+      Start 1375: SandboxEditorPresentation.DisabledReasonTooltipConventionIsSharedByImportAndQueueControls
+14/39 Test #1375: SandboxEditorPresentation.DisabledReasonTooltipConventionIsSharedByImportAndQueueControls ...   Passed    0.01 sec
+      Start 1376: SandboxEditorPresentation.RuntimeImportEventIsReflectedByAppFilePanel
+15/39 Test #1376: SandboxEditorPresentation.RuntimeImportEventIsReflectedByAppFilePanel .......................   Passed    0.04 sec
+      Start 1377: SandboxEditorPresentation.EngineAttachmentRegistersEditorCallback
+16/39 Test #1377: SandboxEditorPresentation.EngineAttachmentRegistersEditorCallback ...........................   Passed    0.04 sec
+      Start 1378: SandboxEditorPresentation.ControllerReattachPinsPanelAttachmentResetPolicy
+17/39 Test #1378: SandboxEditorPresentation.ControllerReattachPinsPanelAttachmentResetPolicy ..................   Passed    0.09 sec
+      Start 1379: SandboxEditorPresentation.EditorShellStartsWithOnlyBuiltinWindows
+18/39 Test #1379: SandboxEditorPresentation.EditorShellStartsWithOnlyBuiltinWindows ...........................   Passed    0.04 sec
+      Start 1380: SandboxEditorPresentation.GpuProfilingControlsReuseTheExistingFrameGraphWindow
+19/39 Test #1380: SandboxEditorPresentation.GpuProfilingControlsReuseTheExistingFrameGraphWindow ..............   Passed    0.01 sec
+      Start 1381: SandboxEditorPresentation.ExternalWindowContributionNeedsNoLegacySwitchEntry
+20/39 Test #1381: SandboxEditorPresentation.ExternalWindowContributionNeedsNoLegacySwitchEntry ................   Passed    0.04 sec
+      Start 1382: SandboxEditorPresentation.ContextWindowContributionReceivesAppOwnedContext
+21/39 Test #1382: SandboxEditorPresentation.ContextWindowContributionReceivesAppOwnedContext ..................   Passed    0.04 sec
+      Start 1383: SandboxEditorPresentation.GlobalVisibilityHotkeyUsesTheVisibilityCommandPath
+22/39 Test #1383: SandboxEditorPresentation.GlobalVisibilityHotkeyUsesTheVisibilityCommandPath ................   Passed    0.04 sec
+      Start 1384: SandboxEditorPresentation.RegistrationDomainMenusOpenOneSharedWindow
+23/39 Test #1384: SandboxEditorPresentation.RegistrationDomainMenusOpenOneSharedWindow ........................   Passed    0.04 sec
+      Start 1385: SandboxEditorPresentation.NormalDomainMenusOpenOneSharedWindow
+24/39 Test #1385: SandboxEditorPresentation.NormalDomainMenusOpenOneSharedWindow ..............................   Passed    0.04 sec
+      Start 1386: SandboxEditorPresentation.OutlierDomainMenusOpenOneSharedWindow
+25/39 Test #1386: SandboxEditorPresentation.OutlierDomainMenusOpenOneSharedWindow .............................   Passed    0.04 sec
+      Start 1387: SandboxEditorPresentation.DensityDomainMenusOpenOneSharedWindow
+26/39 Test #1387: SandboxEditorPresentation.DensityDomainMenusOpenOneSharedWindow .............................   Passed    0.04 sec
+      Start 1388: SandboxEditorPresentation.SpacingDomainMenusOpenOneSharedWindow
+27/39 Test #1388: SandboxEditorPresentation.SpacingDomainMenusOpenOneSharedWindow .............................   Passed    0.04 sec
+      Start 1389: SandboxEditorPresentation.BilateralDomainMenusOpenOneSharedWindow
+28/39 Test #1389: SandboxEditorPresentation.BilateralDomainMenusOpenOneSharedWindow ...........................   Passed    0.04 sec
+      Start 1390: SandboxEditorPresentation.KeypointDomainMenusOpenOneSharedWindow
+29/39 Test #1390: SandboxEditorPresentation.KeypointDomainMenusOpenOneSharedWindow ............................   Passed    0.04 sec
+      Start 1391: SandboxEditorPresentation.DescriptorDomainMenusOpenOneSharedWindow
+30/39 Test #1391: SandboxEditorPresentation.DescriptorDomainMenusOpenOneSharedWindow ..........................   Passed    0.04 sec
+      Start 1392: SandboxEditorPresentation.DensityWeightDomainMenusOpenOneSharedWindow
+31/39 Test #1392: SandboxEditorPresentation.DensityWeightDomainMenusOpenOneSharedWindow .......................   Passed    0.04 sec
+      Start 2684: KeypointAnalysis.AnalyticCovarianceAndLowestIdSuppression
+32/39 Test #2684: KeypointAnalysis.AnalyticCovarianceAndLowestIdSuppression ...................................   Passed    0.01 sec
+      Start 2685: KeypointAnalysis.CompleteSuppliedSupportMatchesReferenceAtBothRadii
+33/39 Test #2685: KeypointAnalysis.CompleteSuppliedSupportMatchesReferenceAtBothRadii .........................   Passed    0.01 sec
+      Start 2686: KeypointAnalysis.RejectsMalformedSupportAndUnrepresentableInputs
+34/39 Test #2686: KeypointAnalysis.RejectsMalformedSupportAndUnrepresentableInputs ............................   Passed    0.01 sec
+      Start 2687: KeypointAnalysis.CloudSpacingUsesNearestLivePointsAndRemapsOriginalSlots
+35/39 Test #2687: KeypointAnalysis.CloudSpacingUsesNearestLivePointsAndRemapsOriginalSlots ....................   Passed    0.00 sec
+      Start 2688: DescriptorAnalysis.AnalyticPlanarHistogramsAndRequestedOrder
+36/39 Test #2688: DescriptorAnalysis.AnalyticPlanarHistogramsAndRequestedOrder ................................   Passed    0.00 sec
+      Start 2689: DescriptorAnalysis.CompleteRowsMatchReferenceWithLowestIdCapsAndAutomaticRadius
+37/39 Test #2689: DescriptorAnalysis.CompleteRowsMatchReferenceWithLowestIdCapsAndAutomaticRadius .............   Passed    0.02 sec
+      Start 2690: DescriptorAnalysis.RejectsInvalidNormalsScaleAndMalformedNeighborhoods
+38/39 Test #2690: DescriptorAnalysis.RejectsInvalidNormalsScaleAndMalformedNeighborhoods ......................   Passed    0.00 sec
+      Start 2691: DescriptorAnalysis.CloudCompactsDeletedNonfiniteRowsAndRemapsQueries
+39/39 Test #2691: DescriptorAnalysis.CloudCompactsDeletedNonfiniteRowsAndRemapsQueries ........................   Passed    0.00 sec
+
+100% tests passed, 0 tests failed out of 39
+
+Label Time Summary:
+contract       =   0.14 sec*proc (4 tests)
+geometry       =   0.06 sec*proc (8 tests)
+integration    =   1.26 sec*proc (27 tests)
+runtime        =   1.41 sec*proc (31 tests)
+unit           =   0.06 sec*proc (8 tests)
+
+Total Test time (real) =   1.83 sec

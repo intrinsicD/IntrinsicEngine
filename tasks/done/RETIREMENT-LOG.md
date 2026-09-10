@@ -8142,3 +8142,5 @@ Retain terminal job outcomes while pending consumers reference them, so reaping 
 - 2026-09-10 — **RUNTIME-225**: Integrated centroid-PCA keypoints with shared CPU/Vulkan complete radius support, canonical config/UI and atomic mask/saliency history. C86 binds 4434 CPU passes plus two actual Vulkan cases, with explicit variant and sanitizer limits. Implementation `aa59947a42e5db293d053e0381487300f6e66f32`; [task](RUNTIME-225-iss-keypoint-spatial-backends.md).
 
 - 2026-09-10 — **RUNTIME-226**: Integrated FPFH with CPU/Vulkan radius support and exact lowest-ID caps, canonical config/UI and atomic 33-column history. C87 binds 4443 CPU passes plus three actual Vulkan cases. Implementation `2e6353df1ca9c2500bc6509ab93a71476399eef1`; [task](RUNTIME-226-fpfh-descriptor-spatial-backends.md).
+
+- 2026-09-10 — **RUNTIME-227**: Integrated compact density weights with conservative CPU/Vulkan radius candidates, shared pagination, canonical config/UI and one guarded float output. C88 binds 4455 CPU passes plus eight actual Vulkan cases. Implementation `618a8c54aa07d4754cbb6a18ab60fb248cfd8ded`; [task](RUNTIME-227-compact-density-weight-spatial-backends.md).

@@ -1,0 +1,14 @@
+Internal ctest changing into directory: /home/alex/Documents/IntrinsicEngine/build/ci-vulkan
+Test project /home/alex/Documents/IntrinsicEngine/build/ci-vulkan
+    Start 26: PointLBVHGpuSmoke.DensityWeightPublishesAllKernelsAcrossDomains
+1/1 Test #26: PointLBVHGpuSmoke.DensityWeightPublishesAllKernelsAcrossDomains ...   Passed   45.82 sec
+
+100% tests passed, 0 tests failed out of 1
+
+Label Time Summary:
+gpu            =  45.82 sec*proc (1 test)
+graphics       =  45.82 sec*proc (1 test)
+integration    =  45.82 sec*proc (1 test)
+vulkan         =  45.82 sec*proc (1 test)
+
+Total Test time (real) =  47.13 sec

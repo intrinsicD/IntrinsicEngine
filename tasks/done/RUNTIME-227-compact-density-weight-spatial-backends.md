@@ -54,23 +54,23 @@ No substitution of the projection methods' existing validated GPU grid driver, n
 One slice: CPU reference correction and supplied-neighborhood reducer, correctness tests and manifest; shared radius pagination plus runtime/config/UI; actual GPU and combined verification, docs and independent fixed-surface review.
 
 ## Required changes
-- [ ] Add conservative query radius and supplied complete-neighborhood density reduction using the existing kernel formula.
-- [ ] Reuse radius pagination across keypoints, descriptors and density weights.
-- [ ] Wire all three backends, canonical config/UI, publication/history and explicit numerical limits.
+- [x] Add conservative query radius and supplied complete-neighborhood density reduction using the existing kernel formula.
+- [x] Reuse radius pagination across keypoints, descriptors and density weights.
+- [x] Wire all three backends, canonical config/UI, publication/history and explicit numerical limits.
 
 ## Tests
-- [ ] Analytic, duplicate/isolated, strict-boundary/shell, malformed neighborhoods, tiny internal-node regression and legacy extreme-radius tests pass.
-- [ ] All-domain CPU/cache/config/history/stale/cancel tests pass.
-- [ ] Actual Vulkan agrees with the reference and rejects overflow/subnormal coordinates/stale/cancelled/partially submitted work without modifying outputs.
-- [ ] Existing keypoint and descriptor Vulkan cases remain passing after pagination reuse.
+- [x] Analytic, duplicate/isolated, strict-boundary/shell, malformed neighborhoods, tiny internal-node regression and legacy extreme-radius tests pass.
+- [x] All-domain CPU/cache/config/history/stale/cancel tests pass.
+- [x] Actual Vulkan agrees with the reference and rejects overflow/subnormal coordinates/stale/cancelled/partially submitted work without modifying outputs.
+- [x] Existing keypoint and descriptor Vulkan cases remain passing after pagination reuse.
 
 ## Docs
-- [ ] Synchronize architecture, spatial-consumer inventory, method/benchmark manifests, module inventory and remaining projection/Framework24 port reminders.
+- [x] Synchronize architecture, spatial-consumer inventory, method/benchmark manifests, module inventory and remaining projection/Framework24 port reminders.
 
 ## Acceptance criteria
-- [ ] All compatible property domains share the same method availability and publication path.
-- [ ] No accepted backend loses strict-support contributors or silently truncates candidate neighborhoods.
-- [ ] Full CPU, focused actual Vulkan, manifest smoke and independent fixed-surface review pass with explicit precision/performance limits.
+- [x] All compatible property domains share the same method availability and publication path.
+- [x] No accepted backend loses strict-support contributors or silently truncates candidate neighborhoods.
+- [x] Full CPU, focused actual Vulkan, manifest smoke and independent fixed-surface review pass with explicit precision/performance limits.
 
 ## Verification
 ```bash
@@ -90,3 +90,10 @@ No layer exceptions, silent fallback/truncation, topology replacement or unsuppo
 
 ## Verification constraints
 CCACHE_DISABLE=1 under BUG-178. Existing vcpkg sandbox constraint BUG-065 requires native configure. Existing BUG-180 excludes GPU LeakSanitizer while retaining ASan+UBSan. Count capability skips separately from passes.
+
+## Completion
+
+**Completed:** 2026-09-10
+**Commit:** `618a8c54aa07d4754cbb6a18ab60fb248cfd8ded` (implementation; retirement/review seal follows).
+
+[Bounded verification](../../ara/evidence/tables/density_weight_verification_2026-09-10.md) and ARA C88 bind 4455 distinct CPU passes and eight actual Vulkan cases, three for density weights. Complete conservative candidates preserve double kernel support; explicit range/subnormal/overflow limitations apply. No speedup or projection GPU-grid replacement is claimed.

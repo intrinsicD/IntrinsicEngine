@@ -1,0 +1,29 @@
+{
+  "command": [
+    "env",
+    "ASAN_OPTIONS=detect_leaks=0",
+    "INTRINSIC_DENSITY_WEIGHT_BENCHMARK_OUTPUT=/tmp/densityweights-benchmark/raw/result.json",
+    "ctest",
+    "--test-dir",
+    "build/ci-vulkan",
+    "--output-on-failure",
+    "-R",
+    "^PointLBVHGpuSmoke.DensityWeightPublishesAllKernelsAcrossDomains$",
+    "--timeout",
+    "120"
+  ],
+  "command_display": "env ASAN_OPTIONS=detect_leaks=0 INTRINSIC_DENSITY_WEIGHT_BENCHMARK_OUTPUT=/tmp/densityweights-benchmark/raw/result.json ctest --test-dir build/ci-vulkan --output-on-failure -R '^PointLBVHGpuSmoke.DensityWeightPublishesAllKernelsAcrossDomains$' --timeout 120",
+  "cwd": ".",
+  "duration_ms": 47138,
+  "exit_code": 0,
+  "finished_at": "2026-09-10T03:40:54Z",
+  "label": "actual-vulkan-corrected",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-09-10T03:40:06Z",
+  "stderr_path": "tasks/evidence/RUNTIME-227/commands/actual-vulkan-corrected.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/RUNTIME-227/commands/actual-vulkan-corrected.stdout.log",
+  "stdout_sha256": "150e224595acaa52d5f5c311f326d37b76edd499472889e301686f627eeb6369",
+  "task_id": "RUNTIME-227"
+}

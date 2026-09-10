@@ -1,0 +1,42 @@
+Internal ctest changing into directory: /home/alex/Documents/IntrinsicEngine/build/ci-vulkan
+Test project /home/alex/Documents/IntrinsicEngine/build/ci-vulkan
+    Start 21: PointLBVHGpuSmoke.KeypointPublishesAcrossDomainsWithCompleteSupport
+1/8 Test #21: PointLBVHGpuSmoke.KeypointPublishesAcrossDomainsWithCompleteSupport ............   Passed   24.75 sec
+    Start 22: PointLBVHGpuSmoke.KeypointRejectsStaleCancellationAndRadiusOverflow
+2/8 Test #22: PointLBVHGpuSmoke.KeypointRejectsStaleCancellationAndRadiusOverflow ............   Passed   16.76 sec
+    Start 23: PointLBVHGpuSmoke.DescriptorPublishesAcrossDomainsWithCompleteSupport
+3/8 Test #23: PointLBVHGpuSmoke.DescriptorPublishesAcrossDomainsWithCompleteSupport ..........   Passed   24.84 sec
+    Start 24: PointLBVHGpuSmoke.DescriptorRejectsStaleCancellationAndRadiusOverflow
+4/8 Test #24: PointLBVHGpuSmoke.DescriptorRejectsStaleCancellationAndRadiusOverflow ..........   Passed   16.85 sec
+    Start 25: PointLBVHGpuSmoke.DescriptorLowestIdCapSupportsDenseRadius
+5/8 Test #25: PointLBVHGpuSmoke.DescriptorLowestIdCapSupportsDenseRadius .....................   Passed   45.61 sec
+    Start 26: PointLBVHGpuSmoke.DensityWeightPublishesAllKernelsAcrossDomains
+6/8 Test #26: PointLBVHGpuSmoke.DensityWeightPublishesAllKernelsAcrossDomains ................***Timeout  30.18 sec
+Running main() from /home/alex/Documents/IntrinsicEngine/external/vcpkg/buildtrees/gtest/src/v1.17.0-0c449efaff.clean/googletest/src/gtest_main.cc
+Note: Google Test filter = PointLBVHGpuSmoke.DensityWeightPublishesAllKernelsAcrossDomains
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from PointLBVHGpuSmoke
+[ RUN      ] PointLBVHGpuSmoke.DensityWeightPublishesAllKernelsAcrossDomains
+[32m[INFO] Initialized Scheduler with 15 worker threads.[0m
+[33m[WARN] [Runtime] Promoted Vulkan device selected; backend remains fail-closed until the first clean default-recipe validation promotes it.[0m
+[33m[WARN] [VulkanDevice::Initialize] Vulkan bootstrap created logical-device, queue, VMA, per-frame command/sync, swapchain image/view/handle, bindless heap, transfer queue, and global pipeline-layout state; canonical frame execution waits for the first clean recipe validation publish, so device remains non-operational during cold start.[0m
+[33m[WARN] [Runtime] VulkanRequestedButNotOperational status=RequestedButIncompleteGate reason=BarrierValidationFailed[0m
+
+    Start 27: PointLBVHGpuSmoke.DensityWeightRejectsStaleCancellationOverflowAndSubmission
+7/8 Test #27: PointLBVHGpuSmoke.DensityWeightRejectsStaleCancellationOverflowAndSubmission ...   Passed   16.74 sec
+    Start 28: PointLBVHGpuSmoke.DensityWeightTinySupportAndOneSample
+8/8 Test #28: PointLBVHGpuSmoke.DensityWeightTinySupportAndOneSample .........................   Passed   21.74 sec
+
+88% tests passed, 1 tests failed out of 8
+
+Label Time Summary:
+gpu            = 197.47 sec*proc (8 tests)
+graphics       = 197.47 sec*proc (8 tests)
+integration    = 197.47 sec*proc (8 tests)
+vulkan         = 197.47 sec*proc (8 tests)
+
+Total Test time (real) = 198.84 sec
+
+The following tests FAILED:
+	 26 - PointLBVHGpuSmoke.DensityWeightPublishesAllKernelsAcrossDomains (Timeout)

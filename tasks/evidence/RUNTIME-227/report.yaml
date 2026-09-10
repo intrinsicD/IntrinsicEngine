@@ -1,0 +1,241 @@
+schema_version: 1
+task_id: RUNTIME-227
+workflow_profile: high-risk
+status: complete
+generated_by: tools/agents/workflow_evidence.py
+generated_at: '2026-09-10T03:41:36Z'
+claim_eligible: false
+source:
+  base_ref: 35c230870
+  base_revision: 35c230870330b619adb456268a2da071cab6bce1
+  head_revision: 618a8c54aa07d4754cbb6a18ab60fb248cfd8ded
+  branch: main
+  worktree: /home/alex/Documents/IntrinsicEngine
+  dirty: true
+  surface:
+  - path: ara/evidence/diagnostics/density_weight_vulkan_2026-09-10/benchmark/runtime-smoke.json
+    sha256: 95f28532c20af5be8620d01cc612863316d83a3a45fb324d4bdcd544b892cd6d
+  - path: ara/evidence/diagnostics/density_weight_vulkan_2026-09-10/record.json
+    sha256: 7260557bacb0aa7fb3f59746dd91abacebe1b90b4e2c3a8c6cd84e19dc71b677
+  - path: ara/evidence/tables/density_weight_verification_2026-09-10.md
+    sha256: db4a36c6acc37186cb67d4f6ca384ad9de56dfd71c42b07f3b45d317fe39cc48
+  - path: ara/logic/claims.md
+    sha256: c3773219d54cd7bc25154c1cf0c7c5cea7b79b9fb870a0b5531e4bec95894562
+  - path: ara/staging/observations.yaml
+    sha256: 9f735c1ebb726c767defcfc42cdd2ec552d9550f8700eda657985e5d1d35c346
+  - path: ara/trace/exploration_tree.yaml
+    sha256: b8d6b42f71f1c4581427e9545ca660711887bb8eae73c79a7a665aca8ebda4e0
+  - path: benchmarks/geometry/manifests/point_lbvh_density_weight_runtime_smoke.yaml
+    sha256: 6d501daf6277d76e1f1163371b6e8e645c46d411a6b03b89e8155ac6a7d323b0
+  - path: docs/api/generated/module_inventory.md
+    sha256: 3ea2d577817321095075f86577565072a5eba407d9a33a1e7f3daf527699313a
+  - path: docs/architecture/density-weights.md
+    sha256: 4c1f2ffc155d6cdd76c80b5f8b212cb5332e7adcff4c8d3b620720335f6ea14f
+  - path: docs/architecture/runtime.md
+    sha256: 0e9904cd04a55d4fa3ef9dead01e986c0e1279f13418a39280570de6e5b69dbf
+  - path: docs/architecture/spatial-index-consumers.md
+    sha256: 108d94d7491f33c961b71a822699f555f5c177e56878eecae7c9c1ee09c1242b
+  - path: methods/geometry/point_lbvh/method.yaml
+    sha256: f5f45e920614ea22adf193b0cbcc05da14e940370d59ceb4d8bd42a203b25401
+  - path: src/app/Sandbox/Editor/Sandbox.MeshProcessingPanels.cpp
+    sha256: be4144bca94f030ea7f2073806704a0d1be292180544ddf775915c784ddb57e6
+  - path: src/app/Sandbox/Sandbox.ConfigSections.cpp
+    sha256: 72df736e80f0954638f959ef1a08136aea823944ef419507b5518614b9d39fee
+  - path: src/geometry/Geometry.PointCloud.Consolidation.cpp
+    sha256: 7df9f58293bf5c80ebf4d819d6506eb3cd9bc2cc65cbeff5910d8de19f3dafa2
+  - path: src/geometry/Geometry.PointCloud.Kernels.cpp
+    sha256: e48716c4fae7705a4e475b41f1f16e5d1abb64fb15bdc5dd7c39a609fcd0ad53
+  - path: src/geometry/Geometry.PointCloud.Kernels.cppm
+    sha256: 1edb884e13339acdb260ae57f2cd06d3fe599a48b7a455a1072b98cc751cc3d2
+  - path: src/runtime/CMakeLists.txt
+    sha256: e26c26fada7c9be1c1c9e5e2bd5875bda14c67645baa74d0ff548de6ca581ef3
+  - path: src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.DensityWeights.cpp
+    sha256: b24ec3c454a6bd9a022c2e6c78c347d638824d1ae740f7b4104112feada626aa
+  - path: src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Descriptors.cpp
+    sha256: 40505ef3fc0ef30c8f576e8c583351e2526c410c1f29221392fc43385c13bfbf
+  - path: src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Keypoints.cpp
+    sha256: eb8adb22e7296a75855d2fcaf8c238c6c13e71a621d53a11a03351c9ba8dc315
+  - path: src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Public.cpp
+    sha256: 41348dae013c2ee85b7ab6949b945c4cf8007215680166a913d5a8b63678209a
+  - path: src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.RadiusRows.cpp
+    sha256: 6191b6a2fb94f93f2f5d8ce3d5f44c3fedb8d0e55b95bd8dc5a825c5ddf8a589
+  - path: src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.RadiusRows.hpp
+    sha256: 923474d5b9691b4765eb8d79bf22d4b00c75447015472a524c4d1e640e035159
+  - path: src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.cpp
+    sha256: bdcc87376434c7cadf23e60f2434b208d6855dffd25b03913d8b3ccfa2c07cec
+  - path: src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.cppm
+    sha256: 8b83dc6a686943beebcb347f9a18ad853dfa88adeb4cf3c0001ece401c591384
+  - path: src/runtime/Editor/internal/Runtime.EditorFeatureContextAdapters.cpp
+    sha256: 66ba0e8f08d336a90765fd2dd8443dbdbb441d37c31d420b9363a45810689bf1
+  - path: src/runtime/Editor/internal/Runtime.EditorFeatures.Detail.cppm
+    sha256: 4cd27e4bfd1a9065332a363368903f3552b1d6b33a736fd7243bb5edaf5b0eef
+  - path: src/runtime/Editor/internal/Runtime.EditorWorkspaceSession.cpp
+    sha256: adbb1c1db7cbbaf69b02a3378a25c15092de412f40e24cef9464221dc32acc89
+  - path: src/runtime/Modules/DensityWeight/Runtime.DensityWeightConfig.cpp
+    sha256: e809e5611dd1d9906fdf86169c968eea4ff27b2290f07d77d7192852d334984a
+  - path: src/runtime/Modules/DensityWeight/Runtime.DensityWeightConfig.cppm
+    sha256: 308248c22ee006de0baba1849bcb9a053cdebe34758509fc1f553390b1bdab3e
+  - path: tasks/backlog/geometry/GEOM-073-point-analysis-property-span-contracts.md
+    sha256: 4d48966c2d26083f5142b838a1e52b34f1b5e40946d77c1872fc6ac908227cba
+  - path: tasks/done/RETIREMENT-LOG.md
+    sha256: 460c9c5922339c0de197d67f427ee7111d1f7b4c7d1eb41cfc3ebef6895c1a99
+  - path: tasks/done/RUNTIME-227-compact-density-weight-spatial-backends.md
+    sha256: 87cab262224936cb8d9734b5ec1a3cec75f2f01bbfbae4e91c33959915b9f34c
+  - path: tests/CMakeLists.txt
+    sha256: 3a53ca731415409b89f5f14fd8ff0633f8091e4930358a9b448c2a536982b4d3
+  - path: tests/contract/runtime/Test.DensityWeightOperations.cpp
+    sha256: 9fc664f6574c1972f3c0f13bb963e5788dc8be10788f73a42eaa58655eafb6c4
+  - path: tests/integration/graphics/Test.PointLBVHGpuSmoke.cpp
+    sha256: 654700a52d66abd266766a4befd900cf5a9e6c6e24fc239e7d8b32f07aee66c3
+  - path: tests/integration/runtime/Test.SandboxEditorPresentation.cpp
+    sha256: 0fceca4d2d5716e6b650cec5c354ecf188d0eb326caedab9c2620e7f4e9ca84c
+  - path: tests/unit/geometry/Test.PointCloudConsolidation.cpp
+    sha256: 1c2e49bd2057d808007af857e8223af530a03740f2f3c2e52fb1e11e139efb1c
+  - path: tests/unit/geometry/Test.PointCloudKernels.cpp
+    sha256: a07d3f7e57a7711621bd3a5d83848768b0de201504ee1e9c8924187ef5b589a7
+  content_digest: 5c2166b0d5a39e10beb9395cd505aeca2c49039e7dd7b854647cbeadda171e30
+touched:
+  paths:
+  - ara/evidence/diagnostics/density_weight_vulkan_2026-09-10/benchmark/runtime-smoke.json
+  - ara/evidence/diagnostics/density_weight_vulkan_2026-09-10/record.json
+  - ara/evidence/tables/density_weight_verification_2026-09-10.md
+  - ara/logic/claims.md
+  - ara/staging/observations.yaml
+  - ara/trace/exploration_tree.yaml
+  - benchmarks/geometry/manifests/point_lbvh_density_weight_runtime_smoke.yaml
+  - docs/api/generated/module_inventory.md
+  - docs/architecture/density-weights.md
+  - docs/architecture/runtime.md
+  - docs/architecture/spatial-index-consumers.md
+  - methods/geometry/point_lbvh/method.yaml
+  - src/app/Sandbox/Editor/Sandbox.MeshProcessingPanels.cpp
+  - src/app/Sandbox/Sandbox.ConfigSections.cpp
+  - src/geometry/Geometry.PointCloud.Consolidation.cpp
+  - src/geometry/Geometry.PointCloud.Kernels.cpp
+  - src/geometry/Geometry.PointCloud.Kernels.cppm
+  - src/runtime/CMakeLists.txt
+  - src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.DensityWeights.cpp
+  - src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Descriptors.cpp
+  - src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Keypoints.cpp
+  - src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Public.cpp
+  - src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.RadiusRows.cpp
+  - src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.RadiusRows.hpp
+  - src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.cpp
+  - src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.cppm
+  - src/runtime/Editor/internal/Runtime.EditorFeatureContextAdapters.cpp
+  - src/runtime/Editor/internal/Runtime.EditorFeatures.Detail.cppm
+  - src/runtime/Editor/internal/Runtime.EditorWorkspaceSession.cpp
+  - src/runtime/Modules/DensityWeight/Runtime.DensityWeightConfig.cpp
+  - src/runtime/Modules/DensityWeight/Runtime.DensityWeightConfig.cppm
+  - tasks/backlog/geometry/GEOM-073-point-analysis-property-span-contracts.md
+  - tasks/done/RETIREMENT-LOG.md
+  - tasks/done/RUNTIME-227-compact-density-weight-spatial-backends.md
+  - tests/CMakeLists.txt
+  - tests/contract/runtime/Test.DensityWeightOperations.cpp
+  - tests/integration/graphics/Test.PointLBVHGpuSmoke.cpp
+  - tests/integration/runtime/Test.SandboxEditorPresentation.cpp
+  - tests/unit/geometry/Test.PointCloudConsolidation.cpp
+  - tests/unit/geometry/Test.PointCloudKernels.cpp
+  layers:
+  - app
+  - geometry
+  - runtime
+  modules:
+  - Geometry.PointCloud.Kernels
+  - Runtime.DensityWeightConfig
+  - Runtime.GeometryProcessingOperations
+extension_seam: Existing kernel reducer, PointNeighborhoods, spatial cache, jobs and property watches;
+  private radius pagination shared by density weights, keypoints and descriptors.
+future_change_plan: GEOM-073 and the spatial-consumer inventory retain source/moving-sample projection
+  adapters, shared LBVH subnormal-coordinate audit and distinct Framework24 scalar saliency/probability
+  ports.
+acceptance:
+- criterion: All compatible property domains share the same method availability and publication path.
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: No accepted backend loses strict-support contributors or silently truncates candidate neighborhoods.
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: Full CPU, focused actual Vulkan, manifest smoke and independent fixed-surface review pass
+    with explicit precision/performance limits.
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+commands:
+- receipt: tasks/evidence/RUNTIME-227/commands/actual-vulkan-corrected.json
+- receipt: tasks/evidence/RUNTIME-227/commands/benchmark.json
+- receipt: tasks/evidence/RUNTIME-227/commands/build-before-kernel-fix.json
+- receipt: tasks/evidence/RUNTIME-227/commands/build-consolidation-support.json
+- receipt: tasks/evidence/RUNTIME-227/commands/build-cpu-final.json
+- receipt: tasks/evidence/RUNTIME-227/commands/build-kernel-reference.json
+- receipt: tasks/evidence/RUNTIME-227/commands/build-vulkan-final.json
+- receipt: tasks/evidence/RUNTIME-227/commands/configure-cpu-budget.json
+- receipt: tasks/evidence/RUNTIME-227/commands/configure-cpu.json
+- receipt: tasks/evidence/RUNTIME-227/commands/configure-vulkan-budget.json
+- receipt: tasks/evidence/RUNTIME-227/commands/configure-vulkan.json
+- receipt: tasks/evidence/RUNTIME-227/commands/focused-geometry.json
+- receipt: tasks/evidence/RUNTIME-227/commands/focused-runtime.json
+- receipt: tasks/evidence/RUNTIME-227/commands/full-cpu.json
+- receipt: tasks/evidence/RUNTIME-227/commands/kernel-consolidation.json
+- receipt: tasks/evidence/RUNTIME-227/commands/kernel-reference.json
+- receipt: tasks/evidence/RUNTIME-227/commands/native-cpu.json
+- receipt: tasks/evidence/RUNTIME-227/commands/retirement-structure.json
+- receipt: tasks/evidence/RUNTIME-227/commands/structural-budget.json
+- receipt: tasks/evidence/RUNTIME-227/commands/structural-corrected.json
+- receipt: tasks/evidence/RUNTIME-227/commands/structural-final.json
+changed_public_contracts:
+- All eight canonical position domains; one float weight property; complete conservative candidates and
+  strict double kernel support; one live point accepted.
+diagnostics_and_previews:
+- Requested/actual backend, live/slot/written counts, kernel contributions, min/max weights, query radius,
+  total candidate occupancy, cache reuse and CPU/GPU timings.
+benchmark_or_parity_evidence:
+- ara/evidence/diagnostics/density_weight_vulkan_2026-09-10/benchmark/runtime-smoke.json
+docs_sync:
+  task_file: tasks/done/RUNTIME-227-compact-density-weight-spatial-backends.md
+  session_brief_present: true
+  canonical_docs_changed: true
+  skill_mirrors_checked: true
+residual_risks:
+- The expected tiny-radius regression failed against the old KD-tree query and passes after conservative
+  expansion; its immutable receipt remains an artifact.
+- Initial compilation needed an existing internal-header import and mutable test callback. Task headings
+  were corrected. The seven-phase GPU comparison lacked the existing 120-second framed-test registration
+  and timed out at 30 seconds; corrected registration and unchanged internal watchdog pass the replacement
+  gate. Seven other cases passed and were not repeated. Immutable receipts remain.
+- Dirty Debug smoke has no speedup claim. Existing BUG-180 excludes GPU LeakSanitizer; isolated full CPU
+  sanitizer suites were not rerun. Vulkan density rejects subnormal coordinates; no shared device-denormal
+  contract is claimed.
+skipped_checks: []
+artifacts:
+- path: ara/evidence/diagnostics/density_weight_vulkan_2026-09-10/record.json
+  sha256: 7260557bacb0aa7fb3f59746dd91abacebe1b90b4e2c3a8c6cd84e19dc71b677
+  kind: file
+- path: ara/evidence/tables/density_weight_verification_2026-09-10.md
+  sha256: db4a36c6acc37186cb67d4f6ca384ad9de56dfd71c42b07f3b45d317fe39cc48
+  kind: file
+- path: tasks/evidence/RUNTIME-227/commands/actual-vulkan.json
+  sha256: 5923cc0c18134994e6a15ab5f650bfdfaacd33ea0573d94c3c62c08f5f35e06c
+  kind: file
+- path: tasks/evidence/RUNTIME-227/commands/actual-vulkan.stdout.log
+  sha256: 32be6fc97fb2c8a9bcfea6def3145b65523234a23c28029d1c0f071de85682fd
+  kind: file
+- path: tasks/evidence/RUNTIME-227/commands/tiny-before-fix.json
+  sha256: f1e9b9799dcad242b52e68bdb376a6eede0f865181ba213f14fb56276980cbff
+  kind: file
+- path: tasks/evidence/RUNTIME-227/commands/tiny-before-fix.stdout.log
+  sha256: ab2ef0c882dec3e68bf07a5eec53eec3ba9c85a6b4bc54f81abec2af831a9642
+  kind: file
+self_review:
+  completed: true
+  scope_matches_task: true
+  layering_preserved: true
+  tests_and_docs_accounted_for: true
+  mechanical_and_semantic_changes_separated: true
+handoff: tasks/evidence/RUNTIME-227/handoff.jsonl
+review: tasks/evidence/RUNTIME-227/reviews.jsonl

@@ -1,0 +1,26 @@
+{
+  "command": [
+    "env",
+    "CCACHE_DISABLE=1",
+    "cmake",
+    "--build",
+    "--preset",
+    "ci",
+    "--target",
+    "IntrinsicGeometryTests"
+  ],
+  "command_display": "env CCACHE_DISABLE=1 cmake --build --preset ci --target IntrinsicGeometryTests",
+  "cwd": ".",
+  "duration_ms": 8671,
+  "exit_code": 0,
+  "finished_at": "2026-09-10T02:56:43Z",
+  "label": "build-kernel-reference",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-09-10T02:56:34Z",
+  "stderr_path": "tasks/evidence/RUNTIME-227/commands/build-kernel-reference.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/RUNTIME-227/commands/build-kernel-reference.stdout.log",
+  "stdout_sha256": "2ad44b3da782b492e3c142bbc1f8c63e6cb586c9f4086b3e1e5f164462f76832",
+  "task_id": "RUNTIME-227"
+}

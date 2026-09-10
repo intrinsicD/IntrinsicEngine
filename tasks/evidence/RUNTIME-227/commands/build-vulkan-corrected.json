@@ -1,0 +1,26 @@
+{
+  "command": [
+    "env",
+    "CCACHE_DISABLE=1",
+    "cmake",
+    "--build",
+    "--preset",
+    "ci-vulkan",
+    "--target",
+    "IntrinsicPointLBVHGpuTests"
+  ],
+  "command_display": "env CCACHE_DISABLE=1 cmake --build --preset ci-vulkan --target IntrinsicPointLBVHGpuTests",
+  "cwd": ".",
+  "duration_ms": 110864,
+  "exit_code": 1,
+  "finished_at": "2026-09-10T03:27:16Z",
+  "label": "build-vulkan-corrected",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-09-10T03:25:25Z",
+  "stderr_path": "tasks/evidence/RUNTIME-227/commands/build-vulkan-corrected.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/RUNTIME-227/commands/build-vulkan-corrected.stdout.log",
+  "stdout_sha256": "18a30c113ddf1e96ab7ff55eb60d452e39376f6c0df57dbe3a687d59dd854c84",
+  "task_id": "RUNTIME-227"
+}

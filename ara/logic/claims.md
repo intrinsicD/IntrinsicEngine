@@ -2114,3 +2114,14 @@
 - **Dependencies**: [C86]
 - **Tags**: FPFH, descriptors, radius support, lowest-ID prefix, LBVH, CPU, Vulkan, bounded integration
 - **From staging**: O219
+
+## C88: Bounded compact density weights with conservative Vulkan radius support
+- **Statement**: The source-bound 2026-09-10 fixtures publish existing Gaussian, ThetaLop and WendlandC2 direct/reciprocal density weights on all eight canonical domains using KD-tree reference, cached CPU LBVH and actual framed Vulkan radius candidates. Observed eight-domain absolute error is zero within 1e-5 tolerance. Tiny support across internal nodes and a single sample retain expected contributions. Config, deleted/unrelated preservation, history, stale inputs, cancellation after completed support, overflow and partial submission rejection checks pass. Existing keypoint/descriptor GPU fixtures pass after shared pagination reuse.
+- **Status**: supported — bounded ci CPU and actual ci-vulkan ASan+UBSan cases only. No general-input floating-point proof, shared-LBVH subnormal-coordinate support, GPU kernel reduction, projection grid replacement, whole-process leak-freedom, speedup or default-change claim. Dirty Debug smoke is diagnostic.
+- **Provenance**: ai-executed
+- **Crystallized via**: artifact-commitment
+- **Falsification criteria**: Replaying the bound source/fixtures loses strict-support contributors, exceeds weight tolerance, mutates deleted/unrelated rows, publishes stale/cancelled/partially submitted results, breaks history/domain/config assertions or regresses the keypoint/descriptor GPU cases.
+- **Proof**: [ara/evidence/diagnostics/density_weight_vulkan_2026-09-10/record.json, ara/evidence/tables/density_weight_verification_2026-09-10.md, tasks/evidence/RUNTIME-227/commands/actual-vulkan.stdout.log, tasks/evidence/RUNTIME-227/commands/actual-vulkan-corrected.stdout.log, tasks/evidence/RUNTIME-227/commands/full-cpu.stdout.log, tests/unit/geometry/Test.PointCloudKernels.cpp, tests/unit/geometry/Test.PointCloudConsolidation.cpp, tests/contract/runtime/Test.DensityWeightOperations.cpp, tests/integration/graphics/Test.PointLBVHGpuSmoke.cpp]
+- **Dependencies**: [C87]
+- **Tags**: compact density weights, conservative radius, LBVH, CPU, Vulkan, bounded integration
+- **From staging**: O220
