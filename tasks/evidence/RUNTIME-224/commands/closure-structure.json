@@ -1,0 +1,21 @@
+{
+  "command": [
+    "bash",
+    "-c",
+    "set -e\npython3 tools/agents/check_task_policy.py --root . --strict\npython3 tools/docs/check_doc_links.py --root .\npython3 tools/agents/check_ara_claims.py --root . --strict\npython3 tools/repo/check_layering.py --root src --strict\npython3 tools/agents/validate_method_manifests.py\npython3 tools/benchmark/validate_benchmark_manifests.py\npython3 tools/benchmark/validate_benchmark_results.py --root ara/evidence/diagnostics/bilateral_vulkan_2026-09-10/benchmark --manifests-root benchmarks --strict\ngit diff --check"
+  ],
+  "command_display": "bash -c 'set -e\npython3 tools/agents/check_task_policy.py --root . --strict\npython3 tools/docs/check_doc_links.py --root .\npython3 tools/agents/check_ara_claims.py --root . --strict\npython3 tools/repo/check_layering.py --root src --strict\npython3 tools/agents/validate_method_manifests.py\npython3 tools/benchmark/validate_benchmark_manifests.py\npython3 tools/benchmark/validate_benchmark_results.py --root ara/evidence/diagnostics/bilateral_vulkan_2026-09-10/benchmark --manifests-root benchmarks --strict\ngit diff --check'",
+  "cwd": ".",
+  "duration_ms": 2393,
+  "exit_code": 0,
+  "finished_at": "2026-09-10T00:37:26Z",
+  "label": "closure-structure",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-09-10T00:37:24Z",
+  "stderr_path": "tasks/evidence/RUNTIME-224/commands/closure-structure.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/RUNTIME-224/commands/closure-structure.stdout.log",
+  "stdout_sha256": "df59dd4899ee85e23f500ffb70ac34196e92d53becbce486194e6c1cae8fb4a3",
+  "task_id": "RUNTIME-224"
+}

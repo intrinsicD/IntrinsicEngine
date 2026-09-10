@@ -3749,3 +3749,15 @@ observations:
     promoted_to: logic/claims.md:C84
     crystallized_via: artifact-commitment
     stale: false
+
+  - id: O217
+    timestamp: '2026-09-10T02:35:59+02:00'
+    provenance: ai-executed
+    content: Bounded fixed-normal bilateral positions match the CPU octree through cached CPU LBVH and actual Vulkan neighborhoods rebuilt for three moving passes, with all-domain guarded publication and history.
+    context: N530 commits the tested scope into method-task closure; no user response, general numerical proof or speedup is inferred. Full overnight PM recording remains an end-of-turn step.
+    potential_type: claim
+    bound_to: [N529, N530]
+    promoted: true
+    promoted_to: logic/claims.md:C85
+    crystallized_via: artifact-commitment
+    stale: false

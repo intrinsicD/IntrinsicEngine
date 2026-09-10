@@ -2081,3 +2081,14 @@
 - **Dependencies**: [C81]
 - **Tags**: local distance ratio, outliers, LBVH, CPU, Vulkan, bounded integration
 - **From staging**: O216
+
+## C85: Bounded bilateral point filtering with moving Vulkan neighborhoods
+- **Statement**: The source-bound 2026-09-10 fixtures publish fixed-normal bilateral point positions on all eight canonical domains through CPU octree, CPU LBVH and actual framed Vulkan neighborhoods with shared CPU weights/updates. Three moving passes at k=8 and k=63 stay within 1e-5 absolute position tolerance (observed zero). Config, private-index lifetime, intermediate isolation, deleted/unrelated preservation, copy/in-place history, stale inputs and intermediate cancellation checks pass.
+- **Status**: supported — bounded ci CPU and actual ci-vulkan ASan+UBSan cases only. No complete Fleishman or Framework24 mesh-normal filtering equivalence, general-input proof, GPU weight evaluation, new visualization readback, whole-process leak-freedom, speedup or default-change claim. Dirty Debug smoke is diagnostic.
+- **Provenance**: ai-executed
+- **Crystallized via**: artifact-commitment
+- **Falsification criteria**: Replaying the recorded source and fixtures exceeds the position tolerance, uses stale neighborhoods after a moving pass, corrupts unrelated/deleted rows, publishes an intermediate/stale/cancelled result, or fails the declared domain/config/workspace/history assertions.
+- **Proof**: [ara/evidence/diagnostics/bilateral_vulkan_2026-09-10/record.json, ara/evidence/tables/bilateral_verification_2026-09-10.md, tasks/evidence/RUNTIME-224/commands/actual-vulkan-verified.stdout.log, tasks/evidence/RUNTIME-224/commands/full-cpu-final.stdout.log, tests/unit/geometry/Test.BilateralPointFilter.cpp, tests/contract/runtime/Test.BilateralFilterOperations.cpp, tests/contract/runtime/Test.SpatialIndexCache.cpp, tests/integration/graphics/Test.PointLBVHGpuSmoke.cpp]
+- **Dependencies**: [C80]
+- **Tags**: bilateral point filtering, LBVH, moving positions, CPU, Vulkan, bounded integration
+- **From staging**: O217

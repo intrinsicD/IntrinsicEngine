@@ -11726,3 +11726,22 @@ tree:
     alternatives: [Mislabel the ratio as full LOF or covariance probability, Infer a performance improvement from a dirty framed smoke]
     evidence: [N527, O216, docs/architecture/outlier-analysis.md]
     status: resolved
+
+  - id: N529
+    type: experiment
+    title: Exercise moving-point bilateral filtering with shared CPU and Vulkan neighborhoods
+    provenance: ai-executed
+    timestamp: '2026-09-10T02:35:59+02:00'
+    result: Implementation 15983b2d4d97cb6f8352a6236eae8b3c3aad36fe passes the reference, all-domain runtime and two actual Vulkan fixtures. Three-pass position error is zero under 1e-5 on the bounded fixture; full CPU has 4423 distinct passes after native follow-up and one expected skip. Earlier fixture-budget failures remain recorded.
+    evidence: [ara/evidence/diagnostics/bilateral_vulkan_2026-09-10/record.json, tasks/evidence/RUNTIME-224/commands/actual-vulkan-verified.stdout.log]
+    status: resolved
+
+  - id: N530
+    type: decision
+    title: Reuse spatial-cache workspace leases for iterative point neighborhoods
+    provenance: ai-executed
+    timestamp: '2026-09-10T02:35:59+02:00'
+    choice: Adopt the tested private-position lease and atomic terminal publication in 15983b2d4d97cb6f8352a6236eae8b3c3aad36fe. Bind only the fixed-normal point-filter integration before method-task closure; retain CPU reductions and separate complete mesh-normal filtering obligations.
+    alternatives: [Publish intermediate geometry to acquire entity indices, Add a parallel spatial service, Claim paper equivalence from a neighborhood-backend test]
+    evidence: [N529, O217, docs/architecture/bilateral-point-filter.md]
+    status: resolved

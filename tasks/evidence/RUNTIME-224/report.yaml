@@ -1,0 +1,220 @@
+schema_version: 1
+task_id: RUNTIME-224
+workflow_profile: high-risk
+status: complete
+generated_by: tools/agents/workflow_evidence.py
+generated_at: '2026-09-10T00:36:20Z'
+claim_eligible: false
+source:
+  base_ref: 052d4121c
+  base_revision: 052d4121cc06c861174b007f2863f482e98a379d
+  head_revision: 15983b2d4d97cb6f8352a6236eae8b3c3aad36fe
+  branch: main
+  worktree: /home/alex/Documents/IntrinsicEngine
+  dirty: true
+  surface:
+  - path: ara/evidence/diagnostics/bilateral_vulkan_2026-09-10/benchmark/runtime-smoke.json
+    sha256: e2517861de303f45cdae2bfd38c8bde84ced9037e3a92f21bd8de02fb507cd7e
+  - path: ara/evidence/diagnostics/bilateral_vulkan_2026-09-10/record.json
+    sha256: 165195b7b7f2c727af77ae9966a73857dd54867ec57ad30710c9fea45ea3c006
+  - path: ara/evidence/tables/bilateral_verification_2026-09-10.md
+    sha256: 46a839ac30c7d57c284a36abad8ce09d5e04d6ef804a753fb5fc627cf961c724
+  - path: ara/logic/claims.md
+    sha256: d2ae76a420a51fdd8eb204beb6fada9e3fc444afbf152f1d8f1f0ad8eea548e8
+  - path: ara/staging/observations.yaml
+    sha256: afb55e95b9f9b12449c1f05e2db30e01ceb106c257fe66388c46826c04724d69
+  - path: ara/trace/exploration_tree.yaml
+    sha256: 21c871e16e00c5dc39281ae0ade9c1f9860422dec41a0144d929fd32e283a2a6
+  - path: benchmarks/geometry/manifests/point_lbvh_bilateral_runtime_smoke.yaml
+    sha256: 56d126dd49200f53e0c76ff1230f7b76fd0a35e077e7829efbf2776976f3421c
+  - path: docs/api/generated/module_inventory.md
+    sha256: 68c0feed3c2e280feaa61d31bc13f5a02f55b67f23800cbe2372c845414f7fab
+  - path: docs/architecture/bilateral-point-filter.md
+    sha256: 85d109cf8143b4b892b779a8b5c1ab685cbcae99d120563170e70c5749c68173
+  - path: docs/architecture/spatial-index-consumers.md
+    sha256: dae846b45db13d7470e37a7e32455798ab12e5cf3185b6f42acc3efc4d480e85
+  - path: docs/architecture/spatial-indices.md
+    sha256: 64b0dbf641c923610db67e6f8e6c8083f369d0ccd4e5609f5a4ec231cb042918
+  - path: methods/geometry/point_lbvh/method.yaml
+    sha256: 119b6aabbd81aeca0b805a2560123d1dd146d0509502e49a720105f0ac87023e
+  - path: methods/geometry/point_lbvh/paper.md
+    sha256: b7932e789370688ba044c160900a828436153cfd84de2597c1bbd043e66c9976
+  - path: src/app/Sandbox/Editor/Sandbox.MeshProcessingPanels.cpp
+    sha256: 25f53f9e65e1fb5b0dddd4edd326ee960a926168d2b81cfaa03bf064ac69be4d
+  - path: src/app/Sandbox/Sandbox.ConfigSections.cpp
+    sha256: 40fc8dc2a19f84394b89ae9aec95109f5e2093aff72c1828572e73ce0e1b8014
+  - path: src/geometry/Geometry.PointCloud.Utils.cpp
+    sha256: 861f319c3a370febd061341495d785b3dc6f41fbfe53a7d038d77d173deab450
+  - path: src/geometry/Geometry.PointCloud.Utils.cppm
+    sha256: 7a745ea543fd84a19687ad7be2516f7aa5b84f3626f03cb454acdf00e861f7d1
+  - path: src/runtime/CMakeLists.txt
+    sha256: 3cc6287ab75bebde63a920b9435cf824976bc532cb8a568ba236fbd35a337c4c
+  - path: src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Bilateral.cpp
+    sha256: 5ad7347f8d03b43aaa9331b011f85905eca5d9f144767737ca908685d71f6ce0
+  - path: src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Public.cpp
+    sha256: 18d71005319b880144be7c8a91fe0dcd2a14df5b34d9804439d2ba3fe69e3b7d
+  - path: src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.cpp
+    sha256: 5462b65fc057a395da003d3332d36dd0fc0eb3ae310855487fcebd727894b0f5
+  - path: src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.cppm
+    sha256: fa90017ed1c03444cc57a7ae87b47492d17dfbff0a7bda87c34e6852e29d634b
+  - path: src/runtime/Editor/internal/Runtime.EditorFeatureContextAdapters.cpp
+    sha256: bfc0ffc9c7d3bea77e3caa8acb4b415aae303ac9a995235d0171380318bb3764
+  - path: src/runtime/Editor/internal/Runtime.EditorFeatures.Detail.cppm
+    sha256: 45bb6d0205aaa95a9d30f2072efd5f50ff3ce65e8e1f6c953c2264fab357c28f
+  - path: src/runtime/Editor/internal/Runtime.EditorWorkspaceSession.cpp
+    sha256: 4d4667017b4a6f4d3c8141c68ffdf353468e98c0926534efd9f3ad865ec641db
+  - path: src/runtime/GeometryIntegration/Runtime.SpatialIndexCache.cpp
+    sha256: 6a01bb1f6e7eb70aa4c145c2b04e9d1fdfe2e7c1310a1d2b5e4f083cf5c8eb7d
+  - path: src/runtime/GeometryIntegration/Runtime.SpatialIndexCache.cppm
+    sha256: fd36a2378587e77d1edc4ce00d4d82e9c400cb86ba88e95eb2055018989e10dc
+  - path: src/runtime/Modules/BilateralFilter/Runtime.BilateralFilterConfig.cpp
+    sha256: 7fda09b6743f217e9dc7cb3649e5d542a1060d81882894914c6994483c1f6bee
+  - path: src/runtime/Modules/BilateralFilter/Runtime.BilateralFilterConfig.cppm
+    sha256: da1eaa6bf94e4241abaeafa9800a7c59d1fc9b0fcbdf6c188eb51b64cf34e2b3
+  - path: tasks/SESSION-BRIEF.md
+    sha256: 22fbe8c8ec057545257eb6b6910f31e8c1ac1219a61a4d6be9d1f87b5e7fe0be
+  - path: tasks/backlog/bugs/BUG-183-reaped-job-dependency-cancellation.md
+    sha256: 2efa47cf1bb8b44c80a63ea52bd3f583529a8aa83b2adc7ac167ed0c97cef592
+  - path: tasks/backlog/geometry/GEOM-073-point-analysis-property-span-contracts.md
+    sha256: b78ceae0b92ca0975358d1fb2ec71a6af5c26f77c4732af66d8dc3799fbb9393
+  - path: tasks/done/RETIREMENT-LOG.md
+    sha256: d2e335ae1ccc7d501e7495cd0f306ac85287214c6a8dae77bd17aae9208e4835
+  - path: tasks/done/RUNTIME-224-bilateral-point-filter-spatial-backends.md
+    sha256: 52dd993c160e62417dd60eca346d605b6590aebfe61f6ff1ab42f0c73a446751
+  - path: tests/CMakeLists.txt
+    sha256: 78185376de179a8f626645f3723d2d1a568fdeb8c1ce7e041e19eebc0dbac23d
+  - path: tests/contract/runtime/Test.BilateralFilterOperations.cpp
+    sha256: f827be6954a78090fd2e24332fd75a9ac159f0fcf3e7ccceec5fdb495bb2a6a3
+  - path: tests/contract/runtime/Test.SpatialIndexCache.cpp
+    sha256: f87c071c42e6e7421d61e83e2ce14ad46599ce3967ad349d69db84b266ae1817
+  - path: tests/integration/graphics/Test.PointLBVHGpuSmoke.cpp
+    sha256: c1697356f13591746c0b381c1656c781d3763e70289043805bab43ad63c6cc44
+  - path: tests/integration/runtime/Test.SandboxEditorPresentation.cpp
+    sha256: 01f03f6b4568eab9de37be22cc05a4367ca8a1ffefe970c7ab3b0cc9773a532a
+  - path: tests/unit/geometry/Test.BilateralPointFilter.cpp
+    sha256: 1f27e3a3f9254f2d73384ceabca78ff09938ee9d579a889f5cf9bf4526422d84
+  content_digest: 02841f59843ff209811201958b72e163591c32216f56d7ab6b3b855629070d55
+touched:
+  paths:
+  - ara/evidence/diagnostics/bilateral_vulkan_2026-09-10/benchmark/runtime-smoke.json
+  - ara/evidence/diagnostics/bilateral_vulkan_2026-09-10/record.json
+  - ara/evidence/tables/bilateral_verification_2026-09-10.md
+  - ara/logic/claims.md
+  - ara/staging/observations.yaml
+  - ara/trace/exploration_tree.yaml
+  - benchmarks/geometry/manifests/point_lbvh_bilateral_runtime_smoke.yaml
+  - docs/api/generated/module_inventory.md
+  - docs/architecture/bilateral-point-filter.md
+  - docs/architecture/spatial-index-consumers.md
+  - docs/architecture/spatial-indices.md
+  - methods/geometry/point_lbvh/method.yaml
+  - methods/geometry/point_lbvh/paper.md
+  - src/app/Sandbox/Editor/Sandbox.MeshProcessingPanels.cpp
+  - src/app/Sandbox/Sandbox.ConfigSections.cpp
+  - src/geometry/Geometry.PointCloud.Utils.cpp
+  - src/geometry/Geometry.PointCloud.Utils.cppm
+  - src/runtime/CMakeLists.txt
+  - src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Bilateral.cpp
+  - src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Public.cpp
+  - src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.cpp
+  - src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.cppm
+  - src/runtime/Editor/internal/Runtime.EditorFeatureContextAdapters.cpp
+  - src/runtime/Editor/internal/Runtime.EditorFeatures.Detail.cppm
+  - src/runtime/Editor/internal/Runtime.EditorWorkspaceSession.cpp
+  - src/runtime/GeometryIntegration/Runtime.SpatialIndexCache.cpp
+  - src/runtime/GeometryIntegration/Runtime.SpatialIndexCache.cppm
+  - src/runtime/Modules/BilateralFilter/Runtime.BilateralFilterConfig.cpp
+  - src/runtime/Modules/BilateralFilter/Runtime.BilateralFilterConfig.cppm
+  - tasks/SESSION-BRIEF.md
+  - tasks/backlog/bugs/BUG-183-reaped-job-dependency-cancellation.md
+  - tasks/backlog/geometry/GEOM-073-point-analysis-property-span-contracts.md
+  - tasks/done/RETIREMENT-LOG.md
+  - tasks/done/RUNTIME-224-bilateral-point-filter-spatial-backends.md
+  - tests/CMakeLists.txt
+  - tests/contract/runtime/Test.BilateralFilterOperations.cpp
+  - tests/contract/runtime/Test.SpatialIndexCache.cpp
+  - tests/integration/graphics/Test.PointLBVHGpuSmoke.cpp
+  - tests/integration/runtime/Test.SandboxEditorPresentation.cpp
+  - tests/unit/geometry/Test.BilateralPointFilter.cpp
+  layers:
+  - geometry
+  - runtime
+  modules:
+  - Geometry.PointCloud.Utils
+  - Runtime.BilateralFilterConfig
+  - Runtime.SpatialIndexCache
+extension_seam: Existing spatial cache with leased private working sets and supplied-neighbor bilateral
+  reduction
+future_change_plan: BUG-183 fixes shared dependency reaping; ISS and other point analyses reuse the cache.
+  Complete Framework24 mesh-normal filtering remains separate.
+acceptance:
+- criterion: All three selectable backends complete the same bounded filter workflow.
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: No intermediate positions reach ECS; final publication and undo preserve property coherence.
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: Full CPU gate, focused actual Vulkan and independent final-surface review pass with explicit
+    limitations.
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+commands:
+- receipt: tasks/evidence/RUNTIME-224/commands/actual-vulkan-verified.json
+- receipt: tasks/evidence/RUNTIME-224/commands/focused-runtime.json
+- receipt: tasks/evidence/RUNTIME-224/commands/full-cpu-final.json
+- receipt: tasks/evidence/RUNTIME-224/commands/geometry-legacy.json
+- receipt: tasks/evidence/RUNTIME-224/commands/geometry-reference.json
+- receipt: tasks/evidence/RUNTIME-224/commands/native-cpu.json
+- receipt: tasks/evidence/RUNTIME-224/commands/structural-final.json
+- receipt: tasks/evidence/RUNTIME-224/commands/structural-initial.json
+- receipt: tasks/evidence/RUNTIME-224/commands/vulkan-bounded-fixture.json
+- receipt: tasks/evidence/RUNTIME-224/commands/vulkan-stale-probe.json
+- receipt: tasks/evidence/RUNTIME-224/commands/closure-structure.json
+changed_public_contracts:
+- All-domain same-cardinality vec3 publication, explicit in-place history, private index leases, k<=63
+  for Vulkan
+diagnostics_and_previews:
+- Requested/actual backend, resolved bandwidth, completed iterations, workspace builds, CPU update and
+  GPU neighborhood time
+benchmark_or_parity_evidence:
+- ara/evidence/diagnostics/bilateral_vulkan_2026-09-10/benchmark/runtime-smoke.json
+docs_sync:
+  task_file: tasks/done/RUNTIME-224-bilateral-point-filter-spatial-backends.md
+  session_brief_present: true
+  canonical_docs_changed: true
+  skill_mirrors_checked: true
+residual_risks:
+- Tiny dirty Debug smoke supports no speedup or broad numerical claim; CPU reduction and BUG-180 GPU LSan
+  exclusion remain. Historical failed attempts are retained as artifacts, superseded by final passing
+  receipts after fixture corrections.
+skipped_checks: []
+artifacts:
+- path: ara/evidence/tables/bilateral_verification_2026-09-10.md
+  sha256: 46a839ac30c7d57c284a36abad8ce09d5e04d6ef804a753fb5fc627cf961c724
+  kind: file
+- path: tasks/evidence/RUNTIME-224/commands/full-cpu.json
+  sha256: bf47aad7db3293a973b7a9762bc87cba9f7bc4d6b77e3a46ccbc76aa4d487f5c
+  kind: file
+- path: tasks/evidence/RUNTIME-224/commands/actual-vulkan.json
+  sha256: 38600209bc4c9992eedbc1cd4dc56a3420974f7ded2b1d688286e0b993a039dc
+  kind: file
+- path: tasks/evidence/RUNTIME-224/commands/vulkan-repeat-probe.json
+  sha256: c1585d4a6c47f6ad5cb0ee796332d7c174e1723ae0aab26334fc91a449d164aa
+  kind: file
+- path: tasks/evidence/RUNTIME-224/commands/actual-vulkan-final.json
+  sha256: 2f552bab58549b7582ea3df4af8fbc1473b1431d8cfec4581671dc319f86d9fb
+  kind: file
+self_review:
+  completed: true
+  scope_matches_task: true
+  layering_preserved: true
+  tests_and_docs_accounted_for: true
+  mechanical_and_semantic_changes_separated: true
+handoff: tasks/evidence/RUNTIME-224/handoff.jsonl
+review: tasks/evidence/RUNTIME-224/reviews.jsonl

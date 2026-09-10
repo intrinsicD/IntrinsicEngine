@@ -8130,3 +8130,7 @@ verified on `origin/main`.
 ### RUNTIME-223 — 2026-09-10
 
 Added the existing local distance-ratio heuristic to Outlier Analysis with shared CPU and framed Vulkan LBVH neighborhoods, canonical property domains, config/UI and revision-safe history. Implementation `0dbff4609`; bounded evidence C84 and `tasks/evidence/RUNTIME-223/report.yaml`. Full CPU and actual Vulkan comparisons pass with the documented unsanitized control skip and BUG-180 leak-check exclusion. This does not implement full LOF/LoOP or Framework24 covariance probability.
+
+### RUNTIME-224 — 2026-09-10
+
+Exposed fixed-normal bilateral point filtering through shared config/UI controls and all eight property domains, with CPU reference, cached CPU LBVH and framed Vulkan neighborhoods rebuilt between moving passes. Existing SpatialIndexCache now owns leased private working sets. Implementation `15983b2d4`; bounded evidence C85 and `tasks/evidence/RUNTIME-224/report.yaml`. Full CPU and both actual Vulkan tests pass with explicit BUG-180 leak-check exclusion. Earlier fixture-budget and registration failures remain recorded; no paper-equivalence or performance-improvement claim. BUG-183 owns the scheduler-level follow-up.

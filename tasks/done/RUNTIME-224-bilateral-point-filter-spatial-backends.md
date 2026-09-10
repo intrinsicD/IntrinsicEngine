@@ -66,7 +66,7 @@ One bounded slice: reference/span contract and analytic tests, manifest, private
 ## Acceptance criteria
 - [x] All three selectable backends complete the same bounded filter workflow.
 - [x] No intermediate positions reach ECS; final publication and undo preserve property coherence.
-- [ ] Full CPU gate, focused actual Vulkan and independent final-surface review pass with explicit limitations.
+- [x] Full CPU gate, focused actual Vulkan and independent final-surface review pass with explicit limitations.
 
 ## Verification
 ```bash
@@ -95,3 +95,6 @@ The first actual Vulkan run exhausted the 95-second fixture budget in phase 3. A
 Both 128-row repetitions passed (including all six phases), but one still approached the global timeout. Final registration separates comparison phases from stale/cancel/dense phases into two independently bounded Vulkan tests. All assertions and the original per-test limits remain.
 
 The first split run passed the comparison case (60.77 seconds), but the new cancellation case inherited CTest's 30-second default. Its explicit registration now shares the established 120-second Vulkan limit; the internal watchdog remains 95 seconds.
+
+## Completion — 2026-09-10
+Commit: `15983b2d4`; terminal evidence and independent acceptance are bound in `tasks/evidence/RUNTIME-224/report.yaml`. C85 records the bounded CPU and actual Vulkan result. The final two Vulkan cases pass in 60.74 and 39.73 seconds, without skips. The full CPU selection has 4,423 distinct passes after native follow-up and one expected unsanitized leak-control skip. CPU computes bandwidth, weights and updates; no speedup or complete mesh-normal filtering equivalence is claimed.
