@@ -157,5 +157,6 @@
     "Full isolated CPU sanitizer suites were not rerun; no LeakSanitizer or leak-freedom claim.",
     "Strict local root hygiene still reports pre-existing .agents metadata under BUG-177."
   ],
-  "benchmark_result": "ara/evidence/diagnostics/point_construction_2026-09-10/results/benchmark.json"
+  "benchmark_result": "ara/evidence/diagnostics/point_construction_2026-09-10/results/benchmark.json",
+  "implementation_commit": "27275206dd6d3d1dd6857db737f3d609ab4cb1cb"
 }

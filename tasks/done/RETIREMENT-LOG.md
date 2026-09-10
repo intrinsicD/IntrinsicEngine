@@ -8150,3 +8150,7 @@ Retain terminal job outcomes while pending consumers reference them, so reaping 
 - 2026-09-10 — **RUNTIME-228**: Added reusable LOP neighborhood steps and cached CPU LBVH through existing config/UI/publication. C89 binds 4463 CPU passes and two existing grid checks. Implementation `020622c844d1809e4614d5ed120925e63aa3bdad`; [task](RUNTIME-228-lop-cached-spatial-steps.md).
 
 - 2026-09-10 — **RUNTIME-229**: Added framed Vulkan LBVH neighborhoods to shared LOP CPU projection steps through existing config/UI/publication. C90 binds 4465 CPU passes and 3 actual Vulkan checks. Implementation `caa85ce781be772faf30de920322010825413afa`; [task](RUNTIME-229-lop-framed-lbvh-projection.md).
+
+- 2026-09-10 — **RUNTIME-230**: Added Hoppe-style reconstruction and kNN graph construction through cached CPU/framed Vulkan neighborhoods, shared config/UI and separate guarded generated entities. C91 binds 4500 CPU passes plus one expected skip, both actual Vulkan cases, generated pixels and failure checks. Implementation `27275206dd6d3d1dd6857db737f3d609ab4cb1cb`; [task](RUNTIME-230-point-construction-spatial-backends.md).
+
+- 2026-09-10 — **BUG-186**: Updated four pre-existing analysis-display tests to inspect appearance lanes after `2c9053f89`, preserving all-domain numerical/history checks and explicit halfedge rejection. Full CPU gate passes. Implementation `27275206dd6d3d1dd6857db737f3d609ab4cb1cb`; [task](BUG-186-analysis-appearance-test-expectations.md).

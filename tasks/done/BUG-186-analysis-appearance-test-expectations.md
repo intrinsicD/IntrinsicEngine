@@ -33,4 +33,7 @@ ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarant
 ```
 
 ## Verification outcome
-The final full CPU run passes all four cases: 4500 total passes, zero failures and one expected unsanitized leak-control skip. Initial and final compressed CTest logs are bound by [the source record](../../../ara/evidence/diagnostics/point_construction_2026-09-10/record.json). No production visualization or method code changed for this correction.
+The final full CPU run passes all four cases: 4500 total passes, zero failures and one expected unsanitized leak-control skip. Initial and final compressed CTest logs are bound by [the source record](../../ara/evidence/diagnostics/point_construction_2026-09-10/record.json). No production visualization or method code changed for this correction.
+
+## Completion
+Completed 2026-09-10. Implementation commit: `27275206dd6d3d1dd6857db737f3d609ab4cb1cb`.

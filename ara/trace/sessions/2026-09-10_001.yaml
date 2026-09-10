@@ -4,8 +4,8 @@ session:
   started: '2026-09-10T00:25:43+02:00'
   last_turn: '2026-09-10T22:38:21+02:00'
   turn_count: 3
-  summary: Completed sequential spatial integrations through LOP with CPU/Vulkan tests, shared neighborhoods and
-    explicit remaining Framework24 work.
+  summary: Completed spatial integrations through LOP and added point construction with bounded CPU/Vulkan evidence,
+    shared neighborhoods and explicit remaining Framework24 work.
 events_logged:
 - turn: 1
   type: decision

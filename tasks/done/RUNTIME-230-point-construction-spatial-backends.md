@@ -74,3 +74,6 @@ The source-documentation audit reports no errors; its 13 declaration-comment rev
 [C91 and source-bound evidence](../../ara/evidence/tables/point_construction_verification_2026-09-10.md) record 4500 CPU passes plus one expected unsanitized leak-control skip, 28 focused geometry cases, seven focused runtime cases and both actual Vulkan cases. The final Vulkan fixture matches the reference positions exactly on its bounded inputs, with equal edge arrays/face counts and visible generated geometry. Its partial-submission, stale and cancellation checks pass. The dirty schema-v2 smoke passes its declared diagnostic thresholds; no performance win is claimed.
 
 Final verification also corrected short final GPU batch reuse, the fixture's handling of reaped terminal tokens and its explicit 180-second budget. The new menu-count assertion was updated; BUG-186 separately tracks four pre-existing appearance-test expectations from `2c9053f89`. Full initial/final logs are retained with the evidence.
+
+## Completion
+Completed 2026-09-10. Implementation commit: `27275206dd6d3d1dd6857db737f3d609ab4cb1cb`.

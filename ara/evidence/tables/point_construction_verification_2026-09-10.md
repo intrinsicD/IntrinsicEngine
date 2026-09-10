@@ -1,6 +1,6 @@
 # Point construction verification
 
-C91 is bound to the [source hashes and executed receipts](../diagnostics/point_construction_2026-09-10/record.json).
+Implementation `27275206dd6d3d1dd6857db737f3d609ab4cb1cb`. C91 is bound to the [source hashes and executed receipts](../diagnostics/point_construction_2026-09-10/record.json).
 
 | Check | Observed result and scope |
 | --- | --- |

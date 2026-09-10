@@ -546,8 +546,8 @@ sessions:
   open_threads: 11
 - id: 2026-09-10_001
   date: '2026-09-10'
-  summary: Completed sequential spatial integrations through LOP with CPU/Vulkan tests, shared neighborhoods and
-    explicit remaining Framework24 work.
+  summary: Completed spatial integrations through LOP and added point construction with bounded CPU/Vulkan evidence,
+    shared neighborhoods and explicit remaining Framework24 work.
   turn_count: 3
   events_count: 16
   claims_touched:

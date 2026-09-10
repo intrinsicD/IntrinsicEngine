@@ -66,3 +66,6 @@ The [method contract](../../methods/geometry/point_construction/method.yaml)
 and [formulation](../../methods/geometry/point_construction/paper.md) describe
 the sample-anchored field, tie semantics and numerical limits. The
 [consumer inventory](spatial-index-consumers.md) tracks other spatial uses.
+
+Bounded CPU/Vulkan execution, generated-pixel checks and current limitations are
+recorded in [C91 verification](../../ara/evidence/tables/point_construction_verification_2026-09-10.md).
