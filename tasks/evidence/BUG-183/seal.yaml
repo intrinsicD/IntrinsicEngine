@@ -1,0 +1,13 @@
+schema_version: 1
+task_id: BUG-183
+sealed_revision: efe6ecfd7b11034a45f9ba82e19a16348e48f620
+source_content_digest: d7d28a2848bcfccfa2ecc2ce5d85556f0cf7905ecf81dbf2d60048fe9ce4e85c
+report_sha256: e08a75327c9f694096c71b57622e64e74df89fd4c6359c7e6d985d23ec34ea63
+records:
+- path: tasks/evidence/BUG-183/handoff.jsonl
+  sha256: f02a93b8a52e222bca671381d824bfd179c8719c1c595b65940d674bc1c74721
+- path: tasks/evidence/BUG-183/reviews.jsonl
+  sha256: 2d55666e50ea1d9f2b4df39d8be40d44d37257d5ba6bdf54fbc73c5cc141af46
+reason: Seal the independently reviewed scheduler correction and before/after evidence at the clean retirement
+  commit.
+generated_by: tools/agents/workflow_evidence.py
