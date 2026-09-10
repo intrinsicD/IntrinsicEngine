@@ -1,6 +1,9 @@
+// Oriented-point reconstruction and reusable grid/field stages for external neighbor queries.
 module;
 
 #include <cstddef>
+#include <cstdint>
+#include <vector>
 #include <optional>
 #include <span>
 
@@ -9,6 +12,8 @@ module;
 export module Geometry.SurfaceReconstruction;
 
 import Geometry.HalfedgeMesh;
+export import Geometry.Grid;
+export import Geometry.SpatialQueries;
 
 export namespace Geometry::SurfaceReconstruction
 {
@@ -48,6 +53,7 @@ export namespace Geometry::SurfaceReconstruction
         // Higher values produce finer detail but consume more memory and time.
         // Memory: O(Resolution^3). Time: O(Resolution^3 * KNeighbors).
         std::size_t Resolution{64};
+        std::size_t MaxGridVertices{16u * 1024u * 1024u};
 
         // Number of nearest neighbors for signed distance computation.
         // k=1 uses only the nearest point (fast, may be noisy).
@@ -100,6 +106,29 @@ export namespace Geometry::SurfaceReconstruction
         std::size_t GridNY{0};
         std::size_t GridNZ{0};
     };
+
+    struct PreparedReconstruction
+    {
+        std::vector<glm::vec3> Points{}, Normals{};
+        Grid::GridDimensions Dimensions{};
+    };
+
+    // Normalizes usable paired samples, estimates missing normals when requested,
+    // and bounds the grid allocation. Filtered indices address Points/Normals.
+    [[nodiscard]] std::optional<PreparedReconstruction> Prepare(
+        std::span<const glm::vec3> points, std::span<const glm::vec3> normals,
+        const ReconstructionParams& params = {});
+    [[nodiscard]] std::vector<glm::vec3> GridQueries(
+        const PreparedReconstruction&, std::size_t first, std::size_t count);
+    // Normals must have unit length, as produced by Prepare.
+    // Complete rows are distance/source-ID ordered. Weighted evaluation preserves
+    // the inherited min(KNeighbors+1, sample count) policy; nearest uses one ID.
+    [[nodiscard]] std::optional<std::vector<float>> EvaluateSignedDistances(
+        std::span<const glm::vec3> points, std::span<const glm::vec3> normals,
+        std::span<const glm::vec3> queries, PointNeighborhoods neighborhoods,
+        const ReconstructionParams& params = {});
+    [[nodiscard]] std::optional<ReconstructionResult> Extract(
+        const PreparedReconstruction&, std::span<const float> field);
 
     // -------------------------------------------------------------------------
     // Reconstruction

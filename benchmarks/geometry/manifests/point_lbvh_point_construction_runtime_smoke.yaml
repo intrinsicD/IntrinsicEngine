@@ -1,0 +1,20 @@
+benchmark_id: geometry.point_lbvh.point_construction_runtime_smoke
+method: geometry.point_construction
+dataset: builtin.point_construction.eight_domains.sphere34
+params:
+  intent: smoke
+  warmup_iterations: 1
+  measured_iterations: 1
+  capability: gpu_vulkan
+  method: hoppe
+  k_neighbors: 3
+  resolution: 6
+  gpu_query_batch_size: 73
+  timed_scope: eight_domain_weighted_hoppe_requests_through_publication
+  additional_checks: nearest_hoppe_union_graph_mutual_graph_and_generated_pixels
+metrics:
+  - runtime_ms
+  - quality_error_linf
+thresholds:
+  smoke_runtime_ms_max: 60000
+  quality_error_linf_max: 0.0001

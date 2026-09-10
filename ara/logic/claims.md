@@ -2147,3 +2147,14 @@
 - **Dependencies**: [C89]
 - **Tags**: LOP, Vulkan LBVH, moving neighborhoods, bounded integration
 - **From staging**: O222
+
+## C91: Shared CPU and Vulkan neighborhoods construct bounded surfaces and graphs
+- **Statement**: The source-bound 2026-09-10 supplied-normal fixtures construct point-anchored nearest and weighted Hoppe surfaces and union/mutual kNN graphs through exhaustive CPU, cached CPU LBVH and actual framed Vulkan neighborhoods on all eight canonical domains. The Vulkan fixture has zero observed output-position difference at a 1e-4 tolerance, equal edge arrays/face counts and visible generated pixels. CPU tests cover guarded publication/history; GPU tests reject stale input, pending-stage cancellation and partial submission without creating output.
+- **Status**: supported — bounded ci CPU and actual ci-vulkan fixtures only. No original Hoppe boundary formulation, general-input or all-interleaving proof, GPU geometry extraction, speedup or default change.
+- **Provenance**: ai-executed
+- **Crystallized via**: artifact-commitment
+- **Falsification criteria**: Replaying the bound fixtures changes the required candidate membership, exceeds 1e-4 position error, changes graph/surface topology, fails generated-pixel checks, alters source properties, loses guarded history or publishes failed work.
+- **Proof**: [ara/evidence/diagnostics/point_construction_2026-09-10/record.json, ara/evidence/tables/point_construction_verification_2026-09-10.md, tests/unit/geometry/Test.PointConstruction.cpp, tests/contract/runtime/Test.PointConstructionOperations.cpp, tests/integration/graphics/Test.PointConstructionGpuSmoke.cpp]
+- **Dependencies**: []
+- **Tags**: Hoppe-style field, kNN graph, CPU LBVH, Vulkan LBVH, generated geometry, bounded integration
+- **From staging**: O223

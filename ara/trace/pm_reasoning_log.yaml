@@ -2018,3 +2018,11 @@ entries:
     - Preserve failed experiments and harness corrections: rejected source assumptions, GPU cold-start skip, cache priming after property storage replacement, complete capacity overflow and measured timeout sizing. No cross-storage cache reuse claim.
     - Vulkan neighborhood execution and CPU numerical reductions remain distinct. Partial LOP submission is statically reviewed only; no all-interleaving or leak-freedom proof.
     - The 07:00 deadline ends this authorized run. Remaining projection adapters and Framework24 ports stay open; unrelated staged observations receive no promotion or inferred abandonment.
+
+  - turn: 2026-09-10_001#3
+    notes:
+    - N539 preserves executed source-bound results and initial failures; N540 provides artifact commitment for O223/C91. No numerical endorsement is inferred from Continue.
+    - Point-anchored Hoppe and fixed k+1 graph semantics remain explicit; GPU neighborhoods do not imply GPU extraction or paper equivalence. Dirty smoke timings remain non-claim-eligible.
+    - The reaped-token wait was a fixture error, while short-batch storage reuse was an implementation defect. BUG-186 owns pre-existing appearance-test drift; existing BUG-177/178/180 limitations remain separate.
+    - The active request resumed after a transient approval-review usage-limit rejection. No quota workaround or new overnight authorization was inferred.
+    - Existing staged atlas/DAG/migration suggestions receive no new closure signal. Prior WLOP/CLOP/EAR work was observed in 9f4764b7d, not reimplemented or attributed to this turn.

@@ -1,0 +1,16 @@
+Internal ctest changing into directory: /home/alex/Documents/IntrinsicEngine/build/ci-vulkan
+Test project /home/alex/Documents/IntrinsicEngine/build/ci-vulkan
+    Start 29: PointConstructionGpuSmoke.QueriesMatchReferenceAcrossDomainsAndGeneratedGeometryRenders
+1/2 Test #29: PointConstructionGpuSmoke.QueriesMatchReferenceAcrossDomainsAndGeneratedGeometryRenders ...   Passed  130.61 sec
+    Start 30: PointConstructionGpuSmoke.StaleCancelledAndPartialSubmissionCreateNoEntity
+2/2 Test #30: PointConstructionGpuSmoke.StaleCancelledAndPartialSubmissionCreateNoEntity ................   Passed   24.03 sec
+
+100% tests passed, 0 tests failed out of 2
+
+Label Time Summary:
+gpu            = 154.64 sec*proc (2 tests)
+graphics       = 154.64 sec*proc (2 tests)
+integration    = 154.64 sec*proc (2 tests)
+vulkan         = 154.64 sec*proc (2 tests)
+
+Total Test time (real) = 154.81 sec

@@ -17,6 +17,7 @@ picking backlog work; theme priorities and rationale live in
 - `RUNTIME-219` — Vulkan LBVH neighborhoods for normal estimation (tasks/active/RUNTIME-219-vulkan-normal-neighborhoods.md)
 - `RUNTIME-220` — Kernel density with shared spatial backends (tasks/active/RUNTIME-220-kernel-density-spatial-backends.md)
 - `RUNTIME-221` — Point spacing and radius estimation with shared spatial backends (tasks/active/RUNTIME-221-point-spacing-spatial-backends.md)
+- `RUNTIME-230` — Spatial queries for point-set construction (tasks/active/RUNTIME-230-point-construction-spatial-backends.md)
 - `UI-041` — Point-set outlier multi-domain panel (tasks/active/UI-041-point-set-outlier-multi-domain-panel.md)
 - `UI-053` — Curvature-extremum engine overlay (tasks/active/UI-053-curvature-extremum-engine-overlay.md)
 
@@ -119,6 +120,7 @@ picking backlog work; theme priorities and rationale live in
 - unblocked: `BUG-171` — Required development receipts cannot be superseded by a passing rerun (tasks/backlog/bugs/BUG-171-required-command-receipt-supersession.md)
 - unblocked: `BUG-172` — Synchronous CPU completion can observe an unfinished or stale load transition (tasks/backlog/bugs/BUG-172-synchronous-cpu-load-completion-race.md)
 - unblocked: `BUG-176` — Concurrent CTest discovery can duplicate generated registrations (tasks/backlog/bugs/BUG-176-concurrent-ctest-discovery.md)
+- unblocked: `BUG-186` — Analysis tests expect retired recipe storage (tasks/backlog/bugs/BUG-186-analysis-appearance-test-expectations.md)
 - unblocked: `GRAPHICS-135` — Measure current render-prep scheduling and material-sync overhead (tasks/backlog/rendering/GRAPHICS-135-renderprep-per-frame-taskgraph-overhead.md)
 - blocked by `ASSETIO-012`: `REVIEW-004` — Framework24 product-convergence audit (tasks/backlog/architecture/REVIEW-004-framework24-product-convergence-audit.md)
 - unblocked: `RUNTIME-218` — Nothing in the scene is ever lit: add default lighting and light authoring (tasks/backlog/runtime/RUNTIME-218-default-scene-lighting-and-light-authoring.md)

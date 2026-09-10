@@ -100,6 +100,7 @@ MakeEditorGeometryProcessingContext(const EditorFeatureBindings &bindings) {
       .LastKeypointAnalysisResult = bindings.LastKeypointAnalysisResult,
       .LastDescriptorAnalysisResult = bindings.LastDescriptorAnalysisResult,
       .LastDensityWeightResult = bindings.LastDensityWeightResult,
+      .LastPointConstructionResult = bindings.LastPointConstructionResult,
       .EngineConfigControlState = bindings.EngineConfigControlState,
       .PreviewEngineConfigDocument = bindings.PreviewEngineConfigDocument,
       .ApplyEngineConfigHotSubset = bindings.ApplyEngineConfigHotSubset,
@@ -269,6 +270,7 @@ ToEditorFeatureBindingsImpl(const EditorGeometryProcessingContext &context) {
       .LastKeypointAnalysisResult = context.LastKeypointAnalysisResult,
       .LastDescriptorAnalysisResult = context.LastDescriptorAnalysisResult,
       .LastDensityWeightResult = context.LastDensityWeightResult,
+      .LastPointConstructionResult = context.LastPointConstructionResult,
       .EngineConfigControlState = context.EngineConfigControlState,
       .AttachmentActive = context.AttachmentActive,
       .InvalidateWorkspaceSnapshotCache =
@@ -411,6 +413,7 @@ ToEditorFeatureBindingsImpl(const EditorWorkspaceSnapshotContext &context) {
   bindings.LastKeypointAnalysisResult = geometry.LastKeypointAnalysisResult;
   bindings.LastDescriptorAnalysisResult = geometry.LastDescriptorAnalysisResult;
   bindings.LastDensityWeightResult = geometry.LastDensityWeightResult;
+  bindings.LastPointConstructionResult = geometry.LastPointConstructionResult;
   bindings.MeshDenoiseKernelAvailable = geometry.MeshDenoiseKernelAvailable;
   bindings.MeshCurvatureKernelAvailable = geometry.MeshCurvatureKernelAvailable;
   bindings.MeshCurvatureDirectionsAvailable =

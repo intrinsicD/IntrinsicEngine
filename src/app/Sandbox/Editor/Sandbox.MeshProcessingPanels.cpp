@@ -396,6 +396,12 @@ namespace Extrinsic::Sandbox::Editor
             Runtime::DensityWeightConfig Draft{};
             std::string LastApplied{}, ConfigDiagnostic{}, VisualizationDiagnostic{};
         };
+        struct ConstructionState
+        {
+            std::optional<Runtime::EditorPointConstructionResult> LastResult{};
+            Runtime::PointConstructionConfig Draft{};
+            std::string LastApplied{}, ConfigDiagnostic{};
+        };
         struct SpacingState
         {
             std::optional<Runtime::EditorPointSpacingResult> LastResult{};
@@ -449,6 +455,7 @@ namespace Extrinsic::Sandbox::Editor
         DescriptorsState Descriptors{};
         DensityState Density{};
         DensityWeightsState DensityWeights{};
+        ConstructionState Construction{};
         SpacingState Spacing{};
         BilateralState Bilateral{};
 
@@ -485,6 +492,7 @@ namespace Extrinsic::Sandbox::Editor
         void DrawDescriptorsWindow(bool&, const SandboxEditorContext&);
         void DrawDensityWindow(bool&, const SandboxEditorContext&);
         void DrawDensityWeightsWindow(bool&, const SandboxEditorContext&);
+        void DrawConstructionWindow(bool&, const SandboxEditorContext&);
         void DrawSpacingWindow(bool&, const SandboxEditorContext&);
         void DrawBilateralWindow(bool&, const SandboxEditorContext&);
         void DrawRegistrationWindow(bool&, const SandboxEditorContext&);
@@ -586,6 +594,18 @@ namespace Extrinsic::Sandbox::Editor
                     (void)Shell->SetEditorWindowOpen("view.density_weights",true);
                     (void)Shell->SetEditorWindowOpen(id,false);
                 }}));
+        RegisterWindow("view.point_construction", {"View"}, "Construct from Points", &Impl::DrawConstructionWindow);
+        for (const auto& [id, domain] : std::array<std::pair<const char*, const char*>, 3>{
+                 {{"mesh.processing.point_construction", "Mesh"}, {"graph.processing.point_construction", "Graph"},
+                  {"pointcloud.processing.point_construction", "PointCloud"}}})
+            Handles.push_back(Shell->RegisterEditorWindow({
+                .Id=id, .MenuPath={domain,"Processing"}, .Title="Construct from Points",
+                .Draw=[](bool& open,const SandboxEditorContext&){open=false;},
+                .OpenStateChanged=[this,id](bool open){
+                    if(!open)return;
+                    (void)Shell->SetEditorWindowOpen("view.point_construction",true);
+                    (void)Shell->SetEditorWindowOpen(id,false);
+                }}));
         RegisterWindow("view.point_spacing", {"View"}, "Point Spacing and Radii", &Impl::DrawSpacingWindow);
         for (const auto& [id, domain] : std::array<std::pair<const char*, const char*>, 3>{
                  {{"mesh.processing.point_spacing", "Mesh"}, {"graph.processing.point_spacing", "Graph"},
@@ -681,6 +701,7 @@ namespace Extrinsic::Sandbox::Editor
         Descriptors = {};
         Density = {};
         DensityWeights = {};
+        Construction = {};
         Spacing = {};
         Bilateral = {};
     }
@@ -3097,6 +3118,221 @@ namespace Extrinsic::Sandbox::Editor
             ImGui::Text("Cache reused: %s; CPU %.3f ms; GPU neighborhoods %.3f ms",result.IndexReused?"yes":"no",result.CpuComputeMilliseconds,result.GpuNeighborhoodMilliseconds);
             ImGui::TextWrapped("%s",result.Message.c_str());
             DrawDismissLastResultButton("Dismiss##DensityWeights",DensityWeights.LastResult,Runtime::EditorGeometryProcessingResultSlot::DensityWeight,context);
+        }
+        ImGui::End();
+    }
+
+    void MeshProcessingPanels::Impl::DrawConstructionWindow(bool& open,
+                                                            const SandboxEditorContext& context)
+    {
+        if (context.GeometryResults.LastPointConstructionResult)
+            Construction.LastResult = context.GeometryResults.LastPointConstructionResult;
+        ImGui::SetNextWindowSize(ImVec2(460, 600), ImGuiCond_FirstUseEver);
+        if (!ImGui::Begin("Construct from Points", &open))
+        {
+            ImGui::End();
+            return;
+        }
+        const auto active = Runtime::GetEditorPointConstructionConfig(context.GeometryCommands)
+                                .value_or(Runtime::PointConstructionConfig{});
+        const auto serialized = Runtime::SerializePointConstructionConfig(active);
+        if (serialized != Construction.LastApplied)
+        {
+            Construction.Draft = active;
+            Construction.LastApplied = serialized;
+            Construction.ConfigDiagnostic.clear();
+        }
+        auto& config = Construction.Draft;
+        bool changed = false;
+        const auto workspace = Runtime::BuildEditorWorkspaceSnapshot(context.SnapshotQueries,
+                                                                     {.Hierarchy = true,
+                                                                      .Inspector = false,
+                                                                      .Selection = false,
+                                                                      .Document = false,
+                                                                      .SceneFile = false,
+                                                                      .FileImport = false,
+                                                                      .AssetImportQueue = false,
+                                                                      .RenderGraph = false,
+                                                                      .RenderRecipe = false,
+                                                                      .CameraRender = false,
+                                                                      .Visualization = false});
+        if (context.Selection && !context.Selection->SelectedStableIds.empty() &&
+            ImGui::Button("Use selected entity"))
+        {
+            config.StableEntityId = context.Selection->SelectedStableIds.front();
+            changed = true;
+        }
+        std::string entityName =
+            config.StableEntityId ? std::to_string(config.StableEntityId) : "Choose entity";
+        for (const auto& row : workspace.Hierarchy)
+            if (row.StableEntityId == config.StableEntityId)
+                entityName = row.Name;
+        if (ImGui::BeginCombo("Entity##Construction", entityName.c_str()))
+        {
+            for (const auto& row : workspace.Hierarchy)
+            {
+                if (Runtime::GetEditorPointConstructionInputCatalog(context.GeometryCommands,
+                                                                    row.StableEntityId)
+                        .Entries.empty())
+                    continue;
+                const auto title = row.Name + " (" + std::to_string(row.StableEntityId) + ")";
+                if (ImGui::Selectable(title.c_str(), row.StableEntityId == config.StableEntityId))
+                {
+                    config.StableEntityId = row.StableEntityId;
+                    changed = true;
+                }
+            }
+            ImGui::EndCombo();
+        }
+        const auto inputName =
+            std::string(Runtime::ToString(config.Positions.Domain)) + ": " + config.Positions.Name;
+        if (ImGui::BeginCombo("Positions##Construction", inputName.c_str()))
+        {
+            const auto catalog = Runtime::GetEditorPointConstructionInputCatalog(
+                context.GeometryCommands, config.StableEntityId);
+            auto previousDomain = Runtime::GeometryElementDomain::Unknown;
+            for (const auto& row : catalog.Entries)
+            {
+                if (row.Ref.Domain != previousDomain)
+                {
+                    ImGui::SeparatorText(std::string(Runtime::ToString(row.Ref.Domain)).c_str());
+                    previousDomain = row.Ref.Domain;
+                }
+                const auto label = std::string(Runtime::ToString(row.Ref.Domain)) + ": " +
+                                   row.Ref.Name + " (" + std::to_string(row.ElementCount) + ")";
+                if (ImGui::Selectable(label.c_str(), row.Ref == config.Positions))
+                {
+                    config.Positions = row.Ref;
+                    config.Normals.Domain = row.Ref.Domain;
+                    changed = true;
+                }
+            }
+            ImGui::EndCombo();
+        }
+        int method = int(config.Method), backend = int(config.Backend);
+        if (ImGui::Combo("Method", &method, "Hoppe surface\0kNN graph\0"))
+        {
+            config.Method = Runtime::PointConstructionMethod(method);
+            changed = true;
+        }
+        if (ImGui::Combo("Neighbors", &backend, "CPU reference\0CPU LBVH (cached)\0Vulkan LBVH\0"))
+        {
+            config.Backend = Runtime::PointConstructionBackend(backend);
+            changed = true;
+        }
+        std::array<char, 257> outputName{};
+        std::copy_n(config.OutputName.c_str(),
+                    std::min(config.OutputName.size(), outputName.size() - 1), outputName.data());
+        if (ImGui::InputText("Output entity", outputName.data(), outputName.size()))
+        {
+            config.OutputName = outputName.data();
+            changed = true;
+        }
+        const auto integer = [&](const char* label, std::uint32_t& value)
+        {
+            int draft = int(value);
+            if (ImGui::InputInt(label, &draft))
+            {
+                value = std::uint32_t(std::max(0, draft));
+                changed = true;
+            }
+        };
+        integer("Neighbors k", config.KNeighbors);
+        if (config.Method == Runtime::PointConstructionMethod::Hoppe)
+        {
+            changed |= ImGui::Checkbox("Estimate normals (CPU)", &config.EstimateNormals);
+            if (config.EstimateNormals)
+                integer("Normal neighbors", config.NormalKNeighbors);
+            else
+            {
+                const auto label = std::string(Runtime::ToString(config.Normals.Domain)) + ": " +
+                                   config.Normals.Name;
+                if (ImGui::BeginCombo("Normals", label.c_str()))
+                {
+                    const auto catalog = Runtime::GetEditorPointConstructionInputCatalog(
+                        context.GeometryCommands, config.StableEntityId);
+                    for (const auto& row : catalog.Entries)
+                    {
+                        if (row.Ref.Domain != config.Positions.Domain &&
+                            config.Positions.Domain != Runtime::GeometryElementDomain::Unknown)
+                            continue;
+                        const auto name =
+                            std::string(Runtime::ToString(row.Ref.Domain)) + ": " + row.Ref.Name;
+                        if (ImGui::Selectable(name.c_str(), row.Ref == config.Normals))
+                        {
+                            config.Normals = row.Ref;
+                            changed = true;
+                        }
+                    }
+                    ImGui::EndCombo();
+                }
+            }
+            integer("Grid resolution", config.Resolution);
+            integer("Maximum grid vertices", config.MaxGridVertices);
+            changed |= ImGui::InputFloat("Bounding-box padding", &config.BoundingBoxPadding);
+            changed |= ImGui::InputFloat("Normal agreement power", &config.NormalAgreementPower);
+            changed |= ImGui::InputFloat("Kernel sigma scale", &config.KernelSigmaScale);
+            ImGui::TextWrapped("Point-anchored tangent-plane field; k > 1 uses k+1 weighted "
+                               "samples. Normal estimation and surface extraction run on the CPU.");
+        }
+        else
+        {
+            changed |= ImGui::Checkbox("Mutual neighbors", &config.Mutual);
+            changed |= ImGui::InputFloat("Minimum pair distance", &config.MinDistanceEpsilon, 0, 0,
+                                         "%.6g");
+            ImGui::TextWrapped("Uses k+1 candidates before self/near-duplicate filtering. Creates "
+                               "an undirected union or mutual graph.");
+        }
+        integer("Query batch size", config.GpuQueryBatchSize);
+        ImGui::TextWrapped("Creates a separate, selectable entity in the source's current world "
+                           "position. Distances are measured in the input property's coordinates.");
+        if (changed)
+        {
+            const auto applied =
+                Runtime::ApplyEditorPointConstructionConfig(context.GeometryCommands, config);
+            Construction.ConfigDiagnostic =
+                applied.Succeeded() ? ""
+                                    : "Controls were rejected by construction config validation.";
+        }
+        if (!Construction.ConfigDiagnostic.empty())
+            ImGui::TextWrapped("%s", Construction.ConfigDiagnostic.c_str());
+        const auto readiness =
+            Runtime::PreviewEditorPointConstructionCommand(context.GeometryCommands, config);
+        if (!readiness.Ready)
+            ImGui::TextWrapped("%s", readiness.Diagnostic.c_str());
+        ImGui::BeginDisabled(!context.GeometryConfigCommandsAvailable || !readiness.Ready ||
+                             !Construction.ConfigDiagnostic.empty());
+        if (ImGui::Button("Construct"))
+        {
+            const auto applied = Runtime::ApplyEditorPointConstructionConfig(
+                context.GeometryCommands, readiness.Resolved);
+            if (applied.Succeeded())
+                PublishCommandResult(
+                    Construction.LastResult,
+                    Runtime::ApplyEditorConfiguredPointConstruction(context.GeometryCommands),
+                    context.MethodResultSinks.PointConstruction);
+            else
+                Construction.ConfigDiagnostic = "Construction config was rejected.";
+        }
+        ImGui::EndDisabled();
+        if (Construction.LastResult)
+        {
+            const auto& result = *Construction.LastResult;
+            ImGui::Separator();
+            ImGui::Text("Status: %s", Runtime::DebugNameForEditorCommandStatus(result.Status));
+            ImGui::Text("Requested: %s; ran: %s", Runtime::ToString(result.RequestedBackend),
+                        result.ActualBackend.c_str());
+            ImGui::Text("Input samples / queries: %zu / %zu", result.InputCount, result.QueryCount);
+            ImGui::Text("Output vertices / edges / faces: %zu / %zu / %zu",
+                        result.OutputVertexCount, result.OutputEdgeCount, result.OutputFaceCount);
+            ImGui::Text("GPU batches: %zu; cache reused: %s", result.GpuQueryBatches,
+                        result.IndexReused ? "yes" : "no");
+            ImGui::Text("CPU %.3f ms; GPU batch latency %.3f ms", result.CpuComputeMilliseconds,
+                        result.GpuNeighborhoodMilliseconds);
+            ImGui::TextWrapped("%s", result.Message.c_str());
+            DrawDismissLastResultButton(
+                "Dismiss##Construction", Construction.LastResult,
+                Runtime::EditorGeometryProcessingResultSlot::PointConstruction, context);
         }
         ImGui::End();
     }

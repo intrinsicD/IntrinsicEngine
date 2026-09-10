@@ -548,8 +548,8 @@ sessions:
   date: '2026-09-10'
   summary: Completed sequential spatial integrations through LOP with CPU/Vulkan tests, shared neighborhoods and
     explicit remaining Framework24 work.
-  turn_count: 2
-  events_count: 13
+  turn_count: 3
+  events_count: 16
   claims_touched:
   - C83
   - C84
@@ -559,4 +559,5 @@ sessions:
   - C88
   - C89
   - C90
+  - C91
   open_threads: 12

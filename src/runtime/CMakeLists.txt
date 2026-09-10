@@ -30,6 +30,7 @@ target_sources(${target_name}
         Modules/KeypointAnalysis/Runtime.KeypointAnalysisConfig.cppm
         Modules/DescriptorAnalysis/Runtime.DescriptorAnalysisConfig.cppm
         Modules/DensityWeight/Runtime.DensityWeightConfig.cppm
+        Modules/PointConstruction/Runtime.PointConstructionConfig.cppm
         Modules/NormalEstimation/Runtime.NormalEstimationConfig.cppm
         Modules/Registration/Runtime.RegistrationConfig.cppm
         Modules/Parameterization/Runtime.ParameterizationConfig.cppm
@@ -132,6 +133,7 @@ target_sources(${target_name}
         Modules/KeypointAnalysis/Runtime.KeypointAnalysisConfig.cpp
         Modules/DescriptorAnalysis/Runtime.DescriptorAnalysisConfig.cpp
         Modules/DensityWeight/Runtime.DensityWeightConfig.cpp
+        Modules/PointConstruction/Runtime.PointConstructionConfig.cpp
         Editor/Operations/Runtime.GeometryProcessingOperations.Outliers.cpp
         Editor/Operations/Runtime.GeometryProcessingOperations.Density.cpp
         Editor/Operations/Runtime.GeometryProcessingOperations.Spacing.cpp
@@ -140,6 +142,7 @@ target_sources(${target_name}
         Editor/Operations/Runtime.GeometryProcessingOperations.Keypoints.cpp
         Editor/Operations/Runtime.GeometryProcessingOperations.Descriptors.cpp
         Editor/Operations/Runtime.GeometryProcessingOperations.DensityWeights.cpp
+        Editor/Operations/Runtime.GeometryProcessingOperations.Construction.cpp
         Editor/Operations/Runtime.GeometryProcessingOperations.RadiusRows.cpp
         Modules/NormalEstimation/Runtime.NormalEstimationConfig.cpp
         Editor/Operations/Runtime.GeometryProcessingOperations.Normals.cpp

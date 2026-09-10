@@ -2509,6 +2509,47 @@ namespace Extrinsic::Runtime
             return std::nullopt;
         return GetDensityWeightConfig(context.EngineConfigControlState->ActiveConfig);
     }
+    RuntimeEngineConfigApplyResult ApplyEditorPointConstructionConfig(
+        const EditorGeometryProcessingContext& context, const PointConstructionConfig& config,
+        std::string sourceId)
+    {
+        RuntimeEngineConfigApplyResult result{
+            .Status = RuntimeEngineConfigApplyStatus::Rejected,
+            .Source = RuntimeConfigControlSource::Editor,
+        };
+        const auto validation = ValidatePointConstructionConfigSection(
+            SerializePointConstructionConfig(config), {}, kPointConstructionConfigSectionName);
+        if (!validation.Usable())
+        {
+            result.LoadResult.Diagnostics = validation.Diagnostics;
+            return result;
+        }
+        if (context.EngineConfigControlState == nullptr || !context.PreviewEngineConfigDocument ||
+            !context.ApplyEngineConfigHotSubset || !context.EngineConfigCommandsAvailable)
+        {
+            return result;
+        }
+
+        Core::Config::EngineConfig candidate = context.EngineConfigControlState->ActiveConfig;
+        SetPointConstructionConfig(candidate, config);
+        if (sourceId.empty())
+        {
+            sourceId = std::string{kPointConstructionConfigSectionName};
+        }
+        result.LoadResult = context.PreviewEngineConfigDocument(
+            Core::Config::SerializeEngineConfig(candidate), sourceId);
+        if (!Core::Config::IsConfigUsable(result.LoadResult))
+            return result;
+        return context.ApplyEngineConfigHotSubset(result.LoadResult);
+    }
+
+    std::optional<PointConstructionConfig> GetEditorPointConstructionConfig(
+        const EditorGeometryProcessingContext& context)
+    {
+        if (context.EngineConfigControlState == nullptr)
+            return std::nullopt;
+        return GetPointConstructionConfig(context.EngineConfigControlState->ActiveConfig);
+    }
 
 
 }

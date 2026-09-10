@@ -1,0 +1,20 @@
+[733/752] Scanning /home/alex/Documents/IntrinsicEngine/src/runtime/GeometryIntegration/Runtime.VertexChannelStreams.cppm for CXX dependencies
+[734/752] Scanning /home/alex/Documents/IntrinsicEngine/src/runtime/Visualization/Runtime.VisualizationRecipes.cppm for CXX dependencies
+[735/752] Scanning /home/alex/Documents/IntrinsicEngine/src/runtime/Config/internal/Runtime.FeatureConfigCodecs.Detail.cppm for CXX dependencies
+[736/752] Scanning /home/alex/Documents/IntrinsicEngine/src/runtime/Editor/internal/Runtime.EditorFeatures.Detail.cppm for CXX dependencies
+[737/752] Scanning /home/alex/Documents/IntrinsicEngine/src/runtime/Editor/internal/Runtime.EditorWorkspaceAttachment.Detail.cppm for CXX dependencies
+[738/752] Scanning /home/alex/Documents/IntrinsicEngine/src/runtime/AssetWorkflow/Runtime.AssetWorkflowGeometryMaterialization.cppm for CXX dependencies
+[739/752] Scanning /home/alex/Documents/IntrinsicEngine/src/runtime/AssetWorkflow/Runtime.AssetWorkflowImportExecutor.cppm for CXX dependencies
+[740/752] Scanning /home/alex/Documents/IntrinsicEngine/src/runtime/AssetWorkflow/Runtime.AssetWorkflowModelTextureDecode.cppm for CXX dependencies
+[741/752] Scanning /home/alex/Documents/IntrinsicEngine/src/runtime/AssetWorkflow/Runtime.AssetWorkflowRecipePolicies.cppm for CXX dependencies
+[742/752] Scanning /home/alex/Documents/IntrinsicEngine/src/runtime/AssetWorkflow/Runtime.AssetWorkflowModelMaterialization.cppm for CXX dependencies
+[743/752] Scanning /home/alex/Documents/IntrinsicEngine/src/runtime/GeometryIntegration/Runtime.GeometryPlanBuilders.cppm for CXX dependencies
+[744/752] Scanning /home/alex/Documents/IntrinsicEngine/src/runtime/AssetWorkflow/Runtime.AssetWorkflowTextureResidency.cppm for CXX dependencies
+[745/752] Generating CXX dyndep file tests/CMakeFiles/TestSupportObjs.dir/CXX.dd
+[746/752] Scanning /home/alex/Documents/IntrinsicEngine/src/runtime/Rendering/Runtime.RenderExtraction.Internal.cpp for CXX dependencies
+[747/752] Scanning /home/alex/Documents/IntrinsicEngine/tests/integration/graphics/Test.PointLBVHGpuSmoke.cpp for CXX dependencies
+[748/752] Scanning /home/alex/Documents/IntrinsicEngine/tests/integration/graphics/Test.PointConstructionGpuSmoke.cpp for CXX dependencies
+[749/752] Generating CXX dyndep file src/runtime/CMakeFiles/ExtrinsicRuntime.dir/CXX.dd
+[750/752] Generating CXX dyndep file tests/CMakeFiles/PointLBVHGpuTestObjs.dir/CXX.dd
+[751/752] Building CXX object tests/CMakeFiles/PointLBVHGpuTestObjs.dir/integration/graphics/Test.PointConstructionGpuSmoke.cpp.o
+[752/752] Linking CXX executable bin/IntrinsicPointLBVHGpuTests

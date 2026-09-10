@@ -1,0 +1,66 @@
+Internal ctest changing into directory: /home/alex/Documents/IntrinsicEngine/build/ci
+Test project /home/alex/Documents/IntrinsicEngine/build/ci
+      Start 1612: RuntimeGraphKNN.ReturnsNulloptForDegenerateInputs
+ 1/28 Test #1612: RuntimeGraphKNN.ReturnsNulloptForDegenerateInputs ...............................   Passed    0.01 sec
+      Start 1613: RuntimeGraphKNN.UnionConnectivityBuildsSymmetricNeighborhoodGraph
+ 2/28 Test #1613: RuntimeGraphKNN.UnionConnectivityBuildsSymmetricNeighborhoodGraph ...............   Passed    0.01 sec
+      Start 1614: RuntimeGraphKNN.MutualConnectivityFiltersNonReciprocalNeighbors
+ 3/28 Test #1614: RuntimeGraphKNN.MutualConnectivityFiltersNonReciprocalNeighbors .................   Passed    0.01 sec
+      Start 1615: RuntimeGraphKNN.CoincidentPointsAreRejectedByDistanceEpsilon
+ 4/28 Test #1615: RuntimeGraphKNN.CoincidentPointsAreRejectedByDistanceEpsilon ....................   Passed    0.01 sec
+      Start 1616: RuntimeGraphKNN.BuildFromIndicesCreatesExpectedGraph
+ 5/28 Test #1616: RuntimeGraphKNN.BuildFromIndicesCreatesExpectedGraph ............................   Passed    0.01 sec
+      Start 1617: RuntimeGraphKNN.BuildFromIndicesRejectsInvalidAndCoincidentPairs
+ 6/28 Test #1617: RuntimeGraphKNN.BuildFromIndicesRejectsInvalidAndCoincidentPairs ................   Passed    0.01 sec
+      Start 1618: RuntimeGraphKNN.OctreeBuilderMatchesBruteForceNeighborSets
+ 7/28 Test #1618: RuntimeGraphKNN.OctreeBuilderMatchesBruteForceNeighborSets ......................   Passed    0.01 sec
+      Start 1916: SurfaceReconstruction.EmptyPointsReturnsNullopt
+ 8/28 Test #1916: SurfaceReconstruction.EmptyPointsReturnsNullopt .................................   Passed    0.01 sec
+      Start 1917: SurfaceReconstruction.TooFewPointsReturnsNullopt
+ 9/28 Test #1917: SurfaceReconstruction.TooFewPointsReturnsNullopt ................................   Passed    0.01 sec
+      Start 1918: SurfaceReconstruction.MismatchedNormalsReturnsNullopt
+10/28 Test #1918: SurfaceReconstruction.MismatchedNormalsReturnsNullopt ...........................   Passed    0.01 sec
+      Start 1919: SurfaceReconstruction.NoNormalsAndNoEstimationReturnsNullopt
+11/28 Test #1919: SurfaceReconstruction.NoNormalsAndNoEstimationReturnsNullopt ....................   Passed    0.01 sec
+      Start 1920: SurfaceReconstruction.ZeroResolutionReturnsNullopt
+12/28 Test #1920: SurfaceReconstruction.ZeroResolutionReturnsNullopt ..............................   Passed    0.01 sec
+      Start 1921: SurfaceReconstruction.InvalidNormalsAreRejected
+13/28 Test #1921: SurfaceReconstruction.InvalidNormalsAreRejected .................................   Passed    0.06 sec
+      Start 1922: SurfaceReconstruction.AllInvalidNormalsReturnNullopt
+14/28 Test #1922: SurfaceReconstruction.AllInvalidNormalsReturnNullopt ............................   Passed    0.01 sec
+      Start 1923: SurfaceReconstruction.SphereWithProvidedNormals
+15/28 Test #1923: SurfaceReconstruction.SphereWithProvidedNormals .................................   Passed    0.12 sec
+      Start 1924: SurfaceReconstruction.SphereWithEstimatedNormals
+16/28 Test #1924: SurfaceReconstruction.SphereWithEstimatedNormals ................................   Passed    0.13 sec
+      Start 1925: SurfaceReconstruction.SphereWithWeightedDistance
+17/28 Test #1925: SurfaceReconstruction.SphereWithWeightedDistance ................................   Passed    0.30 sec
+      Start 1926: SurfaceReconstruction.OutputMeshHasVerticesAndFaces
+18/28 Test #1926: SurfaceReconstruction.OutputMeshHasVerticesAndFaces .............................   Passed    0.06 sec
+      Start 1927: SurfaceReconstruction.HigherResolutionMoreDetail
+19/28 Test #1927: SurfaceReconstruction.HigherResolutionMoreDetail ................................   Passed    0.24 sec
+      Start 1928: SurfaceReconstruction.SphereReconstructionApproximatesRadius
+20/28 Test #1928: SurfaceReconstruction.SphereReconstructionApproximatesRadius ....................   Passed    0.22 sec
+      Start 1929: SurfaceReconstruction.AcceptsBorrowedSpanInput
+21/28 Test #1929: SurfaceReconstruction.AcceptsBorrowedSpanInput ..................................   Passed    0.01 sec
+      Start 1930: PointConstruction.PreparedFieldMatchesLegacyReconstructionAndCpuLbvh
+22/28 Test #1930: PointConstruction.PreparedFieldMatchesLegacyReconstructionAndCpuLbvh ............   Passed    0.11 sec
+      Start 1931: PointConstruction.PlaneFieldRetainsSignedDistanceAndWeightedExtraCandidate
+23/28 Test #1931: PointConstruction.PlaneFieldRetainsSignedDistanceAndWeightedExtraCandidate ......   Passed    0.01 sec
+      Start 1932: PointConstruction.SuppliedFieldRejectsMalformedAndUnorderedRows
+24/28 Test #1932: PointConstruction.SuppliedFieldRejectsMalformedAndUnorderedRows .................   Passed    0.01 sec
+      Start 1933: PointConstruction.NearestTieUsesSuppliedSourceIdentity
+25/28 Test #1933: PointConstruction.NearestTieUsesSuppliedSourceIdentity ..........................   Passed    0.01 sec
+      Start 1934: PointConstruction.PreparationPreservesFilteringAndRejectsUnsafeGrid
+26/28 Test #1934: PointConstruction.PreparationPreservesFilteringAndRejectsUnsafeGrid .............   Passed    0.01 sec
+      Start 1935: PointConstruction.GraphNeighborhoodsPreserveUnionMutualAndDegenerateFiltering
+27/28 Test #1935: PointConstruction.GraphNeighborhoodsPreserveUnionMutualAndDegenerateFiltering ...   Passed    0.01 sec
+      Start 1936: PointConstruction.MalformedGraphRowsDoNotDestroyExistingGraph
+28/28 Test #1936: PointConstruction.MalformedGraphRowsDoNotDestroyExistingGraph ...................   Passed    0.01 sec
+
+100% tests passed, 0 tests failed out of 28
+
+Label Time Summary:
+geometry    =   1.42 sec*proc (28 tests)
+unit        =   1.42 sec*proc (28 tests)
+
+Total Test time (real) =   2.52 sec

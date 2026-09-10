@@ -1,0 +1,4 @@
+[source-documentation] files=5 interfaces=3 cpp=4 readmes=1 errors=0 review=13
+[source-documentation] rules: declaration-comment=13
+HOTSPOT src/geometry/Geometry.Graph.Utils.cppm findings=9 errors=0 review=9
+HOTSPOT src/geometry/Geometry.SurfaceReconstruction.cppm findings=4 errors=0 review=4

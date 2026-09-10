@@ -1,0 +1,90 @@
+{
+  "attempt_id": "attempt-001",
+  "backend": "gpu_vulkan_compute",
+  "benchmark_id": "geometry.point_lbvh.point_construction_runtime_smoke",
+  "claim_eligible": false,
+  "commit": "local-dev",
+  "config_digest": "066f95530a10928dbd77445a8c07547627a8795bef5468783787951eb9fcf69d",
+  "dataset": "builtin.point_construction.eight_domains.sphere34",
+  "diagnostics": {
+    "cpu_geometry_extraction": true,
+    "cpu_reference_total_ms": [
+      3930.003264,
+      4062.2074690000004,
+      3935.8054920000004,
+      81.962353,
+      87.719451
+    ],
+    "foreground_pixels": [
+      2274,
+      2304,
+      2304,
+      183,
+      123
+    ],
+    "mode": "smoke",
+    "runner": "IntrinsicPointLBVHGpuTests",
+    "vulkan_total_ms": [
+      22199.080825,
+      22175.055295,
+      22175.77666,
+      6923.387486,
+      6925.616243
+    ]
+  },
+  "execution_status": "passed",
+  "manifest": {
+    "path": "benchmarks/geometry/manifests/point_lbvh_point_construction_runtime_smoke.yaml",
+    "sha256": "4ca21c08a7d20a3928c02c07a72ea850bf6d86c1ac94f0fa8735e528b6662fc6"
+  },
+  "method": "geometry.point_construction",
+  "metrics": {
+    "quality_error_linf": 0.0,
+    "runtime_ms": 22175.77666
+  },
+  "resolved_params": {
+    "additional_checks": "nearest_hoppe_union_graph_mutual_graph_and_generated_pixels",
+    "capability": "gpu_vulkan",
+    "gpu_query_batch_size": 73,
+    "intent": "smoke",
+    "k_neighbors": 3,
+    "measured_iterations": 1,
+    "method": "hoppe",
+    "resolution": 6,
+    "timed_scope": "eight_domain_weighted_hoppe_requests_through_publication",
+    "warmup_iterations": 1
+  },
+  "run_id": "run-20260910-point-construction",
+  "schema_version": 2,
+  "source": {
+    "revision": "local-dev",
+    "state": "dirty_worktree"
+  },
+  "status": "passed",
+  "threshold_disposition": [
+    {
+      "limit": 60000,
+      "metric": "runtime_ms",
+      "observed": 22175.77666,
+      "operator": "<=",
+      "passed": true,
+      "threshold": "smoke_runtime_ms_max"
+    },
+    {
+      "limit": 0.0001,
+      "metric": "quality_error_linf",
+      "observed": 0.0,
+      "operator": "<=",
+      "passed": true,
+      "threshold": "quality_error_linf_max"
+    }
+  ],
+  "thresholds": {
+    "quality_error_linf_max": 0.0001,
+    "smoke_runtime_ms_max": 60000
+  },
+  "warmup_policy": {
+    "measured_iterations": 1,
+    "warmup_iterations": 1
+  }
+}

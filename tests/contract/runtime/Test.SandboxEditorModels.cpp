@@ -2287,7 +2287,7 @@ TEST(SandboxEditorUi, GeometrySourcesReportProcessingCapabilitiesAndStableEntrie
 
     const std::vector<Runtime::EditorGeometryProcessingEntry> meshEntries =
         Runtime::ResolveEditorGeometryProcessingEntries(meshCaps);
-    ASSERT_EQ(meshEntries.size(), 17u);
+    ASSERT_EQ(meshEntries.size(), 19u);
     EXPECT_EQ(meshEntries[0].Algorithm, Algorithm::KMeans);
     EXPECT_EQ(meshEntries[1].Algorithm, Algorithm::NormalEstimation);
     EXPECT_EQ(meshEntries[2].Algorithm, Algorithm::MeshDenoise);
@@ -2298,10 +2298,12 @@ TEST(SandboxEditorUi, GeometrySourcesReportProcessingCapabilitiesAndStableEntrie
     EXPECT_EQ(meshEntries[7].Algorithm, Algorithm::VectorHeat);
     EXPECT_EQ(meshEntries[8].Algorithm, Algorithm::Parameterization);
     EXPECT_EQ(meshEntries[9].Algorithm, Algorithm::ConvexHull);
-    EXPECT_EQ(meshEntries[10].Algorithm, Algorithm::BooleanCSG);
-    EXPECT_EQ(meshEntries[11].Algorithm, Algorithm::Remeshing);
-    EXPECT_EQ(meshEntries[15].Algorithm, Algorithm::Repair);
-    EXPECT_EQ(meshEntries[16].Algorithm, Algorithm::Geodesics);
+    EXPECT_EQ(meshEntries[10].Algorithm, Algorithm::SurfaceReconstruction);
+    EXPECT_EQ(meshEntries[11].Algorithm, Algorithm::KnnGraphConstruction);
+    EXPECT_EQ(meshEntries[12].Algorithm, Algorithm::BooleanCSG);
+    EXPECT_EQ(meshEntries[13].Algorithm, Algorithm::Remeshing);
+    EXPECT_EQ(meshEntries[17].Algorithm, Algorithm::Repair);
+    EXPECT_EQ(meshEntries[18].Algorithm, Algorithm::Geodesics);
 
     const std::vector<Domain> meshKMeans =
         Runtime::GetAvailableEditorKMeansDomains(registry, mesh);
@@ -2353,11 +2355,13 @@ TEST(SandboxEditorUi, GeometrySourcesReportProcessingCapabilitiesAndStableEntrie
         Domain::MeshVertices));
     const std::vector<Runtime::EditorGeometryProcessingEntry> graphEntries =
         Runtime::ResolveEditorGeometryProcessingEntries(registry, graph);
-    ASSERT_EQ(graphEntries.size(), 4u);
+    ASSERT_EQ(graphEntries.size(), 6u);
     EXPECT_EQ(graphEntries[0].Algorithm, Algorithm::KMeans);
     EXPECT_EQ(graphEntries[1].Algorithm, Algorithm::NormalEstimation);
     EXPECT_EQ(graphEntries[2].Algorithm, Algorithm::ProgressivePoissonSampling);
     EXPECT_EQ(graphEntries[3].Algorithm, Algorithm::ShortestPath);
+    EXPECT_EQ(graphEntries[4].Algorithm, Algorithm::SurfaceReconstruction);
+    EXPECT_EQ(graphEntries[5].Algorithm, Algorithm::KnnGraphConstruction);
     const std::vector<Domain> graphKMeans =
         Runtime::GetAvailableEditorKMeansDomains(registry, graph);
     ASSERT_EQ(graphKMeans.size(), 1u);
@@ -2399,12 +2403,13 @@ TEST(SandboxEditorUi, GeometrySourcesReportProcessingCapabilitiesAndStableEntrie
         Domain::MeshVertices));
     const std::vector<Runtime::EditorGeometryProcessingEntry> cloudEntries =
         Runtime::ResolveEditorGeometryProcessingEntries(registry, cloud);
-    ASSERT_EQ(cloudEntries.size(), 11u);
+    ASSERT_EQ(cloudEntries.size(), 12u);
     EXPECT_EQ(cloudEntries[0].Algorithm, Algorithm::KMeans);
     EXPECT_EQ(cloudEntries[1].Algorithm, Algorithm::NormalEstimation);
     EXPECT_EQ(cloudEntries[2].Algorithm, Algorithm::Registration);
     EXPECT_EQ(cloudEntries[6].Algorithm, Algorithm::ProgressivePoissonSampling);
     EXPECT_EQ(cloudEntries[10].Algorithm, Algorithm::SurfaceReconstruction);
+    EXPECT_EQ(cloudEntries[11].Algorithm, Algorithm::KnnGraphConstruction);
     const std::vector<Domain> cloudKMeans =
         Runtime::GetAvailableEditorKMeansDomains(registry, cloud);
     ASSERT_EQ(cloudKMeans.size(), 1u);

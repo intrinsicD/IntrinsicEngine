@@ -3821,3 +3821,15 @@ observations:
     promoted_to: logic/claims.md:C90
     crystallized_via: artifact-commitment
     stale: false
+
+  - id: O223
+    timestamp: '2026-09-10T22:38:21+02:00'
+    provenance: ai-executed
+    content: Bounded supplied-normal surfaces and kNN graphs retain reference output through shared CPU and actual Vulkan neighborhoods, with generated pixels and failure guards.
+    context: N540 adopts the verified source into the construction workflow; no user endorsement of numerical results or speedup is inferred.
+    potential_type: claim
+    bound_to: [N539, N540]
+    promoted: true
+    promoted_to: logic/claims.md:C91
+    crystallized_via: artifact-commitment
+    stale: false

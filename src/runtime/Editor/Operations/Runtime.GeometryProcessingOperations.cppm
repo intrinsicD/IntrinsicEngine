@@ -46,6 +46,7 @@ export import Extrinsic.Runtime.BilateralFilterConfig;
 export import Extrinsic.Runtime.KeypointAnalysisConfig;
 export import Extrinsic.Runtime.DescriptorAnalysisConfig;
 export import Extrinsic.Runtime.DensityWeightConfig;
+export import Extrinsic.Runtime.PointConstructionConfig;
 import Extrinsic.Runtime.SpatialIndexCache;
 export import Geometry.Geodesic;
 export import Extrinsic.Runtime.PointCloudConsolidationConfig;
@@ -142,6 +143,7 @@ export namespace Extrinsic::Runtime
         RadiusOutlierRemoval,
         ProgressivePoissonSampling,
         Geodesics,
+        KnnGraphConstruction,
     };
 
     struct EditorGeometryProcessingCapabilities
@@ -967,6 +969,25 @@ export namespace Extrinsic::Runtime
         std::string Diagnostic{};
         DensityWeightConfig Resolved{};
     };
+    struct EditorPointConstructionResult
+    {
+        EditorCommandStatus Status{EditorCommandStatus::NoChange};
+        PointConstructionMethod Method{PointConstructionMethod::Hoppe};
+        PointConstructionBackend RequestedBackend{PointConstructionBackend::CpuReference};
+        std::string ActualBackend{}, Message{};
+        std::uint32_t OutputEntityId{};
+        std::size_t InputCount{}, QueryCount{}, OutputVertexCount{}, OutputEdgeCount{}, OutputFaceCount{};
+        bool IndexReused{};
+        std::size_t GpuQueryBatches{};
+        double GpuNeighborhoodMilliseconds{}, CpuComputeMilliseconds{};
+        [[nodiscard]] bool Succeeded() const noexcept { return Status==EditorCommandStatus::Applied; }
+    };
+    struct EditorPointConstructionReadiness
+    {
+        bool Ready{};
+        std::string Diagnostic{};
+        PointConstructionConfig Resolved{};
+    };
     struct EditorKernelDensityResult
     {
         EditorCommandStatus Status{EditorCommandStatus::NoChange};
@@ -1123,6 +1144,7 @@ export namespace Extrinsic::Runtime
         KeypointAnalysis,
         DescriptorAnalysis,
         DensityWeight,
+        PointConstruction,
     };
 
     struct EditorMethodResultSinks
@@ -1149,6 +1171,7 @@ export namespace Extrinsic::Runtime
         std::function<void(EditorKeypointAnalysisResult)> KeypointAnalysis{};
         std::function<void(EditorDescriptorAnalysisResult)> DescriptorAnalysis{};
         std::function<void(EditorDensityWeightResult)> DensityWeight{};
+        std::function<void(EditorPointConstructionResult)> PointConstruction{};
     };
 
     struct EditorGeometryProcessingModel
@@ -1286,6 +1309,7 @@ export namespace Extrinsic::Runtime
         const EditorKeypointAnalysisResult* LastKeypointAnalysisResult{nullptr};
         const EditorDescriptorAnalysisResult* LastDescriptorAnalysisResult{nullptr};
         const EditorDensityWeightResult* LastDensityWeightResult{nullptr};
+        const EditorPointConstructionResult* LastPointConstructionResult{nullptr};
         const RuntimeEngineConfigControlState* EngineConfigControlState{nullptr};
         std::function<Core::Config::EngineConfigLoadResult(const std::string&, const std::string&)>
             PreviewEngineConfigDocument{};
@@ -1749,6 +1773,7 @@ export namespace Extrinsic::Runtime
         std::optional<EditorKeypointAnalysisResult> LastKeypointAnalysisResult{};
         std::optional<EditorDescriptorAnalysisResult> LastDescriptorAnalysisResult{};
         std::optional<EditorDensityWeightResult> LastDensityWeightResult{};
+        std::optional<EditorPointConstructionResult> LastPointConstructionResult{};
     };
 
     struct EditorGeometryProcessingPreparedFrame
@@ -2036,6 +2061,33 @@ export namespace Extrinsic::Runtime
     [[nodiscard]] std::optional<DensityWeightConfig> GetEditorDensityWeightConfig(
         const EditorGeometryProcessingCommands &commands);
     [[nodiscard]] EditorDensityWeightResult ApplyEditorConfiguredDensityWeight(
+        const EditorGeometryProcessingCommands &commands);
+    [[nodiscard]] EditorPointConstructionReadiness PreviewEditorPointConstructionCommand(
+        const EditorGeometryProcessingContext &context, const PointConstructionConfig &config);
+    [[nodiscard]] GeometryPropertyCatalogSnapshot GetEditorPointConstructionInputCatalog(
+        const EditorGeometryProcessingContext &context, std::uint32_t stableId);
+    [[nodiscard]] EditorPointConstructionResult ApplyEditorPointConstructionCommand(
+        const EditorGeometryProcessingContext &context, const PointConstructionConfig &config);
+    [[nodiscard]] RuntimeEngineConfigApplyResult ApplyEditorPointConstructionConfig(
+        const EditorGeometryProcessingContext &context, const PointConstructionConfig &config,
+        std::string sourceId = {});
+    [[nodiscard]] std::optional<PointConstructionConfig> GetEditorPointConstructionConfig(
+        const EditorGeometryProcessingContext &context);
+    [[nodiscard]] EditorPointConstructionResult ApplyEditorConfiguredPointConstruction(
+        const EditorGeometryProcessingContext &context);
+
+    [[nodiscard]] EditorPointConstructionReadiness PreviewEditorPointConstructionCommand(
+        const EditorGeometryProcessingCommands &commands, const PointConstructionConfig &config);
+    [[nodiscard]] GeometryPropertyCatalogSnapshot GetEditorPointConstructionInputCatalog(
+        const EditorGeometryProcessingCommands &commands, std::uint32_t stableId);
+    [[nodiscard]] EditorPointConstructionResult ApplyEditorPointConstructionCommand(
+        const EditorGeometryProcessingCommands &commands, const PointConstructionConfig &config);
+    [[nodiscard]] RuntimeEngineConfigApplyResult ApplyEditorPointConstructionConfig(
+        const EditorGeometryProcessingCommands &commands, const PointConstructionConfig &config,
+        std::string sourceId = {});
+    [[nodiscard]] std::optional<PointConstructionConfig> GetEditorPointConstructionConfig(
+        const EditorGeometryProcessingCommands &commands);
+    [[nodiscard]] EditorPointConstructionResult ApplyEditorConfiguredPointConstruction(
         const EditorGeometryProcessingCommands &commands);
 
 

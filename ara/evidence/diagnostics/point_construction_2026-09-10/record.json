@@ -1,0 +1,161 @@
+{
+  "source_state": "dirty_worktree",
+  "comparison_base": "2c9053f8971c67916d2382bdd8d7850d8d68cedc",
+  "source_sha256": {
+    "benchmarks/geometry/manifests/point_lbvh_point_construction_runtime_smoke.yaml": "4ca21c08a7d20a3928c02c07a72ea850bf6d86c1ac94f0fa8735e528b6662fc6",
+    "methods/geometry/point_construction/README.md": "cfbd3f32957ce990500815228420ea5a8645b51229b7e337fe05e82e49abd8e2",
+    "methods/geometry/point_construction/method.yaml": "6d46f3f098df1ae8fbf7e6ea5043b90e385c25db1392c7dae7aae45815096f8c",
+    "methods/geometry/point_construction/paper.md": "a87e8cfd9aa9c605869eba7515f45edd1d75ea05983c2bbf169cf62004bfe49f",
+    "methods/geometry/point_lbvh/method.yaml": "4f4f614eab768c573f1248bc9259e8e93720132e28d266805f67f99c9ffecc88",
+    "src/app/Sandbox/Editor/Sandbox.MeshProcessingPanels.cpp": "b09268b9a9b3c7dc833f3c722ff0f21b7b68e9d97f8db269f2dde7a4208ecabb",
+    "src/app/Sandbox/Sandbox.ConfigSections.cpp": "0f18ca3035c0c1a5e1453041746a685ff673e0e4673e8d70d3969a1794884cf5",
+    "src/geometry/Geometry.Graph.Utils.cpp": "a19fedc4791ff4fb863e4695313cdf410c54a1151fe5143507772bd8928d9859",
+    "src/geometry/Geometry.Graph.Utils.cppm": "c94a3ba8376b0ab737185064854409ab6fc6d54dbba94ab7423c6a8b90b7fd61",
+    "src/geometry/Geometry.SurfaceReconstruction.cpp": "321fe99f716eb49b814fa6c958a4ca20fea6c47b284601c371c164e72d1c3eda",
+    "src/geometry/Geometry.SurfaceReconstruction.cppm": "9702a21f38023116d9b1fc55991774500ccc710a5a05ffcb0706c0ff3a3f6baa",
+    "src/runtime/CMakeLists.txt": "4b985b0fb24f3e93e309fe376bf618a0c7554b591e4d7ec0546da5f469e815a4",
+    "src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Construction.cpp": "820c9421a966eda0a7df9485be900eaa58d2411208dd8e0540d0d80cc9df4356",
+    "src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Mesh.cpp": "eac2a5a43f4a052484e51baea35475ff5cbb1f51a4db491585fdd8d65f45139e",
+    "src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Public.cpp": "36e74727ff23f2c74e96f9e7d4193e75491beb9caecd5c4ae9d8995b8aa0b120",
+    "src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.cpp": "135f667af3b20bfa30f7c5e52096b3a260f03daa376006e0299d6cfca5f3c738",
+    "src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.cppm": "9898d40e292942eca680ad579ca5759d65e4ecbb3af69e57dcd69d8d1260fd9f",
+    "src/runtime/Editor/internal/Runtime.EditorFeatureContextAdapters.cpp": "c059c52ee0a53244c1b490e38826f0e80aaa921a928046eee321afa5f2784fd1",
+    "src/runtime/Editor/internal/Runtime.EditorFeatures.Detail.cppm": "5aaf9a29d876a2caf2e2e98f7cd3bf23d0bfbc3292c950ee33b2d52a8cdbb67f",
+    "src/runtime/Editor/internal/Runtime.EditorWorkspaceSession.cpp": "6f140156341c6f30afb1d09c95a0c4c754ba6ceb833fca1b2a47847a13888cb8",
+    "src/runtime/Modules/PointConstruction/Runtime.PointConstructionConfig.cpp": "a79f4393af3e45889d514d1c4746f460dfe1d58309f37843c4776ec2e2398f3f",
+    "src/runtime/Modules/PointConstruction/Runtime.PointConstructionConfig.cppm": "eb14d1af1d9a76ce8f7f9fb146d105eebed6a27dbd3e18e6a0a28dbcdd322d98",
+    "tests/CMakeLists.txt": "e54430c9c668debdab1fad778330a0cf2573f476e7c9592c565d25da3c32569c",
+    "tests/contract/runtime/Test.KernelDensityOperations.cpp": "12f51832afb9349ccb3736fe4cc04d37f00e1e6145a75f74a0e3f4d1e1ee5dba",
+    "tests/contract/runtime/Test.KeypointAnalysisOperations.cpp": "de805872683f93eb8cf8bad93a4966c8da0b63a002aeddd7810db5786c34d18a",
+    "tests/contract/runtime/Test.OutlierAnalysis.cpp": "0d13e170448e2f3bd16497b0e16cd7842a471543e28cc01fd13183d91c3caa25",
+    "tests/contract/runtime/Test.PointConstructionOperations.cpp": "578a8df83c09b437f36d14390a82138fb4483c5f4728c3be8ef2584bdac3c043",
+    "tests/contract/runtime/Test.PointSpacingOperations.cpp": "af193cf9344532b4dd85d149dba2cb2f9eddda088e513f8d5b111cd382046a55",
+    "tests/contract/runtime/Test.SandboxEditorModels.cpp": "bc59ae57234f950b55d6c9489dec221bfa4690359c474be3d2a16c40b5ad56a5",
+    "tests/integration/graphics/Test.PointConstructionGpuSmoke.cpp": "0b757af67bab9598c0a8687bd6b19231ba0e212fb56976f7cd46e813e0300c1a",
+    "tests/integration/runtime/Test.SandboxEditorPresentation.cpp": "9335af0fccadf63600efc11c36c9d928a937d2ac51808404a71048ee6806646e",
+    "tests/unit/geometry/Test.PointConstruction.cpp": "aa71f48f58fb5088f52bb05727efa5781e38a7299823e1de74614a9f9bb7dd95"
+  },
+  "environment": {
+    "compiler": "Clang 23",
+    "cpu_preset": "ci with INTRINSIC_BUILD_SANDBOX=ON",
+    "gpu_preset": "ci-vulkan",
+    "gpu_sanitizers": "ASan+UBSan; detect_leaks=0 under BUG-180",
+    "ccache": "disabled under BUG-178"
+  },
+  "cpu": {
+    "selected": 4501,
+    "passed": 4500,
+    "failed": 0,
+    "skipped": [
+      "GlfwLifecycleLsan.EngineStaticTeardownAndLeakControl"
+    ],
+    "elapsed_seconds": 111.78
+  },
+  "geometry_focused": {
+    "passed": 28,
+    "failed": 0
+  },
+  "runtime_focused": {
+    "passed": 7,
+    "failed": 0
+  },
+  "gpu": {
+    "selected": 2,
+    "passed": 2,
+    "failed": 0,
+    "skipped": 0,
+    "position_error_max": 0.0,
+    "position_tolerance": 0.0001,
+    "foreground_pixels": [
+      2274,
+      2304,
+      2304,
+      183,
+      123
+    ],
+    "elapsed_seconds": 154.81,
+    "phases": [
+      "nearest_hoppe",
+      "weighted_hoppe_warmup",
+      "weighted_hoppe_measured",
+      "union_graph",
+      "mutual_graph"
+    ],
+    "domains_per_phase": 8
+  },
+  "receipts": {
+    "cpu-ctest.log.gz": {
+      "path": "ara/evidence/diagnostics/point_construction_2026-09-10/cpu-ctest.log.gz",
+      "sha256": "b9b792840bb3850fa3e151f39911eb74a4a600755262a304f7fc9388deeb9add",
+      "uncompressed_sha256": "f3033e7b6a7090bb739d8068400fec3880c899bedb02ce6eb43df82c9cdb1a08"
+    },
+    "cpu-initial-ctest.log.gz": {
+      "path": "ara/evidence/diagnostics/point_construction_2026-09-10/cpu-initial-ctest.log.gz",
+      "sha256": "d156ac28cebf828bc3f65c1f5799298bb287d508dfabde14de910acf0d5b3dde",
+      "uncompressed_sha256": "c0edea5a46ae912c6d9607302ab6322b6abfa7ff5317fe7d8e6ea9044929985a"
+    },
+    "gpu-ctest.log": {
+      "path": "ara/evidence/diagnostics/point_construction_2026-09-10/gpu-ctest.log",
+      "sha256": "d87fdfd44a63ba50c31aca1872c4aeb4cde1f271738f7b2681f93e66ea61de24",
+      "uncompressed_sha256": "d87fdfd44a63ba50c31aca1872c4aeb4cde1f271738f7b2681f93e66ea61de24"
+    },
+    "gpu-batch-reuse-failure.log": {
+      "path": "ara/evidence/diagnostics/point_construction_2026-09-10/gpu-batch-reuse-failure.log",
+      "sha256": "13bc06840999150b5d8e68117f970e906ac1e0c985b0fd882cfb5b1136f81687",
+      "uncompressed_sha256": "13bc06840999150b5d8e68117f970e906ac1e0c985b0fd882cfb5b1136f81687"
+    },
+    "gpu-retired-token-failure.log": {
+      "path": "ara/evidence/diagnostics/point_construction_2026-09-10/gpu-retired-token-failure.log",
+      "sha256": "b491efd1d279a50b6b115099783a5fea5adeb31487e3c5a169311349489097ec",
+      "uncompressed_sha256": "b491efd1d279a50b6b115099783a5fea5adeb31487e3c5a169311349489097ec"
+    },
+    "geometry-ctest.log": {
+      "path": "ara/evidence/diagnostics/point_construction_2026-09-10/geometry-ctest.log",
+      "sha256": "0f25d1f9b169e70252a34e4c465f4320b045603026a94ae2466e6b18d2d6e96a",
+      "uncompressed_sha256": "0f25d1f9b169e70252a34e4c465f4320b045603026a94ae2466e6b18d2d6e96a"
+    },
+    "runtime-ctest.log": {
+      "path": "ara/evidence/diagnostics/point_construction_2026-09-10/runtime-ctest.log",
+      "sha256": "6412d66cd0dfcc2e37cf557d5ea29f4a952e2c476cd095cf18d4d8357bb51785",
+      "uncompressed_sha256": "6412d66cd0dfcc2e37cf557d5ea29f4a952e2c476cd095cf18d4d8357bb51785"
+    },
+    "workshop.log": {
+      "path": "ara/evidence/diagnostics/point_construction_2026-09-10/workshop.log",
+      "sha256": "a13aaae6d1530a4876f4035ae7d96c1f8cb162d9ed4212329278c2151d3dfd16",
+      "uncompressed_sha256": "a13aaae6d1530a4876f4035ae7d96c1f8cb162d9ed4212329278c2151d3dfd16"
+    },
+    "root-hygiene.log": {
+      "path": "ara/evidence/diagnostics/point_construction_2026-09-10/root-hygiene.log",
+      "sha256": "2252cd6d39c11cbc4c91a1398dc2648a85b43fe69dcc6af7f95edd641158e814",
+      "uncompressed_sha256": "2252cd6d39c11cbc4c91a1398dc2648a85b43fe69dcc6af7f95edd641158e814"
+    },
+    "source-documentation.log": {
+      "path": "ara/evidence/diagnostics/point_construction_2026-09-10/source-documentation.log",
+      "sha256": "98d7e4a2df48e5ff153fd9807ef7edf6cda6eb32fe8a02bcd218c930f48e6afa",
+      "uncompressed_sha256": "98d7e4a2df48e5ff153fd9807ef7edf6cda6eb32fe8a02bcd218c930f48e6afa"
+    },
+    "cpu-build": {
+      "path": "ara/evidence/diagnostics/point_construction_2026-09-10/cpu-build.tail.log",
+      "full_output_sha256": "e31b5d77fab8f5caa3ba646ac816555dbfa444e5d5fe7733fc1bbcacd46a7ee5"
+    },
+    "vulkan-build": {
+      "path": "ara/evidence/diagnostics/point_construction_2026-09-10/vulkan-build.tail.log",
+      "full_output_sha256": "83cf76f1605e0fd520b15c57f8a745a98553219ad46fddb103ccd56d51c1d9fc"
+    }
+  },
+  "resolved_findings": [
+    "Mesh materialization requires the native v:point payload property.",
+    "Short final GPU batches require fresh storage when query cardinality changes.",
+    "GPU fixture tokens can already be reaped after downstream finalization.",
+    "CTest smoke budgets are explicit 180 seconds; no parity or pixel assertion removed.",
+    "Construction menu count updated; BUG-186 aligns four pre-existing appearance expectations with 2c9053f89."
+  ],
+  "limitations": [
+    "Bounded supplied-normal fixtures only; no general-input or all-interleaving proof.",
+    "GPU provides neighborhoods; field arithmetic, normal initialization, graph assembly, Marching Cubes and render-attribute work remain CPU.",
+    "Dirty Debug smoke is not a performance comparison or default-change justification.",
+    "Full isolated CPU sanitizer suites were not rerun; no LeakSanitizer or leak-freedom claim.",
+    "Strict local root hygiene still reports pre-existing .agents metadata under BUG-177."
+  ],
+  "benchmark_result": "ara/evidence/diagnostics/point_construction_2026-09-10/results/benchmark.json"
+}

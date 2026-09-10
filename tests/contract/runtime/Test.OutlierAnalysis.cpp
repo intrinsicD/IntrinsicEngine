@@ -23,6 +23,7 @@ import Extrinsic.Runtime.EngineConfigControl;
 import Extrinsic.ECS.Scene.Registry;
 import Extrinsic.ECS.Components.GeometrySources;
 import Extrinsic.ECS.Components.GeometrySourcesPopulate;
+import Extrinsic.Graphics.Component.VisualizationConfig;
 import Geometry.HalfedgeMesh;
 import Geometry.Graph;
 
@@ -292,12 +293,41 @@ TEST(OutlierAnalysis, MaskAndScoreUseSharedVisualizationRecipesOnEveryDomain)
         context.VisualizationRecipes.SetRecipe=[&](std::uint32_t,R::VisualizationRecipe r){stored=std::move(r);};
         context.VisualizationRecipes.ClearRecipe=[&](std::uint32_t){stored.reset();};
         ASSERT_TRUE(R::ApplyEditorOutlierAnalysisCommand(context,config).Succeeded());
-        EXPECT_EQ(R::ApplyEditorVisualizationRecipeCommand(context,{.StableEntityId=config.StableEntityId,
-            .Recipe={.Data=R::LabelVisualizationRecipe{.Source=config.Mask,.OutputName="mask_colors"}}}),R::EditorCommandStatus::Applied);
-        ASSERT_TRUE(stored);ASSERT_TRUE(std::get_if<R::LabelVisualizationRecipe>(&stored->Data));
-        EXPECT_EQ(R::ApplyEditorVisualizationRecipeCommand(context,{.StableEntityId=config.StableEntityId,
-            .Recipe={.Data=R::ScalarVisualizationRecipe{.Source=config.Score,.OutputName="score_colors"}}}),R::EditorCommandStatus::Applied);
-        ASSERT_TRUE(stored);ASSERT_TRUE(std::get_if<R::ScalarVisualizationRecipe>(&stored->Data));
+        const bool half = D(d)==D::MeshHalfedge || D(d)==D::GraphHalfedge;
+        const auto maskStatus = R::ApplyEditorVisualizationRecipeCommand(context,
+            {.StableEntityId=config.StableEntityId,
+             .Recipe={.Data=R::LabelVisualizationRecipe{.Source=config.Mask,.OutputName="mask_colors"}}});
+        EXPECT_FALSE(stored);
+        if (half)
+            EXPECT_EQ(maskStatus,R::EditorCommandStatus::InvalidVisualizationProperty);
+        else
+        {
+            EXPECT_EQ(maskStatus,R::EditorCommandStatus::Applied);
+            const auto* overrides=scene.Raw().try_get<Extrinsic::Graphics::Components::VisualizationLaneOverrides>(entity);
+            ASSERT_NE(overrides,nullptr);
+            const auto& lane=D(d)==D::MeshVertex || D(d)==D::MeshFace ? overrides->Surface
+                : D(d)==D::PointCloudPoint ? overrides->Points : overrides->Edges;
+            ASSERT_TRUE(lane);
+            EXPECT_EQ(lane->ColorBufferName,config.Mask.Name);
+        }
+        const auto shown = R::ApplyEditorVisualizationRecipeCommand(context,
+            {.StableEntityId=config.StableEntityId,
+             .Recipe={.Data=R::ScalarVisualizationRecipe{.Source=config.Score,.OutputName="score_colors"}}});
+        EXPECT_FALSE(stored);
+        if (half)
+            EXPECT_EQ(shown,R::EditorCommandStatus::InvalidVisualizationProperty);
+        else
+        {
+            EXPECT_EQ(shown,R::EditorCommandStatus::Applied);
+            const auto* overrides=scene.Raw().try_get<Extrinsic::Graphics::Components::VisualizationLaneOverrides>(entity);
+            ASSERT_NE(overrides,nullptr);
+            const auto& lane=D(d)==D::MeshVertex || D(d)==D::MeshFace ? overrides->Surface
+                : D(d)==D::PointCloudPoint ? overrides->Points : overrides->Edges;
+            ASSERT_TRUE(lane);
+            EXPECT_EQ(lane->Source,Extrinsic::Graphics::Components::VisualizationConfig::ColorSource::ScalarField);
+            EXPECT_EQ(lane->ScalarFieldName,config.Score.Name);
+        }
+
     }
 }
 TEST(OutlierAnalysis, RadiusBoundaryAndStatisticalMinimumMatchAcrossCpuBackends)

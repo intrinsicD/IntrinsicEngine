@@ -291,6 +291,7 @@ struct EditorJobResult { std::string Diagnostic{}; };
             case EditorGeometryProcessingAlgorithm::ShortestPath:
             case EditorGeometryProcessingAlgorithm::ConvexHull:
             case EditorGeometryProcessingAlgorithm::SurfaceReconstruction:
+            case EditorGeometryProcessingAlgorithm::KnnGraphConstruction:
             case EditorGeometryProcessingAlgorithm::VectorHeat:
             case EditorGeometryProcessingAlgorithm::Parameterization:
             case EditorGeometryProcessingAlgorithm::BooleanCSG:
@@ -8877,7 +8878,9 @@ GetEditorGeometryProcessingMenuItems(
         case EditorGeometryProcessingAlgorithm::ConvexHull:
             return Domain::MeshVertices | Domain::PointCloudPoints;
         case EditorGeometryProcessingAlgorithm::SurfaceReconstruction:
-            return Domain::PointCloudPoints;
+        case EditorGeometryProcessingAlgorithm::KnnGraphConstruction:
+            return Domain::MeshVertices | Domain::MeshEdges | Domain::MeshHalfedges | Domain::MeshFaces |
+                   Domain::GraphVertices | Domain::GraphEdges | Domain::GraphHalfedges | Domain::PointCloudPoints;
         case EditorGeometryProcessingAlgorithm::VectorHeat:
             return Domain::MeshVertices;
         case EditorGeometryProcessingAlgorithm::Parameterization:
@@ -8940,7 +8943,7 @@ GetEditorGeometryProcessingCapabilities(
 ResolveEditorGeometryProcessingEntries(
         const EditorGeometryProcessingCapabilities capabilities)
     {
-        static constexpr std::array<EditorGeometryProcessingAlgorithm, 24> kAlgorithmOrder{
+        static constexpr std::array<EditorGeometryProcessingAlgorithm, 25> kAlgorithmOrder{
             EditorGeometryProcessingAlgorithm::KMeans,
             EditorGeometryProcessingAlgorithm::NormalEstimation,
             EditorGeometryProcessingAlgorithm::MeshDenoise,
@@ -8958,6 +8961,7 @@ ResolveEditorGeometryProcessingEntries(
             EditorGeometryProcessingAlgorithm::Parameterization,
             EditorGeometryProcessingAlgorithm::ConvexHull,
             EditorGeometryProcessingAlgorithm::SurfaceReconstruction,
+            EditorGeometryProcessingAlgorithm::KnnGraphConstruction,
             EditorGeometryProcessingAlgorithm::BooleanCSG,
             EditorGeometryProcessingAlgorithm::Remeshing,
             EditorGeometryProcessingAlgorithm::Simplification,
@@ -9063,6 +9067,8 @@ ResolveEditorGeometryProcessingEntries(
             return "Convex Hull";
         case EditorGeometryProcessingAlgorithm::SurfaceReconstruction:
             return "Surface Reconstruction";
+        case EditorGeometryProcessingAlgorithm::KnnGraphConstruction:
+            return "kNN Graph Construction";
         case EditorGeometryProcessingAlgorithm::VectorHeat:
             return "Vector Heat Method";
         case EditorGeometryProcessingAlgorithm::Parameterization:

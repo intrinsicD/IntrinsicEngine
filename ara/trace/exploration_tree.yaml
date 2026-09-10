@@ -11821,3 +11821,22 @@ tree:
     alternatives: []
     evidence: [docs/architecture/spatial-index-consumers.md, tasks/done/RUNTIME-229-lop-framed-lbvh-projection.md]
     status: resolved
+
+  - id: N539
+    type: experiment
+    title: Verify point construction across shared CPU and Vulkan neighborhoods
+    provenance: ai-executed
+    timestamp: '2026-09-10T22:38:21+02:00'
+    result: 4500 CPU passes plus one expected skip and both actual Vulkan cases pass. Output-position error is zero on the bounded eight-domain fixtures; generated pixels and stale/cancel/partial-submission guards pass. Initial batch-reuse and fixture failures remain recorded.
+    evidence: [ara/evidence/diagnostics/point_construction_2026-09-10/record.json, ara/evidence/tables/point_construction_verification_2026-09-10.md]
+    status: resolved
+
+  - id: N540
+    type: decision
+    title: Reuse neighborhood reducers and publish construction as separate geometry
+    provenance: ai-executed
+    timestamp: '2026-09-10T22:38:21+02:00'
+    choice: Adopt the tested point-anchored field and fixed k+1 graph semantics through shared cache leases, existing jobs/config and guarded generated-entity history. Retain CPU geometry extraction and keep primitive/global/active-set consumers separate.
+    alternatives: [Add a second spatial service, Replace source topology during construction, Change the original neighborhood policy while changing its backend]
+    evidence: [N539, O223, docs/architecture/point-construction.md]
+    status: resolved

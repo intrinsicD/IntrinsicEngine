@@ -1,0 +1,72 @@
+Internal ctest changing into directory: /home/alex/Documents/IntrinsicEngine/build/ci-vulkan
+Test project /home/alex/Documents/IntrinsicEngine/build/ci-vulkan
+    Start 29: PointConstructionGpuSmoke.QueriesMatchReferenceAcrossDomainsAndGeneratedGeometryRenders
+1/2 Test #29: PointConstructionGpuSmoke.QueriesMatchReferenceAcrossDomainsAndGeneratedGeometryRenders ...***Failed   27.63 sec
+Running main() from /home/alex/Documents/IntrinsicEngine/external/vcpkg/buildtrees/gtest/src/v1.17.0-0c449efaff.clean/googletest/src/gtest_main.cc
+Note: Google Test filter = PointConstructionGpuSmoke.QueriesMatchReferenceAcrossDomainsAndGeneratedGeometryRenders
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from PointConstructionGpuSmoke
+[ RUN      ] PointConstructionGpuSmoke.QueriesMatchReferenceAcrossDomainsAndGeneratedGeometryRenders
+[32m[INFO] Initialized Scheduler with 15 worker threads.[0m
+[33m[WARN] [Runtime] Promoted Vulkan device selected; backend remains fail-closed until the first clean default-recipe validation promotes it.[0m
+[33m[WARN] [VulkanDevice::Initialize] Vulkan bootstrap created logical-device, queue, VMA, per-frame command/sync, swapchain image/view/handle, bindless heap, transfer queue, and global pipeline-layout state; canonical frame execution waits for the first clean recipe validation publish, so device remains non-operational during cold start.[0m
+[33m[WARN] [Runtime] VulkanRequestedButNotOperational status=RequestedButIncompleteGate reason=BarrierValidationFailed[0m
+[31m[ERR]  [JobService] Job 'Construction neighbors (Vulkan)' completion publisher rejected result type 'std::string_view Extrinsic::Runtime::JobResultTypeNameOf() [TResult = bool]'; completion dropped.[0m
+[31m[ERR]  [JobService] Job 'Construction neighbors (Vulkan)' completion publisher rejected result type 'std::string_view Extrinsic::Runtime::JobResultTypeNameOf() [TResult = bool]'; completion dropped.[0m
+[31m[ERR]  [JobService] Job 'Construction neighbors (Vulkan)' completion publisher rejected result type 'std::string_view Extrinsic::Runtime::JobResultTypeNameOf() [TResult = bool]'; completion dropped.[0m
+[31m[ERR]  [JobService] Job 'Construction neighbors (Vulkan)' completion publisher rejected result type 'std::string_view Extrinsic::Runtime::JobResultTypeNameOf() [TResult = bool]'; completion dropped.[0m
+[31m[ERR]  [JobService] Job 'Construction neighbors (Vulkan)' completion publisher rejected result type 'std::string_view Extrinsic::Runtime::JobResultTypeNameOf() [TResult = bool]'; completion dropped.[0m
+[31m[ERR]  [JobService] Job 'Construction neighbors (Vulkan)' completion publisher rejected result type 'std::string_view Extrinsic::Runtime::JobResultTypeNameOf() [TResult = bool]'; completion dropped.[0m
+[31m[ERR]  [JobService] Job 'Construction neighbors (Vulkan)' completion publisher rejected result type 'std::string_view Extrinsic::Runtime::JobResultTypeNameOf() [TResult = bool]'; completion dropped.[0m
+[31m[ERR]  [JobService] Job 'Construction neighbors (Vulkan)' completion publisher rejected result type 'std::string_view Extrinsic::Runtime::JobResultTypeNameOf() [TResult = bool]'; completion dropped.[0m
+/home/alex/Documents/IntrinsicEngine/tests/integration/graphics/Test.PointConstructionGpuSmoke.cpp:285: Failure
+Value of: result.Succeeded()
+  Actual: false
+Expected: true
+domain=1 Only a completed batch with the same query count and k can be reused.
+
+/home/alex/Documents/IntrinsicEngine/tests/integration/graphics/Test.PointConstructionGpuSmoke.cpp:380: Failure
+Value of: run->Done
+  Actual: false
+Expected: true
+
+[  FAILED  ] PointConstructionGpuSmoke.QueriesMatchReferenceAcrossDomainsAndGeneratedGeometryRenders (27577 ms)
+[----------] 1 test from PointConstructionGpuSmoke (27577 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (27577 ms total)
+[  PASSED  ] 0 tests.
+[  FAILED  ] 1 test, listed below:
+[  FAILED  ] PointConstructionGpuSmoke.QueriesMatchReferenceAcrossDomainsAndGeneratedGeometryRenders
+
+ 1 FAILED TEST
+
+    Start 30: PointConstructionGpuSmoke.StaleCancelledAndPartialSubmissionCreateNoEntity
+2/2 Test #30: PointConstructionGpuSmoke.StaleCancelledAndPartialSubmissionCreateNoEntity ................***Timeout  30.29 sec
+Running main() from /home/alex/Documents/IntrinsicEngine/external/vcpkg/buildtrees/gtest/src/v1.17.0-0c449efaff.clean/googletest/src/gtest_main.cc
+Note: Google Test filter = PointConstructionGpuSmoke.StaleCancelledAndPartialSubmissionCreateNoEntity
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from PointConstructionGpuSmoke
+[ RUN      ] PointConstructionGpuSmoke.StaleCancelledAndPartialSubmissionCreateNoEntity
+[32m[INFO] Initialized Scheduler with 15 worker threads.[0m
+[33m[WARN] [Runtime] Promoted Vulkan device selected; backend remains fail-closed until the first clean default-recipe validation promotes it.[0m
+[33m[WARN] [VulkanDevice::Initialize] Vulkan bootstrap created logical-device, queue, VMA, per-frame command/sync, swapchain image/view/handle, bindless heap, transfer queue, and global pipeline-layout state; canonical frame execution waits for the first clean recipe validation publish, so device remains non-operational during cold start.[0m
+[33m[WARN] [Runtime] VulkanRequestedButNotOperational status=RequestedButIncompleteGate reason=BarrierValidationFailed[0m
+
+
+0% tests passed, 2 tests failed out of 2
+
+Label Time Summary:
+gpu            =  57.92 sec*proc (2 tests)
+graphics       =  57.92 sec*proc (2 tests)
+integration    =  57.92 sec*proc (2 tests)
+vulkan         =  57.92 sec*proc (2 tests)
+
+Total Test time (real) =  59.49 sec
+
+The following tests FAILED:
+	 29 - PointConstructionGpuSmoke.QueriesMatchReferenceAcrossDomainsAndGeneratedGeometryRenders (Failed)
+	 30 - PointConstructionGpuSmoke.StaleCancelledAndPartialSubmissionCreateNoEntity (Timeout)
+Errors while running CTest

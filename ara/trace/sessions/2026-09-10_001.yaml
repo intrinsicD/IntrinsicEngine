@@ -2,8 +2,8 @@ session:
   id: 2026-09-10_001
   date: '2026-09-10'
   started: '2026-09-10T00:25:43+02:00'
-  last_turn: '2026-09-10T06:59:01+02:00'
-  turn_count: 2
+  last_turn: '2026-09-10T22:38:21+02:00'
+  turn_count: 3
   summary: Completed sequential spatial integrations through LOP with CPU/Vulkan tests, shared neighborhoods and
     explicit remaining Framework24 work.
 events_logged:
@@ -85,6 +85,24 @@ events_logged:
   routing: crystallized
   provenance: ai-executed
   summary: C90 binds bounded implementation artifacts; no user endorsement or speedup inferred.
+- turn: 3
+  type: experiment
+  id: N539
+  routing: direct
+  provenance: ai-executed
+  summary: Point construction passes bounded CPU/GPU output, visibility and failure checks.
+- turn: 3
+  type: decision
+  id: N540
+  routing: direct
+  provenance: ai-executed
+  summary: Adopt existing cache/jobs/config with borrowed rows and separate generated entities.
+- turn: 3
+  type: observation
+  id: O223
+  routing: crystallized
+  provenance: ai-executed
+  summary: C91 records bounded capability through artifact commitment; no speedup inferred.
 ai_actions:
 - turn: 1
   action: Added span and supplied-candidate statistics/radii, canonical config/runtime/window publication, analytical/CPU/GPU
@@ -108,6 +126,10 @@ ai_actions:
   - docs/architecture/spatial-index-consumers.md
   - src/runtime/Modules/PointCloudConsolidation/Runtime.PointCloudConsolidationModule.cpp
   - ara/logic/claims.md
+- turn: 3
+  action: Implemented Hoppe-style and kNN construction, fixed the short final GPU batch and retired-token test wait, corrected stale appearance tests under BUG-186, and verified CPU/Vulkan source. Native verification resumed after a temporary approval-review usage-limit rejection and the user's Continue.
+  provenance: ai-executed
+  files_changed: [src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Construction.cpp, docs/architecture/point-construction.md, tests/integration/graphics/Test.PointConstructionGpuSmoke.cpp]
 claims_touched:
 - id: C83
   action: crystallized
@@ -133,6 +155,9 @@ claims_touched:
 - id: C90
   action: crystallized
   turn: 2
+- id: C91
+  action: crystallized
+  turn: 3
 key_context:
 - turn: 1
   excerpt: Ok now continue with the next method. Specific choice of spacing/radii was agent-selected within the
@@ -140,6 +165,8 @@ key_context:
 - turn: 2
   excerpt: The user authorized iterating remaining methods until 07:00. No subsequent reaction to outcomes or numerical
     measurements is inferred.
+- turn: 3
+  excerpt: The user requested further GPU LBVH adoption and then continued verification after a usage-limit interruption. The prior 07:00 deadline was not extended or treated as a new overnight run.
 open_threads:
 - 'Spatial consumer inventory: shared kNN/exclusion and the normal adapter are implemented; remaining method migrations
   and primitive/ray extensions stay open. METHOD-003A owns legacy-reference adoption intake.'
@@ -153,8 +180,7 @@ open_threads:
 - 'BUG-178/BUG-180: isolate incremental module-cache failure and leak-enabled pipeline allocation retention; no
   engine or driver ownership conclusion yet.'
 - 'BUG-181: correct touched-scope shader-output CLI arguments and producer ordering on a fresh build tree.'
-- WLOP/CLOP/EAR framed Vulkan LBVH adapters remain; reuse fixed-source leases, moving workspaces and compact-density
-  reducers.
+- WLOP/CLOP/EAR adapters landed separately in 9f4764b7d. This turn adds point construction; remaining active-set, global-quality and primitive/ray consumers retain separate contracts in the inventory.
 - 'GEOM-073: Framework24 scalar Gaussian saliency, covariance probability and remaining descriptor matching/utilities
   remain. No new saliency port was started before the deadline.'
 - RUNTIME-222 model-space radius rendering remains open. Earlier normal/outlier/density/spacing implementation is

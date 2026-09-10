@@ -23,6 +23,7 @@ import Extrinsic.Runtime.EngineConfigControl;
 import Extrinsic.ECS.Scene.Registry;
 import Extrinsic.ECS.Components.GeometrySources;
 import Extrinsic.ECS.Components.GeometrySourcesPopulate;
+import Extrinsic.Graphics.Component.VisualizationConfig;
 import Geometry.HalfedgeMesh;
 import Geometry.Graph;
 
@@ -206,7 +207,21 @@ TEST(PointSpacingOperations, EveryDomainPublishesNamedRadiiAndPreservesDeletedRo
         visualization.VisualizationRecipes.ClearRecipe=[&](std::uint32_t){stored.reset();};
         const auto shown=R::ApplyEditorVisualizationRecipeCommand(visualization,{.StableEntityId=config.StableEntityId,
             .Recipe={.Data=R::ScalarVisualizationRecipe{.Source=config.Radii,.OutputName="radii.colors"}}});
-        EXPECT_EQ(shown,R::EditorCommandStatus::Applied);ASSERT_TRUE(stored);
+
+        EXPECT_FALSE(stored);
+        if (half)
+            EXPECT_EQ(shown,R::EditorCommandStatus::InvalidVisualizationProperty);
+        else
+        {
+            EXPECT_EQ(shown,R::EditorCommandStatus::Applied);
+            const auto* overrides=scene.Raw().try_get<Extrinsic::Graphics::Components::VisualizationLaneOverrides>(entity);
+            ASSERT_NE(overrides,nullptr);
+            const auto& lane=D(d)==D::MeshVertex || D(d)==D::MeshFace ? overrides->Surface
+                : D(d)==D::PointCloudPoint ? overrides->Points : overrides->Edges;
+            ASSERT_TRUE(lane);
+            EXPECT_EQ(lane->Source,Extrinsic::Graphics::Components::VisualizationConfig::ColorSource::ScalarField);
+            EXPECT_EQ(lane->ScalarFieldName,config.Radii.Name);
+        }
         props.Get<float>("radii")[0]=123;
         EXPECT_FALSE(history.Undo().Succeeded());
     }

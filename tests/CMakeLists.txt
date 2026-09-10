@@ -271,6 +271,7 @@ if(TARGET ExtrinsicRuntime)
     Test.KeypointAnalysisOperations.cpp
     Test.DescriptorAnalysisOperations.cpp
     Test.DensityWeightOperations.cpp
+    Test.PointConstructionOperations.cpp
     Test.PointSpacingOperations.cpp
         Test.PrimitiveSelectionRefinement.cpp
         Test.PrimitiveSelectionRefinementWiring.cpp
@@ -464,6 +465,7 @@ set(_geometry_test_files
     Test.GaussianMixture.cpp
     Test.CurvatureSegmentation.cpp
     Test_SurfaceReconstruction.cpp
+    Test.PointConstruction.cpp
     Test_MeshQuality.cpp
     Test_MeshAnalysis.cpp
     Test_Parameterization.cpp
@@ -748,6 +750,7 @@ endif()
 if(TARGET ExtrinsicBackendsVulkan AND INTRINSIC_PLATFORM_BACKEND_SELECTED STREQUAL "Glfw")
     intrinsic_test_object_lib(PointLBVHGpuTestObjs
         SOURCES integration/graphics/Test.PointLBVHGpuSmoke.cpp
+                integration/graphics/Test.PointConstructionGpuSmoke.cpp
         DEPS ExtrinsicRuntime ExtrinsicGraphics ExtrinsicBackendsVulkan ExtrinsicPlatform ExtrinsicRHI ExtrinsicCore
     )
     intrinsic_test_executable(IntrinsicPointLBVHGpuTests
@@ -1753,6 +1756,7 @@ if(_intrinsic_registered_test_targets)
     # present pacing. The fixture stops itself at 70 s with round/frame diagnostics.
     string(APPEND _intrinsic_property_fixup_script
         "if(DEFINED IntrinsicPointLBVHGpuTests_TESTS)\n"
+        "  set_tests_properties(PointConstructionGpuSmoke.QueriesMatchReferenceAcrossDomainsAndGeneratedGeometryRenders PointConstructionGpuSmoke.StaleCancelledAndPartialSubmissionCreateNoEntity PROPERTIES TIMEOUT 180)\n"
         "  set_tests_properties(PointLBVHGpuSmoke.FramedRegistrationReusesTargetAcrossRunsAndMatchesCpuSolve PROPERTIES TIMEOUT 120)\n"
         "  set_tests_properties(PointLBVHGpuSmoke.NormalNeighborhoodsPublishAcrossDomainsAndRejectIncompleteSupport PROPERTIES TIMEOUT 120)\n"
         "  set_tests_properties(PointLBVHGpuSmoke.OutlierNeighborhoodsPublishAcrossDomainsAndCountDenseSupport PROPERTIES TIMEOUT 120)\n"

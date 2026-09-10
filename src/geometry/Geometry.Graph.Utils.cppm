@@ -1,3 +1,4 @@
+// Graph construction, layout and geometric queries with borrowed input adapters.
 module;
 
 #include <cstddef>
@@ -14,6 +15,7 @@ export import Geometry.Graph;
 
 import Geometry.Properties;
 import Geometry.Circulators;
+export import Geometry.SpatialQueries;
 
 export namespace Geometry::Graph
 {
@@ -196,11 +198,15 @@ export namespace Geometry::Graph
         float MaxDisplacement{0.0F};
     };
 
-    // A lightweight halfedge-based graph (no faces), designed for DOD-friendly algorithms.
-    // Storage is via PropertySets, so user-defined properties are supported on vertices/halfedges/edges.
     // Rebuilds `graph` from a point set using an undirected k-nearest-neighbor construction.
     // Returns std::nullopt for degenerate input (empty points or k == 0).
     [[nodiscard]] std::optional<KNNBuildResult> BuildKNNGraph(Graph& graph, std::span<const glm::vec3> points,
+        const KNNBuildParams& params = {});
+
+    // Complete min(k+1,N) rows use distance/source-ID order and no self exclusion.
+    // The self/epsilon filter runs afterward; malformed rows leave graph unchanged.
+    [[nodiscard]] std::optional<KNNBuildResult> BuildKNNGraphFromNeighbors(
+        Graph& graph, std::span<const glm::vec3> points, PointNeighborhoods rows,
         const KNNBuildParams& params = {});
 
     // Builds an undirected graph directly from precomputed per-vertex kNN index lists.

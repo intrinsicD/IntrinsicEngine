@@ -137,6 +137,7 @@ EditorGeometryProcessingPreparedFrame PrepareEditorGeometryProcessingFrame(
             .LastKeypointAnalysisResult = CopyOptional(bindings.LastKeypointAnalysisResult),
             .LastDescriptorAnalysisResult = CopyOptional(bindings.LastDescriptorAnalysisResult),
             .LastDensityWeightResult = CopyOptional(bindings.LastDensityWeightResult),
+            .LastPointConstructionResult = CopyOptional(bindings.LastPointConstructionResult),
         };
       });
   return prepared;
@@ -627,6 +628,7 @@ namespace Extrinsic::Runtime
     EditorKeypointAnalysisReadiness PreviewEditorKeypointAnalysisCommand(const EditorGeometryProcessingCommands& commands,const KeypointAnalysisConfig& config){return PreviewEditorKeypointAnalysisCommand(ContextOrEmpty(commands),config);}
     EditorDescriptorAnalysisReadiness PreviewEditorDescriptorAnalysisCommand(const EditorGeometryProcessingCommands& commands,const DescriptorAnalysisConfig& config){return PreviewEditorDescriptorAnalysisCommand(ContextOrEmpty(commands),config);}
     EditorDensityWeightReadiness PreviewEditorDensityWeightCommand(const EditorGeometryProcessingCommands& commands,const DensityWeightConfig& config){return PreviewEditorDensityWeightCommand(ContextOrEmpty(commands),config);}
+    EditorPointConstructionReadiness PreviewEditorPointConstructionCommand(const EditorGeometryProcessingCommands& commands,const PointConstructionConfig& config){return PreviewEditorPointConstructionCommand(ContextOrEmpty(commands),config);}
     GeometryPropertyCatalogSnapshot GetEditorNormalEstimationInputCatalog(const EditorGeometryProcessingCommands& commands,std::uint32_t stableId){return GetEditorNormalEstimationInputCatalog(ContextOrEmpty(commands),stableId);}
     GeometryPropertyCatalogSnapshot GetEditorOutlierAnalysisInputCatalog(const EditorGeometryProcessingCommands& commands,std::uint32_t stableId){return GetEditorOutlierAnalysisInputCatalog(ContextOrEmpty(commands),stableId);}
     GeometryPropertyCatalogSnapshot GetEditorKernelDensityInputCatalog(const EditorGeometryProcessingCommands& commands,std::uint32_t stableId){return GetEditorKernelDensityInputCatalog(ContextOrEmpty(commands),stableId);}
@@ -635,6 +637,7 @@ namespace Extrinsic::Runtime
     GeometryPropertyCatalogSnapshot GetEditorKeypointAnalysisInputCatalog(const EditorGeometryProcessingCommands& commands,std::uint32_t stableId){return GetEditorKeypointAnalysisInputCatalog(ContextOrEmpty(commands),stableId);}
     GeometryPropertyCatalogSnapshot GetEditorDescriptorAnalysisInputCatalog(const EditorGeometryProcessingCommands& commands,std::uint32_t stableId){return GetEditorDescriptorAnalysisInputCatalog(ContextOrEmpty(commands),stableId);}
     GeometryPropertyCatalogSnapshot GetEditorDensityWeightInputCatalog(const EditorGeometryProcessingCommands& commands,std::uint32_t stableId){return GetEditorDensityWeightInputCatalog(ContextOrEmpty(commands),stableId);}
+    GeometryPropertyCatalogSnapshot GetEditorPointConstructionInputCatalog(const EditorGeometryProcessingCommands& commands,std::uint32_t stableId){return GetEditorPointConstructionInputCatalog(ContextOrEmpty(commands),stableId);}
     EditorNormalEstimationResult ApplyEditorNormalEstimationCommand(const EditorGeometryProcessingCommands& commands,const NormalEstimationConfig& config){return ApplyEditorNormalEstimationCommand(ContextOrEmpty(commands),config);}
     EditorOutlierAnalysisResult ApplyEditorOutlierAnalysisCommand(const EditorGeometryProcessingCommands& commands,const OutlierAnalysisConfig& config){return ApplyEditorOutlierAnalysisCommand(ContextOrEmpty(commands),config);}
     EditorKernelDensityResult ApplyEditorKernelDensityCommand(const EditorGeometryProcessingCommands& commands,const KernelDensityConfig& config){return ApplyEditorKernelDensityCommand(ContextOrEmpty(commands),config);}
@@ -643,6 +646,7 @@ namespace Extrinsic::Runtime
     EditorKeypointAnalysisResult ApplyEditorKeypointAnalysisCommand(const EditorGeometryProcessingCommands& commands,const KeypointAnalysisConfig& config){return ApplyEditorKeypointAnalysisCommand(ContextOrEmpty(commands),config);}
     EditorDescriptorAnalysisResult ApplyEditorDescriptorAnalysisCommand(const EditorGeometryProcessingCommands& commands,const DescriptorAnalysisConfig& config){return ApplyEditorDescriptorAnalysisCommand(ContextOrEmpty(commands),config);}
     EditorDensityWeightResult ApplyEditorDensityWeightCommand(const EditorGeometryProcessingCommands& commands,const DensityWeightConfig& config){return ApplyEditorDensityWeightCommand(ContextOrEmpty(commands),config);}
+    EditorPointConstructionResult ApplyEditorPointConstructionCommand(const EditorGeometryProcessingCommands& commands,const PointConstructionConfig& config){return ApplyEditorPointConstructionCommand(ContextOrEmpty(commands),config);}
     RuntimeEngineConfigApplyResult ApplyEditorNormalEstimationConfig(const EditorGeometryProcessingCommands& commands,const NormalEstimationConfig& config,std::string sourceId){return ApplyEditorNormalEstimationConfig(ContextOrEmpty(commands),config,std::move(sourceId));}
     RuntimeEngineConfigApplyResult ApplyEditorOutlierAnalysisConfig(const EditorGeometryProcessingCommands& commands,const OutlierAnalysisConfig& config,std::string sourceId){return ApplyEditorOutlierAnalysisConfig(ContextOrEmpty(commands),config,std::move(sourceId));}
     RuntimeEngineConfigApplyResult ApplyEditorKernelDensityConfig(const EditorGeometryProcessingCommands& commands,const KernelDensityConfig& config,std::string sourceId){return ApplyEditorKernelDensityConfig(ContextOrEmpty(commands),config,std::move(sourceId));}
@@ -651,6 +655,7 @@ namespace Extrinsic::Runtime
     RuntimeEngineConfigApplyResult ApplyEditorKeypointAnalysisConfig(const EditorGeometryProcessingCommands& commands,const KeypointAnalysisConfig& config,std::string sourceId){return ApplyEditorKeypointAnalysisConfig(ContextOrEmpty(commands),config,std::move(sourceId));}
     RuntimeEngineConfigApplyResult ApplyEditorDescriptorAnalysisConfig(const EditorGeometryProcessingCommands& commands,const DescriptorAnalysisConfig& config,std::string sourceId){return ApplyEditorDescriptorAnalysisConfig(ContextOrEmpty(commands),config,std::move(sourceId));}
     RuntimeEngineConfigApplyResult ApplyEditorDensityWeightConfig(const EditorGeometryProcessingCommands& commands,const DensityWeightConfig& config,std::string sourceId){return ApplyEditorDensityWeightConfig(ContextOrEmpty(commands),config,std::move(sourceId));}
+    RuntimeEngineConfigApplyResult ApplyEditorPointConstructionConfig(const EditorGeometryProcessingCommands& commands,const PointConstructionConfig& config,std::string sourceId){return ApplyEditorPointConstructionConfig(ContextOrEmpty(commands),config,std::move(sourceId));}
     std::optional<NormalEstimationConfig> GetEditorNormalEstimationConfig(const EditorGeometryProcessingCommands& commands){return GetEditorNormalEstimationConfig(ContextOrEmpty(commands));}
     std::optional<OutlierAnalysisConfig> GetEditorOutlierAnalysisConfig(const EditorGeometryProcessingCommands& commands){return GetEditorOutlierAnalysisConfig(ContextOrEmpty(commands));}
     std::optional<KernelDensityConfig> GetEditorKernelDensityConfig(const EditorGeometryProcessingCommands& commands){return GetEditorKernelDensityConfig(ContextOrEmpty(commands));}
@@ -659,6 +664,7 @@ namespace Extrinsic::Runtime
     std::optional<KeypointAnalysisConfig> GetEditorKeypointAnalysisConfig(const EditorGeometryProcessingCommands& commands){return GetEditorKeypointAnalysisConfig(ContextOrEmpty(commands));}
     std::optional<DescriptorAnalysisConfig> GetEditorDescriptorAnalysisConfig(const EditorGeometryProcessingCommands& commands){return GetEditorDescriptorAnalysisConfig(ContextOrEmpty(commands));}
     std::optional<DensityWeightConfig> GetEditorDensityWeightConfig(const EditorGeometryProcessingCommands& commands){return GetEditorDensityWeightConfig(ContextOrEmpty(commands));}
+    std::optional<PointConstructionConfig> GetEditorPointConstructionConfig(const EditorGeometryProcessingCommands& commands){return GetEditorPointConstructionConfig(ContextOrEmpty(commands));}
     EditorNormalEstimationResult ApplyEditorConfiguredNormalEstimation(const EditorGeometryProcessingCommands& commands){return ApplyEditorConfiguredNormalEstimation(ContextOrEmpty(commands));}
     EditorOutlierAnalysisResult ApplyEditorConfiguredOutlierAnalysis(const EditorGeometryProcessingCommands& commands){return ApplyEditorConfiguredOutlierAnalysis(ContextOrEmpty(commands));}
     EditorKernelDensityResult ApplyEditorConfiguredKernelDensity(const EditorGeometryProcessingCommands& commands){return ApplyEditorConfiguredKernelDensity(ContextOrEmpty(commands));}
@@ -667,4 +673,5 @@ namespace Extrinsic::Runtime
     EditorKeypointAnalysisResult ApplyEditorConfiguredKeypointAnalysis(const EditorGeometryProcessingCommands& commands){return ApplyEditorConfiguredKeypointAnalysis(ContextOrEmpty(commands));}
     EditorDescriptorAnalysisResult ApplyEditorConfiguredDescriptorAnalysis(const EditorGeometryProcessingCommands& commands){return ApplyEditorConfiguredDescriptorAnalysis(ContextOrEmpty(commands));}
     EditorDensityWeightResult ApplyEditorConfiguredDensityWeight(const EditorGeometryProcessingCommands& commands){return ApplyEditorConfiguredDensityWeight(ContextOrEmpty(commands));}
+    EditorPointConstructionResult ApplyEditorConfiguredPointConstruction(const EditorGeometryProcessingCommands& commands){return ApplyEditorConfiguredPointConstruction(ContextOrEmpty(commands));}
 }

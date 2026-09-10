@@ -21,6 +21,9 @@ metrics:
   - runtime_ms
   - quality_error_linf
 correctness_tests:
+  - ../../../tests/unit/geometry/Test.PointConstruction.cpp
+  - ../../../tests/contract/runtime/Test.PointConstructionOperations.cpp
+  - ../../../tests/integration/graphics/Test.PointConstructionGpuSmoke.cpp
   - ../../../tests/unit/geometry/Test.PointCloudKernels.cpp
   - ../../../tests/contract/runtime/Test.DensityWeightOperations.cpp
   - ../../../tests/unit/geometry/Test.PointLBVH.cpp
@@ -37,6 +40,7 @@ correctness_tests:
   - ../../../tests/integration/graphics/Test.PointLBVHGpuSmoke.cpp
   - ../../../tests/integration/runtime/Test.ClusteringServiceGpuSmoke.cpp
 benchmarks:
+  - ../../../benchmarks/geometry/manifests/point_lbvh_point_construction_runtime_smoke.yaml
   - ../../../benchmarks/geometry/manifests/point_lbvh_lop_vulkan_runtime_smoke.yaml
   - ../../../benchmarks/geometry/manifests/point_lbvh_lop_cpu_smoke.yaml
   - ../../../benchmarks/geometry/manifests/point_lbvh_density_weight_runtime_smoke.yaml

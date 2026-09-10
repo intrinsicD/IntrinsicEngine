@@ -1,0 +1,20 @@
+[1202/1221] Scanning /home/alex/Documents/IntrinsicEngine/tests/integration/runtime/Test.RuntimeSandboxAcceptance.cpp for CXX dependencies
+[1203/1221] Scanning /home/alex/Documents/IntrinsicEngine/tests/integration/runtime/Test.AssetService.cpp for CXX dependencies
+[1204/1221] Scanning /home/alex/Documents/IntrinsicEngine/tests/integration/runtime/Test.CoreFrameGraphParallel.cpp for CXX dependencies
+[1205/1221] Generating CXX dyndep file tests/CMakeFiles/RuntimeGraphicsCpuTestObjs.dir/CXX.dd
+[1206/1221] Scanning /home/alex/Documents/IntrinsicEngine/tests/integration/runtime/Test.CoreGraphStress.cpp for CXX dependencies
+[1207/1221] Scanning /home/alex/Documents/IntrinsicEngine/tests/integration/runtime/Test.CoreProcess.cpp for CXX dependencies
+[1208/1221] Scanning /home/alex/Documents/IntrinsicEngine/tests/integration/graphics/Test.RenderGraphLegacy.cpp for CXX dependencies
+[1209/1221] Scanning /home/alex/Documents/IntrinsicEngine/tests/integration/graphics/Test.GpuWorldAndCulling.cpp for CXX dependencies
+[1210/1221] Generating CXX dyndep file tests/CMakeFiles/TestSupportObjs.dir/CXX.dd
+[1211/1221] Generating CXX dyndep file tests/CMakeFiles/RuntimeIntegrationCpuTestObjs.dir/CXX.dd
+[1212/1221] Scanning /home/alex/Documents/IntrinsicEngine/tests/integration/graphics/Test.RendererLegacy.cpp for CXX dependencies
+[1213/1221] Generating CXX dyndep file tests/CMakeFiles/GraphicsIntegrationCpuTestObjs.dir/CXX.dd
+[1214/1221] Scanning /home/alex/Documents/IntrinsicEngine/tests/regression/platform/Test.GlfwLifecycleLsanProcess.cpp for CXX dependencies
+[1215/1221] Generating CXX dyndep file tests/CMakeFiles/IntrinsicGlfwLifecycleLsanProcess.dir/CXX.dd
+[1216/1221] Scanning /home/alex/Documents/IntrinsicEngine/tests/integration/runtime/Test.GpuResultReadbackGpuSmoke.cpp for CXX dependencies
+[1217/1221] Generating CXX dyndep file tests/CMakeFiles/RuntimeGpuResultReadbackSmokeTestObjs.dir/CXX.dd
+[1218/1221] Linking CXX executable bin/IntrinsicSandboxEditorIntegrationTests
+[1219/1221] Linking CXX executable bin/IntrinsicRuntimeContractTests
+[1220/1221] Building CXX object tests/CMakeFiles/PointLBVHGpuTestObjs.dir/integration/graphics/Test.PointConstructionGpuSmoke.cpp.o
+[1221/1221] Linking CXX executable bin/IntrinsicPointLBVHGpuTests

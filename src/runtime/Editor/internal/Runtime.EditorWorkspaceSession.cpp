@@ -614,6 +614,13 @@ namespace Extrinsic::Runtime::EditorFeatureDetail
                 if (AttachmentEpochIsActive(epoch))
                     m_LastDensityWeightResult = std::move(result);
             };
+        context.MethodResultSinks.PointConstruction =
+            [epoch = m_AttachmentEpoch, this](
+                EditorPointConstructionResult result)
+            {
+                if (AttachmentEpochIsActive(epoch))
+                    m_LastPointConstructionResult = std::move(result);
+            };
         context.PendingAssetImportPath =
             std::move(pendingAssetImportPath);
         context.PendingAssetImportPayloadKind =
@@ -692,6 +699,9 @@ namespace Extrinsic::Runtime::EditorFeatureDetail
         if (m_LastDensityWeightResult.has_value())
             context.LastDensityWeightResult =
                 &*m_LastDensityWeightResult;
+        if (m_LastPointConstructionResult.has_value())
+            context.LastPointConstructionResult =
+                &*m_LastPointConstructionResult;
         const Core::Extent2D viewport =
             context.CameraViewport.Width != 0u &&
                     context.CameraViewport.Height != 0u
@@ -897,6 +907,9 @@ namespace Extrinsic::Runtime::EditorFeatureDetail
         case EditorGeometryProcessingResultSlot::DensityWeight:
             m_LastDensityWeightResult.reset();
             break;
+        case EditorGeometryProcessingResultSlot::PointConstruction:
+            m_LastPointConstructionResult.reset();
+            break;
         case EditorGeometryProcessingResultSlot::Registration:
             m_LastRegistrationResult.reset();
             return;
@@ -936,6 +949,7 @@ namespace Extrinsic::Runtime::EditorFeatureDetail
         m_LastKeypointAnalysisResult.reset();
         m_LastDescriptorAnalysisResult.reset();
         m_LastDensityWeightResult.reset();
+        m_LastPointConstructionResult.reset();
         m_JobIdentities.clear();
         m_RenderRecipeContext = {};
         m_RenderRecipeState = {};

@@ -418,6 +418,70 @@ namespace Geometry::Graph
         return result;
     }
 
+    std::optional<KNNBuildResult> BuildKNNGraphFromNeighbors(Graph& graph,
+                                                             std::span<const glm::vec3> points,
+                                                             PointNeighborhoods rows,
+                                                             const KNNBuildParams& params)
+    {
+        if (points.empty() || points.size() > std::numeric_limits<std::uint32_t>::max() ||
+            params.K == 0 || !std::isfinite(params.MinDistanceEpsilon) ||
+            params.MinDistanceEpsilon < 0 ||
+            (params.Connectivity != KNNConnectivity::Union &&
+             params.Connectivity != KNNConnectivity::Mutual) ||
+            rows.Offsets.size() != points.size() + 1 || rows.Offsets.front() != 0 ||
+            rows.Offsets.back() != rows.Indices.size())
+            return {};
+        for (auto point : points)
+            if (!std::isfinite(point.x) || !std::isfinite(point.y) || !std::isfinite(point.z))
+                return {};
+        const auto effectiveK = std::min<std::size_t>(params.K, points.size() - 1),
+                   width = effectiveK + 1;
+        const auto minimum2 = params.MinDistanceEpsilon * params.MinDistanceEpsilon;
+        if (!std::isfinite(minimum2))
+            return {};
+        std::vector<std::vector<std::uint32_t>> neighbors(points.size());
+        std::size_t degenerate{};
+        for (std::uint32_t i = 0; i < points.size(); ++i)
+        {
+            const auto begin = rows.Offsets[i], end = rows.Offsets[i + 1];
+            if (begin > end || end > rows.Indices.size() || end - begin != width)
+                return {};
+            float previous = -1;
+            std::uint32_t previousId{};
+            // Validate the full row even after the accepted-neighbor limit is reached.
+            for (auto id : rows.Indices.subspan(begin, width))
+            {
+                if (id >= points.size())
+                    return {};
+                const auto delta = points[id] - points[i];
+                const auto distance = glm::dot(delta, delta);
+                if (!std::isfinite(distance) || distance < previous ||
+                    (distance == previous && id <= previousId))
+                    return {};
+                previous = distance;
+                previousId = id;
+                if (neighbors[i].size() == effectiveK || id == i)
+                    continue;
+                if (distance <= minimum2)
+                {
+                    ++degenerate;
+                    continue;
+                }
+                neighbors[i].push_back(id);
+            }
+        }
+        auto result = BuildKNNGraphFromIndices(
+            graph, points, neighbors,
+            {.MinDistanceEpsilon = params.MinDistanceEpsilon, .Connectivity = params.Connectivity});
+        if (result)
+        {
+            result->RequestedK = params.K;
+            result->EffectiveK = effectiveK;
+            result->DegeneratePairCount = degenerate;
+        }
+        return result;
+    }
+
     std::optional<KNNBuildResult> BuildKNNGraph(Graph& graph, std::span<const glm::vec3> points,
         const KNNBuildParams& params)
     {

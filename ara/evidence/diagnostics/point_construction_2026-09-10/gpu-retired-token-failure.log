@@ -1,0 +1,72 @@
+Internal ctest changing into directory: /home/alex/Documents/IntrinsicEngine/build/ci-vulkan
+Test project /home/alex/Documents/IntrinsicEngine/build/ci-vulkan
+    Start 29: PointConstructionGpuSmoke.QueriesMatchReferenceAcrossDomainsAndGeneratedGeometryRenders
+1/2 Test #29: PointConstructionGpuSmoke.QueriesMatchReferenceAcrossDomainsAndGeneratedGeometryRenders ...   Passed  131.41 sec
+    Start 30: PointConstructionGpuSmoke.StaleCancelledAndPartialSubmissionCreateNoEntity
+2/2 Test #30: PointConstructionGpuSmoke.StaleCancelledAndPartialSubmissionCreateNoEntity ................***Failed  153.92 sec
+Running main() from /home/alex/Documents/IntrinsicEngine/external/vcpkg/buildtrees/gtest/src/v1.17.0-0c449efaff.clean/googletest/src/gtest_main.cc
+Note: Google Test filter = PointConstructionGpuSmoke.StaleCancelledAndPartialSubmissionCreateNoEntity
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from PointConstructionGpuSmoke
+[ RUN      ] PointConstructionGpuSmoke.StaleCancelledAndPartialSubmissionCreateNoEntity
+[32m[INFO] Initialized Scheduler with 15 worker threads.[0m
+[33m[WARN] [Runtime] Promoted Vulkan device selected; backend remains fail-closed until the first clean default-recipe validation promotes it.[0m
+[33m[WARN] [VulkanDevice::Initialize] Vulkan bootstrap created logical-device, queue, VMA, per-frame command/sync, swapchain image/view/handle, bindless heap, transfer queue, and global pipeline-layout state; canonical frame execution waits for the first clean recipe validation publish, so device remains non-operational during cold start.[0m
+[33m[WARN] [Runtime] VulkanRequestedButNotOperational status=RequestedButIncompleteGate reason=BarrierValidationFailed[0m
+/home/alex/Documents/IntrinsicEngine/tests/integration/graphics/Test.PointConstructionGpuSmoke.cpp:222: Failure
+Failed
+Point construction timed out: phase=0 failure=1 results=1
+Google Test trace:
+/home/alex/Documents/IntrinsicEngine/tests/integration/graphics/Test.PointConstructionGpuSmoke.cpp:413: 1
+
+/home/alex/Documents/IntrinsicEngine/tests/integration/graphics/Test.PointConstructionGpuSmoke.cpp:225: Failure
+Failed
+invalid
+Google Test trace:
+/home/alex/Documents/IntrinsicEngine/tests/integration/graphics/Test.PointConstructionGpuSmoke.cpp:413: 1
+
+/home/alex/Documents/IntrinsicEngine/tests/integration/graphics/Test.PointConstructionGpuSmoke.cpp:225: Failure
+Failed
+invalid
+Google Test trace:
+/home/alex/Documents/IntrinsicEngine/tests/integration/graphics/Test.PointConstructionGpuSmoke.cpp:413: 1
+
+/home/alex/Documents/IntrinsicEngine/tests/integration/graphics/Test.PointConstructionGpuSmoke.cpp:225: Failure
+Failed
+invalid
+Google Test trace:
+/home/alex/Documents/IntrinsicEngine/tests/integration/graphics/Test.PointConstructionGpuSmoke.cpp:413: 1
+
+/home/alex/Documents/IntrinsicEngine/tests/integration/graphics/Test.PointConstructionGpuSmoke.cpp:427: Failure
+Value of: run->TimedOut
+  Actual: true
+Expected: false
+Google Test trace:
+/home/alex/Documents/IntrinsicEngine/tests/integration/graphics/Test.PointConstructionGpuSmoke.cpp:413: 1
+
+[  FAILED  ] PointConstructionGpuSmoke.StaleCancelledAndPartialSubmissionCreateNoEntity (153867 ms)
+[----------] 1 test from PointConstructionGpuSmoke (153867 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (153867 ms total)
+[  PASSED  ] 0 tests.
+[  FAILED  ] 1 test, listed below:
+[  FAILED  ] PointConstructionGpuSmoke.StaleCancelledAndPartialSubmissionCreateNoEntity
+
+ 1 FAILED TEST
+
+
+50% tests passed, 1 tests failed out of 2
+
+Label Time Summary:
+gpu            = 285.32 sec*proc (2 tests)
+graphics       = 285.32 sec*proc (2 tests)
+integration    = 285.32 sec*proc (2 tests)
+vulkan         = 285.32 sec*proc (2 tests)
+
+Total Test time (real) = 286.97 sec
+
+The following tests FAILED:
+	 30 - PointConstructionGpuSmoke.StaleCancelledAndPartialSubmissionCreateNoEntity (Failed)
+Errors while running CTest

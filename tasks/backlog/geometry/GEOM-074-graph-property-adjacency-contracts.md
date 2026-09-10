@@ -41,12 +41,13 @@ maturity_target: CPUContracted
 
 ## Spatial acceleration consideration
 
-Future acceleration of BuildKNNGraph needs kNN/self exclusion; nearest-
-edge/radius-edge operations need segment bounds and exact segment distance, not
-point centroids. Preserve the current graph algorithms and property/adjacency
-contract in this slice. Dijkstra, layouts and connectivity are not replaced by
-proximity queries; a later index adaptation must keep geometry independent of
-runtime.
+RUNTIME-230 supplies CPU/Vulkan LBVH candidates to BuildKNNGraphFromNeighbors
+and creates a separate graph through the shared point-construction workflow.
+Preserve its fixed k+1-before-self/epsilon filtering and union/mutual policy.
+Nearest-edge/radius-edge operations still need segment bounds and exact segment
+distance, not point centroids. Preserve the current graph algorithms and
+property/adjacency contract in this slice. Dijkstra, layouts and connectivity
+are not replaced by proximity queries; geometry remains independent of runtime.
 
 See the [shared spatial-index consumer inventory](../../../docs/architecture/spatial-index-consumers.md).
 

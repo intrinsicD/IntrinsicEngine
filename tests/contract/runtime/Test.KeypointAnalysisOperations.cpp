@@ -23,6 +23,7 @@ import Extrinsic.Runtime.EngineConfigControl;
 import Extrinsic.ECS.Scene.Registry;
 import Extrinsic.ECS.Components.GeometrySources;
 import Extrinsic.ECS.Components.GeometrySourcesPopulate;
+import Extrinsic.Graphics.Component.VisualizationConfig;
 import Geometry.HalfedgeMesh;
 import Geometry.Graph;
 
@@ -174,9 +175,22 @@ TEST(KeypointAnalysisOperations, EveryDomainReferenceCacheHistoryAndDeletedRows)
         visualization.VisualizationRecipes.GetRecipe=[&](std::uint32_t){return stored;};
         visualization.VisualizationRecipes.SetRecipe=[&](std::uint32_t,R::VisualizationRecipe value){stored=std::move(value);};
         visualization.VisualizationRecipes.ClearRecipe=[&](std::uint32_t){stored.reset();};
-        EXPECT_EQ(R::ApplyEditorVisualizationRecipeCommand(visualization,{.StableEntityId=c.StableEntityId,
-            .Recipe={.Data=R::ScalarVisualizationRecipe{.Source=c.Score,.OutputName="saliency_colors"}}}),R::EditorCommandStatus::Applied);
-        ASSERT_TRUE(stored);ASSERT_TRUE(std::get_if<R::ScalarVisualizationRecipe>(&stored->Data));
+        const auto shown=R::ApplyEditorVisualizationRecipeCommand(visualization,{.StableEntityId=c.StableEntityId,
+            .Recipe={.Data=R::ScalarVisualizationRecipe{.Source=c.Score,.OutputName="saliency_colors"}}});
+        EXPECT_FALSE(stored);
+        if (half)
+            EXPECT_EQ(shown,R::EditorCommandStatus::InvalidVisualizationProperty);
+        else
+        {
+            EXPECT_EQ(shown,R::EditorCommandStatus::Applied);
+            const auto* overrides=scene.Raw().try_get<Extrinsic::Graphics::Components::VisualizationLaneOverrides>(entity);
+            ASSERT_NE(overrides,nullptr);
+            const auto& lane=D(d)==D::MeshVertex || D(d)==D::MeshFace ? overrides->Surface
+                : D(d)==D::PointCloudPoint ? overrides->Points : overrides->Edges;
+            ASSERT_TRUE(lane);
+            EXPECT_EQ(lane->Source,Extrinsic::Graphics::Components::VisualizationConfig::ColorSource::ScalarField);
+            EXPECT_EQ(lane->ScalarFieldName,c.Score.Name);
+        }
     }
 }
 TEST(KeypointAnalysisOperations, JobsRejectChangedInputsOutputsAndCancellation)

@@ -1,0 +1,42 @@
+id: geometry.point_construction
+name: Oriented-point surface and kNN graph construction
+domain: geometry
+status: reference
+paper:
+  title: Surface Reconstruction from Unorganized Points
+  authors: Hugues Hoppe, Tony DeRose, Tom Duchamp, John McDonald, Werner Stuetzle
+  year: 1992
+  doi: "10.1145/133994.134011"
+  url: "https://hhoppe.com/recon.pdf"
+inputs:
+  - Canonical finite float3 samples on any mesh, graph, or point-cloud element domain
+  - Paired finite nonzero normals or CPU PCA/MST initialization for reconstruction
+  - Grid resolution, allocation budget and point-anchored nearest or weighted k+1 field controls
+  - k+1 candidate graph neighborhoods followed by self/epsilon filtering and union or mutual connectivity
+outputs:
+  - Separate renderable/selectable mesh or graph entity; source properties and topology remain owned by the source
+  - Requested/actual backend, source/query/output counts, cache reuse and CPU/GPU elapsed diagnostics
+backends:
+  - cpu_reference
+  - cpu_optimized
+  - gpu_vulkan_compute
+metrics:
+  - runtime_ms
+  - quality_error_linf
+correctness_tests:
+  - ../../../tests/unit/geometry/Test.PointConstruction.cpp
+  - ../../../tests/contract/runtime/Test.PointConstructionOperations.cpp
+  - ../../../tests/integration/graphics/Test.PointConstructionGpuSmoke.cpp
+  - ../../../tests/integration/runtime/Test.SandboxEditorPresentation.cpp
+benchmarks:
+  - ../../../benchmarks/geometry/manifests/point_lbvh_point_construction_runtime_smoke.yaml
+known_limitations:
+  - The surface field is the existing engine variant anchored at sample points; it does not reproduce Hoppe's neighborhood-centroid anchors or delta/rho undefined-domain boundary test.
+  - Weighted reconstruction retains k+1 candidates when k is greater than one; graph rows use k+1 before self and epsilon filtering, without replenishment.
+  - CPU reference means independent exhaustive float-distance/source-ID neighbor queries; cpu_lbvh and vulkan_lbvh retain CPU field, graph, normal initialization, Marching Cubes and render-attribute work.
+  - Legacy octree nearest ties use traversal order and higher-precision distance intermediates; the new query backends use float distance and source-ID ties. No general equivalence at near ties is claimed.
+  - Runtime k is 1..63, live samples are limited to 2^20, grid storage to 2^24 vertices and graph candidates to 2^24 entries.
+  - Runtime rejects filtered normal initialization rather than silently changing the cached sample identity; supplied invalid live normals also reject.
+  - Vulkan coordinates must be normal-or-zero float components within 1e18; unavailable, incomplete, cancelled, or stale requests publish no geometry and do not select a CPU fallback.
+  - Distances use input-property coordinates; output bakes the captured nonsingular hierarchy transform. Nonuniform scale does not change the query metric.
+  - Dense grids are cubic in resolution and this acceleration does not change Marching Cubes ambiguity, open-boundary or watertightness limitations.

@@ -20,7 +20,7 @@ Root scanned: `src`
 | `graphics/vulkan` | 13 |
 | `physics` | 1 |
 | `platform` | 5 |
-| `runtime` | 84 |
+| `runtime` | 85 |
 
 ## Modules
 
@@ -413,6 +413,7 @@ Root scanned: `src`
 | `Extrinsic.Runtime.PhysicsModule` | `src/runtime/Modules/PhysicsIntegration/Runtime.PhysicsModule.cppm` | `runtime` |
 | `Extrinsic.Runtime.PointCloudConsolidationConfig` | `src/runtime/Modules/PointCloudConsolidation/Runtime.PointCloudConsolidationConfig.cppm` | `runtime` |
 | `Extrinsic.Runtime.PointCloudConsolidationModule` | `src/runtime/Modules/PointCloudConsolidation/Runtime.PointCloudConsolidationModule.cppm` | `runtime` |
+| `Extrinsic.Runtime.PointConstructionConfig` | `src/runtime/Modules/PointConstruction/Runtime.PointConstructionConfig.cppm` | `runtime` |
 | `Extrinsic.Runtime.PointSpacingConfig` | `src/runtime/Modules/PointSpacing/Runtime.PointSpacingConfig.cppm` | `runtime` |
 | `Extrinsic.Runtime.ProgressivePoissonConfig` | `src/runtime/Modules/ProgressivePoisson/Runtime.ProgressivePoissonConfig.cppm` | `runtime` |
 | `Extrinsic.Runtime.ProgressivePoissonGpuBackend` | `src/runtime/Modules/ProgressivePoisson/Runtime.ProgressivePoissonGpuBackend.cppm` | `runtime` |
@@ -429,4 +430,4 @@ Root scanned: `src`
 | `Extrinsic.Runtime.StableEntityLookup` | `src/runtime/Scene/Runtime.StableEntityLookup.cppm` | `runtime` |
 | `Extrinsic.Runtime.VisualizationRecipes` | `src/runtime/Visualization/Runtime.VisualizationRecipes.cppm` | `runtime` |
 
-Total modules: **402**
+Total modules: **403**
