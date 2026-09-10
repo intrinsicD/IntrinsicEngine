@@ -1,0 +1,26 @@
+{
+  "command": [
+    "ctest",
+    "--test-dir",
+    "build/ci",
+    "--output-on-failure",
+    "-R",
+    "^RuntimeJobService\\.",
+    "--timeout",
+    "60"
+  ],
+  "command_display": "ctest --test-dir build/ci --output-on-failure -R '^RuntimeJobService\\.' --timeout 60",
+  "cwd": ".",
+  "duration_ms": 713,
+  "exit_code": 0,
+  "finished_at": "2026-09-10T00:42:18Z",
+  "label": "after-fix-runtime",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-09-10T00:42:17Z",
+  "stderr_path": "tasks/evidence/BUG-183/commands/after-fix-runtime.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/BUG-183/commands/after-fix-runtime.stdout.log",
+  "stdout_sha256": "a5259962e848e70eb073685564cabc4887fa77806f1f41ebc665c65dee75329a",
+  "task_id": "BUG-183"
+}

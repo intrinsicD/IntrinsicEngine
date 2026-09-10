@@ -1,0 +1,26 @@
+{
+  "command": [
+    "ctest",
+    "--test-dir",
+    "build/ci-vulkan",
+    "--output-on-failure",
+    "-R",
+    "^PointLBVHGpuSmoke.BilateralRejectsStaleAndCancelledPasses$",
+    "--timeout",
+    "120"
+  ],
+  "command_display": "ctest --test-dir build/ci-vulkan --output-on-failure -R '^PointLBVHGpuSmoke.BilateralRejectsStaleAndCancelledPasses$' --timeout 120",
+  "cwd": ".",
+  "duration_ms": 37975,
+  "exit_code": 0,
+  "finished_at": "2026-09-10T00:45:20Z",
+  "label": "actual-vulkan-cancellation",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-09-10T00:44:42Z",
+  "stderr_path": "tasks/evidence/BUG-183/commands/actual-vulkan-cancellation.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/BUG-183/commands/actual-vulkan-cancellation.stdout.log",
+  "stdout_sha256": "36efadb7f363a0bf71f9765c4332244106261a38660a812248d594d6c62102e6",
+  "task_id": "BUG-183"
+}

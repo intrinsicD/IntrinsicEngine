@@ -706,6 +706,13 @@ unsettled, `IsComplete()` returns false and `ReapCompleted()` retains the job.
 This makes a drain-until-complete loop close over the finalizer even when an
 empty drain races immediately ahead of the worker queuing it.
 
+Reaping also retains a terminal predecessor while an already-pending job names
+it as a dependency. Cancellation propagates one dependency layer per drain;
+removing that outcome earlier would let a downstream job mistake a failed,
+missing predecessor for a satisfied historical token. Once consumers leave the
+pending-dependency queue, the normal reaping pass releases the records. This
+does not add a permanent outcome ledger for jobs submitted after reaping.
+
 Active-world asset-import and scene-document operations additionally capture
 the submission `{WorldHandle, Scene::Registry*}` pair on the main thread.
 Asset-import apply validates the pipeline binding as before.

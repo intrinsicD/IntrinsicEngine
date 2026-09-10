@@ -1,0 +1,54 @@
+Internal ctest changing into directory: /home/alex/Documents/IntrinsicEngine/build/ci
+Test project /home/alex/Documents/IntrinsicEngine/build/ci
+    Start 915: RuntimeJobService.ReapingKeepsFailedDependenciesUntilConsumersObserveThem
+1/2 Test #915: RuntimeJobService.ReapingKeepsFailedDependenciesUntilConsumersObserveThem ...***Failed    0.02 sec
+Running main() from /home/alex/Documents/IntrinsicEngine/external/vcpkg/buildtrees/gtest/src/v1.17.0-0c449efaff.clean/googletest/src/gtest_main.cc
+Note: Google Test filter = RuntimeJobService.ReapingKeepsFailedDependenciesUntilConsumersObserveThem
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from RuntimeJobService
+[ RUN      ] RuntimeJobService.ReapingKeepsFailedDependenciesUntilConsumersObserveThem
+[32m[INFO] Initialized Scheduler with 1 worker threads.[0m
+/home/alex/Documents/IntrinsicEngine/tests/contract/runtime/Test.RuntimeJobService.cpp:1429: Failure
+Expected equality of these values:
+  downstreamWork.load()
+    Which is: 1
+  0u
+    Which is: 0
+
+/home/alex/Documents/IntrinsicEngine/tests/contract/runtime/Test.RuntimeJobService.cpp:1430: Failure
+Value of: published.empty()
+  Actual: false
+Expected: true
+
+/home/alex/Documents/IntrinsicEngine/tests/contract/runtime/Test.RuntimeJobService.cpp:1431: Failure
+Expected equality of these values:
+  finalizers
+    Which is: 1
+  2u
+    Which is: 2
+
+[  FAILED  ] RuntimeJobService.ReapingKeepsFailedDependenciesUntilConsumersObserveThem (11 ms)
+[----------] 1 test from RuntimeJobService (11 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (11 ms total)
+[  PASSED  ] 0 tests.
+[  FAILED  ] 1 test, listed below:
+[  FAILED  ] RuntimeJobService.ReapingKeepsFailedDependenciesUntilConsumersObserveThem
+
+ 1 FAILED TEST
+
+    Start 916: RuntimeJobService.SuccessfulDependencyChainsRemainReapable
+2/2 Test #916: RuntimeJobService.SuccessfulDependencyChainsRemainReapable ..................   Passed    0.02 sec
+
+50% tests passed, 1 tests failed out of 2
+
+Label Time Summary:
+contract    =   0.03 sec*proc (2 tests)
+runtime     =   0.03 sec*proc (2 tests)
+
+Total Test time (real) =   0.84 sec
+
+The following tests FAILED:
+	915 - RuntimeJobService.ReapingKeepsFailedDependenciesUntilConsumersObserveThem (Failed)

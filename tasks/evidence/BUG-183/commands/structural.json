@@ -1,0 +1,21 @@
+{
+  "command": [
+    "bash",
+    "-c",
+    "set -e\npython3 tools/agents/check_task_policy.py --root . --strict\npython3 tools/docs/check_doc_links.py --root .\npython3 tools/repo/check_layering.py --root src --strict\npython3 tools/repo/check_test_layout.py --root . --strict\ngit diff --check"
+  ],
+  "command_display": "bash -c 'set -e\npython3 tools/agents/check_task_policy.py --root . --strict\npython3 tools/docs/check_doc_links.py --root .\npython3 tools/repo/check_layering.py --root src --strict\npython3 tools/repo/check_test_layout.py --root . --strict\ngit diff --check'",
+  "cwd": ".",
+  "duration_ms": 2411,
+  "exit_code": 0,
+  "finished_at": "2026-09-10T00:44:21Z",
+  "label": "structural",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-09-10T00:44:18Z",
+  "stderr_path": "tasks/evidence/BUG-183/commands/structural.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/BUG-183/commands/structural.stdout.log",
+  "stdout_sha256": "7356d30a6b176cf5d2ddcd9447c40080733f52e1de155ffee6a64229c6d2ff25",
+  "task_id": "BUG-183"
+}

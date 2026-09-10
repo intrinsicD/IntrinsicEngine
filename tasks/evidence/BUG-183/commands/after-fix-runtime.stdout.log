@@ -1,0 +1,64 @@
+Internal ctest changing into directory: /home/alex/Documents/IntrinsicEngine/build/ci
+Test project /home/alex/Documents/IntrinsicEngine/build/ci
+      Start 890: RuntimeJobService.SubmitRunsOnPoolThreadAndPublishesAtGate
+ 1/27 Test #890: RuntimeJobService.SubmitRunsOnPoolThreadAndPublishesAtGate ..........................   Passed    0.01 sec
+      Start 891: RuntimeJobService.CompletionQueuePublicationCannotClobberTerminalState
+ 2/27 Test #891: RuntimeJobService.CompletionQueuePublicationCannotClobberTerminalState ..............   Passed    0.01 sec
+      Start 892: RuntimeJobService.GpuQueueParticipantRecordsDrainsAndUnregisters
+ 3/27 Test #892: RuntimeJobService.GpuQueueParticipantRecordsDrainsAndUnregisters ....................   Passed    0.00 sec
+      Start 893: RuntimeJobService.GpuQueueShutdownRunsParticipantsInReverseOrder
+ 4/27 Test #893: RuntimeJobService.GpuQueueShutdownRunsParticipantsInReverseOrder ....................   Passed    0.00 sec
+      Start 894: RuntimeJobService.CancelBeforeStartPreventsWork
+ 5/27 Test #894: RuntimeJobService.CancelBeforeStartPreventsWork .....................................   Passed    0.02 sec
+      Start 895: RuntimeJobService.CancelMidFlightIsObservedAndDropsCompletion
+ 6/27 Test #895: RuntimeJobService.CancelMidFlightIsObservedAndDropsCompletion .......................   Passed    0.02 sec
+      Start 896: RuntimeJobService.CancelAfterWorkerFinishSuppressesGatePublication
+ 7/27 Test #896: RuntimeJobService.CancelAfterWorkerFinishSuppressesGatePublication ..................   Passed    0.02 sec
+      Start 897: RuntimeJobService.CancelAllForWorldOnlyCancelsMatchingScope
+ 8/27 Test #897: RuntimeJobService.CancelAllForWorldOnlyCancelsMatchingScope .........................   Passed    0.02 sec
+      Start 898: RuntimeJobService.ReapCompletedRemovesTerminalRecords
+ 9/27 Test #898: RuntimeJobService.ReapCompletedRemovesTerminalRecords ...............................   Passed    0.01 sec
+      Start 899: RuntimeJobService.EngineCompletionGatePublishesBeforePumpBOnMainThread
+10/27 Test #899: RuntimeJobService.EngineCompletionGatePublishesBeforePumpBOnMainThread ..............   Passed    0.04 sec
+      Start 900: RuntimeJobService.DependenciesGateDispatchUntilUpstreamPublishes
+11/27 Test #900: RuntimeJobService.DependenciesGateDispatchUntilUpstreamPublishes ....................   Passed    0.02 sec
+      Start 901: RuntimeJobService.DependentIsCancelledWhenUpstreamDoesNotPublish
+12/27 Test #901: RuntimeJobService.DependentIsCancelledWhenUpstreamDoesNotPublish ....................   Passed    0.02 sec
+      Start 902: RuntimeJobService.BoundedApplyLimitsWorkPerDrainWithoutStarving
+13/27 Test #902: RuntimeJobService.BoundedApplyLimitsWorkPerDrainWithoutStarving .....................   Passed    0.02 sec
+      Start 903: RuntimeJobService.NotReadyResultsParkInsteadOfApplyingOrBlocking
+14/27 Test #903: RuntimeJobService.NotReadyResultsParkInsteadOfApplyingOrBlocking ....................   Passed    0.01 sec
+      Start 904: RuntimeJobService.StaleWorldEpochDiscardsResultBeforeItCanMutate
+15/27 Test #904: RuntimeJobService.StaleWorldEpochDiscardsResultBeforeItCanMutate ....................   Passed    0.01 sec
+      Start 905: RuntimeJobService.ValidateBeforeApplyIsFailClosedAndAppliesOnlyOnce
+16/27 Test #905: RuntimeJobService.ValidateBeforeApplyIsFailClosedAndAppliesOnlyOnce .................   Passed    0.01 sec
+      Start 906: RuntimeJobService.ProgressIsReportableFromWorkAndReadableOnMainThread
+17/27 Test #906: RuntimeJobService.ProgressIsReportableFromWorkAndReadableOnMainThread ...............   Passed    0.02 sec
+      Start 907: RuntimeJobService.WorkerTerminalStateWaitsForUnpublishedFinalizerBeforeCompletion
+18/27 Test #907: RuntimeJobService.WorkerTerminalStateWaitsForUnpublishedFinalizerBeforeCompletion ...   Passed    0.01 sec
+      Start 908: RuntimeJobService.CancelBeforeStartFinalizesOnMainThreadInsteadOfPublishing
+19/27 Test #908: RuntimeJobService.CancelBeforeStartFinalizesOnMainThreadInsteadOfPublishing .........   Passed    0.01 sec
+      Start 909: RuntimeJobService.CancelAfterWorkerFinishFinalizesExactlyOnce
+20/27 Test #909: RuntimeJobService.CancelAfterWorkerFinishFinalizesExactlyOnce .......................   Passed    0.01 sec
+      Start 910: RuntimeJobService.StaleDiscardFinalizesSoConsumerStateCannotLeak
+21/27 Test #910: RuntimeJobService.StaleDiscardFinalizesSoConsumerStateCannotLeak ....................   Passed    0.02 sec
+      Start 911: RuntimeJobService.DependencyCancelledJobFinalizesInTheSameDrain
+22/27 Test #911: RuntimeJobService.DependencyCancelledJobFinalizesInTheSameDrain .....................   Passed    0.01 sec
+      Start 912: RuntimeJobService.PublishedJobNeverRunsTheUnpublishedFinalizer
+23/27 Test #912: RuntimeJobService.PublishedJobNeverRunsTheUnpublishedFinalizer ......................   Passed    0.02 sec
+      Start 913: RuntimeJobService.SnapshotAllEnumeratesRetainedJobsInTokenOrder
+24/27 Test #913: RuntimeJobService.SnapshotAllEnumeratesRetainedJobsInTokenOrder .....................   Passed    0.02 sec
+      Start 914: RuntimeJobService.SnapshotAllCarriesReportedProgressAndAge
+25/27 Test #914: RuntimeJobService.SnapshotAllCarriesReportedProgressAndAge ..........................   Passed    0.02 sec
+      Start 915: RuntimeJobService.ReapingKeepsFailedDependenciesUntilConsumersObserveThem
+26/27 Test #915: RuntimeJobService.ReapingKeepsFailedDependenciesUntilConsumersObserveThem ...........   Passed    0.02 sec
+      Start 916: RuntimeJobService.SuccessfulDependencyChainsRemainReapable
+27/27 Test #916: RuntimeJobService.SuccessfulDependencyChainsRemainReapable ..........................   Passed    0.02 sec
+
+100% tests passed, 0 tests failed out of 27
+
+Label Time Summary:
+contract    =   0.96 sec*proc (27 tests)
+runtime     =   0.96 sec*proc (27 tests)
+
+Total Test time (real) =   0.71 sec

@@ -9,6 +9,7 @@ module;
 #include <mutex>
 #include <string>
 #include <unordered_map>
+#include <unordered_set>
 #include <utility>
 #include <vector>
 
@@ -804,13 +805,21 @@ namespace Extrinsic::Runtime
 
         std::uint64_t reaped = 0;
         std::lock_guard lock(m_State->Mutex);
+        // Cancellation propagates one dependency layer per drain. Keep a
+        // predecessor's outcome until every already-pending consumer has
+        // observed it; a missing historical token carries no failure state.
+        std::unordered_set<JobToken, Core::StrongHandleHash<JobTokenTag>> referencedByPending;
+        for (const auto& pending : m_State->PendingDependencies)
+            if (pending)
+                for (const JobToken dependency : pending->DependsOn)
+                    referencedByPending.insert(dependency);
         for (auto it = m_State->Jobs.begin(); it != m_State->Jobs.end();)
         {
             const std::shared_ptr<JobService::JobRecord>& job = it->second;
-            if (!job ||
+            if (!referencedByPending.contains(it->first) && (!job ||
                 (IsTerminal(job->State.load(std::memory_order_acquire)) &&
                  job->UnpublishedFinalizerSettled.load(
-                     std::memory_order_acquire)))
+                     std::memory_order_acquire))))
             {
                 it = m_State->Jobs.erase(it);
                 reaped += 1;

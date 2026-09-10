@@ -1385,3 +1385,75 @@ TEST(RuntimeJobService, SnapshotAllCarriesReportedProgressAndAge)
         return jobs.IsComplete(token);
     }));
 }
+
+TEST(RuntimeJobService, ReapingKeepsFailedDependenciesUntilConsumersObserveThem)
+{
+    SchedulerScope scheduler{1};
+    Runtime::JobService jobs;
+    Runtime::KernelEventBus events;
+    std::vector<int> published;
+    std::atomic<unsigned> downstreamWork{};
+    unsigned finalizers{};
+    auto firstDesc=MakeCountingJob("reap.failed.first",1,published);
+    firstDesc.IsReadyToApply=[] {return false;};
+    const auto first=jobs.Submit(std::move(firstDesc));
+    auto dependent=[&](const char* name,int value,Runtime::JobToken predecessor)
+    {
+        auto desc=MakeCountingJob(name,value,published);
+        desc.DependsOn.push_back({predecessor,"await predecessor outcome"});
+        auto work=std::move(desc.Work);
+        desc.Work=[&downstreamWork,work=std::move(work)](const Runtime::JobCancellation& cancel) mutable
+        {++downstreamWork;return work(cancel);};
+        desc.FinalizeUnpublishedOnMainThread=[&] {++finalizers;};
+        return jobs.Submit(std::move(desc));
+    };
+    const auto second=dependent("reap.failed.second",2,first);
+    const auto third=dependent("reap.failed.third",3,second);
+    ASSERT_TRUE(WaitUntil([&]
+    {
+        (void)jobs.DrainCompletions(events);
+        return jobs.GetState(first)==Runtime::JobState::AwaitingApply;
+    }));
+    ASSERT_TRUE(jobs.Cancel(first));
+    (void)jobs.DrainCompletions(events);
+    EXPECT_EQ(jobs.GetState(second),Runtime::JobState::Cancelled);
+    EXPECT_EQ(jobs.GetState(third),Runtime::JobState::AwaitingDependencies);
+    // Reap in the same frame as cancellation, before the next layer observes it.
+    (void)jobs.ReapCompleted();
+    ASSERT_TRUE(WaitUntil([&]
+    {
+        (void)jobs.DrainCompletions(events);
+        (void)jobs.ReapCompleted();
+        return jobs.Stats().InFlightJobs==0;
+    }));
+    EXPECT_EQ(downstreamWork.load(),0u);
+    EXPECT_TRUE(published.empty());
+    EXPECT_EQ(finalizers,2u);
+    EXPECT_EQ(jobs.Stats().ReapedJobs,3u);
+    EXPECT_TRUE(jobs.SnapshotAll().empty());
+}
+
+TEST(RuntimeJobService, SuccessfulDependencyChainsRemainReapable)
+{
+    SchedulerScope scheduler{1};
+    Runtime::JobService jobs;
+    Runtime::KernelEventBus events;
+    std::vector<int> published;
+    Runtime::JobToken previous{};
+    for(int value=1;value<=3;++value)
+    {
+        auto desc=MakeCountingJob("reap.success",value,published);
+        if(previous.IsValid())desc.DependsOn.push_back({previous,"ordered publication"});
+        previous=jobs.Submit(std::move(desc));
+        ASSERT_TRUE(previous.IsValid());
+    }
+    ASSERT_TRUE(WaitUntil([&]
+    {
+        (void)jobs.DrainCompletions(events);
+        (void)jobs.ReapCompleted();
+        return jobs.Stats().InFlightJobs==0;
+    }));
+    EXPECT_EQ(published,(std::vector<int>{1,2,3}));
+    EXPECT_EQ(jobs.Stats().ReapedJobs,3u);
+    EXPECT_TRUE(jobs.SnapshotAll().empty());
+}

@@ -3,8 +3,12 @@ id: BUG-183
 theme: none
 depends_on: []
 workflow_schema: 1
-workflow_profile: standard
+workflow_profile: high-risk
 evidence: required
+owner: "codex-overnight"
+branch: "main"
+worktree: "/home/alex/Documents/IntrinsicEngine"
+claimed_at: "2026-09-10T00:40:45Z"
 contract_schema: 1
 contracts: []
 contract_review: "The catalog has no JobService dependency ID; preserve its existing documented cancellation and terminal-publication contract."
@@ -20,25 +24,28 @@ No scheduler redesign, worker-budget change or new dependency API.
 ## Context
 Independent RUNTIME-224 source review found that `Runtime.JobService.cpp` ReleaseSatisfiedDependencies treats missing/reaped dependencies as satisfied. Cancellation propagation visits one pending layer per drain; reaping can remove an unsuccessfully terminated predecessor before its downstream consumer observes the failure. RUNTIME-224 adds its own main-thread abandonment guard and actual Vulkan intermediate-cancellation test. This task owns the scheduler-level correction for other consumers. The review finding is source-backed; a deterministic standalone reproducer must establish the exact affected sequence before changing JobService.
 
+## Risk review
+Cancellation propagation and reclamation cross the worker/main-thread lifetime boundary. Use an independent fixed-surface review for this correction; no public API change is needed.
+
 ## Slice plan
 One slice: deterministic multistage cancellation/reap regression, smallest retention/propagation correction, focused tests and documentation.
 
 ## Required changes
-- [ ] Preserve terminal failure information while an unresolved dependent can reference it, or propagate cancellation fully before retiring that information.
-- [ ] Keep published/reaped predecessor behavior and bounded metadata reclamation intact.
+- [x] Preserve terminal failure information while an unresolved dependent can reference it, or propagate cancellation fully before retiring that information.
+- [x] Keep published/reaped predecessor behavior and bounded metadata reclamation intact.
 
 ## Tests
-- [ ] Reproduce cancellation of an intermediate stage with reaping between drains.
-- [ ] Verify no downstream Work or Publish executes after the failed dependency.
-- [ ] Verify successful dependency chains, explicit cancellation and reclamation still work.
+- [x] Reproduce cancellation of an intermediate stage with reaping between drains.
+- [x] Verify no downstream Work or Publish executes after the failed dependency.
+- [x] Verify successful dependency chains, explicit cancellation and reclamation still work.
 
 ## Docs
-- [ ] Synchronize the JobService lifetime/dependency comments with the final rule.
+- [x] Synchronize the JobService lifetime/dependency comments with the final rule.
 
 ## Acceptance criteria
-- [ ] Deterministic regression fails before and passes after the correction.
-- [ ] Existing RuntimeJobService tests and full CPU gate pass.
-- [ ] Completed chains release dependency metadata instead of leaking terminal records.
+- [x] Deterministic regression fails before and passes after the correction.
+- [x] Existing RuntimeJobService tests and full CPU gate pass.
+- [x] Completed chains release dependency metadata instead of leaking terminal records.
 
 ## Verification
 ```bash
@@ -51,3 +58,8 @@ python3 tools/agents/check_task_policy.py --root . --strict
 
 ## Forbidden changes
 Do not weaken cancellation tests or treat every absent token as successful without preserving the failed-dependency contract.
+
+## Reproduction and correction
+The controlled before-fix run executes and publishes the third job after its predecessor is cancelled and reaped: downstream Work=1, nonempty publications, one finalizer instead of two. The successful-chain control passes. Retaining dependency records referenced by the pending queue makes all 27 RuntimeJobService tests pass; completed chains still reclaim all three records.
+
+An existing compiler warning also identifies missing waiting-state cases in the aggregate `InFlightJobs` diagnostic. BUG-184 tracks that separate accounting issue; the regression here additionally asserts the final snapshot is empty and every record was reaped.

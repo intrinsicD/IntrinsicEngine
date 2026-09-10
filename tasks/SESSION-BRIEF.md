@@ -8,6 +8,7 @@ picking backlog work; theme priorities and rationale live in
 
 ## Active tasks
 
+- `BUG-183` — Preserve failed dependency state through job reaping (tasks/active/BUG-183-reaped-job-dependency-cancellation.md)
 - `METHOD-040` — Global multicut curvature-patch CPU reference (tasks/active/METHOD-040-global-multicut-curvature-patch-reference.md)
 - `METHOD-042` — Region-aware parts experiment (tasks/active/METHOD-042-region-aware-parts-experiment.md)
 - `METHOD-043` — Thickness and curve-aligned parts comparison (tasks/active/METHOD-043-thickness-and-curve-parts-comparison.md)
@@ -137,7 +138,7 @@ picking backlog work; theme priorities and rationale live in
 - unblocked: `BUG-180` — Leak-enabled framed ICP process reports 240 retained bytes (tasks/backlog/bugs/BUG-180-framed-icp-leak-enabled-process-retention.md)
 - unblocked: `BUG-181` — Touched-scope shader-output command uses an unsupported flag (tasks/backlog/bugs/BUG-181-touched-scope-shader-output-command.md)
 - unblocked: `BUG-182` — Framed kNN smoke times out when promoted Vulkan is not compiled (tasks/backlog/bugs/BUG-182-framed-knn-unavailable-device-timeout.md)
-- unblocked: `BUG-183` — Preserve failed dependency state through job reaping (tasks/backlog/bugs/BUG-183-reaped-job-dependency-cancellation.md)
+- unblocked: `BUG-184` — Count waiting jobs in aggregate in-flight diagnostics (tasks/backlog/bugs/BUG-184-job-service-waiting-state-accounting.md)
 - unblocked: `GRAPHICS-109` — Offscreen frame capture to PNG (headless figure renders) (tasks/backlog/rendering/GRAPHICS-109-offscreen-frame-capture-png.md)
 
 ## Audits

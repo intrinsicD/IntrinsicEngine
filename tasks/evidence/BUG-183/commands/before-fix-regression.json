@@ -1,0 +1,26 @@
+{
+  "command": [
+    "ctest",
+    "--test-dir",
+    "build/ci",
+    "--output-on-failure",
+    "-R",
+    "^RuntimeJobService\\.(ReapingKeepsFailedDependenciesUntilConsumersObserveThem|SuccessfulDependencyChainsRemainReapable)$",
+    "--timeout",
+    "60"
+  ],
+  "command_display": "ctest --test-dir build/ci --output-on-failure -R '^RuntimeJobService\\.(ReapingKeepsFailedDependenciesUntilConsumersObserveThem|SuccessfulDependencyChainsRemainReapable)$' --timeout 60",
+  "cwd": ".",
+  "duration_ms": 849,
+  "exit_code": 8,
+  "finished_at": "2026-09-10T00:41:30Z",
+  "label": "before-fix-regression",
+  "required": false,
+  "schema_version": 1,
+  "started_at": "2026-09-10T00:41:29Z",
+  "stderr_path": "tasks/evidence/BUG-183/commands/before-fix-regression.stderr.log",
+  "stderr_sha256": "18e00877dc1071c85cd4f479d451bebeef8309022e46cf8c63b0bed5151984a4",
+  "stdout_path": "tasks/evidence/BUG-183/commands/before-fix-regression.stdout.log",
+  "stdout_sha256": "407eb6f87e1aa47b26350dfe97e978cfb1ba9443870bbd5f1c3d18aad7857428",
+  "task_id": "BUG-183"
+}

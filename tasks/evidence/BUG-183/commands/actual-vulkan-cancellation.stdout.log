@@ -1,0 +1,14 @@
+Internal ctest changing into directory: /home/alex/Documents/IntrinsicEngine/build/ci-vulkan
+Test project /home/alex/Documents/IntrinsicEngine/build/ci-vulkan
+    Start 20: PointLBVHGpuSmoke.BilateralRejectsStaleAndCancelledPasses
+1/1 Test #20: PointLBVHGpuSmoke.BilateralRejectsStaleAndCancelledPasses ...   Passed   37.80 sec
+
+100% tests passed, 0 tests failed out of 1
+
+Label Time Summary:
+gpu            =  37.80 sec*proc (1 test)
+graphics       =  37.80 sec*proc (1 test)
+integration    =  37.80 sec*proc (1 test)
+vulkan         =  37.80 sec*proc (1 test)
+
+Total Test time (real) =  37.97 sec
