@@ -1,0 +1,16 @@
+Internal ctest changing into directory: /home/alex/Documents/IntrinsicEngine/build/ci-vulkan
+Test project /home/alex/Documents/IntrinsicEngine/build/ci-vulkan
+    Start 21: PointLBVHGpuSmoke.KeypointPublishesAcrossDomainsWithCompleteSupport
+1/2 Test #21: PointLBVHGpuSmoke.KeypointPublishesAcrossDomainsWithCompleteSupport ...   Passed   24.74 sec
+    Start 22: PointLBVHGpuSmoke.KeypointRejectsStaleCancellationAndRadiusOverflow
+2/2 Test #22: PointLBVHGpuSmoke.KeypointRejectsStaleCancellationAndRadiusOverflow ...   Passed   16.72 sec
+
+100% tests passed, 0 tests failed out of 2
+
+Label Time Summary:
+gpu            =  41.46 sec*proc (2 tests)
+graphics       =  41.46 sec*proc (2 tests)
+integration    =  41.46 sec*proc (2 tests)
+vulkan         =  41.46 sec*proc (2 tests)
+
+Total Test time (real) =  42.79 sec

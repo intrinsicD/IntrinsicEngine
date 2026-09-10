@@ -13,6 +13,7 @@ module;
 export module Geometry.PointCloud.Normals;
 
 import Geometry.KDTree;
+export import Geometry.SpatialQueries;
 import Geometry.PointLBVH;
 import Geometry.Octree;
 import Geometry.PointCloud;
@@ -101,10 +102,7 @@ export namespace Geometry::PointCloud::Normals
     // Row i contains candidate point indices in [Offsets[i], Offsets[i+1]).
     // Supply complete radius support or the reference's k+1 candidates. The
     // estimator removes self/duplicates and orders samples before fitting.
-    struct Neighborhoods
-    {
-        std::span<const std::uint32_t> Offsets{}, Indices{};
-    };
+    using Neighborhoods = Geometry::PointNeighborhoods;
 
     struct PropertySetResult
     {

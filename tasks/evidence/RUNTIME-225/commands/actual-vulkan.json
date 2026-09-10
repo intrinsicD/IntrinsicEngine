@@ -1,0 +1,29 @@
+{
+  "command": [
+    "env",
+    "ASAN_OPTIONS=detect_leaks=0",
+    "INTRINSIC_KEYPOINT_BENCHMARK_OUTPUT=/tmp/iss-benchmark/raw/result.json",
+    "ctest",
+    "--test-dir",
+    "build/ci-vulkan",
+    "--output-on-failure",
+    "-R",
+    "^PointLBVHGpuSmoke.Keypoint",
+    "--timeout",
+    "120"
+  ],
+  "command_display": "env ASAN_OPTIONS=detect_leaks=0 INTRINSIC_KEYPOINT_BENCHMARK_OUTPUT=/tmp/iss-benchmark/raw/result.json ctest --test-dir build/ci-vulkan --output-on-failure -R '^PointLBVHGpuSmoke.Keypoint' --timeout 120",
+  "cwd": ".",
+  "duration_ms": 42793,
+  "exit_code": 0,
+  "finished_at": "2026-09-10T01:41:42Z",
+  "label": "actual-vulkan",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-09-10T01:40:59Z",
+  "stderr_path": "tasks/evidence/RUNTIME-225/commands/actual-vulkan.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/RUNTIME-225/commands/actual-vulkan.stdout.log",
+  "stdout_sha256": "037c877a65643659449b77eaf585bdd2aa426572c504ad7851a2c11b76b9ef4c",
+  "task_id": "RUNTIME-225"
+}

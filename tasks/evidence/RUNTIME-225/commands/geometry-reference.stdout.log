@@ -1,0 +1,86 @@
+Internal ctest changing into directory: /home/alex/Documents/IntrinsicEngine/build/ci
+Test project /home/alex/Documents/IntrinsicEngine/build/ci
+      Start  658: NormalEstimation.EveryCanonicalDomainPublishesNamedNormalsAndSupportsUndoRedo
+ 1/37 Test  #658: NormalEstimation.EveryCanonicalDomainPublishesNamedNormalsAndSupportsUndoRedo ...........   Passed    0.03 sec
+      Start  659: NormalEstimation.PreservesDeletedRowsAndUnrelatedEditsButGuardsOutputHistory
+ 2/37 Test  #659: NormalEstimation.PreservesDeletedRowsAndUnrelatedEditsButGuardsOutputHistory ............   Passed    0.00 sec
+      Start  660: NormalEstimation.TopologyVariantsConsumeCustomPositionsAndGraphMethodAcceptsMesh
+ 3/37 Test  #660: NormalEstimation.TopologyVariantsConsumeCustomPositionsAndGraphMethodAcceptsMesh ........   Passed    0.01 sec
+      Start  661: NormalEstimation.MeshDeletionMasksExcludeFacesAndEdgesWithoutRenumberingOutput
+ 4/37 Test  #661: NormalEstimation.MeshDeletionMasksExcludeFacesAndEdgesWithoutRenumberingOutput ..........   Passed    0.01 sec
+      Start  662: NormalEstimation.RejectsInvalidBindingsAndUnavailableBackendsWithoutMutation
+ 5/37 Test  #662: NormalEstimation.RejectsInvalidBindingsAndUnavailableBackendsWithoutMutation ............   Passed    0.01 sec
+      Start  663: NormalEstimation.RadiusNeighborhoodAndDegenerateFallbackMatchAcrossBackends
+ 6/37 Test  #663: NormalEstimation.RadiusNeighborhoodAndDegenerateFallbackMatchAcrossBackends .............   Passed    0.01 sec
+      Start  664: NormalEstimation.QueuedJobsGuardInputsTopologyDeletionAndOutputButAllowUnrelatedEdits
+ 7/37 Test  #664: NormalEstimation.QueuedJobsGuardInputsTopologyDeletionAndOutputButAllowUnrelatedEdits ...   Passed    0.05 sec
+      Start  665: NormalEstimation.NamedOutputUsesSharedVectorVisualizationRecipe
+ 8/37 Test  #665: NormalEstimation.NamedOutputUsesSharedVectorVisualizationRecipe .........................   Passed    0.01 sec
+      Start  666: NormalEstimation.TopologyCatalogRetainsSmallGraphsAndReportsPcaMinimum
+ 9/37 Test  #666: NormalEstimation.TopologyCatalogRetainsSmallGraphsAndReportsPcaMinimum ..................   Passed    0.01 sec
+      Start  667: NormalEstimation.GraphPositionSlotMayBindAnExistingNormalNamedProperty
+10/37 Test  #667: NormalEstimation.GraphPositionSlotMayBindAnExistingNormalNamedProperty ..................   Passed    0.00 sec
+      Start  668: NormalEstimation.FaceNormalsUseFullPolygonRingAndPublishOnlyFaceOutput
+11/37 Test  #668: NormalEstimation.FaceNormalsUseFullPolygonRingAndPublishOnlyFaceOutput ..................   Passed    0.01 sec
+      Start  669: NormalEstimation.FaceNormalsPreserveDeletedSlotsAndReportDegenerateFallback
+12/37 Test  #669: NormalEstimation.FaceNormalsPreserveDeletedSlotsAndReportDegenerateFallback .............   Passed    0.01 sec
+      Start  670: NormalEstimation.QueuedFaceNormalsPublishToFacesAndRejectStaleTopology
+13/37 Test  #670: NormalEstimation.QueuedFaceNormalsPublishToFacesAndRejectStaleTopology ..................   Passed    0.02 sec
+      Start  671: NormalEstimation.VulkanUnavailablePreservesOutputsOnEveryDomain
+14/37 Test  #671: NormalEstimation.VulkanUnavailablePreservesOutputsOnEveryDomain .........................   Passed    0.01 sec
+      Start  672: NormalEstimationConfig.RoundTripAndSharedPreviewApplyRun
+15/37 Test  #672: NormalEstimationConfig.RoundTripAndSharedPreviewApplyRun ................................   Passed    0.01 sec
+      Start  673: NormalEstimationConfig.VulkanSelectionRoundTripsAndRejectsInvalidBatchSizes
+16/37 Test  #673: NormalEstimationConfig.VulkanSelectionRoundTripsAndRejectsInvalidBatchSizes .............   Passed    0.00 sec
+      Start 2641: PointCloudFeatures.RowAccessorIsBoundsChecked
+17/37 Test #2641: PointCloudFeatures.RowAccessorIsBoundsChecked ...........................................   Passed    0.00 sec
+      Start 2642: PointCloudFeatures.MatchRejectsMismatchedDimensions
+18/37 Test #2642: PointCloudFeatures.MatchRejectsMismatchedDimensions .....................................   Passed    0.00 sec
+      Start 2643: PointCloudFeatures.MatchTieBreakPrefersLowestTargetRow
+19/37 Test #2643: PointCloudFeatures.MatchTieBreakPrefersLowestTargetRow ..................................   Passed    0.00 sec
+      Start 2644: PointCloudFeatures.MatchRatioRejectsSingleTargetAmbiguity
+20/37 Test #2644: PointCloudFeatures.MatchRatioRejectsSingleTargetAmbiguity ...............................   Passed    0.00 sec
+      Start 2645: PointCloudFeatures.MatchRatioRejectsDuplicateTargets
+21/37 Test #2645: PointCloudFeatures.MatchRatioRejectsDuplicateTargets ....................................   Passed    0.00 sec
+      Start 2646: PointCloudFeatures.ComputeDescriptorsSkipsDeletedPoints
+22/37 Test #2646: PointCloudFeatures.ComputeDescriptorsSkipsDeletedPoints .................................   Passed    0.01 sec
+      Start 2647: PointCloudFeatures.KeypointsSkipDeletedPoints
+23/37 Test #2647: PointCloudFeatures.KeypointsSkipDeletedPoints ...........................................   Passed    0.01 sec
+      Start 2648: PointCloudFeatures.ComputeDescriptorsRequiresNormals
+24/37 Test #2648: PointCloudFeatures.ComputeDescriptorsRequiresNormals ....................................   Passed    0.01 sec
+      Start 2649: PointCloudFeatures.DetectKeypointsIsDeterministic
+25/37 Test #2649: PointCloudFeatures.DetectKeypointsIsDeterministic .......................................   Passed    0.02 sec
+      Start 2650: PointCloudFeatures.DetectKeypointsRejectsTooFewPoints
+26/37 Test #2650: PointCloudFeatures.DetectKeypointsRejectsTooFewPoints ...................................   Passed    0.01 sec
+      Start 2651: PointCloudFeatures.DescriptorMatchingIsRotationInvariant
+27/37 Test #2651: PointCloudFeatures.DescriptorMatchingIsRotationInvariant ................................   Passed    0.02 sec
+      Start 2652: PointCloudFeatures.CoarseAlignmentRecoversKnownTransform
+28/37 Test #2652: PointCloudFeatures.CoarseAlignmentRecoversKnownTransform ................................   Passed    0.14 sec
+      Start 2653: PointCloudFeatures.CoarseAlignmentRejectsOutliers
+29/37 Test #2653: PointCloudFeatures.CoarseAlignmentRejectsOutliers .......................................   Passed    0.09 sec
+      Start 2654: PointCloudFeatures.CoarseAlignmentHonorsLargerSampleSize
+30/37 Test #2654: PointCloudFeatures.CoarseAlignmentHonorsLargerSampleSize ................................   Passed    0.14 sec
+      Start 2655: PointCloudFeatures.CoarseAlignmentInsufficientCorrespondences
+31/37 Test #2655: PointCloudFeatures.CoarseAlignmentInsufficientCorrespondences ...........................   Passed    0.01 sec
+      Start 2656: PointCloudFeatures.HandlesCollinearAndDuplicatePoints
+32/37 Test #2656: PointCloudFeatures.HandlesCollinearAndDuplicatePoints ...................................   Passed    0.01 sec
+      Start 2657: PointCloudFeatures.IcpRegistrationRemainsReachable
+33/37 Test #2657: PointCloudFeatures.IcpRegistrationRemainsReachable ......................................   Passed    0.01 sec
+      Start 2658: KeypointAnalysis.AnalyticCovarianceAndLowestIdSuppression
+34/37 Test #2658: KeypointAnalysis.AnalyticCovarianceAndLowestIdSuppression ...............................   Passed    0.00 sec
+      Start 2659: KeypointAnalysis.CompleteSuppliedSupportMatchesReferenceAtBothRadii
+35/37 Test #2659: KeypointAnalysis.CompleteSuppliedSupportMatchesReferenceAtBothRadii .....................   Passed    0.02 sec
+      Start 2660: KeypointAnalysis.RejectsMalformedSupportAndUnrepresentableInputs
+36/37 Test #2660: KeypointAnalysis.RejectsMalformedSupportAndUnrepresentableInputs ........................   Passed    0.01 sec
+      Start 2661: KeypointAnalysis.CloudSpacingUsesNearestLivePointsAndRemapsOriginalSlots
+37/37 Test #2661: KeypointAnalysis.CloudSpacingUsesNearestLivePointsAndRemapsOriginalSlots ................   Passed    0.01 sec
+
+100% tests passed, 0 tests failed out of 37
+
+Label Time Summary:
+contract    =   0.19 sec*proc (16 tests)
+geometry    =   0.51 sec*proc (21 tests)
+runtime     =   0.19 sec*proc (16 tests)
+unit        =   0.51 sec*proc (21 tests)
+
+Total Test time (real) =   1.52 sec

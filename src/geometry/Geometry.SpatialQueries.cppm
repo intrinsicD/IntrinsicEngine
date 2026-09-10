@@ -1,8 +1,10 @@
+// Shared spatial-query concepts, diagnostics and borrowed point-neighborhood rows.
 module;
 
 #include <concepts>
 #include <cstddef>
 #include <cstdint>
+#include <span>
 
 export module Geometry.SpatialQueries;
 
@@ -11,6 +13,13 @@ import Geometry.Overlap;
 
 export namespace Geometry
 {
+    // Row i addresses Indices[Offsets[i]..Offsets[i+1]). The consumer defines
+    // membership, ordering, self handling and completeness requirements.
+    struct PointNeighborhoods
+    {
+        std::span<const std::uint32_t> Offsets{}, Indices{};
+    };
+
     /// Concept satisfied by any shape for which TestOverlap(AABB, Shape) is defined.
     /// Shared by Octree, KDTree, and BVH to avoid repeated concept definitions.
     template <typename Shape>

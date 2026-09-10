@@ -2386,6 +2386,47 @@ namespace Extrinsic::Runtime
             return std::nullopt;
         return GetBilateralFilterConfig(context.EngineConfigControlState->ActiveConfig);
     }
+    RuntimeEngineConfigApplyResult ApplyEditorKeypointAnalysisConfig(
+        const EditorGeometryProcessingContext& context, const KeypointAnalysisConfig& config,
+        std::string sourceId)
+    {
+        RuntimeEngineConfigApplyResult result{
+            .Status = RuntimeEngineConfigApplyStatus::Rejected,
+            .Source = RuntimeConfigControlSource::Editor,
+        };
+        const auto validation = ValidateKeypointAnalysisConfigSection(
+            SerializeKeypointAnalysisConfig(config), {}, kKeypointAnalysisConfigSectionName);
+        if (!validation.Usable())
+        {
+            result.LoadResult.Diagnostics = validation.Diagnostics;
+            return result;
+        }
+        if (context.EngineConfigControlState == nullptr || !context.PreviewEngineConfigDocument ||
+            !context.ApplyEngineConfigHotSubset || !context.EngineConfigCommandsAvailable)
+        {
+            return result;
+        }
+
+        Core::Config::EngineConfig candidate = context.EngineConfigControlState->ActiveConfig;
+        SetKeypointAnalysisConfig(candidate, config);
+        if (sourceId.empty())
+        {
+            sourceId = std::string{kKeypointAnalysisConfigSectionName};
+        }
+        result.LoadResult = context.PreviewEngineConfigDocument(
+            Core::Config::SerializeEngineConfig(candidate), sourceId);
+        if (!Core::Config::IsConfigUsable(result.LoadResult))
+            return result;
+        return context.ApplyEngineConfigHotSubset(result.LoadResult);
+    }
+
+    std::optional<KeypointAnalysisConfig> GetEditorKeypointAnalysisConfig(
+        const EditorGeometryProcessingContext& context)
+    {
+        if (context.EngineConfigControlState == nullptr)
+            return std::nullopt;
+        return GetKeypointAnalysisConfig(context.EngineConfigControlState->ActiveConfig);
+    }
 
 
 }

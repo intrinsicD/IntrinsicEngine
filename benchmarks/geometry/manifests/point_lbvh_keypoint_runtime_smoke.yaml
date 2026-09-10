@@ -1,0 +1,22 @@
+benchmark_id: geometry.point_lbvh.keypoint_runtime_smoke
+method: geometry.point_lbvh
+dataset: builtin.keypoint_samples.eight_domains.seed241
+params:
+  intent: smoke
+  warmup_iterations: 1
+  measured_iterations: 1
+  capability: gpu_vulkan
+  salient_radius: 2
+  nonmax_radius: 0.5
+  minimum_neighbors: 5
+  gamma21: 0.975
+  gamma32: 0.975
+  gpu_radius_capacity: 256
+  gpu_query_batch_size: 128
+  timed_scope: eight_domain_keypoint_requests_through_publication
+metrics:
+  - runtime_ms
+  - quality_error_linf
+thresholds:
+  smoke_runtime_ms_max: 30000
+  quality_error_linf_max: 0.00001

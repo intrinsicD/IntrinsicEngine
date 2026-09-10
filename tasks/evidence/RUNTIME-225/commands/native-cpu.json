@@ -1,0 +1,26 @@
+{
+  "command": [
+    "ctest",
+    "--test-dir",
+    "build/ci",
+    "--output-on-failure",
+    "-R",
+    "^(ImGuiAdapterEngineWiring\\.(RunProducesOneOverlayFramePerEngineFrame|EditorHookInvokedOncePerFrameAndProducesDrawLists|RunNormalizesNativeCloseBeforeFirstFrame|RunNormalizesNativeCloseAfterInteractiveInput)|GizmoInteractionEngineWiring.RunFramePublishesSelectedEntityGizmoPacket)$",
+    "--timeout",
+    "60"
+  ],
+  "command_display": "ctest --test-dir build/ci --output-on-failure -R '^(ImGuiAdapterEngineWiring\\.(RunProducesOneOverlayFramePerEngineFrame|EditorHookInvokedOncePerFrameAndProducesDrawLists|RunNormalizesNativeCloseBeforeFirstFrame|RunNormalizesNativeCloseAfterInteractiveInput)|GizmoInteractionEngineWiring.RunFramePublishesSelectedEntityGizmoPacket)$' --timeout 60",
+  "cwd": ".",
+  "duration_ms": 542,
+  "exit_code": 0,
+  "finished_at": "2026-09-10T01:40:15Z",
+  "label": "native-cpu",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-09-10T01:40:14Z",
+  "stderr_path": "tasks/evidence/RUNTIME-225/commands/native-cpu.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/RUNTIME-225/commands/native-cpu.stdout.log",
+  "stdout_sha256": "1f59a2b1c288a47fca9a5df9362e89d89e19d1d0b5d9c784a8f9ce5da62789d8",
+  "task_id": "RUNTIME-225"
+}

@@ -1,3 +1,4 @@
+// Point-set keypoints and point-cloud descriptor/registration kernels with explicit numerical outputs.
 module;
 
 #include <cstdint>
@@ -11,34 +12,10 @@ module;
 export module Geometry.PointCloud.Features;
 
 import Geometry.PointCloud;
+export import Geometry.SpatialQueries;
 
 export namespace Geometry::PointCloud::Features
 {
-    // =========================================================================
-    // Point-cloud keypoint / descriptor / correspondence / coarse-registration
-    // seams (GEOM-017)
-    // =========================================================================
-    //
-    // Generic, paper-neutral CPU contracts for robust point-cloud registration.
-    // This module owns the reusable pieces that initialize the existing
-    // `Geometry.Registration` ICP path and feed later paper-specific robust /
-    // global registration method packages under `methods/geometry`:
-    //
-    //   keypoints  -> descriptors -> correspondences -> coarse alignment -> ICP
-    //
-    // The default keypoint family is ISS (Intrinsic Shape Signatures, Zhong
-    // 2009) saliency; the default descriptor family is FPFH (Fast Point Feature
-    // Histograms, Rusu et al. 2009, 33-D). Both are deterministic, allocation-
-    // bounded, and `geometry -> core` only. No Eigen types cross this interface.
-    //
-    // Preconditions are explicit: descriptor computation requires the cloud to
-    // carry normals (`Cloud::HasNormals()`); generate them first with
-    // `Geometry::PointCloud::Normals`. Functions fail closed (return `nullopt` /
-    // a non-`Success` status) on unmet preconditions rather than fabricating
-    // data.
-
-    // ------------------------------------------------------------------ Keypoints
-
     struct KeypointParams
     {
         // Neighborhood radius for the saliency covariance. <= 0 selects a radius
@@ -59,12 +36,27 @@ export namespace Geometry::PointCloud::Features
 
     struct KeypointSet
     {
-        // Point indices into the source cloud, sorted ascending (deterministic).
+        // Input-span indices, or original Cloud slots, sorted ascending.
         std::vector<std::uint32_t> Indices;
 
         // Per-keypoint saliency (the smallest covariance eigenvalue lambda3),
         // aligned with Indices.
         std::vector<double> Saliency;
+    };
+
+
+    struct KeypointScale
+    {
+        float MeanSpacing{}, SalientRadius{}, NonMaxRadius{};
+    };
+    struct KeypointAnalysis
+    {
+        KeypointSet Keypoints{};
+        // Pre-NMS candidate scores; rejected candidates are zero. Mask marks
+        // only retained keypoints, including a valid zero-saliency maximum.
+        std::vector<float> Saliency{};
+        std::vector<std::uint32_t> Mask{};
+        KeypointScale Scale{};
     };
 
     // ---------------------------------------------------------------- Descriptors
@@ -175,6 +167,19 @@ export namespace Geometry::PointCloud::Features
     };
 
     // ----------------------------------------------------------------------- API
+
+    [[nodiscard]] std::optional<float> EstimateSpacing(std::span<const glm::vec3> positions);
+    // Positive nearest-other spacing is required even with manual radii.
+    [[nodiscard]] std::optional<KeypointScale> ResolveKeypointScale(
+        std::span<const glm::vec3> positions, const KeypointParams& params = {});
+    [[nodiscard]] std::optional<KeypointAnalysis> AnalyzeKeypoints(
+        std::span<const glm::vec3> positions, const KeypointParams& params = {});
+    // Scale must come from ResolveKeypointScale for these inputs/parameters.
+    // Supply complete max(salient,NMS) radius rows: ascending unique nonself IDs.
+    // Membership/order/shape are checked; the caller guarantees completeness.
+    [[nodiscard]] std::optional<KeypointAnalysis> AnalyzeKeypointsFromNeighbors(
+        std::span<const glm::vec3> positions, const KeypointParams& params,
+        const KeypointScale& scale, Geometry::PointNeighborhoods neighborhoods);
 
     // Mean nearest-neighbor spacing of a cloud; the auto-radius reference scale.
     // Returns nullopt for fewer than two finite points.

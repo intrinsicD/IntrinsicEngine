@@ -128,3 +128,6 @@ probability must not be confused with this existing distance-ratio formula.
 
 ## Bilateral slice
 RUNTIME-224 adds owned span results and a supplied-neighbor single-pass reducer for the fixed-normal point filter, preserving the Cloud wrapper with atomic publication. Runtime uses all canonical domains and private cache workspaces for moving iterations. Feature utilities and the distinct Framework24 covariance probability remain separate work; older progress paragraphs above record their slice-time remainder.
+
+## Keypoint slice
+RUNTIME-225 adds span scale/keypoint analysis and complete supplied radius rows through the common Geometry.SpatialQueries neighborhood view. Runtime composes cached CPU/Vulkan queries with CPU centroid-PCA and suppression on all canonical domains. The corrected nearest-live Cloud spacing also affects descriptor automatic radii. FPFH span/neighborhood/runtime integration and descriptor matching remain open; reuse the common row view and property helpers, while preserving descriptor-space matching semantics. Framework24 scalar Gaussian saliency and covariance probability remain distinct ports.

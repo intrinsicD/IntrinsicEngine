@@ -1,0 +1,52 @@
+Internal ctest changing into directory: /home/alex/Documents/IntrinsicEngine/build/ci
+Test project /home/alex/Documents/IntrinsicEngine/build/ci
+      Start 2647: PointCloudFeatures.RowAccessorIsBoundsChecked
+ 1/21 Test #2647: PointCloudFeatures.RowAccessorIsBoundsChecked ..............................   Passed    0.01 sec
+      Start 2648: PointCloudFeatures.MatchRejectsMismatchedDimensions
+ 2/21 Test #2648: PointCloudFeatures.MatchRejectsMismatchedDimensions ........................   Passed    0.01 sec
+      Start 2649: PointCloudFeatures.MatchTieBreakPrefersLowestTargetRow
+ 3/21 Test #2649: PointCloudFeatures.MatchTieBreakPrefersLowestTargetRow .....................   Passed    0.01 sec
+      Start 2650: PointCloudFeatures.MatchRatioRejectsSingleTargetAmbiguity
+ 4/21 Test #2650: PointCloudFeatures.MatchRatioRejectsSingleTargetAmbiguity ..................   Passed    0.01 sec
+      Start 2651: PointCloudFeatures.MatchRatioRejectsDuplicateTargets
+ 5/21 Test #2651: PointCloudFeatures.MatchRatioRejectsDuplicateTargets .......................   Passed    0.01 sec
+      Start 2652: PointCloudFeatures.ComputeDescriptorsSkipsDeletedPoints
+ 6/21 Test #2652: PointCloudFeatures.ComputeDescriptorsSkipsDeletedPoints ....................   Passed    0.01 sec
+      Start 2653: PointCloudFeatures.KeypointsSkipDeletedPoints
+ 7/21 Test #2653: PointCloudFeatures.KeypointsSkipDeletedPoints ..............................   Passed    0.01 sec
+      Start 2654: PointCloudFeatures.ComputeDescriptorsRequiresNormals
+ 8/21 Test #2654: PointCloudFeatures.ComputeDescriptorsRequiresNormals .......................   Passed    0.01 sec
+      Start 2655: PointCloudFeatures.DetectKeypointsIsDeterministic
+ 9/21 Test #2655: PointCloudFeatures.DetectKeypointsIsDeterministic ..........................   Passed    0.02 sec
+      Start 2656: PointCloudFeatures.DetectKeypointsRejectsTooFewPoints
+10/21 Test #2656: PointCloudFeatures.DetectKeypointsRejectsTooFewPoints ......................   Passed    0.01 sec
+      Start 2657: PointCloudFeatures.DescriptorMatchingIsRotationInvariant
+11/21 Test #2657: PointCloudFeatures.DescriptorMatchingIsRotationInvariant ...................   Passed    0.02 sec
+      Start 2658: PointCloudFeatures.CoarseAlignmentRecoversKnownTransform
+12/21 Test #2658: PointCloudFeatures.CoarseAlignmentRecoversKnownTransform ...................   Passed    0.17 sec
+      Start 2659: PointCloudFeatures.CoarseAlignmentRejectsOutliers
+13/21 Test #2659: PointCloudFeatures.CoarseAlignmentRejectsOutliers ..........................   Passed    0.10 sec
+      Start 2660: PointCloudFeatures.CoarseAlignmentHonorsLargerSampleSize
+14/21 Test #2660: PointCloudFeatures.CoarseAlignmentHonorsLargerSampleSize ...................   Passed    0.17 sec
+      Start 2661: PointCloudFeatures.CoarseAlignmentInsufficientCorrespondences
+15/21 Test #2661: PointCloudFeatures.CoarseAlignmentInsufficientCorrespondences ..............   Passed    0.01 sec
+      Start 2662: PointCloudFeatures.HandlesCollinearAndDuplicatePoints
+16/21 Test #2662: PointCloudFeatures.HandlesCollinearAndDuplicatePoints ......................   Passed    0.01 sec
+      Start 2663: PointCloudFeatures.IcpRegistrationRemainsReachable
+17/21 Test #2663: PointCloudFeatures.IcpRegistrationRemainsReachable .........................   Passed    0.01 sec
+      Start 2664: KeypointAnalysis.AnalyticCovarianceAndLowestIdSuppression
+18/21 Test #2664: KeypointAnalysis.AnalyticCovarianceAndLowestIdSuppression ..................   Passed    0.01 sec
+      Start 2665: KeypointAnalysis.CompleteSuppliedSupportMatchesReferenceAtBothRadii
+19/21 Test #2665: KeypointAnalysis.CompleteSuppliedSupportMatchesReferenceAtBothRadii ........   Passed    0.02 sec
+      Start 2666: KeypointAnalysis.RejectsMalformedSupportAndUnrepresentableInputs
+20/21 Test #2666: KeypointAnalysis.RejectsMalformedSupportAndUnrepresentableInputs ...........   Passed    0.01 sec
+      Start 2667: KeypointAnalysis.CloudSpacingUsesNearestLivePointsAndRemapsOriginalSlots
+21/21 Test #2667: KeypointAnalysis.CloudSpacingUsesNearestLivePointsAndRemapsOriginalSlots ...   Passed    0.01 sec
+
+100% tests passed, 0 tests failed out of 21
+
+Label Time Summary:
+geometry    =   0.62 sec*proc (21 tests)
+unit        =   0.62 sec*proc (21 tests)
+
+Total Test time (real) =   2.23 sec

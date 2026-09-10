@@ -369,6 +369,12 @@ namespace Extrinsic::Sandbox::Editor
             Runtime::OutlierAnalysisConfig Draft{};
             std::string LastApplied{}, ConfigDiagnostic{}, VisualizationDiagnostic{};
         };
+        struct KeypointsState
+        {
+            std::optional<Runtime::EditorKeypointAnalysisResult> LastResult{};
+            Runtime::KeypointAnalysisConfig Draft{};
+            std::string LastApplied{}, ConfigDiagnostic{}, VisualizationDiagnostic{};
+        };
         struct DensityState
         {
             std::optional<Runtime::EditorKernelDensityResult> LastResult{};
@@ -424,6 +430,7 @@ namespace Extrinsic::Sandbox::Editor
         RegistrationState Registration{};
         NormalsState Normals{};
         OutliersState Outliers{};
+        KeypointsState Keypoints{};
         DensityState Density{};
         SpacingState Spacing{};
         BilateralState Bilateral{};
@@ -457,6 +464,7 @@ namespace Extrinsic::Sandbox::Editor
         void DrawSimplifyWindow(bool&, const SandboxEditorContext&);
         void DrawNormalsWindow(bool&, const SandboxEditorContext&);
         void DrawOutliersWindow(bool&, const SandboxEditorContext&);
+        void DrawKeypointsWindow(bool&, const SandboxEditorContext&);
         void DrawDensityWindow(bool&, const SandboxEditorContext&);
         void DrawSpacingWindow(bool&, const SandboxEditorContext&);
         void DrawBilateralWindow(bool&, const SandboxEditorContext&);
@@ -509,6 +517,18 @@ namespace Extrinsic::Sandbox::Editor
                 .OpenStateChanged=[this,id](bool open){
                     if(!open)return;
                     (void)Shell->SetEditorWindowOpen("view.outlier_analysis",true);
+                    (void)Shell->SetEditorWindowOpen(id,false);
+                }}));
+        RegisterWindow("view.keypoint_analysis", {"View"}, "ISS Keypoint Analysis", &Impl::DrawKeypointsWindow);
+        for (const auto& [id, domain] : std::array<std::pair<const char*, const char*>, 3>{
+                 {{"mesh.processing.keypoints", "Mesh"}, {"graph.processing.keypoints", "Graph"},
+                  {"pointcloud.processing.keypoints", "PointCloud"}}})
+            Handles.push_back(Shell->RegisterEditorWindow({
+                .Id=id, .MenuPath={domain,"Processing"}, .Title="ISS Keypoint Analysis",
+                .Draw=[](bool& open,const SandboxEditorContext&){open=false;},
+                .OpenStateChanged=[this,id](bool open){
+                    if(!open)return;
+                    (void)Shell->SetEditorWindowOpen("view.keypoint_analysis",true);
                     (void)Shell->SetEditorWindowOpen(id,false);
                 }}));
         RegisterWindow("view.kernel_density", {"View"}, "Kernel Density", &Impl::DrawDensityWindow);
@@ -614,6 +634,7 @@ namespace Extrinsic::Sandbox::Editor
         Registration.LastResult.reset();
         Normals = {};
         Outliers = {};
+        Keypoints = {};
         Density = {};
         Spacing = {};
         Bilateral = {};
@@ -2423,6 +2444,157 @@ namespace Extrinsic::Sandbox::Editor
                 ImGui::Text("Mean %.5g; standard deviation %.5g; threshold %.5g",double(result.MeanDistance),double(result.StdDevDistance),double(result.DistanceThreshold));
             ImGui::TextWrapped("%s",result.Message.c_str());
             DrawDismissLastResultButton("Dismiss##Outliers",Outliers.LastResult,Runtime::EditorGeometryProcessingResultSlot::OutlierAnalysis,context);
+        }
+        ImGui::End();
+    }
+
+    void MeshProcessingPanels::Impl::DrawKeypointsWindow(bool &open, const SandboxEditorContext &context)
+    {
+        if (context.GeometryResults.LastKeypointAnalysisResult)
+            Keypoints.LastResult = context.GeometryResults.LastKeypointAnalysisResult;
+        ImGui::SetNextWindowSize(ImVec2(460, 600), ImGuiCond_FirstUseEver);
+        if (!ImGui::Begin("ISS Keypoint Analysis", &open))
+        {
+            ImGui::End();
+            return;
+        }
+        const auto active = Runtime::GetEditorKeypointAnalysisConfig(context.GeometryCommands)
+                                .value_or(Runtime::KeypointAnalysisConfig{});
+        const auto serialized = Runtime::SerializeKeypointAnalysisConfig(active);
+        if (serialized != Keypoints.LastApplied)
+        {
+            Keypoints.Draft = active;
+            Keypoints.LastApplied = serialized;
+            Keypoints.ConfigDiagnostic.clear();
+        }
+        auto &config = Keypoints.Draft;
+        bool changed = false;
+        const auto workspace =
+            Runtime::BuildEditorWorkspaceSnapshot(context.SnapshotQueries, {.Hierarchy = true,
+                                                                            .Inspector = false,
+                                                                            .Selection = false,
+                                                                            .Document = false,
+                                                                            .SceneFile = false,
+                                                                            .FileImport = false,
+                                                                            .AssetImportQueue = false,
+                                                                            .RenderGraph = false,
+                                                                            .RenderRecipe = false,
+                                                                            .CameraRender = false,
+                                                                            .Visualization = false});
+        if (context.Selection && !context.Selection->SelectedStableIds.empty() &&
+            ImGui::Button("Use selected entity"))
+        {
+            config.StableEntityId = context.Selection->SelectedStableIds.front();
+            changed = true;
+        }
+        std::string entityName =
+            config.StableEntityId ? std::to_string(config.StableEntityId) : "Choose entity";
+        for (const auto &row : workspace.Hierarchy)
+            if (row.StableEntityId == config.StableEntityId)
+                entityName = row.Name;
+        if (ImGui::BeginCombo("Entity##Keypoints", entityName.c_str()))
+        {
+            for (const auto &row : workspace.Hierarchy)
+            {
+                if (Runtime::GetEditorKeypointAnalysisInputCatalog(context.GeometryCommands,
+                                                                   row.StableEntityId)
+                        .Entries.empty())
+                    continue;
+                const auto title = row.Name + " (" + std::to_string(row.StableEntityId) + ")";
+                if (ImGui::Selectable(title.c_str(), row.StableEntityId == config.StableEntityId))
+                {
+                    config.StableEntityId = row.StableEntityId;
+                    changed = true;
+                }
+            }
+            ImGui::EndCombo();
+        }
+        const auto inputName =
+            std::string(Runtime::ToString(config.Positions.Domain)) + ": " + config.Positions.Name;
+        if (ImGui::BeginCombo("Positions##Keypoints", inputName.c_str()))
+        {
+            const auto catalog = Runtime::GetEditorKeypointAnalysisInputCatalog(context.GeometryCommands, config.StableEntityId);
+            auto previousDomain = Runtime::GeometryElementDomain::Unknown;
+            for (const auto &row : catalog.Entries)
+            {
+                if (row.Ref.Domain != previousDomain)
+                {
+                    ImGui::SeparatorText(std::string(Runtime::ToString(row.Ref.Domain)).c_str());
+                    previousDomain = row.Ref.Domain;
+                }
+                const auto label = std::string(Runtime::ToString(row.Ref.Domain)) + ": " + row.Ref.Name +
+                                   " (" + std::to_string(row.ElementCount) + ")";
+                if (ImGui::Selectable(label.c_str(), row.Ref == config.Positions))
+                {
+                    config.Positions = row.Ref;
+                    config.Mask.Domain = config.Score.Domain = row.Ref.Domain;
+                    changed = true;
+                }
+            }
+            ImGui::EndCombo();
+        }
+        for (auto [label, ref] : {std::pair{"Mask property", &config.Mask}, std::pair{"Saliency property", &config.Score}})
+        {
+            std::array<char,512> name{};
+            std::copy_n(ref->Name.c_str(),std::min(ref->Name.size(),name.size()-1),name.data());
+            if (ImGui::InputText(label,name.data(),name.size())) {ref->Name=name.data();changed=true;}
+        }
+        int backend=int(config.Backend);
+        if(ImGui::Combo("Neighbors",&backend,"CPU KD-tree\0CPU LBVH (cached)\0Vulkan LBVH\0")) {config.Backend=Runtime::KeypointAnalysisBackend(backend);changed=true;}
+        changed |= ImGui::InputFloat("Salient radius (0 = automatic)",&config.SalientRadius);
+        changed |= ImGui::InputFloat("Suppression radius (0 = automatic)",&config.NonMaxRadius);
+        changed |= ImGui::InputDouble("Eigenvalue ratio 2 / 1",&config.Gamma21);
+        changed |= ImGui::InputDouble("Eigenvalue ratio 3 / 2",&config.Gamma32);
+        changed |= ImGui::InputScalar("Minimum neighbors",ImGuiDataType_U32,&config.MinimumNeighbors);
+        ImGui::TextWrapped("Centroid-PCA saliency with radius suppression. Automatic radii use 6 and 4 times mean nearest-neighbor spacing. Equal scores keep the lowest source index.");
+        if(config.Backend==Runtime::KeypointAnalysisBackend::VulkanLBVH)
+        {
+            changed |= ImGui::InputScalar("GPU query batch size",ImGuiDataType_U32,&config.GpuQueryBatchSize);
+            changed |= ImGui::InputScalar("Complete radius capacity",ImGuiDataType_U32,&config.GpuRadiusCapacity);
+            ImGui::TextWrapped("Radius support must fit the selected capacity (up to 1024). Overflow retains previous outputs. Scale, covariance and suppression run on CPU.");
+        }
+        if(changed)
+        {
+            const auto applied=Runtime::ApplyEditorKeypointAnalysisConfig(context.GeometryCommands,config);
+            Keypoints.ConfigDiagnostic=applied.Succeeded()?"":"Controls were rejected by keypoint config validation.";
+        }
+        if(!Keypoints.ConfigDiagnostic.empty())ImGui::TextWrapped("%s",Keypoints.ConfigDiagnostic.c_str());
+        auto analyze=config;
+        const auto readiness=Runtime::PreviewEditorKeypointAnalysisCommand(context.GeometryCommands,analyze);
+        if(!readiness.Ready)ImGui::TextWrapped("%s",readiness.Diagnostic.c_str());
+        const auto execute=[&](Runtime::KeypointAnalysisConfig request){
+            const auto applied=Runtime::ApplyEditorKeypointAnalysisConfig(context.GeometryCommands,request);
+            if(applied.Succeeded())
+                PublishCommandResult(Keypoints.LastResult,Runtime::ApplyEditorConfiguredKeypointAnalysis(context.GeometryCommands),context.MethodResultSinks.KeypointAnalysis);
+            else Keypoints.ConfigDiagnostic="Keypoint config was rejected.";
+        };
+        ImGui::BeginDisabled(!context.GeometryConfigCommandsAvailable || !readiness.Ready || !Keypoints.ConfigDiagnostic.empty());
+        if(ImGui::Button("Detect keypoints"))execute(analyze);
+        ImGui::EndDisabled();
+        ImGui::TextWrapped("Detection writes a mask (1 = retained keypoint) and a score. Geometry stays in source order.");
+        auto mask=config.Mask, score=config.Score;
+        if(readiness.Ready){mask=readiness.Resolved.Mask;score=readiness.Resolved.Score;}
+        if(ImGui::Button("Show mask"))
+            Keypoints.VisualizationDiagnostic=Runtime::DebugNameForEditorCommandStatus(Runtime::ApplyEditorVisualizationRecipeCommand(
+                context.VisualizationCommands,{.StableEntityId=config.StableEntityId,
+                .Recipe={.Data=Runtime::LabelVisualizationRecipe{.Source=mask,.OutputName=mask.Name+".colors"}}}));
+        ImGui::SameLine();
+        if(ImGui::Button("Show saliency"))
+            Keypoints.VisualizationDiagnostic=Runtime::DebugNameForEditorCommandStatus(Runtime::ApplyEditorVisualizationRecipeCommand(
+                context.VisualizationCommands,{.StableEntityId=config.StableEntityId,
+                .Recipe={.Data=Runtime::ScalarVisualizationRecipe{.Source=score,.OutputName=score.Name+".colors"}}}));
+        if(!Keypoints.VisualizationDiagnostic.empty())ImGui::Text("Display: %s",Keypoints.VisualizationDiagnostic.c_str());
+        if(Keypoints.LastResult)
+        {
+            const auto& result=*Keypoints.LastResult;
+            ImGui::Separator();
+            ImGui::Text("Status: %s",Runtime::DebugNameForEditorCommandStatus(result.Status));
+            ImGui::Text("Requested: %s; ran: %s",Runtime::ToString(result.RequestedBackend),result.ActualBackend.c_str());
+            ImGui::Text("Live / total: %zu / %zu; keypoints: %zu",result.LiveCount,result.SlotCount,result.KeypointCount);
+            ImGui::Text("Spacing: %.5g; salient / suppression radii: %.5g / %.5g",double(result.Scale.MeanSpacing),double(result.Scale.SalientRadius),double(result.Scale.NonMaxRadius));
+            ImGui::Text("GPU batches: %zu; largest indexed support: %zu",result.GpuQueryBatches,result.MaximumNeighbors);
+            ImGui::TextWrapped("%s",result.Message.c_str());
+            DrawDismissLastResultButton("Dismiss##Keypoints",Keypoints.LastResult,Runtime::EditorGeometryProcessingResultSlot::KeypointAnalysis,context);
         }
         ImGui::End();
     }

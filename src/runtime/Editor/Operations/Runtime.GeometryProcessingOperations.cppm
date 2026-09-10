@@ -41,6 +41,7 @@ export import Extrinsic.Runtime.OutlierAnalysisConfig;
 export import Extrinsic.Runtime.KernelDensityConfig;
 export import Extrinsic.Runtime.PointSpacingConfig;
 export import Extrinsic.Runtime.BilateralFilterConfig;
+export import Extrinsic.Runtime.KeypointAnalysisConfig;
 import Extrinsic.Runtime.SpatialIndexCache;
 export import Geometry.Geodesic;
 export import Extrinsic.Runtime.PointCloudConsolidationConfig;
@@ -901,6 +902,26 @@ export namespace Extrinsic::Runtime
         std::string Diagnostic{};
         OutlierAnalysisConfig Resolved{};
     };
+    struct EditorKeypointAnalysisResult
+    {
+        EditorCommandStatus Status{EditorCommandStatus::NoChange};
+        KeypointAnalysisBackend RequestedBackend{KeypointAnalysisBackend::CpuKDTree};
+        GeometryPropertyRef Mask{}, Score{};
+        std::string ActualBackend{}, Message{};
+        std::size_t SlotCount{}, LiveCount{}, KeypointCount{}, WrittenCount{};
+        Geometry::PointCloud::Features::KeypointScale Scale{};
+        std::size_t MaximumNeighbors{};
+        bool IndexReused{};
+        std::size_t GpuQueryBatches{};
+        double GpuNeighborhoodMilliseconds{}, CpuComputeMilliseconds{};
+        [[nodiscard]] bool Succeeded() const noexcept { return Status==EditorCommandStatus::Applied || Status==EditorCommandStatus::NoChange; }
+    };
+    struct EditorKeypointAnalysisReadiness
+    {
+        bool Ready{};
+        std::string Diagnostic{};
+        KeypointAnalysisConfig Resolved{};
+    };
     struct EditorKernelDensityResult
     {
         EditorCommandStatus Status{EditorCommandStatus::NoChange};
@@ -1054,6 +1075,7 @@ export namespace Extrinsic::Runtime
         KernelDensity,
         PointSpacing,
         BilateralFilter,
+        KeypointAnalysis,
     };
 
     struct EditorMethodResultSinks
@@ -1077,6 +1099,7 @@ export namespace Extrinsic::Runtime
         std::function<void(EditorKernelDensityResult)> KernelDensity{};
         std::function<void(EditorPointSpacingResult)> PointSpacing{};
         std::function<void(EditorBilateralFilterResult)> BilateralFilter{};
+        std::function<void(EditorKeypointAnalysisResult)> KeypointAnalysis{};
     };
 
     struct EditorGeometryProcessingModel
@@ -1211,6 +1234,7 @@ export namespace Extrinsic::Runtime
         const EditorKernelDensityResult* LastKernelDensityResult{nullptr};
         const EditorPointSpacingResult* LastPointSpacingResult{nullptr};
         const EditorBilateralFilterResult* LastBilateralFilterResult{nullptr};
+        const EditorKeypointAnalysisResult* LastKeypointAnalysisResult{nullptr};
         const RuntimeEngineConfigControlState* EngineConfigControlState{nullptr};
         std::function<Core::Config::EngineConfigLoadResult(const std::string&, const std::string&)>
             PreviewEngineConfigDocument{};
@@ -1671,6 +1695,7 @@ export namespace Extrinsic::Runtime
         std::optional<EditorKernelDensityResult> LastKernelDensityResult{};
         std::optional<EditorPointSpacingResult> LastPointSpacingResult{};
         std::optional<EditorBilateralFilterResult> LastBilateralFilterResult{};
+        std::optional<EditorKeypointAnalysisResult> LastKeypointAnalysisResult{};
     };
 
     struct EditorGeometryProcessingPreparedFrame
@@ -1876,6 +1901,34 @@ export namespace Extrinsic::Runtime
     [[nodiscard]] std::optional<BilateralFilterConfig> GetEditorBilateralFilterConfig(
         const EditorGeometryProcessingCommands &commands);
     [[nodiscard]] EditorBilateralFilterResult ApplyEditorConfiguredBilateralFilter(
+        const EditorGeometryProcessingCommands &commands);
+
+    [[nodiscard]] EditorKeypointAnalysisReadiness PreviewEditorKeypointAnalysisCommand(
+        const EditorGeometryProcessingContext &context, const KeypointAnalysisConfig &config);
+    [[nodiscard]] GeometryPropertyCatalogSnapshot GetEditorKeypointAnalysisInputCatalog(
+        const EditorGeometryProcessingContext &context, std::uint32_t stableId);
+    [[nodiscard]] EditorKeypointAnalysisResult ApplyEditorKeypointAnalysisCommand(
+        const EditorGeometryProcessingContext &context, const KeypointAnalysisConfig &config);
+    [[nodiscard]] RuntimeEngineConfigApplyResult ApplyEditorKeypointAnalysisConfig(
+        const EditorGeometryProcessingContext &context, const KeypointAnalysisConfig &config,
+        std::string sourceId = {});
+    [[nodiscard]] std::optional<KeypointAnalysisConfig> GetEditorKeypointAnalysisConfig(
+        const EditorGeometryProcessingContext &context);
+    [[nodiscard]] EditorKeypointAnalysisResult ApplyEditorConfiguredKeypointAnalysis(
+        const EditorGeometryProcessingContext &context);
+
+    [[nodiscard]] EditorKeypointAnalysisReadiness PreviewEditorKeypointAnalysisCommand(
+        const EditorGeometryProcessingCommands &commands, const KeypointAnalysisConfig &config);
+    [[nodiscard]] GeometryPropertyCatalogSnapshot GetEditorKeypointAnalysisInputCatalog(
+        const EditorGeometryProcessingCommands &commands, std::uint32_t stableId);
+    [[nodiscard]] EditorKeypointAnalysisResult ApplyEditorKeypointAnalysisCommand(
+        const EditorGeometryProcessingCommands &commands, const KeypointAnalysisConfig &config);
+    [[nodiscard]] RuntimeEngineConfigApplyResult ApplyEditorKeypointAnalysisConfig(
+        const EditorGeometryProcessingCommands &commands, const KeypointAnalysisConfig &config,
+        std::string sourceId = {});
+    [[nodiscard]] std::optional<KeypointAnalysisConfig> GetEditorKeypointAnalysisConfig(
+        const EditorGeometryProcessingCommands &commands);
+    [[nodiscard]] EditorKeypointAnalysisResult ApplyEditorConfiguredKeypointAnalysis(
         const EditorGeometryProcessingCommands &commands);
 
 

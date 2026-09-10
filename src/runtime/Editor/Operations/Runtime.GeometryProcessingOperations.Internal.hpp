@@ -3,6 +3,21 @@
 
 namespace Extrinsic::Runtime::GeometryProcessingDetail
 {
+        struct PointPropertyWatch
+        {
+            GeometryElementDomain Domain{};
+            std::string Name{};
+            std::size_t Count{};
+            std::optional<Geometry::PropertyRevision> Revision{};
+            bool operator==(const PointPropertyWatch&) const = default;
+        };
+    [[nodiscard]] PointPropertyWatch ObserveGeometryProperty(const GeometryEntityAvailability&, GeometryElementDomain, std::string);
+    [[nodiscard]] Geometry::PropertySet* MutableGeometryProperties(entt::registry&, entt::entity, GeometryElementDomain);
+    [[nodiscard]] GeometryElementDomain PrimaryPointDomain(const GeometryEntityAvailability&);
+    [[nodiscard]] bool FinitePosition(glm::vec3);
+    [[nodiscard]] bool GeometryPropertiesCurrent(const EditorGeometryProcessingContext&, entt::entity,
+                                               std::span<const PointPropertyWatch>);
+
     struct EditorMeshSourceSnapshot
     {
         Geometry::HalfedgeMesh::Mesh Mesh{};

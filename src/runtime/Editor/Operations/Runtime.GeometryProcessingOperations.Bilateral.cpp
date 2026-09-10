@@ -31,58 +31,18 @@ namespace Extrinsic::Runtime
         namespace GS = ECS::Components::GeometrySources;
         namespace PC = Geometry::PointCloud;
         using D = GeometryElementDomain;
-        struct Watch
-        {
-            D Domain{};
-            std::string Name{};
-            std::size_t Count{};
-            std::optional<Geometry::PropertyRevision> Revision{};
-            bool operator==(const Watch&) const = default;
-        };
-        Watch Observe(const GeometryEntityAvailability& a, D domain, std::string name)
-        {
-            const auto* props = ResolveGeometryPropertySet(a, domain);
-            return {domain, name, props ? props->Size() : 0,
-                    props ? props->FindPropertyRevision(name) : std::nullopt};
-        }
-        Geometry::PropertySet *MutableProperties(entt::registry &raw, entt::entity entity, D domain)
-        {
-            auto view = GS::BuildMutableView(raw, entity);
-            switch (domain)
-            {
-            case D::MeshVertex:
-            case D::GraphNode:
-            case D::PointCloudPoint:
-                return view.VertexSource ? &view.VertexSource->Properties : nullptr;
-            case D::MeshEdge:
-            case D::GraphEdge:
-                return view.EdgeSource ? &view.EdgeSource->Properties : nullptr;
-            case D::MeshHalfedge:
-            case D::GraphHalfedge:
-                return view.HalfedgeSource ? &view.HalfedgeSource->Properties : nullptr;
-            case D::MeshFace:
-                return view.FaceSource ? &view.FaceSource->Properties : nullptr;
-            default:
-                return nullptr;
-            }
-        }
-        D DefaultDomain(const GeometryEntityAvailability &a)
-        {
-            for (auto d : {D::MeshVertex, D::GraphNode, D::PointCloudPoint})
-                if (SupportsGeometryElementDomain(a, d))
-                    return d;
-            return D::Unknown;
-        }
-        bool Finite(glm::vec3 p)
-        {
-            return std::isfinite(p.x) && std::isfinite(p.y) && std::isfinite(p.z);
-        }
+        using GeometryProcessingDetail::PointPropertyWatch;
+        using GeometryProcessingDetail::ObserveGeometryProperty;
+        using GeometryProcessingDetail::MutableGeometryProperties;
+        using GeometryProcessingDetail::PrimaryPointDomain;
+        using GeometryProcessingDetail::FinitePosition;
+        using GeometryProcessingDetail::GeometryPropertiesCurrent;
         struct BilateralWork
         {
             BilateralFilterConfig Config{};
             entt::entity Entity{};
-            std::vector<Watch> Inputs{};
-            Watch OutputWatch{};
+            std::vector<PointPropertyWatch> Inputs{};
+            PointPropertyWatch OutputWatch{};
             std::vector<glm::vec3> Points{}, Normals{};
             std::vector<std::uint32_t> Slots{}, NeighborIds{};
             std::vector<glm::vec3> BeforeOutput{}, AfterOutput{};
@@ -96,19 +56,10 @@ namespace Extrinsic::Runtime
             std::chrono::steady_clock::time_point GpuStarted{};
             EditorBilateralFilterResult Result{};
         };
-        bool CurrentSource(const EditorGeometryProcessingContext& context, entt::entity entity,
-                           std::span<const Watch> inputs)
-        {
-            if (!context.Scene || !context.Scene->Raw().valid(entity)) return false;
-            const auto a = BuildGeometryAvailability(context.Scene->Raw(), entity);
-            for (const auto& w : inputs)
-                if (Observe(a, w.Domain, w.Name) != w) return false;
-            return true;
-        }
         bool CurrentInput(const EditorGeometryProcessingContext& context, const BilateralWork& w)
         {
             const std::array outputs{w.OutputWatch};
-            return CurrentSource(context, w.Entity, w.Inputs) && CurrentSource(context, w.Entity, outputs);
+            return GeometryPropertiesCurrent(context, w.Entity, w.Inputs) && GeometryPropertiesCurrent(context, w.Entity, outputs);
         }
         enum class CapturePurpose { Execute, Readiness, Catalog };
         std::shared_ptr<BilateralWork> Capture(const EditorGeometryProcessingContext& context,
@@ -122,7 +73,7 @@ namespace Extrinsic::Runtime
             const auto entity = GeometryProcessingDetail::ResolveEditorStableEntity(context.Scene->Raw(), c.StableEntityId);
             if (!entity) return fail("Bilateral target entity is stale or missing.");
             const auto a = BuildGeometryAvailability(context.Scene->Raw(), *entity);
-            if (c.Positions.Domain == D::Unknown) c.Positions.Domain = DefaultDomain(a);
+            if (c.Positions.Domain == D::Unknown) c.Positions.Domain = PrimaryPointDomain(a);
             if (c.Output.Domain == D::Unknown) c.Output.Domain = c.Positions.Domain;
             if (c.Normals.Domain == D::Unknown) c.Normals.Domain = c.Positions.Domain;
             const auto* props = ResolveGeometryPropertySet(a, c.Positions.Domain);
@@ -146,9 +97,9 @@ namespace Extrinsic::Runtime
             w->Config = c; w->Entity = *entity;
             w->Result.RequestedBackend = c.Backend;
             w->Result.Output = c.Output; w->Result.SlotCount = props->Size();
-            w->Inputs.push_back(Observe(a, c.Positions.Domain, c.Positions.Name));
-            w->Inputs.push_back(Observe(a, c.Normals.Domain, c.Normals.Name));
-            w->OutputWatch = Observe(a, c.Output.Domain, c.Output.Name);
+            w->Inputs.push_back(ObserveGeometryProperty(a, c.Positions.Domain, c.Positions.Name));
+            w->Inputs.push_back(ObserveGeometryProperty(a, c.Normals.Domain, c.Normals.Name));
+            w->OutputWatch = ObserveGeometryProperty(a, c.Output.Domain, c.Output.Name);
             auto deletionDomain = c.Positions.Domain;
             const char* deletionName = "v:deleted";
             std::size_t divisor = 1;
@@ -165,14 +116,14 @@ namespace Extrinsic::Runtime
             const auto deleted = deletionProps->Get<bool>(deletionName);
             if (deletionProps->Exists(deletionName) && (!deleted || deleted.Size() != deletionProps->Size()))
                 return fail("Deletion mask must be a count-matched bool property.");
-            w->Inputs.push_back(Observe(a, deletionDomain, deletionName));
+            w->Inputs.push_back(ObserveGeometryProperty(a, deletionDomain, deletionName));
             const auto points = props->Get<glm::vec3>(c.Positions.Name);
             const auto normals = props->Get<glm::vec3>(c.Normals.Name);
             bool validLbvh = true;
             for (std::uint32_t i = 0; i < props->Size(); ++i)
             {
                 if (deleted && deleted[i / divisor]) continue;
-                if (!Finite(points[i]) || !Finite(normals[i])) return fail("Live positions and normals must be finite.");
+                if (!FinitePosition(points[i]) || !FinitePosition(normals[i])) return fail("Live positions and normals must be finite.");
                 validLbvh &= Geometry::PointLBVH::ValidPoint(points[i]);
                 ++w->Result.LiveCount;
                 if (purpose == CapturePurpose::Execute) { w->Points.push_back(points[i]); w->Normals.push_back(normals[i]); w->Slots.push_back(i); }
@@ -329,18 +280,18 @@ namespace Extrinsic::Runtime
             struct State { bool Exists{};std::vector<glm::vec3> Values{}; };
             auto before=std::make_shared<State>(State{bool(w->OutputWatch.Revision),w->BeforeOutput});
             auto after=std::make_shared<State>(State{true,w->AfterOutput});
-            auto revisions=std::make_shared<std::array<Watch,1>>(std::array{w->OutputWatch});
+            auto revisions=std::make_shared<std::array<PointPropertyWatch,1>>(std::array{w->OutputWatch});
             auto inputs=w->Inputs;
             std::erase_if(inputs,[&](const auto& input){return input.Domain==w->Config.Output.Domain && input.Name==w->Config.Output.Name;});
             const auto mutate=[context,entity=w->Entity,inputs=std::move(inputs),c=w->Config,revisions](const State& target)
             {
-                if (!CurrentSource(context,entity,inputs) || !CurrentSource(context,entity,*revisions))
+                if (!GeometryPropertiesCurrent(context,entity,inputs) || !GeometryPropertiesCurrent(context,entity,*revisions))
                     return EditorCommandHistoryStatus::StaleEntity;
-                auto* props=MutableProperties(context.Scene->Raw(),entity,c.Positions.Domain);
+                auto* props=MutableGeometryProperties(context.Scene->Raw(),entity,c.Positions.Domain);
                 if (target.Exists) props->GetOrAdd<glm::vec3>(c.Output.Name).Vector()=target.Values;
                 else if (auto p=props->Get<glm::vec3>(c.Output.Name)) props->Remove(p);
                 const auto a=BuildGeometryAvailability(context.Scene->Raw(),entity);
-                *revisions={Observe(a,c.Output.Domain,c.Output.Name)};
+                *revisions={ObserveGeometryProperty(a,c.Output.Domain,c.Output.Name)};
                 ECS::Components::DirtyTags::MarkGpuDirty(context.Scene->Raw(),entity);
                 ECS::Components::DirtyTags::MarkVertexPositionsDirty(context.Scene->Raw(),entity);
                 if (context.InvalidateWorkspaceSnapshotCache) context.InvalidateWorkspaceSnapshotCache();

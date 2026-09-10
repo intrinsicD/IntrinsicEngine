@@ -1,0 +1,42 @@
+Internal ctest changing into directory: /home/alex/Documents/IntrinsicEngine/build/ci
+Test project /home/alex/Documents/IntrinsicEngine/build/ci
+      Start 676: OutlierAnalysis.EveryDomainMatchesReferenceAndPublishesOnlyNamedProperties
+ 1/16 Test #676: OutlierAnalysis.EveryDomainMatchesReferenceAndPublishesOnlyNamedProperties ...............   Passed    0.06 sec
+      Start 677: OutlierAnalysis.RemovalRequiresCurrentDetectionAndPreservesEveryPropertyThroughHistory
+ 2/16 Test #677: OutlierAnalysis.RemovalRequiresCurrentDetectionAndPreservesEveryPropertyThroughHistory ...   Passed    0.01 sec
+      Start 678: OutlierAnalysis.DeletedRowsRemainUntouchedAndMaskOrInputEditsInvalidateRemoval
+ 3/16 Test #678: OutlierAnalysis.DeletedRowsRemainUntouchedAndMaskOrInputEditsInvalidateRemoval ...........   Passed    0.01 sec
+      Start 679: OutlierAnalysis.RadiusUsesAllCountsAndRetainsCoincidentPeers
+ 4/16 Test #679: OutlierAnalysis.RadiusUsesAllCountsAndRetainsCoincidentPeers .............................   Passed    0.30 sec
+      Start 680: OutlierAnalysis.InvalidParametersAndReservedOutputsFailBeforeMutation
+ 5/16 Test #680: OutlierAnalysis.InvalidParametersAndReservedOutputsFailBeforeMutation ....................   Passed    0.01 sec
+      Start 681: OutlierAnalysis.QueuedJobsRejectStaleInputsOutputsAndCancellation
+ 6/16 Test #681: OutlierAnalysis.QueuedJobsRejectStaleInputsOutputsAndCancellation ........................   Passed    0.11 sec
+      Start 682: OutlierAnalysis.MaskAndScoreUseSharedVisualizationRecipesOnEveryDomain
+ 7/16 Test #682: OutlierAnalysis.MaskAndScoreUseSharedVisualizationRecipesOnEveryDomain ...................   Passed    0.01 sec
+      Start 683: OutlierAnalysis.RadiusBoundaryAndStatisticalMinimumMatchAcrossCpuBackends
+ 8/16 Test #683: OutlierAnalysis.RadiusBoundaryAndStatisticalMinimumMatchAcrossCpuBackends ................   Passed    0.01 sec
+      Start 684: OutlierAnalysis.UndoAnotherOutputCannotMakeAnEditedMaskCurrent
+ 9/16 Test #684: OutlierAnalysis.UndoAnotherOutputCannotMakeAnEditedMaskCurrent ...........................   Passed    0.01 sec
+      Start 693: BilateralFilterOperations.EveryDomainCopyAndInPlaceHistory
+10/16 Test #693: BilateralFilterOperations.EveryDomainCopyAndInPlaceHistory ...............................   Passed    0.04 sec
+      Start 694: BilateralFilterOperations.JobsRejectChangedInputsOutputsAndCancellation
+11/16 Test #694: BilateralFilterOperations.JobsRejectChangedInputsOutputsAndCancellation ..................   Passed    0.07 sec
+      Start 695: BilateralFilterOperations.ZeroPassAndOutputPreflight
+12/16 Test #695: BilateralFilterOperations.ZeroPassAndOutputPreflight .....................................   Passed    0.01 sec
+      Start 696: KeypointAnalysisConfig.RoundTripAndSharedPreviewApplyRun
+13/16 Test #696: KeypointAnalysisConfig.RoundTripAndSharedPreviewApplyRun .................................   Passed    0.01 sec
+      Start 697: KeypointAnalysisOperations.EveryDomainReferenceCacheHistoryAndDeletedRows
+14/16 Test #697: KeypointAnalysisOperations.EveryDomainReferenceCacheHistoryAndDeletedRows ................   Passed    0.03 sec
+      Start 698: KeypointAnalysisOperations.JobsRejectChangedInputsOutputsAndCancellation
+15/16 Test #698: KeypointAnalysisOperations.JobsRejectChangedInputsOutputsAndCancellation .................   Passed    0.06 sec
+      Start 699: KeypointAnalysisOperations.InvalidScaleAndOutputPreflightRetainExistingData
+16/16 Test #699: KeypointAnalysisOperations.InvalidScaleAndOutputPreflightRetainExistingData ..............   Passed    0.01 sec
+
+100% tests passed, 0 tests failed out of 16
+
+Label Time Summary:
+contract    =   0.76 sec*proc (16 tests)
+runtime     =   0.76 sec*proc (16 tests)
+
+Total Test time (real) =   1.22 sec

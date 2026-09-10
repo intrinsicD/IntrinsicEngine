@@ -232,151 +232,172 @@ namespace Geometry::PointCloud::Features
         }
     } // namespace
 
-    std::optional<float> EstimateSpacing(const Cloud& cloud)
+    namespace
     {
-        const std::span<const glm::vec3> positions = cloud.Positions();
-        if (positions.size() < 2)
+        bool ValidKeypointInput(std::span<const glm::vec3> points, const KeypointParams& p)
         {
-            return std::nullopt;
+            return points.size()>=2 && points.size()<=std::numeric_limits<std::uint32_t>::max() &&
+                p.MinNeighbors<points.size() && std::ranges::all_of(points,IsFiniteVec) &&
+                std::isfinite(p.SalientRadius) && std::isfinite(p.NonMaxRadius) &&
+                std::isfinite(p.Gamma21) && p.Gamma21>=0 && p.Gamma21<=1 &&
+                std::isfinite(p.Gamma32) && p.Gamma32>=0 && p.Gamma32<=1;
         }
-        const std::vector<std::uint8_t> live = BuildLiveMask(cloud);
-        KDTree tree;
-        if (!tree.BuildFromPoints(positions))
+        bool ValidKeypointScale(const KeypointParams& p,const KeypointScale& s)
         {
-            return std::nullopt;
+            const auto validRadius=[](float r){return std::isfinite(r) && r>0 && std::isfinite(r*r) && r*r>0;};
+            return std::isfinite(s.MeanSpacing) && s.MeanSpacing>0 &&
+                validRadius(s.SalientRadius) && validRadius(s.NonMaxRadius) &&
+                s.SalientRadius==(p.SalientRadius>0?p.SalientRadius:6.f*s.MeanSpacing) &&
+                s.NonMaxRadius==(p.NonMaxRadius>0?p.NonMaxRadius:4.f*s.MeanSpacing);
         }
-        std::vector<KDTree::ElementIndex> knn;
-        double sum = 0.0;
-        std::size_t counted = 0;
-        for (std::size_t i = 0; i < positions.size(); ++i)
+        struct LiveFeaturePoints
         {
-            if (live[i] == 0u)
+            std::vector<glm::vec3> Points{};
+            std::vector<std::uint32_t> Slots{};
+        };
+        LiveFeaturePoints CompactFeaturePoints(const Cloud& cloud)
+        {
+            LiveFeaturePoints result;
+            const auto live=BuildLiveMask(cloud);
+            const auto positions=cloud.Positions();
+            for(std::size_t i=0;i<positions.size();++i)
+                if(live[i]){result.Points.push_back(positions[i]);result.Slots.push_back(std::uint32_t(i));}
+            return result;
+        }
+        template<class Query>
+        std::optional<KeypointAnalysis> AnalyzeKeypointRows(std::span<const glm::vec3> positions,
+            const KeypointParams& params,const KeypointScale& scale,Query&& query)
+        {
+            KeypointAnalysis result;
+            result.Scale=scale;result.Saliency.resize(positions.size());result.Mask.resize(positions.size());
+            std::vector<double> scores(positions.size(),std::numeric_limits<double>::quiet_NaN());
+            std::vector<glm::vec3> local;
+            for(std::uint32_t i=0;i<positions.size();++i)
             {
-                continue;
+                const auto neighbors=query(i,scale.SalientRadius);
+                if(!neighbors)return std::nullopt;
+                if(neighbors->size()<params.MinNeighbors)continue;
+                local.clear();local.push_back(positions[i]);
+                for(auto j:*neighbors)local.push_back(positions[j]);
+                // Preserve the existing centroid covariance and float eigenvalue
+                // publication of ToPCA; the full ISS weighted scatter differs.
+                const auto pca=Geometry::ToPCA(local);
+                if(!pca.Valid)continue;
+                if(!IsFiniteVec(pca.Eigenvalues))return std::nullopt;
+                std::array<double,3> eigen{pca.Eigenvalues.x,pca.Eigenvalues.y,pca.Eigenvalues.z};
+                std::sort(eigen.begin(),eigen.end(),std::greater<double>());
+                if(eigen[0]<=0 || eigen[1]<=0)continue;
+                if(eigen[1]/eigen[0]<=params.Gamma21 && eigen[2]/eigen[1]<=params.Gamma32)
+                {scores[i]=eigen[2];result.Saliency[i]=float(eigen[2]);}
             }
-            knn.clear();
-            // Query a few neighbors so the nearest live (non-deleted) one is
-            // reachable even when deleted slots remain in the index.
-            const auto result = tree.QueryKNN(positions[i], 8, knn);
-            if (!result)
+            for(std::uint32_t i=0;i<positions.size();++i)
             {
-                continue;
+                if(std::isnan(scores[i]))continue;
+                const auto neighbors=query(i,scale.NonMaxRadius);
+                if(!neighbors)return std::nullopt;
+                bool maximum=true;
+                for(auto j:*neighbors)
+                    if(!std::isnan(scores[j]) && (scores[j]>scores[i] || (scores[j]==scores[i] && j<i)))
+                    {maximum=false;break;}
+                if(maximum)
+                {result.Mask[i]=1;result.Keypoints.Indices.push_back(i);result.Keypoints.Saliency.push_back(scores[i]);}
             }
-            for (const KDTree::ElementIndex idx : knn)
-            {
-                if (idx != i && idx < live.size() && live[idx] != 0u)
-                {
-                    sum += glm::distance(positions[i], positions[idx]);
-                    ++counted;
-                    break;
-                }
-            }
+            return result;
         }
-        if (counted == 0)
-        {
-            return std::nullopt;
-        }
-        return static_cast<float>(sum / static_cast<double>(counted));
     }
 
-    std::optional<KeypointSet> DetectKeypoints(const Cloud& cloud, const KeypointParams& params)
+    std::optional<float> EstimateSpacing(std::span<const glm::vec3> positions)
     {
-        const std::span<const glm::vec3> positions = cloud.Positions();
-        if (positions.size() < params.MinNeighbors + 1u)
-        {
-            return std::nullopt;
-        }
-        const std::optional<float> spacing = EstimateSpacing(cloud);
-        if (!spacing || *spacing <= 0.0f)
-        {
-            return std::nullopt;
-        }
-        const float salientRadius = params.SalientRadius > 0.0f ? params.SalientRadius : 6.0f * *spacing;
-        const float nonMaxRadius = params.NonMaxRadius > 0.0f ? params.NonMaxRadius : 4.0f * *spacing;
-
-        const std::vector<std::uint8_t> live = BuildLiveMask(cloud);
+        if(positions.size()<2 || positions.size()>std::numeric_limits<std::uint32_t>::max() ||
+            !std::ranges::all_of(positions,IsFiniteVec))return std::nullopt;
         KDTree tree;
-        if (!tree.BuildFromPoints(positions))
-        {
-            return std::nullopt;
-        }
-
-        // Saliency (smallest eigenvalue) for every candidate that passes the
-        // ISS eigenvalue-ratio gates; NaN marks a rejected point.
-        std::vector<double> saliency(positions.size(), std::numeric_limits<double>::quiet_NaN());
-        std::vector<KDTree::ElementIndex> radiusScratch;
+        if(!tree.BuildFromPoints(positions))return std::nullopt;
         std::vector<std::uint32_t> neighbors;
-        std::vector<glm::vec3> neighborhood;
-        for (std::size_t i = 0; i < positions.size(); ++i)
+        double sum=0;
+        for(std::uint32_t i=0;i<positions.size();++i)
         {
-            if (live[i] == 0u)
+            neighbors.clear();
+            if(!tree.QueryKNN(positions[i],2,neighbors))return std::nullopt;
+            const auto other=std::ranges::find_if(neighbors,[&](auto j){return j!=i;});
+            if(other==neighbors.end())return std::nullopt;
+            const auto distance=glm::distance(positions[i],positions[*other]);
+            if(!std::isfinite(distance))return std::nullopt;
+            sum+=distance;
+        }
+        const auto mean=float(sum/double(positions.size()));
+        return std::isfinite(mean)?std::optional<float>(mean):std::nullopt;
+    }
+    std::optional<float> EstimateSpacing(const Cloud& cloud)
+    {
+        return EstimateSpacing(CompactFeaturePoints(cloud).Points);
+    }
+    std::optional<KeypointScale> ResolveKeypointScale(
+        std::span<const glm::vec3> positions,const KeypointParams& p)
+    {
+        if(!ValidKeypointInput(positions,p))return std::nullopt;
+        const auto spacing=EstimateSpacing(positions);
+        if(!spacing || *spacing<=0)return std::nullopt;
+        KeypointScale scale{*spacing,p.SalientRadius>0?p.SalientRadius:6.f * *spacing,
+            p.NonMaxRadius>0?p.NonMaxRadius:4.f * *spacing};
+        return ValidKeypointScale(p,scale)?std::optional(scale):std::nullopt;
+    }
+    std::optional<KeypointAnalysis> AnalyzeKeypoints(
+        std::span<const glm::vec3> positions,const KeypointParams& p)
+    {
+        const auto scale=ResolveKeypointScale(positions,p);
+        if(!scale)return std::nullopt;
+        KDTree tree;
+        if(!tree.BuildFromPoints(positions))return std::nullopt;
+        std::vector<std::uint32_t> row;
+        return AnalyzeKeypointRows(positions,p,*scale,[&](std::uint32_t i,float radius)
+            ->std::optional<std::span<const std::uint32_t>>
+        {
+            row.clear();
+            if(!tree.QueryRadius(positions[i],radius,row))return std::nullopt;
+            std::erase(row,i);std::sort(row.begin(),row.end());
+            return std::span<const std::uint32_t>(row);
+        });
+    }
+    std::optional<KeypointAnalysis> AnalyzeKeypointsFromNeighbors(
+        std::span<const glm::vec3> positions,const KeypointParams& p,
+        const KeypointScale& scale,Geometry::PointNeighborhoods rows)
+    {
+        if(!ValidKeypointInput(positions,p) || !ValidKeypointScale(p,scale) ||
+            rows.Offsets.size()!=positions.size()+1 || rows.Offsets.front()!=0 ||
+            rows.Offsets.back()!=rows.Indices.size())return std::nullopt;
+        const float radius=std::max(scale.SalientRadius,scale.NonMaxRadius);
+        for(std::uint32_t i=0;i<positions.size();++i)
+        {
+            const auto first=rows.Offsets[i],last=rows.Offsets[i+1];
+            if(first>last || last>rows.Indices.size())return std::nullopt;
+            for(auto k=first;k<last;++k)
             {
-                continue;
-            }
-            GatherRadiusNeighbors(tree, static_cast<std::uint32_t>(i), positions[i],
-                                  salientRadius, 0, live, radiusScratch, neighbors);
-            if (neighbors.size() < params.MinNeighbors)
-            {
-                continue;
-            }
-            neighborhood.clear();
-            neighborhood.push_back(positions[i]);
-            for (const std::uint32_t j : neighbors)
-            {
-                neighborhood.push_back(positions[j]);
-            }
-            const Geometry::PCAResult pca = Geometry::ToPCA(neighborhood);
-            if (!pca.Valid)
-            {
-                continue;
-            }
-            std::array<double, 3> ev{pca.Eigenvalues.x, pca.Eigenvalues.y, pca.Eigenvalues.z};
-            std::sort(ev.begin(), ev.end(), std::greater<double>());
-            const double l1 = ev[0];
-            const double l2 = ev[1];
-            const double l3 = ev[2];
-            if (l1 <= 0.0 || l2 <= 0.0)
-            {
-                continue;
-            }
-            if ((l2 / l1) <= params.Gamma21 && (l3 / l2) <= params.Gamma32)
-            {
-                saliency[i] = l3;
+                const auto j=rows.Indices[k];
+                if(j>=positions.size() || j==i || (k>first && rows.Indices[k-1]>=j))return std::nullopt;
+                const auto delta=positions[j]-positions[i];const float distance=glm::dot(delta,delta);
+                if(!std::isfinite(distance) || distance>radius*radius)return std::nullopt;
             }
         }
-
-        // Non-maximum suppression: keep a candidate only if no neighbor within
-        // nonMaxRadius has strictly greater saliency (ties resolved by index).
-        KeypointSet keypoints;
-        for (std::size_t i = 0; i < positions.size(); ++i)
+        std::vector<std::uint32_t> row;
+        return AnalyzeKeypointRows(positions,p,scale,[&](std::uint32_t i,float r)
+            ->std::optional<std::span<const std::uint32_t>>
         {
-            if (std::isnan(saliency[i]))
+            row.clear();
+            for(auto k=rows.Offsets[i];k<rows.Offsets[i+1];++k)
             {
-                continue;
+                const auto j=rows.Indices[k];const auto delta=positions[j]-positions[i];
+                if(glm::dot(delta,delta)<=r*r)row.push_back(j);
             }
-            GatherRadiusNeighbors(tree, static_cast<std::uint32_t>(i), positions[i],
-                                  nonMaxRadius, 0, live, radiusScratch, neighbors);
-            bool isMax = true;
-            for (const std::uint32_t j : neighbors)
-            {
-                if (std::isnan(saliency[j]))
-                {
-                    continue;
-                }
-                if (saliency[j] > saliency[i] ||
-                    (saliency[j] == saliency[i] && j < i))
-                {
-                    isMax = false;
-                    break;
-                }
-            }
-            if (isMax)
-            {
-                keypoints.Indices.push_back(static_cast<std::uint32_t>(i));
-                keypoints.Saliency.push_back(saliency[i]);
-            }
-        }
-        return keypoints;
+            return std::span<const std::uint32_t>(row);
+        });
+    }
+    std::optional<KeypointSet> DetectKeypoints(const Cloud& cloud,const KeypointParams& params)
+    {
+        const auto compact=CompactFeaturePoints(cloud);
+        auto result=AnalyzeKeypoints(compact.Points,params);
+        if(!result)return std::nullopt;
+        for(auto& i:result->Keypoints.Indices)i=compact.Slots[i];
+        return std::move(result->Keypoints);
     }
 
     std::optional<DescriptorSet> ComputeDescriptors(

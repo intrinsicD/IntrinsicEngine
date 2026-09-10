@@ -919,3 +919,7 @@ canonical primitive domains. See [primitive selection](primitive-selection.md)
 for lifecycle, config, method-input, and viewport contracts.
 
 ICP uses the existing editor command/job owner with the shared spatial-index cache. [Registration ownership and config](registration.md) describes canonical operand binding and framed GPU correspondence batches.
+
+### Keypoint analysis
+
+[ISS-style keypoint analysis](keypoint-analysis.md) uses the existing geometry operations, spatial cache and jobs. Scale preparation precedes complete radius queries and CPU covariance/suppression; one revision-checked history command publishes both named output properties. Shared private property-watch/domain helpers serve keypoints, outliers and bilateral filtering without a new service or module boundary.

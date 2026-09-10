@@ -26,6 +26,8 @@ correctness_tests:
   - ../../../tests/contract/runtime/Test.OutlierAnalysis.cpp
   - ../../../tests/contract/runtime/Test.KernelDensityOperations.cpp
   - ../../../tests/unit/geometry/Test.KernelDensity.cpp
+  - ../../../tests/unit/geometry/Test.KeypointAnalysis.cpp
+  - ../../../tests/contract/runtime/Test.KeypointAnalysisOperations.cpp
   - ../../../tests/unit/geometry/Test.BilateralPointFilter.cpp
   - ../../../tests/contract/runtime/Test.BilateralFilterOperations.cpp
   - ../../../tests/integration/graphics/Test.PointLBVHGpuSmoke.cpp
@@ -39,6 +41,7 @@ benchmarks:
   - ../../../benchmarks/geometry/manifests/point_lbvh_spacing_runtime_smoke.yaml
   - ../../../benchmarks/geometry/manifests/point_lbvh_distance_ratio_runtime_smoke.yaml
   - ../../../benchmarks/geometry/manifests/point_lbvh_bilateral_runtime_smoke.yaml
+  - ../../../benchmarks/geometry/manifests/point_lbvh_keypoint_runtime_smoke.yaml
 known_limitations:
   - Point-neighbor queries only; no triangle distance, ray tracing, arbitrary subset predicates, or refit implementation.
   - CPU indices support at most 2^24 points; GPU supports at most 2^20 points and 2^20 queries per batch.

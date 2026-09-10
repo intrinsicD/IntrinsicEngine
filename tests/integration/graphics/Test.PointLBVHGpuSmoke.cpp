@@ -1717,3 +1717,218 @@ TEST(PointLBVHGpuSmoke, BilateralRejectsStaleAndCancelledPasses)
     ASSERT_FALSE(run->TimedOut)<<"phase="<<run->Phase;ASSERT_TRUE(run->Done);
     EXPECT_TRUE(run->CancelledIntermediate);
 }
+
+namespace
+{
+    class KeypointApp final : public Intrinsic::Tests::RuntimeTestModule
+    {
+    public:
+        Geometry::PropertySet& Props(unsigned d)
+        {
+            return *const_cast<Geometry::PropertySet*>(Runtime::ResolveGeometryPropertySet(
+                Runtime::BuildGeometryAvailability(Context.Scene->Raw(),Entities[d-1]),Domain(d)));
+        }
+        Runtime::KeypointAnalysisConfig Config(unsigned d) const
+        {
+            Runtime::KeypointAnalysisConfig c;
+            c.StableEntityId=Runtime::SelectionController::ToStableEntityId(Entities[d-1]);
+            c.Positions={Domain(d),"samples",Geometry::PropertyValueKind::Vec3};
+            c.Mask={Domain(d),"keypoints",Geometry::PropertyValueKind::UInt32};
+            c.Score={Domain(d),"saliency",Geometry::PropertyValueKind::Float};
+            c.SalientRadius=Phase==2?0:2;c.NonMaxRadius=Phase==2?0:.5f;
+            c.Backend=Runtime::KeypointAnalysisBackend::VulkanLBVH;c.GpuQueryBatchSize=128;
+            return c;
+        }
+        void Resolve() override
+        {
+            Started=std::chrono::steady_clock::now();
+            Context.Scene=Kernel().Worlds().Get(Kernel().ActiveWorld());Context.World=Kernel().ActiveWorld();
+            Context.SpatialIndices=Kernel().Services().Find<Runtime::SpatialIndexCache>();
+            std::mt19937 random(241);std::uniform_real_distribution<float> dist(-1,1);
+            std::vector<glm::vec3> points;
+            for(unsigned i=0;i<66;++i){const float x=dist(random),y=dist(random);points.push_back({x,y,.1f*dist(random)});}
+            points[0]={0,0,0};points[1]={.3f,.4f,0};points[2]=points[0];
+            points[3]={std::nextafter(.5f,1.f),0,0};points[65]={10,0,0};
+            for(unsigned d=1;d<=8;++d)
+            {
+                auto entity=Context.Scene->Create();Entities.push_back(entity);
+                if(d<=unsigned(Domain::MeshFace))
+                {
+                    Geometry::HalfedgeMesh::Mesh mesh;
+                    auto a=mesh.AddVertex({0,0,0}),b=mesh.AddVertex({1,0,0}),c=mesh.AddVertex({0,1,0});
+                    (void)mesh.AddTriangle(a,b,c);GS::PopulateFromMesh(Context.Scene->Raw(),entity,mesh);
+                }
+                else if(d<unsigned(Domain::PointCloudPoint))
+                {
+                    Geometry::Graph::Graph graph;auto a=graph.AddVertex({0,0,0}),b=graph.AddVertex({1,0,0});
+                    (void)graph.AddEdge(a,b);GS::PopulateFromGraph(Context.Scene->Raw(),entity,graph);
+                }
+                else Context.Scene->Raw().emplace<GS::Vertices>(entity);
+                auto& p=Props(d);p.Resize(points.size());p.GetOrAdd<glm::vec3>("samples").Vector()=points;
+                p.GetOrAdd<float>("keep").Vector().assign(points.size(),42);
+                p.GetOrAdd<float>("saliency").Vector().assign(points.size(),77);
+                p.GetOrAdd<std::uint32_t>("keypoints").Vector().assign(points.size(),77);
+                const bool half=d==unsigned(Domain::MeshHalfedge)||d==unsigned(Domain::GraphHalfedge);
+                if(half)
+                {
+                    auto& edges=Context.Scene->Raw().get<GS::Edges>(entity).Properties;
+                    edges.Resize(points.size()/2);edges.GetOrAdd<bool>("e:deleted")[2]=true;
+                }
+                else p.GetOrAdd<bool>(d==unsigned(Domain::MeshFace)?"f:deleted":
+                    (d==unsigned(Domain::MeshEdge)||d==unsigned(Domain::GraphEdge))?"e:deleted":"v:deleted")[4]=true;
+                p.Get<glm::vec3>("samples")[4]={std::numeric_limits<float>::quiet_NaN(),0,0};
+            }
+            Context.MethodResultSinks.KeypointAnalysis=[this](auto result){Results.push_back(std::move(result));};
+        }
+        void Frame(double,double) override
+        {
+            if(std::chrono::steady_clock::now()-Started>std::chrono::seconds(95))
+            {ADD_FAILURE()<<"Keypoint timeout: phase="<<Phase<<" results="<<Results.size();TimedOut=true;Kernel().RequestExit();return;}
+            if(!Kernel().GetDevice().IsOperational())
+            {if(++ColdFrames>4){TimedOut=true;Kernel().RequestExit();}return;}
+            if(Submitted)
+            {
+                if(Phase==4 && !Cancelled && Kernel().Jobs().GetState(ScaleToken)==Runtime::JobState::AwaitingApply)
+                {EXPECT_TRUE(Kernel().Jobs().Cancel(ScaleToken));Cancelled=true;}
+                if(Phase==4)(void)Kernel().Jobs().ReapCompleted();
+                if(Results.size()<(Phase<3?8:1))return;
+                if(Phase>=6)
+                    for(auto token:SubmissionTokens)
+                        if(!Kernel().Jobs().IsComplete(token))return;
+                if(Phase<3)
+                {
+                    PhaseMs.push_back(std::chrono::duration<double,std::milli>(std::chrono::steady_clock::now()-PhaseStarted).count());
+                    for(const auto& result:Results)
+                    {
+                        EXPECT_TRUE(result.Succeeded())<<result.Message;EXPECT_EQ(result.ActualBackend,"vulkan_lbvh");
+                        EXPECT_GT(result.GpuQueryBatches,0);if(Phase>0)EXPECT_TRUE(result.IndexReused);
+                        const auto& reference=ReferenceResults[unsigned(result.Mask.Domain)-1];
+                        EXPECT_EQ(result.KeypointCount,reference.KeypointCount);
+                        EXPECT_FLOAT_EQ(result.Scale.MeanSpacing,reference.Scale.MeanSpacing);
+                        EXPECT_FLOAT_EQ(result.Scale.SalientRadius,reference.Scale.SalientRadius);
+                        EXPECT_FLOAT_EQ(result.Scale.NonMaxRadius,reference.Scale.NonMaxRadius);
+                    }
+                    for(unsigned d=1;d<=8;++d)
+                    {
+                        const auto& p=std::as_const(Props(d));
+                        EXPECT_EQ(p.Get<std::uint32_t>("keypoints").Vector(),ReferenceMasks[d-1]);
+                        const auto scores=p.Get<float>("saliency");
+                        for(std::size_t i=0;i<scores.Size();++i)
+                        {
+                            const double error=std::abs(double(scores[i])-ReferenceScores[d-1][i]);
+                            MaxError=std::isfinite(error)?std::max(MaxError,error):std::numeric_limits<double>::infinity();
+                        }
+                        EXPECT_EQ(p.Get<float>("keep")[0],42);EXPECT_EQ(p.Get<float>("saliency")[4],77);
+                    }
+                    EXPECT_LE(MaxError,1e-5);EXPECT_EQ(History.UndoCount(),8);
+                    for(unsigned i=0;i<8;++i)EXPECT_EQ(History.Undo().Status,Runtime::EditorCommandHistoryStatus::Undone);
+                    for(unsigned d=1;d<=8;++d)
+                    {EXPECT_EQ(std::as_const(Props(d)).Get<float>("saliency")[0],77);EXPECT_EQ(std::as_const(Props(d)).Get<std::uint32_t>("keypoints")[0],77);}
+                    for(unsigned i=0;i<8;++i)EXPECT_EQ(History.Redo().Status,Runtime::EditorCommandHistoryStatus::Redone);
+                    if(Phase==2){Done=true;Kernel().RequestExit();return;}
+                }
+                else
+                {
+                    EXPECT_FALSE(Results.back().Succeeded())<<Results.back().Message;
+                    EXPECT_EQ(std::as_const(Props(8)).Get<float>("saliency")[0],77);
+                    EXPECT_EQ(std::as_const(Props(8)).Get<std::uint32_t>("keypoints")[0],77);EXPECT_EQ(History.UndoCount(),0);
+                    if(Phase==4)EXPECT_TRUE(Cancelled);
+                    if(Phase>=6)
+                    {
+                        EXPECT_EQ(Results.back().Status,Runtime::EditorCommandStatus::GeometryProcessingFailed);
+                        EXPECT_NE(Results.back().Message.find("submission rejected"),std::string::npos);
+                        if(Phase==7){Done=true;Kernel().RequestExit();return;}
+                    }
+                    if(Phase==5)
+                    {
+                        EXPECT_EQ(Results.back().Status,Runtime::EditorCommandStatus::GeometryProcessingFailed);
+                        EXPECT_NE(Results.back().Message.find("overflow"),std::string::npos);
+                        EXPECT_GT(Results.back().MaximumNeighbors,1024);EXPECT_GT(Results.back().GpuQueryBatches,0);
+                    }
+                }
+                Results.clear();Submitted=false;++Phase;
+            }
+            History.ClearHistory();Context.JobCommands={};Context.CommandHistory=nullptr;
+            if(Phase<3)
+            {
+                ReferenceScores.clear();ReferenceMasks.clear();ReferenceResults.clear();const auto cpuStart=std::chrono::steady_clock::now();
+                for(unsigned d=1;d<=8;++d)
+                {
+                    auto c=Config(d);c.Backend=Runtime::KeypointAnalysisBackend::CpuKDTree;
+                    const auto result=Runtime::ApplyEditorKeypointAnalysisCommand(Context,c);ASSERT_TRUE(result.Succeeded())<<result.Message;
+                    ReferenceResults.push_back(result);ReferenceScores.push_back(std::as_const(Props(d)).Get<float>("saliency").Vector());
+                    ReferenceMasks.push_back(std::as_const(Props(d)).Get<std::uint32_t>("keypoints").Vector());
+                    Props(d).Get<float>("saliency").Vector().assign(66,77);Props(d).Get<std::uint32_t>("keypoints").Vector().assign(66,77);
+                }
+                CpuMs.push_back(std::chrono::duration<double,std::milli>(std::chrono::steady_clock::now()-cpuStart).count());
+            }
+            SubmissionCount=0;SubmissionTokens.clear();
+            Context.JobCommands.Submit=[this](Runtime::JobDesc desc,Runtime::EditorJobIdentity)
+            {
+                ++SubmissionCount;
+                if((Phase==6 && SubmissionCount==2) || (Phase==7 && SubmissionCount==3))return Runtime::JobToken{};
+                const bool scale=Phase==4 && desc.DebugName=="Keypoint scale";
+                if(scale)desc.IsReadyToApply=[] {return false;};
+                const auto token=Kernel().Jobs().Submit(std::move(desc));SubmissionTokens.push_back(token);if(scale)ScaleToken=token;return token;
+            };
+            Context.CommandHistory=&History;Submitted=true;PhaseStarted=std::chrono::steady_clock::now();
+            if(Phase<3)
+                for(unsigned d=1;d<=8;++d)
+                {const auto r=Runtime::ApplyEditorKeypointAnalysisCommand(Context,Config(d));if(r.Status!=Runtime::EditorCommandStatus::Pending)Results.push_back(r);}
+            else
+            {
+                auto c=Config(8);auto& p=Props(8);
+                if(Phase==5)
+                {
+                    p.Resize(1030);p.Get<glm::vec3>("samples").Vector().assign(1030,glm::vec3(0));
+                    p.Get<glm::vec3>("samples")[1029]={10,0,0};c.GpuRadiusCapacity=1024;
+                }
+                p.Get<float>("saliency").Vector().assign(p.Size(),77);p.Get<std::uint32_t>("keypoints").Vector().assign(p.Size(),77);
+                const auto r=Runtime::ApplyEditorKeypointAnalysisCommand(Context,c);if(r.Status!=Runtime::EditorCommandStatus::Pending)Results.push_back(r);
+                if(Phase==3)p.Get<glm::vec3>("samples")[0]+=.1f;
+            }
+        }
+        void Shutdown() override {Context={};}
+        Runtime::EditorGeometryProcessingContext Context{};Runtime::EditorCommandHistory History{};
+        std::vector<entt::entity> Entities;
+        std::vector<std::vector<float>> ReferenceScores;
+        std::vector<std::vector<std::uint32_t>> ReferenceMasks;
+        std::vector<Runtime::EditorKeypointAnalysisResult> Results,ReferenceResults;
+        std::vector<double> PhaseMs,CpuMs;
+        std::chrono::steady_clock::time_point Started{},PhaseStarted{};
+        Runtime::JobToken ScaleToken{};std::vector<Runtime::JobToken> SubmissionTokens;unsigned Phase{},ColdFrames{},SubmissionCount{};
+        bool Submitted{},Done{},TimedOut{},Cancelled{};double MaxError{};
+    };
+}
+TEST(PointLBVHGpuSmoke, KeypointPublishesAcrossDomainsWithCompleteSupport)
+{
+    if(!Extrinsic::Platform::Backends::Glfw::CanInitialize())GTEST_SKIP()<<"GLFW unavailable";
+    auto config=Runtime::CreateReferenceEngineConfig();config.Window.Width=64;config.Window.Height=64;
+    config.Render.EnableValidation=true;config.Render.EnableVSync=false;config.ReferenceScene.Enabled=false;
+    auto app=std::make_unique<KeypointApp>();auto* run=app.get();
+    Intrinsic::Tests::RuntimeTestKernel engine(config,std::move(app));engine.EmplaceModule<Runtime::SpatialIndexCache>();
+    engine.Initialize();Shutdown shutdown{engine};engine.Run();ASSERT_TRUE(engine.GetDevice().IsOperational());
+    ASSERT_FALSE(run->TimedOut)<<"phase="<<run->Phase;ASSERT_TRUE(run->Done);ASSERT_EQ(run->PhaseMs.size(),3);
+    EXPECT_LE(run->MaxError,1e-5);
+    if(const auto* output=std::getenv("INTRINSIC_KEYPOINT_BENCHMARK_OUTPUT"))
+    {
+        nlohmann::json json{{"benchmark_id","geometry.point_lbvh.keypoint_runtime_smoke"},{"method","geometry.point_lbvh"},
+            {"backend","gpu_vulkan_compute"},{"dataset","builtin.keypoint_samples.eight_domains.seed241"},{"commit","local-dev"},
+            {"metrics",{{"runtime_ms",run->PhaseMs[1]},{"quality_error_linf",run->MaxError}}},
+            {"diagnostics",{{"runner","IntrinsicPointLBVHGpuTests"},{"mode","smoke"},{"cpu_reference_total_ms",run->CpuMs[1]},
+                {"vulkan_cold_total_ms",run->PhaseMs[0]},{"vulkan_warm_total_ms",run->PhaseMs[1]},
+                {"vulkan_automatic_radius_total_ms",run->PhaseMs[2]},{"warmup_iterations",1},{"measured_iterations",1},
+                {"cpu_scale_covariance_suppression",true}}},{"status",::testing::Test::HasFailure()?"failed":"passed"}};
+        std::ofstream stream(output);ASSERT_TRUE(stream.good());stream<<json.dump(2)<<'\n';ASSERT_TRUE(stream.good());
+    }
+}
+TEST(PointLBVHGpuSmoke, KeypointRejectsStaleCancellationAndRadiusOverflow)
+{
+    if(!Extrinsic::Platform::Backends::Glfw::CanInitialize())GTEST_SKIP()<<"GLFW unavailable";
+    auto config=Runtime::CreateReferenceEngineConfig();config.Window.Width=64;config.Window.Height=64;
+    config.Render.EnableValidation=true;config.Render.EnableVSync=false;config.ReferenceScene.Enabled=false;
+    auto app=std::make_unique<KeypointApp>();auto* run=app.get();run->Phase=3;
+    Intrinsic::Tests::RuntimeTestKernel engine(config,std::move(app));engine.EmplaceModule<Runtime::SpatialIndexCache>();
+    engine.Initialize();Shutdown shutdown{engine};engine.Run();ASSERT_TRUE(engine.GetDevice().IsOperational());
+    ASSERT_FALSE(run->TimedOut)<<"phase="<<run->Phase;ASSERT_TRUE(run->Done);EXPECT_TRUE(run->Cancelled);
+}

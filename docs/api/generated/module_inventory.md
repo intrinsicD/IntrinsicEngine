@@ -20,7 +20,7 @@ Root scanned: `src`
 | `graphics/vulkan` | 13 |
 | `physics` | 1 |
 | `platform` | 5 |
-| `runtime` | 81 |
+| `runtime` | 82 |
 
 ## Modules
 
@@ -404,6 +404,7 @@ Root scanned: `src`
 | `Extrinsic.Runtime.CurvatureSegmentationConfig` | `src/runtime/Modules/CurvatureSegmentation/Runtime.CurvatureSegmentationConfig.cppm` | `runtime` |
 | `Extrinsic.Runtime.GeodesicsConfig` | `src/runtime/Modules/Geodesics/Runtime.GeodesicsConfig.cppm` | `runtime` |
 | `Extrinsic.Runtime.KernelDensityConfig` | `src/runtime/Modules/KernelDensity/Runtime.KernelDensityConfig.cppm` | `runtime` |
+| `Extrinsic.Runtime.KeypointAnalysisConfig` | `src/runtime/Modules/KeypointAnalysis/Runtime.KeypointAnalysisConfig.cppm` | `runtime` |
 | `Extrinsic.Runtime.NormalEstimationConfig` | `src/runtime/Modules/NormalEstimation/Runtime.NormalEstimationConfig.cppm` | `runtime` |
 | `Extrinsic.Runtime.OutlierAnalysisConfig` | `src/runtime/Modules/OutlierAnalysis/Runtime.OutlierAnalysisConfig.cppm` | `runtime` |
 | `Extrinsic.Runtime.ParameterizationConfig` | `src/runtime/Modules/Parameterization/Runtime.ParameterizationConfig.cppm` | `runtime` |
@@ -426,4 +427,4 @@ Root scanned: `src`
 | `Extrinsic.Runtime.StableEntityLookup` | `src/runtime/Scene/Runtime.StableEntityLookup.cppm` | `runtime` |
 | `Extrinsic.Runtime.VisualizationRecipes` | `src/runtime/Visualization/Runtime.VisualizationRecipes.cppm` | `runtime` |
 
-Total modules: **399**
+Total modules: **400**
