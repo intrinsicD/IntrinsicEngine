@@ -11764,3 +11764,22 @@ tree:
     alternatives: [Truncate radius support, Add a parallel spatial service, Replace centroid covariance with a different ISS formulation]
     evidence: [N531, O218, docs/architecture/keypoint-analysis.md]
     status: resolved
+
+  - id: N533
+    type: experiment
+    title: Exercise FPFH with complete and capped CPU and Vulkan radius support
+    provenance: ai-executed
+    timestamp: '2026-09-10T04:46:30+02:00'
+    result: Implementation 2e6353df1ca9c2500bc6509ab93a71476399eef1 passes 4443 distinct CPU cases after native follow-up and three actual Vulkan fixtures. All eight domains have histogram error within 1e-5; dense capped support is accepted and uncapped overflow or failed job chains retain all columns.
+    evidence: [ara/evidence/diagnostics/descriptor_vulkan_2026-09-10/record.json, tasks/evidence/RUNTIME-226/commands/actual-vulkan-corrected.stdout.log]
+    status: resolved
+
+  - id: N534
+    type: decision
+    title: Reuse radius lowest-ID retention and canonical float columns for FPFH
+    provenance: ai-executed
+    timestamp: '2026-09-10T04:46:30+02:00'
+    choice: Adopt the bounded tested FPFH path in 2e6353df1ca9c2500bc6509ab93a71476399eef1; preserve the query-normal histogram formulation, reject invalid normals and insufficient support, and publish 33 float properties through one guarded history operation. Correct the initial distance-ranked radius assumption using the existing CPU and shader source.
+    alternatives: [Reject all dense capped queries, Add a bespoke descriptor property type, Substitute nearest-k neighborhoods, Claim PCL numerical interchangeability]
+    evidence: [N533, O219, docs/architecture/descriptor-analysis.md]
+    status: resolved

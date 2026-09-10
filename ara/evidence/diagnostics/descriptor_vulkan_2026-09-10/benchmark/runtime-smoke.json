@@ -1,0 +1,74 @@
+{
+  "attempt_id": "attempt-001",
+  "backend": "gpu_vulkan_compute",
+  "benchmark_id": "geometry.point_lbvh.descriptor_runtime_smoke",
+  "claim_eligible": false,
+  "commit": "local-dev",
+  "config_digest": "06240e6d581830719bae98d9fc9ff3103f80d03fb420441fb2faabe39f03259b",
+  "dataset": "builtin.descriptor_samples.eight_domains.seed241",
+  "diagnostics": {
+    "cpu_reference_total_ms": 475.866538,
+    "cpu_scale_spfh_fpfh": true,
+    "measured_iterations": 1,
+    "mode": "smoke",
+    "runner": "IntrinsicPointLBVHGpuTests",
+    "vulkan_automatic_radius_total_ms": 6408.080201,
+    "vulkan_cold_total_ms": 6215.078156,
+    "vulkan_warm_total_ms": 6452.327235,
+    "warmup_iterations": 1
+  },
+  "execution_status": "passed",
+  "manifest": {
+    "path": "benchmarks/geometry/manifests/point_lbvh_descriptor_runtime_smoke.yaml",
+    "sha256": "863d5b6724139a7f8a9566f97e1540fd98d43bc8ada1e335bdd046fb0c272829"
+  },
+  "method": "geometry.point_lbvh",
+  "metrics": {
+    "quality_error_linf": 0.0,
+    "runtime_ms": 6452.327235
+  },
+  "resolved_params": {
+    "capability": "gpu_vulkan",
+    "feature_radius": 2,
+    "gpu_query_batch_size": 128,
+    "gpu_radius_capacity": 256,
+    "intent": "smoke",
+    "max_neighbors": 8,
+    "measured_iterations": 1,
+    "timed_scope": "eight_domain_descriptor_requests_through_publication",
+    "warmup_iterations": 1
+  },
+  "run_id": "fpfh-runtime-2026-09-10",
+  "schema_version": 2,
+  "source": {
+    "revision": "local-dev",
+    "state": "dirty_worktree"
+  },
+  "status": "passed",
+  "threshold_disposition": [
+    {
+      "limit": 30000,
+      "metric": "runtime_ms",
+      "observed": 6452.327235,
+      "operator": "<=",
+      "passed": true,
+      "threshold": "smoke_runtime_ms_max"
+    },
+    {
+      "limit": 1e-05,
+      "metric": "quality_error_linf",
+      "observed": 0.0,
+      "operator": "<=",
+      "passed": true,
+      "threshold": "quality_error_linf_max"
+    }
+  ],
+  "thresholds": {
+    "quality_error_linf_max": 1e-05,
+    "smoke_runtime_ms_max": 30000
+  },
+  "warmup_policy": {
+    "measured_iterations": 1,
+    "warmup_iterations": 1
+  }
+}

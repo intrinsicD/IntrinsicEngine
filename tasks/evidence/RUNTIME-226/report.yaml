@@ -1,0 +1,220 @@
+schema_version: 1
+task_id: RUNTIME-226
+workflow_profile: high-risk
+status: complete
+generated_by: tools/agents/workflow_evidence.py
+generated_at: '2026-09-10T02:46:47Z'
+claim_eligible: false
+source:
+  base_ref: 8b21491b8
+  base_revision: 8b21491b861337114fce72a9264d74379500b272
+  head_revision: 2e6353df1ca9c2500bc6509ab93a71476399eef1
+  branch: main
+  worktree: /home/alex/Documents/IntrinsicEngine
+  dirty: true
+  surface:
+  - path: ara/evidence/diagnostics/descriptor_vulkan_2026-09-10/benchmark/runtime-smoke.json
+    sha256: f1d80f902a5b1d5f0a4c364c62a3a261430cb986e54d3046417dc0fe6dda9b95
+  - path: ara/evidence/diagnostics/descriptor_vulkan_2026-09-10/record.json
+    sha256: f3897661c4bf78b51947beb0a02a8108ca17c6d8bf601b598ae5adb42abf34eb
+  - path: ara/evidence/tables/descriptor_verification_2026-09-10.md
+    sha256: 9e1da8f2e4cfb95aec355e1b106170dd01117a472e87ba321e0d004d3582045d
+  - path: ara/logic/claims.md
+    sha256: fdfeed5d7a0937526e32ff21f3387759d0fbfb2dc054a34ad34a4449ba10e918
+  - path: ara/staging/observations.yaml
+    sha256: 15599bbc8c910623a466878402c4a43f9a96b3dfc1a25c26e171b1ce4a849b82
+  - path: ara/trace/exploration_tree.yaml
+    sha256: 7126f00e64b975c037130ca02af6014758f9fc37419cf287f949e0cd3666cd4a
+  - path: benchmarks/geometry/manifests/point_lbvh_descriptor_runtime_smoke.yaml
+    sha256: 863d5b6724139a7f8a9566f97e1540fd98d43bc8ada1e335bdd046fb0c272829
+  - path: docs/api/generated/module_inventory.md
+    sha256: 64f50b95ec498668d98514f1be618957dc94b180bae60b78276e66c6c1b79bc4
+  - path: docs/architecture/descriptor-analysis.md
+    sha256: 19b6302e81637192e5b34c0143b82669497e30e13f3ed9a01d524070e6266a62
+  - path: docs/architecture/runtime.md
+    sha256: a31ee5f820be70b5cf70951698bef522ebd4ce619312ed4dd00edc99fb76b202
+  - path: docs/architecture/spatial-index-consumers.md
+    sha256: 05839673fcfb950997fd10b1704a354e29438162defe2051cbb596ee1372eafd
+  - path: docs/product/framework24-feature-inventory.md
+    sha256: d0fec1976b48a7131464d6c9392661f9056af08add4395840140b929ae66bcc8
+  - path: methods/geometry/point_lbvh/method.yaml
+    sha256: cae825f5b1b3bf360ce15508340096ec1e695e26a5e959ee9e472506df83634b
+  - path: src/app/Sandbox/Editor/Sandbox.MeshProcessingPanels.cpp
+    sha256: 85f5a9ef26aabcf2f14b6d51cf6726985ef13dfe07bfc3c22e6a924a601c7077
+  - path: src/app/Sandbox/Sandbox.ConfigSections.cpp
+    sha256: 6ba37024fabf20e09ccb5ae50085089ddd36b6f8fedaec83ab293739cb8fa3cb
+  - path: src/geometry/Geometry.PointCloud.Features.cpp
+    sha256: 371db3ff9a5041ea2c934a5d4a31ab9b79e605b793fba2832aadab77b182bb0a
+  - path: src/geometry/Geometry.PointCloud.Features.cppm
+    sha256: 0f2e7327547b52a930a15f0643271db56bcc4c3766ef053b718120853b07ab89
+  - path: src/runtime/CMakeLists.txt
+    sha256: 685e86999d28465ea7a1906ef3f4c9ed7947bb3a58b6c0403f62d6a981006bc1
+  - path: src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Descriptors.cpp
+    sha256: 0d75884b89b62736417638d4d2e4e9169cdb417393e3af1d99fd6b26c1dfd98f
+  - path: src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Public.cpp
+    sha256: f779c992796ee79a7984d9a85a4d2480961e4da920a1cef7cbc467b4cb0b0cd9
+  - path: src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.cpp
+    sha256: 7236deea6c1edabf9411467f50c107df98b0f250beb2ad6e63e354123d8cb42e
+  - path: src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.cppm
+    sha256: 4a5d3e49a226e71c66fff4d2eff98ea105bd07f9bb9dae6624cb5e49bd15e42b
+  - path: src/runtime/Editor/internal/Runtime.EditorFeatureContextAdapters.cpp
+    sha256: 9ee5de5bdd82de0428e04f581effad9a65f89fa6e6d0cfab9c3ab429f7061ee2
+  - path: src/runtime/Editor/internal/Runtime.EditorFeatures.Detail.cppm
+    sha256: 0affbf2bf56244cec16e532531a704bac8a00777560f4957ef8102eecc81000f
+  - path: src/runtime/Editor/internal/Runtime.EditorWorkspaceSession.cpp
+    sha256: 5ccdfe257516117be5399944a8d478a46d3d2fcb528b6605e5949aaf6f3fb094
+  - path: src/runtime/Modules/DescriptorAnalysis/Runtime.DescriptorAnalysisConfig.cpp
+    sha256: 6017c468a7f2d2913679a237338ee092741a8e39f2b8628c3bc32deea193660c
+  - path: src/runtime/Modules/DescriptorAnalysis/Runtime.DescriptorAnalysisConfig.cppm
+    sha256: 3854a071c72dc46594b0c42bdb08751d66078a5e7deb3a60c2b32cffec592826
+  - path: tasks/backlog/geometry/GEOM-073-point-analysis-property-span-contracts.md
+    sha256: 014f584a3d4acac7ad327ec72d1c87facf778e7b694c45c097e5380fa4531e71
+  - path: tasks/done/RETIREMENT-LOG.md
+    sha256: f4b7de1d3a87a62bfb079dd7ea728d446e16c25e7e68ffa3a38674e36d37df9d
+  - path: tasks/done/RUNTIME-226-fpfh-descriptor-spatial-backends.md
+    sha256: 99a75e1c72971273d534145cc1b8b8b6088569bcd5d779c269c71c2ae69f0c45
+  - path: tests/CMakeLists.txt
+    sha256: 4eebed505e771c7230cb1b2e74df0c9a2d3b52fa2e84b7e3e8cee9b09264a105
+  - path: tests/contract/runtime/Test.DescriptorAnalysisOperations.cpp
+    sha256: 6d47522c18d0b322e87d5275c224938574b585c190d59c7d644a8a75e2b2d925
+  - path: tests/integration/graphics/Test.PointLBVHGpuSmoke.cpp
+    sha256: 9b709c51ced35bacd1a9334341e8121965a5028b038770e0ff067be2cc3fa258
+  - path: tests/integration/runtime/Test.SandboxEditorPresentation.cpp
+    sha256: aaa59f291fe054b61d93ba8e3136145735dbf5cbae5dcd0922622135f0a1cec9
+  - path: tests/unit/geometry/Test.DescriptorAnalysis.cpp
+    sha256: 3bac00de7dca4b2dd561c77de62b5b1a4a40213d2d9440032f544f8de06f31a8
+  content_digest: c2255223ba4be009b248edd1cf9b5ca6977c7cef1963e2acebb1db17f73cabd9
+touched:
+  paths:
+  - ara/evidence/diagnostics/descriptor_vulkan_2026-09-10/benchmark/runtime-smoke.json
+  - ara/evidence/diagnostics/descriptor_vulkan_2026-09-10/record.json
+  - ara/evidence/tables/descriptor_verification_2026-09-10.md
+  - ara/logic/claims.md
+  - ara/staging/observations.yaml
+  - ara/trace/exploration_tree.yaml
+  - benchmarks/geometry/manifests/point_lbvh_descriptor_runtime_smoke.yaml
+  - docs/api/generated/module_inventory.md
+  - docs/architecture/descriptor-analysis.md
+  - docs/architecture/runtime.md
+  - docs/architecture/spatial-index-consumers.md
+  - docs/product/framework24-feature-inventory.md
+  - methods/geometry/point_lbvh/method.yaml
+  - src/app/Sandbox/Editor/Sandbox.MeshProcessingPanels.cpp
+  - src/app/Sandbox/Sandbox.ConfigSections.cpp
+  - src/geometry/Geometry.PointCloud.Features.cpp
+  - src/geometry/Geometry.PointCloud.Features.cppm
+  - src/runtime/CMakeLists.txt
+  - src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Descriptors.cpp
+  - src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Public.cpp
+  - src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.cpp
+  - src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.cppm
+  - src/runtime/Editor/internal/Runtime.EditorFeatureContextAdapters.cpp
+  - src/runtime/Editor/internal/Runtime.EditorFeatures.Detail.cppm
+  - src/runtime/Editor/internal/Runtime.EditorWorkspaceSession.cpp
+  - src/runtime/Modules/DescriptorAnalysis/Runtime.DescriptorAnalysisConfig.cpp
+  - src/runtime/Modules/DescriptorAnalysis/Runtime.DescriptorAnalysisConfig.cppm
+  - tasks/backlog/geometry/GEOM-073-point-analysis-property-span-contracts.md
+  - tasks/done/RETIREMENT-LOG.md
+  - tasks/done/RUNTIME-226-fpfh-descriptor-spatial-backends.md
+  - tests/CMakeLists.txt
+  - tests/contract/runtime/Test.DescriptorAnalysisOperations.cpp
+  - tests/integration/graphics/Test.PointLBVHGpuSmoke.cpp
+  - tests/integration/runtime/Test.SandboxEditorPresentation.cpp
+  - tests/unit/geometry/Test.DescriptorAnalysis.cpp
+  layers:
+  - app
+  - geometry
+  - runtime
+  modules:
+  - Geometry.PointCloud.Features
+  - Runtime.DescriptorAnalysisConfig
+  - Runtime.GeometryProcessingOperations
+extension_seam: Existing PointNeighborhoods, spatial cache, jobs, canonical property watches and float-column
+  publication
+future_change_plan: GEOM-073 and the spatial-consumer inventory retain compact kernel weights, projection
+  query adapters and distinct Framework24 scalar saliency/probability ports; descriptor-space matching
+  is not a 3D LBVH query.
+acceptance:
+- criterion: Compatible property domains share the same method availability and publication path.
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: No backend silently loses required radius support or falls back to CPU queries.
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: Full CPU gate, focused actual Vulkan, manifest smoke and independent fixed-surface review
+    pass with explicit variant/precision/performance limits.
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+commands:
+- receipt: tasks/evidence/RUNTIME-226/commands/actual-vulkan-corrected.json
+- receipt: tasks/evidence/RUNTIME-226/commands/benchmark.json
+- receipt: tasks/evidence/RUNTIME-226/commands/build-ci-harness.json
+- receipt: tasks/evidence/RUNTIME-226/commands/build-ci-prefix.json
+- receipt: tasks/evidence/RUNTIME-226/commands/build-ci.json
+- receipt: tasks/evidence/RUNTIME-226/commands/build-vulkan-harness.json
+- receipt: tasks/evidence/RUNTIME-226/commands/build-vulkan-prefix.json
+- receipt: tasks/evidence/RUNTIME-226/commands/build-vulkan.json
+- receipt: tasks/evidence/RUNTIME-226/commands/focused-prefix.json
+- receipt: tasks/evidence/RUNTIME-226/commands/full-cpu.json
+- receipt: tasks/evidence/RUNTIME-226/commands/geometry-corrected.json
+- receipt: tasks/evidence/RUNTIME-226/commands/native-cpu.json
+- receipt: tasks/evidence/RUNTIME-226/commands/retirement-structure.json
+- receipt: tasks/evidence/RUNTIME-226/commands/runtime-focused.json
+- receipt: tasks/evidence/RUNTIME-226/commands/structure-harness.json
+- receipt: tasks/evidence/RUNTIME-226/commands/structure-prefix.json
+- receipt: tasks/evidence/RUNTIME-226/commands/structure.json
+changed_public_contracts:
+- All eight canonical position/normal domains; 33 atomic float output properties; complete or exact lowest-ID
+  capped radius support.
+diagnostics_and_previews:
+- Requested/actual backend, live/slot/written counts, resolved scale, total neighborhood occupancy, cache
+  reuse and CPU/GPU timings.
+benchmark_or_parity_evidence:
+- ara/evidence/diagnostics/descriptor_vulkan_2026-09-10/benchmark/runtime-smoke.json
+docs_sync:
+  task_file: tasks/done/RUNTIME-226-fpfh-descriptor-spatial-backends.md
+  session_brief_present: true
+  canonical_docs_changed: true
+  skill_mirrors_checked: true
+residual_risks:
+- Initial dense GPU harness waited for already-reaped successful ancestors; corrected partial-submission-only
+  waiting passes the actual Vulkan replacement gate.
+- Historical geometry assertion incorrectly expected nonempty bins for a duplicate-only capped row. The
+  immutable failure receipt remains an artifact; corrected assertions and final passing gates supersede
+  it.
+- Dirty Debug smoke has no speedup claim. Existing BUG-180 excludes GPU LeakSanitizer; isolated full CPU
+  sanitizer suites were not rerun.
+skipped_checks: []
+artifacts:
+- path: ara/evidence/diagnostics/descriptor_vulkan_2026-09-10/record.json
+  sha256: f3897661c4bf78b51947beb0a02a8108ca17c6d8bf601b598ae5adb42abf34eb
+  kind: file
+- path: ara/evidence/tables/descriptor_verification_2026-09-10.md
+  sha256: 9e1da8f2e4cfb95aec355e1b106170dd01117a472e87ba321e0d004d3582045d
+  kind: file
+- path: tasks/evidence/RUNTIME-226/commands/actual-vulkan.json
+  sha256: e354c034f100f905fd55ff9e614e30e6aff6d0d84d504b81606cff30c3740f23
+  kind: file
+- path: tasks/evidence/RUNTIME-226/commands/actual-vulkan.stdout.log
+  sha256: a8514b7aec0cc0bad32a1199dc3d568e9a978ac34d0576e0dbb1facd3073c2f1
+  kind: file
+- path: tasks/evidence/RUNTIME-226/commands/geometry-reference.json
+  sha256: cc7a6d0845134d5fa16b9b0eb13ee9cc1d269577a91916886eb02f8803930334
+  kind: file
+- path: tasks/evidence/RUNTIME-226/commands/geometry-reference.stdout.log
+  sha256: 04744b8bb48768b1b82cadacd7171186d0c538826cb19a565fac1178421d8cef
+  kind: file
+self_review:
+  completed: true
+  scope_matches_task: true
+  layering_preserved: true
+  tests_and_docs_accounted_for: true
+  mechanical_and_semantic_changes_separated: true
+handoff: tasks/evidence/RUNTIME-226/handoff.jsonl
+review: tasks/evidence/RUNTIME-226/reviews.jsonl

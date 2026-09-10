@@ -50,22 +50,22 @@ Reuse Geometry.PointNeighborhoods, geometry feature kernels, runtime property wa
 One slice: reference/span contract and tests, manifest, indexed runtime/config/UI integration, CPU and actual Vulkan verification, docs and fixed-surface independent review.
 
 ## Required changes
-- [ ] Add span and supplied-neighborhood descriptor computation while preserving the Cloud API.
-- [ ] Use the common neighborhood view without changing other consumers.
-- [ ] Wire all three backends and canonical property/config/UI/publication surfaces.
+- [x] Add span and supplied-neighborhood descriptor computation while preserving the Cloud API.
+- [x] Use the common neighborhood view without changing other consumers.
+- [x] Wire all three backends and canonical property/config/UI/publication surfaces.
 
 ## Tests
-- [ ] Analytic histograms, capped/query-order cases, invalid normals/neighborhoods and deleted rows pass.
-- [ ] All-domain CPU/cache, config, history and stale/cancel tests pass.
-- [ ] Actual Vulkan parity and required-support overflow and dense capped-prefix checks pass.
+- [x] Analytic histograms, capped/query-order cases, invalid normals/neighborhoods and deleted rows pass.
+- [x] All-domain CPU/cache, config, history and stale/cancel tests pass.
+- [x] Actual Vulkan parity and required-support overflow and dense capped-prefix checks pass.
 
 ## Docs
-- [ ] Update architecture, consumer inventory, method/benchmark manifests, module inventory and remaining port reminders.
+- [x] Update architecture, consumer inventory, method/benchmark manifests, module inventory and remaining port reminders.
 
 ## Acceptance criteria
-- [ ] Compatible property domains share the same method availability and publication path.
-- [ ] No backend silently loses required radius support or falls back to CPU queries.
-- [ ] Full CPU gate, focused actual Vulkan, manifest smoke and independent fixed-surface review pass with explicit variant/precision/performance limits.
+- [x] Compatible property domains share the same method availability and publication path.
+- [x] No backend silently loses required radius support or falls back to CPU queries.
+- [x] Full CPU gate, focused actual Vulkan, manifest smoke and independent fixed-surface review pass with explicit variant/precision/performance limits.
 
 ## Verification
 ```bash
@@ -93,3 +93,10 @@ Source review of `Geometry.PointLBVH.cpp::Radius` and `lbvh_query.comp` correcte
 
 ## Test-harness correction
 The first dense capped Vulkan test received a result but then waited for every submitted token. Successful ancestor records may already be reaped before the final result arrives, so IsComplete no longer reports them. Restrict that extra settling wait to partial-submission rejection phases; successful dependency ordering is already enforced by the job service. Retain the initial timeout receipt and run all three actual Vulkan cases again with unchanged production code and time limits.
+
+## Completion
+
+**Completed:** 2026-09-10
+**Commit:** `2e6353df1ca9c2500bc6509ab93a71476399eef1` (implementation; retirement/review seal follows).
+
+[Bounded verification](../../ara/evidence/tables/descriptor_verification_2026-09-10.md) and ARA C87 bind 4443 distinct CPU passes and three actual Vulkan cases. The dense cap=1 path reuses existing lowest-ID retention. Uncapped overflow and failed job chains preserve all outputs. No performance improvement or PCL interchangeability is claimed.

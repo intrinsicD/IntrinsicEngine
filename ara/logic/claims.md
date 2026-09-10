@@ -2103,3 +2103,14 @@
 - **Dependencies**: [C80]
 - **Tags**: keypoints, centroid PCA, complete radius support, LBVH, CPU, Vulkan, bounded integration
 - **From staging**: O218
+
+## C87: Bounded FPFH publication with complete or capped Vulkan radius support
+- **Statement**: The source-bound 2026-09-10 fixtures publish the engine's 33-bin FPFH variant on all eight canonical domains using KD-tree reference, cached CPU LBVH and actual framed Vulkan radius queries. Explicit/automatic-radius histograms stay within 1e-5 absolute tolerance (observed zero on the eight-domain fixture). A dense radius with more than 1024 neighbors supports an exact lowest-ID cap of one within tolerance. Analytic bins, query order/repeats, invalid normals/rows, config, deleted/unrelated preservation, all-column history, stale normals, cancellation/reaping, uncapped overflow and partial-chain submission rejection checks pass.
+- **Status**: supported — bounded ci CPU and actual ci-vulkan ASan+UBSan cases only. No PCL interchangeability, full original pair-source convention, descriptor-space matching acceleration, general-input proof, GPU histogram reduction, new visualization readback, whole-process leak-freedom, speedup or default-change claim. Dirty Debug smoke is diagnostic.
+- **Provenance**: ai-executed
+- **Crystallized via**: artifact-commitment
+- **Falsification criteria**: Replaying the recorded source and fixtures exceeds histogram tolerance, loses required radius/prefix support, corrupts unrelated/deleted properties, publishes stale/cancelled/partially submitted work, or fails declared domain/config/history assertions.
+- **Proof**: [ara/evidence/diagnostics/descriptor_vulkan_2026-09-10/record.json, ara/evidence/tables/descriptor_verification_2026-09-10.md, tasks/evidence/RUNTIME-226/commands/actual-vulkan-corrected.stdout.log, tasks/evidence/RUNTIME-226/commands/full-cpu.stdout.log, tests/unit/geometry/Test.DescriptorAnalysis.cpp, tests/contract/runtime/Test.DescriptorAnalysisOperations.cpp, tests/integration/graphics/Test.PointLBVHGpuSmoke.cpp]
+- **Dependencies**: [C86]
+- **Tags**: FPFH, descriptors, radius support, lowest-ID prefix, LBVH, CPU, Vulkan, bounded integration
+- **From staging**: O219

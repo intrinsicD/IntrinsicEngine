@@ -3773,3 +3773,15 @@ observations:
     promoted_to: logic/claims.md:C86
     crystallized_via: artifact-commitment
     stale: false
+
+  - id: O219
+    timestamp: '2026-09-10T04:46:30+02:00'
+    provenance: ai-executed
+    content: Bounded 33-column FPFH results match the reference through cached CPU LBVH and actual Vulkan radius support, including exact capped prefixes in dense neighborhoods and guarded all-domain publication/history.
+    context: N534 binds the verified implementation into method-task closure; no user response, broad numerical proof or speedup is inferred. Full overnight process recording remains an end-of-turn step.
+    potential_type: claim
+    bound_to: [N533, N534]
+    promoted: true
+    promoted_to: logic/claims.md:C87
+    crystallized_via: artifact-commitment
+    stale: false
