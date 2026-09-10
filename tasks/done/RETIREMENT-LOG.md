@@ -8138,3 +8138,5 @@ Exposed fixed-normal bilateral point filtering through shared config/UI controls
 ### BUG-183 — 2026-09-10
 
 Retain terminal job outcomes while pending consumers reference them, so reaping cannot turn a cancelled predecessor into a satisfied missing token. Implementation `924a45372`; deterministic before/after regression, successful-chain reclamation, 27 focused scheduler cases, full CPU and actual Vulkan cancellation regression verified. Completion evidence: `tasks/evidence/BUG-183/report.yaml`. BUG-184 separately tracks existing waiting-state aggregate accounting.
+
+- 2026-09-10 — **RUNTIME-225**: Integrated centroid-PCA keypoints with shared CPU/Vulkan complete radius support, canonical config/UI and atomic mask/saliency history. C86 binds 4434 CPU passes plus two actual Vulkan cases, with explicit variant and sanitizer limits. Implementation `aa59947a42e5db293d053e0381487300f6e66f32`; [task](RUNTIME-225-iss-keypoint-spatial-backends.md).

@@ -1,0 +1,217 @@
+schema_version: 1
+task_id: RUNTIME-225
+workflow_profile: high-risk
+status: complete
+generated_by: tools/agents/workflow_evidence.py
+generated_at: '2026-09-10T01:45:05Z'
+claim_eligible: false
+source:
+  base_ref: 8725bd3df
+  base_revision: 8725bd3df26b535ffe31cbfbb0ebf3066d8701ba
+  head_revision: aa59947a42e5db293d053e0381487300f6e66f32
+  branch: main
+  worktree: /home/alex/Documents/IntrinsicEngine
+  dirty: true
+  surface:
+  - path: ara/evidence/diagnostics/keypoint_vulkan_2026-09-10/benchmark/runtime-smoke.json
+    sha256: b314c7a47ba317a3836daf92d3db68d6a78a1c74e5b77948a3f91b591fb850c2
+  - path: ara/evidence/diagnostics/keypoint_vulkan_2026-09-10/record.json
+    sha256: 99787b91cb5aad9ca71eadf77833ccbb8d46c89c457258b30d2091495b10f5f9
+  - path: ara/evidence/tables/keypoint_verification_2026-09-10.md
+    sha256: f1c4f2f59158b518065182eb8f754db0e58e8db3ff75e04ed6aec9e5fdf1ad57
+  - path: ara/logic/claims.md
+    sha256: b6668d9c15f0e316135d4b4dc371a2ce0c74351d38cfe4e08a0c2b41876375d1
+  - path: ara/staging/observations.yaml
+    sha256: 1e9214525f1a41d9ade4a0b7406dac95855f86af89dd72324aef3db162cc29cf
+  - path: ara/trace/exploration_tree.yaml
+    sha256: 3a3cfbb5bb1bdb66ae9396b17f0010c639164dc6cc77e3e4fd13f57b2931be4c
+  - path: benchmarks/geometry/manifests/point_lbvh_keypoint_runtime_smoke.yaml
+    sha256: aaa09e0f70eb5d1638ac677b53f59117948848e04cf5579ed22b6120044d5830
+  - path: docs/api/generated/module_inventory.md
+    sha256: 5edcbd87c09f2e83cf3938473525560c0eb12e4f0bbab60c5ab02b2385a5ef71
+  - path: docs/architecture/keypoint-analysis.md
+    sha256: 1211d9411dc2bed7daec5394099d8ef436c0c8c9c064d240c3383243823f7de4
+  - path: docs/architecture/runtime.md
+    sha256: a6e0dfee89a8502f1047e69aff22a0eb5d042a395346c5217de40ba5ac3bf5ce
+  - path: docs/architecture/spatial-index-consumers.md
+    sha256: 9d84fbc1a1c46cd2143e606cd972784e3defcebe8c1b2d3b8204961122f1aef9
+  - path: methods/geometry/point_lbvh/method.yaml
+    sha256: 723de9a299dd90b50efccbf3ee7420b49e60313c082f908f89b076c0e14231a9
+  - path: src/app/Sandbox/Editor/Sandbox.MeshProcessingPanels.cpp
+    sha256: 6cd766e12608ea74894863fe5e00814bf9512682af78a3ef06344292d09d98df
+  - path: src/app/Sandbox/Sandbox.ConfigSections.cpp
+    sha256: d3bb0ca33b79b4b68f32de12f57634e12bc7c37c9fe39426c396948398e77dd0
+  - path: src/geometry/Geometry.PointCloud.Features.cpp
+    sha256: 4b806d166e495f0dd013f10eba8279672385e1927f6a2851cc17e3288b3a9de9
+  - path: src/geometry/Geometry.PointCloud.Features.cppm
+    sha256: 5618fb3b5091663fac131258e057e96eff2aaa8ed6a8161b41fecd47ce696177
+  - path: src/geometry/Geometry.PointCloud.Normals.cppm
+    sha256: 3ebc4708d0f3e5d8e64aecdec5b1f64a0ef2b7a0778ba27cb5f9e10782d3dd99
+  - path: src/geometry/Geometry.SpatialQueries.cppm
+    sha256: 782f219c70f219b80fc81e1893e3253856876794ef8253b33f7c55a380496151
+  - path: src/runtime/CMakeLists.txt
+    sha256: c429727265113cb571474f89529460fc8f48aae811b41cce95bbb5b9611b7c8f
+  - path: src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Bilateral.cpp
+    sha256: 2e7fad9f84e67904fe7aa22b5a6b1883ff264a2143bae189bc8f3956b52e9776
+  - path: src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Internal.hpp
+    sha256: 70cdb3177cf49478df0f6ccc2ade8500932bd447b46a135518565236e22fc731
+  - path: src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Keypoints.cpp
+    sha256: 065a425fffa14078895f6a9347725fb3b554580b534f18f78075097d7e5325a0
+  - path: src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Outliers.cpp
+    sha256: 64660b2ffd8f88f29b729791505a7e99ce4ed4b13d825272de1441733ec97dc1
+  - path: src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.PointProperties.cpp
+    sha256: 32120f4fb10761e8d252e03d72abaa7b11055439a2cce25b967b0b7db1fc16d7
+  - path: src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Public.cpp
+    sha256: 12200c67ce826ee3b06286a8dac6397b0e52a2b8d3d1bca74b39fe0558d66380
+  - path: src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.cpp
+    sha256: 1ed61a3b4621206c3af7717a3aaef9e4ed696a62642683da5afdd7bcb201d4e1
+  - path: src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.cppm
+    sha256: dfcd6a372ab336c199735c8c458be843a4f3bfcd7f3747b7ab98d5b8b839710d
+  - path: src/runtime/Editor/internal/Runtime.EditorFeatureContextAdapters.cpp
+    sha256: b80ffcea4c914ea174a3eeb9cc3b51755d01527269492423c4467fa2ab361365
+  - path: src/runtime/Editor/internal/Runtime.EditorFeatures.Detail.cppm
+    sha256: 7303b76d15acc2f80e7f3f7e7ff875414cf674caf0a2b6ce031a5df84eb74caa
+  - path: src/runtime/Editor/internal/Runtime.EditorWorkspaceSession.cpp
+    sha256: d112f1d0530916f16c43085676a99faa6301160f7b5ba1c0f59fc7c6597e0ea1
+  - path: src/runtime/Modules/KeypointAnalysis/Runtime.KeypointAnalysisConfig.cpp
+    sha256: 754ab178ecc4117cb358f8d0eca2ae5d46d312eb0677b0c9f6aa8c393fa1dcb2
+  - path: src/runtime/Modules/KeypointAnalysis/Runtime.KeypointAnalysisConfig.cppm
+    sha256: a07d2dbc69a9750e047a3f9a0d5a1348bc1dbbc3dd75ed8a53f05ffc3f66311a
+  - path: tasks/backlog/geometry/GEOM-073-point-analysis-property-span-contracts.md
+    sha256: a984ab4f18373178bd2d03e87ad2454c972bdb227c39d7e3e9a20f540e07cf92
+  - path: tasks/done/RETIREMENT-LOG.md
+    sha256: b9bba490810c4c9d723c3009cbaadc2c8a09a7eb0f7b08064287f8b59bf151ba
+  - path: tasks/done/RUNTIME-225-iss-keypoint-spatial-backends.md
+    sha256: 8cafefbd05b55a437fad4966dbb2d3472b8f083ca4273b6fbf0eca2b4a39237f
+  - path: tests/CMakeLists.txt
+    sha256: f4a0a9573439d2cf30a54cc1535984fa67f4fd2f9521f68edcadf3ea45399aba
+  - path: tests/contract/runtime/Test.KeypointAnalysisOperations.cpp
+    sha256: 72c240702161f48bb2738b19868250290ff67b9179d03fb64172eb1ef4ef5871
+  - path: tests/integration/graphics/Test.PointLBVHGpuSmoke.cpp
+    sha256: 82a8429fc63c970e7632fc9c4dc4929f78c72542d9a21e4ddeeb44d5c197810d
+  - path: tests/integration/runtime/Test.SandboxEditorPresentation.cpp
+    sha256: 9b17fd60b1d9ce512b0bea73fcebeffbd758587d150783df88bfe83ac1ca2b59
+  - path: tests/unit/geometry/Test.KeypointAnalysis.cpp
+    sha256: 82b824caa4361df74063752329816a908f8ca9c5e78317eaae201c6ee015fe53
+  content_digest: 9f9c60e953bd77fa3f8273b938cb592bb33e95315d90a6fd2e69cff471d8c14d
+touched:
+  paths:
+  - ara/evidence/diagnostics/keypoint_vulkan_2026-09-10/benchmark/runtime-smoke.json
+  - ara/evidence/diagnostics/keypoint_vulkan_2026-09-10/record.json
+  - ara/evidence/tables/keypoint_verification_2026-09-10.md
+  - ara/logic/claims.md
+  - ara/staging/observations.yaml
+  - ara/trace/exploration_tree.yaml
+  - benchmarks/geometry/manifests/point_lbvh_keypoint_runtime_smoke.yaml
+  - docs/api/generated/module_inventory.md
+  - docs/architecture/keypoint-analysis.md
+  - docs/architecture/runtime.md
+  - docs/architecture/spatial-index-consumers.md
+  - methods/geometry/point_lbvh/method.yaml
+  - src/app/Sandbox/Editor/Sandbox.MeshProcessingPanels.cpp
+  - src/app/Sandbox/Sandbox.ConfigSections.cpp
+  - src/geometry/Geometry.PointCloud.Features.cpp
+  - src/geometry/Geometry.PointCloud.Features.cppm
+  - src/geometry/Geometry.PointCloud.Normals.cppm
+  - src/geometry/Geometry.SpatialQueries.cppm
+  - src/runtime/CMakeLists.txt
+  - src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Bilateral.cpp
+  - src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Internal.hpp
+  - src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Keypoints.cpp
+  - src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Outliers.cpp
+  - src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.PointProperties.cpp
+  - src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Public.cpp
+  - src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.cpp
+  - src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.cppm
+  - src/runtime/Editor/internal/Runtime.EditorFeatureContextAdapters.cpp
+  - src/runtime/Editor/internal/Runtime.EditorFeatures.Detail.cppm
+  - src/runtime/Editor/internal/Runtime.EditorWorkspaceSession.cpp
+  - src/runtime/Modules/KeypointAnalysis/Runtime.KeypointAnalysisConfig.cpp
+  - src/runtime/Modules/KeypointAnalysis/Runtime.KeypointAnalysisConfig.cppm
+  - tasks/backlog/geometry/GEOM-073-point-analysis-property-span-contracts.md
+  - tasks/done/RETIREMENT-LOG.md
+  - tasks/done/RUNTIME-225-iss-keypoint-spatial-backends.md
+  - tests/CMakeLists.txt
+  - tests/contract/runtime/Test.KeypointAnalysisOperations.cpp
+  - tests/integration/graphics/Test.PointLBVHGpuSmoke.cpp
+  - tests/integration/runtime/Test.SandboxEditorPresentation.cpp
+  - tests/unit/geometry/Test.KeypointAnalysis.cpp
+  layers:
+  - app
+  - geometry
+  - runtime
+  modules:
+  - Geometry.PointCloud.Features
+  - Geometry.SpatialQueries
+  - Runtime.GeometryProcessingOperations
+  - Runtime.KeypointAnalysisConfig
+extension_seam: Shared point-neighborhood views, existing spatial cache and private canonical property
+  helpers
+future_change_plan: GEOM-073 and the spatial-consumer inventory retain FPFH and distinct Framework24 saliency/probability
+  ports; reuse complete support and preserve descriptor-space matching.
+acceptance:
+- criterion: Compatible property domains share the same method availability and publication path.
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: No backend silently truncates complete radius support or falls back to CPU queries.
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: Full CPU gate, focused actual Vulkan, manifest smoke and independent fixed-surface review
+    pass with explicit variant/precision/performance limits.
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+commands:
+- receipt: tasks/evidence/RUNTIME-225/commands/actual-vulkan.json
+- receipt: tasks/evidence/RUNTIME-225/commands/benchmark-schema.json
+- receipt: tasks/evidence/RUNTIME-225/commands/build-ci-corrected.json
+- receipt: tasks/evidence/RUNTIME-225/commands/build-vulkan-final.json
+- receipt: tasks/evidence/RUNTIME-225/commands/closure-structure.json
+- receipt: tasks/evidence/RUNTIME-225/commands/docs-final.json
+- receipt: tasks/evidence/RUNTIME-225/commands/full-cpu.json
+- receipt: tasks/evidence/RUNTIME-225/commands/geometry-final.json
+- receipt: tasks/evidence/RUNTIME-225/commands/geometry-reference.json
+- receipt: tasks/evidence/RUNTIME-225/commands/native-cpu.json
+- receipt: tasks/evidence/RUNTIME-225/commands/runtime-focused.json
+- receipt: tasks/evidence/RUNTIME-225/commands/structural-corrected.json
+changed_public_contracts:
+- Span keypoint analysis, complete sorted nonself radius rows, canonical typed mask/saliency outputs and
+  one guarded history operation
+diagnostics_and_previews:
+- Requested/actual backend, resolved scale, keypoint counts, largest observed indexed support, GPU batches
+  and CPU/GPU elapsed times
+benchmark_or_parity_evidence:
+- ara/evidence/diagnostics/keypoint_vulkan_2026-09-10/benchmark/runtime-smoke.json
+docs_sync:
+  task_file: tasks/done/RUNTIME-225-iss-keypoint-spatial-backends.md
+  session_brief_present: true
+  canonical_docs_changed: true
+  skill_mirrors_checked: true
+residual_risks:
+- Tiny dirty Debug smoke supports no speedup or general numerical claim. CPU scale/PCA/suppression remain;
+  BUG-180 owns GPU LSan exclusion. Historical task-field and menu-array failures remain immutable artifacts
+  with passing replacement gates. Full isolated CPU sanitizer suites were not rerun.
+skipped_checks: []
+artifacts:
+- path: ara/evidence/tables/keypoint_verification_2026-09-10.md
+  sha256: f1c4f2f59158b518065182eb8f754db0e58e8db3ff75e04ed6aec9e5fdf1ad57
+  kind: file
+- path: tasks/evidence/RUNTIME-225/commands/structural.json
+  sha256: 3b25be78549979b6ef411eaeb449f76dbf41ce6bf86ca127bcc00a8bef22391a
+  kind: file
+- path: tasks/evidence/RUNTIME-225/commands/build-ci-final.json
+  sha256: 65051b296fad2e2ea83126442b7a4ffa33b25caa8f16bbc54c32c7eaf414e175
+  kind: file
+self_review:
+  completed: true
+  scope_matches_task: true
+  layering_preserved: true
+  tests_and_docs_accounted_for: true
+  mechanical_and_semantic_changes_separated: true
+handoff: tasks/evidence/RUNTIME-225/handoff.jsonl
+review: tasks/evidence/RUNTIME-225/reviews.jsonl

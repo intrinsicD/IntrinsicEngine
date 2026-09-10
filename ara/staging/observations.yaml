@@ -3761,3 +3761,15 @@ observations:
     promoted_to: logic/claims.md:C85
     crystallized_via: artifact-commitment
     stale: false
+
+  - id: O218
+    timestamp: '2026-09-10T03:44:25+02:00'
+    provenance: ai-executed
+    content: Bounded centroid-PCA keypoint masks and saliency match the reference through cached CPU LBVH and actual Vulkan radius support with all-domain guarded publication and history.
+    context: N532 binds the verified implementation into method-task closure; no user response, broad numerical proof or speedup is inferred. Full overnight process recording remains an end-of-turn step.
+    potential_type: claim
+    bound_to: [N531, N532]
+    promoted: true
+    promoted_to: logic/claims.md:C86
+    crystallized_via: artifact-commitment
+    stale: false

@@ -4,7 +4,7 @@ This is the implementation-planning inventory for the shared
 [point LBVH](spatial-indices.md). It covers current geometry, runtime, graphics,
 physics and method consumers, Framework24 counterparts, and open work reviewed
 on 2026-09-10. **Candidate means a place to evaluate integration, not a shipped
-backend or a measured improvement.** The shared cache, Vulkan k-means, ICP and CPU/Vulkan normal/outlier/density/spacing/bilateral-neighborhood
+backend or a measured improvement.** The shared cache, Vulkan k-means, ICP and CPU/Vulkan normal/outlier/density/spacing/bilateral/keypoint-neighborhood
 rows below identify implemented LBVH consumers. Existing KD-tree, octree, grid and primitive
 BVH paths remain in place.
 

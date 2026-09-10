@@ -11745,3 +11745,22 @@ tree:
     alternatives: [Publish intermediate geometry to acquire entity indices, Add a parallel spatial service, Claim paper equivalence from a neighborhood-backend test]
     evidence: [N529, O217, docs/architecture/bilateral-point-filter.md]
     status: resolved
+
+  - id: N531
+    type: experiment
+    title: Exercise centroid-PCA keypoints with complete cached CPU and Vulkan neighborhoods
+    provenance: ai-executed
+    timestamp: '2026-09-10T03:44:25+02:00'
+    result: Implementation aa59947a42e5db293d053e0381487300f6e66f32 passes 4434 distinct CPU cases after native follow-up and both actual Vulkan fixtures. All eight domains have equal masks and zero observed saliency error under 1e-5 at explicit and automatic radii. Overflow and failed job chains retain both outputs.
+    evidence: [ara/evidence/diagnostics/keypoint_vulkan_2026-09-10/record.json, tasks/evidence/RUNTIME-225/commands/actual-vulkan.stdout.log]
+    status: resolved
+
+  - id: N532
+    type: decision
+    title: Share neighborhood views and property watches while preserving detector formulation
+    provenance: ai-executed
+    timestamp: '2026-09-10T03:44:25+02:00'
+    choice: Adopt the bounded tested keypoint path in aa59947a42e5db293d053e0381487300f6e66f32; reuse the normals neighborhood view and private property helpers, reject incomplete support and retain CPU scale/PCA/suppression. Record the shared nearest-live spacing correction and distinguish full ISS descriptors and Framework24 Gaussian saliency.
+    alternatives: [Truncate radius support, Add a parallel spatial service, Replace centroid covariance with a different ISS formulation]
+    evidence: [N531, O218, docs/architecture/keypoint-analysis.md]
+    status: resolved

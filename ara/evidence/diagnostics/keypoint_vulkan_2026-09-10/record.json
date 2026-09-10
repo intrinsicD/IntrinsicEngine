@@ -1,0 +1,127 @@
+{
+  "recorded_at": "2026-09-10T03:44:25+02:00",
+  "implementation_commit": "aa59947a42e5db293d053e0381487300f6e66f32",
+  "comparison_base": "8725bd3df",
+  "source_sha256": {
+    "benchmarks/geometry/manifests/point_lbvh_keypoint_runtime_smoke.yaml": "aaa09e0f70eb5d1638ac677b53f59117948848e04cf5579ed22b6120044d5830",
+    "methods/geometry/point_lbvh/method.yaml": "723de9a299dd90b50efccbf3ee7420b49e60313c082f908f89b076c0e14231a9",
+    "src/app/Sandbox/Editor/Sandbox.MeshProcessingPanels.cpp": "6cd766e12608ea74894863fe5e00814bf9512682af78a3ef06344292d09d98df",
+    "src/app/Sandbox/Sandbox.ConfigSections.cpp": "d3bb0ca33b79b4b68f32de12f57634e12bc7c37c9fe39426c396948398e77dd0",
+    "src/geometry/Geometry.PointCloud.Features.cpp": "4b806d166e495f0dd013f10eba8279672385e1927f6a2851cc17e3288b3a9de9",
+    "src/geometry/Geometry.PointCloud.Features.cppm": "5618fb3b5091663fac131258e057e96eff2aaa8ed6a8161b41fecd47ce696177",
+    "src/geometry/Geometry.PointCloud.Normals.cppm": "3ebc4708d0f3e5d8e64aecdec5b1f64a0ef2b7a0778ba27cb5f9e10782d3dd99",
+    "src/geometry/Geometry.SpatialQueries.cppm": "782f219c70f219b80fc81e1893e3253856876794ef8253b33f7c55a380496151",
+    "src/runtime/CMakeLists.txt": "c429727265113cb571474f89529460fc8f48aae811b41cce95bbb5b9611b7c8f",
+    "src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Bilateral.cpp": "2e7fad9f84e67904fe7aa22b5a6b1883ff264a2143bae189bc8f3956b52e9776",
+    "src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Internal.hpp": "70cdb3177cf49478df0f6ccc2ade8500932bd447b46a135518565236e22fc731",
+    "src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Keypoints.cpp": "065a425fffa14078895f6a9347725fb3b554580b534f18f78075097d7e5325a0",
+    "src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Outliers.cpp": "64660b2ffd8f88f29b729791505a7e99ce4ed4b13d825272de1441733ec97dc1",
+    "src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.PointProperties.cpp": "32120f4fb10761e8d252e03d72abaa7b11055439a2cce25b967b0b7db1fc16d7",
+    "src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Public.cpp": "12200c67ce826ee3b06286a8dac6397b0e52a2b8d3d1bca74b39fe0558d66380",
+    "src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.cpp": "1ed61a3b4621206c3af7717a3aaef9e4ed696a62642683da5afdd7bcb201d4e1",
+    "src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.cppm": "dfcd6a372ab336c199735c8c458be843a4f3bfcd7f3747b7ab98d5b8b839710d",
+    "src/runtime/Editor/internal/Runtime.EditorFeatureContextAdapters.cpp": "b80ffcea4c914ea174a3eeb9cc3b51755d01527269492423c4467fa2ab361365",
+    "src/runtime/Editor/internal/Runtime.EditorFeatures.Detail.cppm": "7303b76d15acc2f80e7f3f7e7ff875414cf674caf0a2b6ce031a5df84eb74caa",
+    "src/runtime/Editor/internal/Runtime.EditorWorkspaceSession.cpp": "d112f1d0530916f16c43085676a99faa6301160f7b5ba1c0f59fc7c6597e0ea1",
+    "src/runtime/Modules/KeypointAnalysis/Runtime.KeypointAnalysisConfig.cpp": "754ab178ecc4117cb358f8d0eca2ae5d46d312eb0677b0c9f6aa8c393fa1dcb2",
+    "src/runtime/Modules/KeypointAnalysis/Runtime.KeypointAnalysisConfig.cppm": "a07d2dbc69a9750e047a3f9a0d5a1348bc1dbbc3dd75ed8a53f05ffc3f66311a",
+    "tests/CMakeLists.txt": "f4a0a9573439d2cf30a54cc1535984fa67f4fd2f9521f68edcadf3ea45399aba",
+    "tests/contract/runtime/Test.KeypointAnalysisOperations.cpp": "72c240702161f48bb2738b19868250290ff67b9179d03fb64172eb1ef4ef5871",
+    "tests/integration/graphics/Test.PointLBVHGpuSmoke.cpp": "82a8429fc63c970e7632fc9c4dc4929f78c72542d9a21e4ddeeb44d5c197810d",
+    "tests/integration/runtime/Test.SandboxEditorPresentation.cpp": "9b17fd60b1d9ce512b0bea73fcebeffbd758587d150783df88bfe83ac1ca2b59",
+    "tests/unit/geometry/Test.KeypointAnalysis.cpp": "82b824caa4361df74063752329816a908f8ca9c5e78317eaae201c6ee015fe53"
+  },
+  "cpu": {
+    "selected": 4435,
+    "passed_in_sandbox": 4429,
+    "skipped_in_sandbox": 6,
+    "native_followup_passed": 5,
+    "distinct_passes": 4434,
+    "remaining_skips": 1
+  },
+  "gpu": {
+    "preset": "ci-vulkan",
+    "sanitizers": "address,undefined; detect_leaks=0 under BUG-180",
+    "actual_cases": [
+      "PointLBVHGpuSmoke.KeypointPublishesAcrossDomainsWithCompleteSupport",
+      "PointLBVHGpuSmoke.KeypointRejectsStaleCancellationAndRadiusOverflow"
+    ],
+    "skips": 0,
+    "quality_error_linf": 0.0,
+    "absolute_tolerance": 1e-05
+  },
+  "receipts": {
+    "full-cpu": {
+      "exit_code": 0,
+      "stdout_path": "tasks/evidence/RUNTIME-225/commands/full-cpu.stdout.log",
+      "stdout_sha256": "38475ceca2c4264e04ec6b9064e1b60f6f8e0f5d2e647e46d2a3bcb69ce8deb1"
+    },
+    "build-vulkan-final": {
+      "exit_code": 0,
+      "stdout_path": "tasks/evidence/RUNTIME-225/commands/build-vulkan-final.stdout.log",
+      "stdout_sha256": "d23ffd19c5532edcd1d041e79437b0eefdea95bc57120af28ad562fadef41006"
+    },
+    "benchmark-schema": {
+      "exit_code": 0,
+      "stdout_path": "tasks/evidence/RUNTIME-225/commands/benchmark-schema.stdout.log",
+      "stdout_sha256": "adfa47d4bb7b2f8b54ba3e9bf6d9d595fed6796ebdd88ccb37a0dd886e573070"
+    },
+    "build-ci-corrected": {
+      "exit_code": 0,
+      "stdout_path": "tasks/evidence/RUNTIME-225/commands/build-ci-corrected.stdout.log",
+      "stdout_sha256": "6f486378aa25f49e9a65354ff38ad31cfc8ca9cefef55d1061b3c16b7dfeb788"
+    },
+    "geometry-final": {
+      "exit_code": 0,
+      "stdout_path": "tasks/evidence/RUNTIME-225/commands/geometry-final.stdout.log",
+      "stdout_sha256": "8c49b58d6f234bfd463cb215a7b403006e586f8a43b2c3c41578a68c394d82d5"
+    },
+    "build-ci-final": {
+      "exit_code": 1,
+      "stdout_path": "tasks/evidence/RUNTIME-225/commands/build-ci-final.stdout.log",
+      "stdout_sha256": "ba28dda73da299bf2deda5ae65b372618ef7f0ac267d784800e2a33b1d91b7f7"
+    },
+    "native-cpu": {
+      "exit_code": 0,
+      "stdout_path": "tasks/evidence/RUNTIME-225/commands/native-cpu.stdout.log",
+      "stdout_sha256": "1f59a2b1c288a47fca9a5df9362e89d89e19d1d0b5d9c784a8f9ce5da62789d8"
+    },
+    "structural": {
+      "exit_code": 1,
+      "stdout_path": "tasks/evidence/RUNTIME-225/commands/structural.stdout.log",
+      "stdout_sha256": "8472b077d9d8b8169221c08d37d4372920e4c8d5192c4a61a1bc4653c7bf5a27"
+    },
+    "runtime-focused": {
+      "exit_code": 0,
+      "stdout_path": "tasks/evidence/RUNTIME-225/commands/runtime-focused.stdout.log",
+      "stdout_sha256": "b38c31cfc3a0710b1341e34979aff7d5104a01331e32af245df52e852b136ab4"
+    },
+    "docs-final": {
+      "exit_code": 0,
+      "stdout_path": "tasks/evidence/RUNTIME-225/commands/docs-final.stdout.log",
+      "stdout_sha256": "6de30ff12fe5b8aba18e77f56f7bcdd2e8996f3b6b43f45d6e53ffc8a3291918"
+    },
+    "actual-vulkan": {
+      "exit_code": 0,
+      "stdout_path": "tasks/evidence/RUNTIME-225/commands/actual-vulkan.stdout.log",
+      "stdout_sha256": "037c877a65643659449b77eaf585bdd2aa426572c504ad7851a2c11b76b9ef4c"
+    },
+    "geometry-reference": {
+      "exit_code": 0,
+      "stdout_path": "tasks/evidence/RUNTIME-225/commands/geometry-reference.stdout.log",
+      "stdout_sha256": "36385bf6c01fba908d9348f660bc4d449bf3c0ff57ddda513c0aa961b437a18a"
+    },
+    "structural-corrected": {
+      "exit_code": 0,
+      "stdout_path": "tasks/evidence/RUNTIME-225/commands/structural-corrected.stdout.log",
+      "stdout_sha256": "e77a1cee693cf3a575907f89720c477102021011e7665468a795c752ea1072f4"
+    }
+  },
+  "limitations": [
+    "Preserved centroid-PCA detector, not full ISS descriptor or Framework24 scalar Gaussian saliency.",
+    "Scale, covariance and suppression remain CPU work; Vulkan supplies complete radius support.",
+    "Dirty Debug smoke is diagnostic and supports no speedup or general-input proof.",
+    "Full isolated CPU sanitizer suites were not rerun; actual Vulkan cases use combined ASan/UBSan with the existing GPU LSan exclusion.",
+    "Historical menu-array compilation and task-field validation failures remain recorded; passing replacements gate closure."
+  ]
+}

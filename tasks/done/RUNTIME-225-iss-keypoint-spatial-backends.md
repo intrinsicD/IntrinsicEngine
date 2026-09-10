@@ -50,22 +50,22 @@ Extract only the existing offsets/indices neighborhood view into Geometry.Spatia
 One slice: reference/span contract and tests, manifest, indexed runtime/config/UI integration, CPU and actual Vulkan verification, docs and fixed-surface independent review.
 
 ## Required changes
-- [ ] Add span and supplied-neighborhood keypoint analysis while preserving the Cloud API.
-- [ ] Use the common neighborhood view without changing normal-estimation semantics.
-- [ ] Wire all three backends and canonical property/config/UI/publication surfaces.
+- [x] Add span and supplied-neighborhood keypoint analysis while preserving the Cloud API.
+- [x] Use the common neighborhood view without changing normal-estimation semantics.
+- [x] Wire all three backends and canonical property/config/UI/publication surfaces.
 
 ## Tests
-- [ ] Analytic saliency/NMS, ties, invalid neighborhoods and deleted-spacing regression pass.
-- [ ] All-domain CPU/cache, config, history and stale/cancel tests pass.
-- [ ] Actual Vulkan parity and complete-support overflow checks pass.
+- [x] Analytic saliency/NMS, ties, invalid neighborhoods and deleted-spacing regression pass.
+- [x] All-domain CPU/cache, config, history and stale/cancel tests pass.
+- [x] Actual Vulkan parity and complete-support overflow checks pass.
 
 ## Docs
-- [ ] Update architecture, consumer inventory, method/benchmark manifests, module inventory and remaining port reminders.
+- [x] Update architecture, consumer inventory, method/benchmark manifests, module inventory and remaining port reminders.
 
 ## Acceptance criteria
-- [ ] Compatible property domains share the same method availability and publication path.
-- [ ] No backend silently truncates complete radius support or falls back to CPU queries.
-- [ ] Full CPU gate, focused actual Vulkan, manifest smoke and independent fixed-surface review pass with explicit variant/precision/performance limits.
+- [x] Compatible property domains share the same method availability and publication path.
+- [x] No backend silently truncates complete radius support or falls back to CPU queries.
+- [x] Full CPU gate, focused actual Vulkan, manifest smoke and independent fixed-surface review pass with explicit variant/precision/performance limits.
 
 ## Verification
 ```bash
@@ -85,3 +85,10 @@ No layer exceptions, silent fallback/truncation, hidden topology replacement, in
 
 ## Verification constraints
 CCACHE_DISABLE=1 under BUG-178. Configure outside the sandbox for the existing vcpkg egress/cache constraint (BUG-065); the initial combined configure approval timed out, and the standalone retry succeeded. Existing BUG-180 excludes GPU LSan while retaining ASan+UBSan. Count actual capability skips separately from passes.
+
+## Completion
+
+**Completed:** 2026-09-10
+**Commit:** `aa59947a42e5db293d053e0381487300f6e66f32` (implementation; retirement/review seal follows).
+
+[Bounded verification](../../ara/evidence/tables/keypoint_verification_2026-09-10.md) and ARA C86 bind the CPU and actual Vulkan outcome. Full CPU has 4434 distinct passes after native follow-up and one expected unsanitized leak-control skip. Both Vulkan cases pass without skips. Historical menu-array compilation and task-field validation errors have passing replacement gates. The reviewed submission-failure race was corrected and exercised before closure. No performance improvement is claimed.

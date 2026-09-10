@@ -2092,3 +2092,14 @@
 - **Dependencies**: [C80]
 - **Tags**: bilateral point filtering, LBVH, moving positions, CPU, Vulkan, bounded integration
 - **From staging**: O217
+
+## C86: Bounded centroid-PCA keypoints with complete Vulkan neighborhoods
+- **Statement**: The source-bound 2026-09-10 fixtures publish ISS-style centroid-PCA keypoint masks and saliency on all eight canonical domains using KD-tree reference, cached CPU LBVH and actual framed Vulkan radius neighborhoods. At explicit and automatic radii masks match and saliency stays within 1e-5 absolute tolerance (observed zero). Analytic ties, malformed support, nearest-live spacing, config, deleted/unrelated preservation, history, stale inputs, cancellation/reaping, overflow above 1024 neighbors and partial-chain submission rejection checks pass.
+- **Status**: supported — bounded ci CPU and actual ci-vulkan ASan+UBSan cases only. No full ISS descriptor or Framework24 scalar Gaussian saliency equivalence, general-input proof, GPU covariance/suppression, new visualization readback, whole-process leak-freedom, speedup or default-change claim. Dirty Debug smoke is diagnostic.
+- **Provenance**: ai-executed
+- **Crystallized via**: artifact-commitment
+- **Falsification criteria**: Replaying the recorded source and fixtures changes masks or exceeds saliency tolerance, silently truncates complete support, corrupts unrelated/deleted rows, publishes a stale/cancelled/partially submitted job, or fails the declared domain/config/history assertions.
+- **Proof**: [ara/evidence/diagnostics/keypoint_vulkan_2026-09-10/record.json, ara/evidence/tables/keypoint_verification_2026-09-10.md, tasks/evidence/RUNTIME-225/commands/actual-vulkan.stdout.log, tasks/evidence/RUNTIME-225/commands/full-cpu.stdout.log, tests/unit/geometry/Test.KeypointAnalysis.cpp, tests/contract/runtime/Test.KeypointAnalysisOperations.cpp, tests/integration/graphics/Test.PointLBVHGpuSmoke.cpp]
+- **Dependencies**: [C80]
+- **Tags**: keypoints, centroid PCA, complete radius support, LBVH, CPU, Vulkan, bounded integration
+- **From staging**: O218
