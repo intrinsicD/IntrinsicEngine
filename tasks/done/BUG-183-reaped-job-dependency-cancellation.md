@@ -63,3 +63,6 @@ Do not weaken cancellation tests or treat every absent token as successful witho
 The controlled before-fix run executes and publishes the third job after its predecessor is cancelled and reaped: downstream Work=1, nonempty publications, one finalizer instead of two. The successful-chain control passes. Retaining dependency records referenced by the pending queue makes all 27 RuntimeJobService tests pass; completed chains still reclaim all three records.
 
 An existing compiler warning also identifies missing waiting-state cases in the aggregate `InFlightJobs` diagnostic. BUG-184 tracks that separate accounting issue; the regression here additionally asserts the final snapshot is empty and every record was reaped.
+
+## Completion — 2026-09-10
+Commit: `924a45372`. The regression fails before the correction and all 27 scheduler cases pass after it. Full CPU selects 4,426 tests with zero failures; native follow-up yields 4,425 distinct passes and one expected unsanitized leak-control skip. The actual Vulkan bilateral cancellation case passes without a skip under the existing BUG-180 leak-check exclusion. No permanent dependency-outcome ledger or public API was added. Independent acceptance and sealed evidence are recorded in `tasks/evidence/BUG-183/report.yaml`.

@@ -1,0 +1,98 @@
+schema_version: 1
+task_id: BUG-183
+workflow_profile: high-risk
+status: complete
+generated_by: tools/agents/workflow_evidence.py
+generated_at: '2026-09-10T00:47:46Z'
+claim_eligible: false
+source:
+  base_ref: 65e9777dc
+  base_revision: 65e9777dc55c148fbbbe55d13aca63cad00aa2bf
+  head_revision: 924a453720dd20c7d5434577939825b0a79117b0
+  branch: main
+  worktree: /home/alex/Documents/IntrinsicEngine
+  dirty: true
+  surface:
+  - path: docs/architecture/runtime.md
+    sha256: ee786999a6ed74095b52b57e74c3459bf7f2e937d447a6e474f355478f7d8be0
+  - path: src/runtime/Kernel/Runtime.JobService.cpp
+    sha256: b8bc43f2b992040cb8134873f6706b43db2d671cf668c8cf61abcbae291209a9
+  - path: tasks/SESSION-BRIEF.md
+    sha256: 186ce86aca3562f33929c2372e33e15b46665bfaae88d43238e6b2ae68181951
+  - path: tasks/backlog/bugs/BUG-183-reaped-job-dependency-cancellation.md
+    sha256: null
+  - path: tasks/backlog/bugs/BUG-184-job-service-waiting-state-accounting.md
+    sha256: a1a34303640741d3e7bd0d068d16a18fee3bf4c992123713ed3018df1fe42041
+  - path: tasks/done/BUG-183-reaped-job-dependency-cancellation.md
+    sha256: 62542275fe68385dbcf5b744d83175d87f5eae8fbf02741cbaac74aa9ed6c5c3
+  - path: tasks/done/RETIREMENT-LOG.md
+    sha256: de40fc303945696547e50ba42e13b3f9071cd0d2eb9e91a3b0f25b09f7c9e30e
+  - path: tests/contract/runtime/Test.RuntimeJobService.cpp
+    sha256: bba16cc83e5bfe8c3570a00c3168424fbd0d4909b48178f1fed1ecaaea4c47b0
+  content_digest: d7d28a2848bcfccfa2ecc2ce5d85556f0cf7905ecf81dbf2d60048fe9ce4e85c
+touched:
+  paths:
+  - docs/architecture/runtime.md
+  - src/runtime/Kernel/Runtime.JobService.cpp
+  - tasks/SESSION-BRIEF.md
+  - tasks/backlog/bugs/BUG-183-reaped-job-dependency-cancellation.md
+  - tasks/backlog/bugs/BUG-184-job-service-waiting-state-accounting.md
+  - tasks/done/BUG-183-reaped-job-dependency-cancellation.md
+  - tasks/done/RETIREMENT-LOG.md
+  - tests/contract/runtime/Test.RuntimeJobService.cpp
+  layers:
+  - runtime
+  modules:
+  - Runtime.JobService
+extension_seam: Existing job reaping under the service mutex
+future_change_plan: BUG-184 tracks the existing aggregate waiting-state counter omission. Subsequent methods
+  can reuse the corrected dependency lifecycle.
+acceptance:
+- criterion: Deterministic regression fails before and passes after the correction.
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: Existing RuntimeJobService tests and full CPU gate pass.
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: Completed chains release dependency metadata instead of leaking terminal records.
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+commands:
+- receipt: tasks/evidence/BUG-183/commands/actual-vulkan-cancellation.json
+- receipt: tasks/evidence/BUG-183/commands/after-fix-runtime.json
+- receipt: tasks/evidence/BUG-183/commands/before-fix-regression.json
+- receipt: tasks/evidence/BUG-183/commands/full-cpu.json
+- receipt: tasks/evidence/BUG-183/commands/native-cpu.json
+- receipt: tasks/evidence/BUG-183/commands/structural.json
+changed_public_contracts:
+- Pending consumers observe terminal predecessor outcomes before reclamation; no API change
+diagnostics_and_previews:
+- Regression checks no downstream work/publication after failure and complete record reclamation
+benchmark_or_parity_evidence: []
+docs_sync:
+  task_file: tasks/done/BUG-183-reaped-job-dependency-cancellation.md
+  session_brief_present: true
+  canonical_docs_changed: true
+  skill_mirrors_checked: true
+residual_risks:
+- No permanent outcome ledger for dependencies submitted after reaping; BUG-184 remains separate. GPU
+  regression retains BUG-180 LSan exclusion; isolated full CPU sanitizer suites were not rerun.
+skipped_checks: []
+artifacts:
+- path: tasks/evidence/BUG-183/commands/before-fix-regression.stdout.log
+  sha256: 407eb6f87e1aa47b26350dfe97e978cfb1ba9443870bbd5f1c3d18aad7857428
+  kind: file
+self_review:
+  completed: true
+  scope_matches_task: true
+  layering_preserved: true
+  tests_and_docs_accounted_for: true
+  mechanical_and_semantic_changes_separated: true
+handoff: tasks/evidence/BUG-183/handoff.jsonl
+review: tasks/evidence/BUG-183/reviews.jsonl

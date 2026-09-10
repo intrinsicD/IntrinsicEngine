@@ -8134,3 +8134,7 @@ Added the existing local distance-ratio heuristic to Outlier Analysis with share
 ### RUNTIME-224 — 2026-09-10
 
 Exposed fixed-normal bilateral point filtering through shared config/UI controls and all eight property domains, with CPU reference, cached CPU LBVH and framed Vulkan neighborhoods rebuilt between moving passes. Existing SpatialIndexCache now owns leased private working sets. Implementation `15983b2d4`; bounded evidence C85 and `tasks/evidence/RUNTIME-224/report.yaml`. Full CPU and both actual Vulkan tests pass with explicit BUG-180 leak-check exclusion. Earlier fixture-budget and registration failures remain recorded; no paper-equivalence or performance-improvement claim. BUG-183 owns the scheduler-level follow-up.
+
+### BUG-183 — 2026-09-10
+
+Retain terminal job outcomes while pending consumers reference them, so reaping cannot turn a cancelled predecessor into a satisfied missing token. Implementation `924a45372`; deterministic before/after regression, successful-chain reclamation, 27 focused scheduler cases, full CPU and actual Vulkan cancellation regression verified. Completion evidence: `tasks/evidence/BUG-183/report.yaml`. BUG-184 separately tracks existing waiting-state aggregate accounting.
