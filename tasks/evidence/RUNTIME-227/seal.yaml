@@ -1,0 +1,13 @@
+schema_version: 1
+task_id: RUNTIME-227
+sealed_revision: 1e53eca0c18932f5807fb715a9ef0bfc7c207284
+source_content_digest: 5c2166b0d5a39e10beb9395cd505aeca2c49039e7dd7b854647cbeadda171e30
+report_sha256: 60c8e954ff8e5352aa1e7b9ca662472763212d499dd0320d509c43eb5ed1c828
+records:
+- path: tasks/evidence/RUNTIME-227/handoff.jsonl
+  sha256: 8eaae8605264679d1678f40bf5595167e9aec143b9d3b3b441c2f1dec69e745c
+- path: tasks/evidence/RUNTIME-227/reviews.jsonl
+  sha256: ff5b50c36d48fc8bb7d17bfa8af22074dc1922b16797f340a68fd6a2b2242612
+reason: Independent exact-diff acceptance and passing CPU/Vulkan evidence; dirty Debug benchmark remains
+  non-claim-eligible for performance.
+generated_by: tools/agents/workflow_evidence.py
