@@ -1,0 +1,12 @@
+schema_version: 1
+task_id: RUNTIME-228
+sealed_revision: 12ef4782f5c58dd7ad2179d0209f72920f9adaf1
+source_content_digest: c26917bb721f0ca58c740264ec9591f6a7a1348a90bb0542af36e1172d9cdd6b
+report_sha256: 0cde40863d483a787b66c67b3d0db825f9bf0e9b6807660578d397fca4db1895
+records:
+- path: tasks/evidence/RUNTIME-228/handoff.jsonl
+  sha256: 7130fd01d3f04c4f04b6354d738efc41e27f4a6ac335313a79e7d3501c6ceabe
+- path: tasks/evidence/RUNTIME-228/reviews.jsonl
+  sha256: e8b4b00a940df485fd413e2f9ec6bd1e528001711f404ee3ed1abf9634f8cfee
+reason: Clean committed CPU LOP adapter and accepted independent review
+generated_by: tools/agents/workflow_evidence.py
