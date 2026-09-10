@@ -1,0 +1,175 @@
+Internal ctest changing into directory: /home/alex/Documents/IntrinsicEngine/build/ci
+Test project /home/alex/Documents/IntrinsicEngine/build/ci
+    Start 2478: SupportRadius.TinyCompleteSupportCannotBypassWorkloadBudget
+1/2 Test #2478: SupportRadius.TinyCompleteSupportCannotBypassWorkloadBudget ...***Failed    0.01 sec
+Running main() from /home/alex/Documents/IntrinsicEngine/external/vcpkg/buildtrees/gtest/src/v1.17.0-0c449efaff.clean/googletest/src/gtest_main.cc
+Note: Google Test filter = SupportRadius.TinyCompleteSupportCannotBypassWorkloadBudget
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from SupportRadius
+[ RUN      ] SupportRadius.TinyCompleteSupportCannotBypassWorkloadBudget
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.SupportRadius.cpp:372: Failure
+Expected equality of these values:
+  result.State
+    Which is: 1-byte object <00>
+  Radius::Status::WorkloadLimitExceeded
+    Which is: 1-byte object <0A>
+Google Test trace:
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.SupportRadius.cpp:367: 2
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.SupportRadius.cpp:373: Failure
+Value of: result.NeighborLimitExceeded
+  Actual: false
+Expected: true
+Google Test trace:
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.SupportRadius.cpp:367: 2
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.SupportRadius.cpp:374: Failure
+Expected equality of these values:
+  result.SupportNeighborsMax
+    Which is: 1
+  count
+    Which is: 2
+Google Test trace:
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.SupportRadius.cpp:367: 2
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.SupportRadius.cpp:375: Failure
+Expected equality of these values:
+  result.SupportNeighborsP50
+    Which is: 1
+  double(count)
+    Which is: 2
+Google Test trace:
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.SupportRadius.cpp:367: 2
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.SupportRadius.cpp:376: Failure
+Expected equality of these values:
+  result.SupportNeighborsP95
+    Which is: 1
+  double(count)
+    Which is: 2
+Google Test trace:
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.SupportRadius.cpp:367: 2
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.SupportRadius.cpp:377: Failure
+Expected equality of these values:
+  result.PredictedContributionCount
+    Which is: 2
+  count*count
+    Which is: 4
+Google Test trace:
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.SupportRadius.cpp:367: 2
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.SupportRadius.cpp:372: Failure
+Expected equality of these values:
+  result.State
+    Which is: 1-byte object <00>
+  Radius::Status::WorkloadLimitExceeded
+    Which is: 1-byte object <0A>
+Google Test trace:
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.SupportRadius.cpp:367: 33
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.SupportRadius.cpp:373: Failure
+Value of: result.NeighborLimitExceeded
+  Actual: false
+Expected: true
+Google Test trace:
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.SupportRadius.cpp:367: 33
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.SupportRadius.cpp:374: Failure
+Expected equality of these values:
+  result.SupportNeighborsMax
+    Which is: 32
+  count
+    Which is: 33
+Google Test trace:
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.SupportRadius.cpp:367: 33
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.SupportRadius.cpp:375: Failure
+Expected equality of these values:
+  result.SupportNeighborsP50
+    Which is: 32
+  double(count)
+    Which is: 33
+Google Test trace:
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.SupportRadius.cpp:367: 33
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.SupportRadius.cpp:376: Failure
+Expected equality of these values:
+  result.SupportNeighborsP95
+    Which is: 32
+  double(count)
+    Which is: 33
+Google Test trace:
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.SupportRadius.cpp:367: 33
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.SupportRadius.cpp:377: Failure
+Expected equality of these values:
+  result.PredictedContributionCount
+    Which is: 1056
+  count*count
+    Which is: 1089
+Google Test trace:
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.SupportRadius.cpp:367: 33
+
+[  FAILED  ] SupportRadius.TinyCompleteSupportCannotBypassWorkloadBudget (0 ms)
+[----------] 1 test from SupportRadius (0 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (0 ms total)
+[  PASSED  ] 0 tests.
+[  FAILED  ] 1 test, listed below:
+[  FAILED  ] SupportRadius.TinyCompleteSupportCannotBypassWorkloadBudget
+
+ 1 FAILED TEST
+
+    Start 2479: SupportRadius.TinyDoubleRadiusStillCountsCoincidentSamples
+2/2 Test #2479: SupportRadius.TinyDoubleRadiusStillCountsCoincidentSamples ....***Failed    0.00 sec
+Running main() from /home/alex/Documents/IntrinsicEngine/external/vcpkg/buildtrees/gtest/src/v1.17.0-0c449efaff.clean/googletest/src/gtest_main.cc
+Note: Google Test filter = SupportRadius.TinyDoubleRadiusStillCountsCoincidentSamples
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from SupportRadius
+[ RUN      ] SupportRadius.TinyDoubleRadiusStillCountsCoincidentSamples
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.SupportRadius.cpp:385: Failure
+Expected equality of these values:
+  result.State
+    Which is: 1-byte object <00>
+  Radius::Status::WorkloadLimitExceeded
+    Which is: 1-byte object <0A>
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.SupportRadius.cpp:386: Failure
+Expected equality of these values:
+  result.SupportNeighborsMax
+    Which is: 0
+  2
+
+/home/alex/Documents/IntrinsicEngine/tests/unit/geometry/Test.SupportRadius.cpp:386: Failure
+Expected equality of these values:
+  result.PredictedContributionCount
+    Which is: 0
+  4
+
+[  FAILED  ] SupportRadius.TinyDoubleRadiusStillCountsCoincidentSamples (0 ms)
+[----------] 1 test from SupportRadius (0 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (0 ms total)
+[  PASSED  ] 0 tests.
+[  FAILED  ] 1 test, listed below:
+[  FAILED  ] SupportRadius.TinyDoubleRadiusStillCountsCoincidentSamples
+
+ 1 FAILED TEST
+
+
+0% tests passed, 2 tests failed out of 2
+
+Label Time Summary:
+geometry    =   0.01 sec*proc (2 tests)
+unit        =   0.01 sec*proc (2 tests)
+
+Total Test time (real) =   0.82 sec
+
+The following tests FAILED:
+	2478 - SupportRadius.TinyCompleteSupportCannotBypassWorkloadBudget (Failed)
+	2479 - SupportRadius.TinyDoubleRadiusStillCountsCoincidentSamples (Failed)

@@ -1,0 +1,26 @@
+{
+  "command": [
+    "env",
+    "CCACHE_DISABLE=1",
+    "cmake",
+    "--build",
+    "--preset",
+    "ci",
+    "--target",
+    "IntrinsicGeometryTests"
+  ],
+  "command_display": "env CCACHE_DISABLE=1 cmake --build --preset ci --target IntrinsicGeometryTests",
+  "cwd": ".",
+  "duration_ms": 5553,
+  "exit_code": 0,
+  "finished_at": "2026-09-10T03:46:34Z",
+  "label": "build-regression",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-09-10T03:46:28Z",
+  "stderr_path": "tasks/evidence/BUG-185/commands/build-regression.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/BUG-185/commands/build-regression.stdout.log",
+  "stdout_sha256": "6fcd012eac4725112bc781b46bab2b1b00b38dbdd7e7d287ea8a5bc866b5596c",
+  "task_id": "BUG-185"
+}

@@ -1,0 +1,26 @@
+{
+  "command": [
+    "ctest",
+    "--test-dir",
+    "build/ci",
+    "--output-on-failure",
+    "-R",
+    "^(SupportRadius|PointCloudKernels|PointCloudConsolidation)\\.",
+    "--timeout",
+    "60"
+  ],
+  "command_display": "ctest --test-dir build/ci --output-on-failure -R '^(SupportRadius|PointCloudKernels|PointCloudConsolidation)\\.' --timeout 60",
+  "cwd": ".",
+  "duration_ms": 2101,
+  "exit_code": 0,
+  "finished_at": "2026-09-10T03:47:58Z",
+  "label": "focused",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-09-10T03:47:56Z",
+  "stderr_path": "tasks/evidence/BUG-185/commands/focused.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/BUG-185/commands/focused.stdout.log",
+  "stdout_sha256": "d5eee2e718f35da01dd601e6cc7c8842434d812a5eadbdd3726b91fa91ce5403",
+  "task_id": "BUG-185"
+}

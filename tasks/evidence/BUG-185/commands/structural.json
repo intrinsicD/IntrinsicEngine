@@ -1,0 +1,21 @@
+{
+  "command": [
+    "bash",
+    "-c",
+    "python3 tools/agents/check_task_policy.py --root . --strict && python3 tools/repo/check_layering.py --root src --strict && python3 tools/repo/check_test_layout.py --root . --strict && python3 tools/docs/check_doc_links.py --root ."
+  ],
+  "command_display": "bash -c 'python3 tools/agents/check_task_policy.py --root . --strict && python3 tools/repo/check_layering.py --root src --strict && python3 tools/repo/check_test_layout.py --root . --strict && python3 tools/docs/check_doc_links.py --root .'",
+  "cwd": ".",
+  "duration_ms": 2183,
+  "exit_code": 0,
+  "finished_at": "2026-09-10T03:47:50Z",
+  "label": "structural",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-09-10T03:47:48Z",
+  "stderr_path": "tasks/evidence/BUG-185/commands/structural.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/BUG-185/commands/structural.stdout.log",
+  "stdout_sha256": "811ab7d949abbdf6408ac63edd8b4dc47fe3f5086608c78671e23de95564e773",
+  "task_id": "BUG-185"
+}

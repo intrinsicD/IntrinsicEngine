@@ -1,0 +1,26 @@
+{
+  "command": [
+    "ctest",
+    "--test-dir",
+    "build/ci",
+    "--output-on-failure",
+    "-R",
+    "^SupportRadius.Tiny",
+    "--timeout",
+    "60"
+  ],
+  "command_display": "ctest --test-dir build/ci --output-on-failure -R '^SupportRadius.Tiny' --timeout 60",
+  "cwd": ".",
+  "duration_ms": 831,
+  "exit_code": 8,
+  "finished_at": "2026-09-10T03:46:52Z",
+  "label": "regression-before",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-09-10T03:46:51Z",
+  "stderr_path": "tasks/evidence/BUG-185/commands/regression-before.stderr.log",
+  "stderr_sha256": "18e00877dc1071c85cd4f479d451bebeef8309022e46cf8c63b0bed5151984a4",
+  "stdout_path": "tasks/evidence/BUG-185/commands/regression-before.stdout.log",
+  "stdout_sha256": "306133009767820b8fd576c6707908a6faaba7902df9397f27a608250ddd01dd",
+  "task_id": "BUG-185"
+}

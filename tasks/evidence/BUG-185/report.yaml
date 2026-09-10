@@ -1,0 +1,96 @@
+schema_version: 1
+task_id: BUG-185
+workflow_profile: high-risk
+status: complete
+generated_by: tools/agents/workflow_evidence.py
+generated_at: '2026-09-10T03:51:15Z'
+claim_eligible: false
+source:
+  base_ref: 4c606987a
+  base_revision: 4c606987ad9a519396b28fa004028f64cbfa138a
+  head_revision: e3ac231d8fc709e0a83233e07ebf5eb0c1fe10a9
+  branch: main
+  worktree: /home/alex/Documents/IntrinsicEngine
+  dirty: true
+  surface:
+  - path: docs/architecture/spatial-index-consumers.md
+    sha256: 03fd10b139ab1daae607292545203f0156a63707f17ab69b4b03fc0d46d34808
+  - path: src/geometry/Geometry.SupportRadius.cpp
+    sha256: fd65ee5103f68384dac93d395dd285bbbd2d4e4075cae2e18a35a8445bf3727b
+  - path: tasks/done/BUG-185-tiny-support-workload-underestimate.md
+    sha256: bf698e55cfd9b7d4ca41a701d6dc52e90d14e195e6f7ccaba4babe838072af6d
+  - path: tasks/done/RETIREMENT-LOG.md
+    sha256: 09d698a5007fee7d2f0c35c597f8e8de43219dc63ff056b7feba1b6a53afab07
+  - path: tests/unit/geometry/Test.SupportRadius.cpp
+    sha256: 54764ec4c4c242da9b7393aaba78831710a92abf89d51c10ce51b23f8ce93b10
+  content_digest: bad395d345ff8827724c549ef38a531779ea6622466a8bedb49de6505e21c0e9
+touched:
+  paths:
+  - docs/architecture/spatial-index-consumers.md
+  - src/geometry/Geometry.SupportRadius.cpp
+  - tasks/done/BUG-185-tiny-support-workload-underestimate.md
+  - tasks/done/RETIREMENT-LOG.md
+  - tests/unit/geometry/Test.SupportRadius.cpp
+  layers:
+  - geometry
+  modules:
+  - Geometry.SupportRadius
+extension_seam: Reuse existing Kernels::ConservativeQueryRadius; preserve public analysis and runtime
+  callers.
+future_change_plan: LOP spatial-query adapters retain existing workload analysis; independent automatic-radius
+  GPU adaptation remains in the spatial consumer inventory.
+acceptance:
+- criterion: Regressions fail before the correction and pass afterward.
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: Exact occupancy and workload guards retain their strict support and sampled-estimate contract.
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: Full CPU, structural and independent fixed-surface review pass.
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+commands:
+- receipt: tasks/evidence/BUG-185/commands/build-fixed.json
+- receipt: tasks/evidence/BUG-185/commands/build-regression.json
+- receipt: tasks/evidence/BUG-185/commands/configure.json
+- receipt: tasks/evidence/BUG-185/commands/focused.json
+- receipt: tasks/evidence/BUG-185/commands/full-cpu.json
+- receipt: tasks/evidence/BUG-185/commands/native-cpu.json
+- receipt: tasks/evidence/BUG-185/commands/retirement-structure.json
+- receipt: tasks/evidence/BUG-185/commands/structural.json
+changed_public_contracts:
+- Strict Euclidean support including self and duplicates, deterministic sampled P95 occupancy and unchanged
+  workload limits.
+diagnostics_and_previews:
+- Existing support quantiles, maxima, predicted contributions and workload rejection status.
+benchmark_or_parity_evidence: []
+docs_sync:
+  task_file: tasks/done/BUG-185-tiny-support-workload-underestimate.md
+  session_brief_present: true
+  canonical_docs_changed: true
+  skill_mirrors_checked: true
+residual_risks:
+- Before-fix regressions intentionally fail and remain immutable artifacts. No new GPU or performance
+  evidence is claimed. Existing unsanitized leak-control skip remains.
+skipped_checks: []
+artifacts:
+- path: tasks/evidence/BUG-185/commands/regression-before.json
+  sha256: 69404d5b4985c7b39083c6d111badebe1b3447070a5ba018147b606c258c7df8
+  kind: file
+- path: tasks/evidence/BUG-185/commands/regression-before.stdout.log
+  sha256: 306133009767820b8fd576c6707908a6faaba7902df9397f27a608250ddd01dd
+  kind: file
+self_review:
+  completed: true
+  scope_matches_task: true
+  layering_preserved: true
+  tests_and_docs_accounted_for: true
+  mechanical_and_semantic_changes_separated: true
+handoff: tasks/evidence/BUG-185/handoff.jsonl
+review: tasks/evidence/BUG-185/reviews.jsonl

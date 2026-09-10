@@ -1,0 +1,21 @@
+{
+  "command": [
+    "bash",
+    "-c",
+    "python3 tools/agents/check_task_policy.py --root . --strict && python3 tools/docs/check_doc_links.py --root . && python3 tools/agents/check_ara_claims.py --root . --strict"
+  ],
+  "command_display": "bash -c 'python3 tools/agents/check_task_policy.py --root . --strict && python3 tools/docs/check_doc_links.py --root . && python3 tools/agents/check_ara_claims.py --root . --strict'",
+  "cwd": ".",
+  "duration_ms": 1934,
+  "exit_code": 0,
+  "finished_at": "2026-09-10T03:50:57Z",
+  "label": "retirement-structure",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-09-10T03:50:55Z",
+  "stderr_path": "tasks/evidence/BUG-185/commands/retirement-structure.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/BUG-185/commands/retirement-structure.stdout.log",
+  "stdout_sha256": "7471d562bd003ba887c99b105913d877ccdec5e28ddea1a702d31e337fa28e2b",
+  "task_id": "BUG-185"
+}

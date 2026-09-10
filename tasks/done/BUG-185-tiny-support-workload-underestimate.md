@@ -42,21 +42,21 @@ No new selectable backend, GPU adapter, sampling policy, quantile/rank formulati
 One slice: reproduce both query-underflow and squared-cutoff-underflow omissions, reuse conservative candidates and robust strict distance comparison, verify and retire.
 
 ## Required changes
-- [ ] Reuse conservative float broad-phase radius.
-- [ ] Avoid double support-square underflow in exact occupancy.
+- [x] Reuse conservative float broad-phase radius.
+- [x] Avoid double support-square underflow in exact occupancy.
 
 ## Tests
-- [ ] Two- and 33-point normal-coordinate fixtures reject neighbor budgets of one and 32 with correct occupancy and predicted counts.
-- [ ] Coincident samples remain inside a positive 1e-310 support radius.
-- [ ] Existing support-radius, consolidation, density and full CPU checks pass.
+- [x] Two- and 33-point normal-coordinate fixtures reject neighbor budgets of one and 32 with correct occupancy and predicted counts.
+- [x] Coincident samples remain inside a positive 1e-310 support radius.
+- [x] Existing support-radius, consolidation, density and full CPU checks pass.
 
 ## Docs
-- [ ] Record the bounded correction and preserve remaining projection/query-adapter reminders.
+- [x] Record the bounded correction and preserve remaining projection/query-adapter reminders.
 
 ## Acceptance criteria
-- [ ] Regressions fail before the correction and pass afterward.
-- [ ] Exact occupancy and workload guards retain their strict support and sampled-estimate contract.
-- [ ] Full CPU, structural and independent fixed-surface review pass.
+- [x] Regressions fail before the correction and pass afterward.
+- [x] Exact occupancy and workload guards retain their strict support and sampled-estimate contract.
+- [x] Full CPU, structural and independent fixed-surface review pass.
 
 ## Verification
 ```bash
@@ -70,3 +70,10 @@ python3 tools/repo/check_layering.py --root src --strict
 
 ## Forbidden changes
 Do not weaken occupancy budgets, introduce truncation or claim a GPU implementation.
+
+## Reproduction and completion
+
+**Completed:** 2026-09-10
+**Commit:** `e3ac231d8fc709e0a83233e07ebf5eb0c1fe10a9`
+
+Both regression tests failed before correction. The two-point and 33-point fixtures previously passed budgets that should reject; the 1e-310 coincident fixture incorrectly reported zero support and zero predicted work. Conservative candidates and direct double-distance comparison restore the declared strict occupancy predicate. All 55 focused geometry cases pass, and full CPU selects 4458 tests with no failures; five native follow-ups yield 4457 distinct passes and one expected unsanitized leak-control skip. No new GPU execution or performance claim is made. The high-risk report retains failing before-fix receipts and the passing replacement gates; independent review and seal bind this correction.

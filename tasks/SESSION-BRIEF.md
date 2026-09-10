@@ -8,7 +8,6 @@ picking backlog work; theme priorities and rationale live in
 
 ## Active tasks
 
-- `BUG-185` — Preserve tiny support in workload occupancy guards (tasks/active/BUG-185-tiny-support-workload-underestimate.md)
 - `METHOD-040` — Global multicut curvature-patch CPU reference (tasks/active/METHOD-040-global-multicut-curvature-patch-reference.md)
 - `METHOD-042` — Region-aware parts experiment (tasks/active/METHOD-042-region-aware-parts-experiment.md)
 - `METHOD-043` — Thickness and curve-aligned parts comparison (tasks/active/METHOD-043-thickness-and-curve-parts-comparison.md)
