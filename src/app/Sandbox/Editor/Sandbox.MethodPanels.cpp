@@ -1256,6 +1256,7 @@ namespace Extrinsic::Sandbox::Editor
             bool changed = false;
             const auto label = [](Runtime::PointCloudConsolidationBackend backend)
             {
+                if (backend == Runtime::PointCloudConsolidationBackend::VulkanLBVH) return "Vulkan LBVH (LOP)";
                 if (backend == Runtime::PointCloudConsolidationBackend::CpuLBVH) return "CPU LBVH (LOP)";
                 if (backend == Runtime::PointCloudConsolidationBackend::VulkanCompute) return "Vulkan compute";
                 return "CPU reference";
@@ -1264,6 +1265,7 @@ namespace Extrinsic::Sandbox::Editor
             {
                 for (auto backend : {Runtime::PointCloudConsolidationBackend::CpuReference,
                      Runtime::PointCloudConsolidationBackend::CpuLBVH,
+                     Runtime::PointCloudConsolidationBackend::VulkanLBVH,
                      Runtime::PointCloudConsolidationBackend::VulkanCompute})
                 {
                     const bool selected = config.Backend == backend;
@@ -1272,6 +1274,11 @@ namespace Extrinsic::Sandbox::Editor
                     if (selected) ImGui::SetItemDefaultFocus();
                 }
                 ImGui::EndCombo();
+            }
+            if (config.Backend == Runtime::PointCloudConsolidationBackend::VulkanLBVH)
+            {
+                changed |= ImGui::InputScalar("GPU query batch size##LOP",ImGuiDataType_U32,&config.GpuQueryBatchSize);
+                changed |= ImGui::InputScalar("GPU radius capacity##LOP",ImGuiDataType_U32,&config.GpuRadiusCapacity);
             }
             changed |= DrawPointCloudConsolidationStrategy(config);
             ImGui::SeparatorText("Shared parameters");

@@ -262,7 +262,12 @@ LOP can also lease the selected property index from `SpatialIndexCache` via
 `cpu_lbvh`; moving-sample indices remain private to its worker. The existing
 config and UI choose that backend, and completion reports index reuse without
 silent fallback. Other strategies retain their existing backend eligibility.
-RUNTIME-229 owns the framed Vulkan LBVH adapter.
+The `vulkan_lbvh` LOP choice uses framed complete radius queries against the leased
+source and a private moving workspace per iteration, then reuses CPU projection
+arithmetic. Config exposes query batch/capacity limits; GPU overflow, stale source
+and cancellation reject publication. Completion identifies
+`vulkan_lbvh_cpu_projection` and reports workspace/query counts. WLOP/CLOP/EAR
+retain their existing eligibility pending separate adapters.
 Geometry-presentation slot edits additionally validate and monotonically
 advance the presentation recipe generation on apply, undo, and redo instead of
 restoring a captured generation and admitting an ABA stale-output match. The

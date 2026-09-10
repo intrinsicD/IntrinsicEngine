@@ -110,7 +110,14 @@ conservative candidates are filtered by the existing strict compact kernel.
 This preserves the engine's selected linear-repulsion variant and distance floor.
 The original [LOP technical report](https://www.wisdom.weizmann.ac.il/~ylipman/lop/LOP_final_TR.pdf)
 uses a different inverse-cubic repulsion in its examples; no original-formulation
-or general convergence guarantee is added. The framed Vulkan LBVH adapter remains
-RUNTIME-229. Existing `gpu_vulkan_compute` grid execution and the frozen METHOD-019
+or general convergence guarantee is added. The `vulkan_lbvh` adapter gathers the same complete rows through framed queries,
+retaining the source lease and a private projected workspace until dependent work
+finishes. Attraction has source IDs without self exclusion; repulsion excludes
+only the matching projected ID. Projection arithmetic stays on the CPU. Capacity
+overflow, cancellation and stale input reject publication without fallback.
+The bounded config accepts at most 64 iterations, query batches 1..16384 and
+row capacities 1..1024; float coordinates must be normal or zero and conservative
+query radius must be representable and at most 1e18. WLOP/CLOP/EAR adapters remain
+follow-up work in the spatial consumer inventory. Existing `gpu_vulkan_compute` grid execution and the frozen METHOD-019
 candidate retain their separate identities. CPU LBVH benchmark timing is diagnostic;
 no default change or acceleration result is asserted.

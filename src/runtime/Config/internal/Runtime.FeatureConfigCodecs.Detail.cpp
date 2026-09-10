@@ -567,6 +567,7 @@ namespace Extrinsic::Runtime::FeatureConfigDetail
             if (value == "gpu_vulkan_compute")
                 return PointCloudConsolidationBackend::VulkanCompute;
             if (value == "cpu_lbvh") return PointCloudConsolidationBackend::CpuLBVH;
+            if (value == "vulkan_lbvh") return PointCloudConsolidationBackend::VulkanLBVH;
             return std::nullopt;
         }
 
@@ -1161,6 +1162,8 @@ namespace Extrinsic::Runtime::FeatureConfigDetail
                  "convergence_tolerance",
                  "target_point_count",
                  "seed",
+                 "gpu_query_batch_size",
+                 "gpu_radius_capacity",
                  "wlop_anisotropic",
                  "normal_source",
                  "normal_angle_radians",
@@ -1277,6 +1280,10 @@ namespace Extrinsic::Runtime::FeatureConfigDetail
                 config.Seed = static_cast<std::uint32_t>(*value);
                 CountParsed(context);
             }
+            if (const auto value = ReadInteger(context, *object, "gpu_query_batch_size", 1, 16384))
+            { config.GpuQueryBatchSize = static_cast<std::uint32_t>(*value); CountParsed(context); }
+            if (const auto value = ReadInteger(context, *object, "gpu_radius_capacity", 1, 1024))
+            { config.GpuRadiusCapacity = static_cast<std::uint32_t>(*value); CountParsed(context); }
             if (const auto value = ReadBool(
                     context, *object, "wlop_anisotropic"))
             {
@@ -2079,6 +2086,8 @@ namespace Extrinsic::Runtime::FeatureConfigDetail
         const PointCloudConsolidationConfig& config)
     {
         return json::object({
+            {"gpu_query_batch_size", config.GpuQueryBatchSize},
+            {"gpu_radius_capacity", config.GpuRadiusCapacity},
             {"backend", std::string{ToConfigString(config.Backend)}},
             {"strategy", std::string{ToConfigString(config.Strategy)}},
             {"support_radius_mode",

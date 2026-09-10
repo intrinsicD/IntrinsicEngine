@@ -148,3 +148,14 @@ TEST(PointCloudConsolidationConfig, CachedLopBackendRoundTrips)
     EXPECT_NE(json.find("cpu_lbvh"),std::string::npos);
     EXPECT_TRUE(Extrinsic::Runtime::ValidatePointCloudConsolidationConfigSection(json,{},"test").Usable());
 }
+
+TEST(PointCloudConsolidationConfig, VulkanLbvhControlsRoundTrip)
+{
+    namespace R=Extrinsic::Runtime;
+    Extrinsic::Core::Config::EngineConfig engine;
+    R::PointCloudConsolidationConfig value;value.Backend=R::PointCloudConsolidationBackend::VulkanLBVH;
+    value.Strategy=R::PointCloudConsolidationStrategy::Lop;value.GpuQueryBatchSize=17;value.GpuRadiusCapacity=113;
+    R::SetPointCloudConsolidationConfig(engine,value);const auto read=R::GetPointCloudConsolidationConfig(engine);
+    ASSERT_TRUE(read);EXPECT_EQ(read->Backend,value.Backend);EXPECT_EQ(read->GpuQueryBatchSize,17u);EXPECT_EQ(read->GpuRadiusCapacity,113u);
+    EXPECT_TRUE(R::ValidatePointCloudConsolidationConfigSection(R::SerializePointCloudConsolidationConfig(value),{},"test").Usable());
+}

@@ -37,6 +37,7 @@ namespace Extrinsic::Runtime
         bool ForceCpu{false};
         std::shared_ptr<const Geometry::PointLBVH::Index> SourceIndex{};
         bool ReusedSpatialIndex{false};
+        std::uint64_t GpuSourceHandle{};
         std::string BackendDiagnostic{};
     };
 

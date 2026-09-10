@@ -120,6 +120,7 @@ export namespace Extrinsic::Runtime
             PointCloudConsolidationBackend::None};
         bool FellBackToCpu{false};
         bool ReusedSpatialIndex{false};
+        std::uint32_t GpuQueryBatches{}, SpatialWorkspaceBuilds{};
         std::string BackendDiagnostic{};
         std::string ImplementationId{"cpu_reference"};
         std::string StrategyToken{"wlop"};

@@ -36,6 +36,7 @@ export namespace Extrinsic::Runtime
         CpuReference,
         VulkanCompute,
         CpuLBVH,
+        VulkanLBVH,
     };
 
     enum class PointCloudConsolidationNormalSource : std::uint32_t
@@ -66,6 +67,9 @@ export namespace Extrinsic::Runtime
         double ConvergenceTolerance{1.0e-4};
         std::uint32_t TargetPointCount{0u};
         std::uint32_t Seed{42u};
+
+        std::uint32_t GpuQueryBatchSize{4096u};
+        std::uint32_t GpuRadiusCapacity{256u};
 
         bool WlopAnisotropic{false};
         PointCloudConsolidationNormalSource NormalSource{

@@ -36,6 +36,8 @@ import Extrinsic.Runtime.JobService;
 import Extrinsic.Runtime.SelectionController;
 import Extrinsic.Runtime.WorldRegistry;
 import Geometry.PointCloud.Consolidation;
+import Geometry.PointCloud.Kernels;
+import Geometry.SpatialQueries;
 import Extrinsic.Runtime.SpatialIndexCache;
 import Geometry.PointCloud;
 import Geometry.PointCloud.Utils;
@@ -257,12 +259,16 @@ namespace Extrinsic::Runtime
                     PointCloudConsolidationBackend::CpuReference &&
                 config.Backend !=
                     PointCloudConsolidationBackend::VulkanCompute &&
-                config.Backend != PointCloudConsolidationBackend::CpuLBVH)
+                config.Backend != PointCloudConsolidationBackend::CpuLBVH &&
+                config.Backend != PointCloudConsolidationBackend::VulkanLBVH)
                 return std::nullopt;
-            if (config.Backend == PointCloudConsolidationBackend::CpuLBVH &&
+            if ((config.Backend == PointCloudConsolidationBackend::CpuLBVH || config.Backend == PointCloudConsolidationBackend::VulkanLBVH) &&
                 config.Strategy != PointCloudConsolidationStrategy::Lop)
                 return std::nullopt;
 
+            if (config.Backend == PointCloudConsolidationBackend::VulkanLBVH &&
+                (config.MaxIterations > 64 || config.GpuQueryBatchSize == 0 || config.GpuQueryBatchSize > 16384 ||
+                 config.GpuRadiusCapacity == 0 || config.GpuRadiusCapacity > 1024)) return std::nullopt;
             double resolvedRadius = 1.0;
             switch (config.SupportRadiusMode)
             {
@@ -1530,9 +1536,8 @@ namespace Extrinsic::Runtime
                 return cancelled;
             }
 
-            if (snapshot.Request.Config.Backend ==
-                    PointCloudConsolidationBackend::VulkanCompute &&
-                !snapshot.ForceCpu)
+            if ((snapshot.Request.Config.Backend == PointCloudConsolidationBackend::VulkanCompute ||
+                 snapshot.Request.Config.Backend == PointCloudConsolidationBackend::VulkanLBVH) && !snapshot.ForceCpu)
             {
                 if (PrepareGpuInitialPositions(snapshot))
                 {
@@ -1550,6 +1555,11 @@ namespace Extrinsic::Runtime
                         *prepared.Snapshot.RadiusAnalysis);
                     prepared.GpuPrepared = true;
                     return prepared;
+                }
+                if (snapshot.Request.Config.Backend == PointCloudConsolidationBackend::VulkanLBVH)
+                {
+                    Consolidation::Result failed; failed.State=Consolidation::Status::NumericalFailure;
+                    return BuildConsolidationJobResult(std::move(snapshot),std::move(failed),PointCloudConsolidationBackend::None);
                 }
                 snapshot.ForceCpu = true;
                 snapshot.BackendDiagnostic =
@@ -2298,6 +2308,211 @@ namespace Extrinsic::Runtime
             return CommandOutcome::Ok();
         }
 
+        struct LopGpuRows
+        {
+            std::vector<std::uint32_t> Offsets{0}, Indices{};
+            std::shared_ptr<SpatialNearestBatch> Batch{};
+            std::size_t Next{};
+            Geometry::PointNeighborhoods View() const { return {Offsets, Indices}; }
+        };
+        struct LopGpuWork
+        {
+            PointCloudConsolidationSnapshot Snapshot{};
+            Consolidation::Result Solver{};
+            std::vector<glm::vec3> Points{};
+            SpatialIndexWorkspace Moving{};
+            LopGpuRows Attraction{}, Repulsion{};
+            std::optional<PointCloudConsolidationResult> Failure{};
+            bool Initialized{}, Abandoned{}, Delivered{};
+            std::uint32_t WorkspaceBuilds{}, QueryBatches{};
+        };
+        bool ValidLopGpuPoint(glm::vec3 p)
+        {
+            if (!Geometry::PointLBVH::ValidPoint(p)) return false;
+            for (int i=0;i<3;++i) if (std::fpclassify(p[i])==FP_SUBNORMAL) return false;
+            return true;
+        }
+        enum class LopRowState { Pending, Ready, Failed };
+        LopRowState AdvanceLopRows(SpatialIndexCache& cache, SpatialIndexHandle index,
+            std::span<const glm::vec3> points, std::uint32_t sourceCount,
+            float radius, bool selfExcluded, LopGpuRows& rows, LopGpuWork& w, std::string& diagnostic)
+        {
+            const auto fail=[&](std::string why){diagnostic=std::move(why);rows.Batch.reset();return LopRowState::Failed;};
+            if(rows.Next==points.size())return LopRowState::Ready;
+            const auto batchSize=w.Snapshot.Request.Config.GpuQueryBatchSize;
+            if(rows.Batch)
+            {
+                if(rows.Batch->State==SpatialQueryState::Failed)return fail(rows.Batch->Diagnostic);
+                if(rows.Batch->State!=SpatialQueryState::Ready)return LopRowState::Pending;
+                const auto expected=std::min<std::size_t>(batchSize,points.size()-rows.Next);
+                if(rows.Batch->Counts.size()!=expected || rows.Batch->Neighbors.size()!=expected*rows.Batch->Capacity)
+                    return fail("Incomplete LOP Vulkan radius batch.");
+                std::vector<std::uint32_t> row;
+                for(std::size_t i=0;i<expected;++i)
+                {
+                    const auto count=rows.Batch->Counts[i];
+                    if(count>rows.Batch->Capacity)return fail("LOP Vulkan radius support exceeds capacity; no output was published.");
+                    if(count>std::numeric_limits<std::uint32_t>::max()-rows.Indices.size())return fail("LOP candidate storage exceeds the packed range.");
+                    row.clear();
+                    for(std::uint32_t j=0;j<count;++j)
+                    {
+                        const auto id=rows.Batch->Neighbors[i*rows.Batch->Capacity+j].Index;
+                        if(id>=sourceCount || (selfExcluded && id==rows.Next+i))return fail("Invalid LOP Vulkan neighbor identity.");
+                        row.push_back(id);
+                    }
+                    std::sort(row.begin(),row.end());
+                    if(std::adjacent_find(row.begin(),row.end())!=row.end())return fail("Duplicate LOP Vulkan neighbor identity.");
+                    rows.Indices.insert(rows.Indices.end(),row.begin(),row.end());
+                    rows.Offsets.push_back(static_cast<std::uint32_t>(rows.Indices.size()));
+                }
+                rows.Next+=expected;
+                if(rows.Next==points.size()){rows.Batch.reset();return LopRowState::Ready;}
+            }
+            const auto count=std::min<std::size_t>(batchSize,points.size()-rows.Next);
+            if(rows.Batch && rows.Batch->Counts.size()!=count)rows.Batch.reset();
+            std::vector<std::uint32_t> exclusions;
+            if(selfExcluded)for(std::size_t i=0;i<count;++i)exclusions.push_back(static_cast<std::uint32_t>(rows.Next+i));
+            const auto capacity=std::max(1u,std::min(w.Snapshot.Request.Config.GpuRadiusCapacity,sourceCount-(selfExcluded?1u:0u)));
+            rows.Batch=cache.QueueGpuRadius(index,points.subspan(rows.Next,count),radius,capacity,exclusions,std::move(rows.Batch));
+            ++w.QueryBatches;
+            if(rows.Batch->State==SpatialQueryState::Failed)return fail(rows.Batch->Diagnostic);
+            return LopRowState::Pending;
+        }
+        bool AdvanceLopGpu(SpatialIndexCache& cache,LopGpuWork& w)
+        {
+            if(w.Abandoned || w.Failure || w.Solver.Diagnostics.Converged)return true;
+            const auto fail=[&](std::string why, PointCloudConsolidationRunStatus status = PointCloudConsolidationRunStatus::GeometryProcessingFailed)
+            {
+                w.Failure=MakeCompletion(w.Snapshot.Request,w.Snapshot.World,w.Snapshot.Correlation,
+                    status,Core::ErrorCode::InvalidState,std::move(why));
+                return true;
+            };
+            if(!cache.Snapshot({w.Snapshot.GpuSourceHandle}))
+                return fail("LOP source changed before the next Vulkan stage.",PointCloudConsolidationRunStatus::StaleSource);
+            if(!std::all_of(w.Points.begin(),w.Points.end(),ValidLopGpuPoint))
+                return fail("LOP Vulkan requires finite normal-or-zero coordinates within LBVH limits, including moving samples.");
+            const auto radius=Geometry::PointCloud::Kernels::ConservativeQueryRadius(w.Snapshot.Params.SupportRadius);
+            if(!radius || *radius>Geometry::PointLBVH::CoordinateLimit)return fail("LOP Vulkan support radius exceeds LBVH limits.");
+            std::string diagnostic;
+            auto state=AdvanceLopRows(cache,{w.Snapshot.GpuSourceHandle},w.Points,
+                static_cast<std::uint32_t>(w.Snapshot.Positions.size()),*radius,false,w.Attraction,w,diagnostic);
+            if(state==LopRowState::Failed)return fail(diagnostic);
+            if(state==LopRowState::Pending)return false;
+            if(!w.Initialized)return true;
+            if(!w.Moving.Ready())
+            {
+                w.Moving=cache.CreateWorkspace(w.Points);
+                if(!w.Moving.Ready())return fail(w.Moving.Diagnostic);
+                ++w.WorkspaceBuilds;
+            }
+            state=AdvanceLopRows(cache,w.Moving.Handle,w.Points,static_cast<std::uint32_t>(w.Points.size()),
+                *radius,true,w.Repulsion,w,diagnostic);
+            if(state==LopRowState::Failed)return fail(diagnostic);
+            return state==LopRowState::Ready;
+        }
+        CommandOutcome SubmitLopGpu(JobService& jobs,KernelEventBus* events,SpatialIndexCache& cache,
+            PointCloudConsolidationSnapshot snapshot,PointCloudConsolidationModuleStats& stats)
+        {
+            auto w=std::make_shared<LopGpuWork>();w->Snapshot=std::move(snapshot);
+            const auto request=w->Snapshot.Request;const auto world=w->Snapshot.World;const auto correlation=w->Snapshot.Correlation;
+            const auto fallback=MakeCompletion(request,world,correlation,PointCloudConsolidationRunStatus::Cancelled,
+                Core::ErrorCode::InvalidState,"LOP Vulkan sequence cancelled; previous output retained.");
+            auto finalize=[events,w,fallback]()mutable
+            {
+                w->Abandoned=true;
+                if(!w->Delivered){w->Delivered=true;PublishCompletion(events,w->Failure?*w->Failure:fallback);}
+            };
+            auto validate=[w]{return w->Abandoned?JobApplyValidation::Cancelled:JobApplyValidation::Current;};
+            auto check=[w](KernelEventBus&,const JobResultEnvelope&)
+            {
+                if(w->Failure)return false;
+                if(!w->Solver.Succeeded())
+                {
+                    w->Failure=MakeCompletion(w->Snapshot.Request,w->Snapshot.World,w->Snapshot.Correlation,
+                        PointCloudConsolidationRunStatus::GeometryProcessingFailed,Core::ErrorCode::InvalidState,
+                        "LOP CPU projection stage failed: "+std::string(Consolidation::DebugName(w->Solver.State)));
+                    return false;
+                }
+                return true;
+            };
+            JobToken previous{};
+            auto submit=[&](JobDesc job)
+            {
+                if(previous.IsValid())job.DependsOn.push_back({previous,"Complete previous LOP stage before using its points"});
+                previous=jobs.Submit(std::move(job));
+                if(previous.IsValid()){++stats.JobsSubmitted;return true;}
+                ++stats.JobSubmissionFailures;return false;
+            };
+            bool accepted=submit({.DebugName="LOP Vulkan support preparation",.Scope=world,.Kind=RuntimeTaskKinds::GeometryProcess,
+                .Work=[w](const JobCancellation& cancellation)
+                {
+                    auto prepared=RunWorker(std::move(w->Snapshot),cancellation);
+                    w->Snapshot=std::move(prepared.Snapshot);
+                    if(!prepared.GpuPrepared){w->Solver.State=Consolidation::Status::NumericalFailure;return JobResultEnvelope::Make(prepared.Completion);}
+                    w->Points=std::move(w->Snapshot.GpuInitialPositions);w->Solver.State=Consolidation::Status::Success;
+                    return JobResultEnvelope::Make(prepared.Completion);
+                },.ValidateBeforeApply=validate,
+                .PublishCompletion=[w](KernelEventBus&,const JobResultEnvelope& envelope)
+                {
+                    if(!w->Solver.Succeeded())
+                    {if(const auto* result=envelope.TryGet<PointCloudConsolidationResult>())w->Failure=*result;return false;}
+                    return true;
+                },.FinalizeUnpublishedOnMainThread=finalize});
+            for(std::uint32_t stage=0;accepted && stage<=request.Config.MaxIterations;++stage)
+            {
+                accepted=submit({.DebugName="LOP Vulkan neighborhoods",.Scope=world,.Kind=RuntimeTaskKinds::GeometryProcess,
+                    .Work=[](const JobCancellation&){return JobResultEnvelope::Make(true);},
+                    .IsReadyToApply=[&cache,w]{return AdvanceLopGpu(cache,*w);},.ValidateBeforeApply=validate,
+                    .PublishCompletion=check,.FinalizeUnpublishedOnMainThread=finalize});
+                if(!accepted)break;
+                const bool last=stage==request.Config.MaxIterations;
+                JobDesc step{.DebugName="LOP projection update",.Scope=world,.Kind=RuntimeTaskKinds::GeometryProcess,
+                    .Work=[w](const JobCancellation&)
+                    {
+                        if(w->Solver.Diagnostics.Converged)return JobResultEnvelope::Make(true);
+                        auto result=w->Initialized
+                            ?Consolidation::StepLopFromNeighbors(w->Snapshot.Positions,w->Points,w->Attraction.View(),w->Repulsion.View(),w->Snapshot.Params)
+                            :Consolidation::InitializeLopFromNeighbors(w->Snapshot.Positions,w->Points,w->Attraction.View(),w->Snapshot.Params);
+                        if(!result.Succeeded()){w->Solver=std::move(result);return JobResultEnvelope::Make(false);}
+                        if(w->Initialized)
+                        {
+                            result.Diagnostics.Iterations=w->Solver.Diagnostics.Iterations+1;
+                            result.Diagnostics.AttractionContributionCount+=w->Solver.Diagnostics.AttractionContributionCount;
+                            result.Diagnostics.RepulsionContributionCount+=w->Solver.Diagnostics.RepulsionContributionCount;
+                        }
+                        w->Solver=std::move(result);w->Points=w->Solver.Positions;w->Initialized=true;
+                        return JobResultEnvelope::Make(true);
+                    },.ValidateBeforeApply=validate,.FinalizeUnpublishedOnMainThread=finalize};
+                if(last)step.PublishCompletion=[w,&stats](KernelEventBus& bus,const JobResultEnvelope&)
+                {
+                    w->Solver.Diagnostics.Implementation="vulkan_lbvh_cpu_projection";
+                    if(w->Solver.Succeeded() && !w->Solver.Diagnostics.Converged)w->Solver.State=Consolidation::Status::NotConverged;
+                    auto result=std::make_shared<PointCloudConsolidationJobResult>(BuildConsolidationJobResult(
+                        std::move(w->Snapshot),std::move(w->Solver),PointCloudConsolidationBackend::VulkanLBVH));
+                    result->Completion.GpuQueryBatches=w->QueryBatches;result->Completion.SpatialWorkspaceBuilds=w->WorkspaceBuilds;
+                    w->Delivered=true;++stats.GpuCompletions;bus.Publish(PointCloudConsolidationJobCompleted{result});return true;
+                };
+                else step.PublishCompletion=[w,check](KernelEventBus& bus,const JobResultEnvelope& result)
+                {
+                    if(!check(bus,result))return false;
+                    w->Attraction={};w->Repulsion={};w->Moving={};return true;
+                };
+                accepted=submit(std::move(step));
+            }
+            if(!accepted)
+            {
+                w->Abandoned=true;
+                if(!w->Delivered)
+                {
+                    w->Delivered=true;
+                    PublishCompletion(events,MakeCompletion(request,world,correlation,PointCloudConsolidationRunStatus::GeometryProcessingFailed,
+                        Core::ErrorCode::InvalidState,"LOP Vulkan job sequence submission rejected; previous output retained."));
+                }
+                return CommandOutcome::Fail("LOP Vulkan job sequence submission rejected.");
+            }
+            ++stats.GpuRequestsAccepted;return CommandOutcome::Ok();
+        }
+
         [[nodiscard]] CommandOutcome HandleRunCommand(
             CommandContext& context,
             const PointCloudConsolidationRequest& request,
@@ -2342,7 +2557,7 @@ namespace Extrinsic::Runtime
                 PublishCompletion(context.Events, std::move(failure));
                 return CommandOutcome::Fail(std::move(message));
             }
-            if (request.Config.Backend == PointCloudConsolidationBackend::CpuLBVH)
+            if (request.Config.Backend == PointCloudConsolidationBackend::CpuLBVH || request.Config.Backend == PointCloudConsolidationBackend::VulkanLBVH)
             {
                 const auto entity = ResolveEntity(context.ActiveWorld.Raw(), request.StableEntityId);
                 const auto acquired = spatialIndices ? spatialIndices->Acquire(world, entity, request.Properties.InputPositions)
@@ -2358,9 +2573,20 @@ namespace Extrinsic::Runtime
                         PointCloudConsolidationRunStatus::GeometryProcessingFailed, Core::ErrorCode::InvalidState, message));
                     return CommandOutcome::Fail(message);
                 }
+                if (request.Config.Backend == PointCloudConsolidationBackend::VulkanLBVH &&
+                    (!spatialIndices->GpuQueriesAvailable() || !std::all_of(snapshot->Positions.begin(),snapshot->Positions.end(),ValidLopGpuPoint)))
+                {
+                    const std::string message="LOP Vulkan requires an operational spatial cache and normal-or-zero finite positions within LBVH limits.";
+                    PublishCompletion(context.Events,MakeCompletion(request,world,context.Correlation,
+                        PointCloudConsolidationRunStatus::InvalidProcessingParameters,Core::ErrorCode::InvalidArgument,message));
+                    return CommandOutcome::Fail(message);
+                }
+                snapshot->GpuSourceHandle = acquired.Handle.Value;
                 snapshot->SourceIndex = std::shared_ptr<const Geometry::PointLBVH::Index>(lease, &lease->Index);
                 snapshot->ReusedSpatialIndex = acquired.Reused;
             }
+            if (request.Config.Backend == PointCloudConsolidationBackend::VulkanLBVH)
+                return SubmitLopGpu(*context.Jobs,context.Events,*spatialIndices,std::move(*snapshot),stats);
             return SubmitSnapshot(
                 *context.Jobs,
                 context.Events,

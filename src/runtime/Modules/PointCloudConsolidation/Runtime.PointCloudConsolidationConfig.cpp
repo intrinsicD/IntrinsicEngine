@@ -18,6 +18,7 @@ namespace Extrinsic::Runtime
     {
         switch (backend)
         {
+        case PointCloudConsolidationBackend::VulkanLBVH: return "vulkan_lbvh";
         case PointCloudConsolidationBackend::CpuLBVH: return "cpu_lbvh";
         case PointCloudConsolidationBackend::None: return "none";
         case PointCloudConsolidationBackend::CpuReference:

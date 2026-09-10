@@ -26,15 +26,17 @@ correctness_tests:
   - "../../../tests/unit/geometry/Test.PointCloudConsolidation.cpp"
   - "../../../tests/integration/runtime/Test.PointCloudConsolidationGpuParity.cpp"
 benchmarks:
+  - ../../../benchmarks/geometry/manifests/point_lbvh_lop_vulkan_runtime_smoke.yaml
   - "../../../benchmarks/geometry/manifests/point_lbvh_lop_cpu_smoke.yaml"
   - "../../../benchmarks/geometry/manifests/locally_optimal_projection_reference_smoke.yaml"
   - "../../../benchmarks/geometry/manifests/lop_family_comparison_smoke.yaml"
   - "../../../benchmarks/geometry/manifests/lop_family_gpu_vulkan_smoke_v3.yaml"
 known_limitations:
-  - "The cpu_lbvh runtime token selects cached CPU LBVH neighborhoods with the existing CPU reference projection arithmetic, for LOP only; it is not a promotion of METHOD-019 or a speedup claim. RUNTIME-229 owns framed Vulkan LBVH projection."
+  - "The cpu_lbvh runtime token selects cached CPU LBVH neighborhoods with the existing CPU reference projection arithmetic, for LOP only; it is not a promotion of METHOD-019 or a speedup claim. The vulkan_lbvh LOP token uses framed GPU neighborhoods with those same CPU projection steps, explicit failure and no fallback."
   - "Compact support h must connect every projected sample to at least one source sample; isolated neighborhoods fail closed."
   - "Thin structures and strongly anisotropic sampling can merge across sheets when h is too large."
   - "METHOD-019's exact optimized candidates preserved parity but missed the frozen useful-acceleration gate for both LOP and WLOP; the frozen optimized candidate remains unselectable; cached query selection has separate evidence and no acceleration claim."
   - "gpu_vulkan_compute supports ordinary LOP and isotropic WLOP only; anisotropic WLOP fails runtime preview and remains on cpu_reference."
-  - "The Vulkan backend uses float shader arithmetic, bounded dense h-cell grids, and one in-flight operation; device, planning, busy, or transport unavailability falls back honestly to cpu_reference."
+  - "The gpu_vulkan_compute grid backend uses float shader arithmetic, bounded dense h-cell grids, and one in-flight operation; device, planning, busy, or transport unavailability falls back honestly to cpu_reference."
   - "Inverse-distance terms use a scale-relative distance floor of 0.01 h for coincident samples."
+  - "vulkan_lbvh accepts normal-or-zero float coordinates, at most 64 iterations, batch sizes 1..16384 and complete-row capacities 1..1024; conservative query radii above 1e18 or non-representable radii fail. It does not provide GPU projection reduction, WLOP/CLOP/EAR acceleration or a speedup claim."

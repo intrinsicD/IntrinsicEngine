@@ -419,7 +419,7 @@ namespace
             Runtime::PointCloudConsolidationRequest request =
                 MakeRequest(Entity);
             request.Config.Backend = Backend;
-            if (Backend == Runtime::PointCloudConsolidationBackend::CpuLBVH)
+            if (Backend == Runtime::PointCloudConsolidationBackend::CpuLBVH || Backend == Runtime::PointCloudConsolidationBackend::VulkanLBVH)
                 request.Config.Strategy = Runtime::PointCloudConsolidationStrategy::Lop;
             request.Config.ConvergenceTolerance = ConvergenceTolerance;
             request.Config.SupportRadiusMode = Runtime::
@@ -1541,4 +1541,16 @@ TEST(PointCloudConsolidationModule, CachedLopReusesAllEightPropertyDomainIndices
         EXPECT_FALSE(result.FellBackToCpu); ++accepted;
     }
     EXPECT_EQ(accepted,8u); engine.Shutdown();
+}
+
+TEST(PointCloudConsolidationModule, VulkanLbvhRejectsUnavailableDeviceWithoutFallback)
+{
+    auto app=std::make_unique<ConsolidationSuccessApp>(Runtime::PointCloudConsolidationBackend::VulkanLBVH);
+    auto* observed=app.get();Intrinsic::Tests::RuntimeTestKernel engine{HeadlessConfig(),std::move(app)};
+    engine.EmplaceModule<Runtime::SpatialIndexCache>();engine.EmplaceModule<Runtime::PointCloudConsolidationModule>();
+    engine.Initialize();engine.Run();ASSERT_TRUE(observed->Completion.has_value());
+    EXPECT_FALSE(observed->Completion->Succeeded());EXPECT_FALSE(observed->Completion->FellBackToCpu);
+    EXPECT_EQ(observed->Completion->ActualBackend,Runtime::PointCloudConsolidationBackend::None);
+    EXPECT_EQ(observed->Scene->Raw().get<GS::Vertices>(observed->Entity).Properties.Size(),25u);
+    EXPECT_EQ(observed->Stats.JobsSubmitted,0u);engine.Shutdown();
 }

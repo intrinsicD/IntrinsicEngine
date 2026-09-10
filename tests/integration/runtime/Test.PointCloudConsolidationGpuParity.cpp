@@ -3,6 +3,9 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <chrono>
+#include <cstdlib>
+#include <fstream>
 #include <cstddef>
 #include <cstdint>
 #include <memory>
@@ -27,6 +30,10 @@ import Extrinsic.Platform.Backend.Glfw;
 import Extrinsic.Graphics.Component.RenderGeometry;
 import Extrinsic.Graphics.GpuWorld;
 import Extrinsic.Runtime.CommandBus;
+import Extrinsic.Runtime.SpatialIndexCache;
+import Extrinsic.Runtime.SceneDocumentModule;
+import Extrinsic.Runtime.EditorCommandHistory;
+import Extrinsic.Runtime.JobService;
 import Extrinsic.Runtime.Engine;
 import Extrinsic.Runtime.EngineConfigBoot;
 import Extrinsic.Runtime.KernelEvents;
@@ -755,4 +762,172 @@ TEST(PointCloudConsolidationGpuParity,
         GetVulkanOperationalDiagnosticsSnapshot();
     EXPECT_EQ(validationAfter.VulkanValidationErrorCount,
               validationBefore.VulkanValidationErrorCount);
+}
+
+namespace
+{
+    class LopLbvhApp final : public Intrinsic::Tests::RuntimeTestModule
+    {
+    public:
+        using Domain=Runtime::GeometryElementDomain;
+        Geometry::PropertySet& Props(unsigned d)
+        {
+            auto& raw=Scene->Raw();auto e=Entities[d-1];
+            if(d==unsigned(Domain::MeshEdge)||d==unsigned(Domain::GraphEdge))return raw.get<GS::Edges>(e).Properties;
+            if(d==unsigned(Domain::MeshHalfedge)||d==unsigned(Domain::GraphHalfedge))return raw.get<GS::Halfedges>(e).Properties;
+            if(d==unsigned(Domain::MeshFace))return raw.get<GS::Faces>(e).Properties;
+            return raw.get<GS::Vertices>(e).Properties;
+        }
+        Runtime::PointCloudConsolidationRequest Request(unsigned d)
+        {
+            auto refs=Runtime::MakePointCloudConsolidationPropertyRefs(Domain(d),"samples",std::nullopt);
+            refs.OutputPositions.Name="projected";
+            Runtime::PointCloudConsolidationConfig c;
+            c.Backend=Runtime::PointCloudConsolidationBackend::VulkanLBVH;c.Strategy=Runtime::PointCloudConsolidationStrategy::Lop;
+            c.SupportRadiusMode=Runtime::PointCloudConsolidationSupportRadiusMode::Manual;c.SupportRadius=.35;
+            c.RepulsionWeight=.2;c.MaxIterations=3;c.ConvergenceTolerance=0;c.GpuRadiusCapacity=64;c.GpuQueryBatchSize=64;
+            return {Runtime::SelectionController::ToStableEntityId(Entities[d-1]),refs,c};
+        }
+        void Resolve() override
+        {
+            Started=std::chrono::steady_clock::now();Scene=Kernel().Worlds().Get(Kernel().ActiveWorld());
+            Service=Kernel().Services().Find<Runtime::PointCloudConsolidationService>();
+            History=Kernel().Services().Find<Runtime::EditorCommandHistory>();ASSERT_NE(History,nullptr);
+            for(unsigned d=1;d<=8;++d)
+            {
+                auto e=Scene->Create();Entities.push_back(e);auto& raw=Scene->Raw();
+                raw.emplace<GS::Vertices>(e).Properties.Resize(32);
+                if(d!=unsigned(Domain::PointCloudPoint))
+                {
+                    raw.emplace<GS::Edges>(e).Properties.Resize(16);
+                    raw.emplace<GS::Halfedges>(e).Properties.Resize(32);
+                    if(d<=unsigned(Domain::MeshFace)){raw.emplace<GS::Faces>(e).Properties.Resize(32);raw.emplace<GS::HasMeshTopology>(e);}
+                    else raw.emplace<GS::HasGraphTopology>(e);
+                }
+                auto& props=Props(d);props.Resize(32);
+                auto p=props.GetOrAdd<glm::vec3>("samples");
+                for(unsigned i=0;i<32;++i)p[i]={float(i%8)*.05f,float(i/8)*.05f,.01f*std::sin(float(i*7))};
+                props.GetOrAdd<glm::vec3>("projected").Vector().assign(32,glm::vec3(77));
+                props.GetOrAdd<float>("untouched").Vector().assign(32,19);
+                auto request=Request(d);auto params=MakeCpuParams(request.Config);
+                References.push_back(Consolidation::Consolidate(p.Vector(),params));
+                ASSERT_FALSE(References.back().Positions.empty());
+            }
+            Subscription=Service->SubscribeCompleted([this](const Runtime::PointCloudConsolidationResult& r){Results.push_back(r);});
+        }
+        void Frame(double,double) override
+        {
+            if(std::chrono::steady_clock::now()-Started>std::chrono::seconds(150)){TimedOut=true;Kernel().RequestExit();return;}
+            if(!Kernel().GetDevice().IsOperational())return;
+            if(Submitted && (Phase==3 || Phase==4) && !Mutated)
+            {
+                for(const auto& job:Kernel().Jobs().SnapshotAll())
+                    if(job.DebugName=="LOP Vulkan neighborhoods" && job.State==Runtime::JobState::AwaitingApply)
+                    {
+                        if(Phase==3)Props(8).Get<glm::vec3>("samples")[0].z+=.01f;
+                        else EXPECT_TRUE(Kernel().Jobs().Cancel(job.Token));
+                        Mutated=true;break;
+                    }
+            }
+            if(Submitted && Results.size()==Expected)
+            {
+                if(Phase<2)
+                {
+                    for(const auto& r:Results)
+                    {
+                        ASSERT_TRUE(r.Succeeded())<<r.Message;EXPECT_EQ(r.ActualBackend,Runtime::PointCloudConsolidationBackend::VulkanLBVH);
+                        EXPECT_FALSE(r.FellBackToCpu);EXPECT_EQ(r.ImplementationId,"vulkan_lbvh_cpu_projection");
+                        EXPECT_EQ(r.Iterations,3u);EXPECT_EQ(r.SpatialWorkspaceBuilds,3u);EXPECT_GT(r.GpuQueryBatches,0u);
+                        if(Phase==1)EXPECT_TRUE(r.ReusedSpatialIndex);
+                        const auto d=unsigned(r.Properties.InputPositions.Domain);
+                        const auto actual=Props(d).Get<glm::vec3>("projected").Vector();
+                        const auto error=MeasurePositionError(actual,References[d-1].Positions);MaxError=std::max(MaxError,error.Linf);
+                        EXPECT_LE(error.Linf,1e-6);EXPECT_EQ(Props(d).Get<float>("untouched").Vector(),std::vector<float>(32,19));
+                    }
+                }
+                else if(Phase>=5)
+                {
+                    ASSERT_EQ(Results.size(),1u);ASSERT_TRUE(Results.front().Succeeded())<<Results.front().Message;
+                    const auto name=Phase==5?"v:position":"projected";
+                    EXPECT_LE(MeasurePositionError(Props(8).Get<glm::vec3>(name).Vector(),SpecialReference.Positions).Linf,1e-6);
+                    EXPECT_EQ(Results.front().Iterations,SpecialReference.Diagnostics.Iterations);
+                    EXPECT_EQ(Results.front().SpatialWorkspaceBuilds,SpecialReference.Diagnostics.Iterations);
+                    EXPECT_EQ(History->UndoCount(),17u);
+                    EXPECT_EQ(History->Undo().Status,Runtime::EditorCommandHistoryStatus::Undone);
+                    EXPECT_EQ(Props(8).Size(),32u);
+                    EXPECT_EQ(History->Redo().Status,Runtime::EditorCommandHistoryStatus::Redone);
+                    EXPECT_EQ(Props(8).Size(),Phase==5?16u:32u);
+                    EXPECT_EQ(History->Undo().Status,Runtime::EditorCommandHistoryStatus::Undone);
+                }
+                else
+                {
+                    EXPECT_EQ(History->UndoCount(),16u);
+                    ASSERT_EQ(Results.size(),1u);EXPECT_FALSE(Results.front().Succeeded());
+                    EXPECT_EQ(Props(8).Get<glm::vec3>("projected").Vector(),BeforeFailure);
+                    if(Phase==2)EXPECT_NE(Results.front().Message.find("capacity"),std::string::npos);
+                    if(Phase==3){EXPECT_TRUE(Mutated);EXPECT_EQ(Results.front().Status,Runtime::PointCloudConsolidationRunStatus::StaleSource);}
+                    if(Phase==4){EXPECT_TRUE(Mutated);EXPECT_EQ(Results.front().Status,Runtime::PointCloudConsolidationRunStatus::Cancelled);}
+                }
+                if(Phase==1)WarmMs=std::chrono::duration<double,std::milli>(std::chrono::steady_clock::now()-PhaseStarted).count();
+                Results.clear();Submitted=false;Mutated=false;++Phase;
+                if(Phase==7){Done=true;Kernel().RequestExit();return;}
+            }
+            if(!Submitted)
+            {
+                Submitted=true;PhaseStarted=std::chrono::steady_clock::now();Expected=Phase<2?8:1;
+                if(Phase<2)for(unsigned d=1;d<=8;++d)
+                {
+                    auto request=Request(d);
+                    // History publication replaces property storage and invalidates prior leases.
+                    // Prime the current storage to exercise acquisition reuse explicitly.
+                    if(Phase==1)(void)Kernel().Services().Find<Runtime::SpatialIndexCache>()->Acquire(
+                        Kernel().ActiveWorld(),Entities[d-1],request.Properties.InputPositions);
+                    (void)Service->Run(request);
+                }
+                else
+                {
+                    BeforeFailure=Props(8).Get<glm::vec3>("projected").Vector();auto request=Request(8);
+                    if(Phase==2)request.Config.GpuRadiusCapacity=1;
+                    if(Phase==5){request.Config.TargetPointCount=16;request.Properties.OutputPositions.Name="v:position";}
+                    if(Phase==6)request.Config.ConvergenceTolerance=1;
+                    if(Phase>=5)SpecialReference=Consolidation::Consolidate(Props(8).Get<glm::vec3>("samples").Vector(),MakeCpuParams(request.Config));
+                    (void)Service->Run(request);
+                }
+            }
+        }
+        void Shutdown() override {if(Service)Service->Unsubscribe(Subscription);}
+        Runtime::EditorCommandHistory* History{};Consolidation::Result SpecialReference{};
+        ECS::Scene::Registry* Scene{};Runtime::PointCloudConsolidationService* Service{};Runtime::KernelEventSubscription Subscription{};
+        std::vector<ECS::EntityHandle> Entities;std::vector<Consolidation::Result> References;
+        std::vector<Runtime::PointCloudConsolidationResult> Results;std::vector<glm::vec3> BeforeFailure;
+        std::chrono::steady_clock::time_point Started{},PhaseStarted{};unsigned Phase{},Expected{};bool Submitted{},TimedOut{},Done{},Mutated{};double MaxError{},WarmMs{};
+    };
+}
+TEST(PointCloudConsolidationGpuParity, VulkanLbvhMovingStepsAcrossDomainsAndFailures)
+{
+    if(!Extrinsic::Platform::Backends::Glfw::CanInitialize())GTEST_SKIP()<<"GLFW unavailable";
+    auto config=Runtime::CreateReferenceEngineConfig();config.Window.Width=64;config.Window.Height=64;
+    config.Render.EnableValidation=true;config.Render.EnableVSync=false;config.ReferenceScene.Enabled=false;
+    auto app=std::make_unique<LopLbvhApp>();auto* observed=app.get();
+    Intrinsic::Tests::RuntimeTestKernel engine(config,std::move(app));
+    engine.EmplaceModule<Runtime::SpatialIndexCache>();engine.EmplaceModule<Runtime::PointCloudConsolidationModule>();engine.EmplaceModule<Runtime::SceneDocumentModule>();
+    engine.Initialize();
+    const auto readiness=Extrinsic::Backends::Vulkan::GetVulkanDeviceOperationalInputs(&engine.GetDevice());
+    if(!readiness.LogicalDeviceReady || !readiness.SwapchainReady || !readiness.CommandSyncReady)
+    {engine.Shutdown();GTEST_SKIP()<<"Vulkan bootstrap unavailable";}
+    const auto before=Extrinsic::Backends::Vulkan::GetVulkanOperationalDiagnosticsSnapshot();engine.Run();
+    EXPECT_FALSE(observed->TimedOut);EXPECT_TRUE(observed->Done);EXPECT_LE(observed->MaxError,1e-6);
+    if(const char* path=std::getenv("INTRINSIC_LOP_LBVH_BENCHMARK_PATH"))
+    {
+        std::ofstream output(path);
+        output << "{\"benchmark_id\":\"geometry.point_lbvh.lop_vulkan_runtime_smoke\",\"method\":\"geometry.point_lbvh\","
+            << "\"backend\":\"gpu_vulkan_compute\",\"dataset\":\"builtin.lop_domains.32x8.three_iterations\",\"commit\":\"local-dev\","
+            << "\"metrics\":{\"runtime_ms\":" << observed->WarmMs << ",\"quality_error_linf\":" << observed->MaxError
+            << "},\"diagnostics\":{\"runner\":\"IntrinsicRuntimePointCloudConsolidationGpuParityTests\",\"mode\":\"smoke\","
+            << "\"warmup_iterations\":1,\"measured_iterations\":1,\"query_backend\":\"vulkan_lbvh\",\"reduction_backend\":\"cpu_reference\"},"
+            << "\"status\":\"" << (observed->Done&&!observed->TimedOut&&observed->MaxError<=1e-6&&!::testing::Test::HasFailure()?"passed":"failed") << "\"}\n";
+        EXPECT_TRUE(output.good());
+    }
+    engine.Shutdown();const auto after=Extrinsic::Backends::Vulkan::GetVulkanOperationalDiagnosticsSnapshot();
+    EXPECT_EQ(before.VulkanValidationErrorCount,after.VulkanValidationErrorCount);
 }
