@@ -1,0 +1,29 @@
+{
+  "command": [
+    "env",
+    "ASAN_OPTIONS=detect_leaks=0",
+    "INTRINSIC_DESCRIPTOR_BENCHMARK_OUTPUT=/tmp/fpfh-benchmark/raw/result.json",
+    "ctest",
+    "--test-dir",
+    "build/ci-vulkan",
+    "--output-on-failure",
+    "-R",
+    "^PointLBVHGpuSmoke.Descriptor",
+    "--timeout",
+    "120"
+  ],
+  "command_display": "env ASAN_OPTIONS=detect_leaks=0 INTRINSIC_DESCRIPTOR_BENCHMARK_OUTPUT=/tmp/fpfh-benchmark/raw/result.json ctest --test-dir build/ci-vulkan --output-on-failure -R '^PointLBVHGpuSmoke.Descriptor' --timeout 120",
+  "cwd": ".",
+  "duration_ms": 87202,
+  "exit_code": 0,
+  "finished_at": "2026-09-10T02:45:01Z",
+  "label": "actual-vulkan-corrected",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-09-10T02:43:33Z",
+  "stderr_path": "tasks/evidence/RUNTIME-226/commands/actual-vulkan-corrected.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/RUNTIME-226/commands/actual-vulkan-corrected.stdout.log",
+  "stdout_sha256": "0fb48ee6fee17e2e1a107f7df2bd18288600e2dca9bf37e7cd173a39b5b486f6",
+  "task_id": "RUNTIME-226"
+}

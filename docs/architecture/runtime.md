@@ -923,3 +923,5 @@ ICP uses the existing editor command/job owner with the shared spatial-index cac
 ### Keypoint analysis
 
 [ISS-style keypoint analysis](keypoint-analysis.md) uses the existing geometry operations, spatial cache and jobs. Scale preparation precedes complete radius queries and CPU covariance/suppression; one revision-checked history command publishes both named output properties. Shared private property-watch/domain helpers serve keypoints, outliers and bilateral filtering without a new service or module boundary.
+
+FPFH histogram analysis uses the shared [descriptor config, spatial queries and property publication](descriptor-analysis.md) on compatible position/normal domains.

@@ -1932,3 +1932,265 @@ TEST(PointLBVHGpuSmoke, KeypointRejectsStaleCancellationAndRadiusOverflow)
     engine.Initialize();Shutdown shutdown{engine};engine.Run();ASSERT_TRUE(engine.GetDevice().IsOperational());
     ASSERT_FALSE(run->TimedOut)<<"phase="<<run->Phase;ASSERT_TRUE(run->Done);EXPECT_TRUE(run->Cancelled);
 }
+
+namespace
+{
+    class DescriptorApp final : public Intrinsic::Tests::RuntimeTestModule
+    {
+    public:
+        Geometry::PropertySet& Props(unsigned d)
+        {
+            return *const_cast<Geometry::PropertySet*>(Runtime::ResolveGeometryPropertySet(
+                Runtime::BuildGeometryAvailability(Context.Scene->Raw(),Entities[d-1]),Domain(d)));
+        }
+        Runtime::DescriptorAnalysisConfig Config(unsigned d) const
+        {
+            Runtime::DescriptorAnalysisConfig c;
+            c.StableEntityId=Runtime::SelectionController::ToStableEntityId(Entities[d-1]);
+            c.Positions={Domain(d),"samples",Geometry::PropertyValueKind::Vec3};
+            c.Normals={Domain(d),"directions",Geometry::PropertyValueKind::Vec3};
+            c.Outputs=Runtime::MakeDescriptorOutputProperties(Domain(d),"descriptor");
+            c.FeatureRadius=Phase==2?0:2;c.MaxNeighbors=Phase==2?0:8;
+            c.Backend=Runtime::DescriptorAnalysisBackend::VulkanLBVH;c.GpuQueryBatchSize=128;
+            return c;
+        }
+        void Resolve() override
+        {
+            Started=std::chrono::steady_clock::now();
+            Context.Scene=Kernel().Worlds().Get(Kernel().ActiveWorld());Context.World=Kernel().ActiveWorld();
+            Context.SpatialIndices=Kernel().Services().Find<Runtime::SpatialIndexCache>();
+            std::mt19937 random(241);std::uniform_real_distribution<float> dist(-1,1);
+            std::vector<glm::vec3> points;
+            for(unsigned i=0;i<66;++i){const float x=dist(random),y=dist(random);points.push_back({x,y,.1f*dist(random)});}
+            points[0]={0,0,0};points[1]={1.2f,1.6f,0};points[2]=points[0];
+            points[3]={std::nextafter(2.f,3.f),0,0};points[65]={10,0,0};
+            for(unsigned d=1;d<=8;++d)
+            {
+                auto entity=Context.Scene->Create();Entities.push_back(entity);
+                if(d<=unsigned(Domain::MeshFace))
+                {
+                    Geometry::HalfedgeMesh::Mesh mesh;
+                    auto a=mesh.AddVertex({0,0,0}),b=mesh.AddVertex({1,0,0}),c=mesh.AddVertex({0,1,0});
+                    (void)mesh.AddTriangle(a,b,c);GS::PopulateFromMesh(Context.Scene->Raw(),entity,mesh);
+                }
+                else if(d<unsigned(Domain::PointCloudPoint))
+                {
+                    Geometry::Graph::Graph graph;auto a=graph.AddVertex({0,0,0}),b=graph.AddVertex({1,0,0});
+                    (void)graph.AddEdge(a,b);GS::PopulateFromGraph(Context.Scene->Raw(),entity,graph);
+                }
+                else Context.Scene->Raw().emplace<GS::Vertices>(entity);
+                auto& p=Props(d);p.Resize(points.size());p.GetOrAdd<glm::vec3>("samples").Vector()=points;
+                p.GetOrAdd<float>("keep").Vector().assign(points.size(),42);
+                auto normals=p.GetOrAdd<glm::vec3>("directions");
+                for(std::size_t i=0;i<points.size();++i)normals[i]={.2f*points[i].x,-.1f*points[i].y,1};
+                for(const auto& output:Config(d).Outputs)p.GetOrAdd<float>(output.Name).Vector().assign(points.size(),77);
+                const bool half=d==unsigned(Domain::MeshHalfedge)||d==unsigned(Domain::GraphHalfedge);
+                if(half)
+                {
+                    auto& edges=Context.Scene->Raw().get<GS::Edges>(entity).Properties;
+                    edges.Resize(points.size()/2);edges.GetOrAdd<bool>("e:deleted")[2]=true;
+                }
+                else p.GetOrAdd<bool>(d==unsigned(Domain::MeshFace)?"f:deleted":
+                    (d==unsigned(Domain::MeshEdge)||d==unsigned(Domain::GraphEdge))?"e:deleted":"v:deleted")[4]=true;
+                p.Get<glm::vec3>("samples")[4]={std::numeric_limits<float>::quiet_NaN(),0,0};
+            }
+            Context.MethodResultSinks.DescriptorAnalysis=[this](auto result){Results.push_back(std::move(result));};
+        }
+        void Frame(double,double) override
+        {
+            if(std::chrono::steady_clock::now()-Started>std::chrono::seconds(95))
+            {ADD_FAILURE()<<"Descriptor timeout: phase="<<Phase<<" results="<<Results.size();TimedOut=true;Kernel().RequestExit();return;}
+            if(!Kernel().GetDevice().IsOperational())
+            {if(++ColdFrames>4){TimedOut=true;Kernel().RequestExit();}return;}
+            if(Submitted)
+            {
+                if(Phase==4 && !Cancelled && Kernel().Jobs().GetState(ScaleToken)==Runtime::JobState::AwaitingApply)
+                {EXPECT_TRUE(Kernel().Jobs().Cancel(ScaleToken));Cancelled=true;}
+                if(Phase==4)(void)Kernel().Jobs().ReapCompleted();
+                if(Results.size()<(Phase<3?8:1))return;
+                // Partial submission must settle accepted jobs. A successful
+                // chain's parents may already be reaped when its result arrives.
+                if(Phase==6 || Phase==7)
+                    for(auto token:SubmissionTokens)
+                        if(!Kernel().Jobs().IsComplete(token))return;
+                if(Phase==8)
+                {
+                    ASSERT_TRUE(Results.back().Succeeded())<<Results.back().Message;
+                    EXPECT_EQ(Results.back().ActualBackend,"vulkan_lbvh");EXPECT_GT(Results.back().MaximumNeighbors,1024);
+                    for(unsigned b=0;b<33;++b)
+                    {
+                        const auto values=std::as_const(Props(8)).Get<float>(Config(8).Outputs[b].Name);
+                        for(std::size_t i=0;i<values.Size();++i)EXPECT_NEAR(values[i],DenseReference[b][i],1e-5);
+                    }
+                    EXPECT_EQ(History.UndoCount(),1);EXPECT_TRUE(History.Undo().Succeeded());
+                    for(const auto& output:Config(8).Outputs)EXPECT_EQ(std::as_const(Props(8)).Get<float>(output.Name)[0],77);
+                    EXPECT_TRUE(History.Redo().Succeeded());Done=true;Kernel().RequestExit();return;
+                }
+                if(Phase<3)
+                {
+                    PhaseMs.push_back(std::chrono::duration<double,std::milli>(std::chrono::steady_clock::now()-PhaseStarted).count());
+                    for(const auto& result:Results)
+                    {
+                        EXPECT_TRUE(result.Succeeded())<<result.Message;EXPECT_EQ(result.ActualBackend,"vulkan_lbvh");
+                        EXPECT_GT(result.GpuQueryBatches,0);if(Phase>0)EXPECT_TRUE(result.IndexReused);
+                        const auto& reference=ReferenceResults[unsigned(result.Outputs[0].Domain)-1];
+                        EXPECT_EQ(result.WrittenCount,reference.WrittenCount);
+                        EXPECT_FLOAT_EQ(result.Scale.MeanSpacing,reference.Scale.MeanSpacing);
+                        EXPECT_FLOAT_EQ(result.Scale.FeatureRadius,reference.Scale.FeatureRadius);
+                    }
+                    for(unsigned d=1;d<=8;++d)
+                    {
+                        const auto& p=std::as_const(Props(d));
+                        for(unsigned b=0;b<33;++b)
+                        {
+                            const auto values=p.Get<float>(Config(d).Outputs[b].Name);
+                            for(std::size_t i=0;i<values.Size();++i)
+                            {
+                                const double error=std::abs(double(values[i])-ReferenceColumns[d-1][b][i]);
+                                MaxError=std::isfinite(error)?std::max(MaxError,error):std::numeric_limits<double>::infinity();
+                            }
+                            EXPECT_EQ(values[4],77);
+                            if(d==unsigned(Domain::MeshHalfedge)||d==unsigned(Domain::GraphHalfedge))EXPECT_EQ(values[5],77);
+                        }
+                        EXPECT_EQ(p.Get<float>("keep")[0],42);
+                    }
+                    EXPECT_LE(MaxError,1e-5);EXPECT_EQ(History.UndoCount(),8);
+                    for(unsigned i=0;i<8;++i)EXPECT_EQ(History.Undo().Status,Runtime::EditorCommandHistoryStatus::Undone);
+                    for(unsigned d=1;d<=8;++d)
+                        for(const auto& output:Config(d).Outputs)EXPECT_EQ(std::as_const(Props(d)).Get<float>(output.Name)[0],77);
+                    for(unsigned i=0;i<8;++i)EXPECT_EQ(History.Redo().Status,Runtime::EditorCommandHistoryStatus::Redone);
+                    if(Phase==2){Done=true;Kernel().RequestExit();return;}
+                }
+                else
+                {
+                    EXPECT_FALSE(Results.back().Succeeded())<<Results.back().Message;
+                    for(const auto& output:Config(8).Outputs)EXPECT_EQ(std::as_const(Props(8)).Get<float>(output.Name)[0],77);
+                    EXPECT_EQ(History.UndoCount(),0);
+                    if(Phase==4)EXPECT_TRUE(Cancelled);
+                    if(Phase>=6)
+                    {
+                        EXPECT_EQ(Results.back().Status,Runtime::EditorCommandStatus::GeometryProcessingFailed);
+                        EXPECT_NE(Results.back().Message.find("submission rejected"),std::string::npos);
+                        if(Phase==7){Done=true;Kernel().RequestExit();return;}
+                    }
+                    if(Phase==5)
+                    {
+                        EXPECT_EQ(Results.back().Status,Runtime::EditorCommandStatus::GeometryProcessingFailed);
+                        EXPECT_NE(Results.back().Message.find("overflow"),std::string::npos);
+                        EXPECT_GT(Results.back().MaximumNeighbors,1024);EXPECT_GT(Results.back().GpuQueryBatches,0);
+                    }
+                }
+                Results.clear();Submitted=false;++Phase;
+            }
+            History.ClearHistory();Context.JobCommands={};Context.CommandHistory=nullptr;
+            if(Phase<3)
+            {
+                ReferenceColumns.clear();ReferenceResults.clear();const auto cpuStart=std::chrono::steady_clock::now();
+                for(unsigned d=1;d<=8;++d)
+                {
+                    auto c=Config(d);c.Backend=Runtime::DescriptorAnalysisBackend::CpuKDTree;
+                    const auto result=Runtime::ApplyEditorDescriptorAnalysisCommand(Context,c);ASSERT_TRUE(result.Succeeded())<<result.Message;
+                    ReferenceResults.push_back(result);std::array<std::vector<float>,33> columns;
+                    for(unsigned b=0;b<33;++b)
+                    {
+                        columns[b]=std::as_const(Props(d)).Get<float>(c.Outputs[b].Name).Vector();
+                        Props(d).Get<float>(c.Outputs[b].Name).Vector().assign(66,77);
+                    }
+                    ReferenceColumns.push_back(std::move(columns));
+                }
+                CpuMs.push_back(std::chrono::duration<double,std::milli>(std::chrono::steady_clock::now()-cpuStart).count());
+            }
+            SubmissionCount=0;SubmissionTokens.clear();
+            Context.JobCommands.Submit=[this](Runtime::JobDesc desc,Runtime::EditorJobIdentity)
+            {
+                ++SubmissionCount;
+                if((Phase==6 && SubmissionCount==2) || (Phase==7 && SubmissionCount==3))return Runtime::JobToken{};
+                const bool scale=Phase==4 && desc.DebugName=="Descriptor scale";
+                if(scale)desc.IsReadyToApply=[] {return false;};
+                const auto token=Kernel().Jobs().Submit(std::move(desc));SubmissionTokens.push_back(token);if(scale)ScaleToken=token;return token;
+            };
+            Context.CommandHistory=&History;Submitted=true;PhaseStarted=std::chrono::steady_clock::now();
+            if(Phase<3)
+                for(unsigned d=1;d<=8;++d)
+                {const auto r=Runtime::ApplyEditorDescriptorAnalysisCommand(Context,Config(d));if(r.Status!=Runtime::EditorCommandStatus::Pending)Results.push_back(r);}
+            else
+            {
+                auto c=Config(8);auto& p=Props(8);
+                if(Phase==5)
+                {
+                    p.Resize(1030);p.Get<glm::vec3>("samples").Vector().assign(1030,glm::vec3(0));
+                    p.Get<glm::vec3>("samples")[1029]={10,0,0};c.GpuRadiusCapacity=1024;c.MaxNeighbors=0;
+                    p.Get<glm::vec3>("directions").Vector().assign(1030,glm::vec3(0,0,1));
+                }
+                if(Phase==8)
+                {
+                    p.Resize(1030);auto positions=p.Get<glm::vec3>("samples"),normals=p.Get<glm::vec3>("directions");
+                    for(unsigned i=0;i<1030;++i)
+                    {positions[i]={.001f*float(i%31),.001f*float(i/31),.0001f*float(i%7)};normals[i]={.01f*float(i%13),.01f*float(i%17),1};}
+                    positions[1029]={10,0,0};c.MaxNeighbors=1;c.GpuRadiusCapacity=1;
+                    auto referenceContext=Context;referenceContext.JobCommands={};referenceContext.CommandHistory=nullptr;
+                    auto referenceConfig=c;referenceConfig.Backend=Runtime::DescriptorAnalysisBackend::CpuKDTree;
+                    const auto reference=Runtime::ApplyEditorDescriptorAnalysisCommand(referenceContext,referenceConfig);ASSERT_TRUE(reference.Succeeded())<<reference.Message;
+                    for(unsigned b=0;b<33;++b)DenseReference[b]=std::as_const(p).Get<float>(c.Outputs[b].Name).Vector();
+                    EXPECT_GT(DenseReference[5][0],0);
+                }
+                for(const auto& output:c.Outputs)p.Get<float>(output.Name).Vector().assign(p.Size(),77);
+                const auto r=Runtime::ApplyEditorDescriptorAnalysisCommand(Context,c);if(r.Status!=Runtime::EditorCommandStatus::Pending)Results.push_back(r);
+                if(Phase==3)p.Get<glm::vec3>("directions")[0]+=.1f;
+            }
+        }
+        void Shutdown() override {Context={};}
+        Runtime::EditorGeometryProcessingContext Context{};Runtime::EditorCommandHistory History{};
+        std::vector<entt::entity> Entities;
+        std::vector<std::array<std::vector<float>,33>> ReferenceColumns;
+        std::array<std::vector<float>,33> DenseReference;
+        std::vector<Runtime::EditorDescriptorAnalysisResult> Results,ReferenceResults;
+        std::vector<double> PhaseMs,CpuMs;
+        std::chrono::steady_clock::time_point Started{},PhaseStarted{};
+        Runtime::JobToken ScaleToken{};std::vector<Runtime::JobToken> SubmissionTokens;unsigned Phase{},ColdFrames{},SubmissionCount{};
+        bool Submitted{},Done{},TimedOut{},Cancelled{};double MaxError{};
+    };
+}
+TEST(PointLBVHGpuSmoke, DescriptorPublishesAcrossDomainsWithCompleteSupport)
+{
+    if(!Extrinsic::Platform::Backends::Glfw::CanInitialize())GTEST_SKIP()<<"GLFW unavailable";
+    auto config=Runtime::CreateReferenceEngineConfig();config.Window.Width=64;config.Window.Height=64;
+    config.Render.EnableValidation=true;config.Render.EnableVSync=false;config.ReferenceScene.Enabled=false;
+    auto app=std::make_unique<DescriptorApp>();auto* run=app.get();
+    Intrinsic::Tests::RuntimeTestKernel engine(config,std::move(app));engine.EmplaceModule<Runtime::SpatialIndexCache>();
+    engine.Initialize();Shutdown shutdown{engine};engine.Run();ASSERT_TRUE(engine.GetDevice().IsOperational());
+    ASSERT_FALSE(run->TimedOut)<<"phase="<<run->Phase;ASSERT_TRUE(run->Done);ASSERT_EQ(run->PhaseMs.size(),3);
+    EXPECT_LE(run->MaxError,1e-5);
+    if(const auto* output=std::getenv("INTRINSIC_DESCRIPTOR_BENCHMARK_OUTPUT"))
+    {
+        nlohmann::json json{{"benchmark_id","geometry.point_lbvh.descriptor_runtime_smoke"},{"method","geometry.point_lbvh"},
+            {"backend","gpu_vulkan_compute"},{"dataset","builtin.descriptor_samples.eight_domains.seed241"},{"commit","local-dev"},
+            {"metrics",{{"runtime_ms",run->PhaseMs[1]},{"quality_error_linf",run->MaxError}}},
+            {"diagnostics",{{"runner","IntrinsicPointLBVHGpuTests"},{"mode","smoke"},{"cpu_reference_total_ms",run->CpuMs[1]},
+                {"vulkan_cold_total_ms",run->PhaseMs[0]},{"vulkan_warm_total_ms",run->PhaseMs[1]},
+                {"vulkan_automatic_radius_total_ms",run->PhaseMs[2]},{"warmup_iterations",1},{"measured_iterations",1},
+                {"cpu_scale_spfh_fpfh",true}}},{"status",::testing::Test::HasFailure()?"failed":"passed"}};
+        std::ofstream stream(output);ASSERT_TRUE(stream.good());stream<<json.dump(2)<<'\n';ASSERT_TRUE(stream.good());
+    }
+}
+TEST(PointLBVHGpuSmoke, DescriptorRejectsStaleCancellationAndRadiusOverflow)
+{
+    if(!Extrinsic::Platform::Backends::Glfw::CanInitialize())GTEST_SKIP()<<"GLFW unavailable";
+    auto config=Runtime::CreateReferenceEngineConfig();config.Window.Width=64;config.Window.Height=64;
+    config.Render.EnableValidation=true;config.Render.EnableVSync=false;config.ReferenceScene.Enabled=false;
+    auto app=std::make_unique<DescriptorApp>();auto* run=app.get();run->Phase=3;
+    Intrinsic::Tests::RuntimeTestKernel engine(config,std::move(app));engine.EmplaceModule<Runtime::SpatialIndexCache>();
+    engine.Initialize();Shutdown shutdown{engine};engine.Run();ASSERT_TRUE(engine.GetDevice().IsOperational());
+    ASSERT_FALSE(run->TimedOut)<<"phase="<<run->Phase;ASSERT_TRUE(run->Done);EXPECT_TRUE(run->Cancelled);
+}
+
+TEST(PointLBVHGpuSmoke, DescriptorLowestIdCapSupportsDenseRadius)
+{
+    if(!Extrinsic::Platform::Backends::Glfw::CanInitialize())GTEST_SKIP()<<"GLFW unavailable";
+    auto config=Runtime::CreateReferenceEngineConfig();config.Window.Width=64;config.Window.Height=64;
+    config.Render.EnableValidation=true;config.Render.EnableVSync=false;config.ReferenceScene.Enabled=false;
+    auto app=std::make_unique<DescriptorApp>();auto* run=app.get();run->Phase=8;
+    Intrinsic::Tests::RuntimeTestKernel engine(config,std::move(app));engine.EmplaceModule<Runtime::SpatialIndexCache>();
+    engine.Initialize();Shutdown shutdown{engine};engine.Run();ASSERT_TRUE(engine.GetDevice().IsOperational());
+    ASSERT_FALSE(run->TimedOut)<<"phase="<<run->Phase;ASSERT_TRUE(run->Done);
+}

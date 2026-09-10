@@ -1,0 +1,26 @@
+{
+  "command": [
+    "env",
+    "CCACHE_DISABLE=1",
+    "cmake",
+    "--build",
+    "--preset",
+    "ci",
+    "--target",
+    "IntrinsicPointLBVHGpuTests"
+  ],
+  "command_display": "env CCACHE_DISABLE=1 cmake --build --preset ci --target IntrinsicPointLBVHGpuTests",
+  "cwd": ".",
+  "duration_ms": 41727,
+  "exit_code": 0,
+  "finished_at": "2026-09-10T02:42:10Z",
+  "label": "build-ci-harness",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-09-10T02:41:28Z",
+  "stderr_path": "tasks/evidence/RUNTIME-226/commands/build-ci-harness.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/RUNTIME-226/commands/build-ci-harness.stdout.log",
+  "stdout_sha256": "f81c4cdbe4f7cf2a2426244432ec842fa5f5277304ba68b38ce953eec470308b",
+  "task_id": "RUNTIME-226"
+}

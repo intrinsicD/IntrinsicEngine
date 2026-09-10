@@ -1,0 +1,26 @@
+{
+  "command": [
+    "ctest",
+    "--test-dir",
+    "build/ci",
+    "--output-on-failure",
+    "-R",
+    "^(DescriptorAnalysis(Config|Operations)?|KeypointAnalysis(Config|Operations)?|PointCloudFeatures)\\.",
+    "--timeout",
+    "60"
+  ],
+  "command_display": "ctest --test-dir build/ci --output-on-failure -R '^(DescriptorAnalysis(Config|Operations)?|KeypointAnalysis(Config|Operations)?|PointCloudFeatures)\\.' --timeout 60",
+  "cwd": ".",
+  "duration_ms": 1703,
+  "exit_code": 0,
+  "finished_at": "2026-09-10T02:13:25Z",
+  "label": "runtime-focused",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-09-10T02:13:23Z",
+  "stderr_path": "tasks/evidence/RUNTIME-226/commands/runtime-focused.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/RUNTIME-226/commands/runtime-focused.stdout.log",
+  "stdout_sha256": "5f0a87ebf0e49236e6e0b45dd46db03f263554e447b5ec31133554fde0d892a6",
+  "task_id": "RUNTIME-226"
+}

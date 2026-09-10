@@ -2427,6 +2427,47 @@ namespace Extrinsic::Runtime
             return std::nullopt;
         return GetKeypointAnalysisConfig(context.EngineConfigControlState->ActiveConfig);
     }
+    RuntimeEngineConfigApplyResult ApplyEditorDescriptorAnalysisConfig(
+        const EditorGeometryProcessingContext& context, const DescriptorAnalysisConfig& config,
+        std::string sourceId)
+    {
+        RuntimeEngineConfigApplyResult result{
+            .Status = RuntimeEngineConfigApplyStatus::Rejected,
+            .Source = RuntimeConfigControlSource::Editor,
+        };
+        const auto validation = ValidateDescriptorAnalysisConfigSection(
+            SerializeDescriptorAnalysisConfig(config), {}, kDescriptorAnalysisConfigSectionName);
+        if (!validation.Usable())
+        {
+            result.LoadResult.Diagnostics = validation.Diagnostics;
+            return result;
+        }
+        if (context.EngineConfigControlState == nullptr || !context.PreviewEngineConfigDocument ||
+            !context.ApplyEngineConfigHotSubset || !context.EngineConfigCommandsAvailable)
+        {
+            return result;
+        }
+
+        Core::Config::EngineConfig candidate = context.EngineConfigControlState->ActiveConfig;
+        SetDescriptorAnalysisConfig(candidate, config);
+        if (sourceId.empty())
+        {
+            sourceId = std::string{kDescriptorAnalysisConfigSectionName};
+        }
+        result.LoadResult = context.PreviewEngineConfigDocument(
+            Core::Config::SerializeEngineConfig(candidate), sourceId);
+        if (!Core::Config::IsConfigUsable(result.LoadResult))
+            return result;
+        return context.ApplyEngineConfigHotSubset(result.LoadResult);
+    }
+
+    std::optional<DescriptorAnalysisConfig> GetEditorDescriptorAnalysisConfig(
+        const EditorGeometryProcessingContext& context)
+    {
+        if (context.EngineConfigControlState == nullptr)
+            return std::nullopt;
+        return GetDescriptorAnalysisConfig(context.EngineConfigControlState->ActiveConfig);
+    }
 
 
 }

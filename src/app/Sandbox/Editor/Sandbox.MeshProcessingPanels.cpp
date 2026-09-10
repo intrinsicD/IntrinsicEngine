@@ -375,6 +375,14 @@ namespace Extrinsic::Sandbox::Editor
             Runtime::KeypointAnalysisConfig Draft{};
             std::string LastApplied{}, ConfigDiagnostic{}, VisualizationDiagnostic{};
         };
+        struct DescriptorsState
+        {
+            std::optional<Runtime::EditorDescriptorAnalysisResult> LastResult{};
+            Runtime::DescriptorAnalysisConfig Draft{};
+            std::string LastApplied{}, ConfigDiagnostic{}, VisualizationDiagnostic{};
+            std::array<char,256> Prefix{"fpfh"};
+            int DisplayBin{};
+        };
         struct DensityState
         {
             std::optional<Runtime::EditorKernelDensityResult> LastResult{};
@@ -431,6 +439,7 @@ namespace Extrinsic::Sandbox::Editor
         NormalsState Normals{};
         OutliersState Outliers{};
         KeypointsState Keypoints{};
+        DescriptorsState Descriptors{};
         DensityState Density{};
         SpacingState Spacing{};
         BilateralState Bilateral{};
@@ -465,6 +474,7 @@ namespace Extrinsic::Sandbox::Editor
         void DrawNormalsWindow(bool&, const SandboxEditorContext&);
         void DrawOutliersWindow(bool&, const SandboxEditorContext&);
         void DrawKeypointsWindow(bool&, const SandboxEditorContext&);
+        void DrawDescriptorsWindow(bool&, const SandboxEditorContext&);
         void DrawDensityWindow(bool&, const SandboxEditorContext&);
         void DrawSpacingWindow(bool&, const SandboxEditorContext&);
         void DrawBilateralWindow(bool&, const SandboxEditorContext&);
@@ -529,6 +539,18 @@ namespace Extrinsic::Sandbox::Editor
                 .OpenStateChanged=[this,id](bool open){
                     if(!open)return;
                     (void)Shell->SetEditorWindowOpen("view.keypoint_analysis",true);
+                    (void)Shell->SetEditorWindowOpen(id,false);
+                }}));
+        RegisterWindow("view.descriptor_analysis", {"View"}, "FPFH Descriptor Analysis", &Impl::DrawDescriptorsWindow);
+        for (const auto& [id, domain] : std::array<std::pair<const char*, const char*>, 3>{
+                 {{"mesh.processing.descriptors", "Mesh"}, {"graph.processing.descriptors", "Graph"},
+                  {"pointcloud.processing.descriptors", "PointCloud"}}})
+            Handles.push_back(Shell->RegisterEditorWindow({
+                .Id=id, .MenuPath={domain,"Processing"}, .Title="FPFH Descriptor Analysis",
+                .Draw=[](bool& open,const SandboxEditorContext&){open=false;},
+                .OpenStateChanged=[this,id](bool open){
+                    if(!open)return;
+                    (void)Shell->SetEditorWindowOpen("view.descriptor_analysis",true);
                     (void)Shell->SetEditorWindowOpen(id,false);
                 }}));
         RegisterWindow("view.kernel_density", {"View"}, "Kernel Density", &Impl::DrawDensityWindow);
@@ -635,6 +657,7 @@ namespace Extrinsic::Sandbox::Editor
         Normals = {};
         Outliers = {};
         Keypoints = {};
+        Descriptors = {};
         Density = {};
         Spacing = {};
         Bilateral = {};
@@ -2595,6 +2618,168 @@ namespace Extrinsic::Sandbox::Editor
             ImGui::Text("GPU batches: %zu; largest indexed support: %zu",result.GpuQueryBatches,result.MaximumNeighbors);
             ImGui::TextWrapped("%s",result.Message.c_str());
             DrawDismissLastResultButton("Dismiss##Keypoints",Keypoints.LastResult,Runtime::EditorGeometryProcessingResultSlot::KeypointAnalysis,context);
+        }
+        ImGui::End();
+    }
+
+    void MeshProcessingPanels::Impl::DrawDescriptorsWindow(bool &open, const SandboxEditorContext &context)
+    {
+        if (context.GeometryResults.LastDescriptorAnalysisResult)
+            Descriptors.LastResult = context.GeometryResults.LastDescriptorAnalysisResult;
+        ImGui::SetNextWindowSize(ImVec2(460, 600), ImGuiCond_FirstUseEver);
+        if (!ImGui::Begin("FPFH Descriptor Analysis", &open))
+        {
+            ImGui::End();
+            return;
+        }
+        const auto active = Runtime::GetEditorDescriptorAnalysisConfig(context.GeometryCommands)
+                                .value_or(Runtime::DescriptorAnalysisConfig{});
+        const auto serialized = Runtime::SerializeDescriptorAnalysisConfig(active);
+        if (serialized != Descriptors.LastApplied)
+        {
+            Descriptors.Draft = active;
+            Descriptors.LastApplied = serialized;
+            Descriptors.ConfigDiagnostic.clear();
+        }
+        auto &config = Descriptors.Draft;
+        bool changed = false;
+        const auto workspace =
+            Runtime::BuildEditorWorkspaceSnapshot(context.SnapshotQueries, {.Hierarchy = true,
+                                                                            .Inspector = false,
+                                                                            .Selection = false,
+                                                                            .Document = false,
+                                                                            .SceneFile = false,
+                                                                            .FileImport = false,
+                                                                            .AssetImportQueue = false,
+                                                                            .RenderGraph = false,
+                                                                            .RenderRecipe = false,
+                                                                            .CameraRender = false,
+                                                                            .Visualization = false});
+        if (context.Selection && !context.Selection->SelectedStableIds.empty() &&
+            ImGui::Button("Use selected entity"))
+        {
+            config.StableEntityId = context.Selection->SelectedStableIds.front();
+            changed = true;
+        }
+        std::string entityName =
+            config.StableEntityId ? std::to_string(config.StableEntityId) : "Choose entity";
+        for (const auto &row : workspace.Hierarchy)
+            if (row.StableEntityId == config.StableEntityId)
+                entityName = row.Name;
+        if (ImGui::BeginCombo("Entity##Descriptors", entityName.c_str()))
+        {
+            for (const auto &row : workspace.Hierarchy)
+            {
+                if (Runtime::GetEditorDescriptorAnalysisInputCatalog(context.GeometryCommands,
+                                                                   row.StableEntityId)
+                        .Entries.empty())
+                    continue;
+                const auto title = row.Name + " (" + std::to_string(row.StableEntityId) + ")";
+                if (ImGui::Selectable(title.c_str(), row.StableEntityId == config.StableEntityId))
+                {
+                    config.StableEntityId = row.StableEntityId;
+                    changed = true;
+                }
+            }
+            ImGui::EndCombo();
+        }
+        const auto inputName =
+            std::string(Runtime::ToString(config.Positions.Domain)) + ": " + config.Positions.Name;
+        if (ImGui::BeginCombo("Positions##Descriptors", inputName.c_str()))
+        {
+            const auto catalog = Runtime::GetEditorDescriptorAnalysisInputCatalog(context.GeometryCommands, config.StableEntityId);
+            auto previousDomain = Runtime::GeometryElementDomain::Unknown;
+            for (const auto &row : catalog.Entries)
+            {
+                if (row.Ref.Domain != previousDomain)
+                {
+                    ImGui::SeparatorText(std::string(Runtime::ToString(row.Ref.Domain)).c_str());
+                    previousDomain = row.Ref.Domain;
+                }
+                const auto label = std::string(Runtime::ToString(row.Ref.Domain)) + ": " + row.Ref.Name +
+                                   " (" + std::to_string(row.ElementCount) + ")";
+                if (ImGui::Selectable(label.c_str(), row.Ref == config.Positions))
+                {
+                    config.Positions = row.Ref;
+                    config.Normals.Domain=row.Ref.Domain;
+                    for(auto& output:config.Outputs)output.Domain=row.Ref.Domain;
+                    changed = true;
+                }
+            }
+            ImGui::EndCombo();
+        }
+        if(ImGui::BeginCombo("Normals##Descriptors",config.Normals.Name.c_str()))
+        {
+            const auto catalog=Runtime::GetEditorDescriptorAnalysisInputCatalog(context.GeometryCommands,config.StableEntityId);
+            for(const auto& row:catalog.Entries)
+                if(row.Ref.Domain==config.Positions.Domain && ImGui::Selectable(row.Ref.Name.c_str(),row.Ref==config.Normals))
+                {config.Normals=row.Ref;changed=true;}
+            ImGui::EndCombo();
+        }
+        if(ImGui::TreeNode("Histogram output properties"))
+        {
+            ImGui::InputText("Output prefix",Descriptors.Prefix.data(),Descriptors.Prefix.size());
+            if(ImGui::Button("Name all 33 bins"))
+            {config.Outputs=Runtime::MakeDescriptorOutputProperties(config.Positions.Domain,Descriptors.Prefix.data());changed=true;}
+            constexpr std::array blocks{"alpha","phi","theta"};
+            for(unsigned i=0;i<33;++i)
+            {
+                std::array<char,512> name{};const auto& current=config.Outputs[i].Name;
+                std::copy_n(current.c_str(),std::min(current.size(),name.size()-1),name.data());
+                const auto label=std::string(blocks[i/11])+" bin "+std::to_string(i%11);
+                if(ImGui::InputText(label.c_str(),name.data(),name.size())){config.Outputs[i].Name=name.data();changed=true;}
+            }
+            ImGui::TreePop();
+        }
+        int backend=int(config.Backend);
+        if(ImGui::Combo("Neighbors",&backend,"CPU KD-tree\0CPU LBVH (cached)\0Vulkan LBVH\0")) {config.Backend=Runtime::DescriptorAnalysisBackend(backend);changed=true;}
+        changed |= ImGui::InputFloat("Feature radius (0 = automatic)",&config.FeatureRadius);
+        changed |= ImGui::InputScalar("Maximum neighbors (0 = all)",ImGuiDataType_U32,&config.MaxNeighbors);
+        ImGui::TextWrapped("FPFH uses three eleven-bin histograms and nonzero normals. Automatic radius is five times mean nearest-neighbor spacing. A neighbor cap keeps the lowest source IDs within the radius.");
+        if(config.Backend==Runtime::DescriptorAnalysisBackend::VulkanLBVH)
+        {
+            changed |= ImGui::InputScalar("GPU query batch size",ImGuiDataType_U32,&config.GpuQueryBatchSize);
+            changed |= ImGui::InputScalar("Radius result capacity",ImGuiDataType_U32,&config.GpuRadiusCapacity);
+            ImGui::TextWrapped("Uncapped radius support must fit the selected capacity (up to 1024). A neighbor cap within that capacity can use the exact lowest-ID prefix even in denser neighborhoods. Scale, SPFH and FPFH run on CPU.");
+        }
+        if(changed)
+        {
+            const auto applied=Runtime::ApplyEditorDescriptorAnalysisConfig(context.GeometryCommands,config);
+            Descriptors.ConfigDiagnostic=applied.Succeeded()?"":"Controls were rejected by descriptor config validation.";
+        }
+        if(!Descriptors.ConfigDiagnostic.empty())ImGui::TextWrapped("%s",Descriptors.ConfigDiagnostic.c_str());
+        auto analyze=config;
+        const auto readiness=Runtime::PreviewEditorDescriptorAnalysisCommand(context.GeometryCommands,analyze);
+        if(!readiness.Ready)ImGui::TextWrapped("%s",readiness.Diagnostic.c_str());
+        const auto execute=[&](Runtime::DescriptorAnalysisConfig request){
+            const auto applied=Runtime::ApplyEditorDescriptorAnalysisConfig(context.GeometryCommands,request);
+            if(applied.Succeeded())
+                PublishCommandResult(Descriptors.LastResult,Runtime::ApplyEditorConfiguredDescriptorAnalysis(context.GeometryCommands),context.MethodResultSinks.DescriptorAnalysis);
+            else Descriptors.ConfigDiagnostic="Descriptor config was rejected.";
+        };
+        ImGui::BeginDisabled(!context.GeometryConfigCommandsAvailable || !readiness.Ready || !Descriptors.ConfigDiagnostic.empty());
+        if(ImGui::Button("Compute FPFH descriptors"))execute(analyze);
+        ImGui::EndDisabled();
+        ImGui::TextWrapped("Writes 33 named float histogram properties in one undoable operation. Each nonempty eleven-bin block sums to 100.");
+        ImGui::SliderInt("Display histogram bin",&Descriptors.DisplayBin,0,32);
+        const auto score=readiness.Ready?readiness.Resolved.Outputs[Descriptors.DisplayBin]:config.Outputs[Descriptors.DisplayBin];
+        ImGui::Text("Property: %s",score.Name.c_str());
+        if(ImGui::Button("Show histogram bin"))
+            Descriptors.VisualizationDiagnostic=Runtime::DebugNameForEditorCommandStatus(Runtime::ApplyEditorVisualizationRecipeCommand(
+                context.VisualizationCommands,{.StableEntityId=config.StableEntityId,
+                .Recipe={.Data=Runtime::ScalarVisualizationRecipe{.Source=score,.OutputName=score.Name+".colors"}}}));
+        if(!Descriptors.VisualizationDiagnostic.empty())ImGui::Text("Display: %s",Descriptors.VisualizationDiagnostic.c_str());
+        if(Descriptors.LastResult)
+        {
+            const auto& result=*Descriptors.LastResult;
+            ImGui::Separator();
+            ImGui::Text("Status: %s",Runtime::DebugNameForEditorCommandStatus(result.Status));
+            ImGui::Text("Requested: %s; ran: %s",Runtime::ToString(result.RequestedBackend),result.ActualBackend.c_str());
+            ImGui::Text("Live / total: %zu / %zu; rows written: %zu",result.LiveCount,result.SlotCount,result.WrittenCount);
+            ImGui::Text("Spacing: %.5g; feature radius: %.5g",double(result.Scale.MeanSpacing),double(result.Scale.FeatureRadius));
+            ImGui::Text("GPU batches: %zu; largest indexed support: %zu",result.GpuQueryBatches,result.MaximumNeighbors);
+            ImGui::TextWrapped("%s",result.Message.c_str());
+            DrawDismissLastResultButton("Dismiss##Descriptors",Descriptors.LastResult,Runtime::EditorGeometryProcessingResultSlot::DescriptorAnalysis,context);
         }
         ImGui::End();
     }

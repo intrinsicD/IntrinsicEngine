@@ -2,6 +2,8 @@
 // publication diagnostics shared by editor, config, and programmatic callers.
 module;
 
+
+#include <array>
 #include <cstddef>
 #include <cstdint>
 #include <functional>
@@ -42,6 +44,7 @@ export import Extrinsic.Runtime.KernelDensityConfig;
 export import Extrinsic.Runtime.PointSpacingConfig;
 export import Extrinsic.Runtime.BilateralFilterConfig;
 export import Extrinsic.Runtime.KeypointAnalysisConfig;
+export import Extrinsic.Runtime.DescriptorAnalysisConfig;
 import Extrinsic.Runtime.SpatialIndexCache;
 export import Geometry.Geodesic;
 export import Extrinsic.Runtime.PointCloudConsolidationConfig;
@@ -922,6 +925,26 @@ export namespace Extrinsic::Runtime
         std::string Diagnostic{};
         KeypointAnalysisConfig Resolved{};
     };
+    struct EditorDescriptorAnalysisResult
+    {
+        EditorCommandStatus Status{EditorCommandStatus::NoChange};
+        DescriptorAnalysisBackend RequestedBackend{DescriptorAnalysisBackend::CpuKDTree};
+        std::array<GeometryPropertyRef,33> Outputs{};
+        std::string ActualBackend{}, Message{};
+        std::size_t SlotCount{}, LiveCount{}, WrittenCount{};
+        Geometry::PointCloud::Features::DescriptorScale Scale{};
+        std::size_t MaximumNeighbors{};
+        bool IndexReused{};
+        std::size_t GpuQueryBatches{};
+        double GpuNeighborhoodMilliseconds{}, CpuComputeMilliseconds{};
+        [[nodiscard]] bool Succeeded() const noexcept { return Status==EditorCommandStatus::Applied || Status==EditorCommandStatus::NoChange; }
+    };
+    struct EditorDescriptorAnalysisReadiness
+    {
+        bool Ready{};
+        std::string Diagnostic{};
+        DescriptorAnalysisConfig Resolved{};
+    };
     struct EditorKernelDensityResult
     {
         EditorCommandStatus Status{EditorCommandStatus::NoChange};
@@ -1076,6 +1099,7 @@ export namespace Extrinsic::Runtime
         PointSpacing,
         BilateralFilter,
         KeypointAnalysis,
+        DescriptorAnalysis,
     };
 
     struct EditorMethodResultSinks
@@ -1100,6 +1124,7 @@ export namespace Extrinsic::Runtime
         std::function<void(EditorPointSpacingResult)> PointSpacing{};
         std::function<void(EditorBilateralFilterResult)> BilateralFilter{};
         std::function<void(EditorKeypointAnalysisResult)> KeypointAnalysis{};
+        std::function<void(EditorDescriptorAnalysisResult)> DescriptorAnalysis{};
     };
 
     struct EditorGeometryProcessingModel
@@ -1235,6 +1260,7 @@ export namespace Extrinsic::Runtime
         const EditorPointSpacingResult* LastPointSpacingResult{nullptr};
         const EditorBilateralFilterResult* LastBilateralFilterResult{nullptr};
         const EditorKeypointAnalysisResult* LastKeypointAnalysisResult{nullptr};
+        const EditorDescriptorAnalysisResult* LastDescriptorAnalysisResult{nullptr};
         const RuntimeEngineConfigControlState* EngineConfigControlState{nullptr};
         std::function<Core::Config::EngineConfigLoadResult(const std::string&, const std::string&)>
             PreviewEngineConfigDocument{};
@@ -1696,6 +1722,7 @@ export namespace Extrinsic::Runtime
         std::optional<EditorPointSpacingResult> LastPointSpacingResult{};
         std::optional<EditorBilateralFilterResult> LastBilateralFilterResult{};
         std::optional<EditorKeypointAnalysisResult> LastKeypointAnalysisResult{};
+        std::optional<EditorDescriptorAnalysisResult> LastDescriptorAnalysisResult{};
     };
 
     struct EditorGeometryProcessingPreparedFrame
@@ -1929,6 +1956,33 @@ export namespace Extrinsic::Runtime
     [[nodiscard]] std::optional<KeypointAnalysisConfig> GetEditorKeypointAnalysisConfig(
         const EditorGeometryProcessingCommands &commands);
     [[nodiscard]] EditorKeypointAnalysisResult ApplyEditorConfiguredKeypointAnalysis(
+        const EditorGeometryProcessingCommands &commands);
+    [[nodiscard]] EditorDescriptorAnalysisReadiness PreviewEditorDescriptorAnalysisCommand(
+        const EditorGeometryProcessingContext &context, const DescriptorAnalysisConfig &config);
+    [[nodiscard]] GeometryPropertyCatalogSnapshot GetEditorDescriptorAnalysisInputCatalog(
+        const EditorGeometryProcessingContext &context, std::uint32_t stableId);
+    [[nodiscard]] EditorDescriptorAnalysisResult ApplyEditorDescriptorAnalysisCommand(
+        const EditorGeometryProcessingContext &context, const DescriptorAnalysisConfig &config);
+    [[nodiscard]] RuntimeEngineConfigApplyResult ApplyEditorDescriptorAnalysisConfig(
+        const EditorGeometryProcessingContext &context, const DescriptorAnalysisConfig &config,
+        std::string sourceId = {});
+    [[nodiscard]] std::optional<DescriptorAnalysisConfig> GetEditorDescriptorAnalysisConfig(
+        const EditorGeometryProcessingContext &context);
+    [[nodiscard]] EditorDescriptorAnalysisResult ApplyEditorConfiguredDescriptorAnalysis(
+        const EditorGeometryProcessingContext &context);
+
+    [[nodiscard]] EditorDescriptorAnalysisReadiness PreviewEditorDescriptorAnalysisCommand(
+        const EditorGeometryProcessingCommands &commands, const DescriptorAnalysisConfig &config);
+    [[nodiscard]] GeometryPropertyCatalogSnapshot GetEditorDescriptorAnalysisInputCatalog(
+        const EditorGeometryProcessingCommands &commands, std::uint32_t stableId);
+    [[nodiscard]] EditorDescriptorAnalysisResult ApplyEditorDescriptorAnalysisCommand(
+        const EditorGeometryProcessingCommands &commands, const DescriptorAnalysisConfig &config);
+    [[nodiscard]] RuntimeEngineConfigApplyResult ApplyEditorDescriptorAnalysisConfig(
+        const EditorGeometryProcessingCommands &commands, const DescriptorAnalysisConfig &config,
+        std::string sourceId = {});
+    [[nodiscard]] std::optional<DescriptorAnalysisConfig> GetEditorDescriptorAnalysisConfig(
+        const EditorGeometryProcessingCommands &commands);
+    [[nodiscard]] EditorDescriptorAnalysisResult ApplyEditorConfiguredDescriptorAnalysis(
         const EditorGeometryProcessingCommands &commands);
 
 

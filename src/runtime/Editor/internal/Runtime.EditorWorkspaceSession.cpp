@@ -600,6 +600,13 @@ namespace Extrinsic::Runtime::EditorFeatureDetail
                 if (AttachmentEpochIsActive(epoch))
                     m_LastKeypointAnalysisResult = std::move(result);
             };
+        context.MethodResultSinks.DescriptorAnalysis =
+            [epoch = m_AttachmentEpoch, this](
+                EditorDescriptorAnalysisResult result)
+            {
+                if (AttachmentEpochIsActive(epoch))
+                    m_LastDescriptorAnalysisResult = std::move(result);
+            };
         context.PendingAssetImportPath =
             std::move(pendingAssetImportPath);
         context.PendingAssetImportPayloadKind =
@@ -672,6 +679,9 @@ namespace Extrinsic::Runtime::EditorFeatureDetail
         if (m_LastKeypointAnalysisResult.has_value())
             context.LastKeypointAnalysisResult =
                 &*m_LastKeypointAnalysisResult;
+        if (m_LastDescriptorAnalysisResult.has_value())
+            context.LastDescriptorAnalysisResult =
+                &*m_LastDescriptorAnalysisResult;
         const Core::Extent2D viewport =
             context.CameraViewport.Width != 0u &&
                     context.CameraViewport.Height != 0u
@@ -871,6 +881,9 @@ namespace Extrinsic::Runtime::EditorFeatureDetail
         case EditorGeometryProcessingResultSlot::KeypointAnalysis:
             m_LastKeypointAnalysisResult.reset();
             break;
+        case EditorGeometryProcessingResultSlot::DescriptorAnalysis:
+            m_LastDescriptorAnalysisResult.reset();
+            break;
         case EditorGeometryProcessingResultSlot::Registration:
             m_LastRegistrationResult.reset();
             return;
@@ -908,6 +921,7 @@ namespace Extrinsic::Runtime::EditorFeatureDetail
         m_LastPointSpacingResult.reset();
         m_LastBilateralFilterResult.reset();
         m_LastKeypointAnalysisResult.reset();
+        m_LastDescriptorAnalysisResult.reset();
         m_JobIdentities.clear();
         m_RenderRecipeContext = {};
         m_RenderRecipeState = {};

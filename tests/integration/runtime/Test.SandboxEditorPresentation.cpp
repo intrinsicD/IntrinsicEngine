@@ -327,7 +327,7 @@ TEST(SandboxEditorPresentation, DefaultDrawStartsWithOnlyMenuBarVisible)
 
     EXPECT_TRUE(ImGuiWindowExists("##MainMenuBar"));
     const auto menu = shell.BuildEditorWindowMenuModel();
-    ASSERT_EQ(menu.size(), 64u);
+    ASSERT_EQ(menu.size(), 68u);
     for (const Runtime::EditorWindowMenuEntry& entry : menu)
     {
         EXPECT_FALSE(entry.Open) << entry.Id;
@@ -345,7 +345,7 @@ TEST(SandboxEditorPresentation, DomainMenusUseAppearanceAndFocusedProcessingWind
         std::string_view Id;
         std::vector<std::string> MenuPath;
     };
-    const std::array<ExpectedWindow, 54> expected{{
+    const std::array<ExpectedWindow, 58> expected{{
         {"pointcloud.appearance", {"PointCloud"}},
         {"pointcloud.properties", {"PointCloud"}},
         {"pointcloud.selection", {"PointCloud"}},
@@ -381,18 +381,22 @@ TEST(SandboxEditorPresentation, DomainMenusUseAppearanceAndFocusedProcessingWind
         {"view.point_spacing", {"View"}},
         {"view.bilateral_filter", {"View"}},
         {"view.keypoint_analysis", {"View"}},
+        {"view.descriptor_analysis", {"View"}},
         {"mesh.processing.kernel_density", {"Mesh", "Processing"}},
         {"mesh.processing.point_spacing", {"Mesh", "Processing"}},
         {"mesh.processing.bilateral_filter", {"Mesh", "Processing"}},
         {"mesh.processing.keypoints", {"Mesh", "Processing"}},
+        {"mesh.processing.descriptors", {"Mesh", "Processing"}},
         {"graph.processing.kernel_density", {"Graph", "Processing"}},
         {"graph.processing.point_spacing", {"Graph", "Processing"}},
         {"graph.processing.bilateral_filter", {"Graph", "Processing"}},
         {"graph.processing.keypoints", {"Graph", "Processing"}},
+        {"graph.processing.descriptors", {"Graph", "Processing"}},
         {"pointcloud.processing.kernel_density", {"PointCloud", "Processing"}},
         {"pointcloud.processing.point_spacing", {"PointCloud", "Processing"}},
         {"pointcloud.processing.bilateral_filter", {"PointCloud", "Processing"}},
         {"pointcloud.processing.keypoints", {"PointCloud", "Processing"}},
+        {"pointcloud.processing.descriptors", {"PointCloud", "Processing"}},
         {"view.outlier_analysis", {"View"}},
         {"mesh.processing.outliers", {"Mesh", "Processing"}},
         {"graph.processing.outliers", {"Graph", "Processing"}},
@@ -1611,6 +1615,29 @@ TEST(SandboxEditorPresentation, KeypointDomainMenusOpenOneSharedWindow)
         ASSERT_TRUE(shell.SetEditorWindowOpen("view.keypoint_analysis", false));
     }
     ASSERT_TRUE(shell.SetEditorWindowOpen("view.keypoint_analysis", true));
+    engine.Run();
+    shell.Detach();
+    engine.Shutdown();
+}
+TEST(SandboxEditorPresentation, DescriptorDomainMenusOpenOneSharedWindow)
+{
+    Intrinsic::Tests::RuntimeTestKernel engine(HeadlessConfig(), std::make_unique<OneFrameApplication>());
+    ComposeEditorUiAndInitialize(engine);
+    Editor::EditorShell shell;
+    shell.Attach(engine.Worlds(), engine.Services());
+    Editor::MeshProcessingPanels panels;
+    panels.Register(shell);
+    for (const auto* id : {"mesh.processing.descriptors", "graph.processing.descriptors", "pointcloud.processing.descriptors"})
+    {
+        ASSERT_TRUE(shell.SetEditorWindowOpen(id, true));
+        const auto menu = shell.BuildEditorWindowMenuModel();
+        ASSERT_NE(FindWindow(menu, "view.descriptor_analysis"), nullptr);
+        EXPECT_TRUE(FindWindow(menu, "view.descriptor_analysis")->Open);
+        ASSERT_NE(FindWindow(menu, id), nullptr);
+        EXPECT_FALSE(FindWindow(menu, id)->Open);
+        ASSERT_TRUE(shell.SetEditorWindowOpen("view.descriptor_analysis", false));
+    }
+    ASSERT_TRUE(shell.SetEditorWindowOpen("view.descriptor_analysis", true));
     engine.Run();
     shell.Detach();
     engine.Shutdown();

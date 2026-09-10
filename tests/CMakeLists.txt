@@ -269,6 +269,7 @@ if(TARGET ExtrinsicRuntime)
         Test.KernelDensityOperations.cpp
     Test.BilateralFilterOperations.cpp
     Test.KeypointAnalysisOperations.cpp
+    Test.DescriptorAnalysisOperations.cpp
     Test.PointSpacingOperations.cpp
         Test.PrimitiveSelectionRefinement.cpp
         Test.PrimitiveSelectionRefinementWiring.cpp
@@ -511,6 +512,7 @@ set(_geometry_test_files
     Test.PointCloudConsolidation.cpp
     Test.PointCloudFeatures.cpp
     Test.KeypointAnalysis.cpp
+    Test.DescriptorAnalysis.cpp
     Test.PointCloudKernels.cpp
     Test_Registration.cpp
     Test_PointCloudRobustness.cpp
@@ -1756,6 +1758,7 @@ if(_intrinsic_registered_test_targets)
         "  set_tests_properties(PointLBVHGpuSmoke.PointSpacingPublishesAcrossDomainsAndPreservesCandidatePolicy PROPERTIES TIMEOUT 120)\n"
         "  set_tests_properties(PointLBVHGpuSmoke.BilateralPublishesMovingPassesAcrossDomains PointLBVHGpuSmoke.BilateralRejectsStaleAndCancelledPasses PROPERTIES TIMEOUT 120)\n"
         "  set_tests_properties(PointLBVHGpuSmoke.KeypointPublishesAcrossDomainsWithCompleteSupport PointLBVHGpuSmoke.KeypointRejectsStaleCancellationAndRadiusOverflow PROPERTIES TIMEOUT 120)\n"
+        "  set_tests_properties(PointLBVHGpuSmoke.DescriptorPublishesAcrossDomainsWithCompleteSupport PointLBVHGpuSmoke.DescriptorRejectsStaleCancellationAndRadiusOverflow PointLBVHGpuSmoke.DescriptorLowestIdCapSupportsDenseRadius PROPERTIES TIMEOUT 120)\n"
         "endif()\n"
     )
     set(_intrinsic_property_fixup_file "${CMAKE_CURRENT_BINARY_DIR}/IntrinsicTestPropertyFixups.cmake")

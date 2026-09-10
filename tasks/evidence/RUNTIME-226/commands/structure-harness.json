@@ -1,0 +1,21 @@
+{
+  "command": [
+    "bash",
+    "-c",
+    "python3 tools/agents/check_task_policy.py --root . --strict && python3 tools/repo/check_test_layout.py --root . --strict && python3 tools/docs/check_doc_links.py --root . && git diff --check"
+  ],
+  "command_display": "bash -c 'python3 tools/agents/check_task_policy.py --root . --strict && python3 tools/repo/check_test_layout.py --root . --strict && python3 tools/docs/check_doc_links.py --root . && git diff --check'",
+  "cwd": ".",
+  "duration_ms": 1997,
+  "exit_code": 0,
+  "finished_at": "2026-09-10T02:44:02Z",
+  "label": "structure-harness",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-09-10T02:44:00Z",
+  "stderr_path": "tasks/evidence/RUNTIME-226/commands/structure-harness.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/RUNTIME-226/commands/structure-harness.stdout.log",
+  "stdout_sha256": "0654e7176da0a24da659feccf211797321cde3699f1ee691629f7b21f72a75c7",
+  "task_id": "RUNTIME-226"
+}

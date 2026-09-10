@@ -28,6 +28,7 @@ target_sources(${target_name}
         Modules/PointSpacing/Runtime.PointSpacingConfig.cppm
         Modules/BilateralFilter/Runtime.BilateralFilterConfig.cppm
         Modules/KeypointAnalysis/Runtime.KeypointAnalysisConfig.cppm
+        Modules/DescriptorAnalysis/Runtime.DescriptorAnalysisConfig.cppm
         Modules/NormalEstimation/Runtime.NormalEstimationConfig.cppm
         Modules/Registration/Runtime.RegistrationConfig.cppm
         Modules/Parameterization/Runtime.ParameterizationConfig.cppm
@@ -128,12 +129,14 @@ target_sources(${target_name}
         Modules/PointSpacing/Runtime.PointSpacingConfig.cpp
         Modules/BilateralFilter/Runtime.BilateralFilterConfig.cpp
         Modules/KeypointAnalysis/Runtime.KeypointAnalysisConfig.cpp
+        Modules/DescriptorAnalysis/Runtime.DescriptorAnalysisConfig.cpp
         Editor/Operations/Runtime.GeometryProcessingOperations.Outliers.cpp
         Editor/Operations/Runtime.GeometryProcessingOperations.Density.cpp
         Editor/Operations/Runtime.GeometryProcessingOperations.Spacing.cpp
         Editor/Operations/Runtime.GeometryProcessingOperations.PointProperties.cpp
         Editor/Operations/Runtime.GeometryProcessingOperations.Bilateral.cpp
         Editor/Operations/Runtime.GeometryProcessingOperations.Keypoints.cpp
+        Editor/Operations/Runtime.GeometryProcessingOperations.Descriptors.cpp
         Modules/NormalEstimation/Runtime.NormalEstimationConfig.cpp
         Editor/Operations/Runtime.GeometryProcessingOperations.Normals.cpp
         Modules/Registration/Runtime.RegistrationConfig.cpp

@@ -131,3 +131,5 @@ RUNTIME-224 adds owned span results and a supplied-neighbor single-pass reducer 
 
 ## Keypoint slice
 RUNTIME-225 adds span scale/keypoint analysis and complete supplied radius rows through the common Geometry.SpatialQueries neighborhood view. Runtime composes cached CPU/Vulkan queries with CPU centroid-PCA and suppression on all canonical domains. The corrected nearest-live Cloud spacing also affects descriptor automatic radii. FPFH span/neighborhood/runtime integration and descriptor matching remain open; reuse the common row view and property helpers, while preserving descriptor-space matching semantics. Framework24 scalar Gaussian saliency and covariance probability remain distinct ports.
+
+RUNTIME-226 adds FPFH position/normal span and supplied-neighborhood kernels, with the Cloud wrapper delegating through live compaction. Its canonical runtime/config/UI and 33-column publication slice has separate verification ownership; descriptor-space matching and remaining utility audit stay in this task.

@@ -1,0 +1,78 @@
+Internal ctest changing into directory: /home/alex/Documents/IntrinsicEngine/build/ci
+Test project /home/alex/Documents/IntrinsicEngine/build/ci
+      Start  696: KeypointAnalysisConfig.RoundTripAndSharedPreviewApplyRun
+ 1/33 Test  #696: KeypointAnalysisConfig.RoundTripAndSharedPreviewApplyRun ..........................   Passed    0.01 sec
+      Start  697: KeypointAnalysisOperations.EveryDomainReferenceCacheHistoryAndDeletedRows
+ 2/33 Test  #697: KeypointAnalysisOperations.EveryDomainReferenceCacheHistoryAndDeletedRows .........   Passed    0.02 sec
+      Start  698: KeypointAnalysisOperations.JobsRejectChangedInputsOutputsAndCancellation
+ 3/33 Test  #698: KeypointAnalysisOperations.JobsRejectChangedInputsOutputsAndCancellation ..........   Passed    0.05 sec
+      Start  699: KeypointAnalysisOperations.InvalidScaleAndOutputPreflightRetainExistingData
+ 4/33 Test  #699: KeypointAnalysisOperations.InvalidScaleAndOutputPreflightRetainExistingData .......   Passed    0.01 sec
+      Start  700: DescriptorAnalysisConfig.RoundTripAndSharedPreviewApplyRun
+ 5/33 Test  #700: DescriptorAnalysisConfig.RoundTripAndSharedPreviewApplyRun ........................   Passed    0.03 sec
+      Start  701: DescriptorAnalysisOperations.EveryDomainReferenceCacheHistoryAndDeletedRows
+ 6/33 Test  #701: DescriptorAnalysisOperations.EveryDomainReferenceCacheHistoryAndDeletedRows .......   Passed    0.07 sec
+      Start  702: DescriptorAnalysisOperations.JobsRejectChangedNormalsEveryOutputAndCancellation
+ 7/33 Test  #702: DescriptorAnalysisOperations.JobsRejectChangedNormalsEveryOutputAndCancellation ...   Passed    0.07 sec
+      Start  703: DescriptorAnalysisOperations.InvalidNormalsScaleAndOutputPreflightRetainData
+ 8/33 Test  #703: DescriptorAnalysisOperations.InvalidNormalsScaleAndOutputPreflightRetainData ......   Passed    0.02 sec
+      Start 2652: PointCloudFeatures.RowAccessorIsBoundsChecked
+ 9/33 Test #2652: PointCloudFeatures.RowAccessorIsBoundsChecked .....................................   Passed    0.01 sec
+      Start 2653: PointCloudFeatures.MatchRejectsMismatchedDimensions
+10/33 Test #2653: PointCloudFeatures.MatchRejectsMismatchedDimensions ...............................   Passed    0.01 sec
+      Start 2654: PointCloudFeatures.MatchTieBreakPrefersLowestTargetRow
+11/33 Test #2654: PointCloudFeatures.MatchTieBreakPrefersLowestTargetRow ............................   Passed    0.01 sec
+      Start 2655: PointCloudFeatures.MatchRatioRejectsSingleTargetAmbiguity
+12/33 Test #2655: PointCloudFeatures.MatchRatioRejectsSingleTargetAmbiguity .........................   Passed    0.00 sec
+      Start 2656: PointCloudFeatures.MatchRatioRejectsDuplicateTargets
+13/33 Test #2656: PointCloudFeatures.MatchRatioRejectsDuplicateTargets ..............................   Passed    0.00 sec
+      Start 2657: PointCloudFeatures.ComputeDescriptorsSkipsDeletedPoints
+14/33 Test #2657: PointCloudFeatures.ComputeDescriptorsSkipsDeletedPoints ...........................   Passed    0.01 sec
+      Start 2658: PointCloudFeatures.KeypointsSkipDeletedPoints
+15/33 Test #2658: PointCloudFeatures.KeypointsSkipDeletedPoints .....................................   Passed    0.01 sec
+      Start 2659: PointCloudFeatures.ComputeDescriptorsRequiresNormals
+16/33 Test #2659: PointCloudFeatures.ComputeDescriptorsRequiresNormals ..............................   Passed    0.01 sec
+      Start 2660: PointCloudFeatures.DetectKeypointsIsDeterministic
+17/33 Test #2660: PointCloudFeatures.DetectKeypointsIsDeterministic .................................   Passed    0.01 sec
+      Start 2661: PointCloudFeatures.DetectKeypointsRejectsTooFewPoints
+18/33 Test #2661: PointCloudFeatures.DetectKeypointsRejectsTooFewPoints .............................   Passed    0.01 sec
+      Start 2662: PointCloudFeatures.DescriptorMatchingIsRotationInvariant
+19/33 Test #2662: PointCloudFeatures.DescriptorMatchingIsRotationInvariant ..........................   Passed    0.02 sec
+      Start 2663: PointCloudFeatures.CoarseAlignmentRecoversKnownTransform
+20/33 Test #2663: PointCloudFeatures.CoarseAlignmentRecoversKnownTransform ..........................   Passed    0.15 sec
+      Start 2664: PointCloudFeatures.CoarseAlignmentRejectsOutliers
+21/33 Test #2664: PointCloudFeatures.CoarseAlignmentRejectsOutliers .................................   Passed    0.09 sec
+      Start 2665: PointCloudFeatures.CoarseAlignmentHonorsLargerSampleSize
+22/33 Test #2665: PointCloudFeatures.CoarseAlignmentHonorsLargerSampleSize ..........................   Passed    0.14 sec
+      Start 2666: PointCloudFeatures.CoarseAlignmentInsufficientCorrespondences
+23/33 Test #2666: PointCloudFeatures.CoarseAlignmentInsufficientCorrespondences .....................   Passed    0.01 sec
+      Start 2667: PointCloudFeatures.HandlesCollinearAndDuplicatePoints
+24/33 Test #2667: PointCloudFeatures.HandlesCollinearAndDuplicatePoints .............................   Passed    0.01 sec
+      Start 2668: PointCloudFeatures.IcpRegistrationRemainsReachable
+25/33 Test #2668: PointCloudFeatures.IcpRegistrationRemainsReachable ................................   Passed    0.01 sec
+      Start 2669: KeypointAnalysis.AnalyticCovarianceAndLowestIdSuppression
+26/33 Test #2669: KeypointAnalysis.AnalyticCovarianceAndLowestIdSuppression .........................   Passed    0.01 sec
+      Start 2670: KeypointAnalysis.CompleteSuppliedSupportMatchesReferenceAtBothRadii
+27/33 Test #2670: KeypointAnalysis.CompleteSuppliedSupportMatchesReferenceAtBothRadii ...............   Passed    0.01 sec
+      Start 2671: KeypointAnalysis.RejectsMalformedSupportAndUnrepresentableInputs
+28/33 Test #2671: KeypointAnalysis.RejectsMalformedSupportAndUnrepresentableInputs ..................   Passed    0.01 sec
+      Start 2672: KeypointAnalysis.CloudSpacingUsesNearestLivePointsAndRemapsOriginalSlots
+29/33 Test #2672: KeypointAnalysis.CloudSpacingUsesNearestLivePointsAndRemapsOriginalSlots ..........   Passed    0.01 sec
+      Start 2673: DescriptorAnalysis.AnalyticPlanarHistogramsAndRequestedOrder
+30/33 Test #2673: DescriptorAnalysis.AnalyticPlanarHistogramsAndRequestedOrder ......................   Passed    0.01 sec
+      Start 2674: DescriptorAnalysis.CompleteRowsMatchReferenceWithLowestIdCapsAndAutomaticRadius
+31/33 Test #2674: DescriptorAnalysis.CompleteRowsMatchReferenceWithLowestIdCapsAndAutomaticRadius ...   Passed    0.02 sec
+      Start 2675: DescriptorAnalysis.RejectsInvalidNormalsScaleAndMalformedNeighborhoods
+32/33 Test #2675: DescriptorAnalysis.RejectsInvalidNormalsScaleAndMalformedNeighborhoods ............   Passed    0.01 sec
+      Start 2676: DescriptorAnalysis.CloudCompactsDeletedNonfiniteRowsAndRemapsQueries
+33/33 Test #2676: DescriptorAnalysis.CloudCompactsDeletedNonfiniteRowsAndRemapsQueries ..............   Passed    0.01 sec
+
+100% tests passed, 0 tests failed out of 33
+
+Label Time Summary:
+contract    =   0.28 sec*proc (8 tests)
+geometry    =   0.56 sec*proc (25 tests)
+runtime     =   0.28 sec*proc (8 tests)
+unit        =   0.56 sec*proc (25 tests)
+
+Total Test time (real) =   1.70 sec

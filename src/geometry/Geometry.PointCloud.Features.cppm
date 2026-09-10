@@ -78,6 +78,11 @@ export namespace Geometry::PointCloud::Features
         std::uint32_t MaxNeighbors{0};
     };
 
+    struct DescriptorScale
+    {
+        float MeanSpacing{}, FeatureRadius{};
+    };
+
     struct DescriptorSet
     {
         DescriptorKind Kind{DescriptorKind::FPFH};
@@ -89,6 +94,7 @@ export namespace Geometry::PointCloud::Features
 
         // Point index each descriptor row was computed at (aligned with rows).
         std::vector<std::uint32_t> SourceIndices;
+        DescriptorScale Scale{};
 
         [[nodiscard]] std::span<const float> Row(std::uint32_t i) const
         {
@@ -188,6 +194,22 @@ export namespace Geometry::PointCloud::Features
     // ISS keypoint detection. Returns nullopt for empty/degenerate input.
     [[nodiscard]] std::optional<KeypointSet> DetectKeypoints(
         const Cloud& cloud, const KeypointParams& params = {});
+
+    [[nodiscard]] std::optional<DescriptorScale> ResolveDescriptorScale(
+        std::span<const glm::vec3> positions, const DescriptorParams& params = {});
+    // Count-matched finite positions and finite nonzero normals. Empty indices
+    // selects all samples; explicit order and repeated indices are preserved.
+    [[nodiscard]] std::optional<DescriptorSet> ComputeDescriptors(
+        std::span<const glm::vec3> positions, std::span<const glm::vec3> normals,
+        std::span<const std::uint32_t> indices = {}, const DescriptorParams& params = {});
+    // Scale must be resolved for these inputs. Supply complete inclusive-radius
+    // rows or, when MaxNeighbors>0, their exact lowest-ID prefixes up to that cap.
+    // IDs are sorted, unique and nonself. Shape/membership are checked; the
+    // caller guarantees completeness or that every required prefix ID is present.
+    [[nodiscard]] std::optional<DescriptorSet> ComputeDescriptorsFromNeighbors(
+        std::span<const glm::vec3> positions, std::span<const glm::vec3> normals,
+        std::span<const std::uint32_t> indices, const DescriptorParams& params,
+        const DescriptorScale& scale, Geometry::PointNeighborhoods neighborhoods);
 
     // FPFH descriptors at the given point indices (empty = all points).
     // Precondition: cloud.HasNormals(). Returns nullopt otherwise.
