@@ -152,13 +152,7 @@ namespace Geometry::PointCloud::Consolidation
         [[nodiscard]] float BroadPhaseRadius(
             const double supportRadius) noexcept
         {
-            float radius = static_cast<float>(supportRadius);
-            if (static_cast<double>(radius) < supportRadius)
-            {
-                radius = std::nextafter(
-                    radius, std::numeric_limits<float>::infinity());
-            }
-            return radius;
+            return Kernels::ConservativeQueryRadius(supportRadius).value_or(0.0f);
         }
 
         [[nodiscard]] bool IsAnisotropic(
@@ -1305,6 +1299,11 @@ namespace Geometry::PointCloud::Consolidation
                             continue;
                         const double distanceSquared =
                             DistanceSquared(projected[i], source[neighbor]);
+                        // DirectionalWeight receives a rounded float offset. Reject
+                        // conservative shell candidates using the exact distance first.
+                        if (diagnostics.UsedAnisotropicWeighting &&
+                            std::sqrt(distanceSquared) >= params.SupportRadius)
+                            continue;
                         const auto radial =
                             diagnostics.UsedAnisotropicWeighting
                             ? Kernels::DirectionalWeight(
@@ -1376,9 +1375,16 @@ namespace Geometry::PointCloud::Consolidation
                         distanceSquared,
                         params.SupportRadius,
                         Kernels::KernelType::ThetaLop);
+                    if (!radial.has_value())
+                    {
+                        failure = Status::NumericalFailure;
+                        return false;
+                    }
+                    if (!(*radial > 0.0))
+                        continue;
                     const auto derivative = Kernels::RepulsionDerivative(
                         std::sqrt(distanceSquared), params.SupportRadius);
-                    if (!radial.has_value() || !derivative.has_value())
+                    if (!derivative.has_value())
                     {
                         failure = Status::NumericalFailure;
                         return false;

@@ -1,3 +1,4 @@
+// Compact radial kernels, density reductions and conservative float query support.
 module;
 
 #include <cstddef>
@@ -12,6 +13,7 @@ module;
 export module Geometry.PointCloud.Kernels;
 
 import Geometry.KDTree;
+export import Geometry.SpatialQueries;
 
 export namespace Geometry::PointCloud::Kernels
 {
@@ -42,6 +44,7 @@ export namespace Geometry::PointCloud::Kernels
         SpatialQueryFailed,
         EmptyNeighborhood,
         NumericalFailure,
+        InvalidNeighborhoods,
     };
 
     struct DensityWeightDiagnostics
@@ -51,6 +54,7 @@ export namespace Geometry::PointCloud::Kernels
         std::size_t NeighborContributionCount{0u};
         std::size_t EmptyNeighborhoodCount{0u};
         bool UsedSuppliedIndex{false};
+        bool UsedSuppliedNeighborhoods{false};
     };
 
     struct DensityWeightResult
@@ -103,6 +107,21 @@ export namespace Geometry::PointCloud::Kernels
     [[nodiscard]] std::optional<double> RepulsionDerivative(
         double distance,
         double supportRadius) noexcept;
+
+    // Outward radius for a float subtract/square/add broad phase followed by a
+    // double exact-support test. A normal squared-radius floor covers underflow.
+    // This does not validate an index's coordinate or AABB construction contract.
+    [[nodiscard]] std::optional<float> ConservativeQueryRadius(double supportRadius) noexcept;
+
+    // Rows contain unique ascending point IDs; self may occur and is ignored.
+    // The caller guarantees every strict-support neighbor is present. Conservative
+    // shell candidates are allowed and filtered by the double kernel predicate.
+    [[nodiscard]] DensityWeightResult ComputeDensityWeightsFromNeighbors(
+        std::span<const glm::vec3> points,
+        Geometry::PointNeighborhoods neighborhoods,
+        double supportRadius,
+        KernelType kernel = KernelType::ThetaLop,
+        DensityWeightMode mode = DensityWeightMode::Direct);
 
     // Compute 1 + sum_{j!=i} kernel(||p_i-p_j||^2,h), or its reciprocal,
     // in point-index order. Accumulation is double precision and output is

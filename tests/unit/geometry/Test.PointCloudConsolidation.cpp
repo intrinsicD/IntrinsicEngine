@@ -1,5 +1,6 @@
 #include <algorithm>
 #include <array>
+#include <bit>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
@@ -1244,4 +1245,52 @@ TEST(PointCloudConsolidation, CloudOverloadRejectsDeletedSlots)
         Consolidation::Consolidate(cloud, ReferenceParams());
     EXPECT_EQ(result.State, Consolidation::Status::InvalidCloud);
     EXPECT_TRUE(result.Positions.empty());
+}
+
+TEST(PointCloudConsolidation, ConservativeDensitySupportMatchesCachedCandidate)
+{
+    const float v=std::bit_cast<float>(std::uint32_t{0x1a01460f});
+    const std::vector<glm::vec3> points{{0,0,0},{v,v,v}};
+    auto params=ReferenceParams();params.SupportRadius=4.6766236639043417e-23;
+    params.MaxIterations=1;params.ConvergenceTolerance=1;
+    const auto reference=Consolidation::Consolidate(points,params);
+    const auto cached=Consolidation::Validation::ConsolidateCpuOptimizedCandidate(points,params);
+    ASSERT_TRUE(reference.Succeeded())<<Consolidation::DebugName(reference.State);
+    ASSERT_TRUE(cached.Succeeded())<<Consolidation::DebugName(cached.State);
+    EXPECT_EQ(reference.Positions,cached.Positions);
+    EXPECT_EQ(reference.Diagnostics.DensityContributionCount,4);
+    EXPECT_EQ(cached.Diagnostics.DensityContributionCount,4);
+}
+
+TEST(PointCloudConsolidation, ExtremeShellDoesNotEvaluateUnusedRepulsionDerivative)
+{
+    const float v=std::bit_cast<float>(std::uint32_t{0x1a01460f});
+    const std::vector<glm::vec3> points{{0,0,0},{v,v,v}};
+    for(bool weighted:{false,true})
+    {
+        auto params=ReferenceParams();params.SupportRadius=1e-310;params.MaxIterations=1;params.ConvergenceTolerance=1;
+        params.Method=weighted?Consolidation::Strategy(Consolidation::WlopStrategy{}):Consolidation::Strategy(Consolidation::LopStrategy{});
+        const auto reference=Consolidation::Consolidate(points,params);
+        const auto cached=Consolidation::Validation::ConsolidateCpuOptimizedCandidate(points,params);
+        ASSERT_TRUE(reference.Succeeded())<<Consolidation::DebugName(reference.State);
+        ASSERT_TRUE(cached.Succeeded())<<Consolidation::DebugName(cached.State);
+        EXPECT_EQ(reference.Positions,points);EXPECT_EQ(cached.Positions,points);
+        EXPECT_EQ(reference.Diagnostics.RepulsionContributionCount,0);EXPECT_EQ(cached.Diagnostics.RepulsionContributionCount,0);
+        EXPECT_EQ(reference.Diagnostics.DensityContributionCount,0);EXPECT_EQ(cached.Diagnostics.DensityContributionCount,0);
+    }
+}
+
+TEST(PointCloudConsolidation, DirectionalAttractionRejectsRoundedOutsideSupport)
+{
+    const std::vector<glm::vec3> points{{1,0,0},{-0x1p-24f,0,0}},normals(2,glm::vec3(0,0,1));
+    auto params=ReferenceParams();params.SupportRadius=1+0x1p-25;params.RepulsionWeight=0;
+    params.MaxIterations=1;params.ConvergenceTolerance=1;
+    params.Method=Consolidation::WlopStrategy{.Weighting=Consolidation::WeightingMode::Anisotropic,
+        .NormalSource=Consolidation::NormalSourcePolicy::RequireAuthored,.NormalRefinementRounds=1};
+    const auto reference=Consolidation::Consolidate(points,normals,params);
+    const auto cached=Consolidation::Validation::ConsolidateCpuOptimizedCandidate(points,normals,params);
+    ASSERT_TRUE(reference.Succeeded())<<Consolidation::DebugName(reference.State);
+    ASSERT_TRUE(cached.Succeeded())<<Consolidation::DebugName(cached.State);
+    EXPECT_EQ(reference.Positions,points);EXPECT_EQ(cached.Positions,points);
+    EXPECT_EQ(reference.Diagnostics.AttractionContributionCount,2);EXPECT_EQ(cached.Diagnostics.AttractionContributionCount,2);
 }

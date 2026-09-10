@@ -15,6 +15,7 @@ import Extrinsic.Runtime.PointSpacingConfig;
 import Extrinsic.Runtime.BilateralFilterConfig;
 import Extrinsic.Runtime.KeypointAnalysisConfig;
 import Extrinsic.Runtime.DescriptorAnalysisConfig;
+import Extrinsic.Runtime.DensityWeightConfig;
 import Extrinsic.Runtime.SelectionController;
 import Extrinsic.Runtime.CurvatureSegmentationConfig;
 import Extrinsic.Runtime.ParameterizationConfig;
@@ -38,6 +39,7 @@ namespace Extrinsic::Sandbox
             !registry.Register(Runtime::MakeBilateralFilterConfigSectionRegistration()) ||
             !registry.Register(Runtime::MakeKeypointAnalysisConfigSectionRegistration()) ||
             !registry.Register(Runtime::MakeDescriptorAnalysisConfigSectionRegistration()) ||
+            !registry.Register(Runtime::MakeDensityWeightConfigSectionRegistration()) ||
             !registry.Register(
                 Runtime::MakeClusteringConfigSectionRegistration(
                     std::move(callbacks.Clustering))) ||

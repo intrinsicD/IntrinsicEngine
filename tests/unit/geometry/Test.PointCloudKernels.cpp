@@ -1,3 +1,5 @@
+#include <bit>
+#include <cstdint>
 #include <cmath>
 #include <limits>
 #include <utility>
@@ -402,4 +404,77 @@ TEST(PointCloudKernels, DensityFailuresPublishNoWeights)
         mismatch.Status,
         Kernels::DensityWeightStatus::SpatialIndexMismatch);
     EXPECT_TRUE(mismatch.Weights.empty());
+}
+
+TEST(PointCloudKernels, DensityIncludesTinySupportAcrossInternalNodes)
+{
+    const float v=std::bit_cast<float>(std::uint32_t{0x1a01460f});
+    const double h=4.6766236639043417e-23;
+    const glm::dvec3 delta(v,v,v);
+    const double contribution=std::exp(-8*glm::dot(delta,delta)/(h*h));
+    ASSERT_GT(contribution,0.00039);
+    for(unsigned count:{1u,32u})
+    {
+        std::vector<glm::vec3> points(count+1,glm::vec3(v));points[0]=glm::vec3(0);
+        const auto result=Kernels::ComputeDensityWeights(points,h,Kernels::KernelType::Gaussian);
+        ASSERT_TRUE(result.Succeeded());
+        EXPECT_FLOAT_EQ(result.Weights[0],float(1+count*contribution));
+        for(unsigned i=1;i<=count;++i)EXPECT_FLOAT_EQ(result.Weights[i],float(count+contribution));
+        EXPECT_EQ(result.Diagnostics.NeighborContributionCount,std::size_t(count)*(count+1));
+    }
+}
+
+TEST(PointCloudKernels, SuppliedDensityRowsPreserveKernelsAndFilterShell)
+{
+    const std::vector<glm::vec3> points{{0,0,0},{0,0,0},{.25f,0,0},{.5f,.5f,0},{1,0,0},{2,0,0}};
+    std::vector<std::uint32_t> ids,offsets{0};
+    for(unsigned i=0;i<points.size();++i)
+    {for(unsigned j=0;j<points.size();++j)ids.push_back(j);offsets.push_back(ids.size());}
+    for(auto kernel:{Kernels::KernelType::Gaussian,Kernels::KernelType::ThetaLop,Kernels::KernelType::WendlandC2})
+        for(auto mode:{Kernels::DensityWeightMode::Direct,Kernels::DensityWeightMode::Reciprocal})
+        {
+            const auto reference=Kernels::ComputeDensityWeights(points,1,kernel,mode);
+            const auto actual=Kernels::ComputeDensityWeightsFromNeighbors(points,{offsets,ids},1,kernel,mode);
+            ASSERT_TRUE(reference.Succeeded());ASSERT_TRUE(actual.Succeeded());
+            EXPECT_EQ(actual.Weights,reference.Weights);
+            EXPECT_EQ(actual.Diagnostics.NeighborContributionCount,reference.Diagnostics.NeighborContributionCount);
+            EXPECT_TRUE(actual.Diagnostics.UsedSuppliedNeighborhoods);EXPECT_FALSE(actual.Diagnostics.UsedSuppliedIndex);
+            double density=2;for(unsigned j:{2u,3u})
+            {const glm::dvec3 d=glm::dvec3(points[j]);density+=*Kernels::Weight(glm::dot(d,d),1,kernel);}
+            EXPECT_FLOAT_EQ(actual.Weights[0],float(mode==Kernels::DensityWeightMode::Direct?density:1/density));
+        }
+}
+
+TEST(PointCloudKernels, InvalidDensityRowsPublishNoWeights)
+{
+    const std::vector<glm::vec3> points{{0,0,0},{.5f,0,0}};
+    const auto check=[&](std::vector<std::uint32_t> offsets,std::vector<std::uint32_t> ids)
+    {
+        const auto result=Kernels::ComputeDensityWeightsFromNeighbors(points,{offsets,ids},1);
+        EXPECT_EQ(result.Status,Kernels::DensityWeightStatus::InvalidNeighborhoods);EXPECT_TRUE(result.Weights.empty());
+    };
+    check({},{});check({1,1,1},{0});check({0,2,1},{0});check({0,1,2},{1,2});
+    check({0,2,2},{1,1});check({0,2,2},{1,0});check({0,0,0},{0});
+    const std::vector<std::uint32_t> offsets{0,0,0};
+    EXPECT_EQ(Kernels::ComputeDensityWeightsFromNeighbors(points,{offsets,{}},0).Status,
+              Kernels::DensityWeightStatus::InvalidSupportRadius);
+}
+
+TEST(PointCloudKernels, ConservativeRadiusRetainsExtremeReferenceSupport)
+{
+    EXPECT_FALSE(Kernels::ConservativeQueryRadius(0));
+    EXPECT_FALSE(Kernels::ConservativeQueryRadius(-1));
+    EXPECT_FALSE(Kernels::ConservativeQueryRadius(std::numeric_limits<double>::infinity()));
+    EXPECT_FALSE(Kernels::ConservativeQueryRadius(std::numeric_limits<double>::quiet_NaN()));
+    EXPECT_FALSE(Kernels::ConservativeQueryRadius(std::numeric_limits<double>::max()));
+    const auto tiny=Kernels::ConservativeQueryRadius(std::numeric_limits<double>::denorm_min());
+    ASSERT_TRUE(tiny);EXPECT_GE((*tiny)*(*tiny),std::numeric_limits<float>::min());
+    const auto huge=Kernels::ConservativeQueryRadius(std::numeric_limits<float>::max());
+    ASSERT_TRUE(huge);EXPECT_EQ(*huge,std::numeric_limits<float>::max());
+    const std::vector<glm::vec3> duplicate{{0,0,0},{0,0,0}};
+    const auto result=Kernels::ComputeDensityWeights(duplicate,std::numeric_limits<double>::denorm_min());
+    ASSERT_TRUE(result.Succeeded());EXPECT_EQ(result.Weights,(std::vector<float>{2,2}));
+    const std::vector<glm::vec3> separated{{0,0,0},{1,0,0}};
+    const auto expanded=Kernels::ComputeDensityWeights(separated,std::numeric_limits<float>::max());
+    ASSERT_TRUE(expanded.Succeeded());EXPECT_EQ(expanded.Weights,(std::vector<float>{2,2}));
 }

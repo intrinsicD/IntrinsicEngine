@@ -137,59 +137,22 @@ namespace Geometry::PointCloud::Kernels
             return true;
         }
 
-        [[nodiscard]] DensityWeightResult ComputeWithIndex(
-            const std::span<const glm::vec3> points,
-            const Geometry::KDTree& index,
-            const double supportRadius,
-            const KernelType kernel,
-            const DensityWeightMode mode,
-            const bool suppliedIndex,
-            Geometry::KDTree::RadiusQueryScratch* const scratch = nullptr)
+        template<class Query>
+        [[nodiscard]] DensityWeightResult ReduceRows(
+            std::span<const glm::vec3> points, double supportRadius,
+            KernelType kernel, DensityWeightMode mode,
+            DensityWeightResult result, Query&& query)
         {
-            DensityWeightResult result = InvalidRequest(
-                points,
-                supportRadius,
-                kernel,
-                mode,
-                suppliedIndex);
-            if (!result.Succeeded())
-                return result;
-            if (!MatchesPoints(index, points))
+            std::vector<float> weights(points.size());
+            for(std::size_t i=0;i<points.size();++i)
             {
-                result.Status =
-                    DensityWeightStatus::SpatialIndexMismatch;
-                return result;
-            }
-
-            std::vector<float> weights(
-                points.size(), 0.0f);
-            std::vector<Geometry::KDTree::ElementIndex> neighbors{};
-            for (std::size_t i = 0u; i < points.size(); ++i)
-            {
-                float queryRadius =
-                    static_cast<float>(supportRadius);
-                if (static_cast<double>(queryRadius) < supportRadius)
-                {
-                    queryRadius = std::nextafter(
-                        queryRadius,
-                        std::numeric_limits<float>::infinity());
-                }
-                const auto query = scratch != nullptr
-                    ? index.QueryRadius(
-                        points[i], queryRadius, neighbors, *scratch)
-                    : index.QueryRadius(
-                        points[i], queryRadius, neighbors);
+                const auto neighbors=query(i);
                 ++result.Diagnostics.QueryCount;
-                if (!query.has_value())
-                {
-                    result.Status =
-                        DensityWeightStatus::SpatialQueryFailed;
-                    return result;
-                }
-
+                if(!neighbors)
+                {result.Status=DensityWeightStatus::SpatialQueryFailed;return result;}
                 double density = 1.0;
                 std::size_t contributionCount = 0u;
-                for (const std::uint32_t neighbor : neighbors)
+                for (const std::uint32_t neighbor : *neighbors)
                 {
                     if (neighbor == i || neighbor >= points.size())
                         continue;
@@ -226,10 +189,33 @@ namespace Geometry::PointCloud::Kernels
                 weights[i] = static_cast<float>(output);
             }
 
-            result.Status = DensityWeightStatus::Success;
-            result.Weights = std::move(weights);
+            result.Status=DensityWeightStatus::Success;
+            result.Weights=std::move(weights);
             return result;
         }
+
+        [[nodiscard]] DensityWeightResult ComputeWithIndex(
+            std::span<const glm::vec3> points, const Geometry::KDTree& index,
+            double supportRadius, KernelType kernel, DensityWeightMode mode,
+            bool suppliedIndex, Geometry::KDTree::RadiusQueryScratch* scratch=nullptr)
+        {
+            auto result=InvalidRequest(points,supportRadius,kernel,mode,suppliedIndex);
+            if(!result.Succeeded())return result;
+            if(!MatchesPoints(index,points))
+            {result.Status=DensityWeightStatus::SpatialIndexMismatch;return result;}
+            const auto radius=ConservativeQueryRadius(supportRadius);
+            if(!radius){result.Status=DensityWeightStatus::InvalidSupportRadius;return result;}
+            std::vector<Geometry::KDTree::ElementIndex> neighbors;
+            return ReduceRows(points,supportRadius,kernel,mode,std::move(result),
+                [&](std::size_t i)->std::optional<std::span<const std::uint32_t>>
+                {
+                    const auto query=scratch ? index.QueryRadius(points[i],*radius,neighbors,*scratch)
+                                             : index.QueryRadius(points[i],*radius,neighbors);
+                    if(!query)return {};
+                    return std::span<const std::uint32_t>(neighbors);
+                });
+        }
+
     }
 
     std::string_view DebugName(const KernelType kernel) noexcept
@@ -278,8 +264,49 @@ namespace Geometry::PointCloud::Kernels
             return "empty_neighborhood";
         case DensityWeightStatus::NumericalFailure:
             return "numerical_failure";
+        case DensityWeightStatus::InvalidNeighborhoods:
+            return "invalid_neighborhoods";
         }
         return "invalid";
+    }
+
+    std::optional<float> ConservativeQueryRadius(double h) noexcept
+    {
+        constexpr double maximum=std::numeric_limits<float>::max();
+        if(!std::isfinite(h) || !(h>0) || h>maximum)return {};
+        // Rounding along the distance expression and absolute underflow error fit
+        // below this margin even after downward rounding of radius squared.
+        // Using min_normal also keeps the query square out of the FTZ range.
+        constexpr double epsilon=std::numeric_limits<float>::epsilon();
+        constexpr double minimum=std::numeric_limits<float>::min();
+        const double expanded=std::sqrt(h*h*(1+8*epsilon)+8*minimum);
+        if(expanded>=maximum)return std::numeric_limits<float>::max();
+        float radius=static_cast<float>(expanded);
+        if(static_cast<double>(radius)<expanded)
+            radius=std::nextafter(radius,std::numeric_limits<float>::infinity());
+        return radius;
+    }
+
+    DensityWeightResult ComputeDensityWeightsFromNeighbors(
+        std::span<const glm::vec3> points, Geometry::PointNeighborhoods rows,
+        double supportRadius, KernelType kernel, DensityWeightMode mode)
+    {
+        auto result=InvalidRequest(points,supportRadius,kernel,mode,false);
+        result.Diagnostics.UsedSuppliedNeighborhoods=true;
+        if(!result.Succeeded())return result;
+        auto invalid=[&]{result.Status=DensityWeightStatus::InvalidNeighborhoods;return result;};
+        if(rows.Offsets.size()!=points.size()+1 || rows.Offsets.front()!=0 ||
+           rows.Offsets.back()!=rows.Indices.size())return invalid();
+        for(std::size_t i=0;i<points.size();++i)
+        {
+            const auto begin=rows.Offsets[i],end=rows.Offsets[i+1];
+            if(begin>end || end>rows.Indices.size())return invalid();
+            for(auto j=begin;j<end;++j)
+                if(rows.Indices[j]>=points.size() || (j>begin && rows.Indices[j-1]>=rows.Indices[j]))return invalid();
+        }
+        return ReduceRows(points,supportRadius,kernel,mode,std::move(result),
+            [&](std::size_t i)->std::optional<std::span<const std::uint32_t>>
+            {return rows.Indices.subspan(rows.Offsets[i],rows.Offsets[i+1]-rows.Offsets[i]);});
     }
 
     std::optional<double> Weight(

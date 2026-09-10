@@ -25,6 +25,7 @@ import Extrinsic.Runtime.SelectionController;
 import Geometry.Properties;
 import Geometry.HalfedgeMesh;
 #include "Editor/Operations/Runtime.GeometryProcessingOperations.Internal.hpp"
+#include "Editor/Operations/Runtime.GeometryProcessingOperations.RadiusRows.hpp"
 
 namespace Extrinsic::Runtime
 {
@@ -46,14 +47,12 @@ namespace Extrinsic::Runtime
             std::vector<PointPropertyWatch> Inputs{};
             PointPropertyWatch MaskWatch{}, ScoreWatch{};
             std::vector<glm::vec3> Points{};
-            std::vector<std::uint32_t> Slots{}, BeforeMask{}, AfterMask{}, NeighborIds{}, Offsets{0};
+            std::vector<std::uint32_t> Slots{}, BeforeMask{}, AfterMask{};
+            GeometryProcessingDetail::PointRadiusRows Rows{};
             std::vector<float> BeforeScore{}, AfterScore{};
             std::shared_ptr<const SpatialIndexSnapshot> Index{};
             SpatialIndexHandle GpuIndex{};
-            std::shared_ptr<SpatialNearestBatch> Batch{};
-            std::size_t NextQuery{};
-            bool GpuFinished{}, Abandoned{};
-            std::chrono::steady_clock::time_point GpuStarted{};
+            bool Abandoned{};
             std::optional<EditorKeypointAnalysisResult> MainFailure{};
             EditorKeypointAnalysisResult Result{};
         };
@@ -165,15 +164,11 @@ namespace Extrinsic::Runtime
             w.Result.CpuComputeMilliseconds=std::chrono::duration<double,std::milli>(std::chrono::steady_clock::now()-started).count();
             w.Result.Status=EditorCommandStatus::Pending;
         }
-        bool AppendRow(KeypointWork& w, std::vector<std::uint32_t>& row)
+        bool AppendRow(KeypointWork& w,std::vector<std::uint32_t>& row)
         {
-            if(row.size()>std::numeric_limits<std::uint32_t>::max()-w.NeighborIds.size())
-            {w.Result.Message="Complete keypoint support exceeds the packed neighborhood range.";return false;}
-            std::sort(row.begin(),row.end());
-            w.Result.MaximumNeighbors=std::max(w.Result.MaximumNeighbors,row.size());
-            w.NeighborIds.insert(w.NeighborIds.end(),row.begin(),row.end());
-            w.Offsets.push_back(std::uint32_t(w.NeighborIds.size()));
-            return true;
+            const bool appended=GeometryProcessingDetail::AppendPointRadiusRow(w.Rows,row,w.Result.Message);
+            w.Result.MaximumNeighbors=std::max(w.Result.MaximumNeighbors,w.Rows.MaximumNeighbors);
+            return appended;
         }
         void Compute(KeypointWork& w)
         {
@@ -201,7 +196,7 @@ namespace Extrinsic::Runtime
                         if(!AppendRow(w,row))return;
                     }
                 }
-                analysis=Features::AnalyzeKeypointsFromNeighbors(w.Points,Parameters(c),r.Scale,{w.Offsets,w.NeighborIds});
+                analysis=Features::AnalyzeKeypointsFromNeighbors(w.Points,Parameters(c),r.Scale,{w.Rows.Offsets,w.Rows.Indices});
             }
             if(!analysis) {r.Message="Keypoint analysis rejected invalid support or unrepresentable covariance.";return;}
             for(std::size_t i=0;i<w.Slots.size();++i)
@@ -212,52 +207,23 @@ namespace Extrinsic::Runtime
                 std::chrono::duration<double,std::milli>(std::chrono::steady_clock::now()-started).count();
             r.Message="Keypoint mask and saliency computed with "+r.ActualBackend+" neighborhoods; scale, covariance and suppression run on CPU.";
         }
-        bool AdvanceGpu(const EditorGeometryProcessingContext& context, KeypointWork& w)
+        bool AdvanceGpu(const EditorGeometryProcessingContext& context,KeypointWork& w)
         {
-            auto fail=[&](std::string why,EditorCommandStatus status=EditorCommandStatus::GeometryProcessingFailed)
-            {w.Result.Status=status;w.Result.Message=std::move(why);w.MainFailure=w.Result;w.Batch.reset();return true;};
-            if(w.Abandoned || !CurrentInput(context,w))return fail("Keypoint input changed or the job was cancelled.",EditorCommandStatus::StaleEntity);
-            if(w.GpuFinished)return true;
-            if(w.GpuStarted==std::chrono::steady_clock::time_point{})w.GpuStarted=std::chrono::steady_clock::now();
-            if(w.Batch)
+            if(w.Abandoned || !CurrentInput(context,w))
             {
-                if(w.Batch->State==SpatialQueryState::Failed)return fail(w.Batch->Diagnostic);
-                if(w.Batch->State!=SpatialQueryState::Ready)return false;
-                w.Result.ActualBackend="vulkan_lbvh";
-                std::vector<std::uint32_t> row;
-                for(std::size_t i=0;i<w.Batch->Counts.size();++i)
-                {
-                    w.Result.MaximumNeighbors=std::max(w.Result.MaximumNeighbors,std::size_t(w.Batch->Counts[i]));
-                    if(w.Batch->Counts[i]>w.Batch->Capacity)
-                        return fail("Vulkan keypoint radius support overflowed capacity; increase capacity or reduce radii. Previous outputs retained.");
-                    row.clear();
-                    for(std::uint32_t j=0;j<w.Batch->Counts[i];++j)
-                    {
-                        const auto id=w.Batch->Neighbors[i*w.Batch->Capacity+j].Index;
-                        const auto found=std::lower_bound(w.Slots.begin(),w.Slots.end(),id);
-                        if(found==w.Slots.end() || *found!=id || id==w.Slots[w.NextQuery+i])
-                            return fail("Invalid Vulkan keypoint source row.");
-                        row.push_back(std::uint32_t(found-w.Slots.begin()));
-                    }
-                    if(!AppendRow(w,row))return fail(w.Result.Message);
-                }
-                w.NextQuery+=w.Batch->Counts.size();
-                if(w.NextQuery==w.Points.size())
-                {
-                    w.Batch.reset();w.GpuFinished=true;
-                    w.Result.GpuNeighborhoodMilliseconds=std::chrono::duration<double,std::milli>(std::chrono::steady_clock::now()-w.GpuStarted).count();
-                    return true;
-                }
+                w.Result.Status=EditorCommandStatus::StaleEntity;
+                w.Result.Message="Keypoint input changed or the job was cancelled.";
+                w.MainFailure=w.Result;w.Rows.Batch.reset();return true;
             }
-            const auto count=std::min<std::size_t>(w.Config.GpuQueryBatchSize,w.Points.size()-w.NextQuery);
-            if(w.Batch && w.Batch->Counts.size()!=count)w.Batch.reset();
-            w.Batch=context.SpatialIndices->QueueGpuRadius(w.GpuIndex,std::span(w.Points).subspan(w.NextQuery,count),
-                std::max(w.Result.Scale.SalientRadius,w.Result.Scale.NonMaxRadius),
-                std::uint32_t(std::min<std::size_t>(w.Config.GpuRadiusCapacity,w.Points.size()-1)),
-                std::span<const std::uint32_t>(w.Slots).subspan(w.NextQuery,count),std::move(w.Batch));
-            ++w.Result.GpuQueryBatches;
-            if(w.Batch->State==SpatialQueryState::Failed)return fail(w.Batch->Diagnostic);
-            return false;
+            std::string diagnostic;
+            const auto state=GeometryProcessingDetail::AdvancePointRadiusRows(*context.SpatialIndices,w.GpuIndex,
+                w.Points,w.Slots,std::max(w.Result.Scale.SalientRadius,w.Result.Scale.NonMaxRadius),w.Config.GpuQueryBatchSize,w.Config.GpuRadiusCapacity,0,w.Rows,diagnostic);
+            w.Result.MaximumNeighbors=w.Rows.MaximumNeighbors;w.Result.GpuQueryBatches=w.Rows.QueryBatches;
+            w.Result.GpuNeighborhoodMilliseconds=w.Rows.Milliseconds;
+            if(w.Rows.Queried)w.Result.ActualBackend="vulkan_lbvh";
+            if(state==GeometryProcessingDetail::RadiusRowsState::Failed)
+            {w.Result.Status=EditorCommandStatus::GeometryProcessingFailed;w.Result.Message=std::move(diagnostic);w.MainFailure=w.Result;}
+            return state!=GeometryProcessingDetail::RadiusRowsState::Pending;
         }
         EditorKeypointAnalysisResult Publish(const EditorGeometryProcessingContext& context,
                                             const std::shared_ptr<KeypointWork>& w)
@@ -391,7 +357,7 @@ namespace Extrinsic::Runtime
                 .DebugName="Keypoint radius support (Vulkan)",.Scope=context.World,.Kind=RuntimeTaskKinds::GeometryProcess,
                 .Work=[](const JobCancellation&){return JobResultEnvelope::Make(true);},
                 .IsReadyToApply=[context,w]{return AdvanceGpu(context,*w);},
-                .PublishCompletion=[w](KernelEventBus&,const JobResultEnvelope&){return w->GpuFinished;},
+                .PublishCompletion=[w](KernelEventBus&,const JobResultEnvelope&){return w->Rows.Finished;},
                 .FinalizeUnpublishedOnMainThread=[w]{w->Abandoned=true;}};
             gpu.DependsOn.push_back({scale,"Resolve keypoint radii before complete Vulkan support"});
             const auto support=context.JobCommands.Submit(std::move(gpu),identity);

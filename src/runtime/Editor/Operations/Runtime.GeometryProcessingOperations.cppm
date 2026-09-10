@@ -45,6 +45,7 @@ export import Extrinsic.Runtime.PointSpacingConfig;
 export import Extrinsic.Runtime.BilateralFilterConfig;
 export import Extrinsic.Runtime.KeypointAnalysisConfig;
 export import Extrinsic.Runtime.DescriptorAnalysisConfig;
+export import Extrinsic.Runtime.DensityWeightConfig;
 import Extrinsic.Runtime.SpatialIndexCache;
 export import Geometry.Geodesic;
 export import Extrinsic.Runtime.PointCloudConsolidationConfig;
@@ -945,6 +946,27 @@ export namespace Extrinsic::Runtime
         std::string Diagnostic{};
         DescriptorAnalysisConfig Resolved{};
     };
+    struct EditorDensityWeightResult
+    {
+        EditorCommandStatus Status{EditorCommandStatus::NoChange};
+        DensityWeightBackend RequestedBackend{DensityWeightBackend::CpuKDTree};
+        GeometryPropertyRef Weights{};
+        std::string ActualBackend{}, Message{};
+        std::size_t SlotCount{}, LiveCount{}, WrittenCount{};
+        Geometry::PointCloud::Kernels::DensityWeightDiagnostics Diagnostics{};
+        float QueryRadius{}, MinWeight{}, MaxWeight{};
+        std::size_t MaximumNeighbors{};
+        bool IndexReused{};
+        std::size_t GpuQueryBatches{};
+        double GpuNeighborhoodMilliseconds{}, CpuComputeMilliseconds{};
+        [[nodiscard]] bool Succeeded() const noexcept { return Status==EditorCommandStatus::Applied || Status==EditorCommandStatus::NoChange; }
+    };
+    struct EditorDensityWeightReadiness
+    {
+        bool Ready{};
+        std::string Diagnostic{};
+        DensityWeightConfig Resolved{};
+    };
     struct EditorKernelDensityResult
     {
         EditorCommandStatus Status{EditorCommandStatus::NoChange};
@@ -1100,6 +1122,7 @@ export namespace Extrinsic::Runtime
         BilateralFilter,
         KeypointAnalysis,
         DescriptorAnalysis,
+        DensityWeight,
     };
 
     struct EditorMethodResultSinks
@@ -1125,6 +1148,7 @@ export namespace Extrinsic::Runtime
         std::function<void(EditorBilateralFilterResult)> BilateralFilter{};
         std::function<void(EditorKeypointAnalysisResult)> KeypointAnalysis{};
         std::function<void(EditorDescriptorAnalysisResult)> DescriptorAnalysis{};
+        std::function<void(EditorDensityWeightResult)> DensityWeight{};
     };
 
     struct EditorGeometryProcessingModel
@@ -1261,6 +1285,7 @@ export namespace Extrinsic::Runtime
         const EditorBilateralFilterResult* LastBilateralFilterResult{nullptr};
         const EditorKeypointAnalysisResult* LastKeypointAnalysisResult{nullptr};
         const EditorDescriptorAnalysisResult* LastDescriptorAnalysisResult{nullptr};
+        const EditorDensityWeightResult* LastDensityWeightResult{nullptr};
         const RuntimeEngineConfigControlState* EngineConfigControlState{nullptr};
         std::function<Core::Config::EngineConfigLoadResult(const std::string&, const std::string&)>
             PreviewEngineConfigDocument{};
@@ -1723,6 +1748,7 @@ export namespace Extrinsic::Runtime
         std::optional<EditorBilateralFilterResult> LastBilateralFilterResult{};
         std::optional<EditorKeypointAnalysisResult> LastKeypointAnalysisResult{};
         std::optional<EditorDescriptorAnalysisResult> LastDescriptorAnalysisResult{};
+        std::optional<EditorDensityWeightResult> LastDensityWeightResult{};
     };
 
     struct EditorGeometryProcessingPreparedFrame
@@ -1983,6 +2009,33 @@ export namespace Extrinsic::Runtime
     [[nodiscard]] std::optional<DescriptorAnalysisConfig> GetEditorDescriptorAnalysisConfig(
         const EditorGeometryProcessingCommands &commands);
     [[nodiscard]] EditorDescriptorAnalysisResult ApplyEditorConfiguredDescriptorAnalysis(
+        const EditorGeometryProcessingCommands &commands);
+    [[nodiscard]] EditorDensityWeightReadiness PreviewEditorDensityWeightCommand(
+        const EditorGeometryProcessingContext &context, const DensityWeightConfig &config);
+    [[nodiscard]] GeometryPropertyCatalogSnapshot GetEditorDensityWeightInputCatalog(
+        const EditorGeometryProcessingContext &context, std::uint32_t stableId);
+    [[nodiscard]] EditorDensityWeightResult ApplyEditorDensityWeightCommand(
+        const EditorGeometryProcessingContext &context, const DensityWeightConfig &config);
+    [[nodiscard]] RuntimeEngineConfigApplyResult ApplyEditorDensityWeightConfig(
+        const EditorGeometryProcessingContext &context, const DensityWeightConfig &config,
+        std::string sourceId = {});
+    [[nodiscard]] std::optional<DensityWeightConfig> GetEditorDensityWeightConfig(
+        const EditorGeometryProcessingContext &context);
+    [[nodiscard]] EditorDensityWeightResult ApplyEditorConfiguredDensityWeight(
+        const EditorGeometryProcessingContext &context);
+
+    [[nodiscard]] EditorDensityWeightReadiness PreviewEditorDensityWeightCommand(
+        const EditorGeometryProcessingCommands &commands, const DensityWeightConfig &config);
+    [[nodiscard]] GeometryPropertyCatalogSnapshot GetEditorDensityWeightInputCatalog(
+        const EditorGeometryProcessingCommands &commands, std::uint32_t stableId);
+    [[nodiscard]] EditorDensityWeightResult ApplyEditorDensityWeightCommand(
+        const EditorGeometryProcessingCommands &commands, const DensityWeightConfig &config);
+    [[nodiscard]] RuntimeEngineConfigApplyResult ApplyEditorDensityWeightConfig(
+        const EditorGeometryProcessingCommands &commands, const DensityWeightConfig &config,
+        std::string sourceId = {});
+    [[nodiscard]] std::optional<DensityWeightConfig> GetEditorDensityWeightConfig(
+        const EditorGeometryProcessingCommands &commands);
+    [[nodiscard]] EditorDensityWeightResult ApplyEditorConfiguredDensityWeight(
         const EditorGeometryProcessingCommands &commands);
 
 

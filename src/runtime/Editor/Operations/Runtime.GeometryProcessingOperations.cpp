@@ -2468,6 +2468,47 @@ namespace Extrinsic::Runtime
             return std::nullopt;
         return GetDescriptorAnalysisConfig(context.EngineConfigControlState->ActiveConfig);
     }
+    RuntimeEngineConfigApplyResult ApplyEditorDensityWeightConfig(
+        const EditorGeometryProcessingContext& context, const DensityWeightConfig& config,
+        std::string sourceId)
+    {
+        RuntimeEngineConfigApplyResult result{
+            .Status = RuntimeEngineConfigApplyStatus::Rejected,
+            .Source = RuntimeConfigControlSource::Editor,
+        };
+        const auto validation = ValidateDensityWeightConfigSection(
+            SerializeDensityWeightConfig(config), {}, kDensityWeightConfigSectionName);
+        if (!validation.Usable())
+        {
+            result.LoadResult.Diagnostics = validation.Diagnostics;
+            return result;
+        }
+        if (context.EngineConfigControlState == nullptr || !context.PreviewEngineConfigDocument ||
+            !context.ApplyEngineConfigHotSubset || !context.EngineConfigCommandsAvailable)
+        {
+            return result;
+        }
+
+        Core::Config::EngineConfig candidate = context.EngineConfigControlState->ActiveConfig;
+        SetDensityWeightConfig(candidate, config);
+        if (sourceId.empty())
+        {
+            sourceId = std::string{kDensityWeightConfigSectionName};
+        }
+        result.LoadResult = context.PreviewEngineConfigDocument(
+            Core::Config::SerializeEngineConfig(candidate), sourceId);
+        if (!Core::Config::IsConfigUsable(result.LoadResult))
+            return result;
+        return context.ApplyEngineConfigHotSubset(result.LoadResult);
+    }
+
+    std::optional<DensityWeightConfig> GetEditorDensityWeightConfig(
+        const EditorGeometryProcessingContext& context)
+    {
+        if (context.EngineConfigControlState == nullptr)
+            return std::nullopt;
+        return GetDensityWeightConfig(context.EngineConfigControlState->ActiveConfig);
+    }
 
 
 }

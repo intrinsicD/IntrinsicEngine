@@ -389,6 +389,12 @@ namespace Extrinsic::Sandbox::Editor
             Runtime::KernelDensityConfig Draft{};
             std::string LastApplied{}, ConfigDiagnostic{}, VisualizationDiagnostic{};
         };
+        struct DensityWeightsState
+        {
+            std::optional<Runtime::EditorDensityWeightResult> LastResult{};
+            Runtime::DensityWeightConfig Draft{};
+            std::string LastApplied{}, ConfigDiagnostic{}, VisualizationDiagnostic{};
+        };
         struct SpacingState
         {
             std::optional<Runtime::EditorPointSpacingResult> LastResult{};
@@ -441,6 +447,7 @@ namespace Extrinsic::Sandbox::Editor
         KeypointsState Keypoints{};
         DescriptorsState Descriptors{};
         DensityState Density{};
+        DensityWeightsState DensityWeights{};
         SpacingState Spacing{};
         BilateralState Bilateral{};
 
@@ -476,6 +483,7 @@ namespace Extrinsic::Sandbox::Editor
         void DrawKeypointsWindow(bool&, const SandboxEditorContext&);
         void DrawDescriptorsWindow(bool&, const SandboxEditorContext&);
         void DrawDensityWindow(bool&, const SandboxEditorContext&);
+        void DrawDensityWeightsWindow(bool&, const SandboxEditorContext&);
         void DrawSpacingWindow(bool&, const SandboxEditorContext&);
         void DrawBilateralWindow(bool&, const SandboxEditorContext&);
         void DrawRegistrationWindow(bool&, const SandboxEditorContext&);
@@ -563,6 +571,18 @@ namespace Extrinsic::Sandbox::Editor
                 .OpenStateChanged=[this,id](bool open){
                     if(!open)return;
                     (void)Shell->SetEditorWindowOpen("view.kernel_density",true);
+                    (void)Shell->SetEditorWindowOpen(id,false);
+                }}));
+        RegisterWindow("view.density_weights", {"View"}, "Compact Density Weights", &Impl::DrawDensityWeightsWindow);
+        for (const auto& [id, domain] : std::array<std::pair<const char*, const char*>, 3>{
+                 {{"mesh.processing.density_weights", "Mesh"}, {"graph.processing.density_weights", "Graph"},
+                  {"pointcloud.processing.density_weights", "PointCloud"}}})
+            Handles.push_back(Shell->RegisterEditorWindow({
+                .Id=id, .MenuPath={domain,"Processing"}, .Title="Compact Density Weights",
+                .Draw=[](bool& open,const SandboxEditorContext&){open=false;},
+                .OpenStateChanged=[this,id](bool open){
+                    if(!open)return;
+                    (void)Shell->SetEditorWindowOpen("view.density_weights",true);
                     (void)Shell->SetEditorWindowOpen(id,false);
                 }}));
         RegisterWindow("view.point_spacing", {"View"}, "Point Spacing and Radii", &Impl::DrawSpacingWindow);
@@ -659,6 +679,7 @@ namespace Extrinsic::Sandbox::Editor
         Keypoints = {};
         Descriptors = {};
         Density = {};
+        DensityWeights = {};
         Spacing = {};
         Bilateral = {};
     }
@@ -2917,6 +2938,154 @@ namespace Extrinsic::Sandbox::Editor
             ImGui::Text("Bandwidth %.5g; density min / mean / max: %.5g / %.5g / %.5g",double(result.UsedBandwidth),double(result.MinDensity),double(result.MeanDensity),double(result.MaxDensity));
             ImGui::TextWrapped("%s",result.Message.c_str());
             DrawDismissLastResultButton("Dismiss##Density",Density.LastResult,Runtime::EditorGeometryProcessingResultSlot::KernelDensity,context);
+        }
+        ImGui::End();
+    }
+
+    void MeshProcessingPanels::Impl::DrawDensityWeightsWindow(bool &open, const SandboxEditorContext &context)
+    {
+        if (context.GeometryResults.LastDensityWeightResult)
+            DensityWeights.LastResult = context.GeometryResults.LastDensityWeightResult;
+        ImGui::SetNextWindowSize(ImVec2(460, 600), ImGuiCond_FirstUseEver);
+        if (!ImGui::Begin("Compact Density Weights", &open))
+        {
+            ImGui::End();
+            return;
+        }
+        const auto active = Runtime::GetEditorDensityWeightConfig(context.GeometryCommands)
+                                .value_or(Runtime::DensityWeightConfig{});
+        const auto serialized = Runtime::SerializeDensityWeightConfig(active);
+        if (serialized != DensityWeights.LastApplied)
+        {
+            DensityWeights.Draft = active;
+            DensityWeights.LastApplied = serialized;
+            DensityWeights.ConfigDiagnostic.clear();
+        }
+        auto &config = DensityWeights.Draft;
+        bool changed = false;
+        const auto workspace =
+            Runtime::BuildEditorWorkspaceSnapshot(context.SnapshotQueries, {.Hierarchy = true,
+                                                                            .Inspector = false,
+                                                                            .Selection = false,
+                                                                            .Document = false,
+                                                                            .SceneFile = false,
+                                                                            .FileImport = false,
+                                                                            .AssetImportQueue = false,
+                                                                            .RenderGraph = false,
+                                                                            .RenderRecipe = false,
+                                                                            .CameraRender = false,
+                                                                            .Visualization = false});
+        if (context.Selection && !context.Selection->SelectedStableIds.empty() &&
+            ImGui::Button("Use selected entity"))
+        {
+            config.StableEntityId = context.Selection->SelectedStableIds.front();
+            changed = true;
+        }
+        std::string entityName =
+            config.StableEntityId ? std::to_string(config.StableEntityId) : "Choose entity";
+        for (const auto &row : workspace.Hierarchy)
+            if (row.StableEntityId == config.StableEntityId)
+                entityName = row.Name;
+        if (ImGui::BeginCombo("Entity##DensityWeights", entityName.c_str()))
+        {
+            for (const auto &row : workspace.Hierarchy)
+            {
+                if (Runtime::GetEditorDensityWeightInputCatalog(context.GeometryCommands,
+                                                                   row.StableEntityId)
+                        .Entries.empty())
+                    continue;
+                const auto title = row.Name + " (" + std::to_string(row.StableEntityId) + ")";
+                if (ImGui::Selectable(title.c_str(), row.StableEntityId == config.StableEntityId))
+                {
+                    config.StableEntityId = row.StableEntityId;
+                    changed = true;
+                }
+            }
+            ImGui::EndCombo();
+        }
+        const auto inputName =
+            std::string(Runtime::ToString(config.Positions.Domain)) + ": " + config.Positions.Name;
+        if (ImGui::BeginCombo("Positions##DensityWeights", inputName.c_str()))
+        {
+            const auto catalog = Runtime::GetEditorDensityWeightInputCatalog(context.GeometryCommands, config.StableEntityId);
+            auto previousDomain = Runtime::GeometryElementDomain::Unknown;
+            for (const auto &row : catalog.Entries)
+            {
+                if (row.Ref.Domain != previousDomain)
+                {
+                    ImGui::SeparatorText(std::string(Runtime::ToString(row.Ref.Domain)).c_str());
+                    previousDomain = row.Ref.Domain;
+                }
+                const auto label = std::string(Runtime::ToString(row.Ref.Domain)) + ": " + row.Ref.Name +
+                                   " (" + std::to_string(row.ElementCount) + ")";
+                if (ImGui::Selectable(label.c_str(), row.Ref == config.Positions))
+                {
+                    config.Positions = row.Ref;
+                    config.Weights.Domain = row.Ref.Domain;
+                    changed = true;
+                }
+            }
+            ImGui::EndCombo();
+        }
+        for (auto [label, ref] : {std::pair{"Weight property", &config.Weights}})
+        {
+            std::array<char,512> name{};
+            std::copy_n(ref->Name.c_str(),std::min(ref->Name.size(),name.size()-1),name.data());
+            if (ImGui::InputText(label,name.data(),name.size())) {ref->Name=name.data();changed=true;}
+        }
+        int backend=int(config.Backend);
+        if(ImGui::Combo("Neighbors",&backend,"CPU KD-tree\0CPU LBVH (cached)\0Vulkan LBVH\0")) {config.Backend=Runtime::DensityWeightBackend(backend);changed=true;}
+        changed |= ImGui::InputDouble("Support radius",&config.SupportRadius);
+        int kernel=int(config.Kernel),mode=int(config.Mode);
+        if(ImGui::Combo("Kernel",&kernel,"Gaussian (sigma = h/4)\0LOP theta\0Wendland C2\0"))
+        {config.Kernel=decltype(config.Kernel)(kernel);changed=true;}
+        if(ImGui::Combo("Weight",&mode,"Direct\0Reciprocal\0"))
+        {config.Mode=decltype(config.Mode)(mode);changed=true;}
+        ImGui::TextWrapped("Sums compact kernel contributions inside the support radius, with a leading 1. An isolated sample has weight 1. Units follow the selected position property.");
+        if(config.Backend==Runtime::DensityWeightBackend::VulkanLBVH)
+        {
+            changed |= ImGui::InputScalar("GPU query batch size",ImGuiDataType_U32,&config.GpuQueryBatchSize);
+            changed |= ImGui::InputScalar("GPU radius capacity",ImGuiDataType_U32,&config.GpuRadiusCapacity);
+            ImGui::TextWrapped("Vulkan collects complete conservative radius candidates. Overflow leaves the previous output unchanged. Subnormal coordinate components are unsupported.");
+        }
+        if(changed)
+        {
+            const auto applied=Runtime::ApplyEditorDensityWeightConfig(context.GeometryCommands,config);
+            DensityWeights.ConfigDiagnostic=applied.Succeeded()?"":"Controls were rejected by density config validation.";
+        }
+        if(!DensityWeights.ConfigDiagnostic.empty())ImGui::TextWrapped("%s",DensityWeights.ConfigDiagnostic.c_str());
+        auto analyze=config;
+        const auto readiness=Runtime::PreviewEditorDensityWeightCommand(context.GeometryCommands,analyze);
+        if(!readiness.Ready)ImGui::TextWrapped("%s",readiness.Diagnostic.c_str());
+        const auto execute=[&](Runtime::DensityWeightConfig request){
+            const auto applied=Runtime::ApplyEditorDensityWeightConfig(context.GeometryCommands,request);
+            if(applied.Succeeded())
+                PublishCommandResult(DensityWeights.LastResult,Runtime::ApplyEditorConfiguredDensityWeight(context.GeometryCommands),context.MethodResultSinks.DensityWeight);
+            else DensityWeights.ConfigDiagnostic="Density config was rejected.";
+        };
+        ImGui::BeginDisabled(!context.GeometryConfigCommandsAvailable || !readiness.Ready || !DensityWeights.ConfigDiagnostic.empty());
+        if(ImGui::Button("Compute compact weights"))execute(analyze);
+        ImGui::EndDisabled();
+        ImGui::TextWrapped("Vulkan computes radius candidates; strict support and kernel reduction run on CPU. The named weight property supports Undo.");
+        auto density=readiness.Ready?readiness.Resolved.Weights:config.Weights;
+        if(ImGui::Button("Show weights"))
+            DensityWeights.VisualizationDiagnostic=Runtime::DebugNameForEditorCommandStatus(Runtime::ApplyEditorVisualizationRecipeCommand(
+                context.VisualizationCommands,{.StableEntityId=config.StableEntityId,
+                .Recipe={.Data=Runtime::ScalarVisualizationRecipe{.Source=density,.OutputName=density.Name+".colors"}}}));
+        if(!DensityWeights.VisualizationDiagnostic.empty())ImGui::Text("Display: %s",DensityWeights.VisualizationDiagnostic.c_str());
+        if(DensityWeights.LastResult)
+        {
+            const auto& result=*DensityWeights.LastResult;
+            ImGui::Separator();
+            ImGui::Text("Status: %s",Runtime::DebugNameForEditorCommandStatus(result.Status));
+            ImGui::Text("Requested: %s; ran: %s",Runtime::ToString(result.RequestedBackend),result.ActualBackend.c_str());
+            ImGui::Text("Live / total: %zu / %zu",result.LiveCount,result.SlotCount);
+            ImGui::Text("Weight min / max: %.5g / %.5g",double(result.MinWeight),double(result.MaxWeight));
+            ImGui::Text("Contributions: %zu; largest candidate row: %zu",result.Diagnostics.NeighborContributionCount,result.MaximumNeighbors);
+            ImGui::Text("Query radius %.5g; GPU batches %zu",double(result.QueryRadius),result.GpuQueryBatches);
+            ImGui::Text("Cache reused: %s; CPU %.3f ms; GPU neighborhoods %.3f ms",result.IndexReused?"yes":"no",result.CpuComputeMilliseconds,result.GpuNeighborhoodMilliseconds);
+            ImGui::TextWrapped("%s",result.Message.c_str());
+            DrawDismissLastResultButton("Dismiss##DensityWeights",DensityWeights.LastResult,Runtime::EditorGeometryProcessingResultSlot::DensityWeight,context);
         }
         ImGui::End();
     }

@@ -25,6 +25,7 @@ import Extrinsic.Runtime.SelectionController;
 import Geometry.Properties;
 import Geometry.HalfedgeMesh;
 #include "Editor/Operations/Runtime.GeometryProcessingOperations.Internal.hpp"
+#include "Editor/Operations/Runtime.GeometryProcessingOperations.RadiusRows.hpp"
 
 namespace Extrinsic::Runtime
 {
@@ -46,14 +47,12 @@ namespace Extrinsic::Runtime
             std::vector<PointPropertyWatch> Inputs{};
             std::array<PointPropertyWatch,33> OutputWatches{};
             std::vector<glm::vec3> Points{}, Normals{};
-            std::vector<std::uint32_t> Slots{}, NeighborIds{}, Offsets{0};
+            std::vector<std::uint32_t> Slots{};
+            GeometryProcessingDetail::PointRadiusRows Rows{};
             std::array<std::vector<float>,33> BeforeOutputs{}, AfterOutputs{};
             std::shared_ptr<const SpatialIndexSnapshot> Index{};
             SpatialIndexHandle GpuIndex{};
-            std::shared_ptr<SpatialNearestBatch> Batch{};
-            std::size_t NextQuery{};
-            bool GpuFinished{}, Abandoned{};
-            std::chrono::steady_clock::time_point GpuStarted{};
+            bool Abandoned{};
             std::optional<EditorDescriptorAnalysisResult> MainFailure{};
             EditorDescriptorAnalysisResult Result{};
         };
@@ -168,15 +167,11 @@ namespace Extrinsic::Runtime
             w.Result.CpuComputeMilliseconds=std::chrono::duration<double,std::milli>(std::chrono::steady_clock::now()-started).count();
             w.Result.Status=EditorCommandStatus::Pending;
         }
-        bool AppendRow(DescriptorWork& w, std::vector<std::uint32_t>& row)
+        bool AppendRow(DescriptorWork& w,std::vector<std::uint32_t>& row)
         {
-            if(row.size()>std::numeric_limits<std::uint32_t>::max()-w.NeighborIds.size())
-            {w.Result.Message="Complete descriptor support exceeds the packed neighborhood range.";return false;}
-            std::sort(row.begin(),row.end());
-            w.Result.MaximumNeighbors=std::max(w.Result.MaximumNeighbors,row.size());
-            w.NeighborIds.insert(w.NeighborIds.end(),row.begin(),row.end());
-            w.Offsets.push_back(std::uint32_t(w.NeighborIds.size()));
-            return true;
+            const bool appended=GeometryProcessingDetail::AppendPointRadiusRow(w.Rows,row,w.Result.Message);
+            w.Result.MaximumNeighbors=std::max(w.Result.MaximumNeighbors,w.Rows.MaximumNeighbors);
+            return appended;
         }
         void Compute(DescriptorWork& w)
         {
@@ -207,7 +202,7 @@ namespace Extrinsic::Runtime
                         if(!AppendRow(w,row))return;
                     }
                 }
-                analysis=Features::ComputeDescriptorsFromNeighbors(w.Points,w.Normals,{},Parameters(c),r.Scale,{w.Offsets,w.NeighborIds});
+                analysis=Features::ComputeDescriptorsFromNeighbors(w.Points,w.Normals,{},Parameters(c),r.Scale,{w.Rows.Offsets,w.Rows.Indices});
             }
             if(!analysis) {r.Message="Descriptor analysis rejected invalid support or invalid normals.";return;}
             for(std::size_t i=0;i<w.Slots.size();++i)for(unsigned b=0;b<33;++b)
@@ -218,55 +213,23 @@ namespace Extrinsic::Runtime
                 std::chrono::duration<double,std::milli>(std::chrono::steady_clock::now()-started).count();
             r.Message="FPFH histogram columns computed with "+r.ActualBackend+" neighborhoods; scale, SPFH and FPFH run on CPU.";
         }
-        bool AdvanceGpu(const EditorGeometryProcessingContext& context, DescriptorWork& w)
+        bool AdvanceGpu(const EditorGeometryProcessingContext& context,DescriptorWork& w)
         {
-            auto fail=[&](std::string why,EditorCommandStatus status=EditorCommandStatus::GeometryProcessingFailed)
-            {w.Result.Status=status;w.Result.Message=std::move(why);w.MainFailure=w.Result;w.Batch.reset();return true;};
-            if(w.Abandoned || !CurrentInput(context,w))return fail("Descriptor input changed or the job was cancelled.",EditorCommandStatus::StaleEntity);
-            if(w.GpuFinished)return true;
-            if(w.GpuStarted==std::chrono::steady_clock::time_point{})w.GpuStarted=std::chrono::steady_clock::now();
-            if(w.Batch)
+            if(w.Abandoned || !CurrentInput(context,w))
             {
-                if(w.Batch->State==SpatialQueryState::Failed)return fail(w.Batch->Diagnostic);
-                if(w.Batch->State!=SpatialQueryState::Ready)return false;
-                w.Result.ActualBackend="vulkan_lbvh";
-                std::vector<std::uint32_t> row;
-                for(std::size_t i=0;i<w.Batch->Counts.size();++i)
-                {
-                    w.Result.MaximumNeighbors=std::max(w.Result.MaximumNeighbors,std::size_t(w.Batch->Counts[i]));
-                    const auto required=w.Config.MaxNeighbors?std::min(w.Config.MaxNeighbors,w.Batch->Counts[i]):w.Batch->Counts[i];
-                    if(required>w.Batch->Capacity)
-                        return fail("Vulkan descriptor radius support overflowed capacity; increase capacity, set a supported neighbor cap or reduce radius. Previous outputs retained.");
-                    row.clear();
-                    for(std::uint32_t j=0;j<required;++j)
-                    {
-                        const auto id=w.Batch->Neighbors[i*w.Batch->Capacity+j].Index;
-                        const auto found=std::lower_bound(w.Slots.begin(),w.Slots.end(),id);
-                        if(found==w.Slots.end() || *found!=id || id==w.Slots[w.NextQuery+i])
-                            return fail("Invalid Vulkan descriptor source row.");
-                        row.push_back(std::uint32_t(found-w.Slots.begin()));
-                    }
-                    if(!AppendRow(w,row))return fail(w.Result.Message);
-                }
-                w.NextQuery+=w.Batch->Counts.size();
-                if(w.NextQuery==w.Points.size())
-                {
-                    w.Batch.reset();w.GpuFinished=true;
-                    w.Result.GpuNeighborhoodMilliseconds=std::chrono::duration<double,std::milli>(std::chrono::steady_clock::now()-w.GpuStarted).count();
-                    return true;
-                }
+                w.Result.Status=EditorCommandStatus::StaleEntity;
+                w.Result.Message="Descriptor input changed or the job was cancelled.";
+                w.MainFailure=w.Result;w.Rows.Batch.reset();return true;
             }
-            const auto count=std::min<std::size_t>(w.Config.GpuQueryBatchSize,w.Points.size()-w.NextQuery);
-            if(w.Batch && w.Batch->Counts.size()!=count)w.Batch.reset();
-            auto capacity=std::uint32_t(std::min<std::size_t>(w.Config.GpuRadiusCapacity,w.Points.size()-1));
-            if(w.Config.MaxNeighbors)capacity=std::min(capacity,w.Config.MaxNeighbors);
-            w.Batch=context.SpatialIndices->QueueGpuRadius(w.GpuIndex,std::span(w.Points).subspan(w.NextQuery,count),
-                w.Result.Scale.FeatureRadius,
-                capacity,
-                std::span<const std::uint32_t>(w.Slots).subspan(w.NextQuery,count),std::move(w.Batch));
-            ++w.Result.GpuQueryBatches;
-            if(w.Batch->State==SpatialQueryState::Failed)return fail(w.Batch->Diagnostic);
-            return false;
+            std::string diagnostic;
+            const auto state=GeometryProcessingDetail::AdvancePointRadiusRows(*context.SpatialIndices,w.GpuIndex,
+                w.Points,w.Slots,w.Result.Scale.FeatureRadius,w.Config.GpuQueryBatchSize,w.Config.GpuRadiusCapacity,w.Config.MaxNeighbors,w.Rows,diagnostic);
+            w.Result.MaximumNeighbors=w.Rows.MaximumNeighbors;w.Result.GpuQueryBatches=w.Rows.QueryBatches;
+            w.Result.GpuNeighborhoodMilliseconds=w.Rows.Milliseconds;
+            if(w.Rows.Queried)w.Result.ActualBackend="vulkan_lbvh";
+            if(state==GeometryProcessingDetail::RadiusRowsState::Failed)
+            {w.Result.Status=EditorCommandStatus::GeometryProcessingFailed;w.Result.Message=std::move(diagnostic);w.MainFailure=w.Result;}
+            return state!=GeometryProcessingDetail::RadiusRowsState::Pending;
         }
         EditorDescriptorAnalysisResult Publish(const EditorGeometryProcessingContext& context,
                                             const std::shared_ptr<DescriptorWork>& w)
@@ -380,7 +343,7 @@ namespace Extrinsic::Runtime
                 .DebugName="Descriptor radius support (Vulkan)",.Scope=context.World,.Kind=RuntimeTaskKinds::GeometryProcess,
                 .Work=[](const JobCancellation&){return JobResultEnvelope::Make(true);},
                 .IsReadyToApply=[context,w]{return AdvanceGpu(context,*w);},
-                .PublishCompletion=[w](KernelEventBus&,const JobResultEnvelope&){return w->GpuFinished;},
+                .PublishCompletion=[w](KernelEventBus&,const JobResultEnvelope&){return w->Rows.Finished;},
                 .FinalizeUnpublishedOnMainThread=[w]{w->Abandoned=true;}};
             gpu.DependsOn.push_back({scale,"Resolve descriptor radius before complete Vulkan support"});
             const auto support=context.JobCommands.Submit(std::move(gpu),identity);

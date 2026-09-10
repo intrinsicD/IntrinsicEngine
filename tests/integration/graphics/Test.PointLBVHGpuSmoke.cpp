@@ -1,5 +1,6 @@
 #include "RuntimeTestModule.hpp"
 #include <algorithm>
+#include <bit>
 #include <entt/entity/entity.hpp>
 #include <glm/glm.hpp>
 #include <gtest/gtest.h>
@@ -2193,4 +2194,262 @@ TEST(PointLBVHGpuSmoke, DescriptorLowestIdCapSupportsDenseRadius)
     Intrinsic::Tests::RuntimeTestKernel engine(config,std::move(app));engine.EmplaceModule<Runtime::SpatialIndexCache>();
     engine.Initialize();Shutdown shutdown{engine};engine.Run();ASSERT_TRUE(engine.GetDevice().IsOperational());
     ASSERT_FALSE(run->TimedOut)<<"phase="<<run->Phase;ASSERT_TRUE(run->Done);
+}
+
+namespace
+{
+    class DensityWeightApp final : public Intrinsic::Tests::RuntimeTestModule
+    {
+    public:
+        Geometry::PropertySet& Props(unsigned d)
+        {
+            return *const_cast<Geometry::PropertySet*>(Runtime::ResolveGeometryPropertySet(
+                Runtime::BuildGeometryAvailability(Context.Scene->Raw(),Entities[d-1]),Domain(d)));
+        }
+
+        Runtime::DensityWeightConfig Config(unsigned d) const
+        {
+            Runtime::DensityWeightConfig c;
+            c.StableEntityId=Runtime::SelectionController::ToStableEntityId(Entities[d-1]);
+            c.Positions={Domain(d),"samples",Geometry::PropertyValueKind::Vec3};
+            c.Weights={Domain(d),"weights",Geometry::PropertyValueKind::Float};c.SupportRadius=2;
+            c.Backend=Runtime::DensityWeightBackend::VulkanLBVH;c.GpuQueryBatchSize=128;
+            if(Phase==2 || Phase==3 || Phase>=20)c.Kernel=decltype(c.Kernel)::Gaussian;
+            if(Phase==4 || Phase==5)c.Kernel=decltype(c.Kernel)::WendlandC2;
+            if(Phase==3 || Phase==5 || Phase==6)c.Mode=decltype(c.Mode)::Reciprocal;
+            if(Phase==12)c.GpuRadiusCapacity=1024;
+            if(Phase==20 || Phase==21)c.SupportRadius=4.6766236639043417e-23;
+            if(Phase==22)c.SupportRadius=1e-310;
+            return c;
+        }
+        void Resolve() override
+        {
+            Started=std::chrono::steady_clock::now();
+            Context.Scene=Kernel().Worlds().Get(Kernel().ActiveWorld());Context.World=Kernel().ActiveWorld();
+            Context.SpatialIndices=Kernel().Services().Find<Runtime::SpatialIndexCache>();
+            std::mt19937 random(251);std::uniform_real_distribution<float> dist(-1,1);
+            std::vector<glm::vec3> points;
+            for(unsigned i=0;i<66;++i){const float x=dist(random),y=dist(random);points.push_back({x,y,.1f*dist(random)});}
+            points[0]={0,0,0};points[1]={2,0,0};points[2]=points[0];
+            points[3]={std::nextafter(2.f,3.f),0,0};points[65]={10,0,0};
+            for(unsigned d=1;d<=8;++d)
+            {
+                auto entity=Context.Scene->Create();Entities.push_back(entity);
+                if(d<=unsigned(Domain::MeshFace))
+                {
+                    Geometry::HalfedgeMesh::Mesh mesh;
+                    auto a=mesh.AddVertex({0,0,0}),b=mesh.AddVertex({1,0,0}),c=mesh.AddVertex({0,1,0});
+                    (void)mesh.AddTriangle(a,b,c);GS::PopulateFromMesh(Context.Scene->Raw(),entity,mesh);
+                }
+                else if(d<unsigned(Domain::PointCloudPoint))
+                {
+                    Geometry::Graph::Graph graph;auto a=graph.AddVertex({0,0,0}),b=graph.AddVertex({1,0,0});
+                    (void)graph.AddEdge(a,b);GS::PopulateFromGraph(Context.Scene->Raw(),entity,graph);
+                }
+                else Context.Scene->Raw().emplace<GS::Vertices>(entity);
+                auto& p=Props(d);p.Resize(points.size());p.GetOrAdd<glm::vec3>("samples").Vector()=points;
+                p.GetOrAdd<float>("keep").Vector().assign(points.size(),42);
+                auto normals=p.GetOrAdd<glm::vec3>("directions");
+                for(std::size_t i=0;i<points.size();++i)normals[i]={.2f*points[i].x,-.1f*points[i].y,1};
+                p.GetOrAdd<float>("weights").Vector().assign(points.size(),77);
+                const bool half=d==unsigned(Domain::MeshHalfedge)||d==unsigned(Domain::GraphHalfedge);
+                if(half)
+                {
+                    auto& edges=Context.Scene->Raw().get<GS::Edges>(entity).Properties;
+                    edges.Resize(points.size()/2);edges.GetOrAdd<bool>("e:deleted")[2]=true;
+                }
+                else p.GetOrAdd<bool>(d==unsigned(Domain::MeshFace)?"f:deleted":
+                    (d==unsigned(Domain::MeshEdge)||d==unsigned(Domain::GraphEdge))?"e:deleted":"v:deleted")[4]=true;
+                p.Get<glm::vec3>("samples")[4]={std::numeric_limits<float>::quiet_NaN(),0,0};
+            }
+
+            Context.MethodResultSinks.DensityWeight=[this](auto result){Results.push_back(std::move(result));};
+        }
+        void Frame(double,double) override
+        {
+            if(std::chrono::steady_clock::now()-Started>std::chrono::seconds(95))
+            {ADD_FAILURE()<<"Density weight timeout: phase="<<Phase<<" results="<<Results.size();TimedOut=true;Kernel().RequestExit();return;}
+            if(!Kernel().GetDevice().IsOperational())
+            {if(++ColdFrames>4){TimedOut=true;Kernel().RequestExit();}return;}
+            const bool all=Phase<7,edge=Phase>=20;
+            if(Submitted)
+            {
+                if(Phase==11 && !Cancelled && SupportReadyForCancel)
+                {EXPECT_TRUE(Kernel().Jobs().Cancel(SupportToken));Cancelled=true;}
+                if(Phase==11)(void)Kernel().Jobs().ReapCompleted();
+                if(Results.size()<(all?8:1))return;
+                if(Phase==13)
+                    for(auto token:SubmissionTokens)
+                        if(Kernel().Jobs().GetState(token)!=Runtime::JobState::Invalid && !Kernel().Jobs().IsComplete(token))return;
+                if(all || edge)
+                {
+                    PhaseMs.push_back(std::chrono::duration<double,std::milli>(std::chrono::steady_clock::now()-PhaseStarted).count());
+                    for(const auto& result:Results)
+                    {
+                        if(!result.Succeeded()){ADD_FAILURE()<<result.Message;Kernel().RequestExit();return;}
+                        EXPECT_EQ(result.ActualBackend,"vulkan_lbvh");EXPECT_GT(result.GpuQueryBatches,0);
+                        if(all && Phase>0)EXPECT_TRUE(result.IndexReused);
+                        const auto slot=all?unsigned(result.Weights.Domain)-1:0;
+                        EXPECT_EQ(result.WrittenCount,ReferenceResults[slot].WrittenCount);
+                        EXPECT_EQ(result.Diagnostics.NeighborContributionCount,ReferenceResults[slot].Diagnostics.NeighborContributionCount);
+                    }
+                    for(unsigned d=all?1:8;d<=8;++d)
+                    {
+                        const auto& p=std::as_const(Props(d));const auto values=p.Get<float>("weights");
+                        const auto& reference=ReferenceColumns[all?d-1:0];ASSERT_EQ(values.Size(),reference.size());
+                        for(std::size_t i=0;i<values.Size();++i)
+                        {
+                            const double error=std::abs(double(values[i])-reference[i]);
+                            MaxError=std::isfinite(error)?std::max(MaxError,error):std::numeric_limits<double>::infinity();
+                        }
+                        if(all)
+                        {
+                            EXPECT_EQ(values[4],77);
+                            if(d==unsigned(Domain::MeshHalfedge)||d==unsigned(Domain::GraphHalfedge))EXPECT_EQ(values[5],77);
+                            EXPECT_EQ(p.Get<float>("keep")[0],42);
+                        }
+                        if(Phase==20 || Phase==21)EXPECT_GT(values[0],1.0003f);
+                        if(Phase==22){EXPECT_EQ(values[0],1);EXPECT_EQ(Results[0].Diagnostics.NeighborContributionCount,0);}
+                    }
+                    EXPECT_LE(MaxError,1e-5);EXPECT_EQ(History.UndoCount(),all?8:1);
+                    for(unsigned i=0;i<(all?8:1);++i)EXPECT_TRUE(History.Undo().Succeeded());
+                    for(unsigned d=all?1:8;d<=8;++d)EXPECT_EQ(std::as_const(Props(d)).Get<float>("weights")[0],77);
+                    for(unsigned i=0;i<(all?8:1);++i)EXPECT_TRUE(History.Redo().Succeeded());
+                    if(Phase==6 || Phase==22){Done=true;Kernel().RequestExit();return;}
+                }
+                else
+                {
+                    EXPECT_FALSE(Results.back().Succeeded())<<Results.back().Message;
+                    EXPECT_EQ(std::as_const(Props(8)).Get<float>("weights")[0],77);EXPECT_EQ(History.UndoCount(),0);
+                    if(Phase==11){EXPECT_TRUE(Cancelled);EXPECT_TRUE(SupportReadyForCancel);EXPECT_EQ(Results.back().Status,Runtime::EditorCommandStatus::StaleEntity);}
+                    if(Phase==12)
+                    {
+                        EXPECT_NE(Results.back().Message.find("overflow"),std::string::npos);
+                        EXPECT_GT(Results.back().MaximumNeighbors,1024);EXPECT_GT(Results.back().GpuQueryBatches,0);
+                    }
+                    if(Phase==13)
+                    {
+                        EXPECT_EQ(SubmissionCount,2);EXPECT_EQ(SubmissionTokens.size(),1);
+                        EXPECT_NE(Results.back().Message.find("submission rejected"),std::string::npos);
+                        Done=true;Kernel().RequestExit();return;
+                    }
+                }
+                Results.clear();Submitted=false;++Phase;
+            }
+            History.ClearHistory();Context.JobCommands={};Context.CommandHistory=nullptr;
+            if(Phase>=20)
+            {
+                auto& p=Props(8);const auto size=Phase==20?2:Phase==21?33:1;p.Resize(size);
+                const float v=std::bit_cast<float>(0x1a01460fu);
+                p.Get<glm::vec3>("samples").Vector().assign(size,glm::vec3(v));p.Get<glm::vec3>("samples")[0]={0,0,0};
+                p.GetOrAdd<bool>("v:deleted").Vector().assign(size,false);p.Get<float>("weights").Vector().assign(size,77);
+                if(Phase==22)p.Get<glm::vec3>("samples")[0]={0,-0.f,std::numeric_limits<float>::min()};
+                if(Phase==20)
+                {
+                    for(unsigned axis=0;axis<3;++axis)for(float sign:{1.f,-1.f})
+                    {
+                        glm::vec3 subnormal(0);subnormal[axis]=sign*std::numeric_limits<float>::denorm_min();p.Get<glm::vec3>("samples")[0]=subnormal;
+                        const auto ready=Runtime::PreviewEditorDensityWeightCommand(Context,Config(8));
+                        EXPECT_FALSE(ready.Ready);EXPECT_NE(ready.Diagnostic.find("subnormal"),std::string::npos);
+                    }
+                    p.Get<glm::vec3>("samples")[0]={0,0,0};
+                    auto c=Config(8);c.SupportRadius=double(Geometry::PointLBVH::CoordinateLimit);
+                    EXPECT_FALSE(Runtime::PreviewEditorDensityWeightCommand(Context,c).Ready);
+                    EXPECT_EQ(std::as_const(p).Get<float>("weights")[0],77);EXPECT_EQ(History.UndoCount(),0);
+                }
+            }
+            if(Phase<7 || Phase>=20)
+            {
+                ReferenceColumns.clear();ReferenceResults.clear();const auto cpuStart=std::chrono::steady_clock::now();
+                for(unsigned d=Phase<7?1:8;d<=8;++d)
+                {
+                    auto c=Config(d);c.Backend=Runtime::DensityWeightBackend::CpuKDTree;
+                    const auto result=Runtime::ApplyEditorDensityWeightCommand(Context,c);
+                    if(!result.Succeeded()){ADD_FAILURE()<<result.Message;Kernel().RequestExit();return;}
+                    ReferenceResults.push_back(result);ReferenceColumns.push_back(std::as_const(Props(d)).Get<float>("weights").Vector());
+                    Props(d).Get<float>("weights").Vector().assign(Props(d).Size(),77);
+                }
+                CpuMs.push_back(std::chrono::duration<double,std::milli>(std::chrono::steady_clock::now()-cpuStart).count());
+            }
+            SubmissionCount=0;SupportReadyForCancel=false;SubmissionTokens.clear();
+            Context.JobCommands.Submit=[this](Runtime::JobDesc desc,Runtime::EditorJobIdentity)
+            {
+                ++SubmissionCount;if(Phase==13 && SubmissionCount==2)return Runtime::JobToken{};
+                const bool support=desc.DebugName=="Density radius support (Vulkan)";
+                if(Phase==11 && support)
+                {
+                    auto ready=std::move(desc.IsReadyToApply);
+                    desc.IsReadyToApply=[this,ready=std::move(ready)]() mutable
+                    {if(!SupportReadyForCancel)SupportReadyForCancel=ready();return false;};
+                }
+                const auto token=Kernel().Jobs().Submit(std::move(desc));SubmissionTokens.push_back(token);if(support)SupportToken=token;return token;
+            };
+            Context.CommandHistory=&History;Submitted=true;PhaseStarted=std::chrono::steady_clock::now();
+            if(Phase<7)
+                for(unsigned d=1;d<=8;++d)
+                {const auto r=Runtime::ApplyEditorDensityWeightCommand(Context,Config(d));if(r.Status!=Runtime::EditorCommandStatus::Pending)Results.push_back(r);}
+            else
+            {
+                auto& p=Props(8);
+                if(Phase==12)
+                {
+                    p.Resize(1030);p.Get<glm::vec3>("samples").Vector().assign(1030,glm::vec3(0));
+                    p.GetOrAdd<bool>("v:deleted").Vector().assign(1030,false);
+                }
+                p.Get<float>("weights").Vector().assign(p.Size(),77);
+                const auto r=Runtime::ApplyEditorDensityWeightCommand(Context,Config(8));if(r.Status!=Runtime::EditorCommandStatus::Pending)Results.push_back(r);
+                if(Phase==10)p.Get<glm::vec3>("samples")[0]+=.1f;
+            }
+        }
+        void Shutdown() override {Context={};}
+        Runtime::EditorGeometryProcessingContext Context{};Runtime::EditorCommandHistory History{};
+        std::vector<entt::entity> Entities;std::vector<std::vector<float>> ReferenceColumns;
+        std::vector<Runtime::EditorDensityWeightResult> Results,ReferenceResults;std::vector<double> PhaseMs,CpuMs;
+        std::chrono::steady_clock::time_point Started{},PhaseStarted{};
+        Runtime::JobToken SupportToken{};std::vector<Runtime::JobToken> SubmissionTokens;
+        unsigned Phase{},ColdFrames{},SubmissionCount{};
+        bool Submitted{},Done{},TimedOut{},Cancelled{},SupportReadyForCancel{};double MaxError{};
+    };
+}
+TEST(PointLBVHGpuSmoke, DensityWeightPublishesAllKernelsAcrossDomains)
+{
+    if(!Extrinsic::Platform::Backends::Glfw::CanInitialize())GTEST_SKIP()<<"GLFW unavailable";
+    auto config=Runtime::CreateReferenceEngineConfig();config.Window.Width=64;config.Window.Height=64;
+    config.Render.EnableValidation=true;config.Render.EnableVSync=false;config.ReferenceScene.Enabled=false;
+    auto app=std::make_unique<DensityWeightApp>();auto* run=app.get();
+    Intrinsic::Tests::RuntimeTestKernel engine(config,std::move(app));engine.EmplaceModule<Runtime::SpatialIndexCache>();
+    engine.Initialize();Shutdown shutdown{engine};engine.Run();ASSERT_TRUE(engine.GetDevice().IsOperational());
+    ASSERT_FALSE(run->TimedOut)<<"phase="<<run->Phase;ASSERT_TRUE(run->Done);ASSERT_EQ(run->PhaseMs.size(),7);
+    EXPECT_LE(run->MaxError,1e-5);
+    if(const auto* output=std::getenv("INTRINSIC_DENSITY_WEIGHT_BENCHMARK_OUTPUT"))
+    {
+        nlohmann::json json{{"benchmark_id","geometry.point_lbvh.density_weight_runtime_smoke"},{"method","geometry.point_lbvh"},
+            {"backend","gpu_vulkan_compute"},{"dataset","builtin.density_weight_samples.eight_domains.seed251"},{"commit","local-dev"},
+            {"metrics",{{"runtime_ms",run->PhaseMs[1]},{"quality_error_linf",run->MaxError}}},
+            {"diagnostics",{{"runner","IntrinsicPointLBVHGpuTests"},{"mode","smoke"},{"cpu_reference_total_ms",run->CpuMs[1]},
+                {"vulkan_cold_total_ms",run->PhaseMs[0]},{"vulkan_warm_total_ms",run->PhaseMs[1]},
+                {"warmup_iterations",1},{"measured_iterations",1},{"cpu_kernel_reduction",true}}},
+            {"status",::testing::Test::HasFailure()?"failed":"passed"}};
+        std::ofstream stream(output);ASSERT_TRUE(stream.good());stream<<json.dump(2)<<'\n';ASSERT_TRUE(stream.good());
+    }
+}
+TEST(PointLBVHGpuSmoke, DensityWeightRejectsStaleCancellationOverflowAndSubmission)
+{
+    if(!Extrinsic::Platform::Backends::Glfw::CanInitialize())GTEST_SKIP()<<"GLFW unavailable";
+    auto config=Runtime::CreateReferenceEngineConfig();config.Window.Width=64;config.Window.Height=64;
+    config.Render.EnableValidation=true;config.Render.EnableVSync=false;config.ReferenceScene.Enabled=false;
+    auto app=std::make_unique<DensityWeightApp>();auto* run=app.get();run->Phase=10;
+    Intrinsic::Tests::RuntimeTestKernel engine(config,std::move(app));engine.EmplaceModule<Runtime::SpatialIndexCache>();
+    engine.Initialize();Shutdown shutdown{engine};engine.Run();ASSERT_TRUE(engine.GetDevice().IsOperational());
+    ASSERT_FALSE(run->TimedOut)<<"phase="<<run->Phase;ASSERT_TRUE(run->Done);EXPECT_TRUE(run->Cancelled);
+}
+TEST(PointLBVHGpuSmoke, DensityWeightTinySupportAndOneSample)
+{
+    if(!Extrinsic::Platform::Backends::Glfw::CanInitialize())GTEST_SKIP()<<"GLFW unavailable";
+    auto config=Runtime::CreateReferenceEngineConfig();config.Window.Width=64;config.Window.Height=64;
+    config.Render.EnableValidation=true;config.Render.EnableVSync=false;config.ReferenceScene.Enabled=false;
+    auto app=std::make_unique<DensityWeightApp>();auto* run=app.get();run->Phase=20;
+    Intrinsic::Tests::RuntimeTestKernel engine(config,std::move(app));engine.EmplaceModule<Runtime::SpatialIndexCache>();
+    engine.Initialize();Shutdown shutdown{engine};engine.Run();ASSERT_TRUE(engine.GetDevice().IsOperational());
+    ASSERT_FALSE(run->TimedOut)<<"phase="<<run->Phase;ASSERT_TRUE(run->Done);EXPECT_LE(run->MaxError,1e-5);
 }
