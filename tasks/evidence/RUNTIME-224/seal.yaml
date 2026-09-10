@@ -1,0 +1,12 @@
+schema_version: 1
+task_id: RUNTIME-224
+sealed_revision: fbbc6cd0310566d826a9e4ec9ef27ca1726a0b89
+source_content_digest: 02841f59843ff209811201958b72e163591c32216f56d7ab6b3b855629070d55
+report_sha256: 2139a9c920b287122691144d4b3c4516e7fbf591685d3c842b95dfeb503b47de
+records:
+- path: tasks/evidence/RUNTIME-224/handoff.jsonl
+  sha256: 67d8ca45275dcb98e58f8b014120263104518e3c26f20604dcc3359193da1600
+- path: tasks/evidence/RUNTIME-224/reviews.jsonl
+  sha256: 44da8acbd1a60272719a9307c45cf8544a97a576edaf26bb31f08f77df6b3199
+reason: Seal the independently reviewed bilateral source and evidence at the clean retirement commit.
+generated_by: tools/agents/workflow_evidence.py
