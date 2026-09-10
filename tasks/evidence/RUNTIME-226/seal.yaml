@@ -1,0 +1,13 @@
+schema_version: 1
+task_id: RUNTIME-226
+sealed_revision: 3d943d7f9431fb962227974c104e722340a6bab7
+source_content_digest: c2255223ba4be009b248edd1cf9b5ca6977c7cef1963e2acebb1db17f73cabd9
+report_sha256: 683ce6fc8be88db148b3c0a6d69c6caf443ef1c2119fd11e7406e5f85a2eb58e
+records:
+- path: tasks/evidence/RUNTIME-226/handoff.jsonl
+  sha256: 4f34c4d7d37d4741e9535a9660b7a0349d1009305ad6b5f94e93d8c1f3ff2029
+- path: tasks/evidence/RUNTIME-226/reviews.jsonl
+  sha256: 78ce979e34b30215ece5a3de4c4de9714d68af4fbc3c2617960827668af7612e
+reason: Verified implementation and independently accepted fixed-surface FPFH evidence committed at clean
+  HEAD.
+generated_by: tools/agents/workflow_evidence.py
