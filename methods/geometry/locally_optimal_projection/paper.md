@@ -96,3 +96,21 @@ candidate was consequently limited to exact neighborhood/scratch reuse under
 the preregistered comparison in
 [`reports/METHOD-019-protocol.md`](reports/METHOD-019-protocol.md); it preserved
 parity but missed the fixed acceleration gate and was not adopted.
+
+## Cached LOP neighborhood adapter
+
+The `cpu_lbvh` runtime choice gathers complete source-attraction and moving-sample
+repulsion rows, then calls the existing double CPU arithmetic. The source index is
+leased from `SpatialIndexCache`; private projected indices are rebuilt for each
+iteration. `SeedLop`, `InitializeLopFromNeighbors`, and `StepLopFromNeighbors`
+allow another query backend to supply the same arithmetic without copying it.
+Rows are sorted unique IDs, with different source and projected index domains;
+conservative candidates are filtered by the existing strict compact kernel.
+
+This preserves the engine's selected linear-repulsion variant and distance floor.
+The original [LOP technical report](https://www.wisdom.weizmann.ac.il/~ylipman/lop/LOP_final_TR.pdf)
+uses a different inverse-cubic repulsion in its examples; no original-formulation
+or general convergence guarantee is added. The framed Vulkan LBVH adapter remains
+RUNTIME-229. Existing `gpu_vulkan_compute` grid execution and the frozen METHOD-019
+candidate retain their separate identities. CPU LBVH benchmark timing is diagnostic;
+no default change or acceleration result is asserted.

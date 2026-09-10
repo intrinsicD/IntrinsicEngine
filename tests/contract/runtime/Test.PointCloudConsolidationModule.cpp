@@ -28,6 +28,7 @@ import Extrinsic.Runtime.CommandBus;
 import Extrinsic.Runtime.EditorCommandHistory;
 import Extrinsic.Runtime.Engine;
 import Extrinsic.Runtime.JobService;
+import Extrinsic.Runtime.SpatialIndexCache;
 import Extrinsic.Runtime.KernelEvents;
 import Extrinsic.Runtime.PointCloudConsolidationConfig;
 import Extrinsic.Runtime.PointCloudConsolidationModule;
@@ -418,6 +419,8 @@ namespace
             Runtime::PointCloudConsolidationRequest request =
                 MakeRequest(Entity);
             request.Config.Backend = Backend;
+            if (Backend == Runtime::PointCloudConsolidationBackend::CpuLBVH)
+                request.Config.Strategy = Runtime::PointCloudConsolidationStrategy::Lop;
             request.Config.ConvergenceTolerance = ConvergenceTolerance;
             request.Config.SupportRadiusMode = Runtime::
                 PointCloudConsolidationSupportRadiusMode::Manual;
@@ -468,11 +471,13 @@ namespace
     {
     public:
         explicit ConsolidationStaleSourceApp(
-            const Runtime::GeometryElementDomain domain)
-            : Domain(domain)
+            const Runtime::GeometryElementDomain domain,
+            Runtime::PointCloudConsolidationBackend backend = Runtime::PointCloudConsolidationBackend::CpuReference)
+            : Domain(domain), Backend(backend)
         {
         }
 
+        Runtime::PointCloudConsolidationBackend Backend;
         [[nodiscard]] Extrinsic::Core::Result
         OnRegister(Runtime::EngineSetup& setup) override
         {
@@ -505,8 +510,11 @@ namespace
                     Completion = result;
                 });
 
-            Correlation = Service->Run(MakeDomainRequest(
-                Entity, Domain, InputProperty, "lop:stale_output"));
+            auto request = MakeDomainRequest(Entity, Domain, InputProperty, "lop:stale_output");
+            request.Config.Backend = Backend;
+            if (Backend == Runtime::PointCloudConsolidationBackend::CpuLBVH)
+                request.Config.Strategy = Runtime::PointCloudConsolidationStrategy::Lop;
+            Correlation = Service->Run(std::move(request));
         }
 
         void Frame(double, double) override
@@ -571,6 +579,8 @@ namespace
         : public Intrinsic::Tests::RuntimeTestModule
     {
     public:
+        explicit ConsolidationPropertyDomainsApp(Runtime::PointCloudConsolidationBackend backend = Runtime::PointCloudConsolidationBackend::CpuReference) : Backend(backend) {}
+        Runtime::PointCloudConsolidationBackend Backend;
         void Resolve() override
         {
             auto& engine = Kernel();
@@ -629,11 +639,16 @@ namespace
             for (const Runtime::GeometryElementDomain domain :
                  kAllElementDomains)
             {
-                Correlations.push_back(Service->Run(MakeDomainRequest(
-                    ResolveTestEntity(Sources, domain),
-                    domain,
-                    InputPropertyForDomain(domain),
-                    OutputPropertyForDomain(domain))));
+                auto request = MakeDomainRequest(ResolveTestEntity(Sources, domain), domain,
+                    InputPropertyForDomain(domain), OutputPropertyForDomain(domain));
+                request.Config.Backend = Backend;
+                if (Backend == Runtime::PointCloudConsolidationBackend::CpuLBVH)
+                {
+                    request.Config.Strategy = Runtime::PointCloudConsolidationStrategy::Lop;
+                    auto* cache = engine.Services().Find<Runtime::SpatialIndexCache>();
+                    if (cache) (void)cache->Acquire(engine.ActiveWorld(), ResolveTestEntity(Sources, domain), request.Properties.InputPositions);
+                }
+                Correlations.push_back(Service->Run(std::move(request)));
             }
 
             Runtime::PointCloudConsolidationRequest rejected =
@@ -1425,13 +1440,16 @@ TEST(PointCloudConsolidationModule,
 
 TEST(PointCloudConsolidationModule, SourceMutationDropsQueuedWriteback)
 {
+    for (const auto backend : {Runtime::PointCloudConsolidationBackend::CpuReference,
+         Runtime::PointCloudConsolidationBackend::CpuLBVH})
     for (const Runtime::GeometryElementDomain domain : kAllElementDomains)
     {
         SCOPED_TRACE(std::string{Runtime::ToString(domain)});
-        auto app = std::make_unique<ConsolidationStaleSourceApp>(domain);
+        auto app = std::make_unique<ConsolidationStaleSourceApp>(domain, backend);
         ConsolidationStaleSourceApp* appPtr = app.get();
         Intrinsic::Tests::RuntimeTestKernel engine{
             HeadlessConfig(1u), std::move(app)};
+        engine.EmplaceModule<Runtime::SpatialIndexCache>();
         engine.EmplaceModule<Runtime::PointCloudConsolidationModule>();
         engine.Initialize();
         engine.Run();
@@ -1484,4 +1502,43 @@ TEST(PointCloudConsolidationModule,
     EXPECT_EQ(first.Vector(), second.Vector());
 
     engine.Shutdown();
+}
+
+TEST(PointCloudConsolidationModule, CachedLopBackendPublishesAndOwnsUndo)
+{
+    auto app = std::make_unique<ConsolidationSuccessApp>(Runtime::PointCloudConsolidationBackend::CpuLBVH);
+    auto* observed = app.get();
+    Intrinsic::Tests::RuntimeTestKernel engine{HeadlessConfig(),std::move(app)};
+    engine.EmplaceModule<Runtime::SpatialIndexCache>();
+    engine.EmplaceModule<Runtime::PointCloudConsolidationModule>();
+    engine.EmplaceModule<Runtime::SceneDocumentModule>();
+    engine.Initialize(); engine.Run();
+    ASSERT_TRUE(observed->Completion.has_value());
+    ASSERT_TRUE(observed->Completion->Succeeded()) << observed->Completion->Message;
+    EXPECT_EQ(observed->Completion->ActualBackend,Runtime::PointCloudConsolidationBackend::CpuLBVH);
+    EXPECT_EQ(observed->Completion->ImplementationId,"cpu_lbvh");
+    EXPECT_FALSE(observed->Completion->FellBackToCpu);
+    auto* history=engine.Services().Find<Runtime::EditorCommandHistory>(); ASSERT_NE(history,nullptr);
+    EXPECT_EQ(history->UndoCount(),1u); EXPECT_EQ(history->Undo().Status,Runtime::EditorCommandHistoryStatus::Undone);
+    EXPECT_EQ(observed->Scene->Raw().get<GS::Vertices>(observed->Entity).Properties.Size(),25u);
+    EXPECT_EQ(history->Redo().Status,Runtime::EditorCommandHistoryStatus::Redone);
+    EXPECT_EQ(observed->Scene->Raw().get<GS::Vertices>(observed->Entity).Properties.Size(),16u);
+    engine.Shutdown();
+}
+
+TEST(PointCloudConsolidationModule, CachedLopReusesAllEightPropertyDomainIndices)
+{
+    auto app=std::make_unique<ConsolidationPropertyDomainsApp>(Runtime::PointCloudConsolidationBackend::CpuLBVH);
+    auto* observed=app.get(); Intrinsic::Tests::RuntimeTestKernel engine{HeadlessConfig(),std::move(app)};
+    engine.EmplaceModule<Runtime::SpatialIndexCache>(); engine.EmplaceModule<Runtime::PointCloudConsolidationModule>();
+    engine.Initialize(); engine.Run();
+    EXPECT_FALSE(observed->TimedOut);
+    std::size_t accepted=0;
+    for(const auto& result:observed->Completions) if(result.RequestedBackend==Runtime::PointCloudConsolidationBackend::CpuLBVH)
+    {
+        ASSERT_TRUE(result.Succeeded()) << result.Message;
+        EXPECT_TRUE(result.ReusedSpatialIndex); EXPECT_EQ(result.ActualBackend,Runtime::PointCloudConsolidationBackend::CpuLBVH);
+        EXPECT_FALSE(result.FellBackToCpu); ++accepted;
+    }
+    EXPECT_EQ(accepted,8u); engine.Shutdown();
 }

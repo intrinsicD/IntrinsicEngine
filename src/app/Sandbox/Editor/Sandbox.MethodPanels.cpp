@@ -1254,32 +1254,23 @@ namespace Extrinsic::Sandbox::Editor
             SandboxPointCloudConsolidationPanelConfig& config)
         {
             bool changed = false;
-            const bool vulkan = config.Backend == Runtime::
-                PointCloudConsolidationBackend::VulkanCompute;
-            if (ImGui::BeginCombo(
-                    "Backend##PointCloudConsolidation",
-                    vulkan ? "Vulkan compute" : "CPU reference"))
+            const auto label = [](Runtime::PointCloudConsolidationBackend backend)
             {
-                if (ImGui::Selectable(
-                        "CPU reference##PointCloudConsolidation",
-                        !vulkan))
+                if (backend == Runtime::PointCloudConsolidationBackend::CpuLBVH) return "CPU LBVH (LOP)";
+                if (backend == Runtime::PointCloudConsolidationBackend::VulkanCompute) return "Vulkan compute";
+                return "CPU reference";
+            };
+            if (ImGui::BeginCombo("Backend##PointCloudConsolidation", label(config.Backend)))
+            {
+                for (auto backend : {Runtime::PointCloudConsolidationBackend::CpuReference,
+                     Runtime::PointCloudConsolidationBackend::CpuLBVH,
+                     Runtime::PointCloudConsolidationBackend::VulkanCompute})
                 {
-                    config.Backend = Runtime::
-                        PointCloudConsolidationBackend::CpuReference;
-                    changed = true;
+                    const bool selected = config.Backend == backend;
+                    if (ImGui::Selectable(label(backend), selected))
+                    { config.Backend = backend; changed = true; }
+                    if (selected) ImGui::SetItemDefaultFocus();
                 }
-                if (!vulkan)
-                    ImGui::SetItemDefaultFocus();
-                if (ImGui::Selectable(
-                        "Vulkan compute##PointCloudConsolidation",
-                        vulkan))
-                {
-                    config.Backend = Runtime::
-                        PointCloudConsolidationBackend::VulkanCompute;
-                    changed = true;
-                }
-                if (vulkan)
-                    ImGui::SetItemDefaultFocus();
                 ImGui::EndCombo();
             }
             changed |= DrawPointCloudConsolidationStrategy(config);

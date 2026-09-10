@@ -34,6 +34,7 @@ import Extrinsic.RHI.TransferQueue;
 import Extrinsic.RHI.Types;
 import Geometry.PointCloud.Consolidation;
 import Geometry.SupportRadius;
+import Geometry.PointLBVH;
 
 #include "Modules/PointCloudConsolidation/Runtime.PointCloudConsolidationGpu.Internal.hpp"
 

@@ -36,6 +36,7 @@ import Extrinsic.Runtime.JobService;
 import Extrinsic.Runtime.SelectionController;
 import Extrinsic.Runtime.WorldRegistry;
 import Geometry.PointCloud.Consolidation;
+import Extrinsic.Runtime.SpatialIndexCache;
 import Geometry.PointCloud;
 import Geometry.PointCloud.Utils;
 import Geometry.Properties;
@@ -255,7 +256,11 @@ namespace Extrinsic::Runtime
             if (config.Backend !=
                     PointCloudConsolidationBackend::CpuReference &&
                 config.Backend !=
-                    PointCloudConsolidationBackend::VulkanCompute)
+                    PointCloudConsolidationBackend::VulkanCompute &&
+                config.Backend != PointCloudConsolidationBackend::CpuLBVH)
+                return std::nullopt;
+            if (config.Backend == PointCloudConsolidationBackend::CpuLBVH &&
+                config.Strategy != PointCloudConsolidationStrategy::Lop)
                 return std::nullopt;
 
             double resolvedRadius = 1.0;
@@ -1395,6 +1400,7 @@ namespace Extrinsic::Runtime
             }
             CopyDiagnostics(result.Completion, consolidated);
             result.Completion.ActualBackend = actualBackend;
+            result.Completion.ReusedSpatialIndex = result.Snapshot.ReusedSpatialIndex;
             result.Completion.FellBackToCpu =
                 result.Snapshot.Request.Config.Backend ==
                     PointCloudConsolidationBackend::VulkanCompute &&
@@ -1550,7 +1556,11 @@ namespace Extrinsic::Runtime
                     "Vulkan initialization could not build the deterministic projection seed; the CPU reference completed the request.";
             }
 
-            Consolidation::Result consolidated = snapshot.Normals.empty()
+            const auto actualBackend = snapshot.SourceIndex
+                ? PointCloudConsolidationBackend::CpuLBVH : PointCloudConsolidationBackend::CpuReference;
+            Consolidation::Result consolidated = snapshot.SourceIndex
+                ? Consolidation::ConsolidateLopWithIndex(snapshot.Positions, *snapshot.SourceIndex, snapshot.Params)
+                : snapshot.Normals.empty()
                 ? Consolidation::Consolidate(
                       std::span<const glm::vec3>{snapshot.Positions},
                       snapshot.Params)
@@ -1565,7 +1575,7 @@ namespace Extrinsic::Runtime
                     BuildConsolidationJobResult(
                         std::move(snapshot),
                         std::move(consolidated),
-                        PointCloudConsolidationBackend::CpuReference);
+                        actualBackend);
                 cancelled.Completion.Status =
                     PointCloudConsolidationRunStatus::Cancelled;
                 cancelled.Completion.Error = Core::ErrorCode::InvalidState;
@@ -1576,7 +1586,7 @@ namespace Extrinsic::Runtime
             return BuildConsolidationJobResult(
                 std::move(snapshot),
                 std::move(consolidated),
-                PointCloudConsolidationBackend::CpuReference);
+                actualBackend);
         }
 
         struct ConsolidationMutationIdentity
@@ -2291,7 +2301,8 @@ namespace Extrinsic::Runtime
         [[nodiscard]] CommandOutcome HandleRunCommand(
             CommandContext& context,
             const PointCloudConsolidationRequest& request,
-            PointCloudConsolidationModuleStats& stats)
+            PointCloudConsolidationModuleStats& stats,
+            SpatialIndexCache* spatialIndices)
         {
             stats.CommandsHandled += 1u;
             if (context.Jobs == nullptr || context.Worlds == nullptr ||
@@ -2330,6 +2341,25 @@ namespace Extrinsic::Runtime
                 std::string message = failure.Message;
                 PublishCompletion(context.Events, std::move(failure));
                 return CommandOutcome::Fail(std::move(message));
+            }
+            if (request.Config.Backend == PointCloudConsolidationBackend::CpuLBVH)
+            {
+                const auto entity = ResolveEntity(context.ActiveWorld.Raw(), request.StableEntityId);
+                const auto acquired = spatialIndices ? spatialIndices->Acquire(world, entity, request.Properties.InputPositions)
+                    : SpatialIndexAcquisition{};
+                const auto lease = spatialIndices ? spatialIndices->Snapshot(acquired.Handle) : nullptr;
+                bool identity = lease && lease->Slots.size() == snapshot->Positions.size();
+                if (identity)
+                    for (std::size_t i = 0; i < lease->Slots.size(); ++i) identity &= lease->Slots[i] == i;
+                if (!identity)
+                {
+                    const std::string message = "LOP CPU LBVH requires a compatible cached compact point index. " + acquired.Diagnostic;
+                    PublishCompletion(context.Events, MakeCompletion(request, world, context.Correlation,
+                        PointCloudConsolidationRunStatus::GeometryProcessingFailed, Core::ErrorCode::InvalidState, message));
+                    return CommandOutcome::Fail(message);
+                }
+                snapshot->SourceIndex = std::shared_ptr<const Geometry::PointLBVH::Index>(lease, &lease->Index);
+                snapshot->ReusedSpatialIndex = acquired.Reused;
             }
             return SubmitSnapshot(
                 *context.Jobs,
@@ -2557,7 +2587,7 @@ namespace Extrinsic::Runtime
                 CommandContext& context,
                 const PointCloudConsolidationRequest& request)
             {
-                return HandleRunCommand(context, request, m_Stats);
+                return HandleRunCommand(context, request, m_Stats, m_SpatialIndices);
             });
         m_JobCompletedSubscription =
             setup.Subscribe<PointCloudConsolidationJobCompleted>(
@@ -2578,6 +2608,7 @@ namespace Extrinsic::Runtime
     Core::Result PointCloudConsolidationModule::OnResolve(EngineSetup& setup)
     {
         m_History = setup.Services().Find<EditorCommandHistory>();
+        m_SpatialIndices = setup.Services().Find<SpatialIndexCache>();
         return Core::Ok();
     }
 
@@ -2601,6 +2632,7 @@ namespace Extrinsic::Runtime
         m_Jobs = nullptr;
         m_Worlds = nullptr;
         m_History = nullptr;
+        m_SpatialIndices = nullptr;
         m_Device = nullptr;
     }
 }

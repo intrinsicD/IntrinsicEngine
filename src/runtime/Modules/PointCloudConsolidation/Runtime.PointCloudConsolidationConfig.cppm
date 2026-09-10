@@ -1,3 +1,4 @@
+// Persisted consolidation strategy and backend controls shared by config and UI.
 module;
 
 #include <cstdint>
@@ -34,6 +35,7 @@ export namespace Extrinsic::Runtime
         None = 0u,
         CpuReference,
         VulkanCompute,
+        CpuLBVH,
     };
 
     enum class PointCloudConsolidationNormalSource : std::uint32_t

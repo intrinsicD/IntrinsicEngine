@@ -566,6 +566,7 @@ namespace Extrinsic::Runtime::FeatureConfigDetail
                 return PointCloudConsolidationBackend::CpuReference;
             if (value == "gpu_vulkan_compute")
                 return PointCloudConsolidationBackend::VulkanCompute;
+            if (value == "cpu_lbvh") return PointCloudConsolidationBackend::CpuLBVH;
             return std::nullopt;
         }
 

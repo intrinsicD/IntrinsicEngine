@@ -1,3 +1,4 @@
+// Point-set projection strategies, diagnostics and reusable LOP neighborhood steps.
 module;
 
 #include <cstddef>
@@ -14,6 +15,8 @@ module;
 export module Geometry.PointCloud.Consolidation;
 
 import Geometry.PointCloud;
+import Geometry.PointLBVH;
+import Geometry.SpatialQueries;
 
 export namespace Geometry::PointCloud::Consolidation
 {
@@ -105,6 +108,8 @@ export namespace Geometry::PointCloud::Consolidation
         UpsamplingFailed,
         NumericalFailure,
         NotConverged,
+        UnsupportedStrategy,
+        InvalidNeighborhoods,
     };
 
     struct Params
@@ -211,6 +216,26 @@ export namespace Geometry::PointCloud::Consolidation
     [[nodiscard]] Result Consolidate(
         const Cloud& cloud,
         const Params& params = {});
+
+    // LOP only. Seed selection matches Consolidate; each successful step owns
+    // finite positions. Step success does not imply whole-solver convergence.
+    [[nodiscard]] Result SeedLop(std::span<const glm::vec3> source, const Params& params);
+    // Rows correspond to projected samples, while attraction IDs address source.
+    // Require ascending unique valid IDs and complete strict-support candidates;
+    // conservative shell candidates are allowed and filtered by the reducer.
+    [[nodiscard]] Result InitializeLopFromNeighbors(
+        std::span<const glm::vec3> source, std::span<const glm::vec3> projected,
+        Geometry::PointNeighborhoods attraction, const Params& params);
+    // Repulsion IDs address projected samples; self is excluded only here.
+    [[nodiscard]] Result StepLopFromNeighbors(
+        std::span<const glm::vec3> source, std::span<const glm::vec3> projected,
+        Geometry::PointNeighborhoods attraction, Geometry::PointNeighborhoods repulsion,
+        const Params& params);
+    // The immutable source index must exactly match source order and values.
+    // Moving-sample indices are rebuilt privately after every update.
+    [[nodiscard]] Result ConsolidateLopWithIndex(
+        std::span<const glm::vec3> source, const Geometry::PointLBVH::Index& index,
+        const Params& params);
 
     namespace Validation
     {

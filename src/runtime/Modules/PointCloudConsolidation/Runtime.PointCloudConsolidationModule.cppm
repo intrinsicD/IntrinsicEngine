@@ -1,3 +1,4 @@
+// Runtime consolidation requests, completion diagnostics and publication lifecycle.
 module;
 
 #include <cstddef>
@@ -21,6 +22,7 @@ import Extrinsic.Runtime.Module;
 import Extrinsic.Runtime.PointCloudConsolidationConfig;
 import Extrinsic.Runtime.WorldHandle;
 import Extrinsic.Runtime.WorldRegistry;
+import Extrinsic.Runtime.SpatialIndexCache;
 import Geometry.PointCloud.Consolidation;
 
 export namespace Extrinsic::Runtime
@@ -117,6 +119,7 @@ export namespace Extrinsic::Runtime
         PointCloudConsolidationBackend ActualBackend{
             PointCloudConsolidationBackend::None};
         bool FellBackToCpu{false};
+        bool ReusedSpatialIndex{false};
         std::string BackendDiagnostic{};
         std::string ImplementationId{"cpu_reference"};
         std::string StrategyToken{"wlop"};
@@ -224,6 +227,7 @@ export namespace Extrinsic::Runtime
         JobService* m_Jobs{};
         WorldRegistry* m_Worlds{};
         EditorCommandHistory* m_History{};
+        SpatialIndexCache* m_SpatialIndices{};
         RHI::IDevice* m_Device{};
         std::unique_ptr<PointCloudConsolidationGpuState> m_GpuState{};
         GpuQueueParticipantHandle m_GpuParticipant{};

@@ -8,6 +8,7 @@ namespace Intrinsic::Bench::Geometry
         unsigned Mismatches{};
     };
     PointLBVHSmokeResult RunPointLBVHSmoke();
+    PointLBVHSmokeResult RunLopLBVHSmoke();
     struct PointLBVHKnnSmokeResult
     {
         double BuildMilliseconds{}, ReferenceMilliseconds{}, WarmMilliseconds{};

@@ -138,3 +138,13 @@ TEST(PointCloudConsolidationConfig, RoundTripsAndFallsBackPerField)
                   Runtime::PointCloudConsolidationBackend::VulkanCompute),
               "gpu_vulkan_compute");
 }
+
+TEST(PointCloudConsolidationConfig, CachedLopBackendRoundTrips)
+{
+    Extrinsic::Runtime::PointCloudConsolidationConfig value;
+    value.Backend=Extrinsic::Runtime::PointCloudConsolidationBackend::CpuLBVH;
+    value.Strategy=Extrinsic::Runtime::PointCloudConsolidationStrategy::Lop;
+    const auto json=Extrinsic::Runtime::SerializePointCloudConsolidationConfig(value);
+    EXPECT_NE(json.find("cpu_lbvh"),std::string::npos);
+    EXPECT_TRUE(Extrinsic::Runtime::ValidatePointCloudConsolidationConfigSection(json,{},"test").Usable());
+}

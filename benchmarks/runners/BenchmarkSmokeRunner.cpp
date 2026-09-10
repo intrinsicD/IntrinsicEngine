@@ -653,6 +653,22 @@ auto EmitPointLBVHSmoke(const std::string& commit) -> EmittedBenchmark
     return {"geometry.point_lbvh.smoke",out.str(),passed};
 }
 
+auto EmitLopLBVHSmoke(const std::string& commit) -> EmittedBenchmark
+{
+    const auto r = Intrinsic::Bench::Geometry::RunLopLBVHSmoke();
+    const bool passed = r.Mismatches == 0 && r.MaxDistanceError == 0;
+    std::ostringstream out;
+    out << "{\"benchmark_id\":\"geometry.point_lbvh.lop_cpu_smoke\","
+        << "\"method\":\"geometry.point_lbvh\",\"backend\":\"cpu_reference\","
+        << "\"dataset\":\"builtin.noisy_plane.16x16.lop64.seed257\",\"commit\":\"" << EscapeJson(commit)
+        << "\",\"metrics\":{\"runtime_ms\":" << r.RuntimeMilliseconds
+        << ",\"quality_error_linf\":" << r.MaxDistanceError
+        << "},\"diagnostics\":{\"runner\":\"IntrinsicBenchmarkSmoke\",\"mode\":\"smoke\",\"query_backend\":\"cpu_lbvh\",\"reduction_backend\":\"cpu_reference\","
+        << "\"warmup_iterations\":1,\"measured_iterations\":4,\"index_mismatches\":" << r.Mismatches
+        << "},\"status\":\"" << (passed ? "passed" : "failed") << "\"}\n";
+    return {"geometry.point_lbvh.lop_cpu_smoke",out.str(),passed};
+}
+
 auto EmitPointLBVHKnnSmoke(const std::string& commit) -> EmittedBenchmark
 {
     const auto r = Intrinsic::Bench::Geometry::RunPointLBVHKnnSmoke();
@@ -1996,6 +2012,7 @@ auto main(int argc, char **argv) -> int {
   emitted.push_back(EmitSignedHeatReferenceSmoke(commit));
   emitted.push_back(EmitGeodesicsReferenceSmoke(commit));
   emitted.push_back(EmitPointLBVHSmoke(commit));
+  emitted.push_back(EmitLopLBVHSmoke(commit));
   emitted.push_back(EmitPointLBVHKnnSmoke(commit));
   emitted.push_back(EmitRegistrationSpatialSmoke(commit));
   emitted.push_back(EmitCurvatureSegmentationReferenceSmoke(commit));

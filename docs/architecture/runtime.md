@@ -258,6 +258,11 @@ exact topology and unrelated/custom property storage remain owned by the
 source. Mesh/graph count changes fail during the shared availability preflight
 before a job is queued. Only a topology-free point-cloud point domain may take
 the existing canonical full-source replacement path, with exact undo/redo.
+LOP can also lease the selected property index from `SpatialIndexCache` via
+`cpu_lbvh`; moving-sample indices remain private to its worker. The existing
+config and UI choose that backend, and completion reports index reuse without
+silent fallback. Other strategies retain their existing backend eligibility.
+RUNTIME-229 owns the framed Vulkan LBVH adapter.
 Geometry-presentation slot edits additionally validate and monotonically
 advance the presentation recipe generation on apply, undo, and redo instead of
 restoring a captured generation and admitting an ABA stale-output match. The

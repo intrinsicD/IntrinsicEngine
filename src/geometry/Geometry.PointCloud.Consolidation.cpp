@@ -1017,13 +1017,20 @@ namespace Geometry::PointCloud::Consolidation
             std::vector<glm::vec3>& projected,
             Diagnostics& diagnostics,
             Status& failure,
-            Geometry::KDTree::RadiusQueryScratch* const scratch = nullptr)
+            Geometry::KDTree::RadiusQueryScratch* const scratch = nullptr,
+            const Geometry::PointNeighborhoods* supplied = nullptr)
         {
             std::vector<glm::vec3> initialized(projected.size());
             std::vector<Geometry::KDTree::ElementIndex> neighbors{};
             for (std::size_t i = 0u; i < projected.size(); ++i)
             {
-                if (!QueryNeighbors(
+                if (supplied != nullptr)
+                {
+                    const auto row = supplied->Indices.subspan(supplied->Offsets[i],
+                        supplied->Offsets[i + 1] - supplied->Offsets[i]);
+                    neighbors.assign(row.begin(), row.end());
+                }
+                else if (!QueryNeighbors(
                         sourceIndex, projected[i], supportRadius, neighbors,
                         scratch))
                 {
@@ -1195,10 +1202,12 @@ namespace Geometry::PointCloud::Consolidation
             std::vector<glm::vec3>& projected,
             Diagnostics& diagnostics,
             Status& failure,
-            OptimizedExecutionScratch* const optimizedScratch = nullptr)
+            OptimizedExecutionScratch* const optimizedScratch = nullptr,
+            const Geometry::PointNeighborhoods* attractionRows = nullptr,
+            const Geometry::PointNeighborhoods* repulsionRows = nullptr)
         {
             Geometry::KDTree projectedIndex{};
-            if (!BuildIndex(projected, projectedIndex))
+            if (repulsionRows == nullptr && !BuildIndex(projected, projectedIndex))
             {
                 failure = Status::SpatialIndexBuildFailed;
                 return false;
@@ -1283,7 +1292,13 @@ namespace Geometry::PointCloud::Consolidation
                 }
                 else
                 {
-                    if (!QueryNeighbors(sourceIndex, projected[i],
+                    if (attractionRows != nullptr)
+                    {
+                        const auto row = attractionRows->Indices.subspan(attractionRows->Offsets[i],
+                            attractionRows->Offsets[i + 1] - attractionRows->Offsets[i]);
+                        neighbors.assign(row.begin(), row.end());
+                    }
+                    else if (!QueryNeighbors(sourceIndex, projected[i],
                                         params.SupportRadius, neighbors,
                                         optimizedScratch != nullptr
                                             ? &optimizedScratch->RadiusQuery
@@ -1341,7 +1356,12 @@ namespace Geometry::PointCloud::Consolidation
 
                 std::span<const Geometry::KDTree::ElementIndex>
                     repulsionNeighbors{};
-                if (optimizedScratch != nullptr &&
+                if (repulsionRows != nullptr)
+                {
+                    repulsionNeighbors = repulsionRows->Indices.subspan(repulsionRows->Offsets[i],
+                        repulsionRows->Offsets[i + 1] - repulsionRows->Offsets[i]);
+                }
+                else if (optimizedScratch != nullptr &&
                     diagnostics.UsedDensityWeighting)
                 {
                     repulsionNeighbors =
@@ -1934,6 +1954,8 @@ namespace Geometry::PointCloud::Consolidation
             return "empty_continuous_attraction";
         case Status::UpsamplingFailed: return "upsampling_failed";
         case Status::NumericalFailure: return "numerical_failure";
+        case Status::UnsupportedStrategy: return "unsupported_strategy";
+        case Status::InvalidNeighborhoods: return "invalid_neighborhoods";
         case Status::NotConverged: return "not_converged";
         }
         return "invalid";
@@ -2199,6 +2221,144 @@ namespace Geometry::PointCloud::Consolidation
         if (cloud.HasNormals())
             return Consolidate(cloud.Positions(), cloud.Normals(), params);
         return Consolidate(cloud.Positions(), params);
+    }
+
+    namespace
+    {
+        bool ValidLopRows(Geometry::PointNeighborhoods rows, std::size_t queries, std::size_t count)
+        {
+            if (rows.Offsets.size() != queries + 1 || rows.Offsets.front() != 0 ||
+                rows.Offsets.back() != rows.Indices.size()) return false;
+            for (std::size_t i = 0; i < queries; ++i)
+            {
+                if (rows.Offsets[i] > rows.Offsets[i + 1] || rows.Offsets[i + 1] > rows.Indices.size()) return false;
+                for (auto k = rows.Offsets[i]; k < rows.Offsets[i + 1]; ++k)
+                    if (rows.Indices[k] >= count || (k > rows.Offsets[i] && rows.Indices[k - 1] >= rows.Indices[k])) return false;
+            }
+            return true;
+        }
+        Result ValidateLop(std::span<const glm::vec3> source, const Params& params)
+        {
+            auto result = InvalidRequest(source, {}, params);
+            if (result.Succeeded() && Kind(params.Method) != StrategyKind::Lop)
+                result.State = Status::UnsupportedStrategy;
+            return result;
+        }
+        Result LopFromRows(std::span<const glm::vec3> source, std::span<const glm::vec3> projected,
+            Geometry::PointNeighborhoods attraction, const Geometry::PointNeighborhoods* repulsion,
+            const Params& params)
+        {
+            auto result = ValidateLop(source, params);
+            if (!result.Succeeded()) return result;
+            const auto target = params.TargetPointCount ? params.TargetPointCount : source.size();
+            if (projected.size() != target) { result.State = Status::InvalidTargetCount; return result; }
+            if (!std::all_of(projected.begin(), projected.end(), [](auto p) { return IsFinite(p); }))
+            { result.State = Status::NonFiniteInput; return result; }
+            if (!ValidLopRows(attraction, projected.size(), source.size()) ||
+                (repulsion && !ValidLopRows(*repulsion, projected.size(), projected.size())))
+            { result.State = Status::InvalidNeighborhoods; return result; }
+            std::vector<glm::vec3> points(projected.begin(), projected.end());
+            const std::vector<float> weights(source.size(), 1.f);
+            const Geometry::KDTree unused;
+            Status failure = Status::NumericalFailure;
+            const bool ok = repulsion
+                ? Iterate(source, unused, weights, nullptr, {}, params, points, result.Diagnostics,
+                    failure, nullptr, &attraction, repulsion)
+                : L2Initialize(source, unused, weights, params.SupportRadius, points,
+                    result.Diagnostics, failure, nullptr, &attraction);
+            if (!ok) { result.State = failure; return result; }
+            result.Positions = std::move(points);
+            result.Diagnostics.OutputPointCount = result.Positions.size();
+            result.Diagnostics.Iterations = repulsion ? 1 : 0;
+            result.Diagnostics.Converged = repulsion && result.Diagnostics.MaxDisplacement <= params.ConvergenceTolerance;
+            return result;
+        }
+        struct LopRows
+        {
+            std::vector<std::uint32_t> Offsets{0}, Indices{};
+            Geometry::PointNeighborhoods View() const { return {Offsets, Indices}; }
+        };
+        bool CollectLopRows(const Geometry::PointLBVH::Index& index,
+            std::span<const glm::vec3> queries, float radius, LopRows& rows)
+        {
+            rows = {};
+            for (const auto query : queries)
+            {
+                if (!Geometry::PointLBVH::ValidPoint(query)) return false;
+                auto hits = index.Radius(query, radius, static_cast<std::uint32_t>(index.Points().size()));
+                if (hits.Overflowed() || hits.Neighbors.size() > std::numeric_limits<std::uint32_t>::max() - rows.Indices.size()) return false;
+                std::sort(hits.Neighbors.begin(), hits.Neighbors.end(), [](auto a, auto b) { return a.Index < b.Index; });
+                for (auto hit : hits.Neighbors) rows.Indices.push_back(hit.Index);
+                rows.Offsets.push_back(static_cast<std::uint32_t>(rows.Indices.size()));
+            }
+            return true;
+        }
+    }
+
+    Result SeedLop(std::span<const glm::vec3> source, const Params& params)
+    {
+        auto result = ValidateLop(source, params);
+        if (!result.Succeeded()) return result;
+        std::vector<std::size_t> selected;
+        if (!InitializeProjected(source, params.TargetPointCount ? params.TargetPointCount : source.size(),
+            params.Seed, result.Positions, selected)) result.State = Status::NumericalFailure;
+        result.Diagnostics.OutputPointCount = result.Positions.size();
+        return result;
+    }
+    Result InitializeLopFromNeighbors(std::span<const glm::vec3> source, std::span<const glm::vec3> projected,
+        Geometry::PointNeighborhoods attraction, const Params& params)
+    { return LopFromRows(source, projected, attraction, nullptr, params); }
+    Result StepLopFromNeighbors(std::span<const glm::vec3> source, std::span<const glm::vec3> projected,
+        Geometry::PointNeighborhoods attraction, Geometry::PointNeighborhoods repulsion, const Params& params)
+    { return LopFromRows(source, projected, attraction, &repulsion, params); }
+
+    Result ConsolidateLopWithIndex(std::span<const glm::vec3> source,
+        const Geometry::PointLBVH::Index& index, const Params& params)
+    {
+        auto result = SeedLop(source, params);
+        result.Diagnostics.Implementation = "cpu_lbvh";
+        auto fail = [&](Status state) { result.State = state; result.Positions.clear(); return result; };
+        if (!result.Succeeded()) return fail(result.State);
+        if (source.size() != index.Points().size() || !std::equal(source.begin(), source.end(), index.Points().begin()))
+            return fail(Status::SpatialIndexBuildFailed);
+        const auto radius = Kernels::ConservativeQueryRadius(params.SupportRadius);
+        if (!radius || *radius > Geometry::PointLBVH::CoordinateLimit) return fail(Status::InvalidSupportRadius);
+        LopRows attraction, repulsion;
+        if (!CollectLopRows(index, result.Positions, *radius, attraction)) return fail(Status::SpatialQueryFailed);
+        auto initialized = InitializeLopFromNeighbors(source, result.Positions, attraction.View(), params);
+        if (!initialized.Succeeded())
+        {
+            result.Diagnostics = initialized.Diagnostics;
+            result.Diagnostics.Implementation = "cpu_lbvh";
+            return fail(initialized.State);
+        }
+        result = std::move(initialized);
+        result.Diagnostics.Implementation = "cpu_lbvh";
+        for (std::uint32_t i = 0; i < params.MaxIterations; ++i)
+        {
+            Geometry::PointLBVH::Index moving;
+            if (!moving.Build(result.Positions)) return fail(Status::SpatialIndexBuildFailed);
+            if (!CollectLopRows(index, result.Positions, *radius, attraction) ||
+                !CollectLopRows(moving, result.Positions, *radius, repulsion)) return fail(Status::SpatialQueryFailed);
+            auto step = StepLopFromNeighbors(source, result.Positions, attraction.View(), repulsion.View(), params);
+            if (!step.Succeeded())
+            {
+                result.Diagnostics.AttractionContributionCount += step.Diagnostics.AttractionContributionCount;
+                result.Diagnostics.RepulsionContributionCount += step.Diagnostics.RepulsionContributionCount;
+                result.Diagnostics.EmptyNeighborhoodCount += step.Diagnostics.EmptyNeighborhoodCount;
+                return fail(step.State);
+            }
+            result.Positions = std::move(step.Positions);
+            result.Diagnostics.AttractionContributionCount += step.Diagnostics.AttractionContributionCount;
+            result.Diagnostics.RepulsionContributionCount += step.Diagnostics.RepulsionContributionCount;
+            result.Diagnostics.Iterations = i + 1;
+            result.Diagnostics.AverageDisplacement = step.Diagnostics.AverageDisplacement;
+            result.Diagnostics.MaxDisplacement = step.Diagnostics.MaxDisplacement;
+            result.Diagnostics.Converged = step.Diagnostics.Converged;
+            if (result.Diagnostics.Converged) break;
+        }
+        result.State = result.Diagnostics.Converged ? Status::Success : Status::NotConverged;
+        return result;
     }
 
     namespace Validation

@@ -17,6 +17,8 @@
 import Geometry.PointCloud;
 import Geometry.PointCloud.Consolidation;
 import Geometry.GaussianMixture;
+import Geometry.PointLBVH;
+import Geometry.SpatialQueries;
 
 namespace
 {
@@ -1293,4 +1295,79 @@ TEST(PointCloudConsolidation, DirectionalAttractionRejectsRoundedOutsideSupport)
     ASSERT_TRUE(cached.Succeeded())<<Consolidation::DebugName(cached.State);
     EXPECT_EQ(reference.Positions,points);EXPECT_EQ(cached.Positions,points);
     EXPECT_EQ(reference.Diagnostics.AttractionContributionCount,2);EXPECT_EQ(cached.Diagnostics.AttractionContributionCount,2);
+}
+
+namespace
+{
+    struct CompleteLopRows
+    {
+        std::vector<std::uint32_t> Offsets{0}, Indices{};
+        CompleteLopRows(std::size_t queries, std::uint32_t count)
+        {
+            for (std::size_t i = 0; i < queries; ++i)
+            { for (std::uint32_t j = 0; j < count; ++j) Indices.push_back(j); Offsets.push_back(Indices.size()); }
+        }
+        Geometry::PointNeighborhoods View() const { return {Offsets, Indices}; }
+    };
+}
+TEST(PointCloudConsolidation, LopSuppliedRowsAndCachedIndexPreserveMovingIterations)
+{
+    std::vector<glm::vec3> source;
+    for (int y = 0; y < 6; ++y) for (int x = 0; x < 7; ++x)
+        source.emplace_back(x * .1f, y * .1f, .015f * std::sin(float(x * 3 + y)));
+    Geometry::PointLBVH::Index index;
+    ASSERT_TRUE(index.Build(source));
+    for (std::size_t target : {std::size_t(0), std::size_t(2), std::size_t(13)})
+    {
+        auto p = ReferenceParams(); p.Method = Consolidation::LopStrategy{};
+        p.TargetPointCount = target; p.MaxIterations = 3; p.ConvergenceTolerance = 0;
+        const auto reference = Consolidation::Consolidate(source, p);
+        const auto cached = Consolidation::ConsolidateLopWithIndex(source, index, p);
+        EXPECT_EQ(cached.State, reference.State);
+        EXPECT_EQ(cached.Positions, reference.Positions);
+        EXPECT_EQ(cached.Diagnostics.AttractionContributionCount, reference.Diagnostics.AttractionContributionCount);
+        EXPECT_EQ(cached.Diagnostics.RepulsionContributionCount, reference.Diagnostics.RepulsionContributionCount);
+        EXPECT_EQ(cached.Diagnostics.Iterations, reference.Diagnostics.Iterations);
+        auto seed = Consolidation::SeedLop(source, p); ASSERT_TRUE(seed.Succeeded());
+        CompleteLopRows attraction(seed.Positions.size(), source.size()), repulsion(seed.Positions.size(), seed.Positions.size());
+        auto result = Consolidation::InitializeLopFromNeighbors(source, seed.Positions, attraction.View(), p);
+        ASSERT_TRUE(result.Succeeded());
+        for (std::uint32_t i = 0; i < reference.Diagnostics.Iterations; ++i)
+        { result = Consolidation::StepLopFromNeighbors(source, result.Positions, attraction.View(), repulsion.View(), p); ASSERT_TRUE(result.Succeeded()); }
+        EXPECT_EQ(result.Positions, reference.Positions);
+    }
+}
+TEST(PointCloudConsolidation, LopRowsValidateIdentityStructureAndStrategy)
+{
+    const std::vector<glm::vec3> source{{0,0,0},{.2f,0,0},{.4f,0,0}};
+    auto p = ReferenceParams(); p.Method = Consolidation::LopStrategy{}; p.TargetPointCount = 2;
+    const std::vector<glm::vec3> projected{source[2], source[0]};
+    CompleteLopRows rows(2,3), repulsion(2,2);
+    auto initialized = Consolidation::InitializeLopFromNeighbors(source, projected, rows.View(), p);
+    ASSERT_TRUE(initialized.Succeeded());
+    EXPECT_GT(initialized.Positions[0].x, initialized.Positions[1].x);
+    auto malformed = rows; malformed.Indices[1] = malformed.Indices[0];
+    EXPECT_EQ(Consolidation::InitializeLopFromNeighbors(source, projected, malformed.View(), p).State, Consolidation::Status::InvalidNeighborhoods);
+    malformed = rows; malformed.Offsets[1] = 99;
+    EXPECT_EQ(Consolidation::StepLopFromNeighbors(source, projected, rows.View(), malformed.View(), p).State, Consolidation::Status::InvalidNeighborhoods);
+    malformed = rows; malformed.Indices[0] = 3;
+    EXPECT_EQ(Consolidation::InitializeLopFromNeighbors(source, projected, malformed.View(), p).State, Consolidation::Status::InvalidNeighborhoods);
+    Geometry::PointLBVH::Index index; ASSERT_TRUE(index.Build(projected));
+    EXPECT_EQ(Consolidation::ConsolidateLopWithIndex(source,index,p).State, Consolidation::Status::SpatialIndexBuildFailed);
+    p.Method = Consolidation::WlopStrategy{};
+    EXPECT_EQ(Consolidation::SeedLop(source,p).State, Consolidation::Status::UnsupportedStrategy);
+}
+TEST(PointCloudConsolidation, LopTinySupportPreservesCoincidentAndStrictContributors)
+{
+    const float v = std::bit_cast<float>(0x1a01460fu);
+    for (auto source : {std::vector<glm::vec3>{{0,0,0},{v,v,v}}, std::vector<glm::vec3>(3,glm::vec3(0))})
+    {
+        auto p = ReferenceParams(); p.Method = Consolidation::LopStrategy{}; p.SupportRadius = 4.6766236639043417e-23;
+        p.MaxIterations = 3; p.ConvergenceTolerance = 0;
+        Geometry::PointLBVH::Index index; ASSERT_TRUE(index.Build(source));
+        const auto reference = Consolidation::Consolidate(source,p);
+        const auto cached = Consolidation::ConsolidateLopWithIndex(source,index,p);
+        EXPECT_EQ(cached.State, reference.State); EXPECT_EQ(cached.Positions,reference.Positions);
+        EXPECT_EQ(cached.Diagnostics.AttractionContributionCount,reference.Diagnostics.AttractionContributionCount);
+    }
 }

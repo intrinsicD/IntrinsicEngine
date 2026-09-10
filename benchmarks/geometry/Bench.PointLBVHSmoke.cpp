@@ -7,6 +7,7 @@
 #include <optional>
 import Geometry.PointLBVH;
 import Geometry.PointCloud.Normals;
+import Geometry.PointCloud.Consolidation;
 namespace Intrinsic::Bench::Geometry
 {
     PointLBVHSmokeResult RunPointLBVHSmoke()
@@ -85,3 +86,32 @@ namespace Intrinsic::Bench::Geometry
         return result;
     }
 } // namespace Intrinsic::Bench::Geometry
+
+namespace Intrinsic::Bench::Geometry
+{
+    PointLBVHSmokeResult RunLopLBVHSmoke()
+    {
+        namespace C = ::Geometry::PointCloud::Consolidation;
+        std::vector<glm::vec3> source;
+        for(int y=0;y<16;++y) for(int x=0;x<16;++x)
+            source.emplace_back(x*.05f,y*.05f,.01f*std::sin(float(x*3+y*7)));
+        C::Params params{.Method=C::LopStrategy{},.SupportRadius=.2,.RepulsionWeight=.2,
+            .MaxIterations=3,.ConvergenceTolerance=0,.TargetPointCount=64,.Seed=257};
+        const auto reference=C::Consolidate(source,params);
+        ::Geometry::PointLBVH::Index index;
+        PointLBVHSmokeResult result;
+        if(!index.Build(source) || reference.Positions.size()!=64) {result.Mismatches=1;return result;}
+        for(int run=-1;run<4;++run)
+        {
+            const auto start=std::chrono::steady_clock::now();
+            const auto projected=C::ConsolidateLopWithIndex(source,index,params);
+            if(run>=0) result.RuntimeMilliseconds+=std::chrono::duration<double,std::milli>(std::chrono::steady_clock::now()-start).count()/4;
+            if(projected.State!=reference.State || projected.Positions.size()!=reference.Positions.size()) {++result.Mismatches;continue;}
+            for(std::size_t i=0;i<reference.Positions.size();++i)
+                result.MaxDistanceError=std::max(result.MaxDistanceError,double(glm::length(projected.Positions[i]-reference.Positions[i])));
+            if(projected.Diagnostics.AttractionContributionCount!=reference.Diagnostics.AttractionContributionCount ||
+               projected.Diagnostics.RepulsionContributionCount!=reference.Diagnostics.RepulsionContributionCount) ++result.Mismatches;
+        }
+        return result;
+    }
+}

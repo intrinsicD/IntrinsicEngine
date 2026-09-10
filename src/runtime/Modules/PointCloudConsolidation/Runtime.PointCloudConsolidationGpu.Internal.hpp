@@ -35,6 +35,8 @@ namespace Extrinsic::Runtime
         std::optional<Geometry::SupportRadius::Analysis> RadiusAnalysis{};
         std::vector<glm::vec3> GpuInitialPositions{};
         bool ForceCpu{false};
+        std::shared_ptr<const Geometry::PointLBVH::Index> SourceIndex{};
+        bool ReusedSpatialIndex{false};
         std::string BackendDiagnostic{};
     };
 

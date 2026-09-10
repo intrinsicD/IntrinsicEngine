@@ -37,6 +37,7 @@ correctness_tests:
   - ../../../tests/integration/graphics/Test.PointLBVHGpuSmoke.cpp
   - ../../../tests/integration/runtime/Test.ClusteringServiceGpuSmoke.cpp
 benchmarks:
+  - ../../../benchmarks/geometry/manifests/point_lbvh_lop_cpu_smoke.yaml
   - ../../../benchmarks/geometry/manifests/point_lbvh_density_weight_runtime_smoke.yaml
   - ../../../benchmarks/geometry/manifests/point_lbvh_smoke.yaml
   - ../../../benchmarks/geometry/manifests/point_lbvh_knn_smoke.yaml

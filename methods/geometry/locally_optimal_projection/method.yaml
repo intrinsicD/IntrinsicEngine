@@ -26,13 +26,15 @@ correctness_tests:
   - "../../../tests/unit/geometry/Test.PointCloudConsolidation.cpp"
   - "../../../tests/integration/runtime/Test.PointCloudConsolidationGpuParity.cpp"
 benchmarks:
+  - "../../../benchmarks/geometry/manifests/point_lbvh_lop_cpu_smoke.yaml"
   - "../../../benchmarks/geometry/manifests/locally_optimal_projection_reference_smoke.yaml"
   - "../../../benchmarks/geometry/manifests/lop_family_comparison_smoke.yaml"
   - "../../../benchmarks/geometry/manifests/lop_family_gpu_vulkan_smoke_v3.yaml"
 known_limitations:
+  - "The cpu_lbvh runtime token selects cached CPU LBVH neighborhoods with the existing CPU reference projection arithmetic, for LOP only; it is not a promotion of METHOD-019 or a speedup claim. RUNTIME-229 owns framed Vulkan LBVH projection."
   - "Compact support h must connect every projected sample to at least one source sample; isolated neighborhoods fail closed."
   - "Thin structures and strongly anisotropic sampling can merge across sheets when h is too large."
-  - "METHOD-019's exact optimized candidates preserved parity but missed the frozen useful-acceleration gate for both LOP and WLOP; no optimized backend is selectable."
+  - "METHOD-019's exact optimized candidates preserved parity but missed the frozen useful-acceleration gate for both LOP and WLOP; the frozen optimized candidate remains unselectable; cached query selection has separate evidence and no acceleration claim."
   - "gpu_vulkan_compute supports ordinary LOP and isotropic WLOP only; anisotropic WLOP fails runtime preview and remains on cpu_reference."
   - "The Vulkan backend uses float shader arithmetic, bounded dense h-cell grids, and one in-flight operation; device, planning, busy, or transport unavailability falls back honestly to cpu_reference."
   - "Inverse-distance terms use a scale-relative distance floor of 0.01 h for coincident samples."
