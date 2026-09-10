@@ -1,0 +1,12 @@
+schema_version: 1
+task_id: BUG-185
+sealed_revision: 918147792dab2ac23fae2acf18d35accca5eaf3f
+source_content_digest: bad395d345ff8827724c549ef38a531779ea6622466a8bedb49de6505e21c0e9
+report_sha256: 20c33cb9077b8b1744a5fa079c4f8d3716a99ee700ed54a9a525ea4acecbfdf5
+records:
+- path: tasks/evidence/BUG-185/handoff.jsonl
+  sha256: 4444121ae573540d76d2fc11291c16803b68d563acc7bb393948541d6c42aea2
+- path: tasks/evidence/BUG-185/reviews.jsonl
+  sha256: 98fac0cb7bb9811e8e269c2e5d85acccd217d71d33b48f6edb09e55c96131b86
+reason: Clean committed support occupancy correction and independent review
+generated_by: tools/agents/workflow_evidence.py
