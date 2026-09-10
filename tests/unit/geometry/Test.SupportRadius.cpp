@@ -1,3 +1,4 @@
+#include <bit>
 #include <cmath>
 #include <cstddef>
 #include <limits>
@@ -355,4 +356,32 @@ TEST(SupportRadius, DegenerateAndInvalidInputsHaveExplicitStatuses)
     EXPECT_EQ(
         Radius::Analyze(Line(8u), 0.0).State,
         Radius::Status::InvalidRadius);
+}
+
+TEST(SupportRadius, TinyCompleteSupportCannotBypassWorkloadBudget)
+{
+    const float v=std::bit_cast<float>(0x1a01460fu);
+    constexpr double radius=4.6766236639043417e-23;
+    for(const std::size_t count:{2u,33u})
+    {
+        SCOPED_TRACE(count);
+        std::vector<glm::vec3> points(count,glm::vec3(v));points[0]={0,0,0};
+        const auto result=Radius::Analyze(points,radius,{},
+            {.MaxNeighborsPerSample=std::uint32_t(count-1)},
+            {.MaxSamples=count,.MaxNeighborRank=1});
+        EXPECT_EQ(result.State,Radius::Status::WorkloadLimitExceeded);
+        EXPECT_TRUE(result.NeighborLimitExceeded);
+        EXPECT_EQ(result.SupportNeighborsMax,count);
+        EXPECT_DOUBLE_EQ(result.SupportNeighborsP50,double(count));
+        EXPECT_DOUBLE_EQ(result.SupportNeighborsP95,double(count));
+        EXPECT_EQ(result.PredictedContributionCount,count*count);
+    }
+}
+TEST(SupportRadius, TinyDoubleRadiusStillCountsCoincidentSamples)
+{
+    const std::vector<glm::vec3> points(2,glm::vec3(0));
+    const auto result=Radius::Analyze(points,1e-310,{},
+        {.MaxNeighborsPerSample=1},{.MaxSamples=2,.MaxNeighborRank=1});
+    EXPECT_EQ(result.State,Radius::Status::WorkloadLimitExceeded);
+    EXPECT_EQ(result.SupportNeighborsMax,2);EXPECT_EQ(result.PredictedContributionCount,4);
 }

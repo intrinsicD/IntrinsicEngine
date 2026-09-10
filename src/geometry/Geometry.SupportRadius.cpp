@@ -15,6 +15,7 @@ module;
 module Geometry.SupportRadius;
 
 import Geometry.KDTree;
+import Geometry.PointCloud.Kernels;
 import Geometry.Statistics;
 
 namespace Geometry::SupportRadius
@@ -85,21 +86,7 @@ namespace Geometry::SupportRadius
         [[nodiscard]] std::optional<float> BroadPhaseRadius(
             const double radius) noexcept
         {
-            if (!std::isfinite(radius) || !(radius > 0.0) ||
-                radius > static_cast<double>(
-                    std::numeric_limits<float>::max()))
-            {
-                return std::nullopt;
-            }
-            float broad = static_cast<float>(radius);
-            if (static_cast<double>(broad) < radius)
-            {
-                broad = std::nextafter(
-                    broad, std::numeric_limits<float>::infinity());
-            }
-            if (!std::isfinite(broad) || !(broad > 0.0F))
-                return std::nullopt;
-            return broad;
+            return PointCloud::Kernels::ConservativeQueryRadius(radius);
         }
 
         [[nodiscard]] std::uint64_t SaturatingMultiply(
@@ -334,7 +321,6 @@ namespace Geometry::SupportRadius
             }
 
             supportCounts.clear();
-            const double radiusSquared = radius * radius;
             for (const std::size_t sampleIndex : sampleIndices)
             {
                 const auto query = index.QueryRadius(
@@ -353,9 +339,8 @@ namespace Geometry::SupportRadius
                 std::uint32_t exactCount = 0u;
                 for (const KDTree::ElementIndex neighbor : neighbors)
                 {
-                    if (SquaredDistance(
-                            points[sampleIndex], points[neighbor]) <
-                        radiusSquared)
+                    if (std::sqrt(SquaredDistance(
+                            points[sampleIndex], points[neighbor])) < radius)
                     {
                         ++exactCount;
                     }
