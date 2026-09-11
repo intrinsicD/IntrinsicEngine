@@ -1,0 +1,95 @@
+{
+  "results": [
+    {
+      "shader": "forward/default_debug_surface.frag",
+      "binary_identical": false,
+      "optimized_binary_identical": false,
+      "interface_and_member_layout_identical": true,
+      "layout_records": 136
+    },
+    {
+      "shader": "deferred/default_debug_gbuffer.frag",
+      "binary_identical": false,
+      "optimized_binary_identical": false,
+      "interface_and_member_layout_identical": true,
+      "layout_records": 137
+    },
+    {
+      "shader": "deferred/gbuffer.frag",
+      "binary_identical": false,
+      "optimized_binary_identical": false,
+      "interface_and_member_layout_identical": true,
+      "layout_records": 144
+    },
+    {
+      "shader": "progressive_poisson_build_cells.comp",
+      "binary_identical": true,
+      "optimized_binary_identical": true,
+      "interface_and_member_layout_identical": true,
+      "layout_records": 36
+    },
+    {
+      "shader": "progressive_poisson_accept_phase.comp",
+      "binary_identical": true,
+      "optimized_binary_identical": true,
+      "interface_and_member_layout_identical": true,
+      "layout_records": 36
+    },
+    {
+      "shader": "kmeans_assign.comp",
+      "binary_identical": true,
+      "optimized_binary_identical": true,
+      "interface_and_member_layout_identical": true,
+      "layout_records": 33
+    },
+    {
+      "shader": "kmeans_reset.comp",
+      "binary_identical": true,
+      "optimized_binary_identical": true,
+      "interface_and_member_layout_identical": true,
+      "layout_records": 28
+    },
+    {
+      "shader": "kmeans_update.comp",
+      "binary_identical": true,
+      "optimized_binary_identical": true,
+      "interface_and_member_layout_identical": true,
+      "layout_records": 29
+    },
+    {
+      "shader": "point.vert",
+      "binary_identical": false,
+      "optimized_binary_identical": false,
+      "interface_and_member_layout_identical": true,
+      "layout_records": 31
+    },
+    {
+      "shader": "point_retained.vert",
+      "binary_identical": false,
+      "optimized_binary_identical": false,
+      "interface_and_member_layout_identical": true,
+      "layout_records": 35
+    },
+    {
+      "shader": "point_surfel.vert",
+      "binary_identical": false,
+      "optimized_binary_identical": false,
+      "interface_and_member_layout_identical": true,
+      "layout_records": 39
+    },
+    {
+      "shader": "point.frag",
+      "binary_identical": false,
+      "optimized_binary_identical": false,
+      "interface_and_member_layout_identical": true,
+      "layout_records": 22
+    },
+    {
+      "shader": "point_retained.frag",
+      "binary_identical": false,
+      "optimized_binary_identical": false,
+      "interface_and_member_layout_identical": true,
+      "layout_records": 29
+    }
+  ]
+}

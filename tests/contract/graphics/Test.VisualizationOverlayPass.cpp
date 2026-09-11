@@ -47,6 +47,9 @@ import Extrinsic.RHI.FrameHandle;
 import Extrinsic.RHI.Handles;
 
 #include "MockRHI.hpp"
+#include "GraphicsTestSupport.hpp"
+
+using Extrinsic::Tests::GraphicsSupport::FindCommandPass;
 
 using namespace Extrinsic;
 using Tests::MockDevice;
@@ -55,36 +58,6 @@ static_assert(!std::is_polymorphic_v<Graphics::VisualizationOverlayUploadHelper>
 
 namespace
 {
-    [[nodiscard]] const Graphics::RenderGraphCommandPassStats* FindCommandPass(
-        const Graphics::RenderGraphFrameStats& stats,
-        const std::string& name)
-    {
-        for (const auto& pass : stats.CommandRecords.Passes)
-        {
-            if (pass.Name == name)
-            {
-                return &pass;
-            }
-        }
-        return nullptr;
-    }
-
-    [[nodiscard]] bool HasBackbufferBarrier(const MockDevice& device,
-                                            const RHI::TextureLayout before,
-                                            const RHI::TextureLayout after) noexcept
-    {
-        for (const auto& barrier : device.CommandContext.TextureBarrierCalls)
-        {
-            if (barrier.Texture == device.BackbufferHandle &&
-                barrier.Before == before &&
-                barrier.After == after)
-            {
-                return true;
-            }
-        }
-        return false;
-    }
-
     void SubmitOneVectorField(Graphics::IRenderer& renderer, const bool depthTested = true)
     {
         // A single non-empty vector-field-overlay packet span is enough
@@ -514,7 +487,7 @@ TEST(VisualizationOverlayPassContract, UploadOverflowSkipsUnavailableWithoutFals
     // `VectorFieldOverlayPacket` whose `2 * ElementCount` exceeds the
     // per-lane cap (`kMaxVectorFieldVertexCount = 1 << 18 = 262144`)
     // must fail-close BEFORE the helper's staging-buffer allocation —
-    // otherwise the per-frame `std::vector<PackedOverlayVertex>` of
+    // otherwise the per-frame packed-vertex staging vector of
     // size `2 * ElementCount` would attempt a multi-GiB host
     // allocation (or throw `bad_alloc`) for an adversarial
     // `ElementCount = UINT32_MAX`. The pass MUST report
@@ -1138,7 +1111,7 @@ TEST(VisualizationOverlayPassContract, VisualizationReadbackDefaultDisabledEvenW
     EXPECT_EQ(pass->Status, Graphics::RenderCommandPassStatus::Recorded);
     EXPECT_EQ(stats.VisualizationOverlayBackbufferReadbackCopyCount, 0u)
         << "Recorded visualization-overlay draws must not arm readback implicitly.";
-    EXPECT_FALSE(HasBackbufferBarrier(device, RHI::TextureLayout::Present, RHI::TextureLayout::TransferSrc));
+    EXPECT_FALSE(device.HasBackbufferBarrier( RHI::TextureLayout::Present, RHI::TextureLayout::TransferSrc));
 
     renderer->Shutdown();
 }
@@ -1182,8 +1155,8 @@ TEST(VisualizationOverlayPassContract, VisualizationReadbackRecordsOnlyWhenPassR
         << "Visualization-overlay readback must not reuse the canonical surface counter.";
     EXPECT_EQ(stats.TransientDebugBackbufferReadbackCopyCount, 0u)
         << "Visualization-overlay readback must not reuse the transient-debug counter.";
-    EXPECT_TRUE(HasBackbufferBarrier(device, RHI::TextureLayout::Present, RHI::TextureLayout::TransferSrc));
-    EXPECT_TRUE(HasBackbufferBarrier(device, RHI::TextureLayout::TransferSrc, RHI::TextureLayout::Present));
+    EXPECT_TRUE(device.HasBackbufferBarrier( RHI::TextureLayout::Present, RHI::TextureLayout::TransferSrc));
+    EXPECT_TRUE(device.HasBackbufferBarrier( RHI::TextureLayout::TransferSrc, RHI::TextureLayout::Present));
 
     renderer->Shutdown();
 }
@@ -1213,7 +1186,7 @@ TEST(VisualizationOverlayPassContract, VisualizationReadbackSkipsWhenPassOmitted
     EXPECT_EQ(FindCommandPass(stats, "VisualizationOverlayPass"), nullptr);
     EXPECT_EQ(stats.VisualizationOverlayBackbufferReadbackCopyCount, 0u)
         << "An armed visualization-overlay readback buffer must not copy clean default frames.";
-    EXPECT_FALSE(HasBackbufferBarrier(device, RHI::TextureLayout::Present, RHI::TextureLayout::TransferSrc));
+    EXPECT_FALSE(device.HasBackbufferBarrier( RHI::TextureLayout::Present, RHI::TextureLayout::TransferSrc));
 
     renderer->Shutdown();
 }
@@ -1249,7 +1222,7 @@ TEST(VisualizationOverlayPassContract, VisualizationReadbackSkipsWhenDeviceNonOp
     ASSERT_NE(pass, nullptr);
     EXPECT_EQ(pass->Status, Graphics::RenderCommandPassStatus::SkippedNonOperational);
     EXPECT_EQ(stats.VisualizationOverlayBackbufferReadbackCopyCount, 0u);
-    EXPECT_FALSE(HasBackbufferBarrier(device, RHI::TextureLayout::Present, RHI::TextureLayout::TransferSrc));
+    EXPECT_FALSE(device.HasBackbufferBarrier( RHI::TextureLayout::Present, RHI::TextureLayout::TransferSrc));
 
     renderer->Shutdown();
 }

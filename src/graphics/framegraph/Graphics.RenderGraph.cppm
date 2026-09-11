@@ -1,8 +1,11 @@
+// Render-graph composition and pure lifetime placement shared with device-backed realization.
 module;
 
 #include <cstdint>
 #include <functional>
 #include <memory>
+#include <span>
+#include <vector>
 #include <string>
 
 export module Extrinsic.Graphics.RenderGraph;
@@ -20,6 +23,39 @@ export import :Executor;
 
 namespace Extrinsic::Graphics
 {
+    // Pass fields are execution ranks; consumers map them to compiled pass identities.
+    export struct TransientPlacementItem
+    {
+        std::uint32_t ResourceIndex = 0u;
+        std::uint32_t FirstUsePass = 0u;
+        std::uint32_t LastUsePass = 0u;
+        std::uint64_t SizeBytes = 0u;
+        std::uint64_t AlignmentBytes = 1u;
+    };
+
+    export struct TransientAliasReuseHazard
+    {
+        std::uint32_t PreviousResourceIndex = 0u;
+        std::uint32_t ResourceIndex = 0u;
+        std::uint32_t PassIndex = 0u;
+        std::uint32_t BlockIndex = 0u;
+        std::uint64_t OffsetBytes = 0u;
+        std::uint64_t SizeBytes = 0u;
+    };
+
+    export struct TransientPlacementPlan
+    {
+        std::vector<TransientResourcePlacement> Placements{};
+        std::vector<TransientAliasReuseHazard> AliasReuseHazards{};
+        std::uint64_t PeakBytes = 0u;
+    };
+
+    // Items are ordered by (FirstUsePass, ResourceIndex) with inclusive lifetimes.
+    // Size/alignment are caller-provided estimates or validated device requirements;
+    // the caller owns final block alignment and memory-type compatibility.
+    export [[nodiscard]] TransientPlacementPlan BuildTransientPlacementPlan(
+        std::span<const TransientPlacementItem> items, bool aliasingEnabled);
+
     export class RenderGraph final
     {
     public:

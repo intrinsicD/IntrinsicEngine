@@ -139,27 +139,6 @@ namespace Geometry::CurvatureSegmentation
         }
 
         [[nodiscard]] bool
-        IsValidMixtureParams(const CurvatureSegmentationParams& params) noexcept
-        {
-            const bool validMode =
-                params.SelectionMode == ComponentSelectionMode::FixedCount ||
-                params.SelectionMode == ComponentSelectionMode::Automatic;
-            return validMode && params.FixedComponentCount > 0u &&
-                   params.AutomaticMinComponents > 0u &&
-                   params.AutomaticMaxComponents >=
-                       params.AutomaticMinComponents &&
-                   std::isfinite(params.AutomaticFitTolerance) &&
-                   params.AutomaticFitTolerance > 0.0 &&
-                   std::isfinite(params.AutomaticComplexityWeight) &&
-                   params.AutomaticComplexityWeight >= 0.0 &&
-                   params.MaxEmIterations > 0u &&
-                   std::isfinite(params.EmRelativeTolerance) &&
-                   params.EmRelativeTolerance >= 0.0 &&
-                   std::isfinite(params.CovarianceFloor) &&
-                   params.CovarianceFloor > 0.0;
-        }
-
-        [[nodiscard]] bool
         IsValidParams(const CurvaturePatchParams& params) noexcept
         {
             return IsValidMixtureParams(params.Mixture) &&
@@ -188,43 +167,6 @@ namespace Geometry::CurvatureSegmentation
         {
             return face.IsValid() && mesh.IsValid(face) &&
                    !mesh.IsDeleted(face);
-        }
-
-        [[nodiscard]] double Median(std::vector<double> values)
-        {
-            if (values.empty())
-                return 0.0;
-            const std::size_t middle = values.size() / 2u;
-            std::nth_element(values.begin(), values.begin() + middle,
-                             values.end());
-            const double upper = values[middle];
-            if ((values.size() & 1u) != 0u)
-                return upper;
-            const double lower =
-                *std::max_element(values.begin(), values.begin() + middle);
-            return 0.5 * (lower + upper);
-        }
-
-        [[nodiscard]] double RobustScale(const std::vector<double>& values,
-                                         const double center)
-        {
-            std::vector<double> deviations;
-            deviations.reserve(values.size());
-            for (const double value : values)
-                deviations.push_back(std::abs(value - center));
-            const double madScale = 1.4826 * Median(std::move(deviations));
-            if (std::isfinite(madScale) && madScale > kTiny)
-                return madScale;
-
-            double squared = 0.0;
-            for (const double value : values)
-            {
-                const double delta = value - center;
-                squared += delta * delta;
-            }
-            const double rms =
-                std::sqrt(squared / static_cast<double>(values.size()));
-            return std::isfinite(rms) && rms > kTiny ? rms : 1.0;
         }
 
         [[nodiscard]] std::uint8_t
@@ -361,12 +303,12 @@ namespace Geometry::CurvatureSegmentation
                 k2Values.push_back(curvature.y);
             }
 
-            result.Diagnostics.SignedK1Center = Median(k1Values);
-            result.Diagnostics.SignedK2Center = Median(k2Values);
-            result.Diagnostics.SignedK1Scale =
-                RobustScale(k1Values, result.Diagnostics.SignedK1Center);
-            result.Diagnostics.SignedK2Scale =
-                RobustScale(k2Values, result.Diagnostics.SignedK2Center);
+            const auto k1Normalization = ComputeCurvatureNormalization(k1Values);
+            const auto k2Normalization = ComputeCurvatureNormalization(k2Values);
+            result.Diagnostics.SignedK1Center = k1Normalization.Center;
+            result.Diagnostics.SignedK2Center = k2Normalization.Center;
+            result.Diagnostics.SignedK1Scale = k1Normalization.Scale;
+            result.Diagnostics.SignedK2Scale = k2Normalization.Scale;
             for (PatchFaceSample& sample : samples)
             {
                 sample.NormalizedCurvature = glm::dvec2{

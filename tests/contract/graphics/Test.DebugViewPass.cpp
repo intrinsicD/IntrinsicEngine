@@ -41,26 +41,13 @@ import Extrinsic.RHI.Handles;
 import Extrinsic.RHI.Types;
 
 #include "MockRHI.hpp"
+#include "GraphicsTestSupport.hpp"
+
+using Extrinsic::Tests::GraphicsSupport::FindCommandPass;
 
 using namespace Extrinsic;
 using Tests::MockDevice;
 
-namespace
-{
-    [[nodiscard]] const Graphics::RenderGraphCommandPassStats* FindCommandPass(
-        const Graphics::RenderGraphFrameStats& stats,
-        const std::string& name)
-    {
-        for (const auto& pass : stats.CommandRecords.Passes)
-        {
-            if (pass.Name == name)
-            {
-                return &pass;
-            }
-        }
-        return nullptr;
-    }
-}
 
 // -----------------------------------------------------------------------------
 // Renderer-integrated tests (executor branch + bind/push/draw shape)

@@ -52,6 +52,9 @@ import Extrinsic.RHI.Handles;
 import Extrinsic.RHI.Types;
 
 #include "MockRHI.hpp"
+#include "GraphicsTestSupport.hpp"
+
+using Extrinsic::Tests::GraphicsSupport::FindCommandPass;
 
 using namespace Extrinsic;
 using Tests::MockDevice;
@@ -60,20 +63,6 @@ static_assert(!std::is_polymorphic_v<Graphics::ImGuiUploadHelper>);
 
 namespace
 {
-    [[nodiscard]] const Graphics::RenderGraphCommandPassStats* FindCommandPass(
-        const Graphics::RenderGraphFrameStats& stats,
-        const std::string& name)
-    {
-        for (const auto& pass : stats.CommandRecords.Passes)
-        {
-            if (pass.Name == name)
-            {
-                return &pass;
-            }
-        }
-        return nullptr;
-    }
-
     // One accepted overlay draw list with matching POD vertex/index payload so
     // `ImGuiOverlaySystem::HasOverlayWork()` becomes true and the Slice C
     // upload helper can pack it when Slice D.1 gives the pass a render target.

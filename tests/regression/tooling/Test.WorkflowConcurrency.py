@@ -232,6 +232,11 @@ def _source_multiworker_budgets() -> set[tuple[str, str, int]]:
                 if declaration is not None and int(declaration.group(1)) > 1:
                     case_budgets.add(int(declaration.group(1)))
 
+            # A paused worker and its controlling test thread both stay live.
+            if "CompletionQueueInterlock" in body and "WaitForWorkerPause" in body:
+                for match in literal_patterns[1].finditer(body):
+                    case_budgets.add(int(match.group(1)))
+
             if (
                 relative_path == "tests/contract/runtime/Test.ClusteringModule.cpp"
                 and re.search(r"NullWindowHeadlessConfig\(\s*\)", body)
@@ -307,15 +312,15 @@ class WorkflowConcurrencyTests(unittest.TestCase):
         source_budgets = _source_multiworker_budgets()
 
         self.assertEqual(declared, source_budgets)
-        self.assertEqual(len(declared), 76)
+        self.assertEqual(len(declared), 78)
         self.assertEqual(
             {
                 budget: sum(
                     declared_budget == budget for _, _, declared_budget in declared
                 )
-                for budget in (3, 4, 8)
+                for budget in (2, 3, 4, 8)
             },
-            {3: 52, 4: 22, 8: 2},
+            {2: 3, 3: 51, 4: 22, 8: 2},
         )
         self.assertIn(
             "Declared multi-worker test "
@@ -1105,7 +1110,11 @@ class WorkflowConcurrencyTests(unittest.TestCase):
         )
         operational_regex = env.get("VULKAN_OPERATIONAL_TEST_REGEX")
         self.assertIsInstance(operational_regex, str)
-        self.assertIn("\n            glslc \\\n", vulkan)
+        setup = next(
+            step for step in job["steps"]
+            if step.get("uses") == "./.github/actions/setup-build"
+        )
+        self.assertIn("glslc", setup["with"]["extra-packages"].split())
         self.assertIn("glslc --version", vulkan)
         self.assertIn(
             r"GpuResultReadbackGpuSmoke\."

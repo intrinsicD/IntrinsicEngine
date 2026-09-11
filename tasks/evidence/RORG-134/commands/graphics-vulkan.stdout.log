@@ -1,0 +1,60 @@
+62/84 Test #3798: RuntimeSandboxAcceptanceGpuSmoke.InspectorTransformEditShiftsReferenceTrianglePixels ........................   Passed    4.25 sec
+      Start 3799: RuntimeSandboxAcceptanceGpuSmoke.ImportedOffOriginObjTriangleAutoFramesAtCenter
+63/84 Test #3799: RuntimeSandboxAcceptanceGpuSmoke.ImportedOffOriginObjTriangleAutoFramesAtCenter .............................   Passed    3.83 sec
+      Start 3800: RuntimeSandboxAcceptanceGpuSmoke.DirectMeshEnrichmentPendingRendersGeometryOnlyImport
+64/84 Test #3800: RuntimeSandboxAcceptanceGpuSmoke.DirectMeshEnrichmentPendingRendersGeometryOnlyImport .......................   Passed    3.82 sec
+      Start 3801: RuntimeSandboxAcceptanceGpuSmoke.ImportedObjWithoutAuthoredUvsSamplesGeneratedAlbedoTexture
+65/84 Test #3801: RuntimeSandboxAcceptanceGpuSmoke.ImportedObjWithoutAuthoredUvsSamplesGeneratedAlbedoTexture .................   Passed    3.86 sec
+      Start 3802: RuntimeSandboxAcceptanceGpuSmoke.ClickPickReadbackSelectsReferenceTriangleAndBackgroundClears
+66/84 Test #3802: RuntimeSandboxAcceptanceGpuSmoke.ClickPickReadbackSelectsReferenceTriangleAndBackgroundClears ...............   Passed    3.95 sec
+      Start 3803: RuntimeSandboxAcceptanceGpuSmoke.ImportedModelSceneIsVisibleAndClickPickable
+67/84 Test #3803: RuntimeSandboxAcceptanceGpuSmoke.ImportedModelSceneIsVisibleAndClickPickable ................................   Passed    4.25 sec
+      Start 3804: RuntimeSandboxAcceptanceGpuSmoke.HierarchySelectionKeepsDefaultSandboxVisibleWithOutline
+68/84 Test #3804: RuntimeSandboxAcceptanceGpuSmoke.HierarchySelectionKeepsDefaultSandboxVisibleWithOutline ....................   Passed    3.68 sec
+      Start 3805: RuntimeSandboxAcceptanceGpuSmoke.ImportedObjectSpaceNormalBakeBindsAndReadsBackExactTargetSlice
+69/84 Test #3805: RuntimeSandboxAcceptanceGpuSmoke.ImportedObjectSpaceNormalBakeBindsAndReadsBackExactTargetSlice .............   Passed    5.33 sec
+      Start 3806: RuntimeSandboxAcceptanceGpuSmoke.PropertyTextureModuleBakesRebindsRebakesAndRemovesOnVulkan
+70/84 Test #3806: RuntimeSandboxAcceptanceGpuSmoke.PropertyTextureModuleBakesRebindsRebakesAndRemovesOnVulkan .................   Passed    6.07 sec
+      Start 3807: RuntimeSandboxAcceptanceGpuSmoke.SeamSplitCornerUvMeshDeIndexesAtUploadAndRendersVisibleSurface
+71/84 Test #3807: RuntimeSandboxAcceptanceGpuSmoke.SeamSplitCornerUvMeshDeIndexesAtUploadAndRendersVisibleSurface .............   Passed    3.81 sec
+      Start 3808: RuntimeSandboxAcceptanceGpuSmoke.SurfaceAppearanceBakesSelectedPropertyAndRestoresAttributes
+72/84 Test #3808: RuntimeSandboxAcceptanceGpuSmoke.SurfaceAppearanceBakesSelectedPropertyAndRestoresAttributes ................   Passed   11.68 sec
+      Start 3809: ClusteringServiceGpuSmoke.VulkanExecutionMatchesCpuReferenceAndCommitsCanonicalProperties
+73/84 Test #3809: ClusteringServiceGpuSmoke.VulkanExecutionMatchesCpuReferenceAndCommitsCanonicalProperties ...................   Passed    4.52 sec
+      Start 3810: PointCloudConsolidationGpuParity.VulkanLopAndIsotropicWlopMatchFrozenCpuReferencesAndRepeat
+74/84 Test #3810: PointCloudConsolidationGpuParity.VulkanLopAndIsotropicWlopMatchFrozenCpuReferencesAndRepeat .................   Passed    8.49 sec
+      Start 3811: PointCloudConsolidationGpuParity.VulkanAutoProcessesChildMeshPositionsAndPublishesDisplacement
+75/84 Test #3811: PointCloudConsolidationGpuParity.VulkanAutoProcessesChildMeshPositionsAndPublishesDisplacement ..............   Passed   20.22 sec
+      Start 3812: PointCloudConsolidationGpuParity.VulkanLbvhMovingStepsAcrossDomainsAndFailures
+76/84 Test #3812: PointCloudConsolidationGpuParity.VulkanLbvhMovingStepsAcrossDomainsAndFailures ..............................   Passed   20.37 sec
+      Start 3813: PointCloudConsolidationGpuParity.VulkanLbvhWlopAcrossDomainsAndFailures
+77/84 Test #3813: PointCloudConsolidationGpuParity.VulkanLbvhWlopAcrossDomainsAndFailures .....................................   Passed   30.22 sec
+      Start 3814: PointCloudConsolidationGpuParity.VulkanLbvhAnisotropicWlopAcrossDomainsAndFailures
+78/84 Test #3814: PointCloudConsolidationGpuParity.VulkanLbvhAnisotropicWlopAcrossDomainsAndFailures ..........................   Passed   37.60 sec
+      Start 3815: PointCloudConsolidationGpuParity.VulkanLbvhClopAcrossDomainsAndFailures
+79/84 Test #3815: PointCloudConsolidationGpuParity.VulkanLbvhClopAcrossDomainsAndFailures .....................................   Passed   17.39 sec
+      Start 3816: PointCloudConsolidationGpuParity.VulkanLbvhEarAcrossDomainsInsertionAndFailures
+80/84 Test #3816: PointCloudConsolidationGpuParity.VulkanLbvhEarAcrossDomainsInsertionAndFailures .............................   Passed   40.06 sec
+      Start 3817: ProgressivePoissonGpuResultReadbackGpuSmoke.VulkanBatchTransportsReferenceShapedResultWithoutBlockingRead
+81/84 Test #3817: ProgressivePoissonGpuResultReadbackGpuSmoke.VulkanBatchTransportsReferenceShapedResultWithoutBlockingRead ...   Passed    1.79 sec
+      Start 3818: GpuResultReadbackGpuSmoke.SharedBatchParksJobAndReleasesDerivedUpload
+82/84 Test #3818: GpuResultReadbackGpuSmoke.SharedBatchParksJobAndReleasesDerivedUpload .......................................   Passed    1.81 sec
+      Start 4604: ExtrinsicSandbox.FramePacingDiagnosticCapture
+83/84 Test #4604: ExtrinsicSandbox.FramePacingDiagnosticCapture ...............................................................   Passed    5.29 sec
+      Start 4605: ExtrinsicSandbox.VulkanShutdownLsanContract
+84/84 Test #4605: ExtrinsicSandbox.VulkanShutdownLsanContract .................................................................   Passed   93.63 sec
+
+100% tests passed, 0 tests failed out of 84
+
+Label Time Summary:
+benchmark      =  29.72 sec*proc (5 tests)
+geometry       = 210.38 sec*proc (14 tests)
+gpu            = 671.25 sec*proc (84 tests)
+graphics       = 460.87 sec*proc (70 tests)
+integration    = 480.35 sec*proc (55 tests)
+regression     =  93.63 sec*proc (1 test)
+runtime        = 415.10 sec*proc (39 tests)
+slow           =   1.81 sec*proc (1 test)
+vulkan         = 671.25 sec*proc (84 tests)
+
+Total Test time (real) = 681.81 sec

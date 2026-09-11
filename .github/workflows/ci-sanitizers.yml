@@ -25,43 +25,9 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Install system dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            cmake \
-            ninja-build \
-            clang-20 \
-            clang-tools-20 \
-            python3 \
-            libx11-dev \
-            libxcursor-dev \
-            libxrandr-dev \
-            libxinerama-dev \
-            libxi-dev \
-            libxext-dev \
-            libxfixes-dev \
-            libwayland-dev \
-            libxkbcommon-dev \
-            libgl1-mesa-dev \
-            libvulkan-dev \
-            vulkan-tools \
-            spirv-tools
-
-      - name: Cache vcpkg binary packages
+      - name: Set up build dependencies
         id: vcpkg-cache
-        uses: actions/cache@v4
-        with:
-          path: external/vcpkg-bincache
-          key: ${{ runner.os }}-vcpkg-${{ hashFiles('vcpkg.json', 'vcpkg-configuration.json', 'tools/vcpkg/**', 'tools/setup/bootstrap_vcpkg.sh') }}
-          restore-keys: |
-            ${{ runner.os }}-vcpkg-
-
-      - name: Bootstrap vcpkg
-        run: tools/setup/bootstrap_vcpkg.sh
-
-      - name: Enable vcpkg binary cache
-        run: echo "VCPKG_BINARY_SOURCES=clear;files,${GITHUB_WORKSPACE}/external/vcpkg-bincache,readwrite" >> "$GITHUB_ENV"
+        uses: ./.github/actions/setup-build
 
       - name: Configure (${{ matrix.sanitizer.name }})
         run: |

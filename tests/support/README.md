@@ -2,6 +2,13 @@
 
 Shared helpers, fixtures, builders, and test-only utilities used by multiple test categories belong here.
 
+`EditorFeatureTestContext.hpp` supplies the editor context and shared canonical
+vertex/UV/topology builders used by the Models, Visualization and MeshMethods
+contract partitions. `GraphicsTestSupport.hpp` shares command-pass inspection
+and exact format conversion for graphics readback tests; `MockRHI.hpp` owns
+the mock backbuffer-barrier query. Expected pixels and packet setup stay in
+their individual tests.
+
 ## Visible-Triangle Readback Harness
 
 `MinimalTriangleReadback.hpp` is the reusable readback harness for the

@@ -70,6 +70,7 @@ import Extrinsic.Runtime.CameraControllers;
 import Extrinsic.Runtime.ClusteringModule;
 import Extrinsic.Runtime.CommandBus;
 import Extrinsic.Runtime.EditorCommandHistory;
+import Extrinsic.Runtime.Private.EditorFeatures;
 import Extrinsic.Runtime.EditorUiHost;
 import Extrinsic.Runtime.EngineConfigControl;
 import Extrinsic.Runtime.GeometryAvailability;
@@ -127,11 +128,14 @@ import Geometry.UvAtlas;
 
 namespace Extrinsic::Runtime {
 namespace {
-        constexpr std::uint64_t kEditorSignatureOffset =
-            1469598103934665603ull;
-        constexpr std::uint64_t kEditorSignaturePrime =
-            1099511628211ull;
-
+        using EditorFeatureDetail::kEditorSignatureOffset;
+        using EditorFeatureDetail::MixSignature;
+        using EditorFeatureDetail::MixSignatureString;
+        using EditorFeatureDetail::GeometryMetadataSignatureForEntity;
+        using EditorFeatureDetail::ResolveStableEntity;
+        using EditorFeatureDetail::SameTransformComponent;
+        using EditorFeatureDetail::ExecuteEditorTransformMutation;
+        using EditorFeatureDetail::ToEditorCommandStatus;
         inline constexpr std::array<EditorMeshRemeshMode, 2>
             kMeshRemeshModes{{
                 EditorMeshRemeshMode::Uniform,
@@ -233,38 +237,6 @@ namespace PointNormals = Geometry::PointCloud::Normals;
         namespace PPR = Intrinsic::Methods::Geometry::ProgressivePoissonReference;
 
 struct EditorJobResult { std::string Diagnostic{}; };
-        [[nodiscard]] EditorCommandStatus ToEditorCommandStatus(
-            const EditorCommandHistoryStatus status) noexcept
-        {
-            switch (status)
-            {
-            case EditorCommandHistoryStatus::Applied:
-            case EditorCommandHistoryStatus::Recorded:
-            case EditorCommandHistoryStatus::Undone:
-            case EditorCommandHistoryStatus::Redone:
-                return EditorCommandStatus::Applied;
-            case EditorCommandHistoryStatus::NoChange:
-                return EditorCommandStatus::NoChange;
-            case EditorCommandHistoryStatus::MissingScene:
-                return EditorCommandStatus::MissingScene;
-            case EditorCommandHistoryStatus::MissingSelectionController:
-                return EditorCommandStatus::MissingSelectionController;
-            case EditorCommandHistoryStatus::StaleEntity:
-                return EditorCommandStatus::StaleEntity;
-            case EditorCommandHistoryStatus::MissingTransform:
-                return EditorCommandStatus::MissingTransform;
-            case EditorCommandHistoryStatus::EmptyUndoStack:
-            case EditorCommandHistoryStatus::EmptyRedoStack:
-            case EditorCommandHistoryStatus::InvalidCommand:
-            case EditorCommandHistoryStatus::CommandFailed:
-            case EditorCommandHistoryStatus::UndoFailed:
-            case EditorCommandHistoryStatus::RedoFailed:
-            case EditorCommandHistoryStatus::UnsupportedOperation:
-                return EditorCommandStatus::NoChange;
-            }
-            return EditorCommandStatus::NoChange;
-        }
-
         constexpr EditorGeometryProcessingDomain kMeshTopologyDomains =
             EditorGeometryProcessingDomain::MeshVertices |
             EditorGeometryProcessingDomain::MeshEdges |
@@ -799,84 +771,10 @@ struct EditorJobResult { std::string Diagnostic{}; };
                     mesh.FaceProperties());
             }
         }
-        [[nodiscard]] std::optional<ECS::EntityHandle> ResolveStableEntity(
-            const entt::registry& raw,
-            const std::uint32_t stableId)
-        {
-            const ECS::EntityHandle entity =
-                SelectionController::ToEntityHandle(stableId);
-            if (entity != ECS::InvalidEntityHandle && raw.valid(entity))
-                return entity;
-            return std::nullopt;
-        }
-
         void InvalidateSelectedModelCache(const EditorGeometryProcessingContext& context)
         {
             if (context.InvalidateWorkspaceSnapshotCache)
                 context.InvalidateWorkspaceSnapshotCache();
-        }
-
-        void MixSignatureByte(std::uint64_t& signature,
-                              const std::uint8_t value) noexcept
-        {
-            signature ^= value;
-            signature *= kEditorSignaturePrime;
-        }
-
-        void MixSignature(std::uint64_t& signature,
-                          std::uint64_t value) noexcept
-        {
-            for (std::uint32_t i = 0u; i < 8u; ++i)
-            {
-                MixSignatureByte(
-                    signature,
-                    static_cast<std::uint8_t>((value >> (i * 8u)) & 0xffu));
-            }
-        }
-
-        void MixSignatureString(std::uint64_t& signature,
-                                const std::string_view value) noexcept
-        {
-            MixSignature(signature, static_cast<std::uint64_t>(value.size()));
-            for (const char c : value)
-            {
-                MixSignatureByte(signature, static_cast<std::uint8_t>(c));
-            }
-        }
-
-        void AppendPropertySetMetadataSignature(
-            std::uint64_t& signature,
-            const std::uint64_t domainTag,
-            const Geometry::PropertySet* properties,
-            const std::size_t deletedCount)
-        {
-            MixSignature(signature, domainTag);
-            if (properties == nullptr)
-            {
-                MixSignature(signature, 0u);
-                return;
-            }
-
-            MixSignature(signature, static_cast<std::uint64_t>(properties->Size()));
-            MixSignature(signature, static_cast<std::uint64_t>(deletedCount));
-            const std::vector<Geometry::PropertyDescriptor> descriptors =
-                properties->Registry().Descriptors(false);
-            MixSignature(signature, static_cast<std::uint64_t>(descriptors.size()));
-            std::uint64_t order = 0u;
-            for (const Geometry::PropertyDescriptor& descriptor : descriptors)
-            {
-                MixSignature(signature, order++);
-                MixSignatureString(signature, descriptor.Name);
-                MixSignature(signature,
-                             static_cast<std::uint64_t>(
-                                 descriptor.ValueKind));
-                MixSignature(signature,
-                             static_cast<std::uint64_t>(
-                                 descriptor.ElementCount));
-                MixSignature(signature,
-                             descriptor.SupportsContiguousSpan ? 1u : 0u);
-                MixSignature(signature, descriptor.SupportsRawData ? 1u : 0u);
-            }
         }
 
         // A topology edit's apply gate fingerprints the stored halfedge arrays
@@ -976,47 +874,6 @@ struct EditorJobResult { std::string Diagnostic{}; };
                 GS::BuildConstView(raw, *entity));
         }
 
-        [[nodiscard]] std::uint64_t GeometryMetadataSignatureForEntity(
-            const entt::registry& raw,
-            const ECS::EntityHandle entity)
-        {
-            const GS::ConstSourceView view = GS::BuildConstView(raw, entity);
-            std::uint64_t signature = kEditorSignatureOffset;
-            MixSignature(signature,
-                         static_cast<std::uint64_t>(view.ActiveDomain));
-            MixSignature(signature, view.HasMeshTopologyMarker ? 1u : 0u);
-            MixSignature(signature, view.HasGraphTopologyMarker ? 1u : 0u);
-            AppendPropertySetMetadataSignature(
-                signature,
-                1u,
-                view.VertexSource != nullptr
-                    ? &view.VertexSource->Properties
-                    : nullptr,
-                view.VertexSource != nullptr ? view.VertexSource->NumDeleted
-                                             : 0u);
-            AppendPropertySetMetadataSignature(
-                signature,
-                2u,
-                view.EdgeSource != nullptr ? &view.EdgeSource->Properties
-                                           : nullptr,
-                view.EdgeSource != nullptr ? view.EdgeSource->NumDeleted
-                                           : 0u);
-            AppendPropertySetMetadataSignature(
-                signature,
-                3u,
-                view.HalfedgeSource != nullptr
-                    ? &view.HalfedgeSource->Properties
-                    : nullptr,
-                0u);
-            AppendPropertySetMetadataSignature(
-                signature,
-                4u,
-                view.FaceSource != nullptr ? &view.FaceSource->Properties
-                                           : nullptr,
-                view.FaceSource != nullptr ? view.FaceSource->NumDeleted
-                                           : 0u);
-            return signature;
-        }
         [[nodiscard]] bool IsFiniteGeometryPosition(
             const glm::vec3& position) noexcept
         {
@@ -3016,37 +2873,6 @@ struct EditorJobResult { std::string Diagnostic{}; };
             result.Status = EditorCommandStatus::Applied;
             result.Error = Core::ErrorCode::Success;
             return result;
-        }
-
-        [[nodiscard]] CurvSeg::CurvatureSegmentationParams
-        MakeCurvatureSegmentationParams(
-            const CurvatureSegmentationConfig& config)
-        {
-            return CurvSeg::CurvatureSegmentationParams{
-                .SelectionMode =
-                    config.SelectionMode ==
-                            CurvatureSegmentationSelectionMode::FixedCount
-                        ? CurvSeg::ComponentSelectionMode::FixedCount
-                        : CurvSeg::ComponentSelectionMode::Automatic,
-                .FixedComponentCount = config.FixedComponentCount,
-                .AutomaticMinComponents =
-                    config.AutomaticMinComponents,
-                .AutomaticMaxComponents =
-                    config.AutomaticMaxComponents,
-                .AutomaticFitTolerance =
-                    config.AutomaticFitTolerance,
-                .AutomaticComplexityWeight =
-                    config.AutomaticComplexityWeight,
-                .MaxEmIterations = config.MaxEmIterations,
-                .EmRelativeTolerance = config.EmRelativeTolerance,
-                .CovarianceFloor = config.CovarianceFloor,
-                .Seed = config.Seed,
-                .SpatialWeight = config.SpatialWeight,
-                .FeatureSensitivity = config.FeatureSensitivity,
-                .MaxSpatialIterations =
-                    config.MaxSpatialIterations,
-                .MinimumRegionFaces = config.MinimumRegionFaces,
-            };
         }
 
         [[nodiscard]] CurvSeg::FeatureEvidenceParams
@@ -8056,105 +7882,6 @@ struct EditorJobResult { std::string Diagnostic{}; };
             return result;
         }
 
-        [[nodiscard]] bool SameTransformComponent(
-            const ECSC::Transform::Component& lhs,
-            const ECSC::Transform::Component& rhs) noexcept
-        {
-            return lhs.Position.x == rhs.Position.x &&
-                   lhs.Position.y == rhs.Position.y &&
-                   lhs.Position.z == rhs.Position.z &&
-                   lhs.Rotation.w == rhs.Rotation.w &&
-                   lhs.Rotation.x == rhs.Rotation.x &&
-                   lhs.Rotation.y == rhs.Rotation.y &&
-                   lhs.Rotation.z == rhs.Rotation.z &&
-                   lhs.Scale.x == rhs.Scale.x &&
-                   lhs.Scale.y == rhs.Scale.y &&
-                   lhs.Scale.z == rhs.Scale.z;
-        }
-
-        struct EditorTransformMutationIdentity
-        {
-            ECS::Scene::Registry* Scene{nullptr};
-            WorldHandle World{};
-            std::uint32_t StableEntityId{0u};
-        };
-
-        [[nodiscard]] EditorCommandHistoryResult ExecuteEditorTransformMutation(
-            EditorCommandHistory& history,
-            ECS::Scene::Registry* scene,
-            const WorldHandle world,
-            const std::uint32_t stableEntityId,
-            const ECSC::Transform::Component& before,
-            const ECSC::Transform::Component& after,
-            std::string label)
-        {
-            return Internal::ExecuteUndoableEntityMutation(
-                history,
-                std::move(label),
-                EditorTransformMutationIdentity{
-                    .Scene = scene,
-                    .World = world,
-                    .StableEntityId = stableEntityId,
-                },
-                before,
-                before,
-                after,
-                [](
-                    const EditorTransformMutationIdentity& identity,
-                    const ECSC::Transform::Component& expected,
-                    const ECSC::Transform::Component&)
-                {
-                    if (identity.Scene == nullptr || !identity.World.IsValid())
-                        return EditorCommandHistoryStatus::MissingScene;
-
-                    entt::registry& raw = identity.Scene->Raw();
-                    const std::optional<ECS::EntityHandle> entity =
-                        ResolveStableEntity(raw, identity.StableEntityId);
-                    if (!entity.has_value())
-                        return EditorCommandHistoryStatus::StaleEntity;
-
-                    const ECSC::Transform::Component* transform =
-                        raw.try_get<ECSC::Transform::Component>(*entity);
-                    if (transform == nullptr)
-                        return EditorCommandHistoryStatus::MissingTransform;
-                    return SameTransformComponent(*transform, expected)
-                        ? EditorCommandHistoryStatus::Applied
-                        : EditorCommandHistoryStatus::StaleEntity;
-                },
-                [](
-                    const EditorTransformMutationIdentity& identity,
-                    const ECSC::Transform::Component& target)
-                {
-                    entt::registry& raw = identity.Scene->Raw();
-                    const std::optional<ECS::EntityHandle> entity =
-                        ResolveStableEntity(raw, identity.StableEntityId);
-                    if (!entity.has_value())
-                        return EditorCommandHistoryStatus::StaleEntity;
-
-                    ECSC::Transform::Component* transform =
-                        raw.try_get<ECSC::Transform::Component>(*entity);
-                    if (transform == nullptr)
-                        return EditorCommandHistoryStatus::MissingTransform;
-                    *transform = target;
-                    return EditorCommandHistoryStatus::Applied;
-                },
-                [](
-                    const EditorTransformMutationIdentity& identity,
-                    const ECSC::Transform::Component&,
-                    const ECSC::Transform::Component& target)
-                {
-                    entt::registry& raw = identity.Scene->Raw();
-                    const std::optional<ECS::EntityHandle> entity =
-                        ResolveStableEntity(raw, identity.StableEntityId);
-                    if (entity.has_value())
-                    {
-                        raw.emplace_or_replace<ECSC::Transform::IsDirtyTag>(
-                            *entity);
-                    }
-                    return target;
-                });
-        }
-
         GeometryPropertyRef ResolveRegistrationDefault(const GeometryEntityAvailability& available, GeometryPropertyRef ref)
         {
             if (ref.Domain == GeometryElementDomain::Unknown)
@@ -8778,33 +8505,7 @@ namespace GeometryProcessingDetail
     EditorCommandStatus ToEditorMethodCommandStatus(
         const EditorCommandHistoryStatus status) noexcept
     {
-        switch (status)
-        {
-        case EditorCommandHistoryStatus::Applied:
-        case EditorCommandHistoryStatus::Recorded:
-        case EditorCommandHistoryStatus::Undone:
-        case EditorCommandHistoryStatus::Redone:
-            return EditorCommandStatus::Applied;
-        case EditorCommandHistoryStatus::NoChange:
-            return EditorCommandStatus::NoChange;
-        case EditorCommandHistoryStatus::MissingScene:
-            return EditorCommandStatus::MissingScene;
-        case EditorCommandHistoryStatus::MissingSelectionController:
-            return EditorCommandStatus::MissingSelectionController;
-        case EditorCommandHistoryStatus::StaleEntity:
-            return EditorCommandStatus::StaleEntity;
-        case EditorCommandHistoryStatus::MissingTransform:
-            return EditorCommandStatus::MissingTransform;
-        case EditorCommandHistoryStatus::EmptyUndoStack:
-        case EditorCommandHistoryStatus::EmptyRedoStack:
-        case EditorCommandHistoryStatus::InvalidCommand:
-        case EditorCommandHistoryStatus::CommandFailed:
-        case EditorCommandHistoryStatus::UndoFailed:
-        case EditorCommandHistoryStatus::RedoFailed:
-        case EditorCommandHistoryStatus::UnsupportedOperation:
-            return EditorCommandStatus::NoChange;
-        }
-        return EditorCommandStatus::NoChange;
+        return ToEditorCommandStatus(status);
     }
 } // namespace GeometryProcessingDetail
 

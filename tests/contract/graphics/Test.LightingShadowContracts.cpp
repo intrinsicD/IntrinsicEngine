@@ -244,7 +244,7 @@ TEST(GraphicsLightingShadowContracts, ShadowPassSkipsDisabledShadowsAndUsesShado
     world.SyncFrame();
 
     Graphics::CullingSystem culling;
-    ASSERT_TRUE(culling.Initialize(device, bufferMgr, pipelineMgr, "shaders/culling/instance_cull.comp"));
+    ASSERT_TRUE(culling.Initialize(device, bufferMgr, pipelineMgr, "shaders/instance_cull.comp"));
 
     RHI::SamplerManager samplerMgr{device};
     RHI::TextureManager textureMgr{device, device.GetBindlessHeap()};

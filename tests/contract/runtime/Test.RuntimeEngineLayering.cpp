@@ -1161,7 +1161,7 @@ TEST(RuntimeEngineLayering, ProductionAsyncSubmissionsCarryOwningWorldScope)
     // carries its owning world scope — so migrated lanes keep the `.Scope =`
     // designator rather than MakeCpuJobDesc's positional scope argument.
     EXPECT_EQ(CountOccurrences(sceneDocument, "JobDesc{"), 2u);
-    EXPECT_EQ(CountOccurrences(sceneDocument, ".Scope = world"), 2u);
+    EXPECT_EQ(CountOccurrences(sceneDocument, ".Scope = binding.World"), 2u);
     EXPECT_EQ(CountOccurrences(importPolicies, "JobDesc{"), 2u);
     EXPECT_EQ(CountOccurrences(importPolicies, ".Scope = world"), 2u);
     EXPECT_EQ(CountOccurrences(visualization, "JobDesc{"), 1u);

@@ -1635,6 +1635,8 @@ set(_intrinsic_multiworker_test_budgets
     "IntrinsicRuntimeContractTests|RuntimeJobService.CancelAfterWorkerFinishFinalizesExactlyOnce|3"
     "IntrinsicRuntimeContractTests|RuntimeJobService.CancelAfterWorkerFinishSuppressesGatePublication|3"
     "IntrinsicRuntimeContractTests|RuntimeJobService.CancelBeforeStartFinalizesOnMainThreadInsteadOfPublishing|2"
+    "IntrinsicRuntimeContractTests|RuntimeJobService.CompletionQueuePublicationCannotClobberTerminalState|2"
+    "IntrinsicRuntimeContractTests|RuntimeJobService.WorkerTerminalStateWaitsForUnpublishedFinalizerBeforeCompletion|2"
     "IntrinsicRuntimeContractTests|RuntimeJobService.CancelMidFlightIsObservedAndDropsCompletion|3"
     "IntrinsicRuntimeContractTests|RuntimeJobService.DependenciesGateDispatchUntilUpstreamPublishes|3"
     "IntrinsicRuntimeContractTests|RuntimeJobService.DependencyCancelledJobFinalizesInTheSameDrain|3"

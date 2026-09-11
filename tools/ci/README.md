@@ -1,5 +1,13 @@
 # tools/ci
 
+The local [setup-build action](../../.github/actions/setup-build/action.yml)
+shares system-package installation and vcpkg cache/bootstrap setup across the
+CPU, sanitizer, coverage, Vulkan, Release and nightly jobs. Callers select
+`graphics`, `base` or `none` for system packages and list capability-specific
+additions explicitly. It forwards the cache-hit output used by configure
+timing; job gates, concurrency and test selectors stay in the workflows.
+
+
 CI helper scripts and workflow validation tools.
 
 ## Current scripts

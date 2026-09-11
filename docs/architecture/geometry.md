@@ -29,6 +29,10 @@
 
 ## Primitive and curve modules
 
+- `Geometry.Raycast::RayAabbSlabInterval` supplies the inclusive, unclipped
+  slab interval shared by overlap and contact queries; each caller retains
+  its forward-ray clipping and result construction.
+
 - `Geometry.Curve` owns the engine's Bezier curve primitive. It exposes
   `BezierCurve` control-point storage, degree reporting, and deterministic
   Bernstein-basis and de Casteljau evaluators. Empty curves, non-finite
@@ -207,6 +211,15 @@ Sandbox UI/config/agent callers and the opt-in smoke/benchmark all invoke the
 service rather than importing backend machinery.
 
 ### Geometry IO coverage
+
+Mesh, graph and point-cloud readers share path handling, file reads and text
+tokenization through `Geometry.IOText.hpp`, with each module adapting file
+errors to its public result type. Mesh and point-cloud PLY readers also share
+scalar names, property descriptors and binary scalar decoding in that header;
+list-count validation and geometry publication stay in the owning readers.
+Point-cloud PCD exporters share validation,
+header construction and file lifetime while retaining separate ASCII and
+little-endian binary row encoders.
 
 `Geometry.HalfedgeMesh.IO` owns mesh OBJ/OFF/STL/PLY import and mesh
 OBJ/OFF/STL/PLY export. The OFF path is symmetric at the geometry module level:
@@ -548,6 +561,11 @@ reference for non-destructive, spatially coherent segmentation of an oriented
 triangle mesh. It averages signed per-vertex `(κ₁, κ₂)` onto faces, robustly
 normalizes both channels, and reuses `Geometry.GaussianMixture::FitEM`; the
 existing 3D GMM carrier receives `(κ₁, κ₂, 0)`, never world-space position.
+Segmentation and patch fitting share the curvature median/MAD normalization
+with RMS and unit-scale fallbacks. Geometry owns mixture and full segmentation
+parameter validation; runtime config validation and execution reuse one
+config-to-parameter conversion. Patch fitting checks mixture parameters without
+requiring the spatial controls that only segmentation consumes.
 Fixed mode fits one caller-selected feasible component count. Automatic mode
 fits an inclusive bounded range, records every candidate, prefers candidates
 meeting the normalized curvature-fit tolerance, and minimizes its documented

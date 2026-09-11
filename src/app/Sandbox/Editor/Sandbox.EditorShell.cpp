@@ -37,6 +37,133 @@ import Extrinsic.Runtime.TextureBakeModule;
 
 namespace Extrinsic::Sandbox::Editor
 {
+    using namespace Extrinsic::Runtime;
+
+    void DrawDiagnostics(const std::vector<EditorDiagnostic>& diagnostics)
+    {
+        for (const EditorDiagnostic& diagnostic : diagnostics)
+        {
+            ImGui::TextDisabled("%s: %s",
+                                DebugNameForEditorDiagnosticCode(diagnostic.Code),
+                                diagnostic.Message.c_str());
+        }
+    }
+
+    void DrawDomainWindowHeader(
+        const Runtime::EditorDomainWindowModel& model)
+    {
+        ImGui::Text(
+            "Expected domain: %s",
+            Runtime::DebugNameForEditorGeometryDomain(
+                model.ExpectedDomain));
+        if (model.HasSelectedEntity)
+        {
+            ImGui::Text(
+                "Selected: %s (%u)",
+                model.SelectedEntity.Name.c_str(),
+                model.SelectedStableId);
+            ImGui::Text(
+                "Selected domain: %s",
+                Runtime::DebugNameForEditorGeometryDomain(
+                    model.SelectedDomain));
+        }
+        else
+        {
+            ImGui::TextDisabled("Selected: none");
+        }
+        DrawDiagnostics(model.Diagnostics);
+    }
+
+    [[nodiscard]] bool DomainWindowReady(
+        const Runtime::EditorDomainWindowModel& model) noexcept
+    {
+        return model.HasSelectedEntity && model.DomainMatches;
+    }
+
+    void DrawVec3(const char* label, const glm::vec3 value)
+    {
+        ImGui::Text("%s: %.3f, %.3f, %.3f", label, value.x, value.y, value.z);
+    }
+
+    [[nodiscard]] const char* DebugNameForTextureBakeEncoder(
+        const PropertyTextureBakeEncoding encoder) noexcept
+    {
+        switch (encoder)
+        {
+        case PropertyTextureBakeEncoding::Auto: return "auto";
+        case PropertyTextureBakeEncoding::LinearScalar: return "linear scalar";
+        case PropertyTextureBakeEncoding::ScalarColormap: return "scalar colormap";
+        case PropertyTextureBakeEncoding::LabelPalette: return "label palette";
+        case PropertyTextureBakeEncoding::Vector2: return "vector2";
+        case PropertyTextureBakeEncoding::Vector3: return "vector3";
+        case PropertyTextureBakeEncoding::Normal: return "normal";
+        case PropertyTextureBakeEncoding::RgbaColor: return "rgba color";
+        }
+        return "unknown";
+    }
+
+    [[nodiscard]] std::span<const EditorTextureBakeTarget>
+    TextureBakeTargetsFor(
+        const EditorTextureBakeControlsModel& model,
+        const std::string_view outputName)
+    {
+        const auto found = std::ranges::find(
+            model.TextureBakeTargets,
+            outputName,
+            &EditorTextureBakeTargetSnapshot::OutputName);
+        if (found == model.TextureBakeTargets.end())
+            return {};
+        return found->Targets;
+    }
+
+    [[nodiscard]] EditorVisualizationConfigCommand
+    MakeVisualizationConfigCommandFromModel(
+        const std::uint32_t stableEntityId,
+        const EditorVisualizationConfigModel& model,
+        const EditorVisualizationTarget target)
+    {
+        return EditorVisualizationConfigCommand{
+            .StableEntityId = stableEntityId,
+            .Target = target,
+            .EnableConfig = true,
+            .Source = model.Source,
+            .Color = model.Color,
+            .ScalarFieldName = model.ScalarFieldName,
+            .ScalarDomain = model.ScalarDomain,
+            .ColorBufferName = model.ColorBufferName,
+            .ScalarAutoRange = model.ScalarAutoRange,
+            .ScalarRangeMin = model.ScalarRangeMin,
+            .ScalarRangeMax = model.ScalarRangeMax,
+            .ScalarBinCount = model.ScalarBinCount,
+            .IsolineCount = model.IsolineCount,
+            .ScalarColormap = model.ScalarColormap,
+            .IsolineWidth = model.IsolineWidth,
+            .IsolineColor = model.IsolineColor,
+            .IsolineValues = model.IsolineValues,
+            .IsolineValueCount = model.IsolineValueCount,
+            .UseBakedTexture = model.UseBakedTexture,
+        };
+    }
+
+    [[nodiscard]] EditorVisualizationConfigCommand
+    MakeUniformVisualizationConfigCommandFromModel(
+        const std::uint32_t stableEntityId,
+        const EditorVisualizationConfigModel& model,
+        const EditorVisualizationTarget target,
+        const glm::vec4 color)
+    {
+        auto command = MakeVisualizationConfigCommandFromModel(stableEntityId, model, target);
+        command.Source = kUniformColorSource;
+        command.Color = color;
+        command.UseBakedTexture = false;
+        return command;
+    }
+
+    bool DrawDismissLastResultButton(const char* const label)
+    {
+        return ImGui::SmallButton(label);
+    }
+
     void DrawDisabledReasonTooltip(const std::string_view disabledReason)
     {
         constexpr ImGuiHoveredFlags hoverFlags =
@@ -54,112 +181,8 @@ namespace Extrinsic::Sandbox::Editor
 
     namespace
     {
-        using namespace Extrinsic::Runtime;
-
-        using VisualizationColorSource =
-            decltype(EditorVisualizationConfigModel{}.Source);
         using ColormapType =
             decltype(EditorVisualizationConfigModel{}.ScalarColormap);
-        inline constexpr VisualizationColorSource kUniformColorSource =
-            static_cast<VisualizationColorSource>(1);
-        inline constexpr VisualizationColorSource kScalarFieldSource =
-            static_cast<VisualizationColorSource>(2);
-
-        inline constexpr std::array<GeometryPresentationSlotSemantic, 5>
-            kTextureBakeTargetSemantics{{
-                GeometryPresentationSlotSemantic::Albedo,
-                GeometryPresentationSlotSemantic::Normal,
-                GeometryPresentationSlotSemantic::Roughness,
-                GeometryPresentationSlotSemantic::Metallic,
-                GeometryPresentationSlotSemantic::ScalarField,
-            }};
-
-        inline constexpr std::array<PropertyTextureBakeEncoding, 8>
-            kTextureBakeEncoders{{
-                PropertyTextureBakeEncoding::Auto,
-                PropertyTextureBakeEncoding::RgbaColor,
-                PropertyTextureBakeEncoding::Normal,
-                PropertyTextureBakeEncoding::ScalarColormap,
-                PropertyTextureBakeEncoding::LinearScalar,
-                PropertyTextureBakeEncoding::LabelPalette,
-                PropertyTextureBakeEncoding::Vector2,
-                PropertyTextureBakeEncoding::Vector3,
-            }};
-
-        inline constexpr std::array<PropertyTextureBakeStorage, 3>
-            kTextureBakeStorageModes{{
-                PropertyTextureBakeStorage::Auto,
-                PropertyTextureBakeStorage::RawFloat,
-                PropertyTextureBakeStorage::EncodedRgba,
-            }};
-
-        inline constexpr std::array<const char*, 3>
-            kTextureBakeStorageNames{{
-                "auto (raw except normals/labels)",
-                "raw float texture",
-                "encoded RGBA texture",
-            }};
-
-        inline constexpr std::array<const char*, 6> kColormapNames{{
-            "Viridis", "Inferno", "Plasma", "Jet", "Coolwarm", "Heat"}};
-
-        inline constexpr std::array<const char*, 2> kNormalSpaceNames{{
-            "object space", "world space"}};
-
-        [[nodiscard]] const char* DebugNameForTextureBakeEncoder(
-            const PropertyTextureBakeEncoding encoder) noexcept
-        {
-            switch (encoder)
-            {
-            case PropertyTextureBakeEncoding::Auto: return "auto";
-            case PropertyTextureBakeEncoding::LinearScalar: return "linear scalar";
-            case PropertyTextureBakeEncoding::ScalarColormap: return "scalar colormap";
-            case PropertyTextureBakeEncoding::LabelPalette: return "label palette";
-            case PropertyTextureBakeEncoding::Vector2: return "vector2";
-            case PropertyTextureBakeEncoding::Vector3: return "vector3";
-            case PropertyTextureBakeEncoding::Normal: return "normal";
-            case PropertyTextureBakeEncoding::RgbaColor: return "rgba color";
-            }
-            return "unknown";
-        }
-
-        struct TextureBakeUiState
-        {
-            std::optional<EditorUvRegenerationCommandResult>*
-                LastUvRegenerationResult{nullptr};
-            std::optional<EditorUvRegenerationCommandResult>*
-                LastUvExtentAdoption{nullptr};
-            std::int32_t* SourceIndex{nullptr};
-            std::int32_t* TargetSemanticIndex{nullptr};
-            std::int32_t* EncoderIndex{nullptr};
-            std::int32_t* StorageIndex{nullptr};
-            std::int32_t* ColormapIndex{nullptr};
-            std::int32_t* NormalSpaceIndex{nullptr};
-            std::uint32_t* AdditionalConsumerMask{nullptr};
-            std::int32_t* Width{nullptr};
-            std::int32_t* Height{nullptr};
-            std::int32_t* Padding{nullptr};
-            std::int32_t* UvResolution{nullptr};
-            std::int32_t* UvPadding{nullptr};
-            float* UvTexelsPerUnit{nullptr};
-            bool* UvForceRegenerate{nullptr};
-            bool* UvPreserveAuthored{nullptr};
-        };
-
-        [[nodiscard]] std::span<const EditorTextureBakeTarget>
-        TextureBakeTargetsFor(
-                const EditorTextureBakeControlsModel& model,
-                const std::string_view outputName)
-        {
-            const auto found = std::ranges::find(
-                model.TextureBakeTargets,
-                outputName,
-                &EditorTextureBakeTargetSnapshot::OutputName);
-            if (found == model.TextureBakeTargets.end())
-                return {};
-            return found->Targets;
-        }
-
         struct BuiltinWindowSpec
         {
             std::string_view Id{};
@@ -208,74 +231,6 @@ namespace Extrinsic::Sandbox::Editor
             request.Selection = registry.IsOpen(builtinHandles[3u]);
             request.Visualization = registry.IsOpen(builtinHandles[9u]);
             return request;
-        }
-
-        [[nodiscard]] EditorVisualizationConfigCommand
-        MakeUniformVisualizationConfigCommandFromModel(
-            const std::uint32_t stableEntityId,
-            const EditorVisualizationConfigModel& model,
-            const EditorVisualizationTarget target,
-            const glm::vec4 color)
-        {
-            return EditorVisualizationConfigCommand{
-                .StableEntityId = stableEntityId,
-                .Target = target,
-                .EnableConfig = true,
-                .Source = kUniformColorSource,
-                .Color = color,
-                .ScalarFieldName = model.ScalarFieldName,
-                .ScalarDomain = model.ScalarDomain,
-                .ColorBufferName = model.ColorBufferName,
-                .ScalarAutoRange = model.ScalarAutoRange,
-                .ScalarRangeMin = model.ScalarRangeMin,
-                .ScalarRangeMax = model.ScalarRangeMax,
-                .ScalarBinCount = model.ScalarBinCount,
-                .IsolineCount = model.IsolineCount,
-                .ScalarColormap = model.ScalarColormap,
-                .IsolineWidth = model.IsolineWidth,
-                .IsolineColor = model.IsolineColor,
-                .IsolineValues = model.IsolineValues,
-                .IsolineValueCount = model.IsolineValueCount,
-            };
-        }
-
-        [[nodiscard]] EditorVisualizationConfigCommand
-        MakeScalarVisualizationConfigCommandFromModel(
-            const std::uint32_t stableEntityId,
-            const EditorVisualizationConfigModel& model,
-            const EditorVisualizationTarget target)
-        {
-            return EditorVisualizationConfigCommand{
-                .StableEntityId = stableEntityId,
-                .Target = target,
-                .EnableConfig = true,
-                .Source = model.Source,
-                .Color = model.Color,
-                .ScalarFieldName = model.ScalarFieldName,
-                .ScalarDomain = model.ScalarDomain,
-                .ColorBufferName = model.ColorBufferName,
-                .ScalarAutoRange = model.ScalarAutoRange,
-                .ScalarRangeMin = model.ScalarRangeMin,
-                .ScalarRangeMax = model.ScalarRangeMax,
-                .ScalarBinCount = model.ScalarBinCount,
-                .IsolineCount = model.IsolineCount,
-                .ScalarColormap = model.ScalarColormap,
-                .IsolineWidth = model.IsolineWidth,
-                .IsolineColor = model.IsolineColor,
-                .IsolineValues = model.IsolineValues,
-                .IsolineValueCount = model.IsolineValueCount,
-                .UseBakedTexture = model.UseBakedTexture,
-            };
-        }
-
-        void DrawDiagnostics(const std::vector<EditorDiagnostic>& diagnostics)
-        {
-            for (const EditorDiagnostic& diagnostic : diagnostics)
-            {
-                ImGui::TextDisabled("%s: %s",
-                                    DebugNameForEditorDiagnosticCode(diagnostic.Code),
-                                    diagnostic.Message.c_str());
-            }
         }
 
         [[nodiscard]] std::string ProgressOverlayText(
@@ -416,11 +371,6 @@ namespace Extrinsic::Sandbox::Editor
             }
 
             DrawDiagnostics(model.Diagnostics);
-        }
-
-        void DrawVec3(const char* label, const glm::vec3 value)
-        {
-            ImGui::Text("%s: %.3f, %.3f, %.3f", label, value.x, value.y, value.z);
         }
 
         void DrawQuat(const char* label, const glm::quat value)
@@ -1694,7 +1644,7 @@ namespace Extrinsic::Sandbox::Editor
                 {
                     (void)ApplyEditorVisualizationConfigCommand(
                         context.VisualizationCommands,
-                        MakeScalarVisualizationConfigCommandFromModel(
+                        MakeVisualizationConfigCommandFromModel(
                             selectedStableId,
                             next,
                             target));

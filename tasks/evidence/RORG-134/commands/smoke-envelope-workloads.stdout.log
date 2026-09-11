@@ -1,0 +1,18 @@
+Internal ctest changing into directory: /home/alex/Documents/IntrinsicEngine/build/ci
+Test project /home/alex/Documents/IntrinsicEngine/build/ci
+    Start 1: IntrinsicBenchmarkSmoke.Run
+1/2 Test #1: IntrinsicBenchmarkSmoke.Run ........   Passed   16.48 sec
+    Start 2: IntrinsicBenchmarkSmoke.Validate
+2/2 Test #2: IntrinsicBenchmarkSmoke.Validate ...   Passed    0.13 sec
+
+100% tests passed, 0 tests failed out of 2
+
+Label Time Summary:
+benchmark    = 148.48 sec*proc (2 tests)
+core         = 148.48 sec*proc (2 tests)
+geometry     = 148.48 sec*proc (2 tests)
+graphics     = 148.48 sec*proc (2 tests)
+physics      = 148.48 sec*proc (2 tests)
+slow         = 148.48 sec*proc (2 tests)
+
+Total Test time (real) =  16.77 sec

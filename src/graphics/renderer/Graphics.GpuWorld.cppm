@@ -1,3 +1,4 @@
+// Managed GPU scene buffers and residency identities for renderer and runtime consumers.
 module;
 
 #include <cstddef>
@@ -23,6 +24,11 @@ export namespace Extrinsic::Graphics
 {
     using GpuInstanceHandle = Core::StrongHandle<GpuInstanceTag>;
     using GpuGeometryHandle = Core::StrongHandle<GpuGeometryTag>;
+
+    // Same nonzero, least-significant-byte-first FNV-1a identity as retained
+    // surface indices, including an empty stream. Zero denotes an absent channel.
+    [[nodiscard]] std::uint64_t FingerprintSurfaceIndices(
+        std::span<const std::uint32_t> indices) noexcept;
 
     struct GpuGeometryResidencyView;
 

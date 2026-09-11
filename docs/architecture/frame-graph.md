@@ -225,6 +225,12 @@ generalizing the renderer into a multi-view system.
 
 ## Transient Placement
 
+`BuildTransientPlacementPlan` is the shared pure placement kernel. Framegraph
+compilation supplies estimated size/alignment; device realization supplies
+validated requirements and retains memory-type, dedicated-allocation and final
+block-alignment checks. The kernel returns ordered alias hazards for each
+consumer to translate into its barrier records.
+
 The framegraph compile product includes a deterministic placement plan for used
 non-imported transient textures and buffers. Placement is driven by the same
 first/last pass lifetime intervals used for logical transient handle reuse. Each

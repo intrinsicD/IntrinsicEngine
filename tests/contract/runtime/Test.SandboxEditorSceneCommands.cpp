@@ -1416,6 +1416,11 @@ TEST(SandboxEditorUi, FileImportDispatchRejectsInvalidPrerequisitesBeforeCallbac
     for (const InvalidCase& invalid : invalidCases)
     {
         SCOPED_TRACE(invalid.Path);
+        context.PendingAssetImportPath = invalid.Path;
+        context.PendingAssetImportPayloadKind = invalid.PayloadKind;
+        const auto model = Runtime::BuildEditorWorkspaceSnapshot(context).FileImport;
+        EXPECT_FALSE(model.CanImport);
+        EXPECT_EQ(model.ImportDisabledReason, invalid.Reason);
         const Runtime::EditorFileImportResult result =
             Runtime::ApplyEditorFileImportCommand(
                 context,
@@ -1427,6 +1432,7 @@ TEST(SandboxEditorUi, FileImportDispatchRejectsInvalidPrerequisitesBeforeCallbac
                   Runtime::EditorCommandStatus::AssetImportFailed);
         EXPECT_EQ(result.Error, invalid.Error);
         EXPECT_EQ(result.Message, invalid.Reason);
+        EXPECT_EQ(result.Message, model.ImportDisabledReason);
         EXPECT_EQ(callbackCalls, 0u);
     }
 

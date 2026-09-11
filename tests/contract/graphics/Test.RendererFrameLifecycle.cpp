@@ -2604,33 +2604,28 @@ TEST(RendererFrameLifecycle, ForwardSurfacePipelineSurvivesOperationalRebuild)
         ReadShaderSource("surface_gbuffer.frag");
     const std::string normalDecode =
         ReadShaderSource("common/property_texture_normal.glsl");
+    const std::string surfaceMaterial = ReadShaderSource("common/surface_material.glsl");
 
     EXPECT_NE(surfaceVertex.find("localVertexIndex = vertexIndex - geo.VertexOffset"), std::string::npos);
     EXPECT_NE(surfaceVertex.find("GpuReadPackedVec2(geo.TexcoordBufferBDA, localVertexIndex)"), std::string::npos);
     EXPECT_NE(surfaceVertex.find("GpuReadPackedVec3(geo.NormalBufferBDA, localVertexIndex)"), std::string::npos);
     EXPECT_NE(surfaceVertex.find("fragUv = localUv"), std::string::npos);
     EXPECT_NE(surfaceVertex.find("fragWorldNormal"), std::string::npos);
-    EXPECT_NE(surfaceFragment.find("mat.AlbedoID"), std::string::npos);
     EXPECT_NE(surfaceFragment.find("fragWorldNormal"), std::string::npos);
-    EXPECT_NE(surfaceFragment.find("mat.NormalID"), std::string::npos);
-    EXPECT_NE(surfaceFragment.find("GpuMaterialFlag_ObjectSpaceNormalMap"), std::string::npos);
-    EXPECT_NE(surfaceFragment.find("ResolveSurfaceNormal"), std::string::npos);
-    EXPECT_NE(defaultGBufferFragment.find("mat.NormalID"), std::string::npos);
-    EXPECT_NE(defaultGBufferFragment.find("GpuMaterialFlag_ObjectSpaceNormalMap"),
-              std::string::npos);
-    EXPECT_NE(defaultGBufferFragment.find("ResolveSurfaceNormal"),
-              std::string::npos);
-    EXPECT_NE(promotedGBufferFragment.find("mat.NormalID"), std::string::npos);
-    EXPECT_NE(promotedGBufferFragment.find("GpuMaterialFlag_ObjectSpaceNormalMap"), std::string::npos);
-    EXPECT_NE(promotedGBufferFragment.find("ResolveSurfaceNormal"), std::string::npos);
-    EXPECT_NE(normalDecode.find("filteredSample.rgb / filteredSample.a"),
-              std::string::npos);
-    EXPECT_NE(surfaceFragment.find("DecodePropertyTextureNormal"),
-              std::string::npos);
-    EXPECT_NE(defaultGBufferFragment.find("DecodePropertyTextureNormal"),
-              std::string::npos);
-    EXPECT_NE(promotedGBufferFragment.find("DecodePropertyTextureNormal"),
-              std::string::npos);
+    EXPECT_NE(surfaceFragment.find("#include \"../common/surface_material.glsl\""), std::string::npos);
+    EXPECT_NE(defaultGBufferFragment.find("#include \"../common/surface_material.glsl\""), std::string::npos);
+    EXPECT_NE(promotedGBufferFragment.find("#include \"common/surface_material.glsl\""), std::string::npos);
+    for (const std::string* fragment : {&surfaceFragment, &defaultGBufferFragment, &promotedGBufferFragment})
+    {
+        EXPECT_NE(fragment->find("SampleSurfaceBaseColor"), std::string::npos);
+        EXPECT_NE(fragment->find("ResolveSurfaceNormal"), std::string::npos);
+        EXPECT_NE(fragment->find("ResolveSurfaceVisualization"), std::string::npos);
+    }
+    EXPECT_NE(surfaceMaterial.find("mat.AlbedoID"), std::string::npos);
+    EXPECT_NE(surfaceMaterial.find("mat.NormalID"), std::string::npos);
+    EXPECT_NE(surfaceMaterial.find("GpuMaterialFlag_ObjectSpaceNormalMap"), std::string::npos);
+    EXPECT_NE(surfaceMaterial.find("DecodePropertyTextureNormal"), std::string::npos);
+    EXPECT_NE(normalDecode.find("filteredSample.rgb / filteredSample.a"), std::string::npos);
     EXPECT_NE(retainedSurfaceFragment.find("DecodePropertyTextureNormal"),
               std::string::npos);
     EXPECT_NE(retainedGBufferFragment.find("DecodePropertyTextureNormal"),
@@ -2644,15 +2639,13 @@ TEST(RendererFrameLifecycle, ForwardSurfacePipelineSurvivesOperationalRebuild)
     EXPECT_NE(surfaceFragment.find("GpuShadingModel_Unlit"), std::string::npos);
     EXPECT_NE(surfaceFragment.find("mat.ShadingModel"), std::string::npos);
     EXPECT_EQ(surfaceFragment.find("GpuMaterialType_DefaultDebugSurface"), std::string::npos);
-    // GRAPHICS-105 Slice B: the Normal channel's attribute-vs-texture choice is
-    // data-driven via the material's per-channel source, in both promoted paths.
-    EXPECT_NE(surfaceFragment.find("GpuMaterialChannelSource"), std::string::npos);
-    EXPECT_NE(promotedGBufferFragment.find("GpuMaterialChannelSource"), std::string::npos);
+    // All promoted paths select the normal source through the shared material policy.
+    EXPECT_NE(surfaceMaterial.find("GpuMaterialChannelSource"), std::string::npos);
     EXPECT_NE(defaultGBufferFragment.find("fragConfigSlot"), std::string::npos);
     EXPECT_NE(defaultGBufferFragment.find("fragVisualizationScalar"), std::string::npos);
     EXPECT_NE(defaultGBufferFragment.find("fragVisualizationColor"), std::string::npos);
     EXPECT_NE(defaultGBufferFragment.find("fragInstanceSlot"), std::string::npos);
-    EXPECT_NE(defaultGBufferFragment.find("GpuResolveVisualizationColorWithColormap"), std::string::npos);
+    EXPECT_NE(surfaceMaterial.find("GpuResolveVisualizationColorWithColormap"), std::string::npos);
 
     Extrinsic::Tests::MockDevice device;
     device.Operational = true;
@@ -2761,8 +2754,7 @@ TEST(RendererFrameLifecycle, ForwardPointSphereImpostorsWriteCorrectedDepth)
 {
     const std::string pointVertex = ReadShaderSource("forward/point.vert");
     const std::string pointFragment = ReadShaderSource("forward/point.frag");
-    const std::string cullShader = ReadShaderSource("culling/instance_cull.comp");
-    const std::string activeCullShader = ReadShaderSource("instance_cull.comp");
+    const std::string cullShader = ReadShaderSource("instance_cull.comp");
 
     EXPECT_NE(pointVertex.find("/ 6u"), std::string::npos);
     EXPECT_NE(pointVertex.find("ResolvePointSizePx"), std::string::npos);
@@ -2780,8 +2772,8 @@ TEST(RendererFrameLifecycle, ForwardPointSphereImpostorsWriteCorrectedDepth)
     EXPECT_NE(pointFragment.find("gl_FragDepth = depth"), std::string::npos);
     EXPECT_NE(cullShader.find("geo.PointVertexCount * 6u"), std::string::npos);
     EXPECT_NE(cullShader.find("geo.PointFirstVertex * 6u"), std::string::npos);
-    EXPECT_NE(activeCullShader.find("buckets.LineQuads"), std::string::npos);
-    EXPECT_NE(activeCullShader.find("(geo.LineIndexCount / 2u) * 6u"), std::string::npos);
+    EXPECT_NE(cullShader.find("buckets.LineQuads"), std::string::npos);
+    EXPECT_NE(cullShader.find("(geo.LineIndexCount / 2u) * 6u"), std::string::npos);
 }
 
 TEST(RendererFrameLifecycle, ForwardLinePointShadersUseSharedVisualizationColorHelpers)

@@ -28,6 +28,7 @@ module;
 
 module Extrinsic.Runtime.VisualizationEditingOperations;
 
+import Extrinsic.Runtime.Private.EditorFeatures;
 import Extrinsic.ECS.Scene.Handle;
 import Extrinsic.Asset.ImportRouter;
 import Extrinsic.Asset.GeometryPayload;
@@ -120,6 +121,19 @@ import Geometry.UvAtlas;
 
 namespace Extrinsic::Runtime {
 namespace {
+        using EditorFeatureDetail::ToEditorJobModel;
+        using EditorFeatureDetail::ResolveStableEntity;
+        using EditorFeatureDetail::ToEditorCommandStatus;
+        using EditorFeatureDetail::AppendVisualizationPropertiesForDomain;
+        using EditorFeatureDetail::EvaluateVertexChannelBinding;
+        using EditorFeatureDetail::IsPropertyCatalogSupportedKind;
+        using EditorFeatureDetail::PropertySetForVisualizationDomain;
+        using EditorFeatureDetail::ScopedEditorStatTimer;
+        using EditorFeatureDetail::ToAttributeSourceType;
+        using EditorFeatureDetail::ToGeometryElementDomain;
+        using EditorFeatureDetail::VertexChannelCatalogDomainForView;
+        using EditorFeatureDetail::VertexChannelPropertySetForView;
+        using EditorFeatureDetail::SameRenderHintComponent;
         namespace ECSC = Extrinsic::ECS::Components;
         namespace Dirty = Extrinsic::ECS::Components::DirtyTags;
         namespace GS = Extrinsic::ECS::Components::GeometrySources;
@@ -128,47 +142,6 @@ namespace {
         namespace A = Extrinsic::Assets;
         namespace GN = Geometry::HalfedgeMesh::VertexNormals;
         namespace GraphNormals = Geometry::Graph::VertexNormals;
-
-        using EditorModelBuildClock = std::chrono::steady_clock;
-
-        [[nodiscard]] std::optional<ECS::EntityHandle> ResolveStableEntity(
-            const entt::registry& raw,
-            std::uint32_t stableId);
-
-        [[nodiscard]] std::uint64_t EditorElapsedNs(
-            const EditorModelBuildClock::time_point start) noexcept
-        {
-            const auto elapsed =
-                std::chrono::duration_cast<std::chrono::nanoseconds>(
-                    EditorModelBuildClock::now() - start)
-                    .count();
-            return elapsed > 0 ? static_cast<std::uint64_t>(elapsed) : 1u;
-        }
-
-        class ScopedEditorStatTimer final
-        {
-        public:
-            explicit ScopedEditorStatTimer(std::uint64_t* target) noexcept
-                : m_Target(target)
-            {
-                if (m_Target != nullptr)
-                    m_Start = EditorModelBuildClock::now();
-            }
-
-            ScopedEditorStatTimer(const ScopedEditorStatTimer&) = delete;
-            ScopedEditorStatTimer& operator=(const ScopedEditorStatTimer&) = delete;
-
-            ~ScopedEditorStatTimer()
-            {
-                if (m_Target != nullptr)
-                    *m_Target += EditorElapsedNs(m_Start);
-            }
-
-        private:
-            std::uint64_t* m_Target{nullptr};
-            EditorModelBuildClock::time_point m_Start{};
-        };
-
 
         [[nodiscard]] G::VisualizationConfig ToVisualizationConfig(
             const EditorVisualizationConfigCommand& command)
@@ -273,7 +246,6 @@ namespace {
                 entity,
                 EditorVisualizationTarget::Entity);
         }
-
 
         [[nodiscard]] EditorCommandHistoryStatus ApplyVisualizationConfigTarget(
             ECS::Scene::Registry* scene,
@@ -433,76 +405,6 @@ namespace {
                 });
         }
 
-        [[nodiscard]] bool IsInternalVisualizationProperty(
-            const std::string& name) noexcept
-        {
-            return name == GS::PropertyNames::kPosition ||
-                   name == GS::PropertyNames::kNormal ||
-                   name == GS::PropertyNames::kVertexConnectivity ||
-                   name == GS::PropertyNames::kEdgeV0 ||
-                   name == GS::PropertyNames::kEdgeV1 ||
-                   name == GS::PropertyNames::kHalfedgeToVertex ||
-                   name == GS::PropertyNames::kHalfedgeNext ||
-                   name == GS::PropertyNames::kHalfedgeFace ||
-                   name == GS::PropertyNames::kHalfedgeConnectivity ||
-                   name == GS::PropertyNames::kFaceHalfedge ||
-                   name == "v:point" ||
-                   name == "v:tex" ||
-                   name == "v:texcoord" ||
-                   // Same reserved property, on the domain that can
-                   // carry a seam.
-                   name == "h:texcoord" ||
-                   name == "h:normal" ||
-                   name == "p:position" ||
-                   name == "p:normal";
-        }
-
-        [[nodiscard]] bool IsConnectivityVisualizationProperty(
-            const std::string& name) noexcept
-        {
-            return name == GS::PropertyNames::kPosition ||
-                   name == GS::PropertyNames::kVertexConnectivity ||
-                   name == GS::PropertyNames::kEdgeV0 ||
-                   name == GS::PropertyNames::kEdgeV1 ||
-                   name == GS::PropertyNames::kHalfedgeToVertex ||
-                   name == GS::PropertyNames::kHalfedgeNext ||
-                   name == GS::PropertyNames::kHalfedgeFace ||
-                   name == GS::PropertyNames::kHalfedgeConnectivity ||
-                   name == GS::PropertyNames::kFaceHalfedge ||
-                   name == "v:point" ||
-                   name == "v:tex" ||
-                   name == "v:texcoord" ||
-                   // Same reserved property, on the domain that can
-                   // carry a seam.
-                   name == "h:texcoord" ||
-                   name == "h:normal" ||
-                   name == "p:position";
-        }
-
-        [[nodiscard]] bool IsScalarVisualizationKind(
-            const Geometry::PropertyValueKind kind) noexcept
-        {
-            return kind == Geometry::PropertyValueKind::Float ||
-                   kind == Geometry::PropertyValueKind::Double;
-        }
-
-        [[nodiscard]] bool DomainSupportsVisualizationConfig(
-            const EditorVisualizationPropertyDomain domain) noexcept
-        {
-            using Domain = EditorVisualizationPropertyDomain;
-            switch (domain)
-            {
-            case Domain::MeshVertices:
-            case Domain::MeshEdges:
-            case Domain::MeshFaces:
-            case Domain::GraphVertices:
-            case Domain::GraphEdges:
-            case Domain::PointCloudPoints:
-                return true;
-            }
-            return false;
-        }
-
         [[nodiscard]] G::VisualizationConfig::Domain ToVisualizationConfigDomain(
             const EditorVisualizationPropertyDomain domain) noexcept
         {
@@ -540,365 +442,6 @@ namespace {
             }
             return G::VisualizationConfig::ColorSource::PerVertexBuffer;
         }
-
-        [[nodiscard]] GeometryElementDomain ToGeometryElementDomain(
-            const EditorVisualizationPropertyDomain domain) noexcept
-        {
-            using Domain = EditorVisualizationPropertyDomain;
-            switch (domain)
-            {
-            case Domain::MeshVertices:
-                return GeometryElementDomain::MeshVertex;
-            case Domain::MeshEdges:
-                return GeometryElementDomain::MeshEdge;
-            case Domain::MeshFaces:
-                return GeometryElementDomain::MeshFace;
-            case Domain::GraphVertices:
-                return GeometryElementDomain::GraphNode;
-            case Domain::GraphEdges:
-                return GeometryElementDomain::GraphEdge;
-            case Domain::PointCloudPoints:
-                return GeometryElementDomain::PointCloudPoint;
-            }
-            return GeometryElementDomain::Unknown;
-        }
-
-        [[nodiscard]] const Geometry::PropertySet* PropertySetForVisualizationDomain(
-            const GeometryEntityAvailability& availability,
-            const EditorVisualizationPropertyDomain domain) noexcept
-        {
-            return ResolveGeometryPropertySet(
-                availability,
-                ToGeometryElementDomain(domain));
-        }
-
-        void AppendVisualizationPropertiesForDomain(
-            std::vector<EditorVisualizationPropertyInfo>& out,
-            const Geometry::PropertySet& properties,
-            EditorVisualizationPropertyDomain domain);
-
-
-
-
-        void AppendVisualizationPropertiesForDomain(
-            std::vector<EditorVisualizationPropertyInfo>& out,
-            const Geometry::PropertySet& properties,
-            const EditorVisualizationPropertyDomain domain)
-        {
-            if (!DomainSupportsVisualizationConfig(domain))
-                return;
-
-            for (const std::string& name : properties.Properties())
-            {
-                // Kinds outside the visualization-capable set (Bool, Int32,
-                // UInt64, Vec2) fall through every predicate below and are
-                // skipped, exactly as the retired editor-local enum did by
-                // returning nullopt for them.
-                const Geometry::PropertyValueKind kind =
-                    DetectGeometryPropertyValueKind(properties, name);
-                if (kind == Geometry::PropertyValueKind::Unknown)
-                    continue;
-
-                const bool internal = IsInternalVisualizationProperty(name);
-                const bool connectivity =
-                    IsConnectivityVisualizationProperty(name);
-                const bool scalar =
-                    !internal && IsScalarVisualizationKind(kind);
-                const bool color =
-                    (!internal || name == GS::PropertyNames::kNormal) &&
-                    (kind == Geometry::PropertyValueKind::Vec3 ||
-                     kind == Geometry::PropertyValueKind::Vec4);
-                const bool vector =
-                    !connectivity && kind == Geometry::PropertyValueKind::Vec3;
-                const bool integer =
-                    !internal && !connectivity &&
-                    kind == Geometry::PropertyValueKind::UInt32;
-                if (!scalar && !color && !vector && !integer)
-                {
-                    continue;
-                }
-
-                out.push_back(EditorVisualizationPropertyInfo{
-                    .Name = name,
-                    .Domain = domain,
-                    .ValueKind = kind,
-                    .ElementCount = properties.Size(),
-                    .ScalarPresetAvailable = scalar,
-                    .IsolinePresetAvailable = scalar,
-                    .ColorBufferPresetAvailable = color || integer,
-                    .VectorFieldCandidate = vector,
-                });
-            }
-        }
-
-
-        [[nodiscard]] const Geometry::PropertySet* PropertySetForCatalogDomain(
-            const GeometryEntityAvailability& availability,
-            const EditorPropertyCatalogDomain domain) noexcept
-        {
-            using Domain = EditorPropertyCatalogDomain;
-            switch (domain)
-            {
-            case Domain::MeshVertices:
-                return ResolveGeometryPropertySet(
-                    availability,
-                    GeometryElementDomain::MeshVertex);
-            case Domain::MeshEdges:
-                return ResolveGeometryPropertySet(
-                    availability,
-                    GeometryElementDomain::MeshEdge);
-            case Domain::MeshHalfedges:
-                return ResolveGeometryPropertySet(
-                    availability,
-                    GeometryElementDomain::MeshHalfedge);
-            case Domain::MeshFaces:
-                return ResolveGeometryPropertySet(
-                    availability,
-                    GeometryElementDomain::MeshFace);
-            case Domain::GraphVertices:
-                return ResolveGeometryPropertySet(
-                    availability,
-                    GeometryElementDomain::GraphNode);
-            case Domain::GraphHalfedges:
-                return ResolveGeometryPropertySet(
-                    availability,
-                    GeometryElementDomain::GraphHalfedge);
-            case Domain::GraphEdges:
-                return ResolveGeometryPropertySet(
-                    availability,
-                    GeometryElementDomain::GraphEdge);
-            case Domain::PointCloudPoints:
-                return ResolveGeometryPropertySet(
-                    availability,
-                    GeometryElementDomain::PointCloudPoint);
-            }
-            return nullptr;
-        }
-
-        [[nodiscard]] GeometryElementDomain ToGeometryElementDomain(
-            const EditorPropertyCatalogDomain domain) noexcept
-        {
-            using Domain = EditorPropertyCatalogDomain;
-            switch (domain)
-            {
-            case Domain::MeshVertices:
-                return GeometryElementDomain::MeshVertex;
-            case Domain::MeshEdges:
-                return GeometryElementDomain::MeshEdge;
-            case Domain::MeshHalfedges:
-                return GeometryElementDomain::MeshHalfedge;
-            case Domain::MeshFaces:
-                return GeometryElementDomain::MeshFace;
-            case Domain::GraphVertices:
-                return GeometryElementDomain::GraphNode;
-            case Domain::GraphHalfedges:
-                return GeometryElementDomain::GraphHalfedge;
-            case Domain::GraphEdges:
-                return GeometryElementDomain::GraphEdge;
-            case Domain::PointCloudPoints:
-                return GeometryElementDomain::PointCloudPoint;
-            }
-            return GeometryElementDomain::Unknown;
-        }
-
-        // Kinds the property catalog surfaces. Bool/Int32/UInt64 were never
-        // representable in the retired editor-local enum (they collapsed to
-        // Unknown), so they stay unsupported here rather than silently becoming
-        // bindable now that the canonical vocabulary can name them.
-        [[nodiscard]] bool IsPropertyCatalogSupportedKind(
-            const Geometry::PropertyValueKind kind) noexcept
-        {
-            switch (kind)
-            {
-            case Geometry::PropertyValueKind::Float:
-            case Geometry::PropertyValueKind::Double:
-            case Geometry::PropertyValueKind::UInt32:
-            case Geometry::PropertyValueKind::Vec2:
-            case Geometry::PropertyValueKind::Vec3:
-            case Geometry::PropertyValueKind::Vec4:
-                return true;
-            case Geometry::PropertyValueKind::Unknown:
-            case Geometry::PropertyValueKind::Bool:
-            case Geometry::PropertyValueKind::Int32:
-            case Geometry::PropertyValueKind::UInt64:
-                break;
-            }
-            return false;
-        }
-
-
-
-
-
-
-
-
-        [[nodiscard]] std::optional<EditorPropertyCatalogDomain>
-        VertexChannelCatalogDomainForView(
-            const GS::ConstSourceView& view) noexcept
-        {
-            const GS::SourceAvailability availability =
-                GS::BuildSourceAvailability(view);
-            using Domain = EditorPropertyCatalogDomain;
-            switch (availability.ProvenanceDomain)
-            {
-            case GS::Domain::Mesh:
-                return Domain::MeshVertices;
-            case GS::Domain::Graph:
-                return Domain::GraphVertices;
-            case GS::Domain::PointCloud:
-                return Domain::PointCloudPoints;
-            case GS::Domain::None:
-            case GS::Domain::Unknown:
-                break;
-            }
-            return std::nullopt;
-        }
-
-        [[nodiscard]] const Geometry::PropertySet*
-        VertexChannelPropertySetForView(
-            const GS::ConstSourceView& view,
-            const EditorPropertyCatalogDomain domain) noexcept
-        {
-            const GeometryEntityAvailability availability =
-                BuildGeometryAvailability(view);
-            return PropertySetForCatalogDomain(availability, domain);
-        }
-
-        [[nodiscard]] std::optional<AttributeSourceType>
-        ToAttributeSourceType(
-            const Geometry::PropertyValueKind kind) noexcept
-        {
-            using Kind = Geometry::PropertyValueKind;
-            switch (kind)
-            {
-            case Kind::Float:
-                return AttributeSourceType::Float32;
-            case Kind::Vec2:
-                return AttributeSourceType::Vec2;
-            case Kind::Vec3:
-                return AttributeSourceType::Vec3;
-            case Kind::Vec4:
-                return AttributeSourceType::Vec4;
-            case Kind::Double:
-            case Kind::UInt32:
-            case Kind::Unknown:
-            case Kind::Bool:
-            case Kind::Int32:
-            case Kind::UInt64:
-                break;
-            }
-            return std::nullopt;
-        }
-
-        [[nodiscard]] bool SourceTypeAllowedForVertexChannel(
-            const VertexChannel channel,
-            const AttributeSourceType type) noexcept
-        {
-            switch (channel)
-            {
-            case VertexChannel::Normal:
-                return type == AttributeSourceType::Vec3;
-            case VertexChannel::Color:
-                return type == AttributeSourceType::Vec3 ||
-                       type == AttributeSourceType::Vec4;
-            case VertexChannel::Position:
-            case VertexChannel::Texcoord:
-            case VertexChannel::Tangent:
-            case VertexChannel::Custom:
-                break;
-            }
-            return false;
-        }
-
-
-        void RecordVertexChannelResolverScratch(
-            EditorWorkspaceSnapshotStats* stats,
-            const std::size_t byteCount)
-        {
-            if (stats == nullptr)
-                return;
-
-            ++stats->VertexChannelResolverScans;
-            ++stats->VertexChannelScratchAllocations;
-            stats->VertexChannelScratchBytes +=
-                static_cast<std::uint64_t>(byteCount);
-        }
-
-        [[nodiscard]] AttributeBindResult EvaluateVertexChannelBinding(
-            const Geometry::PropertySet& properties,
-            const VertexChannel channel,
-            const std::string_view propertyName,
-            const AttributeSourceType sourceType,
-            const std::size_t elementCount,
-            EditorWorkspaceSnapshotStats* modelBuildStats)
-        {
-            ScopedEditorStatTimer timer{
-                modelBuildStats != nullptr
-                    ? &modelBuildStats->VertexChannelValidationTimeNs
-                    : nullptr};
-            if (propertyName.empty())
-            {
-                return AttributeBindResult{
-                    .Status = AttributeBindStatus::EmptyBinding,
-                    .FullyPopulated = false,
-                };
-            }
-            if (elementCount > std::numeric_limits<std::uint32_t>::max())
-            {
-                return AttributeBindResult{
-                    .Status = AttributeBindStatus::CountMismatch,
-                    .FullyPopulated = false,
-                };
-            }
-            if (!SourceTypeAllowedForVertexChannel(channel, sourceType))
-            {
-                return AttributeBindResult{
-                    .Status = AttributeBindStatus::TypeMismatch,
-                    .FullyPopulated = false,
-                };
-            }
-
-            const std::uint32_t count =
-                static_cast<std::uint32_t>(elementCount);
-            const VertexAttributeBinding binding{
-                .Channel = channel,
-                .SourceType = sourceType,
-                .SourceProperty = propertyName,
-                .AllowFallback = false,
-                .Normalize = channel == VertexChannel::Normal,
-                .Fallback = channel == VertexChannel::Normal
-                    ? glm::vec4{0.0f, 0.0f, 1.0f, 0.0f}
-                    : glm::vec4{1.0f, 1.0f, 1.0f, 1.0f},
-            };
-
-            if (channel == VertexChannel::Normal)
-            {
-                RecordVertexChannelResolverScratch(
-                    modelBuildStats,
-                    elementCount * sizeof(glm::vec3));
-                std::vector<glm::vec3> scratch(elementCount);
-                return ResolveVec3Channel(properties, binding, count, scratch);
-            }
-            if (channel == VertexChannel::Color)
-            {
-                RecordVertexChannelResolverScratch(
-                    modelBuildStats,
-                    elementCount * sizeof(std::uint32_t));
-                std::vector<std::uint32_t> scratch(elementCount);
-                return ResolveColorChannelPackedUnorm8(
-                    properties,
-                    binding,
-                    count,
-                    scratch);
-            }
-            return AttributeBindResult{
-                .Status = AttributeBindStatus::TypeMismatch,
-                .FullyPopulated = false,
-            };
-        }
-
-
 
         [[nodiscard]] VertexChannelSourceBinding*
         FindMutableVertexChannelBinding(
@@ -1117,10 +660,6 @@ namespace {
             return false;
         }
 
-
-
-
-
         struct EditorRenderHintState
         {
             std::optional<G::RenderSurface> Surface{};
@@ -1145,68 +684,13 @@ namespace {
             return state;
         }
 
-        [[nodiscard]] bool SameRenderSurface(
-            const G::RenderSurface& lhs,
-            const G::RenderSurface& rhs) noexcept
-        {
-            return lhs.Domain == rhs.Domain;
-        }
-
-        [[nodiscard]] bool SameRenderScalarSource(
-            const std::variant<float, std::string>& lhs,
-            const std::variant<float, std::string>& rhs) noexcept
-        {
-            if (lhs.index() != rhs.index())
-                return false;
-            if (const auto* lhsUniform = std::get_if<float>(&lhs))
-            {
-                const auto* rhsUniform = std::get_if<float>(&rhs);
-                return rhsUniform != nullptr &&
-                       std::bit_cast<std::uint32_t>(*lhsUniform) ==
-                           std::bit_cast<std::uint32_t>(*rhsUniform);
-            }
-            return std::get<std::string>(lhs) == std::get<std::string>(rhs);
-        }
-
-        [[nodiscard]] bool SameRenderEdges(
-            const G::RenderEdges& lhs,
-            const G::RenderEdges& rhs)
-        {
-            return lhs.Domain == rhs.Domain &&
-                   SameRenderScalarSource(lhs.WidthSource, rhs.WidthSource);
-        }
-
-        [[nodiscard]] bool SameRenderPoints(
-            const G::RenderPoints& lhs,
-            const G::RenderPoints& rhs)
-        {
-            return lhs.Type == rhs.Type &&
-                   SameRenderScalarSource(lhs.SizeSource, rhs.SizeSource);
-        }
-
-        template <typename T, typename SameFn>
-        [[nodiscard]] bool SameOptionalRenderComponent(
-            const std::optional<T>& lhs,
-            const std::optional<T>& rhs,
-            SameFn same)
-        {
-            if (lhs.has_value() != rhs.has_value())
-                return false;
-            if (!lhs.has_value())
-                return true;
-            return same(*lhs, *rhs);
-        }
-
         [[nodiscard]] bool SameRenderHintState(
             const EditorRenderHintState& lhs,
             const EditorRenderHintState& rhs)
         {
-            return SameOptionalRenderComponent(
-                       lhs.Surface, rhs.Surface, SameRenderSurface) &&
-                   SameOptionalRenderComponent(
-                       lhs.Edges, rhs.Edges, SameRenderEdges) &&
-                   SameOptionalRenderComponent(
-                       lhs.Points, rhs.Points, SameRenderPoints) &&
+            return SameRenderHintComponent(lhs.Surface, rhs.Surface) &&
+                   SameRenderHintComponent(lhs.Edges, rhs.Edges) &&
+                   SameRenderHintComponent(lhs.Points, rhs.Points) &&
                    SameOptionalVisualizationConfig(lhs.SurfaceVisualization, rhs.SurfaceVisualization);
         }
 
@@ -1600,9 +1084,6 @@ namespace {
             return *status;
         }
 
-        [[nodiscard]] EditorCommandStatus ToEditorCommandStatus(
-            EditorCommandHistoryStatus status) noexcept;
-
         [[nodiscard]] EditorCommandStatus CommitGeometryPresentationChange(
             const EditorVisualizationEditingContext& context,
             const std::uint32_t stableEntityId,
@@ -1703,48 +1184,6 @@ namespace {
             return sourceKind == GeometryPresentationSourceKind::PropertyBake ||
                    sourceKind == GeometryPresentationSourceKind::PropertyBuffer;
         }
-        [[nodiscard]] EditorCommandStatus ToEditorCommandStatus(
-            const EditorCommandHistoryStatus status) noexcept
-        {
-            switch (status)
-            {
-            case EditorCommandHistoryStatus::Applied:
-            case EditorCommandHistoryStatus::Recorded:
-            case EditorCommandHistoryStatus::Undone:
-            case EditorCommandHistoryStatus::Redone:
-                return EditorCommandStatus::Applied;
-            case EditorCommandHistoryStatus::NoChange:
-                return EditorCommandStatus::NoChange;
-            case EditorCommandHistoryStatus::MissingScene:
-                return EditorCommandStatus::MissingScene;
-            case EditorCommandHistoryStatus::MissingSelectionController:
-                return EditorCommandStatus::MissingSelectionController;
-            case EditorCommandHistoryStatus::StaleEntity:
-                return EditorCommandStatus::StaleEntity;
-            case EditorCommandHistoryStatus::MissingTransform:
-                return EditorCommandStatus::MissingTransform;
-            case EditorCommandHistoryStatus::EmptyUndoStack:
-            case EditorCommandHistoryStatus::EmptyRedoStack:
-            case EditorCommandHistoryStatus::InvalidCommand:
-            case EditorCommandHistoryStatus::CommandFailed:
-            case EditorCommandHistoryStatus::UndoFailed:
-            case EditorCommandHistoryStatus::RedoFailed:
-            case EditorCommandHistoryStatus::UnsupportedOperation:
-                return EditorCommandStatus::NoChange;
-            }
-            return EditorCommandStatus::NoChange;
-        }
-        [[nodiscard]] std::optional<ECS::EntityHandle> ResolveStableEntity(
-            const entt::registry& raw,
-            const std::uint32_t stableId)
-        {
-            const ECS::EntityHandle entity =
-                SelectionController::ToEntityHandle(stableId);
-            if (entity != ECS::InvalidEntityHandle && raw.valid(entity))
-                return entity;
-            return std::nullopt;
-        }
-
         void InvalidateSelectedModelCache(const EditorVisualizationEditingContext& context)
         {
             if (context.InvalidateWorkspaceSnapshotCache)
@@ -1761,40 +1200,6 @@ namespace {
         }
         constexpr std::string_view kUvRegenerationJobOutputName{
             "uv_regeneration"};
-
-        [[nodiscard]] EditorJobDependencyModel
-        ToEditorJobDependencyModel(
-            const EditorJobDependency& dependency)
-        {
-            return EditorJobDependencyModel{
-                .Job = dependency.Job,
-                .Reason = dependency.Reason,
-            };
-        }
-
-        [[nodiscard]] EditorJobModel ToEditorJobModel(
-            const EditorJobRecord& job)
-        {
-            EditorJobModel model{
-                .Handle = job.Token,
-                .Key = job.Identity,
-                .Name = job.Name,
-                .RequestedJobDomain = job.RequestedJobDomain,
-                .ResolvedJobDomain = job.ResolvedJobDomain,
-                .Status = job.State,
-                .NormalizedProgress = job.NormalizedProgress,
-                .ProgressDeterminate = job.ProgressDeterminate,
-                .PreviousOutputRetained = job.PreviousOutputRetained,
-                .PayloadToken = job.PayloadToken,
-                .ElapsedMilliseconds = job.ElapsedMilliseconds,
-                .Diagnostic = job.Diagnostic,
-            };
-            model.Dependencies.reserve(job.Dependencies.size());
-            for (const EditorJobDependency& dependency : job.Dependencies)
-                model.Dependencies.push_back(
-                    ToEditorJobDependencyModel(dependency));
-            return model;
-        }
 
         [[nodiscard]] std::optional<EditorJobModel>
         FindDerivedJobModelForOutput(
@@ -2122,7 +1527,6 @@ namespace {
                 model.DisabledReason = "no bakeable mesh vertex or face properties";
             return model;
         }
-
 
     EditorCommandStatus
 ApplyEditorRenderHintCommand(

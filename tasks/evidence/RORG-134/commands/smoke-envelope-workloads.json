@@ -1,0 +1,23 @@
+{
+  "command": [
+    "/bin/bash",
+    "-o",
+    "pipefail",
+    "-c",
+    "ctest --test-dir build/ci --output-on-failure -R '^IntrinsicBenchmarkSmoke[.](Run|Validate)$' --no-tests=error --timeout 120 | tee /tmp/intrinsic-reuse-smoke-workloads.log | tail -45"
+  ],
+  "command_display": "/bin/bash -o pipefail -c 'ctest --test-dir build/ci --output-on-failure -R '\"'\"'^IntrinsicBenchmarkSmoke[.](Run|Validate)$'\"'\"' --no-tests=error --timeout 120 | tee /tmp/intrinsic-reuse-smoke-workloads.log | tail -45'",
+  "cwd": ".",
+  "duration_ms": 16777,
+  "exit_code": 0,
+  "finished_at": "2026-09-11T02:38:48Z",
+  "label": "smoke-envelope-workloads",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-09-11T02:38:31Z",
+  "stderr_path": "tasks/evidence/RORG-134/commands/smoke-envelope-workloads.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/RORG-134/commands/smoke-envelope-workloads.stdout.log",
+  "stdout_sha256": "55b23895ca48cbcefe0dd46c6ecfd1ebc32bcb2cbffe1c4174979d57acd08a12",
+  "task_id": "RORG-134"
+}

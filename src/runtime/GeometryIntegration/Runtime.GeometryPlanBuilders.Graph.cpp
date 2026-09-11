@@ -24,6 +24,98 @@ import Geometry.Properties;
 
 namespace Extrinsic::Runtime
 {
+    bool PrepareBoundVertexColors(
+        const Geometry::PropertySet& properties,
+        const GeometryElementDomain domain,
+        const VertexChannelSourceBinding& binding,
+        const std::size_t vertexCount,
+        std::vector<std::uint32_t>& packedColors)
+    {
+        packedColors.clear();
+        const std::optional<AttributeSourceType> sourceType =
+            binding.Property.Domain == domain
+                ? ToAttributeSourceType(binding.Property.ValueKind)
+                : std::nullopt;
+        if (sourceType != AttributeSourceType::Vec3 &&
+            sourceType != AttributeSourceType::Vec4)
+        {
+            return false;
+        }
+        packedColors.resize(vertexCount);
+        const VertexAttributeBinding colorBinding{
+            .Channel = VertexChannel::Color,
+            .SourceType = *sourceType,
+            .SourceProperty = std::string_view{
+                binding.Property.Name},
+            .AllowFallback = false,
+            .Normalize = false,
+            .Fallback = glm::vec4{1.0f, 1.0f, 1.0f, 1.0f},
+        };
+        const AttributeBindResult colorResult =
+            ResolveColorChannelPackedUnorm8(
+                properties,
+                colorBinding,
+                static_cast<std::uint32_t>(vertexCount),
+                packedColors);
+        if (!colorResult.Ok())
+        {
+            packedColors.clear();
+        }
+        return colorResult.Ok();
+    }
+
+    void PrepareBoundVertexChannels(
+        const Geometry::PropertySet& properties,
+        const GeometryElementDomain domain,
+        const VertexChannelBindingSet* channelBindings,
+        const std::size_t vertexCount,
+        VertexChannelStreams& channels,
+        std::vector<std::uint32_t>& packedColors)
+    {
+        if (channelBindings != nullptr && IsVertexChannelBindingEnabled(channelBindings->Normal))
+        {
+            const std::optional<AttributeSourceType> sourceType =
+                channelBindings->Normal.Property.Domain == domain
+                    ? ToAttributeSourceType(
+                          channelBindings->Normal.Property.ValueKind)
+                    : std::nullopt;
+            std::vector<glm::vec3> normals(vertexCount);
+            const VertexAttributeBinding normalBinding{
+                .Channel = VertexChannel::Normal,
+                .SourceType = sourceType.value_or(AttributeSourceType::Vec3),
+                .SourceProperty = sourceType == AttributeSourceType::Vec3
+                    ? std::string_view{channelBindings->Normal.Property.Name}
+                    : std::string_view{},
+                .AllowFallback = false,
+                .Normalize = true,
+                .Fallback = glm::vec4{0.0f, 0.0f, 1.0f, 0.0f},
+            };
+            const AttributeBindResult normalResult =
+                ResolveVec3Channel(
+                    properties,
+                    normalBinding,
+                    static_cast<std::uint32_t>(vertexCount),
+                    normals);
+            if (normalResult.Ok())
+            {
+                SetChannelVec3(
+                    channels,
+                    VertexChannel::Normal,
+                    std::span<const glm::vec3>{normals.data(), normals.size()});
+            }
+        }
+        if (channelBindings != nullptr && IsVertexChannelBindingEnabled(channelBindings->Color))
+        {
+            if (PrepareBoundVertexColors(
+                    properties, domain, channelBindings->Color, vertexCount, packedColors))
+            {
+                SetChannelPackedUnorm8(
+                    channels, VertexChannel::Color,
+                    std::span<const std::uint32_t>{packedColors});
+            }
+        }
+    }
+
     namespace
     {
         constexpr const char* kGraphDebugName = "Runtime.Graph";
@@ -181,79 +273,9 @@ namespace Extrinsic::Runtime
             outBuffer.Channels,
             VertexChannel::Texcoord,
             std::span<const glm::vec2>{texcoords.data(), texcoords.size()});
-        if (channelBindings != nullptr && IsVertexChannelBindingEnabled(channelBindings->Normal))
-        {
-            const std::optional<AttributeSourceType> sourceType =
-                channelBindings->Normal.Property.Domain ==
-                        GeometryElementDomain::GraphNode
-                    ? ToAttributeSourceType(
-                          channelBindings->Normal.Property.ValueKind)
-                    : std::nullopt;
-            std::vector<glm::vec3> normals(nodeCount);
-            const VertexAttributeBinding normalBinding{
-                .Channel = VertexChannel::Normal,
-                .SourceType = sourceType.value_or(AttributeSourceType::Vec3),
-                .SourceProperty = sourceType == AttributeSourceType::Vec3
-                    ? std::string_view{channelBindings->Normal.Property.Name}
-                    : std::string_view{},
-                .AllowFallback = false,
-                .Normalize = true,
-                .Fallback = glm::vec4{0.0f, 0.0f, 1.0f, 0.0f},
-            };
-            const AttributeBindResult normalResult =
-                ResolveVec3Channel(
-                    view.VertexSource->Properties,
-                    normalBinding,
-                    nodeCountU32,
-                    normals);
-            if (normalResult.Ok())
-            {
-                SetChannelVec3(
-                    outBuffer.Channels,
-                    VertexChannel::Normal,
-                    std::span<const glm::vec3>{normals.data(), normals.size()});
-            }
-        }
-        if (channelBindings != nullptr && IsVertexChannelBindingEnabled(channelBindings->Color))
-        {
-            const std::optional<AttributeSourceType> sourceType =
-                channelBindings->Color.Property.Domain ==
-                        GeometryElementDomain::GraphNode
-                    ? ToAttributeSourceType(
-                          channelBindings->Color.Property.ValueKind)
-                    : std::nullopt;
-            if (sourceType == AttributeSourceType::Vec3 ||
-                sourceType == AttributeSourceType::Vec4)
-            {
-                outBuffer.PackedColors.resize(nodeCount);
-                const VertexAttributeBinding colorBinding{
-                    .Channel = VertexChannel::Color,
-                    .SourceType = *sourceType,
-                    .SourceProperty = std::string_view{
-                        channelBindings->Color.Property.Name},
-                    .AllowFallback = false,
-                    .Normalize = false,
-                    .Fallback = glm::vec4{1.0f, 1.0f, 1.0f, 1.0f},
-                };
-                const AttributeBindResult colorResult =
-                    ResolveColorChannelPackedUnorm8(
-                        view.VertexSource->Properties,
-                        colorBinding,
-                        nodeCountU32,
-                        outBuffer.PackedColors);
-                if (colorResult.Ok())
-                {
-                    SetChannelPackedUnorm8(
-                        outBuffer.Channels,
-                        VertexChannel::Color,
-                        std::span<const std::uint32_t>{outBuffer.PackedColors});
-                }
-                else
-                {
-                    outBuffer.PackedColors.clear();
-                }
-            }
-        }
+        PrepareBoundVertexChannels(
+            view.VertexSource->Properties, GeometryElementDomain::GraphNode,
+            channelBindings, nodeCount, outBuffer.Channels, outBuffer.PackedColors);
 
         const auto channelBytes = [&outBuffer](const VertexChannel channel) -> std::span<const std::byte> {
             const VertexChannelStreams::Stream* stream = outBuffer.Channels.Find(channel);

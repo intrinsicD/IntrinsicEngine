@@ -13,6 +13,7 @@
 //   2 = EWA:       perspective-correct elliptical Gaussian splats (Zwicker et al. 2001).
 
 #version 460
+#extension GL_GOOGLE_include_directive : require
 #extension GL_EXT_scalar_block_layout : require
 #extension GL_EXT_buffer_reference : require
 #extension GL_EXT_shader_explicit_arithmetic_types_int64 : require
@@ -45,6 +46,8 @@ layout(location = 1) out vec2 fragDiscUV;
 layout(location = 2) out vec3 fragNormal;
 layout(location = 3) out vec3 fragWorldPos;
 layout(location = 4) flat out vec3 fragEwaCovInv;  // UV-space inverse covariance (symmetric 2x2: xx, xy, yy)
+
+#include "common/point_splat.glsl"
 
 void main()
 {
@@ -97,9 +100,9 @@ void main()
         // 3-sigma ellipse, and the fragment shader evaluates the Gaussian weight.
 
         vec3 N = worldNorm;
-        vec3 ref = (abs(N.y) < 0.99) ? vec3(0.0, 1.0, 0.0) : vec3(1.0, 0.0, 0.0);
-        vec3 T = normalize(cross(N, ref));
-        vec3 B = cross(N, T);
+        vec3 T;
+        vec3 B;
+        PointTangentFrame(N, T, B);
 
         // Transform to view space.
         vec4 viewPos4 = camera.view * vec4(worldPos, 1.0);
@@ -111,24 +114,11 @@ void main()
         // Perspective Jacobian: maps view-space tangent/bitangent to screen pixels.
         // NDC: ndc.x = fx * v.x / z,  ndc.y = fy * v.y / z  (z = -v.z > 0)
         // Pixels: pix = (ndc * 0.5 + 0.5) * viewport
-        float z = max(-viewPos.z, 1e-4);
-        float invZ2 = 1.0 / (z * z);
-        float fx = camera.proj[0][0];
-        float fy = camera.proj[1][1];
-        float sx = 0.5 * push.ViewportWidth;
-        float sy = 0.5 * push.ViewportHeight;
+        vec2 scrT;
+        vec2 scrB;
+        ProjectPointTangents(camera.proj, vec2(push.ViewportWidth, push.ViewportHeight),
+                             viewPos, viewT, viewB, scrT, scrB);
 
-        // Screen-space images of the tangent and bitangent (in pixels).
-        vec2 scrT = vec2(
-            sx * fx * (viewT.x * z + viewT.z * viewPos.x) * invZ2,
-            sy * fy * (viewT.y * z + viewT.z * viewPos.y) * invZ2
-        );
-        vec2 scrB = vec2(
-            sx * fx * (viewB.x * z + viewB.z * viewPos.x) * invZ2,
-            sy * fy * (viewB.y * z + viewB.z * viewPos.y) * invZ2
-        );
-
-        // Screen-space covariance: C = J * J^T (Jacobian columns = scrT, scrB).
         float c00 = scrT.x * scrT.x + scrB.x * scrB.x;
         float c01 = scrT.x * scrT.y + scrB.x * scrB.y;
         float c11 = scrT.y * scrT.y + scrB.y * scrB.y;
@@ -140,26 +130,17 @@ void main()
 
         // Invert the covariance.
         float det = c00 * c11 - c01 * c01;
-        float invDet = 1.0 / max(det, 1e-6);
-        float ci00 =  c11 * invDet;
-        float ci01 = -c01 * invDet;
-        float ci11 =  c00 * invDet;
+        vec3 covarianceInverse = PointInverseCovariance(vec3(c00, c01, c11), det);
 
         // Billboard extent: 3-sigma cutoff for the ellipse bounding box.
-        const float CUTOFF = 3.0;
-        float extX = CUTOFF * sqrt(max(c00, 0.0));
-        float extY = CUTOFF * sqrt(max(c11, 0.0));
+        float extX;
+        float extY;
+        PointSplatExtent(c00, c11, vec2(push.ViewportWidth, push.ViewportHeight), extX, extY);
 
-        // Clamp to prevent extremely large billboards.
-        extX = min(extX, push.ViewportWidth * 0.5);
-        extY = min(extY, push.ViewportHeight * 0.5);
-
-        // UV-scaled inverse covariance so that the fragment shader evaluates
-        // exp(-0.5 * uv^T * Q * uv) where uv = fragDiscUV in [-1,1].
         fragEwaCovInv = vec3(
-            ci00 * extX * extX,
-            ci01 * extX * extY,
-            ci11 * extY * extY
+            covarianceInverse.x * extX * extX,
+            covarianceInverse.y * extX * extY,
+            covarianceInverse.z * extY * extY
         );
 
         // Expand billboard in clip space.
@@ -178,9 +159,9 @@ void main()
     {
         // Surfel mode: normal-oriented disc.
         vec3 N = worldNorm;
-        vec3 ref = (abs(N.y) < 0.99) ? vec3(0.0, 1.0, 0.0) : vec3(1.0, 0.0, 0.0);
-        vec3 T = normalize(cross(N, ref));
-        vec3 B = cross(N, T);
+        vec3 T;
+        vec3 B;
+        PointTangentFrame(N, T, B);
 
         vec3 offset = (T * localOffset.x + B * localOffset.y) * radiusWorld;
         vec3 expandedPos = worldPos + offset;

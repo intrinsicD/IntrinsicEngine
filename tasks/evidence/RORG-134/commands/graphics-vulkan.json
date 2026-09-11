@@ -1,0 +1,23 @@
+{
+  "command": [
+    "/bin/bash",
+    "-o",
+    "pipefail",
+    "-c",
+    "ctest --test-dir build/ci-vulkan --output-on-failure -L gpu -L vulkan --no-tests=error --timeout 120 | tee /tmp/intrinsic-reuse-final-vulkan.log | tail -60"
+  ],
+  "command_display": "/bin/bash -o pipefail -c 'ctest --test-dir build/ci-vulkan --output-on-failure -L gpu -L vulkan --no-tests=error --timeout 120 | tee /tmp/intrinsic-reuse-final-vulkan.log | tail -60'",
+  "cwd": ".",
+  "duration_ms": 681817,
+  "exit_code": 0,
+  "finished_at": "2026-09-11T03:22:00Z",
+  "label": "graphics-vulkan",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-09-11T03:10:38Z",
+  "stderr_path": "tasks/evidence/RORG-134/commands/graphics-vulkan.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/RORG-134/commands/graphics-vulkan.stdout.log",
+  "stdout_sha256": "9981496fb310720db4abef467801ce31bf37c689815ab9c17a7d3ded6b3c058d",
+  "task_id": "RORG-134"
+}

@@ -1,3 +1,4 @@
+// Ray-query kernels shared by overlap, contact and triangle intersection consumers.
 module;
 #include <cstdint>
 #include <optional>
@@ -11,6 +12,11 @@ import Geometry.IntersectionClassification;
 
 export namespace Geometry
 {
+    // Inclusive slab interval before clipping to the forward ray. Zero-direction
+    // axes accept origins inside the slab; output bounds are valid only on success.
+    [[nodiscard]] bool RayAabbSlabInterval(
+        const Ray& ray, const AABB& box, float& tmin, float& tmax);
+
     struct RayTriangleHit
     {
         float T = std::numeric_limits<float>::infinity();

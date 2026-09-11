@@ -1,0 +1,38 @@
+{
+  "method": "Original and refactored emitter source compiled with Clang 23 using identical synthetic metric records; 313 member names seeded, normal/tiny/large floating values, booleans, integer counts, arrays/vectors and escaped commit metadata. No benchmark algorithms run. JSON parsed without removing any fields.",
+  "results": [
+    {
+      "mode": 0,
+      "matched_results": 35,
+      "payload_sha256": "aca240370c484fbd6f760cbb113d834e895f639cabae904a9c1c1b3efc44d5e6"
+    },
+    {
+      "mode": 1,
+      "matched_results": 35,
+      "payload_sha256": "69a5f5777460f8397eed8129c7bc07b0a605581ea76a04d7339f52043a892ced"
+    },
+    {
+      "mode": 2,
+      "matched_results": 35,
+      "payload_sha256": "1b05258d2d83268ce663a7153b12da7c3266cbb5ec1610480febc9c42fd9bc9c"
+    }
+  ],
+  "escaping_regression": {
+    "all_results_valid_with_control_characters_and_unicode": 35,
+    "native_knn_payload_matches_original": true,
+    "correction": "The shared escaper now uses nlohmann JSON string encoding; legacy stream emitters no longer emit malformed JSON for otherwise unescaped control characters."
+  },
+  "invalid_utf8": [
+    {
+      "version": "before",
+      "exit_code": -6,
+      "wrote_results": false
+    },
+    {
+      "version": "after",
+      "exit_code": -6,
+      "wrote_results": false
+    }
+  ],
+  "invalid_utf8_disposition": "The original mandatory KNN nlohmann serializer already rejected invalid UTF-8 before any output files were written. The shared escaper preserves that whole-run failure behavior; no replacement/ignore policy was introduced."
+}

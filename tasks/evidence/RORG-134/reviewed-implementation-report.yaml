@@ -1,0 +1,501 @@
+schema_version: 1
+task_id: RORG-134
+workflow_profile: high-risk
+status: complete
+generated_by: tools/agents/workflow_evidence.py
+generated_at: '2026-09-11T03:24:13Z'
+claim_eligible: false
+source:
+  base_ref: 90909d7507bf6da1014b6b16ce0a88f05cd0db0c
+  base_revision: 90909d7507bf6da1014b6b16ce0a88f05cd0db0c
+  head_revision: 90909d7507bf6da1014b6b16ce0a88f05cd0db0c
+  branch: main
+  worktree: /home/alex/Documents/IntrinsicEngine
+  dirty: true
+  surface:
+  - path: .github/actions/setup-build/action.yml
+    sha256: 9cf8e0c4118798f2957c8242ea106f80a0588cc1dd6fee4e8796a593a0cc4b76
+  - path: .github/workflows/ci-linux-clang.yml
+    sha256: 4a7b4cf53c1c5b9e07d3ac52eb0db7f2caaa5daeed09a2cd7cc3faff95019fd2
+  - path: .github/workflows/ci-release.yml
+    sha256: 2d2af7fcc19c0b8e7efdedbb04e9720fb3c90d4d464aa49a6b15bde02080ed00
+  - path: .github/workflows/ci-sanitizers.yml
+    sha256: 5635fc2cfdbf0cca8ce36354e8503b9c696f4e01e2d72812ff2489c15eb4d539
+  - path: .github/workflows/ci-source-coverage.yml
+    sha256: 545dbfe069869d7274f827aaad05397f6c835fafbbf24d686a3b0f869b9ea6a2
+  - path: .github/workflows/ci-vulkan.yml
+    sha256: 4983ea350d97e2e1429e221026d8fe8582f3477f37f5f5d85bcd7ad568c1ad88
+  - path: .github/workflows/nightly-deep.yml
+    sha256: 7e1ec3a431ac7c93172bb1be15d30f4ecfe873950a51479a7e3bd936c3ffb83d
+  - path: assets/shaders/common/point_splat.glsl
+    sha256: b24d7394ee4d0061df444490f09385cc0ed95abfc670ffdd2ba7ee2554494f17
+  - path: assets/shaders/common/surface_material.glsl
+    sha256: e0b37e434b449c440ae4cd5295b2b31bfe99ba9a8eac2029ad33452fcf90858d
+  - path: assets/shaders/culling/instance_cull.comp
+    sha256: null
+  - path: assets/shaders/deferred/default_debug_gbuffer.frag
+    sha256: 2714213127549ac9684562ab0606a68d601ce8f23b810502d0b6d0a577814a3f
+  - path: assets/shaders/deferred/gbuffer.frag
+    sha256: 47746fbf620e31be4e01edfbe971ab6251a866e002f4ed7795431c5f6eaa34af
+  - path: assets/shaders/forward/default_debug_surface.frag
+    sha256: ad5af0997c42dd9951f3667f42f7931953f6375ab2ef2dda17539a1f6aeb211a
+  - path: assets/shaders/include/kmeans_state.glsl
+    sha256: 0af95e22f1b14626e28aefe40fdef702bafa598afd40ed509b7084a53817b6cb
+  - path: assets/shaders/include/progressive_poisson_state.glsl
+    sha256: 955d80186bd30f28153840401eaeaddbb24fef4695b23fc2d15e716309f02e75
+  - path: assets/shaders/kmeans_assign.comp
+    sha256: 37580b124a9aa33542945a444b5b53c9df07a632571deb144be01f4f6aea741f
+  - path: assets/shaders/kmeans_reset.comp
+    sha256: 847f942a6065af2c20e40b212f6a317d26bd90e432518a56b37f37cbd57753af
+  - path: assets/shaders/kmeans_update.comp
+    sha256: 9804aca39cf6cde668758038bd4f2f2da34322e57353d8d010eab80d17adee63
+  - path: assets/shaders/point.frag
+    sha256: 205746a93e632ed00b4ed627b31fd51071e221292c515cb0e575032b5372981e
+  - path: assets/shaders/point.vert
+    sha256: dc0525cd00f27d4a2e848e2e0b34d5b3a25cee09ce6a655e569b5cca322a8261
+  - path: assets/shaders/point_retained.frag
+    sha256: 9694ab32e75fe4789566baf6ecd97ab37abc75b4ebcf1763e47055fabac85963
+  - path: assets/shaders/point_retained.vert
+    sha256: 8c2aa648874a696b0e8037521c325ced7d6bb0315b80a7444bea76dd52473b6c
+  - path: assets/shaders/point_surfel.vert
+    sha256: 2f9c835190e0ce2f69b8d10517d79c1e677037b980b960b668ffa6a2e6730a16
+  - path: assets/shaders/progressive_poisson_accept_phase.comp
+    sha256: e793f6dc25fda57335e487100b0b973635d0dbe00c9c06683e6de2d80c8768da
+  - path: assets/shaders/progressive_poisson_build_cells.comp
+    sha256: 9c703c93107ae13c902fd31266363dabeb60e0b52b95e801279b27f343f6f584
+  - path: benchmarks/README.md
+    sha256: bd1f9e35fb1c8225dc92da58b060ccdd37c2bbacb7f3ff3fd448220cd50f8f0b
+  - path: benchmarks/runners/BenchmarkSmokeRunner.cpp
+    sha256: d80e59918346b20faef45c1f051140edceb0d9ef33c3526b8a073f2e709e85e1
+  - path: benchmarks/runners/CurvaturePatchProfileRunner.cpp
+    sha256: 9b77f8fe01a8115ca211c2cd1396022e440d255ffc04c5deea8f9170a840305d
+  - path: benchmarks/runners/CurvatureProfileSupport.hpp
+    sha256: 843c11977aeb144a8e9905ca107b6996b96b0d7695a21708de9771f9c141b673
+  - path: benchmarks/runners/CurvatureSegmentationProfileRunner.cpp
+    sha256: a81099c659b2689a97c818767b0fe92081dc81c049762200b47856de5e9dc9fe
+  - path: docs/architecture/frame-graph.md
+    sha256: f7a02605a041285a760884bd34bf9b6fe07c6d15b76f8bb3572aa057270a91f5
+  - path: docs/architecture/geometry.md
+    sha256: c6f29e30a9409894788f7fff16cf78b768c73a88af935421429151896ec083e5
+  - path: docs/architecture/graphics.md
+    sha256: a028bb322ef289e2e7f86e9c0762e1fc068dd04c7920b2418333aa9957fd4bb6
+  - path: docs/architecture/runtime.md
+    sha256: 5880cbb7f84f61f2dcd1c638ecd69ad9dbd928ff9c732fe867f55d9a2930429a
+  - path: docs/architecture/spatial-index-consumers.md
+    sha256: d790151c6ccaa6caa425e8e9bfe9d4f817497c6735f42274810353c92178bf4d
+  - path: docs/reports/2026-09-08-code-reuse-audit.md
+    sha256: 176943d3c93aeede12c10872f0e2a1efdacf1b0c980dc86f627eceab0b4f7a29
+  - path: src/app/Sandbox/Editor/Sandbox.DomainPanels.cpp
+    sha256: 2967831282e15689258be9e018b4f71ce7f990e3575dc42aa04212e4fecda1a8
+  - path: src/app/Sandbox/Editor/Sandbox.EditorShell.cpp
+    sha256: 6c59d84803f5082413d8a97961f68676844b92db54c93feb3e50e4b120c54573
+  - path: src/app/Sandbox/Editor/Sandbox.EditorShell.cppm
+    sha256: 6ae834121729126c8a17b9b24569a4bfda6bed6222c98bf8fe47c5bcce8b8bd2
+  - path: src/app/Sandbox/Editor/Sandbox.MeshProcessingPanels.cpp
+    sha256: 73657cf298d16f04872e7aa16913fe7bf5061dcea74d7d637fc375db1ec80947
+  - path: src/app/Sandbox/Editor/Sandbox.MethodPanels.cpp
+    sha256: 47eb880920f35f1f4aabcc7ada540c7b6866e0c93bf1e439413d042873dd99f8
+  - path: src/geometry/Geometry.ContactManifold.cpp
+    sha256: 76106f9c09de3a25e66c45a9a84b940d721be6e3bea93f8f97dab8cf06527ec1
+  - path: src/geometry/Geometry.HalfedgeMesh.CurvatureSegmentation.Patches.cpp
+    sha256: f003a7e7cb2d39fca770eb3ea094fec95750e0148a018ba0e52779c9a2316619
+  - path: src/geometry/Geometry.HalfedgeMesh.CurvatureSegmentation.cpp
+    sha256: 87fd4b21200e23c866c28fb080d1448f829435fa5210b4f5e3e9ffab3c4f1eed
+  - path: src/geometry/Geometry.HalfedgeMesh.CurvatureSegmentation.cppm
+    sha256: 3fc6dc9fbbea6bfa24dfdab30f2ccbb61d6b3e9f2e3ad9dc4def69e8956deec7
+  - path: src/geometry/Geometry.HalfedgeMesh.IO.cpp
+    sha256: 08f2c7984bdb5f08a7e912fd830b99b14c798939324ccc5e19556c89718f4b8d
+  - path: src/geometry/Geometry.IOText.hpp
+    sha256: 95ec8f4b62a5b2b84b38f424664cef26005c7e33e00bd369136a5ffcb02113d7
+  - path: src/geometry/Geometry.Overlap.cpp
+    sha256: aeef1e476527c8023c9c3d9a2ac9ea0a4058572084103ec23067cfbc0e92472d
+  - path: src/geometry/Geometry.PointCloud.IO.cpp
+    sha256: 3bee51583fc597eb32b634758bdfbdc58daec39b4bcca2c3c35fc0ba8dc9eb43
+  - path: src/geometry/Geometry.Raycast.cpp
+    sha256: ee9c6845657d5b4967fbded0aa99102133b3dd240ca4a10353c8e2041acefb18
+  - path: src/geometry/Geometry.Raycast.cppm
+    sha256: b9f04978dd7031251df5b0ea8449da402d2e9d772d27309c3a7bdbd09ba23483
+  - path: src/graphics/framegraph/Graphics.RenderGraph.cpp
+    sha256: c3b1ead2514fa9034e52842cf3e28ac6a47954b621e8c5a0d83607d118dda825
+  - path: src/graphics/framegraph/Graphics.RenderGraph.cppm
+    sha256: dd01a08221c642482497baf749977289ce5051584088c3c82b708b2b8911d7c8
+  - path: src/graphics/renderer/Backends/Null/Backends.Null.cpp
+    sha256: 9b1b0c186c4aa9615a5ca04d68a73a6e0a60f937c1b67c7b45133108ffaeebf8
+  - path: src/graphics/renderer/Graphics.CullingSystem.cpp
+    sha256: e9d9414d3487c4844e7cec74e9a9d42b62a0d4f09a5b85dce63560229036d794
+  - path: src/graphics/renderer/Graphics.CullingSystem.cppm
+    sha256: d3cf1e648607812752a60afac3cf39c4f2f096d399ab17d1006f8866b779ba5a
+  - path: src/graphics/renderer/Graphics.GpuWorld.cpp
+    sha256: fc1c19ba1d8866e201e476385e962036608baea1e6fab47c0f489c589b1b11f9
+  - path: src/graphics/renderer/Graphics.GpuWorld.cppm
+    sha256: d96bb57d865d2628d1ac676959dd5c7c0f53a44cd2678884c17a4b48ac2d0abb
+  - path: src/graphics/renderer/Graphics.Renderer.cpp
+    sha256: b3b9a97e54f4147e33a9d4f2a418b0187061bb1653fd0fddd4472ced68083362
+  - path: src/graphics/renderer/Graphics.TransientDebugUploadHelper.cpp
+    sha256: c5ed6c5292777302341495c1142bd446572ff4850bf6a11edd16cef8839bec65
+  - path: src/graphics/renderer/Graphics.TransientDebugUploadHelper.cppm
+    sha256: f1a6772702092a6fe0a81048fdd07382f50be7a7ae688fc2684cad1ae2c274c4
+  - path: src/graphics/renderer/Graphics.VisualizationOverlayUploadHelper.cpp
+    sha256: 2f3aff1af3a7ac73b823dbf6bcb3763e61e9cfbe59469af2d48352cbaf0625cd
+  - path: src/graphics/renderer/Passes/Pass.Deferred.GBuffers.cpp
+    sha256: 0d0ee4e69f6b3a3be79297c4b0ef8e779b45472bede65cf1503f5547411192cb
+  - path: src/graphics/renderer/Passes/Pass.DepthPrepass.cpp
+    sha256: 6c86e4268f8ba2b3c0b4e23ddbd9f6ae8262f490200ca6be0fab3d5d222ca131
+  - path: src/graphics/renderer/Passes/Pass.Forward.Surface.cpp
+    sha256: 9175873169252821c1036b7bace341e8ffa43e3c5fcb5798b8ef98b6e68c8405
+  - path: src/graphics/renderer/Passes/Pass.Selection.EntityId.cpp
+    sha256: f899b3bbb167ddfa4aa301e55cec8f75959599a7ea4c5dc9af83d6f36d9ffc32
+  - path: src/graphics/renderer/Passes/Pass.Selection.FaceId.cpp
+    sha256: 3d9d69130a944f15ac8f843e2f891c2592ac633422f96bc7967eecf271c90e06
+  - path: src/graphics/rhi/RHI.CommandContext.cpp
+    sha256: 6041619ad114f5b37877b544bec1cd527a7e8c2cb30cd07227a820a4811aaf85
+  - path: src/graphics/rhi/RHI.CommandContext.cppm
+    sha256: d71f4ad40d3646fc6239d6fd0f7bc68e7ee6066a43a56a2367afb3ee53445ddc
+  - path: src/graphics/vulkan/Backends.Vulkan.Device.cpp
+    sha256: c68d4c81b16d5c6ddd74e13f85a3106395b399518159462ec9db91a1e8cd9c7d
+  - path: src/graphics/vulkan/Backends.Vulkan.Transfer.cpp
+    sha256: c403c42923ad28e69d41a6001fcea4e3b009c11ccc51469e13ad9bc3308ded9b
+  - path: src/graphics/vulkan/Backends.Vulkan.Transfer.cppm
+    sha256: 5625fac6766edfeaadfa5ed942f4db0c438c8edc82f395329cdc16276437d4e7
+  - path: src/runtime/AssetWorkflow/Runtime.AssetWorkflowImportExecutor.cpp
+    sha256: 43f7e3f96493a0fe9ca913a660bdfcfd059af7a8af745f3d3eb3c3a51b0c534d
+  - path: src/runtime/AssetWorkflow/Runtime.AssetWorkflowImportExecutor.cppm
+    sha256: e3db321d851a6ceae08ad01d354ba7187c328918f10b1092b606e1cf8cbe6a95
+  - path: src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Mesh.cpp
+    sha256: 6816409a6e24d60592d7623bc2b4f8ff159c293ad4cc0ecb8eea32f3bc528f00
+  - path: src/runtime/Editor/Operations/Runtime.SceneEditingOperations.Actions.cpp
+    sha256: 6807d1d9195269e87a0b64f3e68845f295b848a35cc950bdb3655fd79bbfd993
+  - path: src/runtime/Editor/Operations/Runtime.VisualizationEditingOperations.Actions.cpp
+    sha256: 9c367db67cb981b48d854a818625ca077450e64386162039ec88bfbb234de0d2
+  - path: src/runtime/Editor/Runtime.EditorWorkspaceSnapshots.Models.cpp
+    sha256: 17e5af14aaf0815bb084522dac891d9738b1f678112401ae8246d9167a4aef7f
+  - path: src/runtime/Editor/internal/Runtime.EditorFeatureContextAdapters.cpp
+    sha256: 10d58972ce43666718b1317e7efe91d797f974b67832b39c10e8ad29e8485781
+  - path: src/runtime/Editor/internal/Runtime.EditorFeatures.Detail.cppm
+    sha256: d75658380d5ebc3566c76d8464aedb460ca0963875e7f3a45b59f5a068c04ce7
+  - path: src/runtime/Editor/internal/Runtime.EditorMutation.Internal.hpp
+    sha256: abf5292818e84ffbae82cedb2d18af8a70c9b2ee9d33041464d7fbd1a317bf3c
+  - path: src/runtime/GeometryIntegration/Runtime.GeometryPlanBuilders.Graph.cpp
+    sha256: 8937d183a908f5e8d95f905dce64a444a5c758d837a072c89787ade9d74e78f8
+  - path: src/runtime/GeometryIntegration/Runtime.GeometryPlanBuilders.Mesh.cpp
+    sha256: 4c3a1f172043c6b68cb107c5e4304dfeed98feb20b8b9c2ee5d12aec63db47bd
+  - path: src/runtime/GeometryIntegration/Runtime.GeometryPlanBuilders.PointCloud.cpp
+    sha256: bb0933fccc6d36739833ad090f37972f909bc788611bbe8172a34780b032537e
+  - path: src/runtime/GeometryIntegration/Runtime.GeometryPlanBuilders.cppm
+    sha256: 68a03f69c69c4d28a323c2f6782190ab023d077d0767e7ba7e68d2618134f71a
+  - path: src/runtime/Modules/Clustering/Runtime.ClusteringGpuState.cpp
+    sha256: c9f19da648a33e75c6631564bad8ea60983a6af4331753917257e89e39bce03b
+  - path: src/runtime/Modules/CurvatureSegmentation/Runtime.CurvatureSegmentationConfig.cpp
+    sha256: 0c9132558bedcdf91995d3fe8382335e3b364997594b7c4a9441ed51316cf689
+  - path: src/runtime/Modules/CurvatureSegmentation/Runtime.CurvatureSegmentationConfig.cppm
+    sha256: f7490811f1dc0b4f5af898a77b2bb9339545c186ed0f110c3dce1e61127125d2
+  - path: src/runtime/Modules/PointCloudConsolidation/Runtime.PointCloudConsolidationGpu.cpp
+    sha256: 465aba7ca5e568067cd6733f4985809f3bf187c252405268a9511e377b7e47aa
+  - path: src/runtime/Modules/TextureBake/Runtime.TextureBakeModule.cpp
+    sha256: d45615828be883f4050bca752910aba6b225d5dbe54ceb3f27539b8c9bc7f0db
+  - path: src/runtime/Scene/Runtime.SceneDocumentModule.cpp
+    sha256: 9595ddad27a18d5196c259212723a12c2601af53324b356d9e662209d735b628
+  - path: tasks/SESSION-BRIEF.md
+    sha256: 6771453d72e00adb521a750581f861e23b6b5cc1920a97d79eb48e77ce527700
+  - path: tasks/active/RORG-134-code-reuse-audit-completion.md
+    sha256: 209c4d70d0dba77f74b3520827cf9a1449a80413739ca89172baa43b6304fc7e
+  - path: tasks/backlog/bugs/BUG-187-interlocked-worker-budget-inventory.md
+    sha256: ec5380bcd0683449cda0d09a8d6935c67efcd60063906bce5ef3faf0f2bc3759
+  - path: tests/CMakeLists.txt
+    sha256: b04d0f0392e9997cbfb9ff1217a68d001bed291ff30c23723bf14b8e132b5629
+  - path: tests/contract/graphics/Test.CullingPassContracts.cpp
+    sha256: 5d0264f7387dcbf2bb777bce83d0729e1401a556c6e0b1aaaa452df02d98c0fb
+  - path: tests/contract/graphics/Test.DebugViewPass.cpp
+    sha256: dd3c90ba2c13dee1ac207d15e016b4acc9acf0cc745b30c404194f3a3f340d46
+  - path: tests/contract/graphics/Test.GpuWorldLifetimeContract.cpp
+    sha256: 664d0762b7fdc5f12b505c42e5e26e645a4b244017a63c9f304ac3b757f6b6f2
+  - path: tests/contract/graphics/Test.ImGuiPass.cpp
+    sha256: 5bb447d42072a4e0e05e77083b84be970229a8b53ba2b6a16166fd14f39bd884
+  - path: tests/contract/graphics/Test.LightingShadowContracts.cpp
+    sha256: f868fcea4c424c5187e998d5a2f472ee136793d1e86636f26e6edcc7e1da8ce4
+  - path: tests/contract/graphics/Test.LinePointPassContracts.cpp
+    sha256: cec19219def04fe4efb4b3f2a52094413779a44d92a12f498ab9ccb5e9b4cf77
+  - path: tests/contract/graphics/Test.MinimalTriangleAcceptance.cpp
+    sha256: 27ff3f61e1322898328af8193f2fa833ac33797876c87dabbce2164acd61efe7
+  - path: tests/contract/graphics/Test.PresentPass.cpp
+    sha256: 685b57393a0d0139ad279a93d8a6b78b8f45cb5475860c768aae54bd6f0e198e
+  - path: tests/contract/graphics/Test.RendererFrameLifecycle.cpp
+    sha256: 1d95379fff9b514b746cee5c9a2a4b6ff62e6f48391f7c5566ec82718c867117
+  - path: tests/contract/graphics/Test.SelectionPassContracts.cpp
+    sha256: 227cdfc0ec2cd7b314037b3fa1aa0c9186e3571a5ea38cf23f20cf78ab1bf46e
+  - path: tests/contract/graphics/Test.SurfacePassContracts.cpp
+    sha256: b8e704c4fa94bc4588e9b78f0dc4830185c81f55851856a3c06b0967f344fed7
+  - path: tests/contract/graphics/Test.TransientDebugSurfacePass.cpp
+    sha256: 8a530bb84a5b19bd3f3554967cb7bf6f44c26ab695b3c66fe1de55fae67c1cb2
+  - path: tests/contract/graphics/Test.VisualizationOverlayPass.cpp
+    sha256: afadacbf38eac96499835efe3d9bcfb12542d4bf68e09fedc33c74676389805b
+  - path: tests/contract/runtime/Test.RuntimeEngineLayering.cpp
+    sha256: 0ada1493f0ca4bd7e103a18f61269d5022a4c2692062bb72e8a753ad6b975a6e
+  - path: tests/contract/runtime/Test.RuntimeSceneLifecycle.cpp
+    sha256: c9a28f78ec1bcb14eb294d36d48a3b08af83db4265469797f79cdc256fe6ca75
+  - path: tests/contract/runtime/Test.SandboxEditorMeshMethods.cpp
+    sha256: 892eefa929f988dfb518b8c4ba58c31b9028cec7222a6c1dca08a88056632447
+  - path: tests/contract/runtime/Test.SandboxEditorModels.cpp
+    sha256: 71f804624c9211d7b9ecd339807b93083beedf21fc83f002243aa83559e9983f
+  - path: tests/contract/runtime/Test.SandboxEditorSceneCommands.cpp
+    sha256: 47a869914aa3cba0afd20802763fc4e5af2e1b3463f84001a6384e60f7c33355
+  - path: tests/contract/runtime/Test.SandboxEditorVisualization.cpp
+    sha256: 8d309551e705587893985760e4e454745641bd8143b5135f5ca3e15c218d44a1
+  - path: tests/integration/graphics/Test.GpuWorldAndCulling.cpp
+    sha256: 40be10725323729beb6bd3890a799508832bec5ffd43524b33b26737d76f0e40
+  - path: tests/integration/graphics/Test.TransientDebugSurfaceGpuSmoke.cpp
+    sha256: 1fb5c9fb1c6a9625e841e9746300696aa6184135cda94a1b6a6db6a4ba049af5
+  - path: tests/integration/graphics/Test.VisualizationOverlaySurfaceGpuSmoke.cpp
+    sha256: b7fcae0a180f0297da05d7e50fcf1f696f22cf47245934baa5d835c7a1543ee0
+  - path: tests/integration/runtime/Test.SandboxDomainPanels.cpp
+    sha256: d4c00ed3b4d16102fb0a12e93df3c23863aac9efe38b345f472d4cb411478029
+  - path: tests/integration/runtime/Test.SandboxEditorPresentation.cpp
+    sha256: 2f5bbc090cc605463d4d3ebf4dc4445adac7c7e9879f629229fbf817edd313fe
+  - path: tests/regression/tooling/Test.SanitizerPresets.py
+    sha256: 0b63ea73f83eeca5d77ce1e753cfe74b1b267b6a201816bda2a619a2015edec6
+  - path: tests/regression/tooling/Test.WorkflowConcurrency.py
+    sha256: fcd336757b0282775c3859376095d19617d6fca1d081e6b5db61a170406fa62f
+  - path: tests/support/EditorFeatureTestContext.hpp
+    sha256: b001eab4036003c28a7c0457bcd49c3704708368cae8b885d703da3a5fbf8b6a
+  - path: tests/support/GraphicsTestSupport.hpp
+    sha256: ba31908b9b3c994f60fd224a7cbfb953631c5d3f89a9bfa7f57c9506ffddadc7
+  - path: tests/support/MockRHI.hpp
+    sha256: 2a10ebf50c56cae6fc36e2b6537af69b81df18e96614c991a8bd9aedc984587a
+  - path: tests/support/README.md
+    sha256: 684e12cac3ddf073dfdfcf51652d6a41e1f17f2d8651b9bc369a873bc1bd7e9d
+  - path: tests/unit/geometry/Test.GeometryIO.cpp
+    sha256: d72663eb55b969a4bdbe4d8d6174d0de906810912ea49d103dee892bcf6e6989
+  - path: tools/ci/README.md
+    sha256: 9ec836c490d39f21400546ca2d7e1ac605a13d5bccd561951fa063b969308e7c
+  content_digest: 682366c7af12d714b2fc6566b86d42e36ad8acbd9d50fd906c0c2e17669f9f36
+touched:
+  paths:
+  - .github/actions/setup-build/action.yml
+  - .github/workflows/ci-linux-clang.yml
+  - .github/workflows/ci-release.yml
+  - .github/workflows/ci-sanitizers.yml
+  - .github/workflows/ci-source-coverage.yml
+  - .github/workflows/ci-vulkan.yml
+  - .github/workflows/nightly-deep.yml
+  - assets/shaders/common/point_splat.glsl
+  - assets/shaders/common/surface_material.glsl
+  - assets/shaders/culling/instance_cull.comp
+  - assets/shaders/deferred/default_debug_gbuffer.frag
+  - assets/shaders/deferred/gbuffer.frag
+  - assets/shaders/forward/default_debug_surface.frag
+  - assets/shaders/include/kmeans_state.glsl
+  - assets/shaders/include/progressive_poisson_state.glsl
+  - assets/shaders/kmeans_assign.comp
+  - assets/shaders/kmeans_reset.comp
+  - assets/shaders/kmeans_update.comp
+  - assets/shaders/point.frag
+  - assets/shaders/point.vert
+  - assets/shaders/point_retained.frag
+  - assets/shaders/point_retained.vert
+  - assets/shaders/point_surfel.vert
+  - assets/shaders/progressive_poisson_accept_phase.comp
+  - assets/shaders/progressive_poisson_build_cells.comp
+  - benchmarks/README.md
+  - benchmarks/runners/BenchmarkSmokeRunner.cpp
+  - benchmarks/runners/CurvaturePatchProfileRunner.cpp
+  - benchmarks/runners/CurvatureProfileSupport.hpp
+  - benchmarks/runners/CurvatureSegmentationProfileRunner.cpp
+  - docs/architecture/frame-graph.md
+  - docs/architecture/geometry.md
+  - docs/architecture/graphics.md
+  - docs/architecture/runtime.md
+  - docs/architecture/spatial-index-consumers.md
+  - docs/reports/2026-09-08-code-reuse-audit.md
+  - src/app/Sandbox/Editor/Sandbox.DomainPanels.cpp
+  - src/app/Sandbox/Editor/Sandbox.EditorShell.cpp
+  - src/app/Sandbox/Editor/Sandbox.EditorShell.cppm
+  - src/app/Sandbox/Editor/Sandbox.MeshProcessingPanels.cpp
+  - src/app/Sandbox/Editor/Sandbox.MethodPanels.cpp
+  - src/geometry/Geometry.ContactManifold.cpp
+  - src/geometry/Geometry.HalfedgeMesh.CurvatureSegmentation.Patches.cpp
+  - src/geometry/Geometry.HalfedgeMesh.CurvatureSegmentation.cpp
+  - src/geometry/Geometry.HalfedgeMesh.CurvatureSegmentation.cppm
+  - src/geometry/Geometry.HalfedgeMesh.IO.cpp
+  - src/geometry/Geometry.IOText.hpp
+  - src/geometry/Geometry.Overlap.cpp
+  - src/geometry/Geometry.PointCloud.IO.cpp
+  - src/geometry/Geometry.Raycast.cpp
+  - src/geometry/Geometry.Raycast.cppm
+  - src/graphics/framegraph/Graphics.RenderGraph.cpp
+  - src/graphics/framegraph/Graphics.RenderGraph.cppm
+  - src/graphics/renderer/Backends/Null/Backends.Null.cpp
+  - src/graphics/renderer/Graphics.CullingSystem.cpp
+  - src/graphics/renderer/Graphics.CullingSystem.cppm
+  - src/graphics/renderer/Graphics.GpuWorld.cpp
+  - src/graphics/renderer/Graphics.GpuWorld.cppm
+  - src/graphics/renderer/Graphics.Renderer.cpp
+  - src/graphics/renderer/Graphics.TransientDebugUploadHelper.cpp
+  - src/graphics/renderer/Graphics.TransientDebugUploadHelper.cppm
+  - src/graphics/renderer/Graphics.VisualizationOverlayUploadHelper.cpp
+  - src/graphics/renderer/Passes/Pass.Deferred.GBuffers.cpp
+  - src/graphics/renderer/Passes/Pass.DepthPrepass.cpp
+  - src/graphics/renderer/Passes/Pass.Forward.Surface.cpp
+  - src/graphics/renderer/Passes/Pass.Selection.EntityId.cpp
+  - src/graphics/renderer/Passes/Pass.Selection.FaceId.cpp
+  - src/graphics/rhi/RHI.CommandContext.cpp
+  - src/graphics/rhi/RHI.CommandContext.cppm
+  - src/graphics/vulkan/Backends.Vulkan.Device.cpp
+  - src/graphics/vulkan/Backends.Vulkan.Transfer.cpp
+  - src/graphics/vulkan/Backends.Vulkan.Transfer.cppm
+  - src/runtime/AssetWorkflow/Runtime.AssetWorkflowImportExecutor.cpp
+  - src/runtime/AssetWorkflow/Runtime.AssetWorkflowImportExecutor.cppm
+  - src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Mesh.cpp
+  - src/runtime/Editor/Operations/Runtime.SceneEditingOperations.Actions.cpp
+  - src/runtime/Editor/Operations/Runtime.VisualizationEditingOperations.Actions.cpp
+  - src/runtime/Editor/Runtime.EditorWorkspaceSnapshots.Models.cpp
+  - src/runtime/Editor/internal/Runtime.EditorFeatureContextAdapters.cpp
+  - src/runtime/Editor/internal/Runtime.EditorFeatures.Detail.cppm
+  - src/runtime/Editor/internal/Runtime.EditorMutation.Internal.hpp
+  - src/runtime/GeometryIntegration/Runtime.GeometryPlanBuilders.Graph.cpp
+  - src/runtime/GeometryIntegration/Runtime.GeometryPlanBuilders.Mesh.cpp
+  - src/runtime/GeometryIntegration/Runtime.GeometryPlanBuilders.PointCloud.cpp
+  - src/runtime/GeometryIntegration/Runtime.GeometryPlanBuilders.cppm
+  - src/runtime/Modules/Clustering/Runtime.ClusteringGpuState.cpp
+  - src/runtime/Modules/CurvatureSegmentation/Runtime.CurvatureSegmentationConfig.cpp
+  - src/runtime/Modules/CurvatureSegmentation/Runtime.CurvatureSegmentationConfig.cppm
+  - src/runtime/Modules/PointCloudConsolidation/Runtime.PointCloudConsolidationGpu.cpp
+  - src/runtime/Modules/TextureBake/Runtime.TextureBakeModule.cpp
+  - src/runtime/Scene/Runtime.SceneDocumentModule.cpp
+  - tasks/SESSION-BRIEF.md
+  - tasks/active/RORG-134-code-reuse-audit-completion.md
+  - tasks/backlog/bugs/BUG-187-interlocked-worker-budget-inventory.md
+  - tests/CMakeLists.txt
+  - tests/contract/graphics/Test.CullingPassContracts.cpp
+  - tests/contract/graphics/Test.DebugViewPass.cpp
+  - tests/contract/graphics/Test.GpuWorldLifetimeContract.cpp
+  - tests/contract/graphics/Test.ImGuiPass.cpp
+  - tests/contract/graphics/Test.LightingShadowContracts.cpp
+  - tests/contract/graphics/Test.LinePointPassContracts.cpp
+  - tests/contract/graphics/Test.MinimalTriangleAcceptance.cpp
+  - tests/contract/graphics/Test.PresentPass.cpp
+  - tests/contract/graphics/Test.RendererFrameLifecycle.cpp
+  - tests/contract/graphics/Test.SelectionPassContracts.cpp
+  - tests/contract/graphics/Test.SurfacePassContracts.cpp
+  - tests/contract/graphics/Test.TransientDebugSurfacePass.cpp
+  - tests/contract/graphics/Test.VisualizationOverlayPass.cpp
+  - tests/contract/runtime/Test.RuntimeEngineLayering.cpp
+  - tests/contract/runtime/Test.RuntimeSceneLifecycle.cpp
+  - tests/contract/runtime/Test.SandboxEditorMeshMethods.cpp
+  - tests/contract/runtime/Test.SandboxEditorModels.cpp
+  - tests/contract/runtime/Test.SandboxEditorSceneCommands.cpp
+  - tests/contract/runtime/Test.SandboxEditorVisualization.cpp
+  - tests/integration/graphics/Test.GpuWorldAndCulling.cpp
+  - tests/integration/graphics/Test.TransientDebugSurfaceGpuSmoke.cpp
+  - tests/integration/graphics/Test.VisualizationOverlaySurfaceGpuSmoke.cpp
+  - tests/integration/runtime/Test.SandboxDomainPanels.cpp
+  - tests/integration/runtime/Test.SandboxEditorPresentation.cpp
+  - tests/regression/tooling/Test.SanitizerPresets.py
+  - tests/regression/tooling/Test.WorkflowConcurrency.py
+  - tests/support/EditorFeatureTestContext.hpp
+  - tests/support/GraphicsTestSupport.hpp
+  - tests/support/MockRHI.hpp
+  - tests/support/README.md
+  - tests/unit/geometry/Test.GeometryIO.cpp
+  - tools/ci/README.md
+  layers:
+  - app
+  - geometry
+  - graphics
+  - runtime
+  modules: []
+extension_seam: Existing owning modules and private helpers; shared shader ABI and
+  test/benchmark fixtures have present callers.
+future_change_plan: Keep caller-specific policies local; add shared helpers only for
+  matching present contracts.
+acceptance:
+- criterion: The run ends because the audit list is resolved or the specified deadline
+    has arrived; remaining items are explicitly listed.
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: Completed batches preserve existing behavior, pass applicable checks
+    and have Claude review findings resolved.
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+- criterion: Existing uncommitted changes remain intact and the final worktree has
+    a documented verification state.
+  task_checked: true
+  disposition: satisfied
+  evidence: []
+  reason: null
+commands:
+- receipt: tasks/evidence/RORG-134/commands/ci-workflow-regressions.json
+- receipt: tasks/evidence/RORG-134/commands/curvature-profile-cpu.json
+- receipt: tasks/evidence/RORG-134/commands/final-ci-and-vulkan-build.json
+- receipt: tasks/evidence/RORG-134/commands/final-cpu-corrected.json
+- receipt: tasks/evidence/RORG-134/commands/final-docs-sync.json
+- receipt: tasks/evidence/RORG-134/commands/final-docs.json
+- receipt: tasks/evidence/RORG-134/commands/final-vulkan-cpu-producer-sync.json
+- receipt: tasks/evidence/RORG-134/commands/fixtures-hints-envelope-cpu.json
+- receipt: tasks/evidence/RORG-134/commands/graphics-cpu.json
+- receipt: tasks/evidence/RORG-134/commands/graphics-vulkan.json
+- receipt: tasks/evidence/RORG-134/commands/primitives-cpu.json
+- receipt: tasks/evidence/RORG-134/commands/render-kernels-and-channels-cpu.json
+- receipt: tasks/evidence/RORG-134/commands/shader-source-contract-cpu-producer.json
+- receipt: tasks/evidence/RORG-134/commands/smoke-envelope-workloads.json
+- receipt: tasks/evidence/RORG-134/commands/source-structural.json
+changed_public_contracts:
+- Behavior-preserving helper declarations in existing modules; no new layer exception
+  or backend contract.
+diagnostics_and_previews:
+- Initial shader-source assertions and a wrong similarly named producer failed; corrected
+  producer and final CPU gate pass. Historical failed receipts are retained as artifacts.
+benchmark_or_parity_evidence:
+- Existing smoke runner and schema checks pass; profile and synthetic envelope comparisons
+  are recorded without performance claims.
+docs_sync:
+  task_file: tasks/active/RORG-134-code-reuse-audit-completion.md
+  session_brief_present: true
+  canonical_docs_changed: true
+  skill_mirrors_checked: true
+residual_risks:
+- Working tree remains uncommitted; historical seal and formal retirement await integration.
+- Root hygiene retains the pre-existing local .agents directory warning.
+skipped_checks:
+- check: hosted-ci
+  reason: No GitHub workflow execution or separate ci-asan/ci-ubsan CPU job; integration
+    retains those gates, while local ci-vulkan ASan+UBSan tests pass.
+artifacts:
+- path: docs/reports/2026-09-08-code-reuse-audit.md
+  sha256: 176943d3c93aeede12c10872f0e2a1efdacf1b0c980dc86f627eceab0b4f7a29
+  kind: file
+- path: tasks/evidence/RORG-134/curvature-profile-comparison.json
+  sha256: e9ea1508e3962bde7c7dbb070cea6a09dbcb93e25a19157680105ac8f0b132e4
+  kind: file
+- path: tasks/evidence/RORG-134/smoke-envelope-comparison.json
+  sha256: ff9c4042f28ff7eaced2e5061d9365fd32ec15708f054c4c6f90f3f7e65869fc
+  kind: file
+- path: tasks/evidence/RORG-134/shader-layout-comparison.json
+  sha256: fcbb77c5c84aafb8f592f888e3aa66316eca0dd1c93e294cfae541574764f8ed
+  kind: file
+- path: tasks/evidence/RORG-134/ci-setup-comparison.json
+  sha256: 1bbd61f435bb27811bbe61fcdd282e10965bcec0d9734cf9bdd3b576c6d5af6e
+  kind: file
+- path: tasks/evidence/RORG-134/commands/final-cpu.json
+  sha256: a21a5b6dc5d5bd9c16511695d2d5ae2e1f0922ca62987db9d5639f729fbe8ed8
+  kind: file
+- path: tasks/evidence/RORG-134/commands/graphics-shared-cpu.json
+  sha256: 21493d0e6e36f5d1c3b62d594ae289d1eaefddb3ece7f6119f1ede5d333441cf
+  kind: file
+- path: tasks/evidence/RORG-134/commands/shader-source-contract-repair.json
+  sha256: 95fc1ec5e1f0baafc35c5461eb483b2660eef48a0bb71c2b0473db634515b55a
+  kind: file
+- path: tasks/evidence/RORG-134/terminal-review.json
+  sha256: dc9e7bc8db652f4ecffdf50234555ed88b431411dfc218dda8302838a7fed36f
+  kind: file
+self_review:
+  completed: true
+  scope_matches_task: true
+  layering_preserved: true
+  tests_and_docs_accounted_for: true
+  mechanical_and_semantic_changes_separated: true
+handoff: tasks/evidence/RORG-134/handoff.jsonl
+review: tasks/evidence/RORG-134/reviews.jsonl

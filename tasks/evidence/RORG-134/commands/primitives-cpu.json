@@ -1,0 +1,27 @@
+{
+  "command": [
+    "ctest",
+    "--test-dir",
+    "build/ci",
+    "--output-on-failure",
+    "-LE",
+    "gpu|vulkan|slow|flaky-quarantine",
+    "--no-tests=error",
+    "--timeout",
+    "60"
+  ],
+  "command_display": "ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --no-tests=error --timeout 60",
+  "cwd": ".",
+  "duration_ms": 109448,
+  "exit_code": 0,
+  "finished_at": "2026-09-11T01:15:25Z",
+  "label": "primitives-cpu",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-09-11T01:13:36Z",
+  "stderr_path": "tasks/evidence/RORG-134/commands/primitives-cpu.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/RORG-134/commands/primitives-cpu.stdout.log",
+  "stdout_sha256": "f82b932264c3338edb882b1459438705c417445efc6e9c8b24c450a4163fba95",
+  "task_id": "RORG-134"
+}

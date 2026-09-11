@@ -6,6 +6,15 @@ Point-neighbor consumers share the runtime-owned [spatial index cache](spatial-i
 
 ## Responsibilities
 
+- Editor render-hint transactions share component equality, including bitwise
+  scalar-source comparison. Visualization snapshots additionally own stored
+  surface visualization config; scene snapshots retain their narrower scope.
+
+- Private geometry plan builders share explicit normal/color preparation
+  across graph and point-cloud uploads and explicit color resolution for mesh
+  uploads. Topology, mesh automatic color discovery and corner expansion
+  remain with their respective builders.
+
 - Construct and wire subsystem boundaries.
 - Own lifecycle/state transitions for engine execution.
 - Mediate between platform, graphics, assets, ECS, physics, and geometry services.
@@ -443,8 +452,17 @@ imports are source-ratcheted. The app copies the prepared bindings/snapshot
 into `SandboxEditorContext` and `SandboxEditorFrame`, so Sandbox window and
 frame composition remain app-owned.
 Operation bodies compile with their owning feature modules. The private editor
-detail BMI contains only attachment bindings and the workspace-session
-declaration; its session implementation is limited to attachment epochs, job
+detail BMI declares attachment bindings, workspace-session state, shared
+import/property/vertex-channel preflight rules, geometry metadata signatures,
+stable-entity lookup, and transform/history adapters. Actions and copied
+workspace models call the shared implementations alongside the context
+adapters, including validation timing and scratch-allocation accounting.
+Direct actions and queued completions also share import/scene status wording;
+workspace and UV-job views use one job-record projection.
+Transform edits and registration use the same undo validation and dirty stamp;
+feature-specific render-hint transactions retain their own state contracts.
+Its session
+implementation is limited to attachment epochs, job
 identity/result retention, and prepared-frame lifecycle. Presentation-free
 workspace model construction is a separate workspace implementation unit, and
 neutral service-to-feature-context projection remains an internal runtime
@@ -453,7 +471,11 @@ composition adapter.
 `Extrinsic.Sandbox.Editor.Shell` owns hierarchy, inspector, selection,
 file/import, frame-graph, render-recipe/artifact, camera, and visualization
 presentation. All core windows are closed by default and use the shared
-registry. Mesh Appearance forwards the workspace's callback-scoped borrowed
+registry. The same module provides shared app-local diagnostic/domain widgets,
+result dismissal, texture-bake options and borrowed draw state, and visualization
+command builders for the panel modules. Uniform-color commands disable baked
+textures while retaining scalar styling. Mesh Appearance forwards the workspace's
+callback-scoped borrowed
 selected-mesh vertex-property view to the runtime-owned generic scalar-property
 widget; app presentation does not retain that view or import geometry directly.
 `Extrinsic.Sandbox.Editor.MethodPanels` registers
@@ -547,6 +569,11 @@ stale identities, and publication after a terminal stage fail closed. Worker
 stages own only copied CPU data and use `JobService`; the bounded main-thread
 apply boundary remains the only place that mutates imported ECS or asset state.
 Direct synchronous imports produce the same seven-stage trace.
+Queued geometry and model/texture imports share executor-local submission,
+route/decode transitions and apply preflight using that captured identity.
+Payload-specific decoding, service requirements and materialization stay in
+their respective queue paths; unpublished jobs use the shared cancellation
+finalizer.
 
 The default recipe authors renderable/selectable state, runs the named
 direct-mesh normal/UV/property-texture postprocess, and requests one final
@@ -752,10 +779,14 @@ Active-world asset-import and scene-document operations additionally capture
 the submission `{WorldHandle, Scene::Registry*}` pair on the main thread.
 Asset-import apply validates the pipeline binding as before.
 `SceneDocumentModule` queued callbacks capture only weak shared module state
-plus owned operation state, module generation, binding epoch, world, and
-registry identity. They first forget their owned task and then directly compare
-`WorldRegistry::ActiveWorld()` and `WorldRegistry::Get(world)` immediately
-before any commit. The epoch makes an away-and-back switch observable even when
+plus owned operation state and one copied binding record containing module
+generation, binding epoch, world and registry identity. Shared helpers track
+accepted save/load jobs and finalize unpublished results. The apply gate
+compares `WorldRegistry::ActiveWorld()` and `WorldRegistry::Get(world)` before
+publication; completion forgets its owned task before save history updates or
+load replacement. The unpublished finalizer forgets the task before checking
+the binding and records an error event only for a current document.
+The epoch makes an away-and-back switch observable even when
 the world handle and scene address are equal again. An active-world switch
 without retirement therefore suppresses the stale scene callback; decoded work
 cannot be redirected into the new active scene or mutate its path, event, or

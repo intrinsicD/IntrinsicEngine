@@ -1,0 +1,60 @@
+name: Set up build dependencies
+description: Install explicit Linux package sets and restore the shared vcpkg binary cache.
+
+inputs:
+  system-packages:
+    description: "Package set: graphics (toolchain and windowing), base (toolchain), or none (preprovisioned runner)."
+    default: graphics
+  extra-packages:
+    description: Additional space-separated apt package names required by the calling job.
+    default: ""
+
+outputs:
+  cache-hit:
+    description: Whether the vcpkg binary cache was an exact key match.
+    value: ${{ steps.vcpkg-cache.outputs.cache-hit }}
+
+runs:
+  using: composite
+  steps:
+    - name: Install system dependencies
+      if: inputs.system-packages != 'none'
+      shell: bash
+      env:
+        BUILD_SYSTEM_PACKAGES: ${{ inputs.system-packages }}
+        BUILD_EXTRA_PACKAGES: ${{ inputs.extra-packages }}
+      run: |
+        packages=(cmake ninja-build clang-20 clang-tools-20 python3)
+        case "$BUILD_SYSTEM_PACKAGES" in
+          graphics)
+            packages+=(
+              libx11-dev libxcursor-dev libxrandr-dev libxinerama-dev
+              libxi-dev libxext-dev libxfixes-dev libwayland-dev
+              libxkbcommon-dev libgl1-mesa-dev libvulkan-dev
+              vulkan-tools spirv-tools
+            )
+            ;;
+          base) ;;
+          *) echo "::error::Unknown system-packages: $BUILD_SYSTEM_PACKAGES"; exit 1 ;;
+        esac
+        read -r -a extra_packages <<< "$BUILD_EXTRA_PACKAGES"
+        packages+=("${extra_packages[@]}")
+        sudo apt-get update
+        sudo apt-get install -y "${packages[@]}"
+
+    - name: Cache vcpkg binary packages
+      id: vcpkg-cache
+      uses: actions/cache@v4
+      with:
+        path: external/vcpkg-bincache
+        key: ${{ runner.os }}-vcpkg-${{ hashFiles('vcpkg.json', 'vcpkg-configuration.json', 'tools/vcpkg/**', 'tools/setup/bootstrap_vcpkg.sh') }}
+        restore-keys: |
+          ${{ runner.os }}-vcpkg-
+
+    - name: Bootstrap vcpkg
+      shell: bash
+      run: tools/setup/bootstrap_vcpkg.sh
+
+    - name: Enable vcpkg binary cache
+      shell: bash
+      run: echo "VCPKG_BINARY_SOURCES=clear;files,${GITHUB_WORKSPACE}/external/vcpkg-bincache,readwrite" >> "$GITHUB_ENV"

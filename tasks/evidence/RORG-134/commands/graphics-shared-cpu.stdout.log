@@ -1,0 +1,40 @@
+4502/4508 Test #4597: RuntimeSandboxAcceptance.EditorWorkspaceSnapshotEnumeratesAcceptanceScene .......................................   Passed    0.08 sec
+          Start 4598: RuntimeSandboxAcceptance.PrimitiveRefinementResolvesOneDomainPerFamily
+4503/4508 Test #4598: RuntimeSandboxAcceptance.PrimitiveRefinementResolvesOneDomainPerFamily ..........................................   Passed    0.11 sec
+          Start 4599: RuntimeSandboxAcceptance.SelectionOutlineSnapshotPopulatedForSelectedEntity
+4504/4508 Test #4599: RuntimeSandboxAcceptance.SelectionOutlineSnapshotPopulatedForSelectedEntity .....................................   Passed    0.13 sec
+          Start 4600: RuntimeSandboxAcceptance.ViewportLeftClickSubmitsSelectionPick
+4505/4508 Test #4600: RuntimeSandboxAcceptance.ViewportLeftClickSubmitsSelectionPick ..................................................   Passed    0.13 sec
+          Start 4601: RuntimeSandboxAcceptance.IdleFrameSkipsPreRenderTransformFlush
+4506/4508 Test #4601: RuntimeSandboxAcceptance.IdleFrameSkipsPreRenderTransformFlush ..................................................   Passed    0.11 sec
+          Start 4602: RuntimeSandboxAcceptance.InspectorTransformEditFlushedToRenderStateSameFrame
+4507/4508 Test #4602: RuntimeSandboxAcceptance.InspectorTransformEditFlushedToRenderStateSameFrame ....................................   Passed    0.07 sec
+          Start 4603: GlfwLifecycleLsan.EngineStaticTeardownAndLeakControl
+4508/4508 Test #4603: GlfwLifecycleLsan.EngineStaticTeardownAndLeakControl ............................................................***Skipped   0.03 sec
+
+99% tests passed, 1 tests failed out of 4508
+
+Label Time Summary:
+assets         =   0.47 sec*proc (90 tests)
+benchmark      =   0.49 sec*proc (1 test)
+contract       =  87.36 sec*proc (1639 tests)
+core           =  10.68 sec*proc (292 tests)
+ecs            =   0.41 sec*proc (133 tests)
+geometry       = 122.81 sec*proc (1883 tests)
+glfw           =   0.03 sec*proc (1 test)
+graphics       =  31.03 sec*proc (858 tests)
+headless       =   0.03 sec*proc (4 tests)
+integration    =  17.81 sec*proc (284 tests)
+physics        =   0.62 sec*proc (80 tests)
+platform       =   0.07 sec*proc (5 tests)
+regression     =   0.52 sec*proc (2 tests)
+runtime        =  80.45 sec*proc (1235 tests)
+unit           = 135.18 sec*proc (2587 tests)
+
+Total Test time (real) = 234.56 sec
+
+The following tests did not run:
+	4603 - GlfwLifecycleLsan.EngineStaticTeardownAndLeakControl (Skipped)
+
+The following tests FAILED:
+	4375 - RendererFrameLifecycle.ForwardSurfacePipelineSurvivesOperationalRebuild (Failed)

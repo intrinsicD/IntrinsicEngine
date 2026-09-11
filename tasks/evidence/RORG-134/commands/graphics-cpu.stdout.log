@@ -1,0 +1,45 @@
+          Start 4595: RuntimeSandboxAcceptance.SelectionControllerSelectsEntityOfEachFamily
+4500/4507 Test #4595: RuntimeSandboxAcceptance.SelectionControllerSelectsEntityOfEachFamily ...........................................   Passed    0.04 sec
+          Start 4596: RuntimeSandboxAcceptance.EditorWorkspaceSnapshotEnumeratesAcceptanceScene
+4501/4507 Test #4596: RuntimeSandboxAcceptance.EditorWorkspaceSnapshotEnumeratesAcceptanceScene .......................................   Passed    0.04 sec
+          Start 4597: RuntimeSandboxAcceptance.PrimitiveRefinementResolvesOneDomainPerFamily
+4502/4507 Test #4597: RuntimeSandboxAcceptance.PrimitiveRefinementResolvesOneDomainPerFamily ..........................................   Passed    0.04 sec
+          Start 4598: RuntimeSandboxAcceptance.SelectionOutlineSnapshotPopulatedForSelectedEntity
+4503/4507 Test #4598: RuntimeSandboxAcceptance.SelectionOutlineSnapshotPopulatedForSelectedEntity .....................................   Passed    0.05 sec
+          Start 4599: RuntimeSandboxAcceptance.ViewportLeftClickSubmitsSelectionPick
+4504/4507 Test #4599: RuntimeSandboxAcceptance.ViewportLeftClickSubmitsSelectionPick ..................................................   Passed    0.04 sec
+          Start 4600: RuntimeSandboxAcceptance.IdleFrameSkipsPreRenderTransformFlush
+4505/4507 Test #4600: RuntimeSandboxAcceptance.IdleFrameSkipsPreRenderTransformFlush ..................................................   Passed    0.04 sec
+          Start 4601: RuntimeSandboxAcceptance.InspectorTransformEditFlushedToRenderStateSameFrame
+4506/4507 Test #4601: RuntimeSandboxAcceptance.InspectorTransformEditFlushedToRenderStateSameFrame ....................................   Passed    0.04 sec
+          Start 4602: GlfwLifecycleLsan.EngineStaticTeardownAndLeakControl
+4507/4507 Test #4602: GlfwLifecycleLsan.EngineStaticTeardownAndLeakControl ............................................................***Skipped   0.01 sec
+
+100% tests passed, 0 tests failed out of 4507
+
+Label Time Summary:
+assets         =   0.15 sec*proc (90 tests)
+benchmark      =   0.50 sec*proc (1 test)
+contract       =  37.92 sec*proc (1638 tests)
+core           =   4.13 sec*proc (292 tests)
+ecs            =   0.35 sec*proc (133 tests)
+geometry       =  59.96 sec*proc (1883 tests)
+glfw           =   0.01 sec*proc (1 test)
+graphics       =  17.35 sec*proc (857 tests)
+headless       =   0.01 sec*proc (4 tests)
+integration    =  10.06 sec*proc (284 tests)
+physics        =   0.21 sec*proc (80 tests)
+platform       =   0.02 sec*proc (5 tests)
+regression     =   0.51 sec*proc (2 tests)
+runtime        =  33.59 sec*proc (1235 tests)
+unit           =  64.39 sec*proc (2587 tests)
+
+Total Test time (real) = 109.96 sec
+
+The following tests did not run:
+	466 - ImGuiAdapterEngineWiring.RunProducesOneOverlayFramePerEngineFrame (Skipped)
+	467 - ImGuiAdapterEngineWiring.EditorHookInvokedOncePerFrameAndProducesDrawLists (Skipped)
+	471 - ImGuiAdapterEngineWiring.RunNormalizesNativeCloseBeforeFirstFrame (Skipped)
+	472 - ImGuiAdapterEngineWiring.RunNormalizesNativeCloseAfterInteractiveInput (Skipped)
+	553 - GizmoInteractionEngineWiring.RunFramePublishesSelectedEntityGizmoPacket (Skipped)
+	4602 - GlfwLifecycleLsan.EngineStaticTeardownAndLeakControl (Skipped)

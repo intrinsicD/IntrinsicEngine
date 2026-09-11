@@ -2,6 +2,7 @@ module;
 
 #include <algorithm>
 #include <cmath>
+#include <limits>
 #include <optional>
 #include <glm/glm.hpp>
 
@@ -14,6 +15,46 @@ import Geometry.RobustPredicates;
 
 namespace Geometry
 {
+    [[nodiscard]] bool RayAabbSlabInterval(const Ray& r,
+                                           const AABB& b,
+                                           float& tmin,
+                                           float& tmax)
+    {
+        tmin = -std::numeric_limits<float>::infinity();
+        tmax = std::numeric_limits<float>::infinity();
+
+        const auto updateAxis =
+            [&](const float origin,
+                const float direction,
+                const float slabMin,
+                const float slabMax) -> bool
+        {
+            if (direction == 0.0f)
+            {
+                return origin >= slabMin && origin <= slabMax;
+            }
+
+            const float invDir = 1.0f / direction;
+            float nearT = (slabMin - origin) * invDir;
+            float farT = (slabMax - origin) * invDir;
+            if (nearT > farT)
+            {
+                const float tmp = nearT;
+                nearT = farT;
+                farT = tmp;
+            }
+
+            tmin = std::max(tmin, nearT);
+            tmax = std::min(tmax, farT);
+            return tmax >= tmin;
+        };
+
+        return updateAxis(r.Origin.x, r.Direction.x, b.Min.x, b.Max.x) &&
+            updateAxis(r.Origin.y, r.Direction.y, b.Min.y, b.Max.y) &&
+            updateAxis(r.Origin.z, r.Direction.z, b.Min.z, b.Max.z);
+    }
+
+
     namespace
     {
         // Returns major axis permutation Kx, Ky, Kz for direction.

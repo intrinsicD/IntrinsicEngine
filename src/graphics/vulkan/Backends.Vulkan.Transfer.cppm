@@ -1,3 +1,4 @@
+// Vulkan staging, timeline submission and readback ownership behind the RHI transfer queue.
 module;
 
 #include <atomic>
@@ -6,6 +7,7 @@ module;
 #include <memory>
 #include <mutex>
 #include <span>
+#include <string_view>
 #include <vector>
 
 #include "Vulkan.hpp"
@@ -125,6 +127,9 @@ namespace Extrinsic::Backends::Vulkan
 
     private:
         [[nodiscard]] VkCommandBuffer Begin();
+        [[nodiscard]] bool FinishCommandBuffer(VkCommandBuffer cmd, std::string_view operation);
+        // Caller holds m_Mutex through ticket submission and lane-specific retirement.
+        [[nodiscard]] uint64_t SubmitTimelineLocked(VkCommandBuffer cmd, std::string_view operation);
         [[nodiscard]] RHI::TransferToken Submit(VkCommandBuffer cmd);
         [[nodiscard]] RHI::ReadbackToken SubmitReadback(VkCommandBuffer cmd,
                                                         size_t slotIndex,

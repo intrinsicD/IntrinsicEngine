@@ -69,17 +69,6 @@ namespace Extrinsic::Graphics
             return fingerprint == 0u ? 1u : fingerprint;
         }
 
-        [[nodiscard]] std::uint64_t FingerprintUint32Stream(
-            const std::span<const std::uint32_t> values) noexcept
-        {
-            std::uint64_t fingerprint = kFnv1aOffset64;
-            for (const std::uint32_t value : values)
-            {
-                FingerprintUint32(fingerprint, value);
-            }
-            return fingerprint == 0u ? 1u : fingerprint;
-        }
-
         [[nodiscard]] std::uint64_t AlignUp(const std::uint64_t value, const std::uint32_t alignment) noexcept
         {
             if (alignment <= 1u)
@@ -175,7 +164,7 @@ namespace Extrinsic::Graphics
             allocation.PositionFingerprint =
                 FingerprintFloat32Bytes(positionBytes);
             allocation.SurfaceIndexFingerprint =
-                FingerprintUint32Stream(
+                FingerprintSurfaceIndices(
                     std::span<const std::uint32_t>{
                         allocation.SurfaceIndices});
             allocation.TexcoordFingerprint = texcoordBytes.empty()
@@ -556,6 +545,17 @@ namespace Extrinsic::Graphics
                  ChannelSizeMatches(out.Color, desc.VertexCount, kColorElementBytes));
             return out;
         }
+    }
+
+    [[nodiscard]] std::uint64_t FingerprintSurfaceIndices(
+        const std::span<const std::uint32_t> values) noexcept
+    {
+        std::uint64_t fingerprint = kFnv1aOffset64;
+        for (const std::uint32_t value : values)
+        {
+            FingerprintUint32(fingerprint, value);
+        }
+        return fingerprint == 0u ? 1u : fingerprint;
     }
 
     struct GpuWorld::Impl

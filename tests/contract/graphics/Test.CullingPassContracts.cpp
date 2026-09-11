@@ -45,6 +45,7 @@ namespace
     public:
         std::vector<Event> Events;
         std::optional<RHI::GpuCullPushConstants> LastCullPushConstants;
+        std::vector<std::uint32_t> IndexedDrawLimits;
 
         void Begin() override {}
         void End() override {}
@@ -68,7 +69,10 @@ namespace
         void DrawIndexed(std::uint32_t, std::uint32_t, std::uint32_t, std::int32_t, std::uint32_t) override {}
         void DrawIndirect(RHI::BufferHandle, std::uint64_t, std::uint32_t) override {}
         void DrawIndexedIndirect(RHI::BufferHandle, std::uint64_t, std::uint32_t) override {}
-        void DrawIndexedIndirectCount(RHI::BufferHandle, std::uint64_t, RHI::BufferHandle, std::uint64_t, std::uint32_t) override {}
+        void DrawIndexedIndirectCount(RHI::BufferHandle, std::uint64_t, RHI::BufferHandle, std::uint64_t, std::uint32_t maxDrawCount) override
+        {
+            IndexedDrawLimits.push_back(maxDrawCount);
+        }
         void DrawIndirectCount(RHI::BufferHandle, std::uint64_t, RHI::BufferHandle, std::uint64_t, std::uint32_t) override {}
         void Dispatch(std::uint32_t, std::uint32_t, std::uint32_t) override { Events.push_back({.Kind = EventKind::Dispatch}); }
         void DispatchIndirect(RHI::BufferHandle, std::uint64_t) override {}
@@ -146,7 +150,7 @@ TEST(GraphicsCullingContracts, BucketsCoverSurfaceLinePointShadowAndSelectionDom
     RHI::PipelineManager pipelineMgr{device};
 
     Graphics::CullingSystem culling;
-    ASSERT_TRUE(culling.Initialize(device, bufferMgr, pipelineMgr, "shaders/culling/instance_cull.comp"));
+    ASSERT_TRUE(culling.Initialize(device, bufferMgr, pipelineMgr, "shaders/instance_cull.comp"));
 
     for (const auto kind : kIndexedBuckets)
     {
@@ -212,7 +216,7 @@ TEST(GraphicsCullingContracts, CullingPassResetsDispatchesAndPublishesAllBucketM
     world.SyncFrame();
 
     Graphics::CullingSystem culling;
-    ASSERT_TRUE(culling.Initialize(device, bufferMgr, pipelineMgr, "shaders/culling/instance_cull.comp"));
+    ASSERT_TRUE(culling.Initialize(device, bufferMgr, pipelineMgr, "shaders/instance_cull.comp"));
 
     RecordingCommandContext cmd;
     RHI::CameraUBO camera{};
@@ -476,7 +480,7 @@ TEST(GraphicsCullingContracts, CullingDiagnosticsCountExplicitAndDeltaHZBStaleSk
     world.SyncFrame();
 
     Graphics::CullingSystem culling;
-    ASSERT_TRUE(culling.Initialize(device, bufferMgr, pipelineMgr, "shaders/culling/instance_cull.comp"));
+    ASSERT_TRUE(culling.Initialize(device, bufferMgr, pipelineMgr, "shaders/instance_cull.comp"));
 
     RHI::CameraUBO camera{};
     camera.ViewProj = glm::mat4{1.0f};
@@ -517,5 +521,27 @@ TEST(GraphicsCullingContracts, CullingDiagnosticsCountExplicitAndDeltaHZBStaleSk
     EXPECT_NE(deltaCmd.LastCullPushConstants->CullingFlags & RHI::GpuCullFlag_HZBStaleSkip, 0u);
 
     culling.Shutdown();
+    world.Shutdown();
+}
+
+TEST(GraphicsCullingContracts, OpaqueBucketDrawLimitRemainsCallerOwned)
+{
+    MockDevice device;
+    RHI::BufferManager bufferMgr{device};
+    RecordingCommandContext commands;
+    Graphics::GpuWorld world;
+    ASSERT_TRUE(world.Initialize(device, bufferMgr, TinyWorldDesc()));
+    Graphics::GpuDrawBucket bucket{};
+    bucket.Indexed = true;
+    bucket.IndexedArgsBuffer = RHI::BufferHandle{1u, 1u};
+    bucket.CountBuffer = RHI::BufferHandle{2u, 1u};
+    bucket.Capacity = 10u;
+    const RHI::PipelineHandle pipeline{1u, 1u};
+    Graphics::RecordOpaqueSurfaceBucket(commands, pipeline, world, bucket, 0u, 3u);
+    Graphics::RecordOpaqueSurfaceBucket(commands, pipeline, world, bucket, 0u);
+    EXPECT_EQ(commands.IndexedDrawLimits, (std::vector<std::uint32_t>{3u, 10u}));
+    bucket.Indexed = false;
+    Graphics::RecordOpaqueSurfaceBucket(commands, pipeline, world, bucket, 0u);
+    EXPECT_EQ(commands.IndexedDrawLimits.size(), 2u);
     world.Shutdown();
 }

@@ -40,6 +40,15 @@ namespace Geometry::MeshIO
         using Geometry::IOText::SplitWhitespace;
         using Geometry::IOText::TextFileError;
         using Geometry::IOText::Trim;
+        using Geometry::IOText::PlyFormat;
+        using Geometry::IOText::PlyScalar;
+        using Geometry::IOText::PlyScalarBytes;
+        using Geometry::IOText::ParsePlyScalarType;
+        using Geometry::IOText::IsPlyFloatingScalar;
+        using Geometry::IOText::ReadFloatingScalarAt;
+        using Geometry::IOText::PlyProperty;
+        using Geometry::IOText::PlyElement;
+        using Geometry::IOText::ReadScalarAs;
 
         [[nodiscard]] Extrinsic::Core::ErrorCode ToCoreError(TextFileError error)
         {
@@ -335,63 +344,6 @@ namespace Geometry::MeshIO
             return value > 1.0f ? std::clamp(value / 255.0f, 0.0f, 1.0f) : std::clamp(value, 0.0f, 1.0f);
         }
 
-        enum class PlyFormat
-        {
-            Ascii,
-            BinaryLittleEndian,
-            BinaryBigEndian,
-        };
-
-        enum class PlyScalar
-        {
-            Int8,
-            UInt8,
-            Int16,
-            UInt16,
-            Int32,
-            UInt32,
-            Float32,
-            Float64,
-        };
-
-        [[nodiscard]] constexpr std::size_t PlyScalarBytes(PlyScalar s)
-        {
-            switch (s)
-            {
-            case PlyScalar::Int8:
-            case PlyScalar::UInt8:
-                return 1;
-            case PlyScalar::Int16:
-            case PlyScalar::UInt16:
-                return 2;
-            case PlyScalar::Int32:
-            case PlyScalar::UInt32:
-            case PlyScalar::Float32:
-                return 4;
-            case PlyScalar::Float64:
-                return 8;
-            }
-            return 0;
-        }
-
-        [[nodiscard]] std::optional<PlyScalar> ParsePlyScalarType(std::string_view token)
-        {
-            if (token == "char" || token == "int8") return PlyScalar::Int8;
-            if (token == "uchar" || token == "uint8") return PlyScalar::UInt8;
-            if (token == "short" || token == "int16") return PlyScalar::Int16;
-            if (token == "ushort" || token == "uint16") return PlyScalar::UInt16;
-            if (token == "int" || token == "int32") return PlyScalar::Int32;
-            if (token == "uint" || token == "uint32") return PlyScalar::UInt32;
-            if (token == "float" || token == "float32") return PlyScalar::Float32;
-            if (token == "double" || token == "float64") return PlyScalar::Float64;
-            return std::nullopt;
-        }
-
-        [[nodiscard]] bool IsPlyFloatingScalar(PlyScalar scalar)
-        {
-            return scalar == PlyScalar::Float32 || scalar == PlyScalar::Float64;
-        }
-
         [[nodiscard]] bool IsPlyIntegralScalar(PlyScalar scalar)
         {
             return !IsPlyFloatingScalar(scalar);
@@ -437,124 +389,6 @@ namespace Geometry::MeshIO
                 return declaredCount;
             }
             return std::min(declaredCount, remaining / minBytesPerRow);
-        }
-
-        void ByteSwap(std::byte* p, std::size_t n);
-
-        [[nodiscard]] float ReadFloatingScalarAt(const std::byte* base,
-                                                 std::size_t offset,
-                                                 PlyScalar scalar,
-                                                 bool bigEndian)
-        {
-            std::array<std::byte, 8> tmp{};
-            const std::size_t byteCount = PlyScalarBytes(scalar);
-            std::memcpy(tmp.data(), base + offset, byteCount);
-            if (bigEndian)
-            {
-                ByteSwap(tmp.data(), byteCount);
-            }
-
-            if (scalar == PlyScalar::Float64)
-            {
-                double value = 0.0;
-                std::memcpy(&value, tmp.data(), 8);
-                return static_cast<float>(value);
-            }
-
-            float value = 0.0f;
-            std::memcpy(&value, tmp.data(), 4);
-            return value;
-        }
-
-        struct PlyProperty
-        {
-            std::string Name;
-            bool IsList = false;
-            PlyScalar ScalarType = PlyScalar::Float32;
-            PlyScalar ListCountType = PlyScalar::UInt8;
-        };
-
-        struct PlyElement
-        {
-            std::string Name;
-            std::size_t Count = 0;
-            std::vector<PlyProperty> Properties;
-        };
-
-        void ByteSwap(std::byte* p, std::size_t n)
-        {
-            for (std::size_t i = 0; i < n / 2; ++i)
-            {
-                const std::byte tmp = p[i];
-                p[i] = p[n - 1 - i];
-                p[n - 1 - i] = tmp;
-            }
-        }
-
-        template <typename T>
-        [[nodiscard]] T ReadScalarAs(const std::byte*& cursor, PlyScalar type, bool bigEndian)
-        {
-            std::array<std::byte, 8> buf{};
-            const std::size_t n = PlyScalarBytes(type);
-            std::memcpy(buf.data(), cursor, n);
-            if (bigEndian)
-            {
-                ByteSwap(buf.data(), n);
-            }
-            cursor += n;
-
-            switch (type)
-            {
-            case PlyScalar::Int8:
-            {
-                std::int8_t v = 0;
-                std::memcpy(&v, buf.data(), 1);
-                return static_cast<T>(v);
-            }
-            case PlyScalar::UInt8:
-            {
-                std::uint8_t v = 0;
-                std::memcpy(&v, buf.data(), 1);
-                return static_cast<T>(v);
-            }
-            case PlyScalar::Int16:
-            {
-                std::int16_t v = 0;
-                std::memcpy(&v, buf.data(), 2);
-                return static_cast<T>(v);
-            }
-            case PlyScalar::UInt16:
-            {
-                std::uint16_t v = 0;
-                std::memcpy(&v, buf.data(), 2);
-                return static_cast<T>(v);
-            }
-            case PlyScalar::Int32:
-            {
-                std::int32_t v = 0;
-                std::memcpy(&v, buf.data(), 4);
-                return static_cast<T>(v);
-            }
-            case PlyScalar::UInt32:
-            {
-                std::uint32_t v = 0;
-                std::memcpy(&v, buf.data(), 4);
-                return static_cast<T>(v);
-            }
-            case PlyScalar::Float32:
-            {
-                float v = 0.0f;
-                std::memcpy(&v, buf.data(), 4);
-                return static_cast<T>(v);
-            }
-            case PlyScalar::Float64:
-            {
-                double v = 0.0;
-                std::memcpy(&v, buf.data(), 8);
-                return static_cast<T>(v);
-            }
-            }
-            return T{};
         }
 
         [[nodiscard]] std::optional<std::uint64_t> ReadPlyListCount(const std::byte*& cursor,

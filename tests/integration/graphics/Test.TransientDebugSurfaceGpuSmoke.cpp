@@ -32,6 +32,11 @@ import Extrinsic.RHI.TextureUpload;
 import Extrinsic.Runtime.Engine;
 import Extrinsic.Runtime.EngineConfigBoot;
 
+#include "GraphicsTestSupport.hpp"
+
+using Extrinsic::Tests::GraphicsSupport::ReorderToRgba;
+using Extrinsic::Tests::GraphicsSupport::SrgbToLinearPixel;
+
 namespace
 {
 namespace Counters = Extrinsic::Tests::Support::OperationalCounterStability;
@@ -110,57 +115,6 @@ inline constexpr std::array<TransientDebugSamplePoint, 4> kTransientReadbackSamp
 	kPointSample,
 	kClearSample,
 }};
-
-[[nodiscard]] Readback::ExpectedPixel ReorderToRgba(
-	const Extrinsic::RHI::Format format,
-	const std::uint8_t b0,
-	const std::uint8_t b1,
-	const std::uint8_t b2,
-	const std::uint8_t b3) noexcept
-{
-	switch (format)
-	{
-	case Extrinsic::RHI::Format::BGRA8_UNORM:
-	case Extrinsic::RHI::Format::BGRA8_SRGB:
-		return Readback::ExpectedPixel{.R = b2, .G = b1, .B = b0, .A = b3};
-	case Extrinsic::RHI::Format::RGBA8_UNORM:
-	case Extrinsic::RHI::Format::RGBA8_SRGB:
-	default:
-		return Readback::ExpectedPixel{.R = b0, .G = b1, .B = b2, .A = b3};
-	}
-}
-
-[[nodiscard]] constexpr bool IsSrgbFormat(const Extrinsic::RHI::Format format) noexcept
-{
-	return format == Extrinsic::RHI::Format::RGBA8_SRGB ||
-		   format == Extrinsic::RHI::Format::BGRA8_SRGB;
-}
-
-[[nodiscard]] std::uint8_t SrgbByteToLinearByte(const std::uint8_t srgb) noexcept
-{
-	const float s = static_cast<float>(srgb) / 255.0f;
-	const float linear = (s <= 0.04045f)
-							 ? (s / 12.92f)
-							 : std::pow((s + 0.055f) / 1.055f, 2.4f);
-	const float clamped = linear < 0.0f ? 0.0f : (linear > 1.0f ? 1.0f : linear);
-	return static_cast<std::uint8_t>(clamped * 255.0f + 0.5f);
-}
-
-[[nodiscard]] Readback::ExpectedPixel SrgbToLinearPixel(
-	const Extrinsic::RHI::Format format,
-	const Readback::ExpectedPixel& srgbPixel) noexcept
-{
-	if (!IsSrgbFormat(format))
-	{
-		return srgbPixel;
-	}
-	return Readback::ExpectedPixel{
-		.R = SrgbByteToLinearByte(srgbPixel.R),
-		.G = SrgbByteToLinearByte(srgbPixel.G),
-		.B = SrgbByteToLinearByte(srgbPixel.B),
-		.A = srgbPixel.A,
-	};
-}
 
 class ExitAfterFramesApp final : public Intrinsic::Tests::RuntimeTestModule
 {

@@ -1,3 +1,4 @@
+// Per-frame packed vertex uploads for transient debug and visualization overlays.
 module;
 
 #include <cstdint>
@@ -6,6 +7,8 @@ module;
 #include <span>
 #include <vector>
 
+#include <glm/glm.hpp>
+
 export module Extrinsic.Graphics.TransientDebugUploadHelper;
 
 import Extrinsic.Graphics.RenderWorld;
@@ -13,36 +16,43 @@ import Extrinsic.RHI.BufferManager;
 import Extrinsic.RHI.Device;
 import Extrinsic.RHI.Handles;
 
-// GRAPHICS-077 Slices B + C — per-frame host-visible upload helper for
-// the transient debug surface pass. The helper packs sanitized
-// `DebugTrianglePacket` / `DebugLinePacket` / `DebugPointPacket` spans
-// into a small set of host-visible vertex buffers that survive across
-// frames (geometric growth on demand) and reports per-lane upload
-// results so the executor's `RecordTransientDebugSurfacePass(...)`
-// helper can record deterministic `BindPipeline + PushConstants +
-// Draw(...)` shapes.
-//
-// Slice B wired the triangle lane; Slice C extends the helper to
-// the line + point lanes with the same shape (per-lane buffer lease,
-// per-lane growth, per-lane upload result). All three lanes share the
-// `position(vec3) + packed RGBA8 color(uint32)` 16-byte packed-vertex
-// layout consumed by `assets/shaders/transient_debug_*.{vert,frag}`.
-//
-// Lifetime contract: the helper is owned by the renderer. It holds a
-// `RHI::BufferManager::BufferLease` per lane; leases reset before the
-// `BufferManager` is destroyed in `Shutdown()`.
-//
-// Backend policy: per `GRAPHICS-077` and the task non-goals, the helper
-// must not retain GPU resources on `GpuWorld`, must not expose itself
-// through RHI or renderer module surfaces (only the
-// `IRenderer`-internal `Pass.TransientDebug.Surface` consumes the
-// upload result), and must not route through the retained
-// `GpuRender_Line` / `GpuRender_Point` cull buckets. The helper is
-// declared here in the renderer module so CPU contract tests can exercise
-// its concrete buffer-partitioning contract directly.
+// The renderer owns per-lane leases and resets them before BufferManager shutdown.
+// Frame slots retain buffers until reuse; packed uploads stay separate from retained GpuWorld geometry.
 
 export namespace Extrinsic::Graphics
 {
+    // Shared 16-byte BDA vertex layout consumed by debug and visualization shaders.
+    struct PackedColorVertex
+    {
+        float Position[3];
+        std::uint32_t PackedColor;
+    };
+    static_assert(sizeof(PackedColorVertex) == 16u);
+
+    struct PackedVertexUploadResult
+    {
+        RHI::BufferHandle Handle{};
+        std::uint64_t BDA{0u};
+        bool Uploaded{false};
+        bool Overflow{false};
+    };
+
+    [[nodiscard]] std::uint32_t PackVertexColorUnorm4x8(const glm::vec4& color) noexcept;
+
+    // The caller owns frame-slot selection and caps; allocation failure reports
+    // Overflow and leaves the slot empty. Call only after the slot is reusable.
+    [[nodiscard]] PackedVertexUploadResult UploadPackedColorVertices(
+        RHI::IDevice& device,
+        RHI::BufferManager& bufferManager,
+        std::optional<RHI::BufferManager::BufferLease>& bufferLease,
+        std::uint64_t& capacityBytes,
+        std::uint64_t& bufferAllocationCount,
+        std::span<const PackedColorVertex> staging,
+        std::uint64_t initialVertexCount,
+        std::uint64_t maxVertexCount,
+        const char* debugName);
+
+
     // GRAPHICS-077 — deterministic CPU diagnostics for the
     // `TransientDebugSurfacePass` upload + recording path. All counters
     // stay at zero in Slice A (no pipelines, scaffold executor branch

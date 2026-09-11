@@ -1,6 +1,5 @@
 module;
 
-#include <algorithm>
 #include <cstdint>
 
 module Extrinsic.Graphics.Pass.DepthPrepass;
@@ -24,29 +23,10 @@ namespace Extrinsic::Graphics
             return;
         }
 
-        const auto& bucket = culling.GetBucket(RHI::GpuDrawBucketKind::SurfaceOpaque);
-        if (!bucket.Indexed || !bucket.IndexedArgsBuffer.IsValid() ||
-            !bucket.CountBuffer.IsValid() || bucket.Capacity == 0u)
-        {
-            return;
-        }
-
-        cmd.BindPipeline(m_Pipeline);
-        cmd.BindIndexBuffer(gpuWorld.GetManagedIndexBuffer(), 0, RHI::IndexType::Uint32);
-
-        RHI::GpuScenePushConstants pc{};
-        pc.SceneTableBDA = gpuWorld.GetSceneTableBDA();
-        pc.FrameIndex    = frameIndex;
-        pc.DrawBucket    = static_cast<std::uint32_t>(RHI::GpuDrawBucketKind::SurfaceOpaque);
-
-        cmd.PushConstants(&pc, sizeof(pc));
-
-        cmd.DrawIndexedIndirectCount(
-            bucket.IndexedArgsBuffer,
-            0,
-            bucket.CountBuffer,
-            0,
-            std::min(bucket.Capacity, RHI::kMaxIndirectDrawCount));
+        RecordOpaqueSurfaceBucket(
+            cmd, m_Pipeline, gpuWorld,
+            culling.GetBucket(RHI::GpuDrawBucketKind::SurfaceOpaque),
+            frameIndex, RHI::kMaxIndirectDrawCount);
     }
 }
 

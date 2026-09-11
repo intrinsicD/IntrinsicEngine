@@ -1,3 +1,5 @@
+// Executes direct and queued asset imports, preserving ingest identity and
+// main-thread materialization boundaries across payload-specific decoders.
 module;
 
 #include <cstddef>
@@ -140,6 +142,19 @@ namespace Extrinsic::Runtime
         void ImportDroppedFilePaths(std::span<const std::string> paths);
 
     private:
+        [[nodiscard]] Core::Expected<std::shared_ptr<AssetImportStageTrace>>
+            SubmitQueuedImport(
+                const RuntimeAssetImportRequest& request,
+                const AssetImportRecipe& recipe,
+                std::string_view payloadLabel);
+        [[nodiscard]] Core::Result QueueImportDecode(
+            const RuntimeAssetImportRequest& request,
+            const Assets::AssetRouteDiagnostic& routeDiagnostic,
+            AssetImportStageTrace& stageTrace);
+        [[nodiscard]] bool BeginQueuedImportApply(
+            const RuntimeAssetImportRequest& request,
+            AssetImportStageTrace& stageTrace,
+            const ECS::Scene::Registry* submissionScene);
         [[nodiscard]] Core::Expected<RuntimeQueuedAssetImport>
             QueueGeometryImportWithIngest(
                 AssetImportRecipe recipe,

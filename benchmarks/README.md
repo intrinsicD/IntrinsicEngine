@@ -22,6 +22,12 @@ This directory owns IntrinsicEngine benchmark infrastructure and benchmark artif
 - `reports/`: generated benchmark reports and summaries.
 - `runners/`: benchmark runner binaries and orchestration helpers.
 
+The curvature profile runners share fixture construction and boundary measurement
+in `runners/CurvatureProfileSupport.hpp`. Those benchmark oracles remain
+independent of the production segmentation and patch implementations.
+The smoke runner shares its identity/status envelope while each workload keeps
+its numeric formatting and explicit metric/diagnostic payload.
+
 Canonical JSON results use schema v2: stable benchmark identity is separate
 from append-only run/attempt identity, and every result binds the exact
 manifest, resolved params/warmup/thresholds, source state, and recomputed gate

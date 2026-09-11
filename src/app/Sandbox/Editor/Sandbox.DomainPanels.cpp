@@ -59,197 +59,9 @@ inline constexpr PointRenderType kPointSphere = static_cast<PointRenderType>(1);
 inline constexpr PointRenderType kPointSurfel = static_cast<PointRenderType>(2);
 inline constexpr VisualizationColorSource kMaterialSource =
     static_cast<VisualizationColorSource>(0);
-inline constexpr VisualizationColorSource kUniformColorSource =
-    static_cast<VisualizationColorSource>(1);
-inline constexpr VisualizationColorSource kScalarFieldSource =
-    static_cast<VisualizationColorSource>(2);
-
-inline constexpr std::array<GeometryPresentationSlotSemantic, 5>
-    kTextureBakeTargetSemantics{{
-        GeometryPresentationSlotSemantic::Albedo,
-        GeometryPresentationSlotSemantic::Normal,
-        GeometryPresentationSlotSemantic::Roughness,
-        GeometryPresentationSlotSemantic::Metallic,
-        GeometryPresentationSlotSemantic::ScalarField,
-    }};
-
-inline constexpr std::array<PropertyTextureBakeEncoding, 8>
-    kTextureBakeEncoders{{
-        PropertyTextureBakeEncoding::Auto,
-        PropertyTextureBakeEncoding::RgbaColor,
-        PropertyTextureBakeEncoding::Normal,
-        PropertyTextureBakeEncoding::ScalarColormap,
-        PropertyTextureBakeEncoding::LinearScalar,
-        PropertyTextureBakeEncoding::LabelPalette,
-        PropertyTextureBakeEncoding::Vector2,
-        PropertyTextureBakeEncoding::Vector3,
-    }};
-
-inline constexpr std::array<PropertyTextureBakeStorage, 3>
-    kTextureBakeStorageModes{{
-        PropertyTextureBakeStorage::Auto,
-        PropertyTextureBakeStorage::RawFloat,
-        PropertyTextureBakeStorage::EncodedRgba,
-    }};
-
-inline constexpr std::array<const char *, 3> kTextureBakeStorageNames{{
-    "auto (raw except normals/labels)",
-    "raw float texture",
-    "encoded RGBA texture",
-}};
-
-inline constexpr std::array<const char *, 6> kColormapNames{{
-    "Viridis", "Inferno", "Plasma", "Jet", "Coolwarm", "Heat"}};
-
-inline constexpr std::array<const char *, 2> kNormalSpaceNames{{
-    "object space", "world space"}};
-
-[[nodiscard]] const char *DebugNameForTextureBakeEncoder(
-    const PropertyTextureBakeEncoding encoder) noexcept {
-  switch (encoder) {
-  case PropertyTextureBakeEncoding::Auto:
-    return "auto";
-  case PropertyTextureBakeEncoding::LinearScalar:
-    return "linear scalar";
-  case PropertyTextureBakeEncoding::ScalarColormap:
-    return "scalar colormap";
-  case PropertyTextureBakeEncoding::LabelPalette:
-    return "label palette";
-  case PropertyTextureBakeEncoding::Vector2:
-    return "vector2";
-  case PropertyTextureBakeEncoding::Vector3:
-    return "vector3";
-  case PropertyTextureBakeEncoding::Normal:
-    return "normal";
-  case PropertyTextureBakeEncoding::RgbaColor:
-    return "rgba color";
-  }
-  return "unknown";
-}
-
-struct TextureBakeUiState {
-  std::optional<EditorUvRegenerationCommandResult>
-      *LastUvRegenerationResult{nullptr};
-  std::optional<EditorUvRegenerationCommandResult>
-      *LastUvExtentAdoption{nullptr};
-  std::int32_t *SourceIndex{nullptr};
-  std::int32_t *TargetSemanticIndex{nullptr};
-  std::int32_t *EncoderIndex{nullptr};
-  std::int32_t *StorageIndex{nullptr};
-  std::int32_t *ColormapIndex{nullptr};
-  std::int32_t *NormalSpaceIndex{nullptr};
-  std::uint32_t *AdditionalConsumerMask{nullptr};
-  std::int32_t *Width{nullptr};
-  std::int32_t *Height{nullptr};
-  std::int32_t *Padding{nullptr};
-  std::int32_t *UvResolution{nullptr};
-  std::int32_t *UvPadding{nullptr};
-  float *UvTexelsPerUnit{nullptr};
-  bool *UvForceRegenerate{nullptr};
-  bool *UvPreserveAuthored{nullptr};
-};
-
-[[nodiscard]] std::span<const EditorTextureBakeTarget>
-TextureBakeTargetsFor(
-    const EditorTextureBakeControlsModel &model,
-    const std::string_view outputName) {
-  const auto found = std::ranges::find(
-      model.TextureBakeTargets, outputName,
-      &EditorTextureBakeTargetSnapshot::OutputName);
-  if (found == model.TextureBakeTargets.end())
-    return {};
-  return found->Targets;
-}
-
-void DrawDiagnostics(const std::vector<EditorDiagnostic> &diagnostics) {
-  for (const EditorDiagnostic &diagnostic : diagnostics) {
-    ImGui::TextDisabled(
-        "%s: %s", DebugNameForEditorDiagnosticCode(diagnostic.Code),
-        diagnostic.Message.c_str());
-  }
-}
-
-void DrawVec3(const char *label, const glm::vec3 value) {
-  ImGui::Text("%s: %.3f, %.3f, %.3f", label, value.x, value.y, value.z);
-}
-
-[[nodiscard]] EditorVisualizationConfigCommand
-MakeUniformVisualizationConfigCommandFromModel(
-    const std::uint32_t stableEntityId,
-    const EditorVisualizationConfigModel &model,
-    const EditorVisualizationTarget target, const glm::vec4 color) {
-  return EditorVisualizationConfigCommand{
-      .StableEntityId = stableEntityId,
-      .Target = target,
-      .EnableConfig = true,
-      .Source = kUniformColorSource,
-      .Color = color,
-      .ScalarFieldName = model.ScalarFieldName,
-      .ScalarDomain = model.ScalarDomain,
-      .ColorBufferName = model.ColorBufferName,
-      .ScalarAutoRange = model.ScalarAutoRange,
-      .ScalarRangeMin = model.ScalarRangeMin,
-      .ScalarRangeMax = model.ScalarRangeMax,
-      .ScalarBinCount = model.ScalarBinCount,
-      .IsolineCount = model.IsolineCount,
-      .ScalarColormap = model.ScalarColormap,
-      .IsolineWidth = model.IsolineWidth,
-      .IsolineColor = model.IsolineColor,
-      .IsolineValues = model.IsolineValues,
-      .IsolineValueCount = model.IsolineValueCount,
-  };
-}
-
-[[nodiscard]] EditorVisualizationConfigCommand
-MakeScalarVisualizationConfigCommandFromModel(
-    const std::uint32_t stableEntityId,
-    const EditorVisualizationConfigModel &model,
-    const EditorVisualizationTarget target) {
-  return EditorVisualizationConfigCommand{
-      .StableEntityId = stableEntityId,
-      .Target = target,
-      .EnableConfig = true,
-      .Source = model.Source,
-      .Color = model.Color,
-      .ScalarFieldName = model.ScalarFieldName,
-      .ScalarDomain = model.ScalarDomain,
-      .ColorBufferName = model.ColorBufferName,
-      .ScalarAutoRange = model.ScalarAutoRange,
-      .ScalarRangeMin = model.ScalarRangeMin,
-      .ScalarRangeMax = model.ScalarRangeMax,
-      .ScalarBinCount = model.ScalarBinCount,
-      .IsolineCount = model.IsolineCount,
-      .ScalarColormap = model.ScalarColormap,
-      .IsolineWidth = model.IsolineWidth,
-      .IsolineColor = model.IsolineColor,
-      .IsolineValues = model.IsolineValues,
-      .IsolineValueCount = model.IsolineValueCount,
-      .UseBakedTexture = model.UseBakedTexture,
-  };
-}
-
-[[nodiscard]] bool
-DomainWindowReady(const EditorDomainWindowModel &model) noexcept {
-  return model.HasSelectedEntity && model.DomainMatches;
-}
-
 [[nodiscard]] bool
 DomainAppearanceReady(const EditorDomainWindowModel &model) noexcept {
   return model.HasSelectedEntity && model.VisualizationTargetAvailable;
-}
-
-void DrawDomainWindowHeader(const EditorDomainWindowModel &model) {
-  ImGui::Text("Expected domain: %s",
-              DebugNameForEditorGeometryDomain(model.ExpectedDomain));
-  if (model.HasSelectedEntity) {
-    ImGui::Text("Selected: %s (%u)", model.SelectedEntity.Name.c_str(),
-                model.SelectedStableId);
-    ImGui::Text("Selected domain: %s",
-                DebugNameForEditorGeometryDomain(model.SelectedDomain));
-  } else {
-    ImGui::TextDisabled("Selected: none");
-  }
-  DrawDiagnostics(model.Diagnostics);
 }
 
 void DrawPropertyCatalogRows(const EditorPropertyCatalogModel &catalog) {
@@ -1405,7 +1217,7 @@ void DrawScalarVisualizationControls(
   const auto submit = [&](const EditorVisualizationConfigModel &next) {
     if (canEditVisualization) {
       (void)ApplyEditorVisualizationConfigCommand(
-          context.VisualizationCommands, MakeScalarVisualizationConfigCommandFromModel(
+          context.VisualizationCommands, MakeVisualizationConfigCommandFromModel(
                        selectedStableId, next, target));
     }
   };
@@ -1611,7 +1423,7 @@ void DrawDomainVisualizationControls(const EditorDomainWindowModel &model,
     const bool canEnable = hasProperty && model.TextureBake.CanBake;
     ImGui::BeginDisabled(!baked && !canEnable);
     if (ImGui::Checkbox("Use baked texture", &baked)) {
-      auto command = MakeScalarVisualizationConfigCommandFromModel(
+      auto command = MakeVisualizationConfigCommandFromModel(
           model.SelectedStableId, visualization, model.VisualizationTarget);
       command.UseBakedTexture = baked;
       lastStatus = ApplyEditorVisualizationConfigCommand(

@@ -76,6 +76,20 @@ export namespace Geometry::CurvatureSegmentation
         std::uint32_t MinimumRegionFaces{2u};
     };
 
+    [[nodiscard]] bool IsValidMixtureParams(const CurvatureSegmentationParams& params) noexcept;
+    [[nodiscard]] bool IsValidSegmentationParams(const CurvatureSegmentationParams& params) noexcept;
+
+    struct CurvatureNormalization
+    {
+        double Center{0.0};
+        double Scale{1.0};
+    };
+
+    // Called after finite face-sample preflight. Keeps the curvature median and
+    // MAD-to-RMS-to-unit fallback policy, including the empty-input defaults.
+    [[nodiscard]] CurvatureNormalization ComputeCurvatureNormalization(
+        std::span<const double> values);
+
     struct ModelCandidateDiagnostics
     {
         std::uint32_t ComponentCount{0u};

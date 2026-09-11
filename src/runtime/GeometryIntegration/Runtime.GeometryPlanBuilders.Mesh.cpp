@@ -201,37 +201,9 @@ namespace Extrinsic::Runtime
         const auto resolveColors = [&]() {
             if (channelBindings != nullptr && IsVertexChannelBindingEnabled(channelBindings->Color))
             {
-                const std::optional<AttributeSourceType> sourceType =
-                    channelBindings->Color.Property.Domain ==
-                            GeometryElementDomain::MeshVertex
-                        ? ToAttributeSourceType(
-                              channelBindings->Color.Property.ValueKind)
-                        : std::nullopt;
-                if (sourceType != AttributeSourceType::Vec3 &&
-                    sourceType != AttributeSourceType::Vec4)
-                {
-                    return;
-                }
-                outBuffer.PackedColors.resize(vertexCount);
-                const VertexAttributeBinding colorBinding{
-                    .Channel = VertexChannel::Color,
-                    .SourceType = *sourceType,
-                    .SourceProperty = std::string_view{
-                        channelBindings->Color.Property.Name},
-                    .AllowFallback = false,
-                    .Normalize = false,
-                    .Fallback = glm::vec4{1.0f, 1.0f, 1.0f, 1.0f},
-                };
-                const AttributeBindResult colorResult =
-                    ResolveColorChannelPackedUnorm8(
-                        view.VertexSource->Properties,
-                        colorBinding,
-                        vertexCountU32,
-                        outBuffer.PackedColors);
-                if (!colorResult.Ok())
-                {
-                    outBuffer.PackedColors.clear();
-                }
+                (void)PrepareBoundVertexColors(
+                    view.VertexSource->Properties, GeometryElementDomain::MeshVertex,
+                    channelBindings->Color, vertexCount, outBuffer.PackedColors);
                 return;
             }
 

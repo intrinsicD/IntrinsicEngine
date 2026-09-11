@@ -12,9 +12,43 @@ module Extrinsic.Runtime.CurvatureSegmentationConfig;
 import Extrinsic.Core.Config.Engine;
 import Extrinsic.Core.Config.EngineLoad;
 import Extrinsic.Runtime.Private.FeatureConfigCodecs;
+import Geometry.HalfedgeMesh.CurvatureSegmentation;
 
 namespace Extrinsic::Runtime
 {
+    namespace CurvSeg = Geometry::CurvatureSegmentation;
+
+    [[nodiscard]] CurvSeg::CurvatureSegmentationParams
+    MakeCurvatureSegmentationParams(
+        const CurvatureSegmentationConfig& config)
+    {
+        return CurvSeg::CurvatureSegmentationParams{
+            .SelectionMode =
+                config.SelectionMode ==
+                        CurvatureSegmentationSelectionMode::FixedCount
+                    ? CurvSeg::ComponentSelectionMode::FixedCount
+                    : CurvSeg::ComponentSelectionMode::Automatic,
+            .FixedComponentCount = config.FixedComponentCount,
+            .AutomaticMinComponents =
+                config.AutomaticMinComponents,
+            .AutomaticMaxComponents =
+                config.AutomaticMaxComponents,
+            .AutomaticFitTolerance =
+                config.AutomaticFitTolerance,
+            .AutomaticComplexityWeight =
+                config.AutomaticComplexityWeight,
+            .MaxEmIterations = config.MaxEmIterations,
+            .EmRelativeTolerance = config.EmRelativeTolerance,
+            .CovarianceFloor = config.CovarianceFloor,
+            .Seed = config.Seed,
+            .SpatialWeight = config.SpatialWeight,
+            .FeatureSensitivity = config.FeatureSensitivity,
+            .MaxSpatialIterations =
+                config.MaxSpatialIterations,
+            .MinimumRegionFaces = config.MinimumRegionFaces,
+        };
+    }
+
     const char* DebugNameForCurvatureSegmentationMethod(
         const CurvatureSegmentationMethod method) noexcept
     {
@@ -57,25 +91,8 @@ namespace Extrinsic::Runtime
             config.SelectionMode ==
                 CurvatureSegmentationSelectionMode::Automatic;
         return validMethod && validMode &&
-               config.FixedComponentCount > 0u &&
-               config.AutomaticMinComponents > 0u &&
-               config.AutomaticMaxComponents >=
-                   config.AutomaticMinComponents &&
-               std::isfinite(config.AutomaticFitTolerance) &&
-               config.AutomaticFitTolerance > 0.0 &&
-               std::isfinite(config.AutomaticComplexityWeight) &&
-               config.AutomaticComplexityWeight >= 0.0 &&
-               config.MaxEmIterations > 0u &&
-               std::isfinite(config.EmRelativeTolerance) &&
-               config.EmRelativeTolerance >= 0.0 &&
-               std::isfinite(config.CovarianceFloor) &&
-               config.CovarianceFloor > 0.0 &&
-               std::isfinite(config.SpatialWeight) &&
-               config.SpatialWeight >= 0.0 &&
-               std::isfinite(config.FeatureSensitivity) &&
-               config.FeatureSensitivity >= 0.0 &&
-               config.MaxSpatialIterations > 0u &&
-               config.MinimumRegionFaces > 0u &&
+               CurvSeg::IsValidSegmentationParams(
+                   MakeCurvatureSegmentationParams(config)) &&
                std::isfinite(config.FeatureBaseRadiusRatio) &&
                config.FeatureBaseRadiusRatio > 0.0 &&
                config.FeatureBaseRadiusRatio <= 1.0 &&

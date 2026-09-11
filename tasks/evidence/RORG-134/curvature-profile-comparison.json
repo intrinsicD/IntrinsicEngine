@@ -1,0 +1,30 @@
+{
+  "excluded_fields": "*_ms and memory_peak_bytes; no timing or performance claim",
+  "results": [
+    {
+      "result": "geometry.curvature_segmentation.reference.profile.10k.automatic.json",
+      "status": "failed",
+      "stable_payload_sha256": "2bd4dd7ffb5fc48d1a7cdb0e114da7eedad4ab9122324442c136399d8ab04cf8"
+    },
+    {
+      "result": "geometry.curvature_segmentation.reference.profile.10k.fixed.json",
+      "status": "passed",
+      "stable_payload_sha256": "8400adc00c6a7f64c8dd9eaaaf794f6de3d4f40ddf6dffc48200f48077d5bac1"
+    },
+    {
+      "result": "geometry.curvature_segmentation.feature_patch.feature_smoke.json",
+      "status": "passed",
+      "stable_payload_sha256": "aa4514f3ae5e819233f564206e9709f234fa9441538726a703d1268c96ae61fd"
+    },
+    {
+      "result": "geometry.curvature_segmentation.feature_patch.quality_smoke.json",
+      "status": "passed",
+      "stable_payload_sha256": "5b8367701f3b14e74aa39e9cf18956a245aea3934136870d2482c0d63d28b52d"
+    },
+    {
+      "result": "geometry.curvature_segmentation.feature_patch.seed_refutation.json",
+      "status": "passed",
+      "stable_payload_sha256": "9cf0c9cbc21ee2bc14e304d7d55a7c8e7e47e8057bb29921c08047fddfbaa922"
+    }
+  ]
+}

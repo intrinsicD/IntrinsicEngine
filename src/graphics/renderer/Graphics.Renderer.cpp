@@ -1048,9 +1048,6 @@ namespace Extrinsic::Graphics
             return remainder == 0u ? value : value + (alignment - remainder);
         }
 
-        inline constexpr std::uint32_t kInvalidRendererTransientPlacementResource =
-            std::numeric_limits<std::uint32_t>::max();
-
         struct RendererTransientPlacementItem
         {
             std::uint32_t ResourceIndex = 0u;
@@ -1059,20 +1056,10 @@ namespace Extrinsic::Graphics
             RHI::ResourceMemoryRequirements Requirements{};
         };
 
-        struct RendererTransientAliasReuseHazard
-        {
-            std::uint32_t PreviousResourceIndex = 0u;
-            std::uint32_t ResourceIndex = 0u;
-            std::uint32_t PassIndex = 0u;
-            std::uint32_t BlockIndex = 0u;
-            std::uint64_t OffsetBytes = 0u;
-            std::uint64_t SizeBytes = 0u;
-        };
-
         struct RendererTransientPlacementPlan
         {
             std::vector<TransientResourcePlacement> Placements{};
-            std::vector<RendererTransientAliasReuseHazard> AliasReuseHazards{};
+            std::vector<TransientAliasReuseHazard> AliasReuseHazards{};
             std::uint64_t NaiveBytes = 0u;
             std::uint64_t PeakBytes = 0u;
             std::uint64_t BlockAlignmentBytes = 1u;
@@ -1084,25 +1071,7 @@ namespace Extrinsic::Graphics
             std::vector<RendererTransientPlacementItem> items,
             const bool aliasingEnabled)
         {
-            struct ActiveRange
-            {
-                std::uint32_t ResourceIndex = 0u;
-                std::uint32_t LastUsePass = 0u;
-                std::uint32_t BlockIndex = 0u;
-                std::uint64_t OffsetBytes = 0u;
-                std::uint64_t SizeBytes = 0u;
-            };
-
-            struct FreeRange
-            {
-                std::uint32_t BlockIndex = 0u;
-                std::uint64_t OffsetBytes = 0u;
-                std::uint64_t SizeBytes = 0u;
-                std::uint32_t PreviousResourceIndex = kInvalidRendererTransientPlacementResource;
-            };
-
             RendererTransientPlacementPlan plan{};
-            plan.Placements.reserve(items.size());
 
             if (items.empty())
             {
@@ -1136,133 +1105,23 @@ namespace Extrinsic::Graphics
                 return plan;
             }
 
-            std::vector<ActiveRange> activeRanges{};
-            std::vector<FreeRange> freeRanges{};
-            std::uint64_t blockSize = 0u;
-
-            auto sortFreeRanges = [&]() {
-                std::ranges::sort(freeRanges, [](const FreeRange& lhs, const FreeRange& rhs) {
-                    return std::tuple{lhs.BlockIndex, lhs.OffsetBytes, lhs.SizeBytes, lhs.PreviousResourceIndex} <
-                           std::tuple{rhs.BlockIndex, rhs.OffsetBytes, rhs.SizeBytes, rhs.PreviousResourceIndex};
-                });
-            };
-
-            for (const RendererTransientPlacementItem& item : items)
+            std::vector<TransientPlacementItem> placements;
+            placements.reserve(items.size());
+            for (const auto& item : items)
             {
-                for (std::size_t activeIndex = 0u; activeIndex < activeRanges.size();)
-                {
-                    const ActiveRange& active = activeRanges[activeIndex];
-                    if (active.LastUsePass < item.FirstUsePass)
-                    {
-                        if (aliasingEnabled && active.SizeBytes != 0u)
-                        {
-                            freeRanges.push_back(FreeRange{
-                                .BlockIndex = active.BlockIndex,
-                                .OffsetBytes = active.OffsetBytes,
-                                .SizeBytes = active.SizeBytes,
-                                .PreviousResourceIndex = active.ResourceIndex,
-                            });
-                        }
-                        activeRanges.erase(activeRanges.begin() + static_cast<std::ptrdiff_t>(activeIndex));
-                        continue;
-                    }
-                    ++activeIndex;
-                }
-
-                sortFreeRanges();
-
-                bool placedInFreeRange = false;
-                std::uint32_t blockIndex = 0u;
-                std::uint64_t offsetBytes = 0u;
-
-                if (aliasingEnabled && item.Requirements.SizeBytes != 0u)
-                {
-                    for (std::size_t rangeIndex = 0u; rangeIndex < freeRanges.size(); ++rangeIndex)
-                    {
-                        const FreeRange range = freeRanges[rangeIndex];
-                        const std::uint64_t alignedOffset =
-                            AlignUpForRendererPlacement(range.OffsetBytes, item.Requirements.AlignmentBytes);
-                        const std::uint64_t rangeEnd = range.OffsetBytes + range.SizeBytes;
-                        if (alignedOffset > rangeEnd ||
-                            item.Requirements.SizeBytes > rangeEnd - alignedOffset)
-                        {
-                            continue;
-                        }
-
-                        blockIndex = range.BlockIndex;
-                        offsetBytes = alignedOffset;
-                        placedInFreeRange = true;
-                        freeRanges.erase(freeRanges.begin() + static_cast<std::ptrdiff_t>(rangeIndex));
-
-                        if (range.OffsetBytes < alignedOffset)
-                        {
-                            freeRanges.push_back(FreeRange{
-                                .BlockIndex = range.BlockIndex,
-                                .OffsetBytes = range.OffsetBytes,
-                                .SizeBytes = alignedOffset - range.OffsetBytes,
-                                .PreviousResourceIndex = range.PreviousResourceIndex,
-                            });
-                        }
-
-                        const std::uint64_t allocationEnd =
-                            alignedOffset + item.Requirements.SizeBytes;
-                        if (allocationEnd < rangeEnd)
-                        {
-                            freeRanges.push_back(FreeRange{
-                                .BlockIndex = range.BlockIndex,
-                                .OffsetBytes = allocationEnd,
-                                .SizeBytes = rangeEnd - allocationEnd,
-                                .PreviousResourceIndex = range.PreviousResourceIndex,
-                            });
-                        }
-
-                        if (range.PreviousResourceIndex != kInvalidRendererTransientPlacementResource)
-                        {
-                            plan.AliasReuseHazards.push_back(RendererTransientAliasReuseHazard{
-                                .PreviousResourceIndex = range.PreviousResourceIndex,
-                                .ResourceIndex = item.ResourceIndex,
-                                .PassIndex = item.FirstUsePass,
-                                .BlockIndex = blockIndex,
-                                .OffsetBytes = offsetBytes,
-                                .SizeBytes = item.Requirements.SizeBytes,
-                            });
-                        }
-                        break;
-                    }
-                }
-
-                if (!placedInFreeRange)
-                {
-                    offsetBytes =
-                        AlignUpForRendererPlacement(blockSize, item.Requirements.AlignmentBytes);
-                    blockSize = offsetBytes + item.Requirements.SizeBytes;
-                }
-
-                plan.Placements.push_back(TransientResourcePlacement{
+                placements.push_back(TransientPlacementItem{
                     .ResourceIndex = item.ResourceIndex,
-                    .BlockIndex = blockIndex,
-                    .OffsetBytes = offsetBytes,
-                    .SizeBytes = item.Requirements.SizeBytes,
-                    .AlignmentBytes = item.Requirements.AlignmentBytes,
                     .FirstUsePass = item.FirstUsePass,
                     .LastUsePass = item.LastUsePass,
-                });
-
-                activeRanges.push_back(ActiveRange{
-                    .ResourceIndex = item.ResourceIndex,
-                    .LastUsePass = item.LastUsePass,
-                    .BlockIndex = blockIndex,
-                    .OffsetBytes = offsetBytes,
                     .SizeBytes = item.Requirements.SizeBytes,
+                    .AlignmentBytes = item.Requirements.AlignmentBytes,
                 });
             }
-
-            plan.PeakBytes = AlignUpForRendererPlacement(blockSize, plan.BlockAlignmentBytes);
-            std::ranges::sort(plan.Placements, [](const TransientResourcePlacement& lhs,
-                                                  const TransientResourcePlacement& rhs)
-            {
-                return lhs.ResourceIndex < rhs.ResourceIndex;
-            });
+            auto placed = BuildTransientPlacementPlan(placements, aliasingEnabled);
+            plan.Placements = std::move(placed.Placements);
+            plan.AliasReuseHazards = std::move(placed.AliasReuseHazards);
+            plan.PeakBytes = AlignUpForRendererPlacement(
+                placed.PeakBytes, plan.BlockAlignmentBytes);
             return plan;
         }
 
@@ -6004,34 +5863,12 @@ namespace Extrinsic::Graphics
             return desc;
         }
 
-        // GRAPHICS-077 Slice B — transient-debug triangle pipelines. Two
-        // variants per lane (depth-tested + always-on-top) so packets
-        // with `DepthTested = true` rasterize against the prepass depth
-        // and packets with `DepthTested = false` overlay on top
-        // regardless of occlusion. Both variants share the same shader
-        // pair (`assets/shaders/transient_debug_triangle.{vert,frag}`),
-        // a BDA-fetch vertex layout (positions + packed RGBA8 color
-        // pulled from the helper's host-visible vertex buffer), and the
-        // 16-byte `TransientDebugTrianglePushConstants` push block (BDA +
-        // per-draw `FirstVertex`). Color target pinned to `RGBA16_FLOAT`
-        // because the pass writes the `SceneColorHDR` resource declared
-        // by `BuildDefaultFrameRecipe(...)`. `DepthTargetFormat` is
-        // `D32_FLOAT` for both variants (matching the prepass depth);
-        // the always-on-top variant disables `DepthTestEnable` so it
-        // ignores occlusion while still consuming the same render-pass
-        // attachment layout. `ColorBlend[0].Enable = false` matches the
-        // GRAPHICS-077 task non-goal of "no new blend modes" — opaque
-        // overlay is the canonical CPUContracted form; alpha-blended
-        // overlays are reserved for a follow-up task.
-        [[nodiscard]] static RHI::PipelineDesc BuildTransientDebugTrianglePipelineDesc(
+        // Overlay pipelines share HDR color and prepass depth attachments.
+        // Depth writes and blending stay disabled for both depth-test variants.
+        [[nodiscard]] static RHI::PipelineDesc BuildOverlayPipelineDesc(
             const bool depthTested) noexcept
         {
             RHI::PipelineDesc desc{};
-            desc.VertexShaderPath = Core::Filesystem::GetShaderPath(
-                "shaders/transient_debug_triangle.vert.spv");
-            desc.FragmentShaderPath = Core::Filesystem::GetShaderPath(
-                "shaders/transient_debug_triangle.frag.spv");
-            desc.PrimitiveTopology = RHI::Topology::TriangleList;
             desc.Rasterizer.Culling = RHI::CullMode::None;
             desc.Rasterizer.Winding = RHI::FrontFace::CounterClockwise;
             desc.Rasterizer.Fill = RHI::FillMode::Solid;
@@ -6042,6 +5879,18 @@ namespace Extrinsic::Graphics
             desc.ColorTargetCount = 1u;
             desc.ColorTargetFormats[0] = RHI::Format::RGBA16_FLOAT;
             desc.DepthTargetFormat = RHI::Format::D32_FLOAT;
+            return desc;
+        }
+
+        [[nodiscard]] static RHI::PipelineDesc BuildTransientDebugTrianglePipelineDesc(
+            const bool depthTested) noexcept
+        {
+            RHI::PipelineDesc desc = BuildOverlayPipelineDesc(depthTested);
+            desc.VertexShaderPath = Core::Filesystem::GetShaderPath(
+                "shaders/transient_debug_triangle.vert.spv");
+            desc.FragmentShaderPath = Core::Filesystem::GetShaderPath(
+                "shaders/transient_debug_triangle.frag.spv");
+            desc.PrimitiveTopology = RHI::Topology::TriangleList;
             desc.PushConstantSize =
                 static_cast<std::uint32_t>(sizeof(TransientDebugTrianglePushConstants));
             desc.DebugName = depthTested
@@ -6050,39 +5899,15 @@ namespace Extrinsic::Graphics
             return desc;
         }
 
-        // GRAPHICS-077 Slice C — transient-debug line + point pipelines.
-        // Mirror the triangle helper's invariant set (color target =
-        // `RGBA16_FLOAT` because the pass writes `SceneColorHDR`;
-        // depth target = `D32_FLOAT` matching the prepass depth; depth
-        // write disabled because the overlay must not occlude later
-        // composition; `ColorBlend[0].Enable = false` because opaque
-        // overlay is the canonical CPUContracted form). Topology
-        // selects `LineList` / `PointList` per lane. Width / radius
-        // expansion is deferred — the CPUContracted form pins the
-        // bind/push/draw shape only; Slice D verifies the pixel-level
-        // rasterization through an opt-in `gpu;vulkan` smoke. The
-        // shared 16-byte push block carries the helper's vertex buffer
-        // BDA + the per-draw `FirstVertex` so each lane's BDA-fetch
-        // vertex shader resolves the right packet's vertices.
         [[nodiscard]] static RHI::PipelineDesc BuildTransientDebugLinePipelineDesc(
             const bool depthTested) noexcept
         {
-            RHI::PipelineDesc desc{};
+            RHI::PipelineDesc desc = BuildOverlayPipelineDesc(depthTested);
             desc.VertexShaderPath = Core::Filesystem::GetShaderPath(
                 "shaders/transient_debug_line.vert.spv");
             desc.FragmentShaderPath = Core::Filesystem::GetShaderPath(
                 "shaders/transient_debug_line.frag.spv");
             desc.PrimitiveTopology = RHI::Topology::LineList;
-            desc.Rasterizer.Culling = RHI::CullMode::None;
-            desc.Rasterizer.Winding = RHI::FrontFace::CounterClockwise;
-            desc.Rasterizer.Fill = RHI::FillMode::Solid;
-            desc.DepthStencil.DepthTestEnable = depthTested;
-            desc.DepthStencil.DepthWriteEnable = false;
-            desc.DepthStencil.StencilEnable = false;
-            desc.ColorBlend[0].Enable = false;
-            desc.ColorTargetCount = 1u;
-            desc.ColorTargetFormats[0] = RHI::Format::RGBA16_FLOAT;
-            desc.DepthTargetFormat = RHI::Format::D32_FLOAT;
             desc.PushConstantSize =
                 static_cast<std::uint32_t>(sizeof(TransientDebugLinePushConstants));
             desc.DebugName = depthTested
@@ -6094,22 +5919,12 @@ namespace Extrinsic::Graphics
         [[nodiscard]] static RHI::PipelineDesc BuildTransientDebugPointPipelineDesc(
             const bool depthTested) noexcept
         {
-            RHI::PipelineDesc desc{};
+            RHI::PipelineDesc desc = BuildOverlayPipelineDesc(depthTested);
             desc.VertexShaderPath = Core::Filesystem::GetShaderPath(
                 "shaders/transient_debug_point.vert.spv");
             desc.FragmentShaderPath = Core::Filesystem::GetShaderPath(
                 "shaders/transient_debug_point.frag.spv");
             desc.PrimitiveTopology = RHI::Topology::PointList;
-            desc.Rasterizer.Culling = RHI::CullMode::None;
-            desc.Rasterizer.Winding = RHI::FrontFace::CounterClockwise;
-            desc.Rasterizer.Fill = RHI::FillMode::Solid;
-            desc.DepthStencil.DepthTestEnable = depthTested;
-            desc.DepthStencil.DepthWriteEnable = false;
-            desc.DepthStencil.StencilEnable = false;
-            desc.ColorBlend[0].Enable = false;
-            desc.ColorTargetCount = 1u;
-            desc.ColorTargetFormats[0] = RHI::Format::RGBA16_FLOAT;
-            desc.DepthTargetFormat = RHI::Format::D32_FLOAT;
             desc.PushConstantSize =
                 static_cast<std::uint32_t>(sizeof(TransientDebugPointPushConstants));
             desc.DebugName = depthTested
@@ -6118,48 +5933,15 @@ namespace Extrinsic::Graphics
             return desc;
         }
 
-        // GRAPHICS-078 Slice B — visualization-overlay vector-field
-        // pipelines. Two variants per kind (depth-tested + always-on-
-        // top) so packets with `DepthTested = true` rasterize against
-        // the prepass depth and packets with `DepthTested = false`
-        // overlay on top regardless of occlusion. Both variants share
-        // the same shader pair
-        // (`assets/shaders/visualization_vector_field.{vert,frag}`),
-        // a BDA-fetch vertex layout (positions + packed RGBA8 color
-        // pulled from the helper's host-visible vertex buffer), and
-        // the 16-byte `VisualizationVectorFieldPushConstants` push
-        // block (BDA + per-draw `FirstVertex`). Color target pinned to
-        // `RGBA16_FLOAT` because the pass writes the `SceneColorHDR`
-        // resource declared by `BuildDefaultFrameRecipe(...)`.
-        // `DepthTargetFormat` is `D32_FLOAT` matching the prepass
-        // depth; the always-on-top variant disables `DepthTestEnable`
-        // so it ignores occlusion while still consuming the same
-        // render-pass attachment layout. `ColorBlend[0].Enable = false`
-        // matches the GRAPHICS-078 task non-goal of "no third pipeline
-        // variant per kind" — opaque overlay is the canonical
-        // CPUContracted form; alpha-blended glyphs are reserved for a
-        // follow-up task. Topology is `LineList` because each glyph is
-        // expanded into a single anchor→tip line segment by the
-        // helper (two vertices per glyph).
         [[nodiscard]] static RHI::PipelineDesc BuildVisualizationVectorFieldPipelineDesc(
             const bool depthTested) noexcept
         {
-            RHI::PipelineDesc desc{};
+            RHI::PipelineDesc desc = BuildOverlayPipelineDesc(depthTested);
             desc.VertexShaderPath = Core::Filesystem::GetShaderPath(
                 "shaders/visualization_vector_field.vert.spv");
             desc.FragmentShaderPath = Core::Filesystem::GetShaderPath(
                 "shaders/visualization_vector_field.frag.spv");
             desc.PrimitiveTopology = RHI::Topology::LineList;
-            desc.Rasterizer.Culling = RHI::CullMode::None;
-            desc.Rasterizer.Winding = RHI::FrontFace::CounterClockwise;
-            desc.Rasterizer.Fill = RHI::FillMode::Solid;
-            desc.DepthStencil.DepthTestEnable = depthTested;
-            desc.DepthStencil.DepthWriteEnable = false;
-            desc.DepthStencil.StencilEnable = false;
-            desc.ColorBlend[0].Enable = false;
-            desc.ColorTargetCount = 1u;
-            desc.ColorTargetFormats[0] = RHI::Format::RGBA16_FLOAT;
-            desc.DepthTargetFormat = RHI::Format::D32_FLOAT;
             desc.PushConstantSize =
                 static_cast<std::uint32_t>(sizeof(VisualizationVectorFieldPushConstants));
             desc.DebugName = depthTested
@@ -6168,37 +5950,15 @@ namespace Extrinsic::Graphics
             return desc;
         }
 
-        // GRAPHICS-078 Slice C — visualization-overlay isoline pipelines.
-        // Mirrors the vector-field desc exactly except for the shader
-        // pair (`visualization_isoline.{vert,frag}`) and the debug
-        // name. `LineList` topology because each iso value is expanded
-        // by the helper into a deterministic placeholder line segment
-        // (two vertices per iso). Actual scalar-field-derived contour
-        // polylines remain future source-BDA work while preserving the
-        // topology + push-constant contract.
-        // Push-constant block is the dedicated
-        // `VisualizationIsolinePushConstants` shape (BDA +
-        // `FirstVertex`) so per-kind evolution (e.g. per-iso line width
-        // expansion) can land without disturbing the vector-field lane.
         [[nodiscard]] static RHI::PipelineDesc BuildVisualizationIsolinePipelineDesc(
             const bool depthTested) noexcept
         {
-            RHI::PipelineDesc desc{};
+            RHI::PipelineDesc desc = BuildOverlayPipelineDesc(depthTested);
             desc.VertexShaderPath = Core::Filesystem::GetShaderPath(
                 "shaders/visualization_isoline.vert.spv");
             desc.FragmentShaderPath = Core::Filesystem::GetShaderPath(
                 "shaders/visualization_isoline.frag.spv");
             desc.PrimitiveTopology = RHI::Topology::LineList;
-            desc.Rasterizer.Culling = RHI::CullMode::None;
-            desc.Rasterizer.Winding = RHI::FrontFace::CounterClockwise;
-            desc.Rasterizer.Fill = RHI::FillMode::Solid;
-            desc.DepthStencil.DepthTestEnable = depthTested;
-            desc.DepthStencil.DepthWriteEnable = false;
-            desc.DepthStencil.StencilEnable = false;
-            desc.ColorBlend[0].Enable = false;
-            desc.ColorTargetCount = 1u;
-            desc.ColorTargetFormats[0] = RHI::Format::RGBA16_FLOAT;
-            desc.DepthTargetFormat = RHI::Format::D32_FLOAT;
             desc.PushConstantSize =
                 static_cast<std::uint32_t>(sizeof(VisualizationIsolinePushConstants));
             desc.DebugName = depthTested
@@ -7897,7 +7657,7 @@ namespace Extrinsic::Graphics
                     : executionRank;
             };
 
-            for (const RendererTransientAliasReuseHazard& hazard : texturePlan.AliasReuseHazards)
+            for (const TransientAliasReuseHazard& hazard : texturePlan.AliasReuseHazards)
             {
                 BarrierPacket& packet = FindOrCreateRendererBarrierPacket(
                     compiled.BarrierPackets,
@@ -7912,7 +7672,7 @@ namespace Extrinsic::Graphics
                 });
             }
 
-            for (const RendererTransientAliasReuseHazard& hazard : bufferPlan.AliasReuseHazards)
+            for (const TransientAliasReuseHazard& hazard : bufferPlan.AliasReuseHazards)
             {
                 BarrierPacket& packet = FindOrCreateRendererBarrierPacket(
                     compiled.BarrierPackets,

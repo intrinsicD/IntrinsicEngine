@@ -821,47 +821,55 @@ TEST(RuntimeSceneLifecycle, QueuedSceneLoadRejectsAwayAndBackBindingEpoch)
     engine.Shutdown();
 }
 
-TEST(RuntimeSceneLifecycle, RetiredQueuedSceneSavePublishesTerminalEvent)
+TEST(RuntimeSceneLifecycle, CancelledQueuedSceneFilesPublishOneTerminalEvent)
 {
-    TempSceneFile savedScene(
-        "runtime179_retired_scene_save.json",
-        "");
+    for (const auto kind : {Runtime::RuntimeSceneFileOperation::Save,
+                            Runtime::RuntimeSceneFileOperation::Load})
+    {
+        SCOPED_TRACE(kind == Runtime::RuntimeSceneFileOperation::Save ? "save" : "load");
+        TempSceneFile savedScene(
+            "runtime179_cancelled_scene_file.json",
+            R"({"version":2,"entities":[{"id":0,"name":"Cancelled load"}]})");
 
-    Intrinsic::Tests::RuntimeTestKernel engine(NullWindowHeadlessConfig());
-    engine.EmplaceModule<Runtime::AsyncWorkModule>();
-    engine.EmplaceModule<Runtime::SceneDocumentModule>();
-    engine.Initialize();
-    Runtime::SceneDocumentModule& document =
-        *engine.Services().Find<Runtime::SceneDocumentModule>();
-    const Runtime::WorldHandle world = engine.ActiveWorld();
-    auto queued =
-        document.QueueSceneSaveToPath(savedScene.Path.string());
-    ASSERT_TRUE(queued.has_value()) << static_cast<int>(queued.error());
-    ASSERT_FALSE(document.GetLastSceneFileEvent().has_value());
+        Intrinsic::Tests::RuntimeTestKernel engine(NullWindowHeadlessConfig());
+        engine.EmplaceModule<Runtime::AsyncWorkModule>();
+        engine.EmplaceModule<Runtime::SceneDocumentModule>();
+        engine.Initialize();
+        Runtime::SceneDocumentModule& document =
+            *engine.Services().Find<Runtime::SceneDocumentModule>();
+        const Runtime::WorldHandle world = engine.ActiveWorld();
+        auto queued = kind == Runtime::RuntimeSceneFileOperation::Save
+            ? document.QueueSceneSaveToPath(savedScene.Path.string())
+            : document.QueueSceneLoadFromPath(savedScene.Path.string());
+        ASSERT_TRUE(queued.has_value()) << static_cast<int>(queued.error());
+        ASSERT_FALSE(document.GetLastSceneFileEvent().has_value());
 
-    // World retirement cancels the job wherever it is: the drain refuses to
-    // publish a cancelled record even if its worker already finished.
-    EXPECT_EQ(engine.Jobs().CancelAllForWorld(world), 1u);
-    EXPECT_FALSE(document.GetLastSceneFileEvent().has_value());
+        // Cancel before draining; even a finished worker cannot publish its result.
+        EXPECT_EQ(engine.Jobs().CancelAllForWorld(world), 1u);
+        EXPECT_FALSE(document.GetLastSceneFileEvent().has_value());
 
-    ASSERT_TRUE(DrainUntilTerminal(
-        engine.Jobs(), engine.Events(), queued->Task));
-    EXPECT_EQ(engine.Jobs().GetState(queued->Task),
-              Runtime::JobState::Cancelled);
-    const std::optional<Runtime::RuntimeSceneFileEvent>& event =
-        document.GetLastSceneFileEvent();
-    ASSERT_TRUE(event.has_value());
-    EXPECT_EQ(event->Sequence, 1u);
-    EXPECT_EQ(event->Operation, Runtime::RuntimeSceneFileOperation::Save);
-    EXPECT_EQ(event->Task, queued->Task);
-    EXPECT_EQ(event->Path, savedScene.Path.string());
-    EXPECT_EQ(event->Error, Core::ErrorCode::InvalidState);
-    EXPECT_FALSE(event->SaveResult.has_value());
+        ASSERT_TRUE(DrainUntilTerminal(
+            engine.Jobs(), engine.Events(), queued->Task));
+        EXPECT_EQ(engine.Jobs().GetState(queued->Task),
+                  Runtime::JobState::Cancelled);
+        const std::optional<Runtime::RuntimeSceneFileEvent>& event =
+            document.GetLastSceneFileEvent();
+        ASSERT_TRUE(event.has_value());
+        EXPECT_EQ(event->Sequence, 1u);
+        EXPECT_EQ(event->Operation, kind);
+        EXPECT_EQ(event->Task, queued->Task);
+        EXPECT_EQ(event->Path, savedScene.Path.string());
+        EXPECT_EQ(event->Error, Core::ErrorCode::InvalidState);
+        EXPECT_FALSE(event->SaveResult.has_value());
+        EXPECT_FALSE(event->LoadResult.has_value());
+        EXPECT_FALSE(SceneContainsNamedEntity(
+            *engine.Worlds().Get(world), "Cancelled load"));
 
-    // The unpublished finalizer is claimed exactly once, so a later drain
-    // cannot record a second terminal event for the same operation.
-    (void)engine.Jobs().DrainCompletions(engine.Events());
-    ASSERT_TRUE(document.GetLastSceneFileEvent().has_value());
-    EXPECT_EQ(document.GetLastSceneFileEvent()->Sequence, 1u);
-    engine.Shutdown();
+        // The unpublished finalizer is claimed exactly once, so a later drain
+        // cannot record a second terminal event for the same operation.
+        (void)engine.Jobs().DrainCompletions(engine.Events());
+        ASSERT_TRUE(document.GetLastSceneFileEvent().has_value());
+        EXPECT_EQ(document.GetLastSceneFileEvent()->Sequence, 1u);
+        engine.Shutdown();
+    }
 }

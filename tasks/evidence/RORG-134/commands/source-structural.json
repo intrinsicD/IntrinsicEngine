@@ -1,0 +1,23 @@
+{
+  "command": [
+    "/bin/bash",
+    "-o",
+    "pipefail",
+    "-c",
+    "python3 tools/repo/check_layering.py --root src --strict && python3 tools/repo/check_test_layout.py --root . --strict && python3 tools/repo/check_root_hygiene.py --root . && python3 tools/agents/sync_skills.py --check && git diff --check"
+  ],
+  "command_display": "/bin/bash -o pipefail -c 'python3 tools/repo/check_layering.py --root src --strict && python3 tools/repo/check_test_layout.py --root . --strict && python3 tools/repo/check_root_hygiene.py --root . && python3 tools/agents/sync_skills.py --check && git diff --check'",
+  "cwd": ".",
+  "duration_ms": 366,
+  "exit_code": 0,
+  "finished_at": "2026-09-11T03:12:23Z",
+  "label": "source-structural",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-09-11T03:12:23Z",
+  "stderr_path": "tasks/evidence/RORG-134/commands/source-structural.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/RORG-134/commands/source-structural.stdout.log",
+  "stdout_sha256": "4f832e2433d091c8cd5858c206d1100d24a65a05a23004c6fa272cd71582105b",
+  "task_id": "RORG-134"
+}

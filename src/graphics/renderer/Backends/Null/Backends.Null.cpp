@@ -110,40 +110,6 @@ namespace Extrinsic::Backends::Null
         bool IsCompute = false;
     };
 
-    class NullCommandContext final : public RHI::ICommandContext
-    {
-    public:
-        void Begin() override {}
-        void End() override {}
-        void BeginRenderPass(const RHI::RenderPassDesc&) override {}
-        void EndRenderPass() override {}
-        void SetViewport(float, float, float, float, float, float) override {}
-        void SetScissor(std::int32_t, std::int32_t, std::uint32_t, std::uint32_t) override {}
-        void BindPipeline(RHI::PipelineHandle) override {}
-        void BindIndexBuffer(RHI::BufferHandle, std::uint64_t, RHI::IndexType) override {}
-        void PushConstants(const void*, std::uint32_t, std::uint32_t) override {}
-        void Draw(std::uint32_t, std::uint32_t, std::uint32_t, std::uint32_t) override {}
-        void DrawIndexed(std::uint32_t, std::uint32_t, std::uint32_t, std::int32_t, std::uint32_t) override {}
-        void DrawIndirect(RHI::BufferHandle, std::uint64_t, std::uint32_t) override {}
-        void DrawIndexedIndirect(RHI::BufferHandle, std::uint64_t, std::uint32_t) override {}
-        void DrawIndexedIndirectCount(RHI::BufferHandle, std::uint64_t,
-                                      RHI::BufferHandle, std::uint64_t,
-                                      std::uint32_t) override {}
-        void DrawIndirectCount(RHI::BufferHandle, std::uint64_t,
-                               RHI::BufferHandle, std::uint64_t,
-                               std::uint32_t) override {}
-        void Dispatch(std::uint32_t, std::uint32_t, std::uint32_t) override {}
-        void DispatchIndirect(RHI::BufferHandle, std::uint64_t) override {}
-        void TextureBarrier(RHI::TextureHandle, RHI::TextureLayout, RHI::TextureLayout) override {}
-        void BufferBarrier(RHI::BufferHandle, RHI::MemoryAccess, RHI::MemoryAccess) override {}
-        void SubmitBarriers(const RHI::BarrierBatchDesc&) override {}
-        void FillBuffer(RHI::BufferHandle, std::uint64_t, std::uint64_t, std::uint32_t) override {}
-        void CopyBuffer(RHI::BufferHandle, RHI::BufferHandle,
-                        std::uint64_t, std::uint64_t, std::uint64_t) override {}
-        void CopyBufferToTexture(RHI::BufferHandle, std::uint64_t,
-                                 RHI::TextureHandle, std::uint32_t, std::uint32_t) override {}
-    };
-
     class NullDevice final : public RHI::IDevice
     {
     public:
@@ -219,7 +185,7 @@ namespace Extrinsic::Backends::Null
             m_ParallelCommandContexts.reserve(m_ParallelCommandContextRequests.size());
             for (std::size_t i = 0; i < m_ParallelCommandContextRequests.size(); ++i)
             {
-                m_ParallelCommandContexts.push_back(std::make_unique<NullCommandContext>());
+                m_ParallelCommandContexts.push_back(std::make_unique<RHI::NullCommandContext>());
             }
             return !m_ParallelCommandContexts.empty();
         }
@@ -467,7 +433,7 @@ namespace Extrinsic::Backends::Null
         std::uint32_t m_FrameIndex{0};
         RHI::PresentMode m_PresentMode{RHI::PresentMode::VSync};
         Core::Extent2D m_BackbufferExtent{};
-        NullCommandContext m_CommandContext{};
+        RHI::NullCommandContext m_CommandContext{};
 
         std::unique_ptr<RHI::ITransferQueue> m_TransferQueue;
         std::unique_ptr<RHI::IBindlessHeap> m_BindlessHeap;
@@ -475,7 +441,7 @@ namespace Extrinsic::Backends::Null
         RHI::FrameHandle m_ParallelCommandContextFrame{};
         std::vector<RHI::ParallelCommandContextRequest> m_ParallelCommandContextRequests;
         std::vector<RHI::ParallelCommandContextRequest> m_SubmittedParallelCommandContexts;
-        std::vector<std::unique_ptr<NullCommandContext>> m_ParallelCommandContexts;
+        std::vector<std::unique_ptr<RHI::NullCommandContext>> m_ParallelCommandContexts;
 
         Core::ResourcePool<BufferEntry, RHI::BufferHandle, 0> m_Buffers;
         Core::ResourcePool<TextureEntry, RHI::TextureHandle, 0> m_Textures;

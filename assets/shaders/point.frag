@@ -6,6 +6,7 @@
 //   2 = EWA:       Elliptical Gaussian splat with Lambertian shading (Zwicker et al. 2001).
 
 #version 460
+#extension GL_GOOGLE_include_directive : require
 
 layout(set = 0, binding = 0) uniform CameraBuffer {
     mat4 view;
@@ -30,29 +31,23 @@ layout(push_constant) uniform PushConsts {
 
 layout(location = 0) out vec4 outColor;
 
+#include "common/point_splat.glsl"
+
 void main()
 {
     if (push.RenderMode == 2u)
     {
         // ---- EWA mode: Gaussian splat evaluation ----
         vec2 uv = fragDiscUV;
-        float mahal = fragEwaCovInv.x * uv.x * uv.x
-                    + 2.0 * fragEwaCovInv.y * uv.x * uv.y
-                    + fragEwaCovInv.z * uv.y * uv.y;
+        float mahal = PointMahalanobis(fragEwaCovInv, uv);
 
         if (mahal > 9.0) discard;
 
         float weight = exp(-0.5 * mahal);
 
         // Epsilon-guarded renormalization with camera-facing fallback.
-        float nLenE = length(fragNormal);
-        vec3 N = (nLenE > 1e-6) ? (fragNormal / nLenE) : vec3(0.0, 0.0, 1.0);
-        vec3 lightDir = normalize(camera.lightDirAndIntensity.xyz);
-        float NdotL = dot(N, lightDir);
-        float diffuse = max(abs(NdotL), 0.0) * camera.lightDirAndIntensity.w;
-
-        float ambient = camera.ambientColorAndIntensity.w;
-        vec3 lit = fragColor.rgb * (ambient + (1.0 - ambient) * diffuse);
+        vec3 lit = ShadePointLambert(fragColor.rgb, fragNormal,
+                                     camera.lightDirAndIntensity, camera.ambientColorAndIntensity.w);
 
         outColor = vec4(lit, fragColor.a * weight);
     }
@@ -69,16 +64,8 @@ void main()
         {
             // ---- Surfel mode: Lambertian + ambient lighting ----
             // Epsilon-guarded renormalization with camera-facing fallback.
-            float nLenS = length(fragNormal);
-            vec3 N = (nLenS > 1e-6) ? (fragNormal / nLenS) : vec3(0.0, 0.0, 1.0);
-            vec3 lightDir = normalize(camera.lightDirAndIntensity.xyz);
-
-            // Two-sided lighting: flip normal if facing away from light.
-            float NdotL = dot(N, lightDir);
-            float diffuse = max(abs(NdotL), 0.0) * camera.lightDirAndIntensity.w;
-
-            float ambient = camera.ambientColorAndIntensity.w;
-            vec3 lit = fragColor.rgb * (ambient + (1.0 - ambient) * diffuse);
+            vec3 lit = ShadePointLambert(fragColor.rgb, fragNormal,
+                                         camera.lightDirAndIntensity, camera.ambientColorAndIntensity.w);
 
             outColor = vec4(lit, fragColor.a * alpha);
         }

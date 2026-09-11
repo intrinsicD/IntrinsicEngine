@@ -27,6 +27,7 @@ module;
 
 module Extrinsic.Runtime.SceneEditingOperations;
 
+import Extrinsic.Runtime.Private.EditorFeatures;
 import Extrinsic.Asset.ImportRouter;
 import Extrinsic.Asset.GeometryPayload;
 import Extrinsic.Asset.ModelTexturePayload;
@@ -118,6 +119,17 @@ import Geometry.UvAtlas;
 
 namespace Extrinsic::Runtime {
 namespace {
+        using EditorFeatureDetail::BuildImportSuccessMessage;
+        using EditorFeatureDetail::BuildImportPendingMessage;
+        using EditorFeatureDetail::BuildImportFailureMessage;
+        using EditorFeatureDetail::BuildSceneFileSuccessMessage;
+        using EditorFeatureDetail::BuildSceneFileFailureMessage;
+        using EditorFeatureDetail::BuildSceneFilePendingMessage;
+        using EditorFeatureDetail::ExecuteEditorTransformMutation;
+        using EditorFeatureDetail::ToEditorCommandStatus;
+        using EditorFeatureDetail::EvaluateFileImportPrerequisites;
+        using EditorFeatureDetail::FileImportPrerequisiteEvaluation;
+        using EditorFeatureDetail::SameRenderHintComponent;
         namespace ECSC = Extrinsic::ECS::Components;
         namespace Dirty = Extrinsic::ECS::Components::DirtyTags;
         namespace GS = Extrinsic::ECS::Components::GeometrySources;
@@ -126,416 +138,7 @@ namespace {
         namespace A = Extrinsic::Assets;
         namespace GN = Geometry::HalfedgeMesh::VertexNormals;
         namespace GraphNormals = Geometry::Graph::VertexNormals;
-        inline constexpr std::array<A::AssetPayloadKind, 6>
-            kFileImportPayloadKinds{{
-                A::AssetPayloadKind::Unknown,
-                A::AssetPayloadKind::Mesh,
-                A::AssetPayloadKind::PointCloud,
-                A::AssetPayloadKind::Graph,
-                A::AssetPayloadKind::ModelScene,
-                A::AssetPayloadKind::Texture2D,
-            }};
 
-        inline constexpr std::string_view kImportSurfaceUnavailableReason =
-            "Asset import requires an available runtime import command surface.";
-        inline constexpr std::string_view kImportPathEmptyReason =
-            "Enter an asset path before choosing a payload or importing.";
-        inline constexpr std::string_view kImportExtensionMissingReason =
-            "Add a supported file extension to the asset path before importing.";
-
-        struct FileImportPrerequisiteEvaluation
-        {
-            bool CanChoosePayloadHint{false};
-            bool CanImport{false};
-            A::AssetPayloadKind ResolvedPayloadKind{
-                A::AssetPayloadKind::Unknown};
-            std::array<EditorFileImportPayloadOption, 6> PayloadOptions{};
-            std::string PayloadHintDisabledReason{};
-            std::string ImportDisabledReason{};
-            Core::ErrorCode Error{Core::ErrorCode::Success};
-        };
-
-        [[nodiscard]] bool HasPromotedFileImporter(
-            const A::AssetFileFormat format,
-            const A::AssetPayloadKind payloadKind) noexcept
-        {
-            if (payloadKind == A::AssetPayloadKind::ModelScene)
-                return A::IsSupportedModelSceneImportFormat(format);
-            if (payloadKind == A::AssetPayloadKind::Texture2D)
-                return A::IsSupportedTextureImportFormat(format);
-            return true;
-        }
-
-        [[nodiscard]] std::string PayloadChoicesText(
-            const std::span<const A::AssetPayloadKind> payloads)
-        {
-            std::string text{};
-            for (std::size_t i = 0u; i < payloads.size(); ++i)
-            {
-                if (i > 0u)
-                    text += i + 1u == payloads.size() ? " or " : ", ";
-                text += A::DebugNameForAssetPayloadKind(payloads[i]);
-            }
-            return text;
-        }
-
-        [[nodiscard]] std::string BuildUnsupportedExtensionReason(
-            const A::AssetRouteDiagnostic& diagnostic)
-        {
-            std::string reason = "Asset extension";
-            if (!diagnostic.Extension.empty())
-            {
-                reason += " '.";
-                reason += diagnostic.Extension;
-                reason += "'";
-            }
-            reason +=
-                " is unsupported; choose a path with a supported asset file extension.";
-            return reason;
-        }
-
-        [[nodiscard]] std::string BuildIncompatiblePayloadReason(
-            const A::AssetFileFormatInfo& format,
-            const A::AssetPayloadKind payloadKind)
-        {
-            std::string reason = A::DebugNameForAssetFileFormat(format.Format);
-            reason += " import ";
-            const std::string choices = PayloadChoicesText(format.ImportPayloads);
-            if (payloadKind == A::AssetPayloadKind::Unknown)
-            {
-                reason += "requires an explicit ";
-                reason += choices;
-                reason += " payload.";
-                return reason;
-            }
-
-            if (format.ImportPayloads.size() == 1u)
-            {
-                reason += "requires the ";
-                reason += choices;
-                reason += " payload; ";
-            }
-            else
-            {
-                reason += "supports only ";
-                reason += choices;
-                reason += " payloads; ";
-            }
-            reason += A::DebugNameForAssetPayloadKind(payloadKind);
-            reason += " is incompatible.";
-            return reason;
-        }
-
-        [[nodiscard]] std::string BuildUnavailableImporterReason(
-            const A::AssetFileFormatInfo& format)
-        {
-            std::string reason = A::DebugNameForAssetFileFormat(format.Format);
-            reason += " import is unavailable because no promoted ";
-            reason += PayloadChoicesText(format.ImportPayloads);
-            reason +=
-                " importer supports this format; choose a supported asset format.";
-            return reason;
-        }
-
-        [[nodiscard]] FileImportPrerequisiteEvaluation
-        EvaluateFileImportPrerequisites(
-            const bool commandSurfaceAvailable,
-            const std::string_view path,
-            const A::AssetPayloadKind selectedPayloadKind)
-        {
-            FileImportPrerequisiteEvaluation evaluation{};
-            for (std::size_t i = 0u; i < kFileImportPayloadKinds.size(); ++i)
-                evaluation.PayloadOptions[i].Kind = kFileImportPayloadKinds[i];
-
-            const auto disableAll = [&evaluation](const std::string_view reason,
-                                                  const Core::ErrorCode error)
-            {
-                evaluation.PayloadHintDisabledReason = reason;
-                evaluation.ImportDisabledReason = reason;
-                evaluation.Error = error;
-                for (EditorFileImportPayloadOption& option :
-                     evaluation.PayloadOptions)
-                {
-                    option.DisabledReason = reason;
-                }
-            };
-
-            if (!commandSurfaceAvailable)
-            {
-                disableAll(kImportSurfaceUnavailableReason,
-                           Core::ErrorCode::InvalidState);
-                return evaluation;
-            }
-            if (path.empty())
-            {
-                disableAll(kImportPathEmptyReason, Core::ErrorCode::InvalidPath);
-                return evaluation;
-            }
-
-            const A::AssetRouteDiagnostic automaticDiagnostic =
-                A::DiagnoseAssetImportRoute(
-                    path,
-                    A::AssetRouteOperation::Import,
-                    A::AssetImportHint{
-                        .PayloadKind = A::AssetPayloadKind::Unknown,
-                    });
-            if (automaticDiagnostic.Status == A::AssetRouteStatus::MissingExtension)
-            {
-                disableAll(kImportExtensionMissingReason,
-                           automaticDiagnostic.Error);
-                return evaluation;
-            }
-            if (automaticDiagnostic.Status ==
-                A::AssetRouteStatus::UnsupportedExtension)
-            {
-                const std::string reason =
-                    BuildUnsupportedExtensionReason(automaticDiagnostic);
-                disableAll(reason, automaticDiagnostic.Error);
-                return evaluation;
-            }
-
-            const A::AssetFileFormatInfo* format = A::FindAssetFileFormat(path);
-            if (format == nullptr || format->ImportPayloads.empty())
-            {
-                const std::string reason =
-                    automaticDiagnostic.Message.empty()
-                        ? std::string{"The selected asset format has no supported import "
-                                      "payload."}
-                        : automaticDiagnostic.Message;
-                disableAll(reason, automaticDiagnostic.Error);
-                return evaluation;
-            }
-
-            const A::AssetRouteDiagnostic selectedDiagnostic =
-                A::DiagnoseAssetImportRoute(
-                    path,
-                    A::AssetRouteOperation::Import,
-                    A::AssetImportHint{.PayloadKind = selectedPayloadKind});
-            if (selectedDiagnostic.Status == A::AssetRouteStatus::Ready)
-            {
-                const auto selectedRoute = A::ResolveAssetImportRoute(
-                    path,
-                    A::AssetRouteOperation::Import,
-                    A::AssetImportHint{.PayloadKind = selectedPayloadKind});
-                if (selectedRoute.has_value())
-                    evaluation.ResolvedPayloadKind = selectedRoute->PayloadKind;
-            }
-
-            const bool promotedImporterAvailable =
-                std::ranges::any_of(
-                    format->ImportPayloads,
-                    [format](const A::AssetPayloadKind payloadKind)
-                    {
-                        return HasPromotedFileImporter(format->Format,
-                                                       payloadKind);
-                    });
-            if (!promotedImporterAvailable)
-            {
-                const std::string reason = BuildUnavailableImporterReason(*format);
-                disableAll(reason, Core::ErrorCode::AssetUnsupportedFormat);
-                return evaluation;
-            }
-
-            evaluation.CanChoosePayloadHint = true;
-            for (EditorFileImportPayloadOption& option :
-                 evaluation.PayloadOptions)
-            {
-                const A::AssetRouteDiagnostic optionDiagnostic =
-                    A::DiagnoseAssetImportRoute(
-                        path,
-                        A::AssetRouteOperation::Import,
-                        A::AssetImportHint{.PayloadKind = option.Kind});
-                if (optionDiagnostic.Status != A::AssetRouteStatus::Ready)
-                {
-                    option.DisabledReason =
-                        BuildIncompatiblePayloadReason(*format, option.Kind);
-                    continue;
-                }
-
-                const auto optionRoute = A::ResolveAssetImportRoute(
-                    path,
-                    A::AssetRouteOperation::Import,
-                    A::AssetImportHint{.PayloadKind = option.Kind});
-                if (!optionRoute.has_value() ||
-                    !HasPromotedFileImporter(optionRoute->Format,
-                                             optionRoute->PayloadKind))
-                {
-                    option.DisabledReason = BuildUnavailableImporterReason(*format);
-                    continue;
-                }
-                option.Enabled = true;
-            }
-
-            const auto selectedOption = std::ranges::find(
-                evaluation.PayloadOptions,
-                selectedPayloadKind,
-                &EditorFileImportPayloadOption::Kind);
-            if (selectedOption == evaluation.PayloadOptions.end())
-            {
-                evaluation.ImportDisabledReason =
-                    "Select a supported payload hint before importing.";
-                evaluation.Error = Core::ErrorCode::InvalidArgument;
-                return evaluation;
-            }
-            if (!selectedOption->Enabled)
-            {
-                evaluation.ImportDisabledReason = selectedOption->DisabledReason;
-                evaluation.Error = selectedDiagnostic.Error == Core::ErrorCode::Success
-                    ? Core::ErrorCode::AssetUnsupportedFormat
-                    : selectedDiagnostic.Error;
-                return evaluation;
-            }
-
-            evaluation.CanImport = true;
-            evaluation.Error = Core::ErrorCode::Success;
-            return evaluation;
-        }
-        [[nodiscard]] std::string ErrorName(const Core::ErrorCode error)
-        {
-            return std::string(Core::Error::ToString(error));
-        }
-
-        [[nodiscard]] std::string BuildImportSuccessMessage(
-            const EditorFileImportCommand& command,
-            const EditorFileImportResult& result)
-        {
-            std::string message = "Imported ";
-            message += A::DebugNameForAssetPayloadKind(result.PayloadKind);
-            message += " asset";
-            if (!command.Path.empty())
-            {
-                message += " from ";
-                message += command.Path;
-            }
-            message += ".";
-            return message;
-        }
-
-        [[nodiscard]] std::string BuildImportPendingMessage(
-            const EditorFileImportCommand& command,
-            const A::AssetPayloadKind payloadKind)
-        {
-            std::string message = "Queued ";
-            message += A::DebugNameForAssetPayloadKind(payloadKind);
-            message += " asset import";
-            if (!command.Path.empty())
-            {
-                message += " from ";
-                message += command.Path;
-            }
-            message += ".";
-            return message;
-        }
-
-        [[nodiscard]] std::string BuildImportFailureMessage(
-            const Core::ErrorCode error)
-        {
-            std::string message = "Asset import failed: ";
-            message += ErrorName(error);
-            message += ".";
-            return message;
-        }
-
-        [[nodiscard]] std::string BuildSceneFileSuccessMessage(
-            const EditorSceneFileCommand& command,
-            const EditorSceneFileResult& result)
-        {
-            std::string message{};
-            switch (result.Operation)
-            {
-            case EditorSceneFileOperation::New:
-                message = "Created new scene";
-                break;
-            case EditorSceneFileOperation::Save:
-                message = "Saved scene";
-                break;
-            case EditorSceneFileOperation::Load:
-                message = "Opened scene";
-                break;
-            case EditorSceneFileOperation::Close:
-                message = "Closed scene";
-                break;
-            }
-            if (!command.Path.empty())
-            {
-                if (result.Operation == EditorSceneFileOperation::Save)
-                    message += " to ";
-                else if (result.Operation == EditorSceneFileOperation::Load)
-                    message += " from ";
-                else
-                    message += " ";
-                message += command.Path;
-            }
-            message += " (entities=";
-            message += std::to_string(result.Stats.Entities);
-            message += ", mesh=";
-            message += std::to_string(result.Stats.MeshEntities);
-            message += ", graph=";
-            message += std::to_string(result.Stats.GraphEntities);
-            message += ", pointCloud=";
-            message += std::to_string(result.Stats.PointCloudEntities);
-            message += ").";
-            return message;
-        }
-
-        [[nodiscard]] std::string BuildSceneFileFailureMessage(
-            const EditorSceneFileOperation operation,
-            const Core::ErrorCode error)
-        {
-            std::string message{};
-            switch (operation)
-            {
-            case EditorSceneFileOperation::New:
-                message = "Scene new failed: ";
-                break;
-            case EditorSceneFileOperation::Save:
-                message = "Scene save failed: ";
-                break;
-            case EditorSceneFileOperation::Load:
-                message = "Scene open failed: ";
-                break;
-            case EditorSceneFileOperation::Close:
-                message = "Scene close failed: ";
-                break;
-            }
-            message += ErrorName(error);
-            message += ".";
-            return message;
-        }
-
-        [[nodiscard]] std::string BuildSceneFilePendingMessage(
-            const EditorSceneFileCommand& command,
-            const EditorSceneFileOperation operation)
-        {
-            std::string message{};
-            switch (operation)
-            {
-            case EditorSceneFileOperation::New:
-                message = "Queued scene new";
-                break;
-            case EditorSceneFileOperation::Save:
-                message = "Queued scene save";
-                break;
-            case EditorSceneFileOperation::Load:
-                message = "Queued scene open";
-                break;
-            case EditorSceneFileOperation::Close:
-                message = "Queued scene close";
-                break;
-            }
-            if (!command.Path.empty())
-            {
-                if (operation == EditorSceneFileOperation::Save)
-                    message += " to ";
-                else if (operation == EditorSceneFileOperation::Load)
-                    message += " from ";
-                else
-                    message += " ";
-                message += command.Path;
-            }
-            message += ".";
-            return message;
-        }
         struct EditorRenderHintState
         {
             std::optional<G::RenderSurface> Surface{};
@@ -557,68 +160,13 @@ namespace {
             return state;
         }
 
-        [[nodiscard]] bool SameRenderSurface(
-            const G::RenderSurface& lhs,
-            const G::RenderSurface& rhs) noexcept
-        {
-            return lhs.Domain == rhs.Domain;
-        }
-
-        [[nodiscard]] bool SameRenderScalarSource(
-            const std::variant<float, std::string>& lhs,
-            const std::variant<float, std::string>& rhs) noexcept
-        {
-            if (lhs.index() != rhs.index())
-                return false;
-            if (const auto* lhsUniform = std::get_if<float>(&lhs))
-            {
-                const auto* rhsUniform = std::get_if<float>(&rhs);
-                return rhsUniform != nullptr &&
-                       std::bit_cast<std::uint32_t>(*lhsUniform) ==
-                           std::bit_cast<std::uint32_t>(*rhsUniform);
-            }
-            return std::get<std::string>(lhs) == std::get<std::string>(rhs);
-        }
-
-        [[nodiscard]] bool SameRenderEdges(
-            const G::RenderEdges& lhs,
-            const G::RenderEdges& rhs)
-        {
-            return lhs.Domain == rhs.Domain &&
-                   SameRenderScalarSource(lhs.WidthSource, rhs.WidthSource);
-        }
-
-        [[nodiscard]] bool SameRenderPoints(
-            const G::RenderPoints& lhs,
-            const G::RenderPoints& rhs)
-        {
-            return lhs.Type == rhs.Type &&
-                   SameRenderScalarSource(lhs.SizeSource, rhs.SizeSource);
-        }
-
-        template <typename T, typename SameFn>
-        [[nodiscard]] bool SameOptionalRenderComponent(
-            const std::optional<T>& lhs,
-            const std::optional<T>& rhs,
-            SameFn same)
-        {
-            if (lhs.has_value() != rhs.has_value())
-                return false;
-            if (!lhs.has_value())
-                return true;
-            return same(*lhs, *rhs);
-        }
-
         [[nodiscard]] bool SameRenderHintState(
             const EditorRenderHintState& lhs,
             const EditorRenderHintState& rhs)
         {
-            return SameOptionalRenderComponent(
-                       lhs.Surface, rhs.Surface, SameRenderSurface) &&
-                   SameOptionalRenderComponent(
-                       lhs.Edges, rhs.Edges, SameRenderEdges) &&
-                   SameOptionalRenderComponent(
-                       lhs.Points, rhs.Points, SameRenderPoints);
+            return SameRenderHintComponent(lhs.Surface, rhs.Surface) &&
+                   SameRenderHintComponent(lhs.Edges, rhs.Edges) &&
+                   SameRenderHintComponent(lhs.Points, rhs.Points);
         }
 
         [[nodiscard]] bool IsFinitePositive(const float value) noexcept
@@ -738,38 +286,6 @@ namespace {
             return G::RenderPoints::RenderType::Sphere;
         }
 
-        [[nodiscard]] EditorCommandStatus ToEditorCommandStatus(
-            const EditorCommandHistoryStatus status) noexcept
-        {
-            switch (status)
-            {
-            case EditorCommandHistoryStatus::Applied:
-            case EditorCommandHistoryStatus::Recorded:
-            case EditorCommandHistoryStatus::Undone:
-            case EditorCommandHistoryStatus::Redone:
-                return EditorCommandStatus::Applied;
-            case EditorCommandHistoryStatus::NoChange:
-                return EditorCommandStatus::NoChange;
-            case EditorCommandHistoryStatus::MissingScene:
-                return EditorCommandStatus::MissingScene;
-            case EditorCommandHistoryStatus::MissingSelectionController:
-                return EditorCommandStatus::MissingSelectionController;
-            case EditorCommandHistoryStatus::StaleEntity:
-                return EditorCommandStatus::StaleEntity;
-            case EditorCommandHistoryStatus::MissingTransform:
-                return EditorCommandStatus::MissingTransform;
-            case EditorCommandHistoryStatus::EmptyUndoStack:
-            case EditorCommandHistoryStatus::EmptyRedoStack:
-            case EditorCommandHistoryStatus::InvalidCommand:
-            case EditorCommandHistoryStatus::CommandFailed:
-            case EditorCommandHistoryStatus::UndoFailed:
-            case EditorCommandHistoryStatus::RedoFailed:
-            case EditorCommandHistoryStatus::UnsupportedOperation:
-                return EditorCommandStatus::NoChange;
-            }
-            return EditorCommandStatus::NoChange;
-        }
-
         [[nodiscard]] Core::Extent2D SafeViewport(
             const Core::Extent2D commandViewport,
             const Core::Extent2D contextViewport) noexcept
@@ -779,17 +295,6 @@ namespace {
             if (!Core::IsEmpty(contextViewport))
                 return contextViewport;
             return Core::Extent2D{1, 1};
-        }
-
-        [[nodiscard]] std::optional<ECS::EntityHandle> ResolveStableEntity(
-            const entt::registry& raw,
-            const std::uint32_t stableId)
-        {
-            const ECS::EntityHandle entity =
-                SelectionController::ToEntityHandle(stableId);
-            if (entity != ECS::InvalidEntityHandle && raw.valid(entity))
-                return entity;
-            return std::nullopt;
         }
 
         void InvalidateSelectedModelCache(const EditorSceneEditingContext& context)
@@ -805,104 +310,6 @@ namespace {
             if (status == EditorCommandStatus::Applied)
                 InvalidateSelectedModelCache(context);
             return status;
-        }
-        [[nodiscard]] bool SameTransformComponent(
-            const ECSC::Transform::Component& lhs,
-            const ECSC::Transform::Component& rhs) noexcept
-        {
-            return lhs.Position.x == rhs.Position.x &&
-                   lhs.Position.y == rhs.Position.y &&
-                   lhs.Position.z == rhs.Position.z &&
-                   lhs.Rotation.w == rhs.Rotation.w &&
-                   lhs.Rotation.x == rhs.Rotation.x &&
-                   lhs.Rotation.y == rhs.Rotation.y &&
-                   lhs.Rotation.z == rhs.Rotation.z &&
-                   lhs.Scale.x == rhs.Scale.x &&
-                   lhs.Scale.y == rhs.Scale.y &&
-                   lhs.Scale.z == rhs.Scale.z;
-        }
-
-        struct EditorTransformMutationIdentity
-        {
-            ECS::Scene::Registry* Scene{nullptr};
-            WorldHandle World{};
-            std::uint32_t StableEntityId{0u};
-        };
-
-        [[nodiscard]] EditorCommandHistoryResult ExecuteEditorTransformMutation(
-            EditorCommandHistory& history,
-            ECS::Scene::Registry* scene,
-            const WorldHandle world,
-            const std::uint32_t stableEntityId,
-            const ECSC::Transform::Component& before,
-            const ECSC::Transform::Component& after,
-            std::string label)
-        {
-            return Internal::ExecuteUndoableEntityMutation(
-                history,
-                std::move(label),
-                EditorTransformMutationIdentity{
-                    .Scene = scene,
-                    .World = world,
-                    .StableEntityId = stableEntityId,
-                },
-                before,
-                before,
-                after,
-                [](
-                    const EditorTransformMutationIdentity& identity,
-                    const ECSC::Transform::Component& expected,
-                    const ECSC::Transform::Component&)
-                {
-                    if (identity.Scene == nullptr || !identity.World.IsValid())
-                        return EditorCommandHistoryStatus::MissingScene;
-
-                    entt::registry& raw = identity.Scene->Raw();
-                    const std::optional<ECS::EntityHandle> entity =
-                        ResolveStableEntity(raw, identity.StableEntityId);
-                    if (!entity.has_value())
-                        return EditorCommandHistoryStatus::StaleEntity;
-
-                    const ECSC::Transform::Component* transform =
-                        raw.try_get<ECSC::Transform::Component>(*entity);
-                    if (transform == nullptr)
-                        return EditorCommandHistoryStatus::MissingTransform;
-                    return SameTransformComponent(*transform, expected)
-                        ? EditorCommandHistoryStatus::Applied
-                        : EditorCommandHistoryStatus::StaleEntity;
-                },
-                [](
-                    const EditorTransformMutationIdentity& identity,
-                    const ECSC::Transform::Component& target)
-                {
-                    entt::registry& raw = identity.Scene->Raw();
-                    const std::optional<ECS::EntityHandle> entity =
-                        ResolveStableEntity(raw, identity.StableEntityId);
-                    if (!entity.has_value())
-                        return EditorCommandHistoryStatus::StaleEntity;
-
-                    ECSC::Transform::Component* transform =
-                        raw.try_get<ECSC::Transform::Component>(*entity);
-                    if (transform == nullptr)
-                        return EditorCommandHistoryStatus::MissingTransform;
-                    *transform = target;
-                    return EditorCommandHistoryStatus::Applied;
-                },
-                [](
-                    const EditorTransformMutationIdentity& identity,
-                    const ECSC::Transform::Component&,
-                    const ECSC::Transform::Component& target)
-                {
-                    entt::registry& raw = identity.Scene->Raw();
-                    const std::optional<ECS::EntityHandle> entity =
-                        ResolveStableEntity(raw, identity.StableEntityId);
-                    if (entity.has_value())
-                    {
-                        raw.emplace_or_replace<ECSC::Transform::IsDirtyTag>(
-                            *entity);
-                    }
-                    return target;
-                });
         }
 } // namespace
 

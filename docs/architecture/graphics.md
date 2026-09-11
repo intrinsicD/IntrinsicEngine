@@ -13,6 +13,15 @@ Graphics is organized into explicit sublayers:
 
 ## Rules
 
+- Surface material sampling and point/surfel projection/shading math are shared
+  in GLSL includes; each entry point owns its descriptor bindings, varying and
+  push-constant ABI, mode selection and numerical fallback policy. K-means and
+  progressive-Poisson passes share their scalar BDA state layouts.
+- Vulkan swapchain creation shares descriptor and imported-image metadata
+  construction while bootstrap and recreation retain their distinct diagnostics
+  and cleanup. Transfer/readback lanes share command finalization and timeline
+  submission; each holds the queue-state lock through its own retirement work.
+
 - Graphics consumes immutable/snapshot data from higher-level systems.
 - Graphics must not depend on live ECS ownership structures.
 - Graphics-owned GPU handles, slots, leases, and backend resource IDs must not be stored in canonical `src/ecs` components.
@@ -22,6 +31,21 @@ Graphics is organized into explicit sublayers:
   `GeometryResidencyCoordinator` maps their stable keys to `GpuWorld` handles
   and owns the common update/retire lifecycle without importing ECS.
 - Runtime extraction is implemented by `Extrinsic.Runtime.RenderExtraction`, which queries live ECS, maintains entity-to-graphics sidecars outside canonical ECS components, and submits `RuntimeRenderSnapshotBatch` records through `IRenderer::SubmitRuntimeSnapshots()`.
+- Transient debug and visualization uploads share the packed color-vertex ABI,
+  color packing and buffer growth/write routine in
+  `Graphics.TransientDebugUploadHelper`; each helper owns its per-lane limits
+  and reusable frame slots. Their pipeline factories use one descriptor
+  initializer for HDR color, prepass depth, disabled blending and depth writes.
+- `RHI::NullCommandContext` supplies the inert command surface for the Null
+  backend and CPU-only compute execution; recording test doubles keep their
+  own implementations.
+- Opaque surface passes share `RecordOpaqueSurfaceBucket` from the culling
+  module for bucket validation and bind/push/indirect recording. Each pass
+  retains its feature eligibility; depth prepass explicitly supplies its
+  indirect-draw cap while the other passes retain bucket capacity.
+- `GpuWorld` exports `FingerprintSurfaceIndices` so retained surface-index
+  identity and texture-bake atlas acceptance use the same nonzero FNV-1a
+  word-stream implementation. Words are encoded least-significant byte first.
 - Property-backed rendering follows the canonical [geometry property CPU/GPU coherence contract](property-coherence.md): runtime compares per-consumer property revisions, submits only affected copied plan channels, and graphics keeps `GpuWorld` as the single packed residency owner. `GpuWorld` normally routes device-local scene/geometry writes through the asynchronous transfer staging belt and records the existing transfer-write barriers; a rejected staging submission alone takes the synchronous correctness fallback.
 - Frame pipelining is runtime-owned: `Engine` drives a runtime-side `Extrinsic.Runtime.RenderWorldPool` (`GRAPHICS-036A`) around extraction — the producer acquires/publishes a back slot, the synchronous consumer acquires/releases the current front, and the opt-in pipelined consumer acquires/releases the previous front for sim-N / render-N-1 — sized from the core-owned `RenderConfig::SynchronousExtraction` flag (default `true` -> one logical buffer, behavior-preserving; otherwise triple-buffered). The pool manages only slot indices and atomics and introduces no graphics dependency edge. The renderer retains one snapshot-storage copy per pool slot, keyed by the `storageSlot` passed through `SubmitRuntimeSnapshots(..., storageSlot)` and `ExtractRenderWorld(..., storageSlot)`, so extraction-N writes a different retained copy from render-N-1. `GRAPHICS-036C` wires the lifecycle into `Engine::RunFrame` and mirrors the pool's three diagnostics counters onto the extraction stats; `GRAPHICS-036D` proves the opt-in render-N-1 path under `integration;runtime;graphics` CPU/null coverage. The production default remains synchronous.
 - `graphics/rhi` is platform-neutral and depends on `core` only. `RHI::IDevice::Initialize` takes a `RHI::DeviceCreateDesc` (render config + framebuffer extent + opaque native window handle); runtime composition fills it from its live `Platform::IWindow` so neither RHI nor concrete backends (Vulkan, Null) import `Extrinsic.Platform.*`. Backends that need a native surface (Vulkan/GLFW) cast `NativeWindowHandle` to their platform-native type; backends that don't (Null) consume only `InitialFramebufferExtent`. See `ARCH-005` / `WORKSHOP-002` (2026-05-17) for the boundary fix that retired the previous `graphics/rhi -> platform` edge.

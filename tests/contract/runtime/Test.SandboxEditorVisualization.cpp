@@ -110,6 +110,12 @@ namespace ECS = Extrinsic::ECS;
 namespace ECSC = Extrinsic::ECS::Components;
 namespace Dirty = Extrinsic::ECS::Components::DirtyTags;
 namespace GS = Extrinsic::ECS::Components::GeometrySources;
+using Intrinsic::Tests::EditorGeometry::SetPositions;
+using Intrinsic::Tests::EditorGeometry::SetTexcoords;
+using Intrinsic::Tests::EditorGeometry::SetEdges;
+using Intrinsic::Tests::EditorGeometry::SetHalfedges;
+using Intrinsic::Tests::EditorGeometry::SetFaces;
+using Intrinsic::Tests::EditorGeometry::AddTriangleMeshSource;
 namespace Sel = Extrinsic::ECS::Components::Selection;
 namespace G = Extrinsic::Graphics::Components;
 namespace Graphics = Extrinsic::Graphics;
@@ -133,9 +139,6 @@ namespace
         return *service;
     }
 
-constexpr std::uint32_t kInvalidIndex =
-        std::numeric_limits<std::uint32_t>::max();
-
 [[nodiscard]] ECS::EntityHandle MakeSelectable(
         ECS::Scene::Registry& registry,
         std::string name)
@@ -156,25 +159,6 @@ void AddPointCloudSource(ECS::Scene::Registry& registry,
         auto& vertices = registry.Raw().emplace<GS::Vertices>(entity);
         vertices.Properties.Resize(pointCount);
         registry.Raw().emplace<G::RenderPoints>(entity);
-    }
-
-void SetPositions(GS::Vertices& vertices,
-                      const std::vector<glm::vec3>& positions)
-    {
-        vertices.Properties.Resize(positions.size());
-        auto pos = vertices.Properties.GetOrAdd<glm::vec3>(
-            std::string{PN::kPosition},
-            glm::vec3{0.0f});
-        pos.Vector() = positions;
-    }
-
-void SetTexcoords(GS::Vertices& vertices,
-                      const std::vector<glm::vec2>& texcoords)
-    {
-        auto uv = vertices.Properties.GetOrAdd<glm::vec2>(
-            "v:texcoord",
-            glm::vec2{0.0f});
-        uv.Vector() = texcoords;
     }
 
     // A small deterministic, asymmetric point lattice — distinct extents per axis
@@ -216,79 +200,6 @@ void SetFloatProperty(Geometry::PropertySet& properties,
     {
         auto prop = properties.GetOrAdd<float>(name, 0.0f);
         prop.Vector() = values;
-    }
-
-void SetEdges(GS::Edges& edges,
-                  const std::vector<std::uint32_t>& v0,
-                  const std::vector<std::uint32_t>& v1)
-    {
-        edges.Properties.Resize(v0.size());
-        auto p0 = edges.Properties.GetOrAdd<std::uint32_t>(
-            std::string{PN::kEdgeV0},
-            0u);
-        auto p1 = edges.Properties.GetOrAdd<std::uint32_t>(
-            std::string{PN::kEdgeV1},
-            0u);
-        p0.Vector() = v0;
-        p1.Vector() = v1;
-    }
-
-void SetHalfedges(GS::Halfedges& halfedges,
-                      const std::vector<std::uint32_t>& toVertex,
-                      const std::vector<std::uint32_t>& next,
-                      const std::vector<std::uint32_t>& face)
-    {
-        halfedges.Properties.Resize(toVertex.size());
-        auto to = halfedges.Properties.GetOrAdd<std::uint32_t>(
-            std::string{PN::kHalfedgeToVertex},
-            kInvalidIndex);
-        auto nx = halfedges.Properties.GetOrAdd<std::uint32_t>(
-            std::string{PN::kHalfedgeNext},
-            kInvalidIndex);
-        auto fa = halfedges.Properties.GetOrAdd<std::uint32_t>(
-            std::string{PN::kHalfedgeFace},
-            kInvalidIndex);
-        to.Vector() = toVertex;
-        nx.Vector() = next;
-        fa.Vector() = face;
-    }
-
-void SetFaces(GS::Faces& faces,
-                  const std::vector<std::uint32_t>& faceHalfedge)
-    {
-        faces.Properties.Resize(faceHalfedge.size());
-        auto halfedge = faces.Properties.GetOrAdd<std::uint32_t>(
-            std::string{PN::kFaceHalfedge},
-            kInvalidIndex);
-        halfedge.Vector() = faceHalfedge;
-    }
-
-void AddTriangleMeshSource(ECS::Scene::Registry& registry,
-                               const ECS::EntityHandle entity)
-    {
-        auto& raw = registry.Raw();
-        auto& vertices = raw.emplace<GS::Vertices>(entity);
-        SetPositions(vertices,
-                     {
-                         {0.0f, 0.0f, 0.0f},
-                         {1.0f, 0.0f, 0.0f},
-                         {0.0f, 1.0f, 0.0f},
-                     });
-        SetTexcoords(vertices,
-                     {
-                         {0.0f, 0.0f},
-                         {1.0f, 0.0f},
-                         {0.0f, 1.0f},
-                     });
-        auto& edges = raw.emplace<GS::Edges>(entity);
-        SetEdges(edges, {0u, 1u, 2u}, {1u, 2u, 0u});
-        auto& halfedges = raw.emplace<GS::Halfedges>(entity);
-        SetHalfedges(halfedges,
-                     {1u, 2u, 0u, 0u, 2u, 1u},
-                     {1u, 2u, 0u, 5u, 3u, 4u},
-                     {0u, 0u, 0u, kInvalidIndex, kInvalidIndex, kInvalidIndex});
-        auto& faces = raw.emplace<GS::Faces>(entity);
-        SetFaces(faces, {0u});
     }
 
 [[nodiscard]] Runtime::GeometryPresentationRecipe
@@ -438,6 +349,18 @@ TEST(SandboxEditorUi, VertexChannelBindingCommandRebindsNormalsForMeshGraphAndPo
             ASSERT_NE(customOption, normalTarget->Options.end());
             EXPECT_TRUE(customOption->Compatible);
             EXPECT_EQ(customOption->ElementCount, expectedCount);
+
+            const auto scalarOption = std::find_if(
+                normalTarget->Options.begin(), normalTarget->Options.end(),
+                [catalogDomain](const Runtime::EditorVertexChannelBindingOptionModel& option)
+                {
+                    return option.Domain == catalogDomain &&
+                           option.PropertyName == "v:temperature";
+                });
+            ASSERT_NE(scalarOption, normalTarget->Options.end());
+            EXPECT_FALSE(scalarOption->Compatible);
+            EXPECT_EQ(scalarOption->Resolver.Status, Runtime::AttributeBindStatus::TypeMismatch);
+            EXPECT_FALSE(scalarOption->DisabledReason.empty());
 
             registry.Raw().remove<Dirty::DirtyVertexAttributes,
                                   Dirty::DirtyVertexNormals>(entity);
@@ -1299,6 +1222,39 @@ TEST(SandboxEditorUi,
     EXPECT_EQ(transform.Scale, after.Scale);
     EXPECT_TRUE(
         registry.Raw().all_of<ECSC::Transform::IsDirtyTag>(entity));
+}
+TEST(SandboxEditorUi, TransformEditHistoryRejectsDestroyedEntityOnUndoAndRedo)
+{
+    for (const bool redo : {false, true})
+    {
+        SCOPED_TRACE(redo ? "redo" : "undo");
+        ECS::Scene::Registry registry;
+        Runtime::SelectionController selection;
+        Runtime::EditorCommandHistory history;
+        const ECS::EntityHandle entity = MakeSelectable(registry, "Removed");
+        auto context = MakeContext(registry, selection);
+        context.CommandHistory = &history;
+        ASSERT_EQ(Runtime::ApplyEditorTransformEdit(
+                      context,
+                      Runtime::EditorTransformEditCommand{
+                          .StableEntityId =
+                              Runtime::SelectionController::ToStableEntityId(entity),
+                          .SetPosition = true,
+                          .Position = glm::vec3{4.0f, 5.0f, 6.0f},
+                      }),
+                  Runtime::EditorCommandStatus::Applied);
+        if (redo)
+            ASSERT_EQ(history.Undo().Status,
+                      Runtime::EditorCommandHistoryStatus::Undone);
+
+        const auto revision = history.Snapshot().Revision;
+        registry.Destroy(entity);
+        const auto result = redo ? history.Redo() : history.Undo();
+        EXPECT_EQ(result.Status, Runtime::EditorCommandHistoryStatus::StaleEntity);
+        EXPECT_EQ(history.UndoCount(), redo ? 0u : 1u);
+        EXPECT_EQ(history.RedoCount(), redo ? 1u : 0u);
+        EXPECT_EQ(history.Snapshot().Revision, revision);
+    }
 }
 TEST(SandboxEditorUi, CameraControllerCommandReplacesMainController)
 {

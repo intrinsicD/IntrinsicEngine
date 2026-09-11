@@ -1,0 +1,23 @@
+{
+  "command": [
+    "/bin/bash",
+    "-o",
+    "pipefail",
+    "-c",
+    "python3 tests/regression/tooling/Test.WorkflowConcurrency.py && python3 tests/regression/tooling/Test.WorkflowRouting.py && python3 tests/regression/tooling/Test.CcacheWorkflow.py && python3 tests/regression/tooling/Test.CiTiming.py && python3 tests/regression/tooling/Test.SanitizerPresets.py && python3 tests/regression/tooling/Test.TouchedScope.py && python3 tools/ci/check_workflow_names.py --root .github/workflows --strict"
+  ],
+  "command_display": "/bin/bash -o pipefail -c 'python3 tests/regression/tooling/Test.WorkflowConcurrency.py && python3 tests/regression/tooling/Test.WorkflowRouting.py && python3 tests/regression/tooling/Test.CcacheWorkflow.py && python3 tests/regression/tooling/Test.CiTiming.py && python3 tests/regression/tooling/Test.SanitizerPresets.py && python3 tests/regression/tooling/Test.TouchedScope.py && python3 tools/ci/check_workflow_names.py --root .github/workflows --strict'",
+  "cwd": ".",
+  "duration_ms": 12899,
+  "exit_code": 0,
+  "finished_at": "2026-09-11T03:10:53Z",
+  "label": "ci-workflow-regressions",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-09-11T03:10:40Z",
+  "stderr_path": "tasks/evidence/RORG-134/commands/ci-workflow-regressions.stderr.log",
+  "stderr_sha256": "1072a9a668511c28cb2943db292bd87239add213e6700fb730d3f982a7b72f7c",
+  "stdout_path": "tasks/evidence/RORG-134/commands/ci-workflow-regressions.stdout.log",
+  "stdout_sha256": "57720d5f9ed89e3213f2b6d5bb24d98dba2fedca7dc90fec1282e3d9c577727f",
+  "task_id": "RORG-134"
+}

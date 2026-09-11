@@ -149,7 +149,7 @@ TEST(GraphicsSelectionPassContracts, EntityAndFaceIdPassesDrawSurfaceBucket)
     world.SyncFrame();
 
     Graphics::CullingSystem culling;
-    ASSERT_TRUE(culling.Initialize(device, bufferMgr, pipelineMgr, "shaders/culling/instance_cull.comp"));
+    ASSERT_TRUE(culling.Initialize(device, bufferMgr, pipelineMgr, "shaders/instance_cull.comp"));
     const auto& bucket = culling.GetBucket(RHI::GpuDrawBucketKind::SurfaceOpaque);
 
     Graphics::SelectionSystem selection;
@@ -195,7 +195,7 @@ TEST(GraphicsSelectionPassContracts, EdgeAndPointIdPassesDrawLineAndPointBuckets
     world.SyncFrame();
 
     Graphics::CullingSystem culling;
-    ASSERT_TRUE(culling.Initialize(device, bufferMgr, pipelineMgr, "shaders/culling/instance_cull.comp"));
+    ASSERT_TRUE(culling.Initialize(device, bufferMgr, pipelineMgr, "shaders/instance_cull.comp"));
     Graphics::SelectionSystem selection;
     selection.Initialize();
     RHI::CameraUBO camera{};

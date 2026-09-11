@@ -112,12 +112,6 @@ namespace Extrinsic::Sandbox::Editor
             return index < names.size() ? names[index] : "Unknown";
         }
 
-        [[nodiscard]] bool DomainWindowReady(
-            const Runtime::EditorDomainWindowModel& model) noexcept
-        {
-            return model.HasSelectedEntity && model.DomainMatches;
-        }
-
         [[nodiscard]] const char* MeshDenoiseStageName(
             const Runtime::EditorMeshDenoiseStage stage) noexcept
         {
@@ -125,60 +119,6 @@ namespace Extrinsic::Sandbox::Editor
                     Runtime::EditorMeshDenoiseStage::FullBilateral
                 ? "Full bilateral"
                 : "Unknown";
-        }
-
-        void DrawDiagnostics(
-            const std::vector<Runtime::EditorDiagnostic>& diagnostics)
-        {
-            for (const Runtime::EditorDiagnostic& diagnostic : diagnostics)
-            {
-                ImGui::TextDisabled(
-                    "%s: %s",
-                    Runtime::DebugNameForEditorDiagnosticCode(
-                        diagnostic.Code),
-                    diagnostic.Message.c_str());
-            }
-        }
-
-        // Dismissal clears both the panel result and the session slot that
-        // rebuilds it. Draw this control after all readers of the panel result.
-        template <typename ResultT>
-        void DrawDismissLastResultButton(
-            const char* const label,
-            std::optional<ResultT>& panelResult,
-            const Runtime::EditorGeometryProcessingResultSlot slot,
-            const SandboxEditorContext& context)
-        {
-            if (!ImGui::SmallButton(label))
-                return;
-            panelResult.reset();
-            if (context.MethodResultSinks.DismissResult)
-                context.MethodResultSinks.DismissResult(slot);
-        }
-
-        void DrawDomainWindowHeader(
-            const Runtime::EditorDomainWindowModel& model)
-        {
-            ImGui::Text(
-                "Expected domain: %s",
-                Runtime::DebugNameForEditorGeometryDomain(
-                    model.ExpectedDomain));
-            if (model.HasSelectedEntity)
-            {
-                ImGui::Text(
-                    "Selected: %s (%u)",
-                    model.SelectedEntity.Name.c_str(),
-                    model.SelectedStableId);
-                ImGui::Text(
-                    "Selected domain: %s",
-                    Runtime::DebugNameForEditorGeometryDomain(
-                        model.SelectedDomain));
-            }
-            else
-            {
-                ImGui::TextDisabled("Selected: none");
-            }
-            DrawDiagnostics(model.Diagnostics);
         }
 
         template <typename T, std::size_t N>

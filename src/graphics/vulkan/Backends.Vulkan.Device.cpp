@@ -352,6 +352,84 @@ namespace
         return probe;
     }
 
+    // Callers retain query diagnostics, resource adoption and failure cleanup.
+    [[nodiscard]] VkSwapchainCreateInfoKHR MakeSwapchainCreateInfo(
+        const VkSurfaceCapabilitiesKHR& capabilities,
+        const VkSurfaceFormatKHR format, const VkPresentModeKHR presentMode,
+        const VkExtent2D extent, const VkSurfaceKHR surface,
+        const VkSwapchainKHR oldSwapchain,
+        const std::array<std::uint32_t, 2>& queueFamilies)
+    {
+        std::uint32_t imageCount = capabilities.minImageCount + 1u;
+        if (capabilities.maxImageCount > 0u && imageCount > capabilities.maxImageCount)
+            imageCount = capabilities.maxImageCount;
+        VkSwapchainCreateInfoKHR info{};
+        info.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
+        info.surface = surface;
+        info.minImageCount = imageCount;
+        info.imageFormat = format.format;
+        info.imageColorSpace = format.colorSpace;
+        info.imageExtent = extent;
+        info.imageArrayLayers = 1u;
+        info.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+        if ((capabilities.supportedUsageFlags & VK_IMAGE_USAGE_TRANSFER_SRC_BIT) != 0u)
+            info.imageUsage |= VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
+        if (queueFamilies[0] != queueFamilies[1])
+        {
+            info.imageSharingMode = VK_SHARING_MODE_CONCURRENT;
+            info.queueFamilyIndexCount = 2u;
+            info.pQueueFamilyIndices = queueFamilies.data();
+        }
+        else
+        {
+            info.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
+        }
+        info.preTransform = capabilities.currentTransform;
+        info.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
+        info.presentMode = presentMode;
+        info.clipped = VK_TRUE;
+        info.oldSwapchain = oldSwapchain;
+        return info;
+    }
+
+    [[nodiscard]] VkImageViewCreateInfo MakeSwapchainImageViewInfo(
+        const VkImage image, const VkFormat format)
+    {
+        VkImageViewCreateInfo info{};
+        info.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+        info.image = image;
+        info.viewType = VK_IMAGE_VIEW_TYPE_2D;
+        info.format = format;
+        info.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+        info.subresourceRange.baseMipLevel = 0u;
+        info.subresourceRange.levelCount = 1u;
+        info.subresourceRange.baseArrayLayer = 0u;
+        info.subresourceRange.layerCount = 1u;
+        return info;
+    }
+
+    [[nodiscard]] VulkanImage MakeImportedSwapchainImage(
+        const VkImage image, const VkImageView view, const VkFormat format,
+        const VkExtent2D extent, const VkImageUsageFlags usage)
+    {
+        VulkanImage imported{};
+        imported.Image = image;
+        imported.View = view;
+        imported.Format = format;
+        imported.RhiFormat = RHI::Format::Undefined;
+        imported.Dimension = RHI::TextureDimension::Tex2D;
+        imported.Usage = usage;
+        imported.Width = extent.width;
+        imported.Height = extent.height;
+        imported.Depth = 1u;
+        imported.MipLevels = 1u;
+        imported.ArrayLayers = 1u;
+        imported.CurrentLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+        imported.OwnsImage = false;
+        imported.OwnsMemory = false;
+        return imported;
+    }
+
     [[nodiscard]] VkSurfaceFormatKHR ChooseSwapchainSurfaceFormat(const std::vector<VkSurfaceFormatKHR>& formats)
     {
         for (const VkSurfaceFormatKHR& format : formats)
@@ -1171,48 +1249,10 @@ VkResult VulkanDevice::CreateSwapchainResources(const std::uint32_t requestedWid
     if (swapchainExtent.width == 0u || swapchainExtent.height == 0u)
         return VK_ERROR_OUT_OF_DATE_KHR;
 
-    std::uint32_t desiredImageCount = surfaceCapabilities.minImageCount + 1u;
-    if (surfaceCapabilities.maxImageCount > 0u && desiredImageCount > surfaceCapabilities.maxImageCount)
-        desiredImageCount = surfaceCapabilities.maxImageCount;
-
-    const std::uint32_t queueFamilyIndices[] = {m_GraphicsFamily, m_PresentFamily};
-    // GRAPHICS-076E: opt into TRANSFER_SRC for the swapchain images when the
-    // surface advertises it. The default-recipe backbuffer-to-host readback
-    // path records vkCmdCopyImageToBuffer with the backbuffer as the source,
-    // which requires `VK_IMAGE_USAGE_TRANSFER_SRC_BIT` on the image. The flag
-    // is commonly supported but not guaranteed by the Vulkan spec; when the
-    // surface omits it we keep the prior usage set and the gpu;vulkan smoke
-    // trips its own operational-counter assertion instead of producing
-    // undefined results.
-    VkImageUsageFlags swapchainImageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
-    if ((surfaceCapabilities.supportedUsageFlags & VK_IMAGE_USAGE_TRANSFER_SRC_BIT) != 0u)
-    {
-        swapchainImageUsage |= VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
-    }
-    VkSwapchainCreateInfoKHR swapchainInfo{};
-    swapchainInfo.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
-    swapchainInfo.surface = m_Surface;
-    swapchainInfo.minImageCount = desiredImageCount;
-    swapchainInfo.imageFormat = surfaceFormat.format;
-    swapchainInfo.imageColorSpace = surfaceFormat.colorSpace;
-    swapchainInfo.imageExtent = swapchainExtent;
-    swapchainInfo.imageArrayLayers = 1u;
-    swapchainInfo.imageUsage = swapchainImageUsage;
-    if (m_GraphicsFamily != m_PresentFamily)
-    {
-        swapchainInfo.imageSharingMode = VK_SHARING_MODE_CONCURRENT;
-        swapchainInfo.queueFamilyIndexCount = 2u;
-        swapchainInfo.pQueueFamilyIndices = queueFamilyIndices;
-    }
-    else
-    {
-        swapchainInfo.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
-    }
-    swapchainInfo.preTransform = surfaceCapabilities.currentTransform;
-    swapchainInfo.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
-    swapchainInfo.presentMode = presentMode;
-    swapchainInfo.clipped = VK_TRUE;
-    swapchainInfo.oldSwapchain = oldSwapchain;
+    const std::array<std::uint32_t, 2> queueFamilyIndices{m_GraphicsFamily, m_PresentFamily};
+    const VkSwapchainCreateInfoKHR swapchainInfo = MakeSwapchainCreateInfo(
+        surfaceCapabilities, surfaceFormat, presentMode, swapchainExtent,
+        m_Surface, oldSwapchain, queueFamilyIndices);
 
     result = vkCreateSwapchainKHR(m_Device, &swapchainInfo, nullptr, &outState.Swapchain);
     if (result != VK_SUCCESS || outState.Swapchain == VK_NULL_HANDLE)
@@ -1248,16 +1288,8 @@ VkResult VulkanDevice::CreateSwapchainResources(const std::uint32_t requestedWid
     for (VkImage swapchainImage : outState.Images)
     {
         VkImageView imageView = VK_NULL_HANDLE;
-        VkImageViewCreateInfo viewInfo{};
-        viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-        viewInfo.image = swapchainImage;
-        viewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
-        viewInfo.format = outState.Format;
-        viewInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-        viewInfo.subresourceRange.baseMipLevel = 0u;
-        viewInfo.subresourceRange.levelCount = 1u;
-        viewInfo.subresourceRange.baseArrayLayer = 0u;
-        viewInfo.subresourceRange.layerCount = 1u;
+        const VkImageViewCreateInfo viewInfo = MakeSwapchainImageViewInfo(
+            swapchainImage, outState.Format);
 
         result = vkCreateImageView(m_Device, &viewInfo, nullptr, &imageView);
         if (result != VK_SUCCESS || imageView == VK_NULL_HANDLE)
@@ -1279,26 +1311,9 @@ VkResult VulkanDevice::CreateSwapchainResources(const std::uint32_t requestedWid
 
     for (std::size_t imageIndex = 0; imageIndex < outState.Images.size(); ++imageIndex)
     {
-        VulkanImage importedImage{};
-        importedImage.Image = outState.Images[imageIndex];
-        importedImage.View = outState.Views[imageIndex];
-        importedImage.Format = outState.Format;
-        importedImage.RhiFormat = RHI::Format::Undefined;
-        importedImage.Dimension = RHI::TextureDimension::Tex2D;
-        // GRAPHICS-033D: mirror the swapchain's negotiated usage so the
-        // backend-internal `HasImageUsage(image->Usage, VK_IMAGE_USAGE_*)`
-        // checks (e.g. the GRAPHICS-033D backbuffer-to-host readback path)
-        // honour the live TRANSFER_SRC opt-in from
-        // CreateSwapchainResources().
-        importedImage.Usage = swapchainImageUsage;
-        importedImage.Width = outState.Extent.width;
-        importedImage.Height = outState.Extent.height;
-        importedImage.Depth = 1u;
-        importedImage.MipLevels = 1u;
-        importedImage.ArrayLayers = 1u;
-        importedImage.CurrentLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-        importedImage.OwnsImage = false;
-        importedImage.OwnsMemory = false;
+        VulkanImage importedImage = MakeImportedSwapchainImage(
+            outState.Images[imageIndex], outState.Views[imageIndex],
+            outState.Format, outState.Extent, swapchainInfo.imageUsage);
 
         outState.Handles.push_back(m_Images.Add(std::move(importedImage)));
     }
@@ -1959,44 +1974,10 @@ void VulkanDevice::Initialize(const RHI::DeviceCreateDesc& desc)
         const VkExtent2D swapchainExtent = ChooseSwapchainExtent(surfaceCapabilities,
                                                                  desc.InitialFramebufferExtent);
 
-        std::uint32_t desiredImageCount = surfaceCapabilities.minImageCount + 1u;
-        if (surfaceCapabilities.maxImageCount > 0u && desiredImageCount > surfaceCapabilities.maxImageCount)
-            desiredImageCount = surfaceCapabilities.maxImageCount;
-
-        const std::uint32_t queueFamilyIndices[] = {m_GraphicsFamily, m_PresentFamily};
-        // GRAPHICS-033D: mirror the CreateSwapchainResources() opt-in so the
-        // backbuffer-to-host readback path keeps working across the bootstrap
-        // swapchain creation site too (kept in sync with the recreation path
-        // for symmetry).
-        VkImageUsageFlags swapchainImageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
-        if ((surfaceCapabilities.supportedUsageFlags & VK_IMAGE_USAGE_TRANSFER_SRC_BIT) != 0u)
-        {
-            swapchainImageUsage |= VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
-        }
-        VkSwapchainCreateInfoKHR swapchainInfo{};
-        swapchainInfo.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
-        swapchainInfo.surface = m_Surface;
-        swapchainInfo.minImageCount = desiredImageCount;
-        swapchainInfo.imageFormat = surfaceFormat.format;
-        swapchainInfo.imageColorSpace = surfaceFormat.colorSpace;
-        swapchainInfo.imageExtent = swapchainExtent;
-        swapchainInfo.imageArrayLayers = 1u;
-        swapchainInfo.imageUsage = swapchainImageUsage;
-        if (m_GraphicsFamily != m_PresentFamily)
-        {
-            swapchainInfo.imageSharingMode = VK_SHARING_MODE_CONCURRENT;
-            swapchainInfo.queueFamilyIndexCount = 2u;
-            swapchainInfo.pQueueFamilyIndices = queueFamilyIndices;
-        }
-        else
-        {
-            swapchainInfo.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
-        }
-        swapchainInfo.preTransform = surfaceCapabilities.currentTransform;
-        swapchainInfo.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
-        swapchainInfo.presentMode = presentMode;
-        swapchainInfo.clipped = VK_TRUE;
-        swapchainInfo.oldSwapchain = VK_NULL_HANDLE;
+        const std::array<std::uint32_t, 2> queueFamilyIndices{m_GraphicsFamily, m_PresentFamily};
+        const VkSwapchainCreateInfoKHR swapchainInfo = MakeSwapchainCreateInfo(
+            surfaceCapabilities, surfaceFormat, presentMode, swapchainExtent,
+            m_Surface, VK_NULL_HANDLE, queueFamilyIndices);
 
         result = vkCreateSwapchainKHR(m_Device, &swapchainInfo, nullptr, &m_Swapchain);
         diagnostics.LastVkResult = static_cast<std::int32_t>(result);
@@ -2047,16 +2028,8 @@ void VulkanDevice::Initialize(const RHI::DeviceCreateDesc& desc)
         for (VkImage swapchainImage : m_SwapchainImages)
         {
             VkImageView imageView = VK_NULL_HANDLE;
-            VkImageViewCreateInfo viewInfo{};
-            viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-            viewInfo.image = swapchainImage;
-            viewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
-            viewInfo.format = m_SwapchainFormat;
-            viewInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-            viewInfo.subresourceRange.baseMipLevel = 0u;
-            viewInfo.subresourceRange.levelCount = 1u;
-            viewInfo.subresourceRange.baseArrayLayer = 0u;
-            viewInfo.subresourceRange.layerCount = 1u;
+            const VkImageViewCreateInfo viewInfo = MakeSwapchainImageViewInfo(
+                swapchainImage, m_SwapchainFormat);
 
             result = vkCreateImageView(m_Device, &viewInfo, nullptr, &imageView);
             diagnostics.LastVkResult = static_cast<std::int32_t>(result);
@@ -2069,24 +2042,8 @@ void VulkanDevice::Initialize(const RHI::DeviceCreateDesc& desc)
                 return;
             }
 
-            VulkanImage importedImage{};
-            importedImage.Image = swapchainImage;
-            importedImage.View = imageView;
-            importedImage.Format = m_SwapchainFormat;
-            importedImage.RhiFormat = RHI::Format::Undefined;
-            importedImage.Dimension = RHI::TextureDimension::Tex2D;
-            // GRAPHICS-033D: record the live swapchain usage (kept in sync with
-            // the chosen `swapchainImageUsage` above, including the
-            // TRANSFER_SRC opt-in when the surface advertises it).
-            importedImage.Usage = swapchainImageUsage;
-            importedImage.Width = m_SwapchainExtent.width;
-            importedImage.Height = m_SwapchainExtent.height;
-            importedImage.Depth = 1u;
-            importedImage.MipLevels = 1u;
-            importedImage.ArrayLayers = 1u;
-            importedImage.CurrentLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-            importedImage.OwnsImage = false;
-            importedImage.OwnsMemory = false;
+            VulkanImage importedImage = MakeImportedSwapchainImage(
+                swapchainImage, imageView, m_SwapchainFormat, m_SwapchainExtent, swapchainInfo.imageUsage);
 
             m_SwapchainViews.push_back(imageView);
             m_SwapchainHandles.push_back(m_Images.Add(std::move(importedImage)));

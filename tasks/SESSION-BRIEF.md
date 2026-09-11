@@ -13,6 +13,7 @@ picking backlog work; theme priorities and rationale live in
 - `METHOD-043` — Thickness and curve-aligned parts comparison (tasks/active/METHOD-043-thickness-and-curve-parts-comparison.md)
 - `METHOD-044` — Feature-aware patches and distortion-aware atlas merging (tasks/active/METHOD-044-feature-aware-atlas-merge-experiment.md)
 - `METHOD-045` — Preserve baseline regions while constructing UV charts (tasks/active/METHOD-045-baseline-preserving-atlas-cuts.md)
+- `RORG-134` — Complete the bounded code-reuse audit run (tasks/active/RORG-134-code-reuse-audit-completion.md)
 - `RUNTIME-209` — Point-set outlier analysis and publication split (tasks/active/RUNTIME-209-point-set-outlier-analysis-publication.md)
 - `RUNTIME-219` — Vulkan LBVH neighborhoods for normal estimation (tasks/active/RUNTIME-219-vulkan-normal-neighborhoods.md)
 - `RUNTIME-220` — Kernel density with shared spatial backends (tasks/active/RUNTIME-220-kernel-density-spatial-backends.md)
@@ -138,6 +139,7 @@ picking backlog work; theme priorities and rationale live in
 - unblocked: `BUG-181` — Touched-scope shader-output command uses an unsupported flag (tasks/backlog/bugs/BUG-181-touched-scope-shader-output-command.md)
 - unblocked: `BUG-182` — Framed kNN smoke times out when promoted Vulkan is not compiled (tasks/backlog/bugs/BUG-182-framed-knn-unavailable-device-timeout.md)
 - unblocked: `BUG-184` — Count waiting jobs in aggregate in-flight diagnostics (tasks/backlog/bugs/BUG-184-job-service-waiting-state-accounting.md)
+- unblocked: `BUG-187` — Reconcile interlocked single-worker test reservations (tasks/backlog/bugs/BUG-187-interlocked-worker-budget-inventory.md)
 - unblocked: `GRAPHICS-109` — Offscreen frame capture to PNG (headless figure renders) (tasks/backlog/rendering/GRAPHICS-109-offscreen-frame-capture-png.md)
 
 ## Audits

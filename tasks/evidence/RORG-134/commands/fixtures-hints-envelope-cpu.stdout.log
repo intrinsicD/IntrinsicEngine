@@ -1,0 +1,45 @@
+4498/4508 Test #4593: RuntimeSandboxAcceptance.MeshGraphPointCloudAllResideThroughOneExtraction .......................................   Passed    0.04 sec
+          Start 4594: RuntimeSandboxAcceptance.CameraControllerProducesFiniteInvertibleFrameCamera
+4499/4508 Test #4594: RuntimeSandboxAcceptance.CameraControllerProducesFiniteInvertibleFrameCamera ....................................   Passed    0.00 sec
+          Start 4595: RuntimeSandboxAcceptance.ComposedCameraModuleDrivesFiniteFirstFrame
+4500/4508 Test #4595: RuntimeSandboxAcceptance.ComposedCameraModuleDrivesFiniteFirstFrame .............................................   Passed    0.04 sec
+          Start 4596: RuntimeSandboxAcceptance.SelectionControllerSelectsEntityOfEachFamily
+4501/4508 Test #4596: RuntimeSandboxAcceptance.SelectionControllerSelectsEntityOfEachFamily ...........................................   Passed    0.04 sec
+          Start 4597: RuntimeSandboxAcceptance.EditorWorkspaceSnapshotEnumeratesAcceptanceScene
+4502/4508 Test #4597: RuntimeSandboxAcceptance.EditorWorkspaceSnapshotEnumeratesAcceptanceScene .......................................   Passed    0.04 sec
+          Start 4598: RuntimeSandboxAcceptance.PrimitiveRefinementResolvesOneDomainPerFamily
+4503/4508 Test #4598: RuntimeSandboxAcceptance.PrimitiveRefinementResolvesOneDomainPerFamily ..........................................   Passed    0.04 sec
+          Start 4599: RuntimeSandboxAcceptance.SelectionOutlineSnapshotPopulatedForSelectedEntity
+4504/4508 Test #4599: RuntimeSandboxAcceptance.SelectionOutlineSnapshotPopulatedForSelectedEntity .....................................   Passed    0.04 sec
+          Start 4600: RuntimeSandboxAcceptance.ViewportLeftClickSubmitsSelectionPick
+4505/4508 Test #4600: RuntimeSandboxAcceptance.ViewportLeftClickSubmitsSelectionPick ..................................................   Passed    0.04 sec
+          Start 4601: RuntimeSandboxAcceptance.IdleFrameSkipsPreRenderTransformFlush
+4506/4508 Test #4601: RuntimeSandboxAcceptance.IdleFrameSkipsPreRenderTransformFlush ..................................................   Passed    0.04 sec
+          Start 4602: RuntimeSandboxAcceptance.InspectorTransformEditFlushedToRenderStateSameFrame
+4507/4508 Test #4602: RuntimeSandboxAcceptance.InspectorTransformEditFlushedToRenderStateSameFrame ....................................   Passed    0.04 sec
+          Start 4603: GlfwLifecycleLsan.EngineStaticTeardownAndLeakControl
+4508/4508 Test #4603: GlfwLifecycleLsan.EngineStaticTeardownAndLeakControl ............................................................***Skipped   0.01 sec
+
+100% tests passed, 0 tests failed out of 4508
+
+Label Time Summary:
+assets         =   0.15 sec*proc (90 tests)
+benchmark      =   0.50 sec*proc (1 test)
+contract       =  41.05 sec*proc (1639 tests)
+core           =   4.05 sec*proc (292 tests)
+ecs            =   0.35 sec*proc (133 tests)
+geometry       =  60.01 sec*proc (1883 tests)
+glfw           =   0.01 sec*proc (1 test)
+graphics       =  17.36 sec*proc (858 tests)
+headless       =   0.01 sec*proc (4 tests)
+integration    =  10.04 sec*proc (284 tests)
+physics        =   0.20 sec*proc (80 tests)
+platform       =   0.01 sec*proc (5 tests)
+regression     =   0.51 sec*proc (2 tests)
+runtime        =  36.66 sec*proc (1235 tests)
+unit           =  64.36 sec*proc (2587 tests)
+
+Total Test time (real) = 113.18 sec
+
+The following tests did not run:
+	4603 - GlfwLifecycleLsan.EngineStaticTeardownAndLeakControl (Skipped)

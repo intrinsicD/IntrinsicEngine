@@ -151,7 +151,7 @@ TEST(GraphicsSurfacePassContracts, DepthPrepassRecordsSurfaceOpaqueIndirectDraw)
     world.SyncFrame();
 
     Graphics::CullingSystem culling;
-    ASSERT_TRUE(culling.Initialize(device, bufferMgr, pipelineMgr, "shaders/culling/instance_cull.comp"));
+    ASSERT_TRUE(culling.Initialize(device, bufferMgr, pipelineMgr, "shaders/instance_cull.comp"));
 
     Graphics::DepthPrepassPass pass;
     RecordingCommandContext noPipelineCmd;
@@ -181,7 +181,7 @@ TEST(GraphicsSurfacePassContracts, ForwardSurfaceRequiresInitializedSystemAndRec
     world.SyncFrame();
 
     Graphics::CullingSystem culling;
-    ASSERT_TRUE(culling.Initialize(device, bufferMgr, pipelineMgr, "shaders/culling/instance_cull.comp"));
+    ASSERT_TRUE(culling.Initialize(device, bufferMgr, pipelineMgr, "shaders/instance_cull.comp"));
 
     Graphics::ForwardSystem forward;
     Graphics::ForwardSurfacePass pass{forward};
@@ -214,7 +214,7 @@ TEST(GraphicsSurfacePassContracts, DeferredGBufferRequiresInitializedSystemAndRe
     world.SyncFrame();
 
     Graphics::CullingSystem culling;
-    ASSERT_TRUE(culling.Initialize(device, bufferMgr, pipelineMgr, "shaders/culling/instance_cull.comp"));
+    ASSERT_TRUE(culling.Initialize(device, bufferMgr, pipelineMgr, "shaders/instance_cull.comp"));
 
     Graphics::DeferredSystem deferred;
     Graphics::DeferredGBufferPass pass{deferred};

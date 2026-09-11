@@ -1,0 +1,23 @@
+{
+  "command": [
+    "/bin/bash",
+    "-o",
+    "pipefail",
+    "-c",
+    "ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --no-tests=error --timeout 60 | tee /tmp/intrinsic-reuse-curvature-cpu.log | tail -45"
+  ],
+  "command_display": "/bin/bash -o pipefail -c 'ctest --test-dir build/ci --output-on-failure -LE '\"'\"'gpu|vulkan|slow|flaky-quarantine'\"'\"' --no-tests=error --timeout 60 | tee /tmp/intrinsic-reuse-curvature-cpu.log | tail -45'",
+  "cwd": ".",
+  "duration_ms": 112917,
+  "exit_code": 0,
+  "finished_at": "2026-09-11T02:16:09Z",
+  "label": "curvature-profile-cpu",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-09-11T02:14:17Z",
+  "stderr_path": "tasks/evidence/RORG-134/commands/curvature-profile-cpu.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/RORG-134/commands/curvature-profile-cpu.stdout.log",
+  "stdout_sha256": "226f81b22b08ce7626a40444ad222af7ba68f24efb6a8327a824c51c99f952e7",
+  "task_id": "RORG-134"
+}

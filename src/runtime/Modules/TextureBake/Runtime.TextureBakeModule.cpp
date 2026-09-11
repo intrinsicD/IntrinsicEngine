@@ -67,27 +67,9 @@ namespace Extrinsic::Runtime
 
         constexpr float kAtlasEpsilon = 1.0e-4f;
         constexpr float kUvAreaEpsilon = 1.0e-10f;
-        constexpr std::uint64_t kFnv1aOffset64 = 14695981039346656037ull;
-        constexpr std::uint64_t kFnv1aPrime64 = 1099511628211ull;
         constexpr std::size_t kMaxActivePropertyTextureBakes = 256u;
         constexpr std::size_t kMaxRetainedPropertyBakeSourceBytes =
             64u * 1024u * 1024u;
-
-        [[nodiscard]] std::uint64_t FingerprintIndices(
-            const std::span<const std::uint32_t> values) noexcept
-        {
-            std::uint64_t fingerprint = kFnv1aOffset64;
-            for (const std::uint32_t value : values)
-            {
-                for (std::uint32_t shift = 0u; shift < 32u; shift += 8u)
-                {
-                    fingerprint ^= static_cast<std::uint64_t>(
-                        static_cast<std::uint8_t>(value >> shift));
-                    fingerprint *= kFnv1aPrime64;
-                }
-            }
-            return fingerprint == 0u ? 1u : fingerprint;
-        }
 
         [[nodiscard]] PropertyTextureBakeResult UnavailableBakeResult()
         {
@@ -1228,7 +1210,7 @@ namespace Extrinsic::Runtime
                 prepared.Texcoords = resolvedTexcoords;
             }
             prepared.SurfaceIndexFingerprint =
-                FingerprintIndices(prepared.SurfaceIndices);
+                Graphics::FingerprintSurfaceIndices(prepared.SurfaceIndices);
 
             switch (prepared.ValueKind)
             {

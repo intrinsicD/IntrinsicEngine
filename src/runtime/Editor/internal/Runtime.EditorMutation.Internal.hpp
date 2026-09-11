@@ -1,3 +1,4 @@
+// Typed undo transactions instantiated privately by runtime feature owners.
 #pragma once
 
 // Include this file only after importing Extrinsic.Runtime.EditorCommandHistory.
@@ -6,14 +7,18 @@
 
 namespace Extrinsic::Runtime::Internal
 {
-    enum class InitialMutationState
+    namespace
     {
-        ApplyTarget,
-        // Live-preview owners validate and record the current target without
-        // publishing or dirty-stamping it a second time. Undo/redo transitions
-        // still use the normal validate/apply/stamp sequence.
-        TargetAlreadyApplied,
-    };
+        // Multiple implementation units of one module include this header.
+        enum class InitialMutationState
+        {
+            ApplyTarget,
+            // Live-preview owners validate and record the current target without
+            // publishing or dirty-stamping it a second time. Undo/redo transitions
+            // still use the normal validate/apply/stamp sequence.
+            TargetAlreadyApplied,
+        };
+    }
 
     // Runtime-internal, typed transaction shape shared by feature owners.
     //

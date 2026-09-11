@@ -8,6 +8,7 @@ module;
 #include <memory>
 #include <mutex>
 #include <span>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -165,66 +166,80 @@ VkCommandBuffer VulkanTransferQueue::Begin()
     return cmd;
 }
 
-RHI::TransferToken VulkanTransferQueue::Submit(VkCommandBuffer cmd)
+bool VulkanTransferQueue::FinishCommandBuffer(
+    VkCommandBuffer cmd, const std::string_view operation)
 {
     if (!IsValid() || cmd == VK_NULL_HANDLE)
     {
-        Core::Log::Warn("[VulkanTransferQueue] Cannot submit transfer command buffer; service or command buffer is invalid");
+        Core::Log::Warn("[VulkanTransferQueue] Cannot submit {} command buffer; service or command buffer is invalid",
+                       operation == "upload" ? std::string_view{"transfer"} : operation);
         if (cmd != VK_NULL_HANDLE && m_Device != VK_NULL_HANDLE && m_CmdPool != VK_NULL_HANDLE)
             vkFreeCommandBuffers(m_Device, m_CmdPool, 1u, &cmd);
-        return {};
+        return false;
     }
 
-    VkResult result = vkEndCommandBuffer(cmd);
-    if (result != VK_SUCCESS)
+    if (vkEndCommandBuffer(cmd) != VK_SUCCESS)
     {
-        Core::Log::Error("[VulkanTransferQueue] vkEndCommandBuffer failed; upload skipped");
-        vkFreeCommandBuffers(m_Device, m_CmdPool, 1, &cmd);
-        return {};
+        Core::Log::Error("[VulkanTransferQueue] vkEndCommandBuffer failed; {} skipped", operation);
+        vkFreeCommandBuffers(m_Device, m_CmdPool, 1u, &cmd);
+        return false;
     }
+    return true;
+}
 
+uint64_t VulkanTransferQueue::SubmitTimelineLocked(
+    VkCommandBuffer cmd, const std::string_view operation)
+{
     VkCommandBufferSubmitInfo cmdInfo{};
     cmdInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO;
     cmdInfo.commandBuffer = cmd;
 
+    const uint64_t ticket = m_NextTicket.fetch_add(1, std::memory_order_relaxed);
+    VkSemaphoreSubmitInfo sigInfo{};
+    sigInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO;
+    sigInfo.semaphore = m_Timeline;
+    sigInfo.value = ticket;
+    sigInfo.stageMask = VK_PIPELINE_STAGE_2_ALL_TRANSFER_BIT;
+
+    VkSubmitInfo2 submit{};
+    submit.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO_2;
+    submit.commandBufferInfoCount = 1;
+    submit.pCommandBufferInfos = &cmdInfo;
+    submit.signalSemaphoreInfoCount = 1;
+    submit.pSignalSemaphoreInfos = &sigInfo;
+
+    VkResult result;
+    if (m_QueueSubmitMutex != nullptr)
     {
-        std::scoped_lock lock{m_Mutex};
-        const uint64_t ticket = m_NextTicket.fetch_add(1, std::memory_order_relaxed);
-
-        VkSemaphoreSubmitInfo sigInfo{};
-        sigInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO;
-        sigInfo.semaphore = m_Timeline;
-        sigInfo.value     = ticket;
-        sigInfo.stageMask = VK_PIPELINE_STAGE_2_ALL_TRANSFER_BIT;
-
-        VkSubmitInfo2 submit{};
-        submit.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO_2;
-        submit.commandBufferInfoCount   = 1;
-        submit.pCommandBufferInfos      = &cmdInfo;
-        submit.signalSemaphoreInfoCount = 1;
-        submit.pSignalSemaphoreInfos    = &sigInfo;
-
-        if (m_QueueSubmitMutex != nullptr)
-        {
-            std::scoped_lock queueLock{*m_QueueSubmitMutex};
-            result = vkQueueSubmit2(m_Queue, 1, &submit, VK_NULL_HANDLE);
-        }
-        else
-        {
-            result = vkQueueSubmit2(m_Queue, 1, &submit, VK_NULL_HANDLE);
-        }
-        if (result != VK_SUCCESS)
-        {
-            Core::Log::Error("[VulkanTransferQueue] vkQueueSubmit2 failed; upload skipped");
-            vkFreeCommandBuffers(m_Device, m_CmdPool, 1, &cmd);
-            return {};
-        }
-        m_InFlightCommandBuffers.push_back(RetiredCommandBuffer{.CommandBuffer = cmd,
-                                                                .RetireValue = ticket});
-        m_Belt->Retire(ticket);
-        return RHI::TransferToken{ticket};
+        std::scoped_lock queueLock{*m_QueueSubmitMutex};
+        result = vkQueueSubmit2(m_Queue, 1, &submit, VK_NULL_HANDLE);
     }
-    return {};
+    else
+    {
+        result = vkQueueSubmit2(m_Queue, 1, &submit, VK_NULL_HANDLE);
+    }
+    if (result != VK_SUCCESS)
+    {
+        Core::Log::Error("[VulkanTransferQueue] vkQueueSubmit2 failed; {} skipped", operation);
+        vkFreeCommandBuffers(m_Device, m_CmdPool, 1u, &cmd);
+        return 0u;
+    }
+    m_InFlightCommandBuffers.push_back(RetiredCommandBuffer{
+        .CommandBuffer = cmd, .RetireValue = ticket});
+    return ticket;
+}
+
+RHI::TransferToken VulkanTransferQueue::Submit(VkCommandBuffer cmd)
+{
+    if (!FinishCommandBuffer(cmd, "upload"))
+        return {};
+
+    std::scoped_lock lock{m_Mutex};
+    const uint64_t ticket = SubmitTimelineLocked(cmd, "upload");
+    if (ticket == 0u)
+        return {};
+    m_Belt->Retire(ticket);
+    return RHI::TransferToken{ticket};
 }
 
 RHI::ReadbackToken VulkanTransferQueue::SubmitReadback(VkCommandBuffer cmd,
@@ -232,73 +247,23 @@ RHI::ReadbackToken VulkanTransferQueue::SubmitReadback(VkCommandBuffer cmd,
                                                        uint64_t sizeBytes,
                                                        RHI::ReadbackSink sink)
 {
-    if (!IsValid() || cmd == VK_NULL_HANDLE)
-    {
-        Core::Log::Warn("[VulkanTransferQueue] Cannot submit readback command buffer; service or command buffer is invalid");
-        if (cmd != VK_NULL_HANDLE && m_Device != VK_NULL_HANDLE && m_CmdPool != VK_NULL_HANDLE)
-            vkFreeCommandBuffers(m_Device, m_CmdPool, 1u, &cmd);
+    if (!FinishCommandBuffer(cmd, "readback"))
         return {};
-    }
 
-    VkResult result = vkEndCommandBuffer(cmd);
-    if (result != VK_SUCCESS)
-    {
-        Core::Log::Error("[VulkanTransferQueue] vkEndCommandBuffer failed; readback skipped");
-        vkFreeCommandBuffers(m_Device, m_CmdPool, 1, &cmd);
+    std::scoped_lock lock{m_Mutex};
+    const uint64_t ticket = SubmitTimelineLocked(cmd, "readback");
+    if (ticket == 0u)
         return {};
-    }
-
-    VkCommandBufferSubmitInfo cmdInfo{};
-    cmdInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO;
-    cmdInfo.commandBuffer = cmd;
-
-    {
-        std::scoped_lock lock{m_Mutex};
-        const uint64_t ticket = m_NextTicket.fetch_add(1, std::memory_order_relaxed);
-
-        VkSemaphoreSubmitInfo sigInfo{};
-        sigInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO;
-        sigInfo.semaphore = m_Timeline;
-        sigInfo.value = ticket;
-        sigInfo.stageMask = VK_PIPELINE_STAGE_2_ALL_TRANSFER_BIT;
-
-        VkSubmitInfo2 submit{};
-        submit.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO_2;
-        submit.commandBufferInfoCount = 1;
-        submit.pCommandBufferInfos = &cmdInfo;
-        submit.signalSemaphoreInfoCount = 1;
-        submit.pSignalSemaphoreInfos = &sigInfo;
-
-        if (m_QueueSubmitMutex != nullptr)
-        {
-            std::scoped_lock queueLock{*m_QueueSubmitMutex};
-            result = vkQueueSubmit2(m_Queue, 1, &submit, VK_NULL_HANDLE);
-        }
-        else
-        {
-            result = vkQueueSubmit2(m_Queue, 1, &submit, VK_NULL_HANDLE);
-        }
-        if (result != VK_SUCCESS)
-        {
-            Core::Log::Error("[VulkanTransferQueue] vkQueueSubmit2 failed; readback skipped");
-            vkFreeCommandBuffers(m_Device, m_CmdPool, 1, &cmd);
-            return {};
-        }
-
-        const RHI::ReadbackToken token{ticket};
-        m_InFlightCommandBuffers.push_back(RetiredCommandBuffer{.CommandBuffer = cmd,
-                                                                .RetireValue = ticket});
-        if (slotIndex < m_ReadbackSlots.size())
-            m_ReadbackSlots[slotIndex].RetireValue = ticket;
-        m_PendingReadbacks.push_back(PendingReadback{
-            .Token = token,
-            .SlotIndex = slotIndex,
-            .SizeBytes = sizeBytes,
-            .Sink = std::move(sink),
-        });
-        return token;
-    }
-    return {};
+    const RHI::ReadbackToken token{ticket};
+    if (slotIndex < m_ReadbackSlots.size())
+        m_ReadbackSlots[slotIndex].RetireValue = ticket;
+    m_PendingReadbacks.push_back(PendingReadback{
+        .Token = token,
+        .SlotIndex = slotIndex,
+        .SizeBytes = sizeBytes,
+        .Sink = std::move(sink),
+    });
+    return token;
 }
 
 void VulkanTransferQueue::RetireCompletedCommandBuffers(const uint64_t completedValue)

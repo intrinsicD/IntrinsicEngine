@@ -1,8 +1,10 @@
+// Culling outputs and shared recording of indexed opaque-surface buckets.
 module;
 
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <limits>
 #include <memory>
 #include <optional>
 #include <span>
@@ -53,6 +55,14 @@ export namespace Extrinsic::Graphics
         GpuDrawBucketPhase Phase1{};
         GpuDrawBucketPhase Phase2{};
     };
+
+    // Passes own pipeline/feature eligibility. The depth pass supplies its draw cap;
+    // other consumers retain the complete bucket capacity.
+    void RecordOpaqueSurfaceBucket(
+        RHI::ICommandContext& cmd, RHI::PipelineHandle pipeline,
+        const GpuWorld& gpuWorld, const GpuDrawBucket& bucket,
+        std::uint32_t frameIndex,
+        std::uint32_t maxDrawCount = std::numeric_limits<std::uint32_t>::max());
 
     struct CullingHZBDepthSample
     {

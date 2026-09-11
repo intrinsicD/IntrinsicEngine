@@ -133,79 +133,9 @@ namespace Extrinsic::Runtime
             outBuffer.Channels,
             VertexChannel::Texcoord,
             std::span<const glm::vec2>{texcoords.data(), texcoords.size()});
-        if (channelBindings != nullptr && IsVertexChannelBindingEnabled(channelBindings->Normal))
-        {
-            const std::optional<AttributeSourceType> sourceType =
-                channelBindings->Normal.Property.Domain ==
-                        GeometryElementDomain::PointCloudPoint
-                    ? ToAttributeSourceType(
-                          channelBindings->Normal.Property.ValueKind)
-                    : std::nullopt;
-            std::vector<glm::vec3> normals(pointCount);
-            const VertexAttributeBinding normalBinding{
-                .Channel = VertexChannel::Normal,
-                .SourceType = sourceType.value_or(AttributeSourceType::Vec3),
-                .SourceProperty = sourceType == AttributeSourceType::Vec3
-                    ? std::string_view{channelBindings->Normal.Property.Name}
-                    : std::string_view{},
-                .AllowFallback = false,
-                .Normalize = true,
-                .Fallback = glm::vec4{0.0f, 0.0f, 1.0f, 0.0f},
-            };
-            const AttributeBindResult normalResult =
-                ResolveVec3Channel(
-                    view.VertexSource->Properties,
-                    normalBinding,
-                    pointCountU32,
-                    normals);
-            if (normalResult.Ok())
-            {
-                SetChannelVec3(
-                    outBuffer.Channels,
-                    VertexChannel::Normal,
-                    std::span<const glm::vec3>{normals.data(), normals.size()});
-            }
-        }
-        if (channelBindings != nullptr && IsVertexChannelBindingEnabled(channelBindings->Color))
-        {
-            const std::optional<AttributeSourceType> sourceType =
-                channelBindings->Color.Property.Domain ==
-                        GeometryElementDomain::PointCloudPoint
-                    ? ToAttributeSourceType(
-                          channelBindings->Color.Property.ValueKind)
-                    : std::nullopt;
-            if (sourceType == AttributeSourceType::Vec3 ||
-                sourceType == AttributeSourceType::Vec4)
-            {
-                outBuffer.PackedColors.resize(pointCount);
-                const VertexAttributeBinding colorBinding{
-                    .Channel = VertexChannel::Color,
-                    .SourceType = *sourceType,
-                    .SourceProperty = std::string_view{
-                        channelBindings->Color.Property.Name},
-                    .AllowFallback = false,
-                    .Normalize = false,
-                    .Fallback = glm::vec4{1.0f, 1.0f, 1.0f, 1.0f},
-                };
-                const AttributeBindResult colorResult =
-                    ResolveColorChannelPackedUnorm8(
-                        view.VertexSource->Properties,
-                        colorBinding,
-                        pointCountU32,
-                        outBuffer.PackedColors);
-                if (colorResult.Ok())
-                {
-                    SetChannelPackedUnorm8(
-                        outBuffer.Channels,
-                        VertexChannel::Color,
-                        std::span<const std::uint32_t>{outBuffer.PackedColors});
-                }
-                else
-                {
-                    outBuffer.PackedColors.clear();
-                }
-            }
-        }
+        PrepareBoundVertexChannels(
+            view.VertexSource->Properties, GeometryElementDomain::PointCloudPoint,
+            channelBindings, pointCount, outBuffer.Channels, outBuffer.PackedColors);
 
         const auto channelBytes = [&outBuffer](const VertexChannel channel) -> std::span<const std::byte> {
             const VertexChannelStreams::Stream* stream = outBuffer.Channels.Find(channel);

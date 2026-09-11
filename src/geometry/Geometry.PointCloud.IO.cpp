@@ -3,7 +3,6 @@ module;
 #include <algorithm>
 #include <array>
 #include <bit>
-#include <charconv>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
@@ -17,9 +16,10 @@ module;
 #include <string_view>
 #include <vector>
 #include <fstream>
-#include <sstream>
 
 #include <glm/glm.hpp>
+
+#include "Geometry.IOText.hpp"
 
 module Geometry.PointCloud.IO;
 
@@ -31,110 +31,33 @@ namespace Geometry::PointCloudIO
 {
     namespace
     {
-        struct PathInfo
-        {
-            std::string SourcePath;
-            std::string BasePath;
-        };
+        using Geometry::IOText::MakePathInfo;
+        using Geometry::IOText::NextLine;
+        using Geometry::IOText::ParseNumber;
+        using Geometry::IOText::ReadTextFile;
+        using Geometry::IOText::SplitWhitespace;
+        using Geometry::IOText::TextFileError;
+        using Geometry::IOText::Trim;
+        using Geometry::IOText::PlyFormat;
+        using Geometry::IOText::PlyScalar;
+        using Geometry::IOText::PlyScalarBytes;
+        using Geometry::IOText::ParsePlyScalarType;
+        using Geometry::IOText::IsPlyFloatingScalar;
+        using Geometry::IOText::ReadFloatingScalarAt;
+        using Geometry::IOText::PlyProperty;
+        using Geometry::IOText::PlyElement;
+        using Geometry::IOText::ReadScalarAs;
 
-        [[nodiscard]] PathInfo MakePathInfo(std::string_view path)
+        [[nodiscard]] Extrinsic::Core::ErrorCode ToCoreError(TextFileError error)
         {
-            PathInfo info{std::string(path), {}};
-            const auto slash = path.find_last_of("/\\");
-            if (slash != std::string_view::npos)
+            switch (error)
             {
-                info.BasePath.assign(path.substr(0, slash + 1));
+            case TextFileError::FileNotFound:
+                return Extrinsic::Core::ErrorCode::FileNotFound;
+            case TextFileError::FileReadError:
+                return Extrinsic::Core::ErrorCode::FileReadError;
             }
-            return info;
-        }
-
-        [[nodiscard]] Extrinsic::Core::Expected<std::string> ReadTextFile(std::string_view path)
-        {
-            std::ifstream file(std::string(path), std::ios::binary);
-            if (!file)
-            {
-                return Extrinsic::Core::Err<std::string>(Extrinsic::Core::ErrorCode::FileNotFound);
-            }
-
-            std::ostringstream buffer;
-            buffer << file.rdbuf();
-            if (!file.good() && !file.eof())
-            {
-                return Extrinsic::Core::Err<std::string>(Extrinsic::Core::ErrorCode::FileReadError);
-            }
-            return buffer.str();
-        }
-
-        [[nodiscard]] std::string_view Trim(std::string_view text)
-        {
-            while (!text.empty() && (text.front() == ' ' || text.front() == '\t' || text.front() == '\r' || text.front() == '\n'))
-            {
-                text.remove_prefix(1);
-            }
-            while (!text.empty() && (text.back() == ' ' || text.back() == '\t' || text.back() == '\r' || text.back() == '\n'))
-            {
-                text.remove_suffix(1);
-            }
-            return text;
-        }
-
-        [[nodiscard]] bool NextLine(std::string_view text, std::size_t& cursor, std::string_view& line)
-        {
-            if (cursor >= text.size())
-            {
-                return false;
-            }
-            const std::size_t start = cursor;
-            const std::size_t end = text.find('\n', cursor);
-            if (end == std::string_view::npos)
-            {
-                cursor = text.size();
-                line = text.substr(start);
-            }
-            else
-            {
-                cursor = end + 1;
-                line = text.substr(start, end - start);
-            }
-            line = Trim(line);
-            return true;
-        }
-
-        [[nodiscard]] std::vector<std::string_view> SplitWhitespace(std::string_view line)
-        {
-            std::vector<std::string_view> tokens;
-            std::size_t cursor = 0;
-            while (cursor < line.size())
-            {
-                while (cursor < line.size() && (line[cursor] == ' ' || line[cursor] == '\t' || line[cursor] == '\r'))
-                {
-                    ++cursor;
-                }
-                const std::size_t start = cursor;
-                while (cursor < line.size() && line[cursor] != ' ' && line[cursor] != '\t' && line[cursor] != '\r')
-                {
-                    ++cursor;
-                }
-                if (start < cursor)
-                {
-                    tokens.emplace_back(line.substr(start, cursor - start));
-                }
-            }
-            return tokens;
-        }
-
-        template <class T>
-        [[nodiscard]] std::optional<T> ParseNumber(std::string_view token)
-        {
-            T value{};
-            const char* first = token.data();
-            const char* last = token.data() + token.size();
-            const auto [ptr, ec] = std::from_chars(first, last, value);
-            if (ec != std::errc{} || ptr != last)
-            {
-                return std::nullopt;
-            }
-            return value;
+            return Extrinsic::Core::ErrorCode::Unknown;
         }
 
         [[nodiscard]] float NormalizeColorChannel(float value)
@@ -588,181 +511,6 @@ namespace Geometry::PointCloudIO
                 result.Cloud.Normal(point) = normals[i];
             }
             return result;
-        }
-
-        enum class PlyFormat
-        {
-            Ascii,
-            BinaryLittleEndian,
-            BinaryBigEndian,
-        };
-
-        enum class PlyScalar
-        {
-            Int8,
-            UInt8,
-            Int16,
-            UInt16,
-            Int32,
-            UInt32,
-            Float32,
-            Float64,
-        };
-
-        [[nodiscard]] constexpr std::size_t PlyScalarBytes(PlyScalar s)
-        {
-            switch (s)
-            {
-            case PlyScalar::Int8:
-            case PlyScalar::UInt8:
-                return 1;
-            case PlyScalar::Int16:
-            case PlyScalar::UInt16:
-                return 2;
-            case PlyScalar::Int32:
-            case PlyScalar::UInt32:
-            case PlyScalar::Float32:
-                return 4;
-            case PlyScalar::Float64:
-                return 8;
-            }
-            return 0;
-        }
-
-        [[nodiscard]] std::optional<PlyScalar> ParsePlyScalarType(std::string_view token)
-        {
-            if (token == "char" || token == "int8") return PlyScalar::Int8;
-            if (token == "uchar" || token == "uint8") return PlyScalar::UInt8;
-            if (token == "short" || token == "int16") return PlyScalar::Int16;
-            if (token == "ushort" || token == "uint16") return PlyScalar::UInt16;
-            if (token == "int" || token == "int32") return PlyScalar::Int32;
-            if (token == "uint" || token == "uint32") return PlyScalar::UInt32;
-            if (token == "float" || token == "float32") return PlyScalar::Float32;
-            if (token == "double" || token == "float64") return PlyScalar::Float64;
-            return std::nullopt;
-        }
-
-        [[nodiscard]] bool IsPlyFloatingScalar(PlyScalar scalar)
-        {
-            return scalar == PlyScalar::Float32 || scalar == PlyScalar::Float64;
-        }
-
-        void ByteSwap(std::byte* p, std::size_t n);
-
-        [[nodiscard]] float ReadFloatingScalarAt(const std::byte* base,
-                                                 std::size_t offset,
-                                                 PlyScalar scalar,
-                                                 bool bigEndian)
-        {
-            std::array<std::byte, 8> tmp{};
-            const std::size_t byteCount = PlyScalarBytes(scalar);
-            std::memcpy(tmp.data(), base + offset, byteCount);
-            if (bigEndian)
-            {
-                ByteSwap(tmp.data(), byteCount);
-            }
-
-            if (scalar == PlyScalar::Float64)
-            {
-                double value = 0.0;
-                std::memcpy(&value, tmp.data(), 8);
-                return static_cast<float>(value);
-            }
-
-            float value = 0.0f;
-            std::memcpy(&value, tmp.data(), 4);
-            return value;
-        }
-
-        struct PlyProperty
-        {
-            std::string Name;
-            bool IsList = false;
-            PlyScalar ScalarType = PlyScalar::Float32;
-            PlyScalar ListCountType = PlyScalar::UInt8;
-        };
-
-        struct PlyElement
-        {
-            std::string Name;
-            std::size_t Count = 0;
-            std::vector<PlyProperty> Properties;
-        };
-
-        void ByteSwap(std::byte* p, std::size_t n)
-        {
-            for (std::size_t i = 0; i < n / 2; ++i)
-            {
-                const std::byte tmp = p[i];
-                p[i] = p[n - 1 - i];
-                p[n - 1 - i] = tmp;
-            }
-        }
-
-        template <typename T>
-        [[nodiscard]] T ReadScalarAs(const std::byte*& cursor, PlyScalar type, bool bigEndian)
-        {
-            std::array<std::byte, 8> buf{};
-            const std::size_t n = PlyScalarBytes(type);
-            std::memcpy(buf.data(), cursor, n);
-            if (bigEndian)
-            {
-                ByteSwap(buf.data(), n);
-            }
-            cursor += n;
-
-            switch (type)
-            {
-            case PlyScalar::Int8:
-            {
-                std::int8_t v = 0;
-                std::memcpy(&v, buf.data(), 1);
-                return static_cast<T>(v);
-            }
-            case PlyScalar::UInt8:
-            {
-                std::uint8_t v = 0;
-                std::memcpy(&v, buf.data(), 1);
-                return static_cast<T>(v);
-            }
-            case PlyScalar::Int16:
-            {
-                std::int16_t v = 0;
-                std::memcpy(&v, buf.data(), 2);
-                return static_cast<T>(v);
-            }
-            case PlyScalar::UInt16:
-            {
-                std::uint16_t v = 0;
-                std::memcpy(&v, buf.data(), 2);
-                return static_cast<T>(v);
-            }
-            case PlyScalar::Int32:
-            {
-                std::int32_t v = 0;
-                std::memcpy(&v, buf.data(), 4);
-                return static_cast<T>(v);
-            }
-            case PlyScalar::UInt32:
-            {
-                std::uint32_t v = 0;
-                std::memcpy(&v, buf.data(), 4);
-                return static_cast<T>(v);
-            }
-            case PlyScalar::Float32:
-            {
-                float v = 0.0f;
-                std::memcpy(&v, buf.data(), 4);
-                return static_cast<T>(v);
-            }
-            case PlyScalar::Float64:
-            {
-                double v = 0.0;
-                std::memcpy(&v, buf.data(), 8);
-                return static_cast<T>(v);
-            }
-            }
-            return T{};
         }
 
         [[nodiscard]] constexpr bool IsPlyIntegralScalar(PlyScalar scalar)
@@ -1580,7 +1328,7 @@ namespace Geometry::PointCloudIO
         auto text = ReadTextFile(absolute_path);
         if (!text)
         {
-            return Extrinsic::Core::Err<PointCloudIOResult>(text.error());
+            return Extrinsic::Core::Err<PointCloudIOResult>(ToCoreError(text.error()));
         }
 
         PointCloudIOResult result;
@@ -1690,7 +1438,7 @@ namespace Geometry::PointCloudIO
         auto text = ReadTextFile(absolute_path);
         if (!text)
         {
-            return Extrinsic::Core::Err<PointCloudIOResult>(text.error());
+            return Extrinsic::Core::Err<PointCloudIOResult>(ToCoreError(text.error()));
         }
         return ParseStrictAsciiPointCloud(*text, absolute_path, StrictAsciiPointCloudFormat::PTS);
     }
@@ -1700,7 +1448,7 @@ namespace Geometry::PointCloudIO
         auto text = ReadTextFile(absolute_path);
         if (!text)
         {
-            return Extrinsic::Core::Err<PointCloudIOResult>(text.error());
+            return Extrinsic::Core::Err<PointCloudIOResult>(ToCoreError(text.error()));
         }
         return ParsePWNPointCloud(*text, absolute_path);
     }
@@ -1710,7 +1458,7 @@ namespace Geometry::PointCloudIO
         auto text = ReadTextFile(absolute_path);
         if (!text)
         {
-            return Extrinsic::Core::Err<PointCloudIOResult>(text.error());
+            return Extrinsic::Core::Err<PointCloudIOResult>(ToCoreError(text.error()));
         }
         return ParseStrictAsciiPointCloud(*text, absolute_path, StrictAsciiPointCloudFormat::CSV);
     }
@@ -1720,7 +1468,7 @@ namespace Geometry::PointCloudIO
         auto text = ReadTextFile(absolute_path);
         if (!text)
         {
-            return Extrinsic::Core::Err<PointCloudIOResult>(text.error());
+            return Extrinsic::Core::Err<PointCloudIOResult>(ToCoreError(text.error()));
         }
         return ParseStrictAsciiPointCloud(*text, absolute_path, StrictAsciiPointCloudFormat::ThreeD);
     }
@@ -1730,7 +1478,7 @@ namespace Geometry::PointCloudIO
         auto text = ReadTextFile(absolute_path);
         if (!text)
         {
-            return Extrinsic::Core::Err<PointCloudIOResult>(text.error());
+            return Extrinsic::Core::Err<PointCloudIOResult>(ToCoreError(text.error()));
         }
         return ParseStrictAsciiPointCloud(*text, absolute_path, StrictAsciiPointCloudFormat::TXT);
     }
@@ -1740,7 +1488,7 @@ namespace Geometry::PointCloudIO
         auto text = ReadTextFile(absolute_path);
         if (!text)
         {
-            return Extrinsic::Core::Err<PointCloudIOResult>(text.error());
+            return Extrinsic::Core::Err<PointCloudIOResult>(ToCoreError(text.error()));
         }
 
         std::size_t cursor = 0;
@@ -1985,7 +1733,7 @@ namespace Geometry::PointCloudIO
         auto text = ReadTextFile(absolute_path);
         if (!text)
         {
-            return Extrinsic::Core::Err<PointCloudIOResult>(text.error());
+            return Extrinsic::Core::Err<PointCloudIOResult>(ToCoreError(text.error()));
         }
 
         std::size_t cursor = 0;
@@ -2474,330 +2222,233 @@ namespace Geometry::PointCloudIO
         return PointCloudIOWriteStatus::Success;
     }
 
-    PointCloudIOWriteStatus WritePCD(std::string_view absolute_path, const PointCloudIOResult& cloud)
+    namespace
     {
-        if (absolute_path.empty())
-        {
-            return PointCloudIOWriteStatus::InvalidPath;
-        }
+        enum class PCDEncoding { Ascii, Binary };
 
-        const auto& source = cloud.Cloud;
-        if (source.IsEmpty())
+        PointCloudIOWriteStatus WritePCDFile(std::string_view absolute_path,
+                                            const PointCloudIOResult& cloud,
+                                            PCDEncoding encoding)
         {
-            return PointCloudIOWriteStatus::EmptyCloud;
-        }
+            if (absolute_path.empty())
+            {
+                return PointCloudIOWriteStatus::InvalidPath;
+            }
 
-        const auto positions = source.Positions();
-        const std::size_t pointCount = positions.size();
+            const auto& source = cloud.Cloud;
+            if (source.IsEmpty())
+            {
+                return PointCloudIOWriteStatus::EmptyCloud;
+            }
 
-        const bool hasNormals = source.HasNormals() && source.Normals().size() == pointCount;
-        const bool hasColors = source.HasColors() && source.Colors().size() == pointCount;
-        const auto normals = hasNormals ? source.Normals() : std::span<const glm::vec3>{};
-        const auto colors = hasColors ? source.Colors() : std::span<const glm::vec4>{};
+            const auto positions = source.Positions();
+            const std::size_t pointCount = positions.size();
 
-        if (!AllFinite(positions) || (hasNormals && !AllFinite(normals)) ||
-            (hasColors && !AllFinite(colors)))
-        {
-            return PointCloudIOWriteStatus::FileWriteError;
-        }
+            const bool hasNormals = source.HasNormals() && source.Normals().size() == pointCount;
+            const bool hasColors = source.HasColors() && source.Colors().size() == pointCount;
+            const auto normals = hasNormals ? source.Normals() : std::span<const glm::vec3>{};
+            const auto colors = hasColors ? source.Colors() : std::span<const glm::vec4>{};
 
-        std::ofstream stream(std::string(absolute_path), std::ios::binary | std::ios::trunc);
-        if (!stream)
-        {
-            return PointCloudIOWriteStatus::InvalidPath;
-        }
-
-        char buffer[256];
-
-        stream << "# .PCD v0.7\n";
-        stream << "VERSION 0.7\n";
-
-        stream << "FIELDS x y z";
-        if (hasNormals)
-        {
-            stream << " normal_x normal_y normal_z";
-        }
-        if (hasColors)
-        {
-            stream << " r g b";
-        }
-        stream.put('\n');
-
-        stream << "SIZE 4 4 4";
-        if (hasNormals)
-        {
-            stream << " 4 4 4";
-        }
-        if (hasColors)
-        {
-            stream << " 4 4 4";
-        }
-        stream.put('\n');
-
-        stream << "TYPE F F F";
-        if (hasNormals)
-        {
-            stream << " F F F";
-        }
-        if (hasColors)
-        {
-            stream << " F F F";
-        }
-        stream.put('\n');
-
-        stream << "COUNT 1 1 1";
-        if (hasNormals)
-        {
-            stream << " 1 1 1";
-        }
-        if (hasColors)
-        {
-            stream << " 1 1 1";
-        }
-        stream.put('\n');
-
-        {
-            const int written = std::snprintf(buffer, sizeof(buffer),
-                                              "WIDTH %zu\n",
-                                              pointCount);
-            if (written <= 0)
+            if (!AllFinite(positions) || (hasNormals && !AllFinite(normals)) ||
+                (hasColors && !AllFinite(colors)))
             {
                 return PointCloudIOWriteStatus::FileWriteError;
             }
-            stream.write(buffer, written);
-        }
-        stream << "HEIGHT 1\n";
-        stream << "VIEWPOINT 0 0 0 1 0 0 0\n";
-        {
-            const int written = std::snprintf(buffer, sizeof(buffer),
-                                              "POINTS %zu\n",
-                                              pointCount);
-            if (written <= 0)
+
+            std::ofstream stream(std::string(absolute_path), std::ios::binary | std::ios::trunc);
+            if (!stream)
             {
-                return PointCloudIOWriteStatus::FileWriteError;
+                return PointCloudIOWriteStatus::InvalidPath;
             }
-            stream.write(buffer, written);
-        }
-        stream << "DATA ascii\n";
 
-        auto clampUnit = [](float channel) -> float {
-            return channel < 0.0f ? 0.0f : (channel > 1.0f ? 1.0f : channel);
-        };
+            char buffer[256];
 
-        for (std::size_t i = 0; i < pointCount; ++i)
-        {
-            const auto& p = positions[i];
-            int written = std::snprintf(buffer, sizeof(buffer),
-                                        "%.6f %.6f %.6f",
-                                        static_cast<double>(p.x),
-                                        static_cast<double>(p.y),
-                                        static_cast<double>(p.z));
-            if (written <= 0)
-            {
-                return PointCloudIOWriteStatus::FileWriteError;
-            }
-            stream.write(buffer, written);
+            stream << "# .PCD v0.7\n";
+            stream << "VERSION 0.7\n";
 
+            stream << "FIELDS x y z";
             if (hasNormals)
             {
-                const auto& n = normals[i];
-                written = std::snprintf(buffer, sizeof(buffer),
-                                        " %.6f %.6f %.6f",
-                                        static_cast<double>(n.x),
-                                        static_cast<double>(n.y),
-                                        static_cast<double>(n.z));
-                if (written <= 0)
-                {
-                    return PointCloudIOWriteStatus::FileWriteError;
-                }
-                stream.write(buffer, written);
+                stream << " normal_x normal_y normal_z";
             }
-
             if (hasColors)
             {
-                const auto& c = colors[i];
-                written = std::snprintf(buffer, sizeof(buffer),
-                                        " %.6f %.6f %.6f",
-                                        static_cast<double>(clampUnit(c.x)),
-                                        static_cast<double>(clampUnit(c.y)),
-                                        static_cast<double>(clampUnit(c.z)));
+                stream << " r g b";
+            }
+            stream.put('\n');
+
+            stream << "SIZE 4 4 4";
+            if (hasNormals)
+            {
+                stream << " 4 4 4";
+            }
+            if (hasColors)
+            {
+                stream << " 4 4 4";
+            }
+            stream.put('\n');
+
+            stream << "TYPE F F F";
+            if (hasNormals)
+            {
+                stream << " F F F";
+            }
+            if (hasColors)
+            {
+                stream << " F F F";
+            }
+            stream.put('\n');
+
+            stream << "COUNT 1 1 1";
+            if (hasNormals)
+            {
+                stream << " 1 1 1";
+            }
+            if (hasColors)
+            {
+                stream << " 1 1 1";
+            }
+            stream.put('\n');
+
+            {
+                const int written = std::snprintf(buffer, sizeof(buffer),
+                                                  "WIDTH %zu\n",
+                                                  pointCount);
                 if (written <= 0)
                 {
                     return PointCloudIOWriteStatus::FileWriteError;
                 }
                 stream.write(buffer, written);
             }
+            stream << "HEIGHT 1\n";
+            stream << "VIEWPOINT 0 0 0 1 0 0 0\n";
+            {
+                const int written = std::snprintf(buffer, sizeof(buffer),
+                                                  "POINTS %zu\n",
+                                                  pointCount);
+                if (written <= 0)
+                {
+                    return PointCloudIOWriteStatus::FileWriteError;
+                }
+                stream.write(buffer, written);
+            }
+            stream << (encoding == PCDEncoding::Ascii ? "DATA ascii\n" : "DATA binary\n");
 
-            stream.put('\n');
-        }
+            auto clampUnit = [](float channel) -> float {
+                return channel < 0.0f ? 0.0f : (channel > 1.0f ? 1.0f : channel);
+            };
 
-        stream.flush();
-        if (!stream.good())
-        {
-            return PointCloudIOWriteStatus::FileWriteError;
+            if (encoding == PCDEncoding::Ascii)
+            {
+                for (std::size_t i = 0; i < pointCount; ++i)
+                {
+                    const auto& p = positions[i];
+                    int written = std::snprintf(buffer, sizeof(buffer),
+                                                "%.6f %.6f %.6f",
+                                                static_cast<double>(p.x),
+                                                static_cast<double>(p.y),
+                                                static_cast<double>(p.z));
+                    if (written <= 0)
+                    {
+                        return PointCloudIOWriteStatus::FileWriteError;
+                    }
+                    stream.write(buffer, written);
+
+                    if (hasNormals)
+                    {
+                        const auto& n = normals[i];
+                        written = std::snprintf(buffer, sizeof(buffer),
+                                                " %.6f %.6f %.6f",
+                                                static_cast<double>(n.x),
+                                                static_cast<double>(n.y),
+                                                static_cast<double>(n.z));
+                        if (written <= 0)
+                        {
+                            return PointCloudIOWriteStatus::FileWriteError;
+                        }
+                        stream.write(buffer, written);
+                    }
+
+                    if (hasColors)
+                    {
+                        const auto& c = colors[i];
+                        written = std::snprintf(buffer, sizeof(buffer),
+                                                " %.6f %.6f %.6f",
+                                                static_cast<double>(clampUnit(c.x)),
+                                                static_cast<double>(clampUnit(c.y)),
+                                                static_cast<double>(clampUnit(c.z)));
+                        if (written <= 0)
+                        {
+                            return PointCloudIOWriteStatus::FileWriteError;
+                        }
+                        stream.write(buffer, written);
+                    }
+
+                    stream.put('\n');
+                }
+            }
+            else
+            {
+                constexpr bool hostBigEndian = std::endian::native == std::endian::big;
+
+                auto writeFloatLE = [&](float value) -> bool {
+                    std::array<std::byte, 4> bytes{};
+                    std::memcpy(bytes.data(), &value, 4);
+                    if constexpr (hostBigEndian)
+                    {
+                        std::swap(bytes[0], bytes[3]);
+                        std::swap(bytes[1], bytes[2]);
+                    }
+                    stream.write(reinterpret_cast<const char*>(bytes.data()), 4);
+                    return stream.good();
+                };
+
+                for (std::size_t i = 0; i < pointCount; ++i)
+                {
+                    const auto& p = positions[i];
+                    if (!writeFloatLE(p.x) || !writeFloatLE(p.y) || !writeFloatLE(p.z))
+                    {
+                        return PointCloudIOWriteStatus::FileWriteError;
+                    }
+
+                    if (hasNormals)
+                    {
+                        const auto& n = normals[i];
+                        if (!writeFloatLE(n.x) || !writeFloatLE(n.y) || !writeFloatLE(n.z))
+                        {
+                            return PointCloudIOWriteStatus::FileWriteError;
+                        }
+                    }
+
+                    if (hasColors)
+                    {
+                        const auto& c = colors[i];
+                        if (!writeFloatLE(clampUnit(c.x)) ||
+                            !writeFloatLE(clampUnit(c.y)) ||
+                            !writeFloatLE(clampUnit(c.z)))
+                        {
+                            return PointCloudIOWriteStatus::FileWriteError;
+                        }
+                    }
+                }
+            }
+
+            stream.flush();
+            if (!stream.good())
+            {
+                return PointCloudIOWriteStatus::FileWriteError;
+            }
+            return PointCloudIOWriteStatus::Success;
         }
-        return PointCloudIOWriteStatus::Success;
+    }
+
+    PointCloudIOWriteStatus WritePCD(std::string_view absolute_path, const PointCloudIOResult& cloud)
+    {
+        return WritePCDFile(absolute_path, cloud, PCDEncoding::Ascii);
     }
 
     PointCloudIOWriteStatus WritePCDBinary(std::string_view absolute_path, const PointCloudIOResult& cloud)
     {
-        if (absolute_path.empty())
-        {
-            return PointCloudIOWriteStatus::InvalidPath;
-        }
-
-        const auto& source = cloud.Cloud;
-        if (source.IsEmpty())
-        {
-            return PointCloudIOWriteStatus::EmptyCloud;
-        }
-
-        const auto positions = source.Positions();
-        const std::size_t pointCount = positions.size();
-
-        const bool hasNormals = source.HasNormals() && source.Normals().size() == pointCount;
-        const bool hasColors = source.HasColors() && source.Colors().size() == pointCount;
-        const auto normals = hasNormals ? source.Normals() : std::span<const glm::vec3>{};
-        const auto colors = hasColors ? source.Colors() : std::span<const glm::vec4>{};
-
-        if (!AllFinite(positions) || (hasNormals && !AllFinite(normals)) ||
-            (hasColors && !AllFinite(colors)))
-        {
-            return PointCloudIOWriteStatus::FileWriteError;
-        }
-
-        std::ofstream stream(std::string(absolute_path), std::ios::binary | std::ios::trunc);
-        if (!stream)
-        {
-            return PointCloudIOWriteStatus::InvalidPath;
-        }
-
-        char buffer[256];
-
-        stream << "# .PCD v0.7\n";
-        stream << "VERSION 0.7\n";
-
-        stream << "FIELDS x y z";
-        if (hasNormals)
-        {
-            stream << " normal_x normal_y normal_z";
-        }
-        if (hasColors)
-        {
-            stream << " r g b";
-        }
-        stream.put('\n');
-
-        stream << "SIZE 4 4 4";
-        if (hasNormals)
-        {
-            stream << " 4 4 4";
-        }
-        if (hasColors)
-        {
-            stream << " 4 4 4";
-        }
-        stream.put('\n');
-
-        stream << "TYPE F F F";
-        if (hasNormals)
-        {
-            stream << " F F F";
-        }
-        if (hasColors)
-        {
-            stream << " F F F";
-        }
-        stream.put('\n');
-
-        stream << "COUNT 1 1 1";
-        if (hasNormals)
-        {
-            stream << " 1 1 1";
-        }
-        if (hasColors)
-        {
-            stream << " 1 1 1";
-        }
-        stream.put('\n');
-
-        {
-            const int written = std::snprintf(buffer, sizeof(buffer),
-                                              "WIDTH %zu\n",
-                                              pointCount);
-            if (written <= 0)
-            {
-                return PointCloudIOWriteStatus::FileWriteError;
-            }
-            stream.write(buffer, written);
-        }
-        stream << "HEIGHT 1\n";
-        stream << "VIEWPOINT 0 0 0 1 0 0 0\n";
-        {
-            const int written = std::snprintf(buffer, sizeof(buffer),
-                                              "POINTS %zu\n",
-                                              pointCount);
-            if (written <= 0)
-            {
-                return PointCloudIOWriteStatus::FileWriteError;
-            }
-            stream.write(buffer, written);
-        }
-        stream << "DATA binary\n";
-
-
-        auto clampUnit = [](float channel) -> float {
-            return channel < 0.0f ? 0.0f : (channel > 1.0f ? 1.0f : channel);
-        };
-
-        constexpr bool hostBigEndian = std::endian::native == std::endian::big;
-
-        auto writeFloatLE = [&](float value) -> bool {
-            std::array<std::byte, 4> bytes{};
-            std::memcpy(bytes.data(), &value, 4);
-            if constexpr (hostBigEndian)
-            {
-                std::swap(bytes[0], bytes[3]);
-                std::swap(bytes[1], bytes[2]);
-            }
-            stream.write(reinterpret_cast<const char*>(bytes.data()), 4);
-            return stream.good();
-        };
-
-        for (std::size_t i = 0; i < pointCount; ++i)
-        {
-            const auto& p = positions[i];
-            if (!writeFloatLE(p.x) || !writeFloatLE(p.y) || !writeFloatLE(p.z))
-            {
-                return PointCloudIOWriteStatus::FileWriteError;
-            }
-
-            if (hasNormals)
-            {
-                const auto& n = normals[i];
-                if (!writeFloatLE(n.x) || !writeFloatLE(n.y) || !writeFloatLE(n.z))
-                {
-                    return PointCloudIOWriteStatus::FileWriteError;
-                }
-            }
-
-            if (hasColors)
-            {
-                const auto& c = colors[i];
-                if (!writeFloatLE(clampUnit(c.x)) ||
-                    !writeFloatLE(clampUnit(c.y)) ||
-                    !writeFloatLE(clampUnit(c.z)))
-                {
-                    return PointCloudIOWriteStatus::FileWriteError;
-                }
-            }
-        }
-
-        stream.flush();
-        if (!stream.good())
-        {
-            return PointCloudIOWriteStatus::FileWriteError;
-        }
-        return PointCloudIOWriteStatus::Success;
+        return WritePCDFile(absolute_path, cloud, PCDEncoding::Binary);
     }
 }

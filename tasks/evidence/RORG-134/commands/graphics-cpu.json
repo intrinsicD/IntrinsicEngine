@@ -1,0 +1,23 @@
+{
+  "command": [
+    "/bin/bash",
+    "-o",
+    "pipefail",
+    "-c",
+    "ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --no-tests=error --timeout 60 | tee /tmp/intrinsic-reuse-graphics-cpu-full.log | tail -45"
+  ],
+  "command_display": "/bin/bash -o pipefail -c 'ctest --test-dir build/ci --output-on-failure -LE '\"'\"'gpu|vulkan|slow|flaky-quarantine'\"'\"' --no-tests=error --timeout 60 | tee /tmp/intrinsic-reuse-graphics-cpu-full.log | tail -45'",
+  "cwd": ".",
+  "duration_ms": 109975,
+  "exit_code": 0,
+  "finished_at": "2026-09-11T01:36:09Z",
+  "label": "graphics-cpu",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-09-11T01:34:19Z",
+  "stderr_path": "tasks/evidence/RORG-134/commands/graphics-cpu.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/RORG-134/commands/graphics-cpu.stdout.log",
+  "stdout_sha256": "80246e925c54037a7d681bf35c92397abc999ec04322afc645b9af886d79cc9c",
+  "task_id": "RORG-134"
+}

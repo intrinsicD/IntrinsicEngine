@@ -1979,57 +1979,138 @@ namespace Extrinsic::Runtime
         }
     }
 
-    Core::Expected<RuntimeQueuedAssetImport>
-    AssetWorkflowImportExecutor::QueueGeometryImportWithIngest(
-        AssetImportRecipe recipe,
-        std::vector<Assets::AssetPayloadKind> payloadKinds)
+    Core::Expected<std::shared_ptr<AssetImportStageTrace>>
+    AssetWorkflowImportExecutor::SubmitQueuedImport(
+        const RuntimeAssetImportRequest& request,
+        const AssetImportRecipe& recipe,
+        const std::string_view payloadLabel)
     {
-        const RuntimeAssetIngestSource source = recipe.Source;
-        const Assets::AssetId existingAsset = recipe.ExistingAsset;
-        RuntimeAssetImportRequest request{
-            .Path = recipe.Path,
-            .PayloadKind = recipe.PayloadKind,
-        };
-        if (!payloadKinds.empty())
-            request.PayloadKind = payloadKinds.front();
-        RuntimeAssetIngestTransition submit =
-            m_AssetIngestStateMachine.Submit(
-                MakeRuntimeAssetIngestRequest(
-                    request,
-                    source,
-                    existingAsset));
+        const RuntimeAssetIngestTransition submit = m_AssetIngestStateMachine.Submit(
+            MakeRuntimeAssetIngestRequest(request, recipe.Source, recipe.ExistingAsset));
         if (!submit.Succeeded())
         {
             Core::Log::Warn(
-                "[Runtime] Geometry import rejected by ingest state machine: source={} path='{}' payload={} diagnostic={} error={}",
-                DebugNameForRuntimeAssetIngestSource(source),
+                "[Runtime] {} import rejected by ingest state machine: source={} path='{}' payload={} diagnostic={} error={}",
+                payloadLabel,
+                DebugNameForRuntimeAssetIngestSource(recipe.Source),
                 request.Path,
                 Assets::DebugNameForAssetPayloadKind(request.PayloadKind),
                 DebugNameForRuntimeAssetIngestDiagnostic(submit.Diagnostic),
                 Core::Error::ToString(ErrorFromIngestTransition(submit)));
             RecordAssetImportEvent(
                 request,
-                Core::Err<RuntimeAssetImportResult>(
-                    ErrorFromIngestTransition(submit)),
+                Core::Err<RuntimeAssetImportResult>(ErrorFromIngestTransition(submit)),
                 submit.Diagnostic);
-            return Core::Err<RuntimeQueuedAssetImport>(
+            return Core::Err<std::shared_ptr<AssetImportStageTrace>>(
                 ErrorFromIngestTransition(submit));
         }
 
-        const WorldHandle submissionWorld = m_World;
+        return std::make_shared<AssetImportStageTrace>(AssetImportStageTrace{
+            .Identity = AssetImportExecutionIdentity{
+                .Request = submit.Handle,
+                .World = m_World,
+                .BindingGeneration = m_TargetBindingEpoch,
+                .CancellationGeneration = m_Jobs ? m_Jobs->WorldGeneration(m_World) : 0u,
+            },
+        });
+    }
+
+    Core::Result AssetWorkflowImportExecutor::QueueImportDecode(
+        const RuntimeAssetImportRequest& request,
+        const Assets::AssetRouteDiagnostic& routeDiagnostic,
+        AssetImportStageTrace& stageTrace)
+    {
+        const auto fail = [&](const AssetImportStage stage,
+                              const RuntimeAssetIngestTransition& transition) -> Core::Result
+        {
+            const Core::ErrorCode error = ErrorFromIngestTransition(transition);
+            AppendImportStage(stageTrace, stage, error, transition.Diagnostic);
+            RecordAssetImportEvent(
+                request, Core::Err<RuntimeAssetImportResult>(error),
+                transition.Diagnostic, &stageTrace);
+            return Core::Err(error);
+        };
+        const RuntimeAssetIngestHandle operation = stageTrace.Identity.Request;
+        const RuntimeAssetIngestTransition routeResolved =
+            m_AssetIngestStateMachine.ResolveRoute(operation, routeDiagnostic);
+        if (!routeResolved.Succeeded())
+            return fail(AssetImportStage::Route, routeResolved);
+        AppendImportStage(
+            stageTrace, AssetImportStage::Route, Core::ErrorCode::Success,
+            RuntimeAssetIngestDiagnostic::None, RouteStageResult(request));
+
+        const RuntimeAssetIngestTransition decodeQueued =
+            m_AssetIngestStateMachine.QueueDecode(operation);
+        if (!decodeQueued.Succeeded())
+            return fail(AssetImportStage::Decode, decodeQueued);
+
+        const RuntimeAssetIngestTransition decoding =
+            m_AssetIngestStateMachine.MarkDecoding(operation);
+        if (!decoding.Succeeded())
+            return fail(AssetImportStage::Decode, decoding);
+        return Core::Ok();
+    }
+
+    bool AssetWorkflowImportExecutor::BeginQueuedImportApply(
+        const RuntimeAssetImportRequest& request,
+        AssetImportStageTrace& stageTrace,
+        const ECS::Scene::Registry* submissionScene)
+    {
+        const auto fail = [&](const Core::ErrorCode error,
+                              const RuntimeAssetIngestTransition& transition)
+        {
+            AppendNextFailedStage(stageTrace, error, transition.Diagnostic);
+            RecordAssetImportEvent(
+                request, Core::Err<RuntimeAssetImportResult>(error),
+                transition.Diagnostic, &stageTrace);
+            return false;
+        };
+        const RuntimeAssetIngestHandle operation = stageTrace.Identity.Request;
+        AppendImportStage(
+            stageTrace, AssetImportStage::Decode, Core::ErrorCode::Success,
+            RuntimeAssetIngestDiagnostic::None, DecodeStageResult(request));
+
+        const RuntimeAssetIngestTransition decodeComplete =
+            m_AssetIngestStateMachine.CompleteDecode(operation, operation.Generation);
+        if (!decodeComplete.Succeeded())
+            return fail(ErrorFromIngestTransition(decodeComplete), decodeComplete);
+
+        const RuntimeAssetIngestTransition applying =
+            m_AssetIngestStateMachine.BeginApply(operation);
+        if (!applying.Succeeded())
+            return fail(ErrorFromIngestTransition(applying), applying);
+
+        if (!IsCurrentSubmissionTarget(
+                stageTrace.Identity.World, submissionScene,
+                stageTrace.Identity.BindingGeneration))
+        {
+            const RuntimeAssetIngestTransition failed = m_AssetIngestStateMachine.FailApply(
+                operation, operation.Generation, Core::ErrorCode::InvalidState);
+            return fail(Core::ErrorCode::InvalidState, failed);
+        }
+        return true;
+    }
+
+    Core::Expected<RuntimeQueuedAssetImport>
+    AssetWorkflowImportExecutor::QueueGeometryImportWithIngest(
+        AssetImportRecipe recipe,
+        std::vector<Assets::AssetPayloadKind> payloadKinds)
+    {
+        const RuntimeAssetIngestSource source = recipe.Source;
+        RuntimeAssetImportRequest request{
+            .Path = recipe.Path,
+            .PayloadKind = recipe.PayloadKind,
+        };
+        if (!payloadKinds.empty())
+            request.PayloadKind = payloadKinds.front();
+        auto submitted = SubmitQueuedImport(request, recipe, "Geometry");
+        if (!submitted.has_value())
+            return Core::Err<RuntimeQueuedAssetImport>(submitted.error());
+        auto stageTrace = std::move(*submitted);
+        const RuntimeAssetIngestHandle operation = stageTrace->Identity.Request;
+        const WorldHandle submissionWorld = stageTrace->Identity.World;
         ECS::Scene::Registry* const submissionScene = m_Scene.get();
-        const std::uint64_t submissionBindingEpoch = m_TargetBindingEpoch;
-        auto stageTrace = std::make_shared<AssetImportStageTrace>(
-            AssetImportStageTrace{
-                .Identity = AssetImportExecutionIdentity{
-                    .Request = submit.Handle,
-                    .World = submissionWorld,
-                    .BindingGeneration = submissionBindingEpoch,
-                    .CancellationGeneration = m_Jobs
-                        ? m_Jobs->WorldGeneration(submissionWorld)
-                        : 0u,
-                },
-            });
+        const std::uint64_t submissionBindingEpoch = stageTrace->Identity.BindingGeneration;
         if (!m_Initialized ||
             !m_Jobs ||
             !m_AssetService ||
@@ -2045,7 +2126,7 @@ namespace Extrinsic::Runtime
         {
             RuntimeAssetIngestTransition failed =
                 m_AssetIngestStateMachine.FailCallback(
-                    submit.Handle,
+                    operation,
                     Core::ErrorCode::InvalidState);
             Core::Log::Warn(
                 "[Runtime] Geometry import rejected before queueing: source={} path='{}' payload={} error={}",
@@ -2071,73 +2152,14 @@ namespace Extrinsic::Runtime
                 request.Path,
                 Assets::AssetRouteOperation::Import,
                 Assets::AssetImportHint{.PayloadKind = request.PayloadKind});
-        RuntimeAssetIngestTransition routeResolved =
-            m_AssetIngestStateMachine.ResolveRoute(
-                submit.Handle,
-                routeDiagnostic);
-        if (!routeResolved.Succeeded())
+        if (Core::Result queued = QueueImportDecode(request, routeDiagnostic, *stageTrace);
+            !queued.has_value())
         {
-            AppendImportStage(
-                *stageTrace,
-                AssetImportStage::Route,
-                ErrorFromIngestTransition(routeResolved),
-                routeResolved.Diagnostic);
-            RecordAssetImportEvent(
-                request,
-                Core::Err<RuntimeAssetImportResult>(
-                    ErrorFromIngestTransition(routeResolved)),
-                routeResolved.Diagnostic,
-                stageTrace.get());
-            return Core::Err<RuntimeQueuedAssetImport>(
-                ErrorFromIngestTransition(routeResolved));
-        }
-        AppendImportStage(
-            *stageTrace,
-            AssetImportStage::Route,
-            Core::ErrorCode::Success,
-            RuntimeAssetIngestDiagnostic::None,
-            RouteStageResult(request));
-
-        RuntimeAssetIngestTransition decodeQueued =
-            m_AssetIngestStateMachine.QueueDecode(submit.Handle);
-        if (!decodeQueued.Succeeded())
-        {
-            AppendImportStage(
-                *stageTrace,
-                AssetImportStage::Decode,
-                ErrorFromIngestTransition(decodeQueued),
-                decodeQueued.Diagnostic);
-            RecordAssetImportEvent(
-                request,
-                Core::Err<RuntimeAssetImportResult>(
-                    ErrorFromIngestTransition(decodeQueued)),
-                decodeQueued.Diagnostic,
-                stageTrace.get());
-            return Core::Err<RuntimeQueuedAssetImport>(
-                ErrorFromIngestTransition(decodeQueued));
-        }
-
-        RuntimeAssetIngestTransition decoding =
-            m_AssetIngestStateMachine.MarkDecoding(submit.Handle);
-        if (!decoding.Succeeded())
-        {
-            AppendImportStage(
-                *stageTrace,
-                AssetImportStage::Decode,
-                ErrorFromIngestTransition(decoding),
-                decoding.Diagnostic);
-            RecordAssetImportEvent(
-                request,
-                Core::Err<RuntimeAssetImportResult>(
-                    ErrorFromIngestTransition(decoding)),
-                decoding.Diagnostic,
-                stageTrace.get());
-            return Core::Err<RuntimeQueuedAssetImport>(
-                ErrorFromIngestTransition(decoding));
+            return Core::Err<RuntimeQueuedAssetImport>(queued.error());
         }
 
         auto state = std::make_shared<QueuedGeometryImportState>();
-        state->IngestHandle = submit.Handle;
+        state->IngestHandle = operation;
         state->Request = request;
         state->Recipe = std::move(recipe);
         state->StageTrace = stageTrace;
@@ -2191,8 +2213,7 @@ namespace Extrinsic::Runtime
                     this,
                     state,
                     submissionWorld,
-                    submissionScene,
-                    submissionBindingEpoch](
+                    submissionScene](
                         KernelEventBus&,
                         const JobResultEnvelope& envelope) -> bool
                 {
@@ -2230,72 +2251,9 @@ namespace Extrinsic::Runtime
                         return true;
                     }
 
-                    AppendImportStage(
-                        *state->StageTrace,
-                        AssetImportStage::Decode,
-                        Core::ErrorCode::Success,
-                        RuntimeAssetIngestDiagnostic::None,
-                        DecodeStageResult(state->Request));
-
-                    RuntimeAssetIngestTransition decodeComplete =
-                        m_AssetIngestStateMachine.CompleteDecode(
-                            state->IngestHandle,
-                            state->IngestHandle.Generation);
-                    if (!decodeComplete.Succeeded())
+                    if (!BeginQueuedImportApply(
+                            state->Request, *state->StageTrace, submissionScene))
                     {
-                        result = Core::Err<RuntimeAssetImportResult>(
-                            ErrorFromIngestTransition(decodeComplete));
-                        AppendNextFailedStage(
-                            *state->StageTrace,
-                            result.error(),
-                            decodeComplete.Diagnostic);
-                        RecordAssetImportEvent(
-                            state->Request,
-                            result,
-                            decodeComplete.Diagnostic,
-                            state->StageTrace.get());
-                        return true;
-                    }
-
-                    RuntimeAssetIngestTransition applying =
-                        m_AssetIngestStateMachine.BeginApply(state->IngestHandle);
-                    if (!applying.Succeeded())
-                    {
-                        result = Core::Err<RuntimeAssetImportResult>(
-                            ErrorFromIngestTransition(applying));
-                        AppendNextFailedStage(
-                            *state->StageTrace,
-                            result.error(),
-                            applying.Diagnostic);
-                        RecordAssetImportEvent(
-                            state->Request,
-                            result,
-                            applying.Diagnostic,
-                            state->StageTrace.get());
-                        return true;
-                    }
-
-                    if (!IsCurrentSubmissionTarget(
-                            submissionWorld,
-                            submissionScene,
-                            submissionBindingEpoch))
-                    {
-                        result = Core::Err<RuntimeAssetImportResult>(
-                            Core::ErrorCode::InvalidState);
-                        const RuntimeAssetIngestTransition failed =
-                            m_AssetIngestStateMachine.FailApply(
-                                state->IngestHandle,
-                                state->IngestHandle.Generation,
-                                Core::ErrorCode::InvalidState);
-                        AppendNextFailedStage(
-                            *state->StageTrace,
-                            result.error(),
-                            failed.Diagnostic);
-                        RecordAssetImportEvent(
-                            state->Request,
-                            result,
-                            failed.Diagnostic,
-                            state->StageTrace.get());
                         return true;
                     }
 
@@ -2528,44 +2486,14 @@ namespace Extrinsic::Runtime
                 request.Path,
                 Assets::AssetRouteOperation::Import,
                 Assets::AssetImportHint{.PayloadKind = request.PayloadKind});
-        RuntimeAssetIngestTransition submit =
-            m_AssetIngestStateMachine.Submit(
-                MakeRuntimeAssetIngestRequest(
-                    request,
-                    source,
-                    existingAsset));
-        if (!submit.Succeeded())
-        {
-            Core::Log::Warn(
-                "[Runtime] Model/texture import rejected by ingest state machine: source={} path='{}' payload={} diagnostic={} error={}",
-                DebugNameForRuntimeAssetIngestSource(source),
-                request.Path,
-                Assets::DebugNameForAssetPayloadKind(request.PayloadKind),
-                DebugNameForRuntimeAssetIngestDiagnostic(submit.Diagnostic),
-                Core::Error::ToString(ErrorFromIngestTransition(submit)));
-            RecordAssetImportEvent(
-                request,
-                Core::Err<RuntimeAssetImportResult>(
-                    ErrorFromIngestTransition(submit)),
-                submit.Diagnostic);
-            return Core::Err<RuntimeQueuedAssetImport>(
-                ErrorFromIngestTransition(submit));
-        }
-
-        const WorldHandle submissionWorld = m_World;
+        auto submitted = SubmitQueuedImport(request, recipe, "Model/texture");
+        if (!submitted.has_value())
+            return Core::Err<RuntimeQueuedAssetImport>(submitted.error());
+        auto stageTrace = std::move(*submitted);
+        const RuntimeAssetIngestHandle operation = stageTrace->Identity.Request;
+        const WorldHandle submissionWorld = stageTrace->Identity.World;
         ECS::Scene::Registry* const submissionScene = m_Scene.get();
-        const std::uint64_t submissionBindingEpoch = m_TargetBindingEpoch;
-        auto stageTrace = std::make_shared<AssetImportStageTrace>(
-            AssetImportStageTrace{
-                .Identity = AssetImportExecutionIdentity{
-                    .Request = submit.Handle,
-                    .World = submissionWorld,
-                    .BindingGeneration = submissionBindingEpoch,
-                    .CancellationGeneration = m_Jobs
-                        ? m_Jobs->WorldGeneration(submissionWorld)
-                        : 0u,
-                },
-            });
+        const std::uint64_t submissionBindingEpoch = stageTrace->Identity.BindingGeneration;
         if (!m_Initialized ||
             !m_Jobs ||
             !m_AssetService ||
@@ -2581,7 +2509,7 @@ namespace Extrinsic::Runtime
         {
             RuntimeAssetIngestTransition failed =
                 m_AssetIngestStateMachine.FailCallback(
-                    submit.Handle,
+                    operation,
                     Core::ErrorCode::InvalidState);
             Core::Log::Warn(
                 "[Runtime] Model/texture import rejected before queueing: source={} path='{}' payload={} error={}",
@@ -2602,73 +2530,14 @@ namespace Extrinsic::Runtime
                 Core::ErrorCode::InvalidState);
         }
 
-        RuntimeAssetIngestTransition routeResolved =
-            m_AssetIngestStateMachine.ResolveRoute(
-                submit.Handle,
-                routeDiagnostic);
-        if (!routeResolved.Succeeded())
+        if (Core::Result queued = QueueImportDecode(request, routeDiagnostic, *stageTrace);
+            !queued.has_value())
         {
-            AppendImportStage(
-                *stageTrace,
-                AssetImportStage::Route,
-                ErrorFromIngestTransition(routeResolved),
-                routeResolved.Diagnostic);
-            RecordAssetImportEvent(
-                request,
-                Core::Err<RuntimeAssetImportResult>(
-                    ErrorFromIngestTransition(routeResolved)),
-                routeResolved.Diagnostic,
-                stageTrace.get());
-            return Core::Err<RuntimeQueuedAssetImport>(
-                ErrorFromIngestTransition(routeResolved));
-        }
-        AppendImportStage(
-            *stageTrace,
-            AssetImportStage::Route,
-            Core::ErrorCode::Success,
-            RuntimeAssetIngestDiagnostic::None,
-            RouteStageResult(request));
-
-        RuntimeAssetIngestTransition decodeQueued =
-            m_AssetIngestStateMachine.QueueDecode(submit.Handle);
-        if (!decodeQueued.Succeeded())
-        {
-            AppendImportStage(
-                *stageTrace,
-                AssetImportStage::Decode,
-                ErrorFromIngestTransition(decodeQueued),
-                decodeQueued.Diagnostic);
-            RecordAssetImportEvent(
-                request,
-                Core::Err<RuntimeAssetImportResult>(
-                    ErrorFromIngestTransition(decodeQueued)),
-                decodeQueued.Diagnostic,
-                stageTrace.get());
-            return Core::Err<RuntimeQueuedAssetImport>(
-                ErrorFromIngestTransition(decodeQueued));
-        }
-
-        RuntimeAssetIngestTransition decoding =
-            m_AssetIngestStateMachine.MarkDecoding(submit.Handle);
-        if (!decoding.Succeeded())
-        {
-            AppendImportStage(
-                *stageTrace,
-                AssetImportStage::Decode,
-                ErrorFromIngestTransition(decoding),
-                decoding.Diagnostic);
-            RecordAssetImportEvent(
-                request,
-                Core::Err<RuntimeAssetImportResult>(
-                    ErrorFromIngestTransition(decoding)),
-                decoding.Diagnostic,
-                stageTrace.get());
-            return Core::Err<RuntimeQueuedAssetImport>(
-                ErrorFromIngestTransition(decoding));
+            return Core::Err<RuntimeQueuedAssetImport>(queued.error());
         }
 
         auto state = std::make_shared<DroppedModelTextureImportState>();
-        state->IngestHandle = submit.Handle;
+        state->IngestHandle = operation;
         state->Request = request;
         state->Recipe = std::move(recipe);
         state->StageTrace = stageTrace;
@@ -2746,9 +2615,7 @@ namespace Extrinsic::Runtime
                     this,
                     state,
                     existingAsset,
-                    submissionWorld,
-                    submissionScene,
-                    submissionBindingEpoch](
+                    submissionScene](
                         KernelEventBus&,
                         const JobResultEnvelope& envelope) -> bool
                 {
@@ -2797,72 +2664,9 @@ namespace Extrinsic::Runtime
                         return true;
                     }
 
-                    AppendImportStage(
-                        *state->StageTrace,
-                        AssetImportStage::Decode,
-                        Core::ErrorCode::Success,
-                        RuntimeAssetIngestDiagnostic::None,
-                        DecodeStageResult(state->Request));
-
-                    RuntimeAssetIngestTransition decodeComplete =
-                        m_AssetIngestStateMachine.CompleteDecode(
-                            state->IngestHandle,
-                            state->IngestHandle.Generation);
-                    if (!decodeComplete.Succeeded())
+                    if (!BeginQueuedImportApply(
+                            state->Request, *state->StageTrace, submissionScene))
                     {
-                        result = Core::Err<RuntimeAssetImportResult>(
-                            ErrorFromIngestTransition(decodeComplete));
-                        AppendNextFailedStage(
-                            *state->StageTrace,
-                            result.error(),
-                            decodeComplete.Diagnostic);
-                        RecordAssetImportEvent(
-                            state->Request,
-                            result,
-                            decodeComplete.Diagnostic,
-                            state->StageTrace.get());
-                        return true;
-                    }
-
-                    RuntimeAssetIngestTransition applying =
-                        m_AssetIngestStateMachine.BeginApply(state->IngestHandle);
-                    if (!applying.Succeeded())
-                    {
-                        result = Core::Err<RuntimeAssetImportResult>(
-                            ErrorFromIngestTransition(applying));
-                        AppendNextFailedStage(
-                            *state->StageTrace,
-                            result.error(),
-                            applying.Diagnostic);
-                        RecordAssetImportEvent(
-                            state->Request,
-                            result,
-                            applying.Diagnostic,
-                            state->StageTrace.get());
-                        return true;
-                    }
-
-                    if (!IsCurrentSubmissionTarget(
-                            submissionWorld,
-                            submissionScene,
-                            submissionBindingEpoch))
-                    {
-                        result = Core::Err<RuntimeAssetImportResult>(
-                            Core::ErrorCode::InvalidState);
-                        const RuntimeAssetIngestTransition failed =
-                            m_AssetIngestStateMachine.FailApply(
-                                state->IngestHandle,
-                                state->IngestHandle.Generation,
-                                Core::ErrorCode::InvalidState);
-                        AppendNextFailedStage(
-                            *state->StageTrace,
-                            result.error(),
-                            failed.Diagnostic);
-                        RecordAssetImportEvent(
-                            state->Request,
-                            result,
-                            failed.Diagnostic,
-                            state->StageTrace.get());
                         return true;
                     }
 

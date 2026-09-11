@@ -17,6 +17,7 @@
 // tangent-plane Gaussian to a screen-space ellipse.
 
 #version 460
+#extension GL_GOOGLE_include_directive : require
 #extension GL_EXT_scalar_block_layout : require
 
 layout(set = 0, binding = 0) uniform CameraBuffer {
@@ -48,6 +49,8 @@ layout(location = 1) out vec2 fragDiscUV;
 layout(location = 2) out vec3 fragNormal;       // world-space normal (surfel/EWA mode)
 layout(location = 3) out vec3 fragWorldPos;     // world-space position
 layout(location = 4) flat out vec3 fragEwaCovInv;  // UV-space inverse covariance (xx, xy, yy)
+
+#include "common/point_splat.glsl"
 
 void main()
 {
@@ -82,9 +85,9 @@ void main()
         float nLen = length(ptNormal);
         vec3 N = (nLen > 1e-6) ? (ptNormal / nLen) : cameraFwd;
 
-        vec3 ref = (abs(N.y) < 0.99) ? vec3(0.0, 1.0, 0.0) : vec3(1.0, 0.0, 0.0);
-        vec3 T = normalize(cross(N, ref));
-        vec3 B = cross(N, T);
+        vec3 T;
+        vec3 B;
+        PointTangentFrame(N, T, B);
 
         // Transform to view space (points are in world space for SSBO path).
         vec4 viewPos4 = camera.view * vec4(ptPosition, 1.0);
@@ -93,21 +96,10 @@ void main()
         vec3 viewT = viewRot * (T * radiusWorld);
         vec3 viewB = viewRot * (B * radiusWorld);
 
-        float z = max(-viewPos.z, 1e-4);
-        float invZ2 = 1.0 / (z * z);
-        float fx = camera.proj[0][0];
-        float fy = camera.proj[1][1];
-        float sx = 0.5 * push.ViewportWidth;
-        float sy = 0.5 * push.ViewportHeight;
-
-        vec2 scrT = vec2(
-            sx * fx * (viewT.x * z + viewT.z * viewPos.x) * invZ2,
-            sy * fy * (viewT.y * z + viewT.z * viewPos.y) * invZ2
-        );
-        vec2 scrB = vec2(
-            sx * fx * (viewB.x * z + viewB.z * viewPos.x) * invZ2,
-            sy * fy * (viewB.y * z + viewB.z * viewPos.y) * invZ2
-        );
+        vec2 scrT;
+        vec2 scrB;
+        ProjectPointTangents(camera.proj, vec2(push.ViewportWidth, push.ViewportHeight),
+                             viewPos, viewT, viewB, scrT, scrB);
 
         float c00 = scrT.x * scrT.x + scrB.x * scrB.x;
         float c01 = scrT.x * scrT.y + scrB.x * scrB.y;
@@ -118,21 +110,16 @@ void main()
         c11 += 1.0;
 
         float det = c00 * c11 - c01 * c01;
-        float invDet = 1.0 / max(det, 1e-6);
-        float ci00 =  c11 * invDet;
-        float ci01 = -c01 * invDet;
-        float ci11 =  c00 * invDet;
+        vec3 covarianceInverse = PointInverseCovariance(vec3(c00, c01, c11), det);
 
-        const float CUTOFF = 3.0;
-        float extX = CUTOFF * sqrt(max(c00, 0.0));
-        float extY = CUTOFF * sqrt(max(c11, 0.0));
-        extX = min(extX, push.ViewportWidth * 0.5);
-        extY = min(extY, push.ViewportHeight * 0.5);
+        float extX;
+        float extY;
+        PointSplatExtent(c00, c11, vec2(push.ViewportWidth, push.ViewportHeight), extX, extY);
 
         fragEwaCovInv = vec3(
-            ci00 * extX * extX,
-            ci01 * extX * extY,
-            ci11 * extY * extY
+            covarianceInverse.x * extX * extX,
+            covarianceInverse.y * extX * extY,
+            covarianceInverse.z * extY * extY
         );
 
         vec4 clipCenter = camera.proj * viewPos4;
@@ -154,9 +141,9 @@ void main()
         vec3 N = (nLen > 1e-6) ? (ptNormal / nLen) : cameraFwd;
 
         // Choose a reference vector not parallel to N for cross product.
-        vec3 ref = (abs(N.y) < 0.99) ? vec3(0.0, 1.0, 0.0) : vec3(1.0, 0.0, 0.0);
-        vec3 T = normalize(cross(N, ref));
-        vec3 B = cross(N, T);
+        vec3 T;
+        vec3 B;
+        PointTangentFrame(N, T, B);
 
         // Expand quad in the tangent plane.
         vec3 worldOffset = (T * localOffset.x + B * localOffset.y) * radiusWorld;

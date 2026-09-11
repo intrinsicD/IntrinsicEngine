@@ -1,0 +1,66 @@
+....................
+----------------------------------------------------------------------
+Ran 20 tests in 0.280s
+
+OK
+...........
+----------------------------------------------------------------------
+Ran 11 tests in 0.779s
+
+OK
+....................ERROR: ccache --print-stats failed: statistics unavailable
+.ERROR: invalid ccache stats value for 'cache_miss': 'not-a-number'
+..
+----------------------------------------------------------------------
+Ran 23 tests in 0.448s
+
+OK
+....................
+----------------------------------------------------------------------
+Ran 20 tests in 2.257s
+
+OK
+........
+----------------------------------------------------------------------
+Ran 8 tests in 0.054s
+
+OK
+test_local_cannot_mix_with_explicit_paths_or_another_revision (__main__.LocalChangeTests.test_local_cannot_mix_with_explicit_paths_or_another_revision) ... ok
+test_local_collection_failure_broadens_instead_of_using_committed_docs (__main__.LocalChangeTests.test_local_collection_failure_broadens_instead_of_using_committed_docs) ... ok
+test_local_deletion_and_staged_rename_broaden (__main__.LocalChangeTests.test_local_deletion_and_staged_rename_broaden) ... ok
+test_local_includes_staged_unstaged_and_untracked_source (__main__.LocalChangeTests.test_local_includes_staged_unstaged_and_untracked_source) ... ok
+test_local_new_module_broadens_and_ignored_files_stay_excluded (__main__.LocalChangeTests.test_local_new_module_broadens_and_ignored_files_stay_excluded) ... ok
+test_local_preserves_staged_edit_undone_in_worktree (__main__.LocalChangeTests.test_local_preserves_staged_edit_undone_in_worktree) ... ok
+test_local_untracked_names_are_nul_delimited (__main__.LocalChangeTests.test_local_untracked_names_are_nul_delimited) ... ok
+test_broad_route_executes_fast_and_smoke_producers_separately (__main__.TouchedScopeTests.test_broad_route_executes_fast_and_smoke_producers_separately) ... ok
+test_build_action_records_unique_incremental_closure (__main__.TouchedScopeTests.test_build_action_records_unique_incremental_closure) ... ok
+test_ci_tooling_selects_its_owning_regressions (__main__.TouchedScopeTests.test_ci_tooling_selects_its_owning_regressions) ... ok
+test_compile_hotspot_analyzer_selects_only_its_regression (__main__.TouchedScopeTests.test_compile_hotspot_analyzer_selects_only_its_regression) ... ok
+test_ctest_inventory_rejects_zero_and_duplicates (__main__.TouchedScopeTests.test_ctest_inventory_rejects_zero_and_duplicates) ... ok
+test_diverged_pr_diff_starts_at_merge_base (__main__.TouchedScopeTests.test_diverged_pr_diff_starts_at_merge_base) ... ok
+test_docs_and_tasks_are_structural_only (__main__.TouchedScopeTests.test_docs_and_tasks_are_structural_only) ... ok
+test_duplicate_registry_target_fails_closed (__main__.TouchedScopeTests.test_duplicate_registry_target_fails_closed) ... ok
+test_exact_ctest_regexes_are_bounded_and_complete (__main__.TouchedScopeTests.test_exact_ctest_regexes_are_bounded_and_complete) ... ok
+test_finalize_selects_owner_while_smoke_is_unadmitted (__main__.TouchedScopeTests.test_finalize_selects_owner_while_smoke_is_unadmitted) ... ok
+test_focused_runtime_route_excludes_unadmitted_smoke (__main__.TouchedScopeTests.test_focused_runtime_route_excludes_unadmitted_smoke) ... ok
+test_graph_affecting_and_unknown_paths_are_broad (__main__.TouchedScopeTests.test_graph_affecting_and_unknown_paths_are_broad) ... ok
+test_hidden_directory_normalization_is_preserved (__main__.TouchedScopeTests.test_hidden_directory_normalization_is_preserved) ... ok
+test_kernel_paths_select_live_and_synthetic_guards (__main__.TouchedScopeTests.test_kernel_paths_select_live_and_synthetic_guards) ... ok
+test_known_single_and_cross_layer_sources_are_focused (__main__.TouchedScopeTests.test_known_single_and_cross_layer_sources_are_focused) ... ok
+test_malformed_registry_and_aggregate_mismatch_fail_closed (__main__.TouchedScopeTests.test_malformed_registry_and_aggregate_mismatch_fail_closed) ... ok
+test_missing_focused_anchor_widens_to_broad (__main__.TouchedScopeTests.test_missing_focused_anchor_widens_to_broad) ... ok
+test_nul_name_status_parser_handles_modify_and_rename (__main__.TouchedScopeTests.test_nul_name_status_parser_handles_modify_and_rename) ... ok
+test_plan_action_turns_diff_error_into_broad_artifact (__main__.TouchedScopeTests.test_plan_action_turns_diff_error_into_broad_artifact) ... ok
+test_pre_test_discovery_is_exact_only_after_binary_build (__main__.TouchedScopeTests.test_pre_test_discovery_is_exact_only_after_binary_build) ... ok
+test_real_git_diff_uses_two_endpoints_and_missing_ref_fails (__main__.TouchedScopeTests.test_real_git_diff_uses_two_endpoints_and_missing_ref_fails) ... ok
+test_release_routing_admits_method_benchmark_and_build_inputs (__main__.TouchedScopeTests.test_release_routing_admits_method_benchmark_and_build_inputs) ... ok
+test_rename_delete_type_and_unmerged_statuses_broaden (__main__.TouchedScopeTests.test_rename_delete_type_and_unmerged_statuses_broaden) ... ok
+test_runtime_mapping_has_no_retired_selection_target (__main__.TouchedScopeTests.test_runtime_mapping_has_no_retired_selection_target) ... ok
+test_step_summary_names_scope_reasons_labels_and_targets (__main__.TouchedScopeTests.test_step_summary_names_scope_reasons_labels_and_targets) ... ok
+test_workflow_change_is_structural_and_selects_static_regressions (__main__.TouchedScopeTests.test_workflow_change_is_structural_and_selects_static_regressions) ... ok
+test_zero_change_set_broadens_instead_of_succeeding_empty (__main__.TouchedScopeTests.test_zero_change_set_broadens_instead_of_succeeding_empty) ... ok
+
+----------------------------------------------------------------------
+Ran 34 tests in 8.733s
+
+OK

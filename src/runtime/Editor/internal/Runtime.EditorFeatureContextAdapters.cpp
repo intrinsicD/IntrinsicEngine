@@ -1,6 +1,20 @@
 module;
 
+#include <algorithm>
+#include <bit>
+#include <variant>
+#include <array>
+#include <chrono>
+#include <cstddef>
 #include <cstdint>
+#include <limits>
+#include <memory>
+#include <span>
+#include <string_view>
+#include <vector>
+
+#include <entt/entity/registry.hpp>
+#include <glm/glm.hpp>
 #include <optional>
 #include <string>
 #include <utility>
@@ -9,8 +23,13 @@ module Extrinsic.Runtime.Private.EditorFeatures;
 
 import Extrinsic.Asset.ImportRouter;
 import Extrinsic.Asset.GeometryPayload;
+import Extrinsic.Asset.ModelTexturePayload;
 import Extrinsic.Asset.Registry;
 import Extrinsic.Core.Error;
+import Extrinsic.ECS.Components.GeometrySources;
+import Extrinsic.ECS.Component.Transform;
+import Extrinsic.Runtime.EditorCommandHistory;
+import Extrinsic.Runtime.SelectionController;
 import Extrinsic.Graphics.Component.GpuSceneSlot;
 import Extrinsic.Graphics.GpuAssetCache;
 import Extrinsic.Graphics.Renderer;
@@ -21,13 +40,1129 @@ import Extrinsic.RHI.Device;
 import Extrinsic.Runtime.AssetWorkflowModule;
 import Extrinsic.Runtime.AssetWorkflowRecipePolicies;
 import Extrinsic.Runtime.EditorUiHost;
+import Extrinsic.Runtime.GeometryAvailability;
+import Extrinsic.Runtime.VertexAttributeBinding;
+import Geometry.Properties;
 import Extrinsic.Runtime.EngineConfigControl;
 import Extrinsic.Runtime.RenderExtraction;
 import Extrinsic.Runtime.SceneDocumentModule;
 import Extrinsic.Runtime.SceneInteractionModule;
 import Extrinsic.Runtime.TextureBakeModule;
 
+#include "Editor/internal/Runtime.EditorMutation.Internal.hpp"
+
 namespace Extrinsic::Runtime::EditorFeatureDetail {
+namespace
+{
+    namespace A = Extrinsic::Assets;
+    namespace ECSC = Extrinsic::ECS::Components;
+    namespace GS = Extrinsic::ECS::Components::GeometrySources;
+
+    [[nodiscard]] std::string ErrorName(const Core::ErrorCode error)
+    {
+        return std::string(Core::Error::ToString(error));
+    }
+
+    constexpr std::uint64_t kEditorSignaturePrime = 1099511628211ull;
+
+    void MixSignatureByte(std::uint64_t& signature,
+                          const std::uint8_t value) noexcept
+    {
+        signature ^= value;
+        signature *= kEditorSignaturePrime;
+    }
+
+    void AppendPropertySetMetadataSignature(
+        std::uint64_t& signature,
+        const std::uint64_t domainTag,
+        const Geometry::PropertySet* properties,
+        const std::size_t deletedCount)
+    {
+        MixSignature(signature, domainTag);
+        if (properties == nullptr)
+        {
+            MixSignature(signature, 0u);
+            return;
+        }
+
+        MixSignature(signature, static_cast<std::uint64_t>(properties->Size()));
+        MixSignature(signature, static_cast<std::uint64_t>(deletedCount));
+        const std::vector<Geometry::PropertyDescriptor> descriptors =
+            properties->Registry().Descriptors(false);
+        MixSignature(signature, static_cast<std::uint64_t>(descriptors.size()));
+        std::uint64_t order = 0u;
+        for (const Geometry::PropertyDescriptor& descriptor : descriptors)
+        {
+            MixSignature(signature, order++);
+            MixSignatureString(signature, descriptor.Name);
+            MixSignature(signature,
+                         static_cast<std::uint64_t>(
+                             descriptor.ValueKind));
+            MixSignature(signature,
+                         static_cast<std::uint64_t>(
+                             descriptor.ElementCount));
+            MixSignature(signature,
+                         descriptor.SupportsContiguousSpan ? 1u : 0u);
+            MixSignature(signature, descriptor.SupportsRawData ? 1u : 0u);
+        }
+    }
+
+    struct EditorTransformMutationIdentity
+    {
+        ECS::Scene::Registry* Scene{nullptr};
+        WorldHandle World{};
+        std::uint32_t StableEntityId{0u};
+    };
+
+    inline constexpr std::array<A::AssetPayloadKind, 6>
+        kFileImportPayloadKinds{{
+            A::AssetPayloadKind::Unknown,
+            A::AssetPayloadKind::Mesh,
+            A::AssetPayloadKind::PointCloud,
+            A::AssetPayloadKind::Graph,
+            A::AssetPayloadKind::ModelScene,
+            A::AssetPayloadKind::Texture2D,
+        }};
+
+    inline constexpr std::string_view kImportSurfaceUnavailableReason =
+        "Asset import requires an available runtime import command surface.";
+    inline constexpr std::string_view kImportPathEmptyReason =
+        "Enter an asset path before choosing a payload or importing.";
+    inline constexpr std::string_view kImportExtensionMissingReason =
+        "Add a supported file extension to the asset path before importing.";
+
+    [[nodiscard]] bool HasPromotedFileImporter(
+        const A::AssetFileFormat format,
+        const A::AssetPayloadKind payloadKind) noexcept
+    {
+        if (payloadKind == A::AssetPayloadKind::ModelScene)
+            return A::IsSupportedModelSceneImportFormat(format);
+        if (payloadKind == A::AssetPayloadKind::Texture2D)
+            return A::IsSupportedTextureImportFormat(format);
+        return true;
+    }
+
+    [[nodiscard]] std::string PayloadChoicesText(
+        const std::span<const A::AssetPayloadKind> payloads)
+    {
+        std::string text{};
+        for (std::size_t i = 0u; i < payloads.size(); ++i)
+        {
+            if (i > 0u)
+                text += i + 1u == payloads.size() ? " or " : ", ";
+            text += A::DebugNameForAssetPayloadKind(payloads[i]);
+        }
+        return text;
+    }
+
+    [[nodiscard]] std::string BuildUnsupportedExtensionReason(
+        const A::AssetRouteDiagnostic& diagnostic)
+    {
+        std::string reason = "Asset extension";
+        if (!diagnostic.Extension.empty())
+        {
+            reason += " '.";
+            reason += diagnostic.Extension;
+            reason += "'";
+        }
+        reason +=
+            " is unsupported; choose a path with a supported asset file extension.";
+        return reason;
+    }
+
+    [[nodiscard]] std::string BuildIncompatiblePayloadReason(
+        const A::AssetFileFormatInfo& format,
+        const A::AssetPayloadKind payloadKind)
+    {
+        std::string reason = A::DebugNameForAssetFileFormat(format.Format);
+        reason += " import ";
+        const std::string choices = PayloadChoicesText(format.ImportPayloads);
+        if (payloadKind == A::AssetPayloadKind::Unknown)
+        {
+            reason += "requires an explicit ";
+            reason += choices;
+            reason += " payload.";
+            return reason;
+        }
+
+        if (format.ImportPayloads.size() == 1u)
+        {
+            reason += "requires the ";
+            reason += choices;
+            reason += " payload; ";
+        }
+        else
+        {
+            reason += "supports only ";
+            reason += choices;
+            reason += " payloads; ";
+        }
+        reason += A::DebugNameForAssetPayloadKind(payloadKind);
+        reason += " is incompatible.";
+        return reason;
+    }
+
+    [[nodiscard]] std::string BuildUnavailableImporterReason(
+        const A::AssetFileFormatInfo& format)
+    {
+        std::string reason = A::DebugNameForAssetFileFormat(format.Format);
+        reason += " import is unavailable because no promoted ";
+        reason += PayloadChoicesText(format.ImportPayloads);
+        reason +=
+            " importer supports this format; choose a supported asset format.";
+        return reason;
+    }
+
+    [[nodiscard]] bool IsScalarVisualizationKind(
+        const Geometry::PropertyValueKind kind) noexcept
+    {
+        return kind == Geometry::PropertyValueKind::Float ||
+               kind == Geometry::PropertyValueKind::Double;
+    }
+
+    [[nodiscard]] bool DomainSupportsVisualizationConfig(
+        const EditorVisualizationPropertyDomain domain) noexcept
+    {
+        using Domain = EditorVisualizationPropertyDomain;
+        switch (domain)
+        {
+        case Domain::MeshVertices:
+        case Domain::MeshEdges:
+        case Domain::MeshFaces:
+        case Domain::GraphVertices:
+        case Domain::GraphEdges:
+        case Domain::PointCloudPoints:
+            return true;
+        }
+        return false;
+    }
+
+    void RecordVertexChannelResolverScratch(
+        EditorWorkspaceSnapshotStats* stats,
+        const std::size_t byteCount)
+    {
+        if (stats == nullptr)
+            return;
+
+        ++stats->VertexChannelResolverScans;
+        ++stats->VertexChannelScratchAllocations;
+        stats->VertexChannelScratchBytes +=
+            static_cast<std::uint64_t>(byteCount);
+    }
+}
+
+    void MixSignature(std::uint64_t& signature,
+                      std::uint64_t value) noexcept
+    {
+        for (std::uint32_t i = 0u; i < 8u; ++i)
+        {
+            MixSignatureByte(
+                signature,
+                static_cast<std::uint8_t>((value >> (i * 8u)) & 0xffu));
+        }
+    }
+
+    void MixSignatureString(std::uint64_t& signature,
+                            const std::string_view value) noexcept
+    {
+        MixSignature(signature, static_cast<std::uint64_t>(value.size()));
+        for (const char c : value)
+        {
+            MixSignatureByte(signature, static_cast<std::uint8_t>(c));
+        }
+    }
+
+    [[nodiscard]] std::uint64_t GeometryMetadataSignatureForEntity(
+        const entt::registry& raw,
+        const ECS::EntityHandle entity)
+    {
+        const GS::ConstSourceView view = GS::BuildConstView(raw, entity);
+        std::uint64_t signature = kEditorSignatureOffset;
+        MixSignature(signature,
+                     static_cast<std::uint64_t>(view.ActiveDomain));
+        MixSignature(signature, view.HasMeshTopologyMarker ? 1u : 0u);
+        MixSignature(signature, view.HasGraphTopologyMarker ? 1u : 0u);
+        AppendPropertySetMetadataSignature(
+            signature,
+            1u,
+            view.VertexSource != nullptr
+                ? &view.VertexSource->Properties
+                : nullptr,
+            view.VertexSource != nullptr ? view.VertexSource->NumDeleted
+                                         : 0u);
+        AppendPropertySetMetadataSignature(
+            signature,
+            2u,
+            view.EdgeSource != nullptr ? &view.EdgeSource->Properties
+                                       : nullptr,
+            view.EdgeSource != nullptr ? view.EdgeSource->NumDeleted
+                                       : 0u);
+        AppendPropertySetMetadataSignature(
+            signature,
+            3u,
+            view.HalfedgeSource != nullptr
+                ? &view.HalfedgeSource->Properties
+                : nullptr,
+            0u);
+        AppendPropertySetMetadataSignature(
+            signature,
+            4u,
+            view.FaceSource != nullptr ? &view.FaceSource->Properties
+                                       : nullptr,
+            view.FaceSource != nullptr ? view.FaceSource->NumDeleted
+                                       : 0u);
+        return signature;
+    }
+
+    [[nodiscard]] std::optional<ECS::EntityHandle> ResolveStableEntity(
+        const entt::registry& raw,
+        const std::uint32_t stableId)
+    {
+        const ECS::EntityHandle entity =
+            SelectionController::ToEntityHandle(stableId);
+        if (entity != ECS::InvalidEntityHandle && raw.valid(entity))
+            return entity;
+        return std::nullopt;
+    }
+
+    [[nodiscard]] bool SameTransformComponent(
+        const ECSC::Transform::Component& lhs,
+        const ECSC::Transform::Component& rhs) noexcept
+    {
+        return lhs.Position.x == rhs.Position.x &&
+               lhs.Position.y == rhs.Position.y &&
+               lhs.Position.z == rhs.Position.z &&
+               lhs.Rotation.w == rhs.Rotation.w &&
+               lhs.Rotation.x == rhs.Rotation.x &&
+               lhs.Rotation.y == rhs.Rotation.y &&
+               lhs.Rotation.z == rhs.Rotation.z &&
+               lhs.Scale.x == rhs.Scale.x &&
+               lhs.Scale.y == rhs.Scale.y &&
+               lhs.Scale.z == rhs.Scale.z;
+    }
+
+    [[nodiscard]] EditorCommandHistoryResult ExecuteEditorTransformMutation(
+        EditorCommandHistory& history,
+        ECS::Scene::Registry* scene,
+        const WorldHandle world,
+        const std::uint32_t stableEntityId,
+        const ECSC::Transform::Component& before,
+        const ECSC::Transform::Component& after,
+        std::string label)
+    {
+        return Internal::ExecuteUndoableEntityMutation(
+            history,
+            std::move(label),
+            EditorTransformMutationIdentity{
+                .Scene = scene,
+                .World = world,
+                .StableEntityId = stableEntityId,
+            },
+            before,
+            before,
+            after,
+            [](
+                const EditorTransformMutationIdentity& identity,
+                const ECSC::Transform::Component& expected,
+                const ECSC::Transform::Component&)
+            {
+                if (identity.Scene == nullptr || !identity.World.IsValid())
+                    return EditorCommandHistoryStatus::MissingScene;
+
+                entt::registry& raw = identity.Scene->Raw();
+                const std::optional<ECS::EntityHandle> entity =
+                    ResolveStableEntity(raw, identity.StableEntityId);
+                if (!entity.has_value())
+                    return EditorCommandHistoryStatus::StaleEntity;
+
+                const ECSC::Transform::Component* transform =
+                    raw.try_get<ECSC::Transform::Component>(*entity);
+                if (transform == nullptr)
+                    return EditorCommandHistoryStatus::MissingTransform;
+                return SameTransformComponent(*transform, expected)
+                    ? EditorCommandHistoryStatus::Applied
+                    : EditorCommandHistoryStatus::StaleEntity;
+            },
+            [](
+                const EditorTransformMutationIdentity& identity,
+                const ECSC::Transform::Component& target)
+            {
+                entt::registry& raw = identity.Scene->Raw();
+                const std::optional<ECS::EntityHandle> entity =
+                    ResolveStableEntity(raw, identity.StableEntityId);
+                if (!entity.has_value())
+                    return EditorCommandHistoryStatus::StaleEntity;
+
+                ECSC::Transform::Component* transform =
+                    raw.try_get<ECSC::Transform::Component>(*entity);
+                if (transform == nullptr)
+                    return EditorCommandHistoryStatus::MissingTransform;
+                *transform = target;
+                return EditorCommandHistoryStatus::Applied;
+            },
+            [](
+                const EditorTransformMutationIdentity& identity,
+                const ECSC::Transform::Component&,
+                const ECSC::Transform::Component& target)
+            {
+                entt::registry& raw = identity.Scene->Raw();
+                const std::optional<ECS::EntityHandle> entity =
+                    ResolveStableEntity(raw, identity.StableEntityId);
+                if (entity.has_value())
+                {
+                    raw.emplace_or_replace<ECSC::Transform::IsDirtyTag>(
+                        *entity);
+                }
+                return target;
+            });
+    }
+
+    [[nodiscard]] EditorCommandStatus ToEditorCommandStatus(
+        const EditorCommandHistoryStatus status) noexcept
+    {
+        switch (status)
+        {
+        case EditorCommandHistoryStatus::Applied:
+        case EditorCommandHistoryStatus::Recorded:
+        case EditorCommandHistoryStatus::Undone:
+        case EditorCommandHistoryStatus::Redone:
+            return EditorCommandStatus::Applied;
+        case EditorCommandHistoryStatus::NoChange:
+            return EditorCommandStatus::NoChange;
+        case EditorCommandHistoryStatus::MissingScene:
+            return EditorCommandStatus::MissingScene;
+        case EditorCommandHistoryStatus::MissingSelectionController:
+            return EditorCommandStatus::MissingSelectionController;
+        case EditorCommandHistoryStatus::StaleEntity:
+            return EditorCommandStatus::StaleEntity;
+        case EditorCommandHistoryStatus::MissingTransform:
+            return EditorCommandStatus::MissingTransform;
+        case EditorCommandHistoryStatus::EmptyUndoStack:
+        case EditorCommandHistoryStatus::EmptyRedoStack:
+        case EditorCommandHistoryStatus::InvalidCommand:
+        case EditorCommandHistoryStatus::CommandFailed:
+        case EditorCommandHistoryStatus::UndoFailed:
+        case EditorCommandHistoryStatus::RedoFailed:
+        case EditorCommandHistoryStatus::UnsupportedOperation:
+            return EditorCommandStatus::NoChange;
+        }
+        return EditorCommandStatus::NoChange;
+    }
+
+    [[nodiscard]] std::string BuildImportSuccessMessage(
+        const EditorFileImportCommand& command,
+        const EditorFileImportResult& result)
+    {
+        std::string message = "Imported ";
+        message += A::DebugNameForAssetPayloadKind(result.PayloadKind);
+        message += " asset";
+        if (!command.Path.empty())
+        {
+            message += " from ";
+            message += command.Path;
+        }
+        message += ".";
+        return message;
+    }
+
+    [[nodiscard]] std::string BuildImportPendingMessage(
+        const EditorFileImportCommand& command,
+        const A::AssetPayloadKind payloadKind)
+    {
+        std::string message = "Queued ";
+        message += A::DebugNameForAssetPayloadKind(payloadKind);
+        message += " asset import";
+        if (!command.Path.empty())
+        {
+            message += " from ";
+            message += command.Path;
+        }
+        message += ".";
+        return message;
+    }
+
+    [[nodiscard]] std::string BuildImportFailureMessage(
+        const Core::ErrorCode error)
+    {
+        std::string message = "Asset import failed: ";
+        message += ErrorName(error);
+        message += ".";
+        return message;
+    }
+
+    [[nodiscard]] std::string BuildSceneFileSuccessMessage(
+        const EditorSceneFileCommand& command,
+        const EditorSceneFileResult& result)
+    {
+        std::string message{};
+        switch (result.Operation)
+        {
+        case EditorSceneFileOperation::New:
+            message = "Created new scene";
+            break;
+        case EditorSceneFileOperation::Save:
+            message = "Saved scene";
+            break;
+        case EditorSceneFileOperation::Load:
+            message = "Opened scene";
+            break;
+        case EditorSceneFileOperation::Close:
+            message = "Closed scene";
+            break;
+        }
+        if (!command.Path.empty())
+        {
+            if (result.Operation == EditorSceneFileOperation::Save)
+                message += " to ";
+            else if (result.Operation == EditorSceneFileOperation::Load)
+                message += " from ";
+            else
+                message += " ";
+            message += command.Path;
+        }
+        message += " (entities=";
+        message += std::to_string(result.Stats.Entities);
+        message += ", mesh=";
+        message += std::to_string(result.Stats.MeshEntities);
+        message += ", graph=";
+        message += std::to_string(result.Stats.GraphEntities);
+        message += ", pointCloud=";
+        message += std::to_string(result.Stats.PointCloudEntities);
+        message += ").";
+        return message;
+    }
+
+    [[nodiscard]] std::string BuildSceneFileFailureMessage(
+        const EditorSceneFileOperation operation,
+        const Core::ErrorCode error)
+    {
+        std::string message{};
+        switch (operation)
+        {
+        case EditorSceneFileOperation::New:
+            message = "Scene new failed: ";
+            break;
+        case EditorSceneFileOperation::Save:
+            message = "Scene save failed: ";
+            break;
+        case EditorSceneFileOperation::Load:
+            message = "Scene open failed: ";
+            break;
+        case EditorSceneFileOperation::Close:
+            message = "Scene close failed: ";
+            break;
+        }
+        message += ErrorName(error);
+        message += ".";
+        return message;
+    }
+
+    [[nodiscard]] std::string BuildSceneFilePendingMessage(
+        const EditorSceneFileCommand& command,
+        const EditorSceneFileOperation operation)
+    {
+        std::string message{};
+        switch (operation)
+        {
+        case EditorSceneFileOperation::New:
+            message = "Queued scene new";
+            break;
+        case EditorSceneFileOperation::Save:
+            message = "Queued scene save";
+            break;
+        case EditorSceneFileOperation::Load:
+            message = "Queued scene open";
+            break;
+        case EditorSceneFileOperation::Close:
+            message = "Queued scene close";
+            break;
+        }
+        if (!command.Path.empty())
+        {
+            if (operation == EditorSceneFileOperation::Save)
+                message += " to ";
+            else if (operation == EditorSceneFileOperation::Load)
+                message += " from ";
+            else
+                message += " ";
+            message += command.Path;
+        }
+        message += ".";
+        return message;
+    }
+
+    [[nodiscard]] EditorJobModel ToEditorJobModel(
+        const EditorJobRecord& job)
+    {
+        EditorJobModel model{
+            .Handle = job.Token,
+            .Key = job.Identity,
+            .Name = job.Name,
+            .RequestedJobDomain = job.RequestedJobDomain,
+            .ResolvedJobDomain = job.ResolvedJobDomain,
+            .Status = job.State,
+            .NormalizedProgress = job.NormalizedProgress,
+            .ProgressDeterminate = job.ProgressDeterminate,
+            .PreviousOutputRetained = job.PreviousOutputRetained,
+            .PayloadToken = job.PayloadToken,
+            .ElapsedMilliseconds = job.ElapsedMilliseconds,
+            .Diagnostic = job.Diagnostic,
+        };
+        model.Dependencies.reserve(job.Dependencies.size());
+        for (const EditorJobDependency& dependency : job.Dependencies)
+            model.Dependencies.push_back(EditorJobDependencyModel{
+                .Job = dependency.Job,
+                .Reason = dependency.Reason,
+            });
+        return model;
+    }
+
+ScopedEditorStatTimer::ScopedEditorStatTimer(std::uint64_t* target) noexcept
+    : m_Target(target)
+{
+    if (m_Target != nullptr)
+        m_Start = EditorModelBuildClock::now();
+}
+
+ScopedEditorStatTimer::~ScopedEditorStatTimer()
+{
+    if (m_Target != nullptr)
+        *m_Target += EditorElapsedNs(m_Start);
+}
+
+    [[nodiscard]] FileImportPrerequisiteEvaluation
+    EvaluateFileImportPrerequisites(
+        const bool commandSurfaceAvailable,
+        const std::string_view path,
+        const A::AssetPayloadKind selectedPayloadKind)
+    {
+        FileImportPrerequisiteEvaluation evaluation{};
+        for (std::size_t i = 0u; i < kFileImportPayloadKinds.size(); ++i)
+            evaluation.PayloadOptions[i].Kind = kFileImportPayloadKinds[i];
+
+        const auto disableAll = [&evaluation](const std::string_view reason,
+                                              const Core::ErrorCode error)
+        {
+            evaluation.PayloadHintDisabledReason = reason;
+            evaluation.ImportDisabledReason = reason;
+            evaluation.Error = error;
+            for (EditorFileImportPayloadOption& option :
+                 evaluation.PayloadOptions)
+            {
+                option.DisabledReason = reason;
+            }
+        };
+
+        if (!commandSurfaceAvailable)
+        {
+            disableAll(kImportSurfaceUnavailableReason,
+                       Core::ErrorCode::InvalidState);
+            return evaluation;
+        }
+        if (path.empty())
+        {
+            disableAll(kImportPathEmptyReason, Core::ErrorCode::InvalidPath);
+            return evaluation;
+        }
+
+        const A::AssetRouteDiagnostic automaticDiagnostic =
+            A::DiagnoseAssetImportRoute(
+                path,
+                A::AssetRouteOperation::Import,
+                A::AssetImportHint{
+                    .PayloadKind = A::AssetPayloadKind::Unknown,
+                });
+        if (automaticDiagnostic.Status == A::AssetRouteStatus::MissingExtension)
+        {
+            disableAll(kImportExtensionMissingReason,
+                       automaticDiagnostic.Error);
+            return evaluation;
+        }
+        if (automaticDiagnostic.Status ==
+            A::AssetRouteStatus::UnsupportedExtension)
+        {
+            const std::string reason =
+                BuildUnsupportedExtensionReason(automaticDiagnostic);
+            disableAll(reason, automaticDiagnostic.Error);
+            return evaluation;
+        }
+
+        const A::AssetFileFormatInfo* format = A::FindAssetFileFormat(path);
+        if (format == nullptr || format->ImportPayloads.empty())
+        {
+            const std::string reason =
+                automaticDiagnostic.Message.empty()
+                    ? std::string{"The selected asset format has no supported import "
+                                  "payload."}
+                    : automaticDiagnostic.Message;
+            disableAll(reason, automaticDiagnostic.Error);
+            return evaluation;
+        }
+
+        const A::AssetRouteDiagnostic selectedDiagnostic =
+            A::DiagnoseAssetImportRoute(
+                path,
+                A::AssetRouteOperation::Import,
+                A::AssetImportHint{.PayloadKind = selectedPayloadKind});
+        if (selectedDiagnostic.Status == A::AssetRouteStatus::Ready)
+        {
+            const auto selectedRoute = A::ResolveAssetImportRoute(
+                path,
+                A::AssetRouteOperation::Import,
+                A::AssetImportHint{.PayloadKind = selectedPayloadKind});
+            if (selectedRoute.has_value())
+                evaluation.ResolvedPayloadKind = selectedRoute->PayloadKind;
+        }
+
+        const bool promotedImporterAvailable =
+            std::ranges::any_of(
+                format->ImportPayloads,
+                [format](const A::AssetPayloadKind payloadKind)
+                {
+                    return HasPromotedFileImporter(format->Format,
+                                                   payloadKind);
+                });
+        if (!promotedImporterAvailable)
+        {
+            const std::string reason = BuildUnavailableImporterReason(*format);
+            disableAll(reason, Core::ErrorCode::AssetUnsupportedFormat);
+            return evaluation;
+        }
+
+        evaluation.CanChoosePayloadHint = true;
+        for (EditorFileImportPayloadOption& option :
+             evaluation.PayloadOptions)
+        {
+            const A::AssetRouteDiagnostic optionDiagnostic =
+                A::DiagnoseAssetImportRoute(
+                    path,
+                    A::AssetRouteOperation::Import,
+                    A::AssetImportHint{.PayloadKind = option.Kind});
+            if (optionDiagnostic.Status != A::AssetRouteStatus::Ready)
+            {
+                option.DisabledReason =
+                    BuildIncompatiblePayloadReason(*format, option.Kind);
+                continue;
+            }
+
+            const auto optionRoute = A::ResolveAssetImportRoute(
+                path,
+                A::AssetRouteOperation::Import,
+                A::AssetImportHint{.PayloadKind = option.Kind});
+            if (!optionRoute.has_value() ||
+                !HasPromotedFileImporter(optionRoute->Format,
+                                         optionRoute->PayloadKind))
+            {
+                option.DisabledReason = BuildUnavailableImporterReason(*format);
+                continue;
+            }
+            option.Enabled = true;
+        }
+
+        const auto selectedOption = std::ranges::find(
+            evaluation.PayloadOptions,
+            selectedPayloadKind,
+            &EditorFileImportPayloadOption::Kind);
+        if (selectedOption == evaluation.PayloadOptions.end())
+        {
+            evaluation.ImportDisabledReason =
+                "Select a supported payload hint before importing.";
+            evaluation.Error = Core::ErrorCode::InvalidArgument;
+            return evaluation;
+        }
+        if (!selectedOption->Enabled)
+        {
+            evaluation.ImportDisabledReason = selectedOption->DisabledReason;
+            evaluation.Error = selectedDiagnostic.Error == Core::ErrorCode::Success
+                ? Core::ErrorCode::AssetUnsupportedFormat
+                : selectedDiagnostic.Error;
+            return evaluation;
+        }
+
+        evaluation.CanImport = true;
+        evaluation.Error = Core::ErrorCode::Success;
+        return evaluation;
+    }
+
+    [[nodiscard]] bool IsInternalVisualizationProperty(
+        const std::string& name) noexcept
+    {
+        return name == GS::PropertyNames::kPosition ||
+               name == GS::PropertyNames::kNormal ||
+               name == GS::PropertyNames::kVertexConnectivity ||
+               name == GS::PropertyNames::kEdgeV0 ||
+               name == GS::PropertyNames::kEdgeV1 ||
+               name == GS::PropertyNames::kHalfedgeToVertex ||
+               name == GS::PropertyNames::kHalfedgeNext ||
+               name == GS::PropertyNames::kHalfedgeFace ||
+               name == GS::PropertyNames::kHalfedgeConnectivity ||
+               name == GS::PropertyNames::kFaceHalfedge ||
+               name == "v:point" ||
+               name == "v:tex" ||
+               name == "v:texcoord" ||
+               // Same reserved property, on the domain that can
+               // carry a seam.
+               name == "h:texcoord" ||
+               name == "h:normal" ||
+               name == "p:position" ||
+               name == "p:normal";
+    }
+
+    [[nodiscard]] bool IsConnectivityVisualizationProperty(
+        const std::string& name) noexcept
+    {
+        return name == GS::PropertyNames::kPosition ||
+               name == GS::PropertyNames::kVertexConnectivity ||
+               name == GS::PropertyNames::kEdgeV0 ||
+               name == GS::PropertyNames::kEdgeV1 ||
+               name == GS::PropertyNames::kHalfedgeToVertex ||
+               name == GS::PropertyNames::kHalfedgeNext ||
+               name == GS::PropertyNames::kHalfedgeFace ||
+               name == GS::PropertyNames::kHalfedgeConnectivity ||
+               name == GS::PropertyNames::kFaceHalfedge ||
+               name == "v:point" ||
+               name == "v:tex" ||
+               name == "v:texcoord" ||
+               // Same reserved property, on the domain that can
+               // carry a seam.
+               name == "h:texcoord" ||
+               name == "h:normal" ||
+               name == "p:position";
+    }
+
+    [[nodiscard]] GeometryElementDomain ToGeometryElementDomain(
+        const EditorVisualizationPropertyDomain domain) noexcept
+    {
+        using Domain = EditorVisualizationPropertyDomain;
+        switch (domain)
+        {
+        case Domain::MeshVertices:
+            return GeometryElementDomain::MeshVertex;
+        case Domain::MeshEdges:
+            return GeometryElementDomain::MeshEdge;
+        case Domain::MeshFaces:
+            return GeometryElementDomain::MeshFace;
+        case Domain::GraphVertices:
+            return GeometryElementDomain::GraphNode;
+        case Domain::GraphEdges:
+            return GeometryElementDomain::GraphEdge;
+        case Domain::PointCloudPoints:
+            return GeometryElementDomain::PointCloudPoint;
+        }
+        return GeometryElementDomain::Unknown;
+    }
+
+    [[nodiscard]] GeometryElementDomain ToGeometryElementDomain(
+        const EditorPropertyCatalogDomain domain) noexcept
+    {
+        using Domain = EditorPropertyCatalogDomain;
+        switch (domain)
+        {
+        case Domain::MeshVertices:
+            return GeometryElementDomain::MeshVertex;
+        case Domain::MeshEdges:
+            return GeometryElementDomain::MeshEdge;
+        case Domain::MeshHalfedges:
+            return GeometryElementDomain::MeshHalfedge;
+        case Domain::MeshFaces:
+            return GeometryElementDomain::MeshFace;
+        case Domain::GraphVertices:
+            return GeometryElementDomain::GraphNode;
+        case Domain::GraphHalfedges:
+            return GeometryElementDomain::GraphHalfedge;
+        case Domain::GraphEdges:
+            return GeometryElementDomain::GraphEdge;
+        case Domain::PointCloudPoints:
+            return GeometryElementDomain::PointCloudPoint;
+        }
+        return GeometryElementDomain::Unknown;
+    }
+
+    [[nodiscard]] const Geometry::PropertySet* PropertySetForVisualizationDomain(
+        const GeometryEntityAvailability& availability,
+        const EditorVisualizationPropertyDomain domain) noexcept
+    {
+        return ResolveGeometryPropertySet(
+            availability,
+            ToGeometryElementDomain(domain));
+    }
+
+    void AppendVisualizationPropertiesForDomain(
+        std::vector<EditorVisualizationPropertyInfo>& out,
+        const Geometry::PropertySet& properties,
+        const EditorVisualizationPropertyDomain domain)
+    {
+        if (!DomainSupportsVisualizationConfig(domain))
+            return;
+
+        for (const std::string& name : properties.Properties())
+        {
+            // Kinds outside the visualization-capable set (Bool, Int32,
+            // UInt64, Vec2) fall through every predicate below and are
+            // skipped, exactly as the retired editor-local enum did by
+            // returning nullopt for them.
+            const Geometry::PropertyValueKind kind =
+                DetectGeometryPropertyValueKind(properties, name);
+            if (kind == Geometry::PropertyValueKind::Unknown)
+                continue;
+
+            const bool internal = IsInternalVisualizationProperty(name);
+            const bool connectivity =
+                IsConnectivityVisualizationProperty(name);
+            const bool scalar =
+                !internal && IsScalarVisualizationKind(kind);
+            const bool color =
+                (!internal || name == GS::PropertyNames::kNormal) &&
+                (kind == Geometry::PropertyValueKind::Vec3 ||
+                 kind == Geometry::PropertyValueKind::Vec4);
+            const bool vector =
+                !connectivity && kind == Geometry::PropertyValueKind::Vec3;
+            const bool integer =
+                !internal && !connectivity &&
+                kind == Geometry::PropertyValueKind::UInt32;
+            if (!scalar && !color && !vector && !integer)
+            {
+                continue;
+            }
+
+            out.push_back(EditorVisualizationPropertyInfo{
+                .Name = name,
+                .Domain = domain,
+                .ValueKind = kind,
+                .ElementCount = properties.Size(),
+                .ScalarPresetAvailable = scalar,
+                .IsolinePresetAvailable = scalar,
+                .ColorBufferPresetAvailable = color || integer,
+                .VectorFieldCandidate = vector,
+            });
+        }
+    }
+
+    [[nodiscard]] const Geometry::PropertySet* PropertySetForCatalogDomain(
+        const GeometryEntityAvailability& availability,
+        const EditorPropertyCatalogDomain domain) noexcept
+    {
+        using Domain = EditorPropertyCatalogDomain;
+        switch (domain)
+        {
+        case Domain::MeshVertices:
+            return ResolveGeometryPropertySet(
+                availability,
+                GeometryElementDomain::MeshVertex);
+        case Domain::MeshEdges:
+            return ResolveGeometryPropertySet(
+                availability,
+                GeometryElementDomain::MeshEdge);
+        case Domain::MeshHalfedges:
+            return ResolveGeometryPropertySet(
+                availability,
+                GeometryElementDomain::MeshHalfedge);
+        case Domain::MeshFaces:
+            return ResolveGeometryPropertySet(
+                availability,
+                GeometryElementDomain::MeshFace);
+        case Domain::GraphVertices:
+            return ResolveGeometryPropertySet(
+                availability,
+                GeometryElementDomain::GraphNode);
+        case Domain::GraphHalfedges:
+            return ResolveGeometryPropertySet(
+                availability,
+                GeometryElementDomain::GraphHalfedge);
+        case Domain::GraphEdges:
+            return ResolveGeometryPropertySet(
+                availability,
+                GeometryElementDomain::GraphEdge);
+        case Domain::PointCloudPoints:
+            return ResolveGeometryPropertySet(
+                availability,
+                GeometryElementDomain::PointCloudPoint);
+        }
+        return nullptr;
+    }
+
+    [[nodiscard]] bool IsPropertyCatalogSupportedKind(
+        const Geometry::PropertyValueKind kind) noexcept
+    {
+        switch (kind)
+        {
+        case Geometry::PropertyValueKind::Float:
+        case Geometry::PropertyValueKind::Double:
+        case Geometry::PropertyValueKind::UInt32:
+        case Geometry::PropertyValueKind::Vec2:
+        case Geometry::PropertyValueKind::Vec3:
+        case Geometry::PropertyValueKind::Vec4:
+            return true;
+        case Geometry::PropertyValueKind::Unknown:
+        case Geometry::PropertyValueKind::Bool:
+        case Geometry::PropertyValueKind::Int32:
+        case Geometry::PropertyValueKind::UInt64:
+            break;
+        }
+        return false;
+    }
+
+    [[nodiscard]] std::optional<EditorPropertyCatalogDomain>
+    VertexChannelCatalogDomainForView(
+        const GS::ConstSourceView& view) noexcept
+    {
+        const GS::SourceAvailability availability =
+            GS::BuildSourceAvailability(view);
+        using Domain = EditorPropertyCatalogDomain;
+        switch (availability.ProvenanceDomain)
+        {
+        case GS::Domain::Mesh:
+            return Domain::MeshVertices;
+        case GS::Domain::Graph:
+            return Domain::GraphVertices;
+        case GS::Domain::PointCloud:
+            return Domain::PointCloudPoints;
+        case GS::Domain::None:
+        case GS::Domain::Unknown:
+            break;
+        }
+        return std::nullopt;
+    }
+
+    [[nodiscard]] const Geometry::PropertySet*
+    VertexChannelPropertySetForView(
+        const GS::ConstSourceView& view,
+        const EditorPropertyCatalogDomain domain) noexcept
+    {
+        const GeometryEntityAvailability availability =
+            BuildGeometryAvailability(view);
+        return PropertySetForCatalogDomain(availability, domain);
+    }
+
+    [[nodiscard]] std::optional<AttributeSourceType>
+    ToAttributeSourceType(
+        const Geometry::PropertyValueKind kind) noexcept
+    {
+        using Kind = Geometry::PropertyValueKind;
+        switch (kind)
+        {
+        case Kind::Float:
+            return AttributeSourceType::Float32;
+        case Kind::Vec2:
+            return AttributeSourceType::Vec2;
+        case Kind::Vec3:
+            return AttributeSourceType::Vec3;
+        case Kind::Vec4:
+            return AttributeSourceType::Vec4;
+        case Kind::Double:
+        case Kind::UInt32:
+        case Kind::Unknown:
+        case Kind::Bool:
+        case Kind::Int32:
+        case Kind::UInt64:
+            break;
+        }
+        return std::nullopt;
+    }
+
+    [[nodiscard]] bool SourceTypeAllowedForVertexChannel(
+        const VertexChannel channel,
+        const AttributeSourceType type) noexcept
+    {
+        switch (channel)
+        {
+        case VertexChannel::Normal:
+            return type == AttributeSourceType::Vec3;
+        case VertexChannel::Color:
+            return type == AttributeSourceType::Vec3 ||
+                   type == AttributeSourceType::Vec4;
+        case VertexChannel::Position:
+        case VertexChannel::Texcoord:
+        case VertexChannel::Tangent:
+        case VertexChannel::Custom:
+            break;
+        }
+        return false;
+    }
+
+    [[nodiscard]] AttributeBindResult EvaluateVertexChannelBinding(
+        const Geometry::PropertySet& properties,
+        const VertexChannel channel,
+        const std::string_view propertyName,
+        const AttributeSourceType sourceType,
+        const std::size_t elementCount,
+        EditorWorkspaceSnapshotStats* modelBuildStats)
+    {
+        ScopedEditorStatTimer timer{
+            modelBuildStats != nullptr
+                ? &modelBuildStats->VertexChannelValidationTimeNs
+                : nullptr};
+        if (propertyName.empty())
+        {
+            return AttributeBindResult{
+                .Status = AttributeBindStatus::EmptyBinding,
+                .FullyPopulated = false,
+            };
+        }
+        if (elementCount > std::numeric_limits<std::uint32_t>::max())
+        {
+            return AttributeBindResult{
+                .Status = AttributeBindStatus::CountMismatch,
+                .FullyPopulated = false,
+            };
+        }
+        if (!SourceTypeAllowedForVertexChannel(channel, sourceType))
+        {
+            return AttributeBindResult{
+                .Status = AttributeBindStatus::TypeMismatch,
+                .FullyPopulated = false,
+            };
+        }
+
+        const std::uint32_t count =
+            static_cast<std::uint32_t>(elementCount);
+        const VertexAttributeBinding binding{
+            .Channel = channel,
+            .SourceType = sourceType,
+            .SourceProperty = propertyName,
+            .AllowFallback = false,
+            .Normalize = channel == VertexChannel::Normal,
+            .Fallback = channel == VertexChannel::Normal
+                ? glm::vec4{0.0f, 0.0f, 1.0f, 0.0f}
+                : glm::vec4{1.0f, 1.0f, 1.0f, 1.0f},
+        };
+
+        if (channel == VertexChannel::Normal)
+        {
+            RecordVertexChannelResolverScratch(
+                modelBuildStats,
+                elementCount * sizeof(glm::vec3));
+            std::vector<glm::vec3> scratch(elementCount);
+            return ResolveVec3Channel(properties, binding, count, scratch);
+        }
+        if (channel == VertexChannel::Color)
+        {
+            RecordVertexChannelResolverScratch(
+                modelBuildStats,
+                elementCount * sizeof(std::uint32_t));
+            std::vector<std::uint32_t> scratch(elementCount);
+            return ResolveColorChannelPackedUnorm8(
+                properties,
+                binding,
+                count,
+                scratch);
+        }
+        return AttributeBindResult{
+            .Status = AttributeBindStatus::TypeMismatch,
+            .FullyPopulated = false,
+        };
+    }
+
+    [[nodiscard]] std::uint64_t EditorElapsedNs(
+        const EditorModelBuildClock::time_point start) noexcept
+    {
+        const auto elapsed =
+            std::chrono::duration_cast<std::chrono::nanoseconds>(
+                EditorModelBuildClock::now() - start)
+                .count();
+        return elapsed > 0 ? static_cast<std::uint64_t>(elapsed) : 1u;
+    }
+
 EditorSceneEditingContext
 MakeEditorSceneEditingContext(const EditorFeatureBindings &bindings) {
   return EditorSceneEditingContext{
@@ -497,52 +1632,6 @@ namespace
             return payloadKind == A::AssetPayloadKind::ModelScene ||
                    payloadKind == A::AssetPayloadKind::Texture2D;
         }
-        [[nodiscard]] std::string ErrorName(const Core::ErrorCode error)
-        {
-            return std::string(Core::Error::ToString(error));
-        }
-
-        [[nodiscard]] std::string BuildImportSuccessMessage(
-            const EditorFileImportCommand& command,
-            const EditorFileImportResult& result)
-        {
-            std::string message = "Imported ";
-            message += A::DebugNameForAssetPayloadKind(result.PayloadKind);
-            message += " asset";
-            if (!command.Path.empty())
-            {
-                message += " from ";
-                message += command.Path;
-            }
-            message += ".";
-            return message;
-        }
-
-        [[nodiscard]] std::string BuildImportPendingMessage(
-            const EditorFileImportCommand& command,
-            const A::AssetPayloadKind payloadKind)
-        {
-            std::string message = "Queued ";
-            message += A::DebugNameForAssetPayloadKind(payloadKind);
-            message += " asset import";
-            if (!command.Path.empty())
-            {
-                message += " from ";
-                message += command.Path;
-            }
-            message += ".";
-            return message;
-        }
-
-        [[nodiscard]] std::string BuildImportFailureMessage(
-            const Core::ErrorCode error)
-        {
-            std::string message = "Asset import failed: ";
-            message += ErrorName(error);
-            message += ".";
-            return message;
-        }
-
         [[nodiscard]] EditorFileImportResult BuildFileImportResultFromRuntimeEvent(
             const RuntimeAssetImportEvent& event)
         {
@@ -575,107 +1664,6 @@ namespace
                 },
                 result);
             return result;
-        }
-
-        [[nodiscard]] std::string BuildSceneFileSuccessMessage(
-            const EditorSceneFileCommand& command,
-            const EditorSceneFileResult& result)
-        {
-            std::string message{};
-            switch (result.Operation)
-            {
-            case EditorSceneFileOperation::New:
-                message = "Created new scene";
-                break;
-            case EditorSceneFileOperation::Save:
-                message = "Saved scene";
-                break;
-            case EditorSceneFileOperation::Load:
-                message = "Opened scene";
-                break;
-            case EditorSceneFileOperation::Close:
-                message = "Closed scene";
-                break;
-            }
-            if (!command.Path.empty())
-            {
-                if (result.Operation == EditorSceneFileOperation::Save)
-                    message += " to ";
-                else if (result.Operation == EditorSceneFileOperation::Load)
-                    message += " from ";
-                else
-                    message += " ";
-                message += command.Path;
-            }
-            message += " (entities=";
-            message += std::to_string(result.Stats.Entities);
-            message += ", mesh=";
-            message += std::to_string(result.Stats.MeshEntities);
-            message += ", graph=";
-            message += std::to_string(result.Stats.GraphEntities);
-            message += ", pointCloud=";
-            message += std::to_string(result.Stats.PointCloudEntities);
-            message += ").";
-            return message;
-        }
-
-        [[nodiscard]] std::string BuildSceneFileFailureMessage(
-            const EditorSceneFileOperation operation,
-            const Core::ErrorCode error)
-        {
-            std::string message{};
-            switch (operation)
-            {
-            case EditorSceneFileOperation::New:
-                message = "Scene new failed: ";
-                break;
-            case EditorSceneFileOperation::Save:
-                message = "Scene save failed: ";
-                break;
-            case EditorSceneFileOperation::Load:
-                message = "Scene open failed: ";
-                break;
-            case EditorSceneFileOperation::Close:
-                message = "Scene close failed: ";
-                break;
-            }
-            message += ErrorName(error);
-            message += ".";
-            return message;
-        }
-
-        [[nodiscard]] std::string BuildSceneFilePendingMessage(
-            const EditorSceneFileCommand& command,
-            const EditorSceneFileOperation operation)
-        {
-            std::string message{};
-            switch (operation)
-            {
-            case EditorSceneFileOperation::New:
-                message = "Queued scene new";
-                break;
-            case EditorSceneFileOperation::Save:
-                message = "Queued scene save";
-                break;
-            case EditorSceneFileOperation::Load:
-                message = "Queued scene open";
-                break;
-            case EditorSceneFileOperation::Close:
-                message = "Queued scene close";
-                break;
-            }
-            if (!command.Path.empty())
-            {
-                if (operation == EditorSceneFileOperation::Save)
-                    message += " to ";
-                else if (operation == EditorSceneFileOperation::Load)
-                    message += " from ";
-                else
-                    message += " ";
-                message += command.Path;
-            }
-            message += ".";
-            return message;
         }
 
         [[nodiscard]] EditorSceneFileOperation ToSandboxSceneFileOperation(
@@ -1382,5 +2370,82 @@ EditorFeatureBindings MakeEditorFeatureBindings(
 {
     return BuildContextFromRuntime(worlds, services);
 }
+
+namespace
+{
+    [[nodiscard]] bool SameRenderSurface(
+        const Graphics::Components::RenderSurface& lhs,
+        const Graphics::Components::RenderSurface& rhs) noexcept
+    {
+        return lhs.Domain == rhs.Domain;
+    }
+
+    [[nodiscard]] bool SameRenderScalarSource(
+        const std::variant<float, std::string>& lhs,
+        const std::variant<float, std::string>& rhs) noexcept
+    {
+        if (lhs.index() != rhs.index())
+            return false;
+        if (const auto* lhsUniform = std::get_if<float>(&lhs))
+        {
+            const auto* rhsUniform = std::get_if<float>(&rhs);
+            return rhsUniform != nullptr &&
+                   std::bit_cast<std::uint32_t>(*lhsUniform) ==
+                       std::bit_cast<std::uint32_t>(*rhsUniform);
+        }
+        return std::get<std::string>(lhs) == std::get<std::string>(rhs);
+    }
+
+    [[nodiscard]] bool SameRenderEdges(
+        const Graphics::Components::RenderEdges& lhs,
+        const Graphics::Components::RenderEdges& rhs)
+    {
+        return lhs.Domain == rhs.Domain &&
+               SameRenderScalarSource(lhs.WidthSource, rhs.WidthSource);
+    }
+
+    [[nodiscard]] bool SameRenderPoints(
+        const Graphics::Components::RenderPoints& lhs,
+        const Graphics::Components::RenderPoints& rhs)
+    {
+        return lhs.Type == rhs.Type &&
+               SameRenderScalarSource(lhs.SizeSource, rhs.SizeSource);
+    }
+
+    template <typename T, typename SameFn>
+    [[nodiscard]] bool SameOptionalRenderComponent(
+        const std::optional<T>& lhs,
+        const std::optional<T>& rhs,
+        SameFn same)
+    {
+        if (lhs.has_value() != rhs.has_value())
+            return false;
+        if (!lhs.has_value())
+            return true;
+        return same(*lhs, *rhs);
+    }
+
+}
+
+    bool SameRenderHintComponent(
+        const std::optional<Graphics::Components::RenderSurface>& lhs,
+        const std::optional<Graphics::Components::RenderSurface>& rhs)
+    {
+        return SameOptionalRenderComponent(lhs, rhs, SameRenderSurface);
+    }
+
+    bool SameRenderHintComponent(
+        const std::optional<Graphics::Components::RenderEdges>& lhs,
+        const std::optional<Graphics::Components::RenderEdges>& rhs)
+    {
+        return SameOptionalRenderComponent(lhs, rhs, SameRenderEdges);
+    }
+
+    bool SameRenderHintComponent(
+        const std::optional<Graphics::Components::RenderPoints>& lhs,
+        const std::optional<Graphics::Components::RenderPoints>& rhs)
+    {
+        return SameOptionalRenderComponent(lhs, rhs, SameRenderPoints);
+    }
 
 } // namespace Extrinsic::Runtime::EditorFeatureDetail

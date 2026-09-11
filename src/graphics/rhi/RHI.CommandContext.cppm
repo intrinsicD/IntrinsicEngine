@@ -1,3 +1,4 @@
+// API-independent command recording and the inert context used by headless execution.
 module;
 
 #include <cstdint>
@@ -301,5 +302,35 @@ namespace Extrinsic::RHI
         // Kept at the end of this exported polymorphic interface to minimise
         // vtable slot churn for downstream module BMIs.
         virtual void BindFrameSampledTextureAt(TextureHandle texture, std::uint32_t descriptorIndex);
+    };
+
+    // Intentionally ignores commands; recording test doubles and GPU contexts
+    // implement their own observable behavior.
+    export class NullCommandContext final : public ICommandContext
+    {
+    public:
+        void Begin() override {}
+        void End() override {}
+        void BeginRenderPass(const RenderPassDesc&) override {}
+        void EndRenderPass() override {}
+        void SetViewport(float, float, float, float, float, float) override {}
+        void SetScissor(std::int32_t, std::int32_t, std::uint32_t, std::uint32_t) override {}
+        void BindPipeline(PipelineHandle) override {}
+        void BindIndexBuffer(BufferHandle, std::uint64_t, IndexType) override {}
+        void PushConstants(const void*, std::uint32_t, std::uint32_t) override {}
+        void Draw(std::uint32_t, std::uint32_t, std::uint32_t, std::uint32_t) override {}
+        void DrawIndexed(std::uint32_t, std::uint32_t, std::uint32_t, std::int32_t, std::uint32_t) override {}
+        void DrawIndirect(BufferHandle, std::uint64_t, std::uint32_t) override {}
+        void DrawIndexedIndirect(BufferHandle, std::uint64_t, std::uint32_t) override {}
+        void DrawIndexedIndirectCount(BufferHandle, std::uint64_t, BufferHandle, std::uint64_t, std::uint32_t) override {}
+        void DrawIndirectCount(BufferHandle, std::uint64_t, BufferHandle, std::uint64_t, std::uint32_t) override {}
+        void Dispatch(std::uint32_t, std::uint32_t, std::uint32_t) override {}
+        void DispatchIndirect(BufferHandle, std::uint64_t) override {}
+        void TextureBarrier(TextureHandle, TextureLayout, TextureLayout) override {}
+        void BufferBarrier(BufferHandle, MemoryAccess, MemoryAccess) override {}
+        void SubmitBarriers(const BarrierBatchDesc&) override {}
+        void FillBuffer(BufferHandle, std::uint64_t, std::uint64_t, std::uint32_t) override {}
+        void CopyBuffer(BufferHandle, BufferHandle, std::uint64_t, std::uint64_t, std::uint64_t) override {}
+        void CopyBufferToTexture(BufferHandle, std::uint64_t, TextureHandle, std::uint32_t, std::uint32_t) override {}
     };
 }

@@ -191,7 +191,14 @@ class SanitizerPresetTests(unittest.TestCase):
         self.assertEqual(matrix, SANITIZER_MATRIX)
         steps = _named_steps(job)
 
-        install = _one_line(steps["Install system dependencies"]["run"])
+        setup = steps["Set up build dependencies"]
+        self.assertEqual(setup["uses"], "./.github/actions/setup-build")
+        self.assertNotIn("system-packages", setup.get("with", {}))
+        action = yaml.safe_load(
+            (REPO_ROOT / ".github/actions/setup-build/action.yml").read_text()
+        )
+        self.assertEqual(action["inputs"]["system-packages"]["default"], "graphics")
+        install = _one_line(action["runs"]["steps"][0]["run"])
         for package in LINUX_WINDOWING_PACKAGES:
             with self.subTest(package=package):
                 self.assertIn(package, install)

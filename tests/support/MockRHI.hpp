@@ -536,6 +536,22 @@ namespace Extrinsic::Tests
     class MockDevice final : public RHI::IDevice
     {
     public:
+        [[nodiscard]] bool HasBackbufferBarrier(
+            const RHI::TextureLayout before,
+            const RHI::TextureLayout after) const noexcept
+        {
+            for (const auto& barrier : CommandContext.TextureBarrierCalls)
+            {
+                if (barrier.Texture == BackbufferHandle &&
+                    barrier.Before == before &&
+                    barrier.After == after)
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
+
         struct BufferWriteRecord
         {
             RHI::BufferHandle Handle{};

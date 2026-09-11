@@ -375,7 +375,7 @@ TEST(GraphicsCullingSystem, Smoke_InitializeBucketsAndDispatchPath)
     world.SyncFrame();
 
     Graphics::CullingSystem culling;
-    ASSERT_TRUE(culling.Initialize(device, bufferMgr, pipelineMgr, "shaders/culling/instance_cull.comp"));
+    ASSERT_TRUE(culling.Initialize(device, bufferMgr, pipelineMgr, "shaders/instance_cull.comp"));
 
     const auto& surfaceBucket = culling.GetBucket(RHI::GpuDrawBucketKind::SurfaceOpaque);
     const auto& pointsBucket = culling.GetBucket(RHI::GpuDrawBucketKind::Points);

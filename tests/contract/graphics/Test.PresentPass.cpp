@@ -39,6 +39,9 @@ import Extrinsic.RHI.Handles;
 import Extrinsic.RHI.Types;
 
 #include "MockRHI.hpp"
+#include "GraphicsTestSupport.hpp"
+
+using Extrinsic::Tests::GraphicsSupport::FindCommandPass;
 
 using namespace Extrinsic;
 using Tests::MockDevice;
@@ -106,19 +109,6 @@ namespace
         void CopyBufferToTexture(RHI::BufferHandle, std::uint64_t, RHI::TextureHandle, std::uint32_t, std::uint32_t) override {}
     };
 
-    [[nodiscard]] const Graphics::RenderGraphCommandPassStats* FindCommandPass(
-        const Graphics::RenderGraphFrameStats& stats,
-        const std::string& name)
-    {
-        for (const auto& pass : stats.CommandRecords.Passes)
-        {
-            if (pass.Name == name)
-            {
-                return &pass;
-            }
-        }
-        return nullptr;
-    }
 }
 
 // -----------------------------------------------------------------------------

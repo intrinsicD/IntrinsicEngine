@@ -8,6 +8,7 @@
 #include <vector>
 
 #include <gtest/gtest.h>
+#include <glm/vec4.hpp>
 #include <imgui.h>
 #include <imgui_internal.h>
 
@@ -29,6 +30,7 @@ import Extrinsic.Graphics.Component.VisualizationConfig;
 import Extrinsic.Runtime.SelectionController;
 import Extrinsic.Runtime.SceneInteractionModule;
 import Extrinsic.Runtime.EditorCommon;
+import Extrinsic.Runtime.VisualizationEditingOperations;
 import Geometry.HalfedgeMesh;
 import Geometry.Graph;
 import Geometry.PointCloud;
@@ -200,6 +202,49 @@ TEST(SandboxDomainPanels, OpenSameDomainWindowsShareOneModelBuildPerFrame)
     EXPECT_EQ(
         harness.Shell.GetLastFrame().ModelBuildStats.DomainWindowModelCacheHits,
         2u);
+}
+
+TEST(SandboxDomainPanels, UniformColorCommandsDisableBakingAndRetainScalarStyle)
+{
+    Runtime::EditorVisualizationConfigModel model{};
+    model.Source = decltype(model.Source)::ScalarField;
+    model.Color = {0.2f, 0.3f, 0.4f, 0.5f};
+    model.ScalarFieldName = "f:curvature";
+    model.ScalarDomain = decltype(model.ScalarDomain)::Face;
+    model.ScalarAutoRange = false;
+    model.ScalarRangeMin = -2.0f;
+    model.ScalarRangeMax = 3.0f;
+    model.ScalarColormap = decltype(model.ScalarColormap)::Inferno;
+    model.IsolineValues = {-1.0f, 0.5f, 2.0f};
+    model.IsolineValueCount = 3u;
+    model.UseBakedTexture = true;
+
+    const auto base = Editor::MakeVisualizationConfigCommandFromModel(
+        42u, model, Runtime::EditorVisualizationTarget::Surface);
+    const glm::vec4 replacement{0.9f, 0.8f, 0.7f, 1.0f};
+    const auto uniform = Editor::MakeUniformVisualizationConfigCommandFromModel(
+        42u, model, Runtime::EditorVisualizationTarget::Surface, replacement);
+
+    EXPECT_EQ(base.Source, decltype(model.Source)::ScalarField);
+    EXPECT_EQ(base.Color, model.Color);
+    EXPECT_TRUE(base.UseBakedTexture);
+    EXPECT_EQ(uniform.Source, decltype(model.Source)::UniformColor);
+    EXPECT_EQ(uniform.Color, replacement);
+    EXPECT_FALSE(uniform.UseBakedTexture);
+    for (const auto* command : {&base, &uniform})
+    {
+        EXPECT_EQ(command->StableEntityId, 42u);
+        EXPECT_EQ(command->Target, Runtime::EditorVisualizationTarget::Surface);
+        EXPECT_TRUE(command->EnableConfig);
+        EXPECT_EQ(command->ScalarFieldName, "f:curvature");
+        EXPECT_EQ(command->ScalarDomain, decltype(model.ScalarDomain)::Face);
+        EXPECT_FALSE(command->ScalarAutoRange);
+        EXPECT_FLOAT_EQ(command->ScalarRangeMin, -2.0f);
+        EXPECT_FLOAT_EQ(command->ScalarRangeMax, 3.0f);
+        EXPECT_EQ(command->ScalarColormap, decltype(model.ScalarColormap)::Inferno);
+        EXPECT_EQ(command->IsolineValues, model.IsolineValues);
+        EXPECT_EQ(command->IsolineValueCount, 3u);
+    }
 }
 
 TEST(SandboxDomainPanels, AppearanceCheckboxesCanEnableAndReenableEverySupportedLayer)

@@ -1,0 +1,23 @@
+{
+  "command": [
+    "/bin/bash",
+    "-o",
+    "pipefail",
+    "-c",
+    "cmake --build --preset ci --target IntrinsicGraphicsContractCpuTests && ctest --test-dir build/ci --output-on-failure -R '^RendererFrameLifecycle.ForwardSurfacePipelineSurvivesOperationalRebuild$' --no-tests=error --timeout 60"
+  ],
+  "command_display": "/bin/bash -o pipefail -c 'cmake --build --preset ci --target IntrinsicGraphicsContractCpuTests && ctest --test-dir build/ci --output-on-failure -R '\"'\"'^RendererFrameLifecycle.ForwardSurfacePipelineSurvivesOperationalRebuild$'\"'\"' --no-tests=error --timeout 60'",
+  "cwd": ".",
+  "duration_ms": 12533,
+  "exit_code": 0,
+  "finished_at": "2026-09-11T03:15:11Z",
+  "label": "shader-source-contract-cpu-producer",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-09-11T03:14:58Z",
+  "stderr_path": "tasks/evidence/RORG-134/commands/shader-source-contract-cpu-producer.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/RORG-134/commands/shader-source-contract-cpu-producer.stdout.log",
+  "stdout_sha256": "f57f12d089270c289c23606a4b3b2b84f1764760de110223ecd2c72ead80bd98",
+  "task_id": "RORG-134"
+}

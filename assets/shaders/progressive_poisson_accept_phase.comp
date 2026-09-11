@@ -1,4 +1,5 @@
 #version 460
+#extension GL_GOOGLE_include_directive : require
 
 // METHOD-013 Slice C — conservative progressive Poisson phase accept mask.
 //
@@ -14,82 +15,12 @@
 
 layout(local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
 
-layout(buffer_reference, scalar) readonly buffer UIntArrayReadRef
-{
-    uint Values[];
-};
-
-layout(buffer_reference, scalar) buffer UIntArrayRef
-{
-    uint Values[];
-};
+#include "include/progressive_poisson_state.glsl"
 
 layout(buffer_reference, scalar) readonly buffer UInt64ArrayReadRef
 {
     uint64_t Values[];
 };
-
-layout(buffer_reference, scalar) readonly buffer FloatArrayRef
-{
-    float Values[];
-};
-
-layout(buffer_reference, scalar) readonly buffer ProgressivePoissonGpuStateRef
-{
-    uint64_t PositionXBDA;
-    uint64_t PositionYBDA;
-    uint64_t PositionZBDA;
-    uint64_t RemainingKeysBDA;
-    uint64_t NextRemainingKeysBDA;
-    uint64_t AcceptedKeysBDA;
-    uint64_t CellKeysBDA;
-    uint64_t CellPhasesBDA;
-    uint64_t AcceptFlagsBDA;
-    uint64_t CarryFlagsBDA;
-    uint64_t HashKeysBDA;
-    uint64_t HashValuesBDA;
-    uint64_t LevelOffsetsBDA;
-    uint64_t SplatRadiiBDA;
-    uint64_t OutputCountBDA;
-    uint64_t CompactionScratchBDA;
-};
-
-layout(push_constant, scalar) uniform ProgressivePoissonPush
-{
-    uint64_t StateBDA;
-    uint InputCount;
-    uint RemainingCount;
-    uint HashTableCapacity;
-    uint Dimension;
-    uint GridWidth;
-    uint LevelIndex;
-    uint PhaseIndex;
-    uint PhaseCount;
-    float InvCellSize;
-    float RadiusSquared;
-    float OriginX;
-    float OriginY;
-    float OriginZ;
-    float Reserved0;
-} pc;
-
-const uint64_t EmptyHashKey = uint64_t(0xfffffffffffffffful);
-const uint InvalidIndex = 0xffffffffu;
-
-uint64_t packCell2D(int ix, int iy)
-{
-    const uint ux = uint(ix) ^ 0x80000000u;
-    const uint uy = uint(iy) ^ 0x80000000u;
-    return (uint64_t(ux) << 32) | uint64_t(uy);
-}
-
-uint64_t packCell3D(int ix, int iy, int iz)
-{
-    const uint64_t ux = uint64_t((ix + (1 << 20)) & 0x1fffff);
-    const uint64_t uy = uint64_t((iy + (1 << 20)) & 0x1fffff);
-    const uint64_t uz = uint64_t((iz + (1 << 20)) & 0x1fffff);
-    return (ux << 42) | (uy << 21) | uz;
-}
 
 uint lookupCell(ProgressivePoissonGpuStateRef state, uint64_t key)
 {

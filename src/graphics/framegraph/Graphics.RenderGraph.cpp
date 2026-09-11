@@ -113,169 +113,154 @@ namespace Extrinsic::Graphics
             });
             return packets.back();
         }
+    }
 
-        struct TransientPlacementItem
+    [[nodiscard]] TransientPlacementPlan BuildTransientPlacementPlan(
+        const std::span<const TransientPlacementItem> items,
+        const bool aliasingEnabled)
+    {
+        struct ActiveRange
         {
             std::uint32_t ResourceIndex = 0u;
-            std::uint32_t FirstUsePass = 0u;
             std::uint32_t LastUsePass = 0u;
+            std::uint32_t BlockIndex = 0u;
+            std::uint64_t OffsetBytes = 0u;
             std::uint64_t SizeBytes = 0u;
-            std::uint64_t AlignmentBytes = 1u;
         };
 
-        struct TransientPlacementPlan
+        struct FreeRange
         {
-            std::vector<TransientResourcePlacement> Placements{};
-            std::uint64_t PeakBytes = 0u;
+            std::uint32_t BlockIndex = 0u;
+            std::uint64_t OffsetBytes = 0u;
+            std::uint64_t SizeBytes = 0u;
+            std::uint32_t PreviousResourceIndex = kInvalidTransientPlacementResource;
         };
 
-        template <typename EmitAliasReuseHazard>
-        [[nodiscard]] TransientPlacementPlan BuildTransientPlacementPlan(
-            const std::span<const TransientPlacementItem> items,
-            const bool aliasingEnabled,
-            EmitAliasReuseHazard&& emitAliasReuseHazard)
+        std::vector<ActiveRange> activeRanges{};
+        std::vector<FreeRange> freeRanges{};
+        std::uint64_t blockSize = 0u;
+        TransientPlacementPlan plan{};
+        plan.Placements.reserve(items.size());
+
+        auto sortFreeRanges = [&]() {
+            std::ranges::sort(freeRanges, [](const FreeRange& lhs, const FreeRange& rhs) {
+                return std::tuple{lhs.BlockIndex, lhs.OffsetBytes, lhs.SizeBytes, lhs.PreviousResourceIndex} <
+                       std::tuple{rhs.BlockIndex, rhs.OffsetBytes, rhs.SizeBytes, rhs.PreviousResourceIndex};
+            });
+        };
+
+        for (const TransientPlacementItem& item : items)
         {
-            struct ActiveRange
+            for (std::size_t activeIndex = 0u; activeIndex < activeRanges.size();)
             {
-                std::uint32_t ResourceIndex = 0u;
-                std::uint32_t LastUsePass = 0u;
-                std::uint32_t BlockIndex = 0u;
-                std::uint64_t OffsetBytes = 0u;
-                std::uint64_t SizeBytes = 0u;
-            };
-
-            struct FreeRange
-            {
-                std::uint32_t BlockIndex = 0u;
-                std::uint64_t OffsetBytes = 0u;
-                std::uint64_t SizeBytes = 0u;
-                std::uint32_t PreviousResourceIndex = kInvalidTransientPlacementResource;
-            };
-
-            std::vector<ActiveRange> activeRanges{};
-            std::vector<FreeRange> freeRanges{};
-            std::uint64_t blockSize = 0u;
-            TransientPlacementPlan plan{};
-            plan.Placements.reserve(items.size());
-
-            auto sortFreeRanges = [&]() {
-                std::ranges::sort(freeRanges, [](const FreeRange& lhs, const FreeRange& rhs) {
-                    return std::tuple{lhs.BlockIndex, lhs.OffsetBytes, lhs.SizeBytes, lhs.PreviousResourceIndex} <
-                           std::tuple{rhs.BlockIndex, rhs.OffsetBytes, rhs.SizeBytes, rhs.PreviousResourceIndex};
-                });
-            };
-
-            for (const TransientPlacementItem& item : items)
-            {
-                for (std::size_t activeIndex = 0u; activeIndex < activeRanges.size();)
+                const ActiveRange& active = activeRanges[activeIndex];
+                if (active.LastUsePass < item.FirstUsePass)
                 {
-                    const ActiveRange& active = activeRanges[activeIndex];
-                    if (active.LastUsePass < item.FirstUsePass)
+                    if (aliasingEnabled && active.SizeBytes != 0u)
                     {
-                        if (aliasingEnabled && active.SizeBytes != 0u)
-                        {
-                            freeRanges.push_back(FreeRange{
-                                .BlockIndex = active.BlockIndex,
-                                .OffsetBytes = active.OffsetBytes,
-                                .SizeBytes = active.SizeBytes,
-                                .PreviousResourceIndex = active.ResourceIndex,
-                            });
-                        }
-                        activeRanges.erase(activeRanges.begin() + static_cast<std::ptrdiff_t>(activeIndex));
-                        continue;
+                        freeRanges.push_back(FreeRange{
+                            .BlockIndex = active.BlockIndex,
+                            .OffsetBytes = active.OffsetBytes,
+                            .SizeBytes = active.SizeBytes,
+                            .PreviousResourceIndex = active.ResourceIndex,
+                        });
                     }
-                    ++activeIndex;
+                    activeRanges.erase(activeRanges.begin() + static_cast<std::ptrdiff_t>(activeIndex));
+                    continue;
                 }
-
-                sortFreeRanges();
-
-                bool placedInFreeRange = false;
-                std::uint32_t blockIndex = 0u;
-                std::uint64_t offsetBytes = 0u;
-
-                if (aliasingEnabled && item.SizeBytes != 0u)
-                {
-                    for (std::size_t rangeIndex = 0u; rangeIndex < freeRanges.size(); ++rangeIndex)
-                    {
-                        const FreeRange range = freeRanges[rangeIndex];
-                        const std::uint64_t alignedOffset = AlignUp(range.OffsetBytes, item.AlignmentBytes);
-                        const std::uint64_t rangeEnd = range.OffsetBytes + range.SizeBytes;
-                        if (alignedOffset > rangeEnd || item.SizeBytes > rangeEnd - alignedOffset)
-                        {
-                            continue;
-                        }
-
-                        blockIndex = range.BlockIndex;
-                        offsetBytes = alignedOffset;
-                        placedInFreeRange = true;
-                        freeRanges.erase(freeRanges.begin() + static_cast<std::ptrdiff_t>(rangeIndex));
-
-                        if (range.OffsetBytes < alignedOffset)
-                        {
-                            freeRanges.push_back(FreeRange{
-                                .BlockIndex = range.BlockIndex,
-                                .OffsetBytes = range.OffsetBytes,
-                                .SizeBytes = alignedOffset - range.OffsetBytes,
-                                .PreviousResourceIndex = range.PreviousResourceIndex,
-                            });
-                        }
-
-                        const std::uint64_t allocationEnd = alignedOffset + item.SizeBytes;
-                        if (allocationEnd < rangeEnd)
-                        {
-                            freeRanges.push_back(FreeRange{
-                                .BlockIndex = range.BlockIndex,
-                                .OffsetBytes = allocationEnd,
-                                .SizeBytes = rangeEnd - allocationEnd,
-                                .PreviousResourceIndex = range.PreviousResourceIndex,
-                            });
-                        }
-
-                        if (range.PreviousResourceIndex != kInvalidTransientPlacementResource)
-                        {
-                            emitAliasReuseHazard(range.PreviousResourceIndex,
-                                                 item.ResourceIndex,
-                                                 item.FirstUsePass,
-                                                 blockIndex,
-                                                 offsetBytes,
-                                                 item.SizeBytes);
-                        }
-                        break;
-                    }
-                }
-
-                if (!placedInFreeRange)
-                {
-                    offsetBytes = AlignUp(blockSize, item.AlignmentBytes);
-                    blockSize = offsetBytes + item.SizeBytes;
-                }
-
-                plan.Placements.push_back(TransientResourcePlacement{
-                    .ResourceIndex = item.ResourceIndex,
-                    .BlockIndex = blockIndex,
-                    .OffsetBytes = offsetBytes,
-                    .SizeBytes = item.SizeBytes,
-                    .AlignmentBytes = item.AlignmentBytes,
-                    .FirstUsePass = item.FirstUsePass,
-                    .LastUsePass = item.LastUsePass,
-                });
-
-                activeRanges.push_back(ActiveRange{
-                    .ResourceIndex = item.ResourceIndex,
-                    .LastUsePass = item.LastUsePass,
-                    .BlockIndex = blockIndex,
-                    .OffsetBytes = offsetBytes,
-                    .SizeBytes = item.SizeBytes,
-                });
+                ++activeIndex;
             }
 
-            plan.PeakBytes = blockSize;
-            std::ranges::sort(plan.Placements, [](const TransientResourcePlacement& lhs,
-                                                  const TransientResourcePlacement& rhs) {
-                return lhs.ResourceIndex < rhs.ResourceIndex;
+            sortFreeRanges();
+
+            bool placedInFreeRange = false;
+            std::uint32_t blockIndex = 0u;
+            std::uint64_t offsetBytes = 0u;
+
+            if (aliasingEnabled && item.SizeBytes != 0u)
+            {
+                for (std::size_t rangeIndex = 0u; rangeIndex < freeRanges.size(); ++rangeIndex)
+                {
+                    const FreeRange range = freeRanges[rangeIndex];
+                    const std::uint64_t alignedOffset = AlignUp(range.OffsetBytes, item.AlignmentBytes);
+                    const std::uint64_t rangeEnd = range.OffsetBytes + range.SizeBytes;
+                    if (alignedOffset > rangeEnd || item.SizeBytes > rangeEnd - alignedOffset)
+                    {
+                        continue;
+                    }
+
+                    blockIndex = range.BlockIndex;
+                    offsetBytes = alignedOffset;
+                    placedInFreeRange = true;
+                    freeRanges.erase(freeRanges.begin() + static_cast<std::ptrdiff_t>(rangeIndex));
+
+                    if (range.OffsetBytes < alignedOffset)
+                    {
+                        freeRanges.push_back(FreeRange{
+                            .BlockIndex = range.BlockIndex,
+                            .OffsetBytes = range.OffsetBytes,
+                            .SizeBytes = alignedOffset - range.OffsetBytes,
+                            .PreviousResourceIndex = range.PreviousResourceIndex,
+                        });
+                    }
+
+                    const std::uint64_t allocationEnd = alignedOffset + item.SizeBytes;
+                    if (allocationEnd < rangeEnd)
+                    {
+                        freeRanges.push_back(FreeRange{
+                            .BlockIndex = range.BlockIndex,
+                            .OffsetBytes = allocationEnd,
+                            .SizeBytes = rangeEnd - allocationEnd,
+                            .PreviousResourceIndex = range.PreviousResourceIndex,
+                        });
+                    }
+
+                    if (range.PreviousResourceIndex != kInvalidTransientPlacementResource)
+                    {
+                        plan.AliasReuseHazards.push_back(TransientAliasReuseHazard{
+                            .PreviousResourceIndex = range.PreviousResourceIndex,
+                            .ResourceIndex = item.ResourceIndex,
+                            .PassIndex = item.FirstUsePass,
+                            .BlockIndex = blockIndex,
+                            .OffsetBytes = offsetBytes,
+                            .SizeBytes = item.SizeBytes,
+                        });
+                    }
+                    break;
+                }
+            }
+
+            if (!placedInFreeRange)
+            {
+                offsetBytes = AlignUp(blockSize, item.AlignmentBytes);
+                blockSize = offsetBytes + item.SizeBytes;
+            }
+
+            plan.Placements.push_back(TransientResourcePlacement{
+                .ResourceIndex = item.ResourceIndex,
+                .BlockIndex = blockIndex,
+                .OffsetBytes = offsetBytes,
+                .SizeBytes = item.SizeBytes,
+                .AlignmentBytes = item.AlignmentBytes,
+                .FirstUsePass = item.FirstUsePass,
+                .LastUsePass = item.LastUsePass,
             });
-            return plan;
+
+            activeRanges.push_back(ActiveRange{
+                .ResourceIndex = item.ResourceIndex,
+                .LastUsePass = item.LastUsePass,
+                .BlockIndex = blockIndex,
+                .OffsetBytes = offsetBytes,
+                .SizeBytes = item.SizeBytes,
+            });
         }
+
+        plan.PeakBytes = blockSize;
+        std::ranges::sort(plan.Placements, [](const TransientResourcePlacement& lhs,
+                                              const TransientResourcePlacement& rhs) {
+            return lhs.ResourceIndex < rhs.ResourceIndex;
+        });
+        return plan;
     }
 
     struct RenderGraph::Impl
@@ -890,9 +875,21 @@ namespace Extrinsic::Graphics
         };
 
         TransientPlacementPlan texturePlan =
-            BuildTransientPlacementPlan(texturePlacementItems, m_Impl->TransientAliasingEnabled, emitTextureAliasReuseHazard);
+            BuildTransientPlacementPlan(texturePlacementItems, m_Impl->TransientAliasingEnabled);
+        for (const auto& hazard : texturePlan.AliasReuseHazards)
+        {
+            emitTextureAliasReuseHazard(
+                hazard.PreviousResourceIndex, hazard.ResourceIndex, hazard.PassIndex,
+                hazard.BlockIndex, hazard.OffsetBytes, hazard.SizeBytes);
+        }
         TransientPlacementPlan bufferPlan =
-            BuildTransientPlacementPlan(bufferPlacementItems, m_Impl->TransientAliasingEnabled, emitBufferAliasReuseHazard);
+            BuildTransientPlacementPlan(bufferPlacementItems, m_Impl->TransientAliasingEnabled);
+        for (const auto& hazard : bufferPlan.AliasReuseHazards)
+        {
+            emitBufferAliasReuseHazard(
+                hazard.PreviousResourceIndex, hazard.ResourceIndex, hazard.PassIndex,
+                hazard.BlockIndex, hazard.OffsetBytes, hazard.SizeBytes);
+        }
         compiled->TextureTransientPlacements = std::move(texturePlan.Placements);
         compiled->BufferTransientPlacements = std::move(bufferPlan.Placements);
         compiled->TransientPlacedPeakMemoryEstimateBytes = texturePlan.PeakBytes + bufferPlan.PeakBytes;

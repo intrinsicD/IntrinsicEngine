@@ -44,6 +44,9 @@ import Extrinsic.RHI.FrameHandle;
 import Extrinsic.RHI.Handles;
 
 #include "MockRHI.hpp"
+#include "GraphicsTestSupport.hpp"
+
+using Extrinsic::Tests::GraphicsSupport::FindCommandPass;
 
 using namespace Extrinsic;
 using Tests::MockDevice;
@@ -52,36 +55,6 @@ static_assert(!std::is_polymorphic_v<Graphics::TransientDebugUploadHelper>);
 
 namespace
 {
-    [[nodiscard]] const Graphics::RenderGraphCommandPassStats* FindCommandPass(
-        const Graphics::RenderGraphFrameStats& stats,
-        const std::string& name)
-    {
-        for (const auto& pass : stats.CommandRecords.Passes)
-        {
-            if (pass.Name == name)
-            {
-                return &pass;
-            }
-        }
-        return nullptr;
-    }
-
-    [[nodiscard]] bool HasBackbufferBarrier(const MockDevice& device,
-                                            const RHI::TextureLayout before,
-                                            const RHI::TextureLayout after) noexcept
-    {
-        for (const auto& barrier : device.CommandContext.TextureBarrierCalls)
-        {
-            if (barrier.Texture == device.BackbufferHandle &&
-                barrier.Before == before &&
-                barrier.After == after)
-            {
-                return true;
-            }
-        }
-        return false;
-    }
-
     void SubmitOneTriangle(Graphics::IRenderer& renderer, const bool depthTested = true)
     {
         // A single sanitized triangle packet is enough to flip
@@ -1103,7 +1076,7 @@ TEST(TransientDebugSurfacePassContract, TransientReadbackDefaultDisabledEvenWhen
     EXPECT_EQ(pass->Status, Graphics::RenderCommandPassStatus::Recorded);
     EXPECT_EQ(stats.TransientDebugBackbufferReadbackCopyCount, 0u)
         << "Recorded transient debug draws must not arm readback implicitly.";
-    EXPECT_FALSE(HasBackbufferBarrier(device, RHI::TextureLayout::Present, RHI::TextureLayout::TransferSrc));
+    EXPECT_FALSE(device.HasBackbufferBarrier( RHI::TextureLayout::Present, RHI::TextureLayout::TransferSrc));
 
     renderer->Shutdown();
 }
@@ -1146,8 +1119,8 @@ TEST(TransientDebugSurfacePassContract, TransientReadbackRecordsOnlyWhenPassReco
            "whose transient pass recorded.";
     EXPECT_EQ(stats.DefaultRecipeBackbufferReadbackCopyCount, 0u)
         << "Transient-debug readback must not reuse the canonical surface counter.";
-    EXPECT_TRUE(HasBackbufferBarrier(device, RHI::TextureLayout::Present, RHI::TextureLayout::TransferSrc));
-    EXPECT_TRUE(HasBackbufferBarrier(device, RHI::TextureLayout::TransferSrc, RHI::TextureLayout::Present));
+    EXPECT_TRUE(device.HasBackbufferBarrier( RHI::TextureLayout::Present, RHI::TextureLayout::TransferSrc));
+    EXPECT_TRUE(device.HasBackbufferBarrier( RHI::TextureLayout::TransferSrc, RHI::TextureLayout::Present));
 
     renderer->Shutdown();
 }
@@ -1177,7 +1150,7 @@ TEST(TransientDebugSurfacePassContract, TransientReadbackSkipsWhenPassOmitted)
     EXPECT_EQ(FindCommandPass(stats, "TransientDebugSurfacePass"), nullptr);
     EXPECT_EQ(stats.TransientDebugBackbufferReadbackCopyCount, 0u)
         << "An armed transient readback buffer must not copy clean default frames.";
-    EXPECT_FALSE(HasBackbufferBarrier(device, RHI::TextureLayout::Present, RHI::TextureLayout::TransferSrc));
+    EXPECT_FALSE(device.HasBackbufferBarrier( RHI::TextureLayout::Present, RHI::TextureLayout::TransferSrc));
 
     renderer->Shutdown();
 }
@@ -1213,7 +1186,7 @@ TEST(TransientDebugSurfacePassContract, TransientReadbackSkipsWhenDeviceNonOpera
     ASSERT_NE(pass, nullptr);
     EXPECT_EQ(pass->Status, Graphics::RenderCommandPassStatus::SkippedNonOperational);
     EXPECT_EQ(stats.TransientDebugBackbufferReadbackCopyCount, 0u);
-    EXPECT_FALSE(HasBackbufferBarrier(device, RHI::TextureLayout::Present, RHI::TextureLayout::TransferSrc));
+    EXPECT_FALSE(device.HasBackbufferBarrier( RHI::TextureLayout::Present, RHI::TextureLayout::TransferSrc));
 
     renderer->Shutdown();
 }

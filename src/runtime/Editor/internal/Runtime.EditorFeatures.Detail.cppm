@@ -1,10 +1,11 @@
-// Private editor bindings and workspace state keep live runtime dependencies behind copied UI surfaces.
+// Private editor bindings, shared decision/mutation rules and workspace state support the UI surfaces.
 module;
 
 #include <array>
 #include <atomic>
 #include <cstddef>
 #include <cstdint>
+#include <chrono>
 #include <functional>
 #include <memory>
 #include <optional>
@@ -14,6 +15,7 @@ module;
 #include <unordered_map>
 #include <vector>
 
+#include <entt/entity/registry.hpp>
 #include <glm/glm.hpp>
 #include <glm/gtc/quaternion.hpp>
 
@@ -30,6 +32,7 @@ import Extrinsic.Core.StrongHandle;
 import Extrinsic.ECS.Scene.Handle;
 import Extrinsic.ECS.Scene.Registry;
 import Extrinsic.ECS.Component.StableId;
+import Extrinsic.ECS.Component.Transform;
 import Extrinsic.ECS.Components.GeometrySources;
 import Extrinsic.Graphics.Colormap;
 import Extrinsic.Graphics.Component.RenderGeometry;
@@ -52,6 +55,7 @@ import Extrinsic.Runtime.JobService;
 import Extrinsic.Runtime.KernelEvents;
 import Extrinsic.Runtime.MeshPrimitiveView;
 import Extrinsic.Runtime.GeometryPresentation;
+import Extrinsic.Runtime.GeometryAvailability;
 import Extrinsic.Runtime.PrimitiveSelectionRefinement;
 import Extrinsic.Runtime.RenderExtraction;
 import Extrinsic.Runtime.RenderArtifactPublication;
@@ -87,6 +91,153 @@ import Extrinsic.Runtime.VisualizationEditingOperations;
 export namespace Extrinsic::Runtime::EditorFeatureDetail
 {
     using namespace Extrinsic::Runtime;
+
+    inline constexpr std::uint64_t kEditorSignatureOffset = 1469598103934665603ull;
+
+    void MixSignature(std::uint64_t& signature,
+                      std::uint64_t value) noexcept;
+
+    void MixSignatureString(std::uint64_t& signature,
+                            const std::string_view value) noexcept;
+
+    [[nodiscard]] std::uint64_t GeometryMetadataSignatureForEntity(
+        const entt::registry& raw,
+        const ECS::EntityHandle entity);
+
+    [[nodiscard]] std::optional<ECS::EntityHandle> ResolveStableEntity(
+        const entt::registry& raw,
+        const std::uint32_t stableId);
+
+    [[nodiscard]] bool SameTransformComponent(
+        const ECS::Components::Transform::Component& lhs,
+        const ECS::Components::Transform::Component& rhs) noexcept;
+
+    [[nodiscard]] EditorCommandHistoryResult ExecuteEditorTransformMutation(
+        EditorCommandHistory& history,
+        ECS::Scene::Registry* scene,
+        const WorldHandle world,
+        const std::uint32_t stableEntityId,
+        const ECS::Components::Transform::Component& before,
+        const ECS::Components::Transform::Component& after,
+        std::string label);
+
+    [[nodiscard]] EditorCommandStatus ToEditorCommandStatus(
+        const EditorCommandHistoryStatus status) noexcept;
+
+    [[nodiscard]] std::string BuildImportSuccessMessage(
+        const EditorFileImportCommand& command,
+        const EditorFileImportResult& result);
+
+    [[nodiscard]] std::string BuildImportPendingMessage(
+        const EditorFileImportCommand& command,
+        const Assets::AssetPayloadKind payloadKind);
+
+    [[nodiscard]] std::string BuildImportFailureMessage(
+        const Core::ErrorCode error);
+
+    [[nodiscard]] std::string BuildSceneFileSuccessMessage(
+        const EditorSceneFileCommand& command,
+        const EditorSceneFileResult& result);
+
+    [[nodiscard]] std::string BuildSceneFileFailureMessage(
+        const EditorSceneFileOperation operation,
+        const Core::ErrorCode error);
+
+    [[nodiscard]] std::string BuildSceneFilePendingMessage(
+        const EditorSceneFileCommand& command,
+        const EditorSceneFileOperation operation);
+
+    [[nodiscard]] EditorJobModel ToEditorJobModel(
+        const EditorJobRecord& job);
+
+    using EditorModelBuildClock = std::chrono::steady_clock;
+
+    class ScopedEditorStatTimer final
+    {
+    public:
+        explicit ScopedEditorStatTimer(std::uint64_t* target) noexcept;
+        ScopedEditorStatTimer(const ScopedEditorStatTimer&) = delete;
+        ScopedEditorStatTimer& operator=(const ScopedEditorStatTimer&) = delete;
+        ~ScopedEditorStatTimer();
+
+    private:
+        std::uint64_t* m_Target{nullptr};
+        EditorModelBuildClock::time_point m_Start{};
+    };
+
+    struct FileImportPrerequisiteEvaluation
+    {
+        bool CanChoosePayloadHint{false};
+        bool CanImport{false};
+        Assets::AssetPayloadKind ResolvedPayloadKind{
+            Assets::AssetPayloadKind::Unknown};
+        std::array<EditorFileImportPayloadOption, 6> PayloadOptions{};
+        std::string PayloadHintDisabledReason{};
+        std::string ImportDisabledReason{};
+        Core::ErrorCode Error{Core::ErrorCode::Success};
+    };
+
+    [[nodiscard]] FileImportPrerequisiteEvaluation
+    EvaluateFileImportPrerequisites(
+        const bool commandSurfaceAvailable,
+        const std::string_view path,
+        const Assets::AssetPayloadKind selectedPayloadKind);
+
+    [[nodiscard]] bool IsInternalVisualizationProperty(
+        const std::string& name) noexcept;
+
+    [[nodiscard]] bool IsConnectivityVisualizationProperty(
+        const std::string& name) noexcept;
+
+    [[nodiscard]] GeometryElementDomain ToGeometryElementDomain(
+        const EditorVisualizationPropertyDomain domain) noexcept;
+
+    [[nodiscard]] GeometryElementDomain ToGeometryElementDomain(
+        const EditorPropertyCatalogDomain domain) noexcept;
+
+    [[nodiscard]] const Geometry::PropertySet* PropertySetForVisualizationDomain(
+        const GeometryEntityAvailability& availability,
+        const EditorVisualizationPropertyDomain domain) noexcept;
+
+    void AppendVisualizationPropertiesForDomain(
+        std::vector<EditorVisualizationPropertyInfo>& out,
+        const Geometry::PropertySet& properties,
+        const EditorVisualizationPropertyDomain domain);
+
+    [[nodiscard]] const Geometry::PropertySet* PropertySetForCatalogDomain(
+        const GeometryEntityAvailability& availability,
+        const EditorPropertyCatalogDomain domain) noexcept;
+
+    [[nodiscard]] bool IsPropertyCatalogSupportedKind(
+        const Geometry::PropertyValueKind kind) noexcept;
+
+    [[nodiscard]] std::optional<EditorPropertyCatalogDomain>
+    VertexChannelCatalogDomainForView(
+        const ECS::Components::GeometrySources::ConstSourceView& view) noexcept;
+
+    [[nodiscard]] const Geometry::PropertySet*
+    VertexChannelPropertySetForView(
+        const ECS::Components::GeometrySources::ConstSourceView& view,
+        const EditorPropertyCatalogDomain domain) noexcept;
+
+    [[nodiscard]] std::optional<AttributeSourceType>
+    ToAttributeSourceType(
+        const Geometry::PropertyValueKind kind) noexcept;
+
+    [[nodiscard]] bool SourceTypeAllowedForVertexChannel(
+        const VertexChannel channel,
+        const AttributeSourceType type) noexcept;
+
+    [[nodiscard]] AttributeBindResult EvaluateVertexChannelBinding(
+        const Geometry::PropertySet& properties,
+        const VertexChannel channel,
+        const std::string_view propertyName,
+        const AttributeSourceType sourceType,
+        const std::size_t elementCount,
+        EditorWorkspaceSnapshotStats* modelBuildStats);
+
+    [[nodiscard]] std::uint64_t EditorElapsedNs(
+        const EditorModelBuildClock::time_point start) noexcept;
 
     struct EditorFeatureBindings
     {
@@ -311,5 +462,15 @@ export namespace Extrinsic::Runtime::EditorFeatureDetail
         EditorRenderRecipeEditorState m_RenderRecipeState{};
         RenderArtifactRegistry m_RenderArtifactRegistry{};
     };
+
+    [[nodiscard]] bool SameRenderHintComponent(
+        const std::optional<Graphics::Components::RenderSurface>& lhs,
+        const std::optional<Graphics::Components::RenderSurface>& rhs);
+    [[nodiscard]] bool SameRenderHintComponent(
+        const std::optional<Graphics::Components::RenderEdges>& lhs,
+        const std::optional<Graphics::Components::RenderEdges>& rhs);
+    [[nodiscard]] bool SameRenderHintComponent(
+        const std::optional<Graphics::Components::RenderPoints>& lhs,
+        const std::optional<Graphics::Components::RenderPoints>& rhs);
 
 } // namespace Extrinsic::Runtime::EditorFeatureDetail

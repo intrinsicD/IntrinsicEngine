@@ -1,3 +1,4 @@
+// Private topology upload adapters and shared explicit vertex-channel preparation.
 module;
 
 #include <cstddef>
@@ -11,6 +12,7 @@ import Extrinsic.ECS.Component.ProceduralGeometryRef;
 import Extrinsic.ECS.Components.GeometrySources;
 import Extrinsic.Graphics.GeometryResidency;
 import Extrinsic.Graphics.GpuWorld;
+import Extrinsic.Runtime.GeometryAvailability;
 import Extrinsic.Runtime.VertexAttributeBinding;
 import Extrinsic.Runtime.VertexChannelBindings;
 import Extrinsic.Runtime.VertexChannelStreams;
@@ -51,6 +53,17 @@ export namespace Extrinsic::Runtime
             return std::nullopt;
         }
     }
+
+    // An invalid explicit color binding clears colors and returns false without
+    // fallback. Topology owners clear full buffers before channel preparation.
+    [[nodiscard]] bool PrepareBoundVertexColors(
+        const Geometry::PropertySet& properties, GeometryElementDomain domain,
+        const VertexChannelSourceBinding& binding, std::size_t vertexCount,
+        std::vector<std::uint32_t>& packedColors);
+    void PrepareBoundVertexChannels(
+        const Geometry::PropertySet& properties, GeometryElementDomain domain,
+        const VertexChannelBindingSet* channelBindings, std::size_t vertexCount,
+        VertexChannelStreams& channels, std::vector<std::uint32_t>& packedColors);
 
     struct MeshVertex
     {

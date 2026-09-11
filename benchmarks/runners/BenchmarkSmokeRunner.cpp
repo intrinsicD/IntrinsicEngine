@@ -56,31 +56,9 @@
 
 namespace {
 auto EscapeJson(std::string_view input) -> std::string {
-  std::string out;
-  out.reserve(input.size());
-  for (const char ch : input) {
-    switch (ch) {
-    case '"':
-      out += "\\\"";
-      break;
-    case '\\':
-      out += "\\\\";
-      break;
-    case '\n':
-      out += "\\n";
-      break;
-    case '\r':
-      out += "\\r";
-      break;
-    case '\t':
-      out += "\\t";
-      break;
-    default:
-      out += ch;
-      break;
-    }
-  }
-  return out;
+  // Use the same complete JSON string encoding for every result producer.
+  const std::string quoted = nlohmann::json(input).dump();
+  return quoted.substr(1u, quoted.size() - 2u);
 }
 
 template <std::size_t N>
@@ -110,6 +88,36 @@ struct EmittedBenchmark {
   bool Passed{false};
 };
 
+// Payload writers use the caller's stream precision and retain their own
+// metric/diagnostic fields. This envelope owns identity and disposition only.
+template <typename MetricsWriter, typename DiagnosticsWriter>
+auto EmitBenchmarkResult(std::ostringstream& out,
+                         const std::string_view benchmarkId,
+                         const std::string_view method,
+                         const std::string_view backend,
+                         const std::string_view dataset,
+                         const std::string_view commit,
+                         const bool passed,
+                         const MetricsWriter& writeMetrics,
+                         const DiagnosticsWriter& writeDiagnostics)
+    -> EmittedBenchmark {
+  out << "{\n"
+      << "  \"benchmark_id\": \"" << EscapeJson(benchmarkId) << "\",\n"
+      << "  \"method\": \"" << EscapeJson(method) << "\",\n"
+      << "  \"backend\": \"" << EscapeJson(backend) << "\",\n"
+      << "  \"dataset\": \"" << EscapeJson(dataset) << "\",\n"
+      << "  \"commit\": \"" << EscapeJson(commit) << "\",\n"
+      << "  \"metrics\": {\n";
+  writeMetrics();
+  out << "  },\n"
+      << "  \"diagnostics\": {\n";
+  writeDiagnostics();
+  out << "  },\n"
+      << "  \"status\": \"" << (passed ? "passed" : "failed")
+      << "\"\n}\n";
+  return {std::string(benchmarkId), out.str(), passed};
+}
+
 auto EmitHalfedgeSmoke(const std::string &commit) -> EmittedBenchmark {
   using namespace Intrinsic::Bench::Geometry;
 
@@ -118,32 +126,21 @@ auto EmitHalfedgeSmoke(const std::string &commit) -> EmittedBenchmark {
   std::ostringstream out;
   out.setf(std::ios::fixed);
   out.precision(6);
-  out << "{\n"
-      << "  \"benchmark_id\": \"" << EscapeJson(kHalfedgeSmokeBenchmarkId)
-      << "\",\n"
-      << "  \"method\": \"" << EscapeJson(kHalfedgeSmokeMethod) << "\",\n"
-      << "  \"backend\": \"cpu_reference\",\n"
-      << "  \"dataset\": \"" << EscapeJson(kHalfedgeSmokeDataset) << "\",\n"
-      << "  \"commit\": \"" << EscapeJson(commit) << "\",\n"
-      << "  \"metrics\": {\n"
-      << "    \"runtime_ms\": " << metrics.RuntimeMilliseconds << ",\n"
-      << "    \"quality_error_l2\": 0.0\n"
-      << "  },\n"
-      << "  \"diagnostics\": {\n"
-      << "    \"runner\": \"IntrinsicBenchmarkSmoke\",\n"
-      << "    \"mode\": \"smoke\",\n"
-      << "    \"warmup_iterations\": 1,\n"
-      << "    \"measured_iterations\": 8,\n"
-      << "    \"total_area\": " << metrics.TotalArea << ",\n"
-      << "    \"vertex_count\": " << metrics.VertexCount << ",\n"
-      << "    \"face_count\": " << metrics.FaceCount << "\n"
-      << "  },\n"
-      << "  \"status\": \"" << (metrics.Succeeded ? "passed" : "failed")
-      << "\"\n"
-      << "}\n";
-
-  return EmittedBenchmark{kHalfedgeSmokeBenchmarkId, out.str(),
-                          metrics.Succeeded};
+  return EmitBenchmarkResult(out, kHalfedgeSmokeBenchmarkId,
+      kHalfedgeSmokeMethod, "cpu_reference",
+      kHalfedgeSmokeDataset, commit, metrics.Succeeded,
+      [&] {
+        out << "    \"runtime_ms\": " << metrics.RuntimeMilliseconds << ",\n"
+            << "    \"quality_error_l2\": 0.0\n";
+      }, [&] {
+        out << "    \"runner\": \"IntrinsicBenchmarkSmoke\",\n"
+            << "    \"mode\": \"smoke\",\n"
+            << "    \"warmup_iterations\": 1,\n"
+            << "    \"measured_iterations\": 8,\n"
+            << "    \"total_area\": " << metrics.TotalArea << ",\n"
+            << "    \"vertex_count\": " << metrics.VertexCount << ",\n"
+            << "    \"face_count\": " << metrics.FaceCount << "\n";
+      });
 }
 
 auto EmitParameterizationDiagnosticsSmoke(const std::string &commit)
@@ -155,38 +152,25 @@ auto EmitParameterizationDiagnosticsSmoke(const std::string &commit)
   std::ostringstream out;
   out.setf(std::ios::fixed);
   out.precision(6);
-  out << "{\n"
-      << "  \"benchmark_id\": \""
-      << EscapeJson(kParameterizationDiagnosticsSmokeBenchmarkId) << "\",\n"
-      << "  \"method\": \""
-      << EscapeJson(kParameterizationDiagnosticsSmokeMethod) << "\",\n"
-      << "  \"backend\": \"cpu_reference\",\n"
-      << "  \"dataset\": \""
-      << EscapeJson(kParameterizationDiagnosticsSmokeDataset) << "\",\n"
-      << "  \"commit\": \"" << EscapeJson(commit) << "\",\n"
-      << "  \"metrics\": {\n"
-      << "    \"runtime_ms\": " << metrics.RuntimeMilliseconds << ",\n"
-      << "    \"quality_error_l2\": 0.0\n"
-      << "  },\n"
-      << "  \"diagnostics\": {\n"
-      << "    \"runner\": \"IntrinsicBenchmarkSmoke\",\n"
-      << "    \"mode\": \"smoke\",\n"
-      << "    \"warmup_iterations\": 1,\n"
-      << "    \"measured_iterations\": 8,\n"
-      << "    \"mean_conformal_distortion\": "
-      << metrics.MeanConformalDistortion << ",\n"
-      << "    \"max_area_distortion\": " << metrics.MaxAreaDistortion << ",\n"
-      << "    \"mean_stretch\": " << metrics.MeanStretch << ",\n"
-      << "    \"evaluated_face_count\": " << metrics.EvaluatedFaceCount << ",\n"
-      << "    \"flipped_element_count\": " << metrics.FlippedElementCount
-      << "\n"
-      << "  },\n"
-      << "  \"status\": \"" << (metrics.Succeeded ? "passed" : "failed")
-      << "\"\n"
-      << "}\n";
-
-  return EmittedBenchmark{kParameterizationDiagnosticsSmokeBenchmarkId,
-                          out.str(), metrics.Succeeded};
+  return EmitBenchmarkResult(out, kParameterizationDiagnosticsSmokeBenchmarkId,
+      kParameterizationDiagnosticsSmokeMethod, "cpu_reference",
+      kParameterizationDiagnosticsSmokeDataset, commit, metrics.Succeeded,
+      [&] {
+        out << "    \"runtime_ms\": " << metrics.RuntimeMilliseconds << ",\n"
+            << "    \"quality_error_l2\": 0.0\n";
+      }, [&] {
+        out << "    \"runner\": \"IntrinsicBenchmarkSmoke\",\n"
+            << "    \"mode\": \"smoke\",\n"
+            << "    \"warmup_iterations\": 1,\n"
+            << "    \"measured_iterations\": 8,\n"
+            << "    \"mean_conformal_distortion\": "
+            << metrics.MeanConformalDistortion << ",\n"
+            << "    \"max_area_distortion\": " << metrics.MaxAreaDistortion << ",\n"
+            << "    \"mean_stretch\": " << metrics.MeanStretch << ",\n"
+            << "    \"evaluated_face_count\": " << metrics.EvaluatedFaceCount << ",\n"
+            << "    \"flipped_element_count\": " << metrics.FlippedElementCount
+            << "\n";
+      });
 }
 
 auto EmitUvAtlasSmoke(const std::string &commit) -> EmittedBenchmark {
@@ -197,49 +181,38 @@ auto EmitUvAtlasSmoke(const std::string &commit) -> EmittedBenchmark {
   std::ostringstream out;
   out.setf(std::ios::fixed);
   out.precision(6);
-  out << "{\n"
-      << "  \"benchmark_id\": \"" << EscapeJson(kUvAtlasSmokeBenchmarkId)
-      << "\",\n"
-      << "  \"method\": \"" << EscapeJson(kUvAtlasSmokeMethod) << "\",\n"
-      << "  \"backend\": \"cpu_reference\",\n"
-      << "  \"dataset\": \"" << EscapeJson(kUvAtlasSmokeDataset) << "\",\n"
-      << "  \"commit\": \"" << EscapeJson(commit) << "\",\n"
-      << "  \"metrics\": {\n"
-      << "    \"runtime_ms\": " << metrics.RuntimeMilliseconds << ",\n"
-      << "    \"quality_error_l2\": " << metrics.QualityErrorL2 << "\n"
-      << "  },\n"
-      << "  \"diagnostics\": {\n"
-      << "    \"runner\": \"IntrinsicBenchmarkSmoke\",\n"
-      << "    \"mode\": \"smoke\",\n"
-      << "    \"warmup_iterations\": 1,\n"
-      << "    \"measured_iterations\": 4,\n"
-      << "    \"baseline_method\": \"xatlas\",\n"
-      << "    \"probe_method\": \"fast_staged\",\n"
-      << "    \"adoption_claim\": false,\n"
-      << "    \"fast_runtime_ms\": " << metrics.FastRuntimeMilliseconds << ",\n"
-      << "    \"xatlas_runtime_ms\": " << metrics.XAtlasRuntimeMilliseconds
-      << ",\n"
-      << "    \"fast_to_xatlas_runtime_ratio\": "
-      << metrics.FastToXAtlasRuntimeRatio << ",\n"
-      << "    \"fast_chart_count\": " << metrics.FastChartCount << ",\n"
-      << "    \"xatlas_chart_count\": " << metrics.XAtlasChartCount << ",\n"
-      << "    \"fast_mean_conformal_distortion\": "
-      << metrics.FastMeanConformalDistortion << ",\n"
-      << "    \"xatlas_mean_conformal_distortion\": "
-      << metrics.XAtlasMeanConformalDistortion << ",\n"
-      << "    \"fast_max_stretch\": " << metrics.FastMaxStretch << ",\n"
-      << "    \"xatlas_max_stretch\": " << metrics.XAtlasMaxStretch << ",\n"
-      << "    \"fast_flipped_element_count\": "
-      << metrics.FastFlippedElementCount << ",\n"
-      << "    \"xatlas_flipped_element_count\": "
-      << metrics.XAtlasFlippedElementCount << "\n"
-      << "  },\n"
-      << "  \"status\": \"" << (metrics.Succeeded ? "passed" : "failed")
-      << "\"\n"
-      << "}\n";
-
-  return EmittedBenchmark{kUvAtlasSmokeBenchmarkId, out.str(),
-                          metrics.Succeeded};
+  return EmitBenchmarkResult(out, kUvAtlasSmokeBenchmarkId,
+      kUvAtlasSmokeMethod, "cpu_reference",
+      kUvAtlasSmokeDataset, commit, metrics.Succeeded,
+      [&] {
+        out << "    \"runtime_ms\": " << metrics.RuntimeMilliseconds << ",\n"
+            << "    \"quality_error_l2\": " << metrics.QualityErrorL2 << "\n";
+      }, [&] {
+        out << "    \"runner\": \"IntrinsicBenchmarkSmoke\",\n"
+            << "    \"mode\": \"smoke\",\n"
+            << "    \"warmup_iterations\": 1,\n"
+            << "    \"measured_iterations\": 4,\n"
+            << "    \"baseline_method\": \"xatlas\",\n"
+            << "    \"probe_method\": \"fast_staged\",\n"
+            << "    \"adoption_claim\": false,\n"
+            << "    \"fast_runtime_ms\": " << metrics.FastRuntimeMilliseconds << ",\n"
+            << "    \"xatlas_runtime_ms\": " << metrics.XAtlasRuntimeMilliseconds
+            << ",\n"
+            << "    \"fast_to_xatlas_runtime_ratio\": "
+            << metrics.FastToXAtlasRuntimeRatio << ",\n"
+            << "    \"fast_chart_count\": " << metrics.FastChartCount << ",\n"
+            << "    \"xatlas_chart_count\": " << metrics.XAtlasChartCount << ",\n"
+            << "    \"fast_mean_conformal_distortion\": "
+            << metrics.FastMeanConformalDistortion << ",\n"
+            << "    \"xatlas_mean_conformal_distortion\": "
+            << metrics.XAtlasMeanConformalDistortion << ",\n"
+            << "    \"fast_max_stretch\": " << metrics.FastMaxStretch << ",\n"
+            << "    \"xatlas_max_stretch\": " << metrics.XAtlasMaxStretch << ",\n"
+            << "    \"fast_flipped_element_count\": "
+            << metrics.FastFlippedElementCount << ",\n"
+            << "    \"xatlas_flipped_element_count\": "
+            << metrics.XAtlasFlippedElementCount << "\n";
+      });
 }
 
 auto EmitUvAtlasPromotionSmoke(const std::string &commit) -> EmittedBenchmark {
@@ -250,131 +223,120 @@ auto EmitUvAtlasPromotionSmoke(const std::string &commit) -> EmittedBenchmark {
   std::ostringstream out;
   out.setf(std::ios::fixed);
   out.precision(6);
-  out << "{\n"
-      << "  \"benchmark_id\": \"" << EscapeJson(kUvAtlasPromotionBenchmarkId)
-      << "\",\n"
-      << "  \"method\": \"" << EscapeJson(kUvAtlasPromotionMethod) << "\",\n"
-      << "  \"backend\": \"cpu_reference\",\n"
-      << "  \"dataset\": \"" << EscapeJson(kUvAtlasPromotionDataset) << "\",\n"
-      << "  \"commit\": \"" << EscapeJson(commit) << "\",\n"
-      << "  \"metrics\": {\n"
-      << "    \"runtime_ms\": " << metrics.RuntimeMilliseconds << ",\n"
-      << "    \"quality_error_l2\": " << metrics.QualityErrorL2 << ",\n"
-      << "    \"quality_error_linf\": " << metrics.QualityErrorLinf << "\n"
-      << "  },\n"
-      << "  \"diagnostics\": {\n"
-      << "    \"runner\": \"IntrinsicBenchmarkSmoke\",\n"
-      << "    \"mode\": \"promotion_smoke\",\n"
-      << "    \"warmup_pairs\": " << kUvAtlasPromotionWarmupPairs
-      << ",\n"
-      << "    \"measured_pairs\": " << kUvAtlasPromotionMeasuredPairs
-      << ",\n"
-      << "    \"timing_statistic\": \""
-      << EscapeJson(kUvAtlasPromotionTimingStatistic) << "\",\n"
-      << "    \"backend_runtime_statistic\": \""
-      << EscapeJson(kUvAtlasPromotionBackendRuntimeStatistic) << "\",\n"
-      << "    \"measurement_order\": \""
-      << EscapeJson(kUvAtlasPromotionMeasurementOrder) << "\",\n"
-      << "    \"baseline_method\": \"xatlas\",\n"
-      << "    \"probe_method\": \"fast_staged\",\n"
-      << "    \"adoption_claim\": "
-      << (metrics.PromotionPass ? "true" : "false") << ",\n"
-      << "    \"promotion_pass\": "
-      << (metrics.PromotionPass ? "true" : "false") << ",\n"
-      << "    \"runtime_ratio_mean_max\": 1.0,\n"
-      << "    \"runtime_ratio_per_fixture_max\": 1.25,\n"
-      << "    \"conformal_regression_tolerance\": 0.25,\n"
-      << "    \"stretch_regression_tolerance\": 0.05,\n"
-      << "    \"fixture_count\": " << metrics.FixtureCount << ",\n"
-      << "    \"passed_fixture_count\": " << metrics.PassedFixtureCount << ",\n"
-      << "    \"failed_fixture_count\": " << metrics.FailedFixtureCount << ",\n"
-      << "    \"mean_fast_runtime_ms\": " << metrics.MeanFastRuntimeMilliseconds
-      << ",\n"
-      << "    \"mean_xatlas_runtime_ms\": "
-      << metrics.MeanXAtlasRuntimeMilliseconds << ",\n"
-      << "    \"mean_fast_to_xatlas_runtime_ratio\": "
-      << metrics.MeanFastToXAtlasRuntimeRatio << ",\n"
-      << "    \"max_fast_to_xatlas_runtime_ratio\": "
-      << metrics.MaxFastToXAtlasRuntimeRatio << ",\n"
-      << "    \"fast_flipped_element_count_total\": "
-      << metrics.FastFlippedElementCountTotal << ",\n"
-      << "    \"fast_chart_overlap_count_total\": "
-      << metrics.FastChartOverlapCountTotal << ",\n"
-      << "    \"fixtures\": [\n";
+  return EmitBenchmarkResult(out, kUvAtlasPromotionBenchmarkId,
+      kUvAtlasPromotionMethod, "cpu_reference",
+      kUvAtlasPromotionDataset, commit, metrics.PromotionPass,
+      [&] {
+        out << "    \"runtime_ms\": " << metrics.RuntimeMilliseconds << ",\n"
+            << "    \"quality_error_l2\": " << metrics.QualityErrorL2 << ",\n"
+            << "    \"quality_error_linf\": " << metrics.QualityErrorLinf << "\n";
+      }, [&] {
+        out << "    \"runner\": \"IntrinsicBenchmarkSmoke\",\n"
+            << "    \"mode\": \"promotion_smoke\",\n"
+            << "    \"warmup_pairs\": " << kUvAtlasPromotionWarmupPairs
+            << ",\n"
+            << "    \"measured_pairs\": " << kUvAtlasPromotionMeasuredPairs
+            << ",\n"
+            << "    \"timing_statistic\": \""
+            << EscapeJson(kUvAtlasPromotionTimingStatistic) << "\",\n"
+            << "    \"backend_runtime_statistic\": \""
+            << EscapeJson(kUvAtlasPromotionBackendRuntimeStatistic) << "\",\n"
+            << "    \"measurement_order\": \""
+            << EscapeJson(kUvAtlasPromotionMeasurementOrder) << "\",\n"
+            << "    \"baseline_method\": \"xatlas\",\n"
+            << "    \"probe_method\": \"fast_staged\",\n"
+            << "    \"adoption_claim\": "
+            << (metrics.PromotionPass ? "true" : "false") << ",\n"
+            << "    \"promotion_pass\": "
+            << (metrics.PromotionPass ? "true" : "false") << ",\n"
+            << "    \"runtime_ratio_mean_max\": 1.0,\n"
+            << "    \"runtime_ratio_per_fixture_max\": 1.25,\n"
+            << "    \"conformal_regression_tolerance\": 0.25,\n"
+            << "    \"stretch_regression_tolerance\": 0.05,\n"
+            << "    \"fixture_count\": " << metrics.FixtureCount << ",\n"
+            << "    \"passed_fixture_count\": " << metrics.PassedFixtureCount << ",\n"
+            << "    \"failed_fixture_count\": " << metrics.FailedFixtureCount << ",\n"
+            << "    \"mean_fast_runtime_ms\": " << metrics.MeanFastRuntimeMilliseconds
+            << ",\n"
+            << "    \"mean_xatlas_runtime_ms\": "
+            << metrics.MeanXAtlasRuntimeMilliseconds << ",\n"
+            << "    \"mean_fast_to_xatlas_runtime_ratio\": "
+            << metrics.MeanFastToXAtlasRuntimeRatio << ",\n"
+            << "    \"max_fast_to_xatlas_runtime_ratio\": "
+            << metrics.MaxFastToXAtlasRuntimeRatio << ",\n"
+            << "    \"fast_flipped_element_count_total\": "
+            << metrics.FastFlippedElementCountTotal << ",\n"
+            << "    \"fast_chart_overlap_count_total\": "
+            << metrics.FastChartOverlapCountTotal << ",\n"
+            << "    \"fixtures\": [\n";
 
-  for (std::size_t i = 0; i < metrics.Fixtures.size(); ++i) {
-    const auto &fixture = metrics.Fixtures[i];
-    out << "      {\n"
-        << "        \"name\": \"" << EscapeJson(fixture.Name) << "\",\n"
-        << "        \"passed\": " << (fixture.Passed ? "true" : "false")
-        << ",\n"
-        << "        \"input_vertex_count\": " << fixture.InputVertexCount
-        << ",\n"
-        << "        \"input_face_count\": " << fixture.InputFaceCount << ",\n"
-        << "        \"fast_succeeded\": "
-        << (fixture.FastSucceeded ? "true" : "false") << ",\n"
-        << "        \"xatlas_succeeded\": "
-        << (fixture.XAtlasSucceeded ? "true" : "false") << ",\n"
-        << "        \"fast_used_fallback\": "
-        << (fixture.FastUsedFallback ? "true" : "false") << ",\n"
-        << "        \"fast_finite_normalized\": "
-        << (fixture.FastFiniteNormalized ? "true" : "false") << ",\n"
-        << "        \"fast_runtime_ms\": " << fixture.FastRuntimeMilliseconds
-        << ",\n"
-        << "        \"xatlas_runtime_ms\": "
-        << fixture.XAtlasRuntimeMilliseconds << ",\n"
-        << "        \"fast_to_xatlas_runtime_ratio\": "
-        << fixture.FastToXAtlasRuntimeRatio << ",\n"
-        << "        \"fast_runtime_samples_ms\": ";
-    EmitDoubleSamples(out, fixture.FastRuntimeSamplesMilliseconds);
-    out << ",\n"
-        << "        \"xatlas_runtime_samples_ms\": ";
-    EmitDoubleSamples(out, fixture.XAtlasRuntimeSamplesMilliseconds);
-    out << ",\n"
-        << "        \"paired_runtime_ratio_samples\": ";
-    EmitDoubleSamples(out, fixture.PairedRuntimeRatios);
-    out << ",\n"
-        << "        \"conformal_regression\": " << fixture.ConformalRegression
-        << ",\n"
-        << "        \"stretch_regression\": " << fixture.StretchRegression
-        << ",\n"
-        << "        \"fast_output_vertex_count\": "
-        << fixture.FastOutputVertexCount << ",\n"
-        << "        \"xatlas_output_vertex_count\": "
-        << fixture.XAtlasOutputVertexCount << ",\n"
-        << "        \"fast_output_face_count\": " << fixture.FastOutputFaceCount
-        << ",\n"
-        << "        \"xatlas_output_face_count\": "
-        << fixture.XAtlasOutputFaceCount << ",\n"
-        << "        \"fast_chart_count\": " << fixture.FastChartCount << ",\n"
-        << "        \"xatlas_chart_count\": " << fixture.XAtlasChartCount
-        << ",\n"
-        << "        \"fast_flipped_element_count\": "
-        << fixture.FastFlippedElementCount << ",\n"
-        << "        \"xatlas_flipped_element_count\": "
-        << fixture.XAtlasFlippedElementCount << ",\n"
-        << "        \"fast_chart_overlap_count\": "
-        << fixture.FastChartOverlapCount << ",\n"
-        << "        \"fast_mean_conformal_distortion\": "
-        << fixture.FastMeanConformalDistortion << ",\n"
-        << "        \"xatlas_mean_conformal_distortion\": "
-        << fixture.XAtlasMeanConformalDistortion << ",\n"
-        << "        \"fast_max_stretch\": " << fixture.FastMaxStretch << ",\n"
-        << "        \"xatlas_max_stretch\": " << fixture.XAtlasMaxStretch
-        << ",\n"
-        << "        \"fast_packing_utilization\": "
-        << fixture.FastPackingUtilization << "\n"
-        << "      }" << (i + 1u == metrics.Fixtures.size() ? "\n" : ",\n");
-  }
+        for (std::size_t i = 0; i < metrics.Fixtures.size(); ++i) {
+          const auto &fixture = metrics.Fixtures[i];
+          out << "      {\n"
+              << "        \"name\": \"" << EscapeJson(fixture.Name) << "\",\n"
+              << "        \"passed\": " << (fixture.Passed ? "true" : "false")
+              << ",\n"
+              << "        \"input_vertex_count\": " << fixture.InputVertexCount
+              << ",\n"
+              << "        \"input_face_count\": " << fixture.InputFaceCount << ",\n"
+              << "        \"fast_succeeded\": "
+              << (fixture.FastSucceeded ? "true" : "false") << ",\n"
+              << "        \"xatlas_succeeded\": "
+              << (fixture.XAtlasSucceeded ? "true" : "false") << ",\n"
+              << "        \"fast_used_fallback\": "
+              << (fixture.FastUsedFallback ? "true" : "false") << ",\n"
+              << "        \"fast_finite_normalized\": "
+              << (fixture.FastFiniteNormalized ? "true" : "false") << ",\n"
+              << "        \"fast_runtime_ms\": " << fixture.FastRuntimeMilliseconds
+              << ",\n"
+              << "        \"xatlas_runtime_ms\": "
+              << fixture.XAtlasRuntimeMilliseconds << ",\n"
+              << "        \"fast_to_xatlas_runtime_ratio\": "
+              << fixture.FastToXAtlasRuntimeRatio << ",\n"
+              << "        \"fast_runtime_samples_ms\": ";
+          EmitDoubleSamples(out, fixture.FastRuntimeSamplesMilliseconds);
+          out << ",\n"
+              << "        \"xatlas_runtime_samples_ms\": ";
+          EmitDoubleSamples(out, fixture.XAtlasRuntimeSamplesMilliseconds);
+          out << ",\n"
+              << "        \"paired_runtime_ratio_samples\": ";
+          EmitDoubleSamples(out, fixture.PairedRuntimeRatios);
+          out << ",\n"
+              << "        \"conformal_regression\": " << fixture.ConformalRegression
+              << ",\n"
+              << "        \"stretch_regression\": " << fixture.StretchRegression
+              << ",\n"
+              << "        \"fast_output_vertex_count\": "
+              << fixture.FastOutputVertexCount << ",\n"
+              << "        \"xatlas_output_vertex_count\": "
+              << fixture.XAtlasOutputVertexCount << ",\n"
+              << "        \"fast_output_face_count\": " << fixture.FastOutputFaceCount
+              << ",\n"
+              << "        \"xatlas_output_face_count\": "
+              << fixture.XAtlasOutputFaceCount << ",\n"
+              << "        \"fast_chart_count\": " << fixture.FastChartCount << ",\n"
+              << "        \"xatlas_chart_count\": " << fixture.XAtlasChartCount
+              << ",\n"
+              << "        \"fast_flipped_element_count\": "
+              << fixture.FastFlippedElementCount << ",\n"
+              << "        \"xatlas_flipped_element_count\": "
+              << fixture.XAtlasFlippedElementCount << ",\n"
+              << "        \"fast_chart_overlap_count\": "
+              << fixture.FastChartOverlapCount << ",\n"
+              << "        \"fast_mean_conformal_distortion\": "
+              << fixture.FastMeanConformalDistortion << ",\n"
+              << "        \"xatlas_mean_conformal_distortion\": "
+              << fixture.XAtlasMeanConformalDistortion << ",\n"
+              << "        \"fast_max_stretch\": " << fixture.FastMaxStretch << ",\n"
+              << "        \"xatlas_max_stretch\": " << fixture.XAtlasMaxStretch
+              << ",\n"
+              << "        \"fast_packing_utilization\": "
+              << fixture.FastPackingUtilization << "\n"
+              << "      }" << (i + 1u == metrics.Fixtures.size() ? "\n" : ",\n");
+        }
 
-  out << "    ]\n"
-      << "  },\n"
-      << "  \"status\": \"" << (metrics.PromotionPass ? "passed" : "failed")
-      << "\"\n"
-      << "}\n";
-
-  return EmittedBenchmark{kUvAtlasPromotionBenchmarkId, out.str(),
-                          metrics.PromotionPass};
+        out << "    ]\n";
+      });
 }
 
 auto EmitUvAtlasEdgeGroupingScaling(const std::string &commit)
@@ -386,139 +348,126 @@ auto EmitUvAtlasEdgeGroupingScaling(const std::string &commit)
   std::ostringstream out;
   out.setf(std::ios::fixed);
   out.precision(17);
-  out << "{\n"
-      << "  \"benchmark_id\": \""
-      << EscapeJson(kUvAtlasEdgeGroupingScalingBenchmarkId) << "\",\n"
-      << "  \"method\": \""
-      << EscapeJson(kUvAtlasEdgeGroupingScalingMethod) << "\",\n"
-      << "  \"backend\": \"cpu_optimized\",\n"
-      << "  \"dataset\": \""
-      << EscapeJson(kUvAtlasEdgeGroupingScalingDataset) << "\",\n"
-      << "  \"commit\": \"" << EscapeJson(commit) << "\",\n"
-      << "  \"metrics\": {\n"
-      << "    \"runtime_ms\": " << metrics.RuntimeMilliseconds << ",\n"
-      << "    \"throughput_items_per_sec\": "
-      << metrics.ThroughputFacesPerSecond << ",\n"
-      << "    \"quality_error_l2\": " << metrics.QualityErrorL2 << "\n"
-      << "  },\n"
-      << "  \"diagnostics\": {\n"
-      << "    \"runner\": \"IntrinsicBenchmarkSmoke\",\n"
-      << "    \"mode\": \"performance_scaling_smoke\",\n"
-      << "    \"dataset_generation\": \"deterministic indexed planar grids\",\n"
-      << "    \"warmup_pairs\": " << kUvAtlasEdgeGroupingWarmupPairs
-      << ",\n"
-      << "    \"measured_pairs\": " << kUvAtlasEdgeGroupingMeasuredPairs
-      << ",\n"
-      << "    \"timing_statistic\": \""
-      << EscapeJson(kUvAtlasEdgeGroupingTimingStatistic) << "\",\n"
-      << "    \"measurement_order\": \"alternating_small_large_large_small\",\n"
-      << "    \"small_grid_side\": " << kUvAtlasEdgeGroupingSmallGridSide
-      << ",\n"
-      << "    \"large_grid_side\": " << kUvAtlasEdgeGroupingLargeGridSide
-      << ",\n"
-      << "    \"small_vertex_count\": " << metrics.SmallVertexCount << ",\n"
-      << "    \"small_face_count\": " << metrics.SmallFaceCount << ",\n"
-      << "    \"large_vertex_count\": " << metrics.LargeVertexCount << ",\n"
-      << "    \"large_face_count\": " << metrics.LargeFaceCount << ",\n"
-      << "    \"large_output_vertex_count\": "
-      << metrics.LargeOutputVertexCount << ",\n"
-      << "    \"large_output_face_count\": "
-      << metrics.LargeOutputFaceCount << ",\n"
-      << "    \"large_chart_count\": " << metrics.LargeChartCount << ",\n"
-      << "    \"large_seam_count\": " << metrics.LargeSeamCount << ",\n"
-      << "    \"large_boundary_seam_count\": "
-      << metrics.LargeBoundarySeamCount << ",\n"
-      << "    \"large_uv_min\": [" << metrics.LargeUvMinX << ", "
-      << metrics.LargeUvMinY << "],\n"
-      << "    \"large_uv_max\": [" << metrics.LargeUvMaxX << ", "
-      << metrics.LargeUvMaxY << "],\n"
-      << "    \"large_mean_conformal_distortion\": "
-      << metrics.LargeMeanConformalDistortion << ",\n"
-      << "    \"large_max_stretch\": " << metrics.LargeMaxStretch
-      << ",\n"
-      << "    \"large_flipped_element_count\": "
-      << metrics.LargeFlippedElementCount << ",\n"
-      << "    \"small_runtime_samples_ms\": ";
-  EmitDoubleSamples(out, metrics.SmallRuntimeSamplesMilliseconds);
-  out << ",\n"
-      << "    \"large_runtime_samples_ms\": ";
-  EmitDoubleSamples(out, metrics.LargeRuntimeSamplesMilliseconds);
-  out << ",\n"
-      << "    \"small_median_runtime_ms\": "
-      << metrics.SmallMedianRuntimeMilliseconds << ",\n"
-      << "    \"large_median_runtime_ms\": "
-      << metrics.LargeMedianRuntimeMilliseconds << ",\n"
-      << "    \"face_count_ratio\": " << metrics.FaceCountRatio << ",\n"
-      << "    \"runtime_scaling_ratio\": " << metrics.RuntimeScalingRatio
-      << ",\n"
-      << "    \"normalized_runtime_scaling_factor\": "
-      << metrics.NormalizedRuntimeScalingFactor << ",\n"
-      << "    \"baseline_snapshot\": \""
-      << EscapeJson(kUvAtlasEdgeGroupingBaselineSnapshot) << "\",\n"
-      << "    \"baseline_commit\": \""
-      << EscapeJson(kUvAtlasEdgeGroupingBaselineCommit) << "\",\n"
-      << "    \"baseline_large_median_runtime_ms\": "
-      << kUvAtlasEdgeGroupingBaselineLargeRuntimeMilliseconds << ",\n"
-      << "    \"baseline_normalized_runtime_scaling_factor\": "
-      << kUvAtlasEdgeGroupingBaselineNormalizedScalingFactor << ",\n"
-      << "    \"candidate_to_baseline_large_runtime_ratio\": "
-      << metrics.LargeMedianRuntimeMilliseconds /
-             kUvAtlasEdgeGroupingBaselineLargeRuntimeMilliseconds
-      << ",\n"
-      << "    \"candidate_to_baseline_normalized_scaling_ratio\": "
-      << metrics.NormalizedRuntimeScalingFactor /
-             kUvAtlasEdgeGroupingBaselineNormalizedScalingFactor
-      << ",\n"
-      << "    \"baseline_comparison_scope\": \"same-host same-toolchain local before/after\",\n"
-      << "    \"quality_vector_definition\": \"relative output vertex/face/chart counts, absolute seam count, relative boundary count, raw normalized UV bounds, relative mean conformal distortion/max stretch, absolute flipped count\",\n"
-      << "    \"quality_vector_baseline\": {\n"
-      << "      \"output_vertex_count\": "
-      << kUvAtlasEdgeGroupingBaselineOutputVertexCount << ",\n"
-      << "      \"output_face_count\": "
-      << kUvAtlasEdgeGroupingBaselineOutputFaceCount << ",\n"
-      << "      \"chart_count\": "
-      << kUvAtlasEdgeGroupingBaselineChartCount << ",\n"
-      << "      \"seam_count\": "
-      << kUvAtlasEdgeGroupingBaselineSeamCount << ",\n"
-      << "      \"boundary_seam_count\": "
-      << kUvAtlasEdgeGroupingBaselineBoundarySeamCount << ",\n"
-      << "      \"uv_min\": [" << kUvAtlasEdgeGroupingBaselineUvMinX
-      << ", " << kUvAtlasEdgeGroupingBaselineUvMinY << "],\n"
-      << "      \"uv_max\": [" << kUvAtlasEdgeGroupingBaselineUvMaxX
-      << ", " << kUvAtlasEdgeGroupingBaselineUvMaxY << "],\n"
-      << "      \"mean_conformal_distortion\": "
-      << kUvAtlasEdgeGroupingBaselineMeanConformalDistortion << ",\n"
-      << "      \"max_stretch\": "
-      << kUvAtlasEdgeGroupingBaselineMaxStretch << ",\n"
-      << "      \"flipped_element_count\": "
-      << kUvAtlasEdgeGroupingBaselineFlippedElementCount << "\n"
-      << "    },\n"
-      << "    \"quality_vector_delta\": ";
-  EmitDoubleSamples(out, metrics.QualityVectorDelta);
-  out << ",\n"
-      << "    \"output_signature\": \""
-      << metrics.LargeOutputSignature << "\",\n"
-      << "    \"baseline_output_signature\": \""
-      << kUvAtlasEdgeGroupingBaselineOutputSignature << "\",\n"
-      << "    \"matches_baseline_output_signature\": "
-      << (metrics.MatchesBaselineOutputSignature ? "true" : "false")
-      << ",\n"
-      << "    \"large_succeeded\": "
-      << (metrics.LargeSucceeded ? "true" : "false") << ",\n"
-      << "    \"large_finite_normalized\": "
-      << (metrics.LargeFiniteNormalized ? "true" : "false") << ",\n"
-      << "    \"large_used_fallback\": "
-      << (metrics.LargeUsedFallback ? "true" : "false") << ",\n"
-      << "    \"deterministic_topology\": "
-      << (metrics.DeterministicTopology ? "true" : "false") << ",\n"
-      << "    \"performance_claim\": false\n"
-      << "  },\n"
-      << "  \"status\": \"" << (metrics.Passed ? "passed" : "failed")
-      << "\"\n"
-      << "}\n";
-
-  return EmittedBenchmark{kUvAtlasEdgeGroupingScalingBenchmarkId, out.str(),
-                          metrics.Passed};
+  return EmitBenchmarkResult(out, kUvAtlasEdgeGroupingScalingBenchmarkId,
+      kUvAtlasEdgeGroupingScalingMethod, "cpu_optimized",
+      kUvAtlasEdgeGroupingScalingDataset, commit, metrics.Passed,
+      [&] {
+        out << "    \"runtime_ms\": " << metrics.RuntimeMilliseconds << ",\n"
+            << "    \"throughput_items_per_sec\": "
+            << metrics.ThroughputFacesPerSecond << ",\n"
+            << "    \"quality_error_l2\": " << metrics.QualityErrorL2 << "\n";
+      }, [&] {
+        out << "    \"runner\": \"IntrinsicBenchmarkSmoke\",\n"
+            << "    \"mode\": \"performance_scaling_smoke\",\n"
+            << "    \"dataset_generation\": \"deterministic indexed planar grids\",\n"
+            << "    \"warmup_pairs\": " << kUvAtlasEdgeGroupingWarmupPairs
+            << ",\n"
+            << "    \"measured_pairs\": " << kUvAtlasEdgeGroupingMeasuredPairs
+            << ",\n"
+            << "    \"timing_statistic\": \""
+            << EscapeJson(kUvAtlasEdgeGroupingTimingStatistic) << "\",\n"
+            << "    \"measurement_order\": \"alternating_small_large_large_small\",\n"
+            << "    \"small_grid_side\": " << kUvAtlasEdgeGroupingSmallGridSide
+            << ",\n"
+            << "    \"large_grid_side\": " << kUvAtlasEdgeGroupingLargeGridSide
+            << ",\n"
+            << "    \"small_vertex_count\": " << metrics.SmallVertexCount << ",\n"
+            << "    \"small_face_count\": " << metrics.SmallFaceCount << ",\n"
+            << "    \"large_vertex_count\": " << metrics.LargeVertexCount << ",\n"
+            << "    \"large_face_count\": " << metrics.LargeFaceCount << ",\n"
+            << "    \"large_output_vertex_count\": "
+            << metrics.LargeOutputVertexCount << ",\n"
+            << "    \"large_output_face_count\": "
+            << metrics.LargeOutputFaceCount << ",\n"
+            << "    \"large_chart_count\": " << metrics.LargeChartCount << ",\n"
+            << "    \"large_seam_count\": " << metrics.LargeSeamCount << ",\n"
+            << "    \"large_boundary_seam_count\": "
+            << metrics.LargeBoundarySeamCount << ",\n"
+            << "    \"large_uv_min\": [" << metrics.LargeUvMinX << ", "
+            << metrics.LargeUvMinY << "],\n"
+            << "    \"large_uv_max\": [" << metrics.LargeUvMaxX << ", "
+            << metrics.LargeUvMaxY << "],\n"
+            << "    \"large_mean_conformal_distortion\": "
+            << metrics.LargeMeanConformalDistortion << ",\n"
+            << "    \"large_max_stretch\": " << metrics.LargeMaxStretch
+            << ",\n"
+            << "    \"large_flipped_element_count\": "
+            << metrics.LargeFlippedElementCount << ",\n"
+            << "    \"small_runtime_samples_ms\": ";
+        EmitDoubleSamples(out, metrics.SmallRuntimeSamplesMilliseconds);
+        out << ",\n"
+            << "    \"large_runtime_samples_ms\": ";
+        EmitDoubleSamples(out, metrics.LargeRuntimeSamplesMilliseconds);
+        out << ",\n"
+            << "    \"small_median_runtime_ms\": "
+            << metrics.SmallMedianRuntimeMilliseconds << ",\n"
+            << "    \"large_median_runtime_ms\": "
+            << metrics.LargeMedianRuntimeMilliseconds << ",\n"
+            << "    \"face_count_ratio\": " << metrics.FaceCountRatio << ",\n"
+            << "    \"runtime_scaling_ratio\": " << metrics.RuntimeScalingRatio
+            << ",\n"
+            << "    \"normalized_runtime_scaling_factor\": "
+            << metrics.NormalizedRuntimeScalingFactor << ",\n"
+            << "    \"baseline_snapshot\": \""
+            << EscapeJson(kUvAtlasEdgeGroupingBaselineSnapshot) << "\",\n"
+            << "    \"baseline_commit\": \""
+            << EscapeJson(kUvAtlasEdgeGroupingBaselineCommit) << "\",\n"
+            << "    \"baseline_large_median_runtime_ms\": "
+            << kUvAtlasEdgeGroupingBaselineLargeRuntimeMilliseconds << ",\n"
+            << "    \"baseline_normalized_runtime_scaling_factor\": "
+            << kUvAtlasEdgeGroupingBaselineNormalizedScalingFactor << ",\n"
+            << "    \"candidate_to_baseline_large_runtime_ratio\": "
+            << metrics.LargeMedianRuntimeMilliseconds /
+                   kUvAtlasEdgeGroupingBaselineLargeRuntimeMilliseconds
+            << ",\n"
+            << "    \"candidate_to_baseline_normalized_scaling_ratio\": "
+            << metrics.NormalizedRuntimeScalingFactor /
+                   kUvAtlasEdgeGroupingBaselineNormalizedScalingFactor
+            << ",\n"
+            << "    \"baseline_comparison_scope\": \"same-host same-toolchain local before/after\",\n"
+            << "    \"quality_vector_definition\": \"relative output vertex/face/chart counts, absolute seam count, relative boundary count, raw normalized UV bounds, relative mean conformal distortion/max stretch, absolute flipped count\",\n"
+            << "    \"quality_vector_baseline\": {\n"
+            << "      \"output_vertex_count\": "
+            << kUvAtlasEdgeGroupingBaselineOutputVertexCount << ",\n"
+            << "      \"output_face_count\": "
+            << kUvAtlasEdgeGroupingBaselineOutputFaceCount << ",\n"
+            << "      \"chart_count\": "
+            << kUvAtlasEdgeGroupingBaselineChartCount << ",\n"
+            << "      \"seam_count\": "
+            << kUvAtlasEdgeGroupingBaselineSeamCount << ",\n"
+            << "      \"boundary_seam_count\": "
+            << kUvAtlasEdgeGroupingBaselineBoundarySeamCount << ",\n"
+            << "      \"uv_min\": [" << kUvAtlasEdgeGroupingBaselineUvMinX
+            << ", " << kUvAtlasEdgeGroupingBaselineUvMinY << "],\n"
+            << "      \"uv_max\": [" << kUvAtlasEdgeGroupingBaselineUvMaxX
+            << ", " << kUvAtlasEdgeGroupingBaselineUvMaxY << "],\n"
+            << "      \"mean_conformal_distortion\": "
+            << kUvAtlasEdgeGroupingBaselineMeanConformalDistortion << ",\n"
+            << "      \"max_stretch\": "
+            << kUvAtlasEdgeGroupingBaselineMaxStretch << ",\n"
+            << "      \"flipped_element_count\": "
+            << kUvAtlasEdgeGroupingBaselineFlippedElementCount << "\n"
+            << "    },\n"
+            << "    \"quality_vector_delta\": ";
+        EmitDoubleSamples(out, metrics.QualityVectorDelta);
+        out << ",\n"
+            << "    \"output_signature\": \""
+            << metrics.LargeOutputSignature << "\",\n"
+            << "    \"baseline_output_signature\": \""
+            << kUvAtlasEdgeGroupingBaselineOutputSignature << "\",\n"
+            << "    \"matches_baseline_output_signature\": "
+            << (metrics.MatchesBaselineOutputSignature ? "true" : "false")
+            << ",\n"
+            << "    \"large_succeeded\": "
+            << (metrics.LargeSucceeded ? "true" : "false") << ",\n"
+            << "    \"large_finite_normalized\": "
+            << (metrics.LargeFiniteNormalized ? "true" : "false") << ",\n"
+            << "    \"large_used_fallback\": "
+            << (metrics.LargeUsedFallback ? "true" : "false") << ",\n"
+            << "    \"deterministic_topology\": "
+            << (metrics.DeterministicTopology ? "true" : "false") << ",\n"
+            << "    \"performance_claim\": false\n";
+      });
 }
 
 auto EmitProgressivePoissonReferenceSmoke(const std::string &commit)
@@ -530,35 +479,22 @@ auto EmitProgressivePoissonReferenceSmoke(const std::string &commit)
   std::ostringstream out;
   out.setf(std::ios::fixed);
   out.precision(6);
-  out << "{\n"
-      << "  \"benchmark_id\": \""
-      << EscapeJson(kProgressivePoissonReferenceSmokeBenchmarkId) << "\",\n"
-      << "  \"method\": \""
-      << EscapeJson(kProgressivePoissonReferenceSmokeMethod) << "\",\n"
-      << "  \"backend\": \"cpu_reference\",\n"
-      << "  \"dataset\": \""
-      << EscapeJson(kProgressivePoissonReferenceSmokeDataset) << "\",\n"
-      << "  \"commit\": \"" << EscapeJson(commit) << "\",\n"
-      << "  \"metrics\": {\n"
-      << "    \"runtime_ms\": " << metrics.RuntimeMilliseconds << ",\n"
-      << "    \"quality_error_l2\": " << metrics.QualityErrorL2 << "\n"
-      << "  },\n"
-      << "  \"diagnostics\": {\n"
-      << "    \"runner\": \"IntrinsicBenchmarkSmoke\",\n"
-      << "    \"mode\": \"smoke\",\n"
-      << "    \"warmup_iterations\": 1,\n"
-      << "    \"measured_iterations\": 8,\n"
-      << "    \"poisson_ratio_min\": " << metrics.PoissonRatioMin << ",\n"
-      << "    \"coverage_fraction\": " << metrics.CoverageFraction << ",\n"
-      << "    \"accepted_count\": " << metrics.AcceptedCount << ",\n"
-      << "    \"level_count\": " << metrics.LevelCount << "\n"
-      << "  },\n"
-      << "  \"status\": \"" << (metrics.Succeeded ? "passed" : "failed")
-      << "\"\n"
-      << "}\n";
-
-  return EmittedBenchmark{kProgressivePoissonReferenceSmokeBenchmarkId,
-                          out.str(), metrics.Succeeded};
+  return EmitBenchmarkResult(out, kProgressivePoissonReferenceSmokeBenchmarkId,
+      kProgressivePoissonReferenceSmokeMethod, "cpu_reference",
+      kProgressivePoissonReferenceSmokeDataset, commit, metrics.Succeeded,
+      [&] {
+        out << "    \"runtime_ms\": " << metrics.RuntimeMilliseconds << ",\n"
+            << "    \"quality_error_l2\": " << metrics.QualityErrorL2 << "\n";
+      }, [&] {
+        out << "    \"runner\": \"IntrinsicBenchmarkSmoke\",\n"
+            << "    \"mode\": \"smoke\",\n"
+            << "    \"warmup_iterations\": 1,\n"
+            << "    \"measured_iterations\": 8,\n"
+            << "    \"poisson_ratio_min\": " << metrics.PoissonRatioMin << ",\n"
+            << "    \"coverage_fraction\": " << metrics.CoverageFraction << ",\n"
+            << "    \"accepted_count\": " << metrics.AcceptedCount << ",\n"
+            << "    \"level_count\": " << metrics.LevelCount << "\n";
+      });
 }
 
 auto EmitSignedHeatReferenceSmoke(const std::string &commit)
@@ -570,36 +506,23 @@ auto EmitSignedHeatReferenceSmoke(const std::string &commit)
   std::ostringstream out;
   out.setf(std::ios::fixed);
   out.precision(6);
-  out << "{\n"
-      << "  \"benchmark_id\": \""
-      << EscapeJson(kSignedHeatReferenceSmokeBenchmarkId) << "\",\n"
-      << "  \"method\": \"" << EscapeJson(kSignedHeatReferenceSmokeMethod)
-      << "\",\n"
-      << "  \"backend\": \"cpu_reference\",\n"
-      << "  \"dataset\": \"" << EscapeJson(kSignedHeatReferenceSmokeDataset)
-      << "\",\n"
-      << "  \"commit\": \"" << EscapeJson(commit) << "\",\n"
-      << "  \"metrics\": {\n"
-      << "    \"runtime_ms\": " << metrics.RuntimeMilliseconds << ",\n"
-      << "    \"quality_error_l2\": " << metrics.QualityErrorL2 << "\n"
-      << "  },\n"
-      << "  \"diagnostics\": {\n"
-      << "    \"runner\": \"IntrinsicBenchmarkSmoke\",\n"
-      << "    \"mode\": \"smoke\",\n"
-      << "    \"warmup_iterations\": 1,\n"
-      << "    \"measured_iterations\": 8,\n"
-      << "    \"source_vertex_count\": " << metrics.SourceVertexCount << ",\n"
-      << "    \"degenerate_boundary_vertex_count\": "
-      << metrics.DegenerateBoundaryVertexCount << ",\n"
-      << "    \"max_abs_distance\": " << metrics.MaxAbsDistance << ",\n"
-      << "    \"mean_boundary_offset\": " << metrics.MeanBoundaryOffset << "\n"
-      << "  },\n"
-      << "  \"status\": \"" << (metrics.Succeeded ? "passed" : "failed")
-      << "\"\n"
-      << "}\n";
-
-  return EmittedBenchmark{kSignedHeatReferenceSmokeBenchmarkId, out.str(),
-                          metrics.Succeeded};
+  return EmitBenchmarkResult(out, kSignedHeatReferenceSmokeBenchmarkId,
+      kSignedHeatReferenceSmokeMethod, "cpu_reference",
+      kSignedHeatReferenceSmokeDataset, commit, metrics.Succeeded,
+      [&] {
+        out << "    \"runtime_ms\": " << metrics.RuntimeMilliseconds << ",\n"
+            << "    \"quality_error_l2\": " << metrics.QualityErrorL2 << "\n";
+      }, [&] {
+        out << "    \"runner\": \"IntrinsicBenchmarkSmoke\",\n"
+            << "    \"mode\": \"smoke\",\n"
+            << "    \"warmup_iterations\": 1,\n"
+            << "    \"measured_iterations\": 8,\n"
+            << "    \"source_vertex_count\": " << metrics.SourceVertexCount << ",\n"
+            << "    \"degenerate_boundary_vertex_count\": "
+            << metrics.DegenerateBoundaryVertexCount << ",\n"
+            << "    \"max_abs_distance\": " << metrics.MaxAbsDistance << ",\n"
+            << "    \"mean_boundary_offset\": " << metrics.MeanBoundaryOffset << "\n";
+      });
 }
 
 auto EmitGeodesicsReferenceSmoke(const std::string& commit) -> EmittedBenchmark
@@ -611,30 +534,20 @@ auto EmitGeodesicsReferenceSmoke(const std::string& commit) -> EmittedBenchmark
     std::ostringstream out;
     out.setf(std::ios::fixed);
     out.precision(6);
-    out << "{\n"
-        << "  \"benchmark_id\": \"" << EscapeJson("geometry.geodesics_virtual_source.smoke")
-        << "\",\n"
-        << "  \"method\": \"" << EscapeJson("geometry.geodesics_virtual_source") << "\",\n"
-        << "  \"backend\": \"cpu_reference\",\n"
-        << "  \"dataset\": \"" << EscapeJson("builtin.flat_grid.corner_source.8") << "\",\n"
-        << "  \"commit\": \"" << EscapeJson(commit) << "\",\n"
-        << "  \"metrics\": {\n"
-        << "    \"runtime_ms\": " << metrics.RuntimeMilliseconds << ",\n"
-        << "    \"quality_error_l2\": " << metrics.QualityErrorL2 << ",\n"
-        << "    \"quality_error_linf\": " << metrics.MaxAbsoluteError << "\n"
-        << "  },\n"
-        << "  \"diagnostics\": {\n"
-        << "    \"runner\": \"IntrinsicBenchmarkSmoke\",\n"
-        << "    \"mode\": \"smoke\",\n"
-        << "    \"warmup_iterations\": 1,\n"
-        << "    \"measured_iterations\": 8,\n"
-        << "    \"halfedge_expansions\": " << metrics.HalfedgeExpansions << "\n"
-        << "  },\n"
-        << "  \"status\": \"" << (metrics.Succeeded ? "passed" : "failed") << "\"\n"
-        << "}\n";
-
-    return EmittedBenchmark{"geometry.geodesics_virtual_source.smoke", out.str(),
-                            metrics.Succeeded};
+    return EmitBenchmarkResult(out, "geometry.geodesics_virtual_source.smoke",
+      "geometry.geodesics_virtual_source", "cpu_reference",
+      "builtin.flat_grid.corner_source.8", commit, metrics.Succeeded,
+      [&] {
+        out << "    \"runtime_ms\": " << metrics.RuntimeMilliseconds << ",\n"
+              << "    \"quality_error_l2\": " << metrics.QualityErrorL2 << ",\n"
+              << "    \"quality_error_linf\": " << metrics.MaxAbsoluteError << "\n";
+      }, [&] {
+        out << "    \"runner\": \"IntrinsicBenchmarkSmoke\",\n"
+              << "    \"mode\": \"smoke\",\n"
+              << "    \"warmup_iterations\": 1,\n"
+              << "    \"measured_iterations\": 8,\n"
+              << "    \"halfedge_expansions\": " << metrics.HalfedgeExpansions << "\n";
+      });
 }
 
 auto EmitPointLBVHSmoke(const std::string& commit) -> EmittedBenchmark
@@ -642,15 +555,17 @@ auto EmitPointLBVHSmoke(const std::string& commit) -> EmittedBenchmark
     const auto r = Intrinsic::Bench::Geometry::RunPointLBVHSmoke();
     const bool passed = r.Mismatches == 0 && r.MaxDistanceError == 0;
     std::ostringstream out;
-    out << "{\"benchmark_id\":\"geometry.point_lbvh.smoke\","
-        << "\"method\":\"geometry.point_lbvh\",\"backend\":\"cpu_reference\","
-        << "\"dataset\":\"builtin.grid3d.8\",\"commit\":\"" << EscapeJson(commit)
-        << "\",\"metrics\":{\"runtime_ms\":" << r.RuntimeMilliseconds
-        << ",\"quality_error_linf\":" << r.MaxDistanceError
-        << "},\"diagnostics\":{\"runner\":\"IntrinsicBenchmarkSmoke\",\"mode\":\"smoke\","
-        << "\"warmup_iterations\":1,\"measured_iterations\":8,\"index_mismatches\":" << r.Mismatches
-        << "},\"status\":\"" << (passed ? "passed" : "failed") << "\"}\n";
-    return {"geometry.point_lbvh.smoke",out.str(),passed};
+    return EmitBenchmarkResult(out, "geometry.point_lbvh.smoke",
+        "geometry.point_lbvh", "cpu_reference", "builtin.grid3d.8", commit, passed,
+        [&] {
+            out << "    \"runtime_ms\": " << r.RuntimeMilliseconds
+                << ",\n    \"quality_error_linf\": " << r.MaxDistanceError << '\n';
+        }, [&] {
+            out << "    \"runner\": \"IntrinsicBenchmarkSmoke\",\n"
+                << "    \"mode\": \"smoke\",\n"
+                << "    \"warmup_iterations\": 1,\n    \"measured_iterations\": 8,\n"
+                << "    \"index_mismatches\": " << r.Mismatches << '\n';
+        });
 }
 
 auto EmitLopLBVHSmoke(const std::string& commit) -> EmittedBenchmark
@@ -658,31 +573,47 @@ auto EmitLopLBVHSmoke(const std::string& commit) -> EmittedBenchmark
     const auto r = Intrinsic::Bench::Geometry::RunLopLBVHSmoke();
     const bool passed = r.Mismatches == 0 && r.MaxDistanceError == 0;
     std::ostringstream out;
-    out << "{\"benchmark_id\":\"geometry.point_lbvh.lop_cpu_smoke\","
-        << "\"method\":\"geometry.point_lbvh\",\"backend\":\"cpu_reference\","
-        << "\"dataset\":\"builtin.noisy_plane.16x16.lop64.seed257\",\"commit\":\"" << EscapeJson(commit)
-        << "\",\"metrics\":{\"runtime_ms\":" << r.RuntimeMilliseconds
-        << ",\"quality_error_linf\":" << r.MaxDistanceError
-        << "},\"diagnostics\":{\"runner\":\"IntrinsicBenchmarkSmoke\",\"mode\":\"smoke\",\"query_backend\":\"cpu_lbvh\",\"reduction_backend\":\"cpu_reference\","
-        << "\"warmup_iterations\":1,\"measured_iterations\":4,\"index_mismatches\":" << r.Mismatches
-        << "},\"status\":\"" << (passed ? "passed" : "failed") << "\"}\n";
-    return {"geometry.point_lbvh.lop_cpu_smoke",out.str(),passed};
+    return EmitBenchmarkResult(out, "geometry.point_lbvh.lop_cpu_smoke",
+        "geometry.point_lbvh", "cpu_reference",
+        "builtin.noisy_plane.16x16.lop64.seed257", commit, passed,
+        [&] {
+            out << "    \"runtime_ms\": " << r.RuntimeMilliseconds
+                << ",\n    \"quality_error_linf\": " << r.MaxDistanceError << '\n';
+        }, [&] {
+            out << "    \"runner\": \"IntrinsicBenchmarkSmoke\",\n"
+                << "    \"mode\": \"smoke\",\n"
+                << "    \"query_backend\": \"cpu_lbvh\",\n"
+                << "    \"reduction_backend\": \"cpu_reference\",\n"
+                << "    \"warmup_iterations\": 1,\n    \"measured_iterations\": 4,\n"
+                << "    \"index_mismatches\": " << r.Mismatches << '\n';
+        });
 }
 
 auto EmitPointLBVHKnnSmoke(const std::string& commit) -> EmittedBenchmark
 {
     const auto r = Intrinsic::Bench::Geometry::RunPointLBVHKnnSmoke();
     const bool passed = r.Mismatches == 0 && r.MaxDistanceError == 0 && r.MaxNormalError <= 1e-5;
-    nlohmann::json result{{"benchmark_id","geometry.point_lbvh.knn_smoke"},
-        {"method","geometry.point_lbvh"},{"backend","cpu_reference"},
-        {"dataset","builtin.paraboloid.32x16"},{"commit",commit},
-        {"metrics",{{"runtime_ms",r.BuildMilliseconds+r.WarmMilliseconds},{"quality_error_linf",std::max(r.MaxDistanceError,r.MaxNormalError)}}},
-        {"diagnostics",{{"runner","IntrinsicBenchmarkSmoke"},{"mode","smoke"},{"warmup_iterations",1},{"measured_iterations",4},
-            {"build_ms",r.BuildMilliseconds},{"warm_query_ms",r.WarmMilliseconds},{"exhaustive_query_ms",r.ReferenceMilliseconds},
-            {"normal_kdtree_ms",r.NormalReferenceMilliseconds},{"normal_supplied_lbvh_ms",r.NormalLbvhMilliseconds},
-            {"normal_error_linf",r.MaxNormalError},{"index_mismatches",r.Mismatches}}},
-        {"status",passed?"passed":"failed"}};
-    return {"geometry.point_lbvh.knn_smoke",result.dump(2),passed};
+    const nlohmann::json metrics{
+        {"runtime_ms", r.BuildMilliseconds + r.WarmMilliseconds},
+        {"quality_error_linf", std::max(r.MaxDistanceError, r.MaxNormalError)}};
+    const nlohmann::json diagnostics{
+        {"runner", "IntrinsicBenchmarkSmoke"}, {"mode", "smoke"},
+        {"warmup_iterations", 1}, {"measured_iterations", 4},
+        {"build_ms", r.BuildMilliseconds}, {"warm_query_ms", r.WarmMilliseconds},
+        {"exhaustive_query_ms", r.ReferenceMilliseconds},
+        {"normal_kdtree_ms", r.NormalReferenceMilliseconds},
+        {"normal_supplied_lbvh_ms", r.NormalLbvhMilliseconds},
+        {"normal_error_linf", r.MaxNormalError}, {"index_mismatches", r.Mismatches}};
+    std::ostringstream out;
+    // Retain this producer's native JSON numeric encoding rather than stream
+    // rounding. Only the surrounding object is emitted by the shared envelope.
+    const auto writeMembers = [&out](const nlohmann::json& fields) {
+        const std::string payload = fields.dump(2);
+        out << std::string_view{payload}.substr(1u, payload.size() - 2u) << '\n';
+    };
+    return EmitBenchmarkResult(out, "geometry.point_lbvh.knn_smoke",
+        "geometry.point_lbvh", "cpu_reference", "builtin.paraboloid.32x16", commit, passed,
+        [&] { writeMembers(metrics); }, [&] { writeMembers(diagnostics); });
 }
 
 auto EmitRegistrationSpatialSmoke(const std::string& commit) -> EmittedBenchmark
@@ -690,18 +621,20 @@ auto EmitRegistrationSpatialSmoke(const std::string& commit) -> EmittedBenchmark
     const auto r = Intrinsic::Bench::Geometry::RunRegistrationSpatialSmoke();
     const bool passed = r.Failures == 0 && r.MaxTransformError <= 1e-6;
     std::ostringstream out;
-    out << "{\"benchmark_id\":\"geometry.registration.spatial_smoke\","
-        << "\"method\":\"geometry.registration\",\"backend\":\"cpu_reference\","
-        << "\"dataset\":\"builtin.random3d.1025.seed917\",\"commit\":\"" << EscapeJson(commit)
-        << "\",\"metrics\":{\"runtime_ms\":" << r.ColdMilliseconds
-        << ",\"quality_error_linf\":" << r.MaxTransformError
-        << "},\"diagnostics\":{\"runner\":\"IntrinsicBenchmarkSmoke\",\"mode\":\"smoke\","
-        << "\"warmup_iterations\":1,\"measured_iterations\":8,\"failures\":" << r.Failures
-        << ",\"reference_total_ms\":" << r.ReferenceMilliseconds
-        << ",\"lbvh_cold_total_ms\":" << r.ColdMilliseconds
-        << ",\"lbvh_warm_total_ms\":" << r.WarmMilliseconds
-        << "},\"status\":\"" << (passed ? "passed" : "failed") << "\"}\n";
-    return {"geometry.registration.spatial_smoke",out.str(),passed};
+    return EmitBenchmarkResult(out, "geometry.registration.spatial_smoke",
+        "geometry.registration", "cpu_reference", "builtin.random3d.1025.seed917", commit, passed,
+        [&] {
+            out << "    \"runtime_ms\": " << r.ColdMilliseconds
+                << ",\n    \"quality_error_linf\": " << r.MaxTransformError << '\n';
+        }, [&] {
+            out << "    \"runner\": \"IntrinsicBenchmarkSmoke\",\n"
+                << "    \"mode\": \"smoke\",\n"
+                << "    \"warmup_iterations\": 1,\n    \"measured_iterations\": 8,\n"
+                << "    \"failures\": " << r.Failures
+                << ",\n    \"reference_total_ms\": " << r.ReferenceMilliseconds
+                << ",\n    \"lbvh_cold_total_ms\": " << r.ColdMilliseconds
+                << ",\n    \"lbvh_warm_total_ms\": " << r.WarmMilliseconds << '\n';
+        });
 }
 
 auto EmitCurvatureSegmentationReferenceSmoke(const std::string &commit)
@@ -713,61 +646,46 @@ auto EmitCurvatureSegmentationReferenceSmoke(const std::string &commit)
   std::ostringstream out;
   out.setf(std::ios::fixed);
   out.precision(9);
-  out << "{\n"
-      << "  \"benchmark_id\": \""
-      << EscapeJson(kCurvatureSegmentationReferenceSmokeBenchmarkId)
-      << "\",\n"
-      << "  \"method\": \""
-      << EscapeJson(kCurvatureSegmentationReferenceSmokeMethod) << "\",\n"
-      << "  \"backend\": \"cpu_reference\",\n"
-      << "  \"dataset\": \""
-      << EscapeJson(kCurvatureSegmentationReferenceSmokeDataset) << "\",\n"
-      << "  \"commit\": \"" << EscapeJson(commit) << "\",\n"
-      << "  \"metrics\": {\n"
-      << "    \"runtime_ms\": " << metrics.RuntimeMilliseconds << ",\n"
-      << "    \"quality_error_l2\": "
-      << metrics.RegimeMisclassificationFraction << "\n"
-      << "  },\n"
-      << "  \"diagnostics\": {\n"
-      << "    \"runner\": \"IntrinsicBenchmarkSmoke\",\n"
-      << "    \"mode\": \"correctness_smoke\",\n"
-      << "    \"warmup_iterations\": 1,\n"
-      << "    \"measured_iterations\": 8,\n"
-      << "    \"selected_component_count\": "
-      << metrics.SelectedComponentCount << ",\n"
-      << "    \"connected_region_count\": "
-      << metrics.ConnectedRegionCount << ",\n"
-      << "    \"boundary_edge_count\": "
-      << metrics.BoundaryEdgeCount << ",\n"
-      << "    \"fold_boundary_recall\": "
-      << metrics.FoldBoundaryRecall << ",\n"
-      << "    \"quality_error_l2_unit\": "
-      << "\"misclassified_face_fraction\",\n"
-      << "    \"face_aggregation_ms\": "
-      << metrics.FaceAggregationMilliseconds << ",\n"
-      << "    \"gmm_fitting_ms\": "
-      << metrics.GmmFittingMilliseconds << ",\n"
-      << "    \"unary_construction_ms\": "
-      << metrics.UnaryConstructionMilliseconds << ",\n"
-      << "    \"dual_graph_construction_ms\": "
-      << metrics.DualGraphConstructionMilliseconds << ",\n"
-      << "    \"spatial_optimization_ms\": "
-      << metrics.SpatialOptimizationMilliseconds << ",\n"
-      << "    \"connectivity_publication_ms\": "
-      << metrics.ConnectivityPublicationMilliseconds << ",\n"
-      << "    \"segmentation_total_ms\": "
-      << metrics.SegmentationTotalMilliseconds << ",\n"
-      << "    \"gmm_iterations\": " << metrics.GmmIterations << ",\n"
-      << "    \"spatial_iterations\": "
-      << metrics.SpatialIterations << "\n"
-      << "  },\n"
-      << "  \"status\": \"" << (metrics.Succeeded ? "passed" : "failed")
-      << "\"\n"
-      << "}\n";
-
-  return EmittedBenchmark{
-      kCurvatureSegmentationReferenceSmokeBenchmarkId,
-      out.str(), metrics.Succeeded};
+  return EmitBenchmarkResult(out, kCurvatureSegmentationReferenceSmokeBenchmarkId,
+      kCurvatureSegmentationReferenceSmokeMethod, "cpu_reference",
+      kCurvatureSegmentationReferenceSmokeDataset, commit, metrics.Succeeded,
+      [&] {
+        out << "    \"runtime_ms\": " << metrics.RuntimeMilliseconds << ",\n"
+            << "    \"quality_error_l2\": "
+            << metrics.RegimeMisclassificationFraction << "\n";
+      }, [&] {
+        out << "    \"runner\": \"IntrinsicBenchmarkSmoke\",\n"
+            << "    \"mode\": \"correctness_smoke\",\n"
+            << "    \"warmup_iterations\": 1,\n"
+            << "    \"measured_iterations\": 8,\n"
+            << "    \"selected_component_count\": "
+            << metrics.SelectedComponentCount << ",\n"
+            << "    \"connected_region_count\": "
+            << metrics.ConnectedRegionCount << ",\n"
+            << "    \"boundary_edge_count\": "
+            << metrics.BoundaryEdgeCount << ",\n"
+            << "    \"fold_boundary_recall\": "
+            << metrics.FoldBoundaryRecall << ",\n"
+            << "    \"quality_error_l2_unit\": "
+            << "\"misclassified_face_fraction\",\n"
+            << "    \"face_aggregation_ms\": "
+            << metrics.FaceAggregationMilliseconds << ",\n"
+            << "    \"gmm_fitting_ms\": "
+            << metrics.GmmFittingMilliseconds << ",\n"
+            << "    \"unary_construction_ms\": "
+            << metrics.UnaryConstructionMilliseconds << ",\n"
+            << "    \"dual_graph_construction_ms\": "
+            << metrics.DualGraphConstructionMilliseconds << ",\n"
+            << "    \"spatial_optimization_ms\": "
+            << metrics.SpatialOptimizationMilliseconds << ",\n"
+            << "    \"connectivity_publication_ms\": "
+            << metrics.ConnectivityPublicationMilliseconds << ",\n"
+            << "    \"segmentation_total_ms\": "
+            << metrics.SegmentationTotalMilliseconds << ",\n"
+            << "    \"gmm_iterations\": " << metrics.GmmIterations << ",\n"
+            << "    \"spatial_iterations\": "
+            << metrics.SpatialIterations << "\n";
+      });
 }
 
 auto EmitPointCloudConsolidationReferenceSmoke(const std::string &commit)
@@ -779,49 +697,34 @@ auto EmitPointCloudConsolidationReferenceSmoke(const std::string &commit)
   std::ostringstream out;
   out.setf(std::ios::fixed);
   out.precision(9);
-  out << "{\n"
-      << "  \"benchmark_id\": \""
-      << EscapeJson(kPointCloudConsolidationReferenceSmokeBenchmarkId)
-      << "\",\n"
-      << "  \"method\": \""
-      << EscapeJson(kPointCloudConsolidationReferenceSmokeMethod) << "\",\n"
-      << "  \"backend\": \"cpu_reference\",\n"
-      << "  \"dataset\": \""
-      << EscapeJson(kPointCloudConsolidationReferenceSmokeDataset) << "\",\n"
-      << "  \"commit\": \"" << EscapeJson(commit) << "\",\n"
-      << "  \"metrics\": {\n"
-      << "    \"runtime_ms\": " << metrics.RuntimeMilliseconds << ",\n"
-      << "    \"quality_error_l2\": " << metrics.QualityErrorL2 << "\n"
-      << "  },\n"
-      << "  \"diagnostics\": {\n"
-      << "    \"runner\": \"IntrinsicBenchmarkSmoke\",\n"
-      << "    \"mode\": \"correctness_smoke\",\n"
-      << "    \"warmup_iterations\": 1,\n"
-      << "    \"measured_iterations\": 8,\n"
-      << "    \"strategies\": [\"lop\", \"wlop\"],\n"
-      << "    \"raw_plane_error\": " << metrics.RawPlaneError << ",\n"
-      << "    \"wlop_plane_error\": " << metrics.WlopPlaneError << ",\n"
-      << "    \"raw_sphere_error\": " << metrics.RawSphereError << ",\n"
-      << "    \"wlop_sphere_error\": " << metrics.WlopSphereError << ",\n"
-      << "    \"uniformity_without_repulsion\": "
-      << metrics.UniformityWithoutRepulsion << ",\n"
-      << "    \"uniformity_with_repulsion\": "
-      << metrics.UniformityWithRepulsion << ",\n"
-      << "    \"outlier_patch_max_displacement\": "
-      << metrics.OutlierPatchMaxDisplacement << ",\n"
-      << "    \"lop_iterations\": " << metrics.LopIterations << ",\n"
-      << "    \"wlop_plane_iterations\": "
-      << metrics.WlopPlaneIterations << ",\n"
-      << "    \"wlop_sphere_iterations\": "
-      << metrics.WlopSphereIterations << "\n"
-      << "  },\n"
-      << "  \"status\": \"" << (metrics.Succeeded ? "passed" : "failed")
-      << "\"\n"
-      << "}\n";
-
-  return EmittedBenchmark{
-      kPointCloudConsolidationReferenceSmokeBenchmarkId,
-      out.str(), metrics.Succeeded};
+  return EmitBenchmarkResult(out, kPointCloudConsolidationReferenceSmokeBenchmarkId,
+      kPointCloudConsolidationReferenceSmokeMethod, "cpu_reference",
+      kPointCloudConsolidationReferenceSmokeDataset, commit, metrics.Succeeded,
+      [&] {
+        out << "    \"runtime_ms\": " << metrics.RuntimeMilliseconds << ",\n"
+            << "    \"quality_error_l2\": " << metrics.QualityErrorL2 << "\n";
+      }, [&] {
+        out << "    \"runner\": \"IntrinsicBenchmarkSmoke\",\n"
+            << "    \"mode\": \"correctness_smoke\",\n"
+            << "    \"warmup_iterations\": 1,\n"
+            << "    \"measured_iterations\": 8,\n"
+            << "    \"strategies\": [\"lop\", \"wlop\"],\n"
+            << "    \"raw_plane_error\": " << metrics.RawPlaneError << ",\n"
+            << "    \"wlop_plane_error\": " << metrics.WlopPlaneError << ",\n"
+            << "    \"raw_sphere_error\": " << metrics.RawSphereError << ",\n"
+            << "    \"wlop_sphere_error\": " << metrics.WlopSphereError << ",\n"
+            << "    \"uniformity_without_repulsion\": "
+            << metrics.UniformityWithoutRepulsion << ",\n"
+            << "    \"uniformity_with_repulsion\": "
+            << metrics.UniformityWithRepulsion << ",\n"
+            << "    \"outlier_patch_max_displacement\": "
+            << metrics.OutlierPatchMaxDisplacement << ",\n"
+            << "    \"lop_iterations\": " << metrics.LopIterations << ",\n"
+            << "    \"wlop_plane_iterations\": "
+            << metrics.WlopPlaneIterations << ",\n"
+            << "    \"wlop_sphere_iterations\": "
+            << metrics.WlopSphereIterations << "\n";
+      });
 }
 
 auto EmitLopFamilyComparisonSmoke(const std::string &commit)
@@ -833,118 +736,105 @@ auto EmitLopFamilyComparisonSmoke(const std::string &commit)
   std::ostringstream out;
   out.setf(std::ios::fixed);
   out.precision(9);
-  out << "{\n"
-      << "  \"benchmark_id\": \""
-      << EscapeJson(kLopFamilyComparisonBenchmarkId) << "\",\n"
-      << "  \"method\": \"" << EscapeJson(kLopFamilyComparisonMethod)
-      << "\",\n"
-      << "  \"backend\": \"cpu_optimized\",\n"
-      << "  \"dataset\": \"" << EscapeJson(kLopFamilyComparisonDataset)
-      << "\",\n"
-      << "  \"commit\": \"" << EscapeJson(commit) << "\",\n"
-      << "  \"metrics\": {\n"
-      << "    \"runtime_ms\": " << metrics.RuntimeMilliseconds << ",\n"
-      << "    \"quality_error_l2\": " << metrics.QualityErrorL2 << "\n"
-      << "  },\n"
-      << "  \"diagnostics\": {\n"
-      << "    \"runner\": \"IntrinsicBenchmarkSmoke\",\n"
-      << "    \"mode\": \"paired_backend_comparison\",\n"
-      << "    \"baseline_backend\": \"cpu_reference\",\n"
-      << "    \"probe_backend\": \"cpu_optimized\",\n"
-      << "    \"warmup_pairs\": " << kLopFamilyComparisonWarmupPairs
-      << ",\n"
-      << "    \"measured_pairs\": " << kLopFamilyComparisonMeasuredPairs
-      << ",\n"
-      << "    \"timing_statistic\": \"median_paired_runtime_ratio\",\n"
-      << "    \"backend_runtime_statistic\": "
-         "\"median_individual_runtime_ms\",\n"
-      << "    \"measurement_order\": "
-         "\"alternating_reference_optimized_optimized_reference\",\n"
-      << "    \"useful_runtime_ratio_max\": "
-      << kLopFamilyUsefulRuntimeRatioMax << ",\n"
-      << "    \"position_rms_delta_max\": " << kLopFamilyRmsDeltaMax
-      << ",\n"
-      << "    \"position_linf_delta_max\": " << kLopFamilyLinfDeltaMax
-      << ",\n"
-      << "    \"normal_rms_delta_max\": " << kLopFamilyRmsDeltaMax
-      << ",\n"
-      << "    \"normal_linf_delta_max\": " << kLopFamilyLinfDeltaMax
-      << ",\n"
-      << "    \"supported_cpu_threads\": [1],\n"
-      << "    \"evaluated_strategy_count\": "
-      << metrics.EvaluatedStrategyCount << ",\n"
-      << "    \"adopted_strategy_count\": "
-      << metrics.AdoptedStrategyCount << ",\n"
-      << "    \"strategies\": [\n";
+  return EmitBenchmarkResult(out, kLopFamilyComparisonBenchmarkId,
+      kLopFamilyComparisonMethod, "cpu_optimized",
+      kLopFamilyComparisonDataset, commit, metrics.Succeeded,
+      [&] {
+        out << "    \"runtime_ms\": " << metrics.RuntimeMilliseconds << ",\n"
+            << "    \"quality_error_l2\": " << metrics.QualityErrorL2 << "\n";
+      }, [&] {
+        out << "    \"runner\": \"IntrinsicBenchmarkSmoke\",\n"
+            << "    \"mode\": \"paired_backend_comparison\",\n"
+            << "    \"baseline_backend\": \"cpu_reference\",\n"
+            << "    \"probe_backend\": \"cpu_optimized\",\n"
+            << "    \"warmup_pairs\": " << kLopFamilyComparisonWarmupPairs
+            << ",\n"
+            << "    \"measured_pairs\": " << kLopFamilyComparisonMeasuredPairs
+            << ",\n"
+            << "    \"timing_statistic\": \"median_paired_runtime_ratio\",\n"
+            << "    \"backend_runtime_statistic\": "
+               "\"median_individual_runtime_ms\",\n"
+            << "    \"measurement_order\": "
+               "\"alternating_reference_optimized_optimized_reference\",\n"
+            << "    \"useful_runtime_ratio_max\": "
+            << kLopFamilyUsefulRuntimeRatioMax << ",\n"
+            << "    \"position_rms_delta_max\": " << kLopFamilyRmsDeltaMax
+            << ",\n"
+            << "    \"position_linf_delta_max\": " << kLopFamilyLinfDeltaMax
+            << ",\n"
+            << "    \"normal_rms_delta_max\": " << kLopFamilyRmsDeltaMax
+            << ",\n"
+            << "    \"normal_linf_delta_max\": " << kLopFamilyLinfDeltaMax
+            << ",\n"
+            << "    \"supported_cpu_threads\": [1],\n"
+            << "    \"evaluated_strategy_count\": "
+            << metrics.EvaluatedStrategyCount << ",\n"
+            << "    \"adopted_strategy_count\": "
+            << metrics.AdoptedStrategyCount << ",\n"
+            << "    \"strategies\": [\n";
 
-  for (std::size_t i = 0u; i < metrics.Strategies.size(); ++i) {
-    const auto &strategy = metrics.Strategies[i];
-    out << "      {\n"
-        << "        \"strategy\": \"" << EscapeJson(strategy.Strategy)
-        << "\",\n"
-        << "        \"reference_backend\": \"cpu_reference\",\n"
-        << "        \"optimized_backend\": \"cpu_optimized\",\n"
-        << "        \"reference_status\": \""
-        << EscapeJson(strategy.ReferenceStatus) << "\",\n"
-        << "        \"optimized_status\": \""
-        << EscapeJson(strategy.OptimizedStatus) << "\",\n"
-        << "        \"input_point_count\": " << strategy.InputPointCount
-        << ",\n"
-        << "        \"output_point_count\": " << strategy.OutputPointCount
-        << ",\n"
-        << "        \"reference_median_runtime_ms\": "
-        << strategy.ReferenceMedianRuntimeMilliseconds << ",\n"
-        << "        \"optimized_median_runtime_ms\": "
-        << strategy.OptimizedMedianRuntimeMilliseconds << ",\n"
-        << "        \"median_runtime_ratio\": "
-        << strategy.MedianRuntimeRatio << ",\n"
-        << "        \"reference_runtime_samples_ms\": ";
-    EmitDoubleSamples(out, strategy.ReferenceRuntimeSamplesMilliseconds);
-    out << ",\n        \"optimized_runtime_samples_ms\": ";
-    EmitDoubleSamples(out, strategy.OptimizedRuntimeSamplesMilliseconds);
-    out << ",\n        \"paired_runtime_ratio_samples\": ";
-    EmitDoubleSamples(out, strategy.PairedRuntimeRatios);
-    out << ",\n"
-        << "        \"position_rms_delta\": " << strategy.PositionRmsDelta
-        << ",\n"
-        << "        \"position_linf_delta\": " << strategy.PositionLinfDelta
-        << ",\n"
-        << "        \"normal_rms_delta\": " << strategy.NormalRmsDelta
-        << ",\n"
-        << "        \"normal_linf_delta\": " << strategy.NormalLinfDelta
-        << ",\n"
-        << "        \"state_matched\": "
-        << (strategy.StateMatched ? "true" : "false") << ",\n"
-        << "        \"output_shape_matched\": "
-        << (strategy.OutputShapeMatched ? "true" : "false") << ",\n"
-        << "        \"reference_identity_matched\": "
-        << (strategy.ReferenceIdentityMatched ? "true" : "false") << ",\n"
-        << "        \"optimized_identity_matched\": "
-        << (strategy.OptimizedIdentityMatched ? "true" : "false") << ",\n"
-        << "        \"optimized_used_fallback\": "
-        << (strategy.OptimizedUsedFallback ? "true" : "false") << ",\n"
-        << "        \"reference_deterministic\": "
-        << (strategy.ReferenceDeterministic ? "true" : "false") << ",\n"
-        << "        \"optimized_deterministic\": "
-        << (strategy.OptimizedDeterministic ? "true" : "false") << ",\n"
-        << "        \"parity_passed\": "
-        << (strategy.ParityPassed ? "true" : "false") << ",\n"
-        << "        \"acceleration_passed\": "
-        << (strategy.AccelerationPassed ? "true" : "false") << ",\n"
-        << "        \"adopted\": "
-        << (strategy.Adopted ? "true" : "false") << "\n"
-        << "      }"
-        << (i + 1u == metrics.Strategies.size() ? "\n" : ",\n");
-  }
+        for (std::size_t i = 0u; i < metrics.Strategies.size(); ++i) {
+          const auto &strategy = metrics.Strategies[i];
+          out << "      {\n"
+              << "        \"strategy\": \"" << EscapeJson(strategy.Strategy)
+              << "\",\n"
+              << "        \"reference_backend\": \"cpu_reference\",\n"
+              << "        \"optimized_backend\": \"cpu_optimized\",\n"
+              << "        \"reference_status\": \""
+              << EscapeJson(strategy.ReferenceStatus) << "\",\n"
+              << "        \"optimized_status\": \""
+              << EscapeJson(strategy.OptimizedStatus) << "\",\n"
+              << "        \"input_point_count\": " << strategy.InputPointCount
+              << ",\n"
+              << "        \"output_point_count\": " << strategy.OutputPointCount
+              << ",\n"
+              << "        \"reference_median_runtime_ms\": "
+              << strategy.ReferenceMedianRuntimeMilliseconds << ",\n"
+              << "        \"optimized_median_runtime_ms\": "
+              << strategy.OptimizedMedianRuntimeMilliseconds << ",\n"
+              << "        \"median_runtime_ratio\": "
+              << strategy.MedianRuntimeRatio << ",\n"
+              << "        \"reference_runtime_samples_ms\": ";
+          EmitDoubleSamples(out, strategy.ReferenceRuntimeSamplesMilliseconds);
+          out << ",\n        \"optimized_runtime_samples_ms\": ";
+          EmitDoubleSamples(out, strategy.OptimizedRuntimeSamplesMilliseconds);
+          out << ",\n        \"paired_runtime_ratio_samples\": ";
+          EmitDoubleSamples(out, strategy.PairedRuntimeRatios);
+          out << ",\n"
+              << "        \"position_rms_delta\": " << strategy.PositionRmsDelta
+              << ",\n"
+              << "        \"position_linf_delta\": " << strategy.PositionLinfDelta
+              << ",\n"
+              << "        \"normal_rms_delta\": " << strategy.NormalRmsDelta
+              << ",\n"
+              << "        \"normal_linf_delta\": " << strategy.NormalLinfDelta
+              << ",\n"
+              << "        \"state_matched\": "
+              << (strategy.StateMatched ? "true" : "false") << ",\n"
+              << "        \"output_shape_matched\": "
+              << (strategy.OutputShapeMatched ? "true" : "false") << ",\n"
+              << "        \"reference_identity_matched\": "
+              << (strategy.ReferenceIdentityMatched ? "true" : "false") << ",\n"
+              << "        \"optimized_identity_matched\": "
+              << (strategy.OptimizedIdentityMatched ? "true" : "false") << ",\n"
+              << "        \"optimized_used_fallback\": "
+              << (strategy.OptimizedUsedFallback ? "true" : "false") << ",\n"
+              << "        \"reference_deterministic\": "
+              << (strategy.ReferenceDeterministic ? "true" : "false") << ",\n"
+              << "        \"optimized_deterministic\": "
+              << (strategy.OptimizedDeterministic ? "true" : "false") << ",\n"
+              << "        \"parity_passed\": "
+              << (strategy.ParityPassed ? "true" : "false") << ",\n"
+              << "        \"acceleration_passed\": "
+              << (strategy.AccelerationPassed ? "true" : "false") << ",\n"
+              << "        \"adopted\": "
+              << (strategy.Adopted ? "true" : "false") << "\n"
+              << "      }"
+              << (i + 1u == metrics.Strategies.size() ? "\n" : ",\n");
+        }
 
-  out << "    ]\n"
-      << "  },\n"
-      << "  \"status\": \"" << (metrics.Succeeded ? "passed" : "failed")
-      << "\"\n"
-      << "}\n";
-
-  return EmittedBenchmark{kLopFamilyComparisonBenchmarkId, out.str(),
-                          metrics.Succeeded};
+        out << "    ]\n";
+      });
 }
 
 auto EmitContinuousLopReferenceSmoke(const std::string &commit)
@@ -956,69 +846,56 @@ auto EmitContinuousLopReferenceSmoke(const std::string &commit)
   std::ostringstream out;
   out.setf(std::ios::fixed);
   out.precision(9);
-  out << "{\n"
-      << "  \"benchmark_id\": \""
-      << EscapeJson(kContinuousLopReferenceSmokeBenchmarkId) << "\",\n"
-      << "  \"method\": \""
-      << EscapeJson(kContinuousLopReferenceSmokeMethod) << "\",\n"
-      << "  \"backend\": \"cpu_reference\",\n"
-      << "  \"dataset\": \""
-      << EscapeJson(kContinuousLopReferenceSmokeDataset) << "\",\n"
-      << "  \"commit\": \"" << EscapeJson(commit) << "\",\n"
-      << "  \"metrics\": {\n"
-      << "    \"runtime_ms\": " << metrics.RuntimeMilliseconds << ",\n"
-      << "    \"quality_error_l2\": " << metrics.QualityErrorL2 << "\n"
-      << "  },\n"
-      << "  \"diagnostics\": {\n"
-      << "    \"runner\": \"IntrinsicBenchmarkSmoke\",\n"
-      << "    \"mode\": \"correctness_smoke\",\n"
-      << "    \"warmup_iterations\": 1,\n"
-      << "    \"measured_iterations\": 4,\n"
-      << "    \"strategy\": \"clop\",\n"
-      << "    \"raw_plane_error\": " << metrics.RawPlaneError << ",\n"
-      << "    \"clop_plane_error\": " << metrics.ClopPlaneError << ",\n"
-      << "    \"raw_sphere_error\": " << metrics.RawSphereError << ",\n"
-      << "    \"clop_sphere_error\": " << metrics.ClopSphereError << ",\n"
-      << "    \"wlop_parity_mean_distance\": "
-      << metrics.WlopParityMeanDistance << ",\n"
-      << "    \"compact_plane_error\": " << metrics.CompactPlaneError
-      << ",\n"
-      << "    \"uniformity_without_repulsion\": "
-      << metrics.UniformityWithoutRepulsion << ",\n"
-      << "    \"uniformity_with_repulsion\": "
-      << metrics.UniformityWithRepulsion << ",\n"
-      << "    \"outlier_patch_max_displacement\": "
-      << metrics.OutlierPatchMaxDisplacement << ",\n"
-      << "    \"rich_mixture_component_count\": "
-      << metrics.RichMixtureComponentCount << ",\n"
-      << "    \"compact_mixture_component_count\": "
-      << metrics.CompactMixtureComponentCount << ",\n"
-      << "    \"rich_attraction_contributions\": "
-      << metrics.RichAttractionContributions << ",\n"
-      << "    \"compact_attraction_contributions\": "
-      << metrics.CompactAttractionContributions << ",\n"
-      << "    \"rich_mixture_iterations\": "
-      << metrics.RichMixtureIterations << ",\n"
-      << "    \"sphere_mixture_iterations\": "
-      << metrics.SphereMixtureIterations << ",\n"
-      << "    \"plane_projection_iterations\": "
-      << metrics.PlaneProjectionIterations << ",\n"
-      << "    \"sphere_projection_iterations\": "
-      << metrics.SphereProjectionIterations << ",\n"
-      << "    \"mixtures_converged\": "
-      << (metrics.MixturesConverged ? "true" : "false") << ",\n"
-      << "    \"failure_status\": \""
-      << (metrics.InvalidRequestFailedClosed
-              ? "invalid_mixture_component_count"
-              : "unexpected")
-      << "\"\n"
-      << "  },\n"
-      << "  \"status\": \"" << (metrics.Succeeded ? "passed" : "failed")
-      << "\"\n"
-      << "}\n";
-
-  return EmittedBenchmark{kContinuousLopReferenceSmokeBenchmarkId, out.str(),
-                          metrics.Succeeded};
+  return EmitBenchmarkResult(out, kContinuousLopReferenceSmokeBenchmarkId,
+      kContinuousLopReferenceSmokeMethod, "cpu_reference",
+      kContinuousLopReferenceSmokeDataset, commit, metrics.Succeeded,
+      [&] {
+        out << "    \"runtime_ms\": " << metrics.RuntimeMilliseconds << ",\n"
+            << "    \"quality_error_l2\": " << metrics.QualityErrorL2 << "\n";
+      }, [&] {
+        out << "    \"runner\": \"IntrinsicBenchmarkSmoke\",\n"
+            << "    \"mode\": \"correctness_smoke\",\n"
+            << "    \"warmup_iterations\": 1,\n"
+            << "    \"measured_iterations\": 4,\n"
+            << "    \"strategy\": \"clop\",\n"
+            << "    \"raw_plane_error\": " << metrics.RawPlaneError << ",\n"
+            << "    \"clop_plane_error\": " << metrics.ClopPlaneError << ",\n"
+            << "    \"raw_sphere_error\": " << metrics.RawSphereError << ",\n"
+            << "    \"clop_sphere_error\": " << metrics.ClopSphereError << ",\n"
+            << "    \"wlop_parity_mean_distance\": "
+            << metrics.WlopParityMeanDistance << ",\n"
+            << "    \"compact_plane_error\": " << metrics.CompactPlaneError
+            << ",\n"
+            << "    \"uniformity_without_repulsion\": "
+            << metrics.UniformityWithoutRepulsion << ",\n"
+            << "    \"uniformity_with_repulsion\": "
+            << metrics.UniformityWithRepulsion << ",\n"
+            << "    \"outlier_patch_max_displacement\": "
+            << metrics.OutlierPatchMaxDisplacement << ",\n"
+            << "    \"rich_mixture_component_count\": "
+            << metrics.RichMixtureComponentCount << ",\n"
+            << "    \"compact_mixture_component_count\": "
+            << metrics.CompactMixtureComponentCount << ",\n"
+            << "    \"rich_attraction_contributions\": "
+            << metrics.RichAttractionContributions << ",\n"
+            << "    \"compact_attraction_contributions\": "
+            << metrics.CompactAttractionContributions << ",\n"
+            << "    \"rich_mixture_iterations\": "
+            << metrics.RichMixtureIterations << ",\n"
+            << "    \"sphere_mixture_iterations\": "
+            << metrics.SphereMixtureIterations << ",\n"
+            << "    \"plane_projection_iterations\": "
+            << metrics.PlaneProjectionIterations << ",\n"
+            << "    \"sphere_projection_iterations\": "
+            << metrics.SphereProjectionIterations << ",\n"
+            << "    \"mixtures_converged\": "
+            << (metrics.MixturesConverged ? "true" : "false") << ",\n"
+            << "    \"failure_status\": \""
+            << (metrics.InvalidRequestFailedClosed
+                    ? "invalid_mixture_component_count"
+                    : "unexpected")
+            << "\"\n";
+      });
 }
 
 auto EmitEdgeAwareResamplingReferenceSmoke(const std::string &commit)
@@ -1030,66 +907,53 @@ auto EmitEdgeAwareResamplingReferenceSmoke(const std::string &commit)
   std::ostringstream out;
   out.setf(std::ios::fixed);
   out.precision(9);
-  out << "{\n"
-      << "  \"benchmark_id\": \""
-      << EscapeJson(kEdgeAwareResamplingReferenceSmokeBenchmarkId) << "\",\n"
-      << "  \"method\": \""
-      << EscapeJson(kEdgeAwareResamplingReferenceSmokeMethod) << "\",\n"
-      << "  \"backend\": \"cpu_reference\",\n"
-      << "  \"dataset\": \""
-      << EscapeJson(kEdgeAwareResamplingReferenceSmokeDataset) << "\",\n"
-      << "  \"commit\": \"" << EscapeJson(commit) << "\",\n"
-      << "  \"metrics\": {\n"
-      << "    \"runtime_ms\": " << metrics.RuntimeMilliseconds << ",\n"
-      << "    \"quality_error_l2\": " << metrics.QualityErrorL2 << "\n"
-      << "  },\n"
-      << "  \"diagnostics\": {\n"
-      << "    \"runner\": \"IntrinsicBenchmarkSmoke\",\n"
-      << "    \"mode\": \"correctness_smoke\",\n"
-      << "    \"warmup_iterations\": 1,\n"
-      << "    \"measured_iterations\": 4,\n"
-      << "    \"strategies\": [\"wlop_isotropic\", "
-         "\"wlop_anisotropic\", \"ear\"],\n"
-      << "    \"normal_source\": \"authored\",\n"
-      << "    \"raw_expected_plane_error\": "
-      << metrics.RawExpectedPlaneError << ",\n"
-      << "    \"isotropic_expected_plane_error\": "
-      << metrics.IsotropicExpectedPlaneError << ",\n"
-      << "    \"anisotropic_expected_plane_error\": "
-      << metrics.AnisotropicExpectedPlaneError << ",\n"
-      << "    \"edge_sharpness_preservation\": "
-      << metrics.EdgeSharpnessPreservation << ",\n"
-      << "    \"normal_angular_error_radians\": "
-      << metrics.NormalAngularErrorRadians << ",\n"
-      << "    \"uniformity_min_pairwise_distance\": "
-      << metrics.UniformityMinimumPairwiseDistance << ",\n"
-      << "    \"input_point_count\": " << metrics.InputPointCount << ",\n"
-      << "    \"output_point_count\": " << metrics.OutputPointCount << ",\n"
-      << "    \"inserted_point_count\": " << metrics.InsertedPointCount
-      << ",\n"
-      << "    \"inserted_near_feature_count\": "
-      << metrics.InsertedNearFeatureCount << ",\n"
-      << "    \"edge_priority_evaluations\": "
-      << metrics.EdgePriorityEvaluations << ",\n"
-      << "    \"anisotropic_iterations\": "
-      << metrics.AnisotropicIterations << ",\n"
-      << "    \"normal_refinement_iterations\": "
-      << metrics.NormalRefinementIterations << ",\n"
-      << "    \"used_authored_normals\": "
-      << (metrics.UsedAuthoredNormals ? "true" : "false") << ",\n"
-      << "    \"deterministic\": "
-      << (metrics.Deterministic ? "true" : "false") << ",\n"
-      << "    \"failure_status\": \""
-      << (metrics.NormalsRequiredFailedClosed ? "normals_required"
-                                              : "unexpected")
-      << "\"\n"
-      << "  },\n"
-      << "  \"status\": \"" << (metrics.Succeeded ? "passed" : "failed")
-      << "\"\n"
-      << "}\n";
-
-  return EmittedBenchmark{kEdgeAwareResamplingReferenceSmokeBenchmarkId,
-                          out.str(), metrics.Succeeded};
+  return EmitBenchmarkResult(out, kEdgeAwareResamplingReferenceSmokeBenchmarkId,
+      kEdgeAwareResamplingReferenceSmokeMethod, "cpu_reference",
+      kEdgeAwareResamplingReferenceSmokeDataset, commit, metrics.Succeeded,
+      [&] {
+        out << "    \"runtime_ms\": " << metrics.RuntimeMilliseconds << ",\n"
+            << "    \"quality_error_l2\": " << metrics.QualityErrorL2 << "\n";
+      }, [&] {
+        out << "    \"runner\": \"IntrinsicBenchmarkSmoke\",\n"
+            << "    \"mode\": \"correctness_smoke\",\n"
+            << "    \"warmup_iterations\": 1,\n"
+            << "    \"measured_iterations\": 4,\n"
+            << "    \"strategies\": [\"wlop_isotropic\", "
+               "\"wlop_anisotropic\", \"ear\"],\n"
+            << "    \"normal_source\": \"authored\",\n"
+            << "    \"raw_expected_plane_error\": "
+            << metrics.RawExpectedPlaneError << ",\n"
+            << "    \"isotropic_expected_plane_error\": "
+            << metrics.IsotropicExpectedPlaneError << ",\n"
+            << "    \"anisotropic_expected_plane_error\": "
+            << metrics.AnisotropicExpectedPlaneError << ",\n"
+            << "    \"edge_sharpness_preservation\": "
+            << metrics.EdgeSharpnessPreservation << ",\n"
+            << "    \"normal_angular_error_radians\": "
+            << metrics.NormalAngularErrorRadians << ",\n"
+            << "    \"uniformity_min_pairwise_distance\": "
+            << metrics.UniformityMinimumPairwiseDistance << ",\n"
+            << "    \"input_point_count\": " << metrics.InputPointCount << ",\n"
+            << "    \"output_point_count\": " << metrics.OutputPointCount << ",\n"
+            << "    \"inserted_point_count\": " << metrics.InsertedPointCount
+            << ",\n"
+            << "    \"inserted_near_feature_count\": "
+            << metrics.InsertedNearFeatureCount << ",\n"
+            << "    \"edge_priority_evaluations\": "
+            << metrics.EdgePriorityEvaluations << ",\n"
+            << "    \"anisotropic_iterations\": "
+            << metrics.AnisotropicIterations << ",\n"
+            << "    \"normal_refinement_iterations\": "
+            << metrics.NormalRefinementIterations << ",\n"
+            << "    \"used_authored_normals\": "
+            << (metrics.UsedAuthoredNormals ? "true" : "false") << ",\n"
+            << "    \"deterministic\": "
+            << (metrics.Deterministic ? "true" : "false") << ",\n"
+            << "    \"failure_status\": \""
+            << (metrics.NormalsRequiredFailedClosed ? "normals_required"
+                                                    : "unexpected")
+            << "\"\n";
+      });
 }
 
 auto EmitSurfaceSamplingSmoke(const std::string &commit) -> EmittedBenchmark {
@@ -1100,38 +964,25 @@ auto EmitSurfaceSamplingSmoke(const std::string &commit) -> EmittedBenchmark {
   std::ostringstream out;
   out.setf(std::ios::fixed);
   out.precision(6);
-  out << "{\n"
-      << "  \"benchmark_id\": \""
-      << EscapeJson(kSurfaceSamplingSmokeBenchmarkId) << "\",\n"
-      << "  \"method\": \"" << EscapeJson(kSurfaceSamplingSmokeMethod)
-      << "\",\n"
-      << "  \"backend\": \"cpu_reference\",\n"
-      << "  \"dataset\": \"" << EscapeJson(kSurfaceSamplingSmokeDataset)
-      << "\",\n"
-      << "  \"commit\": \"" << EscapeJson(commit) << "\",\n"
-      << "  \"metrics\": {\n"
-      << "    \"runtime_ms\": " << metrics.RuntimeMilliseconds << ",\n"
-      << "    \"quality_error_l2\": " << metrics.QualityErrorL2 << "\n"
-      << "  },\n"
-      << "  \"diagnostics\": {\n"
-      << "    \"runner\": \"IntrinsicBenchmarkSmoke\",\n"
-      << "    \"mode\": \"smoke\",\n"
-      << "    \"warmup_iterations\": 1,\n"
-      << "    \"measured_iterations\": 8,\n"
-      << "    \"sample_count\": " << metrics.WrittenSampleCount << ",\n"
-      << "    \"accepted_triangle_count\": " << metrics.AcceptedTriangleCount
-      << ",\n"
-      << "    \"small_triangle_fraction\": " << metrics.SmallTriangleFraction
-      << ",\n"
-      << "    \"expected_small_triangle_fraction\": "
-      << metrics.ExpectedSmallTriangleFraction << "\n"
-      << "  },\n"
-      << "  \"status\": \"" << (metrics.Succeeded ? "passed" : "failed")
-      << "\"\n"
-      << "}\n";
-
-  return EmittedBenchmark{kSurfaceSamplingSmokeBenchmarkId, out.str(),
-                          metrics.Succeeded};
+  return EmitBenchmarkResult(out, kSurfaceSamplingSmokeBenchmarkId,
+      kSurfaceSamplingSmokeMethod, "cpu_reference",
+      kSurfaceSamplingSmokeDataset, commit, metrics.Succeeded,
+      [&] {
+        out << "    \"runtime_ms\": " << metrics.RuntimeMilliseconds << ",\n"
+            << "    \"quality_error_l2\": " << metrics.QualityErrorL2 << "\n";
+      }, [&] {
+        out << "    \"runner\": \"IntrinsicBenchmarkSmoke\",\n"
+            << "    \"mode\": \"smoke\",\n"
+            << "    \"warmup_iterations\": 1,\n"
+            << "    \"measured_iterations\": 8,\n"
+            << "    \"sample_count\": " << metrics.WrittenSampleCount << ",\n"
+            << "    \"accepted_triangle_count\": " << metrics.AcceptedTriangleCount
+            << ",\n"
+            << "    \"small_triangle_fraction\": " << metrics.SmallTriangleFraction
+            << ",\n"
+            << "    \"expected_small_triangle_fraction\": "
+            << metrics.ExpectedSmallTriangleFraction << "\n";
+      });
 }
 
 auto EmitSimplificationQualitySmoke(const std::string &commit)
@@ -1143,59 +994,46 @@ auto EmitSimplificationQualitySmoke(const std::string &commit)
   std::ostringstream out;
   out.setf(std::ios::fixed);
   out.precision(9);
-  out << "{\n"
-      << "  \"benchmark_id\": \""
-      << EscapeJson(kSimplificationQualitySmokeBenchmarkId) << "\",\n"
-      << "  \"method\": \""
-      << EscapeJson(kSimplificationQualitySmokeMethod) << "\",\n"
-      << "  \"backend\": \"cpu_reference\",\n"
-      << "  \"dataset\": \""
-      << EscapeJson(kSimplificationQualitySmokeDataset) << "\",\n"
-      << "  \"commit\": \"" << EscapeJson(commit) << "\",\n"
-      << "  \"metrics\": {\n"
-      << "    \"runtime_ms\": " << metrics.RuntimeMilliseconds << ",\n"
-      << "    \"quality_error_l2\": " << metrics.QualityErrorL2 << ",\n"
-      << "    \"quality_error_linf\": " << metrics.QualityErrorLinf
-      << "\n"
-      << "  },\n"
-      << "  \"diagnostics\": {\n"
-      << "    \"runner\": \"IntrinsicBenchmarkSmoke\",\n"
-      << "    \"mode\": \"correctness_smoke\",\n"
-      << "    \"warmup_iterations\": 1,\n"
-      << "    \"measured_iterations\": 2,\n"
-      << "    \"failed_measured_iteration_count\": "
-      << metrics.FailedMeasuredIterationCount << ",\n"
-      << "    \"smoke_runtime_ms_max\": "
-      << kSimplificationQualitySmokeRuntimeMillisecondsMax << ",\n"
-      << "    \"adoption_claim\": false,\n"
-      << "    \"paper_scope\": \"scoped paper-inspired adaptation, not equation-level parity\",\n"
-      << "    \"feature_aware_rms_distance\": "
-      << metrics.FeatureAwareRmsDistance << ",\n"
-      << "    \"classical_rms_distance\": "
-      << metrics.ClassicalRmsDistance << ",\n"
-      << "    \"feature_aware_max_distance\": "
-      << metrics.FeatureAwareMaxDistance << ",\n"
-      << "    \"classical_max_distance\": "
-      << metrics.ClassicalMaxDistance << ",\n"
-      << "    \"sensitivity_control_max_distance\": "
-      << metrics.SensitivityControlMaxDistance << ",\n"
-      << "    \"sample_count\": " << metrics.SampleCount << ",\n"
-      << "    \"target_face_count\": " << metrics.TargetFaceCount << ",\n"
-      << "    \"feature_aware_final_face_count\": "
-      << metrics.FeatureAwareFinalFaceCount << ",\n"
-      << "    \"classical_final_face_count\": "
-      << metrics.ClassicalFinalFaceCount << ",\n"
-      << "    \"feature_aware_pinned_corner_count\": "
-      << metrics.FeatureAwarePinnedCornerCount << ",\n"
-      << "    \"feature_aware_quality_rejection_count\": "
-      << metrics.FeatureAwareQualityRejectionCount << "\n"
-      << "  },\n"
-      << "  \"status\": \"" << (metrics.Succeeded ? "passed" : "failed")
-      << "\"\n"
-      << "}\n";
-
-  return EmittedBenchmark{kSimplificationQualitySmokeBenchmarkId, out.str(),
-                          metrics.Succeeded};
+  return EmitBenchmarkResult(out, kSimplificationQualitySmokeBenchmarkId,
+      kSimplificationQualitySmokeMethod, "cpu_reference",
+      kSimplificationQualitySmokeDataset, commit, metrics.Succeeded,
+      [&] {
+        out << "    \"runtime_ms\": " << metrics.RuntimeMilliseconds << ",\n"
+            << "    \"quality_error_l2\": " << metrics.QualityErrorL2 << ",\n"
+            << "    \"quality_error_linf\": " << metrics.QualityErrorLinf
+            << "\n";
+      }, [&] {
+        out << "    \"runner\": \"IntrinsicBenchmarkSmoke\",\n"
+            << "    \"mode\": \"correctness_smoke\",\n"
+            << "    \"warmup_iterations\": 1,\n"
+            << "    \"measured_iterations\": 2,\n"
+            << "    \"failed_measured_iteration_count\": "
+            << metrics.FailedMeasuredIterationCount << ",\n"
+            << "    \"smoke_runtime_ms_max\": "
+            << kSimplificationQualitySmokeRuntimeMillisecondsMax << ",\n"
+            << "    \"adoption_claim\": false,\n"
+            << "    \"paper_scope\": \"scoped paper-inspired adaptation, not equation-level parity\",\n"
+            << "    \"feature_aware_rms_distance\": "
+            << metrics.FeatureAwareRmsDistance << ",\n"
+            << "    \"classical_rms_distance\": "
+            << metrics.ClassicalRmsDistance << ",\n"
+            << "    \"feature_aware_max_distance\": "
+            << metrics.FeatureAwareMaxDistance << ",\n"
+            << "    \"classical_max_distance\": "
+            << metrics.ClassicalMaxDistance << ",\n"
+            << "    \"sensitivity_control_max_distance\": "
+            << metrics.SensitivityControlMaxDistance << ",\n"
+            << "    \"sample_count\": " << metrics.SampleCount << ",\n"
+            << "    \"target_face_count\": " << metrics.TargetFaceCount << ",\n"
+            << "    \"feature_aware_final_face_count\": "
+            << metrics.FeatureAwareFinalFaceCount << ",\n"
+            << "    \"classical_final_face_count\": "
+            << metrics.ClassicalFinalFaceCount << ",\n"
+            << "    \"feature_aware_pinned_corner_count\": "
+            << metrics.FeatureAwarePinnedCornerCount << ",\n"
+            << "    \"feature_aware_quality_rejection_count\": "
+            << metrics.FeatureAwareQualityRejectionCount << "\n";
+      });
 }
 
 auto EmitBoundaryFirstFlatteningReferenceSmoke(const std::string &commit)
@@ -1207,60 +1045,44 @@ auto EmitBoundaryFirstFlatteningReferenceSmoke(const std::string &commit)
   std::ostringstream out;
   out.setf(std::ios::fixed);
   out.precision(9);
-  out << "{\n"
-      << "  \"benchmark_id\": \""
-      << EscapeJson(kBoundaryFirstFlatteningReferenceSmokeBenchmarkId)
-      << "\",\n"
-      << "  \"method\": \""
-      << EscapeJson(kBoundaryFirstFlatteningReferenceSmokeMethod) << "\",\n"
-      << "  \"backend\": \"cpu_reference\",\n"
-      << "  \"dataset\": \""
-      << EscapeJson(kBoundaryFirstFlatteningReferenceSmokeDataset) << "\",\n"
-      << "  \"commit\": \"" << EscapeJson(commit) << "\",\n"
-      << "  \"metrics\": {\n"
-      << "    \"runtime_ms\": " << metrics.RuntimeMilliseconds << ",\n"
-      << "    \"quality_error_l2\": " << metrics.QualityErrorL2 << "\n"
-      << "  },\n"
-      << "  \"diagnostics\": {\n"
-      << "    \"runner\": \"IntrinsicBenchmarkSmoke\",\n"
-      << "    \"mode\": \"correctness_smoke\",\n"
-      << "    \"warmup_iterations\": "
-      << kBoundaryFirstFlatteningReferenceSmokeWarmupIterations << ",\n"
-      << "    \"measured_iterations\": "
-      << kBoundaryFirstFlatteningReferenceSmokeMeasuredIterations << ",\n"
-      << "    \"failed_measured_iteration_count\": "
-      << metrics.FailedMeasuredIterationCount << ",\n"
-      << "    \"smoke_runtime_ms_max\": "
-      << kBoundaryFirstFlatteningReferenceSmokeRuntimeMillisecondsMax << ",\n"
-      << "    \"quality_error_l2_max\": "
-      << kBoundaryFirstFlatteningReferenceSmokeQualityErrorL2Max << ",\n"
-      << "    \"performance_claim\": false,\n"
-      << "    \"boundary_mode\": \"automatic_conformal\",\n"
-      << "    \"mean_conformal_distortion\": "
-      << metrics.MeanConformalDistortion << ",\n"
-      << "    \"max_conformal_distortion\": "
-      << metrics.MaxConformalDistortion << ",\n"
-      << "    \"closure_adjustment_rms_relative\": "
-      << metrics.ClosureAdjustmentRmsRelative << ",\n"
-      << "    \"closure_adjustment_max_relative\": "
-      << metrics.ClosureAdjustmentMaxRelative << ",\n"
-      << "    \"failure_reason\": \""
-      << EscapeJson(std::string(metrics.FailureReason)) << "\",\n"
-      << "    \"vertex_count\": " << metrics.VertexCount << ",\n"
-      << "    \"face_count\": " << metrics.FaceCount << ",\n"
-      << "    \"evaluated_face_count\": "
-      << metrics.EvaluatedFaceCount << ",\n"
-      << "    \"flipped_element_count\": "
-      << metrics.FlippedElementCount << "\n"
-      << "  },\n"
-      << "  \"status\": \"" << (metrics.Succeeded ? "passed" : "failed")
-      << "\"\n"
-      << "}\n";
-
-  return EmittedBenchmark{
-      kBoundaryFirstFlatteningReferenceSmokeBenchmarkId,
-      out.str(),
-      metrics.Succeeded};
+  return EmitBenchmarkResult(out, kBoundaryFirstFlatteningReferenceSmokeBenchmarkId,
+      kBoundaryFirstFlatteningReferenceSmokeMethod, "cpu_reference",
+      kBoundaryFirstFlatteningReferenceSmokeDataset, commit, metrics.Succeeded,
+      [&] {
+        out << "    \"runtime_ms\": " << metrics.RuntimeMilliseconds << ",\n"
+            << "    \"quality_error_l2\": " << metrics.QualityErrorL2 << "\n";
+      }, [&] {
+        out << "    \"runner\": \"IntrinsicBenchmarkSmoke\",\n"
+            << "    \"mode\": \"correctness_smoke\",\n"
+            << "    \"warmup_iterations\": "
+            << kBoundaryFirstFlatteningReferenceSmokeWarmupIterations << ",\n"
+            << "    \"measured_iterations\": "
+            << kBoundaryFirstFlatteningReferenceSmokeMeasuredIterations << ",\n"
+            << "    \"failed_measured_iteration_count\": "
+            << metrics.FailedMeasuredIterationCount << ",\n"
+            << "    \"smoke_runtime_ms_max\": "
+            << kBoundaryFirstFlatteningReferenceSmokeRuntimeMillisecondsMax << ",\n"
+            << "    \"quality_error_l2_max\": "
+            << kBoundaryFirstFlatteningReferenceSmokeQualityErrorL2Max << ",\n"
+            << "    \"performance_claim\": false,\n"
+            << "    \"boundary_mode\": \"automatic_conformal\",\n"
+            << "    \"mean_conformal_distortion\": "
+            << metrics.MeanConformalDistortion << ",\n"
+            << "    \"max_conformal_distortion\": "
+            << metrics.MaxConformalDistortion << ",\n"
+            << "    \"closure_adjustment_rms_relative\": "
+            << metrics.ClosureAdjustmentRmsRelative << ",\n"
+            << "    \"closure_adjustment_max_relative\": "
+            << metrics.ClosureAdjustmentMaxRelative << ",\n"
+            << "    \"failure_reason\": \""
+            << EscapeJson(std::string(metrics.FailureReason)) << "\",\n"
+            << "    \"vertex_count\": " << metrics.VertexCount << ",\n"
+            << "    \"face_count\": " << metrics.FaceCount << ",\n"
+            << "    \"evaluated_face_count\": "
+            << metrics.EvaluatedFaceCount << ",\n"
+            << "    \"flipped_element_count\": "
+            << metrics.FlippedElementCount << "\n";
+      });
 }
 
 auto EmitQualityMetricsSmoke(const std::string &commit) -> EmittedBenchmark {
@@ -1271,37 +1093,25 @@ auto EmitQualityMetricsSmoke(const std::string &commit) -> EmittedBenchmark {
   std::ostringstream out;
   out.setf(std::ios::fixed);
   out.precision(6);
-  out << "{\n"
-      << "  \"benchmark_id\": \"" << EscapeJson(kQualityMetricsSmokeBenchmarkId)
-      << "\",\n"
-      << "  \"method\": \"" << EscapeJson(kQualityMetricsSmokeMethod) << "\",\n"
-      << "  \"backend\": \"cpu_reference\",\n"
-      << "  \"dataset\": \"" << EscapeJson(kQualityMetricsSmokeDataset)
-      << "\",\n"
-      << "  \"commit\": \"" << EscapeJson(commit) << "\",\n"
-      << "  \"metrics\": {\n"
-      << "    \"runtime_ms\": " << metrics.RuntimeMilliseconds << ",\n"
-      << "    \"quality_error_l2\": " << metrics.QualityErrorL2 << "\n"
-      << "  },\n"
-      << "  \"diagnostics\": {\n"
-      << "    \"runner\": \"IntrinsicBenchmarkSmoke\",\n"
-      << "    \"mode\": \"smoke\",\n"
-      << "    \"warmup_iterations\": 1,\n"
-      << "    \"measured_iterations\": 8,\n"
-      << "    \"point_count\": " << metrics.PointCount << ",\n"
-      << "    \"nearest_neighbor_cv\": " << metrics.NearestNeighborCv << ",\n"
-      << "    \"poisson_ratio\": " << metrics.PoissonRatio << ",\n"
-      << "    \"rdf_mean_away_from_zero\": " << metrics.RdfMeanAwayFromZero
-      << ",\n"
-      << "    \"raps_cv\": " << metrics.RapsCv << ",\n"
-      << "    \"coverage_fraction\": " << metrics.CoverageFraction << "\n"
-      << "  },\n"
-      << "  \"status\": \"" << (metrics.Succeeded ? "passed" : "failed")
-      << "\"\n"
-      << "}\n";
-
-  return EmittedBenchmark{kQualityMetricsSmokeBenchmarkId, out.str(),
-                          metrics.Succeeded};
+  return EmitBenchmarkResult(out, kQualityMetricsSmokeBenchmarkId,
+      kQualityMetricsSmokeMethod, "cpu_reference",
+      kQualityMetricsSmokeDataset, commit, metrics.Succeeded,
+      [&] {
+        out << "    \"runtime_ms\": " << metrics.RuntimeMilliseconds << ",\n"
+            << "    \"quality_error_l2\": " << metrics.QualityErrorL2 << "\n";
+      }, [&] {
+        out << "    \"runner\": \"IntrinsicBenchmarkSmoke\",\n"
+            << "    \"mode\": \"smoke\",\n"
+            << "    \"warmup_iterations\": 1,\n"
+            << "    \"measured_iterations\": 8,\n"
+            << "    \"point_count\": " << metrics.PointCount << ",\n"
+            << "    \"nearest_neighbor_cv\": " << metrics.NearestNeighborCv << ",\n"
+            << "    \"poisson_ratio\": " << metrics.PoissonRatio << ",\n"
+            << "    \"rdf_mean_away_from_zero\": " << metrics.RdfMeanAwayFromZero
+            << ",\n"
+            << "    \"raps_cv\": " << metrics.RapsCv << ",\n"
+            << "    \"coverage_fraction\": " << metrics.CoverageFraction << "\n";
+      });
 }
 
 auto EmitPointCloudFilteringSmoke(const std::string &commit)
@@ -1313,39 +1123,26 @@ auto EmitPointCloudFilteringSmoke(const std::string &commit)
   std::ostringstream out;
   out.setf(std::ios::fixed);
   out.precision(6);
-  out << "{\n"
-      << "  \"benchmark_id\": \""
-      << EscapeJson(kPointCloudFilteringSmokeBenchmarkId) << "\",\n"
-      << "  \"method\": \"" << EscapeJson(kPointCloudFilteringSmokeMethod)
-      << "\",\n"
-      << "  \"backend\": \"cpu_reference\",\n"
-      << "  \"dataset\": \"" << EscapeJson(kPointCloudFilteringSmokeDataset)
-      << "\",\n"
-      << "  \"commit\": \"" << EscapeJson(commit) << "\",\n"
-      << "  \"metrics\": {\n"
-      << "    \"runtime_ms\": " << metrics.RuntimeMilliseconds << ",\n"
-      << "    \"quality_error_l2\": " << metrics.QualityErrorL2 << "\n"
-      << "  },\n"
-      << "  \"diagnostics\": {\n"
-      << "    \"runner\": \"IntrinsicBenchmarkSmoke\",\n"
-      << "    \"mode\": \"smoke\",\n"
-      << "    \"warmup_iterations\": 1,\n"
-      << "    \"measured_iterations\": 8,\n"
-      << "    \"input_count\": " << metrics.InputCount << ",\n"
-      << "    \"injected_outliers\": " << metrics.InjectedOutliers << ",\n"
-      << "    \"voxel_reduced_count\": " << metrics.VoxelReducedCount << ",\n"
-      << "    \"statistical_kept\": " << metrics.StatisticalKept << ",\n"
-      << "    \"statistical_rejected\": " << metrics.StatisticalRejected
-      << ",\n"
-      << "    \"radius_kept\": " << metrics.RadiusKept << ",\n"
-      << "    \"radius_rejected\": " << metrics.RadiusRejected << "\n"
-      << "  },\n"
-      << "  \"status\": \"" << (metrics.Succeeded ? "passed" : "failed")
-      << "\"\n"
-      << "}\n";
-
-  return EmittedBenchmark{kPointCloudFilteringSmokeBenchmarkId, out.str(),
-                          metrics.Succeeded};
+  return EmitBenchmarkResult(out, kPointCloudFilteringSmokeBenchmarkId,
+      kPointCloudFilteringSmokeMethod, "cpu_reference",
+      kPointCloudFilteringSmokeDataset, commit, metrics.Succeeded,
+      [&] {
+        out << "    \"runtime_ms\": " << metrics.RuntimeMilliseconds << ",\n"
+            << "    \"quality_error_l2\": " << metrics.QualityErrorL2 << "\n";
+      }, [&] {
+        out << "    \"runner\": \"IntrinsicBenchmarkSmoke\",\n"
+            << "    \"mode\": \"smoke\",\n"
+            << "    \"warmup_iterations\": 1,\n"
+            << "    \"measured_iterations\": 8,\n"
+            << "    \"input_count\": " << metrics.InputCount << ",\n"
+            << "    \"injected_outliers\": " << metrics.InjectedOutliers << ",\n"
+            << "    \"voxel_reduced_count\": " << metrics.VoxelReducedCount << ",\n"
+            << "    \"statistical_kept\": " << metrics.StatisticalKept << ",\n"
+            << "    \"statistical_rejected\": " << metrics.StatisticalRejected
+            << ",\n"
+            << "    \"radius_kept\": " << metrics.RadiusKept << ",\n"
+            << "    \"radius_rejected\": " << metrics.RadiusRejected << "\n";
+      });
 }
 
 auto EmitRigidBodyReferenceSmoke(const std::string &commit)
@@ -1357,36 +1154,23 @@ auto EmitRigidBodyReferenceSmoke(const std::string &commit)
   std::ostringstream out;
   out.setf(std::ios::fixed);
   out.precision(6);
-  out << "{\n"
-      << "  \"benchmark_id\": \""
-      << EscapeJson(kRigidBodyReferenceSmokeBenchmarkId) << "\",\n"
-      << "  \"method\": \"" << EscapeJson(kRigidBodyReferenceSmokeMethod)
-      << "\",\n"
-      << "  \"backend\": \"cpu_reference\",\n"
-      << "  \"dataset\": \"" << EscapeJson(kRigidBodyReferenceSmokeDataset)
-      << "\",\n"
-      << "  \"commit\": \"" << EscapeJson(commit) << "\",\n"
-      << "  \"metrics\": {\n"
-      << "    \"runtime_ms\": " << metrics.RuntimeMilliseconds << ",\n"
-      << "    \"quality_error_l2\": " << metrics.QualityErrorL2 << "\n"
-      << "  },\n"
-      << "  \"diagnostics\": {\n"
-      << "    \"runner\": \"IntrinsicBenchmarkSmoke\",\n"
-      << "    \"mode\": \"smoke\",\n"
-      << "    \"warmup_iterations\": 1,\n"
-      << "    \"measured_iterations\": 8,\n"
-      << "    \"contact_count\": " << metrics.ContactCount << ",\n"
-      << "    \"unsupported_pair_count\": " << metrics.UnsupportedPairCount
-      << ",\n"
-      << "    \"final_velocity_a\": " << metrics.FinalVelocityA << ",\n"
-      << "    \"final_velocity_b\": " << metrics.FinalVelocityB << "\n"
-      << "  },\n"
-      << "  \"status\": \"" << (metrics.Succeeded ? "passed" : "failed")
-      << "\"\n"
-      << "}\n";
-
-  return EmittedBenchmark{kRigidBodyReferenceSmokeBenchmarkId, out.str(),
-                          metrics.Succeeded};
+  return EmitBenchmarkResult(out, kRigidBodyReferenceSmokeBenchmarkId,
+      kRigidBodyReferenceSmokeMethod, "cpu_reference",
+      kRigidBodyReferenceSmokeDataset, commit, metrics.Succeeded,
+      [&] {
+        out << "    \"runtime_ms\": " << metrics.RuntimeMilliseconds << ",\n"
+            << "    \"quality_error_l2\": " << metrics.QualityErrorL2 << "\n";
+      }, [&] {
+        out << "    \"runner\": \"IntrinsicBenchmarkSmoke\",\n"
+            << "    \"mode\": \"smoke\",\n"
+            << "    \"warmup_iterations\": 1,\n"
+            << "    \"measured_iterations\": 8,\n"
+            << "    \"contact_count\": " << metrics.ContactCount << ",\n"
+            << "    \"unsupported_pair_count\": " << metrics.UnsupportedPairCount
+            << ",\n"
+            << "    \"final_velocity_a\": " << metrics.FinalVelocityA << ",\n"
+            << "    \"final_velocity_b\": " << metrics.FinalVelocityB << "\n";
+      });
 }
 
 auto EmitParticleSpringReferenceSmoke(const std::string &commit)
@@ -1398,37 +1182,24 @@ auto EmitParticleSpringReferenceSmoke(const std::string &commit)
   std::ostringstream out;
   out.setf(std::ios::fixed);
   out.precision(6);
-  out << "{\n"
-      << "  \"benchmark_id\": \""
-      << EscapeJson(kParticleSpringReferenceSmokeBenchmarkId) << "\",\n"
-      << "  \"method\": \"" << EscapeJson(kParticleSpringReferenceSmokeMethod)
-      << "\",\n"
-      << "  \"backend\": \"cpu_reference\",\n"
-      << "  \"dataset\": \"" << EscapeJson(kParticleSpringReferenceSmokeDataset)
-      << "\",\n"
-      << "  \"commit\": \"" << EscapeJson(commit) << "\",\n"
-      << "  \"metrics\": {\n"
-      << "    \"runtime_ms\": " << metrics.RuntimeMilliseconds << ",\n"
-      << "    \"quality_error_l2\": " << metrics.QualityErrorL2 << "\n"
-      << "  },\n"
-      << "  \"diagnostics\": {\n"
-      << "    \"runner\": \"IntrinsicBenchmarkSmoke\",\n"
-      << "    \"mode\": \"smoke\",\n"
-      << "    \"warmup_iterations\": 1,\n"
-      << "    \"measured_iterations\": 8,\n"
-      << "    \"degenerate_spring_count\": " << metrics.DegenerateSpringCount
-      << ",\n"
-      << "    \"max_spring_residual\": " << metrics.MaxSpringResidual << ",\n"
-      << "    \"energy_drift\": " << metrics.EnergyDrift << ",\n"
-      << "    \"max_stiffness_dt_ratio\": " << metrics.MaxStiffnessDtRatio
-      << "\n"
-      << "  },\n"
-      << "  \"status\": \"" << (metrics.Succeeded ? "passed" : "failed")
-      << "\"\n"
-      << "}\n";
-
-  return EmittedBenchmark{kParticleSpringReferenceSmokeBenchmarkId, out.str(),
-                          metrics.Succeeded};
+  return EmitBenchmarkResult(out, kParticleSpringReferenceSmokeBenchmarkId,
+      kParticleSpringReferenceSmokeMethod, "cpu_reference",
+      kParticleSpringReferenceSmokeDataset, commit, metrics.Succeeded,
+      [&] {
+        out << "    \"runtime_ms\": " << metrics.RuntimeMilliseconds << ",\n"
+            << "    \"quality_error_l2\": " << metrics.QualityErrorL2 << "\n";
+      }, [&] {
+        out << "    \"runner\": \"IntrinsicBenchmarkSmoke\",\n"
+            << "    \"mode\": \"smoke\",\n"
+            << "    \"warmup_iterations\": 1,\n"
+            << "    \"measured_iterations\": 8,\n"
+            << "    \"degenerate_spring_count\": " << metrics.DegenerateSpringCount
+            << ",\n"
+            << "    \"max_spring_residual\": " << metrics.MaxSpringResidual << ",\n"
+            << "    \"energy_drift\": " << metrics.EnergyDrift << ",\n"
+            << "    \"max_stiffness_dt_ratio\": " << metrics.MaxStiffnessDtRatio
+            << "\n";
+      });
 }
 
 auto EmitXpbdClothReferenceSmoke(const std::string &commit)
@@ -1440,37 +1211,24 @@ auto EmitXpbdClothReferenceSmoke(const std::string &commit)
   std::ostringstream out;
   out.setf(std::ios::fixed);
   out.precision(6);
-  out << "{\n"
-      << "  \"benchmark_id\": \""
-      << EscapeJson(kXpbdClothReferenceSmokeBenchmarkId) << "\",\n"
-      << "  \"method\": \"" << EscapeJson(kXpbdClothReferenceSmokeMethod)
-      << "\",\n"
-      << "  \"backend\": \"cpu_reference\",\n"
-      << "  \"dataset\": \"" << EscapeJson(kXpbdClothReferenceSmokeDataset)
-      << "\",\n"
-      << "  \"commit\": \"" << EscapeJson(commit) << "\",\n"
-      << "  \"metrics\": {\n"
-      << "    \"runtime_ms\": " << metrics.RuntimeMilliseconds << ",\n"
-      << "    \"quality_error_l2\": " << metrics.QualityErrorL2 << "\n"
-      << "  },\n"
-      << "  \"diagnostics\": {\n"
-      << "    \"runner\": \"IntrinsicBenchmarkSmoke\",\n"
-      << "    \"mode\": \"smoke\",\n"
-      << "    \"warmup_iterations\": 1,\n"
-      << "    \"measured_iterations\": 8,\n"
-      << "    \"max_bend_residual\": " << metrics.MaxBendResidual << ",\n"
-      << "    \"degenerate_triangle_count\": "
-      << metrics.DegenerateTriangleCount << ",\n"
-      << "    \"degenerate_constraint_count\": "
-      << metrics.DegenerateConstraintCount << ",\n"
-      << "    \"converged\": " << (metrics.Converged ? "true" : "false") << "\n"
-      << "  },\n"
-      << "  \"status\": \"" << (metrics.Succeeded ? "passed" : "failed")
-      << "\"\n"
-      << "}\n";
-
-  return EmittedBenchmark{kXpbdClothReferenceSmokeBenchmarkId, out.str(),
-                          metrics.Succeeded};
+  return EmitBenchmarkResult(out, kXpbdClothReferenceSmokeBenchmarkId,
+      kXpbdClothReferenceSmokeMethod, "cpu_reference",
+      kXpbdClothReferenceSmokeDataset, commit, metrics.Succeeded,
+      [&] {
+        out << "    \"runtime_ms\": " << metrics.RuntimeMilliseconds << ",\n"
+            << "    \"quality_error_l2\": " << metrics.QualityErrorL2 << "\n";
+      }, [&] {
+        out << "    \"runner\": \"IntrinsicBenchmarkSmoke\",\n"
+            << "    \"mode\": \"smoke\",\n"
+            << "    \"warmup_iterations\": 1,\n"
+            << "    \"measured_iterations\": 8,\n"
+            << "    \"max_bend_residual\": " << metrics.MaxBendResidual << ",\n"
+            << "    \"degenerate_triangle_count\": "
+            << metrics.DegenerateTriangleCount << ",\n"
+            << "    \"degenerate_constraint_count\": "
+            << metrics.DegenerateConstraintCount << ",\n"
+            << "    \"converged\": " << (metrics.Converged ? "true" : "false") << "\n";
+      });
 }
 
 auto EmitSphFluidReferenceSmoke(const std::string &commit) -> EmittedBenchmark {
@@ -1481,39 +1239,26 @@ auto EmitSphFluidReferenceSmoke(const std::string &commit) -> EmittedBenchmark {
   std::ostringstream out;
   out.setf(std::ios::fixed);
   out.precision(6);
-  out << "{\n"
-      << "  \"benchmark_id\": \""
-      << EscapeJson(kSphFluidReferenceSmokeBenchmarkId) << "\",\n"
-      << "  \"method\": \"" << EscapeJson(kSphFluidReferenceSmokeMethod)
-      << "\",\n"
-      << "  \"backend\": \"cpu_reference\",\n"
-      << "  \"dataset\": \"" << EscapeJson(kSphFluidReferenceSmokeDataset)
-      << "\",\n"
-      << "  \"commit\": \"" << EscapeJson(commit) << "\",\n"
-      << "  \"metrics\": {\n"
-      << "    \"runtime_ms\": " << metrics.RuntimeMilliseconds << ",\n"
-      << "    \"quality_error_l2\": " << metrics.QualityErrorL2 << "\n"
-      << "  },\n"
-      << "  \"diagnostics\": {\n"
-      << "    \"runner\": \"IntrinsicBenchmarkSmoke\",\n"
-      << "    \"mode\": \"smoke\",\n"
-      << "    \"warmup_iterations\": 1,\n"
-      << "    \"measured_iterations\": 4,\n"
-      << "    \"column_max_compression\": " << metrics.ColumnMaxCompression
-      << ",\n"
-      << "    \"column_avg_density_error\": "
-      << metrics.ColumnAverageDensityError << ",\n"
-      << "    \"column_max_neighbor_count\": " << metrics.ColumnMaxNeighborCount
-      << ",\n"
-      << "    \"column_stable\": " << (metrics.ColumnStable ? "true" : "false")
-      << "\n"
-      << "  },\n"
-      << "  \"status\": \"" << (metrics.Succeeded ? "passed" : "failed")
-      << "\"\n"
-      << "}\n";
-
-  return EmittedBenchmark{kSphFluidReferenceSmokeBenchmarkId, out.str(),
-                          metrics.Succeeded};
+  return EmitBenchmarkResult(out, kSphFluidReferenceSmokeBenchmarkId,
+      kSphFluidReferenceSmokeMethod, "cpu_reference",
+      kSphFluidReferenceSmokeDataset, commit, metrics.Succeeded,
+      [&] {
+        out << "    \"runtime_ms\": " << metrics.RuntimeMilliseconds << ",\n"
+            << "    \"quality_error_l2\": " << metrics.QualityErrorL2 << "\n";
+      }, [&] {
+        out << "    \"runner\": \"IntrinsicBenchmarkSmoke\",\n"
+            << "    \"mode\": \"smoke\",\n"
+            << "    \"warmup_iterations\": 1,\n"
+            << "    \"measured_iterations\": 4,\n"
+            << "    \"column_max_compression\": " << metrics.ColumnMaxCompression
+            << ",\n"
+            << "    \"column_avg_density_error\": "
+            << metrics.ColumnAverageDensityError << ",\n"
+            << "    \"column_max_neighbor_count\": " << metrics.ColumnMaxNeighborCount
+            << ",\n"
+            << "    \"column_stable\": " << (metrics.ColumnStable ? "true" : "false")
+            << "\n";
+      });
 }
 
 auto EmitVertexFetchLayoutSmoke(const std::string &commit) -> EmittedBenchmark {
@@ -1524,43 +1269,30 @@ auto EmitVertexFetchLayoutSmoke(const std::string &commit) -> EmittedBenchmark {
   std::ostringstream out;
   out.setf(std::ios::fixed);
   out.precision(6);
-  out << "{\n"
-      << "  \"benchmark_id\": \""
-      << EscapeJson(kVertexFetchLayoutSmokeBenchmarkId) << "\",\n"
-      << "  \"method\": \"" << EscapeJson(kVertexFetchLayoutSmokeMethod)
-      << "\",\n"
-      << "  \"backend\": \"cpu_reference\",\n"
-      << "  \"dataset\": \"" << EscapeJson(kVertexFetchLayoutSmokeDataset)
-      << "\",\n"
-      << "  \"commit\": \"" << EscapeJson(commit) << "\",\n"
-      << "  \"metrics\": {\n"
-      << "    \"runtime_ms\": " << metrics.RuntimeMilliseconds << ",\n"
-      << "    \"throughput_items_per_sec\": "
-      << metrics.ThroughputItemsPerSecond << ",\n"
-      << "    \"quality_error_l2\": " << metrics.QualityErrorL2 << "\n"
-      << "  },\n"
-      << "  \"diagnostics\": {\n"
-      << "    \"runner\": \"IntrinsicBenchmarkSmoke\",\n"
-      << "    \"mode\": \"smoke\",\n"
-      << "    \"warmup_iterations\": 1,\n"
-      << "    \"measured_iterations\": 6,\n"
-      << "    \"baseline_layout\": \"uniform_soa\",\n"
-      << "    \"probe_layout\": \"interleaved_aos\",\n"
-      << "    \"adoption_claim\": false,\n"
-      << "    \"soa_runtime_ms\": " << metrics.SoaRuntimeMilliseconds << ",\n"
-      << "    \"interleaved_runtime_ms\": "
-      << metrics.InterleavedRuntimeMilliseconds << ",\n"
-      << "    \"interleaved_to_soa_runtime_ratio\": "
-      << metrics.InterleavedToSoaRuntimeRatio << ",\n"
-      << "    \"vertex_count\": " << metrics.VertexCount << ",\n"
-      << "    \"index_count\": " << metrics.IndexCount << "\n"
-      << "  },\n"
-      << "  \"status\": \"" << (metrics.Succeeded ? "passed" : "failed")
-      << "\"\n"
-      << "}\n";
-
-  return EmittedBenchmark{kVertexFetchLayoutSmokeBenchmarkId, out.str(),
-                          metrics.Succeeded};
+  return EmitBenchmarkResult(out, kVertexFetchLayoutSmokeBenchmarkId,
+      kVertexFetchLayoutSmokeMethod, "cpu_reference",
+      kVertexFetchLayoutSmokeDataset, commit, metrics.Succeeded,
+      [&] {
+        out << "    \"runtime_ms\": " << metrics.RuntimeMilliseconds << ",\n"
+            << "    \"throughput_items_per_sec\": "
+            << metrics.ThroughputItemsPerSecond << ",\n"
+            << "    \"quality_error_l2\": " << metrics.QualityErrorL2 << "\n";
+      }, [&] {
+        out << "    \"runner\": \"IntrinsicBenchmarkSmoke\",\n"
+            << "    \"mode\": \"smoke\",\n"
+            << "    \"warmup_iterations\": 1,\n"
+            << "    \"measured_iterations\": 6,\n"
+            << "    \"baseline_layout\": \"uniform_soa\",\n"
+            << "    \"probe_layout\": \"interleaved_aos\",\n"
+            << "    \"adoption_claim\": false,\n"
+            << "    \"soa_runtime_ms\": " << metrics.SoaRuntimeMilliseconds << ",\n"
+            << "    \"interleaved_runtime_ms\": "
+            << metrics.InterleavedRuntimeMilliseconds << ",\n"
+            << "    \"interleaved_to_soa_runtime_ratio\": "
+            << metrics.InterleavedToSoaRuntimeRatio << ",\n"
+            << "    \"vertex_count\": " << metrics.VertexCount << ",\n"
+            << "    \"index_count\": " << metrics.IndexCount << "\n";
+      });
 }
 
 auto EmitFramegraphBarrierEmissionSmoke(const std::string &commit)
@@ -1572,46 +1304,33 @@ auto EmitFramegraphBarrierEmissionSmoke(const std::string &commit)
   std::ostringstream out;
   out.setf(std::ios::fixed);
   out.precision(6);
-  out << "{\n"
-      << "  \"benchmark_id\": \""
-      << EscapeJson(kFramegraphBarrierEmissionSmokeBenchmarkId) << "\",\n"
-      << "  \"method\": \""
-      << EscapeJson(kFramegraphBarrierEmissionSmokeMethod) << "\",\n"
-      << "  \"backend\": \"cpu_reference\",\n"
-      << "  \"dataset\": \""
-      << EscapeJson(kFramegraphBarrierEmissionSmokeDataset) << "\",\n"
-      << "  \"commit\": \"" << EscapeJson(commit) << "\",\n"
-      << "  \"metrics\": {\n"
-      << "    \"runtime_ms\": " << metrics.RuntimeMilliseconds << ",\n"
-      << "    \"quality_error_l2\": " << metrics.QualityErrorL2 << "\n"
-      << "  },\n"
-      << "  \"diagnostics\": {\n"
-      << "    \"runner\": \"IntrinsicBenchmarkSmoke\",\n"
-      << "    \"mode\": \"smoke\",\n"
-      << "    \"warmup_iterations\": " << metrics.WarmupIterations << ",\n"
-      << "    \"measured_iterations\": " << metrics.MeasuredIterations << ",\n"
-      << "    \"baseline_mode\": \"legacy_full_scan\",\n"
-      << "    \"probe_mode\": \"indexed_range_lookup\",\n"
-      << "    \"adoption_claim\": false,\n"
-      << "    \"legacy_full_scan_ms\": " << metrics.LegacyFullScanMilliseconds << ",\n"
-      << "    \"indexed_range_ms\": " << metrics.IndexedRangeMilliseconds << ",\n"
-      << "    \"pass_count\": " << metrics.PassCount << ",\n"
-      << "    \"barrier_packet_count\": " << metrics.BarrierPacketCount << ",\n"
-      << "    \"legacy_packet_comparisons\": "
-      << metrics.LegacyPacketComparisons << ",\n"
-      << "    \"indexed_range_packet_visits\": "
-      << metrics.IndexedRangePacketVisits << ",\n"
-      << "    \"texture_barrier_visits\": "
-      << metrics.TextureBarrierVisits << ",\n"
-      << "    \"buffer_barrier_visits\": "
-      << metrics.BufferBarrierVisits << "\n"
-      << "  },\n"
-      << "  \"status\": \"" << (metrics.Succeeded ? "passed" : "failed")
-      << "\"\n"
-      << "}\n";
-
-  return EmittedBenchmark{kFramegraphBarrierEmissionSmokeBenchmarkId, out.str(),
-                          metrics.Succeeded};
+  return EmitBenchmarkResult(out, kFramegraphBarrierEmissionSmokeBenchmarkId,
+      kFramegraphBarrierEmissionSmokeMethod, "cpu_reference",
+      kFramegraphBarrierEmissionSmokeDataset, commit, metrics.Succeeded,
+      [&] {
+        out << "    \"runtime_ms\": " << metrics.RuntimeMilliseconds << ",\n"
+            << "    \"quality_error_l2\": " << metrics.QualityErrorL2 << "\n";
+      }, [&] {
+        out << "    \"runner\": \"IntrinsicBenchmarkSmoke\",\n"
+            << "    \"mode\": \"smoke\",\n"
+            << "    \"warmup_iterations\": " << metrics.WarmupIterations << ",\n"
+            << "    \"measured_iterations\": " << metrics.MeasuredIterations << ",\n"
+            << "    \"baseline_mode\": \"legacy_full_scan\",\n"
+            << "    \"probe_mode\": \"indexed_range_lookup\",\n"
+            << "    \"adoption_claim\": false,\n"
+            << "    \"legacy_full_scan_ms\": " << metrics.LegacyFullScanMilliseconds << ",\n"
+            << "    \"indexed_range_ms\": " << metrics.IndexedRangeMilliseconds << ",\n"
+            << "    \"pass_count\": " << metrics.PassCount << ",\n"
+            << "    \"barrier_packet_count\": " << metrics.BarrierPacketCount << ",\n"
+            << "    \"legacy_packet_comparisons\": "
+            << metrics.LegacyPacketComparisons << ",\n"
+            << "    \"indexed_range_packet_visits\": "
+            << metrics.IndexedRangePacketVisits << ",\n"
+            << "    \"texture_barrier_visits\": "
+            << metrics.TextureBarrierVisits << ",\n"
+            << "    \"buffer_barrier_visits\": "
+            << metrics.BufferBarrierVisits << "\n";
+      });
 }
 
 auto EmitFramegraphCompilerIndexingSmoke(const std::string &commit)
@@ -1623,47 +1342,34 @@ auto EmitFramegraphCompilerIndexingSmoke(const std::string &commit)
   std::ostringstream out;
   out.setf(std::ios::fixed);
   out.precision(6);
-  out << "{\n"
-      << "  \"benchmark_id\": \""
-      << EscapeJson(kFramegraphCompilerIndexingSmokeBenchmarkId) << "\",\n"
-      << "  \"method\": \""
-      << EscapeJson(kFramegraphCompilerIndexingSmokeMethod) << "\",\n"
-      << "  \"backend\": \"cpu_reference\",\n"
-      << "  \"dataset\": \""
-      << EscapeJson(kFramegraphCompilerIndexingSmokeDataset) << "\",\n"
-      << "  \"commit\": \"" << EscapeJson(commit) << "\",\n"
-      << "  \"metrics\": {\n"
-      << "    \"runtime_ms\": " << metrics.RuntimeMilliseconds << ",\n"
-      << "    \"quality_error_l2\": " << metrics.QualityErrorL2 << "\n"
-      << "  },\n"
-      << "  \"diagnostics\": {\n"
-      << "    \"runner\": \"IntrinsicBenchmarkSmoke\",\n"
-      << "    \"mode\": \"smoke\",\n"
-      << "    \"warmup_iterations\": " << metrics.WarmupIterations << ",\n"
-      << "    \"measured_iterations\": " << metrics.MeasuredIterations << ",\n"
-      << "    \"baseline_mode\": \"legacy_nested_scan_and_linear_packet_insert\",\n"
-      << "    \"probe_mode\": \"sorted_pass_ids_and_indexed_packet_insert\",\n"
-      << "    \"adoption_claim\": false,\n"
-      << "    \"legacy_scan_ms\": " << metrics.LegacyScanMilliseconds << ",\n"
-      << "    \"indexed_ms\": " << metrics.IndexedMilliseconds << ",\n"
-      << "    \"pass_count\": " << metrics.PassCount << ",\n"
-      << "    \"request_count\": " << metrics.RequestCount << ",\n"
-      << "    \"barrier_packet_count\": " << metrics.BarrierPacketCount << ",\n"
-      << "    \"legacy_pass_id_comparisons\": "
-      << metrics.LegacyPassIdComparisons << ",\n"
-      << "    \"indexed_pass_id_comparisons\": "
-      << metrics.IndexedPassIdComparisons << ",\n"
-      << "    \"legacy_packet_comparisons\": "
-      << metrics.LegacyPacketComparisons << ",\n"
-      << "    \"indexed_packet_lookups\": " << metrics.IndexedPacketLookups
-      << "\n"
-      << "  },\n"
-      << "  \"status\": \"" << (metrics.Succeeded ? "passed" : "failed")
-      << "\"\n"
-      << "}\n";
-
-  return EmittedBenchmark{kFramegraphCompilerIndexingSmokeBenchmarkId,
-                          out.str(), metrics.Succeeded};
+  return EmitBenchmarkResult(out, kFramegraphCompilerIndexingSmokeBenchmarkId,
+      kFramegraphCompilerIndexingSmokeMethod, "cpu_reference",
+      kFramegraphCompilerIndexingSmokeDataset, commit, metrics.Succeeded,
+      [&] {
+        out << "    \"runtime_ms\": " << metrics.RuntimeMilliseconds << ",\n"
+            << "    \"quality_error_l2\": " << metrics.QualityErrorL2 << "\n";
+      }, [&] {
+        out << "    \"runner\": \"IntrinsicBenchmarkSmoke\",\n"
+            << "    \"mode\": \"smoke\",\n"
+            << "    \"warmup_iterations\": " << metrics.WarmupIterations << ",\n"
+            << "    \"measured_iterations\": " << metrics.MeasuredIterations << ",\n"
+            << "    \"baseline_mode\": \"legacy_nested_scan_and_linear_packet_insert\",\n"
+            << "    \"probe_mode\": \"sorted_pass_ids_and_indexed_packet_insert\",\n"
+            << "    \"adoption_claim\": false,\n"
+            << "    \"legacy_scan_ms\": " << metrics.LegacyScanMilliseconds << ",\n"
+            << "    \"indexed_ms\": " << metrics.IndexedMilliseconds << ",\n"
+            << "    \"pass_count\": " << metrics.PassCount << ",\n"
+            << "    \"request_count\": " << metrics.RequestCount << ",\n"
+            << "    \"barrier_packet_count\": " << metrics.BarrierPacketCount << ",\n"
+            << "    \"legacy_pass_id_comparisons\": "
+            << metrics.LegacyPassIdComparisons << ",\n"
+            << "    \"indexed_pass_id_comparisons\": "
+            << metrics.IndexedPassIdComparisons << ",\n"
+            << "    \"legacy_packet_comparisons\": "
+            << metrics.LegacyPacketComparisons << ",\n"
+            << "    \"indexed_packet_lookups\": " << metrics.IndexedPacketLookups
+            << "\n";
+      });
 }
 
 auto EmitFramegraphScratchReuseSmoke(const std::string &commit)
@@ -1675,58 +1381,45 @@ auto EmitFramegraphScratchReuseSmoke(const std::string &commit)
   std::ostringstream out;
   out.setf(std::ios::fixed);
   out.precision(6);
-  out << "{\n"
-      << "  \"benchmark_id\": \""
-      << EscapeJson(kFramegraphScratchReuseSmokeBenchmarkId) << "\",\n"
-      << "  \"method\": \""
-      << EscapeJson(kFramegraphScratchReuseSmokeMethod) << "\",\n"
-      << "  \"backend\": \"cpu_reference\",\n"
-      << "  \"dataset\": \""
-      << EscapeJson(kFramegraphScratchReuseSmokeDataset) << "\",\n"
-      << "  \"commit\": \"" << EscapeJson(commit) << "\",\n"
-      << "  \"metrics\": {\n"
-      << "    \"runtime_ms\": " << metrics.RuntimeMilliseconds << ",\n"
-      << "    \"quality_error_l2\": " << metrics.QualityErrorL2 << "\n"
-      << "  },\n"
-      << "  \"diagnostics\": {\n"
-      << "    \"runner\": \"IntrinsicBenchmarkSmoke\",\n"
-      << "    \"mode\": \"smoke\",\n"
-      << "    \"warmup_iterations\": " << metrics.WarmupIterations << ",\n"
-      << "    \"measured_iterations\": " << metrics.MeasuredIterations << ",\n"
-      << "    \"baseline_mode\": \"fresh_graph_rebuild\",\n"
-      << "    \"probe_mode\": \"reset_redeclare_reuse\",\n"
-      << "    \"adoption_claim\": false,\n"
-      << "    \"fresh_declare_compile_ms\": "
-      << metrics.FreshDeclareCompileMilliseconds << ",\n"
-      << "    \"reused_declare_compile_ms\": "
-      << metrics.ReusedDeclareCompileMilliseconds << ",\n"
-      << "    \"pass_count\": " << metrics.PassCount << ",\n"
-      << "    \"resource_count\": " << metrics.ResourceCount << ",\n"
-      << "    \"barrier_packet_count\": " << metrics.BarrierPacketCount
-      << ",\n"
-      << "    \"fresh_declare_allocations\": "
-      << metrics.FreshDeclareAllocations << ",\n"
-      << "    \"reused_declare_allocations\": "
-      << metrics.ReusedDeclareAllocations << ",\n"
-      << "    \"fresh_declare_bytes\": " << metrics.FreshDeclareBytes
-      << ",\n"
-      << "    \"reused_declare_bytes\": " << metrics.ReusedDeclareBytes
-      << ",\n"
-      << "    \"fresh_declare_compile_allocations\": "
-      << metrics.FreshDeclareCompileAllocations << ",\n"
-      << "    \"reused_declare_compile_allocations\": "
-      << metrics.ReusedDeclareCompileAllocations << ",\n"
-      << "    \"fresh_declare_compile_bytes\": "
-      << metrics.FreshDeclareCompileBytes << ",\n"
-      << "    \"reused_declare_compile_bytes\": "
-      << metrics.ReusedDeclareCompileBytes << "\n"
-      << "  },\n"
-      << "  \"status\": \"" << (metrics.Succeeded ? "passed" : "failed")
-      << "\"\n"
-      << "}\n";
-
-  return EmittedBenchmark{kFramegraphScratchReuseSmokeBenchmarkId, out.str(),
-                          metrics.Succeeded};
+  return EmitBenchmarkResult(out, kFramegraphScratchReuseSmokeBenchmarkId,
+      kFramegraphScratchReuseSmokeMethod, "cpu_reference",
+      kFramegraphScratchReuseSmokeDataset, commit, metrics.Succeeded,
+      [&] {
+        out << "    \"runtime_ms\": " << metrics.RuntimeMilliseconds << ",\n"
+            << "    \"quality_error_l2\": " << metrics.QualityErrorL2 << "\n";
+      }, [&] {
+        out << "    \"runner\": \"IntrinsicBenchmarkSmoke\",\n"
+            << "    \"mode\": \"smoke\",\n"
+            << "    \"warmup_iterations\": " << metrics.WarmupIterations << ",\n"
+            << "    \"measured_iterations\": " << metrics.MeasuredIterations << ",\n"
+            << "    \"baseline_mode\": \"fresh_graph_rebuild\",\n"
+            << "    \"probe_mode\": \"reset_redeclare_reuse\",\n"
+            << "    \"adoption_claim\": false,\n"
+            << "    \"fresh_declare_compile_ms\": "
+            << metrics.FreshDeclareCompileMilliseconds << ",\n"
+            << "    \"reused_declare_compile_ms\": "
+            << metrics.ReusedDeclareCompileMilliseconds << ",\n"
+            << "    \"pass_count\": " << metrics.PassCount << ",\n"
+            << "    \"resource_count\": " << metrics.ResourceCount << ",\n"
+            << "    \"barrier_packet_count\": " << metrics.BarrierPacketCount
+            << ",\n"
+            << "    \"fresh_declare_allocations\": "
+            << metrics.FreshDeclareAllocations << ",\n"
+            << "    \"reused_declare_allocations\": "
+            << metrics.ReusedDeclareAllocations << ",\n"
+            << "    \"fresh_declare_bytes\": " << metrics.FreshDeclareBytes
+            << ",\n"
+            << "    \"reused_declare_bytes\": " << metrics.ReusedDeclareBytes
+            << ",\n"
+            << "    \"fresh_declare_compile_allocations\": "
+            << metrics.FreshDeclareCompileAllocations << ",\n"
+            << "    \"reused_declare_compile_allocations\": "
+            << metrics.ReusedDeclareCompileAllocations << ",\n"
+            << "    \"fresh_declare_compile_bytes\": "
+            << metrics.FreshDeclareCompileBytes << ",\n"
+            << "    \"reused_declare_compile_bytes\": "
+            << metrics.ReusedDeclareCompileBytes << "\n";
+      });
 }
 
 auto EmitFrameRecipeCompileCacheSmoke(const std::string &commit)
@@ -1738,49 +1431,36 @@ auto EmitFrameRecipeCompileCacheSmoke(const std::string &commit)
   std::ostringstream out;
   out.setf(std::ios::fixed);
   out.precision(6);
-  out << "{\n"
-      << "  \"benchmark_id\": \""
-      << EscapeJson(kFrameRecipeCompileCacheSmokeBenchmarkId) << "\",\n"
-      << "  \"method\": \""
-      << EscapeJson(kFrameRecipeCompileCacheSmokeMethod) << "\",\n"
-      << "  \"backend\": \"cpu_reference\",\n"
-      << "  \"dataset\": \""
-      << EscapeJson(kFrameRecipeCompileCacheSmokeDataset) << "\",\n"
-      << "  \"commit\": \"" << EscapeJson(commit) << "\",\n"
-      << "  \"metrics\": {\n"
-      << "    \"runtime_ms\": " << metrics.RuntimeMilliseconds << ",\n"
-      << "    \"quality_error_l2\": " << metrics.QualityErrorL2 << "\n"
-      << "  },\n"
-      << "  \"diagnostics\": {\n"
-      << "    \"runner\": \"IntrinsicBenchmarkSmoke\",\n"
-      << "    \"mode\": \"smoke\",\n"
-      << "    \"warmup_iterations\": " << metrics.WarmupIterations << ",\n"
-      << "    \"measured_iterations\": " << metrics.MeasuredIterations << ",\n"
-      << "    \"baseline_mode\": \"rebuild_each_frame\",\n"
-      << "    \"probe_mode\": \"cached_steady_state\",\n"
-      << "    \"adoption_claim\": false,\n"
-      << "    \"baseline_rebuild_declare_compile_ms\": "
-      << metrics.BaselineRebuildDeclareCompileMilliseconds << ",\n"
-      << "    \"cached_steady_state_declare_compile_ms\": "
-      << metrics.CachedSteadyStateDeclareCompileMilliseconds << ",\n"
-      << "    \"avoided_declare_compile_ms\": "
-      << metrics.AvoidedDeclareCompileMilliseconds << ",\n"
-      << "    \"baseline_compile_attempts_per_frame\": "
-      << metrics.BaselineCompileAttemptsPerFrame << ",\n"
-      << "    \"cached_compile_attempts_per_frame\": "
-      << metrics.CachedCompileAttemptsPerFrame << ",\n"
-      << "    \"pass_count\": " << metrics.PassCount << ",\n"
-      << "    \"resource_count\": " << metrics.ResourceCount << ",\n"
-      << "    \"barrier_count\": " << metrics.BarrierCount << ",\n"
-      << "    \"validation_error_count\": "
-      << metrics.ValidationErrorCount << "\n"
-      << "  },\n"
-      << "  \"status\": \"" << (metrics.Succeeded ? "passed" : "failed")
-      << "\"\n"
-      << "}\n";
-
-  return EmittedBenchmark{kFrameRecipeCompileCacheSmokeBenchmarkId, out.str(),
-                          metrics.Succeeded};
+  return EmitBenchmarkResult(out, kFrameRecipeCompileCacheSmokeBenchmarkId,
+      kFrameRecipeCompileCacheSmokeMethod, "cpu_reference",
+      kFrameRecipeCompileCacheSmokeDataset, commit, metrics.Succeeded,
+      [&] {
+        out << "    \"runtime_ms\": " << metrics.RuntimeMilliseconds << ",\n"
+            << "    \"quality_error_l2\": " << metrics.QualityErrorL2 << "\n";
+      }, [&] {
+        out << "    \"runner\": \"IntrinsicBenchmarkSmoke\",\n"
+            << "    \"mode\": \"smoke\",\n"
+            << "    \"warmup_iterations\": " << metrics.WarmupIterations << ",\n"
+            << "    \"measured_iterations\": " << metrics.MeasuredIterations << ",\n"
+            << "    \"baseline_mode\": \"rebuild_each_frame\",\n"
+            << "    \"probe_mode\": \"cached_steady_state\",\n"
+            << "    \"adoption_claim\": false,\n"
+            << "    \"baseline_rebuild_declare_compile_ms\": "
+            << metrics.BaselineRebuildDeclareCompileMilliseconds << ",\n"
+            << "    \"cached_steady_state_declare_compile_ms\": "
+            << metrics.CachedSteadyStateDeclareCompileMilliseconds << ",\n"
+            << "    \"avoided_declare_compile_ms\": "
+            << metrics.AvoidedDeclareCompileMilliseconds << ",\n"
+            << "    \"baseline_compile_attempts_per_frame\": "
+            << metrics.BaselineCompileAttemptsPerFrame << ",\n"
+            << "    \"cached_compile_attempts_per_frame\": "
+            << metrics.CachedCompileAttemptsPerFrame << ",\n"
+            << "    \"pass_count\": " << metrics.PassCount << ",\n"
+            << "    \"resource_count\": " << metrics.ResourceCount << ",\n"
+            << "    \"barrier_count\": " << metrics.BarrierCount << ",\n"
+            << "    \"validation_error_count\": "
+            << metrics.ValidationErrorCount << "\n";
+      });
 }
 
 auto EmitRenderGraphParallelRecordingSmoke(const std::string &commit)
@@ -1792,55 +1472,42 @@ auto EmitRenderGraphParallelRecordingSmoke(const std::string &commit)
   std::ostringstream out;
   out.setf(std::ios::fixed);
   out.precision(6);
-  out << "{\n"
-      << "  \"benchmark_id\": \""
-      << EscapeJson(kRenderGraphParallelRecordingSmokeBenchmarkId) << "\",\n"
-      << "  \"method\": \""
-      << EscapeJson(kRenderGraphParallelRecordingSmokeMethod) << "\",\n"
-      << "  \"backend\": \"cpu_reference\",\n"
-      << "  \"dataset\": \""
-      << EscapeJson(kRenderGraphParallelRecordingSmokeDataset) << "\",\n"
-      << "  \"commit\": \"" << EscapeJson(commit) << "\",\n"
-      << "  \"metrics\": {\n"
-      << "    \"runtime_ms\": " << metrics.RuntimeMilliseconds << ",\n"
-      << "    \"quality_error_l2\": " << metrics.QualityErrorL2 << "\n"
-      << "  },\n"
-      << "  \"diagnostics\": {\n"
-      << "    \"runner\": \"IntrinsicBenchmarkSmoke\",\n"
-      << "    \"mode\": \"smoke\",\n"
-      << "    \"warmup_iterations\": " << metrics.WarmupIterations << ",\n"
-      << "    \"measured_iterations\": " << metrics.MeasuredIterations << ",\n"
-      << "    \"baseline_mode\": \"serial_execute_recording\",\n"
-      << "    \"probe_mode\": \"scheduler_parallel_record_join\",\n"
-      << "    \"adoption_claim\": false,\n"
-      << "    \"serial_record_ms\": " << metrics.SerialRecordMilliseconds
-      << ",\n"
-      << "    \"parallel_record_ms\": "
-      << metrics.ParallelRecordMilliseconds << ",\n"
-      << "    \"parallel_to_serial_runtime_ratio\": "
-      << metrics.ParallelToSerialRuntimeRatio << ",\n"
-      << "    \"pass_count\": " << metrics.PassCount << ",\n"
-      << "    \"scheduler_worker_count\": " << metrics.SchedulerWorkerCount
-      << ",\n"
-      << "    \"record_ops_per_pass\": " << metrics.RecordOpsPerPass
-      << ",\n"
-      << "    \"parallel_layer_count\": " << metrics.ParallelLayerCount
-      << ",\n"
-      << "    \"parallel_max_layer_width\": "
-      << metrics.ParallelMaxLayerWidth << ",\n"
-      << "    \"parallel_worker_task_count\": "
-      << metrics.ParallelWorkerTaskCount << ",\n"
-      << "    \"parallel_caller_record_count\": "
-      << metrics.ParallelCallerRecordCount << ",\n"
-      << "    \"serial_checksum\": " << metrics.SerialChecksum << ",\n"
-      << "    \"parallel_checksum\": " << metrics.ParallelChecksum << "\n"
-      << "  },\n"
-      << "  \"status\": \"" << (metrics.Succeeded ? "passed" : "failed")
-      << "\"\n"
-      << "}\n";
-
-  return EmittedBenchmark{kRenderGraphParallelRecordingSmokeBenchmarkId,
-                          out.str(), metrics.Succeeded};
+  return EmitBenchmarkResult(out, kRenderGraphParallelRecordingSmokeBenchmarkId,
+      kRenderGraphParallelRecordingSmokeMethod, "cpu_reference",
+      kRenderGraphParallelRecordingSmokeDataset, commit, metrics.Succeeded,
+      [&] {
+        out << "    \"runtime_ms\": " << metrics.RuntimeMilliseconds << ",\n"
+            << "    \"quality_error_l2\": " << metrics.QualityErrorL2 << "\n";
+      }, [&] {
+        out << "    \"runner\": \"IntrinsicBenchmarkSmoke\",\n"
+            << "    \"mode\": \"smoke\",\n"
+            << "    \"warmup_iterations\": " << metrics.WarmupIterations << ",\n"
+            << "    \"measured_iterations\": " << metrics.MeasuredIterations << ",\n"
+            << "    \"baseline_mode\": \"serial_execute_recording\",\n"
+            << "    \"probe_mode\": \"scheduler_parallel_record_join\",\n"
+            << "    \"adoption_claim\": false,\n"
+            << "    \"serial_record_ms\": " << metrics.SerialRecordMilliseconds
+            << ",\n"
+            << "    \"parallel_record_ms\": "
+            << metrics.ParallelRecordMilliseconds << ",\n"
+            << "    \"parallel_to_serial_runtime_ratio\": "
+            << metrics.ParallelToSerialRuntimeRatio << ",\n"
+            << "    \"pass_count\": " << metrics.PassCount << ",\n"
+            << "    \"scheduler_worker_count\": " << metrics.SchedulerWorkerCount
+            << ",\n"
+            << "    \"record_ops_per_pass\": " << metrics.RecordOpsPerPass
+            << ",\n"
+            << "    \"parallel_layer_count\": " << metrics.ParallelLayerCount
+            << ",\n"
+            << "    \"parallel_max_layer_width\": "
+            << metrics.ParallelMaxLayerWidth << ",\n"
+            << "    \"parallel_worker_task_count\": "
+            << metrics.ParallelWorkerTaskCount << ",\n"
+            << "    \"parallel_caller_record_count\": "
+            << metrics.ParallelCallerRecordCount << ",\n"
+            << "    \"serial_checksum\": " << metrics.SerialChecksum << ",\n"
+            << "    \"parallel_checksum\": " << metrics.ParallelChecksum << "\n";
+      });
 }
 
 auto EmitSchedulerHardeningSmoke(const std::string &commit)
@@ -1852,74 +1519,61 @@ auto EmitSchedulerHardeningSmoke(const std::string &commit)
   std::ostringstream out;
   out.setf(std::ios::fixed);
   out.precision(6);
-  out << "{\n"
-      << "  \"benchmark_id\": \""
-      << EscapeJson(kSchedulerHardeningSmokeBenchmarkId) << "\",\n"
-      << "  \"method\": \""
-      << EscapeJson(kSchedulerHardeningSmokeMethod) << "\",\n"
-      << "  \"backend\": \"cpu_optimized\",\n"
-      << "  \"dataset\": \""
-      << EscapeJson(kSchedulerHardeningSmokeDataset) << "\",\n"
-      << "  \"commit\": \"" << EscapeJson(commit) << "\",\n"
-      << "  \"metrics\": {\n"
-      << "    \"runtime_ms\": " << metrics.RuntimeMilliseconds << ",\n"
-      << "    \"throughput_items_per_sec\": "
-      << metrics.ThroughputItemsPerSecond << ",\n"
-      << "    \"quality_error_l2\": " << metrics.QualityErrorL2 << "\n"
-      << "  },\n"
-      << "  \"diagnostics\": {\n"
-      << "    \"runner\": \"IntrinsicBenchmarkSmoke\",\n"
-      << "    \"mode\": \"smoke\",\n"
-      << "    \"warmup_iterations\": " << metrics.WarmupIterations << ",\n"
-      << "    \"measured_iterations\": " << metrics.MeasuredIterations
-      << ",\n"
-      << "    \"timing_statistic\": \"median\",\n"
-      << "    \"dispatch_worker_request\": "
-      << metrics.DispatchWorkerRequest << ",\n"
-      << "    \"dispatch_worker_count\": " << metrics.DispatchWorkerCount
-      << ",\n"
-      << "    \"dispatch_task_count\": " << metrics.DispatchTaskCount
-      << ",\n"
-      << "    \"dispatch_succeeded\": "
-      << (metrics.DispatchSucceeded ? "true" : "false") << ",\n"
-      << "    \"priority_low_task_count\": "
-      << metrics.PriorityLowTaskCount << ",\n"
-      << "    \"priority_high_task_count\": "
-      << metrics.PriorityHighTaskCount << ",\n"
-      << "    \"priority_low_before_first_high\": "
-      << metrics.PriorityLowBeforeFirstHigh << ",\n"
-      << "    \"priority_low_in_high_window\": "
-      << metrics.PriorityLowInHighWindow << ",\n"
-      << "    \"priority_probe_runtime_ms\": "
-      << metrics.PriorityProbeRuntimeMilliseconds << ",\n"
-      << "    \"priority_contract_satisfied\": "
-      << (metrics.PriorityContractSatisfied ? "true" : "false") << ",\n"
-      << "    \"wait_registry_thread_count\": "
-      << metrics.WaitRegistryThreadCount << ",\n"
-      << "    \"wait_registry_operations_per_thread\": "
-      << metrics.WaitRegistryOperationsPerThread << ",\n"
-      << "    \"wait_registry_single_thread_median_ms\": "
-      << metrics.WaitRegistrySingleThreadMedianMilliseconds << ",\n"
-      << "    \"wait_registry_contended_median_ms\": "
-      << metrics.WaitRegistryContendedMedianMilliseconds << ",\n"
-      << "    \"wait_registry_single_thread_throughput_items_per_sec\": "
-      << metrics.WaitRegistrySingleThreadThroughputItemsPerSecond << ",\n"
-      << "    \"wait_registry_contended_throughput_items_per_sec\": "
-      << metrics.WaitRegistryContendedThroughputItemsPerSecond << ",\n"
-      << "    \"wait_registry_contended_scaling_efficiency\": "
-      << metrics.WaitRegistryContendedScalingEfficiency << ",\n"
-      << "    \"wait_registry_succeeded\": "
-      << (metrics.WaitRegistrySucceeded ? "true" : "false") << ",\n"
-      << "    \"worker_wake_notification_telemetry_available\": false,\n"
-      << "    \"worker_wake_evidence\": "
-         "\"candidate_stats_and_contract_tests\"\n"
-      << "  },\n"
-      << "  \"status\": \"" << (metrics.Succeeded ? "passed" : "failed")
-      << "\"\n"
-      << "}\n";
-
-  return EmittedBenchmark{kSchedulerHardeningSmokeBenchmarkId, out.str(),
-                          metrics.Succeeded};
+  return EmitBenchmarkResult(out, kSchedulerHardeningSmokeBenchmarkId,
+      kSchedulerHardeningSmokeMethod, "cpu_optimized",
+      kSchedulerHardeningSmokeDataset, commit, metrics.Succeeded,
+      [&] {
+        out << "    \"runtime_ms\": " << metrics.RuntimeMilliseconds << ",\n"
+            << "    \"throughput_items_per_sec\": "
+            << metrics.ThroughputItemsPerSecond << ",\n"
+            << "    \"quality_error_l2\": " << metrics.QualityErrorL2 << "\n";
+      }, [&] {
+        out << "    \"runner\": \"IntrinsicBenchmarkSmoke\",\n"
+            << "    \"mode\": \"smoke\",\n"
+            << "    \"warmup_iterations\": " << metrics.WarmupIterations << ",\n"
+            << "    \"measured_iterations\": " << metrics.MeasuredIterations
+            << ",\n"
+            << "    \"timing_statistic\": \"median\",\n"
+            << "    \"dispatch_worker_request\": "
+            << metrics.DispatchWorkerRequest << ",\n"
+            << "    \"dispatch_worker_count\": " << metrics.DispatchWorkerCount
+            << ",\n"
+            << "    \"dispatch_task_count\": " << metrics.DispatchTaskCount
+            << ",\n"
+            << "    \"dispatch_succeeded\": "
+            << (metrics.DispatchSucceeded ? "true" : "false") << ",\n"
+            << "    \"priority_low_task_count\": "
+            << metrics.PriorityLowTaskCount << ",\n"
+            << "    \"priority_high_task_count\": "
+            << metrics.PriorityHighTaskCount << ",\n"
+            << "    \"priority_low_before_first_high\": "
+            << metrics.PriorityLowBeforeFirstHigh << ",\n"
+            << "    \"priority_low_in_high_window\": "
+            << metrics.PriorityLowInHighWindow << ",\n"
+            << "    \"priority_probe_runtime_ms\": "
+            << metrics.PriorityProbeRuntimeMilliseconds << ",\n"
+            << "    \"priority_contract_satisfied\": "
+            << (metrics.PriorityContractSatisfied ? "true" : "false") << ",\n"
+            << "    \"wait_registry_thread_count\": "
+            << metrics.WaitRegistryThreadCount << ",\n"
+            << "    \"wait_registry_operations_per_thread\": "
+            << metrics.WaitRegistryOperationsPerThread << ",\n"
+            << "    \"wait_registry_single_thread_median_ms\": "
+            << metrics.WaitRegistrySingleThreadMedianMilliseconds << ",\n"
+            << "    \"wait_registry_contended_median_ms\": "
+            << metrics.WaitRegistryContendedMedianMilliseconds << ",\n"
+            << "    \"wait_registry_single_thread_throughput_items_per_sec\": "
+            << metrics.WaitRegistrySingleThreadThroughputItemsPerSecond << ",\n"
+            << "    \"wait_registry_contended_throughput_items_per_sec\": "
+            << metrics.WaitRegistryContendedThroughputItemsPerSecond << ",\n"
+            << "    \"wait_registry_contended_scaling_efficiency\": "
+            << metrics.WaitRegistryContendedScalingEfficiency << ",\n"
+            << "    \"wait_registry_succeeded\": "
+            << (metrics.WaitRegistrySucceeded ? "true" : "false") << ",\n"
+            << "    \"worker_wake_notification_telemetry_available\": false,\n"
+            << "    \"worker_wake_evidence\": "
+               "\"candidate_stats_and_contract_tests\"\n";
+      });
 }
 
 auto EmitTaskGraphPlanReuseSmoke(
@@ -1932,51 +1586,40 @@ auto EmitTaskGraphPlanReuseSmoke(
   std::ostringstream out;
   out.setf(std::ios::fixed);
   out.precision(6);
-  out << "{\n"
-      << "  \"benchmark_id\": \"" << EscapeJson(benchmarkId) << "\",\n"
-      << "  \"method\": \"" << EscapeJson(kTaskGraphPlanReuseSmokeMethod)
-      << "\",\n"
-      << "  \"backend\": \"cpu_optimized\",\n"
-      << "  \"dataset\": \"" << EscapeJson(dataset) << "\",\n"
-      << "  \"commit\": \"" << EscapeJson(commit) << "\",\n"
-      << "  \"metrics\": {\n"
-      << "    \"runtime_ms\": " << metrics.RuntimeMilliseconds << ",\n"
-      << "    \"throughput_items_per_sec\": "
-      << metrics.ThroughputItemsPerSecond << ",\n"
-      << "    \"quality_error_l2\": " << metrics.QualityErrorL2 << "\n"
-      << "  },\n"
-      << "  \"diagnostics\": {\n"
-      << "    \"runner\": \"IntrinsicBenchmarkSmoke\",\n"
-      << "    \"mode\": \"smoke\",\n"
-      << "    \"timed_scope\": \"registration_compile_reset_for_replay\",\n"
-      << "    \"throughput_item\": \"graph_epoch\",\n"
-      << "    \"timing_statistic\": \"median_per_epoch_runtime_ms\",\n"
-      << "    \"warmup_batches\": " << metrics.WarmupBatches << ",\n"
-      << "    \"measured_batches\": " << metrics.MeasuredBatches << ",\n"
-      << "    \"epochs_per_batch\": " << metrics.EpochsPerBatch << ",\n"
-      << "    \"runtime_samples_ms_per_epoch\": ";
-  EmitDoubleSamples(out, metrics.RuntimeSamplesMilliseconds);
-  out << ",\n"
-      << "    \"pass_count\": " << metrics.PassCount << ",\n"
-      << "    \"resource_count\": " << metrics.PassCount << ",\n"
-      << "    \"edge_count\": " << metrics.EdgeCount << ",\n"
-      << "    \"layer_count\": " << metrics.LayerCount << ",\n"
-      << "    \"compile_call_count\": " << metrics.CompileCallCount << ",\n"
-      << "    \"plan_build_count\": " << metrics.PlanBuildCount << ",\n"
-      << "    \"plan_reuse_count\": " << metrics.PlanReuseCount << ",\n"
-      << "    \"last_compile_reused_plan\": "
-      << (metrics.LastCompileReusedPlan ? "true" : "false") << ",\n"
-      << "    \"plan_order_checksum\": " << metrics.PlanChecksum << ",\n"
-      << "    \"callback_rebind_checksum\": " << metrics.CallbackChecksum
-      << ",\n"
-      << "    \"failure_count\": " << metrics.FailureCount << "\n"
-      << "  },\n"
-      << "  \"status\": \"" << (metrics.Succeeded ? "passed" : "failed")
-      << "\"\n"
-      << "}\n";
-
-  return EmittedBenchmark{std::string(benchmarkId), out.str(),
-                          metrics.Succeeded};
+  return EmitBenchmarkResult(out, benchmarkId,
+      kTaskGraphPlanReuseSmokeMethod, "cpu_optimized",
+      dataset, commit, metrics.Succeeded,
+      [&] {
+        out << "    \"runtime_ms\": " << metrics.RuntimeMilliseconds << ",\n"
+            << "    \"throughput_items_per_sec\": "
+            << metrics.ThroughputItemsPerSecond << ",\n"
+            << "    \"quality_error_l2\": " << metrics.QualityErrorL2 << "\n";
+      }, [&] {
+        out << "    \"runner\": \"IntrinsicBenchmarkSmoke\",\n"
+            << "    \"mode\": \"smoke\",\n"
+            << "    \"timed_scope\": \"registration_compile_reset_for_replay\",\n"
+            << "    \"throughput_item\": \"graph_epoch\",\n"
+            << "    \"timing_statistic\": \"median_per_epoch_runtime_ms\",\n"
+            << "    \"warmup_batches\": " << metrics.WarmupBatches << ",\n"
+            << "    \"measured_batches\": " << metrics.MeasuredBatches << ",\n"
+            << "    \"epochs_per_batch\": " << metrics.EpochsPerBatch << ",\n"
+            << "    \"runtime_samples_ms_per_epoch\": ";
+        EmitDoubleSamples(out, metrics.RuntimeSamplesMilliseconds);
+        out << ",\n"
+            << "    \"pass_count\": " << metrics.PassCount << ",\n"
+            << "    \"resource_count\": " << metrics.PassCount << ",\n"
+            << "    \"edge_count\": " << metrics.EdgeCount << ",\n"
+            << "    \"layer_count\": " << metrics.LayerCount << ",\n"
+            << "    \"compile_call_count\": " << metrics.CompileCallCount << ",\n"
+            << "    \"plan_build_count\": " << metrics.PlanBuildCount << ",\n"
+            << "    \"plan_reuse_count\": " << metrics.PlanReuseCount << ",\n"
+            << "    \"last_compile_reused_plan\": "
+            << (metrics.LastCompileReusedPlan ? "true" : "false") << ",\n"
+            << "    \"plan_order_checksum\": " << metrics.PlanChecksum << ",\n"
+            << "    \"callback_rebind_checksum\": " << metrics.CallbackChecksum
+            << ",\n"
+            << "    \"failure_count\": " << metrics.FailureCount << "\n";
+      });
 }
 
 auto WriteFile(const std::filesystem::path &path, std::string_view payload)

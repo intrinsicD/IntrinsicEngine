@@ -306,6 +306,14 @@ namespace Extrinsic::Runtime
 
         struct State
         {
+            struct CapturedBinding
+            {
+                WorldHandle World{};
+                ECS::Scene::Registry* Registry{nullptr};
+                std::uint64_t BindingEpoch{0u};
+                std::uint64_t ModuleGeneration{0u};
+            };
+
             WorldRegistry* Worlds{nullptr};
             JobService* Jobs{nullptr};
             EditorCommandHistory History{};
@@ -380,20 +388,26 @@ namespace Extrinsic::Runtime
                        BoundRegistry != nullptr;
             }
 
-            [[nodiscard]] bool MatchesCapturedBinding(
-                const std::uint64_t moduleGeneration,
-                const std::uint64_t bindingEpoch,
-                const WorldHandle world,
-                const ECS::Scene::Registry* const registry)
+            [[nodiscard]] CapturedBinding CaptureBinding() const noexcept
+            {
+                return CapturedBinding{
+                    .World = BoundWorld,
+                    .Registry = BoundRegistry,
+                    .BindingEpoch = BindingEpoch,
+                    .ModuleGeneration = ModuleGeneration,
+                };
+            }
+
+            [[nodiscard]] bool MatchesCapturedBinding(const CapturedBinding& binding)
             {
                 if (!ValidateBinding())
                     return false;
-                return ModuleGeneration == moduleGeneration &&
-                       BindingEpoch == bindingEpoch &&
-                       BoundWorld == world &&
-                       BoundRegistry == registry &&
-                       Worlds->ActiveWorld() == world &&
-                       Worlds->Get(world) == registry;
+                return ModuleGeneration == binding.ModuleGeneration &&
+                       BindingEpoch == binding.BindingEpoch &&
+                       BoundWorld == binding.World &&
+                       BoundRegistry == binding.Registry &&
+                       Worlds->ActiveWorld() == binding.World &&
+                       Worlds->Get(binding.World) == binding.Registry;
             }
 
             // `JobService`'s fail-closed revalidation seam for a queued
@@ -404,19 +418,12 @@ namespace Extrinsic::Runtime
             [[nodiscard]] static JobApplyValidation
             ValidateCapturedBinding(
                 const std::weak_ptr<State>& weakState,
-                const std::uint64_t moduleGeneration,
-                const std::uint64_t bindingEpoch,
-                const WorldHandle world,
-                const ECS::Scene::Registry* const registry)
+                const CapturedBinding& binding)
             {
                 const auto locked = weakState.lock();
                 if (!locked)
                     return JobApplyValidation::MissingTarget;
-                return locked->MatchesCapturedBinding(
-                           moduleGeneration,
-                           bindingEpoch,
-                           world,
-                           registry)
+                return locked->MatchesCapturedBinding(binding)
                     ? JobApplyValidation::Current
                     : JobApplyValidation::StaleGeneration;
             }
@@ -425,6 +432,51 @@ namespace Extrinsic::Runtime
                 const JobToken task)
             {
                 std::erase(OwnedTasks, task);
+            }
+
+            template <typename QueuedOperation>
+            static void FinalizeUnpublishedSceneFile(
+                const std::weak_ptr<State>& weakState,
+                const CapturedBinding& binding,
+                const QueuedOperation& operation,
+                const RuntimeSceneFileOperation kind)
+            {
+                const auto locked = weakState.lock();
+                if (!locked)
+                    return;
+                locked->ForgetOwnedTask(operation.Task);
+                if (!locked->MatchesCapturedBinding(binding))
+                    return;
+                locked->RecordSceneFileEvent(RuntimeSceneFileEvent{
+                    .Operation = kind,
+                    .Task = operation.Task,
+                    .Path = operation.Path,
+                    .Error = Core::ErrorCode::InvalidState,
+                });
+            }
+
+            template <typename QueuedOperation>
+            [[nodiscard]] Core::Expected<RuntimeQueuedSceneFileOperation>
+            RecordQueuedSceneFile(
+                const JobToken handle,
+                QueuedOperation& operation,
+                const RuntimeSceneFileOperation kind)
+            {
+                if (!handle.IsValid())
+                {
+                    return Core::Err<RuntimeQueuedSceneFileOperation>(
+                        Core::ErrorCode::InvalidState);
+                }
+                operation.Task = handle;
+                OwnedTasks.push_back(handle);
+                Core::Log::Info(
+                    "[Runtime] Queued scene {}: path='{}'",
+                    kind == RuntimeSceneFileOperation::Save ? "save" : "load",
+                    operation.Path);
+                return RuntimeQueuedSceneFileOperation{
+                    .Task = handle,
+                    .Operation = kind,
+                };
             }
 
             void RecordSceneFileEvent(
@@ -819,18 +871,12 @@ namespace Extrinsic::Runtime
                 Core::ErrorCode::InvalidPath);
         }
 
-        const WorldHandle world = state->BoundWorld;
-        ECS::Scene::Registry* const registry =
-            state->BoundRegistry;
-        const std::uint64_t bindingEpoch =
-            state->BindingEpoch;
-        const std::uint64_t moduleGeneration =
-            state->ModuleGeneration;
+        const auto binding = state->CaptureBinding();
         auto operation =
             std::make_shared<QueuedSceneSaveState>();
         operation->Path = std::move(path);
         SnapshotSerializableScene(
-            *registry, operation->Snapshot);
+            *binding.Registry, operation->Snapshot);
 
         const std::weak_ptr<Impl::State> weakState = state;
         const JobToken handle =
@@ -838,7 +884,7 @@ namespace Extrinsic::Runtime
                 JobDesc{
                     .DebugName = "Runtime.SceneSave." +
                         FileNameFromPath(operation->Path),
-                    .Scope = world,
+                    .Scope = binding.World,
                     .Priority =
                         Core::Dag::TaskPriority::Normal,
                     .Kind = RuntimeTaskKinds::AssetDecode,
@@ -870,19 +916,9 @@ namespace Extrinsic::Runtime
                                 });
                         },
                     .ValidateBeforeApply =
-                        [weakState,
-                         world,
-                         registry,
-                         bindingEpoch,
-                         moduleGeneration]
+                        [weakState, binding]
                         {
-                            return Impl::State::
-                                ValidateCapturedBinding(
-                                    weakState,
-                                    moduleGeneration,
-                                    bindingEpoch,
-                                    world,
-                                    registry);
+                            return Impl::State::ValidateCapturedBinding(weakState, binding);
                         },
                     .PublishCompletion =
                         [weakState, operation](
@@ -937,53 +973,16 @@ namespace Extrinsic::Runtime
                             return true;
                         },
                     .FinalizeUnpublishedOnMainThread =
-                        [weakState,
-                         operation,
-                         world,
-                         registry,
-                         bindingEpoch,
-                         moduleGeneration]
+                        [weakState, operation, binding]
                         {
-                            const auto locked =
-                                weakState.lock();
-                            if (!locked)
-                                return;
-                            locked->ForgetOwnedTask(
-                                operation->Task);
-                            const bool bindingMatches =
-                                locked->MatchesCapturedBinding(
-                                    moduleGeneration,
-                                    bindingEpoch,
-                                    world,
-                                    registry);
-                            if (!bindingMatches)
-                                return;
-                            locked->RecordSceneFileEvent(
-                                RuntimeSceneFileEvent{
-                                    .Operation =
-                                        RuntimeSceneFileOperation::Save,
-                                    .Task = operation->Task,
-                                    .Path = operation->Path,
-                                    .Error =
-                                        Core::ErrorCode::InvalidState,
-                                });
+                            Impl::State::FinalizeUnpublishedSceneFile(
+                                weakState, binding, *operation,
+                                RuntimeSceneFileOperation::Save);
                         },
                 });
 
-        if (!handle.IsValid())
-        {
-            return Core::Err<RuntimeQueuedSceneFileOperation>(
-                Core::ErrorCode::InvalidState);
-        }
-        operation->Task = handle;
-        state->OwnedTasks.push_back(handle);
-        Core::Log::Info(
-            "[Runtime] Queued scene save: path='{}'",
-            operation->Path);
-        return RuntimeQueuedSceneFileOperation{
-            .Task = handle,
-            .Operation = RuntimeSceneFileOperation::Save,
-        };
+        return state->RecordQueuedSceneFile(
+            handle, *operation, RuntimeSceneFileOperation::Save);
     }
 
     Core::Expected<SceneDeserializationResult>
@@ -1044,13 +1043,7 @@ namespace Extrinsic::Runtime
                 Core::ErrorCode::InvalidPath);
         }
 
-        const WorldHandle world = state->BoundWorld;
-        ECS::Scene::Registry* const registry =
-            state->BoundRegistry;
-        const std::uint64_t bindingEpoch =
-            state->BindingEpoch;
-        const std::uint64_t moduleGeneration =
-            state->ModuleGeneration;
+        const auto binding = state->CaptureBinding();
         auto operation =
             std::make_shared<QueuedSceneLoadState>();
         operation->Path = std::move(path);
@@ -1061,7 +1054,7 @@ namespace Extrinsic::Runtime
                 JobDesc{
                     .DebugName = "Runtime.SceneLoad." +
                         FileNameFromPath(operation->Path),
-                    .Scope = world,
+                    .Scope = binding.World,
                     .Priority =
                         Core::Dag::TaskPriority::Normal,
                     .Kind = RuntimeTaskKinds::AssetDecode,
@@ -1093,19 +1086,9 @@ namespace Extrinsic::Runtime
                                 });
                         },
                     .ValidateBeforeApply =
-                        [weakState,
-                         world,
-                         registry,
-                         bindingEpoch,
-                         moduleGeneration]
+                        [weakState, binding]
                         {
-                            return Impl::State::
-                                ValidateCapturedBinding(
-                                    weakState,
-                                    moduleGeneration,
-                                    bindingEpoch,
-                                    world,
-                                    registry);
+                            return Impl::State::ValidateCapturedBinding(weakState, binding);
                         },
                     .PublishCompletion =
                         [weakState, operation](
@@ -1167,53 +1150,16 @@ namespace Extrinsic::Runtime
                             return true;
                         },
                     .FinalizeUnpublishedOnMainThread =
-                        [weakState,
-                         operation,
-                         world,
-                         registry,
-                         bindingEpoch,
-                         moduleGeneration]
+                        [weakState, operation, binding]
                         {
-                            const auto locked =
-                                weakState.lock();
-                            if (!locked)
-                                return;
-                            locked->ForgetOwnedTask(
-                                operation->Task);
-                            const bool bindingMatches =
-                                locked->MatchesCapturedBinding(
-                                    moduleGeneration,
-                                    bindingEpoch,
-                                    world,
-                                    registry);
-                            if (!bindingMatches)
-                                return;
-                            locked->RecordSceneFileEvent(
-                                RuntimeSceneFileEvent{
-                                    .Operation =
-                                        RuntimeSceneFileOperation::Load,
-                                    .Task = operation->Task,
-                                    .Path = operation->Path,
-                                    .Error =
-                                        Core::ErrorCode::InvalidState,
-                                });
+                            Impl::State::FinalizeUnpublishedSceneFile(
+                                weakState, binding, *operation,
+                                RuntimeSceneFileOperation::Load);
                         },
                 });
 
-        if (!handle.IsValid())
-        {
-            return Core::Err<RuntimeQueuedSceneFileOperation>(
-                Core::ErrorCode::InvalidState);
-        }
-        operation->Task = handle;
-        state->OwnedTasks.push_back(handle);
-        Core::Log::Info(
-            "[Runtime] Queued scene load: path='{}'",
-            operation->Path);
-        return RuntimeQueuedSceneFileOperation{
-            .Task = handle,
-            .Operation = RuntimeSceneFileOperation::Load,
-        };
+        return state->RecordQueuedSceneFile(
+            handle, *operation, RuntimeSceneFileOperation::Load);
     }
 
     const std::optional<RuntimeSceneFileEvent>&

@@ -79,38 +79,6 @@ namespace Geometry::CurvatureSegmentation
             return std::isfinite(value.x) && std::isfinite(value.y);
         }
 
-        [[nodiscard]] bool IsValidMode(
-            const ComponentSelectionMode mode) noexcept
-        {
-            return mode == ComponentSelectionMode::FixedCount ||
-                   mode == ComponentSelectionMode::Automatic;
-        }
-
-        [[nodiscard]] bool IsValidParams(
-            const CurvatureSegmentationParams& params) noexcept
-        {
-            return IsValidMode(params.SelectionMode) &&
-                   params.FixedComponentCount > 0u &&
-                   params.AutomaticMinComponents > 0u &&
-                   params.AutomaticMaxComponents >=
-                       params.AutomaticMinComponents &&
-                   std::isfinite(params.AutomaticFitTolerance) &&
-                   params.AutomaticFitTolerance > 0.0 &&
-                   std::isfinite(params.AutomaticComplexityWeight) &&
-                   params.AutomaticComplexityWeight >= 0.0 &&
-                   params.MaxEmIterations > 0u &&
-                   std::isfinite(params.EmRelativeTolerance) &&
-                   params.EmRelativeTolerance >= 0.0 &&
-                   std::isfinite(params.CovarianceFloor) &&
-                   params.CovarianceFloor > 0.0 &&
-                   std::isfinite(params.SpatialWeight) &&
-                   params.SpatialWeight >= 0.0 &&
-                   std::isfinite(params.FeatureSensitivity) &&
-                   params.FeatureSensitivity >= 0.0 &&
-                   params.MaxSpatialIterations > 0u &&
-                   params.MinimumRegionFaces > 0u;
-        }
-
         [[nodiscard]] double Median(std::vector<double> values)
         {
             if (values.empty())
@@ -127,7 +95,7 @@ namespace Geometry::CurvatureSegmentation
         }
 
         [[nodiscard]] double RobustScale(
-            const std::vector<double>& values,
+            const std::span<const double> values,
             const double center)
         {
             std::vector<double> deviations;
@@ -220,12 +188,12 @@ namespace Geometry::CurvatureSegmentation
                 k2Values.push_back(curvature.y);
             }
 
-            diagnostics.SignedK1Center = Median(k1Values);
-            diagnostics.SignedK2Center = Median(k2Values);
-            diagnostics.SignedK1Scale = RobustScale(
-                k1Values, diagnostics.SignedK1Center);
-            diagnostics.SignedK2Scale = RobustScale(
-                k2Values, diagnostics.SignedK2Center);
+            const auto k1Normalization = ComputeCurvatureNormalization(k1Values);
+            const auto k2Normalization = ComputeCurvatureNormalization(k2Values);
+            diagnostics.SignedK1Center = k1Normalization.Center;
+            diagnostics.SignedK2Center = k2Normalization.Center;
+            diagnostics.SignedK1Scale = k1Normalization.Scale;
+            diagnostics.SignedK2Scale = k2Normalization.Scale;
 
             for (FaceSample& sample : samples)
             {
@@ -776,6 +744,46 @@ namespace Geometry::CurvatureSegmentation
         }
     }
 
+    [[nodiscard]] bool
+    IsValidMixtureParams(const CurvatureSegmentationParams& params) noexcept
+    {
+        const bool validMode =
+            params.SelectionMode == ComponentSelectionMode::FixedCount ||
+            params.SelectionMode == ComponentSelectionMode::Automatic;
+        return validMode && params.FixedComponentCount > 0u &&
+               params.AutomaticMinComponents > 0u &&
+               params.AutomaticMaxComponents >=
+                   params.AutomaticMinComponents &&
+               std::isfinite(params.AutomaticFitTolerance) &&
+               params.AutomaticFitTolerance > 0.0 &&
+               std::isfinite(params.AutomaticComplexityWeight) &&
+               params.AutomaticComplexityWeight >= 0.0 &&
+               params.MaxEmIterations > 0u &&
+               std::isfinite(params.EmRelativeTolerance) &&
+               params.EmRelativeTolerance >= 0.0 &&
+               std::isfinite(params.CovarianceFloor) &&
+               params.CovarianceFloor > 0.0;
+    }
+
+    [[nodiscard]] bool IsValidSegmentationParams(
+        const CurvatureSegmentationParams& params) noexcept
+    {
+        return IsValidMixtureParams(params) &&
+               std::isfinite(params.SpatialWeight) &&
+               params.SpatialWeight >= 0.0 &&
+               std::isfinite(params.FeatureSensitivity) &&
+               params.FeatureSensitivity >= 0.0 &&
+               params.MaxSpatialIterations > 0u &&
+               params.MinimumRegionFaces > 0u;
+    }
+
+    CurvatureNormalization ComputeCurvatureNormalization(
+        const std::span<const double> values)
+    {
+        const double center = Median(std::vector<double>(values.begin(), values.end()));
+        return CurvatureNormalization{center, RobustScale(values, center)};
+    }
+
     const char* ToString(const ComponentSelectionMode mode) noexcept
     {
         switch (mode)
@@ -851,7 +859,7 @@ namespace Geometry::CurvatureSegmentation
                 SegmentationStatus::UnsupportedSubmeshView;
             return finish();
         }
-        if (!IsValidParams(params))
+        if (!IsValidSegmentationParams(params))
         {
             diagnostics.Status = SegmentationStatus::InvalidParameters;
             return finish();

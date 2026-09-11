@@ -7,13 +7,9 @@ module Extrinsic.RHI.CommandContext;
 import Extrinsic.RHI.Handles;
 import Extrinsic.RHI.Types;
 
-// Out-of-line definitions for ICommandContext. Keeping these bodies in a single
-// module implementation unit anchors the interface's vtable to one TU (the
-// destructor is the key function) and keeps RHI.CommandContext.cppm limited to
-// declarations per AGENTS.md §5. Semantics are unchanged: the destructor is the
-// defaulted virtual destructor, and the three non-pure virtuals keep their
-// original default behaviour (a no-op, except BindFrameSampledTexture which
-// forwards to the slot-explicit sibling at slot 0).
+// Out-of-line defaults anchor ICommandContext's vtable through its destructor.
+// The inert derived overrides are trivial inline bodies. Sampled-texture binding
+// forwards to the slot-explicit sibling at slot 0.
 namespace Extrinsic::RHI
 {
     ICommandContext::~ICommandContext() = default;

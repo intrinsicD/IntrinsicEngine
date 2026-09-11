@@ -5716,6 +5716,72 @@ TEST(GeometryIO_PointCloudIO, WriteXYZRejectsBadPath)
               Geometry::PointCloudIO::PointCloudIOWriteStatus::InvalidPath);
 }
 
+TEST(GeometryIO_PointCloudIO, ReadersPreserveMissingFileErrors)
+{
+    using namespace Geometry::PointCloudIO;
+    const std::array readers{LoadXYZ, LoadPTS, LoadPWN, LoadCSV,
+                             Load3D, LoadTXT, LoadPCD, LoadPLY};
+    TempFile file(".missing", "");
+    ASSERT_EQ(std::remove(file.Path.c_str()), 0);
+    for (const auto reader : readers)
+    {
+        const auto result = reader(file.Path);
+        ASSERT_FALSE(result.has_value());
+        EXPECT_EQ(result.error(), Extrinsic::Core::ErrorCode::FileNotFound);
+    }
+}
+
+TEST(GeometryIO_PointCloudIO, XYZPreservesWhitespaceAndSourcePaths)
+{
+    TempFile file(".xyz", " \t1 -2 0.5 \r\n\t3 4 5\t");
+    const auto result = Geometry::PointCloudIO::LoadXYZ(file.Path);
+    ASSERT_TRUE(result.has_value());
+    ASSERT_EQ(result->Cloud.VerticesSize(), 2u);
+    EXPECT_EQ(result->Cloud.Position(Geometry::VertexHandle{0}), glm::vec3(1, -2, 0.5f));
+    EXPECT_EQ(result->Cloud.Position(Geometry::VertexHandle{1}), glm::vec3(3, 4, 5));
+    EXPECT_EQ(result->SourcePath, file.Path);
+    EXPECT_EQ(result->BasePath, file.Path.substr(0, file.Path.find_last_of('/') + 1));
+}
+
+TEST(GeometryIO_PointCloudIO, PCDEncodingsPreserveSingleAttributeBytes)
+{
+    using namespace Geometry::PointCloudIO;
+    for (const bool normals : {true, false})
+    {
+        SCOPED_TRACE(normals ? "normals only" : "colors only");
+        PointCloudIOResult cloud;
+        cloud.Cloud.AddPoint(glm::vec3(1, -2, 0.5f));
+        if (normals)
+        {
+            cloud.Cloud.EnableNormals();
+            cloud.Cloud.Normal(Geometry::VertexHandle{0}) = glm::vec3(0, 1, 0);
+        }
+        else
+        {
+            cloud.Cloud.EnableColors();
+            cloud.Cloud.Color(Geometry::VertexHandle{0}) = glm::vec4(-0.5f, 0.5f, 1.5f, 1);
+        }
+        const std::string header = std::string("# .PCD v0.7\nVERSION 0.7\n") +
+            (normals ? "FIELDS x y z normal_x normal_y normal_z\n" : "FIELDS x y z r g b\n") +
+            "SIZE 4 4 4 4 4 4\nTYPE F F F F F F\nCOUNT 1 1 1 1 1 1\n"
+            "WIDTH 1\nHEIGHT 1\nVIEWPOINT 0 0 0 1 0 0 0\nPOINTS 1\n";
+        const std::string asciiRow = normals
+            ? "1.000000 -2.000000 0.500000 0.000000 1.000000 0.000000\n"
+            : "1.000000 -2.000000 0.500000 0.000000 0.500000 1.000000\n";
+        const std::string binaryRow = std::string("\x00\x00\x80\x3f\x00\x00\x00\xc0\x00\x00\x00\x3f", 12) +
+            (normals ? std::string("\x00\x00\x00\x00\x00\x00\x80\x3f\x00\x00\x00\x00", 12)
+                     : std::string("\x00\x00\x00\x00\x00\x00\x00\x3f\x00\x00\x80\x3f", 12));
+        TempFile asciiFile(".pcd", ""), binaryFile(".pcd", "");
+        for (int repeat = 0; repeat < 2; ++repeat)
+        {
+            ASSERT_EQ(WritePCD(asciiFile.Path, cloud), PointCloudIOWriteStatus::Success);
+            ASSERT_EQ(WritePCDBinary(binaryFile.Path, cloud), PointCloudIOWriteStatus::Success);
+            EXPECT_EQ(ReadFileContents(asciiFile.Path), header + "DATA ascii\n" + asciiRow);
+            EXPECT_EQ(ReadFileContents(binaryFile.Path), header + "DATA binary\n" + binaryRow);
+        }
+    }
+}
+
 TEST(GeometryIO_PointCloudIO, WritesPCDPositionsOnly)
 {
     Geometry::PointCloudIO::PointCloudIOResult cloud;

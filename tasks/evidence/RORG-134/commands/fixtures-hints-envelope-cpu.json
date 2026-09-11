@@ -1,0 +1,23 @@
+{
+  "command": [
+    "/bin/bash",
+    "-o",
+    "pipefail",
+    "-c",
+    "ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --no-tests=error --timeout 60 | tee /tmp/intrinsic-reuse-fixtures-cpu.log | tail -45"
+  ],
+  "command_display": "/bin/bash -o pipefail -c 'ctest --test-dir build/ci --output-on-failure -LE '\"'\"'gpu|vulkan|slow|flaky-quarantine'\"'\"' --no-tests=error --timeout 60 | tee /tmp/intrinsic-reuse-fixtures-cpu.log | tail -45'",
+  "cwd": ".",
+  "duration_ms": 113196,
+  "exit_code": 0,
+  "finished_at": "2026-09-11T02:37:53Z",
+  "label": "fixtures-hints-envelope-cpu",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-09-11T02:36:00Z",
+  "stderr_path": "tasks/evidence/RORG-134/commands/fixtures-hints-envelope-cpu.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/RORG-134/commands/fixtures-hints-envelope-cpu.stdout.log",
+  "stdout_sha256": "2a395f593a920b54f761cdcc9f5b791d465333b6fd0c64254391af6b459c0884",
+  "task_id": "RORG-134"
+}

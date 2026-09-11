@@ -747,3 +747,12 @@ TEST(GpuWorldLifetimeContract, NullDeviceModeKeepsCpuLifetimeDiagnosticsObservab
     world.SyncFrame();
     EXPECT_EQ(world.GetDiagnostics().Instances.LiveCount, 1u);
 }
+
+TEST(GpuWorldLifetimeContract, SurfaceIndexFingerprintUsesCanonicalWordBytes)
+{
+    using Extrinsic::Graphics::FingerprintSurfaceIndices;
+    constexpr std::array<std::uint32_t, 3> words{0x01234567u, 0x89abcdefu, 0xffffffffu};
+    EXPECT_EQ(FingerprintSurfaceIndices({}), 0xcbf29ce484222325ull);
+    EXPECT_EQ(FingerprintSurfaceIndices(words), 0x73e732267519b141ull);
+    EXPECT_EQ(FingerprintSurfaceIndices(kTriangleIndices), 0x756241e1be8c9396ull);
+}

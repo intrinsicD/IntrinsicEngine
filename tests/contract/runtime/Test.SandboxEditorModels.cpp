@@ -109,6 +109,12 @@ namespace ECS = Extrinsic::ECS;
 namespace ECSC = Extrinsic::ECS::Components;
 namespace Dirty = Extrinsic::ECS::Components::DirtyTags;
 namespace GS = Extrinsic::ECS::Components::GeometrySources;
+using Intrinsic::Tests::EditorGeometry::SetPositions;
+using Intrinsic::Tests::EditorGeometry::SetTexcoords;
+using Intrinsic::Tests::EditorGeometry::SetEdges;
+using Intrinsic::Tests::EditorGeometry::SetHalfedges;
+using Intrinsic::Tests::EditorGeometry::SetFaces;
+using Intrinsic::Tests::EditorGeometry::AddTriangleMeshSource;
 namespace Sel = Extrinsic::ECS::Components::Selection;
 namespace G = Extrinsic::Graphics::Components;
 namespace Graphics = Extrinsic::Graphics;
@@ -124,9 +130,6 @@ namespace Tests = Extrinsic::Tests;
 
 namespace
 {
-constexpr std::uint32_t kInvalidIndex =
-        std::numeric_limits<std::uint32_t>::max();
-
 [[nodiscard]] bool HasDiagnostic(
         const std::vector<Runtime::EditorDiagnostic>& diagnostics,
         const Runtime::EditorDiagnosticCode code)
@@ -288,25 +291,6 @@ void AddPointCloudSource(ECS::Scene::Registry& registry,
         registry.Raw().emplace<G::RenderPoints>(entity);
     }
 
-void SetPositions(GS::Vertices& vertices,
-                      const std::vector<glm::vec3>& positions)
-    {
-        vertices.Properties.Resize(positions.size());
-        auto pos = vertices.Properties.GetOrAdd<glm::vec3>(
-            std::string{PN::kPosition},
-            glm::vec3{0.0f});
-        pos.Vector() = positions;
-    }
-
-void SetTexcoords(GS::Vertices& vertices,
-                      const std::vector<glm::vec2>& texcoords)
-    {
-        auto uv = vertices.Properties.GetOrAdd<glm::vec2>(
-            "v:texcoord",
-            glm::vec2{0.0f});
-        uv.Vector() = texcoords;
-    }
-
     // A small deterministic, asymmetric point lattice — distinct extents per axis
     // give ICP a well-conditioned correspondence problem (UI-029).
 
@@ -366,79 +350,6 @@ void SetTexcoords(GS::Vertices& vertices,
                 return &row;
         }
         return nullptr;
-    }
-
-void SetEdges(GS::Edges& edges,
-                  const std::vector<std::uint32_t>& v0,
-                  const std::vector<std::uint32_t>& v1)
-    {
-        edges.Properties.Resize(v0.size());
-        auto p0 = edges.Properties.GetOrAdd<std::uint32_t>(
-            std::string{PN::kEdgeV0},
-            0u);
-        auto p1 = edges.Properties.GetOrAdd<std::uint32_t>(
-            std::string{PN::kEdgeV1},
-            0u);
-        p0.Vector() = v0;
-        p1.Vector() = v1;
-    }
-
-void SetHalfedges(GS::Halfedges& halfedges,
-                      const std::vector<std::uint32_t>& toVertex,
-                      const std::vector<std::uint32_t>& next,
-                      const std::vector<std::uint32_t>& face)
-    {
-        halfedges.Properties.Resize(toVertex.size());
-        auto to = halfedges.Properties.GetOrAdd<std::uint32_t>(
-            std::string{PN::kHalfedgeToVertex},
-            kInvalidIndex);
-        auto nx = halfedges.Properties.GetOrAdd<std::uint32_t>(
-            std::string{PN::kHalfedgeNext},
-            kInvalidIndex);
-        auto fa = halfedges.Properties.GetOrAdd<std::uint32_t>(
-            std::string{PN::kHalfedgeFace},
-            kInvalidIndex);
-        to.Vector() = toVertex;
-        nx.Vector() = next;
-        fa.Vector() = face;
-    }
-
-void SetFaces(GS::Faces& faces,
-                  const std::vector<std::uint32_t>& faceHalfedge)
-    {
-        faces.Properties.Resize(faceHalfedge.size());
-        auto halfedge = faces.Properties.GetOrAdd<std::uint32_t>(
-            std::string{PN::kFaceHalfedge},
-            kInvalidIndex);
-        halfedge.Vector() = faceHalfedge;
-    }
-
-void AddTriangleMeshSource(ECS::Scene::Registry& registry,
-                               const ECS::EntityHandle entity)
-    {
-        auto& raw = registry.Raw();
-        auto& vertices = raw.emplace<GS::Vertices>(entity);
-        SetPositions(vertices,
-                     {
-                         {0.0f, 0.0f, 0.0f},
-                         {1.0f, 0.0f, 0.0f},
-                         {0.0f, 1.0f, 0.0f},
-                     });
-        SetTexcoords(vertices,
-                     {
-                         {0.0f, 0.0f},
-                         {1.0f, 0.0f},
-                         {0.0f, 1.0f},
-                     });
-        auto& edges = raw.emplace<GS::Edges>(entity);
-        SetEdges(edges, {0u, 1u, 2u}, {1u, 2u, 0u});
-        auto& halfedges = raw.emplace<GS::Halfedges>(entity);
-        SetHalfedges(halfedges,
-                     {1u, 2u, 0u, 0u, 2u, 1u},
-                     {1u, 2u, 0u, 5u, 3u, 4u},
-                     {0u, 0u, 0u, kInvalidIndex, kInvalidIndex, kInvalidIndex});
-        auto& faces = raw.emplace<GS::Faces>(entity);
-        SetFaces(faces, {0u});
     }
 
 [[nodiscard]] Runtime::GeometryPresentationRecipe
