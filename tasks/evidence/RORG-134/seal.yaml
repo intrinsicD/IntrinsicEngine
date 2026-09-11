@@ -1,0 +1,12 @@
+schema_version: 1
+task_id: RORG-134
+sealed_revision: d01861200599b2a83130773a3ee147a6d9db5695
+source_content_digest: 1dce25ad2603c60320e2f651409a653e392e0b43fae6630fa2b1e575fc8bea5d
+report_sha256: 0c8231b696a103ea262848e3781a7ea79c032e373fe52c6ebfd576ef81687749
+records:
+- path: tasks/evidence/RORG-134/handoff.jsonl
+  sha256: be383533f4ab62a941a9cd73404c83e3e713d07166dbf178fd639433a909a490
+- path: tasks/evidence/RORG-134/reviews.jsonl
+  sha256: 84816596fcb46c02262b497927fc0cf8d514ae33a56765372683c78b151507c3
+reason: Bind the completed cleanup retirement to its exact reviewed commit
+generated_by: tools/agents/workflow_evidence.py
