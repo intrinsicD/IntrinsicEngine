@@ -8,7 +8,7 @@ claim_eligible: false
 source:
   base_ref: 90909d7507bf6da1014b6b16ce0a88f05cd0db0c
   base_revision: 90909d7507bf6da1014b6b16ce0a88f05cd0db0c
-  head_revision: dd18432a8b3b5690d5f8bb36e1881b995634a378
+  head_revision: 90909d7507bf6da1014b6b16ce0a88f05cd0db0c
   branch: main
   worktree: /home/alex/Documents/IntrinsicEngine
   dirty: true
@@ -84,7 +84,7 @@ source:
   - path: docs/architecture/spatial-index-consumers.md
     sha256: d790151c6ccaa6caa425e8e9bfe9d4f817497c6735f42274810353c92178bf4d
   - path: docs/reports/2026-09-08-code-reuse-audit.md
-    sha256: a51c0e18a3a7c6e3a576982b59ff720eb4f799fd30c64ae0e3420020b788db26
+    sha256: 176943d3c93aeede12c10872f0e2a1efdacf1b0c980dc86f627eceab0b4f7a29
   - path: src/app/Sandbox/Editor/Sandbox.DomainPanels.cpp
     sha256: 2967831282e15689258be9e018b4f71ce7f990e3575dc42aa04212e4fecda1a8
   - path: src/app/Sandbox/Editor/Sandbox.EditorShell.cpp
@@ -195,12 +195,12 @@ source:
     sha256: d45615828be883f4050bca752910aba6b225d5dbe54ceb3f27539b8c9bc7f0db
   - path: src/runtime/Scene/Runtime.SceneDocumentModule.cpp
     sha256: 9595ddad27a18d5196c259212723a12c2601af53324b356d9e662209d735b628
-  - path: tasks/done/BUG-187-interlocked-worker-budget-inventory.md
-    sha256: c4628bb5d25c7a265e729f1f925509a14db796ce597780118d65fe01c4e79b48
-  - path: tasks/done/RETIREMENT-LOG.md
-    sha256: 81309534babbaa2006df0081a401fba7d79c0dd648f6a1082d24da666c4d2422
-  - path: tasks/done/RORG-134-code-reuse-audit-completion.md
-    sha256: 10369828d874d8c7d3c7a18859e65b63fa3cc09751dc54f716e628020bc99dad
+  - path: tasks/SESSION-BRIEF.md
+    sha256: 6771453d72e00adb521a750581f861e23b6b5cc1920a97d79eb48e77ce527700
+  - path: tasks/active/RORG-134-code-reuse-audit-completion.md
+    sha256: 209c4d70d0dba77f74b3520827cf9a1449a80413739ca89172baa43b6304fc7e
+  - path: tasks/backlog/bugs/BUG-187-interlocked-worker-budget-inventory.md
+    sha256: ec5380bcd0683449cda0d09a8d6935c67efcd60063906bce5ef3faf0f2bc3759
   - path: tests/CMakeLists.txt
     sha256: b04d0f0392e9997cbfb9ff1217a68d001bed291ff30c23723bf14b8e132b5629
   - path: tests/contract/graphics/Test.CullingPassContracts.cpp
@@ -267,7 +267,7 @@ source:
     sha256: d72663eb55b969a4bdbe4d8d6174d0de906810912ea49d103dee892bcf6e6989
   - path: tools/ci/README.md
     sha256: 9ec836c490d39f21400546ca2d7e1ac605a13d5bccd561951fa063b969308e7c
-  content_digest: 1dce25ad2603c60320e2f651409a653e392e0b43fae6630fa2b1e575fc8bea5d
+  content_digest: a825396c67bfdb7a4a6e51e3432a036b7e38a535f45b3b9e40ad40f75850e09f
 touched:
   paths:
   - .github/actions/setup-build/action.yml
@@ -361,9 +361,9 @@ touched:
   - src/runtime/Modules/PointCloudConsolidation/Runtime.PointCloudConsolidationGpu.cpp
   - src/runtime/Modules/TextureBake/Runtime.TextureBakeModule.cpp
   - src/runtime/Scene/Runtime.SceneDocumentModule.cpp
-  - tasks/done/BUG-187-interlocked-worker-budget-inventory.md
-  - tasks/done/RETIREMENT-LOG.md
-  - tasks/done/RORG-134-code-reuse-audit-completion.md
+  - tasks/SESSION-BRIEF.md
+  - tasks/active/RORG-134-code-reuse-audit-completion.md
+  - tasks/backlog/bugs/BUG-187-interlocked-worker-budget-inventory.md
   - tests/CMakeLists.txt
   - tests/contract/graphics/Test.CullingPassContracts.cpp
   - tests/contract/graphics/Test.DebugViewPass.cpp
@@ -442,7 +442,6 @@ commands:
 - receipt: tasks/evidence/RORG-134/commands/shader-source-contract-cpu-producer.json
 - receipt: tasks/evidence/RORG-134/commands/smoke-envelope-workloads.json
 - receipt: tasks/evidence/RORG-134/commands/source-structural.json
-- receipt: tasks/evidence/RORG-134/commands/retirement-docs.json
 changed_public_contracts:
 - Behavior-preserving helper declarations in existing modules; no new layer exception
   or backend contract.
@@ -452,20 +451,16 @@ diagnostics_and_previews:
 - Staging exposed leading mixed indentation in new GraphicsTestSupport.hpp; normalized
   to spaces. Every line is identical after removing leading whitespace. No C++ token
   or behavior changed.
-- User authorized commit, main integration and push. Retirement changes only task/documentation
-  files; production, shaders, tests and workflows are byte-identical to implementation
-  commit dd18432a8b3b5690d5f8bb36e1881b995634a378. The independent retirement review
-  is local because automatic approval review declined exporting new retirement metadata
-  to Claude.
 benchmark_or_parity_evidence:
 - Existing smoke runner and schema checks pass; profile and synthetic envelope comparisons
   are recorded without performance claims.
 docs_sync:
-  task_file: tasks/done/RORG-134-code-reuse-audit-completion.md
+  task_file: tasks/active/RORG-134-code-reuse-audit-completion.md
   session_brief_present: true
   canonical_docs_changed: true
   skill_mirrors_checked: true
 residual_risks:
+- Working tree remains uncommitted; historical seal and formal retirement await integration.
 - Root hygiene retains the pre-existing local .agents directory warning.
 skipped_checks:
 - check: hosted-ci
@@ -473,7 +468,7 @@ skipped_checks:
     retains those gates, while local ci-vulkan ASan+UBSan tests pass.
 artifacts:
 - path: docs/reports/2026-09-08-code-reuse-audit.md
-  sha256: a51c0e18a3a7c6e3a576982b59ff720eb4f799fd30c64ae0e3420020b788db26
+  sha256: 176943d3c93aeede12c10872f0e2a1efdacf1b0c980dc86f627eceab0b4f7a29
   kind: file
 - path: tasks/evidence/RORG-134/curvature-profile-comparison.json
   sha256: e9ea1508e3962bde7c7dbb070cea6a09dbcb93e25a19157680105ac8f0b132e4
@@ -501,9 +496,6 @@ artifacts:
   kind: file
 - path: tasks/evidence/RORG-134/intrinsic-reuse-whitespace-review.json
   sha256: 4dc291c458a70a88437fb09dbee44753e74addd8b10d5ba0029edfed69a2f2db
-  kind: file
-- path: tasks/evidence/RORG-134/retirement-local-review.txt
-  sha256: 769133f2dfc8ec115733e87a34e07a60660e11b72a881ab3e3634121dd825b86
   kind: file
 self_review:
   completed: true

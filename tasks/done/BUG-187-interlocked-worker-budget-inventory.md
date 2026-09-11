@@ -38,7 +38,10 @@ ctest --test-dir build/ci --output-on-failure -R '^RuntimeJobService\.' --no-tes
 ```
 
 ## Verification outcome
-Fixed in the uncommitted RORG-134 cleanup. All 20 workflow-concurrency
+Fixed in the committed RORG-134 cleanup. All 20 workflow-concurrency
 regressions pass, and the final CPU gate selects 4,508 tests with zero failures
 and one unrelated unsanitized leak-control skip. The three JobService tests
-pass. Retirement awaits integration of the reviewed cleanup.
+pass.
+
+## Completion
+Completed 2026-09-11. Implementation commit: `dd18432a8b3b5690d5f8bb36e1881b995634a378`.

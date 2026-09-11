@@ -8,6 +8,10 @@ so blocks moved from the old active-README history work verbatim.
 
 ## Retired task narratives
 
+- 2026-09-11 — **RORG-134**: Resolved all 38 confirmed code-reuse audit items through owning-layer helpers and documented distinct policies. CPU gate: 4,508 selected, zero failures, one expected skip; all 84 Vulkan and 116 workflow tests passed. Claude reviewed the batches and integration. Implementation `dd18432a8b3b5690d5f8bb36e1881b995634a378`; [task](RORG-134-code-reuse-audit-completion.md). Conditional audit candidates keep their scope decisions; this makes no new backend-maturity or performance claim.
+
+- 2026-09-11 — **BUG-187**: Reconciled the three paused-worker JobService tests with explicit two-processor reservations and the exact 78-case source inventory. Workflow regression and CPU gate pass. Implementation `dd18432a8b3b5690d5f8bb36e1881b995634a378`; [task](BUG-187-interlocked-worker-budget-inventory.md).
+
 Completed 2026-09-09 in implementation commit `3276c7059`:
 
 - [BUG-179](BUG-179-framed-icp-display-off-timeout.md) — Operational test-harness correction. The recorded display-off Vulkan run completed all seven ICP comparisons within the diagnosed bound. The original benchmark timing threshold is unchanged; BUG-180 retains the separate leak-enabled process-retention investigation.

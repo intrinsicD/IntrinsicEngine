@@ -21,7 +21,7 @@ Resolve remaining items in [the reuse audit](../../docs/reports/2026-09-08-code-
 - Feature additions, changed layer policy, algorithm changes, performance claims, or automatic publication.
 
 ## Context
-- Status: cleanup and verification complete; uncommitted integration/retirement pending. Owner: Codex with Claude Code CLI reviewing frozen source packets.
+- Status: complete. Implementation committed; source and follow-up integration reviewed with Claude Code CLI.
 - The operator explicitly directs this cleanup outside the standing convergence work-selection default and authorizes sending cleanup diffs to Claude.
 - The existing uncommitted cleanup is expected and must be preserved. One writer owns this checkout and build tree.
 - R01–R38 are resolved. R06 retains distinct snapshots and R24 retains distinct lifecycle branches after sharing their common policies. No numbered item remains.
@@ -69,7 +69,11 @@ git diff --check
 
 ## Stopping condition
 All 38 numbered audit items were resolved and verified before 08:00
-Europe/Berlin on 2026-09-11. No implementation item remains. The reviewed
-working tree stays uncommitted; commit-bound task retirement and historical
-sealing belong to integration. Existing conditional audit candidates retain
-their explicit scope decisions.
+Europe/Berlin on 2026-09-11. No implementation item remains. The operator subsequently authorized commit, integration into main and push.
+Existing conditional audit candidates retain their explicit scope decisions.
+
+## Completion
+Completed 2026-09-11. Implementation commit: `dd18432a8b3b5690d5f8bb36e1881b995634a378`.
+The committed cleanup resolves all 38 numbered items; no new backend maturity
+claim is made. Final retirement evidence is bound by the report and historical
+seal under `tasks/evidence/RORG-134/`.

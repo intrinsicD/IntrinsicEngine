@@ -1,0 +1,23 @@
+{
+  "command": [
+    "/bin/bash",
+    "-o",
+    "pipefail",
+    "-c",
+    "python3 tools/docs/check_doc_links.py --root . --strict && python3 tools/agents/check_task_policy.py --root . --strict && python3 tools/agents/generate_session_brief.py --check && git diff --check"
+  ],
+  "command_display": "/bin/bash -o pipefail -c 'python3 tools/docs/check_doc_links.py --root . --strict && python3 tools/agents/check_task_policy.py --root . --strict && python3 tools/agents/generate_session_brief.py --check && git diff --check'",
+  "cwd": ".",
+  "duration_ms": 2059,
+  "exit_code": 0,
+  "finished_at": "2026-09-11T05:30:52Z",
+  "label": "retirement-docs",
+  "required": true,
+  "schema_version": 1,
+  "started_at": "2026-09-11T05:30:50Z",
+  "stderr_path": "tasks/evidence/RORG-134/commands/retirement-docs.stderr.log",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_path": "tasks/evidence/RORG-134/commands/retirement-docs.stdout.log",
+  "stdout_sha256": "69a9f9a3e5d28fdf8a1cfa7209cd55f8efbbb7542685b18b44bdf77213ab00b3",
+  "task_id": "RORG-134"
+}

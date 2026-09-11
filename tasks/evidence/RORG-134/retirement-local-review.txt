@@ -1,0 +1,17 @@
+Reviewer: /root/retirement_review (independent read-only local agent)
+Verdict: Accepted — no findings in the fixed retirement diff.
+Source binding: 1dce25ad2603c60320e2f651409a653e392e0b43fae6630fa2b1e575fc8bea5d
+
+All 127 recorded source hashes and referenced artifact hashes match. The
+frozen diff matches the current non-evidence diff. No code changed since
+implementation dd18432a8b3b5690d5f8bb36e1881b995634a378.
+
+The task moves, completion dates, implementation references, retirement
+narratives, audit wording and session-brief removals are consistent. No stale
+references to former task paths remain outside historical evidence. Recorded
+CPU, Vulkan and workflow totals support the retirement summaries; no new
+performance or backend-maturity claim appears.
+
+Scope: retirement documentation and binding only, composing prior accepted
+implementation reviews. Append the bound handoff/review, name maturity Retired
+in the retirement commit/completion summary, then seal and validate.

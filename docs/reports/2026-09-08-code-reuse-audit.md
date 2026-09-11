@@ -3,8 +3,8 @@
 **Completion — 2026-09-11:** All 38 numbered findings are resolved through
 shared implementations or documented retention of distinct caller policies.
 The run stops because the list is complete, before the 08:00 Europe/Berlin
-limit. The combined cleanup remains uncommitted, with the existing changes
-preserved. Final verification: 4,508 CPU tests selected (zero failures, one
+limit. The combined cleanup is committed as `dd18432a8b3b5690d5f8bb36e1881b995634a378`,
+with the existing changes preserved. Final verification: 4,508 CPU tests selected (zero failures, one
 expected unsanitized leak-control skip); all 84 Vulkan tests passed with
 ASan+UBSan; 116 workflow regressions passed. All thirteen changed shader
 entry points compile and pass SPIR-V validation. Final engine/shader source
@@ -646,7 +646,7 @@ Stubbed shell execution and parsed before/after comparisons confirm the ten
 package sets and unchanged cache/bootstrap/gate policy in
 `tasks/evidence/RORG-134/ci-setup-comparison.json`. No hosted GitHub job was
 launched. Workflow regression checks also exposed
-[BUG-187](../../tasks/backlog/bugs/BUG-187-interlocked-worker-budget-inventory.md),
+[BUG-187](../../tasks/done/BUG-187-interlocked-worker-budget-inventory.md),
 a pre-existing stale worker-reservation audit. Its repair reconciles the
 three paused-worker tests without changing scheduler behavior.
 
@@ -681,8 +681,12 @@ three paused-worker tests without changing scheduler behavior.
 
 No numbered reuse item remains. Conditional candidates below still require
 their stated semantic/workload decisions and are not part of the confirmed
-38-item inventory. RORG-134 and BUG-187 retain their notes until this
-uncommitted change is integrated and can receive commit-bound retirement.
+38-item inventory. RORG-134 and BUG-187 are retired under `tasks/done/`, with the implementation
+commit recorded and final retirement evidence sealed under
+`tasks/evidence/RORG-134/`. Staging also exposed mixed leading indentation in
+the new shared graphics-test header. A whitespace-only correction preserved
+every C++ line after stripping indentation and was accepted by Claude; the
+prior code verification remains applicable.
 
 ### Combined architecture review — 2026-09-11
 
