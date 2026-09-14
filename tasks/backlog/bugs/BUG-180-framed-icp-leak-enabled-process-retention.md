@@ -36,6 +36,16 @@ are exclusively driver-owned. The general cohort environment is unchanged;
 no suppression was added. Raw log:
 `build/analysis/remaining-processing-locality-2026-09-13/ratio-diagnostic.log`.
 
+## Additional diagnostic — 2026-09-14
+
+The BUG-194 actual-dragon scalar-display probe completed its assertions, then
+the direct executable exited 1 with 115,665 retained bytes in 21 allocations.
+Stacks include Vulkan instance creation, libdbus and unloaded modules. The
+runner omitted the registered general GPU cohort environment, so this remains
+a leak-enabled diagnostic rather than a passing sanitizer gate. No ownership
+classification or suppression change follows. Raw log:
+`build/analysis/bug194-saliency-followup-2026-09-14/dragon-gpu.log`.
+
 ## Acceptance criteria
 - [ ] Reproduce with the same executable, working directory, source and leak-enabled environment, comparing against the dedicated Vulkan shutdown control.
 - [ ] Preserve the relevant loaded driver/module identity before unload and classify ownership using allocation/free evidence.

@@ -12192,3 +12192,25 @@ tree:
     - build/analysis/bug194-property-display-2026-09-14/publication-final-tests-vulkan.json
     - build/analysis/bug194-property-display-2026-09-14/claude-publication-final.txt
     status: open
+
+  - id: N560
+    type: experiment
+    title: Bound the remaining dragon saliency display failure without a speculative fix
+    provenance: ai-executed
+    timestamp: '2026-09-14T13:50:34+02:00'
+    result: User confirms geodesics works and repeated Show saliency clicks have no visible effect while UI/camera
+      respond. Actual dragon CPU keypoints and real asynchronous widget probes published nonzero saliency and
+      selected it on Vulkan. A corrected Vulkan-method probe also reached scalar GPU selection, but exceeded
+      its diagnostic deadline before extra confirmation frames; not a passing test. Measured presentation waits
+      predated Show and do not match the user symptom. Source-only Claude hypotheses were checked; none reproduced
+      the remaining defect. No production change; temporary probes removed. BUG-194 stays open pending exact
+      Display status and acceleration selection. BUG-193 retains pacing diagnostics; BUG-180 records direct-probe
+      leak retention with incorrect harness environment. No performance claim or remote push.
+    evidence:
+    - tasks/active/BUG-194-large-mesh-property-display.md
+    - tasks/backlog/bugs/BUG-193-gpu-pacing-and-watchdog-margin.md
+    - tasks/backlog/bugs/BUG-180-framed-icp-leak-enabled-process-retention.md
+    - build/analysis/bug194-saliency-followup-2026-09-14/observations.md
+    - build/analysis/bug194-saliency-followup-2026-09-14/dragon-ui-pacing.json
+    - build/analysis/bug194-saliency-followup-2026-09-14/dragon-vulkan-composed.json
+    status: open

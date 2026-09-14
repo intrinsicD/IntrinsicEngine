@@ -2265,3 +2265,12 @@ entries:
       claim or remote push.
     - Existing staged observations retain open owners and stale flags; this bounded bug repair supplies no new
       closure signal for unrelated research hypotheses.
+
+  - turn: 2026-09-14_001#8
+    notes:
+    - Direct-route N560 as diagnostic facts, with no new claim or staged generalization.
+    - User responsiveness excludes attributing their symptom to the slow presentation observed in a separate
+      probe. Successful field readbacks are bounded evidence, not bug closure.
+    - Keep failed diagnostic deadlines, incomplete harness composition and leak-environment mistakes explicit.
+      Temporary source removed; only scoped notes remain.
+    - Existing staged topics retain open owners and stale flags; no unrelated closure signal or C92 change.

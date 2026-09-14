@@ -585,7 +585,7 @@ sessions:
   summary: Geodesic infinity display, entity controls and redundant scalar-result geometry uploads repaired with
     Claude review. Full native CPU, focused sanitizers and five Vulkan checks pass; developer sandbox rebuilt.
     Exact desktop Show delay remains open in BUG-194.
-  turn_count: 7
-  events_count: 7
+  turn_count: 8
+  events_count: 8
   claims_touched: []
   open_threads: 8

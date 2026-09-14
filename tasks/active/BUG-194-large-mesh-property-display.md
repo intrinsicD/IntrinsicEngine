@@ -122,3 +122,57 @@ whether camera/UI remain responsive, and possible baked-texture mode still
 matter if the symptom persists with the rebuilt developer sandbox. Keep this
 note active until that remaining behavior is resolved; do not claim full
 latency closure or retire it solely on the verified geodesic repair.
+
+## Follow-up — persistent saliency selection, 2026-09-14
+The user confirms geodesics now works, but repeated Show saliency clicks still
+have no visible effect while the UI and camera remain responsive. This is not
+evidence of a blocked frame loop. Keep the saliency defect open.
+
+Diagnostic sources, commands, logs and the append-only probe ledger are retained
+locally in `build/analysis/bug194-saliency-followup-2026-09-14/` (ignored). A direct
+CPU keypoint run on the actual dragon produced 644 keypoints and 147,064 nonzero
+scores in [0, 1.55736]. Show returned Applied; Vulkan readback observed scalar
+mode, a nonzero scalar address and an automatically derived range. The captured
+dragon had varying colors. This bounds the all-zero-output and missing-upload
+hypotheses; it does not reproduce the user's failing desktop state.
+
+A second diagnostic drove the real keypoint panel with AsyncWorkModule and
+Vulkan frames. CPU detection published the field, the Show button selected it,
+and GPU readback found it. Both the basic and phase-instrumented runs passed
+using the registered general-GPU environment. Existing frame-phase diagnostics
+measured substantial presentation waits both before and after Show; BUG-193
+owns those observations. They do not match the user's responsive-camera symptom.
+
+Source review confirms Show currently encodes a property to validate it before
+applying the Appearance lane config; extraction encodes the displayed field
+again. Show does not submit a new keypoint computation. Retained baked-texture
+mode can invoke baking through the shared Appearance apply path, but was false
+in these probes and is not an established cause here. Claude's bounded review
+raised source hypotheses; none has yet reproduced this remaining defect.
+
+The initial direct probe passed its assertions but exited on LeakSanitizer
+retention after omitting the registered general-GPU environment (BUG-180).
+An initial CTest probe exceeded the existing 30-second case budget; subsequent
+large-model diagnostics used a separate finite timeout without changing the
+registered gate. An initial Vulkan-method probe omitted SpatialIndexCache from
+its test composition and could not submit detection. These failed harness runs
+are not production regressions or passing verification.
+
+After adding the SpatialIndexCache used by Sandbox main to the temporary
+composition, Vulkan detection produced the field at 197.9 seconds of the UI
+probe and activated Show. Final readback found scalar mode, a nonzero scalar
+address and range [0, 1.23894e-05] on the camera-scaled dragon. The probe reached
+its 200-second UI deadline before its extra confirmation frames, so the run
+failed its timeout/ShowObserved assertions. This is evidence of field publication
+and GPU selection, not a passing Vulkan-method test or a reproduced missing
+display. All temporary source probes were removed after recording the results.
+
+The remaining discriminators are the exact Display status, selected acceleration,
+processing completion status and whether selecting the same property in Appearance
+works. No additional production fix is justified by the successful CPU probes.
+
+Cleanup verification: canonical ci configure/runtime-contract build passed;
+15 visualization-recipe and 18 Appearance/editor contracts passed. The restored
+ci-vulkan executable passed both registered saliency/Appearance recovery and
+surface scalar/isoline readbacks. These maintain the existing regression checks;
+they do not close the user-specific failure.

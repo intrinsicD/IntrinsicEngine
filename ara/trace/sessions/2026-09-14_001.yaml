@@ -2,8 +2,8 @@ session:
   id: 2026-09-14_001
   date: '2026-09-14'
   started: '2026-09-14T00:30:41+02:00'
-  last_turn: '2026-09-14T12:47:18+02:00'
-  turn_count: 7
+  last_turn: '2026-09-14T13:50:34+02:00'
+  turn_count: 8
   summary: Geodesic infinity display, entity controls and redundant scalar-result geometry uploads repaired with
     Claude review. Full native CPU, focused sanitizers and five Vulkan checks pass; developer sandbox rebuilt.
     Exact desktop Show delay remains open in BUG-194.
@@ -57,6 +57,13 @@ events_logged:
   provenance: ai-executed
   summary: Geodesic infinity and shared redundant geometry-upload regressions repaired and verified; exact
     desktop delay remains open.
+- turn: 8
+  type: experiment
+  id: N560
+  routing: direct
+  provenance: ai-executed
+  summary: CPU and Vulkan diagnostic paths reach saliency rendering; remaining responsive desktop failure unreproduced,
+    no speculative source fix.
 ai_actions:
 - turn: 1
   action: Claude planned and edited the existing owners and family leaves. After its interrupted process stopped,
@@ -154,6 +161,14 @@ ai_actions:
   - src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Keypoints.cpp
   - tests/integration/runtime/Test.RuntimeRenderExtraction.cpp
   - tasks/active/BUG-194-large-mesh-property-display.md
+- turn: 8
+  action: Ran actual-dragon CPU/UI/Vulkan probes, checked bounded Claude source hypotheses, removed temporary
+    instrumentation and retained scoped failure/diagnostic evidence. No production fix.
+  provenance: ai-executed
+  files_changed:
+  - tasks/active/BUG-194-large-mesh-property-display.md
+  - tasks/backlog/bugs/BUG-193-gpu-pacing-and-watchdog-margin.md
+  - tasks/backlog/bugs/BUG-180-framed-icp-leak-enabled-process-retention.md
 claims_touched: []
 key_context:
 - turn: 1
@@ -179,6 +194,9 @@ key_context:
   excerpt: User reported delayed Show saliency/mask and pink geodesics on a larger model, requested consistent
     entity controls, and supplied dragon.obj in ~/Dropbox/Work/Datasets/obj. Existing Claude source-sharing
     authorization applies.
+- turn: 8
+  excerpt: User confirms geodesics now works; repeated Show saliency clicks do nothing while UI and camera
+    stay responsive. Exact Display status and acceleration selection remain pending.
 open_threads:
 - BUILD-007 owns matched clean-source engine compile reconciliation; BUILD-006 separately owns backend/cache comparisons.
   C92 remains a hypothesis.
@@ -194,6 +212,6 @@ open_threads:
   does not settle their broader method, architecture or performance hypotheses.
 - ASSETIO-012 is retired. UI-046 retains geometry export, UI-047 path choosing, and ASSETIO-011 broader real-widget
   import coverage; their shared geometry capability owner is now explicit.
-- BUG-194 retains the exact desktop Show delay investigation; confirmed infinity and redundant-upload fixes are verified. Retest build/dev/bin/ExtrinsicSandbox; camera/UI responsiveness and baked-texture mode remain discriminators.
+- 'BUG-194 remains open: user confirms responsive UI/camera and persistent missing saliency display. Actual model CPU and Vulkan probes select the scalar; exact Display status, acceleration and Appearance behavior remain needed.'
 ai_suggestions_pending:
 - No unrelated research observation acquired a closure signal from this refactor.

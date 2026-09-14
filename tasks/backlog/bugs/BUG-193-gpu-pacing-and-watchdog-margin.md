@@ -24,6 +24,18 @@ LBVH sequence passed after its finite-work fixture deadline correction, but its
 WLOP case took about 264 seconds against the unchanged 300-second CTest limit.
 Keep these historical observations distinct from a causal diagnosis.
 
+BUG-194 follow-up on 2026-09-14 used the actual dragon and the real keypoint
+panel with AsyncWorkModule, ci-vulkan and existing frame-phase diagnostics.
+Before and after Show, total frames were roughly one second; presentation
+accounted for about 0.65–0.77 seconds, UI for 0.12–0.13 seconds, and renderer
+preparation for 0.09 seconds. The Show frame added roughly 0.05 seconds of UI
+work, and displaying the scalar added roughly 0.049 seconds of extraction per
+frame. These are local diagnostic samples, not matched benchmark evidence or a
+confirmed presentation cause. The user reports responsive UI/camera during the
+missing saliency display, so this slow-frame probe does not reproduce that
+failure. Source/host display-state controls remain necessary here. Full local
+logs: `build/analysis/bug194-saliency-followup-2026-09-14/dragon-ui-pacing.log`.
+
 ## Acceptance criteria
 - [ ] Reproduce serially with no concurrent compilation, fixed source and recorded
   GPU/display/power state; compare display states when supported.
