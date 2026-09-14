@@ -23,6 +23,7 @@ namespace Extrinsic::Runtime
     {
         struct EditorWorkspaceSnapshotRequest;
         struct EditorWorkspaceSnapshot;
+        struct EditorWorkspaceSnapshotContext;
         struct EditorProcessingContext;
         struct EditorSceneEditingContext;
         struct EditorVisualizationEditingContext;
@@ -110,6 +111,11 @@ export namespace Extrinsic::Runtime::EditorFeatureDetail
         MakeEditorVisualizationEditingContext(const EditorFeatureBindings& bindings);
         [[nodiscard]] EditorRenderRecipeEditingContext
         MakeEditorRenderRecipeEditingContext(const EditorFeatureBindings& bindings);
+        // Reuse the session context captured after epoch guards and callbacks.
+        [[nodiscard]] EditorWorkspaceSnapshotContext
+        MakeEditorWorkspaceSnapshotContext(
+            const EditorFeatureBindings& bindings,
+            const EditorProcessingContext& geometry);
     }
     using EditorWorkspacePreparedFrameVisitor = std::function<void(EditorWorkspacePreparedFrame)>;
 

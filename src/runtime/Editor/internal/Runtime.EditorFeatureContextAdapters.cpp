@@ -24,6 +24,7 @@ module;
 module Extrinsic.Runtime.EditorWorkspaceSnapshots;
 
 import Extrinsic.Runtime.EditorProcessing;
+import Extrinsic.Runtime.Private.EditorWorkspaceAttachment;
 import Extrinsic.Asset.ImportRouter;
 import Extrinsic.Asset.GeometryPayload;
 import Extrinsic.Asset.ModelTexturePayload;
@@ -1309,6 +1310,19 @@ MakeEditorRenderRecipeEditingContext(const EditorFeatureBindings &bindings) {
       .AttachmentActive = bindings.AttachmentActive,
       .RenderRecipeCommandsAvailable = bindings.RenderRecipeCommandsAvailable,
       .EngineConfigCommandsAvailable = bindings.EngineConfigCommandsAvailable,
+  };
+}
+
+EditorWorkspaceSnapshotContext MakeEditorWorkspaceSnapshotContext(
+    const EditorFeatureBindings &bindings,
+    const EditorProcessingContext &geometry) {
+  return EditorWorkspaceSnapshotContext{
+      .Scene = MakeEditorSceneEditingContext(bindings),
+      .Geometry = geometry,
+      .Visualization = MakeEditorVisualizationEditingContext(bindings),
+      .RenderRecipe = MakeEditorRenderRecipeEditingContext(bindings),
+      // This borrow is valid only while the session attachment is active.
+      .SelectedModelCache = bindings.SelectedModelCache,
   };
 }
 

@@ -1,67 +1,23 @@
 module;
-#include <span>
 #include <array>
-#include <cstddef>
 #include <cstdint>
-#include <chrono>
 #include <functional>
-#include <string>
-#include <string_view>
-#include <vector>
-#include <entt/entity/fwd.hpp>
-
 #include <memory>
 #include <optional>
+#include <string>
 #include <utility>
+#include <vector>
 
 module Extrinsic.Runtime.EditorWorkspaceSnapshots;
 
-import Extrinsic.Runtime.EditorProcessing;
-import Extrinsic.Runtime.Private.EditorWorkspaceAttachment;
-import Extrinsic.Asset.ImportRouter;
 import Extrinsic.Asset.Registry;
-import Extrinsic.Asset.Service;
-import Extrinsic.Core.Config.EngineLoad;
-import Extrinsic.Core.Error;
-import Extrinsic.Core.Geometry2D;
-import Extrinsic.ECS.Scene.Handle;
-import Extrinsic.ECS.Scene.Registry;
-import Extrinsic.ECS.Component.Transform;
-import Extrinsic.ECS.Components.GeometrySources;
-import Extrinsic.Graphics.Component.RenderGeometry;
-import Extrinsic.Graphics.RenderRecipeConfig;
-import Extrinsic.Graphics.Renderer;
-import Extrinsic.RHI.Device;
-import Extrinsic.Runtime.AssetWorkflowModule;
-import Extrinsic.Runtime.AssetIngestStateMachine;
-import Extrinsic.Runtime.CameraControllers;
-import Extrinsic.Runtime.ClusteringModule;
-import Extrinsic.Runtime.SpatialIndexCache;
-import Extrinsic.Runtime.PointCloudConsolidationModule;
-import Extrinsic.Runtime.EditorCommandHistory;
-import Extrinsic.Runtime.EngineConfigControl;
-import Extrinsic.Runtime.JobService;
-import Extrinsic.Runtime.GeometryPresentation;
-import Extrinsic.Runtime.GeometryAvailability;
-import Extrinsic.Runtime.PrimitiveSelectionRefinement;
-import Extrinsic.Runtime.RenderArtifactPublication;
-import Extrinsic.Runtime.VertexAttributeBinding;
-import Extrinsic.Runtime.VertexChannelBindings;
-import Extrinsic.Runtime.TextureBakeModule;
-import Extrinsic.Runtime.SceneDocumentModule;
-import Extrinsic.Runtime.SelectionController;
-import Extrinsic.Runtime.ServiceRegistry;
-import Extrinsic.Runtime.WorldHandle;
-import Extrinsic.Runtime.WorldRegistry;
-import Geometry.Properties;
 import Extrinsic.Runtime.EditorCommon;
-import Extrinsic.Runtime.EditorJobProjection;
-import Extrinsic.Runtime.GeometryProcessingOperations;
+import Extrinsic.Runtime.EditorProcessing;
+import Extrinsic.Runtime.EditorWorkspaceAttachment;
+import Extrinsic.Runtime.Private.EditorWorkspaceAttachment;
 import Extrinsic.Runtime.RenderRecipeEditingOperations;
 import Extrinsic.Runtime.SceneEditingOperations;
 import Extrinsic.Runtime.VisualizationEditingOperations;
-
-#include "Editor/internal/Runtime.EditorFeatures.Internal.hpp"
 
 namespace Extrinsic::Runtime {
 extern "C++" {
@@ -92,63 +48,52 @@ EditorSelectedModelCacheStats EditorSelectedModelCache::Stats() const noexcept
 
 } // extern "C++"
 
-struct EditorWorkspaceSnapshotQueries::State {
-  explicit State(EditorWorkspaceSnapshotContext context)
-      : Context(std::move(context)) {}
-
-  EditorWorkspaceSnapshotContext Context{};
+struct EditorWorkspaceSnapshotQueriesAccess final {
+  // Expired handles expose default models without touching session borrows.
+  [[nodiscard]] static const EditorWorkspaceSnapshotContext &
+  ContextOrEmpty(const EditorWorkspaceSnapshotQueries &queries) noexcept {
+    static const EditorWorkspaceSnapshotContext empty{};
+    return queries.IsBound() && queries.m_Context ? *queries.m_Context : empty;
+  }
 };
 
 EditorWorkspaceSnapshotQueries::EditorWorkspaceSnapshotQueries(
-    std::shared_ptr<const State> state)
-    : m_State(std::move(state)) {}
+    std::shared_ptr<const EditorWorkspaceSnapshotContext> context)
+    : m_Context(std::move(context)) {}
 
 bool EditorWorkspaceSnapshotQueries::IsBound() const noexcept {
-  return m_State != nullptr && (!m_State->Context.Scene.AttachmentActive ||
-                                m_State->Context.Scene.AttachmentActive());
+  return m_Context != nullptr && (!m_Context->Scene.AttachmentActive ||
+                                  m_Context->Scene.AttachmentActive());
 }
-
-const EditorWorkspaceSnapshotContext *
-EditorWorkspaceSnapshotQueriesAccess::Resolve(
-    const EditorWorkspaceSnapshotQueries &queries) noexcept {
-  return queries.IsBound() && queries.m_State != nullptr
-             ? &queries.m_State->Context
-             : nullptr;
-}
-
-namespace {
-const EditorWorkspaceSnapshotContext &ContextOrEmpty(
-    const EditorWorkspaceSnapshotQueries &queries) noexcept {
-  static const EditorWorkspaceSnapshotContext empty{};
-  const EditorWorkspaceSnapshotContext *context =
-      EditorWorkspaceSnapshotQueriesAccess::Resolve(queries);
-  return context != nullptr ? *context : empty;
-}
-} // namespace
 
 EditorWorkspaceSnapshotQueries
 BindEditorWorkspaceSnapshotQueries(EditorWorkspaceSnapshotContext context) {
   return EditorWorkspaceSnapshotQueries{
-      std::make_shared<EditorWorkspaceSnapshotQueries::State>(
+      std::make_shared<const EditorWorkspaceSnapshotContext>(
           std::move(context))};
 }
 
 EditorWorkspaceSnapshot BuildEditorWorkspaceSnapshot(
     const EditorWorkspaceSnapshotQueries &queries) {
-  return BuildEditorWorkspaceSnapshot(ContextOrEmpty(queries));
+  return BuildEditorWorkspaceSnapshot(
+      EditorWorkspaceSnapshotQueriesAccess::ContextOrEmpty(queries));
 }
 
 EditorWorkspaceSnapshot BuildEditorWorkspaceSnapshot(
     const EditorWorkspaceSnapshotQueries &queries,
     const EditorWorkspaceSnapshotRequest &request) {
-  return BuildEditorWorkspaceSnapshot(ContextOrEmpty(queries), request);
+  return BuildEditorWorkspaceSnapshot(
+      EditorWorkspaceSnapshotQueriesAccess::ContextOrEmpty(queries), request);
 }
 
 EditorInspectorModel BuildEditorInspectorModel(
     const EditorWorkspaceSnapshotQueries &queries,
     EditorWorkspaceSnapshotStats *modelBuildStats,
     std::optional<std::uint32_t> entity) {
-  EditorWorkspaceSnapshotContext context = ContextOrEmpty(queries);
+  // Copied per query: the stats override is caller-scoped and must not mutate
+  // the shared bound context.
+  EditorWorkspaceSnapshotContext context =
+      EditorWorkspaceSnapshotQueriesAccess::ContextOrEmpty(queries);
   if (modelBuildStats != nullptr)
     context.Visualization.ModelBuildStats = modelBuildStats;
   return BuildEditorInspectorModel(context, entity);
@@ -159,7 +104,8 @@ EditorDomainWindowModel BuildEditorDomainWindowModel(
     EditorDomainWindowKind kind,
     EditorWorkspaceSnapshotStats *modelBuildStats,
     std::optional<std::uint32_t> entity) {
-  EditorWorkspaceSnapshotContext context = ContextOrEmpty(queries);
+  EditorWorkspaceSnapshotContext context =
+      EditorWorkspaceSnapshotQueriesAccess::ContextOrEmpty(queries);
   if (modelBuildStats != nullptr)
     context.Visualization.ModelBuildStats = modelBuildStats;
   return BuildEditorDomainWindowModel(context, kind, entity);
@@ -184,25 +130,11 @@ PrepareEditorWorkspaceSnapshotFrame(
   std::optional<EditorWorkspaceSnapshotPreparedFrame> prepared{};
   (void)state->Session.VisitPreparedFrame(
       [&prepared](EditorFeatureDetail::EditorWorkspacePreparedFrame frame) {
-        const EditorFeatureDetail::EditorFeatureBindings &bindings =
-            frame.Context;
-        const EditorSceneEditingContext scene =
-            EditorFeatureDetail::MakeEditorSceneEditingContext(bindings);
-        const EditorVisualizationEditingContext visualization =
-            EditorFeatureDetail::MakeEditorVisualizationEditingContext(
-                bindings);
-        const EditorRenderRecipeEditingContext renderRecipe =
-            EditorFeatureDetail::MakeEditorRenderRecipeEditingContext(bindings);
         prepared = EditorWorkspaceSnapshotPreparedFrame{
             .Frame = frame.Frame,
             .SnapshotQueries = BindEditorWorkspaceSnapshotQueries(
-                EditorWorkspaceSnapshotContext{
-                    .Scene = scene,
-                    .Geometry = frame.Geometry,
-                    .Visualization = visualization,
-                    .RenderRecipe = renderRecipe,
-                    .SelectedModelCache = bindings.SelectedModelCache,
-                }),
+                EditorFeatureDetail::MakeEditorWorkspaceSnapshotContext(
+                    frame.Context, frame.Geometry)),
         };
       });
   return prepared;

@@ -1249,6 +1249,52 @@ TEST(SandboxEditorUi, DomainWindowBuildReportsTimingDiagnostics)
     EXPECT_GT(stats.PropertyCatalogModelBuildTimeNs, 0u);
     EXPECT_GT(stats.VisualizationModelBuildTimeNs, 0u);
 }
+TEST(SandboxEditorUi, CopiedSnapshotQueriesOwnContextAndIsolateStatisticsOverrides)
+{
+    ECS::Scene::Registry registry;
+    Runtime::SelectionController selection;
+    const ECS::EntityHandle mesh = MakeSelectable(registry, "Mesh");
+    AddTriangleMeshSource(registry, mesh);
+    ASSERT_TRUE(selection.SetSelectedEntity(registry, mesh));
+
+    bool active = true;
+    Runtime::EditorWorkspaceSnapshotStats boundStats{};
+    Runtime::EditorWorkspaceSnapshotStats overrideStats{};
+    Runtime::EditorWorkspaceSnapshotQueries queries{};
+    {
+        Runtime::EditorWorkspaceSnapshotContext context = MakeContext(registry, selection);
+        context.Scene.AttachmentActive = [&active] { return active; };
+        context.Visualization.ModelBuildStats = &boundStats;
+        queries = Runtime::BindEditorWorkspaceSnapshotQueries(std::move(context));
+    }
+    const auto copy = queries;
+    queries = {};
+    ASSERT_TRUE(copy.IsBound());
+
+    EXPECT_TRUE(Runtime::BuildEditorInspectorModel(copy, &overrideStats).HasEntity);
+    EXPECT_EQ(overrideStats.InspectorModelBuilds, 1u);
+    EXPECT_EQ(boundStats.InspectorModelBuilds, 0u);
+    EXPECT_TRUE(Runtime::BuildEditorInspectorModel(copy).HasEntity);
+    EXPECT_EQ(boundStats.InspectorModelBuilds, 1u);
+    EXPECT_EQ(overrideStats.InspectorModelBuilds, 1u);
+
+    EXPECT_TRUE(Runtime::BuildEditorDomainWindowModel(
+        copy, Runtime::EditorDomainWindowKind::Mesh, &overrideStats).HasSelectedEntity);
+    EXPECT_EQ(overrideStats.DomainWindowModelBuilds, 1u);
+    EXPECT_EQ(boundStats.DomainWindowModelBuilds, 0u);
+    EXPECT_TRUE(Runtime::BuildEditorDomainWindowModel(
+        copy, Runtime::EditorDomainWindowKind::Mesh).HasSelectedEntity);
+    EXPECT_EQ(boundStats.DomainWindowModelBuilds, 1u);
+    EXPECT_EQ(overrideStats.DomainWindowModelBuilds, 1u);
+
+    active = false;
+    EXPECT_FALSE(copy.IsBound());
+    EXPECT_FALSE(Runtime::BuildEditorInspectorModel(copy).HasEntity);
+    EXPECT_FALSE(Runtime::BuildEditorDomainWindowModel(
+        copy, Runtime::EditorDomainWindowKind::Mesh).HasSelectedEntity);
+    EXPECT_TRUE(Runtime::BuildEditorWorkspaceSnapshot(copy).Hierarchy.empty());
+}
+
 TEST(SandboxEditorUi, SelectedModelCacheReusesInspectorAnalysis)
 {
     ECS::Scene::Registry registry;

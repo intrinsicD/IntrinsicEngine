@@ -833,15 +833,7 @@ namespace Extrinsic::Runtime::EditorFeatureDetail
         // Capture only after epoch guards and config/job callbacks are installed.
         m_ProcessingContext = MakeEditorProcessingContext(context);
         m_LastFrame = BuildEditorWorkspaceSnapshot(
-            EditorWorkspaceSnapshotContext{
-                .Scene = MakeEditorSceneEditingContext(context),
-                .Geometry = m_ProcessingContext,
-                .Visualization =
-                    MakeEditorVisualizationEditingContext(context),
-                .RenderRecipe =
-                    MakeEditorRenderRecipeEditingContext(context),
-                .SelectedModelCache = context.SelectedModelCache,
-            },
+            MakeEditorWorkspaceSnapshotContext(context, m_ProcessingContext),
             request);
         context.ModelBuildStats = &m_LastFrame.ModelBuildStats;
         m_FramePrepared = true;

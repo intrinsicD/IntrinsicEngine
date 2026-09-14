@@ -2315,3 +2315,11 @@ entries:
       C92 or BUILD-007; no new claim or observation is needed. Existing topics keep their named owners.
     - Distinguish Claude's source-free design consultation from local source review. The rejected full-source
       packet was not sent. Preserve isolated sanitizer and GPU evidence plus the existing leak limitation.
+
+  - turn: 2026-09-15_001#1
+    notes:
+    - Record N568 as executed refactor and verification facts, without a new claim or observation. Structural line/dependency
+      counts do not settle C92 or BUILD-007.
+    - Full-source Claude implementation/review succeeded under standing authorization. Keep the first failing importer
+      expectation, its narrow fix, separate sanitizer/GPU evidence and BUG-180 limitation explicit.
+    - Existing staged research topics retain named open owners; this cleanup does not close their broader hypotheses.

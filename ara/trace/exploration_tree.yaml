@@ -12345,3 +12345,25 @@ tree:
     - src/runtime/Rendering/Runtime.RenderExtraction.Internal.cpp
     - tests/CMakeLists.txt
     status: resolved
+
+  - id: N568
+    type: experiment
+    title: Reuse snapshot context assembly and narrow query compilation
+    provenance: ai-executed
+    timestamp: '2026-09-15T00:37:12+02:00'
+    result: 'Claude planned, implemented and reviewed full source under standing authorization. Two snapshot assembly
+      sites share the existing adapter; queries directly share a const context. Five production files shrink by 76
+      lines; query implementation module dependencies fall from 169 to 101 while the primary interface remains at
+      99. Root preserved the post-callback pointer check and corrected lifetime comments. First focused run passed
+      256/257; one explicit importer entry was added and Claude reviewed the fix. Final full CPU: 4626 pass, one expected
+      unsanitized leak-control skip. Native, isolated ASan and isolated UBSan each pass 257 focused cases; three actual
+      Vulkan readbacks pass with the existing BUG-180 leak exclusion. Developer app rebuilt. Retirement-format validation
+      corrected before closure; RUNTIME-251 retired and the missing RUNTIME-250 log entry backfilled. No timing claim;
+      BUILD-007 and C92 remain open.'
+    evidence:
+    - tasks/done/RUNTIME-251-editor-snapshot-context-reuse.md
+    - src/runtime/Editor/Runtime.EditorWorkspaceSnapshots.Public.cpp
+    - src/runtime/Editor/internal/Runtime.EditorFeatureContextAdapters.cpp
+    - tests/contract/runtime/Test.SandboxEditorModels.cpp
+    - tests/CMakeLists.txt
+    status: resolved

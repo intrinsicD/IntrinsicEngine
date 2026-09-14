@@ -90,6 +90,17 @@ guards and config/job callbacks are installed; the snapshot builder and eleven
 processing-frame leaves and workspace query preparation reuse it. Command handles
 copy it into owned storage.
 
+The session and public snapshot-query preparation share
+`MakeEditorWorkspaceSnapshotContext`, compiled in the existing context-adapter
+unit and declared through the private attachment interface. It combines the
+prepared processing context with scene, visualization and recipe contexts and
+the session cache borrow. The wrapper does not include the broad bindings header.
+Query handles share an immutable context directly; their private access helper
+stays in `Runtime.EditorWorkspaceSnapshots.Public.cpp`. Expired attachments yield
+default models, and statistics overrides use a per-query context copy.
+`EditorCompilationLocality.WorkspaceSnapshotQueries` guards the wrapper's
+dependency boundary.
+
 The eleven leaves import the private attachment plus their own implicit family
 owner, without the broad `Runtime.EditorFeatures.Internal.hpp`. Each leaf copies
 only its family's results and commands. Session preparation/reset clears the

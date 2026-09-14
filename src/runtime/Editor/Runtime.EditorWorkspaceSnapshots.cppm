@@ -3,33 +3,23 @@
 module;
 
 #include <array>
-#include <atomic>
 #include <cstddef>
 #include <cstdint>
-#include <functional>
 #include <memory>
 #include <optional>
 #include <string>
-#include <unordered_map>
 #include <vector>
 
 export module Extrinsic.Runtime.EditorWorkspaceSnapshots;
 
-import Extrinsic.Core.StrongHandle;
 import Extrinsic.ECS.Components.GeometrySources;
 import Extrinsic.Runtime.EditorCommon;
-import Extrinsic.Runtime.EditorJobProjection;
 import Extrinsic.Runtime.EditorWorkspaceAttachment;
 import Extrinsic.Runtime.EditorProcessing;
 import Extrinsic.Runtime.GeometryProcessingOperations;
-import Extrinsic.Runtime.JobService;
-import Extrinsic.Runtime.KernelEvents;
-import Extrinsic.Runtime.RenderArtifactPublication;
 import Extrinsic.Runtime.RenderRecipeEditingOperations;
 import Extrinsic.Runtime.SceneEditingOperations;
-import Extrinsic.Runtime.ServiceRegistry;
 import Extrinsic.Runtime.VisualizationEditingOperations;
-import Extrinsic.Runtime.WorldRegistry;
 
 namespace Extrinsic::Runtime
 {
@@ -229,11 +219,10 @@ export namespace Extrinsic::Runtime
         [[nodiscard]] bool IsBound() const noexcept;
 
     private:
-        struct State;
-        std::shared_ptr<const State> m_State{};
+        std::shared_ptr<const EditorWorkspaceSnapshotContext> m_Context{};
 
         explicit EditorWorkspaceSnapshotQueries(
-            std::shared_ptr<const State> state);
+            std::shared_ptr<const EditorWorkspaceSnapshotContext> context);
         friend struct EditorWorkspaceSnapshotQueriesAccess;
         friend EditorWorkspaceSnapshotQueries
         BindEditorWorkspaceSnapshotQueries(
@@ -286,13 +275,4 @@ export namespace Extrinsic::Runtime
         EditorAssetPayloadKind pendingAssetImportPayloadKind =
             EditorAssetPayloadKind::Unknown,
         std::string pendingSceneFilePath = {});
-}
-
-namespace Extrinsic::Runtime
-{
-    struct EditorWorkspaceSnapshotQueriesAccess final
-    {
-        [[nodiscard]] static const EditorWorkspaceSnapshotContext*
-        Resolve(const EditorWorkspaceSnapshotQueries& queries) noexcept;
-    };
 }

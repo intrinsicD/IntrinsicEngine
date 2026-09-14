@@ -587,3 +587,12 @@ sessions:
   events_count: 18
   claims_touched: [C93]
   open_threads: 9
+
+- id: 2026-09-15_001
+  date: '2026-09-15'
+  summary: Snapshot contexts reuse one adapter; query scaffolding removed. Claude implemented and reviewed source;
+    full CPU, focused ASan/UBSan and three Vulkan checks passed. RUNTIME-251 retired; no compile-time claim.
+  turn_count: 1
+  events_count: 1
+  claims_touched: []
+  open_threads: 9

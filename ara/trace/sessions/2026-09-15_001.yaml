@@ -1,0 +1,54 @@
+session:
+  id: 2026-09-15_001
+  date: '2026-09-15'
+  started: '2026-09-15T00:37:12+02:00'
+  last_turn: '2026-09-15T00:37:12+02:00'
+  turn_count: 1
+  summary: Snapshot contexts reuse one adapter; query scaffolding removed. Claude implemented and reviewed source;
+    full CPU, focused ASan/UBSan and three Vulkan checks passed. RUNTIME-251 retired; no compile-time claim.
+events_logged:
+- turn: 1
+  type: experiment
+  id: N568
+  routing: direct
+  provenance: ai-executed
+  summary: Snapshot contexts reuse one adapter; query scaffolding removed. Claude implemented and reviewed source;
+    full CPU, focused ASan/UBSan and three Vulkan checks passed. RUNTIME-251 retired; no compile-time claim.
+ai_actions:
+- turn: 1
+  action: Claude implemented five production files; root reviewed, added lifetime/statistics and compiler-boundary
+    regressions, fixed the importer-list expectation, verified and retired the task.
+  provenance: ai-executed
+  files_changed:
+  - src/runtime/Editor/Runtime.EditorWorkspaceSnapshots.Public.cpp
+  - src/runtime/Editor/internal/Runtime.EditorFeatureContextAdapters.cpp
+  - tests/contract/runtime/Test.SandboxEditorModels.cpp
+  - tests/integration/runtime/Test.SandboxEditorPresentation.cpp
+  - tests/CMakeLists.txt
+  - tasks/done/RUNTIME-251-editor-snapshot-context-reuse.md
+claims_touched: []
+key_context:
+- turn: 1
+  excerpt: User requested continued duplication and compilation cleanup with Claude through plan, implementation,
+    review, tests and fixes. Standing source-sharing and local commit authorization applies.
+open_threads:
+- BUILD-007 owns matched clean-source engine compile reconciliation; BUILD-006 separately owns backend/cache comparisons.
+  C92 remains a hypothesis.
+- BUG-193 owns unexplained GPU pacing variability and WLOP watchdog margin; BUG-189/191/192 closed only finite-work
+  fixture budget corrections.
+- BUG-178 compiler-cache ICE, BUG-188 sandbox sanitizer discovery and BUG-180 leak-enabled GPU process retention
+  remain open.
+- METHOD-044 native/config/UI adoption and METHOD-045 atlas chart-area/remeshing quality work remain open. METHOD-043
+  retains later candidate integration after METHOD-042 offline closure.
+- REVIEW-004 Framework24 convergence and further consumer-justified workspace/model simplification remain open;
+  no whole-engine completion.
+- Existing staged research observations retain their named owners and stale flags; local refactor/task retirement
+  does not settle their broader method, architecture or performance hypotheses.
+- ASSETIO-012 is retired. UI-046 retains geometry export, UI-047 path choosing, and ASSETIO-011 broader real-widget
+  import coverage; their shared geometry capability owner is now explicit.
+- 'BUG-194 remains open: user confirms responsive UI/camera and persistent missing saliency display. Actual model
+  CPU and Vulkan probes select the scalar; exact Display status, acceleration and Appearance behavior remain needed.'
+- BUG-195 owns disk-headroom preflight and evidence-write recovery; completed backend verification does not close
+  that tooling work.
+ai_suggestions_pending:
+- Existing staged topics retain their open owners and flags; this ordinary refactor supplies no new closure signal.

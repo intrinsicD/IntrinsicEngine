@@ -498,6 +498,21 @@ add_test(NAME EditorCompilationLocality.WorkspaceSnapshots
         --forbid-module Extrinsic.Graphics.Renderer
         --forbid-module Extrinsic.Graphics.GpuAssetCache
         --forbid-module Extrinsic.Runtime.RenderExtraction)
+# Snapshot query preparation uses the narrow context adapter, not concrete services.
+add_test(NAME EditorCompilationLocality.WorkspaceSnapshotQueries
+    COMMAND ${INTRINSIC_TEST_PYTHON_EXECUTABLE}
+        ${CMAKE_SOURCE_DIR}/tools/analysis/compile_hotspots.py --build-dir ${CMAKE_BINARY_DIR}
+        --check-source src/runtime/Editor/Runtime.EditorWorkspaceSnapshots.Public.cpp
+        --forbid-module Extrinsic.Graphics.Renderer
+        --forbid-module Extrinsic.Graphics.GpuAssetCache
+        --forbid-module Extrinsic.Runtime.RenderExtraction
+        --forbid-module Extrinsic.Runtime.ClusteringModule
+        --forbid-module Extrinsic.Runtime.PointCloudConsolidationModule
+        --forbid-module Extrinsic.Runtime.SceneDocumentModule
+        --forbid-module Extrinsic.Runtime.AssetWorkflowModule)
+set_tests_properties(EditorCompilationLocality.WorkspaceSnapshotQueries
+    PROPERTIES LABELS "contract;build;runtime" TIMEOUT 30)
+
 add_test(NAME EditorCompilationLocality.WorkspaceAttachment
     COMMAND ${INTRINSIC_TEST_PYTHON_EXECUTABLE}
         ${CMAKE_SOURCE_DIR}/tools/analysis/compile_hotspots.py --build-dir ${CMAKE_BINARY_DIR}
