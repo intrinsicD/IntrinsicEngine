@@ -582,10 +582,10 @@ sessions:
   open_threads: 6
 - id: 2026-09-14_001
   date: '2026-09-14'
-  summary: Editor simplification and shared geometry formats verified; BUG-184 job accounting and BUG-181 shader
-    feedback now fixed, reviewed with Claude and retired. Native CPU, focused sanitizers and tooling pass. Local
-    commits; compile timing, GPU investigations and broader convergence remain open.
-  turn_count: 6
-  events_count: 6
+  summary: Geodesic infinity display, entity controls and redundant scalar-result geometry uploads repaired with
+    Claude review. Full native CPU, focused sanitizers and five Vulkan checks pass; developer sandbox rebuilt.
+    Exact desktop Show delay remains open in BUG-194.
+  turn_count: 7
+  events_count: 7
   claims_touched: []
-  open_threads: 7
+  open_threads: 8

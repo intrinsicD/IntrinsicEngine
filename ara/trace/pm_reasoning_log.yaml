@@ -2252,3 +2252,16 @@ entries:
       closures do not resolve their hypotheses. C92 still awaits BUILD-007 matched timing.
     - BUG-184 and BUG-181 retire at their intended CPUContracted endpoint; broader convergence, export/path UI,
       GPU pacing/leaks and method work remain open. No remote push.
+
+  - turn: 2026-09-14_001#7
+    notes:
+    - Direct-route N559 as ordinary diagnosis, implementation and verification facts. No new claim or staged
+      general interpretation; C92 remains unchanged.
+    - Keep CPU, separate sanitizer, actual Vulkan and local diagnostic timings distinct. Initial probe fixture
+      omissions, GPU deadlines and reviewed test expectations were corrected without weakening production contracts.
+    - Record source-only Claude review and root backtests. No internal task or ARA notes were sent externally.
+    - BUG-194 remains active because the exact desktop delay was not reproduced; valid next-frame GPU readback
+      and responsive asynchronous UI probes do not establish the absence of every stall. No matched performance
+      claim or remote push.
+    - Existing staged observations retain open owners and stale flags; this bounded bug repair supplies no new
+      closure signal for unrelated research hypotheses.

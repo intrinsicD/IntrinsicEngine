@@ -12163,3 +12163,32 @@ tree:
     - build/analysis/bug184-job-accounting-2026-09-14/full-cpu.json
     - build/analysis/bug181-shader-routing-2026-09-14/claude-followup.txt
     status: resolved
+
+  - id: N559
+    type: experiment
+    title: Repair unreachable scalar display and redundant analysis geometry uploads
+    provenance: ai-executed
+    timestamp: '2026-09-14T12:47:18+02:00'
+    result: 'Supplied dragon has 151486 vertices, 302938 triangles and seven components; a main-component seed
+      leaves 18 unreachable vertices. Runtime and graphics rejected their infinite distances, suppressing the
+      whole scalar field. Regressions reproduced this before the fix. Scalar upload now preserves infinity, finite
+      samples determine autorange, and GPU pixels show reachable gradients or neutral gray; NaN/vector/color
+      rejection remains. Actual publication-to-renderer regressions exposed a full keypoint mesh reupload and
+      partial geodesic reupload. Four scalar/mask publication owners now use existing property revisions; actual
+      position edits still update geometry, and undo/redo remains tested. Geodesic entity changes clear mesh-local
+      seeds through validated config. Claude reviewed bounded source diffs; root fixed real findings and backtested
+      speculative ones. Final native CPU: 4616 passed plus one expected unsanitized lifecycle skip. Focused ASan
+      and UBSan: 117 each passed. Five actual Vulkan readbacks passed; developer sandbox rebuilt. Real dragon
+      asynchronous UI and separate GPU probes did not reproduce the complete desktop delay; the GPU probe reached
+      valid readback but timed out waiting for enrichment at shutdown. BUG-194 stays active. Local source commit
+      6926f6818; no remote push, matched performance claim or C92 change.'
+    evidence:
+    - tasks/active/BUG-194-large-mesh-property-display.md
+    - tests/contract/runtime/Test.GeodesicsOperations.cpp
+    - tests/integration/runtime/Test.RuntimeRenderExtraction.cpp
+    - tests/integration/runtime/Test.RuntimeSandboxAcceptanceGpuSmoke.cpp
+    - build/analysis/bug194-property-display-2026-09-14/source-commit.json
+    - build/analysis/bug194-property-display-2026-09-14/final-full-tests-ci.json
+    - build/analysis/bug194-property-display-2026-09-14/publication-final-tests-vulkan.json
+    - build/analysis/bug194-property-display-2026-09-14/claude-publication-final.txt
+    status: open

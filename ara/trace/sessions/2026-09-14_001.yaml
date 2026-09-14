@@ -2,11 +2,11 @@ session:
   id: 2026-09-14_001
   date: '2026-09-14'
   started: '2026-09-14T00:30:41+02:00'
-  last_turn: '2026-09-14T10:58:19+02:00'
-  turn_count: 6
-  summary: Editor simplification and shared geometry formats verified; BUG-184 job accounting and BUG-181 shader
-    feedback now fixed, reviewed with Claude and retired. Native CPU, focused sanitizers and tooling pass. Local
-    commits; compile timing, GPU investigations and broader convergence remain open.
+  last_turn: '2026-09-14T12:47:18+02:00'
+  turn_count: 7
+  summary: Geodesic infinity display, entity controls and redundant scalar-result geometry uploads repaired with
+    Claude review. Full native CPU, focused sanitizers and five Vulkan checks pass; developer sandbox rebuilt.
+    Exact desktop Show delay remains open in BUG-194.
 events_logged:
 - turn: 1
   type: experiment
@@ -50,6 +50,13 @@ events_logged:
   provenance: ai-executed
   summary: Reused terminal classification and shader compilation; fixed Claude findings, verified native/tooling/focused
     sanitizers, retired BUG-184 and BUG-181.
+- turn: 7
+  type: experiment
+  id: N559
+  routing: direct
+  provenance: ai-executed
+  summary: Geodesic infinity and shared redundant geometry-upload regressions repaired and verified; exact
+    desktop delay remains open.
 ai_actions:
 - turn: 1
   action: Claude planned and edited the existing owners and family leaves. After its interrupted process stopped,
@@ -133,6 +140,20 @@ ai_actions:
   - tests/CMakeLists.txt
   - tasks/done/BUG-184-job-service-waiting-state-accounting.md
   - tasks/done/BUG-181-touched-scope-shader-output-command.md
+- turn: 7
+  action: Root reproduced scalar rejection and redundant geometry uploads, repaired canonical owners and geodesic
+    widgets, incorporated bounded Claude reviews, ran final native/sanitizer/Vulkan verification, rebuilt the
+    developer app, removed temporary probes and archived diagnostics. Source committed locally; BUG-194 remains
+    active for desktop latency.
+  provenance: ai-executed
+  files_changed:
+  - src/runtime/Visualization/Runtime.VisualizationRecipes.cpp
+  - src/graphics/renderer/Graphics.VisualizationPackets.cpp
+  - assets/shaders/common/gpu_scene.glsl
+  - src/app/Sandbox/Editor/Sandbox.MeshProcessingPanels.cpp
+  - src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Keypoints.cpp
+  - tests/integration/runtime/Test.RuntimeRenderExtraction.cpp
+  - tasks/active/BUG-194-large-mesh-property-display.md
 claims_touched: []
 key_context:
 - turn: 1
@@ -154,6 +175,10 @@ key_context:
 - turn: 6
   excerpt: User requested continued remaining-code/open-point work with Claude to save usage, using plan, implementation/refactoring,
     review, testing and fixes. Existing source-sharing and task-retirement authorization persists.
+- turn: 7
+  excerpt: User reported delayed Show saliency/mask and pink geodesics on a larger model, requested consistent
+    entity controls, and supplied dragon.obj in ~/Dropbox/Work/Datasets/obj. Existing Claude source-sharing
+    authorization applies.
 open_threads:
 - BUILD-007 owns matched clean-source engine compile reconciliation; BUILD-006 separately owns backend/cache comparisons.
   C92 remains a hypothesis.
@@ -169,5 +194,6 @@ open_threads:
   does not settle their broader method, architecture or performance hypotheses.
 - ASSETIO-012 is retired. UI-046 retains geometry export, UI-047 path choosing, and ASSETIO-011 broader real-widget
   import coverage; their shared geometry capability owner is now explicit.
+- BUG-194 retains the exact desktop Show delay investigation; confirmed infinity and redundant-upload fixes are verified. Retest build/dev/bin/ExtrinsicSandbox; camera/UI responsiveness and baked-texture mode remain discriminators.
 ai_suggestions_pending:
 - No unrelated research observation acquired a closure signal from this refactor.
