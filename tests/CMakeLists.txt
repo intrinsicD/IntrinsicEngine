@@ -7,6 +7,12 @@ endif()
 include(GoogleTest)
 include(${CMAKE_SOURCE_DIR}/cmake/CompileShaders.cmake)
 
+# Shader verification also runs in Null/headless trees without a GPU executable.
+if(GLSL_COMPILER)
+    add_custom_target(IntrinsicShaderOutputs)
+    intrinsic_add_glsl_shaders(IntrinsicShaderOutputs)
+endif()
+
 # The compiled family and common capture owners must stay independent of session
 # composition and other method contracts. Inspect the configured Clang/CMake graph.
 find_program(INTRINSIC_TEST_PYTHON_EXECUTABLE NAMES python3 REQUIRED)

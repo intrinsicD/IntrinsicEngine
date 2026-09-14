@@ -58,6 +58,11 @@ CI helper scripts and workflow validation tools.
   labels, producer/case inventories, command closure, fallback state, and
   per-batch timing. Missing or ambiguous input fails closed rather than
   producing an empty plan.
+  Shader changes add the existing shader compiler helper's `IntrinsicShaderOutputs`
+  producer to the first build batch, including in Null/headless trees. Output
+  verification uses the selected build directory only after successful builds
+  and requires outputs for changed shader sources; its failure prevents the
+  route from advancing to tests. Build edge counts include this shader producer.
 - `cpu_test_selection.py`: captures the exact path-free `IntrinsicCpuTests`
   producer and logical test-case inventory selected by the canonical
   `-LE 'gpu|vulkan|slow|flaky-quarantine'` predicate, validates the configured

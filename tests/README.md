@@ -514,6 +514,11 @@ configured increment exceeds the declared focused-route budget. The generated
 routing artifact records the exact selection. This lane does not replace
 final CPU/sanitizer/capability PR/merge verification.
 
+Shader changes select the standalone `IntrinsicShaderOutputs` target before
+checking `<build-dir>/bin/shaders` for the changed sources' outputs. This reuses the shader compilation helper
+without requiring a GPU executable or making CPU test targets compile shaders.
+The producer requires `glslc`; unavailable compilation fails the requested build.
+
 `CMakePresets.json` currently defines configure/build presets but no CTest
 `testPresets`, so use the directory-based `ctest --test-dir build/ci ...`
 commands above rather than `ctest --preset ci`. Regular discovered tests use a

@@ -2,6 +2,8 @@
 from __future__ import annotations
 
 import importlib.util
+import contextlib
+import io
 import json
 import re
 import subprocess
@@ -831,6 +833,100 @@ class TouchedScopeTests(unittest.TestCase):
             ],
             [2, 1],
         )
+
+    def test_shader_check_is_deferred_and_prints_selected_output_directory(self) -> None:
+        route = touched_scope.analyze_change_records(
+            [record("assets/shaders/example.comp")]
+        )
+        early = touched_scope.structural_commands(".", route["structural_checks"])
+        self.assertFalse(any("check_shader_outputs.py" in " ".join(c.argv) for c in early))
+        args = touched_scope.parse_args([
+            "--root", ".", "--preset", "ci-fast", "--build-dir", "build/custom shaders",
+        ])
+        output = io.StringIO()
+        with contextlib.redirect_stdout(output):
+            touched_scope.print_plan(route, args)
+        plan = output.getvalue()
+        self.assertLess(plan.index("--fresh"), plan.index("IntrinsicShaderOutputs"))
+        self.assertLess(plan.index("IntrinsicShaderOutputs"), plan.index("check_shader_outputs.py"))
+        self.assertIn("--dir 'build/custom shaders/bin/shaders'", plan)
+        self.assertIn("--require example.comp.spv", plan)
+
+    def test_shader_requirements_follow_source_changes(self) -> None:
+        route = touched_scope.analyze_change_records([
+            record("assets/shaders/old.comp"),
+            touched_scope.ChangeRecord("R100", "assets/shaders/new.comp", "assets/shaders/old.comp"),
+            record("assets/shaders/deleted.frag"),
+            record("assets/shaders/deleted.frag", "D"),
+            record("assets/shaders/restored.vert", "D"),
+            record("assets/shaders/restored.vert", "A"),
+            record("assets/shaders/include.glsl"),
+            record("assets/shaders/include.glslinc"),
+            record("assets/shaders/nested/added.frag", "A"),
+            record("src/example.cpp"),
+        ])
+        command = touched_scope.shader_output_command(Path("build/custom"), route)
+        self.assertEqual(command.argv[4:], (
+            "--require", "nested/added.frag.spv",
+            "--require", "new.comp.spv",
+            "--require", "restored.vert.spv",
+        ))
+
+    def test_shader_output_checker_observes_producer_and_fails_closed(self) -> None:
+        for outcome in ("success", "missing-output", "producer-failure"):
+            with self.subTest(outcome=outcome), tempfile.TemporaryDirectory() as temp:
+                build_dir = Path(temp) / "custom build"
+                write_registry(build_dir, rows=[
+                    ("IntrinsicGraphicsContractTests", "contract,graphics"),
+                    ("IntrinsicRuntimeGraphicsCpuTests", "graphics,integration,runtime"),
+                ])
+                route = touched_scope.finalize_route(
+                    touched_scope.analyze_change_records(
+                        [record("assets/shaders/example.comp")]
+                    ), build_dir,
+                )
+                self.assertNotIn("IntrinsicShaderOutputs", route["finalization"]["selected_targets"])
+                self.assertEqual(touched_scope._test_batches(route)[0]["producer_targets"],
+                                 ["IntrinsicGraphicsContractTests"])
+                calls = []
+                shader_dir = build_dir / "bin" / "shaders"
+                # Configure creates the directory; a warm tree can also contain
+                # unrelated old outputs without the changed shader's output.
+                shader_dir.mkdir(parents=True)
+                (shader_dir / "unrelated.comp.spv").write_bytes(b"fixture")
+
+                def run(argv, *, cwd, capture_output=False):
+                    calls.append(tuple(argv))
+                    if argv[0] == "cmake":
+                        if "IntrinsicShaderOutputs" in argv:
+                            self.assertFalse((shader_dir / "example.comp.spv").exists())
+                            if outcome == "producer-failure":
+                                return subprocess.CompletedProcess(argv, 13, "", "")
+                            if outcome == "success":
+                                (shader_dir / "example.comp.spv").write_bytes(b"fixture")
+                        return subprocess.CompletedProcess(argv, 0, "", "")
+                    self.assertEqual(argv[1], "tools/repo/check_shader_outputs.py")
+                    self.assertEqual(tuple(argv[2:]), (
+                        "--dir", str(shader_dir), "--require", "example.comp.spv",
+                    ))
+                    return subprocess.run(argv, cwd=cwd, text=True, capture_output=True)
+
+                with mock.patch.object(touched_scope, "_ninja_commands", return_value={"shader"}), \
+                     mock.patch.object(touched_scope, "_run_command", side_effect=run):
+                    code, result = touched_scope.execute_build(
+                        route, root=REPO_ROOT, build_dir=build_dir,
+                    )
+                self.assertTrue(any("IntrinsicShaderOutputs" in c for c in calls))
+                checks = [c for c in calls if "check_shader_outputs.py" in " ".join(c)]
+                if outcome == "producer-failure":
+                    self.assertEqual(code, 13)
+                    self.assertEqual(checks, [])
+                    self.assertEqual(result["stage"], "finalized")
+                else:
+                    self.assertEqual(len(checks), 1)
+                    self.assertEqual(calls[-1], checks[0])
+                    self.assertEqual(code == 0, outcome == "success")
+                    self.assertEqual(result["stage"], "built" if code == 0 else "finalized")
 
     def test_ctest_inventory_rejects_zero_and_duplicates(self) -> None:
         build_dir = Path("build/fake")

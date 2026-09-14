@@ -18,6 +18,7 @@ from typing import Any, Iterable, Sequence
 
 
 ROUTE_SCHEMA = "intrinsic.touched-scope-route/v2"
+SHADER_OUTPUT_TARGET = "IntrinsicShaderOutputs"
 DEFAULT_EXCLUDE_LABELS = ("gpu", "vulkan", "slow", "flaky-quarantine")
 DEFAULT_EXCLUDE_REGEX = "|".join(DEFAULT_EXCLUDE_LABELS)
 TARGET_NAME_RE = re.compile(r"[A-Za-z_][A-Za-z0-9_.+-]*\Z")
@@ -1086,13 +1087,6 @@ def structural_commands(root_arg: str, checks: Sequence[str]) -> list[Command]:
                 "task-state links",
             )
         )
-    if "shader_outputs" in selected:
-        commands.append(
-            Command(
-                ("python3", "tools/repo/check_shader_outputs.py", "--root", root_arg),
-                "shader output policy",
-            )
-        )
     if "skills_sync" in selected:
         commands.append(
             Command(
@@ -1114,6 +1108,32 @@ def structural_commands(root_arg: str, checks: Sequence[str]) -> list[Command]:
             seen.add(command.argv)
             deduplicated.append(command)
     return deduplicated
+
+
+def shader_output_command(build_dir: Path, route: dict[str, Any]) -> Command:
+    required: set[str] = set()
+    # Local routes retain successive committed/staged/unstaged records. A later
+    # deletion or rename must remove an earlier requirement for the same path.
+    for record in route["change_records"]:
+        path = record["path"]
+        kind = record["status"][0]
+        if kind == "R":
+            required.discard(record["old_path"])
+        if kind == "D":
+            required.discard(path)
+        elif path.startswith("assets/shaders/") and PurePosixPath(path).suffix in {
+            ".vert", ".frag", ".comp",
+        }:
+            required.add(path)
+    required_args = tuple(
+        arg for path in sorted(required)
+        for arg in ("--require", path.removeprefix("assets/shaders/") + ".spv")
+    )
+    return Command(
+        ("python3", "tools/repo/check_shader_outputs.py", "--dir",
+         str(build_dir / "bin" / "shaders"), *required_args),
+        "verify compiled shader outputs after build",
+    )
 
 
 def _run_command(
@@ -1290,6 +1310,9 @@ def finalize_route(route: dict[str, Any], build_dir: Path) -> dict[str, Any]:
             },
         ]
 
+    if "shader_outputs" in route["structural_checks"]:
+        build_batches[0]["targets"].insert(0, SHADER_OUTPUT_TARGET)
+
     selected = sorted(selected_targets)
     inventory_dir = build_dir / "ci-routing"
     inventory_dir.mkdir(parents=True, exist_ok=True)
@@ -1385,6 +1408,15 @@ def execute_build(
         "ninja_edge_count": len(prior_commands),
         "batches": batch_results,
     }
+    if returncode == 0 and "shader_outputs" in route["structural_checks"]:
+        command = shader_output_command(build_dir, route)
+        print(f"[touched_scope] {command.reason}: {command.shell_text()}", flush=True)
+        result = _run_command(command.argv, cwd=root)
+        route["build"]["shader_outputs"] = {
+            "argv": list(command.argv),
+            "returncode": result.returncode,
+        }
+        returncode = result.returncode
     if returncode == 0:
         route["stage"] = "built"
     return returncode, route
@@ -1691,6 +1723,13 @@ def print_plan(route: dict[str, Any], args: argparse.Namespace) -> None:
             "# finalize/build/test commands are derived from the configured "
             "test registry"
         )
+        if "shader_outputs" in route["structural_checks"]:
+            print("# shader producer runs in the first build batch, or standalone:")
+            print(shlex.join(("cmake", "--build", args.build_dir,
+                              "--target", SHADER_OUTPUT_TARGET)))
+            command = shader_output_command(Path(args.build_dir), route)
+            print(f"# {command.reason}")
+            print(command.shell_text())
     print(
         "Note: touched-scope feedback is not a replacement for full "
         "CPU/sanitizer/capability gates."
