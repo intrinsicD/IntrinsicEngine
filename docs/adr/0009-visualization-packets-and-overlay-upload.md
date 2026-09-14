@@ -182,3 +182,13 @@ graphics task families.
   alternative, deterministic failures, range policy, batch ownership, and the
   separate HTEX scheduling operation.
 - The default CPU correctness gate (`ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60`) exercises `ValidateVisualizationPackets(...)`, the `VisualizationDiagnostics` counter set, and the snapshot-drop behavior without a Vulkan device.
+
+### Unreachable scalar samples
+
+Scalar property uploads accept positive and negative infinity as unreachable or
+undefined-distance samples. Automatic scalar display ranges use only finite
+samples and require at least one; manual ranges must be finite and increasing.
+Stored values and element slots are preserved. The shared colormap shader draws
+non-finite interpolated samples in neutral gray. NaN source values, finite values
+that overflow the float upload representation, and non-finite vector/color
+payloads remain invalid. Isoline extraction still requires finite source data.

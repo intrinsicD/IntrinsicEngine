@@ -534,7 +534,8 @@ TEST(SandboxProcessingPanels, NamedMeshOutputsUseAppearanceWithoutRecomputing)
         }
         if (step == 3)
             ImGui::ActivateItemByID(window->GetID(std::string_view{show.Window} == "mesh.processing.curvature"
-                ? "Entity##MeshCurvature" : "Entity##Processing"));
+                ? "Entity##MeshCurvature" : std::string_view{show.Window} == "mesh.processing.geodesics"
+                    ? "Entity##Geodesics" : "Entity##Processing"));
         if (step == 5)
         {
             auto& popups = ImGui::GetCurrentContext()->OpenPopupStack;
@@ -582,6 +583,53 @@ TEST(SandboxProcessingPanels, NamedMeshOutputsUseAppearanceWithoutRecomputing)
     EXPECT_EQ(h.Selection().SelectedStableIds().front(), R::SelectionController::ToStableEntityId(sceneEntity));
     EXPECT_FALSE(scene.Raw().all_of<G::VisualizationLaneOverrides>(sceneEntity));
     EXPECT_EQ(R::GetMeshCurvatureConfig(h.Control().GetEngineConfigControlState().ActiveConfig)->StableEntityId, stableId);
+}
+
+TEST(SandboxProcessingPanels, GeodesicsFollowsEntityAndResetsMeshLocalSources)
+{
+    PanelHarness h;
+    auto& scene = h.Scene();
+    const auto first = scene.Create(), second = scene.Create();
+    for (const auto entity : {first, second})
+        PopulateSamples(scene.Raw(), entity, R::GeometryElementDomain::MeshVertex);
+    ASSERT_TRUE(h.Selection().SetSelectedEntity(scene, first));
+    auto config = h.Control().GetEngineConfigControlState().ActiveConfig;
+    auto geodesics = *R::GetGeodesicsConfig(config);
+    geodesics.SourceVertices = {0u};
+    R::SetGeodesicsConfig(config, geodesics);
+    ASSERT_TRUE(h.Apply(config));
+    ASSERT_TRUE(h.Shell.SetEditorWindowOpen("mesh.processing.geodesics", true));
+    int frame = 0;
+    h.Driver->OnFrame = [&](R::Engine& engine) {
+        auto* window = ImGui::FindWindowByName("Mesh / Geodesics / Virtual Source Propagation");
+        if (!window) return;
+        ImGui::SetWindowSize(window, {750, 1600});
+        ImGui::SetWindowPos(window, {0, 0});
+        ImGui::FocusWindow(window);
+        if (frame == 3 || frame == 12)
+            ImGui::ActivateItemByID(window->GetID("Compute geodesics"));
+        if (frame == 6)
+        {
+            EXPECT_TRUE(scene.Raw().get<GS::Vertices>(first).Properties.Exists(geodesics.DistanceProperty));
+            EXPECT_FALSE(scene.Raw().get<GS::Vertices>(second).Properties.Exists(geodesics.DistanceProperty));
+            EXPECT_TRUE(h.Selection().SetSelectedEntity(scene, second));
+        }
+        if (frame == 9)
+        {
+            EXPECT_TRUE(R::GetGeodesicsConfig(h.Control().GetEngineConfigControlState().ActiveConfig)->SourceVertices.empty());
+            ImGui::ActivateItemByID(window->GetID("Add source"));
+        }
+        if (frame == 15)
+        {
+            EXPECT_TRUE(scene.Raw().get<GS::Vertices>(second).Properties.Exists(geodesics.DistanceProperty));
+            h.Selection().ClearSelection(scene);
+        }
+        if (++frame == 19) engine.RequestExit();
+    };
+    h.Engine->Run();
+    EXPECT_EQ(frame, 19);
+    EXPECT_TRUE(h.Selection().SelectedStableIds().empty());
+    EXPECT_TRUE(R::GetGeodesicsConfig(h.Control().GetEngineConfigControlState().ActiveConfig)->SourceVertices.empty());
 }
 
 TEST(SandboxProcessingPanels, EntityDefaultsFollowSelectionChangesAndPreserveExplicitChoices)

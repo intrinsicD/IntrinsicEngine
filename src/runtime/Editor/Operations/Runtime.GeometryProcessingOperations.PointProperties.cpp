@@ -25,7 +25,6 @@ import Extrinsic.Runtime.JobService;
 import Extrinsic.Runtime.GeometryAvailability;
 import Extrinsic.ECS.Scene.Registry;
 import Extrinsic.ECS.Components.GeometrySources;
-import Extrinsic.ECS.Component.DirtyTags;
 import Extrinsic.Runtime.SpatialIndexCache;
 import Geometry.Properties;
 import Extrinsic.ECS.Scene.Handle;
@@ -225,8 +224,8 @@ namespace Extrinsic::Runtime::GeometryProcessingDetail
             else if (auto p = props->Get<float>(output.Name)) props->Remove(p);
             const auto a = BuildGeometryAvailability(context.Scene->Raw(), entity);
             *revisions = {ObserveGeometryProperty(a, output.Domain, output.Name)};
-            ECS::Components::DirtyTags::MarkGpuDirty(context.Scene->Raw(), entity);
-            ECS::Components::DirtyTags::MarkVertexAttributesDirty(context.Scene->Raw(), entity);
+            // Scalar buffers follow their property revision. They do not alter
+            // resident positions, topology or vertex channels.
             if (context.InvalidateWorkspaceSnapshotCache) context.InvalidateWorkspaceSnapshotCache();
             return EditorCommandHistoryStatus::Applied;
         };

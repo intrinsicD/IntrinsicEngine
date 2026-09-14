@@ -182,7 +182,7 @@ TEST(DensityWeightOperations, OneSampleAndBackendPreflightPreserveOutputs)
     EXPECT_FALSE(R::ApplyEditorDensityWeightCommand(R::BindEditorProcessingCommands(context),c).Succeeded());EXPECT_EQ(std::as_const(props).Get<float>(c.Weights.Name)[0],77);
 }
 
-TEST(DensityWeightOperations, PublicationUndoAndRedoNotifyRenderAndWorkspace)
+TEST(DensityWeightOperations, PublicationUndoAndRedoAdvancePropertyWithoutInvalidatingGeometry)
 {
     namespace Dirty = Extrinsic::ECS::Components::DirtyTags;
     for (const bool existing : {false, true})
@@ -197,9 +197,12 @@ TEST(DensityWeightOperations, PublicationUndoAndRedoNotifyRenderAndWorkspace)
         R::EditorProcessingContext context{.Scene=&scene, .CommandHistory=&history};
         context.InvalidateWorkspaceSnapshotCache = [&] { ++invalidations; };
         const auto clear = [&] { scene.Raw().remove<Dirty::GpuDirty, Dirty::DirtyVertexAttributes>(entity); };
+        auto revision = props.FindPropertyRevision(config.Weights.Name);
         const auto notified = [&](unsigned expected) {
-            EXPECT_TRUE(scene.Raw().all_of<Dirty::GpuDirty>(entity));
-            EXPECT_TRUE(scene.Raw().all_of<Dirty::DirtyVertexAttributes>(entity));
+            EXPECT_FALSE((scene.Raw().any_of<Dirty::GpuDirty, Dirty::DirtyVertexAttributes>(entity)));
+            const auto current = props.FindPropertyRevision(config.Weights.Name);
+            EXPECT_NE(current, revision);
+            revision = current;
             EXPECT_EQ(invalidations, expected);
         };
         clear();

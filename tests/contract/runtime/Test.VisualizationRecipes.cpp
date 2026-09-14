@@ -1,6 +1,8 @@
+#include <algorithm>
 #include <array>
 #include <chrono>
 #include <cstdint>
+#include <cmath>
 #include <cstring>
 #include <limits>
 #include <optional>
@@ -865,4 +867,49 @@ TEST(VisualizationRecipes, BooleanMasksAndUvsEncodeFiniteRgbaWithoutPublishingAl
     EXPECT_EQ(props.Revision(), revision);
     uv[0].x = std::numeric_limits<float>::quiet_NaN();
     EXPECT_FALSE(encode("v:uv", Geometry::PropertyValueKind::Vec2).Succeeded());
+}
+
+TEST(VisualizationRecipes, InfiniteScalarSamplesPreserveSlotsWithoutPoisoningRange)
+{
+    RecipeSourceFixture source{};
+    auto heat = source.Faces.Properties.Get<double>("heat");
+    ASSERT_TRUE(heat);
+    heat[0] = std::numeric_limits<double>::infinity();
+    heat[1] = -std::numeric_limits<double>::infinity();
+    for (bool automatic : {true, false})
+    {
+        const auto encoded = R::EncodeVisualizationRecipe(source.Availability,
+            {.Data = R::ScalarVisualizationRecipe{
+                .Source = {R::GeometryElementDomain::MeshFace, "heat", Geometry::PropertyValueKind::Double},
+                .AutoRange = automatic, .RangeMin = 0.f, .RangeMax = 20.f}});
+        ASSERT_TRUE(encoded.Succeeded());
+        ASSERT_EQ(encoded.Batch.Scalars.size(), 1u);
+        EXPECT_EQ(encoded.Batch.Scalars.front().ElementCount, 4u);
+        EXPECT_FLOAT_EQ(encoded.Batch.Scalars.front().RangeMin, automatic ? 11.f : 0.f);
+        EXPECT_FLOAT_EQ(encoded.Batch.Scalars.front().RangeMax, automatic ? 13.f : 20.f);
+        ASSERT_EQ(encoded.Batch.PropertyBuffers.size(), 1u);
+        std::array<float, 4> values{};
+        ASSERT_EQ(encoded.Batch.PropertyBuffers.front().Bytes.size(), sizeof(values));
+        std::memcpy(values.data(), encoded.Batch.PropertyBuffers.front().Bytes.data(), sizeof(values));
+        EXPECT_EQ(values[0], std::numeric_limits<float>::infinity());
+        EXPECT_EQ(values[1], -std::numeric_limits<float>::infinity());
+        EXPECT_FLOAT_EQ(values[2], 11.f);
+        EXPECT_FLOAT_EQ(values[3], 13.f);
+    }
+    for (const double invalid : {std::numeric_limits<double>::quiet_NaN(),
+                                 std::numeric_limits<double>::max()})
+    {
+        heat[0] = invalid;
+        const auto encoded = R::EncodeVisualizationRecipe(source.Availability,
+            {.Data = R::ScalarVisualizationRecipe{
+                .Source = {R::GeometryElementDomain::MeshFace, "heat", Geometry::PropertyValueKind::Double}}});
+        EXPECT_EQ(encoded.Status, R::VisualizationRecipeStatus::NonFiniteValue);
+        EXPECT_TRUE(encoded.Batch.Scalars.empty());
+    }
+    std::fill(heat.Vector().begin(), heat.Vector().end(), std::numeric_limits<double>::infinity());
+    const auto empty = R::EncodeVisualizationRecipe(source.Availability,
+        {.Data = R::ScalarVisualizationRecipe{
+            .Source = {R::GeometryElementDomain::MeshFace, "heat", Geometry::PropertyValueKind::Double}}});
+    EXPECT_EQ(empty.Status, R::VisualizationRecipeStatus::NonFiniteValue);
+    EXPECT_TRUE(empty.Batch.Scalars.empty());
 }

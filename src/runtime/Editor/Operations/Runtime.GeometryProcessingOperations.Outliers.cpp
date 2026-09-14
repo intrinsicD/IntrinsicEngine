@@ -341,8 +341,6 @@ namespace Extrinsic::Runtime
                 const auto a=BuildGeometryAvailability(context.Scene->Raw(),entity);
                 *revisions={ObserveGeometryProperty(a,c.Mask.Domain,c.Mask.Name),ObserveGeometryProperty(a,c.Score.Domain,c.Score.Name)};
                 RestoreStamp(context,entity,target.Stamp,false,&c.Mask);
-                ECS::Components::DirtyTags::MarkGpuDirty(context.Scene->Raw(),entity);
-                ECS::Components::DirtyTags::MarkVertexAttributesDirty(context.Scene->Raw(),entity);
                 if (context.InvalidateWorkspaceSnapshotCache) context.InvalidateWorkspaceSnapshotCache();
                 return EditorCommandHistoryStatus::Applied;
             };

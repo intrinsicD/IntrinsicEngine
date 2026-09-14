@@ -3489,11 +3489,11 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke, ReferenceTriangleScalarFieldColormapResol
 // `BinCount == IsolineCount`: the non-contour probe has raw t=0.4 but binned
 // t=0.5, so a shader that still applies isolines to the binned value paints it
 // as a false contour instead of the Viridis mid-point colour.
-TEST(RuntimeSandboxAcceptanceGpuSmoke, AnalysisMaskSaliencyAndAppearanceRecoveryReachGpu)
+namespace
 {
-    using Kind = Geometry::PropertyValueKind;
-    for (int stage = 0; stage != 3; ++stage)
+    void CheckAnalysisPropertyDisplay(const int stage)
     {
+        using Kind = Geometry::PropertyValueKind;
         SCOPED_TRACE(stage);
         auto bootstrap = BootstrapDefaultSandboxAppEngine();
         if (bootstrap.Skipped)
@@ -3508,6 +3508,17 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke, AnalysisMaskSaliencyAndAppearanceRecovery
         properties.GetOrAdd<float>("keypoint_saliency", 0.0f).Vector() = {0.0f, 1.0f, 0.0f};
         properties.GetOrAdd<glm::vec3>("recovery_color", glm::vec3{0.0f}).Vector() =
             {{1, 0, 0}, {0, 1, 0}, {0, 0, 1}};
+        if (stage == 3)
+        {
+            // An unused vertex models a disconnected geodesic component. It
+            // must not suppress the reachable triangle's scalar payload.
+            properties.Resize(4u);
+            properties.GetOrAdd<double>("geodesic_distance", 0.0).Vector() =
+                {0.0, 1.0, 0.0, std::numeric_limits<double>::infinity()};
+        }
+        if (stage == 4)
+            properties.GetOrAdd<double>("geodesic_distance", 0.0).Vector() =
+                std::vector<double>(3u, std::numeric_limits<double>::infinity());
         auto& extraction = RequiredEngineService<RT::RenderExtractionCache>(engine);
         const Intrinsic::Tests::EditorFeatureTestContext context{
             .Scene = &scene,
@@ -3546,6 +3557,15 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke, AnalysisMaskSaliencyAndAppearanceRecovery
             ASSERT_EQ(RT::ApplyEditorVisualizationPropertyCommand(context, recovery),
                       RT::EditorCommandStatus::Applied);
 
+        if (stage >= 3)
+            ASSERT_EQ(RT::ApplyEditorVisualizationRecipeCommand(context, {
+                .StableEntityId = id,
+                .Recipe = {.Data = RT::ScalarVisualizationRecipe{
+                    .Source = {RT::GeometryElementDomain::MeshVertex,
+                               "geodesic_distance", Kind::Double},
+                    .AutoRange = stage == 3, .RangeMin = 0.0f, .RangeMax = 1.0f}}}),
+                RT::EditorCommandStatus::Applied);
+
         auto& renderer = engine.GetRenderer();
         auto& device = engine.GetDevice();
         const auto format = device.GetBackbufferFormat();
@@ -3567,9 +3587,9 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke, AnalysisMaskSaliencyAndAppearanceRecovery
         const auto surface = ReadVisibleInstanceConfigByEntityId(
             device, renderer, id, Extrinsic::RHI::GpuRender_Surface);
         EXPECT_TRUE(surface.Found);
-        EXPECT_EQ(surface.Config.ColorSourceMode, stage == 1 ? 2u : 3u);
-        EXPECT_NE(stage == 1 ? surface.Config.ScalarBDA : surface.Config.ColorBDA, 0u);
-        EXPECT_EQ(surface.Config.ElementCount, 3u);
+        EXPECT_EQ(surface.Config.ColorSourceMode, (stage == 1 || stage >= 3) ? 2u : 3u);
+        EXPECT_NE((stage == 1 || stage >= 3) ? surface.Config.ScalarBDA : surface.Config.ColorBDA, 0u);
+        EXPECT_EQ(surface.Config.ElementCount, stage == 3 ? 4u : 3u);
 
         std::vector<std::uint8_t> pixels(size);
         device.ReadBuffer(readback, pixels.data(), size, 0u);
@@ -3586,13 +3606,41 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke, AnalysisMaskSaliencyAndAppearanceRecovery
         };
         const auto left = sample(*leftPoint);
         const auto right = sample(*rightPoint);
-        EXPECT_GT(RgbDistance(left, right), 20)
+        if (stage == 4)
+        {
+            for (const auto pixel : {left, right})
+            {
+                // The display transform changes luminance, but neutral gray
+                // stays achromatic and distinct from the clear/pink fallback.
+                EXPECT_NEAR(pixel.R, pixel.G, 3) << PixelText(pixel);
+                EXPECT_NEAR(pixel.G, pixel.B, 3) << PixelText(pixel);
+                EXPECT_GT(pixel.R, 48) << PixelText(pixel);
+                EXPECT_LT(pixel.R, 245) << PixelText(pixel);
+            }
+        }
+        else EXPECT_GT(RgbDistance(left, right), 20)
             << "Property visualization collapsed to a uniform color: "
             << PixelText(left) << " / " << PixelText(right);
         renderer.SetDefaultRecipeBackbufferReadbackBuffer({});
         device.DestroyBuffer(readback);
         engine.Shutdown();
     }
+}
+
+TEST(RuntimeSandboxAcceptanceGpuSmoke, AnalysisMaskSaliencyAndAppearanceRecoveryReachGpu)
+{
+    for (int stage = 0; stage != 3; ++stage)
+        CheckAnalysisPropertyDisplay(stage);
+}
+
+TEST(RuntimeSandboxAcceptanceGpuSmoke, UnreachableVertexPreservesReachableScalarGradient)
+{
+    CheckAnalysisPropertyDisplay(3);
+}
+
+TEST(RuntimeSandboxAcceptanceGpuSmoke, UnreachableScalarRegionUsesGray)
+{
+    CheckAnalysisPropertyDisplay(4);
 }
 
 TEST(RuntimeSandboxAcceptanceGpuSmoke, ReferenceTriangleScalarFieldSurfaceAndIsolinesResolveOnGpu)

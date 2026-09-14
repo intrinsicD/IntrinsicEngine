@@ -30,10 +30,10 @@ namespace
     }
 }
 
-TEST(VisualizationPropertyBufferResidencyContract, ValidatesDescriptorShapeAndFinitePayloads)
+TEST(VisualizationPropertyBufferResidencyContract, ValidatesDescriptorShapeAndRejectsNaN)
 {
     const std::array<float, 3> values{{1.0f, 2.0f, 3.0f}};
-    const std::array<float, 2> nonFinite{{1.0f, std::numeric_limits<float>::infinity()}};
+    const std::array<float, 2> nonFinite{{1.0f, std::numeric_limits<float>::quiet_NaN()}};
 
     const std::array<Graphics::VisualizationPropertyBufferUploadDescriptor, 5> descriptors{{
         Graphics::VisualizationPropertyBufferUploadDescriptor{
@@ -83,6 +83,28 @@ TEST(VisualizationPropertyBufferResidencyContract, ValidatesDescriptorShapeAndFi
     EXPECT_EQ(diagnostics.UnsupportedTypeCount, 1u);
     EXPECT_EQ(diagnostics.NonFiniteValueCount, 1u);
     EXPECT_TRUE(diagnostics.HasErrors);
+}
+
+TEST(VisualizationPropertyBufferResidencyContract, OnlyScalarPayloadsAcceptUnreachableSamples)
+{
+    using G = Graphics::VisualizationValueType;
+    const std::array<float, 4> values{0.f, std::numeric_limits<float>::infinity(),
+        -std::numeric_limits<float>::infinity(), 1.f};
+    const std::array<double, 4> doubles{0., std::numeric_limits<double>::infinity(),
+        -std::numeric_limits<double>::infinity(), 1.};
+    for (const auto kind : {G::ScalarFloat, G::ScalarDouble, G::VectorFloat3, G::RgbaFloat4})
+    {
+        SCOPED_TRACE(static_cast<int>(kind));
+        const bool scalar = kind == G::ScalarFloat || kind == G::ScalarDouble;
+        const auto stride = Graphics::ExpectedVisualizationValueStride(kind);
+        auto bytes = kind == G::ScalarDouble ? BytesOf(doubles) : BytesOf(values);
+        Graphics::VisualizationPropertyBufferDiagnostics diagnostics;
+        EXPECT_EQ(Graphics::ValidateVisualizationPropertyBufferUploadDescriptor({
+            .SourceKey = "unreachable", .ValueType = kind,
+            .ElementCount = scalar ? 4u : 1u, .StrideBytes = stride,
+            .Bytes = scalar ? bytes : bytes.first(stride)}, diagnostics), scalar);
+        EXPECT_EQ(diagnostics.NonFiniteValueCount, scalar ? 0u : 1u);
+    }
 }
 
 TEST(VisualizationPropertyBufferResidencyContract, UploadsReusesAndRejectsStaleDirtyStamp)

@@ -18,7 +18,6 @@ module;
 #include <entt/entity/registry.hpp>
 module Extrinsic.Runtime.PointAnalysisOperations;
 import Extrinsic.ECS.Scene.Registry;
-import Extrinsic.ECS.Component.DirtyTags;
 import Extrinsic.ECS.Components.GeometrySources;
 import Extrinsic.Runtime.SpatialIndexCache;
 import Extrinsic.Runtime.EngineConfigControl;
@@ -227,8 +226,6 @@ namespace Extrinsic::Runtime
                 else if (auto p=props->Get<float>(c.Score.Name)) props->Remove(p);
                 const auto a=BuildGeometryAvailability(context.Scene->Raw(),entity);
                 *revisions={ObserveGeometryProperty(a,c.Mask.Domain,c.Mask.Name),ObserveGeometryProperty(a,c.Score.Domain,c.Score.Name)};
-                ECS::Components::DirtyTags::MarkGpuDirty(context.Scene->Raw(),entity);
-                ECS::Components::DirtyTags::MarkVertexAttributesDirty(context.Scene->Raw(),entity);
                 if (context.InvalidateWorkspaceSnapshotCache) context.InvalidateWorkspaceSnapshotCache();
                 return EditorCommandHistoryStatus::Applied;
             };

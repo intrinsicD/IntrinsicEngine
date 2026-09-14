@@ -15,6 +15,8 @@ import Extrinsic.Runtime.EngineConfigControl;
 import Extrinsic.Runtime.MeshFieldOperations;
 import Extrinsic.Runtime.EditorCommandHistory;
 import Extrinsic.Runtime.SelectionController;
+import Extrinsic.Runtime.GeometryAvailability;
+import Extrinsic.Runtime.VisualizationRecipes;
 import Geometry.HalfedgeMesh;
 import Geometry.Properties;
 namespace Runtime = Extrinsic::Runtime;
@@ -29,13 +31,15 @@ namespace
         Extrinsic::ECS::EntityHandle Entity;
         Runtime::EditorProcessingContext Context;
         Runtime::EditorGeodesicsCommand Command;
-        Harness()
+        explicit Harness(bool isolatedVertex = false)
         {
             Geometry::HalfedgeMesh::Mesh mesh;
             auto a = mesh.AddVertex({0, 0, 0}), b = mesh.AddVertex({1, 0, 0});
             auto c = mesh.AddVertex({1, 1, 0}), d = mesh.AddVertex({0, 1, 0});
             EXPECT_TRUE(mesh.AddTriangle(a, b, c));
             EXPECT_TRUE(mesh.AddTriangle(a, c, d));
+            if (isolatedVertex)
+                (void)mesh.AddVertex({3, 3, 0});
             Entity = Scene.Create();
             GS::PopulateFromMesh(Scene.Raw(), Entity, mesh);
             Context.Scene = &Scene;
@@ -223,4 +227,25 @@ TEST(GeodesicsOperations, CustomOutputBindingsRoundTripAndUndoWithoutTouchingDef
     invalid.DistanceProperty = invalid.SourceMaskProperty;
     EXPECT_FALSE(Runtime::ValidateGeodesicsConfigSection(
         Runtime::SerializeGeodesicsConfig(invalid), {}, "geodesics").Usable());
+}
+
+TEST(GeodesicsOperations, UnreachableVertexDoesNotHideReachableDistanceField)
+{
+    Harness h(true);
+    const auto result = Runtime::ApplyEditorGeodesicsCommand(h.Commands(), h.Command);
+    ASSERT_TRUE(result.Succeeded()) << result.Message;
+    ASSERT_EQ(result.Diagnostics.UnreachableVertexCount, 1u);
+    const auto distance = h.Properties().Get<double>(h.Command.Config.DistanceProperty);
+    ASSERT_TRUE(distance);
+    ASSERT_TRUE(std::isinf(distance.Vector().back()));
+    const auto encoded = Runtime::EncodeVisualizationRecipe(
+        Runtime::BuildGeometryAvailability(h.Scene.Raw(), h.Entity),
+        {.Data = Runtime::ScalarVisualizationRecipe{
+            .Source = {Runtime::GeometryElementDomain::MeshVertex,
+                       h.Command.Config.DistanceProperty, Geometry::PropertyValueKind::Double}}});
+    EXPECT_TRUE(encoded.Succeeded()) << static_cast<int>(encoded.Status);
+    ASSERT_EQ(encoded.Batch.Scalars.size(), 1u);
+    EXPECT_EQ(encoded.Batch.Scalars.front().ElementCount, 5u);
+    EXPECT_FLOAT_EQ(encoded.Batch.Scalars.front().RangeMin, 0.0f);
+    EXPECT_NEAR(encoded.Batch.Scalars.front().RangeMax, std::sqrt(2.0), 1e-6);
 }

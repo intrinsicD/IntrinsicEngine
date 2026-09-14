@@ -179,7 +179,6 @@ namespace Extrinsic::Runtime
                 !ApplyCurvatureProperty<bool>(props, sourceName, target.HadSource, target.Source,
                                               false))
                 return EditorCommandHistoryStatus::CommandFailed;
-            Dirty::MarkVertexAttributesDirty(raw, entity);
             if (invalidate)
                 invalidate();
             return EditorCommandHistoryStatus::Applied;

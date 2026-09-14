@@ -502,6 +502,12 @@ vec4 GpuResolveVisualizationColorWithColormap(GpuEntityConfig cfg,
         return GpuResolveVisualizationColorFallback(cfg, perElementColor, baseColor);
     }
 
+    // Preserve unreachable scalar samples without letting infinity/NaN poison
+    // LUT coordinates (interpolation across an infinite sample can yield NaN).
+    if (isinf(scalarValue) || isnan(scalarValue)) {
+        return vec4(0.5, 0.5, 0.5, cfg.VisualizationAlpha);
+    }
+
     const float t = GpuVisualizationNormalizedScalar(cfg, scalarValue);
     const float rawT = GpuVisualizationNormalizedScalarRaw(cfg, scalarValue);
     vec4 color = texture(colormapLut, vec2(t, 0.5));

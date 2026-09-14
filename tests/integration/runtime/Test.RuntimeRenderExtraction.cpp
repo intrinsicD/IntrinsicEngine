@@ -37,6 +37,9 @@ import Extrinsic.Graphics.VisualizationPackets;
 import Extrinsic.RHI.FrameHandle;
 import Extrinsic.RHI.TransferQueue;
 import Extrinsic.RHI.Types;
+import Extrinsic.Runtime.PointAnalysisOperations;
+import Extrinsic.Runtime.PointFieldOperations;
+import Extrinsic.Runtime.MeshFieldOperations;
 import Extrinsic.Runtime.MeshPrimitiveView;
 import Extrinsic.Runtime.GeometryPresentation;
 import Extrinsic.Runtime.RenderExtraction;
@@ -2399,5 +2402,87 @@ TEST(RuntimeRenderExtraction, PolygonFacePropertiesRepeatAcrossTheirTriangles)
         ECS::Components::DirtyTags::MarkFaceTopologyDirty(raw, entity);
         verify(2);
         EXPECT_EQ(faces.Size(), 2u);
+    }
+}
+
+TEST(RuntimeRenderExtraction, PublishedAnalysisPropertiesReuseMeshGeometry)
+{
+    namespace R = Runtime;
+    namespace GS = ECS::Components::GeometrySources;
+    for (const int method : {0, 1, 2, 3})
+    {
+        SCOPED_TRACE(method);
+        RendererFixture fixture;
+        ECS::Scene::Registry scene;
+        const auto entity = scene.Create();
+        auto& raw = scene.Raw();
+        raw.emplace<ECS::Components::Transform::WorldMatrix>(entity).Matrix = glm::mat4{1.f};
+        raw.emplace<Graphics::Components::RenderSurface>(entity);
+        Geometry::HalfedgeMesh::Mesh mesh;
+        const auto a = mesh.AddVertex({0, 0, 0});
+        const auto b = mesh.AddVertex({1, 0, 0});
+        const auto c = mesh.AddVertex({0, 1, 0});
+        (void)mesh.AddVertex({1, 1, 0});
+        ASSERT_TRUE(mesh.AddTriangle(a, b, c));
+        GS::PopulateFromMesh(raw, entity, mesh);
+        auto& properties = raw.get<GS::Vertices>(entity).Properties;
+        EXPECT_EQ(fixture.Extract(scene).MeshGeometryUploads, 1u);
+        { auto world = fixture.Renderer->ExtractRenderWorld({}); fixture.Renderer->PrepareFrame(world); }
+        const Intrinsic::Tests::EditorFeatureTestContext context{
+            .Scene = &scene, .VisualizationCommandsAvailable = true};
+        const auto commands = R::BindEditorProcessingCommands(context);
+        R::GeometryPropertyRef output;
+        if (method == 1)
+        {
+            R::EditorGeodesicsCommand command{.StableEntityId = StableId(entity)};
+            command.Config.SourceVertices = {0u};
+            const auto result = R::ApplyEditorGeodesicsCommand(commands, command);
+            ASSERT_TRUE(result.Succeeded()) << result.Message;
+            output = {R::GeometryElementDomain::MeshVertex, command.Config.DistanceProperty,
+                      Geometry::PropertyValueKind::Double};
+        }
+        else if (method == 0)
+        {
+            R::KeypointAnalysisConfig config;
+            config.StableEntityId = StableId(entity);
+            config.Positions.Domain = config.Mask.Domain = config.Score.Domain = R::GeometryElementDomain::MeshVertex;
+            config.MinimumNeighbors = 3; config.SalientRadius = 2; config.NonMaxRadius = 1;
+            const auto result = R::ApplyEditorKeypointAnalysisCommand(commands, config);
+            ASSERT_TRUE(result.Succeeded()) << result.Message;
+            output = config.Score;
+        }
+        else if (method == 2)
+        {
+            R::OutlierAnalysisConfig config;
+            config.StableEntityId = StableId(entity); config.KNeighbors = 3;
+            config.Positions.Domain = config.Mask.Domain = config.Score.Domain = R::GeometryElementDomain::MeshVertex;
+            const auto result = R::ApplyEditorOutlierAnalysisCommand(commands, config);
+            ASSERT_TRUE(result.Succeeded()) << result.Message;
+            output = config.Score;
+        }
+        else
+        {
+            R::DensityWeightConfig config;
+            config.StableEntityId = StableId(entity); config.SupportRadius = 2;
+            config.Positions.Domain = config.Weights.Domain = R::GeometryElementDomain::MeshVertex;
+            const auto result = R::ApplyEditorDensityWeightCommand(commands, config);
+            ASSERT_TRUE(result.Succeeded()) << result.Message;
+            output = config.Weights;
+        }
+        ASSERT_EQ(R::ApplyEditorVisualizationRecipeCommand(context, {
+            .StableEntityId = StableId(entity),
+            .Recipe = {.Data = R::ScalarVisualizationRecipe{.Source = output}}}),
+            R::EditorCommandStatus::Applied);
+        const auto shown = fixture.Extract(scene);
+        EXPECT_EQ(shown.MeshGeometryUploads, 0u);
+        EXPECT_EQ(shown.MeshGeometryReuploads, 0u);
+        EXPECT_EQ(shown.MeshGeometryPartialUploads, 0u);
+        EXPECT_EQ(shown.VisualizationScalarPacketCount, 1u);
+        { auto world = fixture.Renderer->ExtractRenderWorld({}); fixture.Renderer->PrepareFrame(world); }
+
+        // Actual source-channel changes must still update resident geometry.
+        properties.Get<glm::vec3>("v:position").Vector()[1].x += 0.25f;
+        const auto changed = fixture.Extract(scene);
+        EXPECT_GT(changed.MeshGeometryUploads + changed.MeshGeometryReuploads, 0u);
     }
 }

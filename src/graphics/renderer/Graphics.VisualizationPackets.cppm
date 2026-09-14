@@ -1,3 +1,5 @@
+// Graphics-owned visualization packets and upload descriptors shared by runtime
+// producers and render consumers without live scene ownership.
 module;
 
 #include <cstdint>
@@ -163,6 +165,8 @@ export namespace Extrinsic::Graphics
         std::uint64_t SourceAttributeDirtyStamp{0u};
     };
 
+    // Scalar payloads may contain infinity for unreachable samples, but never
+    // NaN. Vector/color payloads remain finite; scalar display ranges are finite.
     struct VisualizationPropertyBufferUploadDescriptor
     {
         std::string SourceKey{};

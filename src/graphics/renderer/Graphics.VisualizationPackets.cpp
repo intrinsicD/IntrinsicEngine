@@ -116,8 +116,9 @@ namespace Extrinsic::Graphics
         }
 
         template <typename T>
-        [[nodiscard]] bool IsFinitePayload(const std::span<const std::byte> bytes,
-                                           const std::uint64_t componentCount) noexcept
+        [[nodiscard]] bool IsValidNumericPayload(const std::span<const std::byte> bytes,
+                                           const std::uint64_t componentCount,
+                                           const bool allowInfinite = false) noexcept
         {
             const std::uint64_t expectedBytes =
                 componentCount * sizeof(T);
@@ -132,7 +133,7 @@ namespace Extrinsic::Graphics
                 std::memcpy(&value,
                             bytes.data() + i * sizeof(T),
                             sizeof(T));
-                if (!std::isfinite(static_cast<double>(value)))
+                if (std::isnan(value) || (!allowInfinite && std::isinf(value)))
                 {
                     return false;
                 }
@@ -212,20 +213,20 @@ namespace Extrinsic::Graphics
             switch (descriptor.ValueType)
             {
             case VisualizationValueType::ScalarFloat:
-                finite = IsFinitePayload<float>(
-                    descriptor.Bytes, descriptor.ElementCount);
+                finite = IsValidNumericPayload<float>(
+                    descriptor.Bytes, descriptor.ElementCount, true);
                 break;
             case VisualizationValueType::VectorFloat3:
-                finite = IsFinitePayload<float>(
+                finite = IsValidNumericPayload<float>(
                     descriptor.Bytes,
                     static_cast<std::uint64_t>(descriptor.ElementCount) * 3u);
                 break;
             case VisualizationValueType::ScalarDouble:
-                finite = IsFinitePayload<double>(
-                    descriptor.Bytes, descriptor.ElementCount);
+                finite = IsValidNumericPayload<double>(
+                    descriptor.Bytes, descriptor.ElementCount, true);
                 break;
             case VisualizationValueType::RgbaFloat4:
-                finite = IsFinitePayload<float>(
+                finite = IsValidNumericPayload<float>(
                     descriptor.Bytes,
                     static_cast<std::uint64_t>(descriptor.ElementCount) * 4u);
                 break;

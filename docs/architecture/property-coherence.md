@@ -98,6 +98,13 @@ therefore owes an explicit decision, reported in its result as
 
 A silent discard is a defect, not a policy. See `BUG-146`.
 
+Same-cardinality scalar and mask publication updates the named property's
+revision and workspace snapshot, without setting geometry-wide GPU or vertex
+attribute dirty tags. This also applies to undo/redo: visualization buffers
+observe the changed property independently. Marking an unchanged mesh dirty
+forces needless packing and geometry uploads. Topology/cardinality replacement
+and actual geometry-channel edits retain their own dirty/update paths.
+
 CPU-backed visualization recipes use the resolved property's revision as their
 buffer dirty stamp. The graphics residency cache therefore reuses unchanged
 property buffers and reuploads a changed scalar, label, color, vector, or

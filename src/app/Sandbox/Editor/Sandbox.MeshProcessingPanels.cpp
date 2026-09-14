@@ -2902,9 +2902,36 @@ namespace Extrinsic::Sandbox::Editor
     void MeshProcessingPanels::Impl::DrawGeodesicsWindow(bool& open,
                                                          const SandboxEditorContext& context)
     {
-        DrawDomainWindow(open, context, Runtime::EditorDomainWindowKind::Mesh,
-                         "Mesh / Geodesics / Virtual Source Propagation",
-                         GeodesicsInput, &Impl::DrawGeodesicsControls);
+        ImGui::SetNextWindowSize(ImVec2(460, 600), ImGuiCond_FirstUseEver);
+        if (!ImGui::Begin("Mesh / Geodesics / Virtual Source Propagation", &open))
+        {
+            ImGui::End();
+            return;
+        }
+        const auto previousEntity = GeodesicsInput.Entity;
+        DrawProcessingEntity("Entity##Geodesics", context, GeodesicsInput.Entity,
+                             GeodesicsInput.PreviousSelection, Runtime::EditorDomainWindowKind::Mesh);
+        DrawProcessingCpuBackend();
+        if (GeodesicsInitialized && previousEntity != GeodesicsInput.Entity)
+        {
+            // Vertex indices belong to the previous mesh, even when the new
+            // mesh happens to have slots with the same indices.
+            GeodesicsConfig.SourceVertices.clear();
+            GeodesicsDirty = true;
+            GeodesicsResult.reset();
+            GeodesicsMessage.clear();
+            GeodesicsSourceVertex = 0;
+            // Publish the reset even when the new selection has no mesh UI.
+            GeodesicsDirty = !Runtime::ApplyEditorGeodesicsConfig(
+                context.MeshFields.Commands, GeodesicsConfig).Succeeded();
+        }
+        const auto& model = GetDomainWindowModel(context, Runtime::EditorDomainWindowKind::Mesh,
+                                                GeodesicsInput.Entity);
+        if (model.DomainMatches && model.Processing.HasSelectedEntity)
+            DrawGeodesicsControls(model, context);
+        else
+            ImGui::TextDisabled("Choose a mesh entity to compute geodesic distances.");
+        ImGui::End();
     }
     void MeshProcessingPanels::Impl::DrawGeodesicsControls(
         const Runtime::EditorDomainWindowModel& model, const SandboxEditorContext& context)
@@ -2985,23 +3012,26 @@ namespace Extrinsic::Sandbox::Editor
         if (ImGui::InputScalar("Expansion budget", ImGuiDataType_U32,
                                &GeodesicsConfig.MaxHalfedgeExpansions))
             GeodesicsDirty = true;
+        if (GeodesicsDirty)
+        {
+            const auto applied = Runtime::ApplyEditorGeodesicsConfig(
+                context.MeshFields.Commands, GeodesicsConfig);
+            if (applied.Succeeded())
+                GeodesicsDirty = false;
+            else
+                GeodesicsMessage = "Geodesics config was rejected; check property names and expansion budget.";
+        }
+        ImGui::BeginDisabled(GeodesicsDirty || GeodesicsConfig.SourceVertices.empty() ||
+                             !context.ProcessingConfigCommandsAvailable);
         if (ImGui::Button("Compute geodesics"))
         {
-            const auto applied =
-                Runtime::ApplyEditorGeodesicsConfig(context.MeshFields.Commands, GeodesicsConfig);
-            if (applied.Succeeded())
-            {
-                GeodesicsDirty = false;
-                GeodesicsResult = Runtime::ApplyEditorConfiguredGeodesicsCommand(
-                    context.MeshFields.Commands, model.SelectedStableId);
-                GeodesicsMessage = GeodesicsResult->Message;
-
-            }
-            else
-                GeodesicsMessage = "Geodesics config was rejected; check source indices, position "
-                                   "property, and expansion budget.";
+            GeodesicsResult = Runtime::ApplyEditorConfiguredGeodesicsCommand(
+                context.MeshFields.Commands, model.SelectedStableId);
+            GeodesicsMessage = GeodesicsResult->Message;
         }
+        ImGui::EndDisabled();
         ImGui::SeparatorText("Display output properties");
+        ImGui::TextDisabled("Unreachable distances are shown in gray.");
         DrawProcessingPropertyShowButton(context, model.SelectedStableId,
             {Runtime::GeometryElementDomain::MeshVertex, GeodesicsConfig.DistanceProperty, Geometry::PropertyValueKind::Double}, GeodesicsMessage);
         DrawProcessingPropertyShowButton(context, model.SelectedStableId,

@@ -236,7 +236,8 @@ namespace Extrinsic::Runtime
         [[nodiscard]] bool ComputeRange(std::span<const T> values,
                                         float& minOut,
                                         float& maxOut,
-                                        VisualizationEncodingDiagnostics& stats)
+                                        VisualizationEncodingDiagnostics& stats,
+                                        const bool allowInfinite = false)
         {
             if (values.empty())
             {
@@ -250,12 +251,20 @@ namespace Extrinsic::Runtime
             {
                 float converted = 0.0f;
                 ++stats.ScalarValueScanCount;
+                if (allowInfinite && std::isinf(value))
+                    continue;
                 if (!ToFiniteFloat(value, converted))
                 {
                     ++stats.NonFiniteValueCount;
                     return false;
                 }
                 finite.push_back(converted);
+            }
+
+            if (finite.empty())
+            {
+                ++stats.NonFiniteValueCount;
+                return false;
             }
 
             const auto [minIt, maxIt] =
@@ -302,6 +311,9 @@ namespace Extrinsic::Runtime
             return true;
         }
 
+        // Infinite scalar distances denote unreachable samples. Keep their slots
+        // and payloads, but derive the range from finite samples; shaders use a
+        // no-data color. NaNs and finite values outside float range still fail.
         template <typename T>
         bool AppendScalarPacket(const Geometry::ConstProperty<T>& property,
                                 VisualizationEncodingBatch& out,
@@ -324,7 +336,7 @@ namespace Extrinsic::Runtime
             float maxValue = options.RangeMax;
             if (options.AutoRange)
             {
-                if (!ComputeRange(values, minValue, maxValue, stats))
+                if (!ComputeRange(values, minValue, maxValue, stats, /*allowInfinite=*/true))
                     return false;
             }
             else
@@ -339,6 +351,8 @@ namespace Extrinsic::Runtime
                 {
                     float converted = 0.0f;
                     ++stats.ScalarValueScanCount;
+                    if (std::isinf(value))
+                        continue;
                     if (!ToFiniteFloat(value, converted))
                     {
                         ++stats.NonFiniteValueCount;
