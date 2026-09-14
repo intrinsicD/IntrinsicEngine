@@ -862,7 +862,13 @@ TEST(RuntimeJobService, DependentIsCancelledWhenUpstreamDoesNotPublish)
 
     EXPECT_EQ(jobs.GetState(second), Runtime::JobState::Cancelled);
     EXPECT_TRUE(publishOrder.empty());
-    EXPECT_GE(jobs.Stats().DependencyCancelledJobs, 1u);
+
+    // Cancellation is terminal for both the upstream and the released dependent,
+    // so neither may linger in the in-flight aggregate before reaping.
+    const Runtime::JobServiceStats cancelled = jobs.Stats();
+    EXPECT_GE(cancelled.DependencyCancelledJobs, 1u);
+    EXPECT_EQ(cancelled.InFlightJobs, 0u);
+    EXPECT_EQ(cancelled.AwaitingDependencyJobs, 0u);
 }
 
 TEST(RuntimeJobService, BoundedApplyLimitsWorkPerDrainWithoutStarving)
@@ -926,16 +932,101 @@ TEST(RuntimeJobService, NotReadyResultsParkInsteadOfApplyingOrBlocking)
     ASSERT_TRUE(WaitUntil([&] { return jobs.GetState(token) ==
                                        Runtime::JobState::AwaitingGate; }));
 
+    {
+        const Runtime::JobServiceStats gated = jobs.Stats();
+        EXPECT_EQ(gated.InFlightJobs, 1u);
+        EXPECT_EQ(gated.AwaitingGateJobs, 1u);
+    }
+
     EXPECT_EQ(jobs.DrainCompletions(events), 0u);
     EXPECT_EQ(jobs.GetState(token), Runtime::JobState::AwaitingApply);
     EXPECT_EQ(jobs.Stats().LastDrainParked, 1u);
     EXPECT_TRUE(publishOrder.empty());
+
+    // A parked result is still owed work, so it must stay in flight; counting
+    // only Queued/Running/AwaitingGate would report the service as idle here.
+    {
+        const Runtime::JobServiceStats parked = jobs.Stats();
+        EXPECT_EQ(parked.InFlightJobs, 1u);
+        EXPECT_EQ(parked.AwaitingApplyJobs, 1u);
+        EXPECT_EQ(parked.AwaitingGateJobs, 0u);
+        EXPECT_EQ(parked.QueuedJobs, 0u);
+        EXPECT_EQ(parked.RunningJobs, 0u);
+    }
 
     ready.store(true, std::memory_order_release);
     EXPECT_EQ(jobs.DrainCompletions(events), 1u);
     EXPECT_EQ(jobs.GetState(token), Runtime::JobState::Published);
     ASSERT_EQ(publishOrder.size(), 1u);
     EXPECT_EQ(publishOrder[0], 7);
+
+    const Runtime::JobServiceStats published = jobs.Stats();
+    EXPECT_EQ(published.InFlightJobs, 0u);
+    EXPECT_EQ(published.AwaitingApplyJobs, 0u);
+}
+
+TEST(RuntimeJobService, InFlightCountsParkedAndDependencyGatedRecords)
+{
+    Runtime::JobService jobs;
+    Runtime::KernelEventBus events;
+
+    std::vector<int> publishOrder;
+    std::atomic<bool> ready{false};
+    SchedulerScope scheduler{1};
+
+    Runtime::JobDesc ancestorDesc = MakeCountingJob("inflight.ancestor", 1, publishOrder);
+    ancestorDesc.IsReadyToApply = [&ready] { return ready.load(std::memory_order_acquire); };
+    const Runtime::JobToken ancestor = jobs.Submit(std::move(ancestorDesc));
+    ASSERT_TRUE(ancestor.IsValid());
+
+    Runtime::JobDesc childDesc = MakeCountingJob("inflight.child", 2, publishOrder);
+    childDesc.DependsOn.push_back(
+        Runtime::JobDependency{.Job = ancestor, .Reason = "needs ancestor"});
+    const Runtime::JobToken child = jobs.Submit(std::move(childDesc));
+    ASSERT_TRUE(child.IsValid());
+
+    // Park the ancestor at apply; the child stays gated behind it. Drain inside
+    // the wait so the parking pass runs, and use the ancestor's own state as the
+    // oracle rather than any aggregate counter.
+    ASSERT_TRUE(WaitUntil([&]
+    {
+        (void)jobs.DrainCompletions(events);
+        return jobs.GetState(ancestor) == Runtime::JobState::AwaitingApply;
+    }));
+    ASSERT_EQ(jobs.GetState(child), Runtime::JobState::AwaitingDependencies);
+
+    // Both records are non-terminal, so both are in flight even though neither
+    // is Queued, Running, or AwaitingGate.
+    const Runtime::JobServiceStats parked = jobs.Stats();
+    EXPECT_EQ(parked.InFlightJobs, 2u);
+    EXPECT_EQ(parked.AwaitingApplyJobs, 1u);
+    EXPECT_EQ(parked.AwaitingDependencyJobs, 1u);
+    EXPECT_EQ(parked.QueuedJobs, 0u);
+    EXPECT_EQ(parked.RunningJobs, 0u);
+    EXPECT_EQ(parked.AwaitingGateJobs, 0u);
+
+    ready.store(true, std::memory_order_release);
+    ASSERT_TRUE(WaitUntil([&]
+    {
+        (void)jobs.DrainCompletions(events);
+        return jobs.IsComplete(ancestor) && jobs.IsComplete(child);
+    }));
+    EXPECT_EQ(jobs.GetState(ancestor), Runtime::JobState::Published);
+    EXPECT_EQ(jobs.GetState(child), Runtime::JobState::Published);
+    EXPECT_EQ(publishOrder, (std::vector<int>{1, 2}));
+
+    // Terminal-but-unreaped records must not be counted as in flight.
+    const Runtime::JobServiceStats settled = jobs.Stats();
+    EXPECT_EQ(settled.InFlightJobs, 0u);
+    EXPECT_EQ(settled.AwaitingApplyJobs, 0u);
+    EXPECT_EQ(settled.AwaitingDependencyJobs, 0u);
+
+    EXPECT_EQ(jobs.ReapCompleted(), 2u);
+    const Runtime::JobServiceStats reaped = jobs.Stats();
+    EXPECT_EQ(reaped.InFlightJobs, 0u);
+    EXPECT_EQ(reaped.ReapedJobs, 2u);
+    EXPECT_EQ(reaped.PublishedCompletions, 2u);
+    EXPECT_TRUE(jobs.SnapshotAll().empty());
 }
 
 TEST(RuntimeJobService, StaleWorldEpochDiscardsResultBeforeItCanMutate)
@@ -964,7 +1055,14 @@ TEST(RuntimeJobService, StaleWorldEpochDiscardsResultBeforeItCanMutate)
     EXPECT_EQ(jobs.DrainCompletions(events), 0u);
     EXPECT_EQ(jobs.GetState(token), Runtime::JobState::StaleDiscarded);
     EXPECT_TRUE(publishOrder.empty());
-    EXPECT_EQ(jobs.Stats().LastDrainStaleDiscarded, 1u);
+
+    // StaleDiscarded is terminal: the record is excluded from the in-flight
+    // aggregate even though it has not been reaped yet.
+    const Runtime::JobServiceStats discarded = jobs.Stats();
+    EXPECT_EQ(discarded.LastDrainStaleDiscarded, 1u);
+    EXPECT_EQ(discarded.InFlightJobs, 0u);
+    EXPECT_EQ(discarded.AwaitingApplyJobs, 0u);
+    EXPECT_EQ(discarded.AwaitingGateJobs, 0u);
 }
 
 TEST(RuntimeJobService, ValidateBeforeApplyIsFailClosedAndAppliesOnlyOnce)

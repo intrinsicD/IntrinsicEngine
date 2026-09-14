@@ -314,6 +314,13 @@ application is deterministic and bounded without a parallel frame-hook path.
 An application that omits the module retains the kernel service for direct
 Engine use but publishes no app-registry job capability.
 
+`JobService::Stats().InFlightJobs` counts all retained nonterminal jobs, including
+dependency waits and parked apply gates. Invalid and terminal records are
+excluded; pending unpublished finalizers have their own counter. Aggregate
+accounting reuses the same terminal classification as completion and reaping.
+Waiting gauges reflect the latest drain/dependency pass; off-thread readers
+must not assume all fields form one atomic snapshot.
+
 `Extrinsic.Runtime.SceneDocumentModule` is the optional app-composed document
 owner. Registration binds the exact active `{WorldHandle, Registry*}` and
 publishes the concrete module plus its exact owned `EditorCommandHistory`;

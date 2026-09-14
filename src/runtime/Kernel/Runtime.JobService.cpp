@@ -838,6 +838,8 @@ namespace Extrinsic::Runtime
         if (!m_State)
             return {};
 
+        // Waiting states remain in flight; terminal finalizers have a separate counter.
+        // The waiting gauges are already maintained in m_State->Stats.
         std::lock_guard lock(m_State->Mutex);
         JobServiceStats stats = m_State->Stats;
         for (const auto& [_, job] : m_State->Jobs)
@@ -845,27 +847,17 @@ namespace Extrinsic::Runtime
             if (!job)
                 continue;
 
-            switch (job->State.load(std::memory_order_acquire))
-            {
-            case JobState::Queued:
+            const JobState state = job->State.load(std::memory_order_acquire);
+            if (state == JobState::Invalid || IsTerminal(state))
+                continue;
+
+            stats.InFlightJobs += 1;
+            if (state == JobState::Queued)
                 stats.QueuedJobs += 1;
-                stats.InFlightJobs += 1;
-                break;
-            case JobState::Running:
+            if (state == JobState::Running)
                 stats.RunningJobs += 1;
-                stats.InFlightJobs += 1;
-                break;
-            case JobState::AwaitingGate:
+            if (state == JobState::AwaitingGate)
                 stats.AwaitingGateJobs += 1;
-                stats.InFlightJobs += 1;
-                break;
-            case JobState::Invalid:
-            case JobState::Published:
-            case JobState::Dropped:
-            case JobState::Cancelled:
-            case JobState::Rejected:
-                break;
-            }
         }
         return stats;
     }
