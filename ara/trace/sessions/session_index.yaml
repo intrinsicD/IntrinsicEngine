@@ -582,10 +582,10 @@ sessions:
   open_threads: 6
 - id: 2026-09-14_001
   date: '2026-09-14'
-  summary: RUNTIME-243 through 246 simplify editor integration; final full native and isolated sanitizer gates
-    pass. Accumulated source committed locally and 28 completed tasks retired; matched timing and named investigations
-    remain open.
-  turn_count: 4
-  events_count: 4
+  summary: Editor simplification verified and 28 scopes retired; ASSETIO-012 now adds a shared geometry format
+    authority and fixes runtime routing, with Claude review and CPU/sanitizer evidence. Local commits recorded;
+    timing, GPU investigations and product UI owners remain open.
+  turn_count: 5
+  events_count: 5
   claims_touched: []
-  open_threads: 6
+  open_threads: 7

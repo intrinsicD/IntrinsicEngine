@@ -12110,3 +12110,29 @@ tree:
     - tasks/backlog/process/BUILD-007-engine-compile-time-reconciliation.md
     - tasks/backlog/bugs/BUG-193-gpu-pacing-and-watchdog-margin.md
     status: resolved
+
+  - id: N557
+    type: experiment
+    title: Unify geometry format capabilities and close runtime routing gaps
+    provenance: ai-executed
+    timestamp: '2026-09-14T10:27:05+02:00'
+    result: ASSETIO-012 implemented with Claude using a core data-only catalog expanded by geometry and assets without
+      a new module or dependency edge. Runtime reaches existing strict PWN/CSV/3D/TXT loaders; OFF export metadata
+      and edgelist aliases agree. Geometry lookup bodies move out of the interface. Six regression checks fail against
+      original production. Final focused native, ASan and UBSan each pass 272 tests. Full native CPU passes 4605
+      with six skips; five display-dependent cases subsequently pass with host access, leaving the expected ASan-only
+      skip. Root corrected a test color key to the existing p:color property, confirmed by Claude; no alias or decoder
+      workaround. Native generation was refreshed after a copied CMake timestamp omitted the new implementation
+      unit. The unchanged ASan sandbox discovery failure reproduces BUG-188; host retry passes without weakening
+      sanitizer settings. Strict checks pass; source commit 4031301234e6ccd5d4a9058565dbcc52f6249ce1 and retirement
+      ee5062a84 close ASSETIO-012 at CPUContracted. UI-046/047 now point to the shared owner. No fresh GPU, matched
+      timing, C92 promotion, remote push or whole-engine completion.
+    evidence:
+    - tasks/done/ASSETIO-012-single-source-format-capability-table.md
+    - src/core/Core.GeometryFormatCatalog.inc
+    - tests/contract/runtime/Test.AssetWorkflowModule.cpp
+    - build/analysis/assetio012-format-catalog-2026-09-14/source-commit.json
+    - build/analysis/assetio012-format-catalog-2026-09-14/claude-review.txt
+    - build/analysis/assetio012-format-catalog-2026-09-14/claude-fix-review.txt
+    - tasks/backlog/bugs/BUG-188-sandbox-sanitizer-test-discovery.md
+    status: resolved

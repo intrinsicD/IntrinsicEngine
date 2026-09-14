@@ -2,9 +2,11 @@ session:
   id: 2026-09-14_001
   date: '2026-09-14'
   started: '2026-09-14T00:30:41+02:00'
-  last_turn: '2026-09-14T08:46:13+02:00'
-  turn_count: 4
-  summary: RUNTIME-243 through 246 simplify editor integration; final full native and isolated sanitizer gates pass. Accumulated source committed locally and 28 completed tasks retired; matched timing and named investigations remain open.
+  last_turn: '2026-09-14T10:27:05+02:00'
+  turn_count: 5
+  summary: Editor simplification verified and 28 scopes retired; ASSETIO-012 now adds a shared geometry format
+    authority and fixes runtime routing, with Claude review and CPU/sanitizer evidence. Local commits recorded;
+    timing, GPU investigations and product UI owners remain open.
 events_logged:
 - turn: 1
   type: experiment
@@ -25,9 +27,8 @@ events_logged:
   id: N555
   routing: direct
   provenance: ai-executed
-  summary: Action helpers isolated from workspace bindings; unchanged bodies and narrower compiler closures
-    verified. Corrected imports, documentation and stale-scan sequencing; final native CPU and focused sanitizers
-    pass.
+  summary: Action helpers isolated from workspace bindings; unchanged bodies and narrower compiler closures verified.
+    Corrected imports, documentation and stale-scan sequencing; final native CPU and focused sanitizers pass.
 - turn: 4
   type: experiment
   id: N556
@@ -35,6 +36,13 @@ events_logged:
   provenance: ai-executed
   summary: Direct workspace conversion verified against original behavior, then full native/ASan/UBSan gates;
     28 completed scopes retired with real local commit references and preserved evidence limits.
+- turn: 5
+  type: experiment
+  id: N557
+  routing: direct
+  provenance: ai-executed
+  summary: Shared catalog and four strict runtime import routes verified and retired at CPUContracted; preserved
+    color-key semantics, sandbox discovery limits and source-only Claude collaboration.
 ai_actions:
 - turn: 1
   action: Claude planned and edited the existing owners and family leaves. After its interrupted process stopped,
@@ -80,9 +88,9 @@ ai_actions:
   - tests/CMakeLists.txt
 - turn: 4
   action: Claude planned, implemented and reviewed bounded cleanup source. Root backtested regressions, reconciled
-    full gates, audited completed task evidence, corrected stale status/link/heading text, committed source
-    and retired 28 tasks. A further Claude retirement-note batch was rejected by automatic approval review;
-    root completed those edits locally without retrying the rejected sharing.
+    full gates, audited completed task evidence, corrected stale status/link/heading text, committed source and
+    retired 28 tasks. A further Claude retirement-note batch was rejected by automatic approval review; root completed
+    those edits locally without retrying the rejected sharing.
   provenance: ai-executed
   files_changed:
   - src/runtime/Editor/internal/Runtime.EditorFeatureContextAdapters.cpp
@@ -92,32 +100,51 @@ ai_actions:
   - tasks/done/RETIREMENT-LOG.md
   - tasks/backlog/process/BUILD-007-engine-compile-time-reconciliation.md
   - tasks/backlog/bugs/BUG-193-gpu-pacing-and-watchdog-margin.md
+- turn: 5
+  action: Claude planned, implemented temporary production copies and reviewed fixed source plus the one-line
+    test correction. Root added regression/materialization coverage, reconciled CMake generation, ran CPU and
+    sanitizer checks with host controls, synchronized reuse/task docs, and committed and retired ASSETIO-012.
+  provenance: ai-executed
+  files_changed:
+  - src/core/Core.GeometryFormatCatalog.inc
+  - src/geometry/Geometry.IO.cppm
+  - src/geometry/Geometry.IO.cpp
+  - src/assets/Asset.ImportRouter.cpp
+  - src/runtime/AssetWorkflow/Runtime.AssetWorkflowImportExecutor.cpp
+  - tests/contract/runtime/Test.AssetWorkflowModule.cpp
+  - tasks/done/ASSETIO-012-single-source-format-capability-table.md
 claims_touched: []
 key_context:
 - turn: 1
   excerpt: User requested continued code/open-point cleanup with Claude to save usage, following plan/implement/refactor/review/test/fix.
     Existing source-sharing authorization persists.
 - turn: 2
-  excerpt: User requested continued remaining-code/open-point cleanup with Claude to save usage, following
-    plan/implement/refactor/review/test/fix. Source-sharing authorization persists.
+  excerpt: User requested continued remaining-code/open-point cleanup with Claude to save usage, following plan/implement/refactor/review/test/fix.
+    Source-sharing authorization persists.
 - turn: 3
   excerpt: User requested continued remaining-code/open-point work with Claude to save usage, following plan,
     implementation/refactor, review, test and fix. Existing source-sharing authorization persists.
 - turn: 4
   excerpt: User requested continued cleanup with Claude, plan/implement/review/test/fix iteration, and explicitly
     retirement of completed tasks. Local integration and retirement commits recorded; no remote push performed.
+- turn: 5
+  excerpt: User requested continued remaining-code/open-point cleanup with Claude to save usage through plan,
+    implementation/refactoring, review, testing and fixing. Existing source-sharing and completed-task retirement
+    authorization persists.
 open_threads:
-- BUILD-007 owns matched clean-source engine compile reconciliation; BUILD-006 separately owns backend/cache
-  comparisons. C92 remains a hypothesis.
+- BUILD-007 owns matched clean-source engine compile reconciliation; BUILD-006 separately owns backend/cache comparisons.
+  C92 remains a hypothesis.
 - BUG-193 owns unexplained GPU pacing variability and WLOP watchdog margin; BUG-189/191/192 closed only finite-work
   fixture budget corrections.
 - BUG-178 compiler-cache ICE, BUG-188 sandbox sanitizer discovery and BUG-180 leak-enabled GPU process retention
   remain open.
-- METHOD-044 native/config/UI adoption and METHOD-045 atlas chart-area/remeshing quality work remain open.
-  METHOD-043 retains later candidate integration after METHOD-042 offline closure.
+- METHOD-044 native/config/UI adoption and METHOD-045 atlas chart-area/remeshing quality work remain open. METHOD-043
+  retains later candidate integration after METHOD-042 offline closure.
 - REVIEW-004 Framework24 convergence and further consumer-justified workspace/model simplification remain open;
   no whole-engine completion.
 - Existing staged research observations retain their named owners and stale flags; local refactor/task retirement
   does not settle their broader method, architecture or performance hypotheses.
+- ASSETIO-012 is retired. UI-046 retains geometry export, UI-047 path choosing, and ASSETIO-011 broader real-widget
+  import coverage; their shared geometry capability owner is now explicit.
 ai_suggestions_pending:
 - No unrelated research observation acquired a closure signal from this refactor.
