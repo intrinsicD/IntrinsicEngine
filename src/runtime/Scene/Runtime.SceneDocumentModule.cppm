@@ -13,7 +13,7 @@ import Extrinsic.Core.Error;
 import Extrinsic.Core.StrongHandle;
 import Extrinsic.ECS.Scene.Registry;
 import Extrinsic.Runtime.JobService;
-import Extrinsic.Runtime.Module;
+import Extrinsic.Runtime.ModuleLifecycle;
 import Extrinsic.Runtime.SceneSerialization;
 import Extrinsic.Runtime.WorldHandle;
 

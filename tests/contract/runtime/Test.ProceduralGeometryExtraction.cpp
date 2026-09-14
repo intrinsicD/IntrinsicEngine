@@ -16,6 +16,7 @@ import Extrinsic.Graphics.Component.GpuSceneSlot;
 import Extrinsic.Graphics.Component.RenderGeometry;
 import Extrinsic.Graphics.GpuWorld;
 import Extrinsic.Graphics.GpuAssetCache;
+import Extrinsic.Graphics.Renderer;
 import Extrinsic.Runtime.Engine;
 import Extrinsic.Runtime.AssetWorkflowModule;
 import Extrinsic.Runtime.SceneDocumentModule;

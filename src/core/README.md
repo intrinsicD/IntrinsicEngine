@@ -102,6 +102,13 @@ Core owns reusable graph/scheduling primitives, not domain-specific GPU policy.
     running on scheduler workers.
 - **`Extrinsic.Core.FrameGraph`**: ECS-oriented facade over `TaskGraph` with
   typed read/write access declarations plus structural and commit tokens.
+- **`Extrinsic.Core.Hash`**: canonical hashing owner — the 32-bit `HashString` /
+  `StringID` naming lane, the constexpr 64-bit FNV-1a `Hash::HashString64`, and
+  the RTTI-free compile-time type identity `Core::TypeToken<T>()` built on it.
+  `TaskGraph` reuses the 64-bit hash over its own signature source, and the
+  runtime kernel's command/event/service/job interfaces import this module for
+  identity instead of a graph. Tokens are compiler-specific values with the high
+  bit masked off; they are not a frozen cross-compiler ABI.
 - **`Extrinsic.Core.FrameClock`**: reusable steady-clock helper that exposes the
   prior completed-frame duration as a non-negative clamped delta, records the
   current frame at `EndFrame()`, and supports explicit resampling after

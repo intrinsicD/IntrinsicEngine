@@ -1,3 +1,5 @@
+// General-purpose closure task graph: the domain-free setup/compile/consume API
+// every engine graph builds on, including its own compile-time type tokens.
 module;
 
 #include <cstddef>
@@ -65,12 +67,9 @@ export namespace Extrinsic::Core::Dag
 #else
             constexpr std::string_view sig = "TypeTokenValue<unknown>";
 #endif
-            constexpr auto ComputeToken = [](std::string_view s) constexpr -> std::size_t {
-                uint64_t h = 14695981039346656037ULL;
-                for (unsigned char c : s) { h ^= c; h *= 1099511628211ULL; }
-                return static_cast<std::size_t>(h) & kMask;
-            };
-            return ComputeToken(sig);
+            // This graph's own signature source, hashed with the shared
+            // 64-bit FNV-1a; the high bit stays masked off.
+            return static_cast<std::size_t>(Hash::HashString64(sig)) & kMask;
         }
     }
 

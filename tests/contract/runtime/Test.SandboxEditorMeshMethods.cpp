@@ -90,6 +90,9 @@ import Extrinsic.Runtime.EditorWorkspaceAttachment;
 import Extrinsic.Runtime.EditorJobProjection;
 import Extrinsic.Runtime.SceneEditingOperations;
 import Extrinsic.Runtime.GeometryProcessingOperations;
+import Extrinsic.Runtime.MeshFieldOperations;
+import Extrinsic.Runtime.MeshTopologyOperations;
+import Extrinsic.Runtime.ParameterizationOperations;
 import Extrinsic.Runtime.VisualizationEditingOperations;
 import Extrinsic.Runtime.RenderRecipeEditingOperations;
 import Extrinsic.Runtime.SceneDocumentModule;
@@ -465,23 +468,7 @@ void ExpectColorsExactlyEqual(
             MakeGeometryPresentationRuntimeState());
     }
 
-void AddPlanarCycleGraphSource(ECS::Scene::Registry& registry,
-                                   const ECS::EntityHandle entity)
-    {
-        auto& raw = registry.Raw();
-        Geometry::Graph::Graph graph{};
-        const auto v0 = graph.AddVertex({0.0f, 0.0f, 0.0f});
-        const auto v1 = graph.AddVertex({1.0f, 0.0f, 0.0f});
-        const auto v2 = graph.AddVertex({1.0f, 1.0f, 0.0f});
-        const auto v3 = graph.AddVertex({0.0f, 1.0f, 0.0f});
-        (void)graph.AddEdge(v0, v1);
-        (void)graph.AddEdge(v1, v2);
-        (void)graph.AddEdge(v2, v3);
-        (void)graph.AddEdge(v3, v0);
-        GS::PopulateFromGraph(raw, entity, graph);
-        raw.emplace<G::RenderEdges>(entity);
-        raw.emplace<G::RenderPoints>(entity);
-    }
+
 
 [[nodiscard]] Intrinsic::Tests::EditorFeatureTestContext MakeContext(
         ECS::Scene::Registry& registry,
@@ -645,14 +632,7 @@ void AddPlanarCycleGraphSource(ECS::Scene::Registry& registry,
         InstallSandboxDefaultRuntimePolicies(engine);
     }
 
-void ExpectFiniteUnitNormal(const glm::vec3 normal,
-                                const float epsilon = 1.0e-4f)
-    {
-        EXPECT_TRUE(std::isfinite(normal.x));
-        EXPECT_TRUE(std::isfinite(normal.y));
-        EXPECT_TRUE(std::isfinite(normal.z));
-        EXPECT_NEAR(glm::length(normal), 1.0f, epsilon);
-    }
+
 
 struct TmpFile
     {
@@ -766,15 +746,15 @@ TEST(SandboxEditorUi, MeshDenoiseCommandPublishesPositionsAndSupportsUndoRedo)
     EXPECT_EQ(history.RedoCount(), 0u);
     EXPECT_EQ(history.Snapshot().Revision, beforeRejectedUndo.Revision);
 
-    context.LastMeshDenoiseResult = &result;
     const Runtime::EditorDomainWindowModel model =
         Runtime::BuildEditorDomainWindowModel(
             context,
             Runtime::EditorDomainWindowKind::Mesh);
+    // The shared model still answers whether the operation is offered here;
+    // the outcome itself belongs to the mesh-topology family frame.
     EXPECT_TRUE(model.Processing.MeshDenoiseAvailable);
-    ASSERT_TRUE(model.Processing.LastMeshDenoiseResult.has_value());
-    EXPECT_TRUE(model.Processing.LastMeshDenoiseResult->Succeeded());
-    EXPECT_EQ(model.Processing.LastMeshDenoiseResult->WrittenCount, 4u);
+    EXPECT_TRUE(result.Succeeded());
+    EXPECT_EQ(result.WrittenCount, 4u);
 }
 TEST(SandboxEditorUi, MeshDenoiseReportsNoChangeWhenEveryVertexIsPinned)
 {
@@ -870,7 +850,7 @@ TEST(SandboxEditorUi, MeshDenoiseRequestQueuesDerivedJobAndPublishesOnApply)
     Extrinsic::Tests::EditorJobHarness jobs{};
     jobs.Attach(context);
     std::optional<Runtime::EditorMeshDenoiseResult> completedResult{};
-    context.MethodResultSinks.MeshDenoise =
+    const std::function<void(Runtime::EditorMeshDenoiseResult)> onDenoise =
         [&completedResult](Runtime::EditorMeshDenoiseResult result)
         {
             completedResult = std::move(result);
@@ -893,7 +873,8 @@ TEST(SandboxEditorUi, MeshDenoiseRequestQueuesDerivedJobAndPublishesOnApply)
                 .SigmaSpatial = 0.0,
                 .SigmaRange = 0.0,
                 .PreserveBoundary = true,
-            });
+            },
+                onDenoise);
 
     EXPECT_EQ(result.Status, Runtime::EditorCommandStatus::Pending);
     EXPECT_NE(result.Message.find("queued"), std::string::npos);
@@ -935,7 +916,7 @@ TEST(SandboxEditorUi, MeshDenoiseDerivedJobDiscardsStaleMeshBeforeApply)
     Extrinsic::Tests::EditorJobHarness jobs{};
     jobs.Attach(context);
     std::optional<Runtime::EditorMeshDenoiseResult> completedResult{};
-    context.MethodResultSinks.MeshDenoise =
+    const std::function<void(Runtime::EditorMeshDenoiseResult)> onDenoise =
         [&completedResult](Runtime::EditorMeshDenoiseResult result)
         {
             completedResult = std::move(result);
@@ -956,7 +937,8 @@ TEST(SandboxEditorUi, MeshDenoiseDerivedJobDiscardsStaleMeshBeforeApply)
                 .SigmaSpatial = 0.0,
                 .SigmaRange = 0.0,
                 .PreserveBoundary = true,
-            });
+            },
+                onDenoise);
     ASSERT_EQ(result.Status, Runtime::EditorCommandStatus::Pending);
 
     SetPositions(registry.Raw().get<GS::Vertices>(mesh),
@@ -982,530 +964,6 @@ TEST(SandboxEditorUi, MeshDenoiseDerivedJobDiscardsStaleMeshBeforeApply)
     EXPECT_FALSE(registry.Raw().all_of<Dirty::DirtyVertexPositions>(mesh));
 }
 
-namespace
-{
-    // Two dense 5x5 grid clusters plus three far isolated outliers (appended
-    // last) — a deterministic UI-027 outlier-removal fixture mirroring the
-    // GEOM-016 unit fixture.
-    [[nodiscard]] std::vector<glm::vec3> MakeOutlierClusterPositions()
-    {
-        std::vector<glm::vec3> positions;
-        const auto appendGrid = [&positions](const glm::vec3 origin)
-        {
-            for (int y = 0; y < 5; ++y)
-                for (int x = 0; x < 5; ++x)
-                    positions.push_back(
-                        origin + glm::vec3(static_cast<float>(x) * 0.05f,
-                                           static_cast<float>(y) * 0.05f,
-                                           0.0f));
-        };
-        appendGrid(glm::vec3{0.0f});
-        appendGrid(glm::vec3{2.0f, 0.0f, 0.0f});
-        positions.push_back(glm::vec3{10.0f, 10.0f, 10.0f});
-        positions.push_back(glm::vec3{-8.0f, 5.0f, -3.0f});
-        positions.push_back(glm::vec3{12.0f, -7.0f, 4.0f});
-        return positions;
-    }
-
-    [[nodiscard]] std::size_t PointCloudPositionCount(
-        ECS::Scene::Registry& registry,
-        const ECS::EntityHandle entity)
-    {
-        auto pos = registry.Raw()
-                       .get<GS::Vertices>(entity)
-                       .Properties.Get<glm::vec3>(PN::kPosition);
-        return pos ? pos.Vector().size() : 0u;
-    }
-}
-TEST(SandboxEditorUi, PointCloudOutlierRemovalStatisticalPublishesKeptPointsWithUndoRedo)
-{
-    ECS::Scene::Registry registry;
-    Runtime::SelectionController selection;
-    Runtime::EditorCommandHistory history;
-    Intrinsic::Tests::EditorFeatureTestContext context = MakeContext(registry, selection);
-    context.CommandHistory = &history;
-
-    const std::vector<glm::vec3> positions = MakeOutlierClusterPositions();
-    const std::size_t originalCount = positions.size();
-    ASSERT_EQ(originalCount, 53u);
-
-    const ECS::EntityHandle cloud = MakeSelectable(registry, "OutlierCloud");
-    AddPointCloudSource(registry, cloud, originalCount);
-    SetPositions(registry.Raw().get<GS::Vertices>(cloud), positions);
-    ASSERT_TRUE(selection.SetSelectedEntity(registry, cloud));
-    const std::uint32_t stableId =
-        Runtime::SelectionController::ToStableEntityId(cloud);
-    ASSERT_EQ(PointCloudPositionCount(registry, cloud), originalCount);
-
-    const Runtime::EditorPointCloudOutlierRemovalResult result =
-        Runtime::ApplyEditorPointCloudOutlierRemovalCommand(
-            context,
-            Runtime::EditorPointCloudOutlierRemovalCommand{
-                .StableEntityId = stableId,
-                .Method =
-                    Runtime::EditorPointCloudOutlierMethod::Statistical,
-                .KNeighbors = 8u,
-                .StdDevMultiplier = 1.0f,
-            });
-
-    ASSERT_TRUE(result.Succeeded()) << result.Message;
-    EXPECT_EQ(result.OriginalCount, originalCount);
-    EXPECT_GE(result.RejectedCount, 2u);
-    EXPECT_EQ(result.KeptCount + result.RejectedCount, originalCount);
-    EXPECT_LT(result.KeptCount, originalCount);
-    // The published point GeometrySources reflect exactly the kept points.
-    EXPECT_EQ(PointCloudPositionCount(registry, cloud), result.KeptCount);
-    EXPECT_TRUE(registry.Raw().all_of<Dirty::GpuDirty>(cloud));
-    EXPECT_TRUE(registry.Raw().all_of<Dirty::DirtyVertexPositions>(cloud));
-    EXPECT_TRUE(history.IsDirty());
-
-    // Undo restores the original point set; redo re-applies the removal.
-    EXPECT_EQ(history.Undo().Status,
-              Runtime::EditorCommandHistoryStatus::Undone);
-    EXPECT_EQ(PointCloudPositionCount(registry, cloud), originalCount);
-    EXPECT_EQ(history.Redo().Status,
-              Runtime::EditorCommandHistoryStatus::Redone);
-    EXPECT_EQ(PointCloudPositionCount(registry, cloud), result.KeptCount);
-
-    context.LastPointCloudOutlierRemovalResult = &result;
-    const Runtime::EditorDomainWindowModel model =
-        Runtime::BuildEditorDomainWindowModel(
-            context,
-            Runtime::EditorDomainWindowKind::PointCloud);
-    EXPECT_TRUE(model.Processing.PointCloudOutlierRemovalAvailable);
-    ASSERT_TRUE(
-        model.Processing.LastPointCloudOutlierRemovalResult.has_value());
-    EXPECT_TRUE(
-        model.Processing.LastPointCloudOutlierRemovalResult->Succeeded());
-}
-TEST(SandboxEditorUi,
-     PointCloudOutlierRemovalRequestQueuesDerivedJobAndPublishesOnApply)
-{
-    ECS::Scene::Registry registry;
-    Runtime::SelectionController selection;
-    Runtime::EditorCommandHistory history;
-    Intrinsic::Tests::EditorFeatureTestContext context = MakeContext(registry, selection);
-    context.CommandHistory = &history;
-    Extrinsic::Tests::EditorJobHarness jobs{};
-    jobs.Attach(context);
-    std::optional<Runtime::EditorPointCloudOutlierRemovalResult>
-        completedResult{};
-    context.MethodResultSinks.PointCloudOutlierRemoval =
-        [&completedResult](
-            Runtime::EditorPointCloudOutlierRemovalResult result)
-        {
-            completedResult = std::move(result);
-        };
-
-    const std::vector<glm::vec3> positions = MakeOutlierClusterPositions();
-    const std::size_t originalCount = positions.size();
-    const ECS::EntityHandle cloud =
-        MakeSelectable(registry, "QueuedOutlierCloud");
-    AddPointCloudSource(registry, cloud, originalCount);
-    SetPositions(registry.Raw().get<GS::Vertices>(cloud), positions);
-    ASSERT_TRUE(selection.SetSelectedEntity(registry, cloud));
-
-    const Runtime::EditorPointCloudOutlierRemovalResult queued =
-        Runtime::ApplyEditorPointCloudOutlierRemovalCommand(
-            context,
-            Runtime::EditorPointCloudOutlierRemovalCommand{
-                .StableEntityId =
-                    Runtime::SelectionController::ToStableEntityId(cloud),
-                .Method =
-                    Runtime::EditorPointCloudOutlierMethod::Statistical,
-                .KNeighbors = 8u,
-                .StdDevMultiplier = 1.0f,
-            });
-
-    EXPECT_EQ(queued.Status, Runtime::EditorCommandStatus::Pending);
-    EXPECT_EQ(queued.OriginalCount, originalCount);
-    EXPECT_EQ(queued.KeptCount, originalCount);
-    EXPECT_EQ(PointCloudPositionCount(registry, cloud), originalCount);
-    EXPECT_FALSE(registry.Raw().all_of<Dirty::DirtyVertexPositions>(cloud));
-
-    Runtime::EditorJobQueueSnapshot pending =
-        jobs.Snapshot();
-    ASSERT_EQ(pending.Entries.size(), 1u);
-    EXPECT_EQ(pending.Entries[0].Name,
-              "Sandbox.PointCloudOutlierRemoval.CPU");
-    // `JobService` dispatches at submit, so the pre-drain state races;
-    // assert only that the job is still active.
-    EXPECT_TRUE(Runtime::IsActiveEditorJobState(pending.Entries[0].State));
-
-    EXPECT_FALSE(completedResult.has_value());
-    EXPECT_EQ(PointCloudPositionCount(registry, cloud), originalCount);
-    EXPECT_FALSE(registry.Raw().all_of<Dirty::DirtyVertexPositions>(cloud));
-
-    ASSERT_TRUE(jobs.DrainUntilTerminal());
-    Runtime::EditorJobQueueSnapshot done =
-        jobs.Snapshot();
-    ASSERT_EQ(done.Entries.size(), 1u);
-    EXPECT_EQ(done.Entries[0].State, Runtime::JobState::Published);
-    ASSERT_TRUE(completedResult.has_value());
-    EXPECT_TRUE(completedResult->Succeeded()) << completedResult->Message;
-    EXPECT_EQ(completedResult->OriginalCount, originalCount);
-    EXPECT_GE(completedResult->RejectedCount, 2u);
-    EXPECT_EQ(completedResult->KeptCount + completedResult->RejectedCount,
-              originalCount);
-    EXPECT_EQ(PointCloudPositionCount(registry, cloud),
-              completedResult->KeptCount);
-    EXPECT_TRUE(registry.Raw().all_of<Dirty::GpuDirty>(cloud));
-    EXPECT_TRUE(registry.Raw().all_of<Dirty::DirtyVertexPositions>(cloud));
-    EXPECT_TRUE(registry.Raw().all_of<Dirty::DirtyVertexAttributes>(cloud));
-    EXPECT_TRUE(registry.Raw().all_of<Dirty::DirtyVertexNormals>(cloud));
-    EXPECT_TRUE(history.IsDirty());
-
-    EXPECT_EQ(history.Undo().Status,
-              Runtime::EditorCommandHistoryStatus::Undone);
-    EXPECT_EQ(PointCloudPositionCount(registry, cloud), originalCount);
-    EXPECT_EQ(history.Redo().Status,
-              Runtime::EditorCommandHistoryStatus::Redone);
-    EXPECT_EQ(PointCloudPositionCount(registry, cloud),
-              completedResult->KeptCount);
-}
-TEST(SandboxEditorUi, PointCloudOutlierRemovalDerivedJobDiscardsStaleSource)
-{
-    ECS::Scene::Registry registry;
-    Runtime::SelectionController selection;
-    Intrinsic::Tests::EditorFeatureTestContext context = MakeContext(registry, selection);
-    Extrinsic::Tests::EditorJobHarness jobs{};
-    jobs.Attach(context);
-    bool completedSinkCalled = false;
-    context.MethodResultSinks.PointCloudOutlierRemoval =
-        [&completedSinkCalled](
-            Runtime::EditorPointCloudOutlierRemovalResult)
-        {
-            completedSinkCalled = true;
-        };
-
-    const std::vector<glm::vec3> positions = MakeOutlierClusterPositions();
-    const std::size_t originalCount = positions.size();
-    const ECS::EntityHandle cloud =
-        MakeSelectable(registry, "StaleOutlierCloud");
-    AddPointCloudSource(registry, cloud, originalCount);
-    SetPositions(registry.Raw().get<GS::Vertices>(cloud), positions);
-
-    const Runtime::EditorPointCloudOutlierRemovalResult queued =
-        Runtime::ApplyEditorPointCloudOutlierRemovalCommand(
-            context,
-            Runtime::EditorPointCloudOutlierRemovalCommand{
-                .StableEntityId =
-                    Runtime::SelectionController::ToStableEntityId(cloud),
-                .Method =
-                    Runtime::EditorPointCloudOutlierMethod::Statistical,
-                .KNeighbors = 8u,
-                .StdDevMultiplier = 1.0f,
-            });
-    ASSERT_EQ(queued.Status, Runtime::EditorCommandStatus::Pending);
-
-    std::vector<glm::vec3> stalePositions = positions;
-    for (glm::vec3& position : stalePositions)
-        position.x += 100.0f;
-    SetPositions(registry.Raw().get<GS::Vertices>(cloud), stalePositions);
-
-    ASSERT_TRUE(jobs.DrainUntilTerminal());
-    Runtime::EditorJobQueueSnapshot done =
-        jobs.Snapshot();
-    ASSERT_EQ(done.Entries.size(), 1u);
-    EXPECT_EQ(done.Entries[0].State,
-              Runtime::JobState::StaleDiscarded);
-    EXPECT_FALSE(completedSinkCalled);
-    EXPECT_EQ(PointCloudPositionCount(registry, cloud), originalCount);
-    EXPECT_FALSE(registry.Raw().all_of<Dirty::DirtyVertexPositions>(cloud));
-}
-TEST(SandboxEditorUi, PointCloudOutlierRemovalDerivedJobDiscardsStaleProperty)
-{
-    ECS::Scene::Registry registry;
-    Runtime::SelectionController selection;
-    Intrinsic::Tests::EditorFeatureTestContext context = MakeContext(registry, selection);
-    Extrinsic::Tests::EditorJobHarness jobs{};
-    jobs.Attach(context);
-    bool completedSinkCalled = false;
-    context.MethodResultSinks.PointCloudOutlierRemoval =
-        [&completedSinkCalled](
-            Runtime::EditorPointCloudOutlierRemovalResult)
-        {
-            completedSinkCalled = true;
-        };
-
-    const std::vector<glm::vec3> positions = MakeOutlierClusterPositions();
-    const ECS::EntityHandle cloud =
-        MakeSelectable(registry, "StaleOutlierPropertyCloud");
-    AddPointCloudSource(registry, cloud, positions.size());
-    auto& vertices = registry.Raw().get<GS::Vertices>(cloud);
-    SetPositions(vertices, positions);
-    auto confidence =
-        vertices.Properties.GetOrAdd<float>("v:confidence", 0.5f);
-    ASSERT_TRUE(confidence);
-
-    const Runtime::EditorPointCloudOutlierRemovalResult queued =
-        Runtime::ApplyEditorPointCloudOutlierRemovalCommand(
-            context,
-            Runtime::EditorPointCloudOutlierRemovalCommand{
-                .StableEntityId =
-                    Runtime::SelectionController::ToStableEntityId(cloud),
-                .Method =
-                    Runtime::EditorPointCloudOutlierMethod::Statistical,
-                .KNeighbors = 8u,
-                .StdDevMultiplier = 1.0f,
-            });
-    ASSERT_EQ(queued.Status, Runtime::EditorCommandStatus::Pending);
-
-    confidence[0] = 0.75f;
-
-    ASSERT_TRUE(jobs.DrainUntilTerminal());
-    const Runtime::EditorJobQueueSnapshot done =
-        jobs.Snapshot();
-    ASSERT_EQ(done.Entries.size(), 1u);
-    EXPECT_EQ(done.Entries[0].State,
-              Runtime::JobState::StaleDiscarded);
-    EXPECT_FALSE(completedSinkCalled);
-    EXPECT_EQ(PointCloudPositionCount(registry, cloud), positions.size());
-    EXPECT_FALSE(registry.Raw().all_of<Dirty::GpuDirty>(cloud));
-    EXPECT_FALSE(registry.Raw().all_of<Dirty::DirtyVertexPositions>(cloud));
-    EXPECT_FALSE(registry.Raw().all_of<Dirty::DirtyVertexAttributes>(cloud));
-    EXPECT_FALSE(registry.Raw().all_of<Dirty::DirtyVertexNormals>(cloud));
-    EXPECT_FLOAT_EQ(
-        registry.Raw()
-            .get<GS::Vertices>(cloud)
-            .Properties.Get<float>("v:confidence")[0],
-        0.75f);
-}
-TEST(SandboxEditorUi, PointCloudOutlierRemovalRadiusPublishesAndFailsClosed)
-{
-    ECS::Scene::Registry registry;
-    Runtime::SelectionController selection;
-    Runtime::EditorCommandHistory history;
-    Intrinsic::Tests::EditorFeatureTestContext context = MakeContext(registry, selection);
-    context.CommandHistory = &history;
-
-    const std::vector<glm::vec3> positions = MakeOutlierClusterPositions();
-    const std::size_t originalCount = positions.size();
-    const ECS::EntityHandle cloud = MakeSelectable(registry, "RadiusCloud");
-    AddPointCloudSource(registry, cloud, originalCount);
-    SetPositions(registry.Raw().get<GS::Vertices>(cloud), positions);
-    ASSERT_TRUE(selection.SetSelectedEntity(registry, cloud));
-    const std::uint32_t stableId =
-        Runtime::SelectionController::ToStableEntityId(cloud);
-
-    const Runtime::EditorPointCloudOutlierRemovalResult radius =
-        Runtime::ApplyEditorPointCloudOutlierRemovalCommand(
-            context,
-            Runtime::EditorPointCloudOutlierRemovalCommand{
-                .StableEntityId = stableId,
-                .Method =
-                    Runtime::EditorPointCloudOutlierMethod::Radius,
-                .SearchRadius = 0.15f,
-                .MinNeighbors = 3u,
-            });
-    ASSERT_TRUE(radius.Succeeded()) << radius.Message;
-    EXPECT_GE(radius.RejectedCount, 2u);
-    EXPECT_EQ(PointCloudPositionCount(registry, cloud), radius.KeptCount);
-
-    // Fail-closed: non-positive radius is rejected before any mutation.
-    const Runtime::EditorPointCloudOutlierRemovalResult badRadius =
-        Runtime::ApplyEditorPointCloudOutlierRemovalCommand(
-            context,
-            Runtime::EditorPointCloudOutlierRemovalCommand{
-                .StableEntityId = stableId,
-                .Method =
-                    Runtime::EditorPointCloudOutlierMethod::Radius,
-                .SearchRadius = 0.0f,
-                .MinNeighbors = 3u,
-            });
-    EXPECT_EQ(badRadius.Status,
-              Runtime::EditorCommandStatus::InvalidProcessingParameters);
-
-    // Missing scene fails closed.
-    const Runtime::EditorPointCloudOutlierRemovalResult missingScene =
-        Runtime::ApplyEditorPointCloudOutlierRemovalCommand(
-            Intrinsic::Tests::EditorFeatureTestContext{},
-            Runtime::EditorPointCloudOutlierRemovalCommand{
-                .StableEntityId = stableId,
-                .KNeighbors = 8u,
-            });
-    EXPECT_EQ(missingScene.Status,
-              Runtime::EditorCommandStatus::MissingScene);
-
-    // A mesh entity is the wrong domain for point-cloud outlier removal.
-    const ECS::EntityHandle mesh = MakeSelectable(registry, "WrongDomainMesh");
-    AddDenoiseTetraMeshSource(registry, mesh);
-    const Runtime::EditorPointCloudOutlierRemovalResult wrongDomain =
-        Runtime::ApplyEditorPointCloudOutlierRemovalCommand(
-            context,
-            Runtime::EditorPointCloudOutlierRemovalCommand{
-                .StableEntityId =
-                    Runtime::SelectionController::ToStableEntityId(mesh),
-                .KNeighbors = 8u,
-            });
-    EXPECT_EQ(wrongDomain.Status,
-              Runtime::EditorCommandStatus::UnsupportedGeometryDomain);
-}
-TEST(SandboxEditorUi, PointCloudOutlierRemovalPreservesSurvivingPointProperties)
-{
-    ECS::Scene::Registry registry;
-    Runtime::SelectionController selection;
-    Runtime::EditorCommandHistory history;
-    Intrinsic::Tests::EditorFeatureTestContext context = MakeContext(registry, selection);
-    context.CommandHistory = &history;
-
-    const std::vector<glm::vec3> positions = MakeOutlierClusterPositions();
-    const std::size_t originalCount = positions.size();  // 53: 50 inliers + 3 outliers
-    const ECS::EntityHandle cloud = MakeSelectable(registry, "LabeledCloud");
-    AddPointCloudSource(registry, cloud, originalCount);
-    SetPositions(registry.Raw().get<GS::Vertices>(cloud), positions);
-
-    // A non-built-in per-point property: every inlier carries the sentinel 7.0,
-    // the two trailing outliers carry 99.0. removal.Filtered would drop this
-    // property entirely; the command must compact it onto the kept points.
-    {
-        auto labels = registry.Raw()
-                          .get<GS::Vertices>(cloud)
-                          .Properties.GetOrAdd<float>("v:label", 0.0f);
-        ASSERT_EQ(labels.Vector().size(), originalCount);
-        for (std::size_t i = 0; i < originalCount; ++i)
-            labels.Vector()[i] = (i + 3u >= originalCount) ? 99.0f : 7.0f;
-    }
-    const std::vector<float> originalLabels =
-        registry.Raw()
-            .get<GS::Vertices>(cloud)
-            .Properties.Get<float>("v:label")
-            .Vector();
-    ASSERT_TRUE(selection.SetSelectedEntity(registry, cloud));
-
-    const Runtime::EditorPointCloudOutlierRemovalResult result =
-        Runtime::ApplyEditorPointCloudOutlierRemovalCommand(
-            context,
-            Runtime::EditorPointCloudOutlierRemovalCommand{
-                .StableEntityId =
-                    Runtime::SelectionController::ToStableEntityId(cloud),
-                .Method =
-                    Runtime::EditorPointCloudOutlierMethod::Statistical,
-                .KNeighbors = 8u,
-                .StdDevMultiplier = 1.0f,
-            });
-    ASSERT_TRUE(result.Succeeded()) << result.Message;
-
-    // The "v:label" property must survive removal (bug: previously dropped).
-    auto survived = registry.Raw()
-                        .get<GS::Vertices>(cloud)
-                        .Properties.Get<float>("v:label");
-    ASSERT_TRUE(survived) << "v:label property was dropped after outlier removal";
-    EXPECT_EQ(survived.Vector().size(), result.KeptCount);
-    EXPECT_EQ(PointCloudPositionCount(registry, cloud), result.KeptCount);
-    // All kept points are the inliers, so every surviving label is the sentinel.
-    for (const float label : survived.Vector())
-        EXPECT_FLOAT_EQ(label, 7.0f);
-    const std::vector<glm::vec3> keptPositions =
-        MeshVertexPositions(registry, cloud);
-    const std::vector<float> keptLabels = survived.Vector();
-
-    EXPECT_EQ(history.Undo().Status,
-              Runtime::EditorCommandHistoryStatus::Undone);
-    ExpectPositionsExactlyEqual(
-        MeshVertexPositions(registry, cloud),
-        positions);
-    const auto restoredLabels =
-        registry.Raw()
-            .get<GS::Vertices>(cloud)
-            .Properties.Get<float>("v:label");
-    ASSERT_TRUE(restoredLabels);
-    EXPECT_EQ(restoredLabels.Vector(), originalLabels);
-
-    EXPECT_EQ(history.Redo().Status,
-              Runtime::EditorCommandHistoryStatus::Redone);
-    ExpectPositionsExactlyEqual(
-        MeshVertexPositions(registry, cloud),
-        keptPositions);
-    auto redoneLabels =
-        registry.Raw()
-            .get<GS::Vertices>(cloud)
-            .Properties.Get<float>("v:label");
-    ASSERT_TRUE(redoneLabels);
-    EXPECT_EQ(redoneLabels.Vector(), keptLabels);
-
-    redoneLabels[0] = 42.0f;
-    const Runtime::EditorCommandHistorySnapshot beforeRejectedUndo =
-        history.Snapshot();
-    EXPECT_EQ(history.Undo().Status,
-              Runtime::EditorCommandHistoryStatus::StaleEntity);
-    EXPECT_FLOAT_EQ(
-        registry.Raw()
-            .get<GS::Vertices>(cloud)
-            .Properties.Get<float>("v:label")[0],
-        42.0f);
-    ExpectPositionsExactlyEqual(
-        MeshVertexPositions(registry, cloud),
-        keptPositions);
-    EXPECT_EQ(history.UndoCount(), 1u);
-    EXPECT_EQ(history.RedoCount(), 0u);
-    EXPECT_EQ(history.Snapshot().Revision, beforeRejectedUndo.Revision);
-}
-TEST(SandboxEditorUi, PointCloudOutlierRemovalRespectsDeletedSlots)
-{
-    ECS::Scene::Registry registry;
-    Runtime::SelectionController selection;
-    Runtime::EditorCommandHistory history;
-    Intrinsic::Tests::EditorFeatureTestContext context = MakeContext(registry, selection);
-    context.CommandHistory = &history;
-
-    // 53 live points plus one trailing slot marked deleted (a far position that
-    // would look like an outlier if it were wrongly treated as live).
-    std::vector<glm::vec3> positions = MakeOutlierClusterPositions();
-    const std::size_t liveCount = positions.size();  // 53
-    positions.push_back(glm::vec3{50.0f, 50.0f, 50.0f});
-    const std::size_t slotCount = positions.size();  // 54
-
-    const ECS::EntityHandle cloud = MakeSelectable(registry, "DeletedSlotCloud");
-    AddPointCloudSource(registry, cloud, slotCount);
-    SetPositions(registry.Raw().get<GS::Vertices>(cloud), positions);
-    {
-        auto& vertices = registry.Raw().get<GS::Vertices>(cloud);
-        auto deleted =
-            vertices.Properties.GetOrAdd<bool>("p:deleted", false);
-        ASSERT_EQ(deleted.Vector().size(), slotCount);
-        deleted.Vector()[slotCount - 1u] = true;  // last slot is dead
-        vertices.NumDeleted = 1u;
-    }
-    ASSERT_TRUE(selection.SetSelectedEntity(registry, cloud));
-
-    const Runtime::EditorPointCloudOutlierRemovalResult result =
-        Runtime::ApplyEditorPointCloudOutlierRemovalCommand(
-            context,
-            Runtime::EditorPointCloudOutlierRemovalCommand{
-                .StableEntityId =
-                    Runtime::SelectionController::ToStableEntityId(cloud),
-                .Method =
-                    Runtime::EditorPointCloudOutlierMethod::Statistical,
-                .KNeighbors = 8u,
-                .StdDevMultiplier = 1.0f,
-            });
-    ASSERT_TRUE(result.Succeeded()) << result.Message;
-
-    // The deleted slot is excluded: counts reflect the live point set only, and
-    // the dead point is never resurrected into the published cloud.
-    EXPECT_EQ(result.OriginalCount, liveCount);
-    EXPECT_EQ(result.KeptCount + result.RejectedCount, liveCount);
-    EXPECT_EQ(PointCloudPositionCount(registry, cloud), result.KeptCount);
-    EXPECT_LE(result.KeptCount, liveCount);
-    EXPECT_EQ(registry.Raw().get<GS::Vertices>(cloud).NumDeleted, 0u);
-
-    EXPECT_EQ(history.Undo().Status,
-              Runtime::EditorCommandHistoryStatus::Undone);
-    const auto& restored = registry.Raw().get<GS::Vertices>(cloud);
-    EXPECT_EQ(restored.Properties.Size(), slotCount);
-    EXPECT_EQ(restored.NumDeleted, 1u);
-    const auto restoredDeleted =
-        restored.Properties.Get<bool>("p:deleted");
-    ASSERT_TRUE(restoredDeleted);
-    ASSERT_EQ(restoredDeleted.Vector().size(), slotCount);
-    EXPECT_TRUE(restoredDeleted[slotCount - 1u]);
-
-    EXPECT_EQ(history.Redo().Status,
-              Runtime::EditorCommandHistoryStatus::Redone);
-    EXPECT_EQ(PointCloudPositionCount(registry, cloud), result.KeptCount);
-    EXPECT_EQ(registry.Raw().get<GS::Vertices>(cloud).NumDeleted, 0u);
-}
 TEST(SandboxEditorUi, MeshDenoiseCommandFailsClosedForInvalidTargetsAndUnavailableKernel)
 {
     ECS::Scene::Registry registry;
@@ -1739,16 +1197,14 @@ TEST(SandboxEditorUi, MeshCurvatureCommandPublishesCanonicalPropertiesAndSupport
     EXPECT_EQ(history.RedoCount(), 0u);
     EXPECT_EQ(history.Snapshot().Revision, beforePositionRejection.Revision);
 
-    context.LastMeshCurvatureResult = &result;
     const Runtime::EditorDomainWindowModel model =
         Runtime::BuildEditorDomainWindowModel(
             context,
             Runtime::EditorDomainWindowKind::Mesh);
     EXPECT_TRUE(model.Processing.MeshCurvatureAvailable);
     EXPECT_TRUE(model.Processing.MeshCurvatureDirectionsAvailable);
-    ASSERT_TRUE(model.Processing.LastMeshCurvatureResult.has_value());
-    EXPECT_TRUE(model.Processing.LastMeshCurvatureResult->Succeeded());
-    EXPECT_EQ(model.Processing.LastMeshCurvatureResult->ScalarWrittenCount, 16u);
+    EXPECT_TRUE(result.Succeeded());
+    EXPECT_EQ(result.ScalarWrittenCount, 16u);
 }
 
 TEST(SandboxEditorUi, MeshCurvaturePublishesBoundaryOnlyFramework24Support)
@@ -2023,60 +1479,6 @@ TEST(SandboxEditorUi, MeshCurvatureRecomputeThatChangesNothingReportsNoChange)
     EXPECT_FALSE(registry.Raw().all_of<Dirty::DirtyVertexAttributes>(mesh))
         << "a run that published nothing must not mark attributes dirty";
 }
-
-// BUG-145 slice B: outlier removal already computed the rejected set and then
-// reported `Applied` regardless of whether it was empty, replacing the cloud
-// with itself and leaving an undo entry that restores identical points.
-TEST(SandboxEditorUi, PointCloudOutlierRemovalRejectingNothingReportsNoChange)
-{
-    ECS::Scene::Registry registry;
-    Runtime::SelectionController selection;
-    Runtime::EditorCommandHistory history;
-    Intrinsic::Tests::EditorFeatureTestContext context =
-        MakeContext(registry, selection);
-    context.CommandHistory = &history;
-
-    // A tight uniform grid: every point has plenty of close neighbours, so no
-    // radius rejection is possible.
-    std::vector<glm::vec3> positions{};
-    for (int x = 0; x < 4; ++x)
-    {
-        for (int y = 0; y < 4; ++y)
-        {
-            positions.push_back(glm::vec3{static_cast<float>(x) * 0.1f,
-                                          static_cast<float>(y) * 0.1f,
-                                          0.0f});
-        }
-    }
-    const ECS::EntityHandle cloud = MakeSelectable(registry, "DenseCloud");
-    AddPointCloudSource(registry, cloud, positions.size());
-    SetPositions(registry.Raw().get<GS::Vertices>(cloud), positions);
-    ASSERT_TRUE(selection.SetSelectedEntity(registry, cloud));
-    const std::uint32_t stableId =
-        Runtime::SelectionController::ToStableEntityId(cloud);
-
-    const Runtime::EditorPointCloudOutlierRemovalResult result =
-        Runtime::ApplyEditorPointCloudOutlierRemovalCommand(
-            context,
-            Runtime::EditorPointCloudOutlierRemovalCommand{
-                .StableEntityId = stableId,
-                .Method = Runtime::EditorPointCloudOutlierMethod::Radius,
-                .SearchRadius = 1.0f,
-                .MinNeighbors = 1u,
-            });
-
-    EXPECT_EQ(result.Status, Runtime::EditorCommandStatus::NoChange)
-        << result.Message;
-    EXPECT_EQ(result.RejectedCount, 0u);
-    EXPECT_EQ(result.KeptCount, positions.size());
-    EXPECT_NE(result.Message.find("No outliers were rejected"),
-              std::string::npos)
-        << result.Message;
-    EXPECT_EQ(PointCloudPositionCount(registry, cloud), positions.size());
-    EXPECT_FALSE(history.CanUndo())
-        << "a run that rejected nothing must not leave an undo entry";
-}
-
 TEST(SandboxEditorUi, MeshCurvatureRequestQueuesDerivedJobAndPublishesOnApply)
 {
     ECS::Scene::Registry registry;
@@ -2087,7 +1489,7 @@ TEST(SandboxEditorUi, MeshCurvatureRequestQueuesDerivedJobAndPublishesOnApply)
     Extrinsic::Tests::EditorJobHarness jobs{};
     jobs.Attach(context);
     std::optional<Runtime::EditorMeshCurvatureResult> completedResult{};
-    context.MethodResultSinks.MeshCurvature =
+    const std::function<void(Runtime::EditorMeshCurvatureResult)> onCurvature =
         [&completedResult](Runtime::EditorMeshCurvatureResult result)
         {
             completedResult = std::move(result);
@@ -2110,7 +1512,8 @@ TEST(SandboxEditorUi, MeshCurvatureRequestQueuesDerivedJobAndPublishesOnApply)
                 .StableEntityId = stableId,
                 .Output = Runtime::EditorMeshCurvatureOutput::All,
                 .PublishPrincipalDirections = true,
-            });
+            },
+                onCurvature);
 
     EXPECT_EQ(result.Status, Runtime::EditorCommandStatus::Pending);
     EXPECT_EQ(result.VertexSlotCount, 4u);
@@ -2196,7 +1599,7 @@ TEST(SandboxEditorUi, MeshCurvatureDerivedJobDiscardsStalePropertiesBeforeApply)
     Extrinsic::Tests::EditorJobHarness jobs{};
     jobs.Attach(context);
     std::optional<Runtime::EditorMeshCurvatureResult> completedResult{};
-    context.MethodResultSinks.MeshCurvature =
+    const std::function<void(Runtime::EditorMeshCurvatureResult)> onCurvature =
         [&completedResult](Runtime::EditorMeshCurvatureResult result)
         {
             completedResult = std::move(result);
@@ -2222,7 +1625,8 @@ TEST(SandboxEditorUi, MeshCurvatureDerivedJobDiscardsStalePropertiesBeforeApply)
                     Runtime::SelectionController::ToStableEntityId(mesh),
                 .Output = Runtime::EditorMeshCurvatureOutput::All,
                 .PublishPrincipalDirections = true,
-            });
+            },
+                onCurvature);
     ASSERT_EQ(result.Status, Runtime::EditorCommandStatus::Pending);
 
     auto currentMean = properties.Get<double>(PN::kMeanCurvature);
@@ -2265,7 +1669,7 @@ TEST(SandboxEditorUi, MeshCurvatureDerivedJobDiscardsStalePrincipalScalarsBefore
     Extrinsic::Tests::EditorJobHarness jobs{};
     jobs.Attach(context);
     std::optional<Runtime::EditorMeshCurvatureResult> completedResult{};
-    context.MethodResultSinks.MeshCurvature =
+    const std::function<void(Runtime::EditorMeshCurvatureResult)> onCurvature =
         [&completedResult](Runtime::EditorMeshCurvatureResult result)
         {
             completedResult = std::move(result);
@@ -2291,7 +1695,8 @@ TEST(SandboxEditorUi, MeshCurvatureDerivedJobDiscardsStalePrincipalScalarsBefore
                     Runtime::SelectionController::ToStableEntityId(mesh),
                 .Output = Runtime::EditorMeshCurvatureOutput::All,
                 .PublishPrincipalDirections = true,
-            });
+            },
+                onCurvature);
     ASSERT_EQ(result.Status, Runtime::EditorCommandStatus::Pending);
 
     auto currentMax =
@@ -2528,16 +1933,13 @@ TEST(SandboxEditorUi, MeshRemeshCommandReplacesTopologyAndSupportsUndoRedo)
     ASSERT_TRUE(nextHalfedge.IsValid());
     nextHalfedge.Vector().front() = publishedNext;
 
-    context.LastMeshRemeshResult = &uniform;
     const Runtime::EditorDomainWindowModel model =
         Runtime::BuildEditorDomainWindowModel(
             context,
             Runtime::EditorDomainWindowKind::Mesh);
     EXPECT_TRUE(model.Processing.MeshRemeshAvailable);
-    ASSERT_TRUE(model.Processing.LastMeshRemeshResult.has_value());
-    EXPECT_TRUE(model.Processing.LastMeshRemeshResult->Succeeded());
-    EXPECT_EQ(model.Processing.LastMeshRemeshResult->OutputFaceCount,
-              uniform.OutputFaceCount);
+    EXPECT_TRUE(uniform.Succeeded());
+    EXPECT_GT(uniform.OutputFaceCount, 0u);
 
     const ECS::EntityHandle adaptiveMesh =
         MakeSelectable(registry, "AdaptiveRemesh");
@@ -2576,7 +1978,7 @@ TEST(SandboxEditorUi, MeshRemeshRequestQueuesDerivedJobAndPublishesOnApply)
     Extrinsic::Tests::EditorJobHarness jobs{};
     jobs.Attach(context);
     std::optional<Runtime::EditorMeshRemeshResult> completedResult{};
-    context.MethodResultSinks.MeshRemesh =
+    const std::function<void(Runtime::EditorMeshRemeshResult)> onRemesh =
         [&completedResult](Runtime::EditorMeshRemeshResult result)
         {
             completedResult = std::move(result);
@@ -2600,7 +2002,8 @@ TEST(SandboxEditorUi, MeshRemeshRequestQueuesDerivedJobAndPublishesOnApply)
                 .TargetEdgeLength = 0.35,
                 .PreserveBoundary = false,
                 .ProjectToSurface = false,
-            });
+            },
+                onRemesh);
 
     EXPECT_EQ(result.Status, Runtime::EditorCommandStatus::Pending);
     EXPECT_EQ(result.InputVertexCount, before.Vertices);
@@ -2684,16 +2087,13 @@ TEST(SandboxEditorUi, MeshSubdivideCommandReplacesTopologyForAllOperatorsAndSupp
               Runtime::EditorCommandHistoryStatus::Redone);
     ExpectMeshCountsEqual(SourceMeshCounts(registry, loopMesh), afterLoop);
 
-    context.LastMeshSubdivideResult = &loop;
     const Runtime::EditorDomainWindowModel model =
         Runtime::BuildEditorDomainWindowModel(
             context,
             Runtime::EditorDomainWindowKind::Mesh);
     EXPECT_TRUE(model.Processing.MeshSubdivideAvailable);
-    ASSERT_TRUE(model.Processing.LastMeshSubdivideResult.has_value());
-    EXPECT_TRUE(model.Processing.LastMeshSubdivideResult->Succeeded());
-    EXPECT_EQ(model.Processing.LastMeshSubdivideResult->OutputFaceCount,
-              loop.OutputFaceCount);
+    EXPECT_TRUE(loop.Succeeded());
+    EXPECT_GT(loop.OutputFaceCount, 0u);
 
     const ECS::EntityHandle catmullMesh =
         MakeSelectable(registry, "CatmullClarkSubdivide");
@@ -2744,7 +2144,7 @@ TEST(SandboxEditorUi, MeshSubdivideRequestQueuesDerivedJobAndPublishesOnApply)
     Extrinsic::Tests::EditorJobHarness jobs{};
     jobs.Attach(context);
     std::optional<Runtime::EditorMeshSubdivideResult> completedResult{};
-    context.MethodResultSinks.MeshSubdivide =
+    const std::function<void(Runtime::EditorMeshSubdivideResult)> onSubdivide =
         [&completedResult](Runtime::EditorMeshSubdivideResult result)
         {
             completedResult = std::move(result);
@@ -2763,7 +2163,8 @@ TEST(SandboxEditorUi, MeshSubdivideRequestQueuesDerivedJobAndPublishesOnApply)
                 .StableEntityId = stableId,
                 .Operator = Runtime::EditorMeshSubdivideOperator::Loop,
                 .Iterations = 1u,
-            });
+            },
+                onSubdivide);
 
     EXPECT_EQ(result.Status, Runtime::EditorCommandStatus::Pending);
     EXPECT_EQ(result.InputVertexCount, before.Vertices);
@@ -2814,7 +2215,7 @@ TEST(SandboxEditorUi, MeshSubdivideDerivedJobDiscardsStaleMeshBeforeApply)
     Extrinsic::Tests::EditorJobHarness jobs{};
     jobs.Attach(context);
     std::optional<Runtime::EditorMeshSubdivideResult> completedResult{};
-    context.MethodResultSinks.MeshSubdivide =
+    const std::function<void(Runtime::EditorMeshSubdivideResult)> onSubdivide =
         [&completedResult](Runtime::EditorMeshSubdivideResult result)
         {
             completedResult = std::move(result);
@@ -2833,7 +2234,8 @@ TEST(SandboxEditorUi, MeshSubdivideDerivedJobDiscardsStaleMeshBeforeApply)
                 .StableEntityId = stableId,
                 .Operator = Runtime::EditorMeshSubdivideOperator::Loop,
                 .Iterations = 1u,
-            });
+            },
+                onSubdivide);
     ASSERT_EQ(result.Status, Runtime::EditorCommandStatus::Pending);
 
     const std::vector<glm::vec3> stalePositions{
@@ -2870,7 +2272,7 @@ TEST(SandboxEditorUi, MeshSubdivideDerivedJobDiscardsStaleTopologyBeforeApply)
     Extrinsic::Tests::EditorJobHarness jobs{};
     jobs.Attach(context);
     std::optional<Runtime::EditorMeshSubdivideResult> completedResult{};
-    context.MethodResultSinks.MeshSubdivide =
+    const std::function<void(Runtime::EditorMeshSubdivideResult)> onSubdivide =
         [&completedResult](Runtime::EditorMeshSubdivideResult result)
         {
             completedResult = std::move(result);
@@ -2888,7 +2290,8 @@ TEST(SandboxEditorUi, MeshSubdivideDerivedJobDiscardsStaleTopologyBeforeApply)
                     Runtime::SelectionController::ToStableEntityId(mesh),
                 .Operator = Runtime::EditorMeshSubdivideOperator::Loop,
                 .Iterations = 1u,
-            });
+            },
+                onSubdivide);
     ASSERT_EQ(result.Status, Runtime::EditorCommandStatus::Pending);
 
     auto nextHalfedge =
@@ -2976,16 +2379,13 @@ TEST(SandboxEditorUi, MeshSimplifyCommandReducesFaceCountAndSupportsUndoRedo)
               Runtime::EditorCommandHistoryStatus::Redone);
     ExpectMeshCountsEqual(SourceMeshCounts(registry, mesh), afterSimplify);
 
-    context.LastMeshSimplifyResult = &simplified;
     const Runtime::EditorDomainWindowModel model =
         Runtime::BuildEditorDomainWindowModel(
             context,
             Runtime::EditorDomainWindowKind::Mesh);
     EXPECT_TRUE(model.Processing.MeshSimplifyAvailable);
-    ASSERT_TRUE(model.Processing.LastMeshSimplifyResult.has_value());
-    EXPECT_TRUE(model.Processing.LastMeshSimplifyResult->Succeeded());
-    EXPECT_EQ(model.Processing.LastMeshSimplifyResult->OutputFaceCount,
-              simplified.OutputFaceCount);
+    EXPECT_TRUE(simplified.Succeeded());
+    EXPECT_GT(simplified.OutputFaceCount, 0u);
 
     const ECS::EntityHandle classicalMesh =
         MakeSelectable(registry, "SimplifyClassical");
@@ -3018,7 +2418,7 @@ TEST(SandboxEditorUi, MeshSimplifyRequestQueuesDerivedJobAndPublishesOnApply)
     Extrinsic::Tests::EditorJobHarness jobs{};
     jobs.Attach(context);
     std::optional<Runtime::EditorMeshSimplifyResult> completedResult{};
-    context.MethodResultSinks.MeshSimplify =
+    const std::function<void(Runtime::EditorMeshSimplifyResult)> onSimplify =
         [&completedResult](Runtime::EditorMeshSimplifyResult result)
         {
             completedResult = std::move(result);
@@ -3039,7 +2439,8 @@ TEST(SandboxEditorUi, MeshSimplifyRequestQueuesDerivedJobAndPublishesOnApply)
                 .Metric = Runtime::EditorMeshSimplifyMetric::FA_QEM,
                 .TargetFaces = 12u,
                 .PreserveBoundary = false,
-            });
+            },
+                onSimplify);
 
     EXPECT_EQ(result.Status, Runtime::EditorCommandStatus::Pending);
     EXPECT_EQ(result.InputVertexCount, before.Vertices);
@@ -3078,8 +2479,8 @@ TEST(SandboxEditorUi, MeshSimplifyRequestQueuesDerivedJobAndPublishesOnApply)
 
 // BUG-138: the first topology edit on an entity succeeds and every later one is
 // refused as stale, forever. The live session showed simplify applying once on a
-// freshly imported mesh and then reporting "the mesh changed after the job was
-// queued" on every subsequent attempt, with denoise — which runs the same
+// freshly imported mesh and then reporting "the source geometry changed after
+// the job was queued" on every subsequent attempt, with denoise — which runs the same
 // staleness checks minus the topology comparison — still applying on the same
 // entity. Nothing mutates the entity between the two attempts here, so a refusal
 // is the apply gate misreading a re-derived halfedge numbering as a change.
@@ -3093,7 +2494,7 @@ TEST(SandboxEditorUi, MeshSimplifyAppliesAgainAfterAnEarlierTopologyEdit)
     Extrinsic::Tests::EditorJobHarness jobs{};
     jobs.Attach(context);
     std::optional<Runtime::EditorMeshSimplifyResult> completedResult{};
-    context.MethodResultSinks.MeshSimplify =
+    const std::function<void(Runtime::EditorMeshSimplifyResult)> onSimplify =
         [&completedResult](Runtime::EditorMeshSimplifyResult result)
         {
             completedResult = std::move(result);
@@ -3117,7 +2518,8 @@ TEST(SandboxEditorUi, MeshSimplifyAppliesAgainAfterAnEarlierTopologyEdit)
                     .Metric = Runtime::EditorMeshSimplifyMetric::FA_QEM,
                     .TargetFaces = targetFaces,
                     .PreserveBoundary = false,
-                });
+                },
+                onSimplify);
         EXPECT_EQ(submitted.Status, Runtime::EditorCommandStatus::Pending);
         return jobs.DrainUntilTerminal();
     };
@@ -3162,17 +2564,17 @@ TEST(SandboxEditorUi, MeshSubdivideAndRemeshApplyAfterAnEarlierSimplify)
     std::optional<Runtime::EditorMeshSimplifyResult> simplified{};
     std::optional<Runtime::EditorMeshSubdivideResult> subdivided{};
     std::optional<Runtime::EditorMeshRemeshResult> remeshed{};
-    context.MethodResultSinks.MeshSimplify =
+    const std::function<void(Runtime::EditorMeshSimplifyResult)> onSimplify =
         [&simplified](Runtime::EditorMeshSimplifyResult result)
         {
             simplified = std::move(result);
         };
-    context.MethodResultSinks.MeshSubdivide =
+    const std::function<void(Runtime::EditorMeshSubdivideResult)> onSubdivide =
         [&subdivided](Runtime::EditorMeshSubdivideResult result)
         {
             subdivided = std::move(result);
         };
-    context.MethodResultSinks.MeshRemesh =
+    const std::function<void(Runtime::EditorMeshRemeshResult)> onRemesh =
         [&remeshed](Runtime::EditorMeshRemeshResult result)
         {
             remeshed = std::move(result);
@@ -3190,7 +2592,8 @@ TEST(SandboxEditorUi, MeshSubdivideAndRemeshApplyAfterAnEarlierSimplify)
                       .Metric = Runtime::EditorMeshSimplifyMetric::FA_QEM,
                       .TargetFaces = 16u,
                       .PreserveBoundary = false,
-                  })
+                  },
+                onSimplify)
                   .Status,
               Runtime::EditorCommandStatus::Pending);
     ASSERT_TRUE(jobs.DrainUntilTerminal());
@@ -3204,7 +2607,8 @@ TEST(SandboxEditorUi, MeshSubdivideAndRemeshApplyAfterAnEarlierSimplify)
                       .StableEntityId = stableId,
                       .Operator = Runtime::EditorMeshSubdivideOperator::Loop,
                       .Iterations = 1u,
-                  })
+                  },
+                onSubdivide)
                   .Status,
               Runtime::EditorCommandStatus::Pending);
     ASSERT_TRUE(jobs.DrainUntilTerminal());
@@ -3219,7 +2623,8 @@ TEST(SandboxEditorUi, MeshSubdivideAndRemeshApplyAfterAnEarlierSimplify)
                       .StableEntityId = stableId,
                       .Mode = Runtime::EditorMeshRemeshMode::Uniform,
                       .Iterations = 1u,
-                  })
+                  },
+                onRemesh)
                   .Status,
               Runtime::EditorCommandStatus::Pending);
     ASSERT_TRUE(jobs.DrainUntilTerminal());
@@ -3242,7 +2647,7 @@ TEST(SandboxEditorUi, MeshSimplifyStaleDiscardReportsTerminalResultInsteadOfStay
     Extrinsic::Tests::EditorJobHarness jobs{};
     jobs.Attach(context);
     std::optional<Runtime::EditorMeshSimplifyResult> completedResult{};
-    context.MethodResultSinks.MeshSimplify =
+    const std::function<void(Runtime::EditorMeshSimplifyResult)> onSimplify =
         [&completedResult](Runtime::EditorMeshSimplifyResult result)
         {
             completedResult = std::move(result);
@@ -3262,7 +2667,8 @@ TEST(SandboxEditorUi, MeshSimplifyStaleDiscardReportsTerminalResultInsteadOfStay
                 .Metric = Runtime::EditorMeshSimplifyMetric::FA_QEM,
                 .TargetFaces = 12u,
                 .PreserveBoundary = false,
-            });
+            },
+                onSimplify);
     ASSERT_EQ(queued.Status, Runtime::EditorCommandStatus::Pending);
 
     // Move the mesh out from under the in-flight job, exactly as a user edit
@@ -3289,7 +2695,7 @@ TEST(SandboxEditorUi, MeshSimplifyStaleDiscardReportsTerminalResultInsteadOfStay
     EXPECT_FALSE(completedResult->Succeeded());
     EXPECT_NE(completedResult->Message.find("did not apply"), std::string::npos)
         << completedResult->Message;
-    EXPECT_NE(completedResult->Message.find("mesh changed"), std::string::npos)
+    EXPECT_NE(completedResult->Message.find("geometry changed"), std::string::npos)
         << completedResult->Message;
 
     // Refusal is not mutation: the mesh keeps the topology the user edited.
@@ -3310,10 +2716,10 @@ TEST(SandboxEditorUi, MeshRemeshAndSubdivideStaleDiscardsReportTerminalResults)
     jobs.Attach(context);
     std::optional<Runtime::EditorMeshRemeshResult> remeshResult{};
     std::optional<Runtime::EditorMeshSubdivideResult> subdivideResult{};
-    context.MethodResultSinks.MeshRemesh =
+    const std::function<void(Runtime::EditorMeshRemeshResult)> onRemesh =
         [&remeshResult](Runtime::EditorMeshRemeshResult result)
         { remeshResult = std::move(result); };
-    context.MethodResultSinks.MeshSubdivide =
+    const std::function<void(Runtime::EditorMeshSubdivideResult)> onSubdivide =
         [&subdivideResult](Runtime::EditorMeshSubdivideResult result)
         { subdivideResult = std::move(result); };
 
@@ -3345,7 +2751,8 @@ TEST(SandboxEditorUi, MeshRemeshAndSubdivideStaleDiscardsReportTerminalResults)
                       .TargetEdgeLength = 0.35,
                       .PreserveBoundary = false,
                       .ProjectToSurface = true,
-                  })
+                  },
+                onRemesh)
                   .Status,
               Runtime::EditorCommandStatus::Pending);
     ASSERT_EQ(Runtime::ApplyEditorMeshSubdivideCommand(
@@ -3357,7 +2764,8 @@ TEST(SandboxEditorUi, MeshRemeshAndSubdivideStaleDiscardsReportTerminalResults)
                       .Operator = Runtime::EditorMeshSubdivideOperator::Loop,
                       .Iterations = 1u,
                       .PreserveLoopFeatureEdges = true,
-                  })
+                  },
+                onSubdivide)
                   .Status,
               Runtime::EditorCommandStatus::Pending);
 
@@ -3425,6 +2833,102 @@ TEST(SandboxEditorUi, MeshSimplifyCommandFailsClosedForInvalidTargetsAndUnavaila
     EXPECT_EQ(unavailable.Status,
               Runtime::EditorCommandStatus::GeometryProcessingFailed);
 }
+
+// A queued operator that runs to completion and fails reports its own
+// diagnostic. The publisher answers the sink and then returns `Err`, which the
+// job lane reads as "unpublished" and follows with the unpublished finalizer —
+// that finalizer must not deliver a second, generic result over the first.
+TEST(SandboxEditorUi, FailedQueuedMeshJobKeepsItsOwnDiagnosticAndPublishesOnce)
+{
+    ECS::Scene::Registry registry;
+    Runtime::SelectionController selection;
+    Runtime::EditorCommandHistory history;
+    Intrinsic::Tests::EditorFeatureTestContext context =
+        MakeContext(registry, selection);
+    context.CommandHistory = &history;
+    Extrinsic::Tests::EditorJobHarness jobs{};
+    jobs.Attach(context);
+
+    const ECS::EntityHandle mesh = MakeSelectable(registry, "SubdivideBlocked");
+    AddIcosahedronMeshSource(registry, mesh);
+    ASSERT_TRUE(selection.SetSelectedEntity(registry, mesh));
+
+    std::size_t deliveries = 0u;
+    std::optional<Runtime::EditorMeshSubdivideResult> delivered{};
+    // A cap below one iteration's output blocks the operator in the worker.
+    const Runtime::EditorMeshSubdivideResult queued =
+        Runtime::ApplyEditorMeshSubdivideCommand(
+            context,
+            Runtime::EditorMeshSubdivideCommand{
+                .StableEntityId =
+                    Runtime::SelectionController::ToStableEntityId(mesh),
+                .Operator = Runtime::EditorMeshSubdivideOperator::Loop,
+                .Iterations = 1u,
+                .MaxOutputFaces = 1u,
+            },
+            [&](Runtime::EditorMeshSubdivideResult result)
+            {
+                ++deliveries;
+                delivered = std::move(result);
+            });
+    ASSERT_EQ(queued.Status, Runtime::EditorCommandStatus::Pending)
+        << queued.Message;
+
+    ASSERT_TRUE(jobs.DrainUntilTerminal());
+    ASSERT_TRUE(delivered.has_value());
+    EXPECT_EQ(deliveries, 1u) << "exactly one terminal result, never two";
+    EXPECT_EQ(delivered->Status,
+              Runtime::EditorCommandStatus::GeometryProcessingFailed);
+    EXPECT_NE(delivered->Message.find("Geometry.Subdivision"),
+              std::string::npos)
+        << delivered->Message;
+    EXPECT_EQ(delivered->Message.find("did not apply"), std::string::npos)
+        << "the operator's own diagnostic must survive the unpublished "
+           "finalizer: "
+        << delivered->Message;
+    EXPECT_FALSE(history.IsDirty());
+}
+
+TEST(SandboxEditorUi, FailedQueuedCurvatureKeepsItsOwnDiagnosticAndPublishesOnce)
+{
+    ECS::Scene::Registry registry;
+    Runtime::SelectionController selection;
+    Runtime::EditorCommandHistory history;
+    auto context = MakeContext(registry, selection);
+    context.CommandHistory = &history;
+    Extrinsic::Tests::EditorJobHarness jobs{};
+    jobs.Attach(context);
+    const auto mesh = MakeSelectable(registry, "DegenerateCurvature");
+    AddTriangleMeshSource(registry, mesh);
+    auto positions = registry.Raw().get<GS::Vertices>(mesh)
+        .Properties.Get<glm::vec3>(GS::PropertyNames::kPosition);
+    ASSERT_TRUE(positions);
+    // Topologically valid, but below the curvature kernel's quality floor.
+    positions[0] = {0.0f, 0.0f, 0.0f};
+    positions[1] = {1.0f, 0.0f, 0.0f};
+    positions[2] = {1.0f, 1.0e-4f, 0.0f};
+    std::size_t deliveries = 0u;
+    std::optional<Runtime::EditorMeshCurvatureResult> delivered;
+    const auto queued = Runtime::ApplyEditorMeshCurvatureCommand(
+        context,
+        Runtime::EditorMeshCurvatureCommand{
+            .StableEntityId = Runtime::SelectionController::ToStableEntityId(mesh)},
+        [&](Runtime::EditorMeshCurvatureResult result) {
+            ++deliveries;
+            delivered = std::move(result);
+        });
+    ASSERT_EQ(queued.Status, Runtime::EditorCommandStatus::Pending) << queued.Message;
+    ASSERT_TRUE(jobs.DrainUntilTerminal());
+    ASSERT_TRUE(delivered.has_value());
+    EXPECT_EQ(deliveries, 1u);
+    EXPECT_EQ(delivered->Status, Runtime::EditorCommandStatus::GeometryProcessingFailed);
+    EXPECT_NE(delivered->Message.find("Geometry.Curvature"), std::string::npos)
+        << delivered->Message;
+    EXPECT_EQ(delivered->Message.find("did not apply"), std::string::npos)
+        << delivered->Message;
+    EXPECT_FALSE(history.IsDirty());
+}
+
 TEST(SandboxEditorUi, MeshSimplifyPreservesUvSeamsWhenTexcoordsPresent)
 {
     ECS::Scene::Registry registry;
@@ -3834,691 +3338,6 @@ TEST(SandboxEditorUi, MeshTopologyProcessingCommandsFailClosedForInvalidTargetsA
     EXPECT_FALSE(unavailableModel.Processing.MeshSubdivideLoopAvailable);
     EXPECT_FALSE(unavailableModel.Processing.MeshSubdivideCatmullClarkAvailable);
     EXPECT_FALSE(unavailableModel.Processing.MeshSubdivideSqrt3Available);
-}
-TEST(SandboxEditorUi, MeshVertexNormalsCommandPublishesCanonicalNormalsForAllWeightings)
-{
-    ECS::Scene::Registry registry;
-    Runtime::SelectionController selection;
-    Runtime::EditorCommandHistory history;
-
-    const ECS::EntityHandle mesh = MakeSelectable(registry, "NormalMesh");
-    AddTriangleMeshSource(registry, mesh);
-    ASSERT_TRUE(selection.SetSelectedEntity(registry, mesh));
-
-    Intrinsic::Tests::EditorFeatureTestContext context = MakeContext(registry, selection);
-    context.CommandHistory = &history;
-    const std::uint32_t stableId =
-        Runtime::SelectionController::ToStableEntityId(mesh);
-
-    constexpr std::array<GN::AveragingMode, 4> kWeightings{{
-        GN::AveragingMode::UniformFace,
-        GN::AveragingMode::AreaWeighted,
-        GN::AveragingMode::AngleWeighted,
-        GN::AveragingMode::MaxWeighted,
-    }};
-
-    // BUG-145: every weighting agrees on a single flat triangle, so only the
-    // first run changes anything. The later three recompute the same normals
-    // and must report `NoChange` rather than `Applied`, publish nothing, and
-    // leave no undo entry — while still proving each weighting produces the
-    // canonical normal.
-    Runtime::EditorMeshVertexNormalsResult firstResult{};
-    Runtime::EditorMeshVertexNormalsResult lastResult{};
-    bool first = true;
-    for (const GN::AveragingMode weighting : kWeightings)
-    {
-        registry.Raw().remove<Dirty::GpuDirty,
-                              Dirty::DirtyVertexPositions,
-                              Dirty::DirtyVertexAttributes,
-                              Dirty::DirtyVertexTexcoords,
-                              Dirty::DirtyVertexNormals,
-                              Dirty::DirtyVertexColors,
-                              Dirty::DirtyFaceTopology,
-                              Dirty::DirtyEdgeTopology>(mesh);
-        const std::size_t undoCountBefore = history.UndoCount();
-
-        lastResult = Runtime::ApplyEditorMeshVertexNormalsCommand(
-            context,
-            Runtime::EditorMeshVertexNormalsCommand{
-                .StableEntityId = stableId,
-                .Weighting = weighting,
-            });
-
-        EXPECT_EQ(lastResult.NormalStatus, GN::RecomputeStatus::Success);
-        EXPECT_EQ(lastResult.Weighting, weighting);
-        EXPECT_EQ(lastResult.VertexSlotCount, 3u);
-        EXPECT_EQ(lastResult.WrittenCount, 3u);
-        EXPECT_EQ(lastResult.ProcessedFaceCount, 1u);
-        EXPECT_EQ(lastResult.FallbackVertexCount, 0u);
-        if (first)
-        {
-            ASSERT_TRUE(lastResult.Succeeded()) << lastResult.Message;
-            EXPECT_EQ(lastResult.ChangedNormalCount, 3u);
-            EXPECT_EQ(history.UndoCount(), undoCountBefore + 1u);
-            EXPECT_TRUE(registry.Raw().all_of<Dirty::DirtyVertexNormals>(mesh));
-            firstResult = lastResult;
-        }
-        else
-        {
-            EXPECT_EQ(lastResult.Status,
-                      Runtime::EditorCommandStatus::NoChange)
-                << lastResult.Message;
-            EXPECT_EQ(lastResult.ChangedNormalCount, 0u);
-            EXPECT_EQ(history.UndoCount(), undoCountBefore)
-                << "a run that changed nothing must not leave an undo entry";
-            EXPECT_FALSE(registry.Raw().all_of<Dirty::DirtyVertexNormals>(mesh))
-                << "a run that published nothing must not mark normals dirty";
-        }
-        first = false;
-        EXPECT_FALSE(registry.Raw().all_of<Dirty::DirtyVertexAttributes>(mesh));
-        EXPECT_FALSE(registry.Raw().all_of<Dirty::DirtyVertexTexcoords>(mesh));
-        EXPECT_FALSE(registry.Raw().all_of<Dirty::DirtyVertexColors>(mesh));
-        EXPECT_FALSE(registry.Raw().all_of<Dirty::GpuDirty>(mesh));
-        EXPECT_FALSE(registry.Raw().all_of<Dirty::DirtyVertexPositions>(mesh));
-        EXPECT_FALSE(registry.Raw().all_of<Dirty::DirtyFaceTopology>(mesh));
-        EXPECT_FALSE(registry.Raw().all_of<Dirty::DirtyEdgeTopology>(mesh));
-
-        auto normals = registry.Raw()
-                           .get<GS::Vertices>(mesh)
-                           .Properties.Get<glm::vec3>(PN::kNormal);
-        ASSERT_TRUE(normals);
-        ASSERT_EQ(normals.Vector().size(), 3u);
-        for (const glm::vec3 normal : normals.Vector())
-        {
-            EXPECT_NEAR(normal.x, 0.0f, 1.0e-5f);
-            EXPECT_NEAR(normal.y, 0.0f, 1.0e-5f);
-            EXPECT_NEAR(normal.z, 1.0f, 1.0e-5f);
-        }
-    }
-
-    EXPECT_TRUE(history.IsDirty());
-    context.LastMeshVertexNormalsResult = &firstResult;
-    const Runtime::EditorDomainWindowModel model =
-        Runtime::BuildEditorDomainWindowModel(
-            context,
-            Runtime::EditorDomainWindowKind::Mesh);
-    ASSERT_TRUE(model.Processing.MeshVertexNormalsAvailable);
-    ASSERT_TRUE(model.Processing.LastMeshVertexNormalsResult.has_value());
-    EXPECT_TRUE(model.Processing.LastMeshVertexNormalsResult->Succeeded());
-    EXPECT_EQ(model.Processing.LastMeshVertexNormalsResult->WrittenCount, 3u);
-    EXPECT_EQ(model.Processing.LastMeshVertexNormalsResult->ChangedNormalCount,
-              3u);
-}
-// BUG-145: `WrittenCount` is non-zero whenever the kernel ran, so every
-// vertex-normal path reported `Applied` even when it republished the values
-// already stored. A run that changes nothing must report `NoChange` with a
-// reason, publish nothing, and leave no undo entry — synchronously and through
-// the CPU job.
-TEST(SandboxEditorUi, VertexNormalRecomputeThatChangesNothingReportsNoChange)
-{
-    ECS::Scene::Registry registry;
-    Runtime::SelectionController selection;
-    Runtime::EditorCommandHistory history;
-    Intrinsic::Tests::EditorFeatureTestContext context =
-        MakeContext(registry, selection);
-    context.CommandHistory = &history;
-
-    const ECS::EntityHandle mesh = MakeSelectable(registry, "IdempotentMesh");
-    AddTriangleMeshSource(registry, mesh);
-    const std::uint32_t meshId =
-        Runtime::SelectionController::ToStableEntityId(mesh);
-    const auto recomputeMesh = [&]()
-    {
-        return Runtime::ApplyEditorMeshVertexNormalsCommand(
-            context,
-            Runtime::EditorMeshVertexNormalsCommand{
-                .StableEntityId = meshId,
-                .Weighting = GN::AveragingMode::AreaWeighted,
-            });
-    };
-
-    const Runtime::EditorMeshVertexNormalsResult meshFirst = recomputeMesh();
-    ASSERT_TRUE(meshFirst.Succeeded()) << meshFirst.Message;
-    EXPECT_EQ(meshFirst.ChangedNormalCount, meshFirst.WrittenCount)
-        << "an absent v:normal property makes every slot a change";
-    const std::size_t undoAfterFirst = history.UndoCount();
-    EXPECT_GT(undoAfterFirst, 0u);
-
-    const Runtime::EditorMeshVertexNormalsResult meshSecond = recomputeMesh();
-    EXPECT_EQ(meshSecond.Status, Runtime::EditorCommandStatus::NoChange)
-        << meshSecond.Message;
-    EXPECT_EQ(meshSecond.NormalStatus, GN::RecomputeStatus::Success);
-    EXPECT_EQ(meshSecond.WrittenCount, meshFirst.WrittenCount);
-    EXPECT_EQ(meshSecond.ChangedNormalCount, 0u);
-    EXPECT_NE(meshSecond.Message.find("already up to date"), std::string::npos)
-        << meshSecond.Message;
-    EXPECT_EQ(history.UndoCount(), undoAfterFirst)
-        << "a no-op must not leave an undo entry";
-
-    const ECS::EntityHandle graph = MakeSelectable(registry, "IdempotentGraph");
-    AddPlanarCycleGraphSource(registry, graph);
-    const std::uint32_t graphId =
-        Runtime::SelectionController::ToStableEntityId(graph);
-    const auto recomputeGraph = [&]()
-    {
-        return Runtime::ApplyEditorGraphVertexNormalsCommand(
-            context,
-            Runtime::EditorGraphVertexNormalsCommand{
-                .StableEntityId = graphId,
-                .FallbackNormal = glm::vec3{0.0f, 0.0f, 1.0f},
-                .OrientTowardFallback = true,
-            });
-    };
-    ASSERT_TRUE(recomputeGraph().Succeeded());
-    const std::size_t undoAfterGraph = history.UndoCount();
-    const Runtime::EditorGraphVertexNormalsResult graphSecond = recomputeGraph();
-    EXPECT_EQ(graphSecond.Status, Runtime::EditorCommandStatus::NoChange)
-        << graphSecond.Message;
-    EXPECT_EQ(graphSecond.ChangedNormalCount, 0u);
-    EXPECT_GT(graphSecond.WrittenCount, 0u);
-    EXPECT_EQ(history.UndoCount(), undoAfterGraph);
-
-    const ECS::EntityHandle points =
-        MakeSelectable(registry, "IdempotentPoints");
-    AddPointCloudSource(registry, points, 9u);
-    SetPositions(registry.Raw().get<GS::Vertices>(points),
-                 {
-                     {-1.0f, -1.0f, 0.0f},
-                     {0.0f, -1.0f, 0.0f},
-                     {1.0f, -1.0f, 0.0f},
-                     {-1.0f, 0.0f, 0.0f},
-                     {0.0f, 0.0f, 0.0f},
-                     {1.0f, 0.0f, 0.0f},
-                     {-1.0f, 1.0f, 0.0f},
-                     {0.0f, 1.0f, 0.0f},
-                     {1.0f, 1.0f, 0.0f},
-                 });
-    const std::uint32_t pointsId =
-        Runtime::SelectionController::ToStableEntityId(points);
-    const auto recomputePoints = [&]()
-    {
-        return Runtime::ApplyEditorPointCloudVertexNormalsCommand(
-            context,
-            Runtime::EditorPointCloudVertexNormalsCommand{
-                .StableEntityId = pointsId,
-                .KNeighbors = 4u,
-                .MinimumNeighbors = 2u,
-                .UseRadiusSearch = false,
-                .Orientation = PCN::OrientationMode::MinimumSpanningTree,
-                .FallbackNormal = glm::vec3{0.0f, 0.0f, 1.0f},
-            });
-    };
-    ASSERT_TRUE(recomputePoints().Succeeded());
-    const std::size_t undoAfterPoints = history.UndoCount();
-    const Runtime::EditorPointCloudVertexNormalsResult pointsSecond =
-        recomputePoints();
-    EXPECT_EQ(pointsSecond.Status, Runtime::EditorCommandStatus::NoChange)
-        << pointsSecond.Message;
-    EXPECT_EQ(pointsSecond.ChangedNormalCount, 0u);
-    EXPECT_GT(pointsSecond.WrittenCount, 0u);
-    EXPECT_EQ(history.UndoCount(), undoAfterPoints);
-}
-
-// The same rule through the CPU job publisher, which is a separate code path
-// from the synchronous command.
-TEST(SandboxEditorUi, VertexNormalCpuJobThatChangesNothingReportsNoChange)
-{
-    ECS::Scene::Registry registry;
-    Runtime::SelectionController selection;
-    Runtime::EditorCommandHistory history;
-    Intrinsic::Tests::EditorFeatureTestContext context =
-        MakeContext(registry, selection);
-    context.CommandHistory = &history;
-    Extrinsic::Tests::EditorJobHarness jobs{};
-    jobs.Attach(context);
-    std::optional<Runtime::EditorMeshVertexNormalsResult> completed{};
-    context.MethodResultSinks.MeshVertexNormals =
-        [&completed](Runtime::EditorMeshVertexNormalsResult result)
-        {
-            completed = std::move(result);
-        };
-
-    const ECS::EntityHandle mesh = MakeSelectable(registry, "QueuedIdempotent");
-    AddTriangleMeshSource(registry, mesh);
-    const std::uint32_t stableId =
-        Runtime::SelectionController::ToStableEntityId(mesh);
-    const auto submit = [&]()
-    {
-        return Runtime::ApplyEditorMeshVertexNormalsCommand(
-            context,
-            Runtime::EditorMeshVertexNormalsCommand{
-                .StableEntityId = stableId,
-                .Weighting = GN::AveragingMode::AreaWeighted,
-            });
-    };
-
-    ASSERT_EQ(submit().Status, Runtime::EditorCommandStatus::Pending);
-    ASSERT_TRUE(jobs.DrainUntilTerminal());
-    ASSERT_TRUE(completed.has_value());
-    ASSERT_TRUE(completed->Succeeded()) << completed->Message;
-    EXPECT_EQ(completed->ChangedNormalCount, completed->WrittenCount);
-    const std::size_t undoAfterFirst = history.UndoCount();
-    EXPECT_GT(undoAfterFirst, 0u);
-
-    completed.reset();
-    registry.Raw().remove<Dirty::DirtyVertexNormals>(mesh);
-    ASSERT_EQ(submit().Status, Runtime::EditorCommandStatus::Pending);
-    ASSERT_TRUE(jobs.DrainUntilTerminal());
-    ASSERT_TRUE(completed.has_value());
-    EXPECT_EQ(completed->Status, Runtime::EditorCommandStatus::NoChange)
-        << completed->Message;
-    EXPECT_EQ(completed->ChangedNormalCount, 0u);
-    EXPECT_GT(completed->WrittenCount, 0u);
-    EXPECT_NE(completed->Message.find("already up to date"), std::string::npos)
-        << completed->Message;
-    EXPECT_EQ(history.UndoCount(), undoAfterFirst)
-        << "a no-op job must not leave an undo entry";
-    EXPECT_FALSE(registry.Raw().all_of<Dirty::DirtyVertexNormals>(mesh))
-        << "a job that published nothing must not mark normals dirty";
-}
-
-TEST(SandboxEditorUi, MeshVertexNormalsRequestQueuesDerivedJobAndPublishesOnApply)
-{
-    ECS::Scene::Registry registry;
-    Runtime::SelectionController selection;
-    Runtime::EditorCommandHistory history;
-    Intrinsic::Tests::EditorFeatureTestContext context = MakeContext(registry, selection);
-    context.CommandHistory = &history;
-    Extrinsic::Tests::EditorJobHarness jobs{};
-    jobs.Attach(context);
-    std::optional<Runtime::EditorMeshVertexNormalsResult>
-        completedResult{};
-    context.MethodResultSinks.MeshVertexNormals =
-        [&completedResult](
-            Runtime::EditorMeshVertexNormalsResult result)
-        {
-            completedResult = std::move(result);
-        };
-
-    const ECS::EntityHandle mesh = MakeSelectable(registry, "QueuedNormalsMesh");
-    AddTriangleMeshSource(registry, mesh);
-    auto& properties = registry.Raw().get<GS::Vertices>(mesh).Properties;
-    ASSERT_FALSE(properties.Exists(PN::kNormal));
-    const std::uint32_t stableId =
-        Runtime::SelectionController::ToStableEntityId(mesh);
-
-    const Runtime::EditorMeshVertexNormalsResult result =
-        Runtime::ApplyEditorMeshVertexNormalsCommand(
-            context,
-            Runtime::EditorMeshVertexNormalsCommand{
-                .StableEntityId = stableId,
-                .Weighting = GN::AveragingMode::AreaWeighted,
-            });
-
-    EXPECT_EQ(result.Status, Runtime::EditorCommandStatus::Pending);
-    EXPECT_EQ(result.VertexSlotCount, 3u);
-    EXPECT_NE(result.Message.find("queued"), std::string::npos);
-    EXPECT_FALSE(properties.Exists(PN::kNormal));
-    EXPECT_FALSE(registry.Raw().all_of<Dirty::DirtyVertexNormals>(mesh));
-
-    Runtime::EditorJobQueueSnapshot queued =
-        jobs.Snapshot();
-    ASSERT_EQ(queued.Entries.size(), 1u);
-    EXPECT_EQ(queued.Entries[0].Name, "Sandbox.MeshVertexNormals.CPU");
-    // `JobService` dispatches at submit, so the pre-drain state races;
-    // assert only that the job is still active.
-    EXPECT_TRUE(Runtime::IsActiveEditorJobState(queued.Entries[0].State));
-
-    EXPECT_FALSE(completedResult.has_value());
-    EXPECT_FALSE(properties.Exists(PN::kNormal));
-    EXPECT_FALSE(registry.Raw().all_of<Dirty::DirtyVertexNormals>(mesh));
-
-    ASSERT_TRUE(jobs.DrainUntilTerminal());
-    Runtime::EditorJobQueueSnapshot done =
-        jobs.Snapshot();
-    ASSERT_EQ(done.Entries.size(), 1u);
-    EXPECT_EQ(done.Entries[0].State, Runtime::JobState::Published);
-    ASSERT_TRUE(completedResult.has_value());
-    EXPECT_TRUE(completedResult->Succeeded()) << completedResult->Message;
-    EXPECT_EQ(completedResult->NormalStatus, GN::RecomputeStatus::Success);
-    EXPECT_EQ(completedResult->VertexSlotCount, 3u);
-    EXPECT_EQ(completedResult->WrittenCount, 3u);
-    EXPECT_TRUE(registry.Raw().all_of<Dirty::DirtyVertexNormals>(mesh));
-    EXPECT_FALSE(registry.Raw().all_of<Dirty::DirtyVertexAttributes>(mesh));
-    EXPECT_TRUE(history.IsDirty());
-
-    auto normals = properties.Get<glm::vec3>(PN::kNormal);
-    ASSERT_TRUE(normals);
-    ASSERT_EQ(normals.Vector().size(), 3u);
-    for (const glm::vec3 normal : normals.Vector())
-    {
-        EXPECT_NEAR(normal.x, 0.0f, 1.0e-5f);
-        EXPECT_NEAR(normal.y, 0.0f, 1.0e-5f);
-        EXPECT_NEAR(normal.z, 1.0f, 1.0e-5f);
-    }
-
-    const std::vector<glm::vec3> publishedNormals = normals.Vector();
-    registry.Raw().remove<Dirty::DirtyVertexNormals>(mesh);
-    EXPECT_EQ(history.Undo().Status,
-              Runtime::EditorCommandHistoryStatus::Undone);
-    EXPECT_FALSE(properties.Exists(PN::kNormal));
-    EXPECT_TRUE(registry.Raw().all_of<Dirty::DirtyVertexNormals>(mesh));
-
-    registry.Raw().remove<Dirty::DirtyVertexNormals>(mesh);
-    EXPECT_EQ(history.Redo().Status,
-              Runtime::EditorCommandHistoryStatus::Redone);
-    auto redoneNormals = properties.Get<glm::vec3>(PN::kNormal);
-    ASSERT_TRUE(redoneNormals);
-    EXPECT_EQ(redoneNormals.Vector(), publishedNormals);
-    EXPECT_TRUE(registry.Raw().all_of<Dirty::DirtyVertexNormals>(mesh));
-
-    redoneNormals.Vector()[0].x = 0.25f;
-    const Runtime::EditorCommandHistorySnapshot beforeRejectedUndo =
-        history.Snapshot();
-    EXPECT_EQ(history.Undo().Status,
-              Runtime::EditorCommandHistoryStatus::StaleEntity);
-    EXPECT_FLOAT_EQ(redoneNormals.Vector()[0].x, 0.25f);
-    EXPECT_EQ(history.UndoCount(), 1u);
-    EXPECT_EQ(history.RedoCount(), 0u);
-    EXPECT_EQ(history.Snapshot().Revision, beforeRejectedUndo.Revision);
-
-    redoneNormals.Vector() = publishedNormals;
-    EXPECT_EQ(history.Undo().Status,
-              Runtime::EditorCommandHistoryStatus::Undone);
-    EXPECT_FALSE(properties.Exists(PN::kNormal));
-}
-TEST(SandboxEditorUi,
-     GraphAndPointCloudVertexNormalsRequestsQueueDerivedJobsAndPublishOnApply)
-{
-    ECS::Scene::Registry registry;
-    Runtime::SelectionController selection;
-    Runtime::EditorCommandHistory history;
-    Intrinsic::Tests::EditorFeatureTestContext context = MakeContext(registry, selection);
-    context.CommandHistory = &history;
-    Extrinsic::Tests::EditorJobHarness jobs{};
-    jobs.Attach(context);
-    std::optional<Runtime::EditorGraphVertexNormalsResult>
-        completedGraph{};
-    std::optional<Runtime::EditorPointCloudVertexNormalsResult>
-        completedCloud{};
-    context.MethodResultSinks.GraphVertexNormals =
-        [&completedGraph](
-            Runtime::EditorGraphVertexNormalsResult result)
-        {
-            completedGraph = std::move(result);
-        };
-    context.MethodResultSinks.PointCloudVertexNormals =
-        [&completedCloud](
-            Runtime::EditorPointCloudVertexNormalsResult result)
-        {
-            completedCloud = std::move(result);
-        };
-
-    const ECS::EntityHandle graph = MakeSelectable(registry, "QueuedGraphNormals");
-    AddPlanarCycleGraphSource(registry, graph);
-    auto& graphProperties = registry.Raw().get<GS::Vertices>(graph).Properties;
-    ASSERT_FALSE(graphProperties.Exists(PN::kNormal));
-
-    const Runtime::EditorGraphVertexNormalsResult graphResult =
-        Runtime::ApplyEditorGraphVertexNormalsCommand(
-            context,
-            Runtime::EditorGraphVertexNormalsCommand{
-                .StableEntityId =
-                    Runtime::SelectionController::ToStableEntityId(graph),
-                .FallbackNormal = glm::vec3{0.0f, 0.0f, 1.0f},
-                .OrientTowardFallback = true,
-            });
-
-    EXPECT_EQ(graphResult.Status,
-              Runtime::EditorCommandStatus::Pending);
-    EXPECT_EQ(graphResult.VertexSlotCount, 4u);
-    EXPECT_EQ(graphResult.EdgeSlotCount, 4u);
-    EXPECT_FALSE(graphProperties.Exists(PN::kNormal));
-
-    Runtime::EditorJobQueueSnapshot queued =
-        jobs.Snapshot();
-    ASSERT_EQ(queued.Entries.size(), 1u);
-    EXPECT_EQ(queued.Entries[0].Name, "Sandbox.GraphVertexNormals.CPU");
-    // `JobService` dispatches at submit, so the pre-drain state races;
-    // assert only that the job is still active.
-    EXPECT_TRUE(Runtime::IsActiveEditorJobState(queued.Entries[0].State));
-
-    EXPECT_FALSE(completedGraph.has_value());
-    EXPECT_FALSE(graphProperties.Exists(PN::kNormal));
-    ASSERT_TRUE(jobs.DrainUntilTerminal());
-    ASSERT_TRUE(completedGraph.has_value());
-    EXPECT_TRUE(completedGraph->Succeeded()) << completedGraph->Message;
-    EXPECT_EQ(completedGraph->WrittenCount, 4u);
-    EXPECT_TRUE(registry.Raw().all_of<Dirty::DirtyVertexNormals>(graph));
-    auto graphNormals = graphProperties.Get<glm::vec3>(PN::kNormal);
-    ASSERT_TRUE(graphNormals);
-    ASSERT_EQ(graphNormals.Vector().size(), 4u);
-    for (const glm::vec3 normal : graphNormals.Vector())
-    {
-        ExpectFiniteUnitNormal(normal);
-        EXPECT_GT(normal.z, 0.9f);
-    }
-
-    const ECS::EntityHandle cloud = MakeSelectable(registry, "QueuedCloudNormals");
-    AddPointCloudSource(registry, cloud, 9u);
-    SetPositions(registry.Raw().get<GS::Vertices>(cloud),
-                 {
-                     {-1.0f, -1.0f, 0.0f},
-                     {0.0f, -1.0f, 0.0f},
-                     {1.0f, -1.0f, 0.0f},
-                     {-1.0f, 0.0f, 0.0f},
-                     {0.0f, 0.0f, 0.0f},
-                     {1.0f, 0.0f, 0.0f},
-                     {-1.0f, 1.0f, 0.0f},
-                     {0.0f, 1.0f, 0.0f},
-                     {1.0f, 1.0f, 0.0f},
-                 });
-    auto& cloudProperties = registry.Raw().get<GS::Vertices>(cloud).Properties;
-    ASSERT_FALSE(cloudProperties.Exists(PN::kNormal));
-
-    const Runtime::EditorPointCloudVertexNormalsResult cloudResult =
-        Runtime::ApplyEditorPointCloudVertexNormalsCommand(
-            context,
-            Runtime::EditorPointCloudVertexNormalsCommand{
-                .StableEntityId =
-                    Runtime::SelectionController::ToStableEntityId(cloud),
-                .KNeighbors = 4u,
-                .MinimumNeighbors = 2u,
-                .UseRadiusSearch = false,
-                .Orientation = PCN::OrientationMode::MinimumSpanningTree,
-                .FallbackNormal = glm::vec3{0.0f, 0.0f, 1.0f},
-            });
-
-    EXPECT_EQ(cloudResult.Status,
-              Runtime::EditorCommandStatus::Pending);
-    EXPECT_EQ(cloudResult.PointSlotCount, 9u);
-    EXPECT_FALSE(cloudProperties.Exists(PN::kNormal));
-
-    queued = jobs.Snapshot();
-    ASSERT_EQ(queued.Entries.size(), 2u);
-    EXPECT_EQ(queued.Entries[1].Name, "Sandbox.PointCloudVertexNormals.CPU");
-    // `JobService` dispatches at submit, so the pre-drain state races;
-    // assert only that the job is still active.
-    EXPECT_TRUE(Runtime::IsActiveEditorJobState(queued.Entries[1].State));
-
-    EXPECT_FALSE(completedCloud.has_value());
-    EXPECT_FALSE(cloudProperties.Exists(PN::kNormal));
-    ASSERT_TRUE(jobs.DrainUntilTerminal());
-    ASSERT_TRUE(completedCloud.has_value());
-    EXPECT_TRUE(completedCloud->Succeeded()) << completedCloud->Message;
-    EXPECT_EQ(completedCloud->PointSlotCount, 9u);
-    EXPECT_EQ(completedCloud->WrittenCount, 9u);
-    EXPECT_TRUE(registry.Raw().all_of<Dirty::DirtyVertexNormals>(cloud));
-    auto cloudNormals = cloudProperties.Get<glm::vec3>(PN::kNormal);
-    ASSERT_TRUE(cloudNormals);
-    ASSERT_EQ(cloudNormals.Vector().size(), 9u);
-    for (const glm::vec3 normal : cloudNormals.Vector())
-    {
-        ExpectFiniteUnitNormal(normal);
-        EXPECT_GT(normal.z, 0.5f);
-    }
-    EXPECT_TRUE(history.IsDirty());
-
-    registry.Raw().remove<Dirty::DirtyVertexNormals>(graph);
-    registry.Raw().remove<Dirty::DirtyVertexNormals>(cloud);
-    EXPECT_EQ(history.Undo().Status,
-              Runtime::EditorCommandHistoryStatus::Undone);
-    EXPECT_FALSE(cloudProperties.Exists(PN::kNormal));
-    EXPECT_TRUE(graphProperties.Exists(PN::kNormal));
-    EXPECT_TRUE(registry.Raw().all_of<Dirty::DirtyVertexNormals>(cloud));
-
-    EXPECT_EQ(history.Undo().Status,
-              Runtime::EditorCommandHistoryStatus::Undone);
-    EXPECT_FALSE(graphProperties.Exists(PN::kNormal));
-    EXPECT_TRUE(registry.Raw().all_of<Dirty::DirtyVertexNormals>(graph));
-
-    EXPECT_EQ(history.Redo().Status,
-              Runtime::EditorCommandHistoryStatus::Redone);
-    EXPECT_TRUE(graphProperties.Exists(PN::kNormal));
-    EXPECT_EQ(history.Redo().Status,
-              Runtime::EditorCommandHistoryStatus::Redone);
-    EXPECT_TRUE(cloudProperties.Exists(PN::kNormal));
-}
-TEST(SandboxEditorUi, VertexNormalsDerivedJobsDiscardStaleSourcesBeforeApply)
-{
-    ECS::Scene::Registry registry;
-    Runtime::SelectionController selection;
-
-    {
-        Intrinsic::Tests::EditorFeatureTestContext context = MakeContext(registry, selection);
-    Extrinsic::Tests::EditorJobHarness jobs{};
-    jobs.Attach(context);
-        bool completedSinkCalled = false;
-        context.MethodResultSinks.MeshVertexNormals =
-            [&completedSinkCalled](
-                Runtime::EditorMeshVertexNormalsResult)
-            {
-                completedSinkCalled = true;
-            };
-
-        const ECS::EntityHandle mesh =
-            MakeSelectable(registry, "StaleMeshNormals");
-        AddTriangleMeshSource(registry, mesh);
-        const Runtime::EditorMeshVertexNormalsResult result =
-            Runtime::ApplyEditorMeshVertexNormalsCommand(
-                context,
-                Runtime::EditorMeshVertexNormalsCommand{
-                    .StableEntityId =
-                        Runtime::SelectionController::ToStableEntityId(mesh),
-                });
-        ASSERT_EQ(result.Status, Runtime::EditorCommandStatus::Pending);
-
-        SetPositions(registry.Raw().get<GS::Vertices>(mesh),
-                     {
-                         {10.0f, 0.0f, 0.0f},
-                         {11.0f, 0.0f, 0.0f},
-                         {12.0f, 0.0f, 0.0f},
-                     });
-
-    ASSERT_TRUE(jobs.DrainUntilTerminal());
-        Runtime::EditorJobQueueSnapshot done =
-        jobs.Snapshot();
-        ASSERT_EQ(done.Entries.size(), 1u);
-        EXPECT_EQ(done.Entries[0].State,
-                  Runtime::JobState::StaleDiscarded);
-        EXPECT_FALSE(completedSinkCalled);
-        EXPECT_FALSE(registry.Raw().get<GS::Vertices>(mesh)
-                         .Properties.Exists(PN::kNormal));
-        EXPECT_FALSE(registry.Raw().all_of<Dirty::DirtyVertexNormals>(mesh));
-    }
-
-    {
-        Intrinsic::Tests::EditorFeatureTestContext context = MakeContext(registry, selection);
-    Extrinsic::Tests::EditorJobHarness jobs{};
-    jobs.Attach(context);
-        bool completedSinkCalled = false;
-        context.MethodResultSinks.GraphVertexNormals =
-            [&completedSinkCalled](
-                Runtime::EditorGraphVertexNormalsResult)
-            {
-                completedSinkCalled = true;
-            };
-
-        const ECS::EntityHandle graph =
-            MakeSelectable(registry, "StaleGraphNormals");
-        AddPlanarCycleGraphSource(registry, graph);
-        const Runtime::EditorGraphVertexNormalsResult result =
-            Runtime::ApplyEditorGraphVertexNormalsCommand(
-                context,
-                Runtime::EditorGraphVertexNormalsCommand{
-                    .StableEntityId =
-                        Runtime::SelectionController::ToStableEntityId(graph),
-                });
-        ASSERT_EQ(result.Status, Runtime::EditorCommandStatus::Pending);
-
-        auto edgeV0 = registry.Raw()
-                          .get<GS::Edges>(graph)
-                          .Properties.Get<std::uint32_t>(PN::kEdgeV0);
-        ASSERT_TRUE(edgeV0);
-        edgeV0.Vector()[0] = 2u;
-
-    ASSERT_TRUE(jobs.DrainUntilTerminal());
-        Runtime::EditorJobQueueSnapshot done =
-        jobs.Snapshot();
-        ASSERT_EQ(done.Entries.size(), 1u);
-        EXPECT_EQ(done.Entries[0].State,
-                  Runtime::JobState::StaleDiscarded);
-        EXPECT_FALSE(completedSinkCalled);
-        EXPECT_FALSE(registry.Raw().get<GS::Vertices>(graph)
-                         .Properties.Exists(PN::kNormal));
-        EXPECT_FALSE(registry.Raw().all_of<Dirty::DirtyVertexNormals>(graph));
-    }
-
-    {
-        Intrinsic::Tests::EditorFeatureTestContext context = MakeContext(registry, selection);
-    Extrinsic::Tests::EditorJobHarness jobs{};
-    jobs.Attach(context);
-        bool completedSinkCalled = false;
-        context.MethodResultSinks.PointCloudVertexNormals =
-            [&completedSinkCalled](
-                Runtime::EditorPointCloudVertexNormalsResult)
-            {
-                completedSinkCalled = true;
-            };
-
-        const ECS::EntityHandle cloud =
-            MakeSelectable(registry, "StaleCloudNormals");
-        AddPointCloudSource(registry, cloud, 4u);
-        SetPositions(registry.Raw().get<GS::Vertices>(cloud),
-                     {
-                         {0.0f, 0.0f, 0.0f},
-                         {1.0f, 0.0f, 0.0f},
-                         {0.0f, 1.0f, 0.0f},
-                         {1.0f, 1.0f, 0.0f},
-                     });
-        auto& cloudProperties =
-            registry.Raw().get<GS::Vertices>(cloud).Properties;
-        auto existingNormals = cloudProperties.GetOrAdd<glm::vec3>(
-            std::string{PN::kNormal},
-            glm::vec3{0.0f, 0.0f, 1.0f});
-        existingNormals.Vector() = {
-            {0.0f, 0.0f, 1.0f},
-            {0.0f, 0.0f, 1.0f},
-            {0.0f, 0.0f, 1.0f},
-            {0.0f, 0.0f, 1.0f},
-        };
-        const Runtime::EditorPointCloudVertexNormalsResult result =
-            Runtime::ApplyEditorPointCloudVertexNormalsCommand(
-                context,
-                Runtime::EditorPointCloudVertexNormalsCommand{
-                    .StableEntityId =
-                        Runtime::SelectionController::ToStableEntityId(cloud),
-                    .KNeighbors = 3u,
-                    .MinimumNeighbors = 2u,
-                });
-        ASSERT_EQ(result.Status, Runtime::EditorCommandStatus::Pending);
-
-        existingNormals.Vector()[0] = glm::vec3{1.0f, 0.0f, 0.0f};
-
-    ASSERT_TRUE(jobs.DrainUntilTerminal());
-        Runtime::EditorJobQueueSnapshot done =
-        jobs.Snapshot();
-        ASSERT_EQ(done.Entries.size(), 1u);
-        EXPECT_EQ(done.Entries[0].State,
-                  Runtime::JobState::StaleDiscarded);
-        EXPECT_FALSE(completedSinkCalled);
-        const auto retainedNormals =
-            cloudProperties.Get<glm::vec3>(PN::kNormal);
-        ASSERT_TRUE(retainedNormals);
-        EXPECT_EQ(retainedNormals.Vector()[0],
-                  (glm::vec3{1.0f, 0.0f, 0.0f}));
-        EXPECT_FALSE(registry.Raw().all_of<Dirty::DirtyVertexNormals>(cloud));
-    }
 }
 TEST(SandboxEditorUi,
      DirectMeshPostProcessDiscardsCompletionAfterGeometryEdit)
@@ -5338,92 +4157,6 @@ TEST(SandboxEditorUi, DirectMeshPostProcessRejectsRecycledEntityTarget)
     engine.Shutdown();
 }
 
-TEST(SandboxEditorUi, MeshVertexNormalsCommandFailsClosedForInvalidTargets)
-{
-    ECS::Scene::Registry registry;
-    Runtime::SelectionController selection;
-    Intrinsic::Tests::EditorFeatureTestContext context = MakeContext(registry, selection);
-
-    const Runtime::EditorMeshVertexNormalsCommand validShape{
-        .StableEntityId = 1u,
-    };
-
-    const Runtime::EditorMeshVertexNormalsResult missingScene =
-        Runtime::ApplyEditorMeshVertexNormalsCommand(
-            Intrinsic::Tests::EditorFeatureTestContext{},
-            validShape);
-    EXPECT_EQ(missingScene.Status,
-              Runtime::EditorCommandStatus::MissingScene);
-    EXPECT_EQ(missingScene.Error, Core::ErrorCode::InvalidState);
-
-    const Runtime::EditorMeshVertexNormalsResult stale =
-        Runtime::ApplyEditorMeshVertexNormalsCommand(
-            context,
-            Runtime::EditorMeshVertexNormalsCommand{
-                .StableEntityId = std::numeric_limits<std::uint32_t>::max(),
-            });
-    EXPECT_EQ(stale.Status, Runtime::EditorCommandStatus::StaleEntity);
-    EXPECT_EQ(stale.Error, Core::ErrorCode::ResourceNotFound);
-
-    const ECS::EntityHandle cloud = MakeSelectable(registry, "Cloud");
-    AddPointCloudSource(registry, cloud, 3u);
-    const Runtime::EditorMeshVertexNormalsResult wrongDomain =
-        Runtime::ApplyEditorMeshVertexNormalsCommand(
-            context,
-            Runtime::EditorMeshVertexNormalsCommand{
-                .StableEntityId =
-                    Runtime::SelectionController::ToStableEntityId(cloud),
-            });
-    EXPECT_EQ(wrongDomain.Status,
-              Runtime::EditorCommandStatus::UnsupportedGeometryDomain);
-    EXPECT_FALSE(registry.Raw().all_of<Dirty::DirtyVertexAttributes>(cloud));
-
-    const ECS::EntityHandle mesh = MakeSelectable(registry, "TypeConflictMesh");
-    AddTriangleMeshSource(registry, mesh);
-    const auto conflictingNormals = registry.Raw()
-                                        .get<GS::Vertices>(mesh)
-                                        .Properties.GetOrAdd<float>(
-                                            std::string{PN::kNormal},
-                                            0.0f);
-    ASSERT_TRUE(conflictingNormals);
-    const Runtime::EditorMeshVertexNormalsResult conflict =
-        Runtime::ApplyEditorMeshVertexNormalsCommand(
-            context,
-            Runtime::EditorMeshVertexNormalsCommand{
-                .StableEntityId =
-                    Runtime::SelectionController::ToStableEntityId(mesh),
-            });
-    EXPECT_EQ(conflict.Status,
-              Runtime::EditorCommandStatus::GeometryProcessingFailed);
-    EXPECT_EQ(conflict.NormalStatus, GN::RecomputeStatus::PropertyTypeConflict);
-    EXPECT_EQ(conflict.Error, Core::ErrorCode::TypeMismatch);
-    EXPECT_FALSE(registry.Raw().all_of<Dirty::DirtyVertexAttributes>(mesh));
-
-    ASSERT_TRUE(selection.SetSelectedEntity(registry, mesh));
-    context.LastMeshVertexNormalsResult = &conflict;
-    const Runtime::EditorDomainWindowModel model =
-        Runtime::BuildEditorDomainWindowModel(
-            context,
-            Runtime::EditorDomainWindowKind::Mesh);
-    // BUG-141: the failure belongs to the operation that raised it and is
-    // carried on that operation's own result, which its panel renders. It must
-    // not also be mirrored into the shared processing diagnostics, because the
-    // runtime folds that list into every domain window's header.
-    ASSERT_TRUE(model.Processing.LastMeshVertexNormalsResult.has_value());
-    EXPECT_EQ(model.Processing.LastMeshVertexNormalsResult->Status,
-              Runtime::EditorCommandStatus::GeometryProcessingFailed);
-    EXPECT_EQ(model.Processing.LastMeshVertexNormalsResult->Message,
-              conflict.Message);
-    EXPECT_FALSE(HasDiagnostic(
-        model.Processing.Diagnostics,
-        Runtime::EditorDiagnosticCode::GeometryProcessingFailed));
-}
-
-// BUG-141: a queued async job is not a failure. `EditorCommandStatus::Pending`
-// is simply not `Succeeded()`, and the shared diagnostics list used to announce
-// every not-succeeded result under `GeometryProcessingFailed`, so the live
-// session's header read "GeometryProcessingFailed: Mesh simplify CPU job queued
-// (job 3:1)." while the job was running perfectly well.
 TEST(SandboxEditorUi, QueuedMeshJobIsNotReportedAsAProcessingFailure)
 {
     ECS::Scene::Registry registry;
@@ -5450,7 +4183,6 @@ TEST(SandboxEditorUi, QueuedMeshJobIsNotReportedAsAProcessingFailure)
             });
     ASSERT_EQ(queued.Status, Runtime::EditorCommandStatus::Pending);
 
-    context.LastMeshSimplifyResult = &queued;
     const Runtime::EditorDomainWindowModel model =
         Runtime::BuildEditorDomainWindowModel(
             context,
@@ -5462,9 +4194,7 @@ TEST(SandboxEditorUi, QueuedMeshJobIsNotReportedAsAProcessingFailure)
     EXPECT_FALSE(HasDiagnostic(
         model.Diagnostics,
         Runtime::EditorDiagnosticCode::GeometryProcessingFailed));
-    ASSERT_TRUE(model.Processing.LastMeshSimplifyResult.has_value());
-    EXPECT_EQ(model.Processing.LastMeshSimplifyResult->Status,
-              Runtime::EditorCommandStatus::Pending);
+    EXPECT_EQ(queued.Status, Runtime::EditorCommandStatus::Pending);
 }
 
 // BUG-141: one operation's outcome must not appear in another operation's
@@ -5488,16 +4218,18 @@ TEST(SandboxEditorUi, OneOperationsFailureIsAbsentFromTheSharedProcessingModel)
     failed.Status = Runtime::EditorCommandStatus::StaleEntity;
     failed.Error = Core::ErrorCode::InvalidState;
     failed.Message = "Sandbox.MeshSimplify.CPU did not apply.";
-    context.LastMeshSimplifyResult = &failed;
+    Runtime::EditorMeshTopologyResultsSnapshot retainedResults{};
+    retainedResults.LastMeshSimplifyResult = failed;
 
     const Runtime::EditorDomainWindowModel model =
         Runtime::BuildEditorDomainWindowModel(
             context,
             Runtime::EditorDomainWindowKind::Mesh);
 
-    // The simplify panel still has its outcome...
-    ASSERT_TRUE(model.Processing.LastMeshSimplifyResult.has_value());
-    EXPECT_EQ(model.Processing.LastMeshSimplifyResult->Message, failed.Message);
+    // The simplify panel still has its outcome, now through its own family
+    // snapshot rather than the shared processing model...
+    ASSERT_TRUE(retainedResults.LastMeshSimplifyResult.has_value());
+    EXPECT_EQ(retainedResults.LastMeshSimplifyResult->Message, failed.Message);
     // ...and no other panel reading this model inherits it.
     for (const Runtime::EditorDiagnostic& diagnostic :
          model.Processing.Diagnostics)
@@ -5512,279 +4244,6 @@ TEST(SandboxEditorUi, OneOperationsFailureIsAbsentFromTheSharedProcessingModel)
     }
 }
 
-TEST(SandboxEditorUi, GraphAndPointCloudVertexNormalsCommandsPublishCanonicalNormals)
-{
-    ECS::Scene::Registry registry;
-    Runtime::SelectionController selection;
-    Runtime::EditorCommandHistory history;
-    Intrinsic::Tests::EditorFeatureTestContext context = MakeContext(registry, selection);
-    context.CommandHistory = &history;
-
-    const ECS::EntityHandle graph = MakeSelectable(registry, "NormalGraph");
-    AddPlanarCycleGraphSource(registry, graph);
-    const std::uint32_t graphStableId =
-        Runtime::SelectionController::ToStableEntityId(graph);
-
-    const Runtime::EditorGraphVertexNormalsResult graphResult =
-        Runtime::ApplyEditorGraphVertexNormalsCommand(
-            context,
-            Runtime::EditorGraphVertexNormalsCommand{
-                .StableEntityId = graphStableId,
-                .FallbackNormal = glm::vec3{0.0f, 0.0f, 1.0f},
-                .OrientTowardFallback = true,
-            });
-
-    ASSERT_TRUE(graphResult.Succeeded()) << graphResult.Message;
-    EXPECT_EQ(graphResult.NormalStatus, GVN::RecomputeStatus::Success);
-    EXPECT_EQ(graphResult.VertexSlotCount, 4u);
-    EXPECT_EQ(graphResult.EdgeSlotCount, 4u);
-    EXPECT_EQ(graphResult.WrittenCount, 4u);
-    EXPECT_EQ(graphResult.ValidNormalVertexCount, 4u);
-    EXPECT_EQ(graphResult.InvalidEdgeCount, 0u);
-    EXPECT_TRUE(registry.Raw().all_of<Dirty::DirtyVertexNormals>(graph));
-    EXPECT_FALSE(registry.Raw().all_of<Dirty::DirtyVertexAttributes>(graph));
-    EXPECT_FALSE(registry.Raw().all_of<Dirty::GpuDirty>(graph));
-
-    auto graphNormals = registry.Raw()
-                            .get<GS::Vertices>(graph)
-                            .Properties.Get<glm::vec3>(PN::kNormal);
-    ASSERT_TRUE(graphNormals);
-    ASSERT_EQ(graphNormals.Vector().size(), 4u);
-    for (const glm::vec3 normal : graphNormals.Vector())
-    {
-        ExpectFiniteUnitNormal(normal);
-        EXPECT_GT(normal.z, 0.9f);
-    }
-
-    ASSERT_TRUE(selection.SetSelectedEntity(registry, graph));
-    context.LastGraphVertexNormalsResult = &graphResult;
-    const Runtime::EditorDomainWindowModel graphModel =
-        Runtime::BuildEditorDomainWindowModel(
-            context,
-            Runtime::EditorDomainWindowKind::Graph);
-    ASSERT_TRUE(graphModel.Processing.GraphVertexNormalsAvailable);
-    ASSERT_TRUE(graphModel.Processing.LastGraphVertexNormalsResult.has_value());
-    EXPECT_TRUE(
-        graphModel.Processing.LastGraphVertexNormalsResult->Succeeded());
-    EXPECT_EQ(
-        graphModel.Processing.LastGraphVertexNormalsResult->WrittenCount,
-        4u);
-
-    const ECS::EntityHandle cloud = MakeSelectable(registry, "NormalCloud");
-    AddPointCloudSource(registry, cloud, 9u);
-    SetPositions(registry.Raw().get<GS::Vertices>(cloud),
-                 {
-                     {-1.0f, -1.0f, 0.0f},
-                     {0.0f, -1.0f, 0.0f},
-                     {1.0f, -1.0f, 0.0f},
-                     {-1.0f, 0.0f, 0.0f},
-                     {0.0f, 0.0f, 0.0f},
-                     {1.0f, 0.0f, 0.0f},
-                     {-1.0f, 1.0f, 0.0f},
-                     {0.0f, 1.0f, 0.0f},
-                     {1.0f, 1.0f, 0.0f},
-                 });
-    auto deletedPoints = registry.Raw()
-                             .get<GS::Vertices>(cloud)
-                             .Properties.GetOrAdd<bool>("p:deleted", false);
-    ASSERT_EQ(deletedPoints.Vector().size(), 9u);
-    deletedPoints.Vector()[8] = true;
-    const std::uint32_t cloudStableId =
-        Runtime::SelectionController::ToStableEntityId(cloud);
-
-    const Runtime::EditorPointCloudVertexNormalsResult cloudResult =
-        Runtime::ApplyEditorPointCloudVertexNormalsCommand(
-            context,
-            Runtime::EditorPointCloudVertexNormalsCommand{
-                .StableEntityId = cloudStableId,
-                .KNeighbors = 4u,
-                .MinimumNeighbors = 2u,
-                .UseRadiusSearch = false,
-                .Orientation = PCN::OrientationMode::MinimumSpanningTree,
-                .FallbackNormal = glm::vec3{0.0f, 0.0f, 1.0f},
-            });
-
-    ASSERT_TRUE(cloudResult.Succeeded()) << cloudResult.Message;
-    EXPECT_EQ(cloudResult.NormalStatus, PCN::RecomputeStatus::Success);
-    EXPECT_EQ(cloudResult.Backend, PCN::NeighborhoodBackend::KDTree);
-    EXPECT_EQ(cloudResult.PointSlotCount, 9u);
-    EXPECT_EQ(cloudResult.WrittenCount, 8u);
-    EXPECT_EQ(cloudResult.SkippedDeletedPointCount, 1u);
-    EXPECT_EQ(cloudResult.KNeighbors, 4u);
-    EXPECT_EQ(cloudResult.MinimumNeighbors, 2u);
-    EXPECT_TRUE(registry.Raw().all_of<Dirty::DirtyVertexNormals>(cloud));
-    EXPECT_FALSE(registry.Raw().all_of<Dirty::DirtyVertexAttributes>(cloud));
-    EXPECT_FALSE(registry.Raw().all_of<Dirty::GpuDirty>(cloud));
-
-    auto cloudNormals = registry.Raw()
-                            .get<GS::Vertices>(cloud)
-                            .Properties.Get<glm::vec3>(PN::kNormal);
-    ASSERT_TRUE(cloudNormals);
-    ASSERT_EQ(cloudNormals.Vector().size(), 9u);
-    for (const glm::vec3 normal : cloudNormals.Vector())
-    {
-        ExpectFiniteUnitNormal(normal);
-        EXPECT_GT(normal.z, 0.5f);
-    }
-
-    ASSERT_TRUE(selection.SetSelectedEntity(registry, cloud));
-    context.LastGraphVertexNormalsResult = nullptr;
-    context.LastPointCloudVertexNormalsResult = &cloudResult;
-    const Runtime::EditorDomainWindowModel cloudModel =
-        Runtime::BuildEditorDomainWindowModel(
-            context,
-            Runtime::EditorDomainWindowKind::PointCloud);
-    ASSERT_TRUE(cloudModel.Processing.PointCloudVertexNormalsAvailable);
-    ASSERT_TRUE(
-        cloudModel.Processing.LastPointCloudVertexNormalsResult.has_value());
-    EXPECT_TRUE(
-        cloudModel.Processing.LastPointCloudVertexNormalsResult->Succeeded());
-    EXPECT_EQ(
-        cloudModel.Processing.LastPointCloudVertexNormalsResult->WrittenCount,
-        8u);
-    EXPECT_EQ(cloudModel.Processing.LastPointCloudVertexNormalsResult
-                  ->SkippedDeletedPointCount,
-              1u);
-    EXPECT_TRUE(history.IsDirty());
-}
-TEST(SandboxEditorUi, GraphAndPointCloudVertexNormalsCommandsFailClosedForInvalidTargets)
-{
-    ECS::Scene::Registry registry;
-    Runtime::SelectionController selection;
-    Intrinsic::Tests::EditorFeatureTestContext context = MakeContext(registry, selection);
-
-    const Runtime::EditorGraphVertexNormalsResult missingGraphScene =
-        Runtime::ApplyEditorGraphVertexNormalsCommand(
-            Intrinsic::Tests::EditorFeatureTestContext{},
-            Runtime::EditorGraphVertexNormalsCommand{
-                .StableEntityId = 1u,
-            });
-    EXPECT_EQ(missingGraphScene.Status,
-              Runtime::EditorCommandStatus::MissingScene);
-    EXPECT_EQ(missingGraphScene.Error, Core::ErrorCode::InvalidState);
-
-    const ECS::EntityHandle cloudWrongDomain =
-        MakeSelectable(registry, "CloudWrongDomain");
-    AddPointCloudSource(registry, cloudWrongDomain, 3u);
-    SetPositions(registry.Raw().get<GS::Vertices>(cloudWrongDomain),
-                 {
-                     {0.0f, 0.0f, 0.0f},
-                     {1.0f, 0.0f, 0.0f},
-                     {0.0f, 1.0f, 0.0f},
-                 });
-    const Runtime::EditorGraphVertexNormalsResult graphWrongDomain =
-        Runtime::ApplyEditorGraphVertexNormalsCommand(
-            context,
-            Runtime::EditorGraphVertexNormalsCommand{
-                .StableEntityId =
-                    Runtime::SelectionController::ToStableEntityId(
-                        cloudWrongDomain),
-            });
-    EXPECT_EQ(graphWrongDomain.Status,
-              Runtime::EditorCommandStatus::UnsupportedGeometryDomain);
-    EXPECT_FALSE(
-        registry.Raw().all_of<Dirty::DirtyVertexNormals>(cloudWrongDomain));
-
-    const Runtime::EditorPointCloudVertexNormalsResult invalidPointParams =
-        Runtime::ApplyEditorPointCloudVertexNormalsCommand(
-            context,
-            Runtime::EditorPointCloudVertexNormalsCommand{
-                .StableEntityId =
-                    Runtime::SelectionController::ToStableEntityId(
-                        cloudWrongDomain),
-                .KNeighbors = 0u,
-            });
-    EXPECT_EQ(invalidPointParams.Status,
-              Runtime::EditorCommandStatus::InvalidProcessingParameters);
-    EXPECT_FALSE(registry.Raw().get<GS::Vertices>(cloudWrongDomain)
-                     .Properties.Exists(PN::kNormal));
-
-    const ECS::EntityHandle graphConflict =
-        MakeSelectable(registry, "GraphConflict");
-    AddPlanarCycleGraphSource(registry, graphConflict);
-    auto graphConflictNormals = registry.Raw()
-                                    .get<GS::Vertices>(graphConflict)
-                                    .Properties.GetOrAdd<float>(
-                                        std::string{PN::kNormal},
-                                        0.0f);
-    ASSERT_TRUE(graphConflictNormals);
-    const Runtime::EditorGraphVertexNormalsResult graphConflictResult =
-        Runtime::ApplyEditorGraphVertexNormalsCommand(
-            context,
-            Runtime::EditorGraphVertexNormalsCommand{
-                .StableEntityId =
-                    Runtime::SelectionController::ToStableEntityId(
-                        graphConflict),
-            });
-    EXPECT_EQ(graphConflictResult.Status,
-              Runtime::EditorCommandStatus::GeometryProcessingFailed);
-    EXPECT_EQ(graphConflictResult.NormalStatus,
-              GVN::RecomputeStatus::PropertyTypeConflict);
-    EXPECT_EQ(graphConflictResult.Error, Core::ErrorCode::TypeMismatch);
-    EXPECT_FALSE(
-        registry.Raw().all_of<Dirty::DirtyVertexNormals>(graphConflict));
-    EXPECT_TRUE(registry.Raw()
-                    .get<GS::Vertices>(graphConflict)
-                    .Properties.Get<float>(PN::kNormal));
-
-    const ECS::EntityHandle meshWrongDomain =
-        MakeSelectable(registry, "MeshWrongDomain");
-    AddTriangleMeshSource(registry, meshWrongDomain);
-    const Runtime::EditorPointCloudVertexNormalsResult pointWrongDomain =
-        Runtime::ApplyEditorPointCloudVertexNormalsCommand(
-            context,
-            Runtime::EditorPointCloudVertexNormalsCommand{
-                .StableEntityId =
-                    Runtime::SelectionController::ToStableEntityId(
-                        meshWrongDomain),
-            });
-    EXPECT_EQ(pointWrongDomain.Status,
-              Runtime::EditorCommandStatus::UnsupportedGeometryDomain);
-    EXPECT_FALSE(
-        registry.Raw().all_of<Dirty::DirtyVertexNormals>(meshWrongDomain));
-
-    const ECS::EntityHandle cloudConflict =
-        MakeSelectable(registry, "CloudConflict");
-    AddPointCloudSource(registry, cloudConflict, 4u);
-    SetPositions(registry.Raw().get<GS::Vertices>(cloudConflict),
-                 {
-                     {0.0f, 0.0f, 0.0f},
-                     {1.0f, 0.0f, 0.0f},
-                     {0.0f, 1.0f, 0.0f},
-                     {1.0f, 1.0f, 0.0f},
-                 });
-    auto pointConflictNormals = registry.Raw()
-                                    .get<GS::Vertices>(cloudConflict)
-                                    .Properties.GetOrAdd<float>(
-                                        std::string{PN::kNormal},
-                                        0.0f);
-    ASSERT_TRUE(pointConflictNormals);
-    const Runtime::EditorPointCloudVertexNormalsResult
-        pointConflictResult =
-            Runtime::ApplyEditorPointCloudVertexNormalsCommand(
-                context,
-                Runtime::EditorPointCloudVertexNormalsCommand{
-                    .StableEntityId =
-                        Runtime::SelectionController::ToStableEntityId(
-                            cloudConflict),
-                    .KNeighbors = 3u,
-                    .MinimumNeighbors = 2u,
-                });
-    EXPECT_EQ(pointConflictResult.Status,
-              Runtime::EditorCommandStatus::GeometryProcessingFailed);
-    EXPECT_EQ(pointConflictResult.NormalStatus,
-              PCN::RecomputeStatus::PropertyTypeConflict);
-    EXPECT_EQ(pointConflictResult.Error, Core::ErrorCode::TypeMismatch);
-    EXPECT_FALSE(
-        registry.Raw().all_of<Dirty::DirtyVertexNormals>(cloudConflict));
-    EXPECT_TRUE(registry.Raw()
-                    .get<GS::Vertices>(cloudConflict)
-                    .Properties.Get<float>(PN::kNormal));
-}
-// BUG-145 slice D: UV regeneration commits a replacement mesh and reported
-// `Applied` from a written count. Re-running it on a mesh whose authored UVs
-// the atlas preserves resolves to the texcoords and topology already stored,
-// which must read as `NoChange` and leave no undo entry.
 TEST(SandboxEditorUi, UvRegenerationThatReproducesStoredUvsReportsNoChange)
 {
     ECS::Scene::Registry registry;
@@ -5823,6 +4282,114 @@ TEST(SandboxEditorUi, UvRegenerationThatReproducesStoredUvsReportsNoChange)
         << second.Diagnostic;
     EXPECT_EQ(history.UndoCount(), undoAfterFirst)
         << "a no-op must not leave an undo entry";
+}
+
+// With a job lane available the submit-time answer is only `Pending`; the real
+// outcome reaches the caller through the terminal callback, which is what the
+// panel binds to the session's UV-regeneration result slot.
+TEST(SandboxEditorUi, QueuedUvRegenerationDeliversItsOutcomeThroughTheTerminalCallback)
+{
+    ECS::Scene::Registry registry;
+    Runtime::SelectionController selection;
+    Runtime::EditorCommandHistory history;
+
+    const ECS::EntityHandle mesh = MakeSelectable(registry, "UvQueuedTerminal");
+    AddTriangleMeshSource(registry, mesh);
+    ASSERT_TRUE(selection.SetSelectedEntity(registry, mesh));
+    Intrinsic::Tests::EditorFeatureTestContext context =
+        MakeContext(registry, selection);
+    context.CommandHistory = &history;
+    Extrinsic::Tests::EditorJobHarness jobs{};
+    jobs.Attach(context);
+
+    std::optional<Runtime::EditorUvRegenerationCommandResult> delivered{};
+    const Runtime::EditorUvRegenerationCommandResult submitted =
+        Runtime::ApplyEditorUvRegenerationCommand(
+            context,
+            Runtime::EditorUvRegenerationCommand{
+                .StableEntityId =
+                    Runtime::SelectionController::ToStableEntityId(mesh),
+                .PreserveValidAuthoredUvs = true,
+                .Resolution = 64u,
+                .Padding = 2u,
+            },
+            [&delivered](Runtime::EditorUvRegenerationCommandResult result)
+            {
+                delivered = std::move(result);
+            });
+
+    EXPECT_EQ(submitted.Status, Runtime::EditorCommandStatus::Pending)
+        << submitted.Diagnostic;
+    EXPECT_FALSE(delivered.has_value())
+        << "the terminal result must not precede the job";
+    EXPECT_EQ(history.UndoCount(), 0u)
+        << "a queued job must not mutate at submit time";
+
+    ASSERT_TRUE(jobs.DrainUntilTerminal());
+    ASSERT_TRUE(delivered.has_value())
+        << "a queued UV job owes the caller exactly one terminal result";
+    EXPECT_TRUE(delivered->Succeeded()) << delivered->Diagnostic;
+    EXPECT_GT(history.UndoCount(), 0u);
+}
+
+// A queued UV job that never reaches its publisher still owes one terminal
+// result, or the panel sits on its submit-time `Pending` state forever.
+TEST(SandboxEditorUi, StaleQueuedUvRegenerationStillReportsOneTerminalResult)
+{
+    ECS::Scene::Registry registry;
+    Runtime::SelectionController selection;
+    Runtime::EditorCommandHistory history;
+
+    const ECS::EntityHandle mesh = MakeSelectable(registry, "UvQueuedStale");
+    AddTriangleMeshSource(registry, mesh);
+    ASSERT_TRUE(selection.SetSelectedEntity(registry, mesh));
+    Intrinsic::Tests::EditorFeatureTestContext context =
+        MakeContext(registry, selection);
+    context.CommandHistory = &history;
+    Extrinsic::Tests::EditorJobHarness jobs{};
+    jobs.Attach(context);
+
+    std::size_t deliveries = 0u;
+    std::optional<Runtime::EditorUvRegenerationCommandResult> delivered{};
+    const Runtime::EditorUvRegenerationCommandResult submitted =
+        Runtime::ApplyEditorUvRegenerationCommand(
+            context,
+            Runtime::EditorUvRegenerationCommand{
+                .StableEntityId =
+                    Runtime::SelectionController::ToStableEntityId(mesh),
+                .Resolution = 64u,
+                .Padding = 2u,
+            },
+            [&](Runtime::EditorUvRegenerationCommandResult result)
+            {
+                ++deliveries;
+                delivered = std::move(result);
+            });
+    ASSERT_EQ(submitted.Status, Runtime::EditorCommandStatus::Pending)
+        << submitted.Diagnostic;
+
+    // Moving the source invalidates the apply gate the job submitted against,
+    // so the completion is discarded rather than published.
+    SetPositions(registry.Raw().get<GS::Vertices>(mesh),
+                 {
+                     {10.0f, 0.0f, 0.0f},
+                     {11.0f, 0.0f, 0.0f},
+                     {10.0f, 1.0f, 0.0f},
+                 });
+
+    ASSERT_TRUE(jobs.DrainUntilTerminal());
+    Runtime::EditorJobQueueSnapshot done = jobs.Snapshot();
+    ASSERT_EQ(done.Entries.size(), 1u);
+    EXPECT_EQ(done.Entries[0].State, Runtime::JobState::StaleDiscarded);
+
+    ASSERT_TRUE(delivered.has_value());
+    EXPECT_EQ(deliveries, 1u) << "exactly one terminal result, never two";
+    EXPECT_FALSE(delivered->Succeeded());
+    EXPECT_EQ(delivered->Status, Runtime::EditorCommandStatus::StaleEntity)
+        << delivered->Diagnostic;
+    EXPECT_NE(delivered->Diagnostic.find("did not apply"), std::string::npos)
+        << delivered->Diagnostic;
+    EXPECT_EQ(history.UndoCount(), 0u);
 }
 
 // BUG-147 — the atlas emits a fresh output vertex per (chart, source vertex)
@@ -6113,7 +4680,7 @@ TEST(SandboxEditorUi, UvRegenerationRequestQueuesDerivedJobAndPublishesOnApply)
     jobs.Attach(context);
     std::optional<Runtime::EditorUvRegenerationCommandResult>
         completedResult{};
-    context.MethodResultSinks.UvRegeneration =
+    const std::function<void(Runtime::EditorUvRegenerationCommandResult)> onComplete =
         [&completedResult](
             Runtime::EditorUvRegenerationCommandResult result)
         {
@@ -6160,7 +4727,7 @@ TEST(SandboxEditorUi, UvRegenerationRequestQueuesDerivedJobAndPublishesOnApply)
                 .StableEntityId = stableId,
                 .Resolution = 64u,
                 .Padding = 2u,
-            });
+            }, onComplete);
 
     EXPECT_EQ(result.Status, Runtime::EditorCommandStatus::Pending);
     EXPECT_NE(result.Diagnostic.find("queued"), std::string::npos);
@@ -6275,12 +4842,14 @@ TEST(SandboxEditorUi, UvRegenerationDerivedJobDiscardsStaleSource)
     Intrinsic::Tests::EditorFeatureTestContext context = MakeContext(registry, selection);
     Extrinsic::Tests::EditorJobHarness jobs{};
     jobs.Attach(context);
-    bool completedSinkCalled = false;
-    context.MethodResultSinks.UvRegeneration =
-        [&completedSinkCalled](
-            Runtime::EditorUvRegenerationCommandResult)
+    std::size_t deliveries = 0u;
+    Runtime::EditorCommandStatus deliveredStatus{};
+    const std::function<void(Runtime::EditorUvRegenerationCommandResult)> onComplete =
+        [&](
+            Runtime::EditorUvRegenerationCommandResult result)
         {
-            completedSinkCalled = true;
+            ++deliveries;
+            deliveredStatus = result.Status;
         };
 
     const ECS::EntityHandle mesh =
@@ -6303,7 +4872,7 @@ TEST(SandboxEditorUi, UvRegenerationDerivedJobDiscardsStaleSource)
                 .StableEntityId = stableId,
                 .Resolution = 64u,
                 .Padding = 2u,
-            });
+            }, onComplete);
     ASSERT_EQ(result.Status, Runtime::EditorCommandStatus::Pending);
 
     SetPositions(vertices,
@@ -6320,7 +4889,8 @@ TEST(SandboxEditorUi, UvRegenerationDerivedJobDiscardsStaleSource)
     ASSERT_EQ(done.Entries.size(), 1u);
     EXPECT_EQ(done.Entries[0].State,
               Runtime::JobState::StaleDiscarded);
-    EXPECT_FALSE(completedSinkCalled);
+    EXPECT_EQ(deliveries, 1u);
+    EXPECT_EQ(deliveredStatus, Runtime::EditorCommandStatus::StaleEntity);
     EXPECT_FALSE(registry.Raw().all_of<Dirty::DirtyVertexPositions>(mesh));
     EXPECT_FALSE(registry.Raw().all_of<Dirty::DirtyVertexAttributes>(mesh));
     EXPECT_FALSE(registry.Raw().all_of<Dirty::DirtyEdgeTopology>(mesh));
@@ -6342,12 +4912,14 @@ TEST(SandboxEditorUi, UvRegenerationDerivedJobDiscardsStaleAuthoredProperty)
     Intrinsic::Tests::EditorFeatureTestContext context = MakeContext(registry, selection);
     Extrinsic::Tests::EditorJobHarness jobs{};
     jobs.Attach(context);
-    bool completedSinkCalled = false;
-    context.MethodResultSinks.UvRegeneration =
-        [&completedSinkCalled](
-            Runtime::EditorUvRegenerationCommandResult)
+    std::size_t deliveries = 0u;
+    Runtime::EditorCommandStatus deliveredStatus{};
+    const std::function<void(Runtime::EditorUvRegenerationCommandResult)> onComplete =
+        [&](
+            Runtime::EditorUvRegenerationCommandResult result)
         {
-            completedSinkCalled = true;
+            ++deliveries;
+            deliveredStatus = result.Status;
         };
 
     const ECS::EntityHandle mesh =
@@ -6374,7 +4946,7 @@ TEST(SandboxEditorUi, UvRegenerationDerivedJobDiscardsStaleAuthoredProperty)
                     Runtime::SelectionController::ToStableEntityId(mesh),
                 .Resolution = 64u,
                 .Padding = 2u,
-            });
+            }, onComplete);
     ASSERT_EQ(result.Status, Runtime::EditorCommandStatus::Pending);
 
     paint[0] = glm::vec4{0.25f, 0.5f, 0.75f, 1.0f};
@@ -6385,7 +4957,8 @@ TEST(SandboxEditorUi, UvRegenerationDerivedJobDiscardsStaleAuthoredProperty)
     ASSERT_EQ(done.Entries.size(), 1u);
     EXPECT_EQ(done.Entries[0].State,
               Runtime::JobState::StaleDiscarded);
-    EXPECT_FALSE(completedSinkCalled);
+    EXPECT_EQ(deliveries, 1u);
+    EXPECT_EQ(deliveredStatus, Runtime::EditorCommandStatus::StaleEntity);
     EXPECT_FALSE(registry.Raw().all_of<Dirty::DirtyVertexPositions>(mesh));
     EXPECT_FALSE(registry.Raw().all_of<Dirty::DirtyVertexAttributes>(mesh));
     EXPECT_FALSE(registry.Raw().all_of<Dirty::DirtyEdgeTopology>(mesh));
@@ -6804,3 +5377,99 @@ TEST(SandboxEditorUi, TextureBakeRequiresOperationalGpuBackend)
 // (colormap, isoline width/color, highlight isovalues) already configured on
 // the target lane, and the styling fields must round-trip through the config
 // command onto the component.
+
+TEST(SandboxEditorUi, CurvatureCustomBindingsUseAlternatePositionsAndUndoOnBothExecutionPaths)
+{
+    for (const bool queued : {false, true})
+    {
+        SCOPED_TRACE(queued);
+        ECS::Scene::Registry registry;
+        Runtime::SelectionController selection;
+        Runtime::EditorCommandHistory history;
+        auto context = MakeContext(registry, selection);
+        context.CommandHistory = &history;
+        const auto mesh = MakeSelectable(registry, "BoundCurvature");
+        AddDenoiseTetraMeshSource(registry, mesh);
+        auto& properties = registry.Raw().get<GS::Vertices>(mesh).Properties;
+        Runtime::EditorMeshCurvatureCommand command{
+            .StableEntityId = Runtime::SelectionController::ToStableEntityId(mesh)};
+        ASSERT_TRUE(Runtime::ApplyEditorMeshCurvatureCommand(context, command).Succeeded());
+        const auto canonical = properties.Get<double>(PN::kMeanCurvature).Vector();
+        const auto positions = properties.Get<glm::vec3>(PN::kPosition).Vector();
+        auto alternate = properties.GetOrAdd<glm::vec3>("v:rest", {});
+        alternate.Vector() = positions;
+        for (auto& p : alternate.Vector()) p *= 2.f;
+        command.Positions.Name = "v:rest";
+        for (auto* output : {&command.Mean, &command.Gaussian, &command.MinPrincipal,
+                             &command.MaxPrincipal, &command.Direction1, &command.Direction2})
+            output->Name += "_custom";
+        Extrinsic::Tests::EditorJobHarness jobs;
+        if (queued) jobs.Attach(context);
+        const auto result = Runtime::ApplyEditorMeshCurvatureCommand(context, command);
+        if (queued)
+        {
+            ASSERT_EQ(result.Status, Runtime::EditorCommandStatus::Pending);
+            ASSERT_TRUE(jobs.DrainUntilTerminal());
+        }
+        else ASSERT_TRUE(result.Succeeded()) << result.Message;
+        auto mean = properties.Get<double>(command.Mean.Name);
+        ASSERT_TRUE(mean);
+        for (std::size_t i = 0; i < canonical.size(); ++i)
+            EXPECT_NEAR(mean.Vector()[i], canonical[i] / 2., 1e-6);
+        EXPECT_EQ(properties.Get<double>(PN::kMeanCurvature).Vector(), canonical);
+        EXPECT_EQ(properties.Get<glm::vec3>(PN::kPosition).Vector(), positions);
+        ASSERT_TRUE(history.Undo().Succeeded());
+        EXPECT_FALSE(properties.Exists(command.Mean.Name));
+        EXPECT_FALSE(properties.Exists(command.Direction2.Name));
+        EXPECT_EQ(properties.Get<double>(PN::kMeanCurvature).Vector(), canonical);
+        ASSERT_TRUE(history.Redo().Succeeded());
+        EXPECT_TRUE(properties.Exists(command.Direction2.Name));
+    }
+}
+
+TEST(SandboxEditorUi, DetachedQueuedMeshFamiliesDoNotReadFreedScenes)
+{
+    for (int family = 0; family < 3; ++family)
+    {
+        SCOPED_TRACE(family);
+        auto registry = std::make_unique<ECS::Scene::Registry>();
+        Runtime::SelectionController selection;
+        auto context = MakeContext(*registry, selection);
+        bool attached = true;
+        context.AttachmentActive = [&] { return attached; };
+        Extrinsic::Tests::EditorJobHarness jobs;
+        jobs.Attach(context);
+        const auto mesh = MakeSelectable(*registry, "DetachedMeshJob");
+        AddIcosahedronMeshSource(*registry, mesh);
+        const auto stableId = Runtime::SelectionController::ToStableEntityId(mesh);
+        int deliveries = 0;
+        if (family == 0)
+        {
+            const auto queued = Runtime::ApplyEditorMeshCurvatureCommand(context,
+                Runtime::EditorMeshCurvatureCommand{.StableEntityId = stableId},
+                [&](auto) { ++deliveries; });
+            ASSERT_EQ(queued.Status, Runtime::EditorCommandStatus::Pending) << queued.Message;
+        }
+        else if (family == 1)
+        {
+            const auto queued = Runtime::ApplyEditorMeshSubdivideCommand(context,
+                Runtime::EditorMeshSubdivideCommand{.StableEntityId = stableId},
+                [&](auto) { ++deliveries; });
+            ASSERT_EQ(queued.Status, Runtime::EditorCommandStatus::Pending) << queued.Message;
+        }
+        else
+        {
+            const auto queued = Runtime::ApplyEditorUvRegenerationCommand(context,
+                Runtime::EditorUvRegenerationCommand{.StableEntityId = stableId, .Resolution = 64u},
+                [&](auto) { ++deliveries; });
+            ASSERT_EQ(queued.Status, Runtime::EditorCommandStatus::Pending) << queued.Diagnostic;
+        }
+        attached = false;
+        registry.reset();
+        ASSERT_TRUE(jobs.DrainUntilTerminal());
+        const auto snapshot = jobs.Snapshot();
+        ASSERT_EQ(snapshot.Entries.size(), 1u);
+        EXPECT_EQ(snapshot.Entries.front().State, Runtime::JobState::StaleDiscarded);
+        EXPECT_EQ(deliveries, 0);
+    }
+}

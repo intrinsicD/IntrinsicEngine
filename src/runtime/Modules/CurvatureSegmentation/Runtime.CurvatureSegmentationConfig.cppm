@@ -8,6 +8,7 @@ module;
 #include <string_view>
 
 export module Extrinsic.Runtime.CurvatureSegmentationConfig;
+export import Extrinsic.Runtime.GeometryAvailability;
 
 import Extrinsic.Core.Config.Engine;
 import Extrinsic.Core.Config.EngineLoad;
@@ -45,6 +46,7 @@ export namespace Extrinsic::Runtime
 
     struct CurvatureSegmentationConfig
     {
+
         // The feature-patch and boundary-curve methods are explicit diagnostics;
         // their negative adoption verdicts do not change the operational default.
         CurvatureSegmentationMethod Method{
@@ -73,6 +75,17 @@ export namespace Extrinsic::Runtime
         double FeatureBaseRadiusRatio{0.02};
         double HardDihedralThresholdDegrees{45.0};
         double PatchComplexityCost{0.5};
+        GeometryPropertyRef Positions{GeometryElementDomain::MeshVertex, "v:position", Geometry::PropertyValueKind::Vec3};
+        GeometryPropertyRef Components{GeometryElementDomain::MeshFace, "f:curvature_component", Geometry::PropertyValueKind::UInt32};
+        GeometryPropertyRef Regions{GeometryElementDomain::MeshFace, "f:curvature_region", Geometry::PropertyValueKind::UInt32};
+        GeometryPropertyRef RegionColors{GeometryElementDomain::MeshFace, "f:curvature_region_color", Geometry::PropertyValueKind::Vec4};
+        GeometryPropertyRef Boundaries{GeometryElementDomain::MeshEdge, "e:curvature_region_boundary", Geometry::PropertyValueKind::Bool};
+        GeometryPropertyRef BoundaryColors{GeometryElementDomain::MeshEdge, "e:curvature_region_boundary_color", Geometry::PropertyValueKind::Vec4};
+        GeometryPropertyRef HardFeatures{GeometryElementDomain::MeshEdge, "e:curvature_hard_feature", Geometry::PropertyValueKind::Bool};
+        GeometryPropertyRef FeatureConfidence{GeometryElementDomain::MeshEdge, "e:curvature_soft_feature_confidence", Geometry::PropertyValueKind::Double};
+        GeometryPropertyRef BoundaryRoles{GeometryElementDomain::MeshEdge, "e:curvature_patch_boundary_role", Geometry::PropertyValueKind::UInt32};
+        GeometryPropertyRef FeatureColors{GeometryElementDomain::MeshEdge, "e:curvature_feature_patch_color", Geometry::PropertyValueKind::Vec4};
+
     };
 
     [[nodiscard]] Geometry::CurvatureSegmentation::CurvatureSegmentationParams

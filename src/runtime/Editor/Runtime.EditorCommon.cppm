@@ -1,12 +1,16 @@
+// Shared editor diagnostics, domain identifiers and inspection statistics.
 module;
 
 #include <cstdint>
+#include <cstddef>
+#include <optional>
 #include <string>
 #include <string_view>
 
 export module Extrinsic.Runtime.EditorCommon;
 
 import Extrinsic.ECS.Components.GeometrySources;
+import Extrinsic.Runtime.EditorJobProjection;
 
 export namespace Extrinsic::Runtime
 {
@@ -109,4 +113,28 @@ export namespace Extrinsic::Runtime
         std::uint64_t DomainWindowModelBuildTimeNs{0u};
         std::uint64_t WorkspaceSnapshotBuildTimeNs{0u};
     };
+    struct EditorUvDiagnosticsModel
+    {
+        bool HasSelectedEntity{false};
+        bool IsMesh{false};
+        bool HasTexcoords{false};
+        bool TexcoordCountMatchesVertices{false};
+        bool TexcoordsFinite{false};
+        std::string TexcoordPropertyName{"v:texcoord"};
+        std::size_t VertexCount{0u};
+        std::size_t TexcoordCount{0u};
+        std::size_t FaceCount{0u};
+        std::uint32_t AtlasWidth{0u};
+        std::uint32_t AtlasHeight{0u};
+        std::uint32_t ChartCount{0u};
+        std::uint32_t SeamSplitVertexCount{0u};
+        std::string Provenance{};
+        std::string BackendId{};
+        std::string LastFailure{};
+        bool CheckerPreviewAvailable{false};
+        bool UvRegenerationAvailable{false};
+        std::string UvRegenerationDisabledReason{};
+        std::optional<EditorJobModel> UvRegenerationJob{};
+    };
+
 }

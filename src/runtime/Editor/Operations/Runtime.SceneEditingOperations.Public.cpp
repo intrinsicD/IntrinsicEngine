@@ -1,5 +1,4 @@
 module;
-
 #include <cstdint>
 #include <functional>
 #include <memory>
@@ -7,16 +6,23 @@ module;
 
 module Extrinsic.Runtime.SceneEditingOperations;
 
-import Extrinsic.Runtime.Private.EditorFeatures;
+// The prepared frame is projected onto this family's own context only; the
+// all-family bindings stay opaque here.
 import Extrinsic.Runtime.Private.EditorWorkspaceAttachment;
+import Extrinsic.Runtime.EditorCommandHistory;
 
 namespace Extrinsic::Runtime {
 namespace {
 EditorSceneEditingContext
 MakeExpiredSceneEditingContext(EditorSceneEditingContext context) {
-  context.AttachmentActive = [] { return false; };
-  return EditorFeatureDetail::MakeEditorSceneEditingContext(
-      EditorFeatureDetail::ToEditorFeatureBindingsImpl(context));
+  EditorSceneEditingContext expired{};
+  expired.World = std::move(context.World);
+  expired.AssetImportCommands = std::move(context.AssetImportCommands);
+  expired.AssetImportQueueCommands = std::move(context.AssetImportQueueCommands);
+  expired.SceneFileCommands = std::move(context.SceneFileCommands);
+  expired.PrimitiveViewCommands = std::move(context.PrimitiveViewCommands);
+  expired.AttachmentActive = [] { return false; };
+  return expired;
 }
 } // namespace
 
@@ -72,22 +78,22 @@ EditorSceneEditingPreparedFrame PrepareEditorSceneEditingFrame(
 
   (void)state->Session.VisitPreparedFrame(
       [&prepared](EditorFeatureDetail::EditorWorkspacePreparedFrame frame) {
-        const EditorFeatureDetail::EditorFeatureBindings &bindings =
-            frame.Context;
         const EditorSceneEditingContext context =
-            EditorFeatureDetail::MakeEditorSceneEditingContext(bindings);
+            EditorFeatureDetail::MakeEditorSceneEditingContext(frame.Context);
         prepared.Commands = BindEditorSceneEditingCommands(context);
         prepared.AssetImportQueueCommands = context.AssetImportQueueCommands;
         prepared.SceneAvailable = context.Scene != nullptr;
-        if (frame.LastAssetImportResult.has_value())
-          prepared.LastAssetImportResult = frame.LastAssetImportResult;
-        if (frame.LastSceneFileResult.has_value())
-          prepared.LastSceneFileResult = frame.LastSceneFileResult;
+        // Session result pointers stay valid for this prepared-frame visit.
+        if (context.LastAssetImportResult != nullptr)
+          prepared.LastAssetImportResult = *context.LastAssetImportResult;
+        if (context.LastSceneFileResult != nullptr)
+          prepared.LastSceneFileResult = *context.LastSceneFileResult;
 
-        if (bindings.CommandHistory != nullptr) {
-          EditorCommandHistory *history = bindings.CommandHistory;
-          const std::function<bool()> attachmentActive =
-              bindings.AttachmentActive;
+        // Both fields are copied verbatim into this family's context, so the
+        // undo/redo epoch guard reads the same history and predicate.
+        if (context.CommandHistory != nullptr) {
+          EditorCommandHistory *history = context.CommandHistory;
+          const std::function<bool()> attachmentActive = context.AttachmentActive;
           prepared.DocumentCommands.Undo = [history, attachmentActive]() {
             if (attachmentActive && !attachmentActive())
               return EditorCommandHistoryResult{};

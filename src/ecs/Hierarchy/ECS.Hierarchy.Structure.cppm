@@ -1,8 +1,9 @@
+// Declares checked hierarchy traversal and structural link operations.
 module;
 
 #include <cstdint>
 #include <vector>
-#include <entt/entity/registry.hpp>
+#include <entt/entity/fwd.hpp>
 
 export module Extrinsic.ECS.Hierarchy.Structure;
 

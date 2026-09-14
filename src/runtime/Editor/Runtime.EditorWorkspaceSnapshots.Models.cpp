@@ -1,4 +1,6 @@
 module;
+#include <functional>
+#include <entt/entity/fwd.hpp>
 
 #include <algorithm>
 #include <array>
@@ -25,6 +27,7 @@ module;
 
 module Extrinsic.Runtime.EditorWorkspaceSnapshots;
 
+import Extrinsic.Runtime.EditorProcessing;
 import Extrinsic.Asset.ImportRouter;
 import Extrinsic.Asset.GeometryPayload;
 import Extrinsic.Asset.ModelTexturePayload;
@@ -88,13 +91,27 @@ import Extrinsic.Runtime.VertexAttributeBinding;
 import Extrinsic.Runtime.VertexChannelBindings;
 import Extrinsic.Runtime.WorldRegistry;
 import Extrinsic.Runtime.WorldHandle;
-import Extrinsic.Runtime.Private.EditorFeatures;
 import Geometry.Graph;
 import Geometry.Properties;
 import Geometry.UvAtlas;
+import Extrinsic.Asset.Service;
+import Extrinsic.RHI.Device;
+import Extrinsic.Runtime.SpatialIndexCache;
+import Extrinsic.Runtime.PointCloudConsolidationModule;
+import Extrinsic.Runtime.TextureBakeModule;
+import Extrinsic.Runtime.EditorCommon;
+import Extrinsic.Runtime.EditorJobProjection;
+import Extrinsic.Runtime.GeometryProcessingOperations;
+import Extrinsic.Runtime.RenderRecipeEditingOperations;
+import Extrinsic.Runtime.SceneEditingOperations;
+import Extrinsic.Runtime.VisualizationEditingOperations;
+
+#include "Editor/internal/Runtime.EditorFeatures.Internal.hpp"
 
 #include "Editor/internal/Runtime.EditorMutation.Internal.hpp"
 
+extern "C++"
+{
 namespace Extrinsic::Runtime::EditorFeatureDetail {
 namespace {
         namespace ECSC = Extrinsic::ECS::Components;
@@ -1773,10 +1790,17 @@ namespace {
         [[nodiscard]] std::optional<ECS::EntityHandle> ResolveFirstSelectedEntity(
             const EditorFeatureBindings& context)
         {
-            if (context.Scene == nullptr || context.Selection == nullptr)
+            if (context.Scene == nullptr)
                 return std::nullopt;
 
             const entt::registry& raw = context.Scene->Raw();
+            if (context.ModelEntityOverride)
+            {
+                const auto entity = SelectionController::ToEntityHandle(*context.ModelEntityOverride);
+                return entity != ECS::InvalidEntityHandle && raw.valid(entity)
+                    ? std::optional{entity} : std::nullopt;
+            }
+            if (context.Selection == nullptr) return std::nullopt;
             for (const std::uint32_t stableId : context.Selection->SelectedStableIds())
             {
                 const ECS::EntityHandle entity =
@@ -1791,6 +1815,7 @@ namespace {
         BuildSelectedStableIdsForCacheKey(const EditorFeatureBindings& context,
                                           const std::uint32_t fallbackStableId)
         {
+            if (context.ModelEntityOverride) return {*context.ModelEntityOverride};
             std::vector<std::uint32_t> selectedIds{};
             if (context.Selection != nullptr)
             {
@@ -2387,10 +2412,6 @@ namespace {
                 HasAnyEditorGeometryProcessingDomain(
                     model.Capabilities.Domains,
                     EditorGeometryProcessingDomain::PointCloudPoints);
-            model.PointCloudOutlierRemovalAvailable =
-                HasAnyEditorGeometryProcessingDomain(
-                    model.Capabilities.Domains,
-                    EditorGeometryProcessingDomain::PointCloudPoints);
             const bool hasProgressivePoissonDomain =
                 HasAnyEditorGeometryProcessingDomain(
                     model.Capabilities.Domains,
@@ -2459,65 +2480,11 @@ namespace {
                     break;
                 }
             }
-            // Operation-specific results stay on the model for their owning
-            // panels. `model.Diagnostics` carries only whole-model facts (no
-            // scene, no selection, unsupported domain), because
-            // `BuildDomainWindowModel` folds that shared list into every
-            // domain window header and `Pending` is not a failure.
-            if (context.LastKMeansResult != nullptr)
-            {
-                model.LastKMeansResult = *context.LastKMeansResult;
-            }
-            if (context.LastMeshDenoiseResult != nullptr)
-            {
-                model.LastMeshDenoiseResult =
-                    *context.LastMeshDenoiseResult;
-            }
-            if (context.LastMeshCurvatureResult != nullptr)
-            {
-                model.LastMeshCurvatureResult =
-                    *context.LastMeshCurvatureResult;
-            }
-            if (context.LastMeshRemeshResult != nullptr)
-            {
-                model.LastMeshRemeshResult =
-                    *context.LastMeshRemeshResult;
-            }
-            if (context.LastMeshSubdivideResult != nullptr)
-            {
-                model.LastMeshSubdivideResult =
-                    *context.LastMeshSubdivideResult;
-            }
-            if (context.LastMeshSimplifyResult != nullptr)
-            {
-                model.LastMeshSimplifyResult =
-                    *context.LastMeshSimplifyResult;
-            }
-            if (context.LastMeshVertexNormalsResult != nullptr)
-            {
-                model.LastMeshVertexNormalsResult =
-                    *context.LastMeshVertexNormalsResult;
-            }
-            if (context.LastGraphVertexNormalsResult != nullptr)
-            {
-                model.LastGraphVertexNormalsResult =
-                    *context.LastGraphVertexNormalsResult;
-            }
-            if (context.LastPointCloudVertexNormalsResult != nullptr)
-            {
-                model.LastPointCloudVertexNormalsResult =
-                    *context.LastPointCloudVertexNormalsResult;
-            }
-            if (context.LastPointCloudOutlierRemovalResult != nullptr)
-            {
-                model.LastPointCloudOutlierRemovalResult =
-                    *context.LastPointCloudOutlierRemovalResult;
-            }
-            if (context.LastProgressivePoissonResult != nullptr)
-            {
-                model.LastProgressivePoissonResult =
-                    *context.LastProgressivePoissonResult;
-            }
+            // Operation-specific results live in their owning family's prepared
+            // frame, not here. `model.Diagnostics` carries only whole-model facts
+            // (no scene, no selection, unsupported domain), because
+            // `BuildDomainWindowModel` folds that shared list into every domain
+            // window header and `Pending` is not a failure.
             if (!model.Capabilities.HasAny())
             {
                 AddDiagnostic(model.Diagnostics,
@@ -3548,6 +3515,7 @@ BuildEditorDomainWindowModelFromBindings(
     }
 
 } // namespace Extrinsic::Runtime::EditorFeatureDetail
+} // extern "C++"
 
 namespace Extrinsic::Runtime
 {
@@ -3567,17 +3535,21 @@ namespace Extrinsic::Runtime
     }
 
     EditorInspectorModel BuildEditorInspectorModel(
-        const EditorWorkspaceSnapshotContext& context)
+        const EditorWorkspaceSnapshotContext& context,
+        const std::optional<std::uint32_t> entity)
     {
-        return EditorFeatureDetail::BuildEditorInspectorModelFromBindings(
-            EditorFeatureDetail::ToEditorFeatureBindingsImpl(context));
+        auto bindings = EditorFeatureDetail::ToEditorFeatureBindingsImpl(context);
+        bindings.ModelEntityOverride = entity;
+        return EditorFeatureDetail::BuildEditorInspectorModelFromBindings(bindings);
     }
 
     EditorDomainWindowModel BuildEditorDomainWindowModel(
         const EditorWorkspaceSnapshotContext& context,
-        const EditorDomainWindowKind kind)
+        const EditorDomainWindowKind kind,
+        const std::optional<std::uint32_t> entity)
     {
-        return EditorFeatureDetail::BuildEditorDomainWindowModelFromBindings(
-            EditorFeatureDetail::ToEditorFeatureBindingsImpl(context), kind);
+        auto bindings = EditorFeatureDetail::ToEditorFeatureBindingsImpl(context);
+        bindings.ModelEntityOverride = entity;
+        return EditorFeatureDetail::BuildEditorDomainWindowModelFromBindings(bindings, kind);
     }
 }

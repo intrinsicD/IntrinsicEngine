@@ -1,4 +1,6 @@
 module;
+#include <functional>
+#include <entt/entity/fwd.hpp>
 
 #include <algorithm>
 #include <bit>
@@ -19,8 +21,9 @@ module;
 #include <string>
 #include <utility>
 
-module Extrinsic.Runtime.Private.EditorFeatures;
+module Extrinsic.Runtime.EditorWorkspaceSnapshots;
 
+import Extrinsic.Runtime.EditorProcessing;
 import Extrinsic.Asset.ImportRouter;
 import Extrinsic.Asset.GeometryPayload;
 import Extrinsic.Asset.ModelTexturePayload;
@@ -48,9 +51,40 @@ import Extrinsic.Runtime.RenderExtraction;
 import Extrinsic.Runtime.SceneDocumentModule;
 import Extrinsic.Runtime.SceneInteractionModule;
 import Extrinsic.Runtime.TextureBakeModule;
+import Extrinsic.Asset.Service;
+import Extrinsic.Core.Config.EngineLoad;
+import Extrinsic.Core.Geometry2D;
+import Extrinsic.ECS.Scene.Handle;
+import Extrinsic.ECS.Scene.Registry;
+import Extrinsic.Graphics.Component.RenderGeometry;
+import Extrinsic.Graphics.RenderRecipeConfig;
+import Extrinsic.Runtime.AssetIngestStateMachine;
+import Extrinsic.Runtime.CameraControllers;
+import Extrinsic.Runtime.ClusteringModule;
+import Extrinsic.Runtime.SpatialIndexCache;
+import Extrinsic.Runtime.PointCloudConsolidationModule;
+import Extrinsic.Runtime.JobService;
+import Extrinsic.Runtime.GeometryPresentation;
+import Extrinsic.Runtime.PrimitiveSelectionRefinement;
+import Extrinsic.Runtime.RenderArtifactPublication;
+import Extrinsic.Runtime.VertexChannelBindings;
+import Extrinsic.Runtime.ServiceRegistry;
+import Extrinsic.Runtime.WorldHandle;
+import Extrinsic.Runtime.WorldRegistry;
+import Extrinsic.Runtime.EditorCommon;
+import Extrinsic.Runtime.EditorJobProjection;
+import Extrinsic.Runtime.GeometryProcessingOperations;
+import Extrinsic.Runtime.ParameterizationOperations;
+import Extrinsic.Runtime.RenderRecipeEditingOperations;
+import Extrinsic.Runtime.SceneEditingOperations;
+import Extrinsic.Runtime.VisualizationEditingOperations;
+
+#include "Editor/internal/Runtime.EditorFeatures.Internal.hpp"
 
 #include "Editor/internal/Runtime.EditorMutation.Internal.hpp"
 
+extern "C++"
+{
 namespace Extrinsic::Runtime::EditorFeatureDetail {
 namespace
 {
@@ -913,13 +947,14 @@ ScopedEditorStatTimer::~ScopedEditorStatTimer()
                 !internal && IsScalarVisualizationKind(kind);
             const bool color =
                 (!internal || name == GS::PropertyNames::kNormal) &&
-                (kind == Geometry::PropertyValueKind::Vec3 ||
+                (kind == Geometry::PropertyValueKind::Vec2 ||
+                 kind == Geometry::PropertyValueKind::Vec3 ||
                  kind == Geometry::PropertyValueKind::Vec4);
             const bool vector =
                 !connectivity && kind == Geometry::PropertyValueKind::Vec3;
             const bool integer =
                 !internal && !connectivity &&
-                kind == Geometry::PropertyValueKind::UInt32;
+                (kind == Geometry::PropertyValueKind::UInt32 || kind == Geometry::PropertyValueKind::Bool);
             if (!scalar && !color && !vector && !integer)
             {
                 continue;
@@ -1195,54 +1230,22 @@ MakeEditorSceneEditingContext(const EditorFeatureBindings &bindings) {
   };
 }
 
-EditorGeometryProcessingContext
-MakeEditorGeometryProcessingContext(const EditorFeatureBindings &bindings) {
-  return EditorGeometryProcessingContext{
+EditorProcessingContext
+MakeEditorProcessingContext(const EditorFeatureBindings& bindings) {
+  return EditorProcessingContext{
       .Scene = bindings.Scene,
       .World = bindings.World,
-      .Selection = bindings.Selection,
       .CommandHistory = bindings.CommandHistory,
-      .Device = bindings.Device,
       .SpatialIndices = bindings.SpatialIndices,
-      .Clustering = bindings.Clustering,
-      .PointCloudConsolidation = bindings.PointCloudConsolidation,
-      .ParameterizationUvViewCommands = bindings.ParameterizationUvViewCommands,
+      .Device = bindings.Device,
       .JobCommands = bindings.JobCommands,
-      .MethodResultSinks = bindings.MethodResultSinks,
-      .LastKMeansResult = bindings.LastKMeansResult,
-      .LastPointCloudConsolidationResult =
-          bindings.LastPointCloudConsolidationResult,
-      .LastMeshDenoiseResult = bindings.LastMeshDenoiseResult,
-      .LastMeshCurvatureResult = bindings.LastMeshCurvatureResult,
-      .LastMeshRemeshResult = bindings.LastMeshRemeshResult,
-      .LastMeshSubdivideResult = bindings.LastMeshSubdivideResult,
-      .LastMeshSimplifyResult = bindings.LastMeshSimplifyResult,
-      .LastMeshVertexNormalsResult = bindings.LastMeshVertexNormalsResult,
-      .LastGraphVertexNormalsResult = bindings.LastGraphVertexNormalsResult,
-      .LastPointCloudVertexNormalsResult =
-          bindings.LastPointCloudVertexNormalsResult,
-      .LastPointCloudOutlierRemovalResult =
-          bindings.LastPointCloudOutlierRemovalResult,
-      .LastUvRegenerationResult = bindings.LastUvRegenerationResult,
-      .LastParameterizationResult = bindings.LastParameterizationResult,
-      .LastProgressivePoissonResult = bindings.LastProgressivePoissonResult,
-      .LastRegistrationResult = bindings.LastRegistrationResult,
-      .LastNormalEstimationResult = bindings.LastNormalEstimationResult,
-      .LastOutlierAnalysisResult = bindings.LastOutlierAnalysisResult,
-      .LastKernelDensityResult = bindings.LastKernelDensityResult,
-      .LastPointSpacingResult = bindings.LastPointSpacingResult,
-      .LastBilateralFilterResult = bindings.LastBilateralFilterResult,
-      .LastKeypointAnalysisResult = bindings.LastKeypointAnalysisResult,
-      .LastDescriptorAnalysisResult = bindings.LastDescriptorAnalysisResult,
-      .LastDensityWeightResult = bindings.LastDensityWeightResult,
-      .LastPointConstructionResult = bindings.LastPointConstructionResult,
       .EngineConfigControlState = bindings.EngineConfigControlState,
       .PreviewEngineConfigDocument = bindings.PreviewEngineConfigDocument,
       .ApplyEngineConfigHotSubset = bindings.ApplyEngineConfigHotSubset,
       .AttachmentActive = bindings.AttachmentActive,
-      .InvalidateWorkspaceSnapshotCache =
-          bindings.InvalidateWorkspaceSnapshotCache,
+      .InvalidateWorkspaceSnapshotCache = bindings.InvalidateWorkspaceSnapshotCache,
       .EngineConfigCommandsAvailable = bindings.EngineConfigCommandsAvailable,
+      .Selection = bindings.Selection,
       .MeshDenoiseKernelAvailable = bindings.MeshDenoiseKernelAvailable,
       .MeshCurvatureKernelAvailable = bindings.MeshCurvatureKernelAvailable,
       .MeshCurvatureDirectionsAvailable =
@@ -1310,317 +1313,117 @@ MakeEditorRenderRecipeEditingContext(const EditorFeatureBindings &bindings) {
 }
 
 EditorFeatureBindings
-ToEditorFeatureBindingsImpl(const EditorSceneEditingContext &context) {
-  if (context.AttachmentActive && !context.AttachmentActive()) {
-    return EditorFeatureBindings{
-        .World = context.World,
-        .AssetImportCommands = context.AssetImportCommands,
-        .AssetImportQueueCommands = context.AssetImportQueueCommands,
-        .SceneFileCommands = context.SceneFileCommands,
-        .PrimitiveViewCommands = context.PrimitiveViewCommands,
-        .AttachmentActive = context.AttachmentActive,
-    };
-  }
-
-  return EditorFeatureBindings{
-      .Scene = context.Scene,
-      .World = context.World,
-      .Selection = context.Selection,
-      .CommandHistory = context.CommandHistory,
-      .AssetService = context.AssetService,
-      .LastRefinedPrimitive = context.LastRefinedPrimitive,
-      .LastRefinedPrimitiveGeneration = context.LastRefinedPrimitiveGeneration,
-      .CameraControllers = context.CameraControllers,
-      .CameraViewport = context.CameraViewport,
-      .AssetImportCommands = context.AssetImportCommands,
-      .AssetImportQueueCommands = context.AssetImportQueueCommands,
-      .SceneFileCommands = context.SceneFileCommands,
-      .PrimitiveViewCommands = context.PrimitiveViewCommands,
-      .AssetImportQueue = context.AssetImportQueue,
-      .PendingAssetImportPath = context.PendingAssetImportPath,
-      .PendingSceneFilePath = context.PendingSceneFilePath,
-      .PendingAssetImportPayloadKind = context.PendingAssetImportPayloadKind,
-      .LastAssetImportResult = context.LastAssetImportResult,
-      .LastSceneFileResult = context.LastSceneFileResult,
-      .AttachmentActive = context.AttachmentActive,
-      .InvalidateWorkspaceSnapshotCache =
-          context.InvalidateWorkspaceSnapshotCache,
-      .ImGuiAdapterAvailable = context.ImGuiAdapterAvailable,
-      .AssetImportCommandsAvailable = context.AssetImportCommandsAvailable,
-      .SceneFileCommandsAvailable = context.SceneFileCommandsAvailable,
-      .CameraRenderCommandsAvailable = context.CameraRenderCommandsAvailable,
-  };
-}
-
-EditorFeatureBindings
-ToEditorFeatureBindingsImpl(const EditorGeometryProcessingContext &context) {
-  if (context.AttachmentActive && !context.AttachmentActive()) {
-    return EditorFeatureBindings{
-        .World = context.World,
-        .ParameterizationUvViewCommands =
-            context.ParameterizationUvViewCommands,
-        .JobCommands = context.JobCommands,
-        .MethodResultSinks = context.MethodResultSinks,
-        .AttachmentActive = context.AttachmentActive,
-        .PreviewEngineConfigDocument = context.PreviewEngineConfigDocument,
-        .ApplyEngineConfigHotSubset = context.ApplyEngineConfigHotSubset,
-    };
-  }
-
-  return EditorFeatureBindings{
-      .Scene = context.Scene,
-      .World = context.World,
-      .Selection = context.Selection,
-      .CommandHistory = context.CommandHistory,
-      .Device = context.Device,
-      .SpatialIndices = context.SpatialIndices,
-      .Clustering = context.Clustering,
-      .PointCloudConsolidation = context.PointCloudConsolidation,
-      .ParameterizationUvViewCommands = context.ParameterizationUvViewCommands,
-      .JobCommands = context.JobCommands,
-      .MethodResultSinks = context.MethodResultSinks,
-      .LastKMeansResult = context.LastKMeansResult,
-      .LastPointCloudConsolidationResult =
-          context.LastPointCloudConsolidationResult,
-      .LastMeshDenoiseResult = context.LastMeshDenoiseResult,
-      .LastMeshCurvatureResult = context.LastMeshCurvatureResult,
-      .LastMeshRemeshResult = context.LastMeshRemeshResult,
-      .LastMeshSubdivideResult = context.LastMeshSubdivideResult,
-      .LastMeshSimplifyResult = context.LastMeshSimplifyResult,
-      .LastMeshVertexNormalsResult = context.LastMeshVertexNormalsResult,
-      .LastGraphVertexNormalsResult = context.LastGraphVertexNormalsResult,
-      .LastPointCloudVertexNormalsResult =
-          context.LastPointCloudVertexNormalsResult,
-      .LastPointCloudOutlierRemovalResult =
-          context.LastPointCloudOutlierRemovalResult,
-      .LastUvRegenerationResult = context.LastUvRegenerationResult,
-      .LastParameterizationResult = context.LastParameterizationResult,
-      .LastProgressivePoissonResult = context.LastProgressivePoissonResult,
-      .LastRegistrationResult = context.LastRegistrationResult,
-      .LastNormalEstimationResult = context.LastNormalEstimationResult,
-      .LastOutlierAnalysisResult = context.LastOutlierAnalysisResult,
-      .LastKernelDensityResult = context.LastKernelDensityResult,
-      .LastPointSpacingResult = context.LastPointSpacingResult,
-      .LastBilateralFilterResult = context.LastBilateralFilterResult,
-      .LastKeypointAnalysisResult = context.LastKeypointAnalysisResult,
-      .LastDescriptorAnalysisResult = context.LastDescriptorAnalysisResult,
-      .LastDensityWeightResult = context.LastDensityWeightResult,
-      .LastPointConstructionResult = context.LastPointConstructionResult,
-      .EngineConfigControlState = context.EngineConfigControlState,
-      .AttachmentActive = context.AttachmentActive,
-      .InvalidateWorkspaceSnapshotCache =
-          context.InvalidateWorkspaceSnapshotCache,
-      .PreviewEngineConfigDocument = context.PreviewEngineConfigDocument,
-      .ApplyEngineConfigHotSubset = context.ApplyEngineConfigHotSubset,
-      .EngineConfigCommandsAvailable = context.EngineConfigCommandsAvailable,
-      .MeshDenoiseKernelAvailable = context.MeshDenoiseKernelAvailable,
-      .MeshCurvatureKernelAvailable = context.MeshCurvatureKernelAvailable,
-      .MeshCurvatureDirectionsAvailable =
-          context.MeshCurvatureDirectionsAvailable,
-      .CurvatureSegmentationKernelAvailable =
-          context.CurvatureSegmentationKernelAvailable,
-      .MeshRemeshUniformKernelAvailable =
-          context.MeshRemeshUniformKernelAvailable,
-      .MeshRemeshAdaptiveKernelAvailable =
-          context.MeshRemeshAdaptiveKernelAvailable,
-      .MeshRemeshProjectToSurfaceAvailable =
-          context.MeshRemeshProjectToSurfaceAvailable,
-      .MeshRemeshErrorBoundedSizingAvailable =
-          context.MeshRemeshErrorBoundedSizingAvailable,
-      .MeshSubdivideLoopKernelAvailable =
-          context.MeshSubdivideLoopKernelAvailable,
-      .MeshSubdivideCatmullClarkKernelAvailable =
-          context.MeshSubdivideCatmullClarkKernelAvailable,
-      .MeshSubdivideSqrt3KernelAvailable =
-          context.MeshSubdivideSqrt3KernelAvailable,
-      .MeshSubdivideLoopFeatureEdgesAvailable =
-          context.MeshSubdivideLoopFeatureEdgesAvailable,
-      .MeshSimplifyKernelAvailable = context.MeshSimplifyKernelAvailable,
-  };
-}
-
-EditorFeatureBindings
-ToEditorFeatureBindingsImpl(const EditorVisualizationEditingContext &context) {
-  if (context.AttachmentActive && !context.AttachmentActive()) {
-    return EditorFeatureBindings{
-        .World = context.World,
-        .VisualizationRecipes = context.VisualizationRecipes,
-        .JobCommands = context.JobCommands,
-        .AttachmentActive = context.AttachmentActive,
-    };
-  }
-
-  return EditorFeatureBindings{
-      .Scene = context.Scene,
-      .World = context.World,
-      .Selection = context.Selection,
-      .CommandHistory = context.CommandHistory,
-      .TextureBake = context.TextureBake,
-      .VisualizationRecipes = context.VisualizationRecipes,
-      .VisualizationRecipeRevision = context.VisualizationRecipeRevision,
-      .JobCommands = context.JobCommands,
-      .ModelBuildStats = context.ModelBuildStats,
-      .AttachmentActive = context.AttachmentActive,
-      .InvalidateWorkspaceSnapshotCache =
-          context.InvalidateWorkspaceSnapshotCache,
-      .VisualizationCommandsAvailable = context.VisualizationCommandsAvailable,
-  };
-}
-
-EditorFeatureBindings
-ToEditorFeatureBindingsImpl(const EditorRenderRecipeEditingContext &context) {
-  if (context.AttachmentActive && !context.AttachmentActive()) {
-    return EditorFeatureBindings{
-        .AttachmentActive = context.AttachmentActive,
-        .PreviewRenderRecipeDocument = context.PreviewRenderRecipeDocument,
-        .ApplyRenderRecipePreview = context.ApplyRenderRecipePreview,
-        .PreviewEngineConfigDocument = context.PreviewEngineConfigDocument,
-        .ApplyEngineConfigHotSubset = context.ApplyEngineConfigHotSubset,
-    };
-  }
-
-  return EditorFeatureBindings{
-      .RenderGraphStats = context.RenderGraphStats,
-      .RenderRecipeContext = context.RenderRecipeContext,
-      .RenderRecipeEditorState = context.RenderRecipeEditorState,
-      .RenderRecipeRuntimeState = context.RenderRecipeRuntimeState,
-      .EngineConfigControlState = context.EngineConfigControlState,
-      .AttachmentActive = context.AttachmentActive,
-      .PreviewRenderRecipeDocument = context.PreviewRenderRecipeDocument,
-      .ApplyRenderRecipePreview = context.ApplyRenderRecipePreview,
-      .PreviewEngineConfigDocument = context.PreviewEngineConfigDocument,
-      .ApplyEngineConfigHotSubset = context.ApplyEngineConfigHotSubset,
-      .RenderArtifacts = context.RenderArtifacts,
-      .RenderRecipeCommandsAvailable = context.RenderRecipeCommandsAvailable,
-      .EngineConfigCommandsAvailable = context.EngineConfigCommandsAvailable,
-  };
-}
-
-EditorFeatureBindings
 ToEditorFeatureBindingsImpl(const EditorWorkspaceSnapshotContext &context) {
+  const auto &scene = context.Scene;
+  const auto &geometry = context.Geometry;
+  const auto &visualization = context.Visualization;
+  const auto &renderRecipe = context.RenderRecipe;
+
+  // Fail closed: one expired feature attachment makes the whole binding inert.
   const auto attachmentExpired = [](const auto &feature) {
     return feature.AttachmentActive && !feature.AttachmentActive();
   };
-  if (attachmentExpired(context.Scene) || attachmentExpired(context.Geometry) ||
-      attachmentExpired(context.Visualization) ||
-      attachmentExpired(context.RenderRecipe))
+  if (attachmentExpired(scene) || attachmentExpired(geometry) ||
+      attachmentExpired(visualization) || attachmentExpired(renderRecipe))
     return {};
 
-  EditorFeatureBindings bindings = ToEditorFeatureBindingsImpl(context.Scene);
-  const EditorFeatureBindings geometry =
-      ToEditorFeatureBindingsImpl(context.Geometry);
-  const EditorFeatureBindings visualization =
-      ToEditorFeatureBindingsImpl(context.Visualization);
-  const EditorFeatureBindings renderRecipe =
-      ToEditorFeatureBindingsImpl(context.RenderRecipe);
-
-  bindings.Device = geometry.Device;
-  bindings.SpatialIndices = geometry.SpatialIndices;
-  bindings.Clustering = geometry.Clustering;
-  bindings.PointCloudConsolidation = geometry.PointCloudConsolidation;
-  bindings.ParameterizationUvViewCommands =
-      geometry.ParameterizationUvViewCommands;
-  bindings.JobCommands = geometry.JobCommands;
-  bindings.MethodResultSinks = geometry.MethodResultSinks;
-  bindings.LastKMeansResult = geometry.LastKMeansResult;
-  bindings.LastPointCloudConsolidationResult =
-      geometry.LastPointCloudConsolidationResult;
-  bindings.LastMeshDenoiseResult = geometry.LastMeshDenoiseResult;
-  bindings.LastMeshCurvatureResult = geometry.LastMeshCurvatureResult;
-  bindings.LastMeshRemeshResult = geometry.LastMeshRemeshResult;
-  bindings.LastMeshSubdivideResult = geometry.LastMeshSubdivideResult;
-  bindings.LastMeshSimplifyResult = geometry.LastMeshSimplifyResult;
-  bindings.LastMeshVertexNormalsResult = geometry.LastMeshVertexNormalsResult;
-  bindings.LastGraphVertexNormalsResult = geometry.LastGraphVertexNormalsResult;
-  bindings.LastPointCloudVertexNormalsResult =
-      geometry.LastPointCloudVertexNormalsResult;
-  bindings.LastPointCloudOutlierRemovalResult =
-      geometry.LastPointCloudOutlierRemovalResult;
-  bindings.LastUvRegenerationResult = geometry.LastUvRegenerationResult;
-  bindings.LastParameterizationResult = geometry.LastParameterizationResult;
-  bindings.LastProgressivePoissonResult = geometry.LastProgressivePoissonResult;
-  bindings.LastRegistrationResult = geometry.LastRegistrationResult;
-  bindings.LastNormalEstimationResult = geometry.LastNormalEstimationResult;
-  bindings.LastOutlierAnalysisResult = geometry.LastOutlierAnalysisResult;
-  bindings.LastKernelDensityResult = geometry.LastKernelDensityResult;
-  bindings.LastPointSpacingResult = geometry.LastPointSpacingResult;
-  bindings.LastBilateralFilterResult = geometry.LastBilateralFilterResult;
-  bindings.LastKeypointAnalysisResult = geometry.LastKeypointAnalysisResult;
-  bindings.LastDescriptorAnalysisResult = geometry.LastDescriptorAnalysisResult;
-  bindings.LastDensityWeightResult = geometry.LastDensityWeightResult;
-  bindings.LastPointConstructionResult = geometry.LastPointConstructionResult;
-  bindings.MeshDenoiseKernelAvailable = geometry.MeshDenoiseKernelAvailable;
-  bindings.MeshCurvatureKernelAvailable = geometry.MeshCurvatureKernelAvailable;
-  bindings.MeshCurvatureDirectionsAvailable =
-      geometry.MeshCurvatureDirectionsAvailable;
-  bindings.CurvatureSegmentationKernelAvailable =
-      geometry.CurvatureSegmentationKernelAvailable;
-  bindings.MeshRemeshUniformKernelAvailable =
-      geometry.MeshRemeshUniformKernelAvailable;
-  bindings.MeshRemeshAdaptiveKernelAvailable =
-      geometry.MeshRemeshAdaptiveKernelAvailable;
-  bindings.MeshRemeshProjectToSurfaceAvailable =
-      geometry.MeshRemeshProjectToSurfaceAvailable;
-  bindings.MeshRemeshErrorBoundedSizingAvailable =
-      geometry.MeshRemeshErrorBoundedSizingAvailable;
-  bindings.MeshSubdivideLoopKernelAvailable =
-      geometry.MeshSubdivideLoopKernelAvailable;
-  bindings.MeshSubdivideCatmullClarkKernelAvailable =
-      geometry.MeshSubdivideCatmullClarkKernelAvailable;
-  bindings.MeshSubdivideSqrt3KernelAvailable =
-      geometry.MeshSubdivideSqrt3KernelAvailable;
-  bindings.MeshSubdivideLoopFeatureEdgesAvailable =
-      geometry.MeshSubdivideLoopFeatureEdgesAvailable;
-  bindings.MeshSimplifyKernelAvailable = geometry.MeshSimplifyKernelAvailable;
-
-  bindings.TextureBake = visualization.TextureBake;
-  bindings.VisualizationRecipes = visualization.VisualizationRecipes;
-  bindings.VisualizationRecipeRevision =
-      visualization.VisualizationRecipeRevision;
-  if (!bindings.JobCommands.Available())
-    bindings.JobCommands = visualization.JobCommands;
-  bindings.ModelBuildStats = visualization.ModelBuildStats;
-  bindings.VisualizationCommandsAvailable =
-      visualization.VisualizationCommandsAvailable;
-
-  bindings.RenderGraphStats = renderRecipe.RenderGraphStats;
-  bindings.RenderRecipeContext = renderRecipe.RenderRecipeContext;
-  bindings.RenderRecipeEditorState = renderRecipe.RenderRecipeEditorState;
-  bindings.RenderRecipeRuntimeState = renderRecipe.RenderRecipeRuntimeState;
-  bindings.EngineConfigControlState =
-      geometry.EngineConfigControlState != nullptr
-          ? geometry.EngineConfigControlState
-          : renderRecipe.EngineConfigControlState;
-  bindings.PreviewRenderRecipeDocument =
-      renderRecipe.PreviewRenderRecipeDocument;
-  bindings.ApplyRenderRecipePreview = renderRecipe.ApplyRenderRecipePreview;
-  bindings.PreviewEngineConfigDocument =
-      geometry.PreviewEngineConfigDocument
-          ? geometry.PreviewEngineConfigDocument
-          : renderRecipe.PreviewEngineConfigDocument;
-  bindings.ApplyEngineConfigHotSubset =
-      geometry.ApplyEngineConfigHotSubset
-          ? geometry.ApplyEngineConfigHotSubset
-          : renderRecipe.ApplyEngineConfigHotSubset;
-  bindings.RenderArtifacts = renderRecipe.RenderArtifacts;
-  bindings.RenderRecipeCommandsAvailable =
-      renderRecipe.RenderRecipeCommandsAvailable;
-  bindings.EngineConfigCommandsAvailable =
-      geometry.EngineConfigCommandsAvailable ||
-      renderRecipe.EngineConfigCommandsAvailable;
-  if (!bindings.AttachmentActive)
-    bindings.AttachmentActive =
-        geometry.AttachmentActive        ? geometry.AttachmentActive
-        : visualization.AttachmentActive ? visualization.AttachmentActive
-                                         : renderRecipe.AttachmentActive;
-  if (!bindings.InvalidateWorkspaceSnapshotCache) {
-    bindings.InvalidateWorkspaceSnapshotCache =
-        geometry.InvalidateWorkspaceSnapshotCache
-            ? geometry.InvalidateWorkspaceSnapshotCache
-            : visualization.InvalidateWorkspaceSnapshotCache;
-  }
-  bindings.SelectedModelCache = context.SelectedModelCache;
-  return bindings;
+  return EditorFeatureBindings{
+      .Scene = scene.Scene,
+      .World = scene.World,
+      .Selection = scene.Selection,
+      .CommandHistory = scene.CommandHistory,
+      .AssetService = scene.AssetService,
+      .LastRefinedPrimitive = scene.LastRefinedPrimitive,
+      .LastRefinedPrimitiveGeneration = scene.LastRefinedPrimitiveGeneration,
+      .CameraControllers = scene.CameraControllers,
+      .CameraViewport = scene.CameraViewport,
+      .Device = geometry.Device,
+      .TextureBake = visualization.TextureBake,
+      .SpatialIndices = geometry.SpatialIndices,
+      .AssetImportCommands = scene.AssetImportCommands,
+      .AssetImportQueueCommands = scene.AssetImportQueueCommands,
+      .SceneFileCommands = scene.SceneFileCommands,
+      .PrimitiveViewCommands = scene.PrimitiveViewCommands,
+      .VisualizationRecipes = visualization.VisualizationRecipes,
+      .VisualizationRecipeRevision = visualization.VisualizationRecipeRevision,
+      .JobCommands = geometry.JobCommands.Available()
+                         ? geometry.JobCommands
+                         : visualization.JobCommands,
+      .AssetImportQueue = scene.AssetImportQueue,
+      .PendingAssetImportPath = scene.PendingAssetImportPath,
+      .PendingSceneFilePath = scene.PendingSceneFilePath,
+      .PendingAssetImportPayloadKind = scene.PendingAssetImportPayloadKind,
+      .LastAssetImportResult = scene.LastAssetImportResult,
+      .LastSceneFileResult = scene.LastSceneFileResult,
+      .RenderGraphStats = renderRecipe.RenderGraphStats,
+      .RenderRecipeContext = renderRecipe.RenderRecipeContext,
+      .RenderRecipeEditorState = renderRecipe.RenderRecipeEditorState,
+      .RenderRecipeRuntimeState = renderRecipe.RenderRecipeRuntimeState,
+      .EngineConfigControlState =
+          geometry.EngineConfigControlState != nullptr
+              ? geometry.EngineConfigControlState
+              : renderRecipe.EngineConfigControlState,
+      .ModelBuildStats = visualization.ModelBuildStats,
+      .SelectedModelCache = context.SelectedModelCache,
+      .AttachmentActive = scene.AttachmentActive ? scene.AttachmentActive
+                          : geometry.AttachmentActive
+                              ? geometry.AttachmentActive
+                          : visualization.AttachmentActive
+                              ? visualization.AttachmentActive
+                              : renderRecipe.AttachmentActive,
+      // The render recipe context carries no cache invalidation hook, so the
+      // fallback deliberately stops at the visualization context.
+      .InvalidateWorkspaceSnapshotCache =
+          scene.InvalidateWorkspaceSnapshotCache
+              ? scene.InvalidateWorkspaceSnapshotCache
+          : geometry.InvalidateWorkspaceSnapshotCache
+              ? geometry.InvalidateWorkspaceSnapshotCache
+              : visualization.InvalidateWorkspaceSnapshotCache,
+      .PreviewRenderRecipeDocument = renderRecipe.PreviewRenderRecipeDocument,
+      .ApplyRenderRecipePreview = renderRecipe.ApplyRenderRecipePreview,
+      .PreviewEngineConfigDocument =
+          geometry.PreviewEngineConfigDocument
+              ? geometry.PreviewEngineConfigDocument
+              : renderRecipe.PreviewEngineConfigDocument,
+      .ApplyEngineConfigHotSubset = geometry.ApplyEngineConfigHotSubset
+                                        ? geometry.ApplyEngineConfigHotSubset
+                                        : renderRecipe.ApplyEngineConfigHotSubset,
+      .RenderArtifacts = renderRecipe.RenderArtifacts,
+      .ImGuiAdapterAvailable = scene.ImGuiAdapterAvailable,
+      .AssetImportCommandsAvailable = scene.AssetImportCommandsAvailable,
+      .SceneFileCommandsAvailable = scene.SceneFileCommandsAvailable,
+      .CameraRenderCommandsAvailable = scene.CameraRenderCommandsAvailable,
+      .VisualizationCommandsAvailable =
+          visualization.VisualizationCommandsAvailable,
+      .RenderRecipeCommandsAvailable =
+          renderRecipe.RenderRecipeCommandsAvailable,
+      .EngineConfigCommandsAvailable =
+          geometry.EngineConfigCommandsAvailable ||
+          renderRecipe.EngineConfigCommandsAvailable,
+      .MeshDenoiseKernelAvailable = geometry.MeshDenoiseKernelAvailable,
+      .MeshCurvatureKernelAvailable = geometry.MeshCurvatureKernelAvailable,
+      .MeshCurvatureDirectionsAvailable =
+          geometry.MeshCurvatureDirectionsAvailable,
+      .CurvatureSegmentationKernelAvailable =
+          geometry.CurvatureSegmentationKernelAvailable,
+      .MeshRemeshUniformKernelAvailable =
+          geometry.MeshRemeshUniformKernelAvailable,
+      .MeshRemeshAdaptiveKernelAvailable =
+          geometry.MeshRemeshAdaptiveKernelAvailable,
+      .MeshRemeshProjectToSurfaceAvailable =
+          geometry.MeshRemeshProjectToSurfaceAvailable,
+      .MeshRemeshErrorBoundedSizingAvailable =
+          geometry.MeshRemeshErrorBoundedSizingAvailable,
+      .MeshSubdivideLoopKernelAvailable =
+          geometry.MeshSubdivideLoopKernelAvailable,
+      .MeshSubdivideCatmullClarkKernelAvailable =
+          geometry.MeshSubdivideCatmullClarkKernelAvailable,
+      .MeshSubdivideSqrt3KernelAvailable =
+          geometry.MeshSubdivideSqrt3KernelAvailable,
+      .MeshSubdivideLoopFeatureEdgesAvailable =
+          geometry.MeshSubdivideLoopFeatureEdgesAvailable,
+      .MeshSimplifyKernelAvailable = geometry.MeshSimplifyKernelAvailable,
+  };
 }
 
 namespace
@@ -2262,20 +2065,6 @@ namespace
                             return result;
                         },
                     },
-                .ParameterizationUvViewCommands =
-                    EditorParameterizationUvViewCommandSurface{
-                        .Submit =
-                            [renderer, device, &services,
-                             renderExtraction](EditorParameterizationUvViewRequest request)
-                        {
-                            if (renderer == nullptr || device == nullptr)
-                            {
-                                return EditorParameterizationUvViewState{};
-                            }
-                            return SubmitRuntimeParameterizationUvView(
-                                *renderer, *device, services, renderExtraction, std::move(request));
-                        },
-                    },
                 .VisualizationRecipes =
                     EditorVisualizationRecipeCommandSurface{
                         .GetRecipe =
@@ -2371,6 +2160,27 @@ EditorFeatureBindings MakeEditorFeatureBindings(
     return BuildContextFromRuntime(worlds, services);
 }
 
+EditorParameterizationUvViewCommandSurface
+MakeEditorParameterizationUvViewCommandSurface(ServiceRegistry& services)
+{
+    RenderExtractionCache* const renderExtraction = services.Find<RenderExtractionCache>();
+    RHI::IDevice* const device = services.Find<RHI::IDevice>();
+    Graphics::IRenderer* const renderer = services.Find<Graphics::IRenderer>();
+    return EditorParameterizationUvViewCommandSurface{
+        .Submit =
+            [renderer, device, &services, renderExtraction](
+                EditorParameterizationUvViewRequest request)
+        {
+            if (renderer == nullptr || device == nullptr)
+            {
+                return EditorParameterizationUvViewState{};
+            }
+            return SubmitRuntimeParameterizationUvView(
+                *renderer, *device, services, renderExtraction, std::move(request));
+        },
+    };
+}
+
 namespace
 {
     [[nodiscard]] bool SameRenderSurface(
@@ -2449,3 +2259,4 @@ namespace
     }
 
 } // namespace Extrinsic::Runtime::EditorFeatureDetail
+} // extern "C++"

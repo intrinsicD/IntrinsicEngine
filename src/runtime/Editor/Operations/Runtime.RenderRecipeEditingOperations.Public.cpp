@@ -1,22 +1,26 @@
 module;
-
+#include <functional>
 #include <memory>
 #include <string>
-#include <string_view>
 #include <utility>
 
 module Extrinsic.Runtime.RenderRecipeEditingOperations;
 
-import Extrinsic.Runtime.Private.EditorFeatures;
+// The prepared frame is projected onto this family's own context only; the
+// all-family bindings stay opaque here.
 import Extrinsic.Runtime.Private.EditorWorkspaceAttachment;
 
 namespace Extrinsic::Runtime {
 namespace {
 EditorRenderRecipeEditingContext MakeExpiredRenderRecipeEditingContext(
     EditorRenderRecipeEditingContext context) {
-  context.AttachmentActive = [] { return false; };
-  return EditorFeatureDetail::MakeEditorRenderRecipeEditingContext(
-      EditorFeatureDetail::ToEditorFeatureBindingsImpl(context));
+  EditorRenderRecipeEditingContext expired{};
+  expired.PreviewRenderRecipeDocument = std::move(context.PreviewRenderRecipeDocument);
+  expired.ApplyRenderRecipePreview = std::move(context.ApplyRenderRecipePreview);
+  expired.PreviewEngineConfigDocument = std::move(context.PreviewEngineConfigDocument);
+  expired.ApplyEngineConfigHotSubset = std::move(context.ApplyEngineConfigHotSubset);
+  expired.AttachmentActive = [] { return false; };
+  return expired;
 }
 } // namespace
 

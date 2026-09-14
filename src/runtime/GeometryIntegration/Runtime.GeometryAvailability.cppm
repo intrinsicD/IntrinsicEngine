@@ -1,3 +1,4 @@
+// Describes geometry capabilities and typed property references for runtime consumers.
 module;
 
 #include <cstddef>
@@ -7,8 +8,7 @@ module;
 #include <string_view>
 #include <vector>
 
-#include <entt/entity/entity.hpp>
-#include <entt/entity/registry.hpp>
+#include <entt/entity/fwd.hpp>
 
 export module Extrinsic.Runtime.GeometryAvailability;
 

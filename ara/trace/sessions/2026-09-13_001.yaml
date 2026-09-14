@@ -1,0 +1,236 @@
+session:
+  id: 2026-09-13_001
+  date: '2026-09-13'
+  started: '2026-09-13T00:16:58+02:00'
+  last_turn: '2026-09-13T23:57:43+02:00'
+  turn_count: 10
+  summary: Pilot review repaired; point-analysis family implemented with Claude review fixes and full CPU, separate
+    sanitizer and affected Vulkan verification. Normal-family isolation removes three duplicate APIs and 2408
+    production lines; remaining mesh families now pass reconciliation with a further 138-line reduction. Local
+    edit diagnostics remain unqualified performance evidence; BUG-189 has a verified timeout correction. RUNTIME-236
+    finishes remaining processing execution families; lifetime repairs and all selected verification are reconciled.
+    RUNTIME-237 isolates renderer records and resolves BUG-177; all final CPU, sanitizer and selected Vulkan
+    gates pass. RUNTIME-238/239 consolidate renderer queries and recipe lookup and isolate engine/cache imports;
+    all final gates pass. RUNTIME-240 shares kernel hashing and narrows graph/RHI dependencies; reviewed final
+    CPU, sanitizer and selected Vulkan gates pass. RUNTIME-241 collapses private bake composition and cuts bake/editor
+    dependencies; native, focused sanitizers and three Vulkan tests pass. RUNTIME-242 narrows private attachment
+    and sixteen prepared-frame consumers; compiler corrections re-reviewed, native CPU, focused sanitizers and
+    representative Vulkan pass.
+
+events_logged:
+- turn: 1
+  type: experiment
+  id: N543
+  routing: direct
+  provenance: ai-executed
+  summary: Review-driven repair, dependency enforcement, one follow-up probe and verification.
+- turn: 2
+  type: experiment
+  id: N544
+  routing: direct
+  provenance: ai-executed
+  summary: Second-family migration, shared config/catalog/radius owners, fixed Claude review and matched diagnostic.
+- turn: 3
+  type: experiment
+  id: N545
+  routing: direct
+  provenance: ai-executed
+  summary: Normal-family isolation and duplicate API retirement, fixed Claude review, matched diagnostic and full verification.
+- turn: 4
+  type: experiment
+  id: N546
+  routing: direct
+  provenance: ai-executed
+  summary: Remaining scoped families implemented with Claude, repaired through review/build/tests, measured and verified.
+- turn: 5
+  type: experiment
+  id: N547
+  routing: direct
+  provenance: ai-executed
+  summary: Remaining processing families implemented with Claude; lifetime repairs and initial verification failures reconciled without new timing claims.
+- turn: 6
+  type: experiment
+  id: N548
+  routing: direct
+  provenance: ai-executed
+  summary: Render diagnostics ownership and exact root metadata classification implemented with Claude; reviewed
+    corrections and all final gates pass.
+- turn: 7
+  type: experiment
+  id: N549
+  routing: direct
+  provenance: ai-executed
+  summary: Two Claude-assisted refactor batches, fixed independent reviews, exact dependency/footprint records
+    and passing CPU/sanitizer/Vulkan gates.
+- turn: 8
+  type: experiment
+  id: N550
+  routing: direct
+  provenance: ai-executed
+  summary: Kernel hash reuse and narrower command/event/service/job interfaces implemented with Claude; reviewed
+    correction and all final gates pass.
+- turn: 9
+  type: experiment
+  id: N551
+  routing: direct
+  provenance: ai-executed
+  summary: Existing bake Impl owns private composition; Claude review corrections preserved, four dependency
+    guards added, final correctness and GPU tests pass.
+- turn: 10
+  type: experiment
+  id: N552
+  routing: direct
+  provenance: ai-executed
+  summary: Prepared-frame consumers drop snapshot imports; private attachment uses canonical enum owner and
+    borrowed request. Compiler-driven cache corrections independently reviewed; all final gates pass.
+
+ai_actions:
+- turn: 1
+  action: Sent the approved fixed packet to Claude, confirmed findings in source, repaired incomplete-container
+    borrowing, extended nine sibling dependency checks and missing-producer/destruction tests, verified the final
+    diff and updated evidence.
+  provenance: ai-executed
+- turn: 2
+  action: Migrated weights/keypoints/outliers, reused existing generic processing and property owners, fixed Claude
+    findings, checked callbacks and destroyed-scene guards, completed full verification and archived source-bound evidence.
+  provenance: ai-executed
+  files_changed: [tasks/active/RUNTIME-234-point-analysis-compilation-locality.md, ara/evidence/diagnostics/runtime234_compile_locality.json, ara/evidence/tables/runtime234_compile_locality.md]
+- turn: 3
+  action: Reused configured normal execution and shared property/lifetime/config/mesh owners; replaced obsolete API
+    tests with configured-path coverage, reviewed the fixed packet with Claude, corrected build/test findings,
+    and saved measured footprint, compiler scope and full CPU/sanitizer/affected Vulkan evidence.
+  provenance: ai-executed
+  files_changed: [tasks/active/RUNTIME-235-mesh-processing-compilation-locality.md, ara/evidence/diagnostics/runtime235_normals_compile_locality.json, ara/evidence/tables/runtime235_normals_compile_locality.md]
+- turn: 4
+  action: Claude implemented bounded family extraction and reviewed fixed snapshots; Codex repaired findings,
+    reconciled CPU/sanitizer/Vulkan gates, measured full footprint and matched curvature edit, diagnosed the
+    timeout with Claude and preserved failed attempts, environment distinctions and raw source-bound evidence.
+  provenance: ai-executed
+  files_changed: [tasks/active/RUNTIME-235-mesh-processing-compilation-locality.md, tasks/backlog/bugs/BUG-189-distance-ratio-vulkan-smoke-timeout.md, ara/evidence/diagnostics/runtime235_remaining_compile_locality.json, ara/evidence/tables/runtime235_remaining_compile_locality.md]
+- turn: 5
+  action: Reused generic processing/config/property owners, retired broad execution types, fixed freed-scene reads and terminal callbacks with Claude, corrected the immediate ICP caller and phase-diagnosed consolidation test budgets, and archived exact source/size/review/CPU/sanitizer/Vulkan evidence.
+  provenance: ai-executed
+  files_changed: [tasks/active/RUNTIME-236-remaining-processing-contracts.md, tasks/backlog/bugs/BUG-190-curvature-refinement-timeout-during-compilation.md, tasks/backlog/bugs/BUG-191-consolidation-lbvh-sequence-timeout.md, ara/logic/solution/constraints.md]
+- turn: 6
+  action: Moved records and projection into canonical owners, added five compiler-graph producers and an owner-only
+    recipe test, fixed review findings, resolved BUG-177, and archived fixed source snapshots, reviews, full footprint
+    and CPU/sanitizer/Vulkan evidence.
+  provenance: ai-executed
+  files_changed:
+  - tasks/active/RUNTIME-237-render-diagnostics-compilation-boundary.md
+  - tasks/backlog/bugs/BUG-177-root-hygiene-local-agent-metadata.md
+  - src/graphics/renderer/Graphics.RenderDiagnostics.cppm
+- turn: 7
+  action: Replaced repetitive pipeline queries, centralized recipe lookup, hid cache GPU recording, enforced
+    actual compiler boundaries, corrected review/structural findings and archived final fixed source and verification.
+  provenance: ai-executed
+  files_changed:
+  - tasks/active/RUNTIME-238-renderer-query-api-and-engine-locality.md
+  - tasks/active/RUNTIME-239-spatial-query-boundary-and-recipe-lookup.md
+  - src/graphics/renderer/Graphics.Renderer.cppm
+  - src/graphics/renderer/Graphics.RenderingContract.cppm
+  - src/runtime/GeometryIntegration/Runtime.SpatialIndexCache.cppm
+- turn: 8
+  action: Moved type identity to its existing hash owner, shared the 64-bit loop, narrowed kernel imports and
+    the borrowed RHI reference, added four compiler guards/hash tests, fixed review wording, completed verification
+    and archived exact evidence. Assessed the next editor import-prune suggestion and deferred it because retained
+    owners preserve the full dependency set.
+  provenance: ai-executed
+  files_changed:
+  - tasks/active/RUNTIME-240-kernel-type-identity-and-job-locality.md
+  - src/core/Core.Hash.cppm
+  - src/runtime/Kernel/Runtime.JobService.cppm
+  - src/graphics/rhi/RHI.CommandContext.cppm
+  - tests/unit/core/Test.CoreHash.cpp
+  - tests/CMakeLists.txt
+- turn: 9
+  action: Selected the smaller upstream texture-bake fix over a wider attachment proposal. Claude moved the
+    methods; root completed callers, guards and docs after the bounded CLI reached its turn limit. Retained
+    noexcept, participant checks and device-idle ordering. Independently reviewed a fixed snapshot, ran native/focused
+    sanitizer/actual Vulkan gates, and archived complete evidence.
+  provenance: ai-executed
+  files_changed:
+  - tasks/active/RUNTIME-241-texture-bake-compilation-boundary.md
+  - src/runtime/Modules/TextureBake/Runtime.TextureBakeModule.cppm
+  - src/runtime/Modules/TextureBake/Runtime.TextureBakeModule.cpp
+  - tests/CMakeLists.txt
+  - docs/architecture/runtime.md
+- turn: 10
+  action: Claude planned and implemented the bounded existing-owner refactor. Root corrected the missing cache
+    declaration and obsolete module forward, outlined two cache methods, compared original bodies, added compiler
+    guards and obtained a final fixed-diff review. Completed native/focused sanitizer/actual Vulkan gates and
+    archived exact source evidence.
+  provenance: ai-executed
+  files_changed:
+  - tasks/active/RUNTIME-242-editor-prepared-frame-locality.md
+  - src/runtime/Editor/Runtime.EditorWorkspaceSnapshots.cppm
+  - src/runtime/Editor/Runtime.EditorWorkspaceSnapshots.Public.cpp
+  - src/runtime/Editor/internal/Runtime.EditorWorkspaceAttachment.Detail.cppm
+  - src/runtime/Editor/internal/Runtime.EditorFeatures.Internal.hpp
+  - tests/CMakeLists.txt
+  - docs/architecture/sandbox-editor-feature-boundaries.md
+
+claims_touched:
+- id: C92
+  action: additional diagnostic evidence; remains hypothesis
+  turn: 1
+- id: C92
+  action: second-family diagnostic evidence; remains hypothesis
+  turn: 2
+- id: C92
+  action: normal-family diagnostic evidence; remains hypothesis
+  turn: 3
+- id: C92
+  action: remaining-family diagnostic evidence; remains hypothesis
+  turn: 4
+key_context:
+- turn: 1
+  excerpt: The user authorized sending the prepared implementation packet to Claude. This is transmission consent,
+    not endorsement of the measured timing or authorization to commit/push.
+- turn: 2
+  excerpt: The user requested continuation of the authorized simplification with Claude. No compatibility bridge,
+    repeat performance endorsement, commit/push or whole-engine completion was inferred.
+- turn: 3
+  excerpt: The user said Yes, Continue please within the authorized simplification with Claude. This does not
+    endorse the new measurements, request commit/push or close the broader engine migration.
+- turn: 4
+  excerpt: The user asked to continue remaining code with Claude to save usage. Existing transmission authorization
+    was reused; no numerical endorsement, commit/push or whole-engine completion was inferred.
+- turn: 5
+  excerpt: Continue remaining code with Claude to conserve usage authorizes this implementation and existing source transmission; it does not affirm measurements or request a commit, push or new compatibility layer.
+- turn: 6
+  excerpt: The user requested continued implementation/refactoring with Claude, review, tests and fixes. Existing
+    source-transmission authorization persists; no numerical endorsement, compatibility bridge or commit/push is
+    inferred.
+- turn: 7
+  excerpt: User requested continued code cleanup and open-point resolution with Claude to save usage, through
+    plan/implement/refactor/review/test/fix iterations. Existing source-sharing authorization persists; no new
+    compatibility or publication commitment is inferred.
+- turn: 8
+  excerpt: User requested continued cleanup and open-point work with Claude to save usage, following plan/implement/refactor/review/test/fix.
+    Source sharing remains authorized; no compatibility bridge, numerical endorsement or commit/push is inferred.
+- turn: 9
+  excerpt: User again requested continued code/open-point cleanup with Claude to save usage, using plan/implement/refactor/review/test/fix.
+    Existing source-sharing authorization remains valid.
+- turn: 10
+  excerpt: User requested continued code/open-point cleanup with Claude to save usage, following plan/implement/refactor/review/test/fix.
+    Existing authorization covers source sharing.
+
+open_threads:
+- RUNTIME-233/234 implementation and review are complete in the uncommitted checkout; existing gate limitations
+  remain recorded.
+- RUNTIME-235 through RUNTIME-242 processing, renderer and spatial-boundary implementations are verified but
+  uncommitted. The named renderer exposure/inspection and cache/recipe candidates are complete; broader Framework24
+  convergence remains REVIEW-004 work.
+- Repeated clean-source compilation measurements remain unqualified; C92 stays a hypothesis.
+- BUG-177 is resolved and reviewed pending integration; BUG-188 and earlier research observations retain their
+  follow-up owners. BUG-189 is corrected pending integration, and BUG-180 retains the distinct leak-enabled
+  diagnostic.
+- BUG-190 idle CPU reconciliation and BUG-191 targeted test-budget corrections are verified pending integration;
+  original failures remain in evidence.
+- RUNTIME-242 completed the justified outbound attachment/prepared-frame boundary. Sixteen operation files
+  still retain broad feature dependencies; further shared-binding cleanup requires actual-consumer evidence.
+  Full sanitizer merge gates and accumulated integration remain open.
+
+ai_suggestions_pending:
+- No unrelated research observation acquired a closure signal from this code review.

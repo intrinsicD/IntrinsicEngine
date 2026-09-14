@@ -1,0 +1,2724 @@
+{
+  "schema": "intrinsic.processing-locality-diagnostic/v1",
+  "recorded_at": "2026-09-13T12:11:18.906587+02:00",
+  "task": "RUNTIME-235",
+  "claim": "C92",
+  "claim_eligible": false,
+  "source": {
+    "head": "12d61d7597a60b29f80232cc1797c30fded1c7e0",
+    "state": "dirty_worktree",
+    "baseline_includes_prior_uncommitted_work": true,
+    "before_manifest_sha256": "691909e261c90314f0008cf164bb9da45d9da6b9a962e67904d6777ef06751b7",
+    "final_manifest_sha256": "5130fb6b3b16a8cd1d27f6cde14f86157559b10b0948cac39b1080c318c2efbd",
+    "post_probe_changes": [
+      "tests/CMakeLists.txt"
+    ],
+    "post_probe_change_description": "Only one CTest TIMEOUT registration line; all native source exactly restored."
+  },
+  "scope": [
+    "shared mesh helper owner",
+    "shared common point catalog",
+    "obsolete immediate outlier API removal",
+    "registration",
+    "parameterization and UV controls",
+    "curvature segmentation geodesics",
+    "denoise remesh subdivide simplify"
+  ],
+  "footprint": {
+    "production_files": 47,
+    "physical_before": 40193,
+    "physical_after": 40055,
+    "nonblank_before": 37899,
+    "nonblank_after": 37818,
+    "files_added": 16,
+    "files_deleted": 1,
+    "per_file": [
+      {
+        "path": "src/app/Sandbox/Editor/Sandbox.DomainPanels.cpp",
+        "before_sha256": "d6be4ecb1bd8a7ffe2250b646fba1bf48d8140e3c01ef54b21ea5944c7247701",
+        "after_sha256": "4bd31525d34447e1a39c77729b933c07c40338547f91f726339d83bda96f6036",
+        "before_lines": 1829,
+        "after_lines": 1761,
+        "before_nonblank": 1721,
+        "after_nonblank": 1658
+      },
+      {
+        "path": "src/app/Sandbox/Editor/Sandbox.EditorShell.cpp",
+        "before_sha256": "3ca39b40b27d464a12c1e0d2333a2126066545e023a7849e5f3b61df848cced7",
+        "after_sha256": "94f233307f7559e5c276c4fec395c82855ce3c97e8419ef5f26dcb31ac036b98",
+        "before_lines": 3378,
+        "after_lines": 3306,
+        "before_nonblank": 3221,
+        "after_nonblank": 3153
+      },
+      {
+        "path": "src/app/Sandbox/Editor/Sandbox.MeshProcessingPanels.cpp",
+        "before_sha256": "7a2369a7d8a1a931551cdb0e95845269bc072787e5cbd817235a42d5868ad599",
+        "after_sha256": "b878c32cb9c12742f0290cd09cc2390630fa303459b2105142ccac4adb19b8ef",
+        "before_lines": 3003,
+        "after_lines": 3014,
+        "before_nonblank": 2910,
+        "after_nonblank": 2921
+      },
+      {
+        "path": "src/app/Sandbox/Editor/Sandbox.MethodPanels.cpp",
+        "before_sha256": "56080c26eb417400ba82c0027c42a9b7f12c068cd133b07ee326e30c7a7daffd",
+        "after_sha256": "bbc912ec587f11aa2e4efe3b757e4428e089f463e00b6da9c626360f6d1652d5",
+        "before_lines": 3358,
+        "after_lines": 3368,
+        "before_nonblank": 3215,
+        "after_nonblank": 3225
+      },
+      {
+        "path": "src/app/Sandbox/Editor/Sandbox.PanelSupport.cpp",
+        "before_sha256": "6de63a5b6ed45d7059e259fe64ab6c9aac507582a5ddaae433f99f0ad5f81ee8",
+        "after_sha256": "88f2456acaa703e868873f478d7df50501910e8ad2b1af84ce209de0b2f065b4",
+        "before_lines": 840,
+        "after_lines": 1007,
+        "before_nonblank": 784,
+        "after_nonblank": 943
+      },
+      {
+        "path": "src/app/Sandbox/Editor/Sandbox.PanelSupport.hpp",
+        "before_sha256": "ccb064dfa2f55a8259cc1bce9e7a4a377617b66c3a5bd2ced121e6d39614d942",
+        "after_sha256": "9d273fd2cd72996910c144f496e3f51592479bfef15213aba89f7d804e06ea20",
+        "before_lines": 431,
+        "after_lines": 472,
+        "before_nonblank": 375,
+        "after_nonblank": 414
+      },
+      {
+        "path": "src/runtime/CMakeLists.txt",
+        "before_sha256": "85e2d47dd5cb5239b29e126b8522db5a01aacf1b94803188dce91a6a3533ad76",
+        "after_sha256": "b409537313ac1094fd4a4f0613a2fc3b5e5e982ba0dced68c509f49d3cfd1b5e",
+        "before_lines": 287,
+        "after_lines": 302,
+        "before_nonblank": 280,
+        "after_nonblank": 295
+      },
+      {
+        "path": "src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Construction.cpp",
+        "before_sha256": "1f741f66aaf234ed99b9e3af0b483af076807f3be3e042e84270208f1ccd4874",
+        "after_sha256": "6f02a464a4991c0404ec5165ea52f23350f863aa85b85678eb511de63389e842",
+        "before_lines": 870,
+        "after_lines": 864,
+        "before_nonblank": 870,
+        "after_nonblank": 864
+      },
+      {
+        "path": "src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.DensityWeights.cpp",
+        "before_sha256": "312b798805c05487b1b12494a2e8f6b82a990b1b781d0ad41dfe18f22b81f852",
+        "after_sha256": "cc66fb90826fa71b37691b38a48b6f5e582e3850eda234c684fb95bde3845aea",
+        "before_lines": 222,
+        "after_lines": 218,
+        "before_nonblank": 222,
+        "after_nonblank": 218
+      },
+      {
+        "path": "src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Descriptors.cpp",
+        "before_sha256": "f0445d335a9bc837b99d5d9ec622bf9d1c7fb5116e27980fc7ae03d3b745d66b",
+        "after_sha256": "371550a231515682787586893c60ce62d6c8bcb04a795a337e209a2b3ad115ae",
+        "before_lines": 365,
+        "after_lines": 357,
+        "before_nonblank": 363,
+        "after_nonblank": 356
+      },
+      {
+        "path": "src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.DomainProperties.cpp",
+        "before_sha256": "72bf56f39faebfc3979e14b2fee2e12cac7e5252cd05ed89230f6ef8b345b187",
+        "after_sha256": null,
+        "before_lines": 944,
+        "after_lines": 0,
+        "before_nonblank": 876,
+        "after_nonblank": 0
+      },
+      {
+        "path": "src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Internal.hpp",
+        "before_sha256": "4ace27409c96aa76773bfb8033f885fc70b39e78549e572ca254fc4941fd4991",
+        "after_sha256": "1157fa718db578e7b51014c16a3f3ca01ac3ce903ffb8ed97e12249b51b13e85",
+        "before_lines": 43,
+        "after_lines": 24,
+        "before_nonblank": 36,
+        "after_nonblank": 19
+      },
+      {
+        "path": "src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Keypoints.cpp",
+        "before_sha256": "eea82ae2b7a49fff48ed5033b7a7c0a7179fa724679794dc9b02b2db8037947d",
+        "after_sha256": "bdc4794fa4f34c5e7a64ac1b5e57dedfc59c197fa4b65e3dfd74b90bd5fdd03d",
+        "before_lines": 333,
+        "after_lines": 328,
+        "before_nonblank": 332,
+        "after_nonblank": 327
+      },
+      {
+        "path": "src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Mesh.cpp",
+        "before_sha256": "8584636c3d938ff4846f50cf99220b50ebcda5c2c72e0e76351712555cf2182a",
+        "after_sha256": "255013c724d3ebe47622a32fc9c60b83ddecec98e70b43e18fee4cf2e1f4b705",
+        "before_lines": 6825,
+        "after_lines": 461,
+        "before_nonblank": 6435,
+        "after_nonblank": 432
+      },
+      {
+        "path": "src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.MeshSupport.cpp",
+        "before_sha256": null,
+        "after_sha256": "1711deb09b32a5938535c932611682f589217309022fe30c2bf574b33ccb15b9",
+        "before_lines": 0,
+        "after_lines": 749,
+        "before_nonblank": 0,
+        "after_nonblank": 693
+      },
+      {
+        "path": "src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.MeshSupport.hpp",
+        "before_sha256": "6694461710ba542e407748a02bfa0a09179e8e269758608b494bbfb30eb5ec68",
+        "after_sha256": "e5d774686c07fc524cb6c061c00b10190d3eb7a24fe8f1af2af79d347531aae7",
+        "before_lines": 312,
+        "after_lines": 344,
+        "before_nonblank": 250,
+        "after_nonblank": 275
+      },
+      {
+        "path": "src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Normals.cpp",
+        "before_sha256": "5ffdaf5e961a02eca7f9cc098091d54e121c35565858d266948e6703b834f1ef",
+        "after_sha256": "b208754fa6e5b1c20db470aadebca4509e81844d6882f44f70d85470b91ca56a",
+        "before_lines": 701,
+        "after_lines": 696,
+        "before_nonblank": 699,
+        "after_nonblank": 694
+      },
+      {
+        "path": "src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Outliers.cpp",
+        "before_sha256": "7a4cce8a87309d2f103d313697e1bd014542df3b2fafd01d0526d2b35002a274",
+        "after_sha256": "3641b59c2c667deffb160d2c85dae5fe6824ec63727942b15c880646648ba078",
+        "before_lines": 537,
+        "after_lines": 532,
+        "before_nonblank": 536,
+        "after_nonblank": 531
+      },
+      {
+        "path": "src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Public.cpp",
+        "before_sha256": "0fc3e01a5b735a012be6d2e22c493b26bbbc542334135d4f8d54aa73bf93f212",
+        "after_sha256": "1bf13b2df867fdfcd75327c1063706ce99ee49124d52653f506703e1148a5775",
+        "before_lines": 674,
+        "after_lines": 465,
+        "before_nonblank": 580,
+        "after_nonblank": 400
+      },
+      {
+        "path": "src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Registration.cpp",
+        "before_sha256": "4d7f55edbbce8fb19397b11c39b16832d9db2cb1fd3b46380c3d8e898f15b797",
+        "after_sha256": "54a65d9e26c1c61003eb0b1397ac843ad869a954af57a1a907b2c85e22600823",
+        "before_lines": 1025,
+        "after_lines": 1115,
+        "before_nonblank": 953,
+        "after_nonblank": 1041
+      },
+      {
+        "path": "src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Uv.cpp",
+        "before_sha256": "5659ba8faa4922cc9e92a19ae107b4c13e1e4daddb477e3a2a6d181646b0f12a",
+        "after_sha256": "f632d647b0578b442272d724cd27e0608cbee7a19de99c2a941786074c668f77",
+        "before_lines": 1053,
+        "after_lines": 1140,
+        "before_nonblank": 975,
+        "after_nonblank": 1055
+      },
+      {
+        "path": "src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.cpp",
+        "before_sha256": "51a80c5887c6b6638f38950f75e9f56d4775ce5f4130d73e5eb31dc5eecd5d88",
+        "after_sha256": "3b93c372a83466165f8542e8fcc582a08ebe397bb72a3230ab7d0b268a5bfda6",
+        "before_lines": 2394,
+        "after_lines": 2211,
+        "before_nonblank": 2226,
+        "after_nonblank": 2055
+      },
+      {
+        "path": "src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.cppm",
+        "before_sha256": "53aba07b77d2376e4cf41476b0c9cf3289828072e5a1babfb839c4599ee21010",
+        "after_sha256": "2e29346824cde66d2d9b8f0c86aaa6444898e0334e5b66414d8ce504d1b97bf8",
+        "before_lines": 1612,
+        "after_lines": 682,
+        "before_nonblank": 1423,
+        "after_nonblank": 608
+      },
+      {
+        "path": "src/runtime/Editor/Operations/Runtime.MeshFieldOperations.Curvature.cpp",
+        "before_sha256": null,
+        "after_sha256": "131ac8d817771d73387e91a0512f1588281ef858b556529b8b234cb7757edec8",
+        "before_lines": 0,
+        "after_lines": 2648,
+        "before_nonblank": 0,
+        "after_nonblank": 2502
+      },
+      {
+        "path": "src/runtime/Editor/Operations/Runtime.MeshFieldOperations.Frame.cpp",
+        "before_sha256": null,
+        "after_sha256": "9dfe143ad8a2f044a81be8f389edee1e0c6b09e9b8776a9d508b853d2ceca1e6",
+        "before_lines": 0,
+        "after_lines": 81,
+        "before_nonblank": 0,
+        "after_nonblank": 75
+      },
+      {
+        "path": "src/runtime/Editor/Operations/Runtime.MeshFieldOperations.Geodesics.cpp",
+        "before_sha256": null,
+        "after_sha256": "779e8b19921b41d131631f6211c207410eed7343835da2b28dae0b7c92ec4af2",
+        "before_lines": 0,
+        "after_lines": 206,
+        "before_nonblank": 0,
+        "after_nonblank": 198
+      },
+      {
+        "path": "src/runtime/Editor/Operations/Runtime.MeshFieldOperations.Properties.hpp",
+        "before_sha256": null,
+        "after_sha256": "fd1c60ec0130ff3845df108393803d0840c4822640d7948607cf1e92eacd1074",
+        "before_lines": 0,
+        "after_lines": 61,
+        "before_nonblank": 0,
+        "after_nonblank": 56
+      },
+      {
+        "path": "src/runtime/Editor/Operations/Runtime.MeshFieldOperations.cpp",
+        "before_sha256": null,
+        "after_sha256": "1275e69f924a442ec552afd25c90619edb2807dfbfe949538f80d69172175719",
+        "before_lines": 0,
+        "after_lines": 100,
+        "before_nonblank": 0,
+        "after_nonblank": 93
+      },
+      {
+        "path": "src/runtime/Editor/Operations/Runtime.MeshFieldOperations.cppm",
+        "before_sha256": null,
+        "after_sha256": "b0ad228c19a6ecde2a0d4aac61ab3fbeb5bc35736f78a67c3ae73acd4d341afe",
+        "before_lines": 0,
+        "after_lines": 208,
+        "before_nonblank": 0,
+        "after_nonblank": 194
+      },
+      {
+        "path": "src/runtime/Editor/Operations/Runtime.MeshTopologyOperations.Frame.cpp",
+        "before_sha256": null,
+        "after_sha256": "df1d2af31e335f804179940c9b54a27f8343da65177da8f779659a2ea1b3d85e",
+        "before_lines": 0,
+        "after_lines": 81,
+        "before_nonblank": 0,
+        "after_nonblank": 75
+      },
+      {
+        "path": "src/runtime/Editor/Operations/Runtime.MeshTopologyOperations.Topology.cpp",
+        "before_sha256": null,
+        "after_sha256": "554aaa3ee6aa8db3f95900bee0b6830c479bf8c4e7770daf70817cae4eca3cb5",
+        "before_lines": 0,
+        "after_lines": 2975,
+        "before_nonblank": 0,
+        "after_nonblank": 2785
+      },
+      {
+        "path": "src/runtime/Editor/Operations/Runtime.MeshTopologyOperations.cpp",
+        "before_sha256": null,
+        "after_sha256": "b54fd41b509aca15fbd3c7de2dca26298fb14d2530ab053b8b90850d73992ad6",
+        "before_lines": 0,
+        "after_lines": 75,
+        "before_nonblank": 0,
+        "after_nonblank": 71
+      },
+      {
+        "path": "src/runtime/Editor/Operations/Runtime.MeshTopologyOperations.cppm",
+        "before_sha256": null,
+        "after_sha256": "bdcee48df80706496c4cd284bade00bd8fad71e6d623fc81eed57135fd780172",
+        "before_lines": 0,
+        "after_lines": 314,
+        "before_nonblank": 0,
+        "after_nonblank": 287
+      },
+      {
+        "path": "src/runtime/Editor/Operations/Runtime.NormalOperations.cppm",
+        "before_sha256": "c5f95d3f2fa6c89e3c228787f398c4d9da1ceb3beea3399f5a9558cb98bd4ae6",
+        "after_sha256": "3b55879a9007eb45033bc58d9b075c0fc4487e39c691e04a1ba97a11a9123022",
+        "before_lines": 66,
+        "after_lines": 65,
+        "before_nonblank": 66,
+        "after_nonblank": 65
+      },
+      {
+        "path": "src/runtime/Editor/Operations/Runtime.ParameterizationOperations.Frame.cpp",
+        "before_sha256": null,
+        "after_sha256": "56c56b0dddab4008a89f1b4c900ad8e9ac2d0254e3b3270b815a54e6896a1eda",
+        "before_lines": 0,
+        "after_lines": 85,
+        "before_nonblank": 0,
+        "after_nonblank": 79
+      },
+      {
+        "path": "src/runtime/Editor/Operations/Runtime.ParameterizationOperations.cpp",
+        "before_sha256": "6980fa1e884df520a91b8f1e49709e8abb1992348607e7e1f0d3c4623195eb7f",
+        "after_sha256": "22e231985dfa569f37042bea535ea0e2bd3bb2cdac2668dbebd3cf0fb8dc04aa",
+        "before_lines": 1714,
+        "after_lines": 1756,
+        "before_nonblank": 1614,
+        "after_nonblank": 1654
+      },
+      {
+        "path": "src/runtime/Editor/Operations/Runtime.ParameterizationOperations.cppm",
+        "before_sha256": null,
+        "after_sha256": "ed7c294694d5026492c85fec769589f8b147924e1488e5e1bc99dc82539e10f1",
+        "before_lines": 0,
+        "after_lines": 281,
+        "before_nonblank": 0,
+        "after_nonblank": 257
+      },
+      {
+        "path": "src/runtime/Editor/Operations/Runtime.PointAnalysisOperations.cppm",
+        "before_sha256": "9f1054579306cc5299eda93b580087bdd8d96f483c509a7f11b12832f9095809",
+        "after_sha256": "f53f33d745f568dc88ea73f177d46cb11221b772c2b78cc3f5ccaa3a3d273458",
+        "before_lines": 133,
+        "after_lines": 130,
+        "before_nonblank": 130,
+        "after_nonblank": 127
+      },
+      {
+        "path": "src/runtime/Editor/Operations/Runtime.RegistrationOperations.Frame.cpp",
+        "before_sha256": null,
+        "after_sha256": "149fddb604259da881f1644e96d08d45919e31b29a20c8cfa0205ccaf52699a3",
+        "before_lines": 0,
+        "after_lines": 81,
+        "before_nonblank": 0,
+        "after_nonblank": 75
+      },
+      {
+        "path": "src/runtime/Editor/Operations/Runtime.RegistrationOperations.cpp",
+        "before_sha256": null,
+        "after_sha256": "4b96a0f766cfe24a870b5a45013064c687d3b283cd16405cd90de514d4cc2b74",
+        "before_lines": 0,
+        "after_lines": 27,
+        "before_nonblank": 0,
+        "after_nonblank": 27
+      },
+      {
+        "path": "src/runtime/Editor/Operations/Runtime.RegistrationOperations.cppm",
+        "before_sha256": null,
+        "after_sha256": "2d36b2b936e3732e6e43c551558704b3b44ff46f7e408d04a62ef79323b1c6c1",
+        "before_lines": 0,
+        "after_lines": 103,
+        "before_nonblank": 0,
+        "after_nonblank": 98
+      },
+      {
+        "path": "src/runtime/Editor/Runtime.EditorProcessing.cpp",
+        "before_sha256": "f037c4f506150706eec47297c45adea7d66d69920ead0d6bb2b695e5c1e21dbb",
+        "after_sha256": "85ec31baa338ba24ec08198adc89c09709fba97f4bb5ee0434cb40735b2f2f6d",
+        "before_lines": 53,
+        "after_lines": 70,
+        "before_nonblank": 53,
+        "after_nonblank": 70
+      },
+      {
+        "path": "src/runtime/Editor/Runtime.EditorProcessing.cppm",
+        "before_sha256": "1029d0a5d105c6fc4af2fd0a01fcceec9f76aeadd809d0a3a5c47ae0a75a0e37",
+        "after_sha256": "02b796b555706a31f84733c0aa3ad328157e8419d8a9a428a685eaeb063086c3",
+        "before_lines": 45,
+        "after_lines": 75,
+        "before_nonblank": 44,
+        "after_nonblank": 74
+      },
+      {
+        "path": "src/runtime/Editor/Runtime.EditorWorkspaceSnapshots.Models.cpp",
+        "before_sha256": "bf0ef4a961e4da513dc2a4213ee7087ca94bbfcc4386d588e8cbd28e84647435",
+        "after_sha256": "e64ab55759ad1accb2f1b7c99740dddfa36762c74702d12ed7d99fb48952df47",
+        "before_lines": 3570,
+        "after_lines": 3560,
+        "before_nonblank": 3331,
+        "after_nonblank": 3321
+      },
+      {
+        "path": "src/runtime/Editor/internal/Runtime.EditorFeatureContextAdapters.cpp",
+        "before_sha256": "375e2eed8f2bf3e7d751838bdbfcce0a57967335de520da4e86b14531e7ebe6e",
+        "after_sha256": "7eb3617877ccf851c83ec092f3fe70115059a77e2dba45f39510afa24a03a1ca",
+        "before_lines": 2404,
+        "after_lines": 2418,
+        "before_nonblank": 2276,
+        "after_nonblank": 2289
+      },
+      {
+        "path": "src/runtime/Editor/internal/Runtime.EditorFeatures.Internal.hpp",
+        "before_sha256": "fa64434a3a5727607fa58751b3dcd8011bab1c94cccaa9d72e6d709d346881d0",
+        "after_sha256": "09656843b416f44311debeb1eaeefb651a44b847aef58ca7be740c299cbfa389",
+        "before_lines": 269,
+        "after_lines": 291,
+        "before_nonblank": 233,
+        "after_nonblank": 255
+      },
+      {
+        "path": "src/runtime/Editor/internal/Runtime.EditorWorkspaceSession.cpp",
+        "before_sha256": "955ab1175ff446996c98f79c11c4a03856494098afa7ab974ca4635aa46c1c02",
+        "after_sha256": "8ce95b668fe3669466f4bb167fcac2f6141b27070baaac926001780552ad1942",
+        "before_lines": 903,
+        "after_lines": 948,
+        "before_nonblank": 870,
+        "after_nonblank": 914
+      }
+    ]
+  },
+  "source_test_build_changes": [
+    {
+      "path": "src/app/Sandbox/Editor/Sandbox.DomainPanels.cpp",
+      "before_sha256": "d6be4ecb1bd8a7ffe2250b646fba1bf48d8140e3c01ef54b21ea5944c7247701",
+      "after_sha256": "4bd31525d34447e1a39c77729b933c07c40338547f91f726339d83bda96f6036",
+      "before_lines": 1829,
+      "after_lines": 1761,
+      "before_nonblank": 1721,
+      "after_nonblank": 1658
+    },
+    {
+      "path": "src/app/Sandbox/Editor/Sandbox.EditorShell.cpp",
+      "before_sha256": "3ca39b40b27d464a12c1e0d2333a2126066545e023a7849e5f3b61df848cced7",
+      "after_sha256": "94f233307f7559e5c276c4fec395c82855ce3c97e8419ef5f26dcb31ac036b98",
+      "before_lines": 3378,
+      "after_lines": 3306,
+      "before_nonblank": 3221,
+      "after_nonblank": 3153
+    },
+    {
+      "path": "src/app/Sandbox/Editor/Sandbox.MeshProcessingPanels.cpp",
+      "before_sha256": "7a2369a7d8a1a931551cdb0e95845269bc072787e5cbd817235a42d5868ad599",
+      "after_sha256": "b878c32cb9c12742f0290cd09cc2390630fa303459b2105142ccac4adb19b8ef",
+      "before_lines": 3003,
+      "after_lines": 3014,
+      "before_nonblank": 2910,
+      "after_nonblank": 2921
+    },
+    {
+      "path": "src/app/Sandbox/Editor/Sandbox.MethodPanels.cpp",
+      "before_sha256": "56080c26eb417400ba82c0027c42a9b7f12c068cd133b07ee326e30c7a7daffd",
+      "after_sha256": "bbc912ec587f11aa2e4efe3b757e4428e089f463e00b6da9c626360f6d1652d5",
+      "before_lines": 3358,
+      "after_lines": 3368,
+      "before_nonblank": 3215,
+      "after_nonblank": 3225
+    },
+    {
+      "path": "src/app/Sandbox/Editor/Sandbox.PanelSupport.cpp",
+      "before_sha256": "6de63a5b6ed45d7059e259fe64ab6c9aac507582a5ddaae433f99f0ad5f81ee8",
+      "after_sha256": "88f2456acaa703e868873f478d7df50501910e8ad2b1af84ce209de0b2f065b4",
+      "before_lines": 840,
+      "after_lines": 1007,
+      "before_nonblank": 784,
+      "after_nonblank": 943
+    },
+    {
+      "path": "src/app/Sandbox/Editor/Sandbox.PanelSupport.hpp",
+      "before_sha256": "ccb064dfa2f55a8259cc1bce9e7a4a377617b66c3a5bd2ced121e6d39614d942",
+      "after_sha256": "9d273fd2cd72996910c144f496e3f51592479bfef15213aba89f7d804e06ea20",
+      "before_lines": 431,
+      "after_lines": 472,
+      "before_nonblank": 375,
+      "after_nonblank": 414
+    },
+    {
+      "path": "src/app/Sandbox/README.md",
+      "before_sha256": "be2b41a3cb5a58cf884ae53cac183079529c98d94ef47e4eb93af63bfbe3ca35",
+      "after_sha256": "003785955ce91136169dac0615399bff8e5771806d7480907db0ffe4cf29f4a6",
+      "before_lines": 513,
+      "after_lines": 518,
+      "before_nonblank": 466,
+      "after_nonblank": 471
+    },
+    {
+      "path": "src/runtime/CMakeLists.txt",
+      "before_sha256": "85e2d47dd5cb5239b29e126b8522db5a01aacf1b94803188dce91a6a3533ad76",
+      "after_sha256": "b409537313ac1094fd4a4f0613a2fc3b5e5e982ba0dced68c509f49d3cfd1b5e",
+      "before_lines": 287,
+      "after_lines": 302,
+      "before_nonblank": 280,
+      "after_nonblank": 295
+    },
+    {
+      "path": "src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Construction.cpp",
+      "before_sha256": "1f741f66aaf234ed99b9e3af0b483af076807f3be3e042e84270208f1ccd4874",
+      "after_sha256": "6f02a464a4991c0404ec5165ea52f23350f863aa85b85678eb511de63389e842",
+      "before_lines": 870,
+      "after_lines": 864,
+      "before_nonblank": 870,
+      "after_nonblank": 864
+    },
+    {
+      "path": "src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.DensityWeights.cpp",
+      "before_sha256": "312b798805c05487b1b12494a2e8f6b82a990b1b781d0ad41dfe18f22b81f852",
+      "after_sha256": "cc66fb90826fa71b37691b38a48b6f5e582e3850eda234c684fb95bde3845aea",
+      "before_lines": 222,
+      "after_lines": 218,
+      "before_nonblank": 222,
+      "after_nonblank": 218
+    },
+    {
+      "path": "src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Descriptors.cpp",
+      "before_sha256": "f0445d335a9bc837b99d5d9ec622bf9d1c7fb5116e27980fc7ae03d3b745d66b",
+      "after_sha256": "371550a231515682787586893c60ce62d6c8bcb04a795a337e209a2b3ad115ae",
+      "before_lines": 365,
+      "after_lines": 357,
+      "before_nonblank": 363,
+      "after_nonblank": 356
+    },
+    {
+      "path": "src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.DomainProperties.cpp",
+      "before_sha256": "72bf56f39faebfc3979e14b2fee2e12cac7e5252cd05ed89230f6ef8b345b187",
+      "after_sha256": null,
+      "before_lines": 944,
+      "after_lines": 0,
+      "before_nonblank": 876,
+      "after_nonblank": 0
+    },
+    {
+      "path": "src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Internal.hpp",
+      "before_sha256": "4ace27409c96aa76773bfb8033f885fc70b39e78549e572ca254fc4941fd4991",
+      "after_sha256": "1157fa718db578e7b51014c16a3f3ca01ac3ce903ffb8ed97e12249b51b13e85",
+      "before_lines": 43,
+      "after_lines": 24,
+      "before_nonblank": 36,
+      "after_nonblank": 19
+    },
+    {
+      "path": "src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Keypoints.cpp",
+      "before_sha256": "eea82ae2b7a49fff48ed5033b7a7c0a7179fa724679794dc9b02b2db8037947d",
+      "after_sha256": "bdc4794fa4f34c5e7a64ac1b5e57dedfc59c197fa4b65e3dfd74b90bd5fdd03d",
+      "before_lines": 333,
+      "after_lines": 328,
+      "before_nonblank": 332,
+      "after_nonblank": 327
+    },
+    {
+      "path": "src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Mesh.cpp",
+      "before_sha256": "8584636c3d938ff4846f50cf99220b50ebcda5c2c72e0e76351712555cf2182a",
+      "after_sha256": "255013c724d3ebe47622a32fc9c60b83ddecec98e70b43e18fee4cf2e1f4b705",
+      "before_lines": 6825,
+      "after_lines": 461,
+      "before_nonblank": 6435,
+      "after_nonblank": 432
+    },
+    {
+      "path": "src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.MeshSupport.cpp",
+      "before_sha256": null,
+      "after_sha256": "1711deb09b32a5938535c932611682f589217309022fe30c2bf574b33ccb15b9",
+      "before_lines": 0,
+      "after_lines": 749,
+      "before_nonblank": 0,
+      "after_nonblank": 693
+    },
+    {
+      "path": "src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.MeshSupport.hpp",
+      "before_sha256": "6694461710ba542e407748a02bfa0a09179e8e269758608b494bbfb30eb5ec68",
+      "after_sha256": "e5d774686c07fc524cb6c061c00b10190d3eb7a24fe8f1af2af79d347531aae7",
+      "before_lines": 312,
+      "after_lines": 344,
+      "before_nonblank": 250,
+      "after_nonblank": 275
+    },
+    {
+      "path": "src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Normals.cpp",
+      "before_sha256": "5ffdaf5e961a02eca7f9cc098091d54e121c35565858d266948e6703b834f1ef",
+      "after_sha256": "b208754fa6e5b1c20db470aadebca4509e81844d6882f44f70d85470b91ca56a",
+      "before_lines": 701,
+      "after_lines": 696,
+      "before_nonblank": 699,
+      "after_nonblank": 694
+    },
+    {
+      "path": "src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Outliers.cpp",
+      "before_sha256": "7a4cce8a87309d2f103d313697e1bd014542df3b2fafd01d0526d2b35002a274",
+      "after_sha256": "3641b59c2c667deffb160d2c85dae5fe6824ec63727942b15c880646648ba078",
+      "before_lines": 537,
+      "after_lines": 532,
+      "before_nonblank": 536,
+      "after_nonblank": 531
+    },
+    {
+      "path": "src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Public.cpp",
+      "before_sha256": "0fc3e01a5b735a012be6d2e22c493b26bbbc542334135d4f8d54aa73bf93f212",
+      "after_sha256": "1bf13b2df867fdfcd75327c1063706ce99ee49124d52653f506703e1148a5775",
+      "before_lines": 674,
+      "after_lines": 465,
+      "before_nonblank": 580,
+      "after_nonblank": 400
+    },
+    {
+      "path": "src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Registration.cpp",
+      "before_sha256": "4d7f55edbbce8fb19397b11c39b16832d9db2cb1fd3b46380c3d8e898f15b797",
+      "after_sha256": "54a65d9e26c1c61003eb0b1397ac843ad869a954af57a1a907b2c85e22600823",
+      "before_lines": 1025,
+      "after_lines": 1115,
+      "before_nonblank": 953,
+      "after_nonblank": 1041
+    },
+    {
+      "path": "src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Uv.cpp",
+      "before_sha256": "5659ba8faa4922cc9e92a19ae107b4c13e1e4daddb477e3a2a6d181646b0f12a",
+      "after_sha256": "f632d647b0578b442272d724cd27e0608cbee7a19de99c2a941786074c668f77",
+      "before_lines": 1053,
+      "after_lines": 1140,
+      "before_nonblank": 975,
+      "after_nonblank": 1055
+    },
+    {
+      "path": "src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.cpp",
+      "before_sha256": "51a80c5887c6b6638f38950f75e9f56d4775ce5f4130d73e5eb31dc5eecd5d88",
+      "after_sha256": "3b93c372a83466165f8542e8fcc582a08ebe397bb72a3230ab7d0b268a5bfda6",
+      "before_lines": 2394,
+      "after_lines": 2211,
+      "before_nonblank": 2226,
+      "after_nonblank": 2055
+    },
+    {
+      "path": "src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.cppm",
+      "before_sha256": "53aba07b77d2376e4cf41476b0c9cf3289828072e5a1babfb839c4599ee21010",
+      "after_sha256": "2e29346824cde66d2d9b8f0c86aaa6444898e0334e5b66414d8ce504d1b97bf8",
+      "before_lines": 1612,
+      "after_lines": 682,
+      "before_nonblank": 1423,
+      "after_nonblank": 608
+    },
+    {
+      "path": "src/runtime/Editor/Operations/Runtime.MeshFieldOperations.Curvature.cpp",
+      "before_sha256": null,
+      "after_sha256": "131ac8d817771d73387e91a0512f1588281ef858b556529b8b234cb7757edec8",
+      "before_lines": 0,
+      "after_lines": 2648,
+      "before_nonblank": 0,
+      "after_nonblank": 2502
+    },
+    {
+      "path": "src/runtime/Editor/Operations/Runtime.MeshFieldOperations.Frame.cpp",
+      "before_sha256": null,
+      "after_sha256": "9dfe143ad8a2f044a81be8f389edee1e0c6b09e9b8776a9d508b853d2ceca1e6",
+      "before_lines": 0,
+      "after_lines": 81,
+      "before_nonblank": 0,
+      "after_nonblank": 75
+    },
+    {
+      "path": "src/runtime/Editor/Operations/Runtime.MeshFieldOperations.Geodesics.cpp",
+      "before_sha256": null,
+      "after_sha256": "779e8b19921b41d131631f6211c207410eed7343835da2b28dae0b7c92ec4af2",
+      "before_lines": 0,
+      "after_lines": 206,
+      "before_nonblank": 0,
+      "after_nonblank": 198
+    },
+    {
+      "path": "src/runtime/Editor/Operations/Runtime.MeshFieldOperations.Properties.hpp",
+      "before_sha256": null,
+      "after_sha256": "fd1c60ec0130ff3845df108393803d0840c4822640d7948607cf1e92eacd1074",
+      "before_lines": 0,
+      "after_lines": 61,
+      "before_nonblank": 0,
+      "after_nonblank": 56
+    },
+    {
+      "path": "src/runtime/Editor/Operations/Runtime.MeshFieldOperations.cpp",
+      "before_sha256": null,
+      "after_sha256": "1275e69f924a442ec552afd25c90619edb2807dfbfe949538f80d69172175719",
+      "before_lines": 0,
+      "after_lines": 100,
+      "before_nonblank": 0,
+      "after_nonblank": 93
+    },
+    {
+      "path": "src/runtime/Editor/Operations/Runtime.MeshFieldOperations.cppm",
+      "before_sha256": null,
+      "after_sha256": "b0ad228c19a6ecde2a0d4aac61ab3fbeb5bc35736f78a67c3ae73acd4d341afe",
+      "before_lines": 0,
+      "after_lines": 208,
+      "before_nonblank": 0,
+      "after_nonblank": 194
+    },
+    {
+      "path": "src/runtime/Editor/Operations/Runtime.MeshTopologyOperations.Frame.cpp",
+      "before_sha256": null,
+      "after_sha256": "df1d2af31e335f804179940c9b54a27f8343da65177da8f779659a2ea1b3d85e",
+      "before_lines": 0,
+      "after_lines": 81,
+      "before_nonblank": 0,
+      "after_nonblank": 75
+    },
+    {
+      "path": "src/runtime/Editor/Operations/Runtime.MeshTopologyOperations.Topology.cpp",
+      "before_sha256": null,
+      "after_sha256": "554aaa3ee6aa8db3f95900bee0b6830c479bf8c4e7770daf70817cae4eca3cb5",
+      "before_lines": 0,
+      "after_lines": 2975,
+      "before_nonblank": 0,
+      "after_nonblank": 2785
+    },
+    {
+      "path": "src/runtime/Editor/Operations/Runtime.MeshTopologyOperations.cpp",
+      "before_sha256": null,
+      "after_sha256": "b54fd41b509aca15fbd3c7de2dca26298fb14d2530ab053b8b90850d73992ad6",
+      "before_lines": 0,
+      "after_lines": 75,
+      "before_nonblank": 0,
+      "after_nonblank": 71
+    },
+    {
+      "path": "src/runtime/Editor/Operations/Runtime.MeshTopologyOperations.cppm",
+      "before_sha256": null,
+      "after_sha256": "bdcee48df80706496c4cd284bade00bd8fad71e6d623fc81eed57135fd780172",
+      "before_lines": 0,
+      "after_lines": 314,
+      "before_nonblank": 0,
+      "after_nonblank": 287
+    },
+    {
+      "path": "src/runtime/Editor/Operations/Runtime.NormalOperations.cppm",
+      "before_sha256": "c5f95d3f2fa6c89e3c228787f398c4d9da1ceb3beea3399f5a9558cb98bd4ae6",
+      "after_sha256": "3b55879a9007eb45033bc58d9b075c0fc4487e39c691e04a1ba97a11a9123022",
+      "before_lines": 66,
+      "after_lines": 65,
+      "before_nonblank": 66,
+      "after_nonblank": 65
+    },
+    {
+      "path": "src/runtime/Editor/Operations/Runtime.ParameterizationOperations.Frame.cpp",
+      "before_sha256": null,
+      "after_sha256": "56c56b0dddab4008a89f1b4c900ad8e9ac2d0254e3b3270b815a54e6896a1eda",
+      "before_lines": 0,
+      "after_lines": 85,
+      "before_nonblank": 0,
+      "after_nonblank": 79
+    },
+    {
+      "path": "src/runtime/Editor/Operations/Runtime.ParameterizationOperations.cpp",
+      "before_sha256": "6980fa1e884df520a91b8f1e49709e8abb1992348607e7e1f0d3c4623195eb7f",
+      "after_sha256": "22e231985dfa569f37042bea535ea0e2bd3bb2cdac2668dbebd3cf0fb8dc04aa",
+      "before_lines": 1714,
+      "after_lines": 1756,
+      "before_nonblank": 1614,
+      "after_nonblank": 1654
+    },
+    {
+      "path": "src/runtime/Editor/Operations/Runtime.ParameterizationOperations.cppm",
+      "before_sha256": null,
+      "after_sha256": "ed7c294694d5026492c85fec769589f8b147924e1488e5e1bc99dc82539e10f1",
+      "before_lines": 0,
+      "after_lines": 281,
+      "before_nonblank": 0,
+      "after_nonblank": 257
+    },
+    {
+      "path": "src/runtime/Editor/Operations/Runtime.PointAnalysisOperations.cppm",
+      "before_sha256": "9f1054579306cc5299eda93b580087bdd8d96f483c509a7f11b12832f9095809",
+      "after_sha256": "f53f33d745f568dc88ea73f177d46cb11221b772c2b78cc3f5ccaa3a3d273458",
+      "before_lines": 133,
+      "after_lines": 130,
+      "before_nonblank": 130,
+      "after_nonblank": 127
+    },
+    {
+      "path": "src/runtime/Editor/Operations/Runtime.RegistrationOperations.Frame.cpp",
+      "before_sha256": null,
+      "after_sha256": "149fddb604259da881f1644e96d08d45919e31b29a20c8cfa0205ccaf52699a3",
+      "before_lines": 0,
+      "after_lines": 81,
+      "before_nonblank": 0,
+      "after_nonblank": 75
+    },
+    {
+      "path": "src/runtime/Editor/Operations/Runtime.RegistrationOperations.cpp",
+      "before_sha256": null,
+      "after_sha256": "4b96a0f766cfe24a870b5a45013064c687d3b283cd16405cd90de514d4cc2b74",
+      "before_lines": 0,
+      "after_lines": 27,
+      "before_nonblank": 0,
+      "after_nonblank": 27
+    },
+    {
+      "path": "src/runtime/Editor/Operations/Runtime.RegistrationOperations.cppm",
+      "before_sha256": null,
+      "after_sha256": "2d36b2b936e3732e6e43c551558704b3b44ff46f7e408d04a62ef79323b1c6c1",
+      "before_lines": 0,
+      "after_lines": 103,
+      "before_nonblank": 0,
+      "after_nonblank": 98
+    },
+    {
+      "path": "src/runtime/Editor/Runtime.EditorProcessing.cpp",
+      "before_sha256": "f037c4f506150706eec47297c45adea7d66d69920ead0d6bb2b695e5c1e21dbb",
+      "after_sha256": "85ec31baa338ba24ec08198adc89c09709fba97f4bb5ee0434cb40735b2f2f6d",
+      "before_lines": 53,
+      "after_lines": 70,
+      "before_nonblank": 53,
+      "after_nonblank": 70
+    },
+    {
+      "path": "src/runtime/Editor/Runtime.EditorProcessing.cppm",
+      "before_sha256": "1029d0a5d105c6fc4af2fd0a01fcceec9f76aeadd809d0a3a5c47ae0a75a0e37",
+      "after_sha256": "02b796b555706a31f84733c0aa3ad328157e8419d8a9a428a685eaeb063086c3",
+      "before_lines": 45,
+      "after_lines": 75,
+      "before_nonblank": 44,
+      "after_nonblank": 74
+    },
+    {
+      "path": "src/runtime/Editor/Runtime.EditorWorkspaceSnapshots.Models.cpp",
+      "before_sha256": "bf0ef4a961e4da513dc2a4213ee7087ca94bbfcc4386d588e8cbd28e84647435",
+      "after_sha256": "e64ab55759ad1accb2f1b7c99740dddfa36762c74702d12ed7d99fb48952df47",
+      "before_lines": 3570,
+      "after_lines": 3560,
+      "before_nonblank": 3331,
+      "after_nonblank": 3321
+    },
+    {
+      "path": "src/runtime/Editor/internal/Runtime.EditorFeatureContextAdapters.cpp",
+      "before_sha256": "375e2eed8f2bf3e7d751838bdbfcce0a57967335de520da4e86b14531e7ebe6e",
+      "after_sha256": "7eb3617877ccf851c83ec092f3fe70115059a77e2dba45f39510afa24a03a1ca",
+      "before_lines": 2404,
+      "after_lines": 2418,
+      "before_nonblank": 2276,
+      "after_nonblank": 2289
+    },
+    {
+      "path": "src/runtime/Editor/internal/Runtime.EditorFeatures.Internal.hpp",
+      "before_sha256": "fa64434a3a5727607fa58751b3dcd8011bab1c94cccaa9d72e6d709d346881d0",
+      "after_sha256": "09656843b416f44311debeb1eaeefb651a44b847aef58ca7be740c299cbfa389",
+      "before_lines": 269,
+      "after_lines": 291,
+      "before_nonblank": 233,
+      "after_nonblank": 255
+    },
+    {
+      "path": "src/runtime/Editor/internal/Runtime.EditorWorkspaceSession.cpp",
+      "before_sha256": "955ab1175ff446996c98f79c11c4a03856494098afa7ab974ca4635aa46c1c02",
+      "after_sha256": "8ce95b668fe3669466f4bb167fcac2f6141b27070baaac926001780552ad1942",
+      "before_lines": 903,
+      "after_lines": 948,
+      "before_nonblank": 870,
+      "after_nonblank": 914
+    },
+    {
+      "path": "tests/CMakeLists.txt",
+      "before_sha256": "02cdeb3807cc91ae84e26e32007c62e5e11bd21b149124a3cfd39c68a93f9a34",
+      "after_sha256": "367c8aa862ae905a7bfebc677606a210b1e76de7489124fffc0c04c75c2c9242",
+      "before_lines": 1866,
+      "after_lines": 1976,
+      "before_nonblank": 1762,
+      "after_nonblank": 1872
+    },
+    {
+      "path": "tests/contract/runtime/Test.BilateralFilterOperations.cpp",
+      "before_sha256": "38718739e1eae046a7315e783e585e2b4f474b3a828ff30a0cceccd1d0b9a56a",
+      "after_sha256": "ddab0207ab5ee00702d9010d4c565394a5911ef846b5b11ea52d821564f7ca08",
+      "before_lines": 203,
+      "after_lines": 204,
+      "before_nonblank": 199,
+      "after_nonblank": 200
+    },
+    {
+      "path": "tests/contract/runtime/Test.CurvatureSegmentationOperations.cpp",
+      "before_sha256": "2f8976213e58e4b9ebda21055ef487cc4765bf7d6b49ad6e40c97560cbca9ea2",
+      "after_sha256": "d838c5d813d1a99505c680e32a570b44e2ccf7c6be7c2f30ee04b9b661c5a94b",
+      "before_lines": 584,
+      "after_lines": 584,
+      "before_nonblank": 549,
+      "after_nonblank": 549
+    },
+    {
+      "path": "tests/contract/runtime/Test.DensityWeightOperations.cpp",
+      "before_sha256": "12cfe377a7bdc76f8f9b34e23e6fa4468735c4950f105f0474cd84d60b52610c",
+      "after_sha256": "1623cc50ab440a31f896125a82152347336d9d4b79ffe3bfc3b67ae3cca1671e",
+      "before_lines": 343,
+      "after_lines": 344,
+      "before_nonblank": 336,
+      "after_nonblank": 337
+    },
+    {
+      "path": "tests/contract/runtime/Test.DescriptorAnalysisOperations.cpp",
+      "before_sha256": "799ba821f7898e439232a5a0e2101a770b2ec70ffdb77b8acd84e988d999eafb",
+      "after_sha256": "213443b4defe256f1c6cfec0ff627e25c5255fc079f71fab8bce33137d8c2168",
+      "before_lines": 236,
+      "after_lines": 237,
+      "before_nonblank": 233,
+      "after_nonblank": 234
+    },
+    {
+      "path": "tests/contract/runtime/Test.GeodesicsOperations.cpp",
+      "before_sha256": "0c3afc4fe5f6b4f253de3dea2d43c51e4ddf40a0388749f0f192c856d7feb689",
+      "after_sha256": "1e0594e9a85b9c672b70f84334875e29fae82db16e73dd1066ebe6890af55033",
+      "before_lines": 220,
+      "after_lines": 226,
+      "before_nonblank": 215,
+      "after_nonblank": 221
+    },
+    {
+      "path": "tests/contract/runtime/Test.KernelDensityOperations.cpp",
+      "before_sha256": "208745ed8241d98a69838235d3e7b9432eec69e25c0110753305380824225730",
+      "after_sha256": "e993fb88cf9c102773475a0e5566c2905105770dc9a8e5bf8398a27523e4acec",
+      "before_lines": 314,
+      "after_lines": 315,
+      "before_nonblank": 307,
+      "after_nonblank": 308
+    },
+    {
+      "path": "tests/contract/runtime/Test.KeypointAnalysisOperations.cpp",
+      "before_sha256": "14a68b98755f31be12e416b746582e14fb023f68c761dda3dfb51cadce5489cd",
+      "after_sha256": "9d447be415b3487928bd3c8ee57738775299b60f96972b92344e7c2eb888b397",
+      "before_lines": 250,
+      "after_lines": 251,
+      "before_nonblank": 245,
+      "after_nonblank": 246
+    },
+    {
+      "path": "tests/contract/runtime/Test.NormalEstimation.cpp",
+      "before_sha256": "b1e1d7315a8484c29625aca9d817abd6532f54f28543cb5432fad8ce32127918",
+      "after_sha256": "0ea2b083ddd0fa13bde21bb0bdd50428153f663d0cf8fe5eec35fc2e372f68fa",
+      "before_lines": 777,
+      "after_lines": 778,
+      "before_nonblank": 753,
+      "after_nonblank": 754
+    },
+    {
+      "path": "tests/contract/runtime/Test.OutlierAnalysis.cpp",
+      "before_sha256": "8d3f8d144cbe844b69f2953f1c307bad362f37845fa51f5c195a458002632987",
+      "after_sha256": "bd55e98b02fa45fa2efb311803c524e70569cfee8ffc1f8ffbe0c9280d99aaa8",
+      "before_lines": 467,
+      "after_lines": 619,
+      "before_nonblank": 454,
+      "after_nonblank": 596
+    },
+    {
+      "path": "tests/contract/runtime/Test.ParameterizationOperations.cpp",
+      "before_sha256": "b6d6d9327d41bd6c187eda6b8e0835eac3f90567756569660b39ec5fc9dbcc0f",
+      "after_sha256": "06a7b841fd70093d3d344944f209de168376e34375ea22223d33c48519ceedb6",
+      "before_lines": 1360,
+      "after_lines": 1347,
+      "before_nonblank": 1253,
+      "after_nonblank": 1240
+    },
+    {
+      "path": "tests/contract/runtime/Test.PointConstructionOperations.cpp",
+      "before_sha256": "65b263e1caa5d44b117086b5960594ddf416f2e9590f08dc2249ebcd550da0ae",
+      "after_sha256": "3b7c74041d9f8226aec1ed27f4c5fcf47aced51bb5fb7d53d3854f9d0fec23fa",
+      "before_lines": 386,
+      "after_lines": 387,
+      "before_nonblank": 386,
+      "after_nonblank": 387
+    },
+    {
+      "path": "tests/contract/runtime/Test.PointSpacingOperations.cpp",
+      "before_sha256": "7a009721c8009c0d6b5e8c3e54decd581d52f0877ceae5b03437a450c451b8c7",
+      "after_sha256": "091475e4d25c2d15a2e50d7e684e5e03d4de395ee43af110297a72ad4731d514",
+      "before_lines": 315,
+      "after_lines": 316,
+      "before_nonblank": 308,
+      "after_nonblank": 309
+    },
+    {
+      "path": "tests/contract/runtime/Test.PrimitiveSelection.cpp",
+      "before_sha256": "b70f5916905d2e6f327e7793f9ca20b8ab013b26bb0801d0e2ba5492995553d3",
+      "after_sha256": "7d90cb9f141c98177bd6fa124a2721166b1a4a98289ef69c4ee911777a6e82b2",
+      "before_lines": 256,
+      "after_lines": 258,
+      "before_nonblank": 255,
+      "after_nonblank": 257
+    },
+    {
+      "path": "tests/contract/runtime/Test.RegistrationDomains.cpp",
+      "before_sha256": "a1312be523b3e545e70e1e7cb1ef47c0b691f61e3fc17c2369eb9b1bf0366ef9",
+      "after_sha256": "d0055466c1de534c1c8e7986db74d895863b8ba54504b793eb641497bb8cce44",
+      "before_lines": 228,
+      "after_lines": 232,
+      "before_nonblank": 226,
+      "after_nonblank": 230
+    },
+    {
+      "path": "tests/contract/runtime/Test.RuntimeEngineLayering.cpp",
+      "before_sha256": "234e47486001294a5ed48fd56704891aa4e851cb4f6261e5a1a54cf25e1fea66",
+      "after_sha256": "c2a424aad5154aea66fb0db220bd00829d979fa1af5f5a49125658c723792f86",
+      "before_lines": 2291,
+      "after_lines": 2296,
+      "before_nonblank": 2134,
+      "after_nonblank": 2139
+    },
+    {
+      "path": "tests/contract/runtime/Test.SandboxEditorClusteringMethods.cpp",
+      "before_sha256": "4c5c41a1cbbd35aa40cbb999c0a4fc7818be9e9ff32c607bca92c00cf9570809",
+      "after_sha256": "b0cf30b36638006f4730a72aa78b18dc932a8a596f6a5890c737c02b90d502d9",
+      "before_lines": 2955,
+      "after_lines": 2956,
+      "before_nonblank": 2757,
+      "after_nonblank": 2758
+    },
+    {
+      "path": "tests/contract/runtime/Test.SandboxEditorMeshMethods.cpp",
+      "before_sha256": "9ede9745c19e9f8a18144d1628e8bde870a3ba0e5ecc150fb3a8e4775ecc1d62",
+      "after_sha256": "22a5b766b6b708a8cbbdc95d65e2981fdf7ef5d85f951ddfc8699792019d38ab",
+      "before_lines": 5804,
+      "after_lines": 5475,
+      "before_nonblank": 5320,
+      "after_nonblank": 5018
+    },
+    {
+      "path": "tests/contract/runtime/Test.SandboxEditorSessionLifecycle.cpp",
+      "before_sha256": "938920cdf5340f67247a4bd02691858dabf763db9c938b463a97fe2f40f5850f",
+      "after_sha256": "e77e6071269afa1e85ddaaaad7310902a00b81cfd3e8bcb5b44e2ad9720485f7",
+      "before_lines": 793,
+      "after_lines": 1027,
+      "before_nonblank": 753,
+      "after_nonblank": 981
+    },
+    {
+      "path": "tests/integration/graphics/Test.PointLBVHGpuSmoke.cpp",
+      "before_sha256": "b1015cce5fb640c4b6d6fcebbc284f9558185bd4f2c9df5e15df41d5a3aea7d1",
+      "after_sha256": "182ee0785215a26be9086e662f2d21d6017ef43e089e6aae2fae80e321e84700",
+      "before_lines": 2492,
+      "after_lines": 2496,
+      "before_nonblank": 2475,
+      "after_nonblank": 2479
+    },
+    {
+      "path": "tests/integration/runtime/Test.SandboxCurvatureSegmentationPanel.cpp",
+      "before_sha256": "5bf01a44fec234abf1080a7cf127f0d6543a50579a8aafa8548c3606de345af9",
+      "after_sha256": "97e8c962750aaeda45d7722d011e3d1060d659a5f99bba83b804161958b77113",
+      "before_lines": 234,
+      "after_lines": 238,
+      "before_nonblank": 214,
+      "after_nonblank": 218
+    },
+    {
+      "path": "tests/integration/runtime/Test.SandboxDescriptorAnalysisPanel.cpp",
+      "before_sha256": "d145dce937024918e7125c32124ffb9f9290035f4f06fbc9c2519253fa06f8ac",
+      "after_sha256": "b9332098cabb482f9dac67483742cbc499eae110015c068536579c63046e3696",
+      "before_lines": 191,
+      "after_lines": 195,
+      "before_nonblank": 182,
+      "after_nonblank": 186
+    },
+    {
+      "path": "tests/integration/runtime/Test.SandboxDomainPanels.cpp",
+      "before_sha256": "9b795fa240911f9ffe962ae44cea3df7101154ddc56ddec2289c6ed4580182fb",
+      "after_sha256": "4ac2b4228abd935b85977b9edf0737102f8227a1ee6c1a2855fb8dd1325e113e",
+      "before_lines": 411,
+      "after_lines": 415,
+      "before_nonblank": 380,
+      "after_nonblank": 384
+    },
+    {
+      "path": "tests/integration/runtime/Test.SandboxEditorPresentation.cpp",
+      "before_sha256": "d49faa30634b6997da7629249a2be68f6ef0ca498d76101fe75e5003a285cfac",
+      "after_sha256": "8311ef52536866a220404a0a367618624642c7e80873b2c38b8555a902867f1c",
+      "before_lines": 1800,
+      "after_lines": 1890,
+      "before_nonblank": 1667,
+      "after_nonblank": 1751
+    },
+    {
+      "path": "tests/integration/runtime/Test.SandboxParameterizationPanel.cpp",
+      "before_sha256": "1bf838826ce0facd076472b7be76375ef1f983846eb72bf50ff91e4901f87b50",
+      "after_sha256": "e9e907f5220d227af1058936d668d3072b2295cb189c592b70985e6ef94b2e81",
+      "before_lines": 588,
+      "after_lines": 591,
+      "before_nonblank": 551,
+      "after_nonblank": 554
+    },
+    {
+      "path": "tests/integration/runtime/Test.SandboxPointCloudConsolidationPanel.cpp",
+      "before_sha256": "206d83284503822ac01c7a1a1330ac59583a33a63b237cb7dc4b3a5aed1b0581",
+      "after_sha256": "8e425ef02d3428cb067a136cc28b2cbcb8e3d27be2db404d9f83ed990b441193",
+      "before_lines": 869,
+      "after_lines": 873,
+      "before_nonblank": 815,
+      "after_nonblank": 819
+    },
+    {
+      "path": "tests/integration/runtime/Test.SandboxProcessingPanels.cpp",
+      "before_sha256": "2ac92e0d2bfbbe122640a2a78c2f46bc0f065803dc98687ea642939c5bdb1c77",
+      "after_sha256": "bb1792e3385066044e8c7ec88822411851ebbe761924806c7b3ce64b3c2fa9be",
+      "before_lines": 987,
+      "after_lines": 1035,
+      "before_nonblank": 962,
+      "after_nonblank": 1009
+    },
+    {
+      "path": "tests/support/EditorFeatureTestContext.hpp",
+      "before_sha256": "43f0a9170bae1bc52b6b90ed19a0866a8d1c4abf7396c381a359c4a487032dd4",
+      "after_sha256": "05e99d3e035d7a779f4677bd7f2ef22b0d85bc3fa4d1a5829f27c7a0bdc8ea88",
+      "before_lines": 359,
+      "after_lines": 357,
+      "before_nonblank": 342,
+      "after_nonblank": 340
+    },
+    {
+      "path": "tests/support/SandboxEditorJobHarness.hpp",
+      "before_sha256": "f2c025aab14306d8ee56b126c7151883673701664c6cb90bafb87fb15e586a69",
+      "after_sha256": "f3b7fc639a57c42caabb010390a4df23433a31996920beb55c14928863512b0f",
+      "before_lines": 196,
+      "after_lines": 190,
+      "before_nonblank": 181,
+      "after_nonblank": 175
+    }
+  ],
+  "probes": {
+    "before": {
+      "result": {
+        "attempt_id": "attempt-001",
+        "backend": "external_baseline",
+        "benchmark_id": "build.processing_locality.incremental",
+        "claim_eligible": false,
+        "commit": "local-dev",
+        "config_digest": "efce3f3e28c1242d4cf29dc1f47d1d4b803d9c6de3c5669226e319028820e2bb",
+        "dataset": "local.processing_family_content_edits_20260913",
+        "diagnostics": {
+          "case": "family_contract",
+          "command": [
+            "cmake",
+            "--build",
+            "--preset",
+            "ci",
+            "--target",
+            "IntrinsicRuntimeContractTests",
+            "ExtrinsicSandbox",
+            "--parallel",
+            "8"
+          ],
+          "compiler_cache": "disabled",
+          "content_before_sha256": "53aba07b77d2376e4cf41476b0c9cf3289828072e5a1babfb839c4599ee21010",
+          "edited_source_sha256": "aea7844e9476442f5a9180bd476b275975e94c9a027f4ad37c7ff385431563dd",
+          "filesystem_cache": "not_flushed",
+          "physical_edges": "/tmp/intrinsic-runtime235-remaining-20260913/probes/before/family_contract/edges.json",
+          "replacement": {
+            "from": "struct EditorMeshCurvatureResult\n    {",
+            "to": "struct EditorMeshCurvatureResult\n    {\n        bool CompileLocalityProbe{false};"
+          },
+          "return_code": 0,
+          "source": "src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.cppm",
+          "source_before_sha256": "d8aaa7d54b59c223020187ef176265b80567282412453ae96408bac8479d8f9f",
+          "variant": "before"
+        },
+        "execution_status": "passed",
+        "manifest": {
+          "path": "manifests/incremental.yaml",
+          "sha256": "a730172f8e9de144b94557e4b71c101bee169de872c98a9f859282c7f200299b"
+        },
+        "method": "build.cmake_ninja_clang",
+        "metrics": {
+          "build_time_ms": {
+            "family_contract": 344536.78445110563
+          }
+        },
+        "resolved_params": {
+          "build_type": "Debug",
+          "compiler": "clang-23",
+          "compiler_cache": "disabled_by_CCACHE_DISABLE",
+          "configure_overrides": {
+            "INTRINSIC_BUILD_SANDBOX": "ON"
+          },
+          "dependencies": "shared_preinstalled_vcpkg_ci",
+          "family": "curvature",
+          "filesystem_cache": "not_flushed",
+          "intent": "performance",
+          "measured_iterations": 1,
+          "order": "before_then_after",
+          "parallel_jobs": 8,
+          "phases": [
+            "family_contract"
+          ],
+          "preset": "ci",
+          "targets": [
+            "IntrinsicRuntimeContractTests",
+            "ExtrinsicSandbox"
+          ],
+          "warmup_iterations": 0
+        },
+        "run_id": "before-family_contract-20260913T064315Z",
+        "schema_version": 2,
+        "source": {
+          "revision": "local-dev",
+          "snapshot_sha256": "aea7844e9476442f5a9180bd476b275975e94c9a027f4ad37c7ff385431563dd",
+          "state": "dirty_worktree"
+        },
+        "status": "passed",
+        "threshold_disposition": [],
+        "thresholds": {},
+        "warmup_policy": {
+          "measured_iterations": 1,
+          "warmup_iterations": 0
+        }
+      },
+      "compiler_summary": {
+        "latest_compile_output_count": 60,
+        "physical_compile_edge_count": 57,
+        "multi_output_edge_count": 3,
+        "resolved_edge_count": 57,
+        "generated_edge_count": 0,
+        "dependency_edge_count": 0,
+        "external_edge_count": 0,
+        "outside_declared_roots_edge_count": 0,
+        "ambiguous_edge_count": 0,
+        "unresolved_edge_count": 0,
+        "unresolved_output_count": 0,
+        "resolution_issue_output_count": 0
+      },
+      "compiler_roots": [
+        {
+          "root": "src",
+          "indexed_source_count": 797,
+          "configured_command_count": 796,
+          "compiled_edge_count": 31,
+          "present_in_configured_graph": true,
+          "present_in_sampled_build": true
+        },
+        {
+          "root": "tests",
+          "indexed_source_count": 375,
+          "configured_command_count": 364,
+          "compiled_edge_count": 26,
+          "present_in_configured_graph": true,
+          "present_in_sampled_build": true
+        },
+        {
+          "root": "methods",
+          "indexed_source_count": 5,
+          "configured_command_count": 9,
+          "compiled_edge_count": 0,
+          "present_in_configured_graph": true,
+          "present_in_sampled_build": false
+        },
+        {
+          "root": "benchmarks",
+          "indexed_source_count": 39,
+          "configured_command_count": 39,
+          "compiled_edge_count": 0,
+          "present_in_configured_graph": true,
+          "present_in_sampled_build": false
+        }
+      ],
+      "dominating_compiles": [
+        {
+          "edge_id": "973782a08d2cc9b1972459c60506efed5a16ce87ee7ce9472a9d20e1f154d370",
+          "physical_identity": {
+            "start_ms": 161399,
+            "end_ms": 326597,
+            "command_hash": "d49816fe341acd55",
+            "ninja_log_version": 5
+          },
+          "duration_ms": 165198,
+          "output": "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Editor/internal/Runtime.EditorWorkspaceAttachment.Detail.cppm.o",
+          "outputs": [
+            "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Editor/internal/Runtime.EditorWorkspaceAttachment.Detail.cppm.o",
+            "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Extrinsic.Runtime.Private.EditorWorkspaceAttachment.pcm"
+          ],
+          "edge_kind": "module-interface",
+          "source": "src/runtime/Editor/internal/Runtime.EditorWorkspaceAttachment.Detail.cppm",
+          "source_root": "src",
+          "resolution": {
+            "source": "src/runtime/Editor/internal/Runtime.EditorWorkspaceAttachment.Detail.cppm",
+            "status": "resolved",
+            "reason": "compile-command-output",
+            "mapped_outputs": [
+              "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Editor/internal/Runtime.EditorWorkspaceAttachment.Detail.cppm.o"
+            ],
+            "candidates": [
+              "src/runtime/Editor/internal/Runtime.EditorWorkspaceAttachment.Detail.cppm"
+            ]
+          },
+          "source_lines": 63,
+          "includes": 4,
+          "imports": 5,
+          "exports": 2
+        },
+        {
+          "edge_id": "9d9b56021972518c2b2210fd3a7f8c5f0dfba7c16dd22238ff04cdbea25b2feb",
+          "physical_identity": {
+            "start_ms": 77654,
+            "end_ms": 161399,
+            "command_hash": "9233f065db55a92a",
+            "ninja_log_version": 5
+          },
+          "duration_ms": 83745,
+          "output": "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Editor/Runtime.EditorWorkspaceSnapshots.cppm.o",
+          "outputs": [
+            "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Editor/Runtime.EditorWorkspaceSnapshots.cppm.o",
+            "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Extrinsic.Runtime.EditorWorkspaceSnapshots.pcm"
+          ],
+          "edge_kind": "module-interface",
+          "source": "src/runtime/Editor/Runtime.EditorWorkspaceSnapshots.cppm",
+          "source_root": "src",
+          "resolution": {
+            "source": "src/runtime/Editor/Runtime.EditorWorkspaceSnapshots.cppm",
+            "status": "resolved",
+            "reason": "compile-command-output",
+            "mapped_outputs": [
+              "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Editor/Runtime.EditorWorkspaceSnapshots.cppm.o"
+            ],
+            "candidates": [
+              "src/runtime/Editor/Runtime.EditorWorkspaceSnapshots.cppm"
+            ]
+          },
+          "source_lines": 315,
+          "includes": 10,
+          "imports": 15,
+          "exports": 2
+        },
+        {
+          "edge_id": "7f17a8c4c37785cca937dbcec0ecd4b245cef4606110fa975bc14db9372f297b",
+          "physical_identity": {
+            "start_ms": 195,
+            "end_ms": 64547,
+            "command_hash": "2c8e16aadc90d192",
+            "ninja_log_version": 5
+          },
+          "duration_ms": 64352,
+          "output": "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Editor/Operations/Runtime.GeometryProcessingOperations.cppm.o",
+          "outputs": [
+            "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Editor/Operations/Runtime.GeometryProcessingOperations.cppm.o",
+            "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Extrinsic.Runtime.GeometryProcessingOperations.pcm"
+          ],
+          "edge_kind": "module-interface",
+          "source": "src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.cppm",
+          "source_root": "src",
+          "resolution": {
+            "source": "src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.cppm",
+            "status": "resolved",
+            "reason": "compile-command-output",
+            "mapped_outputs": [
+              "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Editor/Operations/Runtime.GeometryProcessingOperations.cppm.o"
+            ],
+            "candidates": [
+              "src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.cppm"
+            ]
+          },
+          "source_lines": 1613,
+          "includes": 11,
+          "imports": 24,
+          "exports": 20
+        },
+        {
+          "edge_id": "d5fc3cb4fedc0011e63d5499a0e311643e0863094834f5f347af57b509fbe966",
+          "physical_identity": {
+            "start_ms": 263714,
+            "end_ms": 320392,
+            "command_hash": "923a50496499df58",
+            "ninja_log_version": 5
+          },
+          "duration_ms": 56678,
+          "output": "tests/CMakeFiles/RuntimeContractTestObjs.dir/contract/runtime/Test.SandboxEditorMeshMethods.cpp.o",
+          "outputs": [
+            "tests/CMakeFiles/RuntimeContractTestObjs.dir/contract/runtime/Test.SandboxEditorMeshMethods.cpp.o"
+          ],
+          "edge_kind": "translation-unit",
+          "source": "tests/contract/runtime/Test.SandboxEditorMeshMethods.cpp",
+          "source_root": "tests",
+          "resolution": {
+            "source": "tests/contract/runtime/Test.SandboxEditorMeshMethods.cpp",
+            "status": "resolved",
+            "reason": "compile-command-output",
+            "mapped_outputs": [
+              "tests/CMakeFiles/RuntimeContractTestObjs.dir/contract/runtime/Test.SandboxEditorMeshMethods.cpp.o"
+            ],
+            "candidates": [
+              "tests/contract/runtime/Test.SandboxEditorMeshMethods.cpp"
+            ]
+          },
+          "source_lines": 5804,
+          "includes": 29,
+          "imports": 83,
+          "exports": 0
+        },
+        {
+          "edge_id": "f3fc324f79a2110b8a667837e41321bf9c9de2a7f328bc2ef1b6d67ab6f51638",
+          "physical_identity": {
+            "start_ms": 254510,
+            "end_ms": 309656,
+            "command_hash": "a153e18b9c97ae1",
+            "ninja_log_version": 5
+          },
+          "duration_ms": 55146,
+          "output": "tests/CMakeFiles/RuntimeContractTestObjs.dir/contract/runtime/Test.SandboxEditorModels.cpp.o",
+          "outputs": [
+            "tests/CMakeFiles/RuntimeContractTestObjs.dir/contract/runtime/Test.SandboxEditorModels.cpp.o"
+          ],
+          "edge_kind": "translation-unit",
+          "source": "tests/contract/runtime/Test.SandboxEditorModels.cpp",
+          "source_root": "tests",
+          "resolution": {
+            "source": "tests/contract/runtime/Test.SandboxEditorModels.cpp",
+            "status": "resolved",
+            "reason": "compile-command-output",
+            "mapped_outputs": [
+              "tests/CMakeFiles/RuntimeContractTestObjs.dir/contract/runtime/Test.SandboxEditorModels.cpp.o"
+            ],
+            "candidates": [
+              "tests/contract/runtime/Test.SandboxEditorModels.cpp"
+            ]
+          },
+          "source_lines": 3613,
+          "includes": 25,
+          "imports": 73,
+          "exports": 0
+        }
+      ]
+    },
+    "after": {
+      "result": {
+        "attempt_id": "attempt-001",
+        "backend": "external_baseline",
+        "benchmark_id": "build.processing_locality.incremental",
+        "claim_eligible": false,
+        "commit": "local-dev",
+        "config_digest": "efce3f3e28c1242d4cf29dc1f47d1d4b803d9c6de3c5669226e319028820e2bb",
+        "dataset": "local.processing_family_content_edits_20260913",
+        "diagnostics": {
+          "case": "family_contract",
+          "command": [
+            "cmake",
+            "--build",
+            "--preset",
+            "ci",
+            "--target",
+            "IntrinsicRuntimeContractTests",
+            "ExtrinsicSandbox",
+            "--parallel",
+            "8"
+          ],
+          "compiler_cache": "disabled",
+          "content_before_sha256": "b0ad228c19a6ecde2a0d4aac61ab3fbeb5bc35736f78a67c3ae73acd4d341afe",
+          "edited_source_sha256": "1def33a8ee5074e218b02f11b59b55689fd37d2bd5a6a2980f7f46b1ac5a13df",
+          "filesystem_cache": "not_flushed",
+          "physical_edges": "/tmp/intrinsic-runtime235-remaining-20260913/probes/after/family_contract/edges.json",
+          "replacement": {
+            "from": "struct EditorMeshCurvatureResult\n    {",
+            "to": "struct EditorMeshCurvatureResult\n    {\n        bool CompileLocalityProbe{false};"
+          },
+          "return_code": 0,
+          "source": "src/runtime/Editor/Operations/Runtime.MeshFieldOperations.cppm",
+          "source_before_sha256": "574761d851319b027f9d1f4436952f21896641ab0d436cb4006b380f75a6af7d",
+          "variant": "after"
+        },
+        "execution_status": "passed",
+        "manifest": {
+          "path": "manifests/incremental.yaml",
+          "sha256": "a730172f8e9de144b94557e4b71c101bee169de872c98a9f859282c7f200299b"
+        },
+        "method": "build.cmake_ninja_clang",
+        "metrics": {
+          "build_time_ms": {
+            "family_contract": 74229.1472160723
+          }
+        },
+        "resolved_params": {
+          "build_type": "Debug",
+          "compiler": "clang-23",
+          "compiler_cache": "disabled_by_CCACHE_DISABLE",
+          "configure_overrides": {
+            "INTRINSIC_BUILD_SANDBOX": "ON"
+          },
+          "dependencies": "shared_preinstalled_vcpkg_ci",
+          "family": "curvature",
+          "filesystem_cache": "not_flushed",
+          "intent": "performance",
+          "measured_iterations": 1,
+          "order": "before_then_after",
+          "parallel_jobs": 8,
+          "phases": [
+            "family_contract"
+          ],
+          "preset": "ci",
+          "targets": [
+            "IntrinsicRuntimeContractTests",
+            "ExtrinsicSandbox"
+          ],
+          "warmup_iterations": 0
+        },
+        "run_id": "after-family_contract-20260913T091953Z",
+        "schema_version": 2,
+        "source": {
+          "revision": "local-dev",
+          "snapshot_sha256": "1def33a8ee5074e218b02f11b59b55689fd37d2bd5a6a2980f7f46b1ac5a13df",
+          "state": "dirty_worktree"
+        },
+        "status": "passed",
+        "threshold_disposition": [],
+        "thresholds": {},
+        "warmup_policy": {
+          "measured_iterations": 1,
+          "warmup_iterations": 0
+        }
+      },
+      "compiler_summary": {
+        "latest_compile_output_count": 17,
+        "physical_compile_edge_count": 16,
+        "multi_output_edge_count": 1,
+        "resolved_edge_count": 16,
+        "generated_edge_count": 0,
+        "dependency_edge_count": 0,
+        "external_edge_count": 0,
+        "outside_declared_roots_edge_count": 0,
+        "ambiguous_edge_count": 0,
+        "unresolved_edge_count": 0,
+        "unresolved_output_count": 0,
+        "resolution_issue_output_count": 0
+      },
+      "compiler_roots": [
+        {
+          "root": "src",
+          "indexed_source_count": 811,
+          "configured_command_count": 810,
+          "compiled_edge_count": 11,
+          "present_in_configured_graph": true,
+          "present_in_sampled_build": true
+        },
+        {
+          "root": "tests",
+          "indexed_source_count": 375,
+          "configured_command_count": 364,
+          "compiled_edge_count": 5,
+          "present_in_configured_graph": true,
+          "present_in_sampled_build": true
+        },
+        {
+          "root": "methods",
+          "indexed_source_count": 5,
+          "configured_command_count": 9,
+          "compiled_edge_count": 0,
+          "present_in_configured_graph": true,
+          "present_in_sampled_build": false
+        },
+        {
+          "root": "benchmarks",
+          "indexed_source_count": 39,
+          "configured_command_count": 39,
+          "compiled_edge_count": 0,
+          "present_in_configured_graph": true,
+          "present_in_sampled_build": false
+        }
+      ],
+      "dominating_compiles": [
+        {
+          "edge_id": "d5fc3cb4fedc0011e63d5499a0e311643e0863094834f5f347af57b509fbe966",
+          "physical_identity": {
+            "start_ms": 34452,
+            "end_ms": 70073,
+            "command_hash": "923a50496499df58",
+            "ninja_log_version": 5
+          },
+          "duration_ms": 35621,
+          "output": "tests/CMakeFiles/RuntimeContractTestObjs.dir/contract/runtime/Test.SandboxEditorMeshMethods.cpp.o",
+          "outputs": [
+            "tests/CMakeFiles/RuntimeContractTestObjs.dir/contract/runtime/Test.SandboxEditorMeshMethods.cpp.o"
+          ],
+          "edge_kind": "translation-unit",
+          "source": "tests/contract/runtime/Test.SandboxEditorMeshMethods.cpp",
+          "source_root": "tests",
+          "resolution": {
+            "source": "tests/contract/runtime/Test.SandboxEditorMeshMethods.cpp",
+            "status": "resolved",
+            "reason": "compile-command-output",
+            "mapped_outputs": [
+              "tests/CMakeFiles/RuntimeContractTestObjs.dir/contract/runtime/Test.SandboxEditorMeshMethods.cpp.o"
+            ],
+            "candidates": [
+              "tests/contract/runtime/Test.SandboxEditorMeshMethods.cpp"
+            ]
+          },
+          "source_lines": 5475,
+          "includes": 29,
+          "imports": 86,
+          "exports": 0
+        },
+        {
+          "edge_id": "9612dfdc245f9c8f67281870daa9f05251c77e66641b78acbc8bed281f721fc6",
+          "physical_identity": {
+            "start_ms": 16674,
+            "end_ms": 38706,
+            "command_hash": "6ad81185eeaf0e06",
+            "ninja_log_version": 5
+          },
+          "duration_ms": 22032,
+          "output": "src/app/Sandbox/CMakeFiles/ExtrinsicSandboxEditor.dir/Editor/Sandbox.EditorShell.cpp.o",
+          "outputs": [
+            "src/app/Sandbox/CMakeFiles/ExtrinsicSandboxEditor.dir/Editor/Sandbox.EditorShell.cpp.o"
+          ],
+          "edge_kind": "translation-unit",
+          "source": "src/app/Sandbox/Editor/Sandbox.EditorShell.cpp",
+          "source_root": "src",
+          "resolution": {
+            "source": "src/app/Sandbox/Editor/Sandbox.EditorShell.cpp",
+            "status": "resolved",
+            "reason": "compile-command-output",
+            "mapped_outputs": [
+              "src/app/Sandbox/CMakeFiles/ExtrinsicSandboxEditor.dir/Editor/Sandbox.EditorShell.cpp.o"
+            ],
+            "candidates": [
+              "src/app/Sandbox/Editor/Sandbox.EditorShell.cpp"
+            ]
+          },
+          "source_lines": 3306,
+          "includes": 20,
+          "imports": 27,
+          "exports": 0
+        },
+        {
+          "edge_id": "933688933279432721f681df9ec9b4f42ec9b097a9d5aafcf2ee22e13ab4c73a",
+          "physical_identity": {
+            "start_ms": 16674,
+            "end_ms": 38422,
+            "command_hash": "1a881bdb9e18206a",
+            "ninja_log_version": 5
+          },
+          "duration_ms": 21748,
+          "output": "src/app/Sandbox/CMakeFiles/ExtrinsicSandboxEditor.dir/Editor/Sandbox.DomainPanels.cpp.o",
+          "outputs": [
+            "src/app/Sandbox/CMakeFiles/ExtrinsicSandboxEditor.dir/Editor/Sandbox.DomainPanels.cpp.o"
+          ],
+          "edge_kind": "translation-unit",
+          "source": "src/app/Sandbox/Editor/Sandbox.DomainPanels.cpp",
+          "source_root": "src",
+          "resolution": {
+            "source": "src/app/Sandbox/Editor/Sandbox.DomainPanels.cpp",
+            "status": "resolved",
+            "reason": "compile-command-output",
+            "mapped_outputs": [
+              "src/app/Sandbox/CMakeFiles/ExtrinsicSandboxEditor.dir/Editor/Sandbox.DomainPanels.cpp.o"
+            ],
+            "candidates": [
+              "src/app/Sandbox/Editor/Sandbox.DomainPanels.cpp"
+            ]
+          },
+          "source_lines": 1761,
+          "includes": 19,
+          "imports": 26,
+          "exports": 0
+        },
+        {
+          "edge_id": "14e2117c3631bd42e5b7f6741b0f2c5d16d7a8b81dcc9a7f95bb5886e3593912",
+          "physical_identity": {
+            "start_ms": 34689,
+            "end_ms": 55072,
+            "command_hash": "9e760ac4dafb2d92",
+            "ninja_log_version": 5
+          },
+          "duration_ms": 20383,
+          "output": "tests/CMakeFiles/RuntimeContractTestObjs.dir/contract/runtime/Test.SandboxEditorSessionLifecycle.cpp.o",
+          "outputs": [
+            "tests/CMakeFiles/RuntimeContractTestObjs.dir/contract/runtime/Test.SandboxEditorSessionLifecycle.cpp.o"
+          ],
+          "edge_kind": "translation-unit",
+          "source": "tests/contract/runtime/Test.SandboxEditorSessionLifecycle.cpp",
+          "source_root": "tests",
+          "resolution": {
+            "source": "tests/contract/runtime/Test.SandboxEditorSessionLifecycle.cpp",
+            "status": "resolved",
+            "reason": "compile-command-output",
+            "mapped_outputs": [
+              "tests/CMakeFiles/RuntimeContractTestObjs.dir/contract/runtime/Test.SandboxEditorSessionLifecycle.cpp.o"
+            ],
+            "candidates": [
+              "tests/contract/runtime/Test.SandboxEditorSessionLifecycle.cpp"
+            ]
+          },
+          "source_lines": 1027,
+          "includes": 24,
+          "imports": 86,
+          "exports": 0
+        },
+        {
+          "edge_id": "c71fcdc89c1f0733fb6e4907d5c27c1a684f5a1b947f3b1f64f8b4cb4fdaed90",
+          "physical_identity": {
+            "start_ms": 21434,
+            "end_ms": 41201,
+            "command_hash": "4087017514703ced",
+            "ninja_log_version": 5
+          },
+          "duration_ms": 19767,
+          "output": "src/app/Sandbox/CMakeFiles/ExtrinsicSandboxEditor.dir/Editor/Sandbox.MeshProcessingPanels.cpp.o",
+          "outputs": [
+            "src/app/Sandbox/CMakeFiles/ExtrinsicSandboxEditor.dir/Editor/Sandbox.MeshProcessingPanels.cpp.o"
+          ],
+          "edge_kind": "translation-unit",
+          "source": "src/app/Sandbox/Editor/Sandbox.MeshProcessingPanels.cpp",
+          "source_root": "src",
+          "resolution": {
+            "source": "src/app/Sandbox/Editor/Sandbox.MeshProcessingPanels.cpp",
+            "status": "resolved",
+            "reason": "compile-command-output",
+            "mapped_outputs": [
+              "src/app/Sandbox/CMakeFiles/ExtrinsicSandboxEditor.dir/Editor/Sandbox.MeshProcessingPanels.cpp.o"
+            ],
+            "candidates": [
+              "src/app/Sandbox/Editor/Sandbox.MeshProcessingPanels.cpp"
+            ]
+          },
+          "source_lines": 3014,
+          "includes": 18,
+          "imports": 23,
+          "exports": 0
+        }
+      ]
+    }
+  },
+  "gate_attempts": {
+    "ara-final": {
+      "name": "ara-final",
+      "command": [
+        "python3",
+        "tools/agents/check_ara_claims.py",
+        "--root",
+        ".",
+        "--strict"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.029313142993487418
+    },
+    "asan-build": {
+      "name": "asan-build",
+      "command": [
+        "cmake",
+        "--build",
+        "--preset",
+        "ci-asan",
+        "--target",
+        "IntrinsicCpuTests",
+        "--parallel",
+        "8"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 479.7768909649458
+    },
+    "asan-configure": {
+      "name": "asan-configure",
+      "command": [
+        "cmake",
+        "--preset",
+        "ci-asan",
+        "--fresh",
+        "-DINTRINSIC_GROUP_PURE_CTEST=ON"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 7.9193499309476465
+    },
+    "asan-full": {
+      "name": "asan-full",
+      "command": [
+        "ctest",
+        "--test-dir",
+        "build/ci-asan",
+        "--output-on-failure",
+        "-LE",
+        "gpu|vulkan|slow|flaky-quarantine",
+        "--no-tests=error",
+        "--timeout",
+        "60",
+        "--parallel",
+        "1"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 553.5990011029644
+    },
+    "benchmark-after": {
+      "name": "benchmark-after",
+      "command": [
+        "python3",
+        "tools/benchmark/validate_benchmark_results.py",
+        "--root",
+        "/tmp/intrinsic-runtime235-remaining-20260913/probes/after/family_contract/results",
+        "--manifests-root",
+        "/tmp/intrinsic-runtime235-remaining-20260913/manifests",
+        "--strict"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.12013904994819313
+    },
+    "benchmark-before": {
+      "name": "benchmark-before",
+      "command": [
+        "python3",
+        "tools/benchmark/validate_benchmark_results.py",
+        "--root",
+        "/tmp/intrinsic-runtime235-remaining-20260913/probes/before/family_contract/results",
+        "--manifests-root",
+        "/tmp/intrinsic-runtime235-remaining-20260913/manifests",
+        "--strict"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.1401342460885644
+    },
+    "benchmark-manifests": {
+      "name": "benchmark-manifests",
+      "command": [
+        "python3",
+        "tools/benchmark/validate_benchmark_manifests.py",
+        "--root",
+        "/tmp/intrinsic-runtime235-remaining-20260913/manifests",
+        "--strict"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.10502713301684707
+    },
+    "build-lifetime": {
+      "name": "build-lifetime",
+      "command": [
+        "cmake",
+        "--build",
+        "--preset",
+        "ci",
+        "--target",
+        "IntrinsicTests",
+        "ExtrinsicSandbox",
+        "--parallel",
+        "8",
+        "--",
+        "-k",
+        "0"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 72.50733582803514
+    },
+    "build-linked": {
+      "name": "build-linked",
+      "command": [
+        "cmake",
+        "--build",
+        "--preset",
+        "ci",
+        "--target",
+        "IntrinsicTests",
+        "ExtrinsicSandbox",
+        "--parallel",
+        "8"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 30.852341769030318
+    },
+    "build-post-probe": {
+      "name": "build-post-probe",
+      "command": [
+        "cmake",
+        "--build",
+        "--preset",
+        "ci",
+        "--target",
+        "IntrinsicTests",
+        "ExtrinsicSandbox",
+        "--parallel",
+        "8"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 35.032168337958865
+    },
+    "build-repaired": {
+      "name": "build-repaired",
+      "command": [
+        "cmake",
+        "--build",
+        "--preset",
+        "ci",
+        "--target",
+        "IntrinsicTests",
+        "ExtrinsicSandbox",
+        "--parallel",
+        "8",
+        "--",
+        "-k",
+        "0"
+      ],
+      "exit_code": 1,
+      "elapsed_seconds": 324.5074738219846
+    },
+    "cpu-full": {
+      "name": "cpu-full",
+      "command": [
+        "ctest",
+        "--test-dir",
+        "build/ci",
+        "--output-on-failure",
+        "-LE",
+        "gpu|vulkan|slow|flaky-quarantine",
+        "--no-tests=error",
+        "--timeout",
+        "60"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 127.81382427504286
+    },
+    "diff-final": {
+      "name": "diff-final",
+      "command": [
+        "git",
+        "diff",
+        "--check"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.06836398399900645
+    },
+    "doc-links-final": {
+      "name": "doc-links-final",
+      "command": [
+        "python3",
+        "tools/docs/check_doc_links.py",
+        "--root",
+        "."
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 1.0730995709309354
+    },
+    "focused-lifetime": {
+      "name": "focused-lifetime",
+      "command": [
+        "ctest",
+        "--test-dir",
+        "build/ci",
+        "--output-on-failure",
+        "-LE",
+        "gpu|vulkan|slow|flaky-quarantine",
+        "--no-tests=error",
+        "--timeout",
+        "60",
+        "-R",
+        "^(NormalEstimation|OutlierAnalysis|KeypointAnalysis|DensityWeight|DescriptorAnalysis|PointConstruction|Registration|Parameterization|CurvatureSegmentation|Geodesics|SandboxEditorUi|SandboxEditorSession|SandboxEditorModels|SandboxEditorPresentation|SandboxProcessingPanels|SandboxParameterizationPanel|SandboxCurvatureSegmentationPanel|PrimitiveSelection|GeometryProcessing|ProcessingCompilationLocality|RuntimeEngineLayering)"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 19.360339122009464
+    },
+    "focused-post-probe": {
+      "name": "focused-post-probe",
+      "command": [
+        "ctest",
+        "--test-dir",
+        "build/ci",
+        "--output-on-failure",
+        "-LE",
+        "gpu|vulkan|slow|flaky-quarantine",
+        "--no-tests=error",
+        "--timeout",
+        "60",
+        "-R",
+        "^(NormalEstimation|OutlierAnalysis|KeypointAnalysis|DensityWeight|DescriptorAnalysis|PointConstruction|Registration|Parameterization|CurvatureSegmentation|Geodesics|SandboxEditorUi|SandboxEditorSession|SandboxEditorModels|SandboxEditorPresentation|SandboxProcessingPanels|SandboxParameterizationPanel|SandboxCurvatureSegmentationPanel|PrimitiveSelection|GeometryProcessing|ProcessingCompilationLocality|RuntimeEngineLayering)"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 17.15081585198641
+    },
+    "focused-repaired": {
+      "name": "focused-repaired",
+      "command": [
+        "ctest",
+        "--test-dir",
+        "build/ci",
+        "--output-on-failure",
+        "-LE",
+        "gpu|vulkan|slow|flaky-quarantine",
+        "--no-tests=error",
+        "--timeout",
+        "60",
+        "-R",
+        "^(NormalEstimation|OutlierAnalysis|KeypointAnalysis|DensityWeight|DescriptorAnalysis|PointConstruction|Registration|Parameterization|CurvatureSegmentation|Geodesics|SandboxEditorUi|SandboxEditorSession|SandboxEditorModels|SandboxEditorPresentation|SandboxProcessingPanels|SandboxParameterizationPanel|SandboxCurvatureSegmentationPanel|PrimitiveSelection|GeometryProcessing|ProcessingCompilationLocality|RuntimeEngineLayering)"
+      ],
+      "exit_code": 8,
+      "elapsed_seconds": 16.806323662982322
+    },
+    "inventory-final": {
+      "name": "inventory-final",
+      "command": [
+        "python3",
+        "tools/repo/generate_module_inventory.py",
+        "--root",
+        "src",
+        "--out",
+        "/tmp/intrinsic-runtime235-remaining-20260913/module_inventory-final.md"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.03810829110443592
+    },
+    "ratio-diagnostic": {
+      "command": [
+        "/home/alex/Documents/IntrinsicEngine/build/ci-vulkan/bin/IntrinsicPointLBVHGpuTests",
+        "--gtest_filter=PointLBVHGpuSmoke.LocalDistanceRatioPublishesAcrossDomains",
+        "--gtest_also_run_disabled_tests"
+      ],
+      "exit_code": 1,
+      "elapsed_seconds": 45.100116842077114,
+      "diagnostic_only": true,
+      "process_timeout_seconds": 120
+    },
+    "root-hygiene-final": {
+      "name": "root-hygiene-final",
+      "command": [
+        "python3",
+        "tools/repo/check_root_hygiene.py",
+        "--root",
+        ".",
+        "--strict"
+      ],
+      "exit_code": 1,
+      "elapsed_seconds": 0.03233937395270914
+    },
+    "root-hygiene-strict": {
+      "name": "root-hygiene-strict",
+      "command": [
+        "python3",
+        "tools/repo/check_root_hygiene.py",
+        "--root",
+        ".",
+        "--strict"
+      ],
+      "exit_code": 1,
+      "elapsed_seconds": 0.05167516297660768
+    },
+    "root-hygiene": {
+      "name": "root-hygiene",
+      "command": [
+        "python3",
+        "tools/repo/check_root_hygiene.py",
+        "--root",
+        "."
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.03248369600623846
+    },
+    "skill-sync-final": {
+      "name": "skill-sync-final",
+      "command": [
+        "python3",
+        "tools/agents/sync_skills.py",
+        "--check"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.02501399500761181
+    },
+    "skill-sync": {
+      "name": "skill-sync",
+      "command": [
+        "python3",
+        "tools/agents/sync_skills.py",
+        "--check"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.025562501046806574
+    },
+    "source-docs-final": {
+      "name": "source-docs-final",
+      "command": [
+        "python3",
+        "tools/agents/skills/intrinsicengine-source-documentation/scripts/audit_source_documentation.py",
+        "--root",
+        ".",
+        "--summary",
+        "--path",
+        "src/app/Sandbox/Editor/Sandbox.PanelSupport.hpp",
+        "--path",
+        "src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Internal.hpp",
+        "--path",
+        "src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.MeshSupport.hpp",
+        "--path",
+        "src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.cppm",
+        "--path",
+        "src/runtime/Editor/Operations/Runtime.MeshFieldOperations.Properties.hpp",
+        "--path",
+        "src/runtime/Editor/Operations/Runtime.MeshFieldOperations.cppm",
+        "--path",
+        "src/runtime/Editor/Operations/Runtime.MeshTopologyOperations.cppm",
+        "--path",
+        "src/runtime/Editor/Operations/Runtime.NormalOperations.cppm",
+        "--path",
+        "src/runtime/Editor/Operations/Runtime.ParameterizationOperations.cppm",
+        "--path",
+        "src/runtime/Editor/Operations/Runtime.PointAnalysisOperations.cppm",
+        "--path",
+        "src/runtime/Editor/Operations/Runtime.RegistrationOperations.cppm",
+        "--path",
+        "src/runtime/Editor/Runtime.EditorProcessing.cppm",
+        "--path",
+        "src/runtime/Editor/internal/Runtime.EditorFeatures.Internal.hpp"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.07371273497119546
+    },
+    "structural-final": {
+      "name": "structural-final",
+      "command": [
+        "bash",
+        "tools/ci/run_clean_workshop_review.sh",
+        ".",
+        "--strict"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 2.121235240949318
+    },
+    "structural": {
+      "name": "structural",
+      "command": [
+        "bash",
+        "tools/ci/run_clean_workshop_review.sh",
+        ".",
+        "--strict"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 2.1766857049660757
+    },
+    "task-state-final": {
+      "name": "task-state-final",
+      "command": [
+        "python3",
+        "tools/agents/check_task_state_links.py",
+        "--root",
+        ".",
+        "--strict"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.5614914820762351
+    },
+    "test-layout-final": {
+      "name": "test-layout-final",
+      "command": [
+        "python3",
+        "tools/repo/check_test_layout.py",
+        "--root",
+        ".",
+        "--strict"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.042199299088679254
+    },
+    "test-layout": {
+      "name": "test-layout",
+      "command": [
+        "python3",
+        "tools/repo/check_test_layout.py",
+        "--root",
+        ".",
+        "--strict"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.04236603400204331
+    },
+    "ubsan-build": {
+      "name": "ubsan-build",
+      "command": [
+        "cmake",
+        "--build",
+        "--preset",
+        "ci-ubsan",
+        "--target",
+        "IntrinsicCpuTests",
+        "--parallel",
+        "8"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 484.66919532290194
+    },
+    "ubsan-configure": {
+      "name": "ubsan-configure",
+      "command": [
+        "cmake",
+        "--preset",
+        "ci-ubsan",
+        "--fresh",
+        "-DINTRINSIC_GROUP_PURE_CTEST=ON"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 7.854686924954876
+    },
+    "ubsan-full": {
+      "name": "ubsan-full",
+      "command": [
+        "ctest",
+        "--test-dir",
+        "build/ci-ubsan",
+        "--output-on-failure",
+        "-LE",
+        "gpu|vulkan|slow|flaky-quarantine",
+        "--no-tests=error",
+        "--timeout",
+        "60",
+        "--parallel",
+        "1"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 239.7016645250842
+    },
+    "vulkan-build": {
+      "name": "vulkan-build",
+      "command": [
+        "cmake",
+        "--build",
+        "--preset",
+        "ci-vulkan",
+        "--target",
+        "IntrinsicPointLBVHGpuTests",
+        "IntrinsicGraphicsVulkanSmokeTests",
+        "--parallel",
+        "8"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 295.68583837396
+    },
+    "vulkan-configure": {
+      "name": "vulkan-configure",
+      "command": [
+        "cmake",
+        "--preset",
+        "ci-vulkan"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 1.5924852499738336
+    },
+    "vulkan-ratio-fixed": {
+      "name": "vulkan-ratio-fixed",
+      "command": [
+        "ctest",
+        "--test-dir",
+        "build/ci-vulkan",
+        "--output-on-failure",
+        "-L",
+        "gpu",
+        "-L",
+        "vulkan",
+        "-R",
+        "^PointLBVHGpuSmoke.LocalDistanceRatioPublishesAcrossDomains$",
+        "--no-tests=error",
+        "--timeout",
+        "120"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 46.61885321896989
+    },
+    "vulkan-ratio-isolated": {
+      "name": "vulkan-ratio-isolated",
+      "command": [
+        "ctest",
+        "--test-dir",
+        "build/ci-vulkan",
+        "--output-on-failure",
+        "-L",
+        "gpu",
+        "-L",
+        "vulkan",
+        "-R",
+        "^PointLBVHGpuSmoke.LocalDistanceRatioPublishesAcrossDomains$",
+        "--no-tests=error",
+        "--timeout",
+        "120"
+      ],
+      "exit_code": 8,
+      "elapsed_seconds": 30.45484346698504
+    },
+    "vulkan-tests": {
+      "name": "vulkan-tests",
+      "command": [
+        "ctest",
+        "--test-dir",
+        "build/ci-vulkan",
+        "--output-on-failure",
+        "-L",
+        "gpu",
+        "-L",
+        "vulkan",
+        "-R",
+        "^(PointLBVHGpuSmoke|PointConstructionGpuSmoke|UvViewGpuSmoke)\\.",
+        "--no-tests=error",
+        "--timeout",
+        "120"
+      ],
+      "exit_code": 8,
+      "elapsed_seconds": 788.8373813779326
+    },
+    "vulkan-timeout-configure": {
+      "name": "vulkan-timeout-configure",
+      "command": [
+        "cmake",
+        "--preset",
+        "ci-vulkan"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.9453788800165057
+    }
+  },
+  "verification": {
+    "cpu": {
+      "selected": 4560,
+      "failed": 0,
+      "skipped": 6
+    },
+    "focused": {
+      "selected": 537,
+      "failed": 0,
+      "skipped": 0
+    },
+    "asan": {
+      "selected": 2938,
+      "failed": 0,
+      "skipped": 0
+    },
+    "ubsan": {
+      "selected": 2938,
+      "failed": 0,
+      "skipped": 1
+    },
+    "vulkan": {
+      "distinct_selected": 23,
+      "initial_passed": 22,
+      "initial_timeouts": 1,
+      "corrected_case_passed": 1,
+      "skipped": 0,
+      "note": "Combined initial suite plus affected registered rerun, not a second full suite. General GPU cohort disables leak detection by pre-existing policy; CPU sanitizer and dedicated shutdown evidence are distinct."
+    }
+  },
+  "review": {
+    "tool": "Claude Code CLI",
+    "authorization": "Persistent user authorization to send repository source for this work",
+    "mode": "Bounded sole-writer implementation followed by fixed-source read-only reviews; root reconciles and verifies",
+    "final_review": "claude-last-review.txt",
+    "timeout_review": "claude-timeout-review.txt",
+    "findings_fixed": [
+      "direct imports and missing definitions",
+      "UV shared controls, dismiss-before-submit and atlas sizing",
+      "exactly-once terminal callbacks and unpublished UV completion",
+      "attachment validation before Scene reads",
+      "focused fixture and stale-result expectations",
+      "shared job-test harness coupling"
+    ]
+  },
+  "timeout_diagnosis": {
+    "owner": "BUG-189",
+    "before_registry": {
+      "backtraceGraph": {
+        "commands": [],
+        "files": [],
+        "nodes": []
+      },
+      "kind": "ctestInfo",
+      "tests": [
+        {
+          "command": [
+            "/home/alex/Documents/IntrinsicEngine/build/ci-vulkan/bin/IntrinsicPointLBVHGpuTests",
+            "--gtest_filter=PointLBVHGpuSmoke.LocalDistanceRatioPublishesAcrossDomains",
+            "--gtest_also_run_disabled_tests"
+          ],
+          "name": "PointLBVHGpuSmoke.LocalDistanceRatioPublishesAcrossDomains",
+          "properties": [
+            {
+              "name": "ENVIRONMENT",
+              "value": [
+                "LSAN_OPTIONS=fast_unwind_on_malloc=0:detect_leaks=0",
+                "ASAN_OPTIONS=symbolize=1:detect_leaks=0:fast_unwind_on_malloc=0",
+                "ASAN_SYMBOLIZER_PATH=/usr/bin/llvm-symbolizer-18"
+              ]
+            },
+            {
+              "name": "SKIP_REGULAR_EXPRESSION",
+              "value": [
+                "\\[  SKIPPED \\]"
+              ]
+            },
+            {
+              "name": "LABELS",
+              "value": [
+                "gpu",
+                "graphics",
+                "integration",
+                "vulkan"
+              ]
+            },
+            {
+              "name": "TIMEOUT",
+              "value": 30.0
+            },
+            {
+              "name": "WORKING_DIRECTORY",
+              "value": "/home/alex/Documents/IntrinsicEngine/build/ci-vulkan/tests"
+            }
+          ]
+        }
+      ],
+      "version": {
+        "major": 1,
+        "minor": 0
+      }
+    },
+    "after_registry": {
+      "backtraceGraph": {
+        "commands": [],
+        "files": [],
+        "nodes": []
+      },
+      "kind": "ctestInfo",
+      "tests": [
+        {
+          "command": [
+            "/home/alex/Documents/IntrinsicEngine/build/ci-vulkan/bin/IntrinsicPointLBVHGpuTests",
+            "--gtest_filter=PointLBVHGpuSmoke.LocalDistanceRatioPublishesAcrossDomains",
+            "--gtest_also_run_disabled_tests"
+          ],
+          "name": "PointLBVHGpuSmoke.LocalDistanceRatioPublishesAcrossDomains",
+          "properties": [
+            {
+              "name": "ENVIRONMENT",
+              "value": [
+                "LSAN_OPTIONS=fast_unwind_on_malloc=0:detect_leaks=0",
+                "ASAN_OPTIONS=symbolize=1:detect_leaks=0:fast_unwind_on_malloc=0",
+                "ASAN_SYMBOLIZER_PATH=/usr/bin/llvm-symbolizer-18"
+              ]
+            },
+            {
+              "name": "SKIP_REGULAR_EXPRESSION",
+              "value": [
+                "\\[  SKIPPED \\]"
+              ]
+            },
+            {
+              "name": "LABELS",
+              "value": [
+                "gpu",
+                "graphics",
+                "integration",
+                "vulkan"
+              ]
+            },
+            {
+              "name": "TIMEOUT",
+              "value": 120.0
+            },
+            {
+              "name": "WORKING_DIRECTORY",
+              "value": "/home/alex/Documents/IntrinsicEngine/build/ci-vulkan/tests"
+            }
+          ]
+        }
+      ],
+      "version": {
+        "major": 1,
+        "minor": 0
+      }
+    },
+    "direct_diagnostic": {
+      "command": [
+        "/home/alex/Documents/IntrinsicEngine/build/ci-vulkan/bin/IntrinsicPointLBVHGpuTests",
+        "--gtest_filter=PointLBVHGpuSmoke.LocalDistanceRatioPublishesAcrossDomains",
+        "--gtest_also_run_disabled_tests"
+      ],
+      "exit_code": 1,
+      "elapsed_seconds": 45.100116842077114,
+      "diagnostic_only": true,
+      "process_timeout_seconds": 120
+    },
+    "direct_phase_diagnostic": {
+      "backend": "gpu_vulkan_compute",
+      "benchmark_id": "geometry.point_lbvh.distance_ratio_runtime_smoke",
+      "commit": "local-dev",
+      "dataset": "builtin.outlier_clusters.eight_domains.seed241",
+      "diagnostics": {
+        "cpu_classification": true,
+        "cpu_classification_sum_ms": [
+          7.1463909999999995,
+          22.222227000000004,
+          57.48652
+        ],
+        "cpu_k63_total_ms": 136.742167,
+        "cpu_reference_total_ms": 93.389964,
+        "gpu_neighborhood_elapsed_sum_ms": [
+          55973.744853,
+          56044.496747000005,
+          55968.542633
+        ],
+        "gpu_query_batch_counts": [
+          14,
+          14,
+          14
+        ],
+        "measured_iterations": 1,
+        "mode": "smoke",
+        "runner": "IntrinsicPointLBVHGpuTests",
+        "vulkan_cold_total_ms": 9588.861579,
+        "vulkan_k63_total_ms": 9856.67407,
+        "vulkan_warm_total_ms": 9902.447956,
+        "warmup_iterations": 1
+      },
+      "method": "geometry.point_lbvh",
+      "metrics": {
+        "quality_error_linf": 0.0,
+        "runtime_ms": 9902.447956
+      },
+      "status": "passed"
+    },
+    "display": "Monitor is Off; read-only xset q",
+    "interpretation": "Missing sibling timeout override exposed under pacing consistent with previously diagnosed BUG-179/143. No new controlled display-state comparison. Direct diagnostic omitted registered environment and exposed retention recorded under BUG-180; never counted as a passing gate."
+  },
+  "limitations": [
+    "One dirty sample per variant, not claim-eligible or a repeated/general speedup",
+    "Curvature only timed; other family boundaries checked using compiler metadata",
+    "Filesystem cache not flushed; orphan non-target generated artifacts reclaimed before final probe, documented separately",
+    "Net file count rises by 15 and physical code falls by only 138 lines",
+    "Initial build/link/focused/timeout failures preserved beside repairs",
+    "Existing strict root hygiene BUG-177 remains",
+    "Sandbox sanitizer discovery requires existing BUG-188 host workaround",
+    "Direct diagnostic retention remains BUG-180; no whole-process leak-freedom claim",
+    "No commit, push, whole-engine migration completion or Framework24 closure"
+  ],
+  "raw_archive": "build/analysis/remaining-processing-locality-2026-09-13/",
+  "raw_file_sha256": {
+    "after-probe.log": "3235d349fa28c462e2c306d95d1a777c3cd1042768d0cc5ef9c6d9866598298a",
+    "ara-final.json": "d41b5b62475d4da762c1da965d5d4893a752e43818f67c493c02661cd4d62ce5",
+    "ara-final.log": "cd47ad74c7705d490578b44770ab33b7979059519376d5b24bf478d73bd9373f",
+    "asan-build.json": "48dc99df5599d9699c9a0232280a1674188980672c7ee0bb7e561abee3b93109",
+    "asan-build.log": "8b293b6e6ab719e45278e9ed781959053d8ed2792c43fe10543bfe5eaec26930",
+    "asan-configure.json": "2e41ec960d061fa192510e38a4ab1769f8a210153895c5e14d9c698cf32781e6",
+    "asan-configure.log": "2af26028af20baeeca4dfdd30e00d96bb6be59d242aff533ef397567431bcaff",
+    "asan-full.json": "abc3ede40fcc827ff16db9b7a2bde6938860f8fc910d6ae34fce118f68f769d3",
+    "asan-full.log": "8f66c7db9c107d3bbb13c6499575b6b1cee982096c79f618cbb2d9f6eccbdf05",
+    "before-probe.log": "d1594625f40ada5bd3c29a732374aba7f99293447930a3ecdc512ca76f76121b",
+    "before.json": "691909e261c90314f0008cf164bb9da45d9da6b9a962e67904d6777ef06751b7",
+    "benchmark-after.json": "11def9eedb1aa781df446d681fba335a5cdd73bef1cdc577dc5bbeb8c2f82749",
+    "benchmark-after.log": "a806b163d505e492f471c36ffc20357118b68a9e796734da3bfcc9b8cb6740fe",
+    "benchmark-before.json": "2f97dab000b75dbe6acecd52445cb3b6355149f508d360856f5400f2bea808ef",
+    "benchmark-before.log": "a806b163d505e492f471c36ffc20357118b68a9e796734da3bfcc9b8cb6740fe",
+    "benchmark-manifests.json": "3425ff180f353ec5e96d0323a34f87826efbc2271dc058f919f185c9b7625339",
+    "benchmark-manifests.log": "9cb45d49281495c1d6e8fdbca0dbf35eb4205c999aacd941f36dd98220c73d26",
+    "build-lifetime.json": "837f8a81c492e561337f702f32703b263ef2d91701835e5a915d9ebc5592550d",
+    "build-lifetime.log": "46718e2a17e8ecc14066fb639e0a28470b3cc93b551ad73d479054f5203ed683",
+    "build-linked.json": "04cee30df5ab2cfb1844c6f334b80a6d061b9053c4523e7a25291332aa7e9646",
+    "build-linked.log": "4ece6cce67367a06f3122e52f6f0c7899312c7c60c33179b97375331a1e6b5b6",
+    "build-post-probe.json": "f48c5621ee6c8f228dc7f8570535b3aa20515f3be461731d77501943936ddd82",
+    "build-post-probe.log": "d962d16a629d34b538f3321f44f53f0115401c6849d480ee906b6d72c97a5be0",
+    "build-reconciliation.log": "08c5042f8409650bed13df678c50486ecd61890c8fdfda3ef45324a4b0490b19",
+    "build-repaired.json": "17aae99a8b6e65f0df3f09c99611d1e2364365dadab0e0cd263fa0e363069bae",
+    "build-repaired.log": "3d92e336d0421dc7b87842acbc3af1ec7191bba7204319bf5c8e438e775e4d3d",
+    "build.log": "436e153643728a3e2d2f5a95c9371b100fddadf017d34d917e80dcd8b0d24ee3",
+    "build_after_repair.py": "89a32cd74785b52c988b784967a538da49fd9bb585553c35d9b4ab5b8373d0ef",
+    "changes.json": "d8725666357c9eb9318603f8b76b12e2ac71dde6f763ed08dd3c99f9e175207f",
+    "claude-confirm-review.txt": "3e40301fa6ad02424b9a4296a27001f05aa887affbefdb4cdc40fc0847273382",
+    "claude-confirm-stderr.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "claude-confirm.txt": "5f8c524a58a5a8a02a7be8c17a35527f932ef46a7756bcc433097c16acbc6971",
+    "claude-final-review-stderr.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "claude-final-review.txt": "5c73ddf25d8caf9530ee5a820809ba28ff5e4a2d365beb4b160a1ea7297eaaf2",
+    "claude-finish-stderr.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "claude-finish-summary.txt": "92b47497c47e44cc9ad05e63e6e29d6f0da3403ccc34ff2bf7d8315479ff70ee",
+    "claude-finish.jsonl": "811a4606d0b22287019b6469316d35ce09abcd2f8222fe5b2b178cbdd12493ca",
+    "claude-finish.txt": "b8d201ea48b465c254d31f5e7401d5ac58fc3b70c5a3bee283865948c4f3aabe",
+    "claude-implement.txt": "ea08707ffb7f820df302316c54c8ebfc54e438fe8b1f37147c391e3ac2176e0c",
+    "claude-implementation-stderr.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "claude-implementation-summary.txt": "9037393a7c25fad2f3f5533980e282a1db03b296530cb616b4357ab764095da9",
+    "claude-implementation.jsonl": "44b96a202f29f8596b4bb607098aa791cc5fcdd1783ccc4fb14f304b84815c52",
+    "claude-last-check.txt": "d77f9fdf4e70a11ed108144b23eb1a68920fcf6bf11faf078929a8340040077a",
+    "claude-last-review.txt": "1097fd9cb33c89eb2259cd3fcde661cd8b2a9a43c592b2d188ac7c1771fb82c5",
+    "claude-last-stderr.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "claude-plan-review.txt": "3f0b937d9ccc5db456dd7f577de25d19ac078a7576fcb00eb76fb881ae59811a",
+    "claude-plan-stderr.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "claude-plan.txt": "6495f5fc670e85ccbb48a352405a83302a6a7e3d219cf8db9dd36c99236eb990",
+    "claude-repair-stderr.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "claude-repair-summary.txt": "823483f7a69ef6a9c2870150084541a5d4c497657355706851226bcad689090a",
+    "claude-repair.jsonl": "ebde6d9bf73c5d3c372d45b15212470257bc3a22558bb4dd6f9b836f55a88578",
+    "claude-repair.txt": "ddd25dad5660593b12335b20076c98ee4b93ef0f308151c805bd3ab108612adc",
+    "claude-review.txt": "acab60bed4228c854c28e975f75194579f0a7f54f87cd8e06539c045a28818b8",
+    "claude-timeout-review.txt": "6fe8d1b94d7a08bc12daf0b7df3f2396e99ba9d2b81890fec66f9cc35ab29f7e",
+    "claude-timeout-stderr.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "claude-timeout.txt": "e48ee69640f90e3aaf3efe718390909e915ab8bd5a1916f62e3b20d2d7a16b8d",
+    "collect_changes.py": "a0c85e6d90a8a5bff0f7fb6f8ddd561730bb53e73f3562e46251918449185f36",
+    "configure-after.log": "4f956da86c7b16b41c5a5f4e5dc3b32406b29783265e90452f5a28092615a22e",
+    "configure.log": "5f8b853893af4c67366b17ff17f2d5f1c2a822daf0c9fda3782ee4328d33cae9",
+    "cpu-full.json": "a9a6316a666628a63ec2d3859e10db8b8007870d4277dfaa401b43c2330670f1",
+    "cpu-full.log": "d1a6c156f0a64a8c85da58b22e5f269168ae13d96b0c7c76a54a622f89de17f5",
+    "cpu_after_build.py": "65191445e512e3cc6bc31206d91b65fd90b624b42c8a6da107c13fbae6f29556",
+    "diagnose_ratio.py": "1c88bd5d553f87be5032ef7c10d3ad326197b518672e3ecdde2d781ce03a1eb0",
+    "diff-final.json": "d394ca434ac69cb381adadc929ca21665515bcec54bf1fd97ad62b648c42ba2f",
+    "diff-final.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "display-state.txt": "b3b26f2a58cdef7107e3585d979ce8a99493964bfc53facce577adc790711d1d",
+    "doc-links-final.json": "f711d76868daaeadf3075ab514b8f54ad701c1f3aa2bd566b91c37cdcf21a95c",
+    "doc-links-final.log": "31c26192c85b068e9ab46b6bf03fe23360419312b49a2e726c7aa6356f45c62c",
+    "field_detail.txt": "2ca2632f8da9a87f1706246c10be75a81dca87d4f9410b965e0d1c5f80e51d3a",
+    "field_public.txt": "d03f024c1a6f776dc35ba14587d36b5af7dbd951a7349cd3e5d4a4b7267ca66c",
+    "final-source-before-probe.json": "6a3cbb985b85c2a519c1a08d43a40df9c846e46eef7618e74a89dacaa9f2fc12",
+    "final-source.json": "5130fb6b3b16a8cd1d27f6cde14f86157559b10b0948cac39b1080c318c2efbd",
+    "finish-launch.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "finish-status.txt": "5d2cbef828b88b95b65ce57f5c948d93f0c66ee6ac279d18e457763dfb3e6171",
+    "focused-lifetime.json": "0c2ddc8c2bd9bc8b460d3d05b00fdb53b68b3bdca94ada71c07e2d6086c47049",
+    "focused-lifetime.log": "19f8eab2f5df17420bca2545ac8fdd142ab405742cf4101d1d13d7fc44692ffc",
+    "focused-post-probe.json": "bce7d8fa1af9756b256342a4a4761d8fdddb90669314a0cfdac2ebf2f9a7e99a",
+    "focused-post-probe.log": "886fb1266ef948f80bfc592ef5b66ab9597b7ff29b5ba780a16fffeead1afc94",
+    "focused-repaired.json": "32a26619db957f0e1c6ebdd3ada69efcbf2f9425b44470a1f620438d13a549d3",
+    "focused-repaired.log": "a97bc420a691e5c68b34b4f1fc749300f922ef0e17c2d0af6d3c2b37fcabf5ac",
+    "footprint-summary.log": "62892cb5997027008f3638c019f38ae5b12aa75d93536053ee556623f7aabf96",
+    "footprint.json": "f3d6ce95f3266384bdfabccecb960ab41dfa2de308ef30b02db4fb8c97ed1af6",
+    "gpu-timeout-ledger.md": "4cba43a625e9667daff90c97b367ec504a6cbbcd5b2153801318dede365b85a2",
+    "implementation-launch.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "implementation-status.txt": "29a90642b9e3064b914f6c79bf94aa881f3b5c20fa4edfbc98151ccc890f5596",
+    "implementation.diff": "48ec79ada9d91148e0bc8e2953b203be42515bac736f25f26803fa69bbf56597",
+    "inventory-final.json": "a5e0bdb84af77041e95e81dcc2e00bba0efbd65d8eaa1820e0fd150295527d33",
+    "inventory-final.log": "1b583618950aeef02d7dd15d14409df9dce9aeeca9f92ef4dd840be3d27970ef",
+    "layering.log": "22062d3420b294030057f2251484e909bdf4effe8d53689844cb19e86990c3b3",
+    "manifest-check.log": "9cb45d49281495c1d6e8fdbca0dbf35eb4205c999aacd941f36dd98220c73d26",
+    "manifests/incremental.yaml": "a730172f8e9de144b94557e4b71c101bee169de872c98a9f859282c7f200299b",
+    "mesh_remainder.txt": "155ed0fdb59e7d6b5015379257022984eceb9bc82f064316b7fa95a136d78567",
+    "module_inventory-final.md": "715c8448a16438052a0d2fd6566dbefc56de9cbfbadd570f50724b457affb447",
+    "module_inventory.md": "715c8448a16438052a0d2fd6566dbefc56de9cbfbadd570f50724b457affb447",
+    "orphan-build-artifacts.json": "f31368a412a6457a6c287c14744072592a49a08ac80a10f39bf095d09b4d4044",
+    "orphan-build-cleanup.json": "aac00e96987c8b0579a6431a29c9d8db3ee8e0e43d559d62415534de36c6d14b",
+    "probe-after.py": "b24fa9c397c2ca74d2509090e784bd3b7846e24480c9397df44d984eb4a5f4b9",
+    "probe.py": "457700a0076b1fbb78eb3a63301e48b5d55224285d2ef33e49026571094e0134",
+    "probes/after/family_contract/edges.json": "52dd384ea663f6b18bbb179f6f3b25ac8dea175b96a024f5939a42abc76fb2d5",
+    "probes/after/family_contract/results/result.json": "b5857fd8af589a18fa43584cb03646dbd32fb9d2ebe1f4513aaa0552b319e79e",
+    "probes/before/family_contract/edges.json": "b3b5a9c73d34fa05559452f78e597eb317183d90b8641658581df18fe7fa60de",
+    "probes/before/family_contract/results/result.json": "8aa3c8e5589df13dde60912d423e707962a5d7ec4c053e48aedf544d2103df46",
+    "progress.py": "cfdfc132e1daa0097c9caaa2a80fcedf775eac95f9885cfa5492bfeb5728e797",
+    "ratio-diagnostic-phases.json": "43b464752dbb5196b9ea5f7c34df5d2dcab754870811275c16e54a6606b7578e",
+    "ratio-diagnostic.json": "93b0429968e9d50940c95c86e0c17c514eddf07d8c6261679b9ee81d3f390143",
+    "ratio-diagnostic.log": "ab446de8943334026ce90d58ae2e32c53b105d7d7bef8431466e2fc0fda9f9da",
+    "ratio-registry-after.json": "59b7c88e5a663a09e2f41d45f86c96cd2f038751b91c4669802e7a94b79bb326",
+    "ratio-registry-before.json": "e669123426d7b6e8e0e25a007617d930a61f1efc0570f1b69c028da0c940bfd4",
+    "reconstruct-review.log": "d7219beb6ba4df13b6dab5896ea9da378466e1a3aac70b808f177b076c856f84",
+    "record_epilogue.py": "20beb5a982df68fe57e60a5b7944a08f85aad06779a7535bd38c30ce6cd21161",
+    "repair-status.txt": "0fe06946fbb8d1f2a25d966619c723c20ea59c1a338a278845c3cdf31c1145da",
+    "repair.diff": "d3ed6a589336bdf5230cffaaa460f1df28966af9117ae630065eb4a43b4a8d7d",
+    "reviewed-changes.json": "34d4ed16013ba69ce732d6a55d54bd6c2c417cdd89aa965322e8f1806c02537f",
+    "reviewed.diff": "b07be1043364b70d83d95728d16ea05e06161567838a7750b5c1bf54cb7ec9d2",
+    "root-followup-findings.txt": "c066fc8995570b0ad77af2b9d5267e0225206af404ced40c555f0e3ecb4def7d",
+    "root-hygiene-final.json": "2cd0678230613335503bb33b118dda1ece5b086c7bd939ba1e87fde860c3dc0f",
+    "root-hygiene-final.log": "2252cd6d39c11cbc4c91a1398dc2648a85b43fe69dcc6af7f95edd641158e814",
+    "root-hygiene-strict.json": "77f799df9ca8cae011666624289633c9fe60000640a68fc86def286952792f2b",
+    "root-hygiene-strict.log": "2252cd6d39c11cbc4c91a1398dc2648a85b43fe69dcc6af7f95edd641158e814",
+    "root-hygiene.json": "1d453582177845652d9d9b6e140eddca405f158f2ca5f4bdd6ef38c85b176fa4",
+    "root-hygiene.log": "f81792ffba45fe12289062cf193419031ae31abf91e76f1b37b45dd75b0991fd",
+    "run_claude.py": "4f56a68543ecf80be8c5a83ab531a4b5742e95140807731a025aec01cb8debe5",
+    "run_claude_finish.py": "e093144c994159d213920e92e6800e4fcfb0d228bb62929d6bef6a2d1efb6f1f",
+    "run_claude_repair.py": "1c9742f1798ca1f7b9bd40c3f6b5f41a0722bd2ed5e88434286517ca8742a60c",
+    "run_gate.py": "9a95e0754cf0a9f4fa0aa9a6145216ae9581c5858d258e9cc9b5f2a9915f4552",
+    "run_sanitizers.py": "bb00d7e359315231aa0c24aa95088dfeb2d9af94277349b542d7696cbe427172",
+    "run_vulkan.py": "fc8b9e89a1d68dda5123c30759945a6d3c045518ae18d5b509607f8c08b990a5",
+    "run_vulkan_tests.py": "275e5333fc319b538c7b3f418b87a87ddff6c497b2ebfdfc5b0ddd07454fa7ff",
+    "san-builds-complete.json": "ea3bc4eed749d659ae7264d22aa5d9197d24443c44dcef498e77bab35d79848e",
+    "skill-sync-final.json": "3179c853bd54dd1a6be04444d80832ec0646c9ca4aeee6cd92a99e924d16b68f",
+    "skill-sync-final.log": "88b25c3d2e47233edcbf51375f72a60528417690a4a74e17a7775a1f41dc3883",
+    "skill-sync.json": "6e228d3af38a13b9723fdde4d87b515dca629d29231e0edd89e5ba7a99616ed2",
+    "skill-sync.log": "88b25c3d2e47233edcbf51375f72a60528417690a4a74e17a7775a1f41dc3883",
+    "source-docs-details.log": "cda39c0f3c90abb8dcfd988ac035ae9ca6dbc3510fca62a950c46b5d8a128c09",
+    "source-docs-final.json": "9d0914d6ae20993eb29506b02f3ac4a5bed4a7c45bac5f215dbdf74889f14aa4",
+    "source-docs-final.log": "97ae80d00a6a988e68d3a26635c566cca06fd92ede2a3574106cd2935ee6f7fa",
+    "source-docs.log": "040669ff41059ed7c709994662856d457581bddd9516a4b2bc2ac86bd4ec843d",
+    "structural-final.json": "721b9583633daff1b518d90333fefcb4e4c186d9df03a2467ce281d3c9f42cdd",
+    "structural-final.log": "c60efafb6b8ba659aa4d72cb53c12b6f0e6296ec1aab3fb8cb8608438bb6f983",
+    "structural.json": "151e4a20d7ce15e71950850437671f35fec5eb0c399e022b2a2351e1adb0ce2d",
+    "structural.log": "3ff7d054e3618bef575e84b9852e16a675de603b6ce18a917c446000c3351f67",
+    "task-state-final.json": "1ba21870ce4c4d803b6daa627c85dda355c3884c013017cd81754bccfb5a71e2",
+    "task-state-final.log": "645ceb10d9240a4c38c28e26a8f6d740d67e462ead5aa9e2c31cfce0451c21d9",
+    "test-layout-final.json": "04bcfd631f50cc7bc612a53c10f0df7de0af8eac011789a41e0f996ce1dbdbb7",
+    "test-layout-final.log": "164bf228e1aef2ee28535d5028a51d6afa83b491716f01cb064037a925a98cb2",
+    "test-layout.json": "74ed0c8651b6674e300fbf488cfdead2cd76a5c892841208c9ba35a5d585a21a",
+    "test-layout.log": "164bf228e1aef2ee28535d5028a51d6afa83b491716f01cb064037a925a98cb2",
+    "topo_detail.txt": "3d601fd149719af30b49328c4933e7bd253a21e8bafa6b75fc38278b92018282",
+    "topo_public.txt": "6c9de0b48d5d4a55c8296fb9ca02405756d21e4e03bd4872c69579752d005cff",
+    "ubsan-build.json": "94b8637312903bce8a53022ea91078651bee0bb7855156b33103ace10420a118",
+    "ubsan-build.log": "b83fc2ea46fb2062b16533287c2d89daac9b09e6e062094fbd7f637562972ae2",
+    "ubsan-configure.json": "31afef6002ec98ca4223dde51d66c5f65d71f6937660d017d8a1994b937f56ff",
+    "ubsan-configure.log": "a3e5be52f5bf7e9adb7266a466552894dace1114f6553b0c4a05700fc13e05ce",
+    "ubsan-full.json": "4927aa981916449f982bf0ce64c96c0d13ca425ae7b191201e656176ae8d1602",
+    "ubsan-full.log": "7375f482ca7df03a0084a1b62bb810a1c0b9eda0144aca6124f97d0f405df2af",
+    "vulkan-build.json": "c609b1fe99e774cb2eb45c5a9863d1a2d76bf4128de98d9c10b3e34d1d1ea19d",
+    "vulkan-build.log": "1593eeb030576a00378acc2e32ad2b247d9876a43c731645309e5f35779d9152",
+    "vulkan-configure.json": "2b4cfd811ba22bdafab534b1f5f1688467d624ee67b907b66c4e4ab23481ed20",
+    "vulkan-configure.log": "764ecd34926b1a2cd69204572d434bf5d5311f2edbab5701e4bc2f40c12b091a",
+    "vulkan-ratio-fixed.json": "ef2cce198c65d1d55d2865a6dce79d4ef752f4271bcba3b98da1b6f5f9e92f10",
+    "vulkan-ratio-fixed.log": "250fa9f6837d748d89d84630d8bffe7e78a2fe8592b3a162bf834fff3f48f958",
+    "vulkan-ratio-isolated.json": "468f5f55c51afb38302ffd2680589f296edbd994fcc68427d7c80e11b40944b0",
+    "vulkan-ratio-isolated.log": "817bc3fa03437416c32a47ec823ee4bdb7d706c51d0638f1c9123addffece72e",
+    "vulkan-tests.json": "78e523c28cdd5bcebd13048b6b38e651235d9f496f6f88265c20c186ec7e3063",
+    "vulkan-tests.log": "1a79974ea5eb9b7f0cf856018c544bfe9439e8567f8d6fb07de3906e5382f01f",
+    "vulkan-timeout-configure.json": "3c5f20273b6dd79f4595758f6c1d62261bc93a92e5d3c456fd826cb53675418a",
+    "vulkan-timeout-configure.log": "48d25e499fec5d51893bc33295316b579f8f33c99c3271018749aca66c8b4046",
+    "warmup.log": "96c002e1ce85087a67b6794ec438cfe0ddd53ef093098036052a31196f2c8d28",
+    "write_evidence.py": "11d014cf60bdf7f4c71a52c74d9a6369a99f1b7739596a5c9e9cad6122d774d5"
+  }
+}

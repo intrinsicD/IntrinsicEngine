@@ -3,10 +3,10 @@
 module;
 
 #include <memory>
+#include "Sandbox.EditorFwd.hpp"
 
 export module Extrinsic.Sandbox.Editor.MeshProcessingPanels;
 
-import Extrinsic.Sandbox.Editor.Shell;
 
 export namespace Extrinsic::Sandbox::Editor
 {

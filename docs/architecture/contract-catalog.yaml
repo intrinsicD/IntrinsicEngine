@@ -28,6 +28,91 @@ contracts:
     proofs:
       - tools/agents/skills/intrinsicengine-source-documentation/scripts/audit_source_documentation.py
       - tests/regression/tooling/Test.SourceDocumentationAudit.py
+  graphics.recipe-slot-lookup:
+    owner: graphics-renderer
+    source: docs/architecture/frame-graph.md
+    applies_when:
+      - Config, frame projection or editor code locates a named render-recipe slot or borrows it for mutation.
+    proofs:
+      - src/graphics/renderer/Graphics.RenderingContract.cppm
+      - src/graphics/renderer/Graphics.RenderingContract.cpp
+      - tests/contract/graphics/Test.RenderRecipeConfig.cpp
+  runtime.spatial-query-locality:
+    owner: runtime-geometry
+    source: docs/architecture/spatial-indices.md
+    applies_when:
+      - SpatialIndexCache's public module dependencies, GPU query integration or borrowed WorldRegistry declaration change.
+    proofs:
+      - tools/analysis/compile_hotspots.py
+      - tests/CMakeLists.txt
+      - tests/contract/runtime/Test.SpatialIndexCache.cpp
+      - tests/integration/graphics/Test.PointLBVHGpuSmoke.cpp
+  runtime.kernel-interface-locality:
+    owner: runtime-core
+    source: docs/architecture/runtime.md
+    applies_when:
+      - Kernel type identity, its shared hash implementation or command/event/service/job interface dependencies change.
+      - JobService's borrowed GPU command-context declaration or its sole owner definition changes.
+    proofs:
+      - tests/unit/core/Test.CoreHash.cpp
+      - tests/unit/core/Test.CoreFrameGraph.cpp
+      - tests/unit/core/Test.CoreFrameGraphTypeTokenHelper.cpp
+      - tests/contract/runtime/Test.RuntimeJobService.cpp
+      - tools/analysis/compile_hotspots.py
+      - tests/CMakeLists.txt
+  runtime.engine-compilation-locality:
+    owner: runtime-build
+    source: docs/architecture/runtime.md
+    applies_when:
+      - Engine's public module dependencies, borrowed renderer type or module-lifecycle declarations change.
+    proofs:
+      - tools/analysis/compile_hotspots.py
+      - tests/regression/tooling/Test.CompileHotspots.py
+      - tests/CMakeLists.txt
+  runtime.render-diagnostics-locality:
+    owner: runtime-build
+    source: docs/architecture/runtime.md
+    applies_when:
+      - Render diagnostics or recipe-override records and their runtime/editor consumers change ownership or module dependencies.
+    proofs:
+      - tools/analysis/compile_hotspots.py
+      - tests/regression/tooling/Test.CompileHotspots.py
+      - tests/CMakeLists.txt
+  runtime.editor-prepared-frame-locality:
+    owner: runtime-editor
+    source: docs/architecture/sandbox-editor-feature-boundaries.md
+    applies_when:
+      - Private editor attachment or processing-frame dependencies on workspace snapshot records change.
+      - Processing-frame result bindings, cached execution contexts or their private compilation boundary change.
+      - Reference-only snapshot borrows or their sole owning definitions change linkage or ownership.
+      - Command-frame context conversions or their opaque return-type declarations change compilation ownership.
+      - Scene or visualization action helper declarations and their workspace-binding dependencies change.
+    proofs:
+      - tests/contract/runtime/Test.SandboxEditorSessionLifecycle.cpp
+      - tests/contract/runtime/Test.SandboxEditorModels.cpp
+      - tools/analysis/compile_hotspots.py
+      - tests/CMakeLists.txt
+  runtime.texture-bake-interface-locality:
+    owner: runtime-editor
+    source: docs/architecture/runtime.md
+    applies_when:
+      - Texture-bake public interface dependencies or its private composition methods change.
+      - Visualization and workspace interfaces acquire texture-bake implementation dependencies.
+    proofs:
+      - tests/contract/runtime/Test.TextureBakeModule.cpp
+      - tests/integration/runtime/Test.RuntimeSandboxAcceptanceGpuSmoke.cpp
+      - tools/analysis/compile_hotspots.py
+      - tests/CMakeLists.txt
+  runtime.processing-compilation-locality:
+    owner: runtime-build
+    source: docs/architecture/sandbox-editor-feature-boundaries.md
+    applies_when:
+      - Density/spacing contracts, shared processing execution or property capture, and their module dependencies change.
+      - Another processing family is migrated to the compilation-locality boundary.
+    proofs:
+      - tools/analysis/compile_hotspots.py
+      - tests/regression/tooling/Test.CompileHotspots.py
+      - tests/CMakeLists.txt
   geometry.element-domain-sources:
     owner: ecs-geometry-runtime
     source: docs/architecture/geometry-api-style.md

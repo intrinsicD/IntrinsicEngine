@@ -1,3 +1,4 @@
+// Runtime setup capabilities and frame hooks used by composition implementations.
 module;
 
 #include <cstdint>
@@ -7,6 +8,7 @@ module;
 #include <utility>
 
 export module Extrinsic.Runtime.Module;
+export import Extrinsic.Runtime.ModuleLifecycle;
 
 export import Extrinsic.Runtime.RenderRecipeActivation;
 
@@ -26,11 +28,12 @@ import Extrinsic.Runtime.WorldRegistry;
 
 namespace Extrinsic::Runtime
 {
-    export using RuntimeModuleResult = Core::Result;
-
-    export [[nodiscard]] inline RuntimeModuleResult RuntimeModuleOk() { return Core::Ok(); }
-
-    export enum class FramePhase : std::uint8_t
+    // C++ language linkage lets the kernel name this phase and the capture
+    // snapshot below through matching forward declarations, so Engine's
+    // interface does not have to import this composition module.
+    export extern "C++"
+    {
+    enum class FramePhase : std::uint8_t
     {
         UiBegin,
         UiBuild,
@@ -43,12 +46,15 @@ namespace Extrinsic::Runtime
         // Engine::RunFrame rather than relying on enum order.
         Simulation,
     };
+    }
 
     export struct RuntimeShutdownAnnounced
     {
     };
 
-    export struct EditorInputCaptureSnapshot
+    export extern "C++"
+    {
+    struct EditorInputCaptureSnapshot
     {
         bool CapturedKeyboard{false};
         bool CapturedMouse{false};
@@ -59,6 +65,7 @@ namespace Extrinsic::Runtime
             return CapturedKeyboard || CapturedMouse || WidgetsActive;
         }
     };
+    }
 
     export struct RuntimeFrameHookContext
     {
@@ -93,7 +100,9 @@ namespace Extrinsic::Runtime
     export using RuntimeViewportInputHook =
         std::function<void(RuntimeViewportInputHookContext&)>;
 
-    export struct RuntimeModuleShutdownContext
+    export extern "C++"
+    {
+    struct RuntimeModuleShutdownContext
     {
         CommandBus& Commands;
         KernelEventBus& Events;
@@ -101,8 +110,11 @@ namespace Extrinsic::Runtime
         WorldRegistry& Worlds;
         ServiceRegistry& Services;
     };
+    }
 
-    export class EngineSetup
+    export extern "C++"
+    {
+    class EngineSetup
     {
     public:
         using FrameHookRegistrar =
@@ -198,18 +210,6 @@ namespace Extrinsic::Runtime
         ViewportInputHookRegistrar m_ViewportInputHookRegistrar{};
         const bool* m_InitializedState{};
     };
+    }
 
-    export class IRuntimeModule
-    {
-    public:
-        virtual ~IRuntimeModule() = default;
-
-        [[nodiscard]] virtual std::string_view Name() const noexcept = 0;
-        [[nodiscard]] virtual RuntimeModuleResult OnRegister(EngineSetup& setup) = 0;
-        [[nodiscard]] virtual RuntimeModuleResult OnResolve(EngineSetup&)
-        {
-            return RuntimeModuleOk();
-        }
-        virtual void OnShutdown(RuntimeModuleShutdownContext& context) = 0;
-    };
 }

@@ -7,14 +7,14 @@ module;
 #include <string>
 #include <string_view>
 
-#include <glm/glm.hpp>
+#include <glm/vec3.hpp>
 
 export module Extrinsic.Runtime.PhysicsModule;
 
 import Extrinsic.Core.Config.Engine;
 import Extrinsic.Core.Config.EngineLoad;
 import Extrinsic.Core.Error;
-import Extrinsic.Runtime.Module;
+import Extrinsic.Runtime.ModuleLifecycle;
 import Extrinsic.Runtime.WorldHandle;
 
 export namespace Extrinsic::Runtime

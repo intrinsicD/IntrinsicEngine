@@ -1,3 +1,7 @@
+// The renderer facade: `IRenderer`'s frame lifecycle, subsystem accessors, the
+// typed `RendererPipelineId` pipeline queries, the runtime snapshot batch it
+// consumes, and the frame command-hook seam. Diagnostics, recipe-override and
+// frame-recipe owners are re-exported because this interface names them.
 module;
 
 #include <cstdint>
@@ -6,7 +10,6 @@ module;
 #include <optional>
 #include <span>
 #include <string>
-#include <vector>
 
 #include <glm/glm.hpp>
 
@@ -21,14 +24,11 @@ import Extrinsic.RHI.PipelineManager;
 import Extrinsic.RHI.Handles;
 import Extrinsic.RHI.Descriptors;
 import Extrinsic.RHI.FrameHandle;
-import Extrinsic.RHI.Profiler;
-import Extrinsic.RHI.QueueAffinity;
 import Extrinsic.Graphics.GpuWorld;
 export import Extrinsic.Graphics.UvView;
 import Extrinsic.Graphics.MaterialSystem;
 import Extrinsic.Graphics.ColormapSystem;
 import Extrinsic.Graphics.VisualizationPackets;
-import Extrinsic.Graphics.VisualizationPropertyBufferResidency;
 import Extrinsic.Graphics.VisualizationSyncSystem;
 import Extrinsic.Graphics.CullingSystem;
 import Extrinsic.Graphics.LightSystem;
@@ -42,32 +42,18 @@ import Extrinsic.Graphics.TransformSyncSystem;
 import Extrinsic.Graphics.ImGuiOverlaySystem;
 import Extrinsic.Graphics.RenderFrameInput;
 import Extrinsic.Graphics.RenderWorld;
-import Extrinsic.Graphics.FrameRecipe;
-import Extrinsic.Graphics.RenderGraph;
 export import Extrinsic.Graphics.RenderingContract;
 export import Extrinsic.Graphics.RenderCommandRouter;
 export import Extrinsic.Graphics.RenderPrepPipeline;
 export import Extrinsic.Graphics.RenderSubsystemRegistry;
-// GRAPHICS-077 — re-export the upload helper module so consumers of
-// `RenderGraphFrameStats::TransientDebugUpload` (e.g. contract tests,
-// editor diagnostics) reach the `TransientDebugUploadDiagnostics`
-// struct without separately importing this internal renderer module.
-// The helper result records (for example
-// `TransientDebugTriangleUploadResult`) ride along for the same consumers but
-// are not part of the renderer's narrow public API.
-export import Extrinsic.Graphics.TransientDebugUploadHelper;
-// GRAPHICS-078 Slice B — re-export the visualization-overlay upload
-// helper module so consumers of
-// `RenderGraphFrameStats::VisualizationOverlayUpload` (e.g. contract
-// tests, editor diagnostics) reach the
-// `VisualizationOverlayUploadDiagnostics` struct without separately
-// importing this internal renderer module. The helper result records (for
-// example `VisualizationVectorFieldUploadResult`) ride along for the same
-// consumers but are not part of the renderer's narrow public API. The
-// `VisualizationOverlayPass` class is also re-exported so contract
-// tests that name the pass type (e.g. for push-constant size checks)
-// keep their import shape unchanged.
-export import Extrinsic.Graphics.VisualizationOverlayUploadHelper;
+// Canonical owners of the renderer's data contracts, re-exported because they
+// appear directly in this interface: the per-frame diagnostics record returned
+// by `GetLastRenderGraphStats()`, the config-lane `FrameRecipeOverride` the
+// override seam accepts, and the frame-recipe vocabulary
+// (`FrameRecipeLightingPath`) the lighting-path seam names.
+export import Extrinsic.Graphics.RenderDiagnostics;
+export import Extrinsic.Graphics.RenderRecipeConfig;
+export import Extrinsic.Graphics.FrameRecipe;
 // GRAPHICS-079 Slice C — re-export the ImGui upload helper result packets for
 // pass-level contract tests. The renderer still owns the concrete helper.
 export import Extrinsic.Graphics.ImGuiUploadHelper;
@@ -79,7 +65,6 @@ export import Extrinsic.Graphics.Pass.VisualizationOverlay;
 // import is local (non-export) because the existing graphics consumers that
 // build the matching wireframe packets already import the module directly.
 import Extrinsic.Graphics.SpatialDebugVisualizers;
-import Extrinsic.Core.Config.Render;
 
 namespace Extrinsic::Graphics
 {
@@ -94,316 +79,6 @@ namespace Extrinsic::Graphics
         [[nodiscard]] friend bool operator==(
             RuntimeFrameCommandHookHandle,
             RuntimeFrameCommandHookHandle) noexcept = default;
-    };
-
-    export struct RenderGraphCompileStats
-    {
-        bool Succeeded = false;
-        std::uint32_t AttemptCount = 0;
-        std::uint32_t CacheHitCount = 0;
-        std::uint32_t CacheMissCount = 0;
-        bool ReusedCachedGraph = false;
-        bool DebugDumpGenerated = false;
-        std::uint32_t PassCount = 0;
-        std::uint32_t CulledPassCount = 0;
-        std::uint32_t ResourceCount = 0;
-        std::uint32_t BarrierCount = 0;
-        std::uint32_t QueueHandoffEdgeCount = 0;
-        std::uint32_t CrossQueueTimelineEdgeCount = 0;
-        std::uint32_t CrossQueueTimelineSignalCount = 0;
-        std::uint32_t CrossQueueTimelineWaitCount = 0;
-        std::uint32_t CrossQueueOwnershipTransferCount = 0;
-        std::uint64_t TransientMemoryEstimateBytes = 0;
-        std::uint64_t TransientNaiveMemoryEstimateBytes = 0;
-        std::uint64_t TransientPlacedPeakMemoryEstimateBytes = 0;
-        std::uint64_t TimeMicros = 0;
-    };
-
-    export struct RenderGraphExecuteStats
-    {
-        bool Succeeded = false;
-        bool DeviceOperational = false;
-        bool ParallelRecordingRequested = false;
-        bool ParallelRecordingAccepted = false;
-        bool SerialFallbackUsed = false;
-        std::uint32_t ParallelCommandContextCount = 0;
-        std::uint32_t ParallelRecordedPassCount = 0;
-        bool ParallelRecordUsedScheduler = false;
-        std::uint32_t ParallelRecordWorkerTaskCount = 0;
-        std::uint32_t ParallelRecordCallerRecordCount = 0;
-        std::uint64_t TimeMicros = 0;
-    };
-
-    export struct RenderGraphCommandPassStats
-    {
-        std::string Name{};
-        FramePassId Id{};
-        RenderCommandPassStatus Status = RenderCommandPassStatus::SkippedUnavailable;
-    };
-
-    export struct RenderGraphCommandRecordStats
-    {
-        std::uint32_t Recorded = 0;
-        std::uint32_t Skipped = 0;
-        std::uint32_t SkippedNonOperational = 0;
-        std::uint32_t SkippedUnavailable = 0;
-        std::vector<RenderGraphCommandPassStats> Passes{};
-    };
-
-    export struct RenderGraphContractIntegrationStats
-    {
-        bool Evaluated = false;
-        bool ContractCompatible = false;
-        bool SharedProductsCompatible = false;
-        bool ArtifactMetadataValid = false;
-        std::string RendererId{};
-        std::string SnapshotId{};
-        std::string RecipeId{};
-        std::string ViewOutputRecipeId{};
-        std::uint32_t SnapshotSourceRevisionCount = 0;
-        std::uint32_t BindingIntentCount = 0;
-        std::uint32_t RecipeSlotCount = 0;
-        std::uint32_t ViewOutputCount = 0;
-        std::uint32_t DeclaredArtifactCount = 0;
-        std::uint32_t VisibilityProductCount = 0;
-        std::uint32_t VisibilityVisibleItemCount = 0;
-        std::uint32_t VisibilityRejectedItemCount = 0;
-        std::uint32_t LightingProductCount = 0;
-        std::uint32_t LightingResolvedLightCount = 0;
-        std::uint32_t LightingIntentCount = 0;
-        std::uint32_t UnsupportedProductDiagnosticCount = 0;
-        std::uint32_t MissingOutputDiagnosticCount = 0;
-        std::uint32_t DegradedFallbackDiagnosticCount = 0;
-        std::uint32_t ArtifactPublicationFailureDiagnosticCount = 0;
-        std::vector<RenderArtifactMetadata> DeclaredArtifacts{};
-        std::vector<std::string> Diagnostics{};
-    };
-
-    export enum class FrameRecipeOverrideDiagnosticCode : std::uint8_t
-    {
-        None = 0,
-        EmptyRecipeId,
-        FixedCoreMutation,
-        UnknownSlot,
-        FixedCoreSlotDisabled,
-        UnsupportedSlotDisable,
-        UnsupportedCapability,
-    };
-
-    export struct FrameRecipeOverrideDiagnostic
-    {
-        FrameRecipeOverrideDiagnosticCode Code{FrameRecipeOverrideDiagnosticCode::None};
-        std::string Subject{};
-        std::string Message{};
-    };
-
-    export struct FrameRecipeOverride
-    {
-        RenderRecipeDescriptor Recipe{};
-        std::vector<std::string> DisabledExtensionSlots{};
-        std::string SourceId{};
-    };
-
-    export struct FrameRecipeOverrideProjection
-    {
-        FrameRecipeFeatures Features{};
-        bool Applied{false};
-        std::uint32_t DisabledSlotCount{0u};
-        std::vector<FrameRecipeOverrideDiagnostic> Diagnostics{};
-    };
-
-    export enum class RenderGraphGpuProfileStatus : std::uint8_t
-    {
-        Disabled = 0,
-        Unavailable,
-        Unsupported,
-        Recording,
-        Submitted,
-        NotReady,
-        Resolved,
-        Exhausted,
-        InvalidLifecycle,
-        DeviceLost,
-    };
-
-    export struct RenderGraphGpuProfileQueueStats
-    {
-        RHI::QueueAffinity Queue{RHI::QueueAffinity::Graphics};
-        RHI::GpuTimestampSource Source{
-            RHI::GpuTimestampSource::Unavailable};
-        std::optional<std::uint64_t> DurationNs{};
-    };
-
-    export struct RenderGraphGpuProfilePassStats
-    {
-        std::string Name{};
-        FramePassId Id{};
-        RHI::QueueAffinity Queue{RHI::QueueAffinity::Graphics};
-        RenderCommandPassStatus CommandStatus{
-            RenderCommandPassStatus::SkippedUnavailable};
-        RHI::GpuTimestampSource Source{
-            RHI::GpuTimestampSource::Unavailable};
-        std::optional<std::uint64_t> DurationNs{};
-    };
-
-    export struct RenderGraphGpuProfileStats
-    {
-        RenderGraphGpuProfileStatus Status{
-            RenderGraphGpuProfileStatus::Disabled};
-        RHI::GpuTimestampSource Source{
-            RHI::GpuTimestampSource::Unavailable};
-        std::string Diagnostic{};
-        bool Fresh{false};
-        bool Stale{false};
-        bool HasResolvedFrame{false};
-        std::uint64_t ResolvedSubmittedFrameNumber{0u};
-        std::uint32_t ResolvedFrameSlot{0u};
-        std::uint64_t SampleAgeFrames{0u};
-        std::vector<RenderGraphGpuProfileQueueStats> QueueEnvelopes{};
-        std::vector<RenderGraphGpuProfilePassStats> Passes{};
-    };
-
-    export struct RenderGraphFrameStats
-    {
-        RenderGraphCompileStats Compile{};
-        RenderGraphExecuteStats Execute{};
-        RenderGraphCommandRecordStats CommandRecords{};
-        RenderGraphContractIntegrationStats Contract{};
-        RenderGraphGpuProfileStats GpuProfile{};
-        std::string DebugDump{};
-        std::string Diagnostic{};
-        std::string LifecycleDiagnostic{};
-        bool FrameRecipeOverrideActive{false};
-        bool FrameRecipeOverrideApplied{false};
-        std::uint32_t FrameRecipeOverrideDisabledSlotCount{0u};
-        std::uint32_t FrameRecipeOverrideDiagnosticCount{0u};
-        std::vector<FrameRecipeOverrideDiagnostic> FrameRecipeOverrideDiagnostics{};
-        // GRAPHICS-037D Slice D — count of frames in which the default
-        // recipe produced an accepted multi-queue submit plan containing an
-        // `AsyncCompute` batch. Stays at zero when the backend has no async
-        // queue, when the framegraph demotes optional queues to graphics, or
-        // when the backend rejects the submit-plan seam.
-        std::uint32_t AsyncComputeUtilizedFrames = 0;
-        // GRAPHICS-038B — HZB build pass command-shape counters. The default
-        // renderer records the deterministic per-mip fallback path until a
-        // concrete backend capability plumbs the SPD-style single-pass path.
-        std::uint32_t HZBBuildRecordedFrames = 0;
-        std::uint32_t HZBBuildDispatchCount = 0;
-        std::uint32_t HZBBuildMipCount = 0;
-        std::uint32_t HZBBuildFallbackFrames = 0;
-        std::uint32_t HZBBuildSinglePassFrames = 0;
-        // GRAPHICS-039C — clustered-light build/assignment command-shape
-        // counters. These increment only when the retained buffers and
-        // compute-pipeline leases are available and the executor records the
-        // cluster passes.
-        std::uint32_t ClusterGridBuildRecordedFrames = 0;
-        std::uint32_t ClusterGridBuildDispatchCount = 0;
-        std::uint32_t ClusterLightAssignmentRecordedFrames = 0;
-        std::uint32_t ClusterLightAssignmentDispatchCount = 0;
-        // GRAPHICS-076E — count of frames in which the opt-in default-recipe
-        // backbuffer-to-host readback seam recorded the
-        // `Present → TransferSrc → CopyImageToBuffer → Present` triplet.
-        // Stays at zero unless `SetDefaultRecipeBackbufferReadbackBuffer()` was
-        // configured with a valid HostVisible+TransferDst buffer and the device
-        // is operational during the frame.
-        std::uint32_t DefaultRecipeBackbufferReadbackCopyCount = 0;
-        // GRAPHICS-077E — count of frames in which the opt-in transient-debug
-        // backbuffer-to-host readback seam recorded the same
-        // `Present -> TransferSrc -> CopyImageToBuffer -> Present` triplet
-        // after the default-recipe graph completed. Unlike the canonical
-        // default-recipe counter above, this increments only when
-        // `"TransientDebugSurfacePass"` recorded in the same frame, a valid
-        // transient-debug readback buffer is armed, and the device is
-        // operational.
-        std::uint32_t TransientDebugBackbufferReadbackCopyCount = 0;
-        // GRAPHICS-078E — count of frames in which the opt-in visualization-
-        // overlay backbuffer-to-host readback seam recorded the same
-        // `Present -> TransferSrc -> CopyImageToBuffer -> Present` triplet
-        // after the default-recipe graph completed. This increments only when
-        // `"VisualizationOverlayPass"` recorded in the same frame, a valid
-        // visualization-overlay readback buffer is armed, and the device is
-        // operational.
-        std::uint32_t VisualizationOverlayBackbufferReadbackCopyCount = 0;
-        // GRAPHICS-074 Slice D.2 — count of frames in which the default
-        // recipe's PickingPass executor branch recorded the picking-readback
-        // copy pair (EntityId + PrimitiveId → renderer-owned
-        // `Picking.Readback` buffer at slot
-        // `frame.FrameIndex % frames-in-flight`). Each operational frame with
-        // a pending pick request increments by 1 (the pair records together
-        // or not at all); stays at zero when no pick is pending, when the
-        // device is non-operational, or when the picking pass is otherwise
-        // gated off. Slice D.3 builds on top of this counter for the
-        // `BeginFrame()` drain + `SelectionSystem::PublishPickResult` /
-        // `PublishNoHit` routing.
-        std::uint32_t PickingReadbackCopyCount = 0;
-        // GRAPHICS-113 — count of frames in which the default-recipe
-        // `PickingPass` route recorded the one-target EntityId producer for
-        // selection outline without a pending click pick. This distinguishes
-        // selected/hovered outline ID work from full primitive-picking work.
-        std::uint32_t SelectionOutlineEntityIdPassCount = 0;
-        // GRAPHICS-113 — count of frames in which pending click-picking
-        // recorded the primitive ID refinement subpasses (face/edge/point).
-        // A successful pending-pick route increments this once per frame after
-        // the three primitive subpasses are recorded under `PickingPass`.
-        std::uint32_t SelectionPrimitiveIdPassCount = 0;
-        // GRAPHICS-075 Slice E.2 — count of frames in which the default
-        // recipe's `PostProcessHistogramPass` executor branch recorded the
-        // histogram-readback `CopyBuffer(PostProcess.Histogram →
-        // Histogram.Readback @ slot * 1024)` after the compute dispatch.
-        // Each operational frame with a valid renderer-owned readback buffer
-        // increments by 1; stays at zero when the device is non-operational,
-        // when the readback buffer is unavailable, or when the histogram
-        // stage itself is gated off. The `BeginFrame()`-side drain consumes
-        // pending slots and forwards the 256-bin payload to
-        // `PostProcessSystem::PublishHistogramReadback(...)`.
-        std::uint32_t HistogramReadbackCopyCount = 0;
-        // GRAPHICS-076 Slice B — count of frames in which the default
-        // recipe's canonical `DebugViewPass` executor branch recorded the
-        // fullscreen `BindPipeline + PushConstants + Draw(3, 1, 0, 0)`
-        // shape. Increments by 1 per operational frame in which the
-        // resolved selection is enabled and the pipeline lease is valid;
-        // stays at zero when the device is non-operational, when
-        // `DebugViewSettings::Enabled` is false, when the pipeline lease
-        // is missing, or when the resolved selection's fallback path also
-        // disabled the pass (`DebugViewFallbackReason::FallbackUnavailable`).
-        std::uint32_t DebugViewPassExecutions = 0;
-        // GRAPHICS-076 Slice B — count of frames in which the default
-        // recipe's `DebugViewSystem::ResolveSelection(...)` reported
-        // `UsedFallback = true` because the requested resource was
-        // missing / disabled / unsupported and the system substituted the
-        // configured fallback resource. Surfaces deterministically the
-        // diagnostic that the task's "no silent failure on invalid
-        // resource" acceptance criterion requires; tests assert this
-        // counter increments by exactly 1 per frame in which the request
-        // resolved through fallback.
-        std::uint32_t DebugViewFallbackInvocationCount = 0;
-        // GRAPHICS-077 Slice A — aggregate diagnostics for the
-        // `TransientDebugSurfacePass` upload + recording path. All
-        // counters stay at zero in Slice A (no pipelines, scaffold
-        // executor branch only). Slice B starts populating the triangle
-        // counters; Slice C starts populating the line + point counters.
-        // Reset per-frame through the existing
-        // `m_LastRenderGraphStats = {}` cadence in `ExecuteFrame()`.
-        TransientDebugUploadDiagnostics TransientDebugUpload{};
-        // GRAPHICS-078 Slice A — aggregate diagnostics for the
-        // `VisualizationOverlayPass` upload + recording path. All
-        // counters stay at zero in Slice A (no pipelines, scaffold
-        // executor branch only) except `MissingPipelineSkipCount` which
-        // increments once per operational-scaffold frame to distinguish
-        // "feature on but pipeline missing" from "feature off". Slice B
-        // starts populating the vector-field counters; Slice C starts
-        // populating the isoline counters. Reset per-frame through the
-        // existing `m_LastRenderGraphStats = {}` cadence in
-        // `ExecuteFrame()`.
-        VisualizationOverlayUploadDiagnostics VisualizationOverlayUpload{};
-        VisualizationPropertyBufferDiagnostics VisualizationPropertyBuffers{};
-        // GRAPHICS-040C — temporal reconstruction diagnostics surfaced on
-        // the renderer stats path. These remain CPU/null observable and do
-        // not expose backend/vendor details.
-        std::uint32_t ReconstructorAppliedFrames = 0;
-        float HistoryDisocclusionPercent = 0.0f;
-        float JitterOffsetX = 0.0f;
-        float JitterOffsetY = 0.0f;
     };
 
     export struct RuntimeRenderSnapshotBatch
@@ -455,7 +130,42 @@ namespace Extrinsic::Graphics
         bool                           SelectionHasHovered{false};
     };
 
-    export class IRenderer
+    // Identifies a pipeline the renderer publishes to external callers.
+    // `Count` is a bound, not a pipeline: it is unmapped and fails closed like
+    // any other value outside this list. Pipelines the renderer keeps entirely
+    // private (for example, depth prepass or present) carry no identifier.
+    export enum class RendererPipelineId : std::uint8_t
+    {
+        DefaultDebugSurface,
+        ForwardSurface,
+        ForwardLine,
+        ForwardPoint,
+        Shadow,
+        DeferredGBuffer,
+        DeferredLighting,
+        SelectionEntityId,
+        SelectionEntityIdOutline,
+        SelectionFaceId,
+        SelectionEdgeId,
+        SelectionPointId,
+        SelectionOutline,
+        PostProcessToneMap,
+        PostProcessBloomDownsample,
+        PostProcessBloomUpsample,
+        PostProcessFXAA,
+        PostProcessSMAAEdge,
+        PostProcessSMAABlend,
+        PostProcessSMAAResolve,
+        PostProcessHistogram,
+        HZBBuild,
+        ClusterGridBuild,
+        ClusterLightAssignment,
+        Count,
+    };
+
+    export extern "C++"
+    {
+    class IRenderer
     {
     public:
         virtual ~IRenderer() = default;
@@ -572,268 +282,22 @@ namespace Extrinsic::Graphics
         virtual void SetParallelRenderGraphRecordingEnabled(bool enabled) noexcept = 0;
         [[nodiscard]] virtual bool IsParallelRenderGraphRecordingEnabled() const noexcept = 0;
 
-        // GRAPHICS-031A — accessor for the canonical missing-material fallback
-        // pipeline. Returns the operational device-side handle when the
-        // pipeline has been compiled (operational device path), and an
-        // invalid handle otherwise. The pipeline state itself is the
-        // canonical default-debug-surface recipe; see GetDefaultDebugSurfacePipelineDesc().
-        [[nodiscard]] virtual RHI::PipelineHandle GetDefaultDebugSurfacePipeline() const noexcept = 0;
+        // Device-side handle for a published pipeline. Invalid when `id` is
+        // unmapped, when the renderer has no pipeline manager yet, or when the
+        // operational device path has not published that lease — callers must
+        // treat an invalid handle as "not available this frame", not as an
+        // error. This query never builds a descriptor, so hot paths can call it
+        // per frame.
+        [[nodiscard]] virtual RHI::PipelineHandle GetPipeline(
+            RendererPipelineId id) const noexcept = 0;
 
-        // GRAPHICS-031A — descriptor used to compile the default-debug-surface
-        // pipeline. Returned by value so callers can assert byte-identical
-        // republish across InitializeOperationalPassResources() invocations
-        // (initial init and RebuildOperationalResources).
-        [[nodiscard]] virtual RHI::PipelineDesc GetDefaultDebugSurfacePipelineDesc() const noexcept = 0;
-
-        // GRAPHICS-070 — accessors for the default-recipe forward surface
-        // pipeline. `GetForwardSurfacePipeline()` returns the operational
-        // device-side handle (or an invalid handle when the device path is
-        // not operational); `GetForwardSurfacePipelineDesc()` returns the
-        // canonical descriptor so contract tests can assert byte-identical
-        // republish across `InitializeOperationalPassResources()` and
-        // `RebuildOperationalResources()`.
-        [[nodiscard]] virtual RHI::PipelineHandle GetForwardSurfacePipeline() const noexcept = 0;
-        [[nodiscard]] virtual RHI::PipelineDesc GetForwardSurfacePipelineDesc() const noexcept = 0;
-
-        // GRAPHICS-071 — accessors for the default-recipe retained line/point
-        // forward pipelines. The handles are invalid until an operational
-        // device path publishes the leases; descriptors remain deterministic so
-        // contract tests can assert byte-identical rebuild behavior.
-        [[nodiscard]] virtual RHI::PipelineHandle GetForwardLinePipeline() const noexcept = 0;
-        [[nodiscard]] virtual RHI::PipelineDesc GetForwardLinePipelineDesc() const noexcept = 0;
-        [[nodiscard]] virtual RHI::PipelineHandle GetForwardPointPipeline() const noexcept = 0;
-        [[nodiscard]] virtual RHI::PipelineDesc GetForwardPointPipelineDesc() const noexcept = 0;
-
-        // GRAPHICS-073 (Slice A) — accessor for the default-recipe depth-only
-        // shadow pipeline. Handle is invalid until an operational device path
-        // publishes the lease; the descriptor remains deterministic so contract
-        // tests can assert byte-identical rebuild behavior.
-        [[nodiscard]] virtual RHI::PipelineHandle GetShadowPipeline() const noexcept = 0;
-        [[nodiscard]] virtual RHI::PipelineDesc GetShadowPipelineDesc() const noexcept = 0;
-
-        // GRAPHICS-072 (Slice A) — accessor for the default-recipe deferred
-        // GBuffer pipeline (vertex `surface.vert.spv` + fragment
-        // `surface_gbuffer.frag.spv`, three color targets `SceneNormal` /
-        // `Albedo` / `Material0`, `D32_FLOAT` depth). Handle is invalid until
-        // an operational device path publishes the lease; the descriptor
-        // remains deterministic so contract tests can assert byte-identical
-        // rebuild behavior.
-        [[nodiscard]] virtual RHI::PipelineHandle GetDeferredGBufferPipeline() const noexcept = 0;
-        [[nodiscard]] virtual RHI::PipelineDesc GetDeferredGBufferPipelineDesc() const noexcept = 0;
-
-        // GRAPHICS-072 (Slice B) — accessor for the default-recipe deferred
-        // lighting pipeline (vertex `post_fullscreen.vert.spv` + fragment
-        // `deferred/lighting.frag.spv`, single `SceneColorHDR` RGBA16F color
-        // target, no depth target). Handle is invalid until an operational
-        // device path publishes the lease; the descriptor remains
-        // deterministic so contract tests can assert byte-identical rebuild
-        // behavior.
-        [[nodiscard]] virtual RHI::PipelineHandle GetDeferredLightingPipeline() const noexcept = 0;
-        [[nodiscard]] virtual RHI::PipelineDesc GetDeferredLightingPipelineDesc() const noexcept = 0;
-
-        // GRAPHICS-074 (Slice A + recipe-side follow-up) — accessor for the
-        // default-recipe EntityId selection pipeline (vertex
-        // `selection/entity_id.vert.spv` + fragment
-        // `selection/entity_id.frag.spv`, two R32_UINT color targets
-        // `EntityId` and `PrimitiveId`, `D32_FLOAT` depth attachment,
-        // `DepthOp::Equal` + `DepthWriteEnable=false`). The depth-equal
-        // shape matches `BuildDefaultFrameRecipe`, which now orders
-        // `PickingPass` after `DepthPrepass` and declares
-        // `Read(SceneDepth, DepthRead)` on the picking pass so the
-        // pipeline samples the prepass-populated nearest-surface depth and
-        // never last-fragment-wins into `EntityId`/`PrimitiveId`. The
-        // recipe also gates the pass on `EnablePicking &&
-        // EnableDepthPrepass` so this pipeline is only requested when a
-        // populated `SceneDepth` exists. Handle is invalid until an
-        // operational device path publishes the lease; the descriptor
-        // remains deterministic so contract tests can assert byte-identical
-        // rebuild behavior. Slices B/C/D add the Face/Edge/Point selection
-        // pipelines (same depth-equal shape), the outline pipeline, and the
-        // `Picking.Readback` drain.
-        [[nodiscard]] virtual RHI::PipelineHandle GetSelectionEntityIdPipeline() const noexcept = 0;
-        [[nodiscard]] virtual RHI::PipelineDesc GetSelectionEntityIdPipelineDesc() const noexcept = 0;
-        // GRAPHICS-113 — one-target EntityId variant used by outline-only
-        // frames. Pending click-picking keeps using the two-target descriptor
-        // above so primitive refinement and readback still write `PrimitiveId`.
-        [[nodiscard]] virtual RHI::PipelineHandle GetSelectionEntityIdOutlinePipeline() const noexcept = 0;
-        [[nodiscard]] virtual RHI::PipelineDesc GetSelectionEntityIdOutlinePipelineDesc() const noexcept = 0;
-
-        // GRAPHICS-074 (Slice B) — accessors for the default-recipe Face /
-        // Edge / Point selection ID pipelines. Each pipeline mirrors the
-        // EntityId pipeline's depth-equal / depth-write-off / two-R32_UINT
-        // color-target shape required by the recipe's `PickingPass`
-        // render-pass declaration, differing only in primitive topology
-        // (`TriangleList` / `LineList` / `PointList`), cull bucket (consumed
-        // through the respective `FaceIdPass` / `EdgeIdPass` / `PointIdPass`
-        // `Execute(...)`), and the shader-side `EncodeSelectionId(domain,
-        // payload)` value packed into `PrimitiveId`. Handles are invalid
-        // until an operational device path publishes the leases; descriptors
-        // remain deterministic so contract tests can assert byte-identical
-        // rebuild behavior.
-        [[nodiscard]] virtual RHI::PipelineHandle GetSelectionFaceIdPipeline() const noexcept = 0;
-        [[nodiscard]] virtual RHI::PipelineDesc GetSelectionFaceIdPipelineDesc() const noexcept = 0;
-        [[nodiscard]] virtual RHI::PipelineHandle GetSelectionEdgeIdPipeline() const noexcept = 0;
-        [[nodiscard]] virtual RHI::PipelineDesc GetSelectionEdgeIdPipelineDesc() const noexcept = 0;
-        [[nodiscard]] virtual RHI::PipelineHandle GetSelectionPointIdPipeline() const noexcept = 0;
-        [[nodiscard]] virtual RHI::PipelineDesc GetSelectionPointIdPipelineDesc() const noexcept = 0;
-
-        // GRAPHICS-074 (Slice C) — accessor for the default-recipe selection
-        // outline pipeline (vertex `post_fullscreen.vert.spv` + fragment
-        // `selection_outline.frag.spv`, single color target matching the
-        // current present source format, alpha blending on, depth-test/write
-        // off). The pipeline is a fullscreen triangle (no vertex inputs) that
-        // the recipe's `"SelectionOutlinePass"` branch binds and draws into
-        // the current present-source color target. Handle is invalid until an
-        // operational device path publishes the lease; the descriptor
-        // remains deterministic so contract tests can assert byte-identical
-        // rebuild behavior. Slice D adds the `Picking.Readback` buffer +
-        // drain + `PublishPickResult` / `PublishNoHit` wiring.
-        [[nodiscard]] virtual RHI::PipelineHandle GetSelectionOutlinePipeline() const noexcept = 0;
-        [[nodiscard]] virtual RHI::PipelineDesc GetSelectionOutlinePipelineDesc() const noexcept = 0;
-
-        // GRAPHICS-075 (Slice A) — accessor for the default-recipe postprocess
-        // tonemap pipeline (vertex `post_fullscreen.vert.spv` + fragment
-        // `post_tonemap.frag.spv`, single backbuffer-format color target, no
-        // depth target, `PushConstantSize = sizeof(PostProcessPushConstants)`).
-        // The pipeline is a fullscreen triangle that the `"PostProcessPass"`
-        // umbrella executor branch binds and draws into the recipe's
-        // `SceneColorLDR` color target after reading the prior frame's
-        // `SceneColorHDR`. Handle is invalid until an operational device path
-        // publishes the lease; the descriptor remains deterministic so
-        // contract tests can assert byte-identical rebuild behavior. Slices
-        // B–E add the bloom / FXAA / SMAA / histogram pipelines behind the
-        // same umbrella branch.
-        [[nodiscard]] virtual RHI::PipelineHandle GetPostProcessToneMapPipeline() const noexcept = 0;
-        [[nodiscard]] virtual RHI::PipelineDesc GetPostProcessToneMapPipelineDesc() const noexcept = 0;
-
-        // GRAPHICS-075 (Slice B.1) — accessors for the default-recipe
-        // postprocess bloom pipelines: a fullscreen 13-tap downsample
-        // (`post_fullscreen.vert.spv` + `post_bloom_downsample.frag.spv`)
-        // and a 9-tap tent-filter upsample (`post_fullscreen.vert.spv` +
-        // `post_bloom_upsample.frag.spv`). Both pipelines target the
-        // recipe's `PostProcess.BloomScratch` RGBA16F transient (`RGBA16_FLOAT`
-        // is the BloomScratch declaration in `BuildDefaultFrameRecipe`), no
-        // depth attachment, `PushConstantSize =
-        // sizeof(PostProcessBloomDownsamplePushConstants)` /
-        // `sizeof(PostProcessBloomUpsamplePushConstants)` (each 16 bytes
-        // matching the shader's std430 push block). Handles are invalid
-        // until an operational device publishes the leases; the descriptors
-        // remain deterministic so contract tests can assert byte-identical
-        // rebuild behavior. Slice B.2 keeps the same pipeline shapes and
-        // adds per-mip iteration + recipe-side `BloomScratch.MipLevels` +
-        // the multi-mip barrier-sequence contract test.
-        [[nodiscard]] virtual RHI::PipelineHandle GetPostProcessBloomDownsamplePipeline() const noexcept = 0;
-        [[nodiscard]] virtual RHI::PipelineDesc GetPostProcessBloomDownsamplePipelineDesc() const noexcept = 0;
-        [[nodiscard]] virtual RHI::PipelineHandle GetPostProcessBloomUpsamplePipeline() const noexcept = 0;
-        [[nodiscard]] virtual RHI::PipelineDesc GetPostProcessBloomUpsamplePipelineDesc() const noexcept = 0;
-
-        // GRAPHICS-075 (Slice C) — accessor for the default-recipe
-        // postprocess FXAA pipeline (vertex `post_fullscreen.vert.spv` +
-        // fragment `post_fxaa.frag.spv`, single backbuffer-format color
-        // target, no depth target, `PushConstantSize =
-        // sizeof(PostProcessFXAAPushConstants)` — 20 bytes mirroring the
-        // shader's `vec2 InvResolution + float ContrastThreshold + float
-        // RelativeThreshold + float SubpixelBlending` std430 push block).
-        // The pipeline is a fullscreen triangle that the `"PostProcessPass"`
-        // umbrella executor branch binds and draws after tonemap when
-        // `PostProcessSettings::AntiAliasing == FXAA`; with `None` the
-        // pass body short-circuits and the helper still reports
-        // `Recorded` under the umbrella's accumulator (the same
-        // "structurally-recorded no-op" taxonomy Slice B.1 added for
-        // bloom-disabled). Handle is invalid until an operational device
-        // path publishes the lease; the descriptor remains deterministic
-        // so contract tests can assert byte-identical rebuild behavior.
-        // SMAA + retained `AreaTex`/`SearchTex` LUTs land with Slice D;
-        // histogram compute + readback drain lands with Slice E behind
-        // the same umbrella branch.
-        [[nodiscard]] virtual RHI::PipelineHandle GetPostProcessFXAAPipeline() const noexcept = 0;
-        [[nodiscard]] virtual RHI::PipelineDesc GetPostProcessFXAAPipelineDesc() const noexcept = 0;
-
-        // GRAPHICS-075 (Slice D.2a) — accessors for the three SMAA
-        // pipelines (vertex `post_fullscreen.vert.spv` paired with
-        // fragments `post_smaa_edge.frag.spv` /
-        // `post_smaa_blend.frag.spv` / `post_smaa_resolve.frag.spv`).
-        // The recipe's `PostProcess.AATemp.{Edges,Weights,Resolved}`
-        // split allocates three matched-format AA transients, so the
-        // pipeline color-target formats are:
-        // - edge → `RG8_UNORM` (matches `AATemp.Edges`);
-        // - blend → `RGBA8_UNORM` (matches `AATemp.Weights`);
-        // - resolve → backbuffer format (matches `AATemp.Resolved`).
-        // Per-stage push constants:
-        // - edge: `PushConstantSize =
-        //   sizeof(PostProcessSMAAEdgePushConstants)` (16 bytes, `vec2
-        //   InvResolution + float EdgeThreshold + float _pad0` std430
-        //   mirroring `post_smaa_edge.frag`);
-        // - blend: `PushConstantSize =
-        //   sizeof(PostProcessSMAABlendPushConstants)` (16 bytes, `vec2
-        //   InvResolution + int MaxSearchSteps + int MaxSearchStepsDiag`
-        //   std430 mirroring `post_smaa_blend.frag`);
-        // - resolve: `PushConstantSize =
-        //   sizeof(PostProcessSMAAResolvePushConstants)` (16 bytes, `vec2
-        //   InvResolution + float _pad0 + float _pad1` std430 mirroring
-        //   `post_smaa_resolve.frag`).
-        // All three pipelines have no depth attachment. The canonical
-        // 20-byte `PostProcessPushConstants` block is intentionally not
-        // reused per the standing "Shader push-constant compatibility
-        // policy": pushing it under any SMAA shader's std430 push block
-        // would alias `Exposure` / `Gamma` / etc. onto `InvResolution.x`
-        // / `InvResolution.y` / threshold scalars and produce
-        // visually-meaningless SMAA output. Handles are invalid until an
-        // operational device path publishes the leases; the descriptors
-        // remain deterministic so contract tests can assert byte-
-        // identical rebuild behavior. Retained `AreaTex` / `SearchTex`
-        // LUT textures (sampled by the blend pipeline) +
-        // exposure-adaptation history buffer land in Slice D.2b
-        // alongside the device-aware `PostProcessSystem::Initialize`
-        // overload.
-        [[nodiscard]] virtual RHI::PipelineHandle GetPostProcessSMAAEdgePipeline() const noexcept = 0;
-        [[nodiscard]] virtual RHI::PipelineDesc GetPostProcessSMAAEdgePipelineDesc() const noexcept = 0;
-        [[nodiscard]] virtual RHI::PipelineHandle GetPostProcessSMAABlendPipeline() const noexcept = 0;
-        [[nodiscard]] virtual RHI::PipelineDesc GetPostProcessSMAABlendPipelineDesc() const noexcept = 0;
-        [[nodiscard]] virtual RHI::PipelineHandle GetPostProcessSMAAResolvePipeline() const noexcept = 0;
-        [[nodiscard]] virtual RHI::PipelineDesc GetPostProcessSMAAResolvePipelineDesc() const noexcept = 0;
-
-        // GRAPHICS-075 (Slice E.1) — accessor for the default-recipe
-        // postprocess histogram compute pipeline (`post_histogram.comp`,
-        // no vertex/fragment stages, `PushConstantSize =
-        // sizeof(PostProcessHistogramPushConstants)` — 16 bytes mirroring
-        // the shader's `uint Width + uint Height + float MinLogLum +
-        // float RangeLogLum` std430 push block). The pipeline is a
-        // compute dispatch (`local_size_x = local_size_y = 16`) bound
-        // and dispatched by the new ordered graph pass
-        // `"PostProcessHistogramPass"` declared by the recipe with
-        // `Read(SceneColorHDR, ShaderRead)` +
-        // `Write(PostProcess.Histogram, BufferUsage::ShaderWrite)` so
-        // the framegraph compiler emits the read-after-write barrier
-        // the shader needs and the dispatch executes outside any
-        // render-pass scope (Vulkan rejects `vkCmdDispatch` inside an
-        // active render-pass scope, which is why the histogram cannot
-        // share the `"PostProcessPass"` umbrella's render-pass scope).
-        // Handle is invalid until an operational device path publishes
-        // the lease; the descriptor remains deterministic so contract
-        // tests can assert byte-identical rebuild behavior. Slice E.2
-        // adds the renderer-owned host-visible `Histogram.Readback`
-        // buffer + `BeginFrame()`-side drain + `PublishHistogramReadback`
-        // wiring that consumes the exposure-adaptation history buffer.
-        [[nodiscard]] virtual RHI::PipelineHandle GetPostProcessHistogramPipeline() const noexcept = 0;
-        [[nodiscard]] virtual RHI::PipelineDesc GetPostProcessHistogramPipelineDesc() const noexcept = 0;
-
-        // GRAPHICS-038B — accessor for the HZB build compute pipeline
-        // (`hzb_build.comp`, no graphics stages, push constants matching
-        // `HZBBuildPushConstants`). Handle is invalid until an operational
-        // device path publishes the lease; descriptor remains deterministic
-        // for contract tests and rebuild verification.
-        [[nodiscard]] virtual RHI::PipelineHandle GetHZBBuildPipeline() const noexcept = 0;
-        [[nodiscard]] virtual RHI::PipelineDesc GetHZBBuildPipelineDesc() const noexcept = 0;
-
-        // GRAPHICS-039C — accessors for the clustered-light compute pipelines.
-        // `ClusterGridBuild` writes froxel AABBs, and
-        // `ClusterLightAssignment` writes the per-cell header/index buffers
-        // consumed through `GpuSceneTable` BDAs by lighting shaders.
-        [[nodiscard]] virtual RHI::PipelineHandle GetClusterGridBuildPipeline() const noexcept = 0;
-        [[nodiscard]] virtual RHI::PipelineDesc GetClusterGridBuildPipelineDesc() const noexcept = 0;
-        [[nodiscard]] virtual RHI::PipelineHandle GetClusterLightAssignmentPipeline() const noexcept = 0;
-        [[nodiscard]] virtual RHI::PipelineDesc GetClusterLightAssignmentPipelineDesc() const noexcept = 0;
+        // Canonical descriptor a published pipeline is compiled from,
+        // independent of whether its lease exists, so contract tests can assert
+        // byte-identical republish across InitializeOperationalPassResources()
+        // and RebuildOperationalResources(). `nullopt` means `id` is unmapped:
+        // `RHI::PipelineDesc` has no invalid state a returned value could carry.
+        [[nodiscard]] virtual std::optional<RHI::PipelineDesc> GetPipelineDesc(
+            RendererPipelineId id) const noexcept = 0;
 
         // GRAPHICS-074 (Slice D.1) — accessor for the renderer-owned host-
         // visible `Picking.Readback` buffer. The buffer is sized for
@@ -946,10 +410,7 @@ namespace Extrinsic::Graphics
         virtual void SubmitUvViewRequest(UvViewRequest request);
         [[nodiscard]] virtual UvViewOutput GetUvViewOutput() const;
     };
+    }
 
     export std::unique_ptr<IRenderer> CreateRenderer();
-
-    export [[nodiscard]] FrameRecipeOverrideProjection ProjectFrameRecipeOverride(
-        const FrameRecipeFeatures& derivedDefaults,
-        const FrameRecipeOverride& recipeOverride);
 }

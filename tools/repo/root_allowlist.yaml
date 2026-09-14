@@ -24,6 +24,7 @@ allowed_root_entries:
   - vcpkg-configuration.json
   - vcpkg.json
 ignored_local_entries:
+  - .agents/
   - .idea/
   - .ruff_cache/
   - Testing/
@@ -38,5 +39,5 @@ ignored_local_entries:
   - vcpkg_installed/
 notes:
   - "Allowed entries are exact tracked repository roots; broad patterns are forbidden."
-  - "Ignored local entries are repository-owned names/patterns for disposable build, dependency, editor, and tool state."
+  - "Ignored local entries classify known build, dependency, editor, and agent/tool state; classification is not permission to delete their contents."
   - "Git's global/user ignore configuration is never consulted for root ownership."

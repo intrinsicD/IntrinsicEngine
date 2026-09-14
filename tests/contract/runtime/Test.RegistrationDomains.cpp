@@ -6,7 +6,7 @@
 #include <limits>
 #include <vector>
 #include "SandboxEditorJobHarness.hpp"
-import Extrinsic.Runtime.GeometryProcessingOperations;
+import Extrinsic.Runtime.RegistrationOperations;
 import Extrinsic.Runtime.SpatialIndexCache;
 import Extrinsic.Runtime.WorldRegistry;
 import Extrinsic.Runtime.SelectionController;
@@ -74,9 +74,10 @@ TEST(RegistrationDomains, EveryCanonicalPointDomainAcceptsCrossDomainBindingsAnd
         R::SpatialIndexCache cache(worlds);
         auto source=Make(scene,D(sourceDomain),{}), target=Make(scene,D(targetDomain),{7,-2,3});
         R::EditorCommandHistory history;
-        R::EditorGeometryProcessingContext context{.Scene=&scene,.World=world,.CommandHistory=&history,.SpatialIndices=&cache};
-        auto before=R::GetEditorRegistrationInputCatalog(context,R::SelectionController::ToStableEntityId(source));
-        auto result=R::ApplyEditorRegistrationCommand(context,{
+        R::EditorProcessingContext context{.Scene=&scene,.World=world,.CommandHistory=&history,.SpatialIndices=&cache};
+        const auto commands=R::BindEditorProcessingCommands(context);
+        auto before=R::GetEditorRegistrationInputCatalog(commands,R::SelectionController::ToStableEntityId(source));
+        auto result=R::ApplyEditorRegistrationCommand(commands,{
             .SourceStableEntityId=R::SelectionController::ToStableEntityId(source),
             .TargetStableEntityId=R::SelectionController::ToStableEntityId(target),
             .InlierRatio=1.,.TrajectoryStep=50,.SourcePositions=Ref(D(sourceDomain)),
@@ -93,7 +94,7 @@ TEST(RegistrationDomains, EveryCanonicalPointDomainAcceptsCrossDomainBindingsAnd
         const auto* props=R::ResolveGeometryPropertySet(R::BuildGeometryAvailability(scene.Raw(),source),D(sourceDomain));
         EXPECT_EQ(props->Get<float>("keep")[0],42.f);
         EXPECT_EQ(props->Get<glm::vec3>("samples")[0],points[0]);
-        EXPECT_EQ(before.Entries.size(),R::GetEditorRegistrationInputCatalog(context,R::SelectionController::ToStableEntityId(source)).Entries.size());
+        EXPECT_EQ(before.Entries.size(),R::GetEditorRegistrationInputCatalog(commands,R::SelectionController::ToStableEntityId(source)).Entries.size());
         EXPECT_FALSE(result.TargetIndexReused);
     }
 }
@@ -112,8 +113,9 @@ TEST(RegistrationDomains, CacheUsesEntityMetricAndRebuildsAfterTargetTransformOr
     EXPECT_FALSE(cache.Snapshot(acquired.Handle));
     EXPECT_FALSE(cache.Acquire(world,target,ref,R::SpatialIndexSpace::EntityTransform).Reused);
     EXPECT_EQ(snapshot->Index.Points()[1],glm::vec3(4,0,0)); // retained CPU lease
-    R::EditorGeometryProcessingContext context{.Scene=&scene,.World=world,.SpatialIndices=&cache};
-    auto result=R::ApplyEditorRegistrationCommand(context,{
+    R::EditorProcessingContext context{.Scene=&scene,.World=world,.SpatialIndices=&cache};
+    const auto commands=R::BindEditorProcessingCommands(context);
+    auto result=R::ApplyEditorRegistrationCommand(commands,{
         .SourceStableEntityId=R::SelectionController::ToStableEntityId(source),
         .TargetStableEntityId=R::SelectionController::ToStableEntityId(target),
         .SourcePositions=ref,.TargetPositions=ref,.Backend=R::RegistrationBackend::VulkanLBVH});
@@ -143,10 +145,11 @@ TEST(RegistrationDomains, QueuedMixedDomainBindingRevisionAndDeletionChangesDisc
     {
         Extrinsic::ECS::Scene::Registry scene;
         auto source=Make(scene,D::GraphHalfedge,{}), target=Make(scene,D::MeshFace,{2,3,4});
-        Intrinsic::Tests::EditorFeatureTestContext context;
+        R::EditorProcessingContext context;
         R::EditorCommandHistory history;context.Scene=&scene;context.CommandHistory=&history;
         Extrinsic::Tests::EditorJobHarness jobs;jobs.Attach(context);
-        auto result=R::ApplyEditorRegistrationCommand(context,{
+        const auto commands=R::BindEditorProcessingCommands(context);
+        auto result=R::ApplyEditorRegistrationCommand(commands,{
             .SourceStableEntityId=R::SelectionController::ToStableEntityId(source),
             .TargetStableEntityId=R::SelectionController::ToStableEntityId(target),
             .TrajectoryStep=50,.SourcePositions=Ref(D::GraphHalfedge),.TargetPositions=Ref(D::MeshFace)});
@@ -168,7 +171,7 @@ TEST(RegistrationConfig, SharedPreviewApplyAndConfiguredRunUseCanonicalOperands)
     namespace Config=Extrinsic::Core::Config;
     Extrinsic::ECS::Scene::Registry scene;
     auto source=Make(scene,D::GraphEdge,{}), target=Make(scene,D::MeshFace,{2,3,4});
-    R::EditorGeometryProcessingContext context{.Scene=&scene};
+    R::EditorProcessingContext context{.Scene=&scene};
     Config::EngineConfigSectionRegistry registry;
     ASSERT_TRUE(registry.Register(R::MakeRegistrationConfigSectionRegistration()));
     R::RuntimeEngineConfigControlState state;
@@ -180,7 +183,7 @@ TEST(RegistrationConfig, SharedPreviewApplyAndConfiguredRunUseCanonicalOperands)
     context.ApplyEngineConfigHotSubset=[&](const Config::EngineConfigLoadResult& preview){
         ++applies;state.ActiveConfig=preview.Preview.Config;
         return R::RuntimeEngineConfigApplyResult{.Status=R::RuntimeEngineConfigApplyStatus::Applied};};
-    auto commands=R::BindEditorGeometryProcessingCommands(context);
+    auto commands=R::BindEditorProcessingCommands(context);
     R::RegistrationConfig config{
         .SourceStableEntityId=R::SelectionController::ToStableEntityId(source),
         .TargetStableEntityId=R::SelectionController::ToStableEntityId(target),
@@ -208,8 +211,9 @@ TEST(RegistrationDomains, RigidPublicationPreservesSignedNonuniformAndZeroScale)
         targetPose.Scale = scale;
         targetPose.Position = {4.f,-2.f,1.f};
         R::EditorCommandHistory history;
-        R::EditorGeometryProcessingContext context{.Scene=&scene,.CommandHistory=&history};
-        const auto result = R::ApplyEditorRegistrationCommand(context,{
+        R::EditorProcessingContext context{.Scene=&scene,.CommandHistory=&history};
+        const auto commands=R::BindEditorProcessingCommands(context);
+        const auto result = R::ApplyEditorRegistrationCommand(commands,{
             .SourceStableEntityId=R::SelectionController::ToStableEntityId(source),
             .TargetStableEntityId=R::SelectionController::ToStableEntityId(target),
             .InlierRatio=1.,.TrajectoryStep=50,

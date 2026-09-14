@@ -1,3 +1,8 @@
+#include <functional>
+#include <span>
+#include <glm/vec3.hpp>
+#include <glm/vec4.hpp>
+#include <glm/vec2.hpp>
 #include <algorithm>
 #include <array>
 #include <cstddef>
@@ -17,6 +22,13 @@
 
 #include "RuntimeTestModule.hpp"
 
+import Extrinsic.Runtime.NormalOperations;
+import Extrinsic.Runtime.RegistrationOperations;
+import Extrinsic.Runtime.MeshFieldOperations;
+import Extrinsic.Runtime.MeshTopologyOperations;
+import Extrinsic.Runtime.ParameterizationOperations;
+import Extrinsic.Runtime.PointFieldOperations;
+import Extrinsic.Runtime.PointAnalysisOperations;
 import Extrinsic.Core.Config.Engine;
 import Extrinsic.Core.Config.Window;
 import Extrinsic.ECS.Components.GeometrySources;
@@ -32,6 +44,10 @@ import Extrinsic.Runtime.Engine;
 import Extrinsic.Runtime.EngineConfigBoot;
 import Extrinsic.Runtime.EngineConfigControl;
 import Extrinsic.Runtime.GeometryProcessingOperations;
+import Extrinsic.Runtime.EditorProcessing;
+import Extrinsic.Runtime.PointCloudServiceOperations;
+import Extrinsic.Runtime.PointSetOperations;
+import Extrinsic.Runtime.PointConstructionOperations;
 import Extrinsic.Runtime.KernelEvents;
 import Extrinsic.Runtime.PointCloudConsolidationConfig;
 import Extrinsic.Runtime.PointCloudConsolidationModule;
@@ -43,6 +59,14 @@ import Extrinsic.Sandbox.ConfigSections;
 import Extrinsic.Sandbox.Editor.MethodPanels;
 import Extrinsic.Sandbox.Editor.Shell;
 import Geometry.Properties;
+import Extrinsic.Runtime.GeometryPresentation;
+import Extrinsic.Runtime.TextureBakeModule;
+import Extrinsic.Runtime.RenderRecipeEditingOperations;
+import Extrinsic.Runtime.SceneEditingOperations;
+import Extrinsic.Runtime.ParameterizationConfig;
+import Extrinsic.Runtime.PointCloudConsolidationTypes;
+
+#include "../../../src/app/Sandbox/Editor/Sandbox.PanelSupport.hpp"
 
 namespace Config = Extrinsic::Core::Config;
 namespace ECS = Extrinsic::ECS;
@@ -572,8 +596,8 @@ TEST(SandboxPointCloudConsolidationPanel,
         Runtime::GeometryElementDomain::MeshFace,
         "f:centroid"));
 
-    const Runtime::EditorGeometryProcessingPreparedFrame prepared =
-        Runtime::PrepareEditorGeometryProcessingFrame(attachment);
+    const Runtime::EditorPointCloudServicePreparedFrame prepared =
+        Runtime::PrepareEditorPointCloudServiceFrame(attachment);
     ASSERT_TRUE(prepared.Commands.IsBound());
     ASSERT_TRUE(prepared.PointCloudConsolidationAvailable);
 
@@ -610,6 +634,7 @@ TEST(SandboxPointCloudConsolidationPanel,
         const Runtime::PointCloudConsolidationAvailability availability =
             Runtime::ResolveEditorPointCloudConsolidationAvailability(
                 prepared.Commands,
+                prepared.PointCloudConsolidation,
                 panelRequest->Execute);
         EXPECT_TRUE(availability.Available) << availability.Message;
         EXPECT_EQ(availability.InputPointCount, 25u);
@@ -685,8 +710,8 @@ TEST(SandboxPointCloudConsolidationPanel,
                            Geometry::PropertyValueKind::Vec3;
             }));
 
-        const Runtime::EditorGeometryProcessingPreparedFrame prepared =
-            Runtime::PrepareEditorGeometryProcessingFrame(attachment);
+        const Runtime::EditorPointCloudServicePreparedFrame prepared =
+            Runtime::PrepareEditorPointCloudServiceFrame(attachment);
         Runtime::PointCloudConsolidationPropertyRefs properties =
             Runtime::MakePointCloudConsolidationPropertyRefs(
                 domain,
@@ -702,6 +727,7 @@ TEST(SandboxPointCloudConsolidationPanel,
         const Runtime::PointCloudConsolidationAvailability availability =
             Runtime::ResolveEditorPointCloudConsolidationAvailability(
                 prepared.Commands,
+                prepared.PointCloudConsolidation,
                 request->Execute);
         EXPECT_TRUE(availability.Available) << availability.Message;
         EXPECT_EQ(availability.InputPointCount, 25u);
@@ -749,16 +775,17 @@ TEST(SandboxPointCloudConsolidationPanel,
     attachment.Attach(engine.Worlds(), engine.Services());
     ASSERT_TRUE(
         Runtime::PrepareEditorWorkspaceSnapshotFrame(attachment).has_value());
-    const Runtime::EditorGeometryProcessingPreparedFrame prepared =
-        Runtime::PrepareEditorGeometryProcessingFrame(attachment);
+    const Runtime::EditorPointCloudServicePreparedFrame prepared =
+        Runtime::PrepareEditorPointCloudServiceFrame(attachment);
     ASSERT_TRUE(prepared.Commands.IsBound());
-    ASSERT_TRUE(prepared.ConfigCommandsAvailable);
+    ASSERT_TRUE(Runtime::AreEditorProcessingConfigCommandsAvailable(prepared.Commands));
     ASSERT_TRUE(prepared.PointCloudConsolidationAvailable);
 
     Editor::SandboxEditorContext context{};
-    context.GeometryCommands = prepared.Commands;
-    context.GeometryConfigCommandsAvailable =
-        prepared.ConfigCommandsAvailable;
+    context.Processing = prepared.Commands;
+    context.PointCloudService = prepared;
+    context.ProcessingConfigCommandsAvailable =
+        Runtime::AreEditorProcessingConfigCommandsAvailable(prepared.Commands);
     context.PointCloudConsolidationAvailable =
         prepared.PointCloudConsolidationAvailable;
 
@@ -822,8 +849,8 @@ TEST(SandboxPointCloudConsolidationPanel,
 
     ASSERT_TRUE(
         Runtime::PrepareEditorWorkspaceSnapshotFrame(attachment).has_value());
-    const Runtime::EditorGeometryProcessingPreparedFrame completed =
-        Runtime::PrepareEditorGeometryProcessingFrame(attachment);
+    const Runtime::EditorPointCloudServicePreparedFrame completed =
+        Runtime::PrepareEditorPointCloudServiceFrame(attachment);
     ASSERT_TRUE(
         completed.Results.LastPointCloudConsolidationResult.has_value());
     EXPECT_TRUE(

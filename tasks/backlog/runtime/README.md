@@ -7,6 +7,9 @@ another backlog directory.
 
 ## Runtime backlog tasks
 
+- [RUNTIME-231 — Shared density/spacing property-operation pilot](../../active/RUNTIME-231-shared-point-property-operations.md)
+  owns the bounded runtime follow-up to the processing complexity review.
+
 ### Framework24 product convergence
 
 - [`RUNTIME-218`](RUNTIME-218-default-scene-lighting-and-light-authoring.md)

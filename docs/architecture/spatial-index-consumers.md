@@ -32,7 +32,9 @@ Moving runtime samples can use `SpatialIndexCache::CreateWorkspace`, retaining
 its immutable snapshot lease while querying. The handle expires when the last
 caller lease is released; pending GPU batches keep resources alive to safe
 completion. Bilateral filtering rebuilds these private indices after each pass.
-Lower-layer kernels and dedicated compute pipelines can continue using a
+The cache's GPU surface is the framed queues; it records builds and queries
+privately from its own frame participant. Lower-layer kernels and dedicated
+compute pipelines that need their own recording or traversal keep using a
 method-owned `Graphics::PointLbvhWorkspace` or geometry index; neither requires
 an ECS component or unconditional per-frame build. Device-thread submission,
 barriers and retirement rules still apply. Physics owns its CPU simulation
@@ -51,7 +53,7 @@ path; selecting Vulkan must not imply every stage uses an LBVH.
 
 | Consumer and source | Existing mechanism / useful LBVH work | Ownership and integration condition |
 | --- | --- | --- |
-| [Entity spatial queries](../../src/runtime/GeometryIntegration/Runtime.SpatialIndexCache.cpp) | **Wired:** CPU nearest/k-nearest/radius and recorded/framed GPU batched queries over canonical float3 properties. | Shared runtime cache; all compatible mesh/graph/point-cloud element domains retain source IDs. |
+| [Entity spatial queries](../../src/runtime/GeometryIntegration/Runtime.SpatialIndexCache.cpp) | **Wired:** CPU nearest/k-nearest/radius and framed GPU batched query queues over canonical float3 properties. | Shared runtime cache; all compatible mesh/graph/point-cloud element domains retain source IDs. |
 | [K-means assignment](../../src/runtime/Modules/Clustering/Runtime.ClusteringGpuState.cpp), [CPU kernel](../../src/geometry/Geometry.KMeans.cpp) | **Wired on Vulkan:** nearest moving centroid each iteration. CPU reference/optimized paths retain their scan/KD-tree behavior. | Private centroid workspace, rebuilt per iteration with reused storage. Any CPU migration needs its own comparison; small cluster counts can favor scans. |
 | [ICP registration](../../src/geometry/Geometry.Registration.cpp) and Framework24 point correspondence | CPU KD-tree reference, cached CPU LBVH, or framed Vulkan LBVH nearest correspondences; all use the shared CPU solve. | Integrated through `SpatialIndexCache` immutable target snapshots and reusable batches. Canonical domains, deletion mapping, entity-transform metric and stale-result checks are preserved; see [registration](registration.md). |
 | [PCA point normals and MST orientation](../../src/geometry/Geometry.PointCloud.Normals.cpp) | **Integrated CPU and Vulkan LBVH neighborhood consumer** through shared normal config/commands, alongside existing KD-tree/octree kernel paths; radius or kNN neighborhoods feed local PCA and orientation edges. | Preserve complete radius support and existing k+1-then-filter policy. [Normal estimation](normal-estimation.md) uses canonical-domain cache leases and named publication (RUNTIME-213/UI-045, RUNTIME-219). Vulkan queries use bounded chunks, at most 64 kNN candidates including the extra self candidate, and reject radius support above 1024 hits. MST orientation and PCA solve remain CPU work; topology normal methods do not use proximity indices. |

@@ -4,7 +4,7 @@ module;
 #include <optional>
 #include <string>
 #include <string_view>
-#include <glm/glm.hpp>
+#include <glm/vec3.hpp>
 export module Extrinsic.Runtime.NormalEstimationConfig;
 export import Extrinsic.Runtime.GeometryAvailability;
 export import Geometry.PointCloud.Normals;

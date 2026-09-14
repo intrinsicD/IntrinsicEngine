@@ -1139,7 +1139,15 @@ TEST(RuntimeEngineLayering, ProductionAsyncSubmissionsCarryOwningWorldScope)
     const auto geometryOperations =
         ReadFile(RepoRoot() / "src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.cpp");
     const auto geometryMeshOperations =
-        ReadFile(RepoRoot() / "src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Mesh.cpp");
+        (ReadFile(RepoRoot() / "src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Mesh.cpp")
+        + ReadFile(RepoRoot() / "src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.MeshSupport.cpp")
+        + ReadFile(RepoRoot() / "src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Registration.cpp")
+        + ReadFile(RepoRoot() / "src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Uv.cpp")
+        + ReadFile(RepoRoot() / "src/runtime/Editor/Operations/Runtime.MeshFieldOperations.Curvature.cpp")
+        + ReadFile(RepoRoot() / "src/runtime/Editor/Operations/Runtime.MeshFieldOperations.Geodesics.cpp")
+        + ReadFile(RepoRoot() / "src/runtime/Editor/Operations/Runtime.MeshTopologyOperations.Topology.cpp"));
+    const auto normalOperations = ReadFile(RepoRoot() /
+        "src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Normals.cpp");
     const auto clusteringModule = ReadFile(
         RepoRoot() /
         "src/runtime/Modules/Clustering/Runtime.ClusteringModule.cpp");
@@ -1185,12 +1193,13 @@ TEST(RuntimeEngineLayering, ProductionAsyncSubmissionsCarryOwningWorldScope)
         WithoutWhitespace(clusteringModule).find(
             "returnKMeansSnapshot{.Command=command,.World=world"),
         std::string::npos);
-    // RUNTIME-194 Slice B5d moved all five desc factories to JobService. The
-    // invariant under test is unchanged — every production async submission
-    // carries its owning world scope.
+    // Every remaining geometry factory and both normal jobs carry their owning world scope.
     EXPECT_EQ(CountOccurrences(geometryMeshOperations, "return DerivedJobDesc{"), 0u);
-    EXPECT_EQ(CountOccurrences(geometryMeshOperations, "return JobDesc{"), 5u);
-    EXPECT_EQ(CountOccurrences(geometryMeshOperations, ".Scope = context.World"), 5u);
+    EXPECT_EQ(CountOccurrences(geometryMeshOperations, "return JobDesc{"), 4u);
+    EXPECT_EQ(CountOccurrences(geometryMeshOperations, ".Scope = context.World"), 4u);
+    EXPECT_EQ(CountOccurrences(normalOperations, "JobDesc desc{"), 1u);
+    EXPECT_EQ(CountOccurrences(normalOperations, "JobDesc gpu{"), 1u);
+    EXPECT_EQ(CountOccurrences(normalOperations, ".Scope = context.World"), 2u);
     EXPECT_EQ(CountOccurrences(
                   workspaceSession,
                   "desc.Scope = m_Worlds->ActiveWorld()"),
@@ -1201,11 +1210,12 @@ TEST(RuntimeEngineLayering, ProductionAsyncSubmissionsCarryOwningWorldScope)
     EXPECT_EQ(CountOccurrences(assetWorkflow, ".Worlds = Worlds"), 1u);
 }
 
+
 TEST(RuntimeEngineLayering, SandboxEditorJobsUseSingleJobServiceSurface)
 {
     const auto editorDetailInterface =
         ReadFile(RepoRoot() /
-                 "src/runtime/Editor/internal/Runtime.EditorFeatures.Detail.cppm");
+                 "src/runtime/Editor/internal/Runtime.EditorFeatures.Internal.hpp");
     const auto jobProjectionInterface =
         ReadFile(RepoRoot() /
                  "src/runtime/Editor/Runtime.EditorJobProjection.cppm");
@@ -2034,7 +2044,7 @@ TEST(RuntimeEngineLayering, RetiredSpatialDebugRegistryHasNoProductionSurface)
         ReadFile(RepoRoot() / "src/runtime/Editor/Runtime.EditorCommandHistory.cppm");
     const auto editorFeatureInterface =
         ReadFile(RepoRoot() /
-                 "src/runtime/Editor/internal/Runtime.EditorFeatures.Detail.cppm");
+                 "src/runtime/Editor/internal/Runtime.EditorFeatures.Internal.hpp");
 
     // No retired module is published.
     EXPECT_EQ(moduleInventory.find("Extrinsic.Runtime.SpatialDebugAdapters"),
@@ -2135,13 +2145,19 @@ TEST(RuntimeEngineLayering,
 // cannot reappear.
 TEST(RuntimeEngineLayering, NoDuplicateGeometryPropertyVocabularyRemains)
 {
-    const std::array<std::filesystem::path, 7> sources{
+    const std::array<std::filesystem::path, 13> sources{
         RepoRoot() / "src/runtime/GeometryIntegration/Runtime.GeometryPresentation.cppm",
         RepoRoot() / "src/runtime/GeometryIntegration/Runtime.GeometryPresentation.cpp",
-        RepoRoot() / "src/runtime/Editor/internal/Runtime.EditorFeatures.Detail.cppm",
+        RepoRoot() / "src/runtime/Editor/internal/Runtime.EditorFeatures.Internal.hpp",
         RepoRoot() / "src/runtime/Editor/internal/Runtime.EditorWorkspaceSession.cpp",
         RepoRoot() / "src/runtime/Editor/Runtime.EditorWorkspaceSnapshots.Models.cpp",
         RepoRoot() / "src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Mesh.cpp",
+        RepoRoot() / "src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.MeshSupport.cpp",
+        RepoRoot() / "src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Registration.cpp",
+        RepoRoot() / "src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Uv.cpp",
+        RepoRoot() / "src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.MeshSupport.hpp",
+        RepoRoot() / "src/runtime/Editor/Operations/Runtime.MeshFieldOperations.Curvature.cpp",
+        RepoRoot() / "src/runtime/Editor/Operations/Runtime.MeshTopologyOperations.Topology.cpp",
         RepoRoot() / "src/runtime/Modules/TextureBake/Runtime.TextureBakeModule.cpp",
     };
 

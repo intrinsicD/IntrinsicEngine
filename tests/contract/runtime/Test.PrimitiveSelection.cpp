@@ -17,6 +17,7 @@ import Extrinsic.Runtime.SelectionController;
 import Extrinsic.Runtime.SceneInteractionModule;
 import Extrinsic.Runtime.RenderExtraction;
 import Extrinsic.Runtime.GeometryProcessingOperations;
+import Extrinsic.Runtime.MeshFieldOperations;
 import Geometry.HalfedgeMesh;
 import Geometry.Graph;
 import Geometry.PointCloud;
@@ -180,11 +181,11 @@ TEST(PrimitiveSelection, HighlightSnapshotAndMethodUseDoNotOverwriteProperties)
     ASSERT_EQ(snapshot.DebugPoints.size(), 2);
     EXPECT_EQ(snapshot.DebugLines.size(), 3);
     EXPECT_EQ(snapshot.DebugPoints[0].Position, glm::vec3(1, 1, 0));
-    R::EditorGeometryProcessingContext context{.Scene = &h.Scene, .Selection = &h.Selection};
-    const auto commands = R::BindEditorGeometryProcessingCommands(context);
-    const auto selected = R::ReadEditorPrimitiveSelection(commands, h.Id, D::MeshVertex);
+    R::EditorProcessingContext context{.Scene = &h.Scene, .Selection = &h.Selection};
+    const auto processing = R::BindEditorProcessingCommands(context);
+    const auto selected = R::ReadEditorPrimitiveSelection(processing, h.Id, D::MeshVertex);
     R::EditorGeodesicsCommand method{h.Id, {.SourceVertices = selected.Indices}};
-    const auto result = R::ApplyEditorGeodesicsCommand(context, method);
+    const auto result = R::ApplyEditorGeodesicsCommand(processing, method);
     ASSERT_TRUE(result.Succeeded()) << result.Message;
     EXPECT_DOUBLE_EQ(result.Diagnostics.Distances[0], 0);
     EXPECT_DOUBLE_EQ(result.Diagnostics.Distances[2], 0);
@@ -210,8 +211,8 @@ TEST(PrimitiveSelection, ConfigValidationAndExpiredCommandsFailClosed)
         EXPECT_FALSE(R::ValidateSelectionConfigSection(text, {}, {}).Usable());
     Harness h;
     bool active = true;
-    const auto commands = R::BindEditorGeometryProcessingCommands(
-        {.Scene = &h.Scene, .Selection = &h.Selection, .AttachmentActive = [&] { return active; }});
+    const auto commands = R::BindEditorProcessingCommands(
+        [&] { R::EditorProcessingContext context{}; context.Scene=&h.Scene; context.Selection=&h.Selection; context.AttachmentActive=[&] { return active; }; return context; }());
     active = false;
     const std::array values{0u};
     EXPECT_FALSE(
@@ -229,7 +230,7 @@ TEST(PrimitiveSelection, SettingsUseSharedPreviewApplyAndRemainReproducible)
     R::RuntimeEngineConfigControlState state;
     Config::PopulateEngineConfigSectionDefaults(state.ActiveConfig, registry);
     int previews = 0, applies = 0;
-    R::EditorGeometryProcessingContext context;
+    R::EditorProcessingContext context;
     context.EngineConfigControlState = &state;
     context.EngineConfigCommandsAvailable = true;
     context.PreviewEngineConfigDocument = [&](const std::string& document, const std::string& source) {
@@ -241,7 +242,7 @@ TEST(PrimitiveSelection, SettingsUseSharedPreviewApplyAndRemainReproducible)
         state.ActiveConfig = preview.Preview.Config;
         return R::RuntimeEngineConfigApplyResult{.Status = R::RuntimeEngineConfigApplyStatus::Applied};
     };
-    const auto commands = R::BindEditorGeometryProcessingCommands(context);
+    const auto commands = R::BindEditorProcessingCommands(context);
     const R::SelectionInteractionConfig config{.Target = R::SelectionTarget::Face, .Highlight = false, .PointRadius = 0.1f};
     ASSERT_TRUE(R::ApplyEditorSelectionInteractionConfig(commands, config).Succeeded());
     EXPECT_EQ(previews, 1);

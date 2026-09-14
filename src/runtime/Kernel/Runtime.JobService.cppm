@@ -1,3 +1,5 @@
+// Runtime job scheduling, cancellation and main-thread publication contracts.
+// Keeps asynchronous work and its terminal reconciliation under one owner.
 module;
 
 #include <cstddef>
@@ -15,11 +17,16 @@ module;
 export module Extrinsic.Runtime.JobService;
 
 import Extrinsic.Core.Dag.Scheduler;
-import Extrinsic.Core.FrameGraph;
+import Extrinsic.Core.Hash;
 import Extrinsic.Core.StrongHandle;
-import Extrinsic.RHI.CommandContext;
 import Extrinsic.Runtime.KernelEvents;
 import Extrinsic.Runtime.WorldHandle;
+
+// GPU participants are only ever handed a command context by reference here.
+// C++ language linkage matches the globally attached definition in
+// `Extrinsic.RHI.CommandContext`, so CPU job declarations stay out of the RHI
+// handle/descriptor closure; anything that records commands imports the owner.
+extern "C++" { namespace Extrinsic::RHI { class ICommandContext; } }
 
 namespace Extrinsic::Runtime
 {
@@ -214,11 +221,10 @@ namespace Extrinsic::Runtime
 
         // Main-thread reconciliation for a job that terminates *without*
         // publishing: cancelled, discarded as stale, dependency-cancelled, or
-        // dropped. Exactly one of `PublishCompletion` and this runs per
-        // submitted job, both on the main thread from a completion drain, so a
-        // consumer that owns control state (an ingest state machine, a pending
-        // request slot) can never be left waiting on a result that will never
-        // arrive. Invoked outside the service lock, so it may submit or cancel.
+        // dropped. Also runs when `PublishCompletion` returns false; consumers
+        // that report that failure from the publisher must suppress duplicate
+        // terminal delivery. Runs once on the main thread from a completion
+        // drain, outside the service lock, so it may submit or cancel.
         //
         // This is the superset of the retired
         // `StreamingTaskDesc::FinalizeCancellationOnMainThread`, which fired on

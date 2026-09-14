@@ -21,6 +21,22 @@ contract_review: "No new engine contract is proposed; this note investigates the
 - A subsequent preset rebuild with `CCACHE_DISABLE=1` passed, followed by the full CPU cohort and real Vulkan registration checks. No speculative source workaround was added. The precise cache-versus-build-input cause is not established.
 - [ICP review](../../../docs/reviews/2026-09-08-icp-spatial-integration.md) records the successful verification and bounded diagnosis.
 
+
+### 2026-09-12 processing cleanup observation
+
+The cached `ci-vulkan` rebuild of `IntrinsicPointLBVHGpuTests` failed in Keypoints
+and Outliers with invalid UTF-8 diagnostics against compiler built-ins and a
+Clang frontend crash. The same preset uses Clang 23 with ASan+UBSan. Include-only
+review edits overlapped this build, so this run cannot distinguish source-input
+changes from cache/module corruption and is not an isolated compiler reproducer.
+The stabilized `CCACHE_DISABLE=1` retry built the complete target, followed by
+nine passing affected GPU integration cases under ASan+UBSan. The linked cleanup
+review records the commands and outcomes.
+No source workaround or gate weakening was introduced. Evidence:
+`build/analysis/point-inputs-2026-09-12/vulkan-build-cached-failure.log` and
+`build/analysis/point-inputs-2026-09-12/vulkan-build-no-cache.log`.
+See [processing cleanup review](../../../docs/reviews/2026-09-11-processing-complexity-review.md).
+
 ## Acceptance criteria
 - [ ] Reproduce with one stabilized source surface and exactly one writer per preset tree, comparing enabled/disabled ccache and a fresh tree.
 - [ ] Record the compiler/cache cause or a bounded non-reproduction; preserve the existing strict module/toolchain gates.

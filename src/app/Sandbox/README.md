@@ -27,9 +27,9 @@ observations because this report is its production reader. Sandbox default
 input policy similarly imports `Extrinsic.Runtime.InputActions` and registers
 against the published `RuntimeInputActionRegistry`, with no Engine forwarding
 method.
-`Sandbox.ConfigSections` is the pre-boot composition surface for the current
+`Sandbox.ConfigSections` is the pre-boot composition surface for runtime configuration, including
 `sandbox.clustering`, `sandbox.progressive_poisson`,
-`sandbox.curvature_segmentation`,
+`sandbox.mesh_curvature`, `sandbox.curvature_segmentation`,
 `sandbox.parameterization`, `sandbox.point_cloud_consolidation`, and
 `sandbox.physics` records.
 Their runtime feature modules own the typed DTOs/codecs. `main.cpp` constructs the
@@ -114,7 +114,16 @@ presentation while the module owns adapter/overlay/action/hook lifecycle.
 Runtime exposes presentation-free workspace snapshots, job projections, and
 focused scene, geometry, visualization, and render-recipe operations. The shell
 copies prepared bindings/snapshots into app-owned `SandboxEditorContext` and
-`SandboxEditorFrame` records. `Sandbox.Editor.MethodPanels` owns the K-Means,
+`SandboxEditorFrame` records. The private `Sandbox.PanelSupport.hpp` shares those records, drawing controls,
+and method-panel action models between implementations and integration tests.
+It also owns the one UV-regeneration block (`DrawSandboxUvRegenerationControls`):
+atlas parameters, submission through `Parameterization.Commands` with the
+session's `ResultSinks.UvRegeneration` terminal callback, once-per-result
+atlas-extent adoption into the bake width/height, status and dismissal. Both
+texture-bake panels call it; neither submits the command itself.
+Registration-only interfaces use `Sandbox.EditorFwd.hpp`; they do not expose
+complete drawing state.
+`Sandbox.Editor.MethodPanels` owns the K-Means,
 Progressive Poisson, parameterization, and point-cloud consolidation ImGui
 controls and registers eight
 domain windows through the shell's context-aware contribution seam. Progressive
@@ -134,6 +143,34 @@ actual backend/fallback, and measured average/maximum displacement.
 `Sandbox.Editor.MeshProcessingPanels`
 owns the ICP registration window plus the mesh denoise, curvature, remesh,
 subdivide, simplify, and the shared [normal-estimation window](../../../docs/architecture/normal-estimation.md).
+Processing Entity inputs initialize from the live selection, follow selection
+changes, and clear when selection is cleared or the selected entity is deleted.
+Explicit input choices persist until the next selection change. ICP uses the
+first two selected entities for source and target, leaving missing slots empty.
+Every processing panel has an entity chooser, including mesh editing, Curvature,
+Segmentation, Geodesics, K-Means, Progressive Poisson, Consolidation, and UV
+Parameterization. Property catalogs, preflight, commands, Show actions, and UV
+preview use that input without changing the scene selection. Manual choices also
+persist while scene selection is empty; clearing or changing the selection resets
+the defaults. ICP exposes separate Source and Target choosers and property slots.
+
+Backend controls describe algorithm execution. CPU methods expose a CPU backend;
+implemented GPU neighborhood queries appear separately under **Acceleration**.
+The stored backend tokens retain their existing config and command semantics.
+
+| Method panels | Algorithm backend | CPU acceleration choices |
+| --- | --- | --- |
+| Mesh denoise, curvature, segmentation, remesh, subdivision, simplification, geodesics, parameterization | CPU | None |
+| Normal PCA, ISS, FPFH, density weights, ICP | CPU | CPU KD-tree, cached CPU LBVH, Vulkan LBVH |
+| Outliers, kernel density, spacing, bilateral point filtering | CPU | CPU octree, cached CPU LBVH, Vulkan LBVH |
+| Point construction | CPU | CPU reference neighborhoods, cached CPU LBVH, Vulkan LBVH |
+| K-Means, Progressive Poisson | CPU or Vulkan | No separate acceleration option |
+| Consolidation | CPU or Vulkan | CPU reference neighborhoods, CPU LBVH for LOP, Vulkan LBVH |
+
+Topology-based normal estimation uses CPU directly. Vulkan execution owns its GPU
+structures; its UI does not offer a separate CPU acceleration selector. Runtime
+results continue to report the requested path, actual execution, and any fallback.
+
 The shared [Outlier Analysis window](../../../docs/architecture/outlier-analysis.md)
 provides statistical/radius detection on any compatible property domain, named
 mask/score display, and separate undoable point-cloud removal. Mesh, Graph and
@@ -141,19 +178,33 @@ PointCloud Processing menus open it; `sandbox.outlier_analysis` controls the sam
 CPU octree, cached CPU LBVH and Vulkan LBVH execution paths.
 The normal menus under Mesh, Graph and PointCloud open that shared window.
 Point PCA offers KD-tree, cached CPU LBVH and Vulkan LBVH neighborhoods with CPU
-fitting/orientation through the same persisted config.
+fitting/orientation through the same persisted config. **Show normals** selects
+the output property for Appearance color display on the corresponding surface,
+edge, or point layer. Processing Show actions resolve already-published output
+properties independently of whether the current method parameters can run.
 Mesh / Processing / Faces / Normals presets full-polygon face-normal computation
 and a face output (`f:normal`), with a button to display its object-space colors. It
 uses the persisted `sandbox.normal_estimation` config and canonical property bindings. The panels own their ImGui
 input/result-presentation state, and consumes only runtime snapshots and typed
-operations. The Curvature window includes production METHOD-037 and diagnostic
+operations. Curvature has its own `sandbox.mesh_curvature` config: a vertex
+position input, four scalar outputs, and two principal-direction outputs.
+**Show <property name>** selects an existing output through the same Appearance
+command path without recomputing it. Mesh / Processing / Curvature Segmentation
+is a separate window with production METHOD-037 and diagnostic
 METHOD-039/METHOD-040 choices through the registered
 `sandbox.curvature_segmentation` draft/apply/reload lane. Select **Feature
 boundaries (METHOD-040, experimental curves_v1)** and **Run segmentation** to
 inspect the fixed boundary profile. Configured Run uses the shared selected-mesh
-preflight and undoable property publication; Show result enables
-`f:curvature_region_color` on the surface and `e:curvature_feature_patch_color`
-on the edge overlay. METHOD-040 hides unused GMM controls and reports its own
+preflight and undoable property publication. Its position input and face/edge
+output names are editable, and each output has a Show button. Automatic display
+uses the configured region and feature colors on the surface and edge overlay.
+Progressive Poisson exposes its position, level, rank, radius, and prefix slots;
+Geodesics exposes editable distance/source-mask outputs; K-Means exposes typed
+position, label, and color slots. Parameterization exposes position/UV bindings,
+and its UV preview follows the configured output. Their Show buttons display
+existing properties independently of method readiness. Consolidation provides
+Show buttons for its position and normal outputs. Boolean masks and UV vectors
+use the shared Appearance color encoder. METHOD-040 hides unused GMM controls and reports its own
 boundary/cleanup diagnostics. It remains experimental and exposes no cut or
 UV-atlas action. Appearance groups surface, edge, and vertex property dropdowns
 for a selected mesh. Surface properties can use the shared UV texture-bake
@@ -254,7 +305,7 @@ and the separate Vulkan grid backend, Auto/Manual support radius, sampled-neighb
 limits, repulsion, stopping criteria, target count, and seed; strategy-specific
 controls cover WLOP anisotropy, CLOP mixture fitting, and EAR normal policy,
 refinement, and edge sensitivity. The window keeps a panel-local draft and
-validates it through `Runtime.GeometryProcessingOperations` before applying the
+validates it through `Runtime.PointCloudServiceOperations` before applying the
 registered `sandbox.point_cloud_consolidation` section with the `Editor`
 source. Running submits those full property references and that same typed
 config to
@@ -276,7 +327,7 @@ compatible property, or a valid strategy is unavailable, controls fail closed
 rather than using a panel-private path.
 
 `Mesh > Processing > Parameterize (UV)` exposes exactly the four CPU strategies
-implemented by `Runtime.GeometryProcessingOperations`: LSCM, harmonic cotangent, uniform Tutte, and
+implemented by `Runtime.ParameterizationOperations`: LSCM, harmonic cotangent, uniform Tutte, and
 Boundary First Flattening. Its controls keep an explicit panel-local draft for
 the selected strategy's typed values; edits remain marked as unapplied until
 the user applies or reloads the draft. Applying routes through the validated

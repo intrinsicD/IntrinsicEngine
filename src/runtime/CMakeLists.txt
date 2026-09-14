@@ -15,6 +15,7 @@ target_sources(${target_name}
         Kernel/Runtime.DeviceBootstrap.cppm
         Kernel/Runtime.JobService.cppm
         Modules/Clustering/Runtime.ClusteringModule.cppm
+        Modules/Clustering/Runtime.ClusteringTypes.cppm
         Modules/Clustering/Runtime.ClusteringGpuBackend.cppm
         GeometryIntegration/Runtime.GeometryPresentation.cppm
         Modules/ProgressivePoisson/Runtime.ProgressivePoissonGpuBackend.cppm
@@ -22,6 +23,7 @@ target_sources(${target_name}
         Modules/Clustering/Runtime.ClusteringConfig.cppm
         Modules/CurvatureSegmentation/Runtime.CurvatureSegmentationConfig.cppm
         Modules/ProgressivePoisson/Runtime.ProgressivePoissonConfig.cppm
+        Modules/Curvature/Runtime.MeshCurvatureConfig.cppm
         Modules/Geodesics/Runtime.GeodesicsConfig.cppm
         Modules/OutlierAnalysis/Runtime.OutlierAnalysisConfig.cppm
         Modules/KernelDensity/Runtime.KernelDensityConfig.cppm
@@ -36,8 +38,20 @@ target_sources(${target_name}
         Modules/Parameterization/Runtime.ParameterizationConfig.cppm
         Modules/PointCloudConsolidation/Runtime.PointCloudConsolidationConfig.cppm
         Modules/PointCloudConsolidation/Runtime.PointCloudConsolidationModule.cppm
+        Modules/PointCloudConsolidation/Runtime.PointCloudConsolidationTypes.cppm
         Editor/Runtime.EditorCommandHistory.cppm
         Editor/Runtime.EditorCommon.cppm
+        Editor/Runtime.EditorProcessing.cppm
+        Editor/Operations/Runtime.PointFieldOperations.cppm
+        Editor/Operations/Runtime.PointAnalysisOperations.cppm
+        Editor/Operations/Runtime.PointSetOperations.cppm
+        Editor/Operations/Runtime.PointConstructionOperations.cppm
+        Editor/Operations/Runtime.PointCloudServiceOperations.cppm
+        Editor/Operations/Runtime.NormalOperations.cppm
+        Editor/Operations/Runtime.RegistrationOperations.cppm
+        Editor/Operations/Runtime.MeshFieldOperations.cppm
+        Editor/Operations/Runtime.MeshTopologyOperations.cppm
+        Editor/Operations/Runtime.ParameterizationOperations.cppm
         Editor/Runtime.EditorWorkspaceAttachment.cppm
         Editor/Runtime.EditorWorkspaceSnapshots.cppm
         Editor/Runtime.EditorJobProjection.cppm
@@ -56,6 +70,7 @@ target_sources(${target_name}
         Kernel/Runtime.InputActions.cppm
         Kernel/Runtime.KernelEvents.cppm
         Kernel/Runtime.Module.cppm
+        Kernel/Runtime.ModuleLifecycle.cppm
         Kernel/Runtime.ServiceRegistry.cppm
         Kernel/Runtime.WorldHandle.cppm
         Kernel/Runtime.WorldRegistry.cppm
@@ -89,7 +104,6 @@ target_sources(${target_name}
         Config/internal/Runtime.FeatureConfigCodecs.Detail.cppm
         PRIVATE
         FILE_SET editor_feature_impl TYPE CXX_MODULES FILES
-        Editor/internal/Runtime.EditorFeatures.Detail.cppm
         Editor/internal/Runtime.EditorWorkspaceAttachment.Detail.cppm
         PRIVATE
         FILE_SET asset_workflow_impl TYPE CXX_MODULES FILES
@@ -117,6 +131,7 @@ target_sources(${target_name}
         Kernel/Runtime.DeviceBootstrap.cpp
         Kernel/Runtime.JobService.cpp
         Modules/Clustering/Runtime.ClusteringModule.cpp
+        Modules/Clustering/Runtime.ClusteringTypes.cpp
         Modules/Clustering/Runtime.ClusteringGpuBackend.cpp
         Modules/Clustering/Runtime.ClusteringGpuState.cpp
         GeometryIntegration/Runtime.GeometryPresentation.cpp
@@ -125,6 +140,7 @@ target_sources(${target_name}
         Modules/Clustering/Runtime.ClusteringConfig.cpp
         Modules/CurvatureSegmentation/Runtime.CurvatureSegmentationConfig.cpp
         Modules/ProgressivePoisson/Runtime.ProgressivePoissonConfig.cpp
+        Modules/Curvature/Runtime.MeshCurvatureConfig.cpp
         Modules/Geodesics/Runtime.GeodesicsConfig.cpp
         Modules/OutlierAnalysis/Runtime.OutlierAnalysisConfig.cpp
         Modules/KernelDensity/Runtime.KernelDensityConfig.cpp
@@ -138,6 +154,8 @@ target_sources(${target_name}
         Editor/Operations/Runtime.GeometryProcessingOperations.Density.cpp
         Editor/Operations/Runtime.GeometryProcessingOperations.Spacing.cpp
         Editor/Operations/Runtime.GeometryProcessingOperations.PointProperties.cpp
+        Editor/Operations/Runtime.GeometryProcessingOperations.MeshSources.cpp
+        Editor/Operations/Runtime.GeometryProcessingOperations.MeshSupport.cpp
         Editor/Operations/Runtime.GeometryProcessingOperations.Bilateral.cpp
         Editor/Operations/Runtime.GeometryProcessingOperations.Keypoints.cpp
         Editor/Operations/Runtime.GeometryProcessingOperations.Descriptors.cpp
@@ -150,6 +168,7 @@ target_sources(${target_name}
         Modules/Parameterization/Runtime.ParameterizationConfig.cpp
         Modules/PointCloudConsolidation/Runtime.PointCloudConsolidationConfig.cpp
         Modules/PointCloudConsolidation/Runtime.PointCloudConsolidationModule.cpp
+        Modules/PointCloudConsolidation/Runtime.PointCloudConsolidationTypes.cpp
         Modules/PointCloudConsolidation/Runtime.PointCloudConsolidationGpu.cpp
         Config/internal/Runtime.FeatureConfigCodecs.Detail.cpp
         Editor/Runtime.EditorCommandHistory.cpp
@@ -159,7 +178,6 @@ target_sources(${target_name}
         Editor/Operations/Runtime.SceneEditingOperations.Public.cpp
         Editor/Operations/Runtime.SceneEditingOperations.Actions.cpp
         Editor/Operations/Runtime.SceneEditingOperations.Debug.cpp
-        Editor/Operations/Runtime.GeometryProcessingOperations.Public.cpp
         Editor/Operations/Runtime.VisualizationEditingOperations.Public.cpp
         Editor/Operations/Runtime.VisualizationEditingOperations.Actions.cpp
         Editor/Operations/Runtime.VisualizationEditingOperations.Debug.cpp
@@ -167,9 +185,39 @@ target_sources(${target_name}
         Editor/Runtime.EditorWorkspaceSnapshots.Public.cpp
         Editor/Runtime.EditorWorkspaceSnapshots.Models.cpp
         Editor/internal/Runtime.EditorFeatureContextAdapters.cpp
+        Editor/internal/Runtime.EditorFeatures.Internal.hpp
+        Editor/internal/Runtime.EditorFeatureCommands.Internal.hpp
+        Editor/internal/Runtime.EditorFeatureProperties.Internal.hpp
+        Editor/internal/Runtime.EditorGeometryHelpers.hpp
+        Editor/Operations/Runtime.GeometryProcessingOperations.MeshSupport.hpp
+        Editor/Operations/Runtime.MeshFieldOperations.Properties.hpp
         Editor/internal/Runtime.EditorWorkspaceSession.cpp
         Editor/Operations/Runtime.GeometryProcessingOperations.cpp
+    Editor/Runtime.EditorProcessing.cpp
+    Editor/Operations/Runtime.PointFieldOperations.cpp
+    Editor/Operations/Runtime.PointAnalysisOperations.cpp
+        Editor/Operations/Runtime.PointCloudServiceOperations.cpp
+        Editor/Operations/Runtime.NormalOperations.cpp
+        Editor/Operations/Runtime.RegistrationOperations.cpp
+        Editor/Operations/Runtime.MeshFieldOperations.cpp
+        Editor/Operations/Runtime.MeshTopologyOperations.cpp
+    Editor/Operations/Runtime.PointFieldOperations.Frame.cpp
+    Editor/Operations/Runtime.PointAnalysisOperations.Frame.cpp
+        Editor/Operations/Runtime.PointSetOperations.Frame.cpp
+        Editor/Operations/Runtime.PointConstructionOperations.Frame.cpp
+        Editor/Operations/Runtime.PointCloudServiceOperations.Frame.cpp
+        Editor/Operations/Runtime.GeometryProcessingOperations.Frame.cpp
+        Editor/Operations/Runtime.NormalOperations.Frame.cpp
+        Editor/Operations/Runtime.RegistrationOperations.Frame.cpp
+        Editor/Operations/Runtime.MeshFieldOperations.Frame.cpp
+        Editor/Operations/Runtime.MeshTopologyOperations.Frame.cpp
+        Editor/Operations/Runtime.ParameterizationOperations.Frame.cpp
+        Editor/Operations/Runtime.MeshFieldOperations.Curvature.cpp
+        Editor/Operations/Runtime.MeshFieldOperations.Geodesics.cpp
+        Editor/Operations/Runtime.MeshTopologyOperations.Topology.cpp
         Editor/Operations/Runtime.GeometryProcessingOperations.Mesh.cpp
+        Editor/Operations/Runtime.GeometryProcessingOperations.Registration.cpp
+        Editor/Operations/Runtime.GeometryProcessingOperations.Uv.cpp
         Editor/Operations/Runtime.ParameterizationOperations.cpp
         Editor/Operations/Runtime.RenderRecipeEditingOperations.cpp
         Editor/Operations/Runtime.RenderRecipeEditingOperations.Debug.cpp

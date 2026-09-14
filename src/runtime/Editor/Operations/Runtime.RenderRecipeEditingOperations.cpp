@@ -27,20 +27,6 @@ namespace Extrinsic::Runtime
             });
         }
 
-        [[nodiscard]] const Graphics::RecipeExtensionSlotDescriptor*
-        FindRecipeSlot(const Graphics::RenderRecipeDescriptor& recipe,
-                       const std::string_view stableName) noexcept
-        {
-            const auto it = std::find_if(
-                recipe.Slots.begin(),
-                recipe.Slots.end(),
-                [stableName](const Graphics::RecipeExtensionSlotDescriptor& slot)
-                {
-                    return slot.StableName == stableName;
-                });
-            return it == recipe.Slots.end() ? nullptr : &*it;
-        }
-
         [[nodiscard]] bool RendererDeclaresSlot(
             const Graphics::RendererDescriptor& renderer,
             const std::string_view stableName) noexcept
@@ -366,7 +352,7 @@ namespace Extrinsic::Runtime
         for (const std::string& slotName : recipeContext.Renderer.DeclaredRecipeSlots)
         {
             if (const Graphics::RecipeExtensionSlotDescriptor* slot =
-                    FindRecipeSlot(recipe, slotName);
+                    Graphics::FindRecipeSlot(recipe, slotName);
                 slot != nullptr)
             {
                 model.Slots.push_back(

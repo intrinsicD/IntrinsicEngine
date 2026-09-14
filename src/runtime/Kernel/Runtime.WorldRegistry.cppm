@@ -1,3 +1,6 @@
+// Runtime-owned registry of ECS scene worlds: handle allocation, active-world
+// selection, deferred destroy announcement and the maintenance events/stats the
+// kernel publishes each frame.
 module;
 
 #include <cstdint>
@@ -41,7 +44,12 @@ namespace Extrinsic::Runtime
         std::uint64_t CancelledJobs{0};
     };
 
-    export class WorldRegistry
+    // C++ language linkage keeps this class globally attached, so a consumer that
+    // only borrows a WorldRegistry& can match it with a forward declaration
+    // instead of importing this module's ECS/JobService closure.
+    export extern "C++"
+    {
+    class WorldRegistry
     {
     public:
         WorldRegistry();
@@ -97,4 +105,5 @@ namespace Extrinsic::Runtime
         WorldHandle m_ActiveWorld{};
         std::uint64_t m_MaintenanceEpoch{0u};
     };
+    }
 }

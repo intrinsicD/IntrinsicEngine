@@ -1,4 +1,6 @@
 module;
+#include <string_view>
+#include <functional>
 #include <algorithm>
 #include <array>
 #include <chrono>
@@ -13,16 +15,29 @@ module;
 #include <utility>
 #include <glm/glm.hpp>
 #include <entt/entity/registry.hpp>
-module Extrinsic.Runtime.GeometryProcessingOperations;
+module Extrinsic.Runtime.PointSetOperations;
 import Extrinsic.ECS.Scene.Registry;
+import Extrinsic.ECS.Scene.Handle;
 import Extrinsic.ECS.Component.DirtyTags;
+import Extrinsic.ECS.Component.Transform;
 import Extrinsic.ECS.Components.GeometrySources;
 import Extrinsic.Runtime.SpatialIndexCache;
 import Extrinsic.Runtime.EngineConfigControl;
 import Extrinsic.Runtime.KernelEvents;
+import Extrinsic.Runtime.SelectionController;
+import Extrinsic.Runtime.WorldHandle;
+import Extrinsic.Runtime.GeometryAvailability;
+import Extrinsic.Runtime.EditorCommandHistory;
+import Extrinsic.Runtime.EditorJobProjection;
+import Extrinsic.Runtime.GeometryPresentation;
+import Extrinsic.Runtime.JobService;
+import Extrinsic.Core.Error;
+import Extrinsic.Core.Config.Engine;
+import Extrinsic.Core.Config.EngineLoad;
 import Geometry.Properties;
-import Geometry.HalfedgeMesh;
-#include "Editor/Operations/Runtime.GeometryProcessingOperations.Internal.hpp"
+#include "Editor/internal/Runtime.EditorProcessingAccess.hpp"
+#include "Editor/internal/Runtime.EditorGeometryHelpers.hpp"
+#include "Editor/Operations/Runtime.GeometryProcessingOperations.PointFields.hpp"
 
 namespace Extrinsic::Runtime
 {
@@ -56,13 +71,13 @@ namespace Extrinsic::Runtime
             std::chrono::steady_clock::time_point GpuStarted{};
             EditorBilateralFilterResult Result{};
         };
-        bool CurrentInput(const EditorGeometryProcessingContext& context, const BilateralWork& w)
+        bool CurrentInput(const EditorProcessingContext& context, const BilateralWork& w)
         {
             const std::array outputs{w.OutputWatch};
             return GeometryPropertiesCurrent(context, w.Entity, w.Inputs) && GeometryPropertiesCurrent(context, w.Entity, outputs);
         }
         enum class CapturePurpose { Execute, Readiness, Catalog };
-        std::shared_ptr<BilateralWork> Capture(const EditorGeometryProcessingContext& context,
+        std::shared_ptr<BilateralWork> Capture(const EditorProcessingContext& context,
             BilateralFilterConfig c, std::string& diagnostic, CapturePurpose purpose = CapturePurpose::Execute)
         {
             auto fail = [&](std::string why) -> std::shared_ptr<BilateralWork> { diagnostic = std::move(why); return {}; };
@@ -70,7 +85,7 @@ namespace Extrinsic::Runtime
                 SerializeBilateralFilterConfig(c), {}, kBilateralFilterConfigSectionName);
             if (!validation.Usable()) return fail(validation.Diagnostics.front().Message);
             if (!context.Scene) return fail("Scene is unavailable.");
-            const auto entity = GeometryProcessingDetail::ResolveEditorStableEntity(context.Scene->Raw(), c.StableEntityId);
+            const auto entity = EditorFeatureDetail::ResolveStableEntity(context.Scene->Raw(), c.StableEntityId);
             if (!entity) return fail("Bilateral target entity is stale or missing.");
             const auto a = BuildGeometryAvailability(context.Scene->Raw(), *entity);
             if (c.Positions.Domain == D::Unknown) c.Positions.Domain = PrimaryPointDomain(a);
@@ -214,7 +229,7 @@ namespace Extrinsic::Runtime
             {ComputeStep(w);if(w.Result.Status!=EditorCommandStatus::Applied)return;}
             CompleteOutput(w);
         }
-        bool AdvanceGpu(const EditorGeometryProcessingContext& context, BilateralWork& w)
+        bool AdvanceGpu(const EditorProcessingContext& context, BilateralWork& w)
         {
             auto fail=[&](std::string why, EditorCommandStatus status=EditorCommandStatus::GeometryProcessingFailed)
             {w.Result.Status=status; w.Result.Message=std::move(why); w.MainFailure=w.Result; w.Batch.reset(); return true;};
@@ -270,7 +285,7 @@ namespace Extrinsic::Runtime
             if (w.Batch->State==SpatialQueryState::Failed) return fail(w.Batch->Diagnostic);
             return false;
         }
-        EditorBilateralFilterResult Publish(const EditorGeometryProcessingContext& context,
+        EditorBilateralFilterResult Publish(const EditorProcessingContext& context,
                                             const std::shared_ptr<BilateralWork>& w)
         {
             auto& r=w->Result;
@@ -299,23 +314,25 @@ namespace Extrinsic::Runtime
             };
             const auto status=context.CommandHistory ? context.CommandHistory->Execute({.Label="Bilateral point filter",
                 .Redo=[mutate,after]{return mutate(*after);},.Undo=[mutate,before]{return mutate(*before);}}).Status : mutate(*after);
-            r.Status=GeometryProcessingDetail::ToEditorMethodCommandStatus(status);
+            r.Status=EditorFeatureDetail::ToEditorCommandStatus(status);
             if (!r.Succeeded()) r.Message="Bilateral publication rejected by history checks.";
             return r;
         }
     }
     EditorBilateralFilterReadiness PreviewEditorBilateralFilterCommand(
-        const EditorGeometryProcessingContext& context,const BilateralFilterConfig& config)
+        const EditorProcessingCommands& commands,const BilateralFilterConfig& config)
     {
+        const auto& context = EditorProcessingCommandsAccess::Resolve(commands);
         EditorBilateralFilterReadiness r;
         auto w=Capture(context,config,r.Diagnostic,CapturePurpose::Readiness);
         r.Ready=bool(w);if(w)r.Resolved=w->Config;return r;
     }
     GeometryPropertyCatalogSnapshot GetEditorBilateralFilterInputCatalog(
-        const EditorGeometryProcessingContext& context,std::uint32_t id)
+        const EditorProcessingCommands& commands,std::uint32_t id)
     {
+        const auto& context = EditorProcessingCommandsAccess::Resolve(commands);
         if(!context.Scene)return {};
-        const auto entity=GeometryProcessingDetail::ResolveEditorStableEntity(context.Scene->Raw(),id);
+        const auto entity=EditorFeatureDetail::ResolveStableEntity(context.Scene->Raw(),id);
         if(!entity)return {};
         const auto a=BuildGeometryAvailability(context.Scene->Raw(),*entity);
         std::uint64_t generation=1469598103934665603ull;
@@ -337,8 +354,10 @@ namespace Extrinsic::Runtime
         return catalog;
     }
     EditorBilateralFilterResult ApplyEditorBilateralFilterCommand(
-        const EditorGeometryProcessingContext &context, const BilateralFilterConfig &config)
+        const EditorProcessingCommands& commands, const BilateralFilterConfig &config,
+        std::function<void(EditorBilateralFilterResult)> onComplete)
     {
+        const auto& context = EditorProcessingCommandsAccess::Resolve(commands);
         std::string diagnostic;
         auto w = Capture(context, config, diagnostic);
         const auto report = [&config, &w](EditorCommandStatus status, std::string message) {
@@ -378,7 +397,7 @@ namespace Extrinsic::Runtime
                 active && IsActiveEditorJobState(active->State))
                 return report(EditorCommandStatus::Pending,
                               "A bilateral filter job for this output is already active.");
-        auto sink = context.MethodResultSinks.BilateralFilter;
+        auto sink = GuardEditorProcessingResult(context, std::move(onComplete));
         auto delivered = std::make_shared<bool>(false);
         auto pending = w->Result;
         pending.Status = EditorCommandStatus::Pending;
@@ -454,12 +473,32 @@ namespace Extrinsic::Runtime
         return pending;
     }
     EditorBilateralFilterResult ApplyEditorConfiguredBilateralFilter(
-        const EditorGeometryProcessingContext &context)
+        const EditorProcessingCommands& commands,
+        std::function<void(EditorBilateralFilterResult)> onComplete)
     {
-        const auto config = GetEditorBilateralFilterConfig(context);
+        const auto config = GetEditorBilateralFilterConfig(commands);
         if (!config)
             return {.Status = EditorCommandStatus::InvalidProcessingParameters,
                     .Message = "Bilateral filtering config is unavailable."};
-        return ApplyEditorBilateralFilterCommand(context, *config);
+        return ApplyEditorBilateralFilterCommand(commands, *config, std::move(onComplete));
+    }
+
+    RuntimeEngineConfigApplyResult ApplyEditorBilateralFilterConfig(
+        const EditorProcessingCommands& commands, const BilateralFilterConfig& config,
+        std::string sourceId)
+    {
+        return ApplyEditorProcessingConfig(commands,
+            ValidateBilateralFilterConfigSection(SerializeBilateralFilterConfig(config), {},
+                                                 kBilateralFilterConfigSectionName),
+            sourceId.empty() ? std::string{kBilateralFilterConfigSectionName} : sourceId,
+            [&](Core::Config::EngineConfig& candidate) { SetBilateralFilterConfig(candidate, config); });
+    }
+
+    std::optional<BilateralFilterConfig> GetEditorBilateralFilterConfig(
+        const EditorProcessingCommands& commands)
+    {
+        const auto& context = EditorProcessingCommandsAccess::Resolve(commands);
+        if (!context.EngineConfigControlState) return std::nullopt;
+        return GetBilateralFilterConfig(context.EngineConfigControlState->ActiveConfig);
     }
 } // namespace Extrinsic::Runtime

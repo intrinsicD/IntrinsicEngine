@@ -14,7 +14,6 @@ import Extrinsic.Graphics.CameraSnapshots;
 import Extrinsic.Graphics.CurrentRendererContractAdapter;
 import Extrinsic.Graphics.RenderFrameInput;
 import Extrinsic.Graphics.RenderRecipeConfig;
-import Extrinsic.Graphics.Renderer;
 
 namespace Extrinsic::Runtime
 {

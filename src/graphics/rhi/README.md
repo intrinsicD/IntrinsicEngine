@@ -229,6 +229,14 @@ any other exported polymorphic RHI interface):
   host. Note: this anchoring does **not** prevent the stale-BMI slot-mismatch
   failure mode above — that is a slot-offset problem, not a symbol-emission one;
   the clean-rebuild rule remains the authoritative prevention.
+- The class definition and all four of its out-of-line member definitions in
+  `RHI.CommandContext.cpp` are wrapped in `extern "C++"`. That keeps the type,
+  and its vtable globally attached, so a CPU interface that only
+  borrows an `ICommandContext&` (currently `Extrinsic.Runtime.JobService`) can
+  match it with a forward declaration. Because the `.cpp` is a module
+  implementation unit, its definitions must respecify that linkage; dropping it
+  on the destructor key function leaves derived TUs referencing a vtable that
+  nothing emits — a link error. Keep the two in step; RTTI is disabled.
 - `BindFrameSampledTextureAt(TextureHandle, std::uint32_t)` is the
   slot-explicit sibling of `BindFrameSampledTexture(TextureHandle)`. Backends
   that bridge framegraph sampled inputs through a global bindless array use it

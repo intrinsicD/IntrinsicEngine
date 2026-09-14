@@ -181,6 +181,17 @@ Every new dependency edge must be justifiable by layer policy and reflected in d
 ## 5. Coding rules
 
 - Use C++23.
+- During the current simplification and compile-locality migration, public C++
+  APIs and engine-owned scene/config formats have no backward-compatibility
+  commitment: the operator confirms there are no external API consumers or
+  persisted user data to migrate. Update in-tree callers, codecs, fixtures and
+  tests together and remove superseded paths directly. Do not add compatibility
+  wrappers, aliases, dual readers or format migrations solely to retain those
+  old representations. Preserve user-facing capabilities and current-format
+  save/load and config round-tripping.
+- Before adding or copying a non-trivial implementation, helper, or source file, use
+  `intrinsicengine-reuse` to find existing owners and consumers and compare their contracts.
+  Record the chosen reuse path or concrete mismatch briefly in the existing task/review or response.
 - Preserve existing module names during mechanical directory moves.
 - Do not mix mechanical moves with semantic refactors.
 - Avoid introducing new engine features during reorganization tasks.

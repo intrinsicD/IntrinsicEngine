@@ -15,12 +15,12 @@ Root scanned: `src`
 | `geometry` | 116 |
 | `graphics/assets` | 1 |
 | `graphics/framegraph` | 7 |
-| `graphics/renderer` | 72 |
+| `graphics/renderer` | 73 |
 | `graphics/rhi` | 18 |
 | `graphics/vulkan` | 13 |
 | `physics` | 1 |
 | `platform` | 5 |
-| `runtime` | 85 |
+| `runtime` | 99 |
 
 ## Modules
 
@@ -266,6 +266,7 @@ Root scanned: `src`
 | `Extrinsic.Graphics.PropertyTextureBake` | `src/graphics/renderer/Graphics.PropertyTextureBake.cppm` | `graphics/renderer` |
 | `Extrinsic.Graphics.Reconstruction` | `src/graphics/renderer/Graphics.Reconstruction.cppm` | `graphics/renderer` |
 | `Extrinsic.Graphics.RenderCommandRouter` | `src/graphics/renderer/Graphics.RenderCommandRouter.cppm` | `graphics/renderer` |
+| `Extrinsic.Graphics.RenderDiagnostics` | `src/graphics/renderer/Graphics.RenderDiagnostics.cppm` | `graphics/renderer` |
 | `Extrinsic.Graphics.RenderFrameInput` | `src/graphics/renderer/Graphics.RenderFrameInput.cppm` | `graphics/renderer` |
 | `Extrinsic.Graphics.RenderPrepPipeline` | `src/graphics/renderer/Graphics.RenderPrepPipeline.cppm` | `graphics/renderer` |
 | `Extrinsic.Graphics.RenderRecipeConfig` | `src/graphics/renderer/Graphics.RenderRecipeConfig.cppm` | `graphics/renderer` |
@@ -360,19 +361,29 @@ Root scanned: `src`
 | `Extrinsic.Runtime.RenderRecipeActivation` | `src/runtime/Config/Runtime.RenderRecipeActivation.cppm` | `runtime` |
 | `Extrinsic.Runtime.Private.FeatureConfigCodecs` | `src/runtime/Config/internal/Runtime.FeatureConfigCodecs.Detail.cppm` | `runtime` |
 | `Extrinsic.Runtime.GeometryProcessingOperations` | `src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.cppm` | `runtime` |
+| `Extrinsic.Runtime.MeshFieldOperations` | `src/runtime/Editor/Operations/Runtime.MeshFieldOperations.cppm` | `runtime` |
+| `Extrinsic.Runtime.MeshTopologyOperations` | `src/runtime/Editor/Operations/Runtime.MeshTopologyOperations.cppm` | `runtime` |
+| `Extrinsic.Runtime.NormalOperations` | `src/runtime/Editor/Operations/Runtime.NormalOperations.cppm` | `runtime` |
+| `Extrinsic.Runtime.ParameterizationOperations` | `src/runtime/Editor/Operations/Runtime.ParameterizationOperations.cppm` | `runtime` |
+| `Extrinsic.Runtime.PointAnalysisOperations` | `src/runtime/Editor/Operations/Runtime.PointAnalysisOperations.cppm` | `runtime` |
+| `Extrinsic.Runtime.PointCloudServiceOperations` | `src/runtime/Editor/Operations/Runtime.PointCloudServiceOperations.cppm` | `runtime` |
+| `Extrinsic.Runtime.PointConstructionOperations` | `src/runtime/Editor/Operations/Runtime.PointConstructionOperations.cppm` | `runtime` |
+| `Extrinsic.Runtime.PointFieldOperations` | `src/runtime/Editor/Operations/Runtime.PointFieldOperations.cppm` | `runtime` |
+| `Extrinsic.Runtime.PointSetOperations` | `src/runtime/Editor/Operations/Runtime.PointSetOperations.cppm` | `runtime` |
+| `Extrinsic.Runtime.RegistrationOperations` | `src/runtime/Editor/Operations/Runtime.RegistrationOperations.cppm` | `runtime` |
 | `Extrinsic.Runtime.RenderRecipeEditingOperations` | `src/runtime/Editor/Operations/Runtime.RenderRecipeEditingOperations.cppm` | `runtime` |
 | `Extrinsic.Runtime.SceneEditingOperations` | `src/runtime/Editor/Operations/Runtime.SceneEditingOperations.cppm` | `runtime` |
 | `Extrinsic.Runtime.VisualizationEditingOperations` | `src/runtime/Editor/Operations/Runtime.VisualizationEditingOperations.cppm` | `runtime` |
 | `Extrinsic.Runtime.EditorCommandHistory` | `src/runtime/Editor/Runtime.EditorCommandHistory.cppm` | `runtime` |
 | `Extrinsic.Runtime.EditorCommon` | `src/runtime/Editor/Runtime.EditorCommon.cppm` | `runtime` |
 | `Extrinsic.Runtime.EditorJobProjection` | `src/runtime/Editor/Runtime.EditorJobProjection.cppm` | `runtime` |
+| `Extrinsic.Runtime.EditorProcessing` | `src/runtime/Editor/Runtime.EditorProcessing.cppm` | `runtime` |
 | `Extrinsic.Runtime.EditorPropertyWidgets` | `src/runtime/Editor/Runtime.EditorPropertyWidgets.cppm` | `runtime` |
 | `Extrinsic.Runtime.EditorUiHost` | `src/runtime/Editor/Runtime.EditorUiHost.cppm` | `runtime` |
 | `Extrinsic.Runtime.EditorUiModule` | `src/runtime/Editor/Runtime.EditorUiModule.cppm` | `runtime` |
 | `Extrinsic.Runtime.EditorWindowRegistry` | `src/runtime/Editor/Runtime.EditorWindowRegistry.cppm` | `runtime` |
 | `Extrinsic.Runtime.EditorWorkspaceAttachment` | `src/runtime/Editor/Runtime.EditorWorkspaceAttachment.cppm` | `runtime` |
 | `Extrinsic.Runtime.EditorWorkspaceSnapshots` | `src/runtime/Editor/Runtime.EditorWorkspaceSnapshots.cppm` | `runtime` |
-| `Extrinsic.Runtime.Private.EditorFeatures` | `src/runtime/Editor/internal/Runtime.EditorFeatures.Detail.cppm` | `runtime` |
 | `Extrinsic.Runtime.Private.EditorWorkspaceAttachment` | `src/runtime/Editor/internal/Runtime.EditorWorkspaceAttachment.Detail.cppm` | `runtime` |
 | `Extrinsic.Runtime.GeometryAvailability` | `src/runtime/GeometryIntegration/Runtime.GeometryAvailability.cppm` | `runtime` |
 | `Extrinsic.Runtime.GeometryPlanBuilders` | `src/runtime/GeometryIntegration/Runtime.GeometryPlanBuilders.cppm` | `runtime` |
@@ -395,12 +406,15 @@ Root scanned: `src`
 | `Extrinsic.Runtime.JobService` | `src/runtime/Kernel/Runtime.JobService.cppm` | `runtime` |
 | `Extrinsic.Runtime.KernelEvents` | `src/runtime/Kernel/Runtime.KernelEvents.cppm` | `runtime` |
 | `Extrinsic.Runtime.Module` | `src/runtime/Kernel/Runtime.Module.cppm` | `runtime` |
+| `Extrinsic.Runtime.ModuleLifecycle` | `src/runtime/Kernel/Runtime.ModuleLifecycle.cppm` | `runtime` |
 | `Extrinsic.Runtime.ServiceRegistry` | `src/runtime/Kernel/Runtime.ServiceRegistry.cppm` | `runtime` |
 | `Extrinsic.Runtime.WorldHandle` | `src/runtime/Kernel/Runtime.WorldHandle.cppm` | `runtime` |
 | `Extrinsic.Runtime.WorldRegistry` | `src/runtime/Kernel/Runtime.WorldRegistry.cppm` | `runtime` |
 | `Extrinsic.Runtime.BilateralFilterConfig` | `src/runtime/Modules/BilateralFilter/Runtime.BilateralFilterConfig.cppm` | `runtime` |
 | `Extrinsic.Runtime.ClusteringConfig` | `src/runtime/Modules/Clustering/Runtime.ClusteringConfig.cppm` | `runtime` |
 | `Extrinsic.Runtime.ClusteringModule` | `src/runtime/Modules/Clustering/Runtime.ClusteringModule.cppm` | `runtime` |
+| `Extrinsic.Runtime.ClusteringTypes` | `src/runtime/Modules/Clustering/Runtime.ClusteringTypes.cppm` | `runtime` |
+| `Extrinsic.Runtime.MeshCurvatureConfig` | `src/runtime/Modules/Curvature/Runtime.MeshCurvatureConfig.cppm` | `runtime` |
 | `Extrinsic.Runtime.CurvatureSegmentationConfig` | `src/runtime/Modules/CurvatureSegmentation/Runtime.CurvatureSegmentationConfig.cppm` | `runtime` |
 | `Extrinsic.Runtime.DensityWeightConfig` | `src/runtime/Modules/DensityWeight/Runtime.DensityWeightConfig.cppm` | `runtime` |
 | `Extrinsic.Runtime.DescriptorAnalysisConfig` | `src/runtime/Modules/DescriptorAnalysis/Runtime.DescriptorAnalysisConfig.cppm` | `runtime` |
@@ -413,6 +427,7 @@ Root scanned: `src`
 | `Extrinsic.Runtime.PhysicsModule` | `src/runtime/Modules/PhysicsIntegration/Runtime.PhysicsModule.cppm` | `runtime` |
 | `Extrinsic.Runtime.PointCloudConsolidationConfig` | `src/runtime/Modules/PointCloudConsolidation/Runtime.PointCloudConsolidationConfig.cppm` | `runtime` |
 | `Extrinsic.Runtime.PointCloudConsolidationModule` | `src/runtime/Modules/PointCloudConsolidation/Runtime.PointCloudConsolidationModule.cppm` | `runtime` |
+| `Extrinsic.Runtime.PointCloudConsolidationTypes` | `src/runtime/Modules/PointCloudConsolidation/Runtime.PointCloudConsolidationTypes.cppm` | `runtime` |
 | `Extrinsic.Runtime.PointConstructionConfig` | `src/runtime/Modules/PointConstruction/Runtime.PointConstructionConfig.cppm` | `runtime` |
 | `Extrinsic.Runtime.PointSpacingConfig` | `src/runtime/Modules/PointSpacing/Runtime.PointSpacingConfig.cppm` | `runtime` |
 | `Extrinsic.Runtime.ProgressivePoissonConfig` | `src/runtime/Modules/ProgressivePoisson/Runtime.ProgressivePoissonConfig.cppm` | `runtime` |
@@ -430,4 +445,4 @@ Root scanned: `src`
 | `Extrinsic.Runtime.StableEntityLookup` | `src/runtime/Scene/Runtime.StableEntityLookup.cppm` | `runtime` |
 | `Extrinsic.Runtime.VisualizationRecipes` | `src/runtime/Visualization/Runtime.VisualizationRecipes.cppm` | `runtime` |
 
-Total modules: **403**
+Total modules: **418**

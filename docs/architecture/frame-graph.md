@@ -62,10 +62,25 @@ The fixed core is intentionally guarded. Config can disable declared optional
 extension slots and express supported binding/output overrides, but it cannot
 inject arbitrary pass-graph nodes, rename fixed passes/resources, or mutate the
 renderer's required core shape. The live projection surface is
-`Graphics::FrameRecipeOverride`: it carries a validated `RenderRecipeDescriptor`,
-disabled extension slots, and a source id. `ProjectFrameRecipeOverride(...)`
-applies that overlay to `FrameRecipeFeatures`; unsupported or fixed-core changes
-produce diagnostics instead of silently changing the graph.
+`Graphics::FrameRecipeOverride` (owned by `Extrinsic.Graphics.RenderRecipeConfig`
+alongside the config schema): it carries a validated `RenderRecipeDescriptor`,
+disabled extension slots, and a source id. `ProjectFrameRecipeOverride(...)`,
+owned by `Extrinsic.Graphics.FrameRecipe`, applies that overlay to
+`FrameRecipeFeatures`; unsupported or fixed-core changes produce diagnostics
+instead of silently changing the graph.
+
+`Extrinsic.Graphics.RenderingContract` owns `RenderRecipeDescriptor` and the
+canonical slot lookup used by every lane. Its exported const and mutable
+`FindRecipeSlot(recipe, stableName)` overloads return the first slot whose
+`StableName` matches and `nullptr` when none does; the config loader, frame
+recipe projection and runtime recipe editing all call the owner rather than
+repeating the traversal. Validation never rejects duplicate stable names, so
+first-match-wins is the observable contract: an edit reaches the first matching
+slot only. A returned pointer borrows a `RenderRecipeDescriptor::Slots` element
+and is invalidated by any resize of that vector. A missing slot drives
+fail-closed behavior at each lane — `Unsupported`/`UnknownRecipeSlot`
+diagnostics in config, and a declared-but-absent placeholder row in the editor
+model.
 
 ## Edit Lanes
 

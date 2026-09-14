@@ -8,12 +8,12 @@
       "Extrinsic.Platform."
     ],
     "exact": [
-      "Extrinsic.Graphics.Renderer",
       "Extrinsic.Runtime.CommandBus",
       "Extrinsic.Runtime.FramePacingDiagnostics",
       "Extrinsic.Runtime.JobService",
       "Extrinsic.Runtime.KernelEvents",
-      "Extrinsic.Runtime.Module",
+      "Extrinsic.Runtime.ModuleLifecycle",
+      "Extrinsic.Runtime.RenderRecipeActivation",
       "Extrinsic.Runtime.ServiceRegistry",
       "Extrinsic.Runtime.WorldHandle",
       "Extrinsic.Runtime.WorldRegistry"
@@ -61,19 +61,19 @@
     ]
   },
   "current_snapshot": {
-    "date": "2026-07-23",
+    "date": "2026-09-13",
     "metric": "exact_declared_engine_surface_v3",
     "plain_import_count": 12,
     "plain_imports": [
       "Extrinsic.Core.Config.Engine",
       "Extrinsic.RHI.Device",
       "Extrinsic.Platform.Window",
-      "Extrinsic.Graphics.Renderer",
       "Extrinsic.Runtime.CommandBus",
       "Extrinsic.Runtime.FramePacingDiagnostics",
       "Extrinsic.Runtime.JobService",
       "Extrinsic.Runtime.KernelEvents",
-      "Extrinsic.Runtime.Module",
+      "Extrinsic.Runtime.ModuleLifecycle",
+      "Extrinsic.Runtime.RenderRecipeActivation",
       "Extrinsic.Runtime.ServiceRegistry",
       "Extrinsic.Runtime.WorldHandle",
       "Extrinsic.Runtime.WorldRegistry"
@@ -82,6 +82,9 @@
     "domain_imports": [],
     "export_import_count": 0,
     "export_imports": [],
+    "borrowed_imports": [
+      "Extrinsic.Graphics.Renderer"
+    ],
     "public_getter_count": 5,
     "public_getters": [
       {

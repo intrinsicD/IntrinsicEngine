@@ -2182,3 +2182,23 @@ TEST(SandboxEditorUi,
             Extrinsic::Graphics::Colormap::Type::Plasma);
   EXPECT_EQ(stored.Edges->ColorBufferName, "e:color");
 }
+
+TEST(SandboxEditorUi, AppearanceSelectsBooleanMasksAndUvProperties)
+{
+    ECS::Scene::Registry registry;
+    Runtime::SelectionController selection;
+    const auto mesh = MakeSelectable(registry, "TypedAppearance");
+    AddTriangleMeshSource(registry, mesh);
+    auto& properties = registry.Raw().get<GS::Vertices>(mesh).Properties;
+    (void)properties.GetOrAdd<bool>("v:mask", true);
+    (void)properties.GetOrAdd<glm::vec2>("v:uv_custom", {0.2f, 0.7f});
+    ASSERT_TRUE(selection.SetSelectedEntity(registry, mesh));
+    auto context = MakeContext(registry, selection);
+    context.VisualizationCommandsAvailable = true;
+    for (const auto* name : {"v:mask", "v:uv_custom"})
+        EXPECT_EQ(Runtime::ApplyEditorVisualizationPropertyCommand(context,
+            {.StableEntityId=Runtime::SelectionController::ToStableEntityId(mesh),
+             .Domain=Runtime::EditorVisualizationPropertyDomain::MeshVertices,
+             .Preset=Runtime::EditorVisualizationPropertyPreset::ColorBuffer, .PropertyName=name}),
+            Runtime::EditorCommandStatus::Applied) << name;
+}

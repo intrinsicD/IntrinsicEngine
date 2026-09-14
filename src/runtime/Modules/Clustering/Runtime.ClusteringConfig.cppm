@@ -9,7 +9,7 @@ export module Extrinsic.Runtime.ClusteringConfig;
 
 import Extrinsic.Core.Config.Engine;
 import Extrinsic.Core.Config.EngineLoad;
-export import Extrinsic.Runtime.ClusteringModule;
+export import Extrinsic.Runtime.ClusteringTypes;
 
 export namespace Extrinsic::Runtime
 {
@@ -23,12 +23,16 @@ export namespace Extrinsic::Runtime
     {
         KMeansParameters Parameters{};
         ClusteringBackend Backend{ClusteringBackend::CpuReference};
+        std::optional<KMeansPropertyRefs> Properties{};
     };
 
     [[nodiscard]] RunKMeans MakeConfiguredKMeansRequest(
         std::uint32_t stableEntityId,
         KMeansPropertyRefs properties,
         const ClusteringConfig& config);
+
+    [[nodiscard]] RunKMeans MakeConfiguredKMeansRequest(
+        std::uint32_t stableEntityId, const ClusteringConfig& config);
 
     [[nodiscard]] std::string SerializeClusteringConfig(
         const ClusteringConfig& config);

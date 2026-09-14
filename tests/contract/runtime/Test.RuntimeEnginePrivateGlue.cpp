@@ -851,11 +851,13 @@ TEST(RuntimeEnginePrivateGlue, ClusteringServiceIsTheSoleKMeansRuntimeRoute)
 {
     const auto root = RepoRoot();
     const auto facadeInterface = ReadFile(
-        root / "src/runtime/Editor/internal/Runtime.EditorFeatures.Detail.cppm");
+        root / "src/runtime/Editor/internal/Runtime.EditorFeatures.Internal.hpp");
+    const auto serviceFamilyInterface = ReadFile(
+        root / "src/runtime/Editor/Operations/Runtime.PointCloudServiceOperations.cppm");
     const auto panelImpl = ReadFile(
         root / "src/app/Sandbox/Editor/Sandbox.MethodPanels.cpp");
     const auto operationImpl = ReadFile(
-        root / "src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Public.cpp");
+        root / "src/runtime/Editor/Operations/Runtime.PointCloudServiceOperations.cpp");
     const auto moduleInterface = ReadFile(
         root / "src/runtime/Modules/Clustering/Runtime.ClusteringModule.cppm");
     const auto gpuPartition = ReadFile(
@@ -870,10 +872,13 @@ TEST(RuntimeEnginePrivateGlue, ClusteringServiceIsTheSoleKMeansRuntimeRoute)
               std::string::npos);
     EXPECT_NE(moduleInterface.find("RunKMeans(RunKMeans command)"),
               std::string::npos);
-    EXPECT_NE(facadeInterface.find("ClusteringService* Clustering"),
+    EXPECT_EQ(facadeInterface.find("ClusteringService* Clustering"),
               std::string::npos);
-    EXPECT_NE(operationImpl.find("context.Clustering->RunKMeans("),
+    EXPECT_NE(serviceFamilyInterface.find("struct EditorPointCloudServiceBorrowedServices"),
               std::string::npos);
+    EXPECT_NE(serviceFamilyInterface.find("ClusteringService* Clustering"),
+              std::string::npos);
+    EXPECT_NE(operationImpl.find("clustering->RunKMeans("), std::string::npos);
     EXPECT_EQ(panelImpl.find("Clustering->RunKMeans("), std::string::npos);
 
     EXPECT_NE(gpuPartition.find(
@@ -902,6 +907,8 @@ TEST(RuntimeEnginePrivateGlue, ClusteringServiceIsTheSoleKMeansRuntimeRoute)
     for (const std::string_view forbidden : forbiddenNames)
     {
         EXPECT_EQ(facadeInterface.find(forbidden), std::string::npos)
+            << forbidden;
+        EXPECT_EQ(serviceFamilyInterface.find(forbidden), std::string::npos)
             << forbidden;
         EXPECT_EQ(panelImpl.find(forbidden), std::string::npos) << forbidden;
         EXPECT_EQ(operationImpl.find(forbidden), std::string::npos)

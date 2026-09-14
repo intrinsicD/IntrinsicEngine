@@ -20,7 +20,9 @@ namespace Extrinsic::Runtime
     {
         return Json{{"source_vertices", config.SourceVertices},
                     {"max_halfedge_expansions", config.MaxHalfedgeExpansions},
-                    {"position_property", config.PositionProperty}}
+                    {"position_property", config.PositionProperty},
+                    {"distance_property", config.DistanceProperty},
+                    {"source_mask_property", config.SourceMaskProperty}}
             .dump();
     }
     Core::Config::EngineConfigSectionValidationResult ValidateGeodesicsConfigSection(
@@ -39,7 +41,8 @@ namespace Extrinsic::Runtime
             return reject("Geodesics config must be an object.");
         for (auto it = doc.begin(); it != doc.end(); ++it)
             if (it.key() != "source_vertices" && it.key() != "max_halfedge_expansions" &&
-                it.key() != "position_property")
+                it.key() != "position_property" && it.key() != "distance_property" &&
+                it.key() != "source_mask_property")
                 return reject("Unknown geodesics field: " + it.key());
         GeodesicsConfig config;
         if (doc.contains("source_vertices"))
@@ -72,6 +75,20 @@ namespace Extrinsic::Runtime
             if (!config.PositionProperty.starts_with("v:") || config.PositionProperty.size() < 3)
                 return reject("position_property must name a vertex float3 property (v:...).");
         }
+        for (const auto& [key, name] : {std::pair{"distance_property", &config.DistanceProperty},
+                                      std::pair{"source_mask_property", &config.SourceMaskProperty}})
+        {
+            if (doc.contains(key))
+            {
+                if (!doc[key].is_string()) return reject(std::string{key} + " must name a vertex property.");
+                *name = doc[key].get<std::string>();
+            }
+            if (!name->starts_with("v:") || name->size() < 3 || name->find('\0') != std::string::npos ||
+                *name == "v:deleted" || *name == "v:position" || *name == config.PositionProperty)
+                return reject("Geodesics outputs must name distinct public vertex properties.");
+        }
+        if (config.DistanceProperty == config.SourceMaskProperty)
+            return reject("Geodesics output properties must be distinct.");
         result.State = EngineConfigState::Valid;
         result.CanonicalPayloadJson = SerializeGeodesicsConfig(config);
         result.ParsedFieldCount = static_cast<std::uint32_t>(doc.size());
@@ -91,7 +108,9 @@ namespace Extrinsic::Runtime
         const auto doc = Json::parse(validated.CanonicalPayloadJson);
         return GeodesicsConfig{doc["source_vertices"].get<std::vector<std::uint32_t>>(),
                                doc["max_halfedge_expansions"].get<std::uint32_t>(),
-                               doc["position_property"].get<std::string>()};
+                               doc["position_property"].get<std::string>(),
+                               doc["distance_property"].get<std::string>(),
+                               doc["source_mask_property"].get<std::string>()};
     }
     void SetGeodesicsConfig(Core::Config::EngineConfig& config, const GeodesicsConfig& value)
     {

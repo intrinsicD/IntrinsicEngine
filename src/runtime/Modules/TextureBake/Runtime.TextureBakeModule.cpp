@@ -562,6 +562,75 @@ namespace Extrinsic::Runtime
         std::uint64_t NextAssetSerial{1u};
         GpuQueueParticipantHandle Participant{};
 
+        // The owning module composes the service through its always-constructed Impl.
+        void Bind(
+            ECS::Scene::Registry* const scene,
+            const WorldHandle world,
+            const std::uint64_t bindingEpoch,
+            Assets::AssetService* const assets,
+            EditorCommandHistory* const history,
+            JobService* const jobs,
+            RHI::IDevice* const device,
+            Graphics::GpuAssetCache* const gpuAssets,
+            Graphics::IRenderer* const renderer,
+            RenderExtractionCache* const extraction,
+            TextureBakeModuleStats* const stats) noexcept
+        {
+            Context = BoundContext{
+                .Scene = scene,
+                .World = world,
+                .BindingEpoch = bindingEpoch,
+                .AssetService = assets,
+                .CommandHistory = history,
+                .Jobs = jobs,
+            };
+            Device = device;
+            GpuAssets = gpuAssets;
+            Renderer = renderer;
+            Extraction = extraction;
+            Stats = stats;
+        }
+
+        void SetTarget(
+            const WorldHandle world,
+            const std::uint64_t bindingEpoch,
+            ECS::Scene::Registry* const scene) noexcept
+        {
+            Context.World = world;
+            Context.BindingEpoch = bindingEpoch;
+            Context.Scene = scene;
+        }
+
+        void SetCommandHistory(
+            EditorCommandHistory* const history) noexcept
+        {
+            Context.CommandHistory = history;
+        }
+
+        // A second registration would leak the first participant, so an
+        // already-registered service reports an invalid handle instead.
+        [[nodiscard]] GpuQueueParticipantHandle RegisterGpuQueueParticipant(
+            JobService& jobs)
+        {
+            if (Participant.IsValid())
+                return {};
+            Participant = jobs.RegisterGpuQueueParticipant(
+                MakeParticipantDesc());
+            return Participant;
+        }
+
+        void Unbind() noexcept
+        {
+            ShutdownAfterDeviceIdle();
+            Context = {};
+            Device = nullptr;
+            GpuAssets = nullptr;
+            Renderer = nullptr;
+            Extraction = nullptr;
+            Stats = nullptr;
+            Participant = {};
+        }
+
         [[nodiscard]] bool Available() const noexcept
         {
             return Context.Scene != nullptr &&
@@ -2124,7 +2193,7 @@ namespace Extrinsic::Runtime
         void DetachTargets(
             const WorldHandle world,
             const std::uint64_t bindingEpoch,
-            const bool destroyGeneratedAssets)
+            const bool destroyGeneratedAssets) noexcept
         {
             for (std::size_t index = 0u; index < WorkItems.size();)
             {
@@ -2176,7 +2245,7 @@ namespace Extrinsic::Runtime
             }
         }
 
-        void DestroySceneAssets(ECS::Scene::Registry& scene)
+        void DestroySceneAssets(ECS::Scene::Registry& scene) noexcept
         {
             auto view = scene.Raw().view<PropertyTextureBakeOutputs>();
             for (auto&& [entity, catalog] : view.each())
@@ -2408,100 +2477,6 @@ namespace Extrinsic::Runtime
                   "texture-bake module is unavailable"};
     }
 
-    void TextureBakeService::Bind(
-        ECS::Scene::Registry* const scene,
-        const WorldHandle world,
-        const std::uint64_t bindingEpoch,
-        Assets::AssetService* const assets,
-        EditorCommandHistory* const history,
-        JobService* const jobs,
-        RHI::IDevice* const device,
-        Graphics::GpuAssetCache* const gpuAssets,
-        Graphics::IRenderer* const renderer,
-        RenderExtractionCache* const extraction,
-        TextureBakeModuleStats* const stats) noexcept
-    {
-        if (!m_Impl)
-            return;
-        m_Impl->Context = Impl::BoundContext{
-            .Scene = scene,
-            .World = world,
-            .BindingEpoch = bindingEpoch,
-            .AssetService = assets,
-            .CommandHistory = history,
-            .Jobs = jobs,
-        };
-        m_Impl->Device = device;
-        m_Impl->GpuAssets = gpuAssets;
-        m_Impl->Renderer = renderer;
-        m_Impl->Extraction = extraction;
-        m_Impl->Stats = stats;
-    }
-
-    void TextureBakeService::SetTarget(
-        const WorldHandle world,
-        const std::uint64_t bindingEpoch,
-        ECS::Scene::Registry* const scene) noexcept
-    {
-        if (!m_Impl)
-            return;
-        m_Impl->Context.World = world;
-        m_Impl->Context.BindingEpoch = bindingEpoch;
-        m_Impl->Context.Scene = scene;
-    }
-
-    void TextureBakeService::SetCommandHistory(
-        EditorCommandHistory* const history) noexcept
-    {
-        if (m_Impl)
-            m_Impl->Context.CommandHistory = history;
-    }
-
-    void TextureBakeService::DetachTargets(
-        const WorldHandle world,
-        const std::uint64_t bindingEpoch,
-        const bool destroyGeneratedAssets) noexcept
-    {
-        if (m_Impl)
-        {
-            m_Impl->DetachTargets(
-                world,
-                bindingEpoch,
-                destroyGeneratedAssets);
-        }
-    }
-
-    void TextureBakeService::DestroySceneAssets(
-        ECS::Scene::Registry& scene) noexcept
-    {
-        if (m_Impl)
-            m_Impl->DestroySceneAssets(scene);
-    }
-
-    GpuQueueParticipantHandle
-    TextureBakeService::RegisterGpuQueueParticipant(JobService& jobs)
-    {
-        if (!m_Impl || m_Impl->Participant.IsValid())
-            return {};
-        m_Impl->Participant = jobs.RegisterGpuQueueParticipant(
-            m_Impl->MakeParticipantDesc());
-        return m_Impl->Participant;
-    }
-
-    void TextureBakeService::Unbind() noexcept
-    {
-        if (!m_Impl)
-            return;
-        m_Impl->ShutdownAfterDeviceIdle();
-        m_Impl->Context = {};
-        m_Impl->Device = nullptr;
-        m_Impl->GpuAssets = nullptr;
-        m_Impl->Renderer = nullptr;
-        m_Impl->Extraction = nullptr;
-        m_Impl->Stats = nullptr;
-        m_Impl->Participant = {};
-    }
-
     namespace
     {
         // Replay persisted appearance and undo/redo through the same bake producer.
@@ -2659,7 +2634,7 @@ namespace Extrinsic::Runtime
                 if (outgoingWorld.IsValid() &&
                     outgoingEpoch != 0u)
                 {
-                    Service.DetachTargets(
+                    Service.m_Impl->DetachTargets(
                         outgoingWorld,
                         outgoingEpoch,
                         destroyGeneratedAssets);
@@ -2667,7 +2642,7 @@ namespace Extrinsic::Runtime
                 BoundWorld = {};
                 BoundRegistry = nullptr;
                 AdvanceBindingEpoch();
-                Service.SetTarget({}, BindingEpoch, nullptr);
+                Service.m_Impl->SetTarget({}, BindingEpoch, nullptr);
                 PublishBindingChanged();
             }
 
@@ -2696,12 +2671,12 @@ namespace Extrinsic::Runtime
                     !BoundWorld.IsValid() ||
                     BoundRegistry == nullptr)
                 {
-                    Service.SetTarget({}, BindingEpoch, nullptr);
+                    Service.m_Impl->SetTarget({}, BindingEpoch, nullptr);
                     PublishBindingChanged();
                     return;
                 }
 
-                Service.SetTarget(
+                Service.m_Impl->SetTarget(
                     BoundWorld,
                     BindingEpoch,
                     BoundRegistry);
@@ -2813,7 +2788,7 @@ namespace Extrinsic::Runtime
                             : std::function<void()>{});
                 }
                 state.GpuParticipant = {};
-                state.Service.Unbind();
+                state.Service.m_Impl->Unbind();
             }
             Unsubscribe(events);
             if (services != nullptr &&
@@ -2878,7 +2853,7 @@ namespace Extrinsic::Runtime
         state.Renderer = &renderer->get();
         state.Extraction = &extraction->get();
         state.Device = &device->get();
-        state.Service.Bind(
+        state.Service.m_Impl->Bind(
             nullptr,
             {},
             0u,
@@ -2929,7 +2904,7 @@ namespace Extrinsic::Runtime
                                     state->Worlds->Get(event.World);
                                 scene != nullptr)
                             {
-                                state->Service.DestroySceneAssets(*scene);
+                                state->Service.m_Impl->DestroySceneAssets(*scene);
                             }
                         }
                     }
@@ -3014,7 +2989,7 @@ namespace Extrinsic::Runtime
         state.Documents = &documents->get();
         state.History = &history->get();
         state.AcceptingCallbacks = true;
-        state.Service.SetCommandHistory(state.History);
+        state.Service.m_Impl->SetCommandHistory(state.History);
 
         const std::weak_ptr<Impl::State> weakState = m_Impl->Shared;
         auto participant = state.Documents->RegisterReplacementParticipant(
@@ -3060,7 +3035,7 @@ namespace Extrinsic::Runtime
         }
 
         state.GpuParticipant =
-            state.Service.RegisterGpuQueueParticipant(setup.Jobs());
+            state.Service.m_Impl->RegisterGpuQueueParticipant(setup.Jobs());
         if (!state.GpuParticipant.IsValid())
         {
             m_Impl->RollBack(

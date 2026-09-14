@@ -433,6 +433,19 @@ def _validate_policy(policy: dict[str, Any], root: Path) -> dict[str, Any]:
     )
     if current_export_count != len(current_exports):
         raise PolicyError("current_snapshot.export_import_count does not match its list")
+    # Owning modules the interface deliberately does not import: it names the
+    # type through a borrowed declaration and the caller imports the owner.
+    current_borrowed = _string_list(
+        current.get("borrowed_imports", []), "current_snapshot.borrowed_imports"
+    )
+    borrowed_overlap = set(current_borrowed) & (
+        set(current_plain_imports) | set(current_exports)
+    )
+    if borrowed_overlap:
+        raise PolicyError(
+            "current_snapshot.borrowed_imports overlaps the imported set: "
+            + ", ".join(sorted(borrowed_overlap))
+        )
     current_getters = _getter_policy_list(
         current.get("public_getters"), "current_snapshot.public_getters"
     )
@@ -441,11 +454,13 @@ def _validate_policy(policy: dict[str, Any], root: Path) -> dict[str, Any]:
     )
     if current_getter_count != len(current_getters):
         raise PolicyError("current_snapshot.public_getter_count does not match its list")
+    allowed_owning_imports = set(current_plain_imports) | set(current_borrowed)
     for getter in current_getters:
-        if getter["owning_import"] not in current_plain_imports:
+        if getter["owning_import"] not in allowed_owning_imports:
             raise PolicyError(
-                "current_snapshot.public_getters owning_import is not an exact "
-                f"plain import: {getter['name']} -> {getter['owning_import']}"
+                "current_snapshot.public_getters owning_import is neither an "
+                "exact plain import nor a declared borrowed import: "
+                f"{getter['name']} -> {getter['owning_import']}"
             )
 
     expected_debt_plain = max(0, current_plain - reference_plain)
@@ -491,6 +506,7 @@ def _validate_policy(policy: dict[str, Any], root: Path) -> dict[str, Any]:
         "reference": reference,
         "current": current,
         "current_plain_imports": current_plain_imports,
+        "current_borrowed_imports": current_borrowed,
         "current_getters": current_getters,
         "debt": debt,
     }
@@ -560,6 +576,15 @@ def check(root: Path) -> int:
             _string_list(current.get("export_imports"), "current_snapshot.export_imports"),
         )
     )
+    borrowed_regressions = sorted(
+        set(validated["current_borrowed_imports"])
+        & (set(snapshot.plain_imports) | set(snapshot.export_imports))
+    )
+    if borrowed_regressions:
+        findings.append(
+            "borrowed owning imports are imported by the Engine interface: "
+            + ", ".join(borrowed_regressions)
+        )
     expected_getters = {
         getter["name"]: getter for getter in validated["current_getters"]
     }
@@ -588,6 +613,7 @@ def check(root: Path) -> int:
         f"plain_imports={len(snapshot.plain_imports)} "
         f"domain_imports={len(snapshot.domain_imports)} "
         f"export_imports={len(snapshot.export_imports)} "
+        f"borrowed_imports={len(validated['current_borrowed_imports'])} "
         f"public_getter_names={len(snapshot.public_getter_names)}"
     )
     print(

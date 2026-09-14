@@ -1,3 +1,4 @@
+// Records transient debug lanes through RHI using renderer-provided pipelines.
 module;
 
 #include <cstdint>
@@ -5,6 +6,7 @@ module;
 
 export module Extrinsic.Graphics.Pass.TransientDebug.Surface;
 
+import Extrinsic.Graphics.RenderDiagnostics;
 import Extrinsic.Graphics.RenderWorld;
 import Extrinsic.Graphics.TransientDebugUploadHelper;
 import Extrinsic.RHI.CommandContext;

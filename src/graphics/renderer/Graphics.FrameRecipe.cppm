@@ -1,3 +1,8 @@
+// Data-driven description of the canonical frame: typed pass/resource ids, the
+// feature/AA/temporal/sizing/import inputs that select them, pass contributions
+// and their validation, the introspection and build entry points the renderer
+// drives, and the projection of a config-lane `FrameRecipeOverride` onto the
+// derived feature set.
 module;
 
 #include <cstdint>
@@ -11,6 +16,7 @@ module;
 export module Extrinsic.Graphics.FrameRecipe;
 
 import Extrinsic.Graphics.RenderGraph;
+export import Extrinsic.Graphics.RenderRecipeConfig;
 import Extrinsic.Graphics.RenderWorld;
 import Extrinsic.RHI.Descriptors;
 import Extrinsic.RHI.Handles;
@@ -576,4 +582,21 @@ namespace Extrinsic::Graphics
         const FrameRecipeShadowSizing& shadowSizing,
         FrameRecipeTemporalOptions temporalOptions,
         const std::vector<FrameRecipePassContribution>& contributions);
+
+    export struct FrameRecipeOverrideProjection
+    {
+        FrameRecipeFeatures Features{};
+        bool Applied{false};
+        std::uint32_t DisabledSlotCount{0u};
+        std::vector<FrameRecipeOverrideDiagnostic> Diagnostics{};
+    };
+
+    // Fail-closed projection of a config-lane override onto the derived
+    // defaults. Any diagnostic restores `derivedDefaults` verbatim, resets
+    // `DisabledSlotCount` and reports `Applied = false`, so a rejected override
+    // never partially mutates the frame. On success `Applied` is true only when
+    // the override actually named disabled extension slots.
+    export [[nodiscard]] FrameRecipeOverrideProjection ProjectFrameRecipeOverride(
+        const FrameRecipeFeatures& derivedDefaults,
+        const FrameRecipeOverride& recipeOverride);
 }

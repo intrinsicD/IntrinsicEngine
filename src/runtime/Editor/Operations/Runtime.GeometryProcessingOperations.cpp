@@ -1,4 +1,5 @@
 module;
+#include <functional>
 
 #include <algorithm>
 #include <array>
@@ -25,181 +26,63 @@ module;
 
 #include "ProgressivePoissonReference.hpp"
 
-module Extrinsic.Runtime.GeometryProcessingOperations;
+module Extrinsic.Runtime.PointSetOperations;
 
-import Extrinsic.Asset.ImportRouter;
-import Extrinsic.Asset.Registry;
 import Extrinsic.Core.Config.Engine;
 import Extrinsic.Core.Config.EngineLoad;
 import Extrinsic.Core.Dag.Scheduler;
 import Extrinsic.Core.Error;
-import Extrinsic.Core.Geometry2D;
-import Extrinsic.ECS.Component.MetaData;
-import Extrinsic.ECS.Component.Hierarchy;
-import Extrinsic.ECS.Component.StableId;
+import Extrinsic.ECS.Scene.Handle;
+import Extrinsic.ECS.Scene.Registry;
 import Extrinsic.ECS.Component.Transform;
-import Extrinsic.ECS.Component.Transform.WorldMatrix;
 import Extrinsic.ECS.Component.DirtyTags;
 import Extrinsic.ECS.Components.GeometrySources;
-import Extrinsic.ECS.Components.Selection;
 import Extrinsic.Graphics.Component.VisualizationConfig;
 import Extrinsic.Graphics.Component.RenderGeometry;
-import Extrinsic.Graphics.CameraSnapshots;
-import Extrinsic.Graphics.CurrentRendererContractAdapter;
-import Extrinsic.Graphics.RenderFrameInput;
-import Extrinsic.Graphics.RenderRecipeConfig;
-import Extrinsic.Graphics.RenderingContract;
-import Extrinsic.Graphics.Renderer;
-import Extrinsic.RHI.CommandContext;
 import Extrinsic.RHI.Device;
-import Extrinsic.Runtime.AssetWorkflowModule;
-import Extrinsic.Runtime.AssetIngestStateMachine;
-import Extrinsic.Runtime.CameraControllers;
-import Extrinsic.Runtime.CommandBus;
 import Extrinsic.Runtime.EditorCommandHistory;
+import Extrinsic.Runtime.EditorJobProjection;
 import Extrinsic.Runtime.EngineConfigControl;
 import Extrinsic.Runtime.GeometryAvailability;
 import Extrinsic.Runtime.JobService;
 import Extrinsic.Runtime.KernelEvents;
-import Extrinsic.Runtime.MeshPrimitiveView;
 import Extrinsic.Runtime.ProgressivePoissonGpuBackend;
 import Extrinsic.Runtime.GeometryPresentation;
-import Extrinsic.Runtime.GeometryPresentation;
-import Extrinsic.Runtime.PrimitiveSelectionRefinement;
-import Extrinsic.Runtime.RenderExtraction;
-import Extrinsic.Runtime.RenderArtifactPublication;
-import Extrinsic.Runtime.ClusteringConfig;
-import Extrinsic.Runtime.ParameterizationConfig;
-import Extrinsic.Runtime.PointCloudConsolidationConfig;
-import Extrinsic.Runtime.PointCloudConsolidationModule;
-import Extrinsic.Runtime.ProgressivePoissonConfig;
-import Extrinsic.Runtime.SceneSerialization;
-import Extrinsic.Runtime.SelectionController;
-import Extrinsic.Runtime.ServiceRegistry;
-import Extrinsic.Runtime.VertexAttributeBinding;
-import Extrinsic.Runtime.VertexChannelBindings;
-import Geometry.Graph;
-import Geometry.Graph.Vertex.Normals;
-import Geometry.Curvature;
-import Geometry.CatmullClark;
+import Extrinsic.Runtime.WorldHandle;
+// Connectivity property tags only; this unit never materializes a graph or a
+// halfedge mesh. `Geometry.HalfedgeMesh.Fwd` re-exports the graph tags.
 import Geometry.HalfedgeMesh.Fwd;
-import Geometry.HalfedgeMesh.AdaptiveRemeshing;
-import Geometry.HalfedgeMesh.SubdivisionSqrt3;
-import Geometry.HalfedgeMesh.Vertices.Normals;
-import Geometry.Mesh.Conversion;
-import Geometry.MeshOperator;
-import Geometry.MeshSoup;
-import Geometry.PointCloud.Normals;
-import Geometry.PointCloud.Utils;
 import Geometry.Properties;
-import Geometry.Registration;
-import Geometry.Remeshing;
-import Geometry.Simplification;
-import Geometry.Smoothing;
-import Geometry.Subdivision;
-import Geometry.UvAtlas;
-
 
 #include "Editor/internal/Runtime.EditorMutation.Internal.hpp"
-#include "Editor/Operations/Runtime.GeometryProcessingOperations.Internal.hpp"
+#include "Editor/internal/Runtime.EditorGeometryHelpers.hpp"
+#include "Editor/internal/Runtime.EditorProcessingAccess.hpp"
+#include "Editor/Operations/Runtime.GeometryProcessingOperations.PointFields.hpp"
 
 namespace Extrinsic::Runtime
 {
     namespace
     {
-        namespace ECSC = Extrinsic::ECS::Components;
         namespace Dirty = Extrinsic::ECS::Components::DirtyTags;
         namespace GS = Extrinsic::ECS::Components::GeometrySources;
-        namespace Sel = Extrinsic::ECS::Components::Selection;
         namespace G = Extrinsic::Graphics::Components;
-        namespace A = Extrinsic::Assets;
         namespace PPR = Intrinsic::Methods::Geometry::ProgressivePoissonReference;
+        namespace MeshSupport = GeometryProcessingDetail::MeshSupport;
 
-        // RUNTIME-194 Slice B5d: the result payload for this file's method
-        // jobs. The computed result itself already reaches the main thread in
-        // the shared job state the worker fills, so the envelope carries only
-        // the diagnostic the retired `DerivedJobOutput` exposed — and exists at
-        // all because an empty envelope is how `JobService` reports a dropped
-        // job.
-        struct EditorGeometryJobResult
-        {
-            std::string Diagnostic{};
-        };
+        // The result payload for this file's method jobs. The computed result
+        // itself already reaches the main thread in the shared job state the
+        // worker fills, so the envelope carries only a diagnostic — and exists
+        // at all because an empty envelope is how `JobService` reports a
+        // dropped job.
+        using EditorGeometryJobResult = MeshSupport::EditorJobResult;
 
-        [[nodiscard]] std::optional<ECS::EntityHandle> ResolveStableEntity(
-            const entt::registry& raw,
-            const std::uint32_t stableId)
-        {
-            return GeometryProcessingDetail::ResolveEditorStableEntity(raw, stableId);
-        }
+        using EditorFeatureDetail::ResolveStableEntity;
+        using EditorFeatureDetail::ToEditorCommandStatus;
+        using MeshSupport::BuildActiveDerivedJobMessage;
+        using MeshSupport::CollectFiniteGeometryPositions;
+        using MeshSupport::FindActiveEditorJob;
+        using MeshSupport::InvalidateSelectedModelCache;
 
-        void InvalidateSelectedModelCache(const EditorGeometryProcessingContext& context)
-        {
-            if (context.InvalidateWorkspaceSnapshotCache)
-                context.InvalidateWorkspaceSnapshotCache();
-        }
-
-        [[nodiscard]] std::optional<EditorJobRecord>
-        FindActiveEditorJob(
-            const EditorGeometryProcessingContext& context,
-            const EditorJobIdentity& identity)
-        {
-            if (!context.JobCommands.FindActive)
-                return std::nullopt;
-            return context.JobCommands.FindActive(identity);
-        }
-
-        [[nodiscard]] std::string BuildActiveDerivedJobMessage(
-            const std::string_view label,
-            const EditorJobRecord& job)
-        {
-            return GeometryProcessingDetail::BuildActiveEditorGeometryJobMessage(
-                label,
-                job);
-        }
-
-        [[nodiscard]] EditorCommandStatus ToEditorCommandStatus(
-            const EditorCommandHistoryStatus status) noexcept
-        {
-            return GeometryProcessingDetail::ToEditorMethodCommandStatus(status);
-        }
-
-        [[nodiscard]] bool IsFinitePosition(const glm::vec3& position) noexcept
-        {
-            return std::isfinite(position.x) &&
-                   std::isfinite(position.y) &&
-                   std::isfinite(position.z);
-        }
-
-        [[nodiscard]] std::optional<std::vector<glm::vec3>> CollectFiniteVertexPositions(
-            const Geometry::PropertySet& properties)
-        {
-            const auto positions =
-                properties.Get<glm::vec3>(GS::PropertyNames::kPosition);
-            if (!positions || positions.Vector().empty())
-                return std::nullopt;
-            if (positions.Vector().size() != properties.Size())
-                return std::nullopt;
-
-            std::vector<glm::vec3> points{};
-            points.reserve(positions.Vector().size());
-            for (const glm::vec3& position : positions.Vector())
-            {
-                if (!IsFinitePosition(position))
-                    return std::nullopt;
-                points.push_back(position);
-            }
-            return points;
-        }
-
-        inline constexpr const char* kProgressivePoissonLevelProperty =
-            "v:poisson_level";
-        inline constexpr const char* kProgressivePoissonRankProperty =
-            "v:poisson_rank";
-        inline constexpr const char* kProgressivePoissonSplatRadiusProperty =
-            "v:poisson_splat_radius";
-        inline constexpr const char* kProgressivePoissonPrefixVisibleProperty =
-            "v:poisson_prefix_visible";
         inline constexpr std::array<std::string_view, 4>
             kObsoleteProgressivePoissonProperties{
                 "p:poisson_level",
@@ -215,52 +98,52 @@ namespace Extrinsic::Runtime
             "Vulkan compute";
 
         [[nodiscard]] const char* ProgressivePoissonBackendId(
-            const EditorProgressivePoissonBackend backend) noexcept
+            const ProgressivePoissonPlaygroundBackend backend) noexcept
         {
             switch (backend)
             {
-            case EditorProgressivePoissonBackend::CpuReference:
+            case ProgressivePoissonPlaygroundBackend::CpuReference:
                 return PPR::kBackendId;
-            case EditorProgressivePoissonBackend::VulkanCompute:
+            case ProgressivePoissonPlaygroundBackend::VulkanCompute:
                 return kProgressivePoissonGpuBackendId;
             }
             return PPR::kBackendId;
         }
 
         [[nodiscard]] const char* ProgressivePoissonBackendDisplayName(
-            const EditorProgressivePoissonBackend backend) noexcept
+            const ProgressivePoissonPlaygroundBackend backend) noexcept
         {
             switch (backend)
             {
-            case EditorProgressivePoissonBackend::CpuReference:
+            case ProgressivePoissonPlaygroundBackend::CpuReference:
                 return kProgressivePoissonCpuBackendDisplayName;
-            case EditorProgressivePoissonBackend::VulkanCompute:
+            case ProgressivePoissonPlaygroundBackend::VulkanCompute:
                 return kProgressivePoissonGpuBackendDisplayName;
             }
             return kProgressivePoissonCpuBackendDisplayName;
         }
 
         [[nodiscard]] const char* ProgressivePoissonChannelPropertyName(
-            const EditorProgressivePoissonChannel channel) noexcept
+            const ProgressivePoissonPlaygroundConfig& config) noexcept
         {
-            switch (channel)
+            switch (config.Channel)
             {
-            case EditorProgressivePoissonChannel::Level:
-                return kProgressivePoissonLevelProperty;
-            case EditorProgressivePoissonChannel::Rank:
-                return kProgressivePoissonRankProperty;
-            case EditorProgressivePoissonChannel::SplatRadius:
-                return kProgressivePoissonSplatRadiusProperty;
-            case EditorProgressivePoissonChannel::PrefixVisible:
-                return kProgressivePoissonPrefixVisibleProperty;
+            case ProgressivePoissonPlaygroundChannel::Level:
+                return config.Level.Name.c_str();
+            case ProgressivePoissonPlaygroundChannel::Rank:
+                return config.Rank.Name.c_str();
+            case ProgressivePoissonPlaygroundChannel::SplatRadius:
+                return config.SplatRadius.Name.c_str();
+            case ProgressivePoissonPlaygroundChannel::PrefixVisible:
+                return config.PrefixVisible.Name.c_str();
             }
-            return kProgressivePoissonLevelProperty;
+            return config.Level.Name.c_str();
         }
 
         [[nodiscard]] EditorProgressivePoissonResult
         MakeProgressivePoissonResult(
             const EditorCommandStatus status,
-            const EditorProgressivePoissonChannel channel,
+            const ProgressivePoissonPlaygroundChannel channel,
             const Core::ErrorCode error,
             std::string message)
         {
@@ -272,26 +155,44 @@ namespace Extrinsic::Runtime
             };
         }
 
-        [[nodiscard]] bool IsValidProgressivePoissonConfig(
-            const EditorProgressivePoissonConfig& config) noexcept
+        // The serialized config keeps `double` knobs, but both sampler backends
+        // take `float`. Narrow once, here, and validate the narrowed values so a
+        // double that collapses to zero or infinity is rejected rather than
+        // reaching a backend with a different number than it was checked against.
+        [[nodiscard]] float ProgressivePoissonHashLoadFactor(
+            const ProgressivePoissonPlaygroundConfig& config) noexcept
         {
+            return static_cast<float>(config.HashLoadFactor);
+        }
+
+        [[nodiscard]] float ProgressivePoissonRadiusAlpha(
+            const ProgressivePoissonPlaygroundConfig& config) noexcept
+        {
+            return static_cast<float>(config.RadiusAlpha);
+        }
+
+        [[nodiscard]] bool IsValidProgressivePoissonConfig(
+            const ProgressivePoissonPlaygroundConfig& config) noexcept
+        {
+            const float hashLoadFactor = ProgressivePoissonHashLoadFactor(config);
+            const float radiusAlpha = ProgressivePoissonRadiusAlpha(config);
             return (config.Dimension == 2u || config.Dimension == 3u) &&
                    config.GridWidth > 0u &&
                    config.MaxLevels > 0u &&
-                   std::isfinite(config.HashLoadFactor) &&
-                   config.HashLoadFactor > 0.0f &&
-                   std::isfinite(config.RadiusAlpha);
+                   std::isfinite(hashLoadFactor) &&
+                   hashLoadFactor > 0.0f &&
+                   std::isfinite(radiusAlpha);
         }
 
         [[nodiscard]] PPR::Config ToProgressivePoissonReferenceConfig(
-            const EditorProgressivePoissonConfig& config) noexcept
+            const ProgressivePoissonPlaygroundConfig& config) noexcept
         {
             PPR::Config out{};
             out.Dimension = config.Dimension;
             out.GridWidth = config.GridWidth;
             out.MaxLevels = config.MaxLevels;
-            out.HashLoadFactor = config.HashLoadFactor;
-            out.RadiusAlpha = config.RadiusAlpha;
+            out.HashLoadFactor = ProgressivePoissonHashLoadFactor(config);
+            out.RadiusAlpha = ProgressivePoissonRadiusAlpha(config);
             out.RandomizeGridOrigin = config.RandomizeGridOrigin;
             out.GridOriginSeed = config.GridOriginSeed;
             out.ShuffleWithinLevels = config.ShuffleWithinLevels;
@@ -311,7 +212,7 @@ namespace Extrinsic::Runtime
         [[nodiscard]] bool PublishProgressivePoissonProperties(
             Geometry::PropertySet& properties,
             const PPR::Result& method,
-            const std::uint32_t prefixCount)
+            const std::uint32_t prefixCount, const ProgressivePoissonPlaygroundConfig& config)
         {
             const std::size_t pointCount = properties.Size();
             std::vector<float> levels(pointCount, -1.0f);
@@ -342,16 +243,16 @@ namespace Extrinsic::Runtime
             }
 
             auto levelProp = properties.GetOrAdd<float>(
-                kProgressivePoissonLevelProperty,
+                config.Level.Name,
                 -1.0f);
             auto rankProp = properties.GetOrAdd<float>(
-                kProgressivePoissonRankProperty,
+                config.Rank.Name,
                 -1.0f);
             auto splatProp = properties.GetOrAdd<float>(
-                kProgressivePoissonSplatRadiusProperty,
+                config.SplatRadius.Name,
                 0.0f);
             auto prefixProp = properties.GetOrAdd<float>(
-                kProgressivePoissonPrefixVisibleProperty,
+                config.PrefixVisible.Name,
                 0.0f);
             if (!levelProp || !rankProp || !splatProp || !prefixProp)
                 return false;
@@ -360,6 +261,10 @@ namespace Extrinsic::Runtime
             rankProp.Vector() = std::move(ranks);
             splatProp.Vector() = std::move(splatRadii);
             prefixProp.Vector() = std::move(prefixVisible);
+            const ProgressivePoissonPlaygroundConfig defaults;
+            const bool canonicalOutputs = config.Level.Name == defaults.Level.Name && config.Rank.Name == defaults.Rank.Name &&
+                config.SplatRadius.Name == defaults.SplatRadius.Name && config.PrefixVisible.Name == defaults.PrefixVisible.Name;
+            if (canonicalOutputs)
             for (const std::string_view obsolete :
                  kObsoleteProgressivePoissonProperties)
             {
@@ -389,22 +294,22 @@ namespace Extrinsic::Runtime
 
         struct ProgressivePoissonBackendResolution
         {
-            EditorProgressivePoissonBackend Requested{
-                EditorProgressivePoissonBackend::CpuReference};
-            EditorProgressivePoissonBackend Actual{
-                EditorProgressivePoissonBackend::CpuReference};
+            ProgressivePoissonPlaygroundBackend Requested{
+                ProgressivePoissonPlaygroundBackend::CpuReference};
+            ProgressivePoissonPlaygroundBackend Actual{
+                ProgressivePoissonPlaygroundBackend::CpuReference};
             std::string FallbackReason{};
         };
 
         [[nodiscard]] ProgressivePoissonGpuConfig ToProgressivePoissonGpuConfig(
-            const EditorProgressivePoissonConfig& config) noexcept
+            const ProgressivePoissonPlaygroundConfig& config) noexcept
         {
             return ProgressivePoissonGpuConfig{
                 .Dimension = config.Dimension,
                 .GridWidth = config.GridWidth,
                 .MaxLevels = config.MaxLevels,
-                .HashLoadFactor = config.HashLoadFactor,
-                .RadiusAlpha = config.RadiusAlpha,
+                .HashLoadFactor = ProgressivePoissonHashLoadFactor(config),
+                .RadiusAlpha = ProgressivePoissonRadiusAlpha(config),
                 .RandomizeGridOrigin = config.RandomizeGridOrigin,
                 .GridOriginSeed = config.GridOriginSeed,
                 .ShuffleWithinLevels = config.ShuffleWithinLevels,
@@ -414,20 +319,20 @@ namespace Extrinsic::Runtime
 
         [[nodiscard]] ProgressivePoissonBackendResolution
         ResolveProgressivePoissonBackend(
-            const EditorProgressivePoissonBackend requested,
-            const EditorProgressivePoissonConfig& config,
+            const ProgressivePoissonPlaygroundBackend requested,
+            const ProgressivePoissonPlaygroundConfig& config,
             const std::uint32_t inputCount,
             RHI::IDevice* device)
         {
             ProgressivePoissonBackendResolution resolved{};
             resolved.Requested = requested;
-            if (requested == EditorProgressivePoissonBackend::CpuReference)
+            if (requested == ProgressivePoissonPlaygroundBackend::CpuReference)
             {
-                resolved.Actual = EditorProgressivePoissonBackend::CpuReference;
+                resolved.Actual = ProgressivePoissonPlaygroundBackend::CpuReference;
                 return resolved;
             }
 
-            resolved.Actual = EditorProgressivePoissonBackend::CpuReference;
+            resolved.Actual = ProgressivePoissonPlaygroundBackend::CpuReference;
             const ProgressivePoissonGpuResolveResult gpu =
                 ResolveProgressivePoissonGpuRequest(
                     ProgressivePoissonGpuResolveDesc{
@@ -440,7 +345,7 @@ namespace Extrinsic::Runtime
             if (gpu.GpuExecutionAvailable)
             {
                 resolved.Actual =
-                    EditorProgressivePoissonBackend::VulkanCompute;
+                    ProgressivePoissonPlaygroundBackend::VulkanCompute;
                 return resolved;
             }
 
@@ -466,7 +371,7 @@ namespace Extrinsic::Runtime
         [[nodiscard]] EditorProgressivePoissonResult
         BuildProgressivePoissonResultFromMethod(
             const PPR::Result& method,
-            const EditorProgressivePoissonConfig& config,
+            const ProgressivePoissonPlaygroundConfig& config,
             const ProgressivePoissonBackendResolution& backend)
         {
             EditorProgressivePoissonResult result{};
@@ -487,7 +392,7 @@ namespace Extrinsic::Runtime
             result.FellBackToCpu =
                 backend.Requested != backend.Actual &&
                 backend.Actual ==
-                    EditorProgressivePoissonBackend::CpuReference;
+                    ProgressivePoissonPlaygroundBackend::CpuReference;
             result.BackendFallbackReason = backend.FallbackReason;
             result.LevelAcceptedCounts = method.Diag.LevelCounts;
             result.BaseRadius = method.BaseRadius;
@@ -520,7 +425,7 @@ namespace Extrinsic::Runtime
         [[nodiscard]] ProgressivePoissonComputedResult
         ComputeProgressivePoissonCpuReference(
             const std::span<const glm::vec3> positions,
-            const EditorProgressivePoissonConfig& config,
+            const ProgressivePoissonPlaygroundConfig& config,
             const ProgressivePoissonBackendResolution& backend)
         {
             const PPR::Config methodConfig =
@@ -538,7 +443,7 @@ namespace Extrinsic::Runtime
         PublishProgressivePoissonComputedResult(
             Geometry::PropertySet& properties,
             const PPR::Result& method,
-            EditorProgressivePoissonResult result)
+            EditorProgressivePoissonResult result, const ProgressivePoissonPlaygroundConfig& config)
         {
             if (!result.Succeeded())
                 return result;
@@ -546,7 +451,7 @@ namespace Extrinsic::Runtime
             if (!PublishProgressivePoissonProperties(
                     properties,
                     method,
-                    result.PrefixCount))
+                    result.PrefixCount, config))
             {
                 result.Status =
                     EditorCommandStatus::GeometryProcessingFailed;
@@ -565,7 +470,7 @@ namespace Extrinsic::Runtime
         RunProgressivePoissonAndPublish(
             const std::span<const glm::vec3> positions,
             Geometry::PropertySet& properties,
-            const EditorProgressivePoissonConfig& config,
+            const ProgressivePoissonPlaygroundConfig& config,
             RHI::IDevice* device)
         {
             const ProgressivePoissonBackendResolution backend =
@@ -579,7 +484,7 @@ namespace Extrinsic::Runtime
             return PublishProgressivePoissonComputedResult(
                 properties,
                 computed.Method,
-                std::move(computed.Result));
+                std::move(computed.Result), config);
         }
 
         void AppendProgressivePoissonSuccessMessage(
@@ -601,7 +506,7 @@ namespace Extrinsic::Runtime
                 " levels; prefix=" +
                 std::to_string(result.PrefixCount) +
                 ", channel=" +
-                DebugNameForEditorProgressivePoissonChannel(
+                DebugNameForProgressivePoissonChannel(
                     result.Channel);
             if (!result.LevelAcceptedCounts.empty())
             {
@@ -631,6 +536,23 @@ namespace Extrinsic::Runtime
             std::optional<G::RenderPoints> RenderPoints{};
             std::optional<G::VisualizationConfig> Visualization{};
         };
+
+        [[nodiscard]] Geometry::PropertySet* ProgressivePoissonProperties(
+            ProgressivePoissonEntityState& state, const GeometryElementDomain domain)
+        {
+            switch (domain)
+            {
+            case GeometryElementDomain::MeshVertex:
+            case GeometryElementDomain::GraphNode:
+            case GeometryElementDomain::PointCloudPoint: return state.Vertices ? &state.Vertices->Properties : nullptr;
+            case GeometryElementDomain::MeshFace: return state.Faces ? &state.Faces->Properties : nullptr;
+            case GeometryElementDomain::MeshEdge:
+            case GeometryElementDomain::GraphEdge: return state.Edges ? &state.Edges->Properties : nullptr;
+            case GeometryElementDomain::MeshHalfedge:
+            case GeometryElementDomain::GraphHalfedge: return state.Halfedges ? &state.Halfedges->Properties : nullptr;
+            default: return nullptr;
+            }
+        }
 
         using ProgressivePoissonEntitySnapshot =
             std::shared_ptr<const ProgressivePoissonEntityState>;
@@ -1147,8 +1069,10 @@ namespace Extrinsic::Runtime
 
         void ApplyProgressivePoissonVisualization(
             ProgressivePoissonEntityState& state,
-            const EditorProgressivePoissonChannel channel)
+            const ProgressivePoissonPlaygroundConfig& bindings, const GeometryElementDomain domain)
         {
+            if (domain != GeometryElementDomain::MeshVertex && domain != GeometryElementDomain::GraphNode &&
+                domain != GeometryElementDomain::PointCloudPoint) return;
             G::RenderPoints points =
                 state.RenderPoints.value_or(G::RenderPoints{});
             if (!std::holds_alternative<float>(points.SizeSource) &&
@@ -1162,7 +1086,7 @@ namespace Extrinsic::Runtime
                 state.Visualization.value_or(G::VisualizationConfig{});
             config.Source = G::VisualizationConfig::ColorSource::ScalarField;
             config.ScalarDomain = G::VisualizationConfig::Domain::Vertex;
-            config.ScalarFieldName = ProgressivePoissonChannelPropertyName(channel);
+            config.ScalarFieldName = ProgressivePoissonChannelPropertyName(bindings);
             config.Scalar.AutoRange = true;
             config.Scalar.BinCount = 0u;
             config.Scalar.Isolines.Num = 0u;
@@ -1190,7 +1114,7 @@ namespace Extrinsic::Runtime
 
         [[nodiscard]] EditorCommandStatus
         CommitProgressivePoissonMutation(
-            const EditorGeometryProcessingContext& context,
+            const EditorProcessingContext& context,
             const std::uint32_t stableEntityId,
             ProgressivePoissonEntityState before,
             ProgressivePoissonEntityState after)
@@ -1311,10 +1235,19 @@ namespace Extrinsic::Runtime
                 : std::nullopt;
         }
 
-        [[nodiscard]] const char* ProgressivePoissonOutputName(
-            const EditorProgressivePoissonConfig& config) noexcept
+        [[nodiscard]] std::optional<GeometryElementDomain> ResolveProgressivePoissonInputDomain(
+            const GeometryEntityAvailability& availability, const ProgressivePoissonPlaygroundConfig& config)
         {
-            return ProgressivePoissonChannelPropertyName(config.Channel);
+            if (config.Positions.Domain == GeometryElementDomain::Unknown)
+                return ResolveProgressivePoissonVertexDomain(availability);
+            return SupportsGeometryElementDomain(availability, config.Positions.Domain)
+                ? std::optional{config.Positions.Domain} : std::nullopt;
+        }
+
+        [[nodiscard]] const char* ProgressivePoissonOutputName(
+            const ProgressivePoissonPlaygroundConfig& config) noexcept
+        {
+            return ProgressivePoissonChannelPropertyName(config);
         }
 
         [[nodiscard]] Core::ErrorCode ProgressivePoissonResultError(
@@ -1348,7 +1281,7 @@ namespace Extrinsic::Runtime
             result.FellBackToCpu =
                 backend.Requested != backend.Actual &&
                 backend.Actual ==
-                    EditorProgressivePoissonBackend::CpuReference;
+                    ProgressivePoissonPlaygroundBackend::CpuReference;
             result.BackendFallbackReason = backend.FallbackReason;
             result.Error = Core::ErrorCode::Success;
             result.Message = "Progressive Poisson CPU job queued";
@@ -1364,14 +1297,6 @@ namespace Extrinsic::Runtime
             return result;
         }
 
-        void PublishProgressivePoissonResultSink(
-            const EditorGeometryProcessingContext& context,
-            EditorProgressivePoissonResult result)
-        {
-            if (context.MethodResultSinks.ProgressivePoisson)
-                context.MethodResultSinks.ProgressivePoisson(std::move(result));
-        }
-
         struct EditorProgressivePoissonCpuJobState
         {
             EditorProgressivePoissonCommand Command{};
@@ -1380,14 +1305,43 @@ namespace Extrinsic::Runtime
             std::vector<glm::vec3> SnapshotPositions{};
             ProgressivePoissonEntitySnapshot BeforeState{};
             std::optional<PPR::Result> Method{};
+            // A rejected publication also runs the unpublished finalizer;
+            // Delivered prevents a second terminal callback. Duplicate active
+            // requests register no sink.
+            std::function<void(EditorProgressivePoissonResult)> Sink{};
+            bool Delivered{false};
+            // Seeded with the submit-time channel/backend identity so a job that
+            // never reached the worker still reports which channel and backend
+            // it was queued for.
             EditorProgressivePoissonResult Result{};
+            // Last answer this job's `ValidateBeforeApply` gave the drain. The
+            // finalizer takes no arguments, so the reason a completion was
+            // refused has to be recorded where it was decided. `Current` means
+            // the gate never rejected, so the job ended for another reason —
+            // cancellation, or a publisher that refused the envelope.
+            JobApplyValidation LastApplyValidation{JobApplyValidation::Current};
         };
+
+        void PublishProgressivePoissonResultSink(
+            EditorProgressivePoissonCpuJobState& job,
+            EditorProgressivePoissonResult result)
+        {
+            if (job.Delivered)
+                return;
+            job.Delivered = true;
+            if (job.Sink)
+                job.Sink(std::move(result));
+        }
 
         [[nodiscard]] JobApplyValidation
         ValidateProgressivePoissonApply(
-            const EditorGeometryProcessingContext& context,
+            const EditorProcessingContext& context,
             const EditorProgressivePoissonCpuJobState& job)
         {
+            // Epoch first: after detachment the borrowed scene pointer may name
+            // a freed registry, so nothing below may read it.
+            if (context.AttachmentActive && !context.AttachmentActive())
+                return JobApplyValidation::StaleWorld;
             if (context.Scene == nullptr)
                 return JobApplyValidation::MissingTarget;
             if (job.BeforeState == nullptr)
@@ -1403,7 +1357,7 @@ namespace Extrinsic::Runtime
                 GS::BuildConstView(raw, *entity);
             const GeometryEntityAvailability availability =
                 BuildGeometryAvailability(view);
-            if (ResolveProgressivePoissonVertexDomain(availability) !=
+            if (ResolveProgressivePoissonInputDomain(availability, job.Command.Config) !=
                 std::optional{job.Domain})
             {
                 return JobApplyValidation::StaleGeneration;
@@ -1420,36 +1374,47 @@ namespace Extrinsic::Runtime
         }
 
         [[nodiscard]] Core::Result PublishProgressivePoissonCpuJob(
-            const EditorGeometryProcessingContext& context,
-            const EditorProgressivePoissonCpuJobState& job)
+            const EditorProcessingContext& context,
+            EditorProgressivePoissonCpuJobState& job)
         {
-            if (!job.Method.has_value())
-                return Core::Err(Core::ErrorCode::Unknown);
-            if (context.Scene == nullptr)
-                return Core::Err(Core::ErrorCode::InvalidState);
-            if (job.BeforeState == nullptr ||
-                !job.BeforeState->Vertices.has_value())
+            // Report publication failures here while their diagnostics are
+            // available; Delivered suppresses the subsequent finalizer callback.
+            const auto abandon = [&job](std::string message, const Core::ErrorCode error)
             {
-                return Core::Err(Core::ErrorCode::InvalidState);
-            }
+                EditorProgressivePoissonResult result = job.Result;
+                result.Status = EditorCommandStatus::GeometryProcessingFailed;
+                result.Error = error;
+                result.Message = std::move(message);
+                PublishProgressivePoissonResultSink(job, std::move(result));
+                return Core::Err(error);
+            };
+            // `ValidateProgressivePoissonApply` has just answered `Current` on
+            // this thread, so the attachment, the scene and the owned
+            // submit-time snapshot are all live here.
+            if (!job.Method.has_value())
+                return abandon("Progressive Poisson produced no result to publish.",
+                               Core::ErrorCode::Unknown);
 
             if (!job.Result.Succeeded())
             {
-                PublishProgressivePoissonResultSink(context, job.Result);
+                PublishProgressivePoissonResultSink(job, job.Result);
                 return Core::Err(ProgressivePoissonResultError(job.Result));
             }
 
             ProgressivePoissonEntityState after = *job.BeforeState;
+            if (!ProgressivePoissonProperties(after, job.Domain))
+                return abandon("Progressive Poisson vertex source state is unavailable.",
+                               Core::ErrorCode::InvalidState);
             EditorProgressivePoissonResult result =
                 PublishProgressivePoissonComputedResult(
-                    after.Vertices->Properties,
+                    *ProgressivePoissonProperties(after, job.Domain),
                     *job.Method,
-                    job.Result);
+                    job.Result, job.Command.Config);
             if (result.Succeeded())
             {
                 ApplyProgressivePoissonVisualization(
                     after,
-                    job.Command.Config.Channel);
+                    job.Command.Config, job.Domain);
                 const EditorCommandStatus committed =
                     CommitProgressivePoissonMutation(
                         context,
@@ -1470,10 +1435,47 @@ namespace Extrinsic::Runtime
                 }
             }
 
-            PublishProgressivePoissonResultSink(context, result);
+            PublishProgressivePoissonResultSink(job, result);
             return result.Succeeded()
                 ? Core::Ok()
                 : Core::Err(ProgressivePoissonResultError(result));
+        }
+
+        // A queued job that terminates without publishing — cancelled, stale,
+        // detached, or dropped — still owes the editor exactly one terminal
+        // result, otherwise its panel row stays `Pending` forever. Reads only
+        // the job's own state: the scene and the spatial caches may already be
+        // gone by the time this runs, and nothing here is published to them.
+        void FinalizeUnpublishedProgressivePoissonJob(
+            EditorProgressivePoissonCpuJobState& job)
+        {
+            if (job.Delivered)
+                return;
+            const JobApplyValidation validation = job.LastApplyValidation;
+            const bool stale = validation == JobApplyValidation::MissingTarget ||
+                               validation == JobApplyValidation::StaleGeneration ||
+                               validation == JobApplyValidation::StaleWorld;
+
+            std::string message{"Sandbox.ProgressivePoisson.CPU did not apply: "};
+            message += MeshSupport::QueuedCpuJobUnpublishedReason(validation);
+            // A worker that already failed carries the more specific reason.
+            if (validation == JobApplyValidation::Current &&
+                !job.Result.Message.empty() &&
+                job.Result.Status == EditorCommandStatus::GeometryProcessingFailed)
+            {
+                message += " (";
+                message += job.Result.Message;
+                message += ")";
+            }
+            message += ".";
+
+            EditorProgressivePoissonResult result = job.Result;
+            result.Status = stale ? EditorCommandStatus::StaleEntity
+                                  : EditorCommandStatus::GeometryProcessingFailed;
+            result.Error = stale ? Core::ErrorCode::InvalidState
+                                 : Core::ErrorCode::Unknown;
+            result.Message = std::move(message);
+            PublishProgressivePoissonResultSink(job, std::move(result));
         }
 
         [[nodiscard]] JobResultEnvelope
@@ -1499,13 +1501,14 @@ namespace Extrinsic::Runtime
 
         [[nodiscard]] EditorProgressivePoissonResult
         SubmitProgressivePoissonCpuDerivedJob(
-            const EditorGeometryProcessingContext& context,
+            const EditorProcessingContext& context,
             const EditorProgressivePoissonCommand& command,
             const GeometryElementDomain domain,
             std::vector<glm::vec3> snapshotPositions,
             ProgressivePoissonEntityState beforeState,
             const std::uint32_t inputCount,
-            ProgressivePoissonBackendResolution backend)
+            ProgressivePoissonBackendResolution backend,
+            std::function<void(EditorProgressivePoissonResult)> onComplete)
         {
             auto state =
                 std::make_shared<EditorProgressivePoissonCpuJobState>();
@@ -1516,6 +1519,8 @@ namespace Extrinsic::Runtime
             state->BeforeState =
                 std::make_shared<ProgressivePoissonEntityState>(
                     std::move(beforeState));
+            state->Result = MakePendingProgressivePoissonCpuJobResult(
+                command, JobToken{}, inputCount, state->Backend);
 
             const EditorJobIdentity identity{
                 .EntityId = command.StableEntityId,
@@ -1523,6 +1528,25 @@ namespace Extrinsic::Runtime
                 .OutputSemantic = GeometryPresentationSlotSemantic::PointScalarField,
                 .OutputName = ProgressivePoissonOutputName(command.Config),
             };
+            if (const std::optional<EditorJobRecord> active =
+                    FindActiveEditorJob(context, identity))
+            {
+                // The active job already owns the callback that will deliver
+                // this output's terminal result; a duplicate request registers
+                // none, so this state is discarded without a sink.
+                EditorProgressivePoissonResult pending =
+                    MakePendingProgressivePoissonCpuJobResult(
+                        command,
+                        active->Token,
+                        inputCount,
+                        state->Backend);
+                pending.Message = BuildActiveDerivedJobMessage(
+                    "Progressive Poisson CPU",
+                    *active);
+                return pending;
+            }
+
+            state->Sink = GuardEditorProcessingResult(context, std::move(onComplete));
             JobDesc desc{
                 .DebugName = "Sandbox.ProgressivePoisson.CPU",
                 .Scope = context.World,
@@ -1539,9 +1563,10 @@ namespace Extrinsic::Runtime
                 .ValidateBeforeApply =
                     [context, state]()
                     {
-                        return ValidateProgressivePoissonApply(
-                            context,
-                            *state);
+                        const JobApplyValidation validation =
+                            ValidateProgressivePoissonApply(context, *state);
+                        state->LastApplyValidation = validation;
+                        return validation;
                     },
                 .PublishCompletion =
                     [context, state](KernelEventBus&,
@@ -1553,28 +1578,17 @@ namespace Extrinsic::Runtime
                             PublishProgressivePoissonCpuJob(context, *state);
                         return published.has_value();
                     },
+                .FinalizeUnpublishedOnMainThread =
+                    [state]() { FinalizeUnpublishedProgressivePoissonJob(*state); },
             };
-
-            if (const std::optional<EditorJobRecord> active =
-                    FindActiveEditorJob(context, identity))
-            {
-                EditorProgressivePoissonResult pending =
-                    MakePendingProgressivePoissonCpuJobResult(
-                        command,
-                        active->Token,
-                        inputCount,
-                        state->Backend);
-                pending.Message = BuildActiveDerivedJobMessage(
-                    "Progressive Poisson CPU",
-                    *active);
-                return pending;
-            }
 
             const JobToken handle = context.JobCommands.Submit(
                 std::move(desc),
                 identity);
             if (!handle.IsValid())
             {
+                // The job was never enqueued, so no finalizer will run for it
+                // and this state dies here with its sink uncalled.
                 return MakeProgressivePoissonResult(
                     EditorCommandStatus::GeometryProcessingFailed, command.Config.Channel,
                     Core::ErrorCode::InvalidState,
@@ -1591,182 +1605,43 @@ namespace Extrinsic::Runtime
 
     }
 
-    std::vector<EditorGeometryProcessingDomain>
-    GetAvailableEditorKMeansDomains(const ECS::Scene::Registry& registry,
-                                           const ECS::EntityHandle entity)
-    {
-        using Domain = EditorGeometryProcessingDomain;
-        const Domain domains =
-            GetEditorGeometryProcessingCapabilities(registry, entity)
-                .Domains &
-            GetEditorSupportedGeometryProcessingDomains(
-                EditorGeometryProcessingAlgorithm::KMeans);
-
-        std::vector<Domain> result{};
-        result.reserve(3u);
-        if (HasAnyEditorGeometryProcessingDomain(
-                domains,
-                Domain::MeshVertices))
-        {
-            result.push_back(Domain::MeshVertices);
-        }
-        if (HasAnyEditorGeometryProcessingDomain(
-                domains,
-                Domain::GraphVertices))
-        {
-            result.push_back(Domain::GraphVertices);
-        }
-        if (HasAnyEditorGeometryProcessingDomain(
-                domains,
-                Domain::PointCloudPoints))
-        {
-            result.push_back(Domain::PointCloudPoints);
-        }
-        return result;
-    }
-
-    const char* DebugNameForEditorProgressivePoissonChannel(
-        const EditorProgressivePoissonChannel channel) noexcept
-    {
-        switch (channel)
-        {
-        case EditorProgressivePoissonChannel::Level:
-            return "Level";
-        case EditorProgressivePoissonChannel::Rank:
-            return "Rank";
-        case EditorProgressivePoissonChannel::SplatRadius:
-            return "Splat radius";
-        case EditorProgressivePoissonChannel::PrefixVisible:
-            return "Prefix visible";
-        }
-        return "Unknown";
-    }
-
-    const char* DebugNameForEditorProgressivePoissonBackend(
-        const EditorProgressivePoissonBackend backend) noexcept
-    {
-        switch (backend)
-        {
-        case EditorProgressivePoissonBackend::CpuReference:
-            return "CPU reference";
-        case EditorProgressivePoissonBackend::VulkanCompute:
-            return "Vulkan compute";
-        }
-        return "Unknown";
-    }
-
-    EditorProgressivePoissonChannel MakeEditorProgressivePoissonChannel(
+    const char* DebugNameForProgressivePoissonChannel(
         const ProgressivePoissonPlaygroundChannel channel) noexcept
     {
         switch (channel)
         {
         case ProgressivePoissonPlaygroundChannel::Level:
-            return EditorProgressivePoissonChannel::Level;
+            return "Level";
         case ProgressivePoissonPlaygroundChannel::Rank:
-            return EditorProgressivePoissonChannel::Rank;
+            return "Rank";
         case ProgressivePoissonPlaygroundChannel::SplatRadius:
-            return EditorProgressivePoissonChannel::SplatRadius;
+            return "Splat radius";
         case ProgressivePoissonPlaygroundChannel::PrefixVisible:
-            return EditorProgressivePoissonChannel::PrefixVisible;
+            return "Prefix visible";
         }
-        return EditorProgressivePoissonChannel::Level;
+        return "Unknown";
     }
 
-    ProgressivePoissonPlaygroundChannel
-    MakeProgressivePoissonPlaygroundChannel(
-        const EditorProgressivePoissonChannel channel) noexcept
-    {
-        switch (channel)
-        {
-        case EditorProgressivePoissonChannel::Level:
-            return ProgressivePoissonPlaygroundChannel::Level;
-        case EditorProgressivePoissonChannel::Rank:
-            return ProgressivePoissonPlaygroundChannel::Rank;
-        case EditorProgressivePoissonChannel::SplatRadius:
-            return ProgressivePoissonPlaygroundChannel::SplatRadius;
-        case EditorProgressivePoissonChannel::PrefixVisible:
-            return ProgressivePoissonPlaygroundChannel::PrefixVisible;
-        }
-        return ProgressivePoissonPlaygroundChannel::Level;
-    }
-
-    EditorProgressivePoissonBackend MakeEditorProgressivePoissonBackend(
+    const char* DebugNameForProgressivePoissonBackend(
         const ProgressivePoissonPlaygroundBackend backend) noexcept
     {
         switch (backend)
         {
         case ProgressivePoissonPlaygroundBackend::CpuReference:
-            return EditorProgressivePoissonBackend::CpuReference;
+            return "CPU reference";
         case ProgressivePoissonPlaygroundBackend::VulkanCompute:
-            return EditorProgressivePoissonBackend::VulkanCompute;
+            return "Vulkan compute";
         }
-        return EditorProgressivePoissonBackend::CpuReference;
+        return "Unknown";
     }
-
-    ProgressivePoissonPlaygroundBackend
-    MakeProgressivePoissonPlaygroundBackend(
-        const EditorProgressivePoissonBackend backend) noexcept
-    {
-        switch (backend)
-        {
-        case EditorProgressivePoissonBackend::CpuReference:
-            return ProgressivePoissonPlaygroundBackend::CpuReference;
-        case EditorProgressivePoissonBackend::VulkanCompute:
-            return ProgressivePoissonPlaygroundBackend::VulkanCompute;
-        }
-        return ProgressivePoissonPlaygroundBackend::CpuReference;
-    }
-
-    EditorProgressivePoissonConfig MakeEditorProgressivePoissonConfig(
-        const ProgressivePoissonPlaygroundConfig& config) noexcept
-    {
-        return EditorProgressivePoissonConfig{
-            .Dimension = config.Dimension,
-            .GridWidth = config.GridWidth,
-            .MaxLevels = config.MaxLevels,
-            .HashLoadFactor = static_cast<float>(config.HashLoadFactor),
-            .RadiusAlpha = static_cast<float>(config.RadiusAlpha),
-            .RandomizeGridOrigin = config.RandomizeGridOrigin,
-            .GridOriginSeed = config.GridOriginSeed,
-            .ShuffleWithinLevels = config.ShuffleWithinLevels,
-            .ShuffleSeed = config.ShuffleSeed,
-            .PrefixCount = config.PrefixCount,
-            .Channel = MakeEditorProgressivePoissonChannel(config.Channel),
-            .Backend = MakeEditorProgressivePoissonBackend(config.Backend),
-            .AutoRunOnEdit = config.AutoRunOnEdit,
-            .DebounceSeconds = config.DebounceSeconds,
-        };
-    }
-
-    ProgressivePoissonPlaygroundConfig
-    MakeProgressivePoissonPlaygroundConfig(
-        const EditorProgressivePoissonConfig& config,
-        const ProgressivePoissonPlaygroundConfig& defaults) noexcept
-    {
-        ProgressivePoissonPlaygroundConfig out = defaults;
-        out.Dimension = config.Dimension;
-        out.GridWidth = config.GridWidth;
-        out.MaxLevels = config.MaxLevels;
-        out.HashLoadFactor = static_cast<double>(config.HashLoadFactor);
-        out.RadiusAlpha = static_cast<double>(config.RadiusAlpha);
-        out.RandomizeGridOrigin = config.RandomizeGridOrigin;
-        out.GridOriginSeed = config.GridOriginSeed;
-        out.ShuffleWithinLevels = config.ShuffleWithinLevels;
-        out.ShuffleSeed = config.ShuffleSeed;
-        out.PrefixCount = config.PrefixCount;
-        out.Channel = MakeProgressivePoissonPlaygroundChannel(config.Channel);
-        out.Backend = MakeProgressivePoissonPlaygroundBackend(config.Backend);
-        out.AutoRunOnEdit = config.AutoRunOnEdit;
-        out.DebounceSeconds = config.DebounceSeconds;
-        return out;
-    }
-
 
     EditorProgressivePoissonResult
     ApplyEditorProgressivePoissonCommand(
-        const EditorGeometryProcessingContext& context,
-        const EditorProgressivePoissonCommand& command)
+        const EditorProcessingCommands& commands,
+        const EditorProgressivePoissonCommand& command,
+        std::function<void(EditorProgressivePoissonResult)> onComplete)
     {
+        const auto& context = EditorProcessingCommandsAccess::Resolve(commands);
         if (context.Scene == nullptr)
         {
             return MakeProgressivePoissonResult(
@@ -1784,6 +1659,9 @@ namespace Extrinsic::Runtime
                 "grid/max-level/hash settings, and finite radius alpha.");
         }
 
+        if (!ValidateProgressivePoissonConfigSection(SerializeProgressivePoissonPlaygroundConfig(command.Config), {}, kProgressivePoissonConfigSectionName).Usable())
+            return MakeProgressivePoissonResult(EditorCommandStatus::InvalidProcessingParameters, command.Config.Channel,
+                Core::ErrorCode::InvalidArgument, "Invalid Progressive Poisson property bindings.");
         entt::registry& raw = context.Scene->Raw();
         const std::optional<ECS::EntityHandle> entity =
             ResolveStableEntity(raw, command.StableEntityId);
@@ -1800,8 +1678,8 @@ namespace Extrinsic::Runtime
         const GeometryEntityAvailability availability =
             BuildGeometryAvailability(view);
         const std::optional<GeometryElementDomain> vertexDomain =
-            ResolveProgressivePoissonVertexDomain(availability);
-        if (!vertexDomain.has_value() || view.VertexSource == nullptr)
+            ResolveProgressivePoissonInputDomain(availability, command.Config);
+        if (!vertexDomain.has_value())
         {
             return MakeProgressivePoissonResult(
                 EditorCommandStatus::UnsupportedGeometryDomain, command.Config.Channel,
@@ -1811,8 +1689,9 @@ namespace Extrinsic::Runtime
         }
         const ProgressivePoissonEntityState beforeState =
             CaptureProgressivePoissonEntityState(raw, *entity);
-        std::optional<std::vector<glm::vec3>> positions =
-            CollectFiniteVertexPositions(view.VertexSource->Properties);
+        const auto* inputProperties = ResolveGeometryPropertySet(availability, *vertexDomain);
+        std::optional<std::vector<glm::vec3>> positions = inputProperties
+            ? CollectFiniteGeometryPositions(*inputProperties, command.Config.Positions.Name) : std::nullopt;
         if (!positions.has_value())
         {
             return MakeProgressivePoissonResult(
@@ -1839,11 +1718,12 @@ namespace Extrinsic::Runtime
                 std::move(*positions),
                 beforeState,
                 pointCount,
-                backend);
+                backend,
+                std::move(onComplete));
         }
 
         ProgressivePoissonEntityState afterState = beforeState;
-        if (!afterState.Vertices.has_value())
+        if (ProgressivePoissonProperties(afterState, *vertexDomain) == nullptr)
         {
             return MakeProgressivePoissonResult(
                 EditorCommandStatus::UnsupportedGeometryDomain,
@@ -1856,13 +1736,13 @@ namespace Extrinsic::Runtime
                 std::span<const glm::vec3>{
                     positions->data(),
                     positions->size()},
-                afterState.Vertices->Properties,
+                *ProgressivePoissonProperties(afterState, *vertexDomain),
                 command.Config,
                 context.Device);
         if (!result.Succeeded())
             return result;
 
-        ApplyProgressivePoissonVisualization(afterState, command.Config.Channel);
+        ApplyProgressivePoissonVisualization(afterState, command.Config, *vertexDomain);
         const EditorCommandStatus publishStatus =
             CommitProgressivePoissonMutation(
                 context,
@@ -1883,229 +1763,12 @@ namespace Extrinsic::Runtime
         return result;
     }
 
-    RuntimeEngineConfigApplyResult ApplyEditorClusteringConfig(
-        const EditorGeometryProcessingContext& context,
-        const ClusteringConfig& config,
-        std::string sourceId)
-    {
-        RuntimeEngineConfigApplyResult result{
-            .Status = RuntimeEngineConfigApplyStatus::Rejected,
-            .Source = RuntimeConfigControlSource::Editor,
-        };
-        if (context.EngineConfigControlState == nullptr ||
-            !context.PreviewEngineConfigDocument ||
-            !context.ApplyEngineConfigHotSubset ||
-            !context.EngineConfigCommandsAvailable)
-        {
-            return result;
-        }
-
-        Core::Config::EngineConfig candidate =
-            context.EngineConfigControlState->ActiveConfig;
-        SetClusteringConfig(candidate, config);
-        if (sourceId.empty())
-            sourceId = std::string{kClusteringConfigSectionName};
-        result.LoadResult = context.PreviewEngineConfigDocument(
-            Core::Config::SerializeEngineConfig(candidate),
-            sourceId);
-        if (!Core::Config::IsConfigUsable(result.LoadResult))
-            return result;
-        return context.ApplyEngineConfigHotSubset(result.LoadResult);
-    }
-
-    std::optional<ClusteringConfig> GetEditorClusteringConfig(
-        const EditorGeometryProcessingContext& context) noexcept
-    {
-        if (context.EngineConfigControlState == nullptr)
-            return std::nullopt;
-        return GetClusteringConfig(
-            context.EngineConfigControlState->ActiveConfig);
-    }
-
-    RuntimeEngineConfigApplyResult ApplyEditorCurvatureSegmentationConfig(
-        const EditorGeometryProcessingContext& context,
-        const CurvatureSegmentationConfig& config,
-        std::string sourceId)
-    {
-        RuntimeEngineConfigApplyResult result{
-            .Status = RuntimeEngineConfigApplyStatus::Rejected,
-            .Source = RuntimeConfigControlSource::Editor,
-        };
-        if (context.EngineConfigControlState == nullptr ||
-            !context.PreviewEngineConfigDocument ||
-            !context.ApplyEngineConfigHotSubset ||
-            !context.EngineConfigCommandsAvailable)
-        {
-            return result;
-        }
-
-        Core::Config::EngineConfig candidate =
-            context.EngineConfigControlState->ActiveConfig;
-        SetCurvatureSegmentationConfig(candidate, config);
-        if (sourceId.empty())
-        {
-            sourceId =
-                std::string{kCurvatureSegmentationConfigSectionName};
-        }
-        result.LoadResult = context.PreviewEngineConfigDocument(
-            Core::Config::SerializeEngineConfig(candidate),
-            sourceId);
-        if (!Core::Config::IsConfigUsable(result.LoadResult))
-            return result;
-        return context.ApplyEngineConfigHotSubset(result.LoadResult);
-    }
-
-    std::optional<CurvatureSegmentationConfig>
-    GetEditorCurvatureSegmentationConfig(
-        const EditorGeometryProcessingContext& context) noexcept
-    {
-        if (context.EngineConfigControlState == nullptr)
-            return std::nullopt;
-        return GetCurvatureSegmentationConfig(
-            context.EngineConfigControlState->ActiveConfig);
-    }
-
-    RuntimeEngineConfigApplyResult ApplyEditorGeodesicsConfig(
-        const EditorGeometryProcessingContext& context, const GeodesicsConfig& config,
-        std::string sourceId)
-    {
-        RuntimeEngineConfigApplyResult result{
-            .Status = RuntimeEngineConfigApplyStatus::Rejected,
-            .Source = RuntimeConfigControlSource::Editor,
-        };
-        const auto validation = ValidateGeodesicsConfigSection(
-            SerializeGeodesicsConfig(config), {}, kGeodesicsConfigSectionName);
-        if (!validation.Usable())
-        {
-            result.LoadResult.Diagnostics = validation.Diagnostics;
-            return result;
-        }
-        if (context.EngineConfigControlState == nullptr || !context.PreviewEngineConfigDocument ||
-            !context.ApplyEngineConfigHotSubset || !context.EngineConfigCommandsAvailable)
-        {
-            return result;
-        }
-
-        Core::Config::EngineConfig candidate = context.EngineConfigControlState->ActiveConfig;
-        SetGeodesicsConfig(candidate, config);
-        if (sourceId.empty())
-        {
-            sourceId = std::string{kGeodesicsConfigSectionName};
-        }
-        result.LoadResult = context.PreviewEngineConfigDocument(
-            Core::Config::SerializeEngineConfig(candidate), sourceId);
-        if (!Core::Config::IsConfigUsable(result.LoadResult))
-            return result;
-        return context.ApplyEngineConfigHotSubset(result.LoadResult);
-    }
-
-    std::optional<GeodesicsConfig> GetEditorGeodesicsConfig(
-        const EditorGeometryProcessingContext& context) noexcept
-    {
-        if (context.EngineConfigControlState == nullptr)
-            return std::nullopt;
-        return GetGeodesicsConfig(context.EngineConfigControlState->ActiveConfig);
-    }
-
-    RuntimeEngineConfigApplyResult ApplyEditorRegistrationConfig(
-        const EditorGeometryProcessingContext& context, const RegistrationConfig& config,
-        std::string sourceId)
-    {
-        RuntimeEngineConfigApplyResult result{
-            .Status = RuntimeEngineConfigApplyStatus::Rejected,
-            .Source = RuntimeConfigControlSource::Editor,
-        };
-        const auto validation = ValidateRegistrationConfigSection(
-            SerializeRegistrationConfig(config), {}, kRegistrationConfigSectionName);
-        if (!validation.Usable())
-        {
-            result.LoadResult.Diagnostics = validation.Diagnostics;
-            return result;
-        }
-        if (context.EngineConfigControlState == nullptr || !context.PreviewEngineConfigDocument ||
-            !context.ApplyEngineConfigHotSubset || !context.EngineConfigCommandsAvailable)
-        {
-            return result;
-        }
-
-        Core::Config::EngineConfig candidate = context.EngineConfigControlState->ActiveConfig;
-        SetRegistrationConfig(candidate, config);
-        if (sourceId.empty())
-        {
-            sourceId = std::string{kRegistrationConfigSectionName};
-        }
-        result.LoadResult = context.PreviewEngineConfigDocument(
-            Core::Config::SerializeEngineConfig(candidate), sourceId);
-        if (!Core::Config::IsConfigUsable(result.LoadResult))
-            return result;
-        return context.ApplyEngineConfigHotSubset(result.LoadResult);
-    }
-
-    std::optional<RegistrationConfig> GetEditorRegistrationConfig(
-        const EditorGeometryProcessingContext& context) noexcept
-    {
-        if (context.EngineConfigControlState == nullptr)
-            return std::nullopt;
-        return GetRegistrationConfig(context.EngineConfigControlState->ActiveConfig);
-    }
-
-    RuntimeEngineConfigApplyResult ApplyEditorPointCloudConsolidationConfig(
-        const EditorGeometryProcessingContext& context,
-        const PointCloudConsolidationConfig& config,
-        std::string sourceId)
-    {
-        RuntimeEngineConfigApplyResult result{
-            .Status = RuntimeEngineConfigApplyStatus::Rejected,
-            .Source = RuntimeConfigControlSource::Editor,
-        };
-        if (context.EngineConfigControlState == nullptr ||
-            !context.PreviewEngineConfigDocument ||
-            !context.ApplyEngineConfigHotSubset ||
-            !context.EngineConfigCommandsAvailable)
-        {
-            return result;
-        }
-
-        Core::Config::EngineConfig candidate =
-            context.EngineConfigControlState->ActiveConfig;
-        SetPointCloudConsolidationConfig(candidate, config);
-        if (sourceId.empty())
-            sourceId = std::string{kPointCloudConsolidationConfigSectionName};
-        result.LoadResult = context.PreviewEngineConfigDocument(
-            Core::Config::SerializeEngineConfig(candidate),
-            sourceId);
-        if (!Core::Config::IsConfigUsable(result.LoadResult))
-            return result;
-        return context.ApplyEngineConfigHotSubset(result.LoadResult);
-    }
-
-    bool IsValidEditorPointCloudConsolidationConfig(
-        const PointCloudConsolidationConfig& config)
-    {
-        const Core::Config::EngineConfigSectionValidationResult validation =
-            ValidatePointCloudConsolidationConfigSection(
-                SerializePointCloudConsolidationConfig(config),
-                SerializePointCloudConsolidationConfig(
-                    PointCloudConsolidationConfig{}),
-                "editor.point_cloud_consolidation");
-        return validation.State == Core::Config::EngineConfigState::Valid;
-    }
-
-    std::optional<PointCloudConsolidationConfig>
-    GetEditorPointCloudConsolidationConfig(
-        const EditorGeometryProcessingContext& context) noexcept
-    {
-        if (context.EngineConfigControlState == nullptr)
-            return std::nullopt;
-        return GetPointCloudConsolidationConfig(
-            context.EngineConfigControlState->ActiveConfig);
-    }
-
     EditorProgressivePoissonConfigResult
     ApplyEditorProgressivePoissonConfigCommand(
-        const EditorGeometryProcessingContext& context,
+        const EditorProcessingCommands& commands,
         const EditorProgressivePoissonConfigCommand& command)
     {
+        const auto& context = EditorProcessingCommandsAccess::Resolve(commands);
         EditorProgressivePoissonConfigResult result{};
         if (context.EngineConfigControlState == nullptr ||
             !context.PreviewEngineConfigDocument ||
@@ -2121,12 +1784,7 @@ namespace Extrinsic::Runtime
 
         Core::Config::EngineConfig candidate =
             context.EngineConfigControlState->ActiveConfig;
-        const ProgressivePoissonPlaygroundConfig current =
-            GetProgressivePoissonPlaygroundConfig(candidate).value_or(
-                ProgressivePoissonPlaygroundConfig{});
-        SetProgressivePoissonPlaygroundConfig(
-            candidate,
-            MakeProgressivePoissonPlaygroundConfig(command.Config, current));
+        SetProgressivePoissonPlaygroundConfig(candidate, command.Config);
         const std::string document =
             Core::Config::SerializeEngineConfig(candidate);
         const std::string sourceId = command.SourceId.empty()
@@ -2164,392 +1822,13 @@ namespace Extrinsic::Runtime
         return result;
     }
 
-    std::optional<EditorProgressivePoissonConfig>
-    GetEditorProgressivePoissonConfig(
-        const EditorGeometryProcessingContext& context) noexcept
+    std::optional<ProgressivePoissonPlaygroundConfig>
+    GetEditorProgressivePoissonConfig(const EditorProcessingCommands& commands)
     {
+        const auto& context = EditorProcessingCommandsAccess::Resolve(commands);
         if (context.EngineConfigControlState == nullptr)
             return std::nullopt;
-        const auto config = GetProgressivePoissonPlaygroundConfig(
+        return GetProgressivePoissonPlaygroundConfig(
             context.EngineConfigControlState->ActiveConfig);
-        if (!config.has_value())
-            return std::nullopt;
-        return MakeEditorProgressivePoissonConfig(*config);
     }
-
-}
-
-namespace Extrinsic::Runtime
-{
-    RuntimeEngineConfigApplyResult ApplyEditorNormalEstimationConfig(
-        const EditorGeometryProcessingContext& context, const NormalEstimationConfig& config,
-        std::string sourceId)
-    {
-        RuntimeEngineConfigApplyResult result{
-            .Status = RuntimeEngineConfigApplyStatus::Rejected,
-            .Source = RuntimeConfigControlSource::Editor,
-        };
-        const auto validation = ValidateNormalEstimationConfigSection(
-            SerializeNormalEstimationConfig(config), {}, kNormalEstimationConfigSectionName);
-        if (!validation.Usable())
-        {
-            result.LoadResult.Diagnostics = validation.Diagnostics;
-            return result;
-        }
-        if (context.EngineConfigControlState == nullptr || !context.PreviewEngineConfigDocument ||
-            !context.ApplyEngineConfigHotSubset || !context.EngineConfigCommandsAvailable)
-        {
-            return result;
-        }
-
-        Core::Config::EngineConfig candidate = context.EngineConfigControlState->ActiveConfig;
-        SetNormalEstimationConfig(candidate, config);
-        if (sourceId.empty())
-        {
-            sourceId = std::string{kNormalEstimationConfigSectionName};
-        }
-        result.LoadResult = context.PreviewEngineConfigDocument(
-            Core::Config::SerializeEngineConfig(candidate), sourceId);
-        if (!Core::Config::IsConfigUsable(result.LoadResult))
-            return result;
-        return context.ApplyEngineConfigHotSubset(result.LoadResult);
-    }
-
-    std::optional<NormalEstimationConfig> GetEditorNormalEstimationConfig(
-        const EditorGeometryProcessingContext& context)
-    {
-        if (context.EngineConfigControlState == nullptr)
-            return std::nullopt;
-        return GetNormalEstimationConfig(context.EngineConfigControlState->ActiveConfig);
-    }
-    RuntimeEngineConfigApplyResult ApplyEditorOutlierAnalysisConfig(
-        const EditorGeometryProcessingContext& context, const OutlierAnalysisConfig& config,
-        std::string sourceId)
-    {
-        RuntimeEngineConfigApplyResult result{
-            .Status = RuntimeEngineConfigApplyStatus::Rejected,
-            .Source = RuntimeConfigControlSource::Editor,
-        };
-        const auto validation = ValidateOutlierAnalysisConfigSection(
-            SerializeOutlierAnalysisConfig(config), {}, kOutlierAnalysisConfigSectionName);
-        if (!validation.Usable())
-        {
-            result.LoadResult.Diagnostics = validation.Diagnostics;
-            return result;
-        }
-        if (context.EngineConfigControlState == nullptr || !context.PreviewEngineConfigDocument ||
-            !context.ApplyEngineConfigHotSubset || !context.EngineConfigCommandsAvailable)
-        {
-            return result;
-        }
-
-        Core::Config::EngineConfig candidate = context.EngineConfigControlState->ActiveConfig;
-        SetOutlierAnalysisConfig(candidate, config);
-        if (sourceId.empty())
-        {
-            sourceId = std::string{kOutlierAnalysisConfigSectionName};
-        }
-        result.LoadResult = context.PreviewEngineConfigDocument(
-            Core::Config::SerializeEngineConfig(candidate), sourceId);
-        if (!Core::Config::IsConfigUsable(result.LoadResult))
-            return result;
-        return context.ApplyEngineConfigHotSubset(result.LoadResult);
-    }
-
-    std::optional<OutlierAnalysisConfig> GetEditorOutlierAnalysisConfig(
-        const EditorGeometryProcessingContext& context)
-    {
-        if (context.EngineConfigControlState == nullptr)
-            return std::nullopt;
-        return GetOutlierAnalysisConfig(context.EngineConfigControlState->ActiveConfig);
-    }
-    RuntimeEngineConfigApplyResult ApplyEditorKernelDensityConfig(
-        const EditorGeometryProcessingContext& context, const KernelDensityConfig& config,
-        std::string sourceId)
-    {
-        RuntimeEngineConfigApplyResult result{
-            .Status = RuntimeEngineConfigApplyStatus::Rejected,
-            .Source = RuntimeConfigControlSource::Editor,
-        };
-        const auto validation = ValidateKernelDensityConfigSection(
-            SerializeKernelDensityConfig(config), {}, kKernelDensityConfigSectionName);
-        if (!validation.Usable())
-        {
-            result.LoadResult.Diagnostics = validation.Diagnostics;
-            return result;
-        }
-        if (context.EngineConfigControlState == nullptr || !context.PreviewEngineConfigDocument ||
-            !context.ApplyEngineConfigHotSubset || !context.EngineConfigCommandsAvailable)
-        {
-            return result;
-        }
-
-        Core::Config::EngineConfig candidate = context.EngineConfigControlState->ActiveConfig;
-        SetKernelDensityConfig(candidate, config);
-        if (sourceId.empty())
-        {
-            sourceId = std::string{kKernelDensityConfigSectionName};
-        }
-        result.LoadResult = context.PreviewEngineConfigDocument(
-            Core::Config::SerializeEngineConfig(candidate), sourceId);
-        if (!Core::Config::IsConfigUsable(result.LoadResult))
-            return result;
-        return context.ApplyEngineConfigHotSubset(result.LoadResult);
-    }
-
-    std::optional<KernelDensityConfig> GetEditorKernelDensityConfig(
-        const EditorGeometryProcessingContext& context)
-    {
-        if (context.EngineConfigControlState == nullptr)
-            return std::nullopt;
-        return GetKernelDensityConfig(context.EngineConfigControlState->ActiveConfig);
-    }
-    RuntimeEngineConfigApplyResult ApplyEditorPointSpacingConfig(
-        const EditorGeometryProcessingContext& context, const PointSpacingConfig& config,
-        std::string sourceId)
-    {
-        RuntimeEngineConfigApplyResult result{
-            .Status = RuntimeEngineConfigApplyStatus::Rejected,
-            .Source = RuntimeConfigControlSource::Editor,
-        };
-        const auto validation = ValidatePointSpacingConfigSection(
-            SerializePointSpacingConfig(config), {}, kPointSpacingConfigSectionName);
-        if (!validation.Usable())
-        {
-            result.LoadResult.Diagnostics = validation.Diagnostics;
-            return result;
-        }
-        if (context.EngineConfigControlState == nullptr || !context.PreviewEngineConfigDocument ||
-            !context.ApplyEngineConfigHotSubset || !context.EngineConfigCommandsAvailable)
-        {
-            return result;
-        }
-
-        Core::Config::EngineConfig candidate = context.EngineConfigControlState->ActiveConfig;
-        SetPointSpacingConfig(candidate, config);
-        if (sourceId.empty())
-        {
-            sourceId = std::string{kPointSpacingConfigSectionName};
-        }
-        result.LoadResult = context.PreviewEngineConfigDocument(
-            Core::Config::SerializeEngineConfig(candidate), sourceId);
-        if (!Core::Config::IsConfigUsable(result.LoadResult))
-            return result;
-        return context.ApplyEngineConfigHotSubset(result.LoadResult);
-    }
-
-    std::optional<PointSpacingConfig> GetEditorPointSpacingConfig(
-        const EditorGeometryProcessingContext& context)
-    {
-        if (context.EngineConfigControlState == nullptr)
-            return std::nullopt;
-        return GetPointSpacingConfig(context.EngineConfigControlState->ActiveConfig);
-    }
-    RuntimeEngineConfigApplyResult ApplyEditorBilateralFilterConfig(
-        const EditorGeometryProcessingContext& context, const BilateralFilterConfig& config,
-        std::string sourceId)
-    {
-        RuntimeEngineConfigApplyResult result{
-            .Status = RuntimeEngineConfigApplyStatus::Rejected,
-            .Source = RuntimeConfigControlSource::Editor,
-        };
-        const auto validation = ValidateBilateralFilterConfigSection(
-            SerializeBilateralFilterConfig(config), {}, kBilateralFilterConfigSectionName);
-        if (!validation.Usable())
-        {
-            result.LoadResult.Diagnostics = validation.Diagnostics;
-            return result;
-        }
-        if (context.EngineConfigControlState == nullptr || !context.PreviewEngineConfigDocument ||
-            !context.ApplyEngineConfigHotSubset || !context.EngineConfigCommandsAvailable)
-        {
-            return result;
-        }
-
-        Core::Config::EngineConfig candidate = context.EngineConfigControlState->ActiveConfig;
-        SetBilateralFilterConfig(candidate, config);
-        if (sourceId.empty())
-        {
-            sourceId = std::string{kBilateralFilterConfigSectionName};
-        }
-        result.LoadResult = context.PreviewEngineConfigDocument(
-            Core::Config::SerializeEngineConfig(candidate), sourceId);
-        if (!Core::Config::IsConfigUsable(result.LoadResult))
-            return result;
-        return context.ApplyEngineConfigHotSubset(result.LoadResult);
-    }
-
-    std::optional<BilateralFilterConfig> GetEditorBilateralFilterConfig(
-        const EditorGeometryProcessingContext& context)
-    {
-        if (context.EngineConfigControlState == nullptr)
-            return std::nullopt;
-        return GetBilateralFilterConfig(context.EngineConfigControlState->ActiveConfig);
-    }
-    RuntimeEngineConfigApplyResult ApplyEditorKeypointAnalysisConfig(
-        const EditorGeometryProcessingContext& context, const KeypointAnalysisConfig& config,
-        std::string sourceId)
-    {
-        RuntimeEngineConfigApplyResult result{
-            .Status = RuntimeEngineConfigApplyStatus::Rejected,
-            .Source = RuntimeConfigControlSource::Editor,
-        };
-        const auto validation = ValidateKeypointAnalysisConfigSection(
-            SerializeKeypointAnalysisConfig(config), {}, kKeypointAnalysisConfigSectionName);
-        if (!validation.Usable())
-        {
-            result.LoadResult.Diagnostics = validation.Diagnostics;
-            return result;
-        }
-        if (context.EngineConfigControlState == nullptr || !context.PreviewEngineConfigDocument ||
-            !context.ApplyEngineConfigHotSubset || !context.EngineConfigCommandsAvailable)
-        {
-            return result;
-        }
-
-        Core::Config::EngineConfig candidate = context.EngineConfigControlState->ActiveConfig;
-        SetKeypointAnalysisConfig(candidate, config);
-        if (sourceId.empty())
-        {
-            sourceId = std::string{kKeypointAnalysisConfigSectionName};
-        }
-        result.LoadResult = context.PreviewEngineConfigDocument(
-            Core::Config::SerializeEngineConfig(candidate), sourceId);
-        if (!Core::Config::IsConfigUsable(result.LoadResult))
-            return result;
-        return context.ApplyEngineConfigHotSubset(result.LoadResult);
-    }
-
-    std::optional<KeypointAnalysisConfig> GetEditorKeypointAnalysisConfig(
-        const EditorGeometryProcessingContext& context)
-    {
-        if (context.EngineConfigControlState == nullptr)
-            return std::nullopt;
-        return GetKeypointAnalysisConfig(context.EngineConfigControlState->ActiveConfig);
-    }
-    RuntimeEngineConfigApplyResult ApplyEditorDescriptorAnalysisConfig(
-        const EditorGeometryProcessingContext& context, const DescriptorAnalysisConfig& config,
-        std::string sourceId)
-    {
-        RuntimeEngineConfigApplyResult result{
-            .Status = RuntimeEngineConfigApplyStatus::Rejected,
-            .Source = RuntimeConfigControlSource::Editor,
-        };
-        const auto validation = ValidateDescriptorAnalysisConfigSection(
-            SerializeDescriptorAnalysisConfig(config), {}, kDescriptorAnalysisConfigSectionName);
-        if (!validation.Usable())
-        {
-            result.LoadResult.Diagnostics = validation.Diagnostics;
-            return result;
-        }
-        if (context.EngineConfigControlState == nullptr || !context.PreviewEngineConfigDocument ||
-            !context.ApplyEngineConfigHotSubset || !context.EngineConfigCommandsAvailable)
-        {
-            return result;
-        }
-
-        Core::Config::EngineConfig candidate = context.EngineConfigControlState->ActiveConfig;
-        SetDescriptorAnalysisConfig(candidate, config);
-        if (sourceId.empty())
-        {
-            sourceId = std::string{kDescriptorAnalysisConfigSectionName};
-        }
-        result.LoadResult = context.PreviewEngineConfigDocument(
-            Core::Config::SerializeEngineConfig(candidate), sourceId);
-        if (!Core::Config::IsConfigUsable(result.LoadResult))
-            return result;
-        return context.ApplyEngineConfigHotSubset(result.LoadResult);
-    }
-
-    std::optional<DescriptorAnalysisConfig> GetEditorDescriptorAnalysisConfig(
-        const EditorGeometryProcessingContext& context)
-    {
-        if (context.EngineConfigControlState == nullptr)
-            return std::nullopt;
-        return GetDescriptorAnalysisConfig(context.EngineConfigControlState->ActiveConfig);
-    }
-    RuntimeEngineConfigApplyResult ApplyEditorDensityWeightConfig(
-        const EditorGeometryProcessingContext& context, const DensityWeightConfig& config,
-        std::string sourceId)
-    {
-        RuntimeEngineConfigApplyResult result{
-            .Status = RuntimeEngineConfigApplyStatus::Rejected,
-            .Source = RuntimeConfigControlSource::Editor,
-        };
-        const auto validation = ValidateDensityWeightConfigSection(
-            SerializeDensityWeightConfig(config), {}, kDensityWeightConfigSectionName);
-        if (!validation.Usable())
-        {
-            result.LoadResult.Diagnostics = validation.Diagnostics;
-            return result;
-        }
-        if (context.EngineConfigControlState == nullptr || !context.PreviewEngineConfigDocument ||
-            !context.ApplyEngineConfigHotSubset || !context.EngineConfigCommandsAvailable)
-        {
-            return result;
-        }
-
-        Core::Config::EngineConfig candidate = context.EngineConfigControlState->ActiveConfig;
-        SetDensityWeightConfig(candidate, config);
-        if (sourceId.empty())
-        {
-            sourceId = std::string{kDensityWeightConfigSectionName};
-        }
-        result.LoadResult = context.PreviewEngineConfigDocument(
-            Core::Config::SerializeEngineConfig(candidate), sourceId);
-        if (!Core::Config::IsConfigUsable(result.LoadResult))
-            return result;
-        return context.ApplyEngineConfigHotSubset(result.LoadResult);
-    }
-
-    std::optional<DensityWeightConfig> GetEditorDensityWeightConfig(
-        const EditorGeometryProcessingContext& context)
-    {
-        if (context.EngineConfigControlState == nullptr)
-            return std::nullopt;
-        return GetDensityWeightConfig(context.EngineConfigControlState->ActiveConfig);
-    }
-    RuntimeEngineConfigApplyResult ApplyEditorPointConstructionConfig(
-        const EditorGeometryProcessingContext& context, const PointConstructionConfig& config,
-        std::string sourceId)
-    {
-        RuntimeEngineConfigApplyResult result{
-            .Status = RuntimeEngineConfigApplyStatus::Rejected,
-            .Source = RuntimeConfigControlSource::Editor,
-        };
-        const auto validation = ValidatePointConstructionConfigSection(
-            SerializePointConstructionConfig(config), {}, kPointConstructionConfigSectionName);
-        if (!validation.Usable())
-        {
-            result.LoadResult.Diagnostics = validation.Diagnostics;
-            return result;
-        }
-        if (context.EngineConfigControlState == nullptr || !context.PreviewEngineConfigDocument ||
-            !context.ApplyEngineConfigHotSubset || !context.EngineConfigCommandsAvailable)
-        {
-            return result;
-        }
-
-        Core::Config::EngineConfig candidate = context.EngineConfigControlState->ActiveConfig;
-        SetPointConstructionConfig(candidate, config);
-        if (sourceId.empty())
-        {
-            sourceId = std::string{kPointConstructionConfigSectionName};
-        }
-        result.LoadResult = context.PreviewEngineConfigDocument(
-            Core::Config::SerializeEngineConfig(candidate), sourceId);
-        if (!Core::Config::IsConfigUsable(result.LoadResult))
-            return result;
-        return context.ApplyEngineConfigHotSubset(result.LoadResult);
-    }
-
-    std::optional<PointConstructionConfig> GetEditorPointConstructionConfig(
-        const EditorGeometryProcessingContext& context)
-    {
-        if (context.EngineConfigControlState == nullptr)
-            return std::nullopt;
-        return GetPointConstructionConfig(context.EngineConfigControlState->ActiveConfig);
-    }
-
-
 }

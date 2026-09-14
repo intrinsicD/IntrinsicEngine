@@ -1,4 +1,3 @@
-module;
 #include <algorithm>
 #include <chrono>
 #include <cstddef>
@@ -10,7 +9,6 @@ module;
 #include <utility>
 #include <vector>
 #include <glm/glm.hpp>
-module Extrinsic.Runtime.GeometryProcessingOperations;
 import Extrinsic.Runtime.SpatialIndexCache;
 #include "Editor/Operations/Runtime.GeometryProcessingOperations.RadiusRows.hpp"
 namespace Extrinsic::Runtime::GeometryProcessingDetail

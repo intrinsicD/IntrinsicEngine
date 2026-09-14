@@ -3,10 +3,10 @@
 module;
 
 #include <memory>
+#include "Sandbox.EditorFwd.hpp"
 
 export module Extrinsic.Sandbox.Editor.DomainPanels;
 
-import Extrinsic.Sandbox.Editor.Shell;
 
 export namespace Extrinsic::Sandbox::Editor {
 class DomainPanels final {

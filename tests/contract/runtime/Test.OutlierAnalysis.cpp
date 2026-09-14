@@ -8,9 +8,10 @@
 #include <entt/entity/registry.hpp>
 #include <variant>
 #include <gtest/gtest.h>
+#include "EditorFeatureTestContext.hpp"
 #include "SandboxEditorJobHarness.hpp"
 
-import Extrinsic.Runtime.GeometryProcessingOperations;
+import Extrinsic.Runtime.PointAnalysisOperations;
 import Extrinsic.Runtime.SpatialIndexCache;
 import Extrinsic.Runtime.WorldRegistry;
 import Extrinsic.Runtime.SelectionController;
@@ -22,6 +23,7 @@ import Extrinsic.Core.Config.EngineLoad;
 import Extrinsic.Runtime.EngineConfigControl;
 import Extrinsic.ECS.Scene.Registry;
 import Extrinsic.ECS.Components.GeometrySources;
+import Extrinsic.ECS.Component.DirtyTags;
 import Extrinsic.ECS.Components.GeometrySourcesPopulate;
 import Extrinsic.Graphics.Component.VisualizationConfig;
 import Geometry.HalfedgeMesh;
@@ -104,12 +106,12 @@ TEST(OutlierAnalysis, EveryDomainMatchesReferenceAndPublishesOnlyNamedProperties
             auto& props=Properties(scene,entity,D(d));const auto size=props.Size();
             const auto positionRevision=std::as_const(props).Get<glm::vec3>("samples").Revision();
             R::EditorCommandHistory history;
-            R::EditorGeometryProcessingContext context{.Scene=&scene,.World=world,.CommandHistory=&history,.SpatialIndices=&cache};
-            const auto catalog=R::GetEditorOutlierAnalysisInputCatalog(context,config.StableEntityId);
+            R::EditorProcessingContext context{.Scene=&scene,.World=world,.CommandHistory=&history,.SpatialIndices=&cache};
+            const auto catalog=R::GetEditorPointInputCatalog(R::BindEditorProcessingCommands(context),config.StableEntityId);
             EXPECT_TRUE(std::ranges::any_of(catalog.Entries,[&](auto& e){return e.Ref==config.Positions;}));
-            ASSERT_TRUE(R::PreviewEditorOutlierAnalysisCommand(context,config).Ready);
+            ASSERT_TRUE(R::PreviewEditorOutlierAnalysisCommand(R::BindEditorProcessingCommands(context),config).Ready);
             EXPECT_FALSE(props.Exists("outliers"));
-            const auto reference=R::ApplyEditorOutlierAnalysisCommand(context,config);
+            const auto reference=R::ApplyEditorOutlierAnalysisCommand(R::BindEditorProcessingCommands(context),config);
             ASSERT_TRUE(reference.Succeeded())<<reference.Message;
             EXPECT_EQ(reference.ActualBackend,"cpu_octree");EXPECT_EQ(reference.RejectedCount,1);
             const auto mask=std::as_const(props).Get<std::uint32_t>("outliers").Vector();
@@ -120,14 +122,14 @@ TEST(OutlierAnalysis, EveryDomainMatchesReferenceAndPublishesOnlyNamedProperties
             ASSERT_TRUE(history.Undo().Succeeded());EXPECT_FALSE(props.Exists("outliers"));EXPECT_FALSE(props.Exists("scores"));
             ASSERT_TRUE(history.Redo().Succeeded());EXPECT_EQ(std::as_const(props).Get<float>("keep")[0],99);
             config.Backend=R::OutlierAnalysisBackend::CpuLBVH;
-            const auto indexed=R::ApplyEditorOutlierAnalysisCommand(context,config);
+            const auto indexed=R::ApplyEditorOutlierAnalysisCommand(R::BindEditorProcessingCommands(context),config);
             ASSERT_TRUE(indexed.Succeeded())<<indexed.Message;EXPECT_EQ(indexed.ActualBackend,"cpu_lbvh");
             EXPECT_EQ(std::as_const(props).Get<std::uint32_t>("outliers").Vector(),mask);
             const auto actual=std::as_const(props).Get<float>("scores");
             for(std::size_t i=0;i<size;++i)EXPECT_NEAR(actual[i],scores[i],1e-5);
-            EXPECT_TRUE(R::ApplyEditorOutlierAnalysisCommand(context,config).IndexReused);
+            EXPECT_TRUE(R::ApplyEditorOutlierAnalysisCommand(R::BindEditorProcessingCommands(context),config).IndexReused);
             if(D(d)==D::PointCloudPoint) EXPECT_EQ(mask[4],0);
-            else {config.Operation=R::OutlierAnalysisOperation::RemoveMarked;EXPECT_FALSE(R::PreviewEditorOutlierAnalysisCommand(context,config).Ready);}
+            else {config.Operation=R::OutlierAnalysisOperation::RemoveMarked;EXPECT_FALSE(R::PreviewEditorOutlierAnalysisCommand(R::BindEditorProcessingCommands(context),config).Ready);}
         }
 }
 
@@ -138,18 +140,22 @@ TEST(OutlierAnalysis, RemovalRequiresCurrentDetectionAndPreservesEveryPropertyTh
     auto custom=props.GetOrAdd<std::string>("custom", "default");
     for(std::size_t i=0;i<props.Size();++i)custom[i]=std::to_string(i);
     R::EditorCommandHistory history;R::SelectionController selection;
-    R::EditorGeometryProcessingContext context{.Scene=&scene,.Selection=&selection,.CommandHistory=&history};
+    R::EditorProcessingContext context = [&] { R::EditorProcessingContext value{}; value.Scene = &scene; value.Selection = &selection; value.CommandHistory = &history; return value; }();
     auto remove=config;remove.Operation=R::OutlierAnalysisOperation::RemoveMarked;
-    EXPECT_FALSE(R::PreviewEditorOutlierAnalysisCommand(context,remove).Ready);
-    ASSERT_TRUE(R::ApplyEditorOutlierAnalysisCommand(context,config).Succeeded());
-    EXPECT_TRUE(R::PreviewEditorOutlierAnalysisCommand(context,remove).Ready);
+    EXPECT_FALSE(R::PreviewEditorOutlierAnalysisCommand(R::BindEditorProcessingCommands(context),remove).Ready);
+    ASSERT_TRUE(R::ApplyEditorOutlierAnalysisCommand(R::BindEditorProcessingCommands(context),config).Succeeded());
+    EXPECT_TRUE(R::PreviewEditorOutlierAnalysisCommand(R::BindEditorProcessingCommands(context),remove).Ready);
     props.Get<float>("keep")[1]=17; // unrelated attribute edits do not invalidate detection.
-    const auto result=R::ApplyEditorOutlierAnalysisCommand(context,remove);
+    ASSERT_FALSE(selection.EditPrimitives(scene, config.StableEntityId, D::PointCloudPoint,
+        R::PrimitiveSelectionEdit::All).Indices.empty());
+    const auto result=R::ApplyEditorOutlierAnalysisCommand(R::BindEditorProcessingCommands(context),remove);
     ASSERT_TRUE(result.Succeeded())<<result.Message;EXPECT_EQ(result.RejectedCount,1);EXPECT_EQ(props.Size(),4);
+    EXPECT_EQ(selection.ReadPrimitives(scene, config.StableEntityId, D::PointCloudPoint).Status,
+              R::PrimitiveSelectionStatus::Empty);
     EXPECT_EQ(std::as_const(props).Get<std::string>("custom")[3],"4"); // deleted row preserved
     EXPECT_EQ(std::as_const(props).Get<float>("keep")[1],17);
     ASSERT_TRUE(history.Undo().Succeeded());EXPECT_EQ(props.Size(),5);EXPECT_EQ(std::as_const(props).Get<std::string>("custom")[3],"3");
-    EXPECT_TRUE(R::PreviewEditorOutlierAnalysisCommand(context,remove).Ready);
+    EXPECT_TRUE(R::PreviewEditorOutlierAnalysisCommand(R::BindEditorProcessingCommands(context),remove).Ready);
     ASSERT_TRUE(history.Redo().Succeeded());EXPECT_EQ(props.Size(),4);
     props.Get<float>("keep")[0]=123;EXPECT_FALSE(history.Undo().Succeeded());
 }
@@ -159,16 +165,16 @@ TEST(OutlierAnalysis, DeletedRowsRemainUntouchedAndMaskOrInputEditsInvalidateRem
     Extrinsic::ECS::Scene::Registry scene;auto entity=Make(scene,D::PointCloudPoint);auto& props=Properties(scene,entity,D::PointCloudPoint);
     auto config=Config(entity,D::PointCloudPoint),remove=config;remove.Operation=R::OutlierAnalysisOperation::RemoveMarked;
     props.GetOrAdd<std::uint32_t>("outliers")[4]=77;props.GetOrAdd<float>("scores")[4]=std::numeric_limits<float>::quiet_NaN();
-    R::EditorCommandHistory history;R::EditorGeometryProcessingContext context{.Scene=&scene,.CommandHistory=&history};
-    ASSERT_TRUE(R::ApplyEditorOutlierAnalysisCommand(context,config).Succeeded());
+    R::EditorCommandHistory history;R::EditorProcessingContext context{.Scene=&scene,.CommandHistory=&history};
+    ASSERT_TRUE(R::ApplyEditorOutlierAnalysisCommand(R::BindEditorProcessingCommands(context),config).Succeeded());
     EXPECT_EQ(std::as_const(props).Get<std::uint32_t>("outliers")[4],77);EXPECT_TRUE(std::isnan(std::as_const(props).Get<float>("scores")[4]));
     props.Get<std::uint32_t>("outliers")[0]=1;
-    EXPECT_FALSE(R::ApplyEditorOutlierAnalysisCommand(context,remove).Succeeded());EXPECT_FALSE(history.Undo().Succeeded());
-    ASSERT_TRUE(R::ApplyEditorOutlierAnalysisCommand(context,config).Succeeded());
+    EXPECT_FALSE(R::ApplyEditorOutlierAnalysisCommand(R::BindEditorProcessingCommands(context),remove).Succeeded());EXPECT_FALSE(history.Undo().Succeeded());
+    ASSERT_TRUE(R::ApplyEditorOutlierAnalysisCommand(R::BindEditorProcessingCommands(context),config).Succeeded());
     props.Get<glm::vec3>("samples")[0].x+=1;
-    EXPECT_FALSE(R::PreviewEditorOutlierAnalysisCommand(context,remove).Ready);
-    ASSERT_TRUE(R::ApplyEditorOutlierAnalysisCommand(context,config).Succeeded());
-    props.Get<bool>("v:deleted")[1]=true;EXPECT_FALSE(R::PreviewEditorOutlierAnalysisCommand(context,remove).Ready);
+    EXPECT_FALSE(R::PreviewEditorOutlierAnalysisCommand(R::BindEditorProcessingCommands(context),remove).Ready);
+    ASSERT_TRUE(R::ApplyEditorOutlierAnalysisCommand(R::BindEditorProcessingCommands(context),config).Succeeded());
+    props.Get<bool>("v:deleted")[1]=true;EXPECT_FALSE(R::PreviewEditorOutlierAnalysisCommand(R::BindEditorProcessingCommands(context),remove).Ready);
 }
 
 TEST(OutlierAnalysis, RadiusUsesAllCountsAndRetainsCoincidentPeers)
@@ -176,30 +182,30 @@ TEST(OutlierAnalysis, RadiusUsesAllCountsAndRetainsCoincidentPeers)
     R::WorldRegistry worlds;auto world=worlds.CreateWorld("dense");auto& scene=*worlds.Get(world);
     auto entity=scene.Create();auto& props=scene.Raw().emplace<GS::Vertices>(entity).Properties;props.Resize(1030);
     (void)props.GetOrAdd<glm::vec3>("samples",glm::vec3(0));props.Get<glm::vec3>("samples")[1029]={10,0,0};
-    R::SpatialIndexCache cache(worlds);R::EditorGeometryProcessingContext context{.Scene=&scene,.World=world,.SpatialIndices=&cache};
+    R::SpatialIndexCache cache(worlds);R::EditorProcessingContext context{.Scene=&scene,.World=world,.SpatialIndices=&cache};
     auto config=Config(entity,D::PointCloudPoint);config.Method=R::OutlierAnalysisMethod::Radius;config.MinimumNeighbors=1028;
     for(auto backend:{R::OutlierAnalysisBackend::CpuOctree,R::OutlierAnalysisBackend::CpuLBVH})
     {
-        config.Backend=backend;const auto result=R::ApplyEditorOutlierAnalysisCommand(context,config);
+        config.Backend=backend;const auto result=R::ApplyEditorOutlierAnalysisCommand(R::BindEditorProcessingCommands(context),config);
         ASSERT_TRUE(result.Succeeded())<<result.Message;EXPECT_EQ(result.RejectedCount,1);
         EXPECT_EQ(std::as_const(props).Get<float>("scores")[0],1028.f);
         EXPECT_EQ(std::as_const(props).Get<float>("scores")[1029],0.f);
     }
     props.Resize(1);config.MinimumNeighbors=0;
-    EXPECT_TRUE(R::ApplyEditorOutlierAnalysisCommand(context,config).Succeeded());
+    EXPECT_TRUE(R::ApplyEditorOutlierAnalysisCommand(R::BindEditorProcessingCommands(context),config).Succeeded());
     EXPECT_EQ(std::as_const(props).Get<float>("scores")[0],0);
 }
 
 TEST(OutlierAnalysis, InvalidParametersAndReservedOutputsFailBeforeMutation)
 {
     Extrinsic::ECS::Scene::Registry scene;auto entity=Make(scene,D::MeshFace);auto config=Config(entity,D::MeshFace);
-    R::EditorGeometryProcessingContext context{.Scene=&scene};
+    R::EditorProcessingContext context{.Scene=&scene};
     for(auto name:{"f:halfedge","v:deleted","e:v0"})
-    {auto c=config;c.Mask.Name=name;EXPECT_FALSE(R::PreviewEditorOutlierAnalysisCommand(context,c).Ready);}
+    {auto c=config;c.Mask.Name=name;EXPECT_FALSE(R::PreviewEditorOutlierAnalysisCommand(R::BindEditorProcessingCommands(context),c).Ready);}
     auto c=config;c.Backend=R::OutlierAnalysisBackend::VulkanLBVH;
-    EXPECT_FALSE(R::ApplyEditorOutlierAnalysisCommand(context,c).Succeeded());
+    EXPECT_FALSE(R::ApplyEditorOutlierAnalysisCommand(R::BindEditorProcessingCommands(context),c).Succeeded());
     auto& props=Properties(scene,entity,D::MeshFace);(void)props.GetOrAdd<float>("outliers");
-    EXPECT_FALSE(R::PreviewEditorOutlierAnalysisCommand(context,config).Ready);
+    EXPECT_FALSE(R::PreviewEditorOutlierAnalysisCommand(R::BindEditorProcessingCommands(context),config).Ready);
 }
 TEST(OutlierAnalysis, QueuedJobsRejectStaleInputsOutputsAndCancellation)
 {
@@ -212,10 +218,12 @@ TEST(OutlierAnalysis, QueuedJobsRejectStaleInputsOutputsAndCancellation)
         Intrinsic::Tests::EditorFeatureTestContext context;context.Scene=&scene;
         R::EditorCommandHistory history;context.CommandHistory=&history;
         std::optional<R::EditorOutlierAnalysisResult> delivered;
-        context.MethodResultSinks.OutlierAnalysis=[&](auto r){delivered=std::move(r);};
+        std::function<void(R::EditorOutlierAnalysisResult)> sink=[&](auto r){delivered=std::move(r);};
         Extrinsic::Tests::EditorJobHarness jobs;jobs.Attach(context);
-        ASSERT_EQ(R::ApplyEditorOutlierAnalysisCommand(context,config).Status,R::EditorCommandStatus::Pending);
-        EXPECT_EQ(R::ApplyEditorOutlierAnalysisCommand(context,config).Status,R::EditorCommandStatus::Pending);
+        ASSERT_EQ(R::ApplyEditorOutlierAnalysisCommand(R::BindEditorProcessingCommands(context),config, sink).Status,R::EditorCommandStatus::Pending);
+        unsigned duplicateDeliveries = 0;
+        EXPECT_EQ(R::ApplyEditorOutlierAnalysisCommand(R::BindEditorProcessingCommands(context), config,
+            [&](R::EditorOutlierAnalysisResult) { ++duplicateDeliveries; }).Status, R::EditorCommandStatus::Pending);
         EXPECT_EQ(jobs.Snapshot().Entries.size(),1);
         switch(change)
         {
@@ -227,6 +235,7 @@ TEST(OutlierAnalysis, QueuedJobsRejectStaleInputsOutputsAndCancellation)
         case 5:(void)jobs.Jobs().Cancel(jobs.Snapshot().Entries[0].Token);break;
         }
         ASSERT_TRUE(jobs.DrainUntilTerminal());ASSERT_TRUE(delivered);
+        EXPECT_EQ(duplicateDeliveries, 0u);
         EXPECT_EQ(delivered->Succeeded(),change==0)<<delivered->Message;
         EXPECT_EQ(history.CanUndo(),change==0);
         EXPECT_EQ(props.Exists("outliers"),change==0 || change==3);
@@ -248,7 +257,7 @@ TEST(OutlierAnalysisConfig, RoundTripAndSharedPreviewApplyRun)
         ASSERT_TRUE(registry.Register(R::MakeOutlierAnalysisConfigSectionRegistration()));
         R::RuntimeEngineConfigControlState state;
         C::PopulateEngineConfigSectionDefaults(state.ActiveConfig, registry);
-        R::EditorGeometryProcessingContext context{.Scene = &scene};
+        R::EditorProcessingContext context{.Scene = &scene};
         context.EngineConfigControlState = &state;
         context.EngineConfigCommandsAvailable = true;
         unsigned previews = 0, applies = 0;
@@ -261,7 +270,7 @@ TEST(OutlierAnalysisConfig, RoundTripAndSharedPreviewApplyRun)
             state.ActiveConfig = preview.Preview.Config;
             return R::RuntimeEngineConfigApplyResult{.Status = R::RuntimeEngineConfigApplyStatus::Applied};
         };
-        auto commands = R::BindEditorGeometryProcessingCommands(context);
+        auto commands = R::BindEditorProcessingCommands(context);
         ASSERT_TRUE(R::PreviewEditorOutlierAnalysisCommand(commands, config).Ready);
         EXPECT_FALSE(Properties(scene, entity, D::MeshFace).Exists("outliers"));
         ASSERT_TRUE(R::ApplyEditorOutlierAnalysisConfig(commands, config).Succeeded());
@@ -292,7 +301,7 @@ TEST(OutlierAnalysis, MaskAndScoreUseSharedVisualizationRecipesOnEveryDomain)
         context.VisualizationRecipes.GetRecipe=[&](std::uint32_t){return stored;};
         context.VisualizationRecipes.SetRecipe=[&](std::uint32_t,R::VisualizationRecipe r){stored=std::move(r);};
         context.VisualizationRecipes.ClearRecipe=[&](std::uint32_t){stored.reset();};
-        ASSERT_TRUE(R::ApplyEditorOutlierAnalysisCommand(context,config).Succeeded());
+        ASSERT_TRUE(R::ApplyEditorOutlierAnalysisCommand(R::BindEditorProcessingCommands(context),config).Succeeded());
         const bool half = D(d)==D::MeshHalfedge || D(d)==D::GraphHalfedge;
         const auto maskStatus = R::ApplyEditorVisualizationRecipeCommand(context,
             {.StableEntityId=config.StableEntityId,
@@ -336,30 +345,30 @@ TEST(OutlierAnalysis, RadiusBoundaryAndStatisticalMinimumMatchAcrossCpuBackends)
     auto entity=scene.Create();auto& props=scene.Raw().emplace<GS::Vertices>(entity).Properties;props.Resize(5);
     props.GetOrAdd<glm::vec3>("samples").Vector()={{0,0,0},{.3f,.4f,0},{.5f,0,0},{std::nextafter(.5f,1.f),0,0},{10,0,0}};
     auto config=Config(entity,D::PointCloudPoint);config.Method=R::OutlierAnalysisMethod::Radius;config.Radius=.5f;
-    R::SpatialIndexCache cache(worlds);R::EditorGeometryProcessingContext context{.Scene=&scene,.World=world,.SpatialIndices=&cache};
-    ASSERT_TRUE(R::ApplyEditorOutlierAnalysisCommand(context,config).Succeeded());
+    R::SpatialIndexCache cache(worlds);R::EditorProcessingContext context{.Scene=&scene,.World=world,.SpatialIndices=&cache};
+    ASSERT_TRUE(R::ApplyEditorOutlierAnalysisCommand(R::BindEditorProcessingCommands(context),config).Succeeded());
     const auto scores=std::as_const(props).Get<float>("scores").Vector();EXPECT_EQ(scores[0],2);
     config.Backend=R::OutlierAnalysisBackend::CpuLBVH;
-    ASSERT_TRUE(R::ApplyEditorOutlierAnalysisCommand(context,config).Succeeded());
+    ASSERT_TRUE(R::ApplyEditorOutlierAnalysisCommand(R::BindEditorProcessingCommands(context),config).Succeeded());
     EXPECT_EQ(std::as_const(props).Get<float>("scores").Vector(),scores);
     config.Method=R::OutlierAnalysisMethod::Statistical;config.KNeighbors=5;
-    EXPECT_FALSE(R::PreviewEditorOutlierAnalysisCommand(context,config).Ready);
+    EXPECT_FALSE(R::PreviewEditorOutlierAnalysisCommand(R::BindEditorProcessingCommands(context),config).Ready);
     config.Backend=R::OutlierAnalysisBackend::CpuOctree;
-    EXPECT_FALSE(R::PreviewEditorOutlierAnalysisCommand(context,config).Ready);
+    EXPECT_FALSE(R::PreviewEditorOutlierAnalysisCommand(R::BindEditorProcessingCommands(context),config).Ready);
 }
 TEST(OutlierAnalysis, UndoAnotherOutputCannotMakeAnEditedMaskCurrent)
 {
     Extrinsic::ECS::Scene::Registry scene;auto entity=Make(scene,D::PointCloudPoint);auto& props=Properties(scene,entity,D::PointCloudPoint);
     auto first=Config(entity,D::PointCloudPoint), second=first;
     second.Mask.Name="other_mask";second.Score.Name="other_score";
-    R::EditorCommandHistory history;R::EditorGeometryProcessingContext context{.Scene=&scene,.CommandHistory=&history};
-    ASSERT_TRUE(R::ApplyEditorOutlierAnalysisCommand(context,first).Succeeded());
-    ASSERT_TRUE(R::ApplyEditorOutlierAnalysisCommand(context,second).Succeeded());
+    R::EditorCommandHistory history;R::EditorProcessingContext context{.Scene=&scene,.CommandHistory=&history};
+    ASSERT_TRUE(R::ApplyEditorOutlierAnalysisCommand(R::BindEditorProcessingCommands(context),first).Succeeded());
+    ASSERT_TRUE(R::ApplyEditorOutlierAnalysisCommand(R::BindEditorProcessingCommands(context),second).Succeeded());
     props.Get<std::uint32_t>(first.Mask.Name)[0]=1;
     ASSERT_TRUE(history.Undo().Succeeded());
     first.Operation=R::OutlierAnalysisOperation::RemoveMarked;
-    EXPECT_FALSE(R::PreviewEditorOutlierAnalysisCommand(context,first).Ready);
-    EXPECT_FALSE(R::ApplyEditorOutlierAnalysisCommand(context,first).Succeeded());
+    EXPECT_FALSE(R::PreviewEditorOutlierAnalysisCommand(R::BindEditorProcessingCommands(context),first).Ready);
+    EXPECT_FALSE(R::ApplyEditorOutlierAnalysisCommand(R::BindEditorProcessingCommands(context),first).Succeeded());
     EXPECT_EQ(props.Size(),5);
 }
 
@@ -378,7 +387,233 @@ TEST(OutlierAnalysisConfig, DistanceRatioRoundTripsDefaultsAndClampsKToSmallInpu
     R::WorldRegistry worlds;auto world=worlds.CreateWorld("distance ratio");auto& scene=*worlds.Get(world);
     R::SpatialIndexCache cache(worlds);auto entity=Make(scene,D::PointCloudPoint);
     auto c=Config(entity,D::PointCloudPoint);c.Method=config.Method;c.KNeighbors=63;c.Backend=R::OutlierAnalysisBackend::CpuLBVH;
-    R::EditorGeometryProcessingContext context{.Scene=&scene,.World=world,.SpatialIndices=&cache};
-    EXPECT_TRUE(R::PreviewEditorOutlierAnalysisCommand(context,c).Ready);
-    EXPECT_TRUE(R::ApplyEditorOutlierAnalysisCommand(context,c).Succeeded());
+    R::EditorProcessingContext context{.Scene=&scene,.World=world,.SpatialIndices=&cache};
+    EXPECT_TRUE(R::PreviewEditorOutlierAnalysisCommand(R::BindEditorProcessingCommands(context),c).Ready);
+    EXPECT_TRUE(R::ApplyEditorOutlierAnalysisCommand(R::BindEditorProcessingCommands(context),c).Succeeded());
+}
+
+TEST(OutlierAnalysisOperations, ExpiredQueuedCommandsNeverBorrowFreedSceneOrDeliver)
+{
+    auto scene = std::make_unique<Extrinsic::ECS::Scene::Registry>();
+    const auto entity = Make(*scene, D::MeshVertex);
+    const auto config = Config(entity, D::MeshVertex);
+    bool active = true;
+    Intrinsic::Tests::EditorFeatureTestContext context;
+    context.Scene = scene.get();
+    context.AttachmentActive = [&] { return active; };
+    R::EditorCommandHistory history;
+    context.CommandHistory = &history;
+    Extrinsic::Tests::EditorJobHarness jobs;
+    jobs.Attach(context);
+    unsigned deliveries = 0;
+    const auto commands = R::BindEditorProcessingCommands(context);
+    ASSERT_EQ(R::ApplyEditorOutlierAnalysisCommand(commands, config,
+        [&](R::EditorOutlierAnalysisResult) { ++deliveries; }).Status, R::EditorCommandStatus::Pending);
+    active = false;
+    scene.reset();
+    ASSERT_TRUE(jobs.DrainUntilTerminal());
+    EXPECT_EQ(deliveries, 0u);
+    EXPECT_FALSE(history.CanUndo());
+    EXPECT_FALSE(commands.IsBound());
+    EXPECT_TRUE(R::GetEditorPointInputCatalog(commands, config.StableEntityId).Entries.empty());
+}
+
+TEST(OutlierAnalysis, RemovalHistoryRejectsExpiredScene)
+{
+    auto scene = std::make_unique<Extrinsic::ECS::Scene::Registry>();
+    const auto entity = Make(*scene, D::PointCloudPoint);
+    auto config = Config(entity, D::PointCloudPoint);
+    bool active = true;
+    R::EditorCommandHistory history;
+    const auto commands = R::BindEditorProcessingCommands({
+        .Scene = scene.get(), .CommandHistory = &history, .AttachmentActive = [&] { return active; }});
+    ASSERT_TRUE(R::ApplyEditorOutlierAnalysisCommand(commands, config).Succeeded());
+    config.Operation = R::OutlierAnalysisOperation::RemoveMarked;
+    const auto removal = R::ApplyEditorOutlierAnalysisCommand(commands, config);
+    ASSERT_EQ(removal.Status, R::EditorCommandStatus::Applied) << removal.Message;
+    ASSERT_TRUE(history.CanUndo());
+    active = false;
+    scene.reset();
+    EXPECT_EQ(history.Undo().Status, R::EditorCommandHistoryStatus::StaleEntity);
+}
+
+TEST(OutlierAnalysis, SharedPointCatalogAdmitsOnlyUsableLiveVec3Inputs)
+{
+    for (unsigned scenario = 0; scenario < 5; ++scenario)
+    {
+        SCOPED_TRACE(scenario);
+        Extrinsic::ECS::Scene::Registry scene;
+        const auto entity = Make(scene, D::PointCloudPoint);
+        const auto config = Config(entity, D::PointCloudPoint);
+        auto& props = Properties(scene, entity, D::PointCloudPoint);
+        // The fixture includes a deleted NaN row; only live rows determine eligibility.
+        if (scenario == 1) props.Get<bool>("v:deleted").Vector().assign(props.Size(), true);
+        if (scenario == 2) props.Get<glm::vec3>("samples")[0].x = std::numeric_limits<float>::quiet_NaN();
+        if (scenario == 3)
+        {
+            auto deleted = props.Get<bool>("v:deleted");
+            props.Remove(deleted);
+            (void)props.GetOrAdd<float>("v:deleted");
+        }
+        if (scenario == 4) props.Get<bool>("v:deleted").Vector().resize(1);
+        const auto commands = R::BindEditorProcessingCommands({.Scene=&scene});
+        // Outlier, keypoint and density-weight inputs share one catalog owner, so
+        // this single snapshot is what every one of those panels resolves.
+        const auto catalog = R::GetEditorPointInputCatalog(commands, config.StableEntityId);
+        EXPECT_EQ(std::ranges::any_of(catalog.Entries, [&](const auto& e) { return e.Ref == config.Positions; }), scenario == 0);
+        EXPECT_TRUE(std::ranges::all_of(catalog.Entries, [](const auto& e) { return e.Ref.ValueKind == Geometry::PropertyValueKind::Vec3; }));
+        EXPECT_FALSE(std::ranges::any_of(catalog.Entries, [](const auto& e) { return e.Ref.Name == "keep"; }));
+    }
+}
+
+namespace
+{
+    namespace Dirty = Extrinsic::ECS::Components::DirtyTags;
+
+    // A tight grid of live points plus, optionally, one trailing slot that is
+    // already marked deleted. The dead slot sits far away, so it would look like
+    // an outlier if removal ever treated it as live.
+    entt::entity MakeRemovalCloud(Extrinsic::ECS::Scene::Registry& scene,
+                                  const std::size_t liveCount,
+                                  const bool withDeletedSlot,
+                                  const glm::vec3 outlier = glm::vec3{12, -7, 4})
+    {
+        const auto entity = scene.Create();
+        auto& vertices = scene.Raw().emplace<GS::Vertices>(entity);
+        const std::size_t slots = liveCount + (withDeletedSlot ? 1u : 0u);
+        vertices.Properties.Resize(slots);
+        auto samples = vertices.Properties.GetOrAdd<glm::vec3>("samples");
+        for (std::size_t i = 0; i < slots; ++i)
+            samples[i] = {float(i % 8) * 0.05f, float(i / 8) * 0.05f, 0};
+        samples[liveCount - 1u] = outlier;
+        auto labels = vertices.Properties.GetOrAdd<float>("keep", 0.f);
+        for (std::size_t i = 0; i < slots; ++i) labels[i] = float(i);
+        if (withDeletedSlot)
+        {
+            auto deleted = vertices.Properties.GetOrAdd<bool>("v:deleted", false);
+            deleted[slots - 1u] = true;
+            samples[slots - 1u] = {50, 50, 50};
+            vertices.NumDeleted = 1u;
+        }
+        return entity;
+    }
+    R::OutlierAnalysisConfig RemovalConfig(entt::entity entity)
+    {
+        return {.StableEntityId = R::SelectionController::ToStableEntityId(entity),
+                .Method = R::OutlierAnalysisMethod::Radius,
+                .Positions = {.Domain = D::PointCloudPoint, .Name = "samples",
+                              .ValueKind = Geometry::PropertyValueKind::Vec3},
+                .Mask = {D::PointCloudPoint, "outliers", Geometry::PropertyValueKind::UInt32},
+                .Score = {D::PointCloudPoint, "scores", Geometry::PropertyValueKind::Float},
+                .MinimumNeighbors = 1, .Radius = 0.2f};
+    }
+}
+
+TEST(OutlierAnalysis, RemovalNotifiesRenderersAndKeepsDeletedRowAccountingExact)
+{
+    Extrinsic::ECS::Scene::Registry scene;
+    const auto entity = MakeRemovalCloud(scene, 16u, true);
+    auto config = RemovalConfig(entity);
+    const auto slotCount = Properties(scene, entity, D::PointCloudPoint).Size();
+    R::EditorCommandHistory history;
+    const auto commands = R::BindEditorProcessingCommands({.Scene = &scene, .CommandHistory = &history});
+    const auto detect = R::ApplyEditorOutlierAnalysisCommand(commands, config);
+    ASSERT_EQ(detect.Status, R::EditorCommandStatus::Applied) << detect.Message;
+    ASSERT_EQ(detect.RejectedCount, 1u);
+    scene.Raw().remove<Dirty::GpuDirty>(entity);
+    scene.Raw().remove<Dirty::DirtyVertexPositions>(entity);
+    scene.Raw().remove<Dirty::DirtyVertexAttributes>(entity);
+    scene.Raw().remove<Dirty::DirtyVertexNormals>(entity);
+
+    config.Operation = R::OutlierAnalysisOperation::RemoveMarked;
+    const auto removal = R::ApplyEditorOutlierAnalysisCommand(commands, config);
+    ASSERT_EQ(removal.Status, R::EditorCommandStatus::Applied) << removal.Message;
+    EXPECT_EQ(removal.RejectedCount, 1u);
+    EXPECT_EQ(removal.WrittenCount + removal.RejectedCount, slotCount);
+
+    const auto& vertices = scene.Raw().get<GS::Vertices>(entity);
+    EXPECT_EQ(vertices.Properties.Size(), slotCount - removal.RejectedCount);
+    // Removing live marked points neither resurrects nor forgets a dead row.
+    EXPECT_EQ(vertices.NumDeleted, 1u);
+    const auto deleted = std::as_const(vertices.Properties).Get<bool>("v:deleted");
+    ASSERT_TRUE(deleted);
+    EXPECT_EQ(std::ranges::count(deleted.Vector(), true), 1);
+    EXPECT_TRUE(scene.Raw().all_of<Dirty::GpuDirty>(entity));
+    EXPECT_TRUE(scene.Raw().all_of<Dirty::DirtyVertexPositions>(entity));
+    EXPECT_TRUE(scene.Raw().all_of<Dirty::DirtyVertexAttributes>(entity));
+    EXPECT_TRUE(scene.Raw().all_of<Dirty::DirtyVertexNormals>(entity));
+    EXPECT_TRUE(history.IsDirty());
+
+    ASSERT_TRUE(history.Undo().Succeeded());
+    const auto& restored = scene.Raw().get<GS::Vertices>(entity);
+    EXPECT_EQ(restored.Properties.Size(), slotCount);
+    EXPECT_EQ(restored.NumDeleted, 1u);
+    const auto restoredDeleted = std::as_const(restored.Properties).Get<bool>("v:deleted");
+    ASSERT_TRUE(restoredDeleted);
+    EXPECT_TRUE(restoredDeleted[slotCount - 1u]);
+    ASSERT_TRUE(history.Redo().Succeeded());
+    EXPECT_EQ(scene.Raw().get<GS::Vertices>(entity).Properties.Size(), slotCount - removal.RejectedCount);
+    EXPECT_EQ(scene.Raw().get<GS::Vertices>(entity).NumDeleted, 1u);
+}
+
+TEST(OutlierAnalysis, RemovalWithNothingMarkedReportsNoChangeAndAddsNoUndoEntry)
+{
+    Extrinsic::ECS::Scene::Registry scene;
+    // Every point has a close neighbour, so detection marks nothing.
+    const auto entity = MakeRemovalCloud(scene, 16u, false, glm::vec3{0.05f, 0.05f, 0});
+    auto config = RemovalConfig(entity);
+    config.Radius = 1.0f;
+    const auto slotCount = Properties(scene, entity, D::PointCloudPoint).Size();
+    R::EditorCommandHistory history;
+    const auto commands = R::BindEditorProcessingCommands({.Scene = &scene, .CommandHistory = &history});
+    const auto detect = R::ApplyEditorOutlierAnalysisCommand(commands, config);
+    ASSERT_TRUE(detect.Succeeded()) << detect.Message;
+    ASSERT_EQ(detect.RejectedCount, 0u);
+    const auto undoCountAfterDetection = history.UndoCount();
+
+    config.Operation = R::OutlierAnalysisOperation::RemoveMarked;
+    const auto removal = R::ApplyEditorOutlierAnalysisCommand(commands, config);
+    EXPECT_EQ(removal.Status, R::EditorCommandStatus::NoChange) << removal.Message;
+    EXPECT_EQ(removal.RejectedCount, 0u);
+    EXPECT_NE(removal.Message.find("No live points are marked"), std::string::npos) << removal.Message;
+    EXPECT_EQ(Properties(scene, entity, D::PointCloudPoint).Size(), slotCount);
+    EXPECT_EQ(history.UndoCount(), undoCountAfterDetection)
+        << "a removal that rejected nothing must not leave an undo entry";
+}
+
+TEST(OutlierAnalysis, RadiusParametersAndMissingSceneFailBeforeAnyMutation)
+{
+    for (const float radius : {0.0f, -1.0f, std::numeric_limits<float>::quiet_NaN(),
+                               std::numeric_limits<float>::infinity()})
+    {
+        SCOPED_TRACE(radius);
+        Extrinsic::ECS::Scene::Registry scene;
+        const auto entity = MakeRemovalCloud(scene, 16u, false);
+        auto config = RemovalConfig(entity);
+        config.Radius = radius;
+        R::EditorCommandHistory history;
+        const auto commands = R::BindEditorProcessingCommands({.Scene = &scene, .CommandHistory = &history});
+        const auto result = R::ApplyEditorOutlierAnalysisCommand(commands, config);
+        EXPECT_FALSE(result.Succeeded()) << result.Message;
+        auto& props = Properties(scene, entity, D::PointCloudPoint);
+        EXPECT_FALSE(props.Exists("outliers"));
+        EXPECT_FALSE(props.Exists("scores"));
+        EXPECT_FALSE(history.CanUndo());
+        if (radius <= 0.0f)
+        {
+            // The serialized config lane rejects the same parameter up front.
+            EXPECT_FALSE(R::ValidateOutlierAnalysisConfigSection(
+                R::SerializeOutlierAnalysisConfig(config), {},
+                R::kOutlierAnalysisConfigSectionName).Usable());
+        }
+    }
+
+    Extrinsic::ECS::Scene::Registry scene;
+    const auto entity = MakeRemovalCloud(scene, 16u, false);
+    const auto config = RemovalConfig(entity);
+    const auto unbound = R::BindEditorProcessingCommands({});
+    const auto missingScene = R::ApplyEditorOutlierAnalysisCommand(unbound, config);
+    EXPECT_FALSE(missingScene.Succeeded());
+    EXPECT_FALSE(R::PreviewEditorOutlierAnalysisCommand(unbound, config).Ready);
+    EXPECT_FALSE(Properties(scene, entity, D::PointCloudPoint).Exists("outliers"));
 }

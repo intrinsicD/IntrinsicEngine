@@ -6,6 +6,7 @@ module;
 #include <string_view>
 
 export module Extrinsic.Runtime.ProgressivePoissonConfig;
+export import Extrinsic.Runtime.GeometryAvailability;
 
 import Extrinsic.Core.Config.Engine;
 import Extrinsic.Core.Config.EngineLoad;
@@ -51,6 +52,12 @@ export namespace Extrinsic::Runtime
             ProgressivePoissonPlaygroundBackend::CpuReference};
         bool AutoRunOnEdit{true};
         double DebounceSeconds{0.25};
+        GeometryPropertyRef Positions{GeometryElementDomain::Unknown, "v:position", Geometry::PropertyValueKind::Vec3};
+        GeometryPropertyRef Level{GeometryElementDomain::Unknown, "v:poisson_level", Geometry::PropertyValueKind::Float};
+        GeometryPropertyRef Rank{GeometryElementDomain::Unknown, "v:poisson_rank", Geometry::PropertyValueKind::Float};
+        GeometryPropertyRef SplatRadius{GeometryElementDomain::Unknown, "v:poisson_splat_radius", Geometry::PropertyValueKind::Float};
+        GeometryPropertyRef PrefixVisible{GeometryElementDomain::Unknown, "v:poisson_prefix_visible", Geometry::PropertyValueKind::Float};
+
     };
 
     [[nodiscard]] std::string SerializeProgressivePoissonPlaygroundConfig(

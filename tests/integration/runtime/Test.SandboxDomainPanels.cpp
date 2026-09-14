@@ -1,3 +1,9 @@
+#include <cstddef>
+#include <cstdint>
+#include <optional>
+#include <span>
+#include <glm/vec3.hpp>
+#include <glm/vec2.hpp>
 // ARCH-006 Slice 4 app/runtime composition coverage.
 #include <algorithm>
 #include <array>
@@ -14,6 +20,16 @@
 
 #include "RuntimeTestModule.hpp"
 
+import Extrinsic.Runtime.NormalOperations;
+import Extrinsic.Runtime.RegistrationOperations;
+import Extrinsic.Runtime.MeshFieldOperations;
+import Extrinsic.Runtime.MeshTopologyOperations;
+import Extrinsic.Runtime.ParameterizationOperations;
+import Extrinsic.Runtime.PointFieldOperations;
+import Extrinsic.Runtime.PointAnalysisOperations;
+import Extrinsic.Runtime.PointSetOperations;
+import Extrinsic.Runtime.PointConstructionOperations;
+import Extrinsic.Runtime.PointCloudServiceOperations;
 import Extrinsic.Core.Config.Engine;
 import Extrinsic.Core.Config.Window;
 import Extrinsic.Runtime.EditorUiModule;
@@ -34,6 +50,17 @@ import Extrinsic.Runtime.VisualizationEditingOperations;
 import Geometry.HalfedgeMesh;
 import Geometry.Graph;
 import Geometry.PointCloud;
+import Extrinsic.Runtime.GeometryPresentation;
+import Extrinsic.Runtime.TextureBakeModule;
+import Extrinsic.Runtime.EditorWorkspaceSnapshots;
+import Extrinsic.Runtime.GeometryProcessingOperations;
+import Extrinsic.Runtime.RenderRecipeEditingOperations;
+import Extrinsic.Runtime.SceneEditingOperations;
+import Extrinsic.Runtime.EngineConfigControl;
+import Extrinsic.Runtime.ParameterizationConfig;
+import Extrinsic.Runtime.PointCloudConsolidationTypes;
+
+#include "../../../src/app/Sandbox/Editor/Sandbox.PanelSupport.hpp"
 
 namespace Core = Extrinsic::Core;
 namespace Runtime = Extrinsic::Runtime;

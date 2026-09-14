@@ -1,6 +1,7 @@
 module;
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
@@ -863,6 +864,40 @@ namespace Extrinsic::Runtime::FeatureConfigDetail
             return true;
         }
 
+        [[nodiscard]] json EncodePropertyRef(const Runtime::GeometryPropertyRef& ref)
+        {
+            return {{"domain", Runtime::ToString(ref.Domain)}, {"name", ref.Name},
+                    {"kind", static_cast<unsigned>(ref.ValueKind)}};
+        }
+
+        void ReadPropertyRef(ValidationContext& context, const json& object,
+            const char* key, Runtime::GeometryPropertyRef& ref, const bool chooseDomain = false)
+        {
+            const auto* value = FindMember(object, key);
+            if (!value) return;
+            if (chooseDomain && value->is_object() && value->contains("domain"))
+            {
+                for (unsigned i = 1; i <= static_cast<unsigned>(Runtime::GeometryElementDomain::PointCloudPoint); ++i)
+                    if (value->at("domain") == Runtime::ToString(static_cast<Runtime::GeometryElementDomain>(i)))
+                        ref.Domain = static_cast<Runtime::GeometryElementDomain>(i);
+            }
+            const auto expected = EncodePropertyRef(ref);
+            if (!value->is_object() || value->size() != 3 || !value->contains("domain") ||
+                value->at("domain") != expected["domain"] || !value->contains("kind") ||
+                value->at("kind") != expected["kind"] || !value->contains("name") || !value->at("name").is_string())
+            {
+                if (context.Result)
+                {
+                    context.Result->State = Core::Config::EngineConfigState::Invalid;
+                    context.Result->Diagnostics.push_back({.Code=Core::Config::EngineConfigDiagnosticCode::InvalidValue,
+                        .Subject=FieldSubject(context.Path, key), .Message="Invalid typed property binding."});
+                }
+                return;
+            }
+            ref.Name = value->at("name").get<std::string>();
+            CountParsed(context);
+        }
+
         [[nodiscard]] ClusteringConfig ParseClustering(
             const std::string_view payload,
             ClusteringConfig config,
@@ -879,7 +914,7 @@ namespace Extrinsic::Runtime::FeatureConfigDetail
                  "max_iterations",
                  "seed",
                  "initialization",
-                 "backend"});
+                 "backend", "properties"});
             if (const auto value = ReadInteger(
                     context, *object, "cluster_count", 1, 1024))
             {
@@ -923,6 +958,42 @@ namespace Extrinsic::Runtime::FeatureConfigDetail
             {
                 CountParsed(context);
             }
+            if (const auto* bindings = FindMember(*object, "properties"))
+            {
+                if (bindings->is_null()) config.Properties.reset();
+                else
+                {
+                    auto properties = config.Properties.value_or(KMeansPropertyRefs{});
+                    ReadPropertyRef(context, *bindings, "positions", properties.InputPositions, true);
+                    ReadPropertyRef(context, *bindings, "labels", properties.OutputLabels, true);
+                    ReadPropertyRef(context, *bindings, "colors", properties.OutputColors, true);
+                    if (bindings->contains("scalar_labels") && !bindings->at("scalar_labels").is_null())
+                    {
+                        properties.OutputScalarLabels = Runtime::GeometryPropertyRef{
+                            properties.InputPositions.Domain, "v:kmeans_scalar_label", Geometry::PropertyValueKind::Float};
+                        ReadPropertyRef(context, *bindings, "scalar_labels", *properties.OutputScalarLabels, true);
+                    }
+                    else properties.OutputScalarLabels.reset();
+                    bool valid = bindings->is_object() && properties.InputPositions.HasName() &&
+                        properties.OutputLabels.HasName() && properties.OutputColors.HasName() &&
+                        properties.InputPositions.Domain == properties.OutputLabels.Domain &&
+                        properties.InputPositions.Domain == properties.OutputColors.Domain &&
+                        properties.InputPositions.Name != properties.OutputLabels.Name &&
+                        properties.InputPositions.Name != properties.OutputColors.Name &&
+                        properties.OutputLabels.Name != properties.OutputColors.Name;
+                    if (properties.OutputScalarLabels)
+                        valid &= properties.OutputScalarLabels->Domain == properties.InputPositions.Domain &&
+                            properties.OutputScalarLabels->HasName() && properties.OutputScalarLabels->Name != properties.InputPositions.Name &&
+                            properties.OutputScalarLabels->Name != properties.OutputLabels.Name && properties.OutputScalarLabels->Name != properties.OutputColors.Name;
+                    if (!valid && context.Result)
+                    {
+                        context.Result->State = Core::Config::EngineConfigState::Invalid;
+                        context.Result->Diagnostics.push_back({.Code=Core::Config::EngineConfigDiagnosticCode::InvalidValue,
+                            .Subject=context.Path, .Message="K-Means requires distinct properties on one element domain."});
+                    }
+                    config.Properties = std::move(properties);
+                }
+            }
             return config;
         }
 
@@ -940,7 +1011,7 @@ namespace Extrinsic::Runtime::FeatureConfigDetail
             AddUnknownFieldDiagnostics(
                 context,
                 *object,
-                {"method",
+                {"positions", "components", "regions", "region_colors", "boundaries", "boundary_colors", "hard_features", "feature_confidence", "boundary_roles", "feature_colors", "method",
                  "selection_mode",
                  "fixed_component_count",
                  "automatic_min_components",
@@ -1133,6 +1204,22 @@ namespace Extrinsic::Runtime::FeatureConfigDetail
                     reference.AutomaticMinComponents;
                 config.AutomaticMaxComponents =
                     reference.AutomaticMaxComponents;
+            }
+            ReadPropertyRef(context, *object, "positions", config.Positions);
+            ReadPropertyRef(context, *object, "components", config.Components);
+            ReadPropertyRef(context, *object, "regions", config.Regions);
+            ReadPropertyRef(context, *object, "region_colors", config.RegionColors);
+            ReadPropertyRef(context, *object, "boundaries", config.Boundaries);
+            ReadPropertyRef(context, *object, "boundary_colors", config.BoundaryColors);
+            ReadPropertyRef(context, *object, "hard_features", config.HardFeatures);
+            ReadPropertyRef(context, *object, "feature_confidence", config.FeatureConfidence);
+            ReadPropertyRef(context, *object, "boundary_roles", config.BoundaryRoles);
+            ReadPropertyRef(context, *object, "feature_colors", config.FeatureColors);
+            if (!Runtime::IsValidCurvatureSegmentationConfig(config) && context.Result)
+            {
+                context.Result->State = Core::Config::EngineConfigState::Invalid;
+                context.Result->Diagnostics.push_back({.Code=Core::Config::EngineConfigDiagnosticCode::InvalidValue,
+                    .Subject=context.Path, .Message="Segmentation requires distinct typed public property bindings."});
             }
             return config;
         }
@@ -1401,7 +1488,7 @@ namespace Extrinsic::Runtime::FeatureConfigDetail
             AddUnknownFieldDiagnostics(
                 context,
                 *object,
-                {"dimension",
+                {"positions", "level_property", "rank_property", "splat_radius_property", "prefix_visible_property", "dimension",
                  "grid_width",
                  "max_levels",
                  "hash_load_factor",
@@ -1513,6 +1600,26 @@ namespace Extrinsic::Runtime::FeatureConfigDetail
                 config.DebounceSeconds = *value;
                 CountParsed(context);
             }
+            ReadPropertyRef(context, *object, "positions", config.Positions, true);
+            ReadPropertyRef(context, *object, "level_property", config.Level, true);
+            ReadPropertyRef(context, *object, "rank_property", config.Rank, true);
+            ReadPropertyRef(context, *object, "splat_radius_property", config.SplatRadius, true);
+            ReadPropertyRef(context, *object, "prefix_visible_property", config.PrefixVisible, true);
+            const std::array refs{&config.Positions, &config.Level, &config.Rank, &config.SplatRadius, &config.PrefixVisible};
+            bool valid = true;
+            for (std::size_t i = 0; i < refs.size(); ++i)
+            {
+                valid &= refs[i]->HasName() && refs[i]->Name.find('\0') == std::string::npos &&
+                    !refs[i]->Name.ends_with(":deleted");
+                if (i != 0) valid &= refs[i]->Domain == GeometryElementDomain::Unknown || refs[i]->Domain == config.Positions.Domain;
+                for (std::size_t j = 0; j < i; ++j) valid &= refs[i]->Name != refs[j]->Name;
+            }
+            if (!valid && context.Result)
+            {
+                context.Result->State = Core::Config::EngineConfigState::Invalid;
+                context.Result->Diagnostics.push_back({.Code=Core::Config::EngineConfigDiagnosticCode::InvalidValue,
+                    .Subject=context.Path, .Message="Progressive Poisson requires distinct properties on one element domain."});
+            }
             return config;
         }
 
@@ -1530,7 +1637,7 @@ namespace Extrinsic::Runtime::FeatureConfigDetail
             AddUnknownFieldDiagnostics(
                 context,
                 *object,
-                {"strategy", "lscm", "harmonic", "bff", "view"});
+                {"positions", "texcoords", "strategy", "lscm", "harmonic", "bff", "view"});
             const ParameterizationLscmConfig referenceLscm = config.Lscm;
             const ParameterizationBffConfig referenceBff = config.Bff;
 
@@ -1896,6 +2003,17 @@ namespace Extrinsic::Runtime::FeatureConfigDetail
                     std::string{bffMessage});
                 config.Bff = referenceBff;
             }
+            ReadPropertyRef(context, *object, "positions", config.Positions);
+            ReadPropertyRef(context, *object, "texcoords", config.Texcoords);
+            if ((!config.Positions.Name.starts_with("v:") || config.Positions.Name.size() < 3 ||
+                 !config.Texcoords.Name.starts_with("v:") || config.Texcoords.Name.size() < 3 ||
+                 config.Texcoords.Name == "v:position" || config.Texcoords.Name == "v:deleted" ||
+                 config.Positions.Name == config.Texcoords.Name || config.Texcoords.Name.find('\0') != std::string::npos) && context.Result)
+            {
+                context.Result->State = Core::Config::EngineConfigState::Invalid;
+                context.Result->Diagnostics.push_back({.Code=Core::Config::EngineConfigDiagnosticCode::InvalidValue,
+                    .Subject=context.Path, .Message="Parameterization requires distinct typed vertex properties."});
+            }
             return config;
         }
 
@@ -1979,7 +2097,15 @@ namespace Extrinsic::Runtime::FeatureConfigDetail
     std::string SerializeClusteringConfigImpl(
         const ClusteringConfig& config)
     {
+        json properties = nullptr;
+        if (config.Properties)
+            properties = {{"positions", EncodePropertyRef(config.Properties->InputPositions)},
+                          {"labels", EncodePropertyRef(config.Properties->OutputLabels)},
+                          {"colors", EncodePropertyRef(config.Properties->OutputColors)},
+                          {"scalar_labels", config.Properties->OutputScalarLabels
+                              ? EncodePropertyRef(*config.Properties->OutputScalarLabels) : json(nullptr)}};
         return json::object({
+            {"properties", properties},
             {"cluster_count", config.Parameters.ClusterCount},
             {"max_iterations", config.Parameters.MaxIterations},
             {"seed", config.Parameters.Seed},
@@ -1993,6 +2119,17 @@ namespace Extrinsic::Runtime::FeatureConfigDetail
         const CurvatureSegmentationConfig& config)
     {
         return json::object({
+            {"positions", EncodePropertyRef(config.Positions)},
+            {"components", EncodePropertyRef(config.Components)},
+            {"regions", EncodePropertyRef(config.Regions)},
+            {"region_colors", EncodePropertyRef(config.RegionColors)},
+            {"boundaries", EncodePropertyRef(config.Boundaries)},
+            {"boundary_colors", EncodePropertyRef(config.BoundaryColors)},
+            {"hard_features", EncodePropertyRef(config.HardFeatures)},
+            {"feature_confidence", EncodePropertyRef(config.FeatureConfidence)},
+            {"boundary_roles", EncodePropertyRef(config.BoundaryRoles)},
+            {"feature_colors", EncodePropertyRef(config.FeatureColors)},
+
             {"method", std::string{ToConfigString(config.Method)}},
             {"selection_mode",
              std::string{ToConfigString(config.SelectionMode)}},
@@ -2021,6 +2158,12 @@ namespace Extrinsic::Runtime::FeatureConfigDetail
         const ProgressivePoissonPlaygroundConfig& config)
     {
         return json::object({
+            {"positions", EncodePropertyRef(config.Positions)},
+            {"level_property", EncodePropertyRef(config.Level)},
+            {"rank_property", EncodePropertyRef(config.Rank)},
+            {"splat_radius_property", EncodePropertyRef(config.SplatRadius)},
+            {"prefix_visible_property", EncodePropertyRef(config.PrefixVisible)},
+
             {"dimension", config.Dimension},
             {"grid_width", config.GridWidth},
             {"max_levels", config.MaxLevels},
@@ -2042,6 +2185,8 @@ namespace Extrinsic::Runtime::FeatureConfigDetail
         const ParameterizationConfig& config)
     {
         return json::object({
+            {"positions", EncodePropertyRef(config.Positions)},
+            {"texcoords", EncodePropertyRef(config.Texcoords)},
             {"strategy", std::string{ToConfigString(config.Strategy)}},
             {"view",
              json::object({

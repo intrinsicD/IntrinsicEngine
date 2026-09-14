@@ -132,7 +132,15 @@ namespace Extrinsic::RHI
         std::span<const MemoryBarrierDesc> MemoryBarriers{};
     };
 
-    export class ICommandContext
+    // C++ language linkage keeps this interface and its out-of-line members
+    // globally attached, so a CPU interface that only borrows an
+    // ICommandContext& (currently `Extrinsic.Runtime.JobService`) can match it
+    // with a forward declaration instead of importing this module's handle and
+    // descriptor closure. The definitions in RHI.CommandContext.cpp respecify
+    // the same linkage.
+    export extern "C++"
+    {
+    class ICommandContext
     {
     public:
         // Out-of-line key function: the destructor is defined in
@@ -303,6 +311,7 @@ namespace Extrinsic::RHI
         // vtable slot churn for downstream module BMIs.
         virtual void BindFrameSampledTextureAt(TextureHandle texture, std::uint32_t descriptorIndex);
     };
+    }
 
     // Intentionally ignores commands; recording test doubles and GPU contexts
     // implement their own observable behavior.

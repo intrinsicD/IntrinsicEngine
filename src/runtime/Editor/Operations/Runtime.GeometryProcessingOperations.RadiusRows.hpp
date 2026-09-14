@@ -1,4 +1,4 @@
-// Private framed radius pagination shared by property-based point methods.
+// Private framed radius and kNN pagination shared by property-based point methods.
 #pragma once
 #include <chrono>
 #include <cstdint>
@@ -6,6 +6,8 @@
 #include <span>
 #include <string>
 #include <vector>
+extern "C++"
+{
 namespace Extrinsic::Runtime::GeometryProcessingDetail
 {
     struct PointRadiusRows
@@ -26,4 +28,23 @@ namespace Extrinsic::Runtime::GeometryProcessingDetail
         SpatialIndexCache&,SpatialIndexHandle,std::span<const glm::vec3> points,
         std::span<const std::uint32_t> slots,float radius,std::uint32_t batchSize,
         std::uint32_t capacity,std::uint32_t lowestIdLimit,PointRadiusRows&,std::string& diagnostic);
+
+    struct PointKnnRows
+    {
+        std::vector<std::uint32_t> Indices{};
+        std::shared_ptr<SpatialNearestBatch> Batch{};
+        std::size_t NextQuery{}, QueryBatches{};
+        bool Finished{};
+        std::chrono::steady_clock::time_point Started{};
+        double Milliseconds{};
+    };
+    enum class KnnRowsState { Pending, Ready, Failed };
+    // Main-thread stage; caller guards staleness/cancellation. Slots are strictly
+    // increasing source IDs aligned with points. Width includes self candidates;
+    // every row must be complete. Returned indices address compact points.
+    [[nodiscard]] KnnRowsState AdvancePointKnnRows(
+        SpatialIndexCache&, SpatialIndexHandle, std::span<const glm::vec3> points,
+        std::span<const std::uint32_t> slots, std::uint32_t width,
+        std::uint32_t batchSize, PointKnnRows&, std::string& diagnostic);
+}
 }

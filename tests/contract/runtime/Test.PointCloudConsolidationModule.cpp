@@ -17,6 +17,7 @@
 
 #include "RuntimeTestModule.hpp"
 
+import Extrinsic.Runtime.Module;
 import Extrinsic.Core.Config.Engine;
 import Extrinsic.Core.Config.Window;
 import Extrinsic.Core.Tasks;

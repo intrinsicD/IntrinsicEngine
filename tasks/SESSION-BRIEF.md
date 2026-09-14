@@ -17,8 +17,25 @@ picking backlog work; theme priorities and rationale live in
 - `RUNTIME-219` — Vulkan LBVH neighborhoods for normal estimation (tasks/active/RUNTIME-219-vulkan-normal-neighborhoods.md)
 - `RUNTIME-220` — Kernel density with shared spatial backends (tasks/active/RUNTIME-220-kernel-density-spatial-backends.md)
 - `RUNTIME-221` — Point spacing and radius estimation with shared spatial backends (tasks/active/RUNTIME-221-point-spacing-spatial-backends.md)
+- `RUNTIME-231` — Share density and spacing property-operation mechanisms (tasks/active/RUNTIME-231-shared-point-property-operations.md)
+- `RUNTIME-232` — Simplify processing result wiring and panel workflows (tasks/active/RUNTIME-232-processing-editor-integration-reuse.md)
+- `RUNTIME-233` — Prove local compilation for density and spacing (tasks/active/RUNTIME-233-processing-compilation-locality-pilot.md)
+- `RUNTIME-234` — Isolate the remaining point-analysis contracts (tasks/active/RUNTIME-234-point-analysis-compilation-locality.md)
+- `RUNTIME-235` — Isolate mesh-processing contracts (tasks/active/RUNTIME-235-mesh-processing-compilation-locality.md)
+- `RUNTIME-236` — Finish remaining processing execution contracts (tasks/active/RUNTIME-236-remaining-processing-contracts.md)
+- `RUNTIME-237` — Separate render diagnostics from runtime module compilation (tasks/active/RUNTIME-237-render-diagnostics-compilation-boundary.md)
+- `RUNTIME-238` — Consolidate renderer queries and isolate Engine compilation (tasks/active/RUNTIME-238-renderer-query-api-and-engine-locality.md)
+- `RUNTIME-239` — Reuse recipe lookup and isolate the spatial query interface (tasks/active/RUNTIME-239-spatial-query-boundary-and-recipe-lookup.md)
+- `RUNTIME-240` — Reuse type identity and narrow the kernel job interface (tasks/active/RUNTIME-240-kernel-type-identity-and-job-locality.md)
+- `RUNTIME-241` — Keep texture-bake composition inside its implementation (tasks/active/RUNTIME-241-texture-bake-compilation-boundary.md)
+- `RUNTIME-242` — Keep workspace snapshots out of processing-frame composition (tasks/active/RUNTIME-242-editor-prepared-frame-locality.md)
+- `RUNTIME-243` — Narrow the processing-frame binding surface (tasks/active/RUNTIME-243-processing-frame-binding-locality.md)
+- `RUNTIME-244` — Narrow editor command-frame dependencies (tasks/active/RUNTIME-244-editor-command-frame-locality.md)
+- `RUNTIME-245` — Narrow editor action helper dependencies (tasks/active/RUNTIME-245-editor-action-helper-locality.md)
+- `RUNTIME-246` — Consolidate workspace context binding conversion (tasks/active/RUNTIME-246-workspace-context-binding-consolidation.md)
 - `UI-041` — Point-set outlier multi-domain panel (tasks/active/UI-041-point-set-outlier-multi-domain-panel.md)
 - `UI-053` — Curvature-extremum engine overlay (tasks/active/UI-053-curvature-extremum-engine-overlay.md)
+- `UI-054` — Share density and spacing panel workflow (tasks/active/UI-054-shared-processing-panel-workflow.md)
 
 ## Theme B — Rendering modernization
 
@@ -47,6 +64,12 @@ picking backlog work; theme priorities and rationale live in
 - unblocked: `BUG-091` — GoogleTest PRE_TEST discovery times out on a cold start (tasks/backlog/bugs/BUG-091-gtest-pretest-discovery-cold-timeout.md)
 - unblocked: `BUG-097` — Progressive model-scene UV job publishes a zero atlas (tasks/backlog/bugs/BUG-097-progressive-model-scene-zero-uv-atlas.md)
 - unblocked: `BUG-149` — Benchmark sealer escapes dotted output directories (tasks/backlog/bugs/BUG-149-benchmark-sealer-dotted-output-directory.md)
+- unblocked: `BUG-189` — Distance-ratio Vulkan smoke exceeds its inherited timeout (tasks/backlog/bugs/BUG-189-distance-ratio-vulkan-smoke-timeout.md)
+- unblocked: `BUG-190` — Curvature refinement test timeout during concurrent compilation (tasks/backlog/bugs/BUG-190-curvature-refinement-timeout-during-compilation.md)
+- unblocked: `BUG-191` — Consolidation LBVH sequence reaches its watchdog (tasks/backlog/bugs/BUG-191-consolidation-lbvh-sequence-timeout.md)
+- unblocked: `BUG-192` — Diagnose the surface-appearance Vulkan acceptance deadline (tasks/backlog/bugs/BUG-192-surface-appearance-vulkan-deadline.md)
+- unblocked: `BUG-193` — Investigate GPU pacing variability and watchdog margin (tasks/backlog/bugs/BUG-193-gpu-pacing-and-watchdog-margin.md)
+- unblocked: `BUILD-007` — Measure matched engine-source compile iteration (tasks/backlog/process/BUILD-007-engine-compile-time-reconciliation.md)
 
 ## Theme H — Agentic workflow hardening
 
@@ -138,6 +161,7 @@ picking backlog work; theme priorities and rationale live in
 - unblocked: `BUG-181` — Touched-scope shader-output command uses an unsupported flag (tasks/backlog/bugs/BUG-181-touched-scope-shader-output-command.md)
 - unblocked: `BUG-182` — Framed kNN smoke times out when promoted Vulkan is not compiled (tasks/backlog/bugs/BUG-182-framed-knn-unavailable-device-timeout.md)
 - unblocked: `BUG-184` — Count waiting jobs in aggregate in-flight diagnostics (tasks/backlog/bugs/BUG-184-job-service-waiting-state-accounting.md)
+- unblocked: `BUG-188` — Sandbox blocks LeakSanitizer during CTest discovery (tasks/backlog/bugs/BUG-188-sandbox-sanitizer-test-discovery.md)
 - unblocked: `GRAPHICS-109` — Offscreen frame capture to PNG (headless figure renders) (tasks/backlog/rendering/GRAPHICS-109-offscreen-frame-capture-png.md)
 
 ## Audits

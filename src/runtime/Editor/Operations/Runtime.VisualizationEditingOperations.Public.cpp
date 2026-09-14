@@ -1,23 +1,26 @@
 module;
-
 #include <cstdint>
+#include <functional>
 #include <memory>
-#include <span>
 #include <string_view>
 #include <utility>
 
 module Extrinsic.Runtime.VisualizationEditingOperations;
 
-import Extrinsic.Runtime.Private.EditorFeatures;
+// The prepared frame is projected onto this family's own context only; the
+// all-family bindings stay opaque here.
 import Extrinsic.Runtime.Private.EditorWorkspaceAttachment;
 
 namespace Extrinsic::Runtime {
 namespace {
 EditorVisualizationEditingContext MakeExpiredVisualizationEditingContext(
     EditorVisualizationEditingContext context) {
-  context.AttachmentActive = [] { return false; };
-  return EditorFeatureDetail::MakeEditorVisualizationEditingContext(
-      EditorFeatureDetail::ToEditorFeatureBindingsImpl(context));
+  EditorVisualizationEditingContext expired{};
+  expired.World = std::move(context.World);
+  expired.VisualizationRecipes = std::move(context.VisualizationRecipes);
+  expired.JobCommands = std::move(context.JobCommands);
+  expired.AttachmentActive = [] { return false; };
+  return expired;
 }
 } // namespace
 

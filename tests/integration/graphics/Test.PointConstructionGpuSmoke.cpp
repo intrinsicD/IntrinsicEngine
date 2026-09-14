@@ -22,7 +22,8 @@ import Extrinsic.RHI.TextureUpload;
 import Extrinsic.Graphics.Renderer;
 import Extrinsic.Runtime.Engine;
 import Extrinsic.Runtime.EngineConfigBoot;
-import Extrinsic.Runtime.GeometryProcessingOperations;
+import Extrinsic.Runtime.PointConstructionOperations;
+import Extrinsic.Runtime.EditorProcessing;
 import Extrinsic.Runtime.SpatialIndexCache;
 import Extrinsic.Runtime.ServiceRegistry;
 import Extrinsic.Runtime.WorldRegistry;
@@ -179,7 +180,8 @@ namespace
                     auto context = Context;
                     context.JobCommands = {};
                     const auto start = std::chrono::steady_clock::now();
-                    const auto result = R::ApplyEditorPointConstructionCommand(context, c);
+                    const auto result = R::ApplyEditorPointConstructionCommand(
+                        R::BindEditorProcessingCommands(context), c);
                     ASSERT_TRUE(result.Succeeded()) << result.Message;
                     cpu += std::chrono::duration<double, std::milli>(
                                std::chrono::steady_clock::now() - start)
@@ -202,9 +204,10 @@ namespace
             };
             for (unsigned d = 1; d <= count; ++d)
             {
-                Context.MethodResultSinks.PointConstruction = [this, d](auto r)
-                { Results.emplace_back(d, std::move(r)); };
-                const auto result = R::ApplyEditorPointConstructionCommand(Context, Config(d));
+                const auto result = R::ApplyEditorPointConstructionCommand(
+                    R::BindEditorProcessingCommands(Context), Config(d),
+                    [this, d](R::EditorPointConstructionResult r)
+                    { Results.emplace_back(d, std::move(r)); });
                 if (result.Status != R::EditorCommandStatus::Pending)
                     Results.emplace_back(d, result);
             }
@@ -351,7 +354,7 @@ namespace
         }
 
       private:
-        R::EditorGeometryProcessingContext Context{};
+        R::EditorProcessingContext Context{};
         std::array<entt::entity, 8> Entities{};
         std::array<Geometry::PropertyRevision, 8> Revisions{};
         std::array<GeometryOutput, 8> Expected{};

@@ -5,7 +5,7 @@ module;
 export module Extrinsic.Runtime.AsyncWorkModule;
 
 import Extrinsic.Core.Error;
-import Extrinsic.Runtime.Module;
+import Extrinsic.Runtime.ModuleLifecycle;
 
 namespace Extrinsic::Runtime
 {

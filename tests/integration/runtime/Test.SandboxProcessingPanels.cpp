@@ -1,0 +1,1039 @@
+#include <cstddef>
+#include <cstdint>
+#include <optional>
+#include <span>
+#include <glm/vec3.hpp>
+#include <glm/vec4.hpp>
+#include <glm/vec2.hpp>
+#include <algorithm>
+#include <array>
+#include <functional>
+#include <memory>
+#include <string>
+#include <string_view>
+#include <vector>
+
+#include <gtest/gtest.h>
+#include <glm/glm.hpp>
+#include <imgui.h>
+#include <imgui_internal.h>
+
+#include "RuntimeTestModule.hpp"
+
+import Extrinsic.Runtime.NormalOperations;
+import Extrinsic.Runtime.RegistrationOperations;
+import Extrinsic.Runtime.MeshFieldOperations;
+import Extrinsic.Runtime.MeshTopologyOperations;
+import Extrinsic.Runtime.PointFieldOperations;
+import Extrinsic.Runtime.PointAnalysisOperations;
+import Extrinsic.Runtime.PointSetOperations;
+import Extrinsic.Runtime.PointConstructionOperations;
+import Extrinsic.Runtime.PointCloudServiceOperations;
+import Extrinsic.Core.Config.Engine;
+import Extrinsic.Core.Config.EngineLoad;
+import Extrinsic.Core.Config.Window;
+import Extrinsic.ECS.Scene.Registry;
+import Extrinsic.ECS.Components.GeometrySources;
+import Extrinsic.ECS.Components.GeometrySourcesPopulate;
+import Extrinsic.ECS.Components.Selection;
+import Extrinsic.Graphics.Component.RenderGeometry;
+import Extrinsic.Graphics.Component.VisualizationConfig;
+import Extrinsic.Runtime.EditorUiModule;
+import Extrinsic.Runtime.JobService;
+import Extrinsic.Runtime.EditorCommon;
+import Extrinsic.Runtime.EditorWorkspaceSnapshots;
+import Extrinsic.Runtime.EngineConfigControl;
+// Config accessors this test round-trips come from their owning config modules,
+// not from the operation families that consume them.
+import Extrinsic.Runtime.CurvatureSegmentationConfig;
+import Extrinsic.Runtime.GeodesicsConfig;
+import Extrinsic.Runtime.MeshCurvatureConfig;
+import Extrinsic.Runtime.RegistrationConfig;
+import Extrinsic.Runtime.GeometryProcessingOperations;
+import Extrinsic.Runtime.EditorProcessing;
+import Extrinsic.Runtime.SceneInteractionModule;
+import Extrinsic.Runtime.SceneEditingOperations;
+import Extrinsic.Runtime.SelectionController;
+import Extrinsic.Sandbox.ConfigSections;
+import Extrinsic.Sandbox.Editor.MeshProcessingPanels;
+import Extrinsic.Sandbox.Editor.MethodPanels;
+import Extrinsic.Sandbox.Editor.Shell;
+import Geometry.Graph;
+import Geometry.HalfedgeMesh;
+import Geometry.PointCloud;
+import Extrinsic.Runtime.GeometryPresentation;
+import Extrinsic.Runtime.TextureBakeModule;
+import Extrinsic.Runtime.RenderRecipeEditingOperations;
+import Extrinsic.Runtime.VisualizationEditingOperations;
+import Extrinsic.Runtime.ParameterizationOperations;
+import Extrinsic.Runtime.PointCloudConsolidationTypes;
+
+#include "../../../src/app/Sandbox/Editor/Sandbox.PanelSupport.hpp"
+
+namespace R = Extrinsic::Runtime;
+namespace Editor = Extrinsic::Sandbox::Editor;
+namespace Config = Extrinsic::Core::Config;
+namespace G = Extrinsic::Graphics::Components;
+namespace GS = Extrinsic::ECS::Components::GeometrySources;
+
+namespace
+{
+    class PanelDriver final : public Intrinsic::Tests::RuntimeTestModule
+    {
+    public:
+        std::function<void(R::Engine&)> OnFrame{};
+        void Frame(double, double) override { OnFrame(Kernel()); }
+    };
+
+    struct PanelHarness
+    {
+        PanelDriver* Driver{};
+        std::unique_ptr<Intrinsic::Tests::RuntimeTestKernel> Engine;
+        Editor::EditorShell Shell;
+        Editor::MeshProcessingPanels Panels;
+        Editor::MethodPanels Methods;
+
+        PanelHarness()
+        {
+            auto sections = Extrinsic::Sandbox::CreateSandboxConfigSectionRegistry();
+            Config::EngineConfig config{};
+            Config::PopulateEngineConfigSectionDefaults(config, sections);
+            config.Simulation.WorkerThreadCount = 1u;
+            config.ReferenceScene.Enabled = false;
+            config.Camera.Enabled = false;
+            config.Window.Backend = Config::WindowBackend::Null;
+            auto driver = std::make_unique<PanelDriver>();
+            Driver = driver.get();
+            Engine = std::make_unique<Intrinsic::Tests::RuntimeTestKernel>(
+                config, std::move(driver));
+            Engine->EmplaceModule<R::EngineConfigControl>(std::move(sections));
+            Engine->EmplaceModule<R::SceneInteractionModule>();
+            Engine->EmplaceModule<R::EditorUiModule>();
+            Engine->Initialize();
+            Shell.Attach(Engine->Worlds(), Engine->Services());
+            Panels.Register(Shell);
+            Methods.Register(Shell);
+            EXPECT_TRUE(Shell.SetEditorWindowOpen("scene.selection", false));
+        }
+
+        ~PanelHarness()
+        {
+            Panels.Unregister();
+            Methods.Unregister();
+            Shell.Detach();
+            Engine->Shutdown();
+        }
+
+        auto& Scene() { return *Engine->Worlds().Get(Engine->ActiveWorld()); }
+        auto& Selection() { return *Engine->Services().Find<R::SelectionController>(); }
+        auto& Control() { return *Engine->Services().Find<R::EngineConfigControl>(); }
+
+        bool Apply(const Config::EngineConfig& config)
+        {
+            return Control().ApplyEngineConfigHotSubset(
+                Control().PreviewEngineConfigControlDocument(
+                    Config::SerializeEngineConfig(config))).Succeeded();
+        }
+    };
+
+    constexpr std::array kInputWindows{
+        "view.normal_estimation", "view.outlier_analysis", "view.keypoint_analysis",
+        "view.descriptor_analysis", "view.kernel_density", "view.density_weights",
+        "view.point_construction", "view.point_spacing", "view.bilateral_filter",
+        "view.registration"};
+
+    void ExpectInputEntities(const Config::EngineConfig& config, std::uint32_t expected,
+                             std::uint32_t target = 0u)
+    {
+        EXPECT_EQ(R::GetNormalEstimationConfig(config)->StableEntityId, expected);
+        EXPECT_EQ(R::GetOutlierAnalysisConfig(config)->StableEntityId, expected);
+        EXPECT_EQ(R::GetKeypointAnalysisConfig(config)->StableEntityId, expected);
+        EXPECT_EQ(R::GetDescriptorAnalysisConfig(config)->StableEntityId, expected);
+        EXPECT_EQ(R::GetKernelDensityConfig(config)->StableEntityId, expected);
+        EXPECT_EQ(R::GetDensityWeightConfig(config)->StableEntityId, expected);
+        EXPECT_EQ(R::GetPointConstructionConfig(config)->StableEntityId, expected);
+        EXPECT_EQ(R::GetPointSpacingConfig(config)->StableEntityId, expected);
+        EXPECT_EQ(R::GetBilateralFilterConfig(config)->StableEntityId, expected);
+        EXPECT_EQ(R::GetRegistrationConfig(config)->SourceStableEntityId, expected);
+        EXPECT_EQ(R::GetRegistrationConfig(config)->TargetStableEntityId, target);
+    }
+
+    void PopulateSamples(auto& raw, auto entity, R::GeometryElementDomain domain)
+    {
+        if (domain == R::GeometryElementDomain::MeshVertex)
+        {
+            Geometry::HalfedgeMesh::Mesh mesh;
+            for (int y = 0; y < 3; ++y)
+                for (int x = 0; x < 3; ++x)
+                    (void)mesh.AddVertex({float(x), float(y), 0});
+            for (int y = 0; y < 2; ++y)
+                for (int x = 0; x < 2; ++x)
+                {
+                    const auto a = Geometry::VertexHandle(y * 3 + x);
+                    const auto b = Geometry::VertexHandle(y * 3 + x + 1);
+                    const auto c = Geometry::VertexHandle((y + 1) * 3 + x);
+                    const auto d = Geometry::VertexHandle((y + 1) * 3 + x + 1);
+                    EXPECT_TRUE(mesh.AddTriangle(a, b, c));
+                    EXPECT_TRUE(mesh.AddTriangle(b, d, c));
+                }
+            GS::PopulateFromMesh(raw, entity, mesh);
+            raw.template emplace<G::RenderSurface>(entity);
+        }
+        else if (domain == R::GeometryElementDomain::GraphNode)
+        {
+            Geometry::Graph::Graph graph;
+            for (int i = 0; i < 9; ++i)
+            {
+                const auto vertex = graph.AddVertex({float(i % 3), float(i / 3), 0});
+                if (i > 0)
+                    (void)graph.AddEdge(Geometry::VertexHandle(i - 1), vertex);
+            }
+            GS::PopulateFromGraph(raw, entity, graph);
+            raw.template emplace<G::RenderEdges>(entity);
+        }
+        else
+        {
+            Geometry::PointCloud::Cloud cloud;
+            for (int i = 0; i < 9; ++i)
+                (void)cloud.AddPoint({float(i % 3), float(i / 3), 0});
+            GS::PopulateFromCloud(raw, entity, cloud);
+            raw.template emplace<G::RenderPoints>(entity);
+        }
+    }
+}
+
+TEST(SandboxProcessingPanels, EveryEntityInputFollowsSelectionWithSelectionDetailsClosed)
+{
+    PanelHarness harness;
+    auto& scene = harness.Scene();
+    const auto first = scene.Create();
+    const auto second = scene.Create();
+    PopulateSamples(scene.Raw(), first, R::GeometryElementDomain::MeshVertex);
+    PopulateSamples(scene.Raw(), second, R::GeometryElementDomain::PointCloudPoint);
+    scene.Raw().emplace<Extrinsic::ECS::Components::Selection::SelectableTag>(second);
+    // A stale persisted input must not become the initial UI selection.
+    auto config = harness.Control().GetEngineConfigControlState().ActiveConfig;
+    auto normals = *R::GetNormalEstimationConfig(config);
+    normals.StableEntityId = R::SelectionController::ToStableEntityId(second);
+    normals.KNeighbors = 7u;
+    R::SetNormalEstimationConfig(config, normals);
+    ASSERT_TRUE(harness.Apply(config));
+    for (const auto id : kInputWindows)
+        ASSERT_TRUE(harness.Shell.SetEditorWindowOpen(id, true));
+    int frame = 0;
+    harness.Driver->OnFrame = [&](R::Engine& engine) {
+        ++frame;
+        const auto& active = harness.Control().GetEngineConfigControlState().ActiveConfig;
+        if (frame == 3 || frame == 12 || frame == 18)
+            ExpectInputEntities(active, 0u);
+        if (frame == 6 || frame == 15)
+            ExpectInputEntities(active, R::SelectionController::ToStableEntityId(first));
+        if (frame == 9)
+            ExpectInputEntities(active, R::SelectionController::ToStableEntityId(second));
+        if (frame == 3 || frame == 12)
+            EXPECT_TRUE(harness.Selection().SetSelectedEntity(scene, first));
+        if (frame == 6)
+            EXPECT_TRUE(harness.Selection().SetSelectedEntity(scene, second));
+        if (frame == 9)
+        {
+            auto edited = active;
+            auto registration = *R::GetRegistrationConfig(edited);
+            registration.TargetStableEntityId = R::SelectionController::ToStableEntityId(first);
+            R::SetRegistrationConfig(edited, registration);
+            EXPECT_TRUE(harness.Apply(edited));
+            harness.Selection().ClearSelection(scene);
+        }
+        if (frame == 15)
+            scene.Destroy(first);
+        if (frame == 18)
+        {
+            EXPECT_EQ(R::GetNormalEstimationConfig(active)->KNeighbors, 7u);
+            const auto third = scene.Create();
+            PopulateSamples(scene.Raw(), third, R::GeometryElementDomain::MeshVertex);
+            EXPECT_TRUE(harness.Selection().SetSelectedEntity(scene, third));
+            harness.Selection().RequestClickPick(0u, 0u, R::SelectionPickMode::Add);
+            (void)harness.Selection().ConsumePendingPick();
+            harness.Selection().ConsumeHit(scene, R::SelectionController::ToStableEntityId(second));
+        }
+        if (frame == 21)
+        {
+            const auto selected = harness.Selection().SelectedStableIds();
+            EXPECT_EQ(selected.size(), 2u);
+            if (selected.size() == 2u)
+                ExpectInputEntities(active, selected[0], selected[1]);
+            engine.RequestExit();
+        }
+    };
+    harness.Engine->Run();
+    EXPECT_EQ(frame, 21);
+}
+
+TEST(SandboxProcessingPanels, ShowButtonsApplyAppearancePropertiesOnMeshGraphAndCloud)
+{
+    for (const auto domain : {R::GeometryElementDomain::MeshVertex,
+                              R::GeometryElementDomain::GraphNode,
+                              R::GeometryElementDomain::PointCloudPoint})
+    {
+        SCOPED_TRACE(R::ToString(domain));
+        PanelHarness harness;
+        auto& scene = harness.Scene();
+        const auto entity = scene.Create();
+        PopulateSamples(scene.Raw(), entity, domain);
+        auto& properties = scene.Raw().get<GS::Vertices>(entity).Properties;
+        for (const auto* name : {"outlier_score", "keypoint_saliency", "density", "density_weight", "radii"})
+            (void)properties.GetOrAdd<float>(name, 0.5f);
+        for (const auto* name : {"outlier_mask", "keypoint_mask"})
+            (void)properties.GetOrAdd<std::uint32_t>(name, 1u);
+        const auto descriptors = R::MakeDescriptorOutputProperties(domain);
+        for (const auto& output : descriptors)
+            (void)properties.GetOrAdd<float>(output.Name, 1.0f);
+        ASSERT_TRUE(harness.Selection().SetSelectedEntity(scene, entity));
+        auto config = harness.Control().GetEngineConfigControlState().ActiveConfig;
+        auto normals = *R::GetNormalEstimationConfig(config);
+        normals.Method = domain == R::GeometryElementDomain::MeshVertex
+            ? R::NormalEstimationMethod::MeshFaceWeighted : R::NormalEstimationMethod::PointSetPCA;
+        normals.KNeighbors = 8u;
+        R::SetNormalEstimationConfig(config, normals);
+        ASSERT_TRUE(harness.Apply(config));
+
+        struct ShowAction { const char* Window; const char* Title; const char* Button; std::string Property; bool Scalar; };
+        const std::array actions{
+            ShowAction{"view.normal_estimation", "Normal Estimation", "Show normals", "v:normal", false},
+            ShowAction{"view.outlier_analysis", "Outlier Analysis", "Show mask", "outlier_mask", false},
+            ShowAction{"view.outlier_analysis", "Outlier Analysis", "Show score", "outlier_score", true},
+            ShowAction{"view.keypoint_analysis", "ISS Keypoint Analysis", "Show mask", "keypoint_mask", false},
+            ShowAction{"view.keypoint_analysis", "ISS Keypoint Analysis", "Show saliency", "keypoint_saliency", true},
+            ShowAction{"view.descriptor_analysis", "FPFH Descriptor Analysis", "Show histogram bin", descriptors[0].Name, true},
+            ShowAction{"view.kernel_density", "Kernel Density", "Show density", "density", true},
+            ShowAction{"view.density_weights", "Compact Density Weights", "Show weights", "density_weight", true},
+            ShowAction{"view.point_spacing", "Point Spacing and Radii", "Show radii", "radii", true}};
+        ASSERT_TRUE(harness.Shell.SetEditorWindowOpen(actions[0].Window, true));
+        int frame = 0;
+        std::size_t action = 0;
+        int step = 0;
+        harness.Driver->OnFrame = [&](R::Engine& engine) {
+            ++frame;
+            if (frame > 100)
+            {
+                ADD_FAILURE() << "Show actions did not finish";
+                engine.RequestExit();
+                return;
+            }
+            const auto& show = actions[action];
+            auto* window = ImGui::FindWindowByName(show.Title);
+            if (window == nullptr)
+                return;
+            ImGui::SetWindowSize(window, {700, 1000});
+            ImGui::SetWindowPos(window, {0, 0});
+            ImGui::FocusWindow(window);
+            if (action == 0 && step == 2)
+                ImGui::ActivateItemByID(window->GetID("Estimate normals"));
+            if (step == 3)
+                ImGui::SetScrollY(window, window->ScrollMax.y);
+            if (step == 5)
+            {
+                if (action == 1 || action == 2)
+                {
+                    const auto input = *R::GetOutlierAnalysisConfig(
+                        harness.Control().GetEngineConfigControlState().ActiveConfig);
+                    const auto readiness = R::PreviewEditorOutlierAnalysisCommand(
+                        R::BindEditorProcessingCommands({.Scene = &scene}), input);
+                    EXPECT_FALSE(readiness.Ready);
+                    EXPECT_NE(readiness.Diagnostic.find("more live samples than k"), std::string::npos);
+                }
+                ImGui::ActivateItemByID(window->GetID(show.Button));
+            }
+            if (++step != 8)
+                return;
+            SCOPED_TRACE(show.Button);
+            const auto* overrides = scene.Raw().try_get<G::VisualizationLaneOverrides>(entity);
+            EXPECT_NE(overrides, nullptr);
+            if (overrides)
+            {
+                const auto& lane = domain == R::GeometryElementDomain::MeshVertex ? overrides->Surface
+                    : domain == R::GeometryElementDomain::GraphNode ? overrides->Edges : overrides->Points;
+                EXPECT_TRUE(lane);
+                if (lane)
+                {
+                    EXPECT_EQ(lane->Source, show.Scalar ? G::VisualizationConfig::ColorSource::ScalarField
+                                                      : G::VisualizationConfig::ColorSource::PerVertexBuffer);
+                    EXPECT_EQ(show.Scalar ? lane->ScalarFieldName : lane->ColorBufferName, show.Property);
+                }
+            }
+            EXPECT_TRUE(harness.Shell.SetEditorWindowOpen(show.Window, false));
+            if (++action == actions.size())
+                engine.RequestExit();
+            else
+            {
+                EXPECT_TRUE(harness.Shell.SetEditorWindowOpen(actions[action].Window, true));
+                step = 0;
+            }
+        };
+        harness.Engine->Run();
+        EXPECT_EQ(action, actions.size());
+        EXPECT_TRUE(properties.Exists("v:normal"));
+    }
+}
+
+TEST(SandboxProcessingPanels, FaceOutputsDisplayWithTheirCanonicalDomain)
+{
+    for (const bool normals : {true, false})
+    {
+        SCOPED_TRACE(normals ? "face normals" : "face score");
+        PanelHarness harness;
+        auto& scene = harness.Scene();
+        const auto entity = scene.Create();
+        PopulateSamples(scene.Raw(), entity, R::GeometryElementDomain::MeshVertex);
+        auto& faces = scene.Raw().get<GS::Faces>(entity).Properties;
+        (void)faces.GetOrAdd<glm::vec3>("f:centroid", {0.5f, 0.5f, 0});
+        (void)faces.GetOrAdd<float>("f:score", 0.5f);
+        ASSERT_TRUE(harness.Selection().SetSelectedEntity(scene, entity));
+        auto config = harness.Control().GetEngineConfigControlState().ActiveConfig;
+        auto outliers = *R::GetOutlierAnalysisConfig(config);
+        outliers.Positions.Domain = outliers.Mask.Domain = outliers.Score.Domain =
+            R::GeometryElementDomain::MeshFace;
+        outliers.Positions.Name = "f:centroid";
+        outliers.Score.Name = "f:score";
+        // Already-published face scores remain displayable when k is too large to run.
+        R::SetOutlierAnalysisConfig(config, outliers);
+        ASSERT_TRUE(harness.Apply(config));
+        ASSERT_EQ(R::GetOutlierAnalysisConfig(harness.Control().GetEngineConfigControlState().ActiveConfig)->Score.Name,
+                  "f:score");
+        ASSERT_TRUE(harness.Shell.SetEditorWindowOpen(
+            normals ? "mesh.processing.faces.normals" : "view.outlier_analysis", true));
+        int frame = 0;
+        harness.Driver->OnFrame = [&](R::Engine& engine) {
+            ++frame;
+            auto* window = ImGui::FindWindowByName(normals ? "Normal Estimation" : "Outlier Analysis");
+            if (window)
+            {
+                ImGui::SetWindowSize(window, {700, 1000});
+                ImGui::SetWindowPos(window, {0, 0});
+                ImGui::FocusWindow(window);
+                if (frame == 3 && normals)
+                    ImGui::ActivateItemByID(window->GetID("Estimate normals"));
+                if (frame == 4)
+                    ImGui::SetScrollY(window, window->ScrollMax.y);
+                if (frame == 6)
+                    ImGui::ActivateItemByID(window->GetID(normals ? "Show face normals" : "Show score"));
+            }
+            if (frame == 9)
+            {
+                EXPECT_NE(window, nullptr);
+                const auto* overrides = scene.Raw().try_get<G::VisualizationLaneOverrides>(entity);
+                EXPECT_TRUE(overrides && overrides->Surface);
+                if (overrides && overrides->Surface)
+                {
+                    const auto& surface = *overrides->Surface;
+                    if (normals)
+                    {
+                        EXPECT_EQ(surface.Source, G::VisualizationConfig::ColorSource::PerFaceBuffer);
+                        EXPECT_EQ(surface.ColorBufferName, "f:normal");
+                        EXPECT_TRUE(faces.Exists("f:normal"));
+                    }
+                    else
+                    {
+                        EXPECT_EQ(surface.Source, G::VisualizationConfig::ColorSource::ScalarField);
+                        EXPECT_EQ(surface.ScalarFieldName, "f:score");
+                        EXPECT_EQ(surface.ScalarDomain, G::VisualizationConfig::Domain::Face);
+                    }
+                }
+                engine.RequestExit();
+            }
+        };
+        harness.Engine->Run();
+        EXPECT_EQ(frame, 9);
+    }
+}
+
+TEST(SandboxProcessingPanels, NamedMeshOutputsUseAppearanceWithoutRecomputing)
+{
+    PanelHarness h;
+    auto& scene = h.Scene();
+    const auto entity = scene.Create();
+    PopulateSamples(scene.Raw(), entity, R::GeometryElementDomain::MeshVertex);
+    const auto sceneEntity = scene.Create();
+    PopulateSamples(scene.Raw(), sceneEntity, R::GeometryElementDomain::MeshVertex);
+    ASSERT_TRUE(h.Selection().SetSelectedEntity(scene, sceneEntity));
+    const auto stableId = R::SelectionController::ToStableEntityId(entity);
+    auto config = h.Control().GetEngineConfigControlState().ActiveConfig;
+    auto curvature = *R::GetMeshCurvatureConfig(config);
+    auto segmentation = *R::GetCurvatureSegmentationConfig(config);
+    auto geodesics = *R::GetGeodesicsConfig(config);
+    auto parameterization = *R::GetParameterizationConfig(config);
+    auto poisson = *R::GetProgressivePoissonPlaygroundConfig(config);
+    poisson.AutoRunOnEdit = false;
+    R::ClusteringConfig clustering;
+    clustering.Properties = R::MakeKMeansPropertyRefs(R::GeometryElementDomain::MeshVertex);
+    struct Action { const char* Window; const char* Title; R::GeometryPropertyRef Property; };
+    std::vector<Action> actions;
+    auto add = [&](const char* window, const char* title, R::GeometryPropertyRef& property) {
+        property.Name += "_ui_custom";
+        actions.push_back({window, title, property});
+        auto& props = property.Domain == R::GeometryElementDomain::MeshFace
+            ? scene.Raw().get<GS::Faces>(entity).Properties
+            : property.Domain == R::GeometryElementDomain::MeshEdge
+                ? scene.Raw().get<GS::Edges>(entity).Properties
+                : scene.Raw().get<GS::Vertices>(entity).Properties;
+        using Kind = Geometry::PropertyValueKind;
+        switch (property.ValueKind)
+        {
+        case Kind::Double: (void)props.GetOrAdd<double>(property.Name, 0.5); break;
+        case Kind::Float: (void)props.GetOrAdd<float>(property.Name, 0.5f); break;
+        case Kind::Bool: (void)props.GetOrAdd<bool>(property.Name, true); break;
+        case Kind::UInt32: (void)props.GetOrAdd<std::uint32_t>(property.Name, 1); break;
+        case Kind::Vec2: (void)props.GetOrAdd<glm::vec2>(property.Name, {0.2f, 0.7f}); break;
+        case Kind::Vec3: (void)props.GetOrAdd<glm::vec3>(property.Name, {0, 0, 1}); break;
+        case Kind::Vec4: (void)props.GetOrAdd<glm::vec4>(property.Name, {0, 0, 1, 1}); break;
+        default: FAIL() << "Unexpected output kind";
+        }
+    };
+    for (auto* property : {&curvature.Mean, &curvature.Gaussian, &curvature.MinPrincipal,
+                          &curvature.MaxPrincipal, &curvature.Direction1, &curvature.Direction2})
+        add("mesh.processing.curvature", "Mesh / Processing / Curvature", *property);
+    for (auto* property : {&segmentation.Components, &segmentation.Regions, &segmentation.RegionColors,
+                          &segmentation.Boundaries, &segmentation.BoundaryColors, &segmentation.HardFeatures,
+                          &segmentation.FeatureConfidence, &segmentation.BoundaryRoles, &segmentation.FeatureColors})
+        add("mesh.processing.segmentation", "Mesh / Processing / Curvature Segmentation", *property);
+    R::GeometryPropertyRef distance{R::GeometryElementDomain::MeshVertex, geodesics.DistanceProperty, Geometry::PropertyValueKind::Double};
+    R::GeometryPropertyRef source{R::GeometryElementDomain::MeshVertex, geodesics.SourceMaskProperty, Geometry::PropertyValueKind::Bool};
+    add("mesh.processing.geodesics", "Mesh / Geodesics / Virtual Source Propagation", distance);
+    add("mesh.processing.geodesics", "Mesh / Geodesics / Virtual Source Propagation", source);
+    geodesics.DistanceProperty = distance.Name;
+    geodesics.SourceMaskProperty = source.Name;
+    for (auto* property : {&clustering.Properties->OutputLabels, &clustering.Properties->OutputColors})
+        add("mesh.processing.kmeans", "Mesh / Processing / K-Means", *property);
+    add("mesh.processing.parameterize_uv", "Mesh / Processing / Parameterize (UV)", parameterization.Texcoords);
+    R::SetParameterizationConfig(config, parameterization);
+    for (auto* property : {&poisson.Level, &poisson.Rank, &poisson.SplatRadius, &poisson.PrefixVisible})
+    {
+        property->Domain = R::GeometryElementDomain::MeshVertex;
+        add("mesh.processing.progressive_poisson", "Mesh / Processing / Progressive Poisson", *property);
+    }
+    poisson.Positions.Domain = R::GeometryElementDomain::MeshVertex;
+    R::SetProgressivePoissonPlaygroundConfig(config, poisson);
+    R::SetMeshCurvatureConfig(config, curvature);
+    R::SetCurvatureSegmentationConfig(config, segmentation);
+    R::SetGeodesicsConfig(config, geodesics);
+    R::SetClusteringConfig(config, clustering);
+    ASSERT_TRUE(h.Apply(config));
+    ASSERT_TRUE(h.Shell.SetEditorWindowOpen(actions.front().Window, true));
+    std::size_t action = 0;
+    int step = 0, frame = 0;
+    h.Driver->OnFrame = [&](R::Engine& engine) {
+        if (++frame > 500) { ADD_FAILURE() << "Show actions did not finish: " << actions[action].Title; engine.RequestExit(); return; }
+        const auto& show = actions[action];
+        auto* window = ImGui::FindWindowByName(show.Title);
+        if (!window) return;
+        ImGui::SetWindowSize(window, {750, 1600});
+        ImGui::SetWindowPos(window, {0, 0});
+        if (step == 1)
+        {
+            ImGui::SetScrollY(window, 0);
+            ImGui::FocusWindow(window);
+        }
+        if (step == 3)
+            ImGui::ActivateItemByID(window->GetID(std::string_view{show.Window} == "mesh.processing.curvature"
+                ? "Entity##MeshCurvature" : "Entity##Processing"));
+        if (step == 5)
+        {
+            auto& popups = ImGui::GetCurrentContext()->OpenPopupStack;
+            EXPECT_FALSE(popups.empty()) << show.Title;
+            if (!popups.empty() && popups.back().Window)
+            {
+                const auto title = "Entity " + std::to_string(static_cast<std::uint32_t>(entity)) +
+                    " (" + std::to_string(stableId) + ")";
+                ImGui::ActivateItemByID(popups.back().Window->GetID(title.c_str()));
+            }
+        }
+        if (show.Property.ValueKind == Geometry::PropertyValueKind::Vec2)
+        {
+            auto* parent = window;
+            for (auto* child : ImGui::GetCurrentContext()->Windows)
+                if (child->ParentWindow == parent && std::string_view{child->Name}.find("ParameterizationControls") != std::string_view::npos)
+                { window = child; break; }
+        }
+        ImGui::SetWindowSize(window, {750, 1600});
+        ImGui::SetWindowPos(window, {0, 0});
+        if (step == 8) { ImGui::FocusWindow(window); ImGui::SetScrollY(window, window->ScrollMax.y); }
+        if (step == 10) ImGui::ActivateItemByID(window->GetID(("Show " + show.Property.Name).c_str()));
+        if (++step != 13) return;
+        SCOPED_TRACE(show.Property.Name);
+        const auto* lanes = scene.Raw().try_get<G::VisualizationLaneOverrides>(entity);
+        EXPECT_NE(lanes, nullptr);
+        if (lanes)
+        {
+            const auto& lane = show.Property.Domain == R::GeometryElementDomain::MeshEdge ? lanes->Edges : lanes->Surface;
+            EXPECT_TRUE(lane);
+            if (lane)
+            {
+                const bool scalar = show.Property.ValueKind == Geometry::PropertyValueKind::Double || show.Property.ValueKind == Geometry::PropertyValueKind::Float;
+                EXPECT_EQ(scalar ? lane->ScalarFieldName : lane->ColorBufferName, show.Property.Name);
+            }
+        }
+        EXPECT_TRUE(h.Shell.SetEditorWindowOpen(show.Window, false));
+        if (++action == actions.size()) { engine.RequestExit(); return; }
+        EXPECT_TRUE(h.Shell.SetEditorWindowOpen(actions[action].Window, true));
+        step = 0;
+    };
+    h.Engine->Run();
+    EXPECT_EQ(action, actions.size());
+    ASSERT_EQ(h.Selection().SelectedStableIds().size(), 1u);
+    EXPECT_EQ(h.Selection().SelectedStableIds().front(), R::SelectionController::ToStableEntityId(sceneEntity));
+    EXPECT_FALSE(scene.Raw().all_of<G::VisualizationLaneOverrides>(sceneEntity));
+    EXPECT_EQ(R::GetMeshCurvatureConfig(h.Control().GetEngineConfigControlState().ActiveConfig)->StableEntityId, stableId);
+}
+
+TEST(SandboxProcessingPanels, EntityDefaultsFollowSelectionChangesAndPreserveExplicitChoices)
+{
+    R::EditorSelectionModel selection;
+    Editor::ProcessingEntityInput source, target;
+    auto sync = [&] {
+        Editor::SynchronizeProcessingEntity(selection, source.PreviousSelection, source.Entity);
+        Editor::SynchronizeProcessingEntity(selection, target.PreviousSelection, target.Entity, 1u);
+    };
+    sync();
+    source.Entity = 7; target.Entity = 9;
+    sync();
+    EXPECT_EQ(source.Entity, 7u);
+    EXPECT_EQ(target.Entity, 9u);
+    selection.SelectedEntities = {{.StableEntityId=3}};
+    sync();
+    EXPECT_EQ(source.Entity, 3u);
+    EXPECT_EQ(target.Entity, 0u);
+    target.Entity = 9;
+    sync();
+    EXPECT_EQ(target.Entity, 9u);
+    selection.SelectedEntities.clear();
+    sync();
+    EXPECT_EQ(source.Entity, 0u);
+    EXPECT_EQ(target.Entity, 0u);
+    selection.SelectedEntities = {{.StableEntityId=3}, {.StableEntityId=5}};
+    sync();
+    EXPECT_EQ(source.Entity, 3u);
+    EXPECT_EQ(target.Entity, 5u);
+}
+
+TEST(SandboxProcessingPanels, ExplicitEntityModelsLeaveSceneSelectionAndCachesUntouched)
+{
+    PanelHarness h;
+    auto& scene = h.Scene();
+    const auto selected = scene.Create(), input = scene.Create();
+    PopulateSamples(scene.Raw(), selected, R::GeometryElementDomain::MeshVertex);
+    PopulateSamples(scene.Raw(), input, R::GeometryElementDomain::MeshVertex);
+    const auto selectedId = R::SelectionController::ToStableEntityId(selected);
+    const auto inputId = R::SelectionController::ToStableEntityId(input);
+    ASSERT_TRUE(h.Selection().SetSelectedEntity(scene, selected));
+    auto& props = scene.Raw().get<GS::Vertices>(input).Properties;
+    (void)props.GetOrAdd<double>("v:input_only", 2.0);
+    (void)props.GetOrAdd<glm::vec2>("v:texcoord", {0.3f, 0.8f});
+    int checks = 0;
+    const auto observer = h.Shell.RegisterEditorWindow(Editor::EditorWindowDescriptor{
+        .Id="test.explicit_entity_models", .MenuPath={"View"}, .Title="Explicit entity model observer",
+        .OpenByDefault=true,
+        .Draw=[&](bool&, const Editor::SandboxEditorContext& context) {
+            const auto chosen = R::BuildEditorDomainWindowModel(context.SnapshotQueries,
+                R::EditorDomainWindowKind::Mesh, nullptr, inputId);
+            const auto inspector = R::BuildEditorInspectorModel(context.SnapshotQueries, nullptr, inputId);
+            const auto uv = R::BuildEditorParameterizationViewModel(
+                context.Parameterization.Commands, context.Parameterization.Results, inputId);
+            const auto global = R::BuildEditorDomainWindowModel(context.SnapshotQueries, R::EditorDomainWindowKind::Mesh);
+            EXPECT_EQ(chosen.SelectedStableId, inputId);
+            EXPECT_EQ(inspector.Entity.StableEntityId, inputId);
+            EXPECT_EQ(uv.SelectedStableEntityId, inputId);
+            EXPECT_TRUE(uv.HasUvCoordinates);
+            EXPECT_EQ(global.SelectedStableId, selectedId);
+            auto hasInput = [](const auto& catalog) {
+                return std::ranges::any_of(catalog.Rows, [](const auto& row) { return row.Name == "v:input_only"; });
+            };
+            EXPECT_TRUE(hasInput(chosen.PropertyCatalog));
+            EXPECT_TRUE(hasInput(inspector.PropertyCatalog));
+            EXPECT_FALSE(hasInput(global.PropertyCatalog));
+            EXPECT_FALSE(R::BuildEditorDomainWindowModel(context.SnapshotQueries,
+                R::EditorDomainWindowKind::Mesh, nullptr, 0u).HasSelectedEntity);
+            EXPECT_FALSE(R::BuildEditorInspectorModel(context.SnapshotQueries, nullptr, 0u).HasEntity);
+            EXPECT_EQ(h.Selection().SelectedStableIds().front(), selectedId);
+            ++checks;
+        }});
+    int frames = 0;
+    h.Driver->OnFrame = [&](R::Engine& engine) { if (++frames == 4) engine.RequestExit(); };
+    h.Engine->Run();
+    EXPECT_GE(checks, 2);
+    EXPECT_TRUE(h.Shell.UnregisterEditorWindow(observer));
+}
+
+TEST(SandboxProcessingPanels, CpuAccelerationControlsPersistTheRequestedExecutionPath)
+{
+    PanelHarness h;
+    auto& scene = h.Scene();
+    const auto entity = scene.Create();
+    PopulateSamples(scene.Raw(), entity, R::GeometryElementDomain::MeshVertex);
+    ASSERT_TRUE(h.Selection().SetSelectedEntity(scene, entity));
+    auto config = h.Control().GetEngineConfigControlState().ActiveConfig;
+    auto normals = *R::GetNormalEstimationConfig(config);
+    normals.Method = R::NormalEstimationMethod::PointSetPCA;
+    R::SetNormalEstimationConfig(config, normals);
+    ASSERT_TRUE(h.Apply(config));
+    struct Control
+    {
+        const char* Window;
+        const char* Title;
+        const char* Combo;
+        const char* GpuChoice;
+        std::function<int(const Config::EngineConfig&)> Backend;
+    };
+    const std::array controls{
+        Control{"view.normal_estimation", "Normal Estimation", "Acceleration##Normals", "Vulkan LBVH (CPU fit)",
+            [](const auto& c) { return int(R::GetNormalEstimationConfig(c)->Backend); }},
+        Control{"view.outlier_analysis", "Outlier Analysis", "Acceleration", "Vulkan LBVH",
+            [](const auto& c) { return int(R::GetOutlierAnalysisConfig(c)->Backend); }},
+        Control{"view.keypoint_analysis", "ISS Keypoint Analysis", "Acceleration", "Vulkan LBVH",
+            [](const auto& c) { return int(R::GetKeypointAnalysisConfig(c)->Backend); }},
+        Control{"view.descriptor_analysis", "FPFH Descriptor Analysis", "Acceleration", "Vulkan LBVH",
+            [](const auto& c) { return int(R::GetDescriptorAnalysisConfig(c)->Backend); }},
+        Control{"view.kernel_density", "Kernel Density", "Acceleration", "Vulkan LBVH",
+            [](const auto& c) { return int(R::GetKernelDensityConfig(c)->Backend); }},
+        Control{"view.density_weights", "Compact Density Weights", "Acceleration", "Vulkan LBVH",
+            [](const auto& c) { return int(R::GetDensityWeightConfig(c)->Backend); }},
+        Control{"view.point_construction", "Construct from Points", "Acceleration", "Vulkan LBVH",
+            [](const auto& c) { return int(R::GetPointConstructionConfig(c)->Backend); }},
+        Control{"view.point_spacing", "Point Spacing and Radii", "Acceleration", "Vulkan LBVH",
+            [](const auto& c) { return int(R::GetPointSpacingConfig(c)->Backend); }},
+        Control{"view.bilateral_filter", "Bilateral Point Filter", "Acceleration", "Vulkan LBVH",
+            [](const auto& c) { return int(R::GetBilateralFilterConfig(c)->Backend); }},
+        Control{"view.registration", "ICP Registration", "Acceleration##ICP", "Vulkan LBVH (CPU solve)",
+            [](const auto& c) { return int(R::GetRegistrationConfig(c)->Backend); }},
+    };
+    ASSERT_TRUE(h.Shell.SetEditorWindowOpen(controls.front().Window, true));
+    std::size_t action = 0;
+    int step = 0, frames = 0;
+    h.Driver->OnFrame = [&](R::Engine& engine) {
+        if (++frames > 180) { ADD_FAILURE() << "Acceleration controls did not finish"; engine.RequestExit(); return; }
+        const auto& control = controls[action];
+        auto* window = ImGui::FindWindowByName(control.Title);
+        if (!window) return;
+        ImGui::SetWindowSize(window, {750, 2200});
+        ImGui::SetWindowPos(window, {0, 0});
+        if (step == 1) { ImGui::FocusWindow(window); ImGui::SetScrollY(window, 0); }
+        if (step == 3) ImGui::ActivateItemByID(window->GetID(control.Combo));
+        if (step == 5)
+        {
+            auto& popups = ImGui::GetCurrentContext()->OpenPopupStack;
+            EXPECT_FALSE(popups.empty()) << control.Title;
+            if (!popups.empty() && popups.back().Window)
+            {
+                const auto seed = popups.back().Window->GetID(2);
+                ImGui::ActivateItemByID(ImHashStr(control.GpuChoice, 0, seed));
+            }
+        }
+        if (++step != 9) return;
+        EXPECT_EQ(control.Backend(h.Control().GetEngineConfigControlState().ActiveConfig), 2) << control.Title;
+        EXPECT_TRUE(h.Shell.SetEditorWindowOpen(control.Window, false));
+        if (++action == controls.size()) { engine.RequestExit(); return; }
+        EXPECT_TRUE(h.Shell.SetEditorWindowOpen(controls[action].Window, true));
+        step = 0;
+    };
+    h.Engine->Run();
+    EXPECT_EQ(action, controls.size());
+}
+
+TEST(SandboxProcessingPanels, MeshOperationUsesChosenEntityWithoutChangingSceneSelection)
+{
+    PanelHarness h;
+    auto& scene = h.Scene();
+    const auto selected = scene.Create(), target = scene.Create();
+    PopulateSamples(scene.Raw(), selected, R::GeometryElementDomain::MeshVertex);
+    PopulateSamples(scene.Raw(), target, R::GeometryElementDomain::MeshVertex);
+    ASSERT_TRUE(h.Selection().SetSelectedEntity(scene, selected));
+    const auto targetId = R::SelectionController::ToStableEntityId(target);
+    ASSERT_TRUE(h.Shell.SetEditorWindowOpen("mesh.processing.subdivide", true));
+    int step = 0, frames = 0;
+    h.Driver->OnFrame = [&](R::Engine& engine) {
+        if (++frames > 30) { ADD_FAILURE() << "Subdivision UI did not complete"; engine.RequestExit(); return; }
+        auto* window = ImGui::FindWindowByName("Mesh / Processing / Subdivide");
+        if (!window) return;
+        ImGui::SetWindowSize(window, {750, 1200});
+        ImGui::SetWindowPos(window, {0, 0});
+        if (step == 1) ImGui::FocusWindow(window);
+        if (step == 3) ImGui::ActivateItemByID(window->GetID("Entity##Processing"));
+        if (step == 5)
+        {
+            auto& popups = ImGui::GetCurrentContext()->OpenPopupStack;
+            EXPECT_FALSE(popups.empty());
+            if (!popups.empty() && popups.back().Window)
+            {
+                const auto title = "Entity " + std::to_string(static_cast<std::uint32_t>(target)) +
+                    " (" + std::to_string(targetId) + ")";
+                ImGui::ActivateItemByID(popups.back().Window->GetID(title.c_str()));
+            }
+        }
+        if (step == 8) ImGui::ActivateItemByID(window->GetID("Subdivide##MeshSubdivide"));
+        if (++step != 12) return;
+        EXPECT_EQ(scene.Raw().get<GS::Faces>(selected).Properties.Size(), 8u);
+        EXPECT_EQ(scene.Raw().get<GS::Faces>(target).Properties.Size(), 32u);
+        EXPECT_EQ(h.Selection().SelectedStableIds().front(), R::SelectionController::ToStableEntityId(selected));
+        engine.RequestExit();
+    };
+    h.Engine->Run();
+    EXPECT_EQ(step, 12);
+}
+
+TEST(SandboxProcessingPanels, SharedScalarPanelsRunConfiguredOutputAndShowWithoutRecomputing)
+{
+    for (const bool spacing : {false, true})
+    {
+        SCOPED_TRACE(spacing ? "spacing" : "density");
+        PanelHarness h;
+        auto& scene = h.Scene();
+        const auto entity = scene.Create();
+        PopulateSamples(scene.Raw(), entity, R::GeometryElementDomain::PointCloudPoint);
+        ASSERT_TRUE(h.Selection().SetSelectedEntity(scene, entity));
+        auto config = h.Control().GetEngineConfigControlState().ActiveConfig;
+        const std::string output = "shared_test_scalar";
+        R::EditorProcessingContext referenceContext{.Scene=&scene};
+        if (spacing)
+        {
+            auto c = *R::GetPointSpacingConfig(config);
+            c.KNeighbors = 3; c.ScaleFactor = 1.5f; c.Radii.Name = output;
+            R::SetPointSpacingConfig(config, c);
+            c.StableEntityId = R::SelectionController::ToStableEntityId(entity);
+            c.Radii.Name = "reference_scalar";
+            ASSERT_TRUE(R::ApplyEditorPointSpacingCommand(R::BindEditorProcessingCommands(referenceContext), c).Succeeded());
+        }
+        else
+        {
+            auto c = *R::GetKernelDensityConfig(config);
+            c.KNeighbors = 3; c.Bandwidth = 0.5f; c.Density.Name = output;
+            R::SetKernelDensityConfig(config, c);
+            c.StableEntityId = R::SelectionController::ToStableEntityId(entity);
+            c.Density.Name = "reference_scalar";
+            ASSERT_TRUE(R::ApplyEditorKernelDensityCommand(R::BindEditorProcessingCommands(referenceContext), c).Succeeded());
+        }
+        ASSERT_TRUE(h.Apply(config));
+        ASSERT_TRUE(h.Shell.SetEditorWindowOpen(spacing ? "view.point_spacing" : "view.kernel_density", true));
+        auto& properties = scene.Raw().get<GS::Vertices>(entity).Properties;
+        std::optional<Geometry::PropertyRevision> revision;
+        std::uint64_t submittedBeforeShow = 0;
+        int frame = 0, step = 0, showFrame = 0;
+        h.Driver->OnFrame = [&](R::Engine& engine) {
+            if (++frame > 400)
+            { ADD_FAILURE() << "Scalar panel did not publish/show output"; engine.RequestExit(); return; }
+            auto* window = ImGui::FindWindowByName(spacing ? "Point Spacing and Radii" : "Kernel Density");
+            if (!window) return;
+            ImGui::SetWindowSize(window, {700, 1000});
+            ImGui::SetWindowPos(window, {0, 0});
+            if (++step == 3)
+                ImGui::ActivateItemByID(window->GetID(spacing ? "Estimate radii" : "Estimate density"));
+            if (!properties.Exists(output)) return;
+            if (!showFrame)
+            {
+                EXPECT_EQ(std::as_const(properties).Get<float>(output).Vector(),
+                          std::as_const(properties).Get<float>("reference_scalar").Vector());
+                revision = properties.FindPropertyRevision(output);
+                submittedBeforeShow = engine.Jobs().Stats().SubmittedJobs;
+                ImGui::ActivateItemByID(window->GetID(spacing ? "Show radii" : "Show density"));
+                showFrame = frame;
+            }
+            if (frame < showFrame + 3) return;
+            EXPECT_EQ(engine.Jobs().Stats().SubmittedJobs, submittedBeforeShow);
+            EXPECT_EQ(properties.FindPropertyRevision(output), revision);
+            const auto* overrides = scene.Raw().try_get<G::VisualizationLaneOverrides>(entity);
+            EXPECT_NE(overrides, nullptr);
+            if (overrides)
+            {
+                EXPECT_TRUE(overrides->Points);
+                if (overrides->Points) EXPECT_EQ(overrides->Points->ScalarFieldName, output);
+            }
+            engine.RequestExit();
+        };
+        h.Engine->Run();
+        EXPECT_GT(showFrame, 0);
+    }
+}
+
+TEST(SandboxProcessingPanels, ReusedExecutionPanelsRejectInvalidRequestsBeforePublishing)
+{
+    struct Method
+    {
+        const char* Window;
+        const char* Title;
+        const char* Run;
+        const char* Parameter;
+    };
+    constexpr std::array methods{
+        Method{"view.keypoint_analysis", "ISS Keypoint Analysis", "Detect keypoints", "Salient radius (0 = automatic)"},
+        Method{"view.descriptor_analysis", "FPFH Descriptor Analysis", "Compute FPFH descriptors", "Feature radius (0 = automatic)"},
+        Method{"view.density_weights", "Compact Density Weights", "Compute compact weights", "Support radius"},
+        Method{"view.bilateral_filter", "Bilateral Point Filter", "Filter positions", "Normal sigma"}};
+    for (std::size_t method = 0; method < methods.size(); ++method)
+    {
+        SCOPED_TRACE(methods[method].Title);
+        PanelHarness h;
+        auto& scene = h.Scene();
+        const auto entity = scene.Create();
+        PopulateSamples(scene.Raw(), entity, R::GeometryElementDomain::PointCloudPoint);
+        ASSERT_TRUE(h.Selection().SetSelectedEntity(scene, entity));
+        const auto id = R::SelectionController::ToStableEntityId(entity);
+        auto& props = scene.Raw().get<GS::Vertices>(entity).Properties;
+        (void)props.GetOrAdd<glm::vec3>("input_normals", {0, 0, 1});
+        auto config = h.Control().GetEngineConfigControlState().ActiveConfig;
+        auto missingInputConfig = config;
+        R::EditorProcessingContext referenceContext{.Scene = &scene};
+        const std::string output = "configured_output", reference = "reference_output";
+        if (method == 0)
+        {
+            auto c = *R::GetKeypointAnalysisConfig(config);
+            c.StableEntityId = id; c.SalientRadius = 2; c.NonMaxRadius = 1;
+            c.Score.Name = output; c.Mask.Name = "configured_mask";
+            R::SetKeypointAnalysisConfig(config, c);
+            c.Positions.Name = "missing_positions";
+            R::SetKeypointAnalysisConfig(missingInputConfig, c);
+            c.Positions.Name = "v:position";
+            c.Score.Name = reference; c.Mask.Name = "reference_mask";
+            ASSERT_TRUE(R::ApplyEditorKeypointAnalysisCommand(R::BindEditorProcessingCommands(referenceContext), c).Succeeded());
+        }
+        else if (method == 1)
+        {
+            auto c = *R::GetDescriptorAnalysisConfig(config);
+            c.StableEntityId = id; c.FeatureRadius = 2; c.Normals.Name = "input_normals";
+            c.Outputs = R::MakeDescriptorOutputProperties(c.Positions.Domain, "configured");
+            c.Outputs[0].Name = output;
+            R::SetDescriptorAnalysisConfig(config, c);
+            c.Positions.Name = "missing_positions";
+            R::SetDescriptorAnalysisConfig(missingInputConfig, c);
+            c.Positions.Name = "v:position";
+            c.Outputs = R::MakeDescriptorOutputProperties(c.Positions.Domain, "reference");
+            c.Outputs[0].Name = reference;
+            ASSERT_TRUE(R::ApplyEditorDescriptorAnalysisCommand(R::BindEditorProcessingCommands(referenceContext), c).Succeeded());
+        }
+        else if (method == 2)
+        {
+            auto c = *R::GetDensityWeightConfig(config);
+            c.StableEntityId = id; c.SupportRadius = 2; c.Weights.Name = output;
+            R::SetDensityWeightConfig(config, c);
+            c.Positions.Name = "missing_positions";
+            R::SetDensityWeightConfig(missingInputConfig, c);
+            c.Positions.Name = "v:position";
+            c.Weights.Name = reference;
+            ASSERT_TRUE(R::ApplyEditorDensityWeightCommand(R::BindEditorProcessingCommands(referenceContext), c).Succeeded());
+        }
+        else
+        {
+            auto c = *R::GetBilateralFilterConfig(config);
+            c.StableEntityId = id; c.KNeighbors = 3; c.SpatialSigma = 1; c.NormalSigma = 2;
+            c.Normals.Name = "input_normals"; c.Output.Name = output;
+            R::SetBilateralFilterConfig(config, c);
+            c.Positions.Name = "missing_positions";
+            R::SetBilateralFilterConfig(missingInputConfig, c);
+            c.Positions.Name = "v:position";
+            c.Output.Name = reference;
+            ASSERT_TRUE(R::ApplyEditorBilateralFilterCommand(R::BindEditorProcessingCommands(referenceContext), c).Succeeded());
+        }
+        ASSERT_TRUE(h.Apply(config));
+        ASSERT_TRUE(h.Shell.SetEditorWindowOpen(methods[method].Window, true));
+        int frame = 0, step = 0;
+        bool completed = false;
+        std::uint64_t jobsBefore = 0;
+        std::string acceptedConfig;
+        h.Driver->OnFrame = [&](R::Engine& engine) {
+            if (++frame > 400)
+            { ADD_FAILURE() << "Processing panel did not publish"; engine.RequestExit(); return; }
+            auto* window = ImGui::FindWindowByName(methods[method].Title);
+            if (!window) return;
+            ImGui::SetWindowSize(window, {750, 1400});
+            ImGui::SetWindowPos(window, {0, 0});
+            ++step;
+            const auto editParameter = [&](int begin, const char* value) {
+                if (step == begin)
+                {
+                    ImGui::FocusWindow(window);
+                    ImGui::ActivateItemByID(window->GetID(methods[method].Parameter));
+                    ImGui::GetCurrentContext()->NavNextActivateFlags = ImGuiActivateFlags_PreferInput;
+                }
+                if (step == begin + 2)
+                {
+                    EXPECT_EQ(ImGui::GetActiveID(), window->GetID(methods[method].Parameter));
+                    ImGui::GetIO().AddInputCharactersUTF8(value);
+                }
+                if (step == begin + 4) ImGui::GetIO().AddKeyEvent(ImGuiKey_Enter, true);
+                if (step == begin + 5) ImGui::GetIO().AddKeyEvent(ImGuiKey_Enter, false);
+            };
+            if (step == 2)
+            {
+                jobsBefore = engine.Jobs().Stats().SubmittedJobs;
+                acceptedConfig = Config::SerializeEngineConfig(h.Control().GetEngineConfigControlState().ActiveConfig);
+            }
+            editParameter(3, "-1");
+            if (step == 10) ImGui::ActivateItemByID(window->GetID(methods[method].Run));
+            if (step == 13)
+            {
+                EXPECT_FALSE(props.Exists(output));
+                EXPECT_EQ(engine.Jobs().Stats().SubmittedJobs, jobsBefore);
+                EXPECT_EQ(Config::SerializeEngineConfig(h.Control().GetEngineConfigControlState().ActiveConfig),
+                          acceptedConfig) << "Rejected controls must leave the accepted configuration intact";
+            }
+            editParameter(14, "2");
+            if (step == 21) EXPECT_TRUE(h.Apply(missingInputConfig));
+            if (step == 24) ImGui::ActivateItemByID(window->GetID(methods[method].Run));
+            if (step == 27)
+            {
+                EXPECT_FALSE(props.Exists(output));
+                EXPECT_EQ(engine.Jobs().Stats().SubmittedJobs, jobsBefore);
+                EXPECT_TRUE(h.Apply(config));
+            }
+            if (step == 30) ImGui::ActivateItemByID(window->GetID(methods[method].Run));
+            if (step < 30) return;
+            if (!props.Exists(output)) return;
+            const auto& values = std::as_const(props);
+            if (method == 3)
+                EXPECT_EQ(values.Get<glm::vec3>(output).Vector(), values.Get<glm::vec3>(reference).Vector());
+            else
+                EXPECT_EQ(values.Get<float>(output).Vector(), values.Get<float>(reference).Vector());
+            if (method == 0)
+                EXPECT_EQ(values.Get<std::uint32_t>("configured_mask").Vector(),
+                          values.Get<std::uint32_t>("reference_mask").Vector());
+            completed = true;
+            engine.RequestExit();
+        };
+        h.Engine->Run();
+        EXPECT_TRUE(completed);
+    }
+}
+
+TEST(SandboxProcessingPanels, UvAtlasAdoptionTracksNewExtentsAndPreservesManualSizing)
+{
+    PanelHarness h;
+    std::optional<R::EditorUvRegenerationCommandResult> result{
+        R::EditorUvRegenerationCommandResult{
+            .Status = R::EditorCommandStatus::Applied,
+            .AtlasWidth = 256u, .AtlasHeight = 128u}};
+    std::optional<R::EditorUvRegenerationCommandResult> adopted;
+    std::int32_t width = 1, height = 1, padding = 0, resolution = 1024, uvPadding = 2;
+    float texelsPerUnit = 0.0f;
+    bool force = true, preserve = false;
+    const Editor::SandboxUvRegenerationControls controls{
+        .LastResult = &result, .LastExtentAdoption = &adopted,
+        .BakeWidth = &width, .BakeHeight = &height, .BakePadding = &padding,
+        .UvResolution = &resolution, .UvPadding = &uvPadding,
+        .UvTexelsPerUnit = &texelsPerUnit,
+        .UvForceRegenerate = &force, .UvPreserveAuthored = &preserve};
+    int checks = 0;
+    const auto observer = h.Shell.RegisterEditorWindow(Editor::EditorWindowDescriptor{
+        .Id = "test.uv_extent_adoption", .MenuPath = {"View"}, .Title = "UV extent adoption",
+        .OpenByDefault = true,
+        .Draw = [&](bool&, const Editor::SandboxEditorContext&) {
+            if (checks >= 3) return;
+            if (checks == 1) width = 73;
+            if (checks == 2) { result->AtlasWidth = 512u; result->AtlasHeight = 256u; }
+            Editor::DrawSandboxUvRegenerationControls({}, nullptr, controls);
+            EXPECT_EQ(width, checks == 0 ? 256 : checks == 1 ? 73 : 512);
+            EXPECT_EQ(height, checks == 2 ? 256 : 128);
+            EXPECT_EQ(padding, 2);
+            ++checks;
+        }});
+    int frames = 0;
+    h.Driver->OnFrame = [&](R::Engine& engine) { if (++frames == 5) engine.RequestExit(); };
+    h.Engine->Run();
+    EXPECT_EQ(checks, 3);
+    EXPECT_TRUE(h.Shell.UnregisterEditorWindow(observer));
+}

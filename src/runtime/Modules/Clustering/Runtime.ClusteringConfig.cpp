@@ -23,6 +23,12 @@ namespace Extrinsic::Runtime
             stableEntityId, std::move(properties), config);
     }
 
+    RunKMeans MakeConfiguredKMeansRequest(
+        const std::uint32_t stableEntityId, const ClusteringConfig& config)
+    {
+        return MakeConfiguredKMeansRequest(stableEntityId, config.Properties.value_or(KMeansPropertyRefs{}), config);
+    }
+
     std::string SerializeClusteringConfig(const ClusteringConfig& config)
     {
         return FeatureConfigDetail::SerializeClusteringConfigImpl(config);

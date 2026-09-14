@@ -1,0 +1,81 @@
+module;
+#include <chrono>
+#include <cstddef>
+#include <cstdint>
+#include <functional>
+#include <memory>
+#include <optional>
+#include <span>
+#include <string>
+#include <string_view>
+#include <utility>
+#include <vector>
+#include <entt/entity/registry.hpp>
+#include <glm/glm.hpp>
+module Extrinsic.Runtime.EditorProcessing;
+import Extrinsic.Core.Config.Engine;
+import Extrinsic.Core.Config.EngineLoad;
+import Extrinsic.Runtime.EngineConfigControl;
+// Named only so the shared job declarations in the point-field header resolve.
+import Extrinsic.Runtime.JobService;
+import Geometry.Properties;
+#include "Editor/internal/Runtime.EditorProcessingAccess.hpp"
+#include "Editor/Operations/Runtime.GeometryProcessingOperations.PointFields.hpp"
+namespace Extrinsic::Runtime
+{
+    bool EditorProcessingCommands::IsBound() const noexcept
+    {
+        return m_Context && (!m_Context->AttachmentActive || m_Context->AttachmentActive());
+    }
+    extern "C++" const EditorProcessingContext& EditorProcessingCommandsAccess::Resolve(const EditorProcessingCommands& commands) noexcept
+    {
+        static const EditorProcessingContext empty{};
+        return commands.IsBound() ? *commands.m_Context : empty;
+    }
+    EditorProcessingCommands BindEditorProcessingCommands(EditorProcessingContext context)
+    {
+        EditorProcessingCommands commands;
+        commands.m_Context = std::make_shared<const EditorProcessingContext>(std::move(context));
+        return commands;
+    }
+    bool AreEditorProcessingConfigCommandsAvailable(
+        const EditorProcessingCommands& commands) noexcept
+    {
+        const auto& context = EditorProcessingCommandsAccess::Resolve(commands);
+        return context.EngineConfigControlState != nullptr &&
+               context.EngineConfigCommandsAvailable &&
+               static_cast<bool>(context.PreviewEngineConfigDocument) &&
+               static_cast<bool>(context.ApplyEngineConfigHotSubset);
+    }
+    GeometryPropertyCatalogSnapshot GetEditorPointInputCatalog(
+        const EditorProcessingCommands& commands, std::uint32_t stableId)
+    {
+        return GeometryProcessingDetail::BuildPointInputCatalog(
+            EditorProcessingCommandsAccess::Resolve(commands), stableId);
+    }
+    extern "C++" RuntimeEngineConfigApplyResult ApplyEditorProcessingConfig(
+        const EditorProcessingCommands& commands,
+        const Core::Config::EngineConfigSectionValidationResult& validation,
+        const std::string& sourceId, const std::function<void(Core::Config::EngineConfig&)>& update)
+    {
+        RuntimeEngineConfigApplyResult result{
+            .Status = RuntimeEngineConfigApplyStatus::Rejected,
+            .Source = RuntimeConfigControlSource::Editor,
+        };
+        if (!validation.Usable())
+        {
+            result.LoadResult.Diagnostics = validation.Diagnostics;
+            return result;
+        }
+        const auto& context = EditorProcessingCommandsAccess::Resolve(commands);
+        if (!context.EngineConfigControlState || !context.PreviewEngineConfigDocument ||
+            !context.ApplyEngineConfigHotSubset || !context.EngineConfigCommandsAvailable)
+            return result;
+        auto candidate = context.EngineConfigControlState->ActiveConfig;
+        update(candidate);
+        result.LoadResult = context.PreviewEngineConfigDocument(
+            Core::Config::SerializeEngineConfig(candidate), sourceId);
+        if (!Core::Config::IsConfigUsable(result.LoadResult)) return result;
+        return context.ApplyEngineConfigHotSubset(result.LoadResult);
+    }
+}

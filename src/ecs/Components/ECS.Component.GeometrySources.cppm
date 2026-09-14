@@ -5,7 +5,7 @@ module;
 #include <cstddef>
 #include <cstdint>
 #include <string_view>
-#include <entt/entity/registry.hpp>
+#include <entt/entity/fwd.hpp>
 
 export module Extrinsic.ECS.Components.GeometrySources;
 

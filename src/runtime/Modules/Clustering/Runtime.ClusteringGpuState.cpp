@@ -1,4 +1,7 @@
 module;
+#include <string_view>
+#include <functional>
+#include <chrono>
 
 #include <algorithm>
 #include <cstdint>

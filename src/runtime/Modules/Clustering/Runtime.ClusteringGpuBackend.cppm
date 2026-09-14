@@ -6,7 +6,7 @@ module;
 #include <string>
 #include <vector>
 
-#include <glm/glm.hpp>
+#include <glm/vec3.hpp>
 
 module Extrinsic.Runtime.ClusteringModule:GpuBackend;
 

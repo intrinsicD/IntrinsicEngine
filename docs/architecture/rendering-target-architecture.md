@@ -1032,6 +1032,10 @@ Runtime.Renderer         owns GpuWorld + RenderGraph   All Graphics.*
 
 **Dependency direction rule:** arrows flow downward. A module may only depend on modules below it in this table. `ECS.Scene` never imports `Graphics.*`. `Graphics.*` never imports `ECS.*`. The interface between them is `RenderWorld` — the immutable extraction product.
 
+**Data contracts are separate owners from execution.** In the current tree the renderer's plain records live in declaration-only modules that carry no rendering system, RHI manager or upload helper: `Extrinsic.Graphics.RenderDiagnostics` owns `RenderGraphFrameStats` and the per-pass/upload diagnostics it aggregates, `Extrinsic.Graphics.RenderRecipeConfig` owns the config-lane `FrameRecipeOverride`, and `Extrinsic.Graphics.FrameRecipe` owns the recipe vocabulary and `ProjectFrameRecipeOverride(...)`. `Extrinsic.Graphics.Renderer` re-exports those owners because `IRenderer` names their types; a reader that only observes frame diagnostics or installs a recipe override imports the owner, not the renderer. The kernel goes one step further: `Runtime.Engine.cppm` names `IRenderer` through an `extern "C++"` declaration and returns the borrowed reference, so only modules that actually drive rendering import `Extrinsic.Graphics.Renderer`. See [runtime.md](runtime.md) for the runtime-side boundary and its compiler-metadata guard.
+
+`IRenderer` exposes its pipelines through the typed `RendererPipelineId` pair `GetPipeline(id)` / `GetPipelineDesc(id)` rather than per-pipeline accessors. The handle query is allocation-free and fails closed on unmapped identifiers and unpublished leases; the descriptor query returns the canonical builder result, or `nullopt` when the identifier is unmapped. See [`src/graphics/renderer/README.md`](../../src/graphics/renderer/README.md) for the full contract.
+
 ### 14.4 Render Graph vs. Task Graph
 
 These are two different DAGs with different purposes:

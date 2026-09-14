@@ -8,9 +8,11 @@
 #include <entt/entity/registry.hpp>
 #include <variant>
 #include <gtest/gtest.h>
+#include "EditorFeatureTestContext.hpp"
 #include "SandboxEditorJobHarness.hpp"
 
-import Extrinsic.Runtime.GeometryProcessingOperations;
+import Extrinsic.Runtime.PointAnalysisOperations;
+import Extrinsic.Runtime.EditorProcessing;
 import Extrinsic.Runtime.SpatialIndexCache;
 import Extrinsic.Runtime.WorldRegistry;
 import Extrinsic.Runtime.SelectionController;
@@ -100,7 +102,7 @@ TEST(DescriptorAnalysisConfig, RoundTripAndSharedPreviewApplyRun)
     ASSERT_TRUE(registry.Register(R::MakeDescriptorAnalysisConfigSectionRegistration()));
     R::RuntimeEngineConfigControlState state;
     C::PopulateEngineConfigSectionDefaults(state.ActiveConfig, registry);
-    R::EditorGeometryProcessingContext context{.Scene = &scene};
+    R::EditorProcessingContext context{.Scene = &scene};
     context.EngineConfigControlState = &state;
     context.EngineConfigCommandsAvailable = true;
     unsigned previews = 0, applies = 0;
@@ -113,7 +115,7 @@ TEST(DescriptorAnalysisConfig, RoundTripAndSharedPreviewApplyRun)
         state.ActiveConfig = preview.Preview.Config;
         return R::RuntimeEngineConfigApplyResult{.Status = R::RuntimeEngineConfigApplyStatus::Applied};
     };
-    auto commands = R::BindEditorGeometryProcessingCommands(context);
+    auto commands = R::BindEditorProcessingCommands(context);
     ASSERT_TRUE(R::PreviewEditorDescriptorAnalysisCommand(commands, config).Ready);
     EXPECT_FALSE(Properties(scene, entity, D::MeshFace).Exists("descriptor.alpha0"));
     ASSERT_TRUE(R::ApplyEditorDescriptorAnalysisConfig(commands, config).Succeeded());
@@ -151,8 +153,9 @@ TEST(DescriptorAnalysisOperations, EveryDomainReferenceCacheHistoryAndDeletedRow
         const auto positionRevision=std::as_const(props).Get<glm::vec3>("samples").Revision();
         const auto normalRevision=std::as_const(props).Get<glm::vec3>("directions").Revision();
         R::EditorCommandHistory history;
-        R::EditorGeometryProcessingContext context{.Scene=&scene,.World=world,.CommandHistory=&history,.SpatialIndices=&cache};
-        const auto catalog=R::GetEditorDescriptorAnalysisInputCatalog(context,c.StableEntityId);
+        const auto context=R::BindEditorProcessingCommands(R::EditorProcessingContext{
+            .Scene=&scene,.World=world,.CommandHistory=&history,.SpatialIndices=&cache});
+        const auto catalog=R::GetEditorPointInputCatalog(context,c.StableEntityId);
         EXPECT_TRUE(std::ranges::any_of(catalog.Entries,[&](auto& e){return e.Ref==c.Positions;}));
         EXPECT_TRUE(std::ranges::any_of(catalog.Entries,[&](auto& e){return e.Ref==c.Normals;}));
         ASSERT_TRUE(R::PreviewEditorDescriptorAnalysisCommand(context,c).Ready);
@@ -207,14 +210,17 @@ TEST(DescriptorAnalysisOperations, JobsRejectChangedNormalsEveryOutputAndCancell
         SCOPED_TRACE(change);Extrinsic::ECS::Scene::Registry scene;auto entity=Make(scene,D::MeshVertex);auto c=Config(entity,D::MeshVertex);
         auto& props=Properties(scene,entity,D::MeshVertex);
         Intrinsic::Tests::EditorFeatureTestContext context;context.Scene=&scene;R::EditorCommandHistory history;context.CommandHistory=&history;
-        std::optional<R::EditorDescriptorAnalysisResult> delivered;context.MethodResultSinks.DescriptorAnalysis=[&](auto r){delivered=std::move(r);};
+        std::optional<R::EditorDescriptorAnalysisResult> delivered;int deliveries=0;
+        auto onComplete=[&](R::EditorDescriptorAnalysisResult r){++deliveries;delivered=std::move(r);};
         Extrinsic::Tests::EditorJobHarness jobs;jobs.Attach(context);
-        ASSERT_EQ(R::ApplyEditorDescriptorAnalysisCommand(context,c).Status,R::EditorCommandStatus::Pending);
+        ASSERT_EQ(R::ApplyEditorDescriptorAnalysisCommand(context,c,onComplete).Status,R::EditorCommandStatus::Pending);
         switch(change){case 0:props.Get<float>("keep")[0]=99;break;case 1:props.Get<glm::vec3>("samples")[0].x+=1;break;
             case 2:props.GetOrAdd<bool>("v:deleted")[0]=true;break;case 3:props.GetOrAdd<float>(c.Outputs[0].Name)[0]=77;break;
             case 4:(void)jobs.Jobs().Cancel(jobs.Snapshot().Entries[0].Token);break;
             case 5:props.Get<glm::vec3>("directions")[0].x+=1;break;case 6:props.GetOrAdd<float>(c.Outputs[32].Name)[0]=77;break;}
-        ASSERT_TRUE(jobs.DrainUntilTerminal());ASSERT_TRUE(delivered);EXPECT_EQ(delivered->Succeeded(),change==0)<<delivered->Message;
+        ASSERT_TRUE(jobs.DrainUntilTerminal());ASSERT_TRUE(delivered);
+        EXPECT_EQ(deliveries,1)<<"a queued descriptor job owes exactly one terminal result";
+        EXPECT_EQ(delivered->Succeeded(),change==0)<<delivered->Message;
         EXPECT_EQ(history.CanUndo(),change==0);
         for(unsigned b=0;b<33;++b)EXPECT_EQ(props.Exists(c.Outputs[b].Name),change==0 || (change==3 && b==0) || (change==6 && b==32));
     }
@@ -222,7 +228,8 @@ TEST(DescriptorAnalysisOperations, JobsRejectChangedNormalsEveryOutputAndCancell
 TEST(DescriptorAnalysisOperations, InvalidNormalsScaleAndOutputPreflightRetainData)
 {
     Extrinsic::ECS::Scene::Registry scene;auto entity=Make(scene,D::MeshVertex);auto c=Config(entity,D::MeshVertex);
-    auto& props=Properties(scene,entity,D::MeshVertex);R::EditorGeometryProcessingContext context{.Scene=&scene};
+    auto& props=Properties(scene,entity,D::MeshVertex);
+    const auto context=R::BindEditorProcessingCommands(R::EditorProcessingContext{.Scene=&scene});
     for(auto name:{"samples","directions","v:deleted","h:connectivity"})
     {auto bad=c;bad.Outputs[32].Name=name;EXPECT_FALSE(R::PreviewEditorDescriptorAnalysisCommand(context,bad).Ready);}
     auto gpu=c;gpu.Backend=R::DescriptorAnalysisBackend::VulkanLBVH;EXPECT_FALSE(R::PreviewEditorDescriptorAnalysisCommand(context,gpu).Ready);

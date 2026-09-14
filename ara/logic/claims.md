@@ -2158,3 +2158,22 @@
 - **Dependencies**: []
 - **Tags**: Hoppe-style field, kNN graph, CPU LBVH, Vulkan LBVH, generated geometry, bounded integration
 - **From staging**: O223
+
+## C92: Processing-family locality is a prototype-latency hypothesis
+- **Statement**: Keeping density/spacing contracts and execution separate from all-method and session aggregates is expected to lower repeated prototype rebuild latency. In the recorded one-sample local Debug experiment, a public spacing-result edit changed the selected build from 399.339 s / 62 compiler invocations to 77.103 s / 23; intermediate shared-test-fixture coupling cost 172.178 s / 41. These observations establish no repeatable speedup.
+- **Status**: hypothesis — dirty, single-sample, compiler-cache-disabled diagnostics are not claim-eligible; no clean-build, startup, runtime, engine-wide slimming or cross-host performance claim.
+- **Provenance**: ai-executed
+- **Crystallized via**: artifact-commitment
+- **Falsification criteria**: Repeated matched clean-commit or approved sealed-source cohorts fail to reduce the declared family-edit build latency, or the compiler boundary permits unrelated numerical adapters to recompile. Timing qualification must preserve the same targets, toolchain and cache conditions.
+- **Proof**: [ara/evidence/diagnostics/runtime233_compile_locality.json, ara/evidence/tables/runtime233_compile_locality.md, tools/analysis/compile_hotspots.py, tests/regression/tooling/Test.CompileHotspots.py, tests/CMakeLists.txt, tasks/active/RUNTIME-233-processing-compilation-locality-pilot.md]
+- **Dependencies**: []
+- **Tags**: compilation, prototype iteration, C++23 modules, local diagnostic, unqualified performance hypothesis
+- **From staging**: O224
+
+- **Follow-up review diagnostic (2026-09-13)**: After removing complete family records from shared private workspace bindings, the same local public-record probe took 61.906 s / 14 compiler invocations. Nine sibling command/workspace producers no longer rebuilt. This additional dirty single sample does not change the hypothesis disposition or qualify a repeatable speedup. See N543 and the existing proof record.
+
+- **Second-family diagnostic (2026-09-13)**: Applying the boundary to weights/keypoints/outliers changed a public density-weight result edit from 351.986 s / 60 compiler invocations to 70.610 s / 16. The density/spacing and shared capture/radius implementations did not rebuild. This remains one dirty sample per variant, not a qualified speedup; production footprint is +30 physical lines across 32 changed files. See N544, [ara/evidence/diagnostics/runtime234_compile_locality.json](../evidence/diagnostics/runtime234_compile_locality.json) and [ara/evidence/tables/runtime234_compile_locality.md](../evidence/tables/runtime234_compile_locality.md). C92 remains a hypothesis.
+
+- **Normal-family diagnostic (2026-09-13)**: Isolating the configured normal operation and deleting three obsolete normal APIs changed the matched normal-result edit from 334.094 s / 57 compiler invocations to 59.089 s / 12. The complete changed native production footprint is −2,408 physical lines, including five new owner files. Full CPU, separate sanitizers and 22 affected actual Vulkan cases have zero failures. This remains one dirty sample per variant; original mislabeled manifest/results and metadata-only corrected reseals are both retained, with no extra execution inferred. See N545, [ara/evidence/diagnostics/runtime235_normals_compile_locality.json](../evidence/diagnostics/runtime235_normals_compile_locality.json) and [ara/evidence/tables/runtime235_normals_compile_locality.md](../evidence/tables/runtime235_normals_compile_locality.md). C92 remains a hypothesis; this establishes neither repeatable timing nor whole-engine completion.
+
+- **Remaining mesh-family diagnostic (2026-09-13)**: After Claude's implementation and reviewed reconciliation, the matched curvature-result edit changed 344.537 s / 57 physical compiler invocations to 74.229 s / 16. Complete changed production footprint is −138 physical lines, with net +15 files. This is one dirty sample per variant; other migrated families have compiler-metadata checks but no independent timing. See N546, [ara/evidence/diagnostics/runtime235_remaining_compile_locality.json](../evidence/diagnostics/runtime235_remaining_compile_locality.json) and [ara/evidence/tables/runtime235_remaining_compile_locality.md](../evidence/tables/runtime235_remaining_compile_locality.md). C92 remains a hypothesis; no repeatable or whole-engine performance conclusion follows.

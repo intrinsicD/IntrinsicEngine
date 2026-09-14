@@ -13,7 +13,7 @@ import Extrinsic.Core.Config.Engine;
 import Extrinsic.Core.Config.EngineLoad;
 import Extrinsic.Core.Error;
 import Extrinsic.Graphics.RenderRecipeConfig;
-import Extrinsic.Runtime.Module;
+import Extrinsic.Runtime.ModuleLifecycle;
 
 namespace Extrinsic::Runtime
 {

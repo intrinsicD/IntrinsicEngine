@@ -12,6 +12,8 @@ if(INTRINSIC_BUILD_SANDBOX OR INTRINSIC_BUILD_TESTS)
             Sandbox.cppm
             PRIVATE
             Editor/Sandbox.EditorController.cpp
+            Editor/Sandbox.PanelSupport.cpp
+            Editor/Sandbox.PanelSupport.hpp
             Editor/Sandbox.EditorShell.cpp
             Editor/Sandbox.DomainPanels.cpp
             Editor/Sandbox.MethodPanels.cpp

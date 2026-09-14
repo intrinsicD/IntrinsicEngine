@@ -28,6 +28,13 @@ Indexed paths retain all candidate rows in host memory, which may be quadratic f
 
 ## Configuration and publication
 
+The editor/config command surface is owned by
+`Extrinsic.Runtime.PointAnalysisOperations`. It uses the shared
+`EditorProcessingCommands` handle and explicit completion callbacks for newly
+queued jobs. `PrepareEditorPointAnalysisFrame` supplies guarded commands,
+completion sinks and copied results to the editor. See
+[processing compilation locality](sandbox-editor-feature-boundaries.md#processing-compilation-locality).
+
 The version-1 schema is `intrinsic.runtime.sandbox.density_weights`. Fields are `entity`, `backend`, `positions`, `weights`, `support_radius`, `kernel`, `mode`, `gpu_query_batch_size` and `gpu_radius_capacity`. Defaults are `cpu_kdtree`, support radius 1, `theta_lop`, `direct`, batch 4096 and capacity 256. Positive finite support radii up to floatmax are accepted by the reference; indexed paths apply their additional range checks. Unknown fields, invalid enum tokens, property aliasing, incompatible domains/kinds and invalid limits fail validation.
 
 All eight canonical domains are accepted: mesh vertices/edges/halfedges/faces, graph nodes/edges/halfedges and point-cloud points. Halfedges use paired edge deletion masks. Finite live positions are required; deleted nonfinite rows are excluded. Existing deleted output rows are preserved; newly created deleted rows initialize to zero. Position, deletion and output revisions guard one atomic history operation. Unrelated properties and topology remain intact. Stale, cancelled and partially rejected job chains preserve output/history.

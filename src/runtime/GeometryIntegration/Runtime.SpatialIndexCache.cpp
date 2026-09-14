@@ -12,6 +12,10 @@ module;
 #include <utility>
 #include <vector>
 module Extrinsic.Runtime.SpatialIndexCache;
+import Extrinsic.Runtime.Module;
+import Extrinsic.Runtime.WorldRegistry;
+import Extrinsic.Graphics.PointLBVH;
+import Extrinsic.RHI.CommandContext;
 import Extrinsic.ECS.Scene.Registry;
 import Extrinsic.RHI.Descriptors;
 import Extrinsic.RHI.Device;
@@ -220,6 +224,67 @@ namespace Extrinsic::Runtime
                 std::ranges::find_if(Entries, [&](const auto& e) { return e->Id == handle.Value; });
             return it != Entries.end() && Current(**it) ? it->get() : nullptr;
         }
+        // Private recording path: the queue participant is the only caller. Records a
+        // lazy GPU build then queries into batch-owned buffers; never silently runs CPU.
+        bool RecordBuild(SpatialIndexHandle handle, RHI::ICommandContext& commands)
+        {
+            auto& s = *this;
+            auto* e = s.Find(handle);
+            if (!e || !s.Device || !s.Device->IsOperational())
+                return false;
+            e->Device = s.Device;
+            if (!e->Gpu)
+            {
+                e->Gpu = std::make_unique<Graphics::PointLbvhWorkspace>(*s.Device);
+                if (!e->Gpu->Reserve(e->Snapshot->Slots.size()))
+                {
+                    e->Gpu.reset();
+                    return false;
+                }
+                auto allocate = [&](std::size_t bytes) {
+                    return s.Device->CreateBuffer(RHI::BufferDesc{
+                        .SizeBytes = std::max(std::size_t(16), bytes),
+                        .Usage = RHI::BufferUsage::Storage | RHI::BufferUsage::TransferSrc |
+                                 RHI::BufferUsage::TransferDst,
+                        .HostVisible = true,
+                        .DebugName = "SpatialIndex.Source"});
+                };
+                e->Points = allocate(e->Snapshot->Slots.size() * 12);
+                e->Mapping = allocate(e->Snapshot->Slots.size() * 4);
+                if (!e->Points.IsValid() || !e->Mapping.IsValid())
+                {
+                    if (e->Points.IsValid())
+                        s.Device->DestroyBuffer(e->Points);
+                    if (e->Mapping.IsValid())
+                        s.Device->DestroyBuffer(e->Mapping);
+                    e->Points = {};
+                    e->Mapping = {};
+                    e->Gpu.reset();
+                    return false;
+                }
+                if (!e->Snapshot->Slots.empty())
+                {
+                    s.Device->WriteBuffer(e->Points, e->Snapshot->Index.Points().data(), e->Snapshot->Slots.size() * 12);
+                    s.Device->WriteBuffer(e->Mapping, e->Snapshot->Slots.data(), e->Snapshot->Slots.size() * 4);
+                }
+            }
+            if (!e->Gpu->View().NodesBDA)
+            {
+                if (!e->Gpu->RecordBuild(commands,
+                                         {.Buffer = e->Points, .Count = std::uint32_t(e->Snapshot->Slots.size())},
+                                         e->Mapping))
+                    return false;
+                ++s.Stats.GpuBuilds;
+            }
+            return true;
+        }
+        bool RecordQueries(SpatialIndexHandle handle, RHI::ICommandContext& commands,
+                           const Graphics::PointLbvhQuery& query)
+        {
+            if (!RecordBuild(handle, commands))
+                return false;
+            return Find(handle)->Gpu->RecordQuery(commands, query);
+        }
     };
     SpatialIndexCache::SpatialIndexCache() : m_Impl(std::make_unique<Impl>())
     {
@@ -250,7 +315,7 @@ namespace Extrinsic::Runtime
                         if (batch->State->State != SpatialQueryState::Queued) continue;
                         m_Impl->Device->WriteBuffer(batch->Input, batch->Queries.data(), batch->Queries.size()*12);
                         m_Impl->Device->WriteBuffer(batch->Exclusions, batch->Excluded.data(), batch->Excluded.size()*4);
-                        if (!RecordGpuQueries({batch->Target->Id}, commands,
+                        if (!m_Impl->RecordQueries({batch->Target->Id}, commands,
                             {.Queries = {.Buffer = batch->Input, .Count = std::uint32_t(batch->Queries.size())},
                              .Neighbors = batch->Output, .Headers = batch->Header,
                              .Capacity = batch->Capacity, .Radius = batch->Radius,
@@ -472,72 +537,6 @@ namespace Extrinsic::Runtime
         auto result = e->Snapshot->Index.KNearest(query, k, CompactSlot(*e->Snapshot, excludedSlot));
         for (auto& neighbor : result) neighbor.Index = e->Snapshot->Slots[neighbor.Index];
         return result;
-    }
-    bool SpatialIndexCache::RecordGpuBuild(SpatialIndexHandle handle,
-                                           RHI::ICommandContext& commands)
-    {
-        auto& s = *m_Impl;
-        auto* e = s.Find(handle);
-        if (!e || !s.Device || !s.Device->IsOperational())
-            return false;
-        e->Device = s.Device;
-        if (!e->Gpu)
-        {
-            e->Gpu = std::make_unique<Graphics::PointLbvhWorkspace>(*s.Device);
-            if (!e->Gpu->Reserve(e->Snapshot->Slots.size()))
-            {
-                e->Gpu.reset();
-                return false;
-            }
-            auto allocate = [&](std::size_t bytes) {
-                return s.Device->CreateBuffer(RHI::BufferDesc{
-                    .SizeBytes = std::max(std::size_t(16), bytes),
-                    .Usage = RHI::BufferUsage::Storage | RHI::BufferUsage::TransferSrc |
-                             RHI::BufferUsage::TransferDst,
-                    .HostVisible = true,
-                    .DebugName = "SpatialIndex.Source"});
-            };
-            e->Points = allocate(e->Snapshot->Slots.size() * 12);
-            e->Mapping = allocate(e->Snapshot->Slots.size() * 4);
-            if (!e->Points.IsValid() || !e->Mapping.IsValid())
-            {
-                if (e->Points.IsValid())
-                    s.Device->DestroyBuffer(e->Points);
-                if (e->Mapping.IsValid())
-                    s.Device->DestroyBuffer(e->Mapping);
-                e->Points = {};
-                e->Mapping = {};
-                e->Gpu.reset();
-                return false;
-            }
-            if (!e->Snapshot->Slots.empty())
-            {
-                s.Device->WriteBuffer(e->Points, e->Snapshot->Index.Points().data(), e->Snapshot->Slots.size() * 12);
-                s.Device->WriteBuffer(e->Mapping, e->Snapshot->Slots.data(), e->Snapshot->Slots.size() * 4);
-            }
-        }
-        if (!e->Gpu->View().NodesBDA)
-        {
-            if (!e->Gpu->RecordBuild(commands,
-                                     {.Buffer = e->Points, .Count = std::uint32_t(e->Snapshot->Slots.size())},
-                                     e->Mapping))
-                return false;
-            ++s.Stats.GpuBuilds;
-        }
-        return true;
-    }
-    bool SpatialIndexCache::RecordGpuQueries(SpatialIndexHandle handle,
-                                             RHI::ICommandContext& commands,
-                                             const Graphics::PointLbvhQuery& query)
-    {
-        if (!RecordGpuBuild(handle, commands))
-            return false;
-        return m_Impl->Find(handle)->Gpu->RecordQuery(commands, query);
-    }
-    Graphics::PointLbvhView SpatialIndexCache::GpuView(SpatialIndexHandle handle) const
-    {
-        const auto* e = m_Impl->Find(handle);
-        return e && e->Gpu ? e->Gpu->View() : Graphics::PointLbvhView{};
     }
     void SpatialIndexCache::Prune()
     {

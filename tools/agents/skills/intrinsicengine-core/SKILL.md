@@ -26,6 +26,7 @@ Load only the procedure whose scope applies. The names below resolve under
 
 | Touched scope | Skill to consult |
 | --- | --- |
+| Before adding a non-trivial implementation/helper/file, finding canonical code, or consolidating duplicated mechanisms | `intrinsicengine-reuse` |
 | Creating, promoting, retiring, or materially updating files under `tasks/` | `intrinsicengine-task-workflow` |
 | Before committing or reporting completion for a non-trivial change (the pre-merge sweep) | `intrinsicengine-review` |
 | Changing dependency boundaries, module ownership, source layout, runtime wiring | `intrinsicengine-review` (architecture deep review + clean-workshop scorecard) |

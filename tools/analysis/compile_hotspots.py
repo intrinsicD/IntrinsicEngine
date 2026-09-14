@@ -676,6 +676,66 @@ def _print_rows(rows: Sequence[Mapping[str, object]], log_path: Path) -> None:
         )
 
 
+def check_module_boundary(
+    repo_root: Path, build_dir: Path, sources: Sequence[str], forbidden: Sequence[str]
+) -> list[str]:
+    """Check Clang's scanned imports against CMake's resolved module closure.
+
+    Call after building the selected producers. No source-text approximation or
+    fallback is used when a source/output or compiler dependency is missing.
+    """
+    resolver = SourceResolver(repo_root, build_dir)
+    failures: list[str] = []
+    for source in sources:
+        matches = [
+            (output, candidates)
+            for output, candidates in resolver.by_output.items()
+            if any(candidate[0] == source for candidate in candidates)
+        ]
+        if len(matches) != 1 or len(matches[0][1]) != 1:
+            raise AnalysisError(f"missing or ambiguous compile producer for {source}")
+        output = build_dir / matches[0][0]
+        ddi = Path(str(output) + ".ddi")
+        metadata = next(
+            (parent / "CXXModules.json" for parent in output.parents
+             if (parent / "CXXModules.json").is_file()), None
+        )
+        if metadata is None:
+            raise AnalysisError(f"missing CMake module metadata for {source}")
+        try:
+            scan = json.loads(ddi.read_text(encoding="utf-8"))
+            graph = json.loads(metadata.read_text(encoding="utf-8"))
+            rules = scan["rules"]
+            if not isinstance(rules, list) or len(rules) != 1:
+                raise ValueError("expected one scanned compile rule")
+            if _normalize_output(rules[0]["primary-output"], build_dir, build_dir) != matches[0][0]:
+                raise ValueError("scanned primary output does not match compile producer")
+            if not output.is_file() or ddi.stat().st_mtime_ns < (repo_root / source).stat().st_mtime_ns:
+                raise ValueError("producer missing or source newer than dependency scan; build first")
+            usages = graph["usages"]
+            known = set(graph["modules"]) | set(graph["references"])
+            if not isinstance(usages, dict):
+                raise ValueError("invalid CMake module usages")
+            pending = [(entry["logical-name"], [source]) for entry in rules[0].get("requires", [])]
+            visited: set[str] = set()
+            while pending:
+                name, trail = pending.pop()
+                if not isinstance(name, str) or name not in known:
+                    raise ValueError(f"unresolved scanned module {name!r}")
+                if name in visited:
+                    continue
+                visited.add(name)
+                if name in forbidden:
+                    failures.append(" -> ".join([*trail, name]))
+                dependencies = usages.get(name, [])
+                if not isinstance(dependencies, list):
+                    raise ValueError(f"invalid dependency list for {name}")
+                pending.extend((dependency, [*trail, name]) for dependency in dependencies)
+        except (OSError, ValueError, KeyError, TypeError) as error:
+            raise AnalysisError(f"invalid compiler dependency metadata for {source}: {error}") from error
+    return failures
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         description="Report slow normalized Ninja compile/module edges"
@@ -684,13 +744,24 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--top", type=int, default=15)
     parser.add_argument("--json-out")
     parser.add_argument("--baseline-json")
+    parser.add_argument("--check-source", action="append", default=[])
+    parser.add_argument("--forbid-module", action="append", default=[])
     args = parser.parse_args(argv)
+    if bool(args.check_source) != bool(args.forbid_module):
+        parser.error("--check-source and --forbid-module must be supplied together")
     if args.top < 1:
         parser.error("--top must be positive")
 
     root = Path(__file__).resolve().parents[2]
     build_dir = _absolute(root, args.build_dir)
     try:
+        if args.check_source:
+            failures = check_module_boundary(root, build_dir, args.check_source, args.forbid_module)
+            for failure in failures:
+                print(f"Forbidden module dependency: {failure}")
+            if not failures:
+                print(f"Module boundary passed ({len(args.check_source)} compiler producers).")
+            return 2 if failures else 0
         report = analyze_build(root, build_dir)
     except AnalysisError as error:
         print(f"Compile hotspot analysis failed: {error}")

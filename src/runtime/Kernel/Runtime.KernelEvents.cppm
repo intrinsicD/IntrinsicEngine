@@ -1,3 +1,5 @@
+// Kernel event bus: erased fan-out notifications that are always queued, so
+// worker-thread publication and listener cascades stay off the publisher.
 module;
 
 #include <cstddef>
@@ -12,7 +14,7 @@ module;
 
 export module Extrinsic.Runtime.KernelEvents;
 
-import Extrinsic.Core.FrameGraph;
+import Extrinsic.Core.Hash;
 
 // ============================================================
 // ARCH-008 — Queued-only kernel event bus with two pump points.

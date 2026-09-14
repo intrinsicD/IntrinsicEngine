@@ -1,6 +1,7 @@
+// Declares hierarchy mutations that preserve world-space pose during reparenting.
 module;
 
-#include <entt/entity/registry.hpp>
+#include <entt/entity/fwd.hpp>
 
 export module Extrinsic.ECS.Hierarchy.Mutation;
 

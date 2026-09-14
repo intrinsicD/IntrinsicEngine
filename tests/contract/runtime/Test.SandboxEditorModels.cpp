@@ -3611,3 +3611,332 @@ TEST(SandboxEditorUi, SurfacePropertySelectorFollowsFaceDomainAndUndo)
         Runtime::EditorCommandStatus::Applied);
     EXPECT_EQ(model().Visualization.Visualization.Source, G::VisualizationConfig::ColorSource::PerFaceBuffer);
 }
+
+namespace
+{
+    // The workspace snapshot context is assembled per feature here instead of
+    // through the shared test harness: the harness derives all four feature
+    // contexts from one field set, which hides the guard independence and the
+    // fallback precedence the combined conversion is responsible for.
+[[nodiscard]] Runtime::EditorSceneEditingContext MakeSceneFeatureContext(
+        ECS::Scene::Registry& registry,
+        Runtime::SelectionController& selection,
+        std::function<bool()> attachmentActive = {})
+    {
+        return Runtime::EditorSceneEditingContext{
+            .Scene = &registry,
+            .Selection = &selection,
+            .AttachmentActive = std::move(attachmentActive),
+            .ImGuiAdapterAvailable = true,
+        };
+    }
+
+[[nodiscard]] std::function<bool()> MakeAttachmentGuard(const bool active)
+    {
+        return [active] { return active; };
+    }
+
+    // A job surface whose rows carry a single identifying name, so the model
+    // reveals which feature context supplied the surface.
+[[nodiscard]] Runtime::EditorJobCommandSurface MakeNamedJobSurface(
+        std::string jobName,
+        const bool submitAvailable)
+    {
+        Runtime::EditorJobCommandSurface surface{};
+        if (submitAvailable)
+        {
+            surface.Submit = [](Runtime::JobDesc, Runtime::EditorJobIdentity)
+            {
+                return Runtime::JobToken{};
+            };
+        }
+        surface.SnapshotEntity =
+            [name = std::move(jobName)](const std::uint32_t stableEntityId)
+        {
+            std::vector<Runtime::EditorJobRecord> rows{};
+            rows.push_back(Runtime::EditorJobRecord{
+                .Token = Runtime::JobToken{1u, 1u},
+                .Identity = Runtime::EditorJobIdentity{
+                    .EntityId = stableEntityId,
+                    .Scope = Runtime::EditorJobScope::MeshVertex,
+                    .OutputSemantic =
+                        Runtime::GeometryPresentationSlotSemantic::Normal,
+                    .OutputName = "normal",
+                },
+                .Name = name,
+                .State = Runtime::JobState::Running,
+            });
+            return rows;
+        };
+        return surface;
+    }
+}
+
+TEST(SandboxEditorWorkspaceContext, ExpiredSceneAttachmentYieldsInertSnapshot)
+{
+    ECS::Scene::Registry registry;
+    Runtime::SelectionController selection;
+    const auto mesh = MakeSelectable(registry, "Scene entity");
+    AddTriangleMeshSource(registry, mesh);
+    ASSERT_TRUE(selection.SetSelectedEntity(registry, mesh));
+
+    Runtime::EditorWorkspaceSnapshotContext context{
+        .Scene = MakeSceneFeatureContext(registry, selection,
+                                         MakeAttachmentGuard(true)),
+        .Geometry = Runtime::EditorProcessingContext{
+            .AttachmentActive = MakeAttachmentGuard(true),
+        },
+        .Visualization = Runtime::EditorVisualizationEditingContext{
+            .AttachmentActive = MakeAttachmentGuard(true),
+        },
+        .RenderRecipe = Runtime::EditorRenderRecipeEditingContext{
+            .AttachmentActive = MakeAttachmentGuard(true),
+        },
+    };
+
+    const Runtime::EditorWorkspaceSnapshot active =
+        Runtime::BuildEditorWorkspaceSnapshot(context);
+    ASSERT_EQ(active.Hierarchy.size(), 1u);
+    EXPECT_EQ(active.Hierarchy[0].Name, "Scene entity");
+    ASSERT_TRUE(active.Inspector.HasEntity);
+
+    context.Scene.AttachmentActive = MakeAttachmentGuard(false);
+    const Runtime::EditorWorkspaceSnapshot expired =
+        Runtime::BuildEditorWorkspaceSnapshot(context);
+    EXPECT_TRUE(expired.Hierarchy.empty());
+    EXPECT_FALSE(expired.Inspector.HasEntity);
+    EXPECT_TRUE(HasDiagnostic(expired.Diagnostics,
+                              Runtime::EditorDiagnosticCode::MissingScene));
+}
+
+TEST(SandboxEditorWorkspaceContext, ExpiredGeometryAttachmentYieldsInertSnapshot)
+{
+    ECS::Scene::Registry registry;
+    Runtime::SelectionController selection;
+    const auto mesh = MakeSelectable(registry, "Scene entity");
+    AddTriangleMeshSource(registry, mesh);
+    ASSERT_TRUE(selection.SetSelectedEntity(registry, mesh));
+
+    const Runtime::EditorWorkspaceSnapshotContext context{
+        .Scene = MakeSceneFeatureContext(registry, selection,
+                                         MakeAttachmentGuard(true)),
+        .Geometry = Runtime::EditorProcessingContext{
+            .AttachmentActive = MakeAttachmentGuard(false),
+        },
+        .Visualization = Runtime::EditorVisualizationEditingContext{
+            .AttachmentActive = MakeAttachmentGuard(true),
+        },
+        .RenderRecipe = Runtime::EditorRenderRecipeEditingContext{
+            .AttachmentActive = MakeAttachmentGuard(true),
+        },
+    };
+
+    const Runtime::EditorWorkspaceSnapshot frame =
+        Runtime::BuildEditorWorkspaceSnapshot(context);
+    EXPECT_TRUE(frame.Hierarchy.empty());
+    EXPECT_FALSE(frame.Inspector.HasEntity);
+    EXPECT_TRUE(HasDiagnostic(frame.Diagnostics,
+                              Runtime::EditorDiagnosticCode::MissingScene));
+}
+
+TEST(SandboxEditorWorkspaceContext,
+     ExpiredVisualizationAttachmentYieldsInertDomainWindow)
+{
+    ECS::Scene::Registry registry;
+    Runtime::SelectionController selection;
+    const auto mesh = MakeSelectable(registry, "Scene entity");
+    AddTriangleMeshSource(registry, mesh);
+    ASSERT_TRUE(selection.SetSelectedEntity(registry, mesh));
+
+    Runtime::EditorWorkspaceSnapshotContext context{
+        .Scene = MakeSceneFeatureContext(registry, selection,
+                                         MakeAttachmentGuard(true)),
+        .Geometry = Runtime::EditorProcessingContext{
+            .AttachmentActive = MakeAttachmentGuard(true),
+        },
+        .Visualization = Runtime::EditorVisualizationEditingContext{
+            .AttachmentActive = MakeAttachmentGuard(true),
+            .VisualizationCommandsAvailable = true,
+        },
+        .RenderRecipe = Runtime::EditorRenderRecipeEditingContext{
+            .AttachmentActive = MakeAttachmentGuard(true),
+        },
+    };
+
+    const Runtime::EditorDomainWindowModel active =
+        Runtime::BuildEditorDomainWindowModel(
+            context,
+            Runtime::EditorDomainWindowKind::Mesh);
+    ASSERT_TRUE(active.HasSelectedEntity);
+    EXPECT_TRUE(active.VisualizationControlsAvailable);
+
+    context.Visualization.AttachmentActive = MakeAttachmentGuard(false);
+    const Runtime::EditorDomainWindowModel expired =
+        Runtime::BuildEditorDomainWindowModel(
+            context,
+            Runtime::EditorDomainWindowKind::Mesh);
+    EXPECT_FALSE(expired.HasSelectedEntity);
+    EXPECT_FALSE(expired.VisualizationControlsAvailable);
+}
+
+TEST(SandboxEditorWorkspaceContext,
+     ExpiredRenderRecipeAttachmentYieldsInertInspector)
+{
+    ECS::Scene::Registry registry;
+    Runtime::SelectionController selection;
+    const auto mesh = MakeSelectable(registry, "Scene entity");
+    AddTriangleMeshSource(registry, mesh);
+    ASSERT_TRUE(selection.SetSelectedEntity(registry, mesh));
+
+    const Runtime::EditorWorkspaceSnapshotContext context{
+        .Scene = MakeSceneFeatureContext(registry, selection,
+                                         MakeAttachmentGuard(true)),
+        .Geometry = Runtime::EditorProcessingContext{
+            .AttachmentActive = MakeAttachmentGuard(true),
+        },
+        .Visualization = Runtime::EditorVisualizationEditingContext{
+            .AttachmentActive = MakeAttachmentGuard(true),
+        },
+        .RenderRecipe = Runtime::EditorRenderRecipeEditingContext{
+            .AttachmentActive = MakeAttachmentGuard(false),
+        },
+    };
+
+    const Runtime::EditorInspectorModel model =
+        Runtime::BuildEditorInspectorModel(context);
+    EXPECT_FALSE(model.HasEntity);
+    EXPECT_TRUE(HasDiagnostic(model.Diagnostics,
+                              Runtime::EditorDiagnosticCode::MissingScene));
+}
+
+TEST(SandboxEditorWorkspaceContext,
+     SceneContextOwnsIdentityOverConflictingFeatureContexts)
+{
+    ECS::Scene::Registry sceneRegistry;
+    Runtime::SelectionController sceneSelection;
+    const auto sceneEntity = MakeSelectable(sceneRegistry, "Scene owned");
+    AddTriangleMeshSource(sceneRegistry, sceneEntity);
+    ASSERT_TRUE(sceneSelection.SetSelectedEntity(sceneRegistry, sceneEntity));
+
+    ECS::Scene::Registry otherRegistry;
+    Runtime::SelectionController otherSelection;
+    const auto otherEntity = MakeSelectable(otherRegistry, "Feature owned");
+    AddTriangleMeshSource(otherRegistry, otherEntity);
+    ASSERT_TRUE(otherSelection.SetSelectedEntity(otherRegistry, otherEntity));
+
+    const Runtime::EditorWorkspaceSnapshotContext context{
+        .Scene = MakeSceneFeatureContext(sceneRegistry, sceneSelection),
+        .Geometry = Runtime::EditorProcessingContext{
+            .Scene = &otherRegistry,
+            .Selection = &otherSelection,
+        },
+        .Visualization = Runtime::EditorVisualizationEditingContext{
+            .Scene = &otherRegistry,
+            .Selection = &otherSelection,
+        },
+    };
+
+    const Runtime::EditorWorkspaceSnapshot frame =
+        Runtime::BuildEditorWorkspaceSnapshot(context);
+    ASSERT_EQ(frame.Hierarchy.size(), 1u);
+    EXPECT_EQ(frame.Hierarchy[0].Name, "Scene owned");
+    ASSERT_TRUE(frame.Inspector.HasEntity);
+    EXPECT_EQ(frame.Inspector.Entity.Entity, sceneEntity);
+    EXPECT_EQ(frame.Inspector.Entity.Name, "Scene owned");
+}
+
+TEST(SandboxEditorWorkspaceContext,
+     GeometrySubmitAvailabilitySelectsJobSurface)
+{
+    ECS::Scene::Registry registry;
+    Runtime::SelectionController selection;
+    const auto mesh = MakeSelectable(registry, "Job owner");
+    AddTriangleMeshSource(registry, mesh);
+    ASSERT_TRUE(selection.SetSelectedEntity(registry, mesh));
+
+    Runtime::EditorWorkspaceSnapshotContext context{
+        .Scene = MakeSceneFeatureContext(registry, selection),
+        .Geometry = Runtime::EditorProcessingContext{
+            .JobCommands = MakeNamedJobSurface("geometry job", false),
+        },
+        .Visualization = Runtime::EditorVisualizationEditingContext{
+            .JobCommands = MakeNamedJobSurface("visualization job", true),
+        },
+    };
+
+    const Runtime::EditorWorkspaceSnapshot withoutSubmit =
+        Runtime::BuildEditorWorkspaceSnapshot(context);
+    ASSERT_TRUE(withoutSubmit.Inspector.HasEntity);
+    ASSERT_EQ(withoutSubmit.Inspector.GeometryPresentation.Jobs.size(), 1u);
+    EXPECT_EQ(withoutSubmit.Inspector.GeometryPresentation.Jobs[0].Name,
+              "visualization job");
+
+    context.Geometry.JobCommands = MakeNamedJobSurface("geometry job", true);
+    const Runtime::EditorWorkspaceSnapshot withSubmit =
+        Runtime::BuildEditorWorkspaceSnapshot(context);
+    ASSERT_EQ(withSubmit.Inspector.GeometryPresentation.Jobs.size(), 1u);
+    EXPECT_EQ(withSubmit.Inspector.GeometryPresentation.Jobs[0].Name,
+              "geometry job");
+}
+
+TEST(SandboxEditorWorkspaceContext,
+     EngineConfigFallsBackFromGeometryToRenderRecipe)
+{
+    ECS::Scene::Registry registry;
+    Runtime::SelectionController selection;
+
+    Runtime::RuntimeEngineConfigControlState geometryState{};
+    geometryState.ActiveConfig.Render.EnableGpuProfiling = true;
+    Runtime::RuntimeEngineConfigControlState recipeState{};
+    recipeState.ActiveConfig.Render.EnableGpuProfiling = false;
+
+    const auto preview = [](const std::string&, const std::string&)
+    {
+        return Core::Config::EngineConfigLoadResult{};
+    };
+    const auto apply = [](const Core::Config::EngineConfigLoadResult&)
+    {
+        return Runtime::RuntimeEngineConfigApplyResult{};
+    };
+
+    // Geometry supplies the control state and both callables, so the render
+    // recipe values stay unused.
+    Runtime::EditorWorkspaceSnapshotContext context{
+        .Scene = MakeSceneFeatureContext(registry, selection),
+        .Geometry = Runtime::EditorProcessingContext{
+            .EngineConfigControlState = &geometryState,
+            .PreviewEngineConfigDocument = preview,
+            .ApplyEngineConfigHotSubset = apply,
+            .EngineConfigCommandsAvailable = true,
+        },
+        .RenderRecipe = Runtime::EditorRenderRecipeEditingContext{
+            .EngineConfigControlState = &recipeState,
+            .PreviewEngineConfigDocument = preview,
+            .ApplyEngineConfigHotSubset = apply,
+            .EngineConfigCommandsAvailable = false,
+        },
+    };
+
+    Runtime::EditorWorkspaceSnapshot frame =
+        Runtime::BuildEditorWorkspaceSnapshot(context);
+    EXPECT_TRUE(frame.RenderGraph.GpuProfilingToggleAvailable);
+    EXPECT_TRUE(frame.RenderGraph.GpuProfilingEnabled);
+
+    // Without geometry state or callables the render recipe supplies both, and
+    // the geometry availability flag still contributes to the toggle.
+    context.Geometry.EngineConfigControlState = nullptr;
+    context.Geometry.PreviewEngineConfigDocument = {};
+    context.Geometry.ApplyEngineConfigHotSubset = {};
+    frame = Runtime::BuildEditorWorkspaceSnapshot(context);
+    EXPECT_TRUE(frame.RenderGraph.GpuProfilingToggleAvailable);
+    EXPECT_FALSE(frame.RenderGraph.GpuProfilingEnabled);
+
+    // Availability is the OR of both feature contexts.
+    context.Geometry.EngineConfigCommandsAvailable = false;
+    frame = Runtime::BuildEditorWorkspaceSnapshot(context);
+    EXPECT_FALSE(frame.RenderGraph.GpuProfilingToggleAvailable);
+
+    context.RenderRecipe.EngineConfigCommandsAvailable = true;
+    frame = Runtime::BuildEditorWorkspaceSnapshot(context);
+    EXPECT_TRUE(frame.RenderGraph.GpuProfilingToggleAvailable);
+}

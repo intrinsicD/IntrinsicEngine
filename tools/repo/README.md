@@ -69,9 +69,11 @@ the method adapter already consumes.
 
 - `layering_allowlist.yaml`: temporary path-scoped exceptions for `check_layering.py`; each entry must include task and expiry notes, avoid broad wildcards, and point at an open removal owner. The allowlist is currently empty.
 - `root_allowlist.yaml`: the exact expected repository roots and bounded named
-  patterns for disposable local build/dependency/editor/tool state consumed by
+  patterns for known local build/dependency/editor/tool state consumed by
   both root checkers. The scripts do not consult developer-global Git ignore
   configuration, so it cannot hide an unowned source root.
+  The optional `.agents/` directory is local session metadata; similarly named
+  directories and a root file named `.agents` remain unowned entries.
 - `kernel_convergence_policy.json`: versioned exact snapshot, substrate
   classification, and temporary-debt ownership consumed by
   `check_kernel_convergence.py`. `RUNTIME-178` owns the recorded debt.

@@ -19,6 +19,8 @@ export namespace Extrinsic::Runtime
         std::uint32_t MaxHalfedgeExpansions{10000000};
         // Vertex-domain float3 binding; topology still comes from the mesh.
         std::string PositionProperty{"v:position"};
+        std::string DistanceProperty{"v:geodesic_distance"};
+        std::string SourceMaskProperty{"v:is_geodesic_source"};
     };
     [[nodiscard]] std::string SerializeGeodesicsConfig(const GeodesicsConfig& config);
     [[nodiscard]] Core::Config::EngineConfigSectionValidationResult ValidateGeodesicsConfigSection(

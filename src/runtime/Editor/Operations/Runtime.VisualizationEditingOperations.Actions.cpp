@@ -1,15 +1,13 @@
 module;
+#include <entt/entity/fwd.hpp>
 
 #include <algorithm>
 #include <array>
-#include <atomic>
-#include <bit>
 #include <chrono>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
-#include <expected>
-#include <limits>
+#include <iterator>
 #include <memory>
 #include <optional>
 #include <span>
@@ -22,100 +20,39 @@ module;
 
 #include <entt/entity/registry.hpp>
 #include <glm/glm.hpp>
-#include <glm/gtc/quaternion.hpp>
-
-#include "ProgressivePoissonReference.hpp"
 
 module Extrinsic.Runtime.VisualizationEditingOperations;
 
-import Extrinsic.Runtime.Private.EditorFeatures;
 import Extrinsic.ECS.Scene.Handle;
 import Extrinsic.Asset.ImportRouter;
-import Extrinsic.Asset.GeometryPayload;
-import Extrinsic.Asset.ModelTexturePayload;
 import Extrinsic.Asset.Registry;
-import Extrinsic.Core.Config.Engine;
-import Extrinsic.Core.Config.EngineLoad;
-import Extrinsic.Core.Dag.Scheduler;
+import Extrinsic.Asset.Service;
 import Extrinsic.Core.Error;
-import Extrinsic.Core.Geometry2D;
-import Extrinsic.ECS.Component.MetaData;
-import Extrinsic.ECS.Component.StableId;
-import Extrinsic.ECS.Component.Transform;
-import Extrinsic.ECS.Component.Transform.WorldMatrix;
 import Extrinsic.ECS.Component.DirtyTags;
+import Extrinsic.ECS.Component.Transform;
 import Extrinsic.ECS.Components.GeometrySources;
 import Extrinsic.ECS.Components.GeometrySourcesPopulate;
-import Extrinsic.ECS.Components.Selection;
-import Extrinsic.ECS.Hierarchy.Structure;
+import Extrinsic.ECS.Scene.Registry;
 import Extrinsic.Graphics.Component.VisualizationConfig;
 import Extrinsic.Graphics.Component.RenderGeometry;
-import Extrinsic.Graphics.CameraSnapshots;
-import Extrinsic.Graphics.CurrentRendererContractAdapter;
-import Extrinsic.Graphics.GpuAssetCache;
-import Extrinsic.Graphics.GpuWorld;
-import Extrinsic.Graphics.RenderFrameInput;
-import Extrinsic.Graphics.RenderRecipeConfig;
-import Extrinsic.Graphics.RenderingContract;
-import Extrinsic.Graphics.Renderer;
-import Extrinsic.Graphics.UvView;
-import Extrinsic.RHI.Bindless;
-import Extrinsic.RHI.CommandContext;
-import Extrinsic.RHI.Device;
-import Extrinsic.RHI.Profiler;
-import Extrinsic.RHI.QueueAffinity;
-import Extrinsic.Platform.Window;
-import Extrinsic.Runtime.AssetWorkflowModule;
-import Extrinsic.Runtime.AssetWorkflowRecipePolicies;
-import Extrinsic.Runtime.AssetIngestStateMachine;
-import Extrinsic.Runtime.CameraControllers;
-import Extrinsic.Runtime.ClusteringModule;
-import Extrinsic.Runtime.CommandBus;
 import Extrinsic.Runtime.EditorCommandHistory;
-import Extrinsic.Runtime.EditorUiHost;
-import Extrinsic.Runtime.EngineConfigControl;
+import Extrinsic.Runtime.EditorCommon;
+import Extrinsic.Runtime.EditorJobProjection;
 import Extrinsic.Runtime.GeometryAvailability;
-import Extrinsic.Runtime.JobService;
-import Extrinsic.Runtime.KernelEvents;
-import Extrinsic.Runtime.MeshPrimitiveView;
-import Extrinsic.Runtime.ProgressivePoissonGpuBackend;
 import Extrinsic.Runtime.GeometryPresentation;
-import Extrinsic.Runtime.PrimitiveSelectionRefinement;
-import Extrinsic.Runtime.RenderExtraction;
-import Extrinsic.Runtime.RenderArtifactPublication;
-import Extrinsic.Runtime.ParameterizationConfig;
-import Extrinsic.Runtime.ProgressivePoissonConfig;
-import Extrinsic.Runtime.SceneDocumentModule;
-import Extrinsic.Runtime.SceneInteractionModule;
-import Extrinsic.Runtime.SceneSerialization;
 import Extrinsic.Runtime.SelectionController;
-import Extrinsic.Runtime.ServiceRegistry;
+import Extrinsic.Runtime.SceneEditingOperations;
 import Extrinsic.Runtime.TextureBakeModule;
 import Extrinsic.Runtime.VertexAttributeBinding;
 import Extrinsic.Runtime.VertexChannelBindings;
-import Extrinsic.Runtime.WorldRegistry;
-import Geometry.Graph;
-import Geometry.Graph.Vertex.Normals;
-import Geometry.Curvature;
-import Geometry.CatmullClark;
-import Geometry.HalfedgeMesh;
-import Geometry.HalfedgeMesh.AdaptiveRemeshing;
-import Geometry.HalfedgeMesh.SubdivisionSqrt3;
-import Geometry.HalfedgeMesh.Vertices.Normals;
-import Geometry.Mesh.Conversion;
-import Geometry.MeshOperator;
-import Geometry.MeshSoup;
-import Geometry.PointCloud;
-import Geometry.PointCloud.Normals;
-import Geometry.PointCloud.SurfaceSampling;
-import Geometry.PointCloud.Utils;
+import Extrinsic.Runtime.WorldHandle;
 import Geometry.Properties;
-import Geometry.Registration;
-import Geometry.Remeshing;
-import Geometry.Simplification;
-import Geometry.Smoothing;
-import Geometry.Subdivision;
-import Geometry.UvAtlas;
+
+#include "Editor/internal/Runtime.EditorGeometryHelpers.hpp"
+
+#include "Editor/internal/Runtime.EditorFeatureCommands.Internal.hpp"
+
+#include "Editor/internal/Runtime.EditorFeatureProperties.Internal.hpp"
 
 #include "Editor/internal/Runtime.EditorMutation.Internal.hpp"
 
@@ -134,14 +71,9 @@ namespace {
         using EditorFeatureDetail::VertexChannelCatalogDomainForView;
         using EditorFeatureDetail::VertexChannelPropertySetForView;
         using EditorFeatureDetail::SameRenderHintComponent;
-        namespace ECSC = Extrinsic::ECS::Components;
         namespace Dirty = Extrinsic::ECS::Components::DirtyTags;
         namespace GS = Extrinsic::ECS::Components::GeometrySources;
-        namespace Sel = Extrinsic::ECS::Components::Selection;
         namespace G = Extrinsic::Graphics::Components;
-        namespace A = Extrinsic::Assets;
-        namespace GN = Geometry::HalfedgeMesh::VertexNormals;
-        namespace GraphNormals = Geometry::Graph::VertexNormals;
 
         [[nodiscard]] G::VisualizationConfig ToVisualizationConfig(
             const EditorVisualizationConfigCommand& command)
@@ -1854,16 +1786,25 @@ ApplyEditorRenderHintCommand(
                     {
                         if (recipe.BufferBDA != 0u || !recipe.BufferSourceKey.empty())
                             return std::nullopt;
-                        if (!EncodeVisualizationRecipe(availability, command.Recipe).Succeeded())
+                        auto resolved = recipe;
+                        if (resolved.Source.Domain == GeometryElementDomain::Unknown)
+                        {
+                            const auto domain = VertexChannelCatalogDomainForView(availability.SourceView);
+                            if (!domain)
+                                return EditorCommandStatus::UnsupportedGeometryDomain;
+                            resolved.Source.Domain = ToGeometryElementDomain(*domain);
+                        }
+                        // Displaying a published result does not depend on processing readiness.
+                        if (!EncodeVisualizationRecipe(availability, {.Data = resolved}).Succeeded())
                             return EditorCommandStatus::InvalidVisualizationProperty;
 
                         EditorVisualizationConfigCommand config{
                             .StableEntityId = command.StableEntityId,
                             .Target = EditorVisualizationTarget::Surface,
                             .Source = G::VisualizationConfig::ColorSource::PerVertexBuffer,
-                            .ColorBufferName = recipe.Source.Name,
+                            .ColorBufferName = resolved.Source.Name,
                         };
-                        switch (recipe.Source.Domain)
+                        switch (resolved.Source.Domain)
                         {
                         case GeometryElementDomain::MeshVertex:
                             break;
@@ -1901,7 +1842,7 @@ ApplyEditorRenderHintCommand(
                         if constexpr (std::is_same_v<T, ScalarVisualizationRecipe>)
                         {
                             config.Source = G::VisualizationConfig::ColorSource::ScalarField;
-                            config.ScalarFieldName = recipe.Source.Name;
+                            config.ScalarFieldName = resolved.Source.Name;
                             config.ScalarAutoRange = recipe.AutoRange;
                             config.ScalarRangeMin = recipe.RangeMin;
                             config.ScalarRangeMax = recipe.RangeMax;

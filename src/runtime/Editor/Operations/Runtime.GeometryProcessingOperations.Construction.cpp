@@ -1,4 +1,6 @@
 module;
+#include <string_view>
+#include <functional>
 #include <algorithm>
 #include <array>
 #include <bit>
@@ -14,11 +16,12 @@ module;
 #include <vector>
 #include <glm/glm.hpp>
 #include <entt/entity/registry.hpp>
-module Extrinsic.Runtime.GeometryProcessingOperations;
+module Extrinsic.Runtime.PointConstructionOperations;
 import Geometry.Graph.Utils;
 import Geometry.SurfaceReconstruction;
 import Extrinsic.Asset.ImportRouter;
 import Extrinsic.ECS.Scene.Registry;
+import Extrinsic.ECS.Scene.Handle;
 import Extrinsic.ECS.Scene.Bootstrap;
 import Extrinsic.ECS.Component.Hierarchy;
 import Extrinsic.ECS.Component.MetaData;
@@ -33,7 +36,22 @@ import Extrinsic.Runtime.AssetWorkflowRecipePolicies;
 import Extrinsic.Runtime.SpatialIndexCache;
 import Extrinsic.Runtime.EngineConfigControl;
 import Extrinsic.Runtime.KernelEvents;
-#include "Editor/Operations/Runtime.GeometryProcessingOperations.Internal.hpp"
+import Extrinsic.Runtime.SelectionController;
+import Extrinsic.Runtime.WorldHandle;
+import Extrinsic.Runtime.GeometryAvailability;
+import Extrinsic.Runtime.EditorCommandHistory;
+import Extrinsic.Runtime.EditorJobProjection;
+import Extrinsic.Runtime.GeometryPresentation;
+import Extrinsic.Runtime.JobService;
+import Extrinsic.Core.Error;
+import Extrinsic.Core.Config.Engine;
+import Extrinsic.Core.Config.EngineLoad;
+import Geometry.Properties;
+import Geometry.HalfedgeMesh;
+import Geometry.HalfedgeMesh.IO;
+#include "Editor/internal/Runtime.EditorProcessingAccess.hpp"
+#include "Editor/internal/Runtime.EditorGeometryHelpers.hpp"
+#include "Editor/Operations/Runtime.GeometryProcessingOperations.PointFields.hpp"
 namespace Extrinsic::Runtime
 {
     namespace
@@ -66,7 +84,7 @@ namespace Extrinsic::Runtime
             std::optional<EditorPointConstructionResult> MainFailure{};
             EditorPointConstructionResult Result{};
         };
-        bool Attached(const EditorGeometryProcessingContext& c)
+        bool Attached(const EditorProcessingContext& c)
         {
             return c.Scene && (!c.AttachmentActive || c.AttachmentActive());
         }
@@ -91,7 +109,7 @@ namespace Extrinsic::Runtime
                         return {};
             return matrix;
         }
-        bool Current(const EditorGeometryProcessingContext& c, const ConstructionWork& w)
+        bool Current(const EditorProcessingContext& c, const ConstructionWork& w)
         {
             if (!Attached(c) || !Detail::GeometryPropertiesCurrent(c, w.Entity, w.Inputs))
                 return false;
@@ -110,7 +128,7 @@ namespace Extrinsic::Runtime
             }
             return true;
         }
-        std::shared_ptr<ConstructionWork> Capture(const EditorGeometryProcessingContext& context,
+        std::shared_ptr<ConstructionWork> Capture(const EditorProcessingContext& context,
                                                   PointConstructionConfig c,
                                                   std::string& diagnostic, bool preview = false)
         {
@@ -126,7 +144,7 @@ namespace Extrinsic::Runtime
             if (!Attached(context))
                 return fail("Scene is unavailable.");
             const auto entity =
-                Detail::ResolveEditorStableEntity(context.Scene->Raw(), c.StableEntityId);
+                EditorFeatureDetail::ResolveStableEntity(context.Scene->Raw(), c.StableEntityId);
             if (!entity)
                 return fail("Construction source is stale or missing.");
             const auto a = BuildGeometryAvailability(context.Scene->Raw(), *entity);
@@ -348,7 +366,7 @@ namespace Extrinsic::Runtime
             w.Result.CpuComputeMilliseconds =
                 priorCpu + std::chrono::duration<double, std::milli>(Clock::now() - start).count();
         }
-        bool AdvanceGpu(const EditorGeometryProcessingContext& context, ConstructionWork& w)
+        bool AdvanceGpu(const EditorProcessingContext& context, ConstructionWork& w)
         {
             const auto fail = [&](std::string message)
             {
@@ -530,7 +548,7 @@ namespace Extrinsic::Runtime
                     v.HalfedgeSource ? v.HalfedgeSource->Properties.Revision() : 0,
                     v.FaceSource ? v.FaceSource->Properties.Revision() : 0};
         }
-        EditorPointConstructionResult Publish(const EditorGeometryProcessingContext& context,
+        EditorPointConstructionResult Publish(const EditorProcessingContext& context,
                                               const std::shared_ptr<ConstructionWork>& w)
         {
             auto& r = w->Result;
@@ -611,7 +629,7 @@ namespace Extrinsic::Runtime
                 registry.emplace<ECS::Components::Culling::World::Bounds>(entity, world);
                 generated->Entity = entity;
                 generated->Metadata =
-                    Detail::EditorGeometryMetadataSignatureForEntity(registry, entity);
+                    EditorFeatureDetail::GeometryMetadataSignatureForEntity(registry, entity);
                 generated->Revisions = GeometryRevisions(registry, entity);
                 if (context.Selection)
                     (void)context.Selection->SetSelectedEntity(scene, entity);
@@ -638,7 +656,7 @@ namespace Extrinsic::Runtime
                     hierarchy->ChildCount || !transform ||
                     Transform::GetMatrix(*transform) != glm::mat4(1) ||
                     generated->Metadata !=
-                        Detail::EditorGeometryMetadataSignatureForEntity(registry, entity) ||
+                        EditorFeatureDetail::GeometryMetadataSignatureForEntity(registry, entity) ||
                     generated->Revisions != GeometryRevisions(registry, entity))
                     return EditorCommandHistoryStatus::StaleEntity;
                 if (context.Selection)
@@ -667,7 +685,7 @@ namespace Extrinsic::Runtime
                                                      .Undo = remove})
                                           .Status
                                     : create();
-            r.Status = Detail::ToEditorMethodCommandStatus(status);
+            r.Status = EditorFeatureDetail::ToEditorCommandStatus(status);
             if (r.Succeeded())
                 r.OutputEntityId = SelectionController::ToStableEntityId(generated->Entity);
             else
@@ -676,9 +694,10 @@ namespace Extrinsic::Runtime
         }
     } // namespace
     EditorPointConstructionReadiness
-    PreviewEditorPointConstructionCommand(const EditorGeometryProcessingContext& context,
+    PreviewEditorPointConstructionCommand(const EditorProcessingCommands& commands,
                                           const PointConstructionConfig& config)
     {
+        const auto& context = EditorProcessingCommandsAccess::Resolve(commands);
         EditorPointConstructionReadiness r;
         const auto w = Capture(context, config, r.Diagnostic, true);
         r.Ready = bool(w);
@@ -686,16 +705,12 @@ namespace Extrinsic::Runtime
             r.Resolved = w->Config;
         return r;
     }
-    GeometryPropertyCatalogSnapshot
-    GetEditorPointConstructionInputCatalog(const EditorGeometryProcessingContext& context,
-                                           std::uint32_t id)
-    {
-        return GetEditorKeypointAnalysisInputCatalog(context, id);
-    }
     EditorPointConstructionResult
-    ApplyEditorPointConstructionCommand(const EditorGeometryProcessingContext& context,
-                                        const PointConstructionConfig& config)
+    ApplyEditorPointConstructionCommand(const EditorProcessingCommands& commands,
+                                        const PointConstructionConfig& config,
+                                        std::function<void(EditorPointConstructionResult)> onComplete)
     {
+        const auto& context = EditorProcessingCommandsAccess::Resolve(commands);
         std::string diagnostic;
         auto w = Capture(context, config, diagnostic);
         const auto report = [&](EditorCommandStatus status, std::string message)
@@ -744,7 +759,7 @@ namespace Extrinsic::Runtime
                               "A construction job for this source/method is already active.");
         const auto pending = report(EditorCommandStatus::Pending, "Point construction queued.");
         auto delivered = std::make_shared<bool>(false);
-        auto sink = context.MethodResultSinks.PointConstruction;
+        auto sink = GuardEditorProcessingResult(context, std::move(onComplete));
         const auto rejected = [pending](std::string message)
         {
             auto r = pending;
@@ -857,12 +872,32 @@ namespace Extrinsic::Runtime
         return pending;
     }
     EditorPointConstructionResult
-    ApplyEditorConfiguredPointConstruction(const EditorGeometryProcessingContext& context)
+    ApplyEditorConfiguredPointConstruction(const EditorProcessingCommands& commands,
+                                           std::function<void(EditorPointConstructionResult)> onComplete)
     {
-        const auto config = GetEditorPointConstructionConfig(context);
+        const auto config = GetEditorPointConstructionConfig(commands);
         if (!config)
             return {.Status = EditorCommandStatus::InvalidProcessingParameters,
                     .Message = "Point construction config is unavailable."};
-        return ApplyEditorPointConstructionCommand(context, *config);
+        return ApplyEditorPointConstructionCommand(commands, *config, std::move(onComplete));
+    }
+
+    RuntimeEngineConfigApplyResult ApplyEditorPointConstructionConfig(
+        const EditorProcessingCommands& commands, const PointConstructionConfig& config,
+        std::string sourceId)
+    {
+        return ApplyEditorProcessingConfig(commands,
+            ValidatePointConstructionConfigSection(SerializePointConstructionConfig(config), {},
+                                                   kPointConstructionConfigSectionName),
+            sourceId.empty() ? std::string{kPointConstructionConfigSectionName} : sourceId,
+            [&](Core::Config::EngineConfig& candidate) { SetPointConstructionConfig(candidate, config); });
+    }
+
+    std::optional<PointConstructionConfig> GetEditorPointConstructionConfig(
+        const EditorProcessingCommands& commands)
+    {
+        const auto& context = EditorProcessingCommandsAccess::Resolve(commands);
+        if (!context.EngineConfigControlState) return std::nullopt;
+        return GetPointConstructionConfig(context.EngineConfigControlState->ActiveConfig);
     }
 } // namespace Extrinsic::Runtime

@@ -2,6 +2,8 @@ module;
 
 module Extrinsic.Runtime.FramePacingDiagnostics;
 
+import Extrinsic.Graphics.RenderDiagnostics;
+
 namespace Extrinsic::Runtime
 {
     void MirrorRenderGraphFramePacingDiagnostics(

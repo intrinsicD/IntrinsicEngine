@@ -9,6 +9,7 @@ and renderer/render-graph orchestration.
 ### Renderer and graph
 
 - `Extrinsic.Graphics.Renderer`
+- `Extrinsic.Graphics.RenderDiagnostics`
 - `Extrinsic.Graphics.RenderingContract`
 - `Extrinsic.Graphics.CurrentRendererContractAdapter`
 - `Extrinsic.Graphics.RenderRecipeConfig`
@@ -18,6 +19,39 @@ and renderer/render-graph orchestration.
 - `Extrinsic.Graphics.RenderPrepPipeline`
 - `Extrinsic.Graphics.RenderSubsystemRegistry`
 - `Extrinsic.Graphics.RenderGraph`
+
+`Extrinsic.Graphics.RenderDiagnostics` is the declaration-only owner of
+`RenderGraphFrameStats` and every record it aggregates, including
+`TransientDebugUploadDiagnostics` and `VisualizationOverlayUploadDiagnostics`;
+`VisualizationPropertyBufferDiagnostics` stays with
+`Extrinsic.Graphics.VisualizationPackets`. It imports no rendering system, RHI
+manager or upload helper, so diagnostics readers need not import
+`Extrinsic.Graphics.Renderer`. `Extrinsic.Graphics.RenderRecipeConfig` owns
+`FrameRecipeOverride` and its diagnostics, and
+`Extrinsic.Graphics.FrameRecipe` owns `ProjectFrameRecipeOverride(...)`. The
+renderer re-exports these three owners because `IRenderer` names their types.
+
+### Pipeline queries
+
+`IRenderer` publishes its pipelines through one typed identifier,
+`RendererPipelineId`, and two queries:
+
+- `GetPipeline(id)` returns the operational device-side `RHI::PipelineHandle`,
+  or an invalid handle when the identifier is unmapped, the pipeline manager
+  does not exist yet, or the operational device path has not published that
+  lease. It builds no descriptor, so the renderer's own HZB and cluster
+  recording paths call it per frame.
+- `GetPipelineDesc(id)` returns the canonical `RHI::PipelineDesc` the matching
+  `BuildXxxPipelineDesc()` produces, independent of lease state, or `nullopt`
+  for an unmapped identifier. The optional is required rather than stylistic:
+  `RHI::PipelineDesc` has no invalid state, so a value-returned unknown would
+  be indistinguishable from a real descriptor.
+
+`RendererPipelineId::Count` is a bound, not a pipeline; it and any value cast
+from outside the enum fail closed on both queries. Pipelines the renderer keeps
+private (for example, depth prepass or present) carry no identifier. The
+descriptor builders and pipeline leases remain the canonical owners — the
+queries only select among them.
 
 `Extrinsic.Graphics.RenderGraph` re-exports:
 
@@ -195,6 +229,14 @@ schemas and activation validation, `GRAPHICS-102` owns shared visibility and
 lighting recipe execution, `RUNTIME-127` owns runtime artifact publication and
 apply semantics, and `GRAPHICS-103` integrates the current renderer path with
 contract-aware render-graph and Vulkan smoke evidence.
+
+As the owner of `RenderRecipeDescriptor`, this module also exports the canonical
+const/mutable `FindRecipeSlot(recipe, stableName)` overloads, compiled in its
+implementation unit. They return the first slot with a matching `StableName` or
+`nullptr`, and the returned pointer borrows a `Slots` element that any resize of
+that vector invalidates. Config loading, frame-recipe projection and runtime
+recipe editing call this owner instead of repeating the traversal; see
+[frame-graph](../../../docs/architecture/frame-graph.md).
 
 `Extrinsic.Graphics.CurrentRendererContractAdapter` is the `GRAPHICS-100`
 CPU/null adapter for the current promoted renderer path. It builds the default
@@ -1338,8 +1380,7 @@ Concretely:
   `RecordVisualizationOverlayPass(...)` with the
   `SkippedNonOperational` / `SkippedUnavailable` taxonomy used by the
   other default-recipe helpers. The new
-  `VisualizationOverlayUploadDiagnostics` struct (moved to
-  `Extrinsic.Graphics.VisualizationOverlayUploadHelper` in Slice B)
+  `VisualizationOverlayUploadDiagnostics` struct
   lives on `RenderGraphFrameStats::VisualizationOverlayUpload` and
   exposes six counters (`UploadOverflowCount`,
   `{VectorField,Isoline}RecordsSubmitted`,

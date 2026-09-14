@@ -1,0 +1,1292 @@
+{
+  "schema": "intrinsic.processing-locality-diagnostic/v1",
+  "task": "RUNTIME-234",
+  "claim_eligible": false,
+  "limitations": [
+    "One dirty-worktree sample per variant, recorded before then after.",
+    "Not a repeatable speedup claim or whole-engine build benchmark.",
+    "Filesystem caches not flushed; host contention uncontrolled; compiler cache disabled.",
+    "Full CPU/ASan/UBSan/Vulkan evidence classes remain separate."
+  ],
+  "conditions": {
+    "preset": "ci",
+    "compiler": "clang-23",
+    "build_type": "Debug",
+    "targets": [
+      "IntrinsicRuntimeContractTests",
+      "ExtrinsicSandbox"
+    ],
+    "parallel_jobs": 8,
+    "compiler_cache": "disabled",
+    "dependencies": "shared preinstalled vcpkg ci",
+    "edit": "prepend one bool member to EditorDensityWeightResult"
+  },
+  "variants": {
+    "before": {
+      "build_time_ms": 351986.1073779175,
+      "physical_compile_edges": 60,
+      "source_roots": [
+        {
+          "root": "src",
+          "indexed_source_count": 790,
+          "configured_command_count": 789,
+          "compiled_edge_count": 34,
+          "present_in_configured_graph": true,
+          "present_in_sampled_build": true
+        },
+        {
+          "root": "tests",
+          "indexed_source_count": 375,
+          "configured_command_count": 364,
+          "compiled_edge_count": 26,
+          "present_in_configured_graph": true,
+          "present_in_sampled_build": true
+        },
+        {
+          "root": "methods",
+          "indexed_source_count": 5,
+          "configured_command_count": 9,
+          "compiled_edge_count": 0,
+          "present_in_configured_graph": true,
+          "present_in_sampled_build": false
+        },
+        {
+          "root": "benchmarks",
+          "indexed_source_count": 39,
+          "configured_command_count": 39,
+          "compiled_edge_count": 0,
+          "present_in_configured_graph": true,
+          "present_in_sampled_build": false
+        }
+      ],
+      "diagnostics": {
+        "variant": "before",
+        "case": "family_contract",
+        "source": "src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.cppm",
+        "source_before_sha256": "b71076c595914374d524103864a44790a942c8043201cd3e238b2dd54d2b0595",
+        "edited_source_sha256": "4e3ddcf1e8d976129c9e21d1e8b5b9749081a0b9599193c86804bd9fd72e6a88",
+        "content_before_sha256": "36cff26be3b9d3270abd7f4a3b359ee8396020a565332cea09a18c2d3496ce10",
+        "replacement": {
+          "from": "struct EditorDensityWeightResult\n    {",
+          "to": "struct EditorDensityWeightResult\n    {\n        bool CompileLocalityProbe{false};"
+        },
+        "command": [
+          "cmake",
+          "--build",
+          "--preset",
+          "ci",
+          "--target",
+          "IntrinsicRuntimeContractTests",
+          "ExtrinsicSandbox",
+          "--parallel",
+          "8"
+        ],
+        "return_code": 0,
+        "compiler_cache": "disabled",
+        "filesystem_cache": "not_flushed",
+        "physical_edges": "/tmp/intrinsic-runtime234-20260913/probes/before/family_contract/edges.json"
+      },
+      "edges": [
+        {
+          "source": "src/runtime/Editor/internal/Runtime.EditorWorkspaceAttachment.Detail.cppm",
+          "duration_ms": 163984,
+          "outputs": [
+            "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Editor/internal/Runtime.EditorWorkspaceAttachment.Detail.cppm.o",
+            "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Extrinsic.Runtime.Private.EditorWorkspaceAttachment.pcm"
+          ]
+        },
+        {
+          "source": "src/runtime/Editor/Runtime.EditorWorkspaceSnapshots.cppm",
+          "duration_ms": 84390,
+          "outputs": [
+            "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Editor/Runtime.EditorWorkspaceSnapshots.cppm.o",
+            "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Extrinsic.Runtime.EditorWorkspaceSnapshots.pcm"
+          ]
+        },
+        {
+          "source": "src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.cppm",
+          "duration_ms": 67537,
+          "outputs": [
+            "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Editor/Operations/Runtime.GeometryProcessingOperations.cppm.o",
+            "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Extrinsic.Runtime.GeometryProcessingOperations.pcm"
+          ]
+        },
+        {
+          "source": "tests/contract/runtime/Test.SandboxEditorMeshMethods.cpp",
+          "duration_ms": 55250,
+          "outputs": [
+            "tests/CMakeFiles/RuntimeContractTestObjs.dir/contract/runtime/Test.SandboxEditorMeshMethods.cpp.o"
+          ]
+        },
+        {
+          "source": "tests/contract/runtime/Test.AssetImportFormatCoverage.cpp",
+          "duration_ms": 54763,
+          "outputs": [
+            "tests/CMakeFiles/RuntimeContractTestObjs.dir/contract/runtime/Test.AssetImportFormatCoverage.cpp.o"
+          ]
+        },
+        {
+          "source": "tests/contract/runtime/Test.SandboxEditorModels.cpp",
+          "duration_ms": 52420,
+          "outputs": [
+            "tests/CMakeFiles/RuntimeContractTestObjs.dir/contract/runtime/Test.SandboxEditorModels.cpp.o"
+          ]
+        },
+        {
+          "source": "tests/contract/runtime/Test.SandboxEditorClusteringMethods.cpp",
+          "duration_ms": 51602,
+          "outputs": [
+            "tests/CMakeFiles/RuntimeContractTestObjs.dir/contract/runtime/Test.SandboxEditorClusteringMethods.cpp.o"
+          ]
+        },
+        {
+          "source": "tests/contract/runtime/Test.SandboxEditorSceneCommands.cpp",
+          "duration_ms": 47141,
+          "outputs": [
+            "tests/CMakeFiles/RuntimeContractTestObjs.dir/contract/runtime/Test.SandboxEditorSceneCommands.cpp.o"
+          ]
+        },
+        {
+          "source": "tests/contract/runtime/Test.SandboxEditorVisualization.cpp",
+          "duration_ms": 46418,
+          "outputs": [
+            "tests/CMakeFiles/RuntimeContractTestObjs.dir/contract/runtime/Test.SandboxEditorVisualization.cpp.o"
+          ]
+        },
+        {
+          "source": "src/runtime/Editor/Operations/Runtime.VisualizationEditingOperations.Actions.cpp",
+          "duration_ms": 46097,
+          "outputs": [
+            "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Editor/Operations/Runtime.VisualizationEditingOperations.Actions.cpp.o"
+          ]
+        },
+        {
+          "source": "tests/contract/runtime/Test.PointConstructionOperations.cpp",
+          "duration_ms": 35710,
+          "outputs": [
+            "tests/CMakeFiles/RuntimeContractTestObjs.dir/contract/runtime/Test.PointConstructionOperations.cpp.o"
+          ]
+        },
+        {
+          "source": "tests/contract/runtime/Test.NormalEstimation.cpp",
+          "duration_ms": 35306,
+          "outputs": [
+            "tests/CMakeFiles/RuntimeContractTestObjs.dir/contract/runtime/Test.NormalEstimation.cpp.o"
+          ]
+        },
+        {
+          "source": "tests/contract/runtime/Test.KernelDensityOperations.cpp",
+          "duration_ms": 31771,
+          "outputs": [
+            "tests/CMakeFiles/RuntimeContractTestObjs.dir/contract/runtime/Test.KernelDensityOperations.cpp.o"
+          ]
+        },
+        {
+          "source": "tests/contract/runtime/Test.OutlierAnalysis.cpp",
+          "duration_ms": 31530,
+          "outputs": [
+            "tests/CMakeFiles/RuntimeContractTestObjs.dir/contract/runtime/Test.OutlierAnalysis.cpp.o"
+          ]
+        },
+        {
+          "source": "tests/contract/runtime/Test.KeypointAnalysisOperations.cpp",
+          "duration_ms": 30131,
+          "outputs": [
+            "tests/CMakeFiles/RuntimeContractTestObjs.dir/contract/runtime/Test.KeypointAnalysisOperations.cpp.o"
+          ]
+        },
+        {
+          "source": "tests/contract/runtime/Test.DescriptorAnalysisOperations.cpp",
+          "duration_ms": 29874,
+          "outputs": [
+            "tests/CMakeFiles/RuntimeContractTestObjs.dir/contract/runtime/Test.DescriptorAnalysisOperations.cpp.o"
+          ]
+        },
+        {
+          "source": "tests/contract/runtime/Test.PointSpacingOperations.cpp",
+          "duration_ms": 29826,
+          "outputs": [
+            "tests/CMakeFiles/RuntimeContractTestObjs.dir/contract/runtime/Test.PointSpacingOperations.cpp.o"
+          ]
+        },
+        {
+          "source": "src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Mesh.cpp",
+          "duration_ms": 29005,
+          "outputs": [
+            "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Editor/Operations/Runtime.GeometryProcessingOperations.Mesh.cpp.o"
+          ]
+        },
+        {
+          "source": "src/runtime/Editor/Runtime.EditorWorkspaceSnapshots.Models.cpp",
+          "duration_ms": 28967,
+          "outputs": [
+            "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Editor/Runtime.EditorWorkspaceSnapshots.Models.cpp.o"
+          ]
+        },
+        {
+          "source": "tests/contract/runtime/Test.RuntimeReferenceScene.cpp",
+          "duration_ms": 28565,
+          "outputs": [
+            "tests/CMakeFiles/RuntimeContractTestObjs.dir/contract/runtime/Test.RuntimeReferenceScene.cpp.o"
+          ]
+        },
+        {
+          "source": "tests/contract/runtime/Test.BilateralFilterOperations.cpp",
+          "duration_ms": 28562,
+          "outputs": [
+            "tests/CMakeFiles/RuntimeContractTestObjs.dir/contract/runtime/Test.BilateralFilterOperations.cpp.o"
+          ]
+        },
+        {
+          "source": "src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Construction.cpp",
+          "duration_ms": 28333,
+          "outputs": [
+            "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Editor/Operations/Runtime.GeometryProcessingOperations.Construction.cpp.o"
+          ]
+        },
+        {
+          "source": "src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.cpp",
+          "duration_ms": 27825,
+          "outputs": [
+            "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Editor/Operations/Runtime.GeometryProcessingOperations.cpp.o"
+          ]
+        },
+        {
+          "source": "tests/contract/runtime/Test.ParameterizationOperations.cpp",
+          "duration_ms": 27713,
+          "outputs": [
+            "tests/CMakeFiles/RuntimeContractTestObjs.dir/contract/runtime/Test.ParameterizationOperations.cpp.o"
+          ]
+        },
+        {
+          "source": "tests/contract/runtime/Test.RuntimeConfigControl.cpp",
+          "duration_ms": 26619,
+          "outputs": [
+            "tests/CMakeFiles/RuntimeContractTestObjs.dir/contract/runtime/Test.RuntimeConfigControl.cpp.o"
+          ]
+        },
+        {
+          "source": "tests/contract/runtime/Test.RegistrationDomains.cpp",
+          "duration_ms": 26195,
+          "outputs": [
+            "tests/CMakeFiles/RuntimeContractTestObjs.dir/contract/runtime/Test.RegistrationDomains.cpp.o"
+          ]
+        },
+        {
+          "source": "tests/contract/runtime/Test.DensityWeightOperations.cpp",
+          "duration_ms": 25895,
+          "outputs": [
+            "tests/CMakeFiles/RuntimeContractTestObjs.dir/contract/runtime/Test.DensityWeightOperations.cpp.o"
+          ]
+        },
+        {
+          "source": "tests/contract/runtime/Test.CurvatureSegmentationOperations.cpp",
+          "duration_ms": 25017,
+          "outputs": [
+            "tests/CMakeFiles/RuntimeContractTestObjs.dir/contract/runtime/Test.CurvatureSegmentationOperations.cpp.o"
+          ]
+        },
+        {
+          "source": "src/runtime/Editor/internal/Runtime.EditorFeatureContextAdapters.cpp",
+          "duration_ms": 24289,
+          "outputs": [
+            "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Editor/internal/Runtime.EditorFeatureContextAdapters.cpp.o"
+          ]
+        },
+        {
+          "source": "tests/contract/runtime/Test.SandboxEditorSessionLifecycle.cpp",
+          "duration_ms": 23977,
+          "outputs": [
+            "tests/CMakeFiles/RuntimeContractTestObjs.dir/contract/runtime/Test.SandboxEditorSessionLifecycle.cpp.o"
+          ]
+        },
+        {
+          "source": "src/app/Sandbox/Editor/Sandbox.EditorShell.cpp",
+          "duration_ms": 23805,
+          "outputs": [
+            "src/app/Sandbox/CMakeFiles/ExtrinsicSandboxEditor.dir/Editor/Sandbox.EditorShell.cpp.o"
+          ]
+        },
+        {
+          "source": "tests/contract/runtime/Test.RuntimeRenderRecipeActivation.cpp",
+          "duration_ms": 23741,
+          "outputs": [
+            "tests/CMakeFiles/RuntimeContractTestObjs.dir/contract/runtime/Test.RuntimeRenderRecipeActivation.cpp.o"
+          ]
+        },
+        {
+          "source": "src/app/Sandbox/Editor/Sandbox.DomainPanels.cpp",
+          "duration_ms": 22678,
+          "outputs": [
+            "src/app/Sandbox/CMakeFiles/ExtrinsicSandboxEditor.dir/Editor/Sandbox.DomainPanels.cpp.o"
+          ]
+        },
+        {
+          "source": "src/runtime/Editor/Operations/Runtime.ParameterizationOperations.cpp",
+          "duration_ms": 19837,
+          "outputs": [
+            "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Editor/Operations/Runtime.ParameterizationOperations.cpp.o"
+          ]
+        },
+        {
+          "source": "src/app/Sandbox/Editor/Sandbox.MeshProcessingPanels.cpp",
+          "duration_ms": 19541,
+          "outputs": [
+            "src/app/Sandbox/CMakeFiles/ExtrinsicSandboxEditor.dir/Editor/Sandbox.MeshProcessingPanels.cpp.o"
+          ]
+        },
+        {
+          "source": "src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Uv.cpp",
+          "duration_ms": 19026,
+          "outputs": [
+            "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Editor/Operations/Runtime.GeometryProcessingOperations.Uv.cpp.o"
+          ]
+        },
+        {
+          "source": "src/app/Sandbox/Editor/Sandbox.PanelSupport.cpp",
+          "duration_ms": 18759,
+          "outputs": [
+            "src/app/Sandbox/CMakeFiles/ExtrinsicSandboxEditor.dir/Editor/Sandbox.PanelSupport.cpp.o"
+          ]
+        },
+        {
+          "source": "src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Normals.cpp",
+          "duration_ms": 18504,
+          "outputs": [
+            "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Editor/Operations/Runtime.GeometryProcessingOperations.Normals.cpp.o"
+          ]
+        },
+        {
+          "source": "src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Registration.cpp",
+          "duration_ms": 18372,
+          "outputs": [
+            "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Editor/Operations/Runtime.GeometryProcessingOperations.Registration.cpp.o"
+          ]
+        },
+        {
+          "source": "src/runtime/Editor/Operations/Runtime.SceneEditingOperations.Actions.cpp",
+          "duration_ms": 17672,
+          "outputs": [
+            "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Editor/Operations/Runtime.SceneEditingOperations.Actions.cpp.o"
+          ]
+        },
+        {
+          "source": "tests/contract/runtime/Test.RuntimeInputActions.cpp",
+          "duration_ms": 17364,
+          "outputs": [
+            "tests/CMakeFiles/RuntimeContractTestObjs.dir/contract/runtime/Test.RuntimeInputActions.cpp.o"
+          ]
+        },
+        {
+          "source": "src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Outliers.cpp",
+          "duration_ms": 16681,
+          "outputs": [
+            "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Editor/Operations/Runtime.GeometryProcessingOperations.Outliers.cpp.o"
+          ]
+        },
+        {
+          "source": "src/app/Sandbox/Editor/Sandbox.MethodPanels.cpp",
+          "duration_ms": 15877,
+          "outputs": [
+            "src/app/Sandbox/CMakeFiles/ExtrinsicSandboxEditor.dir/Editor/Sandbox.MethodPanels.cpp.o"
+          ]
+        },
+        {
+          "source": "src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Bilateral.cpp",
+          "duration_ms": 14877,
+          "outputs": [
+            "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Editor/Operations/Runtime.GeometryProcessingOperations.Bilateral.cpp.o"
+          ]
+        },
+        {
+          "source": "src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.DomainProperties.cpp",
+          "duration_ms": 14753,
+          "outputs": [
+            "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Editor/Operations/Runtime.GeometryProcessingOperations.DomainProperties.cpp.o"
+          ]
+        },
+        {
+          "source": "tests/contract/runtime/Test.GeodesicsOperations.cpp",
+          "duration_ms": 14050,
+          "outputs": [
+            "tests/CMakeFiles/RuntimeContractTestObjs.dir/contract/runtime/Test.GeodesicsOperations.cpp.o"
+          ]
+        },
+        {
+          "source": "tests/contract/runtime/Test.PrimitiveSelection.cpp",
+          "duration_ms": 13847,
+          "outputs": [
+            "tests/CMakeFiles/RuntimeContractTestObjs.dir/contract/runtime/Test.PrimitiveSelection.cpp.o"
+          ]
+        },
+        {
+          "source": "src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Keypoints.cpp",
+          "duration_ms": 13708,
+          "outputs": [
+            "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Editor/Operations/Runtime.GeometryProcessingOperations.Keypoints.cpp.o"
+          ]
+        },
+        {
+          "source": "tests/contract/runtime/Test.TextureBakeModule.cpp",
+          "duration_ms": 13288,
+          "outputs": [
+            "tests/CMakeFiles/RuntimeContractTestObjs.dir/contract/runtime/Test.TextureBakeModule.cpp.o"
+          ]
+        },
+        {
+          "source": "src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Descriptors.cpp",
+          "duration_ms": 12823,
+          "outputs": [
+            "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Editor/Operations/Runtime.GeometryProcessingOperations.Descriptors.cpp.o"
+          ]
+        },
+        {
+          "source": "src/runtime/Editor/internal/Runtime.EditorWorkspaceSession.cpp",
+          "duration_ms": 12445,
+          "outputs": [
+            "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Editor/internal/Runtime.EditorWorkspaceSession.cpp.o"
+          ]
+        },
+        {
+          "source": "src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.DensityWeights.cpp",
+          "duration_ms": 9330,
+          "outputs": [
+            "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Editor/Operations/Runtime.GeometryProcessingOperations.DensityWeights.cpp.o"
+          ]
+        },
+        {
+          "source": "src/runtime/Editor/Runtime.EditorWorkspaceSnapshots.Public.cpp",
+          "duration_ms": 9200,
+          "outputs": [
+            "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Editor/Runtime.EditorWorkspaceSnapshots.Public.cpp.o"
+          ]
+        },
+        {
+          "source": "src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Public.cpp",
+          "duration_ms": 8656,
+          "outputs": [
+            "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Editor/Operations/Runtime.GeometryProcessingOperations.Public.cpp.o"
+          ]
+        },
+        {
+          "source": "src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.RadiusRows.cpp",
+          "duration_ms": 6470,
+          "outputs": [
+            "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Editor/Operations/Runtime.GeometryProcessingOperations.RadiusRows.cpp.o"
+          ]
+        },
+        {
+          "source": "src/runtime/Editor/Operations/Runtime.SceneEditingOperations.Public.cpp",
+          "duration_ms": 6351,
+          "outputs": [
+            "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Editor/Operations/Runtime.SceneEditingOperations.Public.cpp.o"
+          ]
+        },
+        {
+          "source": "src/runtime/Editor/Operations/Runtime.RenderRecipeEditingOperations.Public.cpp",
+          "duration_ms": 6082,
+          "outputs": [
+            "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Editor/Operations/Runtime.RenderRecipeEditingOperations.Public.cpp.o"
+          ]
+        },
+        {
+          "source": "src/runtime/Editor/Operations/Runtime.VisualizationEditingOperations.Public.cpp",
+          "duration_ms": 5755,
+          "outputs": [
+            "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Editor/Operations/Runtime.VisualizationEditingOperations.Public.cpp.o"
+          ]
+        },
+        {
+          "source": "src/runtime/Editor/Operations/Runtime.PointFieldOperations.Frame.cpp",
+          "duration_ms": 5517,
+          "outputs": [
+            "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Editor/Operations/Runtime.PointFieldOperations.Frame.cpp.o"
+          ]
+        },
+        {
+          "source": "src/runtime/Editor/Runtime.EditorWorkspaceAttachment.cpp",
+          "duration_ms": 5241,
+          "outputs": [
+            "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Editor/Runtime.EditorWorkspaceAttachment.cpp.o"
+          ]
+        }
+      ],
+      "canonical_result": {
+        "attempt_id": "attempt-001",
+        "backend": "external_baseline",
+        "benchmark_id": "build.processing_locality.incremental",
+        "claim_eligible": false,
+        "commit": "local-dev",
+        "config_digest": "6f6bb70c840afc76a1506c5d85ce717d53092e7e27586132d361f3b3c3449869",
+        "dataset": "local.processing_family_content_edits_20260913",
+        "diagnostics": {
+          "case": "family_contract",
+          "command": [
+            "cmake",
+            "--build",
+            "--preset",
+            "ci",
+            "--target",
+            "IntrinsicRuntimeContractTests",
+            "ExtrinsicSandbox",
+            "--parallel",
+            "8"
+          ],
+          "compiler_cache": "disabled",
+          "content_before_sha256": "36cff26be3b9d3270abd7f4a3b359ee8396020a565332cea09a18c2d3496ce10",
+          "edited_source_sha256": "4e3ddcf1e8d976129c9e21d1e8b5b9749081a0b9599193c86804bd9fd72e6a88",
+          "filesystem_cache": "not_flushed",
+          "physical_edges": "/tmp/intrinsic-runtime234-20260913/probes/before/family_contract/edges.json",
+          "replacement": {
+            "from": "struct EditorDensityWeightResult\n    {",
+            "to": "struct EditorDensityWeightResult\n    {\n        bool CompileLocalityProbe{false};"
+          },
+          "return_code": 0,
+          "source": "src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.cppm",
+          "source_before_sha256": "b71076c595914374d524103864a44790a942c8043201cd3e238b2dd54d2b0595",
+          "variant": "before"
+        },
+        "execution_status": "passed",
+        "manifest": {
+          "path": "manifests/incremental.yaml",
+          "sha256": "cd2c7eb3a5e25610dc2a8cc5657f04b6c9b1524338d26aaa26618df5fd788580"
+        },
+        "method": "build.cmake_ninja_clang",
+        "metrics": {
+          "build_time_ms": {
+            "family_contract": 351986.1073779175
+          }
+        },
+        "resolved_params": {
+          "build_type": "Debug",
+          "compiler": "clang-23",
+          "compiler_cache": "disabled_by_CCACHE_DISABLE",
+          "dependencies": "shared_preinstalled_vcpkg_ci",
+          "family": "point_analysis",
+          "filesystem_cache": "not_flushed",
+          "intent": "performance",
+          "measured_iterations": 1,
+          "order": "before_then_after",
+          "parallel_jobs": 8,
+          "phases": [
+            "family_contract"
+          ],
+          "preset": "ci",
+          "targets": [
+            "IntrinsicRuntimeContractTests",
+            "ExtrinsicSandbox"
+          ],
+          "warmup_iterations": 0
+        },
+        "run_id": "before-family_contract-20260912T223612Z",
+        "schema_version": 2,
+        "source": {
+          "revision": "local-dev",
+          "snapshot_sha256": "4e3ddcf1e8d976129c9e21d1e8b5b9749081a0b9599193c86804bd9fd72e6a88",
+          "state": "dirty_worktree"
+        },
+        "status": "passed",
+        "threshold_disposition": [],
+        "thresholds": {},
+        "warmup_policy": {
+          "measured_iterations": 1,
+          "warmup_iterations": 0
+        }
+      }
+    },
+    "after": {
+      "build_time_ms": 70610.13681790791,
+      "physical_compile_edges": 16,
+      "source_roots": [
+        {
+          "root": "src",
+          "indexed_source_count": 793,
+          "configured_command_count": 792,
+          "compiled_edge_count": 12,
+          "present_in_configured_graph": true,
+          "present_in_sampled_build": true
+        },
+        {
+          "root": "tests",
+          "indexed_source_count": 375,
+          "configured_command_count": 364,
+          "compiled_edge_count": 4,
+          "present_in_configured_graph": true,
+          "present_in_sampled_build": true
+        },
+        {
+          "root": "methods",
+          "indexed_source_count": 5,
+          "configured_command_count": 9,
+          "compiled_edge_count": 0,
+          "present_in_configured_graph": true,
+          "present_in_sampled_build": false
+        },
+        {
+          "root": "benchmarks",
+          "indexed_source_count": 39,
+          "configured_command_count": 39,
+          "compiled_edge_count": 0,
+          "present_in_configured_graph": true,
+          "present_in_sampled_build": false
+        }
+      ],
+      "diagnostics": {
+        "variant": "after",
+        "case": "family_contract",
+        "source": "src/runtime/Editor/Operations/Runtime.PointAnalysisOperations.cppm",
+        "source_before_sha256": "e40fca9a8f3d547d47492407f883dac32339cb460546ef7e25f71aca25541b5e",
+        "edited_source_sha256": "fb90711e959281c97bd287806af391d37e36e5af2d18da4da936c48e1f800784",
+        "content_before_sha256": "9f1054579306cc5299eda93b580087bdd8d96f483c509a7f11b12832f9095809",
+        "replacement": {
+          "from": "struct EditorDensityWeightResult\n    {",
+          "to": "struct EditorDensityWeightResult\n    {\n        bool CompileLocalityProbe{false};"
+        },
+        "command": [
+          "cmake",
+          "--build",
+          "--preset",
+          "ci",
+          "--target",
+          "IntrinsicRuntimeContractTests",
+          "ExtrinsicSandbox",
+          "--parallel",
+          "8"
+        ],
+        "return_code": 0,
+        "compiler_cache": "disabled",
+        "filesystem_cache": "not_flushed",
+        "physical_edges": "/tmp/intrinsic-runtime234-20260913/probes/after/family_contract/edges.json"
+      },
+      "edges": [
+        {
+          "source": "tests/contract/runtime/Test.KeypointAnalysisOperations.cpp",
+          "duration_ms": 29642,
+          "outputs": [
+            "tests/CMakeFiles/RuntimeContractTestObjs.dir/contract/runtime/Test.KeypointAnalysisOperations.cpp.o"
+          ]
+        },
+        {
+          "source": "tests/contract/runtime/Test.OutlierAnalysis.cpp",
+          "duration_ms": 29634,
+          "outputs": [
+            "tests/CMakeFiles/RuntimeContractTestObjs.dir/contract/runtime/Test.OutlierAnalysis.cpp.o"
+          ]
+        },
+        {
+          "source": "tests/contract/runtime/Test.SandboxEditorSessionLifecycle.cpp",
+          "duration_ms": 26022,
+          "outputs": [
+            "tests/CMakeFiles/RuntimeContractTestObjs.dir/contract/runtime/Test.SandboxEditorSessionLifecycle.cpp.o"
+          ]
+        },
+        {
+          "source": "tests/contract/runtime/Test.DensityWeightOperations.cpp",
+          "duration_ms": 25503,
+          "outputs": [
+            "tests/CMakeFiles/RuntimeContractTestObjs.dir/contract/runtime/Test.DensityWeightOperations.cpp.o"
+          ]
+        },
+        {
+          "source": "src/app/Sandbox/Editor/Sandbox.EditorShell.cpp",
+          "duration_ms": 23539,
+          "outputs": [
+            "src/app/Sandbox/CMakeFiles/ExtrinsicSandboxEditor.dir/Editor/Sandbox.EditorShell.cpp.o"
+          ]
+        },
+        {
+          "source": "src/app/Sandbox/Editor/Sandbox.DomainPanels.cpp",
+          "duration_ms": 22515,
+          "outputs": [
+            "src/app/Sandbox/CMakeFiles/ExtrinsicSandboxEditor.dir/Editor/Sandbox.DomainPanels.cpp.o"
+          ]
+        },
+        {
+          "source": "src/runtime/Editor/Operations/Runtime.PointAnalysisOperations.cppm",
+          "duration_ms": 21638,
+          "outputs": [
+            "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Editor/Operations/Runtime.PointAnalysisOperations.cppm.o",
+            "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Extrinsic.Runtime.PointAnalysisOperations.pcm"
+          ]
+        },
+        {
+          "source": "src/app/Sandbox/Editor/Sandbox.MeshProcessingPanels.cpp",
+          "duration_ms": 21265,
+          "outputs": [
+            "src/app/Sandbox/CMakeFiles/ExtrinsicSandboxEditor.dir/Editor/Sandbox.MeshProcessingPanels.cpp.o"
+          ]
+        },
+        {
+          "source": "src/app/Sandbox/Editor/Sandbox.PanelSupport.cpp",
+          "duration_ms": 18235,
+          "outputs": [
+            "src/app/Sandbox/CMakeFiles/ExtrinsicSandboxEditor.dir/Editor/Sandbox.PanelSupport.cpp.o"
+          ]
+        },
+        {
+          "source": "src/app/Sandbox/Editor/Sandbox.MethodPanels.cpp",
+          "duration_ms": 16464,
+          "outputs": [
+            "src/app/Sandbox/CMakeFiles/ExtrinsicSandboxEditor.dir/Editor/Sandbox.MethodPanels.cpp.o"
+          ]
+        },
+        {
+          "source": "src/runtime/Editor/internal/Runtime.EditorWorkspaceSession.cpp",
+          "duration_ms": 14284,
+          "outputs": [
+            "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Editor/internal/Runtime.EditorWorkspaceSession.cpp.o"
+          ]
+        },
+        {
+          "source": "src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Outliers.cpp",
+          "duration_ms": 11820,
+          "outputs": [
+            "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Editor/Operations/Runtime.GeometryProcessingOperations.Outliers.cpp.o"
+          ]
+        },
+        {
+          "source": "src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Keypoints.cpp",
+          "duration_ms": 9915,
+          "outputs": [
+            "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Editor/Operations/Runtime.GeometryProcessingOperations.Keypoints.cpp.o"
+          ]
+        },
+        {
+          "source": "src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.DensityWeights.cpp",
+          "duration_ms": 7147,
+          "outputs": [
+            "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Editor/Operations/Runtime.GeometryProcessingOperations.DensityWeights.cpp.o"
+          ]
+        },
+        {
+          "source": "src/runtime/Editor/Operations/Runtime.PointAnalysisOperations.Frame.cpp",
+          "duration_ms": 5459,
+          "outputs": [
+            "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Editor/Operations/Runtime.PointAnalysisOperations.Frame.cpp.o"
+          ]
+        },
+        {
+          "source": "src/runtime/Editor/Operations/Runtime.PointAnalysisOperations.cpp",
+          "duration_ms": 2221,
+          "outputs": [
+            "src/runtime/CMakeFiles/ExtrinsicRuntime.dir/Editor/Operations/Runtime.PointAnalysisOperations.cpp.o"
+          ]
+        }
+      ],
+      "canonical_result": {
+        "attempt_id": "attempt-001",
+        "backend": "external_baseline",
+        "benchmark_id": "build.processing_locality.incremental",
+        "claim_eligible": false,
+        "commit": "local-dev",
+        "config_digest": "6f6bb70c840afc76a1506c5d85ce717d53092e7e27586132d361f3b3c3449869",
+        "dataset": "local.processing_family_content_edits_20260913",
+        "diagnostics": {
+          "case": "family_contract",
+          "command": [
+            "cmake",
+            "--build",
+            "--preset",
+            "ci",
+            "--target",
+            "IntrinsicRuntimeContractTests",
+            "ExtrinsicSandbox",
+            "--parallel",
+            "8"
+          ],
+          "compiler_cache": "disabled",
+          "content_before_sha256": "9f1054579306cc5299eda93b580087bdd8d96f483c509a7f11b12832f9095809",
+          "edited_source_sha256": "fb90711e959281c97bd287806af391d37e36e5af2d18da4da936c48e1f800784",
+          "filesystem_cache": "not_flushed",
+          "physical_edges": "/tmp/intrinsic-runtime234-20260913/probes/after/family_contract/edges.json",
+          "replacement": {
+            "from": "struct EditorDensityWeightResult\n    {",
+            "to": "struct EditorDensityWeightResult\n    {\n        bool CompileLocalityProbe{false};"
+          },
+          "return_code": 0,
+          "source": "src/runtime/Editor/Operations/Runtime.PointAnalysisOperations.cppm",
+          "source_before_sha256": "e40fca9a8f3d547d47492407f883dac32339cb460546ef7e25f71aca25541b5e",
+          "variant": "after"
+        },
+        "execution_status": "passed",
+        "manifest": {
+          "path": "manifests/incremental.yaml",
+          "sha256": "cd2c7eb3a5e25610dc2a8cc5657f04b6c9b1524338d26aaa26618df5fd788580"
+        },
+        "method": "build.cmake_ninja_clang",
+        "metrics": {
+          "build_time_ms": {
+            "family_contract": 70610.13681790791
+          }
+        },
+        "resolved_params": {
+          "build_type": "Debug",
+          "compiler": "clang-23",
+          "compiler_cache": "disabled_by_CCACHE_DISABLE",
+          "dependencies": "shared_preinstalled_vcpkg_ci",
+          "family": "point_analysis",
+          "filesystem_cache": "not_flushed",
+          "intent": "performance",
+          "measured_iterations": 1,
+          "order": "before_then_after",
+          "parallel_jobs": 8,
+          "phases": [
+            "family_contract"
+          ],
+          "preset": "ci",
+          "targets": [
+            "IntrinsicRuntimeContractTests",
+            "ExtrinsicSandbox"
+          ],
+          "warmup_iterations": 0
+        },
+        "run_id": "after-family_contract-20260912T231410Z",
+        "schema_version": 2,
+        "source": {
+          "revision": "local-dev",
+          "snapshot_sha256": "fb90711e959281c97bd287806af391d37e36e5af2d18da4da936c48e1f800784",
+          "state": "dirty_worktree"
+        },
+        "status": "passed",
+        "threshold_disposition": [],
+        "thresholds": {},
+        "warmup_policy": {
+          "measured_iterations": 1,
+          "warmup_iterations": 0
+        }
+      }
+    }
+  },
+  "production_footprint": {
+    "files": [
+      {
+        "path": "src/app/Sandbox/Editor/Sandbox.DomainPanels.cpp",
+        "before_lines": 1827,
+        "after_lines": 1828,
+        "before_nonblank_lines": 1719,
+        "after_nonblank_lines": 1720,
+        "new_file": false,
+        "after_sha256": "07c29c7b7fa142bb2902fd0d748d60b8ef906cbd959139a323b04cbb84dbb3d3"
+      },
+      {
+        "path": "src/app/Sandbox/Editor/Sandbox.EditorShell.cpp",
+        "before_lines": 3374,
+        "after_lines": 3376,
+        "before_nonblank_lines": 3217,
+        "after_nonblank_lines": 3219,
+        "new_file": false,
+        "after_sha256": "ea4e0ef805e73b19f015b5e1189cbaf022e6fb50c46bdc0f4babe777126cf305"
+      },
+      {
+        "path": "src/app/Sandbox/Editor/Sandbox.MeshProcessingPanels.cpp",
+        "before_lines": 2997,
+        "after_lines": 2998,
+        "before_nonblank_lines": 2904,
+        "after_nonblank_lines": 2905,
+        "new_file": false,
+        "after_sha256": "ca8d3cd87895f8f42609618bc5982bced0217d29be2c95ea587aa7483c3fc90c"
+      },
+      {
+        "path": "src/app/Sandbox/Editor/Sandbox.MethodPanels.cpp",
+        "before_lines": 3356,
+        "after_lines": 3357,
+        "before_nonblank_lines": 3213,
+        "after_nonblank_lines": 3214,
+        "new_file": false,
+        "after_sha256": "00efd9c1de2f477b3dca8a1d818151fd03e444e5f4ca1c8c6a6babd2f43aca78"
+      },
+      {
+        "path": "src/app/Sandbox/Editor/Sandbox.PanelSupport.cpp",
+        "before_lines": 836,
+        "after_lines": 838,
+        "before_nonblank_lines": 780,
+        "after_nonblank_lines": 782,
+        "new_file": false,
+        "after_sha256": "a07a98068570b6faf3f94eb7f39d5f3fcabf25af734491d48f46605536e6d7e9"
+      },
+      {
+        "path": "src/app/Sandbox/Editor/Sandbox.PanelSupport.hpp",
+        "before_lines": 427,
+        "after_lines": 429,
+        "before_nonblank_lines": 371,
+        "after_nonblank_lines": 373,
+        "new_file": false,
+        "after_sha256": "ccbdf860b9b9949d927545073a5388df134349fccea74e8e9686a49c1b331e62"
+      },
+      {
+        "path": "src/runtime/CMakeLists.txt",
+        "before_lines": 280,
+        "after_lines": 283,
+        "before_nonblank_lines": 273,
+        "after_nonblank_lines": 276,
+        "new_file": false,
+        "after_sha256": "002145032e11324153d926dd4449619ff06fb60c2106f84519812862431b3555"
+      },
+      {
+        "path": "src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Construction.cpp",
+        "before_lines": 870,
+        "after_lines": 870,
+        "before_nonblank_lines": 870,
+        "after_nonblank_lines": 870,
+        "new_file": false,
+        "after_sha256": "1f741f66aaf234ed99b9e3af0b483af076807f3be3e042e84270208f1ccd4874"
+      },
+      {
+        "path": "src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Density.cpp",
+        "before_lines": 308,
+        "after_lines": 310,
+        "before_nonblank_lines": 307,
+        "after_nonblank_lines": 309,
+        "new_file": false,
+        "after_sha256": "40114d93c66d0f8a7d797e61e4a16bd425fcc03d0f1a3b3ae139d2c8c028cd6d"
+      },
+      {
+        "path": "src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.DensityWeights.cpp",
+        "before_lines": 205,
+        "after_lines": 222,
+        "before_nonblank_lines": 205,
+        "after_nonblank_lines": 222,
+        "new_file": false,
+        "after_sha256": "312b798805c05487b1b12494a2e8f6b82a990b1b781d0ad41dfe18f22b81f852"
+      },
+      {
+        "path": "src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Descriptors.cpp",
+        "before_lines": 365,
+        "after_lines": 365,
+        "before_nonblank_lines": 363,
+        "after_nonblank_lines": 363,
+        "new_file": false,
+        "after_sha256": "f0445d335a9bc837b99d5d9ec622bf9d1c7fb5116e27980fc7ae03d3b745d66b"
+      },
+      {
+        "path": "src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Keypoints.cpp",
+        "before_lines": 340,
+        "after_lines": 333,
+        "before_nonblank_lines": 339,
+        "after_nonblank_lines": 332,
+        "new_file": false,
+        "after_sha256": "eea82ae2b7a49fff48ed5033b7a7c0a7179fa724679794dc9b02b2db8037947d"
+      },
+      {
+        "path": "src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Outliers.cpp",
+        "before_lines": 543,
+        "after_lines": 537,
+        "before_nonblank_lines": 542,
+        "after_nonblank_lines": 536,
+        "new_file": false,
+        "after_sha256": "7a4cce8a87309d2f103d313697e1bd014542df3b2fafd01d0526d2b35002a274"
+      },
+      {
+        "path": "src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.PointFields.hpp",
+        "before_lines": 78,
+        "after_lines": 80,
+        "before_nonblank_lines": 74,
+        "after_nonblank_lines": 75,
+        "new_file": false,
+        "after_sha256": "666af01b6d14ea721b1e53a0fdad12f314bb12cf67dab4abbd17cf681fb4da51"
+      },
+      {
+        "path": "src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.PointProperties.cpp",
+        "before_lines": 247,
+        "after_lines": 276,
+        "before_nonblank_lines": 241,
+        "after_nonblank_lines": 270,
+        "new_file": false,
+        "after_sha256": "27605ddf2fc0ebc93ff106cf5ca84d6dba9d7a1a487db25fdff690b077e39e9a"
+      },
+      {
+        "path": "src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Public.cpp",
+        "before_lines": 687,
+        "after_lines": 687,
+        "before_nonblank_lines": 620,
+        "after_nonblank_lines": 602,
+        "new_file": false,
+        "after_sha256": "786c9235793dbadef91419ab4afa2f5bd7ce89b4b9b7cb6b36a85d711beedca6"
+      },
+      {
+        "path": "src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.RadiusRows.cpp",
+        "before_lines": 80,
+        "after_lines": 78,
+        "before_nonblank_lines": 80,
+        "after_nonblank_lines": 78,
+        "new_file": false,
+        "after_sha256": "df057e1cbb7c77f4d38a3ca184b69437d3e80c76e6eb85af558407bc849996dc"
+      },
+      {
+        "path": "src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.RadiusRows.hpp",
+        "before_lines": 29,
+        "after_lines": 32,
+        "before_nonblank_lines": 29,
+        "after_nonblank_lines": 32,
+        "new_file": false,
+        "after_sha256": "cdcc212c430aae7a4f6feb3613fc4dfc0faaeec41c7a27075c70339c393e0255"
+      },
+      {
+        "path": "src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Spacing.cpp",
+        "before_lines": 308,
+        "after_lines": 310,
+        "before_nonblank_lines": 307,
+        "after_nonblank_lines": 309,
+        "new_file": false,
+        "after_sha256": "a4b1b8650f83921dd4512e9432d89fa7f1dd06ffc20353184cb3d99522cf35cb"
+      },
+      {
+        "path": "src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.cpp",
+        "before_lines": 2561,
+        "after_lines": 2432,
+        "before_nonblank_lines": 2382,
+        "after_nonblank_lines": 2265,
+        "new_file": false,
+        "after_sha256": "99d4636e79529ba50ab60f913baac31f23efdbe09fec7f04af5cf2ecc0d26d41"
+      },
+      {
+        "path": "src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.cppm",
+        "before_lines": 1953,
+        "after_lines": 1796,
+        "before_nonblank_lines": 1783,
+        "after_nonblank_lines": 1630,
+        "new_file": false,
+        "after_sha256": "bdd70e89bdc756e3613e9053323305283f9419c82f83ef35efb349968b32a19e"
+      },
+      {
+        "path": "src/runtime/Editor/Operations/Runtime.PointAnalysisOperations.Frame.cpp",
+        "before_lines": 0,
+        "after_lines": 81,
+        "before_nonblank_lines": 0,
+        "after_nonblank_lines": 75,
+        "new_file": true,
+        "after_sha256": "d596decd68afd4b58fb62e398721891be209651b2b4ff57a57c36dcd181c6925"
+      },
+      {
+        "path": "src/runtime/Editor/Operations/Runtime.PointAnalysisOperations.cpp",
+        "before_lines": 0,
+        "after_lines": 55,
+        "before_nonblank_lines": 0,
+        "after_nonblank_lines": 55,
+        "new_file": true,
+        "after_sha256": "e5a51467c7581b1ce471220fb97a90da8c8b95bfea539c0a502cbb14a8676ace"
+      },
+      {
+        "path": "src/runtime/Editor/Operations/Runtime.PointAnalysisOperations.cppm",
+        "before_lines": 0,
+        "after_lines": 133,
+        "before_nonblank_lines": 0,
+        "after_nonblank_lines": 130,
+        "new_file": true,
+        "after_sha256": "9f1054579306cc5299eda93b580087bdd8d96f483c509a7f11b12832f9095809"
+      },
+      {
+        "path": "src/runtime/Editor/Operations/Runtime.PointFieldOperations.cpp",
+        "before_lines": 97,
+        "after_lines": 41,
+        "before_nonblank_lines": 95,
+        "after_nonblank_lines": 41,
+        "new_file": false,
+        "after_sha256": "a3851dd1a3754d171e36bcdb36214eb5f64999674cf33c2e8b719cd205d954d7"
+      },
+      {
+        "path": "src/runtime/Editor/Operations/Runtime.PointFieldOperations.cppm",
+        "before_lines": 96,
+        "after_lines": 100,
+        "before_nonblank_lines": 93,
+        "after_nonblank_lines": 97,
+        "new_file": false,
+        "after_sha256": "718b1c157a95955901d695f870a2741d941deebddcbbb965ad77b5e6145b4937"
+      },
+      {
+        "path": "src/runtime/Editor/Runtime.EditorProcessing.cpp",
+        "before_lines": 24,
+        "after_lines": 53,
+        "before_nonblank_lines": 24,
+        "after_nonblank_lines": 53,
+        "new_file": false,
+        "after_sha256": "f037c4f506150706eec47297c45adea7d66d69920ead0d6bb2b695e5c1e21dbb"
+      },
+      {
+        "path": "src/runtime/Editor/Runtime.EditorProcessing.cppm",
+        "before_lines": 43,
+        "after_lines": 45,
+        "before_nonblank_lines": 42,
+        "after_nonblank_lines": 44,
+        "new_file": false,
+        "after_sha256": "1029d0a5d105c6fc4af2fd0a01fcceec9f76aeadd809d0a3a5c47ae0a75a0e37"
+      },
+      {
+        "path": "src/runtime/Editor/internal/Runtime.EditorFeatureContextAdapters.cpp",
+        "before_lines": 2404,
+        "after_lines": 2404,
+        "before_nonblank_lines": 2276,
+        "after_nonblank_lines": 2276,
+        "new_file": false,
+        "after_sha256": "375e2eed8f2bf3e7d751838bdbfcce0a57967335de520da4e86b14531e7ebe6e"
+      },
+      {
+        "path": "src/runtime/Editor/internal/Runtime.EditorFeatures.Internal.hpp",
+        "before_lines": 261,
+        "after_lines": 265,
+        "before_nonblank_lines": 225,
+        "after_nonblank_lines": 229,
+        "new_file": false,
+        "after_sha256": "ec993c360fd2446d0f1c706d7dbefceef316c340f70579632e3af9a37d203e44"
+      },
+      {
+        "path": "src/runtime/Editor/internal/Runtime.EditorProcessingAccess.hpp",
+        "before_lines": 23,
+        "after_lines": 27,
+        "before_nonblank_lines": 22,
+        "after_nonblank_lines": 25,
+        "new_file": false,
+        "after_sha256": "4db09c178056471ff2306e8a1e131a95a7e552d55cf8f659455dc44fbfad493e"
+      },
+      {
+        "path": "src/runtime/Editor/internal/Runtime.EditorWorkspaceSession.cpp",
+        "before_lines": 902,
+        "after_lines": 910,
+        "before_nonblank_lines": 869,
+        "after_nonblank_lines": 877,
+        "new_file": false,
+        "after_sha256": "4f69539c5fececc7dadd45c214b26cbff7d031836332e7350eefac41fb4875ca"
+      }
+    ],
+    "new_files": 3,
+    "deleted_files": 0,
+    "before_lines": 25521,
+    "after_lines": 25551,
+    "before_nonblank_lines": 24265,
+    "after_nonblank_lines": 24284
+  },
+  "review": {
+    "provider": "Claude Code CLI",
+    "mode": "fixed packet, read-only, no hooks/tools/MCP",
+    "input_sha256": "0eda24a8e713d7e584d68b23bd693764bb30ac2ce175f73ac737c3adeb3c2ba9",
+    "review_sha256": "7c216741f4bd9bf935b4678d62b7b815b2308fd064ea844074fa0bfb794c34f1",
+    "final_reconciled_diff_sha256": "b741d5e6869b525bc3216702f204c3722c075b88cfbe153e97b44f43a9497e49",
+    "final_reconciled_diff_scope": "src and tests against frozen pre-RUNTIME-234 snapshot; subsequent local fixes are not a second Claude review"
+  },
+  "verification": {
+    "focused_final": {
+      "command": "ctest --test-dir build/ci -LE 'gpu|vulkan|slow|flaky-quarantine' --output-on-failure --no-tests=error --timeout 60 -R '^(DensityWeight|Keypoint|Outlier|KernelDensity|PointSpacing|Descriptor|PointConstruction|Bilateral|SandboxProcessingPanels|SandboxEditorSession|SandboxEditorPresentation|SandboxConfigSections|ProcessingCompilationLocality)'",
+      "selected_ctest_entries": 157,
+      "passed_ctest_entries": 157,
+      "failed": 0,
+      "skipped": 0,
+      "skipped_tests": [],
+      "elapsed_seconds": 8.97,
+      "log": "build/analysis/point-analysis-locality-2026-09-13/final-reconciliation.log",
+      "log_sha256": "818a54d3d0885895a037cfe50434cbcd6d444a4b0f8fccd36b2c1138498eb9dd"
+    },
+    "cpu_full": {
+      "command": "ctest --test-dir build/ci -LE 'gpu|vulkan|slow|flaky-quarantine' --output-on-failure --no-tests=error --timeout 60",
+      "selected_ctest_entries": 4548,
+      "passed_ctest_entries": 4542,
+      "failed": 0,
+      "skipped": 6,
+      "skipped_tests": [
+        "ImGuiAdapterEngineWiring.RunProducesOneOverlayFramePerEngineFrame",
+        "ImGuiAdapterEngineWiring.EditorHookInvokedOncePerFrameAndProducesDrawLists",
+        "ImGuiAdapterEngineWiring.RunNormalizesNativeCloseBeforeFirstFrame",
+        "ImGuiAdapterEngineWiring.RunNormalizesNativeCloseAfterInteractiveInput",
+        "GizmoInteractionEngineWiring.RunFramePublishesSelectedEntityGizmoPacket",
+        "GlfwLifecycleLsan.EngineStaticTeardownAndLeakControl"
+      ],
+      "elapsed_seconds": 116.51,
+      "log": "build/analysis/point-analysis-locality-2026-09-13/cpu-full.log",
+      "log_sha256": "b10b407727af4c433d21efb6da5990d1693fb81737fb8e19a64000d107181f02"
+    },
+    "asan_full": {
+      "command": "ctest --test-dir build/ci-asan -LE 'gpu|vulkan|slow|flaky-quarantine' --output-on-failure --no-tests=error --timeout 60 --parallel 1",
+      "selected_ctest_entries": 2926,
+      "passed_ctest_entries": 2926,
+      "failed": 0,
+      "skipped": 0,
+      "skipped_tests": [],
+      "elapsed_seconds": 548.33,
+      "log": "build/analysis/point-analysis-locality-2026-09-13/ci-asan-test.log",
+      "log_sha256": "423aa5602a1f3abb0f3701c8bb3beddee674aa68f173e16dc8372b6c9301c14b"
+    },
+    "ubsan_full": {
+      "command": "ctest --test-dir build/ci-ubsan -LE 'gpu|vulkan|slow|flaky-quarantine' --output-on-failure --no-tests=error --timeout 60 --parallel 1",
+      "selected_ctest_entries": 2926,
+      "passed_ctest_entries": 2925,
+      "failed": 0,
+      "skipped": 1,
+      "skipped_tests": [
+        "GlfwLifecycleLsan.EngineStaticTeardownAndLeakControl"
+      ],
+      "elapsed_seconds": 241.08,
+      "log": "build/analysis/point-analysis-locality-2026-09-13/ci-ubsan-test.log",
+      "log_sha256": "41e2386ad51e012a90d86417056f78f38ca44843e53d3d8d79310ecec6c50491"
+    },
+    "vulkan_affected": {
+      "command": "ctest --test-dir build/ci-vulkan --output-on-failure -L gpu -L vulkan -R '^(PointLBVHGpuSmoke|PointConstructionGpuSmoke)\\.' --timeout 120 --parallel 1",
+      "selected_ctest_entries": 22,
+      "passed_ctest_entries": 22,
+      "failed": 0,
+      "skipped": 0,
+      "skipped_tests": [],
+      "elapsed_seconds": 192.4,
+      "log": "build/analysis/point-analysis-locality-2026-09-13/ci-vulkan-test.log",
+      "log_sha256": "b588a017a524e880bbd9fc27391d473aa4a6c86d7fb358a754f4d9c6c61ab8b9"
+    }
+  },
+  "verification_conditions": {
+    "build_environment": [
+      "VCPKG_FORCE_SYSTEM_BINARIES=1",
+      "CCACHE_DISABLE=1"
+    ],
+    "builds": [
+      "ci: IntrinsicTests ExtrinsicSandbox",
+      "ci-asan: IntrinsicCpuTests",
+      "ci-ubsan: IntrinsicCpuTests",
+      "ci-vulkan: IntrinsicPointLBVHGpuTests"
+    ],
+    "sanitizer_configure": "Fresh matching presets with INTRINSIC_GROUP_PURE_CTEST=ON; serial CTest execution",
+    "counting": "CTest entries; replacement-only grouped sanitizer registration is not directly comparable with individual CPU entry counts.",
+    "skip_reasons": "CPU skips five native-window fixtures and ASan-only leak control; UBSan skips ASan-only leak control; no ASan or Vulkan skips.",
+    "known_environment_issue": "Sanitizer discovery/build uses the authorized host execution path for existing BUG-188.",
+    "structural_exception": "Existing BUG-177: strict root hygiene rejects pre-existing .agents/; gate not weakened and metadata preserved."
+  },
+  "verification_log_hashes": {
+    "boundaries-final.log": "8c44c316846be63461ad7143e1f09a632a827472c3e161c72a607528d7d1552e",
+    "boundaries.log": "88400a7b178aea4713de1021ee97d07e950331dc4445a79d22a7c40d89860c8a",
+    "build-2.log": "0b2d4891608f5357578e50106770613d97491b391558823fad439ef20b3e42e5",
+    "build-3.log": "fa52fb338d15242ef280be4ea7b1018cdeca587d976d79a0ff4497221b6b9f09",
+    "build-4.log": "b530f814209a6a112b77130404e9ed64af3c3f2fd46ad717074c25a49b93e9f5",
+    "build-full-2.log": "92f455780e83f64b31eb865e9ccc7540328213dfa919f04fc4a1ebf5990bf363",
+    "build-full-3.log": "89798e9af981eef4d34e847a8561048a9ae61fa29b32e6c4e953d84fde7976bd",
+    "build-full-4.log": "be79009839b4a6b9b81029ff3a32d4c8e56c50d725858dbf8ae295d046562625",
+    "build-full-5.log": "a6d9ba71121b5f39efb94621a5dce405a54b89b660a619022b74a3dcb44d70b8",
+    "build-full.log": "4a2bd5eb776513dabbb3f22b2be029451a9fa1685aca0a1cb28cdf160415cd40",
+    "build-verified.log": "a6d9ba71121b5f39efb94621a5dce405a54b89b660a619022b74a3dcb44d70b8",
+    "build.log": "658b86d962bb44920a4e45ac38ead1f6a6d781fadd05cce3017a0394b69e493c",
+    "ci-asan-build.log": "4cdbe6ebcdcb83e2df81540bfffde324a7524bc091b9b1e1c568d81d8e26afe3",
+    "ci-asan-configure.log": "428f9e30eef1ecf05e04688ba3b2424da0677d16d48993b89b2f8dffae175449",
+    "ci-asan-test.log": "423aa5602a1f3abb0f3701c8bb3beddee674aa68f173e16dc8372b6c9301c14b",
+    "ci-ubsan-build.log": "29ff4a8a9b4f367a404a4fa9f92dd5e9f3b64e52ba893eebfa2e8525ae700135",
+    "ci-ubsan-configure.log": "df19a6309e52fdd10ad1073ba5541cd6104acccfb076acf21886676665cdc958",
+    "ci-ubsan-test.log": "41e2386ad51e012a90d86417056f78f38ca44843e53d3d8d79310ecec6c50491",
+    "ci-vulkan-build.log": "7a13ccf15c731eb890d9513f38bf18ee69ad2a906e6184c98f8bc00e8f495310",
+    "ci-vulkan-configure.log": "eae00277ab2b309f8359660724ff323952949396c686dea63f62ed3233cf9352",
+    "ci-vulkan-test.log": "b588a017a524e880bbd9fc27391d473aa4a6c86d7fb358a754f4d9c6c61ab8b9",
+    "configure.log": "ee19cb95cb1d928e74cf8dc0bfa249f505c0c676b99d1304ad4019b84d3bcc06",
+    "cpu-full.log": "b10b407727af4c433d21efb6da5990d1693fb81737fb8e19a64000d107181f02",
+    "final-reconciliation.log": "818a54d3d0885895a037cfe50434cbcd6d444a4b0f8fccd36b2c1138498eb9dd",
+    "final-warmup.log": "72b404f9de86661b7f3512ae33d88ced9ceb9592945fe23186e188ba5927518c",
+    "focused-final.log": "6d84317ec5e7c67907a6c47132386f66a5508cb0af1670b58b59c4067d9c9151",
+    "focused-pass.log": "5433d861222ba62e990a8179fef262e070507ed245ddbe1f136cda8f76635c44",
+    "focused-verified.log": "7006c24e0e1aefd9b64ff5eae5afe768cfb03a09d9b99deedca5b2786d49e949",
+    "focused.log": "01648b6c2fab278edaa281688ed9fd358b24ddd8ac70b13d3eac76a55fc4cb21",
+    "frame-test-build.log": "a6d9ba71121b5f39efb94621a5dce405a54b89b660a619022b74a3dcb44d70b8",
+    "frame-test.log": "8f35be3bf8e286597e17ad4465f3c7df88ed36bd00e7c6ff79d4540760b897b4",
+    "root-hygiene.log": "2252cd6d39c11cbc4c91a1398dc2648a85b43fe69dcc6af7f95edd641158e814",
+    "task-policy.log": "ffbf63089db201092ed899b366c1a8caa9181140e52897088f3691cce70839f7",
+    "warmup.log": "96c002e1ce85087a67b6794ec438cfe0ddd53ef093098036052a31196f2c8d28",
+    "final-ara.log": "cd47ad74c7705d490578b44770ab33b7979059519376d5b24bf478d73bd9373f",
+    "final-diff-whitespace.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "final-doc-links.log": "305ced37bac8272e2f48489a740614496260e8995db668b7c9031a87b668464c",
+    "final-layering.log": "e73b03e9353e954e817b674a3ac274842fcfbfccf06e00834a1e7455a48f8de6",
+    "final-skill-mirrors.log": "88b25c3d2e47233edcbf51375f72a60528417690a4a74e17a7775a1f41dc3883",
+    "final-task-policy.log": "ffbf63089db201092ed899b366c1a8caa9181140e52897088f3691cce70839f7",
+    "final-test-layout.log": "164bf228e1aef2ee28535d5028a51d6afa83b491716f01cb064037a925a98cb2"
+  }
+}

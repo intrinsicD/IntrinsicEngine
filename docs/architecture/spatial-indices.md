@@ -23,20 +23,31 @@ destroyed worlds and entities. Shutdown withdraws the service and releases
 its GPU resources before device teardown.
 
 `Nearest`, `KNearest` and `Radius` return CPU results or `nullopt` for stale handles or
-invalid queries. `RecordGpuBuild` lazily creates/uploads live positions and
-source-slot mapping, then records the hierarchy. `RecordGpuQueries` also
-records a batched query into caller-owned buffers. Both GPU operations return
-false when unavailable; they never substitute a CPU result. `GpuView` lets a
-method record a custom traversal using the existing hierarchy. Its borrowed
-buffer address is valid only while the cache entry/device remains alive and
-must not be kept across mutation, pruning, or shutdown.
+invalid queries. The framed queues `QueueGpuNearest`, `QueueGpuKNearest` and
+`QueueGpuRadius` are the cache's canonical GPU query interface. The cache keeps
+lazy build and query recording private: it uploads live positions and the
+source-slot mapping, records the hierarchy once, then records the batched query
+from its own frame participant. A queue never substitutes a CPU result when the
+device or target is unavailable; the batch fails with a diagnostic instead.
 
-GPU calls belong to the device's owning command stream. The caller must submit
-recorded commands, keep input/output buffers alive until execution retires,
-and wait for producer completion before readback. A recorded view is not a
-CPU-observed completion token. These are reusable compute operations; callers
-schedule them through the existing runtime GPU participant path when running
-inside the frame loop. They do not alter the rendering frame recipe.
+The cache owns the device-side command stream, submission, buffer lifetime and
+readback ordering for those batches; `Ready` is the consumer's completion token.
+These are reusable compute operations that run through the existing runtime GPU
+participant path and do not alter the rendering frame recipe.
+
+A consumer that needs lower-level compute or a custom traversal over a hierarchy
+it owns uses `Graphics::PointLbvhWorkspace` directly, including its view of node
+and point buffers. That borrowed buffer address is valid only while the
+workspace and device remain alive.
+
+Because the queues are the whole GPU surface, `Runtime.SpatialIndexCache.cppm`
+carries no GPU or composition dependency: the workspace, command context, device
+and job service belong to its implementation unit, and the CPU constructor names
+`WorldRegistry` through a matching `extern "C++"` forward declaration instead of
+importing the kernel registry. `SpatialCompilationLocality.QueryInterface`
+enforces that closure against the configured Clang/CMake module graph. Query
+callers that also record their own GPU work import
+`Extrinsic.Graphics.PointLBVH` and the RHI modules themselves.
 
 All distances are Euclidean in the bound property's coordinate space. Entity
 transforms alone do not invalidate a local-space index. Transforming a query

@@ -1,3 +1,9 @@
+#include <cstddef>
+#include <functional>
+#include <span>
+#include <glm/vec3.hpp>
+#include <glm/vec4.hpp>
+#include <glm/vec2.hpp>
 // ARCH-006 Slice 5 app-owned editor presentation and composition coverage.
 #include <algorithm>
 #include <array>
@@ -23,6 +29,16 @@
 
 #include "EditorFeatureTestContext.hpp"
 
+import Extrinsic.Runtime.NormalOperations;
+import Extrinsic.Runtime.RegistrationOperations;
+import Extrinsic.Runtime.MeshFieldOperations;
+import Extrinsic.Runtime.MeshTopologyOperations;
+import Extrinsic.Runtime.ParameterizationOperations;
+import Extrinsic.Runtime.PointFieldOperations;
+import Extrinsic.Runtime.PointAnalysisOperations;
+import Extrinsic.Runtime.PointSetOperations;
+import Extrinsic.Runtime.PointConstructionOperations;
+import Extrinsic.Runtime.PointCloudServiceOperations;
 import Extrinsic.Core.Config.Engine;
 import Extrinsic.Core.Config.Window;
 import Extrinsic.Core.Error;
@@ -47,6 +63,44 @@ import Extrinsic.Sandbox.Editor.DomainPanels;
 import Extrinsic.Sandbox.Editor.MeshProcessingPanels;
 import Extrinsic.Sandbox.Editor.MethodPanels;
 import Extrinsic.Sandbox.Editor.Shell;
+import Extrinsic.Asset.ImportRouter;
+import Extrinsic.Asset.Registry;
+import Extrinsic.Asset.Service;
+import Extrinsic.Core.Config.EngineLoad;
+import Extrinsic.Core.Geometry2D;
+import Extrinsic.ECS.Scene.Handle;
+import Extrinsic.ECS.Scene.Registry;
+import Extrinsic.ECS.Component.Transform;
+import Extrinsic.ECS.Components.GeometrySources;
+import Extrinsic.Graphics.Component.RenderGeometry;
+import Extrinsic.Graphics.RenderRecipeConfig;
+import Extrinsic.Graphics.Renderer;
+import Extrinsic.RHI.Device;
+import Extrinsic.Runtime.AssetIngestStateMachine;
+import Extrinsic.Runtime.CameraControllers;
+import Extrinsic.Runtime.ClusteringModule;
+import Extrinsic.Runtime.SpatialIndexCache;
+import Extrinsic.Runtime.PointCloudConsolidationModule;
+import Extrinsic.Runtime.EditorCommandHistory;
+import Extrinsic.Runtime.EngineConfigControl;
+import Extrinsic.Runtime.JobService;
+import Extrinsic.Runtime.GeometryPresentation;
+import Extrinsic.Runtime.GeometryAvailability;
+import Extrinsic.Runtime.PrimitiveSelectionRefinement;
+import Extrinsic.Runtime.RenderArtifactPublication;
+import Extrinsic.Runtime.VertexAttributeBinding;
+import Extrinsic.Runtime.VertexChannelBindings;
+import Extrinsic.Runtime.TextureBakeModule;
+import Extrinsic.Runtime.SelectionController;
+import Extrinsic.Runtime.ServiceRegistry;
+import Extrinsic.Runtime.WorldHandle;
+import Extrinsic.Runtime.WorldRegistry;
+import Geometry.Properties;
+import Extrinsic.Runtime.EditorCommon;
+import Extrinsic.Runtime.ParameterizationConfig;
+import Extrinsic.Runtime.PointCloudConsolidationTypes;
+
+#include "../../../src/app/Sandbox/Editor/Sandbox.PanelSupport.hpp"
 
 namespace Core = Extrinsic::Core;
 namespace Plat = Extrinsic::Platform;
@@ -327,7 +381,7 @@ TEST(SandboxEditorPresentation, DefaultDrawStartsWithOnlyMenuBarVisible)
 
     EXPECT_TRUE(ImGuiWindowExists("##MainMenuBar"));
     const auto menu = shell.BuildEditorWindowMenuModel();
-    ASSERT_EQ(menu.size(), 76u);
+    ASSERT_EQ(menu.size(), 77u);
     for (const Runtime::EditorWindowMenuEntry& entry : menu)
     {
         EXPECT_FALSE(entry.Open) << entry.Id;
@@ -345,7 +399,7 @@ TEST(SandboxEditorPresentation, DomainMenusUseAppearanceAndFocusedProcessingWind
         std::string_view Id;
         std::vector<std::string> MenuPath;
     };
-    const std::array<ExpectedWindow, 66> expected{{
+    const std::array<ExpectedWindow, 67> expected{{
         {"pointcloud.appearance", {"PointCloud"}},
         {"pointcloud.properties", {"PointCloud"}},
         {"pointcloud.selection", {"PointCloud"}},
@@ -359,6 +413,7 @@ TEST(SandboxEditorPresentation, DomainMenusUseAppearanceAndFocusedProcessingWind
         {"pointcloud.processing.kmeans", {"PointCloud", "Processing"}},
         {"graph.processing.kmeans", {"Graph", "Processing"}},
         {"mesh.processing.kmeans", {"Mesh", "Processing"}},
+        {"mesh.processing.segmentation", {"Mesh", "Processing"}},
         {"pointcloud.processing.progressive_poisson", {"PointCloud", "Processing"}},
         {"graph.processing.progressive_poisson", {"Graph", "Processing"}},
         {"pointcloud.processing.consolidation", {"PointCloud", "Processing"}},
@@ -539,9 +594,8 @@ TEST(SandboxEditorPresentation, DomainPanelsPreserveLifetimeCacheAndResultPublic
           "CachedModelFrame != frame",
           "CachedDomainModels",
           "DomainWindowModelCacheHits",
-        "ApplyEditorUvRegenerationCommand",
-        "context.GeometryResults.LastUvRegenerationResult",
-        "lastUvRegenerationResult->value().AtlasWidth",
+        "DrawSandboxUvRegenerationControls",
+        "context.Parameterization.Results.LastUvRegenerationResult",
         "ImGui::InputInt(\"Bake padding\"",
         ".PaddingTexels = paddingSupported",
         "std::int32_t TextureBakeWidth{1024};",
@@ -552,6 +606,75 @@ TEST(SandboxEditorPresentation, DomainPanelsPreserveLifetimeCacheAndResultPublic
     {
         EXPECT_NE(source.find(required), std::string::npos) << required;
     }
+}
+
+// The two texture-bake panels used to carry their own copy of the UV
+// regeneration block, and they drifted: one passed the wrong command handle and
+// neither supplied the terminal callback, so a queued atlas job's real outcome
+// was dropped. The block now has exactly one implementation; these checks keep
+// the panels routed through it and keep that implementation whole.
+TEST(SandboxEditorPresentation, UvRegenerationHasOneImplementationBothPanelsDriveIt)
+{
+    const std::string shared = ReadRepositoryTextFile(
+        "src/app/Sandbox/Editor/Sandbox.PanelSupport.cpp");
+    ASSERT_FALSE(shared.empty());
+
+    for (const std::string_view required :
+         {"void DrawSandboxUvRegenerationControls(",
+          "ApplyEditorUvRegenerationCommand(",
+          "context->Parameterization.Commands",
+          "context->Parameterization.ResultSinks.UvRegeneration",
+          "DismissUvRegenerationResult()",
+          "ImGui::Button(\"Regenerate UVs\")",
+          "lastExtentAdoption = *lastResult;"})
+    {
+        EXPECT_NE(shared.find(required), std::string::npos) << required;
+    }
+
+    const auto submit = shared.find("if (ImGui::Button(\"Regenerate UVs\")");
+    ASSERT_NE(submit, std::string::npos);
+    EXPECT_LT(shared.find("DismissUvRegenerationResult();", submit),
+              shared.find("ApplyEditorUvRegenerationCommand(", submit))
+        << "A new pending run must not restore the previous session result.";
+
+    constexpr std::array<std::string_view, 2> panels{{
+        "src/app/Sandbox/Editor/Sandbox.DomainPanels.cpp",
+        "src/app/Sandbox/Editor/Sandbox.EditorShell.cpp",
+    }};
+    for (const std::string_view panel : panels)
+    {
+        const std::string source = ReadRepositoryTextFile(std::string{panel});
+        ASSERT_FALSE(source.empty()) << panel;
+        EXPECT_NE(source.find("DrawSandboxUvRegenerationControls("),
+                  std::string::npos)
+            << panel;
+        EXPECT_EQ(source.find("ApplyEditorUvRegenerationCommand("),
+                  std::string::npos)
+            << panel << " must not own a second UV submission path";
+    }
+}
+
+// The shell rebuilds `SandboxEditorContext` every frame and drops it again at
+// end of frame, so UV panel state has to live on the shell, not in that copy.
+TEST(SandboxEditorPresentation, EditorShellHoldsUvResultStateForPanelLifetime)
+{
+    const std::string source = ReadRepositoryTextFile(
+        "src/app/Sandbox/Editor/Sandbox.EditorShell.cpp");
+    ASSERT_FALSE(source.empty());
+
+    for (const std::string_view required :
+         {"LastUvRegenerationResult{};",
+          ".LastUvRegenerationResult = &LastUvRegenerationResult,",
+          "LastUvRegenerationResult.reset();",
+          "LastUvExtentAdoption.reset();"})
+    {
+        EXPECT_NE(source.find(required), std::string::npos) << required;
+    }
+    EXPECT_EQ(
+        source.find("&ActiveContext->Parameterization.Results"
+                    ".LastUvRegenerationResult"),
+        std::string::npos)
+        << "panel state must not point into the per-frame context copy";
 }
 
 TEST(SandboxEditorPresentation, MeshProcessingPanelsPreserveLifetimeAndResultPublication)
@@ -573,16 +696,16 @@ TEST(SandboxEditorPresentation, MeshProcessingPanelsPreserveLifetimeAndResultPub
       "ApplyEditorConfiguredRegistrationCommand",
     }};
     constexpr std::array<std::string_view, 10> sinks{{
-        "context.MethodResultSinks.MeshDenoise",
-        "context.MethodResultSinks.MeshCurvature",
-        "context.MethodResultSinks.MeshRemesh",
-        "context.MethodResultSinks.MeshSubdivide",
-        "context.MethodResultSinks.MeshSimplify",
-        "context.MethodResultSinks.NormalEstimation",
-        "context.MethodResultSinks.OutlierAnalysis",
-        "context.MethodResultSinks.KernelDensity",
-        "context.MethodResultSinks.PointSpacing",
-        "context.MethodResultSinks.Registration",
+        "context.MeshTopology.ResultSinks.MeshDenoise",
+        "context.MeshFields.ResultSinks.MeshCurvature",
+        "context.MeshTopology.ResultSinks.MeshRemesh",
+        "context.MeshTopology.ResultSinks.MeshSubdivide",
+        "context.MeshTopology.ResultSinks.MeshSimplify",
+        "context.Normals.ResultSinks.NormalEstimation",
+        "context.PointAnalysis.ResultSinks.OutlierAnalysis",
+        "context.PointFields.ResultSinks.KernelDensity",
+        "context.PointFields.ResultSinks.PointSpacing",
+        "context.Registration.ResultSinks.Registration",
     }};
     for (const std::string_view required : commands)
         EXPECT_NE(source.find(required), std::string::npos) << required;
@@ -609,10 +732,10 @@ TEST(SandboxEditorProgressivePoisson,
          {"processing.ProgressivePoissonAvailable",
           "processing.ProgressivePoissonDisabledReason",
           "DrawDisabledReasonTooltip(disabledReason)",
-          "EditorProgressivePoissonChannel::Rank",
-          "EditorProgressivePoissonChannel::Level",
-          "EditorProgressivePoissonChannel::SplatRadius",
-          "EditorProgressivePoissonChannel::PrefixVisible",
+          "ProgressivePoissonPlaygroundChannel::Rank",
+          "ProgressivePoissonPlaygroundChannel::Level",
+          "ProgressivePoissonPlaygroundChannel::SplatRadius",
+          "ProgressivePoissonPlaygroundChannel::PrefixVisible",
           "const auto runSampler = [&]()",
           "ApplyEditorProgressivePoissonConfigCommand",
           "ApplyEditorProgressivePoissonCommand",
@@ -643,12 +766,14 @@ TEST(SandboxEditorProgressivePoisson,
 
 TEST(SandboxEditorPresentation, ExtrinsicSandboxAppStaysRuntimeOnly)
 {
-    constexpr std::array<std::string_view, 13> paths{{
+    constexpr std::array<std::string_view, 15> paths{{
         "src/app/Sandbox/Sandbox.cppm",
         "src/app/Sandbox/Sandbox.cpp",
         "src/app/Sandbox/main.cpp",
         "src/app/Sandbox/Editor/Sandbox.EditorController.cppm",
         "src/app/Sandbox/Editor/Sandbox.EditorController.cpp",
+        "src/app/Sandbox/Editor/Sandbox.PanelSupport.hpp",
+        "src/app/Sandbox/Editor/Sandbox.PanelSupport.cpp",
         "src/app/Sandbox/Editor/Sandbox.EditorShell.cppm",
         "src/app/Sandbox/Editor/Sandbox.EditorShell.cpp",
         "src/app/Sandbox/Editor/Sandbox.MethodPanels.cppm",
@@ -712,19 +837,27 @@ TEST(SandboxEditorPresentation,
     const std::string appShell =
         ReadRepositoryTextFile("src/app/Sandbox/Editor/Sandbox.EditorShell.cpp");
     const std::string appShellContract =
-        ReadRepositoryTextFile("src/app/Sandbox/Editor/Sandbox.EditorShell.cppm");
+        ReadRepositoryTextFile("src/app/Sandbox/Editor/Sandbox.PanelSupport.hpp");
     const std::string detailContract =
-        ReadRepositoryTextFile("src/runtime/Editor/internal/Runtime.EditorFeatures.Detail.cppm");
+        ReadRepositoryTextFile("src/runtime/Editor/internal/Runtime.EditorFeatures.Internal.hpp");
     const std::string workspaceSession =
         ReadRepositoryTextFile("src/runtime/Editor/internal/Runtime.EditorWorkspaceSession.cpp");
+    const std::string workspaceSessionContract =
+        ReadRepositoryTextFile("src/runtime/Editor/internal/Runtime.EditorWorkspaceAttachment.Detail.cppm");
     const std::string workspaceModels =
         ReadRepositoryTextFile("src/runtime/Editor/Runtime.EditorWorkspaceSnapshots.Models.cpp");
     const std::string sceneActions =
         ReadRepositoryTextFile("src/runtime/Editor/Operations/Runtime.SceneEditingOperations.Actions.cpp");
-    const std::string geometryOperations =
+    const std::string pointSetOperations =
         ReadRepositoryTextFile("src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.cpp");
+    const std::string pointCloudServiceOperations = ReadRepositoryTextFile(
+        "src/runtime/Editor/Operations/Runtime.PointCloudServiceOperations.cpp");
     const std::string geometryMeshOperations =
         ReadRepositoryTextFile("src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Mesh.cpp");
+    const std::string meshTopologyOperations =
+        ReadRepositoryTextFile("src/runtime/Editor/Operations/Runtime.MeshTopologyOperations.Topology.cpp");
+    const std::string meshFieldOperations =
+        ReadRepositoryTextFile("src/runtime/Editor/Operations/Runtime.MeshFieldOperations.Curvature.cpp");
     const std::string visualizationActions =
         ReadRepositoryTextFile("src/runtime/Editor/Operations/Runtime.VisualizationEditingOperations.Actions.cpp");
     const std::string renderRecipeOperations =
@@ -734,10 +867,14 @@ TEST(SandboxEditorPresentation,
     ASSERT_FALSE(appShellContract.empty());
     ASSERT_FALSE(detailContract.empty());
     ASSERT_FALSE(workspaceSession.empty());
+    ASSERT_FALSE(workspaceSessionContract.empty());
     ASSERT_FALSE(workspaceModels.empty());
     ASSERT_FALSE(sceneActions.empty());
-    ASSERT_FALSE(geometryOperations.empty());
+    ASSERT_FALSE(pointSetOperations.empty());
+    ASSERT_FALSE(pointCloudServiceOperations.empty());
     ASSERT_FALSE(geometryMeshOperations.empty());
+    ASSERT_FALSE(meshTopologyOperations.empty());
+    ASSERT_FALSE(meshFieldOperations.empty());
     ASSERT_FALSE(visualizationActions.empty());
     ASSERT_FALSE(renderRecipeOperations.empty());
 
@@ -757,7 +894,7 @@ TEST(SandboxEditorPresentation,
     EXPECT_NE(appShellContract.find("struct SandboxEditorContext final"), std::string::npos);
     for (const std::string_view capability :
          {"Runtime::EditorSceneEditingCommands SceneCommands{};",
-          "Runtime::EditorGeometryProcessingCommands GeometryCommands{};",
+          "Runtime::EditorProcessingCommands Processing{};",
           "Runtime::EditorVisualizationEditingCommands VisualizationCommands{};",
           "Runtime::EditorRenderRecipeEditingCommands RenderRecipeCommands{};",
           "Runtime::EditorWorkspaceSnapshotQueries SnapshotQueries{};"})
@@ -780,7 +917,7 @@ TEST(SandboxEditorPresentation,
           "import Extrinsic.RHI.Device;",
           "import Extrinsic.Runtime.TextureBakeModule;"})
     {
-        EXPECT_EQ(workspaceSession.find(forbidden), std::string::npos)
+        EXPECT_EQ(workspaceSessionContract.find(forbidden), std::string::npos)
             << forbidden;
     }
     for (const std::string_view privateOperationPrefix :
@@ -791,14 +928,28 @@ TEST(SandboxEditorPresentation,
         EXPECT_EQ(detailContract.find(privateOperationPrefix), std::string::npos)
             << privateOperationPrefix;
     }
-    EXPECT_LT(std::ranges::count(workspaceSession, '\n'), 1'000);
+    // EditorCompilationLocality.WorkspaceAttachment checks compiler dependencies.
+    EXPECT_NE(workspaceSessionContract.find("std::unique_ptr<Impl> m_Impl;"),
+              std::string::npos);
+    EXPECT_EQ(workspaceSessionContract.find("EditorFeatureBindings m_Context"),
+              std::string::npos);
+    EXPECT_NE(workspaceSession.find("EditorFeatureBindings m_Context"),
+              std::string::npos);
     EXPECT_NE(workspaceModels.find("BuildEditorWorkspaceSnapshotFromBindings("),
               std::string::npos);
     EXPECT_NE(sceneActions.find("ApplyEditorFileImportCommand("),
               std::string::npos);
-    EXPECT_NE(geometryOperations.find(clusteringConfigDefinition), std::string::npos);
-    EXPECT_NE(geometryOperations.find(poissonDefinition), std::string::npos);
-    EXPECT_NE(geometryMeshOperations.find(meshDenoiseDefinition),
+    EXPECT_NE(pointCloudServiceOperations.find(clusteringConfigDefinition), std::string::npos);
+    EXPECT_NE(pointSetOperations.find(poissonDefinition), std::string::npos);
+    // Mesh topology editing and mesh field publication own their commands; the
+    // broad mesh unit keeps only the cross-cutting domain/menu catalogue.
+    EXPECT_NE(meshTopologyOperations.find(meshDenoiseDefinition),
+              std::string::npos);
+    EXPECT_NE(meshFieldOperations.find("ApplyEditorMeshCurvatureCommand("),
+              std::string::npos);
+    EXPECT_EQ(geometryMeshOperations.find(meshDenoiseDefinition),
+              std::string::npos);
+    EXPECT_NE(geometryMeshOperations.find("ResolveEditorGeometryProcessingEntries("),
               std::string::npos);
     EXPECT_NE(visualizationActions.find("ApplyEditorTextureBakeCommand("),
               std::string::npos);
@@ -816,7 +967,7 @@ TEST(SandboxEditorPresentation,
     ASSERT_NE(firstPrivateSourceSet, std::string::npos);
     const std::string_view publicRuntimeSources{runtimeCMake.data(), firstPrivateSourceSet};
     for (const std::string_view privateModule : {"internal/Runtime.FeatureConfigCodecs.Detail.cppm",
-                                                 "internal/Runtime.EditorFeatures.Detail.cppm"})
+                                                 "internal/Runtime.EditorWorkspaceAttachment.Detail.cppm"})
     {
         EXPECT_EQ(publicRuntimeSources.find(privateModule), std::string_view::npos)
             << privateModule;
@@ -828,11 +979,13 @@ TEST(SandboxEditorPresentation,
               std::string::npos);
     EXPECT_NE(workspaceSession.find("SubscribeRunCompleted("), std::string::npos);
     EXPECT_NE(workspaceSession.find("AttachmentEpochIsActive(epoch)"), std::string::npos);
-    EXPECT_NE(workspaceSession.find("m_LastKMeansResult.reset()"), std::string::npos);
-    EXPECT_EQ(geometryOperations.find("HasInFlightJob()"), std::string::npos);
-    EXPECT_EQ(geometryOperations.find("m_KMeansGpuJobs"), std::string::npos);
+    EXPECT_NE(workspaceSession.find("EditorPointCloudServiceResultsSnapshot m_PointCloudServiceResults{};"),
+              std::string::npos);
+    EXPECT_NE(workspaceSession.find("m_PointCloudServiceResults = {};"), std::string::npos);
+    EXPECT_EQ(pointSetOperations.find("HasInFlightJob()"), std::string::npos);
+    EXPECT_EQ(pointCloudServiceOperations.find("m_KMeansGpuJobs"), std::string::npos);
 
-    constexpr std::array<std::string_view, 14> retiredFiles{{
+    constexpr std::array<std::string_view, 16> retiredFiles{{
         "src/runtime/Runtime.SandboxEditorFacades.cppm",
         "src/runtime/Runtime.SandboxEditorFacades.cpp",
         "src/runtime/Runtime.SandboxEditorFacades.Internal.hpp",
@@ -847,6 +1000,8 @@ TEST(SandboxEditorPresentation,
         "src/runtime/Runtime.RegistrationAlignment.cpp",
         "src/runtime/internal/Runtime.EditorWorkspaceSnapshots.cpp",
         "src/runtime/internal/Runtime.EditorFeatures.Detail.hpp",
+        "src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Public.cpp",
+        "src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Internal.hpp",
     }};
     for (const std::string_view retiredFile : retiredFiles)
     {
@@ -860,15 +1015,25 @@ TEST(SandboxEditorPresentation,
     EXPECT_FALSE(std::filesystem::exists(std::filesystem::path{ENGINE_ROOT_DIR} /
                                          "tests/unit/runtime/Test.RegistrationAlignment.cpp"));
 
-    constexpr std::array<std::string_view, 18> allowedPrivateImporters{{
+    constexpr std::array<std::string_view, 28> allowedPrivateImporters{{
+        "Runtime.EditorWorkspaceSession.cpp",
         "Runtime.EditorCommon.Public.cpp",
         "Runtime.EditorJobProjection.Public.cpp",
         "Runtime.EditorWorkspaceSnapshots.Public.cpp",
         "Runtime.EditorWorkspaceSnapshots.Models.cpp",
         "Runtime.SceneEditingOperations.Public.cpp",
         "Runtime.SceneEditingOperations.Actions.cpp",
-        "Runtime.GeometryProcessingOperations.Public.cpp",
-        "Runtime.GeometryProcessingOperations.Mesh.cpp",
+        "Runtime.PointFieldOperations.Frame.cpp",
+        "Runtime.PointAnalysisOperations.Frame.cpp",
+        "Runtime.PointSetOperations.Frame.cpp",
+        "Runtime.PointConstructionOperations.Frame.cpp",
+        "Runtime.PointCloudServiceOperations.Frame.cpp",
+        "Runtime.NormalOperations.Frame.cpp",
+        "Runtime.RegistrationOperations.Frame.cpp",
+        "Runtime.ParameterizationOperations.Frame.cpp",
+        "Runtime.MeshFieldOperations.Frame.cpp",
+        "Runtime.MeshTopologyOperations.Frame.cpp",
+        "Runtime.GeometryProcessingOperations.Frame.cpp",
         "Runtime.VisualizationEditingOperations.Public.cpp",
         "Runtime.VisualizationEditingOperations.Actions.cpp",
         "Runtime.RenderRecipeEditingOperations.Public.cpp",
@@ -1104,10 +1269,14 @@ TEST(SandboxEditorPresentation,
             "DrawDisabledReasonTooltip(frame.FileImport.ImportDisabledReason);"),
         std::string::npos);
 
+    const auto support = ReadRepositoryTextFile(
+        "src/app/Sandbox/Editor/Sandbox.PanelSupport.cpp");
+    ASSERT_FALSE(support.empty());
+    for (const auto flag : {"ImGuiHoveredFlags_ForTooltip |", "ImGuiHoveredFlags_AllowWhenDisabled"})
+        EXPECT_NE(support.find(flag), std::string::npos) << flag;
+
     for (const std::string_view required :
-         {"ImGuiHoveredFlags_ForTooltip |",
-          "ImGuiHoveredFlags_AllowWhenDisabled",
-          "option.DisabledReason",
+         {"option.DisabledReason",
           "frame.FileImport.PayloadHintDisabledReason",
           "frame.FileImport.ImportDisabledReason",
           "frame.FileImport.CanChoosePayloadHint",
@@ -1285,7 +1454,7 @@ TEST(SandboxEditorPresentation, ControllerReattachPinsPanelAttachmentResetPolicy
     EXPECT_NE(meshPanels.find("Simplify.LastResult.reset();"),
               std::string::npos);
     EXPECT_NE(meshPanels.find("Normals = {};"), std::string::npos);
-    EXPECT_NE(meshPanels.find("Registration.LastResult.reset();"),
+    EXPECT_NE(meshPanels.find("Registration = {};"),
               std::string::npos);
     EXPECT_NE(meshPanels.find("Outliers = {};"), std::string::npos);
     EXPECT_NE(domainPanels.find("LastUvRegenerationResult.reset();"),
@@ -1701,4 +1870,31 @@ TEST(SandboxEditorPresentation, PointConstructionDomainMenusOpenOneSharedWindow)
     engine.Run();
     shell.Detach();
     engine.Shutdown();
+}
+
+TEST(SandboxEditorPresentation, RegistrationInterfacesExcludeProcessingDependencies)
+{
+    for (const auto path : {
+             "src/app/Sandbox/Editor/Sandbox.DomainPanels.cppm",
+             "src/app/Sandbox/Editor/Sandbox.MeshProcessingPanels.cppm",
+             "src/app/Sandbox/Editor/Sandbox.MethodPanels.cppm",
+             "src/app/Sandbox/Editor/Sandbox.EditorShell.cppm"})
+    {
+        const auto source = ReadRepositoryTextFile(path);
+        ASSERT_FALSE(source.empty()) << path;
+        for (const auto dependency : {"EditorWorkspaceSnapshots", "GeometryProcessingOperations",
+                                     "VisualizationEditingOperations", "Editor.PanelSupport"})
+            EXPECT_EQ(source.find(dependency), std::string::npos) << path << ": " << dependency;
+    }
+    for (const auto path : {"src/app/Sandbox/Editor/Sandbox.EditorShell.cppm",
+                            "src/app/Sandbox/Editor/Sandbox.PanelSupport.hpp"})
+    {
+        const auto source = ReadRepositoryTextFile(path);
+        // A definition may be exported only if its first declaration is exported.
+        EXPECT_EQ(source.find("#include \"Sandbox.EditorFwd.hpp\""), std::string::npos) << path;
+    }
+    const auto helpers = ReadRepositoryTextFile(
+        "src/runtime/Editor/internal/Runtime.EditorFeatures.Internal.hpp");
+    EXPECT_EQ(helpers.find("class EditorWorkspaceSession"), std::string::npos);
+    EXPECT_EQ(helpers.find("#include <entt/entity/registry.hpp>"), std::string::npos);
 }

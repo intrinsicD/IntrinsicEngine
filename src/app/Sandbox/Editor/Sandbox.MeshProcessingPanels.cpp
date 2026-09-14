@@ -1,4 +1,9 @@
 module;
+#include <functional>
+#include <span>
+#include <glm/vec3.hpp>
+#include <glm/vec4.hpp>
+#include <glm/vec2.hpp>
 
 #include <algorithm>
 #include <array>
@@ -16,6 +21,16 @@ module;
 
 module Extrinsic.Sandbox.Editor.MeshProcessingPanels;
 
+import Extrinsic.Runtime.NormalOperations;
+import Extrinsic.Runtime.RegistrationOperations;
+import Extrinsic.Runtime.MeshFieldOperations;
+import Extrinsic.Runtime.MeshTopologyOperations;
+import Extrinsic.Runtime.ParameterizationOperations;
+import Extrinsic.Runtime.PointFieldOperations;
+import Extrinsic.Runtime.PointAnalysisOperations;
+import Extrinsic.Runtime.PointSetOperations;
+import Extrinsic.Runtime.PointConstructionOperations;
+import Extrinsic.Runtime.PointCloudServiceOperations;
 import Extrinsic.Sandbox.Editor.Shell;
 
 import Extrinsic.Runtime.EditorCommon;
@@ -25,8 +40,16 @@ import Extrinsic.Runtime.EditorJobProjection;
 import Extrinsic.Runtime.EngineConfigControl;
 import Extrinsic.Runtime.GeometryProcessingOperations;
 import Extrinsic.Runtime.SelectionController;
+import Extrinsic.Runtime.SceneEditingOperations;
 import Extrinsic.Runtime.VisualizationEditingOperations;
 import Extrinsic.Runtime.VisualizationRecipes;
+import Extrinsic.Runtime.GeometryPresentation;
+import Extrinsic.Runtime.TextureBakeModule;
+import Extrinsic.Runtime.RenderRecipeEditingOperations;
+import Extrinsic.Runtime.ParameterizationConfig;
+import Extrinsic.Runtime.PointCloudConsolidationTypes;
+
+#include "Sandbox.PanelSupport.hpp"
 
 namespace Extrinsic::Sandbox::Editor
 {
@@ -55,24 +78,6 @@ namespace Extrinsic::Sandbox::Editor
             kCurvatureSegmentationSelectionModes{{
                 Runtime::CurvatureSegmentationSelectionMode::FixedCount,
                 Runtime::CurvatureSegmentationSelectionMode::Automatic,
-            }};
-        constexpr std::string_view kCurvatureRegionColorProperty =
-            "f:curvature_region_color";
-        constexpr std::string_view kCurvatureFeaturePatchColorProperty =
-            "e:curvature_feature_patch_color";
-        constexpr std::array<std::string_view, 4>
-            kCurvatureScalarProperties{{
-                "v:mean_curvature",
-                "v:gaussian_curvature",
-                "v:min_principal_curvature",
-                "v:max_principal_curvature",
-            }};
-        constexpr std::array<const char*, 4>
-            kCurvatureScalarLabels{{
-                "Mean curvature",
-                "Gaussian curvature",
-                "Minimum principal curvature",
-                "Maximum principal curvature",
             }};
         constexpr std::array<Runtime::EditorMeshRemeshMode, 2>
             kMeshRemeshModes{{
@@ -141,9 +146,31 @@ namespace Extrinsic::Sandbox::Editor
                 sink(std::move(result));
         }
 
+        template <typename State, typename Preview, typename Apply, typename Execute, typename Sink>
+        void DrawProcessingExecution(const SandboxEditorContext& context, State& state, bool changed,
+            Preview preview, Apply apply, Execute execute, const Sink& sink,
+            const char* button, const char* controlsRejected, const char* executionRejected)
+        {
+            if (changed)
+                state.ConfigDiagnostic = apply(state.Draft).Succeeded() ? "" : controlsRejected;
+            if (!state.ConfigDiagnostic.empty()) ImGui::TextWrapped("%s", state.ConfigDiagnostic.c_str());
+            const auto readiness = preview(state.Draft);
+            if (!readiness.Ready) ImGui::TextWrapped("%s", readiness.Diagnostic.c_str());
+            ImGui::BeginDisabled(!context.ProcessingConfigCommandsAvailable || !readiness.Ready ||
+                                 !state.ConfigDiagnostic.empty());
+            if (ImGui::Button(button))
+            {
+                if (apply(state.Draft).Succeeded())
+                    PublishCommandResult(state.LastResult, execute(), sink);
+                else state.ConfigDiagnostic = executionRejected;
+            }
+            ImGui::EndDisabled();
+        }
+
         void ShowCurvatureSegmentationVisualization(
             const SandboxEditorContext& context,
-            const std::uint32_t stableEntityId)
+            const std::uint32_t stableEntityId,
+            const Runtime::CurvatureSegmentationConfig& config)
         {
             using SurfaceDomain = decltype(
                 Runtime::EditorRenderHintModel{}.SurfaceDomainValue);
@@ -172,7 +199,7 @@ namespace Extrinsic::Sandbox::Editor
                     .Preset =
                         Runtime::EditorVisualizationPropertyPreset::ColorBuffer,
                     .PropertyName =
-                        std::string{kCurvatureRegionColorProperty},
+                        config.RegionColors.Name,
                 });
             (void)Runtime::ApplyEditorVisualizationPropertyCommand(
                 context.VisualizationCommands,
@@ -184,51 +211,18 @@ namespace Extrinsic::Sandbox::Editor
                     .Preset =
                         Runtime::EditorVisualizationPropertyPreset::ColorBuffer,
                     .PropertyName =
-                        std::string{kCurvatureFeaturePatchColorProperty},
+                        config.FeatureColors.Name,
                 });
         }
 
-        [[nodiscard]] Runtime::EditorCommandStatus
-        ShowCurvatureScalarVisualization(
-            const SandboxEditorContext& context,
-            const std::uint32_t stableEntityId,
-            const std::string_view propertyName)
-        {
-            using SurfaceDomain = decltype(
-                Runtime::EditorRenderHintModel{}.SurfaceDomainValue);
-            const Runtime::EditorCommandStatus renderHintStatus =
-                Runtime::ApplyEditorRenderHintCommand(
-                context.VisualizationCommands,
-                Runtime::EditorRenderHintCommand{
-                    .StableEntityId = stableEntityId,
-                    .SetSurface = true,
-                    .EnableSurface = true,
-                    .SurfaceDomain = static_cast<SurfaceDomain>(0),
-                });
-            if (renderHintStatus != Runtime::EditorCommandStatus::Applied &&
-                renderHintStatus != Runtime::EditorCommandStatus::NoChange)
-            {
-                return renderHintStatus;
-            }
-            return Runtime::ApplyEditorVisualizationPropertyCommand(
-                context.VisualizationCommands,
-                Runtime::EditorVisualizationPropertyCommand{
-                    .StableEntityId = stableEntityId,
-                    .Target = Runtime::EditorVisualizationTarget::Surface,
-                    .Domain =
-                        Runtime::EditorVisualizationPropertyDomain::MeshVertices,
-                    .Preset =
-                        Runtime::EditorVisualizationPropertyPreset::Scalar,
-                    .PropertyName = std::string{propertyName},
-                    .ScalarAutoRange = true,
-                });
-        }
+
     }
 
     struct MeshProcessingPanels::Impl
     {
         struct DenoiseState
         {
+            ProcessingEntityInput Input{};
             std::optional<Runtime::EditorMeshDenoiseResult> LastResult{};
             std::int32_t Stage{0};
             std::int32_t NormalIterations{5};
@@ -240,30 +234,28 @@ namespace Extrinsic::Sandbox::Editor
 
         struct CurvatureState
         {
+            Runtime::MeshCurvatureConfig Config{};
+            bool Initialized{false};
+            bool Dirty{false};
+            std::optional<std::vector<std::uint32_t>> LastSelectedEntity{};
             std::optional<Runtime::EditorMeshCurvatureResult> LastResult{};
-            std::int32_t Output{0};
-            bool PublishPrincipalDirections{true};
-            std::int32_t ScalarVisualization{0};
-            bool AutoVisualizeCurvature{true};
-            std::optional<std::uint32_t>
-                PendingCurvatureVisualizationStableEntityId{};
-            std::string PendingCurvatureVisualizationProperty{};
-            std::optional<Runtime::EditorCommandStatus>
-                LastCurvatureVisualizationStatus{};
-            Runtime::CurvatureSegmentationConfig SegmentationConfig{};
-            std::optional<Runtime::EditorCurvatureSegmentationResult>
-                LastSegmentationResult{};
-            std::optional<std::uint32_t>
-                LastSegmentationStableEntityId{};
-            std::optional<Runtime::RuntimeEngineConfigApplyResult>
-                LastSegmentationConfigApply{};
-            bool SegmentationConfigInitialized{false};
-            bool SegmentationConfigDirty{false};
-            bool AutoVisualizeSegmentation{true};
+            std::string ConfigDiagnostic{}, VisualizationDiagnostic{};
+        };
+        struct SegmentationState
+        {
+            ProcessingEntityInput Input{};
+            Runtime::CurvatureSegmentationConfig Config{};
+            std::optional<Runtime::EditorCurvatureSegmentationResult> LastResult{};
+            std::optional<Runtime::RuntimeEngineConfigApplyResult> LastConfigApply{};
+            bool Initialized{false};
+            bool Dirty{false};
+            bool AutoVisualize{true};
+            std::string VisualizationDiagnostic{};
         };
 
         struct RemeshState
         {
+            ProcessingEntityInput Input{};
             std::optional<Runtime::EditorMeshRemeshResult> LastResult{};
             std::int32_t Mode{0};
             std::int32_t SizingLaw{0};
@@ -274,6 +266,7 @@ namespace Extrinsic::Sandbox::Editor
 
         struct SubdivideState
         {
+            ProcessingEntityInput Input{};
             std::optional<Runtime::EditorMeshSubdivideResult> LastResult{};
             std::int32_t Operator{0};
             std::int32_t Iterations{1};
@@ -282,6 +275,7 @@ namespace Extrinsic::Sandbox::Editor
 
         struct SimplifyState
         {
+            ProcessingEntityInput Input{};
             std::optional<Runtime::EditorMeshSimplifyResult> LastResult{};
             std::int32_t Metric{1};
             std::int32_t TargetFaces{0};
@@ -295,68 +289,28 @@ namespace Extrinsic::Sandbox::Editor
             bool PreserveUvSeams{true};
         };
 
-        struct NormalsState
+        struct NormalsState : ProcessingDraftState<Runtime::NormalEstimationConfig, Runtime::EditorNormalEstimationResult>
         {
             bool OpenFacePreset{false};
-            std::optional<Runtime::EditorNormalEstimationResult> LastResult{};
-            Runtime::NormalEstimationConfig Draft{};
-            std::string LastApplied{}, ConfigDiagnostic{}, VisualizationDiagnostic{};
         };
 
-        struct OutliersState
+        using OutliersState = ProcessingDraftState<Runtime::OutlierAnalysisConfig, Runtime::EditorOutlierAnalysisResult>;
+        using KeypointsState = ProcessingDraftState<Runtime::KeypointAnalysisConfig, Runtime::EditorKeypointAnalysisResult>;
+        struct DescriptorsState : ProcessingDraftState<Runtime::DescriptorAnalysisConfig, Runtime::EditorDescriptorAnalysisResult>
         {
-            std::optional<Runtime::EditorOutlierAnalysisResult> LastResult{};
-            Runtime::OutlierAnalysisConfig Draft{};
-            std::string LastApplied{}, ConfigDiagnostic{}, VisualizationDiagnostic{};
-        };
-        struct KeypointsState
-        {
-            std::optional<Runtime::EditorKeypointAnalysisResult> LastResult{};
-            Runtime::KeypointAnalysisConfig Draft{};
-            std::string LastApplied{}, ConfigDiagnostic{}, VisualizationDiagnostic{};
-        };
-        struct DescriptorsState
-        {
-            std::optional<Runtime::EditorDescriptorAnalysisResult> LastResult{};
-            Runtime::DescriptorAnalysisConfig Draft{};
-            std::string LastApplied{}, ConfigDiagnostic{}, VisualizationDiagnostic{};
             std::array<char,256> Prefix{"fpfh"};
             int DisplayBin{};
             bool FollowDisplayBin{false};
         };
-        struct DensityState
-        {
-            std::optional<Runtime::EditorKernelDensityResult> LastResult{};
-            Runtime::KernelDensityConfig Draft{};
-            std::string LastApplied{}, ConfigDiagnostic{}, VisualizationDiagnostic{};
-        };
-        struct DensityWeightsState
-        {
-            std::optional<Runtime::EditorDensityWeightResult> LastResult{};
-            Runtime::DensityWeightConfig Draft{};
-            std::string LastApplied{}, ConfigDiagnostic{}, VisualizationDiagnostic{};
-        };
-        struct ConstructionState
-        {
-            std::optional<Runtime::EditorPointConstructionResult> LastResult{};
-            Runtime::PointConstructionConfig Draft{};
-            std::string LastApplied{}, ConfigDiagnostic{};
-        };
-        struct SpacingState
-        {
-            std::optional<Runtime::EditorPointSpacingResult> LastResult{};
-            Runtime::PointSpacingConfig Draft{};
-            std::string LastApplied{}, ConfigDiagnostic{}, VisualizationDiagnostic{};
-        };
-        struct BilateralState
-        {
-            std::optional<Runtime::EditorBilateralFilterResult> LastResult{};
-            Runtime::BilateralFilterConfig Draft{};
-            std::string LastApplied{}, ConfigDiagnostic{}, VisualizationDiagnostic{};
-        };
+        using DensityState = ProcessingDraftState<Runtime::KernelDensityConfig, Runtime::EditorKernelDensityResult>;
+        using DensityWeightsState = ProcessingDraftState<Runtime::DensityWeightConfig, Runtime::EditorDensityWeightResult>;
+        using ConstructionState = ProcessingDraftState<Runtime::PointConstructionConfig, Runtime::EditorPointConstructionResult>;
+        using SpacingState = ProcessingDraftState<Runtime::PointSpacingConfig, Runtime::EditorPointSpacingResult>;
+        using BilateralState = ProcessingDraftState<Runtime::BilateralFilterConfig, Runtime::EditorBilateralFilterResult>;
 
         struct RegistrationState
         {
+            std::optional<std::vector<std::uint32_t>> LastSelectedSource{}, LastSelectedTarget{};
             std::optional<Runtime::EditorRegistrationResult> LastResult{};
             std::string ConfigDiagnostic{};
             Runtime::RegistrationConfig Draft{};
@@ -379,6 +333,8 @@ namespace Extrinsic::Sandbox::Editor
             CachedDomainModels{};
         DenoiseState Denoise{};
         CurvatureState Curvature{};
+        SegmentationState Segmentation{};
+        ProcessingEntityInput GeodesicsInput{};
         Runtime::GeodesicsConfig GeodesicsConfig{};
         bool GeodesicsInitialized{false};
         bool GeodesicsDirty{false};
@@ -410,16 +366,18 @@ namespace Extrinsic::Sandbox::Editor
         [[nodiscard]] const Runtime::EditorDomainWindowModel&
         GetDomainWindowModel(
             const SandboxEditorContext& context,
-            Runtime::EditorDomainWindowKind kind);
+            Runtime::EditorDomainWindowKind kind,
+            std::optional<std::uint32_t> entity = std::nullopt);
         void DrawDomainWindow(
             bool& open,
             const SandboxEditorContext& context,
             Runtime::EditorDomainWindowKind kind,
             const char* title,
-            DrawDomainControls draw);
+            ProcessingEntityInput& input, DrawDomainControls draw);
 
         void DrawDenoiseWindow(bool&, const SandboxEditorContext&);
         void DrawCurvatureWindow(bool&, const SandboxEditorContext&);
+        void DrawSegmentationWindow(bool&, const SandboxEditorContext&);
         void DrawGeodesicsWindow(bool&, const SandboxEditorContext&);
         void DrawGeodesicsControls(const Runtime::EditorDomainWindowModel&,
                                    const SandboxEditorContext&);
@@ -440,9 +398,7 @@ namespace Extrinsic::Sandbox::Editor
         void DrawDenoiseControls(
             const Runtime::EditorDomainWindowModel&,
             const SandboxEditorContext&);
-        void DrawCurvatureControls(
-            const Runtime::EditorDomainWindowModel&,
-            const SandboxEditorContext&);
+        void DrawCurvatureControls(const SandboxEditorContext&);
         void DrawCurvatureSegmentationControls(
             const Runtime::EditorDomainWindowModel&,
             const SandboxEditorContext&);
@@ -468,6 +424,8 @@ namespace Extrinsic::Sandbox::Editor
                        "Virtual Source Propagation", &Impl::DrawGeodesicsWindow);
         RegisterWindow("mesh.processing.curvature", {"Mesh", "Processing"},
                        "Curvature", &Impl::DrawCurvatureWindow);
+        RegisterWindow("mesh.processing.segmentation", {"Mesh", "Processing"},
+                       "Curvature Segmentation", &Impl::DrawSegmentationWindow);
         RegisterWindow("mesh.processing.remesh", {"Mesh", "Processing"},
                        "Remesh", &Impl::DrawRemeshWindow);
         RegisterWindow("mesh.processing.subdivide", {"Mesh", "Processing"},
@@ -618,23 +576,22 @@ namespace Extrinsic::Sandbox::Editor
         Shell = nullptr;
         ResetModelCache();
         Denoise.LastResult.reset();
+        Denoise.Input = {};
         Curvature.LastResult.reset();
+        GeodesicsInput = {};
         GeodesicsInitialized = false;
         GeodesicsDirty = false;
         GeodesicsResult.reset();
         GeodesicsMessage.clear();
-        Curvature.LastSegmentationResult.reset();
-        Curvature.LastSegmentationStableEntityId.reset();
-        Curvature.LastSegmentationConfigApply.reset();
-        Curvature.PendingCurvatureVisualizationStableEntityId.reset();
-        Curvature.PendingCurvatureVisualizationProperty.clear();
-        Curvature.LastCurvatureVisualizationStatus.reset();
-        Curvature.SegmentationConfigInitialized = false;
-        Curvature.SegmentationConfigDirty = false;
+        Curvature = {};
+        Segmentation = {};
         Remesh.LastResult.reset();
+        Remesh.Input = {};
         Subdivide.LastResult.reset();
+        Subdivide.Input = {};
         Simplify.LastResult.reset();
-        Registration.LastResult.reset();
+        Simplify.Input = {};
+        Registration = {};
         Normals = {};
         Outliers = {};
         Keypoints = {};
@@ -683,7 +640,7 @@ namespace Extrinsic::Sandbox::Editor
     const Runtime::EditorDomainWindowModel&
     MeshProcessingPanels::Impl::GetDomainWindowModel(
         const SandboxEditorContext& context,
-        const Runtime::EditorDomainWindowKind kind)
+        const Runtime::EditorDomainWindowKind kind, const std::optional<std::uint32_t> entity)
     {
         const int frame = ImGui::GetFrameCount();
         if (CachedModelFrame != frame)
@@ -693,12 +650,12 @@ namespace Extrinsic::Sandbox::Editor
                 model.reset();
         }
         auto& model = CachedDomainModels[static_cast<std::size_t>(kind)];
-        if (!model.has_value())
+        if (!model.has_value() || (entity && model->SelectedStableId != *entity))
         {
             model = Runtime::BuildEditorDomainWindowModel(
                 context.SnapshotQueries,
                 kind,
-                context.ModelBuildStats);
+                context.ModelBuildStats, entity);
         }
         else if (context.ModelBuildStats != nullptr)
         {
@@ -712,14 +669,15 @@ namespace Extrinsic::Sandbox::Editor
         const SandboxEditorContext& context,
         const Runtime::EditorDomainWindowKind kind,
         const char* title,
-        const DrawDomainControls draw)
+        ProcessingEntityInput& input, const DrawDomainControls draw)
     {
         ImGui::SetNextWindowSize(
             ImVec2(340.0f, 300.0f), ImGuiCond_FirstUseEver);
         if (ImGui::Begin(title, &open))
         {
-            const Runtime::EditorDomainWindowModel& model =
-                GetDomainWindowModel(context, kind);
+            DrawProcessingEntity("Entity##Processing", context, input.Entity, input.PreviousSelection, kind);
+            const auto& model = GetDomainWindowModel(context, kind, input.Entity);
+            DrawProcessingCpuBackend();
             // The header already includes processing diagnostics; render them
             // only once.
             DrawDomainWindowHeader(model);
@@ -742,15 +700,23 @@ namespace Extrinsic::Sandbox::Editor
     {
         DrawDomainWindow(
             open, context, Runtime::EditorDomainWindowKind::Mesh,
-            "Mesh / Processing / Denoise", &Impl::DrawDenoiseControls);
+            "Mesh / Processing / Denoise", Denoise.Input, &Impl::DrawDenoiseControls);
     }
 
     void MeshProcessingPanels::Impl::DrawCurvatureWindow(
         bool& open, const SandboxEditorContext& context)
     {
-        DrawDomainWindow(
-            open, context, Runtime::EditorDomainWindowKind::Mesh,
-            "Mesh / Processing / Curvature", &Impl::DrawCurvatureControls);
+        ImGui::SetNextWindowSize(ImVec2(460.0f, 640.0f), ImGuiCond_FirstUseEver);
+        if (ImGui::Begin("Mesh / Processing / Curvature", &open))
+            DrawCurvatureControls(context);
+        ImGui::End();
+    }
+
+    void MeshProcessingPanels::Impl::DrawSegmentationWindow(
+        bool& open, const SandboxEditorContext& context)
+    {
+        DrawDomainWindow(open, context, Runtime::EditorDomainWindowKind::Mesh,
+            "Mesh / Processing / Curvature Segmentation", Segmentation.Input, &Impl::DrawCurvatureSegmentationControls);
     }
 
     void MeshProcessingPanels::Impl::DrawRemeshWindow(
@@ -758,7 +724,7 @@ namespace Extrinsic::Sandbox::Editor
     {
         DrawDomainWindow(
             open, context, Runtime::EditorDomainWindowKind::Mesh,
-            "Mesh / Processing / Remesh", &Impl::DrawRemeshControls);
+            "Mesh / Processing / Remesh", Remesh.Input, &Impl::DrawRemeshControls);
     }
 
     void MeshProcessingPanels::Impl::DrawSubdivideWindow(
@@ -766,7 +732,7 @@ namespace Extrinsic::Sandbox::Editor
     {
         DrawDomainWindow(
             open, context, Runtime::EditorDomainWindowKind::Mesh,
-            "Mesh / Processing / Subdivide", &Impl::DrawSubdivideControls);
+            "Mesh / Processing / Subdivide", Subdivide.Input, &Impl::DrawSubdivideControls);
     }
 
     void MeshProcessingPanels::Impl::DrawSimplifyWindow(
@@ -774,7 +740,7 @@ namespace Extrinsic::Sandbox::Editor
     {
         DrawDomainWindow(
             open, context, Runtime::EditorDomainWindowKind::Mesh,
-            "Mesh / Processing / Simplify", &Impl::DrawSimplifyControls);
+            "Mesh / Processing / Simplify", Simplify.Input, &Impl::DrawSimplifyControls);
     }
 
     void MeshProcessingPanels::Impl::DrawDenoiseControls(
@@ -783,8 +749,8 @@ namespace Extrinsic::Sandbox::Editor
     {
         const Runtime::EditorGeometryProcessingModel& processing =
             model.Processing;
-        if (context.GeometryResults.LastMeshDenoiseResult.has_value())
-            Denoise.LastResult = *context.GeometryResults.LastMeshDenoiseResult;
+        if (context.MeshTopology.Results.LastMeshDenoiseResult.has_value())
+            Denoise.LastResult = *context.MeshTopology.Results.LastMeshDenoiseResult;
         ImGui::SeparatorText("Denoise");
         if (!processing.MeshDenoiseAvailable)
         {
@@ -846,7 +812,7 @@ namespace Extrinsic::Sandbox::Editor
             PublishCommandResult(
                 Denoise.LastResult,
                 Runtime::ApplyEditorMeshDenoiseCommand(
-                    context.GeometryCommands,
+                    context.MeshTopology.Commands,
                     Runtime::EditorMeshDenoiseCommand{
                         .StableEntityId = model.SelectedStableId,
                         .Stage = stage,
@@ -858,13 +824,12 @@ namespace Extrinsic::Sandbox::Editor
                             Denoise.SigmaSpatial),
                         .SigmaRange = static_cast<double>(Denoise.SigmaRange),
                         .PreserveBoundary = Denoise.PreserveBoundary,
-                    }),
-                context.MethodResultSinks.MeshDenoise);
+                    },
+                    context.MeshTopology.ResultSinks.MeshDenoise),
+                context.MeshTopology.ResultSinks.MeshDenoise);
         }
 
-        const auto& result = Denoise.LastResult.has_value()
-            ? Denoise.LastResult
-            : processing.LastMeshDenoiseResult;
+        const auto& result = Denoise.LastResult;
         if (!result.has_value())
         {
             ImGui::TextDisabled("Last denoise run: none");
@@ -907,165 +872,71 @@ namespace Extrinsic::Sandbox::Editor
         }
         if (!result->Message.empty())
             ImGui::TextWrapped("%s", result->Message.c_str());
-        DrawDismissLastResultButton(
-            "Dismiss##MeshDenoise",
-            Denoise.LastResult,
-            Runtime::EditorGeometryProcessingResultSlot::MeshDenoise,
-            context);
+        DrawDismissLastResultButton("Dismiss##MeshDenoise", Denoise.LastResult, Runtime::EditorMeshTopologyResultSlot::MeshDenoise, context.MeshTopology.ResultSinks.DismissResult);
     }
 
-    void MeshProcessingPanels::Impl::DrawCurvatureControls(
-        const Runtime::EditorDomainWindowModel& model,
-        const SandboxEditorContext& context)
+    void MeshProcessingPanels::Impl::DrawCurvatureControls(const SandboxEditorContext& context)
     {
-        const Runtime::EditorGeometryProcessingModel& processing =
-            model.Processing;
-        if (context.GeometryResults.LastMeshCurvatureResult.has_value())
-            Curvature.LastResult = *context.GeometryResults.LastMeshCurvatureResult;
-        // The interactive runtime executes curvature on the job lane, so the
-        // Compute command normally returns Pending before its properties exist.
-        // Complete the requested visualization when that terminal result is
-        // projected into a later prepared frame.
-        if (Curvature.PendingCurvatureVisualizationStableEntityId.has_value() &&
-            Curvature.LastResult.has_value() &&
-            Curvature.LastResult->Status !=
-                Runtime::EditorCommandStatus::Pending)
+        if (context.MeshFields.Results.LastMeshCurvatureResult.has_value())
+            Curvature.LastResult = *context.MeshFields.Results.LastMeshCurvatureResult;
+        if (!Curvature.Initialized || !Curvature.Dirty)
         {
-            if (Curvature.LastResult->Status ==
-                    Runtime::EditorCommandStatus::Applied ||
-                Curvature.LastResult->Status ==
-                    Runtime::EditorCommandStatus::NoChange)
+            if (auto active = Runtime::GetEditorMeshCurvatureConfig(context.MeshFields.Commands))
             {
-                Curvature.LastCurvatureVisualizationStatus =
-                    ShowCurvatureScalarVisualization(
-                        context,
-                        *Curvature.PendingCurvatureVisualizationStableEntityId,
-                        Curvature.PendingCurvatureVisualizationProperty);
+                Curvature.Config = *active;
+                Curvature.Initialized = true;
             }
-            Curvature.PendingCurvatureVisualizationStableEntityId.reset();
-            Curvature.PendingCurvatureVisualizationProperty.clear();
         }
-        ImGui::SeparatorText("Curvature");
-        if (!processing.MeshCurvatureAvailable)
+        auto& config = Curvature.Config;
+        bool changed = DrawProcessingEntity("Entity##MeshCurvature", context,
+            config.StableEntityId, Curvature.LastSelectedEntity, Runtime::EditorDomainWindowKind::Mesh);
+        const auto& model = GetDomainWindowModel(context, Runtime::EditorDomainWindowKind::Mesh, config.StableEntityId);
+        const auto& processing = model.Processing;
+        DrawProcessingCpuBackend();
+        ImGui::SeparatorText("Input properties");
+        changed |= DrawProcessingPropertyInput("Positions##MeshCurvature", model.PropertyCatalog, config.Positions);
+        ImGui::SeparatorText("Output properties");
+        changed |= DrawProcessingPropertyName("Mean curvature", config.Mean.Name);
+        changed |= DrawProcessingPropertyName("Gaussian curvature", config.Gaussian.Name);
+        changed |= DrawProcessingPropertyName("Minimum principal curvature", config.MinPrincipal.Name);
+        changed |= DrawProcessingPropertyName("Maximum principal curvature", config.MaxPrincipal.Name);
+        changed |= DrawProcessingPropertyName("First principal direction", config.Direction1.Name);
+        changed |= DrawProcessingPropertyName("Second principal direction", config.Direction2.Name);
+        if (ImGui::BeginCombo("Output##MeshCurvature", Runtime::DebugNameForEditorMeshCurvatureOutput(config.Output)))
         {
-            ImGui::TextDisabled(
-                "Mesh curvature is unavailable for this selection.");
-            return;
-        }
-
-        Curvature.Output = std::clamp(
-            Curvature.Output, 0,
-            static_cast<std::int32_t>(kMeshCurvatureOutputs.size() - 1u));
-        const Runtime::EditorMeshCurvatureOutput output =
-            FromIndex(kMeshCurvatureOutputs, Curvature.Output);
-        if (ImGui::BeginCombo(
-                "Output##MeshCurvature",
-                Runtime::DebugNameForEditorMeshCurvatureOutput(output)))
-        {
-            for (std::size_t i = 0u; i < kMeshCurvatureOutputs.size(); ++i)
-            {
-                const bool selected =
-                    Curvature.Output == static_cast<std::int32_t>(i);
-                if (ImGui::Selectable(
-                        Runtime::DebugNameForEditorMeshCurvatureOutput(
-                            kMeshCurvatureOutputs[i]),
-                        selected))
+            for (const auto output : kMeshCurvatureOutputs)
+                if (ImGui::Selectable(Runtime::DebugNameForEditorMeshCurvatureOutput(output), config.Output == output))
                 {
-                    Curvature.Output = static_cast<std::int32_t>(i);
+                    config.Output = output;
+                    changed = true;
                 }
-                if (selected)
-                    ImGui::SetItemDefaultFocus();
-            }
             ImGui::EndCombo();
         }
-        if (!processing.MeshCurvatureDirectionsAvailable)
-            ImGui::BeginDisabled();
-        ImGui::Checkbox(
-            "Principal directions##MeshCurvature",
-            &Curvature.PublishPrincipalDirections);
-        if (!processing.MeshCurvatureDirectionsAvailable)
-            ImGui::EndDisabled();
-
-        Curvature.ScalarVisualization = std::clamp(
-            Curvature.ScalarVisualization,
-            0,
-            static_cast<std::int32_t>(
-                kCurvatureScalarProperties.size() - 1u));
-        if (ImGui::BeginCombo(
-                "Display scalar##MeshCurvature",
-                kCurvatureScalarLabels[static_cast<std::size_t>(
-                    Curvature.ScalarVisualization)]))
+        changed |= ImGui::Checkbox("Principal directions##MeshCurvature", &config.PublishPrincipalDirections);
+        Curvature.Dirty |= changed;
+        if (changed)
         {
-            for (std::size_t i = 0u;
-                 i < kCurvatureScalarProperties.size(); ++i)
-            {
-                const bool selected =
-                    Curvature.ScalarVisualization ==
-                    static_cast<std::int32_t>(i);
-                if (ImGui::Selectable(
-                        kCurvatureScalarLabels[i], selected))
-                {
-                    Curvature.ScalarVisualization =
-                        static_cast<std::int32_t>(i);
-                }
-                if (selected)
-                    ImGui::SetItemDefaultFocus();
-            }
-            ImGui::EndCombo();
+            const auto applied = Runtime::ApplyEditorMeshCurvatureConfig(context.MeshFields.Commands, config);
+            Curvature.ConfigDiagnostic = applied.Succeeded() ? "" : "Invalid curvature property bindings.";
+            if (applied.Succeeded()) Curvature.Dirty = false;
         }
-        (void)ImGui::Checkbox(
-            "Show scalar after compute##MeshCurvature",
-            &Curvature.AutoVisualizeCurvature);
-
+        ImGui::BeginDisabled(!processing.MeshCurvatureAvailable || !context.ProcessingConfigCommandsAvailable ||
+            !Curvature.ConfigDiagnostic.empty());
         if (ImGui::Button("Compute##MeshCurvature"))
-        {
-            Runtime::EditorMeshCurvatureResult commandResult =
-                Runtime::ApplyEditorMeshCurvatureCommand(
-                    context.GeometryCommands,
-                    Runtime::EditorMeshCurvatureCommand{
-                        .StableEntityId = model.SelectedStableId,
-                        .Output = output,
-                        .PublishPrincipalDirections =
-                            Curvature.PublishPrincipalDirections,
-                    });
-            if (Curvature.AutoVisualizeCurvature)
-            {
-                const std::string_view property =
-                    kCurvatureScalarProperties[static_cast<std::size_t>(
-                        Curvature.ScalarVisualization)];
-                Curvature.LastCurvatureVisualizationStatus =
-                    ShowCurvatureScalarVisualization(
-                    context,
-                    model.SelectedStableId,
-                    property);
-                const Runtime::EditorCommandStatus visualizationStatus =
-                    *Curvature.LastCurvatureVisualizationStatus;
-                if (commandResult.Status ==
-                        Runtime::EditorCommandStatus::Pending &&
-                    visualizationStatus !=
-                        Runtime::EditorCommandStatus::Applied &&
-                    visualizationStatus !=
-                        Runtime::EditorCommandStatus::NoChange)
-                {
-                    Curvature.PendingCurvatureVisualizationStableEntityId =
-                        model.SelectedStableId;
-                    Curvature.PendingCurvatureVisualizationProperty = property;
-                }
-                else
-                {
-                    Curvature.PendingCurvatureVisualizationStableEntityId.reset();
-                    Curvature.PendingCurvatureVisualizationProperty.clear();
-                }
-            }
-            PublishCommandResult(
-                Curvature.LastResult,
-                std::move(commandResult),
-                context.MethodResultSinks.MeshCurvature);
-        }
-        DrawCurvatureSegmentationControls(model, context);
-        const auto& result = Curvature.LastResult.has_value()
-            ? Curvature.LastResult
-            : processing.LastMeshCurvatureResult;
+            PublishCommandResult(Curvature.LastResult,
+                Runtime::ApplyEditorMeshCurvatureCommand(context.MeshFields.Commands, config,
+                    context.MeshFields.ResultSinks.MeshCurvature),
+                context.MeshFields.ResultSinks.MeshCurvature);
+        ImGui::EndDisabled();
+        ImGui::SeparatorText("Display output properties");
+        for (const auto* output : {&config.Mean, &config.Gaussian, &config.MinPrincipal,
+                                  &config.MaxPrincipal, &config.Direction1, &config.Direction2})
+            DrawProcessingPropertyShowButton(context, config.StableEntityId, *output, Curvature.VisualizationDiagnostic);
+        if (!processing.MeshCurvatureAvailable)
+            ImGui::TextDisabled("Select a mesh to compute curvature.");
+        if (!Curvature.ConfigDiagnostic.empty()) ImGui::TextWrapped("%s", Curvature.ConfigDiagnostic.c_str());
+        if (!Curvature.VisualizationDiagnostic.empty()) ImGui::Text("Display: %s", Curvature.VisualizationDiagnostic.c_str());
+        const auto& result = Curvature.LastResult;
         if (!result.has_value())
         {
             ImGui::TextDisabled("Last curvature run: none");
@@ -1074,13 +945,6 @@ namespace Extrinsic::Sandbox::Editor
         ImGui::Text(
             "Last curvature run: %s",
             Runtime::DebugNameForEditorCommandStatus(result->Status));
-        if (Curvature.LastCurvatureVisualizationStatus.has_value())
-        {
-            ImGui::Text(
-                "Scalar visualization: %s",
-                Runtime::DebugNameForEditorCommandStatus(
-                    *Curvature.LastCurvatureVisualizationStatus));
-        }
         ImGui::Text(
             "Output: %s",
             Runtime::DebugNameForEditorMeshCurvatureOutput(
@@ -1103,11 +967,12 @@ namespace Extrinsic::Sandbox::Editor
         }
         if (!result->Message.empty())
             ImGui::TextWrapped("%s", result->Message.c_str());
-        DrawDismissLastResultButton(
-            "Dismiss##MeshCurvature",
-            Curvature.LastResult,
-            Runtime::EditorGeometryProcessingResultSlot::MeshCurvature,
-            context);
+        if (Curvature.LastResult.has_value() && DrawDismissLastResultButton("Dismiss##MeshCurvature"))
+        {
+            Curvature.LastResult.reset();
+            if (context.MeshFields.ResultSinks.DismissResult)
+                context.MeshFields.ResultSinks.DismissResult();
+        }
     }
 
     void MeshProcessingPanels::Impl::DrawCurvatureSegmentationControls(
@@ -1122,21 +987,34 @@ namespace Extrinsic::Sandbox::Editor
             return;
         }
 
-        if (!Curvature.SegmentationConfigInitialized)
+        if (!Segmentation.Initialized)
         {
             if (const auto active =
                     Runtime::GetEditorCurvatureSegmentationConfig(
-                        context.GeometryCommands))
+                        context.MeshFields.Commands))
             {
-                Curvature.SegmentationConfig = *active;
+                Segmentation.Config = *active;
             }
-            Curvature.SegmentationConfigInitialized = true;
-            Curvature.SegmentationConfigDirty = false;
+            Segmentation.Initialized = true;
+            Segmentation.Dirty = false;
         }
 
         Runtime::CurvatureSegmentationConfig& config =
-            Curvature.SegmentationConfig;
+            Segmentation.Config;
         bool changed = false;
+        ImGui::SeparatorText("Input properties");
+        changed |= DrawProcessingPropertyInput("Positions##Segmentation", model.PropertyCatalog, config.Positions);
+        ImGui::SeparatorText("Output properties");
+        changed |= DrawProcessingPropertyName("Components##Segmentation", config.Components.Name);
+        changed |= DrawProcessingPropertyName("Regions##Segmentation", config.Regions.Name);
+        changed |= DrawProcessingPropertyName("RegionColors##Segmentation", config.RegionColors.Name);
+        changed |= DrawProcessingPropertyName("Boundaries##Segmentation", config.Boundaries.Name);
+        changed |= DrawProcessingPropertyName("BoundaryColors##Segmentation", config.BoundaryColors.Name);
+        changed |= DrawProcessingPropertyName("HardFeatures##Segmentation", config.HardFeatures.Name);
+        changed |= DrawProcessingPropertyName("FeatureConfidence##Segmentation", config.FeatureConfidence.Name);
+        changed |= DrawProcessingPropertyName("BoundaryRoles##Segmentation", config.BoundaryRoles.Name);
+        changed |= DrawProcessingPropertyName("FeatureColors##Segmentation", config.FeatureColors.Name);
+
         if (ImGui::BeginCombo(
                 "Method##CurvatureSegmentation",
                 Runtime::DebugNameForCurvatureSegmentationMethod(
@@ -1273,7 +1151,7 @@ namespace Extrinsic::Sandbox::Editor
         }
         (void)ImGui::Checkbox(
             "Show clusters and boundaries after run##CurvatureSegmentation",
-            &Curvature.AutoVisualizeSegmentation);
+            &Segmentation.AutoVisualize);
 
         if (!boundaryCurves && ImGui::TreeNode("Advanced GMM and optimizer controls"))
         {
@@ -1343,91 +1221,79 @@ namespace Extrinsic::Sandbox::Editor
             config.PatchComplexityCost = std::clamp(
                 config.PatchComplexityCost, 0.0, 1.0e12);
         }
-        Curvature.SegmentationConfigDirty |= changed;
+        Segmentation.Dirty |= changed;
 
         const bool configCommandsAvailable =
-            context.GeometryConfigCommandsAvailable;
+            context.ProcessingConfigCommandsAvailable;
         ImGui::BeginDisabled(
             !configCommandsAvailable ||
-            !Curvature.SegmentationConfigDirty);
+            !Segmentation.Dirty);
         if (ImGui::Button("Apply configuration##CurvatureSegmentation"))
         {
-            Curvature.LastSegmentationConfigApply =
+            Segmentation.LastConfigApply =
                 Runtime::ApplyEditorCurvatureSegmentationConfig(
-                    context.GeometryCommands,
+                    context.MeshFields.Commands,
                     config,
                     "sandbox.curvature_segmentation.panel");
-            if (Curvature.LastSegmentationConfigApply->Succeeded())
-                Curvature.SegmentationConfigDirty = false;
+            if (Segmentation.LastConfigApply->Succeeded())
+                Segmentation.Dirty = false;
         }
         ImGui::EndDisabled();
         ImGui::SameLine();
         ImGui::BeginDisabled(!configCommandsAvailable);
         if (ImGui::Button("Reload active##CurvatureSegmentation"))
         {
-            Curvature.SegmentationConfigInitialized = false;
-            Curvature.SegmentationConfigDirty = false;
+            Segmentation.Initialized = false;
+            Segmentation.Dirty = false;
         }
         ImGui::EndDisabled();
 
         ImGui::BeginDisabled(!configCommandsAvailable);
         if (ImGui::Button("Run segmentation##CurvatureSegmentation"))
         {
-            Curvature.LastSegmentationConfigApply =
+            Segmentation.LastConfigApply =
                 Runtime::ApplyEditorCurvatureSegmentationConfig(
-                    context.GeometryCommands,
+                    context.MeshFields.Commands,
                     config,
                     "sandbox.curvature_segmentation.panel.run");
-            if (Curvature.LastSegmentationConfigApply->Succeeded())
+            if (Segmentation.LastConfigApply->Succeeded())
             {
-                Curvature.SegmentationConfigDirty = false;
-                Curvature.LastSegmentationResult =
+                Segmentation.Dirty = false;
+                Segmentation.LastResult =
                     Runtime::
                         ApplyEditorConfiguredCurvatureSegmentationCommand(
-                            context.GeometryCommands,
+                            context.MeshFields.Commands,
                             model.SelectedStableId);
-                if (Curvature.LastSegmentationResult->Succeeded())
+                if (Segmentation.LastResult->Succeeded())
                 {
-                    Curvature.LastSegmentationStableEntityId =
-                        model.SelectedStableId;
-                    if (Curvature.AutoVisualizeSegmentation)
+                    if (Segmentation.AutoVisualize)
                     {
                         ShowCurvatureSegmentationVisualization(
-                            context, model.SelectedStableId);
+                            context, model.SelectedStableId, config);
                     }
                 }
-                else
-                    Curvature.LastSegmentationStableEntityId.reset();
             }
         }
         ImGui::EndDisabled();
-        ImGui::SameLine();
-        ImGui::BeginDisabled(
-            !Curvature.LastSegmentationResult.has_value() ||
-            !Curvature.LastSegmentationResult->Succeeded() ||
-            !Curvature.LastSegmentationStableEntityId.has_value());
-        if (ImGui::Button("Show result##CurvatureSegmentation"))
-        {
-            ShowCurvatureSegmentationVisualization(
-                context,
-                *Curvature.LastSegmentationStableEntityId);
-        }
-        ImGui::EndDisabled();
+        ImGui::SeparatorText("Display output properties");
+        for (const auto* output : {&config.Components, &config.Regions, &config.RegionColors, &config.Boundaries, &config.BoundaryColors, &config.HardFeatures, &config.FeatureConfidence, &config.BoundaryRoles, &config.FeatureColors})
+            DrawProcessingPropertyShowButton(context, model.SelectedStableId, *output, Segmentation.VisualizationDiagnostic);
+        if (!Segmentation.VisualizationDiagnostic.empty()) ImGui::Text("Display: %s", Segmentation.VisualizationDiagnostic.c_str());
 
-        if (Curvature.LastSegmentationConfigApply.has_value() &&
-            !Curvature.LastSegmentationConfigApply->Succeeded())
+        if (Segmentation.LastConfigApply.has_value() &&
+            !Segmentation.LastConfigApply->Succeeded())
         {
             ImGui::TextDisabled(
                 "The configuration was rejected; inspect config diagnostics.");
         }
-        if (!Curvature.LastSegmentationResult.has_value())
+        if (!Segmentation.LastResult.has_value())
         {
             ImGui::TextDisabled("Last segmentation run: none");
             return;
         }
 
         const Runtime::EditorCurvatureSegmentationResult& result =
-            *Curvature.LastSegmentationResult;
+            *Segmentation.LastResult;
         ImGui::Text(
             "Last segmentation run: %s",
             Runtime::DebugNameForEditorCommandStatus(result.Status));
@@ -1527,7 +1393,7 @@ namespace Extrinsic::Sandbox::Editor
         ImGui::TextDisabled(
             "Feature lines and boundaries are non-destructive edge properties, not UV seams.");
         if (ImGui::SmallButton("Dismiss##CurvatureSegmentation"))
-            Curvature.LastSegmentationResult.reset();
+            Segmentation.LastResult.reset();
     }
 
     void MeshProcessingPanels::Impl::DrawRemeshControls(
@@ -1536,8 +1402,8 @@ namespace Extrinsic::Sandbox::Editor
     {
         const Runtime::EditorGeometryProcessingModel& processing =
             model.Processing;
-        if (context.GeometryResults.LastMeshRemeshResult.has_value())
-            Remesh.LastResult = *context.GeometryResults.LastMeshRemeshResult;
+        if (context.MeshTopology.Results.LastMeshRemeshResult.has_value())
+            Remesh.LastResult = *context.MeshTopology.Results.LastMeshRemeshResult;
         ImGui::SeparatorText("Remesh");
         if (!processing.MeshRemeshAvailable)
         {
@@ -1658,7 +1524,7 @@ namespace Extrinsic::Sandbox::Editor
             PublishCommandResult(
                 Remesh.LastResult,
                 Runtime::ApplyEditorMeshRemeshCommand(
-                    context.GeometryCommands,
+                    context.MeshTopology.Commands,
                     Runtime::EditorMeshRemeshCommand{
                         .StableEntityId = model.SelectedStableId,
                         .Mode = mode,
@@ -1668,15 +1534,14 @@ namespace Extrinsic::Sandbox::Editor
                         .TargetEdgeLength = static_cast<double>(
                             Remesh.TargetEdgeLength),
                         .ProjectToSurface = Remesh.ProjectToSurface,
-                    }),
-                context.MethodResultSinks.MeshRemesh);
+                    },
+                    context.MeshTopology.ResultSinks.MeshRemesh),
+                context.MeshTopology.ResultSinks.MeshRemesh);
         }
         if (!canRun)
             ImGui::EndDisabled();
 
-        const auto& result = Remesh.LastResult.has_value()
-            ? Remesh.LastResult
-            : processing.LastMeshRemeshResult;
+        const auto& result = Remesh.LastResult;
         if (!result.has_value())
         {
             ImGui::TextDisabled("Last remesh run: none");
@@ -1706,11 +1571,7 @@ namespace Extrinsic::Sandbox::Editor
         }
         if (!result->Message.empty())
             ImGui::TextWrapped("%s", result->Message.c_str());
-        DrawDismissLastResultButton(
-            "Dismiss##MeshRemesh",
-            Remesh.LastResult,
-            Runtime::EditorGeometryProcessingResultSlot::MeshRemesh,
-            context);
+        DrawDismissLastResultButton("Dismiss##MeshRemesh", Remesh.LastResult, Runtime::EditorMeshTopologyResultSlot::MeshRemesh, context.MeshTopology.ResultSinks.DismissResult);
     }
 
     void MeshProcessingPanels::Impl::DrawSubdivideControls(
@@ -1719,8 +1580,8 @@ namespace Extrinsic::Sandbox::Editor
     {
         const Runtime::EditorGeometryProcessingModel& processing =
             model.Processing;
-        if (context.GeometryResults.LastMeshSubdivideResult.has_value())
-            Subdivide.LastResult = *context.GeometryResults.LastMeshSubdivideResult;
+        if (context.MeshTopology.Results.LastMeshSubdivideResult.has_value())
+            Subdivide.LastResult = *context.MeshTopology.Results.LastMeshSubdivideResult;
         ImGui::SeparatorText("Subdivide");
         if (!processing.MeshSubdivideAvailable)
         {
@@ -1801,7 +1662,7 @@ namespace Extrinsic::Sandbox::Editor
             PublishCommandResult(
                 Subdivide.LastResult,
                 Runtime::ApplyEditorMeshSubdivideCommand(
-                    context.GeometryCommands,
+                    context.MeshTopology.Commands,
                     Runtime::EditorMeshSubdivideCommand{
                         .StableEntityId = model.SelectedStableId,
                         .Operator = op,
@@ -1809,15 +1670,14 @@ namespace Extrinsic::Sandbox::Editor
                             Subdivide.Iterations),
                         .PreserveLoopFeatureEdges =
                             Subdivide.PreserveLoopFeatures,
-                    }),
-                context.MethodResultSinks.MeshSubdivide);
+                    },
+                    context.MeshTopology.ResultSinks.MeshSubdivide),
+                context.MeshTopology.ResultSinks.MeshSubdivide);
         }
         if (!canRun)
             ImGui::EndDisabled();
 
-        const auto& result = Subdivide.LastResult.has_value()
-            ? Subdivide.LastResult
-            : processing.LastMeshSubdivideResult;
+        const auto& result = Subdivide.LastResult;
         if (!result.has_value())
         {
             ImGui::TextDisabled("Last subdivide run: none");
@@ -1843,11 +1703,7 @@ namespace Extrinsic::Sandbox::Editor
         }
         if (!result->Message.empty())
             ImGui::TextWrapped("%s", result->Message.c_str());
-        DrawDismissLastResultButton(
-            "Dismiss##MeshSubdivide",
-            Subdivide.LastResult,
-            Runtime::EditorGeometryProcessingResultSlot::MeshSubdivide,
-            context);
+        DrawDismissLastResultButton("Dismiss##MeshSubdivide", Subdivide.LastResult, Runtime::EditorMeshTopologyResultSlot::MeshSubdivide, context.MeshTopology.ResultSinks.DismissResult);
     }
 
     void MeshProcessingPanels::Impl::DrawSimplifyControls(
@@ -1856,8 +1712,8 @@ namespace Extrinsic::Sandbox::Editor
     {
         const Runtime::EditorGeometryProcessingModel& processing =
             model.Processing;
-        if (context.GeometryResults.LastMeshSimplifyResult.has_value())
-            Simplify.LastResult = *context.GeometryResults.LastMeshSimplifyResult;
+        if (context.MeshTopology.Results.LastMeshSimplifyResult.has_value())
+            Simplify.LastResult = *context.MeshTopology.Results.LastMeshSimplifyResult;
         ImGui::SeparatorText("Simplify");
         if (!processing.MeshSimplifyAvailable)
         {
@@ -1942,7 +1798,7 @@ namespace Extrinsic::Sandbox::Editor
             PublishCommandResult(
                 Simplify.LastResult,
                 Runtime::ApplyEditorMeshSimplifyCommand(
-                    context.GeometryCommands,
+                    context.MeshTopology.Commands,
                     Runtime::EditorMeshSimplifyCommand{
                         .StableEntityId = model.SelectedStableId,
                         .Metric = metric,
@@ -1961,15 +1817,14 @@ namespace Extrinsic::Sandbox::Editor
                         .PreserveSharpFeatures =
                             Simplify.PreserveSharpFeatures,
                         .PreserveUvSeams = Simplify.PreserveUvSeams,
-                    }),
-                context.MethodResultSinks.MeshSimplify);
+                    },
+                    context.MeshTopology.ResultSinks.MeshSimplify),
+                context.MeshTopology.ResultSinks.MeshSimplify);
         }
         if (!canRun)
             ImGui::EndDisabled();
 
-        const auto& result = Simplify.LastResult.has_value()
-            ? Simplify.LastResult
-            : processing.LastMeshSimplifyResult;
+        const auto& result = Simplify.LastResult;
         if (!result.has_value())
         {
             ImGui::TextDisabled("Last simplify run: none");
@@ -2003,32 +1858,23 @@ namespace Extrinsic::Sandbox::Editor
         }
         if (!result->Message.empty())
             ImGui::TextWrapped("%s", result->Message.c_str());
-        DrawDismissLastResultButton(
-            "Dismiss##MeshSimplify",
-            Simplify.LastResult,
-            Runtime::EditorGeometryProcessingResultSlot::MeshSimplify,
-            context);
+        DrawDismissLastResultButton("Dismiss##MeshSimplify", Simplify.LastResult, Runtime::EditorMeshTopologyResultSlot::MeshSimplify, context.MeshTopology.ResultSinks.DismissResult);
     }
 
     void MeshProcessingPanels::Impl::DrawNormalsWindow(bool &open, const SandboxEditorContext &context)
     {
-        if (context.GeometryResults.LastNormalEstimationResult)
-            Normals.LastResult = context.GeometryResults.LastNormalEstimationResult;
+        if (context.Normals.Results.LastNormalEstimationResult)
+            Normals.LastResult = context.Normals.Results.LastNormalEstimationResult;
         ImGui::SetNextWindowSize(ImVec2(460, 600), ImGuiCond_FirstUseEver);
         if (!ImGui::Begin("Normal Estimation", &open))
         {
             ImGui::End();
             return;
         }
-        const auto active = Runtime::GetEditorNormalEstimationConfig(context.GeometryCommands)
+        const auto active = Runtime::GetEditorNormalEstimationConfig(context.Normals.Commands)
                                 .value_or(Runtime::NormalEstimationConfig{});
         const auto serialized = Runtime::SerializeNormalEstimationConfig(active);
-        if (serialized != Normals.LastApplied)
-        {
-            Normals.Draft = active;
-            Normals.LastApplied = serialized;
-            Normals.ConfigDiagnostic.clear();
-        }
+        Normals.Synchronize(active, serialized);
         auto &config = Normals.Draft;
         bool changed = false;
         if (Normals.OpenFacePreset)
@@ -2039,86 +1885,19 @@ namespace Extrinsic::Sandbox::Editor
                                 decltype(config.Positions.ValueKind)::Vec3};
             config.Output = {Runtime::GeometryElementDomain::MeshFace, "f:normal",
                              decltype(config.Output.ValueKind)::Vec3};
-            if (context.Selection && !context.Selection->SelectedStableIds.empty())
-                config.StableEntityId = context.Selection->SelectedStableIds.front();
             changed = true;
         }
-        const auto workspace =
-            Runtime::BuildEditorWorkspaceSnapshot(context.SnapshotQueries, {.Hierarchy = true,
-                                                                            .Inspector = false,
-                                                                            .Selection = false,
-                                                                            .Document = false,
-                                                                            .SceneFile = false,
-                                                                            .FileImport = false,
-                                                                            .AssetImportQueue = false,
-                                                                            .RenderGraph = false,
-                                                                            .RenderRecipe = false,
-                                                                            .CameraRender = false,
-                                                                            .Visualization = false});
-        if (context.Selection && !context.Selection->SelectedStableIds.empty() &&
-            ImGui::Button("Use selected entity"))
+        changed |= DrawProcessingEntity("Entity##Normals", context,
+            config.StableEntityId, Normals.LastSelectedEntity);
+        DrawProcessingCpuBackend();
+        if (DrawProcessingPointInput("Positions##Normals", [&] { return Runtime::GetEditorPointInputCatalog(context.Processing, config.StableEntityId); }, config.Positions, config.Method == Runtime::NormalEstimationMethod::MeshFaceNormals
+                    ? std::optional{Runtime::GeometryElementDomain::MeshVertex} : std::nullopt))
         {
-            config.StableEntityId = context.Selection->SelectedStableIds.front();
+            config.Output.Domain = config.Method == Runtime::NormalEstimationMethod::MeshFaceNormals
+                ? Runtime::GeometryElementDomain::MeshFace : config.Positions.Domain;
             changed = true;
         }
-        std::string entityName =
-            config.StableEntityId ? std::to_string(config.StableEntityId) : "Choose entity";
-        for (const auto &row : workspace.Hierarchy)
-            if (row.StableEntityId == config.StableEntityId)
-                entityName = row.Name;
-        if (ImGui::BeginCombo("Entity##Normals", entityName.c_str()))
-        {
-            for (const auto &row : workspace.Hierarchy)
-            {
-                if (Runtime::GetEditorNormalEstimationInputCatalog(context.GeometryCommands,
-                                                                   row.StableEntityId)
-                        .Entries.empty())
-                    continue;
-                const auto title = row.Name + " (" + std::to_string(row.StableEntityId) + ")";
-                if (ImGui::Selectable(title.c_str(), row.StableEntityId == config.StableEntityId))
-                {
-                    config.StableEntityId = row.StableEntityId;
-                    changed = true;
-                }
-            }
-            ImGui::EndCombo();
-        }
-        const auto inputName =
-            std::string(Runtime::ToString(config.Positions.Domain)) + ": " + config.Positions.Name;
-        if (ImGui::BeginCombo("Positions##Normals", inputName.c_str()))
-        {
-            const auto catalog = Runtime::GetEditorNormalEstimationInputCatalog(context.GeometryCommands, config.StableEntityId);
-            auto previousDomain = Runtime::GeometryElementDomain::Unknown;
-            for (const auto &row : catalog.Entries)
-            {
-                if (config.Method == Runtime::NormalEstimationMethod::MeshFaceNormals &&
-                    row.Ref.Domain != Runtime::GeometryElementDomain::MeshVertex)
-                    continue;
-                if (row.Ref.Domain != previousDomain)
-                {
-                    ImGui::SeparatorText(std::string(Runtime::ToString(row.Ref.Domain)).c_str());
-                    previousDomain = row.Ref.Domain;
-                }
-                const auto label = std::string(Runtime::ToString(row.Ref.Domain)) + ": " + row.Ref.Name +
-                                   " (" + std::to_string(row.ElementCount) + ")";
-                if (ImGui::Selectable(label.c_str(), row.Ref == config.Positions))
-                {
-                    config.Positions = row.Ref;
-                    config.Output.Domain = config.Method == Runtime::NormalEstimationMethod::MeshFaceNormals
-                        ? Runtime::GeometryElementDomain::MeshFace : row.Ref.Domain;
-                    changed = true;
-                }
-            }
-            ImGui::EndCombo();
-        }
-        std::array<char, 512> output{};
-        std::copy_n(config.Output.Name.c_str(), std::min(config.Output.Name.size(), output.size() - 1),
-                    output.data());
-        if (ImGui::InputText("Output property##Normals", output.data(), output.size()))
-        {
-            config.Output.Name = output.data();
-            changed = true;
-        }
+        changed |= DrawProcessingPropertyName("Output property##Normals", config.Output.Name);
         if (ImGui::BeginCombo("Method##Normals", Runtime::ToString(config.Method)))
         {
             for (auto method : {Runtime::NormalEstimationMethod::PointSetPCA,
@@ -2134,7 +1913,7 @@ namespace Extrinsic::Sandbox::Editor
                     candidate.Output.Name = method == Runtime::NormalEstimationMethod::MeshFaceNormals
                         ? "f:normal" : "v:normal";
                 const auto readiness =
-                    Runtime::PreviewEditorNormalEstimationCommand(context.GeometryCommands, candidate);
+                    Runtime::PreviewEditorNormalEstimationCommand(context.Normals.Commands, candidate);
                 ImGui::BeginDisabled(!readiness.Ready);
                 if (ImGui::Selectable(Runtime::ToString(method), config.Method == method))
                 {
@@ -2153,7 +1932,7 @@ namespace Extrinsic::Sandbox::Editor
                 "PCA fits local planes to spatial neighbors on the selected element domain. Radius mode uses "
                 "all neighbors within the radius; otherwise k nearest neighbors are used.");
             int backend = int(config.Backend);
-            if (ImGui::Combo("Neighbors##Normals", &backend, "CPU KD-tree\0CPU LBVH (cached)\0Vulkan LBVH (CPU fit)\0"))
+            if (ImGui::Combo("Acceleration##Normals", &backend, "CPU KD-tree\0CPU LBVH (cached)\0Vulkan LBVH (CPU fit)\0"))
             {
                 config.Backend = Runtime::NormalEstimationBackend(backend);
                 changed = true;
@@ -2212,22 +1991,24 @@ namespace Extrinsic::Sandbox::Editor
         }
         if (changed)
         {
-            const auto applied = Runtime::ApplyEditorNormalEstimationConfig(context.GeometryCommands, config);
+            const auto applied = Runtime::ApplyEditorNormalEstimationConfig(context.Normals.Commands, config);
             Normals.ConfigDiagnostic =
                 applied.Succeeded() ? "" : "Controls were rejected by normal config validation.";
         }
         if (!Normals.ConfigDiagnostic.empty())
             ImGui::TextWrapped("%s", Normals.ConfigDiagnostic.c_str());
         const auto readiness =
-            Runtime::PreviewEditorNormalEstimationCommand(context.GeometryCommands, config);
+            Runtime::PreviewEditorNormalEstimationCommand(context.Normals.Commands, config);
         if (!readiness.Ready)
             ImGui::TextWrapped("%s", readiness.Diagnostic.c_str());
-        ImGui::BeginDisabled(!context.GeometryConfigCommandsAvailable || !readiness.Ready ||
+        ImGui::BeginDisabled(!context.ProcessingConfigCommandsAvailable || !readiness.Ready ||
                              !Normals.ConfigDiagnostic.empty());
         if (ImGui::Button("Estimate normals"))
             PublishCommandResult(Normals.LastResult,
-                                 Runtime::ApplyEditorConfiguredNormalEstimation(context.GeometryCommands),
-                                 context.MethodResultSinks.NormalEstimation);
+                                 Runtime::ApplyEditorConfiguredNormalEstimation(context.Normals.Commands, context.Normals.ResultSinks.NormalEstimation),
+                                 context.Normals.ResultSinks.NormalEstimation);
+        ImGui::EndDisabled();
+        const auto outputProperty = config.Output;
         ImGui::SameLine();
         if (config.Method == Runtime::NormalEstimationMethod::MeshFaceNormals)
         {
@@ -2244,23 +2025,16 @@ namespace Extrinsic::Sandbox::Editor
                      .Target = Runtime::EditorVisualizationTarget::Surface,
                      .Domain = Runtime::EditorVisualizationPropertyDomain::MeshFaces,
                      .Preset = Runtime::EditorVisualizationPropertyPreset::ColorBuffer,
-                     .PropertyName = readiness.Resolved.Output.Name});
+                     .PropertyName = outputProperty.Name});
                 (void)hint;
                 Normals.VisualizationDiagnostic = Runtime::DebugNameForEditorCommandStatus(status);
             }
         }
-        else if (ImGui::Button("Show normal vectors"))
+        else if (ImGui::Button("Show normals"))
         {
-            const auto status = Runtime::ApplyEditorVisualizationRecipeCommand(
-                context.VisualizationCommands,
-                {.StableEntityId = config.StableEntityId,
-                 .Recipe = {.Data = Runtime::VectorFieldVisualizationRecipe{
-                                .Source = readiness.Resolved.Output,
-                                .PositionSource = readiness.Resolved.Positions,
-                                .OutputName = readiness.Resolved.Output.Name + ".vectors"}}});
+            const auto status = ShowProcessingProperty(context, config.StableEntityId, outputProperty);
             Normals.VisualizationDiagnostic = Runtime::DebugNameForEditorCommandStatus(status);
         }
-        ImGui::EndDisabled();
         if (!Normals.VisualizationDiagnostic.empty())
             ImGui::Text("Normal display: %s", Normals.VisualizationDiagnostic.c_str());
         if (Normals.LastResult)
@@ -2278,107 +2052,44 @@ namespace Extrinsic::Sandbox::Editor
             ImGui::Text("Written: %zu; changed: %zu; cached index reused: %s", result.WrittenCount,
                         result.ChangedCount, result.IndexReused ? "yes" : "no");
             ImGui::TextWrapped("%s", result.Message.c_str());
-            DrawDismissLastResultButton("Dismiss##Normals", Normals.LastResult,
-                                        Runtime::EditorGeometryProcessingResultSlot::NormalEstimation,
-                                        context);
+            if (DrawDismissLastResultButton("Dismiss##Normals"))
+            {
+                Normals.LastResult.reset();
+                if (context.Normals.ResultSinks.DismissResult) context.Normals.ResultSinks.DismissResult();
+            }
         }
         ImGui::End();
     }
 
     void MeshProcessingPanels::Impl::DrawOutliersWindow(bool &open, const SandboxEditorContext &context)
     {
-        if (context.GeometryResults.LastOutlierAnalysisResult)
-            Outliers.LastResult = context.GeometryResults.LastOutlierAnalysisResult;
+        if (context.PointAnalysis.Results.LastOutlierAnalysisResult)
+            Outliers.LastResult = context.PointAnalysis.Results.LastOutlierAnalysisResult;
         ImGui::SetNextWindowSize(ImVec2(460, 600), ImGuiCond_FirstUseEver);
         if (!ImGui::Begin("Outlier Analysis", &open))
         {
             ImGui::End();
             return;
         }
-        const auto active = Runtime::GetEditorOutlierAnalysisConfig(context.GeometryCommands)
+        const auto active = Runtime::GetEditorOutlierAnalysisConfig(context.PointAnalysis.Commands)
                                 .value_or(Runtime::OutlierAnalysisConfig{});
         const auto serialized = Runtime::SerializeOutlierAnalysisConfig(active);
-        if (serialized != Outliers.LastApplied)
-        {
-            Outliers.Draft = active;
-            Outliers.LastApplied = serialized;
-            Outliers.ConfigDiagnostic.clear();
-        }
+        Outliers.Synchronize(active, serialized);
         auto &config = Outliers.Draft;
         bool changed = false;
-        const auto workspace =
-            Runtime::BuildEditorWorkspaceSnapshot(context.SnapshotQueries, {.Hierarchy = true,
-                                                                            .Inspector = false,
-                                                                            .Selection = false,
-                                                                            .Document = false,
-                                                                            .SceneFile = false,
-                                                                            .FileImport = false,
-                                                                            .AssetImportQueue = false,
-                                                                            .RenderGraph = false,
-                                                                            .RenderRecipe = false,
-                                                                            .CameraRender = false,
-                                                                            .Visualization = false});
-        if (context.Selection && !context.Selection->SelectedStableIds.empty() &&
-            ImGui::Button("Use selected entity"))
+        changed |= DrawProcessingEntity("Entity##Outliers", context,
+            config.StableEntityId, Outliers.LastSelectedEntity);
+        DrawProcessingCpuBackend();
+        if (DrawProcessingPointInput("Positions##Outliers", [&] { return Runtime::GetEditorPointInputCatalog(context.Processing, config.StableEntityId); }, config.Positions))
         {
-            config.StableEntityId = context.Selection->SelectedStableIds.front();
+            config.Mask.Domain = config.Score.Domain = config.Positions.Domain;
             changed = true;
         }
-        std::string entityName =
-            config.StableEntityId ? std::to_string(config.StableEntityId) : "Choose entity";
-        for (const auto &row : workspace.Hierarchy)
-            if (row.StableEntityId == config.StableEntityId)
-                entityName = row.Name;
-        if (ImGui::BeginCombo("Entity##Outliers", entityName.c_str()))
-        {
-            for (const auto &row : workspace.Hierarchy)
-            {
-                if (Runtime::GetEditorOutlierAnalysisInputCatalog(context.GeometryCommands,
-                                                                   row.StableEntityId)
-                        .Entries.empty())
-                    continue;
-                const auto title = row.Name + " (" + std::to_string(row.StableEntityId) + ")";
-                if (ImGui::Selectable(title.c_str(), row.StableEntityId == config.StableEntityId))
-                {
-                    config.StableEntityId = row.StableEntityId;
-                    changed = true;
-                }
-            }
-            ImGui::EndCombo();
-        }
-        const auto inputName =
-            std::string(Runtime::ToString(config.Positions.Domain)) + ": " + config.Positions.Name;
-        if (ImGui::BeginCombo("Positions##Outliers", inputName.c_str()))
-        {
-            const auto catalog = Runtime::GetEditorOutlierAnalysisInputCatalog(context.GeometryCommands, config.StableEntityId);
-            auto previousDomain = Runtime::GeometryElementDomain::Unknown;
-            for (const auto &row : catalog.Entries)
-            {
-                if (row.Ref.Domain != previousDomain)
-                {
-                    ImGui::SeparatorText(std::string(Runtime::ToString(row.Ref.Domain)).c_str());
-                    previousDomain = row.Ref.Domain;
-                }
-                const auto label = std::string(Runtime::ToString(row.Ref.Domain)) + ": " + row.Ref.Name +
-                                   " (" + std::to_string(row.ElementCount) + ")";
-                if (ImGui::Selectable(label.c_str(), row.Ref == config.Positions))
-                {
-                    config.Positions = row.Ref;
-                    config.Mask.Domain = config.Score.Domain = row.Ref.Domain;
-                    changed = true;
-                }
-            }
-            ImGui::EndCombo();
-        }
         for (auto [label, ref] : {std::pair{"Mask property", &config.Mask}, std::pair{"Score property", &config.Score}})
-        {
-            std::array<char,512> name{};
-            std::copy_n(ref->Name.c_str(),std::min(ref->Name.size(),name.size()-1),name.data());
-            if (ImGui::InputText(label,name.data(),name.size())) {ref->Name=name.data();changed=true;}
-        }
+            changed |= DrawProcessingPropertyName(label, ref->Name);
         int method=int(config.Method), backend=int(config.Backend);
         if(ImGui::Combo("Method",&method,"Statistical\0Radius\0Local distance ratio\0")) {config.Method=Runtime::OutlierAnalysisMethod(method);changed=true;}
-        if(ImGui::Combo("Neighbors",&backend,"CPU octree\0CPU LBVH (cached)\0Vulkan LBVH\0")) {config.Backend=Runtime::OutlierAnalysisBackend(backend);changed=true;}
+        if(ImGui::Combo("Acceleration",&backend,"CPU octree\0CPU LBVH (cached)\0Vulkan LBVH\0")) {config.Backend=Runtime::OutlierAnalysisBackend(backend);changed=true;}
         if(config.Method==Runtime::OutlierAnalysisMethod::Statistical)
         {
             changed |= ImGui::InputScalar("Neighbors k",ImGuiDataType_U32,&config.KNeighbors);
@@ -2402,42 +2113,38 @@ namespace Extrinsic::Sandbox::Editor
         if(changed)
         {
             config.Operation=Runtime::OutlierAnalysisOperation::Analyze;
-            const auto applied=Runtime::ApplyEditorOutlierAnalysisConfig(context.GeometryCommands,config);
+            const auto applied=Runtime::ApplyEditorOutlierAnalysisConfig(context.PointAnalysis.Commands,config);
             Outliers.ConfigDiagnostic=applied.Succeeded()?"":"Controls were rejected by outlier config validation.";
         }
         if(!Outliers.ConfigDiagnostic.empty())ImGui::TextWrapped("%s",Outliers.ConfigDiagnostic.c_str());
         auto analyze=config;analyze.Operation=Runtime::OutlierAnalysisOperation::Analyze;
-        const auto readiness=Runtime::PreviewEditorOutlierAnalysisCommand(context.GeometryCommands,analyze);
+        const auto readiness=Runtime::PreviewEditorOutlierAnalysisCommand(context.PointAnalysis.Commands,analyze);
         if(!readiness.Ready)ImGui::TextWrapped("%s",readiness.Diagnostic.c_str());
         const auto execute=[&](Runtime::OutlierAnalysisConfig request){
-            const auto applied=Runtime::ApplyEditorOutlierAnalysisConfig(context.GeometryCommands,request);
+            const auto applied=Runtime::ApplyEditorOutlierAnalysisConfig(context.PointAnalysis.Commands,request);
             if(applied.Succeeded())
-                PublishCommandResult(Outliers.LastResult,Runtime::ApplyEditorConfiguredOutlierAnalysis(context.GeometryCommands),context.MethodResultSinks.OutlierAnalysis);
+                PublishCommandResult(Outliers.LastResult,Runtime::ApplyEditorConfiguredOutlierAnalysis(context.PointAnalysis.Commands, context.PointAnalysis.ResultSinks.OutlierAnalysis),context.PointAnalysis.ResultSinks.OutlierAnalysis);
             else Outliers.ConfigDiagnostic="Outlier config was rejected.";
         };
-        ImGui::BeginDisabled(!context.GeometryConfigCommandsAvailable || !readiness.Ready || !Outliers.ConfigDiagnostic.empty());
+        ImGui::BeginDisabled(!context.ProcessingConfigCommandsAvailable || !readiness.Ready || !Outliers.ConfigDiagnostic.empty());
         if(ImGui::Button("Detect outliers"))execute(analyze);
         ImGui::EndDisabled();
         ImGui::TextWrapped("Detection writes a mask (1 = outlier) and a score. Geometry stays in source order.");
         auto remove=config;remove.Operation=Runtime::OutlierAnalysisOperation::RemoveMarked;
-        const auto removal=Runtime::PreviewEditorOutlierAnalysisCommand(context.GeometryCommands,remove);
-        ImGui::BeginDisabled(!context.GeometryConfigCommandsAvailable || !removal.Ready || !Outliers.ConfigDiagnostic.empty());
+        const auto removal=Runtime::PreviewEditorOutlierAnalysisCommand(context.PointAnalysis.Commands,remove);
+        ImGui::BeginDisabled(!context.ProcessingConfigCommandsAvailable || !removal.Ready || !Outliers.ConfigDiagnostic.empty());
         if(ImGui::Button("Remove marked points"))execute(remove);
         ImGui::EndDisabled();
         if(!removal.Ready && ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
             ImGui::SetTooltip("%s",removal.Diagnostic.c_str());
         ImGui::TextWrapped("Removal compacts point clouds and supports Undo. Detect again after changing positions or the mask.");
-        auto mask=config.Mask, score=config.Score;
-        if(readiness.Ready){mask=readiness.Resolved.Mask;score=readiness.Resolved.Score;}
+        auto mask=config.Mask,
+             score=config.Score;
         if(ImGui::Button("Show mask"))
-            Outliers.VisualizationDiagnostic=Runtime::DebugNameForEditorCommandStatus(Runtime::ApplyEditorVisualizationRecipeCommand(
-                context.VisualizationCommands,{.StableEntityId=config.StableEntityId,
-                .Recipe={.Data=Runtime::LabelVisualizationRecipe{.Source=mask,.OutputName=mask.Name+".colors"}}}));
+            Outliers.VisualizationDiagnostic=Runtime::DebugNameForEditorCommandStatus(ShowProcessingProperty(context, config.StableEntityId, mask));
         ImGui::SameLine();
         if(ImGui::Button("Show score"))
-            Outliers.VisualizationDiagnostic=Runtime::DebugNameForEditorCommandStatus(Runtime::ApplyEditorVisualizationRecipeCommand(
-                context.VisualizationCommands,{.StableEntityId=config.StableEntityId,
-                .Recipe={.Data=Runtime::ScalarVisualizationRecipe{.Source=score,.OutputName=score.Name+".colors"}}}));
+            Outliers.VisualizationDiagnostic=Runtime::DebugNameForEditorCommandStatus(ShowProcessingProperty(context, config.StableEntityId, score));
         if(!Outliers.VisualizationDiagnostic.empty())ImGui::Text("Display: %s",Outliers.VisualizationDiagnostic.c_str());
         if(Outliers.LastResult)
         {
@@ -2449,104 +2156,39 @@ namespace Extrinsic::Sandbox::Editor
             if(result.Method==Runtime::OutlierAnalysisMethod::Statistical)
                 ImGui::Text("Mean %.5g; standard deviation %.5g; threshold %.5g",double(result.MeanDistance),double(result.StdDevDistance),double(result.DistanceThreshold));
             ImGui::TextWrapped("%s",result.Message.c_str());
-            DrawDismissLastResultButton("Dismiss##Outliers",Outliers.LastResult,Runtime::EditorGeometryProcessingResultSlot::OutlierAnalysis,context);
+            DrawDismissLastResultButton("Dismiss##Outliers", Outliers.LastResult, Runtime::EditorPointAnalysisResultSlot::OutlierAnalysis, context.PointAnalysis.ResultSinks.DismissResult);
         }
         ImGui::End();
     }
 
     void MeshProcessingPanels::Impl::DrawKeypointsWindow(bool &open, const SandboxEditorContext &context)
     {
-        if (context.GeometryResults.LastKeypointAnalysisResult)
-            Keypoints.LastResult = context.GeometryResults.LastKeypointAnalysisResult;
+        if (context.PointAnalysis.Results.LastKeypointAnalysisResult)
+            Keypoints.LastResult = context.PointAnalysis.Results.LastKeypointAnalysisResult;
         ImGui::SetNextWindowSize(ImVec2(460, 600), ImGuiCond_FirstUseEver);
         if (!ImGui::Begin("ISS Keypoint Analysis", &open))
         {
             ImGui::End();
             return;
         }
-        const auto active = Runtime::GetEditorKeypointAnalysisConfig(context.GeometryCommands)
+        const auto active = Runtime::GetEditorKeypointAnalysisConfig(context.PointAnalysis.Commands)
                                 .value_or(Runtime::KeypointAnalysisConfig{});
         const auto serialized = Runtime::SerializeKeypointAnalysisConfig(active);
-        if (serialized != Keypoints.LastApplied)
-        {
-            Keypoints.Draft = active;
-            Keypoints.LastApplied = serialized;
-            Keypoints.ConfigDiagnostic.clear();
-        }
+        Keypoints.Synchronize(active, serialized);
         auto &config = Keypoints.Draft;
         bool changed = false;
-        const auto workspace =
-            Runtime::BuildEditorWorkspaceSnapshot(context.SnapshotQueries, {.Hierarchy = true,
-                                                                            .Inspector = false,
-                                                                            .Selection = false,
-                                                                            .Document = false,
-                                                                            .SceneFile = false,
-                                                                            .FileImport = false,
-                                                                            .AssetImportQueue = false,
-                                                                            .RenderGraph = false,
-                                                                            .RenderRecipe = false,
-                                                                            .CameraRender = false,
-                                                                            .Visualization = false});
-        if (context.Selection && !context.Selection->SelectedStableIds.empty() &&
-            ImGui::Button("Use selected entity"))
+        changed |= DrawProcessingEntity("Entity##Keypoints", context,
+            config.StableEntityId, Keypoints.LastSelectedEntity);
+        DrawProcessingCpuBackend();
+        if (DrawProcessingPointInput("Positions##Keypoints", [&] { return Runtime::GetEditorPointInputCatalog(context.Processing, config.StableEntityId); }, config.Positions))
         {
-            config.StableEntityId = context.Selection->SelectedStableIds.front();
+            config.Mask.Domain = config.Score.Domain = config.Positions.Domain;
             changed = true;
         }
-        std::string entityName =
-            config.StableEntityId ? std::to_string(config.StableEntityId) : "Choose entity";
-        for (const auto &row : workspace.Hierarchy)
-            if (row.StableEntityId == config.StableEntityId)
-                entityName = row.Name;
-        if (ImGui::BeginCombo("Entity##Keypoints", entityName.c_str()))
-        {
-            for (const auto &row : workspace.Hierarchy)
-            {
-                if (Runtime::GetEditorKeypointAnalysisInputCatalog(context.GeometryCommands,
-                                                                   row.StableEntityId)
-                        .Entries.empty())
-                    continue;
-                const auto title = row.Name + " (" + std::to_string(row.StableEntityId) + ")";
-                if (ImGui::Selectable(title.c_str(), row.StableEntityId == config.StableEntityId))
-                {
-                    config.StableEntityId = row.StableEntityId;
-                    changed = true;
-                }
-            }
-            ImGui::EndCombo();
-        }
-        const auto inputName =
-            std::string(Runtime::ToString(config.Positions.Domain)) + ": " + config.Positions.Name;
-        if (ImGui::BeginCombo("Positions##Keypoints", inputName.c_str()))
-        {
-            const auto catalog = Runtime::GetEditorKeypointAnalysisInputCatalog(context.GeometryCommands, config.StableEntityId);
-            auto previousDomain = Runtime::GeometryElementDomain::Unknown;
-            for (const auto &row : catalog.Entries)
-            {
-                if (row.Ref.Domain != previousDomain)
-                {
-                    ImGui::SeparatorText(std::string(Runtime::ToString(row.Ref.Domain)).c_str());
-                    previousDomain = row.Ref.Domain;
-                }
-                const auto label = std::string(Runtime::ToString(row.Ref.Domain)) + ": " + row.Ref.Name +
-                                   " (" + std::to_string(row.ElementCount) + ")";
-                if (ImGui::Selectable(label.c_str(), row.Ref == config.Positions))
-                {
-                    config.Positions = row.Ref;
-                    config.Mask.Domain = config.Score.Domain = row.Ref.Domain;
-                    changed = true;
-                }
-            }
-            ImGui::EndCombo();
-        }
         for (auto [label, ref] : {std::pair{"Mask property", &config.Mask}, std::pair{"Saliency property", &config.Score}})
-        {
-            std::array<char,512> name{};
-            std::copy_n(ref->Name.c_str(),std::min(ref->Name.size(),name.size()-1),name.data());
-            if (ImGui::InputText(label,name.data(),name.size())) {ref->Name=name.data();changed=true;}
-        }
+            changed |= DrawProcessingPropertyName(label, ref->Name);
         int backend=int(config.Backend);
-        if(ImGui::Combo("Neighbors",&backend,"CPU KD-tree\0CPU LBVH (cached)\0Vulkan LBVH\0")) {config.Backend=Runtime::KeypointAnalysisBackend(backend);changed=true;}
+        if(ImGui::Combo("Acceleration",&backend,"CPU KD-tree\0CPU LBVH (cached)\0Vulkan LBVH\0")) {config.Backend=Runtime::KeypointAnalysisBackend(backend);changed=true;}
         changed |= ImGui::InputFloat("Salient radius (0 = automatic)",&config.SalientRadius);
         changed |= ImGui::InputFloat("Suppression radius (0 = automatic)",&config.NonMaxRadius);
         changed |= ImGui::InputDouble("Eigenvalue ratio 2 / 1",&config.Gamma21);
@@ -2559,36 +2201,20 @@ namespace Extrinsic::Sandbox::Editor
             changed |= ImGui::InputScalar("Complete radius capacity",ImGuiDataType_U32,&config.GpuRadiusCapacity);
             ImGui::TextWrapped("Radius support must fit the selected capacity (up to 1024). Overflow retains previous outputs. Scale, covariance and suppression run on CPU.");
         }
-        if(changed)
-        {
-            const auto applied=Runtime::ApplyEditorKeypointAnalysisConfig(context.GeometryCommands,config);
-            Keypoints.ConfigDiagnostic=applied.Succeeded()?"":"Controls were rejected by keypoint config validation.";
-        }
-        if(!Keypoints.ConfigDiagnostic.empty())ImGui::TextWrapped("%s",Keypoints.ConfigDiagnostic.c_str());
-        auto analyze=config;
-        const auto readiness=Runtime::PreviewEditorKeypointAnalysisCommand(context.GeometryCommands,analyze);
-        if(!readiness.Ready)ImGui::TextWrapped("%s",readiness.Diagnostic.c_str());
-        const auto execute=[&](Runtime::KeypointAnalysisConfig request){
-            const auto applied=Runtime::ApplyEditorKeypointAnalysisConfig(context.GeometryCommands,request);
-            if(applied.Succeeded())
-                PublishCommandResult(Keypoints.LastResult,Runtime::ApplyEditorConfiguredKeypointAnalysis(context.GeometryCommands),context.MethodResultSinks.KeypointAnalysis);
-            else Keypoints.ConfigDiagnostic="Keypoint config was rejected.";
-        };
-        ImGui::BeginDisabled(!context.GeometryConfigCommandsAvailable || !readiness.Ready || !Keypoints.ConfigDiagnostic.empty());
-        if(ImGui::Button("Detect keypoints"))execute(analyze);
-        ImGui::EndDisabled();
+        DrawProcessingExecution(context, Keypoints, changed,
+            [&](const auto& request) { return Runtime::PreviewEditorKeypointAnalysisCommand(context.PointAnalysis.Commands, request); },
+            [&](const auto& request) { return Runtime::ApplyEditorKeypointAnalysisConfig(context.PointAnalysis.Commands, request); },
+            [&] { return Runtime::ApplyEditorConfiguredKeypointAnalysis(context.PointAnalysis.Commands, context.PointAnalysis.ResultSinks.KeypointAnalysis); },
+            context.PointAnalysis.ResultSinks.KeypointAnalysis, "Detect keypoints",
+            "Controls were rejected by keypoint config validation.", "Keypoint config was rejected.");
         ImGui::TextWrapped("Detection writes a mask (1 = retained keypoint) and a score. Geometry stays in source order.");
-        auto mask=config.Mask, score=config.Score;
-        if(readiness.Ready){mask=readiness.Resolved.Mask;score=readiness.Resolved.Score;}
+        auto mask=config.Mask,
+             score=config.Score;
         if(ImGui::Button("Show mask"))
-            Keypoints.VisualizationDiagnostic=Runtime::DebugNameForEditorCommandStatus(Runtime::ApplyEditorVisualizationRecipeCommand(
-                context.VisualizationCommands,{.StableEntityId=config.StableEntityId,
-                .Recipe={.Data=Runtime::LabelVisualizationRecipe{.Source=mask,.OutputName=mask.Name+".colors"}}}));
+            Keypoints.VisualizationDiagnostic=Runtime::DebugNameForEditorCommandStatus(ShowProcessingProperty(context, config.StableEntityId, mask));
         ImGui::SameLine();
         if(ImGui::Button("Show saliency"))
-            Keypoints.VisualizationDiagnostic=Runtime::DebugNameForEditorCommandStatus(Runtime::ApplyEditorVisualizationRecipeCommand(
-                context.VisualizationCommands,{.StableEntityId=config.StableEntityId,
-                .Recipe={.Data=Runtime::ScalarVisualizationRecipe{.Source=score,.OutputName=score.Name+".colors"}}}));
+            Keypoints.VisualizationDiagnostic=Runtime::DebugNameForEditorCommandStatus(ShowProcessingProperty(context, config.StableEntityId, score));
         if(!Keypoints.VisualizationDiagnostic.empty())ImGui::Text("Display: %s",Keypoints.VisualizationDiagnostic.c_str());
         if(Keypoints.LastResult)
         {
@@ -2600,101 +2226,40 @@ namespace Extrinsic::Sandbox::Editor
             ImGui::Text("Spacing: %.5g; salient / suppression radii: %.5g / %.5g",double(result.Scale.MeanSpacing),double(result.Scale.SalientRadius),double(result.Scale.NonMaxRadius));
             ImGui::Text("GPU batches: %zu; largest indexed support: %zu",result.GpuQueryBatches,result.MaximumNeighbors);
             ImGui::TextWrapped("%s",result.Message.c_str());
-            DrawDismissLastResultButton("Dismiss##Keypoints",Keypoints.LastResult,Runtime::EditorGeometryProcessingResultSlot::KeypointAnalysis,context);
+            DrawDismissLastResultButton("Dismiss##Keypoints", Keypoints.LastResult, Runtime::EditorPointAnalysisResultSlot::KeypointAnalysis, context.PointAnalysis.ResultSinks.DismissResult);
         }
         ImGui::End();
     }
 
     void MeshProcessingPanels::Impl::DrawDescriptorsWindow(bool &open, const SandboxEditorContext &context)
     {
-        if (context.GeometryResults.LastDescriptorAnalysisResult)
-            Descriptors.LastResult = context.GeometryResults.LastDescriptorAnalysisResult;
+        if (context.PointAnalysis.Results.LastDescriptorAnalysisResult)
+            Descriptors.LastResult = context.PointAnalysis.Results.LastDescriptorAnalysisResult;
         ImGui::SetNextWindowSize(ImVec2(460, 600), ImGuiCond_FirstUseEver);
         if (!ImGui::Begin("FPFH Descriptor Analysis", &open))
         {
             ImGui::End();
             return;
         }
-        const auto active = Runtime::GetEditorDescriptorAnalysisConfig(context.GeometryCommands)
+        const auto active = Runtime::GetEditorDescriptorAnalysisConfig(context.PointAnalysis.Commands)
                                 .value_or(Runtime::DescriptorAnalysisConfig{});
         const auto serialized = Runtime::SerializeDescriptorAnalysisConfig(active);
-        if (serialized != Descriptors.LastApplied)
-        {
-            Descriptors.Draft = active;
-            Descriptors.LastApplied = serialized;
-            Descriptors.ConfigDiagnostic.clear();
+        if (Descriptors.Synchronize(active, serialized))
             Descriptors.FollowDisplayBin = false;
-        }
         auto &config = Descriptors.Draft;
         bool changed = false;
-        const auto workspace =
-            Runtime::BuildEditorWorkspaceSnapshot(context.SnapshotQueries, {.Hierarchy = true,
-                                                                            .Inspector = false,
-                                                                            .Selection = false,
-                                                                            .Document = false,
-                                                                            .SceneFile = false,
-                                                                            .FileImport = false,
-                                                                            .AssetImportQueue = false,
-                                                                            .RenderGraph = false,
-                                                                            .RenderRecipe = false,
-                                                                            .CameraRender = false,
-                                                                            .Visualization = false});
-        if (context.Selection && !context.Selection->SelectedStableIds.empty() &&
-            ImGui::Button("Use selected entity"))
+        if (DrawProcessingEntity("Entity##Descriptors", context, config.StableEntityId, Descriptors.LastSelectedEntity))
+        { changed = true; Descriptors.FollowDisplayBin = false; }
+        DrawProcessingCpuBackend();
+        if (DrawProcessingPointInput("Positions##Descriptors", [&] { return Runtime::GetEditorPointInputCatalog(context.Processing, config.StableEntityId); }, config.Positions))
         {
-            config.StableEntityId = context.Selection->SelectedStableIds.front();
+            config.Normals.Domain = config.Positions.Domain;
+            for (auto& output : config.Outputs) output.Domain = config.Positions.Domain;
             changed = true;
-        }
-        std::string entityName =
-            config.StableEntityId ? std::to_string(config.StableEntityId) : "Choose entity";
-        for (const auto &row : workspace.Hierarchy)
-            if (row.StableEntityId == config.StableEntityId)
-                entityName = row.Name;
-        if (ImGui::BeginCombo("Entity##Descriptors", entityName.c_str()))
-        {
-            for (const auto &row : workspace.Hierarchy)
-            {
-                if (Runtime::GetEditorDescriptorAnalysisInputCatalog(context.GeometryCommands,
-                                                                   row.StableEntityId)
-                        .Entries.empty())
-                    continue;
-                const auto title = row.Name + " (" + std::to_string(row.StableEntityId) + ")";
-                if (ImGui::Selectable(title.c_str(), row.StableEntityId == config.StableEntityId))
-                {
-                    config.StableEntityId = row.StableEntityId;
-                    changed = true;
-                }
-            }
-            ImGui::EndCombo();
-        }
-        const auto inputName =
-            std::string(Runtime::ToString(config.Positions.Domain)) + ": " + config.Positions.Name;
-        if (ImGui::BeginCombo("Positions##Descriptors", inputName.c_str()))
-        {
-            const auto catalog = Runtime::GetEditorDescriptorAnalysisInputCatalog(context.GeometryCommands, config.StableEntityId);
-            auto previousDomain = Runtime::GeometryElementDomain::Unknown;
-            for (const auto &row : catalog.Entries)
-            {
-                if (row.Ref.Domain != previousDomain)
-                {
-                    ImGui::SeparatorText(std::string(Runtime::ToString(row.Ref.Domain)).c_str());
-                    previousDomain = row.Ref.Domain;
-                }
-                const auto label = std::string(Runtime::ToString(row.Ref.Domain)) + ": " + row.Ref.Name +
-                                   " (" + std::to_string(row.ElementCount) + ")";
-                if (ImGui::Selectable(label.c_str(), row.Ref == config.Positions))
-                {
-                    config.Positions = row.Ref;
-                    config.Normals.Domain=row.Ref.Domain;
-                    for(auto& output:config.Outputs)output.Domain=row.Ref.Domain;
-                    changed = true;
-                }
-            }
-            ImGui::EndCombo();
         }
         if(ImGui::BeginCombo("Normals##Descriptors",config.Normals.Name.c_str()))
         {
-            const auto catalog=Runtime::GetEditorDescriptorAnalysisInputCatalog(context.GeometryCommands,config.StableEntityId);
+            const auto catalog=Runtime::GetEditorPointInputCatalog(context.Processing,config.StableEntityId);
             for(const auto& row:catalog.Entries)
                 if(row.Ref.Domain==config.Positions.Domain && ImGui::Selectable(row.Ref.Name.c_str(),row.Ref==config.Normals))
                 {config.Normals=row.Ref;changed=true;}
@@ -2708,15 +2273,13 @@ namespace Extrinsic::Sandbox::Editor
             constexpr std::array blocks{"alpha","phi","theta"};
             for(unsigned i=0;i<33;++i)
             {
-                std::array<char,512> name{};const auto& current=config.Outputs[i].Name;
-                std::copy_n(current.c_str(),std::min(current.size(),name.size()-1),name.data());
                 const auto label=std::string(blocks[i/11])+" bin "+std::to_string(i%11);
-                if(ImGui::InputText(label.c_str(),name.data(),name.size())){config.Outputs[i].Name=name.data();changed=true;}
+                changed |= DrawProcessingPropertyName(label.c_str(), config.Outputs[i].Name);
             }
             ImGui::TreePop();
         }
         int backend=int(config.Backend);
-        if(ImGui::Combo("Neighbors",&backend,"CPU KD-tree\0CPU LBVH (cached)\0Vulkan LBVH\0")) {config.Backend=Runtime::DescriptorAnalysisBackend(backend);changed=true;}
+        if(ImGui::Combo("Acceleration",&backend,"CPU KD-tree\0CPU LBVH (cached)\0Vulkan LBVH\0")) {config.Backend=Runtime::DescriptorAnalysisBackend(backend);changed=true;}
         changed |= ImGui::InputFloat("Feature radius (0 = automatic)",&config.FeatureRadius);
         changed |= ImGui::InputScalar("Maximum neighbors (0 = all)",ImGuiDataType_U32,&config.MaxNeighbors);
         ImGui::TextWrapped("FPFH uses three eleven-bin histograms and nonzero normals. Automatic radius is five times mean nearest-neighbor spacing. A neighbor cap keeps the lowest source IDs within the radius.");
@@ -2726,36 +2289,22 @@ namespace Extrinsic::Sandbox::Editor
             changed |= ImGui::InputScalar("Radius result capacity",ImGuiDataType_U32,&config.GpuRadiusCapacity);
             ImGui::TextWrapped("Uncapped radius support must fit the selected capacity (up to 1024). A neighbor cap within that capacity can use the exact lowest-ID prefix even in denser neighborhoods. Scale, SPFH and FPFH run on CPU.");
         }
-        if(changed)
-        {
-            const auto applied=Runtime::ApplyEditorDescriptorAnalysisConfig(context.GeometryCommands,config);
-            Descriptors.ConfigDiagnostic=applied.Succeeded()?"":"Controls were rejected by descriptor config validation.";
-        }
-        if(!Descriptors.ConfigDiagnostic.empty())ImGui::TextWrapped("%s",Descriptors.ConfigDiagnostic.c_str());
-        auto analyze=config;
-        const auto readiness=Runtime::PreviewEditorDescriptorAnalysisCommand(context.GeometryCommands,analyze);
-        if(!readiness.Ready)ImGui::TextWrapped("%s",readiness.Diagnostic.c_str());
-        const auto execute=[&](Runtime::DescriptorAnalysisConfig request){
-            const auto applied=Runtime::ApplyEditorDescriptorAnalysisConfig(context.GeometryCommands,request);
-            if(applied.Succeeded())
-                PublishCommandResult(Descriptors.LastResult,Runtime::ApplyEditorConfiguredDescriptorAnalysis(context.GeometryCommands),context.MethodResultSinks.DescriptorAnalysis);
-            else Descriptors.ConfigDiagnostic="Descriptor config was rejected.";
-        };
-        ImGui::BeginDisabled(!context.GeometryConfigCommandsAvailable || !readiness.Ready || !Descriptors.ConfigDiagnostic.empty());
-        if(ImGui::Button("Compute FPFH descriptors"))execute(analyze);
-        ImGui::EndDisabled();
+        DrawProcessingExecution(context, Descriptors, changed,
+            [&](const auto& request) { return Runtime::PreviewEditorDescriptorAnalysisCommand(context.PointAnalysis.Commands, request); },
+            [&](const auto& request) { return Runtime::ApplyEditorDescriptorAnalysisConfig(context.PointAnalysis.Commands, request); },
+            [&] { return Runtime::ApplyEditorConfiguredDescriptorAnalysis(context.PointAnalysis.Commands, context.PointAnalysis.ResultSinks.DescriptorAnalysis); },
+            context.PointAnalysis.ResultSinks.DescriptorAnalysis, "Compute FPFH descriptors",
+            "Controls were rejected by descriptor config validation.", "Descriptor config was rejected.");
         ImGui::TextWrapped("Writes 33 named float histogram properties in one undoable operation. Each nonempty eleven-bin block sums to 100.");
         const bool displayBinChanged =
             ImGui::SliderInt("Display histogram bin", &Descriptors.DisplayBin, 0, 32,
                              "%d", ImGuiSliderFlags_AlwaysClamp);
-        const auto score=readiness.Ready?readiness.Resolved.Outputs[Descriptors.DisplayBin]:config.Outputs[Descriptors.DisplayBin];
+        const auto score=config.Outputs[Descriptors.DisplayBin];
         ImGui::Text("Property: %s",score.Name.c_str());
         if(ImGui::Button("Show histogram bin") ||
            (displayBinChanged && Descriptors.FollowDisplayBin))
         {
-            const auto status = Runtime::ApplyEditorVisualizationRecipeCommand(
-                context.VisualizationCommands,{.StableEntityId=config.StableEntityId,
-                .Recipe={.Data=Runtime::ScalarVisualizationRecipe{.Source=score,.OutputName=score.Name+".colors"}}});
+            const auto status = ShowProcessingProperty(context, config.StableEntityId, score);
             Descriptors.VisualizationDiagnostic = Runtime::DebugNameForEditorCommandStatus(status);
             if (status == Runtime::EditorCommandStatus::Applied ||
                 status == Runtime::EditorCommandStatus::NoChange)
@@ -2772,133 +2321,53 @@ namespace Extrinsic::Sandbox::Editor
             ImGui::Text("Spacing: %.5g; feature radius: %.5g",double(result.Scale.MeanSpacing),double(result.Scale.FeatureRadius));
             ImGui::Text("GPU batches: %zu; largest indexed support: %zu",result.GpuQueryBatches,result.MaximumNeighbors);
             ImGui::TextWrapped("%s",result.Message.c_str());
-            DrawDismissLastResultButton("Dismiss##Descriptors",Descriptors.LastResult,Runtime::EditorGeometryProcessingResultSlot::DescriptorAnalysis,context);
+            DrawDismissLastResultButton("Dismiss##Descriptors", Descriptors.LastResult, Runtime::EditorPointAnalysisResultSlot::DescriptorAnalysis, context.PointAnalysis.ResultSinks.DismissResult);
         }
         ImGui::End();
     }
 
     void MeshProcessingPanels::Impl::DrawDensityWindow(bool &open, const SandboxEditorContext &context)
     {
-        if (context.GeometryResults.LastKernelDensityResult)
-            Density.LastResult = context.GeometryResults.LastKernelDensityResult;
+        if (context.PointFields.Results.LastKernelDensityResult)
+            Density.LastResult = context.PointFields.Results.LastKernelDensityResult;
         ImGui::SetNextWindowSize(ImVec2(460, 600), ImGuiCond_FirstUseEver);
         if (!ImGui::Begin("Kernel Density", &open))
         {
             ImGui::End();
             return;
         }
-        const auto active = Runtime::GetEditorKernelDensityConfig(context.GeometryCommands)
+        const auto active = Runtime::GetEditorKernelDensityConfig(context.PointFields.Commands)
                                 .value_or(Runtime::KernelDensityConfig{});
         const auto serialized = Runtime::SerializeKernelDensityConfig(active);
-        if (serialized != Density.LastApplied)
-        {
-            Density.Draft = active;
-            Density.LastApplied = serialized;
-            Density.ConfigDiagnostic.clear();
-        }
+        Density.Synchronize(active, serialized);
         auto &config = Density.Draft;
         bool changed = false;
-        const auto workspace =
-            Runtime::BuildEditorWorkspaceSnapshot(context.SnapshotQueries, {.Hierarchy = true,
-                                                                            .Inspector = false,
-                                                                            .Selection = false,
-                                                                            .Document = false,
-                                                                            .SceneFile = false,
-                                                                            .FileImport = false,
-                                                                            .AssetImportQueue = false,
-                                                                            .RenderGraph = false,
-                                                                            .RenderRecipe = false,
-                                                                            .CameraRender = false,
-                                                                            .Visualization = false});
-        if (context.Selection && !context.Selection->SelectedStableIds.empty() &&
-            ImGui::Button("Use selected entity"))
+        changed |= DrawProcessingEntity("Entity##Density", context,
+            config.StableEntityId, Density.LastSelectedEntity);
+        DrawProcessingCpuBackend();
+        if (DrawProcessingPointInput("Positions##Density", [&] { return Runtime::GetEditorKernelDensityInputCatalog(context.PointFields.Commands, config.StableEntityId); }, config.Positions))
         {
-            config.StableEntityId = context.Selection->SelectedStableIds.front();
+            config.Density.Domain = config.Positions.Domain;
             changed = true;
         }
-        std::string entityName =
-            config.StableEntityId ? std::to_string(config.StableEntityId) : "Choose entity";
-        for (const auto &row : workspace.Hierarchy)
-            if (row.StableEntityId == config.StableEntityId)
-                entityName = row.Name;
-        if (ImGui::BeginCombo("Entity##Density", entityName.c_str()))
-        {
-            for (const auto &row : workspace.Hierarchy)
-            {
-                if (Runtime::GetEditorKernelDensityInputCatalog(context.GeometryCommands,
-                                                                   row.StableEntityId)
-                        .Entries.empty())
-                    continue;
-                const auto title = row.Name + " (" + std::to_string(row.StableEntityId) + ")";
-                if (ImGui::Selectable(title.c_str(), row.StableEntityId == config.StableEntityId))
-                {
-                    config.StableEntityId = row.StableEntityId;
-                    changed = true;
-                }
-            }
-            ImGui::EndCombo();
-        }
-        const auto inputName =
-            std::string(Runtime::ToString(config.Positions.Domain)) + ": " + config.Positions.Name;
-        if (ImGui::BeginCombo("Positions##Density", inputName.c_str()))
-        {
-            const auto catalog = Runtime::GetEditorKernelDensityInputCatalog(context.GeometryCommands, config.StableEntityId);
-            auto previousDomain = Runtime::GeometryElementDomain::Unknown;
-            for (const auto &row : catalog.Entries)
-            {
-                if (row.Ref.Domain != previousDomain)
-                {
-                    ImGui::SeparatorText(std::string(Runtime::ToString(row.Ref.Domain)).c_str());
-                    previousDomain = row.Ref.Domain;
-                }
-                const auto label = std::string(Runtime::ToString(row.Ref.Domain)) + ": " + row.Ref.Name +
-                                   " (" + std::to_string(row.ElementCount) + ")";
-                if (ImGui::Selectable(label.c_str(), row.Ref == config.Positions))
-                {
-                    config.Positions = row.Ref;
-                    config.Density.Domain = row.Ref.Domain;
-                    changed = true;
-                }
-            }
-            ImGui::EndCombo();
-        }
-        for (auto [label, ref] : {std::pair{"Density property", &config.Density}})
-        {
-            std::array<char,512> name{};
-            std::copy_n(ref->Name.c_str(),std::min(ref->Name.size(),name.size()-1),name.data());
-            if (ImGui::InputText(label,name.data(),name.size())) {ref->Name=name.data();changed=true;}
-        }
+        changed |= DrawProcessingPropertyName("Density property", config.Density.Name);
         int backend=int(config.Backend);
-        if(ImGui::Combo("Neighbors",&backend,"CPU octree\0CPU LBVH (cached)\0Vulkan LBVH\0")) {config.Backend=Runtime::KernelDensityBackend(backend);changed=true;}
+        if(ImGui::Combo("Acceleration",&backend,"CPU octree\0CPU LBVH (cached)\0Vulkan LBVH\0")) {config.Backend=Runtime::KernelDensityBackend(backend);changed=true;}
         changed |= ImGui::InputScalar("Neighbors k",ImGuiDataType_U32,&config.KNeighbors);
         changed |= ImGui::InputFloat("Bandwidth (0 = automatic)",&config.Bandwidth);
         ImGui::TextWrapped("Local Gaussian average over nearest candidates. Automatic bandwidth uses nearest-other spacing. Distances use the selected property coordinates.");
         if(config.Backend==Runtime::KernelDensityBackend::VulkanLBVH)
             changed |= ImGui::InputScalar("GPU query batch size",ImGuiDataType_U32,&config.GpuQueryBatchSize);
-        if(changed)
-        {
-            const auto applied=Runtime::ApplyEditorKernelDensityConfig(context.GeometryCommands,config);
-            Density.ConfigDiagnostic=applied.Succeeded()?"":"Controls were rejected by density config validation.";
-        }
-        if(!Density.ConfigDiagnostic.empty())ImGui::TextWrapped("%s",Density.ConfigDiagnostic.c_str());
-        auto analyze=config;
-        const auto readiness=Runtime::PreviewEditorKernelDensityCommand(context.GeometryCommands,analyze);
-        if(!readiness.Ready)ImGui::TextWrapped("%s",readiness.Diagnostic.c_str());
-        const auto execute=[&](Runtime::KernelDensityConfig request){
-            const auto applied=Runtime::ApplyEditorKernelDensityConfig(context.GeometryCommands,request);
-            if(applied.Succeeded())
-                PublishCommandResult(Density.LastResult,Runtime::ApplyEditorConfiguredKernelDensity(context.GeometryCommands),context.MethodResultSinks.KernelDensity);
-            else Density.ConfigDiagnostic="Density config was rejected.";
-        };
-        ImGui::BeginDisabled(!context.GeometryConfigCommandsAvailable || !readiness.Ready || !Density.ConfigDiagnostic.empty());
-        if(ImGui::Button("Estimate density"))execute(analyze);
-        ImGui::EndDisabled();
+        DrawProcessingExecution(context, Density, changed,
+            [&](const auto& c) { return Runtime::PreviewEditorKernelDensityCommand(context.PointFields.Commands, c); },
+            [&](const auto& c) { return Runtime::ApplyEditorKernelDensityConfig(context.PointFields.Commands, c); },
+            [&] { return Runtime::ApplyEditorConfiguredKernelDensity(context.PointFields.Commands, context.PointFields.ResultSinks.KernelDensity); },
+            context.PointFields.ResultSinks.KernelDensity, "Estimate density",
+            "Controls were rejected by density config validation.", "Density config was rejected.");
         ImGui::TextWrapped("Vulkan computes neighbors; bandwidth and Gaussian evaluation run on CPU. The named density property supports Undo.");
-        auto density=readiness.Ready?readiness.Resolved.Density:config.Density;
-        if(ImGui::Button("Show density"))
-            Density.VisualizationDiagnostic=Runtime::DebugNameForEditorCommandStatus(Runtime::ApplyEditorVisualizationRecipeCommand(
-                context.VisualizationCommands,{.StableEntityId=config.StableEntityId,
-                .Recipe={.Data=Runtime::ScalarVisualizationRecipe{.Source=density,.OutputName=density.Name+".colors"}}}));
+        if (ImGui::Button("Show density"))
+            Density.VisualizationDiagnostic = Runtime::DebugNameForEditorCommandStatus(
+                ShowProcessingProperty(context, config.StableEntityId, config.Density));
         if(!Density.VisualizationDiagnostic.empty())ImGui::Text("Display: %s",Density.VisualizationDiagnostic.c_str());
         if(Density.LastResult)
         {
@@ -2909,104 +2378,39 @@ namespace Extrinsic::Sandbox::Editor
             ImGui::Text("Live / total: %zu / %zu",result.LiveCount,result.SlotCount);
             ImGui::Text("Bandwidth %.5g; density min / mean / max: %.5g / %.5g / %.5g",double(result.UsedBandwidth),double(result.MinDensity),double(result.MeanDensity),double(result.MaxDensity));
             ImGui::TextWrapped("%s",result.Message.c_str());
-            DrawDismissLastResultButton("Dismiss##Density",Density.LastResult,Runtime::EditorGeometryProcessingResultSlot::KernelDensity,context);
+            DrawDismissLastResultButton("Dismiss##Density", Density.LastResult, Runtime::EditorPointFieldResultSlot::KernelDensity, context.PointFields.ResultSinks.DismissResult);
         }
         ImGui::End();
     }
 
     void MeshProcessingPanels::Impl::DrawDensityWeightsWindow(bool &open, const SandboxEditorContext &context)
     {
-        if (context.GeometryResults.LastDensityWeightResult)
-            DensityWeights.LastResult = context.GeometryResults.LastDensityWeightResult;
+        if (context.PointAnalysis.Results.LastDensityWeightResult)
+            DensityWeights.LastResult = context.PointAnalysis.Results.LastDensityWeightResult;
         ImGui::SetNextWindowSize(ImVec2(460, 600), ImGuiCond_FirstUseEver);
         if (!ImGui::Begin("Compact Density Weights", &open))
         {
             ImGui::End();
             return;
         }
-        const auto active = Runtime::GetEditorDensityWeightConfig(context.GeometryCommands)
+        const auto active = Runtime::GetEditorDensityWeightConfig(context.PointAnalysis.Commands)
                                 .value_or(Runtime::DensityWeightConfig{});
         const auto serialized = Runtime::SerializeDensityWeightConfig(active);
-        if (serialized != DensityWeights.LastApplied)
-        {
-            DensityWeights.Draft = active;
-            DensityWeights.LastApplied = serialized;
-            DensityWeights.ConfigDiagnostic.clear();
-        }
+        DensityWeights.Synchronize(active, serialized);
         auto &config = DensityWeights.Draft;
         bool changed = false;
-        const auto workspace =
-            Runtime::BuildEditorWorkspaceSnapshot(context.SnapshotQueries, {.Hierarchy = true,
-                                                                            .Inspector = false,
-                                                                            .Selection = false,
-                                                                            .Document = false,
-                                                                            .SceneFile = false,
-                                                                            .FileImport = false,
-                                                                            .AssetImportQueue = false,
-                                                                            .RenderGraph = false,
-                                                                            .RenderRecipe = false,
-                                                                            .CameraRender = false,
-                                                                            .Visualization = false});
-        if (context.Selection && !context.Selection->SelectedStableIds.empty() &&
-            ImGui::Button("Use selected entity"))
+        changed |= DrawProcessingEntity("Entity##DensityWeights", context,
+            config.StableEntityId, DensityWeights.LastSelectedEntity);
+        DrawProcessingCpuBackend();
+        if (DrawProcessingPointInput("Positions##DensityWeights", [&] { return Runtime::GetEditorPointInputCatalog(context.Processing, config.StableEntityId); }, config.Positions))
         {
-            config.StableEntityId = context.Selection->SelectedStableIds.front();
+            config.Weights.Domain = config.Positions.Domain;
             changed = true;
         }
-        std::string entityName =
-            config.StableEntityId ? std::to_string(config.StableEntityId) : "Choose entity";
-        for (const auto &row : workspace.Hierarchy)
-            if (row.StableEntityId == config.StableEntityId)
-                entityName = row.Name;
-        if (ImGui::BeginCombo("Entity##DensityWeights", entityName.c_str()))
-        {
-            for (const auto &row : workspace.Hierarchy)
-            {
-                if (Runtime::GetEditorDensityWeightInputCatalog(context.GeometryCommands,
-                                                                   row.StableEntityId)
-                        .Entries.empty())
-                    continue;
-                const auto title = row.Name + " (" + std::to_string(row.StableEntityId) + ")";
-                if (ImGui::Selectable(title.c_str(), row.StableEntityId == config.StableEntityId))
-                {
-                    config.StableEntityId = row.StableEntityId;
-                    changed = true;
-                }
-            }
-            ImGui::EndCombo();
-        }
-        const auto inputName =
-            std::string(Runtime::ToString(config.Positions.Domain)) + ": " + config.Positions.Name;
-        if (ImGui::BeginCombo("Positions##DensityWeights", inputName.c_str()))
-        {
-            const auto catalog = Runtime::GetEditorDensityWeightInputCatalog(context.GeometryCommands, config.StableEntityId);
-            auto previousDomain = Runtime::GeometryElementDomain::Unknown;
-            for (const auto &row : catalog.Entries)
-            {
-                if (row.Ref.Domain != previousDomain)
-                {
-                    ImGui::SeparatorText(std::string(Runtime::ToString(row.Ref.Domain)).c_str());
-                    previousDomain = row.Ref.Domain;
-                }
-                const auto label = std::string(Runtime::ToString(row.Ref.Domain)) + ": " + row.Ref.Name +
-                                   " (" + std::to_string(row.ElementCount) + ")";
-                if (ImGui::Selectable(label.c_str(), row.Ref == config.Positions))
-                {
-                    config.Positions = row.Ref;
-                    config.Weights.Domain = row.Ref.Domain;
-                    changed = true;
-                }
-            }
-            ImGui::EndCombo();
-        }
         for (auto [label, ref] : {std::pair{"Weight property", &config.Weights}})
-        {
-            std::array<char,512> name{};
-            std::copy_n(ref->Name.c_str(),std::min(ref->Name.size(),name.size()-1),name.data());
-            if (ImGui::InputText(label,name.data(),name.size())) {ref->Name=name.data();changed=true;}
-        }
+            changed |= DrawProcessingPropertyName(label, ref->Name);
         int backend=int(config.Backend);
-        if(ImGui::Combo("Neighbors",&backend,"CPU KD-tree\0CPU LBVH (cached)\0Vulkan LBVH\0")) {config.Backend=Runtime::DensityWeightBackend(backend);changed=true;}
+        if(ImGui::Combo("Acceleration",&backend,"CPU KD-tree\0CPU LBVH (cached)\0Vulkan LBVH\0")) {config.Backend=Runtime::DensityWeightBackend(backend);changed=true;}
         changed |= ImGui::InputDouble("Support radius",&config.SupportRadius);
         int kernel=int(config.Kernel),mode=int(config.Mode);
         if(ImGui::Combo("Kernel",&kernel,"Gaussian (sigma = h/4)\0LOP theta\0Wendland C2\0"))
@@ -3020,30 +2424,16 @@ namespace Extrinsic::Sandbox::Editor
             changed |= ImGui::InputScalar("GPU radius capacity",ImGuiDataType_U32,&config.GpuRadiusCapacity);
             ImGui::TextWrapped("Vulkan collects complete conservative radius candidates. Overflow leaves the previous output unchanged. Subnormal coordinate components are unsupported.");
         }
-        if(changed)
-        {
-            const auto applied=Runtime::ApplyEditorDensityWeightConfig(context.GeometryCommands,config);
-            DensityWeights.ConfigDiagnostic=applied.Succeeded()?"":"Controls were rejected by density config validation.";
-        }
-        if(!DensityWeights.ConfigDiagnostic.empty())ImGui::TextWrapped("%s",DensityWeights.ConfigDiagnostic.c_str());
-        auto analyze=config;
-        const auto readiness=Runtime::PreviewEditorDensityWeightCommand(context.GeometryCommands,analyze);
-        if(!readiness.Ready)ImGui::TextWrapped("%s",readiness.Diagnostic.c_str());
-        const auto execute=[&](Runtime::DensityWeightConfig request){
-            const auto applied=Runtime::ApplyEditorDensityWeightConfig(context.GeometryCommands,request);
-            if(applied.Succeeded())
-                PublishCommandResult(DensityWeights.LastResult,Runtime::ApplyEditorConfiguredDensityWeight(context.GeometryCommands),context.MethodResultSinks.DensityWeight);
-            else DensityWeights.ConfigDiagnostic="Density config was rejected.";
-        };
-        ImGui::BeginDisabled(!context.GeometryConfigCommandsAvailable || !readiness.Ready || !DensityWeights.ConfigDiagnostic.empty());
-        if(ImGui::Button("Compute compact weights"))execute(analyze);
-        ImGui::EndDisabled();
+        DrawProcessingExecution(context, DensityWeights, changed,
+            [&](const auto& request) { return Runtime::PreviewEditorDensityWeightCommand(context.PointAnalysis.Commands, request); },
+            [&](const auto& request) { return Runtime::ApplyEditorDensityWeightConfig(context.PointAnalysis.Commands, request); },
+            [&] { return Runtime::ApplyEditorConfiguredDensityWeight(context.PointAnalysis.Commands, context.PointAnalysis.ResultSinks.DensityWeight); },
+            context.PointAnalysis.ResultSinks.DensityWeight, "Compute compact weights",
+            "Controls were rejected by density config validation.", "Density config was rejected.");
         ImGui::TextWrapped("Vulkan computes radius candidates; strict support and kernel reduction run on CPU. The named weight property supports Undo.");
-        auto density=readiness.Ready?readiness.Resolved.Weights:config.Weights;
+        auto density=config.Weights;
         if(ImGui::Button("Show weights"))
-            DensityWeights.VisualizationDiagnostic=Runtime::DebugNameForEditorCommandStatus(Runtime::ApplyEditorVisualizationRecipeCommand(
-                context.VisualizationCommands,{.StableEntityId=config.StableEntityId,
-                .Recipe={.Data=Runtime::ScalarVisualizationRecipe{.Source=density,.OutputName=density.Name+".colors"}}}));
+            DensityWeights.VisualizationDiagnostic=Runtime::DebugNameForEditorCommandStatus(ShowProcessingProperty(context, config.StableEntityId, density));
         if(!DensityWeights.VisualizationDiagnostic.empty())ImGui::Text("Display: %s",DensityWeights.VisualizationDiagnostic.c_str());
         if(DensityWeights.LastResult)
         {
@@ -3057,7 +2447,7 @@ namespace Extrinsic::Sandbox::Editor
             ImGui::Text("Query radius %.5g; GPU batches %zu",double(result.QueryRadius),result.GpuQueryBatches);
             ImGui::Text("Cache reused: %s; CPU %.3f ms; GPU neighborhoods %.3f ms",result.IndexReused?"yes":"no",result.CpuComputeMilliseconds,result.GpuNeighborhoodMilliseconds);
             ImGui::TextWrapped("%s",result.Message.c_str());
-            DrawDismissLastResultButton("Dismiss##DensityWeights",DensityWeights.LastResult,Runtime::EditorGeometryProcessingResultSlot::DensityWeight,context);
+            DrawDismissLastResultButton("Dismiss##DensityWeights", DensityWeights.LastResult, Runtime::EditorPointAnalysisResultSlot::DensityWeight, context.PointAnalysis.ResultSinks.DismissResult);
         }
         ImGui::End();
     }
@@ -3065,89 +2455,27 @@ namespace Extrinsic::Sandbox::Editor
     void MeshProcessingPanels::Impl::DrawConstructionWindow(bool& open,
                                                             const SandboxEditorContext& context)
     {
-        if (context.GeometryResults.LastPointConstructionResult)
-            Construction.LastResult = context.GeometryResults.LastPointConstructionResult;
+        if (context.PointConstruction.Results.LastPointConstructionResult)
+            Construction.LastResult = context.PointConstruction.Results.LastPointConstructionResult;
         ImGui::SetNextWindowSize(ImVec2(460, 600), ImGuiCond_FirstUseEver);
         if (!ImGui::Begin("Construct from Points", &open))
         {
             ImGui::End();
             return;
         }
-        const auto active = Runtime::GetEditorPointConstructionConfig(context.GeometryCommands)
+        const auto active = Runtime::GetEditorPointConstructionConfig(context.PointConstruction.Commands)
                                 .value_or(Runtime::PointConstructionConfig{});
         const auto serialized = Runtime::SerializePointConstructionConfig(active);
-        if (serialized != Construction.LastApplied)
-        {
-            Construction.Draft = active;
-            Construction.LastApplied = serialized;
-            Construction.ConfigDiagnostic.clear();
-        }
+        Construction.Synchronize(active, serialized);
         auto& config = Construction.Draft;
         bool changed = false;
-        const auto workspace = Runtime::BuildEditorWorkspaceSnapshot(context.SnapshotQueries,
-                                                                     {.Hierarchy = true,
-                                                                      .Inspector = false,
-                                                                      .Selection = false,
-                                                                      .Document = false,
-                                                                      .SceneFile = false,
-                                                                      .FileImport = false,
-                                                                      .AssetImportQueue = false,
-                                                                      .RenderGraph = false,
-                                                                      .RenderRecipe = false,
-                                                                      .CameraRender = false,
-                                                                      .Visualization = false});
-        if (context.Selection && !context.Selection->SelectedStableIds.empty() &&
-            ImGui::Button("Use selected entity"))
+        changed |= DrawProcessingEntity("Entity##Construction", context,
+            config.StableEntityId, Construction.LastSelectedEntity);
+        DrawProcessingCpuBackend();
+        if (DrawProcessingPointInput("Positions##Construction", [&] { return Runtime::GetEditorPointInputCatalog(context.Processing, config.StableEntityId); }, config.Positions))
         {
-            config.StableEntityId = context.Selection->SelectedStableIds.front();
+            config.Normals.Domain = config.Positions.Domain;
             changed = true;
-        }
-        std::string entityName =
-            config.StableEntityId ? std::to_string(config.StableEntityId) : "Choose entity";
-        for (const auto& row : workspace.Hierarchy)
-            if (row.StableEntityId == config.StableEntityId)
-                entityName = row.Name;
-        if (ImGui::BeginCombo("Entity##Construction", entityName.c_str()))
-        {
-            for (const auto& row : workspace.Hierarchy)
-            {
-                if (Runtime::GetEditorPointConstructionInputCatalog(context.GeometryCommands,
-                                                                    row.StableEntityId)
-                        .Entries.empty())
-                    continue;
-                const auto title = row.Name + " (" + std::to_string(row.StableEntityId) + ")";
-                if (ImGui::Selectable(title.c_str(), row.StableEntityId == config.StableEntityId))
-                {
-                    config.StableEntityId = row.StableEntityId;
-                    changed = true;
-                }
-            }
-            ImGui::EndCombo();
-        }
-        const auto inputName =
-            std::string(Runtime::ToString(config.Positions.Domain)) + ": " + config.Positions.Name;
-        if (ImGui::BeginCombo("Positions##Construction", inputName.c_str()))
-        {
-            const auto catalog = Runtime::GetEditorPointConstructionInputCatalog(
-                context.GeometryCommands, config.StableEntityId);
-            auto previousDomain = Runtime::GeometryElementDomain::Unknown;
-            for (const auto& row : catalog.Entries)
-            {
-                if (row.Ref.Domain != previousDomain)
-                {
-                    ImGui::SeparatorText(std::string(Runtime::ToString(row.Ref.Domain)).c_str());
-                    previousDomain = row.Ref.Domain;
-                }
-                const auto label = std::string(Runtime::ToString(row.Ref.Domain)) + ": " +
-                                   row.Ref.Name + " (" + std::to_string(row.ElementCount) + ")";
-                if (ImGui::Selectable(label.c_str(), row.Ref == config.Positions))
-                {
-                    config.Positions = row.Ref;
-                    config.Normals.Domain = row.Ref.Domain;
-                    changed = true;
-                }
-            }
-            ImGui::EndCombo();
         }
         int method = int(config.Method), backend = int(config.Backend);
         if (ImGui::Combo("Method", &method, "Hoppe surface\0kNN graph\0"))
@@ -3155,7 +2483,7 @@ namespace Extrinsic::Sandbox::Editor
             config.Method = Runtime::PointConstructionMethod(method);
             changed = true;
         }
-        if (ImGui::Combo("Neighbors", &backend, "CPU reference\0CPU LBVH (cached)\0Vulkan LBVH\0"))
+        if (ImGui::Combo("Acceleration", &backend, "CPU reference\0CPU LBVH (cached)\0Vulkan LBVH\0"))
         {
             config.Backend = Runtime::PointConstructionBackend(backend);
             changed = true;
@@ -3189,8 +2517,8 @@ namespace Extrinsic::Sandbox::Editor
                                    config.Normals.Name;
                 if (ImGui::BeginCombo("Normals", label.c_str()))
                 {
-                    const auto catalog = Runtime::GetEditorPointConstructionInputCatalog(
-                        context.GeometryCommands, config.StableEntityId);
+                    const auto catalog = Runtime::GetEditorPointInputCatalog(
+                        context.Processing, config.StableEntityId);
                     for (const auto& row : catalog.Entries)
                     {
                         if (row.Ref.Domain != config.Positions.Domain &&
@@ -3229,7 +2557,7 @@ namespace Extrinsic::Sandbox::Editor
         if (changed)
         {
             const auto applied =
-                Runtime::ApplyEditorPointConstructionConfig(context.GeometryCommands, config);
+                Runtime::ApplyEditorPointConstructionConfig(context.PointConstruction.Commands, config);
             Construction.ConfigDiagnostic =
                 applied.Succeeded() ? ""
                                     : "Controls were rejected by construction config validation.";
@@ -3237,20 +2565,22 @@ namespace Extrinsic::Sandbox::Editor
         if (!Construction.ConfigDiagnostic.empty())
             ImGui::TextWrapped("%s", Construction.ConfigDiagnostic.c_str());
         const auto readiness =
-            Runtime::PreviewEditorPointConstructionCommand(context.GeometryCommands, config);
+            Runtime::PreviewEditorPointConstructionCommand(context.PointConstruction.Commands, config);
         if (!readiness.Ready)
             ImGui::TextWrapped("%s", readiness.Diagnostic.c_str());
-        ImGui::BeginDisabled(!context.GeometryConfigCommandsAvailable || !readiness.Ready ||
+        ImGui::BeginDisabled(!context.ProcessingConfigCommandsAvailable || !readiness.Ready ||
                              !Construction.ConfigDiagnostic.empty());
         if (ImGui::Button("Construct"))
         {
             const auto applied = Runtime::ApplyEditorPointConstructionConfig(
-                context.GeometryCommands, readiness.Resolved);
+                context.PointConstruction.Commands, readiness.Resolved);
             if (applied.Succeeded())
                 PublishCommandResult(
                     Construction.LastResult,
-                    Runtime::ApplyEditorConfiguredPointConstruction(context.GeometryCommands),
-                    context.MethodResultSinks.PointConstruction);
+                    Runtime::ApplyEditorConfiguredPointConstruction(
+                        context.PointConstruction.Commands,
+                        context.PointConstruction.ResultSinks.PointConstruction),
+                    context.PointConstruction.ResultSinks.PointConstruction);
             else
                 Construction.ConfigDiagnostic = "Construction config was rejected.";
         }
@@ -3270,135 +2600,53 @@ namespace Extrinsic::Sandbox::Editor
             ImGui::Text("CPU %.3f ms; GPU batch latency %.3f ms", result.CpuComputeMilliseconds,
                         result.GpuNeighborhoodMilliseconds);
             ImGui::TextWrapped("%s", result.Message.c_str());
-            DrawDismissLastResultButton(
-                "Dismiss##Construction", Construction.LastResult,
-                Runtime::EditorGeometryProcessingResultSlot::PointConstruction, context);
+            DrawDismissLastResultButton("Dismiss##Construction", Construction.LastResult, Runtime::EditorPointConstructionResultSlot::PointConstruction, context.PointConstruction.ResultSinks.DismissResult);
         }
         ImGui::End();
     }
 
     void MeshProcessingPanels::Impl::DrawSpacingWindow(bool &open, const SandboxEditorContext &context)
     {
-        if (context.GeometryResults.LastPointSpacingResult)
-            Spacing.LastResult = context.GeometryResults.LastPointSpacingResult;
+        if (context.PointFields.Results.LastPointSpacingResult)
+            Spacing.LastResult = context.PointFields.Results.LastPointSpacingResult;
         ImGui::SetNextWindowSize(ImVec2(460, 600), ImGuiCond_FirstUseEver);
         if (!ImGui::Begin("Point Spacing and Radii", &open))
         {
             ImGui::End();
             return;
         }
-        const auto active = Runtime::GetEditorPointSpacingConfig(context.GeometryCommands)
+        const auto active = Runtime::GetEditorPointSpacingConfig(context.PointFields.Commands)
                                 .value_or(Runtime::PointSpacingConfig{});
         const auto serialized = Runtime::SerializePointSpacingConfig(active);
-        if (serialized != Spacing.LastApplied)
-        {
-            Spacing.Draft = active;
-            Spacing.LastApplied = serialized;
-            Spacing.ConfigDiagnostic.clear();
-        }
+        Spacing.Synchronize(active, serialized);
         auto &config = Spacing.Draft;
         bool changed = false;
-        const auto workspace =
-            Runtime::BuildEditorWorkspaceSnapshot(context.SnapshotQueries, {.Hierarchy = true,
-                                                                            .Inspector = false,
-                                                                            .Selection = false,
-                                                                            .Document = false,
-                                                                            .SceneFile = false,
-                                                                            .FileImport = false,
-                                                                            .AssetImportQueue = false,
-                                                                            .RenderGraph = false,
-                                                                            .RenderRecipe = false,
-                                                                            .CameraRender = false,
-                                                                            .Visualization = false});
-        if (context.Selection && !context.Selection->SelectedStableIds.empty() &&
-            ImGui::Button("Use selected entity"))
+        changed |= DrawProcessingEntity("Entity##Spacing", context,
+            config.StableEntityId, Spacing.LastSelectedEntity);
+        DrawProcessingCpuBackend();
+        if (DrawProcessingPointInput("Positions##Spacing", [&] { return Runtime::GetEditorPointSpacingInputCatalog(context.PointFields.Commands, config.StableEntityId); }, config.Positions))
         {
-            config.StableEntityId = context.Selection->SelectedStableIds.front();
+            config.Radii.Domain = config.Positions.Domain;
             changed = true;
         }
-        std::string entityName =
-            config.StableEntityId ? std::to_string(config.StableEntityId) : "Choose entity";
-        for (const auto &row : workspace.Hierarchy)
-            if (row.StableEntityId == config.StableEntityId)
-                entityName = row.Name;
-        if (ImGui::BeginCombo("Entity##Spacing", entityName.c_str()))
-        {
-            for (const auto &row : workspace.Hierarchy)
-            {
-                if (Runtime::GetEditorPointSpacingInputCatalog(context.GeometryCommands,
-                                                                   row.StableEntityId)
-                        .Entries.empty())
-                    continue;
-                const auto title = row.Name + " (" + std::to_string(row.StableEntityId) + ")";
-                if (ImGui::Selectable(title.c_str(), row.StableEntityId == config.StableEntityId))
-                {
-                    config.StableEntityId = row.StableEntityId;
-                    changed = true;
-                }
-            }
-            ImGui::EndCombo();
-        }
-        const auto inputName =
-            std::string(Runtime::ToString(config.Positions.Domain)) + ": " + config.Positions.Name;
-        if (ImGui::BeginCombo("Positions##Spacing", inputName.c_str()))
-        {
-            const auto catalog = Runtime::GetEditorPointSpacingInputCatalog(context.GeometryCommands, config.StableEntityId);
-            auto previousDomain = Runtime::GeometryElementDomain::Unknown;
-            for (const auto &row : catalog.Entries)
-            {
-                if (row.Ref.Domain != previousDomain)
-                {
-                    ImGui::SeparatorText(std::string(Runtime::ToString(row.Ref.Domain)).c_str());
-                    previousDomain = row.Ref.Domain;
-                }
-                const auto label = std::string(Runtime::ToString(row.Ref.Domain)) + ": " + row.Ref.Name +
-                                   " (" + std::to_string(row.ElementCount) + ")";
-                if (ImGui::Selectable(label.c_str(), row.Ref == config.Positions))
-                {
-                    config.Positions = row.Ref;
-                    config.Radii.Domain = row.Ref.Domain;
-                    changed = true;
-                }
-            }
-            ImGui::EndCombo();
-        }
-        for (auto [label, ref] : {std::pair{"Radii property", &config.Radii}})
-        {
-            std::array<char,512> name{};
-            std::copy_n(ref->Name.c_str(),std::min(ref->Name.size(),name.size()-1),name.data());
-            if (ImGui::InputText(label,name.data(),name.size())) {ref->Name=name.data();changed=true;}
-        }
+        changed |= DrawProcessingPropertyName("Radii property", config.Radii.Name);
         int backend=int(config.Backend);
-        if(ImGui::Combo("Neighbors",&backend,"CPU octree\0CPU LBVH (cached)\0Vulkan LBVH\0")) {config.Backend=Runtime::PointSpacingBackend(backend);changed=true;}
+        if(ImGui::Combo("Acceleration",&backend,"CPU octree\0CPU LBVH (cached)\0Vulkan LBVH\0")) {config.Backend=Runtime::PointSpacingBackend(backend);changed=true;}
         changed |= ImGui::InputScalar("Neighbors k",ImGuiDataType_U32,&config.KNeighbors);
         changed |= ImGui::InputFloat("Radius scale",&config.ScaleFactor);
         ImGui::TextWrapped("Radius = scale times mean retained neighbor distance. Nearest-other spacing is reported separately. Values use the selected property coordinates; coverage is not guaranteed.");
         if(config.Backend==Runtime::PointSpacingBackend::VulkanLBVH)
             changed |= ImGui::InputScalar("GPU query batch size",ImGuiDataType_U32,&config.GpuQueryBatchSize);
-        if(changed)
-        {
-            const auto applied=Runtime::ApplyEditorPointSpacingConfig(context.GeometryCommands,config);
-            Spacing.ConfigDiagnostic=applied.Succeeded()?"":"Controls were rejected by radii config validation.";
-        }
-        if(!Spacing.ConfigDiagnostic.empty())ImGui::TextWrapped("%s",Spacing.ConfigDiagnostic.c_str());
-        auto analyze=config;
-        const auto readiness=Runtime::PreviewEditorPointSpacingCommand(context.GeometryCommands,analyze);
-        if(!readiness.Ready)ImGui::TextWrapped("%s",readiness.Diagnostic.c_str());
-        const auto execute=[&](Runtime::PointSpacingConfig request){
-            const auto applied=Runtime::ApplyEditorPointSpacingConfig(context.GeometryCommands,request);
-            if(applied.Succeeded())
-                PublishCommandResult(Spacing.LastResult,Runtime::ApplyEditorConfiguredPointSpacing(context.GeometryCommands),context.MethodResultSinks.PointSpacing);
-            else Spacing.ConfigDiagnostic="Spacing config was rejected.";
-        };
-        ImGui::BeginDisabled(!context.GeometryConfigCommandsAvailable || !readiness.Ready || !Spacing.ConfigDiagnostic.empty());
-        if(ImGui::Button("Estimate radii"))execute(analyze);
-        ImGui::EndDisabled();
+        DrawProcessingExecution(context, Spacing, changed,
+            [&](const auto& c) { return Runtime::PreviewEditorPointSpacingCommand(context.PointFields.Commands, c); },
+            [&](const auto& c) { return Runtime::ApplyEditorPointSpacingConfig(context.PointFields.Commands, c); },
+            [&] { return Runtime::ApplyEditorConfiguredPointSpacing(context.PointFields.Commands, context.PointFields.ResultSinks.PointSpacing); },
+            context.PointFields.ResultSinks.PointSpacing, "Estimate radii",
+            "Controls were rejected by radii config validation.", "Spacing config was rejected.");
         ImGui::TextWrapped("Vulkan computes neighbors; spacing and radii are evaluated on CPU. Undo restores the named radius property. Show radii maps values to colors; point rendering currently expects pixel sizes.");
-        auto radii=readiness.Ready?readiness.Resolved.Radii:config.Radii;
-        if(ImGui::Button("Show radii"))
-            Spacing.VisualizationDiagnostic=Runtime::DebugNameForEditorCommandStatus(Runtime::ApplyEditorVisualizationRecipeCommand(
-                context.VisualizationCommands,{.StableEntityId=config.StableEntityId,
-                .Recipe={.Data=Runtime::ScalarVisualizationRecipe{.Source=radii,.OutputName=radii.Name+".colors"}}}));
+        if (ImGui::Button("Show radii"))
+            Spacing.VisualizationDiagnostic = Runtime::DebugNameForEditorCommandStatus(
+                ShowProcessingProperty(context, config.StableEntityId, config.Radii));
         if(!Spacing.VisualizationDiagnostic.empty())ImGui::Text("Display: %s",Spacing.VisualizationDiagnostic.c_str());
         if(Spacing.LastResult)
         {
@@ -3411,100 +2659,39 @@ namespace Extrinsic::Sandbox::Editor
             ImGui::Text("Nearest spacing min / mean / max: %.5g / %.5g / %.5g", double(result.Statistics.MinSpacing), double(result.Statistics.AverageSpacing), double(result.Statistics.MaxSpacing));
             ImGui::Text("Centroid: %.5g / %.5g / %.5g; bounds diagonal: %.5g", double(result.Statistics.Centroid.x), double(result.Statistics.Centroid.y), double(result.Statistics.Centroid.z), double(result.Statistics.BoundingBoxDiagonal));
             ImGui::TextWrapped("%s",result.Message.c_str());
-            DrawDismissLastResultButton("Dismiss##Spacing",Spacing.LastResult,Runtime::EditorGeometryProcessingResultSlot::PointSpacing,context);
+            DrawDismissLastResultButton("Dismiss##Spacing", Spacing.LastResult, Runtime::EditorPointFieldResultSlot::PointSpacing, context.PointFields.ResultSinks.DismissResult);
         }
         ImGui::End();
     }
 
     void MeshProcessingPanels::Impl::DrawBilateralWindow(bool &open, const SandboxEditorContext &context)
     {
-        if (context.GeometryResults.LastBilateralFilterResult)
-            Bilateral.LastResult = context.GeometryResults.LastBilateralFilterResult;
+        if (context.PointSet.Results.LastBilateralFilterResult)
+            Bilateral.LastResult = context.PointSet.Results.LastBilateralFilterResult;
         ImGui::SetNextWindowSize(ImVec2(460, 600), ImGuiCond_FirstUseEver);
         if (!ImGui::Begin("Bilateral Point Filter", &open))
         {
             ImGui::End();
             return;
         }
-        const auto active = Runtime::GetEditorBilateralFilterConfig(context.GeometryCommands)
+        const auto active = Runtime::GetEditorBilateralFilterConfig(context.PointSet.Commands)
                                 .value_or(Runtime::BilateralFilterConfig{});
         const auto serialized = Runtime::SerializeBilateralFilterConfig(active);
-        if (serialized != Bilateral.LastApplied)
-        {
-            Bilateral.Draft = active;
-            Bilateral.LastApplied = serialized;
-            Bilateral.ConfigDiagnostic.clear();
-        }
+        Bilateral.Synchronize(active, serialized);
         auto &config = Bilateral.Draft;
         bool changed = false;
-        const auto workspace =
-            Runtime::BuildEditorWorkspaceSnapshot(context.SnapshotQueries, {.Hierarchy = true,
-                                                                            .Inspector = false,
-                                                                            .Selection = false,
-                                                                            .Document = false,
-                                                                            .SceneFile = false,
-                                                                            .FileImport = false,
-                                                                            .AssetImportQueue = false,
-                                                                            .RenderGraph = false,
-                                                                            .RenderRecipe = false,
-                                                                            .CameraRender = false,
-                                                                            .Visualization = false});
-        if (context.Selection && !context.Selection->SelectedStableIds.empty() &&
-            ImGui::Button("Use selected entity"))
+        changed |= DrawProcessingEntity("Entity##Bilateral", context,
+            config.StableEntityId, Bilateral.LastSelectedEntity);
+        DrawProcessingCpuBackend();
+        if (DrawProcessingPointInput("Positions##Bilateral", [&] { return Runtime::GetEditorBilateralFilterInputCatalog(context.PointSet.Commands, config.StableEntityId); }, config.Positions))
         {
-            config.StableEntityId = context.Selection->SelectedStableIds.front();
+            config.Output.Domain = config.Normals.Domain = config.Positions.Domain;
             changed = true;
-        }
-        std::string entityName =
-            config.StableEntityId ? std::to_string(config.StableEntityId) : "Choose entity";
-        for (const auto &row : workspace.Hierarchy)
-            if (row.StableEntityId == config.StableEntityId)
-                entityName = row.Name;
-        if (ImGui::BeginCombo("Entity##Bilateral", entityName.c_str()))
-        {
-            for (const auto &row : workspace.Hierarchy)
-            {
-                if (Runtime::GetEditorBilateralFilterInputCatalog(context.GeometryCommands,
-                                                                   row.StableEntityId)
-                        .Entries.empty())
-                    continue;
-                const auto title = row.Name + " (" + std::to_string(row.StableEntityId) + ")";
-                if (ImGui::Selectable(title.c_str(), row.StableEntityId == config.StableEntityId))
-                {
-                    config.StableEntityId = row.StableEntityId;
-                    changed = true;
-                }
-            }
-            ImGui::EndCombo();
-        }
-        const auto inputName =
-            std::string(Runtime::ToString(config.Positions.Domain)) + ": " + config.Positions.Name;
-        if (ImGui::BeginCombo("Positions##Bilateral", inputName.c_str()))
-        {
-            const auto catalog = Runtime::GetEditorBilateralFilterInputCatalog(context.GeometryCommands, config.StableEntityId);
-            auto previousDomain = Runtime::GeometryElementDomain::Unknown;
-            for (const auto &row : catalog.Entries)
-            {
-                if (row.Ref.Domain != previousDomain)
-                {
-                    ImGui::SeparatorText(std::string(Runtime::ToString(row.Ref.Domain)).c_str());
-                    previousDomain = row.Ref.Domain;
-                }
-                const auto label = std::string(Runtime::ToString(row.Ref.Domain)) + ": " + row.Ref.Name +
-                                   " (" + std::to_string(row.ElementCount) + ")";
-                if (ImGui::Selectable(label.c_str(), row.Ref == config.Positions))
-                {
-                    config.Positions = row.Ref;
-                    config.Output.Domain = config.Normals.Domain = row.Ref.Domain;
-                    changed = true;
-                }
-            }
-            ImGui::EndCombo();
         }
         const auto normalsLabel=std::string(Runtime::ToString(config.Normals.Domain))+": "+config.Normals.Name;
         if(ImGui::BeginCombo("Normals##Bilateral",normalsLabel.c_str()))
         {
-            const auto catalog=Runtime::GetEditorBilateralFilterInputCatalog(context.GeometryCommands,config.StableEntityId);
+            const auto catalog=Runtime::GetEditorBilateralFilterInputCatalog(context.PointSet.Commands,config.StableEntityId);
             for(const auto& row:catalog.Entries)
                 if(row.Ref.Domain==config.Positions.Domain && ImGui::Selectable(row.Ref.Name.c_str(),row.Ref==config.Normals))
                 {config.Normals=row.Ref;changed=true;}
@@ -3512,13 +2699,9 @@ namespace Extrinsic::Sandbox::Editor
         }
         if(ImGui::Button("Write to input positions")){config.Output=config.Positions;changed=true;}
         for (auto [label, ref] : {std::pair{"Output positions", &config.Output}})
-        {
-            std::array<char,512> name{};
-            std::copy_n(ref->Name.c_str(),std::min(ref->Name.size(),name.size()-1),name.data());
-            if (ImGui::InputText(label,name.data(),name.size())) {ref->Name=name.data();changed=true;}
-        }
+            changed |= DrawProcessingPropertyName(label, ref->Name);
         int backend=int(config.Backend);
-        if(ImGui::Combo("Neighbors",&backend,"CPU octree\0CPU LBVH (cached)\0Vulkan LBVH\0")) {config.Backend=Runtime::BilateralFilterBackend(backend);changed=true;}
+        if(ImGui::Combo("Acceleration",&backend,"CPU octree\0CPU LBVH (cached)\0Vulkan LBVH\0")) {config.Backend=Runtime::BilateralFilterBackend(backend);changed=true;}
         changed |= ImGui::InputScalar("Neighbors k",ImGuiDataType_U32,&config.KNeighbors);
         changed |= ImGui::InputFloat("Spatial sigma (0 = automatic)",&config.SpatialSigma);
         changed |= ImGui::InputFloat("Normal sigma",&config.NormalSigma);
@@ -3526,24 +2709,12 @@ namespace Extrinsic::Sandbox::Editor
         ImGui::TextWrapped("Filters positions along fixed input normals. Each pass rebuilds neighborhoods; automatic spatial sigma is resolved once.");
         if(config.Backend==Runtime::BilateralFilterBackend::VulkanLBVH)
             changed |= ImGui::InputScalar("GPU query batch size",ImGuiDataType_U32,&config.GpuQueryBatchSize);
-        if(changed)
-        {
-            const auto applied=Runtime::ApplyEditorBilateralFilterConfig(context.GeometryCommands,config);
-            Bilateral.ConfigDiagnostic=applied.Succeeded()?"":"Controls were rejected by filter config validation.";
-        }
-        if(!Bilateral.ConfigDiagnostic.empty())ImGui::TextWrapped("%s",Bilateral.ConfigDiagnostic.c_str());
-        auto analyze=config;
-        const auto readiness=Runtime::PreviewEditorBilateralFilterCommand(context.GeometryCommands,analyze);
-        if(!readiness.Ready)ImGui::TextWrapped("%s",readiness.Diagnostic.c_str());
-        const auto execute=[&](Runtime::BilateralFilterConfig request){
-            const auto applied=Runtime::ApplyEditorBilateralFilterConfig(context.GeometryCommands,request);
-            if(applied.Succeeded())
-                PublishCommandResult(Bilateral.LastResult,Runtime::ApplyEditorConfiguredBilateralFilter(context.GeometryCommands),context.MethodResultSinks.BilateralFilter);
-            else Bilateral.ConfigDiagnostic="Bilateral config was rejected.";
-        };
-        ImGui::BeginDisabled(!context.GeometryConfigCommandsAvailable || !readiness.Ready || !Bilateral.ConfigDiagnostic.empty());
-        if(ImGui::Button("Filter positions"))execute(analyze);
-        ImGui::EndDisabled();
+        DrawProcessingExecution(context, Bilateral, changed,
+            [&](const auto& request) { return Runtime::PreviewEditorBilateralFilterCommand(context.PointSet.Commands, request); },
+            [&](const auto& request) { return Runtime::ApplyEditorBilateralFilterConfig(context.PointSet.Commands, request); },
+            [&] { return Runtime::ApplyEditorConfiguredBilateralFilter(context.PointSet.Commands, context.PointSet.ResultSinks.BilateralFilter); },
+            context.PointSet.ResultSinks.BilateralFilter, "Filter positions",
+            "Controls were rejected by filter config validation.", "Bilateral config was rejected.");
         ImGui::TextWrapped("Vulkan computes neighbors; weights and position updates run on CPU. Only the final result is published. Choose the input position property as output to update the displayed geometry; Undo restores it.");
         if(Bilateral.LastResult)
         {
@@ -3556,7 +2727,7 @@ namespace Extrinsic::Sandbox::Editor
             ImGui::Text("Last-pass displacement mean / max: %.5g / %.5g",double(result.Diagnostics.AverageDisplacement),double(result.Diagnostics.MaxDisplacement));
             ImGui::Text("Degenerate normals: %zu; private index builds: %zu",result.Diagnostics.DegenerateNormals,result.WorkspaceBuilds);
             ImGui::TextWrapped("%s",result.Message.c_str());
-            DrawDismissLastResultButton("Dismiss##Bilateral",Bilateral.LastResult,Runtime::EditorGeometryProcessingResultSlot::BilateralFilter,context);
+            DrawDismissLastResultButton("Dismiss##Bilateral", Bilateral.LastResult, Runtime::EditorPointSetResultSlot::BilateralFilter, context.PointSet.ResultSinks.DismissResult);
         }
         ImGui::End();
     }
@@ -3564,8 +2735,8 @@ namespace Extrinsic::Sandbox::Editor
     void MeshProcessingPanels::Impl::DrawRegistrationWindow(
         bool& open, const SandboxEditorContext& context)
     {
-        if (context.GeometryResults.LastRegistrationResult.has_value())
-            Registration.LastResult = *context.GeometryResults.LastRegistrationResult;
+        if (context.Registration.Results.LastRegistrationResult.has_value())
+            Registration.LastResult = *context.Registration.Results.LastRegistrationResult;
         ImGui::SetNextWindowSize(
             ImVec2(360.0f, 320.0f), ImGuiCond_FirstUseEver);
         if (!ImGui::Begin("ICP Registration", &open))
@@ -3575,49 +2746,25 @@ namespace Extrinsic::Sandbox::Editor
         }
 
         ImGui::TextWrapped("Align named point samples from mesh, graph or point-cloud domains. Applies an undoable transform to the source entity.");
-        const auto activeConfig = Runtime::GetEditorRegistrationConfig(context.GeometryCommands).value_or(Runtime::RegistrationConfig{});
+        const auto activeConfig = Runtime::GetEditorRegistrationConfig(context.Registration.Commands).value_or(Runtime::RegistrationConfig{});
         const auto activeText = Runtime::SerializeRegistrationConfig(activeConfig);
         if (activeText != Registration.LastApplied)
         { Registration.Draft = activeConfig; Registration.LastApplied = activeText; Registration.ConfigDiagnostic.clear(); }
         auto& config = Registration.Draft;
         bool changed = false;
-        const auto workspace = Runtime::BuildEditorWorkspaceSnapshot(context.SnapshotQueries,
-            {.Hierarchy = true, .Inspector = false, .Selection = false, .Document = false,
-             .SceneFile = false, .FileImport = false, .AssetImportQueue = false,
-             .RenderGraph = false, .RenderRecipe = false, .CameraRender = false, .Visualization = false});
-        auto entityChoice = [&](const char* label, std::uint32_t& id) {
-            std::string preview = id ? std::to_string(id) : "Choose entity";
-            for (const auto& row : workspace.Hierarchy)
-                if (row.StableEntityId == id) preview = row.Name + " (" + std::to_string(id) + ")";
-            if (ImGui::BeginCombo(label, preview.c_str()))
-            {
-                for (const auto& row : workspace.Hierarchy)
-                {
-                    const auto catalog = Runtime::GetEditorRegistrationInputCatalog(context.GeometryCommands, row.StableEntityId);
-                    if (catalog.Entries.empty()) continue;
-                    const auto title = row.Name + " (" + std::to_string(row.StableEntityId) + ")";
-                    if (ImGui::Selectable(title.c_str(), id == row.StableEntityId)) { id = row.StableEntityId; changed = true; }
-                }
-                ImGui::EndCombo();
-            }
-        };
-        if (context.Selection && context.Selection->SelectedStableIds.size() >= 2 &&
-            ImGui::Button("Use two selected entities"))
-        {
-            config.SourceStableEntityId = context.Selection->SelectedStableIds[0];
-            config.TargetStableEntityId = context.Selection->SelectedStableIds[1];
-            changed = true;
-        }
-        entityChoice("Source##ICP", config.SourceStableEntityId);
-        entityChoice("Target##ICP", config.TargetStableEntityId);
+        changed |= DrawProcessingEntity("Source##ICP", context,
+            config.SourceStableEntityId, Registration.LastSelectedSource);
+        changed |= DrawProcessingEntity("Target##ICP", context,
+            config.TargetStableEntityId, Registration.LastSelectedTarget, std::nullopt, 1u);
+        DrawProcessingCpuBackend();
         if (ImGui::Button("Swap source and target"))
         {
             std::swap(config.SourceStableEntityId, config.TargetStableEntityId);
             std::swap(config.SourcePositions, config.TargetPositions);
             changed = true;
         }
-        const auto sourceCatalog = Runtime::GetEditorRegistrationInputCatalog(context.GeometryCommands, config.SourceStableEntityId);
-        const auto targetCatalog = Runtime::GetEditorRegistrationInputCatalog(context.GeometryCommands, config.TargetStableEntityId);
+        const auto sourceCatalog = Runtime::GetEditorRegistrationInputCatalog(context.Registration.Commands, config.SourceStableEntityId);
+        const auto targetCatalog = Runtime::GetEditorRegistrationInputCatalog(context.Registration.Commands, config.TargetStableEntityId);
         auto propertyChoice = [&](const char* label, const auto& catalog, Runtime::GeometryPropertyRef& ref,
                                   Runtime::GeometryElementDomain required = Runtime::GeometryElementDomain::Unknown) {
             const auto preview = std::string(Runtime::ToString(ref.Domain)) + ": " + ref.Name;
@@ -3641,7 +2788,7 @@ namespace Extrinsic::Sandbox::Editor
         if (config.Variant == Runtime::EditorICPVariant::PointToPlane)
             propertyChoice("Target normals##ICP", targetCatalog, config.TargetNormals, config.TargetPositions.Domain);
         int backend = int(config.Backend);
-        if (ImGui::Combo("Correspondences##ICP", &backend, "CPU KD-tree (reference)\0CPU LBVH (cached)\0Vulkan LBVH (CPU solve)\0"))
+        if (ImGui::Combo("Acceleration##ICP", &backend, "CPU KD-tree (reference)\0CPU LBVH (cached)\0Vulkan LBVH (CPU solve)\0"))
         { config.Backend = Runtime::RegistrationBackend(backend); changed = true; }
         changed |= ImGui::InputScalar("Max iterations##ICP", ImGuiDataType_U32, &config.MaxIterations);
         changed |= ImGui::InputDouble("Max distance (0 = 1e6)##ICP", &config.MaxCorrespondenceDistance);
@@ -3656,23 +2803,25 @@ namespace Extrinsic::Sandbox::Editor
         { config.TrajectoryStep = config.MaxIterations; changed = true; }
         if (changed)
         {
-            const auto applied = Runtime::ApplyEditorRegistrationConfig(context.GeometryCommands, config);
+            const auto applied = Runtime::ApplyEditorRegistrationConfig(context.Registration.Commands, config);
             Registration.ConfigDiagnostic = applied.Status == Runtime::RuntimeEngineConfigApplyStatus::Rejected
                 ? "Registration controls were rejected by config validation." : "";
         }
         if (!Registration.ConfigDiagnostic.empty()) ImGui::TextWrapped("%s", Registration.ConfigDiagnostic.c_str());
-        const auto readiness = Runtime::PreviewEditorRegistrationCommand(context.GeometryCommands, config);
+        const auto readiness = Runtime::PreviewEditorRegistrationCommand(context.Registration.Commands, config);
         if (!readiness.Ready) ImGui::TextWrapped("%s", readiness.Diagnostic.c_str());
-        ImGui::BeginDisabled(!context.GeometryConfigCommandsAvailable || !Registration.ConfigDiagnostic.empty() || !readiness.Ready);
+        ImGui::BeginDisabled(!context.ProcessingConfigCommandsAvailable || !Registration.ConfigDiagnostic.empty() || !readiness.Ready);
         const bool runFinal = ImGui::Button("Run ICP##ICP");
         if (runFinal)
         {
             config.TrajectoryStep = config.MaxIterations;
-            (void)Runtime::ApplyEditorRegistrationConfig(context.GeometryCommands, config);
+            (void)Runtime::ApplyEditorRegistrationConfig(context.Registration.Commands, config);
         }
         if (runFinal || (applyTrajectory && readiness.Ready && Registration.ConfigDiagnostic.empty()))
             PublishCommandResult(Registration.LastResult,
-                Runtime::ApplyEditorConfiguredRegistrationCommand(context.GeometryCommands), context.MethodResultSinks.Registration);
+                Runtime::ApplyEditorConfiguredRegistrationCommand(
+                    context.Registration.Commands, context.Registration.ResultSinks.Registration),
+                context.Registration.ResultSinks.Registration);
         ImGui::EndDisabled();
 
         if (!Registration.LastResult.has_value())
@@ -3716,11 +2865,12 @@ namespace Extrinsic::Sandbox::Editor
             }
             if (!result.Message.empty())
                 ImGui::TextWrapped("%s", result.Message.c_str());
-            DrawDismissLastResultButton(
-                "Dismiss##Registration",
-                Registration.LastResult,
-                Runtime::EditorGeometryProcessingResultSlot::Registration,
-                context);
+            if (DrawDismissLastResultButton("Dismiss##Registration"))
+            {
+                Registration.LastResult.reset();
+                if (context.Registration.ResultSinks.DismissResult)
+                    context.Registration.ResultSinks.DismissResult();
+            }
         }
         ImGui::End();
     }
@@ -3754,14 +2904,14 @@ namespace Extrinsic::Sandbox::Editor
     {
         DrawDomainWindow(open, context, Runtime::EditorDomainWindowKind::Mesh,
                          "Mesh / Geodesics / Virtual Source Propagation",
-                         &Impl::DrawGeodesicsControls);
+                         GeodesicsInput, &Impl::DrawGeodesicsControls);
     }
     void MeshProcessingPanels::Impl::DrawGeodesicsControls(
         const Runtime::EditorDomainWindowModel& model, const SandboxEditorContext& context)
     {
         if (!GeodesicsDirty)
         {
-            if (auto config = Runtime::GetEditorGeodesicsConfig(context.GeometryCommands))
+            if (auto config = Runtime::GetEditorGeodesicsConfig(context.MeshFields.Commands))
             {
                 GeodesicsConfig = *config;
                 GeodesicsInitialized = true;
@@ -3781,7 +2931,7 @@ namespace Extrinsic::Sandbox::Editor
             GeodesicsDirty = true;
         }
         const auto selected = Runtime::ReadEditorPrimitiveSelection(
-            context.GeometryCommands, model.SelectedStableId, Runtime::GeometryElementDomain::MeshVertex);
+            context.Processing, model.SelectedStableId, Runtime::GeometryElementDomain::MeshVertex);
         ImGui::BeginDisabled(!selected.Usable() || selected.Indices.empty());
         if (ImGui::Button("Use selected vertices as sources"))
         {
@@ -3818,7 +2968,7 @@ namespace Extrinsic::Sandbox::Editor
             for (const auto& row : model.PropertyCatalog.Rows)
             {
                 if (row.Domain != Runtime::EditorPropertyCatalogDomain::MeshVertices ||
-                    row.ValueKind != decltype(row.ValueKind)::Vec3 || row.Internal)
+                    row.ValueKind != decltype(row.ValueKind)::Vec3 || !row.Bindable)
                     continue;
                 if (ImGui::Selectable(row.Name.c_str(),
                                       row.Name == GeodesicsConfig.PositionProperty))
@@ -3829,32 +2979,33 @@ namespace Extrinsic::Sandbox::Editor
             }
             ImGui::EndCombo();
         }
+        ImGui::SeparatorText("Output properties");
+        GeodesicsDirty |= DrawProcessingPropertyName("Distance property", GeodesicsConfig.DistanceProperty);
+        GeodesicsDirty |= DrawProcessingPropertyName("Source mask property", GeodesicsConfig.SourceMaskProperty);
         if (ImGui::InputScalar("Expansion budget", ImGuiDataType_U32,
                                &GeodesicsConfig.MaxHalfedgeExpansions))
             GeodesicsDirty = true;
         if (ImGui::Button("Compute geodesics"))
         {
             const auto applied =
-                Runtime::ApplyEditorGeodesicsConfig(context.GeometryCommands, GeodesicsConfig);
+                Runtime::ApplyEditorGeodesicsConfig(context.MeshFields.Commands, GeodesicsConfig);
             if (applied.Succeeded())
             {
                 GeodesicsDirty = false;
                 GeodesicsResult = Runtime::ApplyEditorConfiguredGeodesicsCommand(
-                    context.GeometryCommands, model.SelectedStableId);
+                    context.MeshFields.Commands, model.SelectedStableId);
                 GeodesicsMessage = GeodesicsResult->Message;
-                if (GeodesicsResult->Succeeded())
-                {
-                    const auto status = ShowCurvatureScalarVisualization(
-                        context, model.SelectedStableId, "v:geodesic_distance");
-                    if (status != Runtime::EditorCommandStatus::Applied &&
-                        status != Runtime::EditorCommandStatus::NoChange)
-                        GeodesicsMessage += " Distance display could not be enabled.";
-                }
+
             }
             else
                 GeodesicsMessage = "Geodesics config was rejected; check source indices, position "
                                    "property, and expansion budget.";
         }
+        ImGui::SeparatorText("Display output properties");
+        DrawProcessingPropertyShowButton(context, model.SelectedStableId,
+            {Runtime::GeometryElementDomain::MeshVertex, GeodesicsConfig.DistanceProperty, Geometry::PropertyValueKind::Double}, GeodesicsMessage);
+        DrawProcessingPropertyShowButton(context, model.SelectedStableId,
+            {Runtime::GeometryElementDomain::MeshVertex, GeodesicsConfig.SourceMaskProperty, Geometry::PropertyValueKind::Bool}, GeodesicsMessage);
         ImGui::TextWrapped("%s", GeodesicsMessage.c_str());
         if (GeodesicsResult)
         {

@@ -1,8 +1,8 @@
+// ECS-facing execution graph: typed component read/write declarations and phase
+// tokens over the general task graph, so systems order by data, not by hand.
 module;
 
-#include <cstddef>
 #include <cstdint>
-#include <limits>
 #include <memory>
 #include <string_view>
 #include <vector>
@@ -18,8 +18,8 @@ import Extrinsic.Core.Memory;
 // -----------------------------------------------------------------------
 // Extrinsic::Core::FrameGraph — ECS system execution graph.
 //
-// Wraps an ExecuteCallbacks Dag::TaskGraph and layers TypeToken-based ECS
-// component dependency declarations on top of it.
+// Wraps an ExecuteCallbacks Dag::TaskGraph and layers typed ECS component
+// dependency declarations on top of it.
 //
 // Dependency model (per frame):
 //   Given systems S_i with declared reads R_i and writes W_i:
@@ -28,8 +28,8 @@ import Extrinsic.Core.Memory;
 //     WAR: S_a reads  C, S_b writes C → S_a before S_b
 //     RAR: both read   C → may execute in parallel (same layer)
 //
-// TypeToken<T>() is a compile-time FNV-1a hash of the type's compiler
-// signature — stable across TUs and named-module boundaries (no RTTI).
+// Typed Read<T>()/Write<T>() declarations resolve to the TaskGraph's own
+// compile-time type tokens; no RTTI is involved.
 //
 // Usage:
 //   FrameGraph fg;
@@ -44,41 +44,6 @@ import Extrinsic.Core.Memory;
 export namespace Extrinsic::Core
 {
     class FrameGraph;
-
-    // -----------------------------------------------------------------------
-    // Compile-time type ID — deterministic FNV-1a hash of compiler type sig.
-    // Stable across TUs and named-module boundaries (no RTTI).
-    // -----------------------------------------------------------------------
-    namespace Detail
-    {
-        [[nodiscard]] constexpr uint64_t HashTypeSig(std::string_view s) noexcept
-        {
-            uint64_t h = 14695981039346656037ULL;
-            for (unsigned char c : s) { h ^= c; h *= 1099511628211ULL; }
-            return h;
-        }
-
-        template <typename T>
-        [[nodiscard]] constexpr std::string_view TypeSig() noexcept
-        {
-#if defined(__clang__) || defined(__GNUC__)
-            return __PRETTY_FUNCTION__;
-#elif defined(_MSC_VER)
-            return __FUNCSIG__;
-#else
-            return "TypeSig<unknown>";
-#endif
-        }
-    }
-
-    template <typename T>
-    [[nodiscard]] std::size_t TypeToken() noexcept
-    {
-        constexpr auto kMask = std::numeric_limits<std::size_t>::max() >> 1;
-        static constexpr std::size_t s_Token = static_cast<std::size_t>(
-            Detail::HashTypeSig(Detail::TypeSig<T>())) & kMask;
-        return s_Token;
-    }
 
     // -----------------------------------------------------------------------
     // FrameGraph pass options — scheduling metadata for the TaskGraph backend.
@@ -112,7 +77,7 @@ export namespace Extrinsic::Core
 
     // -----------------------------------------------------------------------
     // FrameGraphBuilder — passed to user setup lambdas in AddPass().
-    // Thin adapter: translates TypeToken → TaskGraph::Read/WriteResource.
+    // Thin adapter: forwards typed and named declarations to TaskGraphBuilder.
     // -----------------------------------------------------------------------
     class FrameGraphBuilder
     {

@@ -667,103 +667,6 @@ namespace Extrinsic::Graphics
             return false;
         }
 
-        [[nodiscard]] const RecipeExtensionSlotDescriptor* FindRecipeSlot(
-            const RenderRecipeDescriptor& recipe,
-            const std::string_view stableName) noexcept
-        {
-            const auto it = std::find_if(recipe.Slots.begin(),
-                                         recipe.Slots.end(),
-                                         [stableName](const RecipeExtensionSlotDescriptor& slot) {
-                                             return slot.StableName == stableName;
-                                         });
-            return it == recipe.Slots.end() ? nullptr : &*it;
-        }
-
-        [[nodiscard]] bool ContainsCapability(
-            const std::vector<RendererCapability>& capabilities,
-            const RendererCapability capability) noexcept
-        {
-            return std::find(capabilities.begin(), capabilities.end(), capability) != capabilities.end();
-        }
-
-        [[nodiscard]] bool RendererSupportsCapabilities(
-            const RendererDescriptor& renderer,
-            const std::vector<RendererCapability>& required) noexcept
-        {
-            return std::all_of(required.begin(),
-                               required.end(),
-                               [&renderer](const RendererCapability capability) {
-                                   return ContainsCapability(renderer.SupportedCapabilities, capability);
-                               });
-        }
-
-        void AddFrameRecipeOverrideDiagnostic(
-            FrameRecipeOverrideProjection& projection,
-            const FrameRecipeOverrideDiagnosticCode code,
-            std::string subject,
-            std::string message)
-        {
-            projection.Diagnostics.push_back(FrameRecipeOverrideDiagnostic{
-                .Code = code,
-                .Subject = std::move(subject),
-                .Message = std::move(message),
-            });
-        }
-
-        [[nodiscard]] bool IsDisableMappedSlot(const std::string_view stableName) noexcept
-        {
-            return stableName == "postprocess" ||
-                   stableName == "debug-view" ||
-                   stableName == "picking" ||
-                   stableName == "lighting";
-        }
-
-        void DisableMappedFrameRecipeSlot(FrameRecipeFeatures& features,
-                                          const std::string_view stableName,
-                                          std::uint32_t& disabledSlotCount) noexcept
-        {
-            if (stableName == "postprocess")
-            {
-                if (features.EnablePostProcess || features.EnableAntiAliasing)
-                {
-                    ++disabledSlotCount;
-                }
-                features.EnablePostProcess = false;
-                features.EnableAntiAliasing = false;
-                return;
-            }
-            if (stableName == "debug-view")
-            {
-                if (features.EnableDebugView)
-                {
-                    ++disabledSlotCount;
-                }
-                features.EnableDebugView = false;
-                return;
-            }
-            if (stableName == "picking")
-            {
-                if (features.EnablePicking)
-                {
-                    ++disabledSlotCount;
-                }
-                features.EnablePicking = false;
-                return;
-            }
-            if (stableName == "lighting")
-            {
-                if (features.LightingPath != FrameRecipeLightingPath::Forward ||
-                    features.EnableClusterGridBuild ||
-                    features.EnableClusterLightAssignment)
-                {
-                    ++disabledSlotCount;
-                }
-                features.LightingPath = FrameRecipeLightingPath::Forward;
-                features.EnableClusterGridBuild = false;
-                features.EnableClusterLightAssignment = false;
-            }
-        }
-
         void AppendContractDiagnostics(RenderGraphContractIntegrationStats& stats,
                                        const RenderingContractValidationResult& result)
         {
@@ -1324,115 +1227,12 @@ namespace Extrinsic::Graphics
         }
     }
 
-    [[nodiscard]] FrameRecipeOverrideProjection ProjectFrameRecipeOverride(
-        const FrameRecipeFeatures& derivedDefaults,
-        const FrameRecipeOverride& recipeOverride)
-    {
-        FrameRecipeOverrideProjection projection{
-            .Features = derivedDefaults,
-        };
-        const RendererDescriptor renderer = MakeCurrentRendererDescriptor();
-        const RenderRecipeDescriptor baseRecipe = MakeCurrentRendererRecipeDescriptor();
-
-        if (recipeOverride.Recipe.RecipeId.empty())
-        {
-            AddFrameRecipeOverrideDiagnostic(projection,
-                                             FrameRecipeOverrideDiagnosticCode::EmptyRecipeId,
-                                             "recipe.recipeId",
-                                             "frame-recipe override must carry a non-empty recipe id");
-        }
-        if (!recipeOverride.Recipe.FixedCoreName.empty() &&
-            recipeOverride.Recipe.FixedCoreName != baseRecipe.FixedCoreName)
-        {
-            AddFrameRecipeOverrideDiagnostic(projection,
-                                             FrameRecipeOverrideDiagnosticCode::FixedCoreMutation,
-                                             recipeOverride.Recipe.FixedCoreName,
-                                             "frame-recipe override cannot replace the fixed frame core");
-        }
-
-        for (const RecipeExtensionSlotDescriptor& slot : recipeOverride.Recipe.Slots)
-        {
-            const RecipeExtensionSlotDescriptor* baseSlot =
-                FindRecipeSlot(baseRecipe, slot.StableName);
-            if (baseSlot == nullptr)
-            {
-                AddFrameRecipeOverrideDiagnostic(projection,
-                                                 FrameRecipeOverrideDiagnosticCode::UnknownSlot,
-                                                 slot.StableName,
-                                                 "frame-recipe override references an undeclared slot");
-                continue;
-            }
-            if (slot.Kind != baseSlot->Kind || baseSlot->Kind == RecipeSlotKind::FixedCore)
-            {
-                if (slot.StableName != baseSlot->StableName ||
-                    slot.Kind != baseSlot->Kind ||
-                    slot.SchemaId != baseSlot->SchemaId)
-                {
-                    AddFrameRecipeOverrideDiagnostic(projection,
-                                                     FrameRecipeOverrideDiagnosticCode::FixedCoreMutation,
-                                                     slot.StableName,
-                                                     "frame-recipe override cannot mutate the fixed frame core");
-                }
-            }
-            if (!RendererSupportsCapabilities(renderer, slot.RequiredCapabilities))
-            {
-                AddFrameRecipeOverrideDiagnostic(projection,
-                                                 FrameRecipeOverrideDiagnosticCode::UnsupportedCapability,
-                                                 slot.StableName,
-                                                 "frame-recipe override requires a renderer capability that is unavailable");
-            }
-        }
-
-        for (const std::string& stableName : recipeOverride.DisabledExtensionSlots)
-        {
-            const RecipeExtensionSlotDescriptor* baseSlot = FindRecipeSlot(baseRecipe, stableName);
-            if (baseSlot == nullptr)
-            {
-                AddFrameRecipeOverrideDiagnostic(projection,
-                                                 FrameRecipeOverrideDiagnosticCode::UnknownSlot,
-                                                 stableName,
-                                                 "frame-recipe override disables an undeclared slot");
-                continue;
-            }
-            if (baseSlot->Kind == RecipeSlotKind::FixedCore)
-            {
-                AddFrameRecipeOverrideDiagnostic(projection,
-                                                 FrameRecipeOverrideDiagnosticCode::FixedCoreSlotDisabled,
-                                                 stableName,
-                                                 "frame-recipe override cannot disable the fixed frame core");
-                continue;
-            }
-            if (!IsDisableMappedSlot(stableName))
-            {
-                AddFrameRecipeOverrideDiagnostic(projection,
-                                                 FrameRecipeOverrideDiagnosticCode::UnsupportedSlotDisable,
-                                                 stableName,
-                                                 "frame-recipe override can only disable slots with live feature gates");
-                continue;
-            }
-            DisableMappedFrameRecipeSlot(projection.Features,
-                                         stableName,
-                                         projection.DisabledSlotCount);
-        }
-
-        if (!projection.Diagnostics.empty())
-        {
-            projection.Features = derivedDefaults;
-            projection.DisabledSlotCount = 0u;
-            projection.Applied = false;
-            return projection;
-        }
-
-        projection.Applied = !recipeOverride.DisabledExtensionSlots.empty();
-        return projection;
-    }
-
-    void IRenderer::SubmitUvViewRequest(UvViewRequest request)
+    extern "C++" void IRenderer::SubmitUvViewRequest(UvViewRequest request)
     {
         (void)request;
     }
 
-    UvViewOutput IRenderer::GetUvViewOutput() const
+    extern "C++" UvViewOutput IRenderer::GetUvViewOutput() const
     {
         return UvViewOutput{
             .Status = UvViewStatus::CpuFallbackNonOperational,
@@ -4302,366 +4102,164 @@ namespace Extrinsic::Graphics
 
         // ── Resource managers ─────────────────────────────────────────────
 
-        [[nodiscard]] RHI::PipelineHandle GetDefaultDebugSurfacePipeline() const noexcept override
+        // One switch selects the optional lease that owns the identifier; the
+        // manager/lease/validity guard after it is shared because it is
+        // identical for every published pipeline. Every identifier is listed
+        // without a `default:` label so -Wswitch reports a new enumerator that
+        // forgot its lease; `Count` and values cast from outside the enum leave
+        // `lease` null and fail closed through the same guard. No descriptor is
+        // built here — the HZB and cluster hot paths call this every frame.
+        [[nodiscard]] RHI::PipelineHandle GetPipeline(
+            RendererPipelineId id) const noexcept override
         {
-            if (!m_Subsystems.PipelineManager().has_value() || !m_DefaultDebugSurfacePipelineLease.has_value() ||
-                !m_DefaultDebugSurfacePipelineLease->IsValid())
+            const std::optional<RHI::PipelineManager::PipelineLease>* lease = nullptr;
+            switch (id)
+            {
+                case RendererPipelineId::DefaultDebugSurface:
+                    lease = &m_DefaultDebugSurfacePipelineLease;
+                    break;
+                case RendererPipelineId::ForwardSurface:
+                    lease = &m_ForwardSurfacePipelineLease;
+                    break;
+                case RendererPipelineId::ForwardLine:
+                    lease = &m_ForwardLinePipelineLease;
+                    break;
+                case RendererPipelineId::ForwardPoint:
+                    lease = &m_ForwardPointPipelineLease;
+                    break;
+                case RendererPipelineId::Shadow:
+                    lease = &m_ShadowPipelineLease;
+                    break;
+                case RendererPipelineId::DeferredGBuffer:
+                    lease = &m_DeferredGBufferPipelineLease;
+                    break;
+                case RendererPipelineId::DeferredLighting:
+                    lease = &m_DeferredLightingPipelineLease;
+                    break;
+                case RendererPipelineId::SelectionEntityId:
+                    lease = &m_SelectionEntityIdPipelineLease;
+                    break;
+                case RendererPipelineId::SelectionEntityIdOutline:
+                    lease = &m_SelectionEntityIdOutlinePipelineLease;
+                    break;
+                case RendererPipelineId::SelectionFaceId:
+                    lease = &m_SelectionFaceIdPipelineLease;
+                    break;
+                case RendererPipelineId::SelectionEdgeId:
+                    lease = &m_SelectionEdgeIdPipelineLease;
+                    break;
+                case RendererPipelineId::SelectionPointId:
+                    lease = &m_SelectionPointIdPipelineLease;
+                    break;
+                case RendererPipelineId::SelectionOutline:
+                    lease = &m_SelectionOutlinePipelineLease;
+                    break;
+                case RendererPipelineId::PostProcessToneMap:
+                    lease = &m_PostProcessToneMapPipelineLease;
+                    break;
+                case RendererPipelineId::PostProcessBloomDownsample:
+                    lease = &m_PostProcessBloomDownsamplePipelineLease;
+                    break;
+                case RendererPipelineId::PostProcessBloomUpsample:
+                    lease = &m_PostProcessBloomUpsamplePipelineLease;
+                    break;
+                case RendererPipelineId::PostProcessFXAA:
+                    lease = &m_PostProcessFXAAPipelineLease;
+                    break;
+                case RendererPipelineId::PostProcessSMAAEdge:
+                    lease = &m_PostProcessSMAAEdgePipelineLease;
+                    break;
+                case RendererPipelineId::PostProcessSMAABlend:
+                    lease = &m_PostProcessSMAABlendPipelineLease;
+                    break;
+                case RendererPipelineId::PostProcessSMAAResolve:
+                    lease = &m_PostProcessSMAAResolvePipelineLease;
+                    break;
+                case RendererPipelineId::PostProcessHistogram:
+                    lease = &m_PostProcessHistogramPipelineLease;
+                    break;
+                case RendererPipelineId::HZBBuild:
+                    lease = &m_HZBBuildPipelineLease;
+                    break;
+                case RendererPipelineId::ClusterGridBuild:
+                    lease = &m_ClusterGridBuildPipelineLease;
+                    break;
+                case RendererPipelineId::ClusterLightAssignment:
+                    lease = &m_ClusterLightAssignmentPipelineLease;
+                    break;
+                case RendererPipelineId::Count:
+                    break;
+            }
+
+            if (lease == nullptr || !m_Subsystems.PipelineManager().has_value() ||
+                !lease->has_value() || !(*lease)->IsValid())
             {
                 return RHI::PipelineHandle{};
             }
-            return m_Subsystems.PipelineManager()->GetDeviceHandle(m_DefaultDebugSurfacePipelineLease->GetHandle());
+            return m_Subsystems.PipelineManager()->GetDeviceHandle((*lease)->GetHandle());
         }
 
-        [[nodiscard]] RHI::PipelineDesc GetDefaultDebugSurfacePipelineDesc() const noexcept override
+        // Separate from the handle query so the descriptor builders are never
+        // invoked on a handle lookup. Each case returns the exact expression the
+        // matching publisher compiles, which is what keeps republish
+        // byte-identical across init and rebuild.
+        [[nodiscard]] std::optional<RHI::PipelineDesc> GetPipelineDesc(
+            RendererPipelineId id) const noexcept override
         {
-            return BuildDefaultDebugSurfacePipelineDesc(m_BackbufferFormat);
-        }
-
-        [[nodiscard]] RHI::PipelineHandle GetForwardSurfacePipeline() const noexcept override
-        {
-            if (!m_Subsystems.PipelineManager().has_value() || !m_ForwardSurfacePipelineLease.has_value() ||
-                !m_ForwardSurfacePipelineLease->IsValid())
+            switch (id)
             {
-                return RHI::PipelineHandle{};
+                case RendererPipelineId::DefaultDebugSurface:
+                    return BuildDefaultDebugSurfacePipelineDesc(m_BackbufferFormat);
+                case RendererPipelineId::ForwardSurface:
+                    return BuildForwardSurfacePipelineDesc();
+                case RendererPipelineId::ForwardLine:
+                    return BuildForwardLinePipelineDesc();
+                case RendererPipelineId::ForwardPoint:
+                    return BuildForwardPointPipelineDesc();
+                case RendererPipelineId::Shadow:
+                    return BuildShadowPipelineDesc();
+                case RendererPipelineId::DeferredGBuffer:
+                    return BuildDeferredGBufferPipelineDesc();
+                case RendererPipelineId::DeferredLighting:
+                    return BuildDeferredLightingPipelineDesc();
+                case RendererPipelineId::SelectionEntityId:
+                    return BuildSelectionEntityIdPipelineDesc();
+                case RendererPipelineId::SelectionEntityIdOutline:
+                    return BuildSelectionEntityIdOutlinePipelineDesc();
+                case RendererPipelineId::SelectionFaceId:
+                    return BuildSelectionFaceIdPipelineDesc();
+                case RendererPipelineId::SelectionEdgeId:
+                    return BuildSelectionEdgeIdPipelineDesc();
+                case RendererPipelineId::SelectionPointId:
+                    return BuildSelectionPointIdPipelineDesc();
+                case RendererPipelineId::SelectionOutline:
+                    return BuildSelectionOutlinePipelineDesc(m_BackbufferFormat);
+                case RendererPipelineId::PostProcessToneMap:
+                    return BuildPostProcessToneMapPipelineDesc(m_BackbufferFormat);
+                case RendererPipelineId::PostProcessBloomDownsample:
+                    return BuildPostProcessBloomDownsamplePipelineDesc();
+                case RendererPipelineId::PostProcessBloomUpsample:
+                    return BuildPostProcessBloomUpsamplePipelineDesc();
+                case RendererPipelineId::PostProcessFXAA:
+                    return BuildPostProcessFXAAPipelineDesc(m_BackbufferFormat);
+                case RendererPipelineId::PostProcessSMAAEdge:
+                    return BuildPostProcessSMAAEdgePipelineDesc();
+                case RendererPipelineId::PostProcessSMAABlend:
+                    return BuildPostProcessSMAABlendPipelineDesc();
+                case RendererPipelineId::PostProcessSMAAResolve:
+                    return BuildPostProcessSMAAResolvePipelineDesc(m_BackbufferFormat);
+                case RendererPipelineId::PostProcessHistogram:
+                    return BuildPostProcessHistogramPipelineDesc();
+                case RendererPipelineId::HZBBuild:
+                    return BuildHZBBuildPipelineDesc();
+                case RendererPipelineId::ClusterGridBuild:
+                    return BuildClusterGridBuildPipelineDesc();
+                case RendererPipelineId::ClusterLightAssignment:
+                    return BuildClusterLightAssignmentPipelineDesc();
+                case RendererPipelineId::Count:
+                    break;
             }
-            return m_Subsystems.PipelineManager()->GetDeviceHandle(m_ForwardSurfacePipelineLease->GetHandle());
-        }
-
-        [[nodiscard]] RHI::PipelineDesc GetForwardSurfacePipelineDesc() const noexcept override
-        {
-            return BuildForwardSurfacePipelineDesc();
-        }
-
-        [[nodiscard]] RHI::PipelineHandle GetForwardLinePipeline() const noexcept override
-        {
-            if (!m_Subsystems.PipelineManager().has_value() || !m_ForwardLinePipelineLease.has_value() ||
-                !m_ForwardLinePipelineLease->IsValid())
-            {
-                return RHI::PipelineHandle{};
-            }
-            return m_Subsystems.PipelineManager()->GetDeviceHandle(m_ForwardLinePipelineLease->GetHandle());
-        }
-
-        [[nodiscard]] RHI::PipelineDesc GetForwardLinePipelineDesc() const noexcept override
-        {
-            return BuildForwardLinePipelineDesc();
-        }
-
-        [[nodiscard]] RHI::PipelineHandle GetForwardPointPipeline() const noexcept override
-        {
-            if (!m_Subsystems.PipelineManager().has_value() || !m_ForwardPointPipelineLease.has_value() ||
-                !m_ForwardPointPipelineLease->IsValid())
-            {
-                return RHI::PipelineHandle{};
-            }
-            return m_Subsystems.PipelineManager()->GetDeviceHandle(m_ForwardPointPipelineLease->GetHandle());
-        }
-
-        [[nodiscard]] RHI::PipelineDesc GetForwardPointPipelineDesc() const noexcept override
-        {
-            return BuildForwardPointPipelineDesc();
-        }
-
-        [[nodiscard]] RHI::PipelineHandle GetShadowPipeline() const noexcept override
-        {
-            if (!m_Subsystems.PipelineManager().has_value() || !m_ShadowPipelineLease.has_value() ||
-                !m_ShadowPipelineLease->IsValid())
-            {
-                return RHI::PipelineHandle{};
-            }
-            return m_Subsystems.PipelineManager()->GetDeviceHandle(m_ShadowPipelineLease->GetHandle());
-        }
-
-        [[nodiscard]] RHI::PipelineDesc GetShadowPipelineDesc() const noexcept override
-        {
-            return BuildShadowPipelineDesc();
-        }
-
-        [[nodiscard]] RHI::PipelineHandle GetDeferredGBufferPipeline() const noexcept override
-        {
-            if (!m_Subsystems.PipelineManager().has_value() || !m_DeferredGBufferPipelineLease.has_value() ||
-                !m_DeferredGBufferPipelineLease->IsValid())
-            {
-                return RHI::PipelineHandle{};
-            }
-            return m_Subsystems.PipelineManager()->GetDeviceHandle(m_DeferredGBufferPipelineLease->GetHandle());
-        }
-
-        [[nodiscard]] RHI::PipelineDesc GetDeferredGBufferPipelineDesc() const noexcept override
-        {
-            return BuildDeferredGBufferPipelineDesc();
-        }
-
-        [[nodiscard]] RHI::PipelineHandle GetDeferredLightingPipeline() const noexcept override
-        {
-            if (!m_Subsystems.PipelineManager().has_value() || !m_DeferredLightingPipelineLease.has_value() ||
-                !m_DeferredLightingPipelineLease->IsValid())
-            {
-                return RHI::PipelineHandle{};
-            }
-            return m_Subsystems.PipelineManager()->GetDeviceHandle(m_DeferredLightingPipelineLease->GetHandle());
-        }
-
-        [[nodiscard]] RHI::PipelineDesc GetDeferredLightingPipelineDesc() const noexcept override
-        {
-            return BuildDeferredLightingPipelineDesc();
-        }
-
-        [[nodiscard]] RHI::PipelineHandle GetSelectionEntityIdPipeline() const noexcept override
-        {
-            if (!m_Subsystems.PipelineManager().has_value() || !m_SelectionEntityIdPipelineLease.has_value() ||
-                !m_SelectionEntityIdPipelineLease->IsValid())
-            {
-                return RHI::PipelineHandle{};
-            }
-            return m_Subsystems.PipelineManager()->GetDeviceHandle(m_SelectionEntityIdPipelineLease->GetHandle());
-        }
-
-        [[nodiscard]] RHI::PipelineDesc GetSelectionEntityIdPipelineDesc() const noexcept override
-        {
-            return BuildSelectionEntityIdPipelineDesc();
-        }
-
-        [[nodiscard]] RHI::PipelineHandle GetSelectionEntityIdOutlinePipeline() const noexcept override
-        {
-            if (!m_Subsystems.PipelineManager().has_value() ||
-                !m_SelectionEntityIdOutlinePipelineLease.has_value() ||
-                !m_SelectionEntityIdOutlinePipelineLease->IsValid())
-            {
-                return RHI::PipelineHandle{};
-            }
-            return m_Subsystems.PipelineManager()->GetDeviceHandle(
-                m_SelectionEntityIdOutlinePipelineLease->GetHandle());
-        }
-
-        [[nodiscard]] RHI::PipelineDesc GetSelectionEntityIdOutlinePipelineDesc() const noexcept override
-        {
-            return BuildSelectionEntityIdOutlinePipelineDesc();
-        }
-
-        [[nodiscard]] RHI::PipelineHandle GetSelectionFaceIdPipeline() const noexcept override
-        {
-            if (!m_Subsystems.PipelineManager().has_value() || !m_SelectionFaceIdPipelineLease.has_value() ||
-                !m_SelectionFaceIdPipelineLease->IsValid())
-            {
-                return RHI::PipelineHandle{};
-            }
-            return m_Subsystems.PipelineManager()->GetDeviceHandle(m_SelectionFaceIdPipelineLease->GetHandle());
-        }
-
-        [[nodiscard]] RHI::PipelineDesc GetSelectionFaceIdPipelineDesc() const noexcept override
-        {
-            return BuildSelectionFaceIdPipelineDesc();
-        }
-
-        [[nodiscard]] RHI::PipelineHandle GetSelectionEdgeIdPipeline() const noexcept override
-        {
-            if (!m_Subsystems.PipelineManager().has_value() || !m_SelectionEdgeIdPipelineLease.has_value() ||
-                !m_SelectionEdgeIdPipelineLease->IsValid())
-            {
-                return RHI::PipelineHandle{};
-            }
-            return m_Subsystems.PipelineManager()->GetDeviceHandle(m_SelectionEdgeIdPipelineLease->GetHandle());
-        }
-
-        [[nodiscard]] RHI::PipelineDesc GetSelectionEdgeIdPipelineDesc() const noexcept override
-        {
-            return BuildSelectionEdgeIdPipelineDesc();
-        }
-
-        [[nodiscard]] RHI::PipelineHandle GetSelectionPointIdPipeline() const noexcept override
-        {
-            if (!m_Subsystems.PipelineManager().has_value() || !m_SelectionPointIdPipelineLease.has_value() ||
-                !m_SelectionPointIdPipelineLease->IsValid())
-            {
-                return RHI::PipelineHandle{};
-            }
-            return m_Subsystems.PipelineManager()->GetDeviceHandle(m_SelectionPointIdPipelineLease->GetHandle());
-        }
-
-        [[nodiscard]] RHI::PipelineDesc GetSelectionPointIdPipelineDesc() const noexcept override
-        {
-            return BuildSelectionPointIdPipelineDesc();
-        }
-
-        [[nodiscard]] RHI::PipelineHandle GetSelectionOutlinePipeline() const noexcept override
-        {
-            if (!m_Subsystems.PipelineManager().has_value() || !m_SelectionOutlinePipelineLease.has_value() ||
-                !m_SelectionOutlinePipelineLease->IsValid())
-            {
-                return RHI::PipelineHandle{};
-            }
-            return m_Subsystems.PipelineManager()->GetDeviceHandle(m_SelectionOutlinePipelineLease->GetHandle());
-        }
-
-        [[nodiscard]] RHI::PipelineDesc GetSelectionOutlinePipelineDesc() const noexcept override
-        {
-            return BuildSelectionOutlinePipelineDesc(m_BackbufferFormat);
-        }
-
-        [[nodiscard]] RHI::PipelineHandle GetPostProcessToneMapPipeline() const noexcept override
-        {
-            if (!m_Subsystems.PipelineManager().has_value() || !m_PostProcessToneMapPipelineLease.has_value() ||
-                !m_PostProcessToneMapPipelineLease->IsValid())
-            {
-                return RHI::PipelineHandle{};
-            }
-            return m_Subsystems.PipelineManager()->GetDeviceHandle(m_PostProcessToneMapPipelineLease->GetHandle());
-        }
-
-        [[nodiscard]] RHI::PipelineDesc GetPostProcessToneMapPipelineDesc() const noexcept override
-        {
-            return BuildPostProcessToneMapPipelineDesc(m_BackbufferFormat);
-        }
-
-        [[nodiscard]] RHI::PipelineHandle GetPostProcessBloomDownsamplePipeline() const noexcept override
-        {
-            if (!m_Subsystems.PipelineManager().has_value() || !m_PostProcessBloomDownsamplePipelineLease.has_value() ||
-                !m_PostProcessBloomDownsamplePipelineLease->IsValid())
-            {
-                return RHI::PipelineHandle{};
-            }
-            return m_Subsystems.PipelineManager()->GetDeviceHandle(m_PostProcessBloomDownsamplePipelineLease->GetHandle());
-        }
-
-        [[nodiscard]] RHI::PipelineDesc GetPostProcessBloomDownsamplePipelineDesc() const noexcept override
-        {
-            return BuildPostProcessBloomDownsamplePipelineDesc();
-        }
-
-        [[nodiscard]] RHI::PipelineHandle GetPostProcessBloomUpsamplePipeline() const noexcept override
-        {
-            if (!m_Subsystems.PipelineManager().has_value() || !m_PostProcessBloomUpsamplePipelineLease.has_value() ||
-                !m_PostProcessBloomUpsamplePipelineLease->IsValid())
-            {
-                return RHI::PipelineHandle{};
-            }
-            return m_Subsystems.PipelineManager()->GetDeviceHandle(m_PostProcessBloomUpsamplePipelineLease->GetHandle());
-        }
-
-        [[nodiscard]] RHI::PipelineDesc GetPostProcessBloomUpsamplePipelineDesc() const noexcept override
-        {
-            return BuildPostProcessBloomUpsamplePipelineDesc();
-        }
-
-        [[nodiscard]] RHI::PipelineHandle GetPostProcessFXAAPipeline() const noexcept override
-        {
-            if (!m_Subsystems.PipelineManager().has_value() || !m_PostProcessFXAAPipelineLease.has_value() ||
-                !m_PostProcessFXAAPipelineLease->IsValid())
-            {
-                return RHI::PipelineHandle{};
-            }
-            return m_Subsystems.PipelineManager()->GetDeviceHandle(m_PostProcessFXAAPipelineLease->GetHandle());
-        }
-
-        [[nodiscard]] RHI::PipelineDesc GetPostProcessFXAAPipelineDesc() const noexcept override
-        {
-            return BuildPostProcessFXAAPipelineDesc(m_BackbufferFormat);
-        }
-
-        [[nodiscard]] RHI::PipelineHandle GetPostProcessSMAAEdgePipeline() const noexcept override
-        {
-            if (!m_Subsystems.PipelineManager().has_value() || !m_PostProcessSMAAEdgePipelineLease.has_value() ||
-                !m_PostProcessSMAAEdgePipelineLease->IsValid())
-            {
-                return RHI::PipelineHandle{};
-            }
-            return m_Subsystems.PipelineManager()->GetDeviceHandle(m_PostProcessSMAAEdgePipelineLease->GetHandle());
-        }
-
-        [[nodiscard]] RHI::PipelineDesc GetPostProcessSMAAEdgePipelineDesc() const noexcept override
-        {
-            return BuildPostProcessSMAAEdgePipelineDesc();
-        }
-
-        [[nodiscard]] RHI::PipelineHandle GetPostProcessSMAABlendPipeline() const noexcept override
-        {
-            if (!m_Subsystems.PipelineManager().has_value() || !m_PostProcessSMAABlendPipelineLease.has_value() ||
-                !m_PostProcessSMAABlendPipelineLease->IsValid())
-            {
-                return RHI::PipelineHandle{};
-            }
-            return m_Subsystems.PipelineManager()->GetDeviceHandle(m_PostProcessSMAABlendPipelineLease->GetHandle());
-        }
-
-        [[nodiscard]] RHI::PipelineDesc GetPostProcessSMAABlendPipelineDesc() const noexcept override
-        {
-            return BuildPostProcessSMAABlendPipelineDesc();
-        }
-
-        [[nodiscard]] RHI::PipelineHandle GetPostProcessSMAAResolvePipeline() const noexcept override
-        {
-            if (!m_Subsystems.PipelineManager().has_value() || !m_PostProcessSMAAResolvePipelineLease.has_value() ||
-                !m_PostProcessSMAAResolvePipelineLease->IsValid())
-            {
-                return RHI::PipelineHandle{};
-            }
-            return m_Subsystems.PipelineManager()->GetDeviceHandle(m_PostProcessSMAAResolvePipelineLease->GetHandle());
-        }
-
-        [[nodiscard]] RHI::PipelineDesc GetPostProcessSMAAResolvePipelineDesc() const noexcept override
-        {
-            return BuildPostProcessSMAAResolvePipelineDesc(m_BackbufferFormat);
-        }
-
-        [[nodiscard]] RHI::PipelineHandle GetPostProcessHistogramPipeline() const noexcept override
-        {
-            if (!m_Subsystems.PipelineManager().has_value() || !m_PostProcessHistogramPipelineLease.has_value() ||
-                !m_PostProcessHistogramPipelineLease->IsValid())
-            {
-                return RHI::PipelineHandle{};
-            }
-            return m_Subsystems.PipelineManager()->GetDeviceHandle(m_PostProcessHistogramPipelineLease->GetHandle());
-        }
-
-        [[nodiscard]] RHI::PipelineDesc GetPostProcessHistogramPipelineDesc() const noexcept override
-        {
-            return BuildPostProcessHistogramPipelineDesc();
-        }
-
-        [[nodiscard]] RHI::PipelineHandle GetHZBBuildPipeline() const noexcept override
-        {
-            if (!m_Subsystems.PipelineManager().has_value() || !m_HZBBuildPipelineLease.has_value() ||
-                !m_HZBBuildPipelineLease->IsValid())
-            {
-                return RHI::PipelineHandle{};
-            }
-            return m_Subsystems.PipelineManager()->GetDeviceHandle(m_HZBBuildPipelineLease->GetHandle());
-        }
-
-        [[nodiscard]] RHI::PipelineDesc GetHZBBuildPipelineDesc() const noexcept override
-        {
-            return BuildHZBBuildPipelineDesc();
-        }
-
-        [[nodiscard]] RHI::PipelineHandle GetClusterGridBuildPipeline() const noexcept override
-        {
-            if (!m_Subsystems.PipelineManager().has_value() || !m_ClusterGridBuildPipelineLease.has_value() ||
-                !m_ClusterGridBuildPipelineLease->IsValid())
-            {
-                return {};
-            }
-            return m_Subsystems.PipelineManager()->GetDeviceHandle(m_ClusterGridBuildPipelineLease->GetHandle());
-        }
-
-        [[nodiscard]] RHI::PipelineDesc GetClusterGridBuildPipelineDesc() const noexcept override
-        {
-            return BuildClusterGridBuildPipelineDesc();
-        }
-
-        [[nodiscard]] RHI::PipelineHandle GetClusterLightAssignmentPipeline() const noexcept override
-        {
-            if (!m_Subsystems.PipelineManager().has_value() || !m_ClusterLightAssignmentPipelineLease.has_value() ||
-                !m_ClusterLightAssignmentPipelineLease->IsValid())
-            {
-                return {};
-            }
-            return m_Subsystems.PipelineManager()->GetDeviceHandle(m_ClusterLightAssignmentPipelineLease->GetHandle());
-        }
-
-        [[nodiscard]] RHI::PipelineDesc GetClusterLightAssignmentPipelineDesc() const noexcept override
-        {
-            return BuildClusterLightAssignmentPipelineDesc();
+            return std::nullopt;
         }
 
         [[nodiscard]] RHI::BufferHandle GetPickingReadbackBuffer() const noexcept override
@@ -9838,7 +9436,10 @@ namespace Extrinsic::Graphics
             const HZBBuildDispatchPlan plan = ComputeHZBBuildDispatchPlan(
                 m_HZBSystem->GetAllocatedDesc(),
                 HZBBuildCapabilities{.SupportsSinglePassMipChain = false});
-            if (!RecordHZBBuild(cmd, GetHZBBuildPipeline(), m_HZBSystem->CurrentHZB(), plan))
+            if (!RecordHZBBuild(cmd,
+                                GetPipeline(RendererPipelineId::HZBBuild),
+                                m_HZBSystem->CurrentHZB(),
+                                plan))
             {
                 return RenderCommandPassStatus::SkippedUnavailable;
             }
@@ -9876,7 +9477,7 @@ namespace Extrinsic::Graphics
             const RHI::BufferHandle aabbHandle = m_ClusterGridAABBBuffer->GetHandle();
             const std::uint64_t aabbAddress = m_Device->GetBufferDeviceAddress(aabbHandle);
             if (!RecordClusterGridBuild(cmd,
-                                        GetClusterGridBuildPipeline(),
+                                        GetPipeline(RendererPipelineId::ClusterGridBuild),
                                         aabbHandle,
                                         aabbAddress,
                                         plan,
@@ -9917,7 +9518,7 @@ namespace Extrinsic::Graphics
             const RHI::BufferHandle indexHandle = m_ClusterLightIndexBuffer->GetHandle();
             const RHI::BufferHandle counterHandle = m_ClusterLightCounterBuffer->GetHandle();
             if (!RecordClusterLightAssignment(cmd,
-                                              GetClusterLightAssignmentPipeline(),
+                                              GetPipeline(RendererPipelineId::ClusterLightAssignment),
                                               aabbHandle,
                                               m_Device->GetBufferDeviceAddress(aabbHandle),
                                               lightsHandle,

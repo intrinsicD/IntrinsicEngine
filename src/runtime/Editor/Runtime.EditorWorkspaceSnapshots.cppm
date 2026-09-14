@@ -1,3 +1,5 @@
+// Read-only editor workspace and panel snapshots, including cached selections.
+// Exposes copied presentation state without granting scene mutation access.
 module;
 
 #include <array>
@@ -15,10 +17,10 @@ export module Extrinsic.Runtime.EditorWorkspaceSnapshots;
 
 import Extrinsic.Core.StrongHandle;
 import Extrinsic.ECS.Components.GeometrySources;
-import Extrinsic.Runtime.ClusteringModule;
 import Extrinsic.Runtime.EditorCommon;
 import Extrinsic.Runtime.EditorJobProjection;
 import Extrinsic.Runtime.EditorWorkspaceAttachment;
+import Extrinsic.Runtime.EditorProcessing;
 import Extrinsic.Runtime.GeometryProcessingOperations;
 import Extrinsic.Runtime.JobService;
 import Extrinsic.Runtime.KernelEvents;
@@ -36,8 +38,6 @@ namespace Extrinsic::Runtime
 
 export namespace Extrinsic::Runtime
 {
-    struct EditorSelectedModelCache;
-
     struct EditorGeometryDomainModel
     {
         ECS::Components::GeometrySources::Domain Domain{
@@ -166,6 +166,9 @@ export namespace Extrinsic::Runtime
         std::uint32_t Invalidations{0u};
         std::uint32_t Entries{0u};
     };
+    // C++ language linkage so reference-only consumers can forward declare
+    // these aggregates instead of importing this module.
+    extern "C++" {
     struct EditorSelectedModelCache
     {
         std::array<EditorSelectedAnalysisCacheEntry, 4u>
@@ -174,30 +177,9 @@ export namespace Extrinsic::Runtime
             Visualization{};
         EditorSelectedModelCacheStats Counters{};
 
-        void Clear() noexcept
-        {
-            for (EditorSelectedAnalysisCacheEntry& entry : SelectedAnalysis)
-                entry.Valid = false;
-            for (EditorVisualizationModelCacheEntry& entry : Visualization)
-                entry.Valid = false;
-            ++Counters.Invalidations;
-        }
+        void Clear() noexcept;
 
-        [[nodiscard]] EditorSelectedModelCacheStats Stats() const noexcept
-        {
-            EditorSelectedModelCacheStats stats = Counters;
-            for (const EditorSelectedAnalysisCacheEntry& entry : SelectedAnalysis)
-            {
-                if (entry.Valid)
-                    ++stats.Entries;
-            }
-            for (const EditorVisualizationModelCacheEntry& entry : Visualization)
-            {
-                if (entry.Valid)
-                    ++stats.Entries;
-            }
-            return stats;
-        }
+        [[nodiscard]] EditorSelectedModelCacheStats Stats() const noexcept;
     };
     struct EditorWorkspaceSnapshotRequest
     {
@@ -232,11 +214,12 @@ export namespace Extrinsic::Runtime
     struct EditorWorkspaceSnapshotContext
     {
         EditorSceneEditingContext Scene{};
-        EditorGeometryProcessingContext Geometry{};
+        EditorProcessingContext Geometry{};
         EditorVisualizationEditingContext Visualization{};
         EditorRenderRecipeEditingContext RenderRecipe{};
         EditorSelectedModelCache* SelectedModelCache{nullptr};
     };
+    } // extern "C++"
 
     class EditorWorkspaceSnapshotQueries final
     {
@@ -266,11 +249,14 @@ export namespace Extrinsic::Runtime
     [[nodiscard]] EditorWorkspaceSnapshot BuildEditorWorkspaceSnapshot(
         const EditorWorkspaceSnapshotContext& context,
         const EditorWorkspaceSnapshotRequest& request);
+    // An explicit entity binds all model sections without changing scene selection; zero means no entity.
     [[nodiscard]] EditorInspectorModel BuildEditorInspectorModel(
-        const EditorWorkspaceSnapshotContext& context);
+        const EditorWorkspaceSnapshotContext& context,
+        std::optional<std::uint32_t> entity = std::nullopt);
     [[nodiscard]] EditorDomainWindowModel BuildEditorDomainWindowModel(
         const EditorWorkspaceSnapshotContext& context,
-        EditorDomainWindowKind kind);
+        EditorDomainWindowKind kind,
+        std::optional<std::uint32_t> entity = std::nullopt);
     [[nodiscard]] EditorWorkspaceSnapshot BuildEditorWorkspaceSnapshot(
         const EditorWorkspaceSnapshotQueries& queries);
     [[nodiscard]] EditorWorkspaceSnapshot BuildEditorWorkspaceSnapshot(
@@ -278,11 +264,13 @@ export namespace Extrinsic::Runtime
         const EditorWorkspaceSnapshotRequest& request);
     [[nodiscard]] EditorInspectorModel BuildEditorInspectorModel(
         const EditorWorkspaceSnapshotQueries& queries,
-        EditorWorkspaceSnapshotStats* modelBuildStats = nullptr);
+        EditorWorkspaceSnapshotStats* modelBuildStats = nullptr,
+        std::optional<std::uint32_t> entity = std::nullopt);
     [[nodiscard]] EditorDomainWindowModel BuildEditorDomainWindowModel(
         const EditorWorkspaceSnapshotQueries& queries,
         EditorDomainWindowKind kind,
-        EditorWorkspaceSnapshotStats* modelBuildStats = nullptr);
+        EditorWorkspaceSnapshotStats* modelBuildStats = nullptr,
+        std::optional<std::uint32_t> entity = std::nullopt);
 
     struct EditorWorkspaceSnapshotPreparedFrame
     {

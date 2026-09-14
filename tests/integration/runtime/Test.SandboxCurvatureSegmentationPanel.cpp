@@ -1,3 +1,12 @@
+#include <array>
+#include <cstddef>
+#include <cstdint>
+#include <functional>
+#include <optional>
+#include <span>
+#include <glm/vec3.hpp>
+#include <glm/vec4.hpp>
+#include <glm/vec2.hpp>
 #include <algorithm>
 #include <filesystem>
 #include <fstream>
@@ -13,6 +22,16 @@
 
 #include "RuntimeTestModule.hpp"
 
+import Extrinsic.Runtime.NormalOperations;
+import Extrinsic.Runtime.RegistrationOperations;
+import Extrinsic.Runtime.MeshFieldOperations;
+import Extrinsic.Runtime.MeshTopologyOperations;
+import Extrinsic.Runtime.ParameterizationOperations;
+import Extrinsic.Runtime.PointFieldOperations;
+import Extrinsic.Runtime.PointAnalysisOperations;
+import Extrinsic.Runtime.PointSetOperations;
+import Extrinsic.Runtime.PointConstructionOperations;
+import Extrinsic.Runtime.PointCloudServiceOperations;
 import Extrinsic.Core.Config.Engine;
 import Extrinsic.Core.Config.Window;
 import Extrinsic.Runtime.EditorUiHost;
@@ -21,6 +40,19 @@ import Extrinsic.Runtime.EditorWindowRegistry;
 import Extrinsic.Runtime.Engine;
 import Extrinsic.Sandbox.Editor.MeshProcessingPanels;
 import Extrinsic.Sandbox.Editor.Shell;
+import Extrinsic.Runtime.EditorCommon;
+import Extrinsic.Runtime.GeometryPresentation;
+import Extrinsic.Runtime.TextureBakeModule;
+import Extrinsic.Runtime.EditorWorkspaceSnapshots;
+import Extrinsic.Runtime.GeometryProcessingOperations;
+import Extrinsic.Runtime.RenderRecipeEditingOperations;
+import Extrinsic.Runtime.SceneEditingOperations;
+import Extrinsic.Runtime.VisualizationEditingOperations;
+import Extrinsic.Runtime.EngineConfigControl;
+import Extrinsic.Runtime.ParameterizationConfig;
+import Extrinsic.Runtime.PointCloudConsolidationTypes;
+
+#include "../../../src/app/Sandbox/Editor/Sandbox.PanelSupport.hpp"
 
 namespace Config = Extrinsic::Core::Config;
 namespace Runtime = Extrinsic::Runtime;
@@ -79,7 +111,7 @@ namespace
 }
 
 TEST(SandboxCurvatureSegmentationPanel,
-     RegistersInsideTheExistingCurvatureWindow)
+     RegistersSeparateCurvatureAndSegmentationWindows)
 {
     Intrinsic::Tests::RuntimeTestKernel engine{
         HeadlessConfig(), std::make_unique<OneFrameApplication>()};
@@ -108,6 +140,11 @@ TEST(SandboxCurvatureSegmentationPanel,
                 return candidate.Id == "mesh.processing.curvature";
             }),
         1);
+    const auto* segmentation = FindWindow(menu, "mesh.processing.segmentation");
+    ASSERT_NE(segmentation, nullptr);
+    EXPECT_EQ(segmentation->Title, "Curvature Segmentation");
+    EXPECT_EQ(segmentation->MenuPath, (std::vector<std::string>{"Mesh", "Processing"}));
+    ASSERT_TRUE(shell.SetEditorWindowOpen("mesh.processing.segmentation", true));
     ASSERT_TRUE(shell.SetEditorWindowOpen(
         "mesh.processing.curvature", true));
 
@@ -150,11 +187,6 @@ TEST(SandboxCurvatureSegmentationPanel,
     EXPECT_NE(source.find(
                   "ApplyEditorConfiguredCurvatureSegmentationCommand"),
               std::string::npos);
-    EXPECT_NE(source.find("LastSegmentationStableEntityId"),
-              std::string::npos);
-    EXPECT_NE(source.find(
-                  "*Curvature.LastSegmentationStableEntityId"),
-              std::string::npos);
     EXPECT_NE(source.find(
                   "sandbox.curvature_segmentation.panel.run"),
               std::string::npos);
@@ -183,7 +215,7 @@ TEST(SandboxCurvatureSegmentationPanel,
                   "EditorVisualizationPropertyDomain::MeshFaces"),
               std::string_view::npos);
     EXPECT_NE(visualization.find(
-                  "kCurvatureRegionColorProperty"),
+                  "config.RegionColors.Name"),
               std::string_view::npos);
     EXPECT_NE(visualization.find(
                   "EditorVisualizationTarget::Edges"),
@@ -192,35 +224,18 @@ TEST(SandboxCurvatureSegmentationPanel,
                   "EditorVisualizationPropertyDomain::MeshEdges"),
               std::string_view::npos);
     EXPECT_NE(visualization.find(
-                  "kCurvatureFeaturePatchColorProperty"),
+                  "config.FeatureColors.Name"),
               std::string_view::npos);
-    EXPECT_NE(source.find("f:curvature_region_color"),
-              std::string::npos);
-    EXPECT_NE(source.find("e:curvature_feature_patch_color"),
-              std::string::npos);
 
-    const std::size_t scalarBegin = source.find(
-        "ShowCurvatureScalarVisualization(");
-    ASSERT_NE(scalarBegin, std::string::npos);
-    EXPECT_NE(source.find(
-                  "EditorVisualizationPropertyDomain::MeshVertices",
-                  scalarBegin),
-              std::string::npos);
-    EXPECT_NE(source.find("v:mean_curvature"), std::string::npos);
-    EXPECT_NE(source.find("v:gaussian_curvature"), std::string::npos);
-    EXPECT_NE(source.find("v:min_principal_curvature"),
-              std::string::npos);
-    EXPECT_NE(source.find("v:max_principal_curvature"),
-              std::string::npos);
-    EXPECT_NE(source.find(
-                  "PendingCurvatureVisualizationStableEntityId"),
-              std::string::npos);
-    EXPECT_NE(source.find(
-                  "EditorCommandStatus::Pending",
-                  scalarBegin),
-              std::string::npos);
-    EXPECT_NE(source.find(
-                  "Scalar visualization:",
-                  scalarBegin),
-              std::string::npos);
+
+    EXPECT_NE(source.find("DrawProcessingPropertyShowButton"), std::string::npos);
+    const auto curvatureBegin = source.find("void MeshProcessingPanels::Impl::DrawCurvatureControls(");
+    const auto segmentationBegin = source.find("void MeshProcessingPanels::Impl::DrawCurvatureSegmentationControls(");
+    ASSERT_NE(curvatureBegin, std::string::npos);
+    ASSERT_NE(segmentationBegin, std::string::npos);
+    const auto curvature = source.substr(curvatureBegin, segmentationBegin - curvatureBegin);
+    EXPECT_EQ(curvature.find("DrawCurvatureSegmentationControls(model"), std::string::npos);
+    EXPECT_NE(curvature.find("config.Mean.Name"), std::string::npos);
+    EXPECT_NE(curvature.find("config.Direction2.Name"), std::string::npos);
+
 }

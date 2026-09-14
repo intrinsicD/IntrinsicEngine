@@ -1,4 +1,8 @@
 module;
+#include <functional>
+#include <glm/vec3.hpp>
+#include <glm/vec4.hpp>
+#include <glm/vec2.hpp>
 
 #include <algorithm>
 #include <array>
@@ -18,6 +22,13 @@ module;
 
 module Extrinsic.Sandbox.Editor.DomainPanels;
 
+import Extrinsic.Runtime.NormalOperations;
+import Extrinsic.Runtime.RegistrationOperations;
+import Extrinsic.Runtime.PointFieldOperations;
+import Extrinsic.Runtime.PointAnalysisOperations;
+import Extrinsic.Runtime.PointSetOperations;
+import Extrinsic.Runtime.PointConstructionOperations;
+import Extrinsic.Runtime.PointCloudServiceOperations;
 import Extrinsic.Sandbox.Editor.Shell;
 
 import Extrinsic.Runtime.EditorCommon;
@@ -35,6 +46,14 @@ import Extrinsic.Runtime.VisualizationEditingOperations;
 import Extrinsic.Runtime.TextureBakeModule;
 import Extrinsic.Runtime.VertexAttributeBinding;
 import Extrinsic.Runtime.VertexChannelBindings;
+import Extrinsic.Runtime.RenderRecipeEditingOperations;
+import Extrinsic.Runtime.EngineConfigControl;
+import Extrinsic.Runtime.MeshFieldOperations;
+import Extrinsic.Runtime.MeshTopologyOperations;
+import Extrinsic.Runtime.ParameterizationOperations;
+import Extrinsic.Runtime.PointCloudConsolidationTypes;
+
+#include "Sandbox.PanelSupport.hpp"
 
 namespace Extrinsic::Sandbox::Editor {
 namespace {
@@ -301,34 +320,6 @@ void DrawBoundRenderStateRows(const EditorBoundRenderStateModel &bound) {
   DrawDiagnostics(bound.Diagnostics);
 }
 
-void DrawUvRegenerationStatus(
-    const EditorUvDiagnosticsModel &uv,
-    const std::optional<EditorUvRegenerationCommandResult> &lastResult) {
-  if (uv.UvRegenerationJob.has_value()) {
-    const EditorJobModel &job = *uv.UvRegenerationJob;
-    ImGui::Text("UV job: %s %.0f%%", std::string(ToString(job.Status)).c_str(),
-                job.NormalizedProgress * 100.0f);
-    if (!job.Diagnostic.empty())
-      ImGui::TextWrapped("%s", job.Diagnostic.c_str());
-  }
-
-  if (!lastResult.has_value()) {
-    ImGui::TextDisabled("Last UV regeneration: none");
-    return;
-  }
-
-  const EditorUvRegenerationCommandResult &result = *lastResult;
-  ImGui::Text("Last UV regeneration: %s",
-              DebugNameForEditorCommandStatus(result.Status));
-  ImGui::Text("Atlas: %s / %s  %ux%u  charts=%u  splits=%zu",
-              DebugNameForEditorUvAtlasStatus(result.UvStatus),
-              DebugNameForEditorUvAtlasProvenance(result.Provenance),
-              result.AtlasWidth, result.AtlasHeight, result.ChartCount,
-              result.SeamSplitVertexCount);
-  if (!result.Diagnostic.empty())
-    ImGui::TextWrapped("%s", result.Diagnostic.c_str());
-}
-
 void DrawTextureBakeControls(const EditorTextureBakeControlsModel &model,
                              const SandboxEditorContext *context,
                              TextureBakeUiState *state) {
@@ -429,64 +420,21 @@ void DrawTextureBakeControls(const EditorTextureBakeControlsModel &model,
       static_cast<std::int32_t>(kNormalSpaceNames.size() - 1u));
   bakeWidth = std::clamp<std::int32_t>(bakeWidth, 1, 8192);
   bakeHeight = std::clamp<std::int32_t>(bakeHeight, 1, 8192);
-  uvResolution = std::clamp<std::int32_t>(uvResolution, 1, 16384);
-  uvPadding = std::clamp<std::int32_t>(uvPadding, 0, uvResolution - 1);
-  if (!std::isfinite(uvTexelsPerUnit) || uvTexelsPerUnit < 0.0f)
-    uvTexelsPerUnit = 0.0f;
 
-  ImGui::SeparatorText("UV / texture bake");
-  ImGui::Text("UV: %s texcoords=%s count=%zu/%zu", model.Uv.Provenance.c_str(),
-              model.Uv.HasTexcoords ? "yes" : "no", model.Uv.TexcoordCount,
-              model.Uv.VertexCount);
-  if (!model.Uv.LastFailure.empty())
-    ImGui::TextDisabled("%s", model.Uv.LastFailure.c_str());
-  if (!model.Uv.UvRegenerationAvailable)
-    ImGui::TextDisabled("%s", model.Uv.UvRegenerationDisabledReason.c_str());
-
-  ImGui::Checkbox("Force regenerate", &uvForceRegenerate);
-  ImGui::SameLine();
-  ImGui::Checkbox("Preserve valid authored", &uvPreserveAuthored);
-  ImGui::InputInt("UV resolution", &uvResolution);
-  ImGui::InputInt("UV padding", &uvPadding);
-  ImGui::InputFloat("Texels per unit", &uvTexelsPerUnit, 0.0f, 0.0f, "%.3f");
-  uvResolution = std::clamp<std::int32_t>(uvResolution, 1, 16384);
-  uvPadding = std::clamp<std::int32_t>(uvPadding, 0, uvResolution - 1);
-  if (!std::isfinite(uvTexelsPerUnit) || uvTexelsPerUnit < 0.0f)
-    uvTexelsPerUnit = 0.0f;
-
-  const bool canRegenerateUvs = model.Uv.UvRegenerationAvailable &&
-                                context != nullptr &&
-                                model.SelectedStableId != 0u;
-  if (!canRegenerateUvs)
-    ImGui::BeginDisabled();
-  if (ImGui::Button("Regenerate UVs") && canRegenerateUvs) {
-    *lastUvRegenerationResult = ApplyEditorUvRegenerationCommand(
-        context->GeometryCommands, EditorUvRegenerationCommand{
-                      .StableEntityId = model.SelectedStableId,
-                      .PreserveValidAuthoredUvs = uvPreserveAuthored,
-                      .ForceRegenerate = uvForceRegenerate,
-                      .Resolution = static_cast<std::uint32_t>(uvResolution),
-                      .Padding = static_cast<std::uint32_t>(uvPadding),
-                      .TexelsPerUnit = uvTexelsPerUnit,
-                  });
-  }
-  if (lastUvRegenerationResult->has_value()) {
-    if (!lastUvRegenerationResult->value().Succeeded()) {
-      lastUvExtentAdoption->reset();
-    } else if (!lastUvExtentAdoption->has_value()) {
-      bakeWidth = std::clamp<std::int32_t>(
-          static_cast<std::int32_t>(lastUvRegenerationResult->value().AtlasWidth),
-          1, 8192);
-      bakeHeight = std::clamp<std::int32_t>(
-          static_cast<std::int32_t>(lastUvRegenerationResult->value().AtlasHeight),
-          1, 8192);
-      bakePadding = std::clamp<std::int32_t>(uvPadding, 0, 32);
-      *lastUvExtentAdoption = lastUvRegenerationResult->value();
-    }
-  }
-  if (!canRegenerateUvs)
-    ImGui::EndDisabled();
-  DrawUvRegenerationStatus(model.Uv, *lastUvRegenerationResult);
+  DrawSandboxUvRegenerationControls(
+      model, context,
+      SandboxUvRegenerationControls{
+          .LastResult = lastUvRegenerationResult,
+          .LastExtentAdoption = lastUvExtentAdoption,
+          .BakeWidth = &bakeWidth,
+          .BakeHeight = &bakeHeight,
+          .BakePadding = &bakePadding,
+          .UvResolution = &uvResolution,
+          .UvPadding = &uvPadding,
+          .UvTexelsPerUnit = &uvTexelsPerUnit,
+          .UvForceRegenerate = &uvForceRegenerate,
+          .UvPreserveAuthored = &uvPreserveAuthored,
+      });
 
   std::vector<std::size_t> bakeableIndices;
   bakeableIndices.reserve(model.Sources.size());
@@ -1483,7 +1431,7 @@ void DrawDomainSelectionWindow(const EditorDomainWindowModel& model,
 {
     DrawDomainWindowHeader(model);
     ImGui::SeparatorText("Selection tool");
-    auto config = GetEditorSelectionInteractionConfig(context.GeometryCommands);
+    auto config = GetEditorSelectionInteractionConfig(context.Processing);
     int target = static_cast<int>(config.Target);
     bool changed = ImGui::Combo("Pick", &target, "Entities\0Vertices / points\0Edges\0Faces\0");
     config.Target = static_cast<SelectionTarget>(target);
@@ -1493,7 +1441,7 @@ void DrawDomainSelectionWindow(const EditorDomainWindowModel& model,
     if (changed)
     {
         const auto applied =
-            ApplyEditorSelectionInteractionConfig(context.GeometryCommands, config);
+            ApplyEditorSelectionInteractionConfig(context.Processing, config);
         message = applied.Succeeded() ? "Selection settings applied."
                                       : "Selection settings could not be applied.";
     }
@@ -1512,7 +1460,7 @@ void DrawDomainSelectionWindow(const EditorDomainWindowModel& model,
     for (auto domain : domains)
     {
         const auto selection =
-            ReadEditorPrimitiveSelection(context.GeometryCommands, model.SelectedStableId, domain);
+            ReadEditorPrimitiveSelection(context.Processing, model.SelectedStableId, domain);
         if (selection.Status != PrimitiveSelectionStatus::UnsupportedDomain &&
             selection.Status != PrimitiveSelectionStatus::Unavailable)
             available.push_back(domain);
@@ -1535,7 +1483,7 @@ void DrawDomainSelectionWindow(const EditorDomainWindowModel& model,
     const auto edit = [&](PrimitiveSelectionEdit operation,
                           std::span<const std::uint32_t> indices = {}) {
         auto result = ApplyEditorPrimitiveSelection(
-            context.GeometryCommands, model.SelectedStableId, domain, operation, indices);
+            context.Processing, model.SelectedStableId, domain, operation, indices);
         message = result.Usable() ? "Selection updated." : result.Message;
     };
     ImGui::InputInt("Element index", &index);
@@ -1557,7 +1505,7 @@ void DrawDomainSelectionWindow(const EditorDomainWindowModel& model,
     if (ImGui::Button("Clear"))
         edit(PrimitiveSelectionEdit::Clear);
     const auto selected =
-        ReadEditorPrimitiveSelection(context.GeometryCommands, model.SelectedStableId, domain);
+        ReadEditorPrimitiveSelection(context.Processing, model.SelectedStableId, domain);
     ImGui::Text("%zu selected / %zu elements", selected.Indices.size(), selected.ElementCount);
     std::string indices = "In selection order:";
     const auto displayed = std::min<std::size_t>(selected.Indices.size(), 64);
@@ -1737,8 +1685,8 @@ void DomainPanels::Impl::DrawWindow(
     const Runtime::EditorDomainWindowKind kind, const Section section,
     const char *title) {
 
-  if (context.GeometryResults.LastUvRegenerationResult.has_value())
-    LastUvRegenerationResult = *context.GeometryResults.LastUvRegenerationResult;
+  if (context.Parameterization.Results.LastUvRegenerationResult.has_value())
+    LastUvRegenerationResult = *context.Parameterization.Results.LastUvRegenerationResult;
 
 
   TextureBakeUiState textureBakeState{
@@ -1785,7 +1733,7 @@ void DomainPanels::Impl::DrawWindow(
       if (kind == Runtime::EditorDomainWindowKind::Mesh &&
           model.DomainMatches && ImGui::CollapsingHeader("Property distribution")) {
         const auto properties =
-            Runtime::ResolveEditorSelectedMeshVertexProperties(context.GeometryCommands);
+            Runtime::ResolveEditorSelectedMeshVertexProperties(context.Processing);
         if (properties) {
           (void)Runtime::DrawEditorScalarPropertyPlotWidget(
               "mesh.appearance.properties", properties, MeshPropertyPlotState);

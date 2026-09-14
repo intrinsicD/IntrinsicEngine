@@ -16,7 +16,7 @@ import Extrinsic.ECS.Components.GeometrySourcesPopulate;
 import Extrinsic.ECS.Scene.Handle;
 import Extrinsic.ECS.Scene.Registry;
 import Extrinsic.Runtime.EditorCommandHistory;
-import Extrinsic.Runtime.GeometryProcessingOperations;
+import Extrinsic.Runtime.MeshFieldOperations;
 import Extrinsic.Runtime.SelectionController;
 import Geometry.HalfedgeMesh;
 import Geometry.HalfedgeMesh.Builder;
@@ -553,4 +553,32 @@ TEST(CurvatureSegmentationOperations, BoundaryCurvesFailurePreservesExistingPubl
         GS::PropertyNames::kCurvatureComponent).Vector(), components);
     EXPECT_EQ(harness.Faces().Properties.Get<std::uint32_t>(
         GS::PropertyNames::kCurvatureRegion).Vector(), regions);
+}
+
+TEST(CurvatureSegmentationOperations, CustomBindingsPreserveCanonicalOutputsAndUndo)
+{
+    SegmentationHarness h;
+    auto config = MakeFixedConfig();
+    auto alternate = h.Vertices().Properties.GetOrAdd<glm::vec3>("v:rest", {});
+    alternate.Vector() = h.Vertices().Properties.Get<glm::vec3>("v:position").Vector();
+    config.Positions.Name = "v:rest";
+    for (auto* output : {&config.Components, &config.Regions, &config.RegionColors,
+                         &config.Boundaries, &config.BoundaryColors, &config.HardFeatures,
+                         &config.FeatureConfidence, &config.BoundaryRoles, &config.FeatureColors})
+        output->Name += "_custom";
+    auto sentinel = h.Faces().Properties.GetOrAdd<glm::vec4>("f:curvature_region_color", {1, 0, 0, 1});
+    const auto before = sentinel.Vector();
+    const auto result = Runtime::ApplyEditorCurvatureSegmentationCommand(h.Context,
+        {.StableEntityId=h.StableEntityId, .Config=config});
+    ASSERT_TRUE(result.Succeeded()) << result.Message;
+    EXPECT_TRUE(h.Faces().Properties.Exists(config.Regions.Name));
+    EXPECT_TRUE(h.Edges().Properties.Exists(config.FeatureColors.Name));
+    EXPECT_FALSE(h.Faces().Properties.Exists("f:curvature_region"));
+    EXPECT_EQ(sentinel.Vector(), before);
+    ASSERT_TRUE(h.History.Undo().Succeeded());
+    EXPECT_FALSE(h.Faces().Properties.Exists(config.Regions.Name));
+    EXPECT_FALSE(h.Edges().Properties.Exists(config.FeatureColors.Name));
+    EXPECT_EQ(sentinel.Vector(), before);
+    ASSERT_TRUE(h.History.Redo().Succeeded());
+    EXPECT_TRUE(h.Faces().Properties.Exists(config.Regions.Name));
 }

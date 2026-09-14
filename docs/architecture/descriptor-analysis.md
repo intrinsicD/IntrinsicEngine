@@ -26,6 +26,8 @@ Matching these descriptors uses 33-dimensional histogram distance. A 3D position
 
 ## Configuration and publication
 
+`Runtime.PointAnalysisOperations` owns the editor composition, beside keypoints, outliers and density weights, because all four resolve a feature scale, page radius support and publish named same-domain scalars in one undoable transaction.
+
 The version-1 section schema is `intrinsic.runtime.sandbox.descriptor_analysis`. Its fields are `entity`, `backend`, `positions`, `normals`, `outputs`, `feature_radius`, `max_neighbors`, `gpu_query_batch_size` and `gpu_radius_capacity`. Defaults use `cpu_kdtree`, automatic radius, unlimited neighbors, batch 4096 and capacity 256. `outputs` is an array of exactly 33 canonical float references in alpha/phi/theta block order. `MakeDescriptorOutputProperties(domain, prefix)` produces names such as `fpfh.alpha0` through `fpfh.theta10`; the panel's prefix control uses this same helper. Each reference can also be configured independently. Unknown fields, duplicate outputs, input/output aliasing, incompatible kinds/domains and invalid limits are rejected before apply.
 
 All eight canonical domains are accepted: mesh vertices/edges/halfedges/faces, graph nodes/edges/halfedges and point-cloud points. Halfedges use their paired edge deletion mask. Deleted output rows retain existing values or initialize to zero for new properties. The operation preserves unrelated properties and topology. Position, normal, deletion and every output revision guard publication and history. Stale, cancelled and rejected job chains retain the previous columns. No entity-owned transient descriptor component is needed.

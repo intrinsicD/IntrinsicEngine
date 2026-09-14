@@ -50,6 +50,7 @@
 
 #include "EditorFeatureTestContext.hpp"
 
+import Extrinsic.Runtime.NormalOperations;
 import Extrinsic.Asset.ImportRouter;
 import Extrinsic.Asset.ModelTexturePayload;
 import Extrinsic.Asset.Registry;
@@ -7894,9 +7895,11 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke,
     }
     return commandFailed;
   };
-  auto bootstrap = BootstrapDefaultSandboxAppEngineWithApp(
-      std::make_unique<ExitWhenReadyApp>(ready, 2u, 240u,
-                                         std::chrono::seconds{45}, false));
+  // The sequential readbacks need at least 52 frames, even without bake latency.
+  auto readyApp = std::make_unique<ExitWhenReadyApp>(
+      ready, 2u, 240u, std::chrono::seconds{90}, false);
+  ExitWhenReadyApp &readyProbe = *readyApp;
+  auto bootstrap = BootstrapDefaultSandboxAppEngineWithApp(std::move(readyApp));
   if (bootstrap.Skipped)
     GTEST_SKIP() << bootstrap.SkipReason;
   auto &engine = *bootstrap.EnginePtr;
@@ -7934,10 +7937,13 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke,
     ASSERT_TRUE(readback.IsValid());
   }
   const auto run = DriveAcceptanceAndCapture(engine);
+  SCOPED_TRACE("phase=" + std::to_string(phase) + " settle=" +
+               std::to_string(settle) + " " + readyProbe.ExitSummary());
   engine.GetRenderer().SetDefaultRecipeBackbufferReadbackBuffer({});
   EXPECT_TRUE(run.DeviceOperational);
   EXPECT_FALSE(commandFailed);
   EXPECT_EQ(phase, 13u);
+  EXPECT_TRUE(readyProbe.ReadyObserved());
   EXPECT_TRUE(bakedRenderingObserved);
   std::array<RgbaPixel, 9> pixels{};
   for (std::size_t i = 0; i < readbacks.size(); ++i) {

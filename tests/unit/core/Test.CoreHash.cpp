@@ -1,7 +1,10 @@
 #include <gtest/gtest.h>
+#include <cstdint>
+#include <limits>
 #include <unordered_set>
 #include <unordered_map>
 #include <string>
+#include <string_view>
 
 import Extrinsic.Core.Hash;
 
@@ -63,6 +66,88 @@ TEST(CoreHash, HashString_Constexpr)
     constexpr uint32_t hash = HashString("CompileTime");
     static_assert(hash != 0);
     EXPECT_NE(hash, 0u);
+}
+
+// -----------------------------------------------------------------------------
+// HashString64 Function Tests
+//
+// HashString64 is the one 64-bit FNV-1a used by compile-time type identity and
+// by the task graph's own type tokens, so it is pinned against the published
+// reference vectors rather than against whatever the current build produces.
+// -----------------------------------------------------------------------------
+
+TEST(CoreHash, HashString64_KnownVectors)
+{
+    EXPECT_EQ(HashString64(""), 0xcbf29ce484222325ULL);  // FNV-1a 64 offset basis
+    EXPECT_EQ(HashString64("a"), 0xaf63dc4c8601ec8cULL);
+    EXPECT_EQ(HashString64("foobar"), 0x85944171f73967e8ULL);
+}
+
+TEST(CoreHash, HashString64_Constexpr)
+{
+    static_assert(HashString64("") == 0xcbf29ce484222325ULL);
+    static_assert(HashString64("foobar") == 0x85944171f73967e8ULL);
+    EXPECT_NE(HashString64("CompileTime"), 0ull);
+}
+
+TEST(CoreHash, HashString64_HashesEmbeddedNulBytes)
+{
+    // An interior NUL is data, not a terminator.
+    const std::string_view withNul("a\0b", 3);
+
+    EXPECT_EQ(withNul.size(), 3u);
+    EXPECT_NE(HashString64(withNul), HashString64("a"));
+    EXPECT_NE(HashString64(withNul), HashString64("ab"));
+    EXPECT_EQ(HashString64(withNul), 0xe5d29919042666b2ULL);
+}
+
+TEST(CoreHash, HashString64_TreatsBytesAsUnsigned)
+{
+    // A sign-extended byte would XOR in 0xFFFFFFFFFFFFFFFF instead of 0xFF and
+    // silently change every token on platforms with a signed plain `char`.
+    constexpr uint64_t kHighByte =
+        (0xcbf29ce484222325ULL ^ 0xffULL) * 0x100000001b3ULL;
+
+    EXPECT_EQ(HashString64(std::string_view("\xff", 1)), kHighByte);
+    EXPECT_NE(HashString64(std::string_view("\x80", 1)),
+              HashString64(std::string_view("\x00", 1)));
+}
+
+// -----------------------------------------------------------------------------
+// TypeToken Tests — compile-time, RTTI-free type identity over HashString64.
+// Concrete token values are compiler-specific and are deliberately not pinned.
+// -----------------------------------------------------------------------------
+
+namespace
+{
+    struct TypeTokenFixtureA
+    {
+        int Value = 0;
+    };
+
+    struct TypeTokenFixtureB
+    {
+        int Value = 0;
+    };
+}
+
+TEST(CoreHash, TypeToken_StableAndDistinctPerType)
+{
+    const size_t a = Extrinsic::Core::TypeToken<TypeTokenFixtureA>();
+
+    EXPECT_EQ(a, Extrinsic::Core::TypeToken<TypeTokenFixtureA>());
+    EXPECT_NE(a, 0u);
+    EXPECT_NE(a, Extrinsic::Core::TypeToken<TypeTokenFixtureB>());
+}
+
+TEST(CoreHash, TypeToken_LeavesHighBitClear)
+{
+    constexpr size_t kHighBit =
+        ~(std::numeric_limits<size_t>::max() >> 1);
+
+    EXPECT_EQ(Extrinsic::Core::TypeToken<TypeTokenFixtureA>() & kHighBit, 0u);
+    EXPECT_EQ(Extrinsic::Core::TypeToken<TypeTokenFixtureB>() & kHighBit, 0u);
+    EXPECT_EQ(Extrinsic::Core::TypeToken<int>() & kHighBit, 0u);
 }
 
 // -----------------------------------------------------------------------------
@@ -257,4 +342,3 @@ TEST(CoreHash, U64Hash_InUnorderedMap)
     EXPECT_EQ(map[0x1234567890ABCDEFull], "ResourceA");
     EXPECT_EQ(map.size(), 2u);
 }
-

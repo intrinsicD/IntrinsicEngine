@@ -10,6 +10,9 @@ map.
 
 ## Tasks
 
+- [UI-054 — Shared density/spacing panel workflow](../../active/UI-054-shared-processing-panel-workflow.md)
+  follows the runtime consolidation pilot in `RUNTIME-231`.
+
 - **Theme J product gate:**
   [`UI-046`](UI-046-sandbox-geometry-export.md) export,
   [`UI-047`](UI-047-file-chooser-for-import-and-scene-paths.md) file choice,

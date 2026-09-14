@@ -21,6 +21,7 @@ import Extrinsic.Runtime.Engine;
 import Extrinsic.Runtime.EngineConfigBoot;
 import Extrinsic.Runtime.EngineConfigControl;
 import Extrinsic.Runtime.ClusteringConfig;
+import Extrinsic.Runtime.MeshCurvatureConfig;
 import Extrinsic.Runtime.CurvatureSegmentationConfig;
 import Extrinsic.Runtime.ParameterizationConfig;
 import Extrinsic.Runtime.PhysicsModule;
@@ -733,4 +734,52 @@ TEST(SandboxConfigSections,
               defaults->AutomaticMinComponents);
     EXPECT_EQ(active->AutomaticMaxComponents,
               defaults->AutomaticMaxComponents);
+}
+
+TEST(SandboxConfigSections, CurvatureBindingsRoundTripAndRejectAliasing)
+{
+    ConfigControlHarness harness;
+    auto config = harness.Control().GetEngineConfigControlState().ActiveConfig;
+    auto curvature = Runtime::GetMeshCurvatureConfig(config);
+    ASSERT_TRUE(curvature);
+    curvature->StableEntityId = 17;
+    curvature->Positions.Name = "v:rest";
+    curvature->Mean.Name = "v:mean_custom";
+    curvature->Direction2.Name = "v:direction_custom";
+    Runtime::SetMeshCurvatureConfig(config, *curvature);
+    const auto preview = harness.Control().PreviewEngineConfigControlDocument(CoreConfig::SerializeEngineConfig(config));
+    ASSERT_TRUE(harness.Control().ApplyEngineConfigHotSubset(preview).Succeeded());
+    const auto decoded = Runtime::GetMeshCurvatureConfig(harness.Control().GetEngineConfigControlState().ActiveConfig);
+    ASSERT_TRUE(decoded);
+    EXPECT_EQ(decoded->Positions, curvature->Positions);
+    EXPECT_EQ(decoded->Mean, curvature->Mean);
+    EXPECT_EQ(decoded->Direction2, curvature->Direction2);
+    curvature->Direction2 = curvature->Positions;
+    EXPECT_FALSE(Runtime::ValidateMeshCurvatureConfigSection(
+        Runtime::SerializeMeshCurvatureConfig(*curvature), {}, "curvature").Usable());
+    auto segmentation = *Runtime::GetCurvatureSegmentationConfig(config);
+    segmentation.Regions.Name = "f:region_custom";
+    Runtime::SetCurvatureSegmentationConfig(config, segmentation);
+    ASSERT_TRUE(Runtime::GetCurvatureSegmentationConfig(config));
+    EXPECT_EQ(Runtime::GetCurvatureSegmentationConfig(config)->Regions, segmentation.Regions);
+    segmentation.Regions = segmentation.Components;
+    EXPECT_FALSE(Runtime::ValidateCurvatureSegmentationConfigSection(
+        Runtime::SerializeCurvatureSegmentationConfig(segmentation), {}, "segmentation").Usable());
+    Runtime::ClusteringConfig clustering;
+    clustering.Properties = Runtime::MakeKMeansPropertyRefs(Runtime::GeometryElementDomain::MeshFace);
+    clustering.Properties->InputPositions.Name = "f:centroid";
+    clustering.Properties->OutputLabels.Name = "f:custom_clusters";
+    Runtime::SetClusteringConfig(config, clustering);
+    const auto decodedClustering = Runtime::GetClusteringConfig(config);
+    ASSERT_TRUE(decodedClustering);
+    ASSERT_TRUE(decodedClustering->Properties);
+    EXPECT_EQ(decodedClustering->Properties->InputPositions, clustering.Properties->InputPositions);
+    const auto request = Runtime::MakeConfiguredKMeansRequest(17, *decodedClustering);
+    EXPECT_EQ(request.Properties.OutputLabels, clustering.Properties->OutputLabels);    clustering.Properties->OutputScalarLabels.reset();
+    Runtime::SetClusteringConfig(config, clustering);
+    const auto noScalarLabels = Runtime::GetClusteringConfig(config);
+    ASSERT_TRUE(noScalarLabels);
+    ASSERT_TRUE(noScalarLabels->Properties);
+    EXPECT_FALSE(noScalarLabels->Properties->OutputScalarLabels);
+
 }

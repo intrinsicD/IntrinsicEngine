@@ -11,6 +11,7 @@ target_sources(${target_name}
         Graphics.ComputeParallelPrimitives.cppm
         Graphics.PointLBVH.cppm
         Graphics.FrameRecipe.cppm
+        Graphics.RenderDiagnostics.cppm
         Graphics.RenderRecipeConfig.cppm
         Graphics.RenderCommandRouter.cppm
         Graphics.RenderPrepPipeline.cppm

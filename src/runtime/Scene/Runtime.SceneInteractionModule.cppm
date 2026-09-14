@@ -16,7 +16,7 @@ import Extrinsic.Runtime.WorldHandle;
 import Extrinsic.Runtime.GizmoInteraction;
 import Extrinsic.Runtime.SelectionController;
 import Extrinsic.Runtime.RenderExtraction;
-import Extrinsic.Runtime.Module;
+import Extrinsic.Runtime.ModuleLifecycle;
 import Extrinsic.Runtime.PrimitiveSelectionRefinement;
 import Extrinsic.Runtime.StableEntityLookup;
 

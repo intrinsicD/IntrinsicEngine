@@ -1,4 +1,8 @@
 module;
+#include <functional>
+#include <glm/vec3.hpp>
+#include <glm/vec4.hpp>
+#include <glm/vec2.hpp>
 
 #include <algorithm>
 #include <array>
@@ -19,6 +23,18 @@ module;
 
 module Extrinsic.Sandbox.Editor.Shell;
 
+
+import Extrinsic.Runtime.PointFieldOperations;
+import Extrinsic.Runtime.PointAnalysisOperations;
+import Extrinsic.Runtime.PointSetOperations;
+import Extrinsic.Runtime.PointConstructionOperations;
+import Extrinsic.Runtime.PointCloudServiceOperations;
+import Extrinsic.Runtime.NormalOperations;
+import Extrinsic.Runtime.RegistrationOperations;
+import Extrinsic.Runtime.MeshFieldOperations;
+import Extrinsic.Runtime.MeshTopologyOperations;
+import Extrinsic.Runtime.ParameterizationOperations;
+import Extrinsic.Runtime.EditorCommon;
 import Extrinsic.Runtime.EditorUiHost;
 import Extrinsic.Runtime.EditorWindowRegistry;
 import Extrinsic.Runtime.GeometryAvailability;
@@ -32,152 +48,18 @@ import Extrinsic.Runtime.EditorJobProjection;
 import Extrinsic.Runtime.SceneEditingOperations;
 import Extrinsic.Runtime.GeometryProcessingOperations;
 import Extrinsic.Runtime.VisualizationEditingOperations;
+import Extrinsic.Runtime.VisualizationRecipes;
 import Extrinsic.Runtime.RenderRecipeEditingOperations;
 import Extrinsic.Runtime.TextureBakeModule;
+import Extrinsic.Runtime.EngineConfigControl;
+import Extrinsic.Runtime.ParameterizationConfig;
+import Extrinsic.Runtime.PointCloudConsolidationTypes;
+
+#include "Sandbox.PanelSupport.hpp"
 
 namespace Extrinsic::Sandbox::Editor
 {
     using namespace Extrinsic::Runtime;
-
-    void DrawDiagnostics(const std::vector<EditorDiagnostic>& diagnostics)
-    {
-        for (const EditorDiagnostic& diagnostic : diagnostics)
-        {
-            ImGui::TextDisabled("%s: %s",
-                                DebugNameForEditorDiagnosticCode(diagnostic.Code),
-                                diagnostic.Message.c_str());
-        }
-    }
-
-    void DrawDomainWindowHeader(
-        const Runtime::EditorDomainWindowModel& model)
-    {
-        ImGui::Text(
-            "Expected domain: %s",
-            Runtime::DebugNameForEditorGeometryDomain(
-                model.ExpectedDomain));
-        if (model.HasSelectedEntity)
-        {
-            ImGui::Text(
-                "Selected: %s (%u)",
-                model.SelectedEntity.Name.c_str(),
-                model.SelectedStableId);
-            ImGui::Text(
-                "Selected domain: %s",
-                Runtime::DebugNameForEditorGeometryDomain(
-                    model.SelectedDomain));
-        }
-        else
-        {
-            ImGui::TextDisabled("Selected: none");
-        }
-        DrawDiagnostics(model.Diagnostics);
-    }
-
-    [[nodiscard]] bool DomainWindowReady(
-        const Runtime::EditorDomainWindowModel& model) noexcept
-    {
-        return model.HasSelectedEntity && model.DomainMatches;
-    }
-
-    void DrawVec3(const char* label, const glm::vec3 value)
-    {
-        ImGui::Text("%s: %.3f, %.3f, %.3f", label, value.x, value.y, value.z);
-    }
-
-    [[nodiscard]] const char* DebugNameForTextureBakeEncoder(
-        const PropertyTextureBakeEncoding encoder) noexcept
-    {
-        switch (encoder)
-        {
-        case PropertyTextureBakeEncoding::Auto: return "auto";
-        case PropertyTextureBakeEncoding::LinearScalar: return "linear scalar";
-        case PropertyTextureBakeEncoding::ScalarColormap: return "scalar colormap";
-        case PropertyTextureBakeEncoding::LabelPalette: return "label palette";
-        case PropertyTextureBakeEncoding::Vector2: return "vector2";
-        case PropertyTextureBakeEncoding::Vector3: return "vector3";
-        case PropertyTextureBakeEncoding::Normal: return "normal";
-        case PropertyTextureBakeEncoding::RgbaColor: return "rgba color";
-        }
-        return "unknown";
-    }
-
-    [[nodiscard]] std::span<const EditorTextureBakeTarget>
-    TextureBakeTargetsFor(
-        const EditorTextureBakeControlsModel& model,
-        const std::string_view outputName)
-    {
-        const auto found = std::ranges::find(
-            model.TextureBakeTargets,
-            outputName,
-            &EditorTextureBakeTargetSnapshot::OutputName);
-        if (found == model.TextureBakeTargets.end())
-            return {};
-        return found->Targets;
-    }
-
-    [[nodiscard]] EditorVisualizationConfigCommand
-    MakeVisualizationConfigCommandFromModel(
-        const std::uint32_t stableEntityId,
-        const EditorVisualizationConfigModel& model,
-        const EditorVisualizationTarget target)
-    {
-        return EditorVisualizationConfigCommand{
-            .StableEntityId = stableEntityId,
-            .Target = target,
-            .EnableConfig = true,
-            .Source = model.Source,
-            .Color = model.Color,
-            .ScalarFieldName = model.ScalarFieldName,
-            .ScalarDomain = model.ScalarDomain,
-            .ColorBufferName = model.ColorBufferName,
-            .ScalarAutoRange = model.ScalarAutoRange,
-            .ScalarRangeMin = model.ScalarRangeMin,
-            .ScalarRangeMax = model.ScalarRangeMax,
-            .ScalarBinCount = model.ScalarBinCount,
-            .IsolineCount = model.IsolineCount,
-            .ScalarColormap = model.ScalarColormap,
-            .IsolineWidth = model.IsolineWidth,
-            .IsolineColor = model.IsolineColor,
-            .IsolineValues = model.IsolineValues,
-            .IsolineValueCount = model.IsolineValueCount,
-            .UseBakedTexture = model.UseBakedTexture,
-        };
-    }
-
-    [[nodiscard]] EditorVisualizationConfigCommand
-    MakeUniformVisualizationConfigCommandFromModel(
-        const std::uint32_t stableEntityId,
-        const EditorVisualizationConfigModel& model,
-        const EditorVisualizationTarget target,
-        const glm::vec4 color)
-    {
-        auto command = MakeVisualizationConfigCommandFromModel(stableEntityId, model, target);
-        command.Source = kUniformColorSource;
-        command.Color = color;
-        command.UseBakedTexture = false;
-        return command;
-    }
-
-    bool DrawDismissLastResultButton(const char* const label)
-    {
-        return ImGui::SmallButton(label);
-    }
-
-    void DrawDisabledReasonTooltip(const std::string_view disabledReason)
-    {
-        constexpr ImGuiHoveredFlags hoverFlags =
-            ImGuiHoveredFlags_ForTooltip |
-            ImGuiHoveredFlags_AllowWhenDisabled;
-        if (disabledReason.empty() || !ImGui::IsItemHovered(hoverFlags))
-            return;
-
-        ImGui::BeginTooltip();
-        ImGui::TextUnformatted(
-            disabledReason.data(),
-            disabledReason.data() + disabledReason.size());
-        ImGui::EndTooltip();
-    }
 
     namespace
     {
@@ -638,43 +520,6 @@ namespace Extrinsic::Sandbox::Editor
             DrawDiagnostics(bound.Diagnostics);
         }
 
-        void DrawUvRegenerationStatus(
-            const EditorUvDiagnosticsModel& uv,
-            const std::optional<EditorUvRegenerationCommandResult>&
-                lastResult)
-        {
-            if (uv.UvRegenerationJob.has_value())
-            {
-                const EditorJobModel& job =
-                    *uv.UvRegenerationJob;
-                ImGui::Text("UV job: %s %.0f%%",
-                            std::string(ToString(job.Status)).c_str(),
-                            job.NormalizedProgress * 100.0f);
-                if (!job.Diagnostic.empty())
-                    ImGui::TextWrapped("%s", job.Diagnostic.c_str());
-            }
-
-            if (!lastResult.has_value())
-            {
-                ImGui::TextDisabled("Last UV regeneration: none");
-                return;
-            }
-
-            const EditorUvRegenerationCommandResult& result =
-                *lastResult;
-            ImGui::Text("Last UV regeneration: %s",
-                        DebugNameForEditorCommandStatus(result.Status));
-            ImGui::Text("Atlas: %s / %s  %ux%u  charts=%u  splits=%zu",
-                        DebugNameForEditorUvAtlasStatus(result.UvStatus),
-                        DebugNameForEditorUvAtlasProvenance(result.Provenance),
-                        result.AtlasWidth,
-                        result.AtlasHeight,
-                        result.ChartCount,
-                        result.SeamSplitVertexCount);
-            if (!result.Diagnostic.empty())
-                ImGui::TextWrapped("%s", result.Diagnostic.c_str());
-        }
-
         void DrawTextureBakeControls(
             const EditorTextureBakeControlsModel& model,
             const SandboxEditorContext* context,
@@ -796,80 +641,22 @@ namespace Extrinsic::Sandbox::Editor
                 static_cast<std::int32_t>(kNormalSpaceNames.size() - 1u));
             bakeWidth = std::clamp<std::int32_t>(bakeWidth, 1, 8192);
             bakeHeight = std::clamp<std::int32_t>(bakeHeight, 1, 8192);
-            uvResolution = std::clamp<std::int32_t>(uvResolution, 1, 16384);
-            uvPadding = std::clamp<std::int32_t>(uvPadding, 0, uvResolution - 1);
-            if (!std::isfinite(uvTexelsPerUnit) || uvTexelsPerUnit < 0.0f)
-                uvTexelsPerUnit = 0.0f;
 
-            ImGui::SeparatorText("UV / texture bake");
-            ImGui::Text("UV: %s texcoords=%s count=%zu/%zu",
-                        model.Uv.Provenance.c_str(),
-                        model.Uv.HasTexcoords ? "yes" : "no",
-                        model.Uv.TexcoordCount,
-                        model.Uv.VertexCount);
-            if (!model.Uv.LastFailure.empty())
-                ImGui::TextDisabled("%s", model.Uv.LastFailure.c_str());
-            if (!model.Uv.UvRegenerationAvailable)
-                ImGui::TextDisabled("%s",
-                                    model.Uv.UvRegenerationDisabledReason.c_str());
-
-            ImGui::Checkbox("Force regenerate", &uvForceRegenerate);
-            ImGui::SameLine();
-            ImGui::Checkbox("Preserve valid authored", &uvPreserveAuthored);
-            ImGui::InputInt("UV resolution", &uvResolution);
-            ImGui::InputInt("UV padding", &uvPadding);
-            ImGui::InputFloat("Texels per unit", &uvTexelsPerUnit, 0.0f, 0.0f, "%.3f");
-            uvResolution = std::clamp<std::int32_t>(uvResolution, 1, 16384);
-            uvPadding = std::clamp<std::int32_t>(uvPadding, 0, uvResolution - 1);
-            if (!std::isfinite(uvTexelsPerUnit) || uvTexelsPerUnit < 0.0f)
-                uvTexelsPerUnit = 0.0f;
-
-            const bool canRegenerateUvs =
-                model.Uv.UvRegenerationAvailable &&
-                context != nullptr &&
-                model.SelectedStableId != 0u;
-            if (!canRegenerateUvs)
-                ImGui::BeginDisabled();
-            if (ImGui::Button("Regenerate UVs") && canRegenerateUvs)
-            {
-                *lastUvRegenerationResult =
-                    ApplyEditorUvRegenerationCommand(
-                    context->GeometryCommands,
-                    EditorUvRegenerationCommand{
-                        .StableEntityId = model.SelectedStableId,
-                        .PreserveValidAuthoredUvs = uvPreserveAuthored,
-                        .ForceRegenerate = uvForceRegenerate,
-                        .Resolution = static_cast<std::uint32_t>(uvResolution),
-                        .Padding = static_cast<std::uint32_t>(uvPadding),
-                        .TexelsPerUnit = uvTexelsPerUnit,
-                    });
-            }
-            if (lastUvRegenerationResult->has_value())
-            {
-                if (!lastUvRegenerationResult->value().Succeeded())
-                {
-                    lastUvExtentAdoption->reset();
-                }
-                else if (!lastUvExtentAdoption->has_value())
-                {
-                    bakeWidth = std::clamp<std::int32_t>(
-                        static_cast<std::int32_t>(
-                            lastUvRegenerationResult->value().AtlasWidth),
-                        1,
-                        8192);
-                    bakeHeight = std::clamp<std::int32_t>(
-                        static_cast<std::int32_t>(
-                            lastUvRegenerationResult->value().AtlasHeight),
-                        1,
-                        8192);
-                    bakePadding = std::clamp<std::int32_t>(uvPadding, 0, 32);
-                    *lastUvExtentAdoption =
-                        lastUvRegenerationResult->value();
-                }
-            }
-            if (!canRegenerateUvs)
-                ImGui::EndDisabled();
-            DrawUvRegenerationStatus(model.Uv, *lastUvRegenerationResult);
+            DrawSandboxUvRegenerationControls(
+                model,
+                context,
+                SandboxUvRegenerationControls{
+                    .LastResult = lastUvRegenerationResult,
+                    .LastExtentAdoption = lastUvExtentAdoption,
+                    .BakeWidth = &bakeWidth,
+                    .BakeHeight = &bakeHeight,
+                    .BakePadding = &bakePadding,
+                    .UvResolution = &uvResolution,
+                    .UvPadding = &uvPadding,
+                    .UvTexelsPerUnit = &uvTexelsPerUnit,
+                    .UvForceRegenerate = &uvForceRegenerate,
+                    .UvPreserveAuthored = &uvPreserveAuthored,
+                });
 
             std::vector<std::size_t> bakeableIndices;
             bakeableIndices.reserve(model.Sources.size());
@@ -3174,323 +2961,349 @@ namespace Extrinsic::Sandbox::Editor
         }
     }
 
-    struct EditorShell::Impl
+    extern "C++"
     {
-        struct SandboxPreparedFrame final
+        struct EditorShell::Impl
         {
-            Runtime::EditorWorkspaceSnapshotPreparedFrame Workspace{};
-            Runtime::EditorSceneEditingPreparedFrame Scene{};
-            Runtime::EditorGeometryProcessingPreparedFrame Geometry{};
-            Runtime::EditorVisualizationEditingPreparedFrame Visualization{};
-            Runtime::EditorRenderRecipeEditingPreparedFrame RenderRecipe{};
+            struct SandboxPreparedFrame final
+            {
+                Runtime::EditorWorkspaceSnapshotPreparedFrame Workspace{};
+                Runtime::EditorSceneEditingPreparedFrame Scene{};
+                Runtime::EditorVisualizationEditingPreparedFrame Visualization{};
+                Runtime::EditorRenderRecipeEditingPreparedFrame RenderRecipe{};
+            };
+
+            Runtime::EditorWorkspaceAttachment Attachment{};
+            Runtime::EditorUiHost* Host{nullptr};
+            Runtime::EditorUiFrameContributionHandle FrameContribution{};
+            BuiltinWindowHandles BuiltinHandles{};
+            std::vector<Runtime::EditorWindowHandle> RegisteredWindows{};
+            std::array<char, 1024> ImportPathBuffer{};
+            std::array<char, 1024> ScenePathBuffer{};
+            Runtime::EditorAssetPayloadKind ImportPayloadKind{
+                Runtime::EditorAssetPayloadKind::Unknown};
+            std::array<char, 8192> RenderRecipeDraftBuffer{};
+            std::int32_t TextureBakeSourceIndex{0};
+            std::int32_t TextureBakeTargetSemanticIndex{0};
+            std::int32_t TextureBakeEncoderIndex{0};
+            std::int32_t TextureBakeStorageIndex{0};
+            std::int32_t TextureBakeColormapIndex{0};
+            std::int32_t TextureBakeNormalSpaceIndex{0};
+            std::uint32_t TextureBakeAdditionalConsumerMask{0u};
+            // Panel-lifetime, not frame-lifetime: `ActiveContext` is rebuilt
+            // and reset every frame, so the submit-time result and the
+            // once-per-result extent latch must outlive it. The session slot
+            // refreshes the copy below while it holds a terminal result.
+            std::optional<EditorUvRegenerationCommandResult>
+                LastUvRegenerationResult{};
+            std::optional<EditorUvRegenerationCommandResult>
+                LastUvExtentAdoption{};
+            std::int32_t TextureBakeWidth{1024};
+            std::int32_t TextureBakeHeight{1024};
+            std::int32_t TextureBakePadding{2};
+            std::int32_t UvAtlasResolution{1024};
+            std::int32_t UvAtlasPadding{2};
+            float UvAtlasTexelsPerUnit{0.0f};
+            bool UvAtlasForceRegenerate{true};
+            bool UvAtlasPreserveAuthored{false};
+            SandboxEditorFrame LastFrame{};
+            std::optional<SandboxEditorContext> ActiveContext{};
+            std::optional<SandboxPreparedFrame> ActivePreparedFrame{};
+
+            void RegisterBuiltinWindows()
+            {
+                if (Host == nullptr)
+                    return;
+                for (std::size_t index = 0u; index < kBuiltinWindows.size(); ++index)
+                {
+                    const BuiltinWindowSpec& spec = kBuiltinWindows[index];
+                    BuiltinHandles[index] = Host->RegisterWindow(
+                        Runtime::EditorWindowDescriptor{
+                            .Id = std::string{spec.Id},
+                            .MenuPath = {"View"},
+                            .Title = std::string{spec.Title},
+                            .OpenByDefault = false,
+                            .Draw =
+                                [this, id = std::string{spec.Id}](bool& open)
+                                {
+                                    DrawBuiltinWindow(id, open);
+                                },
+                        });
+                }
+            }
+
+            void UnregisterAllWindows()
+            {
+                if (Host != nullptr)
+                {
+                    for (const Runtime::EditorWindowHandle handle :
+                         RegisteredWindows)
+                    {
+                        (void)Host->UnregisterWindow(handle);
+                    }
+                    for (const Runtime::EditorWindowHandle handle :
+                         BuiltinHandles)
+                    {
+                        if (handle.IsValid())
+                            (void)Host->UnregisterWindow(handle);
+                    }
+                }
+                RegisteredWindows.clear();
+                BuiltinHandles = {};
+            }
+
+            void DrawBuiltinWindow(
+                const std::string_view id,
+                bool& open)
+            {
+                if (!ActivePreparedFrame.has_value() || !ActiveContext.has_value())
+                    return;
+
+                if (ActiveContext->Parameterization.Results
+                        .LastUvRegenerationResult.has_value())
+                {
+                    LastUvRegenerationResult =
+                        *ActiveContext->Parameterization.Results
+                             .LastUvRegenerationResult;
+                }
+
+                TextureBakeUiState textureBakeState{
+                    .LastUvRegenerationResult = &LastUvRegenerationResult,
+                    .LastUvExtentAdoption = &LastUvExtentAdoption,
+                    .SourceIndex = &TextureBakeSourceIndex,
+                    .TargetSemanticIndex = &TextureBakeTargetSemanticIndex,
+                    .EncoderIndex = &TextureBakeEncoderIndex,
+                    .StorageIndex = &TextureBakeStorageIndex,
+                    .ColormapIndex = &TextureBakeColormapIndex,
+                    .NormalSpaceIndex = &TextureBakeNormalSpaceIndex,
+                    .AdditionalConsumerMask =
+                        &TextureBakeAdditionalConsumerMask,
+                    .Width = &TextureBakeWidth,
+                    .Height = &TextureBakeHeight,
+                    .Padding = &TextureBakePadding,
+                    .UvResolution = &UvAtlasResolution,
+                    .UvPadding = &UvAtlasPadding,
+                    .UvTexelsPerUnit = &UvAtlasTexelsPerUnit,
+                    .UvForceRegenerate = &UvAtlasForceRegenerate,
+                    .UvPreserveAuthored = &UvAtlasPreserveAuthored,
+                };
+                DrawFixedWindow(
+                    id,
+                    open,
+                    LastFrame,
+                    &*ActiveContext,
+                    &ImportPathBuffer,
+                    &ScenePathBuffer,
+                    &RenderRecipeDraftBuffer,
+                    &ImportPayloadKind,
+                    &ActivePreparedFrame->Scene.LastAssetImportResult,
+                    &ActivePreparedFrame->Scene.LastSceneFileResult,
+                    &textureBakeState);
+            }
+
+            void DrawFrame()
+            {
+                if (!Attachment.IsAttached() || Host == nullptr)
+                    return;
+
+                std::optional<Runtime::EditorWorkspaceSnapshotPreparedFrame>
+                    workspace = Runtime::PrepareEditorWorkspaceSnapshotFrame(
+                        Attachment,
+                        BuildModelRequest(Host->Windows(), BuiltinHandles),
+                        std::string{ImportPathBuffer.data()},
+                        ImportPayloadKind,
+                        std::string{ScenePathBuffer.data()});
+                if (!workspace.has_value())
+                {
+                    return;
+                }
+
+                ActivePreparedFrame.emplace(SandboxPreparedFrame{
+                    .Workspace = std::move(*workspace),
+                    .Scene = Runtime::PrepareEditorSceneEditingFrame(Attachment),
+                    .Visualization =
+                        Runtime::PrepareEditorVisualizationEditingFrame(Attachment),
+                    .RenderRecipe =
+                        Runtime::PrepareEditorRenderRecipeEditingFrame(Attachment),
+                });
+                SandboxPreparedFrame& prepared = *ActivePreparedFrame;
+                LastFrame = SandboxEditorFrame{prepared.Workspace.Frame};
+                ActiveContext.emplace(
+                    prepared.Workspace,
+                    prepared.Scene,
+                    Runtime::PrepareEditorProcessingCommands(Attachment),
+                    Runtime::PrepareEditorPointFieldFrame(Attachment),
+                    Runtime::PrepareEditorPointAnalysisFrame(Attachment),
+                    Runtime::PrepareEditorPointSetFrame(Attachment),
+                    Runtime::PrepareEditorPointConstructionFrame(Attachment),
+                    Runtime::PrepareEditorPointCloudServiceFrame(Attachment),
+                    Runtime::PrepareEditorNormalFrame(Attachment),
+                    Runtime::PrepareEditorRegistrationFrame(Attachment),
+                    Runtime::PrepareEditorMeshFieldFrame(Attachment),
+                    Runtime::PrepareEditorMeshTopologyFrame(Attachment),
+                    Runtime::PrepareEditorParameterizationFrame(Attachment),
+                    prepared.Visualization,
+                    prepared.RenderRecipe,
+                    LastFrame);
+                DrawMainMenuBar(&Host->Windows());
+                (void)Host->Windows().DrawOpenWindows();
+                ActivePreparedFrame.reset();
+                ActiveContext.reset();
+            }
+
+            Runtime::EditorWindowHandle RegisterEditorWindow(
+                EditorWindowDescriptor descriptor)
+            {
+                if (Host == nullptr)
+                    return {};
+                auto draw = std::move(descriptor.Draw);
+                const Runtime::EditorWindowHandle handle =
+                    Host->RegisterWindow(
+                    Runtime::EditorWindowDescriptor{
+                        .Id = std::move(descriptor.Id),
+                        .MenuPath = std::move(descriptor.MenuPath),
+                        .Title = std::move(descriptor.Title),
+                        .OpenByDefault = descriptor.OpenByDefault,
+                        .Draw =
+                            [this, draw = std::move(draw)](bool& open)
+                            {
+                                if (draw && ActiveContext.has_value())
+                                {
+                                    draw(open, *ActiveContext);
+                                }
+                            },
+                        .OpenStateChanged =
+                            std::move(descriptor.OpenStateChanged),
+                    });
+                if (handle.IsValid())
+                    RegisteredWindows.push_back(handle);
+                return handle;
+            }
+
+            void Attach(Runtime::WorldRegistry& worlds, Runtime::ServiceRegistry& services)
+            {
+                Detach();
+                Host = services.Find<Runtime::EditorUiHost>();
+                if (Host == nullptr || !Host->IsOperational())
+                {
+                    Host = nullptr;
+                    return;
+                }
+
+                RegisterBuiltinWindows();
+                Attachment.Attach(worlds, services);
+                if (!Attachment.IsAttached())
+                {
+                    Detach();
+                    return;
+                }
+                FrameContribution = Host->RegisterFrameContribution(
+                    [this]
+                    {
+                        DrawFrame();
+                    });
+                if (!FrameContribution.IsValid())
+                    Detach();
+            }
+
+            void Detach()
+            {
+                ActivePreparedFrame.reset();
+                ActiveContext.reset();
+                LastFrame = {};
+                LastUvRegenerationResult.reset();
+                LastUvExtentAdoption.reset();
+                if (Host != nullptr && FrameContribution.IsValid())
+                    (void)Host->UnregisterFrameContribution(FrameContribution);
+                FrameContribution = {};
+                UnregisterAllWindows();
+                Host = nullptr;
+                Attachment.Detach();
+            }
         };
 
-        Runtime::EditorWorkspaceAttachment Attachment{};
-        Runtime::EditorUiHost* Host{nullptr};
-        Runtime::EditorUiFrameContributionHandle FrameContribution{};
-        BuiltinWindowHandles BuiltinHandles{};
-        std::vector<Runtime::EditorWindowHandle> RegisteredWindows{};
-        std::array<char, 1024> ImportPathBuffer{};
-        std::array<char, 1024> ScenePathBuffer{};
-        Runtime::EditorAssetPayloadKind ImportPayloadKind{
-            Runtime::EditorAssetPayloadKind::Unknown};
-        std::array<char, 8192> RenderRecipeDraftBuffer{};
-        std::int32_t TextureBakeSourceIndex{0};
-        std::int32_t TextureBakeTargetSemanticIndex{0};
-        std::int32_t TextureBakeEncoderIndex{0};
-        std::int32_t TextureBakeStorageIndex{0};
-        std::int32_t TextureBakeColormapIndex{0};
-        std::int32_t TextureBakeNormalSpaceIndex{0};
-        std::uint32_t TextureBakeAdditionalConsumerMask{0u};
-        std::optional<EditorUvRegenerationCommandResult>
-            LastUvExtentAdoption{};
-        std::int32_t TextureBakeWidth{1024};
-        std::int32_t TextureBakeHeight{1024};
-        std::int32_t TextureBakePadding{2};
-        std::int32_t UvAtlasResolution{1024};
-        std::int32_t UvAtlasPadding{2};
-        float UvAtlasTexelsPerUnit{0.0f};
-        bool UvAtlasForceRegenerate{true};
-        bool UvAtlasPreserveAuthored{false};
-        SandboxEditorFrame LastFrame{};
-        std::optional<SandboxEditorContext> ActiveContext{};
-        std::optional<SandboxPreparedFrame> ActivePreparedFrame{};
-
-        void RegisterBuiltinWindows()
+        EditorShell::EditorShell()
+            : m_Impl(std::make_unique<Impl>())
         {
-            if (Host == nullptr)
-                return;
-            for (std::size_t index = 0u; index < kBuiltinWindows.size(); ++index)
-            {
-                const BuiltinWindowSpec& spec = kBuiltinWindows[index];
-                BuiltinHandles[index] = Host->RegisterWindow(
-                    Runtime::EditorWindowDescriptor{
-                        .Id = std::string{spec.Id},
-                        .MenuPath = {"View"},
-                        .Title = std::string{spec.Title},
-                        .OpenByDefault = false,
-                        .Draw =
-                            [this, id = std::string{spec.Id}](bool& open)
-                            {
-                                DrawBuiltinWindow(id, open);
-                            },
-                    });
-            }
         }
 
-        void UnregisterAllWindows()
-        {
-            if (Host != nullptr)
-            {
-                for (const Runtime::EditorWindowHandle handle :
-                     RegisteredWindows)
-                {
-                    (void)Host->UnregisterWindow(handle);
-                }
-                for (const Runtime::EditorWindowHandle handle :
-                     BuiltinHandles)
-                {
-                    if (handle.IsValid())
-                        (void)Host->UnregisterWindow(handle);
-                }
-            }
-            RegisteredWindows.clear();
-            BuiltinHandles = {};
-        }
-
-        void DrawBuiltinWindow(
-            const std::string_view id,
-            bool& open)
-        {
-            if (!ActivePreparedFrame.has_value() || !ActiveContext.has_value())
-                return;
-
-            TextureBakeUiState textureBakeState{
-                .LastUvRegenerationResult =
-                    &ActivePreparedFrame->Geometry.Results.LastUvRegenerationResult,
-                .LastUvExtentAdoption = &LastUvExtentAdoption,
-                .SourceIndex = &TextureBakeSourceIndex,
-                .TargetSemanticIndex = &TextureBakeTargetSemanticIndex,
-                .EncoderIndex = &TextureBakeEncoderIndex,
-                .StorageIndex = &TextureBakeStorageIndex,
-                .ColormapIndex = &TextureBakeColormapIndex,
-                .NormalSpaceIndex = &TextureBakeNormalSpaceIndex,
-                .AdditionalConsumerMask =
-                    &TextureBakeAdditionalConsumerMask,
-                .Width = &TextureBakeWidth,
-                .Height = &TextureBakeHeight,
-                .Padding = &TextureBakePadding,
-                .UvResolution = &UvAtlasResolution,
-                .UvPadding = &UvAtlasPadding,
-                .UvTexelsPerUnit = &UvAtlasTexelsPerUnit,
-                .UvForceRegenerate = &UvAtlasForceRegenerate,
-                .UvPreserveAuthored = &UvAtlasPreserveAuthored,
-            };
-            DrawFixedWindow(
-                id,
-                open,
-                LastFrame,
-                &*ActiveContext,
-                &ImportPathBuffer,
-                &ScenePathBuffer,
-                &RenderRecipeDraftBuffer,
-                &ImportPayloadKind,
-                &ActivePreparedFrame->Scene.LastAssetImportResult,
-                &ActivePreparedFrame->Scene.LastSceneFileResult,
-                &textureBakeState);
-        }
-
-        void DrawFrame()
-        {
-            if (!Attachment.IsAttached() || Host == nullptr)
-                return;
-
-            std::optional<Runtime::EditorWorkspaceSnapshotPreparedFrame>
-                workspace = Runtime::PrepareEditorWorkspaceSnapshotFrame(
-                    Attachment,
-                    BuildModelRequest(Host->Windows(), BuiltinHandles),
-                    std::string{ImportPathBuffer.data()},
-                    ImportPayloadKind,
-                    std::string{ScenePathBuffer.data()});
-            if (!workspace.has_value())
-            {
-                return;
-            }
-
-            ActivePreparedFrame.emplace(SandboxPreparedFrame{
-                .Workspace = std::move(*workspace),
-                .Scene = Runtime::PrepareEditorSceneEditingFrame(Attachment),
-                .Geometry =
-                    Runtime::PrepareEditorGeometryProcessingFrame(Attachment),
-                .Visualization =
-                    Runtime::PrepareEditorVisualizationEditingFrame(Attachment),
-                .RenderRecipe =
-                    Runtime::PrepareEditorRenderRecipeEditingFrame(Attachment),
-            });
-            SandboxPreparedFrame& prepared = *ActivePreparedFrame;
-            LastFrame = SandboxEditorFrame{prepared.Workspace.Frame};
-            ActiveContext.emplace(
-                prepared.Workspace,
-                prepared.Scene,
-                prepared.Geometry,
-                prepared.Visualization,
-                prepared.RenderRecipe,
-                LastFrame);
-            DrawMainMenuBar(&Host->Windows());
-            (void)Host->Windows().DrawOpenWindows();
-            ActivePreparedFrame.reset();
-            ActiveContext.reset();
-        }
-
-        Runtime::EditorWindowHandle RegisterEditorWindow(
-            EditorWindowDescriptor descriptor)
-        {
-            if (Host == nullptr)
-                return {};
-            auto draw = std::move(descriptor.Draw);
-            const Runtime::EditorWindowHandle handle =
-                Host->RegisterWindow(
-                Runtime::EditorWindowDescriptor{
-                    .Id = std::move(descriptor.Id),
-                    .MenuPath = std::move(descriptor.MenuPath),
-                    .Title = std::move(descriptor.Title),
-                    .OpenByDefault = descriptor.OpenByDefault,
-                    .Draw =
-                        [this, draw = std::move(draw)](bool& open)
-                        {
-                            if (draw && ActiveContext.has_value())
-                            {
-                                draw(open, *ActiveContext);
-                            }
-                        },
-                    .OpenStateChanged =
-                        std::move(descriptor.OpenStateChanged),
-                });
-            if (handle.IsValid())
-                RegisteredWindows.push_back(handle);
-            return handle;
-        }
-
-        void Attach(Runtime::WorldRegistry& worlds, Runtime::ServiceRegistry& services)
+        EditorShell::~EditorShell()
         {
             Detach();
-            Host = services.Find<Runtime::EditorUiHost>();
-            if (Host == nullptr || !Host->IsOperational())
-            {
-                Host = nullptr;
-                return;
-            }
-
-            RegisterBuiltinWindows();
-            Attachment.Attach(worlds, services);
-            if (!Attachment.IsAttached())
-            {
-                Detach();
-                return;
-            }
-            FrameContribution = Host->RegisterFrameContribution(
-                [this]
-                {
-                    DrawFrame();
-                });
-            if (!FrameContribution.IsValid())
-                Detach();
         }
 
-        void Detach()
+        void EditorShell::Attach(Runtime::WorldRegistry& worlds, Runtime::ServiceRegistry& services)
         {
-            ActivePreparedFrame.reset();
-            ActiveContext.reset();
-            LastFrame = {};
-            if (Host != nullptr && FrameContribution.IsValid())
-                (void)Host->UnregisterFrameContribution(FrameContribution);
-            FrameContribution = {};
-            UnregisterAllWindows();
-            Host = nullptr;
-            Attachment.Detach();
+            m_Impl->Attach(worlds, services);
         }
-    };
 
-    EditorShell::EditorShell()
-        : m_Impl(std::make_unique<Impl>())
-    {
-    }
-
-    EditorShell::~EditorShell()
-    {
-        Detach();
-    }
-
-    void EditorShell::Attach(Runtime::WorldRegistry& worlds, Runtime::ServiceRegistry& services)
-    {
-        m_Impl->Attach(worlds, services);
-    }
-
-    void EditorShell::Detach()
-    {
-        m_Impl->Detach();
-    }
-
-    Runtime::EditorWindowHandle EditorShell::RegisterEditorWindow(
-        EditorWindowDescriptor descriptor)
-    {
-        return m_Impl->RegisterEditorWindow(std::move(descriptor));
-    }
-
-    bool EditorShell::UnregisterEditorWindow(
-        const Runtime::EditorWindowHandle handle)
-    {
-        if (m_Impl->Host == nullptr)
-            return false;
-        const bool removed = m_Impl->Host->UnregisterWindow(handle);
-        if (removed)
+        void EditorShell::Detach()
         {
-            std::erase(m_Impl->RegisteredWindows, handle);
+            m_Impl->Detach();
         }
-        return removed;
+
+        Runtime::EditorWindowHandle EditorShell::RegisterEditorWindow(
+            EditorWindowDescriptor descriptor)
+        {
+            return m_Impl->RegisterEditorWindow(std::move(descriptor));
+        }
+
+        bool EditorShell::UnregisterEditorWindow(
+            const Runtime::EditorWindowHandle handle)
+        {
+            if (m_Impl->Host == nullptr)
+                return false;
+            const bool removed = m_Impl->Host->UnregisterWindow(handle);
+            if (removed)
+            {
+                std::erase(m_Impl->RegisteredWindows, handle);
+            }
+            return removed;
+        }
+
+        Runtime::EditorUiVisibilityCommandResult
+        EditorShell::ApplyEditorUiVisibilityCommand(
+            const Runtime::EditorUiVisibilityCommand command) noexcept
+        {
+            if (m_Impl->Host == nullptr)
+                return {};
+            return m_Impl->Host->ApplyVisibilityCommand(command);
+        }
+
+        bool EditorShell::IsEditorVisible() const noexcept
+        {
+            return m_Impl->Host != nullptr && m_Impl->Host->IsVisible();
+        }
+
+        std::vector<Runtime::EditorWindowMenuEntry>
+        EditorShell::BuildEditorWindowMenuModel() const
+        {
+            if (m_Impl->Host == nullptr)
+                return {};
+            return m_Impl->Host->BuildWindowMenuModel();
+        }
+
+        bool EditorShell::SetEditorWindowOpen(
+            const std::string_view id,
+            const bool open)
+        {
+            return m_Impl->Host != nullptr &&
+                   m_Impl->Host->SetWindowOpen(id, open);
+        }
+
+        bool EditorShell::IsAttached() const noexcept
+        {
+            return m_Impl->Host != nullptr &&
+                   m_Impl->FrameContribution.IsValid() &&
+                   m_Impl->Host->IsOperational() &&
+                   m_Impl->Attachment.IsAttached();
+        }
+
+        const SandboxEditorFrame&
+        EditorShell::GetLastFrame() const noexcept
+        {
+            return m_Impl->LastFrame;
+        }
     }
 
-    Runtime::EditorUiVisibilityCommandResult
-    EditorShell::ApplyEditorUiVisibilityCommand(
-        const Runtime::EditorUiVisibilityCommand command) noexcept
-    {
-        if (m_Impl->Host == nullptr)
-            return {};
-        return m_Impl->Host->ApplyVisibilityCommand(command);
-    }
-
-    bool EditorShell::IsEditorVisible() const noexcept
-    {
-        return m_Impl->Host != nullptr && m_Impl->Host->IsVisible();
-    }
-
-    std::vector<Runtime::EditorWindowMenuEntry>
-    EditorShell::BuildEditorWindowMenuModel() const
-    {
-        if (m_Impl->Host == nullptr)
-            return {};
-        return m_Impl->Host->BuildWindowMenuModel();
-    }
-
-    bool EditorShell::SetEditorWindowOpen(
-        const std::string_view id,
-        const bool open)
-    {
-        return m_Impl->Host != nullptr &&
-               m_Impl->Host->SetWindowOpen(id, open);
-    }
-
-    bool EditorShell::IsAttached() const noexcept
-    {
-        return m_Impl->Host != nullptr &&
-               m_Impl->FrameContribution.IsValid() &&
-               m_Impl->Host->IsOperational() &&
-               m_Impl->Attachment.IsAttached();
-    }
-
-    const SandboxEditorFrame&
-    EditorShell::GetLastFrame() const noexcept
-    {
-        return m_Impl->LastFrame;
-    }
 }

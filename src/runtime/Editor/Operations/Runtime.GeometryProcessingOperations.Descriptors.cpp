@@ -1,4 +1,6 @@
 module;
+#include <string_view>
+#include <functional>
 #include <algorithm>
 #include <array>
 #include <bit>
@@ -14,17 +16,30 @@ module;
 #include <utility>
 #include <glm/glm.hpp>
 #include <entt/entity/registry.hpp>
-module Extrinsic.Runtime.GeometryProcessingOperations;
+module Extrinsic.Runtime.PointAnalysisOperations;
 import Extrinsic.ECS.Scene.Registry;
+import Extrinsic.ECS.Scene.Handle;
 import Extrinsic.ECS.Component.DirtyTags;
+import Extrinsic.ECS.Component.Transform;
 import Extrinsic.ECS.Components.GeometrySources;
 import Extrinsic.Runtime.SpatialIndexCache;
 import Extrinsic.Runtime.EngineConfigControl;
 import Extrinsic.Runtime.KernelEvents;
 import Extrinsic.Runtime.SelectionController;
+import Extrinsic.Runtime.WorldHandle;
+import Extrinsic.Runtime.GeometryAvailability;
+import Extrinsic.Runtime.EditorCommandHistory;
+import Extrinsic.Runtime.EditorJobProjection;
+import Extrinsic.Runtime.GeometryPresentation;
+import Extrinsic.Runtime.JobService;
+import Extrinsic.Core.Error;
+import Extrinsic.Core.Config.Engine;
+import Extrinsic.Core.Config.EngineLoad;
 import Geometry.Properties;
 import Geometry.HalfedgeMesh;
-#include "Editor/Operations/Runtime.GeometryProcessingOperations.Internal.hpp"
+#include "Editor/internal/Runtime.EditorProcessingAccess.hpp"
+#include "Editor/internal/Runtime.EditorGeometryHelpers.hpp"
+#include "Editor/Operations/Runtime.GeometryProcessingOperations.PointFields.hpp"
 #include "Editor/Operations/Runtime.GeometryProcessingOperations.RadiusRows.hpp"
 
 namespace Extrinsic::Runtime
@@ -56,12 +71,12 @@ namespace Extrinsic::Runtime
             std::optional<EditorDescriptorAnalysisResult> MainFailure{};
             EditorDescriptorAnalysisResult Result{};
         };
-        bool CurrentInput(const EditorGeometryProcessingContext& context, const DescriptorWork& w)
+        bool CurrentInput(const EditorProcessingContext& context, const DescriptorWork& w)
         {
             return GeometryPropertiesCurrent(context, w.Entity, w.Inputs) && GeometryPropertiesCurrent(context, w.Entity, w.OutputWatches);
         }
         enum class CapturePurpose { Execute, Readiness, Catalog };
-        std::shared_ptr<DescriptorWork> Capture(const EditorGeometryProcessingContext& context,
+        std::shared_ptr<DescriptorWork> Capture(const EditorProcessingContext& context,
             DescriptorAnalysisConfig c, std::string& diagnostic, CapturePurpose purpose = CapturePurpose::Execute)
         {
             auto fail = [&](std::string why) -> std::shared_ptr<DescriptorWork> { diagnostic = std::move(why); return {}; };
@@ -69,7 +84,7 @@ namespace Extrinsic::Runtime
                 SerializeDescriptorAnalysisConfig(c), {}, kDescriptorAnalysisConfigSectionName);
             if (!validation.Usable()) return fail(validation.Diagnostics.front().Message);
             if (!context.Scene) return fail("Scene is unavailable.");
-            const auto entity = GeometryProcessingDetail::ResolveEditorStableEntity(context.Scene->Raw(), c.StableEntityId);
+            const auto entity = EditorFeatureDetail::ResolveStableEntity(context.Scene->Raw(), c.StableEntityId);
             if (!entity) return fail("Descriptor target entity is stale or missing.");
             const auto a = BuildGeometryAvailability(context.Scene->Raw(), *entity);
             if (c.Positions.Domain == D::Unknown) c.Positions.Domain = PrimaryPointDomain(a);
@@ -213,7 +228,7 @@ namespace Extrinsic::Runtime
                 std::chrono::duration<double,std::milli>(std::chrono::steady_clock::now()-started).count();
             r.Message="FPFH histogram columns computed with "+r.ActualBackend+" neighborhoods; scale, SPFH and FPFH run on CPU.";
         }
-        bool AdvanceGpu(const EditorGeometryProcessingContext& context,DescriptorWork& w)
+        bool AdvanceGpu(const EditorProcessingContext& context,DescriptorWork& w)
         {
             if(w.Abandoned || !CurrentInput(context,w))
             {
@@ -231,7 +246,7 @@ namespace Extrinsic::Runtime
             {w.Result.Status=EditorCommandStatus::GeometryProcessingFailed;w.Result.Message=std::move(diagnostic);w.MainFailure=w.Result;}
             return state!=GeometryProcessingDetail::RadiusRowsState::Pending;
         }
-        EditorDescriptorAnalysisResult Publish(const EditorGeometryProcessingContext& context,
+        EditorDescriptorAnalysisResult Publish(const EditorProcessingContext& context,
                                             const std::shared_ptr<DescriptorWork>& w)
         {
             auto& r=w->Result;
@@ -263,29 +278,24 @@ namespace Extrinsic::Runtime
             };
             const auto status=context.CommandHistory ? context.CommandHistory->Execute({.Label="Compute FPFH descriptors",
                 .Redo=[mutate,after]{return mutate(*after);},.Undo=[mutate,before]{return mutate(*before);}}).Status : mutate(*after);
-            r.Status=GeometryProcessingDetail::ToEditorMethodCommandStatus(status);
+            r.Status=EditorFeatureDetail::ToEditorCommandStatus(status);
             if (!r.Succeeded()) r.Message="Descriptor publication rejected by history checks.";
             return r;
         }
     }
     EditorDescriptorAnalysisReadiness PreviewEditorDescriptorAnalysisCommand(
-        const EditorGeometryProcessingContext& context,const DescriptorAnalysisConfig& config)
+        const EditorProcessingCommands& commands,const DescriptorAnalysisConfig& config)
     {
+        const auto& context = EditorProcessingCommandsAccess::Resolve(commands);
         EditorDescriptorAnalysisReadiness r;
         auto w=Capture(context,config,r.Diagnostic,CapturePurpose::Readiness);
         r.Ready=bool(w);if(w)r.Resolved=w->Config;return r;
     }
-    GeometryPropertyCatalogSnapshot GetEditorDescriptorAnalysisInputCatalog(
-        const EditorGeometryProcessingContext& context,std::uint32_t id)
-    {
-        // Both slots accept the same finite vec3 property catalog; the combined
-        // preflight additionally checks normal length, domains and all outputs.
-        return GetEditorKeypointAnalysisInputCatalog(context,id);
-    }
-
     EditorDescriptorAnalysisResult ApplyEditorDescriptorAnalysisCommand(
-        const EditorGeometryProcessingContext& context,const DescriptorAnalysisConfig& config)
+        const EditorProcessingCommands& commands,const DescriptorAnalysisConfig& config,
+        std::function<void(EditorDescriptorAnalysisResult)> onComplete)
     {
+        const auto& context = EditorProcessingCommandsAccess::Resolve(commands);
         std::string diagnostic;
         auto w=Capture(context,config,diagnostic);
         const auto report=[&](EditorCommandStatus status,std::string message)
@@ -309,7 +319,7 @@ namespace Extrinsic::Runtime
         if(context.JobCommands.FindActive)
             if(auto active=context.JobCommands.FindActive(identity);active && IsActiveEditorJobState(active->State))
                 return report(EditorCommandStatus::Pending,"A descriptor job for this output is already active.");
-        auto sink=context.MethodResultSinks.DescriptorAnalysis;auto delivered=std::make_shared<bool>(false);
+        auto sink=GuardEditorProcessingResult(context, std::move(onComplete));auto delivered=std::make_shared<bool>(false);
         auto pending=report(EditorCommandStatus::Pending,"Descriptor analysis queued.");
         // Once submitted, Result belongs to the running stage. Submission failures
         // report from this immutable snapshot while earlier stages wind down.
@@ -354,10 +364,12 @@ namespace Extrinsic::Runtime
         if(!token.IsValid()){w->Abandoned=true;return rejected("Descriptor job submission rejected.");}
         return pending;
     }
-    EditorDescriptorAnalysisResult ApplyEditorConfiguredDescriptorAnalysis(const EditorGeometryProcessingContext& context)
+    EditorDescriptorAnalysisResult ApplyEditorConfiguredDescriptorAnalysis(
+        const EditorProcessingCommands& commands,
+        std::function<void(EditorDescriptorAnalysisResult)> onComplete)
     {
-        const auto config=GetEditorDescriptorAnalysisConfig(context);
+        const auto config=GetEditorDescriptorAnalysisConfig(commands);
         if(!config)return {.Status=EditorCommandStatus::InvalidProcessingParameters,.Message="Descriptor config is unavailable."};
-        return ApplyEditorDescriptorAnalysisCommand(context,*config);
+        return ApplyEditorDescriptorAnalysisCommand(commands,*config,std::move(onComplete));
     }
 } // namespace Extrinsic::Runtime

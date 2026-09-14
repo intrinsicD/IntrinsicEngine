@@ -232,7 +232,8 @@ class IRenderFeature {
 All per-frame transient data (pass nodes, adjacency lists, closures) allocated in a `ScopeStack` — zero per-frame heap allocation.
 
 **Canonical examples:**
-- `Core.FrameGraph.cppm` — Compile-time type IDs via `Core::TypeToken<T>()`.
+- `Core.FrameGraph.cppm` — Typed declarations over the task graph's compile-time
+  type IDs; `Core.Hash.cppm` owns `Core::TypeToken<T>()` and the shared 64-bit hash.
 - `ECS.Systems.Transform.cppm` — Declares `Write<Transform::Component>`, signals `"TransformUpdate"`.
 - `Graphics.Systems.PropertySetDirtySync.cppm` — `WaitFor("TransformUpdate")`, signals `"PropertySetDirtySync"`.
 - `Graphics.Systems.MeshViewLifecycle.cppm` — `WaitFor("PropertySetDirtySync")`.

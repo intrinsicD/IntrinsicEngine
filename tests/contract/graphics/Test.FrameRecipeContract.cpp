@@ -2873,3 +2873,21 @@ TEST(FrameRecipeContract, SceneDepthGainsTransferSrcUsageWhenPickingActive)
     EXPECT_TRUE(HasTextureUsage(sceneDepthUsage(true), RHI::TextureUsage::TransferSrc));
     EXPECT_FALSE(HasTextureUsage(sceneDepthUsage(false), RHI::TextureUsage::TransferSrc));
 }
+
+// This producer imports FrameRecipe directly, without Renderer or RenderRecipeConfig.
+TEST(FrameRecipeContract, OverrideProjectionAvailableThroughRecipeOwner)
+{
+    using namespace Extrinsic::Graphics;
+    FrameRecipeFeatures defaults{};
+    defaults.EnablePostProcess = true;
+    const FrameRecipeOverride override{};
+    const FrameRecipeOverrideProjection projection =
+        ProjectFrameRecipeOverride(defaults, override);
+
+    ASSERT_EQ(projection.Diagnostics.size(), 1u);
+    EXPECT_EQ(projection.Diagnostics.front().Code,
+              FrameRecipeOverrideDiagnosticCode::EmptyRecipeId);
+    EXPECT_FALSE(projection.Applied);
+    EXPECT_EQ(projection.DisabledSlotCount, 0u);
+    EXPECT_TRUE(projection.Features.EnablePostProcess);
+}

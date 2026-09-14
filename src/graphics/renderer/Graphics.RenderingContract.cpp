@@ -606,6 +606,27 @@ namespace Extrinsic::Graphics
         });
     }
 
+    [[nodiscard]] const RecipeExtensionSlotDescriptor* FindRecipeSlot(
+        const RenderRecipeDescriptor& recipe,
+        const std::string_view stableName) noexcept
+    {
+        const auto it = std::find_if(recipe.Slots.begin(),
+                                     recipe.Slots.end(),
+                                     [stableName](const RecipeExtensionSlotDescriptor& slot) {
+                                         return slot.StableName == stableName;
+                                     });
+        return it == recipe.Slots.end() ? nullptr : &*it;
+    }
+
+    [[nodiscard]] RecipeExtensionSlotDescriptor* FindRecipeSlot(
+        RenderRecipeDescriptor& recipe,
+        const std::string_view stableName) noexcept
+    {
+        // One traversal for both overloads; the caller already owns a mutable recipe.
+        return const_cast<RecipeExtensionSlotDescriptor*>(
+            FindRecipeSlot(std::as_const(recipe), stableName));
+    }
+
     [[nodiscard]] RenderArtifactLifecycleClass ClassifyRenderArtifactLifecycle(
         const RenderArtifactMetadata& artifact) noexcept
     {

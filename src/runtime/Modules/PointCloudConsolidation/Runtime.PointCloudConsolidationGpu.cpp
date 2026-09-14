@@ -1,4 +1,6 @@
 module;
+#include <functional>
+#include <chrono>
 
 #include <algorithm>
 #include <bit>

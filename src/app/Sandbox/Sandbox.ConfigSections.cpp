@@ -7,6 +7,7 @@ module Extrinsic.Sandbox.ConfigSections;
 
 import Extrinsic.Runtime.ClusteringConfig;
 import Extrinsic.Runtime.GeodesicsConfig;
+import Extrinsic.Runtime.MeshCurvatureConfig;
 import Extrinsic.Runtime.RegistrationConfig;
 import Extrinsic.Runtime.NormalEstimationConfig;
 import Extrinsic.Runtime.OutlierAnalysisConfig;
@@ -32,6 +33,7 @@ namespace Extrinsic::Sandbox
         Runtime::RuntimeEngineConfigSectionRegistry registry{};
         if (!registry.Register(Runtime::MakeSelectionConfigSectionRegistration()) ||
             !registry.Register(Runtime::MakeGeodesicsConfigSectionRegistration()) ||
+            !registry.Register(Runtime::MakeMeshCurvatureConfigSectionRegistration()) ||
             !registry.Register(Runtime::MakeRegistrationConfigSectionRegistration()) ||
             !registry.Register(Runtime::MakeNormalEstimationConfigSectionRegistration()) ||
             !registry.Register(Runtime::MakeOutlierAnalysisConfigSectionRegistration()) ||

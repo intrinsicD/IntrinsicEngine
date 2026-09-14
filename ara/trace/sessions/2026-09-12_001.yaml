@@ -1,0 +1,49 @@
+session:
+  id: 2026-09-12_001
+  date: '2026-09-12'
+  started: '2026-09-12T23:29:15+02:00'
+  last_turn: '2026-09-12T23:29:15+02:00'
+  turn_count: 1
+  summary: Implemented and locally verified the density/spacing compilation-locality pilot; fixed-diff Claude transmission
+    remains pending approval. Local timing is an unqualified hypothesis.
+events_logged:
+- turn: 1
+  type: experiment
+  id: N541
+  routing: direct
+  provenance: ai-executed
+  summary: Controlled content-edit probes and CPU/ASan/UBSan/Vulkan verification.
+- turn: 1
+  type: decision
+  id: N542
+  routing: direct
+  provenance: ai-executed
+  summary: Shared command owner, family result boundary and compiler-metadata checks.
+- turn: 1
+  type: observation
+  id: O224
+  routing: staged then crystallized as hypothesis
+  provenance: ai-executed
+  summary: Repeatable latency remains unqualified.
+ai_actions:
+- turn: 1
+  action: Implemented RUNTIME-233, corrected compiler/test-fixture wiring, added lifetime and compiler-boundary
+    coverage, recorded BUG-188 and follow-up tasks RUNTIME-234/235.
+claims_touched:
+- id: C92
+  action: crystallized as hypothesis
+  turn: 1
+key_context:
+- turn: 1
+  excerpt: The operator requests Claude collaboration and direct API replacement with no compatibility transition.
+    Approval to send the design packet was received; no approval for the prepared implementation packet or endorsement
+    of measured results is inferred.
+open_threads:
+- RUNTIME-233 fixed implementation review with Claude awaits packet transmission approval.
+- RUNTIME-234/235 own subsequent processing-family migrations; Framework24 product completion remains separate.
+- Repeatable compilation latency and clean-build improvements are unqualified.
+- BUG-177 root metadata and BUG-188 sandbox sanitizer discovery remain distinct tooling follow-ups.
+- Earlier spatial, atlas, segmentation and product research remains governed by its existing tasks and observations;
+  this turn changes none of those dispositions.
+ai_suggestions_pending:
+- No unrelated staged observation gained a closure signal; no broad engine-size or performance conclusion was promoted.

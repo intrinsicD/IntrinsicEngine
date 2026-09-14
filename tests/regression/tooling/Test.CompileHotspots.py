@@ -77,6 +77,79 @@ class CompileHotspotFixture:
         return compile_hotspots.analyze_build(self.root, self.build)
 
 
+class ModuleBoundaryTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temporary.cleanup)
+        self.fixture = CompileHotspotFixture(Path(self.temporary.name))
+        self.source = self.fixture.source("src/runtime/Spacing.cpp", "module Family;\n")
+        self.output = "src/runtime/CMakeFiles/Runtime.dir/Spacing.cpp.o"
+        self.fixture.command(self.source, self.output)
+        self.fixture.write()
+        self.object = self.fixture.build / self.output
+        self.object.parent.mkdir(parents=True)
+        self.object.write_text("")
+        self.scan = Path(str(self.object) + ".ddi")
+        self.graph = self.object.parent / "CXXModules.json"
+        self.scan.write_text(json.dumps({"rules": [{
+            "primary-output": self.output, "requires": [{"logical-name": "Family"}]
+        }]}))
+        self.graph.write_text(json.dumps({
+            "modules": {"Family": {}}, "references": {"Core": {}, "OtherFamily": {}},
+            "usages": {"Family": ["Core"]}
+        }))
+
+    def check(self) -> list[str]:
+        return compile_hotspots.check_module_boundary(
+            self.fixture.root, self.fixture.build, ["src/runtime/Spacing.cpp"], ["OtherFamily"]
+        )
+
+    def test_implicit_primary_and_transitive_import_are_checked(self) -> None:
+        self.assertEqual(self.check(), [])
+        graph = json.loads(self.graph.read_text())
+        graph["usages"]["Core"] = ["OtherFamily"]
+        self.graph.write_text(json.dumps(graph))
+        self.assertEqual(self.check(), ["src/runtime/Spacing.cpp -> Family -> Core -> OtherFamily"])
+
+    def test_missing_or_stale_scan_and_missing_producer_fail_closed(self) -> None:
+        import os
+        producer = self.fixture.build / self.output
+        producer.unlink()
+        with self.assertRaisesRegex(compile_hotspots.AnalysisError, "producer missing"):
+            self.check()
+        producer.touch()
+        os.utime(self.source, ns=(self.scan.stat().st_mtime_ns + 1000000000,) * 2)
+        with self.assertRaisesRegex(compile_hotspots.AnalysisError, "source newer"):
+            self.check()
+        self.scan.unlink()
+        with self.assertRaisesRegex(compile_hotspots.AnalysisError, "metadata"):
+            self.check()
+
+    def test_missing_unresolved_and_ambiguous_dependencies_fail_closed(self) -> None:
+        graph = json.loads(self.graph.read_text())
+        graph["usages"]["Core"] = ["Missing"]
+        self.graph.write_text(json.dumps(graph))
+        with self.assertRaisesRegex(compile_hotspots.AnalysisError, "unresolved scanned module"):
+            self.check()
+        self.fixture.command(self.source, self.output + ".duplicate")
+        self.fixture.write()
+        with self.assertRaisesRegex(compile_hotspots.AnalysisError, "ambiguous compile producer"):
+            self.check()
+
+    def test_cycles_terminate_without_hiding_forbidden_modules(self) -> None:
+        graph = json.loads(self.graph.read_text())
+        graph["usages"]["Core"] = ["Family", "OtherFamily"]
+        self.graph.write_text(json.dumps(graph))
+        self.assertEqual(len(self.check()), 1)
+
+    def test_malformed_and_mismatched_scanner_output_fail_closed(self) -> None:
+        for scan in ({"rules": []}, {"rules": [{"primary-output": "wrong.o"}]}):
+            with self.subTest(scan=scan):
+                self.scan.write_text(json.dumps(scan))
+                with self.assertRaises(compile_hotspots.AnalysisError):
+                    self.check()
+
+
 class CompileHotspotTests(unittest.TestCase):
     def test_multi_output_module_command_is_one_physical_edge(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:

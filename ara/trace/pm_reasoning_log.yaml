@@ -2026,3 +2026,184 @@ entries:
     - The reaped-token wait was a fixture error, while short-batch storage reuse was an implementation defect. BUG-186 owns pre-existing appearance-test drift; existing BUG-177/178/180 limitations remain separate.
     - The active request resumed after a transient approval-review usage-limit rejection. No quota workaround or new overnight authorization was inferred.
     - Existing staged atlas/DAG/migration suggestions receive no new closure signal. Prior WLOP/CLOP/EAR work was observed in 9f4764b7d, not reimplemented or attributed to this turn.
+
+  - turn: 2026-09-12_001#1
+    notes:
+      - N541 records executed diagnostics, not clean-source performance evidence. O224/C92 is a hypothesis tied to N542 artifact commitment; no user affirmation of results is invented.
+      - Preserve the intermediate shared-fixture cost, unchanged body-edit costs, production size increase and distinction between compiler counts, link endpoints and test times.
+      - CPU, ASan, UBSan and actual Vulkan are separate evidence classes. BUG-188 is sandbox discovery failure, resolved for this run by an unchanged host retry; no instrumentation or ptrace policy was weakened.
+      - Claude reviewed the design only. The implementation packet remains pending authorization; the task is not retired, committed or pushed. Existing research observations remain staged without inferred abandonment.
+
+  - turn: 2026-09-13_001#1
+    notes:
+      - N543 records a completed external review, locally reviewed repair, and executed diagnostics. Preserve both earlier candidate measurements and full pre-review sanitizer results; final sanitizer coverage is the affected 55-case selector.
+      - C92 receives an additional dirty single sample without status promotion. The user approved transmission only; no numerical endorsement, new research closure, commit or broader engine completion is inferred.
+      - Reuse existing incomplete borrowed bindings instead of adding another family header/accessor. The final size increase is 210 lines and six files; no net slimming claim is made.
+
+  - turn: 2026-09-13_001#2
+    notes:
+      - N544 records executed diagnostics and verification. C92 receives the second-family sample without status promotion; no user affirmation of results or clean-source performance qualification exists.
+      - Preserve the +30-line production footprint and distinguish individual CPU entries from grouped sanitizer entries and actual Vulkan coverage. The final focused run follows exact probe restoration.
+      - Claude reviewed a fixed packet; subsequent findings were fixed and locally verified. Full build reconciliation corrected stale assertion binaries and an explicit selection-service fixture defect without a speculative stale-BMI workaround.
+      - Existing unrelated observations retain their staging disposition. RUNTIME-235 owns remaining migration and legacy deletion; BUG-177 remains a strict root-hygiene failure. No commit, push or whole-engine completion is inferred.
+
+  - turn: 2026-09-13_001#3
+    notes:
+      - N545 records the completed normal-family experiment and verification. C92 receives a bounded dirty single sample without promotion; Continue is authorization to work, not affirmation of performance or whole-engine completion.
+      - Record the full -2408-line native production footprint including five new owner files. Removal of old API-specific tests is balanced by configured-path behavior/lifetime tests, not hidden from case accounting.
+      - Preserve original point_analysis manifest metadata beside the explicit normals/Sandbox correction. The reseal changes metadata and attempt identity, not measured runs or metrics; all results remain claim-ineligible.
+      - Claude reviewed the preserved fixed packet; final reconciliation changes were locally reviewed and fully verified. Keep the initial source-check failure and corrected full CPU result distinct. ASan, UBSan and actual Vulkan are separate evidence classes.
+      - Existing research observations retain their staging disposition and follow-up owners; no new closure or abandonment is inferred. RUNTIME-235 stays active for remaining families, with BUG-177/188 limitations and no commit/push.
+
+  - turn: 2026-09-13_001#4
+    notes:
+      - N546 records executed diagnostics, full footprint and distinct verification classes. C92 stays a hypothesis; the user's continuation is not empirical endorsement, a new commit request or whole-engine completion.
+      - Batched remaining families to respect usage preference; only curvature has a timed edit. Preserve the modest -138 lines and net +15 files rather than describing extraction as large-scale code removal.
+      - Preserve initial imports/link/fixture failures and later repairs. Claude reviewed multiple fixed snapshots; root added freed-scene guard and UV publication tests, then completed full sanitizer reconciliation.
+      - BUG-189's inherited 30 s omission is reproduced and corrected above the unchanged 95 s fixture watchdog. Monitor-off timings match prior BUG-179/143 evidence but this turn did not run a controlled display-state experiment. Do not claim a general GPU performance fix.
+      - Direct timing diagnostic omitted the registered environment and reported retention after passing assertions. Keep this exit 1 under BUG-180, separate from the passing registered cohort; no new leak suppression or external-allocation ownership assertion.
+      - Existing staged observations retain their follow-up owners and disposition; ongoing architecture and method topics are not inferred abandoned. No unrelated promotion is justified.
+
+  - turn: 2026-09-13_001#5
+    notes:
+      - N547 records ordinary refactor verification and exact dirty-baseline footprint, not a new performance or method claim. C92 remains untouched and a hypothesis; continuation is not researcher endorsement of results.
+      - Preserve root findings missed by the first Claude review, failed initial gates, and corrected tests. CPU, ASan, UBSan and actual Vulkan remain distinct evidence classes; final test-only edits have focused reconciliation.
+      - BUG-190 reconciles unchanged curvature timing on an idle host without a deadline change. BUG-191 phase probes distinguish completed cancellation from total-budget exhaustion; original registered LOP/EAR pass after reviewed test-only deadline corrections. No service speedup or controlled display experiment is asserted.
+      - Retain permanent phase-duration failure context at Claude's suggestion but remove temporary debug tags. Root narrows the review's overstatement about excluding an unmeasured final pending phase; actual final runs establish completion of these fixtures.
+      - Update K20's deleted-header evidence reference to existing mesh snapshot owners without changing its constraint or provenance. Existing staged research topics retain their follow-up owners and receive no new closure signal. No ARA claim row is owed for this ordinary refactor.
+      - Preserve BUG-177 root hygiene, BUG-188 host sanitizer workaround and BUG-180 distinct leak-enabled evidence. No commit, push or broader engine/Framework24 completion is inferred.
+
+  - turn: 2026-09-13_001#6
+    notes:
+    - N548 records ordinary refactor and exact metadata-policy verification; dependency counts are structural evidence,
+      not timing measurements. C92 stays a hypothesis and no claim row is created.
+    - Keep fixed review inputs, the follow-up export/fixture fixes, the original negative boundary/root-policy checks
+      and the repaired source synopsis audit. Actual final CPU, ASan, UBSan and Vulkan results remain distinct.
+    - BUG-177 is closed by exact optional directory classification, not metadata deletion or a global-ignore bypass.
+      BUG-188 host discovery and BUG-180 leak-enabled evidence remain separate.
+    - Reviewed all unpromoted observations. Continuing architecture/method topics retain their recorded follow-up
+      owners; this turn supplies no researcher affirmation or new closure signal for them. Do not infer abandonment
+      or promote old research from this implementation batch.
+    - No whole-engine completion, measured speedup, public compatibility bridge or commit/push is inferred. Renderer
+      exposure and inspection plus spatial-record dependencies remain follow-up candidates.
+
+  - turn: 2026-09-13_001#7
+    notes:
+    - N549 covers both RUNTIME-238 and RUNTIME-239 in this single user turn. Record executed refactor verification
+      directly; structural source/dependency counts are not a performance claim. C92 remains untouched and a hypothesis.
+    - Retain independent Claude plan/fixed reviews and reviewed corrections. Initial task-heading and source-synopsis
+      failures remain alongside passing repairs. Final native CPU, separate sanitizer and actual Vulkan runs use
+      identical verified source hashes; initial pre-correction identities are retained.
+    - Vulkan tests actually exercised stale requests, reacquire/rebuild, deterministic ties and deletion through
+      canonical queues. Existing registration, fixture deadlines and leak settings were not weakened. BUG-188
+      host discovery and BUG-180 separate leak evidence remain open.
+    - Reviewed unpromoted observations; continuing architecture/method topics retain their follow-up owners. No
+      new affirmation, independent empirical resolution or abandonment signal licenses promotion of unrelated
+      research. Previously stale entries remain stale.
+    - The two named follow-up candidates are complete; keep integration, clean-source repeated timing and REVIEW-004
+      convergence open. No whole-engine completion or commit/push is inferred.
+
+  - turn: 2026-09-13_001#8
+    notes:
+    - Record N550 as executed refactor/verification evidence. Actual dependency and source counts are structural
+      facts; no qualified timing result was produced and C92 remains untouched, a hypothesis.
+    - Keep fixed Claude review and correction disposition. Correct the RTTI/vtable explanation, preserve qualified
+      signature names and retain the useful cross-TU helper. Full final native, ASan, UBSan and affected Vulkan
+      runs are bound to matching final source hashes.
+    - The execution session ended after successful sanitizer builds during Vulkan startup; preserve that partial
+      log and resume separate gates. No compiler failure was observed, no test deadline/leak setting weakened,
+      and BUG-188/BUG-180 remain independently open.
+    - 'Claude next-plan import pruning is not a demonstrated compilation win: 15 direct imports could become
+      eight but retained-owner metadata still reaches 135 modules. Record this as a bounded planning disposition,
+      not a new research claim or an implemented editor refactor.'
+    - Reviewed unpromoted observations; existing method/architecture topics retain open follow-up owners. This
+      continuation brings no user affirmation or empirical resolution of unrelated research. Preserve staging
+      and prior stale flags; do not infer topic abandonment from ongoing engine refactoring.
+    - Keep integration, matched clean-source timings, the editor model/operation boundary investigation and REVIEW-004
+      product convergence open. No whole-engine completion or commit/push is inferred.
+
+  - turn: 2026-09-13_001#9
+    notes:
+    - Record N551 as completed refactor/verification activity, with structural compiler counts and exact dirty-source
+      evidence. C92 remains an untouched timing hypothesis; no new interpretive claim or observation is warranted.
+    - A smaller upstream owner fix narrows workspace snapshots without the rejected wider snapshot-request/borrow
+      plan. Preserve the prior planning history and update only the current open-thread state.
+    - Claude identified noexcept and duplicate-registration semantics before implementation; both preserved.
+      Final independent review has no blocking finding. CPU guards do not prove GPU lifecycle; three non-skipped
+      actual Vulkan cases supply affected-path evidence.
+    - Native full CPU and focused separate sanitizer selection are appropriate to private composition-only changes;
+      full sanitizer PR/merge requirements remain unchanged. BUG-188 host workaround and BUG-180 distinct leak-enabled
+      follow-up remain open.
+    - Unpromoted observations retain their existing research/architecture follow-up owners; no new user affirmation,
+      empirical resolution or abandonment signal arose. Preserve staging and prior stale flags.
+    - Accumulated integration, matched eligible-source timings, justified further editor locality and REVIEW-004
+      convergence remain open. The task stays active and uncommitted.
+
+  - turn: 2026-09-13_001#10
+    notes:
+    - Record N552 as executed refactor/verification activity. Structural dependency counts do not establish a
+      repeatable compile-speed claim; C92 remains unchanged.
+    - Preserve both compiler failures and the initial review miss. Final cache borrow/definition and compiled
+      methods were independently reviewed, source-compared and verified by all final builds/tests.
+    - Private attachment shrinks from 100 dependencies to 18, but each of sixteen operation closures loses only
+      one module. Report that distinction; do not imply the operation families are now narrow.
+    - Full native CPU, focused separate sanitizers and one representative actual Vulkan test bind to identical
+      source hashes. Full sanitizer merge gates, BUG-188 host discovery and BUG-180 leak-enabled follow-up remain
+      separate.
+    - Reviewed all unpromoted observations; their research/architecture follow-up owners remain open. This turn
+      supplies no unrelated affirmation, empirical resolution or abandonment signal. Preserve staging and prior
+      stale flags.
+    - Keep accumulated integration, matched eligible-source timings, justified further shared-binding locality
+      and REVIEW-004 convergence open. No commit or whole-engine completion is inferred.
+
+  - turn: 2026-09-14_001#1
+    notes:
+    - Record N553 as executed implementation and correctness verification, with structural compiler/footprint
+      counts. C92 remains an untouched timing hypothesis; no new interpretive claim or staging entry.
+    - New calendar-day session carries open work without rewriting the prior ten-turn session. Session start
+      uses the captured baseline timestamp.
+    - Retain interrupted Claude implementation and initial two CPU failures. The corrected tests pin ownership
+      and actual compiler boundaries; no line threshold, skip, timeout or runtime gate was loosened to obtain
+      green.
+    - Three fixed reviews cover production, accepted reuse/guard suggestions and the diagnosed test correction.
+      All final builds and full native/focused sanitizer/representative Vulkan results bind to matching final
+      code hashes.
+    - Unpromoted method/architecture observations retain their open follow-up owners. No unrelated affirmation,
+      empirical resolution, contradiction or abandonment signal arose; preserve staging and existing stale flags.
+    - Accumulated integration, full sanitizer merge gates, matched eligible-source timings, further justified
+      cleanup and REVIEW-004 convergence remain open. BUG-188 and BUG-180 follow-ups remain separate; no commit
+      or engine-completion verdict.
+
+  - turn: 2026-09-14_001#2
+    notes:
+    - Direct-route N554 as implementation/test evidence; no new interpretive claim or observation. C92 timing
+      hypothesis remains untouched.
+    - Append turn2 within existing daily session; preserve turn1 history. Source decl/import changes and field/body
+      equality are structural evidence, not measured compile speed.
+    - Record initialVulkan timeout and both exact-environment failures. Frame47/phase14 wall-budget exhaustion
+      supports a test-deadline correction; final30.4second pass and displayOff observation do not establish constant
+      pacing or a new controlled causal result.
+    - Full CPU gates cover unchanged production inputs; later GPU fixture/per-test timeout edits are explicitly
+      distinguished by source hashes, unchanged CPU registries, reconciled builds and102focusedtestspervariant.
+      Preserve expected skips and all old pixel assertions.
+    - Unpromoted research observations retain existing open owners/stale flags; no unrelated affirmation, resolution,
+      contradiction or abandonment signal arises from this cleanup.
+    - Full sanitizer CPU verification closes for accumulated production source. Integration, matched eligible-source
+      timings, two broad action units, REVIEW004, BUG188 and BUG180 remain separate. No commit/push.
+
+  - turn: 2026-09-14_001#3
+    notes:
+    - Direct-route N555 as bounded refactor/compiler/test evidence. No interpretive observation or claim added;
+      C92 remains an unqualified timing hypothesis.
+    - Preserve both earlier daily turns. Count both new private headers in the net footprint and distinguish
+      declaration movement from removal of dependencies; unchanged implementations are not a new capability claim.
+    - Record root-caught missing import and unnecessary graphics bake import. The interim stale-scan failures
+      came from root editing during testing; preserve them and bind final success to frozen source and rebuilt
+      scans.
+    - Full native CPU passed 4599 plus one expected skip; focused ASan and UBSan passed 97 each. Do not conflate
+      this subset with RUNTIME244 full sanitizer or Vulkan results.
+    - Staged observations retain existing open owners and stale flags. This turn offers no unrelated affirmation,
+      empirical resolution, contradiction or abandonment signal; no promotion.
+    - Keep integration, matched eligible-source timings, REVIEW004 and existing BUG188/BUG180 follow-ups open.
+      Different scene/visualization history state contracts are deliberately preserved; no automatic shared transaction
+      abstraction.

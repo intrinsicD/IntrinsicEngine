@@ -8,9 +8,10 @@
 #include <entt/entity/registry.hpp>
 #include <variant>
 #include <gtest/gtest.h>
+#include "EditorFeatureTestContext.hpp"
 #include "SandboxEditorJobHarness.hpp"
 
-import Extrinsic.Runtime.GeometryProcessingOperations;
+import Extrinsic.Runtime.PointAnalysisOperations;
 import Extrinsic.Runtime.SpatialIndexCache;
 import Extrinsic.Runtime.WorldRegistry;
 import Extrinsic.Runtime.SelectionController;
@@ -104,7 +105,7 @@ TEST(KeypointAnalysisConfig, RoundTripAndSharedPreviewApplyRun)
     ASSERT_TRUE(registry.Register(R::MakeKeypointAnalysisConfigSectionRegistration()));
     R::RuntimeEngineConfigControlState state;
     C::PopulateEngineConfigSectionDefaults(state.ActiveConfig, registry);
-    R::EditorGeometryProcessingContext context{.Scene = &scene};
+    R::EditorProcessingContext context{.Scene = &scene};
     context.EngineConfigControlState = &state;
     context.EngineConfigCommandsAvailable = true;
     unsigned previews = 0, applies = 0;
@@ -117,7 +118,7 @@ TEST(KeypointAnalysisConfig, RoundTripAndSharedPreviewApplyRun)
         state.ActiveConfig = preview.Preview.Config;
         return R::RuntimeEngineConfigApplyResult{.Status = R::RuntimeEngineConfigApplyStatus::Applied};
     };
-    auto commands = R::BindEditorGeometryProcessingCommands(context);
+    auto commands = R::BindEditorProcessingCommands(context);
     ASSERT_TRUE(R::PreviewEditorKeypointAnalysisCommand(commands, config).Ready);
     EXPECT_FALSE(Properties(scene, entity, D::MeshFace).Exists("saliency"));
     ASSERT_TRUE(R::ApplyEditorKeypointAnalysisConfig(commands, config).Succeeded());
@@ -151,11 +152,11 @@ TEST(KeypointAnalysisOperations, EveryDomainReferenceCacheHistoryAndDeletedRows)
         props.GetOrAdd<float>("saliency").Vector().assign(size,77);
         const auto revision=std::as_const(props).Get<glm::vec3>("samples").Revision();
         R::EditorCommandHistory history;
-        R::EditorGeometryProcessingContext context{.Scene=&scene,.World=world,.CommandHistory=&history,.SpatialIndices=&cache};
-        const auto catalog=R::GetEditorKeypointAnalysisInputCatalog(context,c.StableEntityId);
+        R::EditorProcessingContext context{.Scene=&scene,.World=world,.CommandHistory=&history,.SpatialIndices=&cache};
+        const auto catalog=R::GetEditorPointInputCatalog(R::BindEditorProcessingCommands(context),c.StableEntityId);
         EXPECT_TRUE(std::ranges::any_of(catalog.Entries,[&](auto& e){return e.Ref==c.Positions;}));
-        ASSERT_TRUE(R::PreviewEditorKeypointAnalysisCommand(context,c).Ready);
-        const auto reference=R::ApplyEditorKeypointAnalysisCommand(context,c);
+        ASSERT_TRUE(R::PreviewEditorKeypointAnalysisCommand(R::BindEditorProcessingCommands(context),c).Ready);
+        const auto reference=R::ApplyEditorKeypointAnalysisCommand(R::BindEditorProcessingCommands(context),c);
         ASSERT_TRUE(reference.Succeeded())<<reference.Message;EXPECT_EQ(reference.ActualBackend,"cpu_kdtree");
         const auto mask=std::as_const(props).Get<std::uint32_t>("keypoints").Vector();
         const auto score=std::as_const(props).Get<float>("saliency").Vector();
@@ -165,11 +166,11 @@ TEST(KeypointAnalysisOperations, EveryDomainReferenceCacheHistoryAndDeletedRows)
         ASSERT_TRUE(history.Undo().Succeeded());EXPECT_EQ(std::as_const(props).Get<float>("saliency").Vector(),std::vector<float>(size,77));
         ASSERT_TRUE(history.Redo().Succeeded());EXPECT_EQ(std::as_const(props).Get<float>("keep")[0],99);
         c.Backend=R::KeypointAnalysisBackend::CpuLBVH;
-        const auto indexed=R::ApplyEditorKeypointAnalysisCommand(context,c);ASSERT_TRUE(indexed.Succeeded())<<indexed.Message;
+        const auto indexed=R::ApplyEditorKeypointAnalysisCommand(R::BindEditorProcessingCommands(context),c);ASSERT_TRUE(indexed.Succeeded())<<indexed.Message;
         EXPECT_EQ(indexed.ActualBackend,"cpu_lbvh");EXPECT_EQ(indexed.KeypointCount,reference.KeypointCount);
         EXPECT_EQ(std::as_const(props).Get<std::uint32_t>("keypoints").Vector(),mask);
         for(std::size_t i=0;i<size;++i)EXPECT_NEAR(std::as_const(props).Get<float>("saliency")[i],score[i],1e-5);
-        EXPECT_TRUE(R::ApplyEditorKeypointAnalysisCommand(context,c).IndexReused);
+        EXPECT_TRUE(R::ApplyEditorKeypointAnalysisCommand(R::BindEditorProcessingCommands(context),c).IndexReused);
         Intrinsic::Tests::EditorFeatureTestContext visualization;visualization.Scene=&scene;visualization.VisualizationCommandsAvailable=true;
         std::optional<R::VisualizationRecipe> stored;
         visualization.VisualizationRecipes.GetRecipe=[&](std::uint32_t){return stored;};
@@ -200,9 +201,9 @@ TEST(KeypointAnalysisOperations, JobsRejectChangedInputsOutputsAndCancellation)
         SCOPED_TRACE(change);Extrinsic::ECS::Scene::Registry scene;auto entity=Make(scene,D::MeshVertex);auto c=Config(entity,D::MeshVertex);
         auto& props=Properties(scene,entity,D::MeshVertex);
         Intrinsic::Tests::EditorFeatureTestContext context;context.Scene=&scene;R::EditorCommandHistory history;context.CommandHistory=&history;
-        std::optional<R::EditorKeypointAnalysisResult> delivered;context.MethodResultSinks.KeypointAnalysis=[&](auto r){delivered=std::move(r);};
+        std::optional<R::EditorKeypointAnalysisResult> delivered;std::function<void(R::EditorKeypointAnalysisResult)> sink=[&](auto r){delivered=std::move(r);};
         Extrinsic::Tests::EditorJobHarness jobs;jobs.Attach(context);
-        ASSERT_EQ(R::ApplyEditorKeypointAnalysisCommand(context,c).Status,R::EditorCommandStatus::Pending);
+        ASSERT_EQ(R::ApplyEditorKeypointAnalysisCommand(R::BindEditorProcessingCommands(context),c, sink).Status,R::EditorCommandStatus::Pending);
         switch(change){case 0:props.Get<float>("keep")[0]=99;break;case 1:props.Get<glm::vec3>("samples")[0].x+=1;break;
             case 2:props.GetOrAdd<bool>("v:deleted")[0]=true;break;case 3:props.GetOrAdd<float>("saliency")[0]=77;break;
             case 4:(void)jobs.Jobs().Cancel(jobs.Snapshot().Entries[0].Token);break;case 5:props.GetOrAdd<std::uint32_t>("keypoints")[0]=77;break;}
@@ -214,11 +215,37 @@ TEST(KeypointAnalysisOperations, JobsRejectChangedInputsOutputsAndCancellation)
 TEST(KeypointAnalysisOperations, InvalidScaleAndOutputPreflightRetainExistingData)
 {
     Extrinsic::ECS::Scene::Registry scene;auto entity=Make(scene,D::MeshVertex);auto c=Config(entity,D::MeshVertex);
-    auto& props=Properties(scene,entity,D::MeshVertex);R::EditorGeometryProcessingContext context{.Scene=&scene};
-    for(auto name:{"samples","v:deleted","h:connectivity"}){auto bad=c;bad.Score.Name=name;EXPECT_FALSE(R::PreviewEditorKeypointAnalysisCommand(context,bad).Ready);}
-    auto gpu=c;gpu.Backend=R::KeypointAnalysisBackend::VulkanLBVH;EXPECT_FALSE(R::PreviewEditorKeypointAnalysisCommand(context,gpu).Ready);
+    auto& props=Properties(scene,entity,D::MeshVertex);R::EditorProcessingContext context{.Scene=&scene};
+    for(auto name:{"samples","v:deleted","h:connectivity"}){auto bad=c;bad.Score.Name=name;EXPECT_FALSE(R::PreviewEditorKeypointAnalysisCommand(R::BindEditorProcessingCommands(context),bad).Ready);}
+    auto gpu=c;gpu.Backend=R::KeypointAnalysisBackend::VulkanLBVH;EXPECT_FALSE(R::PreviewEditorKeypointAnalysisCommand(R::BindEditorProcessingCommands(context),gpu).Ready);
     props.GetOrAdd<float>("saliency").Vector().assign(props.Size(),77);
     props.Get<glm::vec3>("samples").Vector().assign(props.Size(),glm::vec3(0));
-    EXPECT_FALSE(R::ApplyEditorKeypointAnalysisCommand(context,c).Succeeded());
+    EXPECT_FALSE(R::ApplyEditorKeypointAnalysisCommand(R::BindEditorProcessingCommands(context),c).Succeeded());
     EXPECT_EQ(std::as_const(props).Get<float>("saliency").Vector(),std::vector<float>(props.Size(),77));EXPECT_FALSE(props.Exists("keypoints"));
+}
+
+TEST(KeypointAnalysisOperations, ExpiredQueuedCommandsNeverBorrowFreedSceneOrDeliver)
+{
+    auto scene = std::make_unique<Extrinsic::ECS::Scene::Registry>();
+    const auto entity = Make(*scene, D::MeshVertex);
+    const auto config = Config(entity, D::MeshVertex);
+    bool active = true;
+    Intrinsic::Tests::EditorFeatureTestContext context;
+    context.Scene = scene.get();
+    context.AttachmentActive = [&] { return active; };
+    R::EditorCommandHistory history;
+    context.CommandHistory = &history;
+    Extrinsic::Tests::EditorJobHarness jobs;
+    jobs.Attach(context);
+    unsigned deliveries = 0;
+    const auto commands = R::BindEditorProcessingCommands(context);
+    ASSERT_EQ(R::ApplyEditorKeypointAnalysisCommand(commands, config,
+        [&](R::EditorKeypointAnalysisResult) { ++deliveries; }).Status, R::EditorCommandStatus::Pending);
+    active = false;
+    scene.reset();
+    ASSERT_TRUE(jobs.DrainUntilTerminal());
+    EXPECT_EQ(deliveries, 0u);
+    EXPECT_FALSE(history.CanUndo());
+    EXPECT_FALSE(commands.IsBound());
+    EXPECT_TRUE(R::GetEditorPointInputCatalog(commands, config.StableEntityId).Entries.empty());
 }

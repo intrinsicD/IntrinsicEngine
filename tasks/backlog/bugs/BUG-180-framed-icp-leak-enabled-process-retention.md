@@ -24,6 +24,18 @@ contract_review: "Existing GPU correctness and sanitizer test policies apply; no
 
 - A subsequent read-only CTest discovery inside the filesystem sandbox could not run LeakSanitizer under its ptrace restriction. Repeating discovery outside that sandbox succeeded. This is a separate tooling limitation and supplies no allocation-ownership evidence.
 
+## Additional diagnostic — 2026-09-13
+
+RUNTIME-235's direct distance-ratio timing probe also completed all assertions
+(44.721 s, zero reference error), then exited 1 with 115,869 bytes in 24
+allocations. Its runner omitted the registered CTest environment; the resulting
+leak-enabled run is not a passing sanitizer gate. Stacks include unloaded modules,
+Vulkan instance creation and libdbus. This is a new observation in the existing
+retention investigation, not proof that those allocations share the ICP cause or
+are exclusively driver-owned. The general cohort environment is unchanged;
+no suppression was added. Raw log:
+`build/analysis/remaining-processing-locality-2026-09-13/ratio-diagnostic.log`.
+
 ## Acceptance criteria
 - [ ] Reproduce with the same executable, working directory, source and leak-enabled environment, comparing against the dedicated Vulkan shutdown control.
 - [ ] Preserve the relevant loaded driver/module identity before unload and classify ownership using allocation/free evidence.

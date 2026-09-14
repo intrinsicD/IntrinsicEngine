@@ -1,3 +1,5 @@
+// Kernel command bus: erased plain-data intents with one registered handler each,
+// so every mutation lands at the single main-thread drain point per frame.
 module;
 
 #include <cstddef>
@@ -13,7 +15,7 @@ module;
 
 export module Extrinsic.Runtime.CommandBus;
 
-import Extrinsic.Core.FrameGraph;
+import Extrinsic.Core.Hash;
 import Extrinsic.ECS.Scene.Registry;
 import Extrinsic.Runtime.JobService;
 import Extrinsic.Runtime.KernelEvents;
@@ -42,8 +44,8 @@ import Extrinsic.Runtime.WorldRegistry;
 // members (events, jobs, worlds) as ARCH-008..ARCH-010 land.
 //
 // The repository builds with -fno-rtti and -fno-exceptions: type
-// identity uses the same compile-time FNV-1a type tokens the
-// FrameGraph uses (`Core::TypeToken<T>()`, no RTTI), diagnostics
+// identity uses the shared compile-time FNV-1a type token
+// (`Core::TypeToken<T>()`, no RTTI), diagnostics
 // names come from the compiler signature at compile time, and
 // handlers/hooks must not throw (any throw terminates the
 // process by construction — there is no exception path to guard).
@@ -55,8 +57,8 @@ namespace Extrinsic::Runtime
 {
     export class CommandBus;
 
-    // Compile-time command-type identity (no RTTI): the FrameGraph's
-    // FNV-1a token of the compiler type signature.
+    // Compile-time command-type identity (no RTTI): the shared FNV-1a
+    // token of the compiler type signature, owned by `Extrinsic.Core.Hash`.
     export using CommandTypeKey = std::size_t;
 
     // Compile-time, allocation-free diagnostics name for a command

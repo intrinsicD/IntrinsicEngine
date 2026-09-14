@@ -124,8 +124,11 @@ snapshot carries no temporary debt.
 > The checker treats exact plain-import and re-export sets separately, uses the
 > substrate allowlist complement for the domain metric, parses public Engine
 > declarations after stripping comments/literals/inline bodies, and validates
-> each allowed getter's return type, owning type, and owning import. It fails on
-> same-count substitutions, new or stale entries, and getter type drift. A
+> each allowed getter's return type, owning type, and owning import. An owning
+> module the interface deliberately does not import is declared in
+> `borrowed_imports`; declaring it and importing it are mutually exclusive. It
+> fails on same-count substitutions, new or stale entries, and getter type
+> drift. A
 > reduction therefore must lower the policy in the same change, while the
 > final policy has no numerical capacity for later regrowth.
 
@@ -134,12 +137,17 @@ snapshot carries no temporary debt.
       accepted kernel public surface and no unused plain imports
       (**baseline 45; 2026-07-13 reference 43; post-`RUNTIME-183` checked
       snapshot 22; final `RUNTIME-187` snapshot 12**).
-      The final set is `Core.Config.Engine`, `RHI.Device`, `Platform.Window`,
-      `Graphics.Renderer`, `Runtime.CommandBus`,
-      `Runtime.FramePacingDiagnostics`, `Runtime.JobService`,
-      `Runtime.KernelEvents`, `Runtime.Module`, `Runtime.ServiceRegistry`,
+      The set is `Core.Config.Engine`, `RHI.Device`, `Platform.Window`,
+      `Runtime.CommandBus`, `Runtime.FramePacingDiagnostics`,
+      `Runtime.JobService`, `Runtime.KernelEvents`, `Runtime.ModuleLifecycle`,
+      `Runtime.RenderRecipeActivation`, `Runtime.ServiceRegistry`,
       `Runtime.WorldHandle`, and `Runtime.WorldRegistry`. This is an exact
-      declaration-derived set, not a numerical budget.
+      declaration-derived set, not a numerical budget. `RUNTIME-238` replaced
+      `Graphics.Renderer` and `Runtime.Module` with borrowed declarations:
+      `Graphics.Renderer` is recorded in the policy's `borrowed_imports` as
+      `GetRenderer`'s owning module, and the checker fails if a borrowed owner
+      is imported again. The exact-import policy and
+      `RenderCompilationLocality.EngineInterface` also reject `Runtime.Module`.
 - [x] Domain (non-substrate) imports in `Runtime.Engine.cppm` = 0
       (**baseline 27; 2026-07-13 reference 23; post-`RUNTIME-183` snapshot
       0; final snapshot 0**).

@@ -11840,3 +11840,246 @@ tree:
     alternatives: [Add a second spatial service, Replace source topology during construction, Change the original neighborhood policy while changing its backend]
     evidence: [N539, O223, docs/architecture/point-construction.md]
     status: resolved
+
+  - id: N541
+    type: experiment
+    title: Measure density and spacing compilation locality with fixed content edits
+    provenance: ai-executed
+    timestamp: '2026-09-12T23:29:15+02:00'
+    result: Twelve declared dirty-worktree probes and CPU, separate sanitizer and actual Vulkan gates complete. The final record edit rebuilds 23 compiler producers versus 62 before; C92 remains a performance hypothesis. Preserve the intermediate fixture coupling and sandbox discovery failure as distinct observations.
+    evidence: [ara/evidence/diagnostics/runtime233_compile_locality.json, ara/evidence/tables/runtime233_compile_locality.md]
+    status: resolved
+
+  - id: N542
+    type: decision
+    title: Enforce family compiler boundaries without per-method command frameworks
+    provenance: ai-executed
+    timestamp: '2026-09-12T23:29:15+02:00'
+    choice: Use one generic checked command handle, family-owned records, one compiled point capture owner and explicit session composition. Remove the family import from shared test fixtures and enforce boundaries using Clang/CMake metadata. Retain typed completion functions rather than adding a result-handle trait framework.
+    alternatives: [Keep the broad primary module, Add per-method contexts and targets, Leave family records in the general workspace frame, Add a second build-impact database]
+    evidence: [N541, O224, docs/architecture/sandbox-editor-feature-boundaries.md, tools/analysis/compile_hotspots.py]
+    status: resolved
+
+  - id: N543
+    type: experiment
+    title: Verify the Claude-identified private workspace coupling repair
+    provenance: ai-executed
+    timestamp: '2026-09-13T00:16:58+02:00'
+    result: The approved fixed-packet review identified complete family records in shared private bindings. Incomplete borrowed containers removed nine sibling producers; the new local record probe uses 14 compilers in 61.906 seconds. Full CPU 4538, affected ASan 55, affected UBSan 55 and actual Vulkan 9 pass. C92 stays a hypothesis; no second external review, commit, engine-wide slimming or repeatable timing claim is inferred.
+    evidence: [ara/evidence/diagnostics/runtime233_compile_locality.json, ara/evidence/tables/runtime233_compile_locality.md, tasks/active/RUNTIME-233-processing-compilation-locality-pilot.md]
+    status: resolved
+
+  - id: N544
+    type: experiment
+    title: Verify point-analysis family locality and shared execution reuse
+    provenance: ai-executed
+    timestamp: '2026-09-13T01:44:38+02:00'
+    result: One matched dirty-worktree density-weight result edit changed 351.986 seconds and 60 compiler invocations to 70.610 seconds and 16. All 157 final focused entries pass; full CPU selects 4548 with six expected skips, full ASan 2926 with no skips, full UBSan 2926 with one expected skip, and affected actual Vulkan 22 with no skips. All have zero failures. Production footprint is +30 physical lines across 32 changed files. C92 remains a hypothesis; root-hygiene BUG-177 and mesh migration RUNTIME-235 remain open.
+    evidence: [ara/evidence/diagnostics/runtime234_compile_locality.json, ara/evidence/tables/runtime234_compile_locality.md, tasks/active/RUNTIME-234-point-analysis-compilation-locality.md]
+    status: resolved
+
+  - id: N545
+    type: experiment
+    title: Verify normal-family locality and removal of three duplicate APIs
+    provenance: ai-executed
+    timestamp: '2026-09-13T08:24:59+02:00'
+    result: One matched dirty-worktree normal-result edit changed 334.094 seconds and 57 compiler invocations to 59.089 seconds and 12. Production footprint is -2408 physical lines across 23 changed files including five new owners. Final focused 323, full CPU 4547, full ASan 2925, full UBSan 2925 and actual Vulkan 22 registrations have zero failures; CPU skips six and UBSan skips one expected capability case. Preserve the original wrong family-label metadata beside corrected reseals and the initial stale source-check failure beside the corrected full run. C92 stays a hypothesis; RUNTIME-235 remains active and uncommitted.
+    evidence: [ara/evidence/diagnostics/runtime235_normals_compile_locality.json, ara/evidence/tables/runtime235_normals_compile_locality.md, tasks/active/RUNTIME-235-mesh-processing-compilation-locality.md]
+    status: resolved
+
+  - id: N546
+    type: experiment
+    title: Reconcile remaining mesh-family locality with Claude implementation and review
+    provenance: ai-executed
+    timestamp: '2026-09-13T12:10:50+02:00'
+    result: One matched dirty curvature-result edit changed 344.537 s and 57 compiler invocations to 74.229 s and 16. Complete native production footprint is -138 physical lines across 47 files with 16 additions and one deletion. Final focused 537, full CPU 4560, full ASan 2938 and full UBSan 2938 have zero failures; CPU skips six and UBSan skips one. Actual Vulkan has 22 initial passes plus one corrected registered pass after diagnosing BUG-189's pre-existing timeout omission under monitor-off pacing. All 23 selected cases have passing evidence, no skips. Direct leak-enabled timing diagnostic exits 1 after its assertions; retention remains BUG-180. C92 stays a hypothesis; no general speedup, leak-freedom, commit or whole-engine completion is inferred.
+    evidence: [ara/evidence/diagnostics/runtime235_remaining_compile_locality.json, ara/evidence/tables/runtime235_remaining_compile_locality.md, tasks/active/RUNTIME-235-mesh-processing-compilation-locality.md, tasks/backlog/bugs/BUG-189-distance-ratio-vulkan-smoke-timeout.md]
+    status: resolved
+
+  - id: N547
+    type: experiment
+    title: Finish processing execution-family migration and reconcile lifetime and test failures
+    provenance: ai-executed
+    timestamp: '2026-09-13T15:56:23+02:00'
+    result: Six remaining processing areas migrated with Claude; broad execution plumbing and duplicate Poisson config removed. Exact dirty-baseline production delta is -138 physical lines, -49 nonblank lines and +6 files across 46 touched files. Focused 663 and compiler-metadata 19 checks pass. Full CPU selects 4570 with 4569 passes and one ASan-only skip; ASan 2948 passes; UBSan 2947 passes plus one ASan-only skip. All 32 selected actual Vulkan cases have passing evidence after ICP caller repair and phase-diagnosed LOP/EAR test-budget corrections. Initial build, callback, timeout and documentation failures remain recorded. No new compile-time measurement, claim promotion, commit or whole-engine completion.
+    evidence: [tasks/active/RUNTIME-236-remaining-processing-contracts.md, tasks/backlog/bugs/BUG-190-curvature-refinement-timeout-during-compilation.md, tasks/backlog/bugs/BUG-191-consolidation-lbvh-sequence-timeout.md, build/analysis/runtime236-remaining-processing-2026-09-13/evidence.json]
+    status: resolved
+
+  - id: N548
+    type: experiment
+    title: Isolate render diagnostics and resolve exact local metadata classification
+    provenance: ai-executed
+    timestamp: '2026-09-13T17:19:24+02:00'
+    result: Claude planned, implemented and reviewed canonical render-record ownership. Four runtime interface closures
+      changed from 67/71/97/105 to 22/7/55/62 dependencies; the fifth guarded producer is the diagnostics owner. All
+      23 moved record/function bodies retain the same tokens apart from comments and whitespace. Production delta
+      against the dirty baseline is +18 physical lines, +14 nonblank lines and one file across 16 touched files. Final
+      focused 209, full CPU 4571 plus one expected skip, ASan 2950, UBSan 2949 plus one expected skip and actual Vulkan
+      17 all pass. BUG-177 exact optional directory classification passes 13 tests and the strict root gate. Review
+      fixes expose recipe-owned override types and isolate metadata fixtures. No new timing claim, C92 promotion,
+      commit or whole-engine completion.
+    evidence:
+    - tasks/active/RUNTIME-237-render-diagnostics-compilation-boundary.md
+    - tasks/backlog/bugs/BUG-177-root-hygiene-local-agent-metadata.md
+    - build/analysis/runtime237-render-diagnostics-2026-09-13/verification-summary.json
+    - build/analysis/runtime237-render-diagnostics-2026-09-13/dependency-closure-comparison.json
+    status: resolved
+
+  - id: N549
+    type: experiment
+    title: Consolidate renderer queries and recipe lookup; isolate engine and spatial-query imports
+    provenance: ai-executed
+    timestamp: '2026-09-13T20:28:22+02:00'
+    result: Claude planned, implemented and reviewed RUNTIME-238/239. Forty-eight renderer pipeline getters become
+      two typed queries; recipe lookup has one compiled owner; cache GPU recording is private. Actual final compiler
+      metadata changes Engine 98 to 59 dependencies and SpatialIndexCache 44 to 11. Combined dirty-baseline production
+      delta is -389 physical and -332 nonblank lines across 13 files, with no added/deleted production files.
+      RUNTIME-238 gates passed before RUNTIME-239. Final RUNTIME-239 native CPU passes 4577 plus one expected
+      skip; ASan 2956; UBSan 2955 plus one expected skip; actual Vulkan 40 without skips. Review corrections include
+      matching global class/member linkage, immediate GPU-fixture failure exit and dead cache installation removal.
+      All 1362 final source hashes match. No timing benchmark, C92 promotion, commit or whole-engine completion.
+    evidence:
+    - tasks/active/RUNTIME-238-renderer-query-api-and-engine-locality.md
+    - tasks/active/RUNTIME-239-spatial-query-boundary-and-recipe-lookup.md
+    - build/analysis/runtime238-renderer-query-api-2026-09-13/verification-summary.json
+    - build/analysis/runtime239-spatial-query-boundary-2026-09-13/verification-summary.json
+    - build/analysis/runtime239-spatial-query-boundary-2026-09-13/combined-production-footprint.json
+    - build/analysis/runtime239-spatial-query-boundary-2026-09-13/combined-module-closures.json
+    status: resolved
+
+  - id: N550
+    type: experiment
+    title: Share kernel type hashing and remove graph/RHI interface dependencies
+    provenance: ai-executed
+    timestamp: '2026-09-13T22:10:41+02:00'
+    result: 'Claude planned, implemented and independently reviewed RUNTIME-240. Core.Hash owns the preserved
+      kernel type signature/token and shared FNV-1a64; four kernel interfaces drop FrameGraph and JobService
+      borrows ICommandContext through matching global declarations/definitions. Actual dependencies change KernelEvents
+      16 to 1, ServiceRegistry 16 to 2, JobService 22 to 11, CommandBus 26 to 15, WorldRegistry 25 to 14 and
+      Engine 59 to 52. Both Clang23 pre/post token probes match. Nine existing production files gain 47 physical
+      and 44 nonblank lines; no production file added/deleted. Final focused 164, native CPU 4587 plus one expected
+      skip, ASan 2966, UBSan 2965 plus one expected skip and actual Vulkan 15 pass. All 1362 source hashes match;
+      strict structural checks pass. RTTI comment fixed after review. Interrupted Vulkan build resumed with retained
+      evidence. Next-plan import pruning is deferred: retained snapshot owners still reach all 135 dependencies.
+      No measured speedup, C92 promotion, commit or whole-engine completion.'
+    evidence:
+    - tasks/active/RUNTIME-240-kernel-type-identity-and-job-locality.md
+    - build/analysis/runtime240-kernel-type-identity-2026-09-13/verification-summary.json
+    - build/analysis/runtime240-kernel-type-identity-2026-09-13/dependency-comparison.json
+    - build/analysis/runtime240-kernel-type-identity-2026-09-13/review-disposition.md
+    - build/analysis/runtime240-kernel-type-identity-2026-09-13/next-plan-dependency-check.json
+    status: resolved
+
+  - id: N551
+    type: experiment
+    title: Move texture-bake private composition into its existing implementation
+    provenance: ai-executed
+    timestamp: '2026-09-13T23:15:27+02:00'
+    result: 'RUNTIME-241 implemented with Claude; fixed review found no blocking defect. Preserve six noexcept
+      boundaries and duplicate GPU registration return semantics. Seven private service declarations/imports
+      removed and two forwarding bodies collapsed; two production files shrink by 56 physical and 53 nonblank
+      lines, no production file added/deleted. Actual compiler closures: Bake 102 to 21, Visualization 117 to
+      50, Snapshots 135 to 99, private Attachment 136 to 100. Native CPU 4591 pass plus one expected skip; focused
+      ASan 86, UBSan 86 and actual Vulkan bake/display/normal-map 3 pass without skips. Structural checks and
+      1362 final source hashes match. No matched timing claim, C92 promotion, commit or product-completion verdict.'
+    evidence:
+    - tasks/active/RUNTIME-241-texture-bake-compilation-boundary.md
+    - build/analysis/runtime241-texture-bake-boundary-2026-09-13/verification-summary.json
+    - build/analysis/runtime241-texture-bake-boundary-2026-09-13/dependency-comparison.json
+    - build/analysis/runtime241-texture-bake-boundary-2026-09-13/review-disposition.md
+    status: resolved
+
+  - id: N552
+    type: experiment
+    title: Remove snapshot imports from prepared-frame consumers and private attachment
+    provenance: ai-executed
+    timestamp: '2026-09-13T23:57:43+02:00'
+    result: RUNTIME-242 planned and implemented with Claude. Twenty-one production files shrink by 7 physical
+      and 9 nonblank lines; no production file added/deleted. Four workspace-owned types retain storage and public
+      defaults with matching C++ borrows; cache traversal compiles in the existing Public.cpp. Remove unused
+      LastFrame accessors and private preparation defaults. Actual compiler closure changes private Attachment
+      100 to 18; sixteen context-only operation closures each lose only the snapshot module. Initial review missed
+      a cache borrow, then the compiler exposed an obsolete conflicting forward; both corrected and independently
+      re-reviewed with no blocking finding. Final native CPU 4592 pass plus one expected skip; focused ASan 52,
+      UBSan 52 and representative actual Vulkan workspace/display 1 pass without skips. All builds, strict structural
+      checks and 1362 final source hashes match. No matched timing claim, C92 promotion, commit or whole-engine
+      completion.
+    evidence:
+    - tasks/active/RUNTIME-242-editor-prepared-frame-locality.md
+    - build/analysis/runtime242-editor-prepared-frame-locality-2026-09-13/verification-summary.json
+    - build/analysis/runtime242-editor-prepared-frame-locality-2026-09-13/dependency-comparison.json
+    - build/analysis/runtime242-editor-prepared-frame-locality-2026-09-13/review-disposition.md
+    - build/analysis/runtime242-editor-prepared-frame-locality-2026-09-13/final-review.md
+    status: resolved
+
+  - id: N553
+    type: experiment
+    title: Reuse prepared processing context and isolate family-frame result borrows
+    provenance: ai-executed
+    timestamp: '2026-09-14T01:23:22+02:00'
+    result: RUNTIME-243 planned and implemented with Claude, then reconciled and independently reviewed. Eighteen
+      production files lose 571 physical and 549 nonblank lines; no production file added/deleted. Eleven frame
+      closures narrow from 168-180 to 59-95 modules; private attachment stays at 18. Existing owners retain complete
+      types; session builds one guarded context reused by frame commands and workspace queries. Initial CPU gate
+      caught old service-pointer location and interface-line-cap assertions. Corrected owner checks and actual
+      compiler-boundary bans, independently reviewed; original failed run retained. Final native CPU 4594 pass
+      plus one expected skip; focused ASan 98, UBSan 98 and actual Vulkan workspace/display 1 pass without skips.
+      All builds, structural checks and 1362 code hashes match. Interrupted Claude implementation log retained;
+      source reconciliation completed before final review and tests. No timing claim, C92 promotion, commit or
+      whole-engine completion.
+    evidence:
+    - tasks/active/RUNTIME-243-processing-frame-binding-locality.md
+    - build/analysis/runtime243-processing-frame-locality-2026-09-14/verification-summary.json
+    - build/analysis/runtime243-processing-frame-locality-2026-09-14/dependency-comparison.json
+    - build/analysis/runtime243-processing-frame-locality-2026-09-14/review-disposition.md
+    - build/analysis/runtime243-processing-frame-locality-2026-09-14/final-review.md
+    status: resolved
+
+  - id: N554
+    type: experiment
+    title: Narrow command-frame imports and complete full CPU sanitizer reconciliation
+    provenance: ai-executed
+    timestamp: '2026-09-14T02:32:31+02:00'
+    result: 'RUNTIME-244 planned and implemented with Claude; independent fixed review found no blockers. Three
+      existing compiled context adapters replace broad header dependencies without adding cached state or production
+      files. Seven production files lose125physical/120nonblank lines; command-leaf closures168->55/53/58, private
+      attachment18 unchanged. Full native CPU4598pass+1expectedskip, ASan2977pass, UBSan2976pass+1expectedskip.
+      Vulkan verification exposed BUG192: inherited30second outer deadline and45second fixture budget; exact-environment
+      probes progressed to phase14, and exit diagnostics showed47frames/wall-clock-budget-exhausted. Reviewed
+      GPU-only fix90second internal/120second outer, retaining240framecap/allpixelchecks and adding explicit
+      readiness. Registered Vulkan passed30.4seconds with no skip; host timing remains variable. All CPU registrations
+      unchanged after GPU-only edits; reconciled editor checks102each native/ASan/UBSan. Final1362source hashes
+      match with full-CPU input applicability explicitly distinguished from laterGPUtest changes. Strict checks
+      pass. No timing claim, C92 promotion, commit or whole-engine completion.'
+    evidence:
+    - tasks/active/RUNTIME-244-editor-command-frame-locality.md
+    - tasks/backlog/bugs/BUG-192-surface-appearance-vulkan-deadline.md
+    - build/analysis/runtime244-editor-command-frame-locality-2026-09-14/verification-summary.json
+    - build/analysis/runtime244-editor-command-frame-locality-2026-09-14/dependency-comparison.json
+    - build/analysis/runtime244-editor-command-frame-locality-2026-09-14/vulkan-diagnosis.md
+    - build/analysis/runtime244-editor-command-frame-locality-2026-09-14/review-disposition.md
+    status: resolved
+
+  - id: N555
+    type: experiment
+    title: Separate action helper declarations from workspace binding storage
+    provenance: ai-executed
+    timestamp: '2026-09-14T06:54:08+02:00'
+    result: RUNTIME-245 planned and implemented with Claude, independently reviewed on a fixed snapshot and corrected
+      through a second review. Two private declaration headers retain one compiled helper owner; action bodies,
+      shared records, session, attachment and thin geometry helper are unchanged. Six production files change,
+      including two new headers, net minus 138 physical and 147 nonblank lines. Actual scene/visualization action
+      closures narrow from 220 each to 55 and 75; fifteen monitored producers remain unchanged and no new module
+      dependency remains. Root fixed a missing direct Asset.ImportRouter import and an unnecessary graphics bake
+      import. An interim CPU run correctly rejected stale scans after root edited source during testing; final
+      frozen-source rebuild and full native CPU run pass 4599 tests plus one expected skip. Focused ASan and
+      UBSan each pass 97 tests without skips. Strict checks and 1364 source hashes match. No new Vulkan run,
+      matched compile timing, C92 promotion, commit or whole-engine completion.
+    evidence:
+    - tasks/active/RUNTIME-245-editor-action-helper-locality.md
+    - build/analysis/runtime245-editor-action-helper-locality-2026-09-14/verification-summary.json
+    - build/analysis/runtime245-editor-action-helper-locality-2026-09-14/dependency-comparison.json
+    - build/analysis/runtime245-editor-action-helper-locality-2026-09-14/review-disposition.md
+    - build/analysis/runtime245-editor-action-helper-locality-2026-09-14/claude-review.txt
+    - build/analysis/runtime245-editor-action-helper-locality-2026-09-14/claude-corrections.txt
+    status: resolved

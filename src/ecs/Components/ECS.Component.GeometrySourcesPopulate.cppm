@@ -37,7 +37,7 @@
 module;
 
 #include <entt/entity/entity.hpp>
-#include <entt/entity/registry.hpp>
+#include <entt/entity/fwd.hpp>
 
 export module Extrinsic.ECS.Components.GeometrySourcesPopulate;
 

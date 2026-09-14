@@ -1,3 +1,4 @@
+// Uploads vector-field and isoline packets into retained per-lane GPU buffers.
 module;
 
 #include <cstdint>
@@ -48,31 +49,6 @@ import Extrinsic.RHI.Handles;
 
 export namespace Extrinsic::Graphics
 {
-    // GRAPHICS-078 — deterministic CPU diagnostics for the
-    // `VisualizationOverlayPass` upload + recording path. All counters
-    // stay at zero in Slice A. Slice B populates the vector-field
-    // counters; Slice C populates the isoline counters.
-    // `MissingPipelineSkipCount` increments when the executor reaches
-    // the pass branch with the device operational but at least one
-    // required pipeline lease is missing (so the pass returns
-    // `SkippedUnavailable` for that lane); useful for distinguishing
-    // "feature off" (counter stays zero, pass not in stats) from
-    // "feature on but pipeline missing" (counter increments).
-    // `UploadOverflowCount` reports transient-buffer-allocator capacity
-    // exhaustion from the upload helper.
-    //
-    // Reset per-frame through the renderer's existing
-    // `m_LastRenderGraphStats = {}` cadence in `ExecuteFrame()`.
-    struct VisualizationOverlayUploadDiagnostics
-    {
-        std::uint64_t UploadOverflowCount = 0;
-        std::uint64_t VectorFieldRecordsSubmitted = 0;
-        std::uint64_t IsolineRecordsSubmitted = 0;
-        std::uint64_t VectorFieldRecordsRecorded = 0;
-        std::uint64_t IsolineRecordsRecorded = 0;
-        std::uint64_t MissingPipelineSkipCount = 0;
-    };
-
     // GRAPHICS-078 Slice B — vector-field lane upload result. Mirrors
     // the transient-debug lane upload result: vertex buffer handle +
     // BDA + per-frame `Uploaded` flag. `VertexCount = 2 * sum of

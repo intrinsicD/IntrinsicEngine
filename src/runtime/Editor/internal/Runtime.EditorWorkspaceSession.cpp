@@ -1,4 +1,11 @@
 module;
+#include <span>
+#include <array>
+#include <cstddef>
+#include <chrono>
+#include <functional>
+#include <string_view>
+#include <entt/entity/fwd.hpp>
 
 #include <atomic>
 #include <cstdint>
@@ -9,10 +16,22 @@ module;
 #include <utility>
 #include <vector>
 
-module Extrinsic.Runtime.Private.EditorFeatures;
+module Extrinsic.Runtime.Private.EditorWorkspaceAttachment;
 
+
+import Extrinsic.Runtime.PointFieldOperations;
+import Extrinsic.Runtime.PointAnalysisOperations;
+import Extrinsic.Runtime.PointSetOperations;
+import Extrinsic.Runtime.PointConstructionOperations;
+import Extrinsic.Runtime.PointCloudServiceOperations;
+import Extrinsic.Runtime.NormalOperations;
+import Extrinsic.Runtime.RegistrationOperations;
+import Extrinsic.Runtime.MeshFieldOperations;
+import Extrinsic.Runtime.MeshTopologyOperations;
+import Extrinsic.Runtime.ParameterizationOperations;
 import Extrinsic.Core.Config.EngineLoad;
 import Extrinsic.Core.Error;
+import Extrinsic.Core.StrongHandle;
 import Extrinsic.Core.Geometry2D;
 import Extrinsic.Graphics.CameraSnapshots;
 import Extrinsic.Graphics.CurrentRendererContractAdapter;
@@ -20,6 +39,7 @@ import Extrinsic.Graphics.RenderFrameInput;
 import Extrinsic.Graphics.RenderRecipeConfig;
 import Extrinsic.Graphics.RenderingContract;
 import Extrinsic.Runtime.AssetWorkflowModule;
+import Extrinsic.Runtime.AssetIngestStateMachine;
 import Extrinsic.Runtime.ClusteringModule;
 import Extrinsic.Runtime.SpatialIndexCache;
 import Extrinsic.Runtime.EngineConfigControl;
@@ -30,9 +50,123 @@ import Extrinsic.Runtime.RenderArtifactPublication;
 import Extrinsic.Runtime.SceneDocumentModule;
 import Extrinsic.Runtime.ServiceRegistry;
 import Extrinsic.Runtime.WorldRegistry;
+import Extrinsic.Runtime.VisualizationRecipes;
+import Extrinsic.Asset.ImportRouter;
+import Extrinsic.Asset.Registry;
+import Extrinsic.Asset.Service;
+import Extrinsic.ECS.Scene.Handle;
+import Extrinsic.ECS.Scene.Registry;
+import Extrinsic.ECS.Component.Transform;
+import Extrinsic.ECS.Components.GeometrySources;
+import Extrinsic.Graphics.Component.RenderGeometry;
+import Extrinsic.Graphics.Renderer;
+import Extrinsic.RHI.Device;
+import Extrinsic.Runtime.CameraControllers;
+import Extrinsic.Runtime.EditorCommandHistory;
+import Extrinsic.Runtime.GeometryPresentation;
+import Extrinsic.Runtime.GeometryAvailability;
+import Extrinsic.Runtime.PrimitiveSelectionRefinement;
+import Extrinsic.Runtime.VertexAttributeBinding;
+import Extrinsic.Runtime.VertexChannelBindings;
+import Extrinsic.Runtime.TextureBakeModule;
+import Extrinsic.Runtime.SelectionController;
+import Extrinsic.Runtime.WorldHandle;
+import Geometry.Properties;
+import Extrinsic.Runtime.EditorCommon;
+import Extrinsic.Runtime.EditorJobProjection;
+import Extrinsic.Runtime.EditorWorkspaceSnapshots;
+import Extrinsic.Runtime.GeometryProcessingOperations;
+import Extrinsic.Runtime.RenderRecipeEditingOperations;
+import Extrinsic.Runtime.SceneEditingOperations;
+import Extrinsic.Runtime.VisualizationEditingOperations;
+
+#include "Editor/internal/Runtime.EditorFeatures.Internal.hpp"
 
 namespace Extrinsic::Runtime::EditorFeatureDetail
 {
+    class EditorWorkspaceSession::Impl
+    {
+        public:
+        Impl();
+        ~Impl();
+
+        Impl(const Impl&) = delete;
+        Impl& operator=(const Impl&) = delete;
+        Impl(Impl&&) = delete;
+        Impl& operator=(Impl&&) = delete;
+
+        void Attach(WorldRegistry& worlds, ServiceRegistry& services);
+        void Detach();
+
+        [[nodiscard]] bool PrepareFrame(
+            const EditorWorkspaceSnapshotRequest& request,
+            std::string pendingAssetImportPath,
+            Assets::AssetPayloadKind pendingAssetImportPayloadKind,
+            std::string pendingSceneFilePath);
+
+        // References in the prepared-frame view are valid only for the
+        // duration of the visitor invocation.
+        [[nodiscard]] bool VisitPreparedFrame(const EditorWorkspacePreparedFrameVisitor& visitor);
+
+        [[nodiscard]] bool IsAttached() const noexcept
+        {
+            return m_Worlds != nullptr && m_Services != nullptr;
+        }
+
+        private:
+        void ResetAttachmentState();
+
+        WorldRegistry* m_Worlds{nullptr};
+        ServiceRegistry* m_Services{nullptr};
+        JobService* m_Jobs{nullptr};
+        bool m_FramePrepared{false};
+        EditorFeatureBindings m_Context{};
+        EditorProcessingContext m_ProcessingContext{};
+        EditorFeatureResultBindings m_ResultBindings{};
+        EditorWorkspaceSnapshot m_LastFrame{};
+        EditorSelectedModelCache m_SelectedModelCache{};
+        std::uint64_t m_LastObservedRuntimeImportSequence{0};
+        std::uint64_t m_LastObservedRuntimeSceneFileSequence{0};
+        std::optional<EditorFileImportResult> m_LastImportResult{};
+        std::optional<EditorSceneFileResult> m_LastSceneFileResult{};
+        EditorPointFieldResultsSnapshot m_PointFieldResults{};
+        EditorPointAnalysisResultsSnapshot m_PointAnalysisResults{};
+        EditorNormalResultsSnapshot m_NormalResults{};
+        EditorRegistrationResultsSnapshot m_RegistrationResults{};
+        EditorMeshFieldResultsSnapshot m_MeshFieldResults{};
+        EditorMeshTopologyResultsSnapshot m_MeshTopologyResults{};
+        EditorParameterizationResultsSnapshot m_ParameterizationResults{};
+        EditorPointSetResultsSnapshot m_PointSetResults{};
+        EditorPointConstructionResultsSnapshot m_PointConstructionResults{};
+        EditorPointCloudServiceResultsSnapshot m_PointCloudServiceResults{};
+        EditorPointFieldResultSinks m_PointFieldResultSinks{};
+        EditorPointAnalysisResultSinks m_PointAnalysisResultSinks{};
+        EditorNormalResultSinks m_NormalResultSinks{};
+        EditorRegistrationResultSinks m_RegistrationResultSinks{};
+        EditorMeshFieldResultSinks m_MeshFieldResultSinks{};
+        EditorMeshTopologyResultSinks m_MeshTopologyResultSinks{};
+        EditorParameterizationResultSinks m_ParameterizationResultSinks{};
+        EditorPointSetResultSinks m_PointSetResultSinks{};
+        EditorPointConstructionResultSinks m_PointConstructionResultSinks{};
+        EditorPointCloudServiceResultSinks m_PointCloudServiceResultSinks{};
+        EditorParameterizationUvViewCommandSurface m_ParameterizationUvViewCommands{};
+        EditorPointCloudServiceBorrowedServices m_PointCloudServices{};
+        SpatialIndexCache* m_SpatialIndices{};
+        ClusteringService* m_ClusteringService{};
+        KernelEventSubscription m_KMeansCompletionSubscription{};
+        PointCloudConsolidationService* m_PointCloudConsolidationService{};
+        KernelEventSubscription m_PointCloudConsolidationCompletionSubscription{};
+        // Submit-time identity for jobs this session put on `JobService`, which
+        // stores none itself. The index is pruned against `SnapshotAll()` each
+        // frame and projected by `EditorJobCommandSurface` queries.
+        std::unordered_map<JobToken, EditorJobIdentity, Core::StrongHandleHash<JobTokenTag>>
+            m_JobIdentities{};
+        std::shared_ptr<std::atomic_bool> m_AttachmentEpoch{};
+        Graphics::RenderRecipeConfigContext m_RenderRecipeContext{};
+        EditorRenderRecipeEditorState m_RenderRecipeState{};
+        RenderArtifactRegistry m_RenderArtifactRegistry{};
+    };
+
     namespace
     {
         using EditorJobIdentityIndex =
@@ -134,6 +268,35 @@ namespace Extrinsic::Runtime::EditorFeatureDetail
             };
         }
 
+        void GuardParameterizationUvViewSurface(
+            EditorParameterizationUvViewCommandSurface& surface,
+            const std::shared_ptr<std::atomic_bool>& epoch)
+        {
+            surface.Submit = GuardAttachmentCommand(
+            std::move(surface.Submit), epoch,
+            [](EditorParameterizationUvViewRequest request)
+            {
+                return EditorParameterizationUvViewState{
+                    .Status =
+                        EditorParameterizationUvViewStatus::CpuFallbackNonOperational,
+                    .RequestedMode       = request.View.RenderMode,
+                    .ActiveMode          = ParameterizationUvRenderMode::CpuLayout,
+                    .RequestedBackground = request.View.BackgroundMode,
+                    .ActiveBackground =
+                        request.View.BackgroundMode == ParameterizationUvBackgroundMode::Grid ||
+                                request.View.BackgroundMode ==
+                                    ParameterizationUvBackgroundMode::Checker
+                            ? request.View.BackgroundMode
+                            : ParameterizationUvBackgroundMode::Checker,
+                    .RequestToken = request.RequestToken,
+                    .Width        = request.Width,
+                    .Height       = request.Height,
+                    .Message      = "GPU UV view command failed because the editor session "
+                                    "attachment expired.",
+                };
+            });
+        }
+
         void GuardAttachmentCommandSurfaces(
             EditorFeatureBindings& context,
             const std::shared_ptr<std::atomic_bool>& epoch)
@@ -219,29 +382,6 @@ namespace Extrinsic::Runtime::EditorFeatureDetail
                             "Scene close failed: editor session attachment expired.",
                     };
                 });
-            context.ParameterizationUvViewCommands.Submit = GuardAttachmentCommand(
-                std::move(context.ParameterizationUvViewCommands.Submit), epoch,
-                [](EditorParameterizationUvViewRequest request)
-                {
-                    return EditorParameterizationUvViewState{
-                        .Status =
-                            EditorParameterizationUvViewStatus::CpuFallbackNonOperational,
-                        .RequestedMode       = request.View.RenderMode,
-                        .ActiveMode          = ParameterizationUvRenderMode::CpuLayout,
-                        .RequestedBackground = request.View.BackgroundMode,
-                        .ActiveBackground =
-                            request.View.BackgroundMode == ParameterizationUvBackgroundMode::Grid ||
-                                    request.View.BackgroundMode ==
-                                        ParameterizationUvBackgroundMode::Checker
-                                ? request.View.BackgroundMode
-                                : ParameterizationUvBackgroundMode::Checker,
-                        .RequestToken = request.RequestToken,
-                        .Width        = request.Width,
-                        .Height       = request.Height,
-                        .Message      = "GPU UV view command failed because the editor session "
-                                        "attachment expired.",
-                    };
-                });
             context.VisualizationRecipes.GetRecipe =
                 GuardAttachmentCommand(
                     std::move(context.VisualizationRecipes.GetRecipe),
@@ -298,16 +438,16 @@ namespace Extrinsic::Runtime::EditorFeatureDetail
 
     } // namespace
 
-    EditorWorkspaceSession::EditorWorkspaceSession()
+    EditorWorkspaceSession::Impl::Impl()
     {
     }
 
-    EditorWorkspaceSession::~EditorWorkspaceSession()
+    EditorWorkspaceSession::Impl::~Impl()
     {
         Detach();
     }
 
-    void EditorWorkspaceSession::Attach(WorldRegistry& worlds, ServiceRegistry& services)
+    void EditorWorkspaceSession::Impl::Attach(WorldRegistry& worlds, ServiceRegistry& services)
     {
         Detach();
         m_Worlds          = &worlds;
@@ -326,7 +466,7 @@ namespace Extrinsic::Runtime::EditorFeatureDetail
                     {
                         if (!AttachmentEpochIsActive(epoch))
                             return;
-                        m_LastKMeansResult = completed;
+                        m_PointCloudServiceResults.LastKMeansResult = completed;
                         m_SelectedModelCache.Clear();
                     });
         }
@@ -346,7 +486,7 @@ namespace Extrinsic::Runtime::EditorFeatureDetail
                     {
                         if (!AttachmentEpochIsActive(epoch))
                             return;
-                        m_LastPointCloudConsolidationResult = completed;
+                        m_PointCloudServiceResults.LastPointCloudConsolidationResult = completed;
                         m_SelectedModelCache.Clear();
                     });
         }
@@ -356,14 +496,17 @@ namespace Extrinsic::Runtime::EditorFeatureDetail
         }
     }
 
-    bool EditorWorkspaceSession::PrepareFrame(
+    bool EditorWorkspaceSession::Impl::PrepareFrame(
         const EditorWorkspaceSnapshotRequest& request,
         std::string pendingAssetImportPath,
-        const EditorAssetPayloadKind pendingAssetImportPayloadKind,
+        const Assets::AssetPayloadKind pendingAssetImportPayloadKind,
         std::string pendingSceneFilePath)
     {
         m_FramePrepared = false;
         m_Context = {};
+        m_ProcessingContext = {};
+        m_ResultBindings = {};
+        m_PointCloudServices = {};
         m_LastFrame = {};
         if (m_Worlds == nullptr || m_Services == nullptr ||
             !AttachmentEpochIsActive(m_AttachmentEpoch))
@@ -407,6 +550,10 @@ namespace Extrinsic::Runtime::EditorFeatureDetail
                 m_SelectedModelCache.Clear();
         };
         GuardAttachmentCommandSurfaces(context, m_AttachmentEpoch);
+        m_ParameterizationUvViewCommands =
+            MakeEditorParameterizationUvViewCommandSurface(*m_Services);
+        GuardParameterizationUvViewSurface(m_ParameterizationUvViewCommands, m_AttachmentEpoch);
+        m_ResultBindings.ParameterizationUvViewCommands = &m_ParameterizationUvViewCommands;
         context.SelectedModelCache = &m_SelectedModelCache;
         // The editor owns domain identity while `JobService` owns lifecycle.
         // Keep the token/identity index bounded, then expose only submit, active
@@ -452,175 +599,145 @@ namespace Extrinsic::Runtime::EditorFeatureDetail
                 };
         }
         context.SpatialIndices = m_SpatialIndices;
-        context.Clustering = m_ClusteringService;
-        context.PointCloudConsolidation =
+        m_PointCloudServices.Clustering = m_ClusteringService;
+        m_PointCloudServices.PointCloudConsolidation =
             m_PointCloudConsolidationService;
-        context.MethodResultSinks.DismissResult =
-            [epoch = m_AttachmentEpoch, this](
-                const EditorGeometryProcessingResultSlot slot)
+        m_ResultBindings.PointCloudServices = &m_PointCloudServices;
+        m_PointFieldResultSinks.DismissResult = [epoch = m_AttachmentEpoch, this](EditorPointFieldResultSlot slot)
+        {
+            if (!AttachmentEpochIsActive(epoch)) return;
+            switch (slot)
+            {
+            case EditorPointFieldResultSlot::KernelDensity: m_PointFieldResults.LastKernelDensityResult.reset(); break;
+            case EditorPointFieldResultSlot::PointSpacing: m_PointFieldResults.LastPointSpacingResult.reset(); break;
+            }
+        };
+        m_PointAnalysisResultSinks.DismissResult = [epoch = m_AttachmentEpoch, this](EditorPointAnalysisResultSlot slot)
+        {
+            if (!AttachmentEpochIsActive(epoch)) return;
+            switch (slot)
+            {
+            case EditorPointAnalysisResultSlot::OutlierAnalysis: m_PointAnalysisResults.LastOutlierAnalysisResult.reset(); break;
+            case EditorPointAnalysisResultSlot::KeypointAnalysis: m_PointAnalysisResults.LastKeypointAnalysisResult.reset(); break;
+            case EditorPointAnalysisResultSlot::DensityWeight: m_PointAnalysisResults.LastDensityWeightResult.reset(); break;
+            case EditorPointAnalysisResultSlot::DescriptorAnalysis: m_PointAnalysisResults.LastDescriptorAnalysisResult.reset(); break;
+            }
+        };
+        m_PointSetResultSinks.DismissResult = [epoch = m_AttachmentEpoch, this](EditorPointSetResultSlot slot)
+        {
+            if (!AttachmentEpochIsActive(epoch)) return;
+            switch (slot)
+            {
+            case EditorPointSetResultSlot::BilateralFilter: m_PointSetResults.LastBilateralFilterResult.reset(); break;
+            case EditorPointSetResultSlot::ProgressivePoisson: m_PointSetResults.LastProgressivePoissonResult.reset(); break;
+            }
+        };
+        m_PointConstructionResultSinks.DismissResult =
+            [epoch = m_AttachmentEpoch, this](EditorPointConstructionResultSlot slot)
+        {
+            if (!AttachmentEpochIsActive(epoch)) return;
+            switch (slot)
+            {
+            case EditorPointConstructionResultSlot::PointConstruction:
+                m_PointConstructionResults.LastPointConstructionResult.reset(); break;
+            }
+        };
+        m_PointCloudServiceResultSinks.DismissResult =
+            [epoch = m_AttachmentEpoch, this](EditorPointCloudServiceResultSlot slot)
+        {
+            if (!AttachmentEpochIsActive(epoch)) return;
+            switch (slot)
+            {
+            case EditorPointCloudServiceResultSlot::KMeans:
+                m_PointCloudServiceResults.LastKMeansResult.reset(); break;
+            case EditorPointCloudServiceResultSlot::PointCloudConsolidation:
+                m_PointCloudServiceResults.LastPointCloudConsolidationResult.reset(); break;
+            }
+        };
+        const auto retain = [epoch = m_AttachmentEpoch]<typename Storage, typename Result>(
+            Storage& storage, std::optional<Result> Storage::* member)
+        {
+            return [epoch, storage = &storage, member](Result result)
             {
                 if (AttachmentEpochIsActive(epoch))
-                    DismissGeometryProcessingResult(slot);
+                    storage->*member = std::move(result);
             };
-        context.MethodResultSinks.ProgressivePoisson =
-            [epoch = m_AttachmentEpoch, this](
-                EditorProgressivePoissonResult result)
+        };
+        m_PointSetResultSinks.ProgressivePoisson =
+            retain(m_PointSetResults, &EditorPointSetResultsSnapshot::LastProgressivePoissonResult);
+        m_ParameterizationResultSinks.UvRegeneration = retain(
+            m_ParameterizationResults,
+            &EditorParameterizationResultsSnapshot::LastUvRegenerationResult);
+        m_ParameterizationResultSinks.Parameterization = retain(
+            m_ParameterizationResults,
+            &EditorParameterizationResultsSnapshot::LastParameterizationResult);
+        m_ParameterizationResultSinks.DismissResult = [epoch = m_AttachmentEpoch, this]
+        {
+            if (epoch && epoch->load()) m_ParameterizationResults.LastParameterizationResult.reset();
+        };
+        m_ParameterizationResultSinks.DismissUvRegenerationResult =
+            [epoch = m_AttachmentEpoch, this]
+        {
+            if (epoch && epoch->load()) m_ParameterizationResults.LastUvRegenerationResult.reset();
+        };
+        m_MeshFieldResultSinks.MeshCurvature =
+            retain(m_MeshFieldResults, &EditorMeshFieldResultsSnapshot::LastMeshCurvatureResult);
+        m_MeshFieldResultSinks.DismissResult = [epoch = m_AttachmentEpoch, this]
+        {
+            if (epoch && epoch->load()) m_MeshFieldResults.LastMeshCurvatureResult.reset();
+        };
+        m_MeshTopologyResultSinks.MeshDenoise =
+            retain(m_MeshTopologyResults, &EditorMeshTopologyResultsSnapshot::LastMeshDenoiseResult);
+        m_MeshTopologyResultSinks.MeshRemesh =
+            retain(m_MeshTopologyResults, &EditorMeshTopologyResultsSnapshot::LastMeshRemeshResult);
+        m_MeshTopologyResultSinks.MeshSubdivide =
+            retain(m_MeshTopologyResults, &EditorMeshTopologyResultsSnapshot::LastMeshSubdivideResult);
+        m_MeshTopologyResultSinks.MeshSimplify =
+            retain(m_MeshTopologyResults, &EditorMeshTopologyResultsSnapshot::LastMeshSimplifyResult);
+        m_MeshTopologyResultSinks.DismissResult =
+            [epoch = m_AttachmentEpoch, this](const EditorMeshTopologyResultSlot slot)
+        {
+            if (!AttachmentEpochIsActive(epoch)) return;
+            switch (slot)
             {
-                if (AttachmentEpochIsActive(epoch))
-                    m_LastProgressivePoissonResult =
-                        std::move(result);
-            };
-        context.MethodResultSinks.UvRegeneration =
-            [epoch = m_AttachmentEpoch, this](
-                EditorUvRegenerationCommandResult result)
-            {
-                if (AttachmentEpochIsActive(epoch))
-                    m_LastUvRegenerationResult = std::move(result);
-            };
-        context.MethodResultSinks.Parameterization =
-            [epoch = m_AttachmentEpoch, this](
-                EditorParameterizationResult result)
-            {
-                if (AttachmentEpochIsActive(epoch))
-                    m_LastParameterizationResult = std::move(result);
-            };
-        context.MethodResultSinks.MeshCurvature =
-            [epoch = m_AttachmentEpoch, this](
-                EditorMeshCurvatureResult result)
-            {
-                if (AttachmentEpochIsActive(epoch))
-                    m_LastMeshCurvatureResult = std::move(result);
-            };
-        context.MethodResultSinks.MeshDenoise =
-            [epoch = m_AttachmentEpoch, this](
-                EditorMeshDenoiseResult result)
-            {
-                if (AttachmentEpochIsActive(epoch))
-                    m_LastMeshDenoiseResult = std::move(result);
-            };
-        context.MethodResultSinks.MeshRemesh =
-            [epoch = m_AttachmentEpoch, this](
-                EditorMeshRemeshResult result)
-            {
-                if (AttachmentEpochIsActive(epoch))
-                    m_LastMeshRemeshResult = std::move(result);
-            };
-        context.MethodResultSinks.MeshSubdivide =
-            [epoch = m_AttachmentEpoch, this](
-                EditorMeshSubdivideResult result)
-            {
-                if (AttachmentEpochIsActive(epoch))
-                    m_LastMeshSubdivideResult = std::move(result);
-            };
-        context.MethodResultSinks.MeshSimplify =
-            [epoch = m_AttachmentEpoch, this](
-                EditorMeshSimplifyResult result)
-            {
-                if (AttachmentEpochIsActive(epoch))
-                    m_LastMeshSimplifyResult = std::move(result);
-            };
-        context.MethodResultSinks.MeshVertexNormals =
-            [epoch = m_AttachmentEpoch, this](
-                EditorMeshVertexNormalsResult result)
-            {
-                if (AttachmentEpochIsActive(epoch))
-                    m_LastMeshVertexNormalsResult =
-                        std::move(result);
-            };
-        context.MethodResultSinks.GraphVertexNormals =
-            [epoch = m_AttachmentEpoch, this](
-                EditorGraphVertexNormalsResult result)
-            {
-                if (AttachmentEpochIsActive(epoch))
-                    m_LastGraphVertexNormalsResult =
-                        std::move(result);
-            };
-        context.MethodResultSinks.PointCloudVertexNormals =
-            [epoch = m_AttachmentEpoch, this](
-                EditorPointCloudVertexNormalsResult result)
-            {
-                if (AttachmentEpochIsActive(epoch))
-                    m_LastPointCloudVertexNormalsResult =
-                        std::move(result);
-            };
-        context.MethodResultSinks.PointCloudOutlierRemoval =
-            [epoch = m_AttachmentEpoch, this](
-                EditorPointCloudOutlierRemovalResult result)
-            {
-                if (AttachmentEpochIsActive(epoch))
-                    m_LastPointCloudOutlierRemovalResult =
-                        std::move(result);
-            };
-        context.MethodResultSinks.Registration =
-            [epoch = m_AttachmentEpoch, this](
-                EditorRegistrationResult result)
-            {
-                if (AttachmentEpochIsActive(epoch))
-                    m_LastRegistrationResult = std::move(result);
-            };
-        context.MethodResultSinks.NormalEstimation =
-            [epoch = m_AttachmentEpoch, this](
-                EditorNormalEstimationResult result)
-            {
-                if (AttachmentEpochIsActive(epoch))
-                    m_LastNormalEstimationResult = std::move(result);
-            };
-        context.MethodResultSinks.OutlierAnalysis =
-            [epoch = m_AttachmentEpoch, this](
-                EditorOutlierAnalysisResult result)
-            {
-                if (AttachmentEpochIsActive(epoch))
-                    m_LastOutlierAnalysisResult = std::move(result);
-            };
-        context.MethodResultSinks.KernelDensity =
-            [epoch = m_AttachmentEpoch, this](
-                EditorKernelDensityResult result)
-            {
-                if (AttachmentEpochIsActive(epoch))
-                    m_LastKernelDensityResult = std::move(result);
-            };
-        context.MethodResultSinks.PointSpacing =
-            [epoch = m_AttachmentEpoch, this](
-                EditorPointSpacingResult result)
-            {
-                if (AttachmentEpochIsActive(epoch))
-                    m_LastPointSpacingResult = std::move(result);
-            };
-        context.MethodResultSinks.BilateralFilter =
-            [epoch = m_AttachmentEpoch, this](
-                EditorBilateralFilterResult result)
-            {
-                if (AttachmentEpochIsActive(epoch))
-                    m_LastBilateralFilterResult = std::move(result);
-            };
-        context.MethodResultSinks.KeypointAnalysis =
-            [epoch = m_AttachmentEpoch, this](
-                EditorKeypointAnalysisResult result)
-            {
-                if (AttachmentEpochIsActive(epoch))
-                    m_LastKeypointAnalysisResult = std::move(result);
-            };
-        context.MethodResultSinks.DescriptorAnalysis =
-            [epoch = m_AttachmentEpoch, this](
-                EditorDescriptorAnalysisResult result)
-            {
-                if (AttachmentEpochIsActive(epoch))
-                    m_LastDescriptorAnalysisResult = std::move(result);
-            };
-        context.MethodResultSinks.DensityWeight =
-            [epoch = m_AttachmentEpoch, this](
-                EditorDensityWeightResult result)
-            {
-                if (AttachmentEpochIsActive(epoch))
-                    m_LastDensityWeightResult = std::move(result);
-            };
-        context.MethodResultSinks.PointConstruction =
-            [epoch = m_AttachmentEpoch, this](
-                EditorPointConstructionResult result)
-            {
-                if (AttachmentEpochIsActive(epoch))
-                    m_LastPointConstructionResult = std::move(result);
-            };
+            case EditorMeshTopologyResultSlot::MeshDenoise:
+                m_MeshTopologyResults.LastMeshDenoiseResult.reset(); break;
+            case EditorMeshTopologyResultSlot::MeshRemesh:
+                m_MeshTopologyResults.LastMeshRemeshResult.reset(); break;
+            case EditorMeshTopologyResultSlot::MeshSubdivide:
+                m_MeshTopologyResults.LastMeshSubdivideResult.reset(); break;
+            case EditorMeshTopologyResultSlot::MeshSimplify:
+                m_MeshTopologyResults.LastMeshSimplifyResult.reset(); break;
+            }
+        };
+        m_RegistrationResultSinks.Registration =
+            retain(m_RegistrationResults, &EditorRegistrationResultsSnapshot::LastRegistrationResult);
+        m_RegistrationResultSinks.DismissResult = [epoch = m_AttachmentEpoch, this]
+        {
+            if (epoch && epoch->load()) m_RegistrationResults.LastRegistrationResult.reset();
+        };
+        m_NormalResultSinks.NormalEstimation =
+            retain(m_NormalResults, &EditorNormalResultsSnapshot::LastNormalEstimationResult);
+        m_NormalResultSinks.DismissResult = [epoch = m_AttachmentEpoch, this]
+        {
+            if (epoch && epoch->load()) m_NormalResults.LastNormalEstimationResult.reset();
+        };
+        m_PointAnalysisResultSinks.OutlierAnalysis =
+            retain(m_PointAnalysisResults, &EditorPointAnalysisResultsSnapshot::LastOutlierAnalysisResult);
+        m_PointFieldResultSinks.KernelDensity =
+            retain(m_PointFieldResults, &EditorPointFieldResultsSnapshot::LastKernelDensityResult);
+        m_PointFieldResultSinks.PointSpacing =
+            retain(m_PointFieldResults, &EditorPointFieldResultsSnapshot::LastPointSpacingResult);
+        m_PointSetResultSinks.BilateralFilter =
+            retain(m_PointSetResults, &EditorPointSetResultsSnapshot::LastBilateralFilterResult);
+        m_PointAnalysisResultSinks.KeypointAnalysis =
+            retain(m_PointAnalysisResults, &EditorPointAnalysisResultsSnapshot::LastKeypointAnalysisResult);
+        m_PointAnalysisResultSinks.DescriptorAnalysis =
+            retain(m_PointAnalysisResults, &EditorPointAnalysisResultsSnapshot::LastDescriptorAnalysisResult);
+        m_PointAnalysisResultSinks.DensityWeight =
+            retain(m_PointAnalysisResults, &EditorPointAnalysisResultsSnapshot::LastDensityWeightResult);
+        m_PointConstructionResultSinks.PointConstruction =
+            retain(m_PointConstructionResults, &EditorPointConstructionResultsSnapshot::LastPointConstructionResult);
         context.PendingAssetImportPath =
             std::move(pendingAssetImportPath);
         context.PendingAssetImportPayloadKind =
@@ -631,77 +748,26 @@ namespace Extrinsic::Runtime::EditorFeatureDetail
             context.LastSceneFileResult = &*m_LastSceneFileResult;
         if (m_LastImportResult.has_value())
             context.LastAssetImportResult = &*m_LastImportResult;
-        if (m_LastKMeansResult.has_value())
-            context.LastKMeansResult = &*m_LastKMeansResult;
-        if (m_LastMeshDenoiseResult.has_value())
-            context.LastMeshDenoiseResult =
-                &*m_LastMeshDenoiseResult;
-        if (m_LastMeshCurvatureResult.has_value())
-            context.LastMeshCurvatureResult =
-                &*m_LastMeshCurvatureResult;
-        if (m_LastMeshRemeshResult.has_value())
-            context.LastMeshRemeshResult =
-                &*m_LastMeshRemeshResult;
-        if (m_LastMeshSubdivideResult.has_value())
-            context.LastMeshSubdivideResult =
-                &*m_LastMeshSubdivideResult;
-        if (m_LastMeshSimplifyResult.has_value())
-            context.LastMeshSimplifyResult =
-                &*m_LastMeshSimplifyResult;
-        if (m_LastMeshVertexNormalsResult.has_value())
-            context.LastMeshVertexNormalsResult =
-                &*m_LastMeshVertexNormalsResult;
-        if (m_LastGraphVertexNormalsResult.has_value())
-            context.LastGraphVertexNormalsResult =
-                &*m_LastGraphVertexNormalsResult;
-        if (m_LastPointCloudVertexNormalsResult.has_value())
-            context.LastPointCloudVertexNormalsResult =
-                &*m_LastPointCloudVertexNormalsResult;
-        if (m_LastPointCloudOutlierRemovalResult.has_value())
-            context.LastPointCloudOutlierRemovalResult =
-                &*m_LastPointCloudOutlierRemovalResult;
-        if (m_LastUvRegenerationResult.has_value())
-            context.LastUvRegenerationResult =
-                &*m_LastUvRegenerationResult;
-        if (m_LastParameterizationResult.has_value())
-            context.LastParameterizationResult =
-                &*m_LastParameterizationResult;
-        if (m_LastPointCloudConsolidationResult.has_value())
-            context.LastPointCloudConsolidationResult =
-                &*m_LastPointCloudConsolidationResult;
-        if (m_LastProgressivePoissonResult.has_value())
-            context.LastProgressivePoissonResult =
-                &*m_LastProgressivePoissonResult;
-        if (m_LastRegistrationResult.has_value())
-            context.LastRegistrationResult =
-                &*m_LastRegistrationResult;
-        if (m_LastNormalEstimationResult.has_value())
-            context.LastNormalEstimationResult =
-                &*m_LastNormalEstimationResult;
-        if (m_LastOutlierAnalysisResult.has_value())
-            context.LastOutlierAnalysisResult =
-                &*m_LastOutlierAnalysisResult;
-        if (m_LastKernelDensityResult.has_value())
-            context.LastKernelDensityResult =
-                &*m_LastKernelDensityResult;
-        if (m_LastPointSpacingResult.has_value())
-            context.LastPointSpacingResult =
-                &*m_LastPointSpacingResult;
-        if (m_LastBilateralFilterResult.has_value())
-            context.LastBilateralFilterResult =
-                &*m_LastBilateralFilterResult;
-        if (m_LastKeypointAnalysisResult.has_value())
-            context.LastKeypointAnalysisResult =
-                &*m_LastKeypointAnalysisResult;
-        if (m_LastDescriptorAnalysisResult.has_value())
-            context.LastDescriptorAnalysisResult =
-                &*m_LastDescriptorAnalysisResult;
-        if (m_LastDensityWeightResult.has_value())
-            context.LastDensityWeightResult =
-                &*m_LastDensityWeightResult;
-        if (m_LastPointConstructionResult.has_value())
-            context.LastPointConstructionResult =
-                &*m_LastPointConstructionResult;
+        m_ResultBindings.PointFieldResults = &m_PointFieldResults;
+        m_ResultBindings.PointAnalysisResults = &m_PointAnalysisResults;
+        m_ResultBindings.NormalResults = &m_NormalResults;
+        m_ResultBindings.RegistrationResults = &m_RegistrationResults;
+        m_ResultBindings.MeshFieldResults = &m_MeshFieldResults;
+        m_ResultBindings.MeshTopologyResults = &m_MeshTopologyResults;
+        m_ResultBindings.ParameterizationResults = &m_ParameterizationResults;
+        m_ResultBindings.PointSetResults = &m_PointSetResults;
+        m_ResultBindings.PointConstructionResults = &m_PointConstructionResults;
+        m_ResultBindings.PointCloudServiceResults = &m_PointCloudServiceResults;
+        m_ResultBindings.PointFieldResultSinks = &m_PointFieldResultSinks;
+        m_ResultBindings.PointAnalysisResultSinks = &m_PointAnalysisResultSinks;
+        m_ResultBindings.NormalResultSinks = &m_NormalResultSinks;
+        m_ResultBindings.RegistrationResultSinks = &m_RegistrationResultSinks;
+        m_ResultBindings.MeshFieldResultSinks = &m_MeshFieldResultSinks;
+        m_ResultBindings.MeshTopologyResultSinks = &m_MeshTopologyResultSinks;
+        m_ResultBindings.ParameterizationResultSinks = &m_ParameterizationResultSinks;
+        m_ResultBindings.PointSetResultSinks = &m_PointSetResultSinks;
+        m_ResultBindings.PointConstructionResultSinks = &m_PointConstructionResultSinks;
+        m_ResultBindings.PointCloudServiceResultSinks = &m_PointCloudServiceResultSinks;
         const Core::Extent2D viewport =
             context.CameraViewport.Width != 0u &&
                     context.CameraViewport.Height != 0u
@@ -764,10 +830,12 @@ namespace Extrinsic::Runtime::EditorFeatureDetail
                 };
             context.EngineConfigCommandsAvailable = true;
         }
+        // Capture only after epoch guards and config/job callbacks are installed.
+        m_ProcessingContext = MakeEditorProcessingContext(context);
         m_LastFrame = BuildEditorWorkspaceSnapshot(
             EditorWorkspaceSnapshotContext{
                 .Scene = MakeEditorSceneEditingContext(context),
-                .Geometry = MakeEditorGeometryProcessingContext(context),
+                .Geometry = m_ProcessingContext,
                 .Visualization =
                     MakeEditorVisualizationEditingContext(context),
                 .RenderRecipe =
@@ -780,7 +848,7 @@ namespace Extrinsic::Runtime::EditorFeatureDetail
         return true;
     }
 
-    bool EditorWorkspaceSession::VisitPreparedFrame(
+    bool EditorWorkspaceSession::Impl::VisitPreparedFrame(
         const EditorWorkspacePreparedFrameVisitor& visitor)
     {
         if (!m_FramePrepared || !visitor)
@@ -789,14 +857,13 @@ namespace Extrinsic::Runtime::EditorFeatureDetail
         visitor(EditorWorkspacePreparedFrame{
             .Context = m_Context,
             .Frame = m_LastFrame,
-            .LastAssetImportResult = m_LastImportResult,
-            .LastSceneFileResult = m_LastSceneFileResult,
-            .LastUvRegenerationResult = m_LastUvRegenerationResult,
+            .Geometry = m_ProcessingContext,
+            .Results = m_ResultBindings,
         });
         return true;
     }
 
-    void EditorWorkspaceSession::Detach()
+    void EditorWorkspaceSession::Impl::Detach()
     {
         if (m_AttachmentEpoch != nullptr)
         {
@@ -836,124 +903,65 @@ namespace Extrinsic::Runtime::EditorFeatureDetail
         ResetAttachmentState();
     }
 
-    void EditorWorkspaceSession::DismissGeometryProcessingResult(
-        const EditorGeometryProcessingResultSlot slot)
-    {
-        switch (slot)
-        {
-        case EditorGeometryProcessingResultSlot::KMeans:
-            m_LastKMeansResult.reset();
-            return;
-        case EditorGeometryProcessingResultSlot::PointCloudConsolidation:
-            m_LastPointCloudConsolidationResult.reset();
-            return;
-        case EditorGeometryProcessingResultSlot::ProgressivePoisson:
-            m_LastProgressivePoissonResult.reset();
-            return;
-        case EditorGeometryProcessingResultSlot::UvRegeneration:
-            m_LastUvRegenerationResult.reset();
-            return;
-        case EditorGeometryProcessingResultSlot::Parameterization:
-            m_LastParameterizationResult.reset();
-            return;
-        case EditorGeometryProcessingResultSlot::MeshCurvature:
-            m_LastMeshCurvatureResult.reset();
-            return;
-        case EditorGeometryProcessingResultSlot::MeshDenoise:
-            m_LastMeshDenoiseResult.reset();
-            return;
-        case EditorGeometryProcessingResultSlot::MeshRemesh:
-            m_LastMeshRemeshResult.reset();
-            return;
-        case EditorGeometryProcessingResultSlot::MeshSubdivide:
-            m_LastMeshSubdivideResult.reset();
-            return;
-        case EditorGeometryProcessingResultSlot::MeshSimplify:
-            m_LastMeshSimplifyResult.reset();
-            return;
-        case EditorGeometryProcessingResultSlot::MeshVertexNormals:
-            m_LastMeshVertexNormalsResult.reset();
-            return;
-        case EditorGeometryProcessingResultSlot::GraphVertexNormals:
-            m_LastGraphVertexNormalsResult.reset();
-            return;
-        case EditorGeometryProcessingResultSlot::PointCloudVertexNormals:
-            m_LastPointCloudVertexNormalsResult.reset();
-            return;
-        case EditorGeometryProcessingResultSlot::PointCloudOutlierRemoval:
-            m_LastPointCloudOutlierRemovalResult.reset();
-            return;
-        case EditorGeometryProcessingResultSlot::NormalEstimation:
-            m_LastNormalEstimationResult.reset();
-            break;
-        case EditorGeometryProcessingResultSlot::OutlierAnalysis:
-            m_LastOutlierAnalysisResult.reset();
-            break;
-        case EditorGeometryProcessingResultSlot::KernelDensity:
-            m_LastKernelDensityResult.reset();
-            break;
-        case EditorGeometryProcessingResultSlot::PointSpacing:
-            m_LastPointSpacingResult.reset();
-            break;
-        case EditorGeometryProcessingResultSlot::BilateralFilter:
-            m_LastBilateralFilterResult.reset();
-            break;
-        case EditorGeometryProcessingResultSlot::KeypointAnalysis:
-            m_LastKeypointAnalysisResult.reset();
-            break;
-        case EditorGeometryProcessingResultSlot::DescriptorAnalysis:
-            m_LastDescriptorAnalysisResult.reset();
-            break;
-        case EditorGeometryProcessingResultSlot::DensityWeight:
-            m_LastDensityWeightResult.reset();
-            break;
-        case EditorGeometryProcessingResultSlot::PointConstruction:
-            m_LastPointConstructionResult.reset();
-            break;
-        case EditorGeometryProcessingResultSlot::Registration:
-            m_LastRegistrationResult.reset();
-            return;
-        }
-    }
-
-    void EditorWorkspaceSession::ResetAttachmentState()
+    void EditorWorkspaceSession::Impl::ResetAttachmentState()
     {
         m_FramePrepared = false;
         m_Context = {};
+        // Clear borrowed references before resetting their session-owned storage.
+        m_ProcessingContext = {};
+        m_ResultBindings = {};
+        m_PointCloudServices = {};
         m_LastFrame = {};
         m_SelectedModelCache = {};
         m_LastObservedRuntimeImportSequence = 0u;
         m_LastObservedRuntimeSceneFileSequence = 0u;
         m_LastImportResult.reset();
         m_LastSceneFileResult.reset();
-        m_LastKMeansResult.reset();
-        m_LastPointCloudConsolidationResult.reset();
-        m_LastMeshDenoiseResult.reset();
-        m_LastMeshCurvatureResult.reset();
-        m_LastMeshRemeshResult.reset();
-        m_LastMeshSubdivideResult.reset();
-        m_LastMeshSimplifyResult.reset();
-        m_LastMeshVertexNormalsResult.reset();
-        m_LastGraphVertexNormalsResult.reset();
-        m_LastPointCloudVertexNormalsResult.reset();
-        m_LastPointCloudOutlierRemovalResult.reset();
-        m_LastProgressivePoissonResult.reset();
-        m_LastUvRegenerationResult.reset();
-        m_LastParameterizationResult.reset();
-        m_LastRegistrationResult.reset();
-        m_LastNormalEstimationResult.reset();
-        m_LastOutlierAnalysisResult.reset();
-        m_LastKernelDensityResult.reset();
-        m_LastPointSpacingResult.reset();
-        m_LastBilateralFilterResult.reset();
-        m_LastKeypointAnalysisResult.reset();
-        m_LastDescriptorAnalysisResult.reset();
-        m_LastDensityWeightResult.reset();
-        m_LastPointConstructionResult.reset();
+        m_PointFieldResults = {};
+        m_PointAnalysisResults = {};
+        m_NormalResults = {};
+        m_RegistrationResults = {};
+        m_MeshFieldResults = {};
+        m_MeshTopologyResults = {};
+        m_ParameterizationResults = {};
+        m_PointSetResults = {};
+        m_PointConstructionResults = {};
+        m_PointCloudServiceResults = {};
+        m_PointFieldResultSinks = {};
+        m_PointAnalysisResultSinks = {};
+        m_NormalResultSinks = {};
+        m_RegistrationResultSinks = {};
+        m_MeshFieldResultSinks = {};
+        m_MeshTopologyResultSinks = {};
+        m_ParameterizationResultSinks = {};
+        m_PointSetResultSinks = {};
+        m_PointConstructionResultSinks = {};
+        m_PointCloudServiceResultSinks = {};
+        m_ParameterizationUvViewCommands = {};
         m_JobIdentities.clear();
         m_RenderRecipeContext = {};
         m_RenderRecipeState = {};
         m_RenderArtifactRegistry = {};
     }
 
+
+    EditorWorkspaceSession::EditorWorkspaceSession() : m_Impl(std::make_unique<Impl>()) {}
+    EditorWorkspaceSession::~EditorWorkspaceSession() = default;
+    void EditorWorkspaceSession::Attach(WorldRegistry& worlds, ServiceRegistry& services)
+    {
+        m_Impl->Attach(worlds, services);
+    }
+    void EditorWorkspaceSession::Detach() { m_Impl->Detach(); }
+    bool EditorWorkspaceSession::PrepareFrame(
+        const EditorWorkspaceSnapshotRequest& request, std::string pendingAssetImportPath,
+        Assets::AssetPayloadKind pendingAssetImportPayloadKind, std::string pendingSceneFilePath)
+    {
+        return m_Impl->PrepareFrame(request, std::move(pendingAssetImportPath),
+                                   pendingAssetImportPayloadKind, std::move(pendingSceneFilePath));
+    }
+    bool EditorWorkspaceSession::VisitPreparedFrame(const EditorWorkspacePreparedFrameVisitor& visitor)
+    {
+        return m_Impl->VisitPreparedFrame(visitor);
+    }
+    bool EditorWorkspaceSession::IsAttached() const noexcept { return m_Impl->IsAttached(); }
 } // namespace Extrinsic::Runtime::EditorFeatureDetail

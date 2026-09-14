@@ -10,8 +10,14 @@ import Extrinsic.RHI.Types;
 // Out-of-line defaults anchor ICommandContext's vtable through its destructor.
 // The inert derived overrides are trivial inline bodies. Sampled-texture binding
 // forwards to the slot-explicit sibling at slot 0.
+//
+// Match the interface's global attachment, including the destructor key
+// function that emits the vtable. Importers reference that global symbol.
 namespace Extrinsic::RHI
 {
+    extern "C++"
+    {
+
     ICommandContext::~ICommandContext() = default;
 
     void ICommandContext::BindFrameSampledTexture(TextureHandle texture)
@@ -46,5 +52,7 @@ namespace Extrinsic::RHI
     {
         (void)texture;
         (void)descriptorIndex;
+    }
+
     }
 }

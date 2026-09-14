@@ -16,6 +16,10 @@ import Extrinsic.Runtime.WorldHandle;
 
 namespace Extrinsic::Runtime
 {
+    // Matches the interface's C++ language linkage; only WorldRegistry members
+    // live in this block, so wrapping it keeps every definition globally attached.
+    extern "C++"
+    {
     WorldRegistry::WorldRegistry() = default;
     WorldRegistry::~WorldRegistry() = default;
 
@@ -259,5 +263,6 @@ namespace Extrinsic::Runtime
     std::string WorldRegistry::MakeDefaultName(const std::uint32_t index) const
     {
         return "World " + std::to_string(index);
+    }
     }
 }

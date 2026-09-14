@@ -7,7 +7,7 @@ module;
 #include <string_view>
 #include <vector>
 
-#include <glm/glm.hpp>
+#include <glm/vec4.hpp>
 
 export module Extrinsic.Runtime.GeometryPresentation;
 

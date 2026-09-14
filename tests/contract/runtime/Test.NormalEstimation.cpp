@@ -1,4 +1,6 @@
 #include <algorithm>
+#include <memory>
+#include <functional>
 #include <array>
 #include <cmath>
 #include <limits>
@@ -8,9 +10,12 @@
 #include <entt/entity/registry.hpp>
 #include <variant>
 #include <gtest/gtest.h>
+#include "EditorFeatureTestContext.hpp"
 #include "SandboxEditorJobHarness.hpp"
 
-import Extrinsic.Runtime.GeometryProcessingOperations;
+import Extrinsic.Runtime.NormalOperations;
+import Extrinsic.ECS.Component.DirtyTags;
+import Extrinsic.Runtime.EditorProcessing;
 import Extrinsic.Runtime.SpatialIndexCache;
 import Extrinsic.Runtime.WorldRegistry;
 import Extrinsic.Runtime.SelectionController;
@@ -106,15 +111,15 @@ TEST(NormalEstimation, EveryCanonicalDomainPublishesNamedNormalsAndSupportsUndoR
             auto &props = Properties(scene, entity, D(d));
             const auto slots = props.Size();
             R::EditorCommandHistory history;
-            R::EditorGeometryProcessingContext context{
+            R::EditorProcessingContext context{
                 .Scene = &scene, .World = world, .CommandHistory = &history, .SpatialIndices = &cache};
-            auto catalog = R::GetEditorNormalEstimationInputCatalog(context, config.StableEntityId);
+            auto catalog = R::GetEditorPointInputCatalog(R::BindEditorProcessingCommands(context), config.StableEntityId);
             ASSERT_TRUE(std::ranges::any_of(catalog.Entries,
                                             [&](const auto &e) { return e.Ref == config.Positions; }));
             const auto inputRevision = std::as_const(props).Get<glm::vec3>("samples").Revision();
-            ASSERT_TRUE(R::PreviewEditorNormalEstimationCommand(context, config).Ready);
+            ASSERT_TRUE(R::PreviewEditorNormalEstimationCommand(R::BindEditorProcessingCommands(context), config).Ready);
             EXPECT_FALSE(props.Exists("estimated"));
-            const auto result = R::ApplyEditorNormalEstimationCommand(context, config);
+            const auto result = R::ApplyEditorNormalEstimationCommand(R::BindEditorProcessingCommands(context), config);
             ASSERT_EQ(result.Status, R::EditorCommandStatus::Applied) << result.Message;
             EXPECT_EQ(result.ActualBackend, R::ToString(backend));
             EXPECT_EQ(result.Output, config.Output);
@@ -136,7 +141,7 @@ TEST(NormalEstimation, EveryCanonicalDomainPublishesNamedNormalsAndSupportsUndoR
             EXPECT_FALSE(props.Exists("estimated"));
             ASSERT_TRUE(history.Redo().Succeeded());
             EXPECT_TRUE(props.Exists("estimated"));
-            auto repeated = R::ApplyEditorNormalEstimationCommand(context, config);
+            auto repeated = R::ApplyEditorNormalEstimationCommand(R::BindEditorProcessingCommands(context), config);
             EXPECT_EQ(repeated.Status, R::EditorCommandStatus::NoChange);
             EXPECT_EQ(repeated.IndexReused, backend == R::NormalEstimationBackend::CpuLBVH);
         }
@@ -150,9 +155,9 @@ TEST(NormalEstimation, PreservesDeletedRowsAndUnrelatedEditsButGuardsOutputHisto
     std::ranges::fill(props.GetOrAdd<glm::vec3>("estimated").Vector(), glm::vec3(7, 8, 9));
     props.Get<glm::vec3>("estimated")[4].x = std::numeric_limits<float>::quiet_NaN();
     R::EditorCommandHistory history;
-    R::EditorGeometryProcessingContext context{.Scene = &scene, .CommandHistory = &history};
+    R::EditorProcessingContext context{.Scene = &scene, .CommandHistory = &history};
     ASSERT_TRUE(
-        R::ApplyEditorNormalEstimationCommand(context, Config(entity, D::PointCloudPoint)).Succeeded());
+        R::ApplyEditorNormalEstimationCommand(R::BindEditorProcessingCommands(context), Config(entity, D::PointCloudPoint)).Succeeded());
     EXPECT_TRUE(std::isnan(std::as_const(props).Get<glm::vec3>("estimated")[4].x));
     props.Get<float>("keep")[0] = 99.f;
     ASSERT_TRUE(history.Undo().Succeeded());
@@ -174,13 +179,13 @@ TEST(NormalEstimation, TopologyVariantsConsumeCustomPositionsAndGraphMethodAccep
             const auto entity = Make(scene, domain);
             auto config = Config(entity, domain);
             config.Method = method;
-            R::EditorGeometryProcessingContext context{.Scene = &scene};
+            R::EditorProcessingContext context{.Scene = &scene};
             if (domain == D::GraphNode && method == R::NormalEstimationMethod::MeshFaceWeighted)
             {
-                EXPECT_FALSE(R::PreviewEditorNormalEstimationCommand(context, config).Ready);
+                EXPECT_FALSE(R::PreviewEditorNormalEstimationCommand(R::BindEditorProcessingCommands(context), config).Ready);
                 continue;
             }
-            auto result = R::ApplyEditorNormalEstimationCommand(context, config);
+            auto result = R::ApplyEditorNormalEstimationCommand(R::BindEditorProcessingCommands(context), config);
             ASSERT_TRUE(result.Succeeded()) << result.Message;
             EXPECT_EQ(result.ValidCount, 4);
             EXPECT_EQ(result.FallbackCount, 0);
@@ -208,8 +213,8 @@ TEST(NormalEstimation, MeshDeletionMasksExcludeFacesAndEdgesWithoutRenumberingOu
             faces.GetOrAdd<bool>("f:deleted")[0] = true;
             faces.Get<std::uint32_t>("f:halfedge")[0] = std::numeric_limits<std::uint32_t>::max();
         }
-        R::EditorGeometryProcessingContext context{.Scene = &scene};
-        const auto result = R::ApplyEditorNormalEstimationCommand(context, config);
+        R::EditorProcessingContext context{.Scene = &scene};
+        const auto result = R::ApplyEditorNormalEstimationCommand(R::BindEditorProcessingCommands(context), config);
         ASSERT_TRUE(result.Succeeded()) << result.Message;
         EXPECT_EQ(result.SlotCount, 4);
         EXPECT_EQ(result.ProcessedFaces, 1);
@@ -221,7 +226,7 @@ TEST(NormalEstimation, RejectsInvalidBindingsAndUnavailableBackendsWithoutMutati
 {
     Extrinsic::ECS::Scene::Registry scene;
     const auto entity = Make(scene, D::PointCloudPoint);
-    R::EditorGeometryProcessingContext context{.Scene = &scene};
+    R::EditorProcessingContext context{.Scene = &scene};
     const auto base = Config(entity, D::PointCloudPoint);
     auto &props = Properties(scene, entity, D::PointCloudPoint);
     for (unsigned invalid = 0; invalid < 7; ++invalid)
@@ -251,8 +256,8 @@ TEST(NormalEstimation, RejectsInvalidBindingsAndUnavailableBackendsWithoutMutati
             config.Positions.Name = "missing";
             break;
         }
-        EXPECT_FALSE(R::PreviewEditorNormalEstimationCommand(context, config).Ready);
-        const auto rejected = R::ApplyEditorNormalEstimationCommand(context, config);
+        EXPECT_FALSE(R::PreviewEditorNormalEstimationCommand(R::BindEditorProcessingCommands(context), config).Ready);
+        const auto rejected = R::ApplyEditorNormalEstimationCommand(R::BindEditorProcessingCommands(context), config);
         EXPECT_FALSE(rejected.Succeeded());
         EXPECT_EQ(rejected.Method, config.Method);
         EXPECT_EQ(rejected.RequestedBackend, config.Backend);
@@ -260,7 +265,7 @@ TEST(NormalEstimation, RejectsInvalidBindingsAndUnavailableBackendsWithoutMutati
         EXPECT_FALSE(props.Exists("estimated"));
     }
     props.Get<glm::vec3>("samples")[0].x = std::numeric_limits<float>::quiet_NaN();
-    EXPECT_FALSE(R::PreviewEditorNormalEstimationCommand(context, base).Ready);
+    EXPECT_FALSE(R::PreviewEditorNormalEstimationCommand(R::BindEditorProcessingCommands(context), base).Ready);
     EXPECT_FALSE(props.Exists("estimated"));
 }
 
@@ -271,20 +276,20 @@ TEST(NormalEstimation, RadiusNeighborhoodAndDegenerateFallbackMatchAcrossBackend
     auto &scene = *worlds.Get(world);
     R::SpatialIndexCache cache(worlds);
     auto entity = Make(scene, D::PointCloudPoint);
-    R::EditorGeometryProcessingContext context{.Scene = &scene, .World = world, .SpatialIndices = &cache};
+    R::EditorProcessingContext context{.Scene = &scene, .World = world, .SpatialIndices = &cache};
     auto config = Config(entity, D::PointCloudPoint);
     config.UseRadiusSearch = true;
     config.Radius = 10;
-    auto reference = R::ApplyEditorNormalEstimationCommand(context, config);
+    auto reference = R::ApplyEditorNormalEstimationCommand(R::BindEditorProcessingCommands(context), config);
     ASSERT_TRUE(reference.Succeeded());
     config.Backend = R::NormalEstimationBackend::CpuLBVH;
-    auto accelerated = R::ApplyEditorNormalEstimationCommand(context, config);
+    auto accelerated = R::ApplyEditorNormalEstimationCommand(R::BindEditorProcessingCommands(context), config);
     ASSERT_TRUE(accelerated.Succeeded());
     EXPECT_EQ(accelerated.ChangedCount, 0);
     EXPECT_EQ(accelerated.ValidCount, reference.ValidCount);
     config.Radius = .01f;
     config.FallbackNormal = {1, 0, 0};
-    auto fallback = R::ApplyEditorNormalEstimationCommand(context, config);
+    auto fallback = R::ApplyEditorNormalEstimationCommand(R::BindEditorProcessingCommands(context), config);
     ASSERT_TRUE(fallback.Succeeded());
     EXPECT_EQ(fallback.FallbackCount, 4);
     EXPECT_EQ(fallback.ValidCount, 0);
@@ -305,12 +310,12 @@ TEST(NormalEstimation, QueuedJobsGuardInputsTopologyDeletionAndOutputButAllowUnr
         R::EditorCommandHistory history;
         context.CommandHistory = &history;
         std::optional<R::EditorNormalEstimationResult> delivered;
-        context.MethodResultSinks.NormalEstimation = [&](auto r) { delivered = std::move(r); };
+        std::function<void(R::EditorNormalEstimationResult)> onComplete = [&](auto r) { delivered = std::move(r); };
         Extrinsic::Tests::EditorJobHarness jobs;
         jobs.Attach(context);
-        ASSERT_EQ(R::ApplyEditorNormalEstimationCommand(context, config).Status,
+        ASSERT_EQ(R::ApplyEditorNormalEstimationCommand(R::BindEditorProcessingCommands(context), config, onComplete).Status,
                   R::EditorCommandStatus::Pending);
-        EXPECT_EQ(R::ApplyEditorNormalEstimationCommand(context, config).Status,
+        EXPECT_EQ(R::ApplyEditorNormalEstimationCommand(R::BindEditorProcessingCommands(context), config, onComplete).Status,
                   R::EditorCommandStatus::Pending);
         EXPECT_EQ(jobs.Snapshot().Entries.size(), 1);
         switch (change)
@@ -363,7 +368,7 @@ TEST(NormalEstimationConfig, RoundTripAndSharedPreviewApplyRun)
     ASSERT_TRUE(registry.Register(R::MakeNormalEstimationConfigSectionRegistration()));
     R::RuntimeEngineConfigControlState state;
     C::PopulateEngineConfigSectionDefaults(state.ActiveConfig, registry);
-    R::EditorGeometryProcessingContext context{.Scene = &scene};
+    R::EditorProcessingContext context{.Scene = &scene};
     context.EngineConfigControlState = &state;
     context.EngineConfigCommandsAvailable = true;
     unsigned previews = 0, applies = 0;
@@ -376,7 +381,7 @@ TEST(NormalEstimationConfig, RoundTripAndSharedPreviewApplyRun)
         state.ActiveConfig = preview.Preview.Config;
         return R::RuntimeEngineConfigApplyResult{.Status = R::RuntimeEngineConfigApplyStatus::Applied};
     };
-    auto commands = R::BindEditorGeometryProcessingCommands(context);
+    auto commands = R::BindEditorProcessingCommands(context);
     ASSERT_TRUE(R::PreviewEditorNormalEstimationCommand(commands, config).Ready);
     EXPECT_FALSE(Properties(scene, entity, D::MeshFace).Exists("estimated"));
     ASSERT_TRUE(R::ApplyEditorNormalEstimationConfig(commands, config).Succeeded());
@@ -412,7 +417,7 @@ TEST(NormalEstimation, NamedOutputUsesSharedVectorVisualizationRecipe)
             stored = std::move(r);
         };
         context.VisualizationRecipes.ClearRecipe = [&](std::uint32_t) { stored.reset(); };
-        ASSERT_TRUE(R::ApplyEditorNormalEstimationCommand(context, config).Succeeded());
+        ASSERT_TRUE(R::ApplyEditorNormalEstimationCommand(R::BindEditorProcessingCommands(context), config).Succeeded());
         EXPECT_EQ(
             R::ApplyEditorVisualizationRecipeCommand(
                 context,
@@ -435,15 +440,15 @@ TEST(NormalEstimation, TopologyCatalogRetainsSmallGraphsAndReportsPcaMinimum)
     auto entity = Make(scene, D::GraphNode);
     auto &vertices = Properties(scene, entity, D::GraphNode);
     vertices.Resize(2);
-    R::EditorGeometryProcessingContext context{.Scene = &scene};
+    R::EditorProcessingContext context{.Scene = &scene};
     auto config = Config(entity, D::GraphNode);
-    const auto catalog = R::GetEditorNormalEstimationInputCatalog(context, config.StableEntityId);
+    const auto catalog = R::GetEditorPointInputCatalog(R::BindEditorProcessingCommands(context), config.StableEntityId);
     EXPECT_TRUE(
         std::ranges::any_of(catalog.Entries, [&](const auto &e) { return e.Ref == config.Positions; }));
-    EXPECT_FALSE(R::PreviewEditorNormalEstimationCommand(context, config).Ready);
+    EXPECT_FALSE(R::PreviewEditorNormalEstimationCommand(R::BindEditorProcessingCommands(context), config).Ready);
     config.Method = R::NormalEstimationMethod::GraphNeighborhood;
-    EXPECT_TRUE(R::PreviewEditorNormalEstimationCommand(context, config).Ready);
-    const auto result = R::ApplyEditorNormalEstimationCommand(context, config);
+    EXPECT_TRUE(R::PreviewEditorNormalEstimationCommand(R::BindEditorProcessingCommands(context), config).Ready);
+    const auto result = R::ApplyEditorNormalEstimationCommand(R::BindEditorProcessingCommands(context), config);
     EXPECT_TRUE(result.Succeeded()) << result.Message;
     EXPECT_GT(result.InvalidEdges, 0);
 }
@@ -459,8 +464,8 @@ TEST(NormalEstimation, GraphPositionSlotMayBindAnExistingNormalNamedProperty)
     auto config = Config(entity, D::GraphNode);
     config.Positions.Name = "v:normal";
     config.Method = R::NormalEstimationMethod::GraphNeighborhood;
-    R::EditorGeometryProcessingContext context{.Scene = &scene};
-    const auto result = R::ApplyEditorNormalEstimationCommand(context, config);
+    R::EditorProcessingContext context{.Scene = &scene};
+    const auto result = R::ApplyEditorNormalEstimationCommand(R::BindEditorProcessingCommands(context), config);
     ASSERT_TRUE(result.Succeeded()) << result.Message;
     EXPECT_EQ(result.ValidCount, 4);
     EXPECT_EQ(std::as_const(vertices).Get<glm::vec3>("v:normal").Revision(), revision);
@@ -500,9 +505,9 @@ TEST(NormalEstimation, FaceNormalsUseFullPolygonRingAndPublishOnlyFaceOutput)
     ASSERT_TRUE(R::GetNormalEstimationConfig(engineConfig));
     EXPECT_EQ(R::GetNormalEstimationConfig(engineConfig)->Method, config.Method);
     R::EditorCommandHistory history;
-    R::EditorGeometryProcessingContext context{.Scene = &scene, .CommandHistory = &history};
-    ASSERT_TRUE(R::PreviewEditorNormalEstimationCommand(context, config).Ready);
-    const auto result = R::ApplyEditorNormalEstimationCommand(context, config);
+    R::EditorProcessingContext context{.Scene = &scene, .CommandHistory = &history};
+    ASSERT_TRUE(R::PreviewEditorNormalEstimationCommand(R::BindEditorProcessingCommands(context), config).Ready);
+    const auto result = R::ApplyEditorNormalEstimationCommand(R::BindEditorProcessingCommands(context), config);
     ASSERT_TRUE(result.Succeeded()) << result.Message;
     EXPECT_EQ(result.SlotCount, 2u);
     EXPECT_EQ(result.ValidCount, 2u);
@@ -532,8 +537,8 @@ TEST(NormalEstimation, FaceNormalsPreserveDeletedSlotsAndReportDegenerateFallbac
     auto config = Config(entity, D::MeshVertex);
     config.Method = R::NormalEstimationMethod::MeshFaceNormals;
     config.Output = {D::MeshFace, "f:normal", Geometry::PropertyValueKind::Vec3};
-    R::EditorGeometryProcessingContext context{.Scene = &scene};
-    auto result = R::ApplyEditorNormalEstimationCommand(context, config);
+    R::EditorProcessingContext context{.Scene = &scene};
+    auto result = R::ApplyEditorNormalEstimationCommand(R::BindEditorProcessingCommands(context), config);
     ASSERT_TRUE(result.Succeeded()) << result.Message;
     EXPECT_EQ(result.WrittenCount, 1u);
     EXPECT_EQ(result.SlotCount, 2u);
@@ -542,13 +547,13 @@ TEST(NormalEstimation, FaceNormalsPreserveDeletedSlotsAndReportDegenerateFallbac
     Properties(scene, entity, D::MeshVertex).Get<glm::vec3>("samples").Vector() =
         {{0, 0, 0}, {1, 0, 0}, {2, 0, 0}, {3, 0, 0}};
     config.FallbackNormal = {0, 2, 0};
-    result = R::ApplyEditorNormalEstimationCommand(context, config);
+    result = R::ApplyEditorNormalEstimationCommand(R::BindEditorProcessingCommands(context), config);
     ASSERT_TRUE(result.Succeeded()) << result.Message;
     EXPECT_EQ(result.FallbackCount, 1u);
     EXPECT_EQ(result.ValidCount, 0u);
     EXPECT_EQ(std::as_const(faces).Get<glm::vec3>("f:normal")[1], (glm::vec3{0, 1, 0}));
     config.Output.Domain = D::MeshVertex;
-    EXPECT_FALSE(R::PreviewEditorNormalEstimationCommand(context, config).Ready);
+    EXPECT_FALSE(R::PreviewEditorNormalEstimationCommand(R::BindEditorProcessingCommands(context), config).Ready);
 }
 
 
@@ -564,10 +569,10 @@ TEST(NormalEstimation, QueuedFaceNormalsPublishToFacesAndRejectStaleTopology)
         Intrinsic::Tests::EditorFeatureTestContext context;
         context.Scene = &scene;
         std::optional<R::EditorNormalEstimationResult> delivered;
-        context.MethodResultSinks.NormalEstimation = [&](auto result) { delivered = std::move(result); };
+        std::function<void(R::EditorNormalEstimationResult)> onComplete = [&](auto result) { delivered = std::move(result); };
         Extrinsic::Tests::EditorJobHarness jobs;
         jobs.Attach(context);
-        ASSERT_EQ(R::ApplyEditorNormalEstimationCommand(context, config).Status, R::EditorCommandStatus::Pending);
+        ASSERT_EQ(R::ApplyEditorNormalEstimationCommand(R::BindEditorProcessingCommands(context), config, onComplete).Status, R::EditorCommandStatus::Pending);
         auto &faces = Properties(scene, entity, D::MeshFace);
         if (stale)
             faces.GetOrAdd<bool>("f:deleted")[0] = true;
@@ -610,12 +615,164 @@ TEST(NormalEstimation, VulkanUnavailablePreservesOutputsOnEveryDomain)
         auto entity = Make(scene, D(d));
         auto config = Config(entity, D(d));
         config.Backend = R::NormalEstimationBackend::VulkanLBVH;
-        R::EditorGeometryProcessingContext context{.Scene=&scene};
-        EXPECT_FALSE(R::PreviewEditorNormalEstimationCommand(context, config).Ready);
-        const auto result = R::ApplyEditorNormalEstimationCommand(context, config);
+        R::EditorProcessingContext context{.Scene=&scene};
+        EXPECT_FALSE(R::PreviewEditorNormalEstimationCommand(R::BindEditorProcessingCommands(context), config).Ready);
+        const auto result = R::ApplyEditorNormalEstimationCommand(R::BindEditorProcessingCommands(context), config);
         EXPECT_EQ(result.RequestedBackend, R::NormalEstimationBackend::VulkanLBVH);
         EXPECT_FALSE(result.Succeeded());
         EXPECT_TRUE(result.ActualBackend.empty());
         EXPECT_FALSE(Properties(scene, entity, D(d)).Exists(config.Output.Name));
+    }
+}
+
+TEST(NormalEstimation, CanonicalVariantsRetainWeightingPublicationAndUndoWithoutNoChangeHistory)
+{
+    using Weight = Geometry::HalfedgeMesh::VertexNormals::AveragingMode;
+    for (auto domain : {D::MeshVertex, D::GraphNode, D::PointCloudPoint})
+        for (auto weighting : {Weight::UniformFace, Weight::AreaWeighted, Weight::AngleWeighted,
+                               Weight::AreaAngleWeighted, Weight::MaxWeighted})
+        {
+            Extrinsic::ECS::Scene::Registry scene;
+            const auto entity = Make(scene, domain);
+            auto config = Config(entity, domain);
+            config.Method = domain == D::MeshVertex ? R::NormalEstimationMethod::MeshFaceWeighted
+                : domain == D::GraphNode ? R::NormalEstimationMethod::GraphNeighborhood
+                                        : R::NormalEstimationMethod::PointSetPCA;
+            config.Weighting = weighting;
+            config.Output.Name = "v:normal";
+            R::EditorCommandHistory history;
+            const auto commands = R::BindEditorProcessingCommands({.Scene = &scene, .CommandHistory = &history});
+            unsigned callbacks = 0;
+            const auto result = R::ApplyEditorNormalEstimationCommand(commands, config, [&](auto) { ++callbacks; });
+            ASSERT_EQ(result.Status, R::EditorCommandStatus::Applied) << result.Message;
+            EXPECT_EQ(callbacks, 0u);
+            EXPECT_EQ(result.ValidCount, 4u);
+            EXPECT_EQ(result.ChangedCount, 4u);
+            auto& props = Properties(scene, entity, domain);
+            const auto values = std::as_const(props).Get<glm::vec3>("v:normal").Vector();
+            for (std::size_t i = 0; i < 4; ++i)
+            {
+                EXPECT_NEAR(glm::length(values[i]), 1.0f, 1e-5f);
+                EXPECT_GT(values[i].z, 0.9f);
+            }
+            EXPECT_TRUE(scene.Raw().all_of<Extrinsic::ECS::Components::DirtyTags::DirtyVertexNormals>(entity));
+            EXPECT_EQ(R::ApplyEditorNormalEstimationCommand(commands, config).Status, R::EditorCommandStatus::NoChange);
+            ASSERT_TRUE(history.Undo().Succeeded());
+            EXPECT_FALSE(history.CanUndo());
+            EXPECT_FALSE(props.Exists("v:normal"));
+            ASSERT_TRUE(history.Redo().Succeeded());
+            EXPECT_EQ(std::as_const(props).Get<glm::vec3>("v:normal").Vector(), values);
+        }
+}
+
+TEST(NormalEstimation, EveryVariantQueuesOnceAndReportsNoChangeWithoutAdditionalHistory)
+{
+    for (auto domain : {D::MeshVertex, D::GraphNode, D::PointCloudPoint})
+    {
+        Extrinsic::ECS::Scene::Registry scene;
+        const auto entity = Make(scene, domain);
+        auto config = Config(entity, domain);
+        config.Method = domain == D::MeshVertex ? R::NormalEstimationMethod::MeshFaceWeighted
+            : domain == D::GraphNode ? R::NormalEstimationMethod::GraphNeighborhood
+                                    : R::NormalEstimationMethod::PointSetPCA;
+        R::EditorCommandHistory history;
+        Intrinsic::Tests::EditorFeatureTestContext context;
+        context.Scene = &scene;
+        context.CommandHistory = &history;
+        Extrinsic::Tests::EditorJobHarness jobs;
+        jobs.Attach(context);
+        const auto commands = R::BindEditorProcessingCommands(context);
+        unsigned firstCallbacks = 0, duplicateCallbacks = 0;
+        std::optional<R::EditorNormalEstimationResult> completed;
+        auto finish = [&](auto result) { ++firstCallbacks; completed = std::move(result); };
+        ASSERT_EQ(R::ApplyEditorNormalEstimationCommand(commands, config, finish).Status, R::EditorCommandStatus::Pending);
+        ASSERT_EQ(R::ApplyEditorNormalEstimationCommand(commands, config, [&](auto) { ++duplicateCallbacks; }).Status,
+                  R::EditorCommandStatus::Pending);
+        ASSERT_TRUE(jobs.DrainUntilTerminal());
+        ASSERT_TRUE(completed);
+        EXPECT_EQ(completed->Status, R::EditorCommandStatus::Applied);
+        EXPECT_EQ(firstCallbacks, 1u);
+        EXPECT_EQ(duplicateCallbacks, 0u);
+        ASSERT_EQ(R::ApplyEditorNormalEstimationCommand(commands, config, finish).Status, R::EditorCommandStatus::Pending);
+        ASSERT_TRUE(jobs.DrainUntilTerminal());
+        EXPECT_EQ(completed->Status, R::EditorCommandStatus::NoChange);
+        EXPECT_EQ(firstCallbacks, 2u);
+        ASSERT_TRUE(history.Undo().Succeeded());
+        EXPECT_FALSE(history.CanUndo());
+        EXPECT_FALSE(Properties(scene, entity, domain).Exists(config.Output.Name));
+    }
+}
+
+TEST(NormalEstimation, EveryVariantRejectsDestroyedTargetsBeforeQueuedPublication)
+{
+    for (auto domain : {D::MeshVertex, D::GraphNode, D::PointCloudPoint})
+    {
+        Extrinsic::ECS::Scene::Registry scene;
+        const auto entity = Make(scene, domain);
+        auto config = Config(entity, domain);
+        config.Method = domain == D::MeshVertex ? R::NormalEstimationMethod::MeshFaceWeighted
+            : domain == D::GraphNode ? R::NormalEstimationMethod::GraphNeighborhood
+                                    : R::NormalEstimationMethod::PointSetPCA;
+        R::EditorCommandHistory history;
+        Intrinsic::Tests::EditorFeatureTestContext context;
+        context.Scene = &scene;
+        context.CommandHistory = &history;
+        Extrinsic::Tests::EditorJobHarness jobs;
+        jobs.Attach(context);
+        std::optional<R::EditorNormalEstimationResult> completed;
+        const auto commands = R::BindEditorProcessingCommands(context);
+        ASSERT_EQ(R::ApplyEditorNormalEstimationCommand(commands, config, [&](auto r) { completed = std::move(r); }).Status,
+                  R::EditorCommandStatus::Pending);
+        scene.Raw().destroy(entity);
+        ASSERT_TRUE(jobs.DrainUntilTerminal());
+        ASSERT_TRUE(completed);
+        EXPECT_EQ(completed->Status, R::EditorCommandStatus::StaleEntity);
+        EXPECT_FALSE(history.CanUndo());
+    }
+}
+
+TEST(NormalEstimation, ExpiredAttachmentGuardsFreedSceneHistoryAndCommands)
+{
+    auto scene = std::make_unique<Extrinsic::ECS::Scene::Registry>();
+    const auto entity = Make(*scene, D::MeshVertex);
+    const auto config = Config(entity, D::MeshVertex);
+    bool active = true;
+    R::EditorCommandHistory history;
+    const auto commands = R::BindEditorProcessingCommands({.Scene = scene.get(), .CommandHistory = &history,
+                                                           .AttachmentActive = [&] { return active; }});
+    ASSERT_EQ(R::ApplyEditorNormalEstimationCommand(commands, config).Status, R::EditorCommandStatus::Applied);
+    active = false;
+    scene.reset();
+    EXPECT_EQ(history.Undo().Status, R::EditorCommandHistoryStatus::StaleEntity);
+    EXPECT_FALSE(R::PreviewEditorNormalEstimationCommand(commands, config).Ready);
+    EXPECT_TRUE(R::GetEditorPointInputCatalog(commands, config.StableEntityId).Entries.empty());
+    EXPECT_FALSE(R::ApplyEditorNormalEstimationCommand(commands, config).Succeeded());
+    EXPECT_FALSE(R::GetEditorNormalEstimationConfig(commands));
+}
+
+TEST(NormalEstimation, ExpiredAttachmentSuppressesQueuedCallbacksAfterSceneDestruction)
+{
+    for (auto domain : {D::MeshVertex, D::GraphNode, D::PointCloudPoint})
+    {
+        auto scene = std::make_unique<Extrinsic::ECS::Scene::Registry>();
+        const auto entity = Make(*scene, domain);
+        auto config = Config(entity, domain);
+        config.Method = domain == D::MeshVertex ? R::NormalEstimationMethod::MeshFaceWeighted
+            : domain == D::GraphNode ? R::NormalEstimationMethod::GraphNeighborhood
+                                    : R::NormalEstimationMethod::PointSetPCA;
+        bool active = true;
+        unsigned callbacks = 0;
+        Intrinsic::Tests::EditorFeatureTestContext context;
+        context.Scene = scene.get();
+        context.AttachmentActive = [&] { return active; };
+        Extrinsic::Tests::EditorJobHarness jobs;
+        jobs.Attach(context);
+        const auto commands = R::BindEditorProcessingCommands(context);
+        ASSERT_EQ(R::ApplyEditorNormalEstimationCommand(commands, config, [&](auto) { ++callbacks; }).Status,
+                  R::EditorCommandStatus::Pending);
+        active = false;
+        scene.reset();
+        ASSERT_TRUE(jobs.DrainUntilTerminal());
+        EXPECT_EQ(callbacks, 0u);
     }
 }

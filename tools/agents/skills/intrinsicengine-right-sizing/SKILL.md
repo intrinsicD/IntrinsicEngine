@@ -123,6 +123,10 @@ If none holds, the element is ceremony. Plan the simpler alternative.
 
 ## The right-sizing plan (required before implementing)
 
+Use `intrinsicengine-reuse` to find and verify existing owners/helpers before
+designing the simpler alternative. Its contract comparison distinguishes a
+reusable mechanism from code that only looks similar.
+
 For each ceremony finding, write a short plan — in the task file for new work,
 in the review note for existing code:
 

@@ -519,9 +519,13 @@ is allocated per slice (the `GRAPHICS-072/073/074` series pattern).
 - `src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.cppm` and
   `src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.cpp` — the runtime-owned
   algorithm catalog, capability snapshots, and typed operations.
-- `src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.cpp` and
-  `src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Mesh.cpp` — typed geometry
-  operations, including the ICP observer and mesh-processing executors.
+- `src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.cpp` — typed geometry
+  operations that still belong to the broad module, and
+  `Runtime.GeometryProcessingOperations.Mesh.cpp` — the cross-cutting mesh
+  domain/menu catalogue. The mesh executors themselves live with their families:
+  `Runtime.MeshFieldOperations.*` (curvature, segmentation, geodesics),
+  `Runtime.MeshTopologyOperations.*` (denoise, remesh, subdivide, simplify) and
+  `Runtime.GeometryProcessingOperations.Registration.cpp` (ICP).
 - `src/runtime/Editor/Runtime.EditorWorkspaceSnapshots.Models.cpp` and
   `src/runtime/Editor/internal/Runtime.EditorWorkspaceSession.cpp` — presentation-free
   workspace model assembly and the bounded attachment/job-result lifecycle.

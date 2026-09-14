@@ -27,7 +27,7 @@ import Extrinsic.Runtime.EditorCommandHistory;
 import Extrinsic.Runtime.Engine;
 import Extrinsic.Runtime.EngineConfigBoot;
 import Extrinsic.Runtime.EngineConfigControl;
-import Extrinsic.Runtime.ParameterizationConfig;
+import Extrinsic.Runtime.ParameterizationOperations;
 import Extrinsic.Runtime.EditorWorkspaceSnapshots;
 import Extrinsic.Runtime.EditorJobProjection;
 import Extrinsic.Runtime.SceneEditingOperations;
@@ -182,6 +182,8 @@ namespace
         ECS::EntityHandle Entity{ECS::InvalidEntityHandle};
         std::uint32_t StableEntityId{0u};
         Intrinsic::Tests::EditorFeatureTestContext Context{};
+        Runtime::EditorParameterizationResultsSnapshot Results{};
+        Runtime::EditorParameterizationUvViewCommandSurface UvViewCommands{};
 
         explicit ParameterizationHarness(
             Geometry::HalfedgeMesh::Mesh mesh = MakeGridMesh())
@@ -925,7 +927,7 @@ TEST(ParameterizationOperations, ViewModelNamesCornerDomainUvsItCannotDraw)
         .Properties.GetOrAdd<glm::vec2>("h:texcoord", glm::vec2{0.25f, 0.5f});
 
     const Runtime::EditorParameterizationViewModel model =
-        Runtime::BuildEditorParameterizationViewModel(harness.Context);
+        Runtime::BuildEditorParameterizationViewModel(harness.Context, harness.Results);
     EXPECT_FALSE(model.HasUvCoordinates);
     EXPECT_NE(model.Message.find("h:texcoord"), std::string::npos)
         << "message was: " << model.Message;
@@ -943,9 +945,9 @@ TEST(ParameterizationOperations, ViewModelDoesNotMirrorTheLastResultMessage)
     ASSERT_FALSE(result.Succeeded());
     ASSERT_FALSE(result.Message.empty());
 
-    closed.Context.LastParameterizationResult = &result;
+    closed.Results.LastParameterizationResult = result;
     const Runtime::EditorParameterizationViewModel model =
-        Runtime::BuildEditorParameterizationViewModel(closed.Context);
+        Runtime::BuildEditorParameterizationViewModel(closed.Context, closed.Results);
     ASSERT_TRUE(model.HasLastResult);
     EXPECT_NE(model.Message, result.Message);
     EXPECT_TRUE(model.LastStatus.has_value())
@@ -958,12 +960,12 @@ TEST(ParameterizationOperations, ViewModelIsPointerFreeAndCarriesAggregateDiagno
     const Runtime::EditorParameterizationResult result = Apply(
         harness, Runtime::ParameterizationStrategyKind::HarmonicCotangent);
     ASSERT_TRUE(result.Succeeded()) << result.Message;
-    harness.Context.LastParameterizationResult = &result;
+    harness.Results.LastParameterizationResult = result;
 
     const Runtime::EditorParameterizationViewModel model =
-        Runtime::BuildEditorParameterizationViewModel(harness.Context);
+        Runtime::BuildEditorParameterizationViewModel(harness.Context, harness.Results);
     const Runtime::EditorParameterizationViewModel repeated =
-        Runtime::BuildEditorParameterizationViewModel(harness.Context);
+        Runtime::BuildEditorParameterizationViewModel(harness.Context, harness.Results);
     EXPECT_TRUE(model.HasSelectedEntity);
     EXPECT_TRUE(model.SelectedEntityIsMesh);
     EXPECT_TRUE(model.HasUvCoordinates);
@@ -1005,7 +1007,7 @@ TEST(ParameterizationOperations, ViewModelFansFaceDiagnosticsIntoRenderedTriangl
         };
     Runtime::EditorParameterizationResult last{};
     const Runtime::EditorParameterizationViewModel current =
-        Runtime::BuildEditorParameterizationViewModel(harness.Context);
+        Runtime::BuildEditorParameterizationViewModel(harness.Context, harness.Results);
     ASSERT_TRUE(current.DiagnosticInputFingerprint.has_value());
     last.Status = Runtime::EditorCommandStatus::Applied;
     last.StableEntityId = harness.StableEntityId;
@@ -1014,10 +1016,10 @@ TEST(ParameterizationOperations, ViewModelFansFaceDiagnosticsIntoRenderedTriangl
     last.DiagnosticInputFingerprint = current.DiagnosticInputFingerprint;
     last.Diagnostics.FaceStorageCount = 1u;
     last.Diagnostics.FaceConformalDistortion = {2.5f};
-    harness.Context.LastParameterizationResult = &last;
+    harness.Results.LastParameterizationResult = last;
 
     const Runtime::EditorParameterizationViewModel model =
-        Runtime::BuildEditorParameterizationViewModel(harness.Context);
+        Runtime::BuildEditorParameterizationViewModel(harness.Context, harness.Results);
     ASSERT_EQ(model.Triangles.size(), 2u);
     EXPECT_EQ(model.Triangles[0],
               (std::array<std::uint32_t, 3u>{0u, 1u, 2u}));
@@ -1049,23 +1051,21 @@ TEST(ParameterizationOperations,
     ASSERT_TRUE(last.Succeeded()) << last.Message;
     ASSERT_TRUE(last.DiagnosticInputFingerprint.has_value());
     last.Diagnostics.FaceConformalDistortion.assign(8u, 2.0f);
-    harness.Context.LastParameterizationResult = &last;
+    harness.Results.LastParameterizationResult = last;
 
     Runtime::EditorParameterizationViewModel model =
-        Runtime::BuildEditorParameterizationViewModel(harness.Context);
+        Runtime::BuildEditorParameterizationViewModel(harness.Context, harness.Results);
     EXPECT_EQ(model.TriangleConformalDistortion.size(), 8u);
     EXPECT_EQ(model.DiagnosticInputFingerprint,
               last.DiagnosticInputFingerprint);
 
     ASSERT_TRUE(harness.History.Undo().Succeeded());
-    model = Runtime::BuildEditorParameterizationViewModel(
-        harness.Context);
+    model = Runtime::BuildEditorParameterizationViewModel(harness.Context, harness.Results);
     EXPECT_FALSE(model.DiagnosticInputFingerprint.has_value());
     EXPECT_TRUE(model.TriangleConformalDistortion.empty());
 
     ASSERT_TRUE(harness.History.Redo().Succeeded());
-    model = Runtime::BuildEditorParameterizationViewModel(
-        harness.Context);
+    model = Runtime::BuildEditorParameterizationViewModel(harness.Context, harness.Results);
     EXPECT_EQ(model.DiagnosticInputFingerprint,
               last.DiagnosticInputFingerprint);
     EXPECT_EQ(model.TriangleConformalDistortion.size(), 8u);
@@ -1074,16 +1074,14 @@ TEST(ParameterizationOperations,
     ASSERT_TRUE(uvs);
     const glm::vec2 originalUv = uvs.Vector().front();
     uvs.Vector().front().x = originalUv.x + 0.125f;
-    model = Runtime::BuildEditorParameterizationViewModel(
-        harness.Context);
+    model = Runtime::BuildEditorParameterizationViewModel(harness.Context, harness.Results);
     ASSERT_TRUE(model.DiagnosticInputFingerprint.has_value());
     EXPECT_NE(model.DiagnosticInputFingerprint,
               last.DiagnosticInputFingerprint);
     EXPECT_TRUE(model.TriangleConformalDistortion.empty());
 
     uvs.Vector().front() = originalUv;
-    model = Runtime::BuildEditorParameterizationViewModel(
-        harness.Context);
+    model = Runtime::BuildEditorParameterizationViewModel(harness.Context, harness.Results);
     EXPECT_EQ(model.DiagnosticInputFingerprint,
               last.DiagnosticInputFingerprint);
     EXPECT_EQ(model.TriangleConformalDistortion.size(), 8u);
@@ -1092,8 +1090,7 @@ TEST(ParameterizationOperations,
         GS::PropertyNames::kPosition);
     ASSERT_TRUE(positions);
     positions.Vector().front().x += 0.25f;
-    model = Runtime::BuildEditorParameterizationViewModel(
-        harness.Context);
+    model = Runtime::BuildEditorParameterizationViewModel(harness.Context, harness.Results);
     ASSERT_TRUE(model.DiagnosticInputFingerprint.has_value());
     EXPECT_NE(model.DiagnosticInputFingerprint,
               last.DiagnosticInputFingerprint);
@@ -1129,9 +1126,9 @@ TEST(ParameterizationOperations,
             result.Diagnostics.FaceConformalDistortion[sourceFace]));
     }
 
-    harness.Context.LastParameterizationResult = &result;
+    harness.Results.LastParameterizationResult = result;
     const Runtime::EditorParameterizationViewModel model =
-        Runtime::BuildEditorParameterizationViewModel(harness.Context);
+        Runtime::BuildEditorParameterizationViewModel(harness.Context, harness.Results);
     ASSERT_EQ(model.TriangleConformalDistortion.size(), 7u);
     for (std::size_t triangle = 0u;
          triangle < model.TriangleConformalDistortion.size();
@@ -1145,9 +1142,9 @@ TEST(ParameterizationOperations,
 
 TEST(ParameterizationOperations, CpuViewDisablesGpuWorkAndReportsBackgroundFallback)
 {
-    Intrinsic::Tests::EditorFeatureTestContext context{};
+    Runtime::EditorParameterizationUvViewCommandSurface uvViewCommands{};
     std::vector<Runtime::EditorParameterizationUvViewRequest> requests{};
-    context.ParameterizationUvViewCommands.Submit =
+    uvViewCommands.Submit =
         [&requests](Runtime::EditorParameterizationUvViewRequest request)
         {
             requests.push_back(request);
@@ -1163,7 +1160,7 @@ TEST(ParameterizationOperations, CpuViewDisablesGpuWorkAndReportsBackgroundFallb
         model.View.BackgroundMode = background;
         const Runtime::EditorParameterizationUvViewState state =
             Runtime::SubmitEditorParameterizationUvView(
-                context, model, 320u, 180u);
+                uvViewCommands, model, 320u, 180u);
         ASSERT_FALSE(requests.empty());
         EXPECT_FALSE(requests.back().Enabled);
         EXPECT_EQ(requests.back().Width, 320u);
@@ -1185,7 +1182,7 @@ TEST(ParameterizationOperations, CpuViewDisablesGpuWorkAndReportsBackgroundFallb
 
 TEST(ParameterizationOperations, GpuViewWithoutCommandSurfaceReportsCpuFallback)
 {
-    Intrinsic::Tests::EditorFeatureTestContext context{};
+    const Runtime::EditorParameterizationUvViewCommandSurface uvViewCommands{};
     Runtime::EditorParameterizationViewModel model{};
     model.HasSelectedEntity = true;
     model.SelectedEntityIsMesh = true;
@@ -1203,7 +1200,7 @@ TEST(ParameterizationOperations, GpuViewWithoutCommandSurfaceReportsCpuFallback)
 
     const Runtime::EditorParameterizationUvViewState state =
         Runtime::SubmitEditorParameterizationUvView(
-            context, model, 400u, 240u);
+            uvViewCommands, model, 400u, 240u);
     EXPECT_EQ(
         state.Status,
         Runtime::EditorParameterizationUvViewStatus::CpuFallbackNonOperational);
@@ -1219,9 +1216,9 @@ TEST(ParameterizationOperations, GpuViewWithoutCommandSurfaceReportsCpuFallback)
 
 TEST(ParameterizationOperations, GpuViewRequestTokenIsStableAndSemantic)
 {
-    Intrinsic::Tests::EditorFeatureTestContext context{};
+    Runtime::EditorParameterizationUvViewCommandSurface uvViewCommands{};
     std::vector<Runtime::EditorParameterizationUvViewRequest> requests{};
-    context.ParameterizationUvViewCommands.Submit =
+    uvViewCommands.Submit =
         [&requests](Runtime::EditorParameterizationUvViewRequest request)
         {
             requests.push_back(request);
@@ -1259,11 +1256,11 @@ TEST(ParameterizationOperations, GpuViewRequestTokenIsStableAndSemantic)
     model.LineIndices = {0u, 1u, 1u, 2u, 2u, 0u};
     model.TriangleConformalDistortion = {1.25f};
 
-    const auto submit = [&context](
+    const auto submit = [&uvViewCommands](
                             const Runtime::EditorParameterizationViewModel& value)
     {
         return Runtime::SubmitEditorParameterizationUvView(
-            context, value, 640u, 360u);
+            uvViewCommands, value, 640u, 360u);
     };
     const auto first = submit(model);
     const auto repeated = submit(model);
@@ -1314,4 +1311,37 @@ TEST(ParameterizationOperations, GpuViewRequestTokenIsStableAndSemantic)
     model.SelectedStableEntityId = 30u;
     (void)submit(model);
     EXPECT_NE(requests.back().RequestToken, diagnosticToken);
+}
+
+TEST(ParameterizationOperations, CustomBindingsPreserveBothTextureChannelsThroughUndo)
+{
+    ParameterizationHarness h;
+    auto& props = h.Vertices().Properties;
+    auto alternate = props.GetOrAdd<glm::vec3>("v:rest", {});
+    alternate.Vector() = props.Get<glm::vec3>("v:position").Vector();
+    for (auto& p : alternate.Vector()) p *= 2.f;
+    auto canonical = props.GetOrAdd<glm::vec2>("v:texcoord", {0.2f, 0.7f});
+    auto corners = h.Halfedges().Properties.GetOrAdd<glm::vec2>("h:texcoord", {0.9f, 0.3f});
+    const auto originalUvs = canonical.Vector(), originalCorners = corners.Vector();
+    Runtime::EditorParameterizationCommand command{.StableEntityId=h.StableEntityId};
+    command.Config.Strategy = Runtime::ParameterizationStrategyKind::HarmonicCotangent;
+    command.Config.Positions.Name = "v:rest";
+    command.Config.Texcoords.Name = "v:custom_uv";
+    Config::EngineConfig engine;
+    Runtime::SetParameterizationConfig(engine, command.Config);
+    const auto decoded = Runtime::GetParameterizationConfig(engine);
+    ASSERT_TRUE(decoded);
+    EXPECT_EQ(decoded->Positions.Name, "v:rest");
+    EXPECT_EQ(decoded->Texcoords.Name, "v:custom_uv");
+    const auto result = Runtime::ApplyEditorParameterizationCommand(h.Context, command);
+    ASSERT_TRUE(result.Succeeded()) << result.Message;
+    EXPECT_TRUE(props.Exists("v:custom_uv"));
+    EXPECT_EQ(canonical.Vector(), originalUvs);
+    EXPECT_EQ(corners.Vector(), originalCorners);
+    ASSERT_TRUE(h.History.Undo().Succeeded());
+    EXPECT_FALSE(props.Exists("v:custom_uv"));
+    EXPECT_EQ(canonical.Vector(), originalUvs);
+    EXPECT_EQ(corners.Vector(), originalCorners);
+    ASSERT_TRUE(h.History.Redo().Succeeded());
+    EXPECT_TRUE(props.Exists("v:custom_uv"));
 }

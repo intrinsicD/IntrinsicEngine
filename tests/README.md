@@ -10,6 +10,68 @@ Tests are organized by taxonomy-owned roots:
 - `benchmark/` — benchmark smoke/SLO checks.
 - `support/` — shared test-only fixtures and helpers.
 
+`ProcessingCompilationLocality.Family`, `.PointAnalysis`, `.PointAnalysisTests`, `.Normals`, `.NormalTests` and `.UnrelatedAdapters` check the
+configured Clang/CMake module graph after their runtime and contract-test
+producers are built. They use `tools/analysis/compile_hotspots.py`; its parser
+and failure-path fixtures live in `regression/tooling/Test.CompileHotspots.py`.
+The unrelated cohort includes numerical adapters, scene/visualization/recipe
+commands, workspace model builders, context adapters and method test producers.
+The two point families are independently checked against each other and against
+broad processing/session composition.
+
+`RenderCompilationLocality.RuntimeDiagnostics` uses the same tool on the render
+diagnostics owner, runtime frame-pacing / recipe-activation contracts, recipe
+editing operations and the kernel module that re-exports the contracts: none may reach `Graphics.Renderer`,
+the subsystem registry, the prep pipeline, a concrete rendering system or an
+upload helper.
+
+`RenderCompilationLocality.EngineInterface` applies the same check to
+`Runtime.Engine.cppm`, which borrows `IRenderer` and the runtime frame-hook
+records through declarations: it may reach neither `Graphics.Renderer` and the
+concrete rendering systems nor `Runtime.Module`. Callers that actually drive the
+renderer import `Extrinsic.Graphics.Renderer` themselves.
+
+`SpatialCompilationLocality.QueryInterface` applies the same check to
+`Runtime.SpatialIndexCache.cppm`, whose surface is CPU snapshots plus the framed
+GPU query queues and which borrows `WorldRegistry` through a declaration: it may
+reach neither `Graphics.PointLBVH`, `Runtime.WorldRegistry` and `Runtime.JobService`
+nor `RHI.CommandContext` and `RHI.Device`. Consumers that record their own GPU
+work import `Extrinsic.Graphics.PointLBVH` and the RHI modules themselves.
+
+`KernelCompilationLocality.Commands`, `.Events`, `.Services` and `.Jobs` apply
+the same check to `Runtime.CommandBus.cppm`, `Runtime.KernelEvents.cppm`,
+`Runtime.ServiceRegistry.cppm` and `Runtime.JobService.cppm`. All four take
+compile-time type identity from `Extrinsic.Core.Hash` and may not reach
+`Extrinsic.Core.FrameGraph`; `Runtime.JobService.cppm`, which borrows
+`RHI::ICommandContext` through a declaration, may additionally reach none of
+`Extrinsic.RHI.CommandContext`, `.Descriptors`, `.Types` and `.Handles`. Real
+graph users and GPU queue participants import those owners themselves.
+
+`EditorCompilationLocality.TextureBake`, `.Visualization`, `.WorkspaceSnapshots`
+and `.WorkspaceAttachment` check the bake producer and its editor consumers.
+None may reach the renderer, GPU asset cache or render extraction. The bake
+interface additionally excludes scene-registry, live asset-service, RHI-device
+and command-history composition; those dependencies belong in its implementation.
+`.WorkspaceAttachment` also excludes `Extrinsic.Runtime.EditorWorkspaceSnapshots`
+and `Extrinsic.Runtime.SceneEditingOperations`: the private session borrows the
+snapshot request through a declaration and names the payload kind from its
+canonical asset owner. `.PreparedConsumers` applies the snapshot exclusion to the
+sixteen editor operation units that compose a prepared frame from context alone.
+Units that read a snapshot value import the owning module themselves.
+`EditorCompilationLocality.ProcessingFrames` checks all eleven family composition
+leaves against broad editor, renderer and texture-bake imports using the same
+source list as the prepared-consumer snapshot guard. `.ProcessingFamilies` also
+keeps the ten family leaves independent of the broad geometry-processing module.
+`.CommandFrames` checks scene, visualization and render-recipe preparation against
+processing, renderer, clustering/consolidation service and snapshot dependencies.
+`.SceneFrame`, `.VisualizationFrame` and `.RenderRecipeFrame` also exclude the
+other two command families. `.WorkspaceAttachment` borrows all three contexts
+through matching declarations and excludes their complete owner modules.
+`.Actions` checks both scene and visualization action producers against processing,
+render-recipe editing, renderer, clustering, point-cloud-consolidation and workspace
+snapshot modules. It also excludes graphics texture-bake and RHI command-context
+implementations; actions use the runtime bake contract.
+
 ## CTest labels
 
 CTest labels are assigned per executable in `tests/CMakeLists.txt` and should
@@ -464,6 +526,10 @@ not raise the default for cheap CPU tests.
 Shared support fixtures live under `support/`. Reusable GPU helpers should stay
 engine-free where possible and keep backend-specific setup local to the owning
 `gpu;vulkan` fixture or executable.
+
+`regression/tooling/Test.ClangToolchainSelection.py` checks automatic compiler
+selection through directory aliases while preserving the C++ driver name. It
+runs in the structural CI workflow without requiring an installed Clang toolchain.
 
 Repo-tooling fixtures live alongside their consumers. The layering checker
 fixtures live under

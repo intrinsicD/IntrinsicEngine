@@ -20,7 +20,7 @@ import Extrinsic.Asset.Registry;
 import Extrinsic.Core.Error;
 import Extrinsic.Core.IOBackend;
 import Extrinsic.Runtime.AssetIngestStateMachine;
-import Extrinsic.Runtime.Module;
+import Extrinsic.Runtime.ModuleLifecycle;
 import Extrinsic.Runtime.TextureBakeModule;
 import Extrinsic.Runtime.WorldHandle;
 

@@ -1,3 +1,4 @@
+// Persisted parameterization strategies, typed mesh bindings, and UV view controls.
 module;
 
 #include <cstdint>
@@ -7,6 +8,7 @@ module;
 #include <vector>
 
 export module Extrinsic.Runtime.ParameterizationConfig;
+export import Extrinsic.Runtime.GeometryAvailability;
 
 import Extrinsic.Core.Config.Engine;
 import Extrinsic.Core.Config.EngineLoad;
@@ -108,6 +110,9 @@ export namespace Extrinsic::Runtime
         ParameterizationHarmonicConfig Harmonic{};
         ParameterizationBffConfig Bff{};
         ParameterizationViewConfig View{};
+        GeometryPropertyRef Positions{GeometryElementDomain::MeshVertex, "v:position", Geometry::PropertyValueKind::Vec3};
+        GeometryPropertyRef Texcoords{GeometryElementDomain::MeshVertex, "v:texcoord", Geometry::PropertyValueKind::Vec2};
+
     };
 
     [[nodiscard]] std::string SerializeParameterizationConfig(

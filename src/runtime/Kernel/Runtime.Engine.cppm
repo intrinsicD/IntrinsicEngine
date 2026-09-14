@@ -1,5 +1,9 @@
+// The runtime composition root: `Engine`'s lifecycle, its borrowed subsystem
+// accessors, runtime-module registration and the frame-pacing sample. Renderer
+// and frame-hook types are named through declarations, not imports.
 module;
 
+#include <cstdint>
 #include <memory>
 #include <string_view>
 #include <utility>
@@ -9,18 +13,38 @@ export module Extrinsic.Runtime.Engine;
 import Extrinsic.Core.Config.Engine;
 import Extrinsic.RHI.Device;
 import Extrinsic.Platform.Window;
-import Extrinsic.Graphics.Renderer;
 import Extrinsic.Runtime.CommandBus;
 import Extrinsic.Runtime.FramePacingDiagnostics;
 import Extrinsic.Runtime.JobService;
 import Extrinsic.Runtime.KernelEvents;
-import Extrinsic.Runtime.Module;
+import Extrinsic.Runtime.ModuleLifecycle;
+import Extrinsic.Runtime.RenderRecipeActivation;
 import Extrinsic.Runtime.ServiceRegistry;
 import Extrinsic.Runtime.WorldHandle;
 import Extrinsic.Runtime.WorldRegistry;
 
+namespace Extrinsic::Graphics
+{
+    // Borrowed only as a returned reference; graphics owns the definition in
+    // Extrinsic.Graphics.Renderer. Not exported, so a caller that actually
+    // drives the renderer imports that module itself.
+    extern "C++"
+    {
+        class IRenderer;
+    }
+}
+
 namespace Extrinsic::Runtime
 {
+    // Named by the private frame-hook helper below. Extrinsic.Runtime.Module
+    // owns both definitions; the opaque enum declaration must repeat the
+    // underlying type so the phase stays passable by value here.
+    extern "C++"
+    {
+        enum class FramePhase : std::uint8_t;
+        struct EditorInputCaptureSnapshot;
+    }
+
     export class Engine;
 
     // ============================================================

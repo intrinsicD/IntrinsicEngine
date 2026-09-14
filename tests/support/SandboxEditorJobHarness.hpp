@@ -21,18 +21,12 @@
 #include <utility>
 #include <vector>
 
-#include "EditorFeatureTestContext.hpp"
 
 import Extrinsic.Core.StrongHandle;
 import Extrinsic.Core.Tasks;
 import Extrinsic.Runtime.JobService;
 import Extrinsic.Runtime.KernelEvents;
-import Extrinsic.Runtime.EditorWorkspaceSnapshots;
 import Extrinsic.Runtime.EditorJobProjection;
-import Extrinsic.Runtime.SceneEditingOperations;
-import Extrinsic.Runtime.GeometryProcessingOperations;
-import Extrinsic.Runtime.VisualizationEditingOperations;
-import Extrinsic.Runtime.RenderRecipeEditingOperations;
 
 namespace Extrinsic::Tests
 {
@@ -47,7 +41,7 @@ namespace Extrinsic::Tests
 
         // Installs the `JobService` submit path on `context`, recording the
         // editor identity the service does not keep.
-        void Attach(Intrinsic::Tests::EditorFeatureTestContext& context)
+        void Attach(auto& context)
         {
             context.JobCommands.Submit =
                 [this](Runtime::JobDesc desc,

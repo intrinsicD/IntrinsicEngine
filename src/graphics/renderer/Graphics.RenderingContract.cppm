@@ -1,3 +1,4 @@
+// Renderer and recipe contracts shared by frame composition and config validation.
 module;
 
 #include <cstdint>
@@ -457,4 +458,13 @@ namespace Extrinsic::Graphics
         const ViewOutputRecipeDescriptor& viewRecipe);
     export [[nodiscard]] RenderArtifactLifecycleClass ClassifyRenderArtifactLifecycle(
         const RenderArtifactMetadata& artifact) noexcept;
+
+    // Canonical slot lookup: returns the first slot whose StableName matches, or nullptr when absent.
+    // The result borrows a `recipe.Slots` element and is invalidated by any resize of that vector.
+    export [[nodiscard]] const RecipeExtensionSlotDescriptor* FindRecipeSlot(
+        const RenderRecipeDescriptor& recipe,
+        std::string_view stableName) noexcept;
+    export [[nodiscard]] RecipeExtensionSlotDescriptor* FindRecipeSlot(
+        RenderRecipeDescriptor& recipe,
+        std::string_view stableName) noexcept;
 }

@@ -15,6 +15,8 @@ map.
 
 ## Tasks
 
+- [BUILD-007 — Matched engine compile-time reconciliation](BUILD-007-engine-compile-time-reconciliation.md): compare engine source under matched conditions; separate from the BUILD-006 backend/cache bakeoff.
+
 The verification redesign is bound by the
 [`verification-evidence-architecture.md`](../../../docs/architecture/verification-evidence-architecture.md)
 roadmap. That document is the authoritative dependency and admission map; this

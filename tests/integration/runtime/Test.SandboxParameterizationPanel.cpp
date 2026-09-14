@@ -1,3 +1,8 @@
+#include <functional>
+#include <span>
+#include <glm/vec3.hpp>
+#include <glm/vec4.hpp>
+#include <glm/vec2.hpp>
 #include <algorithm>
 #include <array>
 #include <cmath>
@@ -18,6 +23,15 @@
 #include <imgui_internal.h>
 #include "RuntimeTestModule.hpp"
 
+import Extrinsic.Runtime.NormalOperations;
+import Extrinsic.Runtime.RegistrationOperations;
+import Extrinsic.Runtime.MeshFieldOperations;
+import Extrinsic.Runtime.MeshTopologyOperations;
+import Extrinsic.Runtime.PointFieldOperations;
+import Extrinsic.Runtime.PointAnalysisOperations;
+import Extrinsic.Runtime.PointSetOperations;
+import Extrinsic.Runtime.PointConstructionOperations;
+import Extrinsic.Runtime.PointCloudServiceOperations;
 import Extrinsic.Core.Config.Engine;
 import Extrinsic.Core.Config.EngineLoad;
 import Extrinsic.Core.Config.Window;
@@ -39,7 +53,7 @@ import Extrinsic.Runtime.SceneEditingOperations;
 import Extrinsic.Runtime.GeometryProcessingOperations;
 import Extrinsic.Runtime.VisualizationEditingOperations;
 import Extrinsic.Runtime.RenderRecipeEditingOperations;
-import Extrinsic.Runtime.ParameterizationConfig;
+import Extrinsic.Runtime.ParameterizationOperations;
 import Extrinsic.Runtime.SelectionController;
 import Extrinsic.Sandbox.ConfigSections;
 import Extrinsic.Sandbox.Editor.MethodPanels;
@@ -47,6 +61,11 @@ import Extrinsic.Sandbox.Editor.Shell;
 import Geometry.HalfedgeMesh;
 import Geometry.Parameterization;
 import Geometry.Properties;
+import Extrinsic.Runtime.GeometryPresentation;
+import Extrinsic.Runtime.TextureBakeModule;
+import Extrinsic.Runtime.PointCloudConsolidationTypes;
+
+#include "../../../src/app/Sandbox/Editor/Sandbox.PanelSupport.hpp"
 
 namespace Config = Extrinsic::Core::Config;
 namespace ECS = Extrinsic::ECS;
@@ -172,35 +191,25 @@ namespace
             EXPECT_TRUE(Selection.SetSelectedEntity(Scene, Entity));
             StableEntityId =
                 Runtime::SelectionController::ToStableEntityId(Entity);
-            Runtime::EditorGeometryProcessingContext geometry{
-                .Scene = &Scene,
-                .Selection = &Selection,
-                .CommandHistory = &History,
-                .EngineConfigControlState =
-                    ConfigControl != nullptr
+            Runtime::EditorProcessingContext geometry = [&] { Runtime::EditorProcessingContext value{}; value.Scene = &Scene; value.Selection = &Selection; value.CommandHistory = &History; value.EngineConfigControlState = ConfigControl != nullptr
                         ? &ConfigControl->GetEngineConfigControlState()
-                        : nullptr,
-                .PreviewEngineConfigDocument =
-                    [this](const std::string& document,
+                        : nullptr; value.PreviewEngineConfigDocument = [this](const std::string& document,
                            const std::string& sourceId)
                     {
                         return ConfigControl->PreviewEngineConfigControlDocument(
                             document,
                             sourceId);
-                    },
-                .ApplyEngineConfigHotSubset =
-                    [this](const Config::EngineConfigLoadResult& preview)
+                    }; value.ApplyEngineConfigHotSubset = [this](const Config::EngineConfigLoadResult& preview)
                     {
                         return ConfigControl->ApplyEngineConfigHotSubset(
                             preview,
                             Runtime::RuntimeConfigControlSource::Editor);
-                    },
-                .EngineConfigCommandsAvailable = ConfigControl != nullptr,
-            };
-            Context.GeometryCommands =
-                Runtime::BindEditorGeometryProcessingCommands(
+                    }; value.EngineConfigCommandsAvailable = ConfigControl != nullptr; return value; }();
+            Context.Parameterization.Commands =
+                Runtime::BindEditorProcessingCommands(
                     std::move(geometry));
-            Context.GeometryConfigCommandsAvailable = ConfigControl != nullptr;
+            Context.Processing = Context.Parameterization.Commands;
+            Context.ProcessingConfigCommandsAvailable = ConfigControl != nullptr;
         }
 
         ~ParameterizationPanelHarness()

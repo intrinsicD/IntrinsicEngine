@@ -2518,6 +2518,61 @@ TEST(RendererFrameLifecycle, FrameRecipePassesAllProduceStructuredCommandRecordS
 
 namespace
 {
+    using PipelineId = Extrinsic::Graphics::RendererPipelineId;
+
+    // Every published identifier must map to a descriptor, so a missing
+    // optional is a failure rather than a silent default. Reporting through
+    // `value_or` keeps the empty case from being dereferenced.
+    [[nodiscard]] Extrinsic::RHI::PipelineDesc RequiredPipelineDesc(
+        const Extrinsic::Graphics::IRenderer& renderer,
+        PipelineId id)
+    {
+        const std::optional<Extrinsic::RHI::PipelineDesc> desc =
+            renderer.GetPipelineDesc(id);
+        EXPECT_TRUE(desc.has_value())
+            << "missing descriptor for pipeline id "
+            << static_cast<unsigned>(id);
+        return desc.value_or(Extrinsic::RHI::PipelineDesc{});
+    }
+
+    // The full published set, so mapping/lifecycle coverage below cannot drift
+    // away from the enum.
+    constexpr PipelineId kPublishedPipelineIds[] = {
+        PipelineId::DefaultDebugSurface,
+        PipelineId::ForwardSurface,
+        PipelineId::ForwardLine,
+        PipelineId::ForwardPoint,
+        PipelineId::Shadow,
+        PipelineId::DeferredGBuffer,
+        PipelineId::DeferredLighting,
+        PipelineId::SelectionEntityId,
+        PipelineId::SelectionEntityIdOutline,
+        PipelineId::SelectionFaceId,
+        PipelineId::SelectionEdgeId,
+        PipelineId::SelectionPointId,
+        PipelineId::SelectionOutline,
+        PipelineId::PostProcessToneMap,
+        PipelineId::PostProcessBloomDownsample,
+        PipelineId::PostProcessBloomUpsample,
+        PipelineId::PostProcessFXAA,
+        PipelineId::PostProcessSMAAEdge,
+        PipelineId::PostProcessSMAABlend,
+        PipelineId::PostProcessSMAAResolve,
+        PipelineId::PostProcessHistogram,
+        PipelineId::HZBBuild,
+        PipelineId::ClusterGridBuild,
+        PipelineId::ClusterLightAssignment,
+    };
+    static_assert(sizeof(kPublishedPipelineIds) / sizeof(kPublishedPipelineIds[0]) ==
+                  static_cast<std::size_t>(PipelineId::Count));
+
+    // `Count` is a bound and 0xFF is outside the enum entirely; both must fail
+    // closed on every query.
+    constexpr PipelineId kUnmappedPipelineIds[] = {
+        PipelineId::Count,
+        static_cast<PipelineId>(0xFFu),
+    };
+
     [[nodiscard]] bool PipelineDescBytesEqual(const Extrinsic::RHI::PipelineDesc& lhs,
                                               const Extrinsic::RHI::PipelineDesc& rhs) noexcept
     {
@@ -2553,9 +2608,11 @@ TEST(RendererFrameLifecycle, DefaultDebugSurfacePipelineSurvivesOperationalRebui
     std::unique_ptr<Extrinsic::Graphics::IRenderer> renderer = Extrinsic::Graphics::CreateRenderer();
     renderer->Initialize(device);
 
-    const Extrinsic::RHI::PipelineHandle initialPipeline = renderer->GetDefaultDebugSurfacePipeline();
+    const Extrinsic::RHI::PipelineHandle initialPipeline =
+        renderer->GetPipeline(PipelineId::DefaultDebugSurface);
     EXPECT_TRUE(initialPipeline.IsValid());
-    const Extrinsic::RHI::PipelineDesc initialDesc = renderer->GetDefaultDebugSurfacePipelineDesc();
+    const Extrinsic::RHI::PipelineDesc initialDesc =
+        RequiredPipelineDesc(*renderer, PipelineId::DefaultDebugSurface);
     // The descriptor must reference the compiled SPIR-V artifact emitted by
     // intrinsic_add_glsl_shaders(), not the raw GLSL source — VulkanDevice::
     // CreatePipeline() reads the path verbatim as a SPIR-V binary.
@@ -2578,9 +2635,11 @@ TEST(RendererFrameLifecycle, DefaultDebugSurfacePipelineSurvivesOperationalRebui
     EXPECT_EQ(depthPrepass->Rasterizer.Winding, kVulkanCameraTriangleFrontFace);
 
     EXPECT_TRUE(renderer->RebuildOperationalResources(device));
-    const Extrinsic::RHI::PipelineHandle rebuiltPipeline = renderer->GetDefaultDebugSurfacePipeline();
+    const Extrinsic::RHI::PipelineHandle rebuiltPipeline =
+        renderer->GetPipeline(PipelineId::DefaultDebugSurface);
     EXPECT_TRUE(rebuiltPipeline.IsValid());
-    const Extrinsic::RHI::PipelineDesc rebuiltDesc = renderer->GetDefaultDebugSurfacePipelineDesc();
+    const Extrinsic::RHI::PipelineDesc rebuiltDesc =
+        RequiredPipelineDesc(*renderer, PipelineId::DefaultDebugSurface);
     EXPECT_TRUE(PipelineDescBytesEqual(initialDesc, rebuiltDesc));
 
     renderer->Shutdown();
@@ -2654,9 +2713,11 @@ TEST(RendererFrameLifecycle, ForwardSurfacePipelineSurvivesOperationalRebuild)
     std::unique_ptr<Extrinsic::Graphics::IRenderer> renderer = Extrinsic::Graphics::CreateRenderer();
     renderer->Initialize(device);
 
-    const Extrinsic::RHI::PipelineHandle initialPipeline = renderer->GetForwardSurfacePipeline();
+    const Extrinsic::RHI::PipelineHandle initialPipeline =
+        renderer->GetPipeline(PipelineId::ForwardSurface);
     EXPECT_TRUE(initialPipeline.IsValid());
-    const Extrinsic::RHI::PipelineDesc initialDesc = renderer->GetForwardSurfacePipelineDesc();
+    const Extrinsic::RHI::PipelineDesc initialDesc =
+        RequiredPipelineDesc(*renderer, PipelineId::ForwardSurface);
     // The descriptor must reference the SPIR-V emitted by intrinsic_add_glsl_shaders()
     // and the depth-prepass-on path documented in
     // docs/architecture/rendering-three-pass.md. The shader pair must also
@@ -2685,9 +2746,11 @@ TEST(RendererFrameLifecycle, ForwardSurfacePipelineSurvivesOperationalRebuild)
     EXPECT_EQ(initialDesc.PushConstantSize, sizeof(Extrinsic::RHI::GpuScenePushConstants));
 
     EXPECT_TRUE(renderer->RebuildOperationalResources(device));
-    const Extrinsic::RHI::PipelineHandle rebuiltPipeline = renderer->GetForwardSurfacePipeline();
+    const Extrinsic::RHI::PipelineHandle rebuiltPipeline =
+        renderer->GetPipeline(PipelineId::ForwardSurface);
     EXPECT_TRUE(rebuiltPipeline.IsValid());
-    const Extrinsic::RHI::PipelineDesc rebuiltDesc = renderer->GetForwardSurfacePipelineDesc();
+    const Extrinsic::RHI::PipelineDesc rebuiltDesc =
+        RequiredPipelineDesc(*renderer, PipelineId::ForwardSurface);
     EXPECT_TRUE(PipelineDescBytesEqual(initialDesc, rebuiltDesc));
 
     renderer->Shutdown();
@@ -2706,12 +2769,15 @@ TEST(RendererFrameLifecycle, ForwardLinePointPipelinesSurviveOperationalRebuild)
     std::unique_ptr<Extrinsic::Graphics::IRenderer> renderer = Extrinsic::Graphics::CreateRenderer();
     renderer->Initialize(device);
 
-    const Extrinsic::RHI::PipelineHandle initialLinePipeline = renderer->GetForwardLinePipeline();
-    const Extrinsic::RHI::PipelineHandle initialPointPipeline = renderer->GetForwardPointPipeline();
+    const Extrinsic::RHI::PipelineHandle initialLinePipeline =
+        renderer->GetPipeline(PipelineId::ForwardLine);
+    const Extrinsic::RHI::PipelineHandle initialPointPipeline =
+        renderer->GetPipeline(PipelineId::ForwardPoint);
     EXPECT_TRUE(initialLinePipeline.IsValid());
     EXPECT_TRUE(initialPointPipeline.IsValid());
 
-    const Extrinsic::RHI::PipelineDesc initialLineDesc = renderer->GetForwardLinePipelineDesc();
+    const Extrinsic::RHI::PipelineDesc initialLineDesc =
+        RequiredPipelineDesc(*renderer, PipelineId::ForwardLine);
     EXPECT_TRUE(initialLineDesc.VertexShaderPath.ends_with("shaders/forward/line.vert.spv"))
         << initialLineDesc.VertexShaderPath;
     EXPECT_TRUE(initialLineDesc.FragmentShaderPath.ends_with("shaders/forward/line.frag.spv"))
@@ -2726,7 +2792,8 @@ TEST(RendererFrameLifecycle, ForwardLinePointPipelinesSurviveOperationalRebuild)
     EXPECT_EQ(initialLineDesc.DepthTargetFormat, Extrinsic::RHI::Format::D32_FLOAT);
     EXPECT_EQ(initialLineDesc.PushConstantSize, sizeof(Extrinsic::RHI::GpuScenePushConstants));
 
-    const Extrinsic::RHI::PipelineDesc initialPointDesc = renderer->GetForwardPointPipelineDesc();
+    const Extrinsic::RHI::PipelineDesc initialPointDesc =
+        RequiredPipelineDesc(*renderer, PipelineId::ForwardPoint);
     EXPECT_TRUE(initialPointDesc.VertexShaderPath.ends_with("shaders/forward/point.vert.spv"))
         << initialPointDesc.VertexShaderPath;
     EXPECT_TRUE(initialPointDesc.FragmentShaderPath.ends_with("shaders/forward/point.frag.spv"))
@@ -2742,10 +2809,12 @@ TEST(RendererFrameLifecycle, ForwardLinePointPipelinesSurviveOperationalRebuild)
     EXPECT_EQ(initialPointDesc.PushConstantSize, sizeof(Extrinsic::RHI::GpuScenePushConstants));
 
     EXPECT_TRUE(renderer->RebuildOperationalResources(device));
-    EXPECT_TRUE(renderer->GetForwardLinePipeline().IsValid());
-    EXPECT_TRUE(renderer->GetForwardPointPipeline().IsValid());
-    EXPECT_TRUE(PipelineDescBytesEqual(initialLineDesc, renderer->GetForwardLinePipelineDesc()));
-    EXPECT_TRUE(PipelineDescBytesEqual(initialPointDesc, renderer->GetForwardPointPipelineDesc()));
+    EXPECT_TRUE(renderer->GetPipeline(PipelineId::ForwardLine).IsValid());
+    EXPECT_TRUE(renderer->GetPipeline(PipelineId::ForwardPoint).IsValid());
+    EXPECT_TRUE(PipelineDescBytesEqual(
+        initialLineDesc, RequiredPipelineDesc(*renderer, PipelineId::ForwardLine)));
+    EXPECT_TRUE(PipelineDescBytesEqual(
+        initialPointDesc, RequiredPipelineDesc(*renderer, PipelineId::ForwardPoint)));
 
     renderer->Shutdown();
 }
@@ -2818,10 +2887,12 @@ TEST(RendererFrameLifecycle, ShadowPipelineSurvivesOperationalRebuild)
     std::unique_ptr<Extrinsic::Graphics::IRenderer> renderer = Extrinsic::Graphics::CreateRenderer();
     renderer->Initialize(device);
 
-    const Extrinsic::RHI::PipelineHandle initialShadowPipeline = renderer->GetShadowPipeline();
+    const Extrinsic::RHI::PipelineHandle initialShadowPipeline =
+        renderer->GetPipeline(PipelineId::Shadow);
     EXPECT_TRUE(initialShadowPipeline.IsValid());
 
-    const Extrinsic::RHI::PipelineDesc initialShadowDesc = renderer->GetShadowPipelineDesc();
+    const Extrinsic::RHI::PipelineDesc initialShadowDesc =
+        RequiredPipelineDesc(*renderer, PipelineId::Shadow);
     EXPECT_TRUE(initialShadowDesc.VertexShaderPath.ends_with("shaders/depth_prepass.vert.spv"))
         << initialShadowDesc.VertexShaderPath;
     EXPECT_TRUE(initialShadowDesc.FragmentShaderPath.empty()) << initialShadowDesc.FragmentShaderPath;
@@ -2837,8 +2908,9 @@ TEST(RendererFrameLifecycle, ShadowPipelineSurvivesOperationalRebuild)
     EXPECT_EQ(initialShadowDesc.PushConstantSize, sizeof(Extrinsic::RHI::GpuScenePushConstants));
 
     EXPECT_TRUE(renderer->RebuildOperationalResources(device));
-    EXPECT_TRUE(renderer->GetShadowPipeline().IsValid());
-    EXPECT_TRUE(PipelineDescBytesEqual(initialShadowDesc, renderer->GetShadowPipelineDesc()));
+    EXPECT_TRUE(renderer->GetPipeline(PipelineId::Shadow).IsValid());
+    EXPECT_TRUE(PipelineDescBytesEqual(
+        initialShadowDesc, RequiredPipelineDesc(*renderer, PipelineId::Shadow)));
 
     renderer->Shutdown();
 }
@@ -2983,9 +3055,11 @@ TEST(RendererFrameLifecycle, DeferredGBufferPipelineSurvivesOperationalRebuild)
     std::unique_ptr<Extrinsic::Graphics::IRenderer> renderer = Extrinsic::Graphics::CreateRenderer();
     renderer->Initialize(device);
 
-    const Extrinsic::RHI::PipelineHandle initialPipeline = renderer->GetDeferredGBufferPipeline();
+    const Extrinsic::RHI::PipelineHandle initialPipeline =
+        renderer->GetPipeline(PipelineId::DeferredGBuffer);
     EXPECT_TRUE(initialPipeline.IsValid());
-    const Extrinsic::RHI::PipelineDesc initialDesc = renderer->GetDeferredGBufferPipelineDesc();
+    const Extrinsic::RHI::PipelineDesc initialDesc =
+        RequiredPipelineDesc(*renderer, PipelineId::DeferredGBuffer);
 
     // GRAPHICS-072 Slice A — the deferred GBuffer pipeline MUST select
     // shaders that declare a `layout(push_constant) ScenePC` block matching
@@ -3017,9 +3091,11 @@ TEST(RendererFrameLifecycle, DeferredGBufferPipelineSurvivesOperationalRebuild)
     EXPECT_EQ(initialDesc.PushConstantSize, sizeof(Extrinsic::RHI::GpuScenePushConstants));
 
     EXPECT_TRUE(renderer->RebuildOperationalResources(device));
-    const Extrinsic::RHI::PipelineHandle rebuiltPipeline = renderer->GetDeferredGBufferPipeline();
+    const Extrinsic::RHI::PipelineHandle rebuiltPipeline =
+        renderer->GetPipeline(PipelineId::DeferredGBuffer);
     EXPECT_TRUE(rebuiltPipeline.IsValid());
-    const Extrinsic::RHI::PipelineDesc rebuiltDesc = renderer->GetDeferredGBufferPipelineDesc();
+    const Extrinsic::RHI::PipelineDesc rebuiltDesc =
+        RequiredPipelineDesc(*renderer, PipelineId::DeferredGBuffer);
     EXPECT_TRUE(PipelineDescBytesEqual(initialDesc, rebuiltDesc));
 
     renderer->Shutdown();
@@ -3093,7 +3169,7 @@ TEST(RendererFrameLifecycle, DeferredSurfacePassSkipsUnavailableWhenPipelineMiss
     std::unique_ptr<Extrinsic::Graphics::IRenderer> renderer = Extrinsic::Graphics::CreateRenderer();
     renderer->Initialize(device);
     renderer->SetLightingPath(Extrinsic::Graphics::FrameRecipeLightingPath::Deferred);
-    EXPECT_FALSE(renderer->GetDeferredGBufferPipeline().IsValid());
+    EXPECT_FALSE(renderer->GetPipeline(PipelineId::DeferredGBuffer).IsValid());
 
     Extrinsic::RHI::FrameHandle frame{};
     ASSERT_TRUE(renderer->BeginFrame(frame));
@@ -3122,7 +3198,7 @@ TEST(RendererFrameLifecycle, DeferredSurfacePassSkipsUnavailableWhenPipelineMiss
     ASSERT_NE(FindCommandPass(stats, "CompositionPass"), nullptr);
     EXPECT_EQ(FindCommandPass(stats, "CompositionPass")->Status,
               Extrinsic::Graphics::RenderCommandPassStatus::SkippedUnavailable);
-    EXPECT_TRUE(renderer->GetDeferredLightingPipeline().IsValid());
+    EXPECT_TRUE(renderer->GetPipeline(PipelineId::DeferredLighting).IsValid());
     // Other passes (DepthPrepass, LinePass, PointPass) still record because
     // their pipelines were created successfully.
 
@@ -3149,9 +3225,11 @@ TEST(RendererFrameLifecycle, DeferredLightingPipelineSurvivesOperationalRebuild)
     std::unique_ptr<Extrinsic::Graphics::IRenderer> renderer = Extrinsic::Graphics::CreateRenderer();
     renderer->Initialize(device);
 
-    const Extrinsic::RHI::PipelineHandle initialPipeline = renderer->GetDeferredLightingPipeline();
+    const Extrinsic::RHI::PipelineHandle initialPipeline =
+        renderer->GetPipeline(PipelineId::DeferredLighting);
     EXPECT_TRUE(initialPipeline.IsValid());
-    const Extrinsic::RHI::PipelineDesc initialDesc = renderer->GetDeferredLightingPipelineDesc();
+    const Extrinsic::RHI::PipelineDesc initialDesc =
+        RequiredPipelineDesc(*renderer, PipelineId::DeferredLighting);
 
     EXPECT_TRUE(initialDesc.VertexShaderPath.ends_with(
         "shaders/post_fullscreen.vert.spv"))
@@ -3169,9 +3247,11 @@ TEST(RendererFrameLifecycle, DeferredLightingPipelineSurvivesOperationalRebuild)
     EXPECT_EQ(initialDesc.PushConstantSize, 16u);
 
     EXPECT_TRUE(renderer->RebuildOperationalResources(device));
-    const Extrinsic::RHI::PipelineHandle rebuiltPipeline = renderer->GetDeferredLightingPipeline();
+    const Extrinsic::RHI::PipelineHandle rebuiltPipeline =
+        renderer->GetPipeline(PipelineId::DeferredLighting);
     EXPECT_TRUE(rebuiltPipeline.IsValid());
-    const Extrinsic::RHI::PipelineDesc rebuiltDesc = renderer->GetDeferredLightingPipelineDesc();
+    const Extrinsic::RHI::PipelineDesc rebuiltDesc =
+        RequiredPipelineDesc(*renderer, PipelineId::DeferredLighting);
     EXPECT_TRUE(PipelineDescBytesEqual(initialDesc, rebuiltDesc));
 
     renderer->Shutdown();
@@ -3197,8 +3277,8 @@ TEST(RendererFrameLifecycle, DeferredLightingPassSkipsUnavailableWhenPipelineMis
     std::unique_ptr<Extrinsic::Graphics::IRenderer> renderer = Extrinsic::Graphics::CreateRenderer();
     renderer->Initialize(device);
     renderer->SetLightingPath(Extrinsic::Graphics::FrameRecipeLightingPath::Deferred);
-    EXPECT_TRUE(renderer->GetDeferredGBufferPipeline().IsValid());
-    EXPECT_FALSE(renderer->GetDeferredLightingPipeline().IsValid());
+    EXPECT_TRUE(renderer->GetPipeline(PipelineId::DeferredGBuffer).IsValid());
+    EXPECT_FALSE(renderer->GetPipeline(PipelineId::DeferredLighting).IsValid());
 
     Extrinsic::RHI::FrameHandle frame{};
     ASSERT_TRUE(renderer->BeginFrame(frame));
@@ -3664,10 +3744,12 @@ TEST(RendererFrameLifecycle, EntityIdPickingPipelineSurvivesOperationalRebuild)
     std::unique_ptr<Extrinsic::Graphics::IRenderer> renderer = Extrinsic::Graphics::CreateRenderer();
     renderer->Initialize(device);
 
-    const Extrinsic::RHI::PipelineHandle initialPipeline = renderer->GetSelectionEntityIdPipeline();
+    const Extrinsic::RHI::PipelineHandle initialPipeline =
+        renderer->GetPipeline(PipelineId::SelectionEntityId);
     EXPECT_TRUE(initialPipeline.IsValid());
 
-    const Extrinsic::RHI::PipelineDesc initialDesc = renderer->GetSelectionEntityIdPipelineDesc();
+    const Extrinsic::RHI::PipelineDesc initialDesc =
+        RequiredPipelineDesc(*renderer, PipelineId::SelectionEntityId);
     EXPECT_TRUE(initialDesc.VertexShaderPath.ends_with(
         "shaders/selection/entity_id.vert.spv"))
         << initialDesc.VertexShaderPath;
@@ -3691,9 +3773,11 @@ TEST(RendererFrameLifecycle, EntityIdPickingPipelineSurvivesOperationalRebuild)
     EXPECT_EQ(initialDesc.PushConstantSize, sizeof(Extrinsic::RHI::GpuScenePushConstants));
 
     EXPECT_TRUE(renderer->RebuildOperationalResources(device));
-    const Extrinsic::RHI::PipelineHandle rebuiltPipeline = renderer->GetSelectionEntityIdPipeline();
+    const Extrinsic::RHI::PipelineHandle rebuiltPipeline =
+        renderer->GetPipeline(PipelineId::SelectionEntityId);
     EXPECT_TRUE(rebuiltPipeline.IsValid());
-    const Extrinsic::RHI::PipelineDesc rebuiltDesc = renderer->GetSelectionEntityIdPipelineDesc();
+    const Extrinsic::RHI::PipelineDesc rebuiltDesc =
+        RequiredPipelineDesc(*renderer, PipelineId::SelectionEntityId);
     EXPECT_TRUE(PipelineDescBytesEqual(initialDesc, rebuiltDesc));
 
     renderer->Shutdown();
@@ -3709,11 +3793,11 @@ TEST(RendererFrameLifecycle, EntityIdOutlinePipelineUsesSingleTargetShape)
     renderer->Initialize(device);
 
     const Extrinsic::RHI::PipelineHandle initialPipeline =
-        renderer->GetSelectionEntityIdOutlinePipeline();
+        renderer->GetPipeline(PipelineId::SelectionEntityIdOutline);
     EXPECT_TRUE(initialPipeline.IsValid());
 
     const Extrinsic::RHI::PipelineDesc initialDesc =
-        renderer->GetSelectionEntityIdOutlinePipelineDesc();
+        RequiredPipelineDesc(*renderer, PipelineId::SelectionEntityIdOutline);
     EXPECT_TRUE(initialDesc.VertexShaderPath.ends_with(
         "shaders/selection/entity_id.vert.spv"))
         << initialDesc.VertexShaderPath;
@@ -3735,10 +3819,10 @@ TEST(RendererFrameLifecycle, EntityIdOutlinePipelineUsesSingleTargetShape)
 
     EXPECT_TRUE(renderer->RebuildOperationalResources(device));
     const Extrinsic::RHI::PipelineHandle rebuiltPipeline =
-        renderer->GetSelectionEntityIdOutlinePipeline();
+        renderer->GetPipeline(PipelineId::SelectionEntityIdOutline);
     EXPECT_TRUE(rebuiltPipeline.IsValid());
     const Extrinsic::RHI::PipelineDesc rebuiltDesc =
-        renderer->GetSelectionEntityIdOutlinePipelineDesc();
+        RequiredPipelineDesc(*renderer, PipelineId::SelectionEntityIdOutline);
     EXPECT_TRUE(PipelineDescBytesEqual(initialDesc, rebuiltDesc));
 
     renderer->Shutdown();
@@ -3769,10 +3853,12 @@ TEST(RendererFrameLifecycle, FaceIdPickingPipelineSurvivesOperationalRebuild)
     std::unique_ptr<Extrinsic::Graphics::IRenderer> renderer = Extrinsic::Graphics::CreateRenderer();
     renderer->Initialize(device);
 
-    const Extrinsic::RHI::PipelineHandle initialPipeline = renderer->GetSelectionFaceIdPipeline();
+    const Extrinsic::RHI::PipelineHandle initialPipeline =
+        renderer->GetPipeline(PipelineId::SelectionFaceId);
     EXPECT_TRUE(initialPipeline.IsValid());
 
-    const Extrinsic::RHI::PipelineDesc initialDesc = renderer->GetSelectionFaceIdPipelineDesc();
+    const Extrinsic::RHI::PipelineDesc initialDesc =
+        RequiredPipelineDesc(*renderer, PipelineId::SelectionFaceId);
     EXPECT_TRUE(initialDesc.VertexShaderPath.ends_with(
         "shaders/selection/face_id.vert.spv"))
         << initialDesc.VertexShaderPath;
@@ -3794,9 +3880,11 @@ TEST(RendererFrameLifecycle, FaceIdPickingPipelineSurvivesOperationalRebuild)
     EXPECT_EQ(initialDesc.PushConstantSize, sizeof(Extrinsic::RHI::GpuScenePushConstants));
 
     EXPECT_TRUE(renderer->RebuildOperationalResources(device));
-    const Extrinsic::RHI::PipelineHandle rebuiltPipeline = renderer->GetSelectionFaceIdPipeline();
+    const Extrinsic::RHI::PipelineHandle rebuiltPipeline =
+        renderer->GetPipeline(PipelineId::SelectionFaceId);
     EXPECT_TRUE(rebuiltPipeline.IsValid());
-    const Extrinsic::RHI::PipelineDesc rebuiltDesc = renderer->GetSelectionFaceIdPipelineDesc();
+    const Extrinsic::RHI::PipelineDesc rebuiltDesc =
+        RequiredPipelineDesc(*renderer, PipelineId::SelectionFaceId);
     EXPECT_TRUE(PipelineDescBytesEqual(initialDesc, rebuiltDesc));
 
     renderer->Shutdown();
@@ -3811,10 +3899,12 @@ TEST(RendererFrameLifecycle, EdgeIdPickingPipelineSurvivesOperationalRebuild)
     std::unique_ptr<Extrinsic::Graphics::IRenderer> renderer = Extrinsic::Graphics::CreateRenderer();
     renderer->Initialize(device);
 
-    const Extrinsic::RHI::PipelineHandle initialPipeline = renderer->GetSelectionEdgeIdPipeline();
+    const Extrinsic::RHI::PipelineHandle initialPipeline =
+        renderer->GetPipeline(PipelineId::SelectionEdgeId);
     EXPECT_TRUE(initialPipeline.IsValid());
 
-    const Extrinsic::RHI::PipelineDesc initialDesc = renderer->GetSelectionEdgeIdPipelineDesc();
+    const Extrinsic::RHI::PipelineDesc initialDesc =
+        RequiredPipelineDesc(*renderer, PipelineId::SelectionEdgeId);
     EXPECT_TRUE(initialDesc.VertexShaderPath.ends_with(
         "shaders/selection/edge_id.vert.spv"))
         << initialDesc.VertexShaderPath;
@@ -3836,9 +3926,11 @@ TEST(RendererFrameLifecycle, EdgeIdPickingPipelineSurvivesOperationalRebuild)
     EXPECT_EQ(initialDesc.PushConstantSize, sizeof(Extrinsic::RHI::GpuScenePushConstants));
 
     EXPECT_TRUE(renderer->RebuildOperationalResources(device));
-    const Extrinsic::RHI::PipelineHandle rebuiltPipeline = renderer->GetSelectionEdgeIdPipeline();
+    const Extrinsic::RHI::PipelineHandle rebuiltPipeline =
+        renderer->GetPipeline(PipelineId::SelectionEdgeId);
     EXPECT_TRUE(rebuiltPipeline.IsValid());
-    const Extrinsic::RHI::PipelineDesc rebuiltDesc = renderer->GetSelectionEdgeIdPipelineDesc();
+    const Extrinsic::RHI::PipelineDesc rebuiltDesc =
+        RequiredPipelineDesc(*renderer, PipelineId::SelectionEdgeId);
     EXPECT_TRUE(PipelineDescBytesEqual(initialDesc, rebuiltDesc));
 
     renderer->Shutdown();
@@ -3853,10 +3945,12 @@ TEST(RendererFrameLifecycle, PointIdPickingPipelineSurvivesOperationalRebuild)
     std::unique_ptr<Extrinsic::Graphics::IRenderer> renderer = Extrinsic::Graphics::CreateRenderer();
     renderer->Initialize(device);
 
-    const Extrinsic::RHI::PipelineHandle initialPipeline = renderer->GetSelectionPointIdPipeline();
+    const Extrinsic::RHI::PipelineHandle initialPipeline =
+        renderer->GetPipeline(PipelineId::SelectionPointId);
     EXPECT_TRUE(initialPipeline.IsValid());
 
-    const Extrinsic::RHI::PipelineDesc initialDesc = renderer->GetSelectionPointIdPipelineDesc();
+    const Extrinsic::RHI::PipelineDesc initialDesc =
+        RequiredPipelineDesc(*renderer, PipelineId::SelectionPointId);
     EXPECT_TRUE(initialDesc.VertexShaderPath.ends_with(
         "shaders/selection/point_id.vert.spv"))
         << initialDesc.VertexShaderPath;
@@ -3878,9 +3972,11 @@ TEST(RendererFrameLifecycle, PointIdPickingPipelineSurvivesOperationalRebuild)
     EXPECT_EQ(initialDesc.PushConstantSize, sizeof(Extrinsic::RHI::GpuScenePushConstants));
 
     EXPECT_TRUE(renderer->RebuildOperationalResources(device));
-    const Extrinsic::RHI::PipelineHandle rebuiltPipeline = renderer->GetSelectionPointIdPipeline();
+    const Extrinsic::RHI::PipelineHandle rebuiltPipeline =
+        renderer->GetPipeline(PipelineId::SelectionPointId);
     EXPECT_TRUE(rebuiltPipeline.IsValid());
-    const Extrinsic::RHI::PipelineDesc rebuiltDesc = renderer->GetSelectionPointIdPipelineDesc();
+    const Extrinsic::RHI::PipelineDesc rebuiltDesc =
+        RequiredPipelineDesc(*renderer, PipelineId::SelectionPointId);
     EXPECT_TRUE(PipelineDescBytesEqual(initialDesc, rebuiltDesc));
 
     renderer->Shutdown();
@@ -3905,10 +4001,12 @@ TEST(RendererFrameLifecycle, SelectionOutlinePipelineSurvivesOperationalRebuild)
     std::unique_ptr<Extrinsic::Graphics::IRenderer> renderer = Extrinsic::Graphics::CreateRenderer();
     renderer->Initialize(device);
 
-    const Extrinsic::RHI::PipelineHandle initialPipeline = renderer->GetSelectionOutlinePipeline();
+    const Extrinsic::RHI::PipelineHandle initialPipeline =
+        renderer->GetPipeline(PipelineId::SelectionOutline);
     EXPECT_TRUE(initialPipeline.IsValid());
 
-    const Extrinsic::RHI::PipelineDesc initialDesc = renderer->GetSelectionOutlinePipelineDesc();
+    const Extrinsic::RHI::PipelineDesc initialDesc =
+        RequiredPipelineDesc(*renderer, PipelineId::SelectionOutline);
     EXPECT_TRUE(initialDesc.VertexShaderPath.ends_with(
         "shaders/post_fullscreen.vert.spv"))
         << initialDesc.VertexShaderPath;
@@ -3945,9 +4043,11 @@ TEST(RendererFrameLifecycle, SelectionOutlinePipelineSurvivesOperationalRebuild)
     EXPECT_EQ(initialDesc.PushConstantSize, 144u);
 
     EXPECT_TRUE(renderer->RebuildOperationalResources(device));
-    const Extrinsic::RHI::PipelineHandle rebuiltPipeline = renderer->GetSelectionOutlinePipeline();
+    const Extrinsic::RHI::PipelineHandle rebuiltPipeline =
+        renderer->GetPipeline(PipelineId::SelectionOutline);
     EXPECT_TRUE(rebuiltPipeline.IsValid());
-    const Extrinsic::RHI::PipelineDesc rebuiltDesc = renderer->GetSelectionOutlinePipelineDesc();
+    const Extrinsic::RHI::PipelineDesc rebuiltDesc =
+        RequiredPipelineDesc(*renderer, PipelineId::SelectionOutline);
     EXPECT_TRUE(PipelineDescBytesEqual(initialDesc, rebuiltDesc));
 
     renderer->Shutdown();
@@ -3968,10 +4068,12 @@ TEST(RendererFrameLifecycle, PostProcessToneMapPipelineSurvivesOperationalRebuil
     std::unique_ptr<Extrinsic::Graphics::IRenderer> renderer = Extrinsic::Graphics::CreateRenderer();
     renderer->Initialize(device);
 
-    const Extrinsic::RHI::PipelineHandle initialPipeline = renderer->GetPostProcessToneMapPipeline();
+    const Extrinsic::RHI::PipelineHandle initialPipeline =
+        renderer->GetPipeline(PipelineId::PostProcessToneMap);
     EXPECT_TRUE(initialPipeline.IsValid());
 
-    const Extrinsic::RHI::PipelineDesc initialDesc = renderer->GetPostProcessToneMapPipelineDesc();
+    const Extrinsic::RHI::PipelineDesc initialDesc =
+        RequiredPipelineDesc(*renderer, PipelineId::PostProcessToneMap);
     EXPECT_TRUE(initialDesc.VertexShaderPath.ends_with(
         "shaders/post_fullscreen.vert.spv"))
         << initialDesc.VertexShaderPath;
@@ -4006,9 +4108,11 @@ TEST(RendererFrameLifecycle, PostProcessToneMapPipelineSurvivesOperationalRebuil
     EXPECT_EQ(initialDesc.PushConstantSize, sizeof(Extrinsic::Graphics::PostProcessToneMapPushConstants));
 
     EXPECT_TRUE(renderer->RebuildOperationalResources(device));
-    const Extrinsic::RHI::PipelineHandle rebuiltPipeline = renderer->GetPostProcessToneMapPipeline();
+    const Extrinsic::RHI::PipelineHandle rebuiltPipeline =
+        renderer->GetPipeline(PipelineId::PostProcessToneMap);
     EXPECT_TRUE(rebuiltPipeline.IsValid());
-    const Extrinsic::RHI::PipelineDesc rebuiltDesc = renderer->GetPostProcessToneMapPipelineDesc();
+    const Extrinsic::RHI::PipelineDesc rebuiltDesc =
+        RequiredPipelineDesc(*renderer, PipelineId::PostProcessToneMap);
     EXPECT_TRUE(PipelineDescBytesEqual(initialDesc, rebuiltDesc));
 
     renderer->Shutdown();
@@ -4032,14 +4136,14 @@ TEST(RendererFrameLifecycle, PostProcessBloomPipelinesSurviveOperationalRebuild)
     renderer->Initialize(device);
 
     const Extrinsic::RHI::PipelineHandle initialDownsamplePipeline =
-        renderer->GetPostProcessBloomDownsamplePipeline();
+        renderer->GetPipeline(PipelineId::PostProcessBloomDownsample);
     EXPECT_TRUE(initialDownsamplePipeline.IsValid());
     const Extrinsic::RHI::PipelineHandle initialUpsamplePipeline =
-        renderer->GetPostProcessBloomUpsamplePipeline();
+        renderer->GetPipeline(PipelineId::PostProcessBloomUpsample);
     EXPECT_TRUE(initialUpsamplePipeline.IsValid());
 
     const Extrinsic::RHI::PipelineDesc initialDownsampleDesc =
-        renderer->GetPostProcessBloomDownsamplePipelineDesc();
+        RequiredPipelineDesc(*renderer, PipelineId::PostProcessBloomDownsample);
     EXPECT_TRUE(initialDownsampleDesc.VertexShaderPath.ends_with(
         "shaders/post_fullscreen.vert.spv"))
         << initialDownsampleDesc.VertexShaderPath;
@@ -4065,7 +4169,7 @@ TEST(RendererFrameLifecycle, PostProcessBloomPipelinesSurviveOperationalRebuild)
               sizeof(Extrinsic::Graphics::PostProcessBloomDownsamplePushConstants));
 
     const Extrinsic::RHI::PipelineDesc initialUpsampleDesc =
-        renderer->GetPostProcessBloomUpsamplePipelineDesc();
+        RequiredPipelineDesc(*renderer, PipelineId::PostProcessBloomUpsample);
     EXPECT_TRUE(initialUpsampleDesc.VertexShaderPath.ends_with(
         "shaders/post_fullscreen.vert.spv"))
         << initialUpsampleDesc.VertexShaderPath;
@@ -4088,15 +4192,15 @@ TEST(RendererFrameLifecycle, PostProcessBloomPipelinesSurviveOperationalRebuild)
 
     EXPECT_TRUE(renderer->RebuildOperationalResources(device));
     const Extrinsic::RHI::PipelineHandle rebuiltDownsamplePipeline =
-        renderer->GetPostProcessBloomDownsamplePipeline();
+        renderer->GetPipeline(PipelineId::PostProcessBloomDownsample);
     EXPECT_TRUE(rebuiltDownsamplePipeline.IsValid());
     const Extrinsic::RHI::PipelineHandle rebuiltUpsamplePipeline =
-        renderer->GetPostProcessBloomUpsamplePipeline();
+        renderer->GetPipeline(PipelineId::PostProcessBloomUpsample);
     EXPECT_TRUE(rebuiltUpsamplePipeline.IsValid());
     const Extrinsic::RHI::PipelineDesc rebuiltDownsampleDesc =
-        renderer->GetPostProcessBloomDownsamplePipelineDesc();
+        RequiredPipelineDesc(*renderer, PipelineId::PostProcessBloomDownsample);
     const Extrinsic::RHI::PipelineDesc rebuiltUpsampleDesc =
-        renderer->GetPostProcessBloomUpsamplePipelineDesc();
+        RequiredPipelineDesc(*renderer, PipelineId::PostProcessBloomUpsample);
     EXPECT_TRUE(PipelineDescBytesEqual(initialDownsampleDesc, rebuiltDownsampleDesc));
     EXPECT_TRUE(PipelineDescBytesEqual(initialUpsampleDesc, rebuiltUpsampleDesc));
 
@@ -4118,10 +4222,12 @@ TEST(RendererFrameLifecycle, PostProcessFXAAPipelineSurvivesOperationalRebuild)
     std::unique_ptr<Extrinsic::Graphics::IRenderer> renderer = Extrinsic::Graphics::CreateRenderer();
     renderer->Initialize(device);
 
-    const Extrinsic::RHI::PipelineHandle initialPipeline = renderer->GetPostProcessFXAAPipeline();
+    const Extrinsic::RHI::PipelineHandle initialPipeline =
+        renderer->GetPipeline(PipelineId::PostProcessFXAA);
     EXPECT_TRUE(initialPipeline.IsValid());
 
-    const Extrinsic::RHI::PipelineDesc initialDesc = renderer->GetPostProcessFXAAPipelineDesc();
+    const Extrinsic::RHI::PipelineDesc initialDesc =
+        RequiredPipelineDesc(*renderer, PipelineId::PostProcessFXAA);
     EXPECT_TRUE(initialDesc.VertexShaderPath.ends_with(
         "shaders/post_fullscreen.vert.spv"))
         << initialDesc.VertexShaderPath;
@@ -4150,9 +4256,11 @@ TEST(RendererFrameLifecycle, PostProcessFXAAPipelineSurvivesOperationalRebuild)
               sizeof(Extrinsic::Graphics::PostProcessFXAAPushConstants));
 
     EXPECT_TRUE(renderer->RebuildOperationalResources(device));
-    const Extrinsic::RHI::PipelineHandle rebuiltPipeline = renderer->GetPostProcessFXAAPipeline();
+    const Extrinsic::RHI::PipelineHandle rebuiltPipeline =
+        renderer->GetPipeline(PipelineId::PostProcessFXAA);
     EXPECT_TRUE(rebuiltPipeline.IsValid());
-    const Extrinsic::RHI::PipelineDesc rebuiltDesc = renderer->GetPostProcessFXAAPipelineDesc();
+    const Extrinsic::RHI::PipelineDesc rebuiltDesc =
+        RequiredPipelineDesc(*renderer, PipelineId::PostProcessFXAA);
     EXPECT_TRUE(PipelineDescBytesEqual(initialDesc, rebuiltDesc));
 
     renderer->Shutdown();
@@ -4182,17 +4290,17 @@ TEST(RendererFrameLifecycle, PostProcessSMAAPipelinesSurviveOperationalRebuild)
     renderer->Initialize(device);
 
     const Extrinsic::RHI::PipelineHandle initialEdgePipeline =
-        renderer->GetPostProcessSMAAEdgePipeline();
+        renderer->GetPipeline(PipelineId::PostProcessSMAAEdge);
     EXPECT_TRUE(initialEdgePipeline.IsValid());
     const Extrinsic::RHI::PipelineHandle initialBlendPipeline =
-        renderer->GetPostProcessSMAABlendPipeline();
+        renderer->GetPipeline(PipelineId::PostProcessSMAABlend);
     EXPECT_TRUE(initialBlendPipeline.IsValid());
     const Extrinsic::RHI::PipelineHandle initialResolvePipeline =
-        renderer->GetPostProcessSMAAResolvePipeline();
+        renderer->GetPipeline(PipelineId::PostProcessSMAAResolve);
     EXPECT_TRUE(initialResolvePipeline.IsValid());
 
     const Extrinsic::RHI::PipelineDesc initialEdgeDesc =
-        renderer->GetPostProcessSMAAEdgePipelineDesc();
+        RequiredPipelineDesc(*renderer, PipelineId::PostProcessSMAAEdge);
     EXPECT_TRUE(initialEdgeDesc.VertexShaderPath.ends_with(
         "shaders/post_fullscreen.vert.spv"))
         << initialEdgeDesc.VertexShaderPath;
@@ -4215,7 +4323,7 @@ TEST(RendererFrameLifecycle, PostProcessSMAAPipelinesSurviveOperationalRebuild)
               sizeof(Extrinsic::Graphics::PostProcessSMAAEdgePushConstants));
 
     const Extrinsic::RHI::PipelineDesc initialBlendDesc =
-        renderer->GetPostProcessSMAABlendPipelineDesc();
+        RequiredPipelineDesc(*renderer, PipelineId::PostProcessSMAABlend);
     EXPECT_TRUE(initialBlendDesc.VertexShaderPath.ends_with(
         "shaders/post_fullscreen.vert.spv"))
         << initialBlendDesc.VertexShaderPath;
@@ -4235,7 +4343,7 @@ TEST(RendererFrameLifecycle, PostProcessSMAAPipelinesSurviveOperationalRebuild)
               sizeof(Extrinsic::Graphics::PostProcessSMAABlendPushConstants));
 
     const Extrinsic::RHI::PipelineDesc initialResolveDesc =
-        renderer->GetPostProcessSMAAResolvePipelineDesc();
+        RequiredPipelineDesc(*renderer, PipelineId::PostProcessSMAAResolve);
     EXPECT_TRUE(initialResolveDesc.VertexShaderPath.ends_with(
         "shaders/post_fullscreen.vert.spv"))
         << initialResolveDesc.VertexShaderPath;
@@ -4256,15 +4364,15 @@ TEST(RendererFrameLifecycle, PostProcessSMAAPipelinesSurviveOperationalRebuild)
               sizeof(Extrinsic::Graphics::PostProcessSMAAResolvePushConstants));
 
     EXPECT_TRUE(renderer->RebuildOperationalResources(device));
-    EXPECT_TRUE(renderer->GetPostProcessSMAAEdgePipeline().IsValid());
-    EXPECT_TRUE(renderer->GetPostProcessSMAABlendPipeline().IsValid());
-    EXPECT_TRUE(renderer->GetPostProcessSMAAResolvePipeline().IsValid());
+    EXPECT_TRUE(renderer->GetPipeline(PipelineId::PostProcessSMAAEdge).IsValid());
+    EXPECT_TRUE(renderer->GetPipeline(PipelineId::PostProcessSMAABlend).IsValid());
+    EXPECT_TRUE(renderer->GetPipeline(PipelineId::PostProcessSMAAResolve).IsValid());
     const Extrinsic::RHI::PipelineDesc rebuiltEdgeDesc =
-        renderer->GetPostProcessSMAAEdgePipelineDesc();
+        RequiredPipelineDesc(*renderer, PipelineId::PostProcessSMAAEdge);
     const Extrinsic::RHI::PipelineDesc rebuiltBlendDesc =
-        renderer->GetPostProcessSMAABlendPipelineDesc();
+        RequiredPipelineDesc(*renderer, PipelineId::PostProcessSMAABlend);
     const Extrinsic::RHI::PipelineDesc rebuiltResolveDesc =
-        renderer->GetPostProcessSMAAResolvePipelineDesc();
+        RequiredPipelineDesc(*renderer, PipelineId::PostProcessSMAAResolve);
     EXPECT_TRUE(PipelineDescBytesEqual(initialEdgeDesc, rebuiltEdgeDesc));
     EXPECT_TRUE(PipelineDescBytesEqual(initialBlendDesc, rebuiltBlendDesc));
     EXPECT_TRUE(PipelineDescBytesEqual(initialResolveDesc, rebuiltResolveDesc));
@@ -4294,10 +4402,12 @@ TEST(RendererFrameLifecycle, PostProcessHistogramPipelineSurvivesOperationalRebu
     std::unique_ptr<Extrinsic::Graphics::IRenderer> renderer = Extrinsic::Graphics::CreateRenderer();
     renderer->Initialize(device);
 
-    const Extrinsic::RHI::PipelineHandle initialPipeline = renderer->GetPostProcessHistogramPipeline();
+    const Extrinsic::RHI::PipelineHandle initialPipeline =
+        renderer->GetPipeline(PipelineId::PostProcessHistogram);
     EXPECT_TRUE(initialPipeline.IsValid());
 
-    const Extrinsic::RHI::PipelineDesc initialDesc = renderer->GetPostProcessHistogramPipelineDesc();
+    const Extrinsic::RHI::PipelineDesc initialDesc =
+        RequiredPipelineDesc(*renderer, PipelineId::PostProcessHistogram);
     EXPECT_TRUE(initialDesc.ComputeShaderPath.ends_with(
         "shaders/post_histogram.comp.spv"))
         << initialDesc.ComputeShaderPath;
@@ -4319,9 +4429,11 @@ TEST(RendererFrameLifecycle, PostProcessHistogramPipelineSurvivesOperationalRebu
               sizeof(Extrinsic::Graphics::PostProcessHistogramPushConstants));
 
     EXPECT_TRUE(renderer->RebuildOperationalResources(device));
-    const Extrinsic::RHI::PipelineHandle rebuiltPipeline = renderer->GetPostProcessHistogramPipeline();
+    const Extrinsic::RHI::PipelineHandle rebuiltPipeline =
+        renderer->GetPipeline(PipelineId::PostProcessHistogram);
     EXPECT_TRUE(rebuiltPipeline.IsValid());
-    const Extrinsic::RHI::PipelineDesc rebuiltDesc = renderer->GetPostProcessHistogramPipelineDesc();
+    const Extrinsic::RHI::PipelineDesc rebuiltDesc =
+        RequiredPipelineDesc(*renderer, PipelineId::PostProcessHistogram);
     EXPECT_TRUE(PipelineDescBytesEqual(initialDesc, rebuiltDesc));
 
     renderer->Shutdown();
@@ -4340,10 +4452,12 @@ TEST(RendererFrameLifecycle, HZBBuildPipelineSurvivesOperationalRebuild)
     std::unique_ptr<Extrinsic::Graphics::IRenderer> renderer = Extrinsic::Graphics::CreateRenderer();
     renderer->Initialize(device);
 
-    const Extrinsic::RHI::PipelineHandle initialPipeline = renderer->GetHZBBuildPipeline();
+    const Extrinsic::RHI::PipelineHandle initialPipeline =
+        renderer->GetPipeline(PipelineId::HZBBuild);
     EXPECT_TRUE(initialPipeline.IsValid());
 
-    const Extrinsic::RHI::PipelineDesc initialDesc = renderer->GetHZBBuildPipelineDesc();
+    const Extrinsic::RHI::PipelineDesc initialDesc =
+        RequiredPipelineDesc(*renderer, PipelineId::HZBBuild);
     EXPECT_TRUE(initialDesc.ComputeShaderPath.ends_with(
         "shaders/hzb_build.comp.spv"))
         << initialDesc.ComputeShaderPath;
@@ -4358,9 +4472,11 @@ TEST(RendererFrameLifecycle, HZBBuildPipelineSurvivesOperationalRebuild)
               sizeof(Extrinsic::Graphics::HZBBuildPushConstants));
 
     EXPECT_TRUE(renderer->RebuildOperationalResources(device));
-    const Extrinsic::RHI::PipelineHandle rebuiltPipeline = renderer->GetHZBBuildPipeline();
+    const Extrinsic::RHI::PipelineHandle rebuiltPipeline =
+        renderer->GetPipeline(PipelineId::HZBBuild);
     EXPECT_TRUE(rebuiltPipeline.IsValid());
-    const Extrinsic::RHI::PipelineDesc rebuiltDesc = renderer->GetHZBBuildPipelineDesc();
+    const Extrinsic::RHI::PipelineDesc rebuiltDesc =
+        RequiredPipelineDesc(*renderer, PipelineId::HZBBuild);
     EXPECT_TRUE(PipelineDescBytesEqual(initialDesc, rebuiltDesc));
 
     renderer->Shutdown();
@@ -4376,14 +4492,14 @@ TEST(RendererFrameLifecycle, ClusterLightingPipelinesAndSceneTablePublishSurvive
     renderer->Initialize(device);
 
     const Extrinsic::RHI::PipelineHandle initialGridPipeline =
-        renderer->GetClusterGridBuildPipeline();
+        renderer->GetPipeline(PipelineId::ClusterGridBuild);
     const Extrinsic::RHI::PipelineHandle initialAssignmentPipeline =
-        renderer->GetClusterLightAssignmentPipeline();
+        renderer->GetPipeline(PipelineId::ClusterLightAssignment);
     EXPECT_TRUE(initialGridPipeline.IsValid());
     EXPECT_TRUE(initialAssignmentPipeline.IsValid());
 
     const Extrinsic::RHI::PipelineDesc initialGridDesc =
-        renderer->GetClusterGridBuildPipelineDesc();
+        RequiredPipelineDesc(*renderer, PipelineId::ClusterGridBuild);
     EXPECT_TRUE(initialGridDesc.ComputeShaderPath.ends_with(
         "shaders/cluster_grid_build.comp.spv"))
         << initialGridDesc.ComputeShaderPath;
@@ -4395,7 +4511,7 @@ TEST(RendererFrameLifecycle, ClusterLightingPipelinesAndSceneTablePublishSurvive
               sizeof(Extrinsic::Graphics::ClusterGridBuildPushConstants));
 
     const Extrinsic::RHI::PipelineDesc initialAssignmentDesc =
-        renderer->GetClusterLightAssignmentPipelineDesc();
+        RequiredPipelineDesc(*renderer, PipelineId::ClusterLightAssignment);
     EXPECT_TRUE(initialAssignmentDesc.ComputeShaderPath.ends_with(
         "shaders/light_cluster_assign.comp.spv"))
         << initialAssignmentDesc.ComputeShaderPath;
@@ -4433,14 +4549,130 @@ TEST(RendererFrameLifecycle, ClusterLightingPipelinesAndSceneTablePublishSurvive
     EXPECT_GT(sceneTable->ClusterFarZ, sceneTable->ClusterNearZ);
 
     EXPECT_TRUE(renderer->RebuildOperationalResources(device));
-    EXPECT_TRUE(renderer->GetClusterGridBuildPipeline().IsValid());
-    EXPECT_TRUE(renderer->GetClusterLightAssignmentPipeline().IsValid());
-    EXPECT_TRUE(PipelineDescBytesEqual(initialGridDesc,
-                                      renderer->GetClusterGridBuildPipelineDesc()));
-    EXPECT_TRUE(PipelineDescBytesEqual(initialAssignmentDesc,
-                                      renderer->GetClusterLightAssignmentPipelineDesc()));
+    EXPECT_TRUE(renderer->GetPipeline(PipelineId::ClusterGridBuild).IsValid());
+    EXPECT_TRUE(renderer->GetPipeline(PipelineId::ClusterLightAssignment).IsValid());
+    EXPECT_TRUE(PipelineDescBytesEqual(
+        initialGridDesc, RequiredPipelineDesc(*renderer, PipelineId::ClusterGridBuild)));
+    EXPECT_TRUE(PipelineDescBytesEqual(
+        initialAssignmentDesc,
+        RequiredPipelineDesc(*renderer, PipelineId::ClusterLightAssignment)));
 
     renderer->Shutdown();
+}
+
+// ---------------------------------------------------------------------------
+// RUNTIME-238 — RendererPipelineId query contract. The per-pipeline tests above
+// pin each identifier's descriptor; these pin the states the query itself owns:
+// unmapped identifiers, and the handle/descriptor split across the renderer
+// lifecycle.
+// ---------------------------------------------------------------------------
+
+namespace
+{
+    void ExpectUnmappedIdsFailClosed(const Extrinsic::Graphics::IRenderer& renderer,
+                                     const char* state)
+    {
+        for (const PipelineId id : kUnmappedPipelineIds)
+        {
+            EXPECT_FALSE(renderer.GetPipeline(id).IsValid())
+                << state << " / id " << static_cast<unsigned>(id);
+            EXPECT_FALSE(renderer.GetPipelineDesc(id).has_value())
+                << state << " / id " << static_cast<unsigned>(id);
+        }
+    }
+}
+
+TEST(RendererFrameLifecycle, UnmappedPipelineIdsFailClosedInEveryLifecycleState)
+{
+    std::unique_ptr<Extrinsic::Graphics::IRenderer> renderer = Extrinsic::Graphics::CreateRenderer();
+    ExpectUnmappedIdsFailClosed(*renderer, "pre-initialize");
+
+    Extrinsic::Tests::MockDevice device;
+    device.Operational = true;
+    device.BackbufferHandle = Extrinsic::RHI::TextureHandle{451u, 1u};
+    renderer->Initialize(device);
+    ExpectUnmappedIdsFailClosed(*renderer, "operational");
+
+    EXPECT_TRUE(renderer->RebuildOperationalResources(device));
+    ExpectUnmappedIdsFailClosed(*renderer, "rebuilt");
+
+    renderer->Shutdown();
+    ExpectUnmappedIdsFailClosed(*renderer, "post-shutdown");
+}
+
+TEST(RendererFrameLifecycle, PublishedPipelineDescriptorsExistWithoutOperationalLeases)
+{
+    std::unique_ptr<Extrinsic::Graphics::IRenderer> renderer = Extrinsic::Graphics::CreateRenderer();
+
+    // Before Initialize() there is no pipeline manager at all, so every handle
+    // is invalid while the descriptors stay available for contract inspection.
+    for (const PipelineId id : kPublishedPipelineIds)
+    {
+        EXPECT_FALSE(renderer->GetPipeline(id).IsValid())
+            << "pre-initialize / id " << static_cast<unsigned>(id);
+        EXPECT_TRUE(renderer->GetPipelineDesc(id).has_value())
+            << "pre-initialize / id " << static_cast<unsigned>(id);
+    }
+
+    // A non-operational device publishes no leases, which is the same
+    // fail-closed handle state through a live manager.
+    Extrinsic::Tests::MockDevice device;
+    device.Operational = false;
+    device.BackbufferHandle = Extrinsic::RHI::TextureHandle{452u, 1u};
+    renderer->Initialize(device);
+
+    for (const PipelineId id : kPublishedPipelineIds)
+    {
+        EXPECT_FALSE(renderer->GetPipeline(id).IsValid())
+            << "non-operational / id " << static_cast<unsigned>(id);
+        EXPECT_TRUE(renderer->GetPipelineDesc(id).has_value())
+            << "non-operational / id " << static_cast<unsigned>(id);
+    }
+
+    renderer->Shutdown();
+}
+
+TEST(RendererFrameLifecycle, PublishedPipelineMappingSurvivesRebuildAndShutdown)
+{
+    Extrinsic::Tests::MockDevice device;
+    device.Operational = true;
+    device.BackbufferHandle = Extrinsic::RHI::TextureHandle{453u, 1u};
+
+    std::unique_ptr<Extrinsic::Graphics::IRenderer> renderer = Extrinsic::Graphics::CreateRenderer();
+    renderer->Initialize(device);
+
+    std::vector<Extrinsic::RHI::PipelineDesc> initialDescs;
+    initialDescs.reserve(sizeof(kPublishedPipelineIds) / sizeof(kPublishedPipelineIds[0]));
+    for (const PipelineId id : kPublishedPipelineIds)
+    {
+        EXPECT_TRUE(renderer->GetPipeline(id).IsValid())
+            << "operational / id " << static_cast<unsigned>(id);
+        initialDescs.push_back(RequiredPipelineDesc(*renderer, id));
+    }
+
+    EXPECT_TRUE(renderer->RebuildOperationalResources(device));
+    for (std::size_t i = 0; i < initialDescs.size(); ++i)
+    {
+        const PipelineId id = kPublishedPipelineIds[i];
+        EXPECT_TRUE(renderer->GetPipeline(id).IsValid())
+            << "rebuilt / id " << static_cast<unsigned>(id);
+        EXPECT_TRUE(PipelineDescBytesEqual(initialDescs[i],
+                                           RequiredPipelineDesc(*renderer, id)))
+            << "rebuilt / id " << static_cast<unsigned>(id);
+    }
+
+    // Shutdown releases the leases; the identifier mapping itself is static, so
+    // descriptors remain byte-identical while every handle fails closed.
+    renderer->Shutdown();
+    for (std::size_t i = 0; i < initialDescs.size(); ++i)
+    {
+        const PipelineId id = kPublishedPipelineIds[i];
+        EXPECT_FALSE(renderer->GetPipeline(id).IsValid())
+            << "post-shutdown / id " << static_cast<unsigned>(id);
+        EXPECT_TRUE(PipelineDescBytesEqual(initialDescs[i],
+                                           RequiredPipelineDesc(*renderer, id)))
+            << "post-shutdown / id " << static_cast<unsigned>(id);
+    }
 }
 
 TEST(RendererFrameLifecycle, HZBBuildPassRecordsFallbackDispatches)
@@ -4774,10 +5006,10 @@ TEST(RendererFrameLifecycle, FXAASelectedWithoutPipelineKeepsResolveSkippedAndPr
 
     // The targeted Create call should have failed; FXAA lease is invalid
     // while SMAA leases remain valid.
-    EXPECT_FALSE(renderer->GetPostProcessFXAAPipeline().IsValid())
+    EXPECT_FALSE(renderer->GetPipeline(PipelineId::PostProcessFXAA).IsValid())
         << "Test fixture targeted the wrong pipeline-create call; "
            "FailPipelineCreateCall index needs to match the FXAA slot.";
-    EXPECT_TRUE(renderer->GetPostProcessSMAAResolvePipeline().IsValid());
+    EXPECT_TRUE(renderer->GetPipeline(PipelineId::PostProcessSMAAResolve).IsValid());
 
     // Select FXAA. Without the gate-tightening the resolve helper would
     // accept the pass (SMAA resolve pipeline exists), the recipe would
@@ -4824,13 +5056,13 @@ TEST(RendererFrameLifecycle, SMAASelectedWithoutResolvePipelineKeepsResolveSkipp
     std::unique_ptr<Extrinsic::Graphics::IRenderer> renderer = Extrinsic::Graphics::CreateRenderer();
     renderer->Initialize(device);
 
-    EXPECT_FALSE(renderer->GetPostProcessSMAAResolvePipeline().IsValid())
+    EXPECT_FALSE(renderer->GetPipeline(PipelineId::PostProcessSMAAResolve).IsValid())
         << "Test fixture targeted the wrong pipeline-create call; "
            "FailPipelineCreateCall index needs to match the SMAA resolve "
            "slot.";
-    EXPECT_TRUE(renderer->GetPostProcessFXAAPipeline().IsValid());
-    EXPECT_TRUE(renderer->GetPostProcessSMAAEdgePipeline().IsValid());
-    EXPECT_TRUE(renderer->GetPostProcessSMAABlendPipeline().IsValid());
+    EXPECT_TRUE(renderer->GetPipeline(PipelineId::PostProcessFXAA).IsValid());
+    EXPECT_TRUE(renderer->GetPipeline(PipelineId::PostProcessSMAAEdge).IsValid());
+    EXPECT_TRUE(renderer->GetPipeline(PipelineId::PostProcessSMAABlend).IsValid());
 
     renderer->GetPostProcessSystem().SetSettings(Extrinsic::Graphics::PostProcessSettings{
         .Enabled = true,

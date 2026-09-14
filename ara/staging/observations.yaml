@@ -3833,3 +3833,15 @@ observations:
     promoted_to: logic/claims.md:C91
     crystallized_via: artifact-commitment
     stale: false
+
+  - id: O224
+    timestamp: '2026-09-12T23:29:15+02:00'
+    provenance: ai-executed
+    content: Separating density/spacing contracts and removing the family import from the common test fixture may lower repeated prototype rebuild latency. The local single-sample dirty-worktree probes are diagnostic, not claim-eligible performance evidence.
+    context: N541 records the controlled probes and verification; N542 adopts compiler-dependency enforcement. No user response to these measurements, engine-wide size reduction or completed Claude implementation review is inferred.
+    potential_type: claim
+    bound_to: [N541, N542]
+    promoted: true
+    promoted_to: logic/claims.md:C92
+    crystallized_via: artifact-commitment
+    stale: false

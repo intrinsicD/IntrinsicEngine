@@ -1,3 +1,7 @@
+// Runtime side of the render-recipe config lane: activation state, the borrowed
+// kernel capability Engine startup and live control share, and the
+// preview/validate/apply entry points that install a `FrameRecipeOverride`
+// through the kernel's callback rather than through a renderer reference.
 module;
 
 #include <cstdint>
@@ -11,7 +15,6 @@ export module Extrinsic.Runtime.RenderRecipeActivation;
 import Extrinsic.Core.Config.Engine;
 import Extrinsic.Core.Geometry2D;
 import Extrinsic.Graphics.RenderRecipeConfig;
-import Extrinsic.Graphics.Renderer;
 
 namespace Extrinsic::Runtime
 {

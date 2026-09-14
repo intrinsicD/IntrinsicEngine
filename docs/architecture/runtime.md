@@ -151,15 +151,26 @@ zero re-exports, and five allowed `GetX` names. The twelve imports are:
 - `Extrinsic.Core.Config.Engine`
 - `Extrinsic.RHI.Device`
 - `Extrinsic.Platform.Window`
-- `Extrinsic.Graphics.Renderer`
 - `Extrinsic.Runtime.CommandBus`
 - `Extrinsic.Runtime.FramePacingDiagnostics`
 - `Extrinsic.Runtime.JobService`
 - `Extrinsic.Runtime.KernelEvents`
-- `Extrinsic.Runtime.Module`
+- `Extrinsic.Runtime.ModuleLifecycle`
+- `Extrinsic.Runtime.RenderRecipeActivation`
 - `Extrinsic.Runtime.ServiceRegistry`
 - `Extrinsic.Runtime.WorldHandle`
 - `Extrinsic.Runtime.WorldRegistry`
+
+`RUNTIME-238` replaced the last two implementation imports without changing the
+count. `Extrinsic.Runtime.ModuleLifecycle` supplies `IRuntimeModule` for
+`AddModule`/`EmplaceModule`, and `Extrinsic.Runtime.RenderRecipeActivation`
+supplies the activation kernel and state the private recipe helper names, so
+`Extrinsic.Runtime.Module`'s frame-hook composition closure is no longer part of
+Engine's interface. `Graphics::IRenderer`, `FramePhase` and
+`EditorInputCaptureSnapshot` are named through `extern "C++"` declarations that
+match the definitions in `Extrinsic.Graphics.Renderer` and
+`Extrinsic.Runtime.Module`; the definitions stay with their owners and Engine
+adds no forward header.
 
 The exact allowed getter/type/owner set is:
 
@@ -168,13 +179,99 @@ The exact allowed getter/type/owner set is:
 | `GetDevice` | `RHI::IDevice&` | `Extrinsic.RHI.Device` |
 | `GetEngineConfig` | `const Core::Config::EngineConfig&` | `Extrinsic.Core.Config.Engine` |
 | `GetLastFramePacingDiagnostics` | `const RuntimeFramePacingDiagnostics&` | `Extrinsic.Runtime.FramePacingDiagnostics` |
-| `GetRenderer` | `Graphics::IRenderer&` | `Extrinsic.Graphics.Renderer` |
+| `GetRenderer` | `Graphics::IRenderer&` | `Extrinsic.Graphics.Renderer` (borrowed) |
 | `GetWindow` | `Platform::IWindow&` | `Extrinsic.Platform.Window` |
 
 `tools/repo/check_kernel_convergence.py` compares the exact import and
 re-export sets, getter names, return/owning types, and owning imports. A
 same-count substitution, an unused/new import, a stale policy entry, or a
 getter type change therefore fails instead of fitting under a numerical cap.
+`GetRenderer`'s owning module is recorded in the policy's `borrowed_imports`:
+it is a declared owner Engine must not import, and importing it again fails.
+
+## Kernel type identity and borrowed command context
+
+`Extrinsic.Core.Hash` owns the kernel's compile-time type identity.
+`Core::TypeToken<T>()` and its `Core::Detail::TypeSig<T>()` signature source live
+there beside `Hash::HashString64`, the one constexpr 64-bit FNV-1a byte hash.
+`Extrinsic.Core.Dag.TaskGraph` reuses that hash for its own
+`Detail::TypeTokenValue<T>()`; the two signature sources stay distinct, so the
+graphs keep their existing token values and nothing merges them. The 32-bit
+`HashString`/`StringID` naming lane is unchanged. Tokens are compiler-specific
+values with the high bit masked off, not a frozen cross-compiler ABI.
+
+The four kernel interfaces that need only erased identity —
+`Runtime.CommandBus`, `Runtime.KernelEvents`, `Runtime.ServiceRegistry` and
+`Runtime.JobService` — therefore import `Extrinsic.Core.Hash` and not
+`Extrinsic.Core.FrameGraph`. Callers that actually build an ECS execution graph
+import the frame graph themselves.
+
+`JobService` names `RHI::ICommandContext` only by reference, for GPU queue
+participants. It declares the class with a non-exported `extern "C++"`
+declaration that matches the sole definition in `Extrinsic.RHI.CommandContext`;
+that definition and all four out-of-line member definitions carry the same
+language linkage, so the vtable key function stays globally attached. CPU job
+declarations consequently stay out of the RHI handle/descriptor closure, while
+every participant that records commands, and every implementation unit that
+calls a member, imports the owner. The borrow is valid only while the surface
+stays a reference: a command member or a stored command value belongs in an
+implementation unit, not in this interface.
+
+`KernelCompilationLocality.Commands`, `.Events`, `.Services` and `.Jobs` check
+these boundaries against the configured compiler module graph.
+
+## Texture-bake interface boundary
+
+`runtime.texture-bake-interface-locality` keeps bake records and operations
+separate from private composition dependencies. `TextureBakeService::Impl` in
+`Runtime.TextureBakeModule.cpp` owns binding, target changes, GPU participant
+registration and teardown. The existing friend `TextureBakeModule` accesses
+that always-constructed implementation directly. Asset services, scene registry,
+RHI device, renderer, GPU asset cache, render extraction and command history
+stay out of the public bake interface's compiler dependency closure.
+
+The existing implementation also owns target detachment and scene-asset cleanup;
+module calls use those methods directly, preserving their `noexcept` boundary.
+Unregistration and device-idle ordering precede unbinding. Public request/result
+records and service behavior keep their existing ownership and value semantics.
+The four `EditorCompilationLocality.*` tests enforce the boundary for baking,
+visualization operations, workspace snapshots and private workspace attachment.
+
+## Render diagnostics and recipe-override boundary
+
+The runtime data contracts that name renderer-produced records import narrow
+graphics owners rather than the renderer:
+
+- `Extrinsic.Runtime.FramePacingDiagnostics` imports
+  `Extrinsic.Graphics.RenderDiagnostics`, the declaration-only owner of
+  `RenderGraphFrameStats` and the compile/execute/command-record/contract/GPU-
+  profile and upload diagnostic records it aggregates.
+- `Extrinsic.Runtime.RenderRecipeActivation` imports
+  `Extrinsic.Graphics.RenderRecipeConfig`, which owns `FrameRecipeOverride` and
+  its diagnostics alongside the config schema. Activation installs an override
+  through the kernel's `SetFrameRecipeOverride` callback, so it needs no
+  renderer reference.
+- `Extrinsic.Runtime.RenderRecipeEditingOperations` imports the diagnostics
+  owner for editor inspection of `RenderGraphFrameStats`.
+
+`Extrinsic.Runtime.Module` re-exports the activation kernel and imports the
+pacing record, so every runtime module author inherits these narrow contracts
+instead of the renderer's execution closure. `Extrinsic.Graphics.Renderer`
+re-exports both owners plus `Extrinsic.Graphics.FrameRecipe` because
+`IRenderer` names their types; the records have one definition each and no
+alias or wrapper. `Extrinsic.Graphics.FrameRecipe` owns
+`ProjectFrameRecipeOverride(...)`, which projects an override onto the derived
+`FrameRecipeFeatures`. Callers that execute rendering or reach renderer-owned
+subsystems import `Extrinsic.Graphics.Renderer` themselves — `Engine.cpp` and
+the rendering-facing tests do, while `Runtime.Engine.cppm` only returns the
+borrowed reference.
+
+CTest `RenderCompilationLocality.RuntimeDiagnostics` reads the configured
+Clang/CMake module graph and fails if any of those runtime contracts, or the
+diagnostics owner itself, reaches `Graphics.Renderer`, the subsystem registry,
+the prep pipeline, a concrete rendering system or an upload helper.
+`RenderCompilationLocality.EngineInterface` applies the same closure check to
+`Runtime.Engine.cppm`, additionally forbidding `Extrinsic.Runtime.Module`.
 
 Module granularity follows
 [ADR-0026](../adr/0026-runtime-module-scope-by-consumer-contract.md) only after
@@ -729,6 +826,17 @@ destruction pass; if no active scene exists, the borrowers and lookups are
 detached. Higher-level preview/readiness/switch UX policy is deliberately not in
 the registry; later runtime modules compose those behaviors through the kernel
 events, jobs, and explicit world handles.
+
+`Extrinsic.Runtime.WorldRegistry` owns the sole `WorldRegistry` definition and
+its out-of-line members with `extern "C++"` language linkage, the same pattern
+`Graphics::IRenderer` and the kernel `ModuleLifecycle` records use. A module
+interface that only borrows a `WorldRegistry&` — currently
+`Extrinsic.Runtime.SpatialIndexCache`, whose CPU constructor takes one — names
+it through a matching non-exported forward declaration instead of importing the
+owner and its `ECS::Scene::Registry`/`JobService` closure. The declaration and
+the definition are the same type in either import order; there is no forward
+header, alias or second definition, and every caller that invokes a
+`WorldRegistry` method imports the owner directly.
 
 Camera state is not one of those Engine rebinding paths. `CameraModule`
 observes `ActiveWorldChanged` and resets the exact published registry to an

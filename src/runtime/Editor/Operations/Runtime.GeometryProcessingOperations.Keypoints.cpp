@@ -1,4 +1,5 @@
 module;
+#include <functional>
 #include <algorithm>
 #include <array>
 #include <bit>
@@ -10,11 +11,12 @@ module;
 #include <optional>
 #include <span>
 #include <string>
+#include <string_view>
 #include <vector>
 #include <utility>
 #include <glm/glm.hpp>
 #include <entt/entity/registry.hpp>
-module Extrinsic.Runtime.GeometryProcessingOperations;
+module Extrinsic.Runtime.PointAnalysisOperations;
 import Extrinsic.ECS.Scene.Registry;
 import Extrinsic.ECS.Component.DirtyTags;
 import Extrinsic.ECS.Components.GeometrySources;
@@ -24,7 +26,21 @@ import Extrinsic.Runtime.KernelEvents;
 import Extrinsic.Runtime.SelectionController;
 import Geometry.Properties;
 import Geometry.HalfedgeMesh;
-#include "Editor/Operations/Runtime.GeometryProcessingOperations.Internal.hpp"
+import Extrinsic.ECS.Scene.Handle;
+import Extrinsic.Runtime.WorldHandle;
+import Extrinsic.ECS.Component.Transform;
+import Extrinsic.Runtime.GeometryAvailability;
+import Extrinsic.Core.Error;
+import Geometry.PointCloud.Utils;
+import Extrinsic.Core.Config.Engine;
+import Extrinsic.Core.Config.EngineLoad;
+import Extrinsic.Runtime.EditorCommandHistory;
+import Extrinsic.Runtime.EditorJobProjection;
+import Extrinsic.Runtime.GeometryPresentation;
+import Extrinsic.Runtime.JobService;
+#include "Editor/internal/Runtime.EditorProcessingAccess.hpp"
+#include "Editor/internal/Runtime.EditorGeometryHelpers.hpp"
+#include "Editor/Operations/Runtime.GeometryProcessingOperations.PointFields.hpp"
 #include "Editor/Operations/Runtime.GeometryProcessingOperations.RadiusRows.hpp"
 
 namespace Extrinsic::Runtime
@@ -37,17 +53,13 @@ namespace Extrinsic::Runtime
         using GeometryProcessingDetail::PointPropertyWatch;
         using GeometryProcessingDetail::ObserveGeometryProperty;
         using GeometryProcessingDetail::MutableGeometryProperties;
-        using GeometryProcessingDetail::PrimaryPointDomain;
-        using GeometryProcessingDetail::FinitePosition;
         using GeometryProcessingDetail::GeometryPropertiesCurrent;
-        struct KeypointWork
+        struct KeypointWork : GeometryProcessingDetail::PointInputCapture
         {
             KeypointAnalysisConfig Config{};
             entt::entity Entity{};
-            std::vector<PointPropertyWatch> Inputs{};
             PointPropertyWatch MaskWatch{}, ScoreWatch{};
-            std::vector<glm::vec3> Points{};
-            std::vector<std::uint32_t> Slots{}, BeforeMask{}, AfterMask{};
+            std::vector<std::uint32_t> BeforeMask{}, AfterMask{};
             GeometryProcessingDetail::PointRadiusRows Rows{};
             std::vector<float> BeforeScore{}, AfterScore{};
             std::shared_ptr<const SpatialIndexSnapshot> Index{};
@@ -56,13 +68,13 @@ namespace Extrinsic::Runtime
             std::optional<EditorKeypointAnalysisResult> MainFailure{};
             EditorKeypointAnalysisResult Result{};
         };
-        bool CurrentInput(const EditorGeometryProcessingContext& context, const KeypointWork& w)
+        bool CurrentInput(const EditorProcessingContext& context, const KeypointWork& w)
         {
             const std::array outputs{w.MaskWatch, w.ScoreWatch};
             return GeometryPropertiesCurrent(context, w.Entity, w.Inputs) && GeometryPropertiesCurrent(context, w.Entity, outputs);
         }
-        enum class CapturePurpose { Execute, Readiness, Catalog };
-        std::shared_ptr<KeypointWork> Capture(const EditorGeometryProcessingContext& context,
+        enum class CapturePurpose { Execute, Readiness };
+        std::shared_ptr<KeypointWork> Capture(const EditorProcessingContext& context,
             KeypointAnalysisConfig c, std::string& diagnostic, CapturePurpose purpose = CapturePurpose::Execute)
         {
             auto fail = [&](std::string why) -> std::shared_ptr<KeypointWork> { diagnostic = std::move(why); return {}; };
@@ -70,67 +82,30 @@ namespace Extrinsic::Runtime
                 SerializeKeypointAnalysisConfig(c), {}, kKeypointAnalysisConfigSectionName);
             if (!validation.Usable()) return fail(validation.Diagnostics.front().Message);
             if (!context.Scene) return fail("Scene is unavailable.");
-            const auto entity = GeometryProcessingDetail::ResolveEditorStableEntity(context.Scene->Raw(), c.StableEntityId);
+            const auto entity = EditorFeatureDetail::ResolveStableEntity(context.Scene->Raw(), c.StableEntityId);
             if (!entity) return fail("Keypoint target entity is stale or missing.");
             const auto a = BuildGeometryAvailability(context.Scene->Raw(), *entity);
-            if (c.Positions.Domain == D::Unknown) c.Positions.Domain = PrimaryPointDomain(a);
+            auto w = std::make_shared<KeypointWork>();
+            if (!GeometryProcessingDetail::CapturePointInput(a, c.Positions,
+                    purpose == CapturePurpose::Execute, *w, diagnostic)) return {};
             if (c.Mask.Domain == D::Unknown) c.Mask.Domain = c.Positions.Domain;
             if (c.Score.Domain == D::Unknown) c.Score.Domain = c.Positions.Domain;
+            const std::array outputs{c.Mask, c.Score};
+            if (!GeometryProcessingDetail::ValidatePointOutputs(a, c.Positions, outputs,
+                                                                 "Keypoint", diagnostic)) return {};
             const auto* props = ResolveGeometryPropertySet(a, c.Positions.Domain);
-            if (!props || !ResolveGeometryProperty(a, c.Positions, props->Size(), false).Resolved())
-                return fail("Choose a count-matched vec3 position property on a resolved element domain.");
-            for (const auto& output : {c.Mask, c.Score})
-            {
-                if (output.Domain != c.Positions.Domain || output.Name == c.Positions.Name)
-                    return fail("Keypoint outputs must be distinct properties on the input domain.");
-                for (const auto* reserved : {"v:deleted", "e:deleted", "h:deleted", "f:deleted", "v:halfedge",
-                     "e:v0", "e:v1", "h:to_vertex", "h:next", "h:prev", "h:opposite", "h:face", "f:halfedge", "h:connectivity"})
-                    if (output.Name == reserved) return fail("Keypoint outputs cannot replace topology/deletion properties.");
-                if (props->Exists(output.Name) && !ResolveGeometryProperty(a, output, props->Size(), false).Resolved())
-                    return fail("Keypoint outputs must be absent or count-matched uint32 mask / float score properties.");
-            }
-            if (props->Size() > std::numeric_limits<std::uint32_t>::max()) return fail("Input exceeds the supported slot range.");
-            auto w = std::make_shared<KeypointWork>();
             w->Config = c; w->Entity = *entity;
             w->Result.RequestedBackend = c.Backend;
-            w->Result.Mask = c.Mask; w->Result.Score = c.Score; w->Result.SlotCount = props->Size();
-            w->Inputs.push_back(ObserveGeometryProperty(a, c.Positions.Domain, c.Positions.Name));
+            w->Result.Mask = c.Mask; w->Result.Score = c.Score;
+            w->Result.SlotCount = w->SlotCount; w->Result.LiveCount = w->LiveCount;
             w->MaskWatch = ObserveGeometryProperty(a, c.Mask.Domain, c.Mask.Name);
             w->ScoreWatch = ObserveGeometryProperty(a, c.Score.Domain, c.Score.Name);
-            auto deletionDomain = c.Positions.Domain;
-            const char* deletionName = "v:deleted";
-            std::size_t divisor = 1;
-            if (deletionDomain == D::MeshFace) deletionName = "f:deleted";
-            if (deletionDomain == D::MeshEdge || deletionDomain == D::GraphEdge) deletionName = "e:deleted";
-            if (deletionDomain == D::MeshHalfedge || deletionDomain == D::GraphHalfedge)
-            {
-                deletionDomain = deletionDomain == D::MeshHalfedge ? D::MeshEdge : D::GraphEdge;
-                deletionName = "e:deleted"; divisor = 2;
-            }
-            const auto* deletionProps = ResolveGeometryPropertySet(a, deletionDomain);
-            if (!deletionProps || props->Size() % divisor || deletionProps->Size() != props->Size() / divisor)
-                return fail("Invalid deletion domain/cardinality.");
-            const auto deleted = deletionProps->Get<bool>(deletionName);
-            if (deletionProps->Exists(deletionName) && (!deleted || deleted.Size() != deletionProps->Size()))
-                return fail("Deletion mask must be a count-matched bool property.");
-            w->Inputs.push_back(ObserveGeometryProperty(a, deletionDomain, deletionName));
-            const auto points = props->Get<glm::vec3>(c.Positions.Name);
-            bool validLbvh = true;
-            for (std::uint32_t i = 0; i < props->Size(); ++i)
-            {
-                if (deleted && deleted[i / divisor]) continue;
-                if (!FinitePosition(points[i])) return fail("Live position samples must be finite.");
-                validLbvh &= Geometry::PointLBVH::ValidPoint(points[i]);
-                ++w->Result.LiveCount;
-                if (purpose == CapturePurpose::Execute) { w->Points.push_back(points[i]); w->Slots.push_back(i); }
-            }
             if (!w->Result.LiveCount) return fail("Keypoint analysis requires live input samples.");
-            if (purpose == CapturePurpose::Catalog) return w;
             if(w->Result.LiveCount<2 || c.MinimumNeighbors>=w->Result.LiveCount)
                 return fail("Keypoint analysis requires positive spacing and more live samples than minimum neighbors.");
             if(c.Backend!=KeypointAnalysisBackend::CpuKDTree)
             {
-                if(!context.SpatialIndices || !validLbvh || w->Result.LiveCount>(1u<<24) ||
+                if(!context.SpatialIndices || !w->ValidLbvh || w->Result.LiveCount>(1u<<24) ||
                    std::max(c.SalientRadius,c.NonMaxRadius)>Geometry::PointLBVH::CoordinateLimit)
                     return fail("LBVH needs the spatial cache, at most 2^24 samples and coordinates/radii within 1e18.");
                 if(c.Backend==KeypointAnalysisBackend::VulkanLBVH &&
@@ -207,7 +182,7 @@ namespace Extrinsic::Runtime
                 std::chrono::duration<double,std::milli>(std::chrono::steady_clock::now()-started).count();
             r.Message="Keypoint mask and saliency computed with "+r.ActualBackend+" neighborhoods; scale, covariance and suppression run on CPU.";
         }
-        bool AdvanceGpu(const EditorGeometryProcessingContext& context,KeypointWork& w)
+        bool AdvanceGpu(const EditorProcessingContext& context,KeypointWork& w)
         {
             if(w.Abandoned || !CurrentInput(context,w))
             {
@@ -225,7 +200,7 @@ namespace Extrinsic::Runtime
             {w.Result.Status=EditorCommandStatus::GeometryProcessingFailed;w.Result.Message=std::move(diagnostic);w.MainFailure=w.Result;}
             return state!=GeometryProcessingDetail::RadiusRowsState::Pending;
         }
-        EditorKeypointAnalysisResult Publish(const EditorGeometryProcessingContext& context,
+        EditorKeypointAnalysisResult Publish(const EditorProcessingContext& context,
                                             const std::shared_ptr<KeypointWork>& w)
         {
             auto& r=w->Result;
@@ -259,47 +234,23 @@ namespace Extrinsic::Runtime
             };
             const auto status=context.CommandHistory ? context.CommandHistory->Execute({.Label="Detect keypoints",
                 .Redo=[mutate,after]{return mutate(*after);},.Undo=[mutate,before]{return mutate(*before);}}).Status : mutate(*after);
-            r.Status=GeometryProcessingDetail::ToEditorMethodCommandStatus(status);
+            r.Status=EditorFeatureDetail::ToEditorCommandStatus(status);
             if (!r.Succeeded()) r.Message="Keypoint publication rejected by history checks.";
             return r;
         }
     }
     EditorKeypointAnalysisReadiness PreviewEditorKeypointAnalysisCommand(
-        const EditorGeometryProcessingContext& context,const KeypointAnalysisConfig& config)
+        const EditorProcessingCommands& commands,const KeypointAnalysisConfig& config)
     {
+        const auto& context = EditorProcessingCommandsAccess::Resolve(commands);
         EditorKeypointAnalysisReadiness r;
         auto w=Capture(context,config,r.Diagnostic,CapturePurpose::Readiness);
         r.Ready=bool(w);if(w)r.Resolved=w->Config;return r;
     }
-    GeometryPropertyCatalogSnapshot GetEditorKeypointAnalysisInputCatalog(
-        const EditorGeometryProcessingContext& context,std::uint32_t id)
-    {
-        if(!context.Scene)return {};
-        const auto entity=GeometryProcessingDetail::ResolveEditorStableEntity(context.Scene->Raw(),id);
-        if(!entity)return {};
-        const auto a=BuildGeometryAvailability(context.Scene->Raw(),*entity);
-        std::uint64_t generation=1469598103934665603ull;
-        for(unsigned d=1;d<=unsigned(D::PointCloudPoint);++d)
-        {
-            const auto* props=ResolveGeometryPropertySet(a,D(d));
-            generation=(generation^(props?props->Revision():0))*1099511628211ull;
-        }
-        auto catalog=BuildGeometryPropertyCatalogSnapshot(a,id,generation);
-        std::erase_if(catalog.Entries,[&](auto& entry){
-            if(entry.Ref.ValueKind!=Geometry::PropertyValueKind::Vec3)return true;
-            const auto* props=ResolveGeometryPropertySet(a,entry.Ref.Domain);
-            entry.PropertyGeneration=props->FindPropertyRevision(entry.Ref.Name).value_or(0);
-            KeypointAnalysisConfig c;c.StableEntityId=id;c.Positions=entry.Ref;c.Mask.Domain=c.Score.Domain=entry.Ref.Domain;
-            c.Mask.Name=entry.Ref.Name+".keypoint_mask";c.Score.Name=entry.Ref.Name+".keypoint_score";
-            while(props->Exists(c.Mask.Name))c.Mask.Name+="_";
-            while(props->Exists(c.Score.Name))c.Score.Name+="_";
-            std::string diagnostic;return !Capture(context,c,diagnostic,CapturePurpose::Catalog);
-        });
-        return catalog;
-    }
     EditorKeypointAnalysisResult ApplyEditorKeypointAnalysisCommand(
-        const EditorGeometryProcessingContext& context,const KeypointAnalysisConfig& config)
+        const EditorProcessingCommands& commands,const KeypointAnalysisConfig& config, std::function<void(EditorKeypointAnalysisResult)> onComplete)
     {
+        const auto& context = EditorProcessingCommandsAccess::Resolve(commands);
         std::string diagnostic;
         auto w=Capture(context,config,diagnostic);
         const auto report=[&](EditorCommandStatus status,std::string message)
@@ -323,7 +274,7 @@ namespace Extrinsic::Runtime
         if(context.JobCommands.FindActive)
             if(auto active=context.JobCommands.FindActive(identity);active && IsActiveEditorJobState(active->State))
                 return report(EditorCommandStatus::Pending,"A keypoint job for this output is already active.");
-        auto sink=context.MethodResultSinks.KeypointAnalysis;auto delivered=std::make_shared<bool>(false);
+        auto sink=GuardEditorProcessingResult(context, std::move(onComplete));auto delivered=std::make_shared<bool>(false);
         auto pending=report(EditorCommandStatus::Pending,"Keypoint analysis queued.");
         // Once submitted, Result belongs to the running stage. Submission failures
         // report from this immutable snapshot while earlier stages wind down.
@@ -368,10 +319,10 @@ namespace Extrinsic::Runtime
         if(!token.IsValid()){w->Abandoned=true;return rejected("Keypoint job submission rejected.");}
         return pending;
     }
-    EditorKeypointAnalysisResult ApplyEditorConfiguredKeypointAnalysis(const EditorGeometryProcessingContext& context)
+    EditorKeypointAnalysisResult ApplyEditorConfiguredKeypointAnalysis(const EditorProcessingCommands& commands, std::function<void(EditorKeypointAnalysisResult)> onComplete)
     {
-        const auto config=GetEditorKeypointAnalysisConfig(context);
+        const auto config=GetEditorKeypointAnalysisConfig(commands);
         if(!config)return {.Status=EditorCommandStatus::InvalidProcessingParameters,.Message="Keypoint config is unavailable."};
-        return ApplyEditorKeypointAnalysisCommand(context,*config);
+        return ApplyEditorKeypointAnalysisCommand(commands, *config, std::move(onComplete));
     }
 } // namespace Extrinsic::Runtime

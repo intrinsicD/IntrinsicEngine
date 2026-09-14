@@ -8,9 +8,11 @@
 #include <entt/entity/registry.hpp>
 #include <variant>
 #include <gtest/gtest.h>
+#include "EditorFeatureTestContext.hpp"
 #include "SandboxEditorJobHarness.hpp"
 
-import Extrinsic.Runtime.GeometryProcessingOperations;
+import Extrinsic.Runtime.PointSetOperations;
+import Extrinsic.Runtime.EditorProcessing;
 import Extrinsic.Runtime.SpatialIndexCache;
 import Extrinsic.Runtime.WorldRegistry;
 import Extrinsic.Runtime.SelectionController;
@@ -103,7 +105,7 @@ TEST(BilateralFilterConfig, RoundTripAndSharedPreviewApplyRun)
     ASSERT_TRUE(registry.Register(R::MakeBilateralFilterConfigSectionRegistration()));
     R::RuntimeEngineConfigControlState state;
     C::PopulateEngineConfigSectionDefaults(state.ActiveConfig, registry);
-    R::EditorGeometryProcessingContext context{.Scene = &scene};
+    R::EditorProcessingContext context{.Scene = &scene};
     context.EngineConfigControlState = &state;
     context.EngineConfigCommandsAvailable = true;
     unsigned previews = 0, applies = 0;
@@ -116,7 +118,7 @@ TEST(BilateralFilterConfig, RoundTripAndSharedPreviewApplyRun)
         state.ActiveConfig = preview.Preview.Config;
         return R::RuntimeEngineConfigApplyResult{.Status = R::RuntimeEngineConfigApplyStatus::Applied};
     };
-    auto commands = R::BindEditorGeometryProcessingCommands(context);
+    auto commands = R::BindEditorProcessingCommands(context);
     ASSERT_TRUE(R::PreviewEditorBilateralFilterCommand(commands, config).Ready);
     EXPECT_FALSE(Properties(scene, entity, D::MeshFace).Exists("filtered"));
     ASSERT_TRUE(R::ApplyEditorBilateralFilterConfig(commands, config).Succeeded());
@@ -151,12 +153,13 @@ TEST(BilateralFilterOperations, EveryDomainCopyAndInPlaceHistory)
         props.GetOrAdd<glm::vec3>("filtered").Vector().assign(size,glm::vec3(77));
         if(inPlace)config.Output=config.Positions;
         R::EditorCommandHistory history;
-        R::EditorGeometryProcessingContext context{.Scene=&scene,.World=world,.CommandHistory=&history,.SpatialIndices=&cache};
-        const auto catalog=R::GetEditorBilateralFilterInputCatalog(context,config.StableEntityId);
+        const auto commands=R::BindEditorProcessingCommands(R::EditorProcessingContext{
+            .Scene=&scene,.World=world,.CommandHistory=&history,.SpatialIndices=&cache});
+        const auto catalog=R::GetEditorBilateralFilterInputCatalog(commands,config.StableEntityId);
         EXPECT_TRUE(std::ranges::any_of(catalog.Entries,[&](auto& e){return e.Ref==config.Positions;}));
         EXPECT_TRUE(std::ranges::any_of(catalog.Entries,[&](auto& e){return e.Ref==config.Normals;}));
-        ASSERT_TRUE(R::PreviewEditorBilateralFilterCommand(context,config).Ready);
-        const auto reference=R::ApplyEditorBilateralFilterCommand(context,config);
+        ASSERT_TRUE(R::PreviewEditorBilateralFilterCommand(commands,config).Ready);
+        const auto reference=R::ApplyEditorBilateralFilterCommand(commands,config);
         ASSERT_TRUE(reference.Succeeded())<<reference.Message;EXPECT_EQ(reference.CompletedIterations,3);
         const auto values=std::as_const(props).Get<glm::vec3>(config.Output.Name).Vector();
         EXPECT_EQ(values[2],inPlace?original[2]:glm::vec3(77));if(half)EXPECT_EQ(values[3],inPlace?original[3]:glm::vec3(77));
@@ -166,7 +169,7 @@ TEST(BilateralFilterOperations, EveryDomainCopyAndInPlaceHistory)
         ASSERT_TRUE(history.Redo().Succeeded());EXPECT_EQ(std::as_const(props).Get<float>("keep")[0],99);
         ASSERT_TRUE(history.Undo().Succeeded());
         config.Backend=R::BilateralFilterBackend::CpuLBVH;
-        const auto indexed=R::ApplyEditorBilateralFilterCommand(context,config);
+        const auto indexed=R::ApplyEditorBilateralFilterCommand(commands,config);
         ASSERT_TRUE(indexed.Succeeded())<<indexed.Message;EXPECT_EQ(indexed.ActualBackend,"cpu_lbvh");EXPECT_EQ(indexed.WorkspaceBuilds,2);
         const auto actual=std::as_const(props).Get<glm::vec3>(config.Output.Name);
         for(std::size_t i=0;i<size;++i)if(i!=4 || D(d)!=D::PointCloudPoint)EXPECT_LE(glm::length(actual[i]-values[i]),1e-5);
@@ -182,19 +185,23 @@ TEST(BilateralFilterOperations, JobsRejectChangedInputsOutputsAndCancellation)
         SCOPED_TRACE(change);Extrinsic::ECS::Scene::Registry scene;auto entity=Make(scene,D::MeshVertex);auto config=Config(entity,D::MeshVertex);
         auto& props=Properties(scene,entity,D::MeshVertex);
         Intrinsic::Tests::EditorFeatureTestContext context;context.Scene=&scene;R::EditorCommandHistory history;context.CommandHistory=&history;
-        std::optional<R::EditorBilateralFilterResult> delivered;context.MethodResultSinks.BilateralFilter=[&](auto r){delivered=std::move(r);};
+        std::optional<R::EditorBilateralFilterResult> delivered;int deliveries=0;
+        auto onComplete=[&](R::EditorBilateralFilterResult r){++deliveries;delivered=std::move(r);};
         Extrinsic::Tests::EditorJobHarness jobs;jobs.Attach(context);
-        ASSERT_EQ(R::ApplyEditorBilateralFilterCommand(context,config).Status,R::EditorCommandStatus::Pending);
+        ASSERT_EQ(R::ApplyEditorBilateralFilterCommand(context,config,onComplete).Status,R::EditorCommandStatus::Pending);
         EXPECT_FALSE(props.Exists("filtered"));
         switch(change){case 0:props.Get<float>("keep")[0]=99;break;case 1:props.Get<glm::vec3>("samples")[0].x+=1;break;case 2:props.GetOrAdd<bool>("v:deleted")[0]=true;break;case 3:props.GetOrAdd<glm::vec3>("filtered")[0]=glm::vec3(77);break;case 4:(void)jobs.Jobs().Cancel(jobs.Snapshot().Entries[0].Token);break;case 5:props.Get<glm::vec3>("directions")[0].x=1;break;}
-        ASSERT_TRUE(jobs.DrainUntilTerminal());ASSERT_TRUE(delivered);EXPECT_EQ(delivered->Succeeded(),change==0)<<delivered->Message;
+        ASSERT_TRUE(jobs.DrainUntilTerminal());ASSERT_TRUE(delivered);
+        EXPECT_EQ(deliveries,1)<<"a queued bilateral job owes exactly one terminal result";
+        EXPECT_EQ(delivered->Succeeded(),change==0)<<delivered->Message;
         EXPECT_EQ(history.CanUndo(),change==0);EXPECT_EQ(props.Exists("filtered"),change==0 || change==3);
     }
 }
 TEST(BilateralFilterOperations, ZeroPassAndOutputPreflight)
 {
     Extrinsic::ECS::Scene::Registry scene;auto entity=Make(scene,D::MeshVertex);auto config=Config(entity,D::MeshVertex);
-    auto& props=Properties(scene,entity,D::MeshVertex);R::EditorGeometryProcessingContext context{.Scene=&scene};
+    auto& props=Properties(scene,entity,D::MeshVertex);
+    const auto context=R::BindEditorProcessingCommands(R::EditorProcessingContext{.Scene=&scene});
     config.Iterations=0;const auto result=R::ApplyEditorBilateralFilterCommand(context,config);ASSERT_TRUE(result.Succeeded());EXPECT_EQ(result.CompletedIterations,0);
     EXPECT_EQ(std::as_const(props).Get<glm::vec3>("filtered").Vector(),std::as_const(props).Get<glm::vec3>("samples").Vector());
     config.Output=config.Normals;EXPECT_FALSE(R::PreviewEditorBilateralFilterCommand(context,config).Ready);

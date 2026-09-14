@@ -62,6 +62,11 @@ namespace Extrinsic::Runtime
             return std::isfinite(value);
         }
 
+        [[nodiscard]] bool IsFinite(const glm::vec2& value) noexcept
+        {
+            return IsFinite(value.x) && IsFinite(value.y);
+        }
+
         [[nodiscard]] bool IsFinite(const glm::vec3& value) noexcept
         {
             return IsFinite(value.x) && IsFinite(value.y) && IsFinite(value.z);
@@ -428,11 +433,10 @@ namespace Extrinsic::Runtime
         }
 
         template <typename T>
-        bool AppendColorPacket(const Geometry::ConstProperty<T> &property,
+        bool AppendColorPacket(const std::span<const T> values,
                                VisualizationEncodingBatch &out,
                                const VisualizationEncodingOptions &options,
                                VisualizationEncodingDiagnostics &stats) {
-          const std::span<const T> values = property.Span();
           if (!ValidateSourceSpan(values, stats))
             return false;
 
@@ -459,6 +463,11 @@ namespace Extrinsic::Runtime
                 } else
                   colors.emplace_back(value, 1.0f);
               }
+              payload = CopyBytes(std::span<const glm::vec4>{colors});
+            } else if constexpr (std::is_same_v<T, glm::vec2>) {
+              std::vector<glm::vec4> colors;
+              colors.reserve(values.size());
+              for (const auto value : values) colors.emplace_back(value, 0.0f, 1.0f);
               payload = CopyBytes(std::span<const glm::vec4>{colors});
             } else if constexpr (std::is_same_v<T, std::uint32_t>) {
               std::vector<glm::vec4> colors;
@@ -668,21 +677,33 @@ namespace Extrinsic::Runtime
             if (const auto property = properties.Get<glm::vec4>(options.SourceName);
                 property.IsValid())
             {
-                (void)AppendColorPacket(property, out, options, diagnostics);
+                (void)AppendColorPacket(property.Span(), out, options, diagnostics);
                 return;
             }
 
             if (const auto property =
                     properties.Get<glm::vec3>(options.SourceName);
                 property.IsValid()) {
-              (void)AppendColorPacket(property, out, options, diagnostics);
+              (void)AppendColorPacket(property.Span(), out, options, diagnostics);
               return;
             }
 
             if (const auto property = properties.Get<std::uint32_t>(options.SourceName);
                 property.IsValid())
             {
-                (void)AppendColorPacket(property, out, options, diagnostics);
+                (void)AppendColorPacket(property.Span(), out, options, diagnostics);
+                return;
+            }
+
+            if (const auto property = properties.Get<glm::vec2>(options.SourceName); property.IsValid())
+            {
+                (void)AppendColorPacket(property.Span(), out, options, diagnostics);
+                return;
+            }
+            if (const auto property = properties.Get<bool>(options.SourceName); property.IsValid())
+            {
+                const std::vector<std::uint32_t> labels(property.Vector().begin(), property.Vector().end());
+                (void)AppendColorPacket(std::span<const std::uint32_t>{labels}, out, options, diagnostics);
                 return;
             }
 

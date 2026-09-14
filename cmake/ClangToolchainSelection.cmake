@@ -3,6 +3,20 @@
 set(INTRINSIC_MINIMUM_CLANG_MAJOR 20 CACHE STRING
     "Minimum Clang major version supported by IntrinsicEngine C++23 module builds")
 
+function(intrinsic_clang_driver_path out_var executable)
+    if(NOT executable)
+        set(${out_var} "" PARENT_SCOPE)
+        return()
+    endif()
+    # Resolve directory aliases (e.g. /bin -> /usr/bin), so the scanner's
+    # relative system-header paths survive lexical normalization in depfiles.
+    # Preserve the executable name: resolving clang++ itself can select C mode.
+    get_filename_component(_intrinsic_driver_dir "${executable}" DIRECTORY)
+    get_filename_component(_intrinsic_driver_name "${executable}" NAME)
+    file(REAL_PATH "${_intrinsic_driver_dir}" _intrinsic_driver_dir)
+    set(${out_var} "${_intrinsic_driver_dir}/${_intrinsic_driver_name}" PARENT_SCOPE)
+endfunction()
+
 function(intrinsic_clang_major out_var executable)
     if(NOT executable)
         set(${out_var} "" PARENT_SCOPE)
@@ -178,11 +192,13 @@ function(intrinsic_find_highest_complete_clang_toolchain out_c out_cxx out_scan_
         endif()
     endif()
 
+    intrinsic_clang_driver_path(_intrinsic_best_c "${_intrinsic_best_c}")
+    intrinsic_clang_driver_path(_intrinsic_best_cxx "${_intrinsic_best_cxx}")
+    intrinsic_clang_driver_path(_intrinsic_best_scan_deps "${_intrinsic_best_scan_deps}")
     set(${out_c} "${_intrinsic_best_c}" PARENT_SCOPE)
     set(${out_cxx} "${_intrinsic_best_cxx}" PARENT_SCOPE)
     set(${out_scan_deps} "${_intrinsic_best_scan_deps}" PARENT_SCOPE)
     set(${out_major} "${_intrinsic_best_major}" PARENT_SCOPE)
 endfunction()
-
 
 

@@ -1,0 +1,100 @@
+// Private capture and scalar transactions for point-property methods, plus the
+// job envelope and main-thread job/cache helpers every processing family shares.
+// Include after processing-context, property, command-history and job-projection
+// imports.
+#pragma once
+
+extern "C++"
+{
+namespace Extrinsic::Runtime::GeometryProcessingDetail
+{
+    // Declaration owner for the family-neutral helpers compiled in
+    // `Runtime.GeometryProcessingOperations.MeshSupport.cpp`. They live here
+    // rather than in `…MeshSupport.hpp` because point-set families need them
+    // without that header's by-value halfedge-mesh and mesh-soup snapshots.
+    namespace MeshSupport
+    {
+        // Terminal payload of a queued editor method job. The computed result
+        // reaches the main thread through the job's own shared state, so the
+        // envelope carries only a diagnostic — and exists at all because an
+        // empty envelope is how `JobService` reports a dropped job.
+        struct EditorJobResult { std::string Diagnostic{}; };
+
+        [[nodiscard]] bool IsFiniteGeometryPosition(const glm::vec3& position) noexcept;
+
+        // `std::nullopt` when the property is missing, mis-sized against the
+        // element domain, or carries a non-finite coordinate.
+        [[nodiscard]] std::optional<std::vector<glm::vec3>> CollectFiniteGeometryPositions(
+            const Geometry::PropertySet& properties, std::string_view positionProperty);
+
+        void InvalidateSelectedModelCache(const EditorProcessingContext& context);
+
+        // The guard refuses a duplicate submission when the same entity+output
+        // already has a non-terminal `JobService` job. Identity stays with the
+        // editor session and is resolved through its active-output query.
+        [[nodiscard]] std::optional<EditorJobRecord> FindActiveEditorJob(
+            const EditorProcessingContext& context, const EditorJobIdentity& identity);
+
+        [[nodiscard]] std::string BuildActiveDerivedJobMessage(
+            std::string_view label, const EditorJobRecord& job);
+
+        // Why a queued CPU job never published its result. Phrased for the
+        // terminal result every abandoned job still owes the editor.
+        [[nodiscard]] std::string_view QueuedCpuJobUnpublishedReason(
+            JobApplyValidation validation) noexcept;
+    }
+
+        struct PointPropertyWatch
+        {
+            GeometryElementDomain Domain{};
+            std::string Name{};
+            std::size_t Count{};
+            std::optional<Geometry::PropertyRevision> Revision{};
+            bool operator==(const PointPropertyWatch&) const = default;
+        };
+    [[nodiscard]] PointPropertyWatch ObserveGeometryProperty(const GeometryEntityAvailability&, GeometryElementDomain, std::string);
+    [[nodiscard]] Geometry::PropertySet* MutableGeometryProperties(entt::registry&, entt::entity, GeometryElementDomain);
+    [[nodiscard]] GeometryElementDomain PrimaryPointDomain(const GeometryEntityAvailability&);
+    [[nodiscard]] bool FinitePosition(glm::vec3);
+    [[nodiscard]] bool GeometryPropertiesCurrent(const EditorProcessingContext&, entt::entity,
+                                               std::span<const PointPropertyWatch>);
+
+    struct PointInputCapture
+    {
+        std::vector<PointPropertyWatch> Inputs{};
+        std::vector<glm::vec3> Points{};
+        std::vector<std::uint32_t> Slots{};
+        std::size_t SlotCount{}, LiveCount{};
+        bool ValidLbvh{true};
+        bool HasSubnormalCoordinates{};
+    };
+    struct PointScalarCapture : PointInputCapture
+    {
+        PointPropertyWatch OutputWatch{};
+        std::vector<float> BeforeValues{}, AfterValues{};
+    };
+
+    [[nodiscard]] GeometryPropertyCatalogSnapshot BuildPointInputCatalog(const EditorProcessingContext&, std::uint32_t stableId);
+
+    // Readiness/catalog capture validates live rows without copying values. Resolved
+    // domains are returned in the references; numerical/backend gates stay with callers.
+    // Captures must be empty on entry. Slots preserve ascending source-row order.
+    [[nodiscard]] bool CapturePointInput(
+        const GeometryEntityAvailability&, GeometryPropertyRef& positions, bool copyValues,
+        PointInputCapture&, std::string& diagnostic);
+    // Callers resolve output domains and validate their typed config before preflight.
+    [[nodiscard]] bool ValidatePointOutputs(
+        const GeometryEntityAvailability&, const GeometryPropertyRef& positions,
+        std::span<const GeometryPropertyRef> outputs, std::string_view outputLabel,
+        std::string& diagnostic);
+    [[nodiscard]] bool CapturePointScalarField(
+        const GeometryEntityAvailability&, GeometryPropertyRef& positions,
+        GeometryPropertyRef& output, std::string_view outputLabel, bool copyValues,
+        PointScalarCapture&, std::string& diagnostic);
+    [[nodiscard]] bool PointScalarFieldCurrent(
+        const EditorProcessingContext&, entt::entity, const PointScalarCapture&);
+    [[nodiscard]] EditorCommandHistoryStatus PublishPointScalarField(
+        const EditorProcessingContext&, entt::entity, const PointScalarCapture&,
+        std::string label);
+}
+}

@@ -253,7 +253,8 @@
   matches canonical topology-to-face indices, vertex positions, and UV values.
 - **Provenance**: ai-executed
 - **Crystallized via**: artifact-commitment
-- **Evidence**: [src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Internal.hpp,
+- **Evidence**: [src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.MeshSupport.hpp,
+  src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.MeshSupport.cpp,
   src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Mesh.cpp,
   src/runtime/Editor/Operations/Runtime.ParameterizationOperations.cpp,
   tests/contract/runtime/Test.ParameterizationOperations.cpp,

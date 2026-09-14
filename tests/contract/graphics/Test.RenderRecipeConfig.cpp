@@ -5,6 +5,7 @@
 #include <fstream>
 #include <string>
 #include <string_view>
+#include <vector>
 
 #include <gtest/gtest.h>
 
@@ -362,4 +363,63 @@ TEST(RenderRecipeConfig, PreviewValidationIsSideEffectFreeAndInteractiveFast)
     ASSERT_NE(lightingAfter, nullptr);
     EXPECT_EQ(lightingAfter->SchemaId, originalLightingSchema);
     EXPECT_EQ(context.BaseViewOutput.RecipeId, kCurrentRendererDefaultViewRecipeId);
+}
+
+TEST(RenderRecipeConfig, DuplicateSlotNamesEditOnlyTheFirstMatch)
+{
+    const std::string document = std::string{R"json({
+  "schema": ")json"} + std::string{kRenderRecipeConfigSchemaId} + R"json(",
+  "version": 1,
+  "rendererId": ")json" + std::string{kCurrentRendererContractId} + R"json(",
+  "recipe": {
+    "slots": [
+      {
+        "name": "lighting",
+        "schemaId": "intrinsic.graphics.lighting/first-match/v1",
+        "defaults": "duplicate-name edit target"
+      }
+    ]
+  }
+})json";
+
+    RenderRecipeConfigContext context = MakeContext();
+    const RecipeExtensionSlotDescriptor* baseLighting = FindSlot(context.BaseRecipe, "lighting");
+    ASSERT_NE(baseLighting, nullptr);
+    const std::vector<std::string> baseAllowedRoles = baseLighting->AllowedBindingRoles;
+    RecipeExtensionSlotDescriptor duplicate = *baseLighting;
+    duplicate.SchemaId = "intrinsic.graphics.lighting/second-copy/v1";
+    duplicate.Defaults = "second slot sharing the same stable name";
+    duplicate.AllowedBindingRoles = {"material-table"};
+    duplicate.UsedBindingRoles = {"material-table"};
+    context.BaseRecipe.Slots.push_back(duplicate);
+
+    const RenderRecipeConfigLoadResult result = PreviewRenderRecipeConfig(document, context);
+
+    ASSERT_TRUE(IsConfigUsable(result));
+    EXPECT_EQ(result.State, RenderRecipeConfigState::Valid);
+    EXPECT_EQ(result.Preview.ParsedSlotCount, 1u);
+    ASSERT_EQ(result.Preview.Recipe.Slots.size(), context.BaseRecipe.Slots.size());
+
+    std::vector<const RecipeExtensionSlotDescriptor*> lightingSlots{};
+    for (const RecipeExtensionSlotDescriptor& slot : result.Preview.Recipe.Slots)
+    {
+        if (slot.StableName == "lighting")
+        {
+            lightingSlots.push_back(&slot);
+        }
+    }
+    ASSERT_EQ(lightingSlots.size(), 2u);
+    EXPECT_EQ(lightingSlots[0]->SchemaId, "intrinsic.graphics.lighting/first-match/v1");
+    EXPECT_EQ(lightingSlots[0]->Defaults, "duplicate-name edit target");
+    EXPECT_EQ(lightingSlots[0]->AllowedBindingRoles, baseAllowedRoles);
+    EXPECT_EQ(lightingSlots[1]->SchemaId, "intrinsic.graphics.lighting/second-copy/v1");
+    EXPECT_EQ(lightingSlots[1]->Defaults, "second slot sharing the same stable name");
+    EXPECT_EQ(lightingSlots[1]->AllowedBindingRoles, std::vector<std::string>{"material-table"});
+
+    // The extra duplicate is not itself a contract error: outer validation stays identical.
+    const RenderRecipeConfigLoadResult unique = PreviewRenderRecipeConfig(document, MakeContext());
+    EXPECT_EQ(result.State, unique.State);
+    EXPECT_EQ(result.ContractDiagnostics.Diagnostics.size(),
+              unique.ContractDiagnostics.Diagnostics.size());
+    EXPECT_TRUE(IsCompatible(result.ContractDiagnostics));
 }

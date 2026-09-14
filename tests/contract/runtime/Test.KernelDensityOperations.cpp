@@ -8,9 +8,10 @@
 #include <entt/entity/registry.hpp>
 #include <variant>
 #include <gtest/gtest.h>
+#include "EditorFeatureTestContext.hpp"
 #include "SandboxEditorJobHarness.hpp"
 
-import Extrinsic.Runtime.GeometryProcessingOperations;
+import Extrinsic.Runtime.PointFieldOperations;
 import Extrinsic.Runtime.SpatialIndexCache;
 import Extrinsic.Runtime.WorldRegistry;
 import Extrinsic.Runtime.SelectionController;
@@ -102,10 +103,10 @@ TEST(KernelDensityOperations, QueuedJobsRejectStaleInputsOutputsAndCancellation)
         Intrinsic::Tests::EditorFeatureTestContext context;context.Scene=&scene;
         R::EditorCommandHistory history;context.CommandHistory=&history;
         std::optional<R::EditorKernelDensityResult> delivered;
-        context.MethodResultSinks.KernelDensity=[&](auto r){delivered=std::move(r);};
+        const auto resultSink=[&](auto r){delivered=std::move(r);};
         Extrinsic::Tests::EditorJobHarness jobs;jobs.Attach(context);
-        ASSERT_EQ(R::ApplyEditorKernelDensityCommand(context,config).Status,R::EditorCommandStatus::Pending);
-        EXPECT_EQ(R::ApplyEditorKernelDensityCommand(context,config).Status,R::EditorCommandStatus::Pending);
+        ASSERT_EQ(R::ApplyEditorKernelDensityCommand(context, config, resultSink).Status,R::EditorCommandStatus::Pending);
+        EXPECT_EQ(R::ApplyEditorKernelDensityCommand(context, config, resultSink).Status,R::EditorCommandStatus::Pending);
         EXPECT_EQ(jobs.Snapshot().Entries.size(),1);
         switch(change)
         {
@@ -132,7 +133,7 @@ TEST(KernelDensityConfig, RoundTripAndSharedPreviewApplyRun)
     ASSERT_TRUE(registry.Register(R::MakeKernelDensityConfigSectionRegistration()));
     R::RuntimeEngineConfigControlState state;
     C::PopulateEngineConfigSectionDefaults(state.ActiveConfig, registry);
-    R::EditorGeometryProcessingContext context{.Scene = &scene};
+    R::EditorProcessingContext context{.Scene = &scene};
     context.EngineConfigControlState = &state;
     context.EngineConfigCommandsAvailable = true;
     unsigned previews = 0, applies = 0;
@@ -145,7 +146,7 @@ TEST(KernelDensityConfig, RoundTripAndSharedPreviewApplyRun)
         state.ActiveConfig = preview.Preview.Config;
         return R::RuntimeEngineConfigApplyResult{.Status = R::RuntimeEngineConfigApplyStatus::Applied};
     };
-    auto commands = R::BindEditorGeometryProcessingCommands(context);
+    auto commands = R::BindEditorProcessingCommands(context);
     ASSERT_TRUE(R::PreviewEditorKernelDensityCommand(commands, config).Ready);
     EXPECT_FALSE(Properties(scene, entity, D::MeshFace).Exists("density"));
     ASSERT_TRUE(R::ApplyEditorKernelDensityConfig(commands, config).Succeeded());
@@ -180,11 +181,11 @@ TEST(KernelDensityOperations, EveryDomainPublishesNamedDensityAndPreservesDelete
         props.GetOrAdd<float>("density").Vector().assign(size,77);
         const auto positionRevision=std::as_const(props).Get<glm::vec3>("samples").Revision();
         R::EditorCommandHistory history;
-        R::EditorGeometryProcessingContext context{.Scene=&scene,.World=world,.CommandHistory=&history,.SpatialIndices=&cache};
-        const auto catalog=R::GetEditorKernelDensityInputCatalog(context,config.StableEntityId);
+        R::EditorProcessingContext context{.Scene=&scene,.World=world,.CommandHistory=&history,.SpatialIndices=&cache};
+        const auto catalog=R::GetEditorKernelDensityInputCatalog(R::BindEditorProcessingCommands(context), config.StableEntityId);
         EXPECT_TRUE(std::ranges::any_of(catalog.Entries,[&](auto& e){return e.Ref==config.Positions;}));
-        ASSERT_TRUE(R::PreviewEditorKernelDensityCommand(context,config).Ready);
-        const auto reference=R::ApplyEditorKernelDensityCommand(context,config);
+        ASSERT_TRUE(R::PreviewEditorKernelDensityCommand(R::BindEditorProcessingCommands(context), config).Ready);
+        const auto reference=R::ApplyEditorKernelDensityCommand(R::BindEditorProcessingCommands(context), config);
         ASSERT_TRUE(reference.Succeeded())<<reference.Message;EXPECT_EQ(reference.ActualBackend,"cpu_octree");
         const auto values=std::as_const(props).Get<float>("density").Vector();
         EXPECT_EQ(values[2],77);if(half)EXPECT_EQ(values[3],77);
@@ -193,12 +194,12 @@ TEST(KernelDensityOperations, EveryDomainPublishesNamedDensityAndPreservesDelete
         ASSERT_TRUE(history.Undo().Succeeded());EXPECT_EQ(std::as_const(props).Get<float>("density")[0],77);
         ASSERT_TRUE(history.Redo().Succeeded());EXPECT_EQ(std::as_const(props).Get<float>("keep")[0],99);
         config.Backend=R::KernelDensityBackend::CpuLBVH;
-        const auto indexed=R::ApplyEditorKernelDensityCommand(context,config);
+        const auto indexed=R::ApplyEditorKernelDensityCommand(R::BindEditorProcessingCommands(context), config);
         ASSERT_TRUE(indexed.Succeeded())<<indexed.Message;EXPECT_EQ(indexed.ActualBackend,"cpu_lbvh");
         const auto actual=std::as_const(props).Get<float>("density");
         for(std::size_t i=0;i<size;++i)EXPECT_NEAR(actual[i],values[i],1e-5*std::max(1.f,values[i]));
         EXPECT_FLOAT_EQ(indexed.UsedBandwidth,reference.UsedBandwidth);
-        EXPECT_TRUE(R::ApplyEditorKernelDensityCommand(context,config).IndexReused);
+        EXPECT_TRUE(R::ApplyEditorKernelDensityCommand(R::BindEditorProcessingCommands(context), config).IndexReused);
         Intrinsic::Tests::EditorFeatureTestContext visualization;visualization.Scene=&scene;visualization.VisualizationCommandsAvailable=true;
         std::optional<R::VisualizationRecipe> stored;
         visualization.VisualizationRecipes.GetRecipe=[&](std::uint32_t){return stored;};
@@ -228,17 +229,17 @@ TEST(KernelDensityOperations, EveryDomainPublishesNamedDensityAndPreservesDelete
 TEST(KernelDensityOperations, InvalidUnsupportedAndNumericalFailuresRetainOutput)
 {
     Extrinsic::ECS::Scene::Registry scene;auto entity=Make(scene,D::PointCloudPoint);auto config=Config(entity,D::PointCloudPoint);
-    R::EditorGeometryProcessingContext context{.Scene=&scene};
+    R::EditorProcessingContext context{.Scene=&scene};
     auto& props=Properties(scene,entity,D::PointCloudPoint);props.GetOrAdd<float>("density").Vector().assign(props.Size(),77);
     for(const char* name:{"v:deleted","h:next","samples"})
-    {auto bad=config;bad.Density.Name=name;EXPECT_FALSE(R::PreviewEditorKernelDensityCommand(context,bad).Ready);}
+    {auto bad=config;bad.Density.Name=name;EXPECT_FALSE(R::PreviewEditorKernelDensityCommand(R::BindEditorProcessingCommands(context), bad).Ready);}
     config.Backend=R::KernelDensityBackend::VulkanLBVH;
-    EXPECT_FALSE(R::ApplyEditorKernelDensityCommand(context,config).Succeeded());
+    EXPECT_FALSE(R::ApplyEditorKernelDensityCommand(R::BindEditorProcessingCommands(context), config).Succeeded());
     config.Backend=R::KernelDensityBackend::CpuOctree;config.Bandwidth=1e-30f;
-    EXPECT_FALSE(R::ApplyEditorKernelDensityCommand(context,config).Succeeded());
+    EXPECT_FALSE(R::ApplyEditorKernelDensityCommand(R::BindEditorProcessingCommands(context), config).Succeeded());
     EXPECT_EQ(std::as_const(props).Get<float>("density")[0],77);
     config.Bandwidth=1;config.KNeighbors=std::numeric_limits<std::uint32_t>::max();
-    EXPECT_TRUE(R::ApplyEditorKernelDensityCommand(context,config).Succeeded());
+    EXPECT_TRUE(R::ApplyEditorKernelDensityCommand(R::BindEditorProcessingCommands(context), config).Succeeded());
 }
 TEST(KernelDensityOperations, NewOutputUndoAndPositionEditsRebuildTheCache)
 {
@@ -246,12 +247,69 @@ TEST(KernelDensityOperations, NewOutputUndoAndPositionEditsRebuildTheCache)
     R::SpatialIndexCache cache(worlds);auto entity=Make(scene,D::PointCloudPoint);auto config=Config(entity,D::PointCloudPoint);
     config.Backend=R::KernelDensityBackend::CpuLBVH;config.KNeighbors=std::numeric_limits<std::uint32_t>::max();
     R::EditorCommandHistory history;
-    R::EditorGeometryProcessingContext context{.Scene=&scene,.World=world,.CommandHistory=&history,.SpatialIndices=&cache};
+    R::EditorProcessingContext context{.Scene=&scene,.World=world,.CommandHistory=&history,.SpatialIndices=&cache};
     auto& props=Properties(scene,entity,D::PointCloudPoint);
-    ASSERT_TRUE(R::ApplyEditorKernelDensityCommand(context,config).Succeeded());
+    ASSERT_TRUE(R::ApplyEditorKernelDensityCommand(R::BindEditorProcessingCommands(context), config).Succeeded());
     ASSERT_TRUE(history.Undo().Succeeded());EXPECT_FALSE(props.Exists("density"));
     ASSERT_TRUE(history.Redo().Succeeded());EXPECT_TRUE(props.Exists("density"));
     props.Get<glm::vec3>("samples")[0].x+=.1f;
-    const auto rerun=R::ApplyEditorKernelDensityCommand(context,config);
+    const auto rerun=R::ApplyEditorKernelDensityCommand(R::BindEditorProcessingCommands(context), config);
     ASSERT_TRUE(rerun.Succeeded())<<rerun.Message;EXPECT_FALSE(rerun.IndexReused);
+}
+
+TEST(KernelDensityOperations, ReplacedStorageRejectsUndo)
+{
+    for (const bool replaceOutput : {false, true})
+    {
+        Extrinsic::ECS::Scene::Registry scene;
+        auto entity = Make(scene, D::PointCloudPoint);
+        auto config = Config(entity, D::PointCloudPoint);
+        auto& props = Properties(scene, entity, D::PointCloudPoint);
+        R::EditorCommandHistory history;
+        R::EditorProcessingContext context{.Scene=&scene, .CommandHistory=&history};
+        ASSERT_TRUE(R::ApplyEditorKernelDensityCommand(R::BindEditorProcessingCommands(context), config).Succeeded());
+        const auto computed = std::as_const(props).Get<float>("density").Vector();
+        if (replaceOutput)
+        {
+            auto oldOutput = props.Get<float>("density");
+            props.Remove(oldOutput);
+            props.GetOrAdd<glm::vec3>("density").Vector().assign(props.Size(), glm::vec3(17));
+        }
+        else
+        {
+            const auto samples = std::as_const(props).Get<glm::vec3>("samples").Vector();
+            auto oldSamples = props.Get<glm::vec3>("samples");
+            props.Remove(oldSamples);
+            props.GetOrAdd<glm::vec3>("samples").Vector() = samples;
+        }
+        EXPECT_FALSE(history.Undo().Succeeded());
+        if (replaceOutput)
+            EXPECT_EQ(std::as_const(props).Get<glm::vec3>("density")[0], glm::vec3(17));
+        else EXPECT_EQ(std::as_const(props).Get<float>("density").Vector(), computed);
+    }
+}
+
+TEST(KernelDensityOperations, ExpiredAttachmentRejectsQueuedPublicationAndDelivery)
+{
+    auto scene = std::make_unique<Extrinsic::ECS::Scene::Registry>();
+    const auto entity = Make(*scene, D::MeshVertex);
+    const auto config = Config(entity, D::MeshVertex);
+    bool active = true;
+    Intrinsic::Tests::EditorFeatureTestContext context;
+    context.Scene = scene.get();
+    context.AttachmentActive = [&] { return active; };
+    R::EditorCommandHistory history;
+    context.CommandHistory = &history;
+    Extrinsic::Tests::EditorJobHarness jobs;
+    jobs.Attach(context);
+    unsigned deliveries = 0;
+    const auto commands = R::BindEditorProcessingCommands(context);
+    ASSERT_EQ(R::ApplyEditorKernelDensityCommand(commands, config,
+        [&](R::EditorKernelDensityResult) { ++deliveries; }).Status, R::EditorCommandStatus::Pending);
+    active = false;
+    scene.reset();
+    ASSERT_TRUE(jobs.DrainUntilTerminal());
+    EXPECT_EQ(deliveries, 0u);
+    EXPECT_FALSE(history.CanUndo());
+    EXPECT_FALSE(commands.IsBound());
 }

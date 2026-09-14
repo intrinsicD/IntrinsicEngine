@@ -22,13 +22,12 @@ import Extrinsic.Graphics.Renderer;
 import Extrinsic.RHI.Device;
 import Extrinsic.Runtime.AssetIngestStateMachine;
 import Extrinsic.Runtime.CameraControllers;
-import Extrinsic.Runtime.ClusteringModule;
 import Extrinsic.Runtime.EditorCommon;
+import Extrinsic.Runtime.EditorProcessing;
 import Extrinsic.Runtime.EditorCommandHistory;
 import Extrinsic.Runtime.EditorJobProjection;
 import Extrinsic.Runtime.EditorWorkspaceSnapshots;
 import Extrinsic.Runtime.EngineConfigControl;
-import Extrinsic.Runtime.GeometryProcessingOperations;
 import Extrinsic.Runtime.PrimitiveSelectionRefinement;
 import Extrinsic.Runtime.RenderArtifactPublication;
 import Extrinsic.Runtime.RenderRecipeActivation;
@@ -64,38 +63,19 @@ namespace Intrinsic::Tests
         Core::Extent2D CameraViewport{};
         RHI::IDevice* Device{nullptr};
         Runtime::TextureBakeService* TextureBake{nullptr};
-        Runtime::ClusteringService* Clustering{nullptr};
         Runtime::EditorAssetImportCommandSurface AssetImportCommands{};
         Runtime::EditorAssetImportQueueCommandSurface AssetImportQueueCommands{};
         Runtime::EditorSceneFileCommandSurface SceneFileCommands{};
         Runtime::EditorPrimitiveViewCommandSurface PrimitiveViewCommands{};
-        Runtime::EditorParameterizationUvViewCommandSurface ParameterizationUvViewCommands{};
         Runtime::EditorVisualizationRecipeCommandSurface VisualizationRecipes{};
         std::uint64_t VisualizationRecipeRevision{0u};
         Runtime::EditorJobCommandSurface JobCommands{};
-        Runtime::EditorMethodResultSinks MethodResultSinks{};
         Runtime::RuntimeAssetImportQueueSnapshot AssetImportQueue{};
         std::string PendingAssetImportPath{};
         std::string PendingSceneFilePath{};
         Assets::AssetPayloadKind PendingAssetImportPayloadKind{Assets::AssetPayloadKind::Unknown};
         const Runtime::EditorFileImportResult* LastAssetImportResult{nullptr};
         const Runtime::EditorSceneFileResult* LastSceneFileResult{nullptr};
-        const Runtime::KMeansRunCompleted* LastKMeansResult{nullptr};
-        const Runtime::EditorMeshDenoiseResult* LastMeshDenoiseResult{nullptr};
-        const Runtime::EditorMeshCurvatureResult* LastMeshCurvatureResult{nullptr};
-        const Runtime::EditorMeshRemeshResult* LastMeshRemeshResult{nullptr};
-        const Runtime::EditorMeshSubdivideResult* LastMeshSubdivideResult{nullptr};
-        const Runtime::EditorMeshSimplifyResult* LastMeshSimplifyResult{nullptr};
-        const Runtime::EditorMeshVertexNormalsResult* LastMeshVertexNormalsResult{nullptr};
-        const Runtime::EditorGraphVertexNormalsResult* LastGraphVertexNormalsResult{nullptr};
-        const Runtime::EditorPointCloudVertexNormalsResult* LastPointCloudVertexNormalsResult{
-            nullptr};
-        const Runtime::EditorPointCloudOutlierRemovalResult* LastPointCloudOutlierRemovalResult{
-            nullptr};
-        const Runtime::EditorUvRegenerationCommandResult* LastUvRegenerationResult{nullptr};
-        const Runtime::EditorParameterizationResult* LastParameterizationResult{nullptr};
-        const Runtime::EditorProgressivePoissonResult* LastProgressivePoissonResult{nullptr};
-        const Runtime::EditorRegistrationResult* LastRegistrationResult{nullptr};
         const Graphics::RenderGraphFrameStats* RenderGraphStats{nullptr};
         const Graphics::RenderRecipeConfigContext* RenderRecipeContext{nullptr};
         Runtime::EditorRenderRecipeEditorState* RenderRecipeEditorState{nullptr};
@@ -176,56 +156,40 @@ namespace Intrinsic::Tests
             };
         }
 
-        [[nodiscard]] operator Runtime::EditorGeometryProcessingContext() const
+        [[nodiscard]] operator Runtime::EditorProcessingContext() const
         {
-            return Runtime::EditorGeometryProcessingContext{
+            return Runtime::EditorProcessingContext{
                 .Scene = Scene,
                 .World = World,
-                .Selection = Selection,
                 .CommandHistory = CommandHistory,
                 .Device = Device,
-                .Clustering = Clustering,
-                .ParameterizationUvViewCommands = ParameterizationUvViewCommands,
                 .JobCommands = JobCommands,
-                .MethodResultSinks = MethodResultSinks,
-                .LastKMeansResult = LastKMeansResult,
-                .LastMeshDenoiseResult = LastMeshDenoiseResult,
-                .LastMeshCurvatureResult = LastMeshCurvatureResult,
-                .LastMeshRemeshResult = LastMeshRemeshResult,
-                .LastMeshSubdivideResult = LastMeshSubdivideResult,
-                .LastMeshSimplifyResult = LastMeshSimplifyResult,
-                .LastMeshVertexNormalsResult = LastMeshVertexNormalsResult,
-                .LastGraphVertexNormalsResult = LastGraphVertexNormalsResult,
-                .LastPointCloudVertexNormalsResult = LastPointCloudVertexNormalsResult,
-                .LastPointCloudOutlierRemovalResult = LastPointCloudOutlierRemovalResult,
-                .LastUvRegenerationResult = LastUvRegenerationResult,
-                .LastParameterizationResult = LastParameterizationResult,
-                .LastProgressivePoissonResult = LastProgressivePoissonResult,
-                .LastRegistrationResult = LastRegistrationResult,
                 .EngineConfigControlState = EngineConfigControlState,
                 .PreviewEngineConfigDocument = PreviewEngineConfigDocument,
                 .ApplyEngineConfigHotSubset = ApplyEngineConfigHotSubset,
                 .AttachmentActive = AttachmentActive,
                 .InvalidateWorkspaceSnapshotCache = MakeWorkspaceSnapshotCacheInvalidator(),
                 .EngineConfigCommandsAvailable = EngineConfigCommandsAvailable,
+                .Selection = Selection,
                 .MeshDenoiseKernelAvailable = MeshDenoiseKernelAvailable,
                 .MeshCurvatureKernelAvailable = MeshCurvatureKernelAvailable,
                 .MeshCurvatureDirectionsAvailable = MeshCurvatureDirectionsAvailable,
-                .CurvatureSegmentationKernelAvailable =
-                    CurvatureSegmentationKernelAvailable,
+                .CurvatureSegmentationKernelAvailable = CurvatureSegmentationKernelAvailable,
                 .MeshRemeshUniformKernelAvailable = MeshRemeshUniformKernelAvailable,
                 .MeshRemeshAdaptiveKernelAvailable = MeshRemeshAdaptiveKernelAvailable,
                 .MeshRemeshProjectToSurfaceAvailable = MeshRemeshProjectToSurfaceAvailable,
                 .MeshRemeshErrorBoundedSizingAvailable = MeshRemeshErrorBoundedSizingAvailable,
                 .MeshSubdivideLoopKernelAvailable = MeshSubdivideLoopKernelAvailable,
-                .MeshSubdivideCatmullClarkKernelAvailable =
-                    MeshSubdivideCatmullClarkKernelAvailable,
+                .MeshSubdivideCatmullClarkKernelAvailable = MeshSubdivideCatmullClarkKernelAvailable,
                 .MeshSubdivideSqrt3KernelAvailable = MeshSubdivideSqrt3KernelAvailable,
                 .MeshSubdivideLoopFeatureEdgesAvailable = MeshSubdivideLoopFeatureEdgesAvailable,
                 .MeshSimplifyKernelAvailable = MeshSimplifyKernelAvailable,
             };
         }
-
+        [[nodiscard]] operator Runtime::EditorProcessingCommands() const
+        {
+            return Runtime::BindEditorProcessingCommands(static_cast<Runtime::EditorProcessingContext>(*this));
+        }
         [[nodiscard]] operator Runtime::EditorVisualizationEditingContext() const
         {
             return Runtime::EditorVisualizationEditingContext{
@@ -267,7 +231,7 @@ namespace Intrinsic::Tests
         {
             return Runtime::EditorWorkspaceSnapshotContext{
                 .Scene = static_cast<Runtime::EditorSceneEditingContext>(*this),
-                .Geometry = static_cast<Runtime::EditorGeometryProcessingContext>(*this),
+                .Geometry = static_cast<Runtime::EditorProcessingContext>(*this),
                 .Visualization = static_cast<Runtime::EditorVisualizationEditingContext>(*this),
                 .RenderRecipe = static_cast<Runtime::EditorRenderRecipeEditingContext>(*this),
                 .SelectedModelCache = SelectedModelCache,

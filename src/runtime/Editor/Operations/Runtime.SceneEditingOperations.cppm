@@ -1,3 +1,4 @@
+// Scene editing models and guarded commands shared by editor and runtime callers.
 module;
 
 #include <array>
@@ -10,7 +11,7 @@ module;
 #include <string_view>
 #include <vector>
 
-#include <glm/glm.hpp>
+#include <glm/vec3.hpp>
 #include <glm/gtc/quaternion.hpp>
 
 export module Extrinsic.Runtime.SceneEditingOperations;
@@ -358,34 +359,39 @@ export namespace Extrinsic::Runtime
         float VertexPointRadiusPx{6.0f};
     };
 
-    struct EditorSceneEditingContext
+    // C++ language linkage so the private attachment interface can name the one
+    // context this family's prepared frame borrows without importing this module.
+    extern "C++"
     {
-        ECS::Scene::Registry* Scene{nullptr};
-        WorldHandle World{DefaultWorldHandle};
-        SelectionController* Selection{nullptr};
-        EditorCommandHistory* CommandHistory{nullptr};
-        Assets::AssetService* AssetService{nullptr};
-        const std::optional<PrimitiveSelectionResult>* LastRefinedPrimitive{nullptr};
-        std::uint64_t LastRefinedPrimitiveGeneration{0u};
-        CameraControllerRegistry* CameraControllers{nullptr};
-        Core::Extent2D CameraViewport{};
-        EditorAssetImportCommandSurface AssetImportCommands{};
-        EditorAssetImportQueueCommandSurface AssetImportQueueCommands{};
-        EditorSceneFileCommandSurface SceneFileCommands{};
-        EditorPrimitiveViewCommandSurface PrimitiveViewCommands{};
-        RuntimeAssetImportQueueSnapshot AssetImportQueue{};
-        std::string PendingAssetImportPath{};
-        std::string PendingSceneFilePath{};
-        Assets::AssetPayloadKind PendingAssetImportPayloadKind{Assets::AssetPayloadKind::Unknown};
-        const EditorFileImportResult* LastAssetImportResult{nullptr};
-        const EditorSceneFileResult* LastSceneFileResult{nullptr};
-        std::function<bool()> AttachmentActive{};
-        std::function<void()> InvalidateWorkspaceSnapshotCache{};
-        bool ImGuiAdapterAvailable{false};
-        bool AssetImportCommandsAvailable{false};
-        bool SceneFileCommandsAvailable{false};
-        bool CameraRenderCommandsAvailable{false};
-    };
+        struct EditorSceneEditingContext
+        {
+            ECS::Scene::Registry* Scene{nullptr};
+            WorldHandle World{DefaultWorldHandle};
+            SelectionController* Selection{nullptr};
+            EditorCommandHistory* CommandHistory{nullptr};
+            Assets::AssetService* AssetService{nullptr};
+            const std::optional<PrimitiveSelectionResult>* LastRefinedPrimitive{nullptr};
+            std::uint64_t LastRefinedPrimitiveGeneration{0u};
+            CameraControllerRegistry* CameraControllers{nullptr};
+            Core::Extent2D CameraViewport{};
+            EditorAssetImportCommandSurface AssetImportCommands{};
+            EditorAssetImportQueueCommandSurface AssetImportQueueCommands{};
+            EditorSceneFileCommandSurface SceneFileCommands{};
+            EditorPrimitiveViewCommandSurface PrimitiveViewCommands{};
+            RuntimeAssetImportQueueSnapshot AssetImportQueue{};
+            std::string PendingAssetImportPath{};
+            std::string PendingSceneFilePath{};
+            Assets::AssetPayloadKind PendingAssetImportPayloadKind{Assets::AssetPayloadKind::Unknown};
+            const EditorFileImportResult* LastAssetImportResult{nullptr};
+            const EditorSceneFileResult* LastSceneFileResult{nullptr};
+            std::function<bool()> AttachmentActive{};
+            std::function<void()> InvalidateWorkspaceSnapshotCache{};
+            bool ImGuiAdapterAvailable{false};
+            bool AssetImportCommandsAvailable{false};
+            bool SceneFileCommandsAvailable{false};
+            bool CameraRenderCommandsAvailable{false};
+        };
+    }
 
     struct EditorDocumentCommandSurface
     {

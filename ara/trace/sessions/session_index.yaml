@@ -561,3 +561,31 @@ sessions:
   - C90
   - C91
   open_threads: 12
+
+- id: 2026-09-12_001
+  date: '2026-09-12'
+  summary: Density/spacing compilation-locality pilot implemented and verified locally; Claude implementation review pending approval, repeated performance unqualified.
+  turn_count: 1
+  events_count: 3
+  claims_touched: [C92]
+  open_threads: 5
+
+- id: 2026-09-13_001
+  date: '2026-09-13'
+  summary: Processing, renderer/cache, kernel and editor boundaries simplified with Claude. RUNTIME-242 removes
+    snapshot dependencies from private attachment and sixteen consumers; corrected final builds, native CPU,
+    focused sanitizers and representative Vulkan pass. No timing claim or commit.
+  turn_count: 10
+  events_count: 10
+  claims_touched:
+  - C92
+  open_threads: 6
+- id: 2026-09-14_001
+  date: '2026-09-14'
+  summary: RUNTIME-243 through 245 narrow editor frame and action dependencies. Earlier full CPU sanitizer
+    reconciliation and Vulkan deadline fix retained; final action cleanup passes full native CPU and focused
+    sanitizers. Source remains uncommitted.
+  turn_count: 3
+  events_count: 3
+  claims_touched: []
+  open_threads: 6

@@ -2,10 +2,12 @@
 
 Open **View / Normal Estimation**, or **Mesh / Graph / PointCloud → Processing →
 Vertices → Normals**. These menu entries open one shared window. Choose the
-entity, canonical position property, method and named output; then select
-**Estimate normals**. **Show normal vectors** binds the selected output and
-position properties through the existing vector-field visualization recipe.
-The visualization window owns glyph styling. **Mesh → Processing → Faces → Normals**
+canonical position property, method and named output; then select
+**Estimate normals**. The Entity input follows scene selection, including clearing
+when nothing is selected; an explicit input choice lasts until selection changes.
+**Show normals** selects the named output for color display through the same
+undoable Appearance property configuration on the corresponding surface, edge,
+or point layer. **Mesh → Processing → Faces → Normals**
 opens the same window with `mesh_face_normals`, vertex positions and `f:normal`
 on the face property set selected. **Show face normals** selects Face surface
 appearance and displays the output as a constant color per original face.
@@ -72,7 +74,9 @@ command uses the same binding/numerical preflight. Unknown-domain defaults
 resolve to the entity's vertex/node/point domain; explicit domain bindings are
 preserved. Invalid edits never replace the active config.
 
-The existing geometry-processing owner runs copied CPU jobs through JobService
+`Extrinsic.Runtime.NormalOperations` exposes commands through the generic
+`EditorProcessingCommands` handle and copies results through
+`PrepareEditorNormalFrame`. Its implementation runs copied CPU jobs through JobService
 when composed, with a synchronous path for CPU direct/headless callers. Vulkan
 requests require the framed cache and JobService: a neighborhood job advances
 GPU batches/readback on the device thread, then releases a dependent CPU
@@ -83,7 +87,18 @@ revisions/cardinality of the consumed position, deletion, topology and output
 properties. Cancellation and stale completion retain the previous output.
 Unrelated property edits do not invalidate a result. Output transactions share
 the editor command history and validate before initial apply, undo and redo.
-Legacy default-property normal command APIs remain available to existing callers.
+The configured operation is the canonical normal API for all four algorithms,
+including canonical `v:normal` output. Property watches, mutable-domain lookup,
+input catalogs and config application reuse the shared compiled owners. Mesh
+face-ring validation and normal snapshot reconstruction live in the compiled
+`Runtime.GeometryProcessingOperations.MeshSources.cpp` owner.
+
+Immediate calls return their result directly. A callback supplied to Apply receives
+only a newly queued job's terminal outcome while attached; observing an existing
+active output adds no callback. An expired attachment rejects scene reads, queued
+publication and history replay before dereferencing borrowed services. Prepared
+frames copy retained results; their completion and dismissal callbacks use the
+session attachment epoch.
 
 ## Spatial ownership and numerical limits
 

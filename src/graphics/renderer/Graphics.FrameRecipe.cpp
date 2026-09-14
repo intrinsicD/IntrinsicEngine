@@ -1,5 +1,6 @@
 module;
 
+#include <algorithm>
 #include <cstdint>
 #include <initializer_list>
 #include <optional>
@@ -11,8 +12,10 @@ module;
 
 module Extrinsic.Graphics.FrameRecipe;
 
+import Extrinsic.Graphics.CurrentRendererContractAdapter;
 import Extrinsic.Graphics.Pass.PostProcess.Bloom;
 import Extrinsic.Graphics.RenderGraph;
+import Extrinsic.Graphics.RenderingContract;
 import Extrinsic.Graphics.RenderWorld;
 import Extrinsic.RHI.CommandContext;
 import Extrinsic.RHI.Descriptors;
@@ -2504,5 +2507,200 @@ namespace Extrinsic::Graphics
             .DeclaredPassCount = enabledPassCount,
             .DeclaredResourceCount = enabledResourceCount,
         };
+    }
+
+    namespace
+    {
+        [[nodiscard]] bool ContainsCapability(
+            const std::vector<RendererCapability>& capabilities,
+            const RendererCapability capability) noexcept
+        {
+            return std::find(capabilities.begin(), capabilities.end(), capability) != capabilities.end();
+        }
+
+        [[nodiscard]] bool RendererSupportsCapabilities(
+            const RendererDescriptor& renderer,
+            const std::vector<RendererCapability>& required) noexcept
+        {
+            return std::all_of(required.begin(),
+                               required.end(),
+                               [&renderer](const RendererCapability capability) {
+                                   return ContainsCapability(renderer.SupportedCapabilities, capability);
+                               });
+        }
+
+        void AddFrameRecipeOverrideDiagnostic(
+            FrameRecipeOverrideProjection& projection,
+            const FrameRecipeOverrideDiagnosticCode code,
+            std::string subject,
+            std::string message)
+        {
+            projection.Diagnostics.push_back(FrameRecipeOverrideDiagnostic{
+                .Code = code,
+                .Subject = std::move(subject),
+                .Message = std::move(message),
+            });
+        }
+
+        // Only these slots have a live feature gate the projection can turn
+        // off; disabling anything else is reported rather than silently ignored.
+        [[nodiscard]] bool IsDisableMappedSlot(const std::string_view stableName) noexcept
+        {
+            return stableName == "postprocess" ||
+                   stableName == "debug-view" ||
+                   stableName == "picking" ||
+                   stableName == "lighting";
+        }
+
+        // `disabledSlotCount` counts slots this call actually changed, so
+        // disabling an already-off gate is not reported as an applied change.
+        void DisableMappedFrameRecipeSlot(FrameRecipeFeatures& features,
+                                          const std::string_view stableName,
+                                          std::uint32_t& disabledSlotCount) noexcept
+        {
+            if (stableName == "postprocess")
+            {
+                if (features.EnablePostProcess || features.EnableAntiAliasing)
+                {
+                    ++disabledSlotCount;
+                }
+                features.EnablePostProcess = false;
+                features.EnableAntiAliasing = false;
+                return;
+            }
+            if (stableName == "debug-view")
+            {
+                if (features.EnableDebugView)
+                {
+                    ++disabledSlotCount;
+                }
+                features.EnableDebugView = false;
+                return;
+            }
+            if (stableName == "picking")
+            {
+                if (features.EnablePicking)
+                {
+                    ++disabledSlotCount;
+                }
+                features.EnablePicking = false;
+                return;
+            }
+            if (stableName == "lighting")
+            {
+                if (features.LightingPath != FrameRecipeLightingPath::Forward ||
+                    features.EnableClusterGridBuild ||
+                    features.EnableClusterLightAssignment)
+                {
+                    ++disabledSlotCount;
+                }
+                features.LightingPath = FrameRecipeLightingPath::Forward;
+                features.EnableClusterGridBuild = false;
+                features.EnableClusterLightAssignment = false;
+            }
+        }
+    }
+
+    [[nodiscard]] FrameRecipeOverrideProjection ProjectFrameRecipeOverride(
+        const FrameRecipeFeatures& derivedDefaults,
+        const FrameRecipeOverride& recipeOverride)
+    {
+        FrameRecipeOverrideProjection projection{
+            .Features = derivedDefaults,
+        };
+        const RendererDescriptor renderer = MakeCurrentRendererDescriptor();
+        const RenderRecipeDescriptor baseRecipe = MakeCurrentRendererRecipeDescriptor();
+
+        if (recipeOverride.Recipe.RecipeId.empty())
+        {
+            AddFrameRecipeOverrideDiagnostic(projection,
+                                             FrameRecipeOverrideDiagnosticCode::EmptyRecipeId,
+                                             "recipe.recipeId",
+                                             "frame-recipe override must carry a non-empty recipe id");
+        }
+        if (!recipeOverride.Recipe.FixedCoreName.empty() &&
+            recipeOverride.Recipe.FixedCoreName != baseRecipe.FixedCoreName)
+        {
+            AddFrameRecipeOverrideDiagnostic(projection,
+                                             FrameRecipeOverrideDiagnosticCode::FixedCoreMutation,
+                                             recipeOverride.Recipe.FixedCoreName,
+                                             "frame-recipe override cannot replace the fixed frame core");
+        }
+
+        for (const RecipeExtensionSlotDescriptor& slot : recipeOverride.Recipe.Slots)
+        {
+            const RecipeExtensionSlotDescriptor* baseSlot =
+                FindRecipeSlot(baseRecipe, slot.StableName);
+            if (baseSlot == nullptr)
+            {
+                AddFrameRecipeOverrideDiagnostic(projection,
+                                                 FrameRecipeOverrideDiagnosticCode::UnknownSlot,
+                                                 slot.StableName,
+                                                 "frame-recipe override references an undeclared slot");
+                continue;
+            }
+            if (slot.Kind != baseSlot->Kind || baseSlot->Kind == RecipeSlotKind::FixedCore)
+            {
+                if (slot.StableName != baseSlot->StableName ||
+                    slot.Kind != baseSlot->Kind ||
+                    slot.SchemaId != baseSlot->SchemaId)
+                {
+                    AddFrameRecipeOverrideDiagnostic(projection,
+                                                     FrameRecipeOverrideDiagnosticCode::FixedCoreMutation,
+                                                     slot.StableName,
+                                                     "frame-recipe override cannot mutate the fixed frame core");
+                }
+            }
+            if (!RendererSupportsCapabilities(renderer, slot.RequiredCapabilities))
+            {
+                AddFrameRecipeOverrideDiagnostic(projection,
+                                                 FrameRecipeOverrideDiagnosticCode::UnsupportedCapability,
+                                                 slot.StableName,
+                                                 "frame-recipe override requires a renderer capability that is unavailable");
+            }
+        }
+
+        for (const std::string& stableName : recipeOverride.DisabledExtensionSlots)
+        {
+            const RecipeExtensionSlotDescriptor* baseSlot = FindRecipeSlot(baseRecipe, stableName);
+            if (baseSlot == nullptr)
+            {
+                AddFrameRecipeOverrideDiagnostic(projection,
+                                                 FrameRecipeOverrideDiagnosticCode::UnknownSlot,
+                                                 stableName,
+                                                 "frame-recipe override disables an undeclared slot");
+                continue;
+            }
+            if (baseSlot->Kind == RecipeSlotKind::FixedCore)
+            {
+                AddFrameRecipeOverrideDiagnostic(projection,
+                                                 FrameRecipeOverrideDiagnosticCode::FixedCoreSlotDisabled,
+                                                 stableName,
+                                                 "frame-recipe override cannot disable the fixed frame core");
+                continue;
+            }
+            if (!IsDisableMappedSlot(stableName))
+            {
+                AddFrameRecipeOverrideDiagnostic(projection,
+                                                 FrameRecipeOverrideDiagnosticCode::UnsupportedSlotDisable,
+                                                 stableName,
+                                                 "frame-recipe override can only disable slots with live feature gates");
+                continue;
+            }
+            DisableMappedFrameRecipeSlot(projection.Features,
+                                         stableName,
+                                         projection.DisabledSlotCount);
+        }
+
+        if (!projection.Diagnostics.empty())
+        {
+            projection.Features = derivedDefaults;
+            projection.DisabledSlotCount = 0u;
+            projection.Applied = false;
+            return projection;
+        }
+
+        projection.Applied = !recipeOverride.DisabledExtensionSlots.empty();
+        return projection;
     }
 }

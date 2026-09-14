@@ -831,3 +831,38 @@ TEST(VisualizationRecipes, VertexNormalsMapObjectSpaceDirectionsToRgb) {
   EXPECT_EQ(colors[3], glm::vec4(0.5f, 0.5f, 1, 1));
   EXPECT_EQ(normals.Vector(), original);
 }
+
+TEST(VisualizationRecipes, BooleanMasksAndUvsEncodeFiniteRgbaWithoutPublishingAliases)
+{
+    RecipeSourceFixture source;
+    auto& props = source.Vertices.Properties;
+    auto mask = props.Add<bool>("v:mask", false);
+    mask[1] = mask[3] = true;
+    auto uv = props.Add<glm::vec2>("v:uv", {0.25f, 0.75f});
+    const auto revision = props.Revision();
+    const auto encode = [&](const char* name, Geometry::PropertyValueKind kind) {
+        return R::EncodeVisualizationRecipe(source.Availability,
+            {.Data=R::ColorVisualizationRecipe{.Source={R::GeometryElementDomain::MeshVertex, name, kind}, .OutputName="display"}});
+    };
+    const auto encodedMask = encode("v:mask", Geometry::PropertyValueKind::Bool);
+    const auto encodedUv = encode("v:uv", Geometry::PropertyValueKind::Vec2);
+    ASSERT_TRUE(encodedMask.Succeeded());
+    ASSERT_TRUE(encodedUv.Succeeded());
+    ASSERT_EQ(encodedMask.Batch.PropertyBuffers.size(), 1u);
+    ASSERT_EQ(encodedUv.Batch.PropertyBuffers.size(), 1u);
+    const auto readColors = [](const auto& buffer) {
+        std::array<glm::vec4, 4> colors{};
+        EXPECT_EQ(buffer.Bytes.size(), sizeof(colors));
+        if (buffer.Bytes.size() == sizeof(colors)) std::memcpy(colors.data(), buffer.Bytes.data(), sizeof(colors));
+        return colors;
+    };
+    const auto maskColors = readColors(encodedMask.Batch.PropertyBuffers.front());
+    EXPECT_EQ(maskColors[0], maskColors[2]);
+    EXPECT_EQ(maskColors[1], maskColors[3]);
+    EXPECT_NE(maskColors[0], maskColors[1]);
+    const auto uvColors = readColors(encodedUv.Batch.PropertyBuffers.front());
+    EXPECT_EQ(uvColors[0], (glm::vec4{0.25f, 0.75f, 0.f, 1.f}));
+    EXPECT_EQ(props.Revision(), revision);
+    uv[0].x = std::numeric_limits<float>::quiet_NaN();
+    EXPECT_FALSE(encode("v:uv", Geometry::PropertyValueKind::Vec2).Succeeded());
+}

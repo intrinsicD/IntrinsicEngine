@@ -12,7 +12,7 @@ module;
 #include <string_view>
 #include <vector>
 
-#include <glm/glm.hpp>
+#include <glm/vec4.hpp>
 
 export module Extrinsic.Runtime.VisualizationEditingOperations;
 
@@ -28,7 +28,6 @@ import Extrinsic.Runtime.EditorCommon;
 import Extrinsic.Runtime.EditorJobProjection;
 import Extrinsic.Runtime.EditorWorkspaceAttachment;
 import Extrinsic.Runtime.GeometryPresentation;
-import Extrinsic.Runtime.GeometryProcessingOperations;
 import Extrinsic.Runtime.JobService;
 import Extrinsic.Runtime.TextureBakeModule;
 import Extrinsic.Runtime.VertexAttributeBinding;
@@ -320,10 +319,8 @@ export namespace Extrinsic::Runtime
         GeometryPropertyValueKindFilter ExpectedValueKind{};
         std::size_t ElementCount{0u};
 
-        // The bake representation APIs need a resolved kind, not a
-        // constraint. An unconstrained expectation resolves to `Unknown`,
-        // which those APIs already treat as "no usable representation" —
-        // the same branch the retired `Any` enumerator shared with `Unknown`.
+        // An unconstrained expectation resolves to Unknown: no usable bake
+        // representation is selected.
         [[nodiscard]] Geometry::PropertyValueKind ResolvedExpectedValueKind() const noexcept
         {
             return ExpectedValueKind.value_or(Geometry::PropertyValueKind::Unknown);
@@ -588,22 +585,27 @@ export namespace Extrinsic::Runtime
                    Status == EditorCommandStatus::NoChange;
         }
     };
-    struct EditorVisualizationEditingContext
+    // C++ language linkage so the private attachment interface can name the one
+    // context this family's prepared frame borrows without importing this module.
+    extern "C++"
     {
-        ECS::Scene::Registry* Scene{nullptr};
-        WorldHandle World{DefaultWorldHandle};
-        SelectionController* Selection{nullptr};
-        EditorCommandHistory* CommandHistory{nullptr};
-        TextureBakeService* TextureBake{nullptr};
-        EditorVisualizationRecipeCommandSurface VisualizationRecipes{};
-        std::uint64_t VisualizationRecipeRevision{0u};
-        EditorJobCommandSurface JobCommands{};
-        EditorWorkspaceSnapshotStats* ModelBuildStats{nullptr};
-        std::function<bool()> AttachmentActive{};
-        std::function<void()> InvalidateWorkspaceSnapshotCache{};
-        bool OperationalGpuAvailable{false};
-        bool VisualizationCommandsAvailable{false};
-    };
+        struct EditorVisualizationEditingContext
+        {
+            ECS::Scene::Registry* Scene{nullptr};
+            WorldHandle World{DefaultWorldHandle};
+            SelectionController* Selection{nullptr};
+            EditorCommandHistory* CommandHistory{nullptr};
+            TextureBakeService* TextureBake{nullptr};
+            EditorVisualizationRecipeCommandSurface VisualizationRecipes{};
+            std::uint64_t VisualizationRecipeRevision{0u};
+            EditorJobCommandSurface JobCommands{};
+            EditorWorkspaceSnapshotStats* ModelBuildStats{nullptr};
+            std::function<bool()> AttachmentActive{};
+            std::function<void()> InvalidateWorkspaceSnapshotCache{};
+            bool OperationalGpuAvailable{false};
+            bool VisualizationCommandsAvailable{false};
+        };
+    }
 
     class EditorVisualizationEditingCommands final
     {

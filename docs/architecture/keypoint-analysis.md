@@ -24,6 +24,13 @@ Vulkan radius capacity is 1..1024 and query batch size 1..16384. Any row exceedi
 
 ## Runtime and config
 
+The editor/config command surface is owned by
+`Extrinsic.Runtime.PointAnalysisOperations`. It uses the shared
+`EditorProcessingCommands` handle and explicit completion callbacks for newly
+queued jobs. `PrepareEditorPointAnalysisFrame` supplies guarded commands,
+completion sinks and copied results to the editor. See
+[processing compilation locality](sandbox-editor-feature-boundaries.md#processing-compilation-locality).
+
 Every canonical point-compatible domain is accepted: mesh vertices/edges/halfedges/faces, graph nodes/edges/halfedges and point-cloud points. Runtime compacts finite live samples, uses paired edge deletion for halfedges, and preserves deleted output rows, unrelated properties and topology. New output properties initialize deleted rows to zero. Input, deletion and both output revisions guard one atomic undoable publication. Cancelled or stale scale/query/reduction jobs cannot publish later. Shared private property-watch and domain helpers also serve outlier analysis and bilateral filtering.
 
 Section `sandbox.keypoint_analysis`, schema `intrinsic.runtime.sandbox.keypoint_analysis`, version 1:

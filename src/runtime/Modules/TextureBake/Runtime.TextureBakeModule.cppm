@@ -12,18 +12,11 @@ module;
 export module Extrinsic.Runtime.TextureBakeModule;
 
 import Extrinsic.Asset.Registry;
-import Extrinsic.Asset.Service;
 import Extrinsic.Core.Error;
-import Extrinsic.ECS.Scene.Registry;
 import Extrinsic.Graphics.Colormap;
-import Extrinsic.Graphics.GpuAssetCache;
-import Extrinsic.Graphics.Renderer;
-import Extrinsic.RHI.Device;
-import Extrinsic.Runtime.EditorCommandHistory;
 import Extrinsic.Runtime.GeometryPresentation;
 import Extrinsic.Runtime.JobService;
-import Extrinsic.Runtime.Module;
-import Extrinsic.Runtime.RenderExtraction;
+import Extrinsic.Runtime.ModuleLifecycle;
 import Extrinsic.Runtime.WorldHandle;
 import Geometry.Properties;
 
@@ -277,30 +270,6 @@ namespace Extrinsic::Runtime
 
       private:
         friend class TextureBakeModule;
-
-        void Bind(
-            ECS::Scene::Registry* scene,
-            WorldHandle world,
-            std::uint64_t bindingEpoch,
-            Assets::AssetService* assets,
-            EditorCommandHistory* history,
-            JobService* jobs,
-            RHI::IDevice* device,
-            Graphics::GpuAssetCache* gpuAssets,
-            Graphics::IRenderer* renderer,
-            RenderExtractionCache* extraction,
-            TextureBakeModuleStats* stats) noexcept;
-        void SetTarget(WorldHandle world,
-                       std::uint64_t bindingEpoch,
-                       ECS::Scene::Registry* scene) noexcept;
-        void SetCommandHistory(EditorCommandHistory* history) noexcept;
-        void DetachTargets(WorldHandle world,
-                           std::uint64_t bindingEpoch,
-                           bool destroyGeneratedAssets) noexcept;
-        void DestroySceneAssets(ECS::Scene::Registry& scene) noexcept;
-        [[nodiscard]] GpuQueueParticipantHandle
-            RegisterGpuQueueParticipant(JobService& jobs);
-        void Unbind() noexcept;
 
         struct Impl;
         std::unique_ptr<Impl> m_Impl{};

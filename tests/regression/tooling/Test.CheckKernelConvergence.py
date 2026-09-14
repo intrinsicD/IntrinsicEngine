@@ -130,7 +130,7 @@ class KernelConvergenceTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stdout)
         self.assertIn(
             "plain_imports=12 domain_imports=0 export_imports=0 "
-            "public_getter_names=5",
+            "borrowed_imports=1 public_getter_names=5",
             result.stdout,
         )
         self.assertIn("Temporary debt: none", result.stdout)
@@ -273,7 +273,7 @@ class KernelConvergenceTests(unittest.TestCase):
         self.assertIn("GetDomain return type changed", result.stdout)
         self.assertIn("owning type Domain", result.stdout)
 
-    def test_getter_owning_import_must_be_an_exact_plain_import(self) -> None:
+    def test_getter_owning_import_must_be_imported_or_declared_borrowed(self) -> None:
         policy = fixture_policy()
         current = policy["current_snapshot"]
         assert isinstance(current, dict)
@@ -287,7 +287,44 @@ class KernelConvergenceTests(unittest.TestCase):
             write_fixture(root, policy=policy)
             result = run_checker(root)
         self.assertEqual(result.returncode, 2, result.stdout)
-        self.assertIn("owning_import is not an exact plain import", result.stdout)
+        self.assertIn(
+            "owning_import is neither an exact plain import nor a declared "
+            "borrowed import",
+            result.stdout,
+        )
+
+    def test_borrowed_owning_import_is_accepted_without_an_engine_import(self) -> None:
+        source = BASE_SOURCE.replace("import Extrinsic.Runtime.Domain;\n", "")
+        policy = fixture_policy()
+        current = policy["current_snapshot"]
+        assert isinstance(current, dict)
+        current["plain_import_count"] = 1
+        current["plain_imports"] = ["Extrinsic.Core.Error"]
+        current["domain_import_count"] = 0
+        current["domain_imports"] = []
+        current["borrowed_imports"] = ["Extrinsic.Runtime.Domain"]
+        reference = policy["reference_snapshot"]
+        assert isinstance(reference, dict)
+        reference["plain_import_count"] = 1
+        reference["domain_import_count"] = 0
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            write_fixture(root, source=source, policy=policy)
+            result = run_checker(root)
+        self.assertEqual(result.returncode, 0, result.stdout)
+        self.assertIn("borrowed_imports=1", result.stdout)
+
+    def test_borrowed_import_cannot_also_be_declared_as_imported(self) -> None:
+        policy = fixture_policy()
+        current = policy["current_snapshot"]
+        assert isinstance(current, dict)
+        current["borrowed_imports"] = ["Extrinsic.Runtime.Domain"]
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            write_fixture(root, policy=policy)
+            result = run_checker(root)
+        self.assertEqual(result.returncode, 2, result.stdout)
+        self.assertIn("borrowed_imports overlaps the imported set", result.stdout)
 
     def test_removed_domain_import_forces_same_change_policy_ratchet(self) -> None:
         source = BASE_SOURCE.replace("import Extrinsic.Runtime.Domain;\n", "")

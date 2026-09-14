@@ -2,7 +2,7 @@
 module;
 #include <cstdint>
 #include <entt/entity/entity.hpp>
-#include <glm/glm.hpp>
+#include <glm/vec3.hpp>
 #include <memory>
 #include <optional>
 #include <string>
@@ -10,13 +10,14 @@ module;
 #include <vector>
 export module Extrinsic.Runtime.SpatialIndexCache;
 export import Geometry.PointLBVH;
-export import Extrinsic.Graphics.PointLBVH;
 export import Extrinsic.Runtime.GeometryAvailability;
-import Extrinsic.Runtime.Module;
-import Extrinsic.Runtime.WorldRegistry;
+import Extrinsic.Runtime.ModuleLifecycle;
 import Extrinsic.Runtime.WorldHandle;
 import Extrinsic.Core.Error;
-import Extrinsic.RHI.CommandContext;
+
+// The CPU constructor only borrows a reference; matching the owner's C++ language
+// linkage keeps this interface out of the WorldRegistry job/RHI import closure.
+extern "C++" { namespace Extrinsic::Runtime { class WorldRegistry; } }
 
 export namespace Extrinsic::Runtime
 {
@@ -82,7 +83,7 @@ export namespace Extrinsic::Runtime
         // Immutable CPU lease survives eviction; indices here are compact, Slots maps to original rows.
         [[nodiscard]] std::shared_ptr<const SpatialIndexSnapshot> Snapshot(SpatialIndexHandle handle) const;
         // Device-owner thread only. Reuse a completed batch to retain its buffer allocation.
-        // Results use original property row IDs, matching Nearest and RecordGpuQueries.
+        // Results use original property row IDs, matching Nearest.
         [[nodiscard]] std::shared_ptr<SpatialNearestBatch> QueueGpuNearest(
             SpatialIndexHandle handle, std::span<const glm::vec3> queries,
             std::shared_ptr<SpatialNearestBatch> reuse = {});
@@ -108,13 +109,6 @@ export namespace Extrinsic::Runtime
         [[nodiscard]] std::optional<std::vector<Geometry::PointLBVH::Neighbor>> KNearest(
             SpatialIndexHandle handle, glm::vec3 query, std::uint32_t k,
             std::uint32_t excludedSlot = Geometry::PointLBVH::InvalidIndex) const;
-        // Records a lazy GPU build then queries into caller-owned buffers. Never silently runs CPU.
-        [[nodiscard]] bool RecordGpuBuild(SpatialIndexHandle handle,
-                                          RHI::ICommandContext& commands);
-        [[nodiscard]] bool RecordGpuQueries(SpatialIndexHandle handle,
-                                            RHI::ICommandContext& commands,
-                                            const Graphics::PointLbvhQuery& query);
-        [[nodiscard]] Graphics::PointLbvhView GpuView(SpatialIndexHandle handle) const;
         void Prune();
         [[nodiscard]] SpatialIndexCacheStats Stats() const noexcept;
 

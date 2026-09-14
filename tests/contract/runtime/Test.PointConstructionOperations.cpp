@@ -7,8 +7,10 @@
 #include <glm/glm.hpp>
 #include <entt/entity/registry.hpp>
 #include <gtest/gtest.h>
+#include "EditorFeatureTestContext.hpp"
 #include "SandboxEditorJobHarness.hpp"
-import Extrinsic.Runtime.GeometryProcessingOperations;
+import Extrinsic.Runtime.PointConstructionOperations;
+import Extrinsic.Runtime.EditorProcessing;
 import Extrinsic.Runtime.SpatialIndexCache;
 import Extrinsic.Runtime.WorldRegistry;
 import Extrinsic.Runtime.SelectionController;
@@ -123,7 +125,7 @@ TEST(PointConstructionConfig, RoundTripPreviewApplyAndRejectMalformedControls)
     ASSERT_TRUE(registry.Register(R::MakePointConstructionConfigSectionRegistration()));
     R::RuntimeEngineConfigControlState state;
     C::PopulateEngineConfigSectionDefaults(state.ActiveConfig, registry);
-    R::EditorGeometryProcessingContext context{.Scene = &scene};
+    R::EditorProcessingContext context{.Scene = &scene};
     context.EngineConfigControlState = &state;
     context.EngineConfigCommandsAvailable = true;
     unsigned previews = 0, applies = 0;
@@ -139,7 +141,7 @@ TEST(PointConstructionConfig, RoundTripPreviewApplyAndRejectMalformedControls)
         return R::RuntimeEngineConfigApplyResult{.Status =
                                                      R::RuntimeEngineConfigApplyStatus::Applied};
     };
-    const auto commands = R::BindEditorGeometryProcessingCommands(context);
+    const auto commands = R::BindEditorProcessingCommands(context);
     ASSERT_TRUE(R::PreviewEditorPointConstructionCommand(commands, c).Ready);
     EXPECT_TRUE(scene.Raw().view<EC::StableId>().empty());
     ASSERT_TRUE(R::ApplyEditorPointConstructionConfig(commands, c).Succeeded());
@@ -179,13 +181,10 @@ TEST(PointConstructionOperations, EveryDomainPreservesSourceAndCachedOutputMatch
             const auto revision = props.Revision(), size = props.Size();
             R::EditorCommandHistory history;
             R::SelectionController selection;
-            R::EditorGeometryProcessingContext context{.Scene = &scene,
-                                                       .World = world,
-                                                       .Selection = &selection,
-                                                       .CommandHistory = &history,
-                                                       .SpatialIndices = &cache};
-            const auto catalog =
-                R::GetEditorPointConstructionInputCatalog(context, c.StableEntityId);
+            const auto context = R::BindEditorProcessingCommands(R::EditorProcessingContext{
+                .Scene = &scene, .World = world, .CommandHistory = &history,
+                .SpatialIndices = &cache, .Selection = &selection});
+            const auto catalog = R::GetEditorPointInputCatalog(context, c.StableEntityId);
             EXPECT_TRUE(std::ranges::any_of(catalog.Entries,
                                             [&](const auto& e) { return e.Ref == c.Positions; }));
             ASSERT_TRUE(R::PreviewEditorPointConstructionCommand(context, c).Ready);
@@ -244,7 +243,8 @@ TEST(PointConstructionOperations, GeneratedHistoryRejectsChangedPropertiesNameAn
         Extrinsic::ECS::Scene::Registry scene;
         const auto source = Make(scene, D::PointCloudPoint);
         R::EditorCommandHistory history;
-        R::EditorGeometryProcessingContext context{.Scene = &scene, .CommandHistory = &history};
+        const auto context = R::BindEditorProcessingCommands(
+            R::EditorProcessingContext{.Scene = &scene, .CommandHistory = &history});
         const auto result = R::ApplyEditorPointConstructionCommand(
             context, Config(source, D::PointCloudPoint, R::PointConstructionMethod::KnnGraph));
         ASSERT_TRUE(result.Succeeded()) << result.Message;
@@ -276,7 +276,7 @@ TEST(PointConstructionOperations, FullHierarchyTransformIsBakedWithoutChangingMe
     sourceTransform.Position = {1, 2, 3};
     const auto matrix =
         EC::Transform::GetMatrix(parentTransform) * EC::Transform::GetMatrix(sourceTransform);
-    R::EditorGeometryProcessingContext context{.Scene = &scene};
+    const auto context = R::BindEditorProcessingCommands(R::EditorProcessingContext{.Scene = &scene});
     const auto result = R::ApplyEditorPointConstructionCommand(
         context, Config(source, D::PointCloudPoint, R::PointConstructionMethod::KnnGraph));
     ASSERT_TRUE(result.Succeeded()) << result.Message;
@@ -307,10 +307,12 @@ TEST(PointConstructionOperations, JobsRejectChangedInputsTransformsDetachAndCanc
         bool attached = true;
         context.AttachmentActive = [&] { return attached; };
         std::optional<R::EditorPointConstructionResult> delivered;
-        context.MethodResultSinks.PointConstruction = [&](auto r) { delivered = std::move(r); };
+        int deliveries = 0;
+        auto onComplete = [&](R::EditorPointConstructionResult r)
+        { ++deliveries; delivered = std::move(r); };
         Extrinsic::Tests::EditorJobHarness jobs;
         jobs.Attach(context);
-        ASSERT_EQ(R::ApplyEditorPointConstructionCommand(context, c).Status,
+        ASSERT_EQ(R::ApplyEditorPointConstructionCommand(context, c, onComplete).Status,
                   R::EditorCommandStatus::Pending);
         auto& props = Properties(scene, source, D::MeshVertex);
         switch (change)
@@ -338,8 +340,13 @@ TEST(PointConstructionOperations, JobsRejectChangedInputsTransformsDetachAndCanc
             break;
         }
         ASSERT_TRUE(jobs.DrainUntilTerminal());
-        ASSERT_TRUE(delivered);
-        EXPECT_EQ(delivered->Succeeded(), change == 0) << delivered->Message;
+        // An expired attachment suppresses terminal delivery, which is the
+        // guarded-callback contract every family shares; every other outcome
+        // delivers exactly one result.
+        EXPECT_EQ(deliveries, change == 5 ? 0 : 1);
+        ASSERT_EQ(delivered.has_value(), change != 5);
+        if (delivered.has_value())
+            EXPECT_EQ(delivered->Succeeded(), change == 0) << delivered->Message;
         EXPECT_EQ(history.CanUndo(), change == 0);
         EXPECT_EQ(scene.Raw().view<EC::StableId>().empty(), change != 0);
     }
@@ -353,8 +360,8 @@ TEST(PointConstructionOperations, UnavailableGpuAndInvalidPreparationPublishNoth
     const auto source = Make(scene, D::PointCloudPoint);
     auto c = Config(source, D::PointCloudPoint, R::PointConstructionMethod::Hoppe);
     R::EditorCommandHistory history;
-    R::EditorGeometryProcessingContext context{
-        .Scene = &scene, .World = world, .CommandHistory = &history, .SpatialIndices = &cache};
+    const auto context = R::BindEditorProcessingCommands(R::EditorProcessingContext{
+        .Scene = &scene, .World = world, .CommandHistory = &history, .SpatialIndices = &cache});
     c.Backend = R::PointConstructionBackend::VulkanLBVH;
     EXPECT_FALSE(R::PreviewEditorPointConstructionCommand(context, c).Ready);
     EXPECT_FALSE(R::ApplyEditorPointConstructionCommand(context, c).Succeeded());
@@ -376,8 +383,8 @@ TEST(PointConstructionOperations, OneSampleGraphRetainsTheIsolatedNode)
     const auto source = Make(scene, D::PointCloudPoint);
     auto c = Config(source, D::PointCloudPoint, R::PointConstructionMethod::KnnGraph);
     Properties(scene, source, D::PointCloudPoint).Resize(1);
-    R::EditorGeometryProcessingContext context{
-        .Scene = &scene, .World = world, .SpatialIndices = &cache};
+    const auto context = R::BindEditorProcessingCommands(R::EditorProcessingContext{
+        .Scene = &scene, .World = world, .SpatialIndices = &cache});
     for (auto backend :
          {R::PointConstructionBackend::CpuReference, R::PointConstructionBackend::CpuLBVH})
     {

@@ -53,33 +53,6 @@ export namespace Extrinsic::Graphics
         const char* debugName);
 
 
-    // GRAPHICS-077 — deterministic CPU diagnostics for the
-    // `TransientDebugSurfacePass` upload + recording path. All counters
-    // stay at zero in Slice A (no pipelines, scaffold executor branch
-    // only). Slice B populates the triangle counters; Slice C populates
-    // the line + point counters. `MissingPipelineSkipCount` increments
-    // when the executor reaches the pass branch with the device
-    // operational but at least one required pipeline lease is missing
-    // (so the pass returns `SkippedUnavailable`); useful for
-    // distinguishing "feature off" (counter stays zero, pass not in
-    // stats) from "feature on but pipeline missing" (counter increments).
-    // `UploadOverflowCount` reports transient-buffer-allocator capacity
-    // exhaustion from the upload helper.
-    //
-    // Reset per-frame through the renderer's existing
-    // `m_LastRenderGraphStats = {}` cadence in `ExecuteFrame()`.
-    struct TransientDebugUploadDiagnostics
-    {
-        std::uint64_t UploadOverflowCount = 0;
-        std::uint64_t LineRecordsSubmitted = 0;
-        std::uint64_t PointRecordsSubmitted = 0;
-        std::uint64_t TriangleRecordsSubmitted = 0;
-        std::uint64_t LineRecordsRecorded = 0;
-        std::uint64_t PointRecordsRecorded = 0;
-        std::uint64_t TriangleRecordsRecorded = 0;
-        std::uint64_t MissingPipelineSkipCount = 0;
-    };
-
     struct TransientDebugTriangleUploadResult
     {
         RHI::BufferHandle VertexBuffer{};

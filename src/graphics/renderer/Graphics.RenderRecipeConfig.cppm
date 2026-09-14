@@ -1,3 +1,8 @@
+// Render-recipe config lane data: the serializable schema identity, parse and
+// validation diagnostics, the side-effect-free preview/load results, and the
+// validated `FrameRecipeOverride` those results produce for the renderer.
+//
+// Plain records and free functions only; no renderer or framegraph dependency.
 module;
 
 #include <cstdint>
@@ -93,6 +98,35 @@ namespace Extrinsic::Graphics
         RenderRecipeConfigPreview Preview{};
         std::vector<RenderRecipeConfigDiagnostic> Diagnostics{};
         RenderingContractValidationResult ContractDiagnostics{};
+    };
+
+    export enum class FrameRecipeOverrideDiagnosticCode : std::uint8_t
+    {
+        None = 0,
+        EmptyRecipeId,
+        FixedCoreMutation,
+        UnknownSlot,
+        FixedCoreSlotDisabled,
+        UnsupportedSlotDisable,
+        UnsupportedCapability,
+    };
+
+    export struct FrameRecipeOverrideDiagnostic
+    {
+        FrameRecipeOverrideDiagnosticCode Code{FrameRecipeOverrideDiagnosticCode::None};
+        std::string Subject{};
+        std::string Message{};
+    };
+
+    // Fail-closed override carried from the config/UI/agent lanes to the
+    // renderer. It pairs a validated `RenderRecipeDescriptor` with explicit
+    // optional-slot disables; applying it can only turn off optional feature
+    // gates at the default-recipe build site, never replace the fixed core.
+    export struct FrameRecipeOverride
+    {
+        RenderRecipeDescriptor Recipe{};
+        std::vector<std::string> DisabledExtensionSlots{};
+        std::string SourceId{};
     };
 
     export [[nodiscard]] std::string_view ToString(RenderRecipeConfigState value) noexcept;

@@ -1,0 +1,104 @@
+session:
+  id: 2026-09-14_001
+  date: '2026-09-14'
+  started: '2026-09-14T00:30:41+02:00'
+  last_turn: '2026-09-14T06:54:08+02:00'
+  turn_count: 3
+  summary: RUNTIME-243 through 245 narrow editor frame and action dependencies. Earlier full CPU sanitizer
+    reconciliation and Vulkan deadline fix retained; final action cleanup passes full native CPU and focused
+    sanitizers. Source remains uncommitted.
+events_logged:
+- turn: 1
+  type: experiment
+  id: N553
+  routing: direct
+  provenance: ai-executed
+  summary: Prepared context and family result borrows consolidated; two architecture-test assumptions corrected
+    and independently reviewed; all final gates pass.
+- turn: 2
+  type: experiment
+  id: N554
+  routing: direct
+  provenance: ai-executed
+  summary: Existing command adapters replace broad imports; full CPU sanitizer gates close. Diagnosed and fixed
+    GPU fixture deadlines, retaining all assertions; registered Vulkan and reconciled editor gates pass.
+- turn: 3
+  type: experiment
+  id: N555
+  routing: direct
+  provenance: ai-executed
+  summary: Action helpers isolated from workspace bindings; unchanged bodies and narrower compiler closures
+    verified. Corrected imports, documentation and stale-scan sequencing; final native CPU and focused sanitizers
+    pass.
+ai_actions:
+- turn: 1
+  action: Claude planned and edited the existing owners and family leaves. After its interrupted process stopped,
+    root completed reconciliation and docs, obtained fixed reviews, accepted both suggested improvements, repaired
+    two diagnosed architecture assertions, ran all selected verification and archived exact source evidence.
+  provenance: ai-executed
+  files_changed:
+  - tasks/active/RUNTIME-243-processing-frame-binding-locality.md
+  - src/runtime/Editor/internal/Runtime.EditorWorkspaceAttachment.Detail.cppm
+  - src/runtime/Editor/internal/Runtime.EditorWorkspaceSession.cpp
+  - src/runtime/Editor/Runtime.EditorProcessing.cppm
+  - src/runtime/Editor/Runtime.EditorWorkspaceSnapshots.Public.cpp
+  - tests/CMakeLists.txt
+  - tests/contract/runtime/Test.RuntimeEnginePrivateGlue.cpp
+  - tests/integration/runtime/Test.SandboxEditorPresentation.cpp
+- turn: 2
+  action: Claude planned/implemented/reviewed editor narrowing and independently reviewed timeout diagnosis/correction.
+    Root preserved exact baseline and failed runs, added existing-fixture diagnostics, ran fullCPU native/sanitizers,
+    reconciled GPU-only test changes, verified actualVulkan and archived source/registry evidence.
+  provenance: ai-executed
+  files_changed:
+  - tasks/active/RUNTIME-244-editor-command-frame-locality.md
+  - tasks/backlog/bugs/BUG-192-surface-appearance-vulkan-deadline.md
+  - src/runtime/Editor/internal/Runtime.EditorWorkspaceAttachment.Detail.cppm
+  - src/runtime/Editor/Operations/Runtime.SceneEditingOperations.Public.cpp
+  - src/runtime/Editor/Operations/Runtime.VisualizationEditingOperations.Public.cpp
+  - src/runtime/Editor/Operations/Runtime.RenderRecipeEditingOperations.Public.cpp
+  - tests/CMakeLists.txt
+  - tests/integration/runtime/Test.RuntimeSandboxAcceptanceGpuSmoke.cpp
+- turn: 3
+  action: Claude planned and implemented declaration/import cleanup, then reviewed a fixed diff and corrections.
+    Root verified exact records and bodies, corrected imports, added compiler guards, ran frozen-source builds
+    and tests, and archived evidence including interim failures.
+  provenance: ai-executed
+  files_changed:
+  - tasks/active/RUNTIME-245-editor-action-helper-locality.md
+  - src/runtime/Editor/internal/Runtime.EditorFeatureCommands.Internal.hpp
+  - src/runtime/Editor/internal/Runtime.EditorFeatureProperties.Internal.hpp
+  - src/runtime/Editor/internal/Runtime.EditorFeatures.Internal.hpp
+  - src/runtime/Editor/Operations/Runtime.SceneEditingOperations.Actions.cpp
+  - src/runtime/Editor/Operations/Runtime.VisualizationEditingOperations.Actions.cpp
+  - src/runtime/CMakeLists.txt
+  - tests/CMakeLists.txt
+claims_touched: []
+key_context:
+- turn: 1
+  excerpt: User requested continued code/open-point cleanup with Claude to save usage, following plan/implement/refactor/review/test/fix.
+    Existing source-sharing authorization persists.
+- turn: 2
+  excerpt: User requested continued remaining-code/open-point cleanup with Claude to save usage, following
+    plan/implement/refactor/review/test/fix. Source-sharing authorization persists.
+- turn: 3
+  excerpt: User requested continued remaining-code/open-point work with Claude to save usage, following plan,
+    implementation/refactor, review, test and fix. Existing source-sharing authorization persists.
+open_threads:
+- RUNTIME-233/234 implementation and review are complete in the uncommitted checkout; existing gate limitations
+  remain recorded.
+- RUNTIME-235 through RUNTIME-245 processing, renderer and spatial-boundary implementations are verified but
+  uncommitted. The named renderer exposure/inspection and cache/recipe candidates are complete; broader Framework24
+  convergence remains REVIEW-004 work.
+- Repeated clean-source compilation measurements remain unqualified; C92 stays a hypothesis.
+- BUG-177 is resolved and reviewed pending integration; BUG-188 and earlier research observations retain their
+  follow-up owners. BUG-189 is corrected pending integration, and BUG-180 retains the distinct leak-enabled
+  diagnostic.
+- BUG-190 idle CPU reconciliation and BUG-191 targeted test-budget corrections are verified pending integration;
+  original failures remain in evidence.
+- RUNTIME-245 is implemented, reviewed and verified pending integration. Scene and visualization action closures
+  are now 55/75; further workspace/model simplification requires actual shared-contract evidence. Matched eligible-source
+  compile timing and REVIEW-004 convergence remain open. Full sanitizer and Vulkan results remain scoped to
+  their recorded source; this slice adds full native CPU and focused sanitizer coverage.
+ai_suggestions_pending:
+- No unrelated research observation acquired a closure signal from this refactor.

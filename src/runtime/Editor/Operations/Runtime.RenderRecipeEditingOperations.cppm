@@ -1,3 +1,4 @@
+// Copied recipe-editing models and commands shared by editor and runtime control surfaces.
 module;
 
 #include <cstdint>
@@ -12,7 +13,7 @@ export module Extrinsic.Runtime.RenderRecipeEditingOperations;
 import Extrinsic.Core.Config.EngineLoad;
 import Extrinsic.Graphics.RenderRecipeConfig;
 import Extrinsic.Graphics.RenderingContract;
-import Extrinsic.Graphics.Renderer;
+import Extrinsic.Graphics.RenderDiagnostics;
 import Extrinsic.Runtime.EditorCommon;
 import Extrinsic.Runtime.EditorWorkspaceAttachment;
 import Extrinsic.Runtime.EngineConfigControl;
@@ -335,27 +336,32 @@ export namespace Extrinsic::Runtime
         }
     };
 
-    struct EditorRenderRecipeEditingContext
+    // C++ language linkage so the private attachment interface can name the one
+    // context this family's prepared frame borrows without importing this module.
+    extern "C++"
     {
-        const Graphics::RenderGraphFrameStats* RenderGraphStats{nullptr};
-        const Graphics::RenderRecipeConfigContext* RenderRecipeContext{nullptr};
-        EditorRenderRecipeEditorState* RenderRecipeEditorState{nullptr};
-        const RuntimeRenderRecipeState* RenderRecipeRuntimeState{nullptr};
-        std::function<Graphics::RenderRecipeConfigLoadResult(const std::string&,
-                                                             const std::string&)>
-            PreviewRenderRecipeDocument{};
-        std::function<RuntimeRenderRecipeApplyResult(const Graphics::RenderRecipeConfigLoadResult&)>
-            ApplyRenderRecipePreview{};
-        const RuntimeEngineConfigControlState* EngineConfigControlState{nullptr};
-        std::function<Core::Config::EngineConfigLoadResult(const std::string&, const std::string&)>
-            PreviewEngineConfigDocument{};
-        std::function<RuntimeEngineConfigApplyResult(const Core::Config::EngineConfigLoadResult&)>
-            ApplyEngineConfigHotSubset{};
-        RenderArtifactRegistry* RenderArtifacts{nullptr};
-        std::function<bool()> AttachmentActive{};
-        bool RenderRecipeCommandsAvailable{false};
-        bool EngineConfigCommandsAvailable{false};
-    };
+        struct EditorRenderRecipeEditingContext
+        {
+            const Graphics::RenderGraphFrameStats* RenderGraphStats{nullptr};
+            const Graphics::RenderRecipeConfigContext* RenderRecipeContext{nullptr};
+            EditorRenderRecipeEditorState* RenderRecipeEditorState{nullptr};
+            const RuntimeRenderRecipeState* RenderRecipeRuntimeState{nullptr};
+            std::function<Graphics::RenderRecipeConfigLoadResult(const std::string&,
+                                                                 const std::string&)>
+                PreviewRenderRecipeDocument{};
+            std::function<RuntimeRenderRecipeApplyResult(const Graphics::RenderRecipeConfigLoadResult&)>
+                ApplyRenderRecipePreview{};
+            const RuntimeEngineConfigControlState* EngineConfigControlState{nullptr};
+            std::function<Core::Config::EngineConfigLoadResult(const std::string&, const std::string&)>
+                PreviewEngineConfigDocument{};
+            std::function<RuntimeEngineConfigApplyResult(const Core::Config::EngineConfigLoadResult&)>
+                ApplyEngineConfigHotSubset{};
+            RenderArtifactRegistry* RenderArtifacts{nullptr};
+            std::function<bool()> AttachmentActive{};
+            bool RenderRecipeCommandsAvailable{false};
+            bool EngineConfigCommandsAvailable{false};
+        };
+    }
 
     class EditorRenderRecipeEditingCommands final
     {

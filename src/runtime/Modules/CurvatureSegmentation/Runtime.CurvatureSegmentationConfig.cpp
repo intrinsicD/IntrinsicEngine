@@ -1,6 +1,7 @@
 module;
 
 #include <cmath>
+#include <array>
 #include <cstdint>
 #include <optional>
 #include <string>
@@ -80,6 +81,30 @@ namespace Extrinsic::Runtime
     bool IsValidCurvatureSegmentationConfig(
         const CurvatureSegmentationConfig& config) noexcept
     {
+        const CurvatureSegmentationConfig defaults;
+        const std::array properties{
+            &CurvatureSegmentationConfig::Positions,
+            &CurvatureSegmentationConfig::Components,
+            &CurvatureSegmentationConfig::Regions,
+            &CurvatureSegmentationConfig::RegionColors,
+            &CurvatureSegmentationConfig::Boundaries,
+            &CurvatureSegmentationConfig::BoundaryColors,
+            &CurvatureSegmentationConfig::HardFeatures,
+            &CurvatureSegmentationConfig::FeatureConfidence,
+            &CurvatureSegmentationConfig::BoundaryRoles,
+            &CurvatureSegmentationConfig::FeatureColors
+        };
+        for (std::size_t i = 0; i < properties.size(); ++i)
+        {
+            const auto& ref = config.*properties[i];
+            const auto& expected = defaults.*properties[i];
+            if (ref.Domain != expected.Domain || ref.ValueKind != expected.ValueKind ||
+                !ref.Name.starts_with(expected.Name.substr(0, 2)) || ref.Name.size() < 3 ||
+                ref.Name.find('\0') != std::string::npos || ref.Name.ends_with(":deleted") ||
+                ref.Name == "e:v0" || ref.Name == "e:v1" || ref.Name == "f:halfedge") return false;
+            for (std::size_t j = 0; j < i; ++j)
+                if (ref.Domain == (config.*properties[j]).Domain && ref.Name == (config.*properties[j]).Name) return false;
+        }
         const bool validMethod =
             config.Method == CurvatureSegmentationMethod::CurvatureGmm ||
             config.Method ==

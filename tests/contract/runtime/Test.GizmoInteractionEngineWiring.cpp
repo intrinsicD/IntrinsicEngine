@@ -15,6 +15,7 @@ import Extrinsic.Core.Config.Engine;
 import Extrinsic.ECS.Component.Transform;
 import Extrinsic.ECS.Scene.Handle;
 import Extrinsic.Graphics.RenderFrameInput;
+import Extrinsic.Graphics.Renderer;
 import Extrinsic.Graphics.RenderWorld;
 import Extrinsic.Graphics.GpuAssetCache;
 import Extrinsic.Platform.Window;

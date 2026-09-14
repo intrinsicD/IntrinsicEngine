@@ -11,6 +11,9 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[3]
 ROOT_HYGIENE = REPO_ROOT / "tools" / "repo" / "check_root_hygiene.py"
 EXPECTED_TOP_LEVEL = REPO_ROOT / "tools" / "repo" / "check_expected_top_level.py"
+ROOT_POLICY = REPO_ROOT / "tools" / "repo" / "root_allowlist.yaml"
+sys.path.insert(0, str(ROOT_HYGIENE.parent))
+from check_root_hygiene import load_root_policy
 
 
 def run_checker(
@@ -70,6 +73,33 @@ class RootHygieneTests(unittest.TestCase):
             with self.subTest(checker=checker.name):
                 result = run_checker(checker, REPO_ROOT)
                 self.assertEqual(result.returncode, 0, result.stdout)
+
+    def test_session_metadata_directory_is_optional_and_exact(self) -> None:
+        for kind, expected in (("absent", 0), ("directory", 0),
+                               ("file", 1), ("lookalike", 1)):
+            with self.subTest(kind=kind), tempfile.TemporaryDirectory() as tmp:
+                root = Path(tmp)
+                for entry in load_root_policy(ROOT_POLICY).allowed_root_entries:
+                    path = root / entry.rstrip("/")
+                    if entry.endswith("/"):
+                        path.mkdir()
+                    else:
+                        path.touch()
+                metadata = root / ".agents"
+                if kind == "directory":
+                    metadata.mkdir()
+                elif kind == "file":
+                    metadata.write_text("unexpected root file", encoding="utf-8")
+                elif kind == "lookalike":
+                    (root / ".agents-extra").mkdir()
+                for checker in (ROOT_HYGIENE, EXPECTED_TOP_LEVEL):
+                    with self.subTest(checker=checker.name):
+                        result = run_checker(checker, root, ROOT_POLICY)
+                        self.assertEqual(result.returncode, expected, result.stdout)
+                        if kind == "directory":
+                            self.assertIn("Ignored named local entries:\n  - .agents/", result.stdout)
+                        elif kind == "lookalike":
+                            self.assertIn("Unexpected root entries:\n  - .agents-extra/", result.stdout)
 
     def test_named_local_entries_and_tracked_ara_pass(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

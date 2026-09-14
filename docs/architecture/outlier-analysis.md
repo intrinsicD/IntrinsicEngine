@@ -92,9 +92,14 @@ Output names cannot replace topology or deletion properties.
 `PreviewEditorOutlierAnalysisCommand`, `ApplyEditorOutlierAnalysisConfig` and
 `ApplyEditorConfiguredOutlierAnalysis` are shared by UI and agent/config callers.
 `operation` is `analyze` or `remove_marked`. Preview does not build an index or
-mutate properties. Legacy geometry removal functions and `ApplyEditorPointCloudOutlierRemovalCommand`
-retain their CPU compatibility behavior. The new analysis/config path selects
-LBVH execution; the old PointCloud menu ID opens this analysis window.
+mutate properties. Point-cloud menu actions open this same analysis window.
+
+The editor/config command surface is owned by
+`Extrinsic.Runtime.PointAnalysisOperations`. It uses the shared
+`EditorProcessingCommands` handle and explicit completion callbacks for newly
+queued jobs. `PrepareEditorPointAnalysisFrame` supplies guarded commands,
+completion sinks and copied results to the editor. See
+[processing compilation locality](sandbox-editor-feature-boundaries.md#processing-compilation-locality).
 
 ## Formulation sources and scope
 

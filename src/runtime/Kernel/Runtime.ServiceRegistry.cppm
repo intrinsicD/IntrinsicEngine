@@ -1,3 +1,5 @@
+// Two-phase runtime service registry: providers publish borrowed instances by
+// compile-time type identity, and resolution fails closed with diagnostics.
 module;
 
 #include <cstddef>
@@ -11,10 +13,12 @@ module;
 export module Extrinsic.Runtime.ServiceRegistry;
 
 import Extrinsic.Core.Error;
-import Extrinsic.Core.FrameGraph;
+import Extrinsic.Core.Hash;
 
 namespace Extrinsic::Runtime
 {
+    // Compile-time service-type identity (no RTTI); `Core::TypeToken<T>()` is
+    // the shared token owned by `Extrinsic.Core.Hash`.
     export using ServiceTypeKey = std::size_t;
 
     export template <typename TService>

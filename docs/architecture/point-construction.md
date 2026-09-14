@@ -25,7 +25,7 @@ and programmatic callers share validation and the configured command path:
 | `mutual`, `min_distance_epsilon` | Graph reciprocity and near-duplicate filtering. |
 | `gpu_query_batch_size` | Bounded query chunk size, also used to bound CPU temporary rows. |
 
-The runtime owns composition in `Runtime.GeometryProcessingOperations`.
+The runtime owns composition in `Runtime.PointConstructionOperations`.
 `Geometry.SurfaceReconstruction` owns preparation, signed-distance reduction
 and extraction. `Geometry.Graph.Utils` owns row filtering, edge deduplication
 and graph construction. No geometry layer imports runtime or GPU services.

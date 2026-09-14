@@ -1,3 +1,13 @@
+#include <array>
+#include <cstddef>
+#include <cstdint>
+#include <optional>
+#include <span>
+#include <string_view>
+#include <vector>
+#include <glm/vec3.hpp>
+#include <glm/vec4.hpp>
+#include <glm/vec2.hpp>
 #include <functional>
 #include <memory>
 #include <string>
@@ -10,6 +20,16 @@
 
 #include "RuntimeTestModule.hpp"
 
+import Extrinsic.Runtime.NormalOperations;
+import Extrinsic.Runtime.RegistrationOperations;
+import Extrinsic.Runtime.MeshFieldOperations;
+import Extrinsic.Runtime.MeshTopologyOperations;
+import Extrinsic.Runtime.ParameterizationOperations;
+import Extrinsic.Runtime.PointFieldOperations;
+import Extrinsic.Runtime.PointAnalysisOperations;
+import Extrinsic.Runtime.PointSetOperations;
+import Extrinsic.Runtime.PointConstructionOperations;
+import Extrinsic.Runtime.PointCloudServiceOperations;
 import Extrinsic.Core.Config.Engine;
 import Extrinsic.Core.Config.EngineLoad;
 import Extrinsic.Core.Config.Window;
@@ -22,9 +42,22 @@ import Extrinsic.Runtime.DescriptorAnalysisConfig;
 import Extrinsic.Runtime.EditorUiModule;
 import Extrinsic.Runtime.EngineConfigControl;
 import Extrinsic.Runtime.SelectionController;
+import Extrinsic.Runtime.SceneInteractionModule;
 import Extrinsic.Sandbox.Editor.MeshProcessingPanels;
 import Extrinsic.Sandbox.Editor.Shell;
 import Geometry.HalfedgeMesh;
+import Extrinsic.Runtime.EditorCommon;
+import Extrinsic.Runtime.GeometryPresentation;
+import Extrinsic.Runtime.TextureBakeModule;
+import Extrinsic.Runtime.EditorWorkspaceSnapshots;
+import Extrinsic.Runtime.GeometryProcessingOperations;
+import Extrinsic.Runtime.RenderRecipeEditingOperations;
+import Extrinsic.Runtime.SceneEditingOperations;
+import Extrinsic.Runtime.VisualizationEditingOperations;
+import Extrinsic.Runtime.ParameterizationConfig;
+import Extrinsic.Runtime.PointCloudConsolidationTypes;
+
+#include "../../../src/app/Sandbox/Editor/Sandbox.PanelSupport.hpp"
 
 namespace Runtime = Extrinsic::Runtime;
 namespace Editor = Extrinsic::Sandbox::Editor;
@@ -56,6 +89,7 @@ TEST(SandboxDescriptorAnalysisPanel, SliderFollowsHistogramOnlyAfterShow)
     auto* driver = application.get();
     Intrinsic::Tests::RuntimeTestKernel engine(config, std::move(application));
     engine.EmplaceModule<Runtime::EngineConfigControl>(std::move(sections));
+    engine.EmplaceModule<Runtime::SceneInteractionModule>();
     engine.EmplaceModule<Runtime::EditorUiModule>();
     engine.Initialize();
     auto& scene = *engine.Worlds().Get(engine.ActiveWorld());
@@ -89,6 +123,8 @@ TEST(SandboxDescriptorAnalysisPanel, SliderFollowsHistogramOnlyAfterShow)
     Runtime::SetDescriptorAnalysisConfig(candidate, analysis);
     ASSERT_TRUE(control->ApplyEngineConfigHotSubset(
         control->PreviewEngineConfigControlDocument(Config::SerializeEngineConfig(candidate))).Succeeded());
+
+    ASSERT_TRUE(engine.Services().Find<Runtime::SelectionController>()->SetSelectedEntity(scene, entity));
 
     Editor::EditorShell shell;
     shell.Attach(engine.Worlds(), engine.Services());
@@ -145,10 +181,7 @@ TEST(SandboxDescriptorAnalysisPanel, SliderFollowsHistogramOnlyAfterShow)
         }
         if (frame == 44)
         {
-            analysis.StableEntityId = Runtime::SelectionController::ToStableEntityId(secondEntity);
-            Runtime::SetDescriptorAnalysisConfig(candidate, analysis);
-            EXPECT_TRUE(control->ApplyEngineConfigHotSubset(
-                control->PreviewEngineConfigControlDocument(Config::SerializeEngineConfig(candidate))).Succeeded());
+            EXPECT_TRUE(engine.Services().Find<Runtime::SelectionController>()->SetSelectedEntity(scene, secondEntity));
         }
         if (frame == 57)
         {

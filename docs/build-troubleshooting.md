@@ -343,6 +343,43 @@ configuration-conditional checks; it cannot be combined with `--inventory`.
 
 ## Compile-hotspot diagnostics
 
+If an unchanged build repeatedly rescans C++ dependencies, inspect
+`ninja -C build/ci -d explain IntrinsicTests`. Nonexistent paths such as
+`/include/c++/...` can result from selecting Clang through a directory alias
+such as `/bin`. Automatic toolchain selection resolves the directory while
+preserving the `clang++` executable name. Refresh an older auto-selected cache
+with `cmake --preset ci --fresh`; explicit compiler overrides should use the
+real directory as well (for example `/usr/bin/clang++-23`).
+
+For editor iteration, build `IntrinsicSandboxEditorIntegrationTests` and the
+owning runtime test target after the configured `ci` preset is current. Use the
+`touched_scope.py --local` planner from `AGENTS.md` when ownership is unclear.
+Keep normal caching enabled; disabling it is a diagnostic step for suspected
+stale results. The module-aware launcher deliberately preserves dependency
+invalidation. Run the required full correctness gate after integrating changes.
+
+The default `ci` preset builds the editor library through tests but disables the
+Sandbox executable. For app changes, also verify its entry point and link:
+
+```bash
+cmake --preset ci -DINTRINSIC_BUILD_SANDBOX=ON
+cmake --build --preset ci --target ExtrinsicSandbox
+```
+
+Interfaces that only accept `entt::registry` references can include
+`entt/entity/fwd.hpp`; keep `registry.hpp` in implementation units that use the
+registry. Inline registry operations and owning registry members still require
+the full definition. Check the imported interfaces too when reducing this
+dependency.
+
+Keep source files fixed while their compiler commands run. For a compiler time
+trace, replay the matching `compile_commands.json` entry with `-ftime-trace`,
+redirecting both the object and `-fmodule-output` paths to a temporary directory
+(the latter may be inside the `.modmap` response file). This keeps diagnostic
+outputs out of the live build graph. Distinguish parsing, template work and
+`WriteAST` time before choosing a source or compiler-setting change. Concurrent
+Ninja command durations overlap and must not be summed as build wall time.
+
 Run the compile-hotspot analyzer only after the intended producer build has
 completed:
 

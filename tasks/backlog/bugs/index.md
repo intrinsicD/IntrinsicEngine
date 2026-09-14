@@ -5,6 +5,20 @@ Each entry includes the observed repro, the likely affected symbols, and a fix p
 
 ## Active Issues
 
+- [BUG-178 — Clang 23 crashes during an incremental module rebuild](BUG-178-clang23-incremental-module-ice.md).
+
+- [BUG-180 — Leak-enabled framed ICP process reports 240 retained bytes](BUG-180-framed-icp-leak-enabled-process-retention.md).
+
+- [BUG-188 — Sandbox blocks LeakSanitizer during CTest discovery](BUG-188-sandbox-sanitizer-test-discovery.md).
+
+- [BUG-193 — GPU pacing and watchdog margin](BUG-193-gpu-pacing-and-watchdog-margin.md): controlled follow-up to the corrected Vulkan fixture budgets; preserve finite-work and backend assertions.
+
+- [`BUG-191` — Consolidation LBVH sequence reaches its watchdog](BUG-191-consolidation-lbvh-sequence-timeout.md): distinguish stalled cancellation/publication from finite work exceeding the LOP-specific budget before changing any deadline.
+
+- [`BUG-190` — Curvature refinement timeout during concurrent compilation](BUG-190-curvature-refinement-timeout-during-compilation.md): reconciled with idle registered-case and full CPU passes; local verification now sequences tests after builds, preserving its timeout and assertions. Record pending integration.
+
+- [`BUG-189` — Distance-ratio Vulkan smoke exceeds its inherited timeout](BUG-189-distance-ratio-vulkan-smoke-timeout.md): diagnose the 30-second termination against neighboring frame-based cases without reducing correctness or sanitizer coverage.
+
 - [`BUG-160` — FastStaged fixed seed planes fragment smooth meshes into tiny
   charts](BUG-160-fast-staged-atlas-chart-fragmentation.md): the seed-normal and
   seed-plane admission rule produced about 90k charts on a 100k-face

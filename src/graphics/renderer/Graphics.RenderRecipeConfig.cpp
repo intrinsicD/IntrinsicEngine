@@ -264,30 +264,6 @@ namespace Extrinsic::Graphics
             return false;
         }
 
-        [[nodiscard]] const RecipeExtensionSlotDescriptor* FindRecipeSlot(
-            const RenderRecipeDescriptor& recipe,
-            const std::string_view stableName) noexcept
-        {
-            const auto it = std::find_if(recipe.Slots.begin(),
-                                         recipe.Slots.end(),
-                                         [stableName](const RecipeExtensionSlotDescriptor& slot) {
-                                             return slot.StableName == stableName;
-                                         });
-            return it == recipe.Slots.end() ? nullptr : &*it;
-        }
-
-        [[nodiscard]] RecipeExtensionSlotDescriptor* FindRecipeSlot(
-            RenderRecipeDescriptor& recipe,
-            const std::string_view stableName) noexcept
-        {
-            const auto it = std::find_if(recipe.Slots.begin(),
-                                         recipe.Slots.end(),
-                                         [stableName](const RecipeExtensionSlotDescriptor& slot) {
-                                             return slot.StableName == stableName;
-                                         });
-            return it == recipe.Slots.end() ? nullptr : &*it;
-        }
-
         [[nodiscard]] BindingIntent* FindBinding(BindingSet& bindings,
                                                  const std::string_view semanticName) noexcept
         {

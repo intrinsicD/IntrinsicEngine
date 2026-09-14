@@ -29,6 +29,7 @@ import Extrinsic.ECS.Scene.Registry;
 import Extrinsic.Platform.Backend.Glfw;
 import Extrinsic.Graphics.Component.RenderGeometry;
 import Extrinsic.Graphics.GpuWorld;
+import Extrinsic.Graphics.Renderer;
 import Extrinsic.Runtime.CommandBus;
 import Extrinsic.Runtime.SpatialIndexCache;
 import Extrinsic.Runtime.SceneDocumentModule;
@@ -875,7 +876,9 @@ namespace
         {
             if(::testing::Test::HasFatalFailure()){Kernel().RequestExit();return;}
             SCOPED_TRACE("projection phase "+std::to_string(Phase));
-            const auto budget=Strategy==Runtime::PointCloudConsolidationStrategy::Lop?150:300;
+            // Account for every phase when presentation paces frames at about one second.
+            const auto budget=Strategy==Runtime::PointCloudConsolidationStrategy::Lop?240:
+                Strategy==Runtime::PointCloudConsolidationStrategy::Ear?480:300;
             if(std::chrono::steady_clock::now()-Started>std::chrono::seconds(budget)){TimedOut=true;Kernel().RequestExit();return;}
             if(!Kernel().GetDevice().IsOperational())return;
             if(Submitted && (Phase==3 || Phase==4) && !Mutated)
@@ -956,7 +959,9 @@ namespace
                     }
                     if(Phase==4){EXPECT_TRUE(Mutated);EXPECT_EQ(Results.front().Status,Runtime::PointCloudConsolidationRunStatus::Cancelled);}
                 }
-                if(Phase==1)WarmMs=std::chrono::duration<double,std::milli>(std::chrono::steady_clock::now()-PhaseStarted).count();
+                const double phaseMs=std::chrono::duration<double,std::milli>(std::chrono::steady_clock::now()-PhaseStarted).count();
+                PhaseDurationsMs.push_back(phaseMs);
+                if(Phase==1)WarmMs=phaseMs;
                 Results.clear();Submitted=false;Mutated=false;++Phase;
                 if(Phase==(UsesNormals()?8u:7u)){Done=true;Kernel().RequestExit();return;}
             }
@@ -1006,6 +1011,7 @@ namespace
         std::vector<ECS::EntityHandle> Entities;std::vector<Consolidation::Result> References;
         std::vector<Runtime::PointCloudConsolidationResult> Results;std::vector<glm::vec3> BeforeFailure,BeforeFailureNormals;
         glm::vec3 BeforeSourceMutation{};
+        std::vector<double> PhaseDurationsMs{};
         std::chrono::steady_clock::time_point Started{},PhaseStarted{};unsigned Phase{},Expected{};bool Submitted{},TimedOut{},Done{},Mutated{};double MaxError{},MaxNormalError{},WarmMs{};
     };
 void RunProjectionLbvhCase(
@@ -1022,7 +1028,13 @@ void RunProjectionLbvhCase(
     if(!readiness.LogicalDeviceReady || !readiness.SwapchainReady || !readiness.CommandSyncReady)
     {engine.Shutdown();GTEST_SKIP()<<"Vulkan bootstrap unavailable";}
     const auto before=Extrinsic::Backends::Vulkan::GetVulkanOperationalDiagnosticsSnapshot();engine.Run();
-    EXPECT_FALSE(observed->TimedOut);EXPECT_TRUE(observed->Done);EXPECT_LE(observed->MaxError,1e-6);EXPECT_LE(observed->MaxNormalError,1e-6);
+    EXPECT_FALSE(observed->TimedOut)
+        << "phase=" << observed->Phase
+        << " results=" << observed->Results.size() << "/" << observed->Expected
+        << " submitted=" << observed->Submitted << " mutated=" << observed->Mutated
+        << " phaseElapsedMs=" << std::chrono::duration<double,std::milli>(std::chrono::steady_clock::now()-observed->PhaseStarted).count()
+        << " phaseDurationsMs=" << ::testing::PrintToString(observed->PhaseDurationsMs);
+    EXPECT_TRUE(observed->Done);EXPECT_LE(observed->MaxError,1e-6);EXPECT_LE(observed->MaxNormalError,1e-6);
     if(const char* path=std::getenv("INTRINSIC_LOP_LBVH_BENCHMARK_PATH");
         path && strategy==Runtime::PointCloudConsolidationStrategy::Lop)
     {

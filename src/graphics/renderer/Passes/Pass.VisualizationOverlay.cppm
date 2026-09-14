@@ -1,3 +1,4 @@
+// Records visualization overlays from copied packets and prepared GPU uploads.
 module;
 
 #include <cstdint>
@@ -5,6 +6,7 @@ module;
 
 export module Extrinsic.Graphics.Pass.VisualizationOverlay;
 
+import Extrinsic.Graphics.RenderDiagnostics;
 import Extrinsic.Graphics.VisualizationOverlayUploadHelper;
 import Extrinsic.Graphics.VisualizationPackets;
 import Extrinsic.RHI.CommandContext;

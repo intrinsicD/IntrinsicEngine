@@ -3,7 +3,8 @@ module;
 #include <cstdint>
 #include <optional>
 
-#include <glm/glm.hpp>
+#include <glm/mat4x4.hpp>
+#include <glm/vec3.hpp>
 
 export module Extrinsic.Runtime.PrimitiveSelectionRefinement;
 

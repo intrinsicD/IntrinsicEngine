@@ -1,0 +1,208 @@
+// Same-domain scalar and direction fields published on an existing mesh:
+// curvature, curvature segmentation and geodesic distance. These methods never
+// replace topology, which is what separates them from mesh topology editing.
+module;
+#include <cstddef>
+#include <cstdint>
+#include <functional>
+#include <optional>
+#include <string>
+export module Extrinsic.Runtime.MeshFieldOperations;
+export import Extrinsic.Runtime.EditorProcessing;
+export import Extrinsic.Runtime.EditorCommon;
+export import Extrinsic.Runtime.MeshCurvatureConfig;
+export import Extrinsic.Runtime.CurvatureSegmentationConfig;
+export import Extrinsic.Runtime.GeodesicsConfig;
+export import Extrinsic.Core.Error;
+export import Geometry.Geodesic;
+export import Geometry.HalfedgeMesh.CurvatureSegmentation;
+export import Geometry.HalfedgeMesh.CurvatureSegmentation.Patches;
+export import Geometry.HalfedgeMesh.CurvatureSegmentation.Multicut;
+import Extrinsic.Core.Config.EngineLoad;
+import Extrinsic.Runtime.EngineConfigControl;
+import Extrinsic.Runtime.EditorWorkspaceAttachment;
+
+export namespace Extrinsic::Runtime
+{
+    [[nodiscard]] const char*
+    DebugNameForEditorMeshCurvatureOutput(EditorMeshCurvatureOutput output) noexcept;
+
+    using EditorMeshCurvatureCommand = MeshCurvatureConfig;
+
+    struct EditorMeshCurvatureResult
+    {
+        EditorCommandStatus Status{EditorCommandStatus::NoChange};
+        EditorMeshCurvatureOutput Output{EditorMeshCurvatureOutput::All};
+        bool DirectionsRequested{true};
+        bool DirectionsAvailable{true};
+        bool DirectionsPublished{false};
+        std::size_t VertexSlotCount{0u};
+        // Estimator support is distinct from finite publication count: a
+        // supported flat vertex may be zero, while zero supported vertices
+        // means the operation produced no informative field.
+        std::size_t SupportedVertexCount{0u};
+        std::size_t NonZeroPrincipalVertexCount{0u};
+        double MinimumPrincipalValue{0.0};
+        double MaximumPrincipalValue{0.0};
+        std::size_t DegenerateFaceCount{0u};
+        std::size_t IllConditionedFaceCount{0u};
+        std::size_t UnsupportedFaceCount{0u};
+        double MinimumTriangleQuality{0.0};
+        double TriangleQualityThreshold{0.0};
+        // Counts all four scalar fields written (mean, Gaussian, and minimum
+        // and maximum principal curvature), regardless of value changes.
+        std::size_t ScalarPropertyCount{0u};
+        std::size_t ScalarWrittenCount{0u};
+        // Counts published curvature values that differ from stored values,
+        // counted across every property the run publishes.
+        std::size_t ChangedValueCount{0u};
+        std::size_t DirectionPropertyCount{0u};
+        std::size_t DirectionWrittenCount{0u};
+        std::size_t NonFiniteScalarCount{0u};
+        std::size_t NonFiniteDirectionCount{0u};
+        Core::ErrorCode Error{Core::ErrorCode::Success};
+        std::string Message{};
+
+        [[nodiscard]] bool Succeeded() const noexcept
+        {
+            return Status == EditorCommandStatus::Applied;
+        }
+    };
+
+    struct EditorCurvatureSegmentationCommand
+    {
+        std::uint32_t StableEntityId{0u};
+        CurvatureSegmentationConfig Config{};
+    };
+
+    struct EditorCurvatureSegmentationResult
+    {
+        EditorCommandStatus Status{EditorCommandStatus::NoChange};
+        CurvatureSegmentationConfig Config{};
+        CurvatureSegmentationMethod RequestedMethod{
+            CurvatureSegmentationMethod::CurvatureGmm};
+        CurvatureSegmentationMethod ActualMethod{
+            CurvatureSegmentationMethod::CurvatureGmm};
+        Geometry::CurvatureSegmentation::CurvatureSegmentationDiagnostics
+            Diagnostics{};
+        std::optional<
+            Geometry::CurvatureSegmentation::FeatureEvidenceDiagnostics>
+            FeatureDiagnostics{};
+        std::optional<
+            Geometry::CurvatureSegmentation::CurvaturePatchDiagnostics>
+            PatchDiagnostics{};
+        std::optional<
+            Geometry::CurvatureSegmentation::BoundaryPartitionDiagnostics>
+            BoundaryDiagnostics{};
+        std::size_t ChangedValueCount{0u};
+        Core::ErrorCode Error{Core::ErrorCode::Success};
+        std::string Message{};
+
+        [[nodiscard]] bool Succeeded() const noexcept
+        {
+            const bool commandSucceeded =
+                Status == EditorCommandStatus::Applied ||
+                Status == EditorCommandStatus::NoChange;
+            if (!commandSucceeded || RequestedMethod != ActualMethod)
+                return false;
+            if (ActualMethod ==
+                CurvatureSegmentationMethod::FeatureAlignedPatches)
+            {
+                return FeatureDiagnostics.has_value() &&
+                       FeatureDiagnostics->Succeeded() &&
+                       PatchDiagnostics.has_value() &&
+                       PatchDiagnostics->Succeeded();
+            }
+            if (ActualMethod == CurvatureSegmentationMethod::FeatureBoundaryCurves)
+            {
+                return FeatureDiagnostics.has_value() &&
+                       FeatureDiagnostics->Succeeded() &&
+                       BoundaryDiagnostics.has_value() &&
+                       BoundaryDiagnostics->Status == Geometry::CurvatureSegmentation::
+                           BoundaryPartitionStatus::Success;
+            }
+            return ActualMethod == CurvatureSegmentationMethod::CurvatureGmm &&
+                   Diagnostics.Succeeded();
+        }
+    };
+
+    struct EditorGeodesicsCommand
+    {
+        std::uint32_t StableEntityId{0u};
+        GeodesicsConfig Config{};
+    };
+
+    struct EditorGeodesicsResult
+    {
+        EditorCommandStatus Status{EditorCommandStatus::NoChange};
+        Geometry::Geodesic::VirtualSourceResult Diagnostics{};
+        std::string BackendId{"cpu_reference"};
+        std::string Message{};
+        [[nodiscard]] bool Succeeded() const noexcept
+        {
+            return (Status == EditorCommandStatus::Applied ||
+                    Status == EditorCommandStatus::NoChange) &&
+                   Diagnostics.Succeeded();
+        }
+    };
+
+    // Incomplete borrowed containers keep sibling workspace features independent
+    // of mesh-field records; prepared frames copy their values. Curvature is the
+    // only field method whose outcome the session retains, because it is the
+    // only one that can finish after the frame that requested it.
+    extern "C++"
+    {
+        struct EditorMeshFieldResultSinks
+        {
+            std::function<void()> DismissResult{};
+            std::function<void(EditorMeshCurvatureResult)> MeshCurvature{};
+        };
+        struct EditorMeshFieldResultsSnapshot
+        {
+            std::optional<EditorMeshCurvatureResult> LastMeshCurvatureResult{};
+        };
+    }
+
+    struct EditorMeshFieldPreparedFrame
+    {
+        EditorProcessingCommands Commands{};
+        EditorMeshFieldResultSinks ResultSinks{};
+        EditorMeshFieldResultsSnapshot Results{};
+    };
+    [[nodiscard]] EditorMeshFieldPreparedFrame
+    PrepareEditorMeshFieldFrame(const EditorWorkspaceAttachment&);
+
+    // Immediate outcomes return directly. Only a newly queued job delivers a
+    // terminal callback, while attached. Duplicate Pending requests add no callback.
+    [[nodiscard]] EditorMeshCurvatureResult ApplyEditorMeshCurvatureCommand(
+        const EditorProcessingCommands&, const EditorMeshCurvatureCommand&,
+        std::function<void(EditorMeshCurvatureResult)> onComplete = {});
+    [[nodiscard]] RuntimeEngineConfigApplyResult ApplyEditorMeshCurvatureConfig(
+        const EditorProcessingCommands&, const MeshCurvatureConfig&,
+        std::string sourceId = "sandbox.mesh_curvature");
+    [[nodiscard]] std::optional<MeshCurvatureConfig> GetEditorMeshCurvatureConfig(
+        const EditorProcessingCommands&) noexcept;
+
+    // Segmentation and geodesics publish inline: both run on the calling thread
+    // and own their whole history commit, so neither has a queued completion.
+    [[nodiscard]] EditorCurvatureSegmentationResult ApplyEditorCurvatureSegmentationCommand(
+        const EditorProcessingCommands&, const EditorCurvatureSegmentationCommand&);
+    [[nodiscard]] EditorCurvatureSegmentationResult
+    ApplyEditorConfiguredCurvatureSegmentationCommand(
+        const EditorProcessingCommands&, std::uint32_t stableEntityId);
+    [[nodiscard]] RuntimeEngineConfigApplyResult ApplyEditorCurvatureSegmentationConfig(
+        const EditorProcessingCommands&, const CurvatureSegmentationConfig&,
+        std::string sourceId = "sandbox.curvature_segmentation");
+    [[nodiscard]] std::optional<CurvatureSegmentationConfig>
+    GetEditorCurvatureSegmentationConfig(const EditorProcessingCommands&) noexcept;
+
+    [[nodiscard]] EditorGeodesicsResult ApplyEditorGeodesicsCommand(
+        const EditorProcessingCommands&, const EditorGeodesicsCommand&);
+    [[nodiscard]] EditorGeodesicsResult ApplyEditorConfiguredGeodesicsCommand(
+        const EditorProcessingCommands&, std::uint32_t stableEntityId);
+    [[nodiscard]] RuntimeEngineConfigApplyResult ApplyEditorGeodesicsConfig(
+        const EditorProcessingCommands&, const GeodesicsConfig&,
+        std::string sourceId = "sandbox.geodesics");
+    [[nodiscard]] std::optional<GeodesicsConfig> GetEditorGeodesicsConfig(
+        const EditorProcessingCommands&) noexcept;
+}
