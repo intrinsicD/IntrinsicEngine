@@ -582,10 +582,10 @@ sessions:
   open_threads: 6
 - id: 2026-09-14_001
   date: '2026-09-14'
-  summary: Editor simplification verified and 28 scopes retired; ASSETIO-012 now adds a shared geometry format
-    authority and fixes runtime routing, with Claude review and CPU/sanitizer evidence. Local commits recorded;
-    timing, GPU investigations and product UI owners remain open.
-  turn_count: 5
-  events_count: 5
+  summary: Editor simplification and shared geometry formats verified; BUG-184 job accounting and BUG-181 shader
+    feedback now fixed, reviewed with Claude and retired. Native CPU, focused sanitizers and tooling pass. Local
+    commits; compile timing, GPU investigations and broader convergence remain open.
+  turn_count: 6
+  events_count: 6
   claims_touched: []
   open_threads: 7

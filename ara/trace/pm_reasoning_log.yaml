@@ -2239,3 +2239,16 @@ entries:
       owners and stale flags remain; C92 still awaits BUILD-007 matched timing.
     - ASSETIO-012 retires with real local commits. Export/path UI, broader widget coverage, GPU pacing/leaks, atlas
       work and REVIEW-004 remain open; no push.
+
+  - turn: 2026-09-14_001#6
+    notes:
+    - Direct-route N558 as ordinary bug repair, regression and retirement facts; no new research claim or staged
+      interpretation.
+    - Keep full native CPU, focused sanitizer, tooling and shader compilation evidence distinct. Source-name selection
+      corrected the initial editor regex; no test failure or coverage was hidden.
+    - Record resolved Claude findings and source-only collaboration. No internal task/ARA records were sent. Source
+      hashes match the separate implementation commits.
+    - Existing staged research topics remain with open owners and unchanged stale flags; these diagnostic/tooling
+      closures do not resolve their hypotheses. C92 still awaits BUILD-007 matched timing.
+    - BUG-184 and BUG-181 retire at their intended CPUContracted endpoint; broader convergence, export/path UI,
+      GPU pacing/leaks and method work remain open. No remote push.

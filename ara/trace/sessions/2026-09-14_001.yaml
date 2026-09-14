@@ -2,11 +2,11 @@ session:
   id: 2026-09-14_001
   date: '2026-09-14'
   started: '2026-09-14T00:30:41+02:00'
-  last_turn: '2026-09-14T10:27:05+02:00'
-  turn_count: 5
-  summary: Editor simplification verified and 28 scopes retired; ASSETIO-012 now adds a shared geometry format
-    authority and fixes runtime routing, with Claude review and CPU/sanitizer evidence. Local commits recorded;
-    timing, GPU investigations and product UI owners remain open.
+  last_turn: '2026-09-14T10:58:19+02:00'
+  turn_count: 6
+  summary: Editor simplification and shared geometry formats verified; BUG-184 job accounting and BUG-181 shader
+    feedback now fixed, reviewed with Claude and retired. Native CPU, focused sanitizers and tooling pass. Local
+    commits; compile timing, GPU investigations and broader convergence remain open.
 events_logged:
 - turn: 1
   type: experiment
@@ -43,6 +43,13 @@ events_logged:
   provenance: ai-executed
   summary: Shared catalog and four strict runtime import routes verified and retired at CPUContracted; preserved
     color-key semantics, sandbox discovery limits and source-only Claude collaboration.
+- turn: 6
+  type: experiment
+  id: N558
+  routing: direct
+  provenance: ai-executed
+  summary: Reused terminal classification and shader compilation; fixed Claude findings, verified native/tooling/focused
+    sanitizers, retired BUG-184 and BUG-181.
 ai_actions:
 - turn: 1
   action: Claude planned and edited the existing owners and family leaves. After its interrupted process stopped,
@@ -113,6 +120,19 @@ ai_actions:
   - src/runtime/AssetWorkflow/Runtime.AssetWorkflowImportExecutor.cpp
   - tests/contract/runtime/Test.AssetWorkflowModule.cpp
   - tasks/done/ASSETIO-012-single-source-format-capability-table.md
+- turn: 6
+  action: Claude implemented bounded temporary job source copies and reviewed fixed source diffs. Root backtested
+    waiting-state assertions, repaired shader routing through the existing compiler helper, fixed review findings,
+    verified source hashes and all selected gates, committed each repair separately and retired both tasks.
+  provenance: ai-executed
+  files_changed:
+  - src/runtime/Kernel/Runtime.JobService.cpp
+  - tests/contract/runtime/Test.RuntimeJobService.cpp
+  - tools/ci/touched_scope.py
+  - tests/regression/tooling/Test.TouchedScope.py
+  - tests/CMakeLists.txt
+  - tasks/done/BUG-184-job-service-waiting-state-accounting.md
+  - tasks/done/BUG-181-touched-scope-shader-output-command.md
 claims_touched: []
 key_context:
 - turn: 1
@@ -131,6 +151,9 @@ key_context:
   excerpt: User requested continued remaining-code/open-point cleanup with Claude to save usage through plan,
     implementation/refactoring, review, testing and fixing. Existing source-sharing and completed-task retirement
     authorization persists.
+- turn: 6
+  excerpt: User requested continued remaining-code/open-point work with Claude to save usage, using plan, implementation/refactoring,
+    review, testing and fixes. Existing source-sharing and task-retirement authorization persists.
 open_threads:
 - BUILD-007 owns matched clean-source engine compile reconciliation; BUILD-006 separately owns backend/cache comparisons.
   C92 remains a hypothesis.

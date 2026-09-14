@@ -12136,3 +12136,30 @@ tree:
     - build/analysis/assetio012-format-catalog-2026-09-14/claude-fix-review.txt
     - tasks/backlog/bugs/BUG-188-sandbox-sanitizer-test-discovery.md
     status: resolved
+
+  - id: N558
+    type: experiment
+    title: Close waiting-job accounting and shader feedback bugs through existing owners
+    provenance: ai-executed
+    timestamp: '2026-09-14T10:58:19+02:00'
+    result: 'BUG-184 reuses the existing terminal classifier so parked and dependency-gated jobs remain in flight;
+      two waiting-state backtests fail before the fix. BUG-181 reuses the shader compiler helper for a standalone
+      Null/headless producer and runs the real output checker afterward with required changed outputs. Claude
+      implemented temporary job source copies and reviewed both fixed diffs. Root corrected the new fixture lifetime,
+      stale-output coverage and plan wording; Claude confirmed those fixes. Full native CPU: 4611 pass, one expected
+      unsanitized ASan-only skip, zero failures. Focused ASan and UBSan each pass 29 job/engine and 66 editor
+      mesh cases. The initial filename regex missed the editor suite; actual source-declared names were then selected.
+      All 37 planner tests pass; fresh headless shader build produces 114 current outputs. Strict structural checks
+      pass. Separate local implementation commits 8c671ae4dc548ea0119e3cfc2906a0d85344dba6 and 7d6e9af2dd8677a05353302b286dda757e62d74e;
+      retirement 64afd94a3175bb4ada3a03768553424b80698da7. No GPU execution, matched compile timing, C92 promotion,
+      remote push or whole-engine completion.'
+    evidence:
+    - tasks/done/BUG-184-job-service-waiting-state-accounting.md
+    - tasks/done/BUG-181-touched-scope-shader-output-command.md
+    - src/runtime/Kernel/Runtime.JobService.cpp
+    - tools/ci/touched_scope.py
+    - tests/regression/tooling/Test.TouchedScope.py
+    - build/analysis/bug184-job-accounting-2026-09-14/implementation-commits.json
+    - build/analysis/bug184-job-accounting-2026-09-14/full-cpu.json
+    - build/analysis/bug181-shader-routing-2026-09-14/claude-followup.txt
+    status: resolved
