@@ -582,10 +582,10 @@ sessions:
   open_threads: 6
 - id: 2026-09-14_001
   date: '2026-09-14'
-  summary: RUNTIME-243 through 245 narrow editor frame and action dependencies. Earlier full CPU sanitizer
-    reconciliation and Vulkan deadline fix retained; final action cleanup passes full native CPU and focused
-    sanitizers. Source remains uncommitted.
-  turn_count: 3
-  events_count: 3
+  summary: RUNTIME-243 through 246 simplify editor integration; final full native and isolated sanitizer gates
+    pass. Accumulated source committed locally and 28 completed tasks retired; matched timing and named investigations
+    remain open.
+  turn_count: 4
+  events_count: 4
   claims_touched: []
   open_threads: 6

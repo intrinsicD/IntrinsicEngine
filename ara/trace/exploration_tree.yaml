@@ -12083,3 +12083,30 @@ tree:
     - build/analysis/runtime245-editor-action-helper-locality-2026-09-14/claude-review.txt
     - build/analysis/runtime245-editor-action-helper-locality-2026-09-14/claude-corrections.txt
     status: resolved
+
+  - id: N556
+    type: experiment
+    title: Consolidate workspace binding conversion and retire completed cleanup scopes
+    provenance: ai-executed
+    timestamp: '2026-09-14T08:46:13+02:00'
+    result: RUNTIME-246 planned, implemented and independently reviewed with Claude. One direct conversion replaces
+      four single-caller reverse adapters, preserving ownership and fallback rules; one initial guard pass replaces
+      redundant checks. Two production files lose 142 physical/132 nonblank lines with no new file or module.
+      Seven new public-model regressions pass on original production and final native/ASan/UBSan source. Full
+      native CPU 4606 pass plus one expected skip, full ASan 2985 pass without skips, full UBSan 2984 pass plus
+      one expected skip. All 17 monitored compiler closures unchanged, private attachment 18. Strict checks pass;
+      executable/build source remains unchanged after gates. Local implementation 8a35af54aa70c8e7a7f4bebe48ceabc1eda1e186;
+      retirement 51e2ceece276585f0db9355b2642a8936dbd7b2f closes 28 checked scopes after evidence review and
+      updates links/indexes. Historical actual Vulkan evidence retains original limits; no fresh Vulkan or matched
+      timing result. BUILD-007 owns matched engine timing, BUG-193 owns unexplained pacing and WLOP margin. Atlas,
+      cache, leak, discovery and product convergence owners remain open. C92 is unchanged; no push or whole-engine
+      completion.
+    evidence:
+    - tasks/done/RUNTIME-246-workspace-context-binding-consolidation.md
+    - tasks/done/RETIREMENT-LOG.md
+    - build/analysis/runtime246-workspace-bindings-2026-09-14/verification-summary.json
+    - build/analysis/runtime246-workspace-bindings-2026-09-14/reviewed-source.diff
+    - build/analysis/runtime246-workspace-bindings-2026-09-14/claude-review.txt
+    - tasks/backlog/process/BUILD-007-engine-compile-time-reconciliation.md
+    - tasks/backlog/bugs/BUG-193-gpu-pacing-and-watchdog-margin.md
+    status: resolved

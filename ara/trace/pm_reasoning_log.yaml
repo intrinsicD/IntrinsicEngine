@@ -2207,3 +2207,22 @@ entries:
     - Keep integration, matched eligible-source timings, REVIEW004 and existing BUG188/BUG180 follow-ups open.
       Different scene/visualization history state contracts are deliberately preserved; no automatic shared transaction
       abstraction.
+
+  - turn: 2026-09-14_001#4
+    notes:
+    - Direct-route N556 as implementation, verification and retirement facts; no new general claim. C92 timing
+      hypothesis remains unchanged.
+    - Preserve earlier daily events and source paths as historical facts; update only current summary/open owners
+      and append turn 4.
+    - Record full native and separate sanitizer evidence with expected lifecycle skips. New regressions passed
+      original production too; field/callback limitations remain explicit. No fresh Vulkan or eligible timing
+      run.
+    - Retirement binds real local commits and bounded prior C80-C83 actual Vulkan records, preserving raw evidence
+      and leak limits. METHOD-042 closes its offline experiment without upgrading native maturity.
+    - BUILD-007 and BUG-193 retain uncovered timing/pacing work; METHOD-044/045, BUG-178/180/188 and REVIEW-004
+      remain open. Source staging/retirement are completed, not remaining work.
+    - No new interpretation resolves unrelated staged observations. Existing owners and stale flags remain; retirement
+      is not empirical adjudication of the atlas predictions or evidence for generalized architecture/performance
+      claims.
+    - Record the automatic approval rejection of the expanded retirement-note sharing and the completed local
+      alternative; authorized bounded source review succeeded.
