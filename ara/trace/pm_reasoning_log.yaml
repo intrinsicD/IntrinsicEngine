@@ -2300,3 +2300,11 @@ entries:
       benchmark, research claim or observation; module-count reduction does not settle C92 or BUILD-007.
     - Preserve separate sanitizer and GPU evidence and the expected leak-control skip. Claude approved after
       concrete compiler/review fixes. Existing staged research topics retain their open owners and flags.
+
+  - turn: 2026-09-14_001#13
+    notes:
+    - Direct-route N566 as ordinary implementation and verification facts; no new claim or observation.
+      Structural dependency reduction does not establish compile speedup or settle C92/BUILD-007.
+    - Retain failed test-design attempts and exclude the old-binary run. Final replacement coverage renders
+      only the last generation; source review preserves ordering without a GPU retirement claim.
+    - Unrelated staged topics retain their named owners and flags; no new closure signal.

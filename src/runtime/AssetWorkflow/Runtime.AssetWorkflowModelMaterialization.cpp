@@ -85,22 +85,17 @@ namespace Extrinsic::Runtime
             ECS::Components::Culling::World::Bounds WorldBounds{};
         };
 
-        struct RuntimeModelSceneRecord
+        struct AssetWorkflowModelMaterializationState
         {
-            AssetWorkflowModelMaterializationState State{};
+            AssetWorkflowModelMaterializationRecord Record{};
+            std::vector<Graphics::MaterialSystem::MaterialLease> MaterialLeases{};
+
+            // Missing authored materials use a neutral lit material; slot zero
+            // remains reserved for invalid bindings.
+            Graphics::MaterialSystem::MaterialLease DefaultLitMaterialLease{};
+            std::uint32_t DefaultLitMaterialSlot{Graphics::kDefaultMaterialSlotIndex};
+            bool HasDefaultLitMaterial{false};
         };
-
-        [[nodiscard]] bool IsTypeMismatch(const Core::ErrorCode error) noexcept
-        {
-            return error == Core::ErrorCode::TypeMismatch
-                || error == Core::ErrorCode::AssetTypeMismatch;
-        }
-
-        [[nodiscard]] bool IsUploadDeferral(const Core::ErrorCode error) noexcept
-        {
-            return error == Core::ErrorCode::DeviceNotOperational
-                || error == Core::ErrorCode::ResourceBusy;
-        }
 
         [[nodiscard]] const char* ExtensionFor(
             const Assets::AssetFileFormat format) noexcept
@@ -122,6 +117,39 @@ namespace Extrinsic::Runtime
             default:
                 return ".texture";
             }
+        }
+
+        std::string BuildEmbeddedTextureAssetPath(
+            const std::string_view modelPath,
+            const std::uint32_t imageIndex,
+            const Assets::AssetTexture2DPayload& image)
+        {
+            const std::string_view base = modelPath.empty()
+                ? std::string_view{"model-scene"}
+                : modelPath;
+            return std::string{base}
+                + ".embedded-texture-"
+                + std::to_string(imageIndex)
+                + ExtensionFor(image.Metadata.SourceFormat);
+        }
+
+        Core::Expected<Assets::AssetId> LoadEmbeddedTextureAsset(
+            Assets::AssetService& service,
+            const std::string_view modelPath,
+            const std::uint32_t imageIndex,
+            const Assets::AssetTexture2DPayload& image)
+        {
+            const std::string childPath = BuildEmbeddedTextureAssetPath(
+                modelPath,
+                imageIndex,
+                image);
+            return service.Load<Assets::AssetTexture2DPayload>(
+                childPath,
+                [image](std::string_view, Assets::AssetId)
+                    -> Core::Expected<Assets::AssetTexture2DPayload>
+                {
+                    return image;
+                });
         }
 
         void RecordFailure(
@@ -743,7 +771,6 @@ namespace Extrinsic::Runtime
         [[nodiscard]] Core::Expected<std::vector<Assets::AssetId>> LoadEmbeddedTextures(
             Assets::AssetService& service,
             Graphics::GpuAssetCache& cache,
-            const Assets::AssetId modelAsset,
             const Assets::AssetModelScenePayload& model,
             const std::string_view modelPath,
             const AssetWorkflowModelMaterializationOptions& options,
@@ -788,7 +815,7 @@ namespace Extrinsic::Runtime
                     }
                     else
                     {
-                        if (IsUploadDeferral(upload.error()))
+                        if (IsTextureUploadDeferred(upload.error()))
                         {
                             if (diagnostics != nullptr)
                             {
@@ -805,7 +832,6 @@ namespace Extrinsic::Runtime
                 }
             }
 
-            (void)modelAsset;
             return embeddedTextureAssets;
         }
 
@@ -1672,296 +1698,263 @@ namespace Extrinsic::Runtime
                 }
             }
         }
-    }
 
-    std::string BuildEmbeddedTextureAssetPath(
-        const std::string_view modelPath,
-        const std::uint32_t imageIndex,
-        const Assets::AssetTexture2DPayload& image)
-    {
-        const std::string_view base = modelPath.empty()
-            ? std::string_view{"model-scene"}
-            : modelPath;
-        return std::string{base}
-            + ".embedded-texture-"
-            + std::to_string(imageIndex)
-            + ExtensionFor(image.Metadata.SourceFormat);
-    }
-
-    Core::Expected<Assets::AssetId> LoadEmbeddedTextureAsset(
-        Assets::AssetService& service,
-        const std::string_view modelPath,
-        const std::uint32_t imageIndex,
-        const Assets::AssetTexture2DPayload& image)
-    {
-        const std::string childPath = BuildEmbeddedTextureAssetPath(
-            modelPath,
-            imageIndex,
-            image);
-        return service.Load<Assets::AssetTexture2DPayload>(
-            childPath,
-            [image](std::string_view, Assets::AssetId)
-                -> Core::Expected<Assets::AssetTexture2DPayload>
+        Core::Expected<AssetWorkflowModelMaterializationState> MaterializeModelSceneAsset(
+            Assets::AssetService& service,
+            Graphics::GpuAssetCache& cache,
+            ECS::Scene::Registry& scene,
+            Graphics::MaterialSystem& materials,
+            const Assets::AssetId modelAsset,
+            const AssetWorkflowModelMaterializationOptions& options,
+            AssetWorkflowModelMaterializationDiagnostics* diagnostics)
+        {
+            if (diagnostics != nullptr)
             {
-                return image;
-            });
-    }
+                ++diagnostics->ModelSceneMaterializeRequests;
+            }
 
-    Core::Expected<AssetWorkflowModelMaterializationState> MaterializeModelSceneAsset(
-        Assets::AssetService& service,
-        Graphics::GpuAssetCache& cache,
-        ECS::Scene::Registry& scene,
-        Graphics::MaterialSystem& materials,
-        const Assets::AssetId modelAsset,
-        const AssetWorkflowModelMaterializationOptions& options,
-        AssetWorkflowModelMaterializationDiagnostics* diagnostics)
-    {
-        if (diagnostics != nullptr)
-        {
-            ++diagnostics->ModelSceneMaterializeRequests;
-        }
+            auto modelSpan = service.Read<Assets::AssetModelScenePayload>(modelAsset);
+            if (!modelSpan.has_value())
+            {
+                RecordFailure(diagnostics, modelAsset, modelSpan.error());
+                return Core::Err<AssetWorkflowModelMaterializationState>(modelSpan.error());
+            }
+            if (modelSpan->size() != 1u)
+            {
+                RecordFailure(diagnostics, modelAsset, Core::ErrorCode::AssetInvalidData);
+                return Core::Err<AssetWorkflowModelMaterializationState>(Core::ErrorCode::AssetInvalidData);
+            }
 
-        auto modelSpan = service.Read<Assets::AssetModelScenePayload>(modelAsset);
-        if (!modelSpan.has_value())
-        {
-            RecordFailure(diagnostics, modelAsset, modelSpan.error());
-            return Core::Err<AssetWorkflowModelMaterializationState>(modelSpan.error());
-        }
-        if (modelSpan->size() != 1u)
-        {
-            RecordFailure(diagnostics, modelAsset, Core::ErrorCode::AssetInvalidData);
-            return Core::Err<AssetWorkflowModelMaterializationState>(Core::ErrorCode::AssetInvalidData);
-        }
+            const Assets::AssetModelScenePayload& model = (*modelSpan)[0];
+            if (auto valid = Assets::ValidateAssetModelScenePayload(model); !valid.has_value())
+            {
+                RecordFailure(diagnostics, modelAsset, valid.error());
+                return Core::Err<AssetWorkflowModelMaterializationState>(valid.error());
+            }
 
-        const Assets::AssetModelScenePayload& model = (*modelSpan)[0];
-        if (auto valid = Assets::ValidateAssetModelScenePayload(model); !valid.has_value())
-        {
-            RecordFailure(diagnostics, modelAsset, valid.error());
-            return Core::Err<AssetWorkflowModelMaterializationState>(valid.error());
-        }
+            auto prepared = PreparePrimitives(
+                model,
+                diagnostics,
+                options.ProgressiveRawGeometryFirst);
+            if (!prepared.has_value())
+            {
+                RecordFailure(diagnostics, modelAsset, prepared.error());
+                return Core::Err<AssetWorkflowModelMaterializationState>(prepared.error());
+            }
+            auto preparedNodes = PrepareNodes(model);
+            if (!preparedNodes.has_value())
+            {
+                RecordFailure(diagnostics, modelAsset, preparedNodes.error());
+                return Core::Err<AssetWorkflowModelMaterializationState>(preparedNodes.error());
+            }
+            auto preparedInstances = PreparePrimitiveInstances(
+                model,
+                *prepared,
+                *preparedNodes);
+            if (!preparedInstances.has_value())
+            {
+                RecordFailure(diagnostics, modelAsset, preparedInstances.error());
+                return Core::Err<AssetWorkflowModelMaterializationState>(
+                    preparedInstances.error());
+            }
 
-        auto prepared = PreparePrimitives(
-            model,
-            diagnostics,
-            options.ProgressiveRawGeometryFirst);
-        if (!prepared.has_value())
-        {
-            RecordFailure(diagnostics, modelAsset, prepared.error());
-            return Core::Err<AssetWorkflowModelMaterializationState>(prepared.error());
-        }
-        auto preparedNodes = PrepareNodes(model);
-        if (!preparedNodes.has_value())
-        {
-            RecordFailure(diagnostics, modelAsset, preparedNodes.error());
-            return Core::Err<AssetWorkflowModelMaterializationState>(preparedNodes.error());
-        }
-        auto preparedInstances = PreparePrimitiveInstances(
-            model,
-            *prepared,
-            *preparedNodes);
-        if (!preparedInstances.has_value())
-        {
-            RecordFailure(diagnostics, modelAsset, preparedInstances.error());
-            return Core::Err<AssetWorkflowModelMaterializationState>(
-                preparedInstances.error());
-        }
+            std::string modelPath = model.SourcePath;
+            if (auto servicePath = service.GetPath(modelAsset); servicePath.has_value())
+            {
+                modelPath = std::move(*servicePath);
+            }
 
-        std::string modelPath = model.SourcePath;
-        if (auto servicePath = service.GetPath(modelAsset); servicePath.has_value())
-        {
-            modelPath = std::move(*servicePath);
-        }
+            AssetWorkflowModelMaterializationState state{};
+            state.Record.ModelAsset = modelAsset;
 
-        AssetWorkflowModelMaterializationState state{};
-        state.Record.ModelAsset = modelAsset;
-
-        auto embeddedTextures = LoadEmbeddedTextures(
-            service,
-            cache,
-            modelAsset,
-            model,
-            modelPath,
-            options,
-            diagnostics);
-        if (!embeddedTextures.has_value())
-        {
-            RecordFailure(diagnostics, modelAsset, embeddedTextures.error());
-            return Core::Err<AssetWorkflowModelMaterializationState>(embeddedTextures.error());
-        }
-        state.Record.EmbeddedTextureAssets = std::move(*embeddedTextures);
-
-        if (auto materialRecords = CreateMaterialRecords(
-                materials,
+            auto embeddedTextures = LoadEmbeddedTextures(
+                service,
                 cache,
                 model,
-                state.Record.EmbeddedTextureAssets,
+                modelPath,
                 options,
-                state,
                 diagnostics);
-            !materialRecords.has_value())
-        {
-            RecordFailure(diagnostics, modelAsset, materialRecords.error());
-            return Core::Err<AssetWorkflowModelMaterializationState>(materialRecords.error());
-        }
-
-        auto& raw = scene.Raw();
-        state.Record.Nodes.reserve(model.Nodes.size());
-        std::vector<ECS::EntityHandle> nodeEntities(model.Nodes.size());
-        for (std::size_t nodeIndex = 0u; nodeIndex < model.Nodes.size(); ++nodeIndex)
-        {
-            const Assets::AssetModelNodePayload& node = model.Nodes[nodeIndex];
-            const ECS::EntityHandle entity = ECS::Scene::CreateDefault(
-                scene,
-                node.Name.empty()
-                    ? "model-node-" + std::to_string(nodeIndex)
-                    : node.Name);
-            raw.get<ECS::Components::Transform::Component>(entity) =
-                (*preparedNodes)[nodeIndex].LocalTransform;
-            raw.get<ECS::Components::Transform::WorldMatrix>(entity).Matrix =
-                (*preparedNodes)[nodeIndex].WorldMatrix;
-            nodeEntities[nodeIndex] = entity;
-            state.Record.Nodes.push_back(AssetWorkflowModelNodeRecord{
-                .Entity = entity,
-                .NodeIndex = static_cast<std::uint32_t>(nodeIndex),
-            });
-            if (diagnostics != nullptr)
+            if (!embeddedTextures.has_value())
             {
-                ++diagnostics->NodeEntitiesCreated;
+                RecordFailure(diagnostics, modelAsset, embeddedTextures.error());
+                return Core::Err<AssetWorkflowModelMaterializationState>(embeddedTextures.error());
             }
-        }
+            state.Record.EmbeddedTextureAssets = std::move(*embeddedTextures);
 
-        state.Record.Primitives.reserve(preparedInstances->size());
-        std::vector<std::vector<ECS::EntityHandle>> primitiveEntitiesByNode(
-            model.Nodes.size());
-        for (const PreparedPrimitiveInstance& instance : *preparedInstances)
-        {
-            PreparedPrimitive& primitive = (*prepared)[instance.PrimitiveIndex];
-            const ECS::EntityHandle entity =
-                ECS::Scene::CreateDefault(scene, primitive.Name);
-            raw.get<ECS::Components::Transform::WorldMatrix>(entity).Matrix =
-                (*preparedNodes)[instance.NodeIndex].WorldMatrix;
-            raw.emplace_or_replace<Graphics::Components::RenderSurface>(entity);
-            raw.emplace_or_replace<ECS::Components::Culling::Local::Bounds>(
-                entity,
-                primitive.LocalBounds);
-            raw.emplace_or_replace<ECS::Components::Culling::World::Bounds>(
-                entity,
-                instance.WorldBounds);
-            ECS::Components::GeometrySources::PopulateFromMesh(
-                raw,
-                entity,
-                primitive.Mesh);
-            const Assets::AssetModelMaterialPayload* material =
-                primitive.MaterialIndex < model.Materials.size()
-                    ? &model.Materials[primitive.MaterialIndex]
-                    : nullptr;
-            if (options.ProgressiveRawGeometryFirst ||
-                options.TextureBake != nullptr)
-            {
-                AttachGeometryPresentationRecipe(
-                    scene,
-                    entity,
-                    material,
+            if (auto materialRecords = CreateMaterialRecords(
+                    materials,
+                    cache,
+                    model,
                     state.Record.EmbeddedTextureAssets,
                     options,
-                    primitive,
+                    state,
                     diagnostics);
-                QueueProgressiveEnrichmentJobs(scene,
-                                                entity,
-                                                material,
-                                                primitive,
-                                                options,
-                                                diagnostics);
+                !materialRecords.has_value())
+            {
+                RecordFailure(diagnostics, modelAsset, materialRecords.error());
+                return Core::Err<AssetWorkflowModelMaterializationState>(materialRecords.error());
             }
 
-            std::uint32_t materialSlot = Graphics::kDefaultMaterialSlotIndex;
-            bool hasMaterialSlot = false;
-            if (primitive.MaterialIndex < state.Record.Materials.size())
+            auto& raw = scene.Raw();
+            state.Record.Nodes.reserve(model.Nodes.size());
+            std::vector<ECS::EntityHandle> nodeEntities(model.Nodes.size());
+            for (std::size_t nodeIndex = 0u; nodeIndex < model.Nodes.size(); ++nodeIndex)
             {
-                const AssetWorkflowModelMaterialRecord& material =
-                    state.Record.Materials[primitive.MaterialIndex];
-                materialSlot = material.MaterialSlot;
-                hasMaterialSlot = material.HasMaterialSlot;
-            }
-            else if (EnsureDefaultLitMaterial(materials, state, diagnostics))
-            {
-                // No authored material for this primitive: bind a neutral lit
-                // default so the mesh shades, rather than the unlit slot-0
-                // DefaultDebugSurface fallback.
-                materialSlot = state.DefaultLitMaterialSlot;
-                hasMaterialSlot = true;
+                const Assets::AssetModelNodePayload& node = model.Nodes[nodeIndex];
+                const ECS::EntityHandle entity = ECS::Scene::CreateDefault(
+                    scene,
+                    node.Name.empty()
+                        ? "model-node-" + std::to_string(nodeIndex)
+                        : node.Name);
+                raw.get<ECS::Components::Transform::Component>(entity) =
+                    (*preparedNodes)[nodeIndex].LocalTransform;
+                raw.get<ECS::Components::Transform::WorldMatrix>(entity).Matrix =
+                    (*preparedNodes)[nodeIndex].WorldMatrix;
+                nodeEntities[nodeIndex] = entity;
+                state.Record.Nodes.push_back(AssetWorkflowModelNodeRecord{
+                    .Entity = entity,
+                    .NodeIndex = static_cast<std::uint32_t>(nodeIndex),
+                });
                 if (diagnostics != nullptr)
                 {
-                    ++diagnostics->MaterialLessPrimitivesAssignedDefaultLit;
+                    ++diagnostics->NodeEntitiesCreated;
                 }
             }
 
-            state.Record.Primitives.push_back(AssetWorkflowModelPrimitiveRecord{
-                .Entity = entity,
-                .NodeIndex = instance.NodeIndex,
-                .PrimitiveIndex = primitive.PrimitiveIndex,
-                .GeometryPayloadIndex = primitive.GeometryPayloadIndex,
-                .MaterialIndex = primitive.MaterialIndex,
-                .MaterialSlot = materialSlot,
-                .HasMaterialSlot = hasMaterialSlot,
-            });
-            primitiveEntitiesByNode[instance.NodeIndex].push_back(entity);
+            state.Record.Primitives.reserve(preparedInstances->size());
+            std::vector<std::vector<ECS::EntityHandle>> primitiveEntitiesByNode(
+                model.Nodes.size());
+            for (const PreparedPrimitiveInstance& instance : *preparedInstances)
+            {
+                PreparedPrimitive& primitive = (*prepared)[instance.PrimitiveIndex];
+                const ECS::EntityHandle entity =
+                    ECS::Scene::CreateDefault(scene, primitive.Name);
+                raw.get<ECS::Components::Transform::WorldMatrix>(entity).Matrix =
+                    (*preparedNodes)[instance.NodeIndex].WorldMatrix;
+                raw.emplace_or_replace<Graphics::Components::RenderSurface>(entity);
+                raw.emplace_or_replace<ECS::Components::Culling::Local::Bounds>(
+                    entity,
+                    primitive.LocalBounds);
+                raw.emplace_or_replace<ECS::Components::Culling::World::Bounds>(
+                    entity,
+                    instance.WorldBounds);
+                ECS::Components::GeometrySources::PopulateFromMesh(
+                    raw,
+                    entity,
+                    primitive.Mesh);
+                const Assets::AssetModelMaterialPayload* material =
+                    primitive.MaterialIndex < model.Materials.size()
+                        ? &model.Materials[primitive.MaterialIndex]
+                        : nullptr;
+                if (options.ProgressiveRawGeometryFirst ||
+                    options.TextureBake != nullptr)
+                {
+                    AttachGeometryPresentationRecipe(
+                        scene,
+                        entity,
+                        material,
+                        state.Record.EmbeddedTextureAssets,
+                        options,
+                        primitive,
+                        diagnostics);
+                    QueueProgressiveEnrichmentJobs(scene,
+                                                    entity,
+                                                    material,
+                                                    primitive,
+                                                    options,
+                                                    diagnostics);
+                }
+
+                std::uint32_t materialSlot = Graphics::kDefaultMaterialSlotIndex;
+                bool hasMaterialSlot = false;
+                if (primitive.MaterialIndex < state.Record.Materials.size())
+                {
+                    const AssetWorkflowModelMaterialRecord& material =
+                        state.Record.Materials[primitive.MaterialIndex];
+                    materialSlot = material.MaterialSlot;
+                    hasMaterialSlot = material.HasMaterialSlot;
+                }
+                else if (EnsureDefaultLitMaterial(materials, state, diagnostics))
+                {
+                    // No authored material for this primitive: bind a neutral lit
+                    // default so the mesh shades, rather than the unlit slot-0
+                    // DefaultDebugSurface fallback.
+                    materialSlot = state.DefaultLitMaterialSlot;
+                    hasMaterialSlot = true;
+                    if (diagnostics != nullptr)
+                    {
+                        ++diagnostics->MaterialLessPrimitivesAssignedDefaultLit;
+                    }
+                }
+
+                state.Record.Primitives.push_back(AssetWorkflowModelPrimitiveRecord{
+                    .Entity = entity,
+                    .NodeIndex = instance.NodeIndex,
+                    .PrimitiveIndex = primitive.PrimitiveIndex,
+                    .GeometryPayloadIndex = primitive.GeometryPayloadIndex,
+                    .MaterialIndex = primitive.MaterialIndex,
+                    .MaterialSlot = materialSlot,
+                    .HasMaterialSlot = hasMaterialSlot,
+                });
+                primitiveEntitiesByNode[instance.NodeIndex].push_back(entity);
+                if (diagnostics != nullptr)
+                {
+                    ++diagnostics->PrimitiveEntitiesCreated;
+                    if (options.ProgressiveRawGeometryFirst)
+                    {
+                        ++diagnostics->ProgressiveRawPrimitiveEntitiesPublished;
+                    }
+                }
+            }
+
+            // Attach in reverse because Structure::AttachToParent head-inserts.
+            // The resulting sibling order is authored child nodes followed by the
+            // node's primitive instances, each group retaining payload order.
+            for (std::size_t nodeIndex = 0u; nodeIndex < model.Nodes.size(); ++nodeIndex)
+            {
+                auto& parentHierarchy =
+                    raw.get<ECS::Components::Hierarchy::Component>(
+                        nodeEntities[nodeIndex]);
+                const auto& primitiveChildren = primitiveEntitiesByNode[nodeIndex];
+                for (auto primitive = primitiveChildren.rbegin();
+                     primitive != primitiveChildren.rend();
+                     ++primitive)
+                {
+                    auto& childHierarchy =
+                        raw.get<ECS::Components::Hierarchy::Component>(*primitive);
+                    ECS::Hierarchy::Structure::AttachToParent(
+                        raw,
+                        *primitive,
+                        childHierarchy,
+                        nodeEntities[nodeIndex],
+                        parentHierarchy);
+                }
+
+                const auto& childNodes = model.Nodes[nodeIndex].ChildNodeIndices;
+                for (auto child = childNodes.rbegin();
+                     child != childNodes.rend();
+                     ++child)
+                {
+                    auto& childHierarchy =
+                        raw.get<ECS::Components::Hierarchy::Component>(
+                            nodeEntities[*child]);
+                    ECS::Hierarchy::Structure::AttachToParent(
+                        raw,
+                        nodeEntities[*child],
+                        childHierarchy,
+                        nodeEntities[nodeIndex],
+                        parentHierarchy);
+                }
+            }
+
             if (diagnostics != nullptr)
             {
-                ++diagnostics->PrimitiveEntitiesCreated;
-                if (options.ProgressiveRawGeometryFirst)
-                {
-                    ++diagnostics->ProgressiveRawPrimitiveEntitiesPublished;
-                }
+                ++diagnostics->ModelSceneMaterializeSuccesses;
+                diagnostics->LastError = Core::ErrorCode::Success;
             }
+            return state;
         }
 
-        // Attach in reverse because Structure::AttachToParent head-inserts.
-        // The resulting sibling order is authored child nodes followed by the
-        // node's primitive instances, each group retaining payload order.
-        for (std::size_t nodeIndex = 0u; nodeIndex < model.Nodes.size(); ++nodeIndex)
-        {
-            auto& parentHierarchy =
-                raw.get<ECS::Components::Hierarchy::Component>(
-                    nodeEntities[nodeIndex]);
-            const auto& primitiveChildren = primitiveEntitiesByNode[nodeIndex];
-            for (auto primitive = primitiveChildren.rbegin();
-                 primitive != primitiveChildren.rend();
-                 ++primitive)
-            {
-                auto& childHierarchy =
-                    raw.get<ECS::Components::Hierarchy::Component>(*primitive);
-                ECS::Hierarchy::Structure::AttachToParent(
-                    raw,
-                    *primitive,
-                    childHierarchy,
-                    nodeEntities[nodeIndex],
-                    parentHierarchy);
-            }
-
-            const auto& childNodes = model.Nodes[nodeIndex].ChildNodeIndices;
-            for (auto child = childNodes.rbegin();
-                 child != childNodes.rend();
-                 ++child)
-            {
-                auto& childHierarchy =
-                    raw.get<ECS::Components::Hierarchy::Component>(
-                        nodeEntities[*child]);
-                ECS::Hierarchy::Structure::AttachToParent(
-                    raw,
-                    nodeEntities[*child],
-                    childHierarchy,
-                    nodeEntities[nodeIndex],
-                    parentHierarchy);
-            }
-        }
-
-        if (diagnostics != nullptr)
-        {
-            ++diagnostics->ModelSceneMaterializeSuccesses;
-            diagnostics->LastError = Core::ErrorCode::Success;
-        }
-        return state;
     }
 
     struct AssetWorkflowModelMaterializer::Impl
@@ -1973,7 +1966,7 @@ namespace Extrinsic::Runtime
         AssetWorkflowModelMaterializationOptions Options{};
         AssetWorkflowModelMaterializationDiagnostics Diagnostics{};
         Assets::AssetEventBus::ListenerToken Token{Assets::AssetEventBus::InvalidToken};
-        std::unordered_map<Assets::AssetId, RuntimeModelSceneRecord, Assets::AssetIdHash> Records{};
+        std::unordered_map<Assets::AssetId, AssetWorkflowModelMaterializationState, Assets::AssetIdHash> Records{};
 
         Impl(
             Assets::AssetService& service,
@@ -2003,7 +1996,7 @@ namespace Extrinsic::Runtime
             }
             for (auto& [_, record] : Records)
             {
-                DestroyEntities(Scene, record.State.Record);
+                DestroyEntities(Scene, record.Record);
             }
             Records.clear();
         }
@@ -2031,12 +2024,12 @@ namespace Extrinsic::Runtime
                 return Core::Err(state.error());
             }
 
-            RuntimeModelSceneRecord replacement{.State = std::move(*state)};
+            AssetWorkflowModelMaterializationState replacement = std::move(*state);
             if (auto it = Records.find(id); it != Records.end())
             {
-                RuntimeModelSceneRecord previous = std::move(it->second);
+                AssetWorkflowModelMaterializationState previous = std::move(it->second);
                 it->second = std::move(replacement);
-                DestroyEntities(Scene, previous.State.Record);
+                DestroyEntities(Scene, previous.Record);
             }
             else
             {
@@ -2059,7 +2052,7 @@ namespace Extrinsic::Runtime
                 auto resolved = ::Extrinsic::Runtime::ResolvePendingMaterialTextureBindings(
                     Renderer.GetMaterialSystem(),
                     Cache,
-                    record.State,
+                    record,
                     &Diagnostics);
                 if (!resolved.has_value())
                 {
@@ -2075,7 +2068,7 @@ namespace Extrinsic::Runtime
             for (auto& [_, record] : Records)
             {
                 ::Extrinsic::Runtime::InvalidateMaterialTextureBindingsForAsset(
-                    record.State,
+                    record,
                     id,
                     Diagnostics);
             }
@@ -2088,7 +2081,7 @@ namespace Extrinsic::Runtime
             auto model = Service.Read<Assets::AssetModelScenePayload>(id);
             if (!model.has_value())
             {
-                if (!IsTypeMismatch(model.error()))
+                if (!IsAssetPayloadTypeMismatch(model.error()))
                 {
                     return;
                 }
@@ -2132,7 +2125,7 @@ namespace Extrinsic::Runtime
             {
                 if (auto it = Records.find(id); it != Records.end())
                 {
-                    DestroyEntities(Scene, it->second.State.Record);
+                    DestroyEntities(Scene, it->second.Record);
                     Records.erase(it);
                 }
                 InvalidateMaterialTextureBindingsForAsset(id);
@@ -2180,7 +2173,7 @@ namespace Extrinsic::Runtime
         }
         const auto it = m_Impl->Records.find(modelAsset);
         return it != m_Impl->Records.end()
-            ? &it->second.State.Record
+            ? &it->second.Record
             : nullptr;
     }
 

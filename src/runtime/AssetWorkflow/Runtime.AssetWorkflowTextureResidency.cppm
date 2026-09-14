@@ -1,3 +1,4 @@
+// Declares texture residency, upload requests and shared import error policy.
 module;
 
 #include <cstdint>
@@ -39,8 +40,8 @@ export namespace Extrinsic::Runtime
         Core::ErrorCode LastError{Core::ErrorCode::Success};
     };
 
-    [[nodiscard]] Core::Expected<RHI::TextureDesc> BuildGpuTextureDesc(
-        const Assets::AssetTexture2DPayload& payload);
+    [[nodiscard]] bool IsAssetPayloadTypeMismatch(Core::ErrorCode error) noexcept;
+    [[nodiscard]] bool IsTextureUploadDeferred(Core::ErrorCode error) noexcept;
 
     [[nodiscard]] Core::Result RequestTextureAssetUpload(
         Assets::AssetService& service,

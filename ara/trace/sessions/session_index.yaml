@@ -582,10 +582,10 @@ sessions:
   open_threads: 6
 - id: 2026-09-14_001
   date: '2026-09-14'
-  summary: Asset-import executor consolidated with Claude using one dependency record, two pointer wrappers removed,
-    one module producer removed and 96 fewer production lines. Full CPU, focused sanitizers and five actual
-    Vulkan import checks pass; developer app rebuilt and RUNTIME-248 retired. BUILD-007 timing remains open.
-  turn_count: 12
-  events_count: 16
+  summary: Model construction localized and import error policy shared with Claude. Model-interface dependencies
+    fall from 96 to 54 with 38 fewer production lines, without a timing claim. Original and repeated-import
+    GPU coverage retained; full CPU and focused sanitizers pass. RUNTIME-249 retired; developer app rebuilt.
+  turn_count: 13
+  events_count: 17
   claims_touched: [C93]
   open_threads: 9

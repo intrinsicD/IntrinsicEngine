@@ -12303,3 +12303,25 @@ tree:
     - src/runtime/AssetWorkflow/Runtime.AssetWorkflowImportExecutor.hpp
     - tests/contract/runtime/Test.RuntimeEnginePrivateGlue.cpp
     status: resolved
+
+  - id: N566
+    type: experiment
+    title: Localize model construction and consolidate import error classification
+    provenance: ai-executed
+    timestamp: '2026-09-14T22:34:56+02:00'
+    result: Private model state and construction helpers move into their existing implementation; the
+      record map stores state directly and texture residency owns shared mismatch/deferral predicates.
+      Four production files shrink from 2786 to 2748 lines; the model-interface compiler map drops from
+      96 to 54 dependencies, without a timing claim. Claude reviews prompted unused-argument removal and
+      preservation of original-import readbacks beside a new repeated-import case. An attempted private
+      frame call failed compilation and was removed; an old-binary GPU run is excluded from final evidence.
+      Final builds pass; CPU has 4623 distinct passes and one expected unsanitized leak-control skip,
+      focused native/ASan/UBSan each pass 73 cases, and actual Vulkan passes six import checks with the
+      existing leak exclusion. Only the final replacement generation is rendered; no rendered-generation
+      retirement claim. Developer app rebuilt, RUNTIME-249 retired, BUILD-007 and C92 remain open.
+    evidence:
+    - tasks/done/RUNTIME-249-model-materialization-locality.md
+    - src/runtime/AssetWorkflow/Runtime.AssetWorkflowModelMaterialization.cpp
+    - tests/integration/runtime/Test.RuntimeSandboxAcceptanceGpuSmoke.cpp
+    - tests/CMakeLists.txt
+    status: resolved

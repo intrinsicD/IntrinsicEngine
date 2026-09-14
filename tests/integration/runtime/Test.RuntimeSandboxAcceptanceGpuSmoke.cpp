@@ -4864,7 +4864,7 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke, ClickPickReadbackSelectsReferenceTriangle
 // rendering, and Vulkan selection readback. The target is the second instance:
 // import completion initially selects the first, so observing the second as the
 // sole selected entity proves the click readback changed authoritative state.
-TEST(RuntimeSandboxAcceptanceGpuSmoke, ImportedModelSceneIsVisibleAndClickPickable)
+static void ExpectImportedModelSceneVisibleAndClickPickable(const int replacements)
 {
     auto app = std::make_unique<ClickPickRoundTripApp>();
     auto* appPtr = app.get();
@@ -4897,21 +4897,44 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke, ImportedModelSceneIsVisibleAndClickPickab
     EXPECT_EQ(imported->PrimitiveEntitiesCreated, 2u);
 
     auto& raw = engine.Worlds().Get(engine.ActiveWorld())->Raw();
-    std::vector<EntityHandle> instances{};
-    raw.view<ECSC::MetaData>().each(
-        [&](const EntityHandle entity, const ECSC::MetaData& metadata)
-        {
-            if (metadata.EntityName != "BUG094SharedTriangle")
+    const auto collectInstances = [&]
+    {
+        std::vector<EntityHandle> result{};
+        raw.view<ECSC::MetaData>().each(
+            [&](const EntityHandle entity, const ECSC::MetaData& metadata)
             {
-                return;
-            }
-            const gs::ConstSourceView source = gs::BuildConstView(raw, entity);
-            if (source.Valid() && source.ActiveDomain == gs::Domain::Mesh)
-            {
-                instances.push_back(entity);
-            }
-        });
+                if (metadata.EntityName != "BUG094SharedTriangle")
+                {
+                    return;
+                }
+                const gs::ConstSourceView source = gs::BuildConstView(raw, entity);
+                if (source.Valid() && source.ActiveDomain == gs::Domain::Mesh)
+                {
+                    result.push_back(entity);
+                }
+            });
+        return result;
+    };
+    auto instances = collectInstances();
     ASSERT_EQ(instances.size(), 2u);
+    // Replace before the first frame and verify final output. The separate
+    // zero-replacement case preserves original-import readbacks; retirement
+    // of rendered generations is not exercised here.
+    for (int replacement = 0; replacement < replacements; ++replacement)
+    {
+        auto reimported = RequiredEngineService<RT::AssetWorkflowModule>(engine).ReimportAsset(
+            RT::RuntimeAssetReimportRequest{.Asset = imported->Asset});
+        ASSERT_TRUE(reimported.has_value()) << static_cast<int>(reimported.error());
+        EXPECT_EQ(reimported->Asset, imported->Asset);
+        EXPECT_TRUE(reimported->MaterializedModelScene);
+        EXPECT_EQ(reimported->PrimitiveEntitiesCreated, 2u);
+        for (const EntityHandle old : instances)
+        {
+            EXPECT_FALSE(engine.Worlds().Get(engine.ActiveWorld())->IsValid(old));
+        }
+        instances = collectInstances();
+        ASSERT_EQ(instances.size(), 2u);
+    }
     std::sort(
         instances.begin(),
         instances.end(),
@@ -5123,6 +5146,16 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke, ImportedModelSceneIsVisibleAndClickPickab
         Extrinsic::RHI::BufferHandle{});
     device.DestroyBuffer(readbackBuffer);
     engine.Shutdown();
+}
+
+TEST(RuntimeSandboxAcceptanceGpuSmoke, ImportedModelSceneIsVisibleAndClickPickable)
+{
+    ExpectImportedModelSceneVisibleAndClickPickable(0);
+}
+
+TEST(RuntimeSandboxAcceptanceGpuSmoke, ImportedModelSceneReplacementIsVisibleAndClickPickable)
+{
+    ExpectImportedModelSceneVisibleAndClickPickable(2);
 }
 
 TEST(RuntimeSandboxAcceptanceGpuSmoke, HierarchySelectionKeepsDefaultSandboxVisibleWithOutline)

@@ -678,6 +678,9 @@ is shared by the module's two implementation units, without a separate executor
 BMI. It stores the existing dependency record directly. Borrowed provider pointers
 remain guarded by the initialized value, binding epochs and submission identity;
 the workflow keeps the executor's address stable across reinitialization.
+Model materialization exposes copied records and diagnostics; material leases and
+construction helpers stay in its implementation. Model and texture imports reuse
+the texture-residency owner's payload-mismatch and upload-deferral classification.
 Queued geometry and model/texture imports share executor-local submission,
 route/decode transitions and apply preflight using that captured identity.
 Payload-specific decoding, service requirements and materialization stay in

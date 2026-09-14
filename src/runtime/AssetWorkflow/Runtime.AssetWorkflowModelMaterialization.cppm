@@ -1,10 +1,10 @@
+// Declares workflow-owned model materialization and copied import diagnostics.
 module;
 
 #include <cstdint>
 #include <functional>
 #include <memory>
 #include <string>
-#include <string_view>
 #include <vector>
 
 export module Extrinsic.Runtime.AssetWorkflowModelMaterialization;
@@ -17,12 +17,13 @@ import Extrinsic.ECS.Scene.Handle;
 import Extrinsic.ECS.Scene.Registry;
 import Extrinsic.Graphics.GpuAssetCache;
 import Extrinsic.Graphics.Material;
-import Extrinsic.Graphics.MaterialSystem;
-import Extrinsic.Graphics.Renderer;
 import Extrinsic.Runtime.AssetWorkflowTextureResidency;
 import Extrinsic.Runtime.JobService;
 import Extrinsic.Runtime.TextureBakeModule;
 import Extrinsic.Runtime.WorldHandle;
+
+// IRenderer is globally attached in its owning module; only a reference is used here.
+extern "C++" { namespace Extrinsic::Graphics { class IRenderer; } }
 
 export namespace Extrinsic::Runtime
 {
@@ -133,40 +134,6 @@ export namespace Extrinsic::Runtime
         std::vector<AssetWorkflowModelNodeRecord> Nodes{};
         std::vector<AssetWorkflowModelPrimitiveRecord> Primitives{};
     };
-
-    struct AssetWorkflowModelMaterializationState
-    {
-        AssetWorkflowModelMaterializationRecord Record{};
-        std::vector<Graphics::MaterialSystem::MaterialLease> MaterialLeases{};
-
-        // Lazily-created neutral lit StandardPBR material bound to imported
-        // primitives that carry no authored material, so they shade instead of
-        // falling back to the unlit DefaultDebugSurface (slot 0). Slot 0 stays
-        // reserved for genuine missing/invalid bindings (GRAPHICS-031).
-        Graphics::MaterialSystem::MaterialLease DefaultLitMaterialLease{};
-        std::uint32_t DefaultLitMaterialSlot{Graphics::kDefaultMaterialSlotIndex};
-        bool HasDefaultLitMaterial{false};
-    };
-
-    [[nodiscard]] std::string BuildEmbeddedTextureAssetPath(
-        std::string_view modelPath,
-        std::uint32_t imageIndex,
-        const Assets::AssetTexture2DPayload& image);
-
-    [[nodiscard]] Core::Expected<Assets::AssetId> LoadEmbeddedTextureAsset(
-        Assets::AssetService& service,
-        std::string_view modelPath,
-        std::uint32_t imageIndex,
-        const Assets::AssetTexture2DPayload& image);
-
-    [[nodiscard]] Core::Expected<AssetWorkflowModelMaterializationState> MaterializeModelSceneAsset(
-        Assets::AssetService& service,
-        Graphics::GpuAssetCache& cache,
-        ECS::Scene::Registry& scene,
-        Graphics::MaterialSystem& materials,
-        Assets::AssetId modelAsset,
-        const AssetWorkflowModelMaterializationOptions& options = {},
-        AssetWorkflowModelMaterializationDiagnostics* diagnostics = nullptr);
 
     class AssetWorkflowModelMaterializer
     {

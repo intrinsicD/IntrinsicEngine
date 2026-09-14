@@ -451,6 +451,16 @@ set_tests_properties(KernelCompilationLocality.Commands KernelCompilationLocalit
     KernelCompilationLocality.Services KernelCompilationLocality.Jobs
     PROPERTIES LABELS "contract;build;runtime" TIMEOUT 30)
 
+# Model leases and renderer integration stay inside the implementation.
+add_test(NAME AssetCompilationLocality.ModelMaterialization
+    COMMAND ${INTRINSIC_TEST_PYTHON_EXECUTABLE}
+        ${CMAKE_SOURCE_DIR}/tools/analysis/compile_hotspots.py --build-dir ${CMAKE_BINARY_DIR}
+        --check-source src/runtime/AssetWorkflow/Runtime.AssetWorkflowModelMaterialization.cppm
+        --forbid-module Extrinsic.Graphics.Renderer
+        --forbid-module Extrinsic.Graphics.MaterialSystem)
+set_tests_properties(AssetCompilationLocality.ModelMaterialization
+    PROPERTIES LABELS "contract;runtime;build" TIMEOUT 30)
+
 # Texture-bake composition stays inside its existing implementation. Check both
 # its public producer and the editor interfaces that consume bake records.
 add_test(NAME EditorCompilationLocality.TextureBake

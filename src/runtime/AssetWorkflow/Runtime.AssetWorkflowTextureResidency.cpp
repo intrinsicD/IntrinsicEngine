@@ -16,20 +16,20 @@ import Extrinsic.RHI.Descriptors;
 
 namespace Extrinsic::Runtime
 {
+    [[nodiscard]] bool IsAssetPayloadTypeMismatch(const Core::ErrorCode error) noexcept
+    {
+        return error == Core::ErrorCode::TypeMismatch
+            || error == Core::ErrorCode::AssetTypeMismatch;
+    }
+
+    [[nodiscard]] bool IsTextureUploadDeferred(const Core::ErrorCode error) noexcept
+    {
+        return error == Core::ErrorCode::DeviceNotOperational
+            || error == Core::ErrorCode::ResourceBusy;
+    }
+
     namespace
     {
-        [[nodiscard]] bool IsTypeMismatch(const Core::ErrorCode error) noexcept
-        {
-            return error == Core::ErrorCode::TypeMismatch
-                || error == Core::ErrorCode::AssetTypeMismatch;
-        }
-
-        [[nodiscard]] bool IsUploadDeferral(const Core::ErrorCode error) noexcept
-        {
-            return error == Core::ErrorCode::DeviceNotOperational
-                || error == Core::ErrorCode::ResourceBusy;
-        }
-
         [[nodiscard]] Core::Expected<RHI::Format> ToGpuFormat(
             const Assets::AssetTexture2DMetadata& metadata)
         {
@@ -83,34 +83,35 @@ namespace Extrinsic::Runtime
             diagnostics.LastError = error;
             ++diagnostics.TextureUploadDeferrals;
         }
-    }
 
-    Core::Expected<RHI::TextureDesc> BuildGpuTextureDesc(
-        const Assets::AssetTexture2DPayload& payload)
-    {
-        if (auto valid = Assets::ValidateAssetTexture2DPayload(payload); !valid.has_value())
+        Core::Expected<RHI::TextureDesc> BuildGpuTextureDesc(
+            const Assets::AssetTexture2DPayload& payload)
         {
-            return Core::Err<RHI::TextureDesc>(valid.error());
+            if (auto valid = Assets::ValidateAssetTexture2DPayload(payload); !valid.has_value())
+            {
+                return Core::Err<RHI::TextureDesc>(valid.error());
+            }
+
+            auto format = ToGpuFormat(payload.Metadata);
+            if (!format.has_value())
+            {
+                return Core::Err<RHI::TextureDesc>(format.error());
+            }
+
+            return RHI::TextureDesc{
+                .Width = payload.Metadata.Width,
+                .Height = payload.Metadata.Height,
+                .DepthOrArrayLayers = 1u,
+                .MipLevels = 1u,
+                .Fmt = *format,
+                .Dimension = RHI::TextureDimension::Tex2D,
+                .Usage = RHI::TextureUsage::Sampled | RHI::TextureUsage::TransferDst,
+                .InitialLayout = RHI::TextureLayout::Undefined,
+                .SampleCount = 1u,
+                .DebugName = "Runtime.AssetTexture2D",
+            };
         }
 
-        auto format = ToGpuFormat(payload.Metadata);
-        if (!format.has_value())
-        {
-            return Core::Err<RHI::TextureDesc>(format.error());
-        }
-
-        return RHI::TextureDesc{
-            .Width = payload.Metadata.Width,
-            .Height = payload.Metadata.Height,
-            .DepthOrArrayLayers = 1u,
-            .MipLevels = 1u,
-            .Fmt = *format,
-            .Dimension = RHI::TextureDimension::Tex2D,
-            .Usage = RHI::TextureUsage::Sampled | RHI::TextureUsage::TransferDst,
-            .InitialLayout = RHI::TextureLayout::Undefined,
-            .SampleCount = 1u,
-            .DebugName = "Runtime.AssetTexture2D",
-        };
     }
 
     Core::Result RequestTextureAssetUpload(
@@ -129,8 +130,8 @@ namespace Extrinsic::Runtime
         auto fail = [&cache, id, &options](const Core::ErrorCode error) -> Core::Result
         {
             if (options.NotifyCacheFailedOnUploadError
-                && !IsTypeMismatch(error)
-                && !IsUploadDeferral(error))
+                && !IsAssetPayloadTypeMismatch(error)
+                && !IsTextureUploadDeferred(error))
             {
                 cache.NotifyFailed(id);
             }
@@ -206,7 +207,7 @@ namespace Extrinsic::Runtime
             auto result = RequestTextureAssetUpload(Service, Cache, id, Options);
             if (!result.has_value())
             {
-                if (IsUploadDeferral(result.error()))
+                if (IsTextureUploadDeferred(result.error()))
                 {
                     RecordDeferral(Diagnostics, id, result.error());
                     return result;
@@ -231,7 +232,7 @@ namespace Extrinsic::Runtime
                 (void)UploadReadyTexture(id);
                 return;
             }
-            if (!IsTypeMismatch(texture.error()))
+            if (!IsAssetPayloadTypeMismatch(texture.error()))
             {
                 RecordFailure(Diagnostics, id, texture.error());
                 if (Options.NotifyCacheFailedOnUploadError)
