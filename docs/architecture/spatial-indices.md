@@ -35,15 +35,22 @@ readback ordering for those batches; `Ready` is the consumer's completion token.
 These are reusable compute operations that run through the existing runtime GPU
 participant path and do not alter the rendering frame recipe.
 
-A consumer that needs lower-level compute or a custom traversal over a hierarchy
-it owns uses `Graphics::PointLbvhWorkspace` directly, including its view of node
-and point buffers. That borrowed buffer address is valid only while the
-workspace and device remain alive.
+`QueueGpuCompute` records a consumer callback over the cached node, compact-point
+and original-slot buffers, then reads back one bounded final result. The cache
+retains the index and recorder through completion and device shutdown; consumers
+capture their method workspace in the recorder. The callback receives a command
+context and shader-readable index view. A failed recording/readback returns a
+diagnostic, and runtime consumers still validate source revisions before
+publishing properties. Keypoint computation uses this path.
 
-Because the queues are the whole GPU surface, `Runtime.SpatialIndexCache.cppm`
-carries no GPU or composition dependency: the workspace, command context, device
-and job service belong to its implementation unit, and the CPU constructor names
-`WorldRegistry` through a matching `extern "C++"` forward declaration instead of
+A consumer owning a changing hierarchy uses `Graphics::PointLbvhWorkspace`
+directly. Its borrowed buffer addresses remain valid only while the workspace
+and device remain alive.
+
+`Runtime.SpatialIndexCache.cppm` does not import the GPU workspace, command context,
+device or job service. The recording callback names the command context through
+its matching `extern "C++"` forward declaration and returns a lightweight RHI
+buffer handle. The CPU constructor similarly borrows `WorldRegistry` without
 importing the kernel registry. `SpatialCompilationLocality.QueryInterface`
 enforces that closure against the configured Clang/CMake module graph. Query
 callers that also record their own GPU work import

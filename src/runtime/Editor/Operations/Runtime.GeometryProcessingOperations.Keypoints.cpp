@@ -6,6 +6,7 @@ module;
 #include <chrono>
 #include <cmath>
 #include <cstdint>
+#include <cstring>
 #include <memory>
 #include <limits>
 #include <optional>
@@ -20,6 +21,8 @@ module Extrinsic.Runtime.PointAnalysisOperations;
 import Extrinsic.ECS.Scene.Registry;
 import Extrinsic.ECS.Components.GeometrySources;
 import Extrinsic.Runtime.SpatialIndexCache;
+import Extrinsic.Graphics.PointKeypoints;
+import Extrinsic.RHI.Handles;
 import Extrinsic.Runtime.EngineConfigControl;
 import Extrinsic.Runtime.KernelEvents;
 import Extrinsic.Runtime.SelectionController;
@@ -63,6 +66,7 @@ namespace Extrinsic::Runtime
             std::vector<float> BeforeScore{}, AfterScore{};
             std::shared_ptr<const SpatialIndexSnapshot> Index{};
             SpatialIndexHandle GpuIndex{};
+            std::shared_ptr<SpatialGpuResult> GpuResult{};
             bool Abandoned{};
             std::optional<EditorKeypointAnalysisResult> MainFailure{};
             EditorKeypointAnalysisResult Result{};
@@ -107,9 +111,12 @@ namespace Extrinsic::Runtime
                 if(!context.SpatialIndices || !w->ValidLbvh || w->Result.LiveCount>(1u<<24) ||
                    std::max(c.SalientRadius,c.NonMaxRadius)>Geometry::PointLBVH::CoordinateLimit)
                     return fail("LBVH needs the spatial cache, at most 2^24 samples and coordinates/radii within 1e18.");
-                if(c.Backend==KeypointAnalysisBackend::VulkanLBVH &&
+                if((c.Backend==KeypointAnalysisBackend::VulkanLBVH || c.Backend==KeypointAnalysisBackend::VulkanCompute) &&
                    (!context.JobCommands.Available() || !context.SpatialIndices->GpuQueriesAvailable() || w->Result.LiveCount>(1u<<20)))
                     return fail("Vulkan keypoints require framed GPU queries/jobs and at most 2^20 samples.");
+                if(c.Backend==KeypointAnalysisBackend::VulkanCompute &&
+                   (!context.Device || !context.Device->SupportsShaderFloat64()))
+                    return fail("Vulkan keypoint computation requires shader double-precision support.");
             }
             if (purpose == CapturePurpose::Execute)
             {
@@ -277,6 +284,70 @@ namespace Extrinsic::Runtime
         // report from this immutable snapshot while earlier stages wind down.
         const auto rejected=[pending](std::string message)
         {auto result=pending;result.Status=EditorCommandStatus::GeometryProcessingFailed;result.Message=std::move(message);return result;};
+        if(w->Config.Backend==KeypointAnalysisBackend::VulkanCompute)
+        {
+            JobDesc gpu{
+                .DebugName="Vulkan keypoint computation", .Scope=context.World, .Kind=RuntimeTaskKinds::GeometryProcess,
+                .Work=[](const JobCancellation&){return JobResultEnvelope::Make(true);},
+                .IsReadyToApply=[context,w] {
+                    if(w->Abandoned || !CurrentInput(context,*w))return true;
+                    if(!w->GpuResult)
+                    {
+                        auto workspace=std::make_shared<Graphics::PointKeypointWorkspace>(*context.Device);
+                        const auto& c=w->Config;
+                        const Graphics::PointKeypointParams params{c.SalientRadius,c.NonMaxRadius,c.Gamma21,c.Gamma32,
+                            c.MinimumNeighbors,c.GpuRadiusCapacity,c.GpuQueryBatchSize};
+                        w->GpuResult=context.SpatialIndices->QueueGpuCompute(w->GpuIndex,
+                            sizeof(Graphics::PointKeypointHeader)+w->Slots.size()*sizeof(Graphics::PointKeypointValue),
+                            [workspace,params,w](auto& commands,const SpatialGpuIndexView& view) -> RHI::BufferHandle {
+                                if(w->Abandoned)return {};
+                                return workspace->Record(commands,view.NodesBDA,view.PositionsBDA,
+                                    view.OriginalSlotsBDA,view.Count,params);
+                            });
+                    }
+                    return w->GpuResult->State==SpatialQueryState::Ready || w->GpuResult->State==SpatialQueryState::Failed;
+                },
+                .ValidateBeforeApply=[context,w] {return !w->Abandoned && CurrentInput(context,*w)?JobApplyValidation::Current:JobApplyValidation::StaleGeneration;},
+                .PublishCompletion=[context,w,sink,delivered](KernelEventBus&,const JobResultEnvelope&) {
+                    auto& r=w->Result;r.Status=EditorCommandStatus::GeometryProcessingFailed;
+                    if(!w->GpuResult || w->GpuResult->State!=SpatialQueryState::Ready)
+                        r.Message=w->GpuResult?w->GpuResult->Diagnostic:"Vulkan keypoint computation did not return a result.";
+                    else
+                    {
+                        r.ActualBackend="vulkan_compute";
+                        Graphics::PointKeypointHeader header{};
+                        std::memcpy(&header,w->GpuResult->Data.data(),sizeof(header));
+                        r.MaximumNeighbors=header.MaximumNeighbors;r.KeypointCount=header.KeypointCount;
+                        r.GpuQueryBatches=3*((w->Slots.size()+w->Config.GpuQueryBatchSize-1)/w->Config.GpuQueryBatchSize)+1;
+                        r.Scale={header.MeanSpacing,header.SalientRadius,header.NonMaxRadius};
+                        if(header.Error)
+                            r.Message=(header.Error&2)?"Vulkan keypoint support overflowed capacity; previous outputs retained.":
+                                (header.Error&8)?"Vulkan keypoint spatial traversal exceeded its stack limit.":
+                                "Vulkan keypoint computation rejected invalid scale or nonfinite covariance.";
+                        else
+                        {
+                            for(std::size_t i=0;i<w->Slots.size();++i)
+                            {
+                                Graphics::PointKeypointValue value{};
+                                std::memcpy(&value,w->GpuResult->Data.data()+sizeof(header)+i*sizeof(value),sizeof(value));
+                                w->AfterMask[w->Slots[i]]=value.Mask;w->AfterScore[w->Slots[i]]=value.Saliency;
+                            }
+                            r.WrittenCount=w->Slots.size();r.Status=EditorCommandStatus::Applied;
+                            r.Message="Spacing, covariance, saliency and suppression computed on Vulkan; final properties read back.";
+                        }
+                    }
+                    auto result=Publish(context,w);*delivered=true;if(sink)sink(result);return result.Succeeded();
+                },
+                .FinalizeUnpublishedOnMainThread=[w,sink,delivered,pending]() mutable {
+                    w->Abandoned=true;if(*delivered)return;*delivered=true;
+                    pending.Status=EditorCommandStatus::StaleEntity;
+                    pending.Message="Vulkan keypoint job cancelled or stale; previous outputs retained.";
+                    if(sink)sink(std::move(pending));
+                }};
+            if(!context.JobCommands.Submit(std::move(gpu),identity).IsValid())
+                return rejected("Vulkan keypoint submission rejected.");
+            return pending;
+        }
         JobDesc desc{
             .DebugName="Keypoint covariance and suppression",.Scope=context.World,.Kind=RuntimeTaskKinds::GeometryProcess,
             .Work=[w](const JobCancellation&){Compute(*w);return JobResultEnvelope::Make(true);},

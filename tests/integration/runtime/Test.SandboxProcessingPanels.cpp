@@ -729,14 +729,17 @@ TEST(SandboxProcessingPanels, CpuAccelerationControlsPersistTheRequestedExecutio
         const char* Combo;
         const char* GpuChoice;
         std::function<int(const Config::EngineConfig&)> Backend;
+        int ChoiceIndex{2}, ExpectedBackend{2};
     };
     const std::array controls{
         Control{"view.normal_estimation", "Normal Estimation", "Acceleration##Normals", "Vulkan LBVH (CPU fit)",
             [](const auto& c) { return int(R::GetNormalEstimationConfig(c)->Backend); }},
         Control{"view.outlier_analysis", "Outlier Analysis", "Acceleration", "Vulkan LBVH",
             [](const auto& c) { return int(R::GetOutlierAnalysisConfig(c)->Backend); }},
-        Control{"view.keypoint_analysis", "ISS Keypoint Analysis", "Acceleration", "Vulkan LBVH",
+        Control{"view.keypoint_analysis", "ISS Keypoint Analysis", "Acceleration", "Vulkan LBVH neighborhoods",
             [](const auto& c) { return int(R::GetKeypointAnalysisConfig(c)->Backend); }},
+        Control{"view.keypoint_analysis", "ISS Keypoint Analysis", "Backend", "Vulkan",
+            [](const auto& c) { return int(R::GetKeypointAnalysisConfig(c)->Backend); },1,3},
         Control{"view.descriptor_analysis", "FPFH Descriptor Analysis", "Acceleration", "Vulkan LBVH",
             [](const auto& c) { return int(R::GetDescriptorAnalysisConfig(c)->Backend); }},
         Control{"view.kernel_density", "Kernel Density", "Acceleration", "Vulkan LBVH",
@@ -770,12 +773,12 @@ TEST(SandboxProcessingPanels, CpuAccelerationControlsPersistTheRequestedExecutio
             EXPECT_FALSE(popups.empty()) << control.Title;
             if (!popups.empty() && popups.back().Window)
             {
-                const auto seed = popups.back().Window->GetID(2);
+                const auto seed = popups.back().Window->GetID(control.ChoiceIndex);
                 ImGui::ActivateItemByID(ImHashStr(control.GpuChoice, 0, seed));
             }
         }
         if (++step != 9) return;
-        EXPECT_EQ(control.Backend(h.Control().GetEngineConfigControlState().ActiveConfig), 2) << control.Title;
+        EXPECT_EQ(control.Backend(h.Control().GetEngineConfigControlState().ActiveConfig), control.ExpectedBackend) << control.Title;
         EXPECT_TRUE(h.Shell.SetEditorWindowOpen(control.Window, false));
         if (++action == controls.size()) { engine.RequestExit(); return; }
         EXPECT_TRUE(h.Shell.SetEditorWindowOpen(controls[action].Window, true));

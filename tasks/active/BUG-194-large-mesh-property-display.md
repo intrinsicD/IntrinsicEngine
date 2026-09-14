@@ -176,3 +176,10 @@ Cleanup verification: canonical ci configure/runtime-contract build passed;
 ci-vulkan executable passed both registered saliency/Appearance recovery and
 surface scalar/isoline readbacks. These maintain the existing regression checks;
 they do not close the user-specific failure.
+
+The user subsequently reports “A keypoint job for this output is already active.”
+This is the Detect duplicate-job response, not the Display diagnostic. The guard
+includes queued/running/dependency/gate/apply states. Saliency and mask publish
+together after full detection, so an unfinished first run has no new output to
+show. This narrows the investigation to job completion/progress and UI feedback;
+it does not establish that the current job is progressing rather than stalled.

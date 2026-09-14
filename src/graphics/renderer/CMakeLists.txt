@@ -10,6 +10,7 @@ target_sources(${target_name}
         Graphics.CurrentRendererContractAdapter.cppm
         Graphics.ComputeParallelPrimitives.cppm
         Graphics.PointLBVH.cppm
+        Graphics.PointKeypoints.cppm
         Graphics.FrameRecipe.cppm
         Graphics.RenderDiagnostics.cppm
         Graphics.RenderRecipeConfig.cppm
@@ -54,6 +55,7 @@ target_sources(${target_name}
         Graphics.CameraSnapshots.cpp
         Graphics.ComputeParallelPrimitives.cpp
         Graphics.PointLBVH.cpp
+        Graphics.PointKeypoints.cpp
         Graphics.CurrentRendererContractAdapter.cpp
         Graphics.RenderRecipeConfig.cpp
         Graphics.RenderCommandRouter.cpp

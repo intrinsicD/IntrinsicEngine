@@ -15,7 +15,7 @@ Root scanned: `src`
 | `geometry` | 116 |
 | `graphics/assets` | 1 |
 | `graphics/framegraph` | 7 |
-| `graphics/renderer` | 73 |
+| `graphics/renderer` | 74 |
 | `graphics/rhi` | 18 |
 | `graphics/vulkan` | 13 |
 | `physics` | 1 |
@@ -261,6 +261,7 @@ Root scanned: `src`
 | `Extrinsic.Graphics.LightSystem` | `src/graphics/renderer/Graphics.LightSystem.cppm` | `graphics/renderer` |
 | `Extrinsic.Graphics.Material` | `src/graphics/renderer/Graphics.Material.cppm` | `graphics/renderer` |
 | `Extrinsic.Graphics.MaterialSystem` | `src/graphics/renderer/Graphics.MaterialSystem.cppm` | `graphics/renderer` |
+| `Extrinsic.Graphics.PointKeypoints` | `src/graphics/renderer/Graphics.PointKeypoints.cppm` | `graphics/renderer` |
 | `Extrinsic.Graphics.PointLBVH` | `src/graphics/renderer/Graphics.PointLBVH.cppm` | `graphics/renderer` |
 | `Extrinsic.Graphics.PostProcessSystem` | `src/graphics/renderer/Graphics.PostProcessSystem.cppm` | `graphics/renderer` |
 | `Extrinsic.Graphics.PropertyTextureBake` | `src/graphics/renderer/Graphics.PropertyTextureBake.cppm` | `graphics/renderer` |
@@ -445,4 +446,4 @@ Root scanned: `src`
 | `Extrinsic.Runtime.StableEntityLookup` | `src/runtime/Scene/Runtime.StableEntityLookup.cppm` | `runtime` |
 | `Extrinsic.Runtime.VisualizationRecipes` | `src/runtime/Visualization/Runtime.VisualizationRecipes.cppm` | `runtime` |
 
-Total modules: **418**
+Total modules: **419**

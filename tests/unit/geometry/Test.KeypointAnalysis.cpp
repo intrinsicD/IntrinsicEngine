@@ -99,3 +99,25 @@ TEST(KeypointAnalysis, CloudSpacingUsesNearestLivePointsAndRemapsOriginalSlots)
     const auto keypoints=F::DetectKeypoints(cloud,{.SalientRadius=10,.NonMaxRadius=10});ASSERT_TRUE(keypoints);
     EXPECT_EQ(keypoints->Indices,(std::vector<std::uint32_t>{1}));
 }
+
+TEST(KeypointAnalysis, PlanarRoundoffCannotCreateSaliencyOrBreakZeroScoreTies)
+{
+    std::vector<glm::vec3> points;
+    for(int i=0;i<7;++i)for(int j=0;j<7;++j)
+        points.push_back({.37f*i+.031f*j,.22f*j+.1f*i,0});
+    const auto result=F::AnalyzeKeypoints(points,{.SalientRadius=10,.NonMaxRadius=10,
+        .Gamma21=1,.Gamma32=0,.MinNeighbors=5});
+    ASSERT_TRUE(result);
+    EXPECT_EQ(result->Keypoints.Indices,(std::vector<std::uint32_t>{0}));
+    for(auto value:result->Saliency)EXPECT_EQ(value,0);
+}
+
+TEST(KeypointAnalysis, CollinearRoundoffCannotCreateSecondEigenvalueCandidates)
+{
+    std::vector<glm::vec3> points;
+    for(int i=0;i<30;++i){const float x=.071f*i;points.push_back({x,.5f*x,.25f*x});}
+    const auto result=F::AnalyzeKeypoints(points,{.SalientRadius=3,.NonMaxRadius=3,
+        .Gamma21=1,.Gamma32=1,.MinNeighbors=5});
+    ASSERT_TRUE(result);EXPECT_TRUE(result->Keypoints.Indices.empty());
+    for(auto value:result->Saliency)EXPECT_EQ(value,0);
+}

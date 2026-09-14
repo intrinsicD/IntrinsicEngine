@@ -99,6 +99,7 @@ namespace
     struct RequiredDeviceFeatureProbe
     {
         bool SamplerAnisotropySupported = false;
+        bool ShaderFloat64Supported = false;
         bool DescriptorIndexingSupported = false;
         bool TimelineSemaphoreSupported = false;
         bool DynamicRenderingSupported = false;
@@ -333,6 +334,7 @@ namespace
         vkGetPhysicalDeviceFeatures2(physicalDevice, &features2);
 
         probe.SamplerAnisotropySupported = features2.features.samplerAnisotropy == VK_TRUE;
+        probe.ShaderFloat64Supported = features2.features.shaderFloat64 == VK_TRUE;
         probe.DescriptorIndexingSupported =
             features12.descriptorBindingPartiallyBound == VK_TRUE &&
             features12.descriptorBindingSampledImageUpdateAfterBind == VK_TRUE;
@@ -585,6 +587,7 @@ namespace
                 *outSamplerAnisotropySupported = true;
         }
         enabledFeatures.features.shaderInt64 = VK_TRUE;
+        enabledFeatures.features.shaderFloat64 = featureProbe.ShaderFloat64Supported ? VK_TRUE : VK_FALSE;
         enabledFeatures.features.drawIndirectFirstInstance = VK_TRUE;
         // Selection/picking fragment shaders use gl_PrimitiveID, which glslang
         // emits with SPIR-V Capability Geometry even though no geometry stage is
@@ -1619,6 +1622,7 @@ void VulkanDevice::Initialize(const RHI::DeviceCreateDesc& desc)
 
         volkLoadDevice(m_Device);
         m_SamplerAnisotropySupported = samplerAnisotropySupported;
+        m_ShaderFloat64Supported = featureProbe.ShaderFloat64Supported;
         diagnostics.DescriptorIndexingEnabled = true;
         diagnostics.TimelineSemaphoreEnabled = true;
         diagnostics.DynamicRenderingEnabled = true;
@@ -2351,6 +2355,7 @@ void VulkanDevice::Shutdown()
     m_DefaultSamplerHandle = {};
     m_GlobalPipelineLayout = VK_NULL_HANDLE;
     m_SamplerAnisotropySupported = false;
+    m_ShaderFloat64Supported = false;
 
     if (device != VK_NULL_HANDLE && m_OneShotCmdPool != VK_NULL_HANDLE)
         vkDestroyCommandPool(device, m_OneShotCmdPool, nullptr);

@@ -5,6 +5,7 @@ module;
 #include <limits>
 #include <span>
 #include <glm/glm.hpp>
+#include <Eigen/Eigenvalues>
 
 module Geometry.PCA;
 
@@ -61,8 +62,37 @@ namespace Geometry::PCA
             if (lambda1 > lambda2) std::swap(lambda1, lambda2);
             if (lambda0 > lambda1) std::swap(lambda0, lambda1);
 
+            // The closed form can split repeated zero roots at sqrt(epsilon).
+            // Use the existing symmetric solver for adjacent repeated roots;
+            // their eigenspace needs a full basis, not independent cross products.
+            const auto solveStable = [&] {
+                Eigen3 stable;
+                Eigen::Matrix3d matrix;
+                matrix << a00, a01, a02, a01, a11, a12, a02, a12, a22;
+                const Eigen::SelfAdjointEigenSolver<Eigen::Matrix3d> solver(matrix);
+                if (solver.info() != Eigen::Success)
+                {
+                    stable.Eigenvalues = glm::dvec3{std::numeric_limits<double>::quiet_NaN()};
+                    return stable;
+                }
+                for (int k = 0; k != 3; ++k)
+                {
+                    stable.Eigenvalues[k] = std::max(0.0, solver.eigenvalues()[2-k]);
+                    const auto axis = solver.eigenvectors().col(2-k);
+                    stable.Eigenvectors[k] = {axis[0], axis[1], axis[2]};
+                }
+                if (glm::dot(glm::cross(stable.Eigenvectors[0], stable.Eigenvectors[1]), stable.Eigenvectors[2]) < 0)
+                    stable.Eigenvectors[2] = -stable.Eigenvectors[2];
+                return stable;
+            };
+            const double repeatedRootTolerance = 8 * std::sqrt(std::numeric_limits<double>::epsilon())
+                * std::max(std::abs(lambda0), std::abs(lambda2));
+            if (lambda1-lambda0 <= repeatedRootTolerance || lambda2-lambda1 <= repeatedRootTolerance)
+                return solveStable();
+
             result.Eigenvalues = {lambda2, lambda1, lambda0};
 
+            bool ambiguousBasis = false;
             auto computeEigenvector = [&](double lambda) -> glm::dvec3
             {
                 const glm::dvec3 row0{a00 - lambda, a01, a02};
@@ -95,26 +125,28 @@ namespace Geometry::PCA
                     bestLenSq = lenSq12;
                 }
 
-                if (bestLenSq > 1e-30)
+                if (bestLenSq > 1e-30 && std::isfinite(bestLenSq))
                     return best / std::sqrt(bestLenSq);
 
+                ambiguousBasis = true;
                 return {1.0, 0.0, 0.0};
             };
 
             result.Eigenvectors[2] = computeEigenvector(lambda0);
             result.Eigenvectors[1] = computeEigenvector(lambda1);
             result.Eigenvectors[0] = computeEigenvector(lambda2);
+            if (ambiguousBasis) return solveStable();
 
             const double dot01 = glm::dot(result.Eigenvectors[0], result.Eigenvectors[1]);
             result.Eigenvectors[1] -= dot01 * result.Eigenvectors[0];
             const double len1 = glm::length(result.Eigenvectors[1]);
-            if (len1 > 1e-15)
-                result.Eigenvectors[1] /= len1;
+            if (!(len1 > 1e-15) || !std::isfinite(len1)) return solveStable();
+            result.Eigenvectors[1] /= len1;
 
             result.Eigenvectors[2] = glm::cross(result.Eigenvectors[0], result.Eigenvectors[1]);
             const double len2 = glm::length(result.Eigenvectors[2]);
-            if (len2 > 1e-15)
-                result.Eigenvectors[2] /= len2;
+            if (!(len2 > 1e-15) || !std::isfinite(len2)) return solveStable();
+            result.Eigenvectors[2] /= len2;
         }
 
         result.Eigenvalues.x = std::max(0.0, result.Eigenvalues.x);
@@ -186,6 +218,9 @@ namespace Geometry
         const auto eigen = PCA::SymmetricEigen3(
             c00 * invCount, c01 * invCount, c02 * invCount,
             c11 * invCount, c12 * invCount, c22 * invCount);
+
+        if (!std::isfinite(eigen.Eigenvalues.x) || !std::isfinite(eigen.Eigenvalues.y) ||
+            !std::isfinite(eigen.Eigenvalues.z)) return {};
 
         result.Eigenvectors = glm::mat3{
             glm::vec3{static_cast<float>(eigen.Eigenvectors[0].x), static_cast<float>(eigen.Eigenvectors[0].y), static_cast<float>(eigen.Eigenvectors[0].z)},

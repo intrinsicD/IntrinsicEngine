@@ -743,3 +743,10 @@
 - **Crystallized via**: verbal-affirmation
 - **Evidence**: [N497, src/runtime/GeometryIntegration/Runtime.SpatialIndexCache.cppm, src/graphics/renderer/Graphics.PointLBVH.cppm, src/runtime/Modules/Clustering/Runtime.ClusteringGpuState.cpp, docs/architecture/spatial-indices.md]
 - **From staging**: O202
+
+## A47: Cached-index computation retains method intermediates on the GPU
+- **Decision**: Full keypoint computation reuses the runtime spatial cache's framed submission/readback owner. A captured graphics workspace records spacing, reduction, covariance/eigenvalue scoring and immutable-score suppression over the retained index; only the final result returns to runtime for guarded property/history publication. Method shaders and buffers stay in graphics, with no new runtime module or computation registry.
+- **Provenance**: ai-suggested
+- **Crystallized via**: artifact-commitment
+- **Evidence**: [N563, src/runtime/GeometryIntegration/Runtime.SpatialIndexCache.cpp, src/graphics/renderer/Graphics.PointKeypoints.cpp, src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Keypoints.cpp, docs/architecture/spatial-indices.md]
+- **From staging**: O225

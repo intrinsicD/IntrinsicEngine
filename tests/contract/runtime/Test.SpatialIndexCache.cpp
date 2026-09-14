@@ -138,6 +138,10 @@ TEST(SpatialIndexCache, FramedRadiusWithoutDeviceFailsExplicitly)
     R::WorldRegistry worlds;
     R::SpatialIndexCache cache(worlds);
     EXPECT_FALSE(cache.GpuQueriesAvailable());
+    const auto computation=cache.QueueGpuCompute({},32,{});
+    ASSERT_TRUE(computation);
+    EXPECT_EQ(computation->State,R::SpatialQueryState::Failed);
+    EXPECT_FALSE(computation->Diagnostic.empty());
     const std::vector<glm::vec3> queries{{0,0,0}};
     for (float radius : {-1.f, 0.f, 1.f})
     {

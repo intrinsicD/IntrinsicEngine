@@ -1,6 +1,8 @@
 // Runtime-owned, revision-aware entity point indices shared by geometry consumers.
 module;
 #include <cstdint>
+#include <cstddef>
+#include <functional>
 #include <entt/entity/entity.hpp>
 #include <glm/vec3.hpp>
 #include <memory>
@@ -14,10 +16,14 @@ export import Extrinsic.Runtime.GeometryAvailability;
 import Extrinsic.Runtime.ModuleLifecycle;
 import Extrinsic.Runtime.WorldHandle;
 import Extrinsic.Core.Error;
+import Extrinsic.RHI.Handles;
 
 // The CPU constructor only borrows a reference; matching the owner's C++ language
 // linkage keeps this interface out of the WorldRegistry job/RHI import closure.
-extern "C++" { namespace Extrinsic::Runtime { class WorldRegistry; } }
+extern "C++" {
+    namespace Extrinsic::Runtime { class WorldRegistry; }
+    namespace Extrinsic::RHI { class ICommandContext; }
+}
 
 export namespace Extrinsic::Runtime
 {
@@ -63,6 +69,17 @@ export namespace Extrinsic::Runtime
         std::uint32_t Capacity{1};
         std::string Diagnostic{};
     };
+    struct SpatialGpuIndexView
+    {
+        std::uint64_t NodesBDA{}, PositionsBDA{}, OriginalSlotsBDA{};
+        std::uint32_t Count{};
+    };
+    struct SpatialGpuResult
+    {
+        SpatialQueryState State{SpatialQueryState::Queued};
+        std::vector<std::byte> Data{};
+        std::string Diagnostic{};
+    };
     // This concrete service is also its runtime module; there is no forwarding service layer.
     class SpatialIndexCache final : public IRuntimeModule
     {
@@ -99,6 +116,13 @@ export namespace Extrinsic::Runtime
             std::uint32_t capacity, std::span<const std::uint32_t> excludedSlots = {},
             std::shared_ptr<SpatialNearestBatch> reuse = {});
         [[nodiscard]] bool GpuQueriesAvailable() const noexcept;
+        // Record against the retained, current index on the device-owner thread.
+        // Recorder owns its buffers (including a TransferSrc result of readbackBytes)
+        // through captured leases. The cache retains it until the final readback is safe.
+        [[nodiscard]] std::shared_ptr<SpatialGpuResult> QueueGpuCompute(
+            SpatialIndexHandle handle, std::size_t readbackBytes,
+            std::function<RHI::BufferHandle(RHI::ICommandContext&,
+                                           const SpatialGpuIndexView&)> record);
         // Stale world/entity/property/deletion revisions return nullopt; reacquire to rebuild.
         [[nodiscard]] std::optional<Geometry::PointLBVH::Neighbor> Nearest(
             SpatialIndexHandle handle, glm::vec3 query,

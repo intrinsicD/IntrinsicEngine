@@ -2179,7 +2179,9 @@ namespace Extrinsic::Sandbox::Editor
         bool changed = false;
         changed |= DrawProcessingEntity("Entity##Keypoints", context,
             config.StableEntityId, Keypoints.LastSelectedEntity);
-        DrawProcessingCpuBackend();
+        int computeBackend=config.Backend==Runtime::KeypointAnalysisBackend::VulkanCompute?1:0;
+        if(ImGui::Combo("Backend",&computeBackend,"CPU\0Vulkan\0"))
+        {config.Backend=computeBackend?Runtime::KeypointAnalysisBackend::VulkanCompute:Runtime::KeypointAnalysisBackend::CpuKDTree;changed=true;}
         if (DrawProcessingPointInput("Positions##Keypoints", [&] { return Runtime::GetEditorPointInputCatalog(context.Processing, config.StableEntityId); }, config.Positions))
         {
             config.Mask.Domain = config.Score.Domain = config.Positions.Domain;
@@ -2187,19 +2189,26 @@ namespace Extrinsic::Sandbox::Editor
         }
         for (auto [label, ref] : {std::pair{"Mask property", &config.Mask}, std::pair{"Saliency property", &config.Score}})
             changed |= DrawProcessingPropertyName(label, ref->Name);
-        int backend=int(config.Backend);
-        if(ImGui::Combo("Acceleration",&backend,"CPU KD-tree\0CPU LBVH (cached)\0Vulkan LBVH\0")) {config.Backend=Runtime::KeypointAnalysisBackend(backend);changed=true;}
+        if(config.Backend!=Runtime::KeypointAnalysisBackend::VulkanCompute)
+        {
+            int backend=int(config.Backend);
+            if(ImGui::Combo("Acceleration",&backend,"CPU KD-tree\0CPU LBVH (cached)\0Vulkan LBVH neighborhoods\0"))
+            {config.Backend=Runtime::KeypointAnalysisBackend(backend);changed=true;}
+        }
         changed |= ImGui::InputFloat("Salient radius (0 = automatic)",&config.SalientRadius);
         changed |= ImGui::InputFloat("Suppression radius (0 = automatic)",&config.NonMaxRadius);
         changed |= ImGui::InputDouble("Eigenvalue ratio 2 / 1",&config.Gamma21);
         changed |= ImGui::InputDouble("Eigenvalue ratio 3 / 2",&config.Gamma32);
         changed |= ImGui::InputScalar("Minimum neighbors",ImGuiDataType_U32,&config.MinimumNeighbors);
         ImGui::TextWrapped("Centroid-PCA saliency with radius suppression. Automatic radii use 6 and 4 times mean nearest-neighbor spacing. Equal scores keep the lowest source index.");
-        if(config.Backend==Runtime::KeypointAnalysisBackend::VulkanLBVH)
+        if(config.Backend==Runtime::KeypointAnalysisBackend::VulkanLBVH || config.Backend==Runtime::KeypointAnalysisBackend::VulkanCompute)
         {
             changed |= ImGui::InputScalar("GPU query batch size",ImGuiDataType_U32,&config.GpuQueryBatchSize);
             changed |= ImGui::InputScalar("Complete radius capacity",ImGuiDataType_U32,&config.GpuRadiusCapacity);
-            ImGui::TextWrapped("Radius support must fit the selected capacity (up to 1024). Overflow retains previous outputs. Scale, covariance and suppression run on CPU.");
+            ImGui::TextWrapped("Radius support must fit the selected capacity (up to 1024). Overflow retains previous outputs.");
+            ImGui::TextWrapped("%s",config.Backend==Runtime::KeypointAnalysisBackend::VulkanCompute?
+                "Spacing, covariance, saliency and suppression run on Vulkan. Requires shader double precision.":
+                "Only neighborhood queries run on Vulkan; scale, covariance and suppression run on CPU.");
         }
         DrawProcessingExecution(context, Keypoints, changed,
             [&](const auto& request) { return Runtime::PreviewEditorKeypointAnalysisCommand(context.PointAnalysis.Commands, request); },
@@ -2208,6 +2217,8 @@ namespace Extrinsic::Sandbox::Editor
             context.PointAnalysis.ResultSinks.KeypointAnalysis, "Detect keypoints",
             "Controls were rejected by keypoint config validation.", "Keypoint config was rejected.");
         ImGui::TextWrapped("Detection writes a mask (1 = retained keypoint) and a score. Geometry stays in source order.");
+        if(Keypoints.LastResult && Keypoints.LastResult->Status==Runtime::EditorCommandStatus::Pending)
+            ImGui::TextWrapped("Detection is still active. New saliency and mask properties become available when it finishes.");
         auto mask=config.Mask,
              score=config.Score;
         if(ImGui::Button("Show mask"))
@@ -2224,7 +2235,9 @@ namespace Extrinsic::Sandbox::Editor
             ImGui::Text("Requested: %s; ran: %s",Runtime::ToString(result.RequestedBackend),result.ActualBackend.c_str());
             ImGui::Text("Live / total: %zu / %zu; keypoints: %zu",result.LiveCount,result.SlotCount,result.KeypointCount);
             ImGui::Text("Spacing: %.5g; salient / suppression radii: %.5g / %.5g",double(result.Scale.MeanSpacing),double(result.Scale.SalientRadius),double(result.Scale.NonMaxRadius));
-            ImGui::Text("GPU batches: %zu; largest indexed support: %zu",result.GpuQueryBatches,result.MaximumNeighbors);
+            ImGui::Text("GPU %s: %zu; largest indexed support: %zu",
+                result.RequestedBackend==Runtime::KeypointAnalysisBackend::VulkanCompute?"dispatches":"batches",
+                result.GpuQueryBatches,result.MaximumNeighbors);
             ImGui::TextWrapped("%s",result.Message.c_str());
             DrawDismissLastResultButton("Dismiss##Keypoints", Keypoints.LastResult, Runtime::EditorPointAnalysisResultSlot::KeypointAnalysis, context.PointAnalysis.ResultSinks.DismissResult);
         }

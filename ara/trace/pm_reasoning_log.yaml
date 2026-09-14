@@ -2274,3 +2274,22 @@ entries:
     - Keep failed diagnostic deadlines, incomplete harness composition and leak-environment mistakes explicit.
       Temporary source removed; only scoped notes remain.
     - Existing staged topics retain open owners and stale flags; no unrelated closure signal or C92 change.
+
+  - turn: 2026-09-14_001#9
+    notes:
+    - Direct-route N561 as a user diagnostic question and source-verified guard/publication facts. No live job
+      observation, new benchmark, bug closure or research claim; prior timings remain bounded diagnostics.
+
+  - turn: 2026-09-14_001#10
+    notes:
+    - Direct-route user feasibility question N562; stage proposed GPU implementation as O225. No user adoption,
+      parity or empirical speedup; no claim crystallized. Existing unrelated observations retain their owners.
+
+  - turn: 2026-09-14_001#11
+    notes:
+    - Direct-route N563/N564 as implementation decisions and executed outcomes. Promote O225 to A47 through
+      artifact commitment without upgrading its suggested provenance; stage/commit executed evidence O226 as C93.
+    - Separate reference numerical corrections, analytic tests, CPU gates, isolated sanitizers and actual GPU
+      execution. Preserve failed numerical attempts and disk-truncated records with passing replacements.
+    - Keep dirty Debug smoke and single cold dragon latency diagnostic. No generalized speedup, whole-engine
+      completion, closure of BUG-194/193/195 or remote push is inferred. Unrelated observations retain their owners.

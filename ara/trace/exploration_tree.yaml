@@ -12214,3 +12214,73 @@ tree:
     - build/analysis/bug194-saliency-followup-2026-09-14/dragon-ui-pacing.json
     - build/analysis/bug194-saliency-followup-2026-09-14/dragon-vulkan-composed.json
     status: open
+
+  - id: N561
+    type: question
+    title: Distinguish unfinished keypoint computation from property selection
+    provenance: user
+    timestamp: '2026-09-14T14:01:28+02:00'
+    description: User reports an already-active keypoint job and asks whether saliency is still computing and
+      expensive. Source inspection identifies the Detect duplicate-job guard; active includes waiting states.
+      Both outputs publish after full detection. Pending computation is a candidate explanation, not a confirmed
+      progressing live job or closed display bug.
+    evidence:
+    - tasks/active/BUG-194-large-mesh-property-display.md
+    - src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Keypoints.cpp
+    - src/runtime/Editor/Runtime.EditorJobProjection.Public.cpp
+    status: open
+
+  - id: N562
+    type: question
+    title: Assess GPU parallelism of the current keypoint formulation
+    provenance: user
+    timestamp: '2026-09-14T14:05:38+02:00'
+    description: User asks whether keypoint saliency is GPU-parallel or inherently sequential. Source review
+      identifies independent point scoring and read-only score suppression separated by a stage dependency; current
+      Vulkan support still returns neighborhoods to CPU. No implementation or speedup measurement in this turn.
+    evidence:
+    - src/geometry/Geometry.PointCloud.Features.cpp
+    - src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Keypoints.cpp
+    - src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.RadiusRows.cpp
+    - https://docs.vulkan.org/guide/latest/synchronization_examples.html
+    status: resolved
+
+  - id: N563
+    type: decision
+    title: Add the requested full Vulkan keypoint backend through existing owners
+    provenance: ai-executed
+    timestamp: '2026-09-14T15:43:09+02:00'
+    choice: User requests a parallelization plan and Vulkan implementation, then continuation. Implement
+      spacing queries, double reduction, per-point covariance/eigen scoring and immutable-score NMS in
+      one graphics workspace, using the spatial cache's existing frame participant and final readback.
+      Keep CPU and hybrid acceleration separately selectable through shared validated config/UI.
+    alternatives:
+    - Retain only GPU neighborhood queries with CPU scoring; does not satisfy the requested full backend.
+    - Add another runtime module/job registry; existing frame participant already owns the required lifetime.
+    evidence:
+    - O225
+    - tasks/done/RUNTIME-247-keypoint-vulkan-compute.md
+    - src/graphics/renderer/Graphics.PointKeypoints.cpp
+    - src/runtime/GeometryIntegration/Runtime.SpatialIndexCache.cpp
+    status: resolved
+
+  - id: N564
+    type: experiment
+    title: Reconcile Vulkan keypoint computation with numerical and integration corrections
+    provenance: ai-executed
+    timestamp: '2026-09-14T15:43:09+02:00'
+    result: Initial planar/collinear comparisons exposed reference eigensolver residuals and ambiguous
+      PCA frames. Correct both numerical-zero rules and reuse Eigen for repeated/ambiguous roots; retain
+      the 1e-5 tolerance. Three bounded Claude reviews produced readback, frame-basis, radius-culling,
+      dispatch-reporting and diagnostic corrections. Final CPU has 4622 distinct passes and one expected
+      unsanitized leak-control skip; each isolated sanitizer passes 1450 geometry and 37 affected runtime
+      cases. Seven actual Vulkan cases pass without skips/fallback. Dragon diagnostic has 644 keypoints,
+      exact masks/scores, CPU 88326.229627 ms and GPU 5118.388229 ms; dirty single cold request, not a speedup
+      claim. The small eight-domain smoke is slower on GPU. BUG-194 desktop display, BUG-193 pacing and
+      BUG-195 verification headroom remain open; truncated disk-full records are not accepted as evidence.
+    evidence:
+    - ara/evidence/diagnostics/keypoint_compute_2026-09-14/record.json
+    - ara/evidence/diagnostics/keypoint_compute_2026-09-14/benchmark/runtime-smoke.json
+    - ara/evidence/tables/keypoint_compute_verification_2026-09-14.md
+    - tasks/done/RUNTIME-247-keypoint-vulkan-compute.md
+    status: resolved

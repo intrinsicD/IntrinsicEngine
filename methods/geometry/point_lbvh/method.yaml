@@ -53,6 +53,7 @@ benchmarks:
   - ../../../benchmarks/geometry/manifests/point_lbvh_distance_ratio_runtime_smoke.yaml
   - ../../../benchmarks/geometry/manifests/point_lbvh_bilateral_runtime_smoke.yaml
   - ../../../benchmarks/geometry/manifests/point_lbvh_keypoint_runtime_smoke.yaml
+  - ../../../benchmarks/geometry/manifests/point_lbvh_keypoint_compute_runtime_smoke.yaml
   - ../../../benchmarks/geometry/manifests/point_lbvh_descriptor_runtime_smoke.yaml
 known_limitations:
   - Point-neighbor queries only; no triangle distance, ray tracing, arbitrary subset predicates, or refit implementation.

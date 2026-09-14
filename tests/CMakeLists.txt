@@ -2356,7 +2356,7 @@ if(_intrinsic_registered_test_targets)
         "  set_tests_properties(PointLBVHGpuSmoke.KernelDensityPublishesAcrossDomainsAndPreservesCandidatePolicy PROPERTIES TIMEOUT 120)\n"
         "  set_tests_properties(PointLBVHGpuSmoke.PointSpacingPublishesAcrossDomainsAndPreservesCandidatePolicy PROPERTIES TIMEOUT 120)\n"
         "  set_tests_properties(PointLBVHGpuSmoke.BilateralPublishesMovingPassesAcrossDomains PointLBVHGpuSmoke.BilateralRejectsStaleAndCancelledPasses PROPERTIES TIMEOUT 120)\n"
-        "  set_tests_properties(PointLBVHGpuSmoke.KeypointPublishesAcrossDomainsWithCompleteSupport PointLBVHGpuSmoke.KeypointRejectsStaleCancellationAndRadiusOverflow PROPERTIES TIMEOUT 120)\n"
+        "  set_tests_properties(PointLBVHGpuSmoke.KeypointPublishesAcrossDomainsWithCompleteSupport PointLBVHGpuSmoke.KeypointRejectsStaleCancellationAndRadiusOverflow PointLBVHGpuSmoke.KeypointVulkanComputePublishesAcrossDomains PointLBVHGpuSmoke.KeypointVulkanComputeRejectsStaleCancellationAndOverflow PointLBVHGpuSmoke.KeypointVulkanComputePlanarZeroScoresAndIsotropicFloor PROPERTIES TIMEOUT 120)\n"
         "  set_tests_properties(PointLBVHGpuSmoke.DescriptorPublishesAcrossDomainsWithCompleteSupport PointLBVHGpuSmoke.DescriptorRejectsStaleCancellationAndRadiusOverflow PointLBVHGpuSmoke.DescriptorLowestIdCapSupportsDenseRadius PROPERTIES TIMEOUT 120)\n"
         "  set_tests_properties(PointLBVHGpuSmoke.DensityWeightPublishesAllKernelsAcrossDomains PointLBVHGpuSmoke.DensityWeightRejectsStaleCancellationOverflowAndSubmission PointLBVHGpuSmoke.DensityWeightTinySupportAndOneSample PROPERTIES TIMEOUT 120)\n"
         "endif()\n"

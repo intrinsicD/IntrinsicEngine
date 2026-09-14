@@ -8249,3 +8249,5 @@ Retain terminal job outcomes while pending consumers reference them, so reaping 
 - 2026-09-14 — **UI-041**: Point-set outlier multi-domain panel. Locally verified and integrated in `8a35af54aa70c8e7a7f4bebe48ceabc1eda1e186`. Bounded Operational evidence and original leak/performance limits retained. [Task](UI-041-point-set-outlier-multi-domain-panel.md).
 
 - 2026-09-14 — **RUNTIME-246**: Consolidate workspace context binding conversion. Locally verified and integrated in `8a35af54aa70c8e7a7f4bebe48ceabc1eda1e186`. BUILD-007 owns matched compile timing. [Task](RUNTIME-246-workspace-context-binding-consolidation.md).
+
+- 2026-09-14 — **RUNTIME-247**: Full Vulkan keypoint computation. Bounded **Operational** CPU/reference and actual Vulkan evidence in C93; source hashes and receipts bind this retirement commit. No repeatable speedup claim; BUG-194 display, BUG-193 pacing and BUG-195 verification headroom remain open. [Task](RUNTIME-247-keypoint-vulkan-compute.md).

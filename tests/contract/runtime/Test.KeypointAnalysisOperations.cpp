@@ -137,6 +137,21 @@ TEST(KeypointAnalysisConfig, RoundTripAndSharedPreviewApplyRun)
     EXPECT_EQ(applies, 1);
 }
 
+TEST(KeypointAnalysisConfig, FullVulkanBackendRoundTripsConfig)
+{
+    auto config=Config(entt::entity{1},D::MeshVertex);
+    config.Backend=R::KeypointAnalysisBackend::VulkanCompute;
+    config.GpuQueryBatchSize=256;config.GpuRadiusCapacity=1024;
+    const auto document=R::SerializeKeypointAnalysisConfig(config);
+    EXPECT_NE(document.find("vulkan_compute"),std::string::npos);
+    EXPECT_TRUE(R::ValidateKeypointAnalysisConfigSection(document,{},"test").Usable());
+    Extrinsic::Core::Config::EngineConfig engine;
+    R::SetKeypointAnalysisConfig(engine,config);
+    const auto parsed=R::GetKeypointAnalysisConfig(engine);
+    ASSERT_TRUE(parsed);
+    EXPECT_EQ(R::SerializeKeypointAnalysisConfig(*parsed),document);
+}
+
 TEST(KeypointAnalysisOperations, EveryDomainReferenceCacheHistoryAndDeletedRows)
 {
     for(unsigned d=1;d<=8;++d)
@@ -218,6 +233,9 @@ TEST(KeypointAnalysisOperations, InvalidScaleAndOutputPreflightRetainExistingDat
     auto& props=Properties(scene,entity,D::MeshVertex);R::EditorProcessingContext context{.Scene=&scene};
     for(auto name:{"samples","v:deleted","h:connectivity"}){auto bad=c;bad.Score.Name=name;EXPECT_FALSE(R::PreviewEditorKeypointAnalysisCommand(R::BindEditorProcessingCommands(context),bad).Ready);}
     auto gpu=c;gpu.Backend=R::KeypointAnalysisBackend::VulkanLBVH;EXPECT_FALSE(R::PreviewEditorKeypointAnalysisCommand(R::BindEditorProcessingCommands(context),gpu).Ready);
+    gpu.Backend=R::KeypointAnalysisBackend::VulkanCompute;
+    EXPECT_FALSE(R::PreviewEditorKeypointAnalysisCommand(R::BindEditorProcessingCommands(context),gpu).Ready);
+    EXPECT_FALSE(R::ApplyEditorKeypointAnalysisCommand(R::BindEditorProcessingCommands(context),gpu).Succeeded());
     props.GetOrAdd<float>("saliency").Vector().assign(props.Size(),77);
     props.Get<glm::vec3>("samples").Vector().assign(props.Size(),glm::vec3(0));
     EXPECT_FALSE(R::ApplyEditorKeypointAnalysisCommand(R::BindEditorProcessingCommands(context),c).Succeeded());

@@ -1,5 +1,10 @@
 # Graphics/Backends/Vulkan
 
+`IDevice::SupportsShaderFloat64()` reports optional double-precision shader
+arithmetic. Vulkan enables it when supported; its absence does not disqualify
+the renderer. The full keypoint compute backend requires this capability.
+
+
 Promoted Vulkan 1.3 `IDevice` backend surface. Exports
 `Extrinsic.Backends.Vulkan` with the `CreateVulkanDevice()` factory. The current
 promoted lifecycle symbols are concrete and fail closed: with a native GLFW

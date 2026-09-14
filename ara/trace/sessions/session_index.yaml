@@ -582,10 +582,10 @@ sessions:
   open_threads: 6
 - id: 2026-09-14_001
   date: '2026-09-14'
-  summary: Geodesic infinity display, entity controls and redundant scalar-result geometry uploads repaired with
-    Claude review. Full native CPU, focused sanitizers and five Vulkan checks pass; developer sandbox rebuilt.
-    Exact desktop Show delay remains open in BUG-194.
-  turn_count: 8
-  events_count: 8
-  claims_touched: []
-  open_threads: 8
+  summary: Full Vulkan keypoint computation implemented and reviewed with Claude, including numerical stability
+    repairs. Final native CPU, affected isolated sanitizers and seven actual Vulkan checks pass. C93 records
+    bounded capability/parity; dirty smoke and dragon timings remain diagnostic. BUG-194 display stays open.
+  turn_count: 11
+  events_count: 15
+  claims_touched: [C93]
+  open_threads: 9

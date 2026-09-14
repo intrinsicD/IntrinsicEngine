@@ -3845,3 +3845,36 @@ observations:
     promoted_to: logic/claims.md:C92
     crystallized_via: artifact-commitment
     stale: false
+
+  - id: O225
+    timestamp: '2026-09-14T14:05:38+02:00'
+    provenance: ai-suggested
+    content: A Vulkan keypoint pipeline could keep positions/index and intermediate scores on GPU, use parallel
+      spacing queries plus reduction, per-point covariance/eigenvalue scoring, and parallel suppression after
+      a barrier, then read back final properties. Reuse the current LBVH owner; preserve complete neighborhoods,
+      index tie-breaks and CPU-reference numerical behavior.
+    context: N562 source-backed feasibility discussion; no implementation, accepted plan, parity evidence or
+      measured speedup.
+    potential_type: architecture
+    bound_to:
+    - N562
+    promoted: true
+    promoted_to: logic/solution/architecture.md:A47
+    crystallized_via: artifact-commitment
+    stale: false
+
+  - id: O226
+    timestamp: '2026-09-14T15:43:09+02:00'
+    provenance: ai-executed
+    content: The full Vulkan keypoint backend executes all four computation stages on the RTX 3050 and
+      passes bounded CPU-reference, analytic and failure fixtures. Seven actual Vulkan cases pass with
+      exact observed masks and saliency error 0.0 within 1e-5. Dirty Debug smoke and dragon timings
+      support no repeatable performance claim.
+    context: N564 records combined-source verification after numerical and Claude-review corrections;
+      the source-bound evidence table explicitly separates CPU, sanitizers, GPU and diagnostic timings.
+    potential_type: claim
+    bound_to: [N564]
+    promoted: true
+    promoted_to: logic/claims.md:C93
+    crystallized_via: artifact-commitment
+    stale: false

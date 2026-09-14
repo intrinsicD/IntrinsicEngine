@@ -30,6 +30,7 @@ namespace Extrinsic::Runtime
 {
     namespace
     {
+        static_assert(sizeof(Geometry::PointLBVH::Neighbor) == 8);
         glm::mat4 EntityMatrix(WorldRegistry* worlds, WorldHandle world, entt::entity entity)
         {
             glm::mat4 matrix(1.f);
@@ -146,20 +147,63 @@ namespace Extrinsic::Runtime
             }
         };
         std::vector<std::shared_ptr<Batch>> Batches{};
+        struct Computation
+        {
+            std::shared_ptr<SpatialGpuResult> Result{std::make_shared<SpatialGpuResult>()};
+            std::shared_ptr<Entry> Target{};
+            std::function<RHI::BufferHandle(RHI::ICommandContext&, const SpatialGpuIndexView&)> Record{};
+            RHI::BufferHandle Output{};
+            std::uint64_t SubmittedFrame{};
+            bool DownloadQueued{};
+        };
+        std::vector<std::shared_ptr<Computation>> Computations{};
         void ShutdownBatches()
         {
             // Called after the participant's device-idle fence. Deliver pending sinks
             // before releasing their device-owned source buffers.
-            if (Device && !Batches.empty()) Device->GetTransferQueue().CollectCompleted();
+            if (Device && (!Batches.empty() || !Computations.empty())) Device->GetTransferQueue().CollectCompleted();
             for (auto& batch : Batches)
             {
                 batch->State->State = SpatialQueryState::Failed;
                 batch->State->Diagnostic = "Spatial query service stopped.";
             }
             Batches.clear();
+            for (auto& work : Computations)
+            {
+                work->Result->State = SpatialQueryState::Failed;
+                work->Result->Diagnostic = "Spatial compute service stopped.";
+            }
+            Computations.clear();
         }
         void Drain()
         {
+            for (auto& work : Computations)
+            {
+                if (work->Result->State != SpatialQueryState::Submitted || work->DownloadQueued ||
+                    Device->GetGlobalFrameNumber() < work->SubmittedFrame + Device->GetFramesInFlight()) continue;
+                work->DownloadQueued = true;
+                const auto ticket = Device->GetTransferQueue().DownloadBuffer(
+                    work->Output, work->Result->Data.size(), 0,
+                    RHI::ReadbackSink::Invoke([work](std::span<const std::byte> data) {
+                        if (data.size() != work->Result->Data.size())
+                        {
+                            work->Result->Diagnostic = "GPU computation returned an incomplete result.";
+                            work->Result->State = SpatialQueryState::Failed;
+                            return;
+                        }
+                        std::memcpy(work->Result->Data.data(), data.data(), data.size());
+                        work->Result->State = SpatialQueryState::Ready;
+                    }));
+                if (!ticket.IsValid())
+                {
+                    work->Result->State = SpatialQueryState::Failed;
+                    work->Result->Diagnostic = "GPU computation readback submission failed.";
+                }
+            }
+            std::erase_if(Computations, [](const auto& work) {
+                return (work->Result->State == SpatialQueryState::Ready ||
+                        work->Result->State == SpatialQueryState::Failed) && work.use_count() == 1;
+            });
             for (auto& batch : Batches)
             {
                 if (batch->State->State != SpatialQueryState::Submitted) continue;
@@ -188,6 +232,14 @@ namespace Extrinsic::Runtime
                 auto download = [&](RHI::BufferHandle buffer, std::size_t bytes, bool headers) {
                     return Device->GetTransferQueue().DownloadBuffer(buffer, bytes, 0,
                         RHI::ReadbackSink::Invoke([batch, headers](std::span<const std::byte> data) {
+                            const auto expected = headers ? batch->Headers.size() * sizeof(std::uint32_t)
+                                : batch->State->Neighbors.size() * sizeof(Geometry::PointLBVH::Neighbor);
+                            if (data.size() != expected)
+                            {
+                                batch->State->State = SpatialQueryState::Failed;
+                                batch->State->Diagnostic = "GPU spatial query returned an incomplete result.";
+                                return;
+                            }
                             void* destination = headers ? static_cast<void*>(batch->Headers.data())
                                                        : static_cast<void*>(batch->State->Neighbors.data());
                             std::memcpy(destination, data.data(), data.size());
@@ -310,6 +362,25 @@ namespace Extrinsic::Runtime
             m_Impl->Participant = m_Impl->Jobs->RegisterGpuQueueParticipant({
                 .DebugName = "Runtime.SpatialIndex.Queries",
                 .RecordFrameCommands = [this](RHI::ICommandContext& commands) {
+                    for (auto& work : m_Impl->Computations)
+                    {
+                        if (work->Result->State != SpatialQueryState::Queued) continue;
+                        auto& e = *work->Target;
+                        if (m_Impl->RecordBuild({e.Id}, commands))
+                            work->Output = work->Record(commands,
+                                {e.Gpu->View().NodesBDA,
+                                 m_Impl->Device->GetBufferDeviceAddress(e.Points),
+                                 m_Impl->Device->GetBufferDeviceAddress(e.Mapping),
+                                 std::uint32_t(e.Snapshot->Slots.size())});
+                        if (!work->Output.IsValid())
+                        {
+                            work->Result->State = SpatialQueryState::Failed;
+                            work->Result->Diagnostic = "GPU computation could not record against a current index.";
+                            continue;
+                        }
+                        work->SubmittedFrame = m_Impl->Device->GetGlobalFrameNumber();
+                        work->Result->State = SpatialQueryState::Submitted;
+                    }
                     for (auto& batch : m_Impl->Batches)
                     {
                         if (batch->State->State != SpatialQueryState::Queued) continue;
@@ -331,7 +402,7 @@ namespace Extrinsic::Runtime
                     }
                 },
                 .DrainCompletedTransfers = [this]() { m_Impl->Drain(); },
-                .HasInFlightWork = [this]() { return !m_Impl->Batches.empty(); },
+                .HasInFlightWork = [this]() { return !m_Impl->Batches.empty() || !m_Impl->Computations.empty(); },
                 .ShutdownAfterDeviceIdle = [this]() { m_Impl->ShutdownBatches(); m_Impl->Participant = {}; }
             });
         return setup.RegisterFrameHook(FramePhase::Maintenance,
@@ -504,6 +575,27 @@ namespace Extrinsic::Runtime
         batch->Downloads = 0;
         batch->DownloadQueued = false;
         return batch->State;
+    }
+    std::shared_ptr<SpatialGpuResult> SpatialIndexCache::QueueGpuCompute(
+        SpatialIndexHandle handle, std::size_t readbackBytes,
+        std::function<RHI::BufferHandle(RHI::ICommandContext&, const SpatialGpuIndexView&)> record)
+    {
+        auto work = std::make_shared<Impl::Computation>();
+        auto& s = *m_Impl;
+        const auto* entry = s.Find(handle);
+        if (!entry || !GpuQueriesAvailable() || entry->Snapshot->Slots.empty() ||
+            entry->Snapshot->Slots.size() > (1u << 20) || !record ||
+            readbackBytes == 0 || readbackBytes > (1u << 28))
+        {
+            work->Result->State = SpatialQueryState::Failed;
+            work->Result->Diagnostic = "GPU computation requires a current index, framed device and bounded result.";
+            return work->Result;
+        }
+        work->Target = *std::ranges::find_if(s.Entries, [&](const auto& e) { return e->Id == handle.Value; });
+        work->Record = std::move(record);
+        work->Result->Data.resize(readbackBytes);
+        s.Computations.push_back(work);
+        return work->Result;
     }
     std::optional<Geometry::PointLBVH::Neighbor> SpatialIndexCache::Nearest(
         SpatialIndexHandle handle, glm::vec3 query, std::uint32_t excludedSlot) const

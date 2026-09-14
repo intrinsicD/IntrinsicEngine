@@ -14,7 +14,8 @@ void main()
     uint object=keys.v[slot].y;
     vec3 p=lbvhPoint(pc.points,pc.stride,object);
     if(pc.objectIndices!=uint64_t(0))object=LbvhIndices(pc.objectIndices).v[object];
-    tree.v[pc.count-1+slot]=LbvhNode(p,LBVH_INVALID,p,LBVH_INVALID,object,slot,slot,0);
+    // Retain compact input identity for consumers with compact GPU result arrays.
+    tree.v[pc.count-1+slot]=LbvhNode(p,LBVH_INVALID,p,LBVH_INVALID,object,slot,slot,keys.v[slot].y);
     if(slot==pc.count-1)return;
     int i=int(slot),d=prefix(i,i+1)>prefix(i,i-1)?1:-1;
     int minimum=prefix(i,i-d),maximum=2;

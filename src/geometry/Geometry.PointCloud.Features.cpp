@@ -248,10 +248,15 @@ namespace Geometry::PointCloud::Features
                 // Preserve the existing centroid covariance and float eigenvalue
                 // publication of ToPCA; the full ISS weighted scatter differs.
                 const auto pca=Geometry::ToPCA(local);
-                if(!pca.Valid)continue;
+                if(!pca.Valid)return std::nullopt;
                 if(!IsFiniteVec(pca.Eigenvalues))return std::nullopt;
                 std::array<double,3> eigen{pca.Eigenvalues.x,pca.Eigenvalues.y,pca.Eigenvalues.z};
                 std::sort(eigen.begin(),eigen.end(),std::greater<double>());
+                // Analytic eigensolvers can leave tiny positive residuals on a
+                // plane. They must not create saliency or change zero-score ties.
+                const double roundoff=64*std::numeric_limits<double>::epsilon()*eigen[0];
+                if(eigen[1]<=roundoff)eigen[1]=0;
+                if(eigen[2]<=roundoff)eigen[2]=0;
                 if(eigen[0]<=0 || eigen[1]<=0)continue;
                 if(eigen[1]/eigen[0]<=params.Gamma21 && eigen[2]/eigen[1]<=params.Gamma32)
                 {scores[i]=eigen[2];result.Saliency[i]=float(eigen[2]);}

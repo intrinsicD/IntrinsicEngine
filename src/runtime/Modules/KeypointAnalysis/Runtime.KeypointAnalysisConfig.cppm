@@ -13,7 +13,7 @@ export namespace Extrinsic::Runtime
 {
     inline constexpr std::string_view kKeypointAnalysisConfigSectionName="sandbox.keypoint_analysis";
     inline constexpr std::string_view kKeypointAnalysisConfigSectionSchemaId="intrinsic.runtime.sandbox.keypoint_analysis";
-    enum class KeypointAnalysisBackend : std::uint8_t { CpuKDTree, CpuLBVH, VulkanLBVH };
+    enum class KeypointAnalysisBackend : std::uint8_t { CpuKDTree, CpuLBVH, VulkanLBVH, VulkanCompute };
     [[nodiscard]] const char* ToString(KeypointAnalysisBackend) noexcept;
     struct KeypointAnalysisConfig
     {

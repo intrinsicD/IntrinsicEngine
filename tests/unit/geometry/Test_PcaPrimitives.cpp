@@ -146,3 +146,41 @@ TEST(PcaPrimitives, EllipsoidFitContainsRotatedBoxCorners)
         EXPECT_TRUE(Geometry::Contains(ellipsoid, point));
     }
 }
+
+TEST(PcaPrimitives, RankOneCovarianceDoesNotSplitRepeatedZeroEigenvalues)
+{
+    // Outer product of (1, .5, .25): exact spectrum is (1.3125, 0, 0).
+    const auto result=Geometry::PCA::SymmetricEigen3(1,.5,.25,.25,.125,.0625);
+    EXPECT_NEAR(result.Eigenvalues.x,1.3125,1e-13);
+    EXPECT_NEAR(result.Eigenvalues.y,0,1e-13);
+    EXPECT_NEAR(result.Eigenvalues.z,0,1e-13);
+    const auto axis=glm::normalize(glm::dvec3{1,.5,.25});
+    EXPECT_NEAR(std::abs(glm::dot(result.Eigenvectors[0],axis)),1,1e-12);
+}
+
+TEST(PcaPrimitives, RepeatedEigenvaluesKeepAnOrthonormalRightHandedFrame)
+{
+    for(const auto result:{Geometry::PCA::SymmetricEigen3(1,0,0,0,0,0),
+                           Geometry::PCA::SymmetricEigen3(1,.5,.25,.25,.125,.0625),
+                           Geometry::PCA::SymmetricEigen3(1,0,0,1,0,0),
+                           Geometry::PCA::SymmetricEigen3(3,0,0,1,0,1)})
+    {
+        for(int i=0;i<3;++i)
+        {
+            EXPECT_NEAR(glm::length(result.Eigenvectors[i]),1,1e-12);
+            for(int j=0;j<i;++j)EXPECT_NEAR(glm::dot(result.Eigenvectors[i],result.Eigenvectors[j]),0,1e-12);
+        }
+        EXPECT_NEAR(glm::dot(glm::cross(result.Eigenvectors[0],result.Eigenvectors[1]),result.Eigenvectors[2]),1,1e-12);
+    }
+}
+
+TEST(PcaPrimitives, SmallSeparatedSpectrumKeepsItsEigenvectors)
+{
+    const glm::dmat3 matrix{1e-8,0,0, 0,2e-8,0, 0,0,6e-8};
+    const auto result=Geometry::PCA::SymmetricEigen3(1e-8,0,0,2e-8,0,6e-8);
+    for(int i=0;i<3;++i)
+    {
+        EXPECT_NEAR(glm::length(result.Eigenvectors[i]),1,1e-12);
+        EXPECT_LE(glm::length(matrix*result.Eigenvectors[i]-result.Eigenvalues[i]*result.Eigenvectors[i]),1e-20);
+    }
+}

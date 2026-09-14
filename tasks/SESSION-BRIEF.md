@@ -132,6 +132,7 @@ picking backlog work; theme priorities and rationale live in
 - unblocked: `BUG-180` — Leak-enabled framed ICP process reports 240 retained bytes (tasks/backlog/bugs/BUG-180-framed-icp-leak-enabled-process-retention.md)
 - unblocked: `BUG-182` — Framed kNN smoke times out when promoted Vulkan is not compiled (tasks/backlog/bugs/BUG-182-framed-knn-unavailable-device-timeout.md)
 - unblocked: `BUG-188` — Sandbox blocks LeakSanitizer during CTest discovery (tasks/backlog/bugs/BUG-188-sandbox-sanitizer-test-discovery.md)
+- unblocked: `BUG-195` — Verification can exhaust host disk space (tasks/backlog/bugs/BUG-195-verification-disk-headroom.md)
 - unblocked: `GRAPHICS-109` — Offscreen frame capture to PNG (headless figure renders) (tasks/backlog/rendering/GRAPHICS-109-offscreen-frame-capture-png.md)
 
 ## Audits

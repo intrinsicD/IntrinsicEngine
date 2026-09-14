@@ -24,7 +24,7 @@ namespace Extrinsic::Runtime
         KeypointAnalysisConfig Parse(const Json& data)
         {
             KeypointAnalysisConfig c;c.StableEntityId=data.at("entity");
-            for(unsigned i=0;i<3;++i)if(data.at("backend")==ToString(KeypointAnalysisBackend(i)))c.Backend=KeypointAnalysisBackend(i);
+            for(unsigned i=0;i<4;++i)if(data.at("backend")==ToString(KeypointAnalysisBackend(i)))c.Backend=KeypointAnalysisBackend(i);
             auto read=[&](const char* name,GeometryPropertyRef& ref){
                 ref.Name=data.at(name).at("name");
                 for(unsigned i=0;i<=unsigned(GeometryElementDomain::PointCloudPoint);++i)
@@ -45,7 +45,7 @@ namespace Extrinsic::Runtime
 
     const char* ToString(KeypointAnalysisBackend b) noexcept
     {
-        switch(b){case KeypointAnalysisBackend::CpuKDTree:return "cpu_kdtree";case KeypointAnalysisBackend::CpuLBVH:return "cpu_lbvh";case KeypointAnalysisBackend::VulkanLBVH:return "vulkan_lbvh";}
+        switch(b){case KeypointAnalysisBackend::CpuKDTree:return "cpu_kdtree";case KeypointAnalysisBackend::CpuLBVH:return "cpu_lbvh";case KeypointAnalysisBackend::VulkanLBVH:return "vulkan_lbvh";case KeypointAnalysisBackend::VulkanCompute:return "vulkan_compute";}
         return "invalid";
     }
 
@@ -77,7 +77,7 @@ namespace Extrinsic::Runtime
         if(data["gpu_query_batch_size"]==0 || data["gpu_query_batch_size"]>16384 ||
            data["gpu_radius_capacity"]==0 || data["gpu_radius_capacity"]>1024)
             return reject("GPU query batch must be 1..16384 and complete radius capacity 1..1024.");
-        if(data["backend"]!="cpu_kdtree" && data["backend"]!="cpu_lbvh" && data["backend"]!="vulkan_lbvh")
+        if(data["backend"]!="cpu_kdtree" && data["backend"]!="cpu_lbvh" && data["backend"]!="vulkan_lbvh" && data["backend"]!="vulkan_compute")
             return reject("Unknown keypoint backend.");
         for(auto key:{"salient_radius","nonmax_radius"})
             if(!data[key].is_number() || !std::isfinite(data[key].get<double>()) || data[key]<0 ||

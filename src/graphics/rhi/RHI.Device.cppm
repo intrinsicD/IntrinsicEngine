@@ -1,3 +1,4 @@
+// Backend-neutral device, resource and submission APIs shared by runtime and graphics.
 module;
 
 #include <cstdint>
@@ -155,6 +156,9 @@ namespace Extrinsic::RHI
         virtual void Initialize(const DeviceCreateDesc& desc) = 0;
         virtual void Shutdown()   = 0;
         virtual void WaitIdle()   = 0;
+
+        // Optional shader arithmetic; kernels requiring it must refuse unsupported devices.
+        [[nodiscard]] virtual bool SupportsShaderFloat64() const noexcept { return false; }
 
         // ---- Backend status ------------------------------------------
         /// Whether this backend can actually issue GPU work. Real backends

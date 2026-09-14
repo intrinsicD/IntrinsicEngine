@@ -89,6 +89,7 @@ namespace Extrinsic::Backends::Vulkan
                                                                   uint32_t frameIndex,
                                                                   uint32_t batchIndex) override;
         [[nodiscard]] bool SupportsParallelCommandContexts() const noexcept override;
+        [[nodiscard]] bool SupportsShaderFloat64() const noexcept override { return m_ShaderFloat64Supported; }
         [[nodiscard]] bool BeginFrameParallelCommandContexts(
             const RHI::FrameHandle& frame,
             const RHI::ParallelCommandContextPlanDesc& plan) override;
@@ -367,5 +368,6 @@ namespace Extrinsic::Backends::Vulkan
         // remains guarded by the non-operational device state until full
         // swapchain/resource bring-up lands.
         bool             m_SamplerAnisotropySupported = false;
+        bool             m_ShaderFloat64Supported = false;
     };
 }
