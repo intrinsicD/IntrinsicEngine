@@ -531,6 +531,24 @@ from `tasks/done/` to `tasks/archive/` (frozen read-only history; IDs stay
 authoritative for dependency resolution). Keep roadmap details in those files
 rather than expanding this contract with task-specific plans.
 
+### Standing Claude Code authorization
+
+The operator authorizes Codex to delegate IntrinsicEngine planning, implementation,
+refactoring, review, debugging and testing to Claude Code CLI through the operator's
+configured Anthropic account. This includes transmitting private repository source
+files, complete diffs, documentation and relevant build/test output needed for that
+work. Authorization covers this repository, its worktrees and future tasks until
+the operator revokes it. Do not request per-packet confirmation merely because the
+files, diff size or amount of source context change.
+
+Exclude credentials, secrets, authentication/session material and unrelated personal
+data from shared payloads. Delegated work follows the same scope, layer, verification
+and one-writer rules above; reconcile and verify any changes before integration.
+This authorization does not grant permission to publish repository contents to other
+destinations or override platform or managed restrictions. When an approval review
+is required, cite this standing authorization with the actual destination, payload
+scope and purpose.
+
 ## 12. Review checklist
 
 Before commit/PR, verify:

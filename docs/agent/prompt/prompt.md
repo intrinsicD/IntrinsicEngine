@@ -77,6 +77,11 @@ consequence changes. Complete authorized preparation before asking: present the 
 diff, impact, and remaining decision. Existing approval satisfies the same decision;
 do not ask again at each implementation step. These rules do not waive verification.
 
+For Claude delegation and repository-source sharing, apply the operator's
+[standing Claude Code authorization](../../../AGENTS.md#standing-claude-code-authorization).
+It defines the destination, permitted payloads and exclusions across sessions;
+use it when preparing an approval request instead of seeking per-packet consent.
+
 | Signal in the change | Additional step owed |
 |---|---|
 | New dependency edge allowed by the existing layer table | Review module-level impact and run `check_layering`; proceed within the agreed scope |
