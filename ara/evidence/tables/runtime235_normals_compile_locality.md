@@ -110,7 +110,7 @@ full production footprint, review hashes and test-log hashes. Raw inputs, origin
 and corrected manifests/results, snapshot, logs, probe scripts, fixed review packet
 and final diff are archived locally under `build/analysis/normal-processing-locality-2026-09-13/` (ignored build output).
 
-[RUNTIME-235](../../../tasks/active/RUNTIME-235-mesh-processing-compilation-locality.md)
+[RUNTIME-235](../../../tasks/done/RUNTIME-235-mesh-processing-compilation-locality.md)
 still owns curvature/segmentation, topology, UV/parameterization, registration,
 the obsolete immediate outlier API comparison and later common-catalog cleanup.
 This normal slice does not establish whole-engine or Framework24 completion.

@@ -12,6 +12,14 @@ contracts: [repo.task-contract-discovery, repo.source-documentation, runtime.pro
 ---
 # RUNTIME-234 — Isolate the remaining point-analysis contracts
 
+## Completion — 2026-09-14
+Completed locally and retired after acceptance/evidence review. Accumulated
+implementation commit: `8a35af54aa70c8e7a7f4bebe48ceabc1eda1e186`.
+Historical dirty-source measurements retain their original eligibility limits;
+this retirement is not a publication or whole-engine completion verdict.
+BUILD-007 owns matched engine compile measurements; C92 remains a hypothesis.
+
+
 ## Goal
 Migrate density weights, keypoints and outlier analysis through the proven
 processing-family boundary without duplicating capture or publication mechanisms.
@@ -56,7 +64,7 @@ no arbitrary wall-clock CI threshold or second impact database.
 ## Reuse and right-sizing plan
 - Continue from the fully verified, uncommitted RUNTIME-233 pilot; preserve the
   earlier checkout changes. Its implementation dependency is satisfied in this
-  combined source. No commit or push is requested.
+  combined source. The original slice excluded commit/push; local integration is now recorded above.
 - One PointAnalysisOperations family owns weights, keypoints and outlier
   diagnostics; density/spacing stays independently compiled. Reuse the generic
   processing handle and existing session/frame pattern with incomplete borrowed
@@ -135,12 +143,12 @@ Clean-workshop scope review: rows 1–3 pass (allowed runtime dependencies, no n
 target links, no higher-layer API exposure); rows 4–6 are not applicable (no
 renderer members, passes or recipes changed); row 7 is not applicable (no
 research/product maturity closure); row 8 passes (no layering exceptions or
-compatibility bridges added). Existing root-hygiene finding BUG-177 (`.agents/`)
-remains; no agent metadata was deleted and the strict gate was not weakened.
+compatibility bridges added). The root-hygiene finding BUG-177 (`.agents/`) remained at this checkpoint
+and was subsequently resolved in RUNTIME-237 without deleting agent metadata.
 
 ## Final verification and handoff
 
-Implementation and review are complete in the combined, uncommitted checkout.
+Implementation and review are complete and locally integrated.
 The [local diagnostic report](../../ara/evidence/tables/runtime234_compile_locality.md)
 and [machine-readable record](../../ara/evidence/diagnostics/runtime234_compile_locality.json)
 bind source hashes, footprint, matched edit probes, review and final test logs.
@@ -158,9 +166,10 @@ Full local artifacts are under
   compiler checks pass. Production hashes still match the measured source.
 - Strict layering, task policy, doc links, test layout and skill mirrors pass;
   generated module inventory matches. Compile-hotspot tooling has 22 passing
-  tests; both canonical benchmark results validate. BUG-177 remains a separate
-  root-hygiene gate failure, and BUG-188 retains sanitizer sandbox ownership.
+  tests; both canonical benchmark results validate. BUG-177 was a separate
+  root-hygiene gate failure, subsequently resolved in RUNTIME-237; BUG-188
+  retains sanitizer sandbox ownership.
 
 RUNTIME-235 owns the remaining mesh-processing migration and comparison/deletion
-of the superseded immediate outlier API. No commit, push, whole-engine slimming,
+of the superseded immediate outlier API. No push, whole-engine slimming,
 repeatable speedup or Framework24 completion is inferred from this slice.

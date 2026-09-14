@@ -13,6 +13,16 @@ maturity_target: Operational
 ---
 # RUNTIME-220 — Kernel density with shared spatial backends
 
+## Completion — 2026-09-14
+Completed locally and retired after acceptance/evidence review. Accumulated
+implementation commit: `8a35af54aa70c8e7a7f4bebe48ceabc1eda1e186`. Original implementation `a469dd31a4b4b9d04368d70b0f3ff37546595f4b`.
+Historical dirty-source measurements retain their original eligibility limits;
+this retirement is not a publication or whole-engine completion verdict.
+Achieved maturity: **Operational**, bounded to the CPU and actual Vulkan
+integration runs already recorded in C82 and this note. Recorded GPU
+cohort leak settings remain unchanged; BUG-180 owns leak-enabled follow-up.
+
+
 ## Goal
 - Continue the user's accepted LBVH consumer sequence with local Gaussian kernel density, following normal estimation and outlier analysis.
 
@@ -57,7 +67,7 @@ python3 tools/agents/check_task_policy.py --root . --strict
 ```
 
 ## Review and completion
-- Implemented and locally verified. Keep this note active pending a commit/publication reference; no commit or push in this slice.
+- Implemented, locally verified and integrated in the commit recorded above.
 - Clang 23 `ci` built IntrinsicTests and ExtrinsicSandbox. All 38 focused tests pass. Full CPU selector: 4399 selected, 4393 passes and six sandbox capability skips; the five native-window cases pass outside the sandbox, leaving 4398 distinct passes and one expected unsanitized leak-control skip.
 - Actual `ci-vulkan` ASan+UBSan test on RTX 3050 driver 590.48.01 passed in 44.76 s with zero density delta (1e-5 absolute bound), eight domains, cold/warm reuse, manual bandwidth at k=63, dense duplicates and stale/cancel/history checks. Existing GPU leak exclusion remains owned by BUG-180.
 - The dirty schema-v2 benchmark validates: warm framed total 9876.23 ms versus CPU reference 118.69 ms on this tiny fixture. CPU remains the default; no speedup claim.

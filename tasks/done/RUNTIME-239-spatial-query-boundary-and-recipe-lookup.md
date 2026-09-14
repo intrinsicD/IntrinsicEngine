@@ -12,6 +12,14 @@ contracts: [repo.task-contract-discovery, repo.source-documentation, geometry.el
 ---
 # RUNTIME-239 — Reuse recipe lookup and isolate the spatial query interface
 
+## Completion — 2026-09-14
+Completed locally and retired after acceptance/evidence review. Accumulated
+implementation commit: `8a35af54aa70c8e7a7f4bebe48ceabc1eda1e186`.
+Historical dirty-source measurements retain their original eligibility limits;
+this retirement is not a publication or whole-engine completion verdict.
+BUILD-007 owns matched engine compile measurements; C92 remains a hypothesis.
+
+
 ## Goal
 Complete the two remaining candidates from RUNTIME-238 under the operator's
 continuing plan/implement/review/test/fix authorization with Claude. Preserve
@@ -108,7 +116,7 @@ ci-asan/ci-ubsan grouped serial CPU gates and affected ci-vulkan checks.
 Vulkan host: NVIDIA GeForce RTX 3050, driver 590.48.01.
 BUG-188's host discovery workaround remains. Registered Vulkan tests retain
 their existing leak settings; BUG-180's separate leak-enabled evidence remains
-open. Changes are uncommitted; these observations are not timing speedup claims.
+open. These historical dirty-source observations are not timing speedup claims.
 
 ## Final review and verification — 2026-09-13
 Evidence: `build/analysis/runtime239-spatial-query-boundary-2026-09-13/` contains

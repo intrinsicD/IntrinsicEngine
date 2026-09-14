@@ -13,6 +13,13 @@ contract_review: Existing CPU verification and timeout policies apply; no engine
 ---
 # BUG-190 — Curvature refinement test timeout during concurrent compilation
 
+## Completion — 2026-09-14
+Completed locally and retired after acceptance/evidence review. Accumulated
+implementation commit: `8a35af54aa70c8e7a7f4bebe48ceabc1eda1e186`.
+Historical dirty-source measurements retain their original eligibility limits;
+this retirement is not a publication or whole-engine completion verdict.
+
+
 ## Goal
 Distinguish local load from a regression without changing the registered test,
 its assertions or its timeout.
@@ -57,8 +64,8 @@ uses no windowing or sandbox capability.
 
 The evidence is consistent with competing compilation load causing the earlier
 deadline miss; it does not establish a general timing guarantee or uniquely
-attribute all host variation. The local runner now finishes all compilation
-before serial test suites. No engine code, registered deadline, assertion,
+attribute all host variation. The session-local verification procedure now finishes all compilation
+before serial test suites; this is sequencing discipline, not a shipped runner change. No engine code, registered deadline, assertion,
 label, or sanitizer setting changed for this diagnosis. The failure and passing
 reruns remain alongside the source comparison in the RUNTIME-236 archive.
-Diagnosed and reconciled, pending integration of this record.
+Diagnosed and reconciled; this record is locally integrated.

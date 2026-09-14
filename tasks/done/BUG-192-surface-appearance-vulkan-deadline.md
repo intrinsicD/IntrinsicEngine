@@ -12,6 +12,16 @@ contracts: [repo.task-contract-discovery]
 ---
 # BUG-192 — Diagnose the surface-appearance Vulkan acceptance deadline
 
+## Completion — 2026-09-14
+Completed locally and retired after acceptance/evidence review. Accumulated
+implementation commit: `8a35af54aa70c8e7a7f4bebe48ceabc1eda1e186`.
+Historical dirty-source measurements retain their original eligibility limits;
+this retirement is not a publication or whole-engine completion verdict.
+Closure covers the registered fixture budget correction for observed finite
+work. BUG-193 owns unexplained pacing variation and the WLOP timeout margin;
+no engine speedup or pacing repair is established here.
+
+
 ## Goal
 Resolve the SurfaceAppearanceBakesSelectedPropertyAndRestoresAttributes timeout
 without weakening backend, pixel, history, normal-encoding or sanitizer checks.
@@ -56,7 +66,7 @@ The corrected registered test passed on actual Vulkan in 30.4 seconds, without
 skipping. Registry comparison shows only TIMEOUT changed for this case. All CPU
 registrations remain identical; reconciled native/ASan/UBSan editor checks passed
 102/102 each, preserving the already-passing full CPU gates on unchanged
-production inputs. Implemented and verified, pending integration.
+production inputs. Implemented, verified and locally integrated.
 
 Evidence: `build/analysis/runtime244-editor-command-frame-locality-2026-09-14/`,
 including `vulkan-diagnosis.md`, initial failure, both diagnostic runs, fixed

@@ -12,6 +12,14 @@ contracts: [repo.task-contract-discovery, repo.source-documentation, runtime.edi
 ---
 # RUNTIME-245 — Narrow editor action helper dependencies
 
+## Completion — 2026-09-14
+Completed locally and retired after acceptance/evidence review. Accumulated
+implementation commit: `8a35af54aa70c8e7a7f4bebe48ceabc1eda1e186`.
+Historical dirty-source measurements retain their original eligibility limits;
+this retirement is not a publication or whole-engine completion verdict.
+BUILD-007 owns matched engine compile measurements; C92 remains a hypothesis.
+
+
 ## Goal
 Continue the operator-authorized engine simplification with Claude. Keep scene
 and visualization actions dependent on their actual helper contracts, preserving
@@ -94,11 +102,10 @@ failure logs and their diagnosis remain in the archive; no gate was weakened.
 Evidence: `build/analysis/runtime245-editor-action-helper-locality-2026-09-14/`.
 
 ## Remaining scope
-Implementation, review and verification are complete, pending accumulated
-integration. Matched eligible-source compile timing, genuinely shared mechanisms
+Implementation, review and verification are complete and locally integrated. Matched eligible-source compile timing, genuinely shared mechanisms
 in remaining workspace/model composition, and REVIEW-004 convergence remain
 open. Scene primitive-view Surface tracking is intentionally unchanged; changing
 its undo contract would need its own focused test and decision. Existing BUG-188
 discovery and BUG-180 leak-enabled follow-ups are unchanged. No new Vulkan run,
-compile-time performance claim, commit/push or whole-engine completion verdict
+compile-time performance claim, push or whole-engine completion verdict
 is inferred from this slice.

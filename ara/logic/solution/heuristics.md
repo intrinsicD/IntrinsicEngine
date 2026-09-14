@@ -309,5 +309,5 @@
 - **Provenance**: user-revised
 - **Crystallized via**: verbal-affirmation
 - **Sensitivity**: high
-- **Code ref**: [N515, src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Normals.cpp, src/runtime/GeometryIntegration/Runtime.SpatialIndexCache.cpp, tasks/active/RUNTIME-209-point-set-outlier-analysis-publication.md]
+- **Code ref**: [N515, src/runtime/Editor/Operations/Runtime.GeometryProcessingOperations.Normals.cpp, src/runtime/GeometryIntegration/Runtime.SpatialIndexCache.cpp, tasks/done/RUNTIME-209-point-set-outlier-analysis-publication.md]
 - **From staging**: O210

@@ -7,9 +7,6 @@ another backlog directory.
 
 ## Runtime backlog tasks
 
-- [RUNTIME-231 — Shared density/spacing property-operation pilot](../../active/RUNTIME-231-shared-point-property-operations.md)
-  owns the bounded runtime follow-up to the processing complexity review.
-
 ### Framework24 product convergence
 
 - [`RUNTIME-218`](RUNTIME-218-default-scene-lighting-and-light-authoring.md)
@@ -25,9 +22,6 @@ handle-specific property wrappers, are the semantic boundary. Runtime fixes
 precede their paired UI tasks; graph-capable fixes also wait for `HARDEN-087`
 to align physical ECS materialization with the element-domain contract:
 
-- [RUNTIME-209 — Point-set outlier analysis and publication split](../../active/RUNTIME-209-point-set-outlier-analysis-publication.md)
-  exposes topology-safe detection on all typed sample properties and retains
-  explicit destructive removal only for point clouds.
 - [RUNTIME-210 — Signed Heat runtime and config integration](RUNTIME-210-signed-heat-runtime-config-integration.md)
   adds the missing mesh-only RuntimeModule/config/publication path for the
   existing CPU reference.
@@ -1212,5 +1206,4 @@ split; narratives live in the retirement log.
   retired rendering parity seed; current rendering selection lives in the
   rendering backlog DAG above.
 
-- [RUNTIME-221 — Point spacing and radius spatial backends](../../active/RUNTIME-221-point-spacing-spatial-backends.md): active canonical-domain radius/spacing integration.
 - [RUNTIME-222 — Model-space point radius rendering](RUNTIME-222-model-space-point-radius-rendering.md): config binding, buffer residency and projection of published radii.

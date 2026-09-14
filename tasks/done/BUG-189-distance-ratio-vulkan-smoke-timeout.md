@@ -12,6 +12,16 @@ contracts: [repo.task-contract-discovery]
 ---
 # BUG-189 — Distance-ratio Vulkan smoke exceeds its inherited timeout
 
+## Completion — 2026-09-14
+Completed locally and retired after acceptance/evidence review. Accumulated
+implementation commit: `8a35af54aa70c8e7a7f4bebe48ceabc1eda1e186`.
+Historical dirty-source measurements retain their original eligibility limits;
+this retirement is not a publication or whole-engine completion verdict.
+Closure covers the registered fixture budget correction for observed finite
+work. BUG-193 owns unexplained pacing variation and the WLOP timeout margin;
+no engine speedup or pacing repair is established here.
+
+
 ## Goal
 Diagnose and resolve the `LocalDistanceRatioPublishesAcrossDomains` timeout
 without weakening correctness, backend, sanitizer or domain coverage.
@@ -52,8 +62,8 @@ CTest environment and is diagnostic evidence, not a passing gate.
 
 Read-only `xset q` showed `Monitor is Off`. The current ICP/query times of
 46.71/16.75 seconds closely match the previously controlled display-off findings
-in [BUG-179](../../done/BUG-179-framed-icp-display-off-timeout.md) and
-[BUG-143](../../done/BUG-143-corner-uv-gpu-smoke-exceeds-cohort-timeout.md).
+in [BUG-179](BUG-179-framed-icp-display-off-timeout.md) and
+[BUG-143](BUG-143-corner-uv-gpu-smoke-exceeds-cohort-timeout.md).
 Repeated phase costs rule out a cold-start-only explanation. No new controlled
 on/off comparison or general performance conclusion is claimed here.
 
@@ -67,6 +77,6 @@ The corrected registered test passed in 44.72 seconds (46.619 seconds process
 wall time), exercising the actual Vulkan backend. The existing test is the
 regression reproducer; no duplicate test was added.
 
-Implemented and verified, pending integration. Raw diagnosis, both failures,
+Implemented, verified and locally integrated. Raw diagnosis, both failures,
 registry comparison, Claude review and passing rerun are archived under
 `build/analysis/remaining-processing-locality-2026-09-13/`.

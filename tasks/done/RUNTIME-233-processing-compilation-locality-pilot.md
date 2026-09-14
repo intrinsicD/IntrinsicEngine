@@ -12,6 +12,14 @@ contracts: [repo.task-contract-discovery, repo.source-documentation, runtime.pro
 ---
 # RUNTIME-233 — Prove local compilation for density and spacing
 
+## Completion — 2026-09-14
+Completed locally and retired after acceptance/evidence review. Accumulated
+implementation commit: `8a35af54aa70c8e7a7f4bebe48ceabc1eda1e186`.
+Historical dirty-source measurements retain their original eligibility limits;
+this retirement is not a publication or whole-engine completion verdict.
+BUILD-007 owns matched engine compile measurements; C92 remains a hypothesis.
+
+
 ## Goal
 Make density and spacing independently changeable through geometry, runtime,
 config and editor, while preserving their complete user-facing behavior and
@@ -34,8 +42,8 @@ edit/build measurements before applying the design to further families.
   does not enroll their entire public APIs in the pilot.
 - Use bounded Claude design/diff reviews and focused feedback during iteration;
   reconcile the combined source before full integration gates. Preserve the
-  earlier uncommitted work; no commit or push is part of this task's current
-  authorization. No production source edits while a build reads those files.
+  earlier dirty work. The original slice excluded commit/push; the later
+  retirement request authorizes the local integration recorded above. No production source edits while a build reads those files.
 
 ## Discovery and right-sizing
 - Flagged element: `Runtime.GeometryProcessingOperations.cppm` combines method
@@ -217,7 +225,7 @@ after building the registered producers for deterministic dependency enforcement
   The content-edit probes and compiler boundary tests check this path without
   adding a fake engine feature or a per-method framework.
 - Root hygiene reports the pre-existing local `.agents/` metadata mismatch
-  already owned by [BUG-177](../backlog/bugs/BUG-177-root-hygiene-local-agent-metadata.md).
+  already owned by [BUG-177](BUG-177-root-hygiene-local-agent-metadata.md).
   This task neither changes the root policy nor removes that local state.
 
 ## Architecture review
@@ -304,5 +312,5 @@ file splits as code reduction.
   all 55 affected ASan and all 55 affected UBSan checks pass without skips; all
   nine actual Vulkan cases pass without skips. The meaningful builds, source
   documentation audit, layering, task policy and docs synchronization pass.
-  This note remains active for landing; no commit, push, retirement or
+  This bounded slice is locally integrated and retired; no push or
   full-engine completion is claimed.

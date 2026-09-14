@@ -33,7 +33,7 @@ epochs. Any expired feature still makes the combined result inert.
 - [x] Implement one direct conversion without compatibility wrappers.
 - [x] Verify regression tests against the previous implementation and final source.
 - [x] Resolve independent fixed-diff review and pass relevant final gates.
-- [ ] Record results and retire with a concrete implementation commit.
+- [x] Record results and retire with a concrete implementation commit.
 
 ## Verification
 ```bash
@@ -78,3 +78,7 @@ Scope/layering/tests/docs review passes. Clean-workshop rows 1–3 and 8 pass;
 4–6 are not applicable because renderer/pass/recipe behavior does not change.
 Row 7 retains named follow-ups and original limits for the retired capabilities.
 No new Vulkan run or measured compile speedup is claimed.
+
+## Completion — 2026-09-14
+Completed locally and retired. Implementation commit: `8a35af54aa70c8e7a7f4bebe48ceabc1eda1e186`.
+BUILD-007 owns matched timings; remaining engine/product work stays open.

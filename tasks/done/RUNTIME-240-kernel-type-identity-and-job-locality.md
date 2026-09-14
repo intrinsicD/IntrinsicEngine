@@ -12,6 +12,14 @@ contracts: [repo.task-contract-discovery, repo.source-documentation, runtime.ker
 ---
 # RUNTIME-240 — Reuse type identity and narrow the kernel job interface
 
+## Completion — 2026-09-14
+Completed locally and retired after acceptance/evidence review. Accumulated
+implementation commit: `8a35af54aa70c8e7a7f4bebe48ceabc1eda1e186`.
+Historical dirty-source measurements retain their original eligibility limits;
+this retirement is not a publication or whole-engine completion verdict.
+BUILD-007 owns matched engine compile measurements; C92 remains a hypothesis.
+
+
 ## Goal
 Continue the operator-authorized simplification with Claude, preserving the
 verified uncommitted RUNTIME-233–239 source. Remove frame-graph dependencies
@@ -130,15 +138,15 @@ or GPU continuations, so selection follows the affected interfaces. Preserve
 BUG-188's host discovery workaround and BUG-180's separate leak evidence.
 Run the strict clean-workshop, source-documentation, task/layout/root and skill
 checks; refresh the module inventory and session brief. All builds finish
-before timed tests. Changes stay uncommitted; dependency counts are not timing
+before timed tests. Dependency counts are not timing
 benchmarks or a whole-engine performance result.
 
 ## Final review and verification — 2026-09-13
 The evidence directory above retains the exact dirty baseline, fixed Claude
 review source/diff, review correction and disposition, final source hashes,
 compiler metadata, compiled token probes and complete gate logs. Earlier
-RUNTIME-238/239 archives are unchanged. The accumulated changes remain
-uncommitted and are not claim-eligible timing evidence.
+RUNTIME-238/239 archives are unchanged. Those runs used dirty source and remain non-claim-eligible timing evidence
+after the later local integration.
 
 Claude found no blocking defect. Its valid comment finding was corrected:
 with RTTI disabled, the linkage rationale concerns the vtable, not typeinfo.

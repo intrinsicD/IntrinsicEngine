@@ -108,7 +108,7 @@ retention investigation; ownership remains unproven.
 The [diagnostic JSON](../diagnostics/runtime235_remaining_compile_locality.json)
 binds source hashes, every changed file, complete sealed probe results,
 compiler counts, gate attempts, review hashes, registry comparisons and limitations.
-The [task note](../../../tasks/active/RUNTIME-235-mesh-processing-compilation-locality.md)
+The [task note](../../../tasks/done/RUNTIME-235-mesh-processing-compilation-locality.md)
 records scope, owner/reuse decisions and the clean-workshop sweep.
 Raw source snapshots, logs, Claude packets, scripts and manifests are retained in
 local ignored output `build/analysis/remaining-processing-locality-2026-09-13/`.

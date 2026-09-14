@@ -12,6 +12,14 @@ contracts: [repo.task-contract-discovery, repo.source-documentation, runtime.ren
 ---
 # RUNTIME-237 — Separate render diagnostics from runtime module compilation
 
+## Completion — 2026-09-14
+Completed locally and retired after acceptance/evidence review. Accumulated
+implementation commit: `8a35af54aa70c8e7a7f4bebe48ceabc1eda1e186`.
+Historical dirty-source measurements retain their original eligibility limits;
+this retirement is not a publication or whole-engine completion verdict.
+BUILD-007 owns matched engine compile measurements; C92 remains a hypothesis.
+
+
 ## Goal
 Remove renderer execution dependencies from the runtime's frame-pacing and
 recipe-activation data contracts. Preserve every renderer feature, config
@@ -20,7 +28,7 @@ round trip, diagnostic field and runtime lifecycle behavior.
 ## Scope and owner decisions
 The operator requests continued simplification with Claude, including plan,
 implementation, review, tests and repair. Preserve the verified uncommitted
-RUNTIME-233–236 baseline; no compatibility bridge or commit/push is requested.
+RUNTIME-233–236 baseline; no compatibility bridge is added; local integration is now recorded above.
 Exact source snapshot and hashes: `/tmp/intrinsic-runtime237-20260913/before/`
 and `before.json`.
 
@@ -147,7 +155,7 @@ All 1,362 final source/test/build/tool hashes match the verification snapshot.
 The missing source synopsis found during the first documentation check was
 repaired; the original failing audit and passing rerun are retained. Both
 root-checker entrypoints pass Claude's tightened classification assertions.
-BUG-177 is resolved pending integration. BUG-188's host discovery workaround
+BUG-177 is resolved and locally integrated. BUG-188's host discovery workaround
 and BUG-180's separate leak-enabled GPU evidence remain applicable; registered
 Vulkan success here does not establish whole-process leak freedom.
 
@@ -156,7 +164,6 @@ reclaimed to make room for verification after confirming no active compiler
 used that tree. Logs, metadata, binaries, source and evidence were preserved;
 the exact cleanup manifest is in the archive.
 
-This slice is implemented, reviewed and verified, pending integration. Changes
-remain uncommitted alongside the earlier work. Engine's direct renderer
+This slice is implemented, reviewed, verified and locally integrated. Engine's direct renderer
 exposure, the large renderer inspection API and SpatialIndexCache's GPU-facing
 record dependencies remain candidates for the next scoped iteration.

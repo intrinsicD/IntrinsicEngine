@@ -12,6 +12,14 @@ contracts: [repo.task-contract-discovery, repo.source-documentation, runtime.edi
 ---
 # RUNTIME-242 — Keep workspace snapshots out of processing-frame composition
 
+## Completion — 2026-09-14
+Completed locally and retired after acceptance/evidence review. Accumulated
+implementation commit: `8a35af54aa70c8e7a7f4bebe48ceabc1eda1e186`.
+Historical dirty-source measurements retain their original eligibility limits;
+this retirement is not a publication or whole-engine completion verdict.
+BUILD-007 owns matched engine compile measurements; C92 remains a hypothesis.
+
+
 ## Goal
 Continue the operator-authorized simplification with Claude, preserving the
 verified uncommitted source. Remove unnecessary snapshot dependencies from the
@@ -75,7 +83,7 @@ and BUG-180's separate leak-enabled follow-up.
 Add guards on private attachment and all sixteen context-only operation producers using
 compile_hotspots.py. Run strict clean-workshop, task/layout/root, source docs,
 skill-mirror and compiler-tool checks. Refresh module inventory and session
-brief. Keep source uncommitted. Baseline starts in
+brief. The original verification used dirty source. Baseline starts in
 `/tmp/intrinsic-runtime242-20260913/`; final evidence belongs in
 `build/analysis/runtime242-editor-prepared-frame-locality-2026-09-13/`.
 
@@ -133,9 +141,9 @@ Source-documentation review retains four advisory comments that specify
 selection, ownership or lifetime contracts; there are no documentation errors.
 
 ## Remaining scope
-Implementation and scoped verification are complete; the task stays active
-pending integration of the accumulated uncommitted work. Full sanitizer merge
-gates, matched eligible-source compile measurements, further shared-binding
-cleanup justified by actual consumers, and REVIEW-004 convergence remain open.
+Implementation and scoped verification are complete and locally integrated.
+RUNTIME-246 records the final combined sanitizer gates. BUILD-007 owns matched
+compile measurements; later slices own shared-binding cleanup and REVIEW-004
+owns product convergence.
 BUG-188's host-discovery workaround and BUG-180's separate leak-enabled follow-up
 remain unchanged. No whole-engine completion or compile-speed claim is made.

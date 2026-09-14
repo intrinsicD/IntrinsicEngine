@@ -284,9 +284,9 @@ fail closed. Run them after building their producers. These checks enforce
 module dependencies, not timing budgets or a whole-engine impact database;
 CI-014 remains the owner of generic build-impact selection. Matched content-edit
 probes and their limitations are recorded by
-[RUNTIME-233](../../tasks/active/RUNTIME-233-processing-compilation-locality-pilot.md)
-[RUNTIME-234](../../tasks/active/RUNTIME-234-point-analysis-compilation-locality.md)
-and [RUNTIME-235](../../tasks/active/RUNTIME-235-mesh-processing-compilation-locality.md).
+[RUNTIME-233](../../tasks/done/RUNTIME-233-processing-compilation-locality-pilot.md)
+[RUNTIME-234](../../tasks/done/RUNTIME-234-point-analysis-compilation-locality.md)
+and [RUNTIME-235](../../tasks/done/RUNTIME-235-mesh-processing-compilation-locality.md).
 Further families use this path when they have a coherent contract; they do not
 need a context, handle or library target for each individual method.
 

@@ -13,12 +13,19 @@ contract_review: "An exact optional directory is classified under the existing r
 ---
 # BUG-177 — Root hygiene rejects local agent metadata
 
+## Completion — 2026-09-14
+Completed locally and retired after acceptance/evidence review. Accumulated
+implementation commit: `8a35af54aa70c8e7a7f4bebe48ceabc1eda1e186`.
+Historical dirty-source measurements retain their original eligibility limits;
+this retirement is not a publication or whole-engine completion verdict.
+
+
 ## Goal
 - Determine the ownership/lifecycle of the untracked `.agents/` directory and reconcile it with repository root-hygiene policy without weakening the unknown-entry gate or deleting session metadata blindly.
 
 ## Evidence
 - During METHOD-044 final checks, `python3 tools/repo/check_root_hygiene.py --root . --strict` exited 1 with `.agents/` as the sole unexpected entry. `git ls-files .agents` emitted nothing. The atlas task did not create or edit that directory and left it untouched.
-- [Recorded observation](../../../ara/evidence/diagnostics/method044/root-hygiene-observation.json). Atlas-specific tests, task/ARA/manifest checks and documentation links pass; this is a separate local-workshop issue, not an atlas failure.
+- [Recorded observation](../../ara/evidence/diagnostics/method044/root-hygiene-observation.json). Atlas-specific tests, task/ARA/manifest checks and documentation links pass; this is a separate local-workshop issue, not an atlas failure.
 
 ## Acceptance criteria
 - [x] Identify whether `.agents/` is expected session tooling state or an unintended local artifact, with a reproduction.
@@ -52,5 +59,4 @@ Evidence is archived with RUNTIME-237 at
 `build/analysis/runtime237-render-diagnostics-2026-09-13/`: metadata observation,
 original gate/test failures and passing reruns. Independent Claude review and
 the combined source verification are recorded in RUNTIME-237. The correction
-is implemented, independently reviewed and verified on the combined source,
-pending integration.
+is implemented, independently reviewed, verified and locally integrated.

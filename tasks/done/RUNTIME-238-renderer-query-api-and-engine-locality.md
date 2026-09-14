@@ -12,6 +12,14 @@ contracts: [repo.task-contract-discovery, repo.source-documentation, runtime.ren
 ---
 # RUNTIME-238 — Consolidate renderer queries and isolate Engine compilation
 
+## Completion — 2026-09-14
+Completed locally and retired after acceptance/evidence review. Accumulated
+implementation commit: `8a35af54aa70c8e7a7f4bebe48ceabc1eda1e186`.
+Historical dirty-source measurements retain their original eligibility limits;
+this retirement is not a publication or whole-engine completion verdict.
+BUILD-007 owns matched engine compile measurements; C92 remains a hypothesis.
+
+
 ## Goal
 Replace repeated renderer query methods with one canonical typed mechanism and
 remove implementation dependencies from Engine's public interface. Preserve
@@ -20,7 +28,7 @@ rendering features, configuration, diagnostics and resource lifetimes.
 ## Scope and owner plan
 The operator requests continued simplification with Claude, including planning,
 implementation, review, tests and fixes. Preserve the verified uncommitted
-RUNTIME-237 baseline. No compatibility bridge or commit/push is requested.
+RUNTIME-237 baseline. No compatibility bridge is added; local integration is now recorded above.
 Exact baseline: `/tmp/intrinsic-runtime238-20260913/before/` and `before.json`.
 
 Discovery found 48 pipeline getters in `Graphics.Renderer`: 24 handle/descriptor
@@ -123,7 +131,7 @@ python3 tools/agents/sync_skills.py --check
 Separate `ci-asan`/`ci-ubsan` full CPU gates and actual `ci-vulkan` rendering
 checks pass. BUG-188's host discovery workaround remains; registered Vulkan
 tests do not close BUG-180's separate leak-enabled evidence. No timing benchmark
-or speedup claim was made. Changes stay uncommitted pending integration.
+or speedup claim was made. Changes are locally integrated; the historical measurements remain non-claim-eligible.
 
 
 ## Final review and verification — 2026-09-13

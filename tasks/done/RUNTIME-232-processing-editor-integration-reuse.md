@@ -12,6 +12,14 @@ contracts: [repo.source-documentation, geometry.element-domain-sources, method.e
 ---
 # RUNTIME-232 — Simplify processing result wiring and panel workflows
 
+## Completion — 2026-09-14
+Completed locally and retired after acceptance/evidence review. Accumulated
+implementation commit: `8a35af54aa70c8e7a7f4bebe48ceabc1eda1e186`.
+Historical dirty-source measurements retain their original eligibility limits;
+this retirement is not a publication or whole-engine completion verdict.
+BUILD-007 owns matched engine compile measurements; C92 remains a hypothesis.
+
+
 ## Goal
 Remove repeated processing/editor integration mechanisms while preserving the
 typed APIs, attachment lifetime, config validation and user workflows. The
@@ -74,8 +82,8 @@ python3 tools/agents/sync_skills.py --check
 
 ## Current evidence
 
-Implementation, Claude review and local verification complete; awaiting commit/retirement.
-No commit or push was requested for this slice. Ten existing production files shrink from
+Implementation, Claude review and local verification are complete and locally integrated.
+The original slice preceded the later authorized local integration. Ten existing production files shrink from
 16,608 to 15,893 physical lines (715 removed); no production file/module added.
 
 - `IntrinsicTests` and `ExtrinsicSandbox` build with the configured Clang 23 ci preset.

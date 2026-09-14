@@ -78,7 +78,7 @@ jobs are unavailable. Method-owned validation, the kNN width floor, numerical
 kernel, statistics and diagnostic vocabulary remain explicit.
 
 **Owner and follow-up:** runtime geometry-processing implementation units;
-[RUNTIME-231](../../tasks/active/RUNTIME-231-shared-point-property-operations.md).
+[RUNTIME-231](../../tasks/done/RUNTIME-231-shared-point-property-operations.md).
 No new service, scheduler, plugin registry or public method framework is needed.
 
 ### F2 — Existing common helpers bypassed by sibling implementations: confirmed
@@ -116,7 +116,7 @@ existing app support owner. Keep method-specific parameter widgets and rich
 result displays. UI and config/agent callers must continue through the same
 validated apply functions. A general reflective UI language is unnecessary.
 
-**Follow-up:** [UI-054](../../tasks/active/UI-054-shared-processing-panel-workflow.md),
+**Follow-up:** [UI-054](../../tasks/done/UI-054-shared-processing-panel-workflow.md),
 starting with the same two methods after the runtime pilot.
 
 ### F4 — Central result and context wiring grows per method: real cost, redesign unproven
@@ -296,7 +296,7 @@ results are retained locally under `build/analysis/reuse-2026-09-11/`.
 
 ## Processing/editor integration follow-through
 
-[RUNTIME-232](../../tasks/active/RUNTIME-232-processing-editor-integration-reuse.md)
+[RUNTIME-232](../../tasks/done/RUNTIME-232-processing-editor-integration-reuse.md)
 extends the pilot with two bounded structural changes:
 
 - The existing 24-field `EditorGeometryProcessingResultsSnapshot` is also the

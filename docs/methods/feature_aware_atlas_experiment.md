@@ -79,7 +79,7 @@ Single-sample resident-input timings for the frozen 1.5 feature arm were approxi
 
 ## Reproduce
 
-Verification recorded 11 standalone diagnostic tests, 4308 full CPU CTest entries (zero failures, six skips), and 90 final focused atlas/parameterization entries (zero failures). Task/ARA/manifest/result/layout/link checks pass. The unrelated strict root-hygiene check flags the local `.agents/` directory; [BUG-177](../../tasks/backlog/bugs/BUG-177-root-hygiene-local-agent-metadata.md) tracks that finding without altering the directory or weakening the gate.
+Verification recorded 11 standalone diagnostic tests, 4308 full CPU CTest entries (zero failures, six skips), and 90 final focused atlas/parameterization entries (zero failures). Task/ARA/manifest/result/layout/link checks pass. The unrelated strict root-hygiene check flags the local `.agents/` directory; [BUG-177](../../tasks/done/BUG-177-root-hygiene-local-agent-metadata.md) tracks that finding without altering the directory or weakening the gate.
 
 Offline Python dependencies: NumPy, SciPy, Matplotlib; Trimesh additionally for generated controls/subdivision. They are not new engine/vcpkg dependencies. The native tools reuse the repository's existing xatlas dependency.
 

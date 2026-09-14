@@ -499,7 +499,7 @@ the same configured operation path. See [outlier analysis](../../docs/architectu
 
 The older immediate-removal C++ command remains in the broad processing module
 for its existing test consumers; current app processing does not call it. Its
-retirement is tracked by [RUNTIME-235](../../tasks/active/RUNTIME-235-mesh-processing-compilation-locality.md).
+retirement is tracked by [RUNTIME-235](../../tasks/done/RUNTIME-235-mesh-processing-compilation-locality.md).
 
 ### Sandbox Editor Progressive Poisson Sampling
 

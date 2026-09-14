@@ -12,13 +12,20 @@ contracts: [geometry.element-domain-sources, repo.source-documentation, method.e
 ---
 # UI-054 — Share density and spacing panel workflow
 
+## Completion — 2026-09-14
+Completed locally and retired after acceptance/evidence review. Accumulated
+implementation commit: `8a35af54aa70c8e7a7f4bebe48ceabc1eda1e186`.
+Historical dirty-source measurements retain their original eligibility limits;
+this retirement is not a publication or whole-engine completion verdict.
+
+
 ## Goal
 Replace repeated processing-panel scaffolding with one typed workflow in the
 existing app support owner, starting with density and spacing. Preserve their
 different parameters, statistics and user-visible behavior. This is the UI
 follow-up from the [complexity review](../../docs/reviews/2026-09-11-processing-complexity-review.md);
 the panel pilot is implemented and reviewed, with CPU and UI verification
-passed. The note awaits commit/retirement.
+passed. The completed scope is recorded in the local implementation commit below.
 
 ## Engine integration
 | Field | Preserved contract |
@@ -65,7 +72,7 @@ Reuse its common controls without adding method-name switches to the shared fram
 
 ## Completion evidence
 
-Implemented and reviewed on 2026-09-11; uncommitted, awaiting commit/retirement.
+Implemented and reviewed on 2026-09-11; locally integrated on 2026-09-14.
 App footprint: 4609 → 4585 physical lines. Frame/session/panel result copies
 retain the lifetime roles documented in
 [editor boundaries](../../docs/architecture/sandbox-editor-feature-boundaries.md).

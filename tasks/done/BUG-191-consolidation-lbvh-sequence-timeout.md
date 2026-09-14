@@ -13,6 +13,16 @@ contract_review: Existing GPU test and timeout policies apply; no engine algorit
 ---
 # BUG-191 — Consolidation LBVH sequence reaches its watchdog
 
+## Completion — 2026-09-14
+Completed locally and retired after acceptance/evidence review. Accumulated
+implementation commit: `8a35af54aa70c8e7a7f4bebe48ceabc1eda1e186`.
+Historical dirty-source measurements retain their original eligibility limits;
+this retirement is not a publication or whole-engine completion verdict.
+Closure covers the registered fixture budget correction for observed finite
+work. BUG-193 owns unexplained pacing variation and the WLOP timeout margin;
+no engine speedup or pacing repair is established here.
+
+
 ## Goal
 Determine whether the LOP and EAR multi-domain failure sequences stall or simply
 exceeds its time budget, preserving all numerical, publication and backend checks.
@@ -117,4 +127,4 @@ sanitizer environments and all other properties are identical. The final
 source contains no temporary debug tag. Phase-duration capture is retained
 as permanent test failure context at Claude's recommendation. The unchanged
 CPU locality checks also passed (19/19), and both ci and ci-vulkan test targets
-rebuilt successfully. Implemented and verified, pending integration.
+rebuilt successfully. Implemented, verified and locally integrated.

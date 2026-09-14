@@ -106,7 +106,7 @@ at k=63, dense coincident peers, deletion, staleness, cancellation and history.
 fixture. Set `INTRINSIC_SPACING_BENCHMARK_OUTPUT` to a raw JSON path, then seal
 and validate with the repository benchmark tools. Timings include frames,
 readback and publication; summed request timings overlap. The smoke provides
-no scaling or performance improvement claim. [RUNTIME-221](../../tasks/active/RUNTIME-221-point-spacing-spatial-backends.md)
+no scaling or performance improvement claim. [RUNTIME-221](../../tasks/done/RUNTIME-221-point-spacing-spatial-backends.md)
 tracks the slice; the [consumer inventory](spatial-index-consumers.md) tracks
 remaining spatial integrations.
 

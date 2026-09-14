@@ -1,6 +1,6 @@
 # Density/spacing compilation-locality pilot
 
-[RUNTIME-233](../../../tasks/active/RUNTIME-233-processing-compilation-locality-pilot.md)
+[RUNTIME-233](../../../tasks/done/RUNTIME-233-processing-compilation-locality-pilot.md)
 separates the shared execution context, typed family records and session
 composition. [C92](../../logic/claims.md#c92-processing-family-locality-is-a-prototype-latency-hypothesis)
 is a performance hypothesis. These local measurements are single samples from a
@@ -60,7 +60,7 @@ Strict layering, task policy, doc links, docs synchronization and skill mirrors
 pass. The initial sandbox-only ASan discovery failure is tracked separately as
 [BUG-188](../../../tasks/backlog/bugs/BUG-188-sandbox-sanitizer-test-discovery.md);
 the identical host retry passed without changing sanitizer settings. Existing
-root metadata hygiene remains [BUG-177](../../../tasks/backlog/bugs/BUG-177-root-hygiene-local-agent-metadata.md).
+root metadata hygiene remains [BUG-177](../../../tasks/done/BUG-177-root-hygiene-local-agent-metadata.md).
 
 Across the 47 affected production files, physical lines increase from 44,763 to
 44,973: **six new files and 210 net lines**. This includes interfaces, compiled

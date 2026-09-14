@@ -13,6 +13,16 @@ maturity_target: Operational
 ---
 # UI-041 — Point-set outlier multi-domain panel
 
+## Completion — 2026-09-14
+Completed locally and retired after acceptance/evidence review. Accumulated
+implementation commit: `8a35af54aa70c8e7a7f4bebe48ceabc1eda1e186`. Original implementation `a469dd31a4b4b9d04368d70b0f3ff37546595f4b`.
+Historical dirty-source measurements retain their original eligibility limits;
+this retirement is not a publication or whole-engine completion verdict.
+Achieved maturity: **Operational**, bounded to the CPU and actual Vulkan
+integration runs already recorded in C81 and this note. Recorded GPU
+cohort leak settings remain unchanged; BUG-180 owns leak-enabled follow-up.
+
+
 ## Goal
 
 - Replace the PointCloud-only “Remove Outliers” control with a shared
@@ -102,12 +112,12 @@ python3 tools/agents/validate_tasks.py --root tasks --strict
 - User accepted outlier analysis as the next GPU LBVH consumer after RUNTIME-219. Implement statistical/radius detection with CPU octree reference, explicit cached CPU LBVH and Vulkan LBVH queries. CPU owns score/classification reductions; retain the existing population-variance threshold and inclusive radius rule.
 - GPU kNN excludes the source identity (k<=64). Coincident distinct samples remain eligible. Radius detection consumes exact total hit counts with source exclusion and capacity 1, so dense neighborhoods do not require complete stored hits.
 - Detect publishes named uint32 0/1 mask and float score properties on all eight domains, preserving deleted rows and unrelated data. Remove Marked is a separate operation only for point-cloud points; use property-set copy/swap/resize so every property is retained in source order. Removal requires a current analysis provenance stamp and participates in history.
-- Config/agent and one shared Outlier Analysis window use the same preview/apply/execute path. Existing low-level removal APIs retain compatibility; old destructive menu entry routes to the analysis window. LOF-like probability, density estimation and other GEOM-073 utilities remain separate.
+- Config/agent and one shared Outlier Analysis window use the same preview/apply/execute path. The low-level removal APIs retained compatibility at that checkpoint; RUNTIME-235 subsequently removed the superseded APIs; old destructive menu entry routes to the analysis window. LOF-like probability, density estimation and other GEOM-073 utilities remain separate.
 - Literature: Rusu et al. 2008 DOI 10.1016/j.robot.2008.08.005 and official PCL SOR/ROR sources; LOF (SIGMOD 2000) and LoOP (CIKM 2009) are density-aware alternative estimators, excluded from this query-execution/analysis split.
 
 ## Implementation and verification (2026-09-09)
 
-Implemented and verified locally; pending publication. Bounded result: C81 in
+Implemented, verified locally and integrated. Bounded result: C81 in
 [the claim ledger](../../ara/logic/claims.md), with commands/source identity,
 CPU/native and actual Vulkan evidence in the
 [verification record](../../ara/evidence/tables/outlier_vulkan_verification_2026-09-09.md).
@@ -127,5 +137,5 @@ CPU/native and actual Vulkan evidence in the
 
 Current workflow and limitations: [outlier analysis](../../docs/architecture/outlier-analysis.md).
 The separate LOF-like probability, density and other point-analysis adapters remain
-under GEOM-073 and the spatial consumer inventory. The old combined-removal APIs
-retain CPU compatibility behavior; new UI/config callers use Detect then explicit Remove.
+under GEOM-073 and the spatial consumer inventory. The old combined-removal APIs retained CPU compatibility at that checkpoint.
+RUNTIME-235 subsequently removed them; UI/config callers use Detect then explicit Remove.

@@ -12,6 +12,14 @@ contracts: [repo.task-contract-discovery, repo.source-documentation, runtime.pro
 ---
 # RUNTIME-235 — Isolate mesh-processing contracts
 
+## Completion — 2026-09-14
+Completed locally and retired after acceptance/evidence review. Accumulated
+implementation commit: `8a35af54aa70c8e7a7f4bebe48ceabc1eda1e186`.
+Historical dirty-source measurements retain their original eligibility limits;
+this retirement is not a publication or whole-engine completion verdict.
+BUILD-007 owns matched engine compile measurements; C92 remains a hypothesis.
+
+
 ## Goal
 Migrate coherent mesh-processing families out of the remaining broad processing
 interface, using compiler metadata for each family and a representative matched
@@ -70,8 +78,7 @@ concrete removal candidate, not evidence that all old semantics already match.
 ## Current slice: normal estimation and obsolete normal APIs
 
 The operator requested continuation of the authorized simplification with Claude;
-prior uncommitted RUNTIME-233/234 work is the verified baseline. No commit/push
-is requested. Start with normals: a local public result edit rebuilt 57 physical
+prior uncommitted RUNTIME-233/234 work is the verified baseline. The original slice excluded commit/push; local integration is now recorded above. Start with normals: a local public result edit rebuilt 57 physical
 compiler producers in 334.094 seconds; exact restoration passed in 345.819 seconds.
 The snapshot and declared probe live under `/tmp/intrinsic-runtime235-20260913/`.
 The `ci` preset explicitly enables Sandbox for the same measured target pair.
@@ -136,7 +143,7 @@ and updating all callers together; do not add another forwarding layer.
 
 ## Normal-slice completion — 2026-09-13
 
-Implemented and verified in the uncommitted checkout. The configured normal path
+Implemented and verified, then locally integrated. The configured normal path
 now owns its result/config/frame surface independently of the broad processing
 module. Three obsolete normal APIs and their duplicate capture/job/history code
 are removed; their unique behavior coverage uses the configured path. Existing
@@ -192,7 +199,7 @@ No algorithm/backend axis, dependency exception or compatibility bridge was adde
 | Renderer growth has an owning seam | n/a — renderer unchanged |
 | New passes use typed IDs | n/a — no passes added |
 | Recipe dependencies are resource-driven | n/a — frame recipes unchanged |
-| Scaffold/parity closure has a follow-up | n/a — this task remains active |
+| Scaffold/parity closure has a follow-up | n/a — refactoring scope; later families are recorded below |
 | Temporary exceptions have owner/expiry | n/a — no exception introduced |
 
 The global acceptance criteria remain open for the remaining families listed
@@ -358,14 +365,13 @@ compiler-metadata verification from this implementation checkpoint.
 
 ## Final reconciliation — 2026-09-13
 
-All remaining families in this task are implemented and verified in the
-uncommitted checkout. Registration, parameterization/UV, mesh fields and mesh
+All remaining families in this task are implemented, verified and locally
+integrated. Registration, parameterization/UV, mesh fields and mesh
 topology now have independent contracts and execution owners; the shared mesh
 helpers and common catalog each have one compiled owner. The old immediate
 outlier API is removed with its unique coverage carried onto configured removal.
 This completes RUNTIME-235's implementation scope, not Framework24 convergence
-or migration of every remaining broad processing adapter. The note stays active
-until integration supplies a commit reference.
+or migration of every remaining broad processing adapter. The local integration commit is recorded above.
 
 To respect the operator's usage budget, Claude performed the bounded source
 migration while Codex owned reconciliation and verification. The remaining

@@ -468,12 +468,12 @@
   tasks/done/RUNTIME-206-lop-element-domain-source-integration.md,
   tasks/done/RUNTIME-207-icp-element-domain-source-integration.md,
   tasks/done/RUNTIME-208-progressive-poisson-element-domain-publication.md,
-  tasks/active/RUNTIME-209-point-set-outlier-analysis-publication.md,
+  tasks/done/RUNTIME-209-point-set-outlier-analysis-publication.md,
   tasks/backlog/runtime/RUNTIME-210-signed-heat-runtime-config-integration.md,
   tasks/done/UI-038-progressive-poisson-multi-domain-panel.md,
   tasks/done/UI-039-lop-multi-domain-discovery.md,
   tasks/done/UI-040-icp-compatible-source-selection.md,
-  tasks/active/UI-041-point-set-outlier-multi-domain-panel.md,
+  tasks/done/UI-041-point-set-outlier-multi-domain-panel.md,
   tasks/backlog/ui/UI-042-signed-heat-mesh-panel.md,
   tools/agents/validate_tasks.py,
   tests/regression/tooling/Test.ValidateTasks.py,
@@ -2165,7 +2165,7 @@
 - **Provenance**: ai-executed
 - **Crystallized via**: artifact-commitment
 - **Falsification criteria**: Repeated matched clean-commit or approved sealed-source cohorts fail to reduce the declared family-edit build latency, or the compiler boundary permits unrelated numerical adapters to recompile. Timing qualification must preserve the same targets, toolchain and cache conditions.
-- **Proof**: [ara/evidence/diagnostics/runtime233_compile_locality.json, ara/evidence/tables/runtime233_compile_locality.md, tools/analysis/compile_hotspots.py, tests/regression/tooling/Test.CompileHotspots.py, tests/CMakeLists.txt, tasks/active/RUNTIME-233-processing-compilation-locality-pilot.md]
+- **Proof**: [ara/evidence/diagnostics/runtime233_compile_locality.json, ara/evidence/tables/runtime233_compile_locality.md, tools/analysis/compile_hotspots.py, tests/regression/tooling/Test.CompileHotspots.py, tests/CMakeLists.txt, tasks/done/RUNTIME-233-processing-compilation-locality-pilot.md]
 - **Dependencies**: []
 - **Tags**: compilation, prototype iteration, C++23 modules, local diagnostic, unqualified performance hypothesis
 - **From staging**: O224

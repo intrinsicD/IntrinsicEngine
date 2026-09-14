@@ -102,7 +102,7 @@ include frames/readback/publication; summed request timings overlap. This smoke
 makes no scaling, performance improvement or default-selection claim.
 
 The [consumer inventory](spatial-index-consumers.md) tracks remaining candidates;
-[RUNTIME-220](../../tasks/active/RUNTIME-220-kernel-density-spatial-backends.md)
+[RUNTIME-220](../../tasks/done/RUNTIME-220-kernel-density-spatial-backends.md)
 records this slice.
 
 The [2026-09-09 verification record](../../ara/evidence/tables/density_vulkan_verification_2026-09-09.md)

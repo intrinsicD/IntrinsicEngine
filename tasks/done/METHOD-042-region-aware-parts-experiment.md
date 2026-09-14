@@ -17,6 +17,13 @@ contract_review: "Triangle-surface labels and geometry are semantic inputs. Init
 ---
 # METHOD-042 — Region-aware parts experiment
 
+## Completion — 2026-09-14
+Completed locally and retired after acceptance/evidence review. Accumulated
+implementation commit: `8a35af54aa70c8e7a7f4bebe48ceabc1eda1e186`. Original implementation `92ca1dd4b41ddb4bda7073d15e62c4b2dbfffad5`.
+Historical dirty-source measurements retain their original eligibility limits;
+this retirement is not a publication or whole-engine completion verdict.
+
+
 ## Goal
 - Work out and implement the approved sequence with Claude: test explicit frog seams against the current objective, distinguish geometry/sampling/search failures on controlled shapes, and build the smallest evidence-justified region-aware CPU comparison with inspectable results.
 
@@ -65,8 +72,8 @@ python3 tools/docs/check_doc_links.py --root .
 - Local comparisons remain exploratory; a validated artifact proves its recorded inputs and measurements, not that its boundaries are useful.
 
 ## Session result — 2026-09-07
-- The bounded experiment is implemented and reviewed, with [report](../../docs/methods/frog_parts_experiment.md), [raw summary and bindings](../../ara/evidence/diagnostics/method042/record.json), and [verification](../../ara/evidence/diagnostics/method042/verification.json). It remains in the active tree pending normal human review/commit; no retirement or production maturity is claimed.
+- The bounded experiment is implemented and reviewed, with [report](../../docs/methods/frog_parts_experiment.md), [raw summary and bindings](../../ara/evidence/diagnostics/method042/record.json), and [verification](../../ara/evidence/diagnostics/method042/verification.json). The offline experiment is complete and locally integrated; no production maturity is claimed.
 - C63 records the feasible-but-disfavored provisional seams; C64 refutes sampling stability of the separate diagnostic; C65 distinguishes a missing proposal from an unfavorable explicit seam on the dense synthetic neck. Frog's frozen comparator adds no splits.
 - Claude supplied design/source critique; Codex ran every computation/test and corrected unsupported review findings. The complete retained review sequence is linked in the report.
 - Canonical Clang-23 `ci` build and CPU selector: 4,302 passed, six skipped, zero failed. New tooling suites: 18 passed; existing viewers: 24 passed. Four sealed native measurements validate as schema v2, remain non-claim-eligible, and do not establish performance or quality.
-- [METHOD-043](METHOD-043-thickness-and-curve-parts-comparison.md) owns the independent thickness and curve-aligned comparison, including asymmetric controls and any eventual native/config/UI integration. The operator subsequently approved it with a four-round cap.
+- [METHOD-043](../active/METHOD-043-thickness-and-curve-parts-comparison.md) owns the independent thickness and curve-aligned comparison, including asymmetric controls and any eventual native/config/UI integration. The operator subsequently approved it with a four-round cap.

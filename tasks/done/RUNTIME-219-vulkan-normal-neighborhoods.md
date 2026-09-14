@@ -13,6 +13,16 @@ maturity_target: Operational
 ---
 # RUNTIME-219 — Vulkan LBVH neighborhoods for normal estimation
 
+## Completion — 2026-09-14
+Completed locally and retired after acceptance/evidence review. Accumulated
+implementation commit: `8a35af54aa70c8e7a7f4bebe48ceabc1eda1e186`. Original implementation `a469dd31a4b4b9d04368d70b0f3ff37546595f4b`.
+Historical dirty-source measurements retain their original eligibility limits;
+this retirement is not a publication or whole-engine completion verdict.
+Achieved maturity: **Operational**, bounded to the CPU and actual Vulkan
+integration runs already recorded in C80 and this note. Recorded GPU
+cohort leak settings remain unchanged; BUG-180 owns leak-enabled follow-up.
+
+
 ## Goal
 - Add explicit Vulkan LBVH neighborhood execution to the existing normal-estimation workflow on every canonical point-valued property domain, preserving CPU PCA/orientation and publication semantics.
 
@@ -68,4 +78,4 @@ python3 tools/repo/check_layering.py --root src --strict
 
 - Vulkan: RTX 3050 driver 590.48.01, Clang 23 `ci-vulkan` with ASan+UBSan. Four existing cases passed; two new cases passed after correcting premature cold-start readiness skips. Normal outputs match CPU on eight domains (maximum component error zero, tolerance 1e-5). Radius overflow, source exclusion/reuse, stale/cancelled output retention and undo/redo pass. Existing leak-detection exclusions remain owned by BUG-180.
 - Benchmark: `geometry.point_lbvh.normal_runtime_smoke` produced and validated schema-v2 output, passing the unchanged 15,000 ms/1e-5 smoke gates. Warm wall time 9,822.29 ms versus a separate 168.04 ms CPU reference on this tiny fixture; no speedup or default change. GPU timers include frame waits/readback, and per-request elapsed sums overlap.
-- Completion: implemented and locally verified at **Operational** for the bounded query/CPU-fit workflow. No commit/push yet; keep this note active until publication supplies its retirement reference.
+- Completion: implemented and locally verified at **Operational** for the bounded query/CPU-fit workflow. The local implementation commit is recorded above; no push is inferred.

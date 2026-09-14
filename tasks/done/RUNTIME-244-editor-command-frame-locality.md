@@ -12,6 +12,14 @@ contracts: [repo.task-contract-discovery, repo.source-documentation, runtime.edi
 ---
 # RUNTIME-244 — Narrow editor command-frame dependencies
 
+## Completion — 2026-09-14
+Completed locally and retired after acceptance/evidence review. Accumulated
+implementation commit: `8a35af54aa70c8e7a7f4bebe48ceabc1eda1e186`.
+Historical dirty-source measurements retain their original eligibility limits;
+this retirement is not a publication or whole-engine completion verdict.
+BUILD-007 owns matched engine compile measurements; C92 remains a hypothesis.
+
+
 ## Goal
 Continue the operator-authorized simplification with Claude. Remove broad editor
 bindings from scene, visualization and render-recipe command preparation while
@@ -86,9 +94,9 @@ later. The final 1,362 source/build-input hashes and registry comparisons bind
 that distinction explicitly.
 
 ## Remaining scope
-Implementation and verification are complete, pending accumulated integration.
+Implementation and verification are complete and locally integrated.
 Full CPU sanitizer verification is now recorded for the combined production
 source. Matched eligible-source compile measurements, consumer/helper analysis
 of the two remaining broad action units, and REVIEW-004 convergence remain open.
 BUG-188 discovery and BUG-180's separate leak-enabled follow-up are unchanged.
-No commit/push or whole-engine completion verdict is inferred.
+No push or whole-engine completion verdict is inferred.

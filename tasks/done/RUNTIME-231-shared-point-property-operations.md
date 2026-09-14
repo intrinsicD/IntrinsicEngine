@@ -12,12 +12,20 @@ contracts: [geometry.element-domain-sources, geometry.property-coherence, repo.s
 ---
 # RUNTIME-231 — Share density and spacing property-operation mechanisms
 
+## Completion — 2026-09-14
+Completed locally and retired after acceptance/evidence review. Accumulated
+implementation commit: `8a35af54aa70c8e7a7f4bebe48ceabc1eda1e186`.
+Historical dirty-source measurements retain their original eligibility limits;
+this retirement is not a publication or whole-engine completion verdict.
+BUILD-007 owns matched engine compile measurements; C92 remains a hypothesis.
+
+
 ## Goal
 Prove that density and spacing can share their runtime mechanisms with net
 production-code deletion, unchanged features and clear typed entry points.
 The operator authorized implementation and reuse discovery on 2026-09-11.
 The runtime pilot is implemented and reviewed; CPU, UI, actual Vulkan and
-bounded compile checks passed. The note awaits commit/retirement. See the [review](../../docs/reviews/2026-09-11-processing-complexity-review.md).
+bounded compile checks passed. The completed scope is recorded in the local implementation commit below. See the [review](../../docs/reviews/2026-09-11-processing-complexity-review.md).
 
 ## Scope and design
 - Replace duplicate watch/domain helpers with the existing PointProperties owner.
@@ -84,7 +92,7 @@ hypothetical future method.
 
 ## Completion evidence
 
-Implemented and reviewed on 2026-09-11; uncommitted, awaiting commit/retirement.
+Implemented and reviewed on 2026-09-11; locally integrated on 2026-09-14.
 Runtime footprint: 966 → 853 physical lines, including the 47-line private
 header. Typed job delivery stays in the method adapters. The
 [review](../../docs/reviews/2026-09-11-processing-complexity-review.md#implemented-pilot-and-reuse-discovery)

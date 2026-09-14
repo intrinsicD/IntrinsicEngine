@@ -12,6 +12,14 @@ contracts: [repo.task-contract-discovery, repo.source-documentation, runtime.pro
 ---
 # RUNTIME-236 — Finish remaining processing execution contracts
 
+## Completion — 2026-09-14
+Completed locally and retired after acceptance/evidence review. Accumulated
+implementation commit: `8a35af54aa70c8e7a7f4bebe48ceabc1eda1e186`.
+Historical dirty-source measurements retain their original eligibility limits;
+this retirement is not a publication or whole-engine completion verdict.
+BUILD-007 owns matched engine compile measurements; C92 remains a hypothesis.
+
+
 ## Goal
 Move the remaining bilateral, descriptor, construction, progressive-Poisson,
 clustering and consolidation execution contracts off broad geometry-processing
@@ -24,7 +32,7 @@ Existing verified uncommitted RUNTIME-233/234/235 work is the baseline; preserve
 it. No compatibility wrappers, per-method handles/contexts/libraries or new
 framework. Keep numerical algorithms, services, backend choices, cancellation,
 current config round trips, property-domain eligibility and visible UI behavior.
-No commit/push is requested. The baseline snapshot is
+The original slice excluded commit/push; local integration is now recorded above. The baseline snapshot is
 `/tmp/intrinsic-runtime236-20260913/before/` with hashes in `before.json`.
 
 Flagged ceremony: the broad API still duplicates context/handle resolution,
@@ -208,7 +216,7 @@ descriptor-dismissal switch case and an empty dependency result in the new
 cancellation test; both were fixed and all 663 focused checks then passed.
 The cancellation dependency now makes pre-worker metadata coverage deterministic.
 The full CPU run's one unrelated timeout is tracked in
-[BUG-190](../backlog/bugs/BUG-190-curvature-refinement-timeout-during-compilation.md);
+[BUG-190](BUG-190-curvature-refinement-timeout-during-compilation.md);
 timed test runs are sequenced after compilation rather than changing deadlines.
 
 The four-point review keeps this batch scoped to processing execution ownership
@@ -269,7 +277,7 @@ files, 138 fewer physical lines and 49 fewer nonblank lines. Eight files were
 added and two deleted, a net increase of six compilation-boundary files.
 This batch finishes the remaining processing execution-family migration;
 it is not a whole-engine completion claim or a new compile-time benchmark.
-Changes remain uncommitted alongside the preserved earlier work.
+The accumulated implementation is recorded in the local commit below.
 
 
 The consolidation failures were test budget shortfalls: original-budget probes
@@ -283,6 +291,6 @@ the initial failures, diagnosis and final runs. This is correctness verification
 not a timing benchmark or a claim that the service became faster.
 
 All acceptance criteria for this processing slice are implemented and verified,
-pending integration. Earlier CPU/sanitizer gates were followed by focused checks
+and locally integrated. Earlier CPU/sanitizer gates were followed by focused checks
 for the final test-only edits; the entire suite was not unnecessarily repeated.
-The known BUG-177 root-hygiene mismatch remains an integration limitation.
+The historical BUG-177 root-hygiene mismatch was subsequently resolved in RUNTIME-237.

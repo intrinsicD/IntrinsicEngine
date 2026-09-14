@@ -12,6 +12,14 @@ contracts: [repo.task-contract-discovery, repo.source-documentation, runtime.edi
 ---
 # RUNTIME-243 — Narrow the processing-frame binding surface
 
+## Completion — 2026-09-14
+Completed locally and retired after acceptance/evidence review. Accumulated
+implementation commit: `8a35af54aa70c8e7a7f4bebe48ceabc1eda1e186`.
+Historical dirty-source measurements retain their original eligibility limits;
+this retirement is not a publication or whole-engine completion verdict.
+BUILD-007 owns matched engine compile measurements; C92 remains a hypothesis.
+
+
 ## Goal
 Continue the operator-authorized simplification with Claude. Remove broad editor
 imports from eleven processing-frame leaves while preserving family results,
@@ -88,9 +96,8 @@ modules to 59–95; private attachment stays at 18. No matched timing claim.
 Evidence: `build/analysis/runtime243-processing-frame-locality-2026-09-14/`.
 
 ## Remaining scope
-Implementation and scoped verification are complete; retain active status until
-accumulated uncommitted work is integrated. Full sanitizer merge gates, matched
-eligible-source compile measurements, further consumer-justified simplification
-and REVIEW-004 convergence remain open. BUG-188 host discovery and BUG-180's
-separate leak-enabled follow-up remain unchanged. No whole-engine completion
-verdict or commit/push is inferred.
+Implementation and scoped verification are complete and locally integrated.
+RUNTIME-246 records the final combined sanitizer gates. BUILD-007 owns matched
+compile measurements; further consumer-justified simplification and REVIEW-004
+convergence remain separate. BUG-188 host discovery and BUG-180's
+separate leak-enabled follow-up remain unchanged. No whole-engine completion verdict or push is inferred.

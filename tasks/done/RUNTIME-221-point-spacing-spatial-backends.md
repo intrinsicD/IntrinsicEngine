@@ -13,6 +13,16 @@ maturity_target: Operational
 ---
 # RUNTIME-221 — Point spacing and radius estimation with shared spatial backends
 
+## Completion — 2026-09-14
+Completed locally and retired after acceptance/evidence review. Accumulated
+implementation commit: `8a35af54aa70c8e7a7f4bebe48ceabc1eda1e186`. Original implementation `a469dd31a4b4b9d04368d70b0f3ff37546595f4b`.
+Historical dirty-source measurements retain their original eligibility limits;
+this retirement is not a publication or whole-engine completion verdict.
+Achieved maturity: **Operational**, bounded to the CPU and actual Vulkan
+integration runs already recorded in C83 and this note. Recorded GPU
+cohort leak settings remain unchanged; BUG-180 owns leak-enabled follow-up.
+
+
 ## Goal
 Continue the accepted LBVH consumer sequence with point statistics and splat-radius estimation.
 
@@ -57,7 +67,7 @@ python3 tools/agents/check_task_policy.py --root . --strict
 ```
 
 ## Review and completion
-Implemented and locally verified; keep active pending commit/publication reference.
+Implemented, locally verified and integrated in the commit recorded above.
 Clang 23 ci builds IntrinsicTests and ExtrinsicSandbox. All 38 focused checks pass;
 full CPU selection has 4403 passes and six capability skips, with all five native
 window cases passing on follow-up: 4408 distinct passes and one expected
@@ -76,4 +86,4 @@ service, component or renderer pass is added. Strict task/layering/test-layout,
 method/benchmark manifests, skill mirrors and doc links pass. Source audit has
 zero objective errors; existing broad-interface advisories remain. Root metadata
 is the pre-existing BUG-177 finding; ccache remains disabled under BUG-178.
-RUNTIME-222 explicitly owns model-space radius rendering. No commit or push.
+RUNTIME-222 explicitly owns model-space radius rendering. The local implementation commit is recorded above; no push is inferred.

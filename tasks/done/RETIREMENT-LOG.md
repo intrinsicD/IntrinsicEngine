@@ -8158,3 +8158,59 @@ Retain terminal job outcomes while pending consumers reference them, so reaping 
 - 2026-09-10 — **RUNTIME-230**: Added Hoppe-style reconstruction and kNN graph construction through cached CPU/framed Vulkan neighborhoods, shared config/UI and separate guarded generated entities. C91 binds 4500 CPU passes plus one expected skip, both actual Vulkan cases, generated pixels and failure checks. Implementation `27275206dd6d3d1dd6857db737f3d609ab4cb1cb`; [task](RUNTIME-230-point-construction-spatial-backends.md).
 
 - 2026-09-10 — **BUG-186**: Updated four pre-existing analysis-display tests to inspect appearance lanes after `2c9053f89`, preserving all-domain numerical/history checks and explicit halfedge rejection. Full CPU gate passes. Implementation `27275206dd6d3d1dd6857db737f3d609ab4cb1cb`; [task](BUG-186-analysis-appearance-test-expectations.md).
+
+- 2026-09-14 — **RUNTIME-231**: Share density and spacing property-operation mechanisms. Locally verified and integrated in `8a35af54aa70c8e7a7f4bebe48ceabc1eda1e186`. BUILD-007 owns matched compile timing. [Task](RUNTIME-231-shared-point-property-operations.md).
+
+- 2026-09-14 — **RUNTIME-232**: Simplify processing result wiring and panel workflows. Locally verified and integrated in `8a35af54aa70c8e7a7f4bebe48ceabc1eda1e186`. BUILD-007 owns matched compile timing. [Task](RUNTIME-232-processing-editor-integration-reuse.md).
+
+- 2026-09-14 — **RUNTIME-233**: Prove local compilation for density and spacing. Locally verified and integrated in `8a35af54aa70c8e7a7f4bebe48ceabc1eda1e186`. BUILD-007 owns matched compile timing. [Task](RUNTIME-233-processing-compilation-locality-pilot.md).
+
+- 2026-09-14 — **RUNTIME-234**: Isolate the remaining point-analysis contracts. Locally verified and integrated in `8a35af54aa70c8e7a7f4bebe48ceabc1eda1e186`. BUILD-007 owns matched compile timing. [Task](RUNTIME-234-point-analysis-compilation-locality.md).
+
+- 2026-09-14 — **RUNTIME-235**: Isolate mesh-processing contracts. Locally verified and integrated in `8a35af54aa70c8e7a7f4bebe48ceabc1eda1e186`. BUILD-007 owns matched compile timing. [Task](RUNTIME-235-mesh-processing-compilation-locality.md).
+
+- 2026-09-14 — **RUNTIME-236**: Finish remaining processing execution contracts. Locally verified and integrated in `8a35af54aa70c8e7a7f4bebe48ceabc1eda1e186`. BUILD-007 owns matched compile timing. [Task](RUNTIME-236-remaining-processing-contracts.md).
+
+- 2026-09-14 — **RUNTIME-237**: Separate render diagnostics from runtime module compilation. Locally verified and integrated in `8a35af54aa70c8e7a7f4bebe48ceabc1eda1e186`. BUILD-007 owns matched compile timing. [Task](RUNTIME-237-render-diagnostics-compilation-boundary.md).
+
+- 2026-09-14 — **RUNTIME-238**: Consolidate renderer queries and isolate Engine compilation. Locally verified and integrated in `8a35af54aa70c8e7a7f4bebe48ceabc1eda1e186`. BUILD-007 owns matched compile timing. [Task](RUNTIME-238-renderer-query-api-and-engine-locality.md).
+
+- 2026-09-14 — **RUNTIME-239**: Reuse recipe lookup and isolate the spatial query interface. Locally verified and integrated in `8a35af54aa70c8e7a7f4bebe48ceabc1eda1e186`. BUILD-007 owns matched compile timing. [Task](RUNTIME-239-spatial-query-boundary-and-recipe-lookup.md).
+
+- 2026-09-14 — **RUNTIME-240**: Reuse type identity and narrow the kernel job interface. Locally verified and integrated in `8a35af54aa70c8e7a7f4bebe48ceabc1eda1e186`. BUILD-007 owns matched compile timing. [Task](RUNTIME-240-kernel-type-identity-and-job-locality.md).
+
+- 2026-09-14 — **RUNTIME-241**: Keep texture-bake composition inside its implementation. Locally verified and integrated in `8a35af54aa70c8e7a7f4bebe48ceabc1eda1e186`. BUILD-007 owns matched compile timing. [Task](RUNTIME-241-texture-bake-compilation-boundary.md).
+
+- 2026-09-14 — **RUNTIME-242**: Keep workspace snapshots out of processing-frame composition. Locally verified and integrated in `8a35af54aa70c8e7a7f4bebe48ceabc1eda1e186`. BUILD-007 owns matched compile timing. [Task](RUNTIME-242-editor-prepared-frame-locality.md).
+
+- 2026-09-14 — **RUNTIME-243**: Narrow the processing-frame binding surface. Locally verified and integrated in `8a35af54aa70c8e7a7f4bebe48ceabc1eda1e186`. BUILD-007 owns matched compile timing. [Task](RUNTIME-243-processing-frame-binding-locality.md).
+
+- 2026-09-14 — **RUNTIME-244**: Narrow editor command-frame dependencies. Locally verified and integrated in `8a35af54aa70c8e7a7f4bebe48ceabc1eda1e186`. BUILD-007 owns matched compile timing. [Task](RUNTIME-244-editor-command-frame-locality.md).
+
+- 2026-09-14 — **RUNTIME-245**: Narrow editor action helper dependencies. Locally verified and integrated in `8a35af54aa70c8e7a7f4bebe48ceabc1eda1e186`. BUILD-007 owns matched compile timing. [Task](RUNTIME-245-editor-action-helper-locality.md).
+
+- 2026-09-14 — **UI-054**: Share density and spacing panel workflow. Locally verified and integrated in `8a35af54aa70c8e7a7f4bebe48ceabc1eda1e186`. [Task](UI-054-shared-processing-panel-workflow.md).
+
+- 2026-09-14 — **BUG-177**: Root hygiene rejects local agent metadata. Locally verified and integrated in `8a35af54aa70c8e7a7f4bebe48ceabc1eda1e186`. [Task](BUG-177-root-hygiene-local-agent-metadata.md).
+
+- 2026-09-14 — **BUG-189**: Distance-ratio Vulkan smoke exceeds its inherited timeout. Locally verified and integrated in `8a35af54aa70c8e7a7f4bebe48ceabc1eda1e186`. Fixture budget correction only; BUG-193 owns pacing and watchdog margin. [Task](BUG-189-distance-ratio-vulkan-smoke-timeout.md).
+
+- 2026-09-14 — **BUG-190**: Curvature refinement test timeout during concurrent compilation. Locally verified and integrated in `8a35af54aa70c8e7a7f4bebe48ceabc1eda1e186`. Session-local sequencing procedure; no engine or timeout change. [Task](BUG-190-curvature-refinement-timeout-during-compilation.md).
+
+- 2026-09-14 — **BUG-191**: Consolidation LBVH sequence reaches its watchdog. Locally verified and integrated in `8a35af54aa70c8e7a7f4bebe48ceabc1eda1e186`. Fixture budget correction only; BUG-193 owns pacing and watchdog margin. [Task](BUG-191-consolidation-lbvh-sequence-timeout.md).
+
+- 2026-09-14 — **BUG-192**: Diagnose the surface-appearance Vulkan acceptance deadline. Locally verified and integrated in `8a35af54aa70c8e7a7f4bebe48ceabc1eda1e186`. Fixture budget correction only; BUG-193 owns pacing and watchdog margin. [Task](BUG-192-surface-appearance-vulkan-deadline.md).
+
+- 2026-09-14 — **METHOD-042**: Region-aware parts experiment. Locally verified and integrated in `8a35af54aa70c8e7a7f4bebe48ceabc1eda1e186`. Offline experiment only; METHOD-043 owns candidate integration. [Task](METHOD-042-region-aware-parts-experiment.md).
+
+- 2026-09-14 — **RUNTIME-209**: Point-set outlier analysis and publication split. Locally verified and integrated in `8a35af54aa70c8e7a7f4bebe48ceabc1eda1e186`. Bounded Operational evidence and original leak/performance limits retained. [Task](RUNTIME-209-point-set-outlier-analysis-publication.md).
+
+- 2026-09-14 — **RUNTIME-219**: Vulkan LBVH neighborhoods for normal estimation. Locally verified and integrated in `8a35af54aa70c8e7a7f4bebe48ceabc1eda1e186`. Bounded Operational evidence and original leak/performance limits retained. [Task](RUNTIME-219-vulkan-normal-neighborhoods.md).
+
+- 2026-09-14 — **RUNTIME-220**: Kernel density with shared spatial backends. Locally verified and integrated in `8a35af54aa70c8e7a7f4bebe48ceabc1eda1e186`. Bounded Operational evidence and original leak/performance limits retained. [Task](RUNTIME-220-kernel-density-spatial-backends.md).
+
+- 2026-09-14 — **RUNTIME-221**: Point spacing and radius estimation with shared spatial backends. Locally verified and integrated in `8a35af54aa70c8e7a7f4bebe48ceabc1eda1e186`. Bounded Operational evidence and original leak/performance limits retained. [Task](RUNTIME-221-point-spacing-spatial-backends.md).
+
+- 2026-09-14 — **UI-041**: Point-set outlier multi-domain panel. Locally verified and integrated in `8a35af54aa70c8e7a7f4bebe48ceabc1eda1e186`. Bounded Operational evidence and original leak/performance limits retained. [Task](UI-041-point-set-outlier-multi-domain-panel.md).
+
+- 2026-09-14 — **RUNTIME-246**: Consolidate workspace context binding conversion. Locally verified and integrated in `8a35af54aa70c8e7a7f4bebe48ceabc1eda1e186`. BUILD-007 owns matched compile timing. [Task](RUNTIME-246-workspace-context-binding-consolidation.md).

@@ -12,6 +12,14 @@ contracts: [repo.task-contract-discovery, repo.source-documentation, runtime.tex
 ---
 # RUNTIME-241 — Keep texture-bake composition inside its implementation
 
+## Completion — 2026-09-14
+Completed locally and retired after acceptance/evidence review. Accumulated
+implementation commit: `8a35af54aa70c8e7a7f4bebe48ceabc1eda1e186`.
+Historical dirty-source measurements retain their original eligibility limits;
+this retirement is not a publication or whole-engine completion verdict.
+BUILD-007 owns matched engine compile measurements; C92 remains a hypothesis.
+
+
 ## Goal
 Continue the operator-authorized cleanup with Claude while preserving the
 verified, uncommitted RUNTIME-240 source. Remove private composition methods
@@ -71,8 +79,7 @@ finish; preserve BUG-188's host discovery workaround and BUG-180's separate
 leak-enabled follow-up. Add missing behavior coverage only if review exposes a gap.
 
 Run strict clean-workshop, task/layout/root, source-documentation and skill
-checks; regenerate the module inventory and session brief. Keep changes
-uncommitted. Evidence starts in `/tmp/intrinsic-runtime241-20260913/`; final
+checks; regenerate the module inventory and session brief. The original verification used dirty source. Evidence starts in `/tmp/intrinsic-runtime241-20260913/`; final
 records belong in `build/analysis/runtime241-texture-bake-boundary-2026-09-13/`.
 No repeatable compile-time or whole-engine completion claim is implied.
 
@@ -115,10 +122,9 @@ Verification on the same 1,362 captured source/build inputs:
   module inventory and session brief refreshed.
 
 Full records, frozen review and exact before/after source identity are in
-`build/analysis/runtime241-texture-bake-boundary-2026-09-13/`. Source remains
-uncommitted and non-claim-eligible; all prior dirty work is preserved. Keep
-this task active until accumulated changes are integrated. Remaining scope is
-integration, matched compile timing, justified further editor frame/attachment
-locality work, and existing Framework24 acceptance. The alternative outbound
+`build/analysis/runtime241-texture-bake-boundary-2026-09-13/`. Those runs used dirty source and remain non-claim-eligible timing evidence.
+The implementation is now locally integrated. BUILD-007 owns matched compile
+timing; later editor frame/attachment slices and REVIEW-004 own their separate
+remaining scope. The alternative outbound
 snapshot-request/borrow plan was not implemented. BUG-188's host discovery
 workaround and BUG-180's separate leak-enabled follow-up remain open.
