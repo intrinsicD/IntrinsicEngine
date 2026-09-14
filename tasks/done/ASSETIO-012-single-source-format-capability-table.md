@@ -195,3 +195,8 @@ The sanitizer command uses `--test-dir build/ci-asan` or `build/ci-ubsan`,
 `-R 'AssetFormatCapabilities|AssetWorkflowModule|AssetImportRouter|GeometryIO|RuntimeAssetImportFormatCoverage'`,
 `-LE 'gpu|vulkan|slow|flaky-quarantine' --no-tests=error --timeout 60 --parallel 1`.
 No full sanitizer-suite or new GPU-rendering result is claimed for this slice.
+
+## Completion
+Retired 2026-09-14 at CPUContracted.
+Commit: `4031301234e6ccd5d4a9058565dbcc52f6249ce1`.
+No remote push was performed.

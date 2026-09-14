@@ -6,9 +6,6 @@ GPU-agnostic; GPU residency lives under `src/graphics/assets` and is wired by
 
 ## Tasks
 
-- [ASSETIO-012 — Single-source format capability table](../../active/ASSETIO-012-single-source-format-capability-table.md):
-  Theme J prerequisite for truthful import/export choices in the golden file
-  workflow; derive one capability authority without changing formats.
 - [ASSETIO-011 — Semantic Sandbox File / Import workflow matrix](ASSETIO-011-semantic-sandbox-file-import-workflow-matrix.md):
   app-linked real-widget coverage for every checked-in model route, including
   exact disabled reasons, explicit PLY payloads, queued completion, entity

@@ -6,6 +6,23 @@ task, append its summary block here (see `docs/agent/task-format.md`,
 relative to `tasks/done/`, which sits at the same depth as `tasks/active/`,
 so blocks moved from the old active-README history work verbatim.
 
+
+## 2026-09-14 — ASSETIO-012: shared geometry format capabilities
+
+Retired [ASSETIO-012](ASSETIO-012-single-source-format-capability-table.md) at
+CPUContracted. Source commit `4031301234e6ccd5d4a9058565dbcc52f6249ce1` replaces duplicated
+geometry format declarations with one core data catalog, corrects OFF export
+metadata and the edgelist alias, and reaches the existing PWN/CSV/3D/TXT loaders
+through runtime import. Claude implemented the bounded source slice and reviewed
+the fixed diff and color-property assertion correction.
+
+Full native CPU: 4,605 passed plus six skips; the five display-dependent cases
+then passed on the host, leaving the expected ASan-only skip. Both focused
+sanitizer runs passed 272/272. Strict structural checks pass. UI-046 retains
+export UI, ASSETIO-011 broader real-widget import coverage, BUILD-007 matched
+compile timing, and BUG-188 sanitizer discovery context. No new GPU or compile
+performance result is claimed; no remote push was performed.
+
 ## Retired task narratives
 
 - 2026-09-11 — **RORG-134**: Resolved all 38 confirmed code-reuse audit items through owning-layer helpers and documented distinct policies. CPU gate: 4,508 selected, zero failures, one expected skip; all 84 Vulkan and 116 workflow tests passed. Claude reviewed the batches and integration. Implementation `dd18432a8b3b5690d5f8bb36e1881b995634a378`; [task](RORG-134-code-reuse-audit-completion.md). Conditional audit candidates keep their scope decisions; this makes no new backend-maturity or performance claim.

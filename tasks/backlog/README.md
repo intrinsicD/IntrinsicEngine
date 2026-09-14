@@ -54,12 +54,12 @@ inventory, workflows, scorecard, measurement rules, and stop condition are in
 
 Retired `ARCH-017` established the mission/picker/scorecard reset. `REVIEW-004` is the
 one-shot final gate and depends on the current bounded product owners:
-`ASSETIO-012`, `BENCH-001`, `BUG-160`,
+`BENCH-001`, `BUG-160`,
 `GRAPHICS-135`, `METHOD-015`, `RUNTIME-218`, and `UI-046..051`. `METHOD-015`
 is an existing Framework24 registered-feature gap, not a reopening of the
 unrelated research queue. `BUG-160` owns the remaining atlas chart-policy
 repair after the completed `BUG-159` remap fix.
-`BUG-154`, `BUG-156`, `BUG-158`, and `BUG-159` are satisfied dependencies of `REVIEW-004`,
+`ASSETIO-012`, `BUG-154`, `BUG-156`, `BUG-158`, and `BUG-159` are satisfied dependencies of `REVIEW-004`,
 with `BENCH-001` retaining the unfulfilled claim-grade parity gate.
 
 While `REVIEW-004` is open, Theme J, reproducible Theme G regressions, and
@@ -438,7 +438,6 @@ Disabled-reason tooltips stay owned by `UI-037`.
 - [`ui/UI-049-editor-panel-sizing-and-readability.md`](ui/UI-049-editor-panel-sizing-and-readability.md).
 - [`ui/UI-050-vector-field-property-visualization.md`](ui/UI-050-vector-field-property-visualization.md).
 - [`ui/UI-051-domain-agnostic-appearance-properties-selection-windows.md`](ui/UI-051-domain-agnostic-appearance-properties-selection-windows.md).
-- [`ASSETIO-012`](../active/ASSETIO-012-single-source-format-capability-table.md).
 
 ### Theme G — Active bugs
 
