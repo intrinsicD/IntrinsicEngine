@@ -7,6 +7,24 @@ relative to `tasks/done/`, which sits at the same depth as `tasks/active/`,
 so blocks moved from the old active-README history work verbatim.
 
 
+## 2026-09-14 — BUG-184 and BUG-181: job accounting and shader feedback
+
+Retired [BUG-184](BUG-184-job-service-waiting-state-accounting.md) and
+[BUG-181](BUG-181-touched-scope-shader-output-command.md) at CPUContracted,
+their intended diagnostic/tooling endpoint. Job accounting reuses the existing
+terminal classifier, so dependency waits and parked apply results remain in
+flight (`8c671ae4dc548ea0119e3cfc2906a0d85344dba6`). Shader feedback reuses the existing
+compiler helper in Null/headless builds and checks required changed outputs
+after the producer succeeds (`7d6e9af2dd8677a05353302b286dda757e62d74e`).
+
+Claude implemented the bounded job-source copies and reviewed both fixed source
+diffs. Resolved its test-lifetime and stale-output findings. Full native CPU:
+4,611 passed, one expected ASan-only skip, zero failures. Isolated ASan/UBSan
+each passed 95 job/editor mesh cases; 37 planner tests and strict structural
+checks passed. A fresh headless shader build compiled 114 current outputs.
+BUILD-007 retains matched compile timing; broader convergence/GPU tasks remain
+open. No performance or GPU execution claim; both changes remain local.
+
 ## 2026-09-14 — ASSETIO-012: shared geometry format capabilities
 
 Retired [ASSETIO-012](ASSETIO-012-single-source-format-capability-table.md) at

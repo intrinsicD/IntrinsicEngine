@@ -97,3 +97,11 @@ Local full logs, exact commands, fixed diffs, source hashes and Claude reviews:
 `build/analysis/bug184-job-accounting-2026-09-14/` and
 `build/analysis/bug181-shader-routing-2026-09-14/`. These are interactive local
 verification records, not benchmark or research-claim evidence.
+
+## Completion
+Completed 2026-09-14. Commit: `7d6e9af2dd8677a05353302b286dda757e62d74e`.
+Maturity: CPUContracted, the intended endpoint for this diagnostic/tooling
+repair; no GPU backend or later capability gate belongs to its scope.
+BUILD-007 retains matched compile-time measurement, and the broader engine
+convergence and GPU work remain open under their existing owners. This closure
+adds no performance or backend-capability claim. Committed locally; not pushed.

@@ -8,8 +8,6 @@ picking backlog work; theme priorities and rationale live in
 
 ## Active tasks
 
-- `BUG-181` — Touched-scope shader-output command uses an unsupported flag (tasks/active/BUG-181-touched-scope-shader-output-command.md)
-- `BUG-184` — Count waiting jobs in aggregate in-flight diagnostics (tasks/active/BUG-184-job-service-waiting-state-accounting.md)
 - `METHOD-040` — Global multicut curvature-patch CPU reference (tasks/active/METHOD-040-global-multicut-curvature-patch-reference.md)
 - `METHOD-043` — Thickness and curve-aligned parts comparison (tasks/active/METHOD-043-thickness-and-curve-parts-comparison.md)
 - `METHOD-044` — Feature-aware patches and distortion-aware atlas merging (tasks/active/METHOD-044-feature-aware-atlas-merge-experiment.md)
