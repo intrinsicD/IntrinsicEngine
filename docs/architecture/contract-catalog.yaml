@@ -1,5 +1,15 @@
 schema_version: 1
 contracts:
+  io.geometry-format-capabilities:
+    owner: geometry-and-assets
+    source: docs/architecture/assets.md
+    applies_when:
+      - Geometry format kinds, aliases, import/export domains or binary capabilities change.
+      - Asset routing or runtime decoding for a geometry file format changes.
+    proofs:
+      - tests/contract/runtime/Test.AssetWorkflowModule.cpp
+      - tests/unit/assets/Test.Asset.ImportRouter.cpp
+      - tests/unit/geometry/Test.GeometryIO.cpp
   repo.task-contract-discovery:
     owner: agent-workflow
     source: docs/agent/task-format.md

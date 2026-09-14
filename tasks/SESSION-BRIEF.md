@@ -8,6 +8,7 @@ picking backlog work; theme priorities and rationale live in
 
 ## Active tasks
 
+- `ASSETIO-012` — Two hand-maintained format capability tables have already drifted (tasks/active/ASSETIO-012-single-source-format-capability-table.md)
 - `METHOD-040` — Global multicut curvature-patch CPU reference (tasks/active/METHOD-040-global-multicut-curvature-patch-reference.md)
 - `METHOD-043` — Thickness and curve-aligned parts comparison (tasks/active/METHOD-043-thickness-and-curve-parts-comparison.md)
 - `METHOD-044` — Feature-aware patches and distortion-aware atlas merging (tasks/active/METHOD-044-feature-aware-atlas-merge-experiment.md)
@@ -109,7 +110,6 @@ picking backlog work; theme priorities and rationale live in
 
 ## Theme J — Framework24 product convergence
 
-- unblocked: `ASSETIO-012` — Two hand-maintained format capability tables have already drifted (tasks/backlog/assets/ASSETIO-012-single-source-format-capability-table.md)
 - unblocked: `BENCH-001` — Framework24 golden-workflow comparison harness (tasks/backlog/benchmarks/BENCH-001-framework24-golden-workflow-comparison-harness.md)
 - unblocked: `BUG-160` — FastStaged fixed seed planes fragment smooth meshes into tiny charts (tasks/backlog/bugs/BUG-160-fast-staged-atlas-chart-fragmentation.md)
 - unblocked: `BUG-171` — Required development receipts cannot be superseded by a passing rerun (tasks/backlog/bugs/BUG-171-required-command-receipt-supersession.md)

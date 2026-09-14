@@ -438,7 +438,7 @@ Disabled-reason tooltips stay owned by `UI-037`.
 - [`ui/UI-049-editor-panel-sizing-and-readability.md`](ui/UI-049-editor-panel-sizing-and-readability.md).
 - [`ui/UI-050-vector-field-property-visualization.md`](ui/UI-050-vector-field-property-visualization.md).
 - [`ui/UI-051-domain-agnostic-appearance-properties-selection-windows.md`](ui/UI-051-domain-agnostic-appearance-properties-selection-windows.md).
-- [`assets/ASSETIO-012-single-source-format-capability-table.md`](assets/ASSETIO-012-single-source-format-capability-table.md).
+- [`ASSETIO-012`](../active/ASSETIO-012-single-source-format-capability-table.md).
 
 ### Theme G — Active bugs
 

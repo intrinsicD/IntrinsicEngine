@@ -110,8 +110,26 @@ TEST(AssetImportRouter, ExportRoutesRespectPromotedGeometrySupport)
             "mesh.off",
             AssetRouteOperation::Export,
             AssetImportHint{.PayloadKind = AssetPayloadKind::Mesh});
-    EXPECT_EQ(offExport.Status, AssetRouteStatus::PayloadKindNotSupported);
-    EXPECT_EQ(offExport.Error, ErrorCode::AssetUnsupportedFormat);
+    EXPECT_EQ(offExport.Status, AssetRouteStatus::Ready);
+    EXPECT_EQ(offExport.Error, ErrorCode::Success);
+}
+
+TEST(AssetImportRouter, RoutesStrictAsciiPointCloudFormats)
+{
+    for (const auto extension : {"pwn", "csv", "3d", "txt"})
+    {
+        SCOPED_TRACE(extension);
+        const auto route = ResolveAssetImportRoute(extension);
+        ASSERT_TRUE(route.has_value());
+        EXPECT_EQ(route->PayloadKind, AssetPayloadKind::PointCloud);
+        EXPECT_EQ(route->CanonicalExtension, extension);
+        EXPECT_FALSE(route->PayloadHintRequired);
+        EXPECT_EQ(DiagnoseAssetImportRoute(extension, AssetRouteOperation::Export).Status,
+                  AssetRouteStatus::PayloadKindNotSupported);
+        EXPECT_EQ(DiagnoseAssetImportRoute(extension, AssetRouteOperation::Import,
+                      AssetImportHint{.PayloadKind = AssetPayloadKind::Mesh}).Status,
+                  AssetRouteStatus::PayloadKindNotSupported);
+    }
 }
 
 TEST(AssetImportRouter, PublishesDeterministicDebugNamesAndFormatTable)

@@ -1069,6 +1069,18 @@ namespace Extrinsic::Runtime
                 case Assets::AssetFileFormat::XYZRGB:
                     cloudPayload = Geometry::PointCloudIO::LoadXYZ(request.Path);
                     break;
+                case Assets::AssetFileFormat::PWN:
+                    cloudPayload = Geometry::PointCloudIO::LoadPWN(request.Path);
+                    break;
+                case Assets::AssetFileFormat::CSV:
+                    cloudPayload = Geometry::PointCloudIO::LoadCSV(request.Path);
+                    break;
+                case Assets::AssetFileFormat::ThreeD:
+                    cloudPayload = Geometry::PointCloudIO::Load3D(request.Path);
+                    break;
+                case Assets::AssetFileFormat::TXT:
+                    cloudPayload = Geometry::PointCloudIO::LoadTXT(request.Path);
+                    break;
                 case Assets::AssetFileFormat::PCD:
                     cloudPayload = Geometry::PointCloudIO::LoadPCD(request.Path);
                     break;

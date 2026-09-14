@@ -1,5 +1,9 @@
 // Defines the shared format-capability catalog and deterministic route
 // diagnostics used by asset import and export entry points.
+//
+// Synopsis: the geometry-backed entries of AssetFileFormat are generated from
+// Core.GeometryFormatCatalog.inc so that geometry and assets cannot drift; the
+// asset-only entries (model scenes, textures) are listed explicitly after them.
 module;
 
 #include <cstdint>
@@ -25,24 +29,17 @@ export namespace Extrinsic::Assets
 
     enum class AssetFileFormat : std::uint8_t
     {
-        OBJ = 0,
-        OFF = 1,
-        STL = 2,
-        PLY = 3,
-        XYZ = 4,
-        PTS = 5,
-        XYZRGB = 6,
-        PCD = 7,
-        TGF = 8,
-        EdgeList = 9,
-        GLTF = 10,
-        GLB = 11,
-        PNG = 12,
-        JPEG = 13,
-        TGA = 14,
-        BMP = 15,
-        HDR = 16,
-        KTX = 17,
+#define INTRINSIC_GEOMETRY_FORMAT(Name, ...) Name,
+#include "Core.GeometryFormatCatalog.inc"
+#undef INTRINSIC_GEOMETRY_FORMAT
+        GLTF,
+        GLB,
+        PNG,
+        JPEG,
+        TGA,
+        BMP,
+        HDR,
+        KTX,
         Unknown = 0xff,
     };
 

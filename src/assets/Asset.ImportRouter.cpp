@@ -15,55 +15,44 @@ namespace Extrinsic::Assets
     {
         using Payload = AssetPayloadKind;
 
-        inline constexpr std::array<Payload, 0> NoPayloads{};
-        inline constexpr std::array<Payload, 1> MeshOnly{Payload::Mesh};
-        inline constexpr std::array<Payload, 1> PointCloudOnly{Payload::PointCloud};
-        inline constexpr std::array<Payload, 1> GraphOnly{Payload::Graph};
-        inline constexpr std::array<Payload, 1> ModelSceneOnly{Payload::ModelScene};
-        inline constexpr std::array<Payload, 1> TextureOnly{Payload::Texture2D};
-        inline constexpr std::array<Payload, 2> MeshAndPointCloud{
+        inline constexpr std::array<Payload, 0> NoDomains{};
+        inline constexpr auto MeshOnly = std::to_array({Payload::Mesh});
+        inline constexpr auto PointCloudOnly = std::to_array({Payload::PointCloud});
+        inline constexpr auto GraphOnly = std::to_array({Payload::Graph});
+        inline constexpr auto ModelSceneOnly = std::to_array({Payload::ModelScene});
+        inline constexpr auto TextureOnly = std::to_array({Payload::Texture2D});
+        inline constexpr auto MeshAndPointCloud = std::to_array({
             Payload::Mesh,
-            Payload::PointCloud};
+            Payload::PointCloud});
 
-        inline constexpr std::array<std::string_view, 1> ObjAliases{"obj"};
-        inline constexpr std::array<std::string_view, 1> OffAliases{"off"};
-        inline constexpr std::array<std::string_view, 1> StlAliases{"stl"};
-        inline constexpr std::array<std::string_view, 1> PlyAliases{"ply"};
-        inline constexpr std::array<std::string_view, 1> XyzAliases{"xyz"};
-        inline constexpr std::array<std::string_view, 1> PtsAliases{"pts"};
-        inline constexpr std::array<std::string_view, 1> XyzRgbAliases{"xyzrgb"};
-        inline constexpr std::array<std::string_view, 1> PcdAliases{"pcd"};
-        inline constexpr std::array<std::string_view, 1> TgfAliases{"tgf"};
-        inline constexpr std::array<std::string_view, 2> EdgeAliases{"edges", "edgelist"};
-        inline constexpr std::array<std::string_view, 1> GltfAliases{"gltf"};
-        inline constexpr std::array<std::string_view, 1> GlbAliases{"glb"};
-        inline constexpr std::array<std::string_view, 1> PngAliases{"png"};
-        inline constexpr std::array<std::string_view, 2> JpegAliases{"jpg", "jpeg"};
-        inline constexpr std::array<std::string_view, 1> TgaAliases{"tga"};
-        inline constexpr std::array<std::string_view, 1> BmpAliases{"bmp"};
-        inline constexpr std::array<std::string_view, 1> HdrAliases{"hdr"};
-        inline constexpr std::array<std::string_view, 2> KtxAliases{"ktx", "ktx2"};
+#define INTRINSIC_GEOMETRY_FORMAT(Name, Canonical, ImportDomains, ExportDomains, BinaryImport, BinaryExport, ...) \
+    inline constexpr auto Aliases_##Name = std::to_array<std::string_view>({__VA_ARGS__});
+#include "Core.GeometryFormatCatalog.inc"
+#undef INTRINSIC_GEOMETRY_FORMAT
 
-        inline constexpr std::array<AssetFileFormatInfo, 18> Formats{{
-            {AssetFileFormat::OBJ, "obj", ObjAliases, MeshOnly, MeshOnly, false, false},
-            {AssetFileFormat::OFF, "off", OffAliases, MeshOnly, NoPayloads, false, false},
-            {AssetFileFormat::STL, "stl", StlAliases, MeshOnly, MeshOnly, true, true},
-            {AssetFileFormat::PLY, "ply", PlyAliases, MeshAndPointCloud, MeshAndPointCloud, true, true},
-            {AssetFileFormat::XYZ, "xyz", XyzAliases, PointCloudOnly, PointCloudOnly, false, false},
-            {AssetFileFormat::PTS, "pts", PtsAliases, PointCloudOnly, NoPayloads, false, false},
-            {AssetFileFormat::XYZRGB, "xyzrgb", XyzRgbAliases, PointCloudOnly, NoPayloads, false, false},
-            {AssetFileFormat::PCD, "pcd", PcdAliases, PointCloudOnly, PointCloudOnly, true, true},
-            {AssetFileFormat::TGF, "tgf", TgfAliases, GraphOnly, GraphOnly, false, false},
-            {AssetFileFormat::EdgeList, "edges", EdgeAliases, GraphOnly, GraphOnly, false, false},
-            {AssetFileFormat::GLTF, "gltf", GltfAliases, ModelSceneOnly, NoPayloads, false, false},
-            {AssetFileFormat::GLB, "glb", GlbAliases, ModelSceneOnly, NoPayloads, true, false},
-            {AssetFileFormat::PNG, "png", PngAliases, TextureOnly, NoPayloads, true, false},
-            {AssetFileFormat::JPEG, "jpg", JpegAliases, TextureOnly, NoPayloads, true, false},
-            {AssetFileFormat::TGA, "tga", TgaAliases, TextureOnly, NoPayloads, true, false},
-            {AssetFileFormat::BMP, "bmp", BmpAliases, TextureOnly, NoPayloads, true, false},
-            {AssetFileFormat::HDR, "hdr", HdrAliases, TextureOnly, NoPayloads, true, false},
-            {AssetFileFormat::KTX, "ktx", KtxAliases, TextureOnly, NoPayloads, true, false},
-        }};
+        inline constexpr auto Aliases_GLTF = std::to_array<std::string_view>({"gltf"});
+        inline constexpr auto Aliases_GLB = std::to_array<std::string_view>({"glb"});
+        inline constexpr auto Aliases_PNG = std::to_array<std::string_view>({"png"});
+        inline constexpr auto Aliases_JPEG = std::to_array<std::string_view>({"jpg", "jpeg"});
+        inline constexpr auto Aliases_TGA = std::to_array<std::string_view>({"tga"});
+        inline constexpr auto Aliases_BMP = std::to_array<std::string_view>({"bmp"});
+        inline constexpr auto Aliases_HDR = std::to_array<std::string_view>({"hdr"});
+        inline constexpr auto Aliases_KTX = std::to_array<std::string_view>({"ktx", "ktx2"});
+
+#define INTRINSIC_GEOMETRY_FORMAT(Name, Canonical, ImportDomains, ExportDomains, BinaryImport, BinaryExport, ...) \
+    AssetFileFormatInfo{AssetFileFormat::Name, Canonical, Aliases_##Name, ImportDomains, ExportDomains, BinaryImport, BinaryExport},
+        inline constexpr auto Formats = std::to_array<AssetFileFormatInfo>({
+#include "Core.GeometryFormatCatalog.inc"
+            {AssetFileFormat::GLTF, "gltf", Aliases_GLTF, ModelSceneOnly, NoDomains, false, false},
+            {AssetFileFormat::GLB, "glb", Aliases_GLB, ModelSceneOnly, NoDomains, true, false},
+            {AssetFileFormat::PNG, "png", Aliases_PNG, TextureOnly, NoDomains, true, false},
+            {AssetFileFormat::JPEG, "jpg", Aliases_JPEG, TextureOnly, NoDomains, true, false},
+            {AssetFileFormat::TGA, "tga", Aliases_TGA, TextureOnly, NoDomains, true, false},
+            {AssetFileFormat::BMP, "bmp", Aliases_BMP, TextureOnly, NoDomains, true, false},
+            {AssetFileFormat::HDR, "hdr", Aliases_HDR, TextureOnly, NoDomains, true, false},
+            {AssetFileFormat::KTX, "ktx", Aliases_KTX, TextureOnly, NoDomains, true, false},
+        });
+#undef INTRINSIC_GEOMETRY_FORMAT
 
         [[nodiscard]] constexpr char ToLowerAscii(const char c) noexcept
         {
@@ -379,26 +368,11 @@ namespace Extrinsic::Assets
         {
         case AssetFileFormat::Unknown:
             return "Unknown";
-        case AssetFileFormat::OBJ:
-            return "OBJ";
-        case AssetFileFormat::OFF:
-            return "OFF";
-        case AssetFileFormat::STL:
-            return "STL";
-        case AssetFileFormat::PLY:
-            return "PLY";
-        case AssetFileFormat::XYZ:
-            return "XYZ";
-        case AssetFileFormat::PTS:
-            return "PTS";
-        case AssetFileFormat::XYZRGB:
-            return "XYZRGB";
-        case AssetFileFormat::PCD:
-            return "PCD";
-        case AssetFileFormat::TGF:
-            return "TGF";
-        case AssetFileFormat::EdgeList:
-            return "EdgeList";
+#define INTRINSIC_GEOMETRY_FORMAT(Name, ...) \
+    case AssetFileFormat::Name:              \
+        return #Name;
+#include "Core.GeometryFormatCatalog.inc"
+#undef INTRINSIC_GEOMETRY_FORMAT
         case AssetFileFormat::GLTF:
             return "GLTF";
         case AssetFileFormat::GLB:

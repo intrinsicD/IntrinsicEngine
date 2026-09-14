@@ -212,6 +212,12 @@ service rather than importing backend machinery.
 
 ### Geometry IO coverage
 
+The [shared geometry-format declaration](assets.md#geometry-format-capability-authority)
+owns extension aliases and capability facts for both `Geometry.IO` and asset
+routing. Geometry lookup bodies and table storage live in `Geometry.IO.cpp`; the
+module interface contains the typed API. Adding a format changes the shared row,
+its real loader/writer and runtime dispatch, with cross-layer and import tests.
+
 Mesh, graph and point-cloud readers share path handling, file reads and text
 tokenization through `Geometry.IOText.hpp`, with each module adapting file
 errors to its public result type. Mesh and point-cloud PLY readers also share

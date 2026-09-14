@@ -11,6 +11,7 @@
 #include <string>
 #include <string_view>
 #include <thread>
+#include <utility>
 #include <vector>
 
 #include "RuntimeTestModule.hpp"
@@ -30,10 +31,12 @@ import Extrinsic.Core.Tasks;
 import Extrinsic.ECS.Component.ProceduralGeometryRef;
 import Extrinsic.ECS.Component.Transform.WorldMatrix;
 import Extrinsic.ECS.Components.GeometrySources;
+import Extrinsic.ECS.Components.Selection;
 import Extrinsic.ECS.Scene.Handle;
 import Extrinsic.ECS.Scene.Registry;
 import Extrinsic.Graphics.Colormap;
 import Extrinsic.Graphics.Component.RenderGeometry;
+import Extrinsic.Graphics.Component.VisualizationConfig;
 import Extrinsic.Graphics.GpuAssetCache;
 import Extrinsic.Graphics.GpuWorld;
 import Extrinsic.Graphics.Material;
@@ -59,6 +62,7 @@ import Extrinsic.Runtime.TextureBakeModule;
 import Extrinsic.Runtime.WorldHandle;
 import Extrinsic.Runtime.WorldRegistry;
 import Geometry.Properties;
+import Geometry.IO;
 
 #include "MockRHI.hpp"
 
@@ -765,6 +769,164 @@ namespace
             .OutputName =
                 "runtime-test-normal-" + std::to_string(key),
         };
+    }
+}
+
+
+TEST(AssetFormatCapabilities, GeometryAndAssetCatalogsAgreeInBothDirections)
+{
+    namespace IO = Geometry::IO;
+    using Payload = Assets::AssetPayloadKind;
+    using Domain = IO::GeometryIODomain;
+    constexpr std::array pairs{
+        std::pair{Domain::Mesh, Payload::Mesh},
+        std::pair{Domain::PointCloud, Payload::PointCloud},
+        std::pair{Domain::Graph, Payload::Graph}};
+
+    for (const auto& geometry : IO::SupportedGeometryIOFormats())
+    {
+        SCOPED_TRACE(geometry.CanonicalExtension);
+        const auto* asset = Assets::FindAssetFileFormat(geometry.CanonicalExtension);
+        ASSERT_NE(asset, nullptr);
+        EXPECT_EQ(asset->CanonicalExtension, geometry.CanonicalExtension);
+        EXPECT_EQ(asset->SupportsBinaryImport, geometry.SupportsBinaryImport);
+        EXPECT_EQ(asset->SupportsBinaryExport, geometry.SupportsBinaryExport);
+        ASSERT_EQ(asset->ExtensionAliases.size(), geometry.ExtensionAliases.size());
+        for (std::size_t i = 0; i < geometry.ExtensionAliases.size(); ++i)
+        {
+            const auto alias = geometry.ExtensionAliases[i];
+            EXPECT_EQ(asset->ExtensionAliases[i], alias);
+            EXPECT_EQ(Assets::FindAssetFileFormat(alias), asset);
+            for (const auto operation : {Assets::AssetRouteOperation::Import,
+                                         Assets::AssetRouteOperation::Export})
+            {
+                const bool importing = operation == Assets::AssetRouteOperation::Import;
+                const auto domains = importing ? geometry.ImportDomains : geometry.ExportDomains;
+                const auto payloads = importing ? asset->ImportPayloads : asset->ExportPayloads;
+                EXPECT_EQ(domains.size(), payloads.size());
+                for (const auto& [domain, payload] : pairs)
+                {
+                    const bool supported = importing
+                        ? IO::SupportsImportDomain(alias, domain)
+                        : IO::SupportsExportDomain(alias, domain);
+                    const auto route = Assets::DiagnoseAssetImportRoute(
+                        alias, operation, {.PayloadKind = payload});
+                    EXPECT_EQ(route.Status, supported ? Assets::AssetRouteStatus::Ready
+                        : Assets::AssetRouteStatus::PayloadKindNotSupported);
+                }
+                const auto unhinted = Assets::DiagnoseAssetImportRoute(alias, operation);
+                EXPECT_EQ(unhinted.Status, domains.empty()
+                    ? Assets::AssetRouteStatus::PayloadKindNotSupported
+                    : domains.size() > 1 ? Assets::AssetRouteStatus::AmbiguousPayloadKind
+                                        : Assets::AssetRouteStatus::Ready);
+            }
+        }
+    }
+    for (const auto& asset : Assets::SupportedAssetFileFormats())
+    {
+        for (const auto payloads : {asset.ImportPayloads, asset.ExportPayloads})
+        {
+            for (const auto payload : payloads)
+            {
+                if (payload == Payload::Mesh || payload == Payload::PointCloud || payload == Payload::Graph)
+                    EXPECT_NE(IO::FindGeometryIOFormat(asset.CanonicalExtension), nullptr)
+                        << asset.CanonicalExtension;
+            }
+        }
+    }
+}
+
+TEST(AssetWorkflowModule, ImportsStrictAsciiFormatsWithPropertiesAndRenderComponents)
+{
+    struct Fixture
+    {
+        const char* Extension;
+        const char* Contents;
+        glm::vec3 First;
+        glm::vec3 Second;
+        bool Normals;
+        bool Colors;
+    };
+    const std::array fixtures{
+        Fixture{"pwn", "2\n0 0 0\n1 0 0\n0 0 1\n0 1 0\n", {0, 0, 0}, {1, 0, 0}, true, false},
+        Fixture{"csv", "0,0,0,0,0,1\n1,2,3,0,1,0\n", {0, 0, 0}, {1, 2, 3}, true, false},
+        Fixture{"3d", "-1 0 2 5\n3 4 5 6\n", {-1, 0, 2}, {3, 4, 5}, false, false},
+        Fixture{"txt", "2\n0 0 0 255 0 0 0.25\n2 3 4 0 255 128 0.5\n", {0, 0, 0}, {2, 3, 4}, false, true}};
+    for (const auto& fixture : fixtures)
+    {
+        SCOPED_TRACE(fixture.Extension);
+        TempSceneFile file{std::string{"assetio012-properties."} + fixture.Extension, fixture.Contents};
+        DirectHarness harness;
+        ASSERT_TRUE(harness.Start().has_value());
+        harness.Initialized = true;
+        auto* pipeline = harness.Services.Find<Runtime::AssetWorkflowModule>();
+        ASSERT_NE(pipeline, nullptr);
+        auto* scene = harness.Worlds.Get(harness.InitialWorld);
+        ASSERT_NE(scene, nullptr);
+        const auto before = EntityCount(*scene);
+        const auto imported = pipeline->ImportAssetFromPath({.Path = file.Path.string()});
+        ASSERT_TRUE(imported.has_value()) << static_cast<int>(imported.error());
+        EXPECT_EQ(imported->PayloadKind, Assets::AssetPayloadKind::PointCloud);
+        EXPECT_EQ(imported->PrimitiveEntitiesCreated, 1u);
+        EXPECT_EQ(EntityCount(*scene), before + 1u);
+        std::size_t clouds = 0;
+        auto& raw = scene->Raw();
+        for (const auto entity : raw.view<ECS::Components::GeometrySources::Vertices>())
+        {
+            ++clouds;
+            const auto& properties = raw.get<ECS::Components::GeometrySources::Vertices>(entity).Properties;
+            const auto positions = properties.Get<glm::vec3>("v:position");
+            ASSERT_TRUE(positions);
+            ASSERT_EQ(positions.Vector().size(), 2u);
+            EXPECT_EQ(positions.Vector()[0], fixture.First);
+            EXPECT_EQ(positions.Vector()[1], fixture.Second);
+            const auto normals = properties.Get<glm::vec3>("v:normal");
+            EXPECT_EQ(static_cast<bool>(normals), fixture.Normals);
+            if (fixture.Normals)
+            {
+                ASSERT_TRUE(normals);
+                ASSERT_EQ(normals.Vector().size(), 2u);
+                EXPECT_EQ(normals.Vector()[0], glm::vec3(0, 0, 1));
+                EXPECT_EQ(normals.Vector()[1], glm::vec3(0, 1, 0));
+            }
+            if (fixture.Colors)
+            {
+                const auto colors = properties.Get<glm::vec4>("p:color");
+                ASSERT_TRUE(colors);
+                ASSERT_EQ(colors.Vector().size(), 2u);
+                EXPECT_EQ(colors.Vector()[0], glm::vec4(1, 0, 0, 1));
+                EXPECT_EQ(colors.Vector()[1], glm::vec4(0, 1, 128.0f / 255.0f, 1));
+            }
+            EXPECT_TRUE((raw.all_of<Graphics::Components::RenderPoints,
+                Graphics::Components::VisualizationConfig,
+                ECS::Components::Selection::SelectableTag>(entity)));
+        }
+        EXPECT_EQ(clouds, 1u);
+    }
+}
+
+TEST(AssetWorkflowModule, StrictAsciiImportRejectsMalformedPayloadBeforeMaterialization)
+{
+    for (const auto& [extension, contents] : std::array{
+             std::pair{"pwn", "2\n0 0 0\n1 0 0\n0 0 1\n"},
+             std::pair{"csv", "0,0,0,1\n"},
+             std::pair{"3d", "0 0 0 1 2\n"},
+             std::pair{"txt", "0 0 0 1\n"}})
+    {
+        SCOPED_TRACE(extension);
+        TempSceneFile file{std::string{"assetio012-invalid."} + extension, contents};
+        DirectHarness harness;
+        ASSERT_TRUE(harness.Start().has_value());
+        harness.Initialized = true;
+        auto* pipeline = harness.Services.Find<Runtime::AssetWorkflowModule>();
+        ASSERT_NE(pipeline, nullptr);
+        auto* scene = harness.Worlds.Get(harness.InitialWorld);
+        ASSERT_NE(scene, nullptr);
+        const auto before = EntityCount(*scene);
+        const auto imported = pipeline->ImportAssetFromPath({.Path = file.Path.string()});
+        ASSERT_FALSE(imported.has_value());
+        EXPECT_EQ(imported.error(), Core::ErrorCode::InvalidFormat);
+        EXPECT_EQ(EntityCount(*scene), before);
     }
 }
 

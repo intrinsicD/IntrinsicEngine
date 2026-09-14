@@ -257,7 +257,10 @@ keeps seam duplication observable without changing the source topology.
 field remains editable whenever the window is bound, while the runtime scene snapshot
 independently reports whether the payload chooser and import command are ready.
 Single-payload formats may keep the `Unknown` hint as automatic resolution;
-ambiguous PLY input requires an explicit mesh or point-cloud hint. Disabled
+ambiguous PLY input requires an explicit mesh or point-cloud hint. PWN, CSV,
+3D and TXT resolve automatically to point clouds and use the existing dedicated
+loaders, preserving authored normals/colors where that format provides them.
+Disabled
 chooser rows and commands expose the runtime-owned prerequisite reason on hover,
 including through ImGui's disabled-item hover path, so app code does not carry a
 second extension or importer-capability table. The same disabled-tooltip

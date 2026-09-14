@@ -10,11 +10,8 @@ branch:
 worktree:
 claimed_at:
 contract_schema: 1
-contracts: []
-contract_review: >-
-  Path-entry affordance for existing import/scene commands. No geometry
-  element-domain, property, support-radius, parameterization, or
-  method-integration surface changes.
+contracts:
+  - io.geometry-format-capabilities
 ---
 # UI-047 — File paths must be hand-typed into a raw text field
 
@@ -102,8 +99,8 @@ thread.
 
 ## Required changes
 - [ ] Slice A — add a runtime-owned directory-listing model with extension
-      filtering sourced from the runtime importable-format table (see
-      `ASSETIO-012` for the single-source table this should read).
+      filtering from `Asset.ImportRouter` queries. Its geometry rows derive from
+      `Core.GeometryFormatCatalog.inc` (ASSETIO-012); retain the asset-only rows.
 - [ ] Slice A — enumerate the filesystem beneath `runtime` (in `core` or
       `platform`), never from `app`.
 - [ ] Slice B — add a browse affordance to `File / Import` and `File / Scene`

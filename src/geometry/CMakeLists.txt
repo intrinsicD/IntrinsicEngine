@@ -173,6 +173,7 @@ target_sources(${target_name}
         Geometry.HalfedgeMesh.VectorHeatMethod.cpp
         Geometry.HalfedgeMesh.cpp
         Geometry.HtexPatch.cpp
+        Geometry.IO.cpp
         Geometry.ImplicitPlaneField.cpp
         Geometry.KDTree.cpp
         Geometry.KMeans.cpp

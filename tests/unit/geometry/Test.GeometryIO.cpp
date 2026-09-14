@@ -131,6 +131,10 @@ TEST(GeometryIO_Metadata, ReportsSupportedImportAndExportDomains)
 
     EXPECT_EQ(SupportedGeometryIOFormats().size(), 14u);
 
+    const auto* edges = FindGeometryIOFormat(".EDGELIST");
+    ASSERT_NE(edges, nullptr);
+    EXPECT_EQ(edges->Kind, GeometryIOFormatKind::EdgeList);
+
     const auto* ply = FindGeometryIOFormat(".PLY");
     ASSERT_NE(ply, nullptr);
     EXPECT_EQ(ply->Kind, GeometryIOFormatKind::PLY);

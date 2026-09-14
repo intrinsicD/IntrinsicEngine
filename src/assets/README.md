@@ -27,7 +27,9 @@ store, load pipeline, event bus, and path index behind a single façade.
 - `Asset.ImportRouter` resolves file extensions plus optional payload/domain
   hints to CPU-only import/export routes for mesh, point-cloud, graph, model
   scene, and texture payloads. It does not import geometry, runtime, graphics,
-  or decoder code.
+  or decoder code. Geometry capability rows come from the core-owned
+  `Core.GeometryFormatCatalog.inc`; see the
+  [capability contract](../../docs/architecture/assets.md#geometry-format-capability-authority).
 - `Asset.GeometryPayload` is the CPU-only, type-tagged geometry payload record
   used by model-scene payloads. It owns no codec registry or IO dispatch;
   runtime calls the promoted geometry loaders selected by `Asset.ImportRouter`

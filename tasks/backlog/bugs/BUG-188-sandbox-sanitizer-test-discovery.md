@@ -39,3 +39,12 @@ hosts whose filesystem sandbox prevents LeakSanitizer thread inspection.
 ctest --test-dir build/ci-asan --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --no-tests=error --timeout 60 --parallel 1
 ```
 Run outside the restrictive filesystem sandbox when reproducing the host control.
+
+## Reproduction — 2026-09-14
+ASSETIO-012's focused `ci-asan` CTest selector again failed in discovery of the
+unchanged `IntrinsicRuntimeIntegrationTests`, before executing any selected test.
+The same 272-test selector passed with host access, with serial execution and
+sanitizer settings unchanged. Logs: `focused-asan.log` and
+`focused-asan-host.log` under
+`build/analysis/assetio012-format-catalog-2026-09-14/`. Keep this workflow task
+open; the host retry does not implement automatic supported-context routing.

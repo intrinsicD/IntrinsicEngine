@@ -12,6 +12,7 @@ claimed_at:
 contract_schema: 1
 contracts:
   - geometry.element-domain-sources
+  - io.geometry-format-capabilities
 ---
 # UI-046 — Sandbox cannot export geometry at all
 
@@ -30,10 +31,10 @@ contracts:
 ## Context
 - Symptom: `grep -rn 'Export' src/app/Sandbox/Editor/` returns nothing. There is
   no export affordance anywhere in the editor.
-- The capability exists one layer down and is unreachable:
-  `Geometry.IO.cppm:77-89` declares writers for OBJ, OFF, STL, PLY, PCD, TGF and
-  edge-list (`Asset.ImportRouter.cpp:47-66` additionally records exportability
-  per format, with the drift noted in `ASSETIO-012`).
+- The geometry writers already exist. `Geometry.IO` and `Asset.ImportRouter`
+  derive exportability from `src/core/Core.GeometryFormatCatalog.inc`, including
+  OFF mesh export. Reuse those queries for available format/domain choices;
+  ASSETIO-012 owns the shared capability declaration and route-drift checks.
 - Impact: you can import a mesh, denoise/curvature/K-Means/parameterize it, and
   then have no way to get the result out of the application. For a
   geometry-processing engine this makes the whole processing surface a dead end.
