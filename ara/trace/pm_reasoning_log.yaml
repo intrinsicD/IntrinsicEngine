@@ -2308,3 +2308,10 @@ entries:
     - Retain failed test-design attempts and exclude the old-binary run. Final replacement coverage renders
       only the last generation; source review preserves ordering without a GPU retirement claim.
     - Unrelated staged topics retain their named owners and flags; no new closure signal.
+
+  - turn: 2026-09-14_001#14
+    notes:
+    - Direct-route N567 as ordinary cleanup and verification facts. Dependency/line counts do not settle
+      C92 or BUILD-007; no new claim or observation is needed. Existing topics keep their named owners.
+    - Distinguish Claude's source-free design consultation from local source review. The rejected full-source
+      packet was not sent. Preserve isolated sanitizer and GPU evidence plus the existing leak limitation.

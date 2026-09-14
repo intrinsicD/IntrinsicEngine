@@ -12325,3 +12325,23 @@ tree:
     - tests/integration/runtime/Test.RuntimeSandboxAcceptanceGpuSmoke.cpp
     - tests/CMakeLists.txt
     status: resolved
+
+  - id: N567
+    type: experiment
+    title: Collapse render-extraction forwarding and narrow its module interface
+    provenance: ai-executed
+    timestamp: '2026-09-14T23:38:25+02:00'
+    result: Thirteen direct accessors replace duplicate State methods; an always-present visualization
+      record becomes a value member. Five production files shrink from 5239 to 5124 lines; compiler
+      dependencies fall from 85 to 49, without a timing claim. Claude reviewed two source-free summaries
+      after automatic approval rejected the full-source packet. Local source review confirmed constness,
+      member initialization, nonmovability and complete-type ownership; normalized moved bodies match.
+      Full CPU has 4624 distinct passes with one expected unsanitized leak-control skip after host followup.
+      Focused native, ASan and UBSan each pass 113 tests; seven actual Vulkan readbacks pass under BUG-180's
+      existing leak exclusion. Developer app rebuilt and RUNTIME-250 retired. BUILD-007 and C92 remain open.
+    evidence:
+    - tasks/done/RUNTIME-250-render-extraction-forwarding.md
+    - src/runtime/Rendering/Runtime.RenderExtraction.cppm
+    - src/runtime/Rendering/Runtime.RenderExtraction.Internal.cpp
+    - tests/CMakeLists.txt
+    status: resolved

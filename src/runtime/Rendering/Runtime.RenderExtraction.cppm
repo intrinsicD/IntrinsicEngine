@@ -13,16 +13,16 @@ export module Extrinsic.Runtime.RenderExtraction;
 import Extrinsic.ECS.Scene.Registry;
 import Extrinsic.Asset.Registry;
 import Extrinsic.Graphics.GpuAssetCache;
-import Extrinsic.Graphics.Renderer;
 import Extrinsic.Graphics.GpuWorld;
 import Extrinsic.Graphics.Material;
-import Extrinsic.Graphics.MaterialSystem;
 import Extrinsic.Graphics.RenderWorld;
 import Extrinsic.Graphics.Component.GpuSceneSlot;
 export import Extrinsic.Runtime.GeometryAvailability;
 import Extrinsic.Runtime.RenderWorldPool;
 import Extrinsic.Runtime.WorldHandle;
 export import Extrinsic.Runtime.VisualizationRecipes;
+
+extern "C++" { namespace Extrinsic::Graphics { class IRenderer; } }
 
 export namespace Extrinsic::Runtime
 {

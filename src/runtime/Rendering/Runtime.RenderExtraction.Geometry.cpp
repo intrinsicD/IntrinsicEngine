@@ -1277,12 +1277,13 @@ namespace Extrinsic::Runtime
         return true;
     }
 
-    std::optional<RenderExtractionCache::State::RenderableSidecarView>
-    RenderExtractionCache::State::FindRenderableSidecarForTest(
+    std::optional<RenderExtractionCache::RenderableSidecarView>
+    RenderExtractionCache::FindRenderableSidecarForTest(
         const std::uint32_t stableEntityId) const noexcept
     {
-        const auto it = m_Renderables.find(stableEntityId);
-        if (it == m_Renderables.end())
+        const State& state = *m_State;
+        const auto it = state.m_Renderables.find(stableEntityId);
+        if (it == state.m_Renderables.end())
         {
             return std::nullopt;
         }
@@ -1315,12 +1316,13 @@ namespace Extrinsic::Runtime
         };
     }
 
-    std::optional<RenderExtractionCache::State::GpuRenderableAvailabilityView>
-    RenderExtractionCache::State::FindGpuRenderableAvailability(
+    std::optional<RenderExtractionCache::GpuRenderableAvailabilityView>
+    RenderExtractionCache::FindGpuRenderableAvailability(
         const std::uint32_t stableEntityId) const noexcept
     {
-        const auto it = m_Renderables.find(stableEntityId);
-        if (it == m_Renderables.end())
+        const State& state = *m_State;
+        const auto it = state.m_Renderables.find(stableEntityId);
+        if (it == state.m_Renderables.end())
         {
             return std::nullopt;
         }
@@ -1411,7 +1413,7 @@ namespace Extrinsic::Runtime
         return view;
     }
 
-    void RenderExtractionCache::State::SetMaterialTextureAssetBindings(
+    void RenderExtractionCache::SetMaterialTextureAssetBindings(
         const std::uint32_t stableEntityId,
         Graphics::MaterialTextureAssetBindings bindings)
     {
@@ -1419,23 +1421,24 @@ namespace Extrinsic::Runtime
         {
             return;
         }
-        m_MaterialTextureBindings.insert_or_assign(
+        m_State->m_MaterialTextureBindings.insert_or_assign(
             stableEntityId,
             bindings);
     }
 
-    void RenderExtractionCache::State::ClearMaterialTextureAssetBindings(
+    void RenderExtractionCache::ClearMaterialTextureAssetBindings(
         const std::uint32_t stableEntityId) noexcept
     {
-        m_MaterialTextureBindings.erase(stableEntityId);
+        m_State->m_MaterialTextureBindings.erase(stableEntityId);
     }
 
     std::optional<Graphics::MaterialTextureAssetBindings>
-    RenderExtractionCache::State::GetMaterialTextureAssetBindings(
+    RenderExtractionCache::GetMaterialTextureAssetBindings(
         const std::uint32_t stableEntityId) const noexcept
     {
-        const auto it = m_MaterialTextureBindings.find(stableEntityId);
-        if (it == m_MaterialTextureBindings.end())
+        const State& state = *m_State;
+        const auto it = state.m_MaterialTextureBindings.find(stableEntityId);
+        if (it == state.m_MaterialTextureBindings.end())
         {
             return std::nullopt;
         }

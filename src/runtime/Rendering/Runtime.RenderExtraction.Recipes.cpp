@@ -270,42 +270,44 @@ namespace Extrinsic::Runtime
             break;
         }
 
-        m_VisualizationState->Batch.Append(std::move(encoded.Batch));
+        m_VisualizationState.Batch.Append(std::move(encoded.Batch));
     }
 
-    void RenderExtractionCache::State::SetVisualizationRecipe(
+    void RenderExtractionCache::SetVisualizationRecipe(
         const std::uint32_t stableEntityId,
         VisualizationRecipe recipe)
     {
-        m_VisualizationState->Recipes.insert_or_assign(
+        m_State->m_VisualizationState.Recipes.insert_or_assign(
             stableEntityId,
             std::move(recipe));
-        ++m_VisualizationState->RecipeRevision;
+        ++m_State->m_VisualizationState.RecipeRevision;
     }
 
-    void RenderExtractionCache::State::ClearVisualizationRecipe(
+    void RenderExtractionCache::ClearVisualizationRecipe(
         const std::uint32_t stableEntityId) noexcept
     {
-        if (m_VisualizationState->Recipes.erase(stableEntityId) != 0u)
-            ++m_VisualizationState->RecipeRevision;
+        if (m_State->m_VisualizationState.Recipes.erase(stableEntityId) != 0u)
+            ++m_State->m_VisualizationState.RecipeRevision;
     }
 
     std::optional<VisualizationRecipe>
-    RenderExtractionCache::State::GetVisualizationRecipe(
+    RenderExtractionCache::GetVisualizationRecipe(
         const std::uint32_t stableEntityId) const noexcept
     {
+        const State& state = *m_State;
         const auto it =
-            m_VisualizationState->Recipes.find(stableEntityId);
-        if (it == m_VisualizationState->Recipes.end())
+            state.m_VisualizationState.Recipes.find(stableEntityId);
+        if (it == state.m_VisualizationState.Recipes.end())
             return std::nullopt;
         return it->second;
     }
 
     std::uint64_t
-    RenderExtractionCache::State::
+    RenderExtractionCache::
         GetVisualizationRecipeRevision() const noexcept
     {
-        return m_VisualizationState->RecipeRevision;
+        const State& state = *m_State;
+        return state.m_VisualizationState.RecipeRevision;
     }
 
 }

@@ -124,10 +124,6 @@ namespace Extrinsic::Runtime
         const Graphics::Components::VisualizationConfig* visualization) noexcept;
     struct RenderExtractionCache::State
     {
-        using RenderableSidecarView =
-            RenderExtractionCache::RenderableSidecarView;
-        using GpuRenderableAvailabilityView =
-            RenderExtractionCache::GpuRenderableAvailabilityView;
         State();
         ~State();
 
@@ -140,41 +136,12 @@ namespace Extrinsic::Runtime
             Graphics::GpuAssetCache* gpuAssets,
             std::uint32_t runtimeSnapshotStorageSlot,
             WorldHandle world);
-        void SubmitSceneInteractionSnapshot(
-            const RuntimeSceneInteractionRenderSnapshot& snapshot);
         void ClearSceneState(Graphics::IRenderer& renderer);
         void Shutdown(Graphics::IRenderer& renderer);
 
         void TickGeometryResidency(std::uint64_t currentFrame,
                                    std::uint32_t framesInFlight,
                                    Graphics::IRenderer& renderer);
-
-        void SetMaterialTextureAssetBindings(
-            std::uint32_t stableEntityId,
-            Graphics::MaterialTextureAssetBindings bindings);
-        void ClearMaterialTextureAssetBindings(
-            std::uint32_t stableEntityId) noexcept;
-        [[nodiscard]] std::optional<Graphics::MaterialTextureAssetBindings>
-            GetMaterialTextureAssetBindings(
-                std::uint32_t stableEntityId) const noexcept;
-
-        [[nodiscard]] const RuntimeRenderExtractionStats& GetLastStats() const noexcept;
-        [[nodiscard]] std::uint32_t GetTrackedRenderableCount() const noexcept;
-        [[nodiscard]] std::size_t
-            GetLiveRenderableKeyScratchBucketCountForTest() const noexcept;
-        [[nodiscard]] std::optional<RenderableSidecarView>
-            FindRenderableSidecarForTest(
-                std::uint32_t stableEntityId) const noexcept;
-        [[nodiscard]] std::optional<GpuRenderableAvailabilityView>
-            FindGpuRenderableAvailability(
-                std::uint32_t stableEntityId) const noexcept;
-        void SetVisualizationRecipe(
-            std::uint32_t stableEntityId,
-            VisualizationRecipe recipe);
-        void ClearVisualizationRecipe(std::uint32_t stableEntityId) noexcept;
-        [[nodiscard]] std::optional<VisualizationRecipe>
-            GetVisualizationRecipe(std::uint32_t stableEntityId) const noexcept;
-        [[nodiscard]] std::uint64_t GetVisualizationRecipeRevision() const noexcept;
 
         struct RenderableSidecar
         {
@@ -369,7 +336,7 @@ namespace Extrinsic::Runtime
             std::uint64_t RecipeRevision{0u};
             VisualizationEncodingBatch Batch{};
         };
-        std::unique_ptr<VisualizationRecipeState> m_VisualizationState{};
+        VisualizationRecipeState m_VisualizationState{};
 
         RuntimeSceneInteractionRenderSnapshot m_SceneInteraction{};
         RuntimeRenderExtractionStats m_LastStats{};

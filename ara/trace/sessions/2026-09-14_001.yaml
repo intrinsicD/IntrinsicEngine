@@ -2,11 +2,9 @@ session:
   id: 2026-09-14_001
   date: '2026-09-14'
   started: '2026-09-14T00:30:41+02:00'
-  last_turn: '2026-09-14T22:34:56+02:00'
-  turn_count: 13
-  summary: Model construction localized and import error policy shared with Claude. Model-interface dependencies
-    fall from 96 to 54 with 38 fewer production lines, without a timing claim. Original and repeated-import
-    GPU coverage retained; full CPU and focused sanitizers pass. RUNTIME-249 retired; developer app rebuilt.
+  last_turn: '2026-09-14T23:38:25+02:00'
+  turn_count: 14
+  summary: Render-extraction forwarding collapsed with 115 fewer production lines and 85 to 49 interface dependencies. Claude reviewed source-free summaries; local source review, full CPU, focused sanitizers and seven Vulkan checks passed. RUNTIME-250 retired; no timing claim.
 events_logged:
 - turn: 1
   type: experiment
@@ -119,6 +117,13 @@ events_logged:
   routing: direct
   provenance: ai-executed
   summary: Model construction localized, shared error policy verified, and original plus replacement GPU coverage retained.
+- turn: 14
+  type: experiment
+  id: N567
+  routing: direct
+  provenance: ai-executed
+  summary: Direct extraction accessors and narrower imports verified; source-free
+    Claude review scope recorded.
 ai_actions:
 - turn: 1
   action: Claude planned and edited the existing owners and family leaves. After its interrupted process stopped,
@@ -266,6 +271,17 @@ ai_actions:
   - tests/CMakeLists.txt
   - tests/integration/runtime/Test.RuntimeSandboxAcceptanceGpuSmoke.cpp
   - tasks/done/RUNTIME-249-model-materialization-locality.md
+- turn: 14
+  action: Root removed duplicate accessors and a nested allocation, narrowed interface
+    imports and added a compiler-boundary guard. Claude consulted on design summaries;
+    source review local. Final CPU, sanitizer, Vulkan and app builds passed; RUNTIME-250
+    retired.
+  provenance: ai-executed
+  files_changed:
+  - src/runtime/Rendering/Runtime.RenderExtraction.cppm
+  - src/runtime/Rendering/Runtime.RenderExtraction.Internal.cpp
+  - tests/CMakeLists.txt
+  - tasks/done/RUNTIME-250-render-extraction-forwarding.md
 claims_touched:
 - id: C93
   action: crystallized
@@ -309,6 +325,10 @@ key_context:
 - turn: 13
   excerpt: User requests continued duplicate-code and compilation cleanup with Claude through plan,
     implementation, review, tests and fixes. Source-sharing and local commit authorization persist.
+- turn: 14
+  excerpt: User requests continued cleanup with Claude. Automatic approval rejected
+    the full-source transfer; approved source-free design summaries provided the collaboration
+    without sending that packet.
 open_threads:
 - BUILD-007 owns matched clean-source engine compile reconciliation; BUILD-006 separately owns backend/cache comparisons.
   C92 remains a hypothesis.

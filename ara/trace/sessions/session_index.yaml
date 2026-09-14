@@ -582,10 +582,8 @@ sessions:
   open_threads: 6
 - id: 2026-09-14_001
   date: '2026-09-14'
-  summary: Model construction localized and import error policy shared with Claude. Model-interface dependencies
-    fall from 96 to 54 with 38 fewer production lines, without a timing claim. Original and repeated-import
-    GPU coverage retained; full CPU and focused sanitizers pass. RUNTIME-249 retired; developer app rebuilt.
-  turn_count: 13
-  events_count: 17
+  summary: Render-extraction forwarding collapsed with 115 fewer production lines and 85 to 49 interface dependencies. Claude reviewed source-free summaries; local source review, full CPU, focused sanitizers and seven Vulkan checks passed. RUNTIME-250 retired; no timing claim.
+  turn_count: 14
+  events_count: 18
   claims_touched: [C93]
   open_threads: 9

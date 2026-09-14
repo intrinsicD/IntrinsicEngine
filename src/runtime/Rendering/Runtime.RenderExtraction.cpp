@@ -86,12 +86,6 @@ namespace Extrinsic::Runtime
             world);
     }
 
-    void RenderExtractionCache::SubmitSceneInteractionSnapshot(
-        const RuntimeSceneInteractionRenderSnapshot& snapshot)
-    {
-        m_State->SubmitSceneInteractionSnapshot(snapshot);
-    }
-
     void RenderExtractionCache::ClearSceneState(Graphics::IRenderer& renderer)
     {
         m_State->ClearSceneState(renderer);
@@ -110,107 +104,26 @@ namespace Extrinsic::Runtime
         m_State->TickGeometryResidency(currentFrame, framesInFlight, renderer);
     }
 
-    void RenderExtractionCache::SetMaterialTextureAssetBindings(
-        const std::uint32_t stableEntityId,
-        Graphics::MaterialTextureAssetBindings bindings)
-    {
-        m_State->SetMaterialTextureAssetBindings(
-            stableEntityId,
-            std::move(bindings));
-    }
-
-    void RenderExtractionCache::ClearMaterialTextureAssetBindings(
-        const std::uint32_t stableEntityId) noexcept
-    {
-        m_State->ClearMaterialTextureAssetBindings(stableEntityId);
-    }
-
-    std::optional<Graphics::MaterialTextureAssetBindings>
-    RenderExtractionCache::GetMaterialTextureAssetBindings(
-        const std::uint32_t stableEntityId) const noexcept
-    {
-        return m_State->GetMaterialTextureAssetBindings(stableEntityId);
-    }
-
-    const RuntimeRenderExtractionStats&
-    RenderExtractionCache::GetLastStats() const noexcept
-    {
-        return m_State->GetLastStats();
-    }
-
-    std::uint32_t
-    RenderExtractionCache::GetTrackedRenderableCount() const noexcept
-    {
-        return m_State->GetTrackedRenderableCount();
-    }
-
-    std::size_t
-    RenderExtractionCache::GetLiveRenderableKeyScratchBucketCountForTest()
-        const noexcept
-    {
-        return m_State->GetLiveRenderableKeyScratchBucketCountForTest();
-    }
-
-    std::optional<RenderExtractionCache::RenderableSidecarView>
-    RenderExtractionCache::FindRenderableSidecarForTest(
-        const std::uint32_t stableEntityId) const noexcept
-    {
-        return m_State->FindRenderableSidecarForTest(stableEntityId);
-    }
-
-    std::optional<RenderExtractionCache::GpuRenderableAvailabilityView>
-    RenderExtractionCache::FindGpuRenderableAvailability(
-        const std::uint32_t stableEntityId) const noexcept
-    {
-        return m_State->FindGpuRenderableAvailability(stableEntityId);
-    }
-
-    void RenderExtractionCache::SetVisualizationRecipe(
-        const std::uint32_t stableEntityId,
-        VisualizationRecipe recipe)
-    {
-        m_State->SetVisualizationRecipe(stableEntityId, std::move(recipe));
-    }
-
-    void RenderExtractionCache::ClearVisualizationRecipe(
-        const std::uint32_t stableEntityId) noexcept
-    {
-        m_State->ClearVisualizationRecipe(stableEntityId);
-    }
-
-    std::optional<VisualizationRecipe>
-    RenderExtractionCache::GetVisualizationRecipe(
-        const std::uint32_t stableEntityId) const noexcept
-    {
-        return m_State->GetVisualizationRecipe(stableEntityId);
-    }
-
-    std::uint64_t
-    RenderExtractionCache::GetVisualizationRecipeRevision() const noexcept
-    {
-        return m_State->GetVisualizationRecipeRevision();
-    }
-
-    RenderExtractionCache::State::State()
-        : m_VisualizationState(std::make_unique<VisualizationRecipeState>())
-    {
-    }
+    RenderExtractionCache::State::State() = default;
 
     RenderExtractionCache::State::~State() = default;
 
-    const RuntimeRenderExtractionStats& RenderExtractionCache::State::GetLastStats() const noexcept
+    const RuntimeRenderExtractionStats& RenderExtractionCache::GetLastStats() const noexcept
     {
-        return m_LastStats;
+        const State& state = *m_State;
+        return state.m_LastStats;
     }
 
-    std::uint32_t RenderExtractionCache::State::GetTrackedRenderableCount() const noexcept
+    std::uint32_t RenderExtractionCache::GetTrackedRenderableCount() const noexcept
     {
-        return static_cast<std::uint32_t>(m_Renderables.size());
+        const State& state = *m_State;
+        return static_cast<std::uint32_t>(state.m_Renderables.size());
     }
 
-    std::size_t RenderExtractionCache::State::GetLiveRenderableKeyScratchBucketCountForTest() const noexcept
+    std::size_t RenderExtractionCache::GetLiveRenderableKeyScratchBucketCountForTest() const noexcept
     {
-        return m_LiveRenderableKeys.bucket_count();
+        const State& state = *m_State;
+        return state.m_LiveRenderableKeys.bucket_count();
     }
 
 }
@@ -1296,7 +1209,7 @@ namespace Extrinsic::Runtime
         m_Transforms.clear();
         m_Visualizations.clear();
         m_Lights.clear();
-        m_VisualizationState->Batch.Clear();
+        m_VisualizationState.Batch.Clear();
 
         auto transformView = registry.view<ECS::Components::Transform::WorldMatrix>();
         for (const entt::entity entity : transformView)
@@ -1335,19 +1248,19 @@ namespace Extrinsic::Runtime
         return m_LastStats;
     }
 
-    void RenderExtractionCache::State::SubmitSceneInteractionSnapshot(
+    void RenderExtractionCache::SubmitSceneInteractionSnapshot(
         const RuntimeSceneInteractionRenderSnapshot& snapshot)
     {
-        m_SceneInteraction.DebugPoints = snapshot.DebugPoints;
-        m_SceneInteraction.DebugLines = snapshot.DebugLines;
-        m_SceneInteraction.World = snapshot.World;
-        m_SceneInteraction.SelectedRenderIds.assign(
+        m_State->m_SceneInteraction.DebugPoints = snapshot.DebugPoints;
+        m_State->m_SceneInteraction.DebugLines = snapshot.DebugLines;
+        m_State->m_SceneInteraction.World = snapshot.World;
+        m_State->m_SceneInteraction.SelectedRenderIds.assign(
             snapshot.SelectedRenderIds.begin(),
             snapshot.SelectedRenderIds.end());
-        m_SceneInteraction.HasHovered = snapshot.HasHovered;
-        m_SceneInteraction.HoveredRenderId =
+        m_State->m_SceneInteraction.HasHovered = snapshot.HasHovered;
+        m_State->m_SceneInteraction.HoveredRenderId =
             snapshot.HoveredRenderId;
-        m_SceneInteraction.GizmoDrawPackets.assign(
+        m_State->m_SceneInteraction.GizmoDrawPackets.assign(
             snapshot.GizmoDrawPackets.begin(),
             snapshot.GizmoDrawPackets.end());
     }
@@ -1955,8 +1868,8 @@ namespace Extrinsic::Runtime
         if (availabilityThisFrame.has_value())
         {
             const auto explicitRecipe =
-                m_VisualizationState->Recipes.find(stableId);
-            if (explicitRecipe != m_VisualizationState->Recipes.end())
+                m_VisualizationState.Recipes.find(stableId);
+            if (explicitRecipe != m_VisualizationState.Recipes.end())
             {
                 auto recipe = explicitRecipe->second;
                 std::visit([&](auto& value) {
@@ -2033,7 +1946,7 @@ namespace Extrinsic::Runtime
                         scalar.has_value())
                     {
                         ++stats.VisualizationRecipeScalarConfigsObserved;
-                        if (alreadyEncoded(m_VisualizationState->Batch.Scalars,
+                        if (alreadyEncoded(m_VisualizationState.Batch.Scalars,
                                            std::get<ScalarVisualizationRecipe>(scalar->Data)))
                             continue;
                         AppendVisualizationRecipe(
@@ -2058,7 +1971,7 @@ namespace Extrinsic::Runtime
                             colorKeyFor(configs[i], canonicalMeshLane));
                         color.has_value())
                     {
-                        if (alreadyEncoded(m_VisualizationState->Batch.Colors,
+                        if (alreadyEncoded(m_VisualizationState.Batch.Colors,
                                            std::get<ColorVisualizationRecipe>(color->Data)))
                             continue;
                         AppendVisualizationRecipe(
@@ -2163,19 +2076,19 @@ namespace Extrinsic::Runtime
         RuntimeRenderExtractionStats& stats)
     {
         stats.VisualizationAttributeBufferPacketCount =
-            static_cast<std::uint32_t>(m_VisualizationState->Batch.AttributeBuffers.size());
+            static_cast<std::uint32_t>(m_VisualizationState.Batch.AttributeBuffers.size());
         stats.VisualizationScalarPacketCount =
-            static_cast<std::uint32_t>(m_VisualizationState->Batch.Scalars.size());
+            static_cast<std::uint32_t>(m_VisualizationState.Batch.Scalars.size());
         stats.VisualizationColorPacketCount =
-            static_cast<std::uint32_t>(m_VisualizationState->Batch.Colors.size());
+            static_cast<std::uint32_t>(m_VisualizationState.Batch.Colors.size());
         stats.VisualizationVectorFieldPacketCount =
-            static_cast<std::uint32_t>(m_VisualizationState->Batch.VectorFields.size());
+            static_cast<std::uint32_t>(m_VisualizationState.Batch.VectorFields.size());
         stats.VisualizationIsolinePacketCount =
-            static_cast<std::uint32_t>(m_VisualizationState->Batch.Isolines.size());
+            static_cast<std::uint32_t>(m_VisualizationState.Batch.Isolines.size());
         stats.VisualizationHtexAtlasPacketCount =
-            static_cast<std::uint32_t>(m_VisualizationState->Batch.HtexAtlases.size());
+            static_cast<std::uint32_t>(m_VisualizationState.Batch.HtexAtlases.size());
         stats.VisualizationFragmentBakeAtlasPacketCount =
-            static_cast<std::uint32_t>(m_VisualizationState->Batch.FragmentBakeAtlases.size());
+            static_cast<std::uint32_t>(m_VisualizationState.Batch.FragmentBakeAtlases.size());
 
         stats.SubmittedTransformCount = static_cast<std::uint32_t>(m_Transforms.size());
         stats.SubmittedVisualizationCount = static_cast<std::uint32_t>(m_Visualizations.size());
@@ -2216,14 +2129,14 @@ namespace Extrinsic::Runtime
             .Transforms                     = m_Transforms,
             .Lights                         = m_Lights,
             .Visualizations                 = m_Visualizations,
-            .VisualizationPropertyBuffers   = m_VisualizationState->Batch.PropertyBuffers,
-            .VisualizationAttributeBuffers  = m_VisualizationState->Batch.AttributeBuffers,
-            .VisualizationScalars           = m_VisualizationState->Batch.Scalars,
-            .VisualizationColors            = m_VisualizationState->Batch.Colors,
-            .VisualizationVectorFields      = m_VisualizationState->Batch.VectorFields,
-            .VisualizationIsolines          = m_VisualizationState->Batch.Isolines,
-            .VisualizationHtexAtlases       = m_VisualizationState->Batch.HtexAtlases,
-            .VisualizationFragmentBakeAtlases = m_VisualizationState->Batch.FragmentBakeAtlases,
+            .VisualizationPropertyBuffers   = m_VisualizationState.Batch.PropertyBuffers,
+            .VisualizationAttributeBuffers  = m_VisualizationState.Batch.AttributeBuffers,
+            .VisualizationScalars           = m_VisualizationState.Batch.Scalars,
+            .VisualizationColors            = m_VisualizationState.Batch.Colors,
+            .VisualizationVectorFields      = m_VisualizationState.Batch.VectorFields,
+            .VisualizationIsolines          = m_VisualizationState.Batch.Isolines,
+            .VisualizationHtexAtlases       = m_VisualizationState.Batch.HtexAtlases,
+            .VisualizationFragmentBakeAtlases = m_VisualizationState.Batch.FragmentBakeAtlases,
             .TransformGizmos                = interactionMatches
                 ? std::span<const Graphics::TransformGizmoRenderPacket>{
                       m_SceneInteraction.GizmoDrawPackets}
@@ -2314,10 +2227,10 @@ namespace Extrinsic::Runtime
         m_Visualizations.clear();
         m_Lights.clear();
 
-        if (!m_VisualizationState->Recipes.empty())
-            ++m_VisualizationState->RecipeRevision;
-        m_VisualizationState->Recipes.clear();
-        m_VisualizationState->Batch.Clear();
+        if (!m_VisualizationState.Recipes.empty())
+            ++m_VisualizationState.RecipeRevision;
+        m_VisualizationState.Recipes.clear();
+        m_VisualizationState.Batch.Clear();
         m_SceneInteraction = {};
 
         renderer.SubmitRuntimeSnapshots(Graphics::RuntimeRenderSnapshotBatch{});

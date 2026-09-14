@@ -542,6 +542,15 @@ copies caller storage into reusable extraction-owned storage. Extraction
 accepts it only for the current world and otherwise supplies empty interaction
 data. No controller, module pointer, pick/refinement context, or ECS handle is
 retained by graphics.
+
+`RenderExtractionCache` keeps its data in one private state owner. Public
+lookups and updates access that state in their existing implementation units;
+shared extraction, residency and shutdown algorithms remain private state
+methods. Visualization recipes and their encoding batch are a value member
+of that state. The public interface borrows `IRenderer` through its globally
+attached declaration; rendering implementation imports stay in the `.cpp`
+units. `RenderCompilationLocality.Extraction` checks this compiler boundary.
+
 `Extrinsic.Runtime.EditorPropertyWidgets` keeps scalar-property selector and
 finite-sample histogram models CPU-testable while its ImGui/ImPlot draw code and
 the manifest-managed `implot` dependency remain private to runtime.

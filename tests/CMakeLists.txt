@@ -398,6 +398,16 @@ add_test(NAME RenderCompilationLocality.EngineInterface
 set_tests_properties(RenderCompilationLocality.EngineInterface
     PROPERTIES LABELS "contract;build;runtime;graphics" TIMEOUT 30)
 
+# Extraction exposes renderer borrows; the implementation owns rendering calls.
+add_test(NAME RenderCompilationLocality.Extraction
+    COMMAND ${INTRINSIC_TEST_PYTHON_EXECUTABLE}
+        ${CMAKE_SOURCE_DIR}/tools/analysis/compile_hotspots.py --build-dir ${CMAKE_BINARY_DIR}
+        --check-source src/runtime/Rendering/Runtime.RenderExtraction.cppm
+        --forbid-module Extrinsic.Graphics.Renderer
+        --forbid-module Extrinsic.Graphics.MaterialSystem)
+set_tests_properties(RenderCompilationLocality.Extraction
+    PROPERTIES LABELS "contract;build;runtime;graphics" TIMEOUT 30)
+
 # The spatial query interface publishes CPU snapshots and framed GPU queues; it
 # borrows the world registry through a declaration only. A GPU LBVH workspace,
 # world-registry, job-service or RHI device/command edge here means a low-level
