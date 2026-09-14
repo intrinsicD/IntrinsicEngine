@@ -1,46 +1,10 @@
-// Executes direct and queued asset imports, preserving ingest identity and
-// main-thread materialization boundaries across payload-specific decoders.
-module;
-
-#include <cstddef>
-#include <cstdint>
-#include <functional>
-#include <memory>
-#include <optional>
-#include <span>
-#include <string>
-#include <string_view>
-#include <utility>
-#include <vector>
-
-export module Extrinsic.Runtime.AssetWorkflowImportExecutor;
-
-import Extrinsic.Asset.Registry;
-import Extrinsic.Asset.ImportRouter;
-import Extrinsic.Asset.Service;
-import Extrinsic.Core.Config.Engine;
-import Extrinsic.Core.Error;
-import Extrinsic.Core.IOBackend;
-import Extrinsic.ECS.Scene.Handle;
-import Extrinsic.ECS.Scene.Registry;
-import Extrinsic.Graphics.GpuAssetCache;
-import Extrinsic.Runtime.AssetIngestStateMachine;
-import Extrinsic.Runtime.AssetWorkflowModule;
-import Extrinsic.Runtime.AssetWorkflowModelMaterialization;
-import Extrinsic.Runtime.AssetWorkflowTextureResidency;
-import Extrinsic.Runtime.CameraControllers;
-import Extrinsic.Runtime.EditorCommandHistory;
-import Extrinsic.Runtime.JobService;
-import Extrinsic.Runtime.RenderExtraction;
-import Extrinsic.Runtime.SelectionController;
-import Extrinsic.Runtime.TextureBakeModule;
-import Extrinsic.Runtime.WorldHandle;
-import Extrinsic.Runtime.WorldRegistry;
-import Geometry.HalfedgeMesh.IO;
+// Private import execution state; include only in AssetWorkflowModule
+// implementation units after their imports. Queued work borrows this owner.
+#pragma once
 
 namespace Extrinsic::Runtime
 {
-    export struct AssetWorkflowImportExecutorDependencies
+    struct AssetWorkflowImportExecutorDependencies
     {
         const bool* Initialized{};
         const Core::Config::EngineConfig* Config{};
@@ -60,45 +24,10 @@ namespace Extrinsic::Runtime
         TextureBakeService* TextureBake{};
     };
 
-    struct BorrowedBool
-    {
-        const bool* Ptr{};
-        [[nodiscard]] operator bool() const noexcept { return Ptr != nullptr && *Ptr; }
-    };
-
-    template <typename T>
-    struct BorrowedSubsystem
-    {
-        T* Ptr{};
-
-        [[nodiscard]] T* get() const noexcept { return Ptr; }
-        [[nodiscard]] T& operator*() const noexcept { return *Ptr; }
-        [[nodiscard]] T* operator->() const noexcept { return Ptr; }
-        [[nodiscard]] operator bool() const noexcept { return Ptr != nullptr; }
-        [[nodiscard]] operator T*() const noexcept { return Ptr; }
-        [[nodiscard]] operator T&() const noexcept { return *Ptr; }
-
-        [[nodiscard]] friend bool operator==(
-            const BorrowedSubsystem subsystem,
-            std::nullptr_t) noexcept
-        {
-            return subsystem.Ptr == nullptr;
-        }
-
-        [[nodiscard]] friend bool operator!=(
-            const BorrowedSubsystem subsystem,
-            std::nullptr_t) noexcept
-        {
-            return subsystem.Ptr != nullptr;
-        }
-    };
-
-    export class AssetWorkflowImportExecutor
+    class AssetWorkflowImportExecutor
     {
     public:
         AssetWorkflowImportExecutor() = default;
-        explicit AssetWorkflowImportExecutor(
-            AssetWorkflowImportExecutorDependencies dependencies);
 
         AssetWorkflowImportExecutor(const AssetWorkflowImportExecutor&) = delete;
         AssetWorkflowImportExecutor& operator=(
@@ -131,10 +60,7 @@ namespace Extrinsic::Runtime
         [[nodiscard]] RuntimeAssetImportQueueSnapshot
             GetAssetImportQueueSnapshot() const;
         [[nodiscard]] TextureBakeService*
-            GetTextureBakeServiceForTest() const noexcept
-        {
-            return m_TextureBake.get();
-        }
+            GetTextureBakeServiceForTest() const noexcept;
         [[nodiscard]] std::size_t ClearCompletedAssetImports();
         [[nodiscard]] Core::Result CancelAssetImport(
             RuntimeAssetIngestHandle operation);
@@ -189,23 +115,10 @@ namespace Extrinsic::Runtime
             const ECS::Scene::Registry* scene,
             std::uint64_t bindingEpoch) const noexcept;
 
-        BorrowedBool m_Initialized{};
-        BorrowedSubsystem<const Core::Config::EngineConfig> m_Config{};
-        BorrowedSubsystem<JobService> m_Jobs{};
-        BorrowedSubsystem<WorldRegistry> m_WorldRegistry{};
-        WorldHandle m_World{DefaultWorldHandle};
+        [[nodiscard]] bool IsInitialized() const noexcept;
+
+        AssetWorkflowImportExecutorDependencies m_Dependencies{};
         std::uint64_t m_TargetBindingEpoch{0u};
-        std::function<bool()> m_BindingValid{};
-        BorrowedSubsystem<Assets::AssetService> m_AssetService{};
-        BorrowedSubsystem<Graphics::GpuAssetCache> m_GpuAssetCache{};
-        BorrowedSubsystem<AssetWorkflowTextureResidency> m_TextureResidency{};
-        BorrowedSubsystem<AssetWorkflowModelMaterializer> m_ModelMaterializer{};
-        BorrowedSubsystem<RenderExtractionCache> m_RenderExtraction{};
-        BorrowedSubsystem<ECS::Scene::Registry> m_Scene{};
-        BorrowedSubsystem<SelectionController> m_SelectionController{};
-        BorrowedSubsystem<CameraControllerRegistry> m_CameraControllers{};
-        BorrowedSubsystem<EditorCommandHistory> m_EditorCommandHistory{};
-        BorrowedSubsystem<TextureBakeService> m_TextureBake{};
         RuntimeIOBackendFactory m_ModelTextureImportIOBackendFactoryForTest{};
         std::function<void(const RuntimeAssetImportRequest&)>
             m_QueuedGeometryImportBeforeDecodeHookForTest{};

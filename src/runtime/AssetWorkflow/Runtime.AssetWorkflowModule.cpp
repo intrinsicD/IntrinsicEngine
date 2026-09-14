@@ -17,10 +17,12 @@ module;
 module Extrinsic.Runtime.AssetWorkflowModule;
 
 import Extrinsic.Asset.EventBus;
+import Extrinsic.Asset.ImportRouter;
 import Extrinsic.Asset.Registry;
 import Extrinsic.Asset.Service;
 import Extrinsic.Core.Config.Engine;
 import Extrinsic.Core.Error;
+import Extrinsic.Core.IOBackend;
 import Extrinsic.Core.Logging;
 import Extrinsic.ECS.Scene.Registry;
 import Extrinsic.ECS.Scene.Handle;
@@ -29,7 +31,7 @@ import Extrinsic.Graphics.Colormap;
 import Extrinsic.Graphics.Material;
 import Extrinsic.Graphics.Renderer;
 import Extrinsic.RHI.Device;
-import Extrinsic.Runtime.AssetWorkflowImportExecutor;
+import Extrinsic.Runtime.AssetIngestStateMachine;
 import Extrinsic.Runtime.AssetWorkflowModelMaterialization;
 import Extrinsic.Runtime.AssetWorkflowTextureResidency;
 import Extrinsic.Runtime.CameraControllers;
@@ -46,6 +48,8 @@ import Extrinsic.Runtime.ServiceRegistry;
 import Extrinsic.Runtime.TextureBakeModule;
 import Extrinsic.Runtime.WorldHandle;
 import Extrinsic.Runtime.WorldRegistry;
+
+#include "Runtime.AssetWorkflowImportExecutor.hpp"
 
 namespace Extrinsic::Runtime
 {

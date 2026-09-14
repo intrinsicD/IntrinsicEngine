@@ -12284,3 +12284,22 @@ tree:
     - ara/evidence/tables/keypoint_compute_verification_2026-09-14.md
     - tasks/done/RUNTIME-247-keypoint-vulkan-compute.md
     status: resolved
+
+  - id: N565
+    type: experiment
+    title: Consolidate the private asset-import executor and remove its module producer
+    provenance: ai-executed
+    timestamp: '2026-09-14T22:00:21+02:00'
+    result: Existing workflow ownership supports two implementation units sharing a private declaration.
+      Store the existing dependency record once; remove two borrowed-pointer wrappers and an unused constructor.
+      Correct explicit imports, named-module accessor linkage and the existing source-ownership test.
+      Claude approves the fixed source. Four production files remain, reduced from 5114 to 5018 lines;
+      compiler metadata has no retired executor producer. Full CPU has 4622 distinct passes plus one expected
+      unsanitized leak-control skip; 72 focused tests pass in each native, ASan and UBSan tree, and five
+      actual Vulkan import checks pass under the existing BUG-180 leak exclusion. Developer app rebuilt.
+      RUNTIME-248 retires. Mixed historical compile times are diagnostics; BUILD-007 and C92 remain open.
+    evidence:
+    - tasks/done/RUNTIME-248-private-asset-import-executor.md
+    - src/runtime/AssetWorkflow/Runtime.AssetWorkflowImportExecutor.hpp
+    - tests/contract/runtime/Test.RuntimeEnginePrivateGlue.cpp
+    status: resolved

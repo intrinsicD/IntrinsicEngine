@@ -20,7 +20,7 @@ Root scanned: `src`
 | `graphics/vulkan` | 13 |
 | `physics` | 1 |
 | `platform` | 5 |
-| `runtime` | 99 |
+| `runtime` | 98 |
 
 ## Modules
 
@@ -348,7 +348,6 @@ Root scanned: `src`
 | `Extrinsic.Platform.Backend.Null` | `src/platform/backends/null/Platform.Backend.Null.cppm` | `platform` |
 | `Extrinsic.Runtime.AssetIngestStateMachine` | `src/runtime/AssetWorkflow/Runtime.AssetIngestStateMachine.cppm` | `runtime` |
 | `Extrinsic.Runtime.AssetWorkflowGeometryMaterialization` | `src/runtime/AssetWorkflow/Runtime.AssetWorkflowGeometryMaterialization.cppm` | `runtime` |
-| `Extrinsic.Runtime.AssetWorkflowImportExecutor` | `src/runtime/AssetWorkflow/Runtime.AssetWorkflowImportExecutor.cppm` | `runtime` |
 | `Extrinsic.Runtime.AssetWorkflowModelMaterialization` | `src/runtime/AssetWorkflow/Runtime.AssetWorkflowModelMaterialization.cppm` | `runtime` |
 | `Extrinsic.Runtime.AssetWorkflowModelTextureDecode` | `src/runtime/AssetWorkflow/Runtime.AssetWorkflowModelTextureDecode.cppm` | `runtime` |
 | `Extrinsic.Runtime.AssetWorkflowModule` | `src/runtime/AssetWorkflow/Runtime.AssetWorkflowModule.cppm` | `runtime` |
@@ -446,4 +445,4 @@ Root scanned: `src`
 | `Extrinsic.Runtime.StableEntityLookup` | `src/runtime/Scene/Runtime.StableEntityLookup.cppm` | `runtime` |
 | `Extrinsic.Runtime.VisualizationRecipes` | `src/runtime/Visualization/Runtime.VisualizationRecipes.cppm` | `runtime` |
 
-Total modules: **419**
+Total modules: **418**

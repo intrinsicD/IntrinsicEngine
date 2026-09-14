@@ -2,11 +2,11 @@ session:
   id: 2026-09-14_001
   date: '2026-09-14'
   started: '2026-09-14T00:30:41+02:00'
-  last_turn: '2026-09-14T15:51:40+02:00'
-  turn_count: 11
-  summary: Full Vulkan keypoint computation implemented and reviewed with Claude, including numerical stability
-    repairs. Final native CPU, affected isolated sanitizers and seven actual Vulkan checks pass. C93 records
-    bounded capability/parity; dirty smoke and dragon timings remain diagnostic. BUG-194 display stays open.
+  last_turn: '2026-09-14T22:00:21+02:00'
+  turn_count: 12
+  summary: Asset-import executor consolidated with Claude using one dependency record, two pointer wrappers removed,
+    one module producer removed and 96 fewer production lines. Full CPU, focused sanitizers and five actual
+    Vulkan import checks pass; developer app rebuilt and RUNTIME-248 retired. BUILD-007 timing remains open.
 events_logged:
 - turn: 1
   type: experiment
@@ -107,6 +107,12 @@ events_logged:
   routing: crystallized
   provenance: ai-executed
   summary: Bound verified capability/parity to C93; no performance claim or original display-bug closure.
+- turn: 12
+  type: experiment
+  id: N565
+  routing: direct
+  provenance: ai-executed
+  summary: Private import execution consolidated, fixed after compiler and Claude review findings, verified and retired.
 ai_actions:
 - turn: 1
   action: Claude planned and edited the existing owners and family leaves. After its interrupted process stopped,
@@ -228,6 +234,19 @@ ai_actions:
   - tests/integration/graphics/Test.PointLBVHGpuSmoke.cpp
   - tasks/done/RUNTIME-247-keypoint-vulkan-compute.md
   - ara/evidence/diagnostics/keypoint_compute_2026-09-14/record.json
+- turn: 12
+  action: Root implemented the private executor header and canonical dependency record; Claude reviewed fixed
+    source packets. Corrected imports, accessor linkage and the ownership guard, ran full CPU and focused
+    sanitizer/Vulkan checks, rebuilt the developer app and retired RUNTIME-248. No new timing claim.
+  provenance: ai-executed
+  files_changed:
+  - src/runtime/AssetWorkflow/Runtime.AssetWorkflowImportExecutor.hpp
+  - src/runtime/AssetWorkflow/Runtime.AssetWorkflowImportExecutor.cpp
+  - src/runtime/AssetWorkflow/Runtime.AssetWorkflowModule.cpp
+  - src/runtime/CMakeLists.txt
+  - tests/contract/runtime/Test.RuntimeEnginePrivateGlue.cpp
+  - docs/architecture/runtime.md
+  - tasks/done/RUNTIME-248-private-asset-import-executor.md
 claims_touched:
 - id: C93
   action: crystallized
@@ -265,6 +284,9 @@ key_context:
 - turn: 11
   excerpt: User requested planning and implementation of a Vulkan keypoint backend, then continuation.
     Existing Claude sharing/review and completed-task retirement authorization persist.
+- turn: 12
+  excerpt: User requests continued duplicate-code and compilation cleanup with Claude through plan,
+    implement, review, test and fix. Existing source-sharing and local commit authorization persist.
 open_threads:
 - BUILD-007 owns matched clean-source engine compile reconciliation; BUILD-006 separately owns backend/cache comparisons.
   C92 remains a hypothesis.

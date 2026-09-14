@@ -2293,3 +2293,10 @@ entries:
       execution. Preserve failed numerical attempts and disk-truncated records with passing replacements.
     - Keep dirty Debug smoke and single cold dragon latency diagnostic. No generalized speedup, whole-engine
       completion, closure of BUG-194/193/195 or remote push is inferred. Unrelated observations retain their owners.
+
+  - turn: 2026-09-14_001#12
+    notes:
+    - Record N565 as executed refactor and verification facts, with ordinary task/source evidence. No new
+      benchmark, research claim or observation; module-count reduction does not settle C92 or BUILD-007.
+    - Preserve separate sanitizer and GPU evidence and the expected leak-control skip. Claude approved after
+      concrete compiler/review fixes. Existing staged research topics retain their open owners and flags.

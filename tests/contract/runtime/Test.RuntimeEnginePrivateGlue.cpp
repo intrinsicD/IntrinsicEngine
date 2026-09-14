@@ -635,7 +635,14 @@ TEST(RuntimeEnginePrivateGlue,
         {
             continue;
         }
-        if (ReadFile(entry.path()).find(
+        const auto source = ReadFile(entry.path());
+        if (source.find("#include \"Runtime.AssetWorkflowImportExecutor.hpp\"") !=
+            std::string::npos)
+        {
+            EXPECT_NE(source.find("module Extrinsic.Runtime.AssetWorkflowModule;"),
+                      std::string::npos) << entry.path();
+        }
+        if (source.find(
                 "module Extrinsic.Runtime.AssetWorkflowModule") !=
             std::string::npos)
         {
@@ -643,9 +650,10 @@ TEST(RuntimeEnginePrivateGlue,
         }
     }
 
-    ASSERT_EQ(workflowModuleUnits.size(), 2u);
+    ASSERT_EQ(workflowModuleUnits.size(), 3u);
     bool foundInterface = false;
     bool foundImplementation = false;
+    bool foundExecutor = false;
     for (const auto& owner : workflowModuleUnits)
     {
         foundInterface |=
@@ -656,9 +664,12 @@ TEST(RuntimeEnginePrivateGlue,
             owner ==
             root /
                 "src/runtime/AssetWorkflow/Runtime.AssetWorkflowModule.cpp";
+        foundExecutor |= owner == root /
+            "src/runtime/AssetWorkflow/Runtime.AssetWorkflowImportExecutor.cpp";
     }
     EXPECT_TRUE(foundInterface);
     EXPECT_TRUE(foundImplementation);
+    EXPECT_TRUE(foundExecutor);
     EXPECT_FALSE(std::filesystem::exists(
         root /
         "src/runtime/Runtime.AssetResidencyService.Internal.hpp"));
@@ -806,19 +817,24 @@ TEST(RuntimeEnginePrivateGlue,
     ASSERT_NE(privateBoundary, std::string::npos);
     const std::string publicSources = runtimeCMake.substr(0u, privateBoundary);
 
-    constexpr std::string_view privateModules[] = {
-        "Runtime.AssetWorkflowImportExecutor.cppm",
+    constexpr std::string_view privateSources[] = {
+        "Runtime.AssetWorkflowImportExecutor.hpp",
         "Runtime.AssetWorkflowGeometryMaterialization.cppm",
         "Runtime.AssetWorkflowModelMaterialization.cppm",
         "Runtime.AssetWorkflowModelTextureDecode.cppm",
         "Runtime.AssetWorkflowRecipePolicies.cppm",
         "Runtime.AssetWorkflowTextureResidency.cppm",
     };
-    for (const auto module : privateModules)
+    for (const auto source : privateSources)
     {
-        EXPECT_EQ(publicSources.find(module), std::string::npos) << module;
-        EXPECT_NE(runtimeCMake.find(module), std::string::npos) << module;
+        EXPECT_EQ(publicSources.find(source), std::string::npos) << source;
+        EXPECT_NE(runtimeCMake.find(source), std::string::npos) << source;
     }
+
+    EXPECT_EQ(runtimeCMake.find("Runtime.AssetWorkflowImportExecutor.cppm"),
+              std::string::npos);
+    EXPECT_FALSE(std::filesystem::exists(root /
+        "src/runtime/AssetWorkflow/Runtime.AssetWorkflowImportExecutor.cppm"));
 
     constexpr std::string_view retiredStems[] = {
         "AssetImportPipeline",

@@ -107,7 +107,6 @@ target_sources(${target_name}
         Editor/internal/Runtime.EditorWorkspaceAttachment.Detail.cppm
         PRIVATE
         FILE_SET asset_workflow_impl TYPE CXX_MODULES FILES
-        AssetWorkflow/Runtime.AssetWorkflowImportExecutor.cppm
         AssetWorkflow/Runtime.AssetWorkflowGeometryMaterialization.cppm
         AssetWorkflow/Runtime.AssetWorkflowModelMaterialization.cppm
         AssetWorkflow/Runtime.AssetWorkflowModelTextureDecode.cppm
@@ -121,6 +120,7 @@ target_sources(${target_name}
         Kernel/Runtime.AsyncWorkModule.cpp
         AssetWorkflow/Runtime.AssetWorkflowModule.cpp
         AssetWorkflow/Runtime.AssetWorkflowImportExecutor.cpp
+        AssetWorkflow/Runtime.AssetWorkflowImportExecutor.hpp
         AssetWorkflow/Runtime.AssetIngestStateMachine.cpp
         AssetWorkflow/Runtime.AssetWorkflowGeometryMaterialization.cpp
         AssetWorkflow/Runtime.AssetWorkflowModelMaterialization.cpp

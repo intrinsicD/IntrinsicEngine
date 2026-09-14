@@ -673,6 +673,11 @@ stale identities, and publication after a terminal stage fail closed. Worker
 stages own only copied CPU data and use `JobService`; the bounded main-thread
 apply boundary remains the only place that mutates imported ECS or asset state.
 Direct synchronous imports produce the same seven-stage trace.
+The import executor is private to `AssetWorkflowModule`: its declaration header
+is shared by the module's two implementation units, without a separate executor
+BMI. It stores the existing dependency record directly. Borrowed provider pointers
+remain guarded by the initialized value, binding epochs and submission identity;
+the workflow keeps the executor's address stable across reinitialization.
 Queued geometry and model/texture imports share executor-local submission,
 route/decode transitions and apply preflight using that captured identity.
 Payload-specific decoding, service requirements and materialization stay in

@@ -8251,3 +8251,5 @@ Retain terminal job outcomes while pending consumers reference them, so reaping 
 - 2026-09-14 — **RUNTIME-246**: Consolidate workspace context binding conversion. Locally verified and integrated in `8a35af54aa70c8e7a7f4bebe48ceabc1eda1e186`. BUILD-007 owns matched compile timing. [Task](RUNTIME-246-workspace-context-binding-consolidation.md).
 
 - 2026-09-14 — **RUNTIME-247**: Full Vulkan keypoint computation. Bounded **Operational** CPU/reference and actual Vulkan evidence in C93; source hashes and receipts bind this retirement commit. No repeatable speedup claim; BUG-194 display, BUG-193 pacing and BUG-195 verification headroom remain open. [Task](RUNTIME-247-keypoint-vulkan-compute.md).
+
+- 2026-09-14 — **RUNTIME-248**: Make the asset-import executor private to its owning workflow module and store its dependencies once. Remove two pointer wrappers, 96 production lines and one module producer; no timing claim. Claude approved; full CPU, focused sanitizers and five actual Vulkan import checks pass. Implementation and retirement are in the enclosing commit. BUILD-007 owns matched compile timing. [Task](RUNTIME-248-private-asset-import-executor.md).

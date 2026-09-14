@@ -20,7 +20,7 @@ module;
 #include <glm/glm.hpp>
 #include <glm/gtc/quaternion.hpp>
 
-module Extrinsic.Runtime.AssetWorkflowImportExecutor;
+module Extrinsic.Runtime.AssetWorkflowModule;
 
 import Extrinsic.Asset.GeometryPayload;
 import Extrinsic.Asset.ImportRouter;
@@ -28,6 +28,7 @@ import Extrinsic.Asset.ModelTexturePayload;
 import Extrinsic.Asset.Registry;
 import Extrinsic.Asset.Service;
 import Extrinsic.Core.Dag.Scheduler;
+import Extrinsic.Core.Config.Engine;
 import Extrinsic.Core.Error;
 import Extrinsic.Core.IOBackend;
 import Extrinsic.Core.Logging;
@@ -36,14 +37,17 @@ import Extrinsic.ECS.Component.Culling.World;
 import Extrinsic.ECS.Components.GeometrySources;
 import Extrinsic.ECS.Components.GeometrySourcesPopulate;
 import Extrinsic.ECS.Scene.Bootstrap;
+import Extrinsic.ECS.Scene.Handle;
 import Extrinsic.ECS.Scene.Registry;
 import Extrinsic.Graphics.GpuAssetCache;
 import Extrinsic.Runtime.AssetWorkflowGeometryMaterialization;
+import Extrinsic.Runtime.AssetIngestStateMachine;
 import Extrinsic.Runtime.AssetWorkflowRecipePolicies;
 import Extrinsic.Runtime.AssetWorkflowModelMaterialization;
 import Extrinsic.Runtime.AssetWorkflowTextureResidency;
 import Extrinsic.Runtime.AssetWorkflowModelTextureDecode;
 import Extrinsic.Runtime.CameraControllers;
+import Extrinsic.Runtime.EditorCommandHistory;
 import Extrinsic.Runtime.CameraFocusCommand;
 import Extrinsic.Runtime.JobService;
 import Extrinsic.Runtime.KernelEvents;
@@ -58,6 +62,8 @@ import Geometry.HalfedgeMesh.IO;
 import Geometry.PointCloud;
 import Geometry.PointCloud.IO;
 import Geometry.Properties;
+
+#include "Runtime.AssetWorkflowImportExecutor.hpp"
 
 namespace Extrinsic::Runtime
 {
@@ -1523,15 +1529,20 @@ namespace Extrinsic::Runtime
         }
     }
 
-    AssetWorkflowImportExecutor::AssetWorkflowImportExecutor(
-        AssetWorkflowImportExecutorDependencies dependencies)
+    TextureBakeService* AssetWorkflowImportExecutor::GetTextureBakeServiceForTest() const noexcept
     {
-        SetDependencies(dependencies);
+        return m_Dependencies.TextureBake;
+    }
+
+    bool AssetWorkflowImportExecutor::IsInitialized() const noexcept
+    {
+        return m_Dependencies.Initialized != nullptr && *m_Dependencies.Initialized;
     }
 
     void AssetWorkflowImportExecutor::SetDependencies(
         AssetWorkflowImportExecutorDependencies dependencies) noexcept
     {
+        static_assert(std::is_nothrow_move_assignable_v<AssetWorkflowImportExecutorDependencies>);
         // Active-scene handoffs are replaced on every world switch. The world
         // handle and scene address can both become equal again after an
         // away-and-back switch, so pointer identity alone cannot prove that a
@@ -1539,31 +1550,7 @@ namespace Extrinsic::Runtime
         ++m_TargetBindingEpoch;
         if (m_TargetBindingEpoch == 0u)
             m_TargetBindingEpoch = 1u;
-        m_Initialized = BorrowedBool{dependencies.Initialized};
-        m_Config = BorrowedSubsystem<const Core::Config::EngineConfig>{dependencies.Config};
-        m_Jobs = BorrowedSubsystem<JobService>{dependencies.Jobs};
-        m_WorldRegistry = BorrowedSubsystem<WorldRegistry>{dependencies.Worlds};
-        m_World = dependencies.World;
-        m_BindingValid = std::move(dependencies.BindingValid);
-        m_AssetService = BorrowedSubsystem<Assets::AssetService>{dependencies.AssetService};
-        m_GpuAssetCache = BorrowedSubsystem<Graphics::GpuAssetCache>{dependencies.GpuAssetCache};
-        m_TextureResidency =
-            BorrowedSubsystem<AssetWorkflowTextureResidency>{dependencies.TextureResidency};
-        m_ModelMaterializer =
-            BorrowedSubsystem<AssetWorkflowModelMaterializer>{dependencies.ModelMaterializer};
-        m_RenderExtraction =
-            BorrowedSubsystem<RenderExtractionCache>{dependencies.RenderExtraction};
-        m_Scene = BorrowedSubsystem<ECS::Scene::Registry>{dependencies.Scene};
-        m_SelectionController =
-            BorrowedSubsystem<SelectionController>{dependencies.Selection};
-        m_CameraControllers =
-            BorrowedSubsystem<CameraControllerRegistry>{
-                dependencies.CameraControllers};
-        m_EditorCommandHistory =
-            BorrowedSubsystem<EditorCommandHistory>{dependencies.CommandHistory};
-        m_TextureBake =
-            BorrowedSubsystem<TextureBakeService>{
-                dependencies.TextureBake};
+        m_Dependencies = std::move(dependencies);
     }
 
     bool AssetWorkflowImportExecutor::IsCurrentSubmissionTarget(
@@ -1574,11 +1561,11 @@ namespace Extrinsic::Runtime
         return bindingEpoch == m_TargetBindingEpoch &&
             world.IsValid() &&
             scene != nullptr &&
-            m_WorldRegistry != nullptr &&
-            m_World == world &&
-            m_Scene.get() == scene &&
-            m_WorldRegistry->ActiveWorld() == world &&
-            m_WorldRegistry->Get(world) == scene;
+            m_Dependencies.Worlds != nullptr &&
+            m_Dependencies.World == world &&
+            m_Dependencies.Scene == scene &&
+            m_Dependencies.Worlds->ActiveWorld() == world &&
+            m_Dependencies.Worlds->Get(world) == scene;
     }
 
     Core::Expected<RuntimeAssetImportResult> AssetWorkflowImportExecutor::ImportAssetFromPath(
@@ -1590,7 +1577,7 @@ namespace Extrinsic::Runtime
             {});
         if (result.has_value() && CreatesOrChangesScene(*result))
         {
-            (void)m_EditorCommandHistory->MarkDirty("Import Asset");
+            (void)m_Dependencies.CommandHistory->MarkDirty("Import Asset");
         }
         return result;
     }
@@ -1648,10 +1635,10 @@ namespace Extrinsic::Runtime
             .PayloadKind = request.PayloadKind,
         };
 
-        if (m_AssetService && request.Asset.IsValid() &&
-            m_AssetService->IsAlive(request.Asset))
+        if (m_Dependencies.AssetService && request.Asset.IsValid() &&
+            m_Dependencies.AssetService->IsAlive(request.Asset))
         {
-            auto path = m_AssetService->GetPath(request.Asset);
+            auto path = m_Dependencies.AssetService->GetPath(request.Asset);
             if (path.has_value())
             {
                 importRequest.Path = std::move(*path);
@@ -1663,7 +1650,7 @@ namespace Extrinsic::Runtime
             if (importRequest.PayloadKind == Assets::AssetPayloadKind::Unknown)
             {
                 auto payloadKind =
-                    PayloadKindForExistingAsset(*m_AssetService, request.Asset);
+                    PayloadKindForExistingAsset(*m_Dependencies.AssetService, request.Asset);
                 if (payloadKind.has_value())
                 {
                     importRequest.PayloadKind = *payloadKind;
@@ -1681,7 +1668,7 @@ namespace Extrinsic::Runtime
             request.Asset);
         if (result.has_value() && CreatesOrChangesScene(*result))
         {
-            (void)m_EditorCommandHistory->MarkDirty("Reimport Asset");
+            (void)m_Dependencies.CommandHistory->MarkDirty("Reimport Asset");
         }
         return result;
     }
@@ -1740,7 +1727,7 @@ namespace Extrinsic::Runtime
 
             if (taskIt == m_AssetImportJobs.end() ||
                 !taskIt->Job.IsValid() ||
-                !m_Jobs)
+                !m_Dependencies.Jobs)
             {
                 entry.CanCancel = false;
                 entry.CancelDisabledReason =
@@ -1750,7 +1737,7 @@ namespace Extrinsic::Runtime
 
             entry.CanCancel =
                 QueueStageCanUseAsyncCancellation(entry.Stage) &&
-                JobStateCanCancel(m_Jobs->GetState(taskIt->Job));
+                JobStateCanCancel(m_Dependencies.Jobs->GetState(taskIt->Job));
             if (!entry.CanCancel)
             {
                 entry.CancelDisabledReason =
@@ -1813,12 +1800,12 @@ namespace Extrinsic::Runtime
             });
         if (taskIt == m_AssetImportJobs.end() ||
             !taskIt->Job.IsValid() ||
-            !m_Jobs)
+            !m_Dependencies.Jobs)
         {
             return Core::Err(Core::ErrorCode::InvalidState);
         }
 
-        const JobState state = m_Jobs->GetState(taskIt->Job);
+        const JobState state = m_Dependencies.Jobs->GetState(taskIt->Job);
         if (!JobStateCanCancel(state) &&
             !(allowWaitingForMainThreadApply &&
               state == JobState::AwaitingGate))
@@ -1826,7 +1813,7 @@ namespace Extrinsic::Runtime
             return Core::Err(Core::ErrorCode::InvalidState);
         }
 
-        (void)m_Jobs->Cancel(taskIt->Job);
+        (void)m_Dependencies.Jobs->Cancel(taskIt->Job);
         RuntimeAssetIngestTransition cancelled =
             m_AssetIngestStateMachine.Cancel(operation);
         const bool cancelledRecord =
@@ -1986,7 +1973,7 @@ namespace Extrinsic::Runtime
                 {});
             if (result.has_value() && CreatesOrChangesScene(*result))
             {
-                (void)m_EditorCommandHistory->MarkDirty("Import Asset");
+                (void)m_Dependencies.CommandHistory->MarkDirty("Import Asset");
             }
         }
     }
@@ -2020,9 +2007,9 @@ namespace Extrinsic::Runtime
         return std::make_shared<AssetImportStageTrace>(AssetImportStageTrace{
             .Identity = AssetImportExecutionIdentity{
                 .Request = submit.Handle,
-                .World = m_World,
+                .World = m_Dependencies.World,
                 .BindingGeneration = m_TargetBindingEpoch,
-                .CancellationGeneration = m_Jobs ? m_Jobs->WorldGeneration(m_World) : 0u,
+                .CancellationGeneration = m_Dependencies.Jobs ? m_Dependencies.Jobs->WorldGeneration(m_Dependencies.World) : 0u,
             },
         });
     }
@@ -2121,14 +2108,14 @@ namespace Extrinsic::Runtime
         auto stageTrace = std::move(*submitted);
         const RuntimeAssetIngestHandle operation = stageTrace->Identity.Request;
         const WorldHandle submissionWorld = stageTrace->Identity.World;
-        ECS::Scene::Registry* const submissionScene = m_Scene.get();
+        ECS::Scene::Registry* const submissionScene = m_Dependencies.Scene;
         const std::uint64_t submissionBindingEpoch = stageTrace->Identity.BindingGeneration;
-        if (!m_Initialized ||
-            !m_Jobs ||
-            !m_AssetService ||
-            !m_GpuAssetCache ||
-            !m_RenderExtraction ||
-            !m_EditorCommandHistory ||
+        if (!IsInitialized() ||
+            !m_Dependencies.Jobs ||
+            !m_Dependencies.AssetService ||
+            !m_Dependencies.GpuAssetCache ||
+            !m_Dependencies.RenderExtraction ||
+            !m_Dependencies.CommandHistory ||
             !IsCurrentSubmissionTarget(
                 submissionWorld,
                 submissionScene,
@@ -2179,7 +2166,7 @@ namespace Extrinsic::Runtime
         auto beforeDecodeHook =
             m_QueuedGeometryImportBeforeDecodeHookForTest;
 
-        const JobToken handle = m_Jobs->Submit(
+        const JobToken handle = m_Dependencies.Jobs->Submit(
             JobDesc{
                 .DebugName = "Runtime.ImportGeometry." +
                     FileNameFromPath(request.Path),
@@ -2275,7 +2262,7 @@ namespace Extrinsic::Runtime
                         if (state->Recipe.ExistingAsset.IsValid())
                         {
                             auto reloaded = ReloadDecodedGeometryImport(
-                                *m_AssetService,
+                                *m_Dependencies.AssetService,
                                 state->Recipe.ExistingAsset,
                                 *state->Decoded);
                             if (!reloaded.has_value())
@@ -2289,13 +2276,13 @@ namespace Extrinsic::Runtime
                         }
 
                         return MaterializeDecodedGeometryImport(
-                            *m_AssetService,
+                            *m_Dependencies.AssetService,
                             *submissionScene,
-                            m_Jobs.get(),
-                            m_WorldRegistry.get(),
+                            m_Dependencies.Jobs,
+                            m_Dependencies.Worlds,
                             submissionWorld,
-                            m_BindingValid,
-                            m_TextureBake.get(),
+                            m_Dependencies.BindingValid,
+                            m_Dependencies.TextureBake,
                             state->Recipe,
                             *state->Decoded);
                     }();
@@ -2317,9 +2304,9 @@ namespace Extrinsic::Runtime
                                             1u),
                                         materialized->FocusTarget,
                                         *submissionScene,
-                                        m_SelectionController.get(),
-                                        m_Config.get(),
-                                        m_CameraControllers.get());
+                                        m_Dependencies.Selection,
+                                        m_Dependencies.Config,
+                                        m_Dependencies.CameraControllers);
                                 !completed.has_value())
                             {
                                 result = Core::Err<RuntimeAssetImportResult>(
@@ -2355,7 +2342,7 @@ namespace Extrinsic::Runtime
                             }
                             else if (CreatesOrChangesScene(*result))
                             {
-                                (void)m_EditorCommandHistory->MarkDirty("Import Asset");
+                                (void)m_Dependencies.CommandHistory->MarkDirty("Import Asset");
                             }
                         }
                         if (result.has_value())
@@ -2504,14 +2491,14 @@ namespace Extrinsic::Runtime
         auto stageTrace = std::move(*submitted);
         const RuntimeAssetIngestHandle operation = stageTrace->Identity.Request;
         const WorldHandle submissionWorld = stageTrace->Identity.World;
-        ECS::Scene::Registry* const submissionScene = m_Scene.get();
+        ECS::Scene::Registry* const submissionScene = m_Dependencies.Scene;
         const std::uint64_t submissionBindingEpoch = stageTrace->Identity.BindingGeneration;
-        if (!m_Initialized ||
-            !m_Jobs ||
-            !m_AssetService ||
-            !m_GpuAssetCache ||
-            !m_TextureResidency ||
-            !m_ModelMaterializer ||
+        if (!IsInitialized() ||
+            !m_Dependencies.Jobs ||
+            !m_Dependencies.AssetService ||
+            !m_Dependencies.GpuAssetCache ||
+            !m_Dependencies.TextureResidency ||
+            !m_Dependencies.ModelMaterializer ||
             !IsCurrentSubmissionTarget(
                 submissionWorld,
                 submissionScene,
@@ -2556,7 +2543,7 @@ namespace Extrinsic::Runtime
         RuntimeIOBackendFactory ioBackendFactory =
             m_ModelTextureImportIOBackendFactoryForTest;
 
-        const JobToken handle = m_Jobs->Submit(
+        const JobToken handle = m_Dependencies.Jobs->Submit(
             JobDesc{
                 .DebugName = "Runtime.ImportModelTexture." +
                     FileNameFromPath(request.Path),
@@ -2686,13 +2673,13 @@ namespace Extrinsic::Runtime
                         Assets::AssetPayloadKind::ModelScene)
                     {
                         result = MaterializeDecodedModelSceneImport(
-                            *m_AssetService,
-                            *m_ModelMaterializer,
+                            *m_Dependencies.AssetService,
+                            *m_Dependencies.ModelMaterializer,
                             *submissionScene,
                             state->Recipe,
-                            m_SelectionController.get(),
-                            m_CameraControllers.get(),
-                            m_Config.get(),
+                            m_Dependencies.Selection,
+                            m_Dependencies.CameraControllers,
+                            m_Dependencies.Config,
                             state->Request,
                             existingAsset,
                             std::move(std::get<Assets::AssetModelScenePayload>(
@@ -2701,9 +2688,9 @@ namespace Extrinsic::Runtime
                     else
                     {
                         result = MaterializeDecodedTextureImport(
-                            *m_AssetService,
-                            *m_GpuAssetCache,
-                            *m_TextureResidency,
+                            *m_Dependencies.AssetService,
+                            *m_Dependencies.GpuAssetCache,
+                            *m_Dependencies.TextureResidency,
                             state->Request,
                             existingAsset,
                             std::move(std::get<Assets::AssetTexture2DPayload>(
@@ -2742,7 +2729,7 @@ namespace Extrinsic::Runtime
                             }
                             else if (CreatesOrChangesScene(*result))
                             {
-                                (void)m_EditorCommandHistory->MarkDirty("Import Asset");
+                                (void)m_Dependencies.CommandHistory->MarkDirty("Import Asset");
                             }
                         }
                         if (result.has_value())
@@ -2882,10 +2869,10 @@ namespace Extrinsic::Runtime
         AssetImportStageTrace stageTrace{
             .Identity = AssetImportExecutionIdentity{
                 .Request = submit.Handle,
-                .World = m_World,
+                .World = m_Dependencies.World,
                 .BindingGeneration = m_TargetBindingEpoch,
-                .CancellationGeneration = m_Jobs
-                    ? m_Jobs->WorldGeneration(m_World)
+                .CancellationGeneration = m_Dependencies.Jobs
+                    ? m_Dependencies.Jobs->WorldGeneration(m_Dependencies.World)
                     : 0u,
             },
         };
@@ -2897,7 +2884,7 @@ namespace Extrinsic::Runtime
             {
                 targetError = Core::ErrorCode::InvalidArgument;
             }
-            else if (!m_AssetService || !m_AssetService->IsAlive(existingAsset))
+            else if (!m_Dependencies.AssetService || !m_Dependencies.AssetService->IsAlive(existingAsset))
             {
                 targetError = Core::ErrorCode::ResourceNotFound;
             }
@@ -3241,15 +3228,15 @@ namespace Extrinsic::Runtime
         RuntimeAssetImportRequest request,
         const Assets::AssetId existingAsset)
     {
-        if (!m_Initialized ||
-            !m_AssetService ||
-            !m_GpuAssetCache ||
-            !m_TextureResidency ||
-            !m_ModelMaterializer ||
-            !m_Scene ||
+        if (!IsInitialized() ||
+            !m_Dependencies.AssetService ||
+            !m_Dependencies.GpuAssetCache ||
+            !m_Dependencies.TextureResidency ||
+            !m_Dependencies.ModelMaterializer ||
+            !m_Dependencies.Scene ||
             !IsCurrentSubmissionTarget(
-                m_World,
-                m_Scene.get(),
+                m_Dependencies.World,
+                m_Dependencies.Scene,
                 m_TargetBindingEpoch))
         {
             return Core::Err<RuntimeAssetImportResult>(Core::ErrorCode::InvalidState);
@@ -3287,19 +3274,19 @@ namespace Extrinsic::Runtime
             if (existingAsset.IsValid())
             {
                 return ReloadDecodedGeometryImport(
-                    *m_AssetService,
+                    *m_Dependencies.AssetService,
                     existingAsset,
                     *decoded);
             }
 
             auto materialized = MaterializeDecodedGeometryImport(
-                *m_AssetService,
-                *m_Scene,
-                m_Jobs.get(),
-                m_WorldRegistry.get(),
-                m_World,
-                m_BindingValid,
-                m_TextureBake.get(),
+                *m_Dependencies.AssetService,
+                *m_Dependencies.Scene,
+                m_Dependencies.Jobs,
+                m_Dependencies.Worlds,
+                m_Dependencies.World,
+                m_Dependencies.BindingValid,
+                m_Dependencies.TextureBake,
                 recipe,
                 *decoded);
             if (!materialized.has_value())
@@ -3313,10 +3300,10 @@ namespace Extrinsic::Runtime
                     recipe.Completion.FocusCameraOnCreatedGeometry,
                     std::span<const ECS::EntityHandle>(&createdEntity, 1u),
                     materialized->FocusTarget,
-                    *m_Scene,
-                    m_SelectionController.get(),
-                    m_Config.get(),
-                    m_CameraControllers.get());
+                    *m_Dependencies.Scene,
+                    m_Dependencies.Selection,
+                    m_Dependencies.Config,
+                    m_Dependencies.CameraControllers);
                 !completed.has_value())
             {
                 return Core::Err<RuntimeAssetImportResult>(completed.error());
@@ -3345,13 +3332,13 @@ namespace Extrinsic::Runtime
             }
 
             return MaterializeDecodedModelSceneImport(
-                *m_AssetService,
-                *m_ModelMaterializer,
-                *m_Scene,
+                *m_Dependencies.AssetService,
+                *m_Dependencies.ModelMaterializer,
+                *m_Dependencies.Scene,
                 recipe,
-                m_SelectionController.get(),
-                m_CameraControllers.get(),
-                m_Config.get(),
+                m_Dependencies.Selection,
+                m_Dependencies.CameraControllers,
+                m_Dependencies.Config,
                 request,
                 existingAsset,
                 std::move(*decoded));
@@ -3364,9 +3351,9 @@ namespace Extrinsic::Runtime
         }
 
         return MaterializeDecodedTextureImport(
-            *m_AssetService,
-            *m_GpuAssetCache,
-            *m_TextureResidency,
+            *m_Dependencies.AssetService,
+            *m_Dependencies.GpuAssetCache,
+            *m_Dependencies.TextureResidency,
             request,
             existingAsset,
             std::move(*decoded));
