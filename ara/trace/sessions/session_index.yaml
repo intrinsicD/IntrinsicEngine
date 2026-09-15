@@ -590,8 +590,8 @@ sessions:
 
 - id: 2026-09-15_001
   date: '2026-09-15'
-  summary: RUNTIME259 and260 are retired, locally committed and sealed;13importlines removed with body unchanged, actual compiler closure176to171. RUNTIME261 six-runtime-import plan prepared; overnight remains active until08:00Berlin.
-  turn_count: 14
-  events_count: 14
+  summary: "RUNTIME-261 retired, committed and sealed: six import lines removed, actual compiler closure171to161, bodies unchanged. Claude caught and re-reviewed a corrected export-audit omission. RUNTIME262 direct recipe-owner substitution is prepared; overnight continues until08:00Berlin."
+  turn_count: 15
+  events_count: 15
   claims_touched: []
   open_threads: 10

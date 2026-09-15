@@ -12722,3 +12722,32 @@ tree:
     - tasks/evidence/RUNTIME-260/structural-counts.json
     - tasks/done/RUNTIME-261-workspace-model-runtime-imports.md
     status: resolved
+
+  - id: N582
+    type: experiment
+    title: Remove six runtime imports and prepare direct visualization-recipe ownership
+    provenance: ai-executed
+    timestamp: '2026-09-15T06:37:04+02:00'
+    result: 'Claude deleted six exact import lines from Models.cpp,3463to3457lines and66to60directimports.
+      Root proved every remaining byte and876other productionfiles unchanged. Actual compiler moduleclosure171to161:
+      ClusteringModule/Types,ParameterizationConfig,ProgressivePoissonConfig/GpuBackend,SceneInteractionModule,GizmoInteraction,ComputeParallelPrimitives,GpuTransfer,BufferTransfer
+      leave; MeshPrimitiveView remains transitive. Initial independent review blocked on missing BuildPrimitiveSelectionRenderSnapshot
+      in the prefix-based function inventory. Root searched complete body/four headers with zerohits, manually
+      enumerated all namespace-level functions including individually exported declarations, labeled conservative
+      all-type inventory including private names, and preserved initial review. Independent follow-up approved;
+      no source fix. Both ToString calls keep exact GeometryPresentation scoped-enum overloads and direct
+      GeometryAvailability/processing/selection owners remain. All gates pass:235focusednative,4636fullCPUplusoneexpectedGLFW/LSanskip,202ASan,202UBSan,Vulkanruntimecompile,structural
+      and corrected owner-audit receipt. Source143e8f97c,seald9e43b752; final evidence0errors105warnings,claimreleased.
+      No timing,GPUexecution or fullsanitizersuite claim. RUNTIME262 prepared to replace only RenderExtraction
+      import with directVisualizationRecipes and add one architecture owner sentence; root confirmed EngineConfigControl
+      reexportsRenderRecipeActivation, so no speculative extra import. Root corrected plan visibility/bytecode
+      and producer wording; nextfocus adds existing15VisualizationRecipes cases. No new implementation started.
+      BUILD007/C92 and N569 remainopen.'
+    evidence:
+    - tasks/done/RUNTIME-261-workspace-model-runtime-imports.md
+    - tasks/evidence/RUNTIME-261/seal.yaml
+    - tasks/evidence/RUNTIME-261/structural-counts.json
+    - tasks/evidence/RUNTIME-261/initial-review.txt
+    - tasks/evidence/RUNTIME-261/source-review.txt
+    - tasks/backlog/runtime/RUNTIME-262-workspace-model-recipe-owner.md
+    status: resolved

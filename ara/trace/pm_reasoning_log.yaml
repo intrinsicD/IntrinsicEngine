@@ -2429,3 +2429,16 @@ entries:
       facade paths.
     - No new research claim or observation needed. Preserve pending observations and BUILD007/C92; N569 and
       heartbeat remainopen until deadline or justifiedstop.
+
+  - turn: 2026-09-15_001#15
+    notes:
+    - 'Initial review failure was useful: a name-prefix heuristic omitted an individually exported free function.
+      Preserve it and use manually checked namespace declaration inventories, distinguishing conservative
+      type lists from an export parser.'
+    - Record171to161 actual compiler module count, not six directdeletions as six transitive removals. MeshPrimitiveView
+      remains transitive; no timing,GPUexecution or fullsanitizersuite claim.
+    - 'RUNTIME262 is prepared only: used recipe/availability visibility stays the same and unused extraction
+      names leave. Do not call that a superset/widening, require object-byte equality or infer GPUoperational
+      state from build. EngineConfigControl already supplies activation types.'
+    - No new research claim/observation needed for ordinary cleanup. Preserve pending observations and BUILD007/C92;
+      N569 staysopen until deadline or justifiedstop.
