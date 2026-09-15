@@ -1,0 +1,1 @@
+Exact eight-line deletion; 3476 -> 3468 lines; compiler modules 176 -> 172 removed ['Extrinsic.Graphics.UvView', 'Extrinsic.RHI.PipelineManager', 'Extrinsic.Runtime.EditorUiHost', 'Extrinsic.Runtime.EditorWindowRegistry']

@@ -1,0 +1,69 @@
+Audit complete. Findings below; I made no edits.
+
+## Method (what "proven" means here)
+
+Three facts constrain the proof, and all greps covered both the body and the recursively included private headers (`Runtime.EditorFeatures.Internal.hpp` → `EditorGeometryHelpers.hpp`, `EditorFeatureCommands.Internal.hpp`, `EditorFeatureProperties.Internal.hpp`):
+
+1. **Name visibility requires a direct (or re-exported) import.** Any name the TU *spells* must come from a visible import chain.
+2. **Type completeness only requires reachability**, which is transitive through interface dependencies (exported or not). So a type that arrives via `auto`/member access stays complete as long as *some* retained import transitively imports its owner.
+3. This is an implementation unit of `Extrinsic.Runtime.EditorWorkspaceSnapshots`; the interface (`.cppm:15-22`) imports only 8 modules non-exported, so none of the impl-unit imports are redundant through the interface. No import on lines 30/45/103/105-108 can be dropped on that basis.
+
+So the removal test is: *no exported name of module M is spelled anywhere in the TU or its recursive headers.* I enumerated the export surface of each candidate and grepped for those names, plus every `Graphics::`-qualified and `Geometry::`-qualified use in the TU.
+
+Unqualified lookup cannot reach `Extrinsic::Graphics`, `Extrinsic::Core::Dag`, `Extrinsic::Platform` or `Geometry::*` from inside `Extrinsic::Runtime::EditorFeatureDetail` (sibling namespaces), and the only namespace aliases in the TU are `Runtime.EditorWorkspaceSnapshots.Models.cpp:116-121` (`ECSC`, `Dirty`, `GS`, `Sel`, `G = Graphics::Components`, `A = Extrinsic::Assets`) — none aliases a candidate namespace.
+
+## Tier 1 — proposed removals (8 lines, pure deletions, no replacements)
+
+| Line | Import | Export surface | Proof |
+|---|---|---|---|
+| 37 | `Extrinsic.Core.Dag.Scheduler` | `export namespace Extrinsic::Core::Dag` (+ partitions `:Types :Hazards :Policy :Compiler :DomainGraph`, all into `Core::Dag`) | zero `Dag::` / `Core::Dag` tokens in TU or headers; namespace unreachable by unqualified lookup |
+| 56 | `Extrinsic.Graphics.GpuWorld` | `export namespace Extrinsic::Graphics` | every `Graphics::X` in TU+headers enumerated (below); none from GpuWorld |
+| 62 | `Extrinsic.Graphics.UvView` | `UvViewBackgroundMode/ActiveMode/Status/Bounds/Request/Output/PushConstants`, `class UvView` (`Graphics.UvView.cppm:22-122`) | no `Uv*` token in TU; the only `UvView` string in headers is `EditorParameterizationUvViewCommandSurface` (`EditorFeatures.Internal.hpp:17,111`), a Runtime-owned forward-declared type, never defined or called in this TU |
+| 65 | `Extrinsic.Platform.Window` | `IWindow`, `CreateWindow`, `Window*Event`, `KeyEvent`, `MouseButtonEvent`, `ScrollEvent`, `CursorEvent`, `CharEvent`, `Event`, `CursorMode`, `Extent2D/Offset2D/Rect2D` aliases (`Platform.IWindow.cppm:18-121`) | no `Platform::` or `IWindow` token. **Trap cleared:** `Extent2D` here is only a re-alias of `Core::Extent2D`; the bindings' `Extent2D` is satisfied by the retained `Extrinsic.Core.Geometry2D` (line 39). All `Window` hits in the TU are `EditorDomainWindowKind` / `BuildDomainWindowModel` (Runtime names) |
+| 71 | `Extrinsic.Runtime.CommandBus` | `CommandBus`, `CommandTypeKey`, `CommandCorrelationId`, `CommandStatus`, `CommandOutcome`, `CommandContext`, `CommandDrainServices`, `CommandEnvelope`, `CommandBusStats`, `QuitRequested` (`Runtime.CommandBus.cppm:58-182`) | none spelled. **Trap cleared:** `EditorCommandStatus` (`:2634,2693`, `EditorGeometryHelpers.hpp:39`) is a distinct Runtime editor type, and `.CommandStatus` (`:2887-2888`) is a member designator on a `RenderDiagnostics` struct, not a lookup of `Runtime::CommandStatus` |
+| 73 | `Extrinsic.Runtime.EditorUiHost` | `EditorUiDiagnostics`, `EditorUiFrameContributionHandle`, `EditorUiHostOwnerControl`, `EditorUiHost` + `export import Extrinsic.Runtime.EditorWindowRegistry` | zero `EditorUi` tokens outside the import line. Note this also drops the re-exported `EditorWindowRegistry` surface — also unspelled |
+| 88 | `Extrinsic.Runtime.SceneSerialization` | `SceneSerializationStats/Result`, `SceneDeserializationResult`, `SerializeSceneDocument`, `SaveSceneDocument`, `DeserializeSceneDocument`, `LoadSceneDocument` | none spelled; the only `SceneDocument` hit is `import Extrinsic.Runtime.SceneDocumentModule` (line 86), **retained** |
+| 97 | `Geometry.UvAtlas` | `export namespace Geometry::UvAtlas` | no `UvAtlas` token; all `Geometry::` uses in TU+headers are `PropertySet` / `PropertyValueKind`, owned by the retained `Geometry.Properties` (line 96) |
+
+Complete enumeration of `Graphics::`-qualified names in the TU and its headers, with retained owners — this is the load-bearing proof for GpuWorld/UvView and tier 2:
+
+- `Graphics::Components::*` → `Graphics.Component.VisualizationConfig` / `.RenderGeometry` (lines 51-52, retained)
+- `Graphics::RenderCommandPassStatus` → `Graphics.RenderCommandRouter.cppm:16` (line 57, retained)
+- `Graphics::RenderGraphCommandPassStats`, `RenderGraphGpuProfileStatus/QueueStats/PassStats/Stats`, `RenderGraphFrameStats` → `Graphics.RenderDiagnostics.cppm:66,111,125,133,145,203` (line 58, retained)
+- `Graphics::RenderRecipeConfigContext`, `RenderRecipeConfigLoadResult` → `Graphics.RenderRecipeConfig.cppm:67,92` (line 60, retained)
+
+Nothing else. No `Graphics::` name in this TU lacks a retained owner, so no facade→owner replacement import is needed; all eight are pure deletions.
+
+## Tier 1b — `Geometry.Graph` (line 95), conditional
+
+[ROOT: SUPERSEDED and excluded from RUNTIME-259. Keep Graph and GeometrySourcesPopulate unchanged.]
+
+Name-safe: `Geometry::Graph::*` is never spelled (`Graph` appears only as `EditorDomainWindowKind::Graph` and `GS::Domain`). But `ECS.Component.GeometrySources.cppm:12` imports **only** `Geometry.Properties` — the graph type's reachability comes from `ECS.Component.GeometrySourcesPopulate.cppm:47`. So removing line 95 is safe *only while line 46 (`GeometrySourcesPopulate`) is retained*. Since `GeometrySourcesPopulate` is itself on the unproven-candidate list, these two are coupled and must never be removed in the same change. I'd take line 95 and explicitly mark 46 as blocked.
+
+## Tier 2 — plausible but NOT proven, do not ship in this pass
+
+`Graphics.CameraSnapshots`, `Graphics.CurrentRendererContractAdapter`, `Graphics.GpuAssetCache`, `Graphics.RenderFrameInput`, `Graphics.RenderingContract` (lines 53-55, 59, 61): no exported name of theirs is spelled either. The residual gap is ADL — a Graphics-typed object obtained through the bindings as `auto` could pull in a free function from one of these modules without any `Graphics::` token appearing. Name-lookup-by-grep cannot exclude that; only the compiler can. Leave them for a follow-up pass once tier 1 lands clean, since they share the identical proof shape and would then be a cheap increment.
+
+All other listed candidates (`Asset.GeometryPayload`, `Asset.ModelTexturePayload`, `Asset.Registry`, `ECS.Components.GeometrySourcesPopulate`, `Runtime.AssetWorkflowModule`, `Runtime.ClusteringModule`, `Runtime.MeshPrimitiveView`, `Runtime.ProgressivePoissonGpuBackend`, `Runtime.RenderExtraction`, `Runtime.ParameterizationConfig`, `Runtime.ProgressivePoissonConfig`, `Runtime.SceneDocumentModule`, `Runtime.SceneInteractionModule`, `Runtime.PointCloudConsolidationModule`): these export into `Extrinsic::Runtime` / `Extrinsic::Assets`, the same namespaces the TU lives in and aliases (`A = Extrinsic::Assets`), so unqualified lookup *can* reach them and grep-by-qualified-name proves nothing. Disproving each needs a per-symbol enumeration of the whole export surface against ~3,500 lines of unqualified identifiers. I did not do that and will not claim it. `Graphics.UvView`'s `EditorParameterizationUvViewCommandSurface` near-miss is exactly the kind of collision that makes namespace-name reasoning unsafe here.
+
+## Expected effect (hypothesis until the compiler confirms)
+
+Drops 8-9 direct BMI edges from the heaviest Editor TU. `Core.Dag.Scheduler` is the single largest win — it re-exports five partitions, so it is really six interface units. `EditorUiHost` re-exports `EditorWindowRegistry` (two units). `Platform.Window`, `GpuWorld`, `UvView`, `UvAtlas`, `Geometry.Graph` sit near the bottom of the graph and pull RHI/geometry closures behind them. Realistically this is a rebuild-fan-in reduction (edits to Dag/Platform/UvView stop invalidating this TU) more than a big single-TU wall-clock win; I would not promise a number.
+
+## Bounded verification, using trees that already exist
+
+[ROOT: SUPERSEDED. Use the exact commands in RUNTIME-259 with existing supported preset Clang23 trees. The ci-clang20 tree, module-named target and cross-compiler recommendations below are not authorized verification. Do not rely on the unverified Test.RuntimeEnginePrivateGlue dependency-surface assertion.]
+
+1. In `build/ci-clang20` (per the existing clang-20 repro tree, reusing installed vcpkg ports), rebuild only the `Extrinsic.Runtime.EditorWorkspaceSnapshots` module target. clang-20 is the strictest of the toolchains on module reachability, so it is the right first gate.
+2. Then the sibling TU `Runtime.EditorWorkspaceSnapshots.Public.cpp` and the direct consumer link, to catch anything the shared private headers needed.
+3. `tests/contract/runtime/Test.RuntimeEnginePrivateGlue.cpp` references several of these module names — run that contract test, since it is the one place that could assert on the module's dependency surface.
+4. Do **not** claim parity from clang alone: if CI also builds MSVC or GCC, one of those must pass too, because reachability-vs-visibility divergence between implementations is precisely the failure mode for this class of change.
+5. `Test.BackendConfigureDeterminism.py` is unaffected (dependency-generation scope, BUILD-008), but it is already dirty in the tree — do not fold this change into that branch.
+
+Rollback is per-line and trivial; if the strict build fails, the error names the exact module to restore.
+
+## Is the scope worthwhile
+
+Yes, but modestly — take tier 1 as one small, individually revertible commit of 8 line deletions (9 with `Geometry.Graph`, with `GeometrySourcesPopulate` explicitly pinned), and do not force the remaining candidates. Every one of the `Extrinsic::Runtime`-namespace imports on the original list is genuinely unproven by the evidence available to grep, and deleting them on namespace reasoning is exactly the failure the brief warns against. There is a defensible small subset; it is these 8-9 and no more in this pass.
+
+Root plan correction: use existing supported preset Clang23 build trees and actual compile_commands producer; do not use unverified ci-clang20 or nonexistent module target. Keep Geometry.Graph/GeometrySourcesPopulate and tier2 candidates unchanged. Explicitly checked CommandTypeNameOf, reexported EditorWindowRegistry names and exported free functions; no references. Both unqualified ToString call arguments are GeometryPresentation enums with directly imported canonical overloads. Owner-audit.json binds source/header hashes and checked names. Remaining compiler-map and behavior gates are required before closure.

@@ -1,0 +1,43 @@
+{
+  "files_sha256": {
+    "src/runtime/Editor/Runtime.EditorWorkspaceSnapshots.Models.cpp": "7460553b7883008557408c87368af7234d225f0bd1f1994e3848bb663650546c",
+    "src/runtime/Editor/internal/Runtime.EditorFeatures.Internal.hpp": "d50ff6000032cc34a795775c09e6e574989812a472f81cfed13c2ece05bf38e5",
+    "src/runtime/Editor/internal/Runtime.EditorGeometryHelpers.hpp": "28ea111a6c4804dfd716c63f2e39c57e3e59987b71c466510c73bbe1a9449947",
+    "src/runtime/Editor/internal/Runtime.EditorFeatureCommands.Internal.hpp": "e9212d20569b30349c127e98b81662276f323626c7ac9dfdf6400d8161b18c99",
+    "src/runtime/Editor/internal/Runtime.EditorFeatureProperties.Internal.hpp": "eb7a0803e598c47ad8894c54b8767cdfdebef2779707986772f614e2125dd788"
+  },
+  "additional_exported_function_and_reexport_names_absent": [
+    "CommandTypeNameOf",
+    "EditorWindowRegistry",
+    "EditorWindowHandle",
+    "EditorWindowDescriptor",
+    "EditorWindowMenuEntry",
+    "ApplyEditorUiVisibilityCommand",
+    "FingerprintSurfaceIndices",
+    "BorrowInput",
+    "ValidateUvAtlasInput",
+    "ValidateAuthoredUvs",
+    "CopySourceVertexPropertiesByXref",
+    "DefaultXAtlasBackend",
+    "DefaultFastStagedBackend",
+    "ResolveUvAtlas",
+    "CreateDagScheduler",
+    "CreateTaskPlanGraph",
+    "CreateWindow",
+    "SerializeSceneDocument",
+    "SaveSceneDocument",
+    "DeserializeSceneDocument",
+    "LoadSceneDocument"
+  ],
+  "unqualified_ToString_calls": "Only slot.Semantic and slot.SourceKind in AppendBoundSlotRows. GeometryPresentationSlotSemantic/SourceKind and matching ToString overloads belong to directly retained Runtime.GeometryPresentation; not Geometry.UvAtlas.",
+  "private_header_directives": "Only using namespace Extrinsic::Runtime; no graphics/platform/core-DAG/UV namespace directive.",
+  "retained_owners": "Graphics RenderDiagnostics,RenderCommandRouter,RenderRecipeConfig and component modules; Core.Geometry2D for Extent2D; GeometryPresentation for ToString; Geometry.Properties for property records. No forward declarations or owner substitutions required.",
+  "limits": "Source evidence plus exact-producer compilation required; direct import removal may leave transitive reachability. Original Claude stale tree/compiler recommendations rejected; only eight imports authorized.",
+  "hash_provenance": "files_sha256 records the pre-change ce6522ea6 source; the four private headers are unchanged after the edit.",
+  "additional_serialization_types_absent": [
+    "SceneSerializationStats",
+    "SceneSerializationResult",
+    "SceneDeserializationResult"
+  ],
+  "post_change_source_sha256": "6621f1532d4d38e9c19da2dd20278a217ea1cda9432f8b911d053c9a6d582518"
+}

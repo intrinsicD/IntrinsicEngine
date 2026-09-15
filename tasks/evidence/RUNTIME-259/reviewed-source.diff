@@ -1,0 +1,53 @@
+diff --git a/src/runtime/Editor/Runtime.EditorWorkspaceSnapshots.Models.cpp b/src/runtime/Editor/Runtime.EditorWorkspaceSnapshots.Models.cpp
+index 993fa2f9b..d7e385735 100644
+--- a/src/runtime/Editor/Runtime.EditorWorkspaceSnapshots.Models.cpp
++++ b/src/runtime/Editor/Runtime.EditorWorkspaceSnapshots.Models.cpp
+@@ -34,7 +34,6 @@ import Extrinsic.Asset.ModelTexturePayload;
+ import Extrinsic.Asset.Registry;
+ import Extrinsic.Core.Config.Engine;
+ import Extrinsic.Core.Config.EngineLoad;
+-import Extrinsic.Core.Dag.Scheduler;
+ import Extrinsic.Core.Error;
+ import Extrinsic.Core.Geometry2D;
+ import Extrinsic.ECS.Component.MetaData;
+@@ -53,24 +52,19 @@ import Extrinsic.Graphics.Component.RenderGeometry;
+ import Extrinsic.Graphics.CameraSnapshots;
+ import Extrinsic.Graphics.CurrentRendererContractAdapter;
+ import Extrinsic.Graphics.GpuAssetCache;
+-import Extrinsic.Graphics.GpuWorld;
+ import Extrinsic.Graphics.RenderCommandRouter;
+ import Extrinsic.Graphics.RenderDiagnostics;
+ import Extrinsic.Graphics.RenderFrameInput;
+ import Extrinsic.Graphics.RenderRecipeConfig;
+ import Extrinsic.Graphics.RenderingContract;
+-import Extrinsic.Graphics.UvView;
+ import Extrinsic.RHI.Profiler;
+ import Extrinsic.RHI.QueueAffinity;
+-import Extrinsic.Platform.Window;
+ import Extrinsic.Runtime.AssetWorkflowModule;
+ import Extrinsic.Runtime.AssetWorkflowRecipePolicies;
+ import Extrinsic.Runtime.AssetIngestStateMachine;
+ import Extrinsic.Runtime.CameraControllers;
+ import Extrinsic.Runtime.ClusteringModule;
+-import Extrinsic.Runtime.CommandBus;
+ import Extrinsic.Runtime.EditorCommandHistory;
+-import Extrinsic.Runtime.EditorUiHost;
+ import Extrinsic.Runtime.EngineConfigControl;
+ import Extrinsic.Runtime.GeometryAvailability;
+ import Extrinsic.Runtime.JobService;
+@@ -85,7 +79,6 @@ import Extrinsic.Runtime.ParameterizationConfig;
+ import Extrinsic.Runtime.ProgressivePoissonConfig;
+ import Extrinsic.Runtime.SceneDocumentModule;
+ import Extrinsic.Runtime.SceneInteractionModule;
+-import Extrinsic.Runtime.SceneSerialization;
+ import Extrinsic.Runtime.SelectionController;
+ import Extrinsic.Runtime.ServiceRegistry;
+ import Extrinsic.Runtime.VertexAttributeBinding;
+@@ -94,7 +87,6 @@ import Extrinsic.Runtime.WorldRegistry;
+ import Extrinsic.Runtime.WorldHandle;
+ import Geometry.Graph;
+ import Geometry.Properties;
+-import Geometry.UvAtlas;
+ import Extrinsic.Asset.Service;
+ import Extrinsic.RHI.Device;
+ import Extrinsic.Runtime.SpatialIndexCache;

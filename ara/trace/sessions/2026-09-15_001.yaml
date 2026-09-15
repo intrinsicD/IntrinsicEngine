@@ -219,7 +219,7 @@ ai_actions:
   - tests/regression/tooling/Test.BackendConfigureDeterminism.py
   - docs/build-troubleshooting.md
   - tasks/done/BUILD-008-preserve-unchanged-tinygltf-generation.md
-  - tasks/backlog/runtime/RUNTIME-259-workspace-model-unused-imports.md
+  - tasks/done/RUNTIME-259-workspace-model-unused-imports.md
 claims_touched: []
 key_context:
 - turn: 1

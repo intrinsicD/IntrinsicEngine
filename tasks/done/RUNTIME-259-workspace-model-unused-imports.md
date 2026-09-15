@@ -5,6 +5,10 @@ depends_on: []
 workflow_schema: 1
 workflow_profile: standard
 evidence: required
+owner: "codex-overnight"
+branch: "main"
+worktree: "/home/alex/Documents/IntrinsicEngine"
+claimed_at: "2026-09-15T04:03:10Z"
 contract_schema: 1
 contracts: [runtime.render-diagnostics-locality]
 ---
@@ -66,23 +70,23 @@ remain accurate if only these private imports change; record structural facts
 and review in this task/evidence rather than adding a README history paragraph.
 
 ## Required changes
-- [ ] Verify the eight candidate export surfaces and recursive-header/body uses, preserving baseline source and compiler dependency evidence.
-- [ ] Delete only the eight proven import lines; retain any candidate the compiler/owner audit shows is needed.
-- [ ] Prove that all other bytes and production files are unchanged; record actual module closure before/after without inferring elapsed-time improvement.
+- [x] Verify the eight candidate export surfaces and recursive-header/body uses, preserving baseline source and compiler dependency evidence.
+- [x] Delete only the eight proven import lines; retain any candidate the compiler/owner audit shows is needed.
+- [x] Prove that all other bytes and production files are unchanged; record actual module closure before/after without inferring elapsed-time improvement.
 
 ## Tests
-- [ ] Rebuild the actual Models.cpp producer through the supported ci preset and run focused editor/model/locality coverage.
-- [ ] Build IntrinsicTests and run the full supported CPU gate.
-- [ ] Run existing focused editor cases under ci-asan and ci-ubsan and compile the promoted-Vulkan runtime target.
+- [x] Rebuild the actual Models.cpp producer through the supported ci preset and run focused editor/model/locality coverage.
+- [x] Build IntrinsicTests and run the full supported CPU gate.
+- [x] Run existing focused editor cases under ci-asan and ci-ubsan and compile the promoted-Vulkan runtime target.
 
 ## Docs
-- [ ] Bind fixed-source Claude review, structural facts, gate receipts and any narrowed scope.
-- [ ] Retire and seal the completed slice, update session brief and retirement index; existing architecture remains accurate.
+- [x] Bind fixed-source Claude review, structural facts, gate receipts and any narrowed scope.
+- [x] Retire and seal the completed slice, update session brief and retirement index; existing architecture remains accurate.
 
 ## Acceptance criteria
-- [ ] Production diff contains only proven unused import-line deletions in Models.cpp; all bodies, headers and other production files are identical.
-- [ ] Actual compiler dependencies are recorded, canonical diagnostic owners retained, and relevant native/sanitizer/build gates pass.
-- [ ] Claude reviewed the fixed diff; task is locally committed, retired and sealed with no timing, GPU execution or whole-engine completion claim.
+- [x] Production diff contains only proven unused import-line deletions in Models.cpp; all bodies, headers and other production files are identical.
+- [x] Actual compiler dependencies are recorded, canonical diagnostic owners retained, and relevant native/sanitizer/build gates pass.
+- [x] Claude reviewed the fixed diff; task is locally committed, retired and sealed with no timing, GPU execution or whole-engine completion claim.
 
 ## Verification
 ```bash
@@ -109,3 +113,33 @@ new compiled trees. No test that merely asserts deleted source text is needed.
 - Claiming a removed direct import necessarily leaves the full module closure.
 - Changing layer policy, public APIs, test selectors, feature behavior or cache/backend identities.
 - Pushing or starting implementation after the deadline reserve begins.
+
+## Completion — 2026-09-15
+- Endpoint: **Retired**, eight unused private implementation imports.
+- Commit: implementation and retirement are in the enclosing local commit;
+  `tasks/evidence/RUNTIME-259/seal.yaml` binds the exact source revision.
+- Exactly the eight planned import lines are removed. Models.cpp decreases
+  from 3,476 to 3,468 lines and from 79 to 71 direct imports. Every remaining
+  byte and all 876 other tracked production files are unchanged; no body,
+  header, public API, build list, new helper or source comment change.
+- The rebuilt compiler map decreases from 176 to 172 modules. UvView and
+  EditorUiHost leave alongside their PipelineManager and EditorWindowRegistry
+  dependencies. The other six removed direct imports remain transitively
+  reachable. This is a structural dependency fact, not a timing claim.
+- Canonical diagnostic, recipe-config, geometry-presentation and component
+  owners remain directly imported. The recursive headers retain Core.Geometry2D
+  for Extent2D. Root checked the omitted CommandTypeNameOf/re-exported window
+  names and exported free functions; both bare ToString call arguments are
+  GeometryPresentation enums with retained canonical overloads. Graph and
+  GeometrySourcesPopulate remain unchanged. No workaround declaration.
+- Claude made eight surgical edits and independently reviewed the fixed diff.
+  All gates passed: exact source/compiler proof, 235 focused native tests,
+  4,636 full CPU cases plus one expected GLFW/LSan control skip, 202 focused
+  ASan and 202 focused UBSan cases, promoted-Vulkan runtime compilation and
+  strict structural checks. Vulkan compilation is not GPU execution, and
+  focused sanitizer coverage is not a full sanitizer-suite result.
+- Existing architecture remains accurate. Clean-workshop rows 1–3 and 8 pass
+  (unchanged layers, owners, public boundaries and no exception); rows 4–7
+  do not apply (no frame/pass/protocol/maturity change). Source hashes, owner
+  audit and fixed-source review are bound in task evidence. BUILD-007/C92,
+  broader engine cleanup and Framework24 convergence remain open.
